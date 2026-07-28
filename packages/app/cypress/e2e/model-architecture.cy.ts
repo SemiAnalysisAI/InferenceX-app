@@ -518,6 +518,9 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="model-architecture-svg"]')
         .contains('Top-16 of 896 routed + 2 shared')
         .should('exist');
+      // Same count drives the Experts figure in the specs bar: 16 routed + 2
+      // shared active out of 898, not the assumed "+1".
+      cy.get('[data-testid="model-architecture-svg"]').contains('16+2/898').should('exist');
     });
 
     it('shows Kimi K3 features and developer info', () => {

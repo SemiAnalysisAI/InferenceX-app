@@ -21,6 +21,7 @@ import {
   getFFNSubBlocks,
   getHybridAttentionSubBlocks,
   getModelArchitecture,
+  sharedExpertCount,
 } from '@/lib/model-architectures';
 
 interface ModelArchitectureDiagramProps {
@@ -114,6 +115,9 @@ function renderDiagram(
 
   // Architecture flags
   const isMoE = arch.architectureType === 'moe';
+  // Shared experts are counted inside `numExperts`; read the model's own count
+  // rather than assuming the DeepSeek-style single shared expert.
+  const sharedExperts = sharedExpertCount(arch);
   const hasDenseLayers = isMoE && (arch.denseFFNLayers ?? 0) > 0;
   const denseLayerCount = arch.denseFFNLayers ?? 0;
   const moeLayerCount = (arch.numLayers ?? 0) - denseLayerCount;
@@ -1820,8 +1824,9 @@ function renderDiagram(
       drawArrow(hashNorm2Y + smallH, hashNorm2Y + smallH + arrowH);
 
       // Hash Router + Expert grid (token-id → fixed experts, not a learned gate)
-      const hashRoutedCount = arch.hasSharedExpert ? (arch.numExperts || 0) - 1 : arch.numExperts;
-      const hashRouterSub = `token-id → ${arch.activeExperts} of ${hashRoutedCount}${arch.hasSharedExpert ? ' + 1 shared' : ''}`;
+      const hashShared = sharedExpertCount(arch);
+      const hashRoutedCount = (arch.numExperts ?? 0) - hashShared;
+      const hashRouterSub = `token-id → ${arch.activeExperts} of ${hashRoutedCount}${hashShared > 0 ? ` + ${hashShared} shared` : ''}`;
       drawExpertGrid(
         hashExpertY,
         hashExpertsExpanded,
@@ -2192,9 +2197,10 @@ function renderDiagram(
       ? [
           {
             label: 'Experts',
-            // Active per token = routed top-k + the always-on shared expert, so
-            // show "6+1/385" (not "6/385"): the shared expert is active too.
-            value: `${arch.activeExperts}${arch.hasSharedExpert ? '+1' : ''}/${arch.numExperts}`,
+            // Active per token = routed top-k + the always-on shared experts, so
+            // show "6+1/385" (not "6/385"): the shared experts are active too.
+            // Count them from the model (Kimi K3 has 2), never assume one.
+            value: `${arch.activeExperts}${sharedExperts > 0 ? `+${sharedExperts}` : ''}/${arch.numExperts}`,
           },
         ]
       : []),
