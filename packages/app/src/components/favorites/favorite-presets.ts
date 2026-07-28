@@ -142,7 +142,28 @@ export function findConfigChangeDates(
 }
 
 export const FAVORITE_PRESETS: FavoritePreset[] = [
-  // 0 — MiniMax M3 launch (all configs) — current day-0 featured model
+  // 0 — Kimi K3 launch (all configs) — current day-0 featured model
+  {
+    id: 'kimi-k3-launch',
+    title: 'Kimi K3 — First Look',
+    titleZh: 'Kimi K3 — 首发基准测试',
+    description:
+      'First benchmarks of Kimi K3 across every available GPU. New configurations appear here as they come online.',
+    descriptionZh: '涵盖所有可用 GPU 的 Kimi K3 首批基准测试结果。新配置上线后将在此同步更新。',
+    tags: ['Kimi', 'K3', 'New'],
+    category: 'comparison',
+    wide: true,
+    config: {
+      model: Model.Kimi_K3,
+      sequence: Sequence.EightK_OneK,
+      precisions: ['fp4', 'fp8'],
+      yAxisMetric: 'y_tpPerGpu',
+      hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300', 'mi300x', 'mi325x', 'mi355x'],
+    },
+  },
+  // Hidden — previous MiniMax M3 launch preset (all configs), retired when Kimi K3 became
+  // the day-0 model. Retained so prior ?preset=minimax-m3-launch links (banner, modal,
+  // external shares) keep working.
   {
     id: 'minimax-m3-launch',
     title: 'MiniMax M3 — First Look',
@@ -153,6 +174,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     tags: ['MiniMax', 'M3', 'New'],
     category: 'comparison',
     wide: true,
+    hidden: true,
     config: {
       model: Model.MiniMax_M3,
       sequence: Sequence.EightK_OneK,

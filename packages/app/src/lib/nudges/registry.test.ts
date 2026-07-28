@@ -68,8 +68,8 @@ describe('NUDGE_REGISTRY integrity', () => {
       'filter-hint',
       'github-star-modal',
       'gradient-label',
-      'minimax-m3-launch-banner',
-      'minimax-m3-launch-modal',
+      'kimi-k3-launch-banner',
+      'kimi-k3-launch-modal',
       'reproducibility',
       'star-nudge',
     ]);

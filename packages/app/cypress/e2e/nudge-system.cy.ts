@@ -14,8 +14,8 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
-    'inferencex-minimax-m3-modal-dismissed',
-    'inferencex-minimax-m3-banner-dismissed',
+    'inferencex-kimi-k3-modal-dismissed',
+    'inferencex-kimi-k3-banner-dismissed',
     'inferencex-reproducibility-nudge-shown',
     'inferencex-star-nudge-shown',
     'inferencex-export-nudge-shown',
@@ -80,7 +80,7 @@ describe('Landing nudges — modals', () => {
     // path without needing to stub window.location.
     cy.get('[data-testid="launch-modal-action"]').click();
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-minimax-m3-modal-dismissed')).to.eq('1');
+      expect(win.localStorage.getItem('inferencex-kimi-k3-modal-dismissed')).to.eq('1');
     });
   });
 
@@ -88,7 +88,7 @@ describe('Landing nudges — modals', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
-        win.localStorage.setItem('inferencex-minimax-m3-modal-dismissed', '1');
+        win.localStorage.setItem('inferencex-kimi-k3-modal-dismissed', '1');
       },
     });
     cy.get('[data-testid="launch-modal"]').should('not.exist');
@@ -99,7 +99,7 @@ describe('Landing nudges — modals', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
-        win.localStorage.setItem('inferencex-minimax-m3-modal-dismissed', '1');
+        win.localStorage.setItem('inferencex-kimi-k3-modal-dismissed', '1');
       },
     });
     cy.get('[data-testid="github-star-modal"]').should('be.visible');
@@ -117,7 +117,7 @@ describe('Landing nudges — modals', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
-        win.localStorage.setItem('inferencex-minimax-m3-modal-dismissed', '1');
+        win.localStorage.setItem('inferencex-kimi-k3-modal-dismissed', '1');
       },
     });
     cy.get('[data-testid="github-star-modal"]').should('be.visible');
@@ -178,7 +178,7 @@ describe('Landing nudges — banner', () => {
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
       // Only the X button should persist a dismissal — show alone must not.
-      expect(win.localStorage.getItem('inferencex-minimax-m3-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-kimi-k3-banner-dismissed')).to.eq(null);
     });
   });
 
@@ -193,7 +193,7 @@ describe('Landing nudges — banner', () => {
     // Body click must not write the dismissal key — the banner should still
     // render on a fresh visit to landing.
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-minimax-m3-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-kimi-k3-banner-dismissed')).to.eq(null);
     });
 
     cy.visit('/');
@@ -354,8 +354,8 @@ describe('Nudge scope isolation', () => {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
         // Dismiss all landing nudges so nothing blocks visibility checks
-        win.localStorage.setItem('inferencex-minimax-m3-modal-dismissed', '1');
-        win.localStorage.setItem('inferencex-minimax-m3-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-kimi-k3-modal-dismissed', '1');
+        win.localStorage.setItem('inferencex-kimi-k3-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },
     });

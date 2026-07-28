@@ -50,8 +50,8 @@ describe('First-load navigation', () => {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-starred');
         win.localStorage.removeItem('inferencex-star-modal-dismissed');
-        win.localStorage.removeItem('inferencex-minimax-m3-modal-dismissed');
-        win.localStorage.removeItem('inferencex-minimax-m3-banner-dismissed');
+        win.localStorage.removeItem('inferencex-kimi-k3-modal-dismissed');
+        win.localStorage.removeItem('inferencex-kimi-k3-banner-dismissed');
       },
     });
 
