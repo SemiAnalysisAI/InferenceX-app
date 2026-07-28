@@ -13,6 +13,8 @@ const interceptDerivedMetrics = () => {
             p90_prefill_tps_per_user: 100 + index,
             p75_normalized_e2e_400_s: 8 + index,
             p90_normalized_e2e_400_s: 12 + index,
+            p75_osl_per_e2el: 40 + index,
+            p90_osl_per_e2el: 25 + index,
           },
         ]),
       ),
@@ -144,6 +146,10 @@ const interceptFixedSequenceData = () => {
 describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
     interceptAgenticData();
+    // Stub derived metrics before the visit: if the agentic DEFAULT x-axis mode
+    // is (or becomes) a derived mode that fetches /derived-agentic-metrics on
+    // mount, the chart must not sit on its loading skeleton.
+    interceptDerivedMetrics();
     cy.visit('/inference?i_seq=agentic-traces', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -163,6 +169,16 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       .should('be.visible')
       .and('have.attr', 'aria-selected', 'true');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
+  });
+
+  it('shows the selected percentile in the Interactivity axis label', () => {
+    // Explicitly select the mode — do not rely on the agentic default mode.
+    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
+      'have.attr',
+      'aria-selected',
+      'true',
+    );
     // Agentic plots percentile fields (p90_intvty), so the axis label carries it.
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
@@ -354,6 +370,9 @@ const interceptAgenticDataWithOverlay = () => {
 describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', () => {
   before(() => {
     interceptAgenticDataWithOverlay();
+    // Same as the main suite: keep the visit independent of the agentic default
+    // x-axis mode (a derived default fetches /derived-agentic-metrics on mount).
+    interceptDerivedMetrics();
     cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -366,6 +385,13 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
   });
 
   it('shows overlay (unofficial-run) watermark SVG when an overlay is loaded', () => {
+    // Explicitly select Interactivity — do not rely on the agentic default mode.
+    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
+      'have.attr',
+      'aria-selected',
+      'true',
+    );
     // The unofficial-run pattern watermark appears when isUnofficialRun is true.
     cy.get('[data-testid="inference-chart-display"] svg pattern[id^="unofficial-pattern-"]').should(
       'exist',
