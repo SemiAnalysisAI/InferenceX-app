@@ -558,10 +558,18 @@ describe('TCO Calculator', () => {
 
   describe('DeepSeek V4 agentic calculations', () => {
     beforeEach(() => {
-      cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as(
-        'agenticAvailability',
-      );
-      cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticB300Rows(null) }).as(
+      const b300Rows = agenticB300Rows(null);
+      const b200Rows = agenticB300Rows(null).map((row) => ({
+        ...row,
+        hardware: 'b200',
+      }));
+      cy.intercept('GET', '/api/v1/availability', {
+        body: [
+          ...agenticAvailability,
+          ...agenticAvailability.map((row) => ({ ...row, hardware: 'b200' })),
+        ],
+      }).as('agenticAvailability');
+      cy.intercept('GET', '/api/v1/benchmarks*', { body: [...b300Rows, ...b200Rows] }).as(
         'agenticBenchmarks',
       );
       cy.visit('/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
@@ -576,7 +584,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic Traces');
       cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
       cy.get('[data-testid="calculator-no-data"]').should('not.exist');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 1);
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
         .should('contain.text', 'P90 Interactivity');
@@ -591,7 +599,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calc-percentile-selector"]').click();
       cy.get('[role="option"]').contains('p75').click();
 
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 1);
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
         .should('contain.text', 'P75 Interactivity');
@@ -601,6 +609,21 @@ describe('TCO Calculator', () => {
       );
       cy.get('[data-testid="share-button"]').click();
       cy.get('[data-testid="share-url-input"]').invoke('val').should('include', 'i_pctl=p75');
+    });
+
+    it('preserves a soloed GPU when the agentic percentile changes', () => {
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
+
+      cy.get('.sidebar-legend label').first().click();
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 1);
+
+      cy.get('[data-testid="calc-percentile-selector"]').click();
+      cy.get('[role="option"]').contains('p75').click();
+
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 1);
+      cy.get('[data-testid="calculator-chart-section"] h2')
+        .first()
+        .should('contain.text', 'P75 Interactivity');
     });
   });
 

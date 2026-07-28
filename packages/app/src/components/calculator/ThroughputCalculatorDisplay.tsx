@@ -389,13 +389,13 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   // selection itself PLUS the official hardware list — the selection so an
   // overlay-only model/sequence (where the official list is empty and stays
   // empty) still reseeds, the official list so anything else that changes which
-  // GPUs have data still reseeds. Deliberately NOT keyed on the merged list: an
-  // unofficial run is fetched separately and usually lands after the
-  // benchmarks, so a late arrival — or a run dismissal — would otherwise wipe
-  // GPU filters the user had already set.
-  const selectionKey = `${selectedModel}|${selectedSequence}|${selectedPercentile}|${[
-    ...selectedPrecisions,
-  ]
+  // GPUs have data still reseeds. Percentile is deliberately excluded: it
+  // recalculates agentic values, but should preserve the user's GPU filters
+  // whenever the available hardware set is unchanged. Also deliberately NOT
+  // keyed on the merged list: an unofficial run is fetched separately and
+  // usually lands after the benchmarks, so a late arrival — or a run dismissal
+  // — would otherwise wipe GPU filters the user had already set.
+  const selectionKey = `${selectedModel}|${selectedSequence}|${[...selectedPrecisions]
     .toSorted()
     .join(',')}|${selectedRunDate}|${[...availableHwKeys].toSorted().join(',')}`;
   useEffect(() => {
