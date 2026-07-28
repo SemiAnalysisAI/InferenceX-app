@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 
+import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
 import type { BenchmarkRow } from '@/lib/api';
 
 import {
@@ -113,6 +114,23 @@ describe('rowToAggDataEntry', () => {
   it('maps decode_tp to tp', () => {
     const entry = rowToAggDataEntry(makeRow({ decode_tp: 4 }));
     expect(entry.tp).toBe(4);
+  });
+
+  it('surfaces pipeline parallelism from the metrics JSONB', () => {
+    const base = makeRow();
+    const entry = rowToAggDataEntry(
+      makeRow({ metrics: { ...base.metrics, prefill_pp: 2, decode_pp: 2 } }),
+    );
+    expect(entry.pp).toBe(2);
+    expect(entry.prefill_pp).toBe(2);
+    expect(entry.decode_pp).toBe(2);
+  });
+
+  it('leaves pp undefined for rows predating the field', () => {
+    const entry = rowToAggDataEntry(makeRow());
+    expect(entry.pp).toBeUndefined();
+    expect(entry.prefill_pp).toBeUndefined();
+    expect(entry.decode_pp).toBeUndefined();
   });
 
   it('maps image field', () => {
@@ -330,6 +348,27 @@ describe('transformBenchmarkRows', () => {
     const { hardwareConfig } = transformBenchmarkRows(rows);
     const hwKeys = Object.keys(hardwareConfig);
     expect(hwKeys.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('folds pp into the total GPU count and the point label (overlay path)', () => {
+    // This is the same pipeline `?unofficialrun=` overlays run through
+    // (buildChartData → transformBenchmarkRows), so it exercises the overlay
+    // rendering path for PP configs end to end.
+    const base = makeRow();
+    const rows = [makeRow({ metrics: { ...base.metrics, prefill_pp: 2, decode_pp: 2 } })];
+    const { chartData } = transformBenchmarkRows(rows);
+    const point = chartData.find((d) => d.length > 0)![0];
+    // tp8 × pp2 = 16 total GPUs
+    expect(point.tp).toBe(16);
+    expect(point.pp).toBe(2);
+    expect(getPointLabel(point)).toBe('TP8PP2');
+  });
+
+  it('keeps total GPU count and label unchanged when pp is absent', () => {
+    const { chartData } = transformBenchmarkRows([makeRow()]);
+    const point = chartData.find((d) => d.length > 0)![0];
+    expect(point.tp).toBe(8);
+    expect(getPointLabel(point)).toBe('TP8');
   });
 
   it('labels M3 mtp configs with the "M3 EAGLE" suffix', () => {

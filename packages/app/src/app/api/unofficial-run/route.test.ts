@@ -144,6 +144,33 @@ describe('normalizeArtifactRows', () => {
     expect(m.mean_e2el).toBe(1.5);
   });
 
+  it('surfaces pipeline-parallelism fields in metrics (auto-capture)', () => {
+    // pp has no configs-table column: the frontend reads it from the metrics
+    // JSONB (rowToAggDataEntry), so the overlay route must keep passing it
+    // through. Field shape matches run 30314948116 (Kimi-K3 TP8 PP2).
+    const rows = normalizeArtifactRows(
+      [
+        rawRow({
+          prefill_tp: 8,
+          prefill_ep: 1,
+          prefill_pp: 2,
+          prefill_dp_attention: 'false',
+          prefill_num_workers: 1,
+          num_prefill_gpu: 16,
+          decode_tp: 8,
+          decode_ep: 1,
+          decode_pp: 2,
+          decode_dp_attention: 'false',
+          decode_num_workers: 1,
+          num_decode_gpu: 16,
+        }),
+      ],
+      '2026-03-01',
+    );
+    expect(rows[0].metrics.prefill_pp).toBe(2);
+    expect(rows[0].metrics.decode_pp).toBe(2);
+  });
+
   it('normalizes spec_method from spec_decoding', () => {
     const rows = normalizeArtifactRows([rawRow({ spec_decoding: 'eagle' })], '2026-03-01');
     expect(rows[0].spec_method).toBe('eagle');

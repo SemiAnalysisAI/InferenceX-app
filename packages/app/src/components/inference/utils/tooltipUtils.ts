@@ -62,17 +62,23 @@ const asBool = (v: boolean | string | undefined): boolean | undefined =>
  */
 export const getPointLabel = (d: InferenceData): string =>
   parallelismLabel({
-    tp: d.tp,
+    // InferenceData.tp is the TOTAL GPU count (createChartDataPoint folds pp
+    // into it for aggregated rows) — the label wants the actual TP width, so
+    // prefer the raw decode_tp and keep d.tp only as a legacy fallback.
+    tp: d.decode_tp ?? d.tp,
     ep: d.ep,
+    pp: d.pp,
     dpAttention: asBool(d.dp_attention),
     disagg: d.disagg,
     isMultinode: d.is_multinode,
     prefillTp: d.prefill_tp,
     prefillEp: d.prefill_ep,
+    prefillPp: d.prefill_pp,
     prefillDpAttention: asBool(d.prefill_dp_attention),
     prefillNumWorkers: d.prefill_num_workers,
     decodeTp: d.decode_tp,
     decodeEp: d.decode_ep,
+    decodePp: d.decode_pp,
     decodeDpAttention: asBool(d.decode_dp_attention),
     decodeNumWorkers: d.decode_num_workers,
   });
@@ -221,40 +227,71 @@ const imageTooltipLine = (image: string) =>
         <strong>Image:</strong> <span style="display: inline-block; vertical-align: top; overflow-wrap: anywhere;">${shortenSha(image.trim()).replace(/\s+/u, '<br />')}</span>
       </div>`;
 
+const PARALLELISM_STRINGS = {
+  en: {
+    strategy: 'Parallelism Strategy',
+    gpuCount: (n: number) => `${n} GPU${n > 1 ? 's' : ''}`,
+    prefill: 'Prefill',
+    decode: 'Decode',
+    gpusUnit: 'GPUs',
+    tensorParallelism: 'Tensor Parallelism',
+    expertParallelism: 'Expert Parallelism',
+    pipelineParallelism: 'Pipeline Parallelism',
+    dpAttention: 'DP Attention',
+  },
+  zh: {
+    strategy: '并行策略',
+    gpuCount: (n: number) => `${n} 个 GPU`,
+    prefill: '预填充',
+    decode: '解码',
+    gpusUnit: '个 GPU',
+    tensorParallelism: '张量并行 (TP)',
+    expertParallelism: '专家并行 (EP)',
+    pipelineParallelism: '流水线并行 (PP)',
+    dpAttention: 'DP Attention',
+  },
+} as const;
+
 /**
  * Generates HTML for the parallelism configuration section of a tooltip.
  * Falls back to GPU count for old data without parallelism fields.
+ * Pipeline parallelism is only rendered when > 1 (pp of 0/1 means "no PP",
+ * matching the point-label rule in {@link parallelismLabel}).
  */
-const generateParallelismHTML = (d: InferenceData): string => {
+const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): string => {
+  const t = PARALLELISM_STRINGS[locale];
   if (
     (d.ep === null || d.ep === undefined) &&
     (d.prefill_ep === null || d.prefill_ep === undefined)
   ) {
-    return tooltipLine('Parallelism Strategy', `${d.tp} GPU${d.tp > 1 ? 's' : ''}`);
+    return tooltipLine(t.strategy, t.gpuCount(d.tp));
   }
 
   if (d.is_multinode && d.disagg) {
     const ptp = d.prefill_tp ?? d.tp;
     const pep = d.prefill_ep ?? d.ep ?? 0;
+    const ppp = d.prefill_pp ?? d.pp ?? 1;
     const pdpa = d.prefill_dp_attention ?? d.dp_attention ?? false;
     const dtp = d.decode_tp ?? d.tp;
     const dep = d.decode_ep ?? d.ep ?? 0;
+    const dpp = d.decode_pp ?? d.pp ?? 1;
     const ddpa = d.decode_dp_attention ?? d.dp_attention ?? false;
     const pw = d.prefill_num_workers ?? 1;
     const dw = d.decode_num_workers ?? 1;
     return `
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>Prefill:</strong> ${d.num_prefill_gpu ?? '?'} GPUs, TP: ${ptp}, EP: ${pep}, DPA: ${pdpa ? 'True' : 'False'}, Workers: ${pw}
+        <strong>${t.prefill}:</strong> ${d.num_prefill_gpu ?? '?'} ${t.gpusUnit}, TP: ${ptp}, ${ppp > 1 ? `PP: ${ppp}, ` : ''}EP: ${pep}, DPA: ${pdpa ? 'True' : 'False'}, Workers: ${pw}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>Decode:</strong> ${d.num_decode_gpu ?? '?'} GPUs, TP: ${dtp}, EP: ${dep}, DPA: ${ddpa ? 'True' : 'False'}, Workers: ${dw}
+        <strong>${t.decode}:</strong> ${d.num_decode_gpu ?? '?'} ${t.gpusUnit}, TP: ${dtp}, ${dpp > 1 ? `PP: ${dpp}, ` : ''}EP: ${dep}, DPA: ${ddpa ? 'True' : 'False'}, Workers: ${dw}
       </div>`;
   }
 
   return `
-    ${tooltipLine('Tensor Parallelism', d.tp)}
-    ${d.ep !== null && d.ep !== undefined ? tooltipLine('Expert Parallelism', d.ep) : ''}
-    ${tooltipLine('DP Attention', d.dp_attention ? 'True' : 'False')}`;
+    ${tooltipLine(t.tensorParallelism, d.decode_tp ?? d.tp)}
+    ${d.pp !== null && d.pp !== undefined && d.pp > 1 ? tooltipLine(t.pipelineParallelism, d.pp) : ''}
+    ${d.ep !== null && d.ep !== undefined ? tooltipLine(t.expertParallelism, d.ep) : ''}
+    ${tooltipLine(t.dpAttention, d.dp_attention ? 'True' : 'False')}`;
 };
 
 /**
@@ -314,7 +351,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           : ''
       }
       ${tooltipLine('Total GPUs', d.tp)}
-      ${generateParallelismHTML(d)}
+      ${generateParallelismHTML(d, locale)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Concurrency:</strong> ${d.conc}
       </div>
@@ -374,7 +411,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
         <strong>${yLabel}:</strong> ${fmt(d.y)}
       </div>
       ${tooltipLine('Total GPUs', d.tp)}
-      ${generateParallelismHTML(d)}
+      ${generateParallelismHTML(d, locale)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Concurrency:</strong> ${d.conc}
       </div>
@@ -445,7 +482,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           : ''
       }
       ${tooltipLine('Total GPUs', d.tp)}
-      ${generateParallelismHTML(d)}
+      ${generateParallelismHTML(d, locale)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Concurrency:</strong> ${d.conc}
       </div>
