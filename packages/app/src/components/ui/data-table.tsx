@@ -205,7 +205,7 @@ export function DataTable<T>({
       </div>
 
       <div className="overflow-x-auto relative">
-        {watermark && !isUnofficialDomain && (
+        {watermark && isUnofficialDomain === false && (
           <div
             className="absolute inset-0 pointer-events-none flex items-center justify-center"
             aria-hidden="true"
