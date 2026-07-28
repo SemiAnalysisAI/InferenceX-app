@@ -443,4 +443,118 @@ describe('Model Architecture Diagram', () => {
       cy.contains('Released by DeepSeek').should('be.visible');
     });
   });
+
+  describe('Hybrid Attention Blocks (MoE model - Kimi K3)', () => {
+    before(() => {
+      // The model dropdown only lists models that have availability rows, and the
+      // shared fixtures carry none for kimik3 (nothing ingested yet). Append one
+      // so K3 is selectable, then re-visit with the intercept in place. This block
+      // runs last in the spec, so no earlier block sees the patched availability.
+      cy.fixture('api/availability.json').then((rows: unknown[]) => {
+        cy.intercept('GET', '/api/v1/availability', {
+          body: [
+            ...rows,
+            {
+              model: 'kimik3',
+              isl: 8192,
+              osl: 1024,
+              precision: 'fp4',
+              hardware: 'mi355x',
+              framework: 'vllm',
+              spec_method: 'none',
+              disagg: false,
+              date: '2026-07-18',
+            },
+          ],
+        }).as('availability');
+      });
+      cy.visit('/inference?g_model=Kimi-K3', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+      cy.get('[data-testid="inference-chart-display"]').should('be.visible');
+
+      cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
+      cy.get('body').then(($body) => {
+        if ($body.find('[data-testid="model-architecture-svg"]:visible').length === 0) {
+          cy.get('[data-testid="model-architecture-toggle"]').click();
+        }
+      });
+      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+    });
+
+    it('shows MoE and Hybrid badges for Kimi K3', () => {
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'MoE');
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'Hybrid');
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', '2.8T');
+    });
+
+    it('renders the KDA and gated-MLA layer categories as two alternating blocks', () => {
+      cy.get('[data-testid="expand-altBlock0"]').should('exist');
+      cy.get('[data-testid="expand-altBlock1"]').should('exist');
+      cy.get('[data-testid="alternating-indicator"]').should('exist');
+      cy.get('[data-testid="model-architecture-svg"]').contains('KDA').should('exist');
+      // K3 is a 68:24 split, not the 1:1 interleave the default caption implies.
+      cy.get('[data-testid="model-architecture-svg"]')
+        .contains('gated MLA every 4th layer')
+        .should('exist');
+      cy.get('[data-testid="model-architecture-svg"]')
+        .contains('alternating every layer')
+        .should('not.exist');
+    });
+
+    it('keeps attention static — no CSA/HCA drill-down or union-softmax caption', () => {
+      // K3's hybrid is KDA + gated MLA, not DeepSeek V4's local/compressed CSA-HCA
+      // pair, so `alternatingAttentionExpandable: false` must suppress both the
+      // drill-down and the caption that explains it. DeepSeek V4 keeps both.
+      // Retries re-run this test with the block already expanded, so expand
+      // only when it is still collapsed.
+      cy.get('body').then(($body) => {
+        if ($body.find('[data-testid="expand-altBlock0"]').length > 0) {
+          cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
+        }
+      });
+      cy.get('[data-testid="collapse-altBlock0"]').should('exist');
+      cy.get('[data-testid="expand-altAttention0"]').should('not.exist');
+      cy.get('[data-testid="hybrid-attention-note"]').should('not.exist');
+      // The MoE expert grid inside the block is still expandable, and its router
+      // line reports K3's own two shared experts rather than an assumed one.
+      cy.get('[data-testid="expand-altExperts0"]').should('exist').click({ force: true });
+      cy.get('[data-testid="model-architecture-svg"]')
+        .contains('Top-16 of 896 routed + 2 shared')
+        .should('exist');
+      // Same count drives the Experts figure in the specs bar: 16 routed + 2
+      // shared active out of 898, not the assumed "+1".
+      cy.get('[data-testid="model-architecture-svg"]').contains('16+2/898').should('exist');
+      // K3's FFN is SiTU-GLU, so the drill-down must not claim SwiGLU/SiLU.
+      // The flow caption renders uppercased, so match case-insensitively.
+      cy.get('[data-testid="model-architecture-svg"]')
+        .contains(/expert ffn \(situ-glu\)/iu)
+        .should('exist');
+      cy.get('[data-testid="model-architecture-svg"]').contains('SiTU Activation').should('exist');
+      cy.get('[data-testid="model-architecture-svg"]')
+        .contains(/swiglu|silu/iu)
+        .should('not.exist');
+    });
+
+    it('labels the dense prefix block KDA rather than the model-wide hybrid type', () => {
+      // Layer 1 is the dense-FFN layer and a KDA layer, so "Hybrid Attention"
+      // would misdescribe it next to correctly labelled KDA/MLA blocks.
+      cy.get('[data-testid="expand-denseTransformer"]').should('exist').click({ force: true });
+      cy.get('[data-testid="model-architecture-svg"]')
+        .contains('Kimi Delta Attention (KDA)')
+        .should('exist');
+      cy.get('[data-testid="model-architecture-svg"]')
+        .contains('Hybrid Attention')
+        .should('not.exist');
+      cy.get('[data-testid="collapse-denseTransformer"]').click({ force: true });
+    });
+
+    it('shows Kimi K3 features and developer info', () => {
+      cy.contains('Kimi Delta Attention (KDA linear attention)').should('be.visible');
+      cy.contains('Stable LatentMoE (3584-dim latent)').should('be.visible');
+      cy.contains('Released by Moonshot AI').should('be.visible');
+    });
+  });
 });

@@ -99,6 +99,8 @@ export const MODEL_TO_KEY: Record<string, string> = {
   'moonshotai/Kimi-K2.6': 'kimik2.6',
   'moonshotai/Kimi-K2.7-Code': 'kimik2.7-code',
   'amd/Kimi-K2.7-Code-MXFP4': 'kimik2.7-code',
+  // Kimi-K3 (2.8T KDA/MLA hybrid — distinct architecture from the K2 series)
+  'moonshotai/Kimi-K3': 'kimik3',
   // MiniMax-M2.5
   'MiniMaxAI/MiniMax-M2.5': 'minimaxm2.5',
   // MiniMax-M3 (428B, distinct architecture from the M2 series)

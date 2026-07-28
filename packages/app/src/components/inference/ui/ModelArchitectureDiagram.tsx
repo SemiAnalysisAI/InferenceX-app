@@ -15,11 +15,15 @@ import {
   type ModelArchitecture,
   formatContextWindow,
   formatParamCount,
+  expertRouterSummary,
   getAttentionLabel,
   getAttentionSubBlocks,
   getFFNSubBlocks,
+  denseLayerAttentionLabel,
+  ffnVariantLabel,
   getHybridAttentionSubBlocks,
   getModelArchitecture,
+  sharedExpertCount,
 } from '@/lib/model-architectures';
 
 interface ModelArchitectureDiagramProps {
@@ -113,6 +117,10 @@ function renderDiagram(
 
   // Architecture flags
   const isMoE = arch.architectureType === 'moe';
+  // Shared experts are counted inside `numExperts`; read the model's own count
+  // rather than assuming the DeepSeek-style single shared expert.
+  const sharedExperts = sharedExpertCount(arch);
+  const ffnVariant = ffnVariantLabel(arch);
   const hasDenseLayers = isMoE && (arch.denseFFNLayers ?? 0) > 0;
   const denseLayerCount = arch.denseFFNLayers ?? 0;
   const moeLayerCount = (arch.numLayers ?? 0) - denseLayerCount;
@@ -155,8 +163,16 @@ function renderDiagram(
   // Hybrid models (DeepSeek V4) expose an expandable attention drill-down inside
   // each alternating block, revealing the sliding-window branch as an explicit
   // block alongside the compressed branch. gpt-oss (AlternatingSinkGQA) keeps a
-  // static attention block.
-  const altAttnExpandable = hasAlternatingLayers && arch.attentionType === 'Hybrid';
+  // static attention block. `getHybridAttentionSubBlocks` draws the specific
+  // local/compressed CSA-HCA flow, so hybrids built from other layer types
+  // (Kimi K3: KDA + gated MLA) opt out via alternatingAttentionExpandable and
+  // keep static attention blocks too. Note this is independent of
+  // `attentionExpandable`, which governs the single-block (non-alternating)
+  // drill-down — V4 disables that one while keeping this one.
+  const altAttnExpandable =
+    hasAlternatingLayers &&
+    arch.attentionType === 'Hybrid' &&
+    arch.alternatingAttentionExpandable !== false;
   const altAttnExpanded = [
     altAttnExpandable && expandedBlocks.has('altAttention0'),
     altAttnExpandable && expandedBlocks.has('altAttention1'),
@@ -1513,7 +1529,7 @@ function renderDiagram(
       drawArrow(denseNorm1Y + smallH, denseAttnY);
 
       // Attention (expandable only for non-MLA types)
-      const denseAttnLabel = getAttentionLabel(arch.attentionType);
+      const denseAttnLabel = denseLayerAttentionLabel(arch);
       const denseHeadSub = arch.numHeads ? `${arch.numHeads} heads` : undefined;
       if (isAttnExpandable) {
         drawExpandableBlock(
@@ -1562,7 +1578,7 @@ function renderDiagram(
       );
 
       if (denseFFNExpanded && denseFFNFlow) {
-        drawFlow(denseFFNFlow, denseFFNExpandedStartY, innerX, innerW, 'SwiGLU FFN');
+        drawFlow(denseFFNFlow, denseFFNExpandedStartY, innerX, innerW, `${ffnVariant} FFN`);
       }
 
       const denseFFNBottom = denseFFNExpanded
@@ -1609,10 +1625,7 @@ function renderDiagram(
     routerLabel = 'MoE Router',
     routerSubOverride?: string,
   ) {
-    const routedCount = arch.hasSharedExpert ? (arch.numExperts || 0) - 1 : arch.numExperts;
-    const routerSub =
-      routerSubOverride ??
-      `Top-${arch.activeExperts} of ${routedCount} routed${arch.hasSharedExpert ? ' + 1 shared' : ''}`;
+    const routerSub = routerSubOverride ?? expertRouterSummary(arch);
     const rY = n2Y + smallH + arrowH;
     drawBlock(innerX, rY, innerW, blockH, 'router', routerLabel, routerSub);
     drawArrow(rY + blockH, rY + blockH + arrowH);
@@ -1728,7 +1741,7 @@ function renderDiagram(
       });
 
     if (isExpExpanded) {
-      drawFlow(ffnFlow, expandedStartY, innerX, innerW, 'Expert FFN (SwiGLU)');
+      drawFlow(ffnFlow, expandedStartY, innerX, innerW, `Expert FFN (${ffnVariant})`);
     }
 
     const expertBottom = isExpExpanded ? expandedStartY + expandedH : eY + expertGridH;
@@ -1814,8 +1827,9 @@ function renderDiagram(
       drawArrow(hashNorm2Y + smallH, hashNorm2Y + smallH + arrowH);
 
       // Hash Router + Expert grid (token-id → fixed experts, not a learned gate)
-      const hashRoutedCount = arch.hasSharedExpert ? (arch.numExperts || 0) - 1 : arch.numExperts;
-      const hashRouterSub = `token-id → ${arch.activeExperts} of ${hashRoutedCount}${arch.hasSharedExpert ? ' + 1 shared' : ''}`;
+      const hashShared = sharedExpertCount(arch);
+      const hashRoutedCount = (arch.numExperts ?? 0) - hashShared;
+      const hashRouterSub = `token-id → ${arch.activeExperts} of ${hashRoutedCount}${hashShared > 0 ? ` + ${hashShared} shared` : ''}`;
       drawExpertGrid(
         hashExpertY,
         hashExpertsExpanded,
@@ -1980,7 +1994,7 @@ function renderDiagram(
 
         // Opaque background rect behind the label so it doesn't overlap the arrow
         const cardBg = isDark ? '#131416' : '#eaebec';
-        const labelText = '\u21C5 alternating every layer';
+        const labelText = `\u21C5 ${arch.alternatingNote ?? 'alternating every layer'}`;
         const labelPadX = 6;
         const labelPadY = 4;
         const labelFontSize = 10;
@@ -2112,7 +2126,7 @@ function renderDiagram(
       // === FFN (expandable) for dense models ===
       const ffnSub = arch.ffnDim
         ? `intermediate = ${arch.ffnDim.toLocaleString()}`
-        : 'SwiGLU activation';
+        : `${ffnVariant} activation`;
       drawExpandableBlock(
         innerX,
         ffnY,
@@ -2126,7 +2140,7 @@ function renderDiagram(
       );
 
       if (ffnExpanded) {
-        drawFlow(ffnFlow, ffnExpandedStartY, innerX, innerW, 'SwiGLU Details');
+        drawFlow(ffnFlow, ffnExpandedStartY, innerX, innerW, `${ffnVariant} Details`);
       }
 
       const ffnBottom = ffnExpanded ? ffnExpandedStartY + ffnExpandedH : ffnY + blockH;
@@ -2186,9 +2200,10 @@ function renderDiagram(
       ? [
           {
             label: 'Experts',
-            // Active per token = routed top-k + the always-on shared expert, so
-            // show "6+1/385" (not "6/385"): the shared expert is active too.
-            value: `${arch.activeExperts}${arch.hasSharedExpert ? '+1' : ''}/${arch.numExperts}`,
+            // Active per token = routed top-k + the always-on shared experts, so
+            // show "6+1/385" (not "6/385"): the shared experts are active too.
+            // Count them from the model (Kimi K3 has 2), never assume one.
+            value: `${arch.activeExperts}${sharedExperts > 0 ? `+${sharedExperts}` : ''}/${arch.numExperts}`,
           },
         ]
       : []),
@@ -2365,7 +2380,11 @@ export default function ModelArchitectureDiagram({
               the caption on the parent too — collapsing the parent leaves the child
               id in expandedBlocks (state is restored on re-expand), and the caption
               must not outlive the drawing it explains. */}
+          {/* Mirrors `altAttnExpandable` in renderDiagram: the caption describes the
+              CSA/HCA local-vs-compressed drill-down, so hybrids that opt out of that
+              drill-down must not show it either. */}
           {arch.attentionType === 'Hybrid' &&
+            arch.alternatingAttentionExpandable !== false &&
             [0, 1].some(
               (i) => expandedBlocks.has(`altBlock${i}`) && expandedBlocks.has(`altAttention${i}`),
             ) && (

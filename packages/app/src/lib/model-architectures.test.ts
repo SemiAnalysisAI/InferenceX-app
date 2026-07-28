@@ -12,6 +12,11 @@ import {
   getFFNSubBlocks,
   getHybridAttentionSubBlocks,
   getModelArchitecture,
+  denseLayerAttentionLabel,
+  expertRouterSummary,
+  ffnGateActivationLabel,
+  ffnVariantLabel,
+  sharedExpertCount,
   MODEL_ARCHITECTURES,
 } from './model-architectures';
 
@@ -24,6 +29,7 @@ describe('MODEL_ARCHITECTURES', () => {
       Model.DeepSeek_V4_Pro,
       Model.GptOss,
       Model.Kimi_K2_5,
+      Model.Kimi_K3,
       Model.MiniMax_M2_5,
       Model.MiniMax_M3,
     ];
@@ -246,6 +252,118 @@ describe('getModelArchitecture', () => {
     expect(arch?.contextWindow).toBe(262144);
     expect(arch?.developer).toBe('Moonshot AI');
     expect(arch?.vocabSize).toBe(163840);
+  });
+
+  it('returns architecture for Kimi K3 with hybrid KDA/MLA and LatentMoE details', () => {
+    const arch = getModelArchitecture(Model.Kimi_K3);
+    expect(arch).toBeDefined();
+    expect(arch?.totalParams).toBe(2800);
+    expect(arch?.activeParams).toBe(104);
+    expect(arch?.architectureType).toBe('moe');
+    expect(arch?.attentionType).toBe('Hybrid');
+    // KDA + gated MLA is not the DeepSeek V4 CSA/HCA hybrid, so neither the
+    // single-block nor the per-alternating-block attention drill-down applies
+    // (see ModelArchitectureDiagram). V4 keeps the latter, K3 does not.
+    expect(arch?.attentionExpandable).toBe(false);
+    expect(arch?.alternatingAttentionExpandable).toBe(false);
+    expect(getModelArchitecture(Model.DeepSeek_V4_Pro)?.alternatingAttentionExpandable).not.toBe(
+      false,
+    );
+    expect(arch?.numLayers).toBe(93);
+    expect(arch?.hiddenSize).toBe(7168);
+    expect(arch?.numHeads).toBe(96);
+    expect(arch?.ffnDim).toBe(3072);
+    expect(arch?.numExperts).toBe(898); // 896 routed + 2 shared
+    expect(arch?.sharedExperts).toBe(2);
+    expect(arch?.activeExperts).toBe(16);
+    expect(arch?.hasSharedExpert).toBe(true);
+    expect(arch?.denseFFNLayers).toBe(1);
+    expect(arch?.denseFFNDim).toBe(33792);
+    expect(arch?.contextWindow).toBe(1048576);
+    expect(arch?.vocabSize).toBe(163840);
+    expect(arch?.developer).toBe('Moonshot AI');
+  });
+
+  it('Kimi K3 alternating + dense layer counts sum to numLayers', () => {
+    const arch = getModelArchitecture(Model.Kimi_K3);
+    expect(arch?.alternatingLayers).toHaveLength(2);
+    const [kda, mla] = arch!.alternatingLayers!;
+    // The diagram stacks the dense prefix above both alternating blocks, so the
+    // dense-FFN layer (a KDA layer) is carved out of the KDA count: the model
+    // has 69 KDA layers, 68 of which appear in the alternating block.
+    expect(kda.count).toBe(68);
+    expect(mla.count).toBe(24);
+    const totalAlternating = arch!.alternatingLayers!.reduce((sum, l) => sum + l.count, 0);
+    expect(totalAlternating + (arch!.denseFFNLayers ?? 0)).toBe(arch!.numLayers);
+    // Neither KDA nor gated MLA uses a sliding window.
+    for (const spec of arch!.alternatingLayers!) {
+      expect(spec.slidingWindow).toBeUndefined();
+    }
+    // The 1:1 "alternating every layer" default would misdescribe a 68:24 split.
+    expect(arch?.alternatingNote).toBe('gated MLA every 4th layer');
+    expect(getModelArchitecture(Model.DeepSeek_V4_Pro)?.alternatingNote).toBeUndefined();
+  });
+
+  it('never renders more layer blocks than the model has layers', () => {
+    for (const arch of Object.values(MODEL_ARCHITECTURES)) {
+      if (!arch?.alternatingLayers?.length || arch.numLayers === undefined) continue;
+      const stacked =
+        arch.alternatingLayers.reduce((sum, l) => sum + l.count, 0) +
+        (arch.denseFFNLayers ?? 0) +
+        (arch.hashRoutedLayers ?? 0);
+      expect(stacked, `stacked layer blocks for ${arch.model}`).toBe(arch.numLayers);
+    }
+  });
+
+  it('subtracts the model’s own shared-expert count from the routed figure', () => {
+    // The expert grid renders this string; assuming a single shared expert
+    // would show K3 as "897 routed + 1 shared" against a model card that says
+    // 896 + 2.
+    expect(expertRouterSummary(getModelArchitecture(Model.Kimi_K3)!)).toBe(
+      'Top-16 of 896 routed + 2 shared',
+    );
+    // Unchanged for the DeepSeek-style single-shared-expert models.
+    expect(expertRouterSummary(getModelArchitecture(Model.Kimi_K2_5)!)).toBe(
+      'Top-8 of 384 routed + 1 shared',
+    );
+    expect(expertRouterSummary(getModelArchitecture(Model.DeepSeek_R1)!)).toBe(
+      'Top-8 of 256 routed + 1 shared',
+    );
+    // gpt-oss has no shared expert — no suffix, no subtraction.
+    expect(expertRouterSummary(getModelArchitecture(Model.GptOss)!)).toBe('Top-4 of 128 routed');
+  });
+
+  it('names K3’s FFN SiTU-GLU and leaves every other model on SwiGLU', () => {
+    const k3 = getModelArchitecture(Model.Kimi_K3)!;
+    expect(ffnVariantLabel(k3)).toBe('SiTU-GLU');
+    expect(ffnGateActivationLabel(k3)).toBe('SiTU');
+    const k3Ffn = getFFNSubBlocks(k3);
+    expect(k3Ffn.layout).toBe('parallel');
+    if (k3Ffn.layout !== 'parallel') throw new Error('expected a parallel FFN flow');
+    expect(k3Ffn.leftPath[1]?.name).toBe('SiTU Activation');
+    for (const arch of Object.values(MODEL_ARCHITECTURES)) {
+      if (!arch || arch.model === Model.Kimi_K3) continue;
+      expect(ffnVariantLabel(arch), `ffn variant for ${arch.model}`).toBe('SwiGLU');
+      expect(ffnGateActivationLabel(arch), `gate activation for ${arch.model}`).toBe('SiLU');
+    }
+  });
+
+  it('labels K3’s dense prefix block KDA, not the model-wide hybrid type', () => {
+    // The dense-FFN layer is layer 1, which config.json lists under kda_layers,
+    // so the model-wide "Hybrid Attention" label would misdescribe that block.
+    expect(denseLayerAttentionLabel(getModelArchitecture(Model.Kimi_K3)!)).toBe(
+      'Kimi Delta Attention (KDA)',
+    );
+    // Uniform-attention models keep falling back to their attention type.
+    expect(denseLayerAttentionLabel(getModelArchitecture(Model.DeepSeek_R1)!)).toBe(
+      'Multi-head Latent Attention',
+    );
+  });
+
+  it('defaults the shared-expert count to 1 and to 0 without a shared expert', () => {
+    expect(sharedExpertCount(getModelArchitecture(Model.Kimi_K3)!)).toBe(2);
+    expect(sharedExpertCount(getModelArchitecture(Model.DeepSeek_R1)!)).toBe(1);
+    expect(sharedExpertCount(getModelArchitecture(Model.GptOss)!)).toBe(0);
   });
 
   it('returns architecture for MiniMax M2.5 with MoE and GQA details', () => {

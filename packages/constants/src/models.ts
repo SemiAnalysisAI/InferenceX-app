@@ -14,6 +14,9 @@ export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
   'kimik2.5': 'Kimi-K2.5',
   'kimik2.6': 'Kimi-K2.5',
   'kimik2.7-code': 'Kimi-K2.5',
+  // K3 is a new architecture (Kimi Delta Attention + Attention Residuals, 2.8T),
+  // not a K2 point release, so it gets its own display bucket.
+  kimik3: 'Kimi-K3',
   'minimaxm2.5': 'MiniMax-M2.5',
   'minimaxm2.7': 'MiniMax-M2.5',
   minimaxm3: 'MiniMax-M3',
