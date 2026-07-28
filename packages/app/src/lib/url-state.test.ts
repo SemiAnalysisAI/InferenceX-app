@@ -318,6 +318,7 @@ describe('buildShareUrl tab filtering', () => {
     writeUrlParams({
       g_model: 'x',
       i_seq: 'y',
+      i_pctl: 'p75',
       c_mw: '10',
       c_costcap: '0.5',
       r_range: 'last-7-days',
@@ -327,6 +328,7 @@ describe('buildShareUrl tab filtering', () => {
     const url = buildShareUrl();
     expect(url).toContain('g_model=x');
     expect(url).toContain('i_seq=y');
+    expect(url).toContain('i_pctl=p75');
     expect(url).toContain('c_mw=10');
     expect(url).toContain('c_costcap=0.5');
     expect(url).not.toContain('r_range');

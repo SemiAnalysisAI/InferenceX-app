@@ -1,6 +1,8 @@
 import {
   Model,
   MODEL_OPTIONS,
+  Percentile,
+  PERCENTILE_OPTIONS,
   Precision,
   PRECISION_OPTIONS,
   Sequence,
@@ -11,6 +13,7 @@ export interface CalculatorUrlSeed {
   model?: Model;
   sequence?: Sequence;
   precisions?: string[];
+  percentile?: Percentile;
 }
 
 function pickString(value: string | string[] | undefined): string | undefined {
@@ -49,8 +52,13 @@ export function resolveCalculatorUrlSeed(
     if (precs.length > 0) seed.precisions = precs;
   }
 
+  const percentileParam = pickString(sp.i_pctl);
+  if (percentileParam && (PERCENTILE_OPTIONS as readonly string[]).includes(percentileParam)) {
+    seed.percentile = percentileParam as Percentile;
+  }
+
   return seed;
 }
 
 // Re-export Model/Precision/Sequence for callers that already import this module.
-export { Model, Precision, Sequence };
+export { Model, Percentile, Precision, Sequence };

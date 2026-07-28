@@ -230,6 +230,7 @@ export function sequenceKind(seq: Sequence): ScenarioKind {
 
 interface SequenceConfig {
   label: string;
+  labelZh: string;
   compact: string;
   category: CategoryTag;
   kind: ScenarioKind;
@@ -239,24 +240,28 @@ interface SequenceConfig {
 const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
   [Sequence.OneK_OneK]: {
     label: '1K / 1K',
+    labelZh: '1K / 1K',
     compact: '1k1k',
     category: 'deprecated',
     kind: 'fixed-seq',
   },
   [Sequence.OneK_EightK]: {
     label: '1K / 8K',
+    labelZh: '1K / 8K',
     compact: '1k8k',
     category: 'deprecated',
     kind: 'fixed-seq',
   },
   [Sequence.EightK_OneK]: {
     label: '8K / 1K',
+    labelZh: '8K / 1K',
     compact: '8k1k',
     category: 'default',
     kind: 'fixed-seq',
   },
   [Sequence.AgenticTraces]: {
     label: 'Agentic Traces',
+    labelZh: '智能体轨迹',
     compact: 'agentic',
     category: 'default',
     kind: 'agentic',
@@ -310,8 +315,10 @@ export function getSequenceCategory(sequence: Sequence): CategoryTag {
   return SEQUENCE_CONFIG[sequence]?.category ?? 'default';
 }
 
-export function getSequenceLabel(sequence: Sequence): string {
-  return SEQUENCE_CONFIG[sequence]?.label ?? sequence;
+export function getSequenceLabel(sequence: Sequence, locale: 'en' | 'zh' = 'en'): string {
+  const config = SEQUENCE_CONFIG[sequence];
+  if (!config) return sequence;
+  return locale === 'zh' ? config.labelZh : config.label;
 }
 
 const SEQUENCE_PREFIX_MAPPING: Record<string, Sequence> = Object.fromEntries(

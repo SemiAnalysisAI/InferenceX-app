@@ -7,12 +7,13 @@
  * official-only by design — mixing unmerged-branch numbers into an exported
  * sheet or a fleet projection would be silently misleading.
  *
- * Fixtures are fixed-sequence (1k/1k): the calculator resolves the selected
- * sequence through `sequenceToIslOsl` and filters rows on isl/osl, so the
- * agentic overlay fixtures used by the inference specs never reach it.
+ * Most fixtures are fixed-sequence (1k/1k) to cover sequence switching and
+ * overlay-only hardware. A dedicated agentic case verifies trace-replay rows
+ * follow the same separate-frontier overlay path.
  */
 import {
   ALT_SEQUENCE_LABEL,
+  interceptOverlayRun,
   interceptCalculatorMultiRunOverlay,
   interceptCalculatorOverlayRun,
   OVERLAY_ONLY_HARDWARE,
@@ -55,6 +56,30 @@ const visitCalculatorWithOverlay = () => {
 };
 
 describe('TCO calculator — unofficial run overlay', () => {
+  describe('agentic trace overlay', () => {
+    it('renders official and unofficial DeepSeek V4 agentic calculations separately', () => {
+      interceptOverlayRun();
+      cy.visit(
+        `/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(
+          'agentic-traces',
+        )}&i_prec=fp4`,
+        {
+          onBeforeLoad(win) {
+            win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          },
+        },
+      );
+      cy.wait('@unofficialRun');
+
+      cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
+      cy.get(BARS).should('have.length', 2);
+      cy.get(Y_TICKS).should('contain.text', OVERLAY_RUN_BRANCH);
+      cy.get('[data-testid="calculator-chart-section"] h2')
+        .first()
+        .should('contain.text', 'P90 Interactivity');
+    });
+  });
+
   describe('rendering', () => {
     before(visitCalculatorWithOverlay);
 

@@ -161,10 +161,14 @@ export function getChartTitle(
   targetValue: number,
   costType: CostType,
   costProvider?: CostProvider,
+  interactivityPercentile?: string,
 ): string {
+  const percentilePrefix = interactivityPercentile
+    ? `${interactivityPercentile.toUpperCase()} `
+    : '';
   const targetLabel =
     mode === 'interactivity_to_throughput'
-      ? `${targetValue} tok/s/user Interactivity`
+      ? `${targetValue} tok/s/user ${percentilePrefix}Interactivity`
       : `${targetValue} tok/s/gpu Throughput`;
 
   const tokenTypeLabel =
