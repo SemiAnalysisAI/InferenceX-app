@@ -168,14 +168,25 @@ export interface AggDataEntry {
   num_decode_gpu: number;
   spec_decoding: string;
   ep?: number;
+  /**
+   * Pipeline parallelism (decode-side, mirroring how `ep` mirrors decode_ep).
+   * Sourced from the metrics JSONB (`decode_pp`) — the configs table has no
+   * pp columns — so it's only present on rows whose artifacts emitted it
+   * (2026-07+). Undefined ⇒ treated as pp=1 everywhere (no label suffix).
+   */
+  pp?: number;
   dp_attention?: boolean | string;
   is_multinode?: boolean;
   prefill_tp?: number;
   prefill_ep?: number;
+  /** Prefill-side pipeline parallelism — see {@link AggDataEntry.pp}. */
+  prefill_pp?: number;
   prefill_dp_attention?: boolean | string;
   prefill_num_workers?: number;
   decode_tp?: number;
   decode_ep?: number;
+  /** Decode-side pipeline parallelism — see {@link AggDataEntry.pp}. */
+  decode_pp?: number;
   decode_dp_attention?: boolean | string;
   decode_num_workers?: number;
   image?: string;
