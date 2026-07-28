@@ -139,6 +139,25 @@ export function flipRooflineDirection(dir: RooflineDirection): RooflineDirection
   return FLIP_MAP[dir];
 }
 
+// Statistic words that may already prefix an x-axis label (from chart config
+// or the TTFT override label). Trailing whitespace is consumed so a replace
+// never doubles the separator space.
+const X_LABEL_STAT_PREFIX_RE = /^(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\b\s*/iu;
+
+/**
+ * Agentic sequences plot percentile fields (e.g. `p90_intvty`, `p75_e2el`),
+ * so the x-axis label must carry the selected percentile. Replaces an
+ * existing leading statistic word (e.g. the TTFT override's "P90 Time To
+ * First Token (s)") or prefixes the percentile when the configured label has
+ * none (e.g. "Interactivity (tok/s/user)" → "P90 Interactivity (tok/s/user)").
+ * Only call for agentic sequences — fixed-seq labels must stay untouched.
+ */
+export function applyAgenticPercentileToXLabel(label: string, pctlWord: string): string {
+  return X_LABEL_STAT_PREFIX_RE.test(label)
+    ? label.replace(X_LABEL_STAT_PREFIX_RE, `${pctlWord} `)
+    : `${pctlWord} ${label}`;
+}
+
 /** The dedup key fields a chart series is identified by. */
 interface DedupeRow {
   hardware: string;
@@ -409,13 +428,15 @@ export function useChartData(
 
         // Agentic: relabel to the chosen percentile (the resolver already
         // rewrote the field) — xAxisLabel still carries the raw chartDef
-        // prefix. The chart heading ("vs. <latency>") is also rewritten so the
-        // title above the plot reflects what's drawn.
+        // prefix (or none: the base Interactivity / E2E Latency config labels
+        // have no statistic word, so the percentile is prefixed). The chart
+        // heading ("vs. <latency>") is also rewritten so the title above the
+        // plot reflects what's drawn.
         const headingKey = `${selectedYAxisMetric}_heading` as keyof ChartDefinition;
         let chartHeading = (chartDef[headingKey] as string) || chartDef.heading;
         if (isAgentic) {
           const pctlWord = selectedPercentile.toUpperCase();
-          xAxisLabel = xAxisLabel.replace(/^(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\b/iu, pctlWord);
+          xAxisLabel = applyAgenticPercentileToXLabel(xAxisLabel, pctlWord);
           chartHeading = chartHeading.replace(
             /^(?<vsPrefix>vs\.\s+)(?:(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\s+)?/iu,
             `$1${pctlWord} `,
