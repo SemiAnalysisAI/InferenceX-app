@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import {
+  applyAgenticPercentileToXLabel,
   buildComparisonDates,
   dedupeRowsToLatestPerConfig,
   filterByGPU,
@@ -136,6 +137,54 @@ describe('filterByGPU', () => {
 
   it('excludes when neither key nor alias matches', () => {
     expect(filterByGPU([{ hwKey: 'unknown' }], ['h100'], {})).toHaveLength(0);
+  });
+});
+
+describe('applyAgenticPercentileToXLabel', () => {
+  it('prefixes the percentile when the interactivity label has no statistic word', () => {
+    expect(applyAgenticPercentileToXLabel('Interactivity (tok/s/user)', 'P90')).toBe(
+      'P90 Interactivity (tok/s/user)',
+    );
+  });
+
+  it('prefixes the percentile when the e2e latency label has no statistic word', () => {
+    expect(applyAgenticPercentileToXLabel('End-to-end Latency (s)', 'P90')).toBe(
+      'P90 End-to-end Latency (s)',
+    );
+  });
+
+  it('follows the selected percentile (p75)', () => {
+    expect(applyAgenticPercentileToXLabel('Interactivity (tok/s/user)', 'P75')).toBe(
+      'P75 Interactivity (tok/s/user)',
+    );
+  });
+
+  it('replaces an existing percentile prefix instead of doubling it', () => {
+    expect(applyAgenticPercentileToXLabel('P90 Time To First Token (s)', 'P75')).toBe(
+      'P75 Time To First Token (s)',
+    );
+  });
+
+  it('replaces Median/Mean statistic prefixes', () => {
+    expect(applyAgenticPercentileToXLabel('Median Time To First Token (s)', 'P90')).toBe(
+      'P90 Time To First Token (s)',
+    );
+    expect(applyAgenticPercentileToXLabel('Mean Interactivity (tok/s/user)', 'P75')).toBe(
+      'P75 Interactivity (tok/s/user)',
+    );
+  });
+
+  it('is a no-op when the label already carries the selected percentile', () => {
+    expect(applyAgenticPercentileToXLabel('P90 Interactivity (tok/s/user)', 'P90')).toBe(
+      'P90 Interactivity (tok/s/user)',
+    );
+  });
+
+  it('does not touch mid-label statistic words', () => {
+    // Only a LEADING statistic word is a prefix; words later in the label are content.
+    expect(applyAgenticPercentileToXLabel('Normalized E2E @ 400 output tokens (s)', 'P90')).toBe(
+      'P90 Normalized E2E @ 400 output tokens (s)',
+    );
   });
 });
 

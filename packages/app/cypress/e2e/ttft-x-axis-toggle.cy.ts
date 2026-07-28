@@ -163,6 +163,11 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       .should('be.visible')
       .and('have.attr', 'aria-selected', 'true');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
+    // Agentic plots percentile fields (p90_intvty), so the axis label carries it.
+    cy.get('[data-testid="chart-figure"] svg').should(
+      'contain.text',
+      'P90 Interactivity (tok/s/user)',
+    );
   });
 
   it('defaults to parallelism labels without line labels for the agentic view', () => {
@@ -195,6 +200,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="x-axis-mode-e2e"]').click();
     cy.get('[data-testid="x-axis-mode-e2e"]').should('have.attr', 'aria-selected', 'true');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'End-to-end Latency');
+    cy.get('[data-testid="chart-figure"] svg').should('contain.text', 'P90 End-to-end Latency (s)');
   });
 
   it('switches to request-level normalized E2E at 400 output tokens', () => {
@@ -231,6 +237,11 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       'true',
     );
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
+    // Percentile was switched to p75 in the previous test — the axis label follows.
+    cy.get('[data-testid="chart-figure"] svg').should(
+      'contain.text',
+      'P75 Interactivity (tok/s/user)',
+    );
   });
 });
 
@@ -246,6 +257,9 @@ describe('Default scenario', () => {
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
+    // Fixed-seq plots the mean field — no percentile prefix on the axis label.
+    cy.get('[data-testid="chart-figure"] svg').should('contain.text', 'Interactivity (tok/s/user)');
+    cy.get('[data-testid="chart-figure"] svg').should('not.contain.text', 'P90 Interactivity');
   });
 });
 
@@ -355,6 +369,11 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
     // The unofficial-run pattern watermark appears when isUnofficialRun is true.
     cy.get('[data-testid="inference-chart-display"] svg pattern[id^="unofficial-pattern-"]').should(
       'exist',
+    );
+    // Overlay shares the chartDefinition label — the percentile prefix applies here too.
+    cy.get('[data-testid="chart-figure"] svg').should(
+      'contain.text',
+      'P90 Interactivity (tok/s/user)',
     );
   });
 
