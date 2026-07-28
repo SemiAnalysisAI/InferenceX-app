@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 import * as d3 from 'd3';
+import { getDomainAwareChartWatermark } from '@/lib/unofficial-domain';
 
 import { computeTooltipPosition } from '../layers/scatter-points';
 import { setupChartStructure } from '../chart-setup';
@@ -139,7 +140,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         containerWidth: dimensions.width,
         containerHeight: dimensions.height,
         margin,
-        watermark,
+        watermark: getDomainAwareChartWatermark(watermark, window.location.hostname),
         xLabel: xAxisConfig?.label,
         yLabel: yAxisConfig?.label,
         clipContent,

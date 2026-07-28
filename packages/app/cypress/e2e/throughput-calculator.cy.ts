@@ -231,6 +231,13 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-bar-chart"]').should('not.exist');
     });
 
+    it('hides the table logo with the unofficial-domain notice', () => {
+      cy.contains('This deployment is not hosted at').should('be.visible');
+      cy.get('[data-testid="calculator-results-table"] img[src="/brand/logo-color.webp"]').should(
+        'not.exist',
+      );
+    });
+
     it('results table contains expected column headers', () => {
       cy.get('[data-testid="calculator-results-table"]').within(() => {
         cy.get('thead').should('contain.text', 'GPU');
