@@ -107,6 +107,18 @@ export interface ModelArchitecture {
    * that aren't CSA/HCA-shaped (Kimi K3's KDA + gated MLA stack).
    */
   alternatingAttentionExpandable?: boolean;
+  /**
+   * Number of shared experts included in `numExperts`. Defaults to 1 when
+   * `hasSharedExpert` is set — the DeepSeek-style single shared expert every
+   * other MoE model here uses. Kimi K3's LatentMoE has 2.
+   */
+  sharedExperts?: number;
+  /**
+   * Override the caption on the arrow between the two alternating blocks.
+   * Defaults to "alternating every layer", which is only true for an even 1:1
+   * interleave (gpt-oss, DeepSeek V4). Set it when the split is uneven.
+   */
+  alternatingNote?: string;
 }
 
 /**
@@ -337,16 +349,22 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     vocabSize: 163840,
     ffnDim: 3072, // moe_intermediate_size (per-expert FFN)
     numExperts: 898, // 896 routed + 2 shared
+    sharedExperts: 2,
     activeExperts: 16,
     hasSharedExpert: true,
     denseFFNLayers: 1, // first_k_dense_replace
     denseFFNDim: 33792, // intermediate_size (dense layer FFN)
+    // The dense-FFN layer (layer 1) is a KDA layer, and the diagram stacks the
+    // dense prefix block above both alternating blocks — so it is carved out of
+    // the KDA count here (68 + 24 + 1 dense = 93), the same partition DeepSeek
+    // V4 uses for its hash-routed prefix. Full layer composition is 69 KDA + 24
+    // gated MLA.
     alternatingLayers: [
       {
         label: 'Kimi Delta Attention (KDA)',
         description:
-          'Linear-attention layers with a gated delta-rule state update — constant-size recurrent state instead of a growing KV cache.',
-        count: 69,
+          'Linear-attention layers with a gated delta-rule state update — constant-size recurrent state instead of a growing KV cache. 69 KDA layers total; the first is the dense-FFN layer shown above.',
+        count: 68,
         colorKey: 'attention',
       },
       {
@@ -357,6 +375,9 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
         colorKey: 'norm',
       },
     ],
+    // Not a 1:1 interleave — full attention lands on layers 4, 8, … 92 plus the
+    // final layer 93.
+    alternatingNote: 'gated MLA every 4th layer',
     contextWindow: 1048576, // 1M
     features: [
       'Kimi Delta Attention (KDA linear attention)',
@@ -460,6 +481,25 @@ export function getArchitectureSummary(arch: ModelArchitecture): string {
     return `MoE ${formatParamCount(arch.totalParams)} (${formatParamCount(arch.activeParams)} active)`;
   }
   return `Dense ${formatParamCount(arch.totalParams)}`;
+}
+
+/** Shared experts counted inside `numExperts`. Zero when the model has none. */
+export function sharedExpertCount(arch: ModelArchitecture): number {
+  if (!arch.hasSharedExpert) return 0;
+  return arch.sharedExperts ?? 1;
+}
+
+/**
+ * Router sub-label for a MoE expert grid, e.g. `Top-8 of 384 routed + 1 shared`.
+ * `numExperts` counts routed *and* shared experts, so the shared ones are
+ * subtracted out of the routed figure — with the model's own shared count, not
+ * an assumed 1 (Kimi K3 has 2).
+ */
+export function expertRouterSummary(arch: ModelArchitecture): string {
+  const shared = sharedExpertCount(arch);
+  const routed = (arch.numExperts ?? 0) - shared;
+  const sharedSuffix = shared > 0 ? ` + ${shared} shared` : '';
+  return `Top-${arch.activeExperts} of ${routed} routed${sharedSuffix}`;
 }
 
 /**

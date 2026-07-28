@@ -12,6 +12,8 @@ import {
   getFFNSubBlocks,
   getHybridAttentionSubBlocks,
   getModelArchitecture,
+  expertRouterSummary,
+  sharedExpertCount,
   MODEL_ARCHITECTURES,
 } from './model-architectures';
 
@@ -269,6 +271,7 @@ describe('getModelArchitecture', () => {
     expect(arch?.numHeads).toBe(96);
     expect(arch?.ffnDim).toBe(3072);
     expect(arch?.numExperts).toBe(898); // 896 routed + 2 shared
+    expect(arch?.sharedExperts).toBe(2);
     expect(arch?.activeExperts).toBe(16);
     expect(arch?.hasSharedExpert).toBe(true);
     expect(arch?.denseFFNLayers).toBe(1);
@@ -278,18 +281,59 @@ describe('getModelArchitecture', () => {
     expect(arch?.developer).toBe('Moonshot AI');
   });
 
-  it('Kimi K3 alternating KDA/MLA layer counts sum to numLayers', () => {
+  it('Kimi K3 alternating + dense layer counts sum to numLayers', () => {
     const arch = getModelArchitecture(Model.Kimi_K3);
     expect(arch?.alternatingLayers).toHaveLength(2);
     const [kda, mla] = arch!.alternatingLayers!;
-    expect(kda.count).toBe(69);
+    // The diagram stacks the dense prefix above both alternating blocks, so the
+    // dense-FFN layer (a KDA layer) is carved out of the KDA count: the model
+    // has 69 KDA layers, 68 of which appear in the alternating block.
+    expect(kda.count).toBe(68);
     expect(mla.count).toBe(24);
     const totalAlternating = arch!.alternatingLayers!.reduce((sum, l) => sum + l.count, 0);
-    expect(totalAlternating).toBe(arch!.numLayers);
+    expect(totalAlternating + (arch!.denseFFNLayers ?? 0)).toBe(arch!.numLayers);
     // Neither KDA nor gated MLA uses a sliding window.
     for (const spec of arch!.alternatingLayers!) {
       expect(spec.slidingWindow).toBeUndefined();
     }
+    // The 1:1 "alternating every layer" default would misdescribe a 68:24 split.
+    expect(arch?.alternatingNote).toBe('gated MLA every 4th layer');
+    expect(getModelArchitecture(Model.DeepSeek_V4_Pro)?.alternatingNote).toBeUndefined();
+  });
+
+  it('never renders more layer blocks than the model has layers', () => {
+    for (const arch of Object.values(MODEL_ARCHITECTURES)) {
+      if (!arch?.alternatingLayers?.length || arch.numLayers === undefined) continue;
+      const stacked =
+        arch.alternatingLayers.reduce((sum, l) => sum + l.count, 0) +
+        (arch.denseFFNLayers ?? 0) +
+        (arch.hashRoutedLayers ?? 0);
+      expect(stacked, `stacked layer blocks for ${arch.model}`).toBe(arch.numLayers);
+    }
+  });
+
+  it('subtracts the model’s own shared-expert count from the routed figure', () => {
+    // The expert grid renders this string; assuming a single shared expert
+    // would show K3 as "897 routed + 1 shared" against a model card that says
+    // 896 + 2.
+    expect(expertRouterSummary(getModelArchitecture(Model.Kimi_K3)!)).toBe(
+      'Top-16 of 896 routed + 2 shared',
+    );
+    // Unchanged for the DeepSeek-style single-shared-expert models.
+    expect(expertRouterSummary(getModelArchitecture(Model.Kimi_K2_5)!)).toBe(
+      'Top-8 of 384 routed + 1 shared',
+    );
+    expect(expertRouterSummary(getModelArchitecture(Model.DeepSeek_R1)!)).toBe(
+      'Top-8 of 256 routed + 1 shared',
+    );
+    // gpt-oss has no shared expert — no suffix, no subtraction.
+    expect(expertRouterSummary(getModelArchitecture(Model.GptOss)!)).toBe('Top-4 of 128 routed');
+  });
+
+  it('defaults the shared-expert count to 1 and to 0 without a shared expert', () => {
+    expect(sharedExpertCount(getModelArchitecture(Model.Kimi_K3)!)).toBe(2);
+    expect(sharedExpertCount(getModelArchitecture(Model.DeepSeek_R1)!)).toBe(1);
+    expect(sharedExpertCount(getModelArchitecture(Model.GptOss)!)).toBe(0);
   });
 
   it('returns architecture for MiniMax M2.5 with MoE and GQA details', () => {

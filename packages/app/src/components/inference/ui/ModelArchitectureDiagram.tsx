@@ -15,6 +15,7 @@ import {
   type ModelArchitecture,
   formatContextWindow,
   formatParamCount,
+  expertRouterSummary,
   getAttentionLabel,
   getAttentionSubBlocks,
   getFFNSubBlocks,
@@ -1617,10 +1618,7 @@ function renderDiagram(
     routerLabel = 'MoE Router',
     routerSubOverride?: string,
   ) {
-    const routedCount = arch.hasSharedExpert ? (arch.numExperts || 0) - 1 : arch.numExperts;
-    const routerSub =
-      routerSubOverride ??
-      `Top-${arch.activeExperts} of ${routedCount} routed${arch.hasSharedExpert ? ' + 1 shared' : ''}`;
+    const routerSub = routerSubOverride ?? expertRouterSummary(arch);
     const rY = n2Y + smallH + arrowH;
     drawBlock(innerX, rY, innerW, blockH, 'router', routerLabel, routerSub);
     drawArrow(rY + blockH, rY + blockH + arrowH);
@@ -1988,7 +1986,7 @@ function renderDiagram(
 
         // Opaque background rect behind the label so it doesn't overlap the arrow
         const cardBg = isDark ? '#131416' : '#eaebec';
-        const labelText = '\u21C5 alternating every layer';
+        const labelText = `\u21C5 ${arch.alternatingNote ?? 'alternating every layer'}`;
         const labelPadX = 6;
         const labelPadY = 4;
         const labelFontSize = 10;

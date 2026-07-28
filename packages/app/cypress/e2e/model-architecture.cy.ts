@@ -446,12 +446,34 @@ describe('Model Architecture Diagram', () => {
 
   describe('Hybrid Attention Blocks (MoE model - Kimi K3)', () => {
     before(() => {
-      cy.document().then((doc) => {
-        delete doc.body.dataset.scrollLocked;
-        doc.body.style.removeProperty('pointer-events');
+      // The model dropdown only lists models that have availability rows, and the
+      // shared fixtures carry none for kimik3 (nothing ingested yet). Append one
+      // so K3 is selectable, then re-visit with the intercept in place. This block
+      // runs last in the spec, so no earlier block sees the patched availability.
+      cy.fixture('api/availability.json').then((rows: unknown[]) => {
+        cy.intercept('GET', '/api/v1/availability', {
+          body: [
+            ...rows,
+            {
+              model: 'kimik3',
+              isl: 8192,
+              osl: 1024,
+              precision: 'fp4',
+              hardware: 'mi355x',
+              framework: 'vllm',
+              spec_method: 'none',
+              disagg: false,
+              date: '2026-07-18',
+            },
+          ],
+        }).as('availability');
       });
-      cy.get('[role="combobox"]').filter(':visible').first().click();
-      cy.get('[role="option"]').contains('Kimi K3').click();
+      cy.visit('/inference?g_model=Kimi-K3', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+      cy.get('[data-testid="inference-chart-display"]').should('be.visible');
 
       cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
       cy.get('body').then(($body) => {
@@ -473,6 +495,13 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="expand-altBlock1"]').should('exist');
       cy.get('[data-testid="alternating-indicator"]').should('exist');
       cy.get('[data-testid="model-architecture-svg"]').contains('KDA').should('exist');
+      // K3 is a 68:24 split, not the 1:1 interleave the default caption implies.
+      cy.get('[data-testid="model-architecture-svg"]')
+        .contains('gated MLA every 4th layer')
+        .should('exist');
+      cy.get('[data-testid="model-architecture-svg"]')
+        .contains('alternating every layer')
+        .should('not.exist');
     });
 
     it('keeps attention static — no CSA/HCA drill-down or union-softmax caption', () => {
@@ -483,8 +512,12 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="collapse-altBlock0"]').should('exist');
       cy.get('[data-testid="expand-altAttention0"]').should('not.exist');
       cy.get('[data-testid="hybrid-attention-note"]').should('not.exist');
-      // The MoE expert grid inside the block is still expandable.
-      cy.get('[data-testid="expand-altExperts0"]').should('exist');
+      // The MoE expert grid inside the block is still expandable, and its router
+      // line reports K3's own two shared experts rather than an assumed one.
+      cy.get('[data-testid="expand-altExperts0"]').should('exist').click({ force: true });
+      cy.get('[data-testid="model-architecture-svg"]')
+        .contains('Top-16 of 896 routed + 2 shared')
+        .should('exist');
     });
 
     it('shows Kimi K3 features and developer info', () => {
