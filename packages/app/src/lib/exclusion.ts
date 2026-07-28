@@ -175,6 +175,14 @@ function activeFamilyInGroup(
  * uses `fallbackGroup` when that group is available, then falls back to the
  * alphabetically-first group.
  *
+ * Stickiness only counts as a user's engine choice when `prev` names ONE of the
+ * candidate groups. When `prev` spans several of them the prior selection is
+ * ambiguous — it was carried over from a scope with laxer rules (e.g. switching
+ * a fixed-seq chart, where both engines may be active per hardware, over to
+ * Agentic Traces) — so `fallbackGroup` decides instead of the alphabetical
+ * tie-break, which would otherwise silently pick a different engine than the
+ * one a fresh load of the same chart shows.
+ *
  * If `proposed` has 0 or 1 groups, the input set is returned unchanged.
  */
 export function pickStickyGroup(
@@ -188,6 +196,15 @@ export function pickStickyGroup(
   const result = new Set(proposed);
   const winners = new Set<string>();
   const dropped = new Set<string>();
+
+  // A single sticky candidate is an unambiguous prior choice and wins outright;
+  // several candidates mean `prev` didn't choose between them, so defer to the
+  // configured default before the alphabetical tie-break.
+  const stickyWinner = (candidates: string[]): string | undefined => {
+    if (candidates.length <= 1) return candidates[0];
+    if (fallbackGroup && candidates.includes(fallbackGroup)) return fallbackGroup;
+    return candidates.toSorted()[0];
+  };
 
   for (const [scope, byGroup] of byScope) {
     if (byGroup.size <= 1) continue;
@@ -216,8 +233,8 @@ export function pickStickyGroup(
       }
     }
     const winner =
-      groups.filter((group) => directPrevGroups.has(group)).toSorted()[0] ??
-      groups.filter((group) => correlatedPrevGroups.has(group)).toSorted()[0] ??
+      stickyWinner(groups.filter((group) => directPrevGroups.has(group))) ??
+      stickyWinner(groups.filter((group) => correlatedPrevGroups.has(group))) ??
       (fallbackGroup && groups.includes(fallbackGroup) ? fallbackGroup : undefined) ??
       groups.toSorted()[0];
     winners.add(winner);

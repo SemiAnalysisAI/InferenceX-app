@@ -26,6 +26,60 @@ describe('comparisonExclusion', () => {
     expect(resolved.droppedGroups).toEqual(['sglang']);
   });
 
+  it('keeps the vLLM default when arriving from a fixed-sequence chart', () => {
+    // The dashboard lands on 8K/1K, where per-hardware STP keys are unrestricted,
+    // so both engines are active before the user picks Agentic Traces. That prior
+    // selection names both groups and must not out-vote the chart's vLLM default.
+    const fixedSeqSelection = new Set([
+      'b200_sglang',
+      'b200_vllm',
+      'b300_sglang',
+      'b300_vllm',
+      'gb300_dynamo-sglang',
+      'gb300_dynamo-vllm',
+    ]);
+    const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, false)!;
+    const resolved = resolveExclusionGroups(
+      new Set([
+        'b200_sglang',
+        'b200_vllm',
+        'b200_vllm_mtp',
+        'b300_sglang',
+        'b300_vllm',
+        'b300_vllm_mtp',
+        'gb300_dynamo-sglang_mtp',
+        'gb300_dynamo-vllm_mtp',
+      ]),
+      fixedSeqSelection,
+      exclusion,
+      'keep-sticky',
+      comparisonDefaultGroup(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, false),
+    );
+
+    expect([...resolved.result].toSorted()).toEqual([
+      'b200_vllm',
+      'b200_vllm_mtp',
+      'b300_vllm',
+      'b300_vllm_mtp',
+      'gb300_dynamo-vllm_mtp',
+    ]);
+    expect(resolved.droppedGroups).toEqual(['sglang']);
+  });
+
+  it('still honors an SGLang-only selection carried into the Agentic chart', () => {
+    const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, false)!;
+    const resolved = resolveExclusionGroups(
+      new Set(['b200_sglang', 'b200_vllm', 'b200_vllm_mtp']),
+      new Set(['b200_sglang']),
+      exclusion,
+      'keep-sticky',
+      comparisonDefaultGroup(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, false),
+    );
+
+    expect([...resolved.result]).toEqual(['b200_sglang']);
+    expect(resolved.droppedGroups).toEqual(['vllm']);
+  });
+
   it.each([
     {
       name: 'fixed-sequence DeepSeek V4 Pro',
