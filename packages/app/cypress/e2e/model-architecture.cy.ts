@@ -443,4 +443,54 @@ describe('Model Architecture Diagram', () => {
       cy.contains('Released by DeepSeek').should('be.visible');
     });
   });
+
+  describe('Hybrid Attention Blocks (MoE model - Kimi K3)', () => {
+    before(() => {
+      cy.document().then((doc) => {
+        delete doc.body.dataset.scrollLocked;
+        doc.body.style.removeProperty('pointer-events');
+      });
+      cy.get('[role="combobox"]').filter(':visible').first().click();
+      cy.get('[role="option"]').contains('Kimi K3').click();
+
+      cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
+      cy.get('body').then(($body) => {
+        if ($body.find('[data-testid="model-architecture-svg"]:visible').length === 0) {
+          cy.get('[data-testid="model-architecture-toggle"]').click();
+        }
+      });
+      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+    });
+
+    it('shows MoE and Hybrid badges for Kimi K3', () => {
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'MoE');
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'Hybrid');
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', '2.8T');
+    });
+
+    it('renders the KDA and gated-MLA layer categories as two alternating blocks', () => {
+      cy.get('[data-testid="expand-altBlock0"]').should('exist');
+      cy.get('[data-testid="expand-altBlock1"]').should('exist');
+      cy.get('[data-testid="alternating-indicator"]').should('exist');
+      cy.get('[data-testid="model-architecture-svg"]').contains('KDA').should('exist');
+    });
+
+    it('keeps attention static — no CSA/HCA drill-down or union-softmax caption', () => {
+      // K3's hybrid is KDA + gated MLA, not DeepSeek V4's local/compressed CSA-HCA
+      // pair, so `alternatingAttentionExpandable: false` must suppress both the
+      // drill-down and the caption that explains it. DeepSeek V4 keeps both.
+      cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
+      cy.get('[data-testid="collapse-altBlock0"]').should('exist');
+      cy.get('[data-testid="expand-altAttention0"]').should('not.exist');
+      cy.get('[data-testid="hybrid-attention-note"]').should('not.exist');
+      // The MoE expert grid inside the block is still expandable.
+      cy.get('[data-testid="expand-altExperts0"]').should('exist');
+    });
+
+    it('shows Kimi K3 features and developer info', () => {
+      cy.contains('Kimi Delta Attention (KDA linear attention)').should('be.visible');
+      cy.contains('Stable LatentMoE (3584-dim latent)').should('be.visible');
+      cy.contains('Released by Moonshot AI').should('be.visible');
+    });
+  });
 });

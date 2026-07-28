@@ -24,6 +24,7 @@ describe('MODEL_ARCHITECTURES', () => {
       Model.DeepSeek_V4_Pro,
       Model.GptOss,
       Model.Kimi_K2_5,
+      Model.Kimi_K3,
       Model.MiniMax_M2_5,
       Model.MiniMax_M3,
     ];
@@ -246,6 +247,49 @@ describe('getModelArchitecture', () => {
     expect(arch?.contextWindow).toBe(262144);
     expect(arch?.developer).toBe('Moonshot AI');
     expect(arch?.vocabSize).toBe(163840);
+  });
+
+  it('returns architecture for Kimi K3 with hybrid KDA/MLA and LatentMoE details', () => {
+    const arch = getModelArchitecture(Model.Kimi_K3);
+    expect(arch).toBeDefined();
+    expect(arch?.totalParams).toBe(2800);
+    expect(arch?.activeParams).toBe(104);
+    expect(arch?.architectureType).toBe('moe');
+    expect(arch?.attentionType).toBe('Hybrid');
+    // KDA + gated MLA is not the DeepSeek V4 CSA/HCA hybrid, so neither the
+    // single-block nor the per-alternating-block attention drill-down applies
+    // (see ModelArchitectureDiagram). V4 keeps the latter, K3 does not.
+    expect(arch?.attentionExpandable).toBe(false);
+    expect(arch?.alternatingAttentionExpandable).toBe(false);
+    expect(getModelArchitecture(Model.DeepSeek_V4_Pro)?.alternatingAttentionExpandable).not.toBe(
+      false,
+    );
+    expect(arch?.numLayers).toBe(93);
+    expect(arch?.hiddenSize).toBe(7168);
+    expect(arch?.numHeads).toBe(96);
+    expect(arch?.ffnDim).toBe(3072);
+    expect(arch?.numExperts).toBe(898); // 896 routed + 2 shared
+    expect(arch?.activeExperts).toBe(16);
+    expect(arch?.hasSharedExpert).toBe(true);
+    expect(arch?.denseFFNLayers).toBe(1);
+    expect(arch?.denseFFNDim).toBe(33792);
+    expect(arch?.contextWindow).toBe(1048576);
+    expect(arch?.vocabSize).toBe(163840);
+    expect(arch?.developer).toBe('Moonshot AI');
+  });
+
+  it('Kimi K3 alternating KDA/MLA layer counts sum to numLayers', () => {
+    const arch = getModelArchitecture(Model.Kimi_K3);
+    expect(arch?.alternatingLayers).toHaveLength(2);
+    const [kda, mla] = arch!.alternatingLayers!;
+    expect(kda.count).toBe(69);
+    expect(mla.count).toBe(24);
+    const totalAlternating = arch!.alternatingLayers!.reduce((sum, l) => sum + l.count, 0);
+    expect(totalAlternating).toBe(arch!.numLayers);
+    // Neither KDA nor gated MLA uses a sliding window.
+    for (const spec of arch!.alternatingLayers!) {
+      expect(spec.slidingWindow).toBeUndefined();
+    }
   });
 
   it('returns architecture for MiniMax M2.5 with MoE and GQA details', () => {

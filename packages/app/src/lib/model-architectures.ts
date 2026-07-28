@@ -98,6 +98,15 @@ export interface ModelArchitecture {
   sourceUrl?: string;
   /** Override whether the attention block is expandable in diagrams. If not set, determined by attentionType. */
   attentionExpandable?: boolean;
+  /**
+   * Override whether the attention block *inside each alternating layer block*
+   * drills down to the hybrid local/compressed flow (`getHybridAttentionSubBlocks`).
+   * Defaults to expandable for `Hybrid` attention. Independent of
+   * `attentionExpandable`, which governs the single non-alternating block:
+   * DeepSeek V4 disables that one but keeps this one. Set false for hybrids
+   * that aren't CSA/HCA-shaped (Kimi K3's KDA + gated MLA stack).
+   */
+  alternatingAttentionExpandable?: boolean;
 }
 
 /**
@@ -111,6 +120,7 @@ export interface ModelArchitecture {
  * - https://github.com/deepseek-ai/DeepSeek-V3
  * - https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro (config.json, inference/model.py, DeepSeek_V4.pdf)
  * - https://huggingface.co/moonshotai/Kimi-K2.5/blob/main/config.json
+ * - https://huggingface.co/moonshotai/Kimi-K3/blob/main/config.json (+ model card)
  * - https://huggingface.co/openai/gpt-oss-120b/blob/main/config.json
  * - https://huggingface.co/MiniMaxAI/MiniMax-M2/blob/main/config.json
  * - https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/config.json
@@ -308,6 +318,59 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     releaseDate: '2026-01-27',
     developer: 'Moonshot AI',
     sourceUrl: 'https://huggingface.co/moonshotai/Kimi-K2.5',
+  },
+  [Model.Kimi_K3]: {
+    model: Model.Kimi_K3,
+    totalParams: 2800, // 2.8T
+    activeParams: 104,
+    architectureType: 'moe',
+    // 69 Kimi Delta Attention (linear) layers interleaved with 24 gated-MLA
+    // layers. Neither the GQA drill-down nor the DeepSeek V4 CSA/HCA hybrid
+    // drill-down describes this stack, so both layer categories render as
+    // static attention blocks.
+    attentionType: 'Hybrid',
+    attentionExpandable: false,
+    alternatingAttentionExpandable: false,
+    numLayers: 93,
+    hiddenSize: 7168,
+    numHeads: 96,
+    vocabSize: 163840,
+    ffnDim: 3072, // moe_intermediate_size (per-expert FFN)
+    numExperts: 898, // 896 routed + 2 shared
+    activeExperts: 16,
+    hasSharedExpert: true,
+    denseFFNLayers: 1, // first_k_dense_replace
+    denseFFNDim: 33792, // intermediate_size (dense layer FFN)
+    alternatingLayers: [
+      {
+        label: 'Kimi Delta Attention (KDA)',
+        description:
+          'Linear-attention layers with a gated delta-rule state update — constant-size recurrent state instead of a growing KV cache.',
+        count: 69,
+        colorKey: 'attention',
+      },
+      {
+        label: 'Gated MLA',
+        description:
+          'Multi-head Latent Attention (512-dim compressed KV latent, NoPE) with an output gate, placed every fourth layer to carry full-context recall.',
+        count: 24,
+        colorKey: 'norm',
+      },
+    ],
+    contextWindow: 1048576, // 1M
+    features: [
+      'Kimi Delta Attention (KDA linear attention)',
+      'Gated MLA (every 4th layer, NoPE)',
+      'Attention Residuals (AttnRes)',
+      'Stable LatentMoE (3584-dim latent)',
+      'MoE (896 routed + 2 shared experts, 16 active)',
+      'SiTU-GLU Activation',
+      'Native Multimodality (text/image/video)',
+      'MXFP4 Quantization',
+    ],
+    releaseDate: '2026-06-13',
+    developer: 'Moonshot AI',
+    sourceUrl: 'https://huggingface.co/moonshotai/Kimi-K3',
   },
   [Model.MiniMax_M2_5]: {
     model: Model.MiniMax_M2_5,

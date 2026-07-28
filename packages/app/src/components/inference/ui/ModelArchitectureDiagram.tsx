@@ -155,8 +155,16 @@ function renderDiagram(
   // Hybrid models (DeepSeek V4) expose an expandable attention drill-down inside
   // each alternating block, revealing the sliding-window branch as an explicit
   // block alongside the compressed branch. gpt-oss (AlternatingSinkGQA) keeps a
-  // static attention block.
-  const altAttnExpandable = hasAlternatingLayers && arch.attentionType === 'Hybrid';
+  // static attention block. `getHybridAttentionSubBlocks` draws the specific
+  // local/compressed CSA-HCA flow, so hybrids built from other layer types
+  // (Kimi K3: KDA + gated MLA) opt out via alternatingAttentionExpandable and
+  // keep static attention blocks too. Note this is independent of
+  // `attentionExpandable`, which governs the single-block (non-alternating)
+  // drill-down — V4 disables that one while keeping this one.
+  const altAttnExpandable =
+    hasAlternatingLayers &&
+    arch.attentionType === 'Hybrid' &&
+    arch.alternatingAttentionExpandable !== false;
   const altAttnExpanded = [
     altAttnExpandable && expandedBlocks.has('altAttention0'),
     altAttnExpandable && expandedBlocks.has('altAttention1'),
@@ -2365,7 +2373,11 @@ export default function ModelArchitectureDiagram({
               the caption on the parent too — collapsing the parent leaves the child
               id in expandedBlocks (state is restored on re-expand), and the caption
               must not outlive the drawing it explains. */}
+          {/* Mirrors `altAttnExpandable` in renderDiagram: the caption describes the
+              CSA/HCA local-vs-compressed drill-down, so hybrids that opt out of that
+              drill-down must not show it either. */}
           {arch.attentionType === 'Hybrid' &&
+            arch.alternatingAttentionExpandable !== false &&
             [0, 1].some(
               (i) => expandedBlocks.has(`altBlock${i}`) && expandedBlocks.has(`altAttention${i}`),
             ) && (

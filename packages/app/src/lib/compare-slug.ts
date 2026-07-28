@@ -43,7 +43,8 @@ export interface CompareModelSlug {
 // first, smaller open US-developed models at the bottom. Qwen sits between
 // MiniMax and gpt-oss to keep the Chinese-lab cluster contiguous before the
 // US transition. The two MiniMax entries stay adjacent with the newer M3
-// flagship leading the older M2 series.
+// flagship leading the older M2 series; the two Kimi entries follow the same
+// rule, with K3 leading the K2.5/K2.6/K2.7-Code group.
 export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   {
     slug: 'deepseek-v4',
@@ -58,6 +59,16 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     dbKeys: ['dsr1'],
     label: 'DeepSeek R1',
     seoName: 'DeepSeek R1',
+  },
+  {
+    slug: 'kimi-k3',
+    displayName: 'Kimi-K3',
+    // K3 is a new 2.8T architecture (Kimi Delta Attention + gated MLA), not a
+    // point release of the K2 series, so it gets its own slug and dbKey rather
+    // than joining the kimi-k26 group — same treatment as minimax-m3.
+    dbKeys: ['kimik3'],
+    label: 'Kimi K3 2.8T',
+    seoName: 'Kimi K3',
   },
   {
     slug: 'kimi-k26',

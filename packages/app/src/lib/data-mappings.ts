@@ -7,6 +7,7 @@ export enum Model {
   GptOss = 'gpt-oss-120b',
   Qwen3_5 = 'Qwen-3.5-397B-A17B',
   Kimi_K2_5 = 'Kimi-K2.5',
+  Kimi_K3 = 'Kimi-K3',
   MiniMax_M2_5 = 'MiniMax-M2.5',
   MiniMax_M3 = 'MiniMax-M3',
   GLM_5 = 'GLM-5',
@@ -92,6 +93,13 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     prefix: 'dsv4',
     category: 'default',
     exclusion: MTP_ENGINE_EXCLUSION,
+  },
+  [Model.Kimi_K3]: {
+    // K3 is a separate 2.8T KDA/MLA-hybrid architecture, not a K2 point release,
+    // so it stays out of the K2.5/2.6/2.7-Code grouping below.
+    label: 'Kimi K3 2.8T',
+    prefix: 'kimik3',
+    category: 'default',
   },
   [Model.Kimi_K2_5]: {
     // K2.5, K2.6, and K2.7-Code share an architecture, so the dropdown surfaces
