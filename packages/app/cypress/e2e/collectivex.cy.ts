@@ -149,6 +149,14 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
   });
 
+  it('labels the activation-data rate footnote with the selected metric', () => {
+    cy.get('[data-testid="collectivex-y-axis-select"]').click();
+    cy.contains('[role="option"]', 'Activation-data rate').click();
+    cy.get('[data-testid="collectivex-main-chart"]')
+      .should('contain.text', 'Activation-data rate')
+      .and('not.contain.text', 'Payload rate is derived');
+  });
+
   it('exposes the kernel-mode toggle when a run measured both modes and pins the LL series', () => {
     const withLowLatency = buildDataset({
       shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' })],

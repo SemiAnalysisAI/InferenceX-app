@@ -124,7 +124,7 @@ const STRINGS = {
     noSeries: 'No measured series match these filters.',
     resetFilter: 'Reset filter',
     payloadNote:
-      'Payload rate is derived at the selected latency percentile and is not physical link bandwidth.',
+      'Activation-data rate is derived at the selected latency percentile and is not physical link bandwidth.',
     payloadBandwidthNote:
       'Payload bandwidth is the full logical payload (incl. FP8 scale bytes) ÷ latency, per GPU — a derived rate over logical bytes, not physical link bandwidth. The tooltip β/α is a least-squares fit of latency vs bytes across the ladder (β = per-GPU bandwidth term, α = fixed overhead).',
     deleteRun: 'Delete run',
