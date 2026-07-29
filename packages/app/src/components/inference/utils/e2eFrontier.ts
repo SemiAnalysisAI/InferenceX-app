@@ -2,7 +2,7 @@
  * @file e2eFrontier.ts
  * @description Shared seed for the anti-benchmark-hacking roofline restriction.
  *
- * On the non-e2e xmode charts (interactivity, ttft)
+ * On the non-e2e xmode charts (interactivity, ttft, osl-e2el)
  * the roofline is restricted to the configs that ALSO win on end-to-end latency,
  * so a config can't top interactivity while tanking decode (or vice versa). Both
  * the official path (`useChartData` → benchmark ids → `isOnE2eFrontier`) and the

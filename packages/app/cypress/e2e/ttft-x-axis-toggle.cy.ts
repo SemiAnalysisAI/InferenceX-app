@@ -1,4 +1,4 @@
-import { unlockAgenticGate } from '../support/e2e';
+import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 
 // This spec exercises the agentic x-axis modes, which only exist when the
 // selected model resolves to the Agentic Traces scenario. The default e2e
@@ -126,6 +126,9 @@ const interceptFixedSequenceData = () => {
 describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
     interceptAgenticData();
+    // The agentic default mode is OSL / E2EL, which fetches derived metrics
+    // on first render — stub them before the visit.
+    interceptDerivedAgenticMetrics();
     cy.visit('/inference?i_seq=agentic-traces', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -136,13 +139,32 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
   });
 
-  it('shows Interactivity by default for the agentic view', () => {
+  it('shows OSL / E2EL by default for the agentic view, as the leftmost option', () => {
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Traces');
     cy.get('[data-testid="x-axis-mode-ttft"]').should('be.visible');
     cy.get('[data-testid="x-axis-mode-e2e"]').should('be.visible');
-    cy.get('[data-testid="x-axis-mode-interactivity"]')
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should('be.visible');
+    cy.get('[data-testid="x-axis-mode-osl-e2el"]')
       .should('be.visible')
       .and('have.attr', 'aria-selected', 'true');
+    // OSL / E2EL leads the mode list for agentic.
+    cy.get('[data-testid="x-axis-mode-buttons"] [role="tab"]')
+      .first()
+      .should('have.attr', 'data-testid', 'x-axis-mode-osl-e2el');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90 OSL / E2EL');
+    cy.get('[data-testid="chart-figure"] svg').should(
+      'contain.text',
+      'P90 OSL / E2EL (tok/s/user)',
+    );
+  });
+
+  it('switches to Interactivity and updates the heading', () => {
+    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
+      'have.attr',
+      'aria-selected',
+      'true',
+    );
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
   });
 
@@ -203,6 +225,9 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
 
   it('honors explicit label URL overrides for the agentic view', () => {
     interceptAgenticData();
+    // Fresh page load → fresh React Query cache → the default OSL / E2EL
+    // mode refetches derived metrics.
+    interceptDerivedAgenticMetrics();
     cy.visit('/inference?i_seq=agentic-traces&i_label=0&i_advlabel=0&i_linelabel=1', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -226,6 +251,23 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="x-axis-mode-e2e"]').should('have.attr', 'aria-selected', 'true');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'End-to-end Latency');
     cy.get('[data-testid="chart-figure"] svg').should('contain.text', 'P90 End-to-end Latency (s)');
+  });
+
+  it('switches back to request-level OSL / E2EL', () => {
+    // No cy.wait here: the derived metrics were fetched (and stubbed) on the
+    // initial default-mode load and are still fresh in the React Query cache
+    // (staleTime 5 min), so re-entering the mode fires no new request.
+    cy.get('[data-testid="x-axis-mode-osl-e2el"]').click();
+    cy.get('[data-testid="x-axis-mode-osl-e2el"]').should('have.attr', 'aria-selected', 'true');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90 OSL / E2EL');
+    cy.get('[data-testid="chart-figure"] svg').should(
+      'contain.text',
+      'P90 OSL / E2EL (tok/s/user)',
+    );
+
+    cy.get('[data-testid="percentile-selector"]').click();
+    cy.contains('[role="option"]', 'p75').click();
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P75 OSL / E2EL');
   });
 
   it('switches back to Interactivity', () => {
@@ -358,6 +400,8 @@ const interceptAgenticDataWithOverlay = () => {
 describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', () => {
   before(() => {
     interceptAgenticDataWithOverlay();
+    // Default agentic mode is OSL / E2EL → derived metrics fetch on mount.
+    interceptDerivedAgenticMetrics();
     cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -405,5 +449,16 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
       });
       expect(total).to.be.greaterThan(0);
     });
+  });
+
+  it('osl-e2el mode shows suppression banner for unofficial-run overlays', () => {
+    // Derived metrics are cached from the initial default-mode load.
+    cy.get('[data-testid="x-axis-mode-osl-e2el"]').click();
+    cy.get('[data-testid="x-axis-mode-osl-e2el"]').should('have.attr', 'aria-selected', 'true');
+    // The suppression message appears because isUnofficialRun is true and the
+    // mode is 'osl-e2el' (documented in ChartDisplay.tsx).
+    cy.contains(
+      'OSL / E2EL requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
+    ).should('be.visible');
   });
 });

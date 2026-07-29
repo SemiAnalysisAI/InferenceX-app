@@ -1,7 +1,26 @@
 import { describe, it, expect } from 'vitest';
 
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
-import { filterDataByCostLimit, processOverlayChartData } from '@/components/inference/utils';
+import {
+  filterDataByCostLimit,
+  processOverlayChartData,
+  selectUnofficialOverlayForMode,
+} from '@/components/inference/utils';
+
+describe('selectUnofficialOverlayForMode', () => {
+  const overlays = { e2e: { id: 'e2e' }, interactivity: { id: 'interactivity' } };
+
+  it('suppresses raw unofficial E2E data for OSL / E2EL mode', () => {
+    expect(selectUnofficialOverlayForMode('osl-e2el', 'e2e', overlays)).toBeNull();
+  });
+
+  it('preserves matching unofficial overlays for supported modes', () => {
+    expect(selectUnofficialOverlayForMode('e2e', 'e2e', overlays)).toBe(overlays.e2e);
+    expect(selectUnofficialOverlayForMode('interactivity', 'interactivity', overlays)).toBe(
+      overlays.interactivity,
+    );
+  });
+});
 
 // ---------------------------------------------------------------------------
 // fixture factories

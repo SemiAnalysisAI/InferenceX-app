@@ -10,7 +10,7 @@
  * dashed roofline (the monotone spline between C=8 and C=2 passes within
  * ~0.5% of it) while the official twin was hidden.
  */
-import { unlockAgenticGate } from '../support/e2e';
+import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 import {
   countVisible,
   interceptOverlayRun,
@@ -21,6 +21,10 @@ import {
 describe('Overlay points respect Optimal Only (agentic interactivity)', () => {
   before(() => {
     interceptOverlayRun();
+    // The agentic default mode is OSL / E2EL (which suppresses overlays and
+    // fetches derived metrics) — stub the fetch, then switch to the
+    // Interactivity mode this suite is about.
+    interceptDerivedAgenticMetrics();
     cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -28,6 +32,7 @@ describe('Overlay points respect Optimal Only (agentic interactivity)', () => {
       },
     });
     cy.wait('@unofficialRun');
+    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     cy.get('[data-testid="x-axis-mode-interactivity"]').should(
       'have.attr',

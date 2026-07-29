@@ -66,9 +66,10 @@ describe('computeAggregateStats', () => {
     expect(stats.osl).toBeNull();
     expect(stats.kvCacheUtil).toBeNull();
     expect(stats.prefixCacheHitRate).toBeNull();
+    expect(stats.e2elPerOsl).toBeNull();
   });
 
-  it('computes ISL/OSL percentiles from the profile blob', async () => {
+  it('computes ISL/OSL percentiles + the E2EL/OSL ratio bundle from the profile blob', async () => {
     const profileBlob = makeProfileBlob([
       { isl: 100, osl: 50, rl: 1000, ttft: 100 },
       { isl: 200, osl: 75, rl: 2000, ttft: 200 },
@@ -84,6 +85,12 @@ describe('computeAggregateStats', () => {
     // Server-side metrics still null when there's no server blob.
     expect(stats.kvCacheUtil).toBeNull();
     expect(stats.prefixCacheHitRate).toBeNull();
+
+    // Per-request E2EL/OSL ratios (s/tok): 1/50=0.02, 2/75≈0.02667, 3/100=0.03.
+    expect(stats.e2elPerOsl?.n).toBe(3);
+    expect(stats.e2elPerOsl?.p50).toBeCloseTo(2 / 75, 6);
+    // p90 of 3 values (linear interpolation): pos=1.8 → 0.02667 + 0.8×(0.03-0.02667)
+    expect(stats.e2elPerOsl?.p90).toBeCloseTo(2 / 75 + 0.8 * (0.03 - 2 / 75), 6);
   });
 
   it('computes KV util + prefix hit rate from the server blob alone', async () => {
@@ -99,6 +106,7 @@ describe('computeAggregateStats', () => {
     // Profile-derived metrics absent.
     expect(stats.isl).toBeNull();
     expect(stats.osl).toBeNull();
+    expect(stats.e2elPerOsl).toBeNull();
   });
 
   it('tolerates a malformed profile blob by leaving its metrics null', async () => {
@@ -107,6 +115,7 @@ describe('computeAggregateStats', () => {
     const stats = await computeAggregateStats({ profileBlob: garbage, serverBlob: null });
     expect(stats.isl).toBeNull();
     expect(stats.osl).toBeNull();
+    expect(stats.e2elPerOsl).toBeNull();
     // Version still set so the row is considered "computed".
     expect(stats.version).toBe(STATS_VERSION);
   });
@@ -126,14 +135,14 @@ describe('mergeProfileStatsUpgrade', () => {
     const merged = mergeProfileStatsUpgrade(existing, profile);
     expect(merged.version).toBe(STATS_VERSION);
     expect(merged.isl?.mean).toBe(100);
+    expect(merged.e2elPerOsl?.p90).toBeCloseTo(2.08 / 100, 6);
     expect(merged.kvCacheUtil).toEqual(existing.kvCacheUtil);
     expect(merged.prefixCacheHitRate).toEqual(existing.prefixCacheHitRate);
   });
 
-  it('drops the retired derived fields when upgrading a pre-v6 bundle', async () => {
-    // Bundles written before v6 carry normalizedSessionTimeS /
-    // p90PrefillTpsPerUser / normalizedE2e400 — the upgrade must not
-    // resurrect them into the new bundle.
+  it('drops legacy derived fields when upgrading a pre-v6 bundle', async () => {
+    // A stale bundle from an older STATS_VERSION carries since-retired fields —
+    // the merged result must not resurrect them.
     const legacy = {
       version: STATS_VERSION - 1,
       isl: null,

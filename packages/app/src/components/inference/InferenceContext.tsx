@@ -60,7 +60,12 @@ import {
 } from '@/lib/exclusion';
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
-import { useChartData, X_AXIS_MODES, type XAxisMode } from './hooks/useChartData';
+import {
+  isAgenticOnlyXAxisMode,
+  useChartData,
+  X_AXIS_MODES,
+  type XAxisMode,
+} from './hooks/useChartData';
 import { resolveComparisonEntries } from './utils/comparisonEntry';
 import {
   comparisonDefaultGroup,
@@ -605,23 +610,41 @@ export function InferenceProvider({
   }, [labelScenarioKind, sequenceResolved, getUrlParam]);
 
   // Reconcile the x-axis mode with the scenario kind:
-  //  - On mount with no `i_xmode` URL param: snap to the natural default
-  //    (interactivity for both agentic and fixed-sequence scenarios). The state
-  //    was initialized to a SSR-stable constant so server and client render the
-  //    same DOM; this effect fixes it up after hydration.
-  //  - When the user later switches sequence kinds: snap back to that default
-  //    (the prior selection was for a different kind, so it doesn't carry over).
+  //  - On mount with no `i_xmode` URL param: snap to the kind's natural default
+  //    (OSL / E2EL for agentic — the "north star" e2e-interactivity view —
+  //    and interactivity for fixed-sequence scenarios). The state was initialized
+  //    to a SSR-stable constant so server and client render the same DOM; this
+  //    effect fixes it up after hydration.
+  //  - When the user later switches sequence kinds: snap to the new kind's
+  //    natural default (the prior selection was for a different kind, so it
+  //    doesn't carry over).
   const lastSeqKindRef = useRef<ReturnType<typeof sequenceKind> | null>(null);
   useEffect(() => {
     const kind = sequenceKind(effectiveSequence);
     const isInitialMount = lastSeqKindRef.current === null;
-    // Stale render where the kind hasn't changed — nothing to reconcile.
-    if (!isInitialMount && lastSeqKindRef.current === kind) return;
+    const isAgenticOnlyMode = isAgenticOnlyXAxisMode(selectedXAxisMode);
+    // On a stale render where kind hasn't changed, bail unless the current
+    // mode is agentic-only and we just landed on a fixed-seq scenario — in
+    // that case force the snap so the chart doesn't try to plot trace-derived
+    // metrics against rows that have no trace_replay.
+    if (!isInitialMount && lastSeqKindRef.current === kind) {
+      if (kind === 'fixed-seq' && isAgenticOnlyMode) {
+        handleSetXAxisMode('interactivity');
+      }
+      return;
+    }
     lastSeqKindRef.current = kind;
-    // A URL-restored mode wins on first mount; later kind switches reset it.
-    if (isInitialMount && xAxisModeFromUrlRef.current) return;
-    handleSetXAxisMode('interactivity');
-  }, [effectiveSequence, handleSetXAxisMode]);
+    if (
+      isInitialMount &&
+      xAxisModeFromUrlRef.current &&
+      !(kind === 'fixed-seq' && isAgenticOnlyMode)
+    ) {
+      // URL-restored agentic-only mode on a fixed-seq sequence makes no sense
+      // — fall through to the default snap below.
+      return;
+    }
+    handleSetXAxisMode(kind === 'agentic' ? 'osl-e2el' : 'interactivity');
+  }, [effectiveSequence, selectedXAxisMode, handleSetXAxisMode]);
 
   // Reconcile selectedE2eXAxisMetric whenever the mode, sequence kind, or
   // agentic percentile changes. For fixed-seq the JSONB only carries

@@ -14,7 +14,10 @@ import type {
   OverlayData,
   TrendDataPoint,
 } from '@/components/inference/types';
-import { processOverlayChartData } from '@/components/inference/utils';
+import {
+  processOverlayChartData,
+  selectUnofficialOverlayForMode,
+} from '@/components/inference/utils';
 import {
   isRunComparisonEntry,
   makeRunComparisonEntry,
@@ -53,7 +56,12 @@ import {
   sequenceKind,
 } from '@/lib/data-mappings';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
-import type { XAxisMode } from '@/components/inference/hooks/useChartData';
+import {
+  useDerivedAgenticMetrics,
+  type DerivedAgenticMetric,
+} from '@/hooks/api/use-derived-agentic-metrics';
+import { isAgenticOnlyXAxisMode, type XAxisMode } from '@/components/inference/hooks/useChartData';
+import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useTrendData } from '@/components/inference/hooks/useTrendData';
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import { useLocale } from '@/lib/use-locale';
@@ -84,6 +92,8 @@ const STRINGS = {
     sourceUnofficial: 'Source: UNOFFICIAL',
     sourceOfficial: 'Source: SemiAnalysis InferenceX™',
     updated: 'Updated:',
+    oslE2elDisclaimer:
+      'OSL / E2EL requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
     selectDateRange: 'Select a date range or add a run to view GPU comparison',
     performanceOverTime: 'Performance Over Time',
     performanceOverTimeDesc:
@@ -101,6 +111,8 @@ const STRINGS = {
     sourceUnofficial: '来源：非官方',
     sourceOfficial: '来源：SemiAnalysis InferenceX™',
     updated: '更新时间：',
+    oslE2elDisclaimer:
+      'OSL / E2EL 需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
     selectDateRange: '请选择日期范围或添加运行以查看 GPU 对比',
     performanceOverTime: '性能趋势',
     performanceOverTimeDesc: '双击散点图上的数据点以追踪配置随时间的变化。',
@@ -130,11 +142,49 @@ function zhHeading(configured: string): string {
   return `vs. ${pctl ? `${pctl} ` : ''}${subjectZh}`;
 }
 
+// OSL / E2EL leads: it's the agentic default (and agentic-only, so the
+// filter below drops it for fixed-seq, leaving Interactivity first there).
 const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string; labelZh: string }[] = [
+  { value: 'osl-e2el', label: 'OSL / E2EL', labelZh: 'OSL / E2EL' },
   { value: 'interactivity', label: 'Interactivity', labelZh: '交互性' },
   { value: 'e2e', label: 'E2E Latency', labelZh: '端到端延迟' },
   { value: 'ttft', label: 'TTFT', labelZh: 'TTFT' },
 ];
+
+/**
+ * Presentation + data plumbing for the trace-derived x-axis modes (the
+ * agentic-only modes). One spec per mode keeps the x-label, chart heading,
+ * roofline corner, and derived-metric accessor in sync instead of scattering
+ * `selectedXAxisMode === …` conditionals through the render.
+ */
+interface DerivedXModeSpec {
+  xLabel: (percentileLabel: string) => string;
+  /** Chinese x-label; omit to reuse the English one (technical terms). */
+  xLabelZh?: (percentileLabel: string) => string;
+  /** Chart heading suffix ("vs. …") shown above the plot. */
+  heading: (percentileLabel: string) => string;
+  /** Chinese heading suffix; omit to reuse the English one. */
+  headingZh?: (percentileLabel: string) => string;
+  rooflineCorner: 'upper_right' | 'upper_left';
+  /** Pull the raw metric for this mode off the derived-metrics payload. */
+  value: (m: DerivedAgenticMetric | undefined, percentile: string) => number | null | undefined;
+  /** Convert the raw metric to the plotted x value. */
+  toX: (raw: number) => number;
+}
+
+const DERIVED_X_MODE_SPECS: Partial<Record<XAxisMode, DerivedXModeSpec>> = {
+  // "E2E interactivity": per-request OSL / E2E latency — the rate at which
+  // the user receives output tokens INCLUDING the prefill wait. Slow-tail
+  // percentiles (pXX = 1/pXX(E2EL/OSL)), matching the *_intvty convention.
+  'osl-e2el': {
+    xLabel: (pctl) => `${pctl} OSL / E2EL (tok/s/user)`,
+    heading: (pctl) => `vs. ${pctl} OSL / E2EL`,
+    headingZh: (pctl) => `vs. ${pctl} OSL / 端到端延迟`,
+    rooflineCorner: 'upper_left',
+    value: (m, percentile) => (percentile === 'p75' ? m?.p75_osl_per_e2el : m?.p90_osl_per_e2el),
+    toX: (raw) => raw,
+  },
+};
 
 const VIEW_MODE_OPTIONS: SegmentedToggleOption<InferenceViewMode>[] = [
   {
@@ -194,6 +244,9 @@ export default function ChartDisplay() {
     loading: changelogsLoading,
     totalDatesQueried,
   } = useComparisonChangelogs(selectedGPUs, selectedDateRange, dateRangeAvailableDates);
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const modelDbKeys = useMemo(
     () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
@@ -557,191 +610,258 @@ export default function ChartDisplay() {
   }, [effectiveGraphs, selectedXAxisMode]);
 
   const isAgenticSequence = sequenceKind(selectedSequence) === 'agentic';
-  const displayGraphs = isFirstLoad
-    ? [
-        <Card key="skeleton-0">
-          <Skeleton className="h-7 w-2/4 mb-1" />
-          <Skeleton className="h-5 w-3/4 mb-2" />
-          <Skeleton className="h-[600px] w-full" />
-        </Card>,
-      ]
-    : visibleGraphs.length === 0
-      ? []
-      : visibleGraphs.map((graph, graphIndex) => {
-          const isTimelineMode = Boolean(
-            selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
-          );
-          const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
-          return (
-            <section key={graphIndex} className="pt-8 md:pt-0">
-              <figure data-testid="chart-figure" className="relative rounded-lg">
-                <ChartButtons
-                  chartId={`chart-${graphIndex}`}
-                  analyticsPrefix={
-                    isTimelineMode
-                      ? 'gpu_timeseries'
-                      : graph.chartDefinition.chartType === 'e2e'
-                        ? 'latency'
-                        : 'interactivity'
-                  }
-                  leadingControls={
-                    <SegmentedToggle
-                      value={getViewMode(graphIndex)}
-                      options={viewModeOptions}
-                      onValueChange={(v) => handleViewModeChange(graphIndex, v)}
-                      ariaLabel={t.viewMode}
-                      testId={`inference-view-toggle-${graphIndex}`}
-                    />
-                  }
-                  hideImageExport={getViewMode(graphIndex) === 'table'}
-                  setIsLegendExpanded={setIsLegendExpanded}
-                  exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
-                  onExportMp4={
-                    replayAvailable ? () => replayHandlesRef.current[graphIndex]?.open() : undefined
-                  }
-                  onExportCsv={() => {
-                    const candidateVisibleData = isTimelineMode
-                      ? graph.data.filter((d) => activeDates.has(`${d.date}_${d.hwKey}`))
-                      : graph.data;
-                    const overlay = overlayDataByChartType[graph.chartDefinition.chartType];
-                    const { officialRows: visibleData, overlayRows: visibleOverlayRowsForExport } =
+  const useDerived = isAgenticSequence && isAgenticOnlyXAxisMode(selectedXAxisMode);
+  const derivedTargetIds = useMemo(() => {
+    if (!useDerived) return [] as number[];
+    const ids = new Set<number>();
+    for (const graph of visibleGraphs) {
+      for (const point of graph.data) {
+        // Overlay-only agentic points carry no persisted id — skip them so we
+        // never request `?ids=0`/`?ids=NaN` (which 400s and errors the chart).
+        if (point.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(point.id)) {
+          ids.add(point.id);
+        }
+      }
+    }
+    return [...ids];
+  }, [useDerived, visibleGraphs]);
+  const derivedQuery = useDerivedAgenticMetrics(derivedTargetIds, useDerived);
+  const derivedMetrics = derivedQuery.data;
+  const isDerivedLoading =
+    useDerived &&
+    derivedTargetIds.length > 0 &&
+    (derivedQuery.isPending || derivedQuery.isFetching) &&
+    !derivedMetrics;
+
+  // Set only when the user is on a derived (agentic-only) x-axis mode; the
+  // specs are module constants so this is referentially stable per mode.
+  const derivedSpec = useDerived ? DERIVED_X_MODE_SPECS[selectedXAxisMode] : undefined;
+
+  const renderableGraphs = useMemo(() => {
+    if (!derivedSpec) return visibleGraphs;
+    if (!derivedMetrics) return visibleGraphs.map((graph) => ({ ...graph, data: [] }));
+    const xLabelFn =
+      locale === 'zh' && derivedSpec.xLabelZh ? derivedSpec.xLabelZh : derivedSpec.xLabel;
+    const xLabel = xLabelFn(selectedPercentile.toUpperCase());
+    return visibleGraphs.map((graph) => {
+      const chartDefinition = {
+        ...graph.chartDefinition,
+        x_label: xLabel,
+        y_latency_limit: undefined,
+        [`${selectedYAxisMetric}_roofline` as keyof typeof graph.chartDefinition]:
+          derivedSpec.rooflineCorner,
+      };
+      const data = graph.data
+        .map((point) => {
+          if (!isPersistedBenchmarkId(point.id)) return null;
+          const raw = derivedSpec.value(derivedMetrics[point.id], selectedPercentile);
+          if (raw === null || raw === undefined || !Number.isFinite(raw)) return null;
+          return { ...point, x: derivedSpec.toX(raw) };
+        })
+        .filter((point): point is NonNullable<typeof point> => point !== null);
+      return { ...graph, chartDefinition, data };
+    });
+  }, [derivedSpec, visibleGraphs, derivedMetrics, selectedYAxisMetric, selectedPercentile, locale]);
+
+  const displayGraphs =
+    isFirstLoad || isDerivedLoading
+      ? [
+          <Card key="skeleton-0">
+            <Skeleton className="h-7 w-2/4 mb-1" />
+            <Skeleton className="h-5 w-3/4 mb-2" />
+            <Skeleton className="h-[600px] w-full" />
+          </Card>,
+        ]
+      : renderableGraphs.length === 0
+        ? []
+        : renderableGraphs.map((graph, graphIndex) => {
+            const isTimelineMode = Boolean(
+              selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
+            );
+            const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
+            return (
+              <section key={graphIndex} className="pt-8 md:pt-0">
+                <figure data-testid="chart-figure" className="relative rounded-lg">
+                  <ChartButtons
+                    chartId={`chart-${graphIndex}`}
+                    analyticsPrefix={
                       isTimelineMode
+                        ? 'gpu_timeseries'
+                        : graph.chartDefinition.chartType === 'e2e'
+                          ? 'latency'
+                          : 'interactivity'
+                    }
+                    leadingControls={
+                      <SegmentedToggle
+                        value={getViewMode(graphIndex)}
+                        options={viewModeOptions}
+                        onValueChange={(v) => handleViewModeChange(graphIndex, v)}
+                        ariaLabel={t.viewMode}
+                        testId={`inference-view-toggle-${graphIndex}`}
+                      />
+                    }
+                    hideImageExport={getViewMode(graphIndex) === 'table'}
+                    setIsLegendExpanded={setIsLegendExpanded}
+                    exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
+                    onExportMp4={
+                      replayAvailable
+                        ? () => replayHandlesRef.current[graphIndex]?.open()
+                        : undefined
+                    }
+                    onExportCsv={() => {
+                      const candidateVisibleData = isTimelineMode
+                        ? graph.data.filter((d) => activeDates.has(`${d.date}_${d.hwKey}`))
+                        : graph.data;
+                      const overlay = selectUnofficialOverlayForMode(
+                        selectedXAxisMode,
+                        graph.chartDefinition.chartType,
+                        overlayDataByChartType,
+                      );
+                      const {
+                        officialRows: visibleData,
+                        overlayRows: visibleOverlayRowsForExport,
+                      } = isTimelineMode
                         ? { officialRows: candidateVisibleData, overlayRows: [] }
                         : visibleComparisonRows(candidateVisibleData, overlay);
-                    const { headers, rows } = inferenceChartToCsv(
-                      visibleData,
-                      graph.model,
-                      graph.sequence,
-                    );
-                    // Match warnings against the same series the chart annotates,
-                    // including visible unofficial-run overlay series.
-                    const issueNotes = matchKnownConfigIssues(graph.model, [
-                      ...visibleData,
-                      ...visibleOverlayRowsForExport,
-                    ]).map((issue) =>
-                      knownIssueCsvNote(issue, getDisplayLabel(getHardwareConfig(issue.hwKey))),
-                    );
-                    exportToCsv(
-                      `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
-                      headers,
-                      rows,
-                      issueNotes,
-                    );
-                  }}
-                />
-                <Card>
-                  {(() => {
-                    const chartCaption = (
-                      <>
-                        <h2 className="text-lg font-semibold">
-                          {metricTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
-                          {(() => {
-                            // For Input metrics with dynamic x-axis, use dynamic heading.
-                            // Classify off the ENGLISH title — the localized one has no
-                            // 'input' substring to match on zh pages.
-                            const isInputMetric = metricTitle(
-                              graph.chartDefinition,
-                              selectedYAxisMetric,
-                              'en',
-                            )
-                              .toLowerCase()
-                              .includes('input');
-                            if (
-                              graph.chartDefinition.chartType === 'interactivity' &&
-                              isInputMetric &&
-                              selectedXAxisMetric
-                            ) {
-                              if (selectedXAxisMetric === 'p99_ttft') {
-                                return t.vsTtft('P99');
-                              } else if (selectedXAxisMetric === 'median_ttft') {
-                                return t.vsTtft('Median');
-                              }
-                            }
-
-                            // The e2e chart heading follows the branch-level x-axis
-                            // mode selector.
-                            if (graph.chartDefinition.chartType === 'e2e') {
-                              if (selectedE2eXAxisMetric?.endsWith('_ttft')) {
-                                const percentile = selectedE2eXAxisMetric.replace(/_ttft$/u, '');
-                                const word =
-                                  percentile === 'median' ? 'Median' : percentile.toUpperCase();
-                                return t.vsTtft(word);
-                              }
-                              return isAgenticSequence
-                                ? t.vsE2eLatency(selectedPercentile.toUpperCase())
-                                : t.vsE2eLatency();
-                            }
-
-                            // Fall back to configured heading
-                            const configured =
-                              graph.chartDefinition[
-                                `${selectedYAxisMetric}_heading` as keyof typeof graph.chartDefinition
-                              ] || graph.chartDefinition.heading;
-                            return locale === 'zh' ? zhHeading(String(configured)) : configured;
-                          })()}
-                        </h2>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {getModelLabel(graph.model as Model)} •{' '}
-                          {selectedPrecisions
-                            .map((prec) => getPrecisionLabel(prec as Precision))
-                            .join(', ')}{' '}
-                          • {getSequenceLabel(graph.sequence as Sequence)} •{' '}
-                          {isUnofficialRun ? t.sourceUnofficial : t.sourceOfficial}
-                          {selectedRunDate && (
-                            <>
-                              {' '}
-                              • {t.updated}{' '}
-                              {new Date(`${selectedRunDate}T00:00:00Z`).toLocaleDateString(
-                                locale === 'zh' ? 'zh-CN' : 'en-US',
-                                {
-                                  year: 'numeric',
-                                  month: '2-digit',
-                                  day: '2-digit',
-                                  timeZone: 'UTC',
-                                },
-                              )}
-                            </>
-                          )}
-                        </p>
-                        <MetricAssumptionNotes selectedYAxisMetric={selectedYAxisMetric} />
-                        <UnofficialDomainNotice />
-                      </>
-                    );
-
-                    if (getViewMode(graphIndex) === 'table') {
-                      const overlay = overlayDataByChartType[graph.chartDefinition.chartType];
-                      const { officialRows, overlayRows } = visibleComparisonRows(
-                        graph.data,
-                        overlay,
+                      const { headers, rows } = inferenceChartToCsv(
+                        visibleData,
+                        graph.model,
+                        graph.sequence,
                       );
-                      return (
+                      // Match warnings against the same series the chart annotates,
+                      // including visible unofficial-run overlay series.
+                      const issueNotes = matchKnownConfigIssues(graph.model, [
+                        ...visibleData,
+                        ...visibleOverlayRowsForExport,
+                      ]).map((issue) =>
+                        knownIssueCsvNote(issue, getDisplayLabel(getHardwareConfig(issue.hwKey))),
+                      );
+                      exportToCsv(
+                        `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
+                        headers,
+                        rows,
+                        issueNotes,
+                      );
+                    }}
+                  />
+                  <Card>
+                    {(() => {
+                      const chartCaption = (
                         <>
-                          {chartCaption}
-                          <InferenceTable
-                            data={[...officialRows, ...overlayRows]}
-                            chartDefinition={graph.chartDefinition}
-                            selectedYAxisMetric={selectedYAxisMetric}
-                          />
+                          <h2 className="text-lg font-semibold">
+                            {metricTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
+                            {(() => {
+                              // For Input metrics with dynamic x-axis, use dynamic heading.
+                              // Classify off the ENGLISH title — the localized one has no
+                              // 'input' substring to match on zh pages.
+                              const isInputMetric = metricTitle(
+                                graph.chartDefinition,
+                                selectedYAxisMetric,
+                                'en',
+                              )
+                                .toLowerCase()
+                                .includes('input');
+                              if (
+                                graph.chartDefinition.chartType === 'interactivity' &&
+                                isInputMetric &&
+                                selectedXAxisMetric
+                              ) {
+                                if (selectedXAxisMetric === 'p99_ttft') {
+                                  return t.vsTtft('P99');
+                                } else if (selectedXAxisMetric === 'median_ttft') {
+                                  return t.vsTtft('Median');
+                                }
+                              }
+
+                              // The e2e chart heading follows the branch-level x-axis mode
+                              // selector, including agentic-only derived metrics.
+                              if (graph.chartDefinition.chartType === 'e2e') {
+                                const modeSpec = DERIVED_X_MODE_SPECS[selectedXAxisMode];
+                                if (modeSpec) {
+                                  const heading =
+                                    locale === 'zh' && modeSpec.headingZh
+                                      ? modeSpec.headingZh
+                                      : modeSpec.heading;
+                                  return heading(selectedPercentile.toUpperCase());
+                                }
+                                if (selectedE2eXAxisMetric?.endsWith('_ttft')) {
+                                  const percentile = selectedE2eXAxisMetric.replace(/_ttft$/u, '');
+                                  const word =
+                                    percentile === 'median' ? 'Median' : percentile.toUpperCase();
+                                  return t.vsTtft(word);
+                                }
+                                return isAgenticSequence
+                                  ? t.vsE2eLatency(selectedPercentile.toUpperCase())
+                                  : t.vsE2eLatency();
+                              }
+
+                              // Fall back to configured heading
+                              const configured =
+                                graph.chartDefinition[
+                                  `${selectedYAxisMetric}_heading` as keyof typeof graph.chartDefinition
+                                ] || graph.chartDefinition.heading;
+                              return locale === 'zh' ? zhHeading(String(configured)) : configured;
+                            })()}
+                          </h2>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            {getModelLabel(graph.model as Model)} •{' '}
+                            {selectedPrecisions
+                              .map((prec) => getPrecisionLabel(prec as Precision))
+                              .join(', ')}{' '}
+                            • {getSequenceLabel(graph.sequence as Sequence)} •{' '}
+                            {isUnofficialRun ? t.sourceUnofficial : t.sourceOfficial}
+                            {selectedRunDate && (
+                              <>
+                                {' '}
+                                • {t.updated}{' '}
+                                {new Date(`${selectedRunDate}T00:00:00Z`).toLocaleDateString(
+                                  locale === 'zh' ? 'zh-CN' : 'en-US',
+                                  {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    timeZone: 'UTC',
+                                  },
+                                )}
+                              </>
+                            )}
+                          </p>
+                          <MetricAssumptionNotes selectedYAxisMetric={selectedYAxisMetric} />
+                          {isUnofficialRun && selectedXAxisMode === 'osl-e2el' && (
+                            <p className="mb-2 text-xs text-muted-foreground">
+                              {t.oslE2elDisclaimer}
+                            </p>
+                          )}
+                          <UnofficialDomainNotice />
                         </>
                       );
-                    }
 
-                    return selectedGPUs.length > 0 &&
-                      ((selectedDateRange.startDate && selectedDateRange.endDate) ||
-                        selectedDates.length > 0) ? (
-                      <GPUGraph
-                        chartId={`chart-${graphIndex}`}
-                        modelLabel={graph.model}
-                        data={graph.data}
-                        xLabel={graph.chartDefinition.x_label}
-                        yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
-                        chartDefinition={graph.chartDefinition}
-                        caption={chartCaption}
-                        runNumbering={runNumbering}
-                      />
-                    ) : (
-                      <div className="relative">
-                        <ScatterGraph
+                      if (getViewMode(graphIndex) === 'table') {
+                        const overlay = selectUnofficialOverlayForMode(
+                          selectedXAxisMode,
+                          graph.chartDefinition.chartType,
+                          overlayDataByChartType,
+                        );
+                        const { officialRows, overlayRows } = visibleComparisonRows(
+                          graph.data,
+                          overlay,
+                        );
+                        return (
+                          <>
+                            {chartCaption}
+                            <InferenceTable
+                              data={[...officialRows, ...overlayRows]}
+                              chartDefinition={graph.chartDefinition}
+                              selectedYAxisMetric={selectedYAxisMetric}
+                            />
+                          </>
+                        );
+                      }
+
+                      return selectedGPUs.length > 0 &&
+                        ((selectedDateRange.startDate && selectedDateRange.endDate) ||
+                          selectedDates.length > 0) ? (
+                        <GPUGraph
                           chartId={`chart-${graphIndex}`}
                           modelLabel={graph.model}
                           data={graph.data}
@@ -749,38 +869,54 @@ export default function ChartDisplay() {
                           yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                           chartDefinition={graph.chartDefinition}
                           caption={chartCaption}
-                          overlayData={
-                            overlayDataByChartType[graph.chartDefinition.chartType] ?? undefined
-                          }
+                          runNumbering={runNumbering}
                         />
-                        {selectedGPUs.length > 0 &&
-                          (!selectedDateRange.startDate || !selectedDateRange.endDate) &&
-                          selectedDates.length === 0 && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg z-10">
-                              <p className="text-sm font-medium text-muted-foreground bg-background/90 border border-border rounded-md px-4 py-2 shadow-sm">
-                                {t.selectDateRange}
-                              </p>
-                            </div>
-                          )}
-                      </div>
-                    );
-                  })()}
-                  {replayAvailable && (
-                    <ReplayLauncher
-                      ref={(handle) => {
-                        replayHandlesRef.current[graphIndex] = handle;
-                      }}
-                      parentChartId={`chart-${graphIndex}`}
-                      chartDefinition={graph.chartDefinition}
-                      yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
-                      xLabel={graph.chartDefinition.x_label}
-                    />
-                  )}
-                </Card>
-              </figure>
-            </section>
-          );
-        });
+                      ) : (
+                        <div className="relative">
+                          <ScatterGraph
+                            chartId={`chart-${graphIndex}`}
+                            modelLabel={graph.model}
+                            data={graph.data}
+                            xLabel={graph.chartDefinition.x_label}
+                            yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
+                            chartDefinition={graph.chartDefinition}
+                            caption={chartCaption}
+                            overlayData={
+                              selectUnofficialOverlayForMode(
+                                selectedXAxisMode,
+                                graph.chartDefinition.chartType,
+                                overlayDataByChartType,
+                              ) ?? undefined
+                            }
+                          />
+                          {selectedGPUs.length > 0 &&
+                            (!selectedDateRange.startDate || !selectedDateRange.endDate) &&
+                            selectedDates.length === 0 && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg z-10">
+                                <p className="text-sm font-medium text-muted-foreground bg-background/90 border border-border rounded-md px-4 py-2 shadow-sm">
+                                  {t.selectDateRange}
+                                </p>
+                              </div>
+                            )}
+                        </div>
+                      );
+                    })()}
+                    {replayAvailable && (
+                      <ReplayLauncher
+                        ref={(handle) => {
+                          replayHandlesRef.current[graphIndex] = handle;
+                        }}
+                        parentChartId={`chart-${graphIndex}`}
+                        chartDefinition={graph.chartDefinition}
+                        yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
+                        xLabel={graph.chartDefinition.x_label}
+                      />
+                    )}
+                  </Card>
+                </figure>
+              </section>
+            );
+          });
 
   return (
     <div data-testid="inference-chart-display" className="flex flex-col gap-4">
@@ -847,7 +983,12 @@ export default function ChartDisplay() {
           data-testid="x-axis-mode-buttons"
           className="flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
         >
-          {X_AXIS_MODE_BUTTONS.map(({ value, label, labelZh }) => (
+          {X_AXIS_MODE_BUTTONS.filter(({ value }) => {
+            if (!isAgenticOnlyXAxisMode(value)) return true;
+            // Before mount, render all buttons so SSR and first client render match.
+            if (!mounted) return true;
+            return isAgenticSequence;
+          }).map(({ value, label, labelZh }) => (
             <TabsTrigger
               key={value}
               value={value}

@@ -94,9 +94,9 @@ async function main(): Promise<void> {
       }
 
       let stats: AggregateStats;
-      // v3 onwards → current is a profile-only change (the server-derived
-      // fields haven't changed since v3), so skip re-reading the huge server
-      // blob and carry its KV/prefix distributions forward.
+      // v3 onwards → current is a profile-only change (the server-derived fields
+      // haven't changed since v3), so skip re-reading the huge server blob and
+      // carry its KV/prefix distributions forward.
       const storedVersion = row.aggregate_stats?.version;
       if (storedVersion !== undefined && storedVersion >= 3 && storedVersion < STATS_VERSION) {
         const profileStats = await computeAggregateStats({
