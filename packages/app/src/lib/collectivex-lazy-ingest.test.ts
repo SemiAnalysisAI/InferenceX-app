@@ -337,6 +337,21 @@ describe('discovery cooldown', () => {
 });
 
 describe('ensureCollectiveXRunsList', () => {
+  it('bounds GitHub discovery to runs that could still have rerun artifacts', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime('2026-07-29T00:00:00.000Z');
+    try {
+      mockFetch.mockResolvedValueOnce(runListing());
+
+      await expect(ensureCollectiveXRunsList(1)).resolves.toBe(true);
+
+      const discoveryUrl = new URL(mockFetch.mock.calls[0][0] as string);
+      expect(discoveryUrl.searchParams.get('created')).toBe('>=2026-06-15T00:00:00.000Z');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not probe artifacts for unknown runs beyond the retention window', async () => {
     mockFetch.mockResolvedValueOnce(runListing(runObject({ updated_at: '2020-01-01T00:00:00Z' })));
 

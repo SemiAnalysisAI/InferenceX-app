@@ -32,6 +32,9 @@ routes call before reading the DB (`packages/db/src/queries/collectivex.ts`):
   14-day artifacts may still be downloaded. Each request changes at most eight rows; an
   incomplete response is uncached and the client refetches until the workflow history is
   exhausted. Known rows do not consume the batch, so discovery advances past the newest runs.
+  GitHub discovery is limited to runs created within the last 44 days: the 30-day workflow
+  rerun window plus 14-day artifact retention, covering the oldest rerun whose artifacts can
+  still exist without rescanning permanent workflow history on every cold-origin request.
 - `ensureCollectiveXRun` — fetch one run by id, or compare a stored run's `run_attempt`
   against GitHub and refresh it when a rerun is newer. Only completed runs are persisted.
 

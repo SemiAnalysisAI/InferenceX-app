@@ -53,6 +53,11 @@ const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 // the DB remain visible, but unknown runs beyond this window cannot be
 // assembled and need not spend one GitHub artifact-list request apiece.
 const ARTIFACT_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+// GitHub permits a workflow rerun for 30 days after creation. Include that
+// whole window plus artifact retention so the created-date filter still finds
+// the oldest run whose newest rerun artifacts could be downloadable.
+const WORKFLOW_RERUN_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const DISCOVERY_LOOKBACK_MS = WORKFLOW_RERUN_WINDOW_MS + ARTIFACT_RETENTION_MS;
 // Bound one origin request's work. The runs route reports whether discovery is
 // complete, and the client refetches while more ingestible runs remain.
 const MAX_CHANGED_RUNS_PER_PASS = 8;
@@ -228,14 +233,18 @@ function artifactsMayBeAvailable(run: WorkflowRun): boolean {
   return !Number.isFinite(timestamp) || Date.now() - timestamp <= ARTIFACT_RETENTION_MS;
 }
 
-// Newest-first stream of completed sweep runs across all branches.
+// Newest-first stream of completed sweep runs across all branches. GitHub's
+// created filter bounds cold-origin discovery without excluding any run whose
+// original or rerun artifacts could still be within their retention window.
 async function* sweepRuns(token: string): AsyncGenerator<WorkflowRun> {
   let page = 1;
   let visited = 0;
   let total: number | null = null;
+  const createdSince = new Date(Date.now() - DISCOVERY_LOOKBACK_MS).toISOString();
   while (total === null || visited < total) {
     const parameters = new URLSearchParams({
       status: 'completed',
+      created: `>=${createdSince}`,
       per_page: String(RUNS_PER_PAGE),
       page: String(page),
     });
