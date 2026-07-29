@@ -278,7 +278,18 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       'true',
     );
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
-    // Percentile was switched to p75 in the previous test — the axis label follows.
+    cy.get('[data-testid="chart-figure"] svg').should(
+      'contain.text',
+      'P90 Interactivity (tok/s/user)',
+    );
+  });
+
+  it('follows the percentile selector in the Interactivity axis label', () => {
+    // Select p75 here rather than inheriting it from another test — the axis
+    // label must track the selector on its own.
+    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
+    cy.get('[data-testid="percentile-selector"]').click();
+    cy.contains('[role="option"]', 'p75').click();
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
       'P75 Interactivity (tok/s/user)',
