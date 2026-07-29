@@ -40,12 +40,13 @@ const STRINGS = {
       'Jump straight into the most popular GPU inference benchmark comparisons, curated and ready to explore.',
   },
   zh: {
+    exploreInferenceX: '探索 InferenceX',
+    exploreInferenceXLead:
+      '先查看活跃模型与关键平台的精简成本总览，或打开完整仪表板，探索所有模型、GPU、框架与指标。',
     fullDashboard: '完整仪表板',
-    fullDashboardP1:
-      '覆盖所有模型、GPU、框架与指标。完全可配置的推理基准测试图表，支持日期范围、并发扫描与原始数据导出。',
-    fullDashboardP2:
+    platformCoverage:
       '跨 DeepSeekv4 Pro、Qwen、Kimi、GLM、MiniMax、gpt-oss、Llama 等模型，对比 NVIDIA GB300 NVL72、GB200 NVL72、B300、B200、H200、H100、AMD MI355X、MI325X、MI300X，以及即将上线的 VR200 NVL72、AMD MI455X UALoE72、TPUv7 Ironwood 等硬件。',
-    openDashboard: '打开仪表板',
+    overview: '总览',
     reproTitle: '每一条结果都通过公开的 GitHub Actions 自动化流程透明产生',
     reproP1:
       '仪表板上的每个数据点都由公开的 GitHub Actions 工作流运行产生。配置方案（recipe）保存在公开仓库中，运行在真实目标硬件上执行，完整日志与产物公开可查。点击图表上的任意数据点即可跳转到生成它的那次运行。一切都可复现、可审计、开源。',
@@ -79,60 +80,37 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
 
         {/* Split: exploration entry points vs presets */}
         <section className="flex flex-col gap-4 pb-8">
-          {locale === 'zh' ? (
-            <Card>
-              <div className="flex items-center gap-2 mb-3">
-                <BarChart3 className="size-5 shrink-0 text-brand" />
-                <h2 className="text-lg font-semibold">{STRINGS.zh.fullDashboard}</h2>
-              </div>
-              <p className="text-sm text-muted-foreground mb-2">{STRINGS.zh.fullDashboardP1}</p>
-              <p className="text-sm text-muted-foreground mb-6">{STRINGS.zh.fullDashboardP2}</p>
-              <div className="mt-auto">
-                <LandingTrackedLink
-                  href="/zh/inference"
-                  analyticsEvent="landing_full_dashboard_clicked"
-                  appNavigation
-                  className="inline-flex items-center justify-center gap-2 rounded-md text-sm sm:text-base font-medium h-12 px-8 bg-brand text-primary-foreground hover:bg-brand/90 transition-colors"
-                >
-                  {STRINGS.zh.openDashboard}
-                  <ArrowRight className="size-4" />
-                </LandingTrackedLink>
-              </div>
-            </Card>
-          ) : (
-            <Card>
-              <div className="flex items-center gap-2 mb-3">
-                <BarChart3 className="size-5 shrink-0 text-brand" />
-                <h2 className="text-lg font-semibold">{STRINGS.en.exploreInferenceX}</h2>
-              </div>
-              <p className="text-sm text-muted-foreground mb-2">
-                {STRINGS.en.exploreInferenceXLead}
-              </p>
-              <p className="text-sm text-muted-foreground mb-6">{STRINGS.en.platformCoverage}</p>
-              <div className="mt-auto flex flex-col gap-2 sm:flex-row">
-                <LandingTrackedLink
-                  href="/overview"
-                  data-testid="landing-overview-link"
-                  analyticsEvent="landing_overview_clicked"
-                  appNavigation
-                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-brand px-8 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 motion-reduce:transition-none sm:w-auto sm:text-base"
-                >
-                  {STRINGS.en.overview}
-                  <ArrowRight aria-hidden="true" className="size-4" />
-                </LandingTrackedLink>
-                <LandingTrackedLink
-                  href="/inference"
-                  data-testid="landing-full-dashboard-link"
-                  analyticsEvent="landing_full_dashboard_clicked"
-                  appNavigation
-                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md border border-border px-8 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 motion-reduce:transition-none sm:w-auto sm:text-base"
-                >
-                  {STRINGS.en.fullDashboard}
-                  <ArrowRight aria-hidden="true" className="size-4" />
-                </LandingTrackedLink>
-              </div>
-            </Card>
-          )}
+          {/* Primary product entry points */}
+          <Card>
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="size-5 shrink-0 text-brand" />
+              <h2 className="text-lg font-semibold">{t.exploreInferenceX}</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-2">{t.exploreInferenceXLead}</p>
+            <p className="text-sm text-muted-foreground mb-6">{t.platformCoverage}</p>
+            <div className="mt-auto flex flex-col gap-2 sm:flex-row">
+              <LandingTrackedLink
+                href={`${prefix}/overview`}
+                data-testid="landing-overview-link"
+                analyticsEvent="landing_overview_clicked"
+                appNavigation
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-brand px-8 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 motion-reduce:transition-none sm:w-auto sm:text-base"
+              >
+                {t.overview}
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </LandingTrackedLink>
+              <LandingTrackedLink
+                href={`${prefix}/inference`}
+                data-testid="landing-full-dashboard-link"
+                analyticsEvent="landing_full_dashboard_clicked"
+                appNavigation
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md border border-border px-8 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 motion-reduce:transition-none sm:w-auto sm:text-base"
+              >
+                {t.fullDashboard}
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </LandingTrackedLink>
+            </div>
+          </Card>
 
           {/* Reproducibility callout */}
           <Card>
