@@ -385,6 +385,7 @@ export default function CollectiveXDisplay() {
 
   useEffect(() => {
     if (!runsQuery.data || initializedVersionRef.current === version) return;
+    if (runsQuery.data.runs.length === 0 && !runsQuery.data.discovery_complete) return;
     const initial =
       runsQuery.data.runs.find((run) => run.measured_cases > 0) ?? runsQuery.data.runs[0];
     setVisibleRunIds(initial ? new Set([initial.run_id]) : new Set());

@@ -84,7 +84,7 @@ describe('CollectiveX neutral run view', () => {
       request.reply({
         body: {
           version: 1,
-          runs: (requests === 1 ? [dataset] : [dataset, comparisonDataset]).map(buildRunSummary),
+          runs: (requests === 1 ? [] : [dataset, comparisonDataset]).map(buildRunSummary),
           discovery_complete: requests > 1,
         },
       });
@@ -92,12 +92,14 @@ describe('CollectiveX neutral run view', () => {
 
     cy.reload();
     cy.wait('@progressiveRuns');
-    cy.wait('@run');
     cy.wait('@progressiveRuns');
+    cy.wait('@run');
 
     cy.get(`[data-testid="collectivex-run-row-${comparisonDataset.run.run_id}"]`).should(
       'be.visible',
     );
+    cy.get(`[data-testid="collectivex-run-visible-${runId}"]`).should('be.checked');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
     cy.then(() => expect(requests).to.be.gte(2));
   });
 
