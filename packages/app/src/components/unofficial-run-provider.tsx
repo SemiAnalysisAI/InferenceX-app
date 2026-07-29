@@ -62,6 +62,14 @@ export interface UnofficialRunContextType {
    */
   runIndexByUrl: Record<string, number>;
   unofficialChartData: UnofficialChartData | null;
+  /**
+   * Raw benchmark rows as returned by the unofficial-run API, before any chart
+   * transform. Kept alongside `unofficialChartData` so consumers that build
+   * their own derived shapes from raw rows — today the TCO calculator's
+   * `useThroughputData` — can run overlay rows through the exact same mapping
+   * as official DB rows instead of re-deriving them from chart data.
+   */
+  unofficialBenchmarkRows: BenchmarkRow[] | null;
   unofficialEvalRows: EvalRow[] | null;
   loading: boolean;
   error: string | null;
@@ -169,6 +177,9 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
   const [unofficialRunInfos, setUnofficialRunInfos] = useState<UnofficialRunInfo[]>([]);
   const unofficialRunInfo = unofficialRunInfos[0] ?? null;
   const [unofficialChartData, setUnofficialChartData] = useState<UnofficialChartData | null>(null);
+  const [unofficialBenchmarkRows, setUnofficialBenchmarkRows] = useState<BenchmarkRow[] | null>(
+    null,
+  );
   const [unofficialEvalRows, setUnofficialEvalRows] = useState<EvalRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -231,6 +242,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
   const clearUnofficialRun = useCallback(() => {
     setUnofficialRunInfos([]);
     setUnofficialChartData(null);
+    setUnofficialBenchmarkRows(null);
     setUnofficialEvalRows(null);
     setError(null);
     setAvailableModelsAndSequences([]);
@@ -268,6 +280,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
       if (remaining.length === 0) {
         setUnofficialRunInfos([]);
         setUnofficialChartData(null);
+        setUnofficialBenchmarkRows(null);
         setUnofficialEvalRows(null);
         setError(null);
         setAvailableModelsAndSequences([]);
@@ -313,6 +326,10 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
       // the dismissed run.
       setAvailableModelsAndSequences(parseAvailableModelsAndSequences(nextChartData));
 
+      setUnofficialBenchmarkRows((prev) =>
+        prev ? prev.filter((row) => !belongsToDismissed(row.run_url)) : prev,
+      );
+
       setUnofficialEvalRows((prev) =>
         prev ? prev.filter((row) => !belongsToDismissed(row.run_url)) : prev,
       );
@@ -357,6 +374,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
       if (!unofficialRunIdParam) {
         setUnofficialRunInfos([]);
         setUnofficialChartData(null);
+        setUnofficialBenchmarkRows(null);
         setUnofficialEvalRows(null);
         setError(null);
         setAvailableModelsAndSequences([]);
@@ -374,8 +392,10 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
           if (!response.ok) throw new Error(data.error || 'Failed to fetch unofficial run');
 
           setUnofficialRunInfos(Array.isArray(data.runInfos) ? data.runInfos : []);
-          const chartData = buildChartData(data.benchmarks ?? []);
+          const benchmarkRows: BenchmarkRow[] = data.benchmarks ?? [];
+          const chartData = buildChartData(benchmarkRows);
           setUnofficialChartData(chartData);
+          setUnofficialBenchmarkRows(benchmarkRows);
           setUnofficialEvalRows(data.evaluations ?? []);
           setAvailableModelsAndSequences(parseAvailableModelsAndSequences(chartData));
         })
@@ -383,6 +403,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
           setError(caughtError instanceof Error ? caughtError.message : 'Unknown error');
           setUnofficialRunInfos([]);
           setUnofficialChartData(null);
+          setUnofficialBenchmarkRows(null);
           setUnofficialEvalRows(null);
           setAvailableModelsAndSequences([]);
         })
@@ -402,6 +423,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
         unofficialRunInfos,
         runIndexByUrl,
         unofficialChartData,
+        unofficialBenchmarkRows,
         unofficialEvalRows,
         loading,
         error,

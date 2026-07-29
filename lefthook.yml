@@ -2,12 +2,12 @@ pre-commit:
   parallel: true
   jobs:
     - name: lint
-      run: pnpm lint:fix -- {staged_files}
+      run: bun run lint:fix -- {staged_files}
       stage_fixed: true
 
     - name: format
-      run: pnpm fmt:fix -- {staged_files}
+      run: bun run fmt:fix -- {staged_files}
       stage_fixed: true
 
     - name: typecheck
-      run: pnpm typecheck
+      run: bun run typecheck

@@ -284,22 +284,22 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // Landing modals
   // -------------------------------------------------------------------------
   {
-    id: 'minimax-m3-launch-modal',
+    id: 'kimi-k3-launch-modal',
     type: 'modal',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
-    storageKey: 'inferencex-minimax-m3-modal-dismissed',
+    storageKey: 'inferencex-kimi-k3-modal-dismissed',
     priority: 50,
     scope: 'landing',
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'MiniMax M3 is live',
-      titleZh: 'MiniMax M3 已上线',
+      title: 'Kimi K3 is live',
+      titleZh: 'Kimi K3 已上线',
       description:
-        'Day-zero benchmarks for MiniMax M3 are now available across the latest NVIDIA and AMD GPUs. Results are experimental — see how the new model performs across hardware.',
+        'Day-zero benchmarks for Kimi K3 are now available across the latest NVIDIA and AMD GPUs. Results are experimental — see how the new model performs across hardware.',
       descriptionZh:
-        'MiniMax M3 的首日基准测试数据现已覆盖最新的 NVIDIA 和 AMD GPU。结果为实验性数据——来看看新模型在不同硬件上的表现。',
+        'Kimi K3 的首日基准测试数据现已覆盖最新的 NVIDIA 和 AMD GPU。结果为实验性数据——来看看新模型在不同硬件上的表现。',
       testId: 'launch-modal',
       containerClassName: 'border-brand/40',
       badge: 'New',
@@ -311,14 +311,14 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
         labelZh: '开始探索',
         icon: <ArrowRight className="size-4" />,
         onClick: () => {
-          window.location.href = '/inference?preset=minimax-m3-launch';
+          window.location.href = '/inference?preset=kimi-k3-launch';
         },
       },
     },
     analytics: {
-      shown: 'minimax_m3_modal_shown',
-      dismissed: 'minimax_m3_modal_dismissed',
-      action: 'minimax_m3_modal_explored',
+      shown: 'kimi_k3_modal_shown',
+      dismissed: 'kimi_k3_modal_dismissed',
+      action: 'kimi_k3_modal_explored',
     },
   },
   {
@@ -365,7 +365,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // Landing banner
   // -------------------------------------------------------------------------
   {
-    id: 'minimax-m3-launch-banner',
+    id: 'kimi-k3-launch-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -376,23 +376,23 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'MiniMax M3 benchmarks are live',
-      titleZh: 'MiniMax M3 基准测试已上线',
+      title: 'Kimi K3 benchmarks are live',
+      titleZh: 'Kimi K3 基准测试已上线',
       description: 'First inference numbers across NVIDIA and AMD GPUs, click to explore.',
       descriptionZh: 'NVIDIA 和 AMD GPU 的首批推理数据，点击探索。',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: '/inference?preset=minimax-m3-launch',
+      href: '/inference?preset=kimi-k3-launch',
       onLinkClick: () => {
-        window.location.href = '/inference?preset=minimax-m3-launch';
+        window.location.href = '/inference?preset=kimi-k3-launch';
       },
     },
     analytics: {
       shown: 'launch_banner_shown',
       dismissed: 'launch_banner_dismissed',
       action: 'launch_banner_clicked',
-      properties: { banner_id: 'minimax-m3-launch', preset_id: 'minimax-m3-launch' },
+      properties: { banner_id: 'kimi-k3-launch', preset_id: 'kimi-k3-launch' },
     },
   },
 ];

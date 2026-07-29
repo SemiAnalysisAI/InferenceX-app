@@ -1,10 +1,18 @@
+// Order mirrors DEFAULT_MODELS (MODEL_CONFIG insertion order), which fixes the
+// matrix row order.
 const MODEL_LABELS = [
   'DeepSeek V4 Pro 1.6T',
+  'Kimi K3 2.8T',
   'Kimi K2.5/2.6/2.7-Code 1T',
   'MiniMax M3 428B',
   'GLM5.2',
   'Qwen3.5 397B',
 ];
+
+// Models whose row collapses to a coverage note instead of 5 platform cells:
+// GLM5.2 (fixtures carry no 8K/1K rows) and Kimi K3 (no fixture rows at all —
+// nothing ingested yet).
+const ZERO_COVERAGE_MODELS = 2;
 
 const PLATFORM_HEADERS = [
   'Model',
@@ -261,10 +269,10 @@ describe('Overview page', () => {
           );
         });
         cy.get('[data-testid="overview-desktop-model"]').should('have.length', MODEL_LABELS.length);
-        // GLM's zero-coverage row collapses to a single note instead of 5 cells.
+        // Zero-coverage rows collapse to a single note instead of 5 cells.
         cy.get('[data-testid="overview-platform"]').should(
           'have.length',
-          (MODEL_LABELS.length - 1) * 5,
+          (MODEL_LABELS.length - ZERO_COVERAGE_MODELS) * 5,
         );
         cy.get('details, summary, button').should('not.exist');
         cy.contains(/PRIMARY|Ranked results/).should('not.exist');

@@ -102,6 +102,25 @@ describe('tooltip parallelism — standard (ep field present)', () => {
     expect(html).toContain('True');
   });
 
+  it('shows Pipeline Parallelism when pp > 1', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ tp: 16, decode_tp: 8, ep: 1, pp: 2, dp_attention: false }) }),
+    );
+    expect(html).toContain('Pipeline Parallelism');
+    // The Tensor Parallelism line shows the raw TP width, not the pp-folded
+    // total GPU count.
+    expect(html).toMatch(/Tensor Parallelism:<\/strong> 8/u);
+  });
+
+  it('hides Pipeline Parallelism when pp is 1, 0, or absent', () => {
+    for (const pp of [1, 0, undefined]) {
+      const html = generateTooltipContent(
+        tooltipConfig({ data: pt({ tp: 8, ep: 1, pp, dp_attention: false }) }),
+      );
+      expect(html).not.toContain('Pipeline Parallelism');
+    }
+  });
+
   it('omits Expert Parallelism line when ep is null', () => {
     const d = pt({ tp: 4 });
     (d as any).ep = null;
@@ -170,6 +189,32 @@ describe('tooltip parallelism — multinode disagg', () => {
     expect(html).toContain('Workers: 1');
   });
 
+  it('shows per-role PP in prefill/decode lines only when > 1', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          tp: 8,
+          ep: 1,
+          is_multinode: true,
+          disagg: true,
+          prefill_tp: 8,
+          prefill_ep: 1,
+          prefill_pp: 2,
+          decode_tp: 8,
+          decode_ep: 1,
+          decode_pp: 1,
+          prefill_num_workers: 1,
+          decode_num_workers: 1,
+          num_prefill_gpu: 16,
+          num_decode_gpu: 8,
+        }),
+      }),
+    );
+    // prefill line carries PP: 2; decode line (pp=1) has no PP part
+    expect(html).toContain('PP: 2');
+    expect(html).not.toContain('PP: 1');
+  });
+
   it('shows "?" for missing GPU count fields', () => {
     const html = generateTooltipContent(
       tooltipConfig({
@@ -206,6 +251,48 @@ describe('tooltip parallelism — multinode disagg', () => {
     expect(html).toContain('Decode:');
     expect(html).toContain('8 GPUs');
     expect(html).toContain('16 GPUs');
+  });
+});
+
+// ===========================================================================
+// zh locale
+// ===========================================================================
+describe('tooltip parallelism — zh locale', () => {
+  it('localizes the standard parallelism labels', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({ tp: 16, decode_tp: 8, ep: 1, pp: 2, dp_attention: false }),
+        locale: 'zh',
+      }),
+    );
+    expect(html).toContain('张量并行 (TP)');
+    expect(html).toContain('流水线并行 (PP)');
+    expect(html).not.toContain('Tensor Parallelism');
+  });
+
+  it('localizes the old-data parallelism strategy line', () => {
+    const html = generateTooltipContent(tooltipConfig({ data: pt({ tp: 4 }), locale: 'zh' }));
+    expect(html).toContain('并行策略');
+    expect(html).toContain('4 个 GPU');
+  });
+
+  it('localizes the multinode disagg role headers', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          tp: 8,
+          ep: 4,
+          is_multinode: true,
+          disagg: true,
+          num_prefill_gpu: 16,
+          num_decode_gpu: 24,
+        }),
+        locale: 'zh',
+      }),
+    );
+    expect(html).toContain('预填充:');
+    expect(html).toContain('解码:');
+    expect(html).toContain('16 个 GPU');
   });
 });
 

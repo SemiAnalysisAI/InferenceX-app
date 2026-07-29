@@ -98,6 +98,38 @@ export interface ModelArchitecture {
   sourceUrl?: string;
   /** Override whether the attention block is expandable in diagrams. If not set, determined by attentionType. */
   attentionExpandable?: boolean;
+  /**
+   * Override whether the attention block *inside each alternating layer block*
+   * drills down to the hybrid local/compressed flow (`getHybridAttentionSubBlocks`).
+   * Defaults to expandable for `Hybrid` attention. Independent of
+   * `attentionExpandable`, which governs the single non-alternating block:
+   * DeepSeek V4 disables that one but keeps this one. Set false for hybrids
+   * that aren't CSA/HCA-shaped (Kimi K3's KDA + gated MLA stack).
+   */
+  alternatingAttentionExpandable?: boolean;
+  /**
+   * Number of shared experts included in `numExperts`. Defaults to 1 when
+   * `hasSharedExpert` is set — the DeepSeek-style single shared expert every
+   * other MoE model here uses. Kimi K3's LatentMoE has 2.
+   */
+  sharedExperts?: number;
+  /**
+   * Override the caption on the arrow between the two alternating blocks.
+   * Defaults to "alternating every layer", which is only true for an even 1:1
+   * interleave (gpt-oss, DeepSeek V4). Set it when the split is uneven.
+   */
+  alternatingNote?: string;
+  /**
+   * Attention label for the dense-FFN prefix block, when that layer's mechanism
+   * differs from the model-wide `attentionType`. Only matters for hybrids whose
+   * dense layer belongs to one specific category — Kimi K3's dense layer is a
+   * KDA layer, so the model-wide "Hybrid Attention" label would misdescribe it.
+   */
+  denseLayerAttentionLabel?: string;
+  /** GLU variant of the FFN / expert blocks. Defaults to `SwiGLU`. */
+  ffnVariant?: string;
+  /** Elementwise activation applied to the gate projection. Defaults to `SiLU`. */
+  ffnGateActivation?: string;
 }
 
 /**
@@ -111,6 +143,7 @@ export interface ModelArchitecture {
  * - https://github.com/deepseek-ai/DeepSeek-V3
  * - https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro (config.json, inference/model.py, DeepSeek_V4.pdf)
  * - https://huggingface.co/moonshotai/Kimi-K2.5/blob/main/config.json
+ * - https://huggingface.co/moonshotai/Kimi-K3/blob/main/config.json (+ model card)
  * - https://huggingface.co/openai/gpt-oss-120b/blob/main/config.json
  * - https://huggingface.co/MiniMaxAI/MiniMax-M2/blob/main/config.json
  * - https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/config.json
@@ -309,6 +342,75 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     developer: 'Moonshot AI',
     sourceUrl: 'https://huggingface.co/moonshotai/Kimi-K2.5',
   },
+  [Model.Kimi_K3]: {
+    model: Model.Kimi_K3,
+    totalParams: 2800, // 2.8T
+    activeParams: 104,
+    architectureType: 'moe',
+    // 69 Kimi Delta Attention (linear) layers interleaved with 24 gated-MLA
+    // layers. Neither the GQA drill-down nor the DeepSeek V4 CSA/HCA hybrid
+    // drill-down describes this stack, so both layer categories render as
+    // static attention blocks.
+    attentionType: 'Hybrid',
+    attentionExpandable: false,
+    alternatingAttentionExpandable: false,
+    numLayers: 93,
+    hiddenSize: 7168,
+    numHeads: 96,
+    vocabSize: 163840,
+    ffnDim: 3072, // moe_intermediate_size (per-expert FFN)
+    numExperts: 898, // 896 routed + 2 shared
+    sharedExperts: 2,
+    activeExperts: 16,
+    hasSharedExpert: true,
+    denseFFNLayers: 1, // first_k_dense_replace
+    denseFFNDim: 33792, // intermediate_size (dense layer FFN)
+    // The dense-FFN layer (layer 1) is a KDA layer, and the diagram stacks the
+    // dense prefix block above both alternating blocks — so it is carved out of
+    // the KDA count here (68 + 24 + 1 dense = 93), the same partition DeepSeek
+    // V4 uses for its hash-routed prefix. Full layer composition is 69 KDA + 24
+    // gated MLA.
+    alternatingLayers: [
+      {
+        label: 'Kimi Delta Attention (KDA)',
+        description:
+          'Linear-attention layers with a gated delta-rule state update — constant-size recurrent state instead of a growing KV cache. 69 KDA layers total; the first is the dense-FFN layer shown above.',
+        count: 68,
+        colorKey: 'attention',
+      },
+      {
+        label: 'Gated MLA',
+        description:
+          'Multi-head Latent Attention (512-dim compressed KV latent, NoPE) with an output gate, placed every fourth layer to carry full-context recall.',
+        count: 24,
+        colorKey: 'norm',
+      },
+    ],
+    // Not a 1:1 interleave — full attention lands on layers 4, 8, … 92 plus the
+    // final layer 93.
+    alternatingNote: 'gated MLA every 4th layer',
+    // The dense-FFN prefix is layer 1, which config.json lists under
+    // `kda_layers` — the model-wide "Hybrid Attention" label would be wrong for
+    // that single block.
+    denseLayerAttentionLabel: 'Kimi Delta Attention (KDA)',
+    // hidden_act = "situ"; the model card calls the FFN SiTU-GLU.
+    ffnVariant: 'SiTU-GLU',
+    ffnGateActivation: 'SiTU',
+    contextWindow: 1048576, // 1M
+    features: [
+      'Kimi Delta Attention (KDA linear attention)',
+      'Gated MLA (every 4th layer, NoPE)',
+      'Attention Residuals (AttnRes)',
+      'Stable LatentMoE (3584-dim latent)',
+      'MoE (896 routed + 2 shared experts, 16 active)',
+      'SiTU-GLU Activation',
+      'Native Multimodality (text/image/video)',
+      'MXFP4 Quantization',
+    ],
+    releaseDate: '2026-06-13',
+    developer: 'Moonshot AI',
+    sourceUrl: 'https://huggingface.co/moonshotai/Kimi-K3',
+  },
   [Model.MiniMax_M2_5]: {
     model: Model.MiniMax_M2_5,
     totalParams: 230,
@@ -397,6 +499,44 @@ export function getArchitectureSummary(arch: ModelArchitecture): string {
     return `MoE ${formatParamCount(arch.totalParams)} (${formatParamCount(arch.activeParams)} active)`;
   }
   return `Dense ${formatParamCount(arch.totalParams)}`;
+}
+
+/** GLU variant of the FFN / expert blocks, e.g. `SwiGLU` or K3's `SiTU-GLU`. */
+export function ffnVariantLabel(arch: ModelArchitecture): string {
+  return arch.ffnVariant ?? 'SwiGLU';
+}
+
+/** Elementwise activation on the gate projection, e.g. `SiLU` or K3's `SiTU`. */
+export function ffnGateActivationLabel(arch: ModelArchitecture): string {
+  return arch.ffnGateActivation ?? 'SiLU';
+}
+
+/**
+ * Attention label for the dense-FFN prefix block. Falls back to the model-wide
+ * attention type, which is right for every uniform-attention model; hybrids
+ * whose dense layer is one specific category override it.
+ */
+export function denseLayerAttentionLabel(arch: ModelArchitecture): string {
+  return arch.denseLayerAttentionLabel ?? getAttentionLabel(arch.attentionType);
+}
+
+/** Shared experts counted inside `numExperts`. Zero when the model has none. */
+export function sharedExpertCount(arch: ModelArchitecture): number {
+  if (!arch.hasSharedExpert) return 0;
+  return arch.sharedExperts ?? 1;
+}
+
+/**
+ * Router sub-label for a MoE expert grid, e.g. `Top-8 of 384 routed + 1 shared`.
+ * `numExperts` counts routed *and* shared experts, so the shared ones are
+ * subtracted out of the routed figure — with the model's own shared count, not
+ * an assumed 1 (Kimi K3 has 2).
+ */
+export function expertRouterSummary(arch: ModelArchitecture): string {
+  const shared = sharedExpertCount(arch);
+  const routed = (arch.numExperts ?? 0) - shared;
+  const sharedSuffix = shared > 0 ? ` + ${shared} shared` : '';
+  return `Top-${arch.activeExperts} of ${routed} routed${sharedSuffix}`;
 }
 
 /**
@@ -580,7 +720,7 @@ export function getFFNSubBlocks(
         type: 'projection',
       },
       {
-        name: 'SiLU Activation',
+        name: `${ffnGateActivationLabel(arch)} Activation`,
         detail: 'Applied to gate output',
         type: 'activation',
       },

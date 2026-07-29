@@ -3,7 +3,7 @@
  * After running this, you must run db:migrate before db:ingest.
  *
  * Usage:
- *   pnpm admin:db:reset
+ *   bun run admin:db:reset
  */
 
 import { TABLE_NAMES } from '@semianalysisai/inferencex-constants';
@@ -58,7 +58,7 @@ async function reset(): Promise<void> {
   console.log('  All tables dropped.');
 
   console.log('\n=== db:reset complete ===');
-  console.log('  Invalidate API cache: pnpm admin:cache:invalidate');
+  console.log('  Invalidate API cache: bun run admin:cache:invalidate');
 }
 
 reset()

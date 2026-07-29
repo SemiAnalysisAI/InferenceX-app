@@ -8,7 +8,7 @@
     "./server": "./src/server.ts"
   },
   "scripts": {
-    "mcp": "dotenv -e ../../.env -- tsx src/mcp.ts",
+    "mcp": "bun --env-file=../../.env src/mcp.ts",
     "test:unit": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -21,8 +21,6 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
-    "dotenv-cli": "^11.0.0",
-    "tsx": "^4.23.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
   }

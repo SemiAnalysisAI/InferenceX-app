@@ -169,6 +169,8 @@ Does NOT consume `GlobalFilterProvider`. Fully standalone — reliability data h
 
 **TCO Calculator** (`calculator` tab): All state is local `useState` inside `ThroughputCalculatorDisplay`. It reads `effectiveSequence` and `effectivePrecisions` from `useGlobalFilters()` for the initial GPU list but does not share state back.
 
+It reads `unofficialBenchmarkRows` / `unofficialRunInfos` / `runIndexByUrl` from `useUnofficialRun()` to render unofficial-run overlay bars, but it neither reads nor writes the shared `activeOverlayHwTypes` that the inference and evaluation tabs use: the calculator's local `visibleHwKeys` governs its official and overlay bars alike. Two visibility sets behind one legend can only drift — see [TCO Calculator › Unofficial-Run Overlays](./tco-calculator.md#unofficial-run-overlays-unofficialrun).
+
 **Historical Trends** (`historical` tab): Rendered inside `InferenceProvider` (shares the `inference` + `historical` `isActive` gate). It reads `useInference()` directly — no additional provider. Uses InferenceContext's model/sequence/precision/date state.
 
 **GPU Specs**: Static data, no provider.

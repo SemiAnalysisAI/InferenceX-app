@@ -146,14 +146,21 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     num_decode_gpu: row.num_decode_gpu,
     spec_decoding: row.spec_method,
     ep: row.decode_ep,
+    // Pipeline parallelism has no configs-table column — the ingest mapper
+    // auto-captures the artifact's prefill_pp/decode_pp into the metrics
+    // JSONB, so both official DB rows and live-transformed overlay rows read
+    // it from there. Undefined for artifacts predating the field.
+    pp: m.decode_pp,
     dp_attention: row.decode_dp_attention,
     is_multinode: row.is_multinode,
     prefill_tp: row.prefill_tp,
     prefill_ep: row.prefill_ep,
+    prefill_pp: m.prefill_pp,
     prefill_dp_attention: row.prefill_dp_attention,
     prefill_num_workers: row.prefill_num_workers,
     decode_tp: row.decode_tp,
     decode_ep: row.decode_ep,
+    decode_pp: m.decode_pp,
     decode_dp_attention: row.decode_dp_attention,
     decode_num_workers: row.decode_num_workers,
     image: row.image ?? undefined,

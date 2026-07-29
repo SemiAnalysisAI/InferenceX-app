@@ -24,7 +24,7 @@
  *   gsutil -m rsync -r gs://inferencemax-gha-backup/ ./gcs/
  *
  * Usage:
- *   pnpm admin:db:ingest:gcs
+ *   bun run admin:db:ingest:gcs
  */
 
 import fs from 'fs';
@@ -867,7 +867,7 @@ async function main(): Promise<void> {
   }
 
   console.log('\n=== db:ingest:gcs complete ===');
-  console.log('  Invalidate API cache: pnpm admin:cache:invalidate');
+  console.log('  Invalidate API cache: bun run admin:cache:invalidate');
 }
 
 main()

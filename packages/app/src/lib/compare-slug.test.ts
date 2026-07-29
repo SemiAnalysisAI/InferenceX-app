@@ -266,6 +266,7 @@ describe('compareModelSeoName', () => {
   const EXPECTED: Record<string, string> = {
     'deepseek-v4': 'DeepSeek V4 Pro',
     'deepseek-r1': 'DeepSeek R1',
+    'kimi-k3': 'Kimi K3',
     'kimi-k26': 'Kimi K2.6',
     'glm-5-1': 'GLM-5',
     'glm-5-2': 'GLM-5.2',
@@ -341,6 +342,18 @@ describe('getCompareModelBySlug', () => {
   it('keeps the bare minimax alias on the M2 series, with minimax-m3 canonical', () => {
     expect(getCompareModelBySlug('minimax')?.slug).toBe('minimax-m27');
     expect(getCompareModelBySlug('minimax-m3')?.slug).toBe('minimax-m3');
+  });
+
+  it('keeps the bare kimi alias on the K2 series, with kimi-k3 canonical and separate', () => {
+    // K3 is a distinct architecture, not a K2 point release: it must not join
+    // the kimi-k26 dbKey group, and the family alias stays where it was so
+    // existing /compare/kimi-* links keep resolving to K2.
+    expect(getCompareModelBySlug('kimi')?.slug).toBe('kimi-k26');
+    const k3 = getCompareModelBySlug('kimi-k3');
+    expect(k3?.slug).toBe('kimi-k3');
+    expect(k3?.dbKeys).toEqual(['kimik3']);
+    expect(k3?.displayName).toBe('Kimi-K3');
+    expect(KIMI_K26.dbKeys).not.toContain('kimik3');
   });
 
   it('returns null for unknown slugs', () => {

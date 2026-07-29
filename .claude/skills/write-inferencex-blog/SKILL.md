@@ -321,7 +321,7 @@ The editor runs as a background Node process on `127.0.0.1:4747`, reads from and
 
 While the user reviews in the browser, you can:
 
-- Run `pnpm lint && pnpm typecheck` against the working tree to catch any MDX errors that would block the pre-commit hook later.
+- Run `bun run lint && bun run typecheck` against the working tree to catch any MDX errors that would block the pre-commit hook later.
 - Save the chart image into `packages/app/public/images/{slug}/benchmark-light.png` (and `benchmark-dark.png` if the user provided both) so the `<Figure>` placeholder in the preview shows a real path.
 
 **Concurrent-edit collision warning.** The browser editor auto-saves the user's textarea ~800 ms after their last keystroke. If you re-edit a paragraph the user has open in CodeMirror, your `Edit` call writes to disk first, then the editor's debounced save overwrites your change with the user's stale buffer the next time they type or the timer fires. Failure mode: user asks you to expand a paragraph, you expand it on disk, user types one more character in the browser, the one-liner comes back. When you need to edit a section the user is actively working on, **tell the user explicitly to either close the browser tab or hit the "↻ Reload from disk" button before resuming editing**. Don't rely on them noticing the collision — it looks like nothing happened from their side.
@@ -342,7 +342,7 @@ git push -u origin blog/{slug}
 gh pr create --title "feat(blog): ..." --body "..."
 ```
 
-The pre-commit hook runs `oxlint`, `oxfmt`, and `tsc --noEmit`. All three must pass. If lint/format fails, run `pnpm lint:fix && pnpm fmt:fix` and re-commit (don't `--no-verify`).
+The pre-commit hook runs `oxlint`, `oxfmt`, and `tsc --noEmit`. All three must pass. If lint/format fails, run `bun run lint:fix && bun run fmt:fix` and re-commit (don't `--no-verify`).
 
 After the PR opens, expect Cursor Bugbot to flag correctness issues in the prose (numeric overstatement, claims contradicted by tables, wrong attribution). Treat its findings as real review comments — fix them in a follow-up commit, then resolve the threads. Branch protection on master requires resolved review threads before auto-merge fires.
 

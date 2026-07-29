@@ -4,12 +4,11 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vites
 import { installChunkLoadRecovery } from './chunk-load-recovery';
 
 const KEY = 'chunk_reload';
+const reload = vi.fn();
+let originalLocation: Location;
 
-// JSDOM forbids spying on `window.location.reload`, but the implementation
-// always sets the sessionStorage gate immediately BEFORE calling reload(),
-// so the gate's `'1'` state is a 1:1 proxy for "reload was attempted." We
-// also stub `reload` to a no-op via Object.defineProperty so the bare
-// `window.location.reload()` call doesn't blow up the JSDOM test environment.
+// JSDOM exposes `Location.reload` as non-configurable. In this isolated test
+// environment, replace Location with a prototype-preserving copy that stubs only reload.
 
 function chunkErr(): Error {
   const e = new Error('Loading chunk 123 failed');
@@ -19,10 +18,18 @@ function chunkErr(): Error {
 
 describe('installChunkLoadRecovery', () => {
   beforeAll(() => {
+    originalLocation = window.location;
+    const descriptors = Object.getOwnPropertyDescriptors(originalLocation);
+    Reflect.deleteProperty(descriptors, 'reload');
+    const location = Object.create(Object.getPrototypeOf(originalLocation));
+    Object.defineProperties(location, descriptors);
+    Object.defineProperty(location, 'reload', {
+      configurable: true,
+      value: reload,
+    });
     Object.defineProperty(window, 'location', {
       configurable: true,
-      writable: true,
-      value: { ...window.location, reload: vi.fn() },
+      value: location,
     });
     installChunkLoadRecovery();
   });
@@ -32,7 +39,10 @@ describe('installChunkLoadRecovery', () => {
   });
 
   afterAll(() => {
-    // best-effort cleanup; subsequent suites get a fresh JSDOM anyway
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: originalLocation,
+    });
   });
 
   it('sets the reload gate on ChunkLoadError from an error event', () => {
@@ -51,14 +61,11 @@ describe('installChunkLoadRecovery', () => {
     expect(sessionStorage.getItem(KEY)).toBe('1');
   });
 
-  it('only sets the gate once across multiple chunk errors in one session', () => {
-    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
-    setItemSpy.mockClear();
+  it('reloads only once across multiple chunk errors in one session', () => {
+    reload.mockClear();
     window.dispatchEvent(new ErrorEvent('error', { error: chunkErr() }));
     window.dispatchEvent(new ErrorEvent('error', { error: chunkErr() }));
-    const writes = setItemSpy.mock.calls.filter((c) => c[0] === KEY);
-    expect(writes).toHaveLength(1);
-    setItemSpy.mockRestore();
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
   it('sets the gate on an unhandled rejection with a chunk-error reason', () => {
@@ -68,14 +75,19 @@ describe('installChunkLoadRecovery', () => {
     expect(sessionStorage.getItem(KEY)).toBe('1');
   });
 
-  it('is idempotent: repeated installs do not duplicate the gate write', () => {
-    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
-    setItemSpy.mockClear();
-    installChunkLoadRecovery();
-    installChunkLoadRecovery();
-    window.dispatchEvent(new ErrorEvent('error', { error: chunkErr() }));
-    const writes = setItemSpy.mock.calls.filter((c) => c[0] === KEY);
-    expect(writes).toHaveLength(1);
-    setItemSpy.mockRestore();
+  it('installs each error listener only once', async () => {
+    const addEventListener = vi.spyOn(window, 'addEventListener');
+    vi.resetModules();
+    // Import after resetting module state so the listener spy captures initial installation.
+    const { installChunkLoadRecovery: install } = await import('./chunk-load-recovery');
+
+    install();
+    install();
+
+    expect(addEventListener).toHaveBeenCalledTimes(2);
+    expect(addEventListener.mock.calls.map(([type]) => type)).toEqual(
+      expect.arrayContaining(['error', 'unhandledrejection']),
+    );
+    addEventListener.mockRestore();
   });
 });

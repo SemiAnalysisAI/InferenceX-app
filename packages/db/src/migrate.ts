@@ -5,7 +5,7 @@
  * through PgBouncer's transaction pooling mode.
  *
  * Usage:
- *   pnpm admin:db:migrate
+ *   bun run admin:db:migrate
  */
 
 import path from 'path';
@@ -40,7 +40,7 @@ async function migrate(): Promise<void> {
   await runMigrations(sql, MIGRATIONS_DIR);
 
   console.log('\n=== db:migrate complete ===');
-  console.log('  Invalidate API cache: pnpm admin:cache:invalidate');
+  console.log('  Invalidate API cache: bun run admin:cache:invalidate');
 }
 
 migrate()

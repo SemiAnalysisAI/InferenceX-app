@@ -29,6 +29,11 @@ describe('DB_MODEL_TO_DISPLAY / DISPLAY_MODEL_TO_DB consistency', () => {
   it('maps minimaxm3 to its own MiniMax-M3 display name', () => {
     expect(DISPLAY_MODEL_TO_DB['MiniMax-M3']).toEqual(['minimaxm3']);
   });
+
+  it('keeps kimik3 out of the grouped Kimi-K2.5 display bucket', () => {
+    expect(DISPLAY_MODEL_TO_DB['Kimi-K3']).toEqual(['kimik3']);
+    expect(DISPLAY_MODEL_TO_DB['Kimi-K2.5']).not.toContain('kimik3');
+  });
 });
 
 describe('sequenceToIslOsl', () => {

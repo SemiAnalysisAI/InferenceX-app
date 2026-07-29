@@ -323,7 +323,12 @@ export function createChartDataPoint(
     x: xValue,
     y: yValue,
     hwKey: currentHwKey,
-    tp: entry.disagg ? entry.num_prefill_gpu + entry.num_decode_gpu : entry.tp,
+    // Total GPU count. Disagg rows carry explicit per-role GPU counts; for
+    // aggregated rows the world size is tp × pp (pp undefined/≤1 ⇒ ×1, so
+    // pre-PP rows are unchanged).
+    tp: entry.disagg
+      ? entry.num_prefill_gpu + entry.num_decode_gpu
+      : entry.tp * (entry.pp && entry.pp > 1 ? entry.pp : 1),
     image: entry.image ?? undefined,
 
     // Narrow boolean | string fields to boolean

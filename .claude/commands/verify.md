@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(pnpm test:*), Bash(pnpm typecheck*), Bash(pnpm lint*), Bash(pnpm build*), Bash(pnpm dev*), Bash(pnpm fmt*), Bash(curl:*), Bash(git diff:*), Bash(git status*), Read, Glob, Grep
+allowed-tools: Bash(bun run test:*), Bash(bun run typecheck*), Bash(bun run lint*), Bash(bun run build*), Bash(bun run dev*), Bash(bun run fmt*), Bash(curl:*), Bash(git diff:*), Bash(git status*), Read, Glob, Grep
 description: Verify work is complete before committing — evidence before claims
 ---
 
@@ -34,7 +34,7 @@ Run each step. Report the actual output — not what you expect.
 ### 1. Type checking
 
 ```bash
-pnpm typecheck
+bun run typecheck
 ```
 
 Required: exit 0, no errors
@@ -42,7 +42,7 @@ Required: exit 0, no errors
 ### 2. Linting
 
 ```bash
-pnpm lint
+bun run lint
 ```
 
 Required: exit 0, no errors
@@ -50,7 +50,7 @@ Required: exit 0, no errors
 ### 3. Formatting
 
 ```bash
-pnpm fmt
+bun run fmt
 ```
 
 Required: exit 0, no formatting issues
@@ -58,7 +58,7 @@ Required: exit 0, no formatting issues
 ### 4. Unit tests
 
 ```bash
-pnpm test:unit
+bun run test:unit
 ```
 
 Required: all tests pass, 0 failures
@@ -66,7 +66,7 @@ Required: all tests pass, 0 failures
 ### 5. Dev server starts
 
 ```bash
-pnpm dev --hostname 0.0.0.0 --port 3000 &
+bun run dev -- --hostname 0.0.0.0 --port 3000 &
 curl --retry 10 --retry-delay 2 --retry-connrefused -sSf http://localhost:3000 >/dev/null
 ```
 
@@ -75,7 +75,7 @@ Required: server responds successfully
 ### 6. E2E tests
 
 ```bash
-pnpm test:e2e
+bun run test:e2e
 ```
 
 Required: all tests pass

@@ -7,6 +7,7 @@ export enum Model {
   GptOss = 'gpt-oss-120b',
   Qwen3_5 = 'Qwen-3.5-397B-A17B',
   Kimi_K2_5 = 'Kimi-K2.5',
+  Kimi_K3 = 'Kimi-K3',
   MiniMax_M2_5 = 'MiniMax-M2.5',
   MiniMax_M3 = 'MiniMax-M3',
   GLM_5 = 'GLM-5',
@@ -92,6 +93,13 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     prefix: 'dsv4',
     category: 'default',
     exclusion: MTP_ENGINE_EXCLUSION,
+  },
+  [Model.Kimi_K3]: {
+    // K3 is a separate 2.8T KDA/MLA-hybrid architecture, not a K2 point release,
+    // so it stays out of the K2.5/2.6/2.7-Code grouping below.
+    label: 'Kimi K3 2.8T',
+    prefix: 'kimik3',
+    category: 'default',
   },
   [Model.Kimi_K2_5]: {
     // K2.5, K2.6, and K2.7-Code share an architecture, so the dropdown surfaces
@@ -222,6 +230,7 @@ export function sequenceKind(seq: Sequence): ScenarioKind {
 
 interface SequenceConfig {
   label: string;
+  labelZh: string;
   compact: string;
   category: CategoryTag;
   kind: ScenarioKind;
@@ -231,24 +240,28 @@ interface SequenceConfig {
 const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
   [Sequence.OneK_OneK]: {
     label: '1K / 1K',
+    labelZh: '1K / 1K',
     compact: '1k1k',
     category: 'deprecated',
     kind: 'fixed-seq',
   },
   [Sequence.OneK_EightK]: {
     label: '1K / 8K',
+    labelZh: '1K / 8K',
     compact: '1k8k',
     category: 'deprecated',
     kind: 'fixed-seq',
   },
   [Sequence.EightK_OneK]: {
     label: '8K / 1K',
+    labelZh: '8K / 1K',
     compact: '8k1k',
     category: 'default',
     kind: 'fixed-seq',
   },
   [Sequence.AgenticTraces]: {
     label: 'Agentic Traces',
+    labelZh: '智能体轨迹',
     compact: 'agentic',
     category: 'default',
     kind: 'agentic',
@@ -302,8 +315,10 @@ export function getSequenceCategory(sequence: Sequence): CategoryTag {
   return SEQUENCE_CONFIG[sequence]?.category ?? 'default';
 }
 
-export function getSequenceLabel(sequence: Sequence): string {
-  return SEQUENCE_CONFIG[sequence]?.label ?? sequence;
+export function getSequenceLabel(sequence: Sequence, locale: 'en' | 'zh' = 'en'): string {
+  const config = SEQUENCE_CONFIG[sequence];
+  if (!config) return sequence;
+  return locale === 'zh' ? config.labelZh : config.label;
 }
 
 const SEQUENCE_PREFIX_MAPPING: Record<string, Sequence> = Object.fromEntries(

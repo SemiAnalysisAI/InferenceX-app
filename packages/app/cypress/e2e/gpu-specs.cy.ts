@@ -162,48 +162,29 @@ describe('GPU Specs Tab', () => {
     cy.get('body').type('{esc}');
   });
 
-  it('scale-out topology diagrams have logo watermark', () => {
-    cy.get('[data-testid="topology-h200-sxm"] svg')
-      .should('exist')
-      .within(() => {
-        cy.get('defs pattern[id^="logo-scaleout-"]').should('exist');
-        cy.get('defs pattern[id^="logo-scaleout-"] image')
-          .should('have.attr', 'href', '/brand/logo-color.webp')
-          .and('have.attr', 'opacity', '0.1');
-      });
+  it('hides scale-out topology logos with the unofficial-domain notice', () => {
+    cy.contains('This deployment is not hosted at').should('be.visible');
+    cy.get('[data-testid="topology-h200-sxm"] defs pattern[id^="logo-scaleout-"]').should(
+      'not.exist',
+    );
   });
 
-  it('scale-up switched topology diagrams have logo watermark', () => {
-    cy.get('[data-testid="scaleup-topology-h200-sxm"] svg')
-      .should('exist')
-      .within(() => {
-        cy.get('defs pattern[id^="logo-scaleup-sw-"]').should('exist');
-        cy.get('defs pattern[id^="logo-scaleup-sw-"] image')
-          .should('have.attr', 'href', '/brand/logo-color.webp')
-          .and('have.attr', 'opacity', '0.1');
-      });
+  it('hides switched scale-up topology logos on unofficial domains', () => {
+    cy.get('[data-testid="scaleup-topology-h200-sxm"] defs pattern[id^="logo-scaleup-sw-"]').should(
+      'not.exist',
+    );
   });
 
-  it('scale-up mesh topology diagrams have logo watermark', () => {
-    cy.get('[data-testid="scaleup-topology-mi300x"] svg')
-      .should('exist')
-      .within(() => {
-        cy.get('defs pattern[id^="logo-scaleup-mesh-"]').should('exist');
-        cy.get('defs pattern[id^="logo-scaleup-mesh-"] image')
-          .should('have.attr', 'href', '/brand/logo-color.webp')
-          .and('have.attr', 'opacity', '0.1');
-      });
+  it('hides mesh scale-up topology logos on unofficial domains', () => {
+    cy.get('[data-testid="scaleup-topology-mi300x"] defs pattern[id^="logo-scaleup-mesh-"]').should(
+      'not.exist',
+    );
   });
 
-  it('scale-up NVL72 topology diagrams have logo watermark', () => {
-    cy.get('[data-testid="scaleup-topology-gb200-nvl72"] svg')
-      .should('exist')
-      .within(() => {
-        cy.get('defs pattern[id^="logo-scaleup-nvl72-"]').should('exist');
-        cy.get('defs pattern[id^="logo-scaleup-nvl72-"] image')
-          .should('have.attr', 'href', '/brand/logo-color.webp')
-          .and('have.attr', 'opacity', '0.1');
-      });
+  it('hides NVL72 scale-up topology logos on unofficial domains', () => {
+    cy.get(
+      '[data-testid="scaleup-topology-gb200-nvl72"] defs pattern[id^="logo-scaleup-nvl72-"]',
+    ).should('not.exist');
   });
 });
 
@@ -356,15 +337,11 @@ describe('GPU Specs Radar Chart View', () => {
     });
   });
 
-  it('radar chart has logo watermark', () => {
-    cy.get('[data-testid="gpu-specs-radar-chart"] svg')
-      .first()
-      .within(() => {
-        cy.get('defs pattern[id^="logo-pattern"]').should('exist');
-        cy.get('defs pattern[id^="logo-pattern"] image')
-          .should('have.attr', 'href', '/brand/logo-color.webp')
-          .and('have.attr', 'opacity', '0.1');
-      });
+  it('hides the radar chart logo on unofficial domains', () => {
+    cy.contains('This deployment is not hosted at').should('be.visible');
+    cy.get('[data-testid="gpu-specs-radar-chart"] defs pattern[id^="logo-pattern"]').should(
+      'not.exist',
+    );
   });
 
   it('normalization note is visible', () => {

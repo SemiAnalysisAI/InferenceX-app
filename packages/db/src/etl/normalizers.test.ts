@@ -194,6 +194,16 @@ describe('resolveModelKey', () => {
     expect(resolveModelKey({ model: 'zai-org/GLM-5.2-FP8' })).toBe('glm5.2');
   });
 
+  it('resolves Kimi-K3 identifiers to the kimik3 key, not the K2 buckets', () => {
+    // K3 is a distinct architecture, so it must land in its own DB bucket.
+    // AMD AgentX sweeps emit the bare `kimik3` prefix; the MXFP4 checkpoint is
+    // published under the plain moonshotai path. GitHub Actions run 30298924344.
+    expect(resolveModelKey({ infmax_model_prefix: 'kimik3' })).toBe('kimik3');
+    expect(resolveModelKey({ infmax_model_prefix: 'kimik3-fp4' })).toBe('kimik3');
+    expect(resolveModelKey({ model_prefix: 'kimik3' })).toBe('kimik3');
+    expect(resolveModelKey({ model: 'moonshotai/Kimi-K3' })).toBe('kimik3');
+  });
+
   it('resolves point-release variants to their own DB key (faithful to submitted data)', () => {
     expect(resolveModelKey({ infmax_model_prefix: 'glm5.1' })).toBe('glm5.1');
     expect(resolveModelKey({ infmax_model_prefix: 'glm5.2' })).toBe('glm5.2');

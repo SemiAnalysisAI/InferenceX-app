@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useUnofficialDomain } from '@/hooks/useUnofficialDomain';
 
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { useLocale } from '@/lib/use-locale';
-
-const OFFICIAL_HOSTNAME = new URL(SITE_URL).hostname;
+import { OFFICIAL_HOSTNAME } from '@/lib/unofficial-domain';
 
 const STRINGS = {
   en: {
@@ -21,12 +20,8 @@ const STRINGS = {
 } as const;
 
 export function UnofficialDomainNotice() {
-  const [isUnofficial, setIsUnofficial] = useState(false);
+  const isUnofficial = useUnofficialDomain();
   const t = STRINGS[useLocale()];
-
-  useEffect(() => {
-    setIsUnofficial(window.location.hostname !== OFFICIAL_HOSTNAME);
-  }, []);
 
   if (!isUnofficial) return null;
 

@@ -58,14 +58,14 @@ Use this format:
       [Exact test code]
 
 - [ ] **Step 2: Run test to verify it fails**
-      Run: `pnpm test:unit -- path/to/test`
+      Run: `bun run test:unit -- path/to/test`
       Expected: FAIL
 
 - [ ] **Step 3: Write minimal implementation**
       [Exact implementation code]
 
 - [ ] **Step 4: Run test to verify it passes**
-      Run: `pnpm test:unit -- path/to/test`
+      Run: `bun run test:unit -- path/to/test`
       Expected: PASS
 
 - [ ] **Step 5: Commit**

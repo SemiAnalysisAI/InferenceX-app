@@ -22,6 +22,7 @@ import { parser } from 'stream-json';
 import { pick } from 'stream-json/filters/pick.js';
 import { streamObject } from 'stream-json/streamers/stream-object.js';
 
+import { gunzipJsonWithinLimit } from '../etl/gzip-json-stream';
 import type { DbClient } from '../connection.js';
 import { computeDerivedFromBlob } from './derived-agentic-metrics';
 import {
@@ -360,21 +361,13 @@ export async function getAgenticAggregates(
       if (!row.server_blob) continue;
       let parsed: { kvCacheUtil: number[]; prefixCacheHitRate: number[] } | null = null;
       try {
-        const json = gunzipSync(row.server_blob).toString('utf8');
-        parsed = extractServerMetricSamples(json);
-      } catch (error) {
-        // ERR_STRING_TOO_LONG (>512 MB) hits on high-conc TP+EP rows whose
-        // server_metrics_json decompresses past Node's max string length.
-        // Stream-parse to extract just the metric subtrees we care about.
-        const code = error && (error as NodeJS.ErrnoException).code;
-        const msg = error instanceof Error ? error.message : String(error);
-        if (code === 'ERR_STRING_TOO_LONG' || msg.includes('longer than 0x1fffffe8')) {
-          try {
-            parsed = await streamExtractServerMetricSamples(row.server_blob);
-          } catch {
-            // stream fallback failed too — leave nulls
-          }
-        }
+        const json = gunzipJsonWithinLimit(row.server_blob);
+        parsed =
+          json === null
+            ? await streamExtractServerMetricSamples(row.server_blob)
+            : extractServerMetricSamples(json);
+      } catch {
+        // malformed blob or failed stream fallback — leave nulls
       }
       if (parsed) {
         const kvPct = percentilesOf(parsed.kvCacheUtil);

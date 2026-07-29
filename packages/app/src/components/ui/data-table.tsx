@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 
+import { useUnofficialDomain } from '@/hooks/useUnofficialDomain';
 import { track } from '@/lib/analytics';
 import {
   Select,
@@ -108,6 +109,7 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const isUnofficialDomain = useUnofficialDomain();
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState<number>(10);
   const [sort, setSort] = useState<SortState>({ columnIndex: -1, dir: null });
@@ -205,7 +207,7 @@ export function DataTable<T>({
       </div>
 
       <div className="overflow-x-auto relative">
-        {watermark && (
+        {watermark && isUnofficialDomain === false && (
           <div
             className="absolute inset-0 pointer-events-none flex items-center justify-center"
             aria-hidden="true"

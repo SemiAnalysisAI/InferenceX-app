@@ -27,16 +27,16 @@ InferenceX App — Next.js 16 dashboard for ML inference benchmark data. DB-back
 ## Quick Start
 
 ```bash
-pnpm install              # Install dependencies
-pnpm dev                  # Dev server with Turbopack (http://localhost:3000)
-pnpm build                # Production build
-pnpm typecheck            # TypeScript type checking (all packages)
-pnpm lint                 # Lint with oxlint
-pnpm lint:fix             # Auto-fix lint issues
-pnpm fmt                  # Format check with oxfmt
-pnpm fmt:fix              # Auto-fix formatting
-pnpm test:unit            # Vitest unit tests
-pnpm test:e2e             # Cypress E2E tests
+bun install               # Install dependencies
+bun run dev                # Dev server with Turbopack (http://localhost:3000)
+bun run build              # Production build
+bun run typecheck          # TypeScript type checking (all packages)
+bun run lint               # Lint with oxlint
+bun run lint:fix           # Auto-fix lint issues
+bun run fmt                # Format check with oxfmt
+bun run fmt:fix            # Auto-fix formatting
+bun run test:unit          # Vitest unit tests
+bun run test:e2e           # Cypress E2E tests
 ```
 
 ## Monorepo Structure
@@ -99,9 +99,9 @@ Static content routes (no DB):
 
 ## Code Style & Tooling
 
-- **Linter**: oxlint — `pnpm lint` / `pnpm lint:fix`
-- **Formatter**: oxfmt — `pnpm fmt` / `pnpm fmt:fix`
-- **Type checking**: `pnpm typecheck` (tsc --noEmit, strict mode)
+- **Linter**: oxlint — `bun run lint` / `bun run lint:fix`
+- **Formatter**: oxfmt — `bun run fmt` / `bun run fmt:fix`
+- **Type checking**: `bun run typecheck` (tsc --noEmit, strict mode)
 - **Node**: 24.x
 
 ## Environment Variables
@@ -261,23 +261,11 @@ See [Blog](./docs/blog.md) for content format, available MDX components, and des
 
 Workflow for a periodic dep bump. Branch: `chore/bump-deps-YYYY-MM-DD`. Commit each step separately so failures are easy to bisect.
 
-1. **Bump versions**: `pnpm taze -I -r latest` (interactive, all workspaces). Approve what you want, skip what you don't. **Never let taze write the `pnpm-workspace.yaml` `overrides` block.** taze will propose bumping those entries, but the overrides are security pins driven **solely by `pnpm security`** (step 3) — bumping them here would float them off the lowest-patched-version rule. In interactive mode, deselect them; for a non-interactive `taze -w`, restore them afterward with `git checkout <base-branch> -- pnpm-workspace.yaml` (taze only touches the `overrides` in that file, so this leaves `packages`/`catalog`/`allowBuilds` intact).
-2. **Resolve install errors**:
-   - `ERR_PNPM_IGNORED_BUILDS` after a pnpm major bump means new `allowBuilds` entries in `pnpm-workspace.yaml` were left as placeholder strings — set them to `true` (or `false` if you don't want the build script to run).
-   - pnpm 11 moved `pnpm.overrides` from `package.json` to `pnpm-workspace.yaml`. Overrides left in `package.json` are silently ignored. Migrate them.
-3. **Audit security**: `pnpm security` (runs `pnpm audit && audit-ci`). This is the **only** step that edits the `pnpm-workspace.yaml` `overrides` block (step 1's bump must leave it untouched). For each remaining vulnerability, add a targeted override in `pnpm-workspace.yaml`:
-
-   ```yaml
-   overrides:
-     <pkg>@<vulnerable-range>: '>=<min-patched-version>'
-   ```
-
-   - **Use the lowest patched version** (e.g. `>=8.5.10`, not `>=8.5.14`). pnpm resolves to the highest available that satisfies the constraint, so we automatically get the latest patch — and the override doesn't go stale when 8.5.15 ships.
-   - **Use the narrow `<vulnerable-range>` selector** (not bare `<pkg>:`) so the override only fires on vulnerable resolutions and doesn't disturb pins already on safe versions.
-   - **Verify minimum set**: drop any override that doesn't map to a current advisory. Test by removing it and re-running `pnpm security`.
-
-4. **Fix lint/format**: `pnpm lint:fix && pnpm fmt:fix`. New rules from oxlint version bumps may not have autofixers (e.g. `require-unicode-regexp`, `unicorn/no-negated-condition`) — fix manually. For mechanical bulk changes, delegate to a subagent and verify with `pnpm typecheck`.
-5. **Final check**: `pnpm lint && pnpm fmt && pnpm typecheck && pnpm security` all pass. Pre-commit hook reruns these.
+1. **Bump versions**: `bun update --interactive --recursive`. Review every proposed update across workspaces. Press `l` to select the latest version when an update must cross the declared semver range.
+2. **Resolve install errors**: follow Bun's reported remediation and keep package-manager settings in `bunfig.toml` only when the documented configuration requires them.
+3. **Audit security**: `bun audit` checks the installed packages recorded in `bun.lock`. For each finding, update the affected dependency with `bun update` or `bun update --latest`, then rerun the audit. Do not suppress an advisory without a documented reason.
+4. **Fix lint/format**: `bun run lint:fix && bun run fmt:fix`. New rules from oxlint version bumps may not have autofixers (e.g. `require-unicode-regexp`, `unicorn/no-negated-condition`) — fix manually. For mechanical bulk changes, delegate to a subagent and verify with `bun run typecheck`.
+5. **Final check**: `bun run lint && bun run fmt && bun run typecheck && bun run security` all pass. Pre-commit hook reruns these.
 
 ## Subsystem Docs
 
@@ -303,7 +291,7 @@ Detailed design rationale (the "why" and "how", not the "what") lives in [docs/]
 Three jobs: a lightweight Haiku **`route`** classifier runs on any `@claude` mention in an issue/comment and emits a `profile`; its output gates **`implement`** or **`review`**. (The `review` job also triggers directly on PR open/sync, with no comment to route.)
 
 - `@claude <anything>` — `route` picks a **profile** (`ui` / `code` / `docs` / `question` / `review`) and, for implement profiles, a browser (`playwright` / `chrome` / `none`).
-  - **implement** job (`ui` / `code` / `docs` / `question`): provisions only what's needed — dev server, Playwright browser, and Cypress binary install **on demand** only for browser/UI work, so docs/DB/backend/question tasks stay fast. `ui` gets full browser verification (render real data, check the `?unofficialrun=` overlay, add `track()` + tests, pass `pnpm test:e2e`); the rest get scoped checks. Creates `claude/issue-{N}-*` branches and can push.
+  - **implement** job (`ui` / `code` / `docs` / `question`): provisions only what's needed — dev server, Playwright browser, and Cypress binary install **on demand** only for browser/UI work, so docs/DB/backend/question tasks stay fast. `ui` gets full browser verification (render real data, check the `?unofficialrun=` overlay, add `track()` + tests, pass `bun run test:e2e`); the rest get scoped checks. Creates `claude/issue-{N}-*` branches and can push.
   - **review** job (`review` profile, or any PR open/sync): a **read-only**, **verifying** review. It checks out the PR head, starts a local dev server backed by the real read-only DB, and uses the **Playwright MCP** on `http://localhost:3000` to confirm the changed UI actually works (renders real data, interactions behave, no console errors). It does **not** re-run the test suite — `typecheck`/`lint`/`test:unit` and the fixtures-based e2e are already covered by the dedicated `tests-*`/`lint` workflows; the review reads their status and folds failures into the review as 🔴 BLOCKING — plus the static diff review (bugs, security, missing tests). Never edits or pushes. A review-phrased ask in **any** wording (e.g. "@claude take a look at this PR") routes here, not just the exact `@claude review`. Prompt: `.github/claude/review-prompt.md`.
 - **Explicit overrides** (skip the classifier): `@claude review` → review; `@claude chrome` → Chrome DevTools MCP; `@claude frontend` → full Playwright + dev server; `@claude general` (or `lite`) → lean no-browser. If the router guesses wrong, re-run with the override.
 - `implement` and `review` share a `claude-<PR/issue number>` concurrency group, so reviews and implementation on the same PR serialize instead of clobbering each other.

@@ -3,7 +3,7 @@
  * the compact structures already stored in `dataset_conversations`.
  *
  * Usage:
- *   pnpm --filter @semianalysisai/inferencex-db db:backfill-dataset-stats --yes
+ *   bun run --cwd packages/db db:backfill-dataset-stats --yes
  */
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';

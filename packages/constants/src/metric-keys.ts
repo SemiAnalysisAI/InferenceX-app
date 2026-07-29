@@ -145,4 +145,16 @@ export const METRIC_KEYS = new Set([
   'peak_temp_c',
   'avg_util_pct',
   'avg_mem_used_mb',
+  // extended parallelism dimensions (2026-07+ artifacts): pipeline parallelism
+  // and decode/prefill context parallelism per role. These are config
+  // dimensions, not measurements, but the configs table has no columns for
+  // them — they ride along in the metrics JSONB via the mapper's auto-capture
+  // and the frontend reads pp from here for point labels / tooltips
+  // (rowToAggDataEntry in benchmark-transform.ts).
+  'prefill_pp',
+  'decode_pp',
+  'prefill_dcp_size',
+  'decode_dcp_size',
+  'prefill_pcp_size',
+  'decode_pcp_size',
 ]);

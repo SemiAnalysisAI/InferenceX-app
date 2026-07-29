@@ -172,7 +172,16 @@ function activeFamilyInGroup(
  * multiple groups. Sticks to a group already present in `prev`; for a shared
  * scope with no direct prior key (for example the global MTP scope), also honors
  * a prior key from the same group on an overlapping hardware scope. Otherwise
- * falls back to the alphabetically-first group.
+ * uses `fallbackGroup` when that group is available, then falls back to the
+ * alphabetically-first group.
+ *
+ * Stickiness only counts as a user's engine choice when `prev` names ONE of the
+ * candidate groups. When `prev` spans several of them the prior selection is
+ * ambiguous — it was carried over from a scope with laxer rules (e.g. switching
+ * a fixed-seq chart, where both engines may be active per hardware, over to
+ * Agentic Traces) — so `fallbackGroup` decides instead of the alphabetical
+ * tie-break, which would otherwise silently pick a different engine than the
+ * one a fresh load of the same chart shows.
  *
  * If `proposed` has 0 or 1 groups, the input set is returned unchanged.
  */
@@ -180,12 +189,22 @@ export function pickStickyGroup(
   proposed: Set<string>,
   prev: Set<string>,
   ex: Exclusion,
+  fallbackGroup?: string | null,
 ): { result: Set<string>; keptGroup: string | null; droppedGroups: string[] } {
   const byScope = groupKeysByScope(proposed, ex);
   const allGroups = new Set([...byScope.values()].flatMap((byGroup) => [...byGroup.keys()]));
   const result = new Set(proposed);
   const winners = new Set<string>();
   const dropped = new Set<string>();
+
+  // A single sticky candidate is an unambiguous prior choice and wins outright;
+  // several candidates mean `prev` didn't choose between them, so defer to the
+  // configured default before the alphabetical tie-break.
+  const stickyWinner = (candidates: string[]): string | undefined => {
+    if (candidates.length <= 1) return candidates[0];
+    if (fallbackGroup && candidates.includes(fallbackGroup)) return fallbackGroup;
+    return candidates.toSorted()[0];
+  };
 
   for (const [scope, byGroup] of byScope) {
     if (byGroup.size <= 1) continue;
@@ -214,8 +233,9 @@ export function pickStickyGroup(
       }
     }
     const winner =
-      groups.filter((group) => directPrevGroups.has(group)).toSorted()[0] ??
-      groups.filter((group) => correlatedPrevGroups.has(group)).toSorted()[0] ??
+      stickyWinner(groups.filter((group) => directPrevGroups.has(group))) ??
+      stickyWinner(groups.filter((group) => correlatedPrevGroups.has(group))) ??
+      (fallbackGroup && groups.includes(fallbackGroup) ? fallbackGroup : undefined) ??
       groups.toSorted()[0];
     winners.add(winner);
     for (const [group, keys] of byGroup) {
@@ -330,8 +350,9 @@ export function resolveExclusionGroups(
   prev: Set<string>,
   ex: Exclusion,
   policy: ExclusionConflictPolicy = 'clear-all',
+  fallbackGroup?: string | null,
 ): ExclusionResolution {
-  if (policy === 'keep-sticky') return pickStickyGroup(proposed, prev, ex);
+  if (policy === 'keep-sticky') return pickStickyGroup(proposed, prev, ex, fallbackGroup);
   const cleared = clearAllExclusionGroups(proposed, ex);
   return { ...cleared, keptGroup: null };
 }
@@ -384,6 +405,7 @@ export function resolveExclusionToggle(
   allItems: Set<string>,
   ex: Exclusion,
   policy: ExclusionConflictPolicy = 'clear-all',
+  fallbackGroup?: string | null,
 ): ExclusionToggleDecision {
   const proposed = computeToggle(prev, hw, allItems);
   const wasActive = prev.has(hw);
@@ -409,7 +431,7 @@ export function resolveExclusionToggle(
 
   // Other paths (e.g. solo→restore-all surfacing a hidden second group) are
   // normalized silently because the user didn't explicitly add a conflict.
-  const resolved = resolveExclusionGroups(proposed, prev, ex, policy);
+  const resolved = resolveExclusionGroups(proposed, prev, ex, policy, fallbackGroup);
   if (resolved.droppedGroups.length > 0) {
     return { kind: 'silent-resolve', result: resolved.result };
   }

@@ -344,6 +344,52 @@ describe('pickStickyGroup', () => {
     expect(out.droppedGroups).toEqual(['vllm']);
   });
 
+  it('uses an available fallback group when there is no sticky selection', () => {
+    const proposed = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp']);
+    const out = pickStickyGroup(proposed, new Set(), ex, 'vllm');
+    expect(out.keptGroup).toBe('vllm');
+    expect([...out.result]).toEqual(['h100_vllm_mtp']);
+    expect(out.droppedGroups).toEqual(['sglang']);
+  });
+
+  it('keeps a sticky selection ahead of the fallback group', () => {
+    const proposed = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp']);
+    const out = pickStickyGroup(proposed, new Set(['gb300_sglang_mtp']), ex, 'vllm');
+    expect(out.keptGroup).toBe('sglang');
+    expect([...out.result]).toEqual(['gb300_sglang_mtp']);
+    expect(out.droppedGroups).toEqual(['vllm']);
+  });
+
+  it('prefers the fallback group when prev names several candidate groups', () => {
+    // `prev` carried over from a laxer scope (both engines active), so it is not
+    // an engine choice — the fallback decides instead of the alphabetical order.
+    const proposed = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp']);
+    const prev = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp']);
+    const out = pickStickyGroup(proposed, prev, ex, 'vllm');
+    expect(out.keptGroup).toBe('vllm');
+    expect([...out.result]).toEqual(['h100_vllm_mtp']);
+    expect(out.droppedGroups).toEqual(['sglang']);
+  });
+
+  it('still tie-breaks alphabetically on an ambiguous prev with no fallback', () => {
+    const proposed = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp']);
+    const prev = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp']);
+    const out = pickStickyGroup(proposed, prev, ex);
+    expect(out.keptGroup).toBe('sglang');
+    expect([...out.result]).toEqual(['gb300_sglang_mtp']);
+    expect(out.droppedGroups).toEqual(['vllm']);
+  });
+
+  it('prefers the fallback group when the correlated prev is ambiguous', () => {
+    // Global MTP scope with no direct prior key: both groups correlate through a
+    // hardware-scoped prev key, so the fallback breaks the tie.
+    const proposed = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp']);
+    const prev = new Set(['h100_vllm', 'gb300_sglang']);
+    const out = pickStickyGroup(proposed, prev, agenticEx, 'vllm');
+    expect(out.keptGroup).toBe('vllm');
+    expect([...out.result]).toEqual(['h100_vllm_mtp']);
+  });
+
   it('treats dynamo/mori variants as the same group', () => {
     const proposed = new Set(['h100_vllm_mtp', 'h100_dynamo-vllm_mtp', 'gb300_dynamo-sglang_mtp']);
     const out = pickStickyGroup(proposed, new Set(['h100_vllm_mtp']), ex);

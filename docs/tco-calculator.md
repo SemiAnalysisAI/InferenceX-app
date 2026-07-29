@@ -62,3 +62,62 @@ Adding another context provider to the nesting hierarchy would increase re-rende
 ## Bar Selection & Comparison
 
 Click-to-compare uses `resultKey` (not hwKey) because multi-precision mode produces multiple bars per GPU. Comparison ratios use the lower value as denominator (ratio >= 1.0). Both metric and token type are reflected in the comparison text to avoid ambiguity.
+
+## Unofficial-Run Overlays (`?unofficialrun=`)
+
+A loaded unofficial run contributes an extra bar per (hardware × run) to the bar chart, in the run's palette color (`overlayRunColor`) and labeled `B300 (✕ my-branch)`. The label keeps the branch inside the same paren group as the precision so the `twoRowYAxisLabels({ split: 'parens' })` y-axis customizer still splits it into two rows.
+
+**Overlay results are interpolated separately from official ones.** `useThroughputData` builds two group maps — `gpuDataByGroupKey` (official) and `overlayGpuDataByGroupKey` (per-run, keyed `hwKey[__precision]__run<idx>`) — and runs `interpolateForGPU` over each independently. Folding overlay points into the official Pareto front would silently move the official numbers, and you'd lose the before/after delta that makes the overlay useful in the first place.
+
+Both paths share one row → `GPUDataPoint` mapper, `buildGpuGroups`, so an overlay bar and its official twin can never differ because of a mapping drift. Group identity is carried in `gpuGroupMeta` / `overlayGroupMeta` rather than re-parsed out of the key string; `FleetPlanner` still splits keys itself, which is safe because official keys are unchanged.
+
+Overlay rows arrive unfiltered by model (the unofficial-run API returns every model in the run, while `/api/v1/benchmarks` is already model-scoped), so the hook filters them with `DB_MODEL_TO_DISPLAY`.
+
+**Only the bar chart and its legend show overlay data.** The table view, CSV export, and fleet planner deliberately stay official-only — an exported sheet or an MW projection that silently blends in numbers from an unmerged branch is worse than one that omits them. This is why `barResults` (official + overlay) exists separately from `results` (official) and only reaches `ThroughputBarChart`.
+
+Legend behavior:
+
+- One entry per run that contributes bars, same shape as the inference/evaluation overlay legends (`✕ <branch>`, palette swatch, workflow link). The entry is a label, not a series: per-run removal happens in the banner, so it sets `isRemovable: false` (a default-true opt-out on `CommonLegendItemProps`). Without it those always-active entries inflate `ChartLegend`'s `activeCount`, which is the guard that stops the hide control emptying the chart — and their own hide control would call `removeGpu` with an `overlay-run-*` key and do nothing.
+- Hardware entries merge official hardware with hardware only the run has data for (`legendHwKeys`), otherwise an overlay-only bar would be unhideable.
+- `visibleHwKeys` is the **single source of truth** for both series: one legend entry governs a GPU's official and overlay bars together.
+
+That last point is deliberate and worth not "fixing" back. The obvious-looking alternative — read/write the provider's shared `activeOverlayHwTypes` for the overlay series — gives the one legend two backing sets, and every way they drift renders a legend entry that contradicts the bar beside it:
+
+- the reset effect reseeds `visibleHwKeys` when the available hardware changes but has no business reseeding a set two other tabs share, so a GPU hidden before a model/sequence switch comes back as "active" in the legend with its overlay bar still hidden;
+- the inference or evaluation tab re-enabling a GPU resurrects its calculator overlay bar while this tab's legend still marks it inactive.
+
+Per-tab hardware visibility is already how the calculator treats official data — `visibleHwKeys` has never been shared with the inference tab — so the overlay series just follows the same rule. AGENTS.md's "respect `activeOverlayHwTypes`" exists so overlay points can't ignore a user's hide action; here the calculator's own legend _is_ that hide action. `calculator-overlay.cy.ts` pins the first scenario ("brings hidden overlay bars back when the available hardware changes").
+
+### Seeding the legend selection
+
+Two effects, and the split matters:
+
+- **Reset** keys on the **official** hardware list (`availableHwKeys`) and reseeds `visibleHwKeys` to the merged list. A run is fetched separately from the benchmarks and usually lands later, so keying the reset on the merged list let a late overlay arrival — or a run dismissal — wipe GPU filters the user had already set.
+- **Overlay arrival/departure** is applied **additively**: newly available overlay GPUs start visible, departed ones stop being tracked, everything else keeps whatever the user set. It falls back to all official hardware if the result would be empty, so dismissing a run while an overlay-only GPU was soloed can't leave a blank chart.
+
+The reset's early-out guards on the **merged** list, not the official one. An empty official list is a real state — the "model/sequence exists only in the run" case this feature is for — and bailing on it would leave the previous selection's official keys in `visibleHwKeys`. `toggleGpuVisibility` therefore also counts visible keys against `legendHwKeys` rather than comparing raw set size, so a stale entry can never skew solo/show-all.
+
+### Honesty in the tooltip
+
+- **Clamped values.** `interpolateForGPU` clamps the target into each series' measured range and always returns a value, so a bar can be showing its nearest edge point rather than an interpolation. This is pre-existing across GPUs with different ranges, but widening the slider to cover overlay operating points makes it reachable for every official bar at once — which would turn a side-by-side overlay delta into a real-vs-clamped comparison. Results carry a `clamped` flag and the tooltip says so. (Narrowing the slider back is not the fix: it only moves the clamping onto the overlay bars, and an overlay-only model loses its bounds entirely.)
+- **Escaping.** The tooltip is a hand-built HTML string injected with `.html()`, and branch names and run URLs come from the GitHub API for whatever run id the user pasted. Everything untrusted goes through `escapeHtml` (`lib/utils`). The y-axis tick labels render the same branch but go through d3 `.text()`, and the legend entry is React — both already safe.
+
+The calculator supports both fixed-sequence and Agentic Traces scenarios through
+the shared `rowToSequence` classifier. Agentic rows carry null `isl`/`osl`, so
+filtering them by numeric sequence lengths would silently drop every point.
+
+Agentic interactivity follows the same definition as the main inference chart:
+
+- P90 by default, with P75 selectable and shareable through `i_pctl`
+- interactivity derived as `1 / ITL`, never trusted from a potentially stale
+  artifact-supplied `*_intvty` field
+- interpolation seeded only by points that also win on the selected
+  percentile's end-to-end-latency Pareto frontier, preventing a configuration
+  from winning the calculator by improving interactivity while degrading the
+  full session
+- official and unofficial-run agentic frontiers remain separate, just like
+  their fixed-sequence counterparts
+
+`b300Rows` in `cypress/support/overlay-fixtures.ts` covers the agentic calculator
+path; `singleTurnRows` remains the fixture for fixed-sequence visibility and
+sequence-switching behavior.

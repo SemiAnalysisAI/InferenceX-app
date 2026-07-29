@@ -217,12 +217,15 @@ describe('GPU comparison agentic point detail', () => {
       },
     );
 
+    // Official DeepSeek-V4-Pro agentic charts prefer vLLM when they first resolve
+    // a cross-engine conflict with no sticky selection (comparisonDefaultGroup,
+    // PR #632). Before that the winner was the alphabetically-first group, SGLang.
     cy.get('[data-testid="engine-comparison-conflict-toast"]')
       .should('be.visible')
-      .and('contain.text', 'Kept SGLang and removed vLLM configs');
+      .and('contain.text', 'Kept vLLM and removed SGLang configs');
     cy.get('[data-testid="gpu-multiselect"] [data-slot="select-trigger"]')
-      .should('contain.text', 'SGLang')
-      .and('not.contain.text', 'vLLM');
+      .should('contain.text', 'vLLM')
+      .and('not.contain.text', 'SGLang');
     cy.contains('button', 'Jun 12, 2026').should('be.visible');
   });
 });

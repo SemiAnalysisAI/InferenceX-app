@@ -10,7 +10,7 @@
  * after the cached/uncached split is computed.
  *
  * Usage (DATABASE_WRITE_URL must be provided — never hardcoded):
- *   DATABASE_WRITE_URL='postgres://…' pnpm exec tsx src/ingest-weka-dataset.ts \
+ *   DATABASE_WRITE_URL='postgres://…' bun src/ingest-weka-dataset.ts \
  *     semianalysisai/cc-traces-weka-062126 [--label "…"] [--variant full|256k] \
  *     [--description "…"] [--limit N]
  *
@@ -50,7 +50,7 @@ function parseArgs(): CliArgs {
   const dataset = positional[0];
   if (!dataset) {
     console.error(
-      'Usage: tsx src/ingest-weka-dataset.ts <hf-dataset-id> [--label …] [--variant full|256k] [--description …] [--limit N]',
+      'Usage: bun src/ingest-weka-dataset.ts <hf-dataset-id> [--label …] [--variant full|256k] [--description …] [--limit N]',
     );
     process.exit(1);
   }

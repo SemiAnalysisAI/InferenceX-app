@@ -12,15 +12,15 @@ Enforced by `@pr-claude` — missing/low-quality tests are flagged 🔴 BLOCKING
 1. New utility functions → colocated unit test
 2. New UI features → E2E test in `cypress/e2e/<feature>.cy.ts`
 3. Bug fixes → regression test reproducing the bug
-4. Run `pnpm test:unit` and `pnpm test:e2e` before considering task complete
+4. Run `bun run test:unit` and `bun run test:e2e` before considering task complete
 
 ## Pre-commit Checklist
 
 ```bash
-pnpm dev --hostname 0.0.0.0 --port 3000 &
+bun run dev -- --hostname 0.0.0.0 --port 3000 &
 curl --retry 10 --retry-delay 2 --retry-connrefused -sSf http://localhost:3000 >/dev/null
-pnpm test:unit
-pnpm test:e2e
+bun run test:unit
+bun run test:e2e
 ```
 
 ## Quality Standards

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { splitLabel } from '@/lib/d3-chart/axis-labels';
+
 import type { InterpolatedResult } from './types';
 import {
+  generateTooltipHTML,
+  getResultLabel,
   getCostForType,
   getCostProviderLabel,
   getCostTypeLabel,
@@ -329,6 +333,18 @@ describe('getChartTitle', () => {
     expect(title).toBe('Total Token Throughput per GPU at 30 tok/s/user Interactivity');
   });
 
+  it('includes the selected percentile in an agentic interactivity title', () => {
+    const title = getChartTitle(
+      'throughput',
+      'interactivity_to_throughput',
+      30,
+      'total',
+      undefined,
+      'p90',
+    );
+    expect(title).toBe('Total Token Throughput per GPU at 30 tok/s/user P90 Interactivity');
+  });
+
   it('returns input throughput title when costType is input', () => {
     const title = getChartTitle('throughput', 'interactivity_to_throughput', 30, 'input');
     expect(title).toBe('Input Token Throughput per GPU at 30 tok/s/user Interactivity');
@@ -492,5 +508,129 @@ describe('getSortedResults', () => {
     const sorted = getSortedResults(single, 'throughput', 'total');
     expect(sorted).toHaveLength(1);
     expect(sorted[0].hwKey).toBe('x');
+  });
+});
+
+// =========================================================================
+// getResultLabel() — official + unofficial-run overlay bars
+// =========================================================================
+
+describe('getResultLabel', () => {
+  // Empty config → the helper falls back to the global getHardwareConfig
+  // lookup, which resolves 'b300' to its registry display label.
+  const noConfig = {};
+
+  it('returns the bare hardware name for a single-precision official bar', () => {
+    expect(getResultLabel(makeResult({ hwKey: 'b300' }), noConfig)).toBe('B300');
+  });
+
+  it('appends the precision when multiple precisions are selected', () => {
+    expect(getResultLabel(makeResult({ hwKey: 'b300', precision: 'fp4' }), noConfig)).toBe(
+      'B300 (FP4)',
+    );
+  });
+
+  it('marks an overlay bar with ✕ and the branch name', () => {
+    const label = getResultLabel(
+      makeResult({ hwKey: 'b300', isOverlay: true, runIndex: 0, runLabel: 'feat/my-branch' }),
+      noConfig,
+    );
+    expect(label).toBe('B300 (✕ feat/my-branch)');
+  });
+
+  it('combines precision and branch inside a single paren group', () => {
+    const label = getResultLabel(
+      makeResult({
+        hwKey: 'b300',
+        precision: 'fp8',
+        isOverlay: true,
+        runIndex: 1,
+        runLabel: 'feat/my-branch',
+      }),
+      noConfig,
+    );
+    // One paren group only — twoRowYAxisLabels({split:'parens'}) splits on the
+    // last "(...)", so a second group would break the two-row y-axis label.
+    expect(label).toBe('B300 (FP8 · ✕ feat/my-branch)');
+    expect(splitLabel(label, 'parens')).toEqual(['B300', '(FP8 · ✕ feat/my-branch)']);
+  });
+
+  it('falls back to "unofficial" when the run has no branch name', () => {
+    expect(getResultLabel(makeResult({ hwKey: 'b300', isOverlay: true }), noConfig)).toBe(
+      'B300 (✕ unofficial)',
+    );
+  });
+});
+
+// =========================================================================
+// generateTooltipHTML() — overlay treatment
+// =========================================================================
+
+describe('generateTooltipHTML overlay treatment', () => {
+  const officialRunUrl = 'https://github.com/org/repo/actions/runs/999';
+  const overlayRunUrl = 'https://github.com/org/repo/actions/runs/111';
+
+  it('omits the unofficial header for official bars', () => {
+    const html = generateTooltipHTML(
+      makeResult({ hwKey: 'b300' }),
+      {},
+      'interactivity_to_throughput',
+      'throughput',
+      'total',
+      officialRunUrl,
+    );
+    expect(html).not.toContain('UNOFFICIAL RUN');
+    expect(html).toContain(officialRunUrl);
+  });
+
+  it('adds the unofficial header, branch, and run link for overlay bars', () => {
+    const html = generateTooltipHTML(
+      makeResult({
+        hwKey: 'b300',
+        isOverlay: true,
+        runIndex: 0,
+        runLabel: 'feat/my-branch',
+        runUrl: overlayRunUrl,
+      }),
+      {},
+      'interactivity_to_throughput',
+      'throughput',
+      'total',
+      officialRunUrl,
+    );
+    expect(html).toContain('UNOFFICIAL RUN');
+    expect(html).toContain('feat/my-branch');
+    // Links to the overlay's own workflow run, not the official one behind the
+    // DB data — the two are unrelated.
+    expect(html).toContain(overlayRunUrl);
+    expect(html).not.toContain(officialRunUrl);
+  });
+
+  it('localizes the overlay strings when Chinese strings are supplied', () => {
+    const html = generateTooltipHTML(
+      makeResult({
+        hwKey: 'b300',
+        isOverlay: true,
+        runIndex: 0,
+        runLabel: 'feat/my-branch',
+        runUrl: overlayRunUrl,
+      }),
+      {},
+      'interactivity_to_throughput',
+      'throughput',
+      'total',
+      undefined,
+      false,
+      {
+        unofficialRun: '非官方运行',
+        branch: '分支',
+        viewRun: '查看工作流运行',
+        clamped: '超出实测范围——显示最接近的数据点',
+      },
+    );
+    expect(html).toContain('非官方运行');
+    expect(html).toContain('分支');
+    expect(html).toContain('查看工作流运行');
+    expect(html).not.toContain('UNOFFICIAL RUN');
   });
 });

@@ -37,6 +37,14 @@ export interface CommonLegendItemProps {
   onRemove?: (name: string) => void;
   hideAriaLabel?: string;
   /**
+   * Set false for entries that are labels rather than toggleable series — e.g.
+   * the unofficial-run entries, which are always `isActive` and have nothing to
+   * remove (a run is dismissed from the banner). Such entries render no hide
+   * control and are excluded from the "keep at least one series" active count,
+   * which they would otherwise inflate. Defaults to true.
+   */
+  isRemovable?: boolean;
+  /**
    * When provided, renders a small table icon that opens a per-series points
    * table (all data points for this hardware/framework series). Only the
    * inference tab's legend passes this — other tabs get no icon.
