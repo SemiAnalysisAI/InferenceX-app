@@ -90,19 +90,19 @@ export function CollectiveXRunsTable({
   return (
     <div
       data-testid="collectivex-runs-table"
-      className="mt-3 max-h-[32rem] overflow-auto rounded-md border"
+      className="mt-2 max-h-[28rem] overflow-auto rounded-md border"
     >
       <table className="w-full min-w-[880px] text-sm">
         <thead className="sticky top-0 z-1 bg-background">
           <tr className="border-b-2 border-border text-left text-muted-foreground">
-            <th className="px-3 py-2 font-medium">{t.shown}</th>
-            <th className="px-3 py-2 font-medium">{t.run}</th>
-            <th className="px-3 py-2 font-medium">{t.result}</th>
-            <th className="px-3 py-2 text-right font-medium">{t.cases}</th>
-            <th className="px-3 py-2 text-right font-medium">{t.points}</th>
-            <th className="px-3 py-2 font-medium">{t.skus}</th>
-            <th className="px-3 py-2 font-medium">{t.published}</th>
-            <th className="px-3 py-2 text-right font-medium">{t.actions}</th>
+            <th className="px-3 py-1.5 font-medium">{t.shown}</th>
+            <th className="px-3 py-1.5 font-medium">{t.run}</th>
+            <th className="px-3 py-1.5 font-medium">{t.result}</th>
+            <th className="px-3 py-1.5 text-right font-medium">{t.cases}</th>
+            <th className="px-3 py-1.5 text-right font-medium">{t.points}</th>
+            <th className="px-3 py-1.5 font-medium">{t.skus}</th>
+            <th className="px-3 py-1.5 font-medium">{t.published}</th>
+            <th className="px-3 py-1.5 text-right font-medium">{t.actions}</th>
           </tr>
         </thead>
         <tbody>
@@ -121,7 +121,7 @@ export function CollectiveXRunsTable({
                   visible && 'bg-primary/5',
                 )}
               >
-                <td className="px-3 py-2">
+                <td className="px-3 py-1.5">
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -141,7 +141,7 @@ export function CollectiveXRunsTable({
                     {loading && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
                   </div>
                 </td>
-                <td className="px-3 py-2 font-mono text-xs">
+                <td className="px-3 py-1.5 font-mono text-xs">
                   <div className="flex items-center gap-2">
                     <svg
                       width="24"
@@ -174,7 +174,7 @@ export function CollectiveXRunsTable({
                     </a>
                   </div>
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-1.5">
                   <span
                     className={cn(
                       'inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium',
@@ -184,21 +184,21 @@ export function CollectiveXRunsTable({
                     {conclusion}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">
+                <td className="px-3 py-1.5 text-right tabular-nums">
                   {run.measured_cases}/{run.requested_cases}
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">
+                <td className="px-3 py-1.5 text-right tabular-nums">
                   {run.terminal_points}/{run.requested_points}
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-1.5">
                   {run.covered_skus.length > 0
                     ? run.covered_skus.map((sku) => sku.toUpperCase()).join(', ')
                     : '—'}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
+                <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">
                   {formatDate(run.generated_at, locale)}
                 </td>
-                <td className="px-3 py-2 text-right">
+                <td className="px-3 py-1.5 text-right">
                   <Button
                     type="button"
                     variant="ghost"

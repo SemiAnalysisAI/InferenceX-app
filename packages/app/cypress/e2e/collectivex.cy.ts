@@ -62,6 +62,7 @@ describe('CollectiveX neutral run view', () => {
       .should('contain.text', `${dataset.run.measured_cases}/${dataset.run.requested_cases}`)
       .and('contain.text', String(dataset.series.length));
     cy.get('[data-testid="collectivex-version-select"]').should('contain.text', 'V1');
+    cy.get('[data-testid="collectivex-runs-table"]').should('have.css', 'max-height', '448px');
     cy.get('[data-testid="collectivex-source-link"]').should(
       'have.attr',
       'href',
