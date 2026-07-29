@@ -197,6 +197,32 @@ describe('getDerivedAgenticMetrics write-back', () => {
     expect(written).not.toHaveProperty('normalizedE2e400');
   });
 
+  it('does not stamp the bundle when there are no server fields to preserve', async () => {
+    // A row with null (or pre-v3) stats has no kvCacheUtil / prefixCacheHitRate
+    // for this route to carry forward, and it cannot recompute them — it never
+    // reads the server blob. Stamping the current version anyway would look
+    // complete downstream: the backfill's candidate query skips matching
+    // versions and agentic-aggregates takes the fast path, so those fields
+    // would stay null forever. The response is still served from the blob.
+    const jsonl = rec('s1', 0, { isl: 100, osl: 50, ttft_ms: 500, latency_ms: 1000 });
+    const blob = gzipSync(Buffer.from(jsonl));
+
+    const { sql, calls } = mockSql([
+      // fetchAggregateStatsRows — no stored bundle at all
+      [{ benchmark_result_id: 7, stats: null }],
+      // fallback profile-blob query
+      [{ benchmark_result_id: 7, trace_replay_id: 870, blob }],
+    ]);
+
+    const result = await getDerivedAgenticMetrics(sql, [7]);
+
+    // Caller still gets the freshly computed metric (1 / 0.02 s-per-token).
+    expect(result[7]?.p90_osl_per_e2el).toBeCloseTo(50, 6);
+    // Stats read + blob read only — no write-back UPDATE.
+    expect(calls).toHaveLength(2);
+    expect(calls.some((c) => c.text.includes('update agentic_trace_replay'))).toBe(false);
+  });
+
   it('takes the fast path (no blob read, no write-back) when stats are current', async () => {
     const currentStats = {
       version: STATS_VERSION,

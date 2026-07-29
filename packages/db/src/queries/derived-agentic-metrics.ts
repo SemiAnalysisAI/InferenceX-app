@@ -214,17 +214,28 @@ export async function getDerivedAgenticMetrics(
       // ratio bundle) and carry the stale row's server-derived fields
       // forward untouched — the profile-only upgrade the backfill CLI also
       // performs. Fire-and-forget, best-effort (no-ops on a read-only replica).
-      const { isl, osl } = extractIslOsl(jsonl);
+      //
+      // Only stamp the bundle when the stale row actually HAS server-derived
+      // fields to carry forward. Writing nulls at the current version would
+      // look complete to everyone downstream: the backfill skips the row
+      // (its candidate query matches on version) and the agentic-aggregates
+      // route takes the fast path, so kvCacheUtil / prefixCacheHitRate would
+      // stay null forever. Leaving the row stale instead costs one repeat
+      // parse and lets a reader that CAN see the server blob heal it fully.
       const prior = staleStatsById.get(id) ?? null;
-      const merged: StoredAggregateStats = {
-        version: STATS_VERSION,
-        isl: percentilesOf(isl),
-        osl: percentilesOf(osl),
-        kvCacheUtil: prior?.kvCacheUtil ?? null,
-        prefixCacheHitRate: prior?.prefixCacheHitRate ?? null,
-        e2elPerOsl: e2el_per_osl,
-      };
-      writeBackTraceReplayJsonb(sql, 'aggregate_stats', Number(row.trace_replay_id), merged);
+      const canPreserveServerFields = Boolean(prior?.kvCacheUtil || prior?.prefixCacheHitRate);
+      if (canPreserveServerFields) {
+        const { isl, osl } = extractIslOsl(jsonl);
+        const merged: StoredAggregateStats = {
+          version: STATS_VERSION,
+          isl: percentilesOf(isl),
+          osl: percentilesOf(osl),
+          kvCacheUtil: prior?.kvCacheUtil ?? null,
+          prefixCacheHitRate: prior?.prefixCacheHitRate ?? null,
+          e2elPerOsl: e2el_per_osl,
+        };
+        writeBackTraceReplayJsonb(sql, 'aggregate_stats', Number(row.trace_replay_id), merged);
+      }
     } catch {
       // Skip malformed blobs silently — frontend treats missing ids as "no data".
     }
