@@ -13,7 +13,6 @@ import {
 
 import { useUnofficialDomain } from '@/hooks/useUnofficialDomain';
 import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
 import {
   Select,
   SelectContent,
@@ -21,35 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-const STRINGS = {
-  en: {
-    noData: 'No data available for the current filters.',
-    searchPlaceholder: 'Search...',
-    searchLabel: 'Search table',
-    clearSearch: 'Clear search',
-    noResults: (q: string) => `No results match "${q}"`,
-    perPage: 'per page',
-    rowsPerPage: 'Rows per page',
-    prevPage: 'Previous page',
-    nextPage: 'Next page',
-    of: 'of',
-    filteredFrom: (total: number) => `(filtered from ${total})`,
-  },
-  zh: {
-    noData: '当前筛选条件下无可用数据。',
-    searchPlaceholder: '搜索…',
-    searchLabel: '搜索表格',
-    clearSearch: '清除搜索',
-    noResults: (q: string) => `无匹配"${q}"的结果`,
-    perPage: '每页',
-    rowsPerPage: '每页行数',
-    prevPage: '上一页',
-    nextPage: '下一页',
-    of: '/',
-    filteredFrom: (total: number) => `（从 ${total} 条中筛选）`,
-  },
-} as const;
+import { useLocale } from '@/lib/use-locale';
 
 export interface DataTableColumn<T> {
   /** Column header text. */
@@ -97,6 +68,37 @@ const SORT_ICON = {
   desc: <ArrowDown className="inline size-3" />,
   none: <ArrowUpDown className="inline size-3 opacity-30" />,
 };
+
+const STRINGS = {
+  en: {
+    noData: 'No data available for the current filters.',
+    search: 'Search...',
+    searchAria: 'Search table',
+    clearSearch: 'Clear search',
+    noResults: 'No results match',
+    of: 'of',
+    filteredFrom: 'filtered from',
+    rowUnit: 'rows',
+    rowsPerPage: 'Rows per page',
+    perPage: 'per page',
+    previousPage: 'Previous page',
+    nextPage: 'Next page',
+  },
+  zh: {
+    noData: '当前筛选条件下没有可用数据。',
+    search: '搜索…',
+    searchAria: '搜索表格',
+    clearSearch: '清除搜索',
+    noResults: '没有结果匹配',
+    of: '共',
+    filteredFrom: '筛选自',
+    rowUnit: '行',
+    rowsPerPage: '每页行数',
+    perPage: '每页',
+    previousPage: '上一页',
+    nextPage: '下一页',
+  },
+} as const;
 
 export function DataTable<T>({
   data,
@@ -172,7 +174,7 @@ export function DataTable<T>({
   }
 
   return (
-    <div data-testid={testId} className="mt-3">
+    <div data-testid={testId} className="mt-3 min-w-0 w-full max-w-full">
       {/* Search */}
       <div className="mb-3 max-w-xs relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
@@ -184,9 +186,9 @@ export function DataTable<T>({
             setSearch(e.target.value);
             setPage(0);
           }}
-          placeholder={t.searchPlaceholder}
+          placeholder={t.search}
           className="w-full h-7 pl-8 pr-7 text-xs bg-transparent border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
-          aria-label={t.searchLabel}
+          aria-label={t.searchAria}
         />
         {search && (
           <button
@@ -262,7 +264,7 @@ export function DataTable<T>({
                   colSpan={columns.length}
                   className="py-8 text-center text-sm text-muted-foreground"
                 >
-                  {t.noResults(search)}
+                  {t.noResults} &quot;{search}&quot;
                 </td>
               </tr>
             ) : (
@@ -284,38 +286,55 @@ export function DataTable<T>({
       </div>
 
       {/* Pagination controls */}
-      <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <span>
-            {sorted.length === 0
-              ? '0'
-              : `${safePage * pageSize + 1}–${Math.min((safePage + 1) * pageSize, sorted.length)}`}{' '}
-            {t.of} {sorted.length}
-            {search && ` ${t.filteredFrom(data.length)}`}
+      <div className="flex flex-wrap items-center justify-between gap-2 mt-3 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2">
+          <span data-testid="data-table-pagination-summary">
+            {locale === 'zh' ? (
+              <>
+                {sorted.length === 0
+                  ? `共 0 ${t.rowUnit}`
+                  : `第 ${safePage * pageSize + 1}–${Math.min((safePage + 1) * pageSize, sorted.length)} ${t.rowUnit}，共 ${sorted.length} ${t.rowUnit}`}
+                {search && `（${t.filteredFrom} ${data.length} ${t.rowUnit}）`}
+              </>
+            ) : (
+              <>
+                {sorted.length === 0
+                  ? '0'
+                  : `${safePage * pageSize + 1}–${Math.min((safePage + 1) * pageSize, sorted.length)}`}{' '}
+                {t.of} {sorted.length}
+                {search && ` (${t.filteredFrom} ${data.length})`}
+              </>
+            )}
           </span>
-          <Select
-            value={String(pageSize)}
-            onValueChange={(v) => {
-              const size = Number(v);
-              setPageSize(size);
-              setPage(0);
-              track(`${analyticsPrefix}_page_size_changed`, { size });
-            }}
+          <div
+            data-testid="data-table-page-size"
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap"
           >
-            <SelectTrigger className="h-6 w-auto gap-1 px-2 text-xs" aria-label={t.rowsPerPage}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <SelectItem key={size} value={String(size)}>
-                  {size}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span>{t.perPage}</span>
+            {locale === 'zh' && <span>{t.perPage}</span>}
+            <Select
+              value={String(pageSize)}
+              onValueChange={(v) => {
+                const size = Number(v);
+                setPageSize(size);
+                setPage(0);
+                track(`${analyticsPrefix}_page_size_changed`, { size });
+              }}
+            >
+              <SelectTrigger className="h-6 w-auto gap-1 px-2 text-xs" aria-label={t.rowsPerPage}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span>{locale === 'zh' ? t.rowUnit : t.perPage}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="ml-auto flex shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={() => {
@@ -324,7 +343,7 @@ export function DataTable<T>({
             }}
             disabled={safePage === 0}
             className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            aria-label={t.prevPage}
+            aria-label={t.previousPage}
           >
             <ChevronLeft className="size-4" />
           </button>

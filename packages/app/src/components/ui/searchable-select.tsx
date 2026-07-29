@@ -3,6 +3,7 @@
 import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from 'lucide-react';
 import * as React from 'react';
 
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
@@ -26,11 +27,12 @@ interface SearchableSelectProps {
   triggerTestId?: string;
   disabled?: boolean;
   searchable?: boolean;
+  searchPlaceholder?: string;
+  searchAriaLabel?: string;
+  clearSearchLabel?: string;
+  noResultsLabel?: string;
   /** Analytics event prefix, e.g. "yaxis_metric" → "yaxis_metric_searched" */
   trackPrefix?: string;
-  searchPlaceholder?: string;
-  noResultsLabel?: string;
-  clearSearchLabel?: string;
 }
 
 export function SearchableSelect({
@@ -43,10 +45,11 @@ export function SearchableSelect({
   triggerTestId,
   disabled = false,
   searchable = true,
-  trackPrefix,
   searchPlaceholder = 'Search...',
-  noResultsLabel = 'No results',
+  searchAriaLabel = 'Search options',
   clearSearchLabel = 'Clear search',
+  noResultsLabel = 'No results',
+  trackPrefix,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -56,8 +59,8 @@ export function SearchableSelect({
   // resolve client-side, so SSR would otherwise lock in the default label and
   // leave it stale after hydration.
   const [mounted, setMounted] = React.useState(false);
-  const containerRef = React.useRef<HTMLDivElement>(null);
   const searchRef = React.useRef<HTMLInputElement>(null);
+  const listboxRef = React.useRef<HTMLDivElement>(null);
   const searchUsedRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -65,33 +68,13 @@ export function SearchableSelect({
   }, []);
 
   React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.stopPropagation();
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleKeyDown);
-      searchRef.current?.focus();
-    } else {
+    if (!isOpen) {
       if (searchUsedRef.current && trackPrefix) {
         track(`${trackPrefix}_searched`, { query: search });
         searchUsedRef.current = false;
       }
       setSearch('');
     }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
   }, [isOpen, search, trackPrefix]);
 
   const filteredGroups = React.useMemo(() => {
@@ -120,49 +103,79 @@ export function SearchableSelect({
     onValueChange(optionValue);
     setIsOpen(false);
   };
+  const focusOption = (index: number) => {
+    const options = listboxRef.current?.querySelectorAll<HTMLElement>('[role="option"]');
+    options?.[Math.max(0, Math.min(index, options.length - 1))]?.focus();
+  };
+  const handleOptionKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, optionValue: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleSelect(optionValue);
+      return;
+    }
+    const options = [...(listboxRef.current?.querySelectorAll('[role="option"]') ?? [])];
+    const current = options.indexOf(event.currentTarget);
+    const target =
+      event.key === 'ArrowDown'
+        ? current + 1
+        : event.key === 'ArrowUp'
+          ? current - 1
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? options.length - 1
+              : null;
+    if (target !== null) {
+      event.preventDefault();
+      focusOption(target);
+    }
+  };
 
   return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        id={triggerId}
-        data-testid={triggerTestId}
-        data-slot="select-trigger"
-        data-size="default"
-        role="combobox"
-        aria-expanded={isOpen}
-        aria-haspopup="listbox"
-        aria-controls={listboxId}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
-        className={cn(
-          "border-input data-placeholder:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/90 dark:hover:bg-input/50 flex w-full items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 min-h-9",
-          className,
-        )}
-      >
-        <span
-          className={cn(
-            'flex-1 text-left truncate',
-            (!mounted || !selectedLabel) && 'text-muted-foreground',
-          )}
-        >
-          {mounted ? (selectedLabel ?? placeholder) : placeholder}
-        </span>
-        <ChevronDownIcon
-          className={cn(
-            'size-4 opacity-90 shrink-0 transition-transform',
-            isOpen && 'transform rotate-180',
-          )}
-        />
-      </button>
-
-      {isOpen && (
-        <div
+    <Popover open={isOpen} onOpenChange={(open) => !disabled && setIsOpen(open)}>
+      <div className="relative">
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            id={triggerId}
+            data-testid={triggerTestId}
+            data-slot="select-trigger"
+            data-size="default"
+            role="combobox"
+            aria-expanded={isOpen}
+            aria-haspopup="listbox"
+            aria-controls={listboxId}
+            disabled={disabled}
+            className={cn(
+              "border-input data-placeholder:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/90 dark:hover:bg-input/50 flex w-full items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 min-h-9",
+              className,
+            )}
+          >
+            <span
+              className={cn(
+                'flex-1 text-left truncate',
+                (!mounted || !selectedLabel) && 'text-muted-foreground',
+              )}
+            >
+              {mounted ? (selectedLabel ?? placeholder) : placeholder}
+            </span>
+            <ChevronDownIcon
+              className={cn(
+                'size-4 opacity-90 shrink-0 transition-transform',
+                isOpen && 'transform rotate-180',
+              )}
+            />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
           data-slot="select-content"
-          // No enter animations: tailwindcss-animate sets opacity/scale to 0 at
-          // the start of the animation which makes Cypress treat the search
-          // input as not visible and fail cy.type().
-          className="bg-popover text-popover-foreground absolute z-50 mt-1 w-full origin-top overflow-hidden rounded-md border shadow-md"
+          align="start"
+          sideOffset={4}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            searchRef.current?.focus();
+          }}
+          className="z-[100] w-[var(--radix-popover-trigger-width)] overflow-hidden p-0 data-[state=open]:animate-none data-[state=closed]:animate-none"
         >
           {/* Search header lives outside the scrollable region so it never picks up
            * `sticky` → `position: fixed` resolution that puts it behind the page
@@ -178,7 +191,17 @@ export function SearchableSelect({
                   setSearch(e.target.value);
                   if (e.target.value) searchUsedRef.current = true;
                 }}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    focusOption(0);
+                  } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    focusOption(Number.MAX_SAFE_INTEGER);
+                  }
+                }}
                 placeholder={searchPlaceholder}
+                aria-label={searchAriaLabel}
                 className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
               />
               {search && (
@@ -197,6 +220,7 @@ export function SearchableSelect({
             </div>
           )}
           <div
+            ref={listboxRef}
             id={listboxId}
             role="listbox"
             className="p-1 max-h-72 overflow-y-auto custom-scrollbar"
@@ -217,10 +241,12 @@ export function SearchableSelect({
                     <div
                       key={option.value}
                       role="option"
+                      tabIndex={-1}
                       aria-selected={isSelected}
                       data-slot="select-item"
                       data-value={option.value}
                       onClick={() => handleSelect(option.value)}
+                      onKeyDown={(event) => handleOptionKeyDown(event, option.value)}
                       className={cn(
                         "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
                         'hover:bg-primary/20 hover:pl-3 hover:shadow-sm',
@@ -237,8 +263,8 @@ export function SearchableSelect({
               </div>
             ))}
           </div>
-        </div>
-      )}
-    </div>
+        </PopoverContent>
+      </div>
+    </Popover>
   );
 }

@@ -22,6 +22,8 @@ export interface CommonLegendItemProps {
   hw?: string;
   label: string;
   color: string;
+  /** When present, render a line swatch using this SVG dash pattern instead of a dot. */
+  lineDasharray?: string;
   isActive: boolean;
   isHighlighted?: boolean;
   onClick: (name: string) => void;
@@ -33,6 +35,7 @@ export interface CommonLegendItemProps {
   isLegendExpanded?: boolean; // Whether the legend is expanded to show full text
   sidebarMode?: boolean; // Use sidebar-style visual feedback (line-through + faded dot)
   onRemove?: (name: string) => void;
+  hideAriaLabel?: string;
   /**
    * Set false for entries that are labels rather than toggleable series — e.g.
    * the unofficial-run entries, which are always `isActive` and have nothing to
@@ -47,12 +50,14 @@ export interface CommonLegendItemProps {
    * inference tab's legend passes this — other tabs get no icon.
    */
   onShowPoints?: (name: string) => void;
+  showPointsAriaLabel?: string;
 }
 
 const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
   name,
   label,
   color,
+  lineDasharray,
   title,
   isActive,
   onClick,
@@ -65,6 +70,8 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
   sidebarMode = false,
   onRemove,
   onShowPoints,
+  hideAriaLabel,
+  showPointsAriaLabel,
 }) => {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -96,14 +103,44 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
         onMouseEnter={onHover && isActive ? () => onHover(hw || name) : undefined}
         onMouseLeave={onHoverEnd && isActive ? onHoverEnd : undefined}
       >
-        <span className="relative inline-flex items-center justify-center size-3 mr-2 flex-shrink-0">
-          <span
-            className={cn(
-              'size-3 rounded-full transition-opacity',
-              (canRemove || canRestore) && 'group-hover/item:opacity-0!',
-            )}
-            style={{ backgroundColor: color, opacity: sidebarMode && !isActive ? 0.3 : 1 }}
-          />
+        <span
+          className={cn(
+            'relative inline-flex h-3 items-center justify-center mr-2 flex-shrink-0',
+            lineDasharray === undefined ? 'w-3' : 'w-6',
+          )}
+        >
+          {lineDasharray === undefined ? (
+            <span
+              className={cn(
+                'size-3 rounded-full transition-opacity',
+                (canRemove || canRestore) && 'group-hover/item:opacity-0!',
+              )}
+              style={{ backgroundColor: color, opacity: sidebarMode && !isActive ? 0.3 : 1 }}
+            />
+          ) : (
+            <svg
+              width="24"
+              height="12"
+              viewBox="0 0 24 12"
+              data-testid="legend-line-swatch"
+              className={cn(
+                'transition-opacity',
+                (canRemove || canRestore) && 'group-hover/item:opacity-0!',
+              )}
+              style={{ opacity: sidebarMode && !isActive ? 0.3 : 1 }}
+              aria-hidden="true"
+            >
+              <line
+                x1="1"
+                y1="6"
+                x2="23"
+                y2="6"
+                stroke={color}
+                strokeWidth="2.25"
+                strokeDasharray={lineDasharray === 'none' ? undefined : lineDasharray}
+              />
+            </svg>
+          )}
           {canRemove && (
             <span
               role="button"
@@ -113,7 +150,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
                 onRemove!(hw || name);
               }}
               className="absolute inset-0 inline-flex items-center justify-center opacity-0 group-hover/item:opacity-100"
-              aria-label={t.hide(label)}
+              aria-label={hideAriaLabel ?? t.hide(label)}
               title={t.hide(label)}
             >
               <X size={14} strokeWidth={4} className="text-foreground" />
@@ -147,7 +184,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
         <button
           type="button"
           data-testid={`legend-points-${hw || name}`}
-          aria-label={t.showAllPoints(label)}
+          aria-label={showPointsAriaLabel ?? t.showAllPoints(label)}
           onClick={() => onShowPoints(hw || name)}
           // Reduced opacity at rest (still visible/tappable on touch), full on
           // row hover or keyboard focus. ml-auto pins the icon to the row's

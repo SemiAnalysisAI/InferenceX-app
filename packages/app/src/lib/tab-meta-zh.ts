@@ -17,6 +17,7 @@ export const ZH_TAB_KEYS = [
   'reliability',
   'gpu-specs',
   'gpu-metrics',
+  'collectivex',
   'submissions',
   'ai-chart',
   'current-inferencex-image',
@@ -62,6 +63,11 @@ export const TAB_META_ZH: Record<ZhTabKey, { title: string; description: string 
     title: 'GPU 功耗与能效指标',
     description: 'AI 推理负载下的 GPU 功耗与能效指标。跨硬件对比每瓦 token 数。',
   },
+  collectivex: {
+    title: 'CollectiveX 通信基准测试',
+    description:
+      '跨 NVIDIA 与 AMD GPU 平台对比专家并行（EP）通信性能，包括混合专家（MoE）分发（dispatch）、合并（combine）延迟与逻辑载荷速率。',
+  },
   submissions: {
     title: '基准测试提交记录',
     description:
@@ -102,6 +108,8 @@ export const TAB_INTRO_ZH: Record<ZhTabKey, string> = {
     '本页面提供 GPU 规格对比：NVIDIA、AMD 等厂商加速器的显存容量、显存带宽、FLOPS、互连拓扑与功耗规格。',
   'gpu-metrics':
     '本页面展示 GPU 功耗与能效指标（PowerX）：推理负载下的实测功耗、每瓦 token 数与每兆瓦 token 产出。',
+  collectivex:
+    '本页面展示 CollectiveX 专家并行（EP）通信基准测试结果：在统一工作负载、正确性校验与采样协议下，对比 DeepEP、MoRI、UCCL 及 NCCL/RCCL 参考实现的分发（dispatch）、合并（combine）与完整往返延迟。跨芯片速率均按逻辑载荷计算；只有发布器确认完整且稳定的官方队列才会生成排名与推荐。',
   submissions:
     '本页面列出提交到 InferenceX 的全部基准测试配置：按 GPU 厂商查看提交历史、活动趋势与数据点数量。',
   'ai-chart':
@@ -122,6 +130,7 @@ export const TAB_LABELS_ZH: Record<string, string> = {
   reliability: '可靠性',
   'gpu-specs': 'GPU 规格',
   'gpu-metrics': 'GPU 功耗',
+  collectivex: 'CollectiveX 通信',
   submissions: '提交记录',
   'ai-chart': 'AI 图表',
   'current-inferencex-image': '镜像',

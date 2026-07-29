@@ -1,0 +1,10 @@
+# oxfmt reads this file by default (as does Prettier, if it is ever reintroduced).
+#
+# API response fixtures are stored minified: collectivex-latest.json holds a whole
+# dataset payload, which pretty-printed is ~3.4k lines of indentation for ~60 KB of
+# content and dominates any diff that touches it. They are machine-shaped payloads
+# that are replaced wholesale rather than hand-edited, so formatting them buys
+# nothing; without this entry the pre-commit hook would silently re-expand them.
+packages/app/cypress/fixtures/api/collectivex-latest.json
+packages/app/cypress/fixtures/api/collectivex-run-*.json
+packages/app/cypress/fixtures/api/collectivex-runs.json

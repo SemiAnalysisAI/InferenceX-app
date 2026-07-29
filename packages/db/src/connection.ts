@@ -76,7 +76,7 @@ function wrapPostgres(sql: postgres.Sql): DbClient {
 
 // Survive Next.js HMR — without globalThis the module re-evaluates on each
 // hot reload, leaking the previous postgres.js TCP connection pool.
-const g = globalThis as unknown as { __dbClient?: DbClient; __dbWriteClient?: DbClient };
+const g = globalThis as unknown as { __dbClients?: Map<string, DbClient> };
 
 function makeDbClient(url: string): DbClient {
   return shouldUseNeon(url)
@@ -84,20 +84,39 @@ function makeDbClient(url: string): DbClient {
     : wrapPostgres(postgres(url, postgresOptionsForUrl(url)));
 }
 
+/** One memoized client per connection env var; throws when the var is unset. */
+function memoizedClient(envVar: string): DbClient {
+  g.__dbClients ??= new Map();
+  const cached = g.__dbClients.get(envVar);
+  if (cached) return cached;
+  const url = process.env[envVar];
+  if (!url) throw new Error(`${envVar} is not set`);
+  const client = makeDbClient(url);
+  g.__dbClients.set(envVar, client);
+  return client;
+}
+
 /** Read-only SQL client for API routes. Requires DATABASE_READONLY_URL. */
 export function getDb(): DbClient {
-  if (g.__dbClient) return g.__dbClient;
-  const url = process.env.DATABASE_READONLY_URL;
-  if (!url) throw new Error('DATABASE_READONLY_URL is not set');
-  g.__dbClient = makeDbClient(url);
-  return g.__dbClient;
+  return memoizedClient('DATABASE_READONLY_URL');
 }
 
 /** Write-capable SQL client for API routes that need to insert (e.g. user feedback). */
 export function getWriteDb(): DbClient {
-  if (g.__dbWriteClient) return g.__dbWriteClient;
-  const url = process.env.DATABASE_WRITE_URL;
-  if (!url) throw new Error('DATABASE_WRITE_URL is not set');
-  g.__dbWriteClient = makeDbClient(url);
-  return g.__dbWriteClient;
+  return memoizedClient('DATABASE_WRITE_URL');
+}
+
+/**
+ * Read-only SQL client for the CollectiveX database — a separate Neon
+ * instance from the main benchmark DB, holding raw sweep-run documents.
+ * Must point at the same primary as the write URL (not a lagging replica):
+ * the lazy-ingest routes read their own writes within a single request.
+ */
+export function getCollectiveXDb(): DbClient {
+  return memoizedClient('DATABASE_COLLECTIVEX_READONLY_URL');
+}
+
+/** Write-capable SQL client for the CollectiveX database (lazy ingest + run deletion). */
+export function getCollectiveXWriteDb(): DbClient {
+  return memoizedClient('DATABASE_COLLECTIVEX_WRITE_URL');
 }

@@ -4,9 +4,14 @@ import {
   fetchBenchmarks,
   fetchWorkflowInfo,
   fetchAvailability,
+  deleteCollectiveXRun,
+  fetchCollectiveXRun,
+  fetchCollectiveXRunList,
   fetchReliability,
   fetchEvaluations,
 } from './api';
+import { buildRunSummary } from '@semianalysisai/inferencex-db/collectivex/reader';
+import { makeCollectiveXDataset } from '@/components/collectivex/test-fixture';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -124,5 +129,63 @@ describe('fetchEvaluations', () => {
     const result = await fetchEvaluations();
     expect(mockFetch).toHaveBeenCalledWith('/api/v1/evaluations', expect.objectContaining({}));
     expect(result[0].task).toBe('gsm8k');
+  });
+});
+
+describe('CollectiveX API', () => {
+  const dataset = makeCollectiveXDataset();
+
+  function mockJson(payload: unknown) {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(payload),
+    });
+  }
+
+  it('fetches a specific run by id', async () => {
+    mockJson(dataset);
+
+    const result = await fetchCollectiveXRun(1, dataset.run.run_id);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `/api/v1/collectivex/runs/${dataset.run.run_id}?version=1`,
+      expect.objectContaining({}),
+    );
+    expect(result.run.run_id).toBe(dataset.run.run_id);
+  });
+
+  it('fetches the run list', async () => {
+    mockJson({ version: 1, runs: [buildRunSummary(dataset)], discovery_complete: true });
+
+    const response = await fetchCollectiveXRunList(1);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/collectivex/runs?version=1',
+      expect.objectContaining({}),
+    );
+    expect(response.discovery_complete).toBe(true);
+    expect(response.runs).toHaveLength(1);
+    expect(response.runs[0].run_id).toBe(dataset.run.run_id);
+  });
+
+  it('sends the bearer token on delete and reports success', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+    await expect(deleteCollectiveXRun('160', 'secret-token')).resolves.toBe(true);
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/v1/collectivex/runs/160', {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer secret-token' },
+    });
+  });
+
+  it('resolves false on 401 so callers can clear a stale token', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+    await expect(deleteCollectiveXRun('160', 'stale')).resolves.toBe(false);
+  });
+
+  it('throws on non-auth delete failures', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+    await expect(deleteCollectiveXRun('160', 'secret-token')).rejects.toThrow(/500/);
   });
 });

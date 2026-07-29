@@ -76,6 +76,11 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
       'href',
       '/submissions?unofficialruns=12345',
     );
+    cy.get('[data-testid="tab-trigger-collectivex"]').should(
+      'have.attr',
+      'href',
+      '/collectivex?unofficialruns=12345',
+    );
     cy.get('[data-testid="tab-trigger-historical"]').should(
       'have.attr',
       'href',
@@ -115,6 +120,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     mountTabNav({});
     cy.get('[data-testid="tab-trigger-inference"]').should('exist');
     cy.get('[data-testid="tab-trigger-gpu-specs"]').should('exist');
+    cy.get('[data-testid="tab-trigger-collectivex"]').should('exist');
     cy.get('[data-testid="tab-trigger-submissions"]').should('exist');
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-feedback"]').should('not.exist');

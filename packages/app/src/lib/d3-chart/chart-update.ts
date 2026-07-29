@@ -10,6 +10,8 @@ export interface AxisUpdateConfig {
   yTickFormat?: (d: d3.AxisDomain) => string;
   xTickCount?: number;
   yTickCount?: number;
+  xTickValues?: (number | Date)[];
+  yTickValues?: (number | Date)[];
   /** Override tick size for Y axis (default: 6, use 0 for band scales). */
   yTickSize?: number;
   /** When set, axes animate to new positions over this duration (ms). */
@@ -23,8 +25,16 @@ export function renderAxes(
   yScale: ContinuousScale | d3.ScaleBand<string>,
   config: AxisUpdateConfig,
 ): void {
-  const { xTickFormat, yTickFormat, xTickCount, yTickCount, yTickSize, transitionDuration } =
-    config;
+  const {
+    xTickFormat,
+    yTickFormat,
+    xTickCount,
+    yTickCount,
+    xTickValues,
+    yTickValues,
+    yTickSize,
+    transitionDuration,
+  } = config;
   const dur = transitionDuration ?? 0;
 
   // X axis
@@ -36,6 +46,9 @@ export function renderAxes(
   } else {
     const gen = d3.axisBottom(xScale as ContinuousScale).tickSize(6);
     if (xTickCount) gen.ticks(xTickCount);
+    if (xTickValues) {
+      gen.tickValues(visibleTickValues(xScale, xTickValues) as Iterable<d3.NumberValue>);
+    }
     if (xTickFormat) gen.tickFormat(xTickFormat as any);
     xAxisGen = gen as unknown as d3.Axis<d3.AxisDomain>;
   }
@@ -54,6 +67,9 @@ export function renderAxes(
   } else {
     const yAxisGen = d3.axisLeft(yScale as ContinuousScale).tickSize(yTickSize ?? 6);
     if (yTickCount) yAxisGen.ticks(yTickCount);
+    if (yTickValues) {
+      yAxisGen.tickValues(visibleTickValues(yScale, yTickValues) as Iterable<d3.NumberValue>);
+    }
     if (yTickFormat) yAxisGen.tickFormat(yTickFormat as any);
     const yTarget = dur > 0 ? layout.yAxisGroup.transition().duration(dur) : layout.yAxisGroup;
     (yTarget as any).call(yAxisGen as any);
@@ -67,6 +83,8 @@ export function renderGrid(
   yScale: ContinuousScale | d3.ScaleBand<string>,
   yTickCount?: number,
   transitionDuration = 0,
+  xTickValues?: (number | Date)[],
+  yTickValues?: (number | Date)[],
 ): void {
   const { width, height, gridGroup } = layout;
   const dur = transitionDuration;
@@ -87,7 +105,9 @@ export function renderGrid(
       .attr('y2', height);
   } else {
     const tickScale = xScale as { ticks: (count?: number) => number[]; (v: number): number };
-    const xTicks = tickScale.ticks();
+    const xTicks = xTickValues
+      ? (visibleTickValues(xScale, xTickValues) as number[])
+      : tickScale.ticks();
     const vJoin = vGroup
       .selectAll<SVGLineElement, number>('line')
       .data(xTicks)
@@ -126,7 +146,9 @@ export function renderGrid(
       .attr('y2', (d) => (bandScale(d) || 0) + bandScale.bandwidth() / 2)
       .style('stroke-width', 0.5);
   } else {
-    const yTicks = yScale.ticks(yTickCount ?? 5);
+    const yTicks = yTickValues
+      ? (visibleTickValues(yScale, yTickValues) as number[])
+      : yScale.ticks(yTickCount ?? 5);
     const hJoin = hGroup
       .selectAll<SVGLineElement, number>('line')
       .data(yTicks)
@@ -148,4 +170,19 @@ export function renderGrid(
       .attr('y1', (d: number) => yScale(d))
       .attr('y2', (d: number) => yScale(d));
   }
+}
+
+function visibleTickValues(
+  scale: ContinuousScale | d3.ScaleTime<number, number>,
+  values: (number | Date)[],
+): (number | Date)[] {
+  const domain = scale.domain();
+  const start = Number(domain[0]);
+  const end = Number(domain.at(-1));
+  const min = Math.min(start, end);
+  const max = Math.max(start, end);
+  return values.filter((value) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric >= min && numeric <= max;
+  });
 }

@@ -5,6 +5,7 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./collectivex/*": "./src/collectivex/*.ts",
     "./connection": "./src/connection.ts",
     "./etl/*": "./src/etl/*.ts",
     "./lib/*": "./src/lib/*.ts",
@@ -14,10 +15,12 @@
   "scripts": {
     "db:prepare:ci": "bun src/prepare-ci-artifacts.ts",
     "db:ingest:ci": "bun src/ingest-ci-run.ts",
+    "db:ingest:collectivex": "bun --env-file=../../.env src/ingest-collectivex.ts --download",
     "db:ingest:run": "bun --env-file=../../.env src/ingest-ci-run.ts --download",
     "db:ingest:gcs": "bun --env-file=../../.env src/ingest-gcs-backup.ts",
     "db:ingest:supplemental": "bun --env-file=../../.env src/ingest-supplemental.ts",
     "db:migrate": "bun --env-file=../../.env src/migrate.ts",
+    "db:migrate:collectivex": "bun --env-file=../../.env src/migrate-collectivex.ts",
     "db:apply-overrides": "bun --env-file=../../.env src/apply-overrides.ts",
     "db:backfill-aggregate-stats": "bun --env-file=../../.env src/backfill-aggregate-stats.ts",
     "db:backfill-chart-series": "bun --env-file=../../.env src/backfill-chart-series.ts",

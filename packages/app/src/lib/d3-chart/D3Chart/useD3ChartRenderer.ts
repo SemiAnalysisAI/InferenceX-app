@@ -9,7 +9,7 @@ import type { ChartLayout, ContinuousScale } from '../types';
 
 import { buildScale, isBandScale, type BuiltScale } from './scale-builders';
 import { renderLayer, updateLayerOnZoom } from './layer-renderer';
-import type { D3ChartProps, RenderContext, ZoomContext } from './types';
+import type { AxisConfig, D3ChartProps, RenderContext, ZoomContext } from './types';
 
 interface RendererDeps {
   svgRef: React.RefObject<SVGSVGElement | null>;
@@ -50,6 +50,14 @@ interface RendererDeps {
     svgRef?: React.RefObject<SVGSVGElement | null>,
     zoomAxes?: 'x' | 'y' | 'both',
   ) => void;
+}
+
+function resolveTickValues(
+  tickValues: AxisConfig['tickValues'],
+  scale: AnyScale,
+): (number | Date)[] | undefined {
+  if (!tickValues) return undefined;
+  return typeof tickValues === 'function' ? tickValues(scale) : tickValues;
 }
 
 /**
@@ -98,7 +106,14 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
   // preventing a frame where dots and lines are out of sync during y-axis metric changes.
   useLayoutEffect(() => {
     if (!svgRef.current || !tooltipRef.current || dimensions.width === 0) return;
-    if (data.length === 0 && layers.every((l) => l.type !== 'custom')) return;
+    if (data.length === 0 && layers.every((layer) => layer.type !== 'custom')) {
+      d3.select(svgRef.current).selectAll('*').remove();
+      scalesRef.current = null;
+      layoutRef.current = null;
+      dismissTooltip(true);
+      prevDataRef.current = data;
+      return;
+    }
 
     // Animate when data or scale domains changed (but not on resize/theme changes)
     const dataChanged = data !== prevDataRef.current;
@@ -163,12 +178,24 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
 
       // ── Grid + Axes (skip when no scale configs) ──
       if (hasScales) {
-        renderGrid(layout, xScale as AnyScale, yScale as any, yAxisConfig?.tickCount ?? 5);
+        const xTickValues = resolveTickValues(xAxisConfig?.tickValues, xScale as AnyScale);
+        const yTickValues = resolveTickValues(yAxisConfig?.tickValues, yScale as AnyScale);
+        renderGrid(
+          layout,
+          xScale as AnyScale,
+          yScale as any,
+          yAxisConfig?.tickCount ?? 5,
+          0,
+          xTickValues,
+          yTickValues,
+        );
         renderAxes(layout, xScale as AnyScale, yScale as any, {
           xTickFormat: xAxisConfig?.tickFormat,
           yTickFormat: yAxisConfig?.tickFormat,
           xTickCount: xAxisConfig?.tickCount,
           yTickCount: yAxisConfig?.tickCount,
+          xTickValues,
+          yTickValues,
         });
 
         // Custom axis formatting callbacks
@@ -410,11 +437,15 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
               }
 
               // Update axes + grid
+              const xTickValues = resolveTickValues(xAxisConfig?.tickValues, newXScale as AnyScale);
+              const yTickValues = resolveTickValues(yAxisConfig?.tickValues, newYScale as AnyScale);
               renderAxes(layout, newXScale as AnyScale, newYScale as any, {
                 xTickFormat: xAxisConfig?.tickFormat,
                 yTickFormat: yAxisConfig?.tickFormat,
                 xTickCount: xAxisConfig?.tickCount,
                 yTickCount: yAxisConfig?.tickCount,
+                xTickValues,
+                yTickValues,
               });
               if (xAxisConfig?.customize) {
                 xAxisConfig.customize(layout.xAxisGroup);
@@ -427,6 +458,9 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
                 newXScale as AnyScale,
                 newYScale as any,
                 yAxisConfig?.tickCount ?? 5,
+                0,
+                xTickValues,
+                yTickValues,
               );
 
               // Update layers

@@ -34,10 +34,12 @@
     "admin:cache:warmup": "bun run --cwd packages/app cache:warmup",
     "admin:db:ingest:run": "bun run --cwd packages/db db:ingest:run",
     "admin:db:ingest:ci": "bun run --cwd packages/db db:ingest:ci",
+    "admin:db:ingest:collectivex": "bun run --cwd packages/db db:ingest:collectivex",
     "admin:db:prepare:ci": "bun run --cwd packages/db db:prepare:ci",
     "admin:db:ingest:gcs": "bun run --cwd packages/db db:ingest:gcs",
     "admin:db:ingest:supplemental": "bun run --cwd packages/db db:ingest:supplemental",
     "admin:db:migrate": "bun run --cwd packages/db db:migrate",
+    "admin:db:migrate:collectivex": "bun run --cwd packages/db db:migrate:collectivex",
     "admin:db:apply-overrides": "bun run --cwd packages/db db:apply-overrides",
     "admin:db:reset": "bun run --cwd packages/db db:reset",
     "admin:db:verify": "bun run --cwd packages/db db:verify"

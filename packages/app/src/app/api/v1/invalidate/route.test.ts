@@ -1,11 +1,14 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-const { mockPurgeAll } = vi.hoisted(() => ({
+const { mockPurgeAll, mockPurgeCollectiveX } = vi.hoisted(() => ({
   mockPurgeAll: vi.fn(),
+  mockPurgeCollectiveX: vi.fn(),
 }));
 
 vi.mock('@/lib/api-cache', () => ({
+  COLLECTIVEX_CACHE_SCOPE: 'collectivex',
   purgeAll: mockPurgeAll,
+  purgeCollectiveX: mockPurgeCollectiveX,
 }));
 
 import { POST } from './route';
@@ -42,8 +45,8 @@ afterEach(() => {
   }
 });
 
-function postReq(headers?: Record<string, string>): Request {
-  return new Request('http://localhost/api/v1/invalidate', {
+function postReq(headers?: Record<string, string>, query = ''): Request {
+  return new Request(`http://localhost/api/v1/invalidate${query}`, {
     method: 'POST',
     headers: headers ?? {},
   });
@@ -123,5 +126,23 @@ describe('POST /api/v1/invalidate', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ invalidated: true, blobsDeleted: 0 });
+  });
+
+  it('purges only the CollectiveX scope when requested', async () => {
+    const res = await POST(
+      postReq({ Authorization: 'Bearer test-secret-123' }, '?scope=collectivex'),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ invalidated: true, scope: 'collectivex' });
+    expect(mockPurgeCollectiveX).toHaveBeenCalledOnce();
+    expect(mockPurgeAll).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown scopes without purging anything', async () => {
+    const res = await POST(postReq({ Authorization: 'Bearer test-secret-123' }, '?scope=nope'));
+    expect(res.status).toBe(400);
+    expect(mockPurgeAll).not.toHaveBeenCalled();
+    expect(mockPurgeCollectiveX).not.toHaveBeenCalled();
   });
 });

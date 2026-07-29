@@ -16,6 +16,7 @@ export const VALID_TABS = [
   'calculator',
   'reliability',
   'gpu-specs',
+  'collectivex',
   'ai-chart',
   'gpu-metrics',
   'submissions',
@@ -55,6 +56,11 @@ export const TAB_META: Record<TabKey, { title: string; description: string }> = 
     title: 'GPU Specifications & Comparison',
     description:
       'Detailed GPU specifications for AI inference. Compare NVIDIA, AMD, and Intel GPUs — memory bandwidth, FLOPS, interconnects, and topology.',
+  },
+  collectivex: {
+    title: 'CollectiveX Communication Benchmarks',
+    description:
+      'Experimental cross-vendor expert-parallel communication benchmarks. Compare MoE dispatch and combine latency across NVIDIA and AMD GPU platforms.',
   },
   'ai-chart': {
     title: 'AI-Powered Chart Generation',

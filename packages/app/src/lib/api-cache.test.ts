@@ -16,7 +16,7 @@ vi.mock('./blob-cache', () => ({
   blobPurge: vi.fn(),
 }));
 
-import { cachedQuery, purgeAll, cachedJson } from './api-cache';
+import { cachedQuery, purgeAll, purgeCollectiveX, cachedJson } from './api-cache';
 import { revalidateTag, unstable_cache } from 'next/cache';
 import { blobGet, blobSet, blobPurge } from './blob-cache';
 
@@ -155,6 +155,14 @@ describe('purgeAll', () => {
     expect(mockBlobPurge).toHaveBeenCalled();
   });
 
+  it('drops the CollectiveX tag too — the blob purge removed its entries', async () => {
+    mockBlobPurge.mockResolvedValue(1);
+
+    await purgeAll();
+
+    expect(mockRevalidateTag).toHaveBeenCalledWith('collectivex', { expire: 0 });
+  });
+
   it('returns 0 when no blobs were deleted', async () => {
     mockBlobPurge.mockResolvedValue(0);
 
@@ -172,6 +180,16 @@ describe('purgeAll', () => {
   });
 });
 
+describe('purgeCollectiveX', () => {
+  it('drops only the collectivex tag — no blobs belong to that scope', () => {
+    purgeCollectiveX();
+
+    expect(mockBlobPurge).not.toHaveBeenCalled();
+    expect(mockRevalidateTag).toHaveBeenCalledWith('collectivex', { expire: 0 });
+    expect(mockRevalidateTag).not.toHaveBeenCalledWith('db', { expire: 0 });
+  });
+});
+
 describe('cachedJson', () => {
   it('sets Cache-Control with max-age=0 and 1 day s-maxage', () => {
     const res = cachedJson({ ok: true });
@@ -181,6 +199,20 @@ describe('cachedJson', () => {
   it('sets Vercel-Cache-Tag to db', () => {
     const res = cachedJson({ ok: true });
     expect(res.headers.get('Vercel-Cache-Tag')).toBe('db');
+  });
+
+  it('carries a custom cache tag when one is passed', () => {
+    const res = cachedJson({ ok: true }, { tag: 'collectivex' });
+    expect(res.headers.get('Vercel-Cache-Tag')).toBe('collectivex');
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=86400');
+  });
+
+  it('honors a custom Cache-Control for lazily-refreshed routes', () => {
+    const res = cachedJson(
+      { ok: true },
+      { tag: 'collectivex', cacheControl: 'public, max-age=0, s-maxage=60' },
+    );
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=60');
   });
 
   it('sets an environment-scoped Vercel-Cache-Tag', () => {
