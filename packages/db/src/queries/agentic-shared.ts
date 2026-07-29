@@ -31,8 +31,13 @@ import type { DbClient } from '../connection.js';
  *
  * v5: reject osl <= 0 in extractTurn to exclude cancelled/empty-output turns
  * whose decode-interval math would explode normalized E2E to thousands of seconds.
+ *
+ * v6: drop the retired per-point derived metrics (normalizedSessionTimeS,
+ * p90PrefillTpsPerUser, normalizedE2e400) along with the experimental chart
+ * modes they fed. The bundle is now isl/osl + the server-derived kvCacheUtil
+ * and prefixCacheHitRate.
  */
-export const STATS_VERSION = 5;
+export const STATS_VERSION = 6;
 
 interface ProfileRecord {
   metadata?: { benchmark_phase?: string };

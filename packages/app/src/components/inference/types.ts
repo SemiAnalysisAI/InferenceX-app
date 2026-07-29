@@ -258,7 +258,7 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   /**
    * Whether this point sits on the (e2e_latency, y-metric) Pareto frontier.
    * Set by useChartData when `selectedXAxisMode !== 'e2e'`. The TTFT /
-   * interactivity / session-time / prefill-tps charts use this flag to
+   * interactivity charts use this flag to
    * restrict their roofline computation to e2e-Pareto winners — vendors
    * can't benchmark-hack TTFT by tanking decode (or vice versa) and still
    * appear on the frontier line — while keeping every point visible as
@@ -763,21 +763,10 @@ export interface InferenceChartContextType {
    * at a time, picked by the big buttons above the chart.
    * - 'ttft'          → e2e chartType with x-axis forced to p90_ttft
    * - 'e2e'           → e2e chartType with the chart-config default x-axis (median_e2el / p90_e2el)
-   * - 'normalized-e2e'→ agentic-only; x = per-request E2E normalized to 400 output tokens
    * - 'interactivity' → interactivity chartType (x = median_intvty / p90_intvty)
-   * - 'session-time'  → agentic-only; x = mean-normalized session time (live-computed from trace blobs)
-   * - 'prefill-tps'   → agentic-only; x = mean of P90 prefill TPS/user per session
    */
-  selectedXAxisMode:
-    | 'ttft'
-    | 'e2e'
-    | 'normalized-e2e'
-    | 'interactivity'
-    | 'session-time'
-    | 'prefill-tps';
-  setSelectedXAxisMode: (
-    mode: 'ttft' | 'e2e' | 'normalized-e2e' | 'interactivity' | 'session-time' | 'prefill-tps',
-  ) => void;
+  selectedXAxisMode: 'ttft' | 'e2e' | 'interactivity';
+  setSelectedXAxisMode: (mode: 'ttft' | 'e2e' | 'interactivity') => void;
   scaleType: 'auto' | 'linear' | 'log';
   setScaleType: (type: 'auto' | 'linear' | 'log') => void;
   /** Coarse vendor / framework / agg-disagg / mtp-stp filters applied to the chart point set. */

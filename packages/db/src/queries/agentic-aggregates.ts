@@ -24,7 +24,6 @@ import { streamObject } from 'stream-json/streamers/stream-object.js';
 
 import { gunzipJsonWithinLimit } from '../etl/gzip-json-stream';
 import type { DbClient } from '../connection.js';
-import { computeDerivedFromBlob } from './derived-agentic-metrics';
 import {
   extractIslOsl,
   fetchAggregateStatsRows,
@@ -316,12 +315,8 @@ export async function getAgenticAggregates(
           const oslPct = percentilesOf(osl);
           result[id].isl = islPct;
           result[id].osl = oslPct;
-          // Recompute the profile-derived fields too (same jsonl, no extra
-          // read) so the self-healed bundle is a faithful full recompute — not
-          // a carry-forward of stale derived numbers stamped with a new
-          // version. Server-derived fields are filled in Pass 2 (or stay null
-          // when the server blob is absent, which is the correct complete value).
-          const derived = computeDerivedFromBlob(jsonl);
+          // Server-derived fields are filled in Pass 2 (or stay null when the
+          // server blob is absent, which is the correct complete value).
           pendingById.set(id, {
             traceReplayId: Number(row.trace_replay_id),
             stats: {
@@ -330,9 +325,6 @@ export async function getAgenticAggregates(
               osl: oslPct,
               kvCacheUtil: null,
               prefixCacheHitRate: null,
-              normalizedSessionTimeS: derived.normalized_session_time_s,
-              p90PrefillTpsPerUser: derived.p90_prefill_tps_per_user,
-              normalizedE2e400: derived.normalized_e2e_400,
             },
           });
         } catch {
@@ -404,8 +396,6 @@ interface AggregateStatsRow {
   osl: MetricPercentiles | null;
   kvCacheUtil: MetricPercentiles | null;
   prefixCacheHitRate: MetricPercentiles | null;
-  normalizedSessionTimeS: number | null;
-  p90PrefillTpsPerUser: number | null;
 }
 
 /**
@@ -419,9 +409,6 @@ interface FullAggregateStats {
   osl: MetricPercentiles | null;
   kvCacheUtil: MetricPercentiles | null;
   prefixCacheHitRate: MetricPercentiles | null;
-  normalizedSessionTimeS: number | null;
-  p90PrefillTpsPerUser: number | null;
-  normalizedE2e400: MetricPercentiles | null;
 }
 
 function blankAggregate(id: number): AgenticAggregate {
