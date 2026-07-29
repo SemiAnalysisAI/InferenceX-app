@@ -66,6 +66,12 @@ import {
   getPointLabel,
 } from '@/components/inference/utils/tooltipUtils';
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
+import {
+  OFFLOAD_HALO_DASHARRAY,
+  OFFLOAD_HALO_RADIUS,
+  OFFLOAD_HALO_STROKE_WIDTH,
+  OffloadHaloLegendKey,
+} from '@/components/inference/ui/OffloadHaloLegendKey';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import {
   type ParetoPointLabel,
@@ -838,6 +844,12 @@ const ScatterGraph = React.memo(
 
     // All official points for rendering (unfiltered — visibility via opacity)
     const pointsData = useMemo(() => Object.values(groupedData).flat(), [groupedData]);
+    const hasOffloadHalo = useMemo(
+      () =>
+        pointsData.some((point) => point.offload_mode === 'on') ||
+        processedOverlayData.some((point) => point.offload_mode === 'on'),
+      [pointsData, processedOverlayData],
+    );
 
     // Bulk presence lookup for agentic points: which ids have a stored
     // trace_replay blob → controls the "View charts" button in the pinned
@@ -2541,11 +2553,11 @@ const ScatterGraph = React.memo(
             .data(showHalo ? [true] : [])
             .join('circle')
             .attr('class', 'offload-halo')
-            .attr('r', POINT_SIZE + 4)
+            .attr('r', OFFLOAD_HALO_RADIUS)
             .attr('fill', 'none')
             .attr('stroke', 'var(--foreground)')
-            .attr('stroke-width', 1.5)
-            .attr('stroke-dasharray', '3 2')
+            .attr('stroke-width', OFFLOAD_HALO_STROKE_WIDTH)
+            .attr('stroke-dasharray', OFFLOAD_HALO_DASHARRAY)
             .attr('opacity', 0.9)
             .attr('pointer-events', 'none');
         });
@@ -3080,6 +3092,7 @@ const ScatterGraph = React.memo(
                   : []
               }
               precisionIndicators={selectedPrecisions}
+              keyIndicators={hasOffloadHalo ? <OffloadHaloLegendKey /> : undefined}
               enableTooltips={true}
             />
           }
