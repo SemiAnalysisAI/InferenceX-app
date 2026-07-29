@@ -409,7 +409,9 @@ describe('Overview page', () => {
       .click();
     cy.location('pathname').should('eq', '/zh/overview');
     cy.location('search').should('eq', '?tier=100');
-    cy.contains('GPU 租赁成本 / 每百万输出 token · @100 tok/s/用户 · ↓ 越低越好').should('exist');
+    cy.contains('GPU 租赁成本 / 每百万输出 token · 8K→1K · @100 tok/s/用户 · ↓ 越低越好').should(
+      'exist',
+    );
   });
 
   it('uses the same cell semantics on mobile and fits both 390px and 320px widths', () => {
@@ -603,12 +605,10 @@ describe('Overview page', () => {
     cy.contains('一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。').should(
       'exist',
     );
-    cy.contains('按各模型标注的场景，基于各平台最佳观测服务包络线计算每百万输出 token 成本').should(
-      'exist',
-    );
+    cy.contains('基于最佳观测平台服务包络线计算的各活跃模型每百万输出 token 成本').should('exist');
     cy.get('[data-testid="overview-scope"]').should(
       'have.text',
-      'GPU 租赁成本 / 每百万输出 token · @50 tok/s/用户 · ↓ 越低越好',
+      'GPU 租赁成本 / 每百万输出 token · 8K→1K · @50 tok/s/用户 · ↓ 越低越好',
     );
     cy.contains('成本 = 3 年期租赁 $/GPU/小时 ÷ 每张已部署 GPU 的输出 tok/s。').should('exist');
     cy.contains('分离式结果的分母同时计入预填充与解码 GPU。').should('exist');
@@ -636,14 +636,15 @@ describe('Overview page', () => {
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
     });
     desktopModel('GLM-5.2').within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', 'AgentX');
+      cy.get('[data-testid="overview-model-scenario"]').should('not.exist');
       cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
     });
-    cy.get('body').should('not.contain.text', '标准解码');
     cy.contains('∞ = 无可比结果').should('exist');
 
     cy.visit('/zh/overview?tier=100');
-    cy.contains('GPU 租赁成本 / 每百万输出 token · @100 tok/s/用户 · ↓ 越低越好').should('exist');
+    cy.contains('GPU 租赁成本 / 每百万输出 token · 8K→1K · @100 tok/s/用户 · ↓ 越低越好').should(
+      'exist',
+    );
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.contains('a', '50').should('have.attr', 'href', '/zh/overview');
     });

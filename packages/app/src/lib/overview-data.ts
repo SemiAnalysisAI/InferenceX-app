@@ -310,10 +310,11 @@ function missingReasonForPlatform(
     OVERVIEW_PRECISIONS.includes(row.precision),
   );
   if (supportedRows.length === 0) return 'int4_bf16_only';
+  if (bucketReads.length === 0) return 'no_scenario_data';
   // `cannot reach` is a claim about the whole platform, so it holds only when
   // EVERY qualified serving series tops out below the tier — one merely
   // under-swept stack downgrades the gap to a missing exact read.
-  return bucketReads.length > 0 && bucketReads.every((r) => r.boundary === 'unreachable')
+  return bucketReads.every((r) => r.boundary === 'unreachable')
     ? 'cannot_reach_at_tier'
     : 'no_exact_at_tier';
 }

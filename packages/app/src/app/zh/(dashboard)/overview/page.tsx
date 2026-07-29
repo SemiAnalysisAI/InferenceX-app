@@ -10,7 +10,7 @@ import { getOverviewPageData } from '@/lib/overview-data.server';
 export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
-  '按各活跃模型标注的场景，对比 MI355X、B200、B300、GB200 与 GB300 的每百万输出 token 成本。';
+  '在固定单轮 8K 输入 / 1K 输出负载下，基于最佳观测平台服务包络线对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的每百万输出 token 成本；优先采用推测解码与 FP4。';
 
 export const metadata: Metadata = {
   title: '推理成本总览',

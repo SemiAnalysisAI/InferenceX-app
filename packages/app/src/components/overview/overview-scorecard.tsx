@@ -72,7 +72,8 @@ export const OVERVIEW_STRINGS = {
   zh: {
     title: '推理成本总览',
     purpose: '一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。',
-    scope: (tier: number) => `GPU 租赁成本 / 每百万输出 token · @${tier} tok/s/用户 · ↓ 越低越好`,
+    scope: (tier: number) =>
+      `GPU 租赁成本 / 每百万输出 token · 8K→1K · @${tier} tok/s/用户 · ↓ 越低越好`,
     tierNavLabel: '服务档位',
     tierUnit: 'tok/s/用户',
     engineScopeNavLabel: '引擎范围',
@@ -81,31 +82,29 @@ export const OVERVIEW_STRINGS = {
       community: '开源社区引擎（vLLM/SGLang）',
     },
     snapshot: (through: string) => `数据库快照截至 ${through}`,
-    caption: '按各模型标注的场景，基于各平台最佳观测服务包络线计算每百万输出 token 成本。',
-    modelHeader: '模型 · 场景',
-    scenarioLabels: {
-      single_turn_8k1k: '单轮 · 8K→1K',
-      agentx: 'AgentX',
-    },
+    caption:
+      '基于最佳观测平台服务包络线计算的各活跃模型每百万输出 token 成本；优先采用推测解码与 FP4。',
+    modelHeader: '模型',
     detailsHeader: '详情',
     detailLink: '查看详情',
     detailAria: (modelLabel: string) => `查看详情：${modelLabel}`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
       `打开 ${evidenceDate} 原始数据仪表板：${modelLabel} · ${stack}`,
+    standardDecode: '标准解码',
     estimatedTooltip: (topologies: readonly string[]) =>
       topologies.length === 0
         ? '根据已验证的基准运行结果估算。'
         : `根据已验证的 ${topologies.join(' 与 ')} 运行结果估算。`,
     estimatedAria: (value: string, explanation: string) => `约 ${value}。${explanation}`,
+    noWorkloadResults: '暂无 8K/1K 结果',
     infinityLegend: '∞ = 无可比结果',
     missingReasons: (tier: number): Record<string, string> => ({
       int4_bf16_only: '仅 INT4/BF16',
-      no_scenario_data: '该场景暂无数据',
-      no_speculative_decode_result: '暂无推测解码结果',
+      no_8k1k_data: '无 8K/1K 数据',
       cannot_reach_at_tier: `无法达到 @${tier}`,
       no_exact_at_tier: `无精确 @${tier} 结果`,
     }),
-    methodologyNote: '仅展示推测解码。优先顺序：FP4 → FP8。',
+    methodologyNote: '优先顺序：推测解码 FP4 → 推测解码 FP8 → 标准解码 FP4 → 标准解码 FP8。',
     costNote: '成本 = 3 年期租赁 $/GPU/小时 ÷ 每张已部署 GPU 的输出 tok/s。所有百分比均相对 B200。',
     costDeltaAria: (pct: string, cheaper: boolean) => `比 B200 ${cheaper ? '便宜' : '昂贵'} ${pct}`,
     costDeltaEvenAria: '与 B200 成本基本持平',
@@ -113,7 +112,8 @@ export const OVERVIEW_STRINGS = {
     normalizationNote: '分离式结果的分母同时计入预填充与解码 GPU。',
     interpolationNote:
       '各档位数值采用最佳观测平台服务包络线；≈ 表示根据已验证运行结果估算。不会外推。',
-    comparabilityNote: '每行均在该模型标注的场景内比较各平台；日期、引擎、精度与推测方法可能不同。',
+    comparabilityNote:
+      '方向性平台对比：各单元格取该平台最佳观测包络线，日期、引擎、精度与解码方式可能不同。',
   },
 } as const;
 
@@ -162,7 +162,8 @@ function formatEvidenceDate(
 
 function missingReasonCopy(platform: OverviewPlatformResult, strings: OverviewStrings): string {
   const reason = platform.missingReason;
-  return reason === null ? '' : strings.missingReasons(platform.read.tier)[reason];
+  if (reason === null) return '';
+  return strings.missingReasons(platform.read.tier)[reason] ?? strings.infinityLegend;
 }
 
 const RAW_SOURCE_LINK_CLASS =
@@ -381,16 +382,18 @@ function PlatformCell(props: {
   );
 }
 
-function ModelName({ model, strings }: { model: OverviewModelSummary; strings: OverviewStrings }) {
+function ModelName({ model, locale }: { model: OverviewModelSummary; locale: OverviewLocale }) {
   return (
     <div>
       <h2 className="text-sm font-semibold leading-snug">{model.modelLabel}</h2>
-      <p
-        data-testid="overview-model-scenario"
-        className="mt-0.5 text-[11px] font-normal leading-tight text-muted-foreground"
-      >
-        {strings.scenarioLabels[model.scenario]}
-      </p>
+      {locale === 'en' ? (
+        <p
+          data-testid="overview-model-scenario"
+          className="mt-0.5 text-[11px] font-normal leading-tight text-muted-foreground"
+        >
+          {OVERVIEW_STRINGS.en.scenarioLabels[model.scenario]}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -445,7 +448,7 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
               className="border-b border-border/50 align-top last:border-b-0"
             >
               <th scope="row" className="px-4 py-4 text-left align-top font-normal lg:px-6">
-                <ModelName model={model} strings={strings} />
+                <ModelName model={model} locale={locale} />
               </th>
               {model.platforms.map((platform) => (
                 <td
@@ -488,7 +491,7 @@ export function MobileOverviewList({ models, locale, formatters, strings }: Surf
             data-model={model.model}
             className="space-y-2 px-4 py-3.5"
           >
-            <ModelName model={model} strings={strings} />
+            <ModelName model={model} locale={locale} />
             <div className="grid grid-cols-1">
               {model.platforms.map((platform) => (
                 <div

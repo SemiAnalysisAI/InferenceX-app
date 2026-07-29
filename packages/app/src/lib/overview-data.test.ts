@@ -697,6 +697,28 @@ describe('overview platform selection', () => {
     });
   });
 
+  it('reports scenario-level missing coverage when AgentX rows lack usable P90 metrics', () => {
+    const summary = buildOverviewModelSummary(Model.GLM_5_2, [
+      row({
+        model: 'glm5.2',
+        hardware: 'b200',
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        precision: Precision.FP4,
+        spec_method: 'mtp',
+        metrics: {
+          output_tput_per_gpu: 1200,
+        },
+      }),
+    ]);
+
+    expect(summary.platforms.find(({ hardware }) => hardware === 'b200')).toMatchObject({
+      read: { value: null },
+      missingReason: 'no_scenario_data',
+    });
+  });
+
   it('returns all five platforms with coverage gaps for an empty model', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, []);
 
