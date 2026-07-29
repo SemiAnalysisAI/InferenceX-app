@@ -2,7 +2,11 @@ import { timingSafeEqual } from 'crypto';
 
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { parseCollectiveXVersion } from '@semianalysisai/inferencex-db/collectivex/types';
+import {
+  type CollectiveXDataset,
+  type CollectiveXRunSummary,
+  parseCollectiveXVersion,
+} from '@semianalysisai/inferencex-db/collectivex/types';
 import {
   FIXTURES_MODE,
   getCollectiveXDb,
@@ -34,7 +38,17 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
   if (!version || !RUN_ID.test(runId)) {
     return NextResponse.json({ error: 'Unknown version or run id' }, { status: 400 });
   }
-  if (FIXTURES_MODE) return cachedJson(loadFixture('collectivex-latest'));
+  if (FIXTURES_MODE) {
+    const fixtureList = loadFixture<{ version: number; runs: CollectiveXRunSummary[] }>(
+      'collectivex-runs',
+    );
+    if (fixtureList.version !== version || !fixtureList.runs.some((run) => run.run_id === runId)) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    const latest = loadFixture<CollectiveXDataset>('collectivex-latest');
+    if (latest.run.run_id === runId) return cachedJson(latest);
+    return cachedJson(loadFixture<CollectiveXDataset>(`collectivex-run-${runId}`));
+  }
 
   try {
     await ensureCollectiveXRun(version, runId);

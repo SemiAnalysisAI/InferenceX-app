@@ -8,16 +8,23 @@
  * Usage:
  *   pnpm --filter app capture:fixtures                              (prod)
  *   pnpm --filter app capture:fixtures http://localhost:3000        (local dev)
+ *   pnpm --filter app capture:fixtures -- --collectivex-only         (synthetic multi-run data)
  */
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { buildRunSummary } from '@semianalysisai/inferencex-db/collectivex/reader';
-import { makeCollectiveXDataset } from '@semianalysisai/inferencex-db/collectivex/test-fixture';
+import {
+  buildDataset,
+  makeCollectiveXDataset,
+  makeRawShard,
+} from '@semianalysisai/inferencex-db/collectivex/test-fixture';
 
+const cliArgs = process.argv.filter((argument) => argument !== '--').slice(2);
+const collectiveXOnly = cliArgs.includes('--collectivex-only');
 const baseUrl = (
-  process.argv.filter((a) => a !== '--').slice(2)[0] ?? 'https://inferencex.semianalysis.com'
+  cliArgs.find((argument) => !argument.startsWith('--')) ?? 'https://inferencex.semianalysis.com'
 ).replace(/\/$/u, '');
 
 // `import.meta.dirname` is undefined when this script runs through tsx's CJS
@@ -134,9 +141,52 @@ async function writeFixture(name: string, data: unknown): Promise<number> {
   return body.length;
 }
 
+async function writeCollectiveXFixtures(): Promise<[string, number][]> {
+  const latest = makeCollectiveXDataset();
+  const comparison = buildDataset({
+    shards: [makeRawShard({ precision: 'fp8' })],
+    meta: {
+      run_id: '159',
+      generated_at: '2026-07-07T12:20:00Z',
+      source_sha: 'd'.repeat(40),
+    },
+  });
+  const datasets = [latest, comparison];
+  const sizes: [string, number][] = [
+    ['collectivex-latest', await writeFixture('collectivex-latest', latest)],
+  ];
+  // The newest dataset already has the stable `collectivex-latest` fixture;
+  // older runs get id-keyed files for multi-run selection.
+  for (const dataset of datasets.slice(1)) {
+    const name = `collectivex-run-${dataset.run.run_id}`;
+    sizes.push([name, await writeFixture(name, dataset)]);
+  }
+  sizes.push([
+    'collectivex-runs',
+    await writeFixture('collectivex-runs', {
+      version: 1,
+      runs: datasets.map(buildRunSummary),
+    }),
+  ]);
+  return sizes;
+}
+
+function printSizes(sizes: [string, number][]) {
+  for (const [name, bytes] of sizes) {
+    console.log(`  ${name.padEnd(22)} ${(bytes / 1024).toFixed(1).padStart(8)} KB`);
+  }
+  console.log(`\nWrote ${sizes.length} fixtures to ${fixturesDir}`);
+}
+
 async function main() {
-  console.log(`Capturing fixtures from ${baseUrl}`);
   await mkdir(fixturesDir, { recursive: true });
+  if (collectiveXOnly) {
+    console.log('Generating synthetic CollectiveX fixtures');
+    printSizes(await writeCollectiveXFixtures());
+    return;
+  }
+
+  console.log(`Capturing fixtures from ${baseUrl}`);
 
   const latestDate = await fetchLatestDate();
   console.log(
@@ -192,6 +242,7 @@ async function main() {
   );
 
   const N = TOP_DATES_PER_PARTITION;
+  const collectiveXSizes = await writeCollectiveXFixtures();
   const sizes: [string, number][] = [
     [
       'availability',
@@ -253,23 +304,12 @@ async function main() {
       }),
     ],
     ['workflow-info', await writeFixture('workflow-info', workflowInfo)],
-    // CollectiveX fixtures are synthetic (deterministic contract builders),
-    // not captured — production may hold arbitrary sweep data while the e2e
-    // suite asserts on the builders' known shape.
-    ['collectivex-latest', await writeFixture('collectivex-latest', makeCollectiveXDataset())],
-    [
-      'collectivex-runs',
-      await writeFixture('collectivex-runs', {
-        version: 1,
-        runs: [buildRunSummary(makeCollectiveXDataset())],
-      }),
-    ],
+    // Synthetic deterministic data: production may hold arbitrary sweeps,
+    // while e2e asserts on the builders' known multi-run shape.
+    ...collectiveXSizes,
   ];
 
-  for (const [name, bytes] of sizes) {
-    console.log(`  ${name.padEnd(22)} ${(bytes / 1024).toFixed(1).padStart(8)} KB`);
-  }
-  console.log(`\nWrote ${sizes.length} fixtures to ${fixturesDir}`);
+  printSizes(sizes);
 }
 
 main().catch((error) => {
