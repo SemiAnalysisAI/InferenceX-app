@@ -32,6 +32,11 @@ on:
         description: Existing InferenceX acknowledgment comment to update
         required: false
         type: string
+      reset-staging-database:
+        description: Replace all staged runs by restoring the database from production before ingest
+        required: false
+        default: false
+        type: boolean
 
 permissions: {}
 
@@ -50,6 +55,7 @@ jobs:
       pr-number: ${{ steps.request.outputs.pr-number }}
       requested-by: ${{ steps.request.outputs.requested-by }}
       comment-id: ${{ steps.request.outputs.comment-id }}
+      reset-staging-database: ${{ steps.request.outputs.reset-staging-database }}
     steps:
       - name: Validate request payload
         id: request
@@ -60,6 +66,7 @@ jobs:
           PR_NUMBER: ${{ github.event.client_payload.pr-number || inputs.pr-number }}
           REQUESTED_BY: ${{ github.event.client_payload.requested-by || inputs.requested-by }}
           COMMENT_ID: ${{ github.event.client_payload.comment-id || inputs.comment-id }}
+          RESET_STAGING_DATABASE: ${{ inputs.reset-staging-database || false }}
           SOURCE_REPOSITORY: ${{ github.event.client_payload.source-repository || 'SemiAnalysisAI/InferenceX' }}
         run: |
           if [[ ! "$RUN_ID" =~ ^[0-9]+$ ]]; then
@@ -86,6 +93,10 @@ jobs:
             echo "::error::comment-id must be numeric when provided"
             exit 1
           fi
+          if [[ ! "$RESET_STAGING_DATABASE" =~ ^(true|false)$ ]]; then
+            echo "::error::reset-staging-database must be true or false"
+            exit 1
+          fi
           if [ "$SOURCE_REPOSITORY" != "SemiAnalysisAI/InferenceX" ]; then
             echo "::error::Unsupported source repository: $SOURCE_REPOSITORY"
             exit 1
@@ -98,6 +109,7 @@ jobs:
             echo "pr-number=$PR_NUMBER"
             echo "requested-by=$REQUESTED_BY"
             echo "comment-id=$COMMENT_ID"
+            echo "reset-staging-database=$RESET_STAGING_DATABASE"
           } >> "$GITHUB_OUTPUT"
 
   sync-staging-branch:
@@ -143,15 +155,22 @@ jobs:
             }
             core.notice(`staging now points to ${sha}`);
 
-  refresh-staging-database:
-    name: Refresh Neon staging branch
+  prepare-staging-database:
+    name: Prepare Neon staging branch
     needs: [validate, sync-staging-branch]
     runs-on: ubuntu-latest
-    env:
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
     steps:
+      - name: Preserve accumulated staged runs
+        if: needs.validate.outputs.reset-staging-database != 'true'
+        run: |
+          echo "Preserving the existing Neon staging branch."
+          echo "The ingest is idempotent for this run ID and does not remove other staged runs."
+
       - name: Restore staging from production head
+        if: needs.validate.outputs.reset-staging-database == 'true'
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
         run: |
           if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
             echo "::error::NEON_API_KEY and NEON_PROJECT_ID are required"
@@ -179,8 +198,8 @@ jobs:
           fi
 
           payload=$(jq -cn --arg source_branch_id "$source_branch_id" '{source_branch_id: $source_branch_id}')
-          # This destructive refresh removes the previous unofficial staging ingest.
-          # Every request therefore starts with production data and replaces the shared staged run.
+          # This is an explicit maintenance operation. Normal staging requests preserve
+          # accumulated runs and rely on idempotent run-keyed ingestion.
           curl --retry 3 --retry-all-errors -sSf -X POST \
             -H "Authorization: Bearer $NEON_API_KEY" \
             -H "Content-Type: application/json" \
@@ -206,7 +225,7 @@ jobs:
 
   ingest:
     name: Ingest selected run
-    needs: [validate, refresh-staging-database]
+    needs: [validate, prepare-staging-database]
     permissions:
       contents: read
     uses: ./.github/workflows/ingest-agentic-results.yml
@@ -223,7 +242,7 @@ jobs:
   report:
     name: Report staging result
     if: ${{ always() && needs.validate.result == 'success' }}
-    needs: [validate, sync-staging-branch, refresh-staging-database, ingest]
+    needs: [validate, sync-staging-branch, prepare-staging-database, ingest]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
@@ -235,7 +254,7 @@ jobs:
           PR_NUMBER: ${{ needs.validate.outputs.pr-number }}
           REQUESTED_BY: ${{ needs.validate.outputs.requested-by }}
           COMMENT_ID: ${{ needs.validate.outputs.comment-id }}
-          STAGE_SUCCEEDED: ${{ needs['sync-staging-branch'].result == 'success' && needs['refresh-staging-database'].result == 'success' && needs.ingest.result == 'success' }}
+          STAGE_SUCCEEDED: ${{ needs['sync-staging-branch'].result == 'success' && needs['prepare-staging-database'].result == 'success' && needs.ingest.result == 'success' }}
         with:
           github-token: ${{ secrets.PAT }}
           script: |
