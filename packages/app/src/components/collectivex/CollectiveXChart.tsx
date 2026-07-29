@@ -10,13 +10,13 @@ import type {
   CollectiveXChartPoint,
   CollectiveXOperation,
   CollectiveXPercentile,
-  CollectiveXSeries,
+  CollectiveXRunSeries,
   CollectiveXYAxis,
 } from './types';
 
 interface CollectiveXChartProps {
   chartId: string;
-  series: CollectiveXSeries[];
+  series: CollectiveXRunSeries[];
   colors: Record<string, string>;
   operation: CollectiveXOperation;
   percentile: CollectiveXPercentile;
@@ -67,7 +67,7 @@ function formatMetric(value: number, yAxis: CollectiveXYAxis): string {
 }
 
 function formatPercentiles(
-  value: CollectiveXSeries['points'][number]['components']['dispatch'],
+  value: CollectiveXRunSeries['points'][number]['components']['dispatch'],
 ): string {
   if (value === null) return 'unavailable';
   return `${value.latency_us.p50.toFixed(1)} / ${value.latency_us.p90.toFixed(1)} / ${value.latency_us.p95.toFixed(1)} / ${value.latency_us.p99.toFixed(1)} µs`;

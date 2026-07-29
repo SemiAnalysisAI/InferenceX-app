@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   chartPoints,
   collectiveXColorKey,
+  collectiveXSeriesForRun,
   collectiveXSeriesLabel,
   collectiveXTopologyLabel,
   fitAlphaBeta,
@@ -48,6 +49,13 @@ describe('collectiveXSeriesLabel', () => {
   it('shows the selected EP degree, mode, and phase', () => {
     expect(collectiveXSeriesLabel(scaleOut)).toContain('EP16 · normal · decode');
   });
+
+  it('includes the run id for namespaced multi-run series', () => {
+    const [runSeries] = collectiveXSeriesForRun([scaleUp], '30165164821');
+    expect(collectiveXSeriesLabel(runSeries)).toBe(
+      '#30165164821 · H200-DGXC · deepep-v2 · EP8 · normal · decode · bf16',
+    );
+  });
 });
 
 describe('collectiveXColorKey', () => {
@@ -82,6 +90,25 @@ describe('collectiveXColorKey', () => {
     expect(collectiveXColorKey(scaleUp).split('_')[0]).toBe('nvidia');
     const amd = makeCollectiveXSeries({ sku: 'mi355x', vendor: 'amd' });
     expect(collectiveXColorKey(amd).split('_')[0]).toBe('amd');
+  });
+
+  it('assigns distinct keys to the same configuration from different runs', () => {
+    const [first] = collectiveXSeriesForRun([scaleUp], '30165164821');
+    const [second] = collectiveXSeriesForRun([scaleUp], '30177021271');
+    expect(collectiveXColorKey(first)).not.toBe(collectiveXColorKey(second));
+  });
+});
+
+describe('collectiveXSeriesForRun', () => {
+  it('namespaces otherwise-colliding series ids without mutating the source', () => {
+    const originalId = scaleUp.series_id;
+    const [first] = collectiveXSeriesForRun([scaleUp], '30165164821');
+    const [second] = collectiveXSeriesForRun([scaleUp], '30177021271');
+
+    expect(first.series_id).toBe(`30165164821:${originalId}`);
+    expect(first.run_id).toBe('30165164821');
+    expect(second.series_id).toBe(`30177021271:${originalId}`);
+    expect(scaleUp.series_id).toBe(originalId);
   });
 });
 

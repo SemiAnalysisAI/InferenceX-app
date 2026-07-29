@@ -1,7 +1,7 @@
 'use client';
 
-import { BookOpen, ExternalLink, Loader2, RefreshCw, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { BookOpen, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -16,8 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  useCollectiveX,
-  useCollectiveXRun,
+  useCollectiveXRunDatasets,
   useCollectiveXRuns,
   useDeleteCollectiveXRun,
 } from '@/hooks/api/use-collectivex';
@@ -27,8 +26,10 @@ import { useLocale } from '@/lib/use-locale';
 
 import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXInventory } from './CollectiveXInventory';
+import { CollectiveXRunsTable } from './CollectiveXRunsTable';
 import {
   collectiveXColorKey,
+  collectiveXSeriesForRun,
   collectiveXSeriesLabel,
   collectiveXTopologyLabel,
   seriesMatchesSelection,
@@ -43,6 +44,7 @@ import {
   type CollectiveXPercentile,
   type CollectiveXPhase,
   type CollectiveXPrecision,
+  type CollectiveXRunSeries,
   type CollectiveXVersion,
   type CollectiveXYAxis,
 } from './types';
@@ -94,6 +96,12 @@ const STRINGS = {
     terminalCases: 'Terminal cases',
     publishedUtc: 'Published (UTC)',
     version: 'Benchmark version',
+    runsHeading: 'Runs',
+    runsDescription:
+      'Every stored run for the selected benchmark version. Check one or more runs to compare them in the explorer.',
+    runsShown: 'Runs shown',
+    selectRuns: 'Select one or more runs from the table to show their data.',
+    selectedRunsFailed: 'One or more selected runs failed to load.',
     runControl: 'Run',
     loadRuns: 'Load runs',
     loadingRuns: 'Loading runs…',
@@ -184,6 +192,14 @@ const STRINGS = {
     allocations: '独立分配',
     publishedUtc: '发布时间（UTC）',
     version: '基准版本',
+    // English placeholders per the repository's temporary language override
+    // (no new Chinese translations); localize when the override lifts.
+    runsHeading: 'Runs',
+    runsDescription:
+      'Every stored run for the selected benchmark version. Check one or more runs to compare them in the explorer.',
+    runsShown: 'Runs shown',
+    selectRuns: 'Select one or more runs from the table to show their data.',
+    selectedRunsFailed: 'One or more selected runs failed to load.',
     runControl: 'Run',
     loadRuns: 'Load runs',
     loadingRuns: 'Loading runs…',
@@ -252,8 +268,6 @@ const STRINGS = {
     attemptLabel: 'Attempt',
     matrixLabel: 'Matrix',
     sourceBundles: '源产物包',
-    // English placeholders per the repository's temporary language override
-    // (no new Chinese translations); localize when the override lifts.
     deleteRun: 'Delete run',
     deleteConfirm: (id: string) =>
       `Delete run #${id} from the dashboard database? This cannot be undone.`,
@@ -271,14 +285,6 @@ const CONCLUSION_FALLBACK_CLASS =
 // Remembered admin bearer token for run deletion; cleared on a 401 so a
 // rotated secret re-prompts instead of failing silently forever.
 const ADMIN_TOKEN_STORAGE_KEY = 'collectivex-admin-token';
-
-function formatDate(value: string, locale: 'en' | 'zh'): string {
-  return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'UTC',
-  }).format(new Date(value));
-}
 
 function ControlGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -304,17 +310,35 @@ export default function CollectiveXDisplay() {
   const locale = useLocale();
   const t = STRINGS[locale];
   const [version, setVersion] = useState<CollectiveXVersion>(COLLECTIVEX_DEFAULT_VERSION);
-  // JIT run picker: `runsRequested` gates the run listing behind the "Load runs"
-  // button; `selectedRunId` (null = the latest published run) pins the view to one
-  // specific run's dataset. Runs are keyed by their GitHub Actions run id.
-  const [runsRequested, setRunsRequested] = useState(false);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const latestQuery = useCollectiveX(version);
-  const runsQuery = useCollectiveXRuns(version, runsRequested);
-  const runQuery = useCollectiveXRun(version, selectedRunId);
-  // A pinned run overrides the latest run.
-  const activeQuery = selectedRunId === null ? latestQuery : runQuery;
-  const { data, error, isLoading, isFetching } = activeQuery;
+  const [visibleRunIds, setVisibleRunIds] = useState<Set<string>>(new Set());
+  const initializedVersionRef = useRef<CollectiveXVersion | null>(null);
+  const runsQuery = useCollectiveXRuns(version);
+  const runList = runsQuery.data ?? [];
+  const orderedVisibleRunIds = useMemo(
+    () => runList.filter((run) => visibleRunIds.has(run.run_id)).map((run) => run.run_id),
+    [runList, visibleRunIds],
+  );
+  const runQueries = useCollectiveXRunDatasets(version, orderedVisibleRunIds);
+  const datasets = useMemo(
+    () => runQueries.flatMap((query) => (query.data ? [query.data] : [])),
+    [runQueries],
+  );
+  const combinedSeries = useMemo<CollectiveXRunSeries[]>(
+    () =>
+      datasets.flatMap((dataset) => collectiveXSeriesForRun(dataset.series, dataset.run.run_id)),
+    [datasets],
+  );
+  const loadingRunIds = useMemo(
+    () =>
+      new Set(
+        orderedVisibleRunIds.filter(
+          (_runId, index) => runQueries[index]?.isLoading || runQueries[index]?.isFetching,
+        ),
+      ),
+    [orderedVisibleRunIds, runQueries],
+  );
+  const selectedRunErrors = runQueries.filter((query) => query.error).length;
+  const isFetching = runsQuery.isFetching || runQueries.some((query) => query.isFetching);
   const [epSize, setEpSize] = useState(8);
   const [operation, setOperation] = useState<CollectiveXOperation>('roundtrip');
   const [phase, setPhase] = useState<CollectiveXPhase>('decode');
@@ -340,52 +364,46 @@ export default function CollectiveXDisplay() {
     value,
     label: collectiveXVersionLabel(value),
   }));
-  const runList = runsQuery.data ?? [];
-  const runOptions: SelectOption<string>[] = useMemo(
-    () => [
-      { value: 'latest', label: t.latestPublished },
-      ...runList.map((run) => ({
-        value: run.run_id,
-        label: `#${run.run_id} · ${run.conclusion ?? 'pending'} · ${run.measured_cases}/${run.requested_cases} cases · ${run.terminal_points}/${run.requested_points} points · ${run.covered_skus.length} SKU · ${formatDate(run.generated_at, locale)}`,
-      })),
-    ],
-    [locale, runList, t.latestPublished],
-  );
-  // Runs are per-version; changing the version drops any pinned run and folds
-  // the picker back to its JIT button.
+
+  // Runs are per-version. Start each version on its newest run with measured
+  // data so an incomplete newest sweep cannot blank the explorer.
   useEffect(() => {
-    setSelectedRunId(null);
-    setRunsRequested(false);
+    initializedVersionRef.current = null;
+    setVisibleRunIds(new Set());
   }, [version]);
-  // If a refreshed listing no longer carries the pinned run, fall back to the
-  // latest run rather than a dangling id.
+
   useEffect(() => {
-    if (
-      selectedRunId !== null &&
-      runsQuery.data &&
-      !runsQuery.data.some((run) => run.run_id === selectedRunId)
-    ) {
-      setSelectedRunId(null);
-    }
-  }, [runsQuery.data, selectedRunId]);
-  const dataset = data;
+    if (!runsQuery.data || initializedVersionRef.current === version) return;
+    const initial = runsQuery.data.find((run) => run.measured_cases > 0) ?? runsQuery.data[0];
+    setVisibleRunIds(initial ? new Set([initial.run_id]) : new Set());
+    initializedVersionRef.current = version;
+  }, [runsQuery.data, version]);
+
+  // A deleted run disappears from both the table and the checked set after the
+  // list refetch. Preserve deliberate "none checked" state.
+  useEffect(() => {
+    if (!runsQuery.data || initializedVersionRef.current !== version) return;
+    const liveIds = new Set(runsQuery.data.map((run) => run.run_id));
+    setVisibleRunIds((previous) => {
+      const next = new Set([...previous].filter((runId) => liveIds.has(runId)));
+      return next.size === previous.size ? previous : next;
+    });
+  }, [runsQuery.data, version]);
+
   const availableEpSizes = useMemo(
-    () =>
-      [...new Set(dataset?.series.map((item) => item.system.ep_size))].toSorted((a, b) => a - b),
-    [dataset?.series],
+    () => [...new Set(combinedSeries.map((item) => item.system.ep_size))].toSorted((a, b) => a - b),
+    [combinedSeries],
   );
   const availablePhases = useMemo(
     () =>
       [
         ...new Set(
-          dataset?.series
-            .filter((item) => item.system.ep_size === epSize)
-            .map((item) => item.phase),
+          combinedSeries.filter((item) => item.system.ep_size === epSize).map((item) => item.phase),
         ),
       ].toSorted((left, right) =>
         left === right ? 0 : left === 'decode' ? -1 : right === 'decode' ? 1 : 0,
       ),
-    [dataset?.series, epSize],
+    [combinedSeries, epSize],
   );
   const phaseOptions: SegmentedToggleOption<CollectiveXPhase>[] = availablePhases.map((value) => ({
     value,
@@ -395,14 +413,14 @@ export default function CollectiveXDisplay() {
     () =>
       [
         ...new Set(
-          dataset?.series
+          combinedSeries
             .filter((item) => item.system.ep_size === epSize && item.phase === phase)
             .map((item) => item.mode),
         ),
       ].toSorted((left, right) =>
         left === right ? 0 : left === 'normal' ? -1 : right === 'normal' ? 1 : 0,
       ),
-    [dataset?.series, epSize, phase],
+    [combinedSeries, epSize, phase],
   );
   const modeOptions: SegmentedToggleOption<CollectiveXMode>[] = availableModes.map((value) => ({
     value,
@@ -412,7 +430,7 @@ export default function CollectiveXDisplay() {
     () =>
       [
         ...new Set(
-          dataset?.series
+          combinedSeries
             .filter(
               (item) =>
                 item.system.ep_size === epSize && item.phase === phase && item.mode === mode,
@@ -420,7 +438,7 @@ export default function CollectiveXDisplay() {
             .map((item) => item.precision),
         ),
       ].toSorted(),
-    [dataset?.series, epSize, mode, phase],
+    [combinedSeries, epSize, mode, phase],
   );
   const precisionOptions: SegmentedToggleOption<CollectiveXPrecision>[] = availablePrecisions.map(
     (value) => ({ value, label: t.precision[value] }),
@@ -455,8 +473,8 @@ export default function CollectiveXDisplay() {
   // SKU and EP determine topology; V1 fixes routing. EP, phase, kernel mode,
   // and precision are needed before the library/SKU comparison filters.
   const matchedSeries = useMemo(
-    () => (dataset?.series ?? []).filter((item) => seriesMatchesSelection(item, seriesSelection)),
-    [dataset?.series, seriesSelection],
+    () => combinedSeries.filter((item) => seriesMatchesSelection(item, seriesSelection)),
+    [combinedSeries, seriesSelection],
   );
   const skuOptions = useMemo(
     () => ['all', ...new Set(matchedSeries.map((item) => item.system.sku))],
@@ -486,10 +504,11 @@ export default function CollectiveXDisplay() {
       ),
     [backend, matchedSeries, sku],
   );
+  const phaseSeriesKey = phaseSeries.map((item) => item.series_id).join('\u0000');
 
   useEffect(() => {
-    setActiveSeriesIds(new Set(phaseSeries.map((item) => item.series_id)));
-  }, [phaseSeries]);
+    setActiveSeriesIds(new Set(phaseSeriesKey ? phaseSeriesKey.split('\u0000') : []));
+  }, [phaseSeriesKey]);
 
   const activeSeries = useMemo(
     () => phaseSeries.filter((item) => activeSeriesIds.has(item.series_id)),
@@ -531,45 +550,58 @@ export default function CollectiveXDisplay() {
   );
   const handleRefresh = useCallback(() => {
     track('collectivex_data_refreshed');
-    void activeQuery.refetch();
-    if (runsRequested) void runsQuery.refetch();
-  }, [activeQuery, runsQuery, runsRequested]);
+    void runsQuery.refetch();
+    for (const query of runQueries) void query.refetch();
+  }, [runQueries, runsQuery]);
   const deleteRun = useDeleteCollectiveXRun();
-  const shownRunId = dataset?.run.run_id;
-  const handleDeleteRun = useCallback(async () => {
-    if (!shownRunId) return;
-    track('collectivex_run_delete_prompted', { run: shownRunId });
-    if (!window.confirm(t.deleteConfirm(shownRunId))) return;
-    const stored = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? '';
-    const token = stored || (window.prompt(t.deleteTokenPrompt)?.trim() ?? '');
-    if (!token) return;
-    try {
-      const deleted = await deleteRun.mutateAsync({ runId: shownRunId, token });
-      if (!deleted) {
-        localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
-        track('collectivex_run_delete_failed', { run: shownRunId, reason: 'unauthorized' });
-        window.alert(t.deleteUnauthorized);
-        return;
+  const handleVisibleRunChange = useCallback((runId: string, visible: boolean) => {
+    setVisibleRunIds((previous) => {
+      const next = new Set(previous);
+      if (visible) next.add(runId);
+      else next.delete(runId);
+      return next;
+    });
+  }, []);
+  const handleDeleteRun = useCallback(
+    async (runId: string) => {
+      track('collectivex_run_delete_prompted', { run: runId });
+      if (!window.confirm(t.deleteConfirm(runId))) return;
+      const stored = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? '';
+      const token = stored || (window.prompt(t.deleteTokenPrompt)?.trim() ?? '');
+      if (!token) return;
+      try {
+        const deleted = await deleteRun.mutateAsync({ runId, token });
+        if (!deleted) {
+          localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+          track('collectivex_run_delete_failed', { run: runId, reason: 'unauthorized' });
+          window.alert(t.deleteUnauthorized);
+          return;
+        }
+        localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+        setVisibleRunIds((previous) => {
+          const next = new Set(previous);
+          next.delete(runId);
+          return next;
+        });
+        track('collectivex_run_delete_confirmed', { run: runId });
+      } catch {
+        track('collectivex_run_delete_failed', { run: runId, reason: 'error' });
+        window.alert(t.deleteFailed);
       }
-      localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
-      track('collectivex_run_delete_confirmed', { run: shownRunId });
-      // The deleted run can no longer be pinned; fall back to the new latest.
-      setSelectedRunId(null);
-    } catch {
-      track('collectivex_run_delete_failed', { run: shownRunId, reason: 'error' });
-      window.alert(t.deleteFailed);
-    }
-  }, [deleteRun, shownRunId, t]);
-  if (isLoading) {
+    },
+    [deleteRun, t],
+  );
+
+  if (runsQuery.isLoading) {
     return (
       <Card data-testid="collectivex-loading" className="min-h-80 items-center justify-center">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        <p className="mt-3 text-sm text-muted-foreground">{t.loading}</p>
+        <p className="mt-3 text-sm text-muted-foreground">{t.loadingRuns}</p>
       </Card>
     );
   }
-  if (error || !data || !dataset) {
-    const message = error instanceof Error ? error.message : t.loadError;
+  if (runsQuery.error || !runsQuery.data) {
+    const message = runsQuery.error instanceof Error ? runsQuery.error.message : t.loadError;
     return (
       <Card data-testid="collectivex-error" className="border-destructive">
         <h1 className="text-lg font-semibold">{t.unavailable}</h1>
@@ -584,15 +616,6 @@ export default function CollectiveXDisplay() {
               onChange={setVersion}
             />
           </div>
-          {selectedRunId !== null && (
-            <Button
-              variant="outline"
-              data-testid="collectivex-error-latest"
-              onClick={() => setSelectedRunId(null)}
-            >
-              {t.latestPublished}
-            </Button>
-          )}
           <Button variant="outline" onClick={handleRefresh}>
             <RefreshCw className="size-4" />
             {t.retry}
@@ -601,10 +624,14 @@ export default function CollectiveXDisplay() {
       </Card>
     );
   }
-
-  const run = dataset.run;
-  const conclusionClass =
-    (run.conclusion && CONCLUSION_CLASSES[run.conclusion]) ?? CONCLUSION_FALLBACK_CLASS;
+  const singleDataset = datasets.length === 1 ? datasets[0] : null;
+  const measuredCases = datasets.reduce((sum, dataset) => sum + dataset.run.measured_cases, 0);
+  const requestedCases = datasets.reduce((sum, dataset) => sum + dataset.run.requested_cases, 0);
+  const terminalCases = datasets.reduce((sum, dataset) => sum + dataset.run.terminal_cases, 0);
+  const seriesCount = datasets.reduce((sum, dataset) => sum + dataset.series.length, 0);
+  const singleConclusionClass =
+    (singleDataset?.run.conclusion && CONCLUSION_CLASSES[singleDataset.run.conclusion]) ??
+    CONCLUSION_FALLBACK_CLASS;
 
   return (
     <section data-testid="collectivex-display" className="flex flex-col gap-4">
@@ -615,36 +642,50 @@ export default function CollectiveXDisplay() {
               <h1 className="text-xl font-semibold">CollectiveX</h1>
               <span
                 data-testid="collectivex-run-conclusion"
-                className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${conclusionClass}`}
+                className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${
+                  singleDataset ? singleConclusionClass : CONCLUSION_FALLBACK_CLASS
+                }`}
               >
-                #{run.run_id} · {run.conclusion ?? 'pending'}
+                {singleDataset
+                  ? `#${singleDataset.run.run_id} · ${singleDataset.run.conclusion ?? 'pending'}`
+                  : `${datasets.length} ${t.runsShown.toLowerCase()}`}
               </span>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">{t.description}</p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <a
-              data-testid="collectivex-source-link"
-              href={`https://github.com/SemiAnalysisAI/InferenceX/tree/${run.source_sha}/experimental/CollectiveX`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => track('collectivex_source_opened', { source_sha: run.source_sha })}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              {t.source} <ExternalLink className="size-3.5" />
-            </a>
-            <a
-              data-testid="collectivex-methodology-link"
-              href={`https://github.com/SemiAnalysisAI/InferenceX/blob/${run.source_sha}/experimental/CollectiveX/docs/methodology.md`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() =>
-                track('collectivex_methodology_opened', { source_sha: run.source_sha })
-              }
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <BookOpen className="size-3.5" /> {t.methodology}
-            </a>
+            {singleDataset && (
+              <>
+                <a
+                  data-testid="collectivex-source-link"
+                  href={`https://github.com/SemiAnalysisAI/InferenceX/tree/${singleDataset.run.source_sha}/experimental/CollectiveX`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() =>
+                    track('collectivex_source_opened', {
+                      source_sha: singleDataset.run.source_sha,
+                    })
+                  }
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  {t.source} <ExternalLink className="size-3.5" />
+                </a>
+                <a
+                  data-testid="collectivex-methodology-link"
+                  href={`https://github.com/SemiAnalysisAI/InferenceX/blob/${singleDataset.run.source_sha}/experimental/CollectiveX/docs/methodology.md`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() =>
+                    track('collectivex_methodology_opened', {
+                      source_sha: singleDataset.run.source_sha,
+                    })
+                  }
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <BookOpen className="size-3.5" /> {t.methodology}
+                </a>
+              </>
+            )}
             <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching}>
               {isFetching ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -653,277 +694,253 @@ export default function CollectiveXDisplay() {
               )}
               {t.refresh}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              data-testid="collectivex-delete-run"
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => void handleDeleteRun()}
-              disabled={deleteRun.isPending}
-            >
-              {deleteRun.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Trash2 className="size-4" />
-              )}
-              {t.deleteRun}
-            </Button>
           </div>
         </div>
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat value={dataset.series.length} label={t.seriesCount} />
-          <Stat value={`${run.measured_cases}/${run.requested_cases}`} label={t.measuredCases} />
-          <Stat value={`${run.terminal_cases}/${run.requested_cases}`} label={t.terminalCases} />
-          <Stat value={formatDate(run.generated_at, locale)} label={t.publishedUtc} compact />
-        </div>
+        {datasets.length > 0 && (
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat value={seriesCount} label={t.seriesCount} />
+            <Stat value={`${measuredCases}/${requestedCases}`} label={t.measuredCases} />
+            <Stat value={`${terminalCases}/${requestedCases}`} label={t.terminalCases} />
+            <Stat value={datasets.length} label={t.runsShown} />
+          </div>
+        )}
       </Card>
 
-      {phaseSeries.length === 0 && (
-        <Card data-testid="collectivex-empty-state" className="py-4">
-          <p className="text-sm text-muted-foreground">{t.noSeries}</p>
+      <Card data-testid="collectivex-runs">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">{t.runsHeading}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t.runsDescription}</p>
+          </div>
+          <div className="w-full md:w-44">
+            <SelectControl
+              label={t.version}
+              testId="collectivex-version-select"
+              value={version}
+              options={versionOptions}
+              onChange={(value) => {
+                setVersion(value);
+                track('collectivex_version_changed', { version: value });
+              }}
+            />
+          </div>
+        </div>
+        <CollectiveXRunsTable
+          runs={runList}
+          visibleRunIds={visibleRunIds}
+          loadingRunIds={loadingRunIds}
+          deletingRunId={deleteRun.isPending ? (deleteRun.variables?.runId ?? null) : null}
+          onVisibleChange={handleVisibleRunChange}
+          onDelete={(runId) => void handleDeleteRun(runId)}
+        />
+      </Card>
+
+      {visibleRunIds.size === 0 && (
+        <Card data-testid="collectivex-no-runs-selected" className="py-6 text-center">
+          <p className="text-sm text-muted-foreground">{t.selectRuns}</p>
         </Card>
       )}
-      <Card data-testid="collectivex-main-chart" className="relative">
-        <CollectiveXChart
-          chartId="collectivex-explorer"
-          testId="collectivex-explorer-chart"
-          series={activeSeries}
-          colors={colors}
-          operation={operation}
-          percentile={percentile}
-          yAxis={yAxis}
-          caption={
-            <>
-              <h2 className="text-lg font-semibold">
-                {operation === 'stage' ? 'Stage' : t.operationHeading[operation]} ·{' '}
-                {t.phaseValue[phase]} ·{' '}
-                {yAxis === 'latency'
-                  ? percentile
-                  : locale === 'zh'
-                    ? `${percentile} 延迟分位点`
-                    : `at ${percentile} latency`}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {yAxis === 'activation-rate'
-                  ? 'Activation-data rate at selected latency percentile'
-                  : t.yAxis[yAxis]}
-              </p>
-            </>
-          }
-          legendElement={
-            <ChartLegend
-              variant="sidebar"
-              legendItems={legendItems}
-              disableActiveSort
-              onItemRemove={(id) =>
-                setActiveSeriesIds(
-                  (previous) => new Set([...previous].filter((item) => item !== id)),
-                )
-              }
-              isLegendExpanded={legendExpanded}
-              onExpandedChange={setLegendExpanded}
-              actions={
-                activeSeries.length < phaseSeries.length
-                  ? [
-                      {
-                        id: 'collectivex-reset-filter',
-                        label: t.resetFilter,
-                        onClick: () =>
-                          setActiveSeriesIds(new Set(phaseSeries.map((item) => item.series_id))),
-                      },
-                    ]
-                  : []
-              }
-            />
-          }
-        />
-        {yAxis === 'activation-rate' && (
-          <p className="mt-2 text-xs text-muted-foreground">{t.payloadNote}</p>
-        )}
-        {yAxis === 'payload-rate' && (
-          <p className="mt-2 text-xs text-muted-foreground">{t.payloadBandwidthNote}</p>
-        )}
-      </Card>
-      <Card className="py-4 md:py-5">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-          <SelectControl
-            label={t.version}
-            testId="collectivex-version-select"
-            value={version}
-            options={versionOptions}
-            onChange={(value) => {
-              setVersion(value);
-              track('collectivex_version_changed', { version: value });
-            }}
-          />
-          <ControlGroup label={t.runControl}>
-            {runsRequested ? (
-              runsQuery.isLoading ? (
-                <Button
-                  variant="outline"
-                  className="w-full justify-center"
-                  disabled
-                  data-testid="collectivex-runs-loading"
-                >
-                  <Loader2 className="size-4 animate-spin" />
-                  {t.loadingRuns}
-                </Button>
-              ) : runsQuery.error || !runsQuery.data ? (
-                <Button
-                  variant="outline"
-                  className="w-full justify-center"
-                  data-testid="collectivex-runs-retry"
-                  onClick={() => void runsQuery.refetch()}
-                >
-                  <RefreshCw className="size-4" />
-                  {t.retry}
-                </Button>
-              ) : (
-                <Select
-                  value={selectedRunId ?? 'latest'}
-                  onValueChange={(next) => {
-                    setSelectedRunId(next === 'latest' ? null : next);
-                    track('collectivex_run_selected', { version, run: next });
-                  }}
-                >
-                  <SelectTrigger data-testid="collectivex-run-select" className="min-w-0 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {runOptions.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )
-            ) : (
-              <Button
-                variant="outline"
-                className="w-full justify-center"
-                data-testid="collectivex-load-runs"
-                onClick={() => {
-                  setRunsRequested(true);
-                  track('collectivex_runs_requested', { version });
-                }}
-              >
-                {t.loadRuns}
-              </Button>
-            )}
-          </ControlGroup>
-          <SelectControl
-            label={t.epControl}
-            testId="collectivex-ep-select"
-            value={String(epSize)}
-            options={availableEpSizes.map((value) => ({
-              value: String(value),
-              label: `EP${value}`,
-            }))}
-            onChange={(value) => {
-              setEpSize(Number(value));
-              track('collectivex_ep_changed', { ep: Number(value) });
-            }}
-          />
-          <SelectControl
-            label={t.operationControl}
-            testId="collectivex-operation-select"
-            value={operation}
-            options={operationOptions}
-            onChange={(next) => {
-              setOperation(next);
-              if (next !== 'roundtrip' && yAxis === 'tokens-per-second') setYAxis('latency');
-            }}
-          />
-          <ControlGroup label={t.phaseControl}>
-            <SegmentedToggle
-              value={phase}
-              options={phaseOptions}
-              onValueChange={setPhase}
-              ariaLabel={t.phaseAria}
-              testId="collectivex-phase-toggle"
-            />
-          </ControlGroup>
-          {availableModes.length > 1 && (
-            <ControlGroup label={t.modeControl}>
-              <SegmentedToggle
-                value={mode}
-                options={modeOptions}
-                onValueChange={(next) => {
-                  setMode(next);
-                  track('collectivex_mode_changed', { mode: next });
-                }}
-                ariaLabel={t.modeAria}
-                testId="collectivex-mode-toggle"
-              />
-            </ControlGroup>
+      {visibleRunIds.size > 0 && datasets.length === 0 && loadingRunIds.size > 0 && (
+        <Card
+          data-testid="collectivex-selected-runs-loading"
+          className="min-h-40 items-center justify-center"
+        >
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <p className="mt-3 text-sm text-muted-foreground">{t.loading}</p>
+        </Card>
+      )}
+      {selectedRunErrors > 0 && (
+        <Card data-testid="collectivex-selected-runs-error" className="border-destructive py-4">
+          <p className="text-sm text-destructive">{t.selectedRunsFailed}</p>
+        </Card>
+      )}
+
+      {datasets.length > 0 && (
+        <>
+          {phaseSeries.length === 0 && (
+            <Card data-testid="collectivex-empty-state" className="py-4">
+              <p className="text-sm text-muted-foreground">{t.noSeries}</p>
+            </Card>
           )}
-          <ControlGroup label={t.precisionControl}>
-            <SegmentedToggle
-              value={precision}
-              options={precisionOptions}
-              onValueChange={(next) => {
-                setPrecision(next);
-                track('collectivex_precision_changed', { precision: next });
-              }}
-              ariaLabel={t.precisionAria}
-              testId="collectivex-precision-toggle"
+          <Card data-testid="collectivex-main-chart" className="relative">
+            <CollectiveXChart
+              chartId="collectivex-explorer"
+              testId="collectivex-explorer-chart"
+              series={activeSeries}
+              colors={colors}
+              operation={operation}
+              percentile={percentile}
+              yAxis={yAxis}
+              caption={
+                <>
+                  <h2 className="text-lg font-semibold">
+                    {operation === 'stage' ? 'Stage' : t.operationHeading[operation]} ·{' '}
+                    {t.phaseValue[phase]} ·{' '}
+                    {yAxis === 'latency'
+                      ? percentile
+                      : locale === 'zh'
+                        ? `${percentile} 延迟分位点`
+                        : `at ${percentile} latency`}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {yAxis === 'activation-rate'
+                      ? 'Activation-data rate at selected latency percentile'
+                      : t.yAxis[yAxis]}
+                  </p>
+                </>
+              }
+              legendElement={
+                <ChartLegend
+                  variant="sidebar"
+                  legendItems={legendItems}
+                  disableActiveSort
+                  onItemRemove={(id) =>
+                    setActiveSeriesIds(
+                      (previous) => new Set([...previous].filter((item) => item !== id)),
+                    )
+                  }
+                  isLegendExpanded={legendExpanded}
+                  onExpandedChange={setLegendExpanded}
+                  actions={
+                    activeSeries.length < phaseSeries.length
+                      ? [
+                          {
+                            id: 'collectivex-reset-filter',
+                            label: t.resetFilter,
+                            onClick: () =>
+                              setActiveSeriesIds(
+                                new Set(phaseSeries.map((item) => item.series_id)),
+                              ),
+                          },
+                        ]
+                      : []
+                  }
+                />
+              }
             />
-          </ControlGroup>
-          <ControlGroup label={t.latencyPercentile}>
-            <SegmentedToggle
-              value={percentile}
-              options={PERCENTILE_OPTIONS}
-              onValueChange={setPercentile}
-              ariaLabel={t.percentileAria}
-              testId="collectivex-percentile-toggle"
-            />
-          </ControlGroup>
-          <SelectControl
-            label={t.sku}
-            testId="collectivex-sku-select"
-            value={sku}
-            options={selectOptions(skuOptions, t.all, true)}
-            onChange={setSku}
+            {yAxis === 'activation-rate' && (
+              <p className="mt-2 text-xs text-muted-foreground">{t.payloadNote}</p>
+            )}
+            {yAxis === 'payload-rate' && (
+              <p className="mt-2 text-xs text-muted-foreground">{t.payloadBandwidthNote}</p>
+            )}
+          </Card>
+          <Card className="py-4 md:py-5">
+            <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+              <SelectControl
+                label={t.epControl}
+                testId="collectivex-ep-select"
+                value={String(epSize)}
+                options={availableEpSizes.map((value) => ({
+                  value: String(value),
+                  label: `EP${value}`,
+                }))}
+                onChange={(value) => {
+                  setEpSize(Number(value));
+                  track('collectivex_ep_changed', { ep: Number(value) });
+                }}
+              />
+              <SelectControl
+                label={t.operationControl}
+                testId="collectivex-operation-select"
+                value={operation}
+                options={operationOptions}
+                onChange={(next) => {
+                  setOperation(next);
+                  if (next !== 'roundtrip' && yAxis === 'tokens-per-second') setYAxis('latency');
+                }}
+              />
+              <ControlGroup label={t.phaseControl}>
+                <SegmentedToggle
+                  value={phase}
+                  options={phaseOptions}
+                  onValueChange={setPhase}
+                  ariaLabel={t.phaseAria}
+                  testId="collectivex-phase-toggle"
+                />
+              </ControlGroup>
+              {availableModes.length > 1 && (
+                <ControlGroup label={t.modeControl}>
+                  <SegmentedToggle
+                    value={mode}
+                    options={modeOptions}
+                    onValueChange={(next) => {
+                      setMode(next);
+                      track('collectivex_mode_changed', { mode: next });
+                    }}
+                    ariaLabel={t.modeAria}
+                    testId="collectivex-mode-toggle"
+                  />
+                </ControlGroup>
+              )}
+              <ControlGroup label={t.precisionControl}>
+                <SegmentedToggle
+                  value={precision}
+                  options={precisionOptions}
+                  onValueChange={(next) => {
+                    setPrecision(next);
+                    track('collectivex_precision_changed', { precision: next });
+                  }}
+                  ariaLabel={t.precisionAria}
+                  testId="collectivex-precision-toggle"
+                />
+              </ControlGroup>
+              <ControlGroup label={t.latencyPercentile}>
+                <SegmentedToggle
+                  value={percentile}
+                  options={PERCENTILE_OPTIONS}
+                  onValueChange={setPercentile}
+                  ariaLabel={t.percentileAria}
+                  testId="collectivex-percentile-toggle"
+                />
+              </ControlGroup>
+              <SelectControl
+                label={t.sku}
+                testId="collectivex-sku-select"
+                value={sku}
+                options={selectOptions(skuOptions, t.all, true)}
+                onChange={setSku}
+              />
+              <SelectControl
+                label={t.backend}
+                testId="collectivex-backend-select"
+                value={backend}
+                options={selectOptions(backendOptions, t.all)}
+                onChange={setBackend}
+              />
+              <SelectControl
+                label={t.yAxisControl}
+                testId="collectivex-y-axis-select"
+                value={yAxis}
+                onChange={setYAxis}
+                options={[
+                  { value: 'latency', label: t.yAxis.latency },
+                  ...(operation === 'roundtrip'
+                    ? ([
+                        {
+                          value: 'tokens-per-second',
+                          label: t.tokenRateOption,
+                        },
+                      ] as const)
+                    : []),
+                  {
+                    value: 'activation-rate',
+                    label: 'Activation-data rate at latency percentile',
+                  },
+                  {
+                    value: 'payload-rate',
+                    label: t.yAxis['payload-rate'],
+                  },
+                ]}
+              />
+            </div>
+          </Card>
+          <CollectiveXInventory
+            key={`${version}-${datasets.map((dataset) => `${dataset.run.run_id}:${dataset.run.run_attempt}`).join(',')}`}
+            datasets={datasets}
           />
-          <SelectControl
-            label={t.backend}
-            testId="collectivex-backend-select"
-            value={backend}
-            options={selectOptions(backendOptions, t.all)}
-            onChange={setBackend}
-          />
-          <SelectControl
-            label={t.yAxisControl}
-            testId="collectivex-y-axis-select"
-            value={yAxis}
-            onChange={setYAxis}
-            options={[
-              { value: 'latency', label: t.yAxis.latency },
-              ...(operation === 'roundtrip'
-                ? ([
-                    {
-                      value: 'tokens-per-second',
-                      label: t.tokenRateOption,
-                    },
-                  ] as const)
-                : []),
-              {
-                value: 'activation-rate',
-                label: 'Activation-data rate at latency percentile',
-              },
-              {
-                value: 'payload-rate',
-                label: t.yAxis['payload-rate'],
-              },
-            ]}
-          />
-        </div>
-      </Card>
-      <CollectiveXInventory
-        key={`${dataset.version}-${run.run_id}-${run.run_attempt}`}
-        dataset={dataset}
-      />
+        </>
+      )}
     </section>
   );
 }

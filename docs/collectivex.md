@@ -28,7 +28,7 @@ routes call before reading the DB (`packages/db/src/queries/collectivex.ts`):
 
 - `ensureLatestCollectiveXRun` — walk GitHub's completed sweep runs newest-first; stop at
   the first live requested-version run; persist it if absent.
-- `ensureCollectiveXRunsList` — backfill up to 8 recent runs so the picker lists sweeps
+- `ensureCollectiveXRunsList` — backfill up to 8 recent runs so the run table lists sweeps
   nobody has viewed yet.
 - `ensureCollectiveXRun` — fetch one run by id (only if completed — persisting an
   in-progress run would freeze a partial snapshot).
@@ -57,6 +57,20 @@ Key invariants:
   also used by migrations via `pnpm admin:db:migrate:collectivex`),
   `COLLECTIVEX_ADMIN_SECRET` (delete route Bearer token — deliberately not
   INVALIDATE_SECRET, since it is remembered in browser localStorage), and `GITHUB_TOKEN`.
+
+## Multi-run explorer
+
+The frontend always loads every stored live run summary for the selected benchmark version. The
+summary query has no arbitrary row cap and does not load artifact documents. Each table row has a
+visibility checkbox; checking a run fetches its cached dataset through
+`/api/v1/collectivex/runs/[runId]`. Checked datasets are combined client-side, and the EP, phase,
+kernel mode, precision, SKU, and backend controls filter their combined series.
+
+Series ids, labels, and color keys are namespaced by GitHub Actions run id before rendering, so the
+same matrix case from two runs remains independently toggleable and visually distinct. The newest
+run with measured cases is checked by default; newer incomplete sweeps remain listed but cannot
+blank the initial explorer. Deletion is a row action in the run table and keeps the same tombstone
+semantics described above.
 
 ## The raw-rows exception
 

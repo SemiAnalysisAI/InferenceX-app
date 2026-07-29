@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   }
   if (FIXTURES_MODE) return cachedJson(loadFixture('collectivex-runs'));
 
-  // Backfill failures must not take the picker down — serve the stored list
+  // Backfill failures must not take the run table down — serve the stored list
   // and only surface the error when there is nothing at all to show.
   let ensureError: unknown = null;
   try {

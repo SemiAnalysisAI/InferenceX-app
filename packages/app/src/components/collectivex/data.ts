@@ -7,6 +7,7 @@ import type {
   CollectiveXPhase,
   CollectiveXPoint,
   CollectiveXPrecision,
+  CollectiveXRunSeries,
   CollectiveXSeries,
   CollectiveXYAxis,
 } from './types';
@@ -35,12 +36,26 @@ export function collectiveXTopologyLabel(
   return `${system.nodes}x${system.gpus_per_node} · domain ${system.scale_up_domain} · ${transports} · ${system.topology_class}`;
 }
 
-export function collectiveXSeriesLabel(series: CollectiveXSeries): string {
-  return `${series.system.sku.toUpperCase()} · ${series.backend} · EP${series.system.ep_size} · ${series.mode} · ${series.phase} · ${series.precision}`;
+export function collectiveXSeriesLabel(series: CollectiveXSeries | CollectiveXRunSeries): string {
+  const runPrefix = 'run_id' in series ? `#${series.run_id} · ` : '';
+  return `${runPrefix}${series.system.sku.toUpperCase()} · ${series.backend} · EP${series.system.ep_size} · ${series.mode} · ${series.phase} · ${series.precision}`;
 }
 
-export function collectiveXColorKey(series: CollectiveXSeries): string {
-  return `${series.system.vendor}_${series.system.sku}_${series.backend}_ep${series.system.ep_size}_${series.mode}_${series.phase}_${series.precision}`;
+export function collectiveXColorKey(series: CollectiveXSeries | CollectiveXRunSeries): string {
+  const runSuffix = 'run_id' in series ? `_run${series.run_id}` : '';
+  return `${series.system.vendor}_${series.system.sku}_${series.backend}_ep${series.system.ep_size}_${series.mode}_${series.phase}_${series.precision}${runSuffix}`;
+}
+
+/** Namespace series ids and color/label identity so runs can render together safely. */
+export function collectiveXSeriesForRun(
+  series: readonly CollectiveXSeries[],
+  runId: string,
+): CollectiveXRunSeries[] {
+  return series.map((item) => ({
+    ...item,
+    series_id: `${runId}:${item.series_id}`,
+    run_id: runId,
+  }));
 }
 
 export function seriesMatchesSelection(

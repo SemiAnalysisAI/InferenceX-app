@@ -41,9 +41,6 @@ export interface CollectiveXRunStateRow {
   run_attempt: number;
 }
 
-/** Run summaries capped at this many rows — deletion keeps the list curated. */
-const MAX_LISTED_RUNS = 50;
-
 function toRunRow(row: Record<string, unknown>): CollectiveXRunRow {
   const { docs, ...rest } = row as unknown as Omit<CollectiveXRunRow, 'docs'> & { docs: unknown };
   return { ...rest, docs: Array.isArray(docs) ? docs : [] };
@@ -104,7 +101,7 @@ export async function getCollectiveXRun(
 }
 
 /**
- * Newest-first live run summaries for the picker, straight from the
+ * Every live run summary for a version, newest-first, straight from the
  * precomputed `summary` column — no document loading.
  */
 export async function listCollectiveXRuns(
@@ -116,7 +113,6 @@ export async function listCollectiveXRuns(
     FROM cx_runs
     WHERE version = ${version} AND deleted_at IS NULL
     ORDER BY run_id DESC
-    LIMIT ${MAX_LISTED_RUNS}
   `;
   return rows.map((row) => row.summary as CollectiveXRunSummary);
 }

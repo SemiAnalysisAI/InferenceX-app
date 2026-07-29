@@ -12,31 +12,45 @@ import type { CollectiveXDataset } from '@/components/collectivex/types';
 const SOURCE_SHA = 'c'.repeat(40);
 const dataset = makeCollectiveXDataset();
 const runId = dataset.run.run_id;
+const comparisonDataset = buildDataset({
+  shards: [makeRawShard(), makeRawShard({ precision: 'fp8' })],
+  meta: {
+    run_id: '159',
+    generated_at: '2026-07-07T12:20:00Z',
+    source_sha: 'd'.repeat(40),
+  },
+});
+const incompleteDataset = buildDataset({
+  shards: [],
+  meta: {
+    run_id: '161',
+    generated_at: '2026-07-09T12:20:00Z',
+    conclusion: 'failure',
+  },
+});
 const ADMIN_TOKEN_KEY = 'collectivex-admin-token';
 
-function installLatest(body: CollectiveXDataset | Record<string, unknown> = dataset) {
-  cy.intercept('GET', '/api/v1/collectivex/latest*', { body }).as('latest');
-}
-
-function installRuns() {
+function installRuns(bodies: CollectiveXDataset[] = [dataset]) {
   cy.intercept('GET', '/api/v1/collectivex/runs?*', {
-    body: { version: 1, runs: [buildRunSummary(dataset)] },
+    body: { version: 1, runs: bodies.map(buildRunSummary) },
   }).as('runs');
 }
 
-function installRun(body: CollectiveXDataset = dataset) {
-  cy.intercept('GET', `/api/v1/collectivex/runs/${runId}*`, { body }).as('run');
+function installRun(body: CollectiveXDataset = dataset, alias = 'run') {
+  cy.intercept('GET', `/api/v1/collectivex/runs/${body.run.run_id}*`, { body }).as(alias);
 }
 
 function openCollectiveX() {
   cy.visit('/collectivex');
-  cy.wait('@latest');
+  cy.wait('@runs');
+  cy.wait('@run');
   cy.get('[data-testid="collectivex-display"]').should('be.visible');
 }
 
 describe('CollectiveX neutral run view', () => {
   beforeEach(() => {
-    installLatest();
+    installRuns();
+    installRun();
     openCollectiveX();
   });
 
@@ -94,9 +108,11 @@ describe('CollectiveX neutral run view', () => {
     const ncclEp = buildDataset({
       shards: [makeRawShard({ backend: 'nccl-ep', implName: 'nccl-ep' })],
     });
-    installLatest(ncclEp);
+    installRuns([ncclEp]);
+    installRun(ncclEp);
     cy.reload();
-    cy.wait('@latest');
+    cy.wait('@runs');
+    cy.wait('@run');
     cy.get('[data-testid="collectivex-main-chart"]').should('contain.text', 'nccl-ep');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
   });
@@ -112,9 +128,11 @@ describe('CollectiveX neutral run view', () => {
     const withLowLatency = buildDataset({
       shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' })],
     });
-    installLatest(withLowLatency);
+    installRuns([withLowLatency]);
+    installRun(withLowLatency);
     cy.reload();
-    cy.wait('@latest');
+    cy.wait('@runs');
+    cy.wait('@run');
 
     cy.get('[data-testid="collectivex-mode-toggle"]').should('be.visible');
     cy.get('[data-testid="collectivex-main-chart"]').should('contain.text', 'deepep-v2');
@@ -127,9 +145,11 @@ describe('CollectiveX neutral run view', () => {
 
   it('selects the available phase when a partial run only measured prefill', () => {
     const prefill = buildDataset({ shards: [makeRawShard({ phase: 'prefill' })] });
-    installLatest(prefill);
+    installRuns([prefill]);
+    installRun(prefill);
     cy.reload();
-    cy.wait('@latest');
+    cy.wait('@runs');
+    cy.wait('@run');
     cy.get('[data-testid="collectivex-phase-toggle"]').should('contain.text', 'Prefill');
     cy.get('[data-testid="collectivex-main-chart"]').should('contain.text', 'prefill');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
@@ -153,15 +173,52 @@ describe('CollectiveX neutral run view', () => {
       .and('not.contain.text', 'evidence=');
   });
 
-  it('lists runs on demand and pins a specific run by id', () => {
-    installRuns();
+  it('lists every version-matching run and overlays checked runs', () => {
+    installRuns([dataset, comparisonDataset]);
     installRun();
-    cy.get('[data-testid="collectivex-load-runs"]').click();
+    installRun(comparisonDataset, 'comparisonRun');
+    cy.reload();
     cy.wait('@runs');
-    cy.get('[data-testid="collectivex-run-select"]').click();
-    cy.contains('[role="option"]', `#${runId}`).click();
     cy.wait('@run');
+
+    cy.get(`[data-testid="collectivex-run-row-${runId}"]`).should('be.visible');
+    cy.get(`[data-testid="collectivex-run-row-${comparisonDataset.run.run_id}"]`).should(
+      'be.visible',
+    );
+    cy.get(`[data-testid="collectivex-run-visible-${runId}"]`).should('be.checked');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+
+    cy.get(`[data-testid="collectivex-run-visible-${comparisonDataset.run.run_id}"]`).check();
+    cy.wait('@comparisonRun');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 2);
+    cy.get('[data-testid="chart-legend"]')
+      .should('contain.text', `#${runId}`)
+      .and('contain.text', `#${comparisonDataset.run.run_id}`);
+
+    cy.get(`[data-testid="collectivex-run-visible-${runId}"]`).uncheck();
+    cy.get('[data-testid="collectivex-run-conclusion"]').should(
+      'contain.text',
+      `#${comparisonDataset.run.run_id}`,
+    );
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+  });
+
+  it('defaults to the newest measured run when a newer incomplete run has no series', () => {
+    installRuns([incompleteDataset, dataset]);
+    installRun();
+    cy.reload();
+    cy.wait('@runs');
+    cy.wait('@run');
+
+    cy.get(`[data-testid="collectivex-run-row-${incompleteDataset.run.run_id}"]`).should(
+      'be.visible',
+    );
+    cy.get(`[data-testid="collectivex-run-visible-${incompleteDataset.run.run_id}"]`).should(
+      'not.be.checked',
+    );
+    cy.get(`[data-testid="collectivex-run-visible-${runId}"]`).should('be.checked');
     cy.get('[data-testid="collectivex-run-conclusion"]').should('contain.text', `#${runId}`);
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
   });
 
   it('keeps the chart on top and presents the matrix inventory', () => {
@@ -177,13 +234,24 @@ describe('CollectiveX neutral run view', () => {
 
 describe('CollectiveX run deletion', () => {
   beforeEach(() => {
-    installLatest();
+    installRuns();
+    installRun();
     openCollectiveX();
   });
 
-  it('deletes the shown run after confirm + token prompt and remembers the token', () => {
+  it('deletes a table row after confirm + token prompt and remembers the token', () => {
+    let deleted = false;
+    cy.intercept('GET', '/api/v1/collectivex/runs?*', (request) => {
+      request.reply({
+        body: {
+          version: 1,
+          runs: deleted ? [] : [buildRunSummary(dataset)],
+        },
+      });
+    }).as('runsAfterDelete');
     cy.intercept('DELETE', `/api/v1/collectivex/runs/${runId}`, (request) => {
       expect(request.headers.authorization).to.eq('Bearer test-token');
+      deleted = true;
       request.reply({ deleted: true, runId });
     }).as('deleteRun');
     cy.window().then((win) => {
@@ -192,10 +260,10 @@ describe('CollectiveX run deletion', () => {
       cy.stub(win, 'prompt').returns('test-token');
     });
 
-    cy.get('[data-testid="collectivex-delete-run"]').click();
+    cy.get(`[data-testid="collectivex-delete-run-${runId}"]`).click();
     cy.wait('@deleteRun');
-    // Successful deletion invalidates the dataset queries → latest refetches.
-    cy.wait('@latest');
+    cy.wait('@runsAfterDelete');
+    cy.get(`[data-testid="collectivex-run-row-${runId}"]`).should('not.exist');
     cy.window().then((win) => {
       expect(win.localStorage.getItem(ADMIN_TOKEN_KEY)).to.eq('test-token');
     });
@@ -211,7 +279,7 @@ describe('CollectiveX run deletion', () => {
       cy.stub(win, 'alert').as('unauthorizedAlert');
     });
 
-    cy.get('[data-testid="collectivex-delete-run"]').click();
+    cy.get(`[data-testid="collectivex-delete-run-${runId}"]`).click();
     cy.wait('@delete401');
     cy.get('@unauthorizedAlert').should('have.been.calledWith', 'Invalid admin token.');
     cy.window().then((win) => {
@@ -228,15 +296,15 @@ describe('CollectiveX run deletion', () => {
       cy.stub(win, 'confirm').returns(false);
     });
 
-    cy.get('[data-testid="collectivex-delete-run"]').click();
+    cy.get(`[data-testid="collectivex-delete-run-${runId}"]`).click();
     cy.get('[data-testid="collectivex-display"]').should('be.visible');
     cy.then(() => expect(deleteRequests).to.eq(0));
   });
 });
 
 describe('CollectiveX availability states', () => {
-  it('reports a missing run', () => {
-    cy.intercept('GET', '/api/v1/collectivex/latest*', {
+  it('reports a missing run list', () => {
+    cy.intercept('GET', '/api/v1/collectivex/runs?*', {
       statusCode: 404,
       body: { error: 'Not found' },
     }).as('missing');
@@ -249,7 +317,7 @@ describe('CollectiveX availability states', () => {
   });
 
   it('reports an unavailable backend', () => {
-    cy.intercept('GET', '/api/v1/collectivex/latest*', {
+    cy.intercept('GET', '/api/v1/collectivex/runs?*', {
       statusCode: 503,
       body: { error: 'unavailable' },
     }).as('down');
@@ -261,13 +329,15 @@ describe('CollectiveX availability states', () => {
   });
 
   it('renders the loading state while the run resolves', () => {
-    // "slow" is a reserved alias word in Cypress 15.
-    cy.intercept('GET', '/api/v1/collectivex/latest*', { body: dataset, delay: 500 }).as(
-      'slowLatest',
-    );
+    installRuns();
+    cy.intercept('GET', `/api/v1/collectivex/runs/${runId}*`, {
+      body: dataset,
+      delay: 500,
+    }).as('slowRun');
     cy.visit('/collectivex');
-    cy.get('[data-testid="collectivex-loading"]').should('be.visible');
-    cy.wait('@slowLatest');
+    cy.wait('@runs');
+    cy.get('[data-testid="collectivex-selected-runs-loading"]').should('be.visible');
+    cy.wait('@slowRun');
     cy.get('[data-testid="collectivex-display"]').should('be.visible');
   });
 
@@ -277,9 +347,11 @@ describe('CollectiveX availability states', () => {
       availabilityRequests += 1;
       request.reply([]);
     });
-    installLatest();
+    installRuns();
+    installRun();
     cy.visit('/collectivex');
-    cy.wait('@latest');
+    cy.wait('@runs');
+    cy.wait('@run');
     cy.get('[data-testid="collectivex-display"]').should('be.visible');
     cy.then(() => expect(availabilityRequests).to.eq(0));
   });

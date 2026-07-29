@@ -49,7 +49,7 @@ const MAX_RUN_BYTES = 256 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_REQUEST_ATTEMPTS = 3;
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
-// The picker backfill ingests at most this many recent runs per pass; each
+// The run-table backfill ingests at most this many recent runs per pass; each
 // costs one artifact-bundle download, and only once — afterwards they're rows.
 const MAX_DISCOVERED_RUNS = 8;
 
@@ -429,7 +429,7 @@ async function persistRun(
     source_sha: run.head_sha,
   };
 
-  // Assemble once to validate the bundle and precompute the picker summary;
+  // Assemble once to validate the bundle and precompute the run-table summary;
   // only the raw documents are stored.
   let summary;
   try {
@@ -513,7 +513,7 @@ export function ensureLatestCollectiveXRun(version: CollectiveXVersion): Promise
 
 /**
  * Backfill up to MAX_DISCOVERED_RUNS recent requested-version runs into the
- * DB so the picker lists recent sweeps even before anyone viewed them. Only
+ * DB so the run table lists recent sweeps even before anyone viewed them. Only
  * live matches count toward the cap — tombstoned runs never fill a slot.
  */
 export function ensureCollectiveXRunsList(version: CollectiveXVersion): Promise<void> {

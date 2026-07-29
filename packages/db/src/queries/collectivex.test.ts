@@ -78,6 +78,7 @@ describe('read queries', () => {
     await listCollectiveXRuns(sql, 1);
     expect(calls[0].text).toContain('deleted_at IS NULL');
     expect(calls[0].text).toContain('ORDER BY run_id DESC');
+    expect(calls[0].text).not.toContain('LIMIT');
   });
 });
 

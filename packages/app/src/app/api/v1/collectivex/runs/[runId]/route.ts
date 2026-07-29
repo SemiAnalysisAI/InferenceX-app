@@ -72,7 +72,7 @@ function bearerMatches(header: string, secret: string): boolean {
  * secret — the token is remembered in browser localStorage, so it must not
  * be the CI-held INVALIDATE_SECRET (scoped blast radius, independently
  * rotatable). Deletion tombstones the run (lazy discovery must never
- * re-ingest it) and purges the CollectiveX cache scope so the picker and
+ * re-ingest it) and purges the CollectiveX cache scope so the run table and
  * latest views drop it immediately.
  */
 export async function DELETE(

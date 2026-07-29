@@ -7,6 +7,7 @@
 
 import type {
   CollectiveXPoint,
+  CollectiveXSeries,
   CollectiveXVersion,
 } from '@semianalysisai/inferencex-db/collectivex/types';
 
@@ -51,3 +52,8 @@ export interface CollectiveXChartPoint {
   y: number;
   point: CollectiveXPoint;
 }
+
+/** A stored run's series namespaced for simultaneous multi-run rendering. */
+export type CollectiveXRunSeries = CollectiveXSeries & {
+  run_id: string;
+};

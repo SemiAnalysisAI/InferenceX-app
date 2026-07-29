@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   deleteCollectiveXRun,
@@ -22,27 +22,22 @@ export function useCollectiveX(version: CollectiveXVersion = COLLECTIVEX_DEFAULT
 }
 
 /**
- * Ingested runs for a version, backing the run picker. `enabled` gates the
- * fetch so the list is only pulled when the user opens the picker; refetched on
- * mount so a reopened picker reflects newly ingested runs without a hard reload.
+ * Every ingested run summary for a version, backing the always-visible run
+ * table. Refetched on mount so the table reflects newly ingested runs without
+ * a hard reload.
  */
-export function useCollectiveXRuns(
-  version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
-  enabled = true,
-) {
+export function useCollectiveXRuns(version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION) {
   return useQuery({
     queryKey: ['collectivex-runs', version],
     queryFn: ({ signal }) => fetchCollectiveXRunList(version, signal),
-    enabled,
     staleTime: 0,
     refetchOnMount: 'always',
   });
 }
 
 /**
- * Resolve one selected run's neutral dataset by run_id. `enabled` gates the fetch
- * so the picker only loads a run once the user selects a non-default one; the
- * default view keeps using the latest run via {@link useCollectiveX}.
+ * Resolve one selected run's neutral dataset by run_id. Kept as the focused
+ * single-run hook for callers that do not need the multi-run table.
  */
 export function useCollectiveXRun(version: CollectiveXVersion, runId: string | null) {
   return useQuery({
@@ -54,10 +49,22 @@ export function useCollectiveXRun(version: CollectiveXVersion, runId: string | n
   });
 }
 
+/** Resolve every checked run in parallel for the multi-run explorer. */
+export function useCollectiveXRunDatasets(version: CollectiveXVersion, runIds: readonly string[]) {
+  return useQueries({
+    queries: runIds.map((runId) => ({
+      queryKey: ['collectivex-run', version, runId],
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchCollectiveXRun(version, runId, signal),
+      staleTime: 0,
+      refetchOnMount: 'always' as const,
+    })),
+  });
+}
+
 /**
  * Admin deletion of an ingested run. Resolves `false` on 401 (stale token —
  * the caller clears its stored copy); on success every CollectiveX query is
- * invalidated so the latest view and picker drop the run immediately.
+ * invalidated so the latest view and run table drop the run immediately.
  */
 export function useDeleteCollectiveXRun() {
   const queryClient = useQueryClient();

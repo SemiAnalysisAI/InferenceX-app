@@ -9,6 +9,8 @@ import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { collectiveXTopologyLabel } from './data';
 import type { CollectiveXCoverage, CollectiveXDataset, CollectiveXTerminalStatus } from './types';
 
+type CollectiveXRunCoverage = CollectiveXCoverage & { run_id: string };
+
 const TERMINAL_ORDER: CollectiveXTerminalStatus[] = [
   'measured',
   'unsupported',
@@ -55,9 +57,22 @@ function TerminalBadges({ item }: { item: CollectiveXCoverage }) {
   );
 }
 
-export function CollectiveXInventory({ dataset }: { dataset: CollectiveXDataset }) {
-  const columns = useMemo<DataTableColumn<CollectiveXCoverage>[]>(
+export function CollectiveXInventory({ datasets }: { datasets: CollectiveXDataset[] }) {
+  const rows = useMemo<CollectiveXRunCoverage[]>(
+    () =>
+      datasets.flatMap((dataset) =>
+        dataset.coverage.map((item) => ({ ...item, run_id: dataset.run.run_id })),
+      ),
+    [datasets],
+  );
+  const columns = useMemo<DataTableColumn<CollectiveXRunCoverage>[]>(
     () => [
+      {
+        header: 'Run',
+        cell: (row) => <span className="font-mono text-xs">#{row.run_id}</span>,
+        sortValue: (row) => Number(row.run_id),
+        className: 'whitespace-nowrap',
+      },
       {
         header: 'Case',
         cell: (row) => (
@@ -125,21 +140,27 @@ export function CollectiveXInventory({ dataset }: { dataset: CollectiveXDataset 
     ],
     [],
   );
-  const points = dataset.coverage.flatMap((item) => item.points);
+  const points = rows.flatMap((item) => item.points);
   const measured = points.filter((point) => point.terminal_status === 'measured').length;
   const unsupported = points.filter((point) => point.terminal_status === 'unsupported').length;
+  const measuredCases = datasets.reduce((sum, dataset) => sum + dataset.run.measured_cases, 0);
+  const unsupportedCases = datasets.reduce(
+    (sum, dataset) => sum + dataset.run.unsupported_cases,
+    0,
+  );
+  const terminalPoints = datasets.reduce((sum, dataset) => sum + dataset.run.terminal_points, 0);
+  const requestedPoints = datasets.reduce((sum, dataset) => sum + dataset.run.requested_points, 0);
 
   return (
     <Card data-testid="collectivex-inventory" className="min-w-0 w-full max-w-full overflow-hidden">
       <h2 className="text-lg font-semibold">Matrix case inventory</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        {dataset.coverage.length} cases · {dataset.run.measured_cases} measured ·{' '}
-        {dataset.run.unsupported_cases} unsupported · {dataset.run.terminal_points}/
-        {dataset.run.requested_points} terminal points · {measured} measured · {unsupported}{' '}
-        unsupported
+        {datasets.length} runs · {rows.length} cases · {measuredCases} measured · {unsupportedCases}{' '}
+        unsupported · {terminalPoints}/{requestedPoints} terminal points · {measured} measured ·{' '}
+        {unsupported} unsupported
       </p>
       <DataTable
-        data={dataset.coverage}
+        data={rows}
         columns={columns}
         testId="collectivex-inventory-table"
         analyticsPrefix="collectivex_inventory"
