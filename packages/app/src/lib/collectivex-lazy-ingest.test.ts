@@ -395,6 +395,41 @@ describe('ensureCollectiveXRunsList', () => {
     await expect(ensureCollectiveXRunsList(1)).resolves.toBe(false);
     expect(mockInsert).toHaveBeenCalledTimes(8);
   });
+
+  it('does not consume the mutation budget when concurrent inserts are no-ops', async () => {
+    const runs = Array.from({ length: 8 }, (_unused, index) => runObject({ id: 167 - index }));
+    mockInsert.mockResolvedValue(false);
+    mockFetch.mockResolvedValueOnce(runListing(...runs));
+    for (const run of runs) {
+      mockFetch
+        .mockResolvedValueOnce(Response.json(artifactsBody(run.id)))
+        .mockResolvedValueOnce(new Response(matrixZip))
+        .mockResolvedValueOnce(new Response(shardZip));
+    }
+
+    await expect(ensureCollectiveXRunsList(1)).resolves.toBe(true);
+    expect(mockInsert).toHaveBeenCalledTimes(8);
+  });
+
+  it('does not consume the mutation budget when guarded refreshes are no-ops', async () => {
+    const runs = Array.from({ length: 8 }, (_unused, index) =>
+      runObject({ id: 167 - index, run_attempt: 2 }),
+    );
+    mockGetStates.mockImplementation((_sql: unknown, ids: string[]) =>
+      Promise.resolve({ [ids[0]]: { state: 'live', version: 1, run_attempt: 1 } }),
+    );
+    mockRefresh.mockResolvedValue(false);
+    mockFetch.mockResolvedValueOnce(runListing(...runs));
+    for (const run of runs) {
+      mockFetch
+        .mockResolvedValueOnce(Response.json(artifactsBody(run.id, 2)))
+        .mockResolvedValueOnce(new Response(matrixZip))
+        .mockResolvedValueOnce(new Response(shardZip));
+    }
+
+    await expect(ensureCollectiveXRunsList(1)).resolves.toBe(true);
+    expect(mockRefresh).toHaveBeenCalledTimes(8);
+  });
 });
 
 describe('ensureCollectiveXRun', () => {

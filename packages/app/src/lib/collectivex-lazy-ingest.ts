@@ -405,7 +405,7 @@ async function persistRun(
   candidate: MatrixCandidate,
   token: string,
   refresh = false,
-): Promise<void> {
+): Promise<boolean> {
   const generatedAt = runGeneratedAt(run);
   if (!generatedAt) {
     throw new CollectiveXSweepError('invalid', 'sweep run is missing a timestamp');
@@ -450,9 +450,9 @@ async function persistRun(
     matrix: candidate.matrixDoc,
     summary,
   };
-  await (refresh
+  return refresh
     ? refreshCollectiveXRunAttempt(getCollectiveXWriteDb(), row, docs)
-    : insertCollectiveXRun(getCollectiveXWriteDb(), row, docs));
+    : insertCollectiveXRun(getCollectiveXWriteDb(), row, docs);
 }
 
 /** Download and version-check a candidate's matrix; null when not ingestible. */
@@ -490,8 +490,8 @@ async function considerCandidate(
     if (run.run_attempt > known.run_attempt) {
       const candidate = await matrixCandidateFor(run, version, token);
       if (candidate) {
-        await persistRun(run, candidate, token, true);
-        return 'changed-match';
+        const changed = await persistRun(run, candidate, token, true);
+        return changed ? 'changed-match' : 'match';
       }
     }
     return 'match';
@@ -499,7 +499,8 @@ async function considerCandidate(
   const artifacts = await listArtifacts(run.id, token);
   if (!hasMatrixArtifact(artifacts, run)) return 'skip';
   const candidate = await loadMatrixCandidate(artifacts, token, run);
-  await persistRun(run, candidate, token);
+  const changed = await persistRun(run, candidate, token);
+  if (!changed) return candidate.version === version ? 'match' : 'skip';
   return candidate.version === version ? 'changed-match' : 'changed-other';
 }
 
