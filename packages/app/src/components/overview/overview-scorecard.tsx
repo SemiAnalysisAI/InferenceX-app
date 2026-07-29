@@ -51,11 +51,11 @@ export const OVERVIEW_STRINGS = {
     missingReasons: (tier: number): Record<string, string> => ({
       int4_bf16_only: 'INT4/BF16 only',
       no_scenario_data: 'no data for this scenario',
-      no_speculative_decode_result: 'no speculative-decode result',
       cannot_reach_at_tier: `cannot reach @${tier}`,
       no_exact_at_tier: `no exact @${tier} result`,
     }),
-    methodologyNote: 'Speculative decode only. Priority: FP4 → FP8.',
+    standardDecodeLabel: 'Standard decode',
+    methodologyNote: 'Priority: speculative FP4 → speculative FP8 → standard FP4 → standard FP8.',
     costNote:
       'Cost = 3-yr rental $/GPU/hr ÷ output tok/s per deployed GPU. All percentages compare against B200.',
     costDeltaAria: (pct: string, cheaper: boolean) =>
@@ -101,11 +101,11 @@ export const OVERVIEW_STRINGS = {
     missingReasons: (tier: number): Record<string, string> => ({
       int4_bf16_only: '仅 INT4/BF16',
       no_scenario_data: '该场景暂无数据',
-      no_speculative_decode_result: '暂无推测解码结果',
       cannot_reach_at_tier: `无法达到 @${tier}`,
       no_exact_at_tier: `无精确 @${tier} 结果`,
     }),
-    methodologyNote: '仅展示推测解码。优先顺序：FP4 → FP8。',
+    standardDecodeLabel: '标准解码',
+    methodologyNote: '优先顺序：推测解码 FP4 → 推测解码 FP8 → 标准解码 FP4 → 标准解码 FP8。',
     costNote: '成本 = 3 年期租赁 $/GPU/小时 ÷ 每张已部署 GPU 的输出 tok/s。所有百分比均相对 B200。',
     costDeltaAria: (pct: string, cheaper: boolean) => `比 B200 ${cheaper ? '便宜' : '昂贵'} ${pct}`,
     costDeltaEvenAria: '与 B200 成本基本持平',
@@ -266,10 +266,16 @@ function CellValue({
     return <CellMissing hardware={member.hardware} reason={missingReasonCopy(member, strings)} />;
   }
   const precisionLabel = config?.precision.toUpperCase() ?? member.precision?.toUpperCase() ?? null;
-  const stackBadge =
-    config === null || precisionLabel === null
+  const specLabel =
+    config === null
       ? null
-      : [config.frameworkLabel, precisionLabel, config.specLabel]
+      : config.specMethod === 'none' || config.specMethod === ''
+        ? strings.standardDecodeLabel
+        : config.specLabel;
+  const stackBadge =
+    config === null || precisionLabel === null || specLabel === null
+      ? null
+      : [config.frameworkLabel, precisionLabel, specLabel]
           .filter((part): part is string => part !== null)
           .join(' · ');
   const stack =
@@ -279,7 +285,7 @@ function CellValue({
           member.hardwareLabel,
           config.frameworkLabel,
           config.precision.toUpperCase(),
-          config.specLabel,
+          specLabel,
         ].join(' · ');
   const evidenceDateLabel =
     evidenceDate === null ? '' : formatEvidenceDate(formatters, evidenceDate);

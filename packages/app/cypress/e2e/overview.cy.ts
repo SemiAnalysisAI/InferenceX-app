@@ -127,26 +127,27 @@ describe('Overview page', () => {
     });
   });
 
-  it('shows only speculative-decode reads, with FP8 and method labels', () => {
+  it('prefers speculative decode and falls back to labelled standard-decode reads', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
     desktopModel('Kimi-K2.5').within(() => {
+      cy.get('[data-testid="overview-pair-value"]').should('have.length', 3);
       cy.get('[data-testid="overview-pair-missing"]')
-        .should('have.length', 5)
+        .should('have.length', 2)
         .then(($missing) => {
           expect([...$missing].map((element) => element.getAttribute('title'))).to.deep.equal([
-            'no speculative-decode result',
-            'no speculative-decode result',
-            'no speculative-decode result',
             'no data for this scenario',
             'no data for this scenario',
           ]);
         });
       cy.get('[data-testid="overview-pair-missing"]')
         .children('[aria-hidden="true"]')
-        .should('have.length', 5)
-        .and('have.text', '∞∞∞∞∞');
+        .should('have.length', 2)
+        .and('have.text', '∞∞');
+      platform('b200').should('contain.text', 'Standard decode');
+      platform('mi355x').should('contain.text', 'Standard decode');
+      platform('b300').should('contain.text', 'Standard decode');
     });
 
     desktopModel('DeepSeek-V4-Pro').within(() => {
@@ -164,7 +165,9 @@ describe('Overview page', () => {
         cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
       });
     });
-    cy.get('body').should('not.contain.text', 'Standard decode');
+    cy.contains(
+      'Priority: speculative FP4 → speculative FP8 → standard FP4 → standard FP8.',
+    ).should('exist');
     cy.get('body').should('not.contain.text', 'P90');
   });
 
@@ -632,10 +635,9 @@ describe('Overview page', () => {
       .invoke('text')
       .should('not.match', /100 档由.+领先/);
     desktopModel('Kimi-K2.5').within(() => {
-      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
-      platform('b200')
-        .find('[data-testid="overview-pair-missing"]')
-        .should('have.attr', 'title', '暂无推测解码结果');
+      cy.get('[data-testid="overview-pair-value"]').should('have.length', 3);
+      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 2);
+      platform('b200').should('contain.text', '标准解码');
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
     });
     desktopModel('GLM-5.2').within(() => {
@@ -645,7 +647,9 @@ describe('Overview page', () => {
         .find('[data-testid="overview-pair-missing"]')
         .should('have.attr', 'title', '该场景暂无数据');
     });
-    cy.get('body').should('not.contain.text', '标准解码');
+    cy.contains('优先顺序：推测解码 FP4 → 推测解码 FP8 → 标准解码 FP4 → 标准解码 FP8。').should(
+      'exist',
+    );
     cy.contains('∞ = 无可比结果').should('exist');
 
     cy.visit('/zh/overview?tier=100');

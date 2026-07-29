@@ -95,6 +95,37 @@ describe('overview engine scope and scenario selection', () => {
     expect(overviewScenarioForModel(Model.Qwen3_5)).toBe('single_turn_8k1k');
   });
 
+  it('prefers single-turn 8K/1K rows and otherwise falls back to AgentX', () => {
+    const singleTurn = frontier([1200, 1000, 800, 600], {
+      model: 'glm5.2',
+      hardware: 'b200',
+    });
+    const agentx = [
+      row({
+        model: 'glm5.2',
+        hardware: 'b200',
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        metrics: {
+          p90_itl: 1 / 50,
+          p90_ttlt: 25,
+          output_tput_per_gpu: 850,
+        },
+      }),
+    ];
+
+    expect(buildOverviewModelSummary(Model.GLM_5_2, [...agentx, ...singleTurn]).scenario).toBe(
+      'single_turn_8k1k',
+    );
+    expect(
+      buildOverviewModelSummary(
+        Model.Qwen3_5,
+        agentx.map((entry) => ({ ...entry, model: 'qwen3.5' })),
+      ).scenario,
+    ).toBe('agentx');
+  });
+
   it('resolves valid engine scopes and defaults invalid values to community', () => {
     expect(resolveOverviewEngineScope('community')).toBe('community');
     expect(resolveOverviewEngineScope('all')).toBe('all');
@@ -420,7 +451,7 @@ describe('overview engine scope and scenario selection', () => {
     expect(headlinePairOf(summary, 'gb300-vs-b200')?.candidate.read.value).toBeNull();
   });
 
-  it('uses speculative FP4 then speculative FP8 without standard-decode fallback', () => {
+  it('uses speculative FP4, speculative FP8, standard FP4, then standard FP8', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, [
       ...frontier([900, 700, 500, 300], { hardware: 'b200', precision: Precision.FP4 }),
       ...frontier([1400, 1200, 1000, 800], {
@@ -465,9 +496,9 @@ describe('overview engine scope and scenario selection', () => {
     ).toEqual([
       { hardware: 'b200', precision: Precision.FP4, value: 700 },
       { hardware: 'mi355x', precision: Precision.FP8, value: 900 },
-      { hardware: 'b300', precision: null, value: null },
-      { hardware: 'gb200', precision: null, value: null },
-      { hardware: 'gb300', precision: null, value: null },
+      { hardware: 'b300', precision: Precision.FP4, value: 1100 },
+      { hardware: 'gb200', precision: Precision.FP8, value: 1000 },
+      { hardware: 'gb300', precision: Precision.FP4, value: 900 },
     ]);
   });
 });
@@ -623,18 +654,51 @@ describe('overview platform selection', () => {
     );
   });
 
-  it('shows standard-only data as missing and still flags unsupported precision coverage', () => {
+  it('falls back to standard decode and still flags unsupported precision coverage', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, [
       ...frontier([1200, 1000, 800, 600], { hardware: 'b200', precision: Precision.FP4 }),
-      row({ hardware: 'mi355x', precision: Precision.FP8, spec_method: 'none' }),
+      ...frontier([1100, 900, 700, 500], {
+        hardware: 'mi355x',
+        precision: Precision.FP8,
+        spec_method: 'none',
+      }),
       row({ hardware: 'b300', precision: Precision.INT4 }),
     ]);
 
     expect(headlinePairOf(summary, 'mi355x-vs-b200')?.candidate).toMatchObject({
-      missingReason: 'no_speculative_decode_result',
-      read: { value: null },
+      missingReason: null,
+      precision: Precision.FP8,
+      read: { value: 900, config: { specMethod: 'none' } },
     });
     expect(headlinePairOf(summary, 'b300-vs-b200')?.candidate.missingReason).toBe('int4_bf16_only');
+  });
+
+  it('falls back to standard decode for AgentX when no speculative result exists', () => {
+    const agentxRows = [40, 50, 60].map((interactivity, index) =>
+      row({
+        model: 'glm5.2',
+        hardware: 'b300',
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        precision: Precision.FP4,
+        spec_method: 'none',
+        conc: index + 1,
+        metrics: {
+          p90_itl: 1 / interactivity,
+          p90_ttlt: 30 - index * 5,
+          output_tput_per_gpu: 1000 - index * 100,
+        },
+      }),
+    );
+
+    const summary = buildOverviewModelSummary(Model.GLM_5_2, agentxRows);
+    expect(summary.scenario).toBe('agentx');
+    expect(summary.platforms.find(({ hardware }) => hardware === 'b300')).toMatchObject({
+      missingReason: null,
+      precision: Precision.FP4,
+      read: { value: 900, config: { specMethod: 'none' } },
+    });
   });
 
   it('reads AgentX at the chart-default P90 contract without exposing P90 as the scenario', () => {
@@ -880,18 +944,27 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(qwenB300.baseline.precision).toBe(Precision.FP4);
     expect(qwenB300.baseline.read.value).toBeCloseTo(733.594);
 
-    // Kimi: standard-only rows remain visible as spec-decode coverage gaps.
+    // Kimi: standard-only rows remain visible as explicitly labelled fallbacks.
     const kimi = page.models.find((m) => m.model === Model.Kimi_K2_5)!;
     const kimiMi = headlinePairOf(kimi, 'mi355x-vs-b200')!;
-    expect(kimiMi.candidate.precision).toBeNull();
-    expect(kimiMi.candidate.read.value).toBeNull();
-    expect(kimiMi.candidate.missingReason).toBe('no_speculative_decode_result');
-    expect(kimiMi.baseline.precision).toBeNull();
-    expect(kimiMi.baseline.read.value).toBeNull();
+    expect(kimiMi.candidate.precision).toBe(Precision.FP4);
+    expect(kimiMi.candidate.read).toMatchObject({
+      value: 1000,
+      config: { specMethod: 'none' },
+    });
+    expect(kimiMi.candidate.missingReason).toBeNull();
+    expect(kimiMi.baseline.precision).toBe(Precision.FP4);
+    expect(kimiMi.baseline.read).toMatchObject({
+      value: 800,
+      config: { specMethod: 'none' },
+    });
     const kimiB300 = headlinePairOf(kimi, 'b300-vs-b200')!;
-    expect(kimiB300.candidate.precision).toBeNull();
-    expect(kimiB300.candidate.read.value).toBeNull();
-    expect(kimiB300.candidate.missingReason).toBe('no_speculative_decode_result');
+    expect(kimiB300.candidate.precision).toBe(Precision.FP8);
+    expect(kimiB300.candidate.read).toMatchObject({
+      value: 900,
+      config: { specMethod: 'none' },
+    });
+    expect(kimiB300.candidate.missingReason).toBeNull();
 
     // GLM's AgentX fixture lacks valid P90 metrics, so it cannot produce a tier read.
     const glm = page.models.find((m) => m.model === Model.GLM_5_2)!;

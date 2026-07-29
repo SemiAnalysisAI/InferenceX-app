@@ -80,7 +80,6 @@ export interface OverviewTierRead {
 export type OverviewMissingReason =
   | 'int4_bf16_only'
   | 'no_scenario_data'
-  | 'no_speculative_decode_result'
   | 'cannot_reach_at_tier'
   | 'no_exact_at_tier';
 
@@ -113,7 +112,12 @@ export interface OverviewPageData {
   engineScope: OverviewEngineScope;
 }
 
-const OVERVIEW_SLICE_PRIORITY = [Precision.FP4, Precision.FP8] as const;
+const OVERVIEW_SLICE_PRIORITY = [
+  { speculative: true, precision: Precision.FP4 },
+  { speculative: true, precision: Precision.FP8 },
+  { speculative: false, precision: Precision.FP4 },
+  { speculative: false, precision: Precision.FP8 },
+] as const;
 const OVERVIEW_PRECISIONS: readonly string[] = [Precision.FP4, Precision.FP8];
 const OVERVIEW_HARDWARE_LABELS: Readonly<Record<string, string>> = {
   gb200: 'GB200',
@@ -127,7 +131,21 @@ function overviewHardwareLabel(hardware: string, model: Model): string {
 const isSpeculativeDecode = (specMethod: string): boolean =>
   specMethod !== 'none' && specMethod !== '';
 
-export function overviewScenarioForModel(model: Model): OverviewScenario {
+export function overviewScenarioForModel(
+  model: Model,
+  rows: readonly BenchmarkRow[] = [],
+): OverviewScenario {
+  if (
+    rows.some(
+      (row) =>
+        row.benchmark_type === 'single_turn' &&
+        row.isl === OVERVIEW_WORKLOAD.isl &&
+        row.osl === OVERVIEW_WORKLOAD.osl,
+    )
+  ) {
+    return 'single_turn_8k1k';
+  }
+  if (rows.some((row) => row.benchmark_type === 'agentic_traces')) return 'agentx';
   return model === Model.Kimi_K3 || model === Model.GLM_5_2 ? 'agentx' : 'single_turn_8k1k';
 }
 
@@ -142,8 +160,11 @@ function overviewEngineRows(
   });
 }
 
-function overviewScenarioRows(model: Model, rows: readonly BenchmarkRow[]): BenchmarkRow[] {
-  if (overviewScenarioForModel(model) === 'agentx') {
+function overviewScenarioRows(
+  scenario: OverviewScenario,
+  rows: readonly BenchmarkRow[],
+): BenchmarkRow[] {
+  if (scenario === 'agentx') {
     return rows.filter((row) => row.benchmark_type === 'agentic_traces');
   }
   return rows.filter(
@@ -184,7 +205,6 @@ function buildConfigs(
   const rowsByConfig = new Map<string, BenchmarkRow[]>();
   for (const row of scenarioRows) {
     if (!OVERVIEW_PRECISIONS.includes(row.precision)) continue;
-    if (!isSpeculativeDecode(row.spec_method)) continue;
     const key = overviewServingSeriesKey(row);
     const configRows = rowsByConfig.get(key);
     if (configRows) configRows.push(row);
@@ -262,8 +282,9 @@ function nonComparableAsMissing(
 }
 
 function configPriorityIndex(config: OverviewConfigResult): number {
-  return OVERVIEW_SLICE_PRIORITY.indexOf(
-    config.precision as (typeof OVERVIEW_SLICE_PRIORITY)[number],
+  return OVERVIEW_SLICE_PRIORITY.findIndex(
+    ({ speculative, precision }) =>
+      speculative === isSpeculativeDecode(config.specMethod) && precision === config.precision,
   );
 }
 
@@ -280,8 +301,8 @@ function selectPlatformRead(
     const exact = reads
       .filter(
         (read) =>
-          read.config.precision === priority &&
-          isSpeculativeDecode(read.config.specMethod) &&
+          read.config.precision === priority.precision &&
+          isSpeculativeDecode(read.config.specMethod) === priority.speculative &&
           isInRangeTierRead(read),
       )
       .toSorted(compareTierReads)[0];
@@ -304,11 +325,7 @@ function missingReasonForPlatform(
   if (isInRangeTierRead(read)) return null;
   const hardwareRows = workloadRows.filter((row) => row.hardware === hardware);
   if (hardwareRows.length === 0) return 'no_scenario_data';
-  const speculativeRows = hardwareRows.filter((row) => isSpeculativeDecode(row.spec_method));
-  if (speculativeRows.length === 0) return 'no_speculative_decode_result';
-  const supportedRows = speculativeRows.filter((row) =>
-    OVERVIEW_PRECISIONS.includes(row.precision),
-  );
+  const supportedRows = hardwareRows.filter((row) => OVERVIEW_PRECISIONS.includes(row.precision));
   if (supportedRows.length === 0) return 'int4_bf16_only';
   if (bucketReads.length === 0) return 'no_scenario_data';
   // `cannot reach` is a claim about the whole platform, so it holds only when
@@ -488,8 +505,8 @@ export function buildOverviewModelSummary(
   engineScope: OverviewEngineScope = 'community',
 ): OverviewModelSummary {
   const scopedRows = overviewEngineRows(rows, engineScope);
-  const scenario = overviewScenarioForModel(model);
-  const scenarioRows = overviewScenarioRows(model, scopedRows);
+  const scenario = overviewScenarioForModel(model, rows);
+  const scenarioRows = overviewScenarioRows(scenario, scopedRows);
   return {
     model,
     modelLabel: getModelLabel(model),
@@ -511,9 +528,10 @@ export function assembleOverviewPageData(
       buildOverviewModelSummary(model, rows, tier, engineScope),
     ),
     datasetThroughDate: latestOverviewDate(
-      perModel.flatMap(({ model, rows }) =>
-        overviewScenarioRows(model, overviewEngineRows(rows, engineScope)),
-      ),
+      perModel.flatMap(({ model, rows }) => {
+        const scenario = overviewScenarioForModel(model, rows);
+        return overviewScenarioRows(scenario, overviewEngineRows(rows, engineScope));
+      }),
     ),
     tier,
     engineScope,
