@@ -115,7 +115,9 @@ const agenticBenchmarks = agenticGpus.flatMap((g) =>
     isl: null,
     osl: null,
     conc,
-    offload_mode: 'off',
+    // Keep both visual variants in the fixture: the middle point gets the
+    // dashed offload halo while the others remain plain.
+    offload_mode: conc === 64 ? 'on' : 'off',
     benchmark_type: 'agentic_traces',
     image: 'vllm/vllm-openai:v0.9.0',
     metrics: agenticMetrics(conc),
@@ -169,6 +171,40 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       .should('be.visible')
       .and('have.attr', 'aria-selected', 'true');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
+  });
+
+  it('explains the offload halo in the legend and distinguishes it from plain points', () => {
+    cy.get('#chart-0 [data-testid="offload-halo-key"]')
+      .should('be.visible')
+      .and('contain.text', 'Dashed halo:')
+      .and('contain.text', 'KV offload ON');
+    cy.get('#chart-0 .offload-halo').should('have.length.at.least', 1);
+    cy.get('#chart-0 .dot-group').then(($points) => {
+      cy.get('#chart-0 .offload-halo').should(($halos) => {
+        expect($halos.length).to.be.lessThan($points.length);
+      });
+    });
+  });
+
+  it('keeps the offload halo explanation in the PNG export clone', () => {
+    cy.window().then((win) => {
+      const exportContainer = win.document.querySelector('#chart-0-export');
+      expect(exportContainer).not.to.equal(null);
+      const state = { seen: false };
+      const observer = new win.MutationObserver(() => {
+        if (exportContainer?.querySelector('[data-testid="offload-halo-key"]')) {
+          state.seen = true;
+          observer.disconnect();
+        }
+      });
+      observer.observe(exportContainer!, { childList: true, subtree: true });
+      (win as typeof win & { __offloadHaloExportState: typeof state }).__offloadHaloExportState =
+        state;
+    });
+
+    cy.get('[data-testid="chart-figure"]').first().find('[data-testid="export-button"]').click();
+    cy.get('[data-testid="export-png-button"]').click();
+    cy.window().its('__offloadHaloExportState.seen').should('eq', true);
   });
 
   it('shows the selected percentile in the Interactivity axis label', () => {
@@ -335,7 +371,7 @@ const overlayBenchmarkRow = {
   isl: null,
   osl: null,
   conc: 32,
-  offload_mode: 'off',
+  offload_mode: 'on',
   benchmark_type: 'agentic_traces',
   image: 'vllm/vllm-openai:v0.9.0',
   metrics: agenticMetrics(32),
@@ -345,7 +381,12 @@ const overlayBenchmarkRow = {
 };
 
 const interceptAgenticDataWithOverlay = () => {
-  interceptAgenticData();
+  cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as('availability');
+  // The official path has no halo in this suite, so the legend key below can
+  // only be activated by the offloaded unofficial-run point.
+  cy.intercept('GET', '/api/v1/benchmarks*', {
+    body: agenticBenchmarks.map((row) => ({ ...row, offload_mode: 'off' })),
+  }).as('benchmarks');
   cy.intercept('GET', '/api/unofficial-run*', {
     body: {
       runInfos: [
@@ -401,6 +442,10 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
       'contain.text',
       'P90 Interactivity (tok/s/user)',
     );
+    cy.get('#chart-0 [data-testid="offload-halo-key"]')
+      .should('be.visible')
+      .and('contain.text', 'Dashed halo:')
+      .and('contain.text', 'KV offload ON');
   });
 
   it('switches to ttft x-axis mode and renders SVG with overlay points', () => {

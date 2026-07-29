@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
+import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import type { InferenceData } from '@/components/inference/types';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import ChartLegend, { type CommonLegendItemProps } from '@/components/ui/chart-legend';
@@ -125,6 +126,29 @@ describe('ChartLegend (sidebar variant)', () => {
 
   it('renders no points-table icon when items have no onShowPoints handler', () => {
     cy.get('[data-testid^="legend-points-"]').should('not.exist');
+  });
+
+  it('renders an exportable key explaining the agentic offload halo', () => {
+    cy.mount(
+      <ChartLegend
+        legendItems={MOCK_ITEMS}
+        isLegendExpanded={true}
+        onExpandedChange={() => {}}
+        variant="sidebar"
+        keyIndicators={<OffloadHaloLegendKey />}
+      />,
+    );
+
+    cy.get('[data-testid="offload-halo-key"]')
+      .should('be.visible')
+      .and('contain.text', 'Dashed halo:')
+      .and('contain.text', 'KV offload ON')
+      .and('not.have.class', 'no-export');
+    cy.get('[data-testid="offload-halo-key"] circle[stroke-dasharray="3 2"]').should('exist');
+    cy.get('[data-testid="chart-legend"]').then(($legend) => {
+      const exportClone = $legend[0].cloneNode(true) as HTMLElement;
+      expect(exportClone.querySelector('[data-testid="offload-halo-key"]')).not.to.equal(null);
+    });
   });
 });
 
