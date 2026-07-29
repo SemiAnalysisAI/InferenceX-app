@@ -268,6 +268,12 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="percentile-selector"]').click();
     cy.contains('[role="option"]', 'p75').click();
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P75 OSL / E2EL');
+
+    // The percentile selector is shared page state for the whole suite —
+    // restore the p90 default so later tests assert against a known value.
+    cy.get('[data-testid="percentile-selector"]').click();
+    cy.contains('[role="option"]', 'p90').click();
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90 OSL / E2EL');
   });
 
   it('switches back to Interactivity', () => {
