@@ -60,7 +60,12 @@ import {
   useDerivedAgenticMetrics,
   type DerivedAgenticMetric,
 } from '@/hooks/api/use-derived-agentic-metrics';
-import { isAgenticOnlyXAxisMode, type XAxisMode } from '@/components/inference/hooks/useChartData';
+import {
+  derivedModeRoofline,
+  isAgenticOnlyXAxisMode,
+  type RooflineDirection,
+  type XAxisMode,
+} from '@/components/inference/hooks/useChartData';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useTrendData } from '@/components/inference/hooks/useTrendData';
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
@@ -165,7 +170,13 @@ interface DerivedXModeSpec {
   heading: (percentileLabel: string) => string;
   /** Chinese heading suffix; omit to reuse the English one. */
   headingZh?: (percentileLabel: string) => string;
-  rooflineCorner: 'upper_right' | 'upper_left';
+  /**
+   * True when higher x is better. Derived modes render on the e2e chart
+   * definition, whose corners assume lower-x-is-better, so a higher-is-better
+   * metric mirrors each configured corner horizontally instead of hardcoding
+   * one corner for every y-metric (which inverted cost/joules frontiers).
+   */
+  higherXIsBetter: boolean;
   /** Pull the raw metric for this mode off the derived-metrics payload. */
   value: (m: DerivedAgenticMetric | undefined, percentile: string) => number | null | undefined;
   /** Convert the raw metric to the plotted x value. */
@@ -180,7 +191,7 @@ const DERIVED_X_MODE_SPECS: Partial<Record<XAxisMode, DerivedXModeSpec>> = {
     xLabel: (pctl) => `${pctl} OSL / E2EL (tok/s/user)`,
     heading: (pctl) => `vs. ${pctl} OSL / E2EL`,
     headingZh: (pctl) => `vs. ${pctl} OSL / 端到端延迟`,
-    rooflineCorner: 'upper_left',
+    higherXIsBetter: true,
     value: (m, percentile) => (percentile === 'p75' ? m?.p75_osl_per_e2el : m?.p90_osl_per_e2el),
     toX: (raw) => raw,
   },
@@ -644,12 +655,16 @@ export default function ChartDisplay() {
       locale === 'zh' && derivedSpec.xLabelZh ? derivedSpec.xLabelZh : derivedSpec.xLabel;
     const xLabel = xLabelFn(selectedPercentile.toUpperCase());
     return visibleGraphs.map((graph) => {
+      const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof typeof graph.chartDefinition;
+      const corner = derivedModeRoofline(
+        graph.chartDefinition[rooflineKey] as RooflineDirection | undefined,
+        derivedSpec.higherXIsBetter,
+      );
       const chartDefinition = {
         ...graph.chartDefinition,
         x_label: xLabel,
         y_latency_limit: undefined,
-        [`${selectedYAxisMetric}_roofline` as keyof typeof graph.chartDefinition]:
-          derivedSpec.rooflineCorner,
+        ...(corner ? { [rooflineKey]: corner } : {}),
       };
       const data = graph.data
         .map((point) => {

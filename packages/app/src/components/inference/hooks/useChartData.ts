@@ -113,7 +113,7 @@ export function filterByGPU<T extends { hwKey: unknown }>(
   });
 }
 
-type RooflineDirection = 'upper_left' | 'upper_right' | 'lower_left' | 'lower_right';
+export type RooflineDirection = 'upper_left' | 'upper_right' | 'lower_left' | 'lower_right';
 const FLIP_MAP: Record<RooflineDirection, RooflineDirection> = {
   upper_left: 'upper_right',
   upper_right: 'upper_left',
@@ -124,6 +124,22 @@ const FLIP_MAP: Record<RooflineDirection, RooflineDirection> = {
 /** Flip roofline direction when the x-axis is swapped. */
 export function flipRooflineDirection(dir: RooflineDirection): RooflineDirection {
   return FLIP_MAP[dir];
+}
+
+/**
+ * Roofline corner for a trace-derived x-axis mode. Derived modes render on the
+ * e2e chart definition, whose corners assume lower-x-is-better; when the
+ * derived metric is higher-is-better (OSL / E2EL) the corner mirrors
+ * horizontally. This keeps the y-metric's own good direction — throughput
+ * lands on an upper corner, cost and joules on a lower one — where hardcoding
+ * a single corner inverted the frontier for the cost metrics.
+ */
+export function derivedModeRoofline(
+  configuredE2eCorner: RooflineDirection | undefined,
+  higherXIsBetter: boolean,
+): RooflineDirection | undefined {
+  if (!configuredE2eCorner || !higherXIsBetter) return configuredE2eCorner;
+  return flipRooflineDirection(configuredE2eCorner);
 }
 
 // Statistic words that may already prefix an x-axis label (from chart config
