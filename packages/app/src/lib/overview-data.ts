@@ -1,18 +1,25 @@
 import { resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants';
 
+import { restrictAgenticPointsToE2eFrontier } from './agentic-frontier';
 import type { BenchmarkRow } from './api';
+import { rowToAggDataEntry } from './benchmark-transform';
 import { buildAvailabilityHwKey } from './chart-utils';
 import { getGpuSpecs, getHardwareConfig } from './constants';
-import { DEFAULT_MODELS, getModelLabel, Precision, type Model } from './data-mappings';
+import { DEFAULT_MODELS, getModelLabel, Model, Precision } from './data-mappings';
 import { frameworkFamily } from './framework-family';
-import { computeTcoFeed, type TcoTierBoundary } from './tco-feed';
+import {
+  computeTcoFeed,
+  computeTierReads,
+  type TcoTierBoundary,
+  type TcoTierPoint,
+} from './tco-feed';
 
 export const OVERVIEW_WORKLOAD = { isl: 8192, osl: 1024 } as const;
 export const OVERVIEW_TIERS = [30, 50, 75, 100] as const;
 export type OverviewTier = (typeof OVERVIEW_TIERS)[number];
 export const OVERVIEW_PRIMARY_TIER = 50;
 export type OverviewEngineScope = 'all' | 'community';
-export type OverviewDecodeMode = 'speculative' | 'standard';
+export type OverviewScenario = 'single_turn_8k1k' | 'agentx';
 
 export function resolveOverviewEngineScope(
   raw: string | string[] | undefined,
@@ -72,7 +79,8 @@ export interface OverviewTierRead {
  *  under-swept. */
 export type OverviewMissingReason =
   | 'int4_bf16_only'
-  | 'no_8k1k_data'
+  | 'no_scenario_data'
+  | 'no_speculative_decode_result'
   | 'cannot_reach_at_tier'
   | 'no_exact_at_tier';
 
@@ -82,7 +90,6 @@ export interface OverviewPlatformResult {
   hardware: string;
   hardwareLabel: string;
   precision: string | null;
-  decodeMode: OverviewDecodeMode | null;
   read: OverviewTierRead;
   missingReason: OverviewMissingReason | null;
   /** $ per million output tokens at the retail-rental $/GPU/hr tier. */
@@ -95,6 +102,7 @@ export interface OverviewPlatformResult {
 export interface OverviewModelSummary {
   model: Model;
   modelLabel: string;
+  scenario: OverviewScenario;
   platforms: OverviewPlatformResult[];
 }
 
@@ -105,15 +113,7 @@ export interface OverviewPageData {
   engineScope: OverviewEngineScope;
 }
 
-const OVERVIEW_SLICE_PRIORITY = [
-  { decodeMode: 'speculative', precision: Precision.FP4 },
-  { decodeMode: 'speculative', precision: Precision.FP8 },
-  { decodeMode: 'standard', precision: Precision.FP4 },
-  { decodeMode: 'standard', precision: Precision.FP8 },
-] as const satisfies readonly {
-  decodeMode: OverviewDecodeMode;
-  precision: string;
-}[];
+const OVERVIEW_SLICE_PRIORITY = [Precision.FP4, Precision.FP8] as const;
 const OVERVIEW_PRECISIONS: readonly string[] = [Precision.FP4, Precision.FP8];
 const OVERVIEW_HARDWARE_LABELS: Readonly<Record<string, string>> = {
   gb200: 'GB200',
@@ -124,8 +124,11 @@ function overviewHardwareLabel(hardware: string, model: Model): string {
   return OVERVIEW_HARDWARE_LABELS[hardware] ?? getHardwareConfig(hardware, model).label;
 }
 
-function decodeModeForSpecMethod(specMethod: string): OverviewDecodeMode {
-  return specMethod === 'none' || specMethod === '' ? 'standard' : 'speculative';
+const isSpeculativeDecode = (specMethod: string): boolean =>
+  specMethod !== 'none' && specMethod !== '';
+
+export function overviewScenarioForModel(model: Model): OverviewScenario {
+  return model === Model.Kimi_K3 || model === Model.GLM_5_2 ? 'agentx' : 'single_turn_8k1k';
 }
 
 function overviewEngineRows(
@@ -139,7 +142,10 @@ function overviewEngineRows(
   });
 }
 
-function overviewWorkloadRows(rows: readonly BenchmarkRow[]): BenchmarkRow[] {
+function overviewScenarioRows(model: Model, rows: readonly BenchmarkRow[]): BenchmarkRow[] {
+  if (overviewScenarioForModel(model) === 'agentx') {
+    return rows.filter((row) => row.benchmark_type === 'agentic_traces');
+  }
   return rows.filter(
     (row) =>
       row.benchmark_type === 'single_turn' &&
@@ -148,13 +154,10 @@ function overviewWorkloadRows(rows: readonly BenchmarkRow[]): BenchmarkRow[] {
   );
 }
 
-/** Deliberately from raw rows, not retained winners: an unranked precision or
- *  engine still dates the dataset it was measured in. */
-export function overviewDatasetThroughDate(
-  rows: readonly BenchmarkRow[],
-  engineScope: OverviewEngineScope = 'community',
-): string | null {
-  return overviewWorkloadRows(overviewEngineRows(rows, engineScope)).reduce<string | null>(
+/** Deliberately from raw scenario rows, not retained winners: an unranked
+ * precision or engine still dates the dataset it was measured in. */
+function latestOverviewDate(rows: readonly BenchmarkRow[]): string | null {
+  return rows.reduce<string | null>(
     (latest, row) => (latest === null || row.date > latest ? row.date : latest),
     null,
   );
@@ -173,10 +176,15 @@ function overviewServingSeriesKey(row: BenchmarkRow): string {
 }
 
 /** Chart-equivalent serving series: topology variants are points on one curve. */
-function buildConfigs(model: Model, workloadRows: readonly BenchmarkRow[]): OverviewConfigResult[] {
+function buildConfigs(
+  model: Model,
+  scenario: OverviewScenario,
+  scenarioRows: readonly BenchmarkRow[],
+): OverviewConfigResult[] {
   const rowsByConfig = new Map<string, BenchmarkRow[]>();
-  for (const row of workloadRows) {
+  for (const row of scenarioRows) {
     if (!OVERVIEW_PRECISIONS.includes(row.precision)) continue;
+    if (!isSpeculativeDecode(row.spec_method)) continue;
     const key = overviewServingSeriesKey(row);
     const configRows = rowsByConfig.get(key);
     if (configRows) configRows.push(row);
@@ -190,7 +198,7 @@ function buildConfigs(model: Model, workloadRows: readonly BenchmarkRow[]): Over
       configRows[0].date,
     );
     const latestRows = configRows.filter((row) => row.date === latestDate);
-    const config = buildConfigResult(model, latestRows[0].precision, key, latestRows);
+    const config = buildConfigResult(model, scenario, latestRows[0].precision, key, latestRows);
     if (config) configs.push(config);
   }
   return configs;
@@ -254,10 +262,8 @@ function nonComparableAsMissing(
 }
 
 function configPriorityIndex(config: OverviewConfigResult): number {
-  return OVERVIEW_SLICE_PRIORITY.findIndex(
-    (priority) =>
-      priority.precision === config.precision &&
-      priority.decodeMode === decodeModeForSpecMethod(config.specMethod),
+  return OVERVIEW_SLICE_PRIORITY.indexOf(
+    config.precision as (typeof OVERVIEW_SLICE_PRIORITY)[number],
   );
 }
 
@@ -274,19 +280,19 @@ function selectPlatformRead(
     const exact = reads
       .filter(
         (read) =>
-          read.config.precision === priority.precision &&
-          decodeModeForSpecMethod(read.config.specMethod) === priority.decodeMode &&
+          read.config.precision === priority &&
+          isSpeculativeDecode(read.config.specMethod) &&
           isInRangeTierRead(read),
       )
       .toSorted(compareTierReads)[0];
     if (exact) return exact;
   }
 
-  const fallback = reads.toSorted(
+  const bestMissingRead = reads.toSorted(
     (a, b) =>
       configPriorityIndex(a.config) - configPriorityIndex(b.config) || compareTierReads(a, b),
   )[0];
-  return fallback ? nonComparableAsMissing(fallback, tier) : nullTierRead(tier);
+  return bestMissingRead ? nonComparableAsMissing(bestMissingRead, tier) : nullTierRead(tier);
 }
 
 function missingReasonForPlatform(
@@ -297,8 +303,12 @@ function missingReasonForPlatform(
 ): OverviewMissingReason | null {
   if (isInRangeTierRead(read)) return null;
   const hardwareRows = workloadRows.filter((row) => row.hardware === hardware);
-  if (hardwareRows.length === 0) return 'no_8k1k_data';
-  const supportedRows = hardwareRows.filter((row) => OVERVIEW_PRECISIONS.includes(row.precision));
+  if (hardwareRows.length === 0) return 'no_scenario_data';
+  const speculativeRows = hardwareRows.filter((row) => isSpeculativeDecode(row.spec_method));
+  if (speculativeRows.length === 0) return 'no_speculative_decode_result';
+  const supportedRows = speculativeRows.filter((row) =>
+    OVERVIEW_PRECISIONS.includes(row.precision),
+  );
   if (supportedRows.length === 0) return 'int4_bf16_only';
   // `cannot reach` is a claim about the whole platform, so it holds only when
   // EVERY qualified serving series tops out below the tier — one merely
@@ -320,10 +330,11 @@ export function overviewCostPerMtok(
 
 function buildPlatformResults(
   model: Model,
-  workloadRows: readonly BenchmarkRow[],
+  scenario: OverviewScenario,
+  scenarioRows: readonly BenchmarkRow[],
   tier: OverviewTier,
 ): OverviewPlatformResult[] {
-  const configs = buildConfigs(model, workloadRows);
+  const configs = buildConfigs(model, scenario, scenarioRows);
   const readsForHardware = (hardware: string): OverviewTierRead[] =>
     configs
       .filter((config) => config.hardware === hardware)
@@ -335,10 +346,9 @@ function buildPlatformResults(
       hardware,
       hardwareLabel: overviewHardwareLabel(hardware, model),
       precision: read.config?.precision ?? null,
-      decodeMode: read.config === null ? null : decodeModeForSpecMethod(read.config.specMethod),
       read,
       missingReason: missingReasonForPlatform(
-        workloadRows,
+        scenarioRows,
         hardware,
         read,
         readsForHardware(hardware),
@@ -357,37 +367,82 @@ function buildPlatformResults(
   }));
 }
 
+function deployedGpuFactor(row: BenchmarkRow): number {
+  const totalGpus = row.num_prefill_gpu + row.num_decode_gpu;
+  return row.disagg && row.num_prefill_gpu > 0 && row.num_decode_gpu > 0 && totalGpus > 0
+    ? row.num_decode_gpu / totalGpus
+    : 1;
+}
+
+function topologyEvidence(row: BenchmarkRow): string | undefined {
+  return row.disagg && row.num_prefill_gpu > 0 && row.num_decode_gpu > 0
+    ? `${row.num_prefill_gpu}P+${row.num_decode_gpu}D`
+    : undefined;
+}
+
+interface OverviewAgenticTierPoint extends TcoTierPoint {
+  e2eLatency: number;
+  throughput: number;
+}
+
+function buildAgenticTierReads(rows: readonly BenchmarkRow[]) {
+  const points = rows.flatMap((row): OverviewAgenticTierPoint[] => {
+    const entry = rowToAggDataEntry(row);
+    const factor = deployedGpuFactor(row);
+    const interactivity = entry.p90_intvty;
+    const e2eLatency = entry.p90_e2el;
+    const outputThroughput = entry.output_tput_per_gpu * factor;
+    if (
+      !Number.isFinite(interactivity) ||
+      interactivity <= 0 ||
+      !Number.isFinite(e2eLatency) ||
+      e2eLatency <= 0 ||
+      !Number.isFinite(outputThroughput) ||
+      outputThroughput <= 0
+    ) {
+      return [];
+    }
+    return [
+      {
+        interactivity,
+        e2eLatency,
+        throughput: outputThroughput,
+        outputThroughput,
+        date: row.date,
+        evidenceLabel: topologyEvidence(row),
+      },
+    ];
+  });
+  return computeTierReads(restrictAgenticPointsToE2eFrontier(points), OVERVIEW_TIERS);
+}
+
 function buildConfigResult(
   model: Model,
+  scenario: OverviewScenario,
   precision: string,
   key: string,
   rows: BenchmarkRow[],
 ): OverviewConfigResult | null {
-  const feedRows = rows.map((row) => {
-    const outputTputPerGpu = row.metrics.output_tput_per_gpu;
-    const totalGpus = row.num_prefill_gpu + row.num_decode_gpu;
-    const comparableOutputTputPerGpu =
-      row.disagg &&
-      row.num_prefill_gpu > 0 &&
-      row.num_decode_gpu > 0 &&
-      totalGpus > 0 &&
-      Number.isFinite(outputTputPerGpu)
-        ? (outputTputPerGpu * row.num_decode_gpu) / totalGpus
-        : outputTputPerGpu;
-    const evidenceLabel =
-      row.disagg && row.num_prefill_gpu > 0 && row.num_decode_gpu > 0
-        ? `${row.num_prefill_gpu}P+${row.num_decode_gpu}D`
-        : undefined;
-    return {
-      ...row,
-      metrics: {
-        ...row.metrics,
-        output_tput_per_gpu: comparableOutputTputPerGpu,
-      },
-      evidence_label: evidenceLabel,
-    };
-  });
-  const feed = computeTcoFeed(feedRows, [OVERVIEW_WORKLOAD], OVERVIEW_TIERS);
+  const feed =
+    scenario === 'agentx'
+      ? buildAgenticTierReads(rows)
+      : computeTcoFeed(
+          rows.map((row) => {
+            const outputTputPerGpu = row.metrics.output_tput_per_gpu;
+            return {
+              ...row,
+              metrics: {
+                ...row.metrics,
+                output_tput_per_gpu: Number.isFinite(outputTputPerGpu)
+                  ? outputTputPerGpu * deployedGpuFactor(row)
+                  : outputTputPerGpu,
+              },
+              evidence_label: topologyEvidence(row),
+            };
+          }),
+          [OVERVIEW_WORKLOAD],
+          OVERVIEW_TIERS,
+        );
   if (feed.length === 0) return null;
 
   const first = rows[0];
@@ -432,10 +487,13 @@ export function buildOverviewModelSummary(
   engineScope: OverviewEngineScope = 'community',
 ): OverviewModelSummary {
   const scopedRows = overviewEngineRows(rows, engineScope);
+  const scenario = overviewScenarioForModel(model);
+  const scenarioRows = overviewScenarioRows(model, scopedRows);
   return {
     model,
     modelLabel: getModelLabel(model),
-    platforms: buildPlatformResults(model, overviewWorkloadRows(scopedRows), tier),
+    scenario,
+    platforms: buildPlatformResults(model, scenario, scenarioRows, tier),
   };
 }
 
@@ -451,9 +509,10 @@ export function assembleOverviewPageData(
     models: perModel.map(({ model, rows }) =>
       buildOverviewModelSummary(model, rows, tier, engineScope),
     ),
-    datasetThroughDate: overviewDatasetThroughDate(
-      perModel.flatMap(({ rows }) => rows),
-      engineScope,
+    datasetThroughDate: latestOverviewDate(
+      perModel.flatMap(({ model, rows }) =>
+        overviewScenarioRows(model, overviewEngineRows(rows, engineScope)),
+      ),
     ),
     tier,
     engineScope,

@@ -31,7 +31,10 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
         <header className="max-w-4xl">
           <h1 className="text-lg font-semibold mb-2">{strings.title}</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">{strings.purpose}</p>
-          <p className="mt-1.5 max-w-4xl text-xs leading-snug text-muted-foreground">
+          <p
+            data-testid="overview-scope"
+            className="mt-1.5 max-w-4xl text-xs leading-snug text-muted-foreground"
+          >
             {strings.scope(data.tier)}
           </p>
           {snapshot === null ? null : (
