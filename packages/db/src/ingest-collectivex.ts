@@ -21,8 +21,8 @@
  *   (no flag)                          Read pre-downloaded artifacts from INGEST_ARTIFACTS_PATH
  *
  * Usage:
- *   pnpm admin:db:ingest:collectivex https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123
- *   pnpm admin:db:ingest:collectivex 123
+ *   bun run admin:db:ingest:collectivex https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123
+ *   bun run admin:db:ingest:collectivex 123
  *
  * Environment variables:
  *   DATABASE_COLLECTIVEX_WRITE_URL — Postgres connection string (direct, non-pooled)
@@ -72,7 +72,7 @@ if (isDownloadMode) {
   const args = process.argv.slice(3).filter((a) => !a.startsWith('--'));
   const input = args[0];
   if (!input) {
-    console.error('Usage: pnpm admin:db:ingest:collectivex <run-url-or-id> [repo]');
+    console.error('Usage: bun run admin:db:ingest:collectivex <run-url-or-id> [repo]');
     process.exit(1);
   }
   const match = input.match(/\/runs\/(?<runId>\d+)/u);

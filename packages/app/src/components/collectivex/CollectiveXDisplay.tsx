@@ -314,7 +314,7 @@ export default function CollectiveXDisplay() {
   const [visibleRunIds, setVisibleRunIds] = useState<Set<string>>(new Set());
   const initializedVersionRef = useRef<CollectiveXVersion | null>(null);
   const runsQuery = useCollectiveXRuns(version);
-  const runList = runsQuery.data ?? [];
+  const runList = runsQuery.data?.runs ?? [];
   const orderedVisibleRunIds = useMemo(
     () => runList.filter((run) => visibleRunIds.has(run.run_id)).map((run) => run.run_id),
     [runList, visibleRunIds],
@@ -385,7 +385,8 @@ export default function CollectiveXDisplay() {
 
   useEffect(() => {
     if (!runsQuery.data || initializedVersionRef.current === version) return;
-    const initial = runsQuery.data.find((run) => run.measured_cases > 0) ?? runsQuery.data[0];
+    const initial =
+      runsQuery.data.runs.find((run) => run.measured_cases > 0) ?? runsQuery.data.runs[0];
     setVisibleRunIds(initial ? new Set([initial.run_id]) : new Set());
     initializedVersionRef.current = version;
   }, [runsQuery.data, version]);
@@ -394,7 +395,7 @@ export default function CollectiveXDisplay() {
   // list refetch. Preserve deliberate "none checked" state.
   useEffect(() => {
     if (!runsQuery.data || initializedVersionRef.current !== version) return;
-    const liveIds = new Set(runsQuery.data.map((run) => run.run_id));
+    const liveIds = new Set(runsQuery.data.runs.map((run) => run.run_id));
     setVisibleRunIds((previous) => {
       const next = new Set([...previous].filter((runId) => liveIds.has(runId)));
       return next.size === previous.size ? previous : next;
@@ -547,7 +548,7 @@ export default function CollectiveXDisplay() {
         color: colors[collectiveXColorKey(item)] ?? 'var(--muted-foreground)',
         lineDasharray: collectiveXRunDasharray(item.run_index),
         isActive: activeSeriesIds.has(item.series_id),
-        title: `EP${item.system.ep_size} · ${collectiveXTopologyLabel(item.system)}`,
+        title: `#${item.run_id} · EP${item.system.ep_size} · ${collectiveXTopologyLabel(item.system)}`,
         onClick: () => {
           setActiveSeriesIds((previous) => {
             const next = new Set(previous);
@@ -625,7 +626,10 @@ export default function CollectiveXDisplay() {
               testId="collectivex-error-version-select"
               value={version}
               options={versionOptions}
-              onChange={setVersion}
+              onChange={(value) => {
+                setVersion(value);
+                track('collectivex_version_changed', { version: value });
+              }}
             />
           </div>
           <Button variant="outline" onClick={handleRefresh}>
@@ -807,11 +811,12 @@ export default function CollectiveXDisplay() {
                   variant="sidebar"
                   legendItems={legendItems}
                   disableActiveSort
-                  onItemRemove={(id) =>
+                  onItemRemove={(id) => {
                     setActiveSeriesIds(
                       (previous) => new Set([...previous].filter((item) => item !== id)),
-                    )
-                  }
+                    );
+                    track('collectivex_series_toggled', { series: id, visible: false });
+                  }}
                   isLegendExpanded={legendExpanded}
                   onExpandedChange={setLegendExpanded}
                   actions={
@@ -820,10 +825,12 @@ export default function CollectiveXDisplay() {
                           {
                             id: 'collectivex-reset-filter',
                             label: t.resetFilter,
-                            onClick: () =>
+                            onClick: () => {
                               setActiveSeriesIds(
                                 new Set(phaseSeries.map((item) => item.series_id)),
-                              ),
+                              );
+                              track('collectivex_series_filter_reset');
+                            },
                           },
                         ]
                       : []
@@ -861,13 +868,17 @@ export default function CollectiveXDisplay() {
                 onChange={(next) => {
                   setOperation(next);
                   if (next !== 'roundtrip' && yAxis === 'tokens-per-second') setYAxis('latency');
+                  track('collectivex_operation_changed', { operation: next });
                 }}
               />
               <ControlGroup label={t.phaseControl}>
                 <SegmentedToggle
                   value={phase}
                   options={phaseOptions}
-                  onValueChange={setPhase}
+                  onValueChange={(next) => {
+                    setPhase(next);
+                    track('collectivex_phase_changed', { phase: next });
+                  }}
                   ariaLabel={t.phaseAria}
                   testId="collectivex-phase-toggle"
                 />
@@ -902,7 +913,10 @@ export default function CollectiveXDisplay() {
                 <SegmentedToggle
                   value={percentile}
                   options={PERCENTILE_OPTIONS}
-                  onValueChange={setPercentile}
+                  onValueChange={(next) => {
+                    setPercentile(next);
+                    track('collectivex_percentile_changed', { percentile: next });
+                  }}
                   ariaLabel={t.percentileAria}
                   testId="collectivex-percentile-toggle"
                 />
@@ -912,20 +926,29 @@ export default function CollectiveXDisplay() {
                 testId="collectivex-sku-select"
                 value={sku}
                 options={selectOptions(skuOptions, t.all, true)}
-                onChange={setSku}
+                onChange={(next) => {
+                  setSku(next);
+                  track('collectivex_sku_changed', { sku: next });
+                }}
               />
               <SelectControl
                 label={t.backend}
                 testId="collectivex-backend-select"
                 value={backend}
                 options={selectOptions(backendOptions, t.all)}
-                onChange={setBackend}
+                onChange={(next) => {
+                  setBackend(next);
+                  track('collectivex_backend_changed', { backend: next });
+                }}
               />
               <SelectControl
                 label={t.yAxisControl}
                 testId="collectivex-y-axis-select"
                 value={yAxis}
-                onChange={setYAxis}
+                onChange={(next) => {
+                  setYAxis(next);
+                  track('collectivex_y_axis_changed', { y_axis: next });
+                }}
                 options={[
                   { value: 'latency', label: t.yAxis.latency },
                   ...(operation === 'roundtrip'

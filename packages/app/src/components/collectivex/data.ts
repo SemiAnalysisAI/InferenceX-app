@@ -19,12 +19,22 @@ export interface CollectiveXSeriesSelection {
   precision: CollectiveXPrecision;
 }
 
-const RUN_DASHARRAYS = ['none', '9 4', '3 3', '10 3 2 3', '2 3', '12 3 2 3'] as const;
+const BASE_RUN_DASHARRAYS = ['none', '9 4', '3 3', '10 3 2 3', '2 3', '12 3 2 3'] as const;
 
-/** Stable within the newest-first run table; patterns repeat only after six runs. */
+/**
+ * Stable within the newest-first run table. Preserve the six simple patterns,
+ * then encode higher indexes as a unique dash/gap/accent tuple so two listed
+ * runs never become visually identical merely because their indexes differ by
+ * six.
+ */
 export function collectiveXRunDasharray(runIndex: number): string {
-  const normalized = Math.max(0, Math.trunc(runIndex)) % RUN_DASHARRAYS.length;
-  return RUN_DASHARRAYS[normalized];
+  const normalized = Math.max(0, Math.trunc(runIndex));
+  if (normalized < BASE_RUN_DASHARRAYS.length) return BASE_RUN_DASHARRAYS[normalized];
+  const encoded = normalized - BASE_RUN_DASHARRAYS.length;
+  const dash = 4 + (encoded % 7);
+  const gap = 3 + (Math.floor(encoded / 7) % 7);
+  const accent = 1 + Math.floor(encoded / 49);
+  return `${dash} 3 ${accent} ${gap}`;
 }
 
 export function collectiveXTopologyLabel(
@@ -103,7 +113,7 @@ export function metricValue(
   return component.activation_data_rate_gbps_at_latency_percentile?.[percentile] ?? null;
 }
 
-export interface CollectiveXFit {
+interface CollectiveXFit {
   /** Fixed per-call overhead (µs): the launch/sync/rendezvous floor. */
   alphaUs: number;
   /** Per-GPU bandwidth term (GB/s): the slope of latency vs bytes. */

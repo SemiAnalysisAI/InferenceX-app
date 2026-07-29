@@ -4,7 +4,7 @@
  * migrations must not go through PgBouncer's transaction pooling mode).
  *
  * Usage:
- *   pnpm admin:db:migrate:collectivex
+ *   bun run admin:db:migrate:collectivex
  */
 
 import path from 'path';

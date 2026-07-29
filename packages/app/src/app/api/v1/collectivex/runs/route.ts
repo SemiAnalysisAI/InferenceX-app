@@ -14,6 +14,8 @@ import { loadFixture } from '@/lib/test-fixtures';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+const DISCOVERY_CACHE_CONTROL = 'private, no-store';
+
 export async function GET(request: NextRequest) {
   const version = parseCollectiveXVersion(request.nextUrl.searchParams.get('version') ?? '');
   if (!version) {
@@ -24,8 +26,9 @@ export async function GET(request: NextRequest) {
   // Backfill failures must not take the run table down — serve the stored list
   // and only surface the error when there is nothing at all to show.
   let ensureError: unknown = null;
+  let discoveryComplete = true;
   try {
-    await ensureCollectiveXRunsList(version);
+    discoveryComplete = await ensureCollectiveXRunsList(version);
   } catch (error) {
     ensureError = error;
   }
@@ -41,8 +44,11 @@ export async function GET(request: NextRequest) {
       console.error('CollectiveX run backfill failed; serving stored list:', ensureError);
     }
     return cachedJson(
-      { version, runs },
-      { tag: collectiveXCacheTag(), cacheControl: COLLECTIVEX_CACHE_CONTROL },
+      { version, runs, discovery_complete: discoveryComplete },
+      {
+        tag: collectiveXCacheTag(),
+        cacheControl: discoveryComplete ? COLLECTIVEX_CACHE_CONTROL : DISCOVERY_CACHE_CONTROL,
+      },
     );
   } catch (error) {
     console.error('Error listing CollectiveX runs:', error);

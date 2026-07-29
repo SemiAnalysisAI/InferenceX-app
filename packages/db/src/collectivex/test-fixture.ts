@@ -106,7 +106,7 @@ function makeRawCase(options: ShardOverrides, caseId: string): Json {
   };
 }
 
-export function caseIdOf(options: ShardOverrides = {}): string {
+function caseIdOf(options: ShardOverrides = {}): string {
   if (options.caseId) return options.caseId;
   const tail = options.variant ? `-${options.variant}` : '';
   // Pre-LL artifacts (mode: null) still carried `normal` in their case_ids.

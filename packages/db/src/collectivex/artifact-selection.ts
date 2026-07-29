@@ -7,8 +7,8 @@
  *   cxshard-{cell}-{run_id}-{attempt}  — case-attempt documents per matrix cell
  */
 
-export const MATRIX_PREFIX = 'cxsweep-matrix-';
-export const SHARD_PREFIX = 'cxshard-';
+const MATRIX_PREFIX = 'cxsweep-matrix-';
+const SHARD_PREFIX = 'cxshard-';
 
 export function matrixArtifactName(runId: string): string {
   return `${MATRIX_PREFIX}${runId}`;
@@ -20,7 +20,7 @@ function escapeRegExp(value: string): string {
 }
 
 /** Anything nameable as a shard artifact. `id` is optional — see the tie-break below. */
-export interface ShardArtifactRef {
+interface ShardArtifactRef {
   name: string;
   /** GitHub artifact id, when the caller has one. */
   id?: number;

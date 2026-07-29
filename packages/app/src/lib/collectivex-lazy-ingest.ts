@@ -49,9 +49,13 @@ const MAX_RUN_BYTES = 256 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_REQUEST_ATTEMPTS = 3;
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
-// The run-table backfill ingests at most this many recent runs per pass; each
-// costs one artifact-bundle download, and only once — afterwards they're rows.
-const MAX_DISCOVERED_RUNS = 8;
+// The workflow retains artifacts for 14 days. Older runs already persisted in
+// the DB remain visible, but unknown runs beyond this window cannot be
+// assembled and need not spend one GitHub artifact-list request apiece.
+const ARTIFACT_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+// Bound one origin request's work. The runs route reports whether discovery is
+// complete, and the client refetches while more ingestible runs remain.
+const MAX_CHANGED_RUNS_PER_PASS = 8;
 
 type SweepErrorCode = 'invalid' | 'not-found' | 'unavailable';
 
@@ -101,26 +105,20 @@ export function collectiveXSweepErrorStatus(error: unknown): 404 | 502 | 503 | n
 }
 
 // Concurrent requests for the same target share one discovery pass.
-const inFlight = new Map<string, Promise<void>>();
+const inFlight = new Map<string, Promise<unknown>>();
 
-function dedupe(key: string, work: () => Promise<void>): Promise<void> {
-  const existing = inFlight.get(key);
+function dedupe<T>(key: string, work: () => Promise<T>): Promise<T> {
+  const existing = inFlight.get(key) as Promise<T> | undefined;
   if (existing) return existing;
   const promise = work().finally(() => inFlight.delete(key));
   inFlight.set(key, promise);
   return promise;
 }
 
-// Cooldown for the two walking paths. The DB is the durable cache, but sharing
-// only the in-flight promise still left every read walking GitHub: the routes
-// are force-dynamic and call ensure* per request, so even a fully warm page
-// spent a `list workflow runs` call just to conclude "already known" — GitHub
-// latency on every response, and rate-limit burn that scales with traffic
-// rather than with how often a sweep actually lands.
-//
-// Only `latest:`/`list:` need this. ensureCollectiveXRun returns on a DB hit
-// before it touches GitHub, and throttling it would keep answering 404 for a
-// run that has just appeared.
+// Cooldown for the latest-run walk. The DB is the durable cache, but sharing
+// only the in-flight promise still left every latest read walking GitHub. The
+// runs-list path is intentionally not throttled while incomplete: its response
+// is uncached and the client requests the next bounded discovery batch.
 //
 // Failures are remembered too, and rethrown for the rest of their (shorter)
 // window: swallowing them would let a GitHub outage read as "discovery fine,
@@ -223,6 +221,11 @@ function isSweepRun(run: WorkflowRun): boolean {
 
 function runGeneratedAt(run: WorkflowRun): string {
   return run.updated_at || run.run_started_at || run.created_at || '';
+}
+
+function artifactsMayBeAvailable(run: WorkflowRun): boolean {
+  const timestamp = Date.parse(runGeneratedAt(run));
+  return !Number.isFinite(timestamp) || Date.now() - timestamp <= ARTIFACT_RETENTION_MS;
 }
 
 // Newest-first stream of completed sweep runs across all branches.
@@ -468,29 +471,36 @@ async function matrixCandidateFor(
  * Handle one discovery candidate — the single walker step shared by the
  * latest and runs-list paths: persist absent requested-version runs, refresh
  * live ones whose GitHub attempt is newer (re-run of failed shards), skip
- * everything else. Returns 'match' when the candidate is a live
- * requested-version run in the DB after this call; tombstoned runs are
- * 'skip' — they are invisible to readers and must not satisfy the walk.
+ * everything else. `changed-match` means this pass inserted or refreshed the
+ * requested version; `changed-other` means an absent run was persisted under
+ * its actual version while walking. Known live rows are `match` but do not
+ * consume the runs-list batch. Tombstoned rows are `skip`.
  */
+type CandidateResult = 'changed-match' | 'changed-other' | 'match' | 'skip';
+
 async function considerCandidate(
   run: WorkflowRun,
   version: CollectiveXVersion,
   token: string,
-): Promise<'match' | 'skip'> {
+): Promise<CandidateResult> {
   const states = await getCollectiveXRunStates(getCollectiveXDb(), [String(run.id)]);
   const known = states[String(run.id)];
   if (known) {
     if (known.version !== version || known.state !== 'live') return 'skip';
     if (run.run_attempt > known.run_attempt) {
       const candidate = await matrixCandidateFor(run, version, token);
-      if (candidate) await persistRun(run, candidate, token, true);
+      if (candidate) {
+        await persistRun(run, candidate, token, true);
+        return 'changed-match';
+      }
     }
     return 'match';
   }
-  const candidate = await matrixCandidateFor(run, version, token);
-  if (!candidate) return 'skip';
+  const artifacts = await listArtifacts(run.id, token);
+  if (!hasMatrixArtifact(artifacts, run)) return 'skip';
+  const candidate = await loadMatrixCandidate(artifacts, token, run);
   await persistRun(run, candidate, token);
-  return 'match';
+  return candidate.version === version ? 'changed-match' : 'changed-other';
 }
 
 /**
@@ -505,30 +515,45 @@ export function ensureLatestCollectiveXRun(version: CollectiveXVersion): Promise
     throttled(key, async () => {
       const token = requireToken();
       for await (const run of sweepRuns(token)) {
-        if ((await considerCandidate(run, version, token)) === 'match') return;
+        const result = await considerCandidate(run, version, token);
+        if (result === 'match' || result === 'changed-match') return;
       }
     }),
   );
 }
 
 /**
- * Backfill up to MAX_DISCOVERED_RUNS recent requested-version runs into the
- * DB so the run table lists recent sweeps even before anyone viewed them. Only
- * live matches count toward the cap — tombstoned runs never fill a slot.
+ * Progressively backfill every requested-version run whose artifacts may
+ * still be available. Known live rows do not consume the per-request batch,
+ * so successive calls advance through the workflow history instead of
+ * revisiting the same newest rows forever.
+ *
+ * Returns true once the current GitHub history has been exhausted, or false
+ * when this pass stopped at the mutation budget and the caller should refetch.
  */
-export function ensureCollectiveXRunsList(version: CollectiveXVersion): Promise<void> {
+export function ensureCollectiveXRunsList(version: CollectiveXVersion): Promise<boolean> {
   const key = `list:${version}`;
-  return dedupe(
-    key,
-    throttled(key, async () => {
-      const token = requireToken();
-      let matched = 0;
-      for await (const run of sweepRuns(token)) {
-        if ((await considerCandidate(run, version, token)) === 'match') matched += 1;
-        if (matched >= MAX_DISCOVERED_RUNS) return;
+  return dedupe(key, async () => {
+    const token = requireToken();
+    let changed = 0;
+    for await (const run of sweepRuns(token)) {
+      if (!artifactsMayBeAvailable(run)) continue;
+      let result: CandidateResult;
+      try {
+        result = await considerCandidate(run, version, token);
+      } catch (error) {
+        const code = collectiveXSweepErrorCode(error);
+        // One incomplete or malformed workflow run must not hide every valid
+        // run behind it. Network/service failures still abort so the route can
+        // serve its stored fallback and expose the outage when no fallback exists.
+        if (code === 'invalid' || code === 'not-found') continue;
+        throw error;
       }
-    }),
-  );
+      if (result === 'changed-match' || result === 'changed-other') changed += 1;
+      if (changed >= MAX_CHANGED_RUNS_PER_PASS) return false;
+    }
+    return true;
+  });
 }
 
 /**
@@ -543,9 +568,8 @@ export function ensureCollectiveXRun(version: CollectiveXVersion, runId: string)
     }
     const states = await getCollectiveXRunStates(getCollectiveXDb(), [runId]);
     const known = states[runId];
-    if (known) {
+    if (known && (known.state !== 'live' || known.version !== version)) {
       // Tombstoned or cross-version rows both read as absent to the caller.
-      if (known.state === 'live' && known.version === version) return;
       throw new CollectiveXSweepError('not-found', 'run is not available');
     }
     const token = requireToken();
@@ -572,11 +596,12 @@ export function ensureCollectiveXRun(version: CollectiveXVersion, runId: string)
     if (run.status !== 'completed') {
       throw new CollectiveXSweepError('not-found', 'sweep run has not completed');
     }
+    if (known && run.run_attempt <= known.run_attempt) return;
     const artifacts = await listArtifacts(run.id, token);
     const candidate = await loadMatrixCandidate(artifacts, token, run);
     if (candidate.version !== version) {
       throw new CollectiveXSweepError('not-found', 'run does not match the requested version');
     }
-    await persistRun(run, candidate, token);
+    await persistRun(run, candidate, token, known !== undefined);
   });
 }

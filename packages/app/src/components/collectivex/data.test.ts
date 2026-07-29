@@ -134,6 +134,12 @@ describe('collectiveXRunDasharray', () => {
     expect(collectiveXRunDasharray(-1)).toBe('none');
     expect(collectiveXRunDasharray(1.9)).toBe('9 4');
   });
+
+  it('does not repeat styles after the base six patterns', () => {
+    expect(collectiveXRunDasharray(6)).not.toBe(collectiveXRunDasharray(0));
+    expect(collectiveXRunDasharray(12)).not.toBe(collectiveXRunDasharray(6));
+    expect(collectiveXRunDasharray(55)).not.toBe(collectiveXRunDasharray(6));
+  });
 });
 
 describe('seriesMatchesSelection', () => {

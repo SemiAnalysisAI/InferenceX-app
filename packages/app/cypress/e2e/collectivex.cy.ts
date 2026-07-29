@@ -32,7 +32,7 @@ const ADMIN_TOKEN_KEY = 'collectivex-admin-token';
 
 function installRuns(bodies: CollectiveXDataset[] = [dataset]) {
   cy.intercept('GET', '/api/v1/collectivex/runs?*', {
-    body: { version: 1, runs: bodies.map(buildRunSummary) },
+    body: { version: 1, runs: bodies.map(buildRunSummary), discovery_complete: true },
   }).as('runs');
 }
 
@@ -75,6 +75,30 @@ describe('CollectiveX neutral run view', () => {
         'href',
         `https://github.com/SemiAnalysisAI/InferenceX/blob/${SOURCE_SHA}/experimental/CollectiveX/docs/methodology.md`,
       );
+  });
+
+  it('keeps loading bounded discovery batches until every run is listed', () => {
+    let requests = 0;
+    cy.intercept('GET', '/api/v1/collectivex/runs?*', (request) => {
+      requests += 1;
+      request.reply({
+        body: {
+          version: 1,
+          runs: (requests === 1 ? [dataset] : [dataset, comparisonDataset]).map(buildRunSummary),
+          discovery_complete: requests > 1,
+        },
+      });
+    }).as('progressiveRuns');
+
+    cy.reload();
+    cy.wait('@progressiveRuns');
+    cy.wait('@run');
+    cy.wait('@progressiveRuns');
+
+    cy.get(`[data-testid="collectivex-run-row-${comparisonDataset.run.run_id}"]`).should(
+      'be.visible',
+    );
+    cy.then(() => expect(requests).to.be.gte(2));
   });
 
   it('renders the default decode round-trip chart for the EP8 scale-up series', () => {

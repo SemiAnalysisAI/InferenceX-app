@@ -131,9 +131,11 @@ function sampleAlongAxis<T>(
 }
 
 async function writeFixture(name: string, data: unknown): Promise<number> {
-  // Pretty-print: matches oxfmt's output so re-running capture doesn't dirty
-  // the working tree on the formatter pass.
-  const body = `${JSON.stringify(data, null, 2)}\n`;
+  // Large, machine-shaped API payloads stay minified; every other fixture is
+  // pretty-printed to match oxfmt. This mirrors .prettierignore and makes
+  // repeated capture runs byte-for-byte stable.
+  const minified = name.startsWith('collectivex-');
+  const body = `${JSON.stringify(data, null, minified ? undefined : 2)}\n`;
   await writeFile(resolve(fixturesDir, `${name}.json`), body);
   return body.length;
 }
@@ -163,6 +165,7 @@ async function writeCollectiveXFixtures(): Promise<[string, number][]> {
     await writeFixture('collectivex-runs', {
       version: 1,
       runs: datasets.map(buildRunSummary),
+      discovery_complete: true,
     }),
   ]);
   return sizes;

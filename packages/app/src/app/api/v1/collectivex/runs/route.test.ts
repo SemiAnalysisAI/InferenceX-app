@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildRunSummary } from '@semianalysisai/inferencex-db/collectivex/reader';
 import { makeCollectiveXDataset } from '@semianalysisai/inferencex-db/collectivex/test-fixture';
 
-const { mockList, mockGetDb, mockEnsureList } = vi.hoisted(() => ({
+const { mockList, mockGetDb, mockEnsureList, mockCachedJson } = vi.hoisted(() => ({
   mockList: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
   mockEnsureList: vi.fn(),
+  mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
 }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
@@ -32,7 +33,7 @@ vi.mock('@/lib/collectivex-lazy-ingest', () => ({
 vi.mock('@/lib/api-cache', () => ({
   COLLECTIVEX_CACHE_SCOPE: 'collectivex',
   COLLECTIVEX_CACHE_CONTROL: 'public, max-age=0, s-maxage=60',
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: mockCachedJson,
   collectiveXCacheTag: () => 'collectivex',
 }));
 
@@ -53,7 +54,7 @@ const summary = buildRunSummary(makeCollectiveXDataset());
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, 'error').mockImplementation(() => {});
-  mockEnsureList.mockResolvedValue(undefined);
+  mockEnsureList.mockResolvedValue(true);
   mockList.mockResolvedValue([summary]);
 });
 
@@ -69,16 +70,41 @@ describe('GET /api/v1/collectivex/runs', () => {
   it('backfills recent runs then lists stored summaries newest first', async () => {
     const res = await GET(req('/api/v1/collectivex/runs?version=1'));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ version: 1, runs: [summary] });
+    expect(await res.json()).toEqual({
+      version: 1,
+      runs: [summary],
+      discovery_complete: true,
+    });
     expect(mockEnsureList).toHaveBeenCalledWith(1);
     expect(mockList).toHaveBeenCalledWith('mock-sql', 1);
+  });
+
+  it('marks the list incomplete when another bounded discovery pass is needed', async () => {
+    mockEnsureList.mockResolvedValue(false);
+
+    const res = await GET(req('/api/v1/collectivex/runs?version=1'));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      version: 1,
+      runs: [summary],
+      discovery_complete: false,
+    });
+    expect(mockCachedJson).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ cacheControl: 'private, no-store' }),
+    );
   });
 
   it('serves the stored list when the GitHub backfill fails', async () => {
     mockEnsureList.mockRejectedValue(sweepError('unavailable'));
     const res = await GET(req('/api/v1/collectivex/runs?version=1'));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ version: 1, runs: [summary] });
+    expect(await res.json()).toEqual({
+      version: 1,
+      runs: [summary],
+      discovery_complete: true,
+    });
   });
 
   it('returns 503 when the backfill fails and nothing is stored', async () => {
@@ -92,7 +118,7 @@ describe('GET /api/v1/collectivex/runs', () => {
     mockList.mockResolvedValue([]);
     const res = await GET(req('/api/v1/collectivex/runs?version=1'));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ version: 1, runs: [] });
+    expect(await res.json()).toEqual({ version: 1, runs: [], discovery_complete: true });
   });
 
   it('returns 500 without leaking details on DB failure', async () => {

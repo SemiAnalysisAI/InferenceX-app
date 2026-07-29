@@ -33,9 +33,9 @@ export interface CollectiveXRunInsert {
  * deleted run keeps a tombstoned cx_runs row — otherwise the next discovery
  * pass would re-ingest it.
  */
-export type CollectiveXRunState = 'live' | 'deleted';
+type CollectiveXRunState = 'live' | 'deleted';
 
-export interface CollectiveXRunStateRow {
+interface CollectiveXRunStateRow {
   state: CollectiveXRunState;
   version: number;
   run_attempt: number;

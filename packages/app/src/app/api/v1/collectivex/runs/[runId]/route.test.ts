@@ -109,8 +109,19 @@ describe('GET /api/v1/collectivex/runs/[runId]', () => {
   ] as const)('maps %s ingest failures without exposing details', async (code, status) => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     mockEnsureRun.mockRejectedValue(sweepError(code));
+    mockGetRun.mockResolvedValue(null);
     const res = await get(`/x?version=1`, runId);
     expect(res.status).toBe(status);
+  });
+
+  it('serves a stored run when its GitHub refresh fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockEnsureRun.mockRejectedValue(sweepError('unavailable'));
+
+    const res = await get(`/x?version=1`, runId);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(dataset);
   });
 
   it('returns 404 when the run is absent after a clean ensure', async () => {

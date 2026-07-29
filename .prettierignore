@@ -6,4 +6,5 @@
 # that are replaced wholesale rather than hand-edited, so formatting them buys
 # nothing; without this entry the pre-commit hook would silently re-expand them.
 packages/app/cypress/fixtures/api/collectivex-latest.json
+packages/app/cypress/fixtures/api/collectivex-run-*.json
 packages/app/cypress/fixtures/api/collectivex-runs.json

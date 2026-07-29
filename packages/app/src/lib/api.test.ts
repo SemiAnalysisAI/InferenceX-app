@@ -5,7 +5,6 @@ import {
   fetchWorkflowInfo,
   fetchAvailability,
   deleteCollectiveXRun,
-  fetchCollectiveX,
   fetchCollectiveXRun,
   fetchCollectiveXRunList,
   fetchReliability,
@@ -143,19 +142,6 @@ describe('CollectiveX API', () => {
     });
   }
 
-  it('fetches the latest run dataset', async () => {
-    mockJson(dataset);
-
-    const result = await fetchCollectiveX();
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/v1/collectivex/latest?version=1',
-      expect.objectContaining({}),
-    );
-    expect(result.version).toBe(1);
-    expect(result.run.run_id).toBe(dataset.run.run_id);
-  });
-
   it('fetches a specific run by id', async () => {
     mockJson(dataset);
 
@@ -169,16 +155,17 @@ describe('CollectiveX API', () => {
   });
 
   it('fetches the run list', async () => {
-    mockJson({ version: 1, runs: [buildRunSummary(dataset)] });
+    mockJson({ version: 1, runs: [buildRunSummary(dataset)], discovery_complete: true });
 
-    const runs = await fetchCollectiveXRunList(1);
+    const response = await fetchCollectiveXRunList(1);
 
     expect(mockFetch).toHaveBeenCalledWith(
       '/api/v1/collectivex/runs?version=1',
       expect.objectContaining({}),
     );
-    expect(runs).toHaveLength(1);
-    expect(runs[0].run_id).toBe(dataset.run.run_id);
+    expect(response.discovery_complete).toBe(true);
+    expect(response.runs).toHaveLength(1);
+    expect(response.runs[0].run_id).toBe(dataset.run.run_id);
   });
 
   it('sends the bearer token on delete and reports success', async () => {

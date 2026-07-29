@@ -310,23 +310,16 @@ export function fetchSubmissions(signal?: AbortSignal) {
   return fetchJson<SubmissionsResponse>('/api/v1/submissions', signal);
 }
 
-/** Latest ingested sweep run's neutral view dataset (default page view). */
-export function fetchCollectiveX(
-  signal?: AbortSignal,
-  version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
-) {
-  return fetchJson<CollectiveXDataset>(`/api/v1/collectivex/latest?version=${version}`, signal);
-}
-
-/** Ingested sweep runs for the run picker, keyed by run_id + attempt. */
+/** Stored sweep runs plus whether lazy discovery has reached the end of history. */
 export function fetchCollectiveXRunList(
   version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
   signal?: AbortSignal,
 ) {
-  return fetchJson<{ runs: CollectiveXRunSummary[] }>(
-    `/api/v1/collectivex/runs?version=${version}`,
-    signal,
-  ).then(({ runs }) => runs);
+  return fetchJson<{
+    version: CollectiveXVersion;
+    runs: CollectiveXRunSummary[];
+    discovery_complete: boolean;
+  }>(`/api/v1/collectivex/runs?version=${version}`, signal);
 }
 
 /** Resolve a specific ingested sweep run's neutral view dataset by run_id. */

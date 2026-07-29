@@ -50,11 +50,30 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
     return cachedJson(loadFixture<CollectiveXDataset>(`collectivex-run-${runId}`));
   }
 
+  let ensureError: unknown = null;
   try {
     await ensureCollectiveXRun(version, runId);
+  } catch (error) {
+    ensureError = error;
+  }
+
+  try {
     const row = await getCollectiveXRun(getCollectiveXDb(), version, runId);
     if (row === null) {
+      if (ensureError) {
+        const status = collectiveXSweepErrorStatus(ensureError);
+        if (status !== null) {
+          return NextResponse.json(
+            { error: status === 404 ? 'Not found' : 'Unavailable' },
+            { status },
+          );
+        }
+        throw ensureError;
+      }
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    if (ensureError) {
+      console.error('CollectiveX run refresh failed; serving stored run:', ensureError);
     }
     // Short window like the sibling routes: a GitHub re-run of failed shards
     // refreshes this run's stored contents, and deletion must not linger.
@@ -63,10 +82,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
       cacheControl: COLLECTIVEX_CACHE_CONTROL,
     });
   } catch (error) {
-    const status = collectiveXSweepErrorStatus(error);
-    if (status !== null) {
-      return NextResponse.json({ error: status === 404 ? 'Not found' : 'Unavailable' }, { status });
-    }
     console.error('Error fetching CollectiveX run:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

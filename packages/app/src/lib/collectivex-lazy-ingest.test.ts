@@ -75,6 +75,7 @@ function zipDocs(...docs: unknown[]): ArrayBuffer {
 const matrixZip = zipDocs(matrix);
 const matrixZipV2 = zipDocs(matrixV2);
 const shardZip = zipDocs(shardA, shardB);
+const shardZipV2 = zipDocs({ ...shardA, version: 2 }, { ...shardB, version: 2 });
 
 function runObject(overrides: Record<string, unknown> = {}) {
   return {
@@ -87,7 +88,7 @@ function runObject(overrides: Record<string, unknown> = {}) {
     status: 'completed',
     conclusion: 'success',
     run_attempt: 1,
-    updated_at: '2026-07-08T12:20:00Z',
+    updated_at: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -196,15 +197,16 @@ describe('ensureLatestCollectiveXRun', () => {
       // Run 161 carries a v2 matrix — requesting v1 must move on.
       .mockResolvedValueOnce(Response.json(artifactsBody(161)))
       .mockResolvedValueOnce(new Response(matrixZipV2))
+      .mockResolvedValueOnce(new Response(shardZipV2))
       .mockResolvedValueOnce(Response.json(artifactsBody()))
       .mockResolvedValueOnce(new Response(matrixZip))
       .mockResolvedValueOnce(new Response(shardZip));
 
     await ensureLatestCollectiveXRun(1);
 
-    expect(mockInsert).toHaveBeenCalledTimes(1);
-    expect(mockInsert.mock.calls[0][1].version).toBe(1);
-    expect(mockInsert.mock.calls[0][1].run_id).toBe('160');
+    expect(mockInsert).toHaveBeenCalledTimes(2);
+    expect(mockInsert.mock.calls[0][1]).toMatchObject({ version: 2, run_id: '161' });
+    expect(mockInsert.mock.calls[1][1]).toMatchObject({ version: 1, run_id: '160' });
   });
 
   it('refreshes a live run when GitHub reports a newer attempt', async () => {
@@ -335,22 +337,63 @@ describe('discovery cooldown', () => {
 });
 
 describe('ensureCollectiveXRunsList', () => {
-  it('backfills absent recent runs and counts live ones toward the cap', async () => {
+  it('does not probe artifacts for unknown runs beyond the retention window', async () => {
+    mockFetch.mockResolvedValueOnce(runListing(runObject({ updated_at: '2020-01-01T00:00:00Z' })));
+
+    await expect(ensureCollectiveXRunsList(1)).resolves.toBe(true);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockGetStates).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it('continues past more than eight known rows to backfill an older run', async () => {
+    const runs = Array.from({ length: 10 }, (_unused, index) => runObject({ id: 169 - index }));
     mockGetStates.mockImplementation((_sql: unknown, ids: string[]) =>
       Promise.resolve(
-        ids[0] === '161' ? { '161': { state: 'live', version: 1, run_attempt: 1 } } : {},
+        ids[0] === '160' ? {} : { [ids[0]]: { state: 'live', version: 1, run_attempt: 1 } },
       ),
     );
     mockFetch
-      .mockResolvedValueOnce(twoRunListing())
+      .mockResolvedValueOnce(runListing(...runs))
       .mockResolvedValueOnce(Response.json(artifactsBody()))
       .mockResolvedValueOnce(new Response(matrixZip))
       .mockResolvedValueOnce(new Response(shardZip));
 
-    await ensureCollectiveXRunsList(1);
+    const complete = await ensureCollectiveXRunsList(1);
+
+    expect(complete).toBe(true);
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    expect(mockInsert.mock.calls[0][1].run_id).toBe('160');
+  });
+
+  it('continues past one malformed run instead of hiding later valid runs', async () => {
+    mockFetch
+      .mockResolvedValueOnce(twoRunListing())
+      .mockResolvedValueOnce(Response.json(artifactsBody(161)))
+      .mockResolvedValueOnce(new Response(zipDocs({ record_type: 'samples' })))
+      .mockResolvedValueOnce(Response.json(artifactsBody()))
+      .mockResolvedValueOnce(new Response(matrixZip))
+      .mockResolvedValueOnce(new Response(shardZip));
+
+    await expect(ensureCollectiveXRunsList(1)).resolves.toBe(true);
 
     expect(mockInsert).toHaveBeenCalledTimes(1);
     expect(mockInsert.mock.calls[0][1].run_id).toBe('160');
+  });
+
+  it('reports an incomplete pass after changing eight runs', async () => {
+    const runs = Array.from({ length: 8 }, (_unused, index) => runObject({ id: 167 - index }));
+    mockFetch.mockResolvedValueOnce(runListing(...runs));
+    for (const run of runs) {
+      mockFetch
+        .mockResolvedValueOnce(Response.json(artifactsBody(run.id)))
+        .mockResolvedValueOnce(new Response(matrixZip))
+        .mockResolvedValueOnce(new Response(shardZip));
+    }
+
+    await expect(ensureCollectiveXRunsList(1)).resolves.toBe(false);
+    expect(mockInsert).toHaveBeenCalledTimes(8);
   });
 });
 
@@ -362,11 +405,29 @@ describe('ensureCollectiveXRun', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('returns immediately for live matching runs', async () => {
+  it('checks the GitHub attempt for a live matching run without downloading artifacts', async () => {
     mockGetStates.mockResolvedValue({ '160': { state: 'live', version: 1, run_attempt: 1 } });
+    mockFetch.mockResolvedValueOnce(Response.json(runObject()));
+
     await ensureCollectiveXRun(1, '160');
-    expect(mockFetch).not.toHaveBeenCalled();
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it('refreshes a live matching run when GitHub has a newer attempt', async () => {
+    mockGetStates.mockResolvedValue({ '160': { state: 'live', version: 1, run_attempt: 1 } });
+    mockFetch
+      .mockResolvedValueOnce(Response.json(runObject({ run_attempt: 2 })))
+      .mockResolvedValueOnce(Response.json(artifactsBody(160, 2)))
+      .mockResolvedValueOnce(new Response(matrixZip))
+      .mockResolvedValueOnce(new Response(shardZip));
+
+    await ensureCollectiveXRun(1, '160');
+
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(mockRefresh.mock.calls[0][1]).toMatchObject({ run_id: '160', run_attempt: 2 });
   });
 
   it('persists an absent run fetched by id', async () => {
