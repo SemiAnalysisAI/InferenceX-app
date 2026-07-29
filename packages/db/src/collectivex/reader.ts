@@ -78,12 +78,24 @@ interface RawMatrix {
   }[];
 }
 
+type CollectiveXVendor = CollectiveXSeries['system']['vendor'];
+
+interface SupportedShard {
+  shard: RawShard;
+  vendor: CollectiveXVendor;
+}
+
 export interface CollectiveXNeutralRunMeta {
   run_id: string;
   run_attempt: number;
   generated_at: string;
   conclusion: string | null;
   source_sha: string;
+}
+
+function toSupportedVendor(raw: string): CollectiveXVendor | null {
+  const vendor = raw.trim().toLowerCase();
+  return vendor === 'amd' || vendor === 'nvidia' ? vendor : null;
 }
 
 function matrixOf(value: unknown): RawMatrix {
@@ -191,7 +203,7 @@ function topologyOf(kase: RawCase) {
   };
 }
 
-function buildSeries(shard: RawShard): CollectiveXSeries {
+function buildSeries({ shard, vendor }: SupportedShard): CollectiveXSeries {
   const kase = shard.identity.case_factors.case;
   return {
     series_id: shard.identity.case_id,
@@ -202,7 +214,7 @@ function buildSeries(shard: RawShard): CollectiveXSeries {
     system: {
       ...topologyOf(kase),
       sku: shard.identity.case_factors.sku,
-      vendor: shard.runtime.vendor === 'amd' ? 'amd' : 'nvidia',
+      vendor,
     },
     points: shard.measurement.rows.map((row) => mapPoint(row, kase.ep)),
   };
@@ -279,19 +291,33 @@ export function buildDatasetFromNeutral(
     if (shard.version !== matrix.version) throw new Error('CollectiveX version mismatch');
     return [shard];
   });
-  const successful = new Map<string, RawShard>();
-  const terminal = new Map<string, RawShard>();
-  for (const shard of shards) {
+  const supportedShards = shards.flatMap((shard): SupportedShard[] => {
+    const vendor = toSupportedVendor(shard.runtime.vendor);
+    return vendor ? [{ shard, vendor }] : [];
+  });
+  const supportedCaseIds = new Set(supportedShards.map(({ shard }) => shard.identity.case_id));
+  const hiddenCaseIds = new Set(
+    shards
+      .filter(
+        (shard) =>
+          !toSupportedVendor(shard.runtime.vendor) && !supportedCaseIds.has(shard.identity.case_id),
+      )
+      .map((shard) => shard.identity.case_id),
+  );
+  const successful = new Map<string, SupportedShard>();
+  const terminal = new Map<string, SupportedShard>();
+  for (const supported of supportedShards) {
+    const { shard } = supported;
     const target = shard.outcome.status === 'success' ? successful : terminal;
-    if (!target.has(shard.identity.case_id)) target.set(shard.identity.case_id, shard);
+    if (!target.has(shard.identity.case_id)) target.set(shard.identity.case_id, supported);
   }
 
   const coverage: CollectiveXCoverage[] = matrix.requested_cases.flatMap((requested) => {
     const kase = requested.case;
     const caseId = kase.case_id;
-    if (!caseId) return [];
-    const measured = successful.get(caseId);
-    const failed = terminal.get(caseId);
+    if (!caseId || hiddenCaseIds.has(caseId)) return [];
+    const measured = successful.get(caseId)?.shard;
+    const failed = terminal.get(caseId)?.shard;
     let outcome: CollectiveXOutcome;
     let reason: string | null;
     let points: CollectiveXCoveragePoint[];

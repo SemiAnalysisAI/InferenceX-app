@@ -51,6 +51,9 @@ Key invariants:
 - **"Latest" orders by `run_id`** (monotonic with run creation, matching the discovery
   walk) — not by completion time, where a long-failing older run would shadow a newer
   successful one.
+- **Vendor scope is explicit**: the shared reader accepts only `amd` and `nvidia`
+  result shards (case-insensitive). Other vendor values are omitted from chart series,
+  coverage, and SKU summaries; runs with no supported-vendor cases stay hidden.
 - **GitHub being down never takes the page down**: routes serve whatever the DB holds and
   only surface an error when there is no stored fallback.
 - **Run-list completeness is progressive**: `/api/v1/collectivex/runs` returns

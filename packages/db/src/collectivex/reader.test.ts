@@ -175,6 +175,31 @@ describe('CollectiveX artifact assembly', () => {
     expect(series.points).toHaveLength(10);
   });
 
+  it('displays only AMD and NVIDIA vendor cases', () => {
+    const dataset = buildDataset({
+      shards: [
+        makeRawShard(),
+        makeRawShard({ sku: 'mi355x', vendor: 'AMD' }),
+        makeRawShard({ sku: 'www', vendor: 'www' }),
+      ],
+    });
+
+    expect(dataset.series.map((series) => series.system.vendor).toSorted()).toEqual([
+      'amd',
+      'nvidia',
+    ]);
+    expect(dataset.series.map((series) => series.system.sku).toSorted()).toEqual([
+      'h200-dgxc',
+      'mi355x',
+    ]);
+    expect(dataset.coverage.map((row) => row.sku).toSorted()).toEqual(['h200-dgxc', 'mi355x']);
+    expect(dataset.run).toMatchObject({
+      requested_cases: 2,
+      measured_cases: 2,
+      covered_skus: ['h200-dgxc', 'mi355x'],
+    });
+  });
+
   it('derives a per-GPU payload bandwidth from total_logical_bytes', () => {
     const dispatch = makeCollectiveXSeries().points[0].components.dispatch;
     // total_logical_bytes (400000000) / ep (8) / p50 latency (417 µs) → GB/s.
