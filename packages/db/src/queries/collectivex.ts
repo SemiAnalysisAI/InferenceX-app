@@ -47,10 +47,11 @@ function toRunRow(row: Record<string, unknown>): CollectiveXRunRow {
 }
 
 /**
- * The most recent live run for a version. Ordered by run_id — GitHub run ids
- * increase monotonically with creation, matching lazy discovery's
- * newest-first walk (completion time would let a long-failing older run
- * shadow a newer successful one).
+ * The most recent visible live run for a version. Zero-case summaries contain
+ * no AMD/NVIDIA data and stay hidden. Ordered by run_id — GitHub run ids
+ * increase monotonically with creation, matching lazy discovery's newest-first
+ * walk (completion time would let a long-failing older run shadow a newer
+ * successful one).
  *
  * Row and documents come back in ONE query, with docs filtered to the row's
  * CURRENT run_attempt: a reader can never observe one attempt's metadata with
@@ -72,13 +73,17 @@ export async function getLatestCollectiveXRun(
       WHERE run_id = r.run_id AND run_attempt = r.run_attempt
     ) d ON true
     WHERE r.version = ${version} AND r.deleted_at IS NULL
+      AND COALESCE((r.summary->>'requested_cases')::int, 0) > 0
     ORDER BY r.run_id DESC
     LIMIT 1
   `;
   return rows.length === 0 ? null : toRunRow(rows[0]);
 }
 
-/** One specific live run by id, or null when absent, tombstoned, or on another version. */
+/**
+ * One specific visible live run by id, or null when absent, tombstoned, on
+ * another version, or carrying no supported-vendor cases.
+ */
 export async function getCollectiveXRun(
   sql: DbClient,
   version: number,
@@ -96,13 +101,15 @@ export async function getCollectiveXRun(
       WHERE run_id = r.run_id AND run_attempt = r.run_attempt
     ) d ON true
     WHERE r.version = ${version} AND r.run_id = ${runId} AND r.deleted_at IS NULL
+      AND COALESCE((r.summary->>'requested_cases')::int, 0) > 0
   `;
   return rows.length === 0 ? null : toRunRow(rows[0]);
 }
 
 /**
- * Every live run summary for a version, newest-first, straight from the
- * precomputed `summary` column — no document loading.
+ * Every visible live run summary for a version, newest-first, straight from
+ * the precomputed `summary` column — no document loading. Runs whose reader
+ * summary contains no AMD/NVIDIA cases stay hidden.
  */
 export async function listCollectiveXRuns(
   sql: DbClient,
@@ -112,6 +119,7 @@ export async function listCollectiveXRuns(
     SELECT summary
     FROM cx_runs
     WHERE version = ${version} AND deleted_at IS NULL
+      AND COALESCE((summary->>'requested_cases')::int, 0) > 0
     ORDER BY run_id DESC
   `;
   return rows.map((row) => row.summary as CollectiveXRunSummary);

@@ -5,7 +5,9 @@ import type { DbClient } from '../connection.js';
 import {
   collectiveXDatasetFromRow,
   deleteCollectiveXRun,
+  getCollectiveXRun,
   getCollectiveXRunStates,
+  getLatestCollectiveXRun,
   insertCollectiveXRun,
   listCollectiveXRuns,
   refreshCollectiveXRunAttempt,
@@ -73,12 +75,18 @@ describe('getCollectiveXRunStates', () => {
 });
 
 describe('read queries', () => {
-  it('excludes tombstoned rows and orders newest-created first', async () => {
-    const { sql, calls } = fakeSql([[]]);
+  it('excludes tombstoned and unsupported-vendor-only rows', async () => {
+    const { sql, calls } = fakeSql([[], [], []]);
+    await getLatestCollectiveXRun(sql, 1);
+    await getCollectiveXRun(sql, 1, '160');
     await listCollectiveXRuns(sql, 1);
-    expect(calls[0].text).toContain('deleted_at IS NULL');
-    expect(calls[0].text).toContain('ORDER BY run_id DESC');
-    expect(calls[0].text).not.toContain('LIMIT');
+    for (const call of calls) {
+      expect(call.text).toContain('deleted_at IS NULL');
+      expect(call.text).toContain("summary->>'requested_cases'");
+    }
+    expect(calls[0].text).toContain('ORDER BY r.run_id DESC');
+    expect(calls[2].text).toContain('ORDER BY run_id DESC');
+    expect(calls[2].text).not.toContain('LIMIT');
   });
 });
 
