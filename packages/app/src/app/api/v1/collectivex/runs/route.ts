@@ -26,11 +26,12 @@ export async function GET(request: NextRequest) {
   // Backfill failures must not take the run table down — serve the stored list
   // and only surface the error when there is nothing at all to show.
   let ensureError: unknown = null;
-  let discoveryComplete = true;
+  let discoveryComplete: boolean;
   try {
     discoveryComplete = await ensureCollectiveXRunsList(version);
   } catch (error) {
     ensureError = error;
+    discoveryComplete = false;
   }
 
   try {

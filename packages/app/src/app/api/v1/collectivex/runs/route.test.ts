@@ -96,15 +96,19 @@ describe('GET /api/v1/collectivex/runs', () => {
     );
   });
 
-  it('serves the stored list when the GitHub backfill fails', async () => {
+  it('serves the stored list as incomplete when the GitHub backfill fails', async () => {
     mockEnsureList.mockRejectedValue(sweepError('unavailable'));
     const res = await GET(req('/api/v1/collectivex/runs?version=1'));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       version: 1,
       runs: [summary],
-      discovery_complete: true,
+      discovery_complete: false,
     });
+    expect(mockCachedJson).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ cacheControl: 'private, no-store' }),
+    );
   });
 
   it('returns 503 when the backfill fails and nothing is stored', async () => {
