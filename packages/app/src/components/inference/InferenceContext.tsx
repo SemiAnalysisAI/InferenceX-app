@@ -620,6 +620,11 @@ export function InferenceProvider({
   //    doesn't carry over).
   const lastSeqKindRef = useRef<ReturnType<typeof sequenceKind> | null>(null);
   useEffect(() => {
+    // Wait for availability to resolve the sequence. Before it does,
+    // `effectiveSequence` is a fixed-seq placeholder; recording that kind here
+    // would make the later switch to agentic look like a user-driven kind
+    // change and clobber a URL-restored `i_xmode` with the kind's default.
+    if (!sequenceResolved) return;
     const kind = sequenceKind(effectiveSequence);
     const isInitialMount = lastSeqKindRef.current === null;
     const isAgenticOnlyMode = isAgenticOnlyXAxisMode(selectedXAxisMode);
@@ -644,7 +649,7 @@ export function InferenceProvider({
       return;
     }
     handleSetXAxisMode(kind === 'agentic' ? 'osl-e2el' : 'interactivity');
-  }, [effectiveSequence, selectedXAxisMode, handleSetXAxisMode]);
+  }, [sequenceResolved, effectiveSequence, selectedXAxisMode, handleSetXAxisMode]);
 
   // Reconcile selectedE2eXAxisMetric whenever the mode, sequence kind, or
   // agentic percentile changes. For fixed-seq the JSONB only carries

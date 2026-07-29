@@ -303,6 +303,33 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   });
 });
 
+describe('X-axis mode URL param', () => {
+  // Regression: the reconcile effect used to run before availability resolved
+  // the sequence. It recorded the fixed-seq placeholder kind, then treated the
+  // switch to agentic as a user-driven kind change and clobbered the
+  // URL-restored mode with the agentic default (OSL / E2EL).
+  it('keeps a URL-restored mode through the agentic sequence resolving', () => {
+    interceptAgenticData();
+    interceptDerivedAgenticMetrics();
+    cy.visit('/inference?i_seq=agentic-traces&i_xmode=interactivity', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        unlockAgenticGate(win);
+      },
+    });
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Traces');
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
+      'have.attr',
+      'aria-selected',
+      'true',
+    );
+    // Assert on the rendered chart too: the clobber happened one tick after
+    // the buttons first painted, so a button-only check could pass too early.
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
+    cy.get('[data-testid="x-axis-mode-osl-e2el"]').should('have.attr', 'aria-selected', 'false');
+  });
+});
+
 describe('Default scenario', () => {
   it('bare /inference defaults to 8K / 1K even when the model has agentic data', () => {
     // Availability contains BOTH agentic and fixed-seq rows for the default
