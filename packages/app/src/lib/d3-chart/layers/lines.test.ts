@@ -86,6 +86,28 @@ describe('renderLines', () => {
     expect(strokeByClass['line-path line-seriesB']).toBe('#0f0');
   });
 
+  it('sets a per-series stroke dash pattern when configured', () => {
+    const group = createMockGroup();
+    const { xScale, yScale } = makeScales();
+    renderLines(
+      group as any,
+      SAMPLE_LINES,
+      xScale,
+      yScale,
+      makeConfig({
+        getStrokeDasharray: (key) => (key === 'seriesA' ? 'none' : '9 4'),
+      }),
+    );
+
+    const paths = group.selectAll('.line-path');
+    const dashByClass: Record<string, string | number> = {};
+    for (const el of paths.elements) {
+      dashByClass[el.attrs['class'] as string] = el.attrs['stroke-dasharray'];
+    }
+    expect(dashByClass['line-path line-seriesA']).toBe('none');
+    expect(dashByClass['line-path line-seriesB']).toBe('9 4');
+  });
+
   it('uses default strokeWidth of 2 when not specified', () => {
     const group = createMockGroup();
     const { xScale, yScale } = makeScales();

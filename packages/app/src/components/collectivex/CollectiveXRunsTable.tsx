@@ -7,10 +7,12 @@ import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
 
+import { collectiveXRunDasharray } from './data';
 import type { CollectiveXRunSummary } from './types';
 
 interface CollectiveXRunsTableProps {
   runs: CollectiveXRunSummary[];
+  runIndexById: ReadonlyMap<string, number>;
   visibleRunIds: ReadonlySet<string>;
   loadingRunIds: ReadonlySet<string>;
   deletingRunId: string | null;
@@ -30,6 +32,7 @@ const STRINGS = {
     actions: 'Actions',
     pending: 'pending',
     showRun: (id: string) => `Show run #${id}`,
+    lineStyle: (id: string) => `Line style for run #${id}`,
     openRun: (id: string) => `Open GitHub Actions run #${id}`,
     deleteRun: (id: string) => `Delete run #${id}`,
     empty: 'No runs match this benchmark version.',
@@ -46,6 +49,7 @@ const STRINGS = {
     actions: 'Actions',
     pending: 'pending',
     showRun: (id: string) => `Show run #${id}`,
+    lineStyle: (id: string) => `Line style for run #${id}`,
     openRun: (id: string) => `Open GitHub Actions run #${id}`,
     deleteRun: (id: string) => `Delete run #${id}`,
     empty: 'No runs match this benchmark version.',
@@ -69,6 +73,7 @@ function formatDate(value: string, locale: 'en' | 'zh'): string {
 
 export function CollectiveXRunsTable({
   runs,
+  runIndexById,
   visibleRunIds,
   loadingRunIds,
   deletingRunId,
@@ -106,6 +111,7 @@ export function CollectiveXRunsTable({
             const loading = loadingRunIds.has(run.run_id);
             const deleting = deletingRunId === run.run_id;
             const conclusion = run.conclusion ?? t.pending;
+            const lineDasharray = collectiveXRunDasharray(runIndexById.get(run.run_id) ?? 0);
             return (
               <tr
                 key={run.run_id}
@@ -136,17 +142,37 @@ export function CollectiveXRunsTable({
                   </div>
                 </td>
                 <td className="px-3 py-2 font-mono text-xs">
-                  <a
-                    href={`https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${run.run_id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={t.openRun(run.run_id)}
-                    onClick={() => track('collectivex_run_source_opened', { run: run.run_id })}
-                    className="inline-flex items-center gap-1 hover:underline"
-                  >
-                    #{run.run_id}
-                    <ExternalLink className="size-3" />
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <svg
+                      width="24"
+                      height="10"
+                      viewBox="0 0 24 10"
+                      aria-label={t.lineStyle(run.run_id)}
+                      data-testid={`collectivex-run-line-style-${run.run_id}`}
+                      className="shrink-0 text-foreground"
+                    >
+                      <line
+                        x1="1"
+                        y1="5"
+                        x2="23"
+                        y2="5"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeDasharray={lineDasharray === 'none' ? undefined : lineDasharray}
+                      />
+                    </svg>
+                    <a
+                      href={`https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${run.run_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={t.openRun(run.run_id)}
+                      onClick={() => track('collectivex_run_source_opened', { run: run.run_id })}
+                      className="inline-flex items-center gap-1 hover:underline"
+                    >
+                      #{run.run_id}
+                      <ExternalLink className="size-3" />
+                    </a>
+                  </div>
                 </td>
                 <td className="px-3 py-2">
                   <span

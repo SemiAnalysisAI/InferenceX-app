@@ -66,11 +66,12 @@ visibility checkbox; checking a run fetches its cached dataset through
 `/api/v1/collectivex/runs/[runId]`. Checked datasets are combined client-side, and the EP, phase,
 kernel mode, precision, SKU, and backend controls filter their combined series.
 
-Series ids, labels, and color keys are namespaced by GitHub Actions run id before rendering, so the
-same matrix case from two runs remains independently toggleable and visually distinct. The newest
-run with measured cases is checked by default; newer incomplete sweeps remain listed but cannot
-blank the initial explorer. Deletion is a row action in the run table and keeps the same tombstone
-semantics described above.
+Series ids are namespaced by GitHub Actions run id so the same matrix case from two runs remains
+independently toggleable. Configuration color stays consistent across runs; run identity is encoded
+as a line dash pattern shown in both the run table and legend, keeping run ids out of legend labels.
+The newest run with measured cases is checked by default; newer incomplete sweeps remain listed but
+cannot blank the initial explorer. Deletion is a row action in the run table and keeps the same
+tombstone semantics described above.
 
 ## The raw-rows exception
 

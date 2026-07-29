@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 
-import { chartPoints, collectiveXColorKey, fitAlphaBeta } from './data';
+import { chartPoints, collectiveXColorKey, collectiveXRunDasharray, fitAlphaBeta } from './data';
 import type {
   CollectiveXChartPoint,
   CollectiveXOperation,
@@ -166,6 +166,10 @@ export function CollectiveXChart({
             getColor: (key) => {
               const item = seriesById.get(key);
               return colors[item ? collectiveXColorKey(item) : ''] ?? '#888';
+            },
+            getStrokeDasharray: (key) => {
+              const item = seriesById.get(key);
+              return item ? collectiveXRunDasharray(item.run_index) : 'none';
             },
             strokeWidth: 2.25,
             curve: d3.curveLinear,

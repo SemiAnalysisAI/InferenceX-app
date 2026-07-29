@@ -187,13 +187,32 @@ describe('CollectiveX neutral run view', () => {
     );
     cy.get(`[data-testid="collectivex-run-visible-${runId}"]`).should('be.checked');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+    cy.get(`[data-testid="collectivex-run-line-style-${runId}"] line`).should(
+      'not.have.attr',
+      'stroke-dasharray',
+    );
+    cy.get(
+      `[data-testid="collectivex-run-line-style-${comparisonDataset.run.run_id}"] line`,
+    ).should('have.attr', 'stroke-dasharray', '9 4');
 
     cy.get(`[data-testid="collectivex-run-visible-${comparisonDataset.run.run_id}"]`).check();
     cy.wait('@comparisonRun');
-    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 2);
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path')
+      .should('have.length', 2)
+      .then(($lines) => {
+        expect($lines.eq(0)).to.have.attr('stroke-dasharray', 'none');
+        expect($lines.eq(1)).to.have.attr('stroke-dasharray', '9 4');
+        expect($lines.eq(0)).to.have.attr('stroke', $lines.eq(1).attr('stroke'));
+      });
     cy.get('[data-testid="chart-legend"]')
-      .should('contain.text', `#${runId}`)
-      .and('contain.text', `#${comparisonDataset.run.run_id}`);
+      .should('not.contain.text', `#${runId}`)
+      .and('not.contain.text', `#${comparisonDataset.run.run_id}`)
+      .find('[data-testid="legend-line-swatch"]')
+      .should('have.length', 2)
+      .then(($swatches) => {
+        expect($swatches.eq(0).find('line')).not.to.have.attr('stroke-dasharray');
+        expect($swatches.eq(1).find('line')).to.have.attr('stroke-dasharray', '9 4');
+      });
 
     cy.get(`[data-testid="collectivex-run-visible-${runId}"]`).uncheck();
     cy.get('[data-testid="collectivex-run-conclusion"]').should(

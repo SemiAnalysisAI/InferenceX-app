@@ -29,8 +29,9 @@ import { CollectiveXInventory } from './CollectiveXInventory';
 import { CollectiveXRunsTable } from './CollectiveXRunsTable';
 import {
   collectiveXColorKey,
+  collectiveXLegendLabel,
+  collectiveXRunDasharray,
   collectiveXSeriesForRun,
-  collectiveXSeriesLabel,
   collectiveXTopologyLabel,
   seriesMatchesSelection,
   type CollectiveXSeriesSelection,
@@ -323,10 +324,20 @@ export default function CollectiveXDisplay() {
     () => runQueries.flatMap((query) => (query.data ? [query.data] : [])),
     [runQueries],
   );
+  const runIndexById = useMemo(
+    () => new Map(runList.map((run, index) => [run.run_id, index])),
+    [runList],
+  );
   const combinedSeries = useMemo<CollectiveXRunSeries[]>(
     () =>
-      datasets.flatMap((dataset) => collectiveXSeriesForRun(dataset.series, dataset.run.run_id)),
-    [datasets],
+      datasets.flatMap((dataset) =>
+        collectiveXSeriesForRun(
+          dataset.series,
+          dataset.run.run_id,
+          runIndexById.get(dataset.run.run_id) ?? 0,
+        ),
+      ),
+    [datasets, runIndexById],
   );
   const loadingRunIds = useMemo(
     () =>
@@ -532,8 +543,9 @@ export default function CollectiveXDisplay() {
     () =>
       phaseSeries.map((item) => ({
         name: item.series_id,
-        label: collectiveXSeriesLabel(item),
+        label: collectiveXLegendLabel(item),
         color: colors[collectiveXColorKey(item)] ?? 'var(--muted-foreground)',
+        lineDasharray: collectiveXRunDasharray(item.run_index),
         isActive: activeSeriesIds.has(item.series_id),
         title: `EP${item.system.ep_size} · ${collectiveXTopologyLabel(item.system)}`,
         onClick: () => {
@@ -727,6 +739,7 @@ export default function CollectiveXDisplay() {
         </div>
         <CollectiveXRunsTable
           runs={runList}
+          runIndexById={runIndexById}
           visibleRunIds={visibleRunIds}
           loadingRunIds={loadingRunIds}
           deletingRunId={deleteRun.isPending ? (deleteRun.variables?.runId ?? null) : null}

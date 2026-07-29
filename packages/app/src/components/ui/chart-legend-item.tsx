@@ -22,6 +22,8 @@ export interface CommonLegendItemProps {
   hw?: string;
   label: string;
   color: string;
+  /** When present, render a line swatch using this SVG dash pattern instead of a dot. */
+  lineDasharray?: string;
   isActive: boolean;
   isHighlighted?: boolean;
   onClick: (name: string) => void;
@@ -47,6 +49,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
   name,
   label,
   color,
+  lineDasharray,
   title,
   isActive,
   onClick,
@@ -92,14 +95,44 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
         onMouseEnter={onHover && isActive ? () => onHover(hw || name) : undefined}
         onMouseLeave={onHoverEnd && isActive ? onHoverEnd : undefined}
       >
-        <span className="relative inline-flex items-center justify-center size-3 mr-2 flex-shrink-0">
-          <span
-            className={cn(
-              'size-3 rounded-full transition-opacity',
-              (canRemove || canRestore) && 'group-hover/item:opacity-0!',
-            )}
-            style={{ backgroundColor: color, opacity: sidebarMode && !isActive ? 0.3 : 1 }}
-          />
+        <span
+          className={cn(
+            'relative inline-flex h-3 items-center justify-center mr-2 flex-shrink-0',
+            lineDasharray === undefined ? 'w-3' : 'w-6',
+          )}
+        >
+          {lineDasharray === undefined ? (
+            <span
+              className={cn(
+                'size-3 rounded-full transition-opacity',
+                (canRemove || canRestore) && 'group-hover/item:opacity-0!',
+              )}
+              style={{ backgroundColor: color, opacity: sidebarMode && !isActive ? 0.3 : 1 }}
+            />
+          ) : (
+            <svg
+              width="24"
+              height="12"
+              viewBox="0 0 24 12"
+              data-testid="legend-line-swatch"
+              className={cn(
+                'transition-opacity',
+                (canRemove || canRestore) && 'group-hover/item:opacity-0!',
+              )}
+              style={{ opacity: sidebarMode && !isActive ? 0.3 : 1 }}
+              aria-hidden="true"
+            >
+              <line
+                x1="1"
+                y1="6"
+                x2="23"
+                y2="6"
+                stroke={color}
+                strokeWidth="2.25"
+                strokeDasharray={lineDasharray === 'none' ? undefined : lineDasharray}
+              />
+            </svg>
+          )}
           {canRemove && (
             <span
               role="button"

@@ -455,6 +455,7 @@ export default function ChartLegend({
         name={item.name}
         label={item.label}
         color={item.color}
+        lineDasharray={item.lineDasharray}
         title={item.title}
         isHighlighted={item.isHighlighted}
         hw={item.hw}
@@ -555,6 +556,7 @@ export default function ChartLegend({
                         hw={item.hw}
                         label={item.label}
                         color={item.color}
+                        lineDasharray={item.lineDasharray}
                         title={item.title}
                         isActive={item.isActive}
                         onClick={item.onClick}

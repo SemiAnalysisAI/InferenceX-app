@@ -19,6 +19,14 @@ export interface CollectiveXSeriesSelection {
   precision: CollectiveXPrecision;
 }
 
+const RUN_DASHARRAYS = ['none', '9 4', '3 3', '10 3 2 3', '2 3', '12 3 2 3'] as const;
+
+/** Stable within the newest-first run table; patterns repeat only after six runs. */
+export function collectiveXRunDasharray(runIndex: number): string {
+  const normalized = Math.max(0, Math.trunc(runIndex)) % RUN_DASHARRAYS.length;
+  return RUN_DASHARRAYS[normalized];
+}
+
 export function collectiveXTopologyLabel(
   system: Pick<
     CollectiveXSeries['system'],
@@ -36,25 +44,30 @@ export function collectiveXTopologyLabel(
   return `${system.nodes}x${system.gpus_per_node} · domain ${system.scale_up_domain} · ${transports} · ${system.topology_class}`;
 }
 
+export function collectiveXLegendLabel(series: CollectiveXSeries): string {
+  return `${series.system.sku.toUpperCase()} · ${series.backend} · EP${series.system.ep_size} · ${series.mode} · ${series.phase} · ${series.precision}`;
+}
+
 export function collectiveXSeriesLabel(series: CollectiveXSeries | CollectiveXRunSeries): string {
   const runPrefix = 'run_id' in series ? `#${series.run_id} · ` : '';
-  return `${runPrefix}${series.system.sku.toUpperCase()} · ${series.backend} · EP${series.system.ep_size} · ${series.mode} · ${series.phase} · ${series.precision}`;
+  return `${runPrefix}${collectiveXLegendLabel(series)}`;
 }
 
 export function collectiveXColorKey(series: CollectiveXSeries | CollectiveXRunSeries): string {
-  const runSuffix = 'run_id' in series ? `_run${series.run_id}` : '';
-  return `${series.system.vendor}_${series.system.sku}_${series.backend}_ep${series.system.ep_size}_${series.mode}_${series.phase}_${series.precision}${runSuffix}`;
+  return `${series.system.vendor}_${series.system.sku}_${series.backend}_ep${series.system.ep_size}_${series.mode}_${series.phase}_${series.precision}`;
 }
 
-/** Namespace series ids and color/label identity so runs can render together safely. */
+/** Namespace series ids and attach the run's stable visual-style index. */
 export function collectiveXSeriesForRun(
   series: readonly CollectiveXSeries[],
   runId: string,
+  runIndex = 0,
 ): CollectiveXRunSeries[] {
   return series.map((item) => ({
     ...item,
     series_id: `${runId}:${item.series_id}`,
     run_id: runId,
+    run_index: runIndex,
   }));
 }
 

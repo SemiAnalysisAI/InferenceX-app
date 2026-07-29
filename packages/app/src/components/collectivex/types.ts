@@ -53,7 +53,8 @@ export interface CollectiveXChartPoint {
   point: CollectiveXPoint;
 }
 
-/** A stored run's series namespaced for simultaneous multi-run rendering. */
+/** A stored run's series with namespaced identity and visual-style index. */
 export type CollectiveXRunSeries = CollectiveXSeries & {
   run_id: string;
+  run_index: number;
 };

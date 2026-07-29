@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   chartPoints,
   collectiveXColorKey,
+  collectiveXLegendLabel,
+  collectiveXRunDasharray,
   collectiveXSeriesForRun,
   collectiveXSeriesLabel,
   collectiveXTopologyLabel,
@@ -56,6 +58,13 @@ describe('collectiveXSeriesLabel', () => {
       '#30165164821 · H200-DGXC · deepep-v2 · EP8 · normal · decode · bf16',
     );
   });
+
+  it('keeps run ids out of the configuration label used by the legend', () => {
+    const [runSeries] = collectiveXSeriesForRun([scaleUp], '30165164821');
+    expect(collectiveXLegendLabel(runSeries)).toBe(
+      'H200-DGXC · deepep-v2 · EP8 · normal · decode · bf16',
+    );
+  });
 });
 
 describe('collectiveXColorKey', () => {
@@ -92,23 +101,38 @@ describe('collectiveXColorKey', () => {
     expect(collectiveXColorKey(amd).split('_')[0]).toBe('amd');
   });
 
-  it('assigns distinct keys to the same configuration from different runs', () => {
+  it('keeps the same configuration color across different runs', () => {
     const [first] = collectiveXSeriesForRun([scaleUp], '30165164821');
     const [second] = collectiveXSeriesForRun([scaleUp], '30177021271');
-    expect(collectiveXColorKey(first)).not.toBe(collectiveXColorKey(second));
+    expect(collectiveXColorKey(first)).toBe(collectiveXColorKey(second));
   });
 });
 
 describe('collectiveXSeriesForRun', () => {
   it('namespaces otherwise-colliding series ids without mutating the source', () => {
     const originalId = scaleUp.series_id;
-    const [first] = collectiveXSeriesForRun([scaleUp], '30165164821');
-    const [second] = collectiveXSeriesForRun([scaleUp], '30177021271');
+    const [first] = collectiveXSeriesForRun([scaleUp], '30165164821', 2);
+    const [second] = collectiveXSeriesForRun([scaleUp], '30177021271', 3);
 
     expect(first.series_id).toBe(`30165164821:${originalId}`);
     expect(first.run_id).toBe('30165164821');
+    expect(first.run_index).toBe(2);
     expect(second.series_id).toBe(`30177021271:${originalId}`);
+    expect(second.run_index).toBe(3);
     expect(scaleUp.series_id).toBe(originalId);
+  });
+});
+
+describe('collectiveXRunDasharray', () => {
+  it('uses a solid line for the newest run and distinct patterns for following runs', () => {
+    expect(collectiveXRunDasharray(0)).toBe('none');
+    expect(collectiveXRunDasharray(1)).toBe('9 4');
+    expect(collectiveXRunDasharray(2)).toBe('3 3');
+  });
+
+  it('normalizes invalid negative and fractional indexes', () => {
+    expect(collectiveXRunDasharray(-1)).toBe('none');
+    expect(collectiveXRunDasharray(1.9)).toBe('9 4');
   });
 });
 
