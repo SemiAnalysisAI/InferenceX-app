@@ -9,13 +9,8 @@ const MODEL_LABELS = [
   'Qwen3.5 397B',
 ];
 
-// Models whose row collapses to a coverage note instead of 5 platform cells:
-// GLM5.2 (fixtures carry no 8K/1K rows) and Kimi K3 (no fixture rows at all —
-// nothing ingested yet).
-const ZERO_COVERAGE_MODELS = 2;
-
 const PLATFORM_HEADERS = [
-  'Model',
+  'Model · Scenario',
   'B200 · Reference',
   'MI355X',
   'B300',
@@ -96,17 +91,15 @@ describe('Overview page', () => {
       });
     });
 
-    desktopModel('GLM-5.2')
-      .find('[data-testid="overview-model-coverage-note"]')
-      .should('have.text', 'No 8K/1K results');
-    desktopModel('GLM-5.2').find('[data-testid="overview-pair-missing"]').should('not.exist');
+    desktopModel('GLM-5.2').within(() => {
+      cy.get('[data-testid="overview-model-scenario"]').should('have.text', 'AgentX');
+      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
+    });
     cy.get(
       '[data-testid="overview-engine-scope-switcher"] [data-overview-engine-scope="all"]',
     ).click();
     cy.location('search').should('eq', '?engine=all');
-    desktopModel('GLM-5.2')
-      .find('[data-testid="overview-model-coverage-note"]')
-      .should('have.text', 'No 8K/1K results');
+    desktopModel('GLM-5.2').find('[data-testid="overview-pair-missing"]').should('have.length', 5);
     cy.get('[data-testid="overview-tier-switcher"]')
       .contains('a', '100')
       .should('have.attr', 'href', '/overview?tier=100&engine=all')
@@ -134,42 +127,31 @@ describe('Overview page', () => {
     });
   });
 
-  it('shows cost per Mtok with standard-decode and FP8 labels', () => {
+  it('prefers speculative decode and falls back to labelled standard-decode reads', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
     desktopModel('Kimi-K2.5').within(() => {
-      platform('b200')
-        .should('contain.text', '$1.01')
-        .and('contain.text', 'SGLang · FP4 · Standard decode');
-      platform('mi355x').within(() => {
-        cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]')
-          .should('have.text', '$0.58')
-          .and('not.contain.text', '≈')
-          .and('not.have.attr', 'title');
-        cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"] a').should('not.exist');
-        cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="mi355x"]')
-          .find('a')
-          .should('have.attr', 'href')
-          .and('include', 'i_spec=stp')
-          .and('include', 'i_metric=y_outputTputPerGpu');
-        cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="mi355x"]')
-          .find('a')
-          .should('have.attr', 'aria-label')
-          .and('include', 'Open raw source dashboard');
-        cy.contains('SGLang · FP4 · Standard decode').should('exist');
-      });
-      platform('b300').within(() => {
-        cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
-          'contain.text',
-          '$1.07',
-        );
-        cy.contains('SGLang · FP8 · Standard decode').should('exist');
-      });
-      cy.get('a[title*="NONE"], a[aria-label*="NONE"]').should('not.exist');
+      cy.get('[data-testid="overview-pair-value"]').should('have.length', 3);
+      cy.get('[data-testid="overview-pair-missing"]')
+        .should('have.length', 2)
+        .then(($missing) => {
+          expect([...$missing].map((element) => element.getAttribute('title'))).to.deep.equal([
+            'no data for this scenario',
+            'no data for this scenario',
+          ]);
+        });
+      cy.get('[data-testid="overview-pair-missing"]')
+        .children('[aria-hidden="true"]')
+        .should('have.length', 2)
+        .and('have.text', '∞∞');
+      platform('b200').should('contain.text', 'Standard decode');
+      platform('mi355x').should('contain.text', 'Standard decode');
+      platform('b300').should('contain.text', 'Standard decode');
     });
 
     desktopModel('DeepSeek-V4-Pro').within(() => {
+      cy.contains('MTP').should('exist');
       platform('gb300').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="gb300"]')
           .should('have.attr', 'title', 'Estimated from validated benchmark runs.')
@@ -183,28 +165,23 @@ describe('Overview page', () => {
         cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
       });
     });
+    cy.contains(
+      'Priority: speculative FP4 → speculative FP8 → standard FP4 → standard FP8.',
+    ).should('exist');
+    cy.get('body').should('not.contain.text', 'P90');
   });
 
   it('color-grades the cost delta against B200 and omits it without a baseline', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    desktopModel('Kimi-K2.5').within(() => {
+    desktopModel('Qwen-3.5-397B-A17B').within(() => {
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
       platform('mi355x')
         .find('[data-testid="overview-cost-delta"]')
-        .should('have.text', '-42%42% cheaper than B200')
         .and('have.attr', 'data-cost-polarity', 'cheaper')
-        .and('have.attr', 'title', '42% cheaper than B200')
         .then(($badge) => {
-          expect($badge.attr('style')).to.contain('rgb(16 185 129 / 0.35)');
-        });
-      platform('b300')
-        .find('[data-testid="overview-cost-delta"]')
-        .should('contain.text', '+7%')
-        .and('have.attr', 'data-cost-polarity', 'pricier')
-        .then(($badge) => {
-          expect($badge.attr('style')).to.contain('rgb(239 68 68 / 0.12)');
+          expect($badge.attr('style')).to.contain('rgb(16 185 129 /');
         });
     });
 
@@ -238,11 +215,14 @@ describe('Overview page', () => {
       'Every active model across MI355X, B200, B300, GB200 and GB300 at a glance.',
     ).should('exist');
     cy.contains(
-      'Cost per million output tokens from the best observed platform serving envelopes',
+      'Cost per million output tokens from each platform’s best observed serving envelope',
     ).should('exist');
-    cy.contains(
-      'GPU rental cost / 1M output tokens · 8K→1K · @50 tok/s/user · ↓ lower is better',
-    ).should('exist');
+    cy.get('[data-testid="overview-scope"]')
+      .should(
+        'have.text',
+        'GPU rental cost / 1M output tokens · @50 tok/s/user · ↓ lower is better',
+      )
+      .and('not.contain.text', '8K→1K');
     cy.contains(
       'Cost = 3-yr rental $/GPU/hr ÷ output tok/s per deployed GPU. All percentages compare against B200.',
     ).should('exist');
@@ -269,16 +249,23 @@ describe('Overview page', () => {
           );
         });
         cy.get('[data-testid="overview-desktop-model"]').should('have.length', MODEL_LABELS.length);
-        // Zero-coverage rows collapse to a single note instead of 5 cells.
-        cy.get('[data-testid="overview-platform"]').should(
-          'have.length',
-          (MODEL_LABELS.length - ZERO_COVERAGE_MODELS) * 5,
-        );
+        cy.get('[data-testid="overview-platform"]').should('have.length', MODEL_LABELS.length * 5);
+        cy.get('[data-testid="overview-model-coverage-note"]').should('not.exist');
         cy.get('details, summary, button').should('not.exist');
         cy.contains(/PRIMARY|Ranked results/).should('not.exist');
       });
     for (const label of MODEL_LABELS) {
       cy.get('[data-testid="overview-desktop-matrix"]').should('contain.text', label);
+    }
+    for (const model of ['Kimi-K3', 'GLM-5.2']) {
+      desktopModel(model)
+        .find('[data-testid="overview-model-scenario"]')
+        .should('have.text', 'AgentX');
+    }
+    for (const model of ['DeepSeek-V4-Pro', 'Kimi-K2.5', 'MiniMax-M3', 'Qwen-3.5-397B-A17B']) {
+      desktopModel(model)
+        .find('[data-testid="overview-model-scenario"]')
+        .should('have.text', 'Single-turn · 8K→1K');
     }
   });
 
@@ -344,7 +331,7 @@ describe('Overview page', () => {
       platform('b200')
         .find('[data-testid="overview-pair-missing"]')
         .should('contain.text', '∞')
-        .and('have.attr', 'title', 'no 8K/1K data');
+        .and('have.attr', 'title', 'no data for this scenario');
       platform('gb300').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="gb300"]').should(
           'contain.text',
@@ -353,9 +340,10 @@ describe('Overview page', () => {
       });
     });
 
-    desktopModel('GLM-5.2')
-      .find('[data-testid="overview-model-coverage-note"]')
-      .should('have.text', 'No 8K/1K results');
+    desktopModel('GLM-5.2').within(() => {
+      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
+      cy.get('[data-testid="overview-model-coverage-note"]').should('not.exist');
+    });
     cy.contains('∞ = no comparable result').should('exist');
     cy.get('body')
       .invoke('text')
@@ -374,9 +362,10 @@ describe('Overview page', () => {
     });
 
     cy.location('search').should('eq', '?tier=100');
-    cy.contains(
-      'GPU rental cost / 1M output tokens · 8K→1K · @100 tok/s/user · ↓ lower is better',
-    ).should('exist');
+    cy.get('[data-testid="overview-scope"]').should(
+      'have.text',
+      'GPU rental cost / 1M output tokens · @100 tok/s/user · ↓ lower is better',
+    );
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.get('[aria-current="page"]').should('have.text', '100');
       cy.contains('a', '50').should('have.attr', 'href', '/overview');
@@ -414,17 +403,16 @@ describe('Overview page', () => {
       .should('not.match', /∞\s*%/);
 
     cy.visit('/overview?tier=100');
-    cy.contains(
-      'GPU rental cost / 1M output tokens · 8K→1K · @100 tok/s/user · ↓ lower is better',
-    ).should('exist');
+    cy.get('[data-testid="overview-scope"]').should(
+      'have.text',
+      'GPU rental cost / 1M output tokens · @100 tok/s/user · ↓ lower is better',
+    );
     cy.get('[data-testid="language-toggle"]')
       .should('have.attr', 'href', '/zh/overview?tier=100')
       .click();
     cy.location('pathname').should('eq', '/zh/overview');
     cy.location('search').should('eq', '?tier=100');
-    cy.contains('GPU 租赁成本 / 每百万输出 token · 8K→1K · @100 tok/s/用户 · ↓ 越低越好').should(
-      'exist',
-    );
+    cy.contains('GPU 租赁成本 / 每百万输出 token · @100 tok/s/用户 · ↓ 越低越好').should('exist');
   });
 
   it('uses the same cell semantics on mobile and fits both 390px and 320px widths', () => {
@@ -551,7 +539,7 @@ describe('Overview page', () => {
     cy.viewport(390, 844);
     cy.visit('/overview');
 
-    mobileModel('Kimi-K2.5').within(() => {
+    mobileModel('Qwen-3.5-397B-A17B').within(() => {
       platform('mi355x').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').then(([value]) => {
           cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="mi355x"]').then(
@@ -565,7 +553,7 @@ describe('Overview page', () => {
         });
 
         cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').then(([value]) => {
-          cy.contains('div', 'SGLang · FP4 · Standard decode').then(([metadata]) => {
+          cy.contains('div', 'SGLang · FP8 · MTP').then(([metadata]) => {
             const valueRect = textRect(value);
             const metadataRect = textRect(metadata);
 
@@ -618,9 +606,12 @@ describe('Overview page', () => {
     cy.contains('一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。').should(
       'exist',
     );
-    cy.contains('基于最佳观测平台服务包络线计算的各活跃模型每百万输出 token 成本').should('exist');
-    cy.contains('GPU 租赁成本 / 每百万输出 token · 8K→1K · @50 tok/s/用户 · ↓ 越低越好').should(
+    cy.contains('按各模型标注的场景，基于各平台最佳观测服务包络线计算每百万输出 token 成本').should(
       'exist',
+    );
+    cy.get('[data-testid="overview-scope"]').should(
+      'have.text',
+      'GPU 租赁成本 / 每百万输出 token · @50 tok/s/用户 · ↓ 越低越好',
     );
     cy.contains('成本 = 3 年期租赁 $/GPU/小时 ÷ 每张已部署 GPU 的输出 tok/s。').should('exist');
     cy.contains('分离式结果的分母同时计入预填充与解码 GPU。').should('exist');
@@ -644,19 +635,25 @@ describe('Overview page', () => {
       .invoke('text')
       .should('not.match', /100 档由.+领先/);
     desktopModel('Kimi-K2.5').within(() => {
-      platform('mi355x').should('contain.text', 'SGLang · FP4 · 标准解码');
-      platform('b300').should('contain.text', 'SGLang · FP8 · 标准解码');
+      cy.get('[data-testid="overview-pair-value"]').should('have.length', 3);
+      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 2);
+      platform('b200').should('contain.text', '标准解码');
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
     });
-    desktopModel('GLM-5.2')
-      .find('[data-testid="overview-model-coverage-note"]')
-      .should('have.text', '暂无 8K/1K 结果');
+    desktopModel('GLM-5.2').within(() => {
+      cy.get('[data-testid="overview-model-scenario"]').should('have.text', 'AgentX');
+      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
+      platform('b300')
+        .find('[data-testid="overview-pair-missing"]')
+        .should('have.attr', 'title', '该场景暂无数据');
+    });
+    cy.contains('优先顺序：推测解码 FP4 → 推测解码 FP8 → 标准解码 FP4 → 标准解码 FP8。').should(
+      'exist',
+    );
     cy.contains('∞ = 无可比结果').should('exist');
 
     cy.visit('/zh/overview?tier=100');
-    cy.contains('GPU 租赁成本 / 每百万输出 token · 8K→1K · @100 tok/s/用户 · ↓ 越低越好').should(
-      'exist',
-    );
+    cy.contains('GPU 租赁成本 / 每百万输出 token · @100 tok/s/用户 · ↓ 越低越好').should('exist');
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.contains('a', '50').should('have.attr', 'href', '/zh/overview');
     });

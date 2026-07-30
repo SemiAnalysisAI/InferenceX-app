@@ -75,8 +75,16 @@ describe('First-load navigation', () => {
     cy.location('pathname').should('eq', '/compare');
   });
 
-  it('navigates to dashboard from the landing CTA with one click', () => {
-    cy.contains('a', 'Open Dashboard').click();
+  it('navigates to overview and the full dashboard from the landing CTAs', () => {
+    cy.get('[data-testid="landing-overview-link"]')
+      .should('have.attr', 'href', '/overview')
+      .click();
+    cy.location('pathname').should('eq', '/overview');
+
+    cy.visit('/');
+    cy.get('[data-testid="landing-full-dashboard-link"]')
+      .should('have.attr', 'href', '/inference')
+      .click();
     cy.location('pathname').should('eq', '/inference');
   });
 

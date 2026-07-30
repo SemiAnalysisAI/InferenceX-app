@@ -55,6 +55,7 @@ function summary(overrides: Partial<OverviewModelSummary> = {}): OverviewModelSu
   return {
     model: Model.Qwen3_5,
     modelLabel: 'Qwen 3.5',
+    scenario: 'single_turn_8k1k',
     platforms: [],
     ...overrides,
   };
@@ -93,6 +94,18 @@ describe('buildOverviewDashboardHref', () => {
     expect(href).toContain('i_prec=fp8');
   });
 
+  it('opens AgentX evidence in the Agentic Traces dashboard scenario', () => {
+    const href = buildOverviewDashboardHref(
+      'en',
+      summary({ model: Model.GLM_5_2, scenario: 'agentx' }),
+      config(),
+    );
+
+    expect(href).toContain('g_model=GLM-5.2');
+    expect(href).toContain('i_seq=agentic-traces');
+    expect(href).not.toContain('i_seq=8k%2F1k');
+  });
+
   it('maps specMethod to the dashboard mtp/stp filter bucket, not the raw DB value', () => {
     expect(buildOverviewDashboardHref('en', summary(), config({ specMethod: 'eagle' }))).toContain(
       'i_spec=mtp',
@@ -113,6 +126,12 @@ describe('detailHref', () => {
   it('keeps the model drilldown precision-neutral because headline pairs may differ', () => {
     expect(detailHref('en', summary())).toBe(
       '/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_optimal=1',
+    );
+  });
+
+  it('opens AgentX rows in the Agentic Traces dashboard scenario', () => {
+    expect(detailHref('en', summary({ model: Model.GLM_5_2, scenario: 'agentx' }))).toBe(
+      '/inference?g_model=GLM-5.2&i_seq=agentic-traces&i_optimal=1',
     );
   });
 });

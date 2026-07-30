@@ -5,12 +5,17 @@ describe('Chinese (/zh) pages', () => {
     });
 
     it('renders the Chinese landing content', () => {
-      cy.contains('h2', '完整仪表板').should('exist');
+      cy.contains('h2', '探索 InferenceX').should('exist');
       cy.contains('快速对比').should('exist');
     });
 
-    it('links into the Chinese dashboard tree', () => {
-      cy.get('a[href="/zh/inference"]').should('exist');
+    it('links to the Chinese overview and full dashboard', () => {
+      cy.get('[data-testid="landing-overview-link"]')
+        .should('have.attr', 'href', '/zh/overview')
+        .and('have.text', '总览');
+      cy.get('[data-testid="landing-full-dashboard-link"]')
+        .should('have.attr', 'href', '/zh/inference')
+        .and('have.text', '完整仪表板');
     });
 
     it('sets hreflang alternates to the English homepage', () => {

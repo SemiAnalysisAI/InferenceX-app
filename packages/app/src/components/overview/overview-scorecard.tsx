@@ -21,7 +21,7 @@ export const OVERVIEW_STRINGS = {
     title: 'Inference Cost Overview',
     purpose: 'Every active model across MI355X, B200, B300, GB200 and GB300 at a glance.',
     scope: (tier: number) =>
-      `GPU rental cost / 1M output tokens · 8K→1K · @${tier} tok/s/user · ↓ lower is better`,
+      `GPU rental cost / 1M output tokens · @${tier} tok/s/user · ↓ lower is better`,
     tierNavLabel: 'Service level',
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
@@ -31,27 +31,30 @@ export const OVERVIEW_STRINGS = {
     },
     snapshot: (through: string) => `Database snapshot through ${through}`,
     caption:
-      "Cost per million output tokens from the best observed platform serving envelopes for every active model across today's key platforms, prioritizing speculative decode and FP4.",
-    modelHeader: 'Model',
+      'Cost per million output tokens from each platform’s best observed serving envelope for the scenario shown with each model.',
+    modelHeader: 'Model · Scenario',
+    scenarioLabels: {
+      single_turn_8k1k: 'Single-turn · 8K→1K',
+      agentx: 'AgentX',
+    },
     detailsHeader: 'Details',
     detailLink: 'View details',
     detailAria: (modelLabel: string) => `View details: ${modelLabel}`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
       `Open raw source dashboard for ${evidenceDate}: ${modelLabel} · ${stack}`,
-    standardDecode: 'Standard decode',
     estimatedTooltip: (topologies: readonly string[]) =>
       topologies.length === 0
         ? 'Estimated from validated benchmark runs.'
         : `Estimated from validated ${topologies.join(' and ')} runs.`,
     estimatedAria: (value: string, explanation: string) => `Approximately ${value}. ${explanation}`,
-    noWorkloadResults: 'No 8K/1K results',
     infinityLegend: '∞ = no comparable result',
     missingReasons: (tier: number): Record<string, string> => ({
       int4_bf16_only: 'INT4/BF16 only',
-      no_8k1k_data: 'no 8K/1K data',
+      no_scenario_data: 'no data for this scenario',
       cannot_reach_at_tier: `cannot reach @${tier}`,
       no_exact_at_tier: `no exact @${tier} result`,
     }),
+    standardDecodeLabel: 'Standard decode',
     methodologyNote: 'Priority: speculative FP4 → speculative FP8 → standard FP4 → standard FP8.',
     costNote:
       'Cost = 3-yr rental $/GPU/hr ÷ output tok/s per deployed GPU. All percentages compare against B200.',
@@ -64,13 +67,12 @@ export const OVERVIEW_STRINGS = {
     interpolationNote:
       'Tier values use the best observed platform serving envelope; ≈ marks estimates between validated runs. No extrapolation.',
     comparabilityNote:
-      'Directional platform comparison: cells pick each platform’s best observed envelope, so dates, engines, precisions and decode methods may differ.',
+      'Each row compares platforms within the scenario shown with that model; dates, engines, precisions and speculative methods may differ.',
   },
   zh: {
     title: '推理成本总览',
     purpose: '一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。',
-    scope: (tier: number) =>
-      `GPU 租赁成本 / 每百万输出 token · 8K→1K · @${tier} tok/s/用户 · ↓ 越低越好`,
+    scope: (tier: number) => `GPU 租赁成本 / 每百万输出 token · @${tier} tok/s/用户 · ↓ 越低越好`,
     tierNavLabel: '服务档位',
     tierUnit: 'tok/s/用户',
     engineScopeNavLabel: '引擎范围',
@@ -79,28 +81,30 @@ export const OVERVIEW_STRINGS = {
       community: '开源社区引擎（vLLM/SGLang）',
     },
     snapshot: (through: string) => `数据库快照截至 ${through}`,
-    caption:
-      '基于最佳观测平台服务包络线计算的各活跃模型每百万输出 token 成本；优先采用推测解码与 FP4。',
-    modelHeader: '模型',
+    caption: '按各模型标注的场景，基于各平台最佳观测服务包络线计算每百万输出 token 成本。',
+    modelHeader: '模型 · 场景',
+    scenarioLabels: {
+      single_turn_8k1k: '单轮 · 8K→1K',
+      agentx: 'AgentX',
+    },
     detailsHeader: '详情',
     detailLink: '查看详情',
     detailAria: (modelLabel: string) => `查看详情：${modelLabel}`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
       `打开 ${evidenceDate} 原始数据仪表板：${modelLabel} · ${stack}`,
-    standardDecode: '标准解码',
     estimatedTooltip: (topologies: readonly string[]) =>
       topologies.length === 0
         ? '根据已验证的基准运行结果估算。'
         : `根据已验证的 ${topologies.join(' 与 ')} 运行结果估算。`,
     estimatedAria: (value: string, explanation: string) => `约 ${value}。${explanation}`,
-    noWorkloadResults: '暂无 8K/1K 结果',
     infinityLegend: '∞ = 无可比结果',
     missingReasons: (tier: number): Record<string, string> => ({
       int4_bf16_only: '仅 INT4/BF16',
-      no_8k1k_data: '无 8K/1K 数据',
+      no_scenario_data: '该场景暂无数据',
       cannot_reach_at_tier: `无法达到 @${tier}`,
       no_exact_at_tier: `无精确 @${tier} 结果`,
     }),
+    standardDecodeLabel: '标准解码',
     methodologyNote: '优先顺序：推测解码 FP4 → 推测解码 FP8 → 标准解码 FP4 → 标准解码 FP8。',
     costNote: '成本 = 3 年期租赁 $/GPU/小时 ÷ 每张已部署 GPU 的输出 tok/s。所有百分比均相对 B200。',
     costDeltaAria: (pct: string, cheaper: boolean) => `比 B200 ${cheaper ? '便宜' : '昂贵'} ${pct}`,
@@ -109,8 +113,7 @@ export const OVERVIEW_STRINGS = {
     normalizationNote: '分离式结果的分母同时计入预填充与解码 GPU。',
     interpolationNote:
       '各档位数值采用最佳观测平台服务包络线；≈ 表示根据已验证运行结果估算。不会外推。',
-    comparabilityNote:
-      '方向性平台对比：各单元格取该平台最佳观测包络线，日期、引擎、精度与解码方式可能不同。',
+    comparabilityNote: '每行均在该模型标注的场景内比较各平台；日期、引擎、精度与推测方法可能不同。',
   },
 } as const;
 
@@ -263,14 +266,16 @@ function CellValue({
     return <CellMissing hardware={member.hardware} reason={missingReasonCopy(member, strings)} />;
   }
   const precisionLabel = config?.precision.toUpperCase() ?? member.precision?.toUpperCase() ?? null;
-  const stackBadge =
-    config === null || precisionLabel === null
+  const specLabel =
+    config === null
       ? null
-      : [
-          config.frameworkLabel,
-          precisionLabel,
-          member.decodeMode === 'standard' ? strings.standardDecode : null,
-        ]
+      : config.specMethod === 'none' || config.specMethod === ''
+        ? strings.standardDecodeLabel
+        : config.specLabel;
+  const stackBadge =
+    config === null || precisionLabel === null || specLabel === null
+      ? null
+      : [config.frameworkLabel, precisionLabel, specLabel]
           .filter((part): part is string => part !== null)
           .join(' · ');
   const stack =
@@ -280,7 +285,7 @@ function CellValue({
           member.hardwareLabel,
           config.frameworkLabel,
           config.precision.toUpperCase(),
-          member.decodeMode === 'standard' ? strings.standardDecode : config.specLabel,
+          specLabel,
         ].join(' · ');
   const evidenceDateLabel =
     evidenceDate === null ? '' : formatEvidenceDate(formatters, evidenceDate);
@@ -382,27 +387,17 @@ function PlatformCell(props: {
   );
 }
 
-/** A model with zero 8K/1K coverage collapses to one note instead of a row of
- *  identical empty states. */
-function hasNo8k1kResult(model: OverviewModelSummary): boolean {
+function ModelName({ model, strings }: { model: OverviewModelSummary; strings: OverviewStrings }) {
   return (
-    model.platforms.length > 0 &&
-    model.platforms.every((platform) => platform.missingReason === 'no_8k1k_data')
-  );
-}
-
-function ModelName({ model }: { model: OverviewModelSummary }) {
-  return <h2 className="text-sm font-semibold leading-snug">{model.modelLabel}</h2>;
-}
-
-function CoverageNote({ strings }: { strings: OverviewStrings }) {
-  return (
-    <p
-      data-testid="overview-model-coverage-note"
-      className="text-xs leading-snug text-muted-foreground"
-    >
-      {strings.noWorkloadResults}
-    </p>
+    <div>
+      <h2 className="text-sm font-semibold leading-snug">{model.modelLabel}</h2>
+      <p
+        data-testid="overview-model-scenario"
+        className="mt-0.5 text-[11px] font-normal leading-tight text-muted-foreground"
+      >
+        {strings.scenarioLabels[model.scenario]}
+      </p>
+    </div>
   );
 }
 
@@ -456,28 +451,22 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
               className="border-b border-border/50 align-top last:border-b-0"
             >
               <th scope="row" className="px-4 py-4 text-left align-top font-normal lg:px-6">
-                <ModelName model={model} />
+                <ModelName model={model} strings={strings} />
               </th>
-              {hasNo8k1kResult(model) ? (
-                <td colSpan={model.platforms.length} className="px-4 py-4 align-top">
-                  <CoverageNote strings={strings} />
+              {model.platforms.map((platform) => (
+                <td
+                  key={platform.hardware}
+                  className={`px-3 py-4 align-top ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
+                >
+                  <PlatformCell
+                    locale={locale}
+                    model={model}
+                    platform={platform}
+                    formatters={formatters}
+                    strings={strings}
+                  />
                 </td>
-              ) : (
-                model.platforms.map((platform) => (
-                  <td
-                    key={platform.hardware}
-                    className={`px-3 py-4 align-top ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
-                  >
-                    <PlatformCell
-                      locale={locale}
-                      model={model}
-                      platform={platform}
-                      formatters={formatters}
-                      strings={strings}
-                    />
-                  </td>
-                ))
-              )}
+              ))}
               <td className="px-4 py-4 align-top">
                 <OverviewDetailLink
                   href={detailHref(locale, model)}
@@ -505,36 +494,32 @@ export function MobileOverviewList({ models, locale, formatters, strings }: Surf
             data-model={model.model}
             className="space-y-2 px-4 py-3.5"
           >
-            <ModelName model={model} />
-            {hasNo8k1kResult(model) ? (
-              <CoverageNote strings={strings} />
-            ) : (
-              <div className="grid grid-cols-1">
-                {model.platforms.map((platform) => (
-                  <div
-                    key={platform.hardware}
-                    data-testid="overview-mobile-platform-row"
-                    data-hardware={platform.hardware}
-                    className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-2.5 last:border-b-0"
+            <ModelName model={model} strings={strings} />
+            <div className="grid grid-cols-1">
+              {model.platforms.map((platform) => (
+                <div
+                  key={platform.hardware}
+                  data-testid="overview-mobile-platform-row"
+                  data-hardware={platform.hardware}
+                  className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-2.5 last:border-b-0"
+                >
+                  <span
+                    data-testid="overview-mobile-hardware"
+                    className="pt-0.5 text-xs font-medium text-muted-foreground"
                   >
-                    <span
-                      data-testid="overview-mobile-hardware"
-                      className="pt-0.5 text-xs font-medium text-muted-foreground"
-                    >
-                      {platform.hardwareLabel}
-                    </span>
-                    <PlatformCell
-                      locale={locale}
-                      model={model}
-                      platform={platform}
-                      formatters={formatters}
-                      strings={strings}
-                      phoneRow
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
+                    {platform.hardwareLabel}
+                  </span>
+                  <PlatformCell
+                    locale={locale}
+                    model={model}
+                    platform={platform}
+                    formatters={formatters}
+                    strings={strings}
+                    phoneRow
+                  />
+                </div>
+              ))}
+            </div>
             <OverviewDetailLink
               href={detailHref(locale, model)}
               model={model.model}

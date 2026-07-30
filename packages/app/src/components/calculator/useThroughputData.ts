@@ -4,11 +4,11 @@ import { useCallback, useMemo } from 'react';
 
 import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 
-import type { AggDataEntry, HardwareConfig, InferenceData } from '@/components/inference/types';
+import type { AggDataEntry, HardwareConfig } from '@/components/inference/types';
 import { useBenchmarks } from '@/hooks/api/use-benchmarks';
 import type { BenchmarkRow } from '@/lib/api';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
-import { getHardwareKey, paretoFrontUpperRight } from '@/lib/chart-utils';
+import { getHardwareKey } from '@/lib/chart-utils';
 import { getModelSortIndex, getHardwareConfig, getGpuSpecs } from '@/lib/constants';
 import { Percentile, Sequence, type Model } from '@/lib/data-mappings';
 import { overlayRunIndex } from '@/lib/overlay-run-style';
@@ -22,6 +22,7 @@ import {
   paretoFrontUpperLeft,
   sign,
 } from './interpolation';
+import { restrictAgenticPointsToE2eFrontier } from '@/lib/agentic-frontier';
 import type { CostProvider, GPUDataPoint, InterpolatedResult } from './types';
 
 // Re-export pure functions so existing imports from this module keep working.
@@ -50,50 +51,6 @@ export interface GroupMeta {
 export interface OverlayGroupMeta extends GroupMeta {
   /** Index of the run in the loaded set — drives the overlay palette color. */
   runIndex: number;
-}
-
-interface AgenticFrontierPoint {
-  x: number;
-  y: number;
-  orig: GPUDataPoint;
-}
-
-/**
- * Match the main agentic interactivity chart's anti-benchmark-hacking seed:
- * within each date, only points that also win on the (end-to-end latency,
- * total throughput) upper-right Pareto frontier may feed interpolation.
- *
- * The chart's shared Pareto helper operates on `InferenceData.x/y` only, so
- * minimal projections keep this path aligned without running the full chart
- * transformation pipeline.
- */
-export function restrictAgenticPointsToE2eFrontier(points: GPUDataPoint[]): GPUDataPoint[] {
-  const byDate = new Map<string, AgenticFrontierPoint[]>();
-
-  for (const point of points) {
-    if (
-      typeof point.e2eLatency !== 'number' ||
-      !Number.isFinite(point.e2eLatency) ||
-      !Number.isFinite(point.throughput)
-    ) {
-      continue;
-    }
-    const date = point.date ?? '';
-    let bucket = byDate.get(date);
-    if (!bucket) {
-      bucket = [];
-      byDate.set(date, bucket);
-    }
-    bucket.push({ x: point.e2eLatency, y: point.throughput, orig: point });
-  }
-
-  const winners = new Set<GPUDataPoint>();
-  for (const bucket of byDate.values()) {
-    for (const winner of paretoFrontUpperRight(bucket as unknown as InferenceData[])) {
-      winners.add((winner as unknown as AgenticFrontierPoint).orig);
-    }
-  }
-  return points.filter((point) => winners.has(point));
 }
 
 function getAgenticMetric(
