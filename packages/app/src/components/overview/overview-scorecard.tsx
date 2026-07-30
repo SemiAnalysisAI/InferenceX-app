@@ -69,7 +69,7 @@ export const OVERVIEW_STRINGS = {
     normalizationNote:
       'Disaggregated results include both prefill and decode GPUs in the denominator.',
     interpolationNote:
-      'Tier values use the best observed platform serving envelope; ≈ marks estimates between validated runs. No extrapolation.',
+      'Tier values use the best observed platform serving envelope and may be estimated between validated runs. No extrapolation.',
     comparabilityNote:
       'Each row compares platforms within the scenario shown with that model; dates, engines, precisions and speculative methods may differ.',
   },
@@ -120,7 +120,7 @@ export const OVERVIEW_STRINGS = {
     referenceHeader: '基准',
     normalizationNote: '分离式结果的分母同时计入预填充与解码 GPU。',
     interpolationNote:
-      '各档位数值采用最佳观测平台服务包络线；≈ 表示根据已验证运行结果估算。不会外推。',
+      '各档位数值采用最佳观测平台服务包络线，可能根据已验证运行结果估算。不会外推。',
     comparabilityNote: '每行均在该模型标注的场景内比较各平台；日期、引擎、精度与推测方法可能不同。',
   },
 } as const;
@@ -326,15 +326,7 @@ function CellValue({
     config === null || stack === null
       ? null
       : strings.rawDashboardAria(evidenceDateLabel, model.modelLabel, stack);
-  const costText =
-    estimateExplanation === undefined ? (
-      formattedValue
-    ) : (
-      <span data-testid="overview-estimate-visible" aria-hidden="true">
-        {'≈'}
-        {formattedValue}
-      </span>
-    );
+  const costText = formattedValue;
   return (
     <div className="min-w-0 space-y-0.5 text-sm">
       {/* Fixed cost | delta grids keep comparisons scannable on desktop and phones;

@@ -178,6 +178,9 @@ describe('Overview page', () => {
         // its hover/focus/screen-reader label, never as visible text.
         cy.get(
           '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
+        ).should('have.text', '$0.067');
+        cy.get(
+          '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
         )
           .should(
             'have.attr',
@@ -189,9 +192,6 @@ describe('Overview page', () => {
             'aria-label',
             'Approximately $0.067. Estimated from validated benchmark runs. Open raw source dashboard for Jul 18: DeepSeek V4 Pro 1.6T · B200 · SGLang · FP4 · MTP',
           );
-        cy.get(
-          '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-estimate-visible"]',
-        ).should('have.text', '≈$0.067');
         cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
       });
       // GB300's two points are a single-node and a multi-node aggregate
@@ -299,8 +299,9 @@ describe('Overview page', () => {
       'Disaggregated results include both prefill and decode GPUs in the denominator.',
     ).should('exist');
     cy.contains(
-      'Tier values use the best observed platform serving envelope; ≈ marks estimates between validated runs. No extrapolation.',
+      'Tier values use the best observed platform serving envelope and may be estimated between validated runs. No extrapolation.',
     ).should('exist');
+    cy.get('body').should('not.contain.text', '≈');
     expectNoVisibleDatesOrSnapshot();
     cy.get('[data-testid="overview-pair-topology"]').should('not.exist');
     cy.get('body')
@@ -416,7 +417,7 @@ describe('Overview page', () => {
         cy.get(
           '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
         )
-          .should('contain.text', '≈$0.082')
+          .should('contain.text', '$0.082')
           .should('have.attr', 'href')
           .and('include', 'i_prec=fp4')
           .and('include', 'i_gpus=b200_sglang_mtp');
@@ -448,7 +449,10 @@ describe('Overview page', () => {
           .should('contain.text', '—')
           .and('have.attr', 'title', 'no exact @50 result');
       });
-      platform('b200').find('[data-testid="overview-estimate-visible"]').should('exist');
+      platform('b200')
+        .find('[data-testid="overview-cost-evidence-link"]')
+        .should('have.attr', 'title')
+        .and('include', 'Estimated from validated benchmark runs.');
     });
 
     desktopModel('MiniMax-M3').within(() => {
@@ -503,11 +507,11 @@ describe('Overview page', () => {
     });
 
     desktopModel('Qwen-3.5-397B-A17B').within(() => {
-      platform('b200').should('contain.text', '≈$0.139').and('contain.text', 'FP8');
+      platform('b200').should('contain.text', '$0.139').and('contain.text', 'FP8');
       platform('mi355x').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').should(
           'contain.text',
-          '≈$0.074',
+          '$0.074',
         );
       });
       platform('b300').within(() => {
@@ -580,8 +584,8 @@ describe('Overview page', () => {
       });
       mobileModel('DeepSeek-V4-Pro').within(() => {
         cy.get(
-          '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-estimate-visible"]',
-        ).should('have.text', '≈$0.067');
+          '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
+        ).should('have.text', '$0.067');
         cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]').should(
           'have.attr',
           'title',
@@ -746,8 +750,9 @@ describe('Overview page', () => {
     cy.contains('— = 无结果。∞ = 缺少 B200 基线。').should('exist');
     cy.contains('分离式结果的分母同时计入预填充与解码 GPU。').should('exist');
     cy.contains(
-      '各档位数值采用最佳观测平台服务包络线；≈ 表示根据已验证运行结果估算。不会外推。',
+      '各档位数值采用最佳观测平台服务包络线，可能根据已验证运行结果估算。不会外推。',
     ).should('exist');
+    cy.get('body').should('not.contain.text', '≈');
     expectNoVisibleDatesOrSnapshot();
     desktopModel('DeepSeek-V4-Pro')
       .find(
@@ -760,9 +765,7 @@ describe('Overview page', () => {
     cy.get('@estimatedB200')
       .invoke('attr', 'aria-label')
       .should('include', '约 $0.067。根据已验证的基准运行结果估算。');
-    cy.get('@estimatedB200')
-      .find('[data-testid="overview-estimate-visible"]')
-      .should('have.text', '≈$0.067');
+    cy.get('@estimatedB200').should('have.text', '$0.067');
     cy.get('@estimatedB200')
       .should('have.attr', 'href')
       .and('include', '/zh/inference?')
