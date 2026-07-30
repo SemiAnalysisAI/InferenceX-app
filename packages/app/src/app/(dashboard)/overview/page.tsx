@@ -10,7 +10,7 @@ import { getOverviewPageData } from '@/lib/overview-data.server';
 export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
-  'Compare cost per million output tokens across MI355X, B200, B300, GB200 and GB300 using the scenario shown for each active model.';
+  'Compare hyperscaler cost per million total tokens across MI355X, B200, B300, GB200 and GB300 using the scenario shown for each active model.';
 
 export const metadata: Metadata = {
   title: 'Inference Cost Overview',

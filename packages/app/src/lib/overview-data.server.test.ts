@@ -4,6 +4,8 @@ import type { BenchmarkRow } from './api';
 import { Model, Precision } from './data-mappings';
 import type { OverviewPageData } from './overview-data';
 
+/** `throughput` is TOTAL tok/s per GPU — the overview's cost basis. The
+ *  output metric is a decoy so a regression to output pricing surfaces here. */
 function row(hardware: string, framework: string, throughput: number): BenchmarkRow {
   return {
     id: throughput,
@@ -30,7 +32,7 @@ function row(hardware: string, framework: string, throughput: number): Benchmark
     conc: 1,
     offload_mode: 'off',
     image: null,
-    metrics: { median_intvty: 50, output_tput_per_gpu: throughput },
+    metrics: { median_intvty: 50, tput_per_gpu: throughput, output_tput_per_gpu: 123 },
     date: '2026-07-20',
     run_url: null,
   };

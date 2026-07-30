@@ -83,12 +83,18 @@ export interface TcoFeedRow {
 
 export interface TcoTierPoint {
   interactivity: number;
-  outputThroughput: number;
+  /** Serving throughput (tok/s per GPU) in the CALLER-CHOSEN metric: the
+   *  external feed reads output tokens, the Overview total (input + output)
+   *  tokens per deployed GPU. The frontier math is metric-agnostic. */
+  throughput: number;
   date: string;
   evidenceLabel?: string;
 }
 
-export type TcoTierRead = Omit<TcoFeedRow, 'hardware' | 'workload'>;
+export type TcoTierRead = Omit<TcoFeedRow, 'hardware' | 'workload' | 'output_tput_per_gpu'> & {
+  /** Frontier read at `tier` in the caller's throughput metric; 0 when unreachable. */
+  throughput_per_gpu: number;
+};
 
 export const DEFAULT_TIERS: readonly number[] = [30, 50, 75, 100];
 export const DEFAULT_WORKLOADS: readonly TcoFeedWorkload[] = [
@@ -245,7 +251,8 @@ function bracketKnots(frontier: TcoTierPoint[], tier: number): [TcoTierPoint, Tc
   return [frontier[lo], frontier[lo + 1]];
 }
 
-/** Read fixed service tiers from an output-throughput serving frontier. */
+/** Read fixed service tiers from a serving-throughput frontier (the
+ *  throughput metric is whatever the caller put in `TcoTierPoint.throughput`). */
 export function computeTierReads(
   points: readonly TcoTierPoint[],
   tiers: readonly number[],
@@ -253,12 +260,12 @@ export function computeTierReads(
   const frontier = paretoFrontUpperLeft(
     [...points],
     (point) => point.interactivity,
-    (point) => point.outputThroughput,
+    (point) => point.throughput,
   ).toSorted((a, b) => a.interactivity - b.interactivity);
   if (frontier.length === 0) return [];
 
   const xs = frontier.map((point) => point.interactivity);
-  const ys = frontier.map((point) => point.outputThroughput);
+  const ys = frontier.map((point) => point.throughput);
   const slopes = monotoneSlopes(xs, ys);
   const minIv = xs[0];
   const maxIv = xs.at(-1)!;
@@ -297,7 +304,7 @@ export function computeTierReads(
     }
     return {
       tier,
-      output_tput_per_gpu: round3(value),
+      throughput_per_gpu: round3(value),
       boundary,
       is_interpolated: isInterpolated,
       frontier_points: frontier.length,
@@ -309,6 +316,20 @@ export function computeTierReads(
       ...(tierEvidenceLabels === undefined ? {} : { evidence_labels: tierEvidenceLabels }),
     };
   });
+}
+
+/**
+ * Chart parity: for single_turn rows the inference chart plots the STORED
+ * median_intvty on the x-axis (the ingest mapper's 1/itl invariant only
+ * rewrites agentic rows), so prefer the stored value and fall back to
+ * 1/median_itl only for legacy rows/fixtures that predate the intvty key.
+ * Shared by the feed and the Overview so both read the same x-axis.
+ */
+export function singleTurnInteractivity(metrics: Record<string, number>): number | undefined {
+  const storedIv = metrics.median_intvty;
+  if (Number.isFinite(storedIv) && storedIv > 0) return storedIv;
+  const itl = metrics.median_itl;
+  return Number.isFinite(itl) && itl > 0 ? 1 / itl : undefined;
 }
 
 /**
@@ -331,25 +352,13 @@ export function computeTcoFeed(
       // match below excludes anyway).
       if ((row.benchmark_type ?? 'single_turn') !== 'single_turn') continue;
       if (row.isl !== workload.isl || row.osl !== workload.osl) continue;
-      // Chart parity: for single_turn rows the inference chart plots the
-      // STORED median_intvty on the x-axis (the ingest mapper's 1/itl
-      // invariant only rewrites agentic rows), so prefer the stored value
-      // and fall back to 1/median_itl only for legacy rows/fixtures that
-      // predate the intvty key.
-      const storedIv = row.metrics.median_intvty;
-      const itl = row.metrics.median_itl;
-      const interactivity =
-        Number.isFinite(storedIv) && storedIv > 0
-          ? storedIv
-          : Number.isFinite(itl) && itl > 0
-            ? 1 / itl
-            : undefined;
+      const interactivity = singleTurnInteractivity(row.metrics);
       const otput = row.metrics.output_tput_per_gpu;
       if (interactivity === undefined) continue;
       if (!Number.isFinite(otput) || otput <= 0) continue;
       const point = {
         interactivity,
-        outputThroughput: otput,
+        throughput: otput,
         date: row.date,
         evidenceLabel: row.evidence_label,
       };
@@ -362,10 +371,13 @@ export function computeTcoFeed(
     const hardwareKeys = [...byHardware.keys()].toSorted((a, b) => a.localeCompare(b));
     for (const hardware of hardwareKeys) {
       for (const read of computeTierReads(byHardware.get(hardware)!, tiers)) {
+        // The feed's contract names the metric it serves: output tokens.
+        const { throughput_per_gpu: outputTputPerGpu, ...rest } = read;
         out.push({
           hardware,
           workload: workloadKey,
-          ...read,
+          output_tput_per_gpu: outputTputPerGpu,
+          ...rest,
         });
       }
     }

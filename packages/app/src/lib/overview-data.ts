@@ -8,10 +8,11 @@ import { getGpuSpecs, getHardwareConfig } from './constants';
 import { DEFAULT_MODELS, getModelLabel, Model, Precision } from './data-mappings';
 import { frameworkFamily } from './framework-family';
 import {
-  computeTcoFeed,
   computeTierReads,
+  singleTurnInteractivity,
   type TcoTierBoundary,
   type TcoTierPoint,
+  type TcoTierRead,
 } from './tco-feed';
 
 export const OVERVIEW_WORKLOAD = { isl: 8192, osl: 1024 } as const;
@@ -35,6 +36,8 @@ export function resolveOverviewTier(raw: string | string[] | undefined): Overvie
 
 export interface OverviewTierValue {
   tier: number;
+  /** Total (input + output) tok/s per DEPLOYED GPU on the frontier at `tier` —
+   *  the overview's cost basis; null when the tier is not comparable. */
   value: number | null;
   boundary: TcoTierBoundary;
   /** True only when the tier value falls between observed frontier knots. */
@@ -92,7 +95,8 @@ export interface OverviewPlatformResult {
   precision: string | null;
   read: OverviewTierRead;
   missingReason: OverviewMissingReason | null;
-  /** $ per million output tokens at the retail-rental $/GPU/hr tier. */
+  /** $ per million TOTAL (input + output) tokens at the hyperscaler $/GPU/hr
+   *  tier (`HW_REGISTRY.costh`). */
   costPerMtok: number | null;
   /** Cost delta vs this row's B200 cell; negative = cheaper. Null on the B200
    *  cell itself and whenever either cost is unavailable. */
@@ -108,7 +112,6 @@ export interface OverviewModelSummary {
 
 export interface OverviewPageData {
   models: OverviewModelSummary[];
-  datasetThroughDate: string | null;
   tier: OverviewTier;
   engineScope: OverviewEngineScope;
 }
@@ -173,15 +176,6 @@ function overviewScenarioRows(
       row.benchmark_type === 'single_turn' &&
       row.isl === OVERVIEW_WORKLOAD.isl &&
       row.osl === OVERVIEW_WORKLOAD.osl,
-  );
-}
-
-/** Deliberately from raw scenario rows, not retained winners: an unranked
- * precision or engine still dates the dataset it was measured in. */
-function latestOverviewDate(rows: readonly BenchmarkRow[]): string | null {
-  return rows.reduce<string | null>(
-    (latest, row) => (latest === null || row.date > latest ? row.date : latest),
-    null,
   );
 }
 
@@ -338,14 +332,24 @@ function missingReasonForPlatform(
     : 'no_exact_at_tier';
 }
 
+/**
+ * The overview's cost contract:
+ *
+ *   $ / 1M total tokens = HW_REGISTRY.costh × 1,000,000
+ *                       ÷ (total tok/s per deployed GPU × 3,600)
+ *
+ * `costh` is the HYPERSCALER $/GPU/hr tier (not neocloud `costn` or retail
+ * `costr`), and the denominator counts TOTAL (input + output) tokens over
+ * every deployed GPU — prefill + decode for disaggregated serving.
+ */
 export function overviewCostPerMtok(
   hardware: string,
-  outputTputPerGpu: number | null,
+  totalTputPerGpu: number | null,
 ): number | null {
-  if (outputTputPerGpu === null || outputTputPerGpu <= 0) return null;
-  const costPerGpuHour = getGpuSpecs(hardware).costr;
+  if (totalTputPerGpu === null || totalTputPerGpu <= 0) return null;
+  const costPerGpuHour = getGpuSpecs(hardware).costh;
   if (costPerGpuHour <= 0) return null;
-  return (costPerGpuHour * 1_000_000) / (outputTputPerGpu * 3600);
+  return (costPerGpuHour * 1_000_000) / (totalTputPerGpu * 3600);
 }
 
 function buildPlatformResults(
@@ -402,23 +406,24 @@ function topologyEvidence(row: BenchmarkRow): string | undefined {
 
 interface OverviewAgenticTierPoint extends TcoTierPoint {
   e2eLatency: number;
-  throughput: number;
 }
 
-function buildAgenticTierReads(rows: readonly BenchmarkRow[]) {
+/** AgentX: the tier axis stays P90 interactivity (the chart's SLA contract);
+ *  the throughput read at the tier is total tok/s per deployed GPU. */
+function buildAgenticTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
   const points = rows.flatMap((row): OverviewAgenticTierPoint[] => {
     const entry = rowToAggDataEntry(row);
     const factor = deployedGpuFactor(row);
     const interactivity = entry.p90_intvty;
     const e2eLatency = entry.p90_e2el;
-    const outputThroughput = entry.output_tput_per_gpu * factor;
+    const totalThroughput = entry.tput_per_gpu * factor;
     if (
       !Number.isFinite(interactivity) ||
       interactivity <= 0 ||
       !Number.isFinite(e2eLatency) ||
       e2eLatency <= 0 ||
-      !Number.isFinite(outputThroughput) ||
-      outputThroughput <= 0
+      !Number.isFinite(totalThroughput) ||
+      totalThroughput <= 0
     ) {
       return [];
     }
@@ -426,14 +431,34 @@ function buildAgenticTierReads(rows: readonly BenchmarkRow[]) {
       {
         interactivity,
         e2eLatency,
-        throughput: outputThroughput,
-        outputThroughput,
+        throughput: totalThroughput,
         date: row.date,
         evidenceLabel: topologyEvidence(row),
       },
     ];
   });
   return computeTierReads(restrictAgenticPointsToE2eFrontier(points), OVERVIEW_TIERS);
+}
+
+/** Single-turn 8K/1K: frontier points at the chart's stored interactivity,
+ *  valued in total (input + output) tok/s per DEPLOYED GPU. Rows without a
+ *  usable total-throughput metric are dropped — the overview cannot price
+ *  them, so they must not shape the frontier either. */
+function buildSingleTurnTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
+  const points = rows.flatMap((row): TcoTierPoint[] => {
+    const interactivity = singleTurnInteractivity(row.metrics);
+    const totalTput = row.metrics.tput_per_gpu;
+    if (interactivity === undefined || !Number.isFinite(totalTput) || totalTput <= 0) return [];
+    return [
+      {
+        interactivity,
+        throughput: totalTput * deployedGpuFactor(row),
+        date: row.date,
+        evidenceLabel: topologyEvidence(row),
+      },
+    ];
+  });
+  return computeTierReads(points, OVERVIEW_TIERS);
 }
 
 function buildConfigResult(
@@ -443,26 +468,7 @@ function buildConfigResult(
   key: string,
   rows: BenchmarkRow[],
 ): OverviewConfigResult | null {
-  const feed =
-    scenario === 'agentx'
-      ? buildAgenticTierReads(rows)
-      : computeTcoFeed(
-          rows.map((row) => {
-            const outputTputPerGpu = row.metrics.output_tput_per_gpu;
-            return {
-              ...row,
-              metrics: {
-                ...row.metrics,
-                output_tput_per_gpu: Number.isFinite(outputTputPerGpu)
-                  ? outputTputPerGpu * deployedGpuFactor(row)
-                  : outputTputPerGpu,
-              },
-              evidence_label: topologyEvidence(row),
-            };
-          }),
-          [OVERVIEW_WORKLOAD],
-          OVERVIEW_TIERS,
-        );
+  const feed = scenario === 'agentx' ? buildAgenticTierReads(rows) : buildSingleTurnTierReads(rows);
   if (feed.length === 0) return null;
 
   const first = rows[0];
@@ -485,9 +491,9 @@ function buildConfigResult(
     sourceRunUrls,
     tierValues: feed.map((row) => {
       const value =
-        row.boundary === 'unreachable' && row.output_tput_per_gpu === 0
+        row.boundary === 'unreachable' && row.throughput_per_gpu === 0
           ? null
-          : row.output_tput_per_gpu;
+          : row.throughput_per_gpu;
       return {
         tier: row.tier,
         value,
@@ -529,12 +535,6 @@ export function assembleOverviewPageData(
   return {
     models: perModel.map(({ model, rows }) =>
       buildOverviewModelSummary(model, rows, tier, engineScope),
-    ),
-    datasetThroughDate: latestOverviewDate(
-      perModel.flatMap(({ model, rows }) => {
-        const scenario = overviewScenarioForModel(model, rows);
-        return overviewScenarioRows(scenario, overviewEngineRows(rows, engineScope));
-      }),
     ),
     tier,
     engineScope,
