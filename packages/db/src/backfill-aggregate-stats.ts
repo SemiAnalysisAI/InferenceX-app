@@ -94,12 +94,16 @@ async function main(): Promise<void> {
       }
 
       let stats: AggregateStats;
-      if (row.aggregate_stats?.version === 3) {
+      // v3 onwards → current is a profile-only change (the server-derived
+      // fields haven't changed since v3), so skip re-reading the huge server
+      // blob and carry its KV/prefix distributions forward.
+      const storedVersion = row.aggregate_stats?.version;
+      if (storedVersion !== undefined && storedVersion >= 3 && storedVersion < STATS_VERSION) {
         const profileStats = await computeAggregateStats({
           profileBlob: row.profile_export_jsonl_gz,
           serverBlob: null,
         });
-        stats = mergeProfileStatsUpgrade(row.aggregate_stats, profileStats);
+        stats = mergeProfileStatsUpgrade(row.aggregate_stats!, profileStats);
       } else {
         const [serverRow] = await sql<{ server_metrics_json_gz: Buffer | null }[]>`
           select server_metrics_json_gz

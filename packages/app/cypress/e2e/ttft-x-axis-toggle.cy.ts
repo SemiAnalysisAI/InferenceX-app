@@ -1,27 +1,5 @@
 import { unlockAgenticGate } from '../support/e2e';
 
-const interceptDerivedMetrics = () => {
-  cy.intercept('GET', '/api/v1/derived-agentic-metrics*', (request) => {
-    const ids = new URL(request.url).searchParams.get('ids')?.split(',').filter(Boolean) ?? [];
-    request.reply({
-      body: Object.fromEntries(
-        ids.map((id, index) => [
-          id,
-          {
-            id: Number(id),
-            normalized_session_time_s: 60 + index,
-            p90_prefill_tps_per_user: 100 + index,
-            p75_normalized_e2e_400_s: 8 + index,
-            p90_normalized_e2e_400_s: 12 + index,
-            p75_osl_per_e2el: 40 + index,
-            p90_osl_per_e2el: 25 + index,
-          },
-        ]),
-      ),
-    });
-  }).as('derivedAgenticMetrics');
-};
-
 // This spec exercises the agentic x-axis modes, which only exist when the
 // selected model resolves to the Agentic Traces scenario. The default e2e
 // fixtures (cypress/fixtures/api/*.json) have NO agentic rows for any model, and
@@ -148,10 +126,6 @@ const interceptFixedSequenceData = () => {
 describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
     interceptAgenticData();
-    // Stub derived metrics before the visit: if the agentic DEFAULT x-axis mode
-    // is (or becomes) a derived mode that fetches /derived-agentic-metrics on
-    // mount, the chart must not sit on its loading skeleton.
-    interceptDerivedMetrics();
     cy.visit('/inference?i_seq=agentic-traces', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -166,7 +140,6 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Traces');
     cy.get('[data-testid="x-axis-mode-ttft"]').should('be.visible');
     cy.get('[data-testid="x-axis-mode-e2e"]').should('be.visible');
-    cy.get('[data-testid="x-axis-mode-normalized-e2e"]').should('be.visible');
     cy.get('[data-testid="x-axis-mode-interactivity"]')
       .should('be.visible')
       .and('have.attr', 'aria-selected', 'true');
@@ -255,32 +228,6 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"] svg').should('contain.text', 'P90 End-to-end Latency (s)');
   });
 
-  it('switches to request-level normalized E2E at 400 output tokens', () => {
-    interceptDerivedMetrics();
-    cy.get('[data-testid="x-axis-mode-normalized-e2e"]').click();
-    cy.wait('@derivedAgenticMetrics');
-    cy.get('[data-testid="x-axis-mode-normalized-e2e"]').should(
-      'have.attr',
-      'aria-selected',
-      'true',
-    );
-    cy.get('[data-testid="chart-figure"] h2').should(
-      'contain.text',
-      'P90 Normalized E2E @ 400 output tokens',
-    );
-    cy.get('[data-testid="chart-figure"] svg').should(
-      'contain.text',
-      'P90 Normalized E2E @ 400 output tokens (s)',
-    );
-
-    cy.get('[data-testid="percentile-selector"]').click();
-    cy.contains('[role="option"]', 'p75').click();
-    cy.get('[data-testid="chart-figure"] h2').should(
-      'contain.text',
-      'P75 Normalized E2E @ 400 output tokens',
-    );
-  });
-
   it('switches back to Interactivity', () => {
     cy.get('[data-testid="x-axis-mode-interactivity"]').click();
     cy.get('[data-testid="x-axis-mode-interactivity"]').should(
@@ -289,7 +236,18 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       'true',
     );
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
-    // Percentile was switched to p75 in the previous test — the axis label follows.
+    cy.get('[data-testid="chart-figure"] svg').should(
+      'contain.text',
+      'P90 Interactivity (tok/s/user)',
+    );
+  });
+
+  it('follows the percentile selector in the Interactivity axis label', () => {
+    // Select p75 here rather than inheriting it from another test — the axis
+    // label must track the selector on its own.
+    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
+    cy.get('[data-testid="percentile-selector"]').click();
+    cy.contains('[role="option"]', 'p75').click();
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
       'P75 Interactivity (tok/s/user)',
@@ -411,9 +369,6 @@ const interceptAgenticDataWithOverlay = () => {
 describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', () => {
   before(() => {
     interceptAgenticDataWithOverlay();
-    // Same as the main suite: keep the visit independent of the agentic default
-    // x-axis mode (a derived default fetches /derived-agentic-metrics on mount).
-    interceptDerivedMetrics();
     cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -461,20 +416,5 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
       });
       expect(total).to.be.greaterThan(0);
     });
-  });
-
-  it('normalized-e2e mode shows suppression banner for unofficial-run overlays', () => {
-    interceptDerivedMetrics();
-    cy.get('[data-testid="x-axis-mode-normalized-e2e"]').click();
-    cy.get('[data-testid="x-axis-mode-normalized-e2e"]').should(
-      'have.attr',
-      'aria-selected',
-      'true',
-    );
-    // The suppression message appears because isUnofficialRun is true and the
-    // mode is 'normalized-e2e' (documented in ChartDisplay.tsx ~line 640).
-    cy.contains(
-      'Normalized E2E requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
-    ).should('be.visible');
   });
 });

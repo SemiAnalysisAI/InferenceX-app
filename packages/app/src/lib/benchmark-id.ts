@@ -8,7 +8,7 @@
  *
  * A bare `typeof id === 'number'` check is NOT enough: `NaN` and `0` are both
  * `number` yet neither is a real row. Passing them to the id-keyed endpoints
- * (`/api/v1/derived-agentic-metrics?ids=…`, `…?id=…`) yields a 400 (the routes
+ * (`/api/v1/agentic-aggregates?ids=…`, `…?id=…`) yields a 400 (the routes
  * filter to `Number.isFinite(n) && n > 0`), and building an
  * `/inference/agentic/<id>` link out of one points at a non-existent row.
  *

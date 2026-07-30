@@ -1,9 +1,8 @@
 /**
  * Pre-compute the per-row aggregate stats for an `agentic_trace_replay`
  * blob pair. The output lands in the `aggregate_stats` JSONB column so the
- * detail page can serve the "Aggregates across configs" view and the
- * derived chart x-axis modes from a single SQL row read, instead of
- * parsing the raw blobs on demand.
+ * detail page can serve the "Aggregates across configs" view from a single
+ * SQL row read, instead of parsing the raw blobs on demand.
  *
  * Shape is intentionally versioned — bump `STATS_VERSION` whenever the
  * computation changes so the backfill script knows which rows to recompute.
@@ -12,7 +11,6 @@
 import { gunzipSync } from 'node:zlib';
 
 import { gunzipJsonWithinLimit, streamCollectKeys } from './gzip-json-stream';
-import { computeDerivedFromBlob } from '../queries/derived-agentic-metrics';
 import {
   STATS_VERSION,
   extractIslOsl,
@@ -29,12 +27,19 @@ export interface AggregateStats {
   osl: MetricPercentiles | null;
   kvCacheUtil: MetricPercentiles | null;
   prefixCacheHitRate: MetricPercentiles | null;
-  /** Mean of (per-session e2e time × mean_load / session_load) across sessions. */
-  normalizedSessionTimeS: number | null;
-  /** P90 of per-turn ISL/TTFT pooled across every session's turns. */
-  p90PrefillTpsPerUser: number | null;
-  /** Per-request normalized E2E distribution at a fixed 400-token OSL. */
-  normalizedE2e400: MetricPercentiles | null;
+}
+
+/**
+ * The subset of an older-version bundle a profile-only upgrade carries
+ * forward. Pre-v6 bundles also carry the since-retired derived metrics
+ * (normalizedSessionTimeS, p90PrefillTpsPerUser, normalizedE2e400) — spreading
+ * `profile` first drops them from the merged result.
+ */
+interface ProfileUpgradeCarryover {
+  isl: MetricPercentiles | null;
+  osl: MetricPercentiles | null;
+  kvCacheUtil: MetricPercentiles | null;
+  prefixCacheHitRate: MetricPercentiles | null;
 }
 
 /**
@@ -43,17 +48,13 @@ export interface AggregateStats {
  * while preserving its already-computed KV/cache distributions.
  */
 export function mergeProfileStatsUpgrade(
-  existing: Omit<AggregateStats, 'normalizedE2e400'> & {
-    normalizedE2e400?: MetricPercentiles | null;
-  },
+  existing: ProfileUpgradeCarryover,
   profile: AggregateStats,
 ): AggregateStats {
   return {
     ...profile,
     isl: profile.isl ?? existing.isl,
     osl: profile.osl ?? existing.osl,
-    normalizedSessionTimeS: profile.normalizedSessionTimeS ?? existing.normalizedSessionTimeS,
-    p90PrefillTpsPerUser: profile.p90PrefillTpsPerUser ?? existing.p90PrefillTpsPerUser,
     kvCacheUtil: existing.kvCacheUtil,
     prefixCacheHitRate: existing.prefixCacheHitRate,
   };
@@ -92,9 +93,6 @@ export async function computeAggregateStats(args: {
 }): Promise<AggregateStats> {
   let islPct: MetricPercentiles | null = null;
   let oslPct: MetricPercentiles | null = null;
-  let normalized: number | null = null;
-  let prefillP90: number | null = null;
-  let normalizedE2e400: MetricPercentiles | null = null;
 
   if (args.profileBlob) {
     try {
@@ -102,10 +100,6 @@ export async function computeAggregateStats(args: {
       const { isl, osl } = extractIslOsl(jsonl);
       islPct = percentilesOf(isl);
       oslPct = percentilesOf(osl);
-      const derived = computeDerivedFromBlob(jsonl);
-      normalized = derived.normalized_session_time_s;
-      prefillP90 = derived.p90_prefill_tps_per_user;
-      normalizedE2e400 = derived.normalized_e2e_400;
     } catch {
       // ignore malformed blob — leave nulls
     }
@@ -136,8 +130,5 @@ export async function computeAggregateStats(args: {
     osl: oslPct,
     kvCacheUtil: kvPct,
     prefixCacheHitRate: prefixPct,
-    normalizedSessionTimeS: normalized,
-    p90PrefillTpsPerUser: prefillP90,
-    normalizedE2e400,
   };
 }

@@ -1,4 +1,3 @@
-export * from './agentic';
 export * from './framework-aliases';
 export * from './github';
 export * from './gpu-keys';

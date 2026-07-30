@@ -11,20 +11,6 @@ import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisFiel
 import type { ChartDefinition, InferenceData, YAxisMetricKey } from './types';
 
 /**
- * Select the matching unofficial-run overlay for a chart mode. Normalized E2E
- * is intentionally excluded: unofficial benchmark rows do not include the
- * persisted per-request trace needed to normalize before taking percentiles.
- */
-export function selectUnofficialOverlayForMode<T>(
-  xAxisMode: string,
-  chartType: 'e2e' | 'interactivity',
-  overlays: { e2e: T | null; interactivity: T | null },
-): T | null {
-  if (xAxisMode === 'normalized-e2e') return null;
-  return overlays[chartType];
-}
-
-/**
  * Filters data points based on cost limits defined in the chart definition.
  * Only applies filtering for cost-related metrics, and only filters based on
  * the currently selected cost metric (not all cost fields).

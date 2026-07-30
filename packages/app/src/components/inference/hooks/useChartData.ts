@@ -39,41 +39,18 @@ import {
 /**
  * Chart x-axis variant selected by the mode buttons above the plot. This is
  * the single definition — InferenceContext (URL/state) and ChartDisplay
- * (buttons, derived-metric remapping) import it from here.
+ * (buttons) import it from here.
  */
-export type XAxisMode =
-  | 'ttft'
-  | 'e2e'
-  | 'normalized-e2e'
-  | 'interactivity'
-  | 'session-time'
-  | 'prefill-tps';
+export type XAxisMode = 'ttft' | 'e2e' | 'interactivity';
 
-export const X_AXIS_MODES: readonly XAxisMode[] = [
-  'ttft',
-  'e2e',
-  'normalized-e2e',
-  'interactivity',
-  'session-time',
-  'prefill-tps',
-];
-
-/**
- * Modes whose x metric is derived from persisted per-request traces —
- * these only exist for agentic scenarios (fixed-seq rows have no
- * trace_replay blob to derive them from).
- */
-export function isAgenticOnlyXAxisMode(mode: XAxisMode): boolean {
-  return mode === 'normalized-e2e' || mode === 'session-time' || mode === 'prefill-tps';
-}
+export const X_AXIS_MODES: readonly XAxisMode[] = ['ttft', 'e2e', 'interactivity'];
 
 /**
  * Compute the set of benchmark_results.id values that sit on the
  * (e2e_latency, y) Pareto frontier within each (hwKey, precision, date)
- * group. Used to restrict the non-e2e xmode charts (ttft, interactivity,
- * session-time, prefill-tps) so they show *only* the points that win on
- * end-to-end latency — preventing benchmark-hacking where a config tops
- * one axis while tanking the other.
+ * group. Used to restrict the non-e2e xmode charts (ttft, interactivity) so
+ * they show *only* the points that win on end-to-end latency — preventing
+ * benchmark-hacking where a config tops one axis while tanking the other.
  *
  * Returns null when the y-metric has no roofline direction declared on
  * the e2e chart (caller falls back to no filtering in that case).
@@ -220,7 +197,7 @@ export function useChartData(
   /**
    * Current x-axis mode. When set to anything other than 'e2e', the displayed
    * data is filtered to the (e2e-latency, y) Pareto frontier so the ttft /
-   * interactivity / session-time / prefill-tps charts show only points that
+   * interactivity charts show only points that
    * also win on end-to-end latency — preventing benchmark-hacking where a
    * config tops one metric while tanking the other. The 'e2e' mode is the
    * source of truth and keeps the full point set.
@@ -529,7 +506,7 @@ export function useChartData(
         // non-optimal configs from view.
         //
         // Fixed-seq workloads keep the existing per-axis Pareto since
-        // there's no separate "session-time" notion of total latency —
+        // there's no separate session-level notion of total latency —
         // their e2e IS the request latency, so a TTFT hack there reads
         // honestly on e2e too. The anti-hack constraint is specifically
         // about multi-turn agentic where TTFT measures a tiny fraction
