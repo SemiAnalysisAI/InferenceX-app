@@ -83,6 +83,7 @@ export function detailHref(locale: 'en' | 'zh', model: OverviewModelSummary): st
   const query = new URLSearchParams({
     g_model: model.model,
     i_seq: overviewSequence(model),
+    i_metric: 'y_costh',
     i_optimal: '1',
   });
   return `${inferenceRoute(locale)}?${query}`;

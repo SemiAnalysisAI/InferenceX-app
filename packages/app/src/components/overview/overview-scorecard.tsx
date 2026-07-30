@@ -22,7 +22,9 @@ export const OVERVIEW_STRINGS = {
     purpose: 'Every active model across MI355X, B200, B300, GB200 and GB300 at a glance.',
     // The active tier is not repeated here — the Service level selector below
     // already states it.
-    scope: 'Hyperscaler cost / 1M total tokens · ↓ lower is better',
+    scopeMetric: 'Hyperscaler cost · $/1M total tokens',
+    scopeDirection: '↓ Lower is better',
+    scopeAria: 'Hyperscaler cost per one million total tokens. Lower is better.',
     tierNavLabel: 'Service level',
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
@@ -74,7 +76,9 @@ export const OVERVIEW_STRINGS = {
   zh: {
     title: '推理成本总览',
     purpose: '一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。',
-    scope: '超大规模云（hyperscaler）成本 / 每百万总 token · ↓ 越低越好',
+    scopeMetric: '超大规模云（hyperscaler）成本 · $/1M 总 token',
+    scopeDirection: '↓ 越低越好',
+    scopeAria: '超大规模云（hyperscaler）每百万总 token 成本，越低越好。',
     tierNavLabel: '服务档位',
     tierUnit: 'tok/s/用户',
     engineScopeNavLabel: '引擎范围',

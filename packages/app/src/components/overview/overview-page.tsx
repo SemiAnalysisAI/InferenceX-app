@@ -31,9 +31,21 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
             <h1 className="text-lg font-semibold">{strings.title}</h1>
             <p
               data-testid="overview-scope"
-              className="text-sm font-semibold leading-snug text-foreground"
+              aria-label={strings.scopeAria}
+              className="inline-flex flex-wrap items-baseline gap-x-2 leading-snug"
             >
-              {strings.scope}
+              <span
+                data-testid="overview-scope-metric"
+                className="text-base font-semibold text-foreground"
+              >
+                {strings.scopeMetric}
+              </span>{' '}
+              <span
+                data-testid="overview-scope-direction"
+                className="text-sm font-normal text-muted-foreground"
+              >
+                {strings.scopeDirection}
+              </span>
             </p>
           </div>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{strings.purpose}</p>

@@ -19,8 +19,12 @@ const PLATFORM_HEADERS = [
   'Details',
 ];
 
-const SCOPE_LINE = 'Hyperscaler cost / 1M total tokens · ↓ lower is better';
-const SCOPE_LINE_ZH = '超大规模云（hyperscaler）成本 / 每百万总 token · ↓ 越低越好';
+const SCOPE_METRIC = 'Hyperscaler cost · $/1M total tokens';
+const SCOPE_DIRECTION = '↓ Lower is better';
+const SCOPE_LINE = `${SCOPE_METRIC} ${SCOPE_DIRECTION}`;
+const SCOPE_METRIC_ZH = '超大规模云（hyperscaler）成本 · $/1M 总 token';
+const SCOPE_DIRECTION_ZH = '↓ 越低越好';
+const SCOPE_LINE_ZH = `${SCOPE_METRIC_ZH} ${SCOPE_DIRECTION_ZH}`;
 
 function expectNoHorizontalOverflow() {
   cy.document().then((doc) => {
@@ -335,6 +339,22 @@ describe('Overview page', () => {
   });
 
   it('keeps the title and metric definition on one desktop row and stacks them below xl', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+    cy.get('[data-testid="overview-scope-metric"]')
+      .should('have.text', SCOPE_METRIC)
+      .and('have.css', 'font-size', '16px')
+      .and('have.css', 'font-weight', '600');
+    cy.get('[data-testid="overview-scope-direction"]')
+      .should('have.text', SCOPE_DIRECTION)
+      .and('have.css', 'font-size', '14px')
+      .and('have.css', 'font-weight', '400');
+    cy.get('[data-testid="overview-scope-metric"]').then(([metric]) => {
+      cy.get('[data-testid="overview-scope-direction"]').then(([direction]) => {
+        expect(getComputedStyle(direction).color).not.to.equal(getComputedStyle(metric).color);
+      });
+    });
+
     for (const width of [1280, 1440]) {
       cy.viewport(width, 900);
       cy.visit('/overview');
