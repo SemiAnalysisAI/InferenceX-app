@@ -15,6 +15,7 @@ const STRINGS = {
   en: {
     selectedPoint: 'Selected point',
     disagg: 'disagg',
+    multiNodeAggregate: 'multi-node aggregate',
     githubRun: 'GitHub Actions run →',
     offloadType: 'Offload Type',
     offloadBackend: 'KV Offload Engine',
@@ -30,6 +31,7 @@ const STRINGS = {
   zh: {
     selectedPoint: '已选数据点',
     disagg: '解耦',
+    multiNodeAggregate: '多节点聚合',
     githubRun: 'GitHub Actions 运行 →',
     offloadType: '卸载类型',
     offloadBackend: 'KV 卸载引擎',
@@ -82,6 +84,7 @@ export function PointSummary({ meta }: { meta: PointMeta }) {
         <p className="text-sm text-muted-foreground">
           {t.selectedPoint}
           {meta.disagg ? ` · ${t.disagg}` : ''}
+          {!meta.disagg && meta.is_multinode ? ` · ${t.multiNodeAggregate}` : ''}
           {meta.spec_method && meta.spec_method !== 'none' ? ` · spec=${meta.spec_method}` : ''}
         </p>
         {meta.run_url && (

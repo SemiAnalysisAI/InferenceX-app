@@ -84,6 +84,27 @@ describe('tooltip parallelism — old data (no ep field)', () => {
 // parallelism HTML in tooltips, standard parallelism (ep exists)
 // ===========================================================================
 describe('tooltip parallelism — standard (ep field present)', () => {
+  it('shows multinode aggregate as one topology without prefill/decode roles', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          tp: 16,
+          decode_tp: 8,
+          ep: 1,
+          pp: 2,
+          is_multinode: true,
+          disagg: false,
+        }),
+      }),
+    );
+
+    expect(html).toContain('Multi-node aggregate');
+    expect(html).toMatch(/Tensor Parallelism:<\/strong> 8/u);
+    expect(html).toMatch(/Pipeline Parallelism:<\/strong> 2/u);
+    expect(html).not.toContain('<strong>Prefill:</strong>');
+    expect(html).not.toContain('<strong>Decode:</strong>');
+  });
+
   it('shows TP and EP fields for non-multinode data', () => {
     const html = generateTooltipContent(
       tooltipConfig({ data: pt({ tp: 4, ep: 8, dp_attention: false }) }),

@@ -427,6 +427,7 @@ describe('overview engine scope and scenario selection', () => {
     ['spec method', { spec_method: 'eagle' }],
     ['precision', { precision: Precision.FP8 }],
     ['disaggregation mode', { disagg: true }],
+    ['aggregate deployment mode', { is_multinode: true }],
     ['offload mode', { offload_mode: 'on' }],
     ['raw release', { model: 'qwen3.5-alt' }],
   ])('does not blend points across %s', (_label, secondOverrides) => {
@@ -908,7 +909,8 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
 
     // DeepSeek: only each series' latest-date sweep survives. B300 and MI355X
     // therefore have no exact @50 read; GB200's independent FP8 remains visible.
-    // GB300's two topology points belong to one serving series and interpolate.
+    // GB300's points are single-node and multi-node aggregate deployments, so
+    // they must not be interpolated into one synthetic serving curve.
     const deepseek = page.models.find((m) => m.model === Model.DeepSeek_V4_Pro)!;
     const dsB300 = headlinePairOf(deepseek, 'b300-vs-b200')!;
     expect(dsB300.baseline.read.value).toBeCloseTo(900.219);
@@ -921,9 +923,9 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       'no_exact_at_tier',
     );
     const dsGb300 = headlinePairOf(deepseek, 'gb300-vs-b200')!;
-    expect(dsGb300.candidate.read.value).toBeCloseTo(922.222);
+    expect(dsGb300.candidate.read.value).toBeNull();
     expect(dsGb300.candidate.read.evidenceTopologies).toEqual([]);
-    expect(dsGb300.candidate.missingReason).toBeNull();
+    expect(dsGb300.candidate.missingReason).toBe('no_exact_at_tier');
 
     // MiniMax: the platform result remains visible when B200 has no 8K/1K data.
     const minimax = page.models.find((m) => m.model === Model.MiniMax_M3)!;

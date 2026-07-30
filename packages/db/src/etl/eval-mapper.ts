@@ -269,6 +269,38 @@ function buildEvalConfig(
     decodeNumWorkers > 0 ||
     (explicitDisagg === undefined && (isMultinode || prefillNumWorkers > 0));
 
+  if (!disagg) {
+    const usePrefill =
+      decodeTp <= 0 ||
+      decodeEp <= 0 ||
+      (decodeNumWorkers <= 0 && numDecodeGpu <= 0 && (prefillNumWorkers > 0 || numPrefillGpu > 0));
+    const aggregate = usePrefill
+      ? {
+          tp: prefillTp,
+          ep: prefillEp,
+          dpAttn: prefillDpAttn,
+          numWorkers: prefillNumWorkers,
+          numGpu: numPrefillGpu,
+        }
+      : {
+          tp: decodeTp,
+          ep: decodeEp,
+          dpAttn: decodeDpAttn,
+          numWorkers: decodeNumWorkers,
+          numGpu: numDecodeGpu,
+        };
+    prefillTp = aggregate.tp;
+    decodeTp = aggregate.tp;
+    prefillEp = aggregate.ep;
+    decodeEp = aggregate.ep;
+    prefillDpAttn = aggregate.dpAttn;
+    decodeDpAttn = aggregate.dpAttn;
+    prefillNumWorkers = aggregate.numWorkers;
+    decodeNumWorkers = aggregate.numWorkers;
+    numPrefillGpu = aggregate.numGpu;
+    numDecodeGpu = aggregate.numGpu;
+  }
+
   return {
     hardware,
     framework,

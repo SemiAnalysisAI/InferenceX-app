@@ -47,7 +47,8 @@ const URL_STATE_KEYS = [
   'i_speed',
   'i_mc',
   'i_active',
-  // Quick filters (vendor / framework / agg-disagg / mtp-stp)
+  // Quick filters (vendor / framework / deployment / mtp-stp).
+  // `i_disagg` keeps its historical name for shared-link compatibility.
   'i_vendor',
   'i_fw',
   'i_disagg',

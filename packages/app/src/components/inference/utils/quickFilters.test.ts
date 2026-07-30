@@ -7,6 +7,8 @@ import {
   applyQuickFilters,
   computeAvailableQuickFilters,
   matchesQuickFilters,
+  pointDeploymentMode,
+  parseDeploymentModes,
   pointVendor,
   quickFiltersActive,
   type QuickFilters,
@@ -30,10 +32,29 @@ describe('pointVendor', () => {
   });
 });
 
+describe('parseDeploymentModes', () => {
+  it('expands legacy agg links to both non-disaggregated deployment modes', () => {
+    expect(parseDeploymentModes(['agg'])).toEqual(['single-node', 'multi-node']);
+  });
+
+  it('keeps current modes, removes duplicates, and ignores unknown values', () => {
+    expect(parseDeploymentModes(['multi-node', 'disagg', 'multi-node', 'other'])).toEqual([
+      'multi-node',
+      'disagg',
+    ]);
+  });
+});
+
 describe('computeAvailableQuickFilters', () => {
   it('reports present values per category in display order', () => {
     const points = [
-      point({ hwKey: 'h100_vllm', framework: 'vllm', disagg: false, spec_decoding: 'none' }),
+      point({
+        hwKey: 'h100_vllm',
+        framework: 'vllm',
+        disagg: false,
+        is_multinode: false,
+        spec_decoding: 'none',
+      }),
       point({
         hwKey: 'gb200_dynamo-trt',
         framework: 'dynamo-trt',
@@ -44,13 +65,14 @@ describe('computeAvailableQuickFilters', () => {
         hwKey: 'mi355x_atom',
         framework: 'mooncake-atom',
         disagg: false,
+        is_multinode: true,
         spec_decoding: 'none',
       }),
     ];
     expect(computeAvailableQuickFilters(points)).toEqual({
       vendors: ['NVIDIA', 'AMD'],
       frameworks: ['vllm', 'trt', 'atom'],
-      disagg: ['agg', 'disagg'],
+      deployment: ['single-node', 'multi-node', 'disagg'],
       spec: ['mtp', 'stp'],
     });
   });
@@ -62,7 +84,7 @@ describe('computeAvailableQuickFilters', () => {
     expect(computeAvailableQuickFilters(points)).toEqual({
       vendors: ['NVIDIA'],
       frameworks: ['vllm'],
-      disagg: ['agg'],
+      deployment: ['single-node'],
       spec: ['stp'],
     });
   });
@@ -71,7 +93,7 @@ describe('computeAvailableQuickFilters', () => {
     expect(computeAvailableQuickFilters([])).toEqual({
       vendors: [],
       frameworks: [],
-      disagg: [],
+      deployment: [],
       spec: [],
     });
   });
@@ -82,7 +104,7 @@ describe('quickFiltersActive', () => {
     expect(quickFiltersActive(EMPTY_QUICK_FILTERS)).toBe(false);
     expect(quickFiltersActive(filters({ vendors: ['AMD'] }))).toBe(true);
     expect(quickFiltersActive(filters({ frameworks: ['vllm'] }))).toBe(true);
-    expect(quickFiltersActive(filters({ disagg: ['disagg'] }))).toBe(true);
+    expect(quickFiltersActive(filters({ deployment: ['disagg'] }))).toBe(true);
     expect(quickFiltersActive(filters({ spec: ['mtp'] }))).toBe(true);
   });
 });
@@ -112,14 +134,20 @@ describe('matchesQuickFilters', () => {
     expect(matchesQuickFilters(point({ framework: undefined }), f)).toBe(false);
   });
 
-  it('filters by aggregation mode using the disagg flag', () => {
-    expect(matchesQuickFilters(point({ disagg: true }), filters({ disagg: ['disagg'] }))).toBe(
-      true,
+  it('keeps single-node, multi-node aggregate, and disaggregated modes distinct', () => {
+    const single = point({ disagg: false, is_multinode: false });
+    const multi = point({ disagg: false, is_multinode: true });
+    const disagg = point({ disagg: true, is_multinode: true });
+
+    expect(pointDeploymentMode(single)).toBe('single-node');
+    expect(pointDeploymentMode(multi)).toBe('multi-node');
+    expect(pointDeploymentMode(disagg)).toBe('disagg');
+    expect(matchesQuickFilters(multi, filters({ deployment: ['multi-node'] }))).toBe(true);
+    expect(matchesQuickFilters(multi, filters({ deployment: ['single-node', 'disagg'] }))).toBe(
+      false,
     );
-    expect(matchesQuickFilters(point({ disagg: true }), filters({ disagg: ['agg'] }))).toBe(false);
-    expect(matchesQuickFilters(point({ disagg: false }), filters({ disagg: ['agg'] }))).toBe(true);
-    // Missing disagg flag is treated as aggregated.
-    expect(matchesQuickFilters(point({}), filters({ disagg: ['agg'] }))).toBe(true);
+    // Missing flags retain the historical single-node aggregate fallback.
+    expect(matchesQuickFilters(point({}), filters({ deployment: ['single-node'] }))).toBe(true);
   });
 
   it('filters by spec-decoding via spec_decoding field or _mtp suffix', () => {
@@ -142,7 +170,7 @@ describe('matchesQuickFilters', () => {
   });
 
   it('ANDs categories together', () => {
-    const f = filters({ vendors: ['AMD'], disagg: ['disagg'], spec: ['stp'] });
+    const f = filters({ vendors: ['AMD'], deployment: ['disagg'], spec: ['stp'] });
     expect(
       matchesQuickFilters(
         point({ hwKey: 'mi300x_sglang', disagg: true, spec_decoding: 'none' }),
@@ -174,5 +202,25 @@ describe('applyQuickFilters', () => {
   it('narrows the list to matching points', () => {
     const result = applyQuickFilters(data, filters({ vendors: ['NVIDIA'], spec: ['stp'] }));
     expect(result.map((d) => d.hwKey)).toEqual(['h100_vllm']);
+  });
+
+  it('applies the same deployment classification to unofficial overlay points', () => {
+    const official = point({
+      id: 42,
+      hwKey: 'b200_dynamo-vllm',
+      disagg: false,
+      is_multinode: false,
+    });
+    const overlay = point({
+      id: undefined,
+      run_url: 'https://github.com/example/actions/runs/1',
+      hwKey: 'b200_dynamo-vllm',
+      disagg: false,
+      is_multinode: true,
+    });
+
+    expect(applyQuickFilters([official, overlay], filters({ deployment: ['multi-node'] }))).toEqual(
+      [overlay],
+    );
   });
 });

@@ -69,7 +69,8 @@ import {
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
 import {
   EMPTY_QUICK_FILTERS,
-  type DisaggMode,
+  parseDeploymentModes,
+  type DeploymentMode,
   type QuickFilters,
   type SpecMode,
 } from './utils/quickFilters';
@@ -260,7 +261,7 @@ export function InferenceProvider({
     () => (getUrlParam('i_scale') as 'auto' | 'linear' | 'log') || 'auto',
   );
 
-  // ── Quick filters (vendor / framework / agg-disagg / mtp-stp) ────────────────
+  // ── Quick filters (vendor / framework / deployment / mtp-stp) ───────────────
   // Coarse pre-filters applied to the point set. Empty = no constraint.
   //
   // Initialized empty rather than from the URL so the first client render matches
@@ -271,7 +272,7 @@ export function InferenceProvider({
   // just below, after mount.
   const [quickFilterVendors, setQuickFilterVendors] = useState<string[]>([]);
   const [quickFilterFrameworks, setQuickFilterFrameworks] = useState<string[]>([]);
-  const [quickFilterDisagg, setQuickFilterDisagg] = useState<DisaggMode[]>([]);
+  const [quickFilterDeployment, setQuickFilterDeployment] = useState<DeploymentMode[]>([]);
   const [quickFilterSpec, setQuickFilterSpec] = useState<SpecMode[]>([]);
   useEffect(() => {
     const parse = (key: 'i_vendor' | 'i_fw' | 'i_disagg' | 'i_spec') => {
@@ -280,21 +281,23 @@ export function InferenceProvider({
     };
     const vendors = parse('i_vendor');
     const frameworks = parse('i_fw');
-    const disagg = parse('i_disagg') as DisaggMode[];
+    // Preserve old shared links: `agg` used to mean every non-disaggregated
+    // point, so expand it to both aggregate deployment modes.
+    const deployment = parseDeploymentModes(parse('i_disagg'));
     const spec = parse('i_spec') as SpecMode[];
     if (vendors.length > 0) setQuickFilterVendors(vendors);
     if (frameworks.length > 0) setQuickFilterFrameworks(frameworks);
-    if (disagg.length > 0) setQuickFilterDisagg(disagg);
+    if (deployment.length > 0) setQuickFilterDeployment(deployment);
     if (spec.length > 0) setQuickFilterSpec(spec);
   }, [getUrlParam]);
   const quickFilters = useMemo<QuickFilters>(
     () => ({
       vendors: quickFilterVendors,
       frameworks: quickFilterFrameworks,
-      disagg: quickFilterDisagg,
+      deployment: quickFilterDeployment,
       spec: quickFilterSpec,
     }),
-    [quickFilterVendors, quickFilterFrameworks, quickFilterDisagg, quickFilterSpec],
+    [quickFilterVendors, quickFilterFrameworks, quickFilterDeployment, quickFilterSpec],
   );
   // The Historical Trends tab hides the quick-filter pills (hideGpuComparison), so
   // don't silently narrow its chart with selections carried in via share links or
@@ -1227,7 +1230,7 @@ export function InferenceProvider({
       i_active: iActiveStr,
       i_vendor: quickFilterVendors.join(','),
       i_fw: quickFilterFrameworks.join(','),
-      i_disagg: quickFilterDisagg.join(','),
+      i_disagg: quickFilterDeployment.join(','),
       i_spec: quickFilterSpec.join(','),
     },
     [
@@ -1252,7 +1255,7 @@ export function InferenceProvider({
       iActiveStr,
       quickFilterVendors,
       quickFilterFrameworks,
-      quickFilterDisagg,
+      quickFilterDeployment,
       quickFilterSpec,
     ],
   );
@@ -1409,7 +1412,7 @@ export function InferenceProvider({
       availableQuickFilters,
       setQuickFilterVendors,
       setQuickFilterFrameworks,
-      setQuickFilterDisagg,
+      setQuickFilterDeployment,
       setQuickFilterSpec,
       loading,
       error,

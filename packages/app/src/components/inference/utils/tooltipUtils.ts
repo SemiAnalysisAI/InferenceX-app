@@ -230,6 +230,10 @@ const imageTooltipLine = (image: string) =>
 const PARALLELISM_STRINGS = {
   en: {
     strategy: 'Parallelism Strategy',
+    deployment: 'Deployment',
+    singleNode: 'Single-node aggregate',
+    multiNode: 'Multi-node aggregate',
+    disaggregated: 'Disaggregated',
     gpuCount: (n: number) => `${n} GPU${n > 1 ? 's' : ''}`,
     prefill: 'Prefill',
     decode: 'Decode',
@@ -241,6 +245,10 @@ const PARALLELISM_STRINGS = {
   },
   zh: {
     strategy: '并行策略',
+    deployment: '部署模式',
+    singleNode: '单节点聚合',
+    multiNode: '多节点聚合',
+    disaggregated: '分离式',
     gpuCount: (n: number) => `${n} 个 GPU`,
     prefill: '预填充',
     decode: '解码',
@@ -260,11 +268,12 @@ const PARALLELISM_STRINGS = {
  */
 const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): string => {
   const t = PARALLELISM_STRINGS[locale];
+  const deployment = d.disagg ? t.disaggregated : d.is_multinode ? t.multiNode : t.singleNode;
   if (
     (d.ep === null || d.ep === undefined) &&
     (d.prefill_ep === null || d.prefill_ep === undefined)
   ) {
-    return tooltipLine(t.strategy, t.gpuCount(d.tp));
+    return tooltipLine(t.deployment, deployment) + tooltipLine(t.strategy, t.gpuCount(d.tp));
   }
 
   if (d.is_multinode && d.disagg) {
@@ -279,6 +288,7 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
     const pw = d.prefill_num_workers ?? 1;
     const dw = d.decode_num_workers ?? 1;
     return `
+      ${tooltipLine(t.deployment, deployment)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>${t.prefill}:</strong> ${d.num_prefill_gpu ?? '?'} ${t.gpusUnit}, TP: ${ptp}, ${ppp > 1 ? `PP: ${ppp}, ` : ''}EP: ${pep}, DPA: ${pdpa ? 'True' : 'False'}, Workers: ${pw}
       </div>
@@ -288,6 +298,7 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
   }
 
   return `
+    ${tooltipLine(t.deployment, deployment)}
     ${tooltipLine(t.tensorParallelism, d.decode_tp ?? d.tp)}
     ${d.pp !== null && d.pp !== undefined && d.pp > 1 ? tooltipLine(t.pipelineParallelism, d.pp) : ''}
     ${d.ep !== null && d.ep !== undefined ? tooltipLine(t.expertParallelism, d.ep) : ''}

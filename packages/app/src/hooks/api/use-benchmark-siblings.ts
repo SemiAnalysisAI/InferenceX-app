@@ -6,10 +6,12 @@ export interface BenchmarkSibling {
   offload_mode: string | null;
   decode_tp: number;
   decode_ep: number;
+  decode_pp: number | null;
   decode_dp_attention: boolean;
   decode_num_workers: number;
   prefill_tp: number;
   prefill_ep: number;
+  prefill_pp: number | null;
   prefill_dp_attention: boolean;
   prefill_num_workers: number;
   num_prefill_gpu: number;

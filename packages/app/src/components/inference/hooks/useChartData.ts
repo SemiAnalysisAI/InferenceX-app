@@ -484,7 +484,7 @@ export function useChartData(
         // Filter by selected GPUs if any
         filteredData = filterByGPU(filteredData, selectedGPUs, GPU_ALIAS_TO_CANONICAL);
 
-        // Quick filters (vendor / agg-disagg / mtp-stp) — coarse pre-filter that
+        // Quick filters (vendor / deployment / mtp-stp) — coarse pre-filter that
         // also prunes the legend and rooflines since they derive from this set.
         filteredData = applyQuickFilters(filteredData, quickFilters);
 

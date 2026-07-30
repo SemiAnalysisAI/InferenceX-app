@@ -13,7 +13,9 @@ export const dynamic = 'force-dynamic';
 
 const getCachedSiblings = cachedQuery(
   (id: number): Promise<BenchmarkSiblings | null> => getBenchmarkSiblings(getDb(), id),
-  'benchmark-siblings',
+  // v2 adds PP and makes the aggregate topology explicit. Roll the blob
+  // namespace so old TP0 sibling payloads cannot survive the schema change.
+  'benchmark-siblings-v2',
 );
 
 /**

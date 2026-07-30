@@ -192,7 +192,15 @@ describe('normalizeArtifactRows', () => {
 
   it('handles v2 schema (separate prefill/decode)', () => {
     const rows = normalizeArtifactRows(
-      [rawRow({ prefill_tp: 8, prefill_ep: 1, decode_tp: 4, decode_ep: 2 })],
+      [
+        rawRow({
+          disagg: true,
+          prefill_tp: 8,
+          prefill_ep: 1,
+          decode_tp: 4,
+          decode_ep: 2,
+        }),
+      ],
       '2026-03-01',
     );
     const row = rows[0];

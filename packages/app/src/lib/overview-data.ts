@@ -47,7 +47,7 @@ export interface OverviewTierValue {
 }
 
 /** One chart-equivalent serving series. Topology and GPU-count variants may
- *  contribute points, while release/framework/spec/precision/disagg stay exact. */
+ *  contribute points, while release/framework/spec/precision/deployment stay exact. */
 export interface OverviewConfigResult {
   key: string;
   dbModel: string;
@@ -58,6 +58,7 @@ export interface OverviewConfigResult {
   specMethod: string;
   specLabel: string;
   disagg: boolean;
+  isMultinode: boolean;
   precision: string;
   sourceRunUrls: string[];
   tierValues: OverviewTierValue[];
@@ -192,6 +193,7 @@ function overviewServingSeriesKey(row: BenchmarkRow): string {
     row.spec_method,
     row.precision,
     row.disagg,
+    row.is_multinode,
     row.offload_mode ?? 'off',
   ]);
 }
@@ -464,7 +466,7 @@ function buildConfigResult(
   if (feed.length === 0) return null;
 
   const first = rows[0];
-  const { hardware, framework, spec_method: specMethod, disagg } = first;
+  const { hardware, framework, spec_method: specMethod, disagg, is_multinode: isMultinode } = first;
   const sourceRunUrls = [
     ...new Set(rows.flatMap((row) => (row.run_url === null ? [] : [row.run_url]))),
   ].toSorted();
@@ -478,6 +480,7 @@ function buildConfigResult(
     specMethod,
     specLabel: resolveFrameworkPartLabel(model, specMethod),
     disagg,
+    isMultinode,
     precision,
     sourceRunUrls,
     tierValues: feed.map((row) => {
