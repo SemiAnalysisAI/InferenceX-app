@@ -89,8 +89,8 @@ function baseInferenceState() {
       computeToggle(prev, item, allItems),
     selectedPrecisions: ['fp8'],
     selectedYAxisMetric: 'y',
-    quickFilters: { vendors: [], frameworks: [], disagg: [], spec: [] },
-    availableQuickFilters: { vendors: [], frameworks: [], disagg: [], spec: [] },
+    quickFilters: { vendors: [], frameworks: [], deployment: [], spec: [] },
+    availableQuickFilters: { vendors: [], frameworks: [], deployment: [], spec: [] },
     availableRuns: null,
     selectedRunId: '',
     hideNonOptimal: false,
@@ -395,7 +395,7 @@ describe('ScatterGraph toggle decoration', () => {
     // exactly as it would the official points.
     inferenceState.current = {
       ...baseInferenceState(),
-      quickFilters: { vendors: ['AMD'], frameworks: [], disagg: [], spec: [] },
+      quickFilters: { vendors: ['AMD'], frameworks: [], deployment: [], spec: [] },
     };
     const { container, unmount } = mountChart({
       overlayData: {

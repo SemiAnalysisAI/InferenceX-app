@@ -111,9 +111,40 @@ describe('rowToAggDataEntry', () => {
     expect(entry.spec_decoding).toBe('mtp');
   });
 
-  it('maps decode_tp to tp', () => {
+  it('maps aggregate decode_tp to tp when the decode-shaped side is populated', () => {
     const entry = rowToAggDataEntry(makeRow({ decode_tp: 4 }));
     expect(entry.tp).toBe(4);
+  });
+
+  it('uses one populated prefill-shaped topology for non-disaggregated multinode serving', () => {
+    const base = makeRow();
+    const entry = rowToAggDataEntry(
+      makeRow({
+        framework: 'dynamo-vllm',
+        disagg: false,
+        is_multinode: true,
+        prefill_tp: 8,
+        prefill_ep: 1,
+        prefill_dp_attention: false,
+        prefill_num_workers: 1,
+        decode_tp: 0,
+        decode_ep: 0,
+        decode_dp_attention: false,
+        decode_num_workers: 0,
+        num_prefill_gpu: 16,
+        num_decode_gpu: 0,
+        metrics: { ...base.metrics, prefill_pp: 2, decode_pp: 1 },
+      }),
+    );
+
+    expect(entry.disagg).toBe(false);
+    expect(entry.is_multinode).toBe(true);
+    expect(entry.tp).toBe(8);
+    expect(entry.ep).toBe(1);
+    expect(entry.pp).toBe(2);
+    expect(entry.decode_tp).toBe(8);
+    expect(entry.decode_ep).toBe(1);
+    expect(entry.decode_pp).toBe(2);
   });
 
   it('surfaces pipeline parallelism from the metrics JSONB', () => {
@@ -462,6 +493,7 @@ describe('rowToAggDataEntry — extended edge cases', () => {
   it('maps prefill parallelism fields', () => {
     const entry = rowToAggDataEntry(
       makeRow({
+        disagg: true,
         prefill_tp: 4,
         prefill_ep: 2,
         prefill_dp_attention: true,
@@ -590,7 +622,35 @@ describe('rowToAggDataEntry — extended edge cases', () => {
 // Additional edge-case tests for transformBenchmarkRows
 // ---------------------------------------------------------------------------
 
-describe('transformBenchmarkRows — disaggregated configs', () => {
+describe('transformBenchmarkRows — deployment topology', () => {
+  it('renders multinode aggregate TP8PP2 as 16 total GPUs without prefill/decode roles', () => {
+    const base = makeRow();
+    const { chartData } = transformBenchmarkRows([
+      makeRow({
+        framework: 'dynamo-vllm',
+        disagg: false,
+        is_multinode: true,
+        prefill_tp: 8,
+        prefill_ep: 1,
+        prefill_num_workers: 1,
+        decode_tp: 0,
+        decode_ep: 0,
+        decode_num_workers: 0,
+        num_prefill_gpu: 16,
+        num_decode_gpu: 0,
+        metrics: { ...base.metrics, prefill_pp: 2, decode_pp: 1 },
+      }),
+    ]);
+    const point = chartData.flat()[0];
+
+    expect(point.tp).toBe(16);
+    expect(point.decode_tp).toBe(8);
+    expect(point.pp).toBe(2);
+    expect(point.is_multinode).toBe(true);
+    expect(point.disagg).toBeUndefined();
+    expect(getPointLabel(point)).toContain('TP8PP2');
+  });
+
   it('uses sum of prefill + decode GPUs as tp for disaggregated configs', () => {
     const rows = [
       makeRow({

@@ -27,7 +27,7 @@ export type { TimeSeriesPoint, QueueDepthPoint } from '../etl/compute-chart-seri
 // The endpoint payload combines chart_series with separately queried point
 // metadata. Keep a composite response version so metadata-shape changes roll
 // the blob-cache namespace without forcing an expensive chart_series backfill.
-const POINT_META_VERSION = 2;
+const POINT_META_VERSION = 3;
 export const TRACE_SERVER_METRICS_VERSION = CHART_SERIES_VERSION * 100 + POINT_META_VERSION;
 
 export interface PointMeta {
@@ -38,6 +38,7 @@ export interface PointMeta {
   precision: string;
   spec_method: string;
   disagg: boolean;
+  is_multinode: boolean;
   conc: number;
   offload_mode: string | null;
   kv_offloading: string | null;
@@ -124,6 +125,7 @@ function buildMeta(row: RawMetaRow): PointMeta {
     precision: row.precision,
     spec_method: row.spec_method,
     disagg: row.disagg,
+    is_multinode: row.is_multinode,
     conc: row.conc,
     offload_mode: row.offload_mode,
     kv_offloading: row.kv_offloading,
@@ -181,7 +183,8 @@ export async function getTraceServerMetrics(
       br.trace_replay_id,
       (atr.server_metrics_json_gz is not null) as has_blob,
       atr.chart_series,
-      br.id, c.hardware, c.framework, c.model, c.precision, c.spec_method, c.disagg,
+      br.id, c.hardware, c.framework, c.model, c.precision, c.spec_method,
+      c.disagg, c.is_multinode,
       br.conc, br.offload_mode, br.isl, br.osl, br.benchmark_type,
       br.date::text,
       case when wr.html_url is not null then wr.html_url || '/attempts/' || wr.run_attempt else null end as run_url,

@@ -20,7 +20,7 @@ const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26714
 /** Query the default fixture produces: one source run, so the run is pinned. */
 const PINNED_QUERY =
   'g_model=Qwen-3.5-397B-A17B&g_rundate=2026-07-18&g_runid=26714221123&i_seq=8k%2F1k' +
-  '&i_prec=fp4&i_metric=y_outputTputPerGpu&i_gpus=b200_sglang_mtp&i_spec=mtp&i_disagg=agg' +
+  '&i_prec=fp4&i_metric=y_outputTputPerGpu&i_gpus=b200_sglang_mtp&i_spec=mtp&i_disagg=single-node' +
   '&i_optimal=1&i_advlabel=1';
 
 function config(overrides: Partial<OverviewConfigResult> = {}): OverviewConfigResult {
@@ -34,6 +34,7 @@ function config(overrides: Partial<OverviewConfigResult> = {}): OverviewConfigRe
     specMethod: 'mtp',
     specLabel: 'MTP',
     disagg: false,
+    isMultinode: false,
     precision: Precision.FP4,
     sourceRunUrls: [RUN_URL],
     tierValues: [
@@ -81,6 +82,17 @@ describe('buildOverviewDashboardHref', () => {
         '&i_gpus=gb200_dynamo-trt-disagg_mtp&i_spec=mtp&i_disagg=disagg' +
         '&i_optimal=1&i_advlabel=1',
     );
+  });
+
+  it('selects the multi-node aggregate mode without treating it as disaggregated', () => {
+    const href = buildOverviewDashboardHref(
+      'en',
+      summary(),
+      config({ disagg: false, isMultinode: true }),
+    );
+
+    expect(href).toContain('i_disagg=multi-node');
+    expect(href).not.toContain('i_disagg=disagg');
   });
 
   it('writes g_model even when it equals the dashboard default model', () => {

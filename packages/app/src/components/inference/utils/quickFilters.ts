@@ -2,21 +2,21 @@ import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 
 import type {
   AvailableQuickFilters,
-  DisaggMode,
+  DeploymentMode,
   InferenceData,
   QuickFilters,
   SpecMode,
 } from '@/components/inference/types';
 import { frameworkFamily } from '@/lib/framework-family';
 
-export type { AvailableQuickFilters, DisaggMode, QuickFilters, SpecMode };
+export type { AvailableQuickFilters, DeploymentMode, QuickFilters, SpecMode };
 
 /** Vendor display order for the quick-filter pills. */
 const VENDOR_ORDER = ['NVIDIA', 'AMD'];
 
 /**
  * Quick filters let users narrow the chart to any combination of GPU vendor,
- * serving framework, aggregation mode, and speculative-decoding method without
+ * serving framework, deployment mode, and speculative-decoding method without
  * touching the legend or GPU-config selectors. They are coarse pre-filters
  * applied to the point set (official + unofficial-run overlay), so the legend,
  * rooflines, and Pareto all reflect only the matching configs.
@@ -29,7 +29,7 @@ const VENDOR_ORDER = ['NVIDIA', 'AMD'];
 export const EMPTY_QUICK_FILTERS: QuickFilters = {
   vendors: [],
   frameworks: [],
-  disagg: [],
+  deployment: [],
   spec: [],
 };
 
@@ -50,7 +50,7 @@ const FRAMEWORK_FAMILY_ORDER = FRAMEWORK_FAMILIES.map((f) => f.key);
 /**
  * Compute, in a single pass, which quick-filter values actually have data in a
  * point list. Used to render only existing framework pills and to disable
- * vendor / aggregation / spec options that would yield an empty chart. Each
+ * vendor / deployment / spec options that would yield an empty chart. Each
  * category is returned in display order.
  */
 export function computeAvailableQuickFilters(
@@ -58,7 +58,8 @@ export function computeAvailableQuickFilters(
 ): AvailableQuickFilters {
   const vendors = new Set<string>();
   const frameworks = new Set<string>();
-  let hasAgg = false;
+  let hasSingleNode = false;
+  let hasMultiNode = false;
   let hasDisagg = false;
   let hasMtp = false;
   let hasStp = false;
@@ -67,21 +68,24 @@ export function computeAvailableQuickFilters(
     if (vendor) vendors.add(vendor);
     const fam = frameworkFamily(p.framework);
     if (fam) frameworks.add(fam);
-    if (p.disagg) hasDisagg = true;
-    else hasAgg = true;
+    const deployment = pointDeploymentMode(p);
+    if (deployment === 'disagg') hasDisagg = true;
+    else if (deployment === 'multi-node') hasMultiNode = true;
+    else hasSingleNode = true;
     if (pointSpecMode(p) === 'mtp') hasMtp = true;
     else hasStp = true;
   }
-  const disagg: DisaggMode[] = [];
-  if (hasAgg) disagg.push('agg');
-  if (hasDisagg) disagg.push('disagg');
+  const deployment: DeploymentMode[] = [];
+  if (hasSingleNode) deployment.push('single-node');
+  if (hasMultiNode) deployment.push('multi-node');
+  if (hasDisagg) deployment.push('disagg');
   const spec: SpecMode[] = [];
   if (hasMtp) spec.push('mtp');
   if (hasStp) spec.push('stp');
   return {
     vendors: VENDOR_ORDER.filter((v) => vendors.has(v)),
     frameworks: FRAMEWORK_FAMILY_ORDER.filter((f) => frameworks.has(f)),
-    disagg,
+    deployment,
     spec,
   };
 }
@@ -89,7 +93,7 @@ export function computeAvailableQuickFilters(
 /** True when at least one category constrains the point set. */
 export function quickFiltersActive(f: QuickFilters): boolean {
   return (
-    f.vendors.length > 0 || f.frameworks.length > 0 || f.disagg.length > 0 || f.spec.length > 0
+    f.vendors.length > 0 || f.frameworks.length > 0 || f.deployment.length > 0 || f.spec.length > 0
   );
 }
 
@@ -113,6 +117,22 @@ function pointSpecMode(point: InferenceData): SpecMode {
   return isStandard ? 'stp' : 'mtp';
 }
 
+/** Classify serving topology without conflating aggregate multinode with disaggregation. */
+export function pointDeploymentMode(point: InferenceData): DeploymentMode {
+  if (point.disagg) return 'disagg';
+  return point.is_multinode ? 'multi-node' : 'single-node';
+}
+
+/** Parse deployment URL values while preserving legacy `agg` shared links. */
+export function parseDeploymentModes(values: readonly string[]): DeploymentMode[] {
+  return [
+    ...new Set(values.flatMap((mode) => (mode === 'agg' ? ['single-node', 'multi-node'] : [mode]))),
+  ].filter(
+    (mode): mode is DeploymentMode =>
+      mode === 'single-node' || mode === 'multi-node' || mode === 'disagg',
+  );
+}
+
 /** Whether a single data point satisfies every active quick-filter category. */
 export function matchesQuickFilters(point: InferenceData, f: QuickFilters): boolean {
   if (f.vendors.length > 0) {
@@ -123,10 +143,7 @@ export function matchesQuickFilters(point: InferenceData, f: QuickFilters): bool
     const fam = frameworkFamily(point.framework);
     if (!fam || !f.frameworks.includes(fam)) return false;
   }
-  if (f.disagg.length > 0) {
-    const mode: DisaggMode = point.disagg ? 'disagg' : 'agg';
-    if (!f.disagg.includes(mode)) return false;
-  }
+  if (f.deployment.length > 0 && !f.deployment.includes(pointDeploymentMode(point))) return false;
   if (f.spec.length > 0 && !f.spec.includes(pointSpecMode(point))) return false;
   return true;
 }

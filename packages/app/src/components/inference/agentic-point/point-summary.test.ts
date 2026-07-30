@@ -20,6 +20,7 @@ function meta(overrides: Partial<PointMeta> = {}): PointMeta {
     precision: 'fp8',
     spec_method: 'none',
     disagg: true,
+    is_multinode: true,
     conc: 128,
     offload_mode: 'off',
     kv_offloading: null,
@@ -40,6 +41,17 @@ function meta(overrides: Partial<PointMeta> = {}): PointMeta {
 }
 
 describe('PointSummary', () => {
+  it('identifies multinode aggregate without calling it disaggregated', () => {
+    const html = renderToStaticMarkup(
+      createElement(PointSummary, {
+        meta: meta({ disagg: false, is_multinode: true }),
+      }),
+    );
+
+    expect(html).toContain('multi-node aggregate');
+    expect(html).not.toContain(' · disagg');
+  });
+
   it('hides a stale CPU cache hit rate when offload is disabled', () => {
     const html = renderToStaticMarkup(createElement(PointSummary, { meta: meta() }));
 

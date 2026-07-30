@@ -63,7 +63,7 @@ export function buildOverviewDashboardHref(
     i_metric: 'y_outputTputPerGpu',
     i_gpus: config.hwKey,
     i_spec: dashboardSpecMode(config.specMethod),
-    i_disagg: config.disagg ? 'disagg' : 'agg',
+    i_disagg: config.disagg ? 'disagg' : config.isMultinode ? 'multi-node' : 'single-node',
     i_optimal: '1',
     i_advlabel: '1',
   };
