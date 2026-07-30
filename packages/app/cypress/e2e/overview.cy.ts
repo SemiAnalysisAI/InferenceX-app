@@ -151,7 +151,7 @@ describe('Overview page', () => {
     });
 
     desktopModel('DeepSeek-V4-Pro').within(() => {
-      cy.contains('MTP').should('exist');
+      cy.contains('Spec decode (MTP)').should('exist');
       platform('gb300').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="gb300"]')
           .should('have.attr', 'title', 'Estimated from validated benchmark runs.')
@@ -164,6 +164,9 @@ describe('Overview page', () => {
         ).should('have.text', '≈$1.19');
         cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
       });
+    });
+    desktopModel('MiniMax-M3').within(() => {
+      platform('gb300').should('contain.text', 'Spec decode (M3 EAGLE)');
     });
     cy.contains(
       'Priority: speculative FP4 → speculative FP8 → standard FP4 → standard FP8.',
@@ -553,13 +556,15 @@ describe('Overview page', () => {
         });
 
         cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').then(([value]) => {
-          cy.contains('div', 'SGLang · FP8 · MTP').then(([metadata]) => {
-            const valueRect = textRect(value);
-            const metadataRect = textRect(metadata);
+          cy.contains('div', 'SGLang · FP8')
+            .should('contain.text', 'Spec decode (MTP)')
+            .then(([metadata]) => {
+              const valueRect = textRect(value);
+              const metadataRect = textRect(metadata);
 
-            expect(metadataRect.top).to.be.at.least(valueRect.bottom);
-            expect(getComputedStyle(metadata).fontSize).to.equal('11px');
-          });
+              expect(metadataRect.top).to.be.at.least(valueRect.bottom);
+              expect(getComputedStyle(metadata).fontSize).to.equal('11px');
+            });
         });
       });
     });
@@ -639,6 +644,9 @@ describe('Overview page', () => {
       cy.get('[data-testid="overview-pair-missing"]').should('have.length', 2);
       platform('b200').should('contain.text', '标准解码');
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
+    });
+    desktopModel('DeepSeek-V4-Pro').within(() => {
+      platform('b200').should('contain.text', '推测解码（MTP）');
     });
     desktopModel('GLM-5.2').within(() => {
       cy.get('[data-testid="overview-model-scenario"]').should('have.text', 'AgentX');
