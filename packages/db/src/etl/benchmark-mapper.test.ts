@@ -338,11 +338,44 @@ describe('mapBenchmarkRow', () => {
       expect(result!.config.disagg).toBe(true);
     });
 
-    it('normalizes dynamo-trtllm to dynamo-trt and forces disagg=true (framework implies it)', () => {
+    it('normalizes legacy Dynamo rows without a disagg field to disagg=true', () => {
       const tracker = createSkipTracker();
       const result = mapBenchmarkRow(makeV1Row({ framework: 'dynamo-trtllm' }), tracker);
 
       expect(result!.config.framework).toBe('dynamo-trt');
+      expect(result!.config.disagg).toBe(true);
+    });
+
+    it('preserves explicit disagg=false for a multi-node Dynamo server', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV2Row({
+          framework: 'dynamo-vllm',
+          disagg: false,
+          is_multinode: true,
+          prefill_num_workers: 1,
+          decode_num_workers: 0,
+        }),
+        tracker,
+      );
+
+      expect(result!.config.framework).toBe('dynamo-vllm');
+      expect(result!.config.disagg).toBe(false);
+      expect(result!.config.isMultinode).toBe(true);
+    });
+
+    it('keeps legacy disagg=false Dynamo artifacts disaggregated when decode workers exist', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV2Row({
+          framework: 'dynamo-vllm',
+          disagg: false,
+          prefill_num_workers: 1,
+          decode_num_workers: 1,
+        }),
+        tracker,
+      );
+
       expect(result!.config.disagg).toBe(true);
     });
   });

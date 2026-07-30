@@ -135,7 +135,9 @@ All normalizer logic lives in `packages/db/src/etl/normalizers.ts`. The function
 1. Look up `fw.toLowerCase()` in `FRAMEWORK_ALIASES` (defined in `packages/constants/src/framework-aliases.ts`).
 2. If a match exists, use `alias.canonical` as the framework name and `alias.disagg` as the disagg flag. Example: `sglang-disagg` → `{ framework: 'mori-sglang', disagg: true }`.
 3. If no alias exists, the lowercased raw string is used as-is.
-4. The disagg flag falls back to the raw `disaggField` from the artifact (coerced via `parseBool`, accepting `true`, `"true"`, `"True"`).
+4. An explicit `disagg` field is authoritative for canonical `dynamo-*` frameworks because Dynamo can orchestrate either a disaggregated deployment or one distributed server. Boolean and lowercase/Python-style string values are accepted.
+5. Legacy `dynamo-*` artifacts that omit or do not provide a recognizable `disagg` value fall back to `true`. Canonical `mori-*` frameworks remain intrinsically disaggregated.
+6. Mapper-level topology validation still marks a deployment as disaggregated when it has a non-zero decode worker pool, preserving older genuinely disaggregated Dynamo artifacts that incorrectly emitted `disagg: false`.
 
 `FRAMEWORK_ALIASES` keys are sorted longest-first in `SORTED_ALIASES` (used by `resolveFrameworkAliasesInString`) to prevent substring conflicts — `dynamo-trtllm` must be matched before `trtllm`.
 

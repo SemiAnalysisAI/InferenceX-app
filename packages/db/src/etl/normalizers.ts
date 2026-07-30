@@ -138,14 +138,14 @@ export function resolveModelKey(row: Record<string, any>): string | null {
  * Handles special cases: `sglang-disagg` is normalized to `mori-sglang` + `disagg=true`;
  * `dynamo-trtllm` is renamed to `dynamo-trt`.
  *
- * Framework name carries disagg semantics: any canonical framework starting
- * with `dynamo-` or `mori-` implies disagg, regardless of what the artifact
- * wrote in its `disagg` field. Older artifacts (pre-2026-04) sometimes set
- * `disagg=false` under these frameworks, which produced mixed-date legend
- * lines in the frontend — see migration 002.
+ * An explicit `disagg` value from the artifact is authoritative for Dynamo:
+ * Dynamo can orchestrate a non-disaggregated server. Legacy Dynamo artifacts
+ * that omit the field still fall back to `disagg=true`, preserving their
+ * historical classification. Canonical `mori-*` frameworks and aliases that
+ * explicitly declare `disagg: true` remain intrinsically disaggregated.
  *
  * @param fw - Raw framework value from the artifact (e.g. `"sglang"`, `"sglang-disagg"` → `"mori-sglang"`).
- * @param disaggField - Raw disagg field from the artifact (boolean or string `"True"`/`"true"`).
+ * @param disaggField - Raw disagg field from the artifact (boolean or string true/false).
  * @returns An object with the canonical `framework` string and the `disagg` boolean flag.
  */
 export function normalizeFramework(
@@ -155,9 +155,10 @@ export function normalizeFramework(
   const lower = fw.toLowerCase();
   const alias = FRAMEWORK_ALIASES[lower];
   const canonical = alias?.canonical ?? lower;
-  const rawDisagg =
-    alias?.disagg ?? (disaggField === true || disaggField === 'True' || disaggField === 'true');
-  const disagg = rawDisagg || canonical.startsWith('dynamo-') || canonical.startsWith('mori-');
+  const explicitDisagg = parseOptionalBool(disaggField);
+  const disagg =
+    alias?.disagg ??
+    (canonical.startsWith('mori-') ? true : (explicitDisagg ?? canonical.startsWith('dynamo-')));
   return { framework: canonical, disagg };
 }
 
@@ -189,6 +190,19 @@ export function normalizeSpecMethod(spec: unknown): string {
 }
 
 /**
+ * Parse an explicitly provided, loosely typed boolean.
+ * Accepts JS booleans and lowercase/Python-style string booleans.
+ *
+ * @param v - Value to parse.
+ * @returns The parsed boolean, or `undefined` when the value is absent or unrecognized.
+ */
+export function parseOptionalBool(v: unknown): boolean | undefined {
+  if (v === true || v === 'true' || v === 'True') return true;
+  if (v === false || v === 'false' || v === 'False') return false;
+  return undefined;
+}
+
+/**
  * Coerce a loosely-typed value to a boolean.
  * Accepts JS `true`, the string `'true'`, and the Python-style string `'True'`.
  *
@@ -196,7 +210,7 @@ export function normalizeSpecMethod(spec: unknown): string {
  * @returns `true` if the value is one of the recognized truthy forms, `false` otherwise.
  */
 export function parseBool(v: unknown): boolean {
-  return v === true || v === 'true' || v === 'True';
+  return parseOptionalBool(v) ?? false;
 }
 
 /**
