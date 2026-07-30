@@ -224,7 +224,10 @@ export function mapBenchmarkRow(
       ? row.offload_mode
       : (descriptorToOnOff(row.kv_offloading) ?? descriptorToOnOff(row.offloading) ?? 'off');
 
-  const { framework, disagg } = normalizeFramework(String(row.framework ?? ''), row.disagg);
+  const { framework, disagg: frameworkDisagg } = normalizeFramework(
+    String(row.framework ?? ''),
+    row.disagg,
+  );
   const isMultinode = parseBool(row.is_multinode);
   const precision = normalizePrecision(String(row.precision ?? ''));
   if (!PRECISION_KEYS.has(precision)) {
@@ -233,6 +236,11 @@ export function mapBenchmarkRow(
   const specMethod = normalizeSpecMethod(row.spec_decoding);
 
   const parallelism = resolveParallelism(row);
+  // An explicit non-disagg Dynamo artifact is authoritative for direct
+  // deployments such as one distributed vLLM server. A non-zero decode worker
+  // pool, however, is structural proof of disaggregation and preserves older
+  // Dynamo artifacts that incorrectly emitted disagg=false.
+  const disagg = frameworkDisagg || parallelism.decodeNumWorkers > 0;
   const metrics = captureNumericMetrics(row);
 
   // Agentic rows emit `offload_mode: "on" | "off"` (or older `offloading: "none"|...`)
