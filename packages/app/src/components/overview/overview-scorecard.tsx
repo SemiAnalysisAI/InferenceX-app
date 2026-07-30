@@ -54,6 +54,7 @@ export const OVERVIEW_STRINGS = {
       cannot_reach_at_tier: `cannot reach @${tier}`,
       no_exact_at_tier: `no exact @${tier} result`,
     }),
+    speculativeDecodeLabel: (method: string) => `Spec decode (${method})`,
     standardDecodeLabel: 'Standard decode',
     methodologyNote: 'Priority: speculative FP4 → speculative FP8 → standard FP4 → standard FP8.',
     costNote:
@@ -104,6 +105,7 @@ export const OVERVIEW_STRINGS = {
       cannot_reach_at_tier: `无法达到 @${tier}`,
       no_exact_at_tier: `无精确 @${tier} 结果`,
     }),
+    speculativeDecodeLabel: (method: string) => `推测解码（${method}）`,
     standardDecodeLabel: '标准解码',
     methodologyNote: '优先顺序：推测解码 FP4 → 推测解码 FP8 → 标准解码 FP4 → 标准解码 FP8。',
     costNote: '成本 = 3 年期租赁 $/GPU/小时 ÷ 每张已部署 GPU 的输出 tok/s。所有百分比均相对 B200。',
@@ -266,26 +268,32 @@ function CellValue({
     return <CellMissing hardware={member.hardware} reason={missingReasonCopy(member, strings)} />;
   }
   const precisionLabel = config?.precision.toUpperCase() ?? member.precision?.toUpperCase() ?? null;
-  const specLabel =
+  const evidenceSpecLabel =
     config === null
       ? null
       : config.specMethod === 'none' || config.specMethod === ''
         ? strings.standardDecodeLabel
         : config.specLabel;
-  const stackBadge =
-    config === null || precisionLabel === null || specLabel === null
+  const decodeLabel =
+    config === null || evidenceSpecLabel === null
       ? null
-      : [config.frameworkLabel, precisionLabel, specLabel]
-          .filter((part): part is string => part !== null)
-          .join(' · ');
+      : config.specMethod === 'none' || config.specMethod === ''
+        ? evidenceSpecLabel
+        : strings.speculativeDecodeLabel(evidenceSpecLabel);
+  const stackPrefix =
+    config === null || precisionLabel === null
+      ? null
+      : [config.frameworkLabel, precisionLabel].join(' · ');
+  const stackBadge =
+    stackPrefix === null || decodeLabel === null ? null : [stackPrefix, decodeLabel].join(' · ');
   const stack =
-    config === null
+    config === null || evidenceSpecLabel === null
       ? null
       : [
           member.hardwareLabel,
           config.frameworkLabel,
           config.precision.toUpperCase(),
-          specLabel,
+          evidenceSpecLabel,
         ].join(' · ');
   const evidenceDateLabel =
     evidenceDate === null ? '' : formatEvidenceDate(formatters, evidenceDate);
@@ -358,7 +366,16 @@ function CellValue({
       </div>
       {member.precision === null ? null : (
         <div className="min-w-0 text-[11px] leading-tight font-normal uppercase tracking-wider text-muted-foreground/70">
-          {config === null ? member.precision.toUpperCase() : stackBadge}
+          {config === null ? (
+            member.precision.toUpperCase()
+          ) : phoneRow && stackPrefix !== null && decodeLabel !== null ? (
+            <>
+              <span className="block">{stackPrefix}</span>
+              <span className="block">{decodeLabel}</span>
+            </>
+          ) : (
+            stackBadge
+          )}
         </div>
       )}
     </div>
@@ -501,7 +518,7 @@ export function MobileOverviewList({ models, locale, formatters, strings }: Surf
                   key={platform.hardware}
                   data-testid="overview-mobile-platform-row"
                   data-hardware={platform.hardware}
-                  className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-2.5 last:border-b-0"
+                  className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-1.5 last:border-b-0"
                 >
                   <span
                     data-testid="overview-mobile-hardware"
