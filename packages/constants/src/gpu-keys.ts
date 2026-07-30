@@ -134,8 +134,8 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 9,
     tdp: 600,
     power: 0.975,
-    costh: 0.43,
-    costn: 0.676,
+    costh: 0.677,
+    costn: 0.746,
     costr: 0.52,
   },
 };

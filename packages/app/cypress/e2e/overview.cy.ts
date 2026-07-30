@@ -152,17 +152,28 @@ describe('Overview page', () => {
 
     desktopModel('DeepSeek-V4-Pro').within(() => {
       cy.contains('Spec decode (MTP)').should('exist');
-      platform('gb300').within(() => {
-        cy.get('[data-testid="overview-pair-value"][data-hardware="gb300"]')
+      platform('b200').within(() => {
+        cy.get('[data-testid="overview-pair-value"][data-hardware="b200"]')
           .should('have.attr', 'title', 'Estimated from validated benchmark runs.')
           .and('not.have.attr', 'aria-label');
-        cy.get('[data-testid="overview-pair-value"][data-hardware="gb300"]')
+        cy.get('[data-testid="overview-pair-value"][data-hardware="b200"]')
           .find('.sr-only')
-          .should('have.text', 'Approximately $1.19. Estimated from validated benchmark runs.');
+          .should('have.text', 'Approximately $0.89. Estimated from validated benchmark runs.');
         cy.get(
-          '[data-testid="overview-pair-value"][data-hardware="gb300"] [data-testid="overview-estimate-visible"]',
-        ).should('have.text', '≈$1.19');
+          '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-estimate-visible"]',
+        ).should('have.text', '≈$0.89');
         cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
+      });
+      // GB300's two points are a single-node and a multi-node aggregate
+      // deployment. They are separate serving series, so neither interpolates
+      // to the tier and the cell stays empty instead of blending them.
+      platform('gb300').within(() => {
+        cy.get('[data-testid="overview-pair-value"]').should('not.exist');
+        cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]').should(
+          'have.attr',
+          'title',
+          'no exact @50 result',
+        );
       });
     });
     desktopModel('MiniMax-M3').within(() => {
@@ -189,13 +200,17 @@ describe('Overview page', () => {
     });
 
     desktopModel('DeepSeek-V4-Pro').within(() => {
-      platform('gb300')
+      platform('gb200')
         .find('[data-testid="overview-cost-delta"]')
-        .should('contain.text', '+33%')
+        .should('contain.text', '+71%')
         .and('have.attr', 'data-cost-polarity', 'pricier')
         .then(($badge) => {
-          expect($badge.attr('style')).to.contain('rgb(239 68 68 / 0.29)');
+          // +71% saturates the alpha ramp; read the computed value so the
+          // assertion survives the browser normalizing `0.40` to `0.4`.
+          expect(getComputedStyle($badge[0]).backgroundColor).to.equal('rgba(239, 68, 68, 0.4)');
         });
+      // No read at the tier means no delta to grade.
+      platform('gb300').find('[data-testid="overview-cost-delta"]').should('not.exist');
     });
 
     desktopModel('MiniMax-M3').within(() => {
@@ -302,15 +317,20 @@ describe('Overview page', () => {
     });
 
     desktopModel('DeepSeek-V4-Pro').within(() => {
-      platform('b200').should('contain.text', '≈$0.89').and('contain.text', 'FP4');
-      platform('gb300').within(() => {
-        cy.get(
-          '[data-testid="overview-pair-value"][data-hardware="gb300"] [data-testid="overview-estimate-visible"]',
-        ).should('have.text', '≈$1.19');
-        cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="gb300"]').should(
+      platform('b200').within(() => {
+        cy.get('[data-testid="overview-pair-value"][data-hardware="b200"]')
+          .should('contain.text', '≈$0.89')
+          .find('[data-testid="overview-estimate-visible"]')
+          .should('have.text', '≈$0.89');
+        cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="b200"]').should(
           'have.text',
           'Jul 18',
         );
+        cy.contains('FP4').should('exist');
+      });
+      // A cell without a read at the tier carries no evidence date either.
+      platform('gb300').within(() => {
+        cy.get('[data-testid="overview-pair-evidence-date"]').should('not.exist');
       });
     });
   });
@@ -325,9 +345,12 @@ describe('Overview page', () => {
           .should('contain.text', '∞')
           .and('have.attr', 'title', 'no exact @50 result');
       });
-      platform('gb300')
-        .find('[data-testid="overview-estimate-visible"]')
-        .should('have.text', '≈$1.19');
+      platform('gb300').within(() => {
+        cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]')
+          .should('contain.text', '∞')
+          .and('have.attr', 'title', 'no exact @50 result');
+      });
+      platform('b200').find('[data-testid="overview-estimate-visible"]').should('exist');
     });
 
     desktopModel('MiniMax-M3').within(() => {
@@ -442,11 +465,16 @@ describe('Overview page', () => {
           );
         });
       });
-      mobileModel('DeepSeek-V4-Pro')
-        .find(
-          '[data-testid="overview-pair-value"][data-hardware="gb300"] [data-testid="overview-estimate-visible"]',
-        )
-        .should('have.text', '≈$1.19');
+      mobileModel('DeepSeek-V4-Pro').within(() => {
+        cy.get(
+          '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-estimate-visible"]',
+        ).should('have.text', '≈$0.89');
+        cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]').should(
+          'have.attr',
+          'title',
+          'no exact @50 result',
+        );
+      });
       expectNoHorizontalOverflow();
       expectNoHorizontalScroller('overview-mobile-list');
       expectNoHorizontalScroller('overview-engine-scope-switcher');
@@ -624,15 +652,18 @@ describe('Overview page', () => {
       '各档位数值采用最佳观测平台服务包络线；≈ 表示根据已验证运行结果估算。不会外推。',
     ).should('exist');
     desktopModel('DeepSeek-V4-Pro')
-      .find('[data-testid="overview-pair-value"][data-hardware="gb300"]')
-      .as('estimatedGb300')
+      .find('[data-testid="overview-pair-value"][data-hardware="b200"]')
+      .as('estimatedB200')
       .should('have.attr', 'title', '根据已验证的基准运行结果估算。')
       .and('not.have.attr', 'aria-label');
-    cy.get('@estimatedGb300')
+    cy.get('@estimatedB200')
       .find('[data-testid="overview-estimate-visible"]')
-      .should('have.text', '≈$1.19')
+      .should('have.text', '≈$0.89')
       .siblings('.sr-only')
-      .should('have.text', '约 $1.19。根据已验证的基准运行结果估算。');
+      .should('have.text', '约 $0.89。根据已验证的基准运行结果估算。');
+    desktopModel('DeepSeek-V4-Pro')
+      .find('[data-testid="overview-pair-missing"][data-hardware="gb300"]')
+      .should('have.attr', 'title', '无精确 @50 结果');
     cy.get('body')
       .invoke('text')
       .should('not.match', /回退/);
