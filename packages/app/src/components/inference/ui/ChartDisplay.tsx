@@ -621,6 +621,7 @@ export default function ChartDisplay() {
                       visibleData,
                       graph.model,
                       graph.sequence,
+                      visibleOverlayRowsForExport,
                     );
                     // Match warnings against the same series the chart annotates,
                     // including visible unofficial-run overlay series.
