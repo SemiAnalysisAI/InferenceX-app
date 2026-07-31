@@ -288,6 +288,16 @@ describe('Overview page', () => {
       });
     });
 
+    // The B200 reference column is never washed: its null delta means "no
+    // comparison against itself", not the ∞ state.
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
+      platform('b200').then(([cell]) => {
+        const td = cell.closest('td')!;
+        expect(td.getAttribute('style') ?? '').not.to.contain('background');
+        expect(td.className).to.contain('bg-muted/30');
+      });
+    });
+
     // Priced result with no B200 baseline: neutral gray ∞ and a neutral cell —
     // availability, not a good/bad judgment, so no red/green tint.
     desktopModel('MiniMax-M3', SINGLE_TURN).within(() => {
@@ -435,6 +445,20 @@ describe('Overview page', () => {
       cy.contains('a', 'View details')
         .should('have.attr', 'href')
         .and('include', 'i_seq=agentic-traces');
+      // ...and names its scenario, so the two rows' links are distinguishable
+      // to a screen reader rather than both reading "View details: <model>".
+      cy.contains('a', 'View details').should(
+        'have.attr',
+        'aria-label',
+        `View details: DeepSeek V4 Pro 1.6T · ${AGENTX_LABEL}`,
+      );
+    });
+    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
+      cy.contains('a', 'View details').should(
+        'have.attr',
+        'aria-label',
+        'View details: DeepSeek V4 Pro 1.6T · 8K/1K',
+      );
     });
   });
 

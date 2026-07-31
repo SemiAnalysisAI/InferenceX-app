@@ -42,7 +42,8 @@ export const OVERVIEW_STRINGS = {
       agentx: 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)',
     },
     detailLink: 'View details',
-    detailAria: (modelLabel: string) => `View details: ${modelLabel}`,
+    detailAria: (modelLabel: string, scenarioLabel: string) =>
+      `View details: ${modelLabel} · ${scenarioLabel}`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
       `Open raw source dashboard for ${evidenceDate}: ${modelLabel} · ${stack}`,
     estimatedTooltip: (topologies: readonly string[]) =>
@@ -87,7 +88,8 @@ export const OVERVIEW_STRINGS = {
       agentx: '长上下文多轮真实智能体场景（AgentX）',
     },
     detailLink: '查看详情',
-    detailAria: (modelLabel: string) => `查看详情：${modelLabel}`,
+    detailAria: (modelLabel: string, scenarioLabel: string) =>
+      `查看详情：${modelLabel} · ${scenarioLabel}`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
       `打开 ${evidenceDate} 原始数据仪表板：${modelLabel} · ${stack}`,
     estimatedTooltip: (topologies: readonly string[]) =>
@@ -224,6 +226,9 @@ export function costDeltaCellStyle(
   platform: OverviewPlatformResult,
 ): { backgroundColor: string } | undefined {
   if (platform.costPerMtok === null) return undefined;
+  // B200 is the baseline: its null delta means "nothing to compare against
+  // itself", not the ∞ state, so it keeps the reference column's own tint.
+  if (platform.hardware === 'b200') return undefined;
   const pct = platform.costVsB200Pct;
   const polarity: CostDeltaPolarity = pct === null ? 'no-baseline' : costDeltaPolarity(pct);
   const alpha =
@@ -506,7 +511,10 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
                 <OverviewDetailLink
                   href={detailHref(locale, model)}
                   model={model.model}
-                  ariaLabel={strings.detailAria(model.modelLabel)}
+                  ariaLabel={strings.detailAria(
+                    model.modelLabel,
+                    strings.scenarioLabels[model.scenario],
+                  )}
                   className="mt-1 text-xs"
                 >
                   {strings.detailLink}
@@ -576,7 +584,10 @@ export function MobileOverviewList({ models, locale, formatters, strings }: Surf
             <OverviewDetailLink
               href={detailHref(locale, model)}
               model={model.model}
-              ariaLabel={strings.detailAria(model.modelLabel)}
+              ariaLabel={strings.detailAria(
+                model.modelLabel,
+                strings.scenarioLabels[model.scenario],
+              )}
               className="min-h-11 w-full justify-between"
             >
               {strings.detailLink}
