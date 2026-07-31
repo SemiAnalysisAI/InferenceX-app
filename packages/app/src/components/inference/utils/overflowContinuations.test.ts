@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ClippedInferenceData, InferenceData } from '../types';
-import { buildFrontierContinuations } from './overflowContinuations';
+import { buildFrontierContinuations, fitContinuationLabelBaseline } from './overflowContinuations';
 
 const point = (x: number, y: number): InferenceData =>
   ({
@@ -21,6 +21,13 @@ const point = (x: number, y: number): InferenceData =>
     costni: { y, roof: false },
     costri: { y, roof: false },
   }) as InferenceData;
+
+describe('fitContinuationLabelBaseline', () => {
+  it('keeps labels inside the plot while preferring below-arrow placement', () => {
+    expect(fitContinuationLabelBaseline(413.4, 500)).toBe(431.4);
+    expect(fitContinuationLabelBaseline(500.13, 500)).toBe(488.13);
+  });
+});
 
 describe('buildFrontierContinuations', () => {
   it('returns both crossings when one visible point sits between two clipped frontier regions', () => {

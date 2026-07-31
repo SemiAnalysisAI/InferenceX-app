@@ -89,7 +89,10 @@ import {
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { changelogConfigToHwKey } from '@/components/inference/utils/changelogFormatters';
-import { buildFrontierContinuations } from '@/components/inference/utils/overflowContinuations';
+import {
+  buildFrontierContinuations,
+  fitContinuationLabelBaseline,
+} from '@/components/inference/utils/overflowContinuations';
 
 // Greedy label-collision avoidance.
 // Each candidate is the y-position of the FIRST baseline (relative to point
@@ -2756,7 +2759,7 @@ const ScatterGraph = React.memo(
             .attr('display', null)
             .attr('data-testid', 'overflow-continuation-label')
             .attr('x', geometry.x2 + (labelToRight ? 12 : -12))
-            .attr('y', Math.max(12, geometry.y2 + 18))
+            .attr('y', fitContinuationLabelBaseline(geometry.y2, ctx.height))
             .attr('text-anchor', labelToRight ? 'start' : 'end')
             .attr('fill', color)
             .attr('stroke', ir.getCssColor('--background'))

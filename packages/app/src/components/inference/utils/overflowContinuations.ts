@@ -10,6 +10,12 @@ export interface FrontierContinuation {
   reasons: ClippedInferenceData['reasons'];
   hiddenPointCount: number;
 }
+export function fitContinuationLabelBaseline(endpointY: number, height: number): number {
+  const below = endpointY + 18;
+  return below <= height - 4
+    ? Math.max(12, below)
+    : Math.max(12, Math.min(height - 4, endpointY - 12));
+}
 
 /**
  * Find transitions where a complete Pareto frontier crosses from a visible
