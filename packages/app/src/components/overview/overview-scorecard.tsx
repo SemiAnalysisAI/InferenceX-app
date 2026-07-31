@@ -19,15 +19,15 @@ export type OverviewLocale = 'en' | 'zh';
 export const OVERVIEW_STRINGS = {
   en: {
     title: 'Inference Cost per Million Tokens',
-    // The active tier is not repeated here — the Service level selector below
-    // already states it.
+    // The active tier is not repeated here — the SLO selector below already
+    // states it.
     scopeMetric: 'Hyperscaler cost',
     scopeDirection: '↓ Lower is better',
     // The unit is dropped from the visible line but kept for screen readers.
     scopeAria: 'Hyperscaler cost per one million total tokens. Lower is better.',
     sourcePrefix: 'Source: InferenceX & ',
     sourceLinkText: 'SemiAnalysis Market August 2025 AI Cloud TCO Model',
-    tierNavLabel: 'Service level',
+    tierNavLabel: 'SLO',
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
     engineScopeOptions: {
@@ -74,7 +74,7 @@ export const OVERVIEW_STRINGS = {
     scopeAria: '超大规模云（hyperscaler）每百万总 token 成本，越低越好。',
     sourcePrefix: '来源：InferenceX 与 ',
     sourceLinkText: 'SemiAnalysis Market August 2025 AI Cloud TCO Model',
-    tierNavLabel: '服务档位',
+    tierNavLabel: 'SLO',
     tierUnit: 'tok/s/用户',
     engineScopeNavLabel: '引擎范围',
     engineScopeOptions: {
