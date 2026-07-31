@@ -19,14 +19,14 @@ export type OverviewLocale = 'en' | 'zh';
 export const OVERVIEW_STRINGS = {
   en: {
     title: 'Inference Cost Blended Cost per Million Tokens',
-    purpose: 'Every active model across MI355X, B200, B300, GB200 and GB300 at a glance.',
     // The active tier is not repeated here — the Service level selector below
     // already states it.
     scopeMetric: 'Hyperscaler cost',
     scopeDirection: '↓ Lower is better',
     // The unit is dropped from the visible line but kept for screen readers.
     scopeAria: 'Hyperscaler cost per one million total tokens. Lower is better.',
-    sourceNote: 'Source: SemiAnalysis Market August 2025 AI Cloud TCO Model',
+    sourcePrefix: 'Source: InferenceX & ',
+    sourceLinkText: 'SemiAnalysis Market August 2025 AI Cloud TCO Model',
     tierNavLabel: 'Service level',
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
@@ -68,11 +68,11 @@ export const OVERVIEW_STRINGS = {
   },
   zh: {
     title: '推理混合每百万 token 成本',
-    purpose: '一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。',
     scopeMetric: '超大规模云（hyperscaler）成本',
     scopeDirection: '↓ 越低越好',
     scopeAria: '超大规模云（hyperscaler）每百万总 token 成本，越低越好。',
-    sourceNote: '来源：SemiAnalysis Market August 2025 AI Cloud TCO Model',
+    sourcePrefix: '来源：InferenceX 与 ',
+    sourceLinkText: 'SemiAnalysis Market August 2025 AI Cloud TCO Model',
     tierNavLabel: '服务档位',
     tierUnit: 'tok/s/用户',
     engineScopeNavLabel: '引擎范围',
@@ -459,7 +459,7 @@ interface SurfaceProps {
 export function DesktopOverviewMatrix({ models, locale, formatters, strings }: SurfaceProps) {
   const platforms = models[0]?.platforms ?? [];
   return (
-    <div className="hidden overflow-x-auto xl:block">
+    <div className="hidden xl:block">
       <table data-testid="overview-desktop-matrix" className="w-full border-collapse text-sm">
         <caption className="sr-only">{strings.caption}</caption>
         <colgroup>
@@ -468,16 +468,20 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
             <col key={platform.hardware} className="w-[15.6%]" />
           ))}
         </colgroup>
-        <thead>
+        {/* Sticky so the platform a column belongs to stays readable while
+            scrolling a nine-row matrix. `top-14` clears the site header (h-14,
+            sticky top-0, z-50), and z-10 keeps this under it. Opaque, or the
+            scrolled rows show through. */}
+        <thead className="sticky top-14 z-10 bg-card">
           <tr className="border-b border-border/50 text-xs uppercase tracking-wider text-muted-foreground">
-            <th scope="col" className="px-4 py-2 text-left font-semibold lg:px-6">
+            <th scope="col" className="bg-card px-4 py-2 text-left font-semibold lg:px-6">
               {strings.modelHeader}
             </th>
             {platforms.map((platform) => (
               <th
                 key={platform.hardware}
                 scope="col"
-                className={`px-3 py-2 text-left font-semibold ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
+                className={`px-3 py-2 text-left font-semibold ${platform.hardware === 'b200' ? 'bg-muted' : 'bg-card'}`}
               >
                 {platform.hardware === 'b200'
                   ? `${platform.hardwareLabel} · ${strings.referenceHeader}`

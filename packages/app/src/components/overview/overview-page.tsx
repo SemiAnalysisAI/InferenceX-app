@@ -1,4 +1,5 @@
 import { Card } from '@/components/ui/card';
+import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import type { OverviewPageData } from '@/lib/overview-data';
 
 import {
@@ -32,44 +33,46 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
               and tablets stack the metric under the title. */}
           <div className="flex flex-col gap-x-6 gap-y-1 xl:flex-row xl:items-baseline xl:justify-between">
             <h1 className="text-lg font-semibold">{strings.title}</h1>
-            <div className="flex flex-col gap-y-0.5 xl:items-end">
-              <p
-                data-testid="overview-scope"
-                aria-label={strings.scopeAria}
-                className="inline-flex flex-wrap items-baseline gap-x-2 leading-snug"
+            {/* Metric, direction and provenance read as one line: the numbers
+                and the model they are priced from belong together. */}
+            <p
+              data-testid="overview-scope"
+              aria-label={strings.scopeAria}
+              className="inline-flex flex-wrap items-baseline gap-x-2 leading-snug"
+            >
+              <span
+                data-testid="overview-scope-metric"
+                className="text-base font-semibold text-foreground"
               >
-                <span
-                  data-testid="overview-scope-metric"
-                  className="text-base font-semibold text-foreground"
-                >
-                  {strings.scopeMetric}
-                </span>{' '}
-                <span aria-hidden="true" className="text-sm text-muted-foreground">
-                  ·
-                </span>{' '}
-                <span
-                  data-testid="overview-scope-direction"
-                  className="text-sm font-normal text-muted-foreground"
-                >
-                  {strings.scopeDirection}
-                </span>
-              </p>
-              {/* The $/GPU/hr behind every cell comes from this model, so the
-                  matrix cites it where it states its metric. */}
-              <p className="text-xs leading-snug text-muted-foreground xl:text-right">
+                {strings.scopeMetric}
+              </span>{' '}
+              <span aria-hidden="true" className="text-sm text-muted-foreground">
+                ·
+              </span>{' '}
+              <span
+                data-testid="overview-scope-direction"
+                className="text-sm font-normal text-muted-foreground"
+              >
+                {strings.scopeDirection}
+              </span>{' '}
+              <span aria-hidden="true" className="text-sm text-muted-foreground">
+                ·
+              </span>{' '}
+              <span className="text-sm font-normal text-muted-foreground">
+                {strings.sourcePrefix}
                 <a
                   data-testid="overview-source-link"
                   href={OVERVIEW_SOURCE_HREF}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  className="group rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
-                  {strings.sourceNote}
+                  {strings.sourceLinkText}
+                  <ExternalLinkIcon />
                 </a>
-              </p>
-            </div>
+              </span>
+            </p>
           </div>
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{strings.purpose}</p>
           <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-6">
             <OverviewTierSwitcher
               tier={data.tier}
@@ -88,7 +91,9 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
       </Card>
 
       {/* Official-only summary; uploaded runs remain in the linked dashboard. */}
-      <Card className="overflow-hidden p-0 md:p-0">
+      {/* Clipped on phones for the rounded corners; visible from xl so the
+          desktop matrix header can stick to the page as it scrolls. */}
+      <Card className="overflow-hidden p-0 md:p-0 xl:overflow-visible">
         <DesktopOverviewMatrix
           models={data.models}
           locale={locale}

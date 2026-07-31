@@ -28,15 +28,16 @@ const AGENTX_LABEL_ZH = '长上下文多轮真实智能体场景（AgentX）';
 
 const PAGE_TITLE = 'Inference Cost Blended Cost per Million Tokens';
 const PAGE_TITLE_ZH = '推理混合每百万 token 成本';
-const SOURCE_NOTE = 'Source: SemiAnalysis Market August 2025 AI Cloud TCO Model';
-const SOURCE_NOTE_ZH = '来源：SemiAnalysis Market August 2025 AI Cloud TCO Model';
+const SOURCE_NOTE = 'Source: InferenceX & SemiAnalysis Market August 2025 AI Cloud TCO Model';
+const SOURCE_LINK_TEXT = 'SemiAnalysis Market August 2025 AI Cloud TCO Model';
+const SOURCE_NOTE_ZH = '来源：InferenceX 与 SemiAnalysis Market August 2025 AI Cloud TCO Model';
 const SOURCE_HREF = 'https://semianalysis.com/ai-cloud-tco-model/';
 const SCOPE_METRIC = 'Hyperscaler cost';
 const SCOPE_DIRECTION = '↓ Lower is better';
-const SCOPE_LINE = `${SCOPE_METRIC} · ${SCOPE_DIRECTION}`;
+const SCOPE_LINE = `${SCOPE_METRIC} · ${SCOPE_DIRECTION} · ${SOURCE_NOTE}`;
 const SCOPE_METRIC_ZH = '超大规模云（hyperscaler）成本';
 const SCOPE_DIRECTION_ZH = '↓ 越低越好';
-const SCOPE_LINE_ZH = `${SCOPE_METRIC_ZH} · ${SCOPE_DIRECTION_ZH}`;
+const SCOPE_LINE_ZH = `${SCOPE_METRIC_ZH} · ${SCOPE_DIRECTION_ZH} · ${SOURCE_NOTE_ZH}`;
 
 function expectNoHorizontalOverflow() {
   cy.document().then((doc) => {
@@ -332,9 +333,6 @@ describe('Overview page', () => {
 
     cy.contains('h1', PAGE_TITLE).should('exist');
     cy.contains(
-      'Every active model across MI355X, B200, B300, GB200 and GB300 at a glance.',
-    ).should('exist');
-    cy.contains(
       'Cost per million total tokens from each platform’s best observed serving envelope',
     ).should('exist');
     cy.get('[data-testid="overview-scope"]')
@@ -344,10 +342,14 @@ describe('Overview page', () => {
       .and('not.contain.text', '8K→1K');
     // The TCO model behind every $/GPU/hr is cited under the metric.
     cy.get('[data-testid="overview-source-link"]')
-      .should('have.text', SOURCE_NOTE)
+      .should('have.text', SOURCE_LINK_TEXT)
       .and('have.attr', 'href', SOURCE_HREF)
       .and('have.attr', 'target', '_blank')
       .and('have.attr', 'rel', 'noopener noreferrer');
+    // Opening off-site is signalled by the shared external-link glyph.
+    cy.get('[data-testid="overview-source-link"] svg').should('exist');
+    // The standing blurb above the switchers is gone.
+    cy.get('body').should('not.contain.text', 'at a glance');
     cy.contains('— = no result. ∞ = B200 baseline unavailable.').should('exist');
     // The methodology block is now just the cell-state legend and the
     // configuration-fallback note; the cost-formula, comparability, and
@@ -801,6 +803,35 @@ describe('Overview page', () => {
     });
   });
 
+  it('pins the matrix header to the top of the viewport while the page scrolls', () => {
+    cy.viewport(1280, 700);
+    cy.visit('/overview');
+
+    // Tall enough to scroll the header off a non-sticky layout.
+    cy.get('[data-testid="overview-desktop-matrix"]').then(([table]) => {
+      expect(table.getBoundingClientRect().height).to.be.greaterThan(700);
+    });
+    cy.scrollTo(0, 800);
+    // Pinned just below the sticky site header (h-14 = 56px), never under it.
+    cy.get('header.sticky').then(([siteHeader]) => {
+      const siteBottom = siteHeader.getBoundingClientRect().bottom;
+      cy.get('[data-testid="overview-desktop-matrix"] thead').should(([head]) => {
+        expect(head.getBoundingClientRect().top, 'header pinned below the nav').to.be.closeTo(
+          siteBottom,
+          2,
+        );
+      });
+    });
+    // Opaque and above the rows it overlaps, not blended with them.
+    cy.document().then((doc) => {
+      cy.get('[data-testid="overview-desktop-matrix"] thead').then(([head]) => {
+        const rect = head.getBoundingClientRect();
+        const hit = doc.elementFromPoint(rect.left + 40, rect.top + rect.height / 2);
+        expect(head.contains(hit), 'header paints over the scrolled rows').to.equal(true);
+      });
+    });
+  });
+
   it('fits the full matrix without overlap or clipping at desktop widths', () => {
     for (const width of [1280, 1440]) {
       cy.viewport(width, 900);
@@ -842,16 +873,14 @@ describe('Overview page', () => {
       .should('have.attr', 'href', '/zh/overview')
       .and('contain.text', '总览');
     cy.contains('h1', PAGE_TITLE_ZH).should('exist');
-    cy.contains('一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。').should(
-      'exist',
-    );
     cy.contains('按各模型标注的场景，基于各平台最佳观测服务包络线计算每百万总 token 成本').should(
       'exist',
     );
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);
     cy.get('[data-testid="overview-source-link"]')
-      .should('have.text', SOURCE_NOTE_ZH)
+      .should('have.text', SOURCE_LINK_TEXT)
       .and('have.attr', 'href', SOURCE_HREF);
+    cy.get('body').should('not.contain.text', '一眼对比');
     cy.contains('— = 无结果。∞ = 缺少 B200 基线。').should('exist');
     cy.get('[data-testid="overview-methodology"]').children('p').should('have.length', 2);
     cy.get('body')
