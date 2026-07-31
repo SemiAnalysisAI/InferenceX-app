@@ -74,6 +74,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   29881640438, // 2026-07-22 | Reason: accidental ingest while testing (e2e Test GLM-5.2 AgentX, branch explore/glm52-h200-agentx-tuning-round2)
   29882624421, // 2026-07-22 | Reason: accidental ingest while testing (e2e Test GLM-5.2 AgentX, branch explore/glm52-h200-agentx-tuning-round2)
   29912027293, // 2026-07-22 | Reason: accidental ingest while testing
+  30346826643, // 2026-07-28 | Initial AMD submission for MiniMax M3, used incorrect AgentX harness. Will update after harness updates.
   30405836523, // 2026-07-28 | Reason: No non-DSpark — kimik3-fp4-b300-vllm-agentic AgentX points run without speculative decoding, and Kimi-K3 agentic coding is published DSpark-only (source run of the PR #2397 sweep-reuse ingest)
 ]);
 
