@@ -2756,7 +2756,7 @@ const ScatterGraph = React.memo(
             .attr('display', null)
             .attr('data-testid', 'overflow-continuation-label')
             .attr('x', geometry.x2 + (labelToRight ? 12 : -12))
-            .attr('y', Math.max(12, Math.min(ctx.height - 4, geometry.y2 + 18)))
+            .attr('y', Math.max(12, geometry.y2 + 18))
             .attr('text-anchor', labelToRight ? 'start' : 'end')
             .attr('fill', color)
             .attr('stroke', ir.getCssColor('--background'))

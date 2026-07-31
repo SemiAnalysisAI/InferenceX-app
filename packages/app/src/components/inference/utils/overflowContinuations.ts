@@ -56,8 +56,14 @@ export function buildFrontierContinuations(
       }
       cursor += step;
     }
-    const hiddenPointCount = clipped.filter((entry) =>
-      entry.reasons.some((reason) => reasons.has(reason)),
+    const xDirection = Math.sign(toward.x - from.x);
+    const yDirection = Math.sign(toward.y - from.y);
+    const hiddenPointCount = clipped.filter(
+      (entry) =>
+        entry.reasons.some((reason) => reasons.has(reason)) &&
+        (xDirection === 0
+          ? Math.sign(entry.point.y - from.y) === yDirection
+          : Math.sign(entry.point.x - from.x) === xDirection),
     ).length;
 
     const controlIndex = leftVisible ? index - 1 : index + 2;

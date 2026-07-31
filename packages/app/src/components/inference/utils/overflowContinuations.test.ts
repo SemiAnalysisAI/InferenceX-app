@@ -44,6 +44,22 @@ describe('buildFrontierContinuations', () => {
     ]);
   });
 
+  it('counts clipped points only on the continuation side', () => {
+    const costClipped = point(10, 8);
+    const visible = point(40, 4);
+    const latencyClipped = point(90, 2);
+    const mixedClipped = point(100, 1);
+    const clipped: ClippedInferenceData[] = [
+      { point: costClipped, reasons: ['cost'] },
+      { point: latencyClipped, reasons: ['latency'] },
+      { point: mixedClipped, reasons: ['cost', 'latency'] },
+    ];
+
+    const result = buildFrontierContinuations([visible], clipped, 'lower_left');
+
+    expect(result.map((entry) => entry.hiddenPointCount)).toEqual([1, 2]);
+  });
+
   it('interpolates through consecutive clipped frontier points', () => {
     const controlPoint = point(5, 6);
     const visible = point(10, 5);
