@@ -18,13 +18,15 @@ export type OverviewLocale = 'en' | 'zh';
 
 export const OVERVIEW_STRINGS = {
   en: {
-    title: 'Inference Cost Overview',
+    title: 'Inference Cost Blended Cost per Million Tokens',
     purpose: 'Every active model across MI355X, B200, B300, GB200 and GB300 at a glance.',
     // The active tier is not repeated here — the Service level selector below
     // already states it.
-    scopeMetric: 'Hyperscaler cost · $/1M total tokens',
+    scopeMetric: 'Hyperscaler cost',
     scopeDirection: '↓ Lower is better',
+    // The unit is dropped from the visible line but kept for screen readers.
     scopeAria: 'Hyperscaler cost per one million total tokens. Lower is better.',
+    sourceNote: 'Source: SemiAnalysis Market August 2025 AI Cloud TCO Model',
     tierNavLabel: 'Service level',
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
@@ -39,7 +41,6 @@ export const OVERVIEW_STRINGS = {
       single_turn_8k1k: '8K/1K',
       agentx: 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)',
     },
-    detailsHeader: 'Details',
     detailLink: 'View details',
     detailAria: (modelLabel: string) => `View details: ${modelLabel}`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
@@ -66,11 +67,12 @@ export const OVERVIEW_STRINGS = {
     referenceHeader: 'Reference',
   },
   zh: {
-    title: '推理成本总览',
+    title: '推理混合每百万 token 成本',
     purpose: '一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。',
-    scopeMetric: '超大规模云（hyperscaler）成本 · $/1M 总 token',
+    scopeMetric: '超大规模云（hyperscaler）成本',
     scopeDirection: '↓ 越低越好',
     scopeAria: '超大规模云（hyperscaler）每百万总 token 成本，越低越好。',
+    sourceNote: '来源：SemiAnalysis Market August 2025 AI Cloud TCO Model',
     tierNavLabel: '服务档位',
     tierUnit: 'tok/s/用户',
     engineScopeNavLabel: '引擎范围',
@@ -84,7 +86,6 @@ export const OVERVIEW_STRINGS = {
       single_turn_8k1k: '8K/1K',
       agentx: '长上下文多轮真实智能体场景（AgentX）',
     },
-    detailsHeader: '详情',
     detailLink: '查看详情',
     detailAria: (modelLabel: string) => `查看详情：${modelLabel}`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
@@ -462,11 +463,10 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
       <table data-testid="overview-desktop-matrix" className="w-full border-collapse text-sm">
         <caption className="sr-only">{strings.caption}</caption>
         <colgroup>
-          <col className="w-[17%]" />
+          <col className="w-[22%]" />
           {platforms.map((platform) => (
-            <col key={platform.hardware} className="w-[13.5%]" />
+            <col key={platform.hardware} className="w-[15.6%]" />
           ))}
-          <col className="w-[12%]" />
         </colgroup>
         <thead>
           <tr className="border-b border-border/50 text-xs uppercase tracking-wider text-muted-foreground">
@@ -484,9 +484,6 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
                   : platform.hardwareLabel}
               </th>
             ))}
-            <th scope="col" className="px-4 py-2 text-left font-semibold">
-              {strings.detailsHeader}
-            </th>
           </tr>
         </thead>
         <tbody>
@@ -500,6 +497,16 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
             >
               <th scope="row" className="px-4 py-4 text-left align-top font-normal lg:px-6">
                 <ModelName model={model} strings={strings} />
+                {/* The link lives with the model it drills into, so the matrix
+                    spends no column on a header that is the same every row. */}
+                <OverviewDetailLink
+                  href={detailHref(locale, model)}
+                  model={model.model}
+                  ariaLabel={strings.detailAria(model.modelLabel)}
+                  className="mt-1 text-xs"
+                >
+                  {strings.detailLink}
+                </OverviewDetailLink>
               </th>
               {model.platforms.map((platform) => (
                 <td
@@ -516,15 +523,6 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
                   />
                 </td>
               ))}
-              <td className="px-4 py-4 align-top">
-                <OverviewDetailLink
-                  href={detailHref(locale, model)}
-                  model={model.model}
-                  ariaLabel={strings.detailAria(model.modelLabel)}
-                >
-                  {strings.detailLink}
-                </OverviewDetailLink>
-              </td>
             </tr>
           ))}
         </tbody>

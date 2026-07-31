@@ -9,14 +9,14 @@ const MODEL_LABELS = [
   'Qwen3.5 397B',
 ];
 
+// No trailing Details column: the link sits in the model cell instead.
 const PLATFORM_HEADERS = [
   'Model · Scenario',
   'B200 · Reference',
   'MI355X',
   'B300',
-  'GB200',
-  'GB300',
-  'Details',
+  'GB200 NVL72',
+  'GB300 NVL72',
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
@@ -26,12 +26,17 @@ const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文多轮真实智能体场景（AgentX）';
 
-const SCOPE_METRIC = 'Hyperscaler cost · $/1M total tokens';
+const PAGE_TITLE = 'Inference Cost Blended Cost per Million Tokens';
+const PAGE_TITLE_ZH = '推理混合每百万 token 成本';
+const SOURCE_NOTE = 'Source: SemiAnalysis Market August 2025 AI Cloud TCO Model';
+const SOURCE_NOTE_ZH = '来源：SemiAnalysis Market August 2025 AI Cloud TCO Model';
+const SOURCE_HREF = 'https://semianalysis.com/ai-cloud-tco-model/';
+const SCOPE_METRIC = 'Hyperscaler cost';
 const SCOPE_DIRECTION = '↓ Lower is better';
-const SCOPE_LINE = `${SCOPE_METRIC} ${SCOPE_DIRECTION}`;
-const SCOPE_METRIC_ZH = '超大规模云（hyperscaler）成本 · $/1M 总 token';
+const SCOPE_LINE = `${SCOPE_METRIC} · ${SCOPE_DIRECTION}`;
+const SCOPE_METRIC_ZH = '超大规模云（hyperscaler）成本';
 const SCOPE_DIRECTION_ZH = '↓ 越低越好';
-const SCOPE_LINE_ZH = `${SCOPE_METRIC_ZH} ${SCOPE_DIRECTION_ZH}`;
+const SCOPE_LINE_ZH = `${SCOPE_METRIC_ZH} · ${SCOPE_DIRECTION_ZH}`;
 
 function expectNoHorizontalOverflow() {
   cy.document().then((doc) => {
@@ -325,7 +330,7 @@ describe('Overview page', () => {
       .and('have.class', 'border-secondary');
     cy.get('[data-testid="nav-link-dashboard"]').should('have.class', 'text-brand');
 
-    cy.contains('h1', 'Inference Cost Overview').should('exist');
+    cy.contains('h1', PAGE_TITLE).should('exist');
     cy.contains(
       'Every active model across MI355X, B200, B300, GB200 and GB300 at a glance.',
     ).should('exist');
@@ -335,7 +340,14 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-scope"]')
       .should('have.text', SCOPE_LINE)
       .and('not.contain.text', 'tok/s/user')
+      .and('not.contain.text', '$/1M')
       .and('not.contain.text', '8K→1K');
+    // The TCO model behind every $/GPU/hr is cited under the metric.
+    cy.get('[data-testid="overview-source-link"]')
+      .should('have.text', SOURCE_NOTE)
+      .and('have.attr', 'href', SOURCE_HREF)
+      .and('have.attr', 'target', '_blank')
+      .and('have.attr', 'rel', 'noopener noreferrer');
     cy.contains('— = no result. ∞ = B200 baseline unavailable.').should('exist');
     // The methodology block is now just the cell-state legend and the
     // configuration-fallback note; the cost-formula, comparability, and
@@ -369,6 +381,12 @@ describe('Overview page', () => {
         cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
         cy.get('[data-testid="overview-platform"]').should('have.length', MATRIX_ROWS * 5);
         cy.get('[data-testid="overview-model-coverage-note"]').should('not.exist');
+        // One link per row, inside that row's model cell.
+        cy.get('a').contains('View details').should('exist');
+        cy.get('th[scope="row"]')
+          .find('a')
+          .filter(':contains("View details")')
+          .should('have.length', MATRIX_ROWS);
         cy.get('details, summary, button').should('not.exist');
         cy.contains(/PRIMARY|Ranked results/).should('not.exist');
       });
@@ -438,7 +456,7 @@ describe('Overview page', () => {
     for (const width of [1280, 1440]) {
       cy.viewport(width, 900);
       cy.visit('/overview');
-      cy.contains('h1', 'Inference Cost Overview').then(([title]) => {
+      cy.contains('h1', PAGE_TITLE).then(([title]) => {
         cy.get('[data-testid="overview-scope"]').then(([scope]) => {
           const titleRect = title.getBoundingClientRect();
           const scopeRect = scope.getBoundingClientRect();
@@ -457,7 +475,7 @@ describe('Overview page', () => {
     for (const width of [320, 390, 768]) {
       cy.viewport(width, 900);
       cy.visit('/overview');
-      cy.contains('h1', 'Inference Cost Overview').then(([title]) => {
+      cy.contains('h1', PAGE_TITLE).then(([title]) => {
         cy.get('[data-testid="overview-scope"]').then(([scope]) => {
           expect(
             scope.getBoundingClientRect().top,
@@ -823,7 +841,7 @@ describe('Overview page', () => {
     cy.get('[data-testid="tab-trigger-overview"]')
       .should('have.attr', 'href', '/zh/overview')
       .and('contain.text', '总览');
-    cy.contains('h1', '推理成本总览').should('exist');
+    cy.contains('h1', PAGE_TITLE_ZH).should('exist');
     cy.contains('一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。').should(
       'exist',
     );
@@ -831,6 +849,9 @@ describe('Overview page', () => {
       'exist',
     );
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);
+    cy.get('[data-testid="overview-source-link"]')
+      .should('have.text', SOURCE_NOTE_ZH)
+      .and('have.attr', 'href', SOURCE_HREF);
     cy.contains('— = 无结果。∞ = 缺少 B200 基线。').should('exist');
     cy.get('[data-testid="overview-methodology"]').children('p').should('have.length', 2);
     cy.get('body')

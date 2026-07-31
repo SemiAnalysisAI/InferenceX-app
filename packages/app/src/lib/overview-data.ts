@@ -125,13 +125,10 @@ const OVERVIEW_SLICE_PRIORITY = [
   { speculative: false, precision: Precision.FP8 },
 ] as const;
 const OVERVIEW_PRECISIONS: readonly string[] = [Precision.FP4, Precision.FP8];
-const OVERVIEW_HARDWARE_LABELS: Readonly<Record<string, string>> = {
-  gb200: 'GB200',
-  gb300: 'GB300',
-};
-
+/** The registry label verbatim, rack SKU included — the matrix says
+ *  "GB200 NVL72", not "GB200", so a rack part is never read as a board. */
 function overviewHardwareLabel(hardware: string, model: Model): string {
-  return OVERVIEW_HARDWARE_LABELS[hardware] ?? getHardwareConfig(hardware, model).label;
+  return getHardwareConfig(hardware, model).label;
 }
 
 const isSpeculativeDecode = (specMethod: string): boolean =>
