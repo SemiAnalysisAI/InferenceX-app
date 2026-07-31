@@ -16,11 +16,13 @@ import {
 } from './tco-feed';
 
 export const OVERVIEW_WORKLOAD = { isl: 8192, osl: 1024 } as const;
-export const OVERVIEW_TIERS = [30, 50, 75, 100] as const;
+export const OVERVIEW_TIERS = [30, 50, 75, 100, 150, 200] as const;
 export type OverviewTier = (typeof OVERVIEW_TIERS)[number];
 export const OVERVIEW_PRIMARY_TIER = 50;
 export type OverviewEngineScope = 'all' | 'community';
 export type OverviewScenario = 'single_turn_8k1k' | 'agentx';
+/** Row order within a model: the single-turn workload first, AgentX below it. */
+export const OVERVIEW_SCENARIOS = ['single_turn_8k1k', 'agentx'] as const;
 
 export function resolveOverviewEngineScope(
   raw: string | string[] | undefined,
@@ -123,13 +125,10 @@ const OVERVIEW_SLICE_PRIORITY = [
   { speculative: false, precision: Precision.FP8 },
 ] as const;
 const OVERVIEW_PRECISIONS: readonly string[] = [Precision.FP4, Precision.FP8];
-const OVERVIEW_HARDWARE_LABELS: Readonly<Record<string, string>> = {
-  gb200: 'GB200',
-  gb300: 'GB300',
-};
-
+/** The registry label verbatim, rack SKU included — the matrix says
+ *  "GB200 NVL72", not "GB200", so a rack part is never read as a board. */
 function overviewHardwareLabel(hardware: string, model: Model): string {
-  return OVERVIEW_HARDWARE_LABELS[hardware] ?? getHardwareConfig(hardware, model).label;
+  return getHardwareConfig(hardware, model).label;
 }
 
 const isSpeculativeDecode = (specMethod: string): boolean =>
@@ -151,6 +150,35 @@ export function overviewScenarioForModel(
   }
   if (rows.some((row) => row.benchmark_type === 'agentic_traces')) return 'agentx';
   return model === Model.Kimi_K3 || model === Model.GLM_5_2 ? 'agentx' : 'single_turn_8k1k';
+}
+
+/**
+ * Which scenarios each model is shown under, curated rather than derived: a
+ * model can hold rows for a scenario the overview does not want to headline
+ * for it, so presence of data alone must not add a row. Models listed with
+ * both get one matrix row each, in OVERVIEW_SCENARIOS order.
+ */
+const OVERVIEW_MODEL_SCENARIOS: Partial<Record<Model, readonly OverviewScenario[]>> = {
+  [Model.DeepSeek_V4_Pro]: ['single_turn_8k1k', 'agentx'],
+  [Model.MiniMax_M3]: ['single_turn_8k1k', 'agentx'],
+  [Model.Qwen3_5]: ['single_turn_8k1k', 'agentx'],
+  [Model.Kimi_K2_5]: ['single_turn_8k1k'],
+  [Model.Kimi_K3]: ['agentx'],
+  [Model.GLM_5_2]: ['agentx'],
+};
+
+/** The scenarios this model gets a row for. Unlisted models keep the single
+ *  data-derived scenario, so a new model renders one row until curated. */
+export function overviewScenariosForModel(
+  model: Model,
+  rows: readonly BenchmarkRow[] = [],
+): OverviewScenario[] {
+  const curated = OVERVIEW_MODEL_SCENARIOS[model];
+  return curated === undefined
+    ? [overviewScenarioForModel(model, rows)]
+    : // Normalized through OVERVIEW_SCENARIOS so row order stays single-turn
+      // first however an entry above happens to be written.
+      OVERVIEW_SCENARIOS.filter((scenario) => curated.includes(scenario));
 }
 
 function overviewEngineRows(
@@ -512,9 +540,9 @@ export function buildOverviewModelSummary(
   rows: BenchmarkRow[],
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
+  scenario: OverviewScenario = overviewScenarioForModel(model, rows),
 ): OverviewModelSummary {
   const scopedRows = overviewEngineRows(rows, engineScope);
-  const scenario = overviewScenarioForModel(model, rows);
   const scenarioRows = overviewScenarioRows(scenario, scopedRows);
   return {
     model,
@@ -524,8 +552,11 @@ export function buildOverviewModelSummary(
   };
 }
 
-/** DEFAULT_MODELS fixes the row order; a rowless model still renders all
- *  platforms with missing reasons. Live and fixture paths both feed this. */
+/** DEFAULT_MODELS fixes the row order, and a model benchmarked on both
+ *  scenarios contributes one row per scenario; a rowless model still renders
+ *  all platforms with missing reasons. Live and fixture paths both feed this.
+ *  Scenario presence reads the unscoped rows so switching the engine scope
+ *  changes cell contents, never the shape of the matrix. */
 export function assembleOverviewPageData(
   rowsByModel: Record<string, BenchmarkRow[]>,
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
@@ -533,8 +564,10 @@ export function assembleOverviewPageData(
 ): OverviewPageData {
   const perModel = [...DEFAULT_MODELS].map((model) => ({ model, rows: rowsByModel[model] ?? [] }));
   return {
-    models: perModel.map(({ model, rows }) =>
-      buildOverviewModelSummary(model, rows, tier, engineScope),
+    models: perModel.flatMap(({ model, rows }) =>
+      overviewScenariosForModel(model, rows).map((scenario) =>
+        buildOverviewModelSummary(model, rows, tier, engineScope, scenario),
+      ),
     ),
     tier,
     engineScope,

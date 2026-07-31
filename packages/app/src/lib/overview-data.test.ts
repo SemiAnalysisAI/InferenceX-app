@@ -947,7 +947,20 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       overviewRowsFixture as unknown as Record<string, BenchmarkRow[]>,
     );
 
-    expect(page.models).toHaveLength(DEFAULT_MODELS.size);
+    // Curated scenarios: DeepSeek, MiniMax and Qwen each get both rows, Kimi
+    // K3 and GLM are AgentX-only, Kimi K2.5 is single-turn only.
+    expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([
+      `${Model.DeepSeek_V4_Pro}/single_turn_8k1k`,
+      `${Model.DeepSeek_V4_Pro}/agentx`,
+      `${Model.Kimi_K3}/agentx`,
+      `${Model.Kimi_K2_5}/single_turn_8k1k`,
+      `${Model.MiniMax_M3}/single_turn_8k1k`,
+      `${Model.MiniMax_M3}/agentx`,
+      `${Model.GLM_5_2}/agentx`,
+      `${Model.Qwen3_5}/single_turn_8k1k`,
+      `${Model.Qwen3_5}/agentx`,
+    ]);
+    expect(page.models.length).toBeGreaterThan(DEFAULT_MODELS.size);
     expect(page).not.toHaveProperty('datasetThroughDate');
     expect(page.tier).toBe(50);
 
@@ -973,6 +986,27 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(dsGb300.candidate.read.value).toBeNull();
     expect(dsGb300.candidate.read.evidenceTopologies).toEqual([]);
     expect(dsGb300.candidate.missingReason).toBe('no_exact_at_tier');
+
+    // DeepSeek's AgentX row is priced from its agentic-trace rows alone — the
+    // single-turn sweeps never leak into it, so only the two benchmarked
+    // platforms carry a read.
+    const deepseekAgentx = page.models.find(
+      (m) => m.model === Model.DeepSeek_V4_Pro && m.scenario === 'agentx',
+    )!;
+    const dsxB200 = deepseekAgentx.platforms.find((p) => p.hardware === 'b200')!;
+    expect(dsxB200.read.value).toBe(7500);
+    expect(dsxB200.costPerMtok).toBeCloseTo(1_950_000 / (7500 * 3600), 6);
+    // Distinct from this model's single-turn B200 read (8101.968), so a
+    // regression that fed single-turn rows into this row would land there.
+    expect(dsxB200.read.value).not.toBeCloseTo(8101.968, 3);
+    const dsxMi355x = deepseekAgentx.platforms.find((p) => p.hardware === 'mi355x')!;
+    expect(dsxMi355x.read.value).toBe(6000);
+    expect(dsxMi355x.costVsB200Pct).toBeCloseTo(1_480_000 / 6000 / (1_950_000 / 7500) - 1, 6);
+    expect(
+      deepseekAgentx.platforms
+        .filter((p) => ['b300', 'gb200', 'gb300'].includes(p.hardware))
+        .map((p) => p.missingReason),
+    ).toEqual(['no_scenario_data', 'no_scenario_data', 'no_scenario_data']);
 
     // MiniMax: the platform result remains visible when B200 has no 8K/1K data
     // — priced, but with no percentage baseline (the UI's ∞ badge state).
