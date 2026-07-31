@@ -26,8 +26,8 @@ const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文多轮真实智能体场景（AgentX）';
 
-const PAGE_TITLE = 'Inference Cost Blended Cost per Million Tokens';
-const PAGE_TITLE_ZH = '推理混合每百万 token 成本';
+const PAGE_TITLE = 'Inference Cost per Million Tokens';
+const PAGE_TITLE_ZH = '推理每百万 token 成本';
 const SOURCE_NOTE = 'Source: InferenceX & SemiAnalysis Market August 2025 AI Cloud TCO Model';
 const SOURCE_LINK_TEXT = 'SemiAnalysis Market August 2025 AI Cloud TCO Model';
 const SOURCE_NOTE_ZH = '来源：InferenceX 与 SemiAnalysis Market August 2025 AI Cloud TCO Model';
