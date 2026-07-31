@@ -160,7 +160,11 @@ describe('Chart overflow continuations', () => {
             cy.wrap($continuation)
               .find('[data-testid="overflow-continuation-label"]')
               .should(($label) => {
-                expect(Number($label.attr('y'))).to.be.greaterThan(arrowY);
+                const offset = Number($label.attr('y')) - arrowY;
+                expect(
+                  Math.abs(offset - 18) < 0.01 || Math.abs(offset + 12) < 0.01,
+                  'label is below the arrow or uses the above-arrow bottom-edge fallback',
+                ).to.equal(true);
               });
           });
         cy.wrap($continuation)

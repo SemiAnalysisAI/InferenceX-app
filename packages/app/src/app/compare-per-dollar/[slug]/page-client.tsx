@@ -214,7 +214,7 @@ export default function ComparePerDollarPageClient({
                     className="underline hover:text-primary"
                     onClick={() => track('compare_per_dollar_tco_source_clicked', { slug })}
                   >
-                    SemiAnalysis Market August 2025 Pricing Surveys &amp; AI Cloud TCO Model
+                    SemiAnalysis Market July 2026 Pricing Surveys &amp; AI Cloud TCO Model
                   </a>
                   .
                 </p>

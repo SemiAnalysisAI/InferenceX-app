@@ -18,6 +18,13 @@ import {
 
 let nextId = 1;
 
+const JULY_2026_HYPERSCALER_TCO = {
+  b200: 1.7349236084834354,
+  gb200: 1.8648110244453284,
+  gb300: 2.313899859674561,
+  mi355x: 1.4960710469526235,
+} as const;
+
 // `output_tput_per_gpu` is deliberately a constant decoy on most rows: the
 // overview's cost basis is TOTAL tokens (`tput_per_gpu`), so any expectation
 // below would collapse to the 123 decoy if the code read output tokens.
@@ -151,11 +158,17 @@ describe('overview engine scope and scenario selection', () => {
   });
 
   it('prices from HW_REGISTRY costh — not the retail costr tier', () => {
-    // b200: costh 1.95 vs costr 2.90 — the two tiers disagree, so a costr
+    // b200: costh 1.7349 vs costr 2.60 — the two tiers disagree, so a costr
     // regression cannot pass this assertion.
-    expect(overviewCostPerMtok('b200', 7200)).toBeCloseTo(1_950_000 / (7200 * 3600), 9);
-    expect(overviewCostPerMtok('b200', 7200)).not.toBeCloseTo(2_900_000 / (7200 * 3600), 9);
-    expect(overviewCostPerMtok('mi355x', 9000)).toBeCloseTo(1_480_000 / (9000 * 3600), 9);
+    expect(overviewCostPerMtok('b200', 7200)).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (7200 * 3600),
+      9,
+    );
+    expect(overviewCostPerMtok('b200', 7200)).not.toBeCloseTo(2_600_000 / (7200 * 3600), 9);
+    expect(overviewCostPerMtok('mi355x', 9000)).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) / (9000 * 3600),
+      9,
+    );
     expect(overviewCostPerMtok('b200', null)).toBeNull();
     expect(overviewCostPerMtok('b200', 0)).toBeNull();
     expect(overviewCostPerMtok('b200', -100)).toBeNull();
@@ -170,12 +183,22 @@ describe('overview engine scope and scenario selection', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, rows, 50, 'community');
     const byHardware = Object.fromEntries(summary.platforms.map((p) => [p.hardware, p]));
 
-    // Expected $/GPU/hr from HW_REGISTRY costh — b200 1.95, mi355x 1.48, gb300 2.652.
-    expect(byHardware.b200.costPerMtok).toBeCloseTo(1_950_000 / (7200 * 3600), 6);
+    // Expected $/GPU/hr from HW_REGISTRY costh — b200 1.7349, mi355x 1.4961,
+    // gb300 2.3139.
+    expect(byHardware.b200.costPerMtok).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (7200 * 3600),
+      6,
+    );
     expect(byHardware.b200.costVsB200Pct).toBeNull();
-    expect(byHardware.mi355x.costPerMtok).toBeCloseTo(1_480_000 / (9000 * 3600), 6);
+    expect(byHardware.mi355x.costPerMtok).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) / (9000 * 3600),
+      6,
+    );
     expect(byHardware.mi355x.costVsB200Pct).toBeCloseTo(
-      1_480_000 / (9000 * 3600) / (1_950_000 / (7200 * 3600)) - 1,
+      (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) /
+        (9000 * 3600) /
+        ((JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (7200 * 3600)) -
+        1,
       6,
     );
     expect(byHardware.mi355x.costVsB200Pct).toBeLessThan(0);
@@ -193,7 +216,10 @@ describe('overview engine scope and scenario selection', () => {
     );
     const gb300 = summary.platforms.find((p) => p.hardware === 'gb300')!;
 
-    expect(gb300.costPerMtok).toBeCloseTo(2_652_000 / (9000 * 3600), 6);
+    expect(gb300.costPerMtok).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.gb300 * 1e6) / (9000 * 3600),
+      6,
+    );
     expect(gb300.costVsB200Pct).toBeNull();
     expect(summary.platforms.find((p) => p.hardware === 'b200')?.costPerMtok).toBeNull();
   });
@@ -283,7 +309,7 @@ describe('overview engine scope and scenario selection', () => {
 
     expect(b200.read.config?.framework).toBe('llmd-vllm');
     expect(b200.read.value).toBe(9900);
-    expect(b200.costPerMtok).toBeCloseTo(1_950_000 / (9900 * 3600), 6);
+    expect(b200.costPerMtok).toBeCloseTo((JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (9900 * 3600), 6);
   });
 
   it('builds one serving-series frontier across topology variants', () => {
@@ -786,7 +812,10 @@ describe('overview platform selection', () => {
       boundary: 'interpolated',
       estimated: false,
     });
-    expect(b200.costPerMtok).toBeCloseTo(1_950_000 / (10800 * 3600), 6);
+    expect(b200.costPerMtok).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (10800 * 3600),
+      6,
+    );
   });
 
   it('restricts AgentX points to the E2E frontier on total throughput', () => {
@@ -971,14 +1000,20 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     const deepseek = page.models.find((m) => m.model === Model.DeepSeek_V4_Pro)!;
     const dsB300 = headlinePairOf(deepseek, 'b300-vs-b200')!;
     expect(dsB300.baseline.read.value).toBeCloseTo(8101.968);
-    expect(dsB300.baseline.costPerMtok).toBeCloseTo(1_950_000 / (8101.968 * 3600), 6);
+    expect(dsB300.baseline.costPerMtok).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (8101.968 * 3600),
+      6,
+    );
     expect(dsB300.candidate.read.value).toBeNull();
     expect(dsB300.candidate.costPerMtok).toBeNull();
     expect(dsB300.candidate.missingReason).toBe('no_exact_at_tier');
     const dsGb200 = headlinePairOf(deepseek, 'gb200-vs-b200')!;
     expect(dsGb200.candidate.precision).toBe(Precision.FP8);
     expect(dsGb200.candidate.read.value).toBe(5100);
-    expect(dsGb200.candidate.costPerMtok).toBeCloseTo(2_210_000 / (5100 * 3600), 6);
+    expect(dsGb200.candidate.costPerMtok).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.gb200 * 1e6) / (5100 * 3600),
+      6,
+    );
     expect(headlinePairOf(deepseek, 'mi355x-vs-b200')?.candidate.missingReason).toBe(
       'no_exact_at_tier',
     );
@@ -995,13 +1030,22 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     )!;
     const dsxB200 = deepseekAgentx.platforms.find((p) => p.hardware === 'b200')!;
     expect(dsxB200.read.value).toBe(7500);
-    expect(dsxB200.costPerMtok).toBeCloseTo(1_950_000 / (7500 * 3600), 6);
+    expect(dsxB200.costPerMtok).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (7500 * 3600),
+      6,
+    );
     // Distinct from this model's single-turn B200 read (8101.968), so a
     // regression that fed single-turn rows into this row would land there.
     expect(dsxB200.read.value).not.toBeCloseTo(8101.968, 3);
     const dsxMi355x = deepseekAgentx.platforms.find((p) => p.hardware === 'mi355x')!;
     expect(dsxMi355x.read.value).toBe(6000);
-    expect(dsxMi355x.costVsB200Pct).toBeCloseTo(1_480_000 / 6000 / (1_950_000 / 7500) - 1, 6);
+    expect(dsxMi355x.costVsB200Pct).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) /
+        6000 /
+        ((JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / 7500) -
+        1,
+      6,
+    );
     expect(
       deepseekAgentx.platforms
         .filter((p) => ['b300', 'gb200', 'gb300'].includes(p.hardware))
@@ -1014,7 +1058,10 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     const mmGb300 = headlinePairOf(minimax, 'gb300-vs-b200')!;
     expect(mmGb300.baseline.missingReason).toBe('no_scenario_data');
     expect(mmGb300.candidate.read.value).toBe(6510);
-    expect(mmGb300.candidate.costPerMtok).toBeCloseTo(2_652_000 / (6510 * 3600), 6);
+    expect(mmGb300.candidate.costPerMtok).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.gb300 * 1e6) / (6510 * 3600),
+      6,
+    );
     expect(mmGb300.candidate.costVsB200Pct).toBeNull();
 
     // Qwen: MI355X independently falls back to FP8 while B200 and B300 use FP4.
@@ -1022,11 +1069,17 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     const qwenMi = headlinePairOf(qwen, 'mi355x-vs-b200')!;
     expect(qwenMi.candidate.precision).toBe(Precision.FP8);
     expect(qwenMi.candidate.read.value).toBe(6688);
-    expect(qwenMi.candidate.costPerMtok).toBeCloseTo(1_480_000 / (6688 * 3600), 6);
+    expect(qwenMi.candidate.costPerMtok).toBeCloseTo(
+      (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) / (6688 * 3600),
+      6,
+    );
     expect(qwenMi.baseline.precision).toBe(Precision.FP4);
     expect(qwenMi.baseline.read.value).toBeCloseTo(6602.344);
     expect(qwenMi.candidate.costVsB200Pct).toBeCloseTo(
-      1_480_000 / (6688 * 3600) / (1_950_000 / (6602.344 * 3600)) - 1,
+      (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) /
+        (6688 * 3600) /
+        ((JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (6602.344 * 3600)) -
+        1,
       6,
     );
     const qwenB300 = headlinePairOf(qwen, 'b300-vs-b200')!;
