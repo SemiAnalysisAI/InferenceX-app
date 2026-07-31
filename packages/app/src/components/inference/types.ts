@@ -317,6 +317,18 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   measuredJPerInputToken?: { y: number; roof: boolean };
 }
 
+/** Why a chart-ready point was intentionally excluded from the visible plot. */
+export type ChartClipReason = 'cost' | 'latency';
+
+/**
+ * A filtered point retained only so the chart can explain that its Pareto
+ * curve continues beyond an intentional display limit.
+ */
+export interface ClippedInferenceData {
+  point: InferenceData;
+  reasons: ChartClipReason[];
+}
+
 /**
  * Keys of InferenceData that have the roofline metric structure ({y, roof}).
  */
@@ -494,6 +506,7 @@ export interface RenderableGraph {
   sequence: string;
   chartDefinition: ChartDefinition;
   data: InferenceData[];
+  clippedData?: ClippedInferenceData[];
 }
 /**
  * Props for the {@link ScatterGraph} component.
@@ -510,6 +523,8 @@ export interface RenderableGraph {
 export interface OverlayData {
   /** The data points to overlay */
   data: InferenceData[];
+  /** Overlay points hidden by the same display limits as official data. */
+  clippedData?: ClippedInferenceData[];
   /** Hardware configuration for the overlay data (may have different hardware types) */
   hardwareConfig: HardwareConfig;
   /** Fallback label — branch of the first loaded run. Used when {@link getRunForRow} is absent
@@ -529,6 +544,7 @@ export interface ScatterGraphProps {
   chartId: string;
   modelLabel: string;
   data: InferenceData[];
+  clippedData?: ClippedInferenceData[];
   xLabel: string;
   yLabel: string;
   chartDefinition: ChartDefinition;

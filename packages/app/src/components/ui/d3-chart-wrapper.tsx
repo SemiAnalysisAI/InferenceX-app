@@ -52,6 +52,7 @@ export interface D3ChartWrapperProps {
   ) => void;
   legendElement: React.ReactNode;
   noDataOverlay?: React.ReactNode;
+  plotOverlay?: React.ReactNode;
   caption?: React.ReactNode;
   instructions?: string;
   testId?: string;
@@ -70,6 +71,7 @@ export function D3ChartWrapper({
   hideTooltipElements,
   legendElement,
   noDataOverlay,
+  plotOverlay,
   caption,
   instructions = 'Shift+Scroll to zoom • Drag to pan • Double-click to reset • Click a point to pin tooltip',
   testId,
@@ -113,6 +115,7 @@ export function D3ChartWrapper({
                 computeTooltipPosition. */}
             <PortalTooltip tooltipRef={tooltipRef} pinned={Boolean(pinnedPoint)} />
             {noDataOverlay}
+            {plotOverlay}
           </div>
           <p className="no-export text-xs text-muted-foreground text-center mt-2">{instructions}</p>
           <div className="overflow-hidden max-h-0">

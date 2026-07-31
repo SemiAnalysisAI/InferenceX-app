@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
-import { filterDataByCostLimit, processOverlayChartData } from '@/components/inference/utils';
+import {
+  filterDataByCostLimit,
+  partitionChartDataByLimits,
+  processOverlayChartData,
+  processOverlayChartDataWithClipping,
+} from '@/components/inference/utils';
 
 // ---------------------------------------------------------------------------
 // fixture factories
@@ -127,6 +132,42 @@ describe('filterDataByCostLimit', () => {
     const data = [pt({ costh: { y: 0.5, roof: false } }), pt({ costh: { y: 0.9, roof: false } })];
     const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1 }), 'y_costh');
     expect(result).toHaveLength(2);
+  });
+});
+
+describe('partitionChartDataByLimits', () => {
+  it('retains cost and TTFT outliers with explicit reasons while preserving boundary points', () => {
+    const costOutlier = pt({ x: 10, y: 6 });
+    const ttftOutlier = pt({ x: 61, y: 1 });
+    const both = pt({ x: 70, y: 7 });
+    const boundary = pt({ x: 60, y: 5 });
+
+    const result = partitionChartDataByLimits(
+      [costOutlier, ttftOutlier, both, boundary],
+      chartDef({ y_cost_limit: 5, y_latency_limit: 60 }),
+      'y_costh',
+      { isTtftX: true, isAgentic: false },
+    );
+
+    expect(result.data).toEqual([boundary]);
+    expect(result.clippedData).toEqual([
+      { point: costOutlier, reasons: ['cost'] },
+      { point: ttftOutlier, reasons: ['latency'] },
+      { point: both, reasons: ['cost', 'latency'] },
+    ]);
+  });
+
+  it('does not apply fixed-sequence TTFT clipping to agentic points', () => {
+    const point = pt({ x: 500, y: 1 });
+    const result = partitionChartDataByLimits(
+      [point],
+      chartDef({ y_latency_limit: 60 }),
+      'y_tpPerGpu',
+      { isTtftX: true, isAgentic: true },
+    );
+
+    expect(result.data).toEqual([point]);
+    expect(result.clippedData).toEqual([]);
   });
 });
 
@@ -259,6 +300,34 @@ describe('processOverlayChartData', () => {
     const result = processOverlayChartData(data, 'interactivity', 'y_costh', null);
     expect(result).toHaveLength(1);
     expect(result[0].y).toBe(0.5);
+  });
+
+  it('retains clipped unofficial-run points for the overflow continuation path', () => {
+    const visible = pt({
+      costh: { y: 0.5, roof: false },
+      median_intvty: 10,
+      run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
+    } as any);
+    const clipped = pt({
+      costh: { y: 100, roof: false },
+      median_intvty: 20,
+      run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
+    } as any);
+
+    const result = processOverlayChartDataWithClipping(
+      [visible, clipped],
+      'interactivity',
+      'y_costh',
+      null,
+    );
+
+    expect(result.data).toHaveLength(1);
+    expect(result.clippedData).toEqual([
+      {
+        point: expect.objectContaining({ x: 20, y: 100, run_url: clipped.run_url }),
+        reasons: ['cost'],
+      },
+    ]);
   });
 
   // Regression: overlay points must sit on the SAME x column as the official run.

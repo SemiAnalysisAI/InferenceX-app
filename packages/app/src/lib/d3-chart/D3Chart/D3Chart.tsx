@@ -35,6 +35,7 @@ function D3ChartInner<T>(
     transitionDuration,
     legendElement,
     noDataOverlay,
+    plotOverlay,
     caption,
     onRender,
   }: D3ChartProps<T>,
@@ -149,6 +150,7 @@ function D3ChartInner<T>(
       grabCursor={grabCursor}
       legendElement={legendElement}
       noDataOverlay={noDataOverlay}
+      plotOverlay={plotOverlay}
       caption={caption}
     />
   );

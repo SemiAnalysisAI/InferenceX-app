@@ -2,6 +2,7 @@
 
 import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
+import { ArrowUpRight } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
@@ -14,6 +15,7 @@ import {
   labelOpacityForHover,
 } from '@/components/inference/ui/line-label-visibility';
 import ChartLegend from '@/components/ui/chart-legend';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import {
@@ -57,6 +59,7 @@ import { e2eRestrictedSeed } from '@/components/inference/utils/e2eFrontier';
 import { type RooflineDirection, getSpeedOverlayCorners } from '@/lib/speed-overlay';
 import type {
   ChartDefinition,
+  ClippedInferenceData,
   InferenceData,
   ScatterGraphProps,
 } from '@/components/inference/types';
@@ -88,6 +91,10 @@ import {
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { changelogConfigToHwKey } from '@/components/inference/utils/changelogFormatters';
+import {
+  buildFrontierContinuations,
+  projectContinuationToBounds,
+} from '@/components/inference/utils/overflowContinuations';
 
 // Greedy label-collision avoidance.
 // Each candidate is the y-position of the FIRST baseline (relative to point
@@ -242,6 +249,7 @@ const pointLabelText = (d: InferenceData, advanced: boolean): string =>
 
 // Referentially stable "no overlay data" result (see processedOverlayData).
 const EMPTY_OVERLAY_DATA: InferenceData[] = [];
+const EMPTY_CLIPPED_DATA: ClippedInferenceData[] = [];
 
 function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
   if (a.size !== b.size) return false;
@@ -255,6 +263,17 @@ function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
 type LegendPointsTarget =
   | { kind: 'official'; hwKey: string }
   | { kind: 'overlay'; runIndex: number; runId: number; branch: string };
+
+interface OverflowContinuationEntry {
+  key: string;
+  source: 'official' | 'overlay';
+  hw: string;
+  precision: string;
+  runIndex?: number;
+  from: InferenceData;
+  toward: InferenceData;
+  reasons: ClippedInferenceData['reasons'];
+}
 
 // Scale configs are recomputed from the visible points on every render, but a
 // legend / precision toggle usually leaves the actual domain untouched (x-min
@@ -306,6 +325,8 @@ const lineLabelText = (
   return includePrecision ? `${base} ${getPrecisionLabel(precision as Precision)}` : base;
 };
 
+const pointCountEn = (count: number) => `${count} ${count === 1 ? 'point' : 'points'}`;
+
 const SCATTER_STRINGS = {
   en: {
     logScale: 'Log Scale',
@@ -316,6 +337,17 @@ const SCATTER_STRINGS = {
     gradientLabels: 'Gradient Labels',
     lineLabels: 'Line Labels',
     resetFilter: 'Reset filter',
+    overflowTitle: 'Why the line stops',
+    overflowMixed: (count: number) => `${pointCountEn(count)} outside chart limits`,
+    overflowCost: (count: number, limit: number) => `${pointCountEn(count)} above $${limit}/M`,
+    overflowLatency: (count: number, limit: number) =>
+      `${pointCountEn(count)} beyond ${limit}s TTFT`,
+    overflowCostDetail: (count: number, limit: number) =>
+      `${pointCountEn(count)} above $${limit}/M ${count === 1 ? 'is' : 'are'} hidden.`,
+    overflowLatencyDetail: (count: number, limit: number) =>
+      `${pointCountEn(count)} beyond ${limit}s TTFT ${count === 1 ? 'is' : 'are'} hidden.`,
+    overflowExplanation:
+      'Dashed arrows show where the Pareto line continues beyond the displayed range.',
   },
   zh: {
     logScale: '对数缩放',
@@ -326,6 +358,14 @@ const SCATTER_STRINGS = {
     gradientLabels: '渐变标签',
     lineLabels: '曲线标签',
     resetFilter: '重置筛选',
+    overflowTitle: '曲线为何在此停止',
+    overflowMixed: (count: number) => `${count} 个点超出图表显示范围`,
+    overflowCost: (count: number, limit: number) => `${count} 个点高于 $${limit}/M`,
+    overflowLatency: (count: number, limit: number) => `${count} 个点的 TTFT 超过 ${limit}s`,
+    overflowCostDetail: (count: number, limit: number) => `${count} 个点高于 $${limit}/M，已隐藏。`,
+    overflowLatencyDetail: (count: number, limit: number) =>
+      `${count} 个点的 TTFT 超过 ${limit}s，已隐藏。`,
+    overflowExplanation: '虚线箭头表示 Pareto 曲线仍在图表显示范围外延续。',
   },
 } as const;
 
@@ -334,6 +374,7 @@ const ScatterGraph = React.memo(
     chartId,
     modelLabel,
     data,
+    clippedData = EMPTY_CLIPPED_DATA,
     xLabel,
     yLabel,
     chartDefinition,
@@ -759,6 +800,142 @@ const ScatterGraph = React.memo(
       );
     }, [overlayData, selectedPrecisions, quickFilters, activeOverlayHwTypes]);
 
+    const processedOverlayClippedData = useMemo(() => {
+      if (!overlayData?.clippedData) return EMPTY_CLIPPED_DATA;
+      return overlayData.clippedData.filter(
+        ({ point }) =>
+          selectedPrecisions.includes(point.precision) &&
+          matchesQuickFilters(point, quickFilters) &&
+          activeOverlayHwTypes.has(String(point.hwKey)),
+      );
+    }, [overlayData, selectedPrecisions, quickFilters, activeOverlayHwTypes]);
+
+    const officialOverflowContinuations = useMemo((): OverflowContinuationEntry[] => {
+      interface Bucket {
+        hw: string;
+        precision: string;
+        visible: InferenceData[];
+        clipped: ClippedInferenceData[];
+      }
+      const buckets = new Map<string, Bucket>();
+      const getBucket = (point: InferenceData) => {
+        const key = `${point.hwKey}|${point.precision}|${point.date}`;
+        let bucket = buckets.get(key);
+        if (!bucket) {
+          bucket = {
+            hw: String(point.hwKey),
+            precision: point.precision,
+            visible: [],
+            clipped: [],
+          };
+          buckets.set(key, bucket);
+        }
+        return { key, bucket };
+      };
+      for (const point of data) getBucket(point).bucket.visible.push(point);
+      for (const entry of clippedData) getBucket(entry.point).bucket.clipped.push(entry);
+
+      const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
+      const direction = chartDefinition[rooflineKey] as ParetoDirection | undefined;
+      if (!direction) return [];
+
+      const result: OverflowContinuationEntry[] = [];
+      for (const [bucketKey, bucket] of buckets) {
+        buildFrontierContinuations(bucket.visible, bucket.clipped, direction).forEach(
+          (continuation, index) => {
+            result.push({
+              key: `official-${bucketKey}-${index}`,
+              source: 'official',
+              hw: bucket.hw,
+              precision: bucket.precision,
+              ...continuation,
+            });
+          },
+        );
+      }
+      return result;
+    }, [data, clippedData, selectedYAxisMetric, chartDefinition]);
+
+    const overlayOverflowContinuations = useMemo((): OverflowContinuationEntry[] => {
+      interface Bucket {
+        hw: string;
+        precision: string;
+        runIndex: number;
+        visible: InferenceData[];
+        clipped: ClippedInferenceData[];
+      }
+      const buckets = new Map<string, Bucket>();
+      const getBucket = (point: InferenceData) => {
+        const runIndex = overlayRunIndex(point.run_url ?? null, runIndexByUrl);
+        const key = `${point.hwKey}|${point.precision}|${point.date}|run${runIndex}`;
+        let bucket = buckets.get(key);
+        if (!bucket) {
+          bucket = {
+            hw: String(point.hwKey),
+            precision: point.precision,
+            runIndex,
+            visible: [],
+            clipped: [],
+          };
+          buckets.set(key, bucket);
+        }
+        return { key, bucket };
+      };
+      for (const point of processedOverlayData) getBucket(point).bucket.visible.push(point);
+      for (const entry of processedOverlayClippedData) {
+        getBucket(entry.point).bucket.clipped.push(entry);
+      }
+
+      const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
+      const direction = chartDefinition[rooflineKey] as ParetoDirection | undefined;
+      if (!direction) return [];
+
+      const result: OverflowContinuationEntry[] = [];
+      for (const [bucketKey, bucket] of buckets) {
+        buildFrontierContinuations(bucket.visible, bucket.clipped, direction).forEach(
+          (continuation, index) => {
+            result.push({
+              key: `overlay-${bucketKey}-${index}`,
+              source: 'overlay',
+              hw: bucket.hw,
+              precision: bucket.precision,
+              runIndex: bucket.runIndex,
+              ...continuation,
+            });
+          },
+        );
+      }
+      return result;
+    }, [
+      processedOverlayData,
+      processedOverlayClippedData,
+      selectedYAxisMetric,
+      chartDefinition,
+      runIndexByUrl,
+    ]);
+
+    const activeOfficialClippedData = useMemo(
+      () =>
+        clippedData.filter(
+          ({ point }) =>
+            selectedPrecisions.includes(point.precision) &&
+            effectiveActiveHwTypes.has(String(point.hwKey)),
+        ),
+      [clippedData, selectedPrecisions, effectiveActiveHwTypes],
+    );
+    const activeClippedData = useMemo(
+      () => [...activeOfficialClippedData, ...processedOverlayClippedData],
+      [activeOfficialClippedData, processedOverlayClippedData],
+    );
+    const overflowCounts = useMemo(
+      () => ({
+        total: activeClippedData.length,
+        cost: activeClippedData.filter(({ reasons }) => reasons.includes('cost')).length,
+        latency: activeClippedData.filter(({ reasons }) => reasons.includes('latency')).length,
+      }),
+      [activeClippedData],
+    );
+
     // Warning annotations for visible series (official + unofficial overlay)
     // with known upstream issues. Drawn as an SVG layer (box + arrow to the
     // affected line) so PNG exports carry the warning.
@@ -1062,7 +1239,7 @@ const ScatterGraph = React.memo(
 
     // --- Legend hover highlight ---
     const isRooflineVisible = useCallback(
-      (el: SVGPathElement) => {
+      (el: SVGElement) => {
         const hw = el.dataset.hwKey;
         const prec = el.dataset.precision;
         if (hw === null || hw === undefined || prec === null || prec === undefined) return false;
@@ -1123,10 +1300,12 @@ const ScatterGraph = React.memo(
           .style('opacity', (d) =>
             isPointVisible(d) ? (String(d.hwKey) === hwKey ? 1 : 0.15) : 0,
           );
-        root.selectAll<SVGPathElement, unknown>('.roofline-path').style('opacity', function () {
-          if (!isRooflineVisible(this)) return 0;
-          return this.dataset.hwKey === hwKey ? null : '0.15';
-        });
+        root
+          .selectAll<SVGElement, unknown>('.roofline-path, .official-overflow-continuation')
+          .style('opacity', function () {
+            if (!isRooflineVisible(this)) return 0;
+            return this.dataset.hwKey === hwKey ? null : '0.15';
+          });
         root
           .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
           .style('opacity', function () {
@@ -1143,9 +1322,11 @@ const ScatterGraph = React.memo(
       root
         .selectAll<SVGGElement, InferenceData>('.dot-group')
         .style('opacity', (d) => (isPointVisible(d) ? 1 : 0));
-      root.selectAll<SVGPathElement, unknown>('.roofline-path').style('opacity', function () {
-        return isRooflineVisible(this) ? 1 : 0;
-      });
+      root
+        .selectAll<SVGElement, unknown>('.roofline-path, .official-overflow-continuation')
+        .style('opacity', function () {
+          return isRooflineVisible(this) ? 1 : 0;
+        });
       root
         .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
         .style('opacity', function () {
@@ -2429,6 +2610,102 @@ const ScatterGraph = React.memo(
         },
       };
 
+      // ── Intentional clipping: dashed Pareto continuation + boundary arrow ──
+      const drawOverflowContinuations = (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        ctx: RenderContext,
+        xScale: ContinuousScale,
+        yScale: ContinuousScale,
+      ) => {
+        const ir = interactionRef.current;
+        const entries = [...officialOverflowContinuations, ...overlayOverflowContinuations]
+          .map((entry) => {
+            const geometry = projectContinuationToBounds(
+              entry,
+              xScale,
+              yScale,
+              ctx.width,
+              ctx.height,
+            );
+            return geometry ? { ...entry, geometry } : null;
+          })
+          .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+        const layer = zoomGroup
+          .selectAll<SVGGElement, unknown>('.overflow-continuations-layer')
+          .data([null])
+          .join('g')
+          .attr('class', 'overflow-continuations-layer')
+          .attr('pointer-events', 'none');
+
+        const groups = layer
+          .selectAll<SVGGElement, (typeof entries)[number]>('.overflow-continuation')
+          .data(entries, (entry) => entry.key)
+          .join((enter) => {
+            const group = enter.append('g');
+            group.append('line').attr('class', 'overflow-continuation-line');
+            group
+              .append('path')
+              .attr('class', 'overflow-continuation-arrow')
+              .attr('d', 'M 0 0 L -9 -4.5 L -9 4.5 Z');
+            return group;
+          })
+          .attr('class', (entry) => `overflow-continuation ${entry.source}-overflow-continuation`)
+          .attr('data-testid', (entry) => `${entry.source}-overflow-continuation`)
+          .attr('data-hw-key', (entry) => entry.hw)
+          .attr('data-precision', (entry) => entry.precision)
+          .attr('data-clip-reasons', (entry) => entry.reasons.join(','))
+          .style('transition', 'opacity 150ms ease')
+          .style('opacity', (entry) =>
+            entry.source === 'overlay' ||
+            (ir.effectiveActiveHwTypes.has(entry.hw) &&
+              ir.selectedPrecisions.includes(entry.precision))
+              ? 1
+              : 0,
+          );
+
+        groups.each(function (entry) {
+          const color =
+            entry.source === 'overlay'
+              ? overlayRunColor(entry.runIndex ?? 0)
+              : ir.getCssColor(ir.resolveColor(entry.hw));
+          const { geometry } = entry;
+          const group = d3.select(this);
+          group
+            .select<SVGLineElement>('.overflow-continuation-line')
+            .attr('x1', geometry.x1)
+            .attr('y1', geometry.y1)
+            .attr('x2', geometry.x2)
+            .attr('y2', geometry.y2)
+            .attr('stroke', color)
+            .attr('stroke-width', 2.25)
+            .attr('stroke-dasharray', '6 5')
+            .attr('stroke-linecap', 'round');
+          group
+            .select<SVGPathElement>('.overflow-continuation-arrow')
+            .attr('transform', `translate(${geometry.x2},${geometry.y2}) rotate(${geometry.angle})`)
+            .attr('fill', color);
+        });
+      };
+      const overflowContinuationLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'overflow-continuations',
+        render: (zoomGroup, ctx) =>
+          drawOverflowContinuations(
+            zoomGroup,
+            ctx,
+            ctx.xScale as ContinuousScale,
+            ctx.yScale as ContinuousScale,
+          ),
+        onZoom: (zoomGroup, ctx) =>
+          drawOverflowContinuations(
+            zoomGroup,
+            ctx,
+            ctx.newXScale as ContinuousScale,
+            ctx.newYScale as ContinuousScale,
+          ),
+      };
+
       // ── Known-issue annotations: warning box + arrow to the affected line ──
       const drawKnownIssues = (
         ctx: RenderContext,
@@ -2478,7 +2755,7 @@ const ScatterGraph = React.memo(
 
       const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
-      result.push(speedOverlayLayer, knownIssueLayer);
+      result.push(overflowContinuationLayer, speedOverlayLayer, knownIssueLayer);
       return result;
       // Interaction state (visibility, colors, precision shapes, known-issue
       // annotations) is deliberately NOT a dependency: layer closures read it
@@ -2502,6 +2779,8 @@ const ScatterGraph = React.memo(
       overlayData,
       processedOverlayData,
       overlayRooflines,
+      officialOverflowContinuations,
+      overlayOverflowContinuations,
       unofficialRunInfos,
       runIndexByUrl,
       hardwareConfig,
@@ -2695,6 +2974,22 @@ const ScatterGraph = React.memo(
         }
       });
 
+      zoomGroup
+        .selectAll<SVGGElement, unknown>('.official-overflow-continuation')
+        .each(function () {
+          const hw = this.dataset.hwKey;
+          const precision = this.dataset.precision;
+          if (!hw || !precision) return;
+          const visible =
+            ir.effectiveActiveHwTypes.has(hw) && ir.selectedPrecisions.includes(precision);
+          const color = ir.getCssColor(ir.resolveColor(hw));
+          d3.select(this)
+            .style('opacity', visible ? 1 : 0)
+            .select('.overflow-continuation-line')
+            .attr('stroke', color);
+          d3.select(this).select('.overflow-continuation-arrow').attr('fill', color);
+        });
+
       // Parallelism / line labels: visibility via data attributes (mirrors
       // handleLegendHoverEnd). Placement-level updates happen below.
       zoomGroup
@@ -2761,7 +3056,9 @@ const ScatterGraph = React.memo(
       if (overlayData) return;
       const svg = chartRef.current?.getSvgElement?.();
       if (!svg) return;
-      d3.select(svg).selectAll('.unofficial-overlay-pt, .overlay-roofline-path').remove();
+      d3.select(svg)
+        .selectAll('.unofficial-overlay-pt, .overlay-roofline-path, .overlay-overflow-continuation')
+        .remove();
     }, [overlayData]);
 
     // Dismiss tooltip on filter changes
@@ -2783,6 +3080,15 @@ const ScatterGraph = React.memo(
         chartRef.current?.dismissTooltip();
       }
     }, [effectiveActiveHwTypes, selectedPrecisions, activeOverlayHwTypes]);
+
+    const costLimit = chartDefinition.y_cost_limit ?? 0;
+    const latencyLimit = chartDefinition.y_latency_limit ?? 0;
+    const overflowSummary =
+      overflowCounts.cost > 0 && overflowCounts.latency > 0
+        ? legendT.overflowMixed(overflowCounts.total)
+        : overflowCounts.cost > 0
+          ? legendT.overflowCost(overflowCounts.cost, costLimit)
+          : legendT.overflowLatency(overflowCounts.latency, latencyLimit);
 
     // --- Empty state ---
     if (data.length === 0 && !overlayData?.data?.length) {
@@ -2849,6 +3155,50 @@ const ScatterGraph = React.memo(
                     Please change the model, sequence, precision, date range or GPU selection.
                   </p>
                 </div>
+              </div>
+            ) : undefined
+          }
+          plotOverlay={
+            overflowCounts.total > 0 ? (
+              <div className="no-export absolute right-3 top-7 z-20">
+                <Popover
+                  onOpenChange={(open) => {
+                    if (!open) return;
+                    track('inference_clipped_points_notice_opened', {
+                      chartType: chartDefinition.chartType,
+                      costPoints: overflowCounts.cost,
+                      latencyPoints: overflowCounts.latency,
+                    });
+                  }}
+                >
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      data-testid="chart-overflow-notice"
+                      className="bg-background/95 text-amber-700 dark:text-amber-300 border-amber-500/40 hover:bg-amber-50 dark:hover:bg-amber-950/40 flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur"
+                      aria-label={`${legendT.overflowTitle}: ${overflowSummary}`}
+                    >
+                      <ArrowUpRight className="size-3.5" aria-hidden="true" />
+                      {overflowSummary}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="end"
+                    className="w-72 text-sm"
+                    data-testid="chart-overflow-popover"
+                  >
+                    <p className="font-semibold">{legendT.overflowTitle}</p>
+                    <div className="text-muted-foreground mt-2 space-y-1">
+                      {overflowCounts.cost > 0 && (
+                        <p>{legendT.overflowCostDetail(overflowCounts.cost, costLimit)}</p>
+                      )}
+                      {overflowCounts.latency > 0 && (
+                        <p>{legendT.overflowLatencyDetail(overflowCounts.latency, latencyLimit)}</p>
+                      )}
+                      <p>{legendT.overflowExplanation}</p>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             ) : undefined
           }
