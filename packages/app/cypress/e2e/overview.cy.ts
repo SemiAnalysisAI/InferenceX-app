@@ -387,6 +387,10 @@ describe('Overview page', () => {
           expect([...$headers].map((header) => header.textContent?.trim())).to.deep.equal(
             PLATFORM_HEADERS,
           );
+          // Column headers read at 14px, a step up from the 12px metadata.
+          for (const header of $headers) {
+            expect(getComputedStyle(header).fontSize).to.equal('14px');
+          }
         });
         // One row per curated (model, scenario) pair: six models, three of
         // which (DeepSeek, MiniMax, Qwen) carry a second AgentX row.
@@ -600,6 +604,11 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
+    // The tier control is labelled SLO, not "Service level".
+    cy.get('[data-testid="overview-tier-switcher"]')
+      .should('have.attr', 'aria-label', 'SLO')
+      .and('contain.text', 'SLO');
+    cy.get('body').should('not.contain.text', 'Service level');
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.get('[aria-current="page"]').should('have.text', '50');
       // 30 / 75 / 100 / 150 / 200 link out; the active 50 is inert text.
@@ -955,6 +964,10 @@ describe('Overview page', () => {
 
     cy.visit('/zh/overview?tier=100');
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);
+    cy.get('[data-testid="overview-tier-switcher"]')
+      .should('have.attr', 'aria-label', 'SLO')
+      .and('contain.text', 'SLO');
+    cy.get('body').should('not.contain.text', '服务档位');
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.contains('a', '50').should('have.attr', 'href', '/zh/overview');
     });
