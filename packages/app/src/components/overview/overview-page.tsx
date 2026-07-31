@@ -29,9 +29,9 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
     <section className="flex flex-col gap-4">
       <Card>
         <header>
-          {/* Desktop: title and metric definition share the first row; phones
-              and tablets stack the metric under the title. */}
-          <div className="flex flex-col gap-x-6 gap-y-1 xl:flex-row xl:items-baseline xl:justify-between">
+          {/* Two rows at every width: the title, then the metric it is
+              measured in and where that measure comes from. */}
+          <div className="flex flex-col gap-y-1">
             <h1 className="text-lg font-semibold">{strings.title}</h1>
             {/* Metric, direction and provenance read as one line: the numbers
                 and the model they are priced from belong together. */}

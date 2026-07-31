@@ -462,7 +462,7 @@ describe('Overview page', () => {
     });
   });
 
-  it('keeps the title and metric definition on one desktop row and stacks them below xl', () => {
+  it('stacks the metric definition under the title at every width', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
     cy.get('[data-testid="overview-scope-metric"]')
@@ -479,26 +479,7 @@ describe('Overview page', () => {
       });
     });
 
-    for (const width of [1280, 1440]) {
-      cy.viewport(width, 900);
-      cy.visit('/overview');
-      cy.contains('h1', PAGE_TITLE).then(([title]) => {
-        cy.get('[data-testid="overview-scope"]').then(([scope]) => {
-          const titleRect = title.getBoundingClientRect();
-          const scopeRect = scope.getBoundingClientRect();
-          expect((scopeRect.top + scopeRect.bottom) / 2, `same row at ${width}px`).to.be.closeTo(
-            (titleRect.top + titleRect.bottom) / 2,
-            8,
-          );
-          expect(scopeRect.left, `metric right of title at ${width}px`).to.be.greaterThan(
-            titleRect.right,
-          );
-        });
-      });
-      expectNoHorizontalOverflow();
-    }
-
-    for (const width of [320, 390, 768]) {
+    for (const width of [320, 390, 768, 1280, 1440]) {
       cy.viewport(width, 900);
       cy.visit('/overview');
       cy.contains('h1', PAGE_TITLE).then(([title]) => {
