@@ -612,7 +612,10 @@ export function OverviewTierSwitcher({
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
-  const optionClass = 'inline-flex min-h-11 items-center px-3 tabular-nums';
+  // Six tiers no longer fit one 320px row at px-3: the group clipped its last
+  // option. Tighter padding on phones, and wrapping as the safety net for
+  // larger system fonts — never a clipped or horizontally scrolling control.
+  const optionClass = 'inline-flex min-h-11 items-center px-2 tabular-nums sm:px-3';
   return (
     <nav
       data-testid="overview-tier-switcher"
@@ -620,7 +623,7 @@ export function OverviewTierSwitcher({
       className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
     >
       <span className="text-muted-foreground">{strings.tierNavLabel}</span>
-      <div className="flex divide-x divide-border/60 overflow-hidden rounded-md border border-border/60">
+      <div className="flex flex-wrap divide-x divide-border/60 overflow-hidden rounded-md border border-border/60">
         {OVERVIEW_TIERS.map((option) =>
           option === tier ? (
             <span

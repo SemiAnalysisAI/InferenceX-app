@@ -708,6 +708,40 @@ describe('Overview page', () => {
       expectNoHorizontalOverflow();
       expectNoHorizontalScroller('overview-mobile-list');
       expectNoHorizontalScroller('overview-engine-scope-switcher');
+      // Six tiers must fit the phone: the group is overflow-hidden, so any
+      // overflow silently clips the last option instead of scrolling to it.
+      expectNoHorizontalScroller('overview-tier-switcher');
+    }
+  });
+
+  it('keeps every service level reachable on the narrowest phones', () => {
+    // 320 is the floor; 360/375/414 are the common Android and iPhone widths.
+    for (const width of [320, 360, 375, 414]) {
+      cy.viewport(width, 844);
+      cy.visit('/overview');
+
+      expectNoHorizontalOverflow();
+      expectNoHorizontalScroller('overview-tier-switcher');
+      cy.get('[data-testid="overview-tier-switcher"]').within(() => {
+        // Every tier is rendered, inside the switcher's box, and tappable.
+        cy.get('a, [aria-current="page"]')
+          .filter((_, el) => /^\d+$/.test(el.textContent?.trim() ?? ''))
+          .should('have.length', 6);
+      });
+      cy.get('[data-testid="overview-tier-switcher"]').then(([nav]) => {
+        const navRect = nav.getBoundingClientRect();
+        cy.get('[data-testid="overview-tier-switcher"]')
+          .find('a, [aria-current="page"]')
+          .filter((_, el) => /^\d+$/.test(el.textContent?.trim() ?? ''))
+          .each(($option) => {
+            const rect = $option[0].getBoundingClientRect();
+            expect(
+              rect.right,
+              `tier ${$option.text()} inside the switcher at ${width}px`,
+            ).to.be.at.most(navRect.right + 1);
+            expect(rect.height, `tier ${$option.text()} stays tappable`).to.be.at.least(44);
+          });
+      });
     }
   });
 
