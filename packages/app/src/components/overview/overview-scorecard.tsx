@@ -365,7 +365,7 @@ function CellValue({
               }
               aria-label={
                 estimateExplanation === undefined
-                  ? evidenceAria
+                  ? `${formattedValue}. ${evidenceAria}`
                   : `${strings.estimatedAria(formattedValue, estimateExplanation)} ${evidenceAria}`
               }
               className={RAW_SOURCE_LINK_CLASS}

@@ -20,7 +20,7 @@ const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26714
 /** Query the default fixture produces: one source run, so the run is pinned. */
 const PINNED_QUERY =
   'g_model=Qwen-3.5-397B-A17B&g_rundate=2026-07-18&g_runid=26714221123&i_seq=8k%2F1k' +
-  '&i_prec=fp4&i_metric=y_outputTputPerGpu&i_gpus=b200_sglang_mtp&i_spec=mtp&i_disagg=single-node' +
+  '&i_prec=fp4&i_metric=y_costh&i_gpus=b200_sglang_mtp&i_spec=mtp&i_disagg=single-node' +
   '&i_optimal=1&i_advlabel=1';
 
 function config(overrides: Partial<OverviewConfigResult> = {}): OverviewConfigResult {
@@ -78,7 +78,7 @@ describe('buildOverviewDashboardHref', () => {
 
     expect(href).toBe(
       '/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-07-18&g_runid=26714221123' +
-        '&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerGpu' +
+        '&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_costh' +
         '&i_gpus=gb200_dynamo-trt-disagg_mtp&i_spec=mtp&i_disagg=disagg' +
         '&i_optimal=1&i_advlabel=1',
     );

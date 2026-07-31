@@ -50,7 +50,13 @@ function expectNoHorizontalScroller(testId: string) {
 function expectNoVisibleDatesOrSnapshot() {
   cy.get('[data-testid="overview-pair-evidence-date"]').should('not.exist');
   cy.get('body')
-    .invoke('text')
+    .then(([body]) => {
+      // Next.js RSC payload scripts retain evidence dates for reproducibility.
+      // Assert only against rendered page text, not serialized script/style data.
+      const clone = body.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll('script, style').forEach((node) => node.remove());
+      return clone.textContent ?? '';
+    })
     .should((text) => {
       expect(text).not.to.match(/Database snapshot/i);
       expect(text).not.to.match(/快照/);
@@ -405,6 +411,11 @@ describe('Overview page', () => {
             'have.attr',
             'title',
             'Open raw source dashboard for Jul 18: Qwen3.5 397B · MI355X · SGLang · FP8 · MTP',
+          )
+          .and(
+            'have.attr',
+            'aria-label',
+            '$0.061. Open raw source dashboard for Jul 18: Qwen3.5 397B · MI355X · SGLang · FP8 · MTP',
           )
           .should('have.attr', 'href')
           .and('include', '/inference?')
