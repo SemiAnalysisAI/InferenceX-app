@@ -7,6 +7,7 @@ export interface FrontierContinuation {
   from: InferenceData;
   toward: InferenceData;
   reasons: ClippedInferenceData['reasons'];
+  hiddenPointCount: number;
 }
 
 export interface ProjectedContinuation {
@@ -19,7 +20,7 @@ export interface ProjectedContinuation {
 
 /**
  * Find transitions where a complete Pareto frontier crosses from a visible
- * point into an intentionally clipped point. A single visible point can yield
+ * point into an intentionally clipped run. A single visible point can yield
  * two continuations when hidden frontier points exist on both sides.
  */
 export function buildFrontierContinuations(
@@ -48,15 +49,37 @@ export function buildFrontierContinuations(
     const toward = leftVisible ? right : left;
     const clippedEntry = clippedByPoint.get(toward);
     if (!clippedEntry) continue;
-    result.push({ from, toward, reasons: clippedEntry.reasons });
+
+    const step = leftVisible ? 1 : -1;
+    let cursor = leftVisible ? index + 1 : index;
+    const reasons = new Set<ClippedInferenceData['reasons'][number]>();
+    while (cursor >= 0 && cursor < frontier.length && !visibleSet.has(frontier[cursor])) {
+      const hiddenEntry = clippedByPoint.get(frontier[cursor]);
+      if (hiddenEntry) {
+        hiddenEntry.reasons.forEach((reason) => reasons.add(reason));
+      }
+      cursor += step;
+    }
+    const hiddenPointCount = clipped.filter((entry) =>
+      entry.reasons.some((reason) => reasons.has(reason)),
+    ).length;
+
+    result.push({
+      from,
+      toward,
+      reasons: [...reasons],
+      hiddenPointCount,
+    });
   }
 
   return result;
 }
 
 /**
- * Project a data-space continuation ray to the plot boundary. The endpoint is
- * inset slightly so the arrowhead remains inside the chart clip path.
+ * Project a data-space continuation toward the next clipped Pareto point.
+ * The segment is capped in screen space so a distant outlier cannot create a
+ * line across the whole chart. If the plot boundary is closer, the endpoint
+ * is inset slightly so the arrowhead remains inside the clip path.
  */
 export function projectContinuationToBounds(
   continuation: Pick<FrontierContinuation, 'from' | 'toward'>,
@@ -65,6 +88,7 @@ export function projectContinuationToBounds(
   width: number,
   height: number,
   inset = 7,
+  maxLength = 96,
 ): ProjectedContinuation | null {
   const x1 = xScale(continuation.from.x);
   const y1 = yScale(continuation.from.y);
@@ -86,16 +110,17 @@ export function projectContinuationToBounds(
   const boundaryT = Math.min(...candidates.filter((value) => value > 0));
   if (!Number.isFinite(boundaryT)) return null;
 
-  const boundaryX = x1 + dx * boundaryT;
-  const boundaryY = y1 + dy * boundaryT;
   const unitX = dx / length;
   const unitY = dy / length;
+  const boundaryDistance = length * boundaryT;
+  const segmentLength = Math.min(maxLength, boundaryDistance - inset);
+  if (segmentLength <= 0) return null;
 
   return {
     x1,
     y1,
-    x2: boundaryX - unitX * inset,
-    y2: boundaryY - unitY * inset,
+    x2: x1 + unitX * segmentLength,
+    y2: y1 + unitY * segmentLength,
     angle: (Math.atan2(dy, dx) * 180) / Math.PI,
   };
 }

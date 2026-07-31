@@ -39,6 +39,33 @@ describe('buildFrontierContinuations', () => {
     expect(result).toHaveLength(2);
     expect(result.map((entry) => entry.toward)).toEqual([costClipped, latencyClipped]);
     expect(result.map((entry) => entry.reasons)).toEqual([['cost'], ['latency']]);
+    expect(result.map((entry) => entry.hiddenPointCount)).toEqual([1, 1]);
+  });
+
+  it('counts consecutive clipped frontier points behind one continuation', () => {
+    const visible = point(10, 5);
+    const clippedA = point(20, 4);
+    const clippedB = point(30, 3);
+    const dominatedClipped = point(25, 6);
+
+    const result = buildFrontierContinuations(
+      [visible],
+      [
+        { point: clippedA, reasons: ['latency'] },
+        { point: clippedB, reasons: ['latency'] },
+        { point: dominatedClipped, reasons: ['latency'] },
+      ],
+      'lower_left',
+    );
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        from: visible,
+        toward: clippedA,
+        reasons: ['latency'],
+        hiddenPointCount: 3,
+      }),
+    ]);
   });
 
   it('does not imply a continuation to a clipped point that is not on the full frontier', () => {
@@ -71,6 +98,20 @@ describe('projectContinuationToBounds', () => {
     expect(result!.x2).toBeCloseTo(95.02, 1);
     expect(result!.y2).toBeCloseTo(55.5, 1);
     expect(result!.angle).toBeCloseTo(5.71, 1);
+  });
+
+  it('caps a distant continuation instead of crossing the whole plot', () => {
+    const result = projectContinuationToBounds(
+      { from: point(10, 50), toward: point(1000, 50) },
+      identity,
+      identity,
+      800,
+      100,
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.x2 - result!.x1).toBe(96);
+    expect(result!.y2).toBe(result!.y1);
   });
 
   it('returns null when the visible anchor has been panned outside the viewport', () => {

@@ -116,46 +116,55 @@ const visitOverflowChart = (withOverlay: boolean) => {
   );
   cy.wait('@benchmarks');
   if (withOverlay) cy.wait('@unofficialRun');
-  cy.get('[data-testid="chart-overflow-notice"]').should('be.visible');
+  cy.get('[data-testid="scatter-graph"]').should('be.visible');
 };
 
 describe('Chart overflow continuations', () => {
-  it('draws official dashed arrows and explains both active display limits', () => {
+  it('keeps the original domain and draws compact labeled arrows toward clipped points', () => {
     visitOverflowChart(false);
+
+    cy.get('.x-axis .tick text').then(($ticks) => {
+      const values = [...$ticks].map((tick) => Number(tick.textContent));
+      expect(Math.max(...values)).to.eq(40);
+    });
 
     cy.get('[data-testid="official-overflow-continuation"]')
       .should('have.length', 2)
       .each(($continuation) => {
         cy.wrap($continuation)
           .find('.overflow-continuation-line')
-          .should('have.attr', 'stroke-dasharray');
+          .then(($line) => {
+            expect($line).to.have.attr('stroke-dasharray');
+            const x1 = Number($line.attr('x1'));
+            const y1 = Number($line.attr('y1'));
+            const x2 = Number($line.attr('x2'));
+            const y2 = Number($line.attr('y2'));
+            expect(Math.hypot(x2 - x1, y2 - y1)).to.be.at.most(96.01);
+          });
         cy.wrap($continuation).find('.overflow-continuation-arrow').should('exist');
+        cy.wrap($continuation)
+          .find('[data-testid="overflow-continuation-label"]')
+          .should('be.visible');
       });
 
-    cy.get('[data-testid="chart-overflow-notice"]')
-      .should('contain.text', '2 points outside chart limits')
-      .click();
-    cy.get('[data-testid="chart-overflow-popover"]')
-      .should('contain.text', '1 point above $5/M is hidden.')
-      .and('contain.text', '1 point beyond 60s TTFT is hidden.')
-      .and('contain.text', 'Dashed arrows show where the Pareto line continues');
+    cy.get('[data-testid="overflow-continuation-label"]')
+      .should('have.length', 2)
+      .then(($labels) => {
+        const labels = [...$labels].map((label) => label.textContent);
+        expect(labels).to.have.members(['1 point > $5/M', '1 point > 60s TTFT']);
+      });
+    cy.get('[data-testid="chart-overflow-notice"]').should('not.exist');
   });
 
   it('draws overlay continuations and removes them when that run is dismissed', () => {
     visitOverflowChart(true);
 
     cy.get('[data-testid="overlay-overflow-continuation"]').should('have.length', 2);
-    cy.get('[data-testid="chart-overflow-notice"]').should(
-      'contain.text',
-      '4 points outside chart limits',
-    );
+    cy.get('[data-testid="overflow-continuation-label"]').should('have.length', 4);
 
     cy.get(`[aria-label="Dismiss ${OVERLAY_BRANCH}"]`).click();
     cy.get('[data-testid="overlay-overflow-continuation"]').should('not.exist');
     cy.get('[data-testid="official-overflow-continuation"]').should('have.length', 2);
-    cy.get('[data-testid="chart-overflow-notice"]').should(
-      'contain.text',
-      '2 points outside chart limits',
-    );
+    cy.get('[data-testid="overflow-continuation-label"]').should('have.length', 2);
   });
 });

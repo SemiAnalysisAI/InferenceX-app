@@ -269,8 +269,6 @@ export interface D3ChartProps<T = any> {
   transitionDuration?: number;
   legendElement?: React.ReactNode;
   noDataOverlay?: React.ReactNode;
-  /** React content positioned over the plot SVG (for notices and controls). */
-  plotOverlay?: React.ReactNode;
   caption?: React.ReactNode;
 
   /** Called after all layers render. Useful for one-off DOM manipulations. */

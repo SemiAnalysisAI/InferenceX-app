@@ -2,7 +2,6 @@
 
 import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
-import { ArrowUpRight } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
@@ -15,7 +14,6 @@ import {
   labelOpacityForHover,
 } from '@/components/inference/ui/line-label-visibility';
 import ChartLegend from '@/components/ui/chart-legend';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import {
@@ -273,6 +271,7 @@ interface OverflowContinuationEntry {
   from: InferenceData;
   toward: InferenceData;
   reasons: ClippedInferenceData['reasons'];
+  hiddenPointCount: number;
 }
 
 // Scale configs are recomputed from the visible points on every render, but a
@@ -337,17 +336,9 @@ const SCATTER_STRINGS = {
     gradientLabels: 'Gradient Labels',
     lineLabels: 'Line Labels',
     resetFilter: 'Reset filter',
-    overflowTitle: 'Why the line stops',
-    overflowMixed: (count: number) => `${pointCountEn(count)} outside chart limits`,
-    overflowCost: (count: number, limit: number) => `${pointCountEn(count)} above $${limit}/M`,
-    overflowLatency: (count: number, limit: number) =>
-      `${pointCountEn(count)} beyond ${limit}s TTFT`,
-    overflowCostDetail: (count: number, limit: number) =>
-      `${pointCountEn(count)} above $${limit}/M ${count === 1 ? 'is' : 'are'} hidden.`,
-    overflowLatencyDetail: (count: number, limit: number) =>
-      `${pointCountEn(count)} beyond ${limit}s TTFT ${count === 1 ? 'is' : 'are'} hidden.`,
-    overflowExplanation:
-      'Dashed arrows show where the Pareto line continues beyond the displayed range.',
+    overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
+    overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/M`,
+    overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
   },
   zh: {
     logScale: '对数缩放',
@@ -358,14 +349,9 @@ const SCATTER_STRINGS = {
     gradientLabels: '渐变标签',
     lineLabels: '曲线标签',
     resetFilter: '重置筛选',
-    overflowTitle: '曲线为何在此停止',
-    overflowMixed: (count: number) => `${count} 个点超出图表显示范围`,
-    overflowCost: (count: number, limit: number) => `${count} 个点高于 $${limit}/M`,
-    overflowLatency: (count: number, limit: number) => `${count} 个点的 TTFT 超过 ${limit}s`,
-    overflowCostDetail: (count: number, limit: number) => `${count} 个点高于 $${limit}/M，已隐藏。`,
-    overflowLatencyDetail: (count: number, limit: number) =>
-      `${count} 个点的 TTFT 超过 ${limit}s，已隐藏。`,
-    overflowExplanation: '虚线箭头表示 Pareto 曲线仍在图表显示范围外延续。',
+    overflowMixed: (count: number) => `${count} 个点已截断`,
+    overflowCost: (count: number, limit: number) => `${count} 个点 > $${limit}/M`,
+    overflowLatency: (count: number, limit: number) => `${count} 个点 > ${limit}s TTFT`,
   },
 } as const;
 
@@ -432,6 +418,8 @@ const ScatterGraph = React.memo(
     } = useInference();
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
+    const costLimit = chartDefinition.y_cost_limit ?? 0;
+    const latencyLimit = chartDefinition.y_latency_limit ?? 0;
 
     const {
       isUnofficialRun,
@@ -913,28 +901,6 @@ const ScatterGraph = React.memo(
       chartDefinition,
       runIndexByUrl,
     ]);
-
-    const activeOfficialClippedData = useMemo(
-      () =>
-        clippedData.filter(
-          ({ point }) =>
-            selectedPrecisions.includes(point.precision) &&
-            effectiveActiveHwTypes.has(String(point.hwKey)),
-        ),
-      [clippedData, selectedPrecisions, effectiveActiveHwTypes],
-    );
-    const activeClippedData = useMemo(
-      () => [...activeOfficialClippedData, ...processedOverlayClippedData],
-      [activeOfficialClippedData, processedOverlayClippedData],
-    );
-    const overflowCounts = useMemo(
-      () => ({
-        total: activeClippedData.length,
-        cost: activeClippedData.filter(({ reasons }) => reasons.includes('cost')).length,
-        latency: activeClippedData.filter(({ reasons }) => reasons.includes('latency')).length,
-      }),
-      [activeClippedData],
-    );
 
     // Warning annotations for visible series (official + unofficial overlay)
     // with known upstream issues. Drawn as an SVG layer (box + arrow to the
@@ -2610,7 +2576,7 @@ const ScatterGraph = React.memo(
         },
       };
 
-      // ── Intentional clipping: dashed Pareto continuation + boundary arrow ──
+      // ── Intentional clipping: short dashed Pareto continuation + arrow ──
       const drawOverflowContinuations = (
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
         ctx: RenderContext,
@@ -2648,6 +2614,7 @@ const ScatterGraph = React.memo(
               .append('path')
               .attr('class', 'overflow-continuation-arrow')
               .attr('d', 'M 0 0 L -9 -4.5 L -9 4.5 Z');
+            group.append('text').attr('class', 'overflow-continuation-label');
             return group;
           })
           .attr('class', (entry) => `overflow-continuation ${entry.source}-overflow-continuation`)
@@ -2655,6 +2622,7 @@ const ScatterGraph = React.memo(
           .attr('data-hw-key', (entry) => entry.hw)
           .attr('data-precision', (entry) => entry.precision)
           .attr('data-clip-reasons', (entry) => entry.reasons.join(','))
+          .attr('data-hidden-point-count', (entry) => entry.hiddenPointCount)
           .style('transition', 'opacity 150ms ease')
           .style('opacity', (entry) =>
             entry.source === 'overlay' ||
@@ -2671,6 +2639,13 @@ const ScatterGraph = React.memo(
               : ir.getCssColor(ir.resolveColor(entry.hw));
           const { geometry } = entry;
           const group = d3.select(this);
+          const label =
+            entry.reasons.includes('cost') && entry.reasons.includes('latency')
+              ? legendT.overflowMixed(entry.hiddenPointCount)
+              : entry.reasons.includes('cost')
+                ? legendT.overflowCost(entry.hiddenPointCount, costLimit)
+                : legendT.overflowLatency(entry.hiddenPointCount, latencyLimit);
+          const pointsRight = geometry.x2 >= geometry.x1;
           group
             .select<SVGLineElement>('.overflow-continuation-line')
             .attr('x1', geometry.x1)
@@ -2685,6 +2660,21 @@ const ScatterGraph = React.memo(
             .select<SVGPathElement>('.overflow-continuation-arrow')
             .attr('transform', `translate(${geometry.x2},${geometry.y2}) rotate(${geometry.angle})`)
             .attr('fill', color);
+          group
+            .attr('aria-label', label)
+            .select<SVGTextElement>('.overflow-continuation-label')
+            .attr('data-testid', 'overflow-continuation-label')
+            .attr('x', geometry.x2 + (pointsRight ? -12 : 12))
+            .attr('y', Math.max(12, Math.min(ctx.height - 4, geometry.y2 - 9)))
+            .attr('text-anchor', pointsRight ? 'end' : 'start')
+            .attr('fill', color)
+            .attr('stroke', ir.getCssColor('--background'))
+            .attr('stroke-width', 4)
+            .attr('stroke-linejoin', 'round')
+            .attr('paint-order', 'stroke')
+            .attr('font-size', 11.5)
+            .attr('font-weight', 600)
+            .text(label);
         });
       };
       const overflowContinuationLayer: CustomLayerConfig = {
@@ -3081,15 +3071,6 @@ const ScatterGraph = React.memo(
       }
     }, [effectiveActiveHwTypes, selectedPrecisions, activeOverlayHwTypes]);
 
-    const costLimit = chartDefinition.y_cost_limit ?? 0;
-    const latencyLimit = chartDefinition.y_latency_limit ?? 0;
-    const overflowSummary =
-      overflowCounts.cost > 0 && overflowCounts.latency > 0
-        ? legendT.overflowMixed(overflowCounts.total)
-        : overflowCounts.cost > 0
-          ? legendT.overflowCost(overflowCounts.cost, costLimit)
-          : legendT.overflowLatency(overflowCounts.latency, latencyLimit);
-
     // --- Empty state ---
     if (data.length === 0 && !overlayData?.data?.length) {
       return (
@@ -3155,50 +3136,6 @@ const ScatterGraph = React.memo(
                     Please change the model, sequence, precision, date range or GPU selection.
                   </p>
                 </div>
-              </div>
-            ) : undefined
-          }
-          plotOverlay={
-            overflowCounts.total > 0 ? (
-              <div className="no-export absolute right-3 top-7 z-20">
-                <Popover
-                  onOpenChange={(open) => {
-                    if (!open) return;
-                    track('inference_clipped_points_notice_opened', {
-                      chartType: chartDefinition.chartType,
-                      costPoints: overflowCounts.cost,
-                      latencyPoints: overflowCounts.latency,
-                    });
-                  }}
-                >
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      data-testid="chart-overflow-notice"
-                      className="bg-background/95 text-amber-700 dark:text-amber-300 border-amber-500/40 hover:bg-amber-50 dark:hover:bg-amber-950/40 flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur"
-                      aria-label={`${legendT.overflowTitle}: ${overflowSummary}`}
-                    >
-                      <ArrowUpRight className="size-3.5" aria-hidden="true" />
-                      {overflowSummary}
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    align="end"
-                    className="w-72 text-sm"
-                    data-testid="chart-overflow-popover"
-                  >
-                    <p className="font-semibold">{legendT.overflowTitle}</p>
-                    <div className="text-muted-foreground mt-2 space-y-1">
-                      {overflowCounts.cost > 0 && (
-                        <p>{legendT.overflowCostDetail(overflowCounts.cost, costLimit)}</p>
-                      )}
-                      {overflowCounts.latency > 0 && (
-                        <p>{legendT.overflowLatencyDetail(overflowCounts.latency, latencyLimit)}</p>
-                      )}
-                      <p>{legendT.overflowExplanation}</p>
-                    </div>
-                  </PopoverContent>
-                </Popover>
               </div>
             ) : undefined
           }
