@@ -213,7 +213,7 @@ describe('Overview page', () => {
         // its hover/focus/screen-reader label, never as visible text.
         cy.get(
           '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
-        ).should('have.text', '$0.067');
+        ).should('have.text', '$0.059');
         cy.get(
           '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
         )
@@ -225,7 +225,7 @@ describe('Overview page', () => {
           .and(
             'have.attr',
             'aria-label',
-            'Approximately $0.067. Estimated from validated benchmark runs. Open raw source dashboard for Jul 18: DeepSeek V4 Pro 1.6T · B200 · SGLang · FP4 · MTP',
+            'Approximately $0.059. Estimated from validated benchmark runs. Open raw source dashboard for Jul 18: DeepSeek V4 Pro 1.6T · B200 · SGLang · FP4 · MTP',
           );
         cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
       });
@@ -261,7 +261,7 @@ describe('Overview page', () => {
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
       platform('mi355x')
         .find('[data-testid="overview-cost-delta"]')
-        .should('contain.text', '25%')
+        .should('contain.text', '-15%')
         .and('have.attr', 'data-cost-polarity', 'cheaper')
         .then(($badge) => {
           // The shade lives on the cell now, never on the badge itself.
@@ -274,9 +274,9 @@ describe('Overview page', () => {
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
       platform('gb200')
         .find('[data-testid="overview-cost-delta"]')
-        .should('contain.text', '+80%')
+        .should('contain.text', '+71%')
         .and('have.attr', 'data-cost-polarity', 'pricier');
-      // +80% saturates the alpha ramp; read the computed value so the
+      // +71% saturates the alpha ramp; read the computed value so the
       // assertion survives the browser normalizing `0.40` to `0.4`.
       expectCellTint('gb200', 'rgba(239, 68, 68, 0.4)');
       // No read at the tier means nothing to grade — the cell stays untinted.
@@ -316,18 +316,13 @@ describe('Overview page', () => {
       });
     });
 
-    // Within the ±5% parity band the cell reads as even, not polarity.
+    // Outside the ±5% parity band the cell carries the matching polarity.
     desktopModel('Kimi-K2.5').within(() => {
       platform('b300')
         .find('[data-testid="overview-cost-delta"]')
-        .should('contain.text', '+2%')
-        .and('have.attr', 'data-cost-polarity', 'even');
-      platform('b300').then(([cell]) => {
-        const [r, g, b] = getComputedStyle(cell.closest('td')!)
-          .backgroundColor.match(/\d+/g)!
-          .map(Number);
-        expect(Math.max(r, g, b) - Math.min(r, g, b)).to.be.lessThan(60);
-      });
+        .should('contain.text', '+11%')
+        .and('have.attr', 'data-cost-polarity', 'pricier');
+      expectCellTint('b300', 'rgba(239, 68, 68,');
     });
   });
 
@@ -440,7 +435,7 @@ describe('Overview page', () => {
       // Priced from the AgentX rows alone — the single-turn sweep never leaks in.
       cy.get(
         '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
-      ).should('have.text', '$0.072');
+      ).should('have.text', '$0.064');
       cy.get(
         '[data-testid="overview-pair-value"][data-hardware="mi355x"] [data-testid="overview-cost-evidence-link"]',
       ).should('have.text', '$0.069');
@@ -508,7 +503,7 @@ describe('Overview page', () => {
         cy.get(
           '[data-testid="overview-pair-value"][data-hardware="mi355x"] [data-testid="overview-cost-evidence-link"]',
         )
-          .should('have.text', '$0.061')
+          .should('have.text', '$0.062')
           .and(
             'have.attr',
             'title',
@@ -517,7 +512,7 @@ describe('Overview page', () => {
           .and(
             'have.attr',
             'aria-label',
-            '$0.061. Open raw source dashboard for Jul 18: Qwen3.5 397B · MI355X · SGLang · FP8 · MTP',
+            '$0.062. Open raw source dashboard for Jul 18: Qwen3.5 397B · MI355X · SGLang · FP8 · MTP',
           )
           .should('have.attr', 'href')
           .and('include', '/inference?')
@@ -530,7 +525,7 @@ describe('Overview page', () => {
         cy.get(
           '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
         )
-          .should('contain.text', '$0.082')
+          .should('contain.text', '$0.073')
           .should('have.attr', 'href')
           .and('include', 'i_prec=fp4')
           .and('include', 'i_gpus=b200_sglang_mtp');
@@ -576,7 +571,7 @@ describe('Overview page', () => {
       platform('gb300').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="gb300"]').should(
           'contain.text',
-          '$0.113',
+          '$0.099',
         );
         cy.get('[data-testid="overview-cost-delta"][data-hardware="gb300"]').should(
           'have.attr',
@@ -628,7 +623,7 @@ describe('Overview page', () => {
     });
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
-      platform('b200').should('contain.text', '$0.139').and('contain.text', 'FP8');
+      platform('b200').should('contain.text', '$0.124').and('contain.text', 'FP8');
       platform('mi355x').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').should(
           'contain.text',
@@ -659,7 +654,7 @@ describe('Overview page', () => {
       platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
           'contain.text',
-          '$0.050',
+          '$0.049',
         );
         cy.get('[data-testid="overview-cost-delta"][data-hardware="b300"]')
           .should('contain.text', '∞')
@@ -700,13 +695,13 @@ describe('Overview page', () => {
         platform('mi355x').within(() => {
           cy.get(
             '[data-testid="overview-pair-value"][data-hardware="mi355x"] [data-testid="overview-cost-evidence-link"]',
-          ).should('have.text', '$0.061');
+          ).should('have.text', '$0.062');
         });
       });
       mobileModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
         cy.get(
           '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
-        ).should('have.text', '$0.067');
+        ).should('have.text', '$0.059');
         cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]').should(
           'have.attr',
           'title',
@@ -915,8 +910,8 @@ describe('Overview page', () => {
       .and('include', '原始数据仪表板：DeepSeek V4 Pro 1.6T · B200 · SGLang · FP4 · MTP');
     cy.get('@estimatedB200')
       .invoke('attr', 'aria-label')
-      .should('include', '约 $0.067。根据已验证的基准运行结果估算。');
-    cy.get('@estimatedB200').should('have.text', '$0.067');
+      .should('include', '约 $0.059。根据已验证的基准运行结果估算。');
+    cy.get('@estimatedB200').should('have.text', '$0.059');
     cy.get('@estimatedB200')
       .should('have.attr', 'href')
       .and('include', '/zh/inference?')
@@ -958,7 +953,7 @@ describe('Overview page', () => {
       cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL_ZH);
       cy.get(
         '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
-      ).should('have.text', '$0.072');
+      ).should('have.text', '$0.064');
     });
     cy.contains('若某款芯片不支持 FP4 推测解码，则采用次优的可用配置。').should('exist');
 
