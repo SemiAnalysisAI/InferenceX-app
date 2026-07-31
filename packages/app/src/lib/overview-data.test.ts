@@ -19,10 +19,10 @@ import {
 let nextId = 1;
 
 const JULY_2026_HYPERSCALER_TCO = {
-  b200: 1.7349236084834354,
-  gb200: 1.8648110244453284,
-  gb300: 2.313899859674561,
-  mi355x: 1.4960710469526235,
+  b200: 1.73,
+  gb200: 1.86,
+  gb300: 2.31,
+  mi355x: 1.5,
 } as const;
 
 // `output_tput_per_gpu` is deliberately a constant decoy on most rows: the
@@ -158,7 +158,7 @@ describe('overview engine scope and scenario selection', () => {
   });
 
   it('prices from HW_REGISTRY costh — not the retail costr tier', () => {
-    // b200: costh 1.7349 vs costr 2.60 — the two tiers disagree, so a costr
+    // b200: costh 1.73 vs costr 2.60 — the two tiers disagree, so a costr
     // regression cannot pass this assertion.
     expect(overviewCostPerMtok('b200', 7200)).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (7200 * 3600),
@@ -183,8 +183,8 @@ describe('overview engine scope and scenario selection', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, rows, 50, 'community');
     const byHardware = Object.fromEntries(summary.platforms.map((p) => [p.hardware, p]));
 
-    // Expected $/GPU/hr from HW_REGISTRY costh — b200 1.7349, mi355x 1.4961,
-    // gb300 2.3139.
+    // Expected $/GPU/hr from HW_REGISTRY costh — b200 1.73, mi355x 1.50,
+    // gb300 2.31.
     expect(byHardware.b200.costPerMtok).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (7200 * 3600),
       6,

@@ -261,7 +261,7 @@ describe('Overview page', () => {
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
       platform('mi355x')
         .find('[data-testid="overview-cost-delta"]')
-        .should('contain.text', '-15%')
+        .should('contain.text', '-14%')
         .and('have.attr', 'data-cost-polarity', 'cheaper')
         .then(($badge) => {
           // The shade lives on the cell now, never on the badge itself.
@@ -627,7 +627,7 @@ describe('Overview page', () => {
       platform('mi355x').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').should(
           'contain.text',
-          '$0.074',
+          '$0.075',
         );
       });
       platform('b300').within(() => {
