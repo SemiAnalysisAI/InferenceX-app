@@ -183,7 +183,7 @@ describe('Chart overflow continuations', () => {
       .should('have.length', 2)
       .then(($labels) => {
         const labels = [...$labels].map((label) => label.textContent);
-        expect(labels).to.have.members(['2 points > $5/M', '1 point > 60s TTFT']);
+        expect(labels).to.have.members(['2 points > $5/Mtok', '1 point > 60s TTFT']);
       });
 
     cy.document().then((document) => {

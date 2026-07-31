@@ -394,7 +394,7 @@ const SCATTER_STRINGS = {
     lineLabels: 'Line Labels',
     resetFilter: 'Reset filter',
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
-    overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/M`,
+    overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
   },
   zh: {
@@ -407,7 +407,7 @@ const SCATTER_STRINGS = {
     lineLabels: '曲线标签',
     resetFilter: '重置筛选',
     overflowMixed: (count: number) => `${count} 个点已截断`,
-    overflowCost: (count: number, limit: number) => `${count} 个点 > $${limit}/M`,
+    overflowCost: (count: number, limit: number) => `${count} 个点 > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${count} 个点 > ${limit}s TTFT`,
   },
 } as const;
