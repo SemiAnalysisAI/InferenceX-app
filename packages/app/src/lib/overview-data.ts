@@ -155,17 +155,33 @@ export function overviewScenarioForModel(
   return model === Model.Kimi_K3 || model === Model.GLM_5_2 ? 'agentx' : 'single_turn_8k1k';
 }
 
-/** Every scenario this model has rows for, so a model benchmarked on both the
- *  single-turn workload and AgentX gets a matrix row for each. Falls back to
- *  the model's default scenario so a rowless model still renders one row. */
+/**
+ * Which scenarios each model is shown under, curated rather than derived: a
+ * model can hold rows for a scenario the overview does not want to headline
+ * for it, so presence of data alone must not add a row. Models listed with
+ * both get one matrix row each, in OVERVIEW_SCENARIOS order.
+ */
+const OVERVIEW_MODEL_SCENARIOS: Partial<Record<Model, readonly OverviewScenario[]>> = {
+  [Model.DeepSeek_V4_Pro]: ['single_turn_8k1k', 'agentx'],
+  [Model.MiniMax_M3]: ['single_turn_8k1k', 'agentx'],
+  [Model.Qwen3_5]: ['single_turn_8k1k', 'agentx'],
+  [Model.Kimi_K2_5]: ['single_turn_8k1k'],
+  [Model.Kimi_K3]: ['agentx'],
+  [Model.GLM_5_2]: ['agentx'],
+};
+
+/** The scenarios this model gets a row for. Unlisted models keep the single
+ *  data-derived scenario, so a new model renders one row until curated. */
 export function overviewScenariosForModel(
   model: Model,
   rows: readonly BenchmarkRow[] = [],
 ): OverviewScenario[] {
-  const withRows = OVERVIEW_SCENARIOS.filter(
-    (scenario) => overviewScenarioRows(scenario, rows).length > 0,
-  );
-  return withRows.length > 0 ? withRows : [overviewScenarioForModel(model, rows)];
+  const curated = OVERVIEW_MODEL_SCENARIOS[model];
+  return curated === undefined
+    ? [overviewScenarioForModel(model, rows)]
+    : // Normalized through OVERVIEW_SCENARIOS so row order stays single-turn
+      // first however an entry above happens to be written.
+      OVERVIEW_SCENARIOS.filter((scenario) => curated.includes(scenario));
 }
 
 function overviewEngineRows(

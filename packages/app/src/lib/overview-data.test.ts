@@ -947,15 +947,20 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       overviewRowsFixture as unknown as Record<string, BenchmarkRow[]>,
     );
 
-    // One row per model, plus a second DeepSeek row: the fixture has both
-    // single-turn and AgentX rows for it, and each scenario gets its own row.
-    expect(page.models).toHaveLength(DEFAULT_MODELS.size + 1);
-    expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toContain(
+    // Curated scenarios: DeepSeek, MiniMax and Qwen each get both rows, Kimi
+    // K3 and GLM are AgentX-only, Kimi K2.5 is single-turn only.
+    expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([
+      `${Model.DeepSeek_V4_Pro}/single_turn_8k1k`,
       `${Model.DeepSeek_V4_Pro}/agentx`,
-    );
-    expect(
-      page.models.filter((m) => m.model === Model.DeepSeek_V4_Pro).map((m) => m.scenario),
-    ).toEqual(['single_turn_8k1k', 'agentx']);
+      `${Model.Kimi_K3}/agentx`,
+      `${Model.Kimi_K2_5}/single_turn_8k1k`,
+      `${Model.MiniMax_M3}/single_turn_8k1k`,
+      `${Model.MiniMax_M3}/agentx`,
+      `${Model.GLM_5_2}/agentx`,
+      `${Model.Qwen3_5}/single_turn_8k1k`,
+      `${Model.Qwen3_5}/agentx`,
+    ]);
+    expect(page.models.length).toBeGreaterThan(DEFAULT_MODELS.size);
     expect(page).not.toHaveProperty('datasetThroughDate');
     expect(page.tier).toBe(50);
 

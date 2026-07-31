@@ -20,6 +20,8 @@ const PLATFORM_HEADERS = [
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
+/** Six models, three of them with both a single-turn and an AgentX row. */
+const MATRIX_ROWS = 9;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文多轮真实智能体场景（AgentX）';
@@ -81,6 +83,13 @@ function desktopModel(model: string, scenario?: string) {
 function mobileModel(model: string, scenario?: string) {
   const row = scenario === undefined ? '' : `[data-scenario="${scenario}"]`;
   return cy.get(`[data-testid="overview-mobile-model"][data-model="${model}"]${row}`);
+}
+
+/** The comparison shade sits on the table cell wrapping the platform block. */
+function expectCellTint(hardware: string, expected: string) {
+  platform(hardware).then(([cell]) => {
+    expect(getComputedStyle(cell.closest('td')!).backgroundColor).to.contain(expected);
+  });
 }
 
 function platform(hardware: string) {
@@ -226,7 +235,7 @@ describe('Overview page', () => {
         );
       });
     });
-    desktopModel('MiniMax-M3').within(() => {
+    desktopModel('MiniMax-M3', SINGLE_TURN).within(() => {
       platform('gb300')
         .should('contain.text', 'SGLang · FP8')
         .and('not.contain.text', 'M3 EAGLE')
@@ -238,58 +247,71 @@ describe('Overview page', () => {
     cy.get('body').should('not.contain.text', 'P90');
   });
 
-  it('color-grades the cost delta against B200 and badges a missing baseline with a neutral ∞', () => {
+  it('color-grades the whole cell against B200 and badges a missing baseline with a neutral ∞', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    desktopModel('Qwen-3.5-397B-A17B').within(() => {
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
       platform('mi355x')
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '25%')
         .and('have.attr', 'data-cost-polarity', 'cheaper')
         .then(($badge) => {
-          expect($badge.attr('style')).to.contain('rgb(16 185 129 /');
+          // The shade lives on the cell now, never on the badge itself.
+          expect($badge.attr('style') ?? '').not.to.contain('background');
         });
+      // Cheaper than B200: the whole cell carries the green wash.
+      expectCellTint('mi355x', 'rgba(16, 185, 129,');
     });
 
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
       platform('gb200')
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '+80%')
-        .and('have.attr', 'data-cost-polarity', 'pricier')
-        .then(($badge) => {
-          // +80% saturates the alpha ramp; read the computed value so the
-          // assertion survives the browser normalizing `0.40` to `0.4`.
-          expect(getComputedStyle($badge[0]).backgroundColor).to.equal('rgba(239, 68, 68, 0.4)');
-        });
-      // No read at the tier means no delta to grade.
+        .and('have.attr', 'data-cost-polarity', 'pricier');
+      // +80% saturates the alpha ramp; read the computed value so the
+      // assertion survives the browser normalizing `0.40` to `0.4`.
+      expectCellTint('gb200', 'rgba(239, 68, 68, 0.4)');
+      // No read at the tier means nothing to grade — the cell stays untinted.
       platform('gb300').find('[data-testid="overview-cost-delta"]').should('not.exist');
+      platform('gb300').then(([cell]) => {
+        expect(getComputedStyle(cell.closest('td')!).backgroundColor).to.match(
+          /rgba\(0, 0, 0, 0\)|transparent/,
+        );
+      });
     });
 
-    // Priced result with no B200 baseline: the relative badge shows a neutral
-    // gray ∞ — availability, not a good/bad judgment, so no red/green tint.
-    desktopModel('MiniMax-M3').within(() => {
+    // Priced result with no B200 baseline: neutral gray ∞ and a neutral cell —
+    // availability, not a good/bad judgment, so no red/green tint.
+    desktopModel('MiniMax-M3', SINGLE_TURN).within(() => {
       platform('gb300')
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '∞')
         .and('have.attr', 'data-cost-polarity', 'no-baseline')
-        .and('have.attr', 'title', 'No B200 baseline to compare against')
-        .then(($badge) => {
-          expect($badge.attr('style') ?? '').not.to.contain('background');
-          const color = getComputedStyle($badge[0]).color;
-          const [r, g, b] = color.match(/\d+/g)!.map(Number);
-          // Neutral gray: no channel dominates the way the red/green ramps do.
-          expect(Math.max(r, g, b) - Math.min(r, g, b)).to.be.lessThan(30);
-        });
+        .and('have.attr', 'title', 'No B200 baseline to compare against');
+      platform('gb300').then(([cell]) => {
+        const [r, g, b] = getComputedStyle(cell.closest('td')!)
+          .backgroundColor.match(/\d+/g)!
+          .map(Number);
+        // Slate gray: no channel dominates the way the red (spread 171) and
+        // green (spread 169) ramps do.
+        expect(Math.max(r, g, b) - Math.min(r, g, b)).to.be.lessThan(60);
+      });
     });
 
-    // Within the ±5% parity band the badge reads as even, not polarity.
+    // Within the ±5% parity band the cell reads as even, not polarity.
     desktopModel('Kimi-K2.5').within(() => {
       platform('b300')
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '+2%')
         .and('have.attr', 'data-cost-polarity', 'even');
+      platform('b300').then(([cell]) => {
+        const [r, g, b] = getComputedStyle(cell.closest('td')!)
+          .backgroundColor.match(/\d+/g)!
+          .map(Number);
+        expect(Math.max(r, g, b) - Math.min(r, g, b)).to.be.lessThan(60);
+      });
     });
   });
 
@@ -342,15 +364,10 @@ describe('Overview page', () => {
             PLATFORM_HEADERS,
           );
         });
-        // One row per (model, scenario): every model plus DeepSeek's AgentX row.
-        cy.get('[data-testid="overview-desktop-model"]').should(
-          'have.length',
-          MODEL_LABELS.length + 1,
-        );
-        cy.get('[data-testid="overview-platform"]').should(
-          'have.length',
-          (MODEL_LABELS.length + 1) * 5,
-        );
+        // One row per curated (model, scenario) pair: six models, three of
+        // which (DeepSeek, MiniMax, Qwen) carry a second AgentX row.
+        cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
+        cy.get('[data-testid="overview-platform"]').should('have.length', MATRIX_ROWS * 5);
         cy.get('[data-testid="overview-model-coverage-note"]').should('not.exist');
         cy.get('details, summary, button').should('not.exist');
         cy.contains(/PRIMARY|Ranked results/).should('not.exist');
@@ -366,7 +383,7 @@ describe('Overview page', () => {
     for (const model of ['DeepSeek-V4-Pro', 'Kimi-K2.5', 'MiniMax-M3', 'Qwen-3.5-397B-A17B']) {
       desktopModel(model, SINGLE_TURN)
         .find('[data-testid="overview-model-scenario"]')
-        .should('have.text', 'Single-turn · 8K→1K');
+        .should('have.text', '8K/1K');
     }
   });
 
@@ -456,7 +473,7 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    desktopModel('Qwen-3.5-397B-A17B').within(() => {
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('mi355x').within(() => {
         cy.contains('SGLang · FP8').should('exist');
         cy.get(
@@ -522,7 +539,7 @@ describe('Overview page', () => {
         .and('include', 'Estimated from validated benchmark runs.');
     });
 
-    desktopModel('MiniMax-M3').within(() => {
+    desktopModel('MiniMax-M3', SINGLE_TURN).within(() => {
       platform('b200')
         .find('[data-testid="overview-pair-missing"]')
         .should('contain.text', '—')
@@ -576,7 +593,7 @@ describe('Overview page', () => {
       cy.contains('a', '50').should('have.attr', 'href', '/overview');
     });
 
-    desktopModel('Qwen-3.5-397B-A17B').within(() => {
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b200').should('contain.text', '$0.139').and('contain.text', 'FP8');
       platform('mi355x').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').should(
@@ -604,7 +621,7 @@ describe('Overview page', () => {
         .and('have.attr', 'title', 'no exact @30 result');
     });
     // Exact @30 read priced without a B200 baseline: cost plus the ∞ badge.
-    desktopModel('Qwen-3.5-397B-A17B').within(() => {
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
           'contain.text',
@@ -644,7 +661,7 @@ describe('Overview page', () => {
           expect($option[0].getBoundingClientRect().height).to.be.at.least(44);
         });
       cy.get('[data-testid="overview-desktop-matrix"]').should('not.be.visible');
-      mobileModel('Qwen-3.5-397B-A17B').within(() => {
+      mobileModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
         cy.get('[data-testid="overview-platform"]').should('have.length', 5);
         platform('mi355x').within(() => {
           cy.get(
@@ -722,7 +739,7 @@ describe('Overview page', () => {
       cy.viewport(width, 900);
       cy.visit('/overview');
 
-      mobileModel('Qwen-3.5-397B-A17B').within(() => {
+      mobileModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
         platform('mi355x').within(() => {
           cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').then(([value]) => {
             cy.get('[data-testid="overview-cost-delta"][data-hardware="mi355x"]').then(
@@ -749,7 +766,7 @@ describe('Overview page', () => {
     cy.viewport(390, 844);
     cy.visit('/overview');
 
-    mobileModel('Qwen-3.5-397B-A17B').within(() => {
+    mobileModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('mi355x').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').then(([value]) => {
           cy.contains('div', 'SGLang · FP8')
@@ -859,7 +876,7 @@ describe('Overview page', () => {
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
       platform('b200').should('contain.text', 'SGLang · FP4').and('not.contain.text', 'STP');
     });
-    desktopModel('MiniMax-M3').within(() => {
+    desktopModel('MiniMax-M3', SINGLE_TURN).within(() => {
       platform('gb300')
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '∞')

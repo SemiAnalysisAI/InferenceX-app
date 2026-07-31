@@ -36,7 +36,7 @@ export const OVERVIEW_STRINGS = {
       'Cost per million total tokens from each platform’s best observed serving envelope for the scenario shown with each model.',
     modelHeader: 'Model · Scenario',
     scenarioLabels: {
-      single_turn_8k1k: 'Single-turn · 8K→1K',
+      single_turn_8k1k: '8K/1K',
       agentx: 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)',
     },
     detailsHeader: 'Details',
@@ -81,7 +81,7 @@ export const OVERVIEW_STRINGS = {
     caption: '按各模型标注的场景，基于各平台最佳观测服务包络线计算每百万总 token 成本。',
     modelHeader: '模型 · 场景',
     scenarioLabels: {
-      single_turn_8k1k: '单轮 · 8K→1K',
+      single_turn_8k1k: '8K/1K',
       agentx: '长上下文多轮真实智能体场景（AgentX）',
     },
     detailsHeader: '详情',
@@ -187,10 +187,18 @@ const COST_DELTA_SATURATION = 0.5;
 const COST_DELTA_CLASS = {
   cheaper: 'text-emerald-700 dark:text-emerald-400',
   pricier: 'text-red-700 dark:text-red-400',
-  even: 'bg-muted text-muted-foreground',
+  even: 'text-muted-foreground',
   'no-baseline': 'text-muted-foreground',
 } as const;
-const COST_DELTA_HUE = { cheaper: '16 185 129', pricier: '239 68 68' } as const;
+const COST_DELTA_HUE = {
+  cheaper: '16 185 129',
+  pricier: '239 68 68',
+  // Parity and "no B200 baseline" both read as neutral gray.
+  even: '148 163 184',
+  'no-baseline': '148 163 184',
+} as const;
+/** Flat wash for the two neutral states — they carry no magnitude to ramp. */
+const COST_DELTA_NEUTRAL_ALPHA = '0.10';
 
 type CostDeltaPolarity = keyof typeof COST_DELTA_CLASS;
 
@@ -200,10 +208,26 @@ function costDeltaPolarity(pct: number): CostDeltaPolarity {
 }
 
 /** Continuous shade: only background alpha tracks the magnitude, so every
- *  badge reads on one ramp instead of stepping through discrete bins. */
+ *  cell reads on one ramp instead of stepping through discrete bins. */
 function costDeltaAlpha(pct: number): string {
   const strength = Math.min(Math.abs(pct), COST_DELTA_SATURATION) / COST_DELTA_SATURATION;
   return (0.08 + strength * 0.32).toFixed(2);
+}
+
+/**
+ * The whole cell carries the comparison shade, not just its badge: at a glance
+ * the matrix should read as a heat map, with the badge stating the number.
+ * A cell with no priced read stays untinted — there is nothing to compare.
+ */
+export function costDeltaCellStyle(
+  platform: OverviewPlatformResult,
+): { backgroundColor: string } | undefined {
+  if (platform.costPerMtok === null) return undefined;
+  const pct = platform.costVsB200Pct;
+  const polarity: CostDeltaPolarity = pct === null ? 'no-baseline' : costDeltaPolarity(pct);
+  const alpha =
+    pct === null || polarity === 'even' ? COST_DELTA_NEUTRAL_ALPHA : costDeltaAlpha(pct);
+  return { backgroundColor: `rgb(${COST_DELTA_HUE[polarity]} / ${alpha})` };
 }
 
 /** Relative-to-B200 badge. `pct === null` means the row's B200 baseline is
@@ -237,11 +261,8 @@ function CostDeltaBadge({
       data-hardware={hardware}
       data-cost-polarity={polarity}
       title={aria}
-      style={
-        pct === null || polarity === 'even' || polarity === 'no-baseline'
-          ? undefined
-          : { backgroundColor: `rgb(${COST_DELTA_HUE[polarity]} / ${costDeltaAlpha(pct)})` }
-      }
+      // The cell behind it carries the shade, so the badge itself stays
+      // untinted — two washes of the same hue would double up.
       className={`inline-flex items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-[10px] font-semibold tabular-nums ${
         phoneRow ? 'col-start-2 justify-self-start' : 'xl:col-start-2 xl:justify-self-end'
       } ${COST_DELTA_CLASS[polarity]}`}
@@ -483,6 +504,7 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
               {model.platforms.map((platform) => (
                 <td
                   key={platform.hardware}
+                  style={costDeltaCellStyle(platform)}
                   className={`px-3 py-4 align-top ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
                 >
                   <PlatformCell
@@ -529,6 +551,7 @@ export function MobileOverviewList({ models, locale, formatters, strings }: Surf
                   key={platform.hardware}
                   data-testid="overview-mobile-platform-row"
                   data-hardware={platform.hardware}
+                  style={costDeltaCellStyle(platform)}
                   className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-1.5 last:border-b-0"
                 >
                   <span
