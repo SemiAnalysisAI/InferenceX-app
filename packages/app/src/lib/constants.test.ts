@@ -191,7 +191,7 @@ describe('getHardwareConfig', () => {
 
   it('uses the July 2026 TCO rates for modeled datacenter GPUs', () => {
     const expectedRates = {
-      h100: [1.2951709275144121, 1.5501205804741525, 1.78],
+      h100: [1.168, 1.5501205804741525, 1.78],
       h200: [1.2174257813639555, 1.5918579041035947, 2.05],
       b200: [1.7349236084834354, 2.0693175588620671, 2.6],
       b300: [2.2550110908541448, 2.5151486614356386, 3],
@@ -215,7 +215,7 @@ describe('getGpuSpecs', () => {
   it('returns specs for a base GPU key', () => {
     const specs = getGpuSpecs('h100');
     expect(specs.power).toBe(1.37);
-    expect(specs.costh).toBe(1.2951709275144121);
+    expect(specs.costh).toBe(1.168);
     expect(specs.costn).toBe(1.5501205804741525);
     expect(specs.costr).toBe(1.78);
   });

@@ -29,7 +29,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 7,
     tdp: 700,
     power: 1.37,
-    costh: 1.2951709275144121,
+    costh: 1.168,
     costn: 1.5501205804741525,
     costr: 1.78,
   },
