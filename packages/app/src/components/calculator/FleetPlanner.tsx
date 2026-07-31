@@ -399,7 +399,7 @@ export default function FleetPlanner({
             className="underline hover:text-foreground"
             href="https://semianalysis.com/ai-cloud-tco-model/"
           >
-            SemiAnalysis Market August 2025 Pricing Surveys & AI Cloud TCO Model
+            SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
             <ExternalLinkIcon />
           </Link>
         </small>

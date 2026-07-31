@@ -182,7 +182,7 @@ export function MetricAssumptionNotes({
         <>
           <MetricBadges label={costLabel} values={costValues} />
           <SourceLink href="https://semianalysis.com/ai-cloud-tco-model/" sourceLabel={sourceLabel}>
-            SemiAnalysis Market August 2025 Pricing Surveys & AI Cloud TCO Model
+            SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
           </SourceLink>
         </>
       )}

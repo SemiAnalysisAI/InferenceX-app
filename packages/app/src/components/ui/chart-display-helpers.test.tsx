@@ -85,7 +85,7 @@ describe('MetricAssumptionNotes', () => {
 
     expect(getVisibleText()).toContain('TCO $/GPU/hr:');
     expect(getVisibleText()).toContain(
-      'SemiAnalysis Market August 2025 Pricing Surveys & AI Cloud TCO Model',
+      'SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model',
     );
     expect(getVisibleCaveatText()).toContain('calculate cost per decode GPU or per prefill GPU');
   });

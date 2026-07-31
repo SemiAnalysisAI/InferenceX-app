@@ -188,6 +188,24 @@ describe('getHardwareConfig', () => {
       expect(entry.costr).toBeGreaterThanOrEqual(0);
     }
   });
+
+  it('uses the July 2026 TCO rates for modeled datacenter GPUs', () => {
+    const expectedRates = {
+      h100: [1.2951709275144121, 1.5501205804741525, 1.78],
+      h200: [1.2174257813639555, 1.5918579041035947, 2.05],
+      b200: [1.7349236084834354, 2.0693175588620671, 2.6],
+      b300: [2.2550110908541448, 2.5151486614356386, 3],
+      gb200: [1.8648110244453284, 2.263552701012252, 2.6],
+      gb300: [2.313899859674561, 2.7890137161029926, 3.3],
+      mi300x: [0.9535220083742874, 1.1567197344221469, 1.3],
+      mi325x: [1.0998080408523334, 1.3234578915100057, 1.6],
+      mi355x: [1.4960710469526235, 2.089023971578409, 2.1],
+    } as const;
+
+    for (const [gpu, [costh, costn, costr]] of Object.entries(expectedRates)) {
+      expect(HW_REGISTRY[gpu]).toMatchObject({ costh, costn, costr });
+    }
+  });
 });
 
 // ===========================================================================
@@ -197,9 +215,9 @@ describe('getGpuSpecs', () => {
   it('returns specs for a base GPU key', () => {
     const specs = getGpuSpecs('h100');
     expect(specs.power).toBe(1.37);
-    expect(specs.costh).toBe(1.3);
-    expect(specs.costn).toBe(1.69);
-    expect(specs.costr).toBe(1.3);
+    expect(specs.costh).toBe(1.2951709275144121);
+    expect(specs.costn).toBe(1.5501205804741525);
+    expect(specs.costr).toBe(1.78);
   });
 
   it('extracts base from compound key (e.g. h100_vllm)', () => {
@@ -210,7 +228,7 @@ describe('getGpuSpecs', () => {
   it('extracts base from dash-separated key (e.g. h200-dynamo-trt)', () => {
     const specs = getGpuSpecs('h200-dynamo-trt');
     expect(specs.power).toBe(1.37);
-    expect(specs.costh).toBe(1.41);
+    expect(specs.costh).toBe(1.2174257813639555);
   });
 
   it('returns zero specs for unknown GPU', () => {
