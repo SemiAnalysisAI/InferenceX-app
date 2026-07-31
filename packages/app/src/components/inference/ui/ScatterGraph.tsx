@@ -280,40 +280,48 @@ interface CurvedContinuationGeometry {
   angle: number;
 }
 
-/** Find the last visible point and tangent on an interpolated SVG path. */
+/** Find a compact endpoint on an interpolated path, starting at its visible frontier point. */
 function visibleContinuationEndpoint(
   path: SVGPathElement,
+  anchorX: number,
   width: number,
   height: number,
   inset = 7,
+  maxLength = 96,
 ): CurvedContinuationGeometry | null {
   const totalLength = path.getTotalLength();
-  const start = path.getPointAtLength(0);
-  if (
-    !Number.isFinite(totalLength) ||
-    totalLength === 0 ||
-    start.x < 0 ||
-    start.x > width ||
-    start.y < 0 ||
-    start.y > height
-  ) {
-    return null;
+  if (!Number.isFinite(totalLength) || totalLength === 0) return null;
+
+  const pathStart = path.getPointAtLength(0);
+  const pathEnd = path.getPointAtLength(totalLength);
+  const ascending = pathEnd.x >= pathStart.x;
+  let lowerLength = 0;
+  let upperLength = totalLength;
+  for (let iteration = 0; iteration < 24; iteration++) {
+    const midpoint = (lowerLength + upperLength) / 2;
+    const midpointX = path.getPointAtLength(midpoint).x;
+    if (midpointX < anchorX === ascending) lowerLength = midpoint;
+    else upperLength = midpoint;
   }
 
-  let endpointLength = totalLength;
-  let length = Math.min(2, totalLength);
-  while (length > 0) {
+  const anchorLength = (lowerLength + upperLength) / 2;
+  const start = path.getPointAtLength(anchorLength);
+  if (start.x < 0 || start.x > width || start.y < 0 || start.y > height) return null;
+
+  let endpointLength = Math.min(totalLength, anchorLength + maxLength);
+  let length = Math.min(anchorLength + 2, endpointLength);
+  while (length > anchorLength) {
     const point = path.getPointAtLength(length);
     if (point.x < 0 || point.x > width || point.y < 0 || point.y > height) {
-      endpointLength = Math.max(0, length - inset);
+      endpointLength = Math.max(anchorLength, length - inset);
       break;
     }
-    if (length === totalLength) break;
-    length = Math.min(length + 2, totalLength);
+    if (length === endpointLength) break;
+    length = Math.min(length + 2, endpointLength);
   }
 
   const end = path.getPointAtLength(endpointLength);
-  const tangentStart = path.getPointAtLength(Math.max(0, endpointLength - 2));
+  const tangentStart = path.getPointAtLength(Math.max(anchorLength, endpointLength - 2));
   return {
     x1: start.x,
     y1: start.y,
@@ -2656,7 +2664,7 @@ const ScatterGraph = React.memo(
               .append('clipPath')
               .attr('class', 'overflow-continuation-clip')
               .attr('clipPathUnits', 'userSpaceOnUse')
-              .append('rect');
+              .append('path');
             group.append('path').attr('class', 'overflow-continuation-line');
             group
               .append('path')
@@ -2688,15 +2696,9 @@ const ScatterGraph = React.memo(
           const group = d3.select(this);
           const pointsRight = entry.toward.x >= entry.from.x;
           const anchorX = xScale(entry.from.x);
+          const anchorY = yScale(entry.from.y);
           const clipId = `${chartId}-overflow-continuation-${entry.source}-${index}`;
-          group
-            .select<SVGClipPathElement>('.overflow-continuation-clip')
-            .attr('id', clipId)
-            .select('rect')
-            .attr('x', pointsRight ? anchorX : 0)
-            .attr('y', 0)
-            .attr('width', pointsRight ? Math.max(0, ctx.width - anchorX) : Math.max(0, anchorX))
-            .attr('height', ctx.height);
+          group.select<SVGClipPathElement>('.overflow-continuation-clip').attr('id', clipId);
           const lineGenerator = d3
             .line<InferenceData>()
             .x((point) => xScale(point.x))
@@ -2713,8 +2715,20 @@ const ScatterGraph = React.memo(
             .attr('stroke-linecap', 'round');
           const pathNode = continuationPath.node();
           const geometry = pathNode
-            ? visibleContinuationEndpoint(pathNode, ctx.width, ctx.height)
+            ? visibleContinuationEndpoint(pathNode, anchorX, ctx.width, ctx.height)
             : null;
+          const clipRadius = geometry
+            ? Math.min(96, Math.max(0.1, Math.hypot(geometry.x2 - anchorX, geometry.y2 - anchorY)))
+            : 96;
+          group
+            .select<SVGClipPathElement>('.overflow-continuation-clip')
+            .select('path')
+            .attr(
+              'd',
+              `M${anchorX},${anchorY - clipRadius}A${clipRadius},${clipRadius} 0 0 ${
+                pointsRight ? 1 : 0
+              } ${anchorX},${anchorY + clipRadius}L${anchorX},${anchorY}Z`,
+            );
           group.attr('display', null);
           if (!geometry) {
             group
@@ -2730,6 +2744,7 @@ const ScatterGraph = React.memo(
               : entry.reasons.includes('cost')
                 ? legendT.overflowCost(entry.hiddenPointCount, costLimit)
                 : legendT.overflowLatency(entry.hiddenPointCount, latencyLimit);
+          const labelToRight = geometry.x2 < ctx.width / 2;
           group
             .select<SVGPathElement>('.overflow-continuation-arrow')
             .attr('display', null)
@@ -2740,9 +2755,9 @@ const ScatterGraph = React.memo(
             .select<SVGTextElement>('.overflow-continuation-label')
             .attr('display', null)
             .attr('data-testid', 'overflow-continuation-label')
-            .attr('x', geometry.x2 + (pointsRight ? -12 : 12))
+            .attr('x', geometry.x2 + (labelToRight ? 12 : -12))
             .attr('y', Math.max(12, Math.min(ctx.height - 4, geometry.y2 + 18)))
-            .attr('text-anchor', pointsRight ? 'end' : 'start')
+            .attr('text-anchor', labelToRight ? 'start' : 'end')
             .attr('fill', color)
             .attr('stroke', ir.getCssColor('--background'))
             .attr('stroke-width', 4)

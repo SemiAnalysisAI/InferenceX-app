@@ -145,6 +145,14 @@ describe('Chart overflow continuations', () => {
             }
           });
         cy.wrap($continuation)
+          .find('.overflow-continuation-clip path')
+          .should(($clip) => {
+            const radius = Number(
+              /A(?<radius>[^,]+),/u.exec($clip.attr('d') ?? '')?.groups?.radius,
+            );
+            expect(radius).to.be.at.most(96.1);
+          });
+        cy.wrap($continuation)
           .find('.overflow-continuation-arrow')
           .then(($arrow) => {
             const transform = $arrow.attr('transform') ?? '';
