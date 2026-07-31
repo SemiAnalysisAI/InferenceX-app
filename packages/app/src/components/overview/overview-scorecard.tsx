@@ -478,7 +478,7 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
             sticky top-0, z-50), and z-10 keeps this under it. Opaque, or the
             scrolled rows show through. */}
         <thead className="sticky top-14 z-10 bg-card">
-          <tr className="border-b border-border/50 text-xs uppercase tracking-wider text-muted-foreground">
+          <tr className="border-b border-border/50 text-sm uppercase tracking-wider text-muted-foreground">
             <th scope="col" className="bg-card px-4 py-2 text-left font-semibold lg:px-6">
               {strings.modelHeader}
             </th>

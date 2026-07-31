@@ -387,6 +387,10 @@ describe('Overview page', () => {
           expect([...$headers].map((header) => header.textContent?.trim())).to.deep.equal(
             PLATFORM_HEADERS,
           );
+          // Column headers read at 14px, a step up from the 12px metadata.
+          for (const header of $headers) {
+            expect(getComputedStyle(header).fontSize).to.equal('14px');
+          }
         });
         // One row per curated (model, scenario) pair: six models, three of
         // which (DeepSeek, MiniMax, Qwen) carry a second AgentX row.
