@@ -60,7 +60,7 @@ export function buildOverviewDashboardHref(
     g_runid: soleSourceRun(config)?.id,
     i_seq: overviewSequence(model),
     i_prec: config.precision,
-    i_metric: 'y_outputTputPerGpu',
+    i_metric: 'y_costh',
     i_gpus: config.hwKey,
     i_spec: dashboardSpecMode(config.specMethod),
     i_disagg: config.disagg ? 'disagg' : config.isMultinode ? 'multi-node' : 'single-node',
@@ -83,6 +83,7 @@ export function detailHref(locale: 'en' | 'zh', model: OverviewModelSummary): st
   const query = new URLSearchParams({
     g_model: model.model,
     i_seq: overviewSequence(model),
+    i_metric: 'y_costh',
     i_optimal: '1',
   });
   return `${inferenceRoute(locale)}?${query}`;

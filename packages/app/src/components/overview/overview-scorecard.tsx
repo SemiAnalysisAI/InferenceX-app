@@ -20,8 +20,11 @@ export const OVERVIEW_STRINGS = {
   en: {
     title: 'Inference Cost Overview',
     purpose: 'Every active model across MI355X, B200, B300, GB200 and GB300 at a glance.',
-    scope: (tier: number) =>
-      `GPU rental cost / 1M output tokens · @${tier} tok/s/user · ↓ lower is better`,
+    // The active tier is not repeated here — the Service level selector below
+    // already states it.
+    scopeMetric: 'Hyperscaler cost · $/1M total tokens',
+    scopeDirection: '↓ Lower is better',
+    scopeAria: 'Hyperscaler cost per one million total tokens. Lower is better.',
     tierNavLabel: 'Service level',
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
@@ -29,9 +32,8 @@ export const OVERVIEW_STRINGS = {
       all: 'All Platforms',
       community: 'Open Source Community Engines (vLLM/SGLang)',
     },
-    snapshot: (through: string) => `Database snapshot through ${through}`,
     caption:
-      'Cost per million output tokens from each platform’s best observed serving envelope for the scenario shown with each model.',
+      'Cost per million total tokens from each platform’s best observed serving envelope for the scenario shown with each model.',
     modelHeader: 'Model · Scenario',
     scenarioLabels: {
       single_turn_8k1k: 'Single-turn · 8K→1K',
@@ -47,7 +49,7 @@ export const OVERVIEW_STRINGS = {
         ? 'Estimated from validated benchmark runs.'
         : `Estimated from validated ${topologies.join(' and ')} runs.`,
     estimatedAria: (value: string, explanation: string) => `Approximately ${value}. ${explanation}`,
-    infinityLegend: '∞ = no comparable result',
+    cellStateLegend: '— = no result. ∞ = B200 baseline unavailable.',
     missingReasons: (tier: number): Record<string, string> => ({
       int4_bf16_only: 'INT4/BF16 only',
       no_scenario_data: 'no data for this scenario',
@@ -58,22 +60,25 @@ export const OVERVIEW_STRINGS = {
     standardDecodeLabel: 'Standard decode',
     methodologyNote: 'Priority: speculative FP4 → speculative FP8 → standard FP4 → standard FP8.',
     costNote:
-      'Cost = 3-yr rental $/GPU/hr ÷ output tok/s per deployed GPU. All percentages compare against B200.',
+      'Cost = hyperscaler $/GPU/hr ÷ total tok/s per deployed GPU. Percentages compare against B200.',
     costDeltaAria: (pct: string, cheaper: boolean) =>
       `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than B200`,
     costDeltaEvenAria: 'About the same cost as B200',
+    noBaselineAria: 'No B200 baseline to compare against',
     referenceHeader: 'Reference',
     normalizationNote:
       'Disaggregated results include both prefill and decode GPUs in the denominator.',
     interpolationNote:
-      'Tier values use the best observed platform serving envelope; ≈ marks estimates between validated runs. No extrapolation.',
+      'Tier values use the best observed platform serving envelope and may be estimated between validated runs. No extrapolation.',
     comparabilityNote:
       'Each row compares platforms within the scenario shown with that model; dates, engines, precisions and speculative methods may differ.',
   },
   zh: {
     title: '推理成本总览',
     purpose: '一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。',
-    scope: (tier: number) => `GPU 租赁成本 / 每百万输出 token · @${tier} tok/s/用户 · ↓ 越低越好`,
+    scopeMetric: '超大规模云（hyperscaler）成本 · $/1M 总 token',
+    scopeDirection: '↓ 越低越好',
+    scopeAria: '超大规模云（hyperscaler）每百万总 token 成本，越低越好。',
     tierNavLabel: '服务档位',
     tierUnit: 'tok/s/用户',
     engineScopeNavLabel: '引擎范围',
@@ -81,8 +86,7 @@ export const OVERVIEW_STRINGS = {
       all: '所有平台',
       community: '开源社区引擎（vLLM/SGLang）',
     },
-    snapshot: (through: string) => `数据库快照截至 ${through}`,
-    caption: '按各模型标注的场景，基于各平台最佳观测服务包络线计算每百万输出 token 成本。',
+    caption: '按各模型标注的场景，基于各平台最佳观测服务包络线计算每百万总 token 成本。',
     modelHeader: '模型 · 场景',
     scenarioLabels: {
       single_turn_8k1k: '单轮 · 8K→1K',
@@ -98,7 +102,7 @@ export const OVERVIEW_STRINGS = {
         ? '根据已验证的基准运行结果估算。'
         : `根据已验证的 ${topologies.join(' 与 ')} 运行结果估算。`,
     estimatedAria: (value: string, explanation: string) => `约 ${value}。${explanation}`,
-    infinityLegend: '∞ = 无可比结果',
+    cellStateLegend: '— = 无结果。∞ = 缺少 B200 基线。',
     missingReasons: (tier: number): Record<string, string> => ({
       int4_bf16_only: '仅 INT4/BF16',
       no_scenario_data: '该场景暂无数据',
@@ -108,13 +112,15 @@ export const OVERVIEW_STRINGS = {
     speculativeDecodeLabel: (method: string) => `推测解码（${method}）`,
     standardDecodeLabel: '标准解码',
     methodologyNote: '优先顺序：推测解码 FP4 → 推测解码 FP8 → 标准解码 FP4 → 标准解码 FP8。',
-    costNote: '成本 = 3 年期租赁 $/GPU/小时 ÷ 每张已部署 GPU 的输出 tok/s。所有百分比均相对 B200。',
+    costNote:
+      '成本 = 超大规模云（hyperscaler）$/GPU/小时 ÷ 每张已部署 GPU 的总 tok/s。百分比均相对 B200。',
     costDeltaAria: (pct: string, cheaper: boolean) => `比 B200 ${cheaper ? '便宜' : '昂贵'} ${pct}`,
     costDeltaEvenAria: '与 B200 成本基本持平',
+    noBaselineAria: '缺少可比较的 B200 基线',
     referenceHeader: '基准',
     normalizationNote: '分离式结果的分母同时计入预填充与解码 GPU。',
     interpolationNote:
-      '各档位数值采用最佳观测平台服务包络线；≈ 表示根据已验证运行结果估算。不会外推。',
+      '各档位数值采用最佳观测平台服务包络线，可能根据已验证运行结果估算。不会外推。',
     comparabilityNote: '每行均在该模型标注的场景内比较各平台；日期、引擎、精度与推测方法可能不同。',
   },
 } as const;
@@ -136,11 +142,13 @@ export function overviewFormatters(locale: OverviewLocale): Formatters {
     timeZone: 'UTC',
   });
   return {
+    // Three decimals: at hyperscaler $/GPU/hr over TOTAL tokens, real platforms
+    // land in the $0.0x–$0.1x band, which two decimals would collapse.
     cost: new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 3,
     }),
     percent: new Intl.NumberFormat(tag, {
       style: 'percent',
@@ -170,6 +178,7 @@ function missingReasonCopy(platform: OverviewPlatformResult, strings: OverviewSt
 const RAW_SOURCE_LINK_CLASS =
   'inline-flex min-h-11 items-center rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50';
 
+/** No result for this GPU. The reason survives as hover/focus/SR text only. */
 function CellMissing({ hardware, reason }: { hardware: string; reason: string }) {
   return (
     <span
@@ -178,7 +187,7 @@ function CellMissing({ hardware, reason }: { hardware: string; reason: string })
       title={reason}
       className="inline-flex items-baseline gap-1 text-muted-foreground"
     >
-      <span aria-hidden="true">{'∞'}</span>
+      <span aria-hidden="true">{'—'}</span>
       <span className="sr-only">{reason}</span>
     </span>
   );
@@ -188,10 +197,13 @@ function CellMissing({ hardware, reason }: { hardware: string; reason: string })
 const COST_DELTA_NEUTRAL_BAND = 0.05;
 /** Magnitudes at or beyond this saturate the shade ramp. */
 const COST_DELTA_SATURATION = 0.5;
+// `no-baseline` (∞) is neutral gray, never red/green: a missing B200 baseline
+// is not a better/worse judgment.
 const COST_DELTA_CLASS = {
   cheaper: 'text-emerald-700 dark:text-emerald-400',
   pricier: 'text-red-700 dark:text-red-400',
   even: 'bg-muted text-muted-foreground',
+  'no-baseline': 'text-muted-foreground',
 } as const;
 const COST_DELTA_HUE = { cheaper: '16 185 129', pricier: '239 68 68' } as const;
 
@@ -209,6 +221,8 @@ function costDeltaAlpha(pct: number): string {
   return (0.08 + strength * 0.32).toFixed(2);
 }
 
+/** Relative-to-B200 badge. `pct === null` means the row's B200 baseline is
+ *  unavailable: the badge shows a neutral `∞` instead of a percentage. */
 function CostDeltaBadge({
   pct,
   hardware,
@@ -216,17 +230,22 @@ function CostDeltaBadge({
   strings,
   phoneRow,
 }: {
-  pct: number;
+  pct: number | null;
   hardware: string;
   formatters: Formatters;
   strings: OverviewStrings;
   phoneRow: boolean;
 }) {
-  const polarity = costDeltaPolarity(pct);
+  const polarity: CostDeltaPolarity = pct === null ? 'no-baseline' : costDeltaPolarity(pct);
   const aria =
-    polarity === 'even'
-      ? strings.costDeltaEvenAria
-      : strings.costDeltaAria(formatters.percentAbs.format(Math.abs(pct)), polarity === 'cheaper');
+    pct === null
+      ? strings.noBaselineAria
+      : polarity === 'even'
+        ? strings.costDeltaEvenAria
+        : strings.costDeltaAria(
+            formatters.percentAbs.format(Math.abs(pct)),
+            polarity === 'cheaper',
+          );
   return (
     <span
       data-testid="overview-cost-delta"
@@ -234,7 +253,7 @@ function CostDeltaBadge({
       data-cost-polarity={polarity}
       title={aria}
       style={
-        polarity === 'even'
+        pct === null || polarity === 'even' || polarity === 'no-baseline'
           ? undefined
           : { backgroundColor: `rgb(${COST_DELTA_HUE[polarity]} / ${costDeltaAlpha(pct)})` }
       }
@@ -242,7 +261,7 @@ function CostDeltaBadge({
         phoneRow ? 'col-start-2 justify-self-start' : 'xl:col-start-2 xl:justify-self-end'
       } ${COST_DELTA_CLASS[polarity]}`}
     >
-      <span aria-hidden="true">{formatters.percent.format(pct)}</span>
+      <span aria-hidden="true">{pct === null ? '∞' : formatters.percent.format(pct)}</span>
       <span className="sr-only">{aria}</span>
     </span>
   );
@@ -301,38 +320,61 @@ function CellValue({
   const estimateExplanation = member.read.estimated
     ? strings.estimatedTooltip(evidenceTopologies)
     : undefined;
+  // No visible date, but the evidence link's hover/focus/SR label keeps the
+  // run date so the number stays reproducible.
+  const evidenceAria =
+    config === null || stack === null
+      ? null
+      : strings.rawDashboardAria(evidenceDateLabel, model.modelLabel, stack);
+  const costText = formattedValue;
   return (
     <div className="min-w-0 space-y-0.5 text-sm">
-      {/* Fixed cost | delta | date grids keep comparisons scannable on desktop and phones;
+      {/* Fixed cost | delta grids keep comparisons scannable on desktop and phones;
           the delta slot is reserved even on B200 so numbers align across rows. */}
       <div
         className={
           phoneRow
-            ? 'grid grid-cols-[max-content_max-content_minmax(0,1fr)] items-baseline gap-x-1.5 gap-y-0.5'
-            : 'flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 xl:grid xl:grid-cols-[minmax(max-content,1fr)_3.5rem_auto]'
+            ? 'grid grid-cols-[max-content_minmax(0,1fr)] items-baseline gap-x-1.5 gap-y-0.5'
+            : 'flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 xl:grid xl:grid-cols-[minmax(max-content,1fr)_3.5rem]'
         }
       >
         <span
           data-testid="overview-pair-value"
           data-hardware={member.hardware}
-          title={estimateExplanation}
           className="whitespace-nowrap font-semibold tabular-nums"
         >
-          {estimateExplanation === undefined ? (
-            formattedValue
+          {evidenceAria === null || config === null ? (
+            <span title={estimateExplanation}>
+              {estimateExplanation === undefined ? null : (
+                <span className="sr-only">
+                  {strings.estimatedAria(formattedValue, estimateExplanation)}
+                </span>
+              )}
+              {costText}
+            </span>
           ) : (
-            <>
-              <span className="sr-only">
-                {strings.estimatedAria(formattedValue, estimateExplanation)}
-              </span>
-              <span data-testid="overview-estimate-visible" aria-hidden="true">
-                {'≈'}
-                {formattedValue}
-              </span>
-            </>
+            /* The cost itself is the evidence entry point into the filtered
+               dashboard for exactly this configuration. */
+            <a
+              data-testid="overview-cost-evidence-link"
+              href={buildOverviewDashboardHref(locale, model, config)}
+              title={
+                estimateExplanation === undefined
+                  ? evidenceAria
+                  : `${estimateExplanation} ${evidenceAria}`
+              }
+              aria-label={
+                estimateExplanation === undefined
+                  ? `${formattedValue}. ${evidenceAria}`
+                  : `${strings.estimatedAria(formattedValue, estimateExplanation)} ${evidenceAria}`
+              }
+              className={RAW_SOURCE_LINK_CLASS}
+            >
+              {costText}
+            </a>
           )}
         </span>
-        {member.costVsB200Pct === null ? null : (
+        {member.hardware === 'b200' ? null : (
           <CostDeltaBadge
             pct={member.costVsB200Pct}
             hardware={member.hardware}
@@ -340,28 +382,6 @@ function CellValue({
             strings={strings}
             phoneRow={phoneRow}
           />
-        )}
-        {evidenceDate === null ? null : (
-          <span
-            data-testid="overview-pair-evidence-date"
-            data-hardware={member.hardware}
-            className={`whitespace-nowrap text-[11px] text-muted-foreground/80 tabular-nums ${
-              phoneRow ? 'col-start-3 justify-self-end' : 'xl:col-start-3 xl:justify-self-end'
-            }`}
-          >
-            {config === null || stack === null ? (
-              evidenceDateLabel
-            ) : (
-              <a
-                href={buildOverviewDashboardHref(locale, model, config)}
-                title={strings.rawDashboardAria(evidenceDateLabel, model.modelLabel, stack)}
-                aria-label={strings.rawDashboardAria(evidenceDateLabel, model.modelLabel, stack)}
-                className={RAW_SOURCE_LINK_CLASS}
-              >
-                {evidenceDateLabel}
-              </a>
-            )}
-          </span>
         )}
       </div>
       {member.precision === null ? null : (
@@ -651,11 +671,11 @@ export function OverviewEngineScopeSwitcher({
 export function OverviewMethodology({ strings }: { strings: OverviewStrings }) {
   return (
     <div className="space-y-1 border-t border-border/50 px-4 py-3 text-xs leading-snug text-muted-foreground lg:px-6">
-      <p>{strings.methodologyNote}</p>
       <p>{strings.costNote}</p>
+      <p>{strings.cellStateLegend}</p>
+      <p>{strings.methodologyNote}</p>
       <p>{strings.comparabilityNote}</p>
       <p>{strings.normalizationNote}</p>
-      <p>{strings.infinityLegend}</p>
       <p>{strings.interpolationNote}</p>
     </div>
   );
