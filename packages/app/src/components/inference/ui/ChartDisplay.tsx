@@ -14,7 +14,7 @@ import type {
   OverlayData,
   TrendDataPoint,
 } from '@/components/inference/types';
-import { processOverlayChartData } from '@/components/inference/utils';
+import { processOverlayChartDataWithClipping } from '@/components/inference/utils';
 import {
   isRunComparisonEntry,
   makeRunComparisonEntry,
@@ -310,7 +310,7 @@ export default function ChartDisplay() {
 
       const effectiveXMetric = chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
       const isAgentic = sequenceKind(selectedSequence) === 'agentic';
-      const processed = processOverlayChartData(
+      const processed = processOverlayChartDataWithClipping(
         rawData.data,
         chartType,
         selectedYAxisMetric,
@@ -324,22 +324,30 @@ export default function ChartDisplay() {
         },
       );
 
-      let overlayPoints = processed;
+      let overlayPoints = processed.data;
+      let clippedOverlayPoints = processed.clippedData;
       if (compareGpuPair?.length === 2) {
-        overlayPoints = processed.filter((p) =>
+        overlayPoints = overlayPoints.filter((p) =>
           hardwareKeyMatchesAnyBase(String(p.hwKey), compareGpuPair),
+        );
+        clippedOverlayPoints = clippedOverlayPoints.filter(({ point }) =>
+          hardwareKeyMatchesAnyBase(String(point.hwKey), compareGpuPair),
         );
       }
 
-      if (overlayPoints.length === 0) return null;
+      if (overlayPoints.length === 0 && clippedOverlayPoints.length === 0) return null;
 
-      const keySet = new Set(overlayPoints.map((p) => String(p.hwKey)));
+      const keySet = new Set([
+        ...overlayPoints.map((p) => String(p.hwKey)),
+        ...clippedOverlayPoints.map(({ point }) => String(point.hwKey)),
+      ]);
       const hardwareConfigFiltered = Object.fromEntries(
         Object.entries(rawData.hardwareConfig).filter(([k]) => keySet.has(k)),
       ) as HardwareConfig;
 
       return {
         data: overlayPoints,
+        clippedData: clippedOverlayPoints,
         hardwareConfig: hardwareConfigFiltered,
         label: unofficialRunInfo.branch,
         runUrl: unofficialRunInfo.url,
@@ -547,6 +555,7 @@ export default function ChartDisplay() {
       sequence: selectedSequence,
       chartDefinition,
       data: [] as InferenceData[],
+      clippedData: [],
     }));
   }, [graphs, overlayDataByChartType, selectedModel, selectedSequence]);
 
@@ -745,6 +754,7 @@ export default function ChartDisplay() {
                           chartId={`chart-${graphIndex}`}
                           modelLabel={graph.model}
                           data={graph.data}
+                          clippedData={graph.clippedData}
                           xLabel={graph.chartDefinition.x_label}
                           yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                           chartDefinition={graph.chartDefinition}
