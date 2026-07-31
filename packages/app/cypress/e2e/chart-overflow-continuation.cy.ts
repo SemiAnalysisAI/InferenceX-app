@@ -56,11 +56,13 @@ const row = (
   run_url: runUrl,
 });
 
-// C=1 exceeds $5/M, C=1024 exceeds 60s TTFT, and C=512 is the
-// sole in-bounds point. The complete lower-left cost frontier crosses the
+// C=1 and C=2 exceed $5/M, C=1024 exceeds 60s TTFT, while C=256
+// and C=512 stay in bounds. The complete lower-left cost frontier crosses the
 // visible region on both sides, so the chart should draw two continuations.
 const rows = (runUrl: string | null) => [
   row(910001, 1, 162.6, 0.35, 80, runUrl),
+  row(910004, 2, 140, 0.6, 85, runUrl),
+  row(910005, 256, 70, 30, 2708, runUrl),
   row(910002, 512, 55.7, 36.28, 3887, runUrl),
   row(910003, 1024, 41.45, 69.65, 4486, runUrl),
 ];
@@ -120,7 +122,7 @@ const visitOverflowChart = (withOverlay: boolean) => {
 };
 
 describe('Chart overflow continuations', () => {
-  it('keeps the original domain and draws compact labeled arrows toward clipped points', () => {
+  it('keeps the original domain and interpolates labeled paths toward clipped points', () => {
     visitOverflowChart(false);
 
     cy.get('.x-axis .tick text').then(($ticks) => {
@@ -133,27 +135,127 @@ describe('Chart overflow continuations', () => {
       .each(($continuation) => {
         cy.wrap($continuation)
           .find('.overflow-continuation-line')
-          .then(($line) => {
-            expect($line).to.have.attr('stroke-dasharray');
-            const x1 = Number($line.attr('x1'));
-            const y1 = Number($line.attr('y1'));
-            const x2 = Number($line.attr('x2'));
-            const y2 = Number($line.attr('y2'));
-            expect(Math.hypot(x2 - x1, y2 - y1)).to.be.at.most(96.01);
+          .should(($path) => {
+            expect($path).to.have.attr('clip-path');
+            expect($path).to.have.attr('fill', 'none');
+            expect($path).to.have.attr('stroke-dasharray');
+            expect(($path[0] as unknown as SVGPathElement).getTotalLength()).to.be.greaterThan(0);
+            if ($continuation.attr('data-clip-reasons') === 'cost') {
+              expect($path.attr('d')).to.include('C');
+            }
           });
-        cy.wrap($continuation).find('.overflow-continuation-arrow').should('exist');
+        cy.wrap($continuation)
+          .find('.overflow-continuation-arrow')
+          .then(($arrow) => {
+            const transform = $arrow.attr('transform') ?? '';
+            const arrowY = Number(/translate\([^,]+,(?<y>[^)]+)\)/u.exec(transform)?.groups?.y);
+            cy.wrap($continuation)
+              .find('[data-testid="overflow-continuation-label"]')
+              .should(($label) => {
+                expect(Number($label.attr('y'))).to.be.greaterThan(arrowY);
+              });
+          });
         cy.wrap($continuation)
           .find('[data-testid="overflow-continuation-label"]')
           .should('be.visible');
+      });
+
+    cy.get('[data-testid="official-overflow-continuation"]')
+      .first()
+      .then(($continuation) => {
+        const svg = ($continuation[0] as unknown as SVGGElement).ownerSVGElement!;
+        const overflowLayer = svg.querySelector('.overflow-continuations-layer')!;
+        const rooflinesLayer = svg.querySelector('.rooflines-layer')!;
+        expect(
+          overflowLayer.compareDocumentPosition(rooflinesLayer) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).to.be.greaterThan(0);
       });
 
     cy.get('[data-testid="overflow-continuation-label"]')
       .should('have.length', 2)
       .then(($labels) => {
         const labels = [...$labels].map((label) => label.textContent);
-        expect(labels).to.have.members(['1 point > $5/M', '1 point > 60s TTFT']);
+        expect(labels).to.have.members(['2 points > $5/M', '1 point > 60s TTFT']);
       });
+
+    cy.document().then((document) => {
+      const background = getComputedStyle(document.documentElement)
+        .getPropertyValue('--background')
+        .trim();
+      cy.get('[data-testid="overflow-continuation-label"]')
+        .first()
+        .should('have.attr', 'stroke', background);
+    });
+    cy.get('button[aria-label^="Switch theme"]').click();
+    cy.document().then((document) => {
+      const background = getComputedStyle(document.documentElement)
+        .getPropertyValue('--background')
+        .trim();
+      cy.get('[data-testid="overflow-continuation-label"]')
+        .first()
+        .should('have.attr', 'stroke', background);
+    });
     cy.get('[data-testid="chart-overflow-notice"]').should('not.exist');
+  });
+  it('keeps spline paths rendered through panning and zooming', () => {
+    visitOverflowChart(false);
+
+    cy.get('[data-testid="scatter-graph"] svg').then(($svg) => {
+      const svg = $svg[0];
+      const bounds = svg.getBoundingClientRect();
+      const startX = bounds.x + bounds.width / 2;
+      const startY = bounds.y + bounds.height / 2;
+      svg.dispatchEvent(
+        new MouseEvent('mousedown', {
+          clientX: startX,
+          clientY: startY,
+          button: 0,
+          bubbles: true,
+          cancelable: true,
+          view: window,
+        }),
+      );
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: startX + 300,
+          clientY: startY,
+          buttons: 1,
+          bubbles: true,
+          cancelable: true,
+          view: window,
+        }),
+      );
+      window.dispatchEvent(
+        new MouseEvent('mouseup', {
+          clientX: startX + 300,
+          clientY: startY,
+          button: 0,
+          bubbles: true,
+          cancelable: true,
+          view: window,
+        }),
+      );
+      for (let index = 0; index < 3; index++) {
+        svg.dispatchEvent(
+          new WheelEvent('wheel', {
+            deltaY: -240,
+            clientX: startX,
+            clientY: startY,
+            shiftKey: true,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      }
+    });
+
+    cy.get('[data-testid="official-overflow-continuation"]').each(($continuation) => {
+      expect($continuation.attr('display')).not.to.eq('none');
+      cy.wrap($continuation)
+        .find('.overflow-continuation-line')
+        .should('have.attr', 'd')
+        .and('not.be.empty');
+    });
   });
 
   it('draws overlay continuations and removes them when that run is dismissed', () => {

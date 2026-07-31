@@ -89,10 +89,7 @@ import {
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { changelogConfigToHwKey } from '@/components/inference/utils/changelogFormatters';
-import {
-  buildFrontierContinuations,
-  projectContinuationToBounds,
-} from '@/components/inference/utils/overflowContinuations';
+import { buildFrontierContinuations } from '@/components/inference/utils/overflowContinuations';
 
 // Greedy label-collision avoidance.
 // Each candidate is the y-position of the FIRST baseline (relative to point
@@ -270,8 +267,60 @@ interface OverflowContinuationEntry {
   runIndex?: number;
   from: InferenceData;
   toward: InferenceData;
+  points: InferenceData[];
   reasons: ClippedInferenceData['reasons'];
   hiddenPointCount: number;
+}
+
+interface CurvedContinuationGeometry {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  angle: number;
+}
+
+/** Find the last visible point and tangent on an interpolated SVG path. */
+function visibleContinuationEndpoint(
+  path: SVGPathElement,
+  width: number,
+  height: number,
+  inset = 7,
+): CurvedContinuationGeometry | null {
+  const totalLength = path.getTotalLength();
+  const start = path.getPointAtLength(0);
+  if (
+    !Number.isFinite(totalLength) ||
+    totalLength === 0 ||
+    start.x < 0 ||
+    start.x > width ||
+    start.y < 0 ||
+    start.y > height
+  ) {
+    return null;
+  }
+
+  let endpointLength = totalLength;
+  let length = Math.min(2, totalLength);
+  while (length > 0) {
+    const point = path.getPointAtLength(length);
+    if (point.x < 0 || point.x > width || point.y < 0 || point.y > height) {
+      endpointLength = Math.max(0, length - inset);
+      break;
+    }
+    if (length === totalLength) break;
+    length = Math.min(length + 2, totalLength);
+  }
+
+  const end = path.getPointAtLength(endpointLength);
+  const tangentStart = path.getPointAtLength(Math.max(0, endpointLength - 2));
+  return {
+    x1: start.x,
+    y1: start.y,
+    x2: end.x,
+    y2: end.y,
+    angle: (Math.atan2(end.y - tangentStart.y, end.x - tangentStart.x) * 180) / Math.PI,
+  };
 }
 
 // Scale configs are recomputed from the visible points on every render, but a
@@ -2576,7 +2625,7 @@ const ScatterGraph = React.memo(
         },
       };
 
-      // ── Intentional clipping: short dashed Pareto continuation + arrow ──
+      // ── Intentional clipping: interpolated dashed Pareto continuation + arrow ──
       const drawOverflowContinuations = (
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
         ctx: RenderContext,
@@ -2584,18 +2633,7 @@ const ScatterGraph = React.memo(
         yScale: ContinuousScale,
       ) => {
         const ir = interactionRef.current;
-        const entries = [...officialOverflowContinuations, ...overlayOverflowContinuations]
-          .map((entry) => {
-            const geometry = projectContinuationToBounds(
-              entry,
-              xScale,
-              yScale,
-              ctx.width,
-              ctx.height,
-            );
-            return geometry ? { ...entry, geometry } : null;
-          })
-          .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+        const entries = [...officialOverflowContinuations, ...overlayOverflowContinuations];
 
         const layer = zoomGroup
           .selectAll<SVGGElement, unknown>('.overflow-continuations-layer')
@@ -2603,13 +2641,23 @@ const ScatterGraph = React.memo(
           .join('g')
           .attr('class', 'overflow-continuations-layer')
           .attr('pointer-events', 'none');
+        const rooflinesLayer = zoomGroup.select<SVGGElement>('.rooflines-layer').node();
+        const layerNode = layer.node();
+        if (rooflinesLayer && layerNode && layerNode.nextSibling !== rooflinesLayer) {
+          layerNode.parentNode?.insertBefore(layerNode, rooflinesLayer);
+        }
 
         const groups = layer
           .selectAll<SVGGElement, (typeof entries)[number]>('.overflow-continuation')
           .data(entries, (entry) => entry.key)
           .join((enter) => {
             const group = enter.append('g');
-            group.append('line').attr('class', 'overflow-continuation-line');
+            group
+              .append('clipPath')
+              .attr('class', 'overflow-continuation-clip')
+              .attr('clipPathUnits', 'userSpaceOnUse')
+              .append('rect');
+            group.append('path').attr('class', 'overflow-continuation-line');
             group
               .append('path')
               .attr('class', 'overflow-continuation-arrow')
@@ -2632,40 +2680,68 @@ const ScatterGraph = React.memo(
               : 0,
           );
 
-        groups.each(function (entry) {
+        groups.each(function (entry, index) {
           const color =
             entry.source === 'overlay'
               ? overlayRunColor(entry.runIndex ?? 0)
               : ir.getCssColor(ir.resolveColor(entry.hw));
-          const { geometry } = entry;
           const group = d3.select(this);
+          const pointsRight = entry.toward.x >= entry.from.x;
+          const anchorX = xScale(entry.from.x);
+          const clipId = `${chartId}-overflow-continuation-${entry.source}-${index}`;
+          group
+            .select<SVGClipPathElement>('.overflow-continuation-clip')
+            .attr('id', clipId)
+            .select('rect')
+            .attr('x', pointsRight ? anchorX : 0)
+            .attr('y', 0)
+            .attr('width', pointsRight ? Math.max(0, ctx.width - anchorX) : Math.max(0, anchorX))
+            .attr('height', ctx.height);
+          const lineGenerator = d3
+            .line<InferenceData>()
+            .x((point) => xScale(point.x))
+            .y((point) => yScale(point.y))
+            .curve(d3.curveMonotoneX);
+          const continuationPath = group
+            .select<SVGPathElement>('.overflow-continuation-line')
+            .attr('d', lineGenerator(entry.points) ?? '')
+            .attr('clip-path', `url(#${clipId})`)
+            .attr('fill', 'none')
+            .attr('stroke', color)
+            .attr('stroke-width', 2.25)
+            .attr('stroke-dasharray', '6 5')
+            .attr('stroke-linecap', 'round');
+          const pathNode = continuationPath.node();
+          const geometry = pathNode
+            ? visibleContinuationEndpoint(pathNode, ctx.width, ctx.height)
+            : null;
+          group.attr('display', null);
+          if (!geometry) {
+            group
+              .selectAll<SVGElement, unknown>(
+                '.overflow-continuation-arrow, .overflow-continuation-label',
+              )
+              .attr('display', 'none');
+            return;
+          }
           const label =
             entry.reasons.includes('cost') && entry.reasons.includes('latency')
               ? legendT.overflowMixed(entry.hiddenPointCount)
               : entry.reasons.includes('cost')
                 ? legendT.overflowCost(entry.hiddenPointCount, costLimit)
                 : legendT.overflowLatency(entry.hiddenPointCount, latencyLimit);
-          const pointsRight = geometry.x2 >= geometry.x1;
-          group
-            .select<SVGLineElement>('.overflow-continuation-line')
-            .attr('x1', geometry.x1)
-            .attr('y1', geometry.y1)
-            .attr('x2', geometry.x2)
-            .attr('y2', geometry.y2)
-            .attr('stroke', color)
-            .attr('stroke-width', 2.25)
-            .attr('stroke-dasharray', '6 5')
-            .attr('stroke-linecap', 'round');
           group
             .select<SVGPathElement>('.overflow-continuation-arrow')
+            .attr('display', null)
             .attr('transform', `translate(${geometry.x2},${geometry.y2}) rotate(${geometry.angle})`)
             .attr('fill', color);
           group
             .attr('aria-label', label)
             .select<SVGTextElement>('.overflow-continuation-label')
+            .attr('display', null)
             .attr('data-testid', 'overflow-continuation-label')
             .attr('x', geometry.x2 + (pointsRight ? -12 : 12))
-            .attr('y', Math.max(12, Math.min(ctx.height - 4, geometry.y2 - 9)))
+            .attr('y', Math.max(12, Math.min(ctx.height - 4, geometry.y2 + 18)))
             .attr('text-anchor', pointsRight ? 'end' : 'start')
             .attr('fill', color)
             .attr('stroke', ir.getCssColor('--background'))
@@ -2979,6 +3055,9 @@ const ScatterGraph = React.memo(
             .attr('stroke', color);
           d3.select(this).select('.overflow-continuation-arrow').attr('fill', color);
         });
+      zoomGroup
+        .selectAll<SVGTextElement, unknown>('.overflow-continuation-label')
+        .attr('stroke', ir.getCssColor('--background'));
 
       // Parallelism / line labels: visibility via data attributes (mirrors
       // handleLegendHoverEnd). Placement-level updates happen below.
