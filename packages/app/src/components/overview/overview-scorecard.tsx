@@ -37,7 +37,7 @@ export const OVERVIEW_STRINGS = {
     modelHeader: 'Model · Scenario',
     scenarioLabels: {
       single_turn_8k1k: 'Single-turn · 8K→1K',
-      agentx: 'AgentX',
+      agentx: 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)',
     },
     detailsHeader: 'Details',
     detailLink: 'View details',
@@ -56,22 +56,14 @@ export const OVERVIEW_STRINGS = {
       cannot_reach_at_tier: `cannot reach @${tier}`,
       no_exact_at_tier: `no exact @${tier} result`,
     }),
-    speculativeDecodeLabel: (method: string) => `Spec decode (${method})`,
-    standardDecodeLabel: 'Standard decode',
-    methodologyNote: 'Priority: speculative FP4 → speculative FP8 → standard FP4 → standard FP8.',
-    costNote:
-      'Cost = hyperscaler $/GPU/hr ÷ total tok/s per deployed GPU. Percentages compare against B200.',
+    standardDecodeLabel: 'STP',
+    methodologyNote:
+      'If a chip does not have FP4 spec decoding available, the next best available configuration is used.',
     costDeltaAria: (pct: string, cheaper: boolean) =>
       `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than B200`,
     costDeltaEvenAria: 'About the same cost as B200',
     noBaselineAria: 'No B200 baseline to compare against',
     referenceHeader: 'Reference',
-    normalizationNote:
-      'Disaggregated results include both prefill and decode GPUs in the denominator.',
-    interpolationNote:
-      'Tier values use the best observed platform serving envelope and may be estimated between validated runs. No extrapolation.',
-    comparabilityNote:
-      'Each row compares platforms within the scenario shown with that model; dates, engines, precisions and speculative methods may differ.',
   },
   zh: {
     title: '推理成本总览',
@@ -90,7 +82,7 @@ export const OVERVIEW_STRINGS = {
     modelHeader: '模型 · 场景',
     scenarioLabels: {
       single_turn_8k1k: '单轮 · 8K→1K',
-      agentx: 'AgentX',
+      agentx: '长上下文多轮真实智能体场景（AgentX）',
     },
     detailsHeader: '详情',
     detailLink: '查看详情',
@@ -109,19 +101,12 @@ export const OVERVIEW_STRINGS = {
       cannot_reach_at_tier: `无法达到 @${tier}`,
       no_exact_at_tier: `无精确 @${tier} 结果`,
     }),
-    speculativeDecodeLabel: (method: string) => `推测解码（${method}）`,
-    standardDecodeLabel: '标准解码',
-    methodologyNote: '优先顺序：推测解码 FP4 → 推测解码 FP8 → 标准解码 FP4 → 标准解码 FP8。',
-    costNote:
-      '成本 = 超大规模云（hyperscaler）$/GPU/小时 ÷ 每张已部署 GPU 的总 tok/s。百分比均相对 B200。',
+    standardDecodeLabel: 'STP',
+    methodologyNote: '若某款芯片不支持 FP4 推测解码，则采用次优的可用配置。',
     costDeltaAria: (pct: string, cheaper: boolean) => `比 B200 ${cheaper ? '便宜' : '昂贵'} ${pct}`,
     costDeltaEvenAria: '与 B200 成本基本持平',
     noBaselineAria: '缺少可比较的 B200 基线',
     referenceHeader: '基准',
-    normalizationNote: '分离式结果的分母同时计入预填充与解码 GPU。',
-    interpolationNote:
-      '各档位数值采用最佳观测平台服务包络线，可能根据已验证运行结果估算。不会外推。',
-    comparabilityNote: '每行均在该模型标注的场景内比较各平台；日期、引擎、精度与推测方法可能不同。',
   },
 } as const;
 
@@ -293,18 +278,22 @@ function CellValue({
       : config.specMethod === 'none' || config.specMethod === ''
         ? strings.standardDecodeLabel
         : config.specLabel;
+  // Speculative decode is the expected case, so a cell only calls out the
+  // exception: a standard-decode read, badged STP.
   const decodeLabel =
-    config === null || evidenceSpecLabel === null
-      ? null
-      : config.specMethod === 'none' || config.specMethod === ''
-        ? evidenceSpecLabel
-        : strings.speculativeDecodeLabel(evidenceSpecLabel);
+    config !== null && (config.specMethod === 'none' || config.specMethod === '')
+      ? strings.standardDecodeLabel
+      : null;
   const stackPrefix =
     config === null || precisionLabel === null
       ? null
       : [config.frameworkLabel, precisionLabel].join(' · ');
   const stackBadge =
-    stackPrefix === null || decodeLabel === null ? null : [stackPrefix, decodeLabel].join(' · ');
+    stackPrefix === null
+      ? null
+      : decodeLabel === null
+        ? stackPrefix
+        : [stackPrefix, decodeLabel].join(' · ');
   const stack =
     config === null || evidenceSpecLabel === null
       ? null
@@ -482,9 +471,10 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
         <tbody>
           {models.map((model) => (
             <tr
-              key={model.model}
+              key={`${model.model}-${model.scenario}`}
               data-testid="overview-desktop-model"
               data-model={model.model}
+              data-scenario={model.scenario}
               className="border-b border-border/50 align-top last:border-b-0"
             >
               <th scope="row" className="px-4 py-4 text-left align-top font-normal lg:px-6">
@@ -525,10 +515,11 @@ export function MobileOverviewList({ models, locale, formatters, strings }: Surf
   return (
     <ul data-testid="overview-mobile-list" className="divide-y divide-border/50 xl:hidden">
       {models.map((model) => (
-        <li key={model.model}>
+        <li key={`${model.model}-${model.scenario}`}>
           <article
             data-testid="overview-mobile-model"
             data-model={model.model}
+            data-scenario={model.scenario}
             className="space-y-2 px-4 py-3.5"
           >
             <ModelName model={model} strings={strings} />
@@ -670,13 +661,12 @@ export function OverviewEngineScopeSwitcher({
 
 export function OverviewMethodology({ strings }: { strings: OverviewStrings }) {
   return (
-    <div className="space-y-1 border-t border-border/50 px-4 py-3 text-xs leading-snug text-muted-foreground lg:px-6">
-      <p>{strings.costNote}</p>
+    <div
+      data-testid="overview-methodology"
+      className="space-y-1 border-t border-border/50 px-4 py-3 text-xs leading-snug text-muted-foreground lg:px-6"
+    >
       <p>{strings.cellStateLegend}</p>
       <p>{strings.methodologyNote}</p>
-      <p>{strings.comparabilityNote}</p>
-      <p>{strings.normalizationNote}</p>
-      <p>{strings.interpolationNote}</p>
     </div>
   );
 }

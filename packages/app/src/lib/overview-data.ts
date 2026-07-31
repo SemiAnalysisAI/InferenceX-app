@@ -16,11 +16,13 @@ import {
 } from './tco-feed';
 
 export const OVERVIEW_WORKLOAD = { isl: 8192, osl: 1024 } as const;
-export const OVERVIEW_TIERS = [30, 50, 75, 100] as const;
+export const OVERVIEW_TIERS = [30, 50, 75, 100, 150, 200] as const;
 export type OverviewTier = (typeof OVERVIEW_TIERS)[number];
 export const OVERVIEW_PRIMARY_TIER = 50;
 export type OverviewEngineScope = 'all' | 'community';
 export type OverviewScenario = 'single_turn_8k1k' | 'agentx';
+/** Row order within a model: the single-turn workload first, AgentX below it. */
+export const OVERVIEW_SCENARIOS = ['single_turn_8k1k', 'agentx'] as const;
 
 export function resolveOverviewEngineScope(
   raw: string | string[] | undefined,
@@ -151,6 +153,19 @@ export function overviewScenarioForModel(
   }
   if (rows.some((row) => row.benchmark_type === 'agentic_traces')) return 'agentx';
   return model === Model.Kimi_K3 || model === Model.GLM_5_2 ? 'agentx' : 'single_turn_8k1k';
+}
+
+/** Every scenario this model has rows for, so a model benchmarked on both the
+ *  single-turn workload and AgentX gets a matrix row for each. Falls back to
+ *  the model's default scenario so a rowless model still renders one row. */
+export function overviewScenariosForModel(
+  model: Model,
+  rows: readonly BenchmarkRow[] = [],
+): OverviewScenario[] {
+  const withRows = OVERVIEW_SCENARIOS.filter(
+    (scenario) => overviewScenarioRows(scenario, rows).length > 0,
+  );
+  return withRows.length > 0 ? withRows : [overviewScenarioForModel(model, rows)];
 }
 
 function overviewEngineRows(
@@ -512,9 +527,9 @@ export function buildOverviewModelSummary(
   rows: BenchmarkRow[],
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
+  scenario: OverviewScenario = overviewScenarioForModel(model, rows),
 ): OverviewModelSummary {
   const scopedRows = overviewEngineRows(rows, engineScope);
-  const scenario = overviewScenarioForModel(model, rows);
   const scenarioRows = overviewScenarioRows(scenario, scopedRows);
   return {
     model,
@@ -524,8 +539,11 @@ export function buildOverviewModelSummary(
   };
 }
 
-/** DEFAULT_MODELS fixes the row order; a rowless model still renders all
- *  platforms with missing reasons. Live and fixture paths both feed this. */
+/** DEFAULT_MODELS fixes the row order, and a model benchmarked on both
+ *  scenarios contributes one row per scenario; a rowless model still renders
+ *  all platforms with missing reasons. Live and fixture paths both feed this.
+ *  Scenario presence reads the unscoped rows so switching the engine scope
+ *  changes cell contents, never the shape of the matrix. */
 export function assembleOverviewPageData(
   rowsByModel: Record<string, BenchmarkRow[]>,
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
@@ -533,8 +551,10 @@ export function assembleOverviewPageData(
 ): OverviewPageData {
   const perModel = [...DEFAULT_MODELS].map((model) => ({ model, rows: rowsByModel[model] ?? [] }));
   return {
-    models: perModel.map(({ model, rows }) =>
-      buildOverviewModelSummary(model, rows, tier, engineScope),
+    models: perModel.flatMap(({ model, rows }) =>
+      overviewScenariosForModel(model, rows).map((scenario) =>
+        buildOverviewModelSummary(model, rows, tier, engineScope, scenario),
+      ),
     ),
     tier,
     engineScope,

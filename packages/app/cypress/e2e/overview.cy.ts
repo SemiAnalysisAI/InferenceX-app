@@ -19,6 +19,11 @@ const PLATFORM_HEADERS = [
   'Details',
 ];
 
+const SINGLE_TURN = 'single_turn_8k1k';
+const AGENTX = 'agentx';
+const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
+const AGENTX_LABEL_ZH = '长上下文多轮真实智能体场景（AgentX）';
+
 const SCOPE_METRIC = 'Hyperscaler cost · $/1M total tokens';
 const SCOPE_DIRECTION = '↓ Lower is better';
 const SCOPE_LINE = `${SCOPE_METRIC} ${SCOPE_DIRECTION}`;
@@ -66,12 +71,16 @@ function expectNoVisibleDatesOrSnapshot() {
     });
 }
 
-function desktopModel(model: string) {
-  return cy.get(`[data-testid="overview-desktop-model"][data-model="${model}"]`);
+/** A model benchmarked on both scenarios has one row per scenario, so every
+ *  such model must be addressed by (model, scenario) — not by model alone. */
+function desktopModel(model: string, scenario?: string) {
+  const row = scenario === undefined ? '' : `[data-scenario="${scenario}"]`;
+  return cy.get(`[data-testid="overview-desktop-model"][data-model="${model}"]${row}`);
 }
 
-function mobileModel(model: string) {
-  return cy.get(`[data-testid="overview-mobile-model"][data-model="${model}"]`);
+function mobileModel(model: string, scenario?: string) {
+  const row = scenario === undefined ? '' : `[data-scenario="${scenario}"]`;
+  return cy.get(`[data-testid="overview-mobile-model"][data-model="${model}"]${row}`);
 }
 
 function platform(hardware: string) {
@@ -119,7 +128,7 @@ describe('Overview page', () => {
     });
 
     desktopModel('GLM-5.2').within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', 'AgentX');
+      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL);
       cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
     });
     cy.get(
@@ -172,13 +181,18 @@ describe('Overview page', () => {
         .children('[aria-hidden="true"]')
         .should('have.length', 2)
         .and('have.text', '——');
-      platform('b200').should('contain.text', 'Standard decode');
-      platform('mi355x').should('contain.text', 'Standard decode');
-      platform('b300').should('contain.text', 'Standard decode');
+      // Standard decode is the exception, so those cells badge STP.
+      platform('b200').should('contain.text', 'SGLang · FP4 · STP');
+      platform('mi355x').should('contain.text', 'SGLang · FP4 · STP');
+      platform('b300').should('contain.text', 'SGLang · FP8 · STP');
     });
 
-    desktopModel('DeepSeek-V4-Pro').within(() => {
-      cy.contains('Spec decode (MTP)').should('exist');
+    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
+      // Speculative decode is the expected case and goes unlabelled; the stack
+      // badge stops at framework and precision.
+      cy.contains('SGLang · FP4').should('exist');
+      cy.get('[data-testid="overview-platform"]').should('not.contain.text', 'STP');
+      cy.root().should('not.contain.text', 'Spec decode');
       platform('b200').within(() => {
         // The estimated cost is itself the evidence link; the run date lives in
         // its hover/focus/screen-reader label, never as visible text.
@@ -213,10 +227,13 @@ describe('Overview page', () => {
       });
     });
     desktopModel('MiniMax-M3').within(() => {
-      platform('gb300').should('contain.text', 'Spec decode (M3 EAGLE)');
+      platform('gb300')
+        .should('contain.text', 'SGLang · FP8')
+        .and('not.contain.text', 'M3 EAGLE')
+        .and('not.contain.text', 'STP');
     });
     cy.contains(
-      'Priority: speculative FP4 → speculative FP8 → standard FP4 → standard FP8.',
+      'If a chip does not have FP4 spec decoding available, the next best available configuration is used.',
     ).should('exist');
     cy.get('body').should('not.contain.text', 'P90');
   });
@@ -236,7 +253,7 @@ describe('Overview page', () => {
         });
     });
 
-    desktopModel('DeepSeek-V4-Pro').within(() => {
+    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
       platform('gb200')
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '+80%')
@@ -297,16 +314,17 @@ describe('Overview page', () => {
       .should('have.text', SCOPE_LINE)
       .and('not.contain.text', 'tok/s/user')
       .and('not.contain.text', '8K→1K');
-    cy.contains(
-      'Cost = hyperscaler $/GPU/hr ÷ total tok/s per deployed GPU. Percentages compare against B200.',
-    ).should('exist');
     cy.contains('— = no result. ∞ = B200 baseline unavailable.').should('exist');
-    cy.contains(
-      'Disaggregated results include both prefill and decode GPUs in the denominator.',
-    ).should('exist');
-    cy.contains(
-      'Tier values use the best observed platform serving envelope and may be estimated between validated runs. No extrapolation.',
-    ).should('exist');
+    // The methodology block is now just the cell-state legend and the
+    // configuration-fallback note; the cost-formula, comparability, and
+    // interpolation notes were removed.
+    cy.get('[data-testid="overview-methodology"]').children('p').should('have.length', 2);
+    cy.get('body')
+      .invoke('text')
+      .should('not.match', /Cost = hyperscaler/)
+      .and('not.match', /Each row compares platforms/)
+      .and('not.match', /prefill and decode GPUs in the denominator/)
+      .and('not.match', /No extrapolation/);
     cy.get('body').should('not.contain.text', '≈');
     expectNoVisibleDatesOrSnapshot();
     cy.get('[data-testid="overview-pair-topology"]').should('not.exist');
@@ -324,8 +342,15 @@ describe('Overview page', () => {
             PLATFORM_HEADERS,
           );
         });
-        cy.get('[data-testid="overview-desktop-model"]').should('have.length', MODEL_LABELS.length);
-        cy.get('[data-testid="overview-platform"]').should('have.length', MODEL_LABELS.length * 5);
+        // One row per (model, scenario): every model plus DeepSeek's AgentX row.
+        cy.get('[data-testid="overview-desktop-model"]').should(
+          'have.length',
+          MODEL_LABELS.length + 1,
+        );
+        cy.get('[data-testid="overview-platform"]').should(
+          'have.length',
+          (MODEL_LABELS.length + 1) * 5,
+        );
         cy.get('[data-testid="overview-model-coverage-note"]').should('not.exist');
         cy.get('details, summary, button').should('not.exist');
         cy.contains(/PRIMARY|Ranked results/).should('not.exist');
@@ -336,13 +361,44 @@ describe('Overview page', () => {
     for (const model of ['Kimi-K3', 'GLM-5.2']) {
       desktopModel(model)
         .find('[data-testid="overview-model-scenario"]')
-        .should('have.text', 'AgentX');
+        .should('have.text', AGENTX_LABEL);
     }
     for (const model of ['DeepSeek-V4-Pro', 'Kimi-K2.5', 'MiniMax-M3', 'Qwen-3.5-397B-A17B']) {
-      desktopModel(model)
+      desktopModel(model, SINGLE_TURN)
         .find('[data-testid="overview-model-scenario"]')
         .should('have.text', 'Single-turn · 8K→1K');
     }
+  });
+
+  it('gives a model benchmarked on both scenarios one row each, priced independently', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+
+    cy.get('[data-testid="overview-desktop-model"][data-model="DeepSeek-V4-Pro"]').should(
+      'have.length',
+      2,
+    );
+    // Single-turn first, AgentX directly below it, both under the same label.
+    cy.get('[data-testid="overview-desktop-model"][data-model="DeepSeek-V4-Pro"]').then(($rows) => {
+      expect([...$rows].map((row) => row.dataset.scenario)).to.deep.equal([SINGLE_TURN, AGENTX]);
+    });
+
+    desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
+      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL);
+      cy.contains('DeepSeek V4 Pro 1.6T').should('exist');
+      // Priced from the AgentX rows alone — the single-turn sweep never leaks in.
+      cy.get(
+        '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
+      ).should('have.text', '$0.072');
+      cy.get(
+        '[data-testid="overview-pair-value"][data-hardware="mi355x"] [data-testid="overview-cost-evidence-link"]',
+      ).should('have.text', '$0.069');
+      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 3);
+      // Its detail link points at the agentic-traces workload, not 8K→1K.
+      cy.contains('a', 'View details')
+        .should('have.attr', 'href')
+        .and('include', 'i_seq=agentic-traces');
+    });
   });
 
   it('keeps the title and metric definition on one desktop row and stacks them below xl', () => {
@@ -435,7 +491,7 @@ describe('Overview page', () => {
       });
     });
 
-    desktopModel('DeepSeek-V4-Pro').within(() => {
+    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
       // A cell without a read at the tier carries no evidence link either.
       platform('gb300').within(() => {
         cy.get('[data-testid="overview-cost-evidence-link"]').should('not.exist');
@@ -448,7 +504,7 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    desktopModel('DeepSeek-V4-Pro').within(() => {
+    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
       platform('mi355x').within(() => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="mi355x"]')
           .should('contain.text', '—')
@@ -504,8 +560,11 @@ describe('Overview page', () => {
 
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.get('[aria-current="page"]').should('have.text', '50');
-      cy.get('a').should('have.length', 3);
+      // 30 / 75 / 100 / 150 / 200 link out; the active 50 is inert text.
+      cy.get('a').should('have.length', 5);
       cy.contains('a', '30').should('have.attr', 'href', '/overview?tier=30');
+      cy.contains('a', '150').should('have.attr', 'href', '/overview?tier=150');
+      cy.contains('a', '200').should('have.attr', 'href', '/overview?tier=200');
       cy.contains('a', '100').should('have.attr', 'href', '/overview?tier=100').click();
     });
 
@@ -533,7 +592,7 @@ describe('Overview page', () => {
     });
 
     cy.visit('/overview?tier=30');
-    desktopModel('DeepSeek-V4-Pro').within(() => {
+    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
       platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="b300"]')
           .should('contain.text', '—')
@@ -593,7 +652,7 @@ describe('Overview page', () => {
           ).should('have.text', '$0.061');
         });
       });
-      mobileModel('DeepSeek-V4-Pro').within(() => {
+      mobileModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
         cy.get(
           '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
         ).should('have.text', '$0.067');
@@ -615,7 +674,7 @@ describe('Overview page', () => {
       cy.viewport(width, 844);
       cy.visit('/overview');
 
-      mobileModel('DeepSeek-V4-Pro').within(() => {
+      mobileModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
         cy.get('[data-testid="overview-mobile-platform-row"]')
           .should('have.length', 5)
           .then(($rows) => {
@@ -644,7 +703,7 @@ describe('Overview page', () => {
       cy.viewport(width, 900);
       cy.visit('/overview');
 
-      mobileModel('DeepSeek-V4-Pro').within(() => {
+      mobileModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
         cy.get('[data-testid="overview-mobile-platform-row"]').then(($rows) => {
           const rows = [...$rows];
           expect(rows).to.have.length(5);
@@ -694,7 +753,7 @@ describe('Overview page', () => {
       platform('mi355x').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').then(([value]) => {
           cy.contains('div', 'SGLang · FP8')
-            .should('contain.text', 'Spec decode (MTP)')
+            .should('not.contain.text', 'STP')
             .then(([metadata]) => {
               const valueRect = textRect(value);
               const metadataRect = textRect(metadata);
@@ -755,17 +814,17 @@ describe('Overview page', () => {
       'exist',
     );
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);
-    cy.contains(
-      '成本 = 超大规模云（hyperscaler）$/GPU/小时 ÷ 每张已部署 GPU 的总 tok/s。百分比均相对 B200。',
-    ).should('exist');
     cy.contains('— = 无结果。∞ = 缺少 B200 基线。').should('exist');
-    cy.contains('分离式结果的分母同时计入预填充与解码 GPU。').should('exist');
-    cy.contains(
-      '各档位数值采用最佳观测平台服务包络线，可能根据已验证运行结果估算。不会外推。',
-    ).should('exist');
+    cy.get('[data-testid="overview-methodology"]').children('p').should('have.length', 2);
+    cy.get('body')
+      .invoke('text')
+      .should('not.match', /成本 = 超大规模云/)
+      .and('not.match', /每行均在该模型标注的场景内比较各平台/)
+      .and('not.match', /分离式结果的分母同时计入预填充与解码 GPU/)
+      .and('not.match', /不会外推/);
     cy.get('body').should('not.contain.text', '≈');
     expectNoVisibleDatesOrSnapshot();
-    desktopModel('DeepSeek-V4-Pro')
+    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN)
       .find(
         '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
       )
@@ -781,7 +840,7 @@ describe('Overview page', () => {
       .should('have.attr', 'href')
       .and('include', '/zh/inference?')
       .and('include', 'g_model=DeepSeek-V4-Pro');
-    desktopModel('DeepSeek-V4-Pro')
+    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN)
       .find('[data-testid="overview-pair-missing"][data-hardware="gb300"]')
       .should('contain.text', '—')
       .and('have.attr', 'title', '无精确 @50 结果');
@@ -794,11 +853,11 @@ describe('Overview page', () => {
     desktopModel('Kimi-K2.5').within(() => {
       cy.get('[data-testid="overview-pair-value"]').should('have.length', 3);
       cy.get('[data-testid="overview-pair-missing"]').should('have.length', 2);
-      platform('b200').should('contain.text', '标准解码');
+      platform('b200').should('contain.text', 'SGLang · FP4 · STP');
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
     });
-    desktopModel('DeepSeek-V4-Pro').within(() => {
-      platform('b200').should('contain.text', '推测解码（MTP）');
+    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
+      platform('b200').should('contain.text', 'SGLang · FP4').and('not.contain.text', 'STP');
     });
     desktopModel('MiniMax-M3').within(() => {
       platform('gb300')
@@ -808,15 +867,19 @@ describe('Overview page', () => {
         .and('have.attr', 'title', '缺少可比较的 B200 基线');
     });
     desktopModel('GLM-5.2').within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', 'AgentX');
+      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL_ZH);
       cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
       platform('b300')
         .find('[data-testid="overview-pair-missing"]')
         .should('have.attr', 'title', '该场景暂无数据');
     });
-    cy.contains('优先顺序：推测解码 FP4 → 推测解码 FP8 → 标准解码 FP4 → 标准解码 FP8。').should(
-      'exist',
-    );
+    desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
+      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL_ZH);
+      cy.get(
+        '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
+      ).should('have.text', '$0.072');
+    });
+    cy.contains('若某款芯片不支持 FP4 推测解码，则采用次优的可用配置。').should('exist');
 
     cy.visit('/zh/overview?tier=100');
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);
