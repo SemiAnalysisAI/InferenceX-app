@@ -89,12 +89,14 @@ describe('rowToAggDataEntry', () => {
     expect(entry.median_ttft).toBe(0.15);
     expect(entry.p99_e2el).toBe(3.1);
     expect(entry.median_intvty).toBe(12.5);
+    expect(entry.rawMetricKeys).toContain('median_ttft');
   });
 
   it('defaults missing metrics to 0', () => {
     const entry = rowToAggDataEntry(makeRow({ metrics: {} }));
     expect(entry.tput_per_gpu).toBe(0);
     expect(entry.median_ttft).toBe(0);
+    expect(entry.rawMetricKeys).toEqual([]);
   });
 
   it('maps disagg and GPU count fields', () => {

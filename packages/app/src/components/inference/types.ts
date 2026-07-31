@@ -80,6 +80,8 @@ export interface WorkerPower {
  * @property {number} p99_e2el - 99th percentile of End-to-End Latency.
  */
 export interface AggDataEntry {
+  /** Metric keys present in the source row before missing values are normalized to zero. */
+  rawMetricKeys?: string[];
   /** Stable per-point id from benchmark_results — for trace_replay lookups. */
   id?: number;
   hw: string;
