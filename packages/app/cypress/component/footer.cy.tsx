@@ -54,6 +54,18 @@ describe('Footer', () => {
       .and('include', 'github.com/SemiAnalysisAI/InferenceX-app');
   });
 
+  it('contains the destinations moved out of the primary navigation', () => {
+    cy.get('[data-testid="footer-link-supporters"]')
+      .should('contain.text', 'Supporters')
+      .and('have.attr', 'href', '/quotes');
+    cy.get('[data-testid="footer-link-datasets"]')
+      .should('contain.text', 'Datasets')
+      .and('have.attr', 'href', '/datasets');
+    cy.get('[data-testid="footer-link-articles"]')
+      .should('contain.text', 'Articles')
+      .and('have.attr', 'href', '/blog');
+  });
+
   it('all external links open in a new tab', () => {
     cy.get('[data-testid="footer-links"]')
       .find('a[target="_blank"]')

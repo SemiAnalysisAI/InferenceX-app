@@ -29,6 +29,15 @@ describe('Chinese (/zh) pages', () => {
 
     it('footer renders in Chinese with zh-internal links', () => {
       cy.get('[data-testid="footer-brand-description"]').should('contain.text', '开源推理基准测试');
+      cy.get('[data-testid="footer-link-supporters"]')
+        .should('contain.text', '支持者')
+        .and('have.attr', 'href', '/zh/quotes');
+      cy.get('[data-testid="footer-link-datasets"]')
+        .should('contain.text', '数据集')
+        .and('have.attr', 'href', '/zh/datasets');
+      cy.get('[data-testid="footer-link-articles"]')
+        .should('contain.text', '文章')
+        .and('have.attr', 'href', '/zh/blog');
       cy.get('[data-testid="footer-link-land-acknowledgement"]').should(
         'have.attr',
         'href',

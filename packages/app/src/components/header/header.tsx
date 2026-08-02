@@ -17,7 +17,6 @@ import { GitHubStars } from './GithubStars';
 
 /** Dashboard tab paths that should highlight the "Dashboard" nav link. */
 const DASHBOARD_TABS = [
-  '/overview',
   '/inference',
   '/evaluation',
   '/historical',
@@ -33,6 +32,12 @@ const DASHBOARD_TABS = [
 const NAV_LINKS = [
   { href: '/', label: 'Home', testId: 'nav-link-home', event: 'header_home_clicked' },
   {
+    href: '/overview',
+    label: 'Overview',
+    testId: 'nav-link-overview',
+    event: 'header_overview_clicked',
+  },
+  {
     href: '/inference',
     label: 'Dashboard',
     testId: 'nav-link-dashboard',
@@ -44,19 +49,6 @@ const NAV_LINKS = [
     testId: 'nav-link-compare',
     event: 'header_compare_clicked',
   },
-  {
-    href: '/quotes',
-    label: 'Supporters',
-    testId: 'nav-link-supporters',
-    event: 'header_supporters_clicked',
-  },
-  {
-    href: '/datasets',
-    label: 'Datasets',
-    testId: 'nav-link-datasets',
-    event: 'header_datasets_clicked',
-  },
-  { href: '/blog', label: 'Articles', testId: 'nav-link-blog', event: 'header_blog_clicked' },
   { href: '/about', label: 'About', testId: 'nav-link-about', event: 'header_about_clicked' },
 ] as const;
 
@@ -198,7 +190,9 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 )}
                 onClick={(e) => {
                   track(event);
-                  if (href === '/inference') navigateInApp(e, router, displayHref);
+                  if (href === '/overview' || href === '/inference') {
+                    navigateInApp(e, router, displayHref);
+                  }
                 }}
               >
                 {label}
@@ -261,7 +255,9 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                       )}
                       onClick={(e) => {
                         track(event);
-                        if (href === '/inference') navigateInApp(e, router, displayHref);
+                        if (href === '/overview' || href === '/inference') {
+                          navigateInApp(e, router, displayHref);
+                        }
                       }}
                     >
                       {label}

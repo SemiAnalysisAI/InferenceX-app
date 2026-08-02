@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
+import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 
 import { StarButton } from './footer-star-cta';
@@ -24,6 +25,9 @@ const STRINGS = {
     benchmarks: 'Benchmarks',
     frontend: 'Frontend',
     more: 'More',
+    supporters: 'Supporters',
+    datasets: 'Datasets',
+    articles: 'Articles',
     gpuReliability: 'GPU Reliability',
     perfPerDollar: 'Performance per Dollar',
     glossary: 'AI Inference Glossary',
@@ -48,6 +52,9 @@ const STRINGS = {
     benchmarks: '基准测试仓库',
     frontend: '前端仓库',
     more: '更多',
+    supporters: '支持者',
+    datasets: '数据集',
+    articles: '文章',
     gpuReliability: 'GPU 可靠性',
     perfPerDollar: '每美元性能',
     glossary: 'AI 推理术语表',
@@ -179,6 +186,30 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
             </div>
             <div data-testid="footer-links-more" className="flex flex-col gap-2.5">
               <span className="text-sm font-medium text-foreground">{t.more}</span>
+              <Link
+                data-testid="footer-link-supporters"
+                href={`${prefix}/quotes`}
+                onClick={() => track('footer_supporters_clicked')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.supporters}
+              </Link>
+              <Link
+                data-testid="footer-link-datasets"
+                href={`${prefix}/datasets`}
+                onClick={() => track('footer_datasets_clicked')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.datasets}
+              </Link>
+              <Link
+                data-testid="footer-link-articles"
+                href={`${prefix}/blog`}
+                onClick={() => track('footer_articles_clicked')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.articles}
+              </Link>
               <Link
                 data-testid="footer-link-reliability"
                 href={`${prefix}/reliability`}

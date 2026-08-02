@@ -37,8 +37,10 @@ function rectOf(selector: string) {
 }
 
 describe('Header', () => {
+  let mockRouter: ReturnType<typeof createMockRouter>;
+
   beforeEach(() => {
-    const mockRouter = createMockRouter();
+    mockRouter = createMockRouter();
     cy.mount(
       <AppRouterContext.Provider value={mockRouter}>
         <PathnameContext.Provider value="/">
@@ -60,6 +62,20 @@ describe('Header', () => {
     cy.get('[data-testid="header"]').find('img[alt="SemiAnalysis logo"]').should('exist');
   });
 
+  it('shows Overview as a top-level nav link', () => {
+    cy.get('[data-testid="nav-link-overview"]')
+      .should('be.visible')
+      .and('have.attr', 'href', '/overview');
+  });
+
+  it('uses resilient app navigation for the desktop Overview link', () => {
+    cy.clock();
+    cy.get('[data-testid="nav-link-overview"]').click();
+    cy.wrap(mockRouter.push).should('have.been.calledOnceWith', '/overview');
+    cy.tick(250);
+    cy.wrap(mockRouter.push).should('have.been.calledTwice');
+  });
+
   it('shows Dashboard nav link', () => {
     cy.get('[data-testid="nav-link-dashboard"]').should('be.visible');
     cy.get('[data-testid="nav-link-dashboard"]').should('have.attr', 'href', '/inference');
@@ -70,9 +86,10 @@ describe('Header', () => {
     cy.get('[data-testid="nav-link-compare"]').should('have.attr', 'href', '/compare');
   });
 
-  it('shows Supporters nav link', () => {
-    cy.get('[data-testid="nav-link-supporters"]').should('be.visible');
-    cy.get('[data-testid="nav-link-supporters"]').should('have.attr', 'href', '/quotes');
+  it('keeps footer destinations out of the primary nav', () => {
+    cy.get('[data-testid="nav-link-supporters"]').should('not.exist');
+    cy.get('[data-testid="nav-link-datasets"]').should('not.exist');
+    cy.get('[data-testid="nav-link-blog"]').should('not.exist');
   });
 
   it('shows the GitHub stars button linking to the correct repo', () => {
@@ -95,10 +112,23 @@ describe('Header', () => {
       .click()
       .should('have.attr', 'aria-expanded', 'true');
     cy.get('[data-testid="mobile-menu"]').within(() => {
+      cy.contains('a', 'Overview').should('be.visible').and('have.attr', 'href', '/overview');
       cy.contains('a', 'Dashboard').should('be.visible').and('have.attr', 'href', '/inference');
       cy.contains('a', 'Comparisons').should('be.visible').and('have.attr', 'href', '/compare');
-      cy.contains('a', 'Supporters').should('be.visible').and('have.attr', 'href', '/quotes');
+      cy.contains('a', 'Supporters').should('not.exist');
+      cy.contains('a', 'Datasets').should('not.exist');
+      cy.contains('a', 'Articles').should('not.exist');
     });
+  });
+
+  it('uses resilient app navigation for the mobile Overview link', () => {
+    cy.clock();
+    cy.viewport(375, 812);
+    cy.get('[data-testid="mobile-menu-toggle"]').click();
+    cy.get('[data-testid="mobile-menu"]').contains('a', 'Overview').click();
+    cy.wrap(mockRouter.push).should('have.been.calledOnceWith', '/overview');
+    cy.tick(250);
+    cy.wrap(mockRouter.push).should('have.been.calledTwice');
   });
 
   describe('at 320x700', () => {
@@ -156,11 +186,12 @@ describe('Header', () => {
       cy.get('[data-testid="mobile-menu-toggle"]').click();
       cy.get('[data-testid="mobile-menu"]').should('be.visible');
       cy.get('[data-testid="mobile-menu"]').within(() => {
-        ['Home', 'Dashboard', 'Comparisons', 'Supporters', 'Datasets', 'Articles', 'About'].forEach(
-          (label) => {
-            cy.contains('a', label).should('be.visible');
-          },
-        );
+        ['Home', 'Overview', 'Dashboard', 'Comparisons', 'About'].forEach((label) => {
+          cy.contains('a', label).should('be.visible');
+        });
+        ['Supporters', 'Datasets', 'Articles'].forEach((label) => {
+          cy.contains('a', label).should('not.exist');
+        });
       });
       cy.get('[data-testid="mobile-menu"] a').each(($link) => {
         const rect = $link[0].getBoundingClientRect();

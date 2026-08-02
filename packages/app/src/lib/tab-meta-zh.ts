@@ -140,11 +140,9 @@ export const TAB_LABELS_ZH: Record<string, string> = {
 /** Chinese labels for the site header nav on /zh pages, keyed by English href. */
 export const NAV_LABELS_ZH: Record<string, string> = {
   '/': '首页',
+  '/overview': '总览',
   '/inference': '仪表板',
   '/compare': 'GPU 对比',
-  '/quotes': '支持者',
-  '/datasets': '数据集',
-  '/blog': '文章',
   '/about': '关于',
 };
 
