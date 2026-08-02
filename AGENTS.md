@@ -110,6 +110,13 @@ See `.env.example`. Key vars: `GITHUB_TOKEN`, `DATABASE_READONLY_URL`, `DATABASE
 
 See [Testing](./docs/testing.md) for full requirements, quality standards, and pre-commit checklist. Tests are **mandatory** — missing/low-quality tests are 🔴 BLOCKING on PR review.
 
+### E2E Runtime and PR Workflow
+
+- Prefer focused Cypress specs while iterating, and create the draft PR before starting a full local E2E run so CI and review setup can proceed in parallel.
+- A warm local `bun run test:e2e` typically takes about **4–6 minutes** because the component and integration suites run sequentially on one machine; cold dependency/browser setup can take longer.
+- GitHub Actions is usually faster in wall-clock time: integration specs run across **four shards per browser** for Chrome and Firefox (eight parallel E2E jobs), while component tests run in a separate job. Recent successful workflows complete in roughly **3–5 minutes**.
+- Local targeted tests remain the fastest feedback loop. The sharded GitHub run is the authoritative broad browser check; do not spend time emulating all CI shards serially before opening the PR.
+
 ## Analytics Requirement
 
 All interactive elements should have `track()` from `@/lib/analytics` (autocapture provides baseline coverage).

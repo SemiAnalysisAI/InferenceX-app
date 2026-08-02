@@ -330,11 +330,11 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    cy.get('[data-testid="chart-section-tabs"]').should('be.visible');
-    cy.get('[data-testid="tab-trigger-overview"]')
+    cy.get('[data-testid="chart-section-tabs"]').should('not.exist');
+    cy.get('[data-testid="nav-link-overview"]')
       .should('have.attr', 'href', '/overview')
-      .and('have.class', 'border-secondary');
-    cy.get('[data-testid="nav-link-dashboard"]').should('have.class', 'text-brand');
+      .and('have.class', 'text-brand');
+    cy.get('[data-testid="nav-link-dashboard"]').should('not.have.class', 'text-brand');
 
     cy.contains('h1', PAGE_TITLE).should('exist');
     cy.contains(
@@ -878,7 +878,8 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/zh/overview');
 
-    cy.get('[data-testid="tab-trigger-overview"]')
+    cy.get('[data-testid="chart-section-tabs"]').should('not.exist');
+    cy.get('[data-testid="nav-link-overview"]')
       .should('have.attr', 'href', '/zh/overview')
       .and('contain.text', '总览');
     cy.contains('h1', PAGE_TITLE_ZH).should('exist');
