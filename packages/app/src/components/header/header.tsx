@@ -190,7 +190,9 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 )}
                 onClick={(e) => {
                   track(event);
-                  if (href === '/inference') navigateInApp(e, router, displayHref);
+                  if (href === '/overview' || href === '/inference') {
+                    navigateInApp(e, router, displayHref);
+                  }
                 }}
               >
                 {label}
@@ -253,7 +255,9 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                       )}
                       onClick={(e) => {
                         track(event);
-                        if (href === '/inference') navigateInApp(e, router, displayHref);
+                        if (href === '/overview' || href === '/inference') {
+                          navigateInApp(e, router, displayHref);
+                        }
                       }}
                     >
                       {label}

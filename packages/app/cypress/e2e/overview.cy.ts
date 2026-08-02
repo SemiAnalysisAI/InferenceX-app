@@ -680,7 +680,7 @@ describe('Overview page', () => {
       cy.viewport(width, 844);
       cy.visit('/overview');
 
-      cy.get('[data-testid="mobile-chart-select"]').should('be.visible');
+      cy.get('[data-testid="mobile-chart-select"]').should('not.exist');
       cy.get('[data-testid="overview-mobile-list"]').should('be.visible');
       cy.get('[data-testid="overview-tier-switcher"]').should('be.visible');
       cy.get('[data-testid="overview-engine-scope-switcher"]')

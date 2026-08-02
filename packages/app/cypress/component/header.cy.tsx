@@ -37,8 +37,10 @@ function rectOf(selector: string) {
 }
 
 describe('Header', () => {
+  let mockRouter: ReturnType<typeof createMockRouter>;
+
   beforeEach(() => {
-    const mockRouter = createMockRouter();
+    mockRouter = createMockRouter();
     cy.mount(
       <AppRouterContext.Provider value={mockRouter}>
         <PathnameContext.Provider value="/">
@@ -64,6 +66,14 @@ describe('Header', () => {
     cy.get('[data-testid="nav-link-overview"]')
       .should('be.visible')
       .and('have.attr', 'href', '/overview');
+  });
+
+  it('uses resilient app navigation for the desktop Overview link', () => {
+    cy.clock();
+    cy.get('[data-testid="nav-link-overview"]').click();
+    cy.wrap(mockRouter.push).should('have.been.calledOnceWith', '/overview');
+    cy.tick(250);
+    cy.wrap(mockRouter.push).should('have.been.calledTwice');
   });
 
   it('shows Dashboard nav link', () => {
@@ -109,6 +119,16 @@ describe('Header', () => {
       cy.contains('a', 'Datasets').should('not.exist');
       cy.contains('a', 'Articles').should('not.exist');
     });
+  });
+
+  it('uses resilient app navigation for the mobile Overview link', () => {
+    cy.clock();
+    cy.viewport(375, 812);
+    cy.get('[data-testid="mobile-menu-toggle"]').click();
+    cy.get('[data-testid="mobile-menu"]').contains('a', 'Overview').click();
+    cy.wrap(mockRouter.push).should('have.been.calledOnceWith', '/overview');
+    cy.tick(250);
+    cy.wrap(mockRouter.push).should('have.been.calledTwice');
   });
 
   describe('at 320x700', () => {
