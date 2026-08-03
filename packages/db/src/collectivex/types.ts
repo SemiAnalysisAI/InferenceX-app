@@ -11,8 +11,27 @@ export type CollectiveXPhase = 'decode' | 'prefill';
 export type CollectiveXPrecision = 'bf16' | 'fp8';
 /** Kernel mode: throughput-oriented `normal`, or decode-only `low-latency`. */
 export type CollectiveXMode = 'normal' | 'low-latency';
-export const COLLECTIVEX_VERSIONS = [1] as const;
+/**
+ * Sweep generations this reader can ingest.
+ *
+ * A new entry is added when the benchmark changes what a published number MEANS, so that rows
+ * from two generations are never mixed in one comparison. Version 2 is the standardized timing
+ * window: `roundtrip` became dispatch-then-combine in every row (expert-output staging is
+ * excluded and reported separately as `stage`, where before it sat inside the chain for MoRI
+ * BF16 and FlashInfer BF16 only), and the fp8 quantize moved into the timed dispatch to match
+ * what a production forward pass pays. Rows also carry `logical_copies` and
+ * `implementation.stage_excluded_from_roundtrip` so a reader can tell the generations apart from
+ * the artifact alone rather than from the version tag.
+ */
+export const COLLECTIVEX_VERSIONS = [1, 2] as const;
 export type CollectiveXVersion = (typeof COLLECTIVEX_VERSIONS)[number];
+/**
+ * The generation the dashboard shows when no version is requested. Tracks the generation the
+ * sweep currently emits (`configs/sweep.json`), so a fresh run is visible without a code change;
+ * the trade-off is that this reads empty in the window between bumping the sweep's version and
+ * publishing the first run of that generation. Older generations stay reachable by explicit
+ * request through `parseCollectiveXVersion`.
+ */
 export const COLLECTIVEX_DEFAULT_VERSION: CollectiveXVersion = COLLECTIVEX_VERSIONS.at(-1)!;
 
 export function parseCollectiveXVersion(raw: string): CollectiveXVersion | null {
