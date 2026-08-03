@@ -33,6 +33,27 @@ Every INSERT uses `ON CONFLICT DO UPDATE` or `DO NOTHING`. This means:
 
 The unique constraints match natural keys (e.g., `(workflow_run_id, config_id, isl, osl, conc)` for benchmarks), not surrogate keys.
 
+### Audited Point Purges
+
+`packages/db/src/etl/run-overrides.ts` is the durable audit record for exceptional
+data removal. Use `PURGED_BENCHMARK_POINTS` when a valid workflow run contains a
+specific invalid result, such as a server hang. Each record names `githubRunId`,
+`runAttempt`, `configId`, `benchmarkType`, `isl`, `osl`, `conc`, and `offloadMode`,
+with a dated reason comment. The full identity is required because one run can
+contain multiple serving configurations at the same sequence lengths and concurrency.
+
+`bun run db:apply-overrides` previews every matching row and requires confirmation
+before deleting it in a transaction. It also removes unreferenced server logs and
+trace-replay sidecars, clears availability entries that no remaining successful row
+supports, and refreshes `latest_benchmarks`. The override remains in source control,
+so future CI and GCS ingests skip the point instead of restoring it.
+
+CI ingests match the run attempt exactly. If a GCS backup cannot retrieve GitHub run
+metadata, it matches the same run and full point identity across attempts. This
+conservative fallback prevents a failed GitHub lookup from restoring a suppressed
+point. It can only suppress an identical point from another attempt while that
+attempt remains unknown.
+
 ### Why Two Connection Types
 
 | Connection                      | Library     | Use Case                             | Why                                                                                                  |
