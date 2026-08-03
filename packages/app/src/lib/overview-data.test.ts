@@ -11,6 +11,7 @@ import {
   buildOverviewModelSummary,
   overviewCostPerMtok,
   overviewScenarioForModel,
+  resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
   resolveOverviewTier,
   type OverviewModelSummary,
@@ -121,6 +122,16 @@ function headlinePairOf(summary: OverviewModelSummary, id: string) {
 }
 
 describe('overview engine scope and scenario selection', () => {
+  it.each([
+    [undefined, 'hardware'],
+    ['hardware', 'hardware'],
+    ['30d', 'history'],
+    [['30d'], 'history'],
+    ['unknown', 'hardware'],
+  ] as const)('resolves comparison mode %j to %s', (raw, expected) => {
+    expect(resolveOverviewComparisonMode(raw)).toBe(expected);
+  });
+
   it('assigns each active model to its configured scenario', () => {
     expect(overviewScenarioForModel(Model.Kimi_K3)).toBe('agentx');
     expect(overviewScenarioForModel(Model.GLM_5_2)).toBe('agentx');

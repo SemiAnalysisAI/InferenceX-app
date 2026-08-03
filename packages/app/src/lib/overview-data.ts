@@ -20,6 +20,8 @@ export const OVERVIEW_TIERS = [30, 50, 75, 100, 150, 200] as const;
 export type OverviewTier = (typeof OVERVIEW_TIERS)[number];
 export const OVERVIEW_PRIMARY_TIER = 50;
 export type OverviewEngineScope = 'all' | 'community';
+export type OverviewComparisonMode = 'hardware' | 'history';
+export const OVERVIEW_DEFAULT_COMPARISON_MODE: OverviewComparisonMode = 'hardware';
 export type OverviewScenario = 'single_turn_8k1k' | 'agentx';
 /** Row order within a model: the single-turn workload first, AgentX below it. */
 export const OVERVIEW_SCENARIOS = ['single_turn_8k1k', 'agentx'] as const;
@@ -29,6 +31,13 @@ export function resolveOverviewEngineScope(
 ): OverviewEngineScope {
   const candidate = Array.isArray(raw) ? raw[0] : raw;
   return candidate === 'all' ? 'all' : 'community';
+}
+
+export function resolveOverviewComparisonMode(
+  raw: string | readonly string[] | undefined,
+): OverviewComparisonMode {
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  return candidate === '30d' ? 'history' : OVERVIEW_DEFAULT_COMPARISON_MODE;
 }
 
 export function resolveOverviewTier(raw: string | string[] | undefined): OverviewTier {
