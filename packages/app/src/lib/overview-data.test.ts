@@ -7,14 +7,18 @@ import { dedupeRowsToLatestPerConfig } from '@/components/inference/hooks/useCha
 import type { BenchmarkRow } from './api';
 import { DEFAULT_MODELS, Model, Precision } from './data-mappings';
 import {
+  assembleOverviewHistoricalPageData,
   assembleOverviewPageData,
   buildOverviewModelSummary,
   overviewCostPerMtok,
+  overviewHistoricalWindow,
   overviewScenarioForModel,
+  overviewSnapshotDate,
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
   resolveOverviewTier,
   type OverviewModelSummary,
+  type OverviewPageData,
 } from './overview-data';
 
 let nextId = 1;
@@ -119,6 +123,17 @@ function headlinePairOf(summary: OverviewModelSummary, id: string) {
   const candidate = summary.platforms.find((platform) => platform.hardware === candidateHardware);
   const baseline = summary.platforms.find((platform) => platform.hardware === 'b200');
   return candidate === undefined || baseline === undefined ? undefined : { candidate, baseline };
+}
+
+function platformFor(
+  page: OverviewPageData,
+  model: Model,
+  scenario: OverviewModelSummary['scenario'],
+  hardware: string,
+) {
+  return page.models
+    .find((summary) => summary.model === model && summary.scenario === scenario)
+    ?.platforms.find((platform) => platform.hardware === hardware);
 }
 
 describe('overview engine scope and scenario selection', () => {
@@ -602,6 +617,156 @@ describe('overview engine scope and scenario selection', () => {
       { hardware: 'gb200', precision: Precision.FP8, value: 9000 },
       { hardware: 'gb300', precision: Precision.FP4, value: 8100 },
     ]);
+  });
+});
+
+describe('overview historical window', () => {
+  it('anchors the target and floor to the latest database evidence date', () => {
+    expect(overviewHistoricalWindow('2026-08-03')).toEqual({
+      snapshotDate: '2026-08-03',
+      targetDate: '2026-07-04',
+      earliestDate: '2026-06-04',
+    });
+  });
+
+  it('returns the latest date across model buckets', () => {
+    expect(
+      overviewSnapshotDate({
+        a: [row({ date: '2026-07-30' })],
+        b: [row({ date: '2026-08-03' })],
+      }),
+    ).toBe('2026-08-03');
+  });
+
+  it('returns null when every model bucket is empty', () => {
+    expect(overviewSnapshotDate({ a: [], b: [] })).toBeNull();
+  });
+});
+
+describe('assembleOverviewHistoricalPageData', () => {
+  const window = {
+    snapshotDate: '2026-08-03',
+    targetDate: '2026-07-04',
+    earliestDate: '2026-06-04',
+  } as const;
+  const currentRows = {
+    [Model.Qwen3_5]: [
+      ...frontier([12000, 10000, 8000, 6000], {
+        hardware: 'mi355x',
+        framework: 'sglang',
+        date: '2026-08-01',
+        precision: Precision.FP4,
+      }),
+      ...frontier([9600, 8000, 6400, 4800], {
+        hardware: 'b300',
+        framework: 'sglang',
+        date: '2026-08-02',
+        precision: Precision.FP4,
+      }),
+      ...frontier([8400, 7000, 5600, 4200], {
+        hardware: 'gb200',
+        framework: 'sglang',
+        date: '2026-07-04',
+        precision: Precision.FP4,
+      }),
+    ],
+  };
+  const baselineRows = {
+    [Model.Qwen3_5]: [
+      ...frontier([9600, 8000, 6400, 4800], {
+        hardware: 'mi355x',
+        framework: 'vllm',
+        date: '2026-06-20',
+        precision: Precision.FP4,
+      }),
+      ...frontier([8400, 7000, 5600, 4200], {
+        hardware: 'gb200',
+        framework: 'sglang',
+        date: '2026-06-20',
+        precision: Precision.FP4,
+      }),
+    ],
+  };
+
+  it('compares each current platform envelope with the same historical platform', () => {
+    const page = assembleOverviewHistoricalPageData(
+      currentRows,
+      baselineRows,
+      window,
+      50,
+      'community',
+    );
+    const platform = platformFor(page, Model.Qwen3_5, 'single_turn_8k1k', 'mi355x');
+
+    expect(page.comparisonMode).toBe('history');
+    expect(page.historicalWindow).toEqual(window);
+    expect(platform?.historicalComparison?.status).toBe('comparable');
+    expect(platform?.historicalComparison?.costDeltaPct).toBeCloseTo(-0.2, 9);
+    expect(platform?.historicalComparison?.baselineDate).toBe('2026-06-20');
+  });
+
+  it('marks a priced current cell without a baseline as no_baseline', () => {
+    const page = assembleOverviewHistoricalPageData(
+      currentRows,
+      baselineRows,
+      window,
+      50,
+      'community',
+    );
+    const comparison = platformFor(
+      page,
+      Model.Qwen3_5,
+      'single_turn_8k1k',
+      'b300',
+    )?.historicalComparison;
+
+    expect(comparison).toEqual({
+      status: 'no_baseline',
+      baselineCostPerMtok: null,
+      costDeltaPct: null,
+      baselineDate: null,
+    });
+  });
+
+  it('does not report zero improvement when current evidence is not newer than the cutoff', () => {
+    const page = assembleOverviewHistoricalPageData(
+      currentRows,
+      baselineRows,
+      window,
+      50,
+      'community',
+    );
+    const comparison = platformFor(
+      page,
+      Model.Qwen3_5,
+      'single_turn_8k1k',
+      'gb200',
+    )?.historicalComparison;
+
+    expect(comparison?.status).toBe('no_newer_result');
+    expect(comparison?.costDeltaPct).toBeNull();
+  });
+
+  it('allows the winning engine to change between snapshots', () => {
+    const page = assembleOverviewHistoricalPageData(
+      currentRows,
+      baselineRows,
+      window,
+      50,
+      'community',
+    );
+    const current = platformFor(page, Model.Qwen3_5, 'single_turn_8k1k', 'mi355x');
+    const baseline = buildOverviewModelSummary(
+      Model.Qwen3_5,
+      baselineRows[Model.Qwen3_5],
+      50,
+      'community',
+      'single_turn_8k1k',
+    ).platforms.find((platform) => platform.hardware === 'mi355x');
+
+    expect(current?.read.config?.framework).toBe('sglang');
+    expect(baseline?.read.config?.framework).toBe('vllm');
+    expect(current?.historicalComparison?.status).toBe('comparable');
   });
 });
 

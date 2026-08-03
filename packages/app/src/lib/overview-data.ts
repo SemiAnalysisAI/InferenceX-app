@@ -98,6 +98,15 @@ export type OverviewMissingReason =
   | 'cannot_reach_at_tier'
   | 'no_exact_at_tier';
 
+export type OverviewHistoricalStatus = 'comparable' | 'no_baseline' | 'no_newer_result';
+
+export interface OverviewHistoricalComparison {
+  status: OverviewHistoricalStatus;
+  baselineCostPerMtok: number | null;
+  costDeltaPct: number | null;
+  baselineDate: string | null;
+}
+
 export const OVERVIEW_HARDWARE = ['b200', 'mi355x', 'b300', 'gb200', 'gb300'] as const;
 
 export interface OverviewPlatformResult {
@@ -112,6 +121,7 @@ export interface OverviewPlatformResult {
   /** Cost delta vs this row's B200 cell; negative = cheaper. Null on the B200
    *  cell itself and whenever either cost is unavailable. */
   costVsB200Pct: number | null;
+  historicalComparison: OverviewHistoricalComparison | null;
 }
 
 export interface OverviewModelSummary {
@@ -125,6 +135,35 @@ export interface OverviewPageData {
   models: OverviewModelSummary[];
   tier: OverviewTier;
   engineScope: OverviewEngineScope;
+  comparisonMode: OverviewComparisonMode;
+  historicalWindow: OverviewHistoricalWindow | null;
+}
+
+export interface OverviewHistoricalWindow {
+  snapshotDate: string;
+  targetDate: string;
+  earliestDate: string;
+}
+
+function subtractUtcDays(isoDate: string, days: number): string {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
+export function overviewSnapshotDate(
+  rowsByModel: Readonly<Record<string, readonly BenchmarkRow[]>>,
+): string | null {
+  const dates = Object.values(rowsByModel).flatMap((rows) => rows.map((row) => row.date));
+  return dates.length === 0 ? null : (dates.toSorted().at(-1) ?? null);
+}
+
+export function overviewHistoricalWindow(snapshotDate: string): OverviewHistoricalWindow {
+  return {
+    snapshotDate,
+    targetDate: subtractUtcDays(snapshotDate, 30),
+    earliestDate: subtractUtcDays(snapshotDate, 60),
+  };
 }
 
 const OVERVIEW_SLICE_PRIORITY = [
@@ -425,6 +464,7 @@ function buildPlatformResults(
       platform.hardware === 'b200' || b200Cost === null || platform.costPerMtok === null
         ? null
         : platform.costPerMtok / b200Cost - 1,
+    historicalComparison: null,
   }));
 }
 
@@ -580,5 +620,78 @@ export function assembleOverviewPageData(
     ),
     tier,
     engineScope,
+    comparisonMode: OVERVIEW_DEFAULT_COMPARISON_MODE,
+    historicalWindow: null,
+  };
+}
+
+function overviewPlatformKey(
+  model: OverviewModelSummary,
+  platform: OverviewPlatformResult,
+): string {
+  return `${model.model}|${model.scenario}|${platform.hardware}`;
+}
+
+export function assembleOverviewHistoricalPageData(
+  currentRowsByModel: Record<string, BenchmarkRow[]>,
+  baselineRowsByModel: Record<string, BenchmarkRow[]>,
+  window: OverviewHistoricalWindow,
+  tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
+  engineScope: OverviewEngineScope = 'community',
+): OverviewPageData {
+  const current = assembleOverviewPageData(currentRowsByModel, tier, engineScope);
+  const baseline = assembleOverviewPageData(baselineRowsByModel, tier, engineScope);
+  const baselineByKey = new Map(
+    baseline.models.flatMap((model) =>
+      model.platforms.map((platform) => [overviewPlatformKey(model, platform), platform] as const),
+    ),
+  );
+
+  return {
+    ...current,
+    comparisonMode: 'history',
+    historicalWindow: window,
+    models: current.models.map((model) => ({
+      ...model,
+      platforms: model.platforms.map((platform) => {
+        if (platform.costPerMtok === null) return platform;
+
+        const previous = baselineByKey.get(overviewPlatformKey(model, platform));
+        const currentDate = platform.read.config?.latestDate ?? null;
+        if (currentDate === null || currentDate <= window.targetDate) {
+          return {
+            ...platform,
+            historicalComparison: {
+              status: 'no_newer_result',
+              baselineCostPerMtok: previous?.costPerMtok ?? null,
+              costDeltaPct: null,
+              baselineDate: previous?.read.config?.latestDate ?? null,
+            },
+          };
+        }
+
+        if (previous === undefined || previous.costPerMtok === null) {
+          return {
+            ...platform,
+            historicalComparison: {
+              status: 'no_baseline',
+              baselineCostPerMtok: null,
+              costDeltaPct: null,
+              baselineDate: null,
+            },
+          };
+        }
+
+        return {
+          ...platform,
+          historicalComparison: {
+            status: 'comparable',
+            baselineCostPerMtok: previous.costPerMtok,
+            costDeltaPct: platform.costPerMtok / previous.costPerMtok - 1,
+            baselineDate: previous.read.config?.latestDate ?? null,
+          },
+        };
+      }),
+    })),
   };
 }

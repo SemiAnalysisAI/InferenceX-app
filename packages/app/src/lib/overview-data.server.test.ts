@@ -6,7 +6,12 @@ import type { OverviewPageData } from './overview-data';
 
 /** `throughput` is TOTAL tok/s per GPU — the overview's cost basis. The
  *  output metric is a decoy so a regression to output pricing surfaces here. */
-function row(hardware: string, framework: string, throughput: number): BenchmarkRow {
+function row(
+  hardware: string,
+  framework: string,
+  throughput: number,
+  date = '2026-07-20',
+): BenchmarkRow {
   return {
     id: throughput,
     hardware,
@@ -33,7 +38,7 @@ function row(hardware: string, framework: string, throughput: number): Benchmark
     offload_mode: 'off',
     image: null,
     metrics: { median_intvty: 50, tput_per_gpu: throughput, output_tput_per_gpu: 123 },
-    date: '2026-07-20',
+    date,
     run_url: null,
   };
 }
@@ -85,8 +90,12 @@ describe('getOverviewPageData engine scope forwarding', () => {
 
   it('forwards community scope through live benchmark queries', async () => {
     const getCachedBenchmarks = vi.fn(() => Promise.resolve(rows));
+    const getCachedBenchmarksAsOf = vi.fn();
     vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
-    vi.doMock('@/lib/benchmark-data.server', () => ({ getCachedBenchmarks }));
+    vi.doMock('@/lib/benchmark-data.server', () => ({
+      getCachedBenchmarks,
+      getCachedBenchmarksAsOf,
+    }));
     vi.doMock('@/lib/test-fixtures', () => ({ loadFixture: vi.fn() }));
 
     const { getOverviewPageData } = await import('./overview-data.server');
@@ -98,5 +107,70 @@ describe('getOverviewPageData engine scope forwarding', () => {
       baseline: 'llmd-vllm',
     });
     expect(getCachedBenchmarks).toHaveBeenCalled();
+    expect(getCachedBenchmarksAsOf).not.toHaveBeenCalled();
+  });
+
+  it('loads an as-of snapshot for history mode and rejects baselines older than 60 days', async () => {
+    const currentRows = [...rows, row('b300', 'vllm', 1100)];
+    const historicalRows = [
+      row('mi355x', 'dynamo-vllm', 800, '2026-06-15'),
+      row('b200', 'llmd-vllm', 700, '2026-06-15'),
+      row('b300', 'vllm', 900, '2026-05-20'),
+    ];
+    const getCachedBenchmarks = vi.fn(() => Promise.resolve(currentRows));
+    const getCachedBenchmarksAsOf = vi.fn((_keys: string[], _date: string) =>
+      Promise.resolve(historicalRows),
+    );
+    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+    vi.doMock('@/lib/benchmark-data.server', () => ({
+      getCachedBenchmarks,
+      getCachedBenchmarksAsOf,
+    }));
+    vi.doMock('@/lib/test-fixtures', () => ({ loadFixture: vi.fn() }));
+
+    const { getOverviewPageData } = await import('./overview-data.server');
+    const page = await getOverviewPageData(50, 'community', 'history');
+    const qwen = page.models.find((model) => model.model === Model.Qwen3_5);
+    const mi355x = qwen?.platforms.find(({ hardware }) => hardware === 'mi355x');
+    const b300 = qwen?.platforms.find(({ hardware }) => hardware === 'b300');
+
+    expect(page.comparisonMode).toBe('history');
+    expect(page.historicalWindow).toEqual({
+      snapshotDate: '2026-07-20',
+      targetDate: '2026-06-20',
+      earliestDate: '2026-05-21',
+    });
+    expect(getCachedBenchmarksAsOf).toHaveBeenCalled();
+    expect(getCachedBenchmarksAsOf.mock.calls.every(([, date]) => date === '2026-06-20')).toBe(
+      true,
+    );
+    expect(mi355x?.historicalComparison?.status).toBe('comparable');
+    expect(mi355x?.historicalComparison?.baselineDate).toBe('2026-06-15');
+    expect(b300?.historicalComparison?.status).toBe('no_baseline');
+  });
+
+  it('loads separate current and historical fixtures in history mode', async () => {
+    const loadFixture = vi.fn((name: string) =>
+      name === 'overview-history-rows'
+        ? { [Model.Qwen3_5]: [row('mi355x', 'dynamo-vllm', 800, '2026-06-15')] }
+        : { [Model.Qwen3_5]: rows },
+    );
+    const getCachedBenchmarks = vi.fn();
+    const getCachedBenchmarksAsOf = vi.fn();
+    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: true }));
+    vi.doMock('@/lib/benchmark-data.server', () => ({
+      getCachedBenchmarks,
+      getCachedBenchmarksAsOf,
+    }));
+    vi.doMock('@/lib/test-fixtures', () => ({ loadFixture }));
+
+    const { getOverviewPageData } = await import('./overview-data.server');
+    const page = await getOverviewPageData(50, 'community', 'history');
+
+    expect(page.comparisonMode).toBe('history');
+    expect(loadFixture).toHaveBeenCalledWith('overview-rows');
+    expect(loadFixture).toHaveBeenCalledWith('overview-history-rows');
+    expect(getCachedBenchmarks).not.toHaveBeenCalled();
+    expect(getCachedBenchmarksAsOf).not.toHaveBeenCalled();
   });
 });
