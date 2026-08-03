@@ -145,6 +145,18 @@ export interface OverviewHistoricalWindow {
   earliestDate: string;
 }
 
+function overviewScenarioOfRow(row: BenchmarkRow): OverviewScenario | null {
+  if (row.benchmark_type === 'agentic_traces') return 'agentx';
+  if (
+    row.benchmark_type === 'single_turn' &&
+    row.isl === OVERVIEW_WORKLOAD.isl &&
+    row.osl === OVERVIEW_WORKLOAD.osl
+  ) {
+    return 'single_turn_8k1k';
+  }
+  return null;
+}
+
 function subtractUtcDays(isoDate: string, days: number): string {
   const date = new Date(`${isoDate}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() - days);
@@ -154,18 +166,19 @@ function subtractUtcDays(isoDate: string, days: number): string {
 export function overviewSnapshotDate(
   rowsByModel: Readonly<Record<string, readonly BenchmarkRow[]>>,
 ): string | null {
-  const dates = Object.values(rowsByModel).flatMap((rows) =>
-    rows
-      .filter(
-        (row) =>
+  const dates = Object.entries(rowsByModel).flatMap(([modelKey, rows]) => {
+    const scenarios = overviewScenariosForModel(modelKey as Model, rows);
+    return rows
+      .filter((row) => {
+        const scenario = overviewScenarioOfRow(row);
+        return (
           (OVERVIEW_HARDWARE as readonly string[]).includes(row.hardware) &&
-          (row.benchmark_type === 'agentic_traces' ||
-            (row.benchmark_type === 'single_turn' &&
-              row.isl === OVERVIEW_WORKLOAD.isl &&
-              row.osl === OVERVIEW_WORKLOAD.osl)),
-      )
-      .map((row) => row.date),
-  );
+          scenario !== null &&
+          scenarios.includes(scenario)
+        );
+      })
+      .map((row) => row.date);
+  });
   return dates.length === 0 ? null : (dates.toSorted().at(-1) ?? null);
 }
 

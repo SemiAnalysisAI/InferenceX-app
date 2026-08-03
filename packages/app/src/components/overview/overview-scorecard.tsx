@@ -81,7 +81,7 @@ export const OVERVIEW_STRINGS = {
       `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than this platform’s ${baselineDate} result`,
     historicalEvenAria: (baselineDate: string) =>
       `About the same cost as this platform’s ${baselineDate} result`,
-    historyCellStateLegend: '— = no newer result. ∞ = no 30–60-day baseline.',
+    historyCellStateLegend: '— = no current result or no newer result. ∞ = no 30–60-day baseline.',
     referenceHeader: 'Reference',
   },
   zh: {
@@ -137,7 +137,7 @@ export const OVERVIEW_STRINGS = {
     historicalDeltaAria: (pct: string, cheaper: boolean, baselineDate: string) =>
       `比该平台 ${baselineDate} 的结果${cheaper ? '便宜' : '昂贵'} ${pct}`,
     historicalEvenAria: (baselineDate: string) => `与该平台 ${baselineDate} 的结果成本基本持平`,
-    historyCellStateLegend: '— = 没有更新结果。∞ = 缺少 30–60 天前的基线。',
+    historyCellStateLegend: '— = 当前无结果或没有更新结果。∞ = 缺少 30–60 天前的基线。',
     referenceHeader: '基准',
   },
 } as const;

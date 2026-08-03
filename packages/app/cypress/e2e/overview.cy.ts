@@ -159,7 +159,7 @@ describe('Overview page', () => {
           .and('have.text', '30 天变化');
       });
     cy.contains('当前成本及其相对 30–60 天前最近一次有效平台结果的变化。').should('exist');
-    cy.contains('— = 没有更新结果。∞ = 缺少 30–60 天前的基线。').should('exist');
+    cy.contains('— = 当前无结果或没有更新结果。∞ = 缺少 30–60 天前的基线。').should('exist');
   });
 
   it('compares each platform with its own validated result from 30–60 days earlier', () => {
@@ -208,7 +208,9 @@ describe('Overview page', () => {
     cy.contains(
       'Current cost and change versus the latest validated platform result 30–60 days earlier.',
     ).should('exist');
-    cy.contains('— = no newer result. ∞ = no 30–60-day baseline.').should('exist');
+    cy.contains('— = no current result or no newer result. ∞ = no 30–60-day baseline.').should(
+      'exist',
+    );
     expectNoVisibleDatesOrSnapshot();
   });
 

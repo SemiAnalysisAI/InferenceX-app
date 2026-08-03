@@ -650,6 +650,20 @@ describe('overview historical window', () => {
     ).toBe('2026-07-30');
   });
 
+  it('ignores newer rows from scenarios excluded by the curated model layout', () => {
+    expect(
+      overviewSnapshotDate({
+        [Model.Kimi_K2_5]: [
+          row({ model: 'kimik2.5', date: '2026-07-30' }),
+          agenticRow(50, 25, 7650, 850, {
+            model: 'kimik2.5',
+            date: '2026-08-03',
+          }),
+        ],
+      }),
+    ).toBe('2026-07-30');
+  });
+
   it('returns null when every model bucket is empty', () => {
     expect(overviewSnapshotDate({ a: [], b: [] })).toBeNull();
   });
