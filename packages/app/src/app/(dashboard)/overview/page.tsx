@@ -4,7 +4,11 @@ import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { OverviewPageContent } from '@/components/overview/overview-page';
 import { enAlternates } from '@/lib/i18n';
-import { resolveOverviewEngineScope, resolveOverviewTier } from '@/lib/overview-data';
+import {
+  resolveOverviewComparisonMode,
+  resolveOverviewEngineScope,
+  resolveOverviewTier,
+} from '@/lib/overview-data';
 import { getOverviewPageData } from '@/lib/overview-data.server';
 
 export const dynamic = 'force-dynamic';
@@ -38,6 +42,7 @@ export default async function OverviewPage({ searchParams }: Props) {
   const data = await getOverviewPageData(
     resolveOverviewTier(sp.tier),
     resolveOverviewEngineScope(sp.engine),
+    resolveOverviewComparisonMode(sp.compare),
   );
   return <OverviewPageContent data={data} locale="en" />;
 }

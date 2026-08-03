@@ -154,7 +154,18 @@ function subtractUtcDays(isoDate: string, days: number): string {
 export function overviewSnapshotDate(
   rowsByModel: Readonly<Record<string, readonly BenchmarkRow[]>>,
 ): string | null {
-  const dates = Object.values(rowsByModel).flatMap((rows) => rows.map((row) => row.date));
+  const dates = Object.values(rowsByModel).flatMap((rows) =>
+    rows
+      .filter(
+        (row) =>
+          (OVERVIEW_HARDWARE as readonly string[]).includes(row.hardware) &&
+          (row.benchmark_type === 'agentic_traces' ||
+            (row.benchmark_type === 'single_turn' &&
+              row.isl === OVERVIEW_WORKLOAD.isl &&
+              row.osl === OVERVIEW_WORKLOAD.osl)),
+      )
+      .map((row) => row.date),
+  );
   return dates.length === 0 ? null : (dates.toSorted().at(-1) ?? null);
 }
 

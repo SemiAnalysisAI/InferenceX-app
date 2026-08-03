@@ -638,6 +638,18 @@ describe('overview historical window', () => {
     ).toBe('2026-08-03');
   });
 
+  it('ignores newer rows that cannot appear in the overview', () => {
+    expect(
+      overviewSnapshotDate({
+        qwen: [
+          row({ date: '2026-07-30' }),
+          row({ date: '2026-08-03', hardware: 'h200' }),
+          row({ date: '2026-08-02', isl: 1024, osl: 1024 }),
+        ],
+      }),
+    ).toBe('2026-07-30');
+  });
+
   it('returns null when every model bucket is empty', () => {
     expect(overviewSnapshotDate({ a: [], b: [] })).toBeNull();
   });

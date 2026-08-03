@@ -5,6 +5,7 @@ import type { OverviewPageData } from '@/lib/overview-data';
 import {
   DesktopOverviewMatrix,
   MobileOverviewList,
+  OverviewComparisonSwitcher,
   OverviewEngineScopeSwitcher,
   OverviewMethodology,
   OverviewTierSwitcher,
@@ -77,10 +78,19 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
             <OverviewTierSwitcher
               tier={data.tier}
               engineScope={data.engineScope}
+              comparisonMode={data.comparisonMode}
               locale={locale}
               strings={strings}
             />
             <OverviewEngineScopeSwitcher
+              engineScope={data.engineScope}
+              tier={data.tier}
+              comparisonMode={data.comparisonMode}
+              locale={locale}
+              strings={strings}
+            />
+            <OverviewComparisonSwitcher
+              comparisonMode={data.comparisonMode}
               engineScope={data.engineScope}
               tier={data.tier}
               locale={locale}
@@ -99,14 +109,16 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
           locale={locale}
           formatters={formatters}
           strings={strings}
+          comparisonMode={data.comparisonMode}
         />
         <MobileOverviewList
           models={data.models}
           locale={locale}
           formatters={formatters}
           strings={strings}
+          comparisonMode={data.comparisonMode}
         />
-        <OverviewMethodology strings={strings} />
+        <OverviewMethodology strings={strings} comparisonMode={data.comparisonMode} />
       </Card>
     </section>
   );

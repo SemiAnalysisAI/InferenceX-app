@@ -114,6 +114,126 @@ function textRect(element: Element) {
 }
 
 describe('Overview page', () => {
+  it('switches between B200 and 30-day comparison without losing page state', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+
+    cy.get('[data-testid="overview-comparison-switcher"]')
+      .should('have.attr', 'aria-label', 'Compare')
+      .within(() => {
+        cy.get('[data-overview-comparison="hardware"]')
+          .should('have.attr', 'aria-current', 'true')
+          .and('match', 'span')
+          .and('have.text', 'vs B200');
+        cy.get('[data-overview-comparison="history"]')
+          .should('have.attr', 'href', '/overview?compare=30d')
+          .and('have.text', '30-day change')
+          .click();
+      });
+
+    cy.location('search').should('eq', '?compare=30d');
+    cy.get('[data-testid="overview-comparison-switcher"]')
+      .find('[data-overview-comparison="history"]')
+      .should('have.attr', 'aria-current', 'true')
+      .and('match', 'span');
+    cy.get('[data-testid="overview-desktop-matrix"] thead').should('contain.text', 'B200');
+    cy.get('[data-testid="overview-desktop-matrix"] thead').should('not.contain.text', 'Reference');
+
+    cy.get('[data-testid="overview-tier-switcher"]')
+      .contains('a', '100')
+      .should('have.attr', 'href', '/overview?tier=100&compare=30d');
+    cy.get('[data-testid="overview-engine-scope-switcher"]')
+      .find('[data-overview-engine-scope="all"]')
+      .should('have.attr', 'href', '/overview?engine=all&compare=30d');
+    cy.get('[data-testid="language-toggle"]')
+      .should('have.attr', 'href', '/zh/overview?compare=30d')
+      .click();
+    cy.location('pathname').should('eq', '/zh/overview');
+    cy.location('search').should('eq', '?compare=30d');
+    cy.get('[data-testid="overview-comparison-switcher"]')
+      .should('have.attr', 'aria-label', '对比方式')
+      .within(() => {
+        cy.get('[data-overview-comparison="hardware"]').should('have.text', '对比 B200');
+        cy.get('[data-overview-comparison="history"]')
+          .should('have.attr', 'aria-current', 'true')
+          .and('have.text', '30 天变化');
+      });
+    cy.contains('当前成本及其相对 30–60 天前最近一次有效平台结果的变化。').should('exist');
+    cy.contains('— = 没有更新结果。∞ = 缺少 30–60 天前的基线。').should('exist');
+  });
+
+  it('compares each platform with its own validated result from 30–60 days earlier', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview?compare=30d');
+
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
+      // Unlike the hardware view, B200 is a normal platform in the historical
+      // view and receives its own change badge and heat-map tint.
+      platform('b200')
+        .find('[data-testid="overview-cost-delta"]')
+        .should('have.attr', 'data-history-status', 'comparable')
+        .and('have.attr', 'data-cost-polarity', 'cheaper')
+        .and('contain.text', '-17%');
+      platform('mi355x')
+        .find('[data-testid="overview-cost-delta"]')
+        .should('have.attr', 'data-history-status', 'comparable')
+        .and('have.attr', 'data-cost-polarity', 'cheaper')
+        .and('contain.text', '-25%');
+      platform('b300')
+        .find('[data-testid="overview-cost-delta"]')
+        .should('have.attr', 'data-history-status', 'no_baseline')
+        .and('have.attr', 'data-cost-polarity', 'no-baseline')
+        .and('contain.text', '∞')
+        .and('have.attr', 'title', 'No validated platform baseline from 30–60 days earlier');
+      platform('gb200')
+        .find('[data-testid="overview-cost-delta"]')
+        .should('have.attr', 'data-history-status', 'no_newer_result')
+        .and('contain.text', '—')
+        .and(
+          'have.attr',
+          'title',
+          'No newer validated result after the historical comparison date',
+        );
+    });
+
+    desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
+      platform('b200')
+        .find('[data-testid="overview-cost-delta"]')
+        .should('have.attr', 'data-history-status', 'comparable');
+      platform('mi355x')
+        .find('[data-testid="overview-cost-delta"]')
+        .should('have.attr', 'data-history-status', 'comparable');
+    });
+
+    cy.contains(
+      'Current cost and change versus the latest validated platform result 30–60 days earlier.',
+    ).should('exist');
+    cy.contains('— = no newer result. ∞ = no 30–60-day baseline.').should('exist');
+    expectNoVisibleDatesOrSnapshot();
+  });
+
+  it('keeps the historical comparison complete and non-scrolling across desktop, tablet and phone', () => {
+    for (const width of [320, 390, 768, 1024, 1279, 1280, 1440]) {
+      cy.viewport(width, 900);
+      cy.visit('/overview?compare=30d');
+
+      cy.get('[data-testid="overview-comparison-switcher"]')
+        .should('be.visible')
+        .find('[data-overview-comparison]')
+        .each(($option) => {
+          expect($option[0].getBoundingClientRect().height).to.be.at.least(44);
+        });
+      cy.get('[data-testid="overview-cost-delta"][data-hardware="b200"]').should('exist');
+      expectNoHorizontalOverflow();
+      if (width < 1280) {
+        expectNoHorizontalScroller('overview-mobile-list');
+        expectNoHorizontalScroller('overview-comparison-switcher');
+      } else {
+        expectNoHorizontalScroller('overview-desktop-matrix');
+      }
+    }
+  });
+
   it('defaults to community engine scope and switches with canonical links preserving tier and locale', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
