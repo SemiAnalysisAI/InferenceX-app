@@ -3,7 +3,7 @@
  *   1. Patch conclusions for CONCLUSION_OVERRIDES
  *   2. Purge runs listed in PURGED_RUNS
  *   3. Purge specific attempts listed in PURGED_RUN_ATTEMPTS
- *
+ *   4. Purge individual benchmark points listed in PURGED_BENCHMARK_POINTS
  * Previews changes (read-only), then confirms before writing.
  *
  * Usage:
@@ -16,7 +16,13 @@
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
 import { type Sql, createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
-import { CONCLUSION_OVERRIDES, PURGED_RUN_ATTEMPTS, PURGED_RUNS } from './etl/run-overrides.js';
+import {
+  type PurgedBenchmarkPoint,
+  CONCLUSION_OVERRIDES,
+  PURGED_BENCHMARK_POINTS,
+  PURGED_RUN_ATTEMPTS,
+  PURGED_RUNS,
+} from './etl/run-overrides.js';
 
 const sql = createAdminSql({
   noSsl: hasNoSslFlag(),
@@ -144,6 +150,95 @@ async function previewPurge(
 }
 
 /**
+ * Delete benchmark results and any sidecars or availability rows left orphaned by
+ * the deletion. The result IDs may come from a whole run or selected points.
+ */
+async function purgeBenchmarkResults(tx: Sql, resultIds: number[]): Promise<void> {
+  if (resultIds.length === 0) return;
+
+  const availKeys = await tx`
+    SELECT DISTINCT c.model, br.isl, br.osl, c.precision, c.hardware,
+           c.framework, c.spec_method, c.disagg, br.date::text AS date
+    FROM benchmark_results br
+    JOIN configs c ON c.id = br.config_id
+    WHERE br.id = ANY(${resultIds})
+  `;
+  const logRows = await tx`
+    SELECT DISTINCT server_log_id AS id FROM benchmark_results
+    WHERE id = ANY(${resultIds}) AND server_log_id IS NOT NULL
+  `;
+  const traceRows = await tx`
+    SELECT DISTINCT trace_replay_id AS id FROM benchmark_results
+    WHERE id = ANY(${resultIds}) AND trace_replay_id IS NOT NULL
+  `;
+
+  await tx`DELETE FROM benchmark_results WHERE id = ANY(${resultIds})`;
+
+  const sIds = logRows.map((r) => r.id as number);
+  if (sIds.length > 0) {
+    await tx`
+      DELETE FROM server_logs
+      WHERE id = ANY(${sIds})
+        AND NOT EXISTS (
+          SELECT 1 FROM benchmark_results br WHERE br.server_log_id = server_logs.id
+        )
+    `;
+  }
+
+  const trIds = traceRows.map((r) => r.id as number);
+  if (trIds.length > 0) {
+    await tx`
+      DELETE FROM agentic_trace_replay
+      WHERE id = ANY(${trIds})
+        AND NOT EXISTS (
+          SELECT 1 FROM benchmark_results br WHERE br.trace_replay_id = agentic_trace_replay.id
+        )
+    `;
+  }
+
+  if (availKeys.length > 0) {
+    const models = availKeys.map((r) => r.model as string);
+    const isls = availKeys.map((r) => r.isl as number | null);
+    const osls = availKeys.map((r) => r.osl as number | null);
+    const precisions = availKeys.map((r) => r.precision as string);
+    const hardwares = availKeys.map((r) => r.hardware as string);
+    const frameworks = availKeys.map((r) => r.framework as string);
+    const specMethods = availKeys.map((r) => r.spec_method as string);
+    const disaggs = availKeys.map((r) => String(r.disagg));
+    const dates = availKeys.map((r) => r.date as string);
+
+    await tx`
+      DELETE FROM availability a
+      USING (
+        SELECT t.model, t.isl::int AS isl, t.osl::int AS osl, t.precision, t.hardware,
+               t.framework, t.spec_method, t.disagg::boolean AS disagg, t.date::date AS date
+        FROM unnest(
+          ${models}::text[], ${isls}::int[], ${osls}::int[],
+          ${precisions}::text[], ${hardwares}::text[], ${frameworks}::text[],
+          ${specMethods}::text[], ${disaggs}::text[], ${dates}::text[]
+        ) AS t(model, isl, osl, precision, hardware, framework, spec_method, disagg, date)
+      ) k
+      WHERE a.model = k.model
+        AND a.isl IS NOT DISTINCT FROM k.isl
+        AND a.osl IS NOT DISTINCT FROM k.osl
+        AND a.precision = k.precision AND a.hardware = k.hardware
+        AND a.framework = k.framework AND a.spec_method = k.spec_method
+        AND a.disagg = k.disagg AND a.date = k.date
+        AND NOT EXISTS (
+          SELECT 1 FROM benchmark_results br
+          JOIN configs c ON c.id = br.config_id
+          WHERE c.model = a.model
+            AND br.isl IS NOT DISTINCT FROM a.isl
+            AND br.osl IS NOT DISTINCT FROM a.osl
+            AND c.precision = a.precision AND c.hardware = a.hardware
+            AND c.framework = a.framework AND c.spec_method = a.spec_method
+            AND c.disagg = a.disagg AND br.date = a.date AND br.error IS NULL
+        )
+    `;
+  }
+}
+
+/**
  * Delete data for the given workflow_run rows (one or more attempts) in a transaction.
  * `wrIds` is the set of `workflow_runs.id` values to remove; sibling attempts of the
  * same `github_run_id` that aren't in `wrIds` are left intact.
@@ -153,100 +248,18 @@ async function purge(wrIds: number[]): Promise<void> {
   await sql.begin(async (_tx) => {
     const tx = _tx as unknown as Sql;
 
-    // Capture availability keys + server_log_ids before deleting benchmarks
-    const availKeys = await tx`
-      SELECT DISTINCT c.model, br.isl, br.osl, c.precision, c.hardware,
-             c.framework, c.spec_method, c.disagg, br.date::text AS date
-      FROM benchmark_results br
-      JOIN configs c ON c.id = br.config_id
-      WHERE br.workflow_run_id = ANY(${wrIds})
+    const resultRows = await tx`
+      SELECT id FROM benchmark_results WHERE workflow_run_id = ANY(${wrIds})
     `;
-    const logRows = await tx`
-      SELECT DISTINCT server_log_id AS id FROM benchmark_results
-      WHERE workflow_run_id = ANY(${wrIds}) AND server_log_id IS NOT NULL
-    `;
-    const traceRows = await tx`
-      SELECT DISTINCT trace_replay_id AS id FROM benchmark_results
-      WHERE workflow_run_id = ANY(${wrIds}) AND trace_replay_id IS NOT NULL
-    `;
+    await purgeBenchmarkResults(
+      tx,
+      resultRows.map((row) => row.id as number),
+    );
 
     // Children first
-    await tx`DELETE FROM benchmark_results WHERE workflow_run_id = ANY(${wrIds})`;
     await tx`DELETE FROM run_stats WHERE workflow_run_id = ANY(${wrIds})`;
     await tx`DELETE FROM eval_results WHERE workflow_run_id = ANY(${wrIds})`;
     await tx`DELETE FROM changelog_entries WHERE workflow_run_id = ANY(${wrIds})`;
-
-    // Orphaned server_logs
-    const sIds = logRows.map((r) => r.id as number);
-    if (sIds.length > 0) {
-      await tx`
-        DELETE FROM server_logs
-        WHERE id = ANY(${sIds})
-          AND NOT EXISTS (
-            SELECT 1 FROM benchmark_results br WHERE br.server_log_id = server_logs.id
-          )
-      `;
-    }
-
-    // Orphaned agentic_trace_replay sidecars (profile-export + server-metrics
-    // blobs). benchmark_results.trace_replay_id has no ON DELETE cascade, so
-    // deleting the run's rows above leaves these behind — clear any that are no
-    // longer referenced by a surviving benchmark_results row.
-    const trIds = traceRows.map((r) => r.id as number);
-    if (trIds.length > 0) {
-      await tx`
-        DELETE FROM agentic_trace_replay
-        WHERE id = ANY(${trIds})
-          AND NOT EXISTS (
-            SELECT 1 FROM benchmark_results br WHERE br.trace_replay_id = agentic_trace_replay.id
-          )
-      `;
-    }
-
-    // Orphaned availability rows. NULL-safe on isl/osl (`IS NOT DISTINCT FROM`)
-    // so agentic rows are matched too: agentic_traces availability has isl/osl
-    // NULL, and a row-value `IN` / `=` never matches NULL — which previously
-    // left agentic availability rows behind after a purge.
-    if (availKeys.length > 0) {
-      const models = availKeys.map((r) => r.model as string);
-      const isls = availKeys.map((r) => r.isl as number | null);
-      const osls = availKeys.map((r) => r.osl as number | null);
-      const precisions = availKeys.map((r) => r.precision as string);
-      const hardwares = availKeys.map((r) => r.hardware as string);
-      const frameworks = availKeys.map((r) => r.framework as string);
-      const specMethods = availKeys.map((r) => r.spec_method as string);
-      const disaggs = availKeys.map((r) => String(r.disagg));
-      const dates = availKeys.map((r) => r.date as string);
-
-      await tx`
-        DELETE FROM availability a
-        USING (
-          SELECT t.model, t.isl::int AS isl, t.osl::int AS osl, t.precision, t.hardware,
-                 t.framework, t.spec_method, t.disagg::boolean AS disagg, t.date::date AS date
-          FROM unnest(
-            ${models}::text[], ${isls}::int[], ${osls}::int[],
-            ${precisions}::text[], ${hardwares}::text[], ${frameworks}::text[],
-            ${specMethods}::text[], ${disaggs}::text[], ${dates}::text[]
-          ) AS t(model, isl, osl, precision, hardware, framework, spec_method, disagg, date)
-        ) k
-        WHERE a.model = k.model
-          AND a.isl IS NOT DISTINCT FROM k.isl
-          AND a.osl IS NOT DISTINCT FROM k.osl
-          AND a.precision = k.precision AND a.hardware = k.hardware
-          AND a.framework = k.framework AND a.spec_method = k.spec_method
-          AND a.disagg = k.disagg AND a.date = k.date
-          AND NOT EXISTS (
-            SELECT 1 FROM benchmark_results br
-            JOIN configs c ON c.id = br.config_id
-            WHERE c.model = a.model
-              AND br.isl IS NOT DISTINCT FROM a.isl
-              AND br.osl IS NOT DISTINCT FROM a.osl
-              AND c.precision = a.precision AND c.hardware = a.hardware
-              AND c.framework = a.framework AND c.spec_method = a.spec_method
-              AND c.disagg = a.disagg AND br.date = a.date AND br.error IS NULL
-          )
-      `;
-    }
 
     // Parent last (target the specific workflow_runs rows so partial purges
     // leave sibling attempts of the same github_run_id intact)
@@ -254,6 +267,46 @@ async function purge(wrIds: number[]): Promise<void> {
   });
 
   console.log(`    deleted.`);
+}
+
+interface BenchmarkPointPurgeTarget {
+  resultIds: number[];
+}
+
+/** Preview exact benchmark rows selected by an audited point override. */
+async function previewBenchmarkPointPurge(
+  point: PurgedBenchmarkPoint,
+): Promise<BenchmarkPointPurgeTarget | null> {
+  console.log(`  ${point.githubRunId} (attempt ${point.runAttempt})`);
+  const rows = await sql`
+    SELECT br.id
+    FROM benchmark_results br
+    JOIN workflow_runs wr ON wr.id = br.workflow_run_id
+    WHERE wr.github_run_id = ${point.githubRunId}
+      AND wr.run_attempt = ${point.runAttempt}
+      AND br.config_id = ${point.configId}
+      AND br.benchmark_type = ${point.benchmarkType}
+      AND br.isl IS NOT DISTINCT FROM ${point.isl}
+      AND br.osl IS NOT DISTINCT FROM ${point.osl}
+      AND br.conc = ${point.conc}
+      AND br.offload_mode = ${point.offloadMode}
+  `;
+  const description =
+    `config ${point.configId}, ${point.benchmarkType}, isl ${point.isl}, ` +
+    `osl ${point.osl}, conc ${point.conc}, offload ${point.offloadMode}`;
+  if (rows.length === 0) {
+    console.log(`    ${description}, not in DB, skipping.`);
+    return null;
+  }
+  console.log(`    ${description}, ${rows.length} benchmark row(s).`);
+  return { resultIds: rows.map((row) => row.id as number) };
+}
+
+async function purgeBenchmarkPoints(resultIds: number[]): Promise<void> {
+  await sql.begin(async (_tx) => {
+    await purgeBenchmarkResults(_tx as unknown as Sql, resultIds);
+  });
+  console.log(`    deleted ${resultIds.length} benchmark point(s).`);
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -300,6 +353,26 @@ async function main(): Promise<void> {
   }
   if (found.length > 0) hasWork = true;
 
+  const pointTargets: BenchmarkPointPurgeTarget[] = [];
+  if (PURGED_BENCHMARK_POINTS.length > 0) {
+    console.log(`\n  Benchmark point purge targets (${PURGED_BENCHMARK_POINTS.length}):`);
+    for (const point of PURGED_BENCHMARK_POINTS) {
+      if (PURGED_RUNS.has(point.githubRunId)) {
+        console.log(`  ${point.githubRunId}, already in PURGED_RUNS, skipping point purge.`);
+        continue;
+      }
+      if (PURGED_RUN_ATTEMPTS.get(point.githubRunId)?.has(point.runAttempt)) {
+        console.log(
+          `  ${point.githubRunId} attempt ${point.runAttempt}, already purged, skipping point purge.`,
+        );
+        continue;
+      }
+      const result = await previewBenchmarkPointPurge(point);
+      if (result) pointTargets.push(result);
+    }
+  }
+  if (pointTargets.length > 0) hasWork = true;
+
   if (!hasWork) {
     console.log('\n  Nothing to do.');
     return;
@@ -324,6 +397,13 @@ async function main(): Promise<void> {
     console.log('\n  Purging runs...');
     for (const { wrIds } of found) {
       await purge(wrIds);
+    }
+  }
+
+  if (pointTargets.length > 0) {
+    console.log('\n  Purging benchmark points...');
+    for (const { resultIds } of pointTargets) {
+      await purgeBenchmarkPoints(resultIds);
     }
   }
 

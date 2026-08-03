@@ -32,7 +32,7 @@ import path from 'path';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
-import { PURGED_RUNS } from './etl/run-overrides';
+import { isBenchmarkPointPurged, PURGED_RUNS } from './etl/run-overrides';
 import { createSkipTracker, type Skips } from './etl/skip-tracker';
 import { GPU_KEYS, parseIslOsl } from './etl/normalizers';
 import { createConfigCache } from './etl/config-cache';
@@ -581,12 +581,31 @@ async function main(): Promise<void> {
     });
     if (workflowRunId === null) return wr;
 
+    const runAttempt = result.ghInfo?.runAttempt ?? 0;
+
     const allInserted: (BenchmarkParams & { configId: number })[] = [];
     for (const { zipFile, rows, serverLogPath } of result.bmkZips) {
       const toInsert: (BenchmarkParams & { configId: number })[] = [];
       for (const row of rows) {
         try {
           const configId = await getOrCreateConfig(row.config);
+          if (
+            isBenchmarkPointPurged(result.githubRunId, runAttempt, {
+              configId,
+              benchmarkType: row.benchmarkType,
+              isl: row.isl,
+              osl: row.osl,
+              conc: row.conc,
+              offloadMode: row.offloadMode,
+            })
+          ) {
+            console.log(
+              `  [${result.dateDir}] skipped purged benchmark point: config ${configId}, ` +
+                `${row.benchmarkType}, isl ${row.isl}, osl ${row.osl}, conc ${row.conc}, ` +
+                `offload ${row.offloadMode}`,
+            );
+            continue;
+          }
           toInsert.push({ ...row, configId });
         } catch (error: any) {
           tracker.recordDbError(`config for ${zipFile}`, error);
