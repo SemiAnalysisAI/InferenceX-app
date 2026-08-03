@@ -15,6 +15,10 @@
  *   Use this when a single attempt produced bad data but a later attempt is expected to succeed
  *   (or has already succeeded), so we can't nuke the entire run.
  *
+ * PURGED_BENCHMARK_POINTS, purge individual benchmark rows from an otherwise valid
+ * run attempt and skip them on every future ingest. Each entry uses the row's durable
+ * database natural key, which can be queried from the linked dashboard point.
+ *
  * Note: GitHub deletes old workflow runs over time so these overrides may not be applicable forever,
  *       but we should keep them around for historical reference. You can find these on github (if available) by filling
  *       in the run id into the following link: https://github.com/SemiAnalysisAI/InferenceX/actions/runs/{run_id_here}
@@ -81,6 +85,49 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
   [25199291771, new Set([1, 2])], // 2026-05-01 | dsv4 GB200 dynamo-vllm MTP2 | Reason: only 2 of 6 conc points uploaded on both attempts. re-run pending
 ]);
+
+export interface BenchmarkPointKey {
+  configId: number;
+  benchmarkType: string;
+  isl: number | null;
+  osl: number | null;
+  conc: number;
+  offloadMode: string;
+}
+
+export interface PurgedBenchmarkPoint extends BenchmarkPointKey {
+  githubRunId: number;
+  runAttempt: number;
+}
+
+/**
+ * Individual benchmark rows to skip on ingest and delete from the DB.
+ * Keep a dated reason comment beside every entry for auditability:
+ * `{ githubRunId, runAttempt, configId, benchmarkType, isl, osl, conc, offloadMode }`.
+ */
+export const PURGED_BENCHMARK_POINTS: readonly PurgedBenchmarkPoint[] = [];
+
+/**
+ * True when this exact benchmark result is suppressed. When an ingest source
+ * cannot determine the attempt, match the point across every attempt of its run.
+ */
+export function isBenchmarkPointPurged(
+  githubRunId: number,
+  runAttempt: number | null | undefined,
+  point: BenchmarkPointKey,
+): boolean {
+  return PURGED_BENCHMARK_POINTS.some(
+    (candidate) =>
+      candidate.githubRunId === githubRunId &&
+      (runAttempt === null || runAttempt === undefined || candidate.runAttempt === runAttempt) &&
+      candidate.configId === point.configId &&
+      candidate.benchmarkType === point.benchmarkType &&
+      candidate.isl === point.isl &&
+      candidate.osl === point.osl &&
+      candidate.conc === point.conc &&
+      candidate.offloadMode === point.offloadMode,
+  );
+}
 
 /**
  * True when the (run, attempt) pair should be skipped on ingest. Pass `runAttempt`
