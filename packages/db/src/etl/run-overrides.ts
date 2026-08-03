@@ -106,16 +106,19 @@ export interface PurgedBenchmarkPoint extends BenchmarkPointKey {
  */
 export const PURGED_BENCHMARK_POINTS: readonly PurgedBenchmarkPoint[] = [];
 
-/** True when this exact benchmark result is suppressed for a run attempt. */
+/**
+ * True when this exact benchmark result is suppressed. When an ingest source
+ * cannot determine the attempt, match the point across every attempt of its run.
+ */
 export function isBenchmarkPointPurged(
   githubRunId: number,
-  runAttempt: number,
+  runAttempt: number | null | undefined,
   point: BenchmarkPointKey,
 ): boolean {
   return PURGED_BENCHMARK_POINTS.some(
     (candidate) =>
       candidate.githubRunId === githubRunId &&
-      candidate.runAttempt === runAttempt &&
+      (runAttempt === null || runAttempt === undefined || candidate.runAttempt === runAttempt) &&
       candidate.configId === point.configId &&
       candidate.benchmarkType === point.benchmarkType &&
       candidate.isl === point.isl &&

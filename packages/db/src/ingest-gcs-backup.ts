@@ -581,8 +581,6 @@ async function main(): Promise<void> {
     });
     if (workflowRunId === null) return wr;
 
-    const runAttempt = result.ghInfo?.runAttempt ?? 0;
-
     const allInserted: (BenchmarkParams & { configId: number })[] = [];
     for (const { zipFile, rows, serverLogPath } of result.bmkZips) {
       const toInsert: (BenchmarkParams & { configId: number })[] = [];
@@ -590,7 +588,7 @@ async function main(): Promise<void> {
         try {
           const configId = await getOrCreateConfig(row.config);
           if (
-            isBenchmarkPointPurged(result.githubRunId, runAttempt, {
+            isBenchmarkPointPurged(result.githubRunId, result.ghInfo?.runAttempt, {
               configId,
               benchmarkType: row.benchmarkType,
               isl: row.isl,

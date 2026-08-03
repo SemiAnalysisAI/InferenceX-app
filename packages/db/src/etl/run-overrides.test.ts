@@ -158,6 +158,8 @@ describe('isBenchmarkPointPurged', () => {
 
     try {
       expect(isBenchmarkPointPurged(point.githubRunId, point.runAttempt, point)).toBe(true);
+      expect(isBenchmarkPointPurged(point.githubRunId, undefined, point)).toBe(true);
+      expect(isBenchmarkPointPurged(point.githubRunId, null, point)).toBe(true);
       expect(isBenchmarkPointPurged(point.githubRunId, 2, point)).toBe(false);
       expect(isBenchmarkPointPurged(2, point.runAttempt, point)).toBe(false);
       expect(
