@@ -168,9 +168,11 @@ export const Y_AXIS_METRICS = [
   'y_tpPerGpu',
   'y_inputTputPerGpu',
   'y_outputTputPerGpu',
+  'y_outputTputPerTotalGpu',
   'y_tpPerMw',
   'y_inputTputPerMw',
   'y_outputTputPerMw',
+  'y_outputTputPerTotalMw',
   'y_costh',
   'y_costn',
   'y_costr',
@@ -310,6 +312,16 @@ export function createChartDataPoint(
   const outputTputPerGpu = entry.output_tput_per_gpu ?? 0;
   const inputTputPerGpu = entry.input_tput_per_gpu ?? 0;
 
+  // Output throughput normalized over the TOTAL GPU count. Disagg configs report
+  // output_tput_per_gpu per decode GPU only, so fold the prefill pool back in:
+  // (tok/s/decode-gpu * num_decode) / (num_prefill + num_decode). For aggregated
+  // configs every GPU decodes, so the value equals output_tput_per_gpu as-is.
+  const totalGpuCount = entry.num_prefill_gpu + entry.num_decode_gpu;
+  const outputTputPerTotalGpu =
+    entry.disagg && totalGpuCount > 0
+      ? (outputTputPerGpu * entry.num_decode_gpu) / totalGpuCount
+      : outputTputPerGpu;
+
   const tokensPerHour = (tputPerGpu * 3600) / 1000000;
   const outputTokensPerHour = (outputTputPerGpu * 3600) / 1000000;
   const inputTokensPerHour = (inputTputPerGpu * 3600) / 1000000;
@@ -357,6 +369,9 @@ export function createChartDataPoint(
     // Roofline metric fields
     tpPerGpu: { y: tputPerGpu, roof: false },
     ...(outputTputPerGpu ? { outputTputPerGpu: { y: outputTputPerGpu, roof: false } } : {}),
+    ...(outputTputPerGpu
+      ? { outputTputPerTotalGpu: { y: outputTputPerTotalGpu, roof: false } }
+      : {}),
     ...(inputTputPerGpu ? { inputTputPerGpu: { y: inputTputPerGpu, roof: false } } : {}),
     tpPerMw: { y: (tputPerGpu * 1000) / hardwarePower, roof: false },
     ...(inputTputPerGpu
@@ -371,6 +386,14 @@ export function createChartDataPoint(
       ? {
           outputTputPerMw: {
             y: hardwarePower ? (outputTputPerGpu * 1000) / hardwarePower : 0,
+            roof: false,
+          },
+        }
+      : {}),
+    ...(outputTputPerGpu
+      ? {
+          outputTputPerTotalMw: {
+            y: hardwarePower ? (outputTputPerTotalGpu * 1000) / hardwarePower : 0,
             roof: false,
           },
         }
@@ -632,10 +655,12 @@ export const calculateRoofline = (
     | keyof InferenceData
     | `tpPerGpu.y`
     | `outputTputPerGpu.y`
+    | `outputTputPerTotalGpu.y`
     | `inputTputPerGpu.y`
     | `tpPerMw.y`
     | `inputTputPerMw.y`
     | `outputTputPerMw.y`
+    | `outputTputPerTotalMw.y`
     | `costh.y`
     | `costn.y`
     | `costr.y`
@@ -710,10 +735,12 @@ export function computeAllRooflines(
             | keyof InferenceData
             | `tpPerGpu.y`
             | `outputTputPerGpu.y`
+            | `outputTputPerTotalGpu.y`
             | `inputTputPerGpu.y`
             | `tpPerMw.y`
             | `inputTputPerMw.y`
             | `outputTputPerMw.y`
+            | `outputTputPerTotalMw.y`
             | `costh.y`
             | `costn.y`
             | `costr.y`
@@ -757,12 +784,16 @@ export function markRooflinePoints(
       if (newPoint.outputTputPerGpu) {
         newPoint.outputTputPerGpu.roof = false;
       }
+      if (newPoint.outputTputPerTotalGpu) {
+        newPoint.outputTputPerTotalGpu.roof = false;
+      }
       if (newPoint.inputTputPerGpu) {
         newPoint.inputTputPerGpu.roof = false;
       }
       newPoint.tpPerMw.roof = false;
       if (newPoint.inputTputPerMw) newPoint.inputTputPerMw.roof = false;
       if (newPoint.outputTputPerMw) newPoint.outputTputPerMw.roof = false;
+      if (newPoint.outputTputPerTotalMw) newPoint.outputTputPerTotalMw.roof = false;
       newPoint.costh.roof = false;
       newPoint.costn.roof = false;
       newPoint.costr.roof = false;
@@ -806,6 +837,10 @@ export function markRooflinePoints(
           if (newPoint.outputTputPerGpu) {
             newPoint.outputTputPerGpu.roof = onCurrentRoofline;
           }
+        } else if (chartDefYKey === 'y_outputTputPerTotalGpu') {
+          if (newPoint.outputTputPerTotalGpu) {
+            newPoint.outputTputPerTotalGpu.roof = onCurrentRoofline;
+          }
         } else if (chartDefYKey === 'y_inputTputPerGpu') {
           if (newPoint.inputTputPerGpu) {
             newPoint.inputTputPerGpu.roof = onCurrentRoofline;
@@ -816,6 +851,8 @@ export function markRooflinePoints(
           if (newPoint.inputTputPerMw) newPoint.inputTputPerMw.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_outputTputPerMw') {
           if (newPoint.outputTputPerMw) newPoint.outputTputPerMw.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_outputTputPerTotalMw') {
+          if (newPoint.outputTputPerTotalMw) newPoint.outputTputPerTotalMw.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_costh') {
           newPoint.costh.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_costn') {

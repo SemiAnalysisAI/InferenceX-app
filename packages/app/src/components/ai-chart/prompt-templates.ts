@@ -51,8 +51,8 @@ Open-source ML inference benchmark dashboard. Automated CI runs test real servin
 **Sequences**: 1k/1k, 1k/8k, 8k/1k (input/output token lengths)
 
 **Benchmark y-axis metrics**: ${Y_METRIC_LIST}
-  Throughput: y_tpPerGpu (total tok/s/gpu, DEFAULT), y_outputTputPerGpu, y_inputTputPerGpu
-  Efficiency: y_tpPerMw (tok/s/MW)
+  Throughput: y_tpPerGpu (total tok/s/gpu, DEFAULT), y_outputTputPerGpu, y_inputTputPerGpu, y_outputTputPerTotalGpu (output tok/s over total GPUs incl. prefill)
+  Efficiency: y_tpPerMw (tok/s/MW), y_outputTputPerTotalMw (output tok/s/MW over total GPUs)
   Cost: y_costh (hyperscaler $/Mtok), y_costn (neocloud), y_costr (3yr rental)
   Energy: y_jTotal (J/tok), y_jOutput, y_jInput
 **Eval metric**: eval_score

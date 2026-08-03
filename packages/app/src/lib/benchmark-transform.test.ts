@@ -863,6 +863,51 @@ describe('transformBenchmarkRows — data point values', () => {
     expect(point.inputTputPerGpu!.y).toBe(80);
   });
 
+  it('sets outputTputPerTotalGpu equal to outputTputPerGpu for non-disagg rows', () => {
+    const rows = [
+      makeRow({
+        disagg: false,
+        metrics: {
+          tput_per_gpu: 500,
+          output_tput_per_gpu: 420,
+          input_tput_per_gpu: 80,
+          median_intvty: 18,
+          median_e2el: 2.5,
+        },
+      }),
+    ];
+    const { chartData } = transformBenchmarkRows(rows);
+    const point = chartData[0][0];
+    expect(point.outputTputPerTotalGpu).toBeDefined();
+    expect(point.outputTputPerTotalGpu!.y).toBe(420);
+    expect(point.outputTputPerTotalMw).toBeDefined();
+    expect(point.outputTputPerTotalMw!.y).toBeGreaterThan(0);
+  });
+
+  it('normalizes outputTputPerTotalGpu over prefill+decode GPUs for disagg rows', () => {
+    const rows = [
+      makeRow({
+        disagg: true,
+        num_prefill_gpu: 4,
+        num_decode_gpu: 2,
+        metrics: {
+          tput_per_gpu: 500,
+          output_tput_per_gpu: 900,
+          input_tput_per_gpu: 80,
+          median_intvty: 18,
+          median_e2el: 2.5,
+        },
+      }),
+    ];
+    const { chartData } = transformBenchmarkRows(rows);
+    const point = chartData[0][0];
+    // (900 tok/s/decode-gpu * 2 decode GPUs) / (4 + 2 total GPUs)
+    expect(point.outputTputPerTotalGpu).toBeDefined();
+    expect(point.outputTputPerTotalGpu!.y).toBe(300);
+    // Per-decode-GPU metric stays untouched
+    expect(point.outputTputPerGpu!.y).toBe(900);
+  });
+
   it('groups data points by hwKey within each chart', () => {
     const rows = [
       makeRow({ hardware: 'h200', framework: 'trt', conc: 16 }),

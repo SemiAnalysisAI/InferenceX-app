@@ -37,6 +37,14 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
   const specs = getGpuSpecs(hwKey);
   const power = specs.power;
 
+  // Output throughput normalized over the total GPU count — mirrors the
+  // outputTputPerTotalGpu derivation in createChartDataPoint (chart-utils.ts).
+  const totalGpuCount = entry.num_prefill_gpu + entry.num_decode_gpu;
+  const outputTputTotal =
+    entry.disagg && totalGpuCount > 0
+      ? (outputTput * entry.num_decode_gpu) / totalGpuCount
+      : outputTput;
+
   const tokPerHr = (tput * 3600) / 1_000_000;
   const outTokPerHr = (outputTput * 3600) / 1_000_000;
   const inTokPerHr = (inputTput * 3600) / 1_000_000;
@@ -55,8 +63,10 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
     date: row.date,
     tpPerGpu: wrapMetric(tput),
     outputTputPerGpu: wrapMetric(outputTput),
+    outputTputPerTotalGpu: wrapMetric(outputTputTotal),
     inputTputPerGpu: wrapMetric(inputTput),
     tpPerMw: wrapMetric(power > 0 ? (tput * 1000) / power : 0),
+    outputTputPerTotalMw: wrapMetric(power > 0 ? (outputTputTotal * 1000) / power : 0),
     // Cost per million tokens (total / output / input)
     costh: wrapMetric(tokPerHr ? specs.costh / tokPerHr : 0),
     costn: wrapMetric(tokPerHr ? specs.costn / tokPerHr : 0),

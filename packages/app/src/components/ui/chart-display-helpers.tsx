@@ -12,7 +12,19 @@ import type { Locale } from '@/lib/i18n';
 
 // Keep these metric-key groups in sync with chart-utils/chart configs when new source-backed
 // metrics are added; this helper owns which caption notes and caveats appear for each family.
-const POWER_SOURCE_METRICS = new Set(['y_tpPerMw', 'y_inputTputPerMw', 'y_outputTputPerMw']);
+const POWER_SOURCE_METRICS = new Set([
+  'y_tpPerMw',
+  'y_inputTputPerMw',
+  'y_outputTputPerMw',
+  'y_outputTputPerTotalMw',
+]);
+// Per-MW metrics that normalize disagg configs per decode/prefill GPU pool only.
+// y_outputTputPerTotalMw is excluded — it already folds in the total GPU count,
+// so the per-pool disagg caveat doesn't apply (it gets TotalGpuNote instead).
+const PER_POOL_POWER_METRICS = new Set(['y_tpPerMw', 'y_inputTputPerMw', 'y_outputTputPerMw']);
+// Metrics normalized over the total GPU count (prefill + decode) — disagg configs
+// ARE apples-to-apples with aggregated configs here, which TotalGpuNote calls out.
+const TOTAL_GPU_NORMALIZED_METRICS = new Set(['y_outputTputPerTotalGpu', 'y_outputTputPerTotalMw']);
 const TOTAL_COST_METRICS = new Set(['y_costh', 'y_costn', 'y_costr']);
 const OUTPUT_COST_METRICS = new Set(['y_costhOutput', 'y_costnOutput', 'y_costrOutput']);
 const INPUT_COST_METRICS = new Set(['y_costhi', 'y_costni', 'y_costri']);
@@ -97,6 +109,34 @@ function DisaggCaveat({
         TRTLLM) calculate {calculationNoun} per decode GPU or per prefill GPU, rather than per total
         GPU count. This makes direct {comparisonNoun} comparison with aggregated configs not an
         apples-to-apples comparison.
+      </>
+    );
+
+  return (
+    <div
+      className={`overflow-hidden transition-all duration-200 ease-in-out ${
+        visible ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
+      }`}
+    >
+      <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
+        {content}
+      </p>
+    </div>
+  );
+}
+
+function TotalGpuNote({ visible, locale = 'en' }: { visible: boolean; locale?: Locale }) {
+  const content =
+    locale === 'zh' ? (
+      <>
+        <strong>注意：</strong>该指标按总 GPU 数（预填充 + 解码 GPU）对输出吞吐量进行归一化，
+        因此分离式推理配置可与聚合配置直接对比。
+      </>
+    ) : (
+      <>
+        <strong>Note:</strong> This metric normalizes output throughput over the total GPU count
+        (prefill + decode GPUs), so disaggregated inference configurations are directly comparable
+        with aggregated configs.
       </>
     );
 
@@ -203,11 +243,15 @@ export function MetricAssumptionNotes({
       />
       {includePowerThroughputCaveat && (
         <DisaggCaveat
-          visible={POWER_SOURCE_METRICS.has(selectedYAxisMetric)}
+          visible={PER_POOL_POWER_METRICS.has(selectedYAxisMetric)}
           calculationNoun="power"
           locale={locale}
         />
       )}
+      <TotalGpuNote
+        visible={TOTAL_GPU_NORMALIZED_METRICS.has(selectedYAxisMetric)}
+        locale={locale}
+      />
       {showJouleSource && (
         <>
           <MetricBadges label={powerLabel} values={POWER_VALUES} />

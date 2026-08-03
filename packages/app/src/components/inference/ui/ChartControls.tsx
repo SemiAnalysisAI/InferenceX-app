@@ -121,9 +121,11 @@ const METRIC_GROUPS: {
       'y_tpPerGpu',
       'y_inputTputPerGpu',
       'y_outputTputPerGpu',
+      'y_outputTputPerTotalGpu',
       'y_tpPerMw',
       'y_inputTputPerMw',
       'y_outputTputPerMw',
+      'y_outputTputPerTotalMw',
     ],
   },
   {
