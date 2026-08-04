@@ -58,6 +58,7 @@
     "dompurify": "^3.4.12",
     "gray-matter": "^4.0.3",
     "iwanthue": "^2.1.0",
+    "katex": "^0.16.47",
     "lucide-react": "^1.27.0",
     "mp4-muxer": "^5.2.2",
     "next": "^16.2.12",
@@ -66,7 +67,9 @@
     "posthog-js": "^1.407.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
     "shiki": "^4.3.1",
     "tailwind-merge": "^3.6.0",
     "three": "^0.185.1"
