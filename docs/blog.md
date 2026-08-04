@@ -38,6 +38,30 @@ Slug is derived from the filename (e.g., `my-post.mdx` -> `my-post`), not from f
 | `<Figure src="..." alt="..." caption="..." />` | Captioned figures                | Uses `<img>` (not `next/image`) for external URLs                                 |
 | `<Blur>...</Blur>`                             | Paywall teaser blur overlay      | Content is blurred, unselectable, and not clickable                               |
 | `<JsonLd>{...}</JsonLd>`                       | Structured data (JSON-LD)        | Renders `<script type="application/ld+json">`. Validates JSON before rendering.   |
+| `$$ … $$`                                      | LaTeX math (KaTeX)               | `$$` is the **only** delimiter — see [Math](#math-katex) below                    |
+
+`<Figure caption>` is a plain string prop, so MDX never parses it. Inline `[label](https://…)`
+links in a caption are turned into real anchors by `renderCaption` in `mdx-components.tsx`;
+other markdown (bold, code) still renders literally.
+
+### Math (KaTeX)
+
+`remark-math` + `rehype-katex` run in the MDX pipeline of both `/blog/[slug]` and
+`/zh/blog/[slug]`. Write display math as a `$$`-fenced block:
+
+```
+$$
+\mathbf{S}_t = \mathbf{S}_{t-1} + \beta_t\mathbf{v}_t\mathbf{k}_t^\top
+$$
+```
+
+`singleDollarTextMath` is **disabled**: a lone `$` is never a math delimiter, because posts
+are full of prices like `$1.95/GPU/hr` and `$3 per million tokens` that would otherwise be
+swallowed into a formula. Inline math therefore also needs `$$…$$`.
+
+KaTeX runs with `strict: false`, so one malformed expression renders in red rather than
+failing the whole build. `katex/dist/katex.min.css` is imported by the post pages, and its
+fonts are emitted to `/_next/static/media/` — no external CDN.
 
 Heading ID deduplication: if two headings share a slug, the second gets prefixed with its parent heading's slug (e.g., `overview-details`). If no parent exists, a level suffix is appended (`intro-2`).
 

@@ -3,9 +3,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { compileMDX } from 'next-mdx-remote/rsc';
 import rehypeShikiFromHighlighter from '@shikijs/rehype/core';
+import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import { createHighlighterCore } from 'shiki/core';
 import { createOnigurumaEngine } from 'shiki/engine/oniguruma';
+
+import 'katex/dist/katex.min.css';
 
 import { BlogBackLink } from '@/components/blog/blog-back-link';
 import { BlogPostNav } from '@/components/blog/blog-post-nav';
@@ -119,8 +123,13 @@ export default async function ZhBlogPostPage({ params }: Props) {
     components: createMdxComponents('zh'),
     options: {
       mdxOptions: {
-        remarkPlugins: [remarkGfm],
+        // `singleDollarTextMath: false` keeps prices like $1.95/GPU/hr from being parsed
+        // as inline math; math must be delimited with `$$`.
+        remarkPlugins: [remarkGfm, [remarkMath, { singleDollarTextMath: false }]],
         rehypePlugins: [
+          // `strict: false` keeps a single malformed expression from failing the whole build;
+          // KaTeX renders it inline in red instead.
+          [rehypeKatex, { strict: false }],
           [
             rehypeShikiFromHighlighter,
             highlighter,

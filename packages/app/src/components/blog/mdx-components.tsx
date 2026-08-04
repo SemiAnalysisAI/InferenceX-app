@@ -50,6 +50,34 @@ function Blur(props: { children?: ReactNode }) {
   return <div className="blur-sm select-none pointer-events-none">{props.children}</div>;
 }
 
+/** `[label](https://…)` inside a `<Figure caption>`. Captions are plain strings, so MDX
+ *  never sees them — without this, source credits would render as literal brackets. */
+const CAPTION_LINK = /\[(?<label>[^\]]+)\]\((?<href>https?:\/\/[^\s)]+)\)/gu;
+
+export function renderCaption(caption: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+  for (const match of caption.matchAll(CAPTION_LINK)) {
+    const full = match[0];
+    const { label, href } = match.groups as { label: string; href: string };
+    if (match.index > cursor) nodes.push(caption.slice(cursor, match.index));
+    nodes.push(
+      <a
+        key={`${href}-${match.index}`}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-2"
+      >
+        {label}
+      </a>,
+    );
+    cursor = match.index + full.length;
+  }
+  if (cursor < caption.length) nodes.push(caption.slice(cursor));
+  return nodes;
+}
+
 /** Creates a fresh set of MDX components with clean heading dedup state per render. */
 export function createMdxComponents(
   locale: Locale = 'en',
@@ -149,7 +177,7 @@ export function createMdxComponents(
           )}
           {props.caption && (
             <figcaption className="text-center text-sm text-muted-foreground mt-2">
-              {props.caption}
+              {renderCaption(props.caption)}
             </figcaption>
           )}
         </figure>
