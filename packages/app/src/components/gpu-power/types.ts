@@ -70,7 +70,7 @@ export const GPU_METRIC_OPTIONS: GpuMetricConfig[] = [
   { key: 'temperature', label: 'Temperature', unit: '°C', yAxisLabel: 'Temperature (°C)' },
   { key: 'smClock', label: 'GFX Clock', unit: 'MHz', yAxisLabel: 'GFX Clock (MHz)' },
   { key: 'memClock', label: 'Memory Clock', unit: 'MHz', yAxisLabel: 'Memory Clock (MHz)' },
-  { key: 'gpuUtil', label: 'GPU Utilization', unit: '%', yAxisLabel: 'GPU Utilization (%)' },
+  { key: 'gpuUtil', label: 'Chip Utilization', unit: '%', yAxisLabel: 'Chip Utilization (%)' },
   { key: 'memUtil', label: 'Memory Utilization', unit: '%', yAxisLabel: 'Memory Utilization (%)' },
 ];
 
@@ -203,7 +203,7 @@ export function detectAnomalies(
             gpuIndex,
             seconds,
             value: values[i],
-            message: `GPU ${gpuIndex} at ${seconds.toFixed(0)}s: ${metricKey} = ${values[i].toFixed(1)} (Modified Z = ${modifiedZ.toFixed(1)}, median = ${med.toFixed(1)})`,
+            message: `Chip ${gpuIndex} at ${seconds.toFixed(0)}s: ${metricKey} = ${values[i].toFixed(1)} (Modified Z = ${modifiedZ.toFixed(1)}, median = ${med.toFixed(1)})`,
           });
         }
       }
@@ -216,7 +216,7 @@ export function detectAnomalies(
           gpuIndex,
           seconds,
           value: row.temperature,
-          message: `GPU ${gpuIndex} at ${seconds.toFixed(0)}s: temperature ${row.temperature}°C exceeds throttle threshold (83°C)`,
+          message: `Chip ${gpuIndex} at ${seconds.toFixed(0)}s: temperature ${row.temperature}°C exceeds throttle threshold (83°C)`,
         });
       }
 
@@ -228,7 +228,7 @@ export function detectAnomalies(
           gpuIndex,
           seconds,
           value: row.power,
-          message: `GPU ${gpuIndex} at ${seconds.toFixed(0)}s: power ${row.power.toFixed(1)}W is ${((row.power / tdpInfo.tdp) * 100).toFixed(0)}% of TDP (${tdpInfo.tdp}W)`,
+          message: `Chip ${gpuIndex} at ${seconds.toFixed(0)}s: power ${row.power.toFixed(1)}W is ${((row.power / tdpInfo.tdp) * 100).toFixed(0)}% of TDP (${tdpInfo.tdp}W)`,
         });
       }
 
@@ -244,7 +244,7 @@ export function detectAnomalies(
           gpuIndex,
           seconds,
           value: row.smClock,
-          message: `GPU ${gpuIndex} at ${seconds.toFixed(0)}s: SM clock ${row.smClock} MHz dropped ${((1 - row.smClock / smMedian) * 100).toFixed(0)}% below median (${smMedian.toFixed(0)} MHz)`,
+          message: `Chip ${gpuIndex} at ${seconds.toFixed(0)}s: SM clock ${row.smClock} MHz dropped ${((1 - row.smClock / smMedian) * 100).toFixed(0)}% below median (${smMedian.toFixed(0)} MHz)`,
         });
       }
 
@@ -256,7 +256,7 @@ export function detectAnomalies(
           gpuIndex,
           seconds,
           value: 0,
-          message: `GPU ${gpuIndex} at ${seconds.toFixed(0)}s: utilization dropped to 0% (was ${rows[i - 1].gpuUtil}%)`,
+          message: `Chip ${gpuIndex} at ${seconds.toFixed(0)}s: utilization dropped to 0% (was ${rows[i - 1].gpuUtil}%)`,
         });
       }
     }

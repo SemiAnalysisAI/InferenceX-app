@@ -27,7 +27,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
-import type { ChartDefinition, DisaggMode, SpecMode } from '@/components/inference/types';
+import type { ChartDefinition, DeploymentMode, SpecMode } from '@/components/inference/types';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
@@ -46,20 +46,23 @@ const STRINGS = {
     scaleAuto: 'Auto',
     scaleLinear: 'Linear',
     scaleLog: 'Logarithmic',
-    gpuConfig: 'GPU Config',
+    gpuConfig: 'Chip Config',
     gpuConfigTooltip:
-      'Select up to 4 GPU configurations to compare their historical performance over time. This allows for tracking how software updates may affect specific hardware.',
-    gpuConfigPlaceholder: 'Select a GPU Config for comparison',
+      'Select up to 4 chip configurations to compare their historical performance over time. This allows for tracking how software updates may affect specific hardware.',
+    gpuConfigPlaceholder: 'Select a Chip Config for comparison',
     comparisonDateRange: 'Comparison Date Range',
     comparisonDateRangeTooltip:
-      'Select the start and end dates for the historical comparison. The chart will show performance data for the selected GPU configs across this time range.',
+      'Select the start and end dates for the historical comparison. The chart will show performance data for the selected chip configs across this time range.',
     dateRangePlaceholder: 'Select date range',
     quickFilters: 'Quick Filters',
     quickFiltersTooltip:
-      'Narrow the chart to any combination of GPU vendor, serving framework, aggregation mode (aggregated vs disaggregated serving), and speculative decoding (MTP vs standard). Selecting none in a group shows all.',
+      'Narrow the chart by chip vendor, serving framework, deployment mode (single-node, multi-node aggregate, or disaggregated), and speculative decoding. Selecting none in a group shows all.',
     filterVendor: 'Vendor',
     filterFramework: 'Framework',
-    filterAggregation: 'Aggregation',
+    filterDeployment: 'Deployment',
+    singleNode: 'Single-node',
+    multiNode: 'Multi-node',
+    disaggregated: 'Disaggregated',
     filterSpecDecoding: 'Spec Decoding',
     noData: 'No data for the current selection',
   },
@@ -75,20 +78,23 @@ const STRINGS = {
     scaleAuto: '自动',
     scaleLinear: '线性',
     scaleLog: '对数',
-    gpuConfig: 'GPU 配置',
+    gpuConfig: 'Chip 配置',
     gpuConfigTooltip:
-      '最多选择 4 个 GPU 配置以对比其历史性能趋势。可用于追踪软件更新对特定硬件的影响。',
-    gpuConfigPlaceholder: '选择 GPU 配置进行对比',
+      '最多选择 4 个 Chip 配置以对比其历史性能趋势。可用于追踪软件更新对特定硬件的影响。',
+    gpuConfigPlaceholder: '选择 Chip 配置进行对比',
     comparisonDateRange: '对比日期范围',
     comparisonDateRangeTooltip:
-      '选择历史对比的起止日期。图表将展示所选 GPU 配置在此时间范围内的性能数据。',
+      '选择历史对比的起止日期。图表将展示所选 Chip 配置在此时间范围内的性能数据。',
     dateRangePlaceholder: '选择日期范围',
     quickFilters: '快捷筛选',
     quickFiltersTooltip:
-      '按 GPU 厂商、推理框架、聚合模式（聚合 vs 分离式）和投机解码（MTP vs 标准）的任意组合筛选图表。某组不选则显示全部。',
+      '按 Chip 厂商、推理框架、部署模式（单节点、多节点聚合或分离式）和投机解码筛选图表。某组不选则显示全部。',
     filterVendor: '厂商',
     filterFramework: '框架',
-    filterAggregation: '聚合模式',
+    filterDeployment: '部署模式',
+    singleNode: '单节点',
+    multiNode: '多节点聚合',
+    disaggregated: '分离式',
     filterSpecDecoding: '投机解码',
     noData: '当前选择无可用数据',
   },
@@ -180,15 +186,12 @@ const METRIC_TITLE_ZH_MAP = (() => {
   return map;
 })();
 
-/** Quick-filter pill groups: vendor, aggregation mode, spec-decoding method. */
+/** Quick-filter pill groups: vendor, deployment mode, spec-decoding method. */
 const QUICK_FILTER_VENDORS: { value: string; label: string }[] = [
   { value: 'NVIDIA', label: 'NVIDIA' },
   { value: 'AMD', label: 'AMD' },
 ];
-const QUICK_FILTER_DISAGG: { value: DisaggMode; label: string }[] = [
-  { value: 'agg', label: 'Aggregated' },
-  { value: 'disagg', label: 'Disaggregated' },
-];
+const QUICK_FILTER_DEPLOYMENT: DeploymentMode[] = ['single-node', 'multi-node', 'disagg'];
 const QUICK_FILTER_SPEC: { value: SpecMode; label: string }[] = [
   { value: 'mtp', label: 'MTP' },
   { value: 'stp', label: 'STP' },
@@ -253,7 +256,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     availableQuickFilters,
     setQuickFilterVendors,
     setQuickFilterFrameworks,
-    setQuickFilterDisagg,
+    setQuickFilterDeployment,
     setQuickFilterSpec,
   } = useInference();
 
@@ -360,7 +363,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
   };
 
   const handleQuickFilterToggle = (
-    category: 'vendor' | 'framework' | 'disagg' | 'spec',
+    category: 'vendor' | 'framework' | 'deployment' | 'spec',
     value: string,
   ) => {
     const wasActive =
@@ -368,14 +371,14 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
         ? quickFilters.vendors.includes(value)
         : category === 'framework'
           ? quickFilters.frameworks.includes(value)
-          : category === 'disagg'
-            ? quickFilters.disagg.includes(value as DisaggMode)
+          : category === 'deployment'
+            ? quickFilters.deployment.includes(value as DeploymentMode)
             : quickFilters.spec.includes(value as SpecMode);
     if (category === 'vendor') setQuickFilterVendors(toggleValue(quickFilters.vendors, value));
     else if (category === 'framework')
       setQuickFilterFrameworks(toggleValue(quickFilters.frameworks, value));
-    else if (category === 'disagg')
-      setQuickFilterDisagg(toggleValue(quickFilters.disagg, value as DisaggMode));
+    else if (category === 'deployment')
+      setQuickFilterDeployment(toggleValue(quickFilters.deployment, value as DeploymentMode));
     else setQuickFilterSpec(toggleValue(quickFilters.spec, value as SpecMode));
     // `active` is the state *after* this toggle.
     track('inference_quick_filter_toggled', { category, value, active: !wasActive });
@@ -411,7 +414,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     available: availableQuickFilters.frameworks.includes(f.key),
   }));
   const quickFilterGroups: {
-    key: 'vendor' | 'framework' | 'disagg' | 'spec';
+    key: 'vendor' | 'framework' | 'deployment' | 'spec';
     label: string;
     options: readonly { value: string; label: string; available: boolean }[];
     selected: readonly string[];
@@ -436,13 +439,19 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
         ]
       : []),
     {
-      key: 'disagg',
-      label: t.filterAggregation,
-      options: QUICK_FILTER_DISAGG.map((o) => ({
-        ...o,
-        available: availableQuickFilters.disagg.includes(o.value),
+      key: 'deployment',
+      label: t.filterDeployment,
+      options: QUICK_FILTER_DEPLOYMENT.map((value) => ({
+        value,
+        label:
+          value === 'single-node'
+            ? t.singleNode
+            : value === 'multi-node'
+              ? t.multiNode
+              : t.disaggregated,
+        available: availableQuickFilters.deployment.includes(value),
       })),
-      selected: quickFilters.disagg,
+      selected: quickFilters.deployment,
     },
     {
       key: 'spec',

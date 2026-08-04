@@ -19,6 +19,7 @@ export interface PointMeta {
   precision: string;
   spec_method: string;
   disagg: boolean;
+  is_multinode: boolean;
   conc: number;
   offload_mode: string | null;
   kv_offloading: string | null;

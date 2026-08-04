@@ -118,7 +118,7 @@ export default function AboutPage() {
                 </span>
                 <div>
                   <strong className="text-foreground">Artifacts uploaded.</strong> Request
-                  latencies, token counts, GPU power telemetry, and evaluation samples are attached
+                  latencies, token counts, chip power telemetry, and evaluation samples are attached
                   to the run page. GitHub Actions retains them for 90 days, and a weekly snapshot of
                   the full benchmark database is published as a public GitHub Release for longer
                   auditability.

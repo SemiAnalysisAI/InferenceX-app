@@ -35,7 +35,7 @@ import {
   listRunArtifacts,
 } from './lib/github-artifacts';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
-import { isRunAttemptPurged } from './etl/run-overrides';
+import { isBenchmarkPointPurged, isRunAttemptPurged } from './etl/run-overrides';
 import { createSkipTracker } from './etl/skip-tracker';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices } from './etl/workflow-run';
@@ -466,6 +466,22 @@ async function main(): Promise<void> {
       for (const row of rows) {
         try {
           const configId = await getOrCreateConfig(row.config);
+          if (
+            isBenchmarkPointPurged(runIdNum, runAttemptNum, {
+              configId,
+              benchmarkType: row.benchmarkType,
+              isl: row.isl,
+              osl: row.osl,
+              conc: row.conc,
+              offloadMode: row.offloadMode,
+            })
+          ) {
+            console.log(
+              `    skipped purged benchmark point: config ${configId}, ${row.benchmarkType}, ` +
+                `isl ${row.isl}, osl ${row.osl}, conc ${row.conc}, offload ${row.offloadMode}`,
+            );
+            continue;
+          }
           toInsert.push({ ...row, configId });
         } catch (error: any) {
           tracker.recordDbError(`config for ${path.basename(file)}`, error);

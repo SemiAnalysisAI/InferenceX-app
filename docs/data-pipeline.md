@@ -33,6 +33,27 @@ Every INSERT uses `ON CONFLICT DO UPDATE` or `DO NOTHING`. This means:
 
 The unique constraints match natural keys (e.g., `(workflow_run_id, config_id, isl, osl, conc)` for benchmarks), not surrogate keys.
 
+### Audited Point Purges
+
+`packages/db/src/etl/run-overrides.ts` is the durable audit record for exceptional
+data removal. Use `PURGED_BENCHMARK_POINTS` when a valid workflow run contains a
+specific invalid result, such as a server hang. Each record names `githubRunId`,
+`runAttempt`, `configId`, `benchmarkType`, `isl`, `osl`, `conc`, and `offloadMode`,
+with a dated reason comment. The full identity is required because one run can
+contain multiple serving configurations at the same sequence lengths and concurrency.
+
+`bun run db:apply-overrides` previews every matching row and requires confirmation
+before deleting it in a transaction. It also removes unreferenced server logs and
+trace-replay sidecars, clears availability entries that no remaining successful row
+supports, and refreshes `latest_benchmarks`. The override remains in source control,
+so future CI and GCS ingests skip the point instead of restoring it.
+
+CI ingests match the run attempt exactly. If a GCS backup cannot retrieve GitHub run
+metadata, it matches the same run and full point identity across attempts. This
+conservative fallback prevents a failed GitHub lookup from restoring a suppressed
+point. It can only suppress an identical point from another attempt while that
+attempt remains unknown.
+
 ### Why Two Connection Types
 
 | Connection                      | Library     | Use Case                             | Why                                                                                                  |
@@ -135,7 +156,9 @@ All normalizer logic lives in `packages/db/src/etl/normalizers.ts`. The function
 1. Look up `fw.toLowerCase()` in `FRAMEWORK_ALIASES` (defined in `packages/constants/src/framework-aliases.ts`).
 2. If a match exists, use `alias.canonical` as the framework name and `alias.disagg` as the disagg flag. Example: `sglang-disagg` → `{ framework: 'mori-sglang', disagg: true }`.
 3. If no alias exists, the lowercased raw string is used as-is.
-4. The disagg flag falls back to the raw `disaggField` from the artifact (coerced via `parseBool`, accepting `true`, `"true"`, `"True"`).
+4. An explicit `disagg` field is authoritative for canonical `dynamo-*` frameworks because Dynamo can orchestrate either a disaggregated deployment or one distributed server. Boolean and lowercase/Python-style string values are accepted.
+5. Legacy `dynamo-*` artifacts that omit or do not provide a recognizable `disagg` value fall back to `true`. Canonical `mori-*` frameworks remain intrinsically disaggregated.
+6. Mapper-level topology validation still marks a deployment as disaggregated when it has a non-zero decode worker pool, preserving older genuinely disaggregated Dynamo artifacts that incorrectly emitted `disagg: false`.
 
 `FRAMEWORK_ALIASES` keys are sorted longest-first in `SORTED_ALIASES` (used by `resolveFrameworkAliasesInString`) to prevent substring conflicts — `dynamo-trtllm` must be matched before `trtllm`.
 

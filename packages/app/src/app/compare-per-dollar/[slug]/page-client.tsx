@@ -42,10 +42,10 @@ const STRINGS = {
     fullComparisonLinkText: 'View full latency + throughput comparison →',
     caveatSeqFallback: 'sequence',
     caveatPrecFallback: 'precision',
-    pricingLabel: 'GPU pricing (owning hyperscaler):',
+    pricingLabel: 'Chip pricing (owning hyperscaler):',
     pricingSource: 'Source:',
     emptyState:
-      'No interpolated cost-per-token data available for the default model on this GPU pair. Use the chart controls below to select a model and precision with benchmark data for both GPUs.',
+      'No interpolated cost-per-token data available for the default model on this chip pair. Use the chart controls below to select a model and precision with benchmark data for both chips.',
   },
   zh: {
     eyebrowSuffix: '每美元性能',
@@ -54,10 +54,10 @@ const STRINGS = {
     fullComparisonLinkText: '查看完整延迟与吞吐量对比 →',
     caveatSeqFallback: '序列',
     caveatPrecFallback: '精度',
-    pricingLabel: 'GPU 定价（所属云服务商）：',
+    pricingLabel: 'Chip 定价（所属云服务商）：',
     pricingSource: '来源：',
     emptyState:
-      '当前默认模型在此 GPU 组合上没有可用的插值每 token 成本数据。请使用下方图表控件选择一个两款 GPU 均有基准测试数据的模型和精度。',
+      '当前默认模型在此 Chip 组合上没有可用的插值每 token 成本数据。请使用下方图表控件选择一个两款 Chip 均有基准测试数据的模型和精度。',
   },
 } as const;
 
@@ -203,9 +203,9 @@ export default function ComparePerDollarPageClient({
                   data-testid="compare-per-dollar-pricing"
                 >
                   {t.pricingLabel} <strong>{aLabel}</strong>{' '}
-                  {aCostPerGpuHr > 0 ? `$${aCostPerGpuHr.toFixed(2)}/GPU/hr` : '—'} ·{' '}
+                  {aCostPerGpuHr > 0 ? `$${aCostPerGpuHr.toFixed(2)}/chip/hr` : '—'} ·{' '}
                   <strong>{bLabel}</strong>{' '}
-                  {bCostPerGpuHr > 0 ? `$${bCostPerGpuHr.toFixed(2)}/GPU/hr` : '—'}.{' '}
+                  {bCostPerGpuHr > 0 ? `$${bCostPerGpuHr.toFixed(2)}/chip/hr` : '—'}.{' '}
                   {t.pricingSource}{' '}
                   <a
                     href="https://semianalysis.com/ai-cloud-tco-model/"
@@ -214,7 +214,7 @@ export default function ComparePerDollarPageClient({
                     className="underline hover:text-primary"
                     onClick={() => track('compare_per_dollar_tco_source_clicked', { slug })}
                   >
-                    SemiAnalysis Market August 2025 Pricing Surveys &amp; AI Cloud TCO Model
+                    SemiAnalysis Market July 2026 Pricing Surveys &amp; AI Cloud TCO Model
                   </a>
                   .
                 </p>

@@ -114,7 +114,7 @@ export function getMetricLabel(
     }
     default: {
       return mode === 'interactivity_to_throughput'
-        ? `${tokenTypePrefix}Throughput per GPU (tok/s/gpu)`
+        ? `${tokenTypePrefix}Throughput per Chip (tok/s/chip)`
         : 'Interactivity (tok/s/user)';
     }
   }
@@ -135,7 +135,7 @@ export function getValueLabel(
     }
     default: {
       return mode === 'interactivity_to_throughput'
-        ? `${getThroughputForType(d, costType).toFixed(1)} tok/s/gpu`
+        ? `${getThroughputForType(d, costType).toFixed(1)} tok/s/chip`
         : `${getThroughputForType(d, costType).toFixed(1)} tok/s/user`;
     }
   }
@@ -169,7 +169,7 @@ export function getChartTitle(
   const targetLabel =
     mode === 'interactivity_to_throughput'
       ? `${targetValue} tok/s/user ${percentilePrefix}Interactivity`
-      : `${targetValue} tok/s/gpu Throughput`;
+      : `${targetValue} tok/s/chip Throughput`;
 
   const tokenTypeLabel =
     costType === 'input' ? 'Input' : costType === 'output' ? 'Output' : 'Total';
@@ -184,7 +184,7 @@ export function getChartTitle(
     }
     default: {
       return mode === 'interactivity_to_throughput'
-        ? `${tokenTypeLabel} Token Throughput per GPU at ${targetLabel}`
+        ? `${tokenTypeLabel} Token Throughput per Chip at ${targetLabel}`
         : `Interactivity at ${targetLabel}`;
     }
   }
@@ -276,7 +276,7 @@ export function generateTooltipHTML(
       : barMetric === 'cost'
         ? costLabel
         : mode === 'interactivity_to_throughput'
-          ? 'tok/s/gpu'
+          ? 'tok/s/chip'
           : 'tok/s/user';
   const metricValue = getMetricValue(d, barMetric, costType);
 
@@ -528,7 +528,7 @@ export default function ThroughputBarChart({
           .text((d) => {
             if (barMetric === 'cost') {
               return mode === 'interactivity_to_throughput'
-                ? `${getThroughputForType(d, costType).toFixed(1)} tok/s/gpu`
+                ? `${getThroughputForType(d, costType).toFixed(1)} tok/s/chip`
                 : `${getThroughputForType(d, costType).toFixed(1)} tok/s/user`;
             }
             const costLbl = getCostTypeLabel(costType);

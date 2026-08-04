@@ -81,6 +81,21 @@ export interface TcoFeedRow {
   evidence_labels?: string[];
 }
 
+export interface TcoTierPoint {
+  interactivity: number;
+  /** Serving throughput (tok/s per GPU) in the CALLER-CHOSEN metric: the
+   *  external feed reads output tokens, the Overview total (input + output)
+   *  tokens per deployed GPU. The frontier math is metric-agnostic. */
+  throughput: number;
+  date: string;
+  evidenceLabel?: string;
+}
+
+export type TcoTierRead = Omit<TcoFeedRow, 'hardware' | 'workload' | 'output_tput_per_gpu'> & {
+  /** Frontier read at `tier` in the caller's throughput metric; 0 when unreachable. */
+  throughput_per_gpu: number;
+};
+
 export const DEFAULT_TIERS: readonly number[] = [30, 50, 75, 100];
 export const DEFAULT_WORKLOADS: readonly TcoFeedWorkload[] = [
   { isl: 1024, osl: 1024 },
@@ -207,21 +222,14 @@ export function parseAlpha(raw: string | null): number | null {
   return value;
 }
 
-interface FrontierPoint {
-  interactivity: number;
-  throughput: number;
-  date: string;
-  evidenceLabel?: string;
-}
-
 const round3 = (v: number): number => Math.round(v * 1000) / 1000;
 
 /** Two knots' dates as an ascending {from,to} evidence range. */
-function evidenceRange(a: FrontierPoint, b: FrontierPoint): { from: string; to: string } {
+function evidenceRange(a: TcoTierPoint, b: TcoTierPoint): { from: string; to: string } {
   return a.date <= b.date ? { from: a.date, to: b.date } : { from: b.date, to: a.date };
 }
 
-function evidenceLabels(a: FrontierPoint, b: FrontierPoint): string[] | undefined {
+function evidenceLabels(a: TcoTierPoint, b: TcoTierPoint): string[] | undefined {
   const labels = [...new Set([a.evidenceLabel, b.evidenceLabel].filter(Boolean))] as string[];
   return labels.length === 0 ? undefined : labels;
 }
@@ -231,7 +239,7 @@ function evidenceLabels(a: FrontierPoint, b: FrontierPoint): string[] | undefine
  * pair xs[lo] ≤ tier ≤ xs[lo+1], collapsing to a single knot when `tier` lands
  * on an endpoint. `frontier` is sorted ascending by interactivity.
  */
-function bracketKnots(frontier: FrontierPoint[], tier: number): [FrontierPoint, FrontierPoint] {
+function bracketKnots(frontier: TcoTierPoint[], tier: number): [TcoTierPoint, TcoTierPoint] {
   const last = frontier.length - 1;
   if (tier <= frontier[0].interactivity) return [frontier[0], frontier[0]];
   if (tier >= frontier[last].interactivity) return [frontier[last], frontier[last]];
@@ -241,6 +249,87 @@ function bracketKnots(frontier: FrontierPoint[], tier: number): [FrontierPoint, 
     if (frontier[i].interactivity <= tier) lo = i;
   }
   return [frontier[lo], frontier[lo + 1]];
+}
+
+/** Read fixed service tiers from a serving-throughput frontier (the
+ *  throughput metric is whatever the caller put in `TcoTierPoint.throughput`). */
+export function computeTierReads(
+  points: readonly TcoTierPoint[],
+  tiers: readonly number[],
+): TcoTierRead[] {
+  const frontier = paretoFrontUpperLeft(
+    [...points],
+    (point) => point.interactivity,
+    (point) => point.throughput,
+  ).toSorted((a, b) => a.interactivity - b.interactivity);
+  if (frontier.length === 0) return [];
+
+  const xs = frontier.map((point) => point.interactivity);
+  const ys = frontier.map((point) => point.throughput);
+  const slopes = monotoneSlopes(xs, ys);
+  const minIv = xs[0];
+  const maxIv = xs.at(-1)!;
+  const yLo = Math.min(...ys);
+  const yHi = Math.max(...ys);
+  let latest = frontier[0].date;
+  let oldest = frontier[0].date;
+  for (const point of frontier) {
+    if (point.date > latest) latest = point.date;
+    if (point.date < oldest) oldest = point.date;
+  }
+
+  return tiers.map((tier) => {
+    let value: number;
+    let boundary: TcoTierBoundary;
+    let isInterpolated = false;
+    let evidenceDate: { from: string; to: string } | null;
+    let tierEvidenceLabels: string[] | undefined;
+    if (tier > maxIv) {
+      value = 0;
+      boundary = 'unreachable';
+      evidenceDate = null;
+    } else if (tier < minIv) {
+      value = ys[0];
+      boundary = 'clamped_low';
+      evidenceDate = evidenceRange(frontier[0], frontier[0]);
+      tierEvidenceLabels = evidenceLabels(frontier[0], frontier[0]);
+    } else {
+      const [lo, hi] = bracketKnots(frontier, tier);
+      const raw = hermiteInterpolate(xs, ys, slopes, tier);
+      value = Math.max(yLo, Math.min(yHi, raw));
+      boundary = 'interpolated';
+      isInterpolated = lo.interactivity !== hi.interactivity;
+      evidenceDate = evidenceRange(lo, hi);
+      tierEvidenceLabels = evidenceLabels(lo, hi);
+    }
+    return {
+      tier,
+      throughput_per_gpu: round3(value),
+      boundary,
+      is_interpolated: isInterpolated,
+      frontier_points: frontier.length,
+      frontier_min_interactivity: round3(minIv),
+      frontier_max_interactivity: round3(maxIv),
+      latest_date: latest,
+      oldest_frontier_date: oldest,
+      evidence_date: evidenceDate,
+      ...(tierEvidenceLabels === undefined ? {} : { evidence_labels: tierEvidenceLabels }),
+    };
+  });
+}
+
+/**
+ * Chart parity: for single_turn rows the inference chart plots the STORED
+ * median_intvty on the x-axis (the ingest mapper's 1/itl invariant only
+ * rewrites agentic rows), so prefer the stored value and fall back to
+ * 1/median_itl only for legacy rows/fixtures that predate the intvty key.
+ * Shared by the feed and the Overview so both read the same x-axis.
+ */
+export function singleTurnInteractivity(metrics: Record<string, number>): number | undefined {
+  const storedIv = metrics.median_intvty;
+  if (Number.isFinite(storedIv) && storedIv > 0) return storedIv;
+  const itl = metrics.median_itl;
+  return Number.isFinite(itl) && itl > 0 ? 1 / itl : undefined;
 }
 
 /**
@@ -256,26 +345,14 @@ export function computeTcoFeed(
   const out: TcoFeedRow[] = [];
 
   for (const workload of workloads) {
-    const byHardware = new Map<string, FrontierPoint[]>();
+    const byHardware = new Map<string, TcoTierPoint[]>();
     for (const row of rows) {
       // Rows predating the benchmark_type column are fixed-seq by definition
       // (agentic rows are newer and carry isl/osl = null, which the workload
       // match below excludes anyway).
       if ((row.benchmark_type ?? 'single_turn') !== 'single_turn') continue;
       if (row.isl !== workload.isl || row.osl !== workload.osl) continue;
-      // Chart parity: for single_turn rows the inference chart plots the
-      // STORED median_intvty on the x-axis (the ingest mapper's 1/itl
-      // invariant only rewrites agentic rows), so prefer the stored value
-      // and fall back to 1/median_itl only for legacy rows/fixtures that
-      // predate the intvty key.
-      const storedIv = row.metrics.median_intvty;
-      const itl = row.metrics.median_itl;
-      const interactivity =
-        Number.isFinite(storedIv) && storedIv > 0
-          ? storedIv
-          : Number.isFinite(itl) && itl > 0
-            ? 1 / itl
-            : undefined;
+      const interactivity = singleTurnInteractivity(row.metrics);
       const otput = row.metrics.output_tput_per_gpu;
       if (interactivity === undefined) continue;
       if (!Number.isFinite(otput) || otput <= 0) continue;
@@ -293,68 +370,14 @@ export function computeTcoFeed(
     const workloadKey = `${workload.isl}x${workload.osl}`;
     const hardwareKeys = [...byHardware.keys()].toSorted((a, b) => a.localeCompare(b));
     for (const hardware of hardwareKeys) {
-      const frontier = paretoFrontUpperLeft(
-        byHardware.get(hardware)!,
-        (p) => p.interactivity,
-        (p) => p.throughput,
-      ).toSorted((a, b) => a.interactivity - b.interactivity);
-      if (frontier.length === 0) continue;
-
-      const xs = frontier.map((p) => p.interactivity);
-      const ys = frontier.map((p) => p.throughput);
-      const slopes = monotoneSlopes(xs, ys);
-      const minIv = xs[0];
-      const maxIv = xs.at(-1)!;
-      // Clamp bounds against spline overshoot, mirroring interpolateForGPU.
-      const yLo = Math.min(...ys);
-      const yHi = Math.max(...ys);
-      // 'YYYY-MM-DD' compares chronologically as a string.
-      let latest = frontier[0].date;
-      let oldest = frontier[0].date;
-      for (const p of frontier) {
-        if (p.date > latest) latest = p.date;
-        if (p.date < oldest) oldest = p.date;
-      }
-
-      for (const tier of tiers) {
-        let value: number;
-        let boundary: TcoTierBoundary;
-        let isInterpolated = false;
-        let evidenceDate: { from: string; to: string } | null;
-        let tierEvidenceLabels: string[] | undefined;
-        if (tier > maxIv) {
-          value = 0;
-          boundary = 'unreachable';
-          evidenceDate = null;
-        } else if (tier < minIv) {
-          value = ys[0];
-          boundary = 'clamped_low';
-          // The clamped read is the min-interactivity knot's throughput.
-          evidenceDate = evidenceRange(frontier[0], frontier[0]);
-          tierEvidenceLabels = evidenceLabels(frontier[0], frontier[0]);
-        } else {
-          const [lo, hi] = bracketKnots(frontier, tier);
-          const raw = hermiteInterpolate(xs, ys, slopes, tier);
-          value = Math.max(yLo, Math.min(yHi, raw));
-          boundary = 'interpolated';
-          isInterpolated = lo.interactivity !== hi.interactivity;
-          evidenceDate = evidenceRange(lo, hi);
-          tierEvidenceLabels = evidenceLabels(lo, hi);
-        }
+      for (const read of computeTierReads(byHardware.get(hardware)!, tiers)) {
+        // The feed's contract names the metric it serves: output tokens.
+        const { throughput_per_gpu: outputTputPerGpu, ...rest } = read;
         out.push({
           hardware,
           workload: workloadKey,
-          tier,
-          output_tput_per_gpu: round3(value),
-          boundary,
-          is_interpolated: isInterpolated,
-          frontier_points: frontier.length,
-          frontier_min_interactivity: round3(minIv),
-          frontier_max_interactivity: round3(maxIv),
-          latest_date: latest,
-          oldest_frontier_date: oldest,
-          evidence_date: evidenceDate,
-          ...(tierEvidenceLabels === undefined ? {} : { evidence_labels: tierEvidenceLabels }),
+          output_tput_per_gpu: outputTputPerGpu,
+          ...rest,
         });
       }
     }

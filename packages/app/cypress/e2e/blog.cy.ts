@@ -67,4 +67,50 @@ describe('Blog', () => {
         });
     });
   });
+
+  describe('Math rendering', () => {
+    before(() => {
+      cy.visit('/blog/kimi-k3-the-manos-the-mythos-the');
+    });
+
+    it('renders $$ blocks through KaTeX', () => {
+      cy.get('article.prose .katex').should('have.length.gte', 1);
+      cy.get('article.prose .katex').first().should('be.visible');
+    });
+
+    it('leaves single-dollar prices as literal text, not math', () => {
+      // `singleDollarTextMath: false` — otherwise "$3 ... $15" would be swallowed
+      // into an inline formula and the prices would disappear from the prose.
+      cy.get('article.prose').should('contain.text', '$3 per million tokens input');
+      cy.get('article.prose').should('contain.text', '$15 per million tokens output');
+    });
+
+    it('renders every figure the post references', () => {
+      cy.get('article.prose figure img').should('have.length.gte', 20);
+      // Only the first figure is eager; the rest are `loading="lazy"` and stay at
+      // naturalWidth 0 until scrolled to, so decode is only asserted on that one.
+      cy.get('article.prose figure img')
+        .first()
+        .should(($img) => {
+          expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+        });
+      cy.get('article.prose figure img').each(($img) => {
+        expect($img[0].getAttribute('alt') ?? '').to.have.length.greaterThan(0);
+        expect($img[0].getAttribute('src') ?? '').to.match(
+          /^\/images\/kimi-k3-the-manos-the-mythos-the\//u,
+        );
+      });
+    });
+
+    it('serves every figure image the post references', () => {
+      // Complements the eager-only decode check above: the srcs exist on the server
+      // even though lazy images have not fetched them yet.
+      cy.get('article.prose figure img').then(($imgs) => {
+        const srcs = [...new Set([...$imgs].map((img) => img.getAttribute('src') ?? ''))];
+        for (const src of srcs) {
+          cy.request({ url: src, encoding: 'binary' }).its('status').should('eq', 200);
+        }
+      });
+    });
+  });
 });

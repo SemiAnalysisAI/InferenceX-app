@@ -49,6 +49,32 @@ function applyAgenticMetricAliases(raw: Record<string, number>): Record<string, 
 export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   const isAgentic = row.benchmark_type === 'agentic_traces';
   const m = isAgentic ? applyAgenticMetricAliases(row.metrics) : row.metrics;
+  // Non-disaggregated multinode artifacts historically stored their one
+  // aggregate engine topology in the prefill-shaped fields and left the
+  // decode-shaped fields at zero. Those names are only a transport/schema
+  // detail: aggregate serving has one TP/PP/EP topology. Select the populated
+  // side once and expose it through the canonical chart fields.
+  const aggregateUsesPrefill =
+    !row.disagg &&
+    (row.decode_tp <= 0 ||
+      row.decode_ep <= 0 ||
+      (row.decode_num_workers <= 0 &&
+        row.num_decode_gpu <= 0 &&
+        (row.prefill_num_workers > 0 || row.num_prefill_gpu > 0)));
+  const aggregateTp = aggregateUsesPrefill ? row.prefill_tp : row.decode_tp;
+  const aggregateEp = aggregateUsesPrefill ? row.prefill_ep : row.decode_ep;
+  // A few historical aggregate rows mirrored TP/EP into both schema halves
+  // before PP was mirrored. Since there is only one engine, prefer whichever
+  // side carries the meaningful (>1) PP value.
+  const aggregatePp =
+    !row.disagg && (m.prefill_pp !== undefined || m.decode_pp !== undefined)
+      ? Math.max(m.prefill_pp ?? 1, m.decode_pp ?? 1)
+      : aggregateUsesPrefill
+        ? m.prefill_pp
+        : m.decode_pp;
+  const aggregateDpAttention = aggregateUsesPrefill
+    ? row.prefill_dp_attention
+    : row.decode_dp_attention;
   // Prefer the dedicated column (added in migration 004); fall back to the
   // legacy stash inside `metrics` for any rows ingested before that column
   // existed.
@@ -67,13 +93,14 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   // emitting `?ids=NaN` or an `/inference/agentic/NaN` link.
   const numericId = typeof row.id === 'number' ? row.id : Number(row.id);
   return {
+    rawMetricKeys: Object.keys(m),
     id: isPersistedBenchmarkId(numericId) ? numericId : undefined,
     hw: row.hardware,
     framework: row.framework,
     model: DB_MODEL_TO_DISPLAY[row.model] ?? row.model,
     precision: row.precision,
     hwKey: '',
-    tp: row.decode_tp,
+    tp: aggregateTp,
     conc: row.conc,
     tput_per_gpu: m.tput_per_gpu ?? 0,
     output_tput_per_gpu: m.output_tput_per_gpu ?? 0,
@@ -145,23 +172,23 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     num_prefill_gpu: row.num_prefill_gpu,
     num_decode_gpu: row.num_decode_gpu,
     spec_decoding: row.spec_method,
-    ep: row.decode_ep,
+    ep: aggregateEp,
     // Pipeline parallelism has no configs-table column — the ingest mapper
     // auto-captures the artifact's prefill_pp/decode_pp into the metrics
     // JSONB, so both official DB rows and live-transformed overlay rows read
     // it from there. Undefined for artifacts predating the field.
-    pp: m.decode_pp,
-    dp_attention: row.decode_dp_attention,
+    pp: aggregatePp,
+    dp_attention: aggregateDpAttention,
     is_multinode: row.is_multinode,
-    prefill_tp: row.prefill_tp,
-    prefill_ep: row.prefill_ep,
-    prefill_pp: m.prefill_pp,
-    prefill_dp_attention: row.prefill_dp_attention,
+    prefill_tp: row.disagg ? row.prefill_tp : aggregateTp,
+    prefill_ep: row.disagg ? row.prefill_ep : aggregateEp,
+    prefill_pp: row.disagg ? m.prefill_pp : aggregatePp,
+    prefill_dp_attention: row.disagg ? row.prefill_dp_attention : aggregateDpAttention,
     prefill_num_workers: row.prefill_num_workers,
-    decode_tp: row.decode_tp,
-    decode_ep: row.decode_ep,
-    decode_pp: m.decode_pp,
-    decode_dp_attention: row.decode_dp_attention,
+    decode_tp: row.disagg ? row.decode_tp : aggregateTp,
+    decode_ep: row.disagg ? row.decode_ep : aggregateEp,
+    decode_pp: row.disagg ? m.decode_pp : aggregatePp,
+    decode_dp_attention: row.disagg ? row.decode_dp_attention : aggregateDpAttention,
     decode_num_workers: row.decode_num_workers,
     image: row.image ?? undefined,
     date: row.date,

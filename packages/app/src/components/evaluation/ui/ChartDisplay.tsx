@@ -29,7 +29,7 @@ const STRINGS = {
     viewModeAria: 'View mode',
     heading: 'Accuracy Evals',
     description:
-      'Benchmark results showing model quality versus throughput trade-offs across different GPUs, quantization levels, and inference configurations.',
+      'Benchmark results showing model quality versus throughput trade-offs across different chips, quantization levels, and inference configurations.',
     captionHeading: 'Evaluation Score by Hardware Configuration',
     sourceUnofficial: 'Source: UNOFFICIAL',
     sourceOfficial: 'Source: SemiAnalysis InferenceX™',
@@ -40,7 +40,7 @@ const STRINGS = {
     tableView: '表格',
     viewModeAria: '视图模式',
     heading: '准确率评估',
-    description: '基准测试结果展示不同 GPU、量化精度和推理配置下，模型质量与吞吐量之间的权衡。',
+    description: '基准测试结果展示不同 Chip、量化精度和推理配置下，模型质量与吞吐量之间的权衡。',
     captionHeading: '各硬件配置的评估得分',
     sourceUnofficial: '来源：非官方',
     sourceOfficial: '来源：SemiAnalysis InferenceX™',

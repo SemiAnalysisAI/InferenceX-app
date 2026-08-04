@@ -8,8 +8,9 @@ import {
 } from './overview-data';
 import type { UrlStateParams } from './url-state';
 
-/** The single-turn 8K-in/1K-out workload every overview link filters to. */
-const OVERVIEW_WORKLOAD_SEQ = '8k/1k';
+function overviewSequence(model: OverviewModelSummary): '8k/1k' | 'agentic-traces' {
+  return model.scenario === 'agentx' ? 'agentic-traces' : '8k/1k';
+}
 
 /** The `/inference` route base for a locale — shared by every overview link. */
 function inferenceRoute(locale: 'en' | 'zh'): string {
@@ -57,12 +58,12 @@ export function buildOverviewDashboardHref(
     g_model: model.model,
     g_rundate: config.latestDate,
     g_runid: soleSourceRun(config)?.id,
-    i_seq: OVERVIEW_WORKLOAD_SEQ,
+    i_seq: overviewSequence(model),
     i_prec: config.precision,
-    i_metric: 'y_outputTputPerGpu',
+    i_metric: 'y_costh',
     i_gpus: config.hwKey,
     i_spec: dashboardSpecMode(config.specMethod),
-    i_disagg: config.disagg ? 'disagg' : 'agg',
+    i_disagg: config.disagg ? 'disagg' : config.isMultinode ? 'multi-node' : 'single-node',
     i_optimal: '1',
     i_advlabel: '1',
   };
@@ -81,7 +82,8 @@ export function buildOverviewDashboardHref(
 export function detailHref(locale: 'en' | 'zh', model: OverviewModelSummary): string {
   const query = new URLSearchParams({
     g_model: model.model,
-    i_seq: OVERVIEW_WORKLOAD_SEQ,
+    i_seq: overviewSequence(model),
+    i_metric: 'y_costh',
     i_optimal: '1',
   });
   return `${inferenceRoute(locale)}?${query}`;

@@ -6,7 +6,7 @@ import { hasZhSibling, languageAlternates } from '@/lib/i18n';
 export const LANDING_META = {
   title: 'Open Source AI Inference Benchmark',
   description:
-    'Compare AI inference performance across GPUs and frameworks. Real benchmarks on NVIDIA GB200, B200, AMD MI355X, and more. Free, open-source, continuously updated.',
+    'Compare AI inference performance across chips and frameworks. Real benchmarks on NVIDIA GB200, B200, AMD MI355X, and more. Free, open-source, continuously updated.',
 };
 
 export const VALID_TABS = [
@@ -30,7 +30,7 @@ export const TAB_META: Record<TabKey, { title: string; description: string }> = 
   inference: {
     title: 'AI Inference Benchmarks',
     description:
-      'Compare AI inference latency, throughput, and time-to-first-token across GPUs and providers. Real benchmarks on NVIDIA GB200, H100, AMD MI355X, and more.',
+      'Compare AI inference latency, throughput, and time-to-first-token across chips and providers. Real benchmarks on NVIDIA GB200, H100, AMD MI355X, and more.',
   },
   evaluation: {
     title: 'LLM Evaluation Results',
@@ -40,47 +40,47 @@ export const TAB_META: Record<TabKey, { title: string; description: string }> = 
   historical: {
     title: 'Historical Inference Trends',
     description:
-      'Track AI inference performance over time. Historical benchmark data showing GPU and provider improvements in latency, throughput, and cost.',
+      'Track AI inference performance over time. Historical benchmark data showing chip and provider improvements in latency, throughput, and cost.',
   },
   calculator: {
     title: 'Throughput & TCO Calculator',
     description:
-      'Calculate AI inference throughput and total cost of ownership. Compare GPU cost-efficiency for LLM serving across hardware configurations.',
+      'Calculate AI inference throughput and total cost of ownership. Compare chip cost-efficiency for LLM serving across hardware configurations.',
   },
   reliability: {
     title: 'Provider Reliability Metrics',
     description:
-      'AI inference provider reliability and uptime tracking. Compare error rates and availability across GPU cloud providers.',
+      'AI inference provider reliability and uptime tracking. Compare error rates and availability across chip cloud providers.',
   },
   'gpu-specs': {
-    title: 'GPU Specifications & Comparison',
+    title: 'Chip Specifications & Comparison',
     description:
-      'Detailed GPU specifications for AI inference. Compare NVIDIA, AMD, and Intel GPUs — memory bandwidth, FLOPS, interconnects, and topology.',
+      'Detailed chip specifications for AI inference. Compare NVIDIA, AMD, and Intel chips — memory bandwidth, FLOPS, interconnects, and topology.',
   },
   collectivex: {
     title: 'CollectiveX Communication Benchmarks',
     description:
-      'Experimental cross-vendor expert-parallel communication benchmarks. Compare MoE dispatch and combine latency across NVIDIA and AMD GPU platforms.',
+      'Experimental cross-vendor expert-parallel communication benchmarks. Compare MoE dispatch and combine latency across NVIDIA and AMD chip platforms.',
   },
   'ai-chart': {
     title: 'AI-Powered Chart Generation',
     description:
-      'Generate custom inference benchmark charts using natural language prompts. Compare GPUs, costs, and performance with AI assistance.',
+      'Generate custom inference benchmark charts using natural language prompts. Compare chips, costs, and performance with AI assistance.',
   },
   'gpu-metrics': {
-    title: 'GPU Power & Efficiency Metrics',
+    title: 'Chip Power & Efficiency Metrics',
     description:
-      'GPU power consumption and efficiency metrics during AI inference workloads. Compare tokens-per-watt across hardware.',
+      'Chip power consumption and efficiency metrics during AI inference workloads. Compare tokens-per-watt across hardware.',
   },
   submissions: {
     title: 'Benchmark Submissions',
     description:
-      'All benchmark configurations submitted to InferenceX. View submission history, activity trends, and datapoint volumes across GPU vendors.',
+      'All benchmark configurations submitted to InferenceX. View submission history, activity trends, and datapoint volumes across chip vendors.',
   },
   'current-inferencex-image': {
     title: 'Current InferenceX Image',
     description:
-      'Current InferenceX Docker image tags per model, GPU SKU, and configuration. Compares deployed images against latest vLLM and SGLang releases to flag outdated tags.',
+      'Current InferenceX Docker image tags per model, chip SKU, and configuration. Compares deployed images against latest vLLM and SGLang releases to flag outdated tags.',
   },
   feedback: {
     title: 'User Feedback',

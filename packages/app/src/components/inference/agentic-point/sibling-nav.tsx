@@ -60,19 +60,37 @@ function frameworkLabel(fw: string) {
 
 /** Short label for a sibling chip: parallelism + concurrency. */
 export function chipLabel(s: BenchmarkSibling): string {
+  const usePrefill =
+    !s.disagg &&
+    (s.decode_tp <= 0 ||
+      s.decode_ep <= 0 ||
+      (s.decode_num_workers <= 0 &&
+        s.num_decode_gpu <= 0 &&
+        (s.prefill_num_workers > 0 || s.num_prefill_gpu > 0)));
+  const aggregatePp =
+    !s.disagg && (s.prefill_pp !== null || s.decode_pp !== null)
+      ? Math.max(s.prefill_pp ?? 1, s.decode_pp ?? 1)
+      : undefined;
   // Same parallelism labeler the chart points use (TP/EP/TEP/DEP/DPA…).
   const parallel = parallelismLabel({
-    tp: s.decode_tp,
-    ep: s.decode_ep,
-    dpAttention: s.decode_dp_attention,
+    tp: usePrefill ? s.prefill_tp : s.decode_tp,
+    ep: usePrefill ? s.prefill_ep : s.decode_ep,
+    pp: s.disagg
+      ? usePrefill
+        ? (s.prefill_pp ?? undefined)
+        : (s.decode_pp ?? undefined)
+      : aggregatePp,
+    dpAttention: usePrefill ? s.prefill_dp_attention : s.decode_dp_attention,
     disagg: s.disagg,
     isMultinode: s.is_multinode,
     prefillTp: s.prefill_tp,
     prefillEp: s.prefill_ep,
+    prefillPp: s.prefill_pp ?? undefined,
     prefillDpAttention: s.prefill_dp_attention,
     prefillNumWorkers: s.prefill_num_workers,
     decodeTp: s.decode_tp,
     decodeEp: s.decode_ep,
+    decodePp: s.decode_pp ?? undefined,
     decodeDpAttention: s.decode_dp_attention,
     decodeNumWorkers: s.decode_num_workers,
   });
@@ -86,19 +104,23 @@ const SORT_OPTIONS: { value: SortMode; label: string }[] = [
   { value: 'default', label: 'Default' },
   { value: 'conc', label: 'Concurrency ↑' },
   { value: 'parallelism', label: 'Parallelism' },
-  { value: 'tput', label: 'Throughput/GPU ↓' },
+  { value: 'tput', label: 'Throughput/Chip ↓' },
   { value: 'requests', label: 'Total requests ↓' },
 ];
 
 // Group key for the "parallelism" sort: ep first (so TP/EP1 sorts ahead of
 // EP/TEP/DEP groups), then tp, then dp-attention, then disagg — every config
 // of one parallelism lands together, ordered by concurrency within.
-const parallelRank = (s: BenchmarkSibling): [number, number, number, number] => [
-  s.decode_ep ?? 0,
-  s.decode_tp ?? 0,
-  s.decode_dp_attention ? 1 : 0,
-  s.disagg ? 1 : 0,
-];
+const parallelRank = (s: BenchmarkSibling): [number, number, number, number, number] => {
+  const usePrefill = !s.disagg && s.decode_tp <= 0 && s.prefill_tp > 0;
+  return [
+    usePrefill ? s.prefill_ep : s.decode_ep,
+    usePrefill ? s.prefill_tp : s.decode_tp,
+    (usePrefill ? s.prefill_pp : s.decode_pp) ?? 1,
+    (usePrefill ? s.prefill_dp_attention : s.decode_dp_attention) ? 1 : 0,
+    s.disagg ? 1 : 0,
+  ];
+};
 
 function sortSiblings(siblings: BenchmarkSibling[], mode: SortMode): BenchmarkSibling[] {
   if (mode === 'default') return siblings;

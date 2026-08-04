@@ -23,6 +23,12 @@ bun run test:unit
 bun run test:e2e
 ```
 
+## Runtime and CI Sharding
+
+A warm local `bun run test:e2e` typically takes about **4–6 minutes** because Cypress component tests and integration tests run sequentially on one machine. Cold dependency or browser setup can take longer, so use focused `--spec` runs while iterating and open the draft PR before starting the full local suite.
+
+GitHub Actions runs integration specs across **four shards per browser** for Chrome and Firefox, for eight parallel E2E jobs, with component tests in a separate job. Recent successful workflows finish in roughly **3–5 minutes** wall-clock. The sharded CI run is the authoritative broad browser check and is substantially faster than reproducing both browsers and every shard serially on a local machine.
+
 ## Quality Standards
 
 1. **No tautological tests** — every test must verify a real transformation

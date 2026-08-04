@@ -145,7 +145,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         className: 'whitespace-nowrap',
       },
       {
-        header: 'GPU',
+        header: 'Chip',
         cell: (row) => {
           const isUnofficial = row.evalResultId <= 0;
           // Inset a per-run colored dot — same palette the unofficial banner and

@@ -15,7 +15,7 @@ import type {
   TrendDataPoint,
 } from '@/components/inference/types';
 import {
-  processOverlayChartData,
+  processOverlayChartDataWithClipping,
   selectUnofficialOverlayForMode,
 } from '@/components/inference/utils';
 import {
@@ -57,18 +57,18 @@ import {
 } from '@/lib/data-mappings';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import {
-  useDerivedAgenticMetrics,
-  type DerivedAgenticMetric,
-} from '@/hooks/api/use-derived-agentic-metrics';
-import {
   derivedModeRoofline,
   isAgenticOnlyXAxisMode,
   type RooflineDirection,
   type XAxisMode,
 } from '@/components/inference/hooks/useChartData';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import {
+  useDerivedAgenticMetrics,
+  type DerivedAgenticMetric,
+} from '@/hooks/api/use-derived-agentic-metrics';
 import { useTrendData } from '@/components/inference/hooks/useTrendData';
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
+import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useLocale } from '@/lib/use-locale';
 
 import ChartControls from './ChartControls';
@@ -99,7 +99,7 @@ const STRINGS = {
     updated: 'Updated:',
     oslE2elDisclaimer:
       'OSL / E2EL requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
-    selectDateRange: 'Select a date range or add a run to view GPU comparison',
+    selectDateRange: 'Select a date range or add a run to view chip comparison',
     performanceOverTime: 'Performance Over Time',
     performanceOverTimeDesc:
       'Double-click points on the scatter chart to track configurations over time.',
@@ -118,7 +118,7 @@ const STRINGS = {
     updated: '更新时间：',
     oslE2elDisclaimer:
       'OSL / E2EL 需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
-    selectDateRange: '请选择日期范围或添加运行以查看 GPU 对比',
+    selectDateRange: '请选择日期范围或添加运行以查看 Chip 对比',
     performanceOverTime: '性能趋势',
     performanceOverTimeDesc: '双击散点图上的数据点以追踪配置随时间的变化。',
     viewMode: '视图模式',
@@ -147,8 +147,6 @@ function zhHeading(configured: string): string {
   return `vs. ${pctl ? `${pctl} ` : ''}${subjectZh}`;
 }
 
-// OSL / E2EL leads: it's the agentic default (and agentic-only, so the
-// filter below drops it for fixed-seq, leaving Interactivity first there).
 const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string; labelZh: string }[] = [
   { value: 'osl-e2el', label: 'OSL / E2EL', labelZh: 'OSL / E2EL' },
   { value: 'interactivity', label: 'Interactivity', labelZh: '交互性' },
@@ -156,37 +154,18 @@ const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string; labelZh: string }[
   { value: 'ttft', label: 'TTFT', labelZh: 'TTFT' },
 ];
 
-/**
- * Presentation + data plumbing for the trace-derived x-axis modes (the
- * agentic-only modes). One spec per mode keeps the x-label, chart heading,
- * roofline corner, and derived-metric accessor in sync instead of scattering
- * `selectedXAxisMode === …` conditionals through the render.
- */
+/** Presentation and data plumbing for trace-derived agentic x-axis modes. */
 interface DerivedXModeSpec {
   xLabel: (percentileLabel: string) => string;
-  /** Chinese x-label; omit to reuse the English one (technical terms). */
   xLabelZh?: (percentileLabel: string) => string;
-  /** Chart heading suffix ("vs. …") shown above the plot. */
   heading: (percentileLabel: string) => string;
-  /** Chinese heading suffix; omit to reuse the English one. */
   headingZh?: (percentileLabel: string) => string;
-  /**
-   * True when higher x is better. Derived modes render on the e2e chart
-   * definition, whose corners assume lower-x-is-better, so a higher-is-better
-   * metric mirrors each configured corner horizontally instead of hardcoding
-   * one corner for every y-metric (which inverted cost/joules frontiers).
-   */
   higherXIsBetter: boolean;
-  /** Pull the raw metric for this mode off the derived-metrics payload. */
   value: (m: DerivedAgenticMetric | undefined, percentile: string) => number | null | undefined;
-  /** Convert the raw metric to the plotted x value. */
   toX: (raw: number) => number;
 }
 
 const DERIVED_X_MODE_SPECS: Partial<Record<XAxisMode, DerivedXModeSpec>> = {
-  // "E2E interactivity": per-request OSL / E2E latency — the rate at which
-  // the user receives output tokens INCLUDING the prefill wait. Slow-tail
-  // percentiles (pXX = 1/pXX(E2EL/OSL)), matching the *_intvty convention.
   'osl-e2el': {
     xLabel: (pctl) => `${pctl} OSL / E2EL (tok/s/user)`,
     heading: (pctl) => `vs. ${pctl} OSL / E2EL`,
@@ -374,7 +353,7 @@ export default function ChartDisplay() {
 
       const effectiveXMetric = chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
       const isAgentic = sequenceKind(selectedSequence) === 'agentic';
-      const processed = processOverlayChartData(
+      const processed = processOverlayChartDataWithClipping(
         rawData.data,
         chartType,
         selectedYAxisMetric,
@@ -388,22 +367,30 @@ export default function ChartDisplay() {
         },
       );
 
-      let overlayPoints = processed;
+      let overlayPoints = processed.data;
+      let clippedOverlayPoints = processed.clippedData;
       if (compareGpuPair?.length === 2) {
-        overlayPoints = processed.filter((p) =>
+        overlayPoints = overlayPoints.filter((p) =>
           hardwareKeyMatchesAnyBase(String(p.hwKey), compareGpuPair),
+        );
+        clippedOverlayPoints = clippedOverlayPoints.filter(({ point }) =>
+          hardwareKeyMatchesAnyBase(String(point.hwKey), compareGpuPair),
         );
       }
 
-      if (overlayPoints.length === 0) return null;
+      if (overlayPoints.length === 0 && clippedOverlayPoints.length === 0) return null;
 
-      const keySet = new Set(overlayPoints.map((p) => String(p.hwKey)));
+      const keySet = new Set([
+        ...overlayPoints.map((p) => String(p.hwKey)),
+        ...clippedOverlayPoints.map(({ point }) => String(point.hwKey)),
+      ]);
       const hardwareConfigFiltered = Object.fromEntries(
         Object.entries(rawData.hardwareConfig).filter(([k]) => keySet.has(k)),
       ) as HardwareConfig;
 
       return {
         data: overlayPoints,
+        clippedData: clippedOverlayPoints,
         hardwareConfig: hardwareConfigFiltered,
         label: unofficialRunInfo.branch,
         runUrl: unofficialRunInfo.url,
@@ -611,6 +598,7 @@ export default function ChartDisplay() {
       sequence: selectedSequence,
       chartDefinition,
       data: [] as InferenceData[],
+      clippedData: [],
     }));
   }, [graphs, overlayDataByChartType, selectedModel, selectedSequence]);
 
@@ -627,8 +615,6 @@ export default function ChartDisplay() {
     const ids = new Set<number>();
     for (const graph of visibleGraphs) {
       for (const point of graph.data) {
-        // Overlay-only agentic points carry no persisted id — skip them so we
-        // never request `?ids=0`/`?ids=NaN` (which 400s and errors the chart).
         if (point.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(point.id)) {
           ids.add(point.id);
         }
@@ -643,14 +629,13 @@ export default function ChartDisplay() {
     derivedTargetIds.length > 0 &&
     (derivedQuery.isPending || derivedQuery.isFetching) &&
     !derivedMetrics;
-
-  // Set only when the user is on a derived (agentic-only) x-axis mode; the
-  // specs are module constants so this is referentially stable per mode.
   const derivedSpec = useDerived ? DERIVED_X_MODE_SPECS[selectedXAxisMode] : undefined;
 
   const renderableGraphs = useMemo(() => {
     if (!derivedSpec) return visibleGraphs;
-    if (!derivedMetrics) return visibleGraphs.map((graph) => ({ ...graph, data: [] }));
+    if (!derivedMetrics) {
+      return visibleGraphs.map((graph) => ({ ...graph, data: [], clippedData: [] }));
+    }
     const xLabelFn =
       locale === 'zh' && derivedSpec.xLabelZh ? derivedSpec.xLabelZh : derivedSpec.xLabel;
     const xLabel = xLabelFn(selectedPercentile.toUpperCase());
@@ -666,15 +651,22 @@ export default function ChartDisplay() {
         y_latency_limit: undefined,
         ...(corner ? { [rooflineKey]: corner } : {}),
       };
+      const remapPoint = (point: InferenceData): InferenceData | null => {
+        if (!isPersistedBenchmarkId(point.id)) return null;
+        const raw = derivedSpec.value(derivedMetrics[point.id], selectedPercentile);
+        if (raw === null || raw === undefined || !Number.isFinite(raw)) return null;
+        return { ...point, x: derivedSpec.toX(raw) };
+      };
       const data = graph.data
-        .map((point) => {
-          if (!isPersistedBenchmarkId(point.id)) return null;
-          const raw = derivedSpec.value(derivedMetrics[point.id], selectedPercentile);
-          if (raw === null || raw === undefined || !Number.isFinite(raw)) return null;
-          return { ...point, x: derivedSpec.toX(raw) };
+        .map(remapPoint)
+        .filter((point): point is InferenceData => point !== null);
+      const clippedData = (graph.clippedData ?? [])
+        .map((entry) => {
+          const point = remapPoint(entry.point);
+          return point ? { ...entry, point } : null;
         })
-        .filter((point): point is NonNullable<typeof point> => point !== null);
-      return { ...graph, chartDefinition, data };
+        .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+      return { ...graph, chartDefinition, data, clippedData };
     });
   }, [derivedSpec, visibleGraphs, derivedMetrics, selectedYAxisMetric, selectedPercentile, locale]);
 
@@ -742,6 +734,7 @@ export default function ChartDisplay() {
                         visibleData,
                         graph.model,
                         graph.sequence,
+                        visibleOverlayRowsForExport,
                       );
                       // Match warnings against the same series the chart annotates,
                       // including visible unofficial-run overlay series.
@@ -788,8 +781,8 @@ export default function ChartDisplay() {
                                 }
                               }
 
-                              // The e2e chart heading follows the branch-level x-axis mode
-                              // selector, including agentic-only derived metrics.
+                              // The e2e chart heading follows the branch-level x-axis
+                              // mode selector.
                               if (graph.chartDefinition.chartType === 'e2e') {
                                 const modeSpec = DERIVED_X_MODE_SPECS[selectedXAxisMode];
                                 if (modeSpec) {
@@ -892,6 +885,7 @@ export default function ChartDisplay() {
                             chartId={`chart-${graphIndex}`}
                             modelLabel={graph.model}
                             data={graph.data}
+                            clippedData={graph.clippedData}
                             xLabel={graph.chartDefinition.x_label}
                             yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                             chartDefinition={graph.chartDefinition}

@@ -316,11 +316,9 @@ export async function getAgenticAggregates(
           const oslPct = percentilesOf(osl);
           result[id].isl = islPct;
           result[id].osl = oslPct;
-          // Recompute the profile-derived fields too (same jsonl, no extra
-          // read) so the self-healed bundle is a faithful full recompute — not
-          // a carry-forward of stale derived numbers stamped with a new
-          // version. Server-derived fields are filled in Pass 2 (or stay null
-          // when the server blob is absent, which is the correct complete value).
+          // Recompute every profile-derived field from this same JSONL so the
+          // self-healed bundle is complete at the new version. Server-derived
+          // fields are filled in Pass 2 (or stay null without a server blob).
           const derived = computeDerivedFromBlob(jsonl);
           pendingById.set(id, {
             traceReplayId: Number(row.trace_replay_id),

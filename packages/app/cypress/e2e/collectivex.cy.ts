@@ -228,10 +228,13 @@ describe('CollectiveX neutral run view', () => {
     );
     cy.get(
       `[data-testid="collectivex-run-line-style-${comparisonDataset.run.run_id}"] line`,
-    ).should('have.attr', 'stroke-dasharray', '9 4');
+    ).should('not.exist');
 
     cy.get(`[data-testid="collectivex-run-visible-${comparisonDataset.run.run_id}"]`).check();
     cy.wait('@comparisonRun');
+    cy.get(
+      `[data-testid="collectivex-run-line-style-${comparisonDataset.run.run_id}"] line`,
+    ).should('have.attr', 'stroke-dasharray', '9 4');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path')
       .should('have.length', 2)
       .then(($lines) => {
@@ -254,7 +257,26 @@ describe('CollectiveX neutral run view', () => {
       'contain.text',
       `#${comparisonDataset.run.run_id}`,
     );
-    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+    cy.get(`[data-testid="collectivex-run-line-style-${runId}"]`).should('not.exist');
+    cy.get(
+      `[data-testid="collectivex-run-line-style-${comparisonDataset.run.run_id}"] line`,
+    ).should('not.have.attr', 'stroke-dasharray');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path')
+      .should('have.length', 1)
+      .and('have.attr', 'stroke-dasharray', 'none');
+    cy.get('[data-testid="chart-legend"] [data-testid="legend-line-swatch"] line')
+      .should('have.length', 1)
+      .and('not.have.attr', 'stroke-dasharray');
+
+    // Re-selecting a run assigns it the next active slot instead of restoring a
+    // permanent run-specific pattern.
+    cy.get(`[data-testid="collectivex-run-visible-${runId}"]`).check();
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path')
+      .should('have.length', 2)
+      .then(($lines) => {
+        expect($lines.eq(0)).to.have.attr('stroke-dasharray', 'none');
+        expect($lines.eq(1)).to.have.attr('stroke-dasharray', '9 4');
+      });
   });
 
   it('defaults to the newest measured run when a newer incomplete run has no series', () => {
@@ -320,6 +342,51 @@ describe('CollectiveX run deletion', () => {
     cy.get(`[data-testid="collectivex-run-row-${runId}"]`).should('not.exist');
     cy.window().then((win) => {
       expect(win.localStorage.getItem(ADMIN_TOKEN_KEY)).to.eq('test-token');
+    });
+  });
+
+  it('deletes every shown run with one confirmation and one token prompt', () => {
+    const deletedRunIds = new Set<string>();
+    cy.intercept('GET', '/api/v1/collectivex/runs?*', (request) => {
+      request.reply({
+        body: {
+          version: 1,
+          runs: [dataset, comparisonDataset]
+            .filter((item) => !deletedRunIds.has(item.run.run_id))
+            .map(buildRunSummary),
+          discovery_complete: true,
+        },
+      });
+    }).as('runsAfterBulkDelete');
+    installRun(comparisonDataset, 'comparisonRunForDelete');
+    cy.intercept('DELETE', '/api/v1/collectivex/runs/*', (request) => {
+      expect(request.headers.authorization).to.eq('Bearer bulk-test-token');
+      deletedRunIds.add(request.url.split('/').at(-1) ?? '');
+      request.reply({ deleted: true });
+    }).as('deleteShownRun');
+
+    cy.reload();
+    cy.wait('@runsAfterBulkDelete');
+    cy.wait('@run');
+    cy.get(`[data-testid="collectivex-run-visible-${comparisonDataset.run.run_id}"]`).check();
+    cy.wait('@comparisonRunForDelete');
+    cy.window().then((win) => {
+      win.localStorage.removeItem(ADMIN_TOKEN_KEY);
+      cy.stub(win, 'confirm').as('bulkDeleteConfirm').returns(true);
+      cy.stub(win, 'prompt').as('bulkDeletePrompt').returns('bulk-test-token');
+    });
+
+    cy.get('[data-testid="collectivex-delete-shown-runs"]').click();
+    cy.wait('@deleteShownRun');
+    cy.wait('@deleteShownRun');
+    cy.get(`[data-testid="collectivex-run-row-${runId}"]`).should('not.exist');
+    cy.get(`[data-testid="collectivex-run-row-${comparisonDataset.run.run_id}"]`).should(
+      'not.exist',
+    );
+    cy.get('@bulkDeleteConfirm').should('have.been.calledOnce');
+    cy.get('@bulkDeletePrompt').should('have.been.calledOnce');
+    cy.then(() => {
+      expect(deletedRunIds).to.deep.eq(new Set([runId, comparisonDataset.run.run_id]));
     });
   });
 

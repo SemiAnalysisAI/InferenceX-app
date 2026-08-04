@@ -33,7 +33,7 @@ import {
 const STRINGS = {
   en: {
     searchPlaceholder: 'Search configs...',
-    colGpu: 'GPU',
+    colGpu: 'Chip',
     colModel: 'Model',
     colPrecision: 'Precision',
     colSpecMethod: 'Spec Method',
@@ -45,23 +45,27 @@ const STRINGS = {
     noData: 'No submission data available.',
     vsPrev: 'vs prev',
     vendorLabel: 'Vendor:',
-    vendorTip: 'GPU manufacturer',
+    vendorTip: 'Chip manufacturer',
     specMethodLabel: 'Spec Method:',
     specMethodTip: 'Speculative decoding method (e.g. MTP, Eagle)',
     disaggLabel: 'Disaggregated:',
-    disaggTip: 'Prefill and decode run on separate GPU pools',
+    disaggTip: 'Prefill and decode run on separate chip pools',
     multinodeLabel: 'Multinode:',
     multinodeTip: 'Config spans multiple physical nodes',
-    totalGpusLabel: 'Total GPUs:',
-    totalGpusTip: 'Total physical GPUs. When disaggregated, prefill + decode are separate pools',
-    prefillGpusLabel: 'Prefill GPUs:',
-    prefillGpusTip: 'GPUs for the prefill (prompt processing) phase',
-    decodeGpusLabel: 'Decode GPUs:',
-    decodeGpusTip: 'GPUs for the decode (token generation) phase',
+    totalGpusLabel: 'Total Chips:',
+    totalGpusTip: 'Total physical Chips. When disaggregated, prefill + decode are separate pools',
+    prefillGpusLabel: 'Prefill Chips:',
+    prefillGpusTip: 'Chips for the prefill (prompt processing) phase',
+    decodeGpusLabel: 'Decode Chips:',
+    decodeGpusTip: 'Chips for the decode (token generation) phase',
     prefillTpEpLabel: 'Prefill TP/EP:',
     prefillTpEpTip: 'Tensor parallelism / Expert parallelism for prefill',
     decodeTpEpLabel: 'Decode TP/EP:',
     decodeTpEpTip: 'Tensor parallelism / Expert parallelism for decode',
+    aggregateGpusLabel: 'Aggregate Chips:',
+    aggregateGpusTip: 'Chips in the single aggregate inference engine',
+    aggregateTpEpLabel: 'Aggregate TP/EP:',
+    aggregateTpEpTip: 'Tensor parallelism / Expert parallelism for the aggregate inference engine',
     sequencesLabel: 'Sequences:',
     sequencesTip: 'Distinct ISL/OSL sequence length combinations tested',
     concurrenciesLabel: 'Concurrencies:',
@@ -87,7 +91,7 @@ const STRINGS = {
   },
   zh: {
     searchPlaceholder: '搜索配置...',
-    colGpu: 'GPU',
+    colGpu: 'Chip',
     colModel: '模型',
     colPrecision: '精度',
     colSpecMethod: '推测解码',
@@ -99,23 +103,27 @@ const STRINGS = {
     noData: '暂无提交数据。',
     vsPrev: '对比',
     vendorLabel: '厂商：',
-    vendorTip: 'GPU 制造商',
+    vendorTip: 'Chip 制造商',
     specMethodLabel: '推测解码方法：',
     specMethodTip: '推测解码方法（如 MTP、Eagle）',
     disaggLabel: '分离式部署：',
-    disaggTip: 'Prefill 和 Decode 在不同 GPU 池上运行',
+    disaggTip: 'Prefill 和 Decode 在不同 Chip 池上运行',
     multinodeLabel: '多节点：',
     multinodeTip: '配置跨多个物理节点',
-    totalGpusLabel: '总 GPU 数：',
-    totalGpusTip: '物理 GPU 总数。分离式部署时，Prefill 和 Decode 使用不同的 GPU 池',
-    prefillGpusLabel: 'Prefill GPU 数：',
-    prefillGpusTip: '用于 Prefill（提示处理）阶段的 GPU',
-    decodeGpusLabel: 'Decode GPU 数：',
-    decodeGpusTip: '用于 Decode（Token 生成）阶段的 GPU',
+    totalGpusLabel: '总 Chip 数：',
+    totalGpusTip: '物理 Chip 总数。分离式部署时，Prefill 和 Decode 使用不同的 Chip 池',
+    prefillGpusLabel: 'Prefill Chip 数：',
+    prefillGpusTip: '用于 Prefill（提示处理）阶段的 Chip',
+    decodeGpusLabel: 'Decode Chip 数：',
+    decodeGpusTip: '用于 Decode（Token 生成）阶段的 Chip',
     prefillTpEpLabel: 'Prefill TP/EP：',
     prefillTpEpTip: 'Prefill 的张量并行 / 专家并行',
     decodeTpEpLabel: 'Decode TP/EP：',
     decodeTpEpTip: 'Decode 的张量并行 / 专家并行',
+    aggregateGpusLabel: '聚合推理 Chip 数：',
+    aggregateGpusTip: '单个聚合推理引擎使用的 Chip 数',
+    aggregateTpEpLabel: '聚合推理 TP/EP：',
+    aggregateTpEpTip: '聚合推理引擎的张量并行 / 专家并行',
     sequencesLabel: '序列组合：',
     sequencesTip: '测试的不同 ISL/OSL 序列长度组合数',
     concurrenciesLabel: '并发数：',
@@ -511,22 +519,38 @@ function SubmissionRow({
                     {row.disagg ? row.num_prefill_gpu + row.num_decode_gpu : row.num_prefill_gpu}
                   </span>
                 </DetailItem>
-                <DetailItem label={t.prefillGpusLabel} tip={t.prefillGpusTip}>
-                  <span className="tabular-nums">{row.num_prefill_gpu}</span>
-                </DetailItem>
-                <DetailItem label={t.decodeGpusLabel} tip={t.decodeGpusTip}>
-                  <span className="tabular-nums">{row.num_decode_gpu}</span>
-                </DetailItem>
-                <DetailItem label={t.prefillTpEpLabel} tip={t.prefillTpEpTip}>
-                  <span className="tabular-nums">
-                    {row.prefill_tp ?? '—'}/{row.prefill_ep ?? '—'}
-                  </span>
-                </DetailItem>
-                <DetailItem label={t.decodeTpEpLabel} tip={t.decodeTpEpTip}>
-                  <span className="tabular-nums">
-                    {row.decode_tp ?? '—'}/{row.decode_ep ?? '—'}
-                  </span>
-                </DetailItem>
+                {row.disagg ? (
+                  <>
+                    <DetailItem label={t.prefillGpusLabel} tip={t.prefillGpusTip}>
+                      <span className="tabular-nums">{row.num_prefill_gpu}</span>
+                    </DetailItem>
+                    <DetailItem label={t.decodeGpusLabel} tip={t.decodeGpusTip}>
+                      <span className="tabular-nums">{row.num_decode_gpu}</span>
+                    </DetailItem>
+                    <DetailItem label={t.prefillTpEpLabel} tip={t.prefillTpEpTip}>
+                      <span className="tabular-nums">
+                        {row.prefill_tp ?? '—'}/{row.prefill_ep ?? '—'}
+                      </span>
+                    </DetailItem>
+                    <DetailItem label={t.decodeTpEpLabel} tip={t.decodeTpEpTip}>
+                      <span className="tabular-nums">
+                        {row.decode_tp ?? '—'}/{row.decode_ep ?? '—'}
+                      </span>
+                    </DetailItem>
+                  </>
+                ) : (
+                  <>
+                    <DetailItem label={t.aggregateGpusLabel} tip={t.aggregateGpusTip}>
+                      <span className="tabular-nums">{row.num_prefill_gpu}</span>
+                    </DetailItem>
+                    <DetailItem label={t.aggregateTpEpLabel} tip={t.aggregateTpEpTip}>
+                      <span className="tabular-nums">
+                        {row.decode_tp > 0 ? row.decode_tp : (row.prefill_tp ?? '—')}/
+                        {row.decode_ep > 0 ? row.decode_ep : (row.prefill_ep ?? '—')}
+                      </span>
+                    </DetailItem>
+                  </>
+                )}
                 <DetailItem label={t.sequencesLabel} tip={t.sequencesTip}>
                   <span className="tabular-nums">{row.distinct_sequences ?? '—'}</span>
                 </DetailItem>

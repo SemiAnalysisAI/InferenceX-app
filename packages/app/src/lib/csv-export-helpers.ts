@@ -3,8 +3,8 @@
  * These functions convert chart-specific data structures into
  * { headers, rows } suitable for csv-export.ts.
  *
- * Inference export dumps ALL raw benchmark fields from the DB,
- * not just the currently plotted x/y axes.
+ * Inference export includes benchmark summary fields beyond the currently
+ * plotted x/y axes.
  */
 
 import type { InferenceData, TrendDataPoint } from '@/components/inference/types';
@@ -17,15 +17,23 @@ interface CsvData {
   rows: (string | number | boolean | null | undefined)[][];
 }
 
+/** Preserve a real zero while leaving source metrics that were not measured blank. */
+function benchmarkMetric(point: InferenceData, key: string): number | '' {
+  if (point.rawMetricKeys && !point.rawMetricKeys.includes(key)) return '';
+  const value = point[key as keyof InferenceData];
+  return typeof value === 'number' ? value : '';
+}
+
 /**
  * Generate CSV data from inference scatter/GPU chart data points.
- * Exports all raw benchmark metrics so the user gets a full data dump,
- * regardless of which axes are currently plotted.
+ * Exports benchmark summary metrics regardless of which axes are currently
+ * plotted. Visible unofficial-run rows are appended after official rows.
  */
 export function inferenceChartToCsv(
   data: InferenceData[],
   model: string,
   sequence: string,
+  overlayData: InferenceData[] = [],
 ): CsvData {
   const islOsl = sequenceToIslOsl(sequence);
   const headers = [
@@ -40,46 +48,48 @@ export function inferenceChartToCsv(
     'Concurrency',
     'Date',
     // Throughput
-    'Throughput/GPU (tok/s)',
-    'Output Throughput/GPU (tok/s)',
-    'Input Throughput/GPU (tok/s)',
+    'Throughput/Chip (tok/s)',
+    'Output Throughput/Chip (tok/s)',
+    'Input Throughput/Chip (tok/s)',
     // Latency — TTFT
-    'Mean TTFT (ms)',
-    'Median TTFT (ms)',
-    'P99 TTFT (ms)',
-    'Std TTFT (ms)',
+    'Mean TTFT (s)',
+    'Median TTFT (s)',
+    'P99 TTFT (s)',
+    'Std TTFT (s)',
     // Latency — TPOT
-    'Mean TPOT (ms)',
-    'Median TPOT (ms)',
-    'P99 TPOT (ms)',
-    'Std TPOT (ms)',
+    'Mean TPOT (s)',
+    'Median TPOT (s)',
+    'P99 TPOT (s)',
+    'Std TPOT (s)',
     // Interactivity
     'Mean Interactivity (tok/s/user)',
     'Median Interactivity (tok/s/user)',
     'P99 Interactivity (tok/s/user)',
     'Std Interactivity (tok/s/user)',
     // ITL
-    'Mean ITL (ms)',
-    'Median ITL (ms)',
-    'P99 ITL (ms)',
-    'Std ITL (ms)',
+    'Mean ITL (s)',
+    'Median ITL (s)',
+    'P99 ITL (s)',
+    'Std ITL (s)',
     // E2E Latency
-    'Mean E2E Latency (ms)',
-    'Median E2E Latency (ms)',
-    'P99 E2E Latency (ms)',
-    'Std E2E Latency (ms)',
+    'Mean E2E Latency (s)',
+    'Median E2E Latency (s)',
+    'P99 E2E Latency (s)',
+    'Std E2E Latency (s)',
     // Disaggregated
     'Disaggregated',
-    'Num Prefill GPUs',
-    'Num Decode GPUs',
+    'Num Prefill Chips',
+    'Num Decode Chips',
     'Spec Decoding',
     // Parallelism
     'EP',
     'DP Attention',
     'Is Multinode',
+    // Provenance (especially important when unofficial-run rows are included)
+    'Run URL',
   ];
 
-  const rows = data
+  const rows = [...data, ...overlayData]
     .filter((d) => !d.hidden)
     .map((d) => [
       model,
@@ -92,29 +102,29 @@ export function inferenceChartToCsv(
       d.tp,
       d.conc,
       d.date,
-      d.tput_per_gpu ?? '',
-      d.output_tput_per_gpu ?? '',
-      d.input_tput_per_gpu ?? '',
-      d.mean_ttft ?? '',
-      d.median_ttft ?? '',
-      d.p99_ttft ?? '',
-      d.std_ttft ?? '',
-      d.mean_tpot ?? '',
-      d.median_tpot ?? '',
-      d.p99_tpot ?? '',
-      d.std_tpot ?? '',
-      d.mean_intvty ?? '',
-      d.median_intvty ?? '',
-      d.p99_intvty ?? '',
-      d.std_intvty ?? '',
-      d.mean_itl ?? '',
-      d.median_itl ?? '',
-      d.p99_itl ?? '',
-      d.std_itl ?? '',
-      d.mean_e2el ?? '',
-      d.median_e2el ?? '',
-      d.p99_e2el ?? '',
-      d.std_e2el ?? '',
+      benchmarkMetric(d, 'tput_per_gpu'),
+      benchmarkMetric(d, 'output_tput_per_gpu'),
+      benchmarkMetric(d, 'input_tput_per_gpu'),
+      benchmarkMetric(d, 'mean_ttft'),
+      benchmarkMetric(d, 'median_ttft'),
+      benchmarkMetric(d, 'p99_ttft'),
+      benchmarkMetric(d, 'std_ttft'),
+      benchmarkMetric(d, 'mean_tpot'),
+      benchmarkMetric(d, 'median_tpot'),
+      benchmarkMetric(d, 'p99_tpot'),
+      benchmarkMetric(d, 'std_tpot'),
+      benchmarkMetric(d, 'mean_intvty'),
+      benchmarkMetric(d, 'median_intvty'),
+      benchmarkMetric(d, 'p99_intvty'),
+      benchmarkMetric(d, 'std_intvty'),
+      benchmarkMetric(d, 'mean_itl'),
+      benchmarkMetric(d, 'median_itl'),
+      benchmarkMetric(d, 'p99_itl'),
+      benchmarkMetric(d, 'std_itl'),
+      benchmarkMetric(d, 'mean_e2el'),
+      benchmarkMetric(d, 'median_e2el'),
+      benchmarkMetric(d, 'p99_e2el'),
+      benchmarkMetric(d, 'std_e2el'),
       d.disagg ?? false,
       d.num_prefill_gpu ?? '',
       d.num_decode_gpu ?? '',
@@ -122,6 +132,7 @@ export function inferenceChartToCsv(
       d.ep ?? '',
       d.dp_attention ?? '',
       d.is_multinode ?? '',
+      d.run_url ?? '',
     ]);
 
   return { headers, rows };
@@ -139,7 +150,7 @@ export function reliabilityChartToCsv(
     total: number;
   }[],
 ): CsvData {
-  const headers = ['GPU Model', 'GPU Key', 'Success Rate (%)', 'Successful Runs', 'Total Runs'];
+  const headers = ['Chip Model', 'Chip Key', 'Success Rate (%)', 'Successful Runs', 'Total Runs'];
 
   const rows = data.map((d) => [d.modelLabel, d.model, d.successRate, d.n_success, d.total]);
 
@@ -234,12 +245,12 @@ export function calculatorChartToCsv(
   getLabel?: (hwKey: string) => string,
 ): CsvData {
   const headers = [
-    'GPU',
+    'Chip',
     'Hardware Key',
     'Precision',
-    'Total Throughput (tok/s/gpu)',
-    'Output Throughput (tok/s/gpu)',
-    'Input Throughput (tok/s/gpu)',
+    'Total Throughput (tok/s/chip)',
+    'Output Throughput (tok/s/chip)',
+    'Input Throughput (tok/s/chip)',
     'Cost per Million Total Tokens ($)',
     'Cost per Million Input Tokens ($)',
     'Cost per Million Output Tokens ($)',
@@ -281,7 +292,7 @@ export function historicalTrendToCsv(
   targetInteractivity: number,
 ): CsvData {
   const headers = [
-    'GPU',
+    'Chip',
     'Hardware Key',
     'Precision',
     'Date',

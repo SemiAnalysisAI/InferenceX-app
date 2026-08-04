@@ -29,7 +29,7 @@ describe('GPUGraph', () => {
           modelLabel="DeepSeek R1"
           data={data}
           xLabel="Concurrency"
-          yLabel="Throughput / GPU (tok/s)"
+          yLabel="Throughput / Chip (tok/s)"
           chartDefinition={defaultChartDef}
         />
       </div>,
@@ -56,7 +56,7 @@ describe('GPUGraph', () => {
           modelLabel="DeepSeek R1"
           data={[]}
           xLabel="Concurrency"
-          yLabel="Throughput / GPU (tok/s)"
+          yLabel="Throughput / Chip (tok/s)"
           chartDefinition={defaultChartDef}
         />
       </div>,
@@ -110,7 +110,7 @@ describe('GPUGraph', () => {
           modelLabel="DeepSeek R1"
           data={data}
           xLabel="Concurrency"
-          yLabel="Throughput / GPU (tok/s)"
+          yLabel="Throughput / Chip (tok/s)"
           chartDefinition={defaultChartDef}
         />
       </div>,
@@ -190,7 +190,7 @@ describe('GPUGraph', () => {
           modelLabel="DeepSeek R1"
           data={data}
           xLabel="Interactivity"
-          yLabel="Throughput / GPU (tok/s)"
+          yLabel="Throughput / Chip (tok/s)"
           chartDefinition={interactivityChartDef}
         />
       </div>,
@@ -248,7 +248,7 @@ describe('GPUGraph', () => {
           modelLabel="DeepSeek R1"
           data={data}
           xLabel="Interactivity"
-          yLabel="Throughput / GPU (tok/s)"
+          yLabel="Throughput / Chip (tok/s)"
           chartDefinition={createMockChartDefinition({
             chartType: 'interactivity',
             y_tpPerGpu_roofline: 'upper_left',
@@ -289,7 +289,7 @@ describe('GPUGraph', () => {
           modelLabel="DeepSeek R1"
           data={data}
           xLabel="Concurrency"
-          yLabel="Throughput / GPU (tok/s)"
+          yLabel="Throughput / Chip (tok/s)"
           chartDefinition={defaultChartDef}
         />
       </div>,

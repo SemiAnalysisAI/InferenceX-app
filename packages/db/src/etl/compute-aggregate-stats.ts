@@ -39,7 +39,7 @@ export interface AggregateStats {
 
 /**
  * The subset of an older-version bundle a profile-only upgrade carries
- * forward. Pre-v6 bundles also carry since-retired derived fields
+ * forward. Pre-v6 bundles also carry the since-retired derived metrics
  * (normalizedSessionTimeS, p90PrefillTpsPerUser, normalizedE2e400) — spreading
  * `profile` first drops them from the merged result.
  */

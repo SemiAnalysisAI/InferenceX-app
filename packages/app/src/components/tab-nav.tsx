@@ -26,12 +26,11 @@ import { TAB_LABELS_ZH } from '@/lib/tab-meta-zh';
 import { cn } from '@/lib/utils';
 
 const VISIBLE_TABS = [
-  { href: '/overview', label: 'Overview', testId: 'tab-trigger-overview' },
   { href: '/inference', label: 'Inference Performance', testId: 'tab-trigger-inference' },
   { href: '/evaluation', label: 'Accuracy Evals', testId: 'tab-trigger-evaluation' },
   { href: '/historical', label: 'Historical Trends', testId: 'tab-trigger-historical' },
   { href: '/calculator', label: 'TCO Calculator', testId: 'tab-trigger-calculator' },
-  { href: '/gpu-specs', label: 'GPU Specs', testId: 'tab-trigger-gpu-specs' },
+  { href: '/gpu-specs', label: 'Chip Specs', testId: 'tab-trigger-gpu-specs' },
   { href: '/collectivex', label: 'CollectiveX', testId: 'tab-trigger-collectivex' },
   { href: '/submissions', label: 'Submissions', testId: 'tab-trigger-submissions' },
 ] as const;

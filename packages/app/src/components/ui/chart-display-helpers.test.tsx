@@ -47,9 +47,9 @@ describe('MetricAssumptionNotes', () => {
   it('shows power source badges and the per-MW disaggregation caveat for inference metrics', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_inputTputPerMw" />);
 
-    expect(getVisibleText()).toContain('All in Power/GPU:');
+    expect(getVisibleText()).toContain('All in Power/Chip:');
     expect(getVisibleText()).toContain('SemiAnalysis Datacenter Industry Model');
-    expect(getVisibleCaveatText()).toContain('calculate power per decode GPU or per prefill GPU');
+    expect(getVisibleCaveatText()).toContain('calculate power per decode chip or per prefill chip');
   });
 
   it('preserves historical-trends semantics when both compatibility flags are disabled', () => {
@@ -63,7 +63,7 @@ describe('MetricAssumptionNotes', () => {
 
     expect(getVisibleText()).not.toContain('SemiAnalysis Datacenter Industry Model');
     expect(getVisibleCaveatText()).not.toContain(
-      'calculate power per decode GPU or per prefill GPU',
+      'calculate power per decode chip or per prefill chip',
     );
 
     renderUi(
@@ -76,32 +76,34 @@ describe('MetricAssumptionNotes', () => {
 
     expect(getVisibleText()).toContain('SemiAnalysis Datacenter Industry Model');
     expect(getVisibleCaveatText()).not.toContain(
-      'calculate power per decode GPU or per prefill GPU',
+      'calculate power per decode chip or per prefill chip',
     );
   });
 
   it('renders TCO notes, source attribution, and the cost disaggregation caveat', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_costhOutput" />);
 
-    expect(getVisibleText()).toContain('TCO $/GPU/hr:');
+    expect(getVisibleText()).toContain('TCO $/chip/hr:');
     expect(getVisibleText()).toContain(
-      'SemiAnalysis Market August 2025 Pricing Surveys & AI Cloud TCO Model',
+      'SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model',
     );
-    expect(getVisibleCaveatText()).toContain('calculate cost per decode GPU or per prefill GPU');
+    expect(getVisibleCaveatText()).toContain('calculate cost per decode chip or per prefill chip');
   });
 
   it('renders metric-specific throughput caveats and preserves Joules wording semantics', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_inputTputPerGpu" />);
 
     expect(getVisibleCaveatText()).toContain(
-      'calculate input throughput per decode GPU or per prefill GPU',
+      'calculate input throughput per decode chip or per prefill chip',
     );
     expect(getVisibleCaveatText()).toContain('direct input throughput comparison');
 
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_jTotal" />);
 
     expect(getVisibleText()).toContain('SemiAnalysis Datacenter Industry Model');
-    expect(getVisibleCaveatText()).toContain('calculate Joules per decode GPU or per prefill GPU');
+    expect(getVisibleCaveatText()).toContain(
+      'calculate Joules per decode chip or per prefill chip',
+    );
     expect(getVisibleCaveatText()).toContain('direct Joules per token comparison');
   });
 });

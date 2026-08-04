@@ -140,9 +140,10 @@ describe('mergeProfileStatsUpgrade', () => {
     expect(merged.prefixCacheHitRate).toEqual(existing.prefixCacheHitRate);
   });
 
-  it('drops legacy derived fields when upgrading a pre-v6 bundle', async () => {
-    // A stale bundle from an older STATS_VERSION carries since-retired fields —
-    // the merged result must not resurrect them.
+  it('drops the retired derived fields when upgrading a pre-v6 bundle', async () => {
+    // Bundles written before v6 carry normalizedSessionTimeS /
+    // p90PrefillTpsPerUser / normalizedE2e400 — the upgrade must not
+    // resurrect them into the new bundle.
     const legacy = {
       version: STATS_VERSION - 1,
       isl: null,

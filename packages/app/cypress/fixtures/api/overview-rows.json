@@ -25,7 +25,7 @@
       "conc": 8,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 30, "output_tput_per_gpu": 1300 },
+      "metrics": { "median_intvty": 30, "tput_per_gpu": 11700, "output_tput_per_gpu": 1300 },
       "date": "2026-06-24",
       "run_url": null
     },
@@ -54,7 +54,7 @@
       "conc": 16,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 70, "output_tput_per_gpu": 1000 },
+      "metrics": { "median_intvty": 70, "tput_per_gpu": 9000, "output_tput_per_gpu": 1000 },
       "date": "2026-07-04",
       "run_url": null
     },
@@ -83,7 +83,7 @@
       "conc": 8,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 40, "output_tput_per_gpu": 1050 },
+      "metrics": { "median_intvty": 40, "tput_per_gpu": 9450, "output_tput_per_gpu": 1050 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -112,7 +112,7 @@
       "conc": 24,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 110, "output_tput_per_gpu": 300 },
+      "metrics": { "median_intvty": 110, "tput_per_gpu": 2700, "output_tput_per_gpu": 300 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -141,7 +141,7 @@
       "conc": 16,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 60, "output_tput_per_gpu": 760 },
+      "metrics": { "median_intvty": 60, "tput_per_gpu": 6840, "output_tput_per_gpu": 760 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -170,7 +170,7 @@
       "conc": 8,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 45, "output_tput_per_gpu": 1050 },
+      "metrics": { "median_intvty": 45, "tput_per_gpu": 9450, "output_tput_per_gpu": 1050 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -199,7 +199,7 @@
       "conc": 16,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 60, "output_tput_per_gpu": 750 },
+      "metrics": { "median_intvty": 60, "tput_per_gpu": 6750, "output_tput_per_gpu": 750 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -228,7 +228,7 @@
       "conc": 8,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 30, "output_tput_per_gpu": 800 },
+      "metrics": { "median_intvty": 30, "tput_per_gpu": 7200, "output_tput_per_gpu": 800 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -257,7 +257,75 @@
       "conc": 8,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 50, "output_tput_per_gpu": 600 },
+      "metrics": { "median_intvty": 50, "tput_per_gpu": 5100, "output_tput_per_gpu": 600 },
+      "date": "2026-07-18",
+      "run_url": null
+    },
+    {
+      "id": 28,
+      "hardware": "b200",
+      "framework": "sglang",
+      "model": "dsv4",
+      "precision": "fp4",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "prefill_dp_attention": false,
+      "prefill_num_workers": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "decode_dp_attention": false,
+      "decode_num_workers": 1,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "benchmark_type": "agentic_traces",
+      "isl": null,
+      "osl": null,
+      "conc": 8,
+      "offload_mode": "off",
+      "image": null,
+      "metrics": {
+        "p90_itl": 0.02,
+        "p90_ttlt": 120,
+        "tput_per_gpu": 7500,
+        "output_tput_per_gpu": 830
+      },
+      "date": "2026-07-18",
+      "run_url": null
+    },
+    {
+      "id": 29,
+      "hardware": "mi355x",
+      "framework": "sglang",
+      "model": "dsv4",
+      "precision": "fp4",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "prefill_dp_attention": false,
+      "prefill_num_workers": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "decode_dp_attention": false,
+      "decode_num_workers": 1,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "benchmark_type": "agentic_traces",
+      "isl": null,
+      "osl": null,
+      "conc": 8,
+      "offload_mode": "off",
+      "image": null,
+      "metrics": {
+        "p90_itl": 0.02,
+        "p90_ttlt": 130,
+        "tput_per_gpu": 6000,
+        "output_tput_per_gpu": 670
+      },
       "date": "2026-07-18",
       "run_url": null
     }
@@ -288,7 +356,7 @@
       "conc": 8,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 50, "output_tput_per_gpu": 800 },
+      "metrics": { "median_intvty": 50, "tput_per_gpu": 7200, "output_tput_per_gpu": 800 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -317,7 +385,7 @@
       "conc": 8,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 50, "output_tput_per_gpu": 1000 },
+      "metrics": { "median_intvty": 50, "tput_per_gpu": 8600, "output_tput_per_gpu": 1000 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -346,7 +414,7 @@
       "conc": 8,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 50, "output_tput_per_gpu": 700 },
+      "metrics": { "median_intvty": 50, "tput_per_gpu": 6300, "output_tput_per_gpu": 700 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -375,7 +443,7 @@
       "conc": 8,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 50, "output_tput_per_gpu": 900 },
+      "metrics": { "median_intvty": 50, "tput_per_gpu": 8460, "output_tput_per_gpu": 900 },
       "date": "2026-07-18",
       "run_url": null
     }
@@ -406,7 +474,7 @@
       "conc": 8,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 30, "output_tput_per_gpu": 1400 },
+      "metrics": { "median_intvty": 30, "tput_per_gpu": 12880, "output_tput_per_gpu": 1400 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -435,7 +503,7 @@
       "conc": 16,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 70, "output_tput_per_gpu": 980 },
+      "metrics": { "median_intvty": 70, "tput_per_gpu": 9016, "output_tput_per_gpu": 980 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -464,7 +532,7 @@
       "conc": 8,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 40, "output_tput_per_gpu": 800 },
+      "metrics": { "median_intvty": 40, "tput_per_gpu": 7200, "output_tput_per_gpu": 800 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -493,7 +561,7 @@
       "conc": 24,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 80, "output_tput_per_gpu": 600 },
+      "metrics": { "median_intvty": 80, "tput_per_gpu": 5400, "output_tput_per_gpu": 600 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -522,7 +590,7 @@
       "conc": 12,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 50, "output_tput_per_gpu": 900 },
+      "metrics": { "median_intvty": 50, "tput_per_gpu": 8100, "output_tput_per_gpu": 900 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -551,7 +619,7 @@
       "conc": 12,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 50, "output_tput_per_gpu": 760 },
+      "metrics": { "median_intvty": 50, "tput_per_gpu": 6688, "output_tput_per_gpu": 760 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -580,7 +648,7 @@
       "conc": 24,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 120, "output_tput_per_gpu": 300 },
+      "metrics": { "median_intvty": 120, "tput_per_gpu": 2700, "output_tput_per_gpu": 300 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -609,7 +677,7 @@
       "conc": 24,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 120, "output_tput_per_gpu": 600 },
+      "metrics": { "median_intvty": 120, "tput_per_gpu": 5280, "output_tput_per_gpu": 600 },
       "date": "2026-07-18",
       "run_url": null
     }
@@ -640,7 +708,7 @@
       "conc": 8,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 50, "output_tput_per_gpu": 777 },
+      "metrics": { "median_intvty": 50, "tput_per_gpu": 6993, "output_tput_per_gpu": 777 },
       "date": "2026-07-18",
       "run_url": null
     }
@@ -671,7 +739,7 @@
       "conc": 8,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 30, "output_tput_per_gpu": 820 },
+      "metrics": { "median_intvty": 30, "tput_per_gpu": 7380, "output_tput_per_gpu": 820 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -700,7 +768,7 @@
       "conc": 16,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 70, "output_tput_per_gpu": 560 },
+      "metrics": { "median_intvty": 70, "tput_per_gpu": 5040, "output_tput_per_gpu": 560 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -729,7 +797,7 @@
       "conc": 12,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 50, "output_tput_per_gpu": 650 },
+      "metrics": { "median_intvty": 50, "tput_per_gpu": 5785, "output_tput_per_gpu": 650 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -758,7 +826,7 @@
       "conc": 12,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 50, "output_tput_per_gpu": 600 },
+      "metrics": { "median_intvty": 50, "tput_per_gpu": 5400, "output_tput_per_gpu": 600 },
       "date": "2026-07-18",
       "run_url": null
     },
@@ -787,7 +855,7 @@
       "conc": 12,
       "offload_mode": "off",
       "image": null,
-      "metrics": { "median_intvty": 50, "output_tput_per_gpu": 700 },
+      "metrics": { "median_intvty": 50, "tput_per_gpu": 6510, "output_tput_per_gpu": 700 },
       "date": "2026-07-18",
       "run_url": null
     }

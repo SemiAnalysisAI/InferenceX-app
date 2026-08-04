@@ -8,7 +8,7 @@ import chartDefinitions from '@/components/inference/inference-chart-config.json
 import { e2eFrontierWinners } from '@/components/inference/utils/e2eFrontier';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 
-import type { ChartDefinition, InferenceData, YAxisMetricKey } from './types';
+import type { ChartDefinition, ClippedInferenceData, InferenceData, YAxisMetricKey } from './types';
 
 /**
  * Select the matching unofficial-run overlay for a chart mode. OSL / E2EL
@@ -23,6 +23,11 @@ export function selectUnofficialOverlayForMode<T>(
 ): T | null {
   if (xAxisMode === 'osl-e2el') return null;
   return overlays[chartType];
+}
+
+export interface ProcessedChartData {
+  data: InferenceData[];
+  clippedData: ClippedInferenceData[];
 }
 
 /**
@@ -82,6 +87,41 @@ export const filterDataByCostLimit = (
 };
 
 /**
+ * Partition already-remapped chart points without discarding the outliers.
+ * The visible array preserves the existing chart behavior; clippedData gives
+ * ScatterGraph enough context to draw and explain a boundary continuation.
+ */
+export function partitionChartDataByLimits(
+  data: InferenceData[],
+  chartDefinition: ChartDefinition,
+  selectedYAxisMetric: string,
+  options: { isTtftX: boolean; isAgentic: boolean },
+): ProcessedChartData {
+  const costLimitApplies =
+    selectedYAxisMetric.includes('cost') &&
+    selectedYAxisMetric !== 'y_costUser' &&
+    chartDefinition.y_cost_limit !== undefined;
+  const latencyLimitApplies =
+    options.isTtftX && !options.isAgentic && chartDefinition.y_latency_limit !== undefined;
+
+  const visible: InferenceData[] = [];
+  const clippedData: ClippedInferenceData[] = [];
+
+  for (const point of data) {
+    const reasons: ClippedInferenceData['reasons'] = [];
+    if (costLimitApplies && point.y > chartDefinition.y_cost_limit!) reasons.push('cost');
+    if (latencyLimitApplies && point.x > chartDefinition.y_latency_limit!) {
+      reasons.push('latency');
+    }
+
+    if (reasons.length > 0) clippedData.push({ point, reasons });
+    else visible.push(point);
+  }
+
+  return { data: visible, clippedData };
+}
+
+/**
  * Process overlay (unofficial run) data to match the same pipeline as official data.
  *
  * Applies: metric field filtering, x/y remapping (via the resolveXAxisField
@@ -105,8 +145,32 @@ export function processOverlayChartData(
     restrictToE2eFrontier?: boolean;
   },
 ): InferenceData[] {
+  return processOverlayChartDataWithClipping(
+    data,
+    chartType,
+    selectedYAxisMetric,
+    selectedXAxisMetric,
+    options,
+  ).data;
+}
+
+/**
+ * Overlay processor variant that retains intentionally clipped points for the
+ * dashed boundary-continuation layer.
+ */
+export function processOverlayChartDataWithClipping(
+  data: InferenceData[],
+  chartType: 'e2e' | 'interactivity',
+  selectedYAxisMetric: string,
+  selectedXAxisMetric: string | null,
+  options?: {
+    isAgentic?: boolean;
+    selectedPercentile?: string;
+    restrictToE2eFrontier?: boolean;
+  },
+): ProcessedChartData {
   const chartDef = (chartDefinitions as ChartDefinition[]).find((d) => d.chartType === chartType);
-  if (!chartDef) return [];
+  if (!chartDef) return { data: [], clippedData: [] };
 
   const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
   const isAgentic = options?.isAgentic === true;
@@ -129,12 +193,7 @@ export function processOverlayChartData(
       const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
       const xValue = (d as any)[xAxisField] ?? d.x;
       return { ...d, x: xValue, y: yValue };
-    })
-    .filter(
-      (d) => !isTtftX || isAgentic || !chartDef.y_latency_limit || d.x <= chartDef.y_latency_limit,
-    );
-
-  const costFiltered = filterDataByCostLimit(processedData, chartDef, selectedYAxisMetric);
+    });
 
   // Anti-benchmark-hacking parity: on agentic charts whose x-axis is NOT the
   // natural e2e latency, the official roofline is restricted to configs that
@@ -147,7 +206,7 @@ export function processOverlayChartData(
   // path, which draws those rooflines unrestricted).
   if (options?.restrictToE2eFrontier) {
     const byRun = new Map<string, InferenceData[]>();
-    for (const p of costFiltered) {
+    for (const p of processedData) {
       const runKey = p.run_url ?? '';
       let bucket = byRun.get(runKey);
       if (!bucket) {
@@ -164,5 +223,8 @@ export function processOverlayChartData(
     }
   }
 
-  return costFiltered;
+  return partitionChartDataByLimits(processedData, chartDef, selectedYAxisMetric, {
+    isTtftX,
+    isAgentic,
+  });
 }

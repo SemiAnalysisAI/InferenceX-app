@@ -409,6 +409,39 @@ describe('mapAggEvalRow', () => {
       expect(result!.config.disagg).toBe(true);
     });
 
+    it('preserves explicit disagg=false for a multi-node Dynamo eval', () => {
+      const tracker = createSkipTracker();
+      const result = mapAggEvalRow(
+        makeV2Row({
+          disagg: false,
+          prefill_tp: 8,
+          prefill_ep: 1,
+          prefill_num_workers: 1,
+          num_prefill_gpu: 16,
+          decode_tp: 0,
+          decode_ep: 0,
+          decode_num_workers: 0,
+          num_decode_gpu: 0,
+        }),
+        tracker,
+      );
+
+      expect(result!.config.framework).toBe('dynamo-trt');
+      expect(result!.config.disagg).toBe(false);
+      expect(result!.config.isMultinode).toBe(true);
+      expect(result!.config.prefillTp).toBe(8);
+      expect(result!.config.decodeTp).toBe(8);
+      expect(result!.config.numPrefillGpu).toBe(16);
+      expect(result!.config.numDecodeGpu).toBe(16);
+    });
+
+    it('treats a decode worker pool as disaggregated despite a legacy false field', () => {
+      const tracker = createSkipTracker();
+      const result = mapAggEvalRow(makeV2Row({ disagg: false }), tracker);
+
+      expect(result!.config.disagg).toBe(true);
+    });
+
     it('keeps disagg=false for a non-dynamo/mori framework with zero workers / not multinode', () => {
       const tracker = createSkipTracker();
       const result = mapAggEvalRow(

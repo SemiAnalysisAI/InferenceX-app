@@ -188,6 +188,34 @@ describe('getHardwareConfig', () => {
       expect(entry.costr).toBeGreaterThanOrEqual(0);
     }
   });
+
+  it('states every cost tier to at most two decimal places', () => {
+    for (const [gpu, entry] of Object.entries(HW_REGISTRY)) {
+      for (const tier of ['costh', 'costn', 'costr'] as const) {
+        const value = entry[tier];
+        // A published rate, never a raw TCO-model output with 16 digits.
+        expect(`${gpu}.${tier}=${value}`).toBe(`${gpu}.${tier}=${Math.round(value * 100) / 100}`);
+      }
+    }
+  });
+
+  it('uses the July 2026 TCO rates for modeled datacenter GPUs', () => {
+    const expectedRates = {
+      h100: [1.17, 1.55, 1.78],
+      h200: [1.22, 1.59, 2.05],
+      b200: [1.73, 2.07, 2.6],
+      b300: [2.26, 2.52, 3],
+      gb200: [1.86, 2.26, 2.6],
+      gb300: [2.31, 2.79, 3.3],
+      mi300x: [0.95, 1.16, 1.3],
+      mi325x: [1.1, 1.32, 1.6],
+      mi355x: [1.5, 2.09, 2.1],
+    } as const;
+
+    for (const [gpu, [costh, costn, costr]] of Object.entries(expectedRates)) {
+      expect(HW_REGISTRY[gpu]).toMatchObject({ costh, costn, costr });
+    }
+  });
 });
 
 // ===========================================================================
@@ -197,9 +225,9 @@ describe('getGpuSpecs', () => {
   it('returns specs for a base GPU key', () => {
     const specs = getGpuSpecs('h100');
     expect(specs.power).toBe(1.37);
-    expect(specs.costh).toBe(1.3);
-    expect(specs.costn).toBe(1.69);
-    expect(specs.costr).toBe(1.3);
+    expect(specs.costh).toBe(1.17);
+    expect(specs.costn).toBe(1.55);
+    expect(specs.costr).toBe(1.78);
   });
 
   it('extracts base from compound key (e.g. h100_vllm)', () => {
@@ -210,7 +238,7 @@ describe('getGpuSpecs', () => {
   it('extracts base from dash-separated key (e.g. h200-dynamo-trt)', () => {
     const specs = getGpuSpecs('h200-dynamo-trt');
     expect(specs.power).toBe(1.37);
-    expect(specs.costh).toBe(1.41);
+    expect(specs.costh).toBe(1.22);
   });
 
   it('returns zero specs for unknown GPU', () => {

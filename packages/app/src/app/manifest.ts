@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: `${SITE_NAME} by ${AUTHOR_NAME}`,
     short_name: SITE_NAME,
     description:
-      'Open-source AI inference benchmark. Compare GPU performance across NVIDIA, AMD, and more.',
+      'Open-source AI inference benchmark. Compare chip performance across NVIDIA, AMD, and more.',
     start_url: '/',
     display: 'standalone',
     background_color: '#09090b',

@@ -24,18 +24,28 @@ export default function ChartTooltip({ active, payload }: TooltipContentProps<nu
   if (active && pointPayload) {
     return (
       <div className="bg-accent p-2 border rounded-sm">
-        <p>{`GPU: ${hardwareConfig[pointPayload.hwKey as keyof typeof hardwareConfig].gpu}`}</p>
-        <p>{`Total GPUs: ${pointPayload.tp}`}</p>
+        <p>{`Chip: ${hardwareConfig[pointPayload.hwKey as keyof typeof hardwareConfig].gpu}`}</p>
+        <p>{`Total Chips: ${pointPayload.tp}`}</p>
+        <p>{`Deployment: ${
+          pointPayload.disagg
+            ? 'Disaggregated'
+            : pointPayload.is_multinode
+              ? 'Multi-node aggregate'
+              : 'Single-node aggregate'
+        }`}</p>
         {(pointPayload.ep !== null && pointPayload.ep !== undefined) ||
         (pointPayload.prefill_ep !== null && pointPayload.prefill_ep !== undefined) ? (
           pointPayload.is_multinode && pointPayload.disagg ? (
             <>
-              <p>{`Prefill: ${pointPayload.num_prefill_gpu ?? '?'} GPUs, TP: ${pointPayload.prefill_tp ?? pointPayload.tp}, EP: ${pointPayload.prefill_ep ?? pointPayload.ep ?? 0}, DPA: ${(pointPayload.prefill_dp_attention ?? pointPayload.dp_attention) ? 'True' : 'False'}, Workers: ${pointPayload.prefill_num_workers ?? 1}`}</p>
-              <p>{`Decode: ${pointPayload.num_decode_gpu ?? '?'} GPUs, TP: ${pointPayload.decode_tp ?? pointPayload.tp}, EP: ${pointPayload.decode_ep ?? pointPayload.ep ?? 0}, DPA: ${(pointPayload.decode_dp_attention ?? pointPayload.dp_attention) ? 'True' : 'False'}, Workers: ${pointPayload.decode_num_workers ?? 1}`}</p>
+              <p>{`Prefill: ${pointPayload.num_prefill_gpu ?? '?'} Chips, TP: ${pointPayload.prefill_tp ?? pointPayload.tp}, EP: ${pointPayload.prefill_ep ?? pointPayload.ep ?? 0}, DPA: ${(pointPayload.prefill_dp_attention ?? pointPayload.dp_attention) ? 'True' : 'False'}, Workers: ${pointPayload.prefill_num_workers ?? 1}`}</p>
+              <p>{`Decode: ${pointPayload.num_decode_gpu ?? '?'} Chips, TP: ${pointPayload.decode_tp ?? pointPayload.tp}, EP: ${pointPayload.decode_ep ?? pointPayload.ep ?? 0}, DPA: ${(pointPayload.decode_dp_attention ?? pointPayload.dp_attention) ? 'True' : 'False'}, Workers: ${pointPayload.decode_num_workers ?? 1}`}</p>
             </>
           ) : (
             <>
-              <p>{`Tensor Parallelism: ${pointPayload.tp}`}</p>
+              <p>{`Tensor Parallelism: ${pointPayload.decode_tp ?? pointPayload.tp}`}</p>
+              {typeof pointPayload.pp === 'number' && pointPayload.pp > 1 && (
+                <p>{`Pipeline Parallelism: ${pointPayload.pp}`}</p>
+              )}
               {pointPayload.ep !== null && pointPayload.ep !== undefined && (
                 <p>{`Expert Parallelism: ${pointPayload.ep}`}</p>
               )}
@@ -43,7 +53,7 @@ export default function ChartTooltip({ active, payload }: TooltipContentProps<nu
             </>
           )
         ) : (
-          <p>{`Parallelism Strategy: ${pointPayload.tp} GPU${(pointPayload.tp ?? 0) > 1 ? 's' : ''}`}</p>
+          <p>{`Parallelism Strategy: ${pointPayload.tp} Chip${(pointPayload.tp ?? 0) > 1 ? 's' : ''}`}</p>
         )}
         <p>{`Concurrent Requests: ${pointPayload.conc} Users`}</p>
         <p>{`X: ${pointPayload.x}`}</p>

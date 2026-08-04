@@ -25,7 +25,7 @@ describe('Measured power on unofficial-run overlay', () => {
     cy.contains('[data-slot="select-content"]', 'Measured Energy')
       .scrollIntoView()
       .should('be.visible');
-    cy.contains('[role="option"]', 'Measured Average Power per GPU')
+    cy.contains('[role="option"]', 'Measured Average Power per Chip')
       .scrollIntoView()
       .should('be.visible');
     cy.contains('[role="option"]', 'Measured Joules per Output Token')
@@ -33,7 +33,7 @@ describe('Measured power on unofficial-run overlay', () => {
       .should('be.visible');
 
     // Select the power option
-    cy.contains('[role="option"]', 'Measured Average Power per GPU').click();
+    cy.contains('[role="option"]', 'Measured Average Power per Chip').click();
     cy.get('[data-slot="select-content"]').should('not.exist');
 
     // Initial-load screenshot

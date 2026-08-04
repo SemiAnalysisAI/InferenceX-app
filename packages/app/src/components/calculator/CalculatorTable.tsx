@@ -35,22 +35,22 @@ const STRINGS = {
     throughputTotal: 'Total',
     throughputInput: 'Input',
     throughputOutput: 'Output',
-    throughputSuffix: ' Throughput (tok/s/gpu)',
+    throughputSuffix: ' Throughput (tok/s/chip)',
     costPrefix: 'Cost (',
     costSuffix: ')',
     concurrency: 'Concurrency',
     footer:
-      'Values are interpolated from real InferenceMAX benchmark data points. Only GPUs with data in the measured range are shown.',
+      'Values are interpolated from real InferenceMAX benchmark data points. Only chips with data in the measured range are shown.',
   },
   zh: {
     throughputTotal: '总',
     throughputInput: '输入',
     throughputOutput: '输出',
-    throughputSuffix: '吞吐量 (tok/s/gpu)',
+    throughputSuffix: '吞吐量 (tok/s/chip)',
     costPrefix: '成本 (',
     costSuffix: ')',
     concurrency: '并发数',
-    footer: '数值基于真实 InferenceMAX 基准测试数据插值计算。仅显示在测量范围内有数据的 GPU。',
+    footer: '数值基于真实 InferenceMAX 基准测试数据插值计算。仅显示在测量范围内有数据的 Chip。',
   },
 } as const;
 
@@ -78,7 +78,7 @@ export default function CalculatorTable({
   const columns = useMemo<DataTableColumn<InterpolatedResult>[]>(
     () => [
       {
-        header: 'GPU',
+        header: 'Chip',
         cell: (r) => getLabel(r, hardwareConfig),
         sortValue: (r) => getLabel(r, hardwareConfig),
         className: 'font-medium whitespace-nowrap',

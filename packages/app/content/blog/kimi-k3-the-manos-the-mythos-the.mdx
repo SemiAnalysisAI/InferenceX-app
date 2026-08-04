@@ -1,0 +1,781 @@
+---
+title: 'Kimi K3: The Manos, The Mythos, The Legendos'
+subtitle: "Kimi K3's architecture: compressed memory, attention across depth, latent expert routing, and serving performance"
+date: '2026-08-03'
+publishDate: '2026-08-03'
+tags:
+  - inference
+  - benchmark
+  - gpu
+  - kimi
+  - vllm
+  - nvidia
+  - b200
+  - b300
+  - dynamo
+---
+
+_Originally published on the [SemiAnalysis newsletter](https://newsletter.semianalysis.com/p/kimi-k3-the-manos-the-mythos-the) on August 3, 2026._
+
+Kimi K3 took the world by storm at its announcement, sweeping leaderboards and establishing itself as the open frontier model. While the community is eager to understand how Kimi K3 works, many have been surprised by the unconventional techniques driving its performance. This article serves as a primer to understanding the core techniques of the Kimi K3 model architecture.
+
+## Kimi Delta Attention
+
+Kimi Delta Attention (KDA) is the linear attention layer in Kimi K3's hybrid attention mechanism. We trace the origins of KDA, starting from linear attention, DeltaNet, Gated DeltaNet (GDN), then to KDA.
+
+### Linear Attention
+
+The derivation of linear attention stems from **removing the softmax operation in the standard softmax attention**. Below we compare the iterative inference formulas, which show the computation of the output vector at token position t:
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/softmax-vs-linear-attention.png"
+  alt="Softmax attention output formula compared with the linear attention output formula, which drops the exponential normalization"
+  caption="Source: [DeltaNet Explained (Part I)](https://sustcsonglin.github.io/blog/2024/deltanet-1/)"
+/>
+
+By removing the softmax operation, we can reorder the operations and reduce the computation complexity of attention from quadratic to linear:
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/linear-attention-reordering.png"
+  alt="Step-by-step reordering of the linear attention sum into a running state matrix S of shape d by d multiplied by the query"
+  caption="Source: [Linear Attention and Beyond (Interactive Tutorial with Songlin Yang)](https://www.youtube.com/watch?v=d0HJvGSWw8A)"
+/>
+
+The new equations are as follows:
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/linear-attention-recurrence.png"
+  alt="Linear attention recurrence: the state update S_t = S_t-1 + v_t k_t transpose and the output o_t = S_t q_t"
+  caption="Source: [Linear Attention and Beyond (Interactive Tutorial with Songlin Yang)](https://www.youtube.com/watch?v=d0HJvGSWw8A)"
+/>
+
+Vectors q, k, v, have dimensions _L_ by _d_. The computational complexity of both equations are O(*Ld*²), thereby making the computation linear. Comparing the new equations with softmax attention's equation, we see that **softmax attention requires accessing all past key and value vectors**, whereas **linear attention compresses all past key and value vectors** **into one hidden state S**.
+
+We reinterpret the new equations as an **online learning objective**. We view matrix S as an associative memory that stores the associations between key vector k and value vector v, and we retrieve v by multiplying S with k. We can then interpret the first equation as **continuously updating the matrix S at every position to perfect the retrieval**. Finally, we can interpret the vt @ kt.T term as the gradient of loss function -(S @ kt.T) @ vt with respect to S.
+
+$$
+\begin{aligned}
+\textbf{Objective:}\quad
+\mathcal{L}_t(\mathbf{S})
+&=
+-\left\langle
+\mathbf{S}\mathbf{k}_t,\mathbf{v}_t
+\right\rangle
+\\[8pt]
+\textbf{SGD update:}\quad
+\mathbf{S}_t
+&=
+\mathbf{S}_{t-1}
+-\beta_t\nabla\mathcal{L}_t(\mathbf{S}_{t-1})
+\\
+&=
+\mathbf{S}_{t-1}
++\beta_t\mathbf{v}_t\mathbf{k}_t^\top
+\end{aligned}
+$$
+
+### DeltaNet
+
+Under the online learning objective view, we see the values of matrix S will grow unboundedly: old and new information gets blurred together in S as the sequence grows, which destabilizes learning. Without softmax giving well-scaled and bounded outputs, linear attention typically lags behind softmax attention on long-range recall tasks.
+
+DeltaNet improves upon linear attention by **changing the loss function to minimizing the L2 norm of the value retrieval**. Unlike linear attention's loss function, DeltaNet's loss function regularizes the growth of S. This creates a new matrix S update rule, the Delta Rule, as below:
+
+$$
+\begin{aligned}
+\textbf{Objective:}\quad
+\mathcal{L}_t(\mathbf{S})
+&=
+\frac{1}{2}
+\left\|
+\mathbf{S}\mathbf{k}_t-\mathbf{v}_t
+\right\|^2
+\\[6pt]
+\textbf{SGD update:}\quad
+\mathbf{S}_t
+&=
+\mathbf{S}_{t-1}
+-\beta_t\nabla\mathcal{L}_t\!\left(\mathbf{S}_{t-1}\right)
+\\
+&=
+\mathbf{S}_{t-1}
+-\beta_t
+\left(
+\mathbf{S}_{t-1}\mathbf{k}_t-\mathbf{v}_t
+\right)
+\mathbf{k}_t^\top
+\end{aligned}
+$$
+
+Source: [Linear Attention and Beyond (Interactive Tutorial with Songlin Yang)](https://www.youtube.com/watch?v=d0HJvGSWw8A)
+
+The Delta Rule becomes the basis of DeltaNet's attention equation:
+
+$$
+\mathbf{S}_t
+=
+\mathbf{S}_{t-1}
+-
+\beta_t
+\left(
+\mathbf{S}_{t-1}\mathbf{k}_t-\mathbf{v}_t
+\right)
+\mathbf{k}_t^\top
+$$
+
+Conceptually, Sₜ-1 @ kₜ - vₜ represents the associations irrelevant to the current key and value, and DeltaNet performs targeted removal of those associations.
+
+### Gated DeltaNet
+
+GDN and KDA are adaptations of DeltaNet. Gated DeltaNet applies the LSTM forget gate _alpha_ on the matrix S, allowing the model to control memory lifespan with weight decay. KDA further expands _alpha_ into a diagonal matrix that enables fine-grained per-channel memory decay and positional awareness.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/gdn-vs-kda-update-rule.png"
+  alt="Gated DeltaNet state update using a scalar forget gate alpha versus the KDA update using Diag(alpha), a per-channel diagonal decay matrix"
+  caption="Source: [Kimi Linear](https://arxiv.org/abs/2510.26692)"
+/>
+
+### FlashKDA Algorithm
+
+Moonshot developed FlashKDA, their custom kernels for KDA, and [open-sourced it](https://github.com/MoonshotAI/FlashKDA/tree/master). Here we explain the algorithm and derive the arithmetic intensity.
+
+#### Algorithm
+
+First, let's start from an alternative formulation of the recurrence formula:
+
+```text
+u_t = beta_t * (v_t - (D_t @ S_t-1).T @ k_t)
+S_t = D_t @ S_t-1 + k_t @ u_t.T
+o_t.T = q_t.T @ S_t
+```
+
+Here, D_t is the diagonal matrix of the alpha forget gate, and u_t is the delta in the delta rule. For decode, the kernel roughly follows the formula. For prefill, we parallelize the operation by unrolling the recurrence formula in chunks of tokens, in order to efficiently execute the operations on GPUs. Assume we unroll token i to j, and the starting state is S_i-1, we get:
+
+```text
+S_j = D_j:i @ S_i-1 + sum(D_j:t+1 @ k_t @ u_t.T, t=i:j)
+o_j.T = q_j.T @ S_j
+      = q_j.T @ D_j:i @ S_i-1 + sum(q_j.T @ D_j:t+1 @ k_t @ u_t.T, t=i:j)
+```
+
+D_j:i refers to the cumulative decay from token i to j: D_j @ D_j-1 @ D_j-2 @ … @ D_i. In FlashKDA's matrix form, the formula becomes:
+
+```text
+S_out = D_j:i @ S_in + K_restore.T @ U
+M_qk = tril(Q_decay @ K_inv.T)
+O = Q_decay @ S_in + M_qk @ U
+```
+
+The vector to matrix mapping is as follows:
+
+- S_in refers to the state at the starting position of a chunk
+
+- S_out refers to the state at the end position of a chunk
+
+- K_restore is the matrix form of D_j:t+1 @ k_t
+
+- Q_decay is the matrix form of q_j.T @ D_j:i
+
+- Q_decay @ K_inv.T the matrix form of q_j.T @ D_j:t+1 @ k_t, derived from (q_j.T @ D_j:i) @ (D_t:i^-1 @ k_t)
+
+- M_qk is the causal mask, so it's a lower triangular matrix
+
+U is the matrix form of unrolled u_t. To compute this, we apply UT transform and compute the following:
+
+```text
+B = Diag(beta) @ (V - K_decay @ S_in)
+L = StrictTril(Diag(beta) @ K_decay @ K_inv.T)
+U = (I + L)^-1 @ B
+```
+
+Please consult [Songlin Yang's blog post](https://sustcsonglin.github.io/blog/2024/deltanet-2/) and [Kimi Linear paper section 3.1](https://arxiv.org/abs/2510.26692) for the full derivation. Note that here U corresponds to the pseudo-value term in the Kimi Linear paper.
+
+Implementation-wise, FlashKDA launches 2 kernels: K1 and K2. K1 prepares chunk-level tensors in parallel, including:
+
+```text
+a = exp2(cumsum(g))
+K_decay = Diag(a) @ K
+Q_decay = Diag(a) @ Q
+K_inv = Diag(a)^-1 @ K
+K_restore = a[-1] * K_inv
+L = StrictTril(Diag(beta) @ K_decay @ K_inv.T); INV = (I + L)^-1
+M_qk = tril(Q_decay @ K_inv.T)
+```
+
+Here `a` is the cumulative decay, where each element is the cumulative decay at a token position.
+
+K2 performs chunk-level recurrent computation:
+
+```text
+U = INV @ Diag(beta) @ (V - K_decay @ S)
+O = Q_decay @ S + M_qk @ U
+S = Diag(a[-1]) @ S + K_restore.T @ U
+```
+
+#### Complexity Analysis
+
+Here we analyze the complexity of an attention head. For decode, the critical path computations are:
+
+- D_t @ S_t-1: Element-wise multiplication, D × D
+
+- S_t-1.T @ k_t: D × D × 1
+
+- k_t @ u_t.T: D × 1 × D
+
+- q_t.T @ S_t: 1 D × D
+
+The decode kernel roughly performs `7*D²` FLOPs.
+
+Reading and writing the FP32 recurrent state dominates the memory traffic, so the memory traffic is roughly `8*D²` bytes.
+
+For prefill, the critical path of K1 is at computing L, INV, and M_qk.
+
+- L: C × D × C
+
+- INV: [Neumann factorization](https://github.com/MoonshotAI/FlashKDA/blob/1ce47ea3bb22c84eb9cc665028399cf35e8ffb0b/csrc/smxx/utils.cuh#L190), performs 6 C × C × C matrix multiplications
+
+- M_qk: C × D × C
+
+For K2,
+
+- K_decay @ S: C × D × D
+
+- Q_decay @ S: C × D × D
+
+- M_qk @ U: C × C × D
+
+- INV @ B: C × C × D
+
+- K_restore.T @ U: D × C × D
+
+Combining K1 and K2, FlashKDA performs `12*C^3 + 8*C²*D + 6*C*D²` FLOPs. Since we analyzed at the chunk level (chunk size C), assuming sequence length T `>>` C, the overall FLOPs is `T/C * O(C*D²) = O(T*D²)`.
+
+For memory traffic:
+
+- K1 read Q, K, g: C × D
+
+- K1 write and K2 read Q_decay, K_decay, K_restore: C × D
+
+- K1 write and K2 read INV, M_qk: C × C
+
+- K2 read V and write O: C × D
+
+- K2 read and write S once per kernel: D × D
+
+In total, FlashKDA accesses `3 * 2*C*D + 2 * (3 * 2*C*D + 2 * 2*C*C) + 2 * 2*C*D = 8*C² + 22*C*D` bytes. At the kernel level, it accesses `T/C * (8*C² + 22*C*D) + 8*D² ~ O(TC + TD + D²)`.
+
+This concretely shows that the computational complexity of KDA:
+
+- Prefill: Linear to sequence length for both computation and memory
+
+- Decode: Constant to sequence length for both computation and memory
+
+## Kimi Linear
+
+Moonshot trained Kimi Linear models as proof of concept for their KDA design, so we can infer Kimi K3's architecture design from Kimi Linear. Comparing the K3 release tech blog with Kimi Linear, we see Kimi K3 shares the shared expert count, the hybrid linear attention ratio, and the general attention module design.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/kimi-linear-vs-kimi-k3-config.png"
+  alt="Configuration table comparing Kimi Linear and Kimi K3 across activated experts, routed experts, KDA to MLA ratio, activation function, output gate type, attention type, MoE type, routing, and optimizer"
+  caption="Source: SemiAnalysis"
+/>
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/kimi-k3-architecture-overview.png"
+  alt="Kimi K3 architecture diagram showing the Stable LatentMoE block, the KDA module with short convolutions and L2 norm, and the 3:1 interleaving of KDA and Gated MLA layers with attention residual connections back to earlier blocks"
+  caption="Source: [Kimi K3 Tech Blog](https://www.kimi.com/blog/kimi-k3)"
+/>
+
+The diagram above shows the operations performed on the inputs of KDA. For the query, key, and value, we apply linear transformation and short convolution. Applying short convolution effectively capturing local token dependencies, and doing a left padding convolution avoids breaking causality. We additionally apply L2 norm to the query and key to stabilize the eigenvector of the transition and the output matrices. For the decay memory gates, alpha is a low rank projection, and beta is a down projection. The KDA output is normalized per head and controlled by an output forget gate, implemented as a linear transformation in K3, instead of a low rank projection in Kimi Linear. Finally, we apply a linear layer to mix per-head information.
+
+Kimi Linear interleaves KDA with full attention Multi-head Latent Attention (MLA). Kimi Linear showed that 3:1 is the ideal KDA to MLA ratio that balances performance and efficiency. KDA also serves as a strong position-aware operator, replacing the RoPE in MLA.
+
+Keeping MLA as full attention is an interesting choice, as all other open weight models move to Grouped Query Attention (GQA). MLA uses an absorption trick to reduce the computation of a decode step at the cost of extra computation during the prefill step. This is a sensible trade-off for decode-dominant reasoning workloads, but for prefill-dominant agentic workloads, extra computation becomes a high cost with little benefits. As a result, all frontier open weight models use GQA-based attention mechanisms: GLM 5.2 DeepSeek Sparse Attention, DeepSeek V4 Compressed Sparse Attention, MiniMax M3 MiniMax Sparse Attention, and MiMo V3 HySparse are all based on GQA. We suspect Moonshot's future models such as Kimi K4 will feature attention mechanisms that replace MLA.
+
+## KV Cache Efficiency
+
+We argue that **one should not infer KV cache efficiency solely based on KV cache space complexity**. KV cache size is not a standalone factor but a property of the model design: no open weight models are released with static KV cache compression techniques, and model architecture inference efficiency affects KV cache efficiency. The effects of KV cache size also vary, depending on the total memory capacity of a deployed model instance. For example, deploying a model with wide expert parallelism has very different memory profiles than doing so with tensor parallelism, which affects the memory capacity left for KV cache. Thus, we propose considering both the model architecture system efficiency and the KV cache size to understand the KV cache efficiency, and we quantify that with **KV throughput**.
+
+### KV Throughput
+
+KV throughput is defined as KV cache size divided by the prefill time (Time to first token), given a specific sequence length. KV throughput represents the minimum bandwidth required to reliably serve a model with PD disaggregation, but it is also a good proxy for understanding KV cache efficiency. Prefill time encapsulates the efficiency of the model architecture, and as the sequence length increases, we will see the memory-bounded and the compute-bounded situations. As shown in the table below, we can see the benefits of hybrid linear attention become more pronounced as sequence length increases.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/kv-throughput-by-sequence-length.png"
+  alt="KV throughput table at 1K, 8K, 32K, and 128K sequence lengths for hybrid models Kimi Linear, MiMo-V2-Flash, Qwen3.5-397B, and Ring-2.5-1T against dense models MiniMax-M2.5 and Qwen3-235B"
+  caption="Source: [Prefill-as-a-Service: KVCache of Next-Generation Models Could Go Cross-Datacenter](https://arxiv.org/abs/2604.15039v1)"
+/>
+
+This is also a good way to understand the bandwidth requirements of KV cache offloading to different memory tiers in a cluster.
+
+### KV Cache Residency
+
+The location where KV cache is stored follows the memory hierarchy. First, KV cache resides in HBM, the fastest memory in a GPU cluster, consuming whatever capacity is left by model weights and activations. As KV cache size exceeds the HBM capacity, it spills into server DRAM, a higher capacity but lower bandwidth memory pool. Finally, when KV cache exceeds DRAM capacity, it spills to disk storage such as SSD. This is analogous to the computer architecture cache hierarchy: register, cache memory, main memory, disk storage.
+
+The analogy continues for memory coherency. Popular distributed KV cache framework Mooncake Store supports write-through and write-back policies for KV cache loading. Mooncake Store features a distributed KV cache pool that makes all KV cache visible to all workers. Implementing write-through policy between DRAM and the lower-level distributed KV cache pool offers multiple benefits in multi-node scenarios, including sharing prefix cache across nodes, avoid KV cache duplication for tensor parallelized MLA, and KV cache redundancy when a node goes down.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/gpu-memory-hierarchy.png"
+  alt="GPU memory hierarchy pyramid from registers and SHMEM L1 cache through L2 cache, HBM, host DRAM, and NVMe or network storage, annotated with access latency and capacity"
+  caption="Source: SemiAnalysis"
+/>
+
+### KDA Prefix Cache Management
+
+At each token position in a request, Kimi K3 KDA's recurrent state is fixed in size, whereas standard attention KV cache grows with sequence length. This KV cache space reduction comes at the cost of complicating prefix caching, especially when Kimi K3 is a hybrid attention of KDA and MLA.
+
+Roughly speaking, modern inference engines identify prefix cache hits by matching the longest token prefix in the existing cache.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/prefix-cache-hit.png"
+  alt="Token-level diagram of a prefix cache hit where the first two tokens of a new request match the existing KV cache and the rest diverge"
+  caption="Source: SemiAnalysis"
+/>
+
+Identifying the longest prefix becomes a problem for linear attentions like KDA. Without prior knowledge of where the boundary of a prefix is, we will have to cache KDA's recurrent state at every token position. This means every token has a cache, and the KV cache memory usage regresses to growing with sequence length, defeating the purpose of using linear attention. To tackle this problem, Moonshot saves recurrent states at a coarse granularity, e.g. vLLM caches every 32K tokens. vLLM additionally caches at prompt boundaries, since for agentic workloads, a new turn typically starts at the end of a prompt.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/kda-cache-retention-intervals.png"
+  alt="Interval-based KDA cache retention across three conversation turns, keeping states at fixed intervals and prompt ends while discarding the rest, with MLA caching every token"
+  caption="Source: [Kimi K3 Is Here: Efficient Day-0 Support on vLLM](https://vllm.ai/blog/2026-07-27-k3)"
+/>
+
+This shows that even though linear attentions like KDA greatly reduce KV cache memory consumption, **realistically during serving, they do not consume a constant amount of KV cache memory**.
+
+## Attention Residuals
+
+### Residual Connections
+
+Residual connections are one of the key innovations that allowed us to build bigger deep neural networks through scaling model depth. The deeper the neural network, the more expressive they become but training them naively is hard. Signals from the earlier layer need to be preserved till the last layer and gradient need to survive from output to first without vanishing.
+
+Instead of modeling whole networks as a single function, passing information only through nonlinear transformations, residual networks connect smaller blocks with identity paths. Each block fᵢ ​ learns a change to its input xᵢ, given by the recurrence:
+
+$$
+x_{l+1} = x_l + f_l(x_l)
+$$
+
+The identity mapping allows features to carry from shallower units to any deeper unit and gives the gradient a path highway so they do not vanish.
+
+$$
+\frac{\partial x_{l+1}}{\partial x_l} = I + f_l'(x_l)
+$$
+
+While residual connections allow us to build deeper networks, they come with challenges.
+
+Early layers heavily influence residual stream to have effect on final output. Because of which residual stream has irreversible information loss with increasing depth. Later layers increase output gain to have effect on this modified residual stream which can destabilize training. Another variant like highway networks allow gating mechanisms for information flow but they suffer from the same crucial problem. Layers don't have selective access to information from earlier layers.
+
+### Recurrence In Time and Depth
+
+Sequence modeling dominated by recurrent neural networks had the same recurrence formulation.
+
+$$
+h_{t+1} = h_t + f(h_t, x_{t+1})
+$$
+
+Where each step has identity mapping with previous state for direct information flow and the sequence model faced the same challenge: depth in the time axis dilutes signal.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/residual-connections-vs-rnn-hidden-state.png"
+  alt="Side-by-side diagram of residual connections stacked over depth and an RNN hidden state carried over time, both following an identity-plus-function recurrence"
+  caption="Source: SemiAnalysis"
+/>
+
+Attention machines transformer removed this constrained by retrieving any token in past with powerful and expensive attention mechanism
+
+### Attention on residual stream
+
+Motivated by attention mechanism in sequence modeling, kimi developed attention residual, where they take attention over depth blocks,
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/attention-residual-equations.png"
+  alt="Attention Residuals equations 2 and 3 defining the per-layer attention weight alpha and the learned query, key, and value for each layer"
+  caption="Source: [Attention Residuals](https://arxiv.org/pdf/2603.15031)"
+/>
+
+Standard causal self-attention computes the output of token _t_ as a weighted sum of previous token representations:
+
+$$
+\mathbf{o}_t
+=
+\sum_{i=1}^{t}
+\alpha_{i\rightarrow t}\,\mathbf{v}_i,
+\qquad
+\alpha_{i\rightarrow t}
+=
+\frac{\phi(\mathbf{q}_t,\mathbf{k}_i)}
+{\sum_{j=1}^{t}\phi(\mathbf{q}_t,\mathbf{k}_j)}
+$$
+
+Attention Residuals use the same attention mechanism, but replace the sequence dimension with the depth dimension. Instead of attending over previous tokens, each layer attends over representations produced by previous layers.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/sequence-wise-vs-depth-wise-attention.png"
+  alt="Sequence-wise attention over tokens t1 to t4 compared with depth-wise attention over layer representations h1 to h4"
+  caption="Source: SemiAnalysis"
+/>
+
+Unlike standard attention, the query is a learned parameter for each layer rather than being generated from the current token.
+
+$$
+\alpha_{i \to l}
+=
+\frac{\phi(\mathbf{q}_l,\mathbf{k}_i)}
+{\displaystyle\sum_{j=0}^{l-1}\phi(\mathbf{q}_l,\mathbf{k}_j)}
+$$
+
+For each layer ℓ, we define:
+
+$$
+\mathbf{q}_l=\mathbf{w}_l,
+\qquad
+\mathbf{k}_i=\mathbf{v}_i=
+\begin{cases}
+\mathbf{h}_1, & i=0,\\
+f_i(\mathbf{h}_i), & 1\le i<l.
+\end{cases}
+$$
+
+Each colored block represents the output token representation from a previous transformer layer. Just as standard causal self-attention performs softmax attention over tokens in the sequence, Attention Residuals perform softmax attention over the representations produced by previous layers.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/full-attention-residuals.png"
+  alt="Full Attention Residuals diagram where every layer attends with a learned query vector over the key and value representations of all previous layers"
+  caption="Source: SemiAnalysis"
+/>
+
+Attention residual allows the model to get fine grained control over what inputs to pick from past layers making the model more expressive.
+
+### Block Attention Residuals
+
+Attention residual need to all past layer outputs for attention. For large models distributed over many GPUs this creates O(Ld) communication overhead. To overcome this block attention residual dividends layers L into N blocks of S layers. Block AttnRes applies attention over completed block outputs and for current block its evolving partial sum.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/block-attention-residuals.png"
+  alt="Block Attention Residuals diagram where layers are grouped into blocks and each layer attends over completed block representations plus the evolving partial sum of the current block"
+  caption="source: SemiAnalysis"
+/>
+
+Block Attention has minimal tread over full attention residual but they cut down communication from O*(Ld)* to O*(Nd).*
+
+Let bₙⁱ denote the partial sum over the first _i_ layers in block _n_, such that
+
+$$
+\mathbf{b}_n=\mathbf{b}_n^S,
+\qquad
+\mathbf{b}_0=\mathbf{h}_1.
+$$
+
+For the _i_-th layer in block _n_, the available block representations are
+
+$$
+\mathbf{V}_l=
+\begin{cases}
+[\mathbf{b}_0,\mathbf{b}_1,\ldots,\mathbf{b}_{n-1}]^\top,
+& i=1,\\[4pt]
+[\mathbf{b}_0,\mathbf{b}_1,\ldots,\mathbf{b}_{n-1},
+\mathbf{b}_n^{i-1}]^\top,
+& i>1.
+\end{cases}
+$$
+
+Unlike standard attention, the query is not input-dependent. Each layer learns a query vector:
+
+$$
+\mathbf{q}_l=\mathbf{w}_l
+$$
+
+Attention weights over the available block representations are computed as
+
+$$
+\boldsymbol{\alpha}_l
+=
+\operatorname{softmax}
+\left(
+\mathbf{K}_l\mathbf{w}_l
+\right).
+$$
+
+The output is the weighted sum of previous layer representations
+
+$$
+\mathbf{h}_l
+=
+\boldsymbol{\alpha}_l^\top\mathbf{V}_l.
+$$
+
+Rather than depending only on the residual stream to preserve information, Attention Residuals give every layer direct, selective access to earlier representations. This block based variant of attention residuals greatly reduces communication overhead while having competitive performance.
+
+Block residuals show better scaling compared standard residual connection achieving 1.25× compute efficiency. Consistently lower validation loss compared to baseline and gap widening with decay phase. Unlike standard residual networks where output magnitude increases as depth increases. selective aggregation of block attention has bounded output. And consistent gradient magnitude.
+
+### Training
+
+Unlike standard residual networks, attention residuals need all N-1 block input for computation of the Nth layer. This becomes a problem for pipeline parallelism as all N layer blocks output need to be transferred across stages.
+
+With clever cross stage caching and activation checkpointing, Kimi reduced overhead to only 4% compared to standard architecture for pipeline parallelism.
+
+#### Cross-stage caching
+
+For _P_ physical stages and _V_ virtual stages. Each block _N_ needs _C=PV_ communication for each chunk. Naively this needs transferring all accumulated blocks for each stage. This is quadratic cost growth for each physical and virtual stage
+
+$$
+\mathrm{Comm}_{\mathrm{naive}}
+=
+\sum_{j=1}^{C-1} jN_p \cdot d
+=
+\frac{C(C-1)}{2}N_p d
+$$
+
+This high communication can be reduced by caching input across virtual stages. Blocks computed in earlier layer can be stored in local memory,
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/cross-stage-caching-model-split.png"
+  alt="Model layers split into blocks B0 through B4 and mapped onto four GPUs across two virtual stages for cross-stage caching"
+  caption="Source: SemiAnalysis"
+/>
+
+For the first virtual stage all block embedding needs to be transferred in the physical stage, each completed block is stored on respective rank. For all subsequent virtual stages all cached blocks can be reused for computation. Only the block not present on rank need to be transferred for attention to residual computation.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/cross-stage-caching-virtual-stages.png"
+  alt="Per-GPU table of complete, cached, communicated, and generated blocks across virtual stage 0 and virtual stage 1, showing no communication overhead for cached blocks"
+  caption="Source: SemiAnalysis"
+/>
+
+These split communication costs for first and subsequent virtual stages. For the first virtual stage its need incur the same quadratic cost for all physical layers. In subsequent virtual stages we need cached inputs from local devices and Transfer of only PNp chunks needed cutting down total communication from O*(C)* to O*(P)*
+
+$$
+\mathrm{Comm}_{\mathrm{cached}}
+=
+\underbrace{\frac{P(P-1)}{2}N_p d}_{\text{first virtual stage}}
++
+\underbrace{(V-1)P^2N_p d}_{\text{subsequent virtual stages}}
+$$
+
+The cutdown of communication is directly proportional to virtual stages V. Because of this for full stage of one forward and backward pass all computation and communication can be overlapped
+
+#### Memory overhead
+
+Due to cross stage caching all blocks are stored once across all V virtual stages. With Activation checkpointing all inter-block chunks for attention are eliminated. Each stage activation checkpoint _Pl_ matches memory size of H*l* of standard architecture and has no extra memory cost.
+
+### Inference
+
+Because Attention Residuals need the output of all previous blocks to compute attention, a naive implementation has excessive memory accesses. To reduce overhead, inference is split into two phases which mirror prefill and decode stages of autoregressive attention. This computation is divided into inter-block attention for completed blocks and intra-block attention for evolving attention in the running block.
+
+#### Phase 1: Parallel Inter-Block Attention
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/inter-block-attention-phase-1.png"
+  alt="Phase 1 grid where queries q12 to q15 attend in parallel over the completed blocks B0, B1, and B2"
+  caption="Source: SemiAnalysis"
+/>
+
+During decoding, we have to output the completed block and the query vector learned per layer. All inter block layers simultaneously with a single batched query against the completed block representations, returning both outputs and softmax statistics which can be reused for further computation. This phase is similar to prefill phase decoding
+
+#### Phase 2: Sequential Intra-Block Attention
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/intra-block-attention-phase-2.png"
+  alt="Phase 2 grid where queries q12 to q15 attend sequentially over the evolving partial sums b0, b1, and b2 inside the running block"
+  caption="Source: SemiAnalysis"
+/>
+
+This phase is analogous to the decode phase, Similar to flash attention, evolving sum can be computed with online softmax for intra blocks combined with precomputed inter block results. Which reduces redundant memory access.
+
+With this two phase design, the IO footprint is similar to standard residual architecture, with only the addition of phase ones inter block computation, amortized by batching all queries in the block.
+
+## LatentMoE
+
+LatentMoE compresses the routed tokens before the dispatch operation, and then decompresses them after the aggregation operation. In Kimi K3's Stable LatentMoE, they apply an RMSNorm before the up-projection (decompressing) operation to reduce sensitivity to scale variations and improve model performance.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/latentmoe-block.png"
+  alt="Stable LatentMoE block showing shared experts, routed experts, the down-projection before dispatch, and the norm plus up-projection after aggregation"
+  caption="Source: [Kimi K3 Tech Report](https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf)"
+/>
+
+Here we explain the design principles behind LatentMoE regarding MoE communication. As shown in the LatentMoE paper, the communication volume is proportional to total routed tokens _t_, number of active experts _K_, and expert input dimension _d_, while being inversely proportional to the expert parallel size _E_. This is potentially the reason behind Kimi K3's latent MoE dimension size and active expert count configuration. Kimi K2 series feature 8 active experts with input dimension size 7168, so Kimi K3's latent input dimension size being 3584 (half of 7168) would allow the active expert count to double to 16 without increasing the communication volume.
+
+However, the **ratio of communication to computation** **time** is arguably more important for estimating system efficiency (Discussions [here](https://x.com/chhillee/status/2077966168304787769) and [here](https://x.com/chhillee/status/2078130513546723531)). The ratio indicates the roofline of how well MoE kernels can overlap communication with computation at a throughput-bound regime, and **expert intermediate dimension size** is the only model configuration that affects the ratio. Specifically, increasing the expert intermediate dimension size would decrease the ratio, meaning that the theoretical maximum fraction of communication that can be hidden is higher. Here we derive the formula:
+
+- _t_: total input tokens across the expert parallel (EP) domain
+
+- _K_: number of active experts per token
+
+- _N_: number of total experts
+
+- _E_: Ranks in the EP domain
+
+- _d_: Expert input dimension
+
+- _m_: Expert intermediate dimension
+
+- _P_: Aggregate bytes communicated per activation element (dispatch + combine)
+
+- _F_: Effective FFN expert (modeled as SwiGLU) computation throughput per GPU, FLOP/s
+
+- _B_: Effective uni-directional network bandwidth per GPU, B/s
+
+1. Assuming uniform expert routing, each GPU is assigned _t \* K / E_ tokens
+
+2. Assuming uniform expert routing, an average _1 / E_ tokens are local to the source GPUs, so each GPU dispatches _(t\*K/E) \* (1-1/E)_ tokens
+
+3. Each token is a d dimensional vector, so the communication volume per token is _d \* P_
+
+4. The communication volume per GPU is _(t\*K/E) \* (1-1/E) \* d \* P_
+
+5. The communication time T*comm = *(t \* K \* d \* P) / (E \* B) \* (1-1/E)\_
+
+6. The SwiGLU computation involves 3 matrix multiplications:
+
+   1. Up (First) projection: _d_ to _m_
+
+   2. Gate projection: _d_ to _m_
+
+   3. Down (Second) projection: _m_ to _d_
+
+So the computation is `2*d*m + 2*d*m + 2*m*d = 6*d*m` FLOPs per token
+
+7. The computation time per GPU is `T_comp = (6*d*m) * (t*K/E) / F`
+
+8. The communication to computation time ratio is
+
+   `T_comm / T_comp`
+
+   `= ((t * K * d * P) / (E * B) * (1-1/E)) / ((6*d*m) * (t*K/E) / F)`
+
+   `= (P*F) / (6*m*B) * (1-1/E)`
+
+We believe this formula also motivates an increase in expert intermediate dimension to 3072 in not just Kimi K2 to K3, but all recent open weight models, including DeepSeek V4 Pro, MiniMax M3, MiMo V2.5 Pro, and Inkling. As hardware improves and expert weight precision reduces to save memory capacity, the compute throughput increases, so one way of reducing the ratio is by increasing the expert intermediate dimension.
+
+### Quantile load balancing (QB)
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/quantile-balancing.png"
+  alt="Three-panel diagram showing imbalanced routing of eight tokens onto four experts, the quantile balancing margin cutoffs, and the resulting balanced routing"
+  caption="Source: [Kimi K3 report](https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf)"
+/>
+
+Many previous load balancing methods require careful hyperparameter tuning. Quantile balancing is hyperparameter free aux-loss free load balancing technique developed by Jianlin Su in [Feb 2026 blog post](https://kexue.fm/archives/11619)
+
+Base principle QB is the same as auxfree load balancing where router biases are updated dynamically based on the system's load. But instead of updated bias by some small coefficient like aux-free lb, QB directly computes the next bias from the distribution of router scores relative to routing cutoff threshold. Bias updates become small naturally when the router balances load evenly.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/qb-solver-algorithm.png"
+  alt="Pseudocode for the alternating QB solver that iteratively updates the per-token cutoff alpha and the per-expert bias beta by descending sort"
+  caption="Source: [Kimi K3 report](https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf)"
+/>
+
+QB tries to find the bias that would have approximately balanced under the current cutoffs and routing on the current batch, solving constraint optimization problems and applying these updates for the next batch. The first constraint is that each token is routed to exactly k experts. The second constraint is a batch of m tokens each picks k experts, gives (mk) assignments in total, to spread load evenly across n experts each expert should process _q=mk/n_ tokens.
+
+Each token finds the cutoff threshold as the (k+1)-th highest biased router score and uses it to calculate the bias update needed to balance load for each expert. For each expert, QB sorts the margins between its router score and every token's cutoff. It sets negative bias to q+1 the largest margin, leaving exactly q margin above the threshold. Since q/m=k/n, this is (1-k/n) quantile of the margin, which is why it's called Quantile Balancing.
+
+## Inference performance
+
+We are actively tracking Kimi K3's inference performance on [InferenceX](https://inferencex.semianalysis.com/).
+
+As of 30th July, all providers on OpenRouter have a floor of $3 per million tokens input and $15 per million tokens output. Both Nvidia and AMD had Day 0 recipes on vLLM, boasting DRAM offload and DSpark speculative decoding.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/openrouter-kimi-k3-providers.png"
+  alt="OpenRouter provider table for Kimi K3 listing input, output, and cache read prices alongside latency, throughput, and uptime for Modal, Baseten, Morph, Fireworks, Together, Moonshot AI, and DigitalOcean"
+  caption="Source: [OpenRouter](https://openrouter.ai/moonshotai/kimi-k3#providers)"
+/>
+
+On InferenceX, we benchmark Kimi K3 serving performance directly on recorded internal claude code traces. We replay an hour of these traces as they reach a steady state. There is a median of 142k input tokens and a median of 444 output tokens per turn with a median of 65 turns per session. The short output tokens per turn is typical for workloads on agentic harnesses, where the agent calls tools frequently, even edits are tool uses.
+
+This benchmark is a big step up from our previous 8k1k/1k1k benchmark, as it truly reflects real-world agentic use cases. From a systems perspective, it is also realistic and closest to production systems. It can reflect KV cache behavior, including prefix cache and KV offloading to DRAM.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/inferencex-agentic-trace-distributions.png"
+  alt="Distribution histograms of the agentic trace dataset: input tokens per turn, output tokens per turn, uncached input tokens per request, and turns per conversation"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/datasets)"
+/>
+
+For Kimi K3, Day 0 bringup was easier than DSv4 due to better documentation and preparation ahead of weights release. Appropriate images and a speculative decoder model were released at the same time as the weights.
+
+_Related: [DeepSeekV4 1.6T Day 0 to Day 43 Performance Over Time — Huawei, GB300 NVL72, MI355X, B200](/blog/deepseekv4-16t-day-0-to-day-43-performance)_
+
+For Nvidia, bringup was simple. But due to the models' sheer size, it doesn't fit on a single B200 node. We had to use PP to get it working. DSpark also didn't work with PP.
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/b200-dynamo-vllm-kimi-k3-throughput.png"
+  alt="Token throughput per GPU versus P90 interactivity for Kimi K3 FP4 on B200 with Dynamo vLLM at TP8PP2, sweeping concurrency from 1 to 32"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/)"
+/>
+
+For B300, the model fits on 1 node and serves well. After accounting for the weights, GPU HBM can only hold 3.25M tok. In the graph below, throughput goes up as batch sizes increase until concurrency increases above 8. This roughly correlates to the 3.25M tok KV cache budget, and cache starts to thrash, resulting in hit rates falling to `<` 10% when theoretical hit rate is 95%.
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+  Click to see the full InferenceX dashboard →
+</DashboardCTA>
+
+_The article continues with the B300 concurrency sweep, the AMD MI355X and MI455X bringup, and the full cross-hardware serving comparison for Kimi K3, in the [subscriber edition on the SemiAnalysis newsletter](https://newsletter.semianalysis.com/p/kimi-k3-the-manos-the-mythos-the)._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is Kimi Delta Attention (KDA)?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "KDA is the linear attention layer in Kimi K3's hybrid attention mechanism. It descends from linear attention and DeltaNet: linear attention removes the softmax so all past keys and values compress into a single hidden state S, DeltaNet regularizes the growth of S by minimizing the L2 norm of the value retrieval, Gated DeltaNet adds an LSTM-style scalar forget gate alpha, and KDA expands alpha into a diagonal matrix for fine-grained per-channel memory decay and positional awareness. KDA also replaces RoPE as the position-aware operator in the full attention layers."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the KDA to MLA ratio in Kimi K3?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "3:1, the same ratio Kimi Linear showed balances performance and efficiency. Kimi K3 interleaves three KDA layers with one full-attention Gated MLA layer. Keeping MLA as the full attention mechanism is unusual: GLM 5.2, DeepSeek V4, MiniMax M3, and MiMo V3 all use GQA-based sparse attention instead, because MLA's absorption trick trades extra prefill computation for cheaper decode, which suits decode-dominant reasoning but not prefill-dominant agentic workloads."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the computational complexity of FlashKDA?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "For decode, both computation and memory traffic are constant with respect to sequence length: roughly 7*D^2 FLOPs and 8*D^2 bytes per head, dominated by reading and writing the FP32 recurrent state. For prefill, FlashKDA runs two kernels (K1 prepares chunk-level tensors, K2 does the chunk-level recurrence) performing 12*C^3 + 8*C^2*D + 6*C*D^2 FLOPs per chunk of size C, so overall FLOPs is O(T*D^2) and memory traffic is O(TC + TD + D^2) — linear in sequence length T."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does linear attention actually give Kimi K3 a constant-size KV cache during serving?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. KDA's recurrent state is fixed size at any single token position, but prefix caching requires storing state at positions a future request might resume from. Caching every position would regress memory usage to growing with sequence length, so Moonshot saves recurrent states at coarse granularity — vLLM caches every 32K tokens, plus at prompt boundaries because agentic turns typically start at the end of a prompt. Realistically, KDA greatly reduces KV cache memory but does not consume a constant amount of it."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What are Attention Residuals and Block Attention Residuals?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Attention Residuals apply softmax attention across the depth dimension instead of the sequence dimension: each layer attends over the representations produced by previous layers, using a learned per-layer query vector rather than one generated from the current token. This gives every layer direct, selective access to earlier representations instead of relying on the residual stream alone. Block Attention Residuals group the L layers into N blocks and attend over completed block outputs plus the current block's evolving partial sum, cutting communication from O(Ld) to O(Nd) while staying competitive on quality — about 1.25x compute efficiency over standard residual connections."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is LatentMoE and why does expert intermediate dimension matter?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "LatentMoE compresses routed tokens before dispatch and decompresses them after aggregation; Kimi K3's Stable LatentMoE adds an RMSNorm before the up-projection. Halving the expert input dimension from 7168 to 3584 lets the active expert count double from 8 to 16 at the same communication volume. But the ratio of communication to computation time, which sets how much communication a MoE kernel can hide, works out to (P*F) / (6*m*B) * (1-1/E) — expert intermediate dimension m is the only model configuration in it. That is why recent open weight models, Kimi K3 included, raised the expert intermediate dimension to 3072."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does InferenceX benchmark Kimi K3?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On recorded internal Claude Code traces rather than fixed 8k1k/1k1k synthetic shapes. An hour of traces is replayed at steady state, with a median of 142k input tokens and 444 output tokens per turn across a median of 65 turns per session. Short outputs per turn are typical of agentic harnesses where the agent calls tools frequently. Replaying real traces exercises production KV cache behavior including prefix cache hits and KV offloading to DRAM."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does Kimi K3 serve on B200 and B300?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Both Nvidia and AMD shipped Day 0 vLLM recipes with DRAM offload and DSpark speculative decoding, and Day 0 bringup was easier than DeepSeek V4 because images and a speculative decoder model landed alongside the weights. Kimi K3 does not fit on a single B200 node, so it needs pipeline parallelism, and DSpark does not work with PP. On B300 the model fits on one node; after weights, HBM holds about 3.25M tokens of KV cache, and throughput improves with concurrency only up to 8, past which the cache thrashes and hit rates fall below 10% against a theoretical 95%."
+      }
+    }
+  ]
+}`}</JsonLd>

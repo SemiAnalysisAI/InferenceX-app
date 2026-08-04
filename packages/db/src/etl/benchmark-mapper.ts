@@ -224,7 +224,10 @@ export function mapBenchmarkRow(
       ? row.offload_mode
       : (descriptorToOnOff(row.kv_offloading) ?? descriptorToOnOff(row.offloading) ?? 'off');
 
-  const { framework, disagg } = normalizeFramework(String(row.framework ?? ''), row.disagg);
+  const { framework, disagg: frameworkDisagg } = normalizeFramework(
+    String(row.framework ?? ''),
+    row.disagg,
+  );
   const isMultinode = parseBool(row.is_multinode);
   const precision = normalizePrecision(String(row.precision ?? ''));
   if (!PRECISION_KEYS.has(precision)) {
@@ -232,8 +235,63 @@ export function mapBenchmarkRow(
   }
   const specMethod = normalizeSpecMethod(row.spec_decoding);
 
-  const parallelism = resolveParallelism(row);
+  let parallelism = resolveParallelism(row);
+  // An explicit non-disagg Dynamo artifact is authoritative for direct
+  // deployments such as one distributed vLLM server. A non-zero decode worker
+  // pool, however, is structural proof of disaggregation and preserves older
+  // Dynamo artifacts that incorrectly emitted disagg=false.
+  const disagg = frameworkDisagg || parallelism.decodeNumWorkers > 0;
   const metrics = captureNumericMetrics(row);
+  if (!disagg) {
+    const usePrefill =
+      parallelism.decodeTp <= 0 ||
+      parallelism.decodeEp <= 0 ||
+      (parallelism.decodeNumWorkers <= 0 &&
+        parallelism.numDecodeGpu <= 0 &&
+        (parallelism.prefillNumWorkers > 0 || parallelism.numPrefillGpu > 0));
+    const aggregate = usePrefill
+      ? {
+          tp: parallelism.prefillTp,
+          ep: parallelism.prefillEp,
+          dpAttn: parallelism.prefillDpAttn,
+          numWorkers: parallelism.prefillNumWorkers,
+          numGpu: parallelism.numPrefillGpu,
+          pp:
+            metrics.prefill_pp !== undefined || metrics.decode_pp !== undefined
+              ? Math.max(metrics.prefill_pp ?? 1, metrics.decode_pp ?? 1)
+              : undefined,
+        }
+      : {
+          tp: parallelism.decodeTp,
+          ep: parallelism.decodeEp,
+          dpAttn: parallelism.decodeDpAttn,
+          numWorkers: parallelism.decodeNumWorkers,
+          numGpu: parallelism.numDecodeGpu,
+          pp:
+            metrics.prefill_pp !== undefined || metrics.decode_pp !== undefined
+              ? Math.max(metrics.prefill_pp ?? 1, metrics.decode_pp ?? 1)
+              : undefined,
+        };
+    // The configs schema retains prefill/decode-shaped columns for backwards
+    // compatibility, but an aggregate deployment has only one engine. Mirror
+    // that engine into both halves so every reader sees the same topology.
+    parallelism = {
+      prefillTp: aggregate.tp,
+      prefillEp: aggregate.ep,
+      prefillDpAttn: aggregate.dpAttn,
+      prefillNumWorkers: aggregate.numWorkers,
+      decodeTp: aggregate.tp,
+      decodeEp: aggregate.ep,
+      decodeDpAttn: aggregate.dpAttn,
+      decodeNumWorkers: aggregate.numWorkers,
+      numPrefillGpu: aggregate.numGpu,
+      numDecodeGpu: aggregate.numGpu,
+    };
+    if (aggregate.pp !== undefined) {
+      metrics.prefill_pp = aggregate.pp;
+      metrics.decode_pp = aggregate.pp;
+    }
+  }
 
   // Agentic rows emit `offload_mode: "on" | "off"` (or older `offloading: "none"|...`)
   // — preserve as a stringified metric for legacy readers. Runtime cache

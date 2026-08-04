@@ -50,7 +50,7 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
     data: pt(),
     isPinned: false,
     xLabel: 'E2E Latency (ms)',
-    yLabel: 'Throughput per GPU',
+    yLabel: 'Throughput per Chip',
     selectedYAxisMetric: 'y_tpPerGpu',
     hardwareConfig: mockHardwareConfig,
     ...overrides,
@@ -63,20 +63,20 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
 describe('tooltip parallelism — old data (no ep field)', () => {
   it('shows GPU count when ep and prefill_ep are absent', () => {
     const html = generateTooltipContent(tooltipConfig({ data: pt({ tp: 4 }) }));
-    expect(html).toContain('4 GPU');
+    expect(html).toContain('4 Chip');
     expect(html).not.toContain('Tensor Parallelism');
     expect(html).not.toContain('Expert Parallelism');
   });
 
   it('pluralizes "GPUs" for tp > 1', () => {
     const html = generateTooltipContent(tooltipConfig({ data: pt({ tp: 8 }) }));
-    expect(html).toContain('8 GPUs');
+    expect(html).toContain('8 Chips');
   });
 
   it('uses singular "GPU" for tp = 1', () => {
     const html = generateTooltipContent(tooltipConfig({ data: pt({ tp: 1 }) }));
-    expect(html).toContain('1 GPU');
-    expect(html).not.toContain('1 GPUs');
+    expect(html).toContain('1 Chip');
+    expect(html).not.toContain('1 Chips');
   });
 });
 
@@ -84,6 +84,27 @@ describe('tooltip parallelism — old data (no ep field)', () => {
 // parallelism HTML in tooltips, standard parallelism (ep exists)
 // ===========================================================================
 describe('tooltip parallelism — standard (ep field present)', () => {
+  it('shows multinode aggregate as one topology without prefill/decode roles', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          tp: 16,
+          decode_tp: 8,
+          ep: 1,
+          pp: 2,
+          is_multinode: true,
+          disagg: false,
+        }),
+      }),
+    );
+
+    expect(html).toContain('Multi-node aggregate');
+    expect(html).toMatch(/Tensor Parallelism:<\/strong> 8/u);
+    expect(html).toMatch(/Pipeline Parallelism:<\/strong> 2/u);
+    expect(html).not.toContain('<strong>Prefill:</strong>');
+    expect(html).not.toContain('<strong>Decode:</strong>');
+  });
+
   it('shows TP and EP fields for non-multinode data', () => {
     const html = generateTooltipContent(
       tooltipConfig({ data: pt({ tp: 4, ep: 8, dp_attention: false }) }),
@@ -162,8 +183,8 @@ describe('tooltip parallelism — multinode disagg', () => {
     );
     expect(html).toContain('Prefill:');
     expect(html).toContain('Decode:');
-    expect(html).toContain('16 GPUs');
-    expect(html).toContain('24 GPUs');
+    expect(html).toContain('16 Chips');
+    expect(html).toContain('24 Chips');
     expect(html).toContain('Workers: 2');
     expect(html).toContain('Workers: 3');
   });
@@ -226,7 +247,7 @@ describe('tooltip parallelism — multinode disagg', () => {
         }),
       }),
     );
-    expect(html).toContain('? GPUs');
+    expect(html).toContain('? Chips');
   });
 
   it('also works with GPU graph tooltip', () => {
@@ -249,8 +270,8 @@ describe('tooltip parallelism — multinode disagg', () => {
     );
     expect(html).toContain('Prefill:');
     expect(html).toContain('Decode:');
-    expect(html).toContain('8 GPUs');
-    expect(html).toContain('16 GPUs');
+    expect(html).toContain('8 Chips');
+    expect(html).toContain('16 Chips');
   });
 });
 
@@ -273,7 +294,7 @@ describe('tooltip parallelism — zh locale', () => {
   it('localizes the old-data parallelism strategy line', () => {
     const html = generateTooltipContent(tooltipConfig({ data: pt({ tp: 4 }), locale: 'zh' }));
     expect(html).toContain('并行策略');
-    expect(html).toContain('4 个 GPU');
+    expect(html).toContain('4 个 Chip');
   });
 
   it('localizes the multinode disagg role headers', () => {
@@ -292,7 +313,7 @@ describe('tooltip parallelism — zh locale', () => {
     );
     expect(html).toContain('预填充:');
     expect(html).toContain('解码:');
-    expect(html).toContain('16 个 GPU');
+    expect(html).toContain('16 个 Chip');
   });
 });
 
@@ -302,13 +323,13 @@ describe('tooltip parallelism — zh locale', () => {
 describe('tooltip — Total GPUs line', () => {
   it('always shows Total GPUs in standard tooltip', () => {
     const html = generateTooltipContent(tooltipConfig({ data: pt({ tp: 16 }) }));
-    expect(html).toContain('Total GPUs');
+    expect(html).toContain('Total Chips');
     expect(html).toContain('16');
   });
 
   it('always shows Total GPUs in GPU graph tooltip', () => {
     const html = generateGPUGraphTooltipContent(tooltipConfig({ data: pt({ tp: 32 }) }));
-    expect(html).toContain('Total GPUs');
+    expect(html).toContain('Total Chips');
     expect(html).toContain('32');
   });
 });

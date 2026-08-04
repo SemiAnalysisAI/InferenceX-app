@@ -80,6 +80,8 @@ export interface WorkerPower {
  * @property {number} p99_e2el - 99th percentile of End-to-End Latency.
  */
 export interface AggDataEntry {
+  /** Metric keys present in the source row before missing values are normalized to zero. */
+  rawMetricKeys?: string[];
   /** Stable per-point id from benchmark_results — for trace_replay lookups. */
   id?: number;
   hw: string;
@@ -317,6 +319,18 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   measuredJPerInputToken?: { y: number; roof: boolean };
 }
 
+/** Why a chart-ready point was intentionally excluded from the visible plot. */
+export type ChartClipReason = 'cost' | 'latency';
+
+/**
+ * A filtered point retained only so the chart can explain that its Pareto
+ * curve continues beyond an intentional display limit.
+ */
+export interface ClippedInferenceData {
+  point: InferenceData;
+  reasons: ChartClipReason[];
+}
+
 /**
  * Keys of InferenceData that have the roofline metric structure ({y, roof}).
  */
@@ -494,6 +508,7 @@ export interface RenderableGraph {
   sequence: string;
   chartDefinition: ChartDefinition;
   data: InferenceData[];
+  clippedData?: ClippedInferenceData[];
 }
 /**
  * Props for the {@link ScatterGraph} component.
@@ -510,6 +525,8 @@ export interface RenderableGraph {
 export interface OverlayData {
   /** The data points to overlay */
   data: InferenceData[];
+  /** Overlay points hidden by the same display limits as official data. */
+  clippedData?: ClippedInferenceData[];
   /** Hardware configuration for the overlay data (may have different hardware types) */
   hardwareConfig: HardwareConfig;
   /** Fallback label — branch of the first loaded run. Used when {@link getRunForRow} is absent
@@ -529,6 +546,7 @@ export interface ScatterGraphProps {
   chartId: string;
   modelLabel: string;
   data: InferenceData[];
+  clippedData?: ClippedInferenceData[];
   xLabel: string;
   yLabel: string;
   chartDefinition: ChartDefinition;
@@ -674,13 +692,13 @@ export interface RunInfo {
   changelog?: ChangelogMetadata;
 }
 
-/** Aggregation mode for the quick filters: aggregated vs disaggregated serving. */
-export type DisaggMode = 'agg' | 'disagg';
+/** Deployment mode for quick filters. Multinode aggregate is not disaggregated serving. */
+export type DeploymentMode = 'single-node' | 'multi-node' | 'disagg';
 /** Speculative-decoding mode for the quick filters: MTP vs standard token prediction. */
 export type SpecMode = 'mtp' | 'stp';
 
 /**
- * Coarse vendor / framework / aggregation / spec-decoding filters applied to the
+ * Coarse vendor / framework / deployment / spec-decoding filters applied to the
  * chart point set. Empty array within a category = no constraint. Framework
  * values are engine-family keys ('vllm' | 'sglang' | 'trt' | 'atom'). See
  * `utils/quickFilters.ts`.
@@ -688,14 +706,14 @@ export type SpecMode = 'mtp' | 'stp';
 export interface QuickFilters {
   vendors: string[];
   frameworks: string[];
-  disagg: DisaggMode[];
+  deployment: DeploymentMode[];
   spec: SpecMode[];
 }
 
 /**
  * The quick-filter values that actually have data for the current model /
  * sequence / precision. Drives which pills are shown (frameworks) or disabled
- * (vendor / agg / spec). Same shape as {@link QuickFilters}.
+ * (vendor / deployment / spec). Same shape as {@link QuickFilters}.
  */
 export type AvailableQuickFilters = QuickFilters;
 
@@ -771,13 +789,13 @@ export interface InferenceChartContextType {
   setSelectedXAxisMode: (mode: 'ttft' | 'e2e' | 'interactivity' | 'osl-e2el') => void;
   scaleType: 'auto' | 'linear' | 'log';
   setScaleType: (type: 'auto' | 'linear' | 'log') => void;
-  /** Coarse vendor / framework / agg-disagg / mtp-stp filters applied to the chart point set. */
+  /** Coarse vendor / framework / deployment / mtp-stp filters applied to the chart point set. */
   quickFilters: QuickFilters;
   /** Quick-filter values that have data for the current model (drives pill enable/disable). */
   availableQuickFilters: AvailableQuickFilters;
   setQuickFilterVendors: (vendors: string[]) => void;
   setQuickFilterFrameworks: (frameworks: string[]) => void;
-  setQuickFilterDisagg: (modes: DisaggMode[]) => void;
+  setQuickFilterDeployment: (modes: DeploymentMode[]) => void;
   setQuickFilterSpec: (modes: SpecMode[]) => void;
   setIsLegendExpanded: (metric: boolean) => void;
   isLegendExpanded: boolean;

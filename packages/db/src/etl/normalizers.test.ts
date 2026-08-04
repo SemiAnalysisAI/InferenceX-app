@@ -5,6 +5,7 @@ import {
   normalizeFramework,
   normalizeSpecMethod,
   parseBool,
+  parseOptionalBool,
   parseNum,
   parseInt2,
   parseIslOsl,
@@ -253,8 +254,12 @@ describe('normalizeFramework', () => {
     });
   });
 
-  it('renames dynamo-trtllm to dynamo-trt and forces disagg=true (framework implies it)', () => {
+  it('renames dynamo-trtllm while preserving an explicit non-disagg value', () => {
     expect(normalizeFramework('dynamo-trtllm', false)).toEqual({
+      framework: 'dynamo-trt',
+      disagg: false,
+    });
+    expect(normalizeFramework('dynamo-trtllm', undefined)).toEqual({
       framework: 'dynamo-trt',
       disagg: true,
     });
@@ -276,13 +281,17 @@ describe('normalizeFramework', () => {
     });
   });
 
-  it('forces disagg=true for dynamo-* canonicals regardless of disaggField', () => {
+  it('honors explicit Dynamo disagg values and only infers true when absent', () => {
     expect(normalizeFramework('dynamo-trt', false)).toEqual({
       framework: 'dynamo-trt',
-      disagg: true,
+      disagg: false,
     });
     expect(normalizeFramework('dynamo-sglang', 'false')).toEqual({
       framework: 'dynamo-sglang',
+      disagg: false,
+    });
+    expect(normalizeFramework('dynamo-vllm', true)).toEqual({
+      framework: 'dynamo-vllm',
       disagg: true,
     });
     expect(normalizeFramework('dynamo-vllm', null)).toEqual({
@@ -344,6 +353,22 @@ describe('parseBool', () => {
     expect(parseBool(1)).toBe(false);
     expect(parseBool('1')).toBe(false);
     expect(parseBool('TRUE')).toBe(false);
+  });
+});
+
+describe('parseOptionalBool', () => {
+  it('preserves explicit true and false values', () => {
+    expect(parseOptionalBool(true)).toBe(true);
+    expect(parseOptionalBool('True')).toBe(true);
+    expect(parseOptionalBool(false)).toBe(false);
+    expect(parseOptionalBool('False')).toBe(false);
+  });
+
+  it('returns undefined for absent or unrecognized values', () => {
+    expect(parseOptionalBool(null)).toBeUndefined();
+    expect(parseOptionalBool(undefined)).toBeUndefined();
+    expect(parseOptionalBool('TRUE')).toBeUndefined();
+    expect(parseOptionalBool(1)).toBeUndefined();
   });
 });
 

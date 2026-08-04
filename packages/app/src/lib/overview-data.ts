@@ -1,18 +1,28 @@
 import { resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants';
 
+import { restrictAgenticPointsToE2eFrontier } from './agentic-frontier';
 import type { BenchmarkRow } from './api';
+import { rowToAggDataEntry } from './benchmark-transform';
 import { buildAvailabilityHwKey } from './chart-utils';
 import { getGpuSpecs, getHardwareConfig } from './constants';
-import { DEFAULT_MODELS, getModelLabel, Precision, type Model } from './data-mappings';
+import { DEFAULT_MODELS, getModelLabel, Model, Precision } from './data-mappings';
 import { frameworkFamily } from './framework-family';
-import { computeTcoFeed, type TcoTierBoundary } from './tco-feed';
+import {
+  computeTierReads,
+  singleTurnInteractivity,
+  type TcoTierBoundary,
+  type TcoTierPoint,
+  type TcoTierRead,
+} from './tco-feed';
 
 export const OVERVIEW_WORKLOAD = { isl: 8192, osl: 1024 } as const;
-export const OVERVIEW_TIERS = [30, 50, 75, 100] as const;
+export const OVERVIEW_TIERS = [30, 50, 75, 100, 150, 200] as const;
 export type OverviewTier = (typeof OVERVIEW_TIERS)[number];
 export const OVERVIEW_PRIMARY_TIER = 50;
 export type OverviewEngineScope = 'all' | 'community';
-export type OverviewDecodeMode = 'speculative' | 'standard';
+export type OverviewScenario = 'single_turn_8k1k' | 'agentx';
+/** Row order within a model: the single-turn workload first, AgentX below it. */
+export const OVERVIEW_SCENARIOS = ['single_turn_8k1k', 'agentx'] as const;
 
 export function resolveOverviewEngineScope(
   raw: string | string[] | undefined,
@@ -28,6 +38,8 @@ export function resolveOverviewTier(raw: string | string[] | undefined): Overvie
 
 export interface OverviewTierValue {
   tier: number;
+  /** Total (input + output) tok/s per DEPLOYED GPU on the frontier at `tier` —
+   *  the overview's cost basis; null when the tier is not comparable. */
   value: number | null;
   boundary: TcoTierBoundary;
   /** True only when the tier value falls between observed frontier knots. */
@@ -40,7 +52,7 @@ export interface OverviewTierValue {
 }
 
 /** One chart-equivalent serving series. Topology and GPU-count variants may
- *  contribute points, while release/framework/spec/precision/disagg stay exact. */
+ *  contribute points, while release/framework/spec/precision/deployment stay exact. */
 export interface OverviewConfigResult {
   key: string;
   dbModel: string;
@@ -51,6 +63,7 @@ export interface OverviewConfigResult {
   specMethod: string;
   specLabel: string;
   disagg: boolean;
+  isMultinode: boolean;
   precision: string;
   sourceRunUrls: string[];
   tierValues: OverviewTierValue[];
@@ -72,7 +85,7 @@ export interface OverviewTierRead {
  *  under-swept. */
 export type OverviewMissingReason =
   | 'int4_bf16_only'
-  | 'no_8k1k_data'
+  | 'no_scenario_data'
   | 'cannot_reach_at_tier'
   | 'no_exact_at_tier';
 
@@ -82,10 +95,10 @@ export interface OverviewPlatformResult {
   hardware: string;
   hardwareLabel: string;
   precision: string | null;
-  decodeMode: OverviewDecodeMode | null;
   read: OverviewTierRead;
   missingReason: OverviewMissingReason | null;
-  /** $ per million output tokens at the retail-rental $/GPU/hr tier. */
+  /** $ per million TOTAL (input + output) tokens at the hyperscaler $/GPU/hr
+   *  tier (`HW_REGISTRY.costh`). */
   costPerMtok: number | null;
   /** Cost delta vs this row's B200 cell; negative = cheaper. Null on the B200
    *  cell itself and whenever either cost is unavailable. */
@@ -95,37 +108,77 @@ export interface OverviewPlatformResult {
 export interface OverviewModelSummary {
   model: Model;
   modelLabel: string;
+  scenario: OverviewScenario;
   platforms: OverviewPlatformResult[];
 }
 
 export interface OverviewPageData {
   models: OverviewModelSummary[];
-  datasetThroughDate: string | null;
   tier: OverviewTier;
   engineScope: OverviewEngineScope;
 }
 
 const OVERVIEW_SLICE_PRIORITY = [
-  { decodeMode: 'speculative', precision: Precision.FP4 },
-  { decodeMode: 'speculative', precision: Precision.FP8 },
-  { decodeMode: 'standard', precision: Precision.FP4 },
-  { decodeMode: 'standard', precision: Precision.FP8 },
-] as const satisfies readonly {
-  decodeMode: OverviewDecodeMode;
-  precision: string;
-}[];
+  { speculative: true, precision: Precision.FP4 },
+  { speculative: true, precision: Precision.FP8 },
+  { speculative: false, precision: Precision.FP4 },
+  { speculative: false, precision: Precision.FP8 },
+] as const;
 const OVERVIEW_PRECISIONS: readonly string[] = [Precision.FP4, Precision.FP8];
-const OVERVIEW_HARDWARE_LABELS: Readonly<Record<string, string>> = {
-  gb200: 'GB200',
-  gb300: 'GB300',
-};
-
+/** The registry label verbatim, rack SKU included — the matrix says
+ *  "GB200 NVL72", not "GB200", so a rack part is never read as a board. */
 function overviewHardwareLabel(hardware: string, model: Model): string {
-  return OVERVIEW_HARDWARE_LABELS[hardware] ?? getHardwareConfig(hardware, model).label;
+  return getHardwareConfig(hardware, model).label;
 }
 
-function decodeModeForSpecMethod(specMethod: string): OverviewDecodeMode {
-  return specMethod === 'none' || specMethod === '' ? 'standard' : 'speculative';
+const isSpeculativeDecode = (specMethod: string): boolean =>
+  specMethod !== 'none' && specMethod !== '';
+
+export function overviewScenarioForModel(
+  model: Model,
+  rows: readonly BenchmarkRow[] = [],
+): OverviewScenario {
+  if (
+    rows.some(
+      (row) =>
+        row.benchmark_type === 'single_turn' &&
+        row.isl === OVERVIEW_WORKLOAD.isl &&
+        row.osl === OVERVIEW_WORKLOAD.osl,
+    )
+  ) {
+    return 'single_turn_8k1k';
+  }
+  if (rows.some((row) => row.benchmark_type === 'agentic_traces')) return 'agentx';
+  return model === Model.Kimi_K3 || model === Model.GLM_5_2 ? 'agentx' : 'single_turn_8k1k';
+}
+
+/**
+ * Which scenarios each model is shown under, curated rather than derived: a
+ * model can hold rows for a scenario the overview does not want to headline
+ * for it, so presence of data alone must not add a row. Models listed with
+ * both get one matrix row each, in OVERVIEW_SCENARIOS order.
+ */
+const OVERVIEW_MODEL_SCENARIOS: Partial<Record<Model, readonly OverviewScenario[]>> = {
+  [Model.DeepSeek_V4_Pro]: ['single_turn_8k1k', 'agentx'],
+  [Model.MiniMax_M3]: ['single_turn_8k1k', 'agentx'],
+  [Model.Qwen3_5]: ['single_turn_8k1k', 'agentx'],
+  [Model.Kimi_K2_5]: ['single_turn_8k1k'],
+  [Model.Kimi_K3]: ['agentx'],
+  [Model.GLM_5_2]: ['agentx'],
+};
+
+/** The scenarios this model gets a row for. Unlisted models keep the single
+ *  data-derived scenario, so a new model renders one row until curated. */
+export function overviewScenariosForModel(
+  model: Model,
+  rows: readonly BenchmarkRow[] = [],
+): OverviewScenario[] {
+  const curated = OVERVIEW_MODEL_SCENARIOS[model];
+  return curated === undefined
+    ? [overviewScenarioForModel(model, rows)]
+    : // Normalized through OVERVIEW_SCENARIOS so row order stays single-turn
+      // first however an entry above happens to be written.
+      OVERVIEW_SCENARIOS.filter((scenario) => curated.includes(scenario));
 }
 
 function overviewEngineRows(
@@ -139,24 +192,18 @@ function overviewEngineRows(
   });
 }
 
-function overviewWorkloadRows(rows: readonly BenchmarkRow[]): BenchmarkRow[] {
+function overviewScenarioRows(
+  scenario: OverviewScenario,
+  rows: readonly BenchmarkRow[],
+): BenchmarkRow[] {
+  if (scenario === 'agentx') {
+    return rows.filter((row) => row.benchmark_type === 'agentic_traces');
+  }
   return rows.filter(
     (row) =>
       row.benchmark_type === 'single_turn' &&
       row.isl === OVERVIEW_WORKLOAD.isl &&
       row.osl === OVERVIEW_WORKLOAD.osl,
-  );
-}
-
-/** Deliberately from raw rows, not retained winners: an unranked precision or
- *  engine still dates the dataset it was measured in. */
-export function overviewDatasetThroughDate(
-  rows: readonly BenchmarkRow[],
-  engineScope: OverviewEngineScope = 'community',
-): string | null {
-  return overviewWorkloadRows(overviewEngineRows(rows, engineScope)).reduce<string | null>(
-    (latest, row) => (latest === null || row.date > latest ? row.date : latest),
-    null,
   );
 }
 
@@ -168,14 +215,19 @@ function overviewServingSeriesKey(row: BenchmarkRow): string {
     row.spec_method,
     row.precision,
     row.disagg,
+    row.is_multinode,
     row.offload_mode ?? 'off',
   ]);
 }
 
 /** Chart-equivalent serving series: topology variants are points on one curve. */
-function buildConfigs(model: Model, workloadRows: readonly BenchmarkRow[]): OverviewConfigResult[] {
+function buildConfigs(
+  model: Model,
+  scenario: OverviewScenario,
+  scenarioRows: readonly BenchmarkRow[],
+): OverviewConfigResult[] {
   const rowsByConfig = new Map<string, BenchmarkRow[]>();
-  for (const row of workloadRows) {
+  for (const row of scenarioRows) {
     if (!OVERVIEW_PRECISIONS.includes(row.precision)) continue;
     const key = overviewServingSeriesKey(row);
     const configRows = rowsByConfig.get(key);
@@ -190,7 +242,7 @@ function buildConfigs(model: Model, workloadRows: readonly BenchmarkRow[]): Over
       configRows[0].date,
     );
     const latestRows = configRows.filter((row) => row.date === latestDate);
-    const config = buildConfigResult(model, latestRows[0].precision, key, latestRows);
+    const config = buildConfigResult(model, scenario, latestRows[0].precision, key, latestRows);
     if (config) configs.push(config);
   }
   return configs;
@@ -255,9 +307,8 @@ function nonComparableAsMissing(
 
 function configPriorityIndex(config: OverviewConfigResult): number {
   return OVERVIEW_SLICE_PRIORITY.findIndex(
-    (priority) =>
-      priority.precision === config.precision &&
-      priority.decodeMode === decodeModeForSpecMethod(config.specMethod),
+    ({ speculative, precision }) =>
+      speculative === isSpeculativeDecode(config.specMethod) && precision === config.precision,
   );
 }
 
@@ -275,18 +326,18 @@ function selectPlatformRead(
       .filter(
         (read) =>
           read.config.precision === priority.precision &&
-          decodeModeForSpecMethod(read.config.specMethod) === priority.decodeMode &&
+          isSpeculativeDecode(read.config.specMethod) === priority.speculative &&
           isInRangeTierRead(read),
       )
       .toSorted(compareTierReads)[0];
     if (exact) return exact;
   }
 
-  const fallback = reads.toSorted(
+  const bestMissingRead = reads.toSorted(
     (a, b) =>
       configPriorityIndex(a.config) - configPriorityIndex(b.config) || compareTierReads(a, b),
   )[0];
-  return fallback ? nonComparableAsMissing(fallback, tier) : nullTierRead(tier);
+  return bestMissingRead ? nonComparableAsMissing(bestMissingRead, tier) : nullTierRead(tier);
 }
 
 function missingReasonForPlatform(
@@ -297,33 +348,45 @@ function missingReasonForPlatform(
 ): OverviewMissingReason | null {
   if (isInRangeTierRead(read)) return null;
   const hardwareRows = workloadRows.filter((row) => row.hardware === hardware);
-  if (hardwareRows.length === 0) return 'no_8k1k_data';
+  if (hardwareRows.length === 0) return 'no_scenario_data';
   const supportedRows = hardwareRows.filter((row) => OVERVIEW_PRECISIONS.includes(row.precision));
   if (supportedRows.length === 0) return 'int4_bf16_only';
+  if (bucketReads.length === 0) return 'no_scenario_data';
   // `cannot reach` is a claim about the whole platform, so it holds only when
   // EVERY qualified serving series tops out below the tier — one merely
   // under-swept stack downgrades the gap to a missing exact read.
-  return bucketReads.length > 0 && bucketReads.every((r) => r.boundary === 'unreachable')
+  return bucketReads.every((r) => r.boundary === 'unreachable')
     ? 'cannot_reach_at_tier'
     : 'no_exact_at_tier';
 }
 
+/**
+ * The overview's cost contract:
+ *
+ *   $ / 1M total tokens = HW_REGISTRY.costh × 1,000,000
+ *                       ÷ (total tok/s per deployed GPU × 3,600)
+ *
+ * `costh` is the HYPERSCALER $/GPU/hr tier (not neocloud `costn` or retail
+ * `costr`), and the denominator counts TOTAL (input + output) tokens over
+ * every deployed GPU — prefill + decode for disaggregated serving.
+ */
 export function overviewCostPerMtok(
   hardware: string,
-  outputTputPerGpu: number | null,
+  totalTputPerGpu: number | null,
 ): number | null {
-  if (outputTputPerGpu === null || outputTputPerGpu <= 0) return null;
-  const costPerGpuHour = getGpuSpecs(hardware).costr;
+  if (totalTputPerGpu === null || totalTputPerGpu <= 0) return null;
+  const costPerGpuHour = getGpuSpecs(hardware).costh;
   if (costPerGpuHour <= 0) return null;
-  return (costPerGpuHour * 1_000_000) / (outputTputPerGpu * 3600);
+  return (costPerGpuHour * 1_000_000) / (totalTputPerGpu * 3600);
 }
 
 function buildPlatformResults(
   model: Model,
-  workloadRows: readonly BenchmarkRow[],
+  scenario: OverviewScenario,
+  scenarioRows: readonly BenchmarkRow[],
   tier: OverviewTier,
 ): OverviewPlatformResult[] {
-  const configs = buildConfigs(model, workloadRows);
+  const configs = buildConfigs(model, scenario, scenarioRows);
   const readsForHardware = (hardware: string): OverviewTierRead[] =>
     configs
       .filter((config) => config.hardware === hardware)
@@ -335,10 +398,9 @@ function buildPlatformResults(
       hardware,
       hardwareLabel: overviewHardwareLabel(hardware, model),
       precision: read.config?.precision ?? null,
-      decodeMode: read.config === null ? null : decodeModeForSpecMethod(read.config.specMethod),
       read,
       missingReason: missingReasonForPlatform(
-        workloadRows,
+        scenarioRows,
         hardware,
         read,
         readsForHardware(hardware),
@@ -357,41 +419,88 @@ function buildPlatformResults(
   }));
 }
 
+function deployedGpuFactor(row: BenchmarkRow): number {
+  const totalGpus = row.num_prefill_gpu + row.num_decode_gpu;
+  return row.disagg && row.num_prefill_gpu > 0 && row.num_decode_gpu > 0 && totalGpus > 0
+    ? row.num_decode_gpu / totalGpus
+    : 1;
+}
+
+function topologyEvidence(row: BenchmarkRow): string | undefined {
+  return row.disagg && row.num_prefill_gpu > 0 && row.num_decode_gpu > 0
+    ? `${row.num_prefill_gpu}P+${row.num_decode_gpu}D`
+    : undefined;
+}
+
+interface OverviewAgenticTierPoint extends TcoTierPoint {
+  e2eLatency: number;
+}
+
+/** AgentX: the tier axis stays P90 interactivity (the chart's SLA contract);
+ *  the throughput read at the tier is total tok/s per deployed GPU. */
+function buildAgenticTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
+  const points = rows.flatMap((row): OverviewAgenticTierPoint[] => {
+    const entry = rowToAggDataEntry(row);
+    const factor = deployedGpuFactor(row);
+    const interactivity = entry.p90_intvty;
+    const e2eLatency = entry.p90_e2el;
+    const totalThroughput = entry.tput_per_gpu * factor;
+    if (
+      !Number.isFinite(interactivity) ||
+      interactivity <= 0 ||
+      !Number.isFinite(e2eLatency) ||
+      e2eLatency <= 0 ||
+      !Number.isFinite(totalThroughput) ||
+      totalThroughput <= 0
+    ) {
+      return [];
+    }
+    return [
+      {
+        interactivity,
+        e2eLatency,
+        throughput: totalThroughput,
+        date: row.date,
+        evidenceLabel: topologyEvidence(row),
+      },
+    ];
+  });
+  return computeTierReads(restrictAgenticPointsToE2eFrontier(points), OVERVIEW_TIERS);
+}
+
+/** Single-turn 8K/1K: frontier points at the chart's stored interactivity,
+ *  valued in total (input + output) tok/s per DEPLOYED GPU. Rows without a
+ *  usable total-throughput metric are dropped — the overview cannot price
+ *  them, so they must not shape the frontier either. */
+function buildSingleTurnTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
+  const points = rows.flatMap((row): TcoTierPoint[] => {
+    const interactivity = singleTurnInteractivity(row.metrics);
+    const totalTput = row.metrics.tput_per_gpu;
+    if (interactivity === undefined || !Number.isFinite(totalTput) || totalTput <= 0) return [];
+    return [
+      {
+        interactivity,
+        throughput: totalTput * deployedGpuFactor(row),
+        date: row.date,
+        evidenceLabel: topologyEvidence(row),
+      },
+    ];
+  });
+  return computeTierReads(points, OVERVIEW_TIERS);
+}
+
 function buildConfigResult(
   model: Model,
+  scenario: OverviewScenario,
   precision: string,
   key: string,
   rows: BenchmarkRow[],
 ): OverviewConfigResult | null {
-  const feedRows = rows.map((row) => {
-    const outputTputPerGpu = row.metrics.output_tput_per_gpu;
-    const totalGpus = row.num_prefill_gpu + row.num_decode_gpu;
-    const comparableOutputTputPerGpu =
-      row.disagg &&
-      row.num_prefill_gpu > 0 &&
-      row.num_decode_gpu > 0 &&
-      totalGpus > 0 &&
-      Number.isFinite(outputTputPerGpu)
-        ? (outputTputPerGpu * row.num_decode_gpu) / totalGpus
-        : outputTputPerGpu;
-    const evidenceLabel =
-      row.disagg && row.num_prefill_gpu > 0 && row.num_decode_gpu > 0
-        ? `${row.num_prefill_gpu}P+${row.num_decode_gpu}D`
-        : undefined;
-    return {
-      ...row,
-      metrics: {
-        ...row.metrics,
-        output_tput_per_gpu: comparableOutputTputPerGpu,
-      },
-      evidence_label: evidenceLabel,
-    };
-  });
-  const feed = computeTcoFeed(feedRows, [OVERVIEW_WORKLOAD], OVERVIEW_TIERS);
+  const feed = scenario === 'agentx' ? buildAgenticTierReads(rows) : buildSingleTurnTierReads(rows);
   if (feed.length === 0) return null;
 
   const first = rows[0];
-  const { hardware, framework, spec_method: specMethod, disagg } = first;
+  const { hardware, framework, spec_method: specMethod, disagg, is_multinode: isMultinode } = first;
   const sourceRunUrls = [
     ...new Set(rows.flatMap((row) => (row.run_url === null ? [] : [row.run_url]))),
   ].toSorted();
@@ -405,13 +514,14 @@ function buildConfigResult(
     specMethod,
     specLabel: resolveFrameworkPartLabel(model, specMethod),
     disagg,
+    isMultinode,
     precision,
     sourceRunUrls,
     tierValues: feed.map((row) => {
       const value =
-        row.boundary === 'unreachable' && row.output_tput_per_gpu === 0
+        row.boundary === 'unreachable' && row.throughput_per_gpu === 0
           ? null
-          : row.output_tput_per_gpu;
+          : row.throughput_per_gpu;
       return {
         tier: row.tier,
         value,
@@ -430,17 +540,23 @@ export function buildOverviewModelSummary(
   rows: BenchmarkRow[],
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
+  scenario: OverviewScenario = overviewScenarioForModel(model, rows),
 ): OverviewModelSummary {
   const scopedRows = overviewEngineRows(rows, engineScope);
+  const scenarioRows = overviewScenarioRows(scenario, scopedRows);
   return {
     model,
     modelLabel: getModelLabel(model),
-    platforms: buildPlatformResults(model, overviewWorkloadRows(scopedRows), tier),
+    scenario,
+    platforms: buildPlatformResults(model, scenario, scenarioRows, tier),
   };
 }
 
-/** DEFAULT_MODELS fixes the row order; a rowless model still renders all
- *  platforms with missing reasons. Live and fixture paths both feed this. */
+/** DEFAULT_MODELS fixes the row order, and a model benchmarked on both
+ *  scenarios contributes one row per scenario; a rowless model still renders
+ *  all platforms with missing reasons. Live and fixture paths both feed this.
+ *  Scenario presence reads the unscoped rows so switching the engine scope
+ *  changes cell contents, never the shape of the matrix. */
 export function assembleOverviewPageData(
   rowsByModel: Record<string, BenchmarkRow[]>,
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
@@ -448,12 +564,10 @@ export function assembleOverviewPageData(
 ): OverviewPageData {
   const perModel = [...DEFAULT_MODELS].map((model) => ({ model, rows: rowsByModel[model] ?? [] }));
   return {
-    models: perModel.map(({ model, rows }) =>
-      buildOverviewModelSummary(model, rows, tier, engineScope),
-    ),
-    datasetThroughDate: overviewDatasetThroughDate(
-      perModel.flatMap(({ rows }) => rows),
-      engineScope,
+    models: perModel.flatMap(({ model, rows }) =>
+      overviewScenariosForModel(model, rows).map((scenario) =>
+        buildOverviewModelSummary(model, rows, tier, engineScope, scenario),
+      ),
     ),
     tier,
     engineScope,

@@ -241,7 +241,7 @@ export const GPU_SPECS: GpuSpec[] = [
 
 /** Column definitions for the GPU specs table */
 export const GPU_SPEC_COLUMNS = [
-  { key: 'name', label: 'GPU', align: 'left' as const },
+  { key: 'name', label: 'Chip', align: 'left' as const },
   { key: 'memory', label: 'Memory', align: 'right' as const },
   { key: 'memoryBandwidth', label: 'Mem BW', align: 'right' as const },
   { key: 'fp4', label: 'FP4 TFLOP/s', align: 'right' as const },
@@ -254,7 +254,7 @@ export const GPU_SPEC_COLUMNS = [
   { key: 'domainMemoryBandwidth', label: 'Scale Up Domain Mem BW', align: 'right' as const },
   { key: 'scaleUpTopology', label: 'Scale Up Topology', align: 'left' as const },
   { key: 'scaleUpSwitch', label: 'Scale Up Switch', align: 'left' as const },
-  { key: 'scaleOutBandwidth', label: 'Scale Out BW per GPU', align: 'right' as const },
+  { key: 'scaleOutBandwidth', label: 'Scale Out BW per Chip', align: 'right' as const },
   { key: 'scaleOutTech', label: 'Scale Out Tech', align: 'left' as const },
   { key: 'scaleOutSwitch', label: 'Scale Out Switch', align: 'left' as const },
   { key: 'scaleOutTopology', label: 'Scale Out Topology', align: 'left' as const },
@@ -484,7 +484,7 @@ export const GPU_CHART_METRICS: GpuChartMetric[] = [
   {
     key: 'scaleUpWorldSize',
     label: 'World Size',
-    unit: 'GPUs',
+    unit: 'Chips',
     getValue: (spec) => spec.scaleUpWorldSize,
   },
   {
@@ -501,7 +501,7 @@ export const GPU_CHART_METRICS: GpuChartMetric[] = [
   },
   {
     key: 'scaleOutBandwidth',
-    label: 'Scale Out BW per GPU',
+    label: 'Scale Out BW per Chip',
     unit: 'Gbit/s',
     getValue: (spec) => parseNumericFromString(spec.scaleOutBandwidth),
   },

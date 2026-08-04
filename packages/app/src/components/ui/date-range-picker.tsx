@@ -207,7 +207,7 @@ export function DateRangePicker({
                   <div className="flex flex-col items-center gap-2 text-center px-4">
                     <p className="text-sm font-medium text-foreground">No available dates</p>
                     <p className="text-xs text-muted-foreground">
-                      Please change Model, ISL/OSL, or GPU to see available dates.
+                      Please change Model, ISL/OSL, or Chip to see available dates.
                     </p>
                   </div>
                 </div>
@@ -220,7 +220,7 @@ export function DateRangePicker({
                     <p className="text-sm font-medium text-foreground">Only 1 date available</p>
                     <p className="text-xs text-muted-foreground">
                       Historical comparison requires at least 2 dates. Please change Model, ISL/OSL,
-                      or GPU selection.
+                      or chip selection.
                     </p>
                     <Button
                       variant="outline"

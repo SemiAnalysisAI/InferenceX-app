@@ -23,26 +23,26 @@ const makePoint = (overrides: Partial<InferenceData> = {}): InferenceData => ({
   tput_per_gpu: 4800,
   output_tput_per_gpu: 3200,
   input_tput_per_gpu: 1600,
-  mean_ttft: 120,
-  median_ttft: 110,
-  p99_ttft: 250,
-  std_ttft: 30,
-  mean_tpot: 15,
-  median_tpot: 14,
-  p99_tpot: 28,
-  std_tpot: 4,
+  mean_ttft: 0.12,
+  median_ttft: 0.11,
+  p99_ttft: 0.25,
+  std_ttft: 0.03,
+  mean_tpot: 0.015,
+  median_tpot: 0.014,
+  p99_tpot: 0.028,
+  std_tpot: 0.004,
   mean_intvty: 66,
   median_intvty: 71,
   p99_intvty: 35,
   std_intvty: 12,
-  mean_itl: 16,
-  median_itl: 15,
-  p99_itl: 30,
-  std_itl: 5,
-  mean_e2el: 5000,
-  median_e2el: 4800,
-  p99_e2el: 8000,
-  std_e2el: 1200,
+  mean_itl: 0.016,
+  median_itl: 0.015,
+  p99_itl: 0.03,
+  std_itl: 0.005,
+  mean_e2el: 5,
+  median_e2el: 4.8,
+  p99_e2el: 8,
+  std_e2el: 1.2,
   tpPerGpu: { y: 1200, roof: false },
   tpPerMw: { y: 694, roof: false },
   costh: { y: 0.5, roof: false },
@@ -55,20 +55,22 @@ const makePoint = (overrides: Partial<InferenceData> = {}): InferenceData => ({
 });
 
 describe('inferenceChartToCsv', () => {
-  it('exports all raw benchmark fields', () => {
+  it('exports benchmark summary fields', () => {
     const data = [makePoint()];
     const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k');
 
     // Should have all metric columns
-    expect(headers).toContain('Throughput/GPU (tok/s)');
-    expect(headers).toContain('Mean TTFT (ms)');
-    expect(headers).toContain('P99 TTFT (ms)');
+    expect(headers).toContain('Throughput/Chip (tok/s)');
+    expect(headers).toContain('Mean TTFT (s)');
+    expect(headers).toContain('P99 TTFT (s)');
     expect(headers).toContain('Mean Interactivity (tok/s/user)');
-    expect(headers).toContain('Mean E2E Latency (ms)');
+    expect(headers).toContain('Mean E2E Latency (s)');
     expect(headers).toContain('Disaggregated');
     expect(headers).toContain('EP');
     expect(headers).toContain('DP Attention');
+    expect(headers).toContain('Run URL');
     expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveLength(headers.length);
   });
 
   it('includes Model, ISL, and OSL columns from model and sequence', () => {
@@ -89,14 +91,77 @@ describe('inferenceChartToCsv', () => {
     const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k');
     const row = rows[0];
 
-    const tputIdx = headers.indexOf('Throughput/GPU (tok/s)');
+    const tputIdx = headers.indexOf('Throughput/Chip (tok/s)');
     expect(row[tputIdx]).toBe(4800);
 
-    const ttftIdx = headers.indexOf('Mean TTFT (ms)');
-    expect(row[ttftIdx]).toBe(120);
+    const ttftIdx = headers.indexOf('Mean TTFT (s)');
+    expect(row[ttftIdx]).toBe(0.12);
 
     const p99IntIdx = headers.indexOf('P99 Interactivity (tok/s/user)');
     expect(row[p99IntIdx]).toBe(35);
+  });
+
+  it('labels raw latency statistics as seconds without changing their values', () => {
+    const issueMetrics = {
+      mean_ttft: 1.615576321,
+      median_ttft: 0.403875659,
+      p99_ttft: 20.67356789,
+      std_ttft: 3.964372301,
+      mean_tpot: 0.048823025,
+      median_tpot: 0.0490139,
+      p99_tpot: 0.061919564,
+      std_tpot: 0.005588959,
+      mean_itl: 0.048892513,
+      median_itl: 0.02832133,
+      p99_itl: 0.190448091,
+      std_itl: 0.091604103,
+      mean_e2el: 46.55299096,
+      median_e2el: 45.77583359,
+      p99_e2el: 75.47229264,
+      std_e2el: 8.356892074,
+    };
+    const { headers, rows } = inferenceChartToCsv(
+      [makePoint(issueMetrics)],
+      'llama-3.1-405b',
+      '1k/1k',
+    );
+    const row = rows[0];
+
+    for (const [metric, value] of Object.entries(issueMetrics)) {
+      const [stat, ...nameParts] = metric.split('_');
+      const metricName =
+        nameParts.join('_') === 'e2el' ? 'E2E Latency' : nameParts.join('_').toUpperCase();
+      const statName = stat === 'std' ? 'Std' : `${stat[0].toUpperCase()}${stat.slice(1)}`;
+      const header = `${statName} ${metricName} (s)`;
+
+      expect(headers).toContain(header);
+      expect(row[headers.indexOf(header)]).toBe(value);
+    }
+
+    expect(headers.filter((header) => header.endsWith('(ms)'))).toEqual([]);
+  });
+
+  it('exports visible unofficial-run rows with their provenance', () => {
+    const official = makePoint({
+      hwKey: 'h100-sxm-sglang',
+      run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/100',
+    });
+    const overlay = makePoint({
+      hwKey: 'b200-sxm-vllm',
+      hw: 'B200 SXM (vLLM)',
+      framework: 'vllm',
+      mean_tpot: 0.048823025,
+      run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/2405',
+    });
+    const { headers, rows } = inferenceChartToCsv([official], 'llama-3.1-405b', '1k/1k', [overlay]);
+
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.length === headers.length)).toBe(true);
+    expect(rows[1][headers.indexOf('Hardware Key')]).toBe('b200-sxm-vllm');
+    expect(rows[1][headers.indexOf('Mean TPOT (s)')]).toBe(0.048823025);
+    expect(rows[1][headers.indexOf('Run URL')]).toBe(
+      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/2405',
+    );
   });
 
   it('filters out hidden data points', () => {
@@ -111,8 +176,8 @@ describe('inferenceChartToCsv', () => {
     const row = rows[0];
 
     expect(row[headers.indexOf('Disaggregated')]).toBe(true);
-    expect(row[headers.indexOf('Num Prefill GPUs')]).toBe(2);
-    expect(row[headers.indexOf('Num Decode GPUs')]).toBe(6);
+    expect(row[headers.indexOf('Num Prefill Chips')]).toBe(2);
+    expect(row[headers.indexOf('Num Decode Chips')]).toBe(6);
     expect(row[headers.indexOf('EP')]).toBe(4);
   });
 
@@ -201,8 +266,22 @@ describe('inferenceChartToCsv', () => {
     // Missing optional fields should be ''
     expect(row[headers.indexOf('Hardware')]).toBe('');
     expect(row[headers.indexOf('Framework')]).toBe('');
-    expect(row[headers.indexOf('Throughput/GPU (tok/s)')]).toBe('');
+    expect(row[headers.indexOf('Throughput/Chip (tok/s)')]).toBe('');
     expect(row[headers.indexOf('EP')]).toBe('');
+  });
+
+  it('exports missing source metrics as blank while preserving a measured zero', () => {
+    const data = [
+      makePoint({
+        rawMetricKeys: ['median_ttft'],
+        mean_ttft: 0,
+        median_ttft: 0,
+      }),
+    ];
+    const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k');
+
+    expect(rows[0][headers.indexOf('Mean TTFT (s)')]).toBe('');
+    expect(rows[0][headers.indexOf('Median TTFT (s)')]).toBe(0);
   });
 });
 
@@ -216,8 +295,8 @@ describe('reliabilityChartToCsv (mirrors ReliabilityChartDisplay export)', () =>
     const { headers, rows } = reliabilityChartToCsv(data);
 
     expect(headers).toEqual([
-      'GPU Model',
-      'GPU Key',
+      'Chip Model',
+      'Chip Key',
       'Success Rate (%)',
       'Successful Runs',
       'Total Runs',
@@ -374,7 +453,7 @@ describe('calculatorChartToCsv (mirrors ThroughputCalculatorDisplay export)', ()
 
     const { headers, rows } = calculatorChartToCsv(results, 125);
 
-    expect(headers[0]).toBe('GPU');
+    expect(headers[0]).toBe('Chip');
     expect(headers[13]).toBe('Target Interactivity (tok/s/user)');
     expect(rows).toHaveLength(1);
     expect(rows[0][3]).toBe(1200);
@@ -457,10 +536,10 @@ describe('calculatorChartToCsv (mirrors ThroughputCalculatorDisplay export)', ()
       (hwKey) => labelMap[hwKey] ?? hwKey,
     );
     expect(rows).toHaveLength(2);
-    expect(rows[0][headers.indexOf('GPU')]).toBe('H100 SXM (SGLang)');
+    expect(rows[0][headers.indexOf('Chip')]).toBe('H100 SXM (SGLang)');
     expect(rows[0][headers.indexOf('Precision')]).toBe('FP8');
     expect(rows[0][headers.indexOf('Cost per Million Total Tokens ($)')]).toBe(0.52);
-    expect(rows[1][headers.indexOf('GPU')]).toBe('B200 SXM (SGLang)');
+    expect(rows[1][headers.indexOf('Chip')]).toBe('B200 SXM (SGLang)');
     expect(rows[1][headers.indexOf('Precision')]).toBe('FP4');
   });
 });
@@ -483,10 +562,10 @@ describe('historicalTrendToCsv (mirrors HistoricalTrendsDisplay export)', () => 
       { id: 'b200-sxm-sglang__fp4', label: 'B200 SXM (SGLang) (FP4)', precision: 'fp4' },
     ];
 
-    const { headers, rows } = historicalTrendToCsv(trendLines, lineConfigs, 'Throughput/GPU', 35);
+    const { headers, rows } = historicalTrendToCsv(trendLines, lineConfigs, 'Throughput/Chip', 35);
 
-    expect(headers).toContain('GPU');
-    expect(headers).toContain('Throughput/GPU');
+    expect(headers).toContain('Chip');
+    expect(headers).toContain('Throughput/Chip');
     expect(headers).toContain('Synthetic');
     expect(headers).toContain('Target Interactivity (tok/s/user)');
     expect(rows).toHaveLength(3);

@@ -213,19 +213,19 @@ describe('getMetricLabel', () => {
 
   it('returns throughput label for interactivity_to_throughput mode with total type', () => {
     expect(getMetricLabel('throughput', 'interactivity_to_throughput', 'total')).toBe(
-      'Throughput per GPU (tok/s/gpu)',
+      'Throughput per Chip (tok/s/chip)',
     );
   });
 
   it('returns input throughput label for interactivity_to_throughput mode with input type', () => {
     expect(getMetricLabel('throughput', 'interactivity_to_throughput', 'input')).toBe(
-      'Input Throughput per GPU (tok/s/gpu)',
+      'Input Throughput per Chip (tok/s/chip)',
     );
   });
 
   it('returns output throughput label for interactivity_to_throughput mode with output type', () => {
     expect(getMetricLabel('throughput', 'interactivity_to_throughput', 'output')).toBe(
-      'Output Throughput per GPU (tok/s/gpu)',
+      'Output Throughput per Chip (tok/s/chip)',
     );
   });
 
@@ -279,21 +279,21 @@ describe('getValueLabel', () => {
   it('formats total throughput value in interactivity_to_throughput mode', () => {
     const result = makeResult({ value: 456.7 });
     expect(getValueLabel(result, 'throughput', 'interactivity_to_throughput', 'total')).toBe(
-      '456.7 tok/s/gpu',
+      '456.7 tok/s/chip',
     );
   });
 
   it('formats input throughput value when costType is input', () => {
     const result = makeResult({ inputTputValue: 55.3 });
     expect(getValueLabel(result, 'throughput', 'interactivity_to_throughput', 'input')).toBe(
-      '55.3 tok/s/gpu',
+      '55.3 tok/s/chip',
     );
   });
 
   it('formats output throughput value when costType is output', () => {
     const result = makeResult({ outputTputValue: 401.2 });
     expect(getValueLabel(result, 'throughput', 'interactivity_to_throughput', 'output')).toBe(
-      '401.2 tok/s/gpu',
+      '401.2 tok/s/chip',
     );
   });
 
@@ -330,7 +330,7 @@ describe('getCostProviderLabel', () => {
 describe('getChartTitle', () => {
   it('returns total throughput title with interactivity target label', () => {
     const title = getChartTitle('throughput', 'interactivity_to_throughput', 30, 'total');
-    expect(title).toBe('Total Token Throughput per GPU at 30 tok/s/user Interactivity');
+    expect(title).toBe('Total Token Throughput per Chip at 30 tok/s/user Interactivity');
   });
 
   it('includes the selected percentile in an agentic interactivity title', () => {
@@ -342,22 +342,22 @@ describe('getChartTitle', () => {
       undefined,
       'p90',
     );
-    expect(title).toBe('Total Token Throughput per GPU at 30 tok/s/user P90 Interactivity');
+    expect(title).toBe('Total Token Throughput per Chip at 30 tok/s/user P90 Interactivity');
   });
 
   it('returns input throughput title when costType is input', () => {
     const title = getChartTitle('throughput', 'interactivity_to_throughput', 30, 'input');
-    expect(title).toBe('Input Token Throughput per GPU at 30 tok/s/user Interactivity');
+    expect(title).toBe('Input Token Throughput per Chip at 30 tok/s/user Interactivity');
   });
 
   it('returns output throughput title when costType is output', () => {
     const title = getChartTitle('throughput', 'interactivity_to_throughput', 30, 'output');
-    expect(title).toBe('Output Token Throughput per GPU at 30 tok/s/user Interactivity');
+    expect(title).toBe('Output Token Throughput per Chip at 30 tok/s/user Interactivity');
   });
 
   it('returns interactivity title in throughput_to_interactivity mode', () => {
     const title = getChartTitle('throughput', 'throughput_to_interactivity', 500, 'total');
-    expect(title).toBe('Interactivity at 500 tok/s/gpu Throughput');
+    expect(title).toBe('Interactivity at 500 tok/s/chip Throughput');
   });
 
   it('returns total power title with target label', () => {
@@ -405,7 +405,7 @@ describe('getChartTitle', () => {
   it('defaults to hyperscaler when no costProvider is specified for cost', () => {
     const title = getChartTitle('cost', 'throughput_to_interactivity', 500, 'total');
     expect(title).toBe(
-      'Cost per Million Total Tokens (Owning - Hyperscaler) at 500 tok/s/gpu Throughput',
+      'Cost per Million Total Tokens (Owning - Hyperscaler) at 500 tok/s/chip Throughput',
     );
   });
 });

@@ -55,7 +55,7 @@ async function fetchGpuMetrics(runId: string) {
     if (rows.length > 0) parsedArtifacts.push({ name: artifact.name, data: rows });
   }
 
-  if (parsedArtifacts.length === 0) throw new Error('No GPU metrics data found in artifacts');
+  if (parsedArtifacts.length === 0) throw new Error('No Chip metrics data found in artifacts');
 
   return {
     runInfo: normalizeGithubRunInfo(run),

@@ -12,7 +12,7 @@ import type {
   RenderableGraph,
   YAxisMetricKey,
 } from '@/components/inference/types';
-import { filterDataByCostLimit } from '@/components/inference/utils';
+import { partitionChartDataByLimits } from '@/components/inference/utils';
 import {
   parseComparisonEntry,
   resolveComparisonEntries,
@@ -39,7 +39,7 @@ import {
 /**
  * Chart x-axis variant selected by the mode buttons above the plot. This is
  * the single definition — InferenceContext (URL/state) and ChartDisplay
- * (buttons, derived-metric remapping) import it from here.
+ * (buttons) import it from here.
  */
 export type XAxisMode = 'ttft' | 'e2e' | 'interactivity' | 'osl-e2el';
 
@@ -510,7 +510,7 @@ export function useChartData(
         // Filter by selected GPUs if any
         filteredData = filterByGPU(filteredData, selectedGPUs, GPU_ALIAS_TO_CANONICAL);
 
-        // Quick filters (vendor / agg-disagg / mtp-stp) — coarse pre-filter that
+        // Quick filters (vendor / deployment / mtp-stp) — coarse pre-filter that
         // also prunes the legend and rooflines since they derive from this set.
         filteredData = applyQuickFilters(filteredData, quickFilters);
 
@@ -520,33 +520,12 @@ export function useChartData(
           );
         }
 
-        filteredData = filterDataByCostLimit(filteredData, chartDefinition, selectedYAxisMetric);
-
-        // For AGENTIC workloads only: when the user is NOT viewing the
-        // e2e latency chart, mark each point with whether it sits on the
-        // (e2e_latency, y) Pareto frontier for its (hwKey, precision,
-        // date) group. The chart still renders every point as scatter —
-        // only e2e-Pareto winners feed the roofline (ScatterGraph honors
-        // the flag). Prevents benchmark-hacking the TTFT / interactivity
-        // line by tanking decode (or vice versa) without hiding the
-        // non-optimal configs from view.
-        //
-        // Fixed-seq workloads keep the existing per-axis Pareto since
-        // there's no separate "session-time" notion of total latency —
-        // their e2e IS the request latency, so a TTFT hack there reads
-        // honestly on e2e too. The anti-hack constraint is specifically
-        // about multi-turn agentic where TTFT measures a tiny fraction
-        // of the user-visible session time.
-        const isAgentic = selectedSequence === Sequence.AgenticTraces;
-        const e2eParetoSet =
-          isAgentic && selectedXAxisMode !== 'e2e'
-            ? e2eParetoIds(filteredData, selectedYAxisMetric, selectedPercentile)
-            : null;
-
-        // Filter to points that have the selected metric, then remap x/y
+        // Filter to points that have the selected metric, then remap x/y.
+        // Intentional cost/TTFT outliers are partitioned only after this step
+        // so ScatterGraph can retain them for dashed boundary continuations.
         const hasMetric = filteredData.some((d) => metricKey in d);
         const isTtftX = typeof xAxisField === 'string' && xAxisField.endsWith('_ttft');
-        const processedData = hasMetric
+        const mappedData = hasMetric
           ? filteredData
               .filter((d) => metricKey in d)
               .map((d: InferenceData) => {
@@ -558,36 +537,46 @@ export function useChartData(
                 // d.x would otherwise mask the regression).
                 const xCandidate = (d as Partial<AggDataEntry>)[xAxisField];
                 const xValue = typeof xCandidate === 'number' ? xCandidate : d.x;
-                const isOnE2eFrontier =
-                  e2eParetoSet === null
-                    ? undefined
-                    : isPersistedBenchmarkId(d.id) && e2eParetoSet.has(d.id);
                 return {
                   ...d,
                   x: xValue,
                   y: yValue,
                   roof,
-                  isOnE2eFrontier,
                 };
               })
-              // When TTFT is on the x-axis, apply the latency limit to filter
-              // overload outliers (fixed-seq conc=2048 rows with TTFT > 60s that
-              // compress all real data to the far left). Skip for agentic — long
-              // TTFTs there reflect real workloads (multi-turn, big prompts).
-              .filter(
-                (d) =>
-                  !isTtftX ||
-                  isAgentic ||
-                  !chartDefinition.y_latency_limit ||
-                  d.x <= chartDefinition.y_latency_limit,
-              )
           : [];
+
+        // For AGENTIC workloads only: when the user is NOT viewing the
+        // e2e latency chart, mark each point with whether it sits on the
+        // (e2e_latency, y) Pareto frontier for its (hwKey, precision,
+        // date) group. Include clipped points in this seed so official and
+        // unofficial continuation lines preserve the same anti-hacking rule.
+        const isAgentic = selectedSequence === Sequence.AgenticTraces;
+        const e2eParetoSet =
+          isAgentic && selectedXAxisMode !== 'e2e'
+            ? e2eParetoIds(mappedData, selectedYAxisMetric, selectedPercentile)
+            : null;
+        const stampedData = mappedData.map((d) => ({
+          ...d,
+          isOnE2eFrontier:
+            e2eParetoSet === null
+              ? undefined
+              : isPersistedBenchmarkId(d.id) && e2eParetoSet.has(d.id),
+        }));
+
+        const { data: processedData, clippedData } = partitionChartDataByLimits(
+          stampedData,
+          chartDefinition,
+          selectedYAxisMetric,
+          { isTtftX, isAgentic },
+        );
 
         return {
           model: selectedModel,
           sequence: selectedSequence,
           chartDefinition,
           data: processedData,
+          clippedData,
         };
       },
     );

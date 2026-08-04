@@ -2,8 +2,6 @@
 
 For detailed subsystem docs, see [docs/index.md](./docs/index.md).
 
-> **Temporary language override (highest repository priority):** Until the user explicitly removes this override, ignore any instruction elsewhere in this repository that requires Simplified Chinese or bilingual output, including instructions in later sections, nested agent files, contribution guides, checklists, and templates. Work in English only: do not create or update `/zh` pages, Chinese documentation, translations, or Chinese text in commits, pull requests, issues, reviews, or comments. Leave existing Chinese content untouched.
-
 > **PR and GitHub-issue titles & descriptions must be bilingual — include a Simplified Chinese version in addition to English.** Title format: `<English title> / <中文标题>` (keep bracket prefixes at the front untranslated). In the PR/issue body, follow the English content with a `## 中文说明` section mirroring the summary; don't translate code blocks, logs, or stack traces — summarize around them. **Commit messages must include a Chinese translation too**: keep the subject line in English (conventional-commit style) and include the Chinese translation of the subject and key points in the commit body (e.g. a trailing `中文：<translation>` paragraph); squash-merge commits inherit the bilingual PR title, which satisfies the subject requirement automatically.
 
 > **Translation quality bar:** write natural technical Chinese, not word-for-word machine translation (style reference: [`vllm-project/vllm-ascend` `README.zh.md`](https://github.com/vllm-project/vllm-ascend/blob/main/README.zh.md)). Preserve product names, hardware SKUs, framework/library names (Next.js, React Query, D3.js, Tailwind ...), flags, and code identifiers in English. Use parenthetical English clarification for acronyms on first use. Preferred terms: benchmark 基准测试, dashboard 仪表板, chart 图表, config 配置, throughput 吞吐量, latency 延迟, single-node/multi-node 单节点/多节点, evaluation 评估, artifact 产物.
@@ -111,6 +109,13 @@ See `.env.example`. Key vars: `GITHUB_TOKEN`, `DATABASE_READONLY_URL`, `DATABASE
 ## Testing
 
 See [Testing](./docs/testing.md) for full requirements, quality standards, and pre-commit checklist. Tests are **mandatory** — missing/low-quality tests are 🔴 BLOCKING on PR review.
+
+### E2E Runtime and PR Workflow
+
+- Prefer focused Cypress specs while iterating, and create the draft PR before starting a full local E2E run so CI and review setup can proceed in parallel.
+- A warm local `bun run test:e2e` typically takes about **4–6 minutes** because the component and integration suites run sequentially on one machine; cold dependency/browser setup can take longer.
+- GitHub Actions is usually faster in wall-clock time: integration specs run across **four shards per browser** for Chrome and Firefox (eight parallel E2E jobs), while component tests run in a separate job. Recent successful workflows complete in roughly **3–5 minutes**.
+- Local targeted tests remain the fastest feedback loop. The sharded GitHub run is the authoritative broad browser check; do not spend time emulating all CI shards serially before opening the PR.
 
 ## Analytics Requirement
 

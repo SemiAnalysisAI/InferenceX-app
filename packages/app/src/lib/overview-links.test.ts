@@ -20,7 +20,7 @@ const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26714
 /** Query the default fixture produces: one source run, so the run is pinned. */
 const PINNED_QUERY =
   'g_model=Qwen-3.5-397B-A17B&g_rundate=2026-07-18&g_runid=26714221123&i_seq=8k%2F1k' +
-  '&i_prec=fp4&i_metric=y_outputTputPerGpu&i_gpus=b200_sglang_mtp&i_spec=mtp&i_disagg=agg' +
+  '&i_prec=fp4&i_metric=y_costh&i_gpus=b200_sglang_mtp&i_spec=mtp&i_disagg=single-node' +
   '&i_optimal=1&i_advlabel=1';
 
 function config(overrides: Partial<OverviewConfigResult> = {}): OverviewConfigResult {
@@ -34,6 +34,7 @@ function config(overrides: Partial<OverviewConfigResult> = {}): OverviewConfigRe
     specMethod: 'mtp',
     specLabel: 'MTP',
     disagg: false,
+    isMultinode: false,
     precision: Precision.FP4,
     sourceRunUrls: [RUN_URL],
     tierValues: [
@@ -55,6 +56,7 @@ function summary(overrides: Partial<OverviewModelSummary> = {}): OverviewModelSu
   return {
     model: Model.Qwen3_5,
     modelLabel: 'Qwen 3.5',
+    scenario: 'single_turn_8k1k',
     platforms: [],
     ...overrides,
   };
@@ -76,10 +78,21 @@ describe('buildOverviewDashboardHref', () => {
 
     expect(href).toBe(
       '/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-07-18&g_runid=26714221123' +
-        '&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerGpu' +
+        '&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_costh' +
         '&i_gpus=gb200_dynamo-trt-disagg_mtp&i_spec=mtp&i_disagg=disagg' +
         '&i_optimal=1&i_advlabel=1',
     );
+  });
+
+  it('selects the multi-node aggregate mode without treating it as disaggregated', () => {
+    const href = buildOverviewDashboardHref(
+      'en',
+      summary(),
+      config({ disagg: false, isMultinode: true }),
+    );
+
+    expect(href).toContain('i_disagg=multi-node');
+    expect(href).not.toContain('i_disagg=disagg');
   });
 
   it('writes g_model even when it equals the dashboard default model', () => {
@@ -91,6 +104,18 @@ describe('buildOverviewDashboardHref', () => {
 
     expect(href).toContain('g_model=DeepSeek-V4-Pro');
     expect(href).toContain('i_prec=fp8');
+  });
+
+  it('opens AgentX evidence in the Agentic Traces dashboard scenario', () => {
+    const href = buildOverviewDashboardHref(
+      'en',
+      summary({ model: Model.GLM_5_2, scenario: 'agentx' }),
+      config(),
+    );
+
+    expect(href).toContain('g_model=GLM-5.2');
+    expect(href).toContain('i_seq=agentic-traces');
+    expect(href).not.toContain('i_seq=8k%2F1k');
   });
 
   it('maps specMethod to the dashboard mtp/stp filter bucket, not the raw DB value', () => {
@@ -112,7 +137,13 @@ describe('buildOverviewDashboardHref', () => {
 describe('detailHref', () => {
   it('keeps the model drilldown precision-neutral because headline pairs may differ', () => {
     expect(detailHref('en', summary())).toBe(
-      '/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_optimal=1',
+      '/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_metric=y_costh&i_optimal=1',
+    );
+  });
+
+  it('opens AgentX rows in the Agentic Traces dashboard scenario', () => {
+    expect(detailHref('en', summary({ model: Model.GLM_5_2, scenario: 'agentx' }))).toBe(
+      '/inference?g_model=GLM-5.2&i_seq=agentic-traces&i_metric=y_costh&i_optimal=1',
     );
   });
 });

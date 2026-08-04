@@ -57,6 +57,7 @@ import { e2eRestrictedSeed } from '@/components/inference/utils/e2eFrontier';
 import { type RooflineDirection, getSpeedOverlayCorners } from '@/lib/speed-overlay';
 import type {
   ChartDefinition,
+  ClippedInferenceData,
   InferenceData,
   ScatterGraphProps,
 } from '@/components/inference/types';
@@ -88,6 +89,10 @@ import {
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { changelogConfigToHwKey } from '@/components/inference/utils/changelogFormatters';
+import {
+  buildFrontierContinuations,
+  fitContinuationLabelBaseline,
+} from '@/components/inference/utils/overflowContinuations';
 
 // Greedy label-collision avoidance.
 // Each candidate is the y-position of the FIRST baseline (relative to point
@@ -242,6 +247,7 @@ const pointLabelText = (d: InferenceData, advanced: boolean): string =>
 
 // Referentially stable "no overlay data" result (see processedOverlayData).
 const EMPTY_OVERLAY_DATA: InferenceData[] = [];
+const EMPTY_CLIPPED_DATA: ClippedInferenceData[] = [];
 
 function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
   if (a.size !== b.size) return false;
@@ -255,6 +261,78 @@ function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
 type LegendPointsTarget =
   | { kind: 'official'; hwKey: string }
   | { kind: 'overlay'; runIndex: number; runId: number; branch: string };
+
+interface OverflowContinuationEntry {
+  key: string;
+  source: 'official' | 'overlay';
+  hw: string;
+  precision: string;
+  runIndex?: number;
+  from: InferenceData;
+  toward: InferenceData;
+  points: InferenceData[];
+  reasons: ClippedInferenceData['reasons'];
+  hiddenPointCount: number;
+}
+
+interface CurvedContinuationGeometry {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  angle: number;
+}
+
+/** Find a compact endpoint on an interpolated path, starting at its visible frontier point. */
+function visibleContinuationEndpoint(
+  path: SVGPathElement,
+  anchorX: number,
+  width: number,
+  height: number,
+  inset = 7,
+  maxLength = 96,
+): CurvedContinuationGeometry | null {
+  const totalLength = path.getTotalLength();
+  if (!Number.isFinite(totalLength) || totalLength === 0) return null;
+
+  const pathStart = path.getPointAtLength(0);
+  const pathEnd = path.getPointAtLength(totalLength);
+  const ascending = pathEnd.x >= pathStart.x;
+  let lowerLength = 0;
+  let upperLength = totalLength;
+  for (let iteration = 0; iteration < 24; iteration++) {
+    const midpoint = (lowerLength + upperLength) / 2;
+    const midpointX = path.getPointAtLength(midpoint).x;
+    if (midpointX < anchorX === ascending) lowerLength = midpoint;
+    else upperLength = midpoint;
+  }
+
+  const anchorLength = (lowerLength + upperLength) / 2;
+  const start = path.getPointAtLength(anchorLength);
+  if (start.x < 0 || start.x > width || start.y < 0 || start.y > height) return null;
+
+  let endpointLength = Math.min(totalLength, anchorLength + maxLength);
+  let length = Math.min(anchorLength + 2, endpointLength);
+  while (length > anchorLength) {
+    const point = path.getPointAtLength(length);
+    if (point.x < 0 || point.x > width || point.y < 0 || point.y > height) {
+      endpointLength = Math.max(anchorLength, length - inset);
+      break;
+    }
+    if (length === endpointLength) break;
+    length = Math.min(length + 2, endpointLength);
+  }
+
+  const end = path.getPointAtLength(endpointLength);
+  const tangentStart = path.getPointAtLength(Math.max(anchorLength, endpointLength - 2));
+  return {
+    x1: start.x,
+    y1: start.y,
+    x2: end.x,
+    y2: end.y,
+    angle: (Math.atan2(end.y - tangentStart.y, end.x - tangentStart.x) * 180) / Math.PI,
+  };
+}
 
 // Scale configs are recomputed from the visible points on every render, but a
 // legend / precision toggle usually leaves the actual domain untouched (x-min
@@ -306,6 +384,8 @@ const lineLabelText = (
   return includePrecision ? `${base} ${getPrecisionLabel(precision as Precision)}` : base;
 };
 
+const pointCountEn = (count: number) => `${count} ${count === 1 ? 'point' : 'points'}`;
+
 const SCATTER_STRINGS = {
   en: {
     logScale: 'Log Scale',
@@ -316,6 +396,9 @@ const SCATTER_STRINGS = {
     gradientLabels: 'Gradient Labels',
     lineLabels: 'Line Labels',
     resetFilter: 'Reset filter',
+    overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
+    overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
+    overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
   },
   zh: {
     logScale: '对数缩放',
@@ -326,6 +409,9 @@ const SCATTER_STRINGS = {
     gradientLabels: '渐变标签',
     lineLabels: '曲线标签',
     resetFilter: '重置筛选',
+    overflowMixed: (count: number) => `${count} 个点已截断`,
+    overflowCost: (count: number, limit: number) => `${count} 个点 > $${limit}/Mtok`,
+    overflowLatency: (count: number, limit: number) => `${count} 个点 > ${limit}s TTFT`,
   },
 } as const;
 
@@ -334,6 +420,7 @@ const ScatterGraph = React.memo(
     chartId,
     modelLabel,
     data,
+    clippedData = EMPTY_CLIPPED_DATA,
     xLabel,
     yLabel,
     chartDefinition,
@@ -391,6 +478,8 @@ const ScatterGraph = React.memo(
     } = useInference();
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
+    const costLimit = chartDefinition.y_cost_limit ?? 0;
+    const latencyLimit = chartDefinition.y_latency_limit ?? 0;
 
     const {
       isUnofficialRun,
@@ -759,6 +848,120 @@ const ScatterGraph = React.memo(
       );
     }, [overlayData, selectedPrecisions, quickFilters, activeOverlayHwTypes]);
 
+    const processedOverlayClippedData = useMemo(() => {
+      if (!overlayData?.clippedData) return EMPTY_CLIPPED_DATA;
+      return overlayData.clippedData.filter(
+        ({ point }) =>
+          selectedPrecisions.includes(point.precision) &&
+          matchesQuickFilters(point, quickFilters) &&
+          activeOverlayHwTypes.has(String(point.hwKey)),
+      );
+    }, [overlayData, selectedPrecisions, quickFilters, activeOverlayHwTypes]);
+
+    const officialOverflowContinuations = useMemo((): OverflowContinuationEntry[] => {
+      interface Bucket {
+        hw: string;
+        precision: string;
+        visible: InferenceData[];
+        clipped: ClippedInferenceData[];
+      }
+      const buckets = new Map<string, Bucket>();
+      const getBucket = (point: InferenceData) => {
+        const key = `${point.hwKey}|${point.precision}|${point.date}`;
+        let bucket = buckets.get(key);
+        if (!bucket) {
+          bucket = {
+            hw: String(point.hwKey),
+            precision: point.precision,
+            visible: [],
+            clipped: [],
+          };
+          buckets.set(key, bucket);
+        }
+        return { key, bucket };
+      };
+      for (const point of data) getBucket(point).bucket.visible.push(point);
+      for (const entry of clippedData) getBucket(entry.point).bucket.clipped.push(entry);
+
+      const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
+      const direction = chartDefinition[rooflineKey] as ParetoDirection | undefined;
+      if (!direction) return [];
+
+      const result: OverflowContinuationEntry[] = [];
+      for (const [bucketKey, bucket] of buckets) {
+        buildFrontierContinuations(bucket.visible, bucket.clipped, direction).forEach(
+          (continuation, index) => {
+            result.push({
+              key: `official-${bucketKey}-${index}`,
+              source: 'official',
+              hw: bucket.hw,
+              precision: bucket.precision,
+              ...continuation,
+            });
+          },
+        );
+      }
+      return result;
+    }, [data, clippedData, selectedYAxisMetric, chartDefinition]);
+
+    const overlayOverflowContinuations = useMemo((): OverflowContinuationEntry[] => {
+      interface Bucket {
+        hw: string;
+        precision: string;
+        runIndex: number;
+        visible: InferenceData[];
+        clipped: ClippedInferenceData[];
+      }
+      const buckets = new Map<string, Bucket>();
+      const getBucket = (point: InferenceData) => {
+        const runIndex = overlayRunIndex(point.run_url ?? null, runIndexByUrl);
+        const key = `${point.hwKey}|${point.precision}|${point.date}|run${runIndex}`;
+        let bucket = buckets.get(key);
+        if (!bucket) {
+          bucket = {
+            hw: String(point.hwKey),
+            precision: point.precision,
+            runIndex,
+            visible: [],
+            clipped: [],
+          };
+          buckets.set(key, bucket);
+        }
+        return { key, bucket };
+      };
+      for (const point of processedOverlayData) getBucket(point).bucket.visible.push(point);
+      for (const entry of processedOverlayClippedData) {
+        getBucket(entry.point).bucket.clipped.push(entry);
+      }
+
+      const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
+      const direction = chartDefinition[rooflineKey] as ParetoDirection | undefined;
+      if (!direction) return [];
+
+      const result: OverflowContinuationEntry[] = [];
+      for (const [bucketKey, bucket] of buckets) {
+        buildFrontierContinuations(bucket.visible, bucket.clipped, direction).forEach(
+          (continuation, index) => {
+            result.push({
+              key: `overlay-${bucketKey}-${index}`,
+              source: 'overlay',
+              hw: bucket.hw,
+              precision: bucket.precision,
+              runIndex: bucket.runIndex,
+              ...continuation,
+            });
+          },
+        );
+      }
+      return result;
+    }, [
+      processedOverlayData,
+      processedOverlayClippedData,
+      selectedYAxisMetric,
+      chartDefinition,
+      runIndexByUrl,
+    ]);
+
     // Warning annotations for visible series (official + unofficial overlay)
     // with known upstream issues. Drawn as an SVG layer (box + arrow to the
     // affected line) so PNG exports carry the warning.
@@ -1062,7 +1265,7 @@ const ScatterGraph = React.memo(
 
     // --- Legend hover highlight ---
     const isRooflineVisible = useCallback(
-      (el: SVGPathElement) => {
+      (el: SVGElement) => {
         const hw = el.dataset.hwKey;
         const prec = el.dataset.precision;
         if (hw === null || hw === undefined || prec === null || prec === undefined) return false;
@@ -1123,10 +1326,12 @@ const ScatterGraph = React.memo(
           .style('opacity', (d) =>
             isPointVisible(d) ? (String(d.hwKey) === hwKey ? 1 : 0.15) : 0,
           );
-        root.selectAll<SVGPathElement, unknown>('.roofline-path').style('opacity', function () {
-          if (!isRooflineVisible(this)) return 0;
-          return this.dataset.hwKey === hwKey ? null : '0.15';
-        });
+        root
+          .selectAll<SVGElement, unknown>('.roofline-path, .official-overflow-continuation')
+          .style('opacity', function () {
+            if (!isRooflineVisible(this)) return 0;
+            return this.dataset.hwKey === hwKey ? null : '0.15';
+          });
         root
           .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
           .style('opacity', function () {
@@ -1143,9 +1348,11 @@ const ScatterGraph = React.memo(
       root
         .selectAll<SVGGElement, InferenceData>('.dot-group')
         .style('opacity', (d) => (isPointVisible(d) ? 1 : 0));
-      root.selectAll<SVGPathElement, unknown>('.roofline-path').style('opacity', function () {
-        return isRooflineVisible(this) ? 1 : 0;
-      });
+      root
+        .selectAll<SVGElement, unknown>('.roofline-path, .official-overflow-continuation')
+        .style('opacity', function () {
+          return isRooflineVisible(this) ? 1 : 0;
+        });
       root
         .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
         .style('opacity', function () {
@@ -2429,6 +2636,160 @@ const ScatterGraph = React.memo(
         },
       };
 
+      // ── Intentional clipping: interpolated dashed Pareto continuation + arrow ──
+      const drawOverflowContinuations = (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        ctx: RenderContext,
+        xScale: ContinuousScale,
+        yScale: ContinuousScale,
+      ) => {
+        const ir = interactionRef.current;
+        const entries = [...officialOverflowContinuations, ...overlayOverflowContinuations];
+
+        const layer = zoomGroup
+          .selectAll<SVGGElement, unknown>('.overflow-continuations-layer')
+          .data([null])
+          .join('g')
+          .attr('class', 'overflow-continuations-layer')
+          .attr('pointer-events', 'none');
+        const rooflinesLayer = zoomGroup.select<SVGGElement>('.rooflines-layer').node();
+        const layerNode = layer.node();
+        if (rooflinesLayer && layerNode && layerNode.nextSibling !== rooflinesLayer) {
+          layerNode.parentNode?.insertBefore(layerNode, rooflinesLayer);
+        }
+
+        const groups = layer
+          .selectAll<SVGGElement, (typeof entries)[number]>('.overflow-continuation')
+          .data(entries, (entry) => entry.key)
+          .join((enter) => {
+            const group = enter.append('g');
+            group
+              .append('clipPath')
+              .attr('class', 'overflow-continuation-clip')
+              .attr('clipPathUnits', 'userSpaceOnUse')
+              .append('path');
+            group.append('path').attr('class', 'overflow-continuation-line');
+            group
+              .append('path')
+              .attr('class', 'overflow-continuation-arrow')
+              .attr('d', 'M 0 0 L -9 -4.5 L -9 4.5 Z');
+            group.append('text').attr('class', 'overflow-continuation-label');
+            return group;
+          })
+          .attr('class', (entry) => `overflow-continuation ${entry.source}-overflow-continuation`)
+          .attr('data-testid', (entry) => `${entry.source}-overflow-continuation`)
+          .attr('data-hw-key', (entry) => entry.hw)
+          .attr('data-precision', (entry) => entry.precision)
+          .attr('data-clip-reasons', (entry) => entry.reasons.join(','))
+          .attr('data-hidden-point-count', (entry) => entry.hiddenPointCount)
+          .style('transition', 'opacity 150ms ease')
+          .style('opacity', (entry) =>
+            entry.source === 'overlay' ||
+            (ir.effectiveActiveHwTypes.has(entry.hw) &&
+              ir.selectedPrecisions.includes(entry.precision))
+              ? 1
+              : 0,
+          );
+
+        groups.each(function (entry, index) {
+          const color =
+            entry.source === 'overlay'
+              ? overlayRunColor(entry.runIndex ?? 0)
+              : ir.getCssColor(ir.resolveColor(entry.hw));
+          const group = d3.select(this);
+          const pointsRight = entry.toward.x >= entry.from.x;
+          const anchorX = xScale(entry.from.x);
+          const anchorY = yScale(entry.from.y);
+          const clipId = `${chartId}-overflow-continuation-${entry.source}-${index}`;
+          group.select<SVGClipPathElement>('.overflow-continuation-clip').attr('id', clipId);
+          const lineGenerator = d3
+            .line<InferenceData>()
+            .x((point) => xScale(point.x))
+            .y((point) => yScale(point.y))
+            .curve(d3.curveMonotoneX);
+          const continuationPath = group
+            .select<SVGPathElement>('.overflow-continuation-line')
+            .attr('d', lineGenerator(entry.points) ?? '')
+            .attr('clip-path', `url(#${clipId})`)
+            .attr('fill', 'none')
+            .attr('stroke', color)
+            .attr('stroke-width', 2.25)
+            .attr('stroke-dasharray', '6 5')
+            .attr('stroke-linecap', 'round');
+          const pathNode = continuationPath.node();
+          const geometry = pathNode
+            ? visibleContinuationEndpoint(pathNode, anchorX, ctx.width, ctx.height)
+            : null;
+          const clipRadius = geometry
+            ? Math.min(96, Math.max(0.1, Math.hypot(geometry.x2 - anchorX, geometry.y2 - anchorY)))
+            : 96;
+          group
+            .select<SVGClipPathElement>('.overflow-continuation-clip')
+            .select('path')
+            .attr(
+              'd',
+              `M${anchorX},${anchorY - clipRadius}A${clipRadius},${clipRadius} 0 0 ${
+                pointsRight ? 1 : 0
+              } ${anchorX},${anchorY + clipRadius}L${anchorX},${anchorY}Z`,
+            );
+          group.attr('display', null);
+          if (!geometry) {
+            group
+              .selectAll<SVGElement, unknown>(
+                '.overflow-continuation-arrow, .overflow-continuation-label',
+              )
+              .attr('display', 'none');
+            return;
+          }
+          const label =
+            entry.reasons.includes('cost') && entry.reasons.includes('latency')
+              ? legendT.overflowMixed(entry.hiddenPointCount)
+              : entry.reasons.includes('cost')
+                ? legendT.overflowCost(entry.hiddenPointCount, costLimit)
+                : legendT.overflowLatency(entry.hiddenPointCount, latencyLimit);
+          const labelToRight = geometry.x2 < ctx.width / 2;
+          group
+            .select<SVGPathElement>('.overflow-continuation-arrow')
+            .attr('display', null)
+            .attr('transform', `translate(${geometry.x2},${geometry.y2}) rotate(${geometry.angle})`)
+            .attr('fill', color);
+          group
+            .attr('aria-label', label)
+            .select<SVGTextElement>('.overflow-continuation-label')
+            .attr('display', null)
+            .attr('data-testid', 'overflow-continuation-label')
+            .attr('x', geometry.x2 + (labelToRight ? 12 : -12))
+            .attr('y', fitContinuationLabelBaseline(geometry.y2, ctx.height))
+            .attr('text-anchor', labelToRight ? 'start' : 'end')
+            .attr('fill', color)
+            .attr('stroke', ir.getCssColor('--background'))
+            .attr('stroke-width', 4)
+            .attr('stroke-linejoin', 'round')
+            .attr('paint-order', 'stroke')
+            .attr('font-size', 11.5)
+            .attr('font-weight', 600)
+            .text(label);
+        });
+      };
+      const overflowContinuationLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'overflow-continuations',
+        render: (zoomGroup, ctx) =>
+          drawOverflowContinuations(
+            zoomGroup,
+            ctx,
+            ctx.xScale as ContinuousScale,
+            ctx.yScale as ContinuousScale,
+          ),
+        onZoom: (zoomGroup, ctx) =>
+          drawOverflowContinuations(
+            zoomGroup,
+            ctx,
+            ctx.newXScale as ContinuousScale,
+            ctx.newYScale as ContinuousScale,
+          ),
+      };
+
       // ── Known-issue annotations: warning box + arrow to the affected line ──
       const drawKnownIssues = (
         ctx: RenderContext,
@@ -2478,7 +2839,7 @@ const ScatterGraph = React.memo(
 
       const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
-      result.push(speedOverlayLayer, knownIssueLayer);
+      result.push(overflowContinuationLayer, speedOverlayLayer, knownIssueLayer);
       return result;
       // Interaction state (visibility, colors, precision shapes, known-issue
       // annotations) is deliberately NOT a dependency: layer closures read it
@@ -2502,6 +2863,8 @@ const ScatterGraph = React.memo(
       overlayData,
       processedOverlayData,
       overlayRooflines,
+      officialOverflowContinuations,
+      overlayOverflowContinuations,
       unofficialRunInfos,
       runIndexByUrl,
       hardwareConfig,
@@ -2695,6 +3058,25 @@ const ScatterGraph = React.memo(
         }
       });
 
+      zoomGroup
+        .selectAll<SVGGElement, unknown>('.official-overflow-continuation')
+        .each(function () {
+          const hw = this.dataset.hwKey;
+          const precision = this.dataset.precision;
+          if (!hw || !precision) return;
+          const visible =
+            ir.effectiveActiveHwTypes.has(hw) && ir.selectedPrecisions.includes(precision);
+          const color = ir.getCssColor(ir.resolveColor(hw));
+          d3.select(this)
+            .style('opacity', visible ? 1 : 0)
+            .select('.overflow-continuation-line')
+            .attr('stroke', color);
+          d3.select(this).select('.overflow-continuation-arrow').attr('fill', color);
+        });
+      zoomGroup
+        .selectAll<SVGTextElement, unknown>('.overflow-continuation-label')
+        .attr('stroke', ir.getCssColor('--background'));
+
       // Parallelism / line labels: visibility via data attributes (mirrors
       // handleLegendHoverEnd). Placement-level updates happen below.
       zoomGroup
@@ -2761,7 +3143,9 @@ const ScatterGraph = React.memo(
       if (overlayData) return;
       const svg = chartRef.current?.getSvgElement?.();
       if (!svg) return;
-      d3.select(svg).selectAll('.unofficial-overlay-pt, .overlay-roofline-path').remove();
+      d3.select(svg)
+        .selectAll('.unofficial-overlay-pt, .overlay-roofline-path, .overlay-overflow-continuation')
+        .remove();
     }, [overlayData]);
 
     // Dismiss tooltip on filter changes
@@ -2806,7 +3190,7 @@ const ScatterGraph = React.memo(
               </svg>
               <h3 className="text-sm font-medium mb-1">No data available</h3>
               <p className="text-xs">
-                Please change the model, sequence, precision, date range or GPU selection.
+                Please change the model, sequence, precision, date range or chip selection.
               </p>
             </div>
           </div>
@@ -2846,7 +3230,7 @@ const ScatterGraph = React.memo(
                 <div className="text-muted-foreground text-center bg-background/80 px-4 py-2 rounded-md">
                   <p className="text-sm font-medium">No data available</p>
                   <p className="text-xs mt-1">
-                    Please change the model, sequence, precision, date range or GPU selection.
+                    Please change the model, sequence, precision, date range or chip selection.
                   </p>
                 </div>
               </div>

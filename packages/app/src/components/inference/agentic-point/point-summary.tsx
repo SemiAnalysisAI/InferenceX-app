@@ -15,13 +15,14 @@ const STRINGS = {
   en: {
     selectedPoint: 'Selected point',
     disagg: 'disagg',
+    multiNodeAggregate: 'multi-node aggregate',
     githubRun: 'GitHub Actions run →',
     offloadType: 'Offload Type',
     offloadBackend: 'KV Offload Engine',
     transferEngine: 'KV Transfer Engine',
     router: 'Router',
     concurrency: 'Concurrency',
-    gpuCacheHit: 'GPU cache hit',
+    gpuCacheHit: 'Chip cache hit',
     cpuCacheHit: 'CPU cache hit',
     enabledLegacy: 'Enabled (legacy data)',
     disabledLegacy: 'Disabled (legacy data)',
@@ -30,13 +31,14 @@ const STRINGS = {
   zh: {
     selectedPoint: '已选数据点',
     disagg: '解耦',
+    multiNodeAggregate: '多节点聚合',
     githubRun: 'GitHub Actions 运行 →',
     offloadType: '卸载类型',
     offloadBackend: 'KV 卸载引擎',
     transferEngine: 'KV 传输引擎',
     router: '路由器',
     concurrency: '并发数',
-    gpuCacheHit: 'GPU Cache 命中率',
+    gpuCacheHit: 'Chip Cache 命中率',
     cpuCacheHit: 'CPU Cache 命中率',
     enabledLegacy: '已启用（旧版数据）',
     disabledLegacy: '已禁用（旧版数据）',
@@ -82,6 +84,7 @@ export function PointSummary({ meta }: { meta: PointMeta }) {
         <p className="text-sm text-muted-foreground">
           {t.selectedPoint}
           {meta.disagg ? ` · ${t.disagg}` : ''}
+          {!meta.disagg && meta.is_multinode ? ` · ${t.multiNodeAggregate}` : ''}
           {meta.spec_method && meta.spec_method !== 'none' ? ` · spec=${meta.spec_method}` : ''}
         </p>
         {meta.run_url && (

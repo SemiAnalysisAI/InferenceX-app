@@ -15,6 +15,7 @@ import {
   normalizePrecision,
   normalizeSpecMethod,
   parseBool,
+  parseOptionalBool,
   parseNum,
   parseInt2,
   parseIslOsl,
@@ -213,11 +214,10 @@ export function mapAggEvalRow(row: Record<string, any>, tracker: SkipTracker): E
  *   with `prefill_num_workers`/`decode_num_workers` and `is_multinode`. Presence of
  *   `prefill_tp` on the source selects the v2 branch.
  *
- * `disagg` is true if the framework alias forced it (e.g. `sglang-disagg`), or if
- * the row carries `is_multinode: true`, or if either side has workers > 0 —
- * this keeps disagg eval configs from collapsing onto non-disagg ones via the
- * natural key (which would otherwise merge them because eval-mapper used to
- * copy v1 `tp`/`ep` into both prefill and decode slots).
+ * An explicit `disagg: false` on a Dynamo row is authoritative for a direct
+ * deployment unless a non-zero decode worker pool proves disaggregation.
+ * When the field is absent, the framework, multi-node marker, and worker
+ * topology retain the legacy inference behavior.
  */
 function buildEvalConfig(
   src: Record<string, any>,
@@ -263,7 +263,43 @@ function buildEvalConfig(
     numDecodeGpu = tp * ep;
   }
 
-  const disagg = disaggFromFw || isMultinode || prefillNumWorkers > 0 || decodeNumWorkers > 0;
+  const explicitDisagg = parseOptionalBool(src.disagg);
+  const disagg =
+    disaggFromFw ||
+    decodeNumWorkers > 0 ||
+    (explicitDisagg === undefined && (isMultinode || prefillNumWorkers > 0));
+
+  if (!disagg) {
+    const usePrefill =
+      decodeTp <= 0 ||
+      decodeEp <= 0 ||
+      (decodeNumWorkers <= 0 && numDecodeGpu <= 0 && (prefillNumWorkers > 0 || numPrefillGpu > 0));
+    const aggregate = usePrefill
+      ? {
+          tp: prefillTp,
+          ep: prefillEp,
+          dpAttn: prefillDpAttn,
+          numWorkers: prefillNumWorkers,
+          numGpu: numPrefillGpu,
+        }
+      : {
+          tp: decodeTp,
+          ep: decodeEp,
+          dpAttn: decodeDpAttn,
+          numWorkers: decodeNumWorkers,
+          numGpu: numDecodeGpu,
+        };
+    prefillTp = aggregate.tp;
+    decodeTp = aggregate.tp;
+    prefillEp = aggregate.ep;
+    decodeEp = aggregate.ep;
+    prefillDpAttn = aggregate.dpAttn;
+    decodeDpAttn = aggregate.dpAttn;
+    prefillNumWorkers = aggregate.numWorkers;
+    decodeNumWorkers = aggregate.numWorkers;
+    numPrefillGpu = aggregate.numGpu;
+    numDecodeGpu = aggregate.numGpu;
+  }
 
   return {
     hardware,

@@ -192,7 +192,7 @@ describe('GPU comparison agentic point detail', () => {
       .should('contain', 'Offload Type: DRAM')
       .and('contain', 'KV Offload Engine: Mooncake 0.3.11.post1')
       .and('contain', 'Router: vLLM Router 0.1.14')
-      .and('contain', 'GPU Cache Hit Rate: 87.5%')
+      .and('contain', 'Chip Cache Hit Rate: 87.5%')
       .and('not.contain', 'Offload Mode');
     cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
       .should('be.visible')

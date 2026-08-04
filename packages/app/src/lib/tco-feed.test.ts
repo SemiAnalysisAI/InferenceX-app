@@ -12,6 +12,7 @@ import {
   parseTierWeights,
   parseWorkloads,
   parseWorkloadWeights,
+  singleTurnInteractivity,
   tcoFeedToCsv,
   tcoScoresToCsv,
   type TcoFeedRow,
@@ -261,6 +262,23 @@ describe('computeTcoFeed — frontier reads', () => {
 
   it('returns an empty feed for empty input', () => {
     expect(computeTcoFeed([], WORKLOAD_8K1K, [50])).toEqual([]);
+  });
+});
+
+describe('singleTurnInteractivity', () => {
+  it('prefers the stored median_intvty over the 1/median_itl fallback', () => {
+    expect(singleTurnInteractivity({ median_intvty: 42, median_itl: 0.02 })).toBe(42);
+  });
+
+  it('falls back to 1/median_itl for legacy rows that predate the intvty key', () => {
+    expect(singleTurnInteractivity({ median_itl: 0.02 })).toBe(50);
+  });
+
+  it('returns undefined when neither metric is usable', () => {
+    expect(singleTurnInteractivity({})).toBeUndefined();
+    expect(singleTurnInteractivity({ median_intvty: 0, median_itl: 0 })).toBeUndefined();
+    expect(singleTurnInteractivity({ median_intvty: -5, median_itl: -1 })).toBeUndefined();
+    expect(singleTurnInteractivity({ median_intvty: Number.NaN })).toBeUndefined();
   });
 });
 

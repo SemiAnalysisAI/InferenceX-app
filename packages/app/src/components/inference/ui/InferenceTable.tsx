@@ -50,7 +50,7 @@ export default function InferenceTable({
   const columns = useMemo<DataTableColumn<InferenceData>[]>(
     () => [
       {
-        header: 'GPU',
+        header: 'Chip',
         cell: (row) => getDisplayLabel(getHardwareConfig(row.hwKey, row.model)),
         sortValue: (row) => getDisplayLabel(getHardwareConfig(row.hwKey, row.model)),
         className: 'font-medium whitespace-nowrap',
@@ -90,7 +90,7 @@ export default function InferenceTable({
         className: 'tabular-nums',
       },
       {
-        header: 'Throughput/GPU (tok/s)',
+        header: 'Throughput/Chip (tok/s)',
         align: 'right',
         cell: (row) => fmt(row.tput_per_gpu ?? 0, 1),
         sortValue: (row) => row.tput_per_gpu ?? 0,

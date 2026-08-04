@@ -11,7 +11,7 @@ import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 
 const title = 'AI Inference Glossary';
 const description =
-  'Clear, technically grounded definitions for LLM inference benchmarks, serving metrics, distributed parallelism, numerical precision, GPU hardware, and inference software.';
+  'Clear, technically grounded definitions for LLM inference benchmarks, serving metrics, distributed parallelism, numerical precision, chip hardware, and inference software.';
 
 export const metadata: Metadata = {
   title,
@@ -170,7 +170,7 @@ export default function GlossaryPage() {
             <p className="mt-3 leading-7 text-muted-foreground">
               Every term page links to InferenceX articles where the concept changes a measured
               result, including MTP acceptance behavior, NVL72 wide-EP scaling, and software-only
-              speedups on unchanged GPUs.
+              speedups on unchanged chips.
             </p>
             <div className="mt-5 flex flex-wrap gap-3 text-sm font-medium">
               <Link href="/blog" className="text-brand hover:underline">

@@ -10,7 +10,7 @@ import { getOverviewPageData } from '@/lib/overview-data.server';
 export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
-  'Cost per million output tokens from the best observed platform serving envelopes across MI355X, B200, B300, GB200 and GB300 at a fixed single-turn 8K input / 1K output workload, prioritizing speculative decode and FP4.';
+  'Compare hyperscaler cost per million total tokens across MI355X, B200, B300, GB200 and GB300 using the scenario shown for each active model.';
 
 export const metadata: Metadata = {
   title: 'Inference Cost Overview',

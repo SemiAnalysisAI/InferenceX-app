@@ -38,38 +38,38 @@ const STRINGS = {
   en: {
     fleetTitle: 'Fleet Projection',
     fleetDescription:
-      'Size a deployment by facility power: how many GPUs fit in your megawatt budget, and what they serve at the target interactivity above.',
+      'Size a deployment by facility power: how many chips fit in your megawatt budget, and what they serve at the target interactivity above.',
     mwLabel: 'Facility Power (MW)',
     mwTooltip:
-      'Total facility power budget in megawatts. GPU count uses all-in power per GPU (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model — not bare TDP.',
+      'Total facility power budget in megawatts. Chip count uses all-in power per chip (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model — not bare TDP.',
     mwPlaceholder: 'e.g. 10',
-    colGpu: 'GPU',
-    colGpus: 'GPUs',
+    colGpu: 'Chip',
+    colGpus: 'Chips',
     colFleetTput: (tokenType: string) => `Fleet ${tokenType}tok/s`,
     colUsers: 'Concurrent Users',
     colCostHr: 'Fleet $/hr',
     colCostMo: 'Fleet $/mo',
     fleetEmpty: 'Enter a facility power budget to project fleet capacity and cost.',
     fleetTooSmall:
-      'This power budget is too small to power a single GPU of the shown hardware — try a larger value.',
-    fleetNoGpus: 'No GPUs are visible to project — enable hardware in the chart legend.',
+      'This power budget is too small to power a single chip of the shown hardware — try a larger value.',
+    fleetNoGpus: 'No chips are visible to project — enable hardware in the chart legend.',
     costCapTitle: 'Interactivity Within a Cost Target',
     costCapDescription:
-      'Set a cost ceiling per million tokens and find the highest interactivity each GPU can serve without exceeding it.',
+      'Set a cost ceiling per million tokens and find the highest interactivity each chip can serve without exceeding it.',
     costCapLabel: 'Cost Target ($/M tok)',
     costCapTooltip:
       'Maximum acceptable cost per million tokens (at the selected pricing tier and token type). The answer is the highest interactivity whose interpolated cost stays at or below this ceiling.',
     costCapPlaceholder: 'e.g. 0.50',
     colMaxInteractivity: 'Max Interactivity (tok/s/user)',
-    colTputAtIv: 'Throughput (tok/s/gpu)',
+    colTputAtIv: 'Throughput (tok/s/chip)',
     notReachable: 'Not reachable',
-    costCapEmpty: 'Enter a cost target to find the serveable interactivity per GPU.',
-    costCapNoGpus: 'No GPUs are visible to evaluate — enable hardware in the chart legend.',
+    costCapEmpty: 'Enter a cost target to find the serveable interactivity per chip.',
+    costCapNoGpus: 'No chips are visible to evaluate — enable hardware in the chart legend.',
     note: 'Note:',
     disaggFleet:
-      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report throughput per decode GPU or per prefill GPU, rather than per total GPU count — fleet sizes and costs for those configs are not an apples-to-apples comparison with aggregated configs.',
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report throughput per decode chip or per prefill chip, rather than per total chip count — fleet sizes and costs for those configs are not an apples-to-apples comparison with aggregated configs.',
     assumptions: (tier: string) =>
-      `Assumes 100% utilization at this operating point and owned-datacenter economics: fleet cost = GPUs × ${tier} $/GPU/hr, months = 730 hr. Facility power is all-in per-GPU power (host, networking, cooling), not bare TDP.`,
+      `Assumes 100% utilization at this operating point and owned-datacenter economics: fleet cost = chips × ${tier} $/chip/hr, months = 730 hr. Facility power is all-in per-chip power (host, networking, cooling), not bare TDP.`,
     source: 'Source: ',
     tokenTypeTotal: '',
     tokenTypeInput: 'input ',
@@ -78,37 +78,37 @@ const STRINGS = {
   zh: {
     fleetTitle: '集群规模测算',
     fleetDescription:
-      '按设施功率规划部署：在给定兆瓦预算内可容纳多少 GPU，以及在上方目标交互性下的服务能力。',
+      '按设施功率规划部署：在给定兆瓦预算内可容纳多少 Chip，以及在上方目标交互性下的服务能力。',
     mwLabel: '设施功率 (MW)',
     mwTooltip:
-      '设施总功率预算（兆瓦）。GPU 数量按每 GPU 全含功率（主机、网络、散热）计算，数据来自 SemiAnalysis Datacenter Industry Model，而非裸 TDP。',
+      '设施总功率预算（兆瓦）。Chip 数量按每 Chip 全含功率（主机、网络、散热）计算，数据来自 SemiAnalysis Datacenter Industry Model，而非裸 TDP。',
     mwPlaceholder: '如 10',
-    colGpu: 'GPU',
-    colGpus: 'GPU 数',
+    colGpu: 'Chip',
+    colGpus: 'Chip 数',
     colFleetTput: (tokenType: string) => `集群${tokenType} tok/s`,
     colUsers: '并发用户数',
     colCostHr: '集群 $/hr',
     colCostMo: '集群 $/mo',
     fleetEmpty: '输入设施功率预算以测算集群容量与成本。',
-    fleetTooSmall: '该功率预算不足以为所示任一 GPU 供电——请尝试更大的数值。',
-    fleetNoGpus: '当前无可见 GPU 可测算——请在图表图例中启用硬件。',
+    fleetTooSmall: '该功率预算不足以为所示任一 Chip 供电——请尝试更大的数值。',
+    fleetNoGpus: '当前无可见 Chip 可测算——请在图表图例中启用硬件。',
     costCapTitle: '成本上限下的交互性',
     costCapDescription:
-      '设定每百万 token 的成本上限，查看每款 GPU 在不超支前提下可提供的最高交互性。',
+      '设定每百万 token 的成本上限，查看每款 Chip 在不超支前提下可提供的最高交互性。',
     costCapLabel: '成本上限 ($/M tok)',
     costCapTooltip:
       '每百万 token 的最高可接受成本（按所选定价层级和 token 类型）。结果为插值成本不超过该上限的最高交互性。',
     costCapPlaceholder: '如 0.50',
     colMaxInteractivity: '最高交互性 (tok/s/user)',
-    colTputAtIv: '吞吐量 (tok/s/gpu)',
+    colTputAtIv: '吞吐量 (tok/s/chip)',
     notReachable: '无法达到',
-    costCapEmpty: '输入成本上限以查看每款 GPU 可提供的交互性。',
-    costCapNoGpus: '当前无可见 GPU 可评估——请在图表图例中启用硬件。',
+    costCapEmpty: '输入成本上限以查看每款 Chip 可提供的交互性。',
+    costCapNoGpus: '当前无可见 Chip 可评估——请在图表图例中启用硬件。',
     note: '注意：',
     disaggFleet:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 GPU 或预填充 GPU 报告吞吐量，而非按 GPU 总数——这类配置的集群规模与成本和聚合配置并非同类比较。',
+      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 Chip 或预填充 Chip 报告吞吐量，而非按 Chip 总数——这类配置的集群规模与成本和聚合配置并非同类比较。',
     assumptions: (tier: string) =>
-      `假设该操作点下 100% 利用率及自有数据中心经济模型：集群成本 = GPU 数 × ${tier} $/GPU/hr，每月按 730 小时计。设施功率为每 GPU 全含功率（主机、网络、散热），非裸 TDP。`,
+      `假设该操作点下 100% 利用率及自有数据中心经济模型：集群成本 = Chip 数 × ${tier} $/chip/hr，每月按 730 小时计。设施功率为每 Chip 全含功率（主机、网络、散热），非裸 TDP。`,
     source: '来源：',
     tokenTypeTotal: '总',
     tokenTypeInput: '输入',
@@ -399,7 +399,7 @@ export default function FleetPlanner({
             className="underline hover:text-foreground"
             href="https://semianalysis.com/ai-cloud-tco-model/"
           >
-            SemiAnalysis Market August 2025 Pricing Surveys & AI Cloud TCO Model
+            SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
             <ExternalLinkIcon />
           </Link>
         </small>

@@ -28,17 +28,12 @@ import { STATS_VERSION } from '@semianalysisai/inferencex-db/queries/agentic-agg
 import { REQUEST_TIMELINE_VERSION } from '@semianalysisai/inferencex-db/etl/compute-request-timeline';
 import { TRACE_SERVER_METRICS_VERSION } from '@semianalysisai/inferencex-db/queries/trace-server-metrics';
 
-import { CACHE_KEY_PREFIX as derivedAgenticMetricsKey } from './derived-agentic-metrics/route';
 import { CACHE_KEY_PREFIX as agenticAggregatesKey } from './agentic-aggregates/route';
 import { CACHE_KEY_PREFIX as requestTimelineKey } from './request-timeline/route';
 import { CACHE_KEY_PREFIX as traceServerMetricsKey } from './trace-server-metrics/route';
 import { CACHE_KEY_PREFIX as traceHistogramsKey } from './trace-histograms/route';
 
 describe('agentic blob-cache keys are version-derived', () => {
-  it('derived-agentic-metrics key embeds STATS_VERSION', () => {
-    expect(derivedAgenticMetricsKey).toBe(`derived-agentic-metrics-v${STATS_VERSION}`);
-  });
-
   it('agentic-aggregates key embeds STATS_VERSION', () => {
     expect(agenticAggregatesKey).toBe(`agentic-aggregates-v${STATS_VERSION}`);
   });
@@ -57,7 +52,6 @@ describe('agentic blob-cache keys are version-derived', () => {
 
   it('every key actually contains a version segment (no unversioned literals)', () => {
     for (const key of [
-      derivedAgenticMetricsKey,
       agenticAggregatesKey,
       requestTimelineKey,
       traceServerMetricsKey,
