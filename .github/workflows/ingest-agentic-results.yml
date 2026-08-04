@@ -98,7 +98,7 @@ jobs:
     # High-concurrency rows also precompute request timelines from GiB-scale
     # artifacts, so retain enough headroom for a complete recovered sweep.
     timeout-minutes: 180
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: blacksmith-16vcpu-ubuntu-2404
     permissions:
       contents: read
     env:
