@@ -31,7 +31,12 @@ describe('Compare Interpolated Table', () => {
   });
 
   it('shows metric rows (throughput, cost, power, concurrency)', () => {
-    const expectedMetrics = ['Throughput (tok/s/gpu)', 'Cost ($/M tok)', 'tok/s/MW', 'Concurrency'];
+    const expectedMetrics = [
+      'Throughput (tok/s/chip)',
+      'Cost ($/M tok)',
+      'tok/s/MW',
+      'Concurrency',
+    ];
     for (const metric of expectedMetrics) {
       cy.get('[data-testid="compare-interpolated-table"] tbody').should('contain.text', metric);
     }
@@ -46,7 +51,7 @@ describe('Compare Interpolated Table', () => {
     cy.get('[data-testid="compare-table-target-1"]').then(($input) => {
       const original = Number($input.val() as string);
       const next = original + 3;
-      cy.contains('[data-testid="compare-interpolated-table"] tbody tr', 'Throughput (tok/s/gpu)')
+      cy.contains('[data-testid="compare-interpolated-table"] tbody tr', 'Throughput (tok/s/chip)')
         .find('td')
         .eq(2)
         .invoke('text')
@@ -55,7 +60,7 @@ describe('Compare Interpolated Table', () => {
           cy.get('[data-testid="compare-table-target-1"]').should('have.value', String(next));
           cy.contains(
             '[data-testid="compare-interpolated-table"] tbody tr',
-            'Throughput (tok/s/gpu)',
+            'Throughput (tok/s/chip)',
           )
             .find('td')
             .eq(2)
@@ -72,7 +77,7 @@ describe('Compare Interpolated Table', () => {
     cy.get('[data-testid="compare-table-target-2"]').then(($input) => {
       const original = Number($input.val() as string);
       const next = original - 3;
-      cy.contains('[data-testid="compare-interpolated-table"] tbody tr', 'Throughput (tok/s/gpu)')
+      cy.contains('[data-testid="compare-interpolated-table"] tbody tr', 'Throughput (tok/s/chip)')
         .find('td')
         .eq(3)
         .invoke('text')
@@ -81,7 +86,7 @@ describe('Compare Interpolated Table', () => {
           cy.get('[data-testid="compare-table-target-2"]').should('have.value', String(next));
           cy.contains(
             '[data-testid="compare-interpolated-table"] tbody tr',
-            'Throughput (tok/s/gpu)',
+            'Throughput (tok/s/chip)',
           )
             .find('td')
             .eq(3)

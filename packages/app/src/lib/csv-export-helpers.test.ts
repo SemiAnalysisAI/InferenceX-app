@@ -60,7 +60,7 @@ describe('inferenceChartToCsv', () => {
     const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k');
 
     // Should have all metric columns
-    expect(headers).toContain('Throughput/GPU (tok/s)');
+    expect(headers).toContain('Throughput/Chip (tok/s)');
     expect(headers).toContain('Mean TTFT (s)');
     expect(headers).toContain('P99 TTFT (s)');
     expect(headers).toContain('Mean Interactivity (tok/s/user)');
@@ -91,7 +91,7 @@ describe('inferenceChartToCsv', () => {
     const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k');
     const row = rows[0];
 
-    const tputIdx = headers.indexOf('Throughput/GPU (tok/s)');
+    const tputIdx = headers.indexOf('Throughput/Chip (tok/s)');
     expect(row[tputIdx]).toBe(4800);
 
     const ttftIdx = headers.indexOf('Mean TTFT (s)');
@@ -176,8 +176,8 @@ describe('inferenceChartToCsv', () => {
     const row = rows[0];
 
     expect(row[headers.indexOf('Disaggregated')]).toBe(true);
-    expect(row[headers.indexOf('Num Prefill GPUs')]).toBe(2);
-    expect(row[headers.indexOf('Num Decode GPUs')]).toBe(6);
+    expect(row[headers.indexOf('Num Prefill Chips')]).toBe(2);
+    expect(row[headers.indexOf('Num Decode Chips')]).toBe(6);
     expect(row[headers.indexOf('EP')]).toBe(4);
   });
 
@@ -266,7 +266,7 @@ describe('inferenceChartToCsv', () => {
     // Missing optional fields should be ''
     expect(row[headers.indexOf('Hardware')]).toBe('');
     expect(row[headers.indexOf('Framework')]).toBe('');
-    expect(row[headers.indexOf('Throughput/GPU (tok/s)')]).toBe('');
+    expect(row[headers.indexOf('Throughput/Chip (tok/s)')]).toBe('');
     expect(row[headers.indexOf('EP')]).toBe('');
   });
 
@@ -295,8 +295,8 @@ describe('reliabilityChartToCsv (mirrors ReliabilityChartDisplay export)', () =>
     const { headers, rows } = reliabilityChartToCsv(data);
 
     expect(headers).toEqual([
-      'GPU Model',
-      'GPU Key',
+      'Chip Model',
+      'Chip Key',
       'Success Rate (%)',
       'Successful Runs',
       'Total Runs',
@@ -453,7 +453,7 @@ describe('calculatorChartToCsv (mirrors ThroughputCalculatorDisplay export)', ()
 
     const { headers, rows } = calculatorChartToCsv(results, 125);
 
-    expect(headers[0]).toBe('GPU');
+    expect(headers[0]).toBe('Chip');
     expect(headers[13]).toBe('Target Interactivity (tok/s/user)');
     expect(rows).toHaveLength(1);
     expect(rows[0][3]).toBe(1200);
@@ -536,10 +536,10 @@ describe('calculatorChartToCsv (mirrors ThroughputCalculatorDisplay export)', ()
       (hwKey) => labelMap[hwKey] ?? hwKey,
     );
     expect(rows).toHaveLength(2);
-    expect(rows[0][headers.indexOf('GPU')]).toBe('H100 SXM (SGLang)');
+    expect(rows[0][headers.indexOf('Chip')]).toBe('H100 SXM (SGLang)');
     expect(rows[0][headers.indexOf('Precision')]).toBe('FP8');
     expect(rows[0][headers.indexOf('Cost per Million Total Tokens ($)')]).toBe(0.52);
-    expect(rows[1][headers.indexOf('GPU')]).toBe('B200 SXM (SGLang)');
+    expect(rows[1][headers.indexOf('Chip')]).toBe('B200 SXM (SGLang)');
     expect(rows[1][headers.indexOf('Precision')]).toBe('FP4');
   });
 });
@@ -562,10 +562,10 @@ describe('historicalTrendToCsv (mirrors HistoricalTrendsDisplay export)', () => 
       { id: 'b200-sxm-sglang__fp4', label: 'B200 SXM (SGLang) (FP4)', precision: 'fp4' },
     ];
 
-    const { headers, rows } = historicalTrendToCsv(trendLines, lineConfigs, 'Throughput/GPU', 35);
+    const { headers, rows } = historicalTrendToCsv(trendLines, lineConfigs, 'Throughput/Chip', 35);
 
-    expect(headers).toContain('GPU');
-    expect(headers).toContain('Throughput/GPU');
+    expect(headers).toContain('Chip');
+    expect(headers).toContain('Throughput/Chip');
     expect(headers).toContain('Synthetic');
     expect(headers).toContain('Target Interactivity (tok/s/user)');
     expect(rows).toHaveLength(3);

@@ -61,7 +61,7 @@ const entries = [
     significance:
       'Inference performance depends on the system around the model. User experience depends on latency and interactivity, while operator economics depend on throughput, utilization, power, and hardware cost. Optimizing one dimension can make another worse.',
     benchmarkContext:
-      'InferenceX benchmarks complete serving recipes because peak chip specifications alone cannot describe serving performance. Each curve captures a model, engine, numerical precision, parallelism strategy, GPU system, sequence length, and concurrency sweep.',
+      'InferenceX benchmarks complete serving recipes because peak chip specifications alone cannot describe serving performance. Each curve captures a model, engine, numerical precision, parallelism strategy, chip system, sequence length, and concurrency sweep.',
     relatedTerms: ['inference-engine', 'prefill', 'decode', 'throughput', 'interactivity'],
     articleSlugs: [INFERENCEMAX, INFERENCEX_V2],
   },
@@ -71,13 +71,13 @@ const entries = [
     aliases: ['serving engine', 'LLM serving framework'],
     category: 'Serving',
     plainEnglish:
-      'The inference engine is the traffic controller behind an AI service: it keeps incoming requests moving and makes sure the GPUs do the right work at the right time.',
+      'The inference engine is the traffic controller behind an AI service: it keeps incoming requests moving and makes sure the chips do the right work at the right time.',
     definition:
       'An inference engine is the software runtime that turns model weights and incoming requests into generated outputs on accelerators.',
     explanation:
-      'The engine owns request scheduling, batching, KV-cache allocation, distributed execution, kernel selection, and token sampling. vLLM, SGLang, and TensorRT-LLM can run the same model on the same GPU yet produce different curves because their schedulers, kernels, and distributed strategies differ.',
+      'The engine owns request scheduling, batching, KV-cache allocation, distributed execution, kernel selection, and token sampling. vLLM, SGLang, and TensorRT-LLM can run the same model on the same chip yet produce different curves because their schedulers, kernels, and distributed strategies differ.',
     significance:
-      'Engine version and configuration can matter as much as GPU choice. A scheduler change, a fused attention kernel, or a corrected model-specific path can move throughput several-fold without any hardware change.',
+      'Engine version and configuration can matter as much as chip choice. A scheduler change, a fused attention kernel, or a corrected model-specific path can move throughput several-fold without any hardware change.',
     benchmarkContext:
       'InferenceX records the engine and container image as part of each reproducible recipe. Historical views are therefore useful for separating software gains from silicon gains.',
     relatedTerms: ['ai-inference', 'vllm', 'sglang', 'tensorrt-llm', 'nvidia-dynamo'],
@@ -93,12 +93,12 @@ const entries = [
     definition:
       'Throughput is the total rate at which an inference system produces tokens across all active requests.',
     explanation:
-      'InferenceX commonly normalizes throughput as tokens per second per GPU so systems of different sizes can be compared. Higher batching or concurrency often raises aggregate throughput because weight reads and compute are amortized across more requests, but individual users may receive tokens more slowly.',
+      'InferenceX commonly normalizes throughput as tokens per second per chip so systems of different sizes can be compared. Higher batching or concurrency often raises aggregate throughput because weight reads and compute are amortized across more requests, but individual users may receive tokens more slowly.',
     significance:
       'Maximum throughput captures only one operating point. A system can lead in tokens per second while operating at interactivity too low for a real-time product. The useful comparison is throughput at a latency or interactivity target appropriate to the workload.',
     benchmarkContext:
       'On an InferenceX chart, throughput is read together with interactivity across the full concurrency sweep. The Pareto frontier removes operating points that are worse on both axes.',
-    measurement: { label: 'Typical unit', value: 'tokens/second/GPU (tok/s/GPU)' },
+    measurement: { label: 'Typical unit', value: 'tokens/second/chip (tok/s/chip)' },
     relatedTerms: ['interactivity', 'concurrency', 'pareto-frontier', 'iso-interactivity'],
     articleSlugs: [INFERENCEMAX, INFERENCEX_V2, SGLANG_056],
   },
@@ -201,15 +201,15 @@ const entries = [
     aliases: ['continuous batching', 'dynamic batching'],
     category: 'Serving',
     plainEnglish:
-      'Batching is like putting several passengers on one bus: the GPU handles multiple requests together so each trip does more useful work.',
+      'Batching is like putting several passengers on one bus: the chip handles multiple requests together so each trip does more useful work.',
     definition:
       'Batching groups work from multiple requests so an accelerator can process their tokens together.',
     explanation:
-      'Large matrix operations use GPUs more efficiently than many tiny operations. Modern serving engines continuously add and remove sequences as requests arrive and finish, without waiting for a fixed batch to complete. The resulting batch shape changes throughout prefill and decode.',
+      'Large matrix operations use chips more efficiently than many tiny operations. Modern serving engines continuously add and remove sequences as requests arrive and finish, without waiting for a fixed batch to complete. The resulting batch shape changes throughout prefill and decode.',
     significance:
       'Batching creates the core throughput-latency tradeoff. Larger effective batches amortize weight reads and launch overhead but generally increase the time between tokens for each user.',
     benchmarkContext:
-      'Concurrency supplies work to the batcher. Parallelism, sequence lengths, request completion, and scheduler policy determine the effective batch observed by the GPU.',
+      'Concurrency supplies work to the batcher. Parallelism, sequence lengths, request completion, and scheduler policy determine the effective batch observed by the chip.',
     relatedTerms: ['concurrency', 'throughput', 'decode', 'interactivity'],
     articleSlugs: [INFERENCEMAX, INFERENCEX_V2, SGLANG_056],
   },
@@ -284,7 +284,7 @@ const entries = [
       'Cost curves use the same concurrency sweep as throughput curves. At iso-interactivity, lower $/M means the system delivers the same streaming experience with less modeled infrastructure cost.',
     measurement: {
       label: 'InferenceX form',
-      value: '$/M = TCO($/GPU-hour) × 1,000,000 / (3600 × tok/s/GPU)',
+      value: '$/M = TCO($/chip-hour) × 1,000,000 / (3600 × tok/s/chip)',
     },
     relatedTerms: [
       'total-cost-of-ownership',
@@ -327,11 +327,11 @@ const entries = [
     definition:
       'Total cost of ownership is an all-in estimate of the cost to provision and operate computing infrastructure over its useful life.',
     explanation:
-      'A GPU’s purchase price is only one input. TCO models can include host systems, networking, power delivery, cooling, facilities, financing, depreciation, maintenance, and expected utilization, then normalize the result to cost per GPU-hour.',
+      'A chip’s purchase price is only one input. TCO models can include host systems, networking, power delivery, cooling, facilities, financing, depreciation, maintenance, and expected utilization, then normalize the result to cost per chip-hour.',
     significance:
       'Using TCO instead of list price makes cross-system economics more realistic, especially for rack-scale products whose networking and power infrastructure differ. The result remains a model and should be read with its assumptions.',
     benchmarkContext:
-      'InferenceX combines SemiAnalysis AI Cloud TCO inputs with observed tok/s/GPU. This separates hourly system cost from the software and workload behavior that determines how many tokens that hour produces.',
+      'InferenceX combines SemiAnalysis AI Cloud TCO inputs with observed tok/s/chip. This separates hourly system cost from the software and workload behavior that determines how many tokens that hour produces.',
     relatedTerms: [
       'cost-per-million-tokens',
       'performance-per-dollar',
@@ -378,7 +378,7 @@ const entries = [
     significance:
       'Prefill has a different resource profile from decode. When both share the same workers, large prompt jobs can interrupt decode batches and make streaming latency less predictable.',
     benchmarkContext:
-      'Disaggregated recipes place prefill on a separately sized GPU pool. When reading a result, check the prefill tensor parallelism, GPU count, input length, and whether KV state must cross a network before decode.',
+      'Disaggregated recipes place prefill on a separately sized chip pool. When reading a result, check the prefill tensor parallelism, chip count, input length, and whether KV state must cross a network before decode.',
     relatedTerms: ['decode', 'kv-cache', 'time-to-first-token', 'disaggregated-inference'],
     articleSlugs: [INFERENCEX_V2, GB300_DSV4, GB200_KIMI],
   },
@@ -396,7 +396,7 @@ const entries = [
     significance:
       'Decode controls streaming interactivity and often dominates the cost of long outputs. Techniques such as speculative decoding, MTP, quantization, and wide expert parallelism aim to reduce the work or time required per accepted token.',
     benchmarkContext:
-      'InferenceX decode performance appears as tok/s/user and aggregate tok/s/GPU across concurrency. Output sequence length, batch shape, precision, and parallelism must match for a fair comparison.',
+      'InferenceX decode performance appears as tok/s/user and aggregate tok/s/chip across concurrency. Output sequence length, batch shape, precision, and parallelism must match for a fair comparison.',
     relatedTerms: ['prefill', 'time-per-output-token', 'kv-cache', 'speculative-decoding'],
     articleSlugs: [INFERENCEX_V2, GB300_DSV4, SGLANG_056],
   },
@@ -449,11 +449,11 @@ const entries = [
     aliases: ['disaggregated prefill', 'disagg'],
     category: 'Serving',
     plainEnglish:
-      'Disaggregated inference gives prompt reading and answer writing to separate GPU teams, so each team can be tuned for its own job.',
+      'Disaggregated inference gives prompt reading and answer writing to separate chip teams, so each team can be tuned for its own job.',
     definition:
       'Disaggregated inference runs prefill and decode on separate worker pools and transfers request state between them.',
     explanation:
-      'Prefill is usually compute heavy, while decode is often memory-bandwidth and communication heavy. Separating them lets each pool use different GPU counts, parallelism, batch policy, and scaling behavior instead of compromising on one shared configuration.',
+      'Prefill is usually compute heavy, while decode is often memory-bandwidth and communication heavy. Separating them lets each pool use different chip counts, parallelism, batch policy, and scaling behavior instead of compromising on one shared configuration.',
     significance:
       'Disaggregation can isolate decode from prompt spikes and improve throughput or service-level predictability. It also adds routing and KV-transfer overhead, so weak networking or immature kernels can make it slower than aggregated serving.',
     benchmarkContext:
@@ -522,7 +522,7 @@ const entries = [
     abbreviation: 'TP',
     category: 'Parallelism',
     plainEnglish:
-      'Tensor parallelism splits one large calculation across several GPUs so they solve it together.',
+      'Tensor parallelism splits one large calculation across several chips so they solve it together.',
     definition:
       'Tensor parallelism shards individual tensor operations and model weight matrices across multiple accelerators.',
     explanation:
@@ -540,15 +540,15 @@ const entries = [
     abbreviation: 'EP',
     category: 'Parallelism',
     plainEnglish:
-      'Expert parallelism gives different GPUs different specialist parts of a model, then sends each token to the specialists it needs.',
+      'Expert parallelism gives different chips different specialist parts of a model, then sends each token to the specialists it needs.',
     definition:
       'Expert parallelism distributes the experts of a mixture-of-experts model across accelerators and routes tokens to the ranks holding their selected experts.',
     explanation:
-      'MoE layers activate only a subset of experts for each token. EP exploits that sparsity so every GPU need not store or compute every expert, but it introduces dispatch and combine all-to-all communication around each MoE layer.',
+      'MoE layers activate only a subset of experts for each token. EP exploits that sparsity so every chip need not store or compute every expert, but it introduces dispatch and combine all-to-all communication around each MoE layer.',
     significance:
-      'Wider EP reduces the expert-weight footprint per GPU and can improve decode batching and capacity. Its benefit depends on balanced routing and an interconnect fast enough to move tokens among ranks.',
+      'Wider EP reduces the expert-weight footprint per chip and can improve decode batching and capacity. Its benefit depends on balanced routing and an interconnect fast enough to move tokens among ranks.',
     benchmarkContext:
-      'InferenceX reports EP width as part of distributed recipes. NVL72 systems can keep much wider groups inside the NVLink scale-up domain than conventional eight-GPU nodes.',
+      'InferenceX reports EP width as part of distributed recipes. NVL72 systems can keep much wider groups inside the NVLink scale-up domain than conventional eight-chip nodes.',
     relatedTerms: [
       'mixture-of-experts',
       'wide-expert-parallelism',
@@ -581,15 +581,15 @@ const entries = [
     abbreviation: 'Wide EP',
     category: 'Parallelism',
     plainEnglish:
-      'Wide expert parallelism spreads a model’s specialists across many GPUs, giving each GPU less expert data to hold and move.',
+      'Wide expert parallelism spreads a model’s specialists across many chips, giving each chip less expert data to hold and move.',
     definition:
       'Wide expert parallelism uses a large number of accelerator ranks for the expert-parallel group of a mixture-of-experts model.',
     explanation:
-      'Spreading hundreds of experts across more ranks reduces the number of expert weights stored and streamed by each GPU. Tokens from a larger peer group can also form more efficient expert batches, while dispatch and combine traffic grows across the group.',
+      'Spreading hundreds of experts across more ranks reduces the number of expert weights stored and streamed by each chip. Tokens from a larger peer group can also form more efficient expert batches, while dispatch and combine traffic grows across the group.',
     significance:
       'Wide EP is most effective inside a high-bandwidth scale-up network. Crossing a slower scale-out fabric can turn the same all-to-all traffic into the bottleneck and erase the memory-side benefit.',
     benchmarkContext:
-      'InferenceX uses wide EP in rack-scale disaggregated recipes. Compare the EP width, decode pool size, fabric, and GPU model together.',
+      'InferenceX uses wide EP in rack-scale disaggregated recipes. Compare the EP width, decode pool size, fabric, and chip model together.',
     relatedTerms: [
       'expert-parallelism',
       'mixture-of-experts',
@@ -603,7 +603,7 @@ const entries = [
     term: 'All-reduce',
     category: 'Parallelism',
     plainEnglish:
-      'All-reduce lets every GPU solve one piece of a calculation, combines those pieces, and gives the combined result back to everyone.',
+      'All-reduce lets every chip solve one piece of a calculation, combines those pieces, and gives the combined result back to everyone.',
     definition:
       'All-reduce is a collective communication operation that combines values from every participating rank and returns the reduced result to every rank.',
     explanation:
@@ -620,7 +620,7 @@ const entries = [
     term: 'All-to-all',
     category: 'Parallelism',
     plainEnglish:
-      'All-to-all is a coordinated exchange where every GPU sends a different package of data to every other GPU.',
+      'All-to-all is a coordinated exchange where every chip sends a different package of data to every other chip.',
     definition:
       'All-to-all is a collective pattern in which every participating rank sends distinct data to every other rank.',
     explanation:
@@ -628,7 +628,7 @@ const entries = [
     significance:
       'All-to-all is more demanding than simple point-to-point transfers and can become network bound as EP grows. Specialized kernels overlap communication with compute and optimize token packing to keep the fabric busy.',
     benchmarkContext:
-      'Rack-scale NVLink can keep wide-EP all-to-all traffic inside the scale-up domain. Multi-node recipes over InfiniBand or RoCE must overcome a much lower per-GPU scale-out bandwidth.',
+      'Rack-scale NVLink can keep wide-EP all-to-all traffic inside the scale-up domain. Multi-node recipes over InfiniBand or RoCE must overcome a much lower per-chip scale-out bandwidth.',
     relatedTerms: [
       'expert-parallelism',
       'wide-expert-parallelism',
@@ -643,15 +643,15 @@ const entries = [
     aliases: ['scale-up domain', 'scale-out fabric'],
     category: 'Parallelism',
     plainEnglish:
-      'Scale-up is the ultra-fast network inside one tightly connected GPU system. Scale-out is the broader network connecting separate servers or racks.',
+      'Scale-up is the ultra-fast network inside one tightly connected chip system. Scale-out is the broader network connecting separate servers or racks.',
     definition:
       'Scale-up networking connects accelerators inside one tightly coupled system, while scale-out networking connects multiple systems or racks into a larger cluster.',
     explanation:
-      'Scale-up fabrics such as NVLink offer very high per-GPU bandwidth and low latency for fine-grained collectives. Scale-out fabrics such as InfiniBand or RoCE reach more machines but usually provide much less bandwidth per accelerator.',
+      'Scale-up fabrics such as NVLink offer very high per-chip bandwidth and low latency for fine-grained collectives. Scale-out fabrics such as InfiniBand or RoCE reach more machines but usually provide much less bandwidth per accelerator.',
     significance:
       'Distributed inference crosses both domains. Frequent TP or EP collectives benefit disproportionately from staying inside scale-up, while coarser request routing and some prefill/decode transfers can tolerate scale-out.',
     benchmarkContext:
-      'System topology determines the communication domain. A B200 in an eight-GPU node and a GB200 NVL72 expose related silicon through different scale-up group sizes.',
+      'System topology determines the communication domain. A B200 in an eight-chip node and a GB200 NVL72 expose related silicon through different scale-up group sizes.',
     relatedTerms: ['nvlink', 'wide-expert-parallelism', 'all-to-all', 'tensor-parallelism'],
     articleSlugs: [INFERENCEX_V2, GB200_R1, GB200_KIMI],
   },
@@ -661,7 +661,7 @@ const entries = [
     abbreviation: 'HBM',
     category: 'Hardware',
     plainEnglish:
-      'HBM is the GPU’s small pool of extremely fast nearby memory, where model weights and working data must fit while inference runs.',
+      'HBM is the chip’s small pool of extremely fast nearby memory, where model weights and working data must fit while inference runs.',
     definition:
       'High-bandwidth memory is stacked memory placed close to an accelerator to provide much higher bandwidth than conventional server memory.',
     explanation:
@@ -669,7 +669,7 @@ const entries = [
     significance:
       'LLM decode often reads far more data than it computes per token, making HBM bandwidth a primary performance limit. Extra capacity can also enable a more efficient recipe even when nominal compute remains similar.',
     benchmarkContext:
-      'InferenceX hardware comparisons separate HBM capacity from bandwidth. For example, GB300’s larger capacity fits wider prefill/decode layouts than GB200 despite similar bandwidth per GPU.',
+      'InferenceX hardware comparisons separate HBM capacity from bandwidth. For example, GB300’s larger capacity fits wider prefill/decode layouts than GB200 despite similar bandwidth per chip.',
     relatedTerms: ['memory-bandwidth', 'decode', 'kv-cache', 'quantization'],
     articleSlugs: [GB300_DSV4, B200_KIMI, MI355X_DSV4],
   },
@@ -679,7 +679,7 @@ const entries = [
     aliases: ['HBM bandwidth'],
     category: 'Hardware',
     plainEnglish:
-      'Memory bandwidth is the width of the pipe feeding data to the GPU’s compute units. A wider pipe keeps them from sitting idle.',
+      'Memory bandwidth is the width of the pipe feeding data to the chip’s compute units. A wider pipe keeps them from sitting idle.',
     definition:
       'Memory bandwidth is the rate at which data can be transferred between accelerator memory and the compute units.',
     explanation:
@@ -697,15 +697,15 @@ const entries = [
     aliases: ['NVIDIA NVLink'],
     category: 'Hardware',
     plainEnglish:
-      'NVLink is NVIDIA’s high-speed highway between GPUs, allowing them to cooperate much faster than over ordinary server networking.',
+      'NVLink is NVIDIA’s high-speed highway between chips, allowing them to cooperate much faster than over ordinary server networking.',
     definition:
-      'NVLink is NVIDIA’s high-bandwidth accelerator interconnect for moving data directly among GPUs within a scale-up domain.',
+      'NVLink is NVIDIA’s high-bandwidth accelerator interconnect for moving data directly among chips within a scale-up domain.',
     explanation:
-      'NVSwitch systems connect multiple NVLink endpoints so collectives can span an eight-GPU server or, in NVL72 products, a 72-GPU rack-scale domain. That bandwidth is distinct from the InfiniBand or Ethernet fabric connecting separate systems.',
+      'NVSwitch systems connect multiple NVLink endpoints so collectives can span an eight-chip server or, in NVL72 products, a 72-chip rack-scale domain. That bandwidth is distinct from the InfiniBand or Ethernet fabric connecting separate systems.',
     significance:
-      'Large TP and especially wide-EP groups exchange data at every generated token. Keeping those collectives on NVLink can make a rack-scale recipe faster than a similar GPU count spread across scale-out links.',
+      'Large TP and especially wide-EP groups exchange data at every generated token. Keeping those collectives on NVLink can make a rack-scale recipe faster than a similar chip count spread across scale-out links.',
     benchmarkContext:
-      'InferenceX compares both node-level GPUs and NVL72 systems. Interpret the system topology and parallel group width before attributing the entire result to per-GPU compute.',
+      'InferenceX compares both node-level chips and NVL72 systems. Interpret the system topology and parallel group width before attributing the entire result to per-chip compute.',
     relatedTerms: ['scale-up-vs-scale-out', 'all-to-all', 'all-reduce', 'wide-expert-parallelism'],
     articleSlugs: [GB200_R1, GB200_KIMI, INFERENCEX_V2, VR_RUBIN],
   },
@@ -741,7 +741,7 @@ const entries = [
     significance:
       'FP8 is broadly supported on recent NVIDIA and AMD accelerators and often serves as a stable low-precision baseline. Actual performance depends on end-to-end kernel coverage; fallback operations can erase theoretical gains.',
     benchmarkContext:
-      'An InferenceX FP8 label covers the complete recipe. The checkpoint filename, engine, attention backend, KV-cache format, GPU generation, and MTP setting can all change the curve.',
+      'An InferenceX FP8 label covers the complete recipe. The checkpoint filename, engine, attention backend, KV-cache format, chip generation, and MTP setting can all change the curve.',
     relatedTerms: ['quantization', 'fp4', 'high-bandwidth-memory', 'rocm', 'cuda'],
     articleSlugs: [INFERENCEX_V2, MI355X_GLM5, B200_MINIMAX],
   },
@@ -769,7 +769,7 @@ const entries = [
     aliases: ['NVIDIA FP4'],
     category: 'Numerical precision',
     plainEnglish:
-      'NVFP4 is NVIDIA’s Blackwell-optimized version of 4-bit model math, designed to move less data and use the GPU’s fastest low-precision hardware.',
+      'NVFP4 is NVIDIA’s Blackwell-optimized version of 4-bit model math, designed to move less data and use the chip’s fastest low-precision hardware.',
     definition:
       'NVFP4 is NVIDIA’s block-scaled four-bit floating-point quantization format for Blackwell-generation tensor-core inference.',
     explanation:
@@ -864,13 +864,13 @@ const entries = [
     term: 'CUDA',
     aliases: ['NVIDIA CUDA'],
     category: 'Software',
-    plainEnglish: 'CUDA is NVIDIA’s software toolbox for making programs run on its GPUs.',
+    plainEnglish: 'CUDA is NVIDIA’s software toolbox for making programs run on its chips.',
     definition:
-      'CUDA is NVIDIA’s GPU computing platform, programming model, compiler toolchain, and library ecosystem.',
+      'CUDA is NVIDIA’s chip computing platform, programming model, compiler toolchain, and library ecosystem.',
     explanation:
-      'LLM engines use CUDA kernels and libraries for matrix multiplication, attention, collectives, graph capture, memory management, and custom fused operations. Container, driver, CUDA, and GPU architecture versions must be compatible.',
+      'LLM engines use CUDA kernels and libraries for matrix multiplication, attention, collectives, graph capture, memory management, and custom fused operations. Container, driver, CUDA, and chip architecture versions must be compatible.',
     significance:
-      'Serving performance depends on the software above the silicon. New kernels, CUDA Graph usage, compiler specialization, and library releases can move the benchmark curve without changing the GPU.',
+      'Serving performance depends on the software above the silicon. New kernels, CUDA Graph usage, compiler specialization, and library releases can move the benchmark curve without changing the chip.',
     benchmarkContext:
       'InferenceX recipes pin container images and therefore a concrete CUDA stack. Historical comparisons can isolate the effect of an engine image bump on otherwise identical hardware and configuration.',
     relatedTerms: ['inference-engine', 'nvfp4', 'nvlink', 'rocm', 'tensorrt-llm'],
@@ -882,9 +882,9 @@ const entries = [
     aliases: ['AMD ROCm'],
     category: 'Software',
     plainEnglish:
-      'ROCm is AMD’s software toolbox for running AI and other high-performance programs on AMD GPUs.',
+      'ROCm is AMD’s software toolbox for running AI and other high-performance programs on AMD chips.',
     definition:
-      'ROCm is AMD’s open GPU computing software platform, including runtimes, compilers, communication libraries, and optimized math and AI kernels.',
+      'ROCm is AMD’s open chip computing software platform, including runtimes, compilers, communication libraries, and optimized math and AI kernels.',
     explanation:
       'vLLM and SGLang use ROCm plus AMD-specific libraries and kernel projects to run on Instinct accelerators. Model support depends on compatible attention, MoE, quantization, collective, and graph-execution paths.',
     significance:
@@ -899,7 +899,7 @@ const entries = [
     term: 'vLLM',
     category: 'Software',
     plainEnglish:
-      'vLLM is open-source software that organizes requests and GPU memory so language models can serve many users efficiently.',
+      'vLLM is open-source software that organizes requests and chip memory so language models can serve many users efficiently.',
     definition:
       'vLLM is an open-source LLM inference and serving engine focused on high-throughput scheduling, memory-efficient KV-cache management, and broad model and hardware support.',
     explanation:
@@ -920,7 +920,7 @@ const entries = [
     definition:
       'SGLang is an open-source serving engine and language-model programming system optimized for high-performance LLM and multimodal inference.',
     explanation:
-      'The serving runtime includes continuous batching, prefix-aware scheduling, distributed parallelism, speculative decoding, and multiple attention and MoE kernel backends across NVIDIA and AMD GPUs.',
+      'The serving runtime includes continuous batching, prefix-aware scheduling, distributed parallelism, speculative decoding, and multiple attention and MoE kernel backends across NVIDIA and AMD chips.',
     significance:
       'SGLang releases and model-specific kernel work can change throughput on the same hardware. Scheduler overhead matters at low concurrency, while attention, MoE, and communication kernels dominate other regions.',
     benchmarkContext:
@@ -934,9 +934,9 @@ const entries = [
     aliases: ['TRT-LLM', 'TRTLLM'],
     category: 'Software',
     plainEnglish:
-      'TensorRT-LLM is NVIDIA’s optimized software stack for getting high inference performance from NVIDIA GPUs.',
+      'TensorRT-LLM is NVIDIA’s optimized software stack for getting high inference performance from NVIDIA chips.',
     definition:
-      'TensorRT-LLM is NVIDIA’s inference stack for compiling, optimizing, and serving large language models on NVIDIA GPUs.',
+      'TensorRT-LLM is NVIDIA’s inference stack for compiling, optimizing, and serving large language models on NVIDIA chips.',
     explanation:
       'It provides NVIDIA-tuned kernels, quantization paths, distributed execution, and model-specific optimizations. It can run as a serving backend and its kernels can also appear inside other engines through integrations.',
     significance:
@@ -952,13 +952,13 @@ const entries = [
     aliases: ['Dynamo'],
     category: 'Software',
     plainEnglish:
-      'NVIDIA Dynamo coordinates many GPU workers. It routes requests, moves model memory, and assigns prompt reading and answer generation to the right pools.',
+      'NVIDIA Dynamo coordinates many chip workers. It routes requests, moves model memory, and assigns prompt reading and answer generation to the right pools.',
     definition:
       'NVIDIA Dynamo is a distributed inference framework that orchestrates request routing, worker pools, KV-cache movement, and disaggregated serving.',
     explanation:
       'Dynamo can place prefill and decode on separately scaled pools and use engines such as vLLM or TensorRT-LLM as worker runtimes. Kernels remain inside those engines while Dynamo handles the surrounding data and control paths.',
     significance:
-      'Rack-scale performance depends on the single-GPU runtime plus routing, cache transfer, topology awareness, and pool sizing. Together they determine whether wide parallelism and disaggregation improve end-to-end performance.',
+      'Rack-scale performance depends on the single-chip runtime plus routing, cache transfer, topology awareness, and pool sizing. Together they determine whether wide parallelism and disaggregation improve end-to-end performance.',
     benchmarkContext:
       'Labels such as Dynamo vLLM and Dynamo TRT-LLM identify both layers of the recipe. InferenceX articles specify the prefill/decode topology because two Dynamo configurations can have very different performance.',
     relatedTerms: [

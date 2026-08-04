@@ -13,7 +13,7 @@ const STRINGS = {
   en: {
     exploreInferenceX: 'Explore InferenceX',
     exploreInferenceXLead:
-      'Start with a concise cost overview across active models and key platforms, or open the full dashboard for every model, GPU, framework, and metric.',
+      'Start with a concise cost overview across active models and key platforms, or open the full dashboard for every model, chip, framework, and metric.',
     fullDashboard: 'Full Dashboard',
     platformCoverage:
       'Compare NVIDIA GB300 NVL72, GB200 NVL72, B300, B200, H200, H100, AMD MI355X, MI325X, MI300X and soon VR200 NVL72, AMD MI455X UALoE72, TPUv7 Ironwood, etc across DeepSeekv4 Pro, Qwen, Kimi, GLM, MiniMax, gpt-oss, Llama and other models.',
@@ -22,7 +22,7 @@ const STRINGS = {
     reproP1:
       'Every data point on the dashboard is produced by a public GitHub Actions workflow run. The recipe lives in the repo, the run executes on the actual target hardware, and the full logs and artifacts are publicly viewable. Click any point on a chart to jump straight to the run that produced it. All reproducible, auditable, and open source.',
     reproStat: '1,000+ new benchmark datapoints added per week on average.',
-    reproStatTail: 'Browse every new model, GPU, framework, and configuration as it lands.',
+    reproStatTail: 'Browse every new model, chip, framework, and configuration as it lands.',
     actionsRunsTitle: 'Public Actions runs',
     actionsRunsDesc:
       'Every benchmark executes on GitHub Actions with full logs visible while the run is in progress.',
@@ -37,12 +37,12 @@ const STRINGS = {
     howItWorks: 'How it works',
     quickComparisons: 'Quick Comparisons',
     quickComparisonsDesc:
-      'Jump straight into the most popular GPU inference benchmark comparisons, curated and ready to explore.',
+      'Jump straight into the most popular chip inference benchmark comparisons, curated and ready to explore.',
   },
   zh: {
     exploreInferenceX: '探索 InferenceX',
     exploreInferenceXLead:
-      '先查看活跃模型与关键平台的精简成本总览，或打开完整仪表板，探索所有模型、GPU、框架与指标。',
+      '先查看活跃模型与关键平台的精简成本总览，或打开完整仪表板，探索所有模型、Chip、框架与指标。',
     fullDashboard: '完整仪表板',
     platformCoverage:
       '跨 DeepSeekv4 Pro、Qwen、Kimi、GLM、MiniMax、gpt-oss、Llama 等模型，对比 NVIDIA GB300 NVL72、GB200 NVL72、B300、B200、H200、H100、AMD MI355X、MI325X、MI300X，以及即将上线的 VR200 NVL72、AMD MI455X UALoE72、TPUv7 Ironwood 等硬件。',
@@ -51,7 +51,7 @@ const STRINGS = {
     reproP1:
       '仪表板上的每个数据点都由公开的 GitHub Actions 工作流运行产生。配置方案（recipe）保存在公开仓库中，运行在真实目标硬件上执行，完整日志与产物公开可查。点击图表上的任意数据点即可跳转到生成它的那次运行。一切都可复现、可审计、开源。',
     reproStat: '平均每周新增 1,000+ 条基准测试数据点。',
-    reproStatTail: '第一时间浏览每个新上线的模型、GPU、框架与配置。',
+    reproStatTail: '第一时间浏览每个新上线的模型、Chip、框架与配置。',
     actionsRunsTitle: '公开的 Actions 运行',
     actionsRunsDesc: '每次基准测试都在 GitHub Actions 上执行，运行过程中即可实时查看完整日志。',
     openRecipesTitle: '开放的配置方案',
@@ -63,7 +63,7 @@ const STRINGS = {
     viewRuns: '在 GitHub Actions 上查看基准测试运行',
     howItWorks: '工作原理',
     quickComparisons: '快速对比',
-    quickComparisonsDesc: '一键进入最热门的 GPU 推理基准测试对比，精选视图开箱即用。',
+    quickComparisonsDesc: '一键进入最热门的 Chip 推理基准测试对比，精选视图开箱即用。',
   },
 } as const;
 

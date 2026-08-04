@@ -11,11 +11,11 @@ import { SITE_URL, SITE_NAME, AUTHOR_NAME } from '@semianalysisai/inferencex-con
 
 export const metadata: Metadata = {
   title: 'Articles',
-  description: `Technical articles from ${SITE_NAME} by ${AUTHOR_NAME} — AI inference benchmarking, GPU performance analysis, and ML infrastructure insights.`,
+  description: `Technical articles from ${SITE_NAME} by ${AUTHOR_NAME} — AI inference benchmarking, chip performance analysis, and ML infrastructure insights.`,
   alternates: enAlternates('/blog'),
   openGraph: {
     title: `Articles | ${SITE_NAME} by ${AUTHOR_NAME}`,
-    description: 'AI inference benchmarking insights and GPU performance analysis.',
+    description: 'AI inference benchmarking insights and chip performance analysis.',
     url: `${SITE_URL}/blog`,
   },
 };
@@ -49,7 +49,7 @@ export default async function BlogPage({
           <Card>
             <h2 className="text-2xl lg:text-4xl font-bold tracking-tight">Articles</h2>
             <p className="mt-3 text-base lg:text-lg text-muted-foreground">
-              Insights on AI inference benchmarking, GPU performance, and ML infrastructure.
+              Insights on AI inference benchmarking, chip performance, and ML infrastructure.
             </p>
             <p className="text-sm text-muted-foreground">
               New to the terminology?{' '}

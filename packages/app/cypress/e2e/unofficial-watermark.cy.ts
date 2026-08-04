@@ -79,7 +79,7 @@ describe('Unofficial-run watermark', () => {
         expect(tooltip).to.contain.text('KV Offload Engine: HiCache');
         expect(tooltip).to.contain.text('KV Transfer Engine: NIXL');
         expect(tooltip).to.contain.text('Router: SGLang Router 0.3.2');
-        expect(tooltip).to.contain.text('GPU Cache Hit Rate: 87.5%');
+        expect(tooltip).to.contain.text('Chip Cache Hit Rate: 87.5%');
       });
 
     cy.get('[data-testid="scatter-graph"]').first().scrollIntoView();

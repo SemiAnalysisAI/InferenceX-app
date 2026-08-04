@@ -62,7 +62,7 @@ interface MetricRow {
 
 const METRICS: MetricRow[] = [
   {
-    label: 'Throughput (tok/s/gpu)',
+    label: 'Throughput (tok/s/chip)',
     extract: (r) => r.value,
     format: (v) => v.toFixed(1),
     direction: 'higher',

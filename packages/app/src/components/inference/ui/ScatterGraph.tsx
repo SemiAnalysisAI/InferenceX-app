@@ -3190,7 +3190,7 @@ const ScatterGraph = React.memo(
               </svg>
               <h3 className="text-sm font-medium mb-1">No data available</h3>
               <p className="text-xs">
-                Please change the model, sequence, precision, date range or GPU selection.
+                Please change the model, sequence, precision, date range or chip selection.
               </p>
             </div>
           </div>
@@ -3230,7 +3230,7 @@ const ScatterGraph = React.memo(
                 <div className="text-muted-foreground text-center bg-background/80 px-4 py-2 rounded-md">
                   <p className="text-sm font-medium">No data available</p>
                   <p className="text-xs mt-1">
-                    Please change the model, sequence, precision, date range or GPU selection.
+                    Please change the model, sequence, precision, date range or chip selection.
                   </p>
                 </div>
               </div>

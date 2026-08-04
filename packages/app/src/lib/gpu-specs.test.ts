@@ -304,7 +304,7 @@ describe('GPU_SPEC_COLUMNS', () => {
 
   it('first column is GPU name', () => {
     expect(GPU_SPEC_COLUMNS[0].key).toBe('name');
-    expect(GPU_SPEC_COLUMNS[0].label).toBe('GPU');
+    expect(GPU_SPEC_COLUMNS[0].label).toBe('Chip');
   });
 
   it('includes domain memory columns', () => {

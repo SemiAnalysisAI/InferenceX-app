@@ -26,14 +26,14 @@ import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `投机解码（MTP 多 token 预测、MiniMax M3 的 EAGLE 等模型专用方法）是否能提升推理吞吐量和降低成本？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，提供经过验证的、可复现的测试结果。${SUPPORTERS_LINE_ZH}每个页面对比同一模型和 GPU 上投机解码开启与关闭的性能差异。`;
+const DESCRIPTION = `投机解码（MTP 多 token 预测、MiniMax M3 的 EAGLE 等模型专用方法）是否能提升推理吞吐量和降低成本？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，提供经过验证的、可复现的测试结果。${SUPPORTERS_LINE_ZH}每个页面对比同一模型和 Chip 上投机解码开启与关闭的性能差异。`;
 
 export const metadata: Metadata = {
-  title: 'GPU 投机解码对比',
+  title: 'Chip 投机解码对比',
   description: DESCRIPTION,
   alternates: zhAlternates('/compare-spec-decode'),
   openGraph: {
-    title: `GPU 投机解码对比 | ${SITE_NAME}`,
+    title: `Chip 投机解码对比 | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/zh/compare-spec-decode`,
     type: 'website',
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: `GPU 投机解码对比 | ${SITE_NAME}`,
+    title: `Chip 投机解码对比 | ${SITE_NAME}`,
     description: DESCRIPTION,
   },
 };
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',
-  name: `GPU 投机解码对比 | ${SITE_NAME}`,
+  name: `Chip 投机解码对比 | ${SITE_NAME}`,
   description: DESCRIPTION,
   url: `${SITE_URL}/zh/compare-spec-decode`,
   inLanguage: 'zh-CN',
@@ -84,10 +84,10 @@ export default async function CompareSpecDecodeIndexPageZh() {
       <JsonLd data={jsonLd} />
       <section>
         <Card>
-          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">GPU 投机解码对比</h1>
+          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">Chip 投机解码对比</h1>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} 组投机解码对比，涵盖 {formatModelList(modelsWithPairs)}
-            。每个页面对比同一模型和 GPU 上投机解码方法（MTP、EAGLE
+            。每个页面对比同一模型和 Chip 上投机解码方法（MTP、EAGLE
             等）开启与关闭的推理性能——在相同交互性水平下的吞吐量、成本和交互性。
           </p>
           <div className="mt-6 flex flex-wrap gap-3" data-testid="compare-spec-decode-index-links">
@@ -95,7 +95,7 @@ export default async function CompareSpecDecodeIndexPageZh() {
               href="/zh/compare"
               className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
             >
-              GPU 对比
+              Chip 对比
               <span aria-hidden="true" className="text-lg lg:text-xl">
                 →
               </span>

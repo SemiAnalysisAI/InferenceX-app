@@ -121,7 +121,7 @@ export const TopologyDiagram = forwardRef<
               variant="ghost"
               size="icon"
               onClick={() => navigate('prev')}
-              aria-label="Previous GPU"
+              aria-label="Previous Chip"
               data-testid="topology-nav-prev"
             >
               <ChevronLeft className="size-5" />
@@ -139,7 +139,7 @@ export const TopologyDiagram = forwardRef<
               variant="ghost"
               size="icon"
               onClick={() => navigate('next')}
-              aria-label="Next GPU"
+              aria-label="Next Chip"
               data-testid="topology-nav-next"
             >
               <ChevronRight className="size-5" />
@@ -665,7 +665,7 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
         .attr('class', 'font-medium')
         .style('font-size', fontSize)
         .attr('fill', vendorColor)
-        .text(`GPU ${i}`);
+        .text(`Chip ${i}`);
     }
 
     // Abstracted server boxes (inside same pod as Server 1)

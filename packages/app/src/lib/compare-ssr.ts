@@ -307,7 +307,7 @@ export function computeCompareImageRows(
 export function jsonLdEntryFor(key: string, summary: PairSummary, position: number) {
   const meta = HW_REGISTRY[key];
   const label = meta?.label ?? key.toUpperCase();
-  const props: { name: string; value: string | number }[] = [{ name: 'Category', value: 'GPU' }];
+  const props: { name: string; value: string | number }[] = [{ name: 'Category', value: 'Chip' }];
   if (meta) {
     props.push(
       { name: 'Vendor', value: meta.vendor },
@@ -317,7 +317,7 @@ export function jsonLdEntryFor(key: string, summary: PairSummary, position: numb
   }
   if (summary.bestThroughputPerGpu !== null) {
     props.push({
-      name: 'Best Throughput per GPU (tok/s)',
+      name: 'Best Throughput per Chip (tok/s)',
       value: Number(summary.bestThroughputPerGpu.toFixed(2)),
     });
   }
@@ -506,10 +506,10 @@ function fullSummary(i: FullBoth): string {
       ? null
       : `${i.cheaper} is ${fmtPctDelta(i.costRatio)} cheaper per token`;
   const tputPart = i.tputTied
-    ? 'throughput per GPU is essentially tied'
+    ? 'throughput per chip is essentially tied'
     : i.tputRatio === null
       ? null
-      : `${i.faster} delivers ${fmtPctDelta(i.tputRatio)} more tok/s/GPU`;
+      : `${i.faster} delivers ${fmtPctDelta(i.tputRatio)} more tok/s/chip`;
   const both = [costPart, tputPart].filter(Boolean).join('; ');
   return both.length > 0
     ? `${both.charAt(0).toUpperCase()}${both.slice(1)}`
@@ -518,17 +518,17 @@ function fullSummary(i: FullBoth): string {
 
 const FULL_BOTH_TEMPLATES: ((i: FullBoth) => string)[] = [
   (i) =>
-    `At ${i.target} tok/s/user interactivity on ${i.modelLabel}, ${i.aLabel} delivers ${i.aValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${i.bValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.bCost)}. ${fullSummary(i)} at this point.`,
+    `At ${i.target} tok/s/user interactivity on ${i.modelLabel}, ${i.aLabel} delivers ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${i.bValue.toFixed(0)} tok/s/chip at ${fmtCost(i.bCost)}. ${fullSummary(i)} at this point.`,
   (i) =>
-    `${i.aLabel} posts ${i.aValue.toFixed(0)} tok/s/GPU for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}; ${i.bLabel} posts ${i.bValue.toFixed(0)} tok/s/GPU for ${fmtCost(i.bCost)}. ${fullSummary(i)}.`,
+    `${i.aLabel} posts ${i.aValue.toFixed(0)} tok/s/chip for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}; ${i.bLabel} posts ${i.bValue.toFixed(0)} tok/s/chip for ${fmtCost(i.bCost)}. ${fullSummary(i)}.`,
   (i) =>
-    `Throughput at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} hits ${i.aValue.toFixed(0)} tok/s/GPU, ${i.bLabel} hits ${i.bValue.toFixed(0)}. Per-million costs land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${fullSummary(i)}.`,
+    `Throughput at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} hits ${i.aValue.toFixed(0)} tok/s/chip, ${i.bLabel} hits ${i.bValue.toFixed(0)}. Per-million costs land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${fullSummary(i)}.`,
   (i) =>
-    `${i.aLabel} / ${i.bLabel} on ${i.modelLabel} at ${i.target} tok/s/user: ${i.aValue.toFixed(0)} / ${i.bValue.toFixed(0)} tok/s/GPU, ${fmtCost(i.aCost)} / ${fmtCost(i.bCost)} per million tokens. ${fullSummary(i)}.`,
+    `${i.aLabel} / ${i.bLabel} on ${i.modelLabel} at ${i.target} tok/s/user: ${i.aValue.toFixed(0)} / ${i.bValue.toFixed(0)} tok/s/chip, ${fmtCost(i.aCost)} / ${fmtCost(i.bCost)} per million tokens. ${fullSummary(i)}.`,
   (i) =>
-    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} runs ${i.aValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${i.bValue.toFixed(0)} at ${fmtCost(i.bCost)}/M. ${fullSummary(i)}.`,
+    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} runs ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${i.bValue.toFixed(0)} at ${fmtCost(i.bCost)}/M. ${fullSummary(i)}.`,
   (i) =>
-    `Setting ${i.target} tok/s/user as the target on ${i.modelLabel}, ${i.aLabel} produces ${i.aValue.toFixed(0)} tok/s/GPU (${fmtCost(i.aCost)} per million tokens) and ${i.bLabel} produces ${i.bValue.toFixed(0)} (${fmtCost(i.bCost)}). ${fullSummary(i)}.`,
+    `Setting ${i.target} tok/s/user as the target on ${i.modelLabel}, ${i.aLabel} produces ${i.aValue.toFixed(0)} tok/s/chip (${fmtCost(i.aCost)} per million tokens) and ${i.bLabel} produces ${i.bValue.toFixed(0)} (${fmtCost(i.bCost)}). ${fullSummary(i)}.`,
 ];
 
 const FULL_SINGLE_TEMPLATES: ((args: {
@@ -540,11 +540,11 @@ const FULL_SINGLE_TEMPLATES: ((args: {
   presentCost: number;
 }) => string)[] = [
   (i) =>
-    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.presentLabel} delivers ${i.presentValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.presentCost)} per million tokens; ${i.missingLabel} hasn't been benchmarked at this target.`,
+    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.presentLabel} delivers ${i.presentValue.toFixed(0)} tok/s/chip at ${fmtCost(i.presentCost)} per million tokens; ${i.missingLabel} hasn't been benchmarked at this target.`,
   (i) =>
-    `${i.presentLabel} hits ${i.presentValue.toFixed(0)} tok/s/GPU for ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. No ${i.missingLabel} data at this operating point.`,
+    `${i.presentLabel} hits ${i.presentValue.toFixed(0)} tok/s/chip for ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. No ${i.missingLabel} data at this operating point.`,
   (i) =>
-    `${i.presentLabel}: ${i.presentValue.toFixed(0)} tok/s/GPU, ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. ${i.missingLabel} is unmeasured here.`,
+    `${i.presentLabel}: ${i.presentValue.toFixed(0)} tok/s/chip, ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. ${i.missingLabel} is unmeasured here.`,
 ];
 
 /** Pick template `rowIndex` in the rotation starting from a per-page hash
@@ -828,7 +828,7 @@ export function compareMetaDescription(
 
   const tputClause =
     stat.tputPct > 0
-      ? `${stat.faster} delivers ${stat.tputPct}% more tok/s/GPU than ${stat.slower} on ${modelName}`
+      ? `${stat.faster} delivers ${stat.tputPct}% more tok/s/chip than ${stat.slower} on ${modelName}`
       : null;
   const costClause =
     stat.costPct > 0 ? `${stat.cheaper} is ${stat.costPct}% cheaper per token` : null;
@@ -919,7 +919,7 @@ export function buildBreadcrumbJsonLd(
 ) {
   const indexUrl =
     variant === 'per-dollar' ? `${SITE_URL}/compare-per-dollar` : `${SITE_URL}/compare`;
-  const indexName = variant === 'per-dollar' ? 'GPU Performance per Dollar' : 'GPU Comparisons';
+  const indexName = variant === 'per-dollar' ? 'Chip Performance per Dollar' : 'Chip Comparisons';
   return {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -977,7 +977,7 @@ export function buildJsonLd(
       : `${fullLabel} Inference Benchmark`;
   const itemListDescription =
     variant === 'per-dollar'
-      ? `Cost per million tokens of ${aLabel} versus ${bLabel} on ${model.label}. GPU performance normalized by owning-hyperscaler TCO across LLM workloads.`
+      ? `Cost per million tokens of ${aLabel} versus ${bLabel} on ${model.label}. Chip performance normalized by owning-hyperscaler TCO across LLM workloads.`
       : `Head-to-head AI inference benchmark comparison of ${aLabel} and ${bLabel} on ${model.label} across LLM workloads.`;
   const datasetName =
     variant === 'per-dollar'
@@ -997,7 +997,7 @@ export function buildJsonLd(
       ];
       if (row.a) {
         metrics.push(
-          { name: `${aLabel} Throughput (tok/s/gpu)`, value: row.a.value.toFixed(1) },
+          { name: `${aLabel} Throughput (tok/s/chip)`, value: row.a.value.toFixed(1) },
           { name: `${aLabel} Cost ($/M tok)`, value: row.a.cost.toFixed(3) },
           { name: `${aLabel} tok/s/MW`, value: row.a.tpPerMw.toFixed(0) },
           { name: `${aLabel} Concurrency`, value: String(Math.round(row.a.concurrency)) },
@@ -1005,7 +1005,7 @@ export function buildJsonLd(
       }
       if (row.b) {
         metrics.push(
-          { name: `${bLabel} Throughput (tok/s/gpu)`, value: row.b.value.toFixed(1) },
+          { name: `${bLabel} Throughput (tok/s/chip)`, value: row.b.value.toFixed(1) },
           { name: `${bLabel} Cost ($/M tok)`, value: row.b.cost.toFixed(3) },
           { name: `${bLabel} tok/s/MW`, value: row.b.tpPerMw.toFixed(0) },
           { name: `${bLabel} Concurrency`, value: String(Math.round(row.b.concurrency)) },
@@ -1045,12 +1045,12 @@ export function buildJsonLd(
               license: 'https://www.apache.org/licenses/LICENSE-2.0',
               isAccessibleForFree: true,
               measurementTechnique:
-                'Open-source automated GPU CI/CD inference benchmark (github.com/SemiAnalysisAI/InferenceX)',
+                'Open-source automated chip CI/CD inference benchmark (github.com/SemiAnalysisAI/InferenceX)',
               keywords: [
                 ...new Set(
                   [
                     'AI inference benchmark',
-                    'GPU comparison',
+                    'Chip comparison',
                     variant === 'per-dollar' ? 'cost per million tokens' : 'inference latency',
                     variant === 'per-dollar' ? 'performance per dollar' : 'tokens per second',
                     model.label,

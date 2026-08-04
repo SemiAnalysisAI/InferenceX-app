@@ -39,14 +39,14 @@ export const FAQ_ITEMS_ZH: FaqItem[] = [
   {
     question: '什么是 InferenceX？',
     answer:
-      'InferenceX（原名 InferenceMAX）是一个开源、厂商中立的基准测试（benchmark）平台，持续衡量各类 GPU 和软件栈的 AI 推理性能。每当配置发生变化时，基准测试会重新运行，确保结果始终跟随模型和框架的演进保持最新。',
+      'InferenceX（原名 InferenceMAX）是一个开源、厂商中立的基准测试（benchmark）平台，持续衡量各类 Chip 和软件栈的 AI 推理性能。每当配置发生变化时，基准测试会重新运行，确保结果始终跟随模型和框架的演进保持最新。',
   },
   {
     question: 'InferenceX 由谁开发？',
     answer: `InferenceX 由独立半导体与 AI 研究机构 SemiAnalysis 构建，受到 ${supporterOrgs.join('、')} 的支持与信赖。基准测试代码、数据和仪表板均在 GitHub 上开源。`,
   },
   {
-    question: 'InferenceX 测试了哪些 GPU？',
+    question: 'InferenceX 测试了哪些 Chip？',
     answer: '我们会在新加速器可用时持续添加。',
     list: Object.entries(gpusByVendor).map(([vendor, gpus]) => `${vendor}: ${gpus.join(', ')}`),
   },
@@ -62,7 +62,7 @@ export const FAQ_ITEMS_ZH: FaqItem[] = [
       `框架：${frameworkNames.join(', ')}`,
       `精度：${[...PRECISION_KEYS].map((p) => p.toUpperCase()).join(', ')}`,
       '运行时：CUDA、ROCm',
-      '分离式推理（Disaggregated serving，独立的 prefill/decode GPU 池）',
+      '分离式推理（Disaggregated serving，独立的 prefill/decode Chip 池）',
       '多 token 预测（MTP）',
       '面向 MoE 模型的宽专家并行（Wide Expert Parallelism）',
     ],
@@ -72,8 +72,8 @@ export const FAQ_ITEMS_ZH: FaqItem[] = [
     answer: '',
     list: [
       '交互性（tok/s/user）',
-      '每 GPU token 吞吐量（tok/s/gpu）',
-      '每 GPU 输入和输出吞吐量',
+      '每 Chip token 吞吐量（tok/s/chip）',
+      '每 Chip 输入和输出吞吐量',
       '每兆瓦 token 吞吐量（tok/s/MW）',
       'P99 首 token 延迟（TTFT）',
       '每百万 token 成本（总计、输入、输出）——涵盖超大规模云、NeoCoud 和裸机租赁定价',
@@ -102,12 +102,12 @@ export const FAQ_ITEMS_ZH: FaqItem[] = [
   {
     question: '结果如何实现可复现？',
     answer:
-      '仪表板上的每一个数据点均由公开的 GitHub Actions 工作流运行产生。测试配方（模型、框架、精度、并行度、序列长度、并发数）已提交至仓库，在目标硬件上实际执行，产物（日志、指标、GPU 追踪数据）上传至运行页面。用户可从任何图表的 tooltip 直接点击链接，跳转到生成该数据点的 GitHub Actions 运行。',
+      '仪表板上的每一个数据点均由公开的 GitHub Actions 工作流运行产生。测试配方（模型、框架、精度、并行度、序列长度、并发数）已提交至仓库，在目标硬件上实际执行，产物（日志、指标、Chip 追踪数据）上传至运行页面。用户可从任何图表的 tooltip 直接点击链接，跳转到生成该数据点的 GitHub Actions 运行。',
   },
   {
     question: '在哪里可以查看原始基准测试日志？',
     answer:
-      '在图表上点击任意数据点即可打开 tooltip。其中的"GitHub Actions Run"链接将直接跳转到生成该数据点的工作流运行。在那里您可以查看完整的任务日志、框架和驱动版本、命令行参数，以及下载原始产物（包括请求延迟、token 计数和 GPU 功耗遥测数据）。',
+      '在图表上点击任意数据点即可打开 tooltip。其中的"GitHub Actions Run"链接将直接跳转到生成该数据点的工作流运行。在那里您可以查看完整的任务日志、框架和驱动版本、命令行参数，以及下载原始产物（包括请求延迟、token 计数和 Chip 功耗遥测数据）。',
   },
   {
     question: '我可以自己重新运行基准测试吗？',
@@ -122,6 +122,6 @@ export const FAQ_ITEMS_ZH: FaqItem[] = [
   {
     question: '我可以使用 InferenceX 的数据进行自己的分析吗？',
     answer:
-      '可以。所有数据均可自由获取。仪表板支持按 GPU、模型、框架和日期范围筛选，您也可以直接从任何图表导出原始 CSV 数据。',
+      '可以。所有数据均可自由获取。仪表板支持按 Chip、模型、框架和日期范围筛选，您也可以直接从任何图表导出原始 CSV 数据。',
   },
 ];

@@ -20,7 +20,7 @@ import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 
 const title = 'AI 推理术语表';
 const description =
-  '清晰、技术严谨的 LLM 推理基准、服务指标、分布式并行、数值精度、GPU 硬件与推理软件术语定义。';
+  '清晰、技术严谨的 LLM 推理基准、服务指标、分布式并行、数值精度、Chip 硬件与推理软件术语定义。';
 const browserLabels: GlossaryBrowserLabels = {
   searchLabel: '搜索 AI 推理术语表',
   searchPlaceholder: '搜索 MTP、延迟、FP4…',

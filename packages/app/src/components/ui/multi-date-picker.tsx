@@ -143,7 +143,7 @@ export function MultiDatePicker({
           <DialogHeader>
             <DialogTitle>Select Comparison Dates</DialogTitle>
             <DialogDescription>
-              Choose up to {maxDates} dates to compare GPU performance over time.
+              Choose up to {maxDates} dates to compare chip performance over time.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">

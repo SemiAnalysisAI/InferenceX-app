@@ -107,7 +107,7 @@ const STRINGS = {
   en: {
     title: 'TCO Calculator',
     description:
-      'Set a target interactivity (tokens/sec/user) and compare the throughput and cost across all GPUs. Values are interpolated from real benchmark data.',
+      'Set a target interactivity (tokens/sec/user) and compare the throughput and cost across all chips. Values are interpolated from real benchmark data.',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
       'The pricing tier used to calculate cost per million tokens. Hyperscaler (e.g. AWS/GCP), Neocloud (e.g. CoreWeave), or 3-year rental.',
@@ -118,13 +118,13 @@ const STRINGS = {
     tokenTypePlaceholder: 'Token type',
     metricLabel: 'Metric',
     metricTooltip:
-      'The comparison metric shown in the chart. Throughput (tok/s/gpu), power efficiency (tok/s/MW), or cost per million tokens.',
+      'The comparison metric shown in the chart. Throughput (tok/s/chip), power efficiency (tok/s/MW), or cost per million tokens.',
     targetLabel: 'Target Interactivity (tok/s/user)',
     targetTooltip:
-      'The interactivity operating point used for interpolation. Adjust the slider to compare GPU throughput, cost, and power efficiency at different interactivity levels.',
+      'The interactivity operating point used for interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency at different interactivity levels.',
     targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
-      `The ${percentile} interactivity operating point used for agentic trace interpolation. Adjust the slider to compare GPU throughput, cost, and power efficiency.`,
+      `The ${percentile} interactivity operating point used for agentic trace interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency.`,
     metricThroughput: 'Throughput',
     metricCost: 'Cost',
     viewChart: 'Chart',
@@ -138,15 +138,15 @@ const STRINGS = {
     totalTokens: 'Total Tokens',
     inputTokens: 'Input Tokens',
     outputTokens: 'Output Tokens',
-    allInPower: 'All in Power/GPU: ',
-    tcoPerHr: 'TCO $/GPU/hr: ',
+    allInPower: 'All in Power/Chip: ',
+    tcoPerHr: 'TCO $/chip/hr: ',
     source: 'Source: ',
     updated: ' • Updated: ',
     note: 'Note:',
     disaggCost:
-      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) calculate cost per decode GPU or per prefill GPU, rather than per total GPU count. This makes direct cost comparison with aggregated configs not an apples-to-apples comparison.',
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) calculate cost per decode chip or per prefill chip, rather than per total chip count. This makes direct cost comparison with aggregated configs not an apples-to-apples comparison.',
     disaggThroughput:
-      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) calculate throughput per decode GPU or per prefill GPU, rather than per total GPU count. This makes direct throughput comparison with aggregated configs not an apples-to-apples comparison.',
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) calculate throughput per decode chip or per prefill chip, rather than per total chip count. This makes direct throughput comparison with aggregated configs not an apples-to-apples comparison.',
     compMetricThroughput: 'throughput',
     compMetricCost: 'cost efficiency',
     compMetricPower: 'tok/s/MW',
@@ -157,7 +157,7 @@ const STRINGS = {
   zh: {
     title: 'TCO 计算器',
     description:
-      '设定目标交互性（tokens/sec/user），比较所有 GPU 的吞吐量和成本。数值基于真实基准测试数据插值计算。',
+      '设定目标交互性（tokens/sec/user），比较所有 Chip 的吞吐量和成本。数值基于真实基准测试数据插值计算。',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
       '用于计算每百万 token 成本的定价层级。Hyperscaler（如 AWS/GCP）、Neocloud（如 CoreWeave）或 3 年租赁。',
@@ -167,13 +167,13 @@ const STRINGS = {
     tokenTypePlaceholder: 'Token 类型',
     metricLabel: '指标',
     metricTooltip:
-      '图表中显示的比较指标。吞吐量（tok/s/gpu）、能效（tok/s/MW）或每百万 token 成本。',
+      '图表中显示的比较指标。吞吐量（tok/s/chip）、能效（tok/s/MW）或每百万 token 成本。',
     targetLabel: '目标交互性 (tok/s/user)',
     targetTooltip:
-      '用于插值的交互性操作点。调整滑块以比较不同交互性级别下 GPU 的吞吐量、成本和能效。',
+      '用于插值的交互性操作点。调整滑块以比较不同交互性级别下 Chip 的吞吐量、成本和能效。',
     targetAgenticLabel: (percentile: string) => `目标 ${percentile} 交互性 (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
-      `用于智能体轨迹插值的 ${percentile} 交互性操作点。调整滑块以比较 GPU 的吞吐量、成本和能效。`,
+      `用于智能体轨迹插值的 ${percentile} 交互性操作点。调整滑块以比较 Chip 的吞吐量、成本和能效。`,
     metricThroughput: '吞吐量',
     metricCost: '成本',
     viewChart: '图表',
@@ -187,15 +187,15 @@ const STRINGS = {
     totalTokens: '总 Token',
     inputTokens: '输入 Token',
     outputTokens: '输出 Token',
-    allInPower: '全含功率/GPU：',
-    tcoPerHr: 'TCO $/GPU/hr：',
+    allInPower: '全含功率/Chip：',
+    tcoPerHr: 'TCO $/chip/hr：',
     source: '来源：',
     updated: ' • 更新于：',
     note: '注意：',
     disaggCost:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 GPU 或预填充 GPU 计算成本，而非按 GPU 总数。因此与聚合配置的直接成本对比并非同类比较。',
+      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 Chip 或预填充 Chip 计算成本，而非按 Chip 总数。因此与聚合配置的直接成本对比并非同类比较。',
     disaggThroughput:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 GPU 或预填充 GPU 计算吞吐量，而非按 GPU 总数。因此与聚合配置的直接吞吐量对比并非同类比较。',
+      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 Chip 或预填充 Chip 计算吞吐量，而非按 Chip 总数。因此与聚合配置的直接吞吐量对比并非同类比较。',
     compMetricThroughput: '吞吐量',
     compMetricCost: '成本效率',
     compMetricPower: 'tok/s/MW',
@@ -219,7 +219,7 @@ function getChartTitleZh(
   const targetLabel =
     mode === 'interactivity_to_throughput'
       ? `${targetValue} tok/s/user ${percentilePrefix}交互性`
-      : `${targetValue} tok/s/gpu 吞吐量`;
+      : `${targetValue} tok/s/chip 吞吐量`;
   const tokenTypeLabel = costType === 'input' ? '输入' : costType === 'output' ? '输出' : '总';
   switch (barMetric) {
     case 'power': {
@@ -231,7 +231,7 @@ function getChartTitleZh(
     }
     default: {
       return mode === 'interactivity_to_throughput'
-        ? `${targetLabel}下每 GPU ${tokenTypeLabel} token 吞吐量`
+        ? `${targetLabel}下每 Chip ${tokenTypeLabel} token 吞吐量`
         : `${targetLabel}下的交互性`;
     }
   }

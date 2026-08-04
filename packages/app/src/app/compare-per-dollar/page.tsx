@@ -19,21 +19,21 @@ import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `Which GPU delivers more inference performance per dollar? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Compare cost per million tokens, normalized by hyperscaler TCO, across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
+const DESCRIPTION = `Which chip delivers more inference performance per dollar? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Compare cost per million tokens, normalized by hyperscaler TCO, across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
 
 export const metadata: Metadata = {
-  title: 'GPU Performance per Dollar',
+  title: 'Chip Performance per Dollar',
   description: DESCRIPTION,
   alternates: enAlternates('/compare-per-dollar'),
   openGraph: {
-    title: `GPU Performance per Dollar | ${SITE_NAME}`,
+    title: `Chip Performance per Dollar | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/compare-per-dollar`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: `GPU Performance per Dollar | ${SITE_NAME}`,
+    title: `Chip Performance per Dollar | ${SITE_NAME}`,
     description: DESCRIPTION,
   },
 };
@@ -77,7 +77,7 @@ function groupPairsByVendorForModel(
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',
-  name: `GPU Performance per Dollar | ${SITE_NAME}`,
+  name: `Chip Performance per Dollar | ${SITE_NAME}`,
   description: DESCRIPTION,
   url: `${SITE_URL}/compare-per-dollar`,
 };
@@ -100,7 +100,7 @@ export default async function ComparePerDollarIndexPage() {
       <section>
         <Card>
           <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">
-            GPU Performance per Dollar
+            Chip Performance per Dollar
           </h1>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} head-to-head cost-per-million-tokens comparisons across{' '}
@@ -114,7 +114,7 @@ export default async function ComparePerDollarIndexPage() {
               href="/compare"
               className="inline-flex items-center gap-2 rounded-md bg-brand px-5 py-3 text-base lg:text-lg font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
             >
-              GPU latency + throughput comparisons
+              Chip latency + throughput comparisons
               <span aria-hidden="true" className="text-lg lg:text-xl">
                 →
               </span>
@@ -152,7 +152,7 @@ export default async function ComparePerDollarIndexPage() {
               <div>
                 <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {pairs.length} GPU pair{pairs.length === 1 ? '' : 's'} with cost-per-token
+                  {pairs.length} chip pair{pairs.length === 1 ? '' : 's'} with cost-per-token
                   benchmark data on {model.label}.
                 </p>
               </div>

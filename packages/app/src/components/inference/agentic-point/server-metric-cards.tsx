@@ -93,7 +93,11 @@ export function KvCacheUtilizationCard({ sliced }: { sliced: SlicedServerSeries 
               }))
             : []),
           {
-            name: hasHost ? 'GPU HBM (avg n=50)' : hasPerEngine ? 'Avg' : 'GPU KV cache (avg n=50)',
+            name: hasHost
+              ? 'Chip HBM (avg n=50)'
+              : hasPerEngine
+                ? 'Avg'
+                : 'Chip KV cache (avg n=50)',
             data: rollingAverage(serverSeries.kvCacheUsage, 50),
             // Skip raw scatter when per-engine overlay is on — the
             // DP-rank lines already convey the spread, dots would be noise.
@@ -247,7 +251,7 @@ export function PrefixCacheHitRateCard({ sliced }: { sliced: SlicedServerSeries 
           <TimeSeriesChart
             series={[
               {
-                name: 'GPU (HBM, avg n=50)',
+                name: 'Chip (HBM, avg n=50)',
                 data: rollingAverage(serverSeries.prefixCacheHitRate, 50),
                 rawData: serverSeries.prefixCacheHitRate,
                 color: '#a855f7',

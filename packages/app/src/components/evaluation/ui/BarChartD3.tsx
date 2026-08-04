@@ -79,7 +79,7 @@ const parallelismHTML = (data: EvaluationChartData): string => {
       ),
     ) +
     row('Decode', fmtSideTooltip(data.tp, data.ep, data.dp_attention, data.decodeNumWorkers)) +
-    row('GPUs', `${data.numPrefillGpu} prefill / ${data.numDecodeGpu} decode`)
+    row('Chips', `${data.numPrefillGpu} prefill / ${data.numDecodeGpu} decode`)
   );
 };
 

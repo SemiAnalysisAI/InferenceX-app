@@ -39,18 +39,18 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '推理既是模型问题，也是系统问题。用户体验取决于延迟和交互性，运营成本则取决于吞吐量、利用率、功耗与硬件成本；只优化其中一个维度，往往会牺牲另一个维度。',
     benchmarkContext:
-      'InferenceX 测试完整的推理方案，因为芯片峰值规格无法代表实际服务性能。每条曲线都对应明确的模型、引擎、精度、并行策略、GPU 系统、序列长度和并发扫描。',
+      'InferenceX 测试完整的推理方案，因为芯片峰值规格无法代表实际服务性能。每条曲线都对应明确的模型、引擎、精度、并行策略、Chip 系统、序列长度和并发扫描。',
   },
   'inference-engine': {
     term: '推理引擎',
     aliases: ['inference engine', '服务引擎', 'LLM 服务框架'],
     plainEnglish:
-      '推理引擎就像 AI 服务背后的交通调度员：它安排请求流转，并让 GPU 在正确时间执行正确任务。',
+      '推理引擎就像 AI 服务背后的交通调度员：它安排请求流转，并让 Chip 在正确时间执行正确任务。',
     definition: '推理引擎是将模型权重和用户请求转化为加速器上生成结果的软件运行时。',
     explanation:
-      '它负责请求调度、连续批处理、KV 缓存分配、分布式执行、内核选择与 token 采样。vLLM、SGLang 和 TensorRT-LLM 即使运行同一模型和 GPU，也会因调度器、内核与分布式策略不同而产生不同曲线。',
+      '它负责请求调度、连续批处理、KV 缓存分配、分布式执行、内核选择与 token 采样。vLLM、SGLang 和 TensorRT-LLM 即使运行同一模型和 Chip，也会因调度器、内核与分布式策略不同而产生不同曲线。',
     significance:
-      '引擎版本和配置有时与 GPU 选择同样重要。一次调度器更新、融合注意力内核或模型专用路径修复，都可能在硬件不变时带来数倍性能变化。',
+      '引擎版本和配置有时与 Chip 选择同样重要。一次调度器更新、融合注意力内核或模型专用路径修复，都可能在硬件不变时带来数倍性能变化。',
     benchmarkContext:
       'InferenceX 将引擎和容器镜像记录为可复现方案的一部分，因此历史视图能够区分软件进步与芯片代际进步。',
   },
@@ -60,12 +60,12 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish: '吞吐量就是整个系统每秒一共能完成多少工作。',
     definition: '吞吐量是推理系统在所有活跃请求上生成 token 的总速率。',
     explanation:
-      'InferenceX 通常使用每 GPU 每秒 token 数进行归一化，便于比较不同规模的系统。提高批大小或并发往往能摊薄权重读取和计算成本，从而提高总吞吐量，但单个用户收到 token 的速度可能下降。',
+      'InferenceX 通常使用每 Chip 每秒 token 数进行归一化，便于比较不同规模的系统。提高批大小或并发往往能摊薄权重读取和计算成本，从而提高总吞吐量，但单个用户收到 token 的速度可能下降。',
     significance:
       '最大吞吐量不是完整的性能结论。某个点即使拥有最高 tok/s，也可能因为交互性过低而不适合实时产品；有效比较应在符合业务需求的延迟或交互性目标下进行。',
     benchmarkContext:
       'InferenceX 将吞吐量与交互性放在完整并发扫描中共同展示，并用 Pareto 前沿剔除两个轴上都更差的运行点。',
-    measurement: { label: '常用单位', value: 'token/秒/GPU（tok/s/GPU）' },
+    measurement: { label: '常用单位', value: 'token/秒/Chip（tok/s/Chip）' },
   },
   interactivity: {
     term: '交互性',
@@ -135,14 +135,14 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     term: '批处理',
     aliases: ['batching', '连续批处理', '动态批处理'],
     plainEnglish:
-      '批处理就像让多名乘客坐同一辆巴士：GPU 一次处理多个请求，让每趟计算完成更多有效工作。',
+      '批处理就像让多名乘客坐同一辆巴士：Chip 一次处理多个请求，让每趟计算完成更多有效工作。',
     definition: '批处理将多个请求的工作组合起来，使加速器能够一起处理它们的 token。',
     explanation:
-      '大型矩阵运算比大量微小运算更能发挥 GPU 效率。现代推理引擎采用连续批处理，请求到达和结束时动态加入或退出，无需等待固定批次全部完成。',
+      '大型矩阵运算比大量微小运算更能发挥 Chip 效率。现代推理引擎采用连续批处理，请求到达和结束时动态加入或退出，无需等待固定批次全部完成。',
     significance:
       '批处理是吞吐量与延迟核心权衡的来源。更大的有效批次能摊薄权重读取和内核启动开销，但通常会增加每位用户的 token 间隔。',
     benchmarkContext:
-      '并发量是批处理的输入，并不等同于某个固定内核批大小；并行策略、序列长度、请求完成时机和调度策略都会改变 GPU 实际看到的批形状。',
+      '并发量是批处理的输入，并不等同于某个固定内核批大小；并行策略、序列长度、请求完成时机和调度策略都会改变 Chip 实际看到的批形状。',
   },
   'pareto-frontier': {
     term: 'Pareto 前沿',
@@ -196,7 +196,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '成本曲线使用与吞吐曲线相同的并发扫描。在等交互性下，更低的 $/M 表示以更少建模成本提供相同流式体验。',
     measurement: {
       label: 'InferenceX 计算式',
-      value: '$/M = TCO（$/GPU 小时）× 1,000,000 /（3600 × tok/s/GPU）',
+      value: '$/M = TCO（$/Chip 小时）× 1,000,000 /（3600 × tok/s/Chip）',
     },
   },
   'performance-per-dollar': {
@@ -217,11 +217,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish: 'TCO 包含硬件采购，以及后续供电、制冷、网络和运维成本。',
     definition: '总体拥有成本（TCO）是基础设施在使用寿命内采购、部署和运营的综合成本估算。',
     explanation:
-      'GPU 采购价只是其中一项。TCO 模型还可包含主机、网络、供电、制冷、机房、融资、折旧、维护和预期利用率，并归一化为每 GPU 小时成本。',
+      'Chip 采购价只是其中一项。TCO 模型还可包含主机、网络、供电、制冷、机房、融资、折旧、维护和预期利用率，并归一化为每 Chip 小时成本。',
     significance:
       'TCO 比标价更适合跨系统经济性比较，尤其是网络与电力基础设施不同的机架级产品；但它仍是模型，必须连同假设一起阅读。',
     benchmarkContext:
-      'InferenceX 将 SemiAnalysis AI Cloud TCO 输入与实测 tok/s/GPU 结合，从而区分每小时系统成本和决定该小时 token 产出的软硬件行为。',
+      'InferenceX 将 SemiAnalysis AI Cloud TCO 输入与实测 tok/s/Chip 结合，从而区分每小时系统成本和决定该小时 token 产出的软硬件行为。',
   },
   'tokens-per-megawatt': {
     term: '每兆瓦 token 吞吐量',
@@ -246,7 +246,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '预填充与解码的资源特征不同。两者共享工作节点时，大型提示词任务会打断解码批次，使流式延迟更不稳定。',
     benchmarkContext:
-      '分离式方案将预填充放在独立 GPU 池。阅读结果时应检查预填充 TP、GPU 数、输入长度，以及 KV 状态是否需要跨网络传输到解码池。',
+      '分离式方案将预填充放在独立 Chip 池。阅读结果时应检查预填充 TP、Chip 数、输入长度，以及 KV 状态是否需要跨网络传输到解码池。',
   },
   decode: {
     term: '解码',
@@ -258,7 +258,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '解码决定流式交互性，也常主导长输出成本。推测解码、MTP、量化和宽专家并行都试图减少每个有效 token 的工作量或耗时。',
     benchmarkContext:
-      'InferenceX 用 tok/s/user 与总 tok/s/GPU 展示不同并发下的解码性能。公平比较必须匹配输出长度、批形状、精度和并行策略。',
+      'InferenceX 用 tok/s/user 与总 tok/s/Chip 展示不同并发下的解码性能。公平比较必须匹配输出长度、批形状、精度和并行策略。',
   },
   'kv-cache': {
     term: 'KV 缓存',
@@ -289,10 +289,10 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'disaggregated-inference': {
     term: '分离式推理',
     aliases: ['disaggregated inference', 'PD 分离', '分离式预填充', 'disagg'],
-    plainEnglish: '分离式推理把“读提示词”和“写答案”交给两组 GPU，让每组都能针对自己的任务优化。',
+    plainEnglish: '分离式推理把“读提示词”和“写答案”交给两组 Chip，让每组都能针对自己的任务优化。',
     definition: '分离式推理在不同工作池上运行预填充与解码，并在两者之间传输请求状态。',
     explanation:
-      '预填充通常偏计算密集，解码则常受内存带宽和通信限制。分离后，两侧可以采用不同 GPU 数、并行度、批策略和扩缩容方式。',
+      '预填充通常偏计算密集，解码则常受内存带宽和通信限制。分离后，两侧可以采用不同 Chip 数、并行度、批策略和扩缩容方式。',
     significance:
       '分离可隔离提示词峰值并提升吞吐量或 SLA 稳定性，但也增加路由与 KV 传输开销；网络薄弱或内核不成熟时，它可能反而慢于聚合式服务。',
     benchmarkContext:
@@ -341,7 +341,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'tensor-parallelism': {
     term: '张量并行',
     aliases: ['tensor parallelism', 'TP'],
-    plainEnglish: '张量并行把一次大型计算拆给多张 GPU，让它们共同完成。',
+    plainEnglish: '张量并行把一次大型计算拆给多张 Chip，让它们共同完成。',
     definition: '张量并行（TP）把单个张量运算和模型权重矩阵切分到多个加速器上。',
     explanation:
       '每一层由多个 rank 协同执行，部分结果需要通过集体通信合并，常见方式是在并行矩阵乘之后执行 all-reduce。',
@@ -353,13 +353,13 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'expert-parallelism': {
     term: '专家并行',
     aliases: ['expert parallelism', 'EP'],
-    plainEnglish: '专家并行把模型中的不同“专家”分配给不同 GPU，再把每个 token 送到需要的专家。',
+    plainEnglish: '专家并行把模型中的不同“专家”分配给不同 Chip，再把每个 token 送到需要的专家。',
     definition:
       '专家并行（EP）把 MoE 模型的专家分布到不同加速器，并将 token 路由到持有所选专家的 rank。',
     explanation:
-      'MoE 层对每个 token 只激活部分专家。EP 利用这种稀疏性，避免每张 GPU 存储和计算全部专家，但每个 MoE 层前后都要执行 dispatch 与 combine all-to-all。',
+      'MoE 层对每个 token 只激活部分专家。EP 利用这种稀疏性，避免每张 Chip 存储和计算全部专家，但每个 MoE 层前后都要执行 dispatch 与 combine all-to-all。',
     significance:
-      '更宽 EP 能减少每 GPU 专家权重占用，并改善解码批处理与容量；收益取决于路由均衡和互连能否足够快地移动 token。',
+      '更宽 EP 能减少每 Chip 专家权重占用，并改善解码批处理与容量；收益取决于路由均衡和互连能否足够快地移动 token。',
     benchmarkContext:
       'InferenceX 将 EP 宽度列为分布式方案的一部分。NVL72 可让远宽于传统八卡节点的专家组保持在 NVLink scale-up 域内。',
   },
@@ -379,19 +379,20 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'wide-expert-parallelism': {
     term: '宽专家并行',
     aliases: ['wide expert parallelism', 'Wide EP'],
-    plainEnglish: '宽专家并行把模型专家铺到大量 GPU 上，让每张 GPU 需要保存和移动的专家数据更少。',
+    plainEnglish:
+      '宽专家并行把模型专家铺到大量 Chip 上，让每张 Chip 需要保存和移动的专家数据更少。',
     definition: '宽专家并行使用大量加速器 rank 构成 MoE 模型的专家并行组。',
     explanation:
-      '把数百个专家分散到更多 rank，可减少每张 GPU 需要存储和流式读取的专家权重；更大的同伴组也可形成更高效的专家批次，但 dispatch/combine 流量会扩展。',
+      '把数百个专家分散到更多 rank，可减少每张 Chip 需要存储和流式读取的专家权重；更大的同伴组也可形成更高效的专家批次，但 dispatch/combine 流量会扩展。',
     significance:
       'Wide EP 在高带宽 scale-up 网络中最有效。若流量跨越较慢的 scale-out 网络，同样的 all-to-all 可能成为瓶颈并抵消内存侧收益。',
     benchmarkContext:
-      'InferenceX 在机架级分离式方案中使用 Wide EP。比较时必须同时查看 EP 宽度、解码池大小与网络，而不能只看图例中的 GPU 型号。',
+      'InferenceX 在机架级分离式方案中使用 Wide EP。比较时必须同时查看 EP 宽度、解码池大小与网络，而不能只看图例中的 Chip 型号。',
   },
   'all-reduce': {
     term: 'All-reduce',
     aliases: ['全归约'],
-    plainEnglish: 'All-reduce 让每张 GPU 完成一部分计算，再合并结果并把完整答案发回所有 GPU。',
+    plainEnglish: 'All-reduce 让每张 Chip 完成一部分计算，再合并结果并把完整答案发回所有 Chip。',
     definition:
       'All-reduce 是一种集体通信操作：合并所有参与 rank 的值，并把归约结果返回给每个 rank。',
     explanation:
@@ -404,32 +405,32 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'all-to-all': {
     term: 'All-to-all',
     aliases: ['全交换'],
-    plainEnglish: 'All-to-all 是一次有组织的交换：每张 GPU 都向其他每张 GPU 发送不同的数据包。',
+    plainEnglish: 'All-to-all 是一次有组织的交换：每张 Chip 都向其他每张 Chip 发送不同的数据包。',
     definition: 'All-to-all 是每个参与 rank 向所有其他 rank 发送不同数据的集体通信模式。',
     explanation:
       '专家并行 MoE 层先用 all-to-all dispatch 把 token 发往所选专家，再用 combine 把专家输出送回；流量与不均衡程度取决于 token 路由。',
     significance:
       'All-to-all 比简单点对点传输更苛刻，EP 扩大后容易受网络限制。专用内核会重叠通信与计算并优化 token 打包。',
     benchmarkContext:
-      '机架级 NVLink 可让 Wide EP 的 all-to-all 留在 scale-up 域内；跨节点 InfiniBand 或 RoCE 方案需要面对远低得多的每 GPU scale-out 带宽。',
+      '机架级 NVLink 可让 Wide EP 的 all-to-all 留在 scale-up 域内；跨节点 InfiniBand 或 RoCE 方案需要面对远低得多的每 Chip scale-out 带宽。',
   },
   'scale-up-vs-scale-out': {
     term: 'Scale-up 与 scale-out 网络',
     aliases: ['纵向扩展域', '横向扩展网络'],
-    plainEnglish: 'Scale-up 是同一套 GPU 系统内部的超高速网络，scale-out 则连接不同服务器或机架。',
+    plainEnglish: 'Scale-up 是同一套 Chip 系统内部的超高速网络，scale-out 则连接不同服务器或机架。',
     definition:
       'Scale-up 网络连接同一紧耦合系统内的加速器，scale-out 网络则把多个系统或机架连接成更大集群。',
     explanation:
-      'NVLink 等 scale-up 网络为细粒度集体通信提供极高每 GPU 带宽和低延迟；InfiniBand 或 RoCE 等 scale-out 网络覆盖更多机器，但每加速器带宽通常更低。',
+      'NVLink 等 scale-up 网络为细粒度集体通信提供极高每 Chip 带宽和低延迟；InfiniBand 或 RoCE 等 scale-out 网络覆盖更多机器，但每加速器带宽通常更低。',
     significance:
       '分布式推理会跨越两个域。高频 TP/EP 集体通信尤其适合留在 scale-up 内，较粗粒度请求路由和部分预填充/解码传输则更能容忍 scale-out。',
     benchmarkContext:
-      'GPU 名称本身不能描述通信域。八卡节点中的 B200 与 GB200 NVL72 使用相关芯片，却拥有完全不同的 scale-up 组规模。',
+      'Chip 名称本身不能描述通信域。八卡节点中的 B200 与 GB200 NVL72 使用相关芯片，却拥有完全不同的 scale-up 组规模。',
   },
   'high-bandwidth-memory': {
     term: '高带宽内存',
     aliases: ['high-bandwidth memory', 'HBM'],
-    plainEnglish: 'HBM 是紧挨 GPU 的一小池超高速内存，推理时模型权重和工作数据都要放在这里。',
+    plainEnglish: 'HBM 是紧挨 Chip 的一小池超高速内存，推理时模型权重和工作数据都要放在这里。',
     definition: '高带宽内存（HBM）是靠近加速器堆叠的内存，其带宽远高于传统服务器内存。',
     explanation:
       'HBM 存储模型权重、激活、工作区与 KV 缓存。容量决定哪些模型、批大小和并行布局能放入；带宽决定内存受限内核能多快读取这些状态。',
@@ -441,7 +442,8 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'memory-bandwidth': {
     term: '内存带宽',
     aliases: ['memory bandwidth', 'HBM 带宽'],
-    plainEnglish: '内存带宽就像向 GPU 计算单元供给数据的管道宽度；管道越宽，计算单元越不容易空等。',
+    plainEnglish:
+      '内存带宽就像向 Chip 计算单元供给数据的管道宽度；管道越宽，计算单元越不容易空等。',
     definition: '内存带宽是数据在加速器内存与计算单元之间传输的速率。',
     explanation:
       '当移动所需字节比执行算术更耗时，内核就是内存带宽受限。LLM 解码经常处于该状态，因为每一步都要为较少的新 token 计算流式读取模型/专家权重和 KV 缓存。',
@@ -452,15 +454,15 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   nvlink: {
     term: 'NVLink',
-    aliases: ['NVIDIA NVLink', 'GPU 高速互连'],
-    plainEnglish: 'NVLink 是 NVIDIA GPU 之间的高速公路，让多张 GPU 的协作远快于普通服务器网络。',
-    definition: 'NVLink 是 NVIDIA 用于 scale-up 域内 GPU 直接数据传输的高带宽加速器互连。',
+    aliases: ['NVIDIA NVLink', 'Chip 高速互连'],
+    plainEnglish: 'NVLink 是 NVIDIA Chip 之间的高速公路，让多张 Chip 的协作远快于普通服务器网络。',
+    definition: 'NVLink 是 NVIDIA 用于 scale-up 域内 Chip 直接数据传输的高带宽加速器互连。',
     explanation:
-      'NVSwitch 系统连接多个 NVLink 端点，使集体通信可覆盖八卡服务器，或在 NVL72 产品中覆盖 72 GPU 机架级域；该带宽不同于连接独立系统的 InfiniBand/Ethernet。',
+      'NVSwitch 系统连接多个 NVLink 端点，使集体通信可覆盖八卡服务器，或在 NVL72 产品中覆盖 72 Chip 机架级域；该带宽不同于连接独立系统的 InfiniBand/Ethernet。',
     significance:
-      '大型 TP，尤其是 Wide EP，会在每个生成 token 上交换数据。把通信留在 NVLink 上，可让机架级方案显著快于通过 scale-out 连接的相似 GPU 数量。',
+      '大型 TP，尤其是 Wide EP，会在每个生成 token 上交换数据。把通信留在 NVLink 上，可让机架级方案显著快于通过 scale-out 连接的相似 Chip 数量。',
     benchmarkContext:
-      'InferenceX 同时比较节点级 GPU 与 NVL72。归因于单 GPU 算力前，应先理解系统拓扑与并行组宽度。',
+      'InferenceX 同时比较节点级 Chip 与 NVL72。归因于单 Chip 算力前，应先理解系统拓扑与并行组宽度。',
   },
   quantization: {
     term: '量化',
@@ -485,7 +487,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'FP8 在新一代 NVIDIA 与 AMD 加速器上支持广泛，常作为稳定低精度基线；真实性能取决于端到端内核覆盖，回退操作会抹平理论收益。',
     benchmarkContext:
-      'InferenceX 的 FP8 标签覆盖完整方案，检查点文件名只是其中一项。引擎、注意力后端、KV 缓存格式、GPU 代际和 MTP 设置都可能改变曲线。',
+      'InferenceX 的 FP8 标签覆盖完整方案，检查点文件名只是其中一项。引擎、注意力后端、KV 缓存格式、Chip 代际和 MTP 设置都可能改变曲线。',
   },
   fp4: {
     term: 'FP4',
@@ -565,21 +567,21 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   cuda: {
     term: 'CUDA',
     aliases: ['NVIDIA CUDA'],
-    plainEnglish: 'CUDA 是让程序在 NVIDIA GPU 上运行的软件工具箱。',
-    definition: 'CUDA 是 NVIDIA 的 GPU 计算平台、编程模型、编译工具链与软件库生态。',
+    plainEnglish: 'CUDA 是让程序在 NVIDIA Chip 上运行的软件工具箱。',
+    definition: 'CUDA 是 NVIDIA 的 Chip 计算平台、编程模型、编译工具链与软件库生态。',
     explanation:
-      'LLM 引擎使用 CUDA 内核和库执行矩阵乘、注意力、集体通信、图捕获、内存管理与融合操作；容器、驱动、CUDA 和 GPU 架构版本必须兼容。',
+      'LLM 引擎使用 CUDA 内核和库执行矩阵乘、注意力、集体通信、图捕获、内存管理与融合操作；容器、驱动、CUDA 和 Chip 架构版本必须兼容。',
     significance:
-      '服务性能取决于芯片之上的软件。新内核、CUDA Graph、编译器专用化和库版本都能在 GPU 不变时移动基准曲线。',
+      '服务性能取决于芯片之上的软件。新内核、CUDA Graph、编译器专用化和库版本都能在 Chip 不变时移动基准曲线。',
     benchmarkContext:
       'InferenceX 固定容器镜像，从而固定具体 CUDA 栈。历史比较可隔离仅更新引擎镜像对相同硬件与配置的影响。',
   },
   rocm: {
     term: 'ROCm',
     aliases: ['AMD ROCm'],
-    plainEnglish: 'ROCm 是让 AI 和高性能程序在 AMD GPU 上运行的软件工具箱。',
+    plainEnglish: 'ROCm 是让 AI 和高性能程序在 AMD Chip 上运行的软件工具箱。',
     definition:
-      'ROCm 是 AMD 的开放 GPU 计算软件平台，包含运行时、编译器、通信库及优化数学和 AI 内核。',
+      'ROCm 是 AMD 的开放 Chip 计算软件平台，包含运行时、编译器、通信库及优化数学和 AI 内核。',
     explanation:
       'vLLM 与 SGLang 通过 ROCm、AMD 专用库和内核项目在 Instinct 加速器上运行。模型支持取决于兼容的注意力、MoE、量化、集体通信与图执行路径。',
     significance:
@@ -590,7 +592,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   vllm: {
     term: 'vLLM',
     aliases: ['开源 LLM 推理引擎'],
-    plainEnglish: 'vLLM 是开源软件，通过组织请求和 GPU 内存，让语言模型高效服务大量用户。',
+    plainEnglish: 'vLLM 是开源软件，通过组织请求和 Chip 内存，让语言模型高效服务大量用户。',
     definition:
       'vLLM 是开源 LLM 推理与服务引擎，重点提供高吞吐调度、高效 KV 缓存管理和广泛模型/硬件支持。',
     explanation:
@@ -607,7 +609,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       'SGLang 是用于快速服务语言模型的开源软件，提供面向复杂 AI 工作负载的调度和优化功能。',
     definition: 'SGLang 是面向高性能 LLM 与多模态推理的开源服务引擎和语言模型编程系统。',
     explanation:
-      '服务运行时包含连续批处理、前缀感知调度、分布式并行、推测解码，以及面向 NVIDIA/AMD GPU 的多种注意力和 MoE 内核后端。',
+      '服务运行时包含连续批处理、前缀感知调度、分布式并行、推测解码，以及面向 NVIDIA/AMD Chip 的多种注意力和 MoE 内核后端。',
     significance:
       'SGLang 快速迭代的版本和模型专用内核可在硬件不变时显著改变吞吐量；低并发受调度开销影响，其他区间则由注意力、MoE 与通信内核主导。',
     benchmarkContext:
@@ -616,9 +618,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'tensorrt-llm': {
     term: 'TensorRT-LLM',
     aliases: ['TRT-LLM', 'TRTLLM'],
-    plainEnglish: 'TensorRT-LLM 是 NVIDIA 为自家 GPU 优化的 LLM 推理软件栈。',
+    plainEnglish: 'TensorRT-LLM 是 NVIDIA 为自家 Chip 优化的 LLM 推理软件栈。',
     definition:
-      'TensorRT-LLM 是 NVIDIA 用于在 NVIDIA GPU 上编译、优化和服务大语言模型的推理软件栈。',
+      'TensorRT-LLM 是 NVIDIA 用于在 NVIDIA Chip 上编译、优化和服务大语言模型的推理软件栈。',
     explanation:
       '它提供 NVIDIA 优化内核、量化路径、分布式执行和模型专用优化；既可作为服务后端，也可通过集成让其他引擎使用其衍生内核。',
     significance:
@@ -630,13 +632,13 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     term: 'NVIDIA Dynamo',
     aliases: ['Dynamo', '分布式推理框架'],
     plainEnglish:
-      'NVIDIA Dynamo 协调大量 GPU worker，负责路由请求、移动模型记忆，并把读提示词和写答案分配给合适的资源池。',
+      'NVIDIA Dynamo 协调大量 Chip worker，负责路由请求、移动模型记忆，并把读提示词和写答案分配给合适的资源池。',
     definition:
       'NVIDIA Dynamo 是用于编排请求路由、worker 池、KV 缓存移动和分离式服务的分布式推理框架。',
     explanation:
       'Dynamo 可把预填充与解码放在独立扩展的池中，并使用 vLLM 或 TensorRT-LLM 作为 worker 运行时。内核仍由这些引擎执行，Dynamo 负责外围数据与控制路径。',
     significance:
-      '机架级性能由单 GPU 运行时、路由、缓存传输、拓扑感知与池大小共同决定。这些因素决定 Wide EP 和分离式推理能否提升端到端性能。',
+      '机架级性能由单 Chip 运行时、路由、缓存传输、拓扑感知与池大小共同决定。这些因素决定 Wide EP 和分离式推理能否提升端到端性能。',
     benchmarkContext:
       'Dynamo vLLM、Dynamo TRT-LLM 标签同时标识编排层与执行引擎。InferenceX 文章还会明确预填充/解码拓扑，因为两种 Dynamo 配置可能表现完全不同。',
   },

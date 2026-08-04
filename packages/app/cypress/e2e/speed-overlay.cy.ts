@@ -48,7 +48,7 @@ describe('Bus / Race Car Speed Overlay', () => {
 
   it('switching to an input-token throughput (TTFT X) places bus top-right, car bottom-left', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-    cy.get('[role="option"]').contains('Input Token Throughput per GPU').click({ force: true });
+    cy.get('[role="option"]').contains('Input Token Throughput per Chip').click({ force: true });
     cy.get('[data-testid="speed-overlay-bus"]').should('have.attr', 'data-corner', 'top-right');
     cy.get('[data-testid="speed-overlay-car"]').should('have.attr', 'data-corner', 'bottom-left');
   });
