@@ -87,9 +87,29 @@ describe('Blog', () => {
 
     it('renders every figure the post references', () => {
       cy.get('article.prose figure img').should('have.length.gte', 20);
+      // Only the first figure is eager; the rest are `loading="lazy"` and stay at
+      // naturalWidth 0 until scrolled to, so decode is only asserted on that one.
+      cy.get('article.prose figure img')
+        .first()
+        .should(($img) => {
+          expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+        });
       cy.get('article.prose figure img').each(($img) => {
         expect($img[0].getAttribute('alt') ?? '').to.have.length.greaterThan(0);
-        expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+        expect($img[0].getAttribute('src') ?? '').to.match(
+          /^\/images\/kimi-k3-the-manos-the-mythos-the\//u,
+        );
+      });
+    });
+
+    it('serves every figure image the post references', () => {
+      // Complements the eager-only decode check above: the srcs exist on the server
+      // even though lazy images have not fetched them yet.
+      cy.get('article.prose figure img').then(($imgs) => {
+        const srcs = [...new Set([...$imgs].map((img) => img.getAttribute('src') ?? ''))];
+        for (const src of srcs) {
+          cy.request({ url: src, encoding: 'binary' }).its('status').should('eq', 200);
+        }
       });
     });
   });

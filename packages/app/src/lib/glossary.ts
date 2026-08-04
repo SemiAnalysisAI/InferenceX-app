@@ -44,6 +44,7 @@ const B200_MINIMAX = 'b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar';
 const B200_KIMI = 'b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar';
 const SGLANG_056 = 'sglang-0-5-6-b200-deepseek-r1-fp4-up-to-1-8x';
 const VR_RUBIN = 'vera-rubin-nvl72-vs-gb200-nvl72-inference';
+const KIMI_K3 = 'kimi-k3-the-manos-the-mythos-the';
 
 const entries = [
   {
@@ -421,7 +422,7 @@ const entries = [
       'multi-head-latent-attention',
       'high-bandwidth-memory',
     ],
-    articleSlugs: [INFERENCEX_V2, MI355X_KIMI, SGLANG_056],
+    articleSlugs: [INFERENCEX_V2, MI355X_KIMI, SGLANG_056, KIMI_K3],
   },
   {
     slug: 'prefix-caching',
@@ -439,7 +440,7 @@ const entries = [
     benchmarkContext:
       'InferenceX generally disables prefix caching on random datasets to isolate full prompt processing from cache policy. Treat benchmark cost as a no-hit baseline unless the recipe says otherwise.',
     relatedTerms: ['kv-cache', 'prefill', 'time-to-first-token', 'nvidia-dynamo'],
-    articleSlugs: [INFERENCEX_V2, GB200_KIMI],
+    articleSlugs: [INFERENCEX_V2, GB200_KIMI, KIMI_K3],
   },
   {
     slug: 'disaggregated-inference',
@@ -476,7 +477,7 @@ const entries = [
     benchmarkContext:
       'Compare speculative recipes at realistic acceptance rates and verify model quality. InferenceX distinguishes MTP-enabled and disabled curves because the benefit changes across concurrency and interactivity.',
     relatedTerms: ['multi-token-prediction', 'decode', 'batching', 'mixture-of-experts'],
-    articleSlugs: [INFERENCEX_V2, DEEPSEEK_V4, B200_GLM5],
+    articleSlugs: [INFERENCEX_V2, DEEPSEEK_V4, B200_GLM5, KIMI_K3],
   },
   {
     slug: 'multi-token-prediction',
@@ -554,7 +555,7 @@ const entries = [
       'all-to-all',
       'tensor-parallelism',
     ],
-    articleSlugs: [INFERENCEX_V2, GB200_R1, GB200_KIMI],
+    articleSlugs: [INFERENCEX_V2, GB200_R1, GB200_KIMI, KIMI_K3],
   },
   {
     slug: 'data-parallelism',
@@ -820,7 +821,7 @@ const entries = [
       'all-to-all',
       'speculative-decoding',
     ],
-    articleSlugs: [GB300_DSV4, B200_KIMI, B200_MINIMAX, MI355X_KIMI],
+    articleSlugs: [GB300_DSV4, B200_KIMI, B200_MINIMAX, MI355X_KIMI, KIMI_K3],
   },
   {
     slug: 'multi-head-latent-attention',
@@ -838,7 +839,7 @@ const entries = [
     benchmarkContext:
       'Several DeepSeek-derived models in InferenceX use MLA. Articles track fixes where an attention backend handled one heads-per-rank shape efficiently but failed or fell back on another.',
     relatedTerms: ['kv-cache', 'decode', 'sparse-attention', 'tensor-parallelism'],
-    articleSlugs: [MI355X_KIMI, B200_GLM5, MI355X_DSV4, SGLANG_056],
+    articleSlugs: [MI355X_KIMI, B200_GLM5, MI355X_DSV4, SGLANG_056, KIMI_K3],
   },
   {
     slug: 'sparse-attention',
@@ -856,7 +857,7 @@ const entries = [
     benchmarkContext:
       'InferenceX tracks model-specific sparse-attention stacks such as DSA on GLM-5 and DeepSeek-V4. Engine versions and backend choices are part of the result because support has changed rapidly.',
     relatedTerms: ['multi-head-latent-attention', 'kv-cache', 'decode', 'inference-engine'],
-    articleSlugs: [B200_GLM5, MI355X_DSV4, GB300_DSV4],
+    articleSlugs: [B200_GLM5, MI355X_DSV4, GB300_DSV4, KIMI_K3],
   },
   {
     slug: 'cuda',
@@ -908,7 +909,7 @@ const entries = [
     benchmarkContext:
       'InferenceX treats vLLM as one engine option and pins the exact image in each recipe. Engine name alone does not set a fixed performance level, so comparisons must match model, precision, workload, and topology.',
     relatedTerms: ['inference-engine', 'nvidia-dynamo', 'kv-cache', 'sglang', 'rocm'],
-    articleSlugs: [MI355X_KIMI, GB200_KIMI, B200_MINIMAX, B200_KIMI],
+    articleSlugs: [MI355X_KIMI, GB200_KIMI, B200_MINIMAX, B200_KIMI, KIMI_K3],
   },
   {
     slug: 'sglang',

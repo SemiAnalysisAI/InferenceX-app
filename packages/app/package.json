@@ -58,7 +58,7 @@
     "dompurify": "^3.4.12",
     "gray-matter": "^4.0.3",
     "iwanthue": "^2.1.0",
-    "katex": "^0.18.1",
+    "katex": "^0.16.47",
     "lucide-react": "^1.27.0",
     "mp4-muxer": "^5.2.2",
     "next": "^16.2.12",
