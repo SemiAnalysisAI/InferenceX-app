@@ -67,7 +67,7 @@ export function collectiveXColorKey(series: CollectiveXSeries | CollectiveXRunSe
   return `${series.system.vendor}_${series.system.sku}_${series.backend}_ep${series.system.ep_size}_${series.mode}_${series.phase}_${series.precision}`;
 }
 
-/** Namespace series ids and attach the run's stable visual-style index. */
+/** Namespace series ids and attach the run's current selection-order style index. */
 export function collectiveXSeriesForRun(
   series: readonly CollectiveXSeries[],
   runId: string,

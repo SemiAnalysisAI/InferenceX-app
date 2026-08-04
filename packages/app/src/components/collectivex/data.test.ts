@@ -124,7 +124,7 @@ describe('collectiveXSeriesForRun', () => {
 });
 
 describe('collectiveXRunDasharray', () => {
-  it('uses a solid line for the newest run and distinct patterns for following runs', () => {
+  it('uses a solid line for the first selected run and distinct patterns for following runs', () => {
     expect(collectiveXRunDasharray(0)).toBe('none');
     expect(collectiveXRunDasharray(1)).toBe('9 4');
     expect(collectiveXRunDasharray(2)).toBe('3 3');
