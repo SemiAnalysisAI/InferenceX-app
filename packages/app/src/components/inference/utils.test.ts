@@ -12,8 +12,10 @@ import {
 describe('selectUnofficialOverlayForMode', () => {
   const overlays = { e2e: { id: 'e2e' }, interactivity: { id: 'interactivity' } };
 
-  it('suppresses raw unofficial E2E data for OSL / E2EL mode', () => {
-    expect(selectUnofficialOverlayForMode('osl-e2el', 'e2e', overlays)).toBeNull();
+  it('suppresses raw unofficial E2E data for E2E Normalized Interactivity mode', () => {
+    expect(
+      selectUnofficialOverlayForMode('e2e-normalized-interactivity', 'e2e', overlays),
+    ).toBeNull();
   });
 
   it('preserves matching unofficial overlays for supported modes', () => {

@@ -21,7 +21,7 @@ import {
 describe('Overlay points respect Optimal Only (agentic interactivity)', () => {
   before(() => {
     interceptOverlayRun();
-    // The agentic default mode is OSL / E2EL (which suppresses overlays and
+    // The agentic default mode is E2E Normalized Interactivity (which suppresses overlays and
     // fetches derived metrics) — stub the fetch, then switch to the
     // Interactivity mode this suite is about.
     interceptDerivedAgenticMetrics();

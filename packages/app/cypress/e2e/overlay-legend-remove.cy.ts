@@ -20,7 +20,7 @@ import {
 describe('Official legend X works while an unofficial overlay is loaded', () => {
   before(() => {
     interceptOverlayRun();
-    // The agentic default mode is OSL / E2EL (which suppresses overlays and
+    // The agentic default mode is E2E Normalized Interactivity (which suppresses overlays and
     // fetches derived metrics) — stub the fetch, then switch to Interactivity
     // where the overlay renders.
     interceptDerivedAgenticMetrics();

@@ -11,7 +11,7 @@ import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisFiel
 import type { ChartDefinition, ClippedInferenceData, InferenceData, YAxisMetricKey } from './types';
 
 /**
- * Select the matching unofficial-run overlay for a chart mode. OSL / E2EL
+ * Select the matching unofficial-run overlay for a chart mode. E2E Normalized Interactivity
  * is intentionally excluded: unofficial benchmark rows do not include the
  * persisted per-request trace needed to derive the per-request ratio
  * percentiles.
@@ -21,7 +21,7 @@ export function selectUnofficialOverlayForMode<T>(
   chartType: 'e2e' | 'interactivity',
   overlays: { e2e: T | null; interactivity: T | null },
 ): T | null {
-  if (xAxisMode === 'osl-e2el') return null;
+  if (xAxisMode === 'e2e-normalized-interactivity') return null;
   return overlays[chartType];
 }
 

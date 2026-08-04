@@ -614,7 +614,7 @@ export function InferenceProvider({
 
   // Reconcile the x-axis mode with the scenario kind:
   //  - On mount with no `i_xmode` URL param: snap to the kind's natural default
-  //    (OSL / E2EL for agentic — the "north star" e2e-interactivity view —
+  //    (E2E Normalized Interactivity for agentic — the "north star" e2e-interactivity view —
   //    and interactivity for fixed-sequence scenarios). The state was initialized
   //    to a SSR-stable constant so server and client render the same DOM; this
   //    effect fixes it up after hydration.
@@ -647,7 +647,7 @@ export function InferenceProvider({
       // — fall through to the default snap below.
       return;
     }
-    handleSetXAxisMode(kind === 'agentic' ? 'osl-e2el' : 'interactivity');
+    handleSetXAxisMode(kind === 'agentic' ? 'e2e-normalized-interactivity' : 'interactivity');
   }, [sequenceResolved, effectiveSequence, selectedXAxisMode, handleSetXAxisMode]);
 
   // Reconcile selectedE2eXAxisMetric whenever the mode, sequence kind, or

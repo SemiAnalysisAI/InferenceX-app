@@ -205,7 +205,7 @@ describe('flipRooflineDirection', () => {
 });
 
 describe('derived higher-is-better x-axis rooflines', () => {
-  // The OSL / E2EL mode renders on the e2e chart definition (lower-x-is-better)
+  // The E2E Normalized Interactivity mode renders on the e2e chart definition (lower-x-is-better)
   // but its x-axis is higher-is-better, like interactivity. ChartDisplay
   // therefore mirrors each configured e2e corner horizontally rather than
   // hardcoding one corner — hardcoding `upper_left` inverted the frontier for

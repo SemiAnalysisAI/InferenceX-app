@@ -2,11 +2,11 @@ import { bulkIdsFetcher, useBulkIdsQuery } from './benchmark-id-query';
 
 export interface DerivedAgenticMetric {
   id: number;
-  /** Slow-tail P75 OSL/E2EL in tok/s/user — 1 / p75(per-request E2EL/OSL).
+  /** Slow-tail P75 E2E Normalized Interactivity in tok/s/user — 1 / p75(per-request E2EL/OSL).
    *  Null when the JSONL had no usable records. */
-  p75_osl_per_e2el: number | null;
-  /** Slow-tail P90 OSL/E2EL in tok/s/user — 1 / p90(per-request E2EL/OSL). */
-  p90_osl_per_e2el: number | null;
+  p75_e2e_norm_intvty: number | null;
+  /** Slow-tail P90 E2E Normalized Interactivity in tok/s/user — 1 / p90(per-request E2EL/OSL). */
+  p90_e2e_norm_intvty: number | null;
 }
 
 export type DerivedAgenticMetricMap = Record<number, DerivedAgenticMetric>;
@@ -38,9 +38,9 @@ async function fetchDerivedAgenticMetrics(
 }
 
 /**
- * Fetch per-id derived agentic metrics (slow-tail OSL/E2EL tok/s/user)
+ * Fetch per-id derived agentic metrics (slow-tail E2E Normalized Interactivity tok/s/user)
  * computed live from the stored aiperf profile_export.jsonl. Used to drive
- * the "OSL / E2EL" chart variant.
+ * the "E2E Normalized Interactivity" chart variant.
  *
  * Ids without a trace_replay blob (older or non-aiperf agentic runs) are
  * silently omitted from the response.

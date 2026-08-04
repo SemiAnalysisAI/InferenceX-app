@@ -5,7 +5,7 @@
  * cheap once per agentic point but adds up to be meaningful only when
  * actually plotted.
  *
- * - OSL / E2EL ("e2e interactivity"): per-request output_sequence_length
+ * - E2E Normalized Interactivity ("e2e interactivity"): per-request output_sequence_length
  *   divided by request_latency — the rate at which the user receives output
  *   tokens INCLUDING the prefill wait, per
  *   https://semianalysis.slack.com/archives/C0AV4T40BT3/p1782432266626969.
@@ -17,7 +17,7 @@
  *   Percentiles follow the slow-tail convention the mapper enforces for
  *   `*_intvty` (1/p(ITL), not p(1/ITL)): we store percentiles of the
  *   per-request E2EL/OSL ratio (seconds per output token) and the read path
- *   inverts, so `p90 OSL/E2EL = 1 / p90(E2EL/OSL)` is the 90th-percentile
+ *   inverts, so `p90 E2E Normalized Interactivity = 1 / p90(E2EL/OSL)` is the 90th-percentile
  *   WORST request's effective token rate.
  */
 
@@ -37,10 +37,10 @@ import {
 export interface DerivedAgenticMetric {
   /** benchmark_results.id this entry belongs to. */
   id: number;
-  /** Slow-tail P75 OSL/E2EL in tok/s/user — 1 / p75(per-request E2EL/OSL). */
-  p75_osl_per_e2el: number | null;
-  /** Slow-tail P90 OSL/E2EL in tok/s/user — 1 / p90(per-request E2EL/OSL). */
-  p90_osl_per_e2el: number | null;
+  /** Slow-tail P75 E2E Normalized Interactivity in tok/s/user — 1 / p75(per-request E2EL/OSL). */
+  p75_e2e_norm_intvty: number | null;
+  /** Slow-tail P90 E2E Normalized Interactivity in tok/s/user — 1 / p90(per-request E2EL/OSL). */
+  p90_e2e_norm_intvty: number | null;
 }
 
 export type DerivedAgenticMetricMap = Record<number, DerivedAgenticMetric>;
@@ -162,8 +162,8 @@ export async function getDerivedAgenticMetrics(
     if (row.stats && Number(row.stats.version) === STATS_VERSION) {
       result[id] = {
         id,
-        p75_osl_per_e2el: invertRatio(row.stats.e2elPerOsl?.p75),
-        p90_osl_per_e2el: invertRatio(row.stats.e2elPerOsl?.p90),
+        p75_e2e_norm_intvty: invertRatio(row.stats.e2elPerOsl?.p75),
+        p90_e2e_norm_intvty: invertRatio(row.stats.e2elPerOsl?.p90),
       };
     } else {
       idsNeedingBlob.push(id);
@@ -205,8 +205,8 @@ export async function getDerivedAgenticMetrics(
       const { e2el_per_osl } = computeDerivedFromBlob(jsonl);
       result[id] = {
         id,
-        p75_osl_per_e2el: invertRatio(e2el_per_osl?.p75),
-        p90_osl_per_e2el: invertRatio(e2el_per_osl?.p90),
+        p75_e2e_norm_intvty: invertRatio(e2el_per_osl?.p75),
+        p90_e2e_norm_intvty: invertRatio(e2el_per_osl?.p90),
       };
 
       // Self-heal the shared `aggregate_stats` bundle. We only have the profile

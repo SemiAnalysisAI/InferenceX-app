@@ -163,8 +163,8 @@ describe('getDerivedAgenticMetrics write-back', () => {
     const result = await getDerivedAgenticMetrics(sql, [7]);
 
     // Response is the freshly recomputed slow-tail inverse (tok/s/user).
-    expect(result[7]?.p90_osl_per_e2el).toBeCloseTo(1 / 0.038, 6);
-    expect(result[7]?.p75_osl_per_e2el).toBeCloseTo(1 / 0.035, 6);
+    expect(result[7]?.p90_e2e_norm_intvty).toBeCloseTo(1 / 0.038, 6);
+    expect(result[7]?.p75_e2e_norm_intvty).toBeCloseTo(1 / 0.035, 6);
 
     // 3 calls: stats read, blob read, write-back UPDATE.
     expect(calls).toHaveLength(3);
@@ -217,7 +217,7 @@ describe('getDerivedAgenticMetrics write-back', () => {
     const result = await getDerivedAgenticMetrics(sql, [7]);
 
     // Caller still gets the freshly computed metric (1 / 0.02 s-per-token).
-    expect(result[7]?.p90_osl_per_e2el).toBeCloseTo(50, 6);
+    expect(result[7]?.p90_e2e_norm_intvty).toBeCloseTo(50, 6);
     // Stats read + blob read only — no write-back UPDATE.
     expect(calls).toHaveLength(2);
     expect(calls.some((c) => c.text.includes('update agentic_trace_replay'))).toBe(false);
@@ -236,8 +236,8 @@ describe('getDerivedAgenticMetrics write-back', () => {
 
     const result = await getDerivedAgenticMetrics(sql, [7]);
 
-    expect(result[7]?.p75_osl_per_e2el).toBeCloseTo(25, 6);
-    expect(result[7]?.p90_osl_per_e2el).toBeCloseTo(20, 6);
+    expect(result[7]?.p75_e2e_norm_intvty).toBeCloseTo(25, 6);
+    expect(result[7]?.p90_e2e_norm_intvty).toBeCloseTo(20, 6);
     // Only the stats read — no fallback blob query, no write-back.
     expect(calls).toHaveLength(1);
   });
@@ -258,6 +258,6 @@ describe('getDerivedAgenticMetrics write-back', () => {
     ]);
 
     const result = await getDerivedAgenticMetrics(sql, [7]);
-    expect(result[7]).toEqual({ id: 7, p75_osl_per_e2el: null, p90_osl_per_e2el: null });
+    expect(result[7]).toEqual({ id: 7, p75_e2e_norm_intvty: null, p90_e2e_norm_intvty: null });
   });
 });

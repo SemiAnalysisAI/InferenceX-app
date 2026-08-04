@@ -97,8 +97,8 @@ const STRINGS = {
     sourceUnofficial: 'Source: UNOFFICIAL',
     sourceOfficial: 'Source: SemiAnalysis InferenceX™',
     updated: 'Updated:',
-    oslE2elDisclaimer:
-      'OSL / E2EL requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
+    e2eNormIntvtyDisclaimer:
+      'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
     selectDateRange: 'Select a date range or add a run to view chip comparison',
     performanceOverTime: 'Performance Over Time',
     performanceOverTimeDesc:
@@ -116,8 +116,8 @@ const STRINGS = {
     sourceUnofficial: '来源：非官方',
     sourceOfficial: '来源：SemiAnalysis InferenceX™',
     updated: '更新时间：',
-    oslE2elDisclaimer:
-      'OSL / E2EL 需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
+    e2eNormIntvtyDisclaimer:
+      '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
     selectDateRange: '请选择日期范围或添加运行以查看 Chip 对比',
     performanceOverTime: '性能趋势',
     performanceOverTimeDesc: '双击散点图上的数据点以追踪配置随时间的变化。',
@@ -132,6 +132,7 @@ const STRINGS = {
 // for agentic sequences (e.g. "vs. P90 Interactivity"), so this matches the
 // pattern instead of a fixed string; unknown headings pass through unchanged.
 const HEADING_SUBJECT_ZH: Record<string, string> = {
+  'E2E Normalized Interactivity': '端到端归一化交互性',
   Interactivity: '交互性',
   'End-to-end Latency': '端到端延迟',
   'Time To First Token': '首 token 延迟（TTFT）',
@@ -148,7 +149,11 @@ function zhHeading(configured: string): string {
 }
 
 const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string; labelZh: string }[] = [
-  { value: 'osl-e2el', label: 'OSL / E2EL', labelZh: 'OSL / E2EL' },
+  {
+    value: 'e2e-normalized-interactivity',
+    label: 'E2E Normalized Interactivity',
+    labelZh: '端到端归一化交互性',
+  },
   { value: 'interactivity', label: 'Interactivity', labelZh: '交互性' },
   { value: 'e2e', label: 'E2E Latency', labelZh: '端到端延迟' },
   { value: 'ttft', label: 'TTFT', labelZh: 'TTFT' },
@@ -166,12 +171,14 @@ interface DerivedXModeSpec {
 }
 
 const DERIVED_X_MODE_SPECS: Partial<Record<XAxisMode, DerivedXModeSpec>> = {
-  'osl-e2el': {
-    xLabel: (pctl) => `${pctl} OSL / E2EL (tok/s/user)`,
-    heading: (pctl) => `vs. ${pctl} OSL / E2EL`,
-    headingZh: (pctl) => `vs. ${pctl} OSL / 端到端延迟`,
+  'e2e-normalized-interactivity': {
+    xLabel: (pctl) => `${pctl} E2E Normalized Interactivity (tok/s/user)`,
+    xLabelZh: (pctl) => `${pctl} 端到端归一化交互性 (tok/s/user)`,
+    heading: (pctl) => `vs. ${pctl} E2E Normalized Interactivity`,
+    headingZh: (pctl) => `vs. ${pctl} 端到端归一化交互性`,
     higherXIsBetter: true,
-    value: (m, percentile) => (percentile === 'p75' ? m?.p75_osl_per_e2el : m?.p90_osl_per_e2el),
+    value: (m, percentile) =>
+      percentile === 'p75' ? m?.p75_e2e_norm_intvty : m?.p90_e2e_norm_intvty,
     toX: (raw) => raw,
   },
 };
@@ -835,11 +842,12 @@ export default function ChartDisplay() {
                             )}
                           </p>
                           <MetricAssumptionNotes selectedYAxisMetric={selectedYAxisMetric} />
-                          {isUnofficialRun && selectedXAxisMode === 'osl-e2el' && (
-                            <p className="mb-2 text-xs text-muted-foreground">
-                              {t.oslE2elDisclaimer}
-                            </p>
-                          )}
+                          {isUnofficialRun &&
+                            selectedXAxisMode === 'e2e-normalized-interactivity' && (
+                              <p className="mb-2 text-xs text-muted-foreground">
+                                {t.e2eNormIntvtyDisclaimer}
+                              </p>
+                            )}
                           <UnofficialDomainNotice />
                         </>
                       );

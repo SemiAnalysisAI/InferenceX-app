@@ -147,7 +147,7 @@ describe('GPU comparison agentic point detail', () => {
       );
       request.reply({ body: result });
     });
-    // The agentic default x-axis mode (OSL / E2EL) fetches derived metrics on
+    // The agentic default x-axis mode (E2E Normalized Interactivity) fetches derived metrics on
     // mount; without values every point drops out of the (remapped) data set.
     interceptDerivedAgenticMetrics();
 

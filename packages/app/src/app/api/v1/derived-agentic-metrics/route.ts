@@ -35,7 +35,7 @@ const getCachedDerivedAgenticMetrics = cachedQuery(
  *
  * Returns per-id derived metrics computed live from the stored aiperf
  * profile_export.jsonl blobs:
- *  - p75/p90_osl_per_e2el: slow-tail OSL / E2E-latency in tok/s/user,
+ *  - p75/p90_e2e_norm_intvty: slow-tail OSL / E2E-latency in tok/s/user,
  *    computed as 1 / pXX(per-request E2EL/OSL) across every turn in every
  *    session — plain interactivity charged for the prefill wait.
  *

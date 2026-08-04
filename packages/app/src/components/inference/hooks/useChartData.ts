@@ -41,9 +41,14 @@ import {
  * the single definition — InferenceContext (URL/state) and ChartDisplay
  * (buttons) import it from here.
  */
-export type XAxisMode = 'ttft' | 'e2e' | 'interactivity' | 'osl-e2el';
+export type XAxisMode = 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity';
 
-export const X_AXIS_MODES: readonly XAxisMode[] = ['ttft', 'e2e', 'interactivity', 'osl-e2el'];
+export const X_AXIS_MODES: readonly XAxisMode[] = [
+  'ttft',
+  'e2e',
+  'interactivity',
+  'e2e-normalized-interactivity',
+];
 
 /**
  * Modes whose x metric is derived from persisted per-request traces —
@@ -51,14 +56,14 @@ export const X_AXIS_MODES: readonly XAxisMode[] = ['ttft', 'e2e', 'interactivity
  * trace_replay blob to derive them from).
  */
 export function isAgenticOnlyXAxisMode(mode: XAxisMode): boolean {
-  return mode === 'osl-e2el';
+  return mode === 'e2e-normalized-interactivity';
 }
 
 /**
  * Compute the set of benchmark_results.id values that sit on the
  * (e2e_latency, y) Pareto frontier within each (hwKey, precision, date)
  * group. Used to restrict the non-e2e xmode charts (ttft, interactivity,
- * osl-e2el) so they show *only* the points that win on
+ * e2e-normalized-interactivity) so they show *only* the points that win on
  * end-to-end latency — preventing benchmark-hacking where a config tops
  * one axis while tanking the other.
  *
@@ -129,7 +134,7 @@ export function flipRooflineDirection(dir: RooflineDirection): RooflineDirection
 /**
  * Roofline corner for a trace-derived x-axis mode. Derived modes render on the
  * e2e chart definition, whose corners assume lower-x-is-better; when the
- * derived metric is higher-is-better (OSL / E2EL) the corner mirrors
+ * derived metric is higher-is-better (E2E Normalized Interactivity) the corner mirrors
  * horizontally. This keeps the y-metric's own good direction — throughput
  * lands on an upper corner, cost and joules on a lower one — where hardcoding
  * a single corner inverted the frontier for the cost metrics.
@@ -223,7 +228,7 @@ export function useChartData(
   /**
    * Current x-axis mode. When set to anything other than 'e2e', the displayed
    * data is filtered to the (e2e-latency, y) Pareto frontier so the ttft /
-   * interactivity / osl-e2el charts show only points that
+   * interactivity / e2e-normalized-interactivity charts show only points that
    * also win on end-to-end latency — preventing benchmark-hacking where a
    * config tops one metric while tanking the other. The 'e2e' mode is the
    * source of truth and keeps the full point set.

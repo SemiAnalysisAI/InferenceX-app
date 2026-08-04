@@ -37,7 +37,7 @@ import type { DbClient } from '../connection.js';
  * modes they fed.
  *
  * v7: add `e2elPerOsl` — percentiles of per-request E2E latency divided by
- * OSL (seconds per output token), the inverse of the "OSL / E2EL" x-axis
+ * OSL (seconds per output token), the inverse of the "E2E Normalized Interactivity" x-axis
  * metric.
  */
 export const STATS_VERSION = 7;

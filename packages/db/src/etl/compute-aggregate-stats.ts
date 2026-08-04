@@ -31,8 +31,8 @@ export interface AggregateStats {
   prefixCacheHitRate: MetricPercentiles | null;
   /**
    * Per-request E2E latency / OSL (seconds per output token) percentiles.
-   * The read path inverts to plot the slow-tail "OSL / E2EL" x-axis metric
-   * (tok/s/user): pXX OSL/E2EL = 1 / pXX(E2EL/OSL).
+   * The read path inverts to plot the slow-tail "E2E Normalized Interactivity" x-axis metric
+   * (tok/s/user): pXX E2E Normalized Interactivity = 1 / pXX(E2EL/OSL).
    */
   e2elPerOsl: MetricPercentiles | null;
 }
