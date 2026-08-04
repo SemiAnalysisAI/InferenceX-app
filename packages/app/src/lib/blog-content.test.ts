@@ -9,9 +9,10 @@ import { describe, expect, it } from 'vitest';
  * pointing at an image nobody committed, and en/zh drifting apart in structure.
  */
 
-// Resolved from this file so the suite works whether vitest runs from the repo
-// root or from packages/app.
-const APP_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
+// Resolved from this file so the suite works whether vitest runs from the repo root
+// or from packages/app. `import.meta.dirname` rather than `new URL(...).pathname`:
+// the latter keeps percent-encoding and yields a leading-slash `/C:/…` on Windows.
+const APP_DIR = path.resolve(import.meta.dirname, '..', '..');
 const CONTENT_DIR = path.join(APP_DIR, 'content', 'blog');
 const ZH_DIR = path.join(CONTENT_DIR, 'zh');
 const PUBLIC_DIR = path.join(APP_DIR, 'public');
