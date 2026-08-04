@@ -14,9 +14,7 @@ import { createGzip, gzipSync } from 'node:zlib';
 
 import type postgres from 'postgres';
 
-import { computeAggregateStats } from './compute-aggregate-stats.js';
-import { computeChartSeries } from './compute-chart-series.js';
-import { computeRequestTimeline } from './compute-request-timeline.js';
+import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
 import type { ServerMetricsContext } from './server-metrics-adapters';
 
 type Sql = ReturnType<typeof postgres>;
@@ -195,11 +193,11 @@ export async function insertTraceReplay(
   // a streaming parser for oversized server_metrics blobs.
   const computeStart = Date.now();
   log('computing aggregate stats, chart series, and request timeline');
-  const [aggregateStats, chartSeries, requestTimeline] = await Promise.all([
-    computeAggregateStats({ profileBlob: profileGz, serverBlob: metricsJsonGz }),
-    computeChartSeries(metricsJsonGz, metricsContext),
-    Promise.resolve(computeRequestTimeline(profileGz)),
-  ]);
+  const { aggregateStats, chartSeries, requestTimeline } = await computeTraceDerivedPayloads(
+    profileGz,
+    metricsJsonGz,
+    metricsContext,
+  );
   log(
     `computed derived JSON: chart_windows=${chartSeries?.timeslicesCount ?? 0}, ` +
       `timeline_requests=${requestTimeline?.requests.length ?? 0} (${elapsed(computeStart)})`,

@@ -2,7 +2,11 @@ import { gzipSync } from 'node:zlib';
 
 import { describe, expect, it } from 'vitest';
 
-import { gunzipJsonWithinLimit, streamCollectKeys } from './gzip-json-stream.js';
+import {
+  collectMetricPhases,
+  gunzipJsonWithinLimit,
+  streamCollectKeys,
+} from './gzip-json-stream.js';
 
 describe('gunzipJsonWithinLimit', () => {
   const json = JSON.stringify({ metrics: { value: 1 } });
@@ -58,6 +62,50 @@ describe('streamCollectKeys', () => {
   it('rejects on a non-gzip buffer', async () => {
     await expect(
       streamCollectKeys(Buffer.from('not gzip'), 'metrics', new Set(['x'])),
+    ).rejects.toThrow();
+  });
+});
+
+describe('collectMetricPhases', () => {
+  const blob = gzipSync(
+    JSON.stringify({
+      metadata: { ignored: true },
+      metrics: {
+        wanted: { series: [{ timeslices: [{ start_ns: 1, rate: 2 }] }] },
+        ignored: { series: [{ timeslices: [{ start_ns: 3, rate: 4 }] }] },
+      },
+      warmup_metrics: {
+        wanted: { series: [{ timeslices: [{ start_ns: 0, rate: 1 }] }] },
+        ignored: { series: [] },
+      },
+    }),
+  );
+
+  it('retains the complete phase maps on the bounded fast path', async () => {
+    const phases = await collectMetricPhases(blob, new Set(['wanted']));
+
+    expect(phases.complete).toBe(true);
+    expect(Object.keys(phases.metrics)).toEqual(['wanted', 'ignored']);
+    expect(Object.keys(phases.warmupMetrics)).toEqual(['wanted', 'ignored']);
+  });
+
+  it('collects both filtered phase maps from one streaming parse', async () => {
+    const phases = await collectMetricPhases(blob, new Set(['wanted']), 1);
+
+    expect(phases).toEqual({
+      metrics: {
+        wanted: { series: [{ timeslices: [{ start_ns: 1, rate: 2 }] }] },
+      },
+      warmupMetrics: {
+        wanted: { series: [{ timeslices: [{ start_ns: 0, rate: 1 }] }] },
+      },
+      complete: false,
+    });
+  });
+
+  it('rejects malformed gzip input on both paths', async () => {
+    await expect(
+      collectMetricPhases(Buffer.from('not gzip'), new Set(['wanted']), 1),
     ).rejects.toThrow();
   });
 });
