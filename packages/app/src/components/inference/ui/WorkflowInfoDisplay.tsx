@@ -118,6 +118,7 @@ export default function WorkflowInfoDisplay({
       .filter((entry) => entry.config_keys.length > 0);
     return filtered.length > 0 ? { entries: filtered } : null;
   })();
+  const selectedRunConfigs = availableRuns?.[selectedRunId]?.runConfigs ?? [];
 
   return (
     <div className="flex flex-wrap gap-2 lg:gap-4 text-muted-foreground">
@@ -229,7 +230,7 @@ export default function WorkflowInfoDisplay({
                         <div className="text-xs font-bold">Updated Configs</div>
                         <ul className="list-disc pl-4">
                           {entry.config_keys.map((key: string) => (
-                            <li key={key}>{formatConfigKeys(key)}</li>
+                            <li key={key}>{formatConfigKeys(key, selectedRunConfigs)}</li>
                           ))}
                         </ul>
                       </div>
