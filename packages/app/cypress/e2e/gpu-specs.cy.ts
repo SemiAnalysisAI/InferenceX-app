@@ -5,11 +5,11 @@ describe('GPU Specs Tab', () => {
     });
     cy.visit('/gpu-specs');
     // Wait for GPU Specs tab content to be present in the DOM
-    cy.get('h2').contains('GPU Specifications').should('exist');
+    cy.get('h2').contains('Chip Specifications').should('exist');
   });
 
   it('tab renders with correct title', () => {
-    cy.get('h2').should('contain.text', 'GPU Specifications');
+    cy.get('h2').should('contain.text', 'Chip Specifications');
   });
 
   it('specs table is visible with all GPUs', () => {
@@ -41,7 +41,7 @@ describe('GPU Specs Tab', () => {
   });
 
   it('table has correct column headers', () => {
-    cy.get('th').eq(0).should('contain.text', 'GPU');
+    cy.get('th').eq(0).should('contain.text', 'Chip');
     cy.get('th').eq(1).should('contain.text', 'Memory');
     cy.get('th').eq(2).should('contain.text', 'Mem BW');
     cy.get('th').eq(3).should('contain.text', 'FP4');
@@ -90,8 +90,8 @@ describe('GPU Specs Tab', () => {
     cy.get('[data-testid="topology-h200-sxm"] svg')
       .should('exist')
       .within(() => {
-        cy.contains('GPU 0').should('exist');
-        cy.contains('GPU 7').should('exist');
+        cy.contains('Chip 0').should('exist');
+        cy.contains('Chip 7').should('exist');
         cy.contains('L0').should('exist');
         cy.contains('S0').should('exist');
         cy.contains('Server 1').should('exist');
@@ -140,7 +140,7 @@ describe('GPU Specs Tab', () => {
     cy.get('[data-testid="scaleup-topology-h200-sxm"] svg')
       .should('exist')
       .within(() => {
-        cy.contains('GPU 0').should('exist');
+        cy.contains('Chip 0').should('exist');
         cy.contains('NVSwitch').should('exist');
       });
   });
@@ -149,8 +149,8 @@ describe('GPU Specs Tab', () => {
     cy.get('[data-testid="scaleup-topology-mi300x"] svg')
       .should('exist')
       .within(() => {
-        cy.contains('GPU 0').should('exist');
-        cy.contains('GPU 7').should('exist');
+        cy.contains('Chip 0').should('exist');
+        cy.contains('Chip 7').should('exist');
       });
   });
 
@@ -194,7 +194,7 @@ describe('GPU Specs Bar Chart View', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/gpu-specs');
-    cy.get('h2').contains('GPU Specifications').should('exist');
+    cy.get('h2').contains('Chip Specifications').should('exist');
     // Dismiss any Radix Dialog scroll locks from topology diagram components
     cy.get('body').then(($body) => {
       if ($body.attr('data-scroll-locked')) {
@@ -268,7 +268,7 @@ describe('GPU Specs Radar Chart View', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/gpu-specs');
-    cy.get('h2').contains('GPU Specifications').should('exist');
+    cy.get('h2').contains('Chip Specifications').should('exist');
     cy.get('body').then(($body) => {
       if ($body.attr('data-scroll-locked')) {
         cy.get('body').type('{esc}', { force: true });
@@ -367,7 +367,7 @@ describe('GPU Specs Navigation', () => {
   it('tab switcher activates GPU Specs', () => {
     cy.get('[data-testid="tab-trigger-gpu-specs"]').click();
     cy.url().should('include', '/gpu-specs');
-    cy.get('h2').should('contain.text', 'GPU Specifications');
+    cy.get('h2').should('contain.text', 'Chip Specifications');
   });
 });
 
@@ -377,7 +377,7 @@ describe('Topology Dialog Navigation', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/gpu-specs');
-    cy.get('h2').contains('GPU Specifications').should('exist');
+    cy.get('h2').contains('Chip Specifications').should('exist');
   });
 
   it('scale-out topology dialog has navigation arrows', () => {

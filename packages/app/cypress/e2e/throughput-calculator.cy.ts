@@ -201,7 +201,7 @@ describe('TCO Calculator', () => {
     });
 
     it('shows TCO badges when cost metric is selected', () => {
-      cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'TCO $/GPU/hr');
+      cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'TCO $/chip/hr');
       cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', '$');
     });
 
@@ -505,7 +505,7 @@ describe('TCO Calculator', () => {
       );
       cy.get('[data-testid="calculator-chart-section"]').should(
         'contain.text',
-        'throughput per decode GPU',
+        'throughput per decode chip',
       );
     });
 
@@ -513,7 +513,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-metric-cost"]').click();
       cy.get('[data-testid="calculator-chart-section"]').should(
         'contain.text',
-        'cost per decode GPU',
+        'cost per decode chip',
       );
     });
 
@@ -521,7 +521,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-metric-power"]').click();
       cy.get('[data-testid="calculator-chart-section"]').should(
         'contain.text',
-        'throughput per decode GPU',
+        'throughput per decode chip',
       );
     });
   });
@@ -712,7 +712,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calc-fleet-mw-input"]').type('0.0001');
       cy.get('[data-testid="calculator-fleet-empty"]')
         .should('be.visible')
-        .and('contain.text', 'too small to power a single GPU');
+        .and('contain.text', 'too small to power a single chip');
       cy.get('[data-testid="calculator-fleet-table"]').should('not.exist');
     });
 
