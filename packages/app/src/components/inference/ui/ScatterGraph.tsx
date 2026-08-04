@@ -52,8 +52,12 @@ import {
   getShapeKeyForPrecision,
 } from '@/lib/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { paretoFrontForDirection, type ParetoDirection } from '@/lib/chart-utils';
-import { e2eRestrictedSeed } from '@/components/inference/utils/e2eFrontier';
+import {
+  isFrontierEligible,
+  paretoFrontForDirection,
+  type ParetoDirection,
+} from '@/lib/chart-utils';
+import { canonicalFrontierPoints } from '@/components/inference/utils/canonicalFrontier';
 import { type RooflineDirection, getSpeedOverlayCorners } from '@/lib/speed-overlay';
 import type {
   ChartDefinition,
@@ -390,6 +394,8 @@ const SCATTER_STRINGS = {
   en: {
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
+    optimalInfo:
+      'On agentic, optimal is defined by the E2E Normalized Interactivity Pareto frontier. Every x-axis reuses exactly that winner set.',
     labels: 'Labels',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
@@ -403,6 +409,8 @@ const SCATTER_STRINGS = {
   zh: {
     logScale: '对数缩放',
     optimalOnly: '仅最优',
+    optimalInfo:
+      '在智能体场景中，最优点由端到端归一化交互性的 Pareto 前沿统一定义，所有横轴均复用同一组优胜点。',
     labels: '标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',
@@ -470,7 +478,6 @@ const ScatterGraph = React.memo(
       trackedConfigs,
       addTrackedConfig,
       removeTrackedConfig,
-      selectedXAxisMode,
       selectedSequence,
       selectedModel,
       quickFilters,
@@ -773,11 +780,13 @@ const ScatterGraph = React.memo(
       for (const hwKey of Object.keys(groupedData)) {
         const combined: InferenceData[] = [];
         for (const datePoints of groupPointsByDate(groupedData[hwKey]).values()) {
-          // e2eRestrictedSeed narrows to the e2e-Pareto winners when the
-          // isOnE2eFrontier flag is present (agentic non-e2e xmodes).
-          const seedPoints = e2eRestrictedSeed(datePoints);
-          if (seedPoints.length === 0) continue;
-          combined.push(...frontierFn(seedPoints));
+          // Agentic modes reuse the exact normalized north-star winners.
+          // Do not Pareto them a second time after swapping x axes: doing so
+          // would violate the iff contract by dropping canonical winners.
+          const canonicalPoints = canonicalFrontierPoints(datePoints);
+          const front = canonicalPoints ?? frontierFn(datePoints.filter(isFrontierEligible));
+          if (front.length === 0) continue;
+          combined.push(...front);
         }
         combined.sort((a, b) => a.x - b.x);
         result[hwKey] = combined;
@@ -1011,9 +1020,8 @@ const ScatterGraph = React.memo(
       const frontierFn = paretoFrontForDirection(dir ?? 'lower_right');
       const result: Record<string, Entry> = {};
       for (const [key, group] of Object.entries(grouped)) {
-        // Same e2e-winner narrowing the official `rooflines` memo applies
-        // (flags stamped per run in processOverlayChartData).
-        const front = frontierFn(e2eRestrictedSeed(group.points));
+        const canonicalPoints = canonicalFrontierPoints(group.points);
+        const front = canonicalPoints ?? frontierFn(group.points.filter(isFrontierEligible));
         front.sort((a, b) => a.x - b.x);
         result[key] = { hwKey: group.hwKey, runIndex: group.runIndex, points: front };
       }
@@ -3360,15 +3368,10 @@ const ScatterGraph = React.memo(
                     setHideNonOptimal(checked);
                     track('latency_hide_non_optimal_toggled', { enabled: checked });
                   },
-                  // On agentic + non-e2e chart, "optimal" means "on the
-                  // e2e-latency Pareto frontier" (not a per-axis Pareto on the
-                  // current x metric). Explain that so users don't wonder why
-                  // a point sitting above the line is still considered
-                  // dominated.
-                  ...(selectedSequence === Sequence.AgenticTraces && selectedXAxisMode !== 'e2e'
+                  // Every agentic axis shares the normalized north-star set.
+                  ...(selectedSequence === Sequence.AgenticTraces
                     ? {
-                        infoTooltip:
-                          "On agentic, optimal = on the end-to-end latency Pareto frontier, so a config can't win this axis by tanking e2e. Off-frontier points may appear above the line.",
+                        infoTooltip: legendT.optimalInfo,
                       }
                     : {}),
                 },

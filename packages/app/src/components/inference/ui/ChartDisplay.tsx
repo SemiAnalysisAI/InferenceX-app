@@ -24,6 +24,7 @@ import {
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
+import { canonicalNormalizedFrontierIds } from '@/components/inference/utils/canonicalFrontier';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { Card } from '@/components/ui/card';
@@ -165,7 +166,6 @@ interface DerivedXModeSpec {
   xLabelZh?: (percentileLabel: string) => string;
   heading: (percentileLabel: string) => string;
   headingZh?: (percentileLabel: string) => string;
-  higherXIsBetter: boolean;
   value: (m: DerivedAgenticMetric | undefined, percentile: string) => number | null | undefined;
   toX: (raw: number) => number;
 }
@@ -176,7 +176,6 @@ const DERIVED_X_MODE_SPECS: Partial<Record<XAxisMode, DerivedXModeSpec>> = {
     xLabelZh: (pctl) => `${pctl} 端到端归一化交互性 (tok/s/user)`,
     heading: (pctl) => `vs. ${pctl} E2E Normalized Interactivity`,
     headingZh: (pctl) => `vs. ${pctl} 端到端归一化交互性`,
-    higherXIsBetter: true,
     value: (m, percentile) =>
       percentile === 'p75' ? m?.p75_e2e_norm_intvty : m?.p90_e2e_norm_intvty,
     toX: (raw) => raw,
@@ -368,9 +367,9 @@ export default function ChartDisplay() {
         {
           isAgentic,
           selectedPercentile,
-          // Same gate useChartData applies to the official points — on any
-          // non-e2e x-mode, agentic rooflines are restricted to e2e winners.
-          restrictToE2eFrontier: isAgentic && selectedXAxisMode !== 'e2e',
+          // Unofficial rows lack persisted request traces, so they cannot be
+          // admitted to the normalized north-star frontier on any agentic axis.
+          restrictToNormalizedFrontier: isAgentic,
         },
       );
 
@@ -616,69 +615,101 @@ export default function ChartDisplay() {
   }, [effectiveGraphs, selectedXAxisMode]);
 
   const isAgenticSequence = sequenceKind(selectedSequence) === 'agentic';
-  const useDerived = isAgenticSequence && isAgenticOnlyXAxisMode(selectedXAxisMode);
+  const useDerivedXAxis = isAgenticSequence && isAgenticOnlyXAxisMode(selectedXAxisMode);
   const derivedTargetIds = useMemo(() => {
-    if (!useDerived) return [] as number[];
+    // Every agentic x-axis is classified by the normalized north-star
+    // frontier, so all modes need the persisted trace-derived metric.
+    if (!isAgenticSequence) return [] as number[];
     const ids = new Set<number>();
     for (const graph of visibleGraphs) {
-      for (const point of graph.data) {
+      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      for (const point of points) {
         if (point.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(point.id)) {
           ids.add(point.id);
         }
       }
     }
     return [...ids];
-  }, [useDerived, visibleGraphs]);
-  const derivedQuery = useDerivedAgenticMetrics(derivedTargetIds, useDerived);
+  }, [isAgenticSequence, visibleGraphs]);
+  const derivedQuery = useDerivedAgenticMetrics(derivedTargetIds, isAgenticSequence);
   const derivedMetrics = derivedQuery.data;
-  const isDerivedLoading =
-    useDerived &&
+  const isCanonicalFrontierLoading =
+    isAgenticSequence &&
     derivedTargetIds.length > 0 &&
     (derivedQuery.isPending || derivedQuery.isFetching) &&
     !derivedMetrics;
-  const derivedSpec = useDerived ? DERIVED_X_MODE_SPECS[selectedXAxisMode] : undefined;
+  const derivedSpec = useDerivedXAxis ? DERIVED_X_MODE_SPECS[selectedXAxisMode] : undefined;
 
   const renderableGraphs = useMemo(() => {
-    if (!derivedSpec) return visibleGraphs;
+    if (!isAgenticSequence) return visibleGraphs;
     if (!derivedMetrics) {
       return visibleGraphs.map((graph) => ({ ...graph, data: [], clippedData: [] }));
     }
-    const xLabelFn =
-      locale === 'zh' && derivedSpec.xLabelZh ? derivedSpec.xLabelZh : derivedSpec.xLabel;
-    const xLabel = xLabelFn(selectedPercentile.toUpperCase());
     return visibleGraphs.map((graph) => {
       const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof typeof graph.chartDefinition;
-      const corner = derivedModeRoofline(
-        graph.chartDefinition[rooflineKey] as RooflineDirection | undefined,
-        derivedSpec.higherXIsBetter,
+      // The normalized axis is higher-is-better. Compute its true Pareto
+      // direction once, regardless of which x-axis is currently displayed.
+      const configuredCorner = graph.chartDefinition[rooflineKey] as RooflineDirection | undefined;
+      const canonicalCorner =
+        graph.chartDefinition.chartType === 'e2e'
+          ? derivedModeRoofline(configuredCorner, true)
+          : configuredCorner;
+      const allPoints = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      const canonicalIds = canonicalNormalizedFrontierIds(
+        allPoints,
+        derivedMetrics,
+        selectedPercentile,
+        canonicalCorner,
       );
-      const chartDefinition = {
-        ...graph.chartDefinition,
-        x_label: xLabel,
-        y_latency_limit: undefined,
-        ...(corner ? { [rooflineKey]: corner } : {}),
-      };
-      const remapPoint = (point: InferenceData): InferenceData | null => {
-        if (!isPersistedBenchmarkId(point.id)) return null;
-        const raw = derivedSpec.value(derivedMetrics[point.id], selectedPercentile);
+
+      const preparePoint = (point: InferenceData): InferenceData | null => {
+        const pointId = isPersistedBenchmarkId(point.id) ? point.id : null;
+        const stamped = {
+          ...point,
+          isOnNormalizedInteractivityFrontier:
+            canonicalIds === null ? undefined : pointId !== null && canonicalIds.has(pointId),
+        };
+        if (!derivedSpec) return stamped;
+        if (pointId === null) return null;
+        const raw = derivedSpec.value(derivedMetrics[pointId], selectedPercentile);
         if (raw === null || raw === undefined || !Number.isFinite(raw)) return null;
-        return { ...point, x: derivedSpec.toX(raw) };
+        return { ...stamped, x: derivedSpec.toX(raw) };
       };
+
       const data = graph.data
-        .map(remapPoint)
+        .map(preparePoint)
         .filter((point): point is InferenceData => point !== null);
       const clippedData = (graph.clippedData ?? [])
         .map((entry) => {
-          const point = remapPoint(entry.point);
+          const point = preparePoint(entry.point);
           return point ? { ...entry, point } : null;
         })
         .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+      if (!derivedSpec) return { ...graph, data, clippedData };
+
+      const xLabelFn =
+        locale === 'zh' && derivedSpec.xLabelZh ? derivedSpec.xLabelZh : derivedSpec.xLabel;
+      const chartDefinition = {
+        ...graph.chartDefinition,
+        x_label: xLabelFn(selectedPercentile.toUpperCase()),
+        y_latency_limit: undefined,
+        ...(canonicalCorner ? { [rooflineKey]: canonicalCorner } : {}),
+      };
       return { ...graph, chartDefinition, data, clippedData };
     });
-  }, [derivedSpec, visibleGraphs, derivedMetrics, selectedYAxisMetric, selectedPercentile, locale]);
+  }, [
+    isAgenticSequence,
+    derivedSpec,
+    visibleGraphs,
+    derivedMetrics,
+    selectedYAxisMetric,
+    selectedPercentile,
+    locale,
+  ]);
 
   const displayGraphs =
-    isFirstLoad || isDerivedLoading
+    isFirstLoad || isCanonicalFrontierLoading
       ? [
           <Card key="skeleton-0">
             <Skeleton className="h-7 w-2/4 mb-1" />

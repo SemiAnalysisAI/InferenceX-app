@@ -25,9 +25,7 @@ import {
 } from '@/lib/constants';
 import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmark-transform';
 import { Sequence, type Model } from '@/lib/data-mappings';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
-import { e2eFrontierWinners } from '@/components/inference/utils/e2eFrontier';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import {
   applyQuickFilters,
@@ -57,34 +55,6 @@ export const X_AXIS_MODES: readonly XAxisMode[] = [
  */
 export function isAgenticOnlyXAxisMode(mode: XAxisMode): boolean {
   return mode === 'e2e-normalized-interactivity';
-}
-
-/**
- * Compute the set of benchmark_results.id values that sit on the
- * (e2e_latency, y) Pareto frontier within each (hwKey, precision, date)
- * group. Used to restrict the non-e2e xmode charts (ttft, interactivity,
- * e2e-normalized-interactivity) so they show *only* the points that win on
- * end-to-end latency — preventing benchmark-hacking where a config tops
- * one axis while tanking the other.
- *
- * Returns null when the y-metric has no roofline direction declared on
- * the e2e chart (caller falls back to no filtering in that case).
- */
-function e2eParetoIds(
-  points: InferenceData[],
-  selectedYAxisMetric: string,
-  percentile: string,
-): Set<number> | null {
-  // Shared seed with the overlay path (processOverlayChartData) so both draw
-  // the SAME e2e-restricted frontier. null = the y-metric has no e2e roofline
-  // direction → caller skips filtering. Only persisted DB rows carry ids to pin.
-  const winners = e2eFrontierWinners(points, selectedYAxisMetric, percentile);
-  if (winners === null) return null;
-  const ids = new Set<number>();
-  for (const winner of winners) {
-    if (isPersistedBenchmarkId(winner.id)) ids.add(winner.id);
-  }
-  return ids;
 }
 
 /** Build deduplicated comparison dates, excluding the main run date. */
@@ -225,15 +195,9 @@ export function useChartData(
    * configs that the selected run did not produce.
    */
   selectedRunId?: string,
-  /**
-   * Current x-axis mode. When set to anything other than 'e2e', the displayed
-   * data is filtered to the (e2e-latency, y) Pareto frontier so the ttft /
-   * interactivity / e2e-normalized-interactivity charts show only points that
-   * also win on end-to-end latency — preventing benchmark-hacking where a
-   * config tops one metric while tanking the other. The 'e2e' mode is the
-   * source of truth and keeps the full point set.
-   */
-  selectedXAxisMode: XAxisMode = 'e2e',
+  /** Current x-axis mode. Canonical agentic-frontier stamping happens later,
+   * after ChartDisplay has fetched the trace-derived normalized metric. */
+  _selectedXAxisMode: XAxisMode = 'e2e',
   /**
    * GitHub run id for the "as of run" base view. Set only when an
    * earlier-than-latest run is selected.
@@ -551,26 +515,10 @@ export function useChartData(
               })
           : [];
 
-        // For AGENTIC workloads only: when the user is NOT viewing the
-        // e2e latency chart, mark each point with whether it sits on the
-        // (e2e_latency, y) Pareto frontier for its (hwKey, precision,
-        // date) group. Include clipped points in this seed so official and
-        // unofficial continuation lines preserve the same anti-hacking rule.
         const isAgentic = selectedSequence === Sequence.AgenticTraces;
-        const e2eParetoSet =
-          isAgentic && selectedXAxisMode !== 'e2e'
-            ? e2eParetoIds(mappedData, selectedYAxisMetric, selectedPercentile)
-            : null;
-        const stampedData = mappedData.map((d) => ({
-          ...d,
-          isOnE2eFrontier:
-            e2eParetoSet === null
-              ? undefined
-              : isPersistedBenchmarkId(d.id) && e2eParetoSet.has(d.id),
-        }));
 
         const { data: processedData, clippedData } = partitionChartDataByLimits(
-          stampedData,
+          mappedData,
           chartDefinition,
           selectedYAxisMetric,
           { isTtftX, isAgentic },
@@ -596,7 +544,6 @@ export function useChartData(
     userPowers,
     stableChartDefinitions,
     compareGpuPair,
-    selectedXAxisMode,
     selectedPercentile,
     quickFilters,
   ]);

@@ -258,16 +258,14 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   y: number;
   hidden?: boolean;
   /**
-   * Whether this point sits on the (e2e_latency, y-metric) Pareto frontier.
-   * Set by useChartData when `selectedXAxisMode !== 'e2e'`. The TTFT /
-   * interactivity / e2e-normalized-interactivity charts use this flag to
-   * restrict their roofline computation to e2e-Pareto winners — vendors
-   * can't benchmark-hack TTFT by tanking decode (or vice versa) and still
-   * appear on the frontier line — while keeping every point visible as
-   * scatter so the user can see where dominated configs actually sit.
-   * Undefined when the chart is in e2e mode (no remapping needed).
+   * Whether this point sits on the canonical
+   * (E2E Normalized Interactivity, y-metric) Pareto frontier. Every agentic
+   * x-axis reuses this exact winner set, so E2E latency, Interactivity, and
+   * TTFT cannot introduce a locally-optimal point or remove a north-star
+   * winner. Undefined for fixed-sequence data and y metrics without a
+   * declared Pareto direction.
    */
-  isOnE2eFrontier?: boolean;
+  isOnNormalizedInteractivityFrontier?: boolean;
 
   // Overridden fields with narrower types
   hwKey: string;
