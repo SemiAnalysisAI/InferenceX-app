@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpen, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
+import { BookOpen, ExternalLink, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -128,11 +128,17 @@ const STRINGS = {
     payloadBandwidthNote:
       'Payload bandwidth is the full logical payload (incl. FP8 scale bytes) ÷ latency, per GPU — a derived rate over logical bytes, not physical link bandwidth. The tooltip β/α is a least-squares fit of latency vs bytes across the ladder (β = per-GPU bandwidth term, α = fixed overhead).',
     deleteRun: 'Delete run',
+    deleteShownRuns: 'Delete shown runs',
+    deletingShownRuns: 'Deleting shown runs…',
     deleteConfirm: (id: string) =>
       `Delete run #${id} from the dashboard database? This cannot be undone.`,
+    deleteShownConfirm: (ids: readonly string[]) =>
+      `Delete ${ids.length} shown ${ids.length === 1 ? 'run' : 'runs'} from the dashboard database? This cannot be undone.\n\n${ids.map((id) => `#${id}`).join('\n')}`,
     deleteTokenPrompt: 'Admin token required to delete runs:',
     deleteUnauthorized: 'Invalid admin token.',
     deleteFailed: 'Deleting the run failed. Try again.',
+    deleteShownFailed: (deleted: number, total: number) =>
+      `Deleted ${deleted} of ${total} shown runs before the operation failed. Try again.`,
   },
   zh: {
     operation: {
@@ -269,12 +275,17 @@ const STRINGS = {
     attemptLabel: 'Attempt',
     matrixLabel: 'Matrix',
     sourceBundles: '源产物包',
-    deleteRun: 'Delete run',
-    deleteConfirm: (id: string) =>
-      `Delete run #${id} from the dashboard database? This cannot be undone.`,
-    deleteTokenPrompt: 'Admin token required to delete runs:',
-    deleteUnauthorized: 'Invalid admin token.',
-    deleteFailed: 'Deleting the run failed. Try again.',
+    deleteRun: '删除运行',
+    deleteShownRuns: '删除已显示的运行',
+    deletingShownRuns: '正在删除已显示的运行…',
+    deleteConfirm: (id: string) => `从仪表板数据库中删除运行 #${id}？此操作无法撤销。`,
+    deleteShownConfirm: (ids: readonly string[]) =>
+      `从仪表板数据库中删除当前显示的 ${ids.length} 个运行？此操作无法撤销。\n\n${ids.map((id) => `#${id}`).join('\n')}`,
+    deleteTokenPrompt: '删除运行需要管理员令牌：',
+    deleteUnauthorized: '管理员令牌无效。',
+    deleteFailed: '删除运行失败，请重试。',
+    deleteShownFailed: (deleted: number, total: number) =>
+      `操作失败前已删除 ${total} 个已显示运行中的 ${deleted} 个，请重试。`,
   },
 } as const;
 const CONCLUSION_CLASSES: Record<string, string> = {
@@ -312,21 +323,22 @@ export default function CollectiveXDisplay() {
   const t = STRINGS[locale];
   const [version, setVersion] = useState<CollectiveXVersion>(COLLECTIVEX_DEFAULT_VERSION);
   const [visibleRunIds, setVisibleRunIds] = useState<Set<string>>(new Set());
+  const [bulkDeletingRunIds, setBulkDeletingRunIds] = useState<Set<string>>(new Set());
   const initializedVersionRef = useRef<CollectiveXVersion | null>(null);
   const runsQuery = useCollectiveXRuns(version);
   const runList = runsQuery.data?.runs ?? [];
-  const orderedVisibleRunIds = useMemo(
-    () => runList.filter((run) => visibleRunIds.has(run.run_id)).map((run) => run.run_id),
-    [runList, visibleRunIds],
-  );
+  const orderedVisibleRunIds = useMemo(() => {
+    const liveRunIds = new Set(runList.map((run) => run.run_id));
+    return [...visibleRunIds].filter((runId) => liveRunIds.has(runId));
+  }, [runList, visibleRunIds]);
   const runQueries = useCollectiveXRunDatasets(version, orderedVisibleRunIds);
   const datasets = useMemo(
     () => runQueries.flatMap((query) => (query.data ? [query.data] : [])),
     [runQueries],
   );
-  const runIndexById = useMemo(
-    () => new Map(runList.map((run, index) => [run.run_id, index])),
-    [runList],
+  const selectedRunIndexById = useMemo(
+    () => new Map(orderedVisibleRunIds.map((runId, index) => [runId, index])),
+    [orderedVisibleRunIds],
   );
   const combinedSeries = useMemo<CollectiveXRunSeries[]>(
     () =>
@@ -334,10 +346,10 @@ export default function CollectiveXDisplay() {
         collectiveXSeriesForRun(
           dataset.series,
           dataset.run.run_id,
-          runIndexById.get(dataset.run.run_id) ?? 0,
+          selectedRunIndexById.get(dataset.run.run_id) ?? 0,
         ),
       ),
-    [datasets, runIndexById],
+    [datasets, selectedRunIndexById],
   );
   const loadingRunIds = useMemo(
     () =>
@@ -568,6 +580,11 @@ export default function CollectiveXDisplay() {
     for (const query of runQueries) void query.refetch();
   }, [runQueries, runsQuery]);
   const deleteRun = useDeleteCollectiveXRun();
+  const deletingRunIds = useMemo(() => {
+    if (bulkDeletingRunIds.size > 0) return bulkDeletingRunIds;
+    const runId = deleteRun.isPending ? deleteRun.variables?.runId : undefined;
+    return new Set(runId ? [runId] : []);
+  }, [bulkDeletingRunIds, deleteRun.isPending, deleteRun.variables?.runId]);
   const handleVisibleRunChange = useCallback((runId: string, visible: boolean) => {
     setVisibleRunIds((previous) => {
       const next = new Set(previous);
@@ -605,6 +622,53 @@ export default function CollectiveXDisplay() {
     },
     [deleteRun, t],
   );
+  const handleDeleteShownRuns = useCallback(async () => {
+    const runIds = [...orderedVisibleRunIds];
+    if (runIds.length === 0) return;
+    track('collectivex_shown_runs_delete_prompted', { count: runIds.length, runs: runIds });
+    if (!window.confirm(t.deleteShownConfirm(runIds))) return;
+    const stored = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? '';
+    const token = stored || (window.prompt(t.deleteTokenPrompt)?.trim() ?? '');
+    if (!token) return;
+
+    setBulkDeletingRunIds(new Set(runIds));
+    let deletedCount = 0;
+    try {
+      for (const runId of runIds) {
+        const deleted = await deleteRun.mutateAsync({ runId, token });
+        if (!deleted) {
+          localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+          track('collectivex_shown_runs_delete_failed', {
+            count: runIds.length,
+            deleted: deletedCount,
+            reason: 'unauthorized',
+          });
+          window.alert(t.deleteUnauthorized);
+          return;
+        }
+        deletedCount += 1;
+        setVisibleRunIds((previous) => {
+          const next = new Set(previous);
+          next.delete(runId);
+          return next;
+        });
+      }
+      localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+      track('collectivex_shown_runs_delete_confirmed', {
+        count: runIds.length,
+        runs: runIds,
+      });
+    } catch {
+      track('collectivex_shown_runs_delete_failed', {
+        count: runIds.length,
+        deleted: deletedCount,
+        reason: 'error',
+      });
+      window.alert(t.deleteShownFailed(deletedCount, runIds.length));
+    } finally {
+      setBulkDeletingRunIds(new Set());
+    }
+  }, [deleteRun, orderedVisibleRunIds, t]);
 
   if (runsQuery.isLoading) {
     return (
@@ -729,25 +793,42 @@ export default function CollectiveXDisplay() {
             <h2 className="text-lg font-semibold">{t.runsHeading}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{t.runsDescription}</p>
           </div>
-          <div className="w-full md:w-44">
-            <SelectControl
-              label={t.version}
-              testId="collectivex-version-select"
-              value={version}
-              options={versionOptions}
-              onChange={(value) => {
-                setVersion(value);
-                track('collectivex_version_changed', { version: value });
-              }}
-            />
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end md:w-auto">
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              data-testid="collectivex-delete-shown-runs"
+              disabled={visibleRunIds.size === 0 || deletingRunIds.size > 0}
+              onClick={() => void handleDeleteShownRuns()}
+            >
+              {bulkDeletingRunIds.size > 0 ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Trash2 className="size-4" />
+              )}
+              {bulkDeletingRunIds.size > 0 ? t.deletingShownRuns : t.deleteShownRuns}
+            </Button>
+            <div className="w-full sm:w-44">
+              <SelectControl
+                label={t.version}
+                testId="collectivex-version-select"
+                value={version}
+                options={versionOptions}
+                onChange={(value) => {
+                  setVersion(value);
+                  track('collectivex_version_changed', { version: value });
+                }}
+              />
+            </div>
           </div>
         </div>
         <CollectiveXRunsTable
           runs={runList}
-          runIndexById={runIndexById}
+          selectedRunIndexById={selectedRunIndexById}
           visibleRunIds={visibleRunIds}
           loadingRunIds={loadingRunIds}
-          deletingRunId={deleteRun.isPending ? (deleteRun.variables?.runId ?? null) : null}
+          deletingRunIds={deletingRunIds}
           onVisibleChange={handleVisibleRunChange}
           onDelete={(runId) => void handleDeleteRun(runId)}
         />

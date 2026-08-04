@@ -82,11 +82,13 @@ their combined series.
 
 Series ids are namespaced by GitHub Actions run id so the same matrix case from two runs remains
 independently toggleable. Configuration color stays consistent across runs; run identity is encoded
-as a stable, non-repeating line dash pattern shown in both the run table and legend, keeping run ids
-out of visible legend labels while retaining them in the legend item's accessible title.
+by the active selection order: the first checked run is solid and each additional checked run gets
+the next non-repeating dash pattern. Removing a run compacts those style slots, so a lone remaining
+run is always solid. Active patterns appear in both the run table and legend, keeping run ids out of
+visible legend labels while retaining them in the legend item's accessible title.
 The newest run with measured cases is checked by default; newer incomplete sweeps remain listed but
-cannot blank the initial explorer. Deletion is a row action in the run table and keeps the same
-tombstone semantics described above.
+cannot blank the initial explorer. Deletion is available per row or as one confirmed action for all
+currently shown runs; both paths keep the same tombstone semantics described above.
 
 ## The raw-rows exception
 
