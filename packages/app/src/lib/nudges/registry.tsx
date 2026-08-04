@@ -297,9 +297,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       title: 'Kimi K3 is live',
       titleZh: 'Kimi K3 已上线',
       description:
-        'Day-zero benchmarks for Kimi K3 are now available across the latest NVIDIA and AMD GPUs. Results are experimental — see how the new model performs across hardware.',
+        'Day-zero benchmarks for Kimi K3 are now available across the latest NVIDIA and AMD chips. Results are experimental — see how the new model performs across hardware.',
       descriptionZh:
-        'Kimi K3 的首日基准测试数据现已覆盖最新的 NVIDIA 和 AMD GPU。结果为实验性数据——来看看新模型在不同硬件上的表现。',
+        'Kimi K3 的首日基准测试数据现已覆盖最新的 NVIDIA 和 AMD Chip。结果为实验性数据——来看看新模型在不同硬件上的表现。',
       testId: 'launch-modal',
       containerClassName: 'border-brand/40',
       badge: 'New',
@@ -337,9 +337,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       title: 'Star InferenceX on GitHub',
       titleZh: '在 GitHub 上为 InferenceX 加星',
       description:
-        'Star InferenceX on GitHub to get notified when we publish new benchmark data. We update GPU performance comparisons regularly — starring is the easiest way to stay in the loop and help the project grow.',
+        'Star InferenceX on GitHub to get notified when we publish new benchmark data. We update chip performance comparisons regularly — starring is the easiest way to stay in the loop and help the project grow.',
       descriptionZh:
-        '在 GitHub 上为 InferenceX 加星，以便在我们发布新基准测试数据时收到通知。我们定期更新 GPU 性能对比——加星是保持关注并帮助项目成长的最简单方式。',
+        '在 GitHub 上为 InferenceX 加星，以便在我们发布新基准测试数据时收到通知。我们定期更新 Chip 性能对比——加星是保持关注并帮助项目成长的最简单方式。',
       testId: 'github-star-modal',
       dismissLabel: 'Maybe Later',
       dismissLabelZh: '稍后再看',
@@ -378,8 +378,8 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       iconClassName: 'text-brand',
       title: 'Kimi K3 benchmarks are live',
       titleZh: 'Kimi K3 基准测试已上线',
-      description: 'First inference numbers across NVIDIA and AMD GPUs, click to explore.',
-      descriptionZh: 'NVIDIA 和 AMD GPU 的首批推理数据，点击探索。',
+      description: 'First inference numbers across NVIDIA and AMD chips, click to explore.',
+      descriptionZh: 'NVIDIA 和 AMD Chip 的首批推理数据，点击探索。',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',

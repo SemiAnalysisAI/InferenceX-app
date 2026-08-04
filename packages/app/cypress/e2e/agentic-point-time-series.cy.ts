@@ -312,7 +312,7 @@ describe('Agentic point orchestrator metric sources', () => {
       .and('contain.text', 'Mooncake')
       .and('contain.text', 'Router')
       .and('contain.text', 'vLLM Router 0.1.14')
-      .and('contain.text', 'GPU cache hit')
+      .and('contain.text', 'Chip cache hit')
       .and('contain.text', 'CPU cache hit');
 
     cy.get('[data-testid="metric-source-toolbar"]')

@@ -147,7 +147,7 @@ describe('Gradient Labels with non-default Y-axis metrics', () => {
 
   it('gradient defs render for throughput metric (upper_right roofline)', () => {
     cy.get('#scatter-gradient-labels').click();
-    selectMetricAndEnableGradient('Token Throughput per GPU');
+    selectMetricAndEnableGradient('Token Throughput per Chip');
 
     cy.get(
       '[data-testid="scatter-graph"] svg defs linearGradient[id^="roofline-gradient-"]',

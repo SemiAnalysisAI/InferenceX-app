@@ -180,7 +180,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
     return (
       <div data-testid="gpu-specs-radar-chart">
         <div className="flex items-center justify-center h-60 text-muted-foreground">
-          Select at least one GPU to display the radar chart.
+          Select at least one chip to display the radar chart.
         </div>
       </div>
     );
@@ -229,8 +229,8 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
       />
       <div className="px-4 md:px-8 pt-2">
         <p className="text-xs text-muted-foreground">
-          Values are normalized to percentages of the maximum across all GPUs for each metric. GPUs
-          without FP4 support show 0% on the FP4 axis.
+          Values are normalized to percentages of the maximum across all chips for each metric.
+          chips without FP4 support show 0% on the FP4 axis.
         </p>
       </div>
     </div>

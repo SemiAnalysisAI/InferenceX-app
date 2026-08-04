@@ -84,7 +84,7 @@ const STRINGS = {
     sourceUnofficial: 'Source: UNOFFICIAL',
     sourceOfficial: 'Source: SemiAnalysis InferenceX™',
     updated: 'Updated:',
-    selectDateRange: 'Select a date range or add a run to view GPU comparison',
+    selectDateRange: 'Select a date range or add a run to view chip comparison',
     performanceOverTime: 'Performance Over Time',
     performanceOverTimeDesc:
       'Double-click points on the scatter chart to track configurations over time.',
@@ -101,7 +101,7 @@ const STRINGS = {
     sourceUnofficial: '来源：非官方',
     sourceOfficial: '来源：SemiAnalysis InferenceX™',
     updated: '更新时间：',
-    selectDateRange: '请选择日期范围或添加运行以查看 GPU 对比',
+    selectDateRange: '请选择日期范围或添加运行以查看 Chip 对比',
     performanceOverTime: '性能趋势',
     performanceOverTimeDesc: '双击散点图上的数据点以追踪配置随时间的变化。',
     viewMode: '视图模式',

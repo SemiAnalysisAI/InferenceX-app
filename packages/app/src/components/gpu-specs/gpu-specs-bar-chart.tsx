@@ -330,7 +330,7 @@ export function GpuSpecsBarChart({
         </div>
         {metric.key === 'fp4' && (
           <p className="text-xs text-muted-foreground mt-2">
-            GPUs without FP4 support (H100, H200, MI300X, MI325X) are excluded.
+            Chips without FP4 support (H100, H200, MI300X, MI325X) are excluded.
           </p>
         )}
       </div>

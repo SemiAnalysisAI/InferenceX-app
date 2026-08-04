@@ -274,7 +274,7 @@ export default function ComparisonChangelog({
         <div className="px-4 pt-2 pb-4 flex flex-col gap-3">
           {filteredChangelogs.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No config changelog data matching the selected GPUs and precisions for this date
+              No config changelog data matching the selected chips and precisions for this date
               range. Changelog tracking began Dec 30, 2025.
             </p>
           ) : (

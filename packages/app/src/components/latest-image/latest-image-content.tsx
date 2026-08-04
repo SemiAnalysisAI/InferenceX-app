@@ -33,7 +33,7 @@ import {
 const STRINGS = {
   en: {
     title: 'Current InferenceX Image',
-    description: 'Docker image tags for each model and GPU configuration.',
+    description: 'Docker image tags for each model and chip configuration.',
     loading: 'Loading...',
     error: 'Failed to load image data.',
     noMatch: 'No image data matches the selected filters.',
@@ -45,8 +45,8 @@ const STRINGS = {
     tooltipIslOsl: 'Input Sequence Length / Output Sequence Length in tokens.',
     labelSpecDecode: 'Spec Decode',
     tooltipSpecDecode: 'Speculative decoding method. MTP = Multi-Token Prediction.',
-    labelGpuSku: 'GPU SKU',
-    tooltipGpuSku: 'Filter by GPU model (e.g. H200, MI300X, B200).',
+    labelGpuSku: 'Chip SKU',
+    tooltipGpuSku: 'Filter by Chip model (e.g. H200, MI300X, B200).',
     labelNodeType: 'Node Type',
     tooltipNodeType:
       'Single node = non-disaggregated serving. Disaggregated = separate prefill/decode pools, including Dynamo, Mori, and llm-d.',
@@ -60,7 +60,7 @@ const STRINGS = {
     allFrameworks: 'All frameworks',
     thModel: 'Model',
     thPrecision: 'Precision',
-    thGpuSku: 'GPU SKU',
+    thGpuSku: 'Chip SKU',
     thSpecDecode: 'Spec Decode',
     thCurrentTag: 'Current InferenceX Image Tag',
     thActualLatest: 'Actual Latest Tag',
@@ -68,7 +68,7 @@ const STRINGS = {
   },
   zh: {
     title: 'InferenceX 当前镜像',
-    description: '各模型与 GPU 配置的 Docker 镜像标签。',
+    description: '各模型与 Chip 配置的 Docker 镜像标签。',
     loading: '加载中……',
     error: '无法加载镜像数据。',
     noMatch: '没有符合当前筛选条件的镜像数据。',
@@ -80,8 +80,8 @@ const STRINGS = {
     tooltipIslOsl: '输入序列长度 / 输出序列长度（token 数）。',
     labelSpecDecode: '投机解码',
     tooltipSpecDecode: '投机解码方式。MTP = 多 Token 预测。',
-    labelGpuSku: 'GPU SKU',
-    tooltipGpuSku: '按 GPU 型号筛选（如 H200、MI300X、B200）。',
+    labelGpuSku: 'Chip SKU',
+    tooltipGpuSku: '按 Chip 型号筛选（如 H200、MI300X、B200）。',
     labelNodeType: '节点类型',
     tooltipNodeType:
       '单节点 = 非分离式服务。分离式 = 使用独立预填充/解码池，包括 Dynamo、Mori 和 llm-d。',
@@ -95,7 +95,7 @@ const STRINGS = {
     allFrameworks: '全部框架',
     thModel: '模型',
     thPrecision: '精度',
-    thGpuSku: 'GPU SKU',
+    thGpuSku: 'Chip SKU',
     thSpecDecode: '投机解码',
     thCurrentTag: '当前 InferenceX 镜像标签',
     thActualLatest: '实际最新标签',

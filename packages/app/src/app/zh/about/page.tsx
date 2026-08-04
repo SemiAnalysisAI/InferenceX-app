@@ -115,7 +115,7 @@ export default function AboutPageZh() {
                   3
                 </span>
                 <div>
-                  <strong className="text-foreground">上传产物。</strong> 请求延迟、token 计数、GPU
+                  <strong className="text-foreground">上传产物。</strong> 请求延迟、token 计数、Chip
                   功耗遥测数据和评估样本均附加到运行页面。GitHub Actions 保留这些产物 90
                   天，同时每周发布完整基准测试数据库的快照作为公开的 GitHub
                   Release，以实现更长期的可审计性。

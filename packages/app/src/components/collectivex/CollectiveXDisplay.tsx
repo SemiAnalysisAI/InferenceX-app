@@ -80,7 +80,7 @@ const STRINGS = {
     yAxis: {
       latency: 'Latency',
       'tokens-per-second': 'Token rate at selected latency percentile',
-      'payload-rate': 'Payload bandwidth at selected latency percentile (per GPU)',
+      'payload-rate': 'Payload bandwidth at selected latency percentile (per chip)',
     },
     all: 'All',
     loading: 'Resolving CollectiveX run...',
@@ -126,7 +126,7 @@ const STRINGS = {
     payloadNote:
       'Activation-data rate is derived at the selected latency percentile and is not physical link bandwidth.',
     payloadBandwidthNote:
-      'Payload bandwidth is the full logical payload (incl. FP8 scale bytes) ÷ latency, per GPU — a derived rate over logical bytes, not physical link bandwidth. The tooltip β/α is a least-squares fit of latency vs bytes across the ladder (β = per-GPU bandwidth term, α = fixed overhead).',
+      'Payload bandwidth is the full logical payload (incl. FP8 scale bytes) ÷ latency, per chip — a derived rate over logical bytes, not physical link bandwidth. The tooltip β/α is a least-squares fit of latency vs bytes across the ladder (β = per-chip bandwidth term, α = fixed overhead).',
     deleteRun: 'Delete run',
     deleteShownRuns: 'Delete shown runs',
     deletingShownRuns: 'Deleting shown runs…',
@@ -164,7 +164,7 @@ const STRINGS = {
     yAxis: {
       latency: '延迟',
       'tokens-per-second': '所选延迟分位点的 token 速率',
-      'payload-rate': '所选延迟分位点的载荷带宽（每 GPU）',
+      'payload-rate': '所选延迟分位点的载荷带宽（每 Chip）',
     },
     mode: { normal: '常规', 'low-latency': '低延迟' },
     fabricScope: { all: '全部', 'scale-up': '域内', 'scale-out': '跨域' },
@@ -269,7 +269,7 @@ const STRINGS = {
     isolatedNote: '分项之和为派生值，不用于计算吞吐量。',
     payloadNote: '逻辑载荷速率按所选延迟分位点派生，不代表物理链路带宽。',
     payloadBandwidthNote:
-      '载荷带宽为完整逻辑载荷（含 FP8 缩放字节）÷ 延迟（每 GPU），是基于逻辑字节的派生速率，不代表物理链路带宽。工具提示中的 β/α 为延迟对字节在整个梯度上的最小二乘拟合（β = 每 GPU 带宽项，α = 固定开销）。',
+      '载荷带宽为完整逻辑载荷（含 FP8 缩放字节）÷ 延迟（每 Chip），是基于逻辑字节的派生速率，不代表物理链路带宽。工具提示中的 β/α 为延迟对字节在整个梯度上的最小二乘拟合（β = 每 Chip 带宽项，α = 固定开销）。',
     provenance: '发布数据溯源',
     runLabel: 'Run',
     attemptLabel: 'Attempt',

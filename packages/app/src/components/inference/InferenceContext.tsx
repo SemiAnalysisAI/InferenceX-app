@@ -1542,7 +1542,7 @@ export function InferenceProvider({
           <DialogHeader>
             <DialogTitle>Date Range Reset</DialogTitle>
             <DialogDescription>
-              The GPU configs are not available in the selected date range. The date range will be
+              The chip configs are not available in the selected date range. The date range will be
               reset.
             </DialogDescription>
           </DialogHeader>

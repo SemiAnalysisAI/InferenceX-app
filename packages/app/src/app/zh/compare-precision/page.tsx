@@ -19,14 +19,14 @@ import { canonicalPrecisionCompareSlug, precisionDisplayLabel } from '@/lib/comp
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `精度如何影响 GPU 推理性能？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，提供经过验证的、可复现的测试结果。${SUPPORTERS_LINE_ZH}在同一 GPU 上横向对比 FP4、FP8、BF16、INT4 等多种量化精度对 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5、Qwen 3.5 等模型的影响。`;
+const DESCRIPTION = `精度如何影响 Chip 推理性能？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，提供经过验证的、可复现的测试结果。${SUPPORTERS_LINE_ZH}在同一 Chip 上横向对比 FP4、FP8、BF16、INT4 等多种量化精度对 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5、Qwen 3.5 等模型的影响。`;
 
 export const metadata: Metadata = {
-  title: 'GPU 精度对比',
+  title: 'Chip 精度对比',
   description: DESCRIPTION,
   alternates: zhAlternates('/compare-precision'),
   openGraph: {
-    title: `GPU 精度对比 | ${SITE_NAME}`,
+    title: `Chip 精度对比 | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/zh/compare-precision`,
     type: 'website',
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: `GPU 精度对比 | ${SITE_NAME}`,
+    title: `Chip 精度对比 | ${SITE_NAME}`,
     description: DESCRIPTION,
   },
 };
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',
-  name: `GPU 精度对比 | ${SITE_NAME}`,
+  name: `Chip 精度对比 | ${SITE_NAME}`,
   description: DESCRIPTION,
   url: `${SITE_URL}/zh/compare-precision`,
   inLanguage: 'zh-CN',
@@ -60,10 +60,10 @@ export default async function ComparePrecisionIndexPageZh() {
       <JsonLd data={jsonLd} />
       <section>
         <Card>
-          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">GPU 精度对比</h1>
+          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">Chip 精度对比</h1>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} 组精度正面对比，涵盖 {formatModelList(modelsWithPairs)}
-            。查看 FP4、FP8、BF16、INT4 等多种量化精度如何影响同一 GPU
+            。查看 FP4、FP8、BF16、INT4 等多种量化精度如何影响同一 Chip
             上的吞吐量、成本和交互性——每个页面展示推理图表及插值对比表格。
           </p>
           <div className="mt-6 flex flex-wrap gap-3" data-testid="compare-precision-index-links">
@@ -71,7 +71,7 @@ export default async function ComparePrecisionIndexPageZh() {
               href="/zh/compare"
               className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
             >
-              GPU 对比
+              Chip 对比
               <span aria-hidden="true" className="text-lg lg:text-xl">
                 →
               </span>

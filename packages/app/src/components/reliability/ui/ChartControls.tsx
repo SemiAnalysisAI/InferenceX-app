@@ -18,7 +18,7 @@ const STRINGS = {
   en: {
     dateRangeLabel: 'Date Range',
     dateRangeTooltip:
-      'Time window for calculating GPU reliability metrics. Longer ranges provide more stable statistics but may not reflect recent changes in hardware performance.',
+      'Time window for calculating chip reliability metrics. Longer ranges provide more stable statistics but may not reflect recent changes in hardware performance.',
     dateRangePlaceholder: 'Select date range',
     last3Days: 'Last 3 days',
     last7Days: 'Last 7 days',
@@ -29,7 +29,7 @@ const STRINGS = {
   zh: {
     dateRangeLabel: '时间范围',
     dateRangeTooltip:
-      '计算 GPU 可靠性指标的时间窗口。更长的范围可提供更稳定的统计数据，但可能无法反映近期的硬件性能变化。',
+      '计算 Chip 可靠性指标的时间窗口。更长的范围可提供更稳定的统计数据，但可能无法反映近期的硬件性能变化。',
     dateRangePlaceholder: '选择时间范围',
     last3Days: '最近 3 天',
     last7Days: '最近 7 天',

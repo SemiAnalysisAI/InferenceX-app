@@ -160,7 +160,7 @@ const jsonLd = {
       '@id': `${SITE_URL}/#application`,
       name: SITE_NAME,
       description:
-        'Open-source AI inference benchmark dashboard. Compare GPU performance for LLM inference across NVIDIA GB200, H100, AMD MI355X, and more.',
+        'Open-source AI inference benchmark dashboard. Compare chip performance for LLM inference across NVIDIA GB200, H100, AMD MI355X, and more.',
       url: SITE_URL,
       applicationCategory: 'DeveloperApplication',
       operatingSystem: 'Web',

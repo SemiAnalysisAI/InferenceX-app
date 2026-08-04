@@ -194,16 +194,16 @@ describe('compareMetaDescription', () => {
     ]);
     const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
     expect(desc).toBe(
-      'B200 delivers 34% more tok/s/GPU than B300 on GLM-5; B300 is 12% cheaper per token. Verified open-source benchmarks from InferenceX by SemiAnalysis.',
+      'B200 delivers 34% more tok/s/chip than B300 on GLM-5; B300 is 12% cheaper per token. Verified open-source benchmarks from InferenceX by SemiAnalysis.',
     );
     expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
-    expect(desc.startsWith('B200 delivers 34% more tok/s/GPU than B300 on GLM-5')).toBe(true);
+    expect(desc.startsWith('B200 delivers 34% more tok/s/chip than B300 on GLM-5')).toBe(true);
   });
 
   it('emits only the throughput clause when cost is within 1% (tied)', () => {
     const ssr = makeSsrRows([[40, ir(134, 1), ir(100, 1)]]);
     const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
-    expect(desc.includes('34% more tok/s/GPU')).toBe(true);
+    expect(desc.includes('34% more tok/s/chip')).toBe(true);
     expect(desc.includes('cheaper per token')).toBe(false);
     expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
   });
@@ -212,14 +212,14 @@ describe('compareMetaDescription', () => {
     const ssr = makeSsrRows([[40, ir(100, 1.5), ir(100, 1)]]);
     const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
     expect(desc).toContain('B300 is 50% cheaper per token than B200 on GLM-5');
-    expect(desc.includes('more tok/s/GPU')).toBe(false);
+    expect(desc.includes('more tok/s/chip')).toBe(false);
     expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
   });
 
   it('falls back to boilerplate when there is no comparable data', () => {
     const empty = compareMetaDescription(GLM, 'b200', 'b300', []);
     expect(empty.startsWith('B200 vs B300 inference benchmark on GLM-5')).toBe(true);
-    expect(empty.includes('tok/s/GPU')).toBe(false);
+    expect(empty.includes('tok/s/chip')).toBe(false);
     expect(empty.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
 
     // One side missing at every target → still boilerplate.
@@ -246,7 +246,7 @@ describe('compareMetaDescription', () => {
       [60, null, null],
     ]);
     const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
-    expect(desc.includes('34% more tok/s/GPU')).toBe(true);
+    expect(desc.includes('34% more tok/s/chip')).toBe(true);
   });
 
   it('falls back to an outer usable row when the middle target is degenerate', () => {
@@ -256,7 +256,7 @@ describe('compareMetaDescription', () => {
       [60, null, null],
     ]);
     const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
-    expect(desc.includes('34% more tok/s/GPU')).toBe(true);
+    expect(desc.includes('34% more tok/s/chip')).toBe(true);
   });
 
   it('stays ≤155 chars even with long GPU labels, model name, and huge ratios', () => {
@@ -264,7 +264,7 @@ describe('compareMetaDescription', () => {
     const desc = compareMetaDescription(DSV4, 'gb200', 'gb300', ssr);
     expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
     // A differentiating stat is still present (not the boilerplate).
-    expect(desc.includes('tok/s/GPU') || desc.includes('cheaper per token')).toBe(true);
+    expect(desc.includes('tok/s/chip') || desc.includes('cheaper per token')).toBe(true);
   });
 });
 
@@ -282,7 +282,7 @@ describe('compareMetaDescriptionZh — structural 1:1 port', () => {
     expect(zh).toContain('B300');
     expect(zh).toContain('34%');
     expect(zh).toContain('12%');
-    expect(zh).toContain('每 GPU 吞吐量');
+    expect(zh).toContain('每 Chip 吞吐量');
     expect(zh).toContain('每 token 成本');
     expect(zh.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
   });
