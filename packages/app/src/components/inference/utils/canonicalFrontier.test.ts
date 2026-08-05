@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '../types';
-import { canonicalFrontierPoints, canonicalNormalizedFrontierIds } from './canonicalFrontier';
+import { canonicalNormalizedFrontierIds, canonicalParetoIntersection } from './canonicalFrontier';
 
 const point = (id: number, y: number, over: Partial<InferenceData> = {}): InferenceData =>
   ({
@@ -51,19 +51,69 @@ describe('canonicalNormalizedFrontierIds', () => {
   });
 });
 
-describe('canonicalFrontierPoints', () => {
-  it('returns the exact stamped set without a second axis-local Pareto pass', () => {
-    const canonicalA = point(1, 100, { x: 1, isOnNormalizedInteractivityFrontier: true });
-    const canonicalB = point(2, 90, { x: 2, isOnNormalizedInteractivityFrontier: true });
-    const localOnly = point(3, 500, { x: 3, isOnNormalizedInteractivityFrontier: false });
+describe('canonicalParetoIntersection', () => {
+  it.each([
+    [
+      'E2E latency',
+      [
+        [5, 10.78256, 9091],
+        [10, 11.35504, 17113],
+        [15, 10.55072, 22505],
+        [20, 14.05108, 34255],
+        [30, 17.62118, 46840],
+        [40, 25.18999, 54350],
+        [50, 40.75138, 54443],
+      ],
+    ],
+    [
+      'TTFT',
+      [
+        [5, 1.13862, 9091],
+        [10, 0.97378, 17113],
+        [15, 0.77209, 22505],
+        [20, 1.11642, 34255],
+        [30, 1.27482, 46840],
+        [40, 1.50933, 54350],
+        [50, 2.80568, 54443],
+      ],
+    ],
+  ])('removes the screenshot zig-zag from the %s frontier', (_axis, rows) => {
+    const points = rows.map(([conc, x, y]) =>
+      point(conc, y, {
+        x,
+        conc,
+        isOnNormalizedInteractivityFrontier: true,
+      }),
+    );
 
-    expect(canonicalFrontierPoints([canonicalA, canonicalB, localOnly])).toEqual([
-      canonicalA,
-      canonicalB,
-    ]);
+    expect(
+      canonicalParetoIntersection(points, 'upper_right')?.map((candidate) => candidate.conc),
+    ).toEqual([15, 20, 30, 40, 50]);
+  });
+
+  it('computes the selected-axis frontier before intersecting the canonical set', () => {
+    const nonCanonicalDominator = point(1, 110, {
+      x: 1,
+      isOnNormalizedInteractivityFrontier: false,
+    });
+    const dominatedCanonicalWinner = point(2, 100, {
+      x: 2,
+      isOnNormalizedInteractivityFrontier: true,
+    });
+    const canonicalTradeoff = point(3, 120, {
+      x: 3,
+      isOnNormalizedInteractivityFrontier: true,
+    });
+
+    expect(
+      canonicalParetoIntersection(
+        [dominatedCanonicalWinner, canonicalTradeoff, nonCanonicalDominator],
+        'upper_right',
+      ),
+    ).toEqual([canonicalTradeoff]);
   });
 
   it('returns null when no canonical stamp is present', () => {
-    expect(canonicalFrontierPoints([point(1, 100)])).toBeNull();
+    expect(canonicalParetoIntersection([point(1, 100)], 'upper_right')).toBeNull();
   });
 });

@@ -5,7 +5,7 @@ import {
 } from '@/lib/chart-utils';
 
 import type { ClippedInferenceData, InferenceData } from '../types';
-import { canonicalFrontierPoints } from './canonicalFrontier';
+import { canonicalParetoIntersection } from './canonicalFrontier';
 
 export interface FrontierContinuation {
   from: InferenceData;
@@ -36,7 +36,7 @@ export function buildFrontierContinuations(
   const visibleSet = new Set(visible);
   const clippedByPoint = new Map(clipped.map((entry) => [entry.point, entry]));
   const allPoints = [...visible, ...clipped.map((entry) => entry.point)];
-  const canonicalPoints = canonicalFrontierPoints(allPoints);
+  const canonicalPoints = canonicalParetoIntersection(allPoints, direction);
   const frontier = (
     canonicalPoints ?? paretoFrontForDirection(direction)(allPoints.filter(isFrontierEligible))
   ).toSorted((a, b) => a.x - b.x);

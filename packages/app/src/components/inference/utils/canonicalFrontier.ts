@@ -3,10 +3,9 @@
  * @description Canonical agentic Pareto-frontier helpers.
  *
  * E2E Normalized Interactivity is the agentic "north star" axis. Its true
- * Pareto frontier is computed once, then the exact same winning benchmark ids
- * are re-plotted on E2E latency, Interactivity, and TTFT. Those alternate axes
- * must not add a locally-optimal point or drop a canonical winner with a second
- * Pareto pass.
+ * Pareto frontier supplies the canonical eligibility set for every agentic
+ * x-axis. Each displayed axis still computes its own true Pareto frontier, and
+ * only points that belong to both sets may be drawn as optimal.
  */
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
@@ -69,16 +68,27 @@ export function canonicalNormalizedFrontierIds(
 }
 
 /**
- * Return the exact canonical winners when frontier flags are present.
+ * Return the intersection of the selected-axis Pareto frontier and the
+ * normalized-interactivity frontier when canonical flags are present.
+ *
+ * The selected-axis frontier must be computed from all eligible points before
+ * applying the canonical restriction. Computing Pareto(canonicalPoints) would
+ * incorrectly retain a canonical point that is dominated on the selected axis
+ * by a non-canonical point.
+ *
  * `null` means no canonical restriction was stamped, so the caller should
  * compute its ordinary local Pareto frontier.
  */
-export function canonicalFrontierPoints(points: InferenceData[]): InferenceData[] | null {
+export function canonicalParetoIntersection(
+  points: InferenceData[],
+  direction: ParetoDirection,
+): InferenceData[] | null {
   const isCanonical = points.some(
     (point) => point.isOnNormalizedInteractivityFrontier !== undefined,
   );
   if (!isCanonical) return null;
-  return points.filter(
-    (point) => point.isOnNormalizedInteractivityFrontier === true && isFrontierEligible(point),
+  const selectedAxisFrontier = paretoFrontForDirection(direction)(
+    points.filter(isFrontierEligible),
   );
+  return selectedAxisFrontier.filter((point) => point.isOnNormalizedInteractivityFrontier === true);
 }

@@ -57,7 +57,7 @@ import {
   paretoFrontForDirection,
   type ParetoDirection,
 } from '@/lib/chart-utils';
-import { canonicalFrontierPoints } from '@/components/inference/utils/canonicalFrontier';
+import { canonicalParetoIntersection } from '@/components/inference/utils/canonicalFrontier';
 import { type RooflineDirection, getSpeedOverlayCorners } from '@/lib/speed-overlay';
 import type {
   ChartDefinition,
@@ -395,7 +395,7 @@ const SCATTER_STRINGS = {
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
     optimalInfo:
-      'On agentic, optimal is defined by the E2E Normalized Interactivity Pareto frontier. Every x-axis reuses exactly that winner set.',
+      'On agentic, optimal points must be Pareto-optimal on the selected x-axis and also belong to the E2E Normalized Interactivity frontier.',
     labels: 'Labels',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
@@ -410,7 +410,7 @@ const SCATTER_STRINGS = {
     logScale: '对数缩放',
     optimalOnly: '仅最优',
     optimalInfo:
-      '在智能体场景中，最优点由端到端归一化交互性的 Pareto 前沿统一定义，所有横轴均复用同一组优胜点。',
+      '在智能体场景中，最优点既必须在当前横轴上满足 Pareto 最优，也必须属于端到端归一化交互性的 Pareto 前沿。',
     labels: '标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',
@@ -780,10 +780,10 @@ const ScatterGraph = React.memo(
       for (const hwKey of Object.keys(groupedData)) {
         const combined: InferenceData[] = [];
         for (const datePoints of groupPointsByDate(groupedData[hwKey]).values()) {
-          // Agentic modes reuse the exact normalized north-star winners.
-          // Do not Pareto them a second time after swapping x axes: doing so
-          // would violate the iff contract by dropping canonical winners.
-          const canonicalPoints = canonicalFrontierPoints(datePoints);
+          // Agentic modes intersect the selected-axis Pareto frontier with the
+          // normalized north-star frontier. This keeps every drawn curve a true
+          // Pareto frontier without admitting a non-canonical winner.
+          const canonicalPoints = canonicalParetoIntersection(datePoints, dir ?? 'lower_right');
           const front = canonicalPoints ?? frontierFn(datePoints.filter(isFrontierEligible));
           if (front.length === 0) continue;
           combined.push(...front);
@@ -1020,7 +1020,7 @@ const ScatterGraph = React.memo(
       const frontierFn = paretoFrontForDirection(dir ?? 'lower_right');
       const result: Record<string, Entry> = {};
       for (const [key, group] of Object.entries(grouped)) {
-        const canonicalPoints = canonicalFrontierPoints(group.points);
+        const canonicalPoints = canonicalParetoIntersection(group.points, dir ?? 'lower_right');
         const front = canonicalPoints ?? frontierFn(group.points.filter(isFrontierEligible));
         front.sort((a, b) => a.x - b.x);
         result[key] = { hwKey: group.hwKey, runIndex: group.runIndex, points: front };

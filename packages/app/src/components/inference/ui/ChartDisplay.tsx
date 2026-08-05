@@ -645,7 +645,7 @@ export default function ChartDisplay() {
     if (!derivedMetrics) {
       // Legacy AgentX axes can still render transient/non-persisted rows, which
       // have no ids to request. Persisted rows remain gated on their derived
-      // metrics so every displayed frontier keeps the canonical iff contract.
+      // metrics so every displayed frontier can enforce canonical eligibility.
       if (!derivedSpec && derivedTargetIds.length === 0) return visibleGraphs;
       return visibleGraphs.map((graph) => ({ ...graph, data: [], clippedData: [] }));
     }
