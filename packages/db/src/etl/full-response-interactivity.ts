@@ -13,7 +13,7 @@
 
 import { gunzipSync } from 'node:zlib';
 
-import { meanOf, quantile, readNum } from '../queries/agentic-shared.js';
+import { meanOf, quantile, readNum } from '../queries/agentic-shared';
 
 export const FULL_RESPONSE_STAT_KEYS = [
   'mean',
