@@ -63,4 +63,57 @@ describe('discoverTraceReplayArtifacts', () => {
       'multinode_server_logs/agentic/conc_96/aiperf_artifacts/profile_export.jsonl',
     );
   });
+
+  it('does not extract a duplicate archive when a complete per-concurrency trace exists', () => {
+    const root = tempDir();
+    const suffix = 'config-c_conc96_variant';
+    writeTraceFiles(path.join(root, `agentic_${suffix}`, 'conc_96'));
+
+    const artifactDir = path.join(root, `multinode_server_logs_${suffix}`);
+    const archiveSource = path.join(root, 'duplicate-archive-source');
+    writeTraceFiles(path.join(archiveSource, 'agentic', 'conc_96'));
+    fs.mkdirSync(artifactDir, { recursive: true });
+    execFileSync('tar', [
+      '-czf',
+      path.join(artifactDir, 'multinode_server_logs.tar.gz'),
+      '-C',
+      archiveSource,
+      '.',
+    ]);
+    fs.rmSync(archiveSource, { recursive: true, force: true });
+
+    const found = discoverTraceReplayArtifacts(root);
+
+    expect(found.get(`${suffix}|96`)?.profileJsonl).toContain(
+      `agentic_${suffix}/conc_96/aiperf_artifacts`,
+    );
+    expect(fs.existsSync(path.join(artifactDir, 'multinode_server_logs'))).toBe(false);
+  });
+
+  it('retains the archive fallback when the direct trace is incomplete', () => {
+    const root = tempDir();
+    const suffix = 'config-d_conc96_variant';
+    const directDir = path.join(root, `agentic_${suffix}`, 'conc_96');
+    writeTraceFiles(directDir);
+    fs.rmSync(path.join(directDir, 'aiperf_artifacts', 'server_metrics_export.json'));
+
+    const artifactDir = path.join(root, `multinode_server_logs_${suffix}`);
+    const archiveSource = path.join(root, 'fallback-archive-source');
+    writeTraceFiles(path.join(archiveSource, 'agentic', 'conc_96'));
+    fs.mkdirSync(artifactDir, { recursive: true });
+    execFileSync('tar', [
+      '-czf',
+      path.join(artifactDir, 'multinode_server_logs.tar.gz'),
+      '-C',
+      archiveSource,
+      '.',
+    ]);
+    fs.rmSync(archiveSource, { recursive: true, force: true });
+
+    const found = discoverTraceReplayArtifacts(root);
+
+    expect(found.get(`${suffix}|96`)?.serverMetricsJson).toContain(
+      'multinode_server_logs/agentic/conc_96/aiperf_artifacts/server_metrics_export.json',
+    );
+  });
 });

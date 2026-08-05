@@ -69,7 +69,7 @@ export function mergeProfileStatsUpgrade(
 }
 
 /** Metric subtrees we extract via stream-parse on oversized server blobs. */
-const TARGET_METRIC_KEYS = new Set([
+export const AGGREGATE_SERVER_METRIC_KEYS = new Set([
   'vllm:kv_cache_usage_perc',
   'vllm:gpu_cache_usage_perc',
   'vllm:prefix_cache_hits',
@@ -86,8 +86,34 @@ const TARGET_METRIC_KEYS = new Set([
 async function streamExtractServer(
   buffer: Buffer,
 ): Promise<{ kvCacheUtil: number[]; prefixCacheHitRate: number[] }> {
-  const collected = await streamCollectKeys<unknown>(buffer, 'metrics', TARGET_METRIC_KEYS);
+  const collected = await streamCollectKeys<unknown>(
+    buffer,
+    'metrics',
+    AGGREGATE_SERVER_METRIC_KEYS,
+  );
   return extractServerMetricSamples(JSON.stringify({ metrics: collected }));
+}
+
+/**
+ * Add server-derived distributions to profile stats using an already parsed
+ * profiling metric map. Ingest uses this to share one server JSON parse with
+ * chart-series generation; the output shape and ordering match
+ * `computeAggregateStats()` exactly.
+ */
+export function withServerMetricAggregateStats(
+  profileStats: AggregateStats,
+  metrics: Record<string, unknown>,
+): AggregateStats {
+  try {
+    const server = extractServerMetricSamples(JSON.stringify({ metrics }));
+    return {
+      ...profileStats,
+      kvCacheUtil: percentilesOf(server.kvCacheUtil),
+      prefixCacheHitRate: percentilesOf(server.prefixCacheHitRate),
+    };
+  } catch {
+    return profileStats;
+  }
 }
 
 /**
