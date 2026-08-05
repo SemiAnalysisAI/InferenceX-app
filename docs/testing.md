@@ -12,7 +12,7 @@ Enforced by `@pr-claude` — missing/low-quality tests are flagged 🔴 BLOCKING
 1. New utility functions → colocated unit test
 2. New UI features → E2E test in `cypress/e2e/<feature>.cy.ts`
 3. Bug fixes → regression test reproducing the bug
-4. Run `bun run test:unit` and `bun run test:e2e` before considering task complete
+4. Run `bun run test:unit` and the local smoke suite, `bun run test:e2e`, before considering a task complete. The full E2E suite runs in CI and is available locally as `bun run test:e2e:full`.
 
 ## Pre-commit Checklist
 
@@ -25,9 +25,9 @@ bun run test:e2e
 
 ## Runtime and CI Sharding
 
-A warm local `bun run test:e2e` typically takes about **4–6 minutes** because Cypress component tests and integration tests run sequentially on one machine. Cold dependency or browser setup can take longer, so use focused `--spec` runs while iterating and open the draft PR before starting the full local suite.
+The local `bun run test:e2e` command is a smoke suite with 83 Cypress tests across the core page, chart, overlay, localization, and component paths. It is the default agent and developer check and is intended to stay under one minute once the app is running.
 
-GitHub Actions runs integration specs across **four shards per browser** for Chrome and Firefox, for eight parallel E2E jobs, with component tests in a separate job. Recent successful workflows finish in roughly **3–5 minutes** wall-clock. The sharded CI run is the authoritative broad browser check and is substantially faster than reproducing both browsers and every shard serially on a local machine.
+The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as one component job plus four integration shards per browser, Chrome and Firefox. The CI workflow is the merge gate for the full E2E suite.
 
 ## Quality Standards
 

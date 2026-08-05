@@ -34,7 +34,8 @@ bun run lint:fix           # Auto-fix lint issues
 bun run fmt                # Format check with oxfmt
 bun run fmt:fix            # Auto-fix formatting
 bun run test:unit          # Vitest unit tests
-bun run test:e2e           # Cypress E2E tests
+bun run test:e2e           # Cypress smoke suite, the default local check
+bun run test:e2e:full      # Full Cypress suite, normally covered by CI
 ```
 
 ## Monorepo Structure
@@ -112,10 +113,10 @@ See [Testing](./docs/testing.md) for full requirements, quality standards, and p
 
 ### E2E Runtime and PR Workflow
 
-- Prefer focused Cypress specs while iterating, and create the draft PR before starting a full local E2E run so CI and review setup can proceed in parallel.
-- A warm local `bun run test:e2e` typically takes about **4–6 minutes** because the component and integration suites run sequentially on one machine; cold dependency/browser setup can take longer.
-- GitHub Actions is usually faster in wall-clock time: integration specs run across **four shards per browser** for Chrome and Firefox (eight parallel E2E jobs), while component tests run in a separate job. Recent successful workflows complete in roughly **3–5 minutes**.
-- Local targeted tests remain the fastest feedback loop. The sharded GitHub run is the authoritative broad browser check; do not spend time emulating all CI shards serially before opening the PR.
+- Prefer `bun run test:e2e` while iterating. It runs the local smoke suite and avoids blocking development on the full browser matrix.
+- Use `bun run test:e2e:full` only when a local full-suite run is useful. The merge gate runs the full suite in GitHub Actions.
+- A warm local full E2E run typically takes about **4–6 minutes** because the component and integration suites run sequentially on one machine; cold dependency/browser setup can take longer.
+- GitHub Actions runs integration specs across **four shards per browser** for Chrome and Firefox (eight parallel E2E jobs), while component tests run in a separate job. Recent successful workflows complete in roughly **3–5 minutes**.
 
 ## Analytics Requirement
 
@@ -296,7 +297,7 @@ Detailed design rationale (the "why" and "how", not the "what") lives in [docs/]
 Three jobs: a lightweight Haiku **`route`** classifier runs on any `@claude` mention in an issue/comment and emits a `profile`; its output gates **`implement`** or **`review`**. (The `review` job also triggers directly on PR open/sync, with no comment to route.)
 
 - `@claude <anything>` — `route` picks a **profile** (`ui` / `code` / `docs` / `question` / `review`) and, for implement profiles, a browser (`playwright` / `chrome` / `none`).
-  - **implement** job (`ui` / `code` / `docs` / `question`): provisions only what's needed — dev server, Playwright browser, and Cypress binary install **on demand** only for browser/UI work, so docs/DB/backend/question tasks stay fast. `ui` gets full browser verification (render real data, check the `?unofficialrun=` overlay, add `track()` + tests, pass `bun run test:e2e`); the rest get scoped checks. Creates `claude/issue-{N}-*` branches and can push.
+  - **implement** job (`ui` / `code` / `docs` / `question`): provisions only what's needed — dev server, Playwright browser, and Cypress binary install **on demand** only for browser/UI work, so docs/DB/backend/question tasks stay fast. `ui` gets focused browser verification plus the `?unofficialrun=` overlay, then passes `bun run test:e2e`; the full suite remains covered by the merge checks. Creates `claude/issue-{N}-*` branches and can push.
   - **review** job (`review` profile, or any PR open/sync): a **read-only**, **verifying** review. It checks out the PR head, starts a local dev server backed by the real read-only DB, and uses the **Playwright MCP** on `http://localhost:3000` to confirm the changed UI actually works (renders real data, interactions behave, no console errors). It does **not** re-run the test suite — `typecheck`/`lint`/`test:unit` and the fixtures-based e2e are already covered by the dedicated `tests-*`/`lint` workflows; the review reads their status and folds failures into the review as 🔴 BLOCKING — plus the static diff review (bugs, security, missing tests). Never edits or pushes. A review-phrased ask in **any** wording (e.g. "@claude take a look at this PR") routes here, not just the exact `@claude review`. Prompt: `.github/claude/review-prompt.md`.
 - **Explicit overrides** (skip the classifier): `@claude review` → review; `@claude chrome` → Chrome DevTools MCP; `@claude frontend` → full Playwright + dev server; `@claude general` (or `lite`) → lean no-browser. If the router guesses wrong, re-run with the override.
 - `implement` and `review` share a `claude-<PR/issue number>` concurrency group, so reviews and implementation on the same PR serialize instead of clobbering each other.
