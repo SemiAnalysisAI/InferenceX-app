@@ -357,7 +357,6 @@ function CostDeltaBadge({
       data-cost-polarity={polarity}
       data-history-status={comparisonMode === 'history' ? status : undefined}
       title={aria}
-      aria-label={aria}
       // The cell behind it carries the shade, so the badge itself stays
       // untinted — two washes of the same hue would double up.
       className={`inline-flex items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-[10px] font-semibold tabular-nums ${
@@ -367,6 +366,7 @@ function CostDeltaBadge({
       <span aria-hidden="true">
         {status === 'no_newer_result' ? '—' : pct === null ? '∞' : formatters.percent.format(pct)}
       </span>
+      <span className="sr-only">{aria}</span>
     </span>
   );
 }

@@ -165,10 +165,11 @@ function subtractUtcDays(isoDate: string, days: number): string {
 
 export function overviewSnapshotDate(
   rowsByModel: Readonly<Record<string, readonly BenchmarkRow[]>>,
+  engineScope: OverviewEngineScope = 'community',
 ): string | null {
   const dates = Object.entries(rowsByModel).flatMap(([modelKey, rows]) => {
     const scenarios = overviewScenariosForModel(modelKey as Model, rows);
-    return rows
+    return overviewEngineRows(rows, engineScope)
       .filter((row) => {
         const scenario = overviewScenarioOfRow(row);
         return (
@@ -341,8 +342,12 @@ interface ConfigTierRead extends OverviewTierRead {
 const isInRangeTierRead = <T extends OverviewTierRead>(read: T): read is T & { value: number } =>
   read.value !== null && read.boundary === 'interpolated';
 
+export function overviewTierEvidenceDate(read: OverviewTierRead): string | null {
+  return read.evidenceDate?.to ?? read.config?.latestDate ?? null;
+}
+
 function readFreshness(read: ConfigTierRead): string {
-  return read.evidenceDate?.to ?? read.config.latestDate;
+  return overviewTierEvidenceDate(read) ?? read.config.latestDate;
 }
 
 function compareTierReads(a: ConfigTierRead, b: ConfigTierRead): number {
@@ -681,7 +686,7 @@ export function assembleOverviewHistoricalPageData(
         if (platform.costPerMtok === null) return platform;
 
         const previous = baselineByKey.get(overviewPlatformKey(model, platform));
-        const currentDate = platform.read.config?.latestDate ?? null;
+        const currentDate = overviewTierEvidenceDate(platform.read);
         if (currentDate === null || currentDate <= window.targetDate) {
           return {
             ...platform,
@@ -689,7 +694,7 @@ export function assembleOverviewHistoricalPageData(
               status: 'no_newer_result',
               baselineCostPerMtok: previous?.costPerMtok ?? null,
               costDeltaPct: null,
-              baselineDate: previous?.read.config?.latestDate ?? null,
+              baselineDate: previous === undefined ? null : overviewTierEvidenceDate(previous.read),
             },
           };
         }
@@ -712,7 +717,7 @@ export function assembleOverviewHistoricalPageData(
             status: 'comparable',
             baselineCostPerMtok: previous.costPerMtok,
             costDeltaPct: platform.costPerMtok / previous.costPerMtok - 1,
-            baselineDate: previous.read.config?.latestDate ?? null,
+            baselineDate: overviewTierEvidenceDate(previous.read),
           },
         };
       }),

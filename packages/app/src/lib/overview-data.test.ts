@@ -14,6 +14,7 @@ import {
   overviewHistoricalWindow,
   overviewScenarioForModel,
   overviewSnapshotDate,
+  overviewTierEvidenceDate,
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
   resolveOverviewTier,
@@ -664,8 +665,34 @@ describe('overview historical window', () => {
     ).toBe('2026-07-30');
   });
 
+  it('anchors the snapshot date to rows visible in the active engine scope', () => {
+    const rows = {
+      [Model.Qwen3_5]: [
+        row({ date: '2026-07-30', framework: 'sglang' }),
+        row({ date: '2026-08-03', framework: 'atom' }),
+      ],
+    };
+
+    expect(overviewSnapshotDate(rows, 'community')).toBe('2026-07-30');
+    expect(overviewSnapshotDate(rows, 'all')).toBe('2026-08-03');
+  });
+
   it('returns null when every model bucket is empty', () => {
     expect(overviewSnapshotDate({ a: [], b: [] })).toBeNull();
+  });
+
+  it('uses the selected tier evidence date instead of the config latest date', () => {
+    const read = buildOverviewModelSummary(Model.Qwen3_5, [
+      ...frontier([12000, 10000, 8000, 6000], { date: '2026-08-01' }),
+    ]).platforms[0].read;
+
+    expect(
+      overviewTierEvidenceDate({
+        ...read,
+        evidenceDate: { from: '2026-07-03', to: '2026-07-04' },
+      }),
+    ).toBe('2026-07-04');
+    expect(overviewTierEvidenceDate({ ...read, evidenceDate: null })).toBe('2026-08-01');
   });
 });
 

@@ -45,7 +45,7 @@ export async function getOverviewPageData(
     return assembleOverviewPageData(currentRowsByModel, tier, engineScope);
   }
 
-  const snapshotDate = overviewSnapshotDate(currentRowsByModel);
+  const snapshotDate = overviewSnapshotDate(currentRowsByModel, engineScope);
   if (snapshotDate === null) {
     return {
       ...assembleOverviewPageData(currentRowsByModel, tier, engineScope),

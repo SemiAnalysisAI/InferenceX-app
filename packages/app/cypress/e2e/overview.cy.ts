@@ -67,7 +67,7 @@ function expectNoVisibleDatesOrSnapshot() {
       // Next.js RSC payload scripts retain evidence dates for reproducibility.
       // Assert only against rendered page text, not serialized script/style data.
       const clone = body.cloneNode(true) as HTMLElement;
-      clone.querySelectorAll('script, style').forEach((node) => node.remove());
+      clone.querySelectorAll('script, style, .sr-only').forEach((node) => node.remove());
       return clone.textContent ?? '';
     })
     .should((text) => {
@@ -171,9 +171,16 @@ describe('Overview page', () => {
       // view and receives its own change badge and heat-map tint.
       platform('b200')
         .find('[data-testid="overview-cost-delta"]')
+        .as('b200HistoryDelta')
         .should('have.attr', 'data-history-status', 'comparable')
         .and('have.attr', 'data-cost-polarity', 'cheaper')
         .and('contain.text', '-17%');
+      cy.get('@b200HistoryDelta')
+        .should(($badge) => {
+          expect($badge).not.to.have.attr('aria-label');
+        })
+        .find('.sr-only')
+        .should('have.text', '17% cheaper than this platform’s Jun 10 result');
       platform('mi355x')
         .find('[data-testid="overview-cost-delta"]')
         .should('have.attr', 'data-history-status', 'comparable')
