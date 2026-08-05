@@ -7,7 +7,8 @@
  * stream-json pipeline collects only the top-level subtrees callers need.
  */
 
-import { Readable } from 'node:stream';
+import { PassThrough, Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { createGunzip, gunzipSync } from 'node:zlib';
 
 import { chain } from 'stream-chain';
@@ -56,7 +57,7 @@ export async function streamCollectKeys<T>(
   wanted: ReadonlySet<string>,
 ): Promise<Record<string, T>> {
   const collected: Record<string, T> = {};
-  const pipeline = chain([
+  const metricStream = chain([
     Readable.from(buffer),
     createGunzip(),
     parser(),
@@ -64,12 +65,84 @@ export async function streamCollectKeys<T>(
     streamObject(),
   ]);
   await new Promise<void>((resolve, reject) => {
-    pipeline.on('data', (chunk: unknown) => {
+    metricStream.on('data', (chunk: unknown) => {
       const { key, value } = chunk as { key: string; value: T };
       if (wanted.has(key)) collected[key] = value;
     });
-    pipeline.on('end', resolve);
-    pipeline.on('error', reject);
+    metricStream.on('end', resolve);
+    metricStream.on('error', reject);
   });
   return collected;
+}
+
+export interface MetricPhaseMaps<T> {
+  metrics: Record<string, T>;
+  warmupMetrics: Record<string, T>;
+  /** True when the bounded fast path retained every metric in the document. */
+  complete: boolean;
+}
+
+async function collectTokenBranch<T>(
+  input: PassThrough,
+  filter: 'metrics' | 'warmup_metrics',
+  wanted: ReadonlySet<string>,
+): Promise<Record<string, T>> {
+  const collected: Record<string, T> = {};
+  const output = chain([input, pick({ filter }), streamObject()]);
+  for await (const chunk of output) {
+    const { key, value } = chunk as { key: string; value: T };
+    if (wanted.has(key)) collected[key] = value;
+  }
+  return collected;
+}
+
+/**
+ * Gunzip and parse both server-metric phase blocks once. Large documents fan
+ * the parser's token stream out to two lightweight selectors, avoiding one
+ * complete decompression + JSON tokenization pass per phase.
+ */
+export async function collectMetricPhases<T>(
+  buffer: Buffer,
+  wanted: ReadonlySet<string>,
+  maxInMemoryBytes = MAX_IN_MEMORY_JSON_BYTES,
+): Promise<MetricPhaseMaps<T>> {
+  const json = gunzipJsonWithinLimit(buffer, maxInMemoryBytes);
+  if (json !== null) {
+    const parsed = JSON.parse(json) as {
+      metrics?: Record<string, T>;
+      warmup_metrics?: Record<string, T>;
+    };
+    return {
+      metrics: parsed.metrics ?? {},
+      warmupMetrics: parsed.warmup_metrics ?? {},
+      complete: true,
+    };
+  }
+
+  // Attach every branch before starting the source pipeline so no parser
+  // tokens can be missed. PassThrough backpressure keeps the two consumers in
+  // lockstep without buffering the full document.
+  const profilingInput = new PassThrough({ objectMode: true });
+  const warmupInput = new PassThrough({ objectMode: true });
+  const tokenTee = new PassThrough({ objectMode: true });
+  tokenTee.pipe(profilingInput);
+  tokenTee.pipe(warmupInput);
+
+  const profiling = collectTokenBranch<T>(profilingInput, 'metrics', wanted);
+  const warmup = collectTokenBranch<T>(warmupInput, 'warmup_metrics', wanted);
+  const tokens = chain([Readable.from(buffer), createGunzip(), parser()]);
+
+  try {
+    const [, metrics, warmupMetrics] = await Promise.all([
+      pipeline(tokens, tokenTee),
+      profiling,
+      warmup,
+    ]);
+    return { metrics, warmupMetrics, complete: false };
+  } catch (error) {
+    tokenTee.destroy();
+    profilingInput.destroy();
+    warmupInput.destroy();
+    throw error;
+  }
 }

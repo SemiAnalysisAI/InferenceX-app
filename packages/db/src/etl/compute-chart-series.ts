@@ -156,18 +156,18 @@ interface RawSeries {
   timeslices?: RawSlice[];
 }
 
-interface RawMetric {
+export interface RawMetric {
   series?: RawSeries[];
 }
 
-type MetricsMap = Record<string, RawMetric>;
+export type MetricsMap = Record<string, RawMetric>;
 
 /**
  * The set of metric subtrees the chart consumes. Includes both vllm:* and
  * sglang:* names so the stream-parse fallback collects whichever framework
  * the blob was emitted by — `buildSeriesFromMetrics` then picks per metric.
  */
-const CHART_METRIC_KEYS = new Set([
+export const CHART_METRIC_KEYS = new Set([
   // vLLM
   'vllm:kv_cache_usage_perc',
   'vllm:gpu_cache_usage_perc',
@@ -255,6 +255,19 @@ export async function computeChartSeries(
     return null;
   }
   return buildSeriesFromMetrics(metrics, context);
+}
+
+/**
+ * Build the chart payload from already parsed phase maps. This is the same
+ * merge + projection used by `computeChartSeries()`, exposed so ingest can
+ * share one server JSON parse with aggregate-stat computation.
+ */
+export function computeChartSeriesFromMetricPhases(
+  profiling: MetricsMap,
+  warmup: MetricsMap,
+  context: ServerMetricsContext = {},
+): ChartSeries {
+  return buildSeriesFromMetrics(mergePhaseMetrics(profiling, warmup), context);
 }
 
 /**
