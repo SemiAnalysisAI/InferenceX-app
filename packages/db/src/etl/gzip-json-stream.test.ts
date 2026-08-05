@@ -103,6 +103,54 @@ describe('collectMetricPhases', () => {
     });
   });
 
+  it('ignores nested phase lookalikes and preserves selected scalar and compound values', async () => {
+    const adversarial = gzipSync(
+      JSON.stringify({
+        metadata: {
+          metrics: { wanted: { nested: 'must not be selected' } },
+          warmup_metrics: { wanted: { nested: 'must not be selected' } },
+        },
+        metrics: {
+          wanted: [1, { nested: true }, null],
+          scalar: 42,
+          ignored: { very: { deeply: ['nested', 'value'] } },
+        },
+        warmup_metrics: {
+          wanted: false,
+          scalar: 'warmup',
+          ignored: [1, 2, 3],
+        },
+      }),
+    );
+
+    await expect(
+      collectMetricPhases(adversarial, new Set(['wanted', 'scalar']), 1),
+    ).resolves.toEqual({
+      metrics: {
+        wanted: [1, { nested: true }, null],
+        scalar: 42,
+      },
+      warmupMetrics: {
+        wanted: false,
+        scalar: 'warmup',
+      },
+      complete: false,
+    });
+  });
+
+  it('matches JSON semantics for duplicate phase and metric keys', async () => {
+    const duplicateKeys = gzipSync(
+      '{"metrics":{"wanted":1,"wanted":2},"metrics":{"wanted":3},' +
+        '"warmup_metrics":{"wanted":4,"wanted":5}}',
+    );
+
+    await expect(collectMetricPhases(duplicateKeys, new Set(['wanted']), 1)).resolves.toEqual({
+      metrics: { wanted: 3 },
+      warmupMetrics: { wanted: 5 },
+      complete: false,
+    });
+  });
+
   it('rejects malformed gzip input on both paths', async () => {
     await expect(
       collectMetricPhases(Buffer.from('not gzip'), new Set(['wanted']), 1),
