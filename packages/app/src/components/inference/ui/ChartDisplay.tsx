@@ -643,6 +643,10 @@ export default function ChartDisplay() {
   const renderableGraphs = useMemo(() => {
     if (!isAgenticSequence) return visibleGraphs;
     if (!derivedMetrics) {
+      // Legacy AgentX axes can still render transient/non-persisted rows, which
+      // have no ids to request. Persisted rows remain gated on their derived
+      // metrics so every displayed frontier keeps the canonical iff contract.
+      if (!derivedSpec && derivedTargetIds.length === 0) return visibleGraphs;
       return visibleGraphs.map((graph) => ({ ...graph, data: [], clippedData: [] }));
     }
     return visibleGraphs.map((graph) => {
@@ -701,6 +705,7 @@ export default function ChartDisplay() {
   }, [
     isAgenticSequence,
     derivedSpec,
+    derivedTargetIds.length,
     visibleGraphs,
     derivedMetrics,
     selectedYAxisMetric,

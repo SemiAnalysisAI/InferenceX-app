@@ -1,14 +1,7 @@
 /**
- * Overlay (unofficial run) points must respect the "Optimal Only" toggle the
- * same way official points do.
- *
- * Regression: with Optimal Only ON (the default — `i_optimal !== '0'`),
- * official non-pareto points are hidden via `isPointVisible`, but overlay X
- * markers rendered every point unconditionally. On the agentic interactivity
- * chart this made an e2e-dominated config (TP8 C=4 in the GLM5.2 B300 hicache
- * run) look like a pareto point: its X marker stayed visible sitting on the
- * dashed roofline (the monotone spline between C=8 and C=2 passes within
- * ~0.5% of it) while the official twin was hidden.
+ * Unofficial runs do not have persisted request traces, so they cannot join
+ * the canonical E2E Normalized Interactivity frontier. Optimal Only must hide
+ * them on every AgentX axis; Show All remains the explicit way to inspect them.
  */
 import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 import {
@@ -18,7 +11,7 @@ import {
   REAL_CONFIGS,
 } from '../support/overlay-fixtures';
 
-describe('Overlay points respect Optimal Only (agentic interactivity)', () => {
+describe('Overlay points follow canonical Optimal Only policy (agentic interactivity)', () => {
   before(() => {
     interceptOverlayRun();
     // The agentic default mode is E2E Normalized Interactivity (which suppresses overlays and
@@ -45,17 +38,17 @@ describe('Overlay points respect Optimal Only (agentic interactivity)', () => {
     );
   });
 
-  // Optimal Only defaults ON (i_optimal !== '0') — the DEFAULT view is where
-  // the regression lived: official C=4 hidden, overlay C=4 X still drawn.
-  it('hides the e2e-dominated overlay point in the default Optimal Only view', () => {
+  it('hides trace-less overlay points in the default Optimal Only view', () => {
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-    // Official parity check: 4 of 5 official dots visible.
+    // The deterministic derived-metric stub puts all five official rows on the
+    // canonical frontier.
     cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
-      expect(countVisible($dots), 'visible official points').to.eq(REAL_CONFIGS.length - 1);
+      expect(countVisible($dots), 'visible official points').to.eq(REAL_CONFIGS.length);
     });
-    // The overlay must hide its C=4 too — 4 of 5 X markers visible.
+    // Overlay rows have no persisted trace ids and therefore no canonical
+    // frontier membership.
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(($pts) => {
-      expect(countVisible($pts), 'visible overlay X markers').to.eq(REAL_CONFIGS.length - 1);
+      expect(countVisible($pts), 'visible overlay X markers').to.eq(0);
     });
   });
 
@@ -67,11 +60,11 @@ describe('Overlay points respect Optimal Only (agentic interactivity)', () => {
     });
   });
 
-  it('re-hides the e2e-dominated overlay point when Optimal Only is re-enabled', () => {
+  it('re-hides trace-less overlay points when Optimal Only is re-enabled', () => {
     cy.get('#scatter-hide-non-optimal').click();
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(($pts) => {
-      expect(countVisible($pts), 'visible overlay X markers').to.eq(REAL_CONFIGS.length - 1);
+      expect(countVisible($pts), 'visible overlay X markers').to.eq(0);
     });
   });
 });
