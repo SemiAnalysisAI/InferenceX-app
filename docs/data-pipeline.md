@@ -95,6 +95,20 @@ AIPerf exports public-dataset provenance in `metadata.dataset`, including the Hu
 
 Legacy artifacts without provenance leave any existing mapping untouched. A workflow run can map to only one dataset; conflicting dataset IDs fail ingest rather than silently linking the run to an arbitrary dataset.
 
+### Agentic Full-Response Interactivity
+
+Agentic charts use full-response inter-token latency as their canonical ITL and
+define each interactivity percentile as the reciprocal of the matching ITL
+percentile. Current aggregate artifacts provide the namespaced
+`*_full_response_itl` fields directly. During ingest those fields replace the
+legacy visible-content ITL values in the canonical `*_itl` and `*_intvty` keys.
+
+For artifacts produced before the aggregate field existed, trace-replay ingest
+reconstructs each request's decode interval from the retained lifecycle duration
+minus TTFT, then divides by `output_sequence_length - 1`. The same helper powers
+the one-time `db:backfill-full-response-interactivity` data migration, keeping
+historical rows and newly ingested rows on one definition.
+
 ## Frontend Transform Pipeline
 
 ### Why transformBenchmarkRows Exists

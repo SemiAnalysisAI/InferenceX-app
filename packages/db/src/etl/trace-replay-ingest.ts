@@ -15,6 +15,7 @@ import { createGzip, gzipSync } from 'node:zlib';
 import type postgres from 'postgres';
 
 import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
+import { fullResponseMetricsFromGzip } from './full-response-interactivity.js';
 import type { ServerMetricsContext } from './server-metrics-adapters';
 
 type Sql = ReturnType<typeof postgres>;
@@ -61,6 +62,7 @@ export interface PreparedTraceReplay {
   compressionMs: number;
   computeMs: number;
   cacheHitRates: { gpu: number; cpu: number | null } | null;
+  fullResponseMetrics: Record<string, number>;
 }
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -198,6 +200,7 @@ export async function prepareTraceReplay(
     metricsContext,
   );
   const computeMs = Date.now() - computeStart;
+  const fullResponseMetrics = fullResponseMetricsFromGzip(profile.data);
 
   return {
     profileGz: profile.data,
@@ -214,6 +217,7 @@ export async function prepareTraceReplay(
     compressionMs,
     computeMs,
     cacheHitRates: cacheHitRatesFromChartSeries(chartSeries),
+    fullResponseMetrics,
   };
 }
 
@@ -244,6 +248,7 @@ export async function persistPreparedTraceReplay(
     chartSeriesJson,
     requestTimelineJson,
     cacheHitRates,
+    fullResponseMetrics,
   } = prepared;
 
   let linkedCount = 0;
@@ -366,6 +371,15 @@ export async function persistPreparedTraceReplay(
         where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
       `;
       log('updated cache-hit metrics from chart series');
+    }
+    if (Object.keys(fullResponseMetrics).length > 0) {
+      await tx`
+        update benchmark_results
+        set metrics = metrics || ${JSON.stringify(fullResponseMetrics)}::jsonb
+        where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
+          and not (metrics ? 'median_full_response_itl')
+      `;
+      log('filled full-response ITL and interactivity from the AIPerf profile');
     }
     linkedCount = unlinked.length;
   });

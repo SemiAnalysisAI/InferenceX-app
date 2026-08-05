@@ -8,6 +8,7 @@ import type { ConfigParams } from './config-cache';
 import type { SkipTracker } from './skip-tracker';
 import { METRIC_KEYS, PRECISION_KEYS } from '@semianalysisai/inferencex-constants';
 import { flattenAgenticAggRow } from './agentic-v3-flatten';
+import { preferFullResponseMetrics } from './full-response-interactivity';
 import {
   resolveModelKey,
   hwToGpuKey,
@@ -241,7 +242,8 @@ export function mapBenchmarkRow(
   // pool, however, is structural proof of disaggregation and preserves older
   // Dynamo artifacts that incorrectly emitted disagg=false.
   const disagg = frameworkDisagg || parallelism.decodeNumWorkers > 0;
-  const metrics = captureNumericMetrics(row);
+  let metrics = captureNumericMetrics(row);
+  if (isAgentic) metrics = preferFullResponseMetrics(metrics);
   if (!disagg) {
     const usePrefill =
       parallelism.decodeTp <= 0 ||

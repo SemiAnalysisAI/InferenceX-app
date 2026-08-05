@@ -51,6 +51,7 @@ async function traceFixture() {
       metrics: {
         input_sequence_length: { value: 128, unit: 'tokens' },
         output_sequence_length: { value: 64, unit: 'tokens' },
+        time_to_first_token: { value: 0.001, unit: 'ms' },
       },
     }),
   );
@@ -104,6 +105,7 @@ function fingerprint(prepared: PreparedTraceReplay) {
     chartWindows: prepared.chartWindows,
     timelineRequests: prepared.timelineRequests,
     cacheHitRates: prepared.cacheHitRates,
+    fullResponseMetrics: prepared.fullResponseMetrics,
   };
 }
 
