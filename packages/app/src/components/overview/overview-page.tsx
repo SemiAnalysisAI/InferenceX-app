@@ -5,6 +5,7 @@ import type { OverviewPageData } from '@/lib/overview-data';
 import {
   DesktopOverviewMatrix,
   MobileOverviewList,
+  OverviewComparisonSwitcher,
   OverviewEngineScopeSwitcher,
   OverviewMethodology,
   OverviewTierSwitcher,
@@ -26,7 +27,7 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
   const formatters = overviewFormatters(locale);
 
   return (
-    <section className="flex flex-col gap-4">
+    <section data-testid="overview-page" className="flex flex-col gap-4">
       <Card>
         <header>
           {/* Two rows at every width: the title, then the metric it is
@@ -77,18 +78,28 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
             <OverviewTierSwitcher
               tier={data.tier}
               engineScope={data.engineScope}
+              comparisonMode={data.comparisonMode}
               locale={locale}
               strings={strings}
             />
             <OverviewEngineScopeSwitcher
               engineScope={data.engineScope}
               tier={data.tier}
+              comparisonMode={data.comparisonMode}
               locale={locale}
               strings={strings}
             />
           </div>
         </header>
       </Card>
+
+      <OverviewComparisonSwitcher
+        comparisonMode={data.comparisonMode}
+        engineScope={data.engineScope}
+        tier={data.tier}
+        locale={locale}
+        strings={strings}
+      />
 
       {/* Official-only summary; uploaded runs remain in the linked dashboard. */}
       {/* Clipped on phones for the rounded corners; visible from xl so the
@@ -99,14 +110,16 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
           locale={locale}
           formatters={formatters}
           strings={strings}
+          comparisonMode={data.comparisonMode}
         />
         <MobileOverviewList
           models={data.models}
           locale={locale}
           formatters={formatters}
           strings={strings}
+          comparisonMode={data.comparisonMode}
         />
-        <OverviewMethodology strings={strings} />
+        <OverviewMethodology strings={strings} comparisonMode={data.comparisonMode} />
       </Card>
     </section>
   );

@@ -1,6 +1,8 @@
 import { runIdFromRunUrl } from './known-issues';
 import {
+  OVERVIEW_DEFAULT_COMPARISON_MODE,
   OVERVIEW_PRIMARY_TIER,
+  type OverviewComparisonMode,
   type OverviewConfigResult,
   type OverviewEngineScope,
   type OverviewModelSummary,
@@ -94,11 +96,13 @@ export function overviewHref(
   locale: 'en' | 'zh',
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
+  comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
 ): string {
   const base = locale === 'zh' ? '/zh/overview' : '/overview';
   const query = new URLSearchParams();
   if (tier !== OVERVIEW_PRIMARY_TIER) query.set('tier', String(tier));
   if (engineScope !== 'community') query.set('engine', engineScope);
+  if (comparisonMode === 'history') query.set('compare', '30d');
   const search = query.toString();
   return search === '' ? base : `${base}?${search}`;
 }
@@ -108,8 +112,9 @@ export function overviewTierHref(
   locale: 'en' | 'zh',
   tier: OverviewTier,
   engineScope: OverviewEngineScope = 'community',
+  comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
 ): string {
-  return overviewHref(locale, tier, engineScope);
+  return overviewHref(locale, tier, engineScope, comparisonMode);
 }
 
 /** Engine-scope switch preserving the active service tier. */
@@ -117,6 +122,7 @@ export function overviewEngineScopeHref(
   locale: 'en' | 'zh',
   engineScope: OverviewEngineScope,
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
+  comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
 ): string {
-  return overviewHref(locale, tier, engineScope);
+  return overviewHref(locale, tier, engineScope, comparisonMode);
 }

@@ -19,3 +19,15 @@ export const getCachedBenchmarks = cachedQuery(
   'benchmarks',
   { blobOnly: true },
 );
+
+/** Historical overview snapshots use the same line-level as-of semantics as
+ * the dashboard, cached separately from the absolute-latest read. */
+export const getCachedBenchmarksAsOf = cachedQuery(
+  (dbModelKeys: string[], date: string) => {
+    if (FIXTURES_MODE) return Promise.resolve(loadFixture<BenchmarkRow[]>('benchmarks'));
+
+    return getLatestBenchmarks(getDb(), dbModelKeys, date);
+  },
+  'benchmarks-as-of',
+  { blobOnly: true },
+);

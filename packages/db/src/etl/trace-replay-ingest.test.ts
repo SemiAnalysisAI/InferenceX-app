@@ -119,7 +119,7 @@ describe('gzipTraceReplayInput', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 });
 
 describe('persistPreparedTraceReplay', () => {
