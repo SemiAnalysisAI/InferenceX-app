@@ -118,13 +118,22 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
+    cy.get('[data-testid="overview-page"]')
+      .children('[data-testid="overview-comparison-switcher"]')
+      .should('have.length', 1)
+      .and('have.class', 'justify-center');
     cy.get('[data-testid="overview-comparison-switcher"]')
       .should('have.attr', 'aria-label', 'Compare')
       .within(() => {
         cy.get('[data-overview-comparison="hardware"]')
           .should('have.attr', 'aria-current', 'true')
           .and('match', 'span')
-          .and('have.text', 'vs B200');
+          .and('have.text', 'vs B200')
+          .then(([active]) => {
+            const style = getComputedStyle(active);
+            expect(style.borderBottomWidth).to.equal('2px');
+            expect(style.backgroundColor).to.match(/rgba\(0, 0, 0, 0\)|transparent/);
+          });
         cy.get('[data-overview-comparison="history"]')
           .should('have.attr', 'href', '/overview?compare=30d')
           .and('have.text', '30-day change')
@@ -159,7 +168,7 @@ describe('Overview page', () => {
           .and('have.text', '30 天变化');
       });
     cy.contains('当前成本及其相对 30–60 天前最近一次有效平台结果的变化。').should('exist');
-    cy.contains('— = 当前无结果或没有更新结果。∞ = 缺少 30–60 天前的基线。').should('exist');
+    cy.contains('缺少有效 30 天对比的平台仅显示当前成本。').should('exist');
   });
 
   it('compares each platform with its own validated result from 30–60 days earlier', () => {
@@ -186,21 +195,13 @@ describe('Overview page', () => {
         .should('have.attr', 'data-history-status', 'comparable')
         .and('have.attr', 'data-cost-polarity', 'cheaper')
         .and('contain.text', '-25%');
-      platform('b300')
-        .find('[data-testid="overview-cost-delta"]')
-        .should('have.attr', 'data-history-status', 'no_baseline')
-        .and('have.attr', 'data-cost-polarity', 'no-baseline')
-        .and('contain.text', '∞')
-        .and('have.attr', 'title', 'No validated platform baseline from 30–60 days earlier');
-      platform('gb200')
-        .find('[data-testid="overview-cost-delta"]')
-        .should('have.attr', 'data-history-status', 'no_newer_result')
-        .and('contain.text', '—')
-        .and(
-          'have.attr',
-          'title',
-          'No newer validated result after the historical comparison date',
+      platform('b300').find('[data-testid="overview-cost-delta"]').should('not.exist');
+      platform('b300').then(([cell]) => {
+        expect(getComputedStyle(cell.closest('td')!).backgroundColor).to.match(
+          /rgba\(0, 0, 0, 0\)|transparent/,
         );
+      });
+      platform('gb200').find('[data-testid="overview-cost-delta"]').should('not.exist');
     });
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
@@ -215,7 +216,8 @@ describe('Overview page', () => {
     cy.contains(
       'Current cost and change versus the latest validated platform result 30–60 days earlier.',
     ).should('exist');
-    cy.contains('— = no current result or no newer result. ∞ = no 30–60-day baseline.').should(
+    cy.get('[data-testid="overview-cost-delta"]').should('not.contain.text', '∞');
+    cy.contains('Platforms without a valid 30-day comparison show current cost only.').should(
       'exist',
     );
     expectNoVisibleDatesOrSnapshot();

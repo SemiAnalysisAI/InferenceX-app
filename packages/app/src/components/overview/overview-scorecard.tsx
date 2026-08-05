@@ -75,13 +75,11 @@ export const OVERVIEW_STRINGS = {
       `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than B200`,
     costDeltaEvenAria: 'About the same cost as B200',
     noBaselineAria: 'No B200 baseline to compare against',
-    noHistoricalBaselineAria: 'No validated platform baseline from 30–60 days earlier',
-    noNewerResultAria: 'No newer validated result after the historical comparison date',
     historicalDeltaAria: (pct: string, cheaper: boolean, baselineDate: string) =>
       `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than this platform’s ${baselineDate} result`,
     historicalEvenAria: (baselineDate: string) =>
       `About the same cost as this platform’s ${baselineDate} result`,
-    historyCellStateLegend: '— = no current result or no newer result. ∞ = no 30–60-day baseline.',
+    historyCellStateLegend: 'Platforms without a valid 30-day comparison show current cost only.',
     referenceHeader: 'Reference',
   },
   zh: {
@@ -132,12 +130,10 @@ export const OVERVIEW_STRINGS = {
     costDeltaAria: (pct: string, cheaper: boolean) => `比 B200 ${cheaper ? '便宜' : '昂贵'} ${pct}`,
     costDeltaEvenAria: '与 B200 成本基本持平',
     noBaselineAria: '缺少可比较的 B200 基线',
-    noHistoricalBaselineAria: '缺少 30–60 天前的有效平台基线',
-    noNewerResultAria: '历史对比日期之后没有新的有效结果',
     historicalDeltaAria: (pct: string, cheaper: boolean, baselineDate: string) =>
       `比该平台 ${baselineDate} 的结果${cheaper ? '便宜' : '昂贵'} ${pct}`,
     historicalEvenAria: (baselineDate: string) => `与该平台 ${baselineDate} 的结果成本基本持平`,
-    historyCellStateLegend: '— = 当前无结果或没有更新结果。∞ = 缺少 30–60 天前的基线。',
+    historyCellStateLegend: '缺少有效 30 天对比的平台仅显示当前成本。',
     referenceHeader: '基准',
   },
 } as const;
@@ -235,7 +231,7 @@ const COST_DELTA_NEUTRAL_ALPHA = '0.10';
 type CostDeltaPolarity = keyof typeof COST_DELTA_CLASS;
 
 interface DisplayedComparison {
-  status: OverviewHistoricalComparison['status'];
+  status: Exclude<OverviewHistoricalComparison['status'], 'no_newer_result'>;
   pct: number | null;
   baselineDate: string | null;
 }
@@ -247,13 +243,13 @@ function displayedComparison(
   if (platform.costPerMtok === null) return null;
   if (comparisonMode === 'history') {
     const comparison = platform.historicalComparison;
-    return comparison === null
-      ? { status: 'no_baseline', pct: null, baselineDate: null }
-      : {
+    return comparison?.status === 'comparable' && comparison.costDeltaPct !== null
+      ? {
           status: comparison.status,
           pct: comparison.costDeltaPct,
           baselineDate: comparison.baselineDate,
-        };
+        }
+      : null;
   }
   if (platform.hardware === 'b200') return null;
   return {
@@ -281,9 +277,8 @@ function comparisonAria(
   formatters: Formatters,
   strings: OverviewStrings,
 ): string {
-  if (comparison.status === 'no_newer_result') return strings.noNewerResultAria;
   if (comparison.status === 'no_baseline' || comparison.pct === null) {
-    return comparisonMode === 'history' ? strings.noHistoricalBaselineAria : strings.noBaselineAria;
+    return strings.noBaselineAria;
   }
   if (comparisonMode === 'hardware') {
     return polarity === 'even'
@@ -330,8 +325,8 @@ export function costDeltaCellStyle(
   return { backgroundColor: `rgb(${COST_DELTA_HUE[polarity]} / ${alpha})` };
 }
 
-/** Relative comparison badge. Missing evidence stays neutral and uses `∞` or
- *  `—` instead of manufacturing a percentage. */
+/** Relative comparison badge. Missing B200 evidence stays neutral and uses
+ *  `∞` instead of manufacturing a percentage. */
 function CostDeltaBadge({
   comparison,
   comparisonMode,
@@ -363,9 +358,7 @@ function CostDeltaBadge({
         phoneRow ? 'col-start-2 justify-self-start' : 'xl:col-start-2 xl:justify-self-end'
       } ${COST_DELTA_CLASS[polarity]}`}
     >
-      <span aria-hidden="true">
-        {status === 'no_newer_result' ? '—' : pct === null ? '∞' : formatters.percent.format(pct)}
-      </span>
+      <span aria-hidden="true">{pct === null ? '∞' : formatters.percent.format(pct)}</span>
       <span className="sr-only">{aria}</span>
     </span>
   );
@@ -829,37 +822,34 @@ export function OverviewComparisonSwitcher({
 }) {
   const options: OverviewComparisonMode[] = ['hardware', 'history'];
   const optionClass =
-    'inline-flex min-h-11 items-center rounded-md border border-border/60 px-3 py-1.5 leading-snug';
+    'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 border-transparent px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors duration-200 hover:border-muted-foreground/30 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:min-w-[140px]';
   return (
     <nav
       data-testid="overview-comparison-switcher"
       aria-label={strings.comparisonNavLabel}
-      className="flex flex-wrap items-center gap-2 text-xs"
+      className="flex flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
     >
-      <span className="text-muted-foreground">{strings.comparisonNavLabel}</span>
-      <div className="flex gap-1">
-        {options.map((option) =>
-          option === comparisonMode ? (
-            <span
-              key={option}
-              data-overview-comparison={option}
-              aria-current="true"
-              className={`${optionClass} bg-foreground font-semibold text-background`}
-            >
-              {strings.comparisonOptions[option]}
-            </span>
-          ) : (
-            <a
-              key={option}
-              data-overview-comparison={option}
-              href={overviewHref(locale, tier, engineScope, option)}
-              className={`${optionClass} text-muted-foreground transition-colors hover:bg-muted hover:text-foreground`}
-            >
-              {strings.comparisonOptions[option]}
-            </a>
-          ),
-        )}
-      </div>
+      {options.map((option) =>
+        option === comparisonMode ? (
+          <span
+            key={option}
+            data-overview-comparison={option}
+            aria-current="true"
+            className={`${optionClass} border-secondary text-secondary dark:border-primary dark:text-primary`}
+          >
+            {strings.comparisonOptions[option]}
+          </span>
+        ) : (
+          <a
+            key={option}
+            data-overview-comparison={option}
+            href={overviewHref(locale, tier, engineScope, option)}
+            className={optionClass}
+          >
+            {strings.comparisonOptions[option]}
+          </a>
+        ),
+      )}
     </nav>
   );
 }

@@ -27,7 +27,7 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
   const formatters = overviewFormatters(locale);
 
   return (
-    <section className="flex flex-col gap-4">
+    <section data-testid="overview-page" className="flex flex-col gap-4">
       <Card>
         <header>
           {/* Two rows at every width: the title, then the metric it is
@@ -89,16 +89,17 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
               locale={locale}
               strings={strings}
             />
-            <OverviewComparisonSwitcher
-              comparisonMode={data.comparisonMode}
-              engineScope={data.engineScope}
-              tier={data.tier}
-              locale={locale}
-              strings={strings}
-            />
           </div>
         </header>
       </Card>
+
+      <OverviewComparisonSwitcher
+        comparisonMode={data.comparisonMode}
+        engineScope={data.engineScope}
+        tier={data.tier}
+        locale={locale}
+        strings={strings}
+      />
 
       {/* Official-only summary; uploaded runs remain in the linked dashboard. */}
       {/* Clipped on phones for the rounded corners; visible from xl so the
