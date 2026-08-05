@@ -1,8 +1,9 @@
 /**
  * Pre-compute the per-row aggregate stats for an `agentic_trace_replay`
  * blob pair. The output lands in the `aggregate_stats` JSONB column so the
- * detail page can serve the "Aggregates across configs" view from a single
- * SQL row read, instead of parsing the raw blobs on demand.
+ * detail page can serve the "Aggregates across configs" view and the
+ * derived chart x-axis modes from a single SQL row read, instead of
+ * parsing the raw blobs on demand.
  *
  * Shape is intentionally versioned — bump `STATS_VERSION` whenever the
  * computation changes so the backfill script knows which rows to recompute.
@@ -11,6 +12,7 @@
 import { gunzipSync } from 'node:zlib';
 
 import { gunzipJsonWithinLimit, streamCollectKeys } from './gzip-json-stream';
+import { computeDerivedFromBlob } from '../queries/derived-agentic-metrics';
 import {
   STATS_VERSION,
   extractIslOsl,
@@ -27,6 +29,12 @@ export interface AggregateStats {
   osl: MetricPercentiles | null;
   kvCacheUtil: MetricPercentiles | null;
   prefixCacheHitRate: MetricPercentiles | null;
+  /**
+   * Per-request E2E latency / OSL (seconds per output token) percentiles.
+   * The read path inverts to plot the slow-tail "E2E Normalized Interactivity" x-axis metric
+   * (tok/s/user): pXX E2E Normalized Interactivity = 1 / pXX(E2EL/OSL).
+   */
+  e2elPerOsl: MetricPercentiles | null;
 }
 
 /**
@@ -119,6 +127,7 @@ export async function computeAggregateStats(args: {
 }): Promise<AggregateStats> {
   let islPct: MetricPercentiles | null = null;
   let oslPct: MetricPercentiles | null = null;
+  let e2elPerOsl: MetricPercentiles | null = null;
 
   if (args.profileBlob) {
     try {
@@ -126,6 +135,7 @@ export async function computeAggregateStats(args: {
       const { isl, osl } = extractIslOsl(jsonl);
       islPct = percentilesOf(isl);
       oslPct = percentilesOf(osl);
+      e2elPerOsl = computeDerivedFromBlob(jsonl).e2el_per_osl;
     } catch {
       // ignore malformed blob — leave nulls
     }
@@ -156,5 +166,6 @@ export async function computeAggregateStats(args: {
     osl: oslPct,
     kvCacheUtil: kvPct,
     prefixCacheHitRate: prefixPct,
+    e2elPerOsl,
   };
 }

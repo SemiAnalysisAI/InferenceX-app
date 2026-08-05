@@ -24,6 +24,7 @@ import { streamObject } from 'stream-json/streamers/stream-object.js';
 
 import { gunzipJsonWithinLimit } from '../etl/gzip-json-stream';
 import type { DbClient } from '../connection.js';
+import { computeDerivedFromBlob } from './derived-agentic-metrics';
 import {
   extractIslOsl,
   fetchAggregateStatsRows,
@@ -315,8 +316,10 @@ export async function getAgenticAggregates(
           const oslPct = percentilesOf(osl);
           result[id].isl = islPct;
           result[id].osl = oslPct;
-          // Server-derived fields are filled in Pass 2 (or stay null when the
-          // server blob is absent, which is the correct complete value).
+          // Recompute every profile-derived field from this same JSONL so the
+          // self-healed bundle is complete at the new version. Server-derived
+          // fields are filled in Pass 2 (or stay null without a server blob).
+          const derived = computeDerivedFromBlob(jsonl);
           pendingById.set(id, {
             traceReplayId: Number(row.trace_replay_id),
             stats: {
@@ -325,6 +328,7 @@ export async function getAgenticAggregates(
               osl: oslPct,
               kvCacheUtil: null,
               prefixCacheHitRate: null,
+              e2elPerOsl: derived.e2el_per_osl,
             },
           });
         } catch {
@@ -409,6 +413,7 @@ interface FullAggregateStats {
   osl: MetricPercentiles | null;
   kvCacheUtil: MetricPercentiles | null;
   prefixCacheHitRate: MetricPercentiles | null;
+  e2elPerOsl: MetricPercentiles | null;
 }
 
 function blankAggregate(id: number): AgenticAggregate {

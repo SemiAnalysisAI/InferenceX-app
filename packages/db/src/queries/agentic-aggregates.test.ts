@@ -129,6 +129,7 @@ interface WrittenStats {
   osl: unknown;
   kvCacheUtil: { mean: number } | null;
   prefixCacheHitRate: unknown;
+  e2elPerOsl: { p90: number; n: number } | null;
 }
 
 /** Capture SQL template text + bound values for the write-back assertions. */
@@ -225,11 +226,15 @@ describe('getAgenticAggregates write-back', () => {
     expect(written.version).toBe(STATS_VERSION);
     // Server field FRESHLY recomputed (0.25), not the stale 0.9 carried forward.
     expect(written.kvCacheUtil?.mean).toBeCloseTo(0.25, 6);
-    expect(written.isl).not.toBeNull();
-    // The retired derived fields must not survive the recompute.
+    // Derived ratio bundle FRESHLY recomputed from the two turns:
+    // ratios (s/tok) = [1.0/50, 2.0/50] = [0.02, 0.04] → p90 = 0.038.
+    expect(written.e2elPerOsl?.n).toBe(2);
+    expect(written.e2elPerOsl?.p90).toBeCloseTo(0.038, 8);
+    // Retired legacy fields must not survive the recompute.
     expect(written).not.toHaveProperty('normalizedSessionTimeS');
     expect(written).not.toHaveProperty('p90PrefillTpsPerUser');
     expect(written).not.toHaveProperty('normalizedE2e400');
+    expect(written.isl).not.toBeNull();
   });
 
   it('does not write back for an id whose profile blob is missing/malformed', async () => {

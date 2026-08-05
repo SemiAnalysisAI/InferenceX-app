@@ -5,10 +5,24 @@
  */
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
-import { e2eFrontierWinners } from '@/components/inference/utils/e2eFrontier';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 
 import type { ChartDefinition, ClippedInferenceData, InferenceData, YAxisMetricKey } from './types';
+
+/**
+ * Select the matching unofficial-run overlay for a chart mode. E2E Normalized Interactivity
+ * is intentionally excluded: unofficial benchmark rows do not include the
+ * persisted per-request trace needed to derive the per-request ratio
+ * percentiles.
+ */
+export function selectUnofficialOverlayForMode<T>(
+  xAxisMode: string,
+  chartType: 'e2e' | 'interactivity',
+  overlays: { e2e: T | null; interactivity: T | null },
+): T | null {
+  if (xAxisMode === 'e2e-normalized-interactivity') return null;
+  return overlays[chartType];
+}
 
 export interface ProcessedChartData {
   data: InferenceData[];
@@ -111,13 +125,13 @@ export function partitionChartDataByLimits(
  *
  * Applies: metric field filtering, x/y remapping (via the resolveXAxisField
  * resolver shared with `useChartData`, so the overlay of a run lands on the
- * identical x column as that run's official points), the e2e-Pareto frontier
- * stamping for agentic non-e2e x-modes, and cost limit filtering.
+ * identical x column as that run's official points), canonical-frontier
+ * handling for agentic modes, and cost limit filtering.
  *
- * `options.restrictToE2eFrontier` is the caller-computed official gate
- * (`isAgentic && selectedXAxisMode !== 'e2e'`) — passed in rather than
- * re-derived from chartType so the overlay can't drift from `useChartData`'s
- * stamping condition.
+ * Unofficial rows do not carry persisted per-request traces, so they cannot be
+ * proven members of the E2E Normalized Interactivity frontier. When the
+ * canonical rule applies they remain visible in show-all mode but are never
+ * classified as optimal or used to draw an alternate-axis roofline.
  */
 export function processOverlayChartData(
   data: InferenceData[],
@@ -127,7 +141,7 @@ export function processOverlayChartData(
   options?: {
     isAgentic?: boolean;
     selectedPercentile?: string;
-    restrictToE2eFrontier?: boolean;
+    restrictToNormalizedFrontier?: boolean;
   },
 ): InferenceData[] {
   return processOverlayChartDataWithClipping(
@@ -151,7 +165,7 @@ export function processOverlayChartDataWithClipping(
   options?: {
     isAgentic?: boolean;
     selectedPercentile?: string;
-    restrictToE2eFrontier?: boolean;
+    restrictToNormalizedFrontier?: boolean;
   },
 ): ProcessedChartData {
   const chartDef = (chartDefinitions as ChartDefinition[]).find((d) => d.chartType === chartType);
@@ -180,31 +194,14 @@ export function processOverlayChartDataWithClipping(
       return { ...d, x: xValue, y: yValue };
     });
 
-  // Anti-benchmark-hacking parity: on agentic charts whose x-axis is NOT the
-  // natural e2e latency, the official roofline is restricted to configs that
-  // ALSO win on end-to-end latency (useChartData stamps `isOnE2eFrontier`,
-  // ScatterGraph's rooflines honor it via e2eRestrictedSeed). Stamp the same
-  // flag on overlay points, seeded per run (matching overlayRooflines' per-run
-  // grouping) so points from one unofficial run can't dominate another's.
-  // A null winner set means the y-metric declares no e2e roofline direction —
-  // no restriction applies, so the flag stays unset (matching the official
-  // path, which draws those rooflines unrestricted).
-  if (options?.restrictToE2eFrontier) {
-    const byRun = new Map<string, InferenceData[]>();
-    for (const p of processedData) {
-      const runKey = p.run_url ?? '';
-      let bucket = byRun.get(runKey);
-      if (!bucket) {
-        bucket = [];
-        byRun.set(runKey, bucket);
-      }
-      bucket.push(p);
-    }
-    for (const runPoints of byRun.values()) {
-      const winners = e2eFrontierWinners(runPoints, selectedYAxisMetric, selectedPercentile);
-      // Direction-less metrics resolve null for every run — stop entirely.
-      if (winners === null) break;
-      for (const p of runPoints) p.isOnE2eFrontier = winners.has(p);
+  // The normalized metric is derived from persisted request traces, which an
+  // unofficial overlay does not have. An all-false canonical stamp prevents a
+  // local E2E / Interactivity / TTFT frontier from impersonating the north-star
+  // frontier. Metrics without a declared Pareto direction remain unrestricted.
+  const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
+  if (options?.restrictToNormalizedFrontier && chartDef[rooflineKey]) {
+    for (const point of processedData) {
+      point.isOnNormalizedInteractivityFrontier = false;
     }
   }
 

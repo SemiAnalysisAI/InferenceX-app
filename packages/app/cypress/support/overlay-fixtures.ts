@@ -40,10 +40,10 @@ export const metricsFor = (intvty: number, tput: number, e2el: number): Record<s
 });
 
 let idCursor = 900000;
-export const b300Rows = (runUrl: string | null) =>
+export const b300Rows = (runUrl: string | null, hardware = 'b300') =>
   REAL_CONFIGS.map(([conc, intvty, tput, e2el]) => ({
     id: runUrl ? 0 : idCursor++,
-    hardware: 'b300',
+    hardware,
     framework: 'sglang',
     model: DEFAULT_MODEL_DB_KEY,
     precision: 'fp4',
@@ -82,7 +82,7 @@ export const availability = [
 ];
 
 /** Intercept availability + benchmarks + unofficial-run with the B300 fixture. */
-export const interceptOverlayRun = () => {
+export const interceptOverlayRun = ({ overlayHardware = 'b300' } = {}) => {
   cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', { body: b300Rows(null) }).as('benchmarks');
   cy.intercept('GET', '/api/unofficial-run*', {
@@ -100,7 +100,7 @@ export const interceptOverlayRun = () => {
           isNonMainBranch: true,
         },
       ],
-      benchmarks: b300Rows(OVERLAY_RUN_URL),
+      benchmarks: b300Rows(OVERLAY_RUN_URL, overlayHardware),
       evaluations: [],
     },
   }).as('unofficialRun');
