@@ -34,7 +34,7 @@ import {
   paretoFrontForDirection,
   type ParetoDirection,
 } from '@/lib/chart-utils';
-import { canonicalFrontierPoints } from '@/components/inference/utils/canonicalFrontier';
+import { canonicalParetoIntersection } from '@/components/inference/utils/canonicalFrontier';
 import type {
   ChartDefinition,
   InferenceData,
@@ -256,8 +256,10 @@ const GPUGraph = React.memo(
       const dir = chartDefinition[rooflineKey] as ParetoDirection | undefined;
       const frontier = paretoFrontForDirection(dir ?? 'lower_right');
       for (const key of Object.keys(groupedData)) {
-        const canonicalPoints = canonicalFrontierPoints(groupedData[key]);
-        result[key] = canonicalPoints ?? frontier(groupedData[key].filter(isFrontierEligible));
+        const canonicalPoints = canonicalParetoIntersection(groupedData[key], dir ?? 'lower_right');
+        result[key] = (
+          canonicalPoints ?? frontier(groupedData[key].filter(isFrontierEligible))
+        ).toSorted((a, b) => a.x - b.x);
       }
       return result;
     }, [groupedData, selectedYAxisMetric, chartDefinition]);
