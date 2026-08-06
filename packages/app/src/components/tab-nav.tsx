@@ -31,11 +31,11 @@ const VISIBLE_TABS = [
   { href: '/historical', label: 'Historical Trends', testId: 'tab-trigger-historical' },
   { href: '/calculator', label: 'TCO Calculator', testId: 'tab-trigger-calculator' },
   { href: '/gpu-specs', label: 'Chip Specs', testId: 'tab-trigger-gpu-specs' },
-  { href: '/collectivex', label: 'CollectiveX', testId: 'tab-trigger-collectivex' },
   { href: '/submissions', label: 'Submissions', testId: 'tab-trigger-submissions' },
 ] as const;
 
 const GATED_TABS = [
+  { href: '/collectivex', label: 'CollectiveX', testId: 'tab-trigger-collectivex' },
   { href: '/ai-chart', label: 'AI Chart', testId: 'tab-trigger-ai-chart' },
   { href: '/gpu-metrics', label: 'PowerX', testId: 'tab-trigger-gpu-metrics' },
   {
