@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { revalidateTag, unstable_cache } from 'next/cache';
 import { blobGet, blobPurge, blobSet } from './blob-cache';
 
@@ -52,6 +54,21 @@ interface CachedQueryOptions {
   tag?: string;
 }
 
+// Leave room for BLOB_CACHE_PREFIX and the `.json` suffix in the final Vercel
+// Blob pathname. Short keys keep their existing human-readable form (and warm
+// cache entries); large argument lists use a fixed-size digest instead.
+const MAX_INLINE_BLOB_KEY_BYTES = 512;
+
+function blobKeyForArgs(keyPrefix: string, args: unknown[]): string {
+  if (args.length === 0) return keyPrefix;
+
+  const inlineKey = `${keyPrefix}:${args.join(':')}`;
+  if (Buffer.byteLength(inlineKey, 'utf8') <= MAX_INLINE_BLOB_KEY_BYTES) return inlineKey;
+
+  const digest = createHash('sha256').update(JSON.stringify(args)).digest('hex');
+  return `${keyPrefix}:sha256:${digest}`;
+}
+
 /**
  * Cache a function's result using unstable_cache (fast, local).
  * Set `blobOnly: true` for payloads known to exceed Next.js's 2MB unstable_cache limit.
@@ -63,13 +80,24 @@ export function cachedQuery<T, Args extends unknown[]>(
 ): (...args: Args) => Promise<T> {
   if (options?.blobOnly) {
     return async (...args: Args): Promise<T> => {
-      const blobKey = args.length > 0 ? `${keyPrefix}:${args.join(':')}` : keyPrefix;
+      const blobKey = blobKeyForArgs(keyPrefix, args);
 
       const cached = await blobGet<T>(blobKey);
       if (cached) return cached;
 
       const result = await fn(...args);
-      await blobSet(blobKey, result);
+      try {
+        await blobSet(blobKey, result);
+      } catch (error) {
+        // Blob storage is an optimization, not part of the data contract. A
+        // cache outage or rejected pathname must not turn a successful DB read
+        // into an API 500.
+        console.warn(
+          `[blob cache] could not persist ${keyPrefix}; serving uncached result. ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
       return result;
     };
   }
