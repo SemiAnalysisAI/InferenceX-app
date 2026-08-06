@@ -77,6 +77,7 @@ import ComparisonChangelog from './ComparisonChangelog';
 import CustomCosts from './CustomCosts';
 import CustomPowers from './CustomPowers';
 import GPUGraph from './GPUGraph';
+import InteractivityTables from './InteractivityTables';
 import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLauncher';
 import TrendChart from './TrendChart';
 
@@ -1054,6 +1055,13 @@ export default function ChartDisplay() {
         </TabsList>
       </Tabs>
       <div className="flex flex-col gap-4">{displayGraphs}</div>
+
+      {/* Summary tables below the Pareto chart. Render for every y-axis
+          metric; the tables auto-pick higher/lower-is-better semantics from
+          the active metric's roofline direction on the interactivity chart
+          definition. Reactive to model, precision, sequence and the legend
+          on/off toggles via useInference() context. */}
+      <InteractivityTables />
 
       {/* Performance Over Time — Modal Drill-Down */}
       <Dialog

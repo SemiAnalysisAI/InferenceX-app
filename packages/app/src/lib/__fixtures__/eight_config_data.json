@@ -1,0 +1,420 @@
+{
+  "MI355X_SGLang_nonMTP": [
+    {
+      "Conc": 1,
+      "Interactivity_tok_s_user": 42.4425,
+      "Token_Throughput_per_GPU_tok_s_gpu": 43.927,
+      "Median_TTFT_ms": 1.8887
+    },
+    {
+      "Conc": 2,
+      "Interactivity_tok_s_user": 40.0599,
+      "Token_Throughput_per_GPU_tok_s_gpu": 83.1647,
+      "Median_TTFT_ms": 1.837
+    },
+    {
+      "Conc": 4,
+      "Interactivity_tok_s_user": 32.8412,
+      "Token_Throughput_per_GPU_tok_s_gpu": 135.9584,
+      "Median_TTFT_ms": 1.5697
+    },
+    {
+      "Conc": 8,
+      "Interactivity_tok_s_user": 28.2131,
+      "Token_Throughput_per_GPU_tok_s_gpu": 233.3679,
+      "Median_TTFT_ms": 1.4875
+    },
+    {
+      "Conc": 16,
+      "Interactivity_tok_s_user": 20.0572,
+      "Token_Throughput_per_GPU_tok_s_gpu": 336.0692,
+      "Median_TTFT_ms": 1.4909
+    },
+    {
+      "Conc": 16,
+      "Interactivity_tok_s_user": 20.1404,
+      "Token_Throughput_per_GPU_tok_s_gpu": 302.1082,
+      "Median_TTFT_ms": 4.7495
+    },
+    {
+      "Conc": 32,
+      "Interactivity_tok_s_user": 16.5069,
+      "Token_Throughput_per_GPU_tok_s_gpu": 488.2661,
+      "Median_TTFT_ms": 5.2389
+    },
+    {
+      "Conc": 64,
+      "Interactivity_tok_s_user": 15.0528,
+      "Token_Throughput_per_GPU_tok_s_gpu": 802.9119,
+      "Median_TTFT_ms": 14.1662
+    },
+    {
+      "Conc": 128,
+      "Interactivity_tok_s_user": 10.121,
+      "Token_Throughput_per_GPU_tok_s_gpu": 1194.3396,
+      "Median_TTFT_ms": 16.3291
+    },
+    {
+      "Conc": 256,
+      "Interactivity_tok_s_user": 6.0659,
+      "Token_Throughput_per_GPU_tok_s_gpu": 1503.2389,
+      "Median_TTFT_ms": 19.203
+    }
+  ],
+  "MI355X_ATOM_nonMTP": [
+    {
+      "Conc": 1,
+      "Interactivity_tok_s_user": 43.3401,
+      "Token_Throughput_per_GPU_tok_s_gpu": 47.4194,
+      "Median_TTFT_ms": 0.4657
+    },
+    {
+      "Conc": 2,
+      "Interactivity_tok_s_user": 41.1286,
+      "Token_Throughput_per_GPU_tok_s_gpu": 89.3156,
+      "Median_TTFT_ms": 0.4643
+    },
+    {
+      "Conc": 4,
+      "Interactivity_tok_s_user": 39.377,
+      "Token_Throughput_per_GPU_tok_s_gpu": 168.4226,
+      "Median_TTFT_ms": 0.4865
+    },
+    {
+      "Conc": 8,
+      "Interactivity_tok_s_user": 35.9213,
+      "Token_Throughput_per_GPU_tok_s_gpu": 307.4319,
+      "Median_TTFT_ms": 0.4701
+    },
+    {
+      "Conc": 16,
+      "Interactivity_tok_s_user": 29.9705,
+      "Token_Throughput_per_GPU_tok_s_gpu": 512.6047,
+      "Median_TTFT_ms": 0.4759
+    },
+    {
+      "Conc": 32,
+      "Interactivity_tok_s_user": 23.9073,
+      "Token_Throughput_per_GPU_tok_s_gpu": 814.9395,
+      "Median_TTFT_ms": 0.4957
+    },
+    {
+      "Conc": 64,
+      "Interactivity_tok_s_user": 16.6093,
+      "Token_Throughput_per_GPU_tok_s_gpu": 1162.8702,
+      "Median_TTFT_ms": 0.6299
+    },
+    {
+      "Conc": 128,
+      "Interactivity_tok_s_user": 10.4412,
+      "Token_Throughput_per_GPU_tok_s_gpu": 1469.8935,
+      "Median_TTFT_ms": 0.6871
+    },
+    {
+      "Conc": 256,
+      "Interactivity_tok_s_user": 2.3998,
+      "Token_Throughput_per_GPU_tok_s_gpu": 704.7307,
+      "Median_TTFT_ms": 3.5858
+    },
+    {
+      "Conc": 512,
+      "Interactivity_tok_s_user": 3.7953,
+      "Token_Throughput_per_GPU_tok_s_gpu": 2138.47,
+      "Median_TTFT_ms": 1.7068
+    }
+  ],
+  "B200_SGLang_nonMTP": [
+    {
+      "Conc": 2,
+      "Interactivity_tok_s_user": 80.2493,
+      "Token_Throughput_per_GPU_tok_s_gpu": 145.0523,
+      "Median_TTFT_ms": 0.454
+    },
+    {
+      "Conc": 4,
+      "Interactivity_tok_s_user": 70.4374,
+      "Token_Throughput_per_GPU_tok_s_gpu": 261.4948,
+      "Median_TTFT_ms": 0.4077
+    },
+    {
+      "Conc": 8,
+      "Interactivity_tok_s_user": 60.7308,
+      "Token_Throughput_per_GPU_tok_s_gpu": 513.6405,
+      "Median_TTFT_ms": 0.3958
+    },
+    {
+      "Conc": 16,
+      "Interactivity_tok_s_user": 47.7448,
+      "Token_Throughput_per_GPU_tok_s_gpu": 816.2807,
+      "Median_TTFT_ms": 0.3986
+    },
+    {
+      "Conc": 32,
+      "Interactivity_tok_s_user": 34.3571,
+      "Token_Throughput_per_GPU_tok_s_gpu": 1169.9087,
+      "Median_TTFT_ms": 0.4118
+    },
+    {
+      "Conc": 64,
+      "Interactivity_tok_s_user": 19.183,
+      "Token_Throughput_per_GPU_tok_s_gpu": 1330.0161,
+      "Median_TTFT_ms": 0.8243
+    },
+    {
+      "Conc": 128,
+      "Interactivity_tok_s_user": 13.233,
+      "Token_Throughput_per_GPU_tok_s_gpu": 1945.3725,
+      "Median_TTFT_ms": 0.8562
+    },
+    {
+      "Conc": 256,
+      "Interactivity_tok_s_user": 8.9919,
+      "Token_Throughput_per_GPU_tok_s_gpu": 2600.2499,
+      "Median_TTFT_ms": 0.9585
+    },
+    {
+      "Conc": 512,
+      "Interactivity_tok_s_user": 6.0656,
+      "Token_Throughput_per_GPU_tok_s_gpu": 3492.0547,
+      "Median_TTFT_ms": 1.1088
+    }
+  ],
+  "B200_DynamoVLLM_nonMTP_disagg": [
+    {
+      "Conc": 1,
+      "Interactivity_tok_s_user": 80.1069,
+      "Token_Throughput_per_GPU_tok_s_gpu": 29.4083,
+      "Median_TTFT_ms": 3.8403
+    },
+    {
+      "Conc": 16,
+      "Interactivity_tok_s_user": 53.1696,
+      "Token_Throughput_per_GPU_tok_s_gpu": 391.6534,
+      "Median_TTFT_ms": 3.328
+    },
+    {
+      "Conc": 32,
+      "Interactivity_tok_s_user": 40.7967,
+      "Token_Throughput_per_GPU_tok_s_gpu": 614.4892,
+      "Median_TTFT_ms": 3.3836
+    },
+    {
+      "Conc": 64,
+      "Interactivity_tok_s_user": 32.1821,
+      "Token_Throughput_per_GPU_tok_s_gpu": 1008.1675,
+      "Median_TTFT_ms": 3.2835
+    },
+    {
+      "Conc": 128,
+      "Interactivity_tok_s_user": 26.334,
+      "Token_Throughput_per_GPU_tok_s_gpu": 1660.2779,
+      "Median_TTFT_ms": 3.4014
+    },
+    {
+      "Conc": 256,
+      "Interactivity_tok_s_user": 19.5779,
+      "Token_Throughput_per_GPU_tok_s_gpu": 1753.8925,
+      "Median_TTFT_ms": 1.4311
+    },
+    {
+      "Conc": 512,
+      "Interactivity_tok_s_user": 18.2665,
+      "Token_Throughput_per_GPU_tok_s_gpu": 3195.7277,
+      "Median_TTFT_ms": 1.5909
+    },
+    {
+      "Conc": 1024,
+      "Interactivity_tok_s_user": 17.3737,
+      "Token_Throughput_per_GPU_tok_s_gpu": 5801.349,
+      "Median_TTFT_ms": 2.9751
+    },
+    {
+      "Conc": 8192,
+      "Interactivity_tok_s_user": 14.8238,
+      "Token_Throughput_per_GPU_tok_s_gpu": 7329.1025,
+      "Median_TTFT_ms": 222.4298
+    },
+    {
+      "Conc": 12345,
+      "Interactivity_tok_s_user": 14.8342,
+      "Token_Throughput_per_GPU_tok_s_gpu": 7360.2266,
+      "Median_TTFT_ms": 369.2497
+    }
+  ],
+  "GB200_DynamoVLLM_nonMTP_disagg": [
+    {
+      "Conc": 1,
+      "Interactivity_tok_s_user": 75.4019,
+      "Token_Throughput_per_GPU_tok_s_gpu": 32.7974,
+      "Median_TTFT_ms": 0.6629
+    },
+    {
+      "Conc": 256,
+      "Interactivity_tok_s_user": 24.2552,
+      "Token_Throughput_per_GPU_tok_s_gpu": 3147.9943,
+      "Median_TTFT_ms": 2.0077
+    },
+    {
+      "Conc": 256,
+      "Interactivity_tok_s_user": 32.4352,
+      "Token_Throughput_per_GPU_tok_s_gpu": 1613.8082,
+      "Median_TTFT_ms": 2.3161
+    },
+    {
+      "Conc": 512,
+      "Interactivity_tok_s_user": 21.0842,
+      "Token_Throughput_per_GPU_tok_s_gpu": 5336.1547,
+      "Median_TTFT_ms": 2.341
+    },
+    {
+      "Conc": 512,
+      "Interactivity_tok_s_user": 28.2006,
+      "Token_Throughput_per_GPU_tok_s_gpu": 2004.5428,
+      "Median_TTFT_ms": 17.6427
+    },
+    {
+      "Conc": 1024,
+      "Interactivity_tok_s_user": 21.5425,
+      "Token_Throughput_per_GPU_tok_s_gpu": 6036.2244,
+      "Median_TTFT_ms": 40.5199
+    },
+    {
+      "Conc": 4096,
+      "Interactivity_tok_s_user": 15.092,
+      "Token_Throughput_per_GPU_tok_s_gpu": 8933.0452,
+      "Median_TTFT_ms": 51.7808
+    },
+    {
+      "Conc": 4096,
+      "Interactivity_tok_s_user": 18.402,
+      "Token_Throughput_per_GPU_tok_s_gpu": 8153.0641,
+      "Median_TTFT_ms": 117.6863
+    }
+  ],
+  "GB200_DynamoVLLM_MTP_disagg": [
+    {
+      "Conc": 1,
+      "Interactivity_tok_s_user": 152.9557,
+      "Token_Throughput_per_GPU_tok_s_gpu": 143.2128,
+      "Median_TTFT_ms": 0.3757
+    },
+    {
+      "Conc": 16,
+      "Interactivity_tok_s_user": 99.465,
+      "Token_Throughput_per_GPU_tok_s_gpu": 269.0948,
+      "Median_TTFT_ms": 1.5557
+    },
+    {
+      "Conc": 32,
+      "Interactivity_tok_s_user": 83.1891,
+      "Token_Throughput_per_GPU_tok_s_gpu": 490.2363,
+      "Median_TTFT_ms": 1.3076
+    },
+    {
+      "Conc": 64,
+      "Interactivity_tok_s_user": 63.4528,
+      "Token_Throughput_per_GPU_tok_s_gpu": 721.1578,
+      "Median_TTFT_ms": 1.5374
+    },
+    {
+      "Conc": 128,
+      "Interactivity_tok_s_user": 44.0639,
+      "Token_Throughput_per_GPU_tok_s_gpu": 2584.5112,
+      "Median_TTFT_ms": 2.502
+    },
+    {
+      "Conc": 1024,
+      "Interactivity_tok_s_user": 16.4509,
+      "Token_Throughput_per_GPU_tok_s_gpu": 5781.1445,
+      "Median_TTFT_ms": 2.4078
+    }
+  ],
+  "GB300_DynamoSGLang_nonMTP_disagg": [
+    {
+      "Conc": 1,
+      "Interactivity_tok_s_user": 92.0641,
+      "Token_Throughput_per_GPU_tok_s_gpu": 94.053,
+      "Median_TTFT_ms": 0.9646
+    },
+    {
+      "Conc": 1024,
+      "Interactivity_tok_s_user": 47.2857,
+      "Token_Throughput_per_GPU_tok_s_gpu": 3106.1871,
+      "Median_TTFT_ms": 113.8477
+    },
+    {
+      "Conc": 1024,
+      "Interactivity_tok_s_user": 37.9203,
+      "Token_Throughput_per_GPU_tok_s_gpu": 7099.6766,
+      "Median_TTFT_ms": 8.9875
+    },
+    {
+      "Conc": 4096,
+      "Interactivity_tok_s_user": 26.3267,
+      "Token_Throughput_per_GPU_tok_s_gpu": 9599.2883,
+      "Median_TTFT_ms": 31.6256
+    },
+    {
+      "Conc": 8192,
+      "Interactivity_tok_s_user": 22.3924,
+      "Token_Throughput_per_GPU_tok_s_gpu": 10419.6758,
+      "Median_TTFT_ms": 64.9696
+    },
+    {
+      "Conc": 21504,
+      "Interactivity_tok_s_user": 11.0323,
+      "Token_Throughput_per_GPU_tok_s_gpu": 11444.0756,
+      "Median_TTFT_ms": 92.2394
+    }
+  ],
+  "GB300_DynamoSGLang_MTP_disagg": [
+    {
+      "Conc": 1,
+      "Interactivity_tok_s_user": 173.3876,
+      "Token_Throughput_per_GPU_tok_s_gpu": 161.3425,
+      "Median_TTFT_ms": 0.9401
+    },
+    {
+      "Conc": 8,
+      "Interactivity_tok_s_user": 160.0061,
+      "Token_Throughput_per_GPU_tok_s_gpu": 289.7123,
+      "Median_TTFT_ms": 1.6635
+    },
+    {
+      "Conc": 32,
+      "Interactivity_tok_s_user": 135.693,
+      "Token_Throughput_per_GPU_tok_s_gpu": 688.7133,
+      "Median_TTFT_ms": 4.0586
+    },
+    {
+      "Conc": 64,
+      "Interactivity_tok_s_user": 116.0557,
+      "Token_Throughput_per_GPU_tok_s_gpu": 1226.2824,
+      "Median_TTFT_ms": 4.8214
+    },
+    {
+      "Conc": 256,
+      "Interactivity_tok_s_user": 85.8193,
+      "Token_Throughput_per_GPU_tok_s_gpu": 2652.9551,
+      "Median_TTFT_ms": 24.9809
+    },
+    {
+      "Conc": 256,
+      "Interactivity_tok_s_user": 70.3439,
+      "Token_Throughput_per_GPU_tok_s_gpu": 3884.9172,
+      "Median_TTFT_ms": 23.7946
+    },
+    {
+      "Conc": 512,
+      "Interactivity_tok_s_user": 58.2314,
+      "Token_Throughput_per_GPU_tok_s_gpu": 6229.1466,
+      "Median_TTFT_ms": 19.6604
+    },
+    {
+      "Conc": 1024,
+      "Interactivity_tok_s_user": 49.6076,
+      "Token_Throughput_per_GPU_tok_s_gpu": 7564.4013,
+      "Median_TTFT_ms": 22.5606
+    }
+  ]
+}
