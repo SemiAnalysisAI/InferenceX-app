@@ -40,6 +40,21 @@ export interface ShardOverrides {
   status?: string;
   reasons?: string[];
   rows?: RowOverrides[];
+  /**
+   * Emit the chained-measurement fields: `components.pair_period`, the
+   * per-operation `chain_floor_us`, `chain_health`, and the implementation
+   * flag. Off by default so the shared fixtures keep modelling the artifacts
+   * that predate the chained schedule.
+   */
+  chained?: boolean;
+  /** Chained period includes the inter-pair barrier (requires `chained`). */
+  chainBarrier?: boolean;
+  /**
+   * Emit the unrelated opt-in `components.period` burst estimator that some
+   * backends carry. Independent of `chained` — it is not the chained pair
+   * period and must never be read as one.
+   */
+  burstPeriod?: boolean;
 }
 
 function percentiles(base: number): Json {
@@ -58,7 +73,13 @@ function bytes(activation: number, total: number = activation): Json {
   return { activation_data_bytes: activation, total_logical_bytes: total };
 }
 
-function makeRawRow(index: number, row: RowOverrides, worldSize: number): Json {
+function makeRawRow(
+  index: number,
+  row: RowOverrides,
+  worldSize: number,
+  chained: boolean,
+  burstPeriod: boolean,
+): Json {
   const tokensPerRank = row.tokensPerRank ?? 128 * (index + 1);
   const components: Json = {
     dispatch: component(417 + index),
@@ -68,6 +89,12 @@ function makeRawRow(index: number, row: RowOverrides, worldSize: number): Json {
       ? { availability: 'unavailable', percentiles_us: null }
       : component(120 + index),
   };
+  // Steady state is cheaper than the isolated roundtrip: chaining the pairs
+  // overlaps what timing one pair alone serializes.
+  if (chained) components.pair_period = component(844 + index);
+  // A distinctly different value, so a consumer that confuses the two is caught
+  // by the number it reports rather than by luck.
+  if (burstPeriod) components.period = component(611 + index);
   // Dispatch total exceeds activation (models FP8 scale bytes); combine is
   // always bf16 (total == activation); roundtrip total is their sum.
   const byteProvenance: Json = {
@@ -83,7 +110,17 @@ function makeRawRow(index: number, row: RowOverrides, worldSize: number): Json {
     global_tokens: row.globalTokens ?? tokensPerRank * worldSize,
     token_rate_at_latency_percentile: percentiles(8_338_218),
     components,
+    // No `pair_period` byte provenance: the pair moves the roundtrip's bytes,
+    // and the reader is expected to read them from there.
     byte_provenance: byteProvenance,
+    // Floors and the spread are component-shaped like the entries above, not
+    // bare numbers — a floor can be unavailable on its own.
+    ...(chained
+      ? {
+          chain_floor_us: { dispatch: component(388 + index), combine: component(351 + index) },
+          chain_health: { pair_spread_us: component(12 + index) },
+        }
+      : {}),
   };
 }
 
@@ -131,9 +168,18 @@ export function makeRawShard(options: ShardOverrides = {}): Json {
       case_id: caseId,
       case_factors: { sku, case: makeRawCase({ ...options, backend }, caseId) },
     },
-    implementation: { name: options.implName ?? backend },
+    implementation: {
+      name: options.implName ?? backend,
+      ...(options.chained
+        ? { chained_period: true, chain_barrier: options.chainBarrier ?? false }
+        : {}),
+    },
     runtime: { vendor: options.vendor ?? 'nvidia' },
-    measurement: { rows: rows.map((row, index) => makeRawRow(index, row, worldSize)) },
+    measurement: {
+      rows: rows.map((row, index) =>
+        makeRawRow(index, row, worldSize, options.chained === true, options.burstPeriod === true),
+      ),
+    },
     outcome: {
       status: options.status ?? 'success',
       ...(options.reasons ? { reasons: options.reasons } : {}),

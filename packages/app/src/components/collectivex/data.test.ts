@@ -8,8 +8,10 @@ import {
   collectiveXSeriesForRun,
   collectiveXSeriesLabel,
   collectiveXTopologyLabel,
+  componentFor,
   fitAlphaBeta,
   metricValue,
+  resolvedOperation,
   seriesMatchesSelection,
   type CollectiveXSeriesSelection,
 } from './data';
@@ -196,6 +198,61 @@ describe('metricValue', () => {
   });
 });
 
+describe('headline latency', () => {
+  const chained = makeCollectiveXSeries({ chained: true });
+  const chainedPoint = chained.points[0];
+  // The default fixture predates the chained schedule: round trip only.
+  const isolatedPoint = scaleUp.points[0];
+
+  it('reads the pair period when the row measured one', () => {
+    expect(componentFor(chainedPoint, 'pair_period')).toBe(chainedPoint.components.pair_period);
+    expect(metricValue(chainedPoint, 'pair_period', 'p50', 'latency')).toBe(
+      chainedPoint.components.pair_period?.latency_us.p50,
+    );
+    expect(resolvedOperation(chainedPoint, 'pair_period')).toBe('pair_period');
+  });
+
+  it('falls back to the round trip for a row measured before the chained schedule', () => {
+    expect(componentFor(isolatedPoint, 'pair_period')).toBe(isolatedPoint.components.roundtrip);
+    expect(metricValue(isolatedPoint, 'pair_period', 'p50', 'latency')).toBe(
+      isolatedPoint.components.roundtrip?.latency_us.p50,
+    );
+    // The label follows the fallback so it never claims an unmeasured period.
+    expect(resolvedOperation(isolatedPoint, 'pair_period')).toBe('roundtrip');
+  });
+
+  it('leaves every other operation resolving to itself', () => {
+    expect(componentFor(chainedPoint, 'dispatch')).toBe(chainedPoint.components.dispatch);
+    expect(resolvedOperation(chainedPoint, 'dispatch')).toBe('dispatch');
+    // A missing component stays missing — only the headline falls back.
+    const unavailable = makeCollectiveXSeries({ rows: [{ stageUnavailable: true }] }).points[0];
+    expect(componentFor(unavailable, 'stage')).toBeNull();
+  });
+
+  it('keeps the token rate on the round trip, which is what the artifact derived it from', () => {
+    expect(metricValue(chainedPoint, 'pair_period', 'p50', 'tokens-per-second')).toBeNull();
+    expect(metricValue(chainedPoint, 'roundtrip', 'p50', 'tokens-per-second')).toBe(
+      chainedPoint.roundtrip_token_rate_at_latency_percentile.p50,
+    );
+  });
+
+  it('derives the payload rate from the round trip byte provenance the pair shares', () => {
+    // The pair moves the roundtrip's bytes, so the rate axes stay populated on
+    // the headline instead of blanking out.
+    expect(
+      chainedPoint.components.pair_period?.payload_data_rate_gbps_at_latency_percentile?.p50,
+    ).toBeGreaterThan(0);
+    expect(chainedPoint.components.pair_period?.payload_bytes).toBe(
+      chainedPoint.components.roundtrip?.payload_bytes,
+    );
+  });
+
+  it('plots old and new series together when a comparison spans both', () => {
+    const points = chartPoints([chained, scaleUp], 'pair_period', 'p50', 'latency');
+    expect(points).toHaveLength(chained.points.length + scaleUp.points.length);
+  });
+});
+
 function pct(value: number): CollectiveXPercentiles {
   return { p50: value, p90: value, p95: value, p99: value };
 }
@@ -218,8 +275,16 @@ describe('fitAlphaBeta', () => {
       return {
         tokens_per_rank: bytesPerGpu / 1e4,
         global_tokens: bytesPerGpu / 1e3,
-        components: { dispatch: component, stage: null, combine: component, roundtrip: component },
+        components: {
+          dispatch: component,
+          stage: null,
+          combine: component,
+          roundtrip: component,
+          pair_period: null,
+        },
         roundtrip_token_rate_at_latency_percentile: pct(1),
+        chain_floor_us: null,
+        pair_spread_us: null,
       };
     };
     return {
@@ -240,6 +305,8 @@ describe('fitAlphaBeta', () => {
         vendor: 'nvidia',
       },
       points: [point(1e6), point(2e6), point(3e6)],
+      chained_period: false,
+      chain_barrier: false,
     };
   }
 

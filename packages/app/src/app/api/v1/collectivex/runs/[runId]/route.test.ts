@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { makeCollectiveXDataset } from '@semianalysisai/inferencex-db/collectivex/test-fixture';
+import type { CollectiveXDataset } from '@semianalysisai/inferencex-db/collectivex/types';
+import {
+  buildDataset,
+  makeCollectiveXDataset,
+  makeRawShard,
+} from '@semianalysisai/inferencex-db/collectivex/test-fixture';
 
 const { mockGetRun, mockDelete, mockFromRow, mockGetDb, mockGetWriteDb, mockPurge, mockEnsureRun } =
   vi.hoisted(() => ({
@@ -100,6 +105,23 @@ describe('GET /api/v1/collectivex/runs/[runId]', () => {
     expect(await res.json()).toEqual(dataset);
     expect(mockEnsureRun).toHaveBeenCalledWith(1, runId);
     expect(mockGetRun).toHaveBeenCalledWith('mock-sql', 1, runId);
+  });
+
+  it('serves the chained-period fields to the client', async () => {
+    const chained = buildDataset({
+      shards: [makeRawShard({ chained: true, chainBarrier: true })],
+    });
+    mockFromRow.mockReturnValue(chained);
+
+    const res = await get(`/x?version=1`, runId);
+    const [series] = ((await res.json()) as CollectiveXDataset).series;
+
+    expect(series.chained_period).toBe(true);
+    expect(series.chain_barrier).toBe(true);
+    expect(series.points[0].components.pair_period?.latency_us.p50).toBe(844);
+    expect(series.points[0].chain_floor_us?.dispatch?.p50).toBe(388);
+    expect(series.points[0].chain_floor_us?.combine?.p50).toBe(351);
+    expect(series.points[0].pair_spread_us?.p50).toBe(12);
   });
 
   it.each([

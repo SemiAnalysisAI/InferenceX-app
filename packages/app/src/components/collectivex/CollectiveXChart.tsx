@@ -5,11 +5,18 @@ import { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 
-import { chartPoints, collectiveXColorKey, collectiveXRunDasharray, fitAlphaBeta } from './data';
+import {
+  chartPoints,
+  collectiveXColorKey,
+  collectiveXRunDasharray,
+  fitAlphaBeta,
+  resolvedOperation,
+} from './data';
 import type {
   CollectiveXChartPoint,
   CollectiveXOperation,
   CollectiveXPercentile,
+  CollectiveXPercentiles,
   CollectiveXRunSeries,
   CollectiveXYAxis,
 } from './types';
@@ -31,6 +38,7 @@ const OPERATION_LABELS: Record<CollectiveXOperation, string> = {
   stage: 'Stage',
   combine: 'Combine',
   roundtrip: 'Round trip (measured)',
+  pair_period: 'Pair period (chained)',
 };
 
 const Y_AXIS_LABELS: Record<CollectiveXYAxis, string> = {
@@ -71,6 +79,19 @@ function formatPercentiles(
 ): string {
   if (value === null) return 'unavailable';
   return `${value.latency_us.p50.toFixed(1)} / ${value.latency_us.p90.toFixed(1)} / ${value.latency_us.p95.toFixed(1)} / ${value.latency_us.p99.toFixed(1)} µs`;
+}
+
+/**
+ * A secondary chain number (a wait-free floor, the pair spread) as a suffix on
+ * the line it qualifies. Shown at the selected percentile rather than as a
+ * second four-value block, and labelled with it so the two cannot be confused.
+ */
+function formatChainValue(
+  label: string,
+  value: CollectiveXPercentiles | null | undefined,
+  percentile: CollectiveXPercentile,
+): string {
+  return value ? ` · ${label} ${value[percentile].toFixed(1)} µs (${percentile})` : '';
 }
 
 function escapeHtml(value: string): string {
@@ -206,6 +227,16 @@ export function CollectiveXChart({
           const color = colors[point.colorKey] ?? '#888';
           const measurement = point.point;
           const measuredRoundtrip = measurement.components.roundtrip;
+          const pairPeriod = measurement.components.pair_period;
+          // Name the quantity this row's headline actually came from: a point
+          // measured before the chained schedule falls back to the roundtrip.
+          const headline = resolvedOperation(measurement, operation);
+          const floors = measurement.chain_floor_us;
+          const spread = measurement.pair_spread_us;
+          const barrier = seriesById.get(point.seriesId)?.chain_barrier === true;
+          const pairLine = pairPeriod
+            ? `<div class="text-muted-foreground">Pair period: ${formatPercentiles(pairPeriod)} (chained${barrier ? ', +barrier' : ''})${formatChainValue('spread', spread, percentile)}</div>`
+            : '';
           const fit = fitsBySeries.get(point.seriesId);
           const fitLine = fit
             ? `<div class="mt-1 text-muted-foreground">Fit β=${fit.betaGbps.toFixed(fit.betaGbps >= 100 ? 0 : 1)} GB/s · α=${fit.alphaUs.toFixed(1)} µs (p50, per chip)</div>`
@@ -213,13 +244,14 @@ export function CollectiveXChart({
           return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; max-width: 380px; user-select: ${isPinned ? 'text' : 'none'}">
             ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
             <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
-            <div>${escapeHtml(OPERATION_LABELS[operation])} ${yAxis === 'latency' ? percentile : `at ${percentile} latency`}: <strong>${formatMetric(point.y, yAxis)}</strong></div>
+            <div>${escapeHtml(OPERATION_LABELS[headline])} ${yAxis === 'latency' ? percentile : `at ${percentile} latency`}: <strong>${formatMetric(point.y, yAxis)}</strong></div>
             <div class="text-muted-foreground">${measurement.tokens_per_rank} tokens/rank · ${measurement.global_tokens} global tokens</div>
             <div class="mt-1 text-muted-foreground">Latency p50 / p90 / p95 / p99</div>
-            <div class="text-muted-foreground">Dispatch: ${formatPercentiles(measurement.components.dispatch)}</div>
+            <div class="text-muted-foreground">Dispatch: ${formatPercentiles(measurement.components.dispatch)}${formatChainValue('floor', floors?.dispatch, percentile)}</div>
             <div class="text-muted-foreground">Stage: ${formatPercentiles(measurement.components.stage)}</div>
-            <div class="text-muted-foreground">Combine: ${formatPercentiles(measurement.components.combine)}</div>
+            <div class="text-muted-foreground">Combine: ${formatPercentiles(measurement.components.combine)}${formatChainValue('floor', floors?.combine, percentile)}</div>
             <div class="text-muted-foreground">Round trip: ${formatPercentiles(measuredRoundtrip)}${measuredRoundtrip ? ' (measured)' : ''}</div>
+            ${pairLine}
             ${fitLine}
           </div>`;
         },

@@ -22,7 +22,14 @@ export function parseCollectiveXVersion(raw: string): CollectiveXVersion | null 
     : null;
 }
 
-export type CollectiveXOperation = 'dispatch' | 'stage' | 'combine' | 'roundtrip';
+/**
+ * `pair_period` is the steady-state cost of one chained dispatch+combine pair
+ * and supersedes `roundtrip` (which times that pair in isolation) as the
+ * headline latency. Artifacts predating the chained measurement carry only
+ * `roundtrip`; see `componentFor` in the app's collectivex/data.ts for the
+ * presence-keyed fallback consumers apply.
+ */
+export type CollectiveXOperation = 'dispatch' | 'stage' | 'combine' | 'roundtrip' | 'pair_period';
 export type CollectiveXPercentile = 'p50' | 'p90' | 'p95' | 'p99';
 export type CollectiveXOutcome =
   | 'success'
@@ -55,11 +62,31 @@ export interface CollectiveXComponent {
   payload_bytes: number | null;
 }
 
+export interface CollectiveXChainFloors {
+  /** Wait-free dispatch floor. Null when that operation measured none. */
+  dispatch: CollectiveXPercentiles | null;
+  /** Wait-free combine floor. Null when that operation measured none. */
+  combine: CollectiveXPercentiles | null;
+}
+
 export interface CollectiveXPoint {
   tokens_per_rank: number;
   global_tokens: number;
   components: Record<CollectiveXOperation, CollectiveXComponent | null>;
   roundtrip_token_rate_at_latency_percentile: CollectiveXPercentiles;
+  /**
+   * Per-operation wait-free floors: what the operation costs on the rank that
+   * never waited on a peer (cross-rank min under the chained schedule). The
+   * gap between a floor and the measured component is wait, not work. Null for
+   * artifacts predating the chained measurement.
+   */
+  chain_floor_us: CollectiveXChainFloors | null;
+  /**
+   * Cross-rank spread of the pair period (µs, max minus min) — how far apart
+   * the ranks' pair periods sat, i.e. whether the chain ran in lockstep. Null
+   * for artifacts predating the chained measurement.
+   */
+  pair_spread_us: CollectiveXPercentiles | null;
 }
 
 export interface CollectiveXTopology {
@@ -83,6 +110,18 @@ export interface CollectiveXSeries {
     vendor: 'nvidia' | 'amd';
   };
   points: CollectiveXPoint[];
+  /**
+   * True when this case measured the steady-state chained pair period, so its
+   * headline latency reads `components.pair_period`. False for artifacts
+   * predating the chained measurement, which carry only `roundtrip`.
+   */
+  chained_period: boolean;
+  /**
+   * True when the reported pair period includes a small inter-pair barrier.
+   * The barrier adds a fixed cost an un-barriered period does not carry, so a
+   * barriered period is not directly comparable and is badged in the UI.
+   */
+  chain_barrier: boolean;
 }
 
 export interface CollectiveXCoveragePoint {

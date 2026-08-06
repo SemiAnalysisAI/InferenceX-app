@@ -15,6 +15,7 @@ import type {
 // star re-export anywhere in a page's module graph ("Using `export * from '...'` in
 // a page is disallowed"), and this module is reached from the /collectivex page.
 export type {
+  CollectiveXChainFloors,
   CollectiveXComponent,
   CollectiveXCoverage,
   CollectiveXCoveragePoint,

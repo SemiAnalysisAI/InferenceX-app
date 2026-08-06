@@ -52,6 +52,11 @@ interface RawRow {
   token_rate_at_latency_percentile: CollectiveXPercentiles;
   components: Record<string, RawComponent | null>;
   byte_provenance: Record<string, { activation_data_bytes: number; total_logical_bytes?: number }>;
+  // Chained-measurement fields, absent on artifacts predating it. Each leaf is
+  // component-shaped (availability + percentiles) like the entries above, so
+  // an unavailable floor reads as "not measured" rather than as a zero.
+  chain_floor_us?: { dispatch?: RawComponent | null; combine?: RawComponent | null } | null;
+  chain_health?: { pair_spread_us?: RawComponent | null } | null;
 }
 
 interface RawShard {
@@ -61,7 +66,7 @@ interface RawShard {
     case_id: string;
     case_factors: { sku: string; case: RawCase };
   };
-  implementation: { name: string };
+  implementation: { name: string; chained_period?: unknown; chain_barrier?: unknown };
   runtime: { vendor: string };
   measurement: { rows: RawRow[] };
   outcome: { status: string; reasons?: string[] };
@@ -153,31 +158,44 @@ function ratesFrom(
   };
 }
 
+/** Latencies from a component-shaped block; null when it measured nothing. */
+function percentilesOf(raw: RawComponent | null | undefined): CollectiveXPercentiles | null {
+  return !raw?.percentiles_us || raw.availability === 'unavailable' ? null : raw.percentiles_us;
+}
+
 function mapComponent(
   raw: RawComponent | null | undefined,
   bytes: { activation_data_bytes: number; total_logical_bytes?: number } | undefined,
   ep: number,
 ): CollectiveXComponent | null {
-  if (!raw?.percentiles_us || raw.availability === 'unavailable') return null;
+  const latencies = percentilesOf(raw);
+  if (latencies === null) return null;
   // Byte counts are aggregate across the EP world (routed_copies = fanout.sum()).
   // Activation rate stays aggregate (unchanged); payload rate is per-GPU over the
   // full logical payload, falling back to activation bytes for pre-provenance
   // artifacts that carry no total_logical_bytes.
   const payloadBytes = bytes ? (bytes.total_logical_bytes ?? bytes.activation_data_bytes) : null;
   return {
-    latency_us: raw.percentiles_us,
+    latency_us: latencies,
     activation_data_rate_gbps_at_latency_percentile: bytes
-      ? ratesFrom(bytes.activation_data_bytes, raw.percentiles_us)
+      ? ratesFrom(bytes.activation_data_bytes, latencies)
       : null,
     payload_data_rate_gbps_at_latency_percentile:
-      payloadBytes === null ? null : ratesFrom(payloadBytes, raw.percentiles_us, Math.max(1, ep)),
+      payloadBytes === null ? null : ratesFrom(payloadBytes, latencies, Math.max(1, ep)),
     payload_bytes: payloadBytes,
   };
 }
 
+// Components are mapped by explicit name, never by iterating `row.components`.
+// Artifacts also carry an unrelated opt-in `components.period` (a burst
+// estimator some backends emit) whose name is one token from `pair_period` —
+// it is NOT the chained period and must never reach the headline. Keeping the
+// lookup explicit is what keeps it out.
 function mapPoint(row: RawRow, ep: number): CollectiveXPoint {
-  const component = (name: string) =>
-    mapComponent(row.components[name], row.byte_provenance[name], ep);
+  const component = (name: string, bytesFrom = name) =>
+    mapComponent(row.components[name], row.byte_provenance[bytesFrom], ep);
+  const dispatchFloor = percentilesOf(row.chain_floor_us?.dispatch);
+  const combineFloor = percentilesOf(row.chain_floor_us?.combine);
   return {
     tokens_per_rank: row.tokens_per_rank,
     global_tokens: row.global_tokens,
@@ -186,8 +204,21 @@ function mapPoint(row: RawRow, ep: number): CollectiveXPoint {
       stage: component('stage'),
       combine: component('combine'),
       roundtrip: component('roundtrip'),
+      // A pair moves the same logical payload as the roundtrip it supersedes
+      // (one dispatch + one combine), so the period reads the roundtrip's byte
+      // provenance unless the artifact carries provenance of its own — without
+      // it the payload/activation rate axes would blank out on the headline.
+      pair_period: component(
+        'pair_period',
+        row.byte_provenance.pair_period ? 'pair_period' : 'roundtrip',
+      ),
     },
     roundtrip_token_rate_at_latency_percentile: row.token_rate_at_latency_percentile,
+    chain_floor_us:
+      dispatchFloor === null && combineFloor === null
+        ? null
+        : { dispatch: dispatchFloor, combine: combineFloor },
+    pair_spread_us: percentilesOf(row.chain_health?.pair_spread_us),
   };
 }
 
@@ -205,6 +236,7 @@ function topologyOf(kase: RawCase) {
 
 function buildSeries({ shard, vendor }: SupportedShard): CollectiveXSeries {
   const kase = shard.identity.case_factors.case;
+  const points = shard.measurement.rows.map((row) => mapPoint(row, kase.ep));
   return {
     series_id: shard.identity.case_id,
     phase: kase.phase === 'prefill' ? 'prefill' : 'decode',
@@ -216,7 +248,14 @@ function buildSeries({ shard, vendor }: SupportedShard): CollectiveXSeries {
       sku: shard.identity.case_factors.sku,
       vendor,
     },
-    points: shard.measurement.rows.map((row) => mapPoint(row, kase.ep)),
+    points,
+    // A measured pair period is the real signal: the implementation flag is
+    // absent rather than false on artifacts predating the chained schedule, so
+    // it can confirm chaining but never rule it out.
+    chained_period:
+      shard.implementation.chained_period === true ||
+      points.some((point) => point.components.pair_period !== null),
+    chain_barrier: shard.implementation.chain_barrier === true,
   };
 }
 

@@ -11,6 +11,10 @@ import {
   makeRunMeta,
 } from './test-fixture';
 
+function pct(value: number) {
+  return { p50: value, p90: value, p95: value, p99: value };
+}
+
 function requestedOf(shard: Record<string, unknown>) {
   const identity = shard.identity as {
     case_id: string;
@@ -222,6 +226,95 @@ describe('CollectiveX artifact assembly', () => {
     expect(
       makeCollectiveXSeries({ rows: [{ stageUnavailable: true }] }).points[0].components.stage,
     ).toBeNull();
+  });
+
+  it('maps the chained pair period, its floors, and its health signal', () => {
+    const series = makeCollectiveXSeries({ chained: true, chainBarrier: true });
+    expect(series.chained_period).toBe(true);
+    expect(series.chain_barrier).toBe(true);
+    const point = series.points[0];
+    expect(point.components.pair_period?.latency_us.p50).toBe(844);
+    // Floors and the spread carry the full percentile axis, like every other
+    // measured block — not a single collapsed number.
+    expect(point.chain_floor_us?.dispatch?.p50).toBe(388);
+    expect(point.chain_floor_us?.combine?.p50).toBe(351);
+    expect(point.pair_spread_us?.p50).toBe(12);
+    expect(point.pair_spread_us?.p99).toBeCloseTo(12 * 1.2, 6);
+  });
+
+  it('gives the pair period the round trip byte provenance it shares', () => {
+    // A pair moves one dispatch + one combine — the roundtrip's payload — and
+    // the artifact carries no provenance of its own, so the derived rates must
+    // come from the roundtrip rather than reading as unavailable.
+    const point = makeCollectiveXSeries({ chained: true }).points[0];
+    expect(point.components.pair_period?.payload_bytes).toBe(
+      point.components.roundtrip?.payload_bytes,
+    );
+    expect(
+      point.components.pair_period?.payload_data_rate_gbps_at_latency_percentile?.p50,
+    ).toBeCloseTo((784763904 / 8 / 844) * 1e-3, 3);
+  });
+
+  it('leaves artifacts predating the chained schedule with no chain fields', () => {
+    const series = makeCollectiveXSeries();
+    expect(series.chained_period).toBe(false);
+    expect(series.chain_barrier).toBe(false);
+    expect(series.points[0].components.pair_period).toBeNull();
+    expect(series.points[0].chain_floor_us).toBeNull();
+    expect(series.points[0].pair_spread_us).toBeNull();
+  });
+
+  it('reads a measured pair period as chained even without the implementation flag', () => {
+    // The flag and the component ship together, but the component is the
+    // evidence: a shard carrying one without the other still ran chained.
+    const shard = makeRawShard({ chained: true });
+    (shard.implementation as Record<string, unknown>).chained_period = undefined;
+    const dataset = buildDataset({ shards: [shard] });
+    expect(dataset.series[0].chained_period).toBe(true);
+  });
+
+  it('never reads the unrelated burst-estimator `period` as the chained pair period', () => {
+    // `components.period` is an opt-in burst estimator some backends emit. Its
+    // name is one token from `pair_period`; mapping it as the headline would
+    // publish a different measurement under the pair period's label.
+    const both = makeCollectiveXSeries({ chained: true, burstPeriod: true });
+    expect(both.points[0].components.pair_period?.latency_us.p50).toBe(844);
+    expect(both.points[0].components).not.toHaveProperty('period');
+
+    // On its own it must not make a series read as chained, and the headline
+    // must stay on the round trip.
+    const burstOnly = makeCollectiveXSeries({ burstPeriod: true });
+    expect(burstOnly.chained_period).toBe(false);
+    expect(burstOnly.points[0].components.pair_period).toBeNull();
+    expect(burstOnly.points[0].components.roundtrip?.latency_us.p50).toBe(921);
+  });
+
+  it('reads an unavailable floor as unmeasured without hiding its sibling', () => {
+    const shard = makeRawShard({ chained: true });
+    const rows = (shard.measurement as { rows: Record<string, unknown>[] }).rows;
+    rows[0].chain_floor_us = {
+      dispatch: {
+        availability: 'measured',
+        origin: 'chained-cross-rank-min',
+        percentiles_us: pct(9),
+      },
+      combine: { availability: 'unavailable', origin: null, percentiles_us: null, sample_count: 0 },
+    };
+    const point = buildDataset({ shards: [shard] }).series[0].points[0];
+    expect(point.chain_floor_us?.dispatch?.p50).toBe(9);
+    expect(point.chain_floor_us?.combine).toBeNull();
+  });
+
+  it('drops chain blocks that do not carry percentiles', () => {
+    // Defensive: a producer-side shape change must read as "not measured"
+    // rather than surfacing a nonsense floor.
+    const shard = makeRawShard({ chained: true });
+    const rows = (shard.measurement as { rows: Record<string, unknown>[] }).rows;
+    rows[0].chain_floor_us = { dispatch: 388, combine: null };
+    rows[0].chain_health = { pair_spread_us: 12 };
+    const point = buildDataset({ shards: [shard] }).series[0].points[0];
+    expect(point.chain_floor_us).toBeNull();
+    expect(point.pair_spread_us).toBeNull();
   });
 
   it('rejects malformed and cross-version artifacts', () => {

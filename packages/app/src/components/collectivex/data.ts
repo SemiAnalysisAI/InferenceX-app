@@ -93,16 +93,51 @@ export function seriesMatchesSelection(
   );
 }
 
+/**
+ * Resolve an operation to a row's measured component. `pair_period` — the
+ * steady-state cost of one chained dispatch+combine pair — is the preferred
+ * headline latency, but artifacts predating the chained measurement carry only
+ * the isolated `roundtrip`, so the headline falls back to it row by row. That
+ * keeps a comparison spanning old and new runs plotting both instead of
+ * blanking the old ones. Every other operation resolves to itself.
+ */
+export function componentFor(
+  point: CollectiveXPoint,
+  operation: CollectiveXOperation,
+): CollectiveXComponent | null {
+  const component = point.components[operation];
+  if (component === null && operation === 'pair_period') return point.components.roundtrip;
+  return component;
+}
+
+/**
+ * The operation a row's value actually came from, after the headline fallback —
+ * so a label never claims a pair period the row does not carry.
+ */
+export function resolvedOperation(
+  point: CollectiveXPoint,
+  operation: CollectiveXOperation,
+): CollectiveXOperation {
+  return operation === 'pair_period' && point.components.pair_period === null
+    ? 'roundtrip'
+    : operation;
+}
+
 export function metricValue(
   point: CollectiveXPoint,
   operation: CollectiveXOperation,
   percentile: CollectiveXPercentile,
   yAxis: CollectiveXYAxis,
 ): number | null {
-  const component: CollectiveXComponent | null = point.components[operation];
+  const component: CollectiveXComponent | null = componentFor(point, operation);
   if (component === null) return null;
   if (yAxis === 'latency') return component.latency_us[percentile];
   if (yAxis === 'tokens-per-second') {
+    // The artifact derives this rate from the drained roundtrip, so it stays
+    // with the roundtrip. Showing it under the pair period would pair an
+    // idle-pipeline throughput with a steady-state latency, and recomputing one
+    // from the period would publish a number no artifact contains — the
+    // producer's planned period-based rate is where that belongs.
     return operation === 'roundtrip'
       ? point.roundtrip_token_rate_at_latency_percentile[percentile]
       : null;
@@ -156,7 +191,7 @@ export function fitAlphaBeta(
   const bytesPerGpu: number[] = [];
   const latencies: number[] = [];
   for (const point of series.points) {
-    const component = point.components[operation];
+    const component = componentFor(point, operation);
     if (component === null || component.payload_bytes === null) continue;
     const latency = component.latency_us[percentile];
     if (latency <= 0) continue;

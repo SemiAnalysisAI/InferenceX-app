@@ -67,12 +67,21 @@ const STRINGS = {
       dispatch: 'Dispatch',
       combine: 'Combine',
       roundtrip: 'Round trip',
+      pair_period: 'Pair period',
     },
     operationHeading: {
       dispatch: 'Dispatch',
       combine: 'Combine',
       roundtrip: 'Round trip (measured)',
+      pair_period: 'Pair period (chained)',
     },
+    chainBarrier: 'includes barrier',
+    chainBarrierTitle:
+      'The reported period includes a small barrier between pairs, a fixed cost an un-barriered period does not carry.',
+    chainFallbackNote:
+      'Series measured before the chained schedule have no pair period; those fall back to their round trip.',
+    chainThroughputNote:
+      'Token rate is derived from the drained round-trip latency, not from the pair period, so it is shown on the Round trip view.',
     phase: { decode: 'Decode', prefill: 'Prefill' },
     phaseValue: { decode: 'decode', prefill: 'prefill' },
     mode: { normal: 'Normal', 'low-latency': 'Low-latency' },
@@ -120,7 +129,7 @@ const STRINGS = {
     sku: 'SKU',
     backend: 'Backend',
     yAxisControl: 'Y axis',
-    tokenRateOption: 'Token rate at latency percentile',
+    tokenRateOption: 'Token rate at round-trip latency percentile',
     noSeries: 'No measured series match these filters.',
     resetFilter: 'Reset filter',
     payloadNote:
@@ -145,14 +154,21 @@ const STRINGS = {
       dispatch: '分发',
       combine: '合并',
       roundtrip: '往返',
+      pair_period: '配对周期',
       'isolated-sum': '分项之和',
     },
     operationHeading: {
       dispatch: '分发',
       combine: '合并',
       roundtrip: '往返（实测）',
+      pair_period: '配对周期（链式实测）',
       'isolated-sum': '分项之和（派生）',
     },
+    chainBarrier: '含屏障',
+    chainBarrierTitle: '所报告的周期包含配对之间的小屏障，这是无屏障周期不具有的固定开销。',
+    chainFallbackNote: '在链式调度之前测得的 series 没有配对周期，将回退到各自的往返延迟。',
+    chainThroughputNote:
+      'Token 速率由排空后的往返延迟推导，而非配对周期，因此仅在「往返」视图中显示。',
     phase: { decode: '解码', prefill: '预填充' },
     phaseValue: { decode: '解码', prefill: '预填充' },
     precision: { bf16: 'BF16', fp8: 'FP8' },
@@ -230,7 +246,7 @@ const STRINGS = {
     xScale: 'X 轴刻度',
     xScaleAria: 'CollectiveX X 轴刻度',
     yAxisControl: 'Y 轴',
-    tokenRateOption: '延迟分位点对应的 token 速率',
+    tokenRateOption: '往返延迟分位点对应的 token 速率',
     yScale: 'Y 轴刻度',
     yScaleAria: 'CollectiveX Y 轴刻度',
     noSeries: 'No measured series match these filters.',
@@ -294,6 +310,8 @@ const CONCLUSION_CLASSES: Record<string, string> = {
 };
 const CONCLUSION_FALLBACK_CLASS =
   'border-amber-600/40 bg-amber-500/10 text-amber-700 dark:text-amber-300';
+const CHAIN_BARRIER_BADGE_CLASS =
+  'rounded-md border border-amber-600/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300';
 // Remembered admin bearer token for run deletion; cleared on a 401 so a
 // rotated secret re-prompts instead of failing silently forever.
 const ADMIN_TOKEN_STORAGE_KEY = 'collectivex-admin-token';
@@ -377,7 +395,33 @@ export default function CollectiveXDisplay() {
   const [backend, setBackend] = useState('all');
   const [activeSeriesIds, setActiveSeriesIds] = useState<Set<string>>(new Set());
   const [legendExpanded, setLegendExpanded] = useState(true);
+  // The chained pair period is the preferred headline, but only runs that
+  // measured it carry one — so it is offered (and taken) only when the loaded
+  // runs have it, and an explicit choice is never overridden.
+  const operationTouchedRef = useRef(false);
+  const headlineAvailable = useMemo(
+    () => combinedSeries.some((item) => item.chained_period),
+    [combinedSeries],
+  );
+  useEffect(() => {
+    if (headlineAvailable) {
+      if (operationTouchedRef.current) return;
+      setOperation('pair_period');
+      // The artifact derives its token rate from the round trip, so that axis
+      // is not offered on the period. The manual operation change resets it
+      // too; without this the auto-flip would leave it selected and blank the
+      // chart. Functional form so the effect need not depend on yAxis.
+      setYAxis((current) => (current === 'tokens-per-second' ? 'latency' : current));
+      return;
+    }
+    // Deselecting the chained run drops the option; fall the selection back
+    // rather than leaving the control on a value it no longer offers.
+    setOperation((current) => (current === 'pair_period' ? 'roundtrip' : current));
+  }, [headlineAvailable]);
   const operationOptions: SelectOption<CollectiveXOperation>[] = [
+    ...(headlineAvailable
+      ? [{ value: 'pair_period' as const, label: t.operation.pair_period }]
+      : []),
     { value: 'dispatch', label: t.operation.dispatch },
     { value: 'stage', label: 'Stage' },
     { value: 'combine', label: t.operation.combine },
@@ -561,7 +605,11 @@ export default function CollectiveXDisplay() {
         color: colors[collectiveXColorKey(item)] ?? 'var(--muted-foreground)',
         lineDasharray: collectiveXRunDasharray(item.run_index),
         isActive: activeSeriesIds.has(item.series_id),
-        title: `#${item.run_id} · EP${item.system.ep_size} · ${collectiveXTopologyLabel(item.system)}`,
+        // A barriered period is an upper bound on the free-running one, so which
+        // series carries it has to be visible without hovering a data point.
+        title: `#${item.run_id} · EP${item.system.ep_size} · ${collectiveXTopologyLabel(item.system)}${
+          item.chain_barrier ? ` · ${t.chainBarrier}` : ''
+        }`,
         onClick: () => {
           setActiveSeriesIds((previous) => {
             const next = new Set(previous);
@@ -572,7 +620,7 @@ export default function CollectiveXDisplay() {
           track('collectivex_series_toggled', { series: item.series_id });
         },
       })),
-    [activeSeriesIds, colors, phaseSeries],
+    [activeSeriesIds, colors, phaseSeries, t],
   );
   const handleRefresh = useCallback(() => {
     track('collectivex_data_refreshed');
@@ -705,6 +753,13 @@ export default function CollectiveXDisplay() {
       </Card>
     );
   }
+  // Caveats that only apply while the pair period is the shown headline: a
+  // barriered period carries a fixed extra cost, and a series measured before
+  // the chained schedule is showing its round trip instead.
+  const showsBarrieredPeriod =
+    operation === 'pair_period' && activeSeries.some((item) => item.chain_barrier);
+  const showsPeriodFallback =
+    operation === 'pair_period' && activeSeries.some((item) => !item.chained_period);
   const singleDataset = datasets.length === 1 ? datasets[0] : null;
   const measuredCases = datasets.reduce((sum, dataset) => sum + dataset.run.measured_cases, 0);
   const requestedCases = datasets.reduce((sum, dataset) => sum + dataset.run.requested_cases, 0);
@@ -872,14 +927,25 @@ export default function CollectiveXDisplay() {
               yAxis={yAxis}
               caption={
                 <>
-                  <h2 className="text-lg font-semibold">
-                    {operation === 'stage' ? 'Stage' : t.operationHeading[operation]} ·{' '}
-                    {t.phaseValue[phase]} ·{' '}
-                    {yAxis === 'latency'
-                      ? percentile
-                      : locale === 'zh'
-                        ? `${percentile} 延迟分位点`
-                        : `at ${percentile} latency`}
+                  <h2 className="flex flex-wrap items-center gap-2 text-lg font-semibold">
+                    <span>
+                      {operation === 'stage' ? 'Stage' : t.operationHeading[operation]} ·{' '}
+                      {t.phaseValue[phase]} ·{' '}
+                      {yAxis === 'latency'
+                        ? percentile
+                        : locale === 'zh'
+                          ? `${percentile} 延迟分位点`
+                          : `at ${percentile} latency`}
+                    </span>
+                    {showsBarrieredPeriod && (
+                      <span
+                        data-testid="collectivex-chain-barrier-badge"
+                        className={CHAIN_BARRIER_BADGE_CLASS}
+                        title={t.chainBarrierTitle}
+                      >
+                        {t.chainBarrier}
+                      </span>
+                    )}
                   </h2>
                   <p className="text-sm text-muted-foreground">
                     {yAxis === 'activation-rate'
@@ -926,6 +992,22 @@ export default function CollectiveXDisplay() {
             {yAxis === 'payload-rate' && (
               <p className="mt-2 text-xs text-muted-foreground">{t.payloadBandwidthNote}</p>
             )}
+            {showsPeriodFallback && (
+              <p
+                data-testid="collectivex-chain-fallback-note"
+                className="mt-2 text-xs text-muted-foreground"
+              >
+                {t.chainFallbackNote}
+              </p>
+            )}
+            {operation === 'pair_period' && (
+              <p
+                data-testid="collectivex-chain-throughput-note"
+                className="mt-2 text-xs text-muted-foreground"
+              >
+                {t.chainThroughputNote}
+              </p>
+            )}
           </Card>
           <Card className="py-4 md:py-5">
             <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
@@ -948,6 +1030,7 @@ export default function CollectiveXDisplay() {
                 value={operation}
                 options={operationOptions}
                 onChange={(next) => {
+                  operationTouchedRef.current = true;
                   setOperation(next);
                   if (next !== 'roundtrip' && yAxis === 'tokens-per-second') setYAxis('latency');
                   track('collectivex_operation_changed', { operation: next });
