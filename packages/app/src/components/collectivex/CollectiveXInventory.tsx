@@ -143,11 +143,10 @@ export function CollectiveXInventory({ datasets }: { datasets: CollectiveXDatase
   const points = rows.flatMap((item) => item.points);
   const measured = points.filter((point) => point.terminal_status === 'measured').length;
   const unsupported = points.filter((point) => point.terminal_status === 'unsupported').length;
-  const measuredCases = datasets.reduce((sum, dataset) => sum + dataset.run.measured_cases, 0);
-  const unsupportedCases = datasets.reduce(
-    (sum, dataset) => sum + dataset.run.unsupported_cases,
-    0,
-  );
+  // Counted from this table's own EP coverage rows: the run-level totals also
+  // include kv-transfer cases, which live in their own card, not here.
+  const measuredCases = rows.filter((row) => row.outcome === 'success').length;
+  const unsupportedCases = rows.filter((row) => row.outcome === 'unsupported').length;
   const terminalPoints = datasets.reduce((sum, dataset) => sum + dataset.run.terminal_points, 0);
   const requestedPoints = datasets.reduce((sum, dataset) => sum + dataset.run.requested_points, 0);
 
