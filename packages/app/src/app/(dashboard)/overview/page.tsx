@@ -7,6 +7,7 @@ import { enAlternates } from '@/lib/i18n';
 import {
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
+  resolveOverviewModelScope,
   resolveOverviewReferenceHardware,
   resolveOverviewTier,
 } from '@/lib/overview-data';
@@ -45,6 +46,7 @@ export default async function OverviewPage({ searchParams }: Props) {
     resolveOverviewEngineScope(sp.engine),
     resolveOverviewComparisonMode(sp.compare),
     resolveOverviewReferenceHardware(sp.ref),
+    resolveOverviewModelScope(sp.models),
   );
   return <OverviewPageContent data={data} locale="en" />;
 }

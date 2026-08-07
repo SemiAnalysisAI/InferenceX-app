@@ -5,7 +5,16 @@ import type { BenchmarkRow } from './api';
 import { rowToAggDataEntry } from './benchmark-transform';
 import { buildAvailabilityHwKey } from './chart-utils';
 import { getGpuSpecs, getHardwareConfig } from './constants';
-import { DEFAULT_MODELS, getModelLabel, Model, Precision } from './data-mappings';
+import {
+  DEFAULT_MODELS,
+  DEPRECATED_MODELS,
+  getModelCategory,
+  getModelLabel,
+  MAINTENANCE_MODELS,
+  Model,
+  Precision,
+  type CategoryTag,
+} from './data-mappings';
 import { frameworkFamily } from './framework-family';
 import {
   computeTierReads,
@@ -25,6 +34,8 @@ export const OVERVIEW_DEFAULT_REFERENCE_HARDWARE: OverviewReferenceHardware = 'b
 export type OverviewEngineScope = 'all' | 'community';
 export type OverviewComparisonMode = 'hardware' | 'history';
 export const OVERVIEW_DEFAULT_COMPARISON_MODE: OverviewComparisonMode = 'hardware';
+export type OverviewModelScope = 'default' | 'all';
+export const OVERVIEW_DEFAULT_MODEL_SCOPE: OverviewModelScope = 'default';
 export type OverviewScenario = 'single_turn_8k1k' | 'agentx';
 /** Row order within a model: the single-turn workload first, AgentX below it. */
 export const OVERVIEW_SCENARIOS = ['single_turn_8k1k', 'agentx'] as const;
@@ -51,6 +62,22 @@ export function resolveOverviewComparisonMode(
 ): OverviewComparisonMode {
   const candidate = Array.isArray(raw) ? raw[0] : raw;
   return candidate === '30d' ? 'history' : OVERVIEW_DEFAULT_COMPARISON_MODE;
+}
+
+export function resolveOverviewModelScope(
+  raw: string | readonly string[] | undefined,
+): OverviewModelScope {
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  return candidate === 'all' ? 'all' : OVERVIEW_DEFAULT_MODEL_SCOPE;
+}
+
+// Note (wenyao): row order is a contract — defaults, then maintenance, then
+// deprecated, each in MODEL_CONFIG declaration order; the overview e2e asserts
+// inactive rows always sit below the default rows.
+export function overviewModelsForScope(scope: OverviewModelScope): Model[] {
+  return scope === 'all'
+    ? [...DEFAULT_MODELS, ...MAINTENANCE_MODELS, ...DEPRECATED_MODELS]
+    : [...DEFAULT_MODELS];
 }
 
 export function resolveOverviewTier(raw: string | string[] | undefined): OverviewTier {
@@ -140,6 +167,7 @@ export interface OverviewPlatformResult {
 export interface OverviewModelSummary {
   model: Model;
   modelLabel: string;
+  category: CategoryTag;
   scenario: OverviewScenario;
   platforms: OverviewPlatformResult[];
 }
@@ -150,6 +178,7 @@ export interface OverviewPageData {
   engineScope: OverviewEngineScope;
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
+  modelScope: OverviewModelScope;
   historicalWindow: OverviewHistoricalWindow | null;
 }
 
@@ -649,6 +678,7 @@ export function buildOverviewModelSummary(
   return {
     model,
     modelLabel: getModelLabel(model),
+    category: getModelCategory(model),
     scenario,
     platforms: buildPlatformResults(model, scenario, scenarioRows, tier, referenceHardware),
   };
@@ -664,8 +694,12 @@ export function assembleOverviewPageData(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
 ): OverviewPageData {
-  const perModel = [...DEFAULT_MODELS].map((model) => ({ model, rows: rowsByModel[model] ?? [] }));
+  const perModel = overviewModelsForScope(modelScope).map((model) => ({
+    model,
+    rows: rowsByModel[model] ?? [],
+  }));
   return {
     models: perModel.flatMap(({ model, rows }) =>
       overviewScenariosForModel(model, rows).map((scenario) =>
@@ -676,6 +710,7 @@ export function assembleOverviewPageData(
     engineScope,
     comparisonMode: OVERVIEW_DEFAULT_COMPARISON_MODE,
     referenceHardware,
+    modelScope,
     historicalWindow: null,
   };
 }
@@ -694,18 +729,21 @@ export function assembleOverviewHistoricalPageData(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
 ): OverviewPageData {
   const current = assembleOverviewPageData(
     currentRowsByModel,
     tier,
     engineScope,
     referenceHardware,
+    modelScope,
   );
   const baseline = assembleOverviewPageData(
     baselineRowsByModel,
     tier,
     engineScope,
     referenceHardware,
+    modelScope,
   );
   const baselineByKey = new Map(
     baseline.models.flatMap((model) =>

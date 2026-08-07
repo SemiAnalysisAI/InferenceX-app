@@ -8,7 +8,7 @@ import type { OverviewSearchKey } from '@/lib/overview-links';
 import { useOverviewNavigation } from './overview-navigation';
 
 interface OverviewNavAnalytics {
-  control: 'comparison' | 'engine' | 'tier';
+  control: 'comparison' | 'engine' | 'models' | 'tier';
   value: string;
 }
 
