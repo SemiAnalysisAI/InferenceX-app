@@ -523,6 +523,9 @@ describe('CollectiveX kv-transfer card', () => {
       'contain.text',
       `${kvDataset.run.measured_cases}/${kvDataset.run.requested_cases}`,
     );
+    // The runs table distinguishes the run's suites: this run carries both.
+    cy.get(`[data-testid="collectivex-run-suite-ep-${kvDataset.run.run_id}"]`).should('be.visible');
+    cy.get(`[data-testid="collectivex-run-suite-kv-${kvDataset.run.run_id}"]`).should('be.visible');
   });
 
   it('plots the kv chart and switches metric, axis, and page size', () => {
@@ -557,10 +560,12 @@ describe('CollectiveX kv-transfer card', () => {
     });
   });
 
-  it('renders no kv card for an EP-only run', () => {
+  it('renders no kv card and no KV suite badge for an EP-only run', () => {
     installRuns();
     installRun();
     openCollectiveX();
     cy.get('[data-testid="collectivex-kv-table"]').should('not.exist');
+    cy.get(`[data-testid="collectivex-run-suite-ep-${runId}"]`).should('be.visible');
+    cy.get(`[data-testid="collectivex-run-suite-kv-${runId}"]`).should('not.exist');
   });
 });
