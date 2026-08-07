@@ -2,6 +2,7 @@ import {
   getModelExclusion,
   getSequenceDefaultExclusionGroup,
   getSequenceExclusion,
+  getSequenceExclusionExemptFamilies,
   getSequenceExclusionPolicy,
 } from '@/lib/data-mappings';
 import { buildExclusion, type Exclusion, type ExclusionConflictPolicy } from '@/lib/exclusion';
@@ -35,6 +36,11 @@ export function comparisonExclusionPolicy(
  * Resolve the production comparability guard for the current chart scope.
  * Unofficial previews are diagnostic and intentionally allow engine families
  * to share a graph, even when the corresponding official view does not.
+ *
+ * The scenario's exempt families are composed onto the model specs too, so a
+ * family the scenario declares comparable (8K/1K ATOM) escapes the model-level
+ * variant rule as well — otherwise its MTP configs would still be grouped and
+ * blocked.
  */
 export function comparisonExclusion(
   model: Parameters<typeof getModelExclusion>[0],
@@ -43,10 +49,12 @@ export function comparisonExclusion(
 ): Exclusion | null {
   if (isUnofficialRun) return null;
 
-  const modelSpecs = getModelExclusion(model);
-  const sequenceSpecs = getSequenceExclusion(sequence);
-  if (modelSpecs.length === 0 && sequenceSpecs.length === 0) return null;
-  if (modelSpecs.length === 0) return buildExclusion(sequenceSpecs);
-  if (sequenceSpecs.length === 0) return buildExclusion(modelSpecs);
-  return buildExclusion([...modelSpecs, ...sequenceSpecs]);
+  const specs = [...getModelExclusion(model), ...getSequenceExclusion(sequence)];
+  if (specs.length === 0) return null;
+
+  const exempt = getSequenceExclusionExemptFamilies(sequence);
+  if (exempt.length === 0) return buildExclusion(specs);
+  return buildExclusion(
+    specs.map((spec) => ({ ...spec, exemptFamilies: [...(spec.exemptFamilies ?? []), ...exempt] })),
+  );
 }

@@ -87,15 +87,20 @@ const STP_ENGINE_EXCLUSION_BASE = {
 const AGENTIC_STP_ENGINE_EXCLUSION: ExclusionSpec[] = [STP_ENGINE_EXCLUSION_BASE];
 
 /**
- * Fixed-sequence STP exclusion: vLLM and SGLang tune their standard-token
- * runs against engine-specific serving paths, so their unsuffixed numbers
- * aren't directly comparable on one graph — same rule the MTP configs and the
- * agentic chart already enforce. Unlike the agentic rule this one is limited to
- * those two groups, so TRTLLM (and any other family) stays freely selectable
- * next to either of them.
+ * Fixed-sequence STP exclusion: vLLM and SGLang tune their standard-token runs
+ * against engine-specific serving paths, so their unsuffixed numbers aren't
+ * directly comparable on one graph — same rule the MTP configs and the agentic
+ * chart already enforce.
+ *
+ * Unlike the agentic rule this one covers ONLY the literal vLLM and SGLang
+ * families (with their `dynamo-`/`mori-`/`llmd-` deployment variants). Every
+ * other engine — ATOM and Mooncake ATOMesh included, despite the SGLang group
+ * alias the MTP rule relies on — stays freely selectable next to either of
+ * them. `participatingFamilies` is matched before `groupAliases` precisely so
+ * ATOM escapes here while still sharing SGLang's MTP comparability group.
  */
 const FIXED_SEQ_STP_ENGINE_EXCLUSION: ExclusionSpec[] = [
-  { ...STP_ENGINE_EXCLUSION_BASE, participatingGroups: ['vllm', 'sglang'] },
+  { ...STP_ENGINE_EXCLUSION_BASE, participatingFamilies: ['vllm', 'sglang'] },
 ];
 
 // Total parameter counts appended to each label so users can compare model
@@ -263,6 +268,13 @@ interface SequenceConfig {
    * alphabetical, which would silently land on a different engine.
    */
   defaultExclusionGroup?: string;
+  /**
+   * Engine families exempt from EVERY exclusion rule on this scenario —
+   * composed onto the model specs as well as this sequence's own. Use it when a
+   * family's numbers are comparable with everything in one scenario but still
+   * need grouping elsewhere.
+   */
+  exclusionExemptFamilies?: readonly string[];
 }
 
 const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
@@ -289,6 +301,10 @@ const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
     exclusion: FIXED_SEQ_STP_ENGINE_EXCLUSION,
     exclusionPolicy: 'keep-sticky',
     defaultExclusionGroup: 'vllm',
+    // ATOM stays comparable with both vLLM and SGLang here — for its MTP
+    // configs as well, which the model-level rule would otherwise fold into
+    // SGLang's group. Only vLLM and SGLang block each other on 8K/1K.
+    exclusionExemptFamilies: ['atom'],
   },
   [Sequence.AgenticTraces]: {
     label: 'Agentic Traces',
@@ -324,6 +340,14 @@ export function getSequenceDefaultExclusionGroup(
 ): string | null {
   if (!sequence) return null;
   return SEQUENCE_CONFIG[sequence as Sequence]?.defaultExclusionGroup ?? null;
+}
+
+/** Engine families exempt from every exclusion rule on a sequence. */
+export function getSequenceExclusionExemptFamilies(
+  sequence: Sequence | string | null | undefined,
+): readonly string[] {
+  if (!sequence) return [];
+  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusionExemptFamilies ?? [];
 }
 
 export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];
