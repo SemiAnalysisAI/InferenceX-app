@@ -113,30 +113,92 @@ function textRect(element: Element) {
 }
 
 describe('Overview page', () => {
-  it('updates overview selectors with a soft URL transition instead of reloading the document', () => {
+  it('updates selectors through cached overview JSON without an RSC round trip', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
+    let jsonRequests = 0;
+    let rscRequests = 0;
+    const rscUrls: string[] = [];
+    cy.intercept('GET', '**/api/v1/overview*', () => {
+      jsonRequests += 1;
+    }).as('overviewJson');
+    cy.intercept('GET', '**/overview*', (request) => {
+      const url = new URL(request.url);
+      if (
+        (url.pathname === '/overview' || url.pathname === '/zh/overview') &&
+        (url.searchParams.has('_rsc') || request.headers.rsc === '1')
+      ) {
+        rscRequests += 1;
+        rscUrls.push(`${url.pathname}${url.search}`);
+      }
+    });
     cy.window().then((win) => {
       (win as Window & { __overviewNavigationSentinel?: string }).__overviewNavigationSentinel =
         'preserved';
     });
 
     cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    cy.wait('@overviewJson');
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
+
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '50').click();
+    cy.location('search').should('eq', '');
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    cy.location('search').should('eq', '?tier=75');
+    cy.then(() => {
+      expect(jsonRequests, 'one request; both visited selections are cached').to.equal(1);
+      expect(rscUrls, 'selector RSC requests').to.deep.equal([]);
+    });
 
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .find('[data-overview-engine-scope="all"]')
       .click();
+    cy.wait('@overviewJson');
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.get('[data-overview-comparison="history"]').click();
+    cy.wait('@overviewJson');
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all&compare=30d');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.go('back');
+    cy.get('[data-overview-comparison="hardware"]', { timeout: 15_000 }).should(
+      'have.attr',
+      'aria-current',
+      'true',
+    );
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+    cy.then(() => {
+      expect(rscRequests, 'selector and popstate RSC requests').to.equal(0);
+    });
+  });
+
+  it('leaves overview through browser history without requesting overview data', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+    cy.intercept('GET', '**/api/v1/overview*').as('overviewJson');
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    cy.wait('@overviewJson');
+    cy.location('search').should('eq', '?tier=75');
+
+    cy.window().then((win) => {
+      let overviewRequests = 0;
+      const fetch = win.fetch.bind(win);
+      cy.stub(win, 'fetch').callsFake((input, init) => {
+        const url = input instanceof win.Request ? input.url : input.toString();
+        if (url.startsWith('/api/v1/overview')) {
+          overviewRequests += 1;
+          return new Promise<Response>(() => {});
+        }
+        return fetch(input, init);
+      });
+
+      win.history.pushState(win.history.state, '', '/inference');
+      win.dispatchEvent(new win.PopStateEvent('popstate', { state: win.history.state }));
+      expect(overviewRequests, 'overview requests after leaving overview').to.equal(0);
+    });
   });
 
   it('preserves pending selections when controls are changed rapidly', () => {
@@ -973,6 +1035,8 @@ describe('Overview page', () => {
                 expect(badgeText).not.to.equal(null);
 
                 expect(badgeRect.left - valueRect.right).to.be.at.most(8);
+                // Electron can report a 1.5 CSS-pixel font-rasterization delta;
+                // two pixels still constrains both labels to the same baseline.
                 expect(textRect(badgeText as Element).bottom).to.be.closeTo(
                   textRect(value).bottom,
                   2,
