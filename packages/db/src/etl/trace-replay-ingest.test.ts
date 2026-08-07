@@ -65,7 +65,10 @@ function mockSqlWithTransaction(lockedRows: { id: number }[]): {
     if (text.includes('insert into agentic_trace_replay')) return Promise.resolve([{ id: 123 }]);
     return Promise.resolve([]);
   };
-  const tx = Object.assign(execute, { array: (values: unknown[]) => values });
+  const tx = Object.assign(execute, {
+    array: (values: unknown[]) => values,
+    json: (value: unknown) => value,
+  });
   const sql = Object.assign(execute, {
     array: (values: unknown[]) => values,
     begin: (operation: (transaction: typeof tx) => Promise<void>) => operation(tx),
@@ -158,6 +161,9 @@ describe('persistPreparedTraceReplay', () => {
     const metricUpdate = calls.find((call) =>
       call.text.includes("not (metrics ? 'median_full_response_itl')"),
     );
-    expect(metricUpdate?.values).toContain(JSON.stringify(preparedFixture().fullResponseMetrics));
+    expect(metricUpdate?.values).toContainEqual(preparedFixture().fullResponseMetrics);
+    expect(metricUpdate?.values).not.toContain(
+      JSON.stringify(preparedFixture().fullResponseMetrics),
+    );
   });
 });

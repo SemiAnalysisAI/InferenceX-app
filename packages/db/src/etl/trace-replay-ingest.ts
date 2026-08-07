@@ -375,7 +375,7 @@ export async function persistPreparedTraceReplay(
     if (Object.keys(fullResponseMetrics).length > 0) {
       await tx`
         update benchmark_results
-        set metrics = metrics || ${JSON.stringify(fullResponseMetrics)}::jsonb
+        set metrics = metrics || ${tx.json(fullResponseMetrics)}
         where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
           and not (metrics ? 'median_full_response_itl')
       `;
