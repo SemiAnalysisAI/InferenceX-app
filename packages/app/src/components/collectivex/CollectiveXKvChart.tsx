@@ -28,10 +28,11 @@ const X_LABELS: Record<CollectiveXKvChartSelection['x'], string> = {
   isl: 'Input sequence length, tokens (log)',
 };
 
-const Y_LABELS: Record<CollectiveXKvChartSelection['y'], string> = {
-  bandwidth: 'Aggregate pull bandwidth at p50 (GB/s)',
-  latency: 'Burst completion latency p50 (ms)',
-};
+function yLabel(selection: CollectiveXKvChartSelection): string {
+  return selection.y === 'bandwidth'
+    ? `Aggregate ${selection.op} bandwidth at p50 (GB/s)`
+    : 'Burst completion latency p50 (ms)';
+}
 
 function paddedDomain(values: number[]): [number, number] {
   if (values.length === 0) return [1, 10];
@@ -120,7 +121,7 @@ export function CollectiveXKvChart({
         tickFormat: (value) => formatCompact(Number(value)),
       }}
       yAxis={{
-        label: Y_LABELS[selection.y],
+        label: yLabel(selection),
         tickCount: 5,
         tickFormat: (value) => formatCompact(Number(value)),
       }}

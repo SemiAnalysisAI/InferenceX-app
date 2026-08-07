@@ -75,14 +75,28 @@ function cellsOf(row: CollectiveXKvRunCase) {
   };
 }
 
-export function CollectiveXKvSection({ datasets }: { datasets: CollectiveXDataset[] }) {
+export function CollectiveXKvSection({
+  datasets,
+  runIndexById,
+}: {
+  datasets: CollectiveXDataset[];
+  /** Selection-order style index per run id, shared with the EP explorer so
+   * the same run keeps the same dash pattern on both charts. */
+  runIndexById: ReadonlyMap<string, number>;
+}) {
   const locale = useLocale();
   const strings = STRINGS[locale === 'zh' ? 'zh' : 'en'];
   const [yAxis, setYAxis] = useState<CollectiveXKvChartSelection['y']>('bandwidth');
   const [xAxis, setXAxis] = useState<CollectiveXKvChartSelection['x']>('batch');
   const [pageTokens, setPageTokens] = useState<'64' | '16'>('64');
   const [op, setOp] = useState<CollectiveXKvChartSelection['op']>('pull');
-  const [activeSeriesIds, setActiveSeriesIds] = useState<Set<string> | null>(null);
+  // Legend toggles are keyed to the current series set: when checked runs
+  // change, the stored selection is stale and every series starts active
+  // again (the EP explorer resets the same way).
+  const [seriesSelection, setSeriesSelection] = useState<{
+    ids: Set<string>;
+    signature: string;
+  } | null>(null);
   const [legendExpanded, setLegendExpanded] = useState(false);
 
   const rows = useMemo<CollectiveXKvRunCase[]>(
@@ -91,15 +105,26 @@ export function CollectiveXKvSection({ datasets }: { datasets: CollectiveXDatase
         (dataset.kv ?? []).map((item) => ({
           ...item,
           run_id: dataset.run.run_id,
-          run_index: index,
+          run_index: runIndexById.get(dataset.run.run_id) ?? index,
         })),
       ),
-    [datasets],
+    [datasets, runIndexById],
   );
   const measuredCases = useMemo(() => rows.filter((row) => row.rows.length > 0), [rows]);
+  const seriesSignature = useMemo(
+    () =>
+      measuredCases
+        .map((kase) => `${kase.run_id}:${kase.case_id}`)
+        .toSorted()
+        .join('|'),
+    [measuredCases],
+  );
   const activeIds = useMemo(
-    () => activeSeriesIds ?? new Set(measuredCases.map((kase) => `${kase.run_id}:${kase.case_id}`)),
-    [activeSeriesIds, measuredCases],
+    () =>
+      seriesSelection && seriesSelection.signature === seriesSignature
+        ? seriesSelection.ids
+        : new Set(measuredCases.map((kase) => `${kase.run_id}:${kase.case_id}`)),
+    [measuredCases, seriesSelection, seriesSignature],
   );
   const activeCases = useMemo(
     () => measuredCases.filter((kase) => activeIds.has(`${kase.run_id}:${kase.case_id}`)),
@@ -133,12 +158,10 @@ export function CollectiveXKvSection({ datasets }: { datasets: CollectiveXDatase
           isActive: activeIds.has(seriesId),
           title: `#${kase.run_id} · ${kase.workload} · ${kase.topology.topology_class}`,
           onClick: () => {
-            setActiveSeriesIds(() => {
-              const next = new Set(activeIds);
-              if (next.has(seriesId)) next.delete(seriesId);
-              else next.add(seriesId);
-              return next;
-            });
+            const next = new Set(activeIds);
+            if (next.has(seriesId)) next.delete(seriesId);
+            else next.add(seriesId);
+            setSeriesSelection({ ids: next, signature: seriesSignature });
             track('collectivex_kv_series_toggled', { series: seriesId });
           },
         };

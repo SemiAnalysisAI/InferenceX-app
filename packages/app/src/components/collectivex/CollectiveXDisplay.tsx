@@ -864,7 +864,7 @@ export default function CollectiveXDisplay() {
           )}
           {/* KV-transfer cases lead for kv-only runs: the EP chart below is
               legitimately empty for them and must not bury the selected data. */}
-          <CollectiveXKvSection datasets={datasets} />
+          <CollectiveXKvSection datasets={datasets} runIndexById={selectedRunIndexById} />
           <Card data-testid="collectivex-main-chart" className="relative">
             <CollectiveXChart
               chartId="collectivex-explorer"
