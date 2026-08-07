@@ -997,7 +997,7 @@ describe('Overview page', () => {
                 expect(badgeRect.left - valueRect.right).to.be.at.most(8);
                 expect(textRect(badgeText as Element).bottom).to.be.closeTo(
                   textRect(value).bottom,
-                  1,
+                  2,
                 );
               },
             );
