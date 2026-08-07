@@ -26,6 +26,7 @@ import { useLocale } from '@/lib/use-locale';
 
 import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXInventory } from './CollectiveXInventory';
+import { CollectiveXKvTable } from './CollectiveXKvTable';
 import { CollectiveXRunsTable } from './CollectiveXRunsTable';
 import {
   collectiveXColorKey,
@@ -1053,6 +1054,7 @@ export default function CollectiveXDisplay() {
               />
             </div>
           </Card>
+          <CollectiveXKvTable datasets={datasets} />
           <CollectiveXInventory
             key={`${version}-${datasets.map((dataset) => `${dataset.run.run_id}:${dataset.run.run_attempt}`).join(',')}`}
             datasets={datasets}
