@@ -101,6 +101,7 @@ function LanguageToggle({
   return (
     <Link
       href={target + search}
+      prefetch={false}
       data-testid="language-toggle"
       hrefLang={isZh ? 'en' : 'zh-CN'}
       className="inline-flex items-center min-h-11 px-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
@@ -193,6 +194,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 key={href}
                 data-testid={testId}
                 href={displayHref}
+                prefetch={isActive(pathname, href) ? false : undefined}
                 className={cn(
                   'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
                   isActive(pathname, href)
@@ -258,6 +260,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                     <Link
                       key={href}
                       href={displayHref}
+                      prefetch={isActive(pathname, href) ? false : undefined}
                       className={cn(
                         'flex items-center min-h-11 px-3 rounded-md text-sm font-medium transition-colors',
                         isActive(pathname, href)

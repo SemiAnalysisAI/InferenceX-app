@@ -78,6 +78,7 @@ API routes (`packages/app/src/app/api/v1/`):
   assembled through the shared reader (the one deliberate exception to the raw-rows rule below);
   `runs/[runId]` also handles admin DELETE. See [CollectiveX](./docs/collectivex.md).
 - `tco-feed?model=dsv4&workloads=1024x1024,8192x1024&tiers=30,50,75,100&format=csv` — per-hardware Pareto-frontier output-throughput reads at fixed interactivity tiers, for external spreadsheet TCO models (Excel Power Query); `view=scores` (optional `weights`, `workload_weights`, `alpha`) folds them into one tier-weighted, workload-blended, output-equivalent score per hardware
+- `overview?tier=50&engine=community&compare=30d&ref=b200` — a compact, cached page-data response used only by `/overview` selector navigation
 
 **API routes return raw DB data** — no presentation logic. Frontend handles all transformations.
 Exceptions: the CollectiveX routes assemble raw stored documents through the shared reader in
@@ -85,7 +86,10 @@ Exceptions: the CollectiveX routes assemble raw stored documents through the sha
 `tco-feed`, which runs the calculator's frontier interpolation server-side because its consumers
 (spreadsheets) cannot execute the TS transforms — its assumptions (tier weights, workload mix, α)
 enter only as explicit query params with documented defaults, so a published sheet's URL fully
-records its methodology.
+records its methodology; and `overview`, which assembles the same `OverviewPageData` used for the
+initial server render so selector changes can update the matrix without transferring every model's
+raw benchmark history or triggering a React Server Component (RSC) round trip. It is a page-owned
+backend-for-frontend (BFF), not a reusable public data API.
 
 Static content routes (no DB):
 
