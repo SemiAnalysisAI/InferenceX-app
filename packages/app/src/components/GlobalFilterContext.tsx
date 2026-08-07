@@ -36,7 +36,7 @@ import {
 import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/default-sequence';
-import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
+import type { AvailabilityRow, RunConfigRow, WorkflowInfoResponse } from '@/lib/api';
 
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
@@ -55,6 +55,7 @@ interface RunInfo {
   runDate: string;
   runUrl: string;
   conclusion: string | null;
+  runConfigs: RunConfigRow[];
   changelog?: {
     entries: {
       config_keys: string[];
@@ -127,6 +128,9 @@ function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
       runDate: run.created_at,
       runUrl: run.html_url ? `${run.html_url}/attempts/${run.run_attempt}` : '',
       conclusion: run.conclusion,
+      runConfigs: (data.runConfigs ?? []).filter(
+        (config) => String(config.github_run_id) === String(run.github_run_id),
+      ),
       ...(runChangelogs.length > 0 && {
         changelog: {
           entries: runChangelogs.map((c) => ({

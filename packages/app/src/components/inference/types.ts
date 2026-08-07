@@ -2,6 +2,7 @@ import type React from 'react';
 
 import type { HardwareEntry } from '@/lib/constants';
 import type { Model, Sequence } from '@/lib/data-mappings';
+import type { RunConfigRow } from '@/lib/api';
 
 /**
  * Role of a single worker process in a multinode / disaggregated deployment.
@@ -687,6 +688,7 @@ export interface RunInfo {
   runDate: string;
   runUrl: string;
   conclusion: string | null;
+  runConfigs?: RunConfigRow[];
   changelog?: ChangelogMetadata;
 }
 

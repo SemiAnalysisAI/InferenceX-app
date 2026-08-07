@@ -92,7 +92,7 @@ import {
   renderKnownIssueAnnotations,
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
-import { changelogConfigToHwKey } from '@/components/inference/utils/changelogFormatters';
+import { resolveChangelogHwKeys } from '@/components/inference/utils/changelogFormatters';
 import {
   buildFrontierContinuations,
   fitContinuationLabelBaseline,
@@ -744,8 +744,9 @@ const ScatterGraph = React.memo(
           const hwKeys = cl.entries.flatMap((entry: any) =>
             (entry.config_keys ?? entry['config-keys'] ?? [])
               .filter((key: string) => selectedPrecisions.includes(key.split('-')[1]))
-              .map(changelogConfigToHwKey)
-              .filter((key: string | null): key is string => key !== null),
+              .flatMap((key: string) =>
+                resolveChangelogHwKeys(key, availableRuns[selectedRunId]?.runConfigs ?? []),
+              ),
           );
           return new Set(hwKeys);
         }
