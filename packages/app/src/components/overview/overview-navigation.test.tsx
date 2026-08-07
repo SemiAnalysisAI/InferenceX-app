@@ -79,6 +79,10 @@ describe('OverviewNavigationProvider', () => {
     renderProvider(pageData(50), '/overview');
     act(() => selectTier?.());
 
+    expect(fetch).toHaveBeenCalledWith('/api/v1/overview?tier=75', {
+      headers: { Accept: 'application/json' },
+    });
+
     renderProvider(pageData(100), '/overview?tier=100');
     expect(container.querySelector('[data-testid="tier"]')?.textContent).toBe('100');
 

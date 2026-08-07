@@ -8,6 +8,14 @@ API routes return raw DB rows with zero transformation, validation, or filtering
 - **Flexibility**: The frontend changes far more often than the data shape. Keeping transformation client-side means API routes never need updating for new chart metrics, filter logic, or display formats.
 - **Simplicity**: No DTOs, no mappers, no validation gatekeeping. The DB schema IS the API contract.
 
+### Deliberate API Exceptions
+
+Some routes serve a purpose that raw DB rows cannot satisfy:
+
+- CollectiveX assembles stored sweep documents through its shared reader.
+- `tco-feed` performs server-side frontier interpolation for spreadsheet consumers that cannot run the TypeScript transforms.
+- `/api/v1/overview` is a page-owned backend-for-frontend (BFF). It returns the compact `OverviewPageData` shape used by the initial server render, allowing selector changes to update the matrix without downloading every model's raw benchmark history or triggering a React Server Component (RSC) round trip. It is not a reusable public data API.
+
 ## Hash-Based Tab Routing (Not Next.js Routes)
 
 Tabs use `window.location.hash` instead of Next.js file-based routing because:
