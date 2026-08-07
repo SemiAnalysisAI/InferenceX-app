@@ -9,11 +9,13 @@ import {
   assembleOverviewPageData,
   OVERVIEW_DEFAULT_COMPARISON_MODE,
   OVERVIEW_PRIMARY_TIER,
+  OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   overviewHistoricalWindow,
   overviewSnapshotDate,
   type OverviewComparisonMode,
   type OverviewEngineScope,
   type OverviewPageData,
+  type OverviewReferenceHardware,
   type OverviewTier,
 } from '@/lib/overview-data';
 import { loadFixture } from '@/lib/test-fixtures';
@@ -35,6 +37,7 @@ export async function getOverviewPageData(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
 ): Promise<OverviewPageData> {
   // Synthetic rows go through the same assemblers as the live path, so a
   // contract drift breaks fixture tests instead of stranding the page.
@@ -42,13 +45,13 @@ export async function getOverviewPageData(
     ? loadFixture<Record<string, BenchmarkRow[]>>('overview-rows')
     : await loadRowsByModel(getCachedBenchmarks);
   if (comparisonMode === 'hardware') {
-    return assembleOverviewPageData(currentRowsByModel, tier, engineScope);
+    return assembleOverviewPageData(currentRowsByModel, tier, engineScope, referenceHardware);
   }
 
   const snapshotDate = overviewSnapshotDate(currentRowsByModel, engineScope);
   if (snapshotDate === null) {
     return {
-      ...assembleOverviewPageData(currentRowsByModel, tier, engineScope),
+      ...assembleOverviewPageData(currentRowsByModel, tier, engineScope, referenceHardware),
       comparisonMode: 'history',
     };
   }
@@ -70,5 +73,6 @@ export async function getOverviewPageData(
     window,
     tier,
     engineScope,
+    referenceHardware,
   );
 }

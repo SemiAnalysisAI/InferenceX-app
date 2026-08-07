@@ -1,11 +1,13 @@
 import { runIdFromRunUrl } from './known-issues';
 import {
   OVERVIEW_DEFAULT_COMPARISON_MODE,
+  OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   OVERVIEW_PRIMARY_TIER,
   type OverviewComparisonMode,
   type OverviewConfigResult,
   type OverviewEngineScope,
   type OverviewModelSummary,
+  type OverviewReferenceHardware,
   type OverviewTier,
 } from './overview-data';
 import type { UrlStateParams } from './url-state';
@@ -97,11 +99,15 @@ export function overviewHref(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
 ): string {
   const base = locale === 'zh' ? '/zh/overview' : '/overview';
   const query = new URLSearchParams();
   if (tier !== OVERVIEW_PRIMARY_TIER) query.set('tier', String(tier));
   if (engineScope !== 'community') query.set('engine', engineScope);
+  if (referenceHardware !== OVERVIEW_DEFAULT_REFERENCE_HARDWARE) {
+    query.set('ref', referenceHardware);
+  }
   if (comparisonMode === 'history') query.set('compare', '30d');
   const search = query.toString();
   return search === '' ? base : `${base}?${search}`;
@@ -113,8 +119,9 @@ export function overviewTierHref(
   tier: OverviewTier,
   engineScope: OverviewEngineScope = 'community',
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
 ): string {
-  return overviewHref(locale, tier, engineScope, comparisonMode);
+  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware);
 }
 
 /** Engine-scope switch preserving the active service tier. */
@@ -123,6 +130,7 @@ export function overviewEngineScopeHref(
   engineScope: OverviewEngineScope,
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
 ): string {
-  return overviewHref(locale, tier, engineScope, comparisonMode);
+  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware);
 }

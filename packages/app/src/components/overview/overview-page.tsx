@@ -79,6 +79,7 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
               tier={data.tier}
               engineScope={data.engineScope}
               comparisonMode={data.comparisonMode}
+              referenceHardware={data.referenceHardware}
               locale={locale}
               strings={strings}
             />
@@ -86,6 +87,7 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
               engineScope={data.engineScope}
               tier={data.tier}
               comparisonMode={data.comparisonMode}
+              referenceHardware={data.referenceHardware}
               locale={locale}
               strings={strings}
             />
@@ -97,6 +99,7 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
         comparisonMode={data.comparisonMode}
         engineScope={data.engineScope}
         tier={data.tier}
+        referenceHardware={data.referenceHardware}
         locale={locale}
         strings={strings}
       />
@@ -111,6 +114,7 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
           formatters={formatters}
           strings={strings}
           comparisonMode={data.comparisonMode}
+          referenceHardware={data.referenceHardware}
         />
         <MobileOverviewList
           models={data.models}
@@ -118,8 +122,13 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
           formatters={formatters}
           strings={strings}
           comparisonMode={data.comparisonMode}
+          referenceHardware={data.referenceHardware}
         />
-        <OverviewMethodology strings={strings} comparisonMode={data.comparisonMode} />
+        <OverviewMethodology
+          strings={strings}
+          comparisonMode={data.comparisonMode}
+          referenceHardware={data.referenceHardware}
+        />
       </Card>
     </section>
   );

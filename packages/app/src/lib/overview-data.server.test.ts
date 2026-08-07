@@ -69,6 +69,19 @@ afterEach(() => {
 });
 
 describe('getOverviewPageData engine scope forwarding', () => {
+  it('forwards the selected hardware reference through fixture mode', async () => {
+    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: true }));
+    vi.doMock('@/lib/benchmark-data.server', () => ({ getCachedBenchmarks: vi.fn() }));
+    vi.doMock('@/lib/test-fixtures', () => ({
+      loadFixture: vi.fn(() => ({ [Model.Qwen3_5]: rows })),
+    }));
+
+    const { getOverviewPageData } = await import('./overview-data.server');
+    const page = await getOverviewPageData(50, 'community', 'hardware', 'b300');
+
+    expect(page.referenceHardware).toBe('b300');
+  });
+
   it('forwards community scope through fixture mode', async () => {
     const getCachedBenchmarks = vi.fn();
     vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: true }));

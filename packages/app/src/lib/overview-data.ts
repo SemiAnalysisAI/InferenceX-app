@@ -19,6 +19,9 @@ export const OVERVIEW_WORKLOAD = { isl: 8192, osl: 1024 } as const;
 export const OVERVIEW_TIERS = [30, 50, 75, 100, 150, 200] as const;
 export type OverviewTier = (typeof OVERVIEW_TIERS)[number];
 export const OVERVIEW_PRIMARY_TIER = 50;
+export const OVERVIEW_HARDWARE = ['b200', 'mi355x', 'b300', 'gb200', 'gb300'] as const;
+export type OverviewReferenceHardware = (typeof OVERVIEW_HARDWARE)[number];
+export const OVERVIEW_DEFAULT_REFERENCE_HARDWARE: OverviewReferenceHardware = 'b200';
 export type OverviewEngineScope = 'all' | 'community';
 export type OverviewComparisonMode = 'hardware' | 'history';
 export const OVERVIEW_DEFAULT_COMPARISON_MODE: OverviewComparisonMode = 'hardware';
@@ -31,6 +34,16 @@ export function resolveOverviewEngineScope(
 ): OverviewEngineScope {
   const candidate = Array.isArray(raw) ? raw[0] : raw;
   return candidate === 'all' ? 'all' : 'community';
+}
+
+export function resolveOverviewReferenceHardware(
+  raw: string | readonly string[] | undefined,
+): OverviewReferenceHardware {
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  return (
+    OVERVIEW_HARDWARE.find((hardware) => hardware === candidate) ??
+    OVERVIEW_DEFAULT_REFERENCE_HARDWARE
+  );
 }
 
 export function resolveOverviewComparisonMode(
@@ -107,8 +120,6 @@ export interface OverviewHistoricalComparison {
   baselineDate: string | null;
 }
 
-export const OVERVIEW_HARDWARE = ['b200', 'mi355x', 'b300', 'gb200', 'gb300'] as const;
-
 export interface OverviewPlatformResult {
   hardware: string;
   hardwareLabel: string;
@@ -118,9 +129,9 @@ export interface OverviewPlatformResult {
   /** $ per million TOTAL (input + output) tokens at the hyperscaler $/GPU/hr
    *  tier (`HW_REGISTRY.costh`). */
   costPerMtok: number | null;
-  /** Cost delta vs this row's B200 cell; negative = cheaper. Null on the B200
-   *  cell itself and whenever either cost is unavailable. */
-  costVsB200Pct: number | null;
+  /** Cost delta vs this row's selected reference cell; negative = cheaper.
+   *  Null on the reference cell itself and whenever either cost is unavailable. */
+  costVsReferencePct: number | null;
   historicalComparison: OverviewHistoricalComparison | null;
 }
 
@@ -136,6 +147,7 @@ export interface OverviewPageData {
   tier: OverviewTier;
   engineScope: OverviewEngineScope;
   comparisonMode: OverviewComparisonMode;
+  referenceHardware: OverviewReferenceHardware;
   historicalWindow: OverviewHistoricalWindow | null;
 }
 
@@ -462,6 +474,7 @@ function buildPlatformResults(
   scenario: OverviewScenario,
   scenarioRows: readonly BenchmarkRow[],
   tier: OverviewTier,
+  referenceHardware: OverviewReferenceHardware,
 ): OverviewPlatformResult[] {
   const configs = buildConfigs(model, scenario, scenarioRows);
   const readsForHardware = (hardware: string): OverviewTierRead[] =>
@@ -486,13 +499,16 @@ function buildPlatformResults(
     };
   });
 
-  const b200Cost = platforms.find((platform) => platform.hardware === 'b200')?.costPerMtok ?? null;
+  const referenceCost =
+    platforms.find((platform) => platform.hardware === referenceHardware)?.costPerMtok ?? null;
   return platforms.map((platform) => ({
     ...platform,
-    costVsB200Pct:
-      platform.hardware === 'b200' || b200Cost === null || platform.costPerMtok === null
+    costVsReferencePct:
+      platform.hardware === referenceHardware ||
+      referenceCost === null ||
+      platform.costPerMtok === null
         ? null
-        : platform.costPerMtok / b200Cost - 1,
+        : platform.costPerMtok / referenceCost - 1,
     historicalComparison: null,
   }));
 }
@@ -619,6 +635,7 @@ export function buildOverviewModelSummary(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
   scenario: OverviewScenario = overviewScenarioForModel(model, rows),
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
 ): OverviewModelSummary {
   const scopedRows = overviewEngineRows(rows, engineScope);
   const scenarioRows = overviewScenarioRows(scenario, scopedRows);
@@ -626,7 +643,7 @@ export function buildOverviewModelSummary(
     model,
     modelLabel: getModelLabel(model),
     scenario,
-    platforms: buildPlatformResults(model, scenario, scenarioRows, tier),
+    platforms: buildPlatformResults(model, scenario, scenarioRows, tier, referenceHardware),
   };
 }
 
@@ -639,17 +656,19 @@ export function assembleOverviewPageData(
   rowsByModel: Record<string, BenchmarkRow[]>,
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
 ): OverviewPageData {
   const perModel = [...DEFAULT_MODELS].map((model) => ({ model, rows: rowsByModel[model] ?? [] }));
   return {
     models: perModel.flatMap(({ model, rows }) =>
       overviewScenariosForModel(model, rows).map((scenario) =>
-        buildOverviewModelSummary(model, rows, tier, engineScope, scenario),
+        buildOverviewModelSummary(model, rows, tier, engineScope, scenario, referenceHardware),
       ),
     ),
     tier,
     engineScope,
     comparisonMode: OVERVIEW_DEFAULT_COMPARISON_MODE,
+    referenceHardware,
     historicalWindow: null,
   };
 }
@@ -667,9 +686,20 @@ export function assembleOverviewHistoricalPageData(
   window: OverviewHistoricalWindow,
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
 ): OverviewPageData {
-  const current = assembleOverviewPageData(currentRowsByModel, tier, engineScope);
-  const baseline = assembleOverviewPageData(baselineRowsByModel, tier, engineScope);
+  const current = assembleOverviewPageData(
+    currentRowsByModel,
+    tier,
+    engineScope,
+    referenceHardware,
+  );
+  const baseline = assembleOverviewPageData(
+    baselineRowsByModel,
+    tier,
+    engineScope,
+    referenceHardware,
+  );
   const baselineByKey = new Map(
     baseline.models.flatMap((model) =>
       model.platforms.map((platform) => [overviewPlatformKey(model, platform), platform] as const),
