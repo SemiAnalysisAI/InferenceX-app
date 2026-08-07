@@ -86,7 +86,11 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
   [25199291771, new Set([1, 2])], // 2026-05-01 | dsv4 GB200 dynamo-vllm MTP2 | Reason: only 2 of 6 conc points uploaded on both attempts. re-run pending
   [29651235293, new Set([1])], // 2026-08-07 | GLM-5.2 NVFP4 B300 SGLang single-node agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
+  [29657732517, new Set([1])], // 2026-07-18 | GLM-5.2 FP8 MI325X SGLang 1M agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [29682242847, new Set([1])], // 2026-08-07 | GLM-5.2 NVFP4 B300 SGLang agentic HiCache | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
+  [30133534310, new Set([1])], // 2026-07-24 | GLM-5.2 FP8 H200 Dynamo-SGLang 1P2D agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
+  [30133535261, new Set([1])], // 2026-07-24 | GLM-5.2 FP8 H200 Dynamo-SGLang 2P2D agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
+  [30133570824, new Set([1])], // 2026-07-24 | GLM-5.2 FP8 H200 Dynamo-SGLang 2P4D agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
 ]);
 
 export interface BenchmarkPointKey {
