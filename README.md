@@ -105,26 +105,27 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 These are the main scripts you'll use during development. Admin scripts for database and cache management are listed separately below.
 Some of these may require additional setup or environment variables.
 
-| Script                         | Description                                |
-| ------------------------------ | ------------------------------------------ |
-| `bun run dev`                  | Start development server with Turbopack    |
-| `bun run build`                | Production build                           |
-| `bun run start`                | Start production server                    |
-| `bun run preview`              | Build then start production server locally |
-| `bun run typecheck`            | TypeScript type checking (all packages)    |
-| `bun run lint`                 | Lint with oxlint                           |
-| `bun run lint:fix`             | Auto-fix lint issues                       |
-| `bun run fmt`                  | Format check with oxfmt                    |
-| `bun run fmt:fix`              | Auto-fix formatting                        |
-| `bun run security`             | Security audit                             |
-| `bun run test`                 | Run all tests (unit + E2E)                 |
-| `bun run test:unit`            | Vitest unit tests                          |
-| `bun run test:unit:coverage`   | Vitest unit tests with coverage            |
-| `bun run test:e2e`             | Cypress E2E tests                          |
-| `bun run test:e2e:component`   | Cypress component tests only               |
-| `bun run test:e2e:integration` | Cypress integration tests only             |
-| `bun run clean`                | Remove build artifacts                     |
-| `bun run clean:all`            | Remove build artifacts + node_modules      |
+| Script                         | Description                                    |
+| ------------------------------ | ---------------------------------------------- |
+| `bun run dev`                  | Start development server with Turbopack        |
+| `bun run build`                | Production build                               |
+| `bun run start`                | Start production server                        |
+| `bun run preview`              | Build then start production server locally     |
+| `bun run typecheck`            | TypeScript type checking (all packages)        |
+| `bun run lint`                 | Lint with oxlint                               |
+| `bun run lint:fix`             | Auto-fix lint issues                           |
+| `bun run fmt`                  | Format check with oxfmt                        |
+| `bun run fmt:fix`              | Auto-fix formatting                            |
+| `bun run security`             | Security audit                                 |
+| `bun run test`                 | Run all tests (unit + E2E)                     |
+| `bun run test:unit`            | Vitest unit tests                              |
+| `bun run test:unit:coverage`   | Vitest unit tests with coverage                |
+| `bun run test:e2e`             | Curated local Cypress smoke suite              |
+| `bun run test:e2e:full`        | Complete Cypress component + integration suite |
+| `bun run test:e2e:component`   | Complete Cypress component suite only          |
+| `bun run test:e2e:integration` | Complete Cypress integration suite only        |
+| `bun run clean`                | Remove build artifacts                         |
+| `bun run clean:all`            | Remove build artifacts + node_modules          |
 
 This repository uses Vitest and Cypress. Use the `bun run test:*` scripts above; `bun test` invokes Bun's separate built-in test runner and is not supported.
 

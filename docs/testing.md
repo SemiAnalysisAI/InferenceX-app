@@ -25,7 +25,7 @@ bun run test:e2e
 
 ## Runtime and CI Sharding
 
-The local `bun run test:e2e` command is a smoke suite with 83 Cypress tests across the core page, chart, overlay, localization, and component paths. It is the default agent and developer check and is intended to stay under one minute once the app is running.
+The local `bun run test:e2e` command is a curated smoke suite across the core page, chart, overlay, localization, and component paths. It is the default agent and developer check and is intended to stay under one minute once the app is running.
 
 The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as one component job plus four integration shards per browser, Chrome and Firefox. The CI workflow is the merge gate for the full E2E suite.
 
