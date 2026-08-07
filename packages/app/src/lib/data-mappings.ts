@@ -121,9 +121,15 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     // all versions joined with a slash — matches the GLM5/5.1 pattern. The
     // hyphenated `Model.Kimi_K2_5` enum value stays as-is for internal
     // routing / DB key mapping.
+    //
+    // Fully retired after 2026-08-06 per MODELS.md: agentic coding was
+    // deprecated first, then Single-turn 8k1k — its last active scenario — so
+    // no scenario remains. Kimi-K3 (launched 2026-07-27) takes the cluster
+    // time. Historical rows stay queryable; the model just leaves the active
+    // groups in the selector.
     label: 'Kimi K2.5/2.6/2.7-Code 1T',
     prefix: 'kimik2.5',
-    category: 'default',
+    category: 'deprecated',
   },
   [Model.MiniMax_M3]: {
     label: 'MiniMax M3 428B',
