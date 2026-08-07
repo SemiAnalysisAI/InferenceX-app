@@ -739,6 +739,28 @@ describe('transformBenchmarkRows — hardware key resolution', () => {
     expect(hardwareConfig).toHaveProperty('h200_trt_mtp');
   });
 
+  it('groups mixed agentic spec methods into one hardware series', () => {
+    const rows = [
+      makeRow({
+        benchmark_type: 'agentic_traces',
+        hardware: 'h200',
+        framework: 'trt',
+        spec_method: 'none',
+      }),
+      makeRow({
+        benchmark_type: 'agentic_traces',
+        hardware: 'h200',
+        framework: 'trt',
+        spec_method: 'mtp',
+      }),
+    ];
+
+    const { chartData, hardwareConfig } = transformBenchmarkRows(rows);
+    expect(Object.keys(hardwareConfig)).toEqual(['h200_trt']);
+    expect(chartData[0].map((point) => point.hwKey)).toEqual(['h200_trt', 'h200_trt']);
+    expect(chartData[0].map((point) => point.spec_decoding)).toEqual(['none', 'mtp']);
+  });
+
   it('handles AMD hardware with vllm framework', () => {
     const rows = [makeRow({ hardware: 'mi300x', framework: 'vllm' })];
     const { chartData, hardwareConfig } = transformBenchmarkRows(rows);

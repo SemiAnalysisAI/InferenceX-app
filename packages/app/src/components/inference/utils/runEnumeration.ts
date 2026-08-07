@@ -10,9 +10,9 @@
  * changelog entry, and that newest run is exactly the one the plain-date "latest"
  * view shows — so enumerating from changelog entries alone would silently drop it.
  *
- * Runs are scoped to the selected GPUs using the canonical {@link getHardwareKey}
- * so MTP and disagg variants (separate hw keys) are kept distinct, exactly as the
- * chart keys them.
+ * Runs are scoped to the selected GPUs using the canonical {@link getHardwareKey}.
+ * Fixed-sequence MTP variants stay distinct; agentic MTP and non-MTP points map
+ * to the same series, exactly as the chart keys them.
  */
 
 import type { AggDataEntry } from '@/components/inference/types';
@@ -46,6 +46,7 @@ function runConfigHwKey(rc: RunConfigRow): string {
     framework: rc.framework,
     disagg: rc.disagg,
     spec_decoding: rc.spec_method,
+    benchmark_type: rc.benchmark_type,
   } as unknown as AggDataEntry);
 }
 

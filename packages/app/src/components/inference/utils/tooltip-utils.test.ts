@@ -491,6 +491,23 @@ describe('generateOverlayTooltipContent', () => {
     expect(html).toContain('<strong>CPU Cache Hit Rate:</strong> 42.0%');
   });
 
+  it('shows point-level speculative decoding for mixed agentic overlays', () => {
+    const mtp = generateOverlayTooltipContent(
+      overlayConfig({
+        data: pt({ benchmark_type: 'agentic_traces', spec_decoding: 'mtp' }),
+      }),
+    );
+    const standardZh = generateOverlayTooltipContent(
+      overlayConfig({
+        data: pt({ benchmark_type: 'agentic_traces', spec_decoding: 'none' }),
+        locale: 'zh',
+      }),
+    );
+
+    expect(mtp).toContain('<strong>Speculative Decoding:</strong> MTP');
+    expect(standardZh).toContain('<strong>投机解码:</strong> 关闭');
+  });
+
   it('hides stale CPU cache hits for unofficial overlays without offload', () => {
     const html = generateOverlayTooltipContent(
       overlayConfig({

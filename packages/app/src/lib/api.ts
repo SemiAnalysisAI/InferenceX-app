@@ -102,6 +102,7 @@ export interface RunConfigRow {
   framework: string;
   spec_method: string;
   disagg: boolean;
+  benchmark_type: string;
 }
 
 export interface WorkflowInfoResponse {

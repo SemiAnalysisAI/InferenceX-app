@@ -16,6 +16,7 @@ function rc(over: Partial<RunConfigRow>): RunConfigRow {
     framework: 'vllm',
     spec_method: 'none',
     disagg: false,
+    benchmark_type: 'single_turn',
     ...over,
   };
 }
@@ -64,6 +65,15 @@ describe('dataRunsForDate', () => {
     ];
     const runs = dataRunsForDate(rows, { ...SCOPE, selectedGPUs: ['mi300x_vllm_mtp'] });
     expect(runs.map((r) => r.runId)).toEqual(['2']);
+  });
+
+  it('maps agentic MTP and non-MTP run coverage to one GPU series', () => {
+    const rows = [
+      rc({ github_run_id: 1, spec_method: 'none', benchmark_type: 'agentic_traces' }),
+      rc({ github_run_id: 2, spec_method: 'mtp', benchmark_type: 'agentic_traces' }),
+    ];
+    const runs = dataRunsForDate(rows, SCOPE);
+    expect(runs.map((r) => r.runId)).toEqual(['1', '2']);
   });
 
   it('excludes runs for other models, precisions, and GPUs', () => {

@@ -256,6 +256,15 @@ describe('buildAvailabilityHwKey', () => {
     expect(buildAvailabilityHwKey('h200', undefined, 'mtp')).toBe('h200_mtp');
   });
 
+  it('omits speculative decoding from agentic availability series keys', () => {
+    expect(buildAvailabilityHwKey('h200', 'sglang', 'mtp', false, 'agentic_traces')).toBe(
+      'h200_sglang',
+    );
+    expect(buildAvailabilityHwKey('h200', 'sglang', 'eagle', false, 'agentic_traces')).toBe(
+      'h200_sglang',
+    );
+  });
+
   it('handles undefined framework and spec method', () => {
     expect(buildAvailabilityHwKey('b200', undefined, undefined)).toBe('b200');
   });
@@ -919,6 +928,13 @@ describe('getHardwareKey', () => {
     expect(getHardwareKey(entry({ hw: 'h100-sxm', framework: '', spec_decoding: 'mtp' }))).toBe(
       'h100_mtp',
     );
+  });
+
+  it('omits speculative decoding from agentic series identity', () => {
+    const base = { hw: 'h100-sxm', framework: 'vllm', benchmark_type: 'agentic_traces' };
+    expect(getHardwareKey(entry({ ...base, spec_decoding: 'none' }))).toBe('h100_vllm');
+    expect(getHardwareKey(entry({ ...base, spec_decoding: 'mtp' }))).toBe('h100_vllm');
+    expect(getHardwareKey(entry({ ...base, spec_decoding: 'eagle' }))).toBe('h100_vllm');
   });
 
   it('appends spec_decoding suffix when not "none" and not "mtp"', () => {

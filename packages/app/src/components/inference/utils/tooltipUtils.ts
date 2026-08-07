@@ -1,4 +1,5 @@
 import { formatNumber, getDisplayLabel } from '@/lib/utils';
+import { specMethodDisplayLabel } from '@/lib/compare-variant-slug';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
@@ -172,10 +173,25 @@ const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => 
  * Agentic-only request success and token totals. Cache metadata is rendered
  * separately because fixed-sequence rows can carry it too.
  */
-const generateAgenticHTML = (d: InferenceData): string => {
+const AGENTIC_STRINGS = {
+  en: { speculativeDecoding: 'Speculative Decoding', off: 'Off' },
+  zh: { speculativeDecoding: '投机解码', off: '关闭' },
+} as const;
+
+const generateAgenticHTML = (d: InferenceData, locale: Locale): string => {
   if (d.benchmark_type !== 'agentic_traces') return '';
 
+  const t = AGENTIC_STRINGS[locale];
   const parts: string[] = [];
+  const specMethod = d.spec_decoding ?? 'none';
+  parts.push(
+    tooltipLine(
+      t.speculativeDecoding,
+      specMethod === 'none' || specMethod === ''
+        ? t.off
+        : specMethodDisplayLabel(d.model, specMethod),
+    ),
+  );
 
   if (d.num_requests_total !== undefined && d.num_requests_successful !== undefined) {
     const successPct =
@@ -370,7 +386,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
         <strong>Precision:</strong> ${d.precision.toUpperCase()}
       </div>
       ${generateCacheMetadataHTML(d, locale)}
-      ${generateAgenticHTML(d)}
+      ${generateAgenticHTML(d, locale)}
       ${runLinkHTML(runUrl)}
       ${viewChartsButtonHTML(isPinned, Boolean(hasTrace), d.id)}
       ${
@@ -430,7 +446,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
         <strong>Precision:</strong> ${d.precision.toUpperCase()}
       </div>
       ${generateCacheMetadataHTML(d, locale)}
-      ${generateAgenticHTML(d)}
+      ${generateAgenticHTML(d, locale)}
     </div>
   `;
 };
@@ -501,7 +517,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
         <strong>Precision:</strong> ${d.precision.toUpperCase()}
       </div>
       ${generateCacheMetadataHTML(d, locale)}
-      ${generateAgenticHTML(d)}
+      ${generateAgenticHTML(d, locale)}
       ${runLinkHTML(runUrl)}
       ${viewChartsButtonHTML(isPinned, Boolean(hasTrace), d.id)}
     </div>

@@ -76,6 +76,7 @@ export interface RunConfigRow {
   framework: string;
   spec_method: string;
   disagg: boolean;
+  benchmark_type: string;
 }
 
 /**
@@ -96,7 +97,8 @@ export async function getRunConfigsByDate(sql: DbClient, date: string): Promise<
       c.hardware,
       c.framework,
       c.spec_method,
-      c.disagg
+      c.disagg,
+      br.benchmark_type
     FROM benchmark_results br
     JOIN configs c ON c.id = br.config_id
     JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
