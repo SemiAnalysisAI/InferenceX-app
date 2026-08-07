@@ -177,6 +177,130 @@ export function makeRawMatrix(requested: RequestedCaseSpec[], version = 1): Json
   };
 }
 
+export interface KvOverrides {
+  sku?: string;
+  backend?: string;
+  fabric?: string;
+  workload?: string;
+  precision?: string;
+  vendor?: string;
+  status?: string;
+  reasons?: string[];
+  disposition?: 'runnable' | 'unsupported';
+  reason?: string;
+  /** String on purpose by default: the kv entrypoint emitted `version: '1'`. */
+  version?: number | string;
+  rows?: Partial<KvRowSpec>[];
+  omitShard?: boolean;
+}
+
+interface KvRowSpec {
+  kind: string;
+  isl: number;
+  page_tokens: number | null;
+  batch: number;
+  op: string;
+  gbps_p50: number;
+  latency_p50: number;
+  verify_passed: boolean;
+}
+
+function makeRawKvRow(spec: Partial<KvRowSpec>): Json {
+  const latency = spec.latency_p50 ?? 24.77;
+  return {
+    kind: spec.kind ?? 'paged',
+    preset: 'dsv4',
+    isl: spec.isl ?? 32768,
+    page_tokens: spec.page_tokens === undefined ? 64 : spec.page_tokens,
+    layers: 61,
+    page_bytes: spec.kind === 'bulk' ? null : 9216,
+    descs: spec.kind === 'bulk' ? 1 : 20302,
+    req_bytes: 183000000,
+    batch: spec.batch ?? 1,
+    op: spec.op ?? 'pull',
+    prep_ms: 1.2,
+    latency_ms: {
+      p50: latency,
+      p95: latency * 1.05,
+      min: latency * 0.98,
+      max: latency * 1.1,
+      n: 24,
+    },
+    gbps_p50: spec.gbps_p50 ?? 7.39,
+    verify: { passed: spec.verify_passed ?? true, detail: '' },
+  };
+}
+
+function kvCaseIdOf(options: KvOverrides): string {
+  return `${options.sku ?? 'gb200'}-${options.backend ?? 'nixl'}-${options.workload ?? 'kv-dsv4'}-${options.fabric ?? 'rdma'}-xfer-ep2-paged-${options.precision ?? 'fp8'}`;
+}
+
+/**
+ * A kv-transfer shard + its matrix requested-case entry. Mirrors the real
+ * artifacts: the shard's case carries only the identity factors while the
+ * matrix entry carries the full case (isl_ladder, batch_sizes, topology).
+ */
+export function makeKvFixture(options: KvOverrides = {}): {
+  shard: Json | null;
+  requested: RequestedCaseSpec;
+} {
+  const caseId = kvCaseIdOf(options);
+  const sku = options.sku ?? 'gb200';
+  const identityCase: Json = {
+    backend: options.backend ?? 'nixl',
+    workload: options.workload ?? 'kv-dsv4',
+    mode: options.fabric ?? 'rdma',
+    phase: 'xfer',
+    ep: 2,
+    routing: 'paged',
+    precision: options.precision ?? 'fp8',
+    suite: 'kv-transfer',
+  };
+  const rows = options.rows ?? [
+    { kind: 'paged', page_tokens: 64, batch: 1 },
+    { kind: 'paged', page_tokens: 64, batch: 16, gbps_p50: 15.12, latency_p50: 193.7 },
+    { kind: 'paged', page_tokens: 16, batch: 1, gbps_p50: 2.72, latency_p50: 67.3 },
+    { kind: 'bulk', page_tokens: null, batch: 1, gbps_p50: 89.41, latency_p50: 2.05 },
+  ];
+  const shard: Json | null = options.omitShard
+    ? null
+    : {
+        version: options.version ?? '1',
+        record_type: 'case-attempt',
+        identity: { case_id: caseId, case_factors: { sku, case: identityCase } },
+        implementation: { name: options.backend ?? 'nixl' },
+        runtime: { vendor: options.vendor ?? 'nvidia' },
+        measurement: { rows: rows.map(makeRawKvRow) },
+        outcome: {
+          status: options.status ?? 'success',
+          ...(options.reasons ? { reasons: options.reasons } : {}),
+        },
+      };
+  const requested: RequestedCaseSpec = {
+    caseId,
+    sku,
+    disposition: options.disposition,
+    reason: options.reason,
+    case: {
+      ...identityCase,
+      case_id: caseId,
+      isl_ladder: '512 4096 32768',
+      page_tokens: '16 64',
+      batch_sizes: '1 4 16',
+      ops: 'pull push',
+      nodes: 2,
+      gpus_per_node: 1,
+      scale_up_domain: 72,
+      scope: 'scale-out',
+      scale_up_transport: 'mnnvl',
+      scale_out_transport: options.fabric ?? 'rdma',
+      transport: options.fabric ?? 'rdma',
+      topology_class: `${sku}-kv-${options.fabric ?? 'rdma'}`,
+    },
+  };
+  return { shard, requested };
+}
+
 export function makeRunMeta(
   overrides: Partial<CollectiveXNeutralRunMeta> = {},
 ): CollectiveXNeutralRunMeta {
@@ -194,12 +318,19 @@ export function buildDataset(
   options: {
     shards?: Json[];
     requestedCases?: RequestedCaseSpec[];
+    kv?: KvOverrides[];
     meta?: Partial<CollectiveXNeutralRunMeta>;
   } = {},
 ): CollectiveXDataset {
   const shards = options.shards ?? [makeRawShard()];
-  const requested = [...shards.map(requestedFromShard), ...(options.requestedCases ?? [])];
-  return buildDatasetFromNeutral(makeRawMatrix(requested), shards, makeRunMeta(options.meta));
+  const kvFixtures = (options.kv ?? []).map(makeKvFixture);
+  const requested = [
+    ...shards.map(requestedFromShard),
+    ...kvFixtures.map((fixture) => fixture.requested),
+    ...(options.requestedCases ?? []),
+  ];
+  const docs = [...shards, ...kvFixtures.flatMap((fixture) => fixture.shard ?? [])];
+  return buildDatasetFromNeutral(makeRawMatrix(requested), docs, makeRunMeta(options.meta));
 }
 
 export function makeCollectiveXSeries(overrides: ShardOverrides = {}): CollectiveXSeries {

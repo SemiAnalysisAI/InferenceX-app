@@ -28,6 +28,21 @@ const incompleteDataset = buildDataset({
     conclusion: 'failure',
   },
 });
+const kvDataset = buildDataset({
+  shards: [makeRawShard()],
+  kv: [
+    {},
+    {
+      sku: 'mi355x',
+      backend: 'mori-io',
+      fabric: 'rdma',
+      vendor: 'amd',
+      status: 'invalid',
+      reasons: ['transfer verification failed'],
+    },
+  ],
+  meta: { run_id: '162', generated_at: '2026-08-07T12:20:00Z', source_sha: 'e'.repeat(40) },
+});
 const ADMIN_TOKEN_KEY = 'collectivex-admin-token';
 
 function installRuns(bodies: CollectiveXDataset[] = [dataset]) {
@@ -475,5 +490,45 @@ describe('CollectiveX availability states', () => {
     cy.wait('@run');
     cy.get('[data-testid="collectivex-display"]').should('be.visible');
     cy.then(() => expect(availabilityRequests).to.eq(0));
+  });
+});
+
+describe('CollectiveX kv-transfer card', () => {
+  it('renders kv cases with bandwidth-bound cells and per-case outcomes', () => {
+    installRuns([kvDataset]);
+    installRun(kvDataset);
+    openCollectiveX();
+    cy.get('[data-testid="collectivex-kv-table"]')
+      .should('be.visible')
+      .and('contain.text', 'KV-cache transfer')
+      .and('contain.text', '2 cases')
+      .and('contain.text', '1 measured');
+    cy.get('[data-testid="collectivex-kv-table-table"]').within(() => {
+      // The measured gb200 nixl case: bulk ceiling, paged-64 at batch 1 and
+      // at the largest measured batch, paged-16, and the handoff latency.
+      cy.contains('td', 'GB200').parent().as('measured');
+      cy.get('@measured').should('contain.text', 'nixl').and('contain.text', 'kv-dsv4');
+      cy.get('@measured').should('contain.text', '89.41');
+      cy.get('@measured').should('contain.text', '7.39');
+      cy.get('@measured').should('contain.text', '15.12 (b16)');
+      cy.get('@measured').should('contain.text', '2.72');
+      cy.get('@measured').should('contain.text', '24.8');
+      // The failed mori-io case keeps its outcome and reason, with no cells.
+      cy.contains('td', 'MI355X').parent().as('failed');
+      cy.get('@failed').should('contain.text', 'mori-io').and('contain.text', 'invalid');
+      cy.get('@failed').should('contain.text', 'transfer-verification-failed');
+    });
+    // KV cases count into the header stats alongside EP cases.
+    cy.get('[data-testid="collectivex-display"]').should(
+      'contain.text',
+      `${kvDataset.run.measured_cases}/${kvDataset.run.requested_cases}`,
+    );
+  });
+
+  it('renders no kv card for an EP-only run', () => {
+    installRuns();
+    installRun();
+    openCollectiveX();
+    cy.get('[data-testid="collectivex-kv-table"]').should('not.exist');
   });
 });

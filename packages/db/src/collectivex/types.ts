@@ -108,6 +108,52 @@ export interface CollectiveXCoverage {
   detail: string | null;
 }
 
+/** kv-transfer latency percentiles (the suite reports ms, not us). */
+export interface CollectiveXKvLatency {
+  p50: number;
+  p95: number;
+  min: number;
+  max: number;
+  n: number;
+}
+
+/** One measured kv-transfer grid point (a burst of `batch` requests). */
+export interface CollectiveXKvRow {
+  kind: 'paged' | 'bulk';
+  isl: number;
+  page_tokens: number | null;
+  batch: number;
+  op: 'pull' | 'push';
+  descs: number;
+  req_bytes: number;
+  prep_ms: number;
+  latency_ms: CollectiveXKvLatency;
+  gbps_p50: number;
+  verify_passed: boolean;
+}
+
+/**
+ * One kv-transfer matrix case (2 nodes x 1 GPU: the per-worker prefill/decode
+ * pair). Fabric is the case's declared lane (`rdma` | `mnnvl`); rows are empty
+ * unless a successful shard measured the case.
+ */
+export interface CollectiveXKvCase {
+  case_id: string;
+  label: string;
+  disposition: 'runnable' | 'unsupported';
+  sku: string;
+  vendor: 'nvidia' | 'amd' | null;
+  backend: string;
+  fabric: string;
+  workload: string;
+  precision: CollectiveXPrecision;
+  topology: CollectiveXTopology;
+  outcome: CollectiveXOutcome;
+  reason: string | null;
+  detail: string | null;
+  rows: CollectiveXKvRow[];
+}
+
 export interface CollectiveXRun {
   run_id: string;
   run_attempt: number;
@@ -123,6 +169,9 @@ export interface CollectiveXRun {
   terminal_points: number;
   measured_points: number;
   covered_skus: string[];
+  /** kv-transfer case counts; absent on datasets read before the kv suite. */
+  kv_requested_cases?: number;
+  kv_measured_cases?: number;
 }
 
 export interface CollectiveXDataset {
@@ -130,6 +179,8 @@ export interface CollectiveXDataset {
   run: CollectiveXRun;
   coverage: CollectiveXCoverage[];
   series: CollectiveXSeries[];
+  /** kv-transfer cases; absent on datasets captured before the kv suite. */
+  kv?: CollectiveXKvCase[];
 }
 
 export interface CollectiveXRunSummary {
@@ -143,4 +194,6 @@ export interface CollectiveXRunSummary {
   requested_points: number;
   terminal_points: number;
   terminal_counts: { measured: number; unsupported: number; failed: number };
+  /** kv-transfer case counts; absent on summaries stored before the kv suite. */
+  kv_cases?: { requested: number; measured: number };
 }
