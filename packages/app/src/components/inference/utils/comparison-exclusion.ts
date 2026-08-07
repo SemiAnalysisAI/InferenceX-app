@@ -1,19 +1,34 @@
-import { getModelExclusion, getSequenceExclusion, Model, Sequence } from '@/lib/data-mappings';
-import { buildExclusion, type Exclusion } from '@/lib/exclusion';
+import {
+  getModelExclusion,
+  getSequenceDefaultExclusionGroup,
+  getSequenceExclusion,
+  getSequenceExclusionPolicy,
+} from '@/lib/data-mappings';
+import { buildExclusion, type Exclusion, type ExclusionConflictPolicy } from '@/lib/exclusion';
 
 /**
  * Preferred engine group when an official comparison first encounters multiple
- * valid groups and has no sticky user selection to preserve.
+ * valid groups and has no sticky user selection to preserve. Unofficial
+ * previews impose no guard, so they have no default either.
  */
 export function comparisonDefaultGroup(
-  model: Parameters<typeof getModelExclusion>[0],
   sequence: Parameters<typeof getSequenceExclusion>[0],
   isUnofficialRun: boolean,
 ): string | null {
-  if (!isUnofficialRun && model === Model.DeepSeek_V4_Pro && sequence === Sequence.AgenticTraces) {
-    return 'vllm';
-  }
-  return null;
+  if (isUnofficialRun) return null;
+  return getSequenceDefaultExclusionGroup(sequence);
+}
+
+/**
+ * How the current scenario resolves a multi-group selection. Scenarios that
+ * restrict standard-token engines keep one group so the chart still renders on
+ * load; variant-only rules (e.g. fixed-seq MTP alone) clear every conflicting
+ * group so those configs stay deselected until the user picks one.
+ */
+export function comparisonExclusionPolicy(
+  sequence: Parameters<typeof getSequenceExclusion>[0],
+): ExclusionConflictPolicy {
+  return getSequenceExclusionPolicy(sequence);
 }
 
 /**
