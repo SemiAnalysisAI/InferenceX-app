@@ -69,6 +69,7 @@ import {
 import { resolveComparisonEntries } from './utils/comparisonEntry';
 import {
   comparisonDefaultGroup,
+  comparisonExclusionPolicy,
   comparisonExclusion as resolveComparisonExclusion,
 } from './utils/comparison-exclusion';
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
@@ -146,11 +147,10 @@ export function InferenceProvider({
     [selectedModel, effectiveSequence, isUnofficialRun],
   );
   const defaultExclusionGroup = useMemo(
-    () => comparisonDefaultGroup(selectedModel, effectiveSequence, isUnofficialRun),
-    [selectedModel, effectiveSequence, isUnofficialRun],
+    () => comparisonDefaultGroup(effectiveSequence, isUnofficialRun),
+    [effectiveSequence, isUnofficialRun],
   );
-  const exclusionPolicy: ExclusionConflictPolicy =
-    sequenceKind(effectiveSequence) === 'agentic' ? 'keep-sticky' : 'clear-all';
+  const exclusionPolicy: ExclusionConflictPolicy = comparisonExclusionPolicy(effectiveSequence);
 
   // ── GPU comparison state (owned by inference, not global) ─────────────────
   const [selectedDates, setSelectedDates] = useState<string[]>(() => {
@@ -1083,8 +1083,9 @@ export function InferenceProvider({
     }
     if (exclusion) {
       // Automatic resets must never surface multiple incomparable engine groups.
-      // AgentX keeps one sticky group so its chart remains useful; variant-only
-      // rules retain the existing clear-all behavior.
+      // Scenarios that restrict standard-token engines (8K/1K, AgentX) keep one
+      // sticky group so their charts remain useful; variant-only rules retain
+      // the existing clear-all behavior.
       const { result, droppedGroups } = resolveHwSelection(hwTypesWithData);
       setActiveHwTypes(result);
       if (droppedGroups.length > 0) {

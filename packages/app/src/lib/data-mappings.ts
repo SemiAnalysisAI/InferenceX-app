@@ -1,4 +1,4 @@
-import type { ExclusionSpec } from './exclusion';
+import type { ExclusionConflictPolicy, ExclusionSpec } from './exclusion';
 
 export enum Model {
   Llama3_3_70B = 'Llama-3.3-70B-Instruct-FP8',
@@ -69,18 +69,33 @@ const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
 ];
 
 /**
- * AgentX STP exclusion: unsuffixed standard-token configs for the same hardware
+ * Base STP exclusion: unsuffixed standard-token configs for the same hardware
  * SKU can't mix engine families. Different hardware may use different engines
- * on one graph. Fixed-sequence STP comparisons remain available; this rule is
- * attached only to the Agentic Traces sequence.
+ * on one graph.
  */
-const AGENTIC_STP_ENGINE_EXCLUSION: ExclusionSpec[] = [
-  {
-    suffix: null,
-    stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
-    groupAliases: { atom: 'sglang' },
-    scope: 'hardware',
-  },
+const STP_ENGINE_EXCLUSION_BASE = {
+  suffix: null,
+  stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+  groupAliases: { atom: 'sglang' },
+  scope: 'hardware',
+} as const satisfies ExclusionSpec;
+
+/**
+ * AgentX STP exclusion: every engine family is its own comparability group
+ * (ATOM aliased onto SGLang) while the agentic benchmark is new.
+ */
+const AGENTIC_STP_ENGINE_EXCLUSION: ExclusionSpec[] = [STP_ENGINE_EXCLUSION_BASE];
+
+/**
+ * Fixed-sequence STP exclusion: vLLM and SGLang tune their standard-token
+ * runs against engine-specific serving paths, so their unsuffixed numbers
+ * aren't directly comparable on one graph — same rule the MTP configs and the
+ * agentic chart already enforce. Unlike the agentic rule this one is limited to
+ * those two groups, so TRTLLM (and any other family) stays freely selectable
+ * next to either of them.
+ */
+const FIXED_SEQ_STP_ENGINE_EXCLUSION: ExclusionSpec[] = [
+  { ...STP_ENGINE_EXCLUSION_BASE, participatingGroups: ['vllm', 'sglang'] },
 ];
 
 // Total parameter counts appended to each label so users can compare model
@@ -235,6 +250,19 @@ interface SequenceConfig {
   category: CategoryTag;
   kind: ScenarioKind;
   exclusion?: ExclusionSpec[];
+  /**
+   * How this scenario resolves a selection that spans several comparability
+   * groups. `clear-all` (the default) deselects every conflicting group so the
+   * user opts into one; `keep-sticky` keeps a single group so the chart still
+   * renders data on load.
+   */
+  exclusionPolicy?: ExclusionConflictPolicy;
+  /**
+   * Comparability group preferred when `keep-sticky` has to choose and the
+   * user has no prior selection to honor. Without it the tie-break is
+   * alphabetical, which would silently land on a different engine.
+   */
+  defaultExclusionGroup?: string;
 }
 
 const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
@@ -258,6 +286,9 @@ const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
     compact: '8k1k',
     category: 'default',
     kind: 'fixed-seq',
+    exclusion: FIXED_SEQ_STP_ENGINE_EXCLUSION,
+    exclusionPolicy: 'keep-sticky',
+    defaultExclusionGroup: 'vllm',
   },
   [Sequence.AgenticTraces]: {
     label: 'Agentic Traces',
@@ -266,6 +297,8 @@ const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
     category: 'default',
     kind: 'agentic',
     exclusion: AGENTIC_STP_ENGINE_EXCLUSION,
+    exclusionPolicy: 'keep-sticky',
+    defaultExclusionGroup: 'vllm',
   },
 };
 
@@ -275,6 +308,22 @@ export function getSequenceExclusion(
 ): ExclusionSpec[] {
   if (!sequence) return [];
   return SEQUENCE_CONFIG[sequence as Sequence]?.exclusion ?? [];
+}
+
+/** Multi-group conflict policy for a sequence. Defaults to `clear-all`. */
+export function getSequenceExclusionPolicy(
+  sequence: Sequence | string | null | undefined,
+): ExclusionConflictPolicy {
+  if (!sequence) return 'clear-all';
+  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusionPolicy ?? 'clear-all';
+}
+
+/** Preferred comparability group for a sequence, or null when unconfigured. */
+export function getSequenceDefaultExclusionGroup(
+  sequence: Sequence | string | null | undefined,
+): string | null {
+  if (!sequence) return null;
+  return SEQUENCE_CONFIG[sequence as Sequence]?.defaultExclusionGroup ?? null;
 }
 
 export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];
