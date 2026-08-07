@@ -15,6 +15,9 @@ import type {
   CollectiveXCoverage,
   CollectiveXCoveragePoint,
   CollectiveXDataset,
+  CollectiveXKvCase,
+  CollectiveXKvLatency,
+  CollectiveXKvRow,
   CollectiveXMode,
   CollectiveXOutcome,
   CollectiveXPercentiles,
@@ -39,6 +42,10 @@ interface RawCase {
   scale_up_domain: number;
   scale_up_transport: string;
   scale_out_transport: string | null;
+  /** `kv-transfer` on KV handoff cases; absent on EP cases. */
+  suite?: string;
+  /** KV workload preset name (e.g. `kv-dsv4`); absent on EP cases. */
+  workload?: string;
 }
 
 interface RawComponent {
@@ -54,8 +61,25 @@ interface RawRow {
   byte_provenance: Record<string, { activation_data_bytes: number; total_logical_bytes?: number }>;
 }
 
+// KV shards report per-burst rows instead of per-ladder-token rows; the two
+// families share the shard envelope and are told apart by `case.suite`.
+interface RawKvRow {
+  kind: string;
+  isl: number;
+  page_tokens: number | null;
+  batch?: number;
+  op: string;
+  descs: number;
+  req_bytes: number;
+  prep_ms?: number;
+  latency_ms: CollectiveXKvLatency;
+  gbps_p50: number;
+  verify?: { passed: boolean; detail?: string };
+}
+
 interface RawShard {
-  version: number;
+  /** Numeric in EP artifacts; the kv entrypoint emitted it as a string. */
+  version: number | string;
   record_type: 'case-attempt';
   identity: {
     case_id: string;
@@ -279,6 +303,81 @@ function terminalPoints(
   }));
 }
 
+function isKvCase(kase: RawCase): boolean {
+  return kase.suite === 'kv-transfer';
+}
+
+function mapKvRow(row: RawKvRow): CollectiveXKvRow {
+  return {
+    kind: row.kind === 'bulk' ? 'bulk' : 'paged',
+    isl: row.isl,
+    page_tokens: row.page_tokens ?? null,
+    // Rows predating the batch dimension measured one request per burst.
+    batch: row.batch ?? 1,
+    op: row.op === 'push' ? 'push' : 'pull',
+    descs: row.descs,
+    req_bytes: row.req_bytes,
+    prep_ms: row.prep_ms ?? 0,
+    latency_ms: row.latency_ms,
+    gbps_p50: row.gbps_p50,
+    verify_passed: row.verify?.passed ?? true,
+  };
+}
+
+function buildKvCases(
+  requestedCases: RawMatrix['requested_cases'],
+  successful: Map<string, SupportedShard>,
+  terminal: Map<string, SupportedShard>,
+  hiddenCaseIds: Set<string>,
+): CollectiveXKvCase[] {
+  return requestedCases.flatMap((requested) => {
+    const kase = requested.case;
+    const caseId = kase.case_id;
+    if (!isKvCase(kase) || !caseId || hiddenCaseIds.has(caseId)) return [];
+    const measured = successful.get(caseId);
+    const failed = terminal.get(caseId);
+    let outcome: CollectiveXOutcome;
+    let reason: string | null;
+    if (measured) {
+      outcome = 'success';
+      reason = null;
+    } else if (failed) {
+      outcome = toOutcome(failed.shard.outcome.status);
+      reason = reasonId(failed.shard.outcome.reasons?.[0] ?? outcome);
+    } else if (requested.disposition === 'unsupported') {
+      outcome = 'unsupported';
+      reason = reasonId(requested.reason ?? outcome);
+    } else {
+      outcome = 'pending';
+      reason = 'pending';
+    }
+    const fabric = kase.mode ?? 'rdma';
+    const workload = kase.workload ?? 'kv';
+    const precision = toPrecision(kase.precision);
+    const shard = measured ?? failed;
+    return [
+      {
+        case_id: caseId,
+        label: `${requested.sku} · ${kase.backend} · ${fabric} · ${workload} · ${precision}`,
+        disposition: requested.disposition,
+        sku: requested.sku,
+        vendor: shard?.vendor ?? null,
+        backend: kase.backend,
+        fabric,
+        workload,
+        precision,
+        topology: topologyOf(kase),
+        outcome,
+        reason,
+        detail: requested.detail ?? null,
+        rows: measured
+          ? (measured.shard.measurement.rows as unknown as RawKvRow[]).map(mapKvRow)
+          : [],
+      },
+    ];
+  });
+}
+
 export function buildDatasetFromNeutral(
   matrixRaw: unknown,
   docs: unknown[],
@@ -288,7 +387,7 @@ export function buildDatasetFromNeutral(
   const shards = docs.flatMap((doc) => {
     const shard = shardOf(doc);
     if (!shard) return [];
-    if (shard.version !== matrix.version) throw new Error('CollectiveX version mismatch');
+    if (Number(shard.version) !== matrix.version) throw new Error('CollectiveX version mismatch');
     return [shard];
   });
   const supportedShards = shards.flatMap((shard): SupportedShard[] => {
@@ -315,7 +414,7 @@ export function buildDatasetFromNeutral(
   const coverage: CollectiveXCoverage[] = matrix.requested_cases.flatMap((requested) => {
     const kase = requested.case;
     const caseId = kase.case_id;
-    if (!caseId || hiddenCaseIds.has(caseId)) return [];
+    if (isKvCase(kase) || !caseId || hiddenCaseIds.has(caseId)) return [];
     const measured = successful.get(caseId)?.shard;
     const failed = terminal.get(caseId)?.shard;
     let outcome: CollectiveXOutcome;
@@ -358,27 +457,43 @@ export function buildDatasetFromNeutral(
       },
     ];
   });
+  const kv = buildKvCases(matrix.requested_cases, successful, terminal, hiddenCaseIds);
   const points = coverage.flatMap((item) => item.points);
+  // KV cases count into the run's case totals (the run picker's visibility
+  // gate is `requested_cases > 0`, and a kv-only sweep is a real run), but
+  // carry no ladder points — point totals stay EP-only.
   return {
     version: matrix.version,
     run: {
       ...run,
-      requested_cases: coverage.length,
-      terminal_cases: coverage.filter((item) =>
-        item.points.every((point) => point.terminal_status !== 'pending'),
-      ).length,
-      measured_cases: coverage.filter((item) => item.outcome === 'success').length,
-      unsupported_cases: coverage.filter((item) => item.outcome === 'unsupported').length,
-      failed_cases: coverage.filter((item) =>
-        ['failed', 'invalid', 'diagnostic'].includes(item.outcome),
-      ).length,
+      requested_cases: coverage.length + kv.length,
+      terminal_cases:
+        coverage.filter((item) => item.points.every((point) => point.terminal_status !== 'pending'))
+          .length + kv.filter((item) => item.outcome !== 'pending').length,
+      measured_cases:
+        coverage.filter((item) => item.outcome === 'success').length +
+        kv.filter((item) => item.outcome === 'success').length,
+      unsupported_cases:
+        coverage.filter((item) => item.outcome === 'unsupported').length +
+        kv.filter((item) => item.outcome === 'unsupported').length,
+      failed_cases:
+        coverage.filter((item) => ['failed', 'invalid', 'diagnostic'].includes(item.outcome))
+          .length +
+        kv.filter((item) => ['failed', 'invalid', 'diagnostic'].includes(item.outcome)).length,
       requested_points: points.length,
       terminal_points: points.filter((point) => point.terminal_status !== 'pending').length,
       measured_points: points.filter((point) => point.terminal_status === 'measured').length,
-      covered_skus: [...new Set(coverage.map((item) => item.sku))].toSorted(),
+      covered_skus: [
+        ...new Set([...coverage.map((item) => item.sku), ...kv.map((item) => item.sku)]),
+      ].toSorted(),
+      kv_requested_cases: kv.length,
+      kv_measured_cases: kv.filter((item) => item.outcome === 'success').length,
     },
     coverage,
-    series: [...successful.values()].map(buildSeries),
+    series: [...successful.values()]
+      .filter(({ shard }) => !isKvCase(shard.identity.case_factors.case))
+      .map(buildSeries),
+    kv,
   };
 }
 
@@ -398,6 +513,10 @@ export function buildRunSummary(dataset: CollectiveXDataset): CollectiveXRunSumm
       measured: run.measured_cases,
       unsupported: run.unsupported_cases,
       failed: run.failed_cases,
+    },
+    kv_cases: {
+      requested: run.kv_requested_cases ?? 0,
+      measured: run.kv_measured_cases ?? 0,
     },
   };
 }
