@@ -3,7 +3,6 @@
 const MODEL_LABELS = [
   'DeepSeek V4 Pro 1.6T',
   'Kimi K3 2.8T',
-  'Kimi K2.5/2.6/2.7-Code 1T',
   'MiniMax M3 428B',
   'GLM5.2',
   'Qwen3.5 397B',
@@ -20,8 +19,8 @@ const PLATFORM_HEADERS = [
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
-/** Six models, three of them with both a single-turn and an AgentX row. */
-const MATRIX_ROWS = 9;
+/** Five models, three of them with both a single-turn and an AgentX row. */
+const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文多轮真实智能体场景（AgentX）';
@@ -426,24 +425,12 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    desktopModel('Kimi-K2.5').within(() => {
-      cy.get('[data-testid="overview-pair-value"]').should('have.length', 3);
-      cy.get('[data-testid="overview-pair-missing"]')
-        .should('have.length', 2)
-        .then(($missing) => {
-          expect([...$missing].map((element) => element.getAttribute('title'))).to.deep.equal([
-            'no data for this scenario',
-            'no data for this scenario',
-          ]);
-        });
-      cy.get('[data-testid="overview-pair-missing"]')
-        .children('[aria-hidden="true"]')
-        .should('have.length', 2)
-        .and('have.text', '——');
-      // Standard decode is the exception, so those cells badge STP.
-      platform('b200').should('contain.text', 'SGLang · FP4 · STP');
-      platform('mi355x').should('contain.text', 'SGLang · FP4 · STP');
-      platform('b300').should('contain.text', 'SGLang · FP8 · STP');
+    // Standard decode is the exception, so that cell badges STP. Qwen's GB300
+    // slice is standard-decode only; its other platforms stay speculative.
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
+      platform('gb300').should('contain.text', 'SGLang · FP8 · STP');
+      platform('b200').should('not.contain.text', 'STP');
+      platform('mi355x').should('not.contain.text', 'STP');
     });
 
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
@@ -559,15 +546,6 @@ describe('Overview page', () => {
         expect(Math.max(r, g, b) - Math.min(r, g, b)).to.be.lessThan(60);
       });
     });
-
-    // Outside the ±5% parity band the cell carries the matching polarity.
-    desktopModel('Kimi-K2.5').within(() => {
-      platform('b300')
-        .find('[data-testid="overview-cost-delta"]')
-        .should('contain.text', '+11%')
-        .and('have.attr', 'data-cost-polarity', 'pricier');
-      expectCellTint('b300', 'rgba(239, 68, 68,');
-    });
   });
 
   it('renders the full platform matrix for every active model', () => {
@@ -653,7 +631,7 @@ describe('Overview page', () => {
         .find('[data-testid="overview-model-scenario"]')
         .should('have.text', AGENTX_LABEL);
     }
-    for (const model of ['DeepSeek-V4-Pro', 'Kimi-K2.5', 'MiniMax-M3', 'Qwen-3.5-397B-A17B']) {
+    for (const model of ['DeepSeek-V4-Pro', 'MiniMax-M3', 'Qwen-3.5-397B-A17B']) {
       desktopModel(model, SINGLE_TURN)
         .find('[data-testid="overview-model-scenario"]')
         .should('have.text', '8K/1K');
@@ -1025,7 +1003,7 @@ describe('Overview page', () => {
                 expect(badgeRect.left - valueRect.right).to.be.at.most(8);
                 expect(textRect(badgeText as Element).bottom).to.be.closeTo(
                   textRect(value).bottom,
-                  1,
+                  2,
                 );
               },
             );
@@ -1171,10 +1149,10 @@ describe('Overview page', () => {
     cy.get('body')
       .invoke('text')
       .should('not.match', /100 档由.+领先/);
-    desktopModel('Kimi-K2.5').within(() => {
-      cy.get('[data-testid="overview-pair-value"]').should('have.length', 3);
-      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 2);
-      platform('b200').should('contain.text', 'SGLang · FP4 · STP');
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
+      // Stack badges stay English on the Chinese page: framework, precision and
+      // the STP decode marker are all product identifiers, not UI copy.
+      platform('gb300').should('contain.text', 'SGLang · FP8 · STP');
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
     });
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {

@@ -168,7 +168,7 @@ From the model name, derive (MiniMax M3 shown as the worked example):
 
 ### Verify
 
-`bun run typecheck && bun run lint && bun run fmt && bun run test:unit`, then `rg` for the old slug to confirm only the intentional hidden preset + blog links remain. Final gate: `bun run test:e2e` and a manual `bun run dev` check that the banner/modal/preset read `DISPLAY` and `/inference?preset=SLUG-launch` renders data.
+`bun run typecheck && bun run lint && bun run fmt && bun run test:unit`, then `rg` for the old slug to confirm only the intentional hidden preset + blog links remain. Final gate: `bun run test:e2e:full` and a manual `bun run dev` check that the banner/modal/preset read `DISPLAY` and `/inference?preset=SLUG-launch` renders data.
 
 ---
 

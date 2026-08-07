@@ -26,6 +26,7 @@
     "fmt:fix": "oxfmt --write --no-error-on-unmatched-pattern",
     "test": "bun run --cwd packages/app test",
     "test:e2e": "bun run --cwd packages/app test:e2e",
+    "test:e2e:full": "bun run --cwd packages/app test:e2e:full",
     "test:e2e:component": "bun run --cwd packages/app test:e2e:component",
     "test:e2e:integration": "bun run --cwd packages/app test:e2e:integration",
     "test:unit": "bun scripts/run-workspace-script.ts test:unit",

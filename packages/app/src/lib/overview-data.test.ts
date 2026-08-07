@@ -1252,12 +1252,12 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     );
 
     // Curated scenarios: DeepSeek, MiniMax and Qwen each get both rows, Kimi
-    // K3 and GLM are AgentX-only, Kimi K2.5 is single-turn only.
+    // K3 and GLM are AgentX-only. Kimi K2.5 is absent — deprecated models are
+    // not default models, and the matrix is built from DEFAULT_MODELS.
     expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([
       `${Model.DeepSeek_V4_Pro}/single_turn_8k1k`,
       `${Model.DeepSeek_V4_Pro}/agentx`,
       `${Model.Kimi_K3}/agentx`,
-      `${Model.Kimi_K2_5}/single_turn_8k1k`,
       `${Model.MiniMax_M3}/single_turn_8k1k`,
       `${Model.MiniMax_M3}/agentx`,
       `${Model.GLM_5_2}/agentx`,
@@ -1363,27 +1363,18 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(qwenB300.baseline.precision).toBe(Precision.FP4);
     expect(qwenB300.baseline.read.value).toBeCloseTo(6602.344);
 
-    // Kimi: standard-only rows remain visible as explicitly labelled fallbacks.
-    const kimi = page.models.find((m) => m.model === Model.Kimi_K2_5)!;
-    const kimiMi = headlinePairOf(kimi, 'mi355x-vs-b200')!;
-    expect(kimiMi.candidate.precision).toBe(Precision.FP4);
-    expect(kimiMi.candidate.read).toMatchObject({
-      value: 8600,
-      config: { specMethod: 'none' },
-    });
-    expect(kimiMi.candidate.missingReason).toBeNull();
-    expect(kimiMi.baseline.precision).toBe(Precision.FP4);
-    expect(kimiMi.baseline.read).toMatchObject({
-      value: 7200,
-      config: { specMethod: 'none' },
-    });
-    const kimiB300 = headlinePairOf(kimi, 'b300-vs-b200')!;
-    expect(kimiB300.candidate.precision).toBe(Precision.FP8);
-    expect(kimiB300.candidate.read).toMatchObject({
+    // Standard-decode-only rows remain visible as explicitly labelled
+    // fallbacks: Qwen's GB300 slice has no speculative read, so the platform
+    // resolves to its STP row rather than reporting missing data. Each platform
+    // is selected independently, so the B200 baseline still picks its own
+    // best (speculative) read.
+    const qwenGb300 = headlinePairOf(qwen, 'gb300-vs-b200')!;
+    expect(qwenGb300.candidate.precision).toBe(Precision.FP8);
+    expect(qwenGb300.candidate.read).toMatchObject({
       value: 8460,
       config: { specMethod: 'none' },
     });
-    expect(kimiB300.candidate.missingReason).toBeNull();
+    expect(qwenGb300.candidate.missingReason).toBeNull();
 
     // GLM's AgentX fixture lacks valid P90 metrics, so it cannot produce a tier read.
     const glm = page.models.find((m) => m.model === Model.GLM_5_2)!;

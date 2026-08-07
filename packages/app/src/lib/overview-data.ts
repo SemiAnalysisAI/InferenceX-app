@@ -249,7 +249,6 @@ const OVERVIEW_MODEL_SCENARIOS: Partial<Record<Model, readonly OverviewScenario[
   [Model.DeepSeek_V4_Pro]: ['single_turn_8k1k', 'agentx'],
   [Model.MiniMax_M3]: ['single_turn_8k1k', 'agentx'],
   [Model.Qwen3_5]: ['single_turn_8k1k', 'agentx'],
-  [Model.Kimi_K2_5]: ['single_turn_8k1k'],
   [Model.Kimi_K3]: ['agentx'],
   [Model.GLM_5_2]: ['agentx'],
 };
