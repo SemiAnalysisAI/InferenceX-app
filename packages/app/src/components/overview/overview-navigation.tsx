@@ -106,6 +106,10 @@ export function OverviewNavigationProvider({
 
   useEffect(() => {
     const handlePopState = () => {
+      if (window.location.pathname !== '/overview' && window.location.pathname !== '/zh/overview') {
+        ++navigationIdRef.current;
+        return;
+      }
       const href = `${window.location.pathname}${window.location.search}${window.location.hash}`;
       commit(href, false);
     };

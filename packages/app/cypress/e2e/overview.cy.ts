@@ -176,6 +176,32 @@ describe('Overview page', () => {
     });
   });
 
+  it('leaves overview through browser history without requesting overview data', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+    cy.intercept('GET', '**/api/v1/overview*').as('overviewJson');
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    cy.wait('@overviewJson');
+    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75');
+
+    cy.window().then((win) => {
+      let overviewRequests = 0;
+      const fetch = win.fetch.bind(win);
+      cy.stub(win, 'fetch').callsFake((input, init) => {
+        const url = input instanceof win.Request ? input.url : input.toString();
+        if (url.startsWith('/api/v1/overview')) {
+          overviewRequests += 1;
+          return new Promise<Response>(() => {});
+        }
+        return fetch(input, init);
+      });
+
+      win.history.pushState(win.history.state, '', '/inference');
+      win.dispatchEvent(new win.PopStateEvent('popstate', { state: win.history.state }));
+      expect(overviewRequests, 'overview requests after leaving overview').to.equal(0);
+    });
+  });
+
   it('preserves pending selections when controls are changed rapidly', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
