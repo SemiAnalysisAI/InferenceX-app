@@ -92,6 +92,28 @@ describe('rowToAggDataEntry', () => {
     expect(entry.rawMetricKeys).toContain('median_ttft');
   });
 
+  it('prefers full-response AgentX ITL and interactivity for artifact overlays', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        benchmark_type: 'agentic_traces',
+        metrics: {
+          median_itl: 0.000003,
+          median_intvty: 333_333,
+          median_full_response_itl: 0.005,
+          median_full_response_intvty: 200,
+          std_full_response_itl: 0.001,
+          std_full_response_intvty: 20,
+        },
+      }),
+    );
+
+    expect(entry.median_itl).toBe(0.005);
+    expect(entry.median_tpot).toBe(0.005);
+    expect(entry.median_intvty).toBe(200);
+    expect(entry.std_itl).toBe(0.001);
+    expect(entry.std_intvty).toBe(20);
+  });
+
   it('defaults missing metrics to 0', () => {
     const entry = rowToAggDataEntry(makeRow({ metrics: {} }));
     expect(entry.tput_per_gpu).toBe(0);

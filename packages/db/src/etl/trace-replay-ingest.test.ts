@@ -44,6 +44,12 @@ function preparedFixture(): PreparedTraceReplay {
     compressionMs: 10,
     computeMs: 20,
     cacheHitRates: null,
+    fullResponseMetrics: {
+      median_full_response_itl: 0.005,
+      median_full_response_intvty: 200,
+      median_itl: 0.005,
+      median_intvty: 200,
+    },
   };
 }
 
@@ -149,5 +155,9 @@ describe('persistPreparedTraceReplay', () => {
       calls.filter((call) => call.text.includes('trace_replay_upload_parts (field, part, data)')),
     ).toHaveLength(6);
     expect(linkCall?.values.some((value) => Array.isArray(value) && value.includes(41))).toBe(true);
+    const metricUpdate = calls.find((call) =>
+      call.text.includes("not (metrics ? 'median_full_response_itl')"),
+    );
+    expect(metricUpdate?.values).toContain(JSON.stringify(preparedFixture().fullResponseMetrics));
   });
 });

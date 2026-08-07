@@ -33,6 +33,7 @@ function fingerprint(prepared: PreparedTraceReplay) {
     chartWindows: prepared.chartWindows,
     timelineRequests: prepared.timelineRequests,
     cacheHitRates: prepared.cacheHitRates,
+    fullResponseMetrics: prepared.fullResponseMetrics,
   };
 }
 

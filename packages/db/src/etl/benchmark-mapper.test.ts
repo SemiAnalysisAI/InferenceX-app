@@ -908,6 +908,36 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(m.std_intvty).toBeCloseTo(24.77636, 6);
   });
 
+  it('makes full-response ITL canonical when the aggregate provides it', () => {
+    const tracker = createSkipTracker();
+    const row = makeV3AgenticRow();
+    row.request_metrics.latency.itl.p99 = 0.2;
+    row.request_metrics.latency.intvty.p99 = 5;
+    row.request_metrics.latency.full_response_itl = {
+      mean: 0.005,
+      p50: 0.004,
+      p75: 0.006,
+      std: 0.001,
+    };
+    row.request_metrics.latency.full_response_intvty = {
+      mean: 200,
+      p50: 250,
+      p75: 166.666667,
+      std: 20,
+    };
+
+    const metrics = mapBenchmarkRow(row, tracker)!.metrics;
+
+    expect(metrics.median_full_response_itl).toBe(0.004);
+    expect(metrics.p75_full_response_itl).toBe(0.006);
+    expect(metrics.median_itl).toBe(0.004);
+    expect(metrics.p75_intvty).toBeCloseTo(1 / 0.006, 6);
+    expect(metrics.std_itl).toBe(0.001);
+    expect(metrics.std_intvty).toBe(20);
+    expect(metrics).not.toHaveProperty('p99_itl');
+    expect(metrics).not.toHaveProperty('p99_intvty');
+  });
+
   it("maps kv_offloading 'none' to offload off and skips the empty backend", () => {
     const tracker = createSkipTracker();
     const result = mapBenchmarkRow(makeV3AgenticRow(), tracker);
