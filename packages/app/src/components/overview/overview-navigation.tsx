@@ -10,13 +10,14 @@ import {
   useMemo,
   useRef,
   useState,
-  useTransition,
 } from 'react';
 
 import { notifyClientSearchChange } from '@/lib/client-navigation';
+import type { OverviewPageData } from '@/lib/overview-data';
 import { mergeOverviewControlHref, type OverviewSearchKey } from '@/lib/overview-links';
 
 interface OverviewNavigationValue {
+  data: OverviewPageData;
   prefetch: (targetHref: string, keys: readonly OverviewSearchKey[]) => void;
   resolve: (targetHref: string, keys: readonly OverviewSearchKey[]) => string;
   push: (targetHref: string, keys: readonly OverviewSearchKey[]) => void;
@@ -25,33 +26,92 @@ interface OverviewNavigationValue {
 const OverviewNavigationContext = createContext<OverviewNavigationValue | null>(null);
 
 export function OverviewNavigationProvider({
+  initialData,
   initialHref,
   children,
 }: {
+  initialData: OverviewPageData;
   initialHref: string;
   children: ReactNode;
 }) {
   const router = useRouter();
+  const [data, setData] = useState(initialData);
   const [pendingHref, setPendingHref] = useState(initialHref);
   const pendingHrefRef = useRef(initialHref);
-  const [isPending, startTransition] = useTransition();
+  const committedHrefRef = useRef(initialHref);
+  const navigationIdRef = useRef(0);
+  const dataCacheRef = useRef(new Map<string, OverviewPageData>([[initialHref, initialData]]));
+  const requestCacheRef = useRef(new Map<string, Promise<OverviewPageData>>());
 
-  const resetToLocation = useCallback(() => {
-    const href = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    pendingHrefRef.current = href;
-    setPendingHref(href);
+  const load = useCallback((href: string): Promise<OverviewPageData> => {
+    const cached = dataCacheRef.current.get(href);
+    if (cached !== undefined) return Promise.resolve(cached);
+
+    const pending = requestCacheRef.current.get(href);
+    if (pending !== undefined) return pending;
+
+    const url = new URL(href, window.location.origin);
+    const request = fetch(`/api/v1/overview${url.search}`, {
+      headers: { Accept: 'application/json' },
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Overview request failed (${response.status})`);
+        const nextData = (await response.json()) as OverviewPageData;
+        dataCacheRef.current.set(href, nextData);
+        return nextData;
+      })
+      .finally(() => requestCacheRef.current.delete(href));
+
+    requestCacheRef.current.set(href, request);
+    return request;
   }, []);
 
-  useEffect(() => {
-    window.addEventListener('popstate', resetToLocation);
-    return () => window.removeEventListener('popstate', resetToLocation);
-  }, [resetToLocation]);
+  const commit = useCallback(
+    (href: string, updateHistory: boolean) => {
+      const navigationId = ++navigationIdRef.current;
+      pendingHrefRef.current = href;
+      setPendingHref(href);
+      if (updateHistory) {
+        window.history.pushState(window.history.state, '', href);
+        notifyClientSearchChange(href);
+      }
+
+      void load(href)
+        .then((nextData) => {
+          if (navigationId !== navigationIdRef.current) return;
+          committedHrefRef.current = href;
+          setData(nextData);
+        })
+        .catch(() => {
+          if (navigationId !== navigationIdRef.current) return;
+          if (updateHistory) {
+            window.history.replaceState(window.history.state, '', committedHrefRef.current);
+            notifyClientSearchChange(committedHrefRef.current);
+            router.push(href, { scroll: false });
+          } else {
+            window.location.reload();
+          }
+        });
+    },
+    [load, router],
+  );
 
   useEffect(() => {
-    if (isPending) return;
+    dataCacheRef.current.set(initialHref, initialData);
+    committedHrefRef.current = initialHref;
     pendingHrefRef.current = initialHref;
     setPendingHref(initialHref);
-  }, [initialHref, isPending]);
+    setData(initialData);
+  }, [initialData, initialHref]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const href = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      commit(href, false);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [commit]);
 
   const resolve = useCallback(
     (targetHref: string, keys: readonly OverviewSearchKey[]) =>
@@ -61,19 +121,18 @@ export function OverviewNavigationProvider({
 
   const value = useMemo<OverviewNavigationValue>(
     () => ({
+      data,
       resolve,
       prefetch: (targetHref, keys) => {
-        router.prefetch(mergeOverviewControlHref(pendingHrefRef.current, targetHref, keys));
+        const href = mergeOverviewControlHref(pendingHrefRef.current, targetHref, keys);
+        void load(href).catch(() => undefined);
       },
       push: (targetHref, keys) => {
         const href = mergeOverviewControlHref(pendingHrefRef.current, targetHref, keys);
-        pendingHrefRef.current = href;
-        setPendingHref(href);
-        notifyClientSearchChange(href);
-        startTransition(() => router.push(href, { scroll: false }));
+        commit(href, true);
       },
     }),
-    [resolve, router],
+    [commit, data, load, resolve],
   );
 
   return (
