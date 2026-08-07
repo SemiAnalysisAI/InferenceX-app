@@ -73,6 +73,7 @@ import {
   comparisonExclusion as resolveComparisonExclusion,
 } from './utils/comparison-exclusion';
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
+import { trackedConfigIdentity } from './utils/point-identity';
 import {
   EMPTY_QUICK_FILTERS,
   parseDeploymentModes,
@@ -554,27 +555,26 @@ export function InferenceProvider({
   }, [availabilityRows, dbModelKeys, effectiveSequence, effectivePrecisions, selectedModel]);
 
   // --- Tracked config functions ---
-  const buildTrackedConfigId = useCallback((point: InferenceData): string => {
-    let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}`;
-    if (point.disagg) {
-      key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;
-    }
-    return key;
-  }, []);
-
   const addTrackedConfig = useCallback(
     (point: InferenceData, chartType: string) => {
       setTrackedConfigs((prev) => {
-        const id = buildTrackedConfigId(point);
+        const id = trackedConfigIdentity(point);
         if (prev.some((c) => c.id === id)) {
           return prev.filter((c) => c.id !== id);
         }
         if (prev.length >= 6) return prev;
 
         const hwConfig = hardwareConfig[point.hwKey];
-        const label = hwConfig
+        let label = hwConfig
           ? `${getDisplayLabel(hwConfig)} — TP${point.tp} conc=${point.conc} ${point.precision.toUpperCase()}`
           : `${point.hwKey} — TP${point.tp} conc=${point.conc} ${point.precision.toUpperCase()}`;
+        if (point.benchmark_type === 'agentic_traces') {
+          const specLabel =
+            point.spec_decoding && point.spec_decoding !== 'none'
+              ? point.spec_decoding.toUpperCase()
+              : 'STP';
+          label += ` ${specLabel}`;
+        }
 
         const color = TABLEAU_10[prev.length % TABLEAU_10.length];
         return [
@@ -591,11 +591,13 @@ export function InferenceProvider({
             disagg: point.disagg,
             num_prefill_gpu: point.num_prefill_gpu,
             num_decode_gpu: point.num_decode_gpu,
+            benchmark_type: point.benchmark_type,
+            spec_decoding: point.spec_decoding,
           },
         ];
       });
     },
-    [buildTrackedConfigId, hardwareConfig],
+    [hardwareConfig],
   );
 
   const removeTrackedConfig = useCallback((id: string) => {

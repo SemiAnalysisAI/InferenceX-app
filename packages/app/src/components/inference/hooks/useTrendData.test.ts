@@ -1,25 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import type { InferenceData, TrackedConfig, TrendDataPoint } from '@/components/inference/types';
-
-// ─── Re-implement the pure functions from useTrendData.ts for testing ───
-// These are module-private in the hook, so we replicate them here to verify behavior.
-
-function buildMatchKey(config: TrackedConfig): string {
-  let key = `${config.hwKey}|${config.precision}|${config.tp}|${config.conc}`;
-  if (config.disagg) {
-    key += `|disagg|${config.num_prefill_gpu ?? 0}|${config.num_decode_gpu ?? 0}`;
-  }
-  return key;
-}
-
-function buildPointMatchKey(point: InferenceData): string {
-  let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}`;
-  if (point.disagg) {
-    key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;
-  }
-  return key;
-}
+import { trackedConfigIdentity } from '@/components/inference/utils/point-identity';
 
 function buildTrendLines(
   accumulator: Map<string, Map<string, TrendDataPoint>>,
@@ -73,10 +55,10 @@ function makePoint(overrides: Partial<InferenceData> = {}): InferenceData {
 
 // ─── Tests ───
 
-describe('buildMatchKey', () => {
+describe('trackedConfigIdentity for tracked configs', () => {
   it('builds a key from config fields', () => {
     const config = makeConfig();
-    expect(buildMatchKey(config)).toBe('h100|fp8|8|64');
+    expect(trackedConfigIdentity(config)).toBe('h100|fp8|8|64');
   });
 
   it('includes disagg fields when disagg is true', () => {
@@ -85,24 +67,24 @@ describe('buildMatchKey', () => {
       num_prefill_gpu: 2,
       num_decode_gpu: 6,
     });
-    expect(buildMatchKey(config)).toBe('h100|fp8|8|64|disagg|2|6');
+    expect(trackedConfigIdentity(config)).toBe('h100|fp8|8|64|disagg|2|6');
   });
 
   it('uses 0 for missing disagg GPU counts', () => {
     const config = makeConfig({ disagg: true });
-    expect(buildMatchKey(config)).toBe('h100|fp8|8|64|disagg|0|0');
+    expect(trackedConfigIdentity(config)).toBe('h100|fp8|8|64|disagg|0|0');
   });
 
   it('does not include disagg when disagg is false', () => {
     const config = makeConfig({ disagg: false });
-    expect(buildMatchKey(config)).toBe('h100|fp8|8|64');
+    expect(trackedConfigIdentity(config)).toBe('h100|fp8|8|64');
   });
 });
 
-describe('buildPointMatchKey', () => {
+describe('trackedConfigIdentity for chart points', () => {
   it('builds a key from data point fields', () => {
     const point = makePoint();
-    expect(buildPointMatchKey(point)).toBe('h100|fp8|8|64');
+    expect(trackedConfigIdentity(point)).toBe('h100|fp8|8|64');
   });
 
   it('includes disagg fields for disaggregated points', () => {
@@ -111,7 +93,7 @@ describe('buildPointMatchKey', () => {
       num_prefill_gpu: 1,
       num_decode_gpu: 7,
     });
-    expect(buildPointMatchKey(point)).toBe('h100|fp8|8|64|disagg|1|7');
+    expect(trackedConfigIdentity(point)).toBe('h100|fp8|8|64|disagg|1|7');
   });
 
   it('produces the same key as buildMatchKey for matching config and point', () => {
@@ -127,13 +109,13 @@ describe('buildPointMatchKey', () => {
       tp: 4,
       conc: 128,
     });
-    expect(buildPointMatchKey(point)).toBe(buildMatchKey(config));
+    expect(trackedConfigIdentity(point)).toBe(trackedConfigIdentity(config));
   });
 
   it('produces different keys for different configs', () => {
     const point1 = makePoint({ hwKey: 'h100', tp: 8 });
     const point2 = makePoint({ hwKey: 'h200', tp: 8 });
-    expect(buildPointMatchKey(point1)).not.toBe(buildPointMatchKey(point2));
+    expect(trackedConfigIdentity(point1)).not.toBe(trackedConfigIdentity(point2));
   });
 });
 
@@ -305,24 +287,55 @@ describe('match key consistency between config and point', () => {
       num_prefill_gpu: 4,
       num_decode_gpu: 68,
     });
-    expect(buildPointMatchKey(point)).toBe(buildMatchKey(config));
+    expect(trackedConfigIdentity(point)).toBe(trackedConfigIdentity(config));
   });
 
   it('non-disagg config does not match disagg point', () => {
     const config = makeConfig({ disagg: false });
     const point = makePoint({ disagg: true, num_prefill_gpu: 2, num_decode_gpu: 6 });
-    expect(buildPointMatchKey(point)).not.toBe(buildMatchKey(config));
+    expect(trackedConfigIdentity(point)).not.toBe(trackedConfigIdentity(config));
   });
 
   it('different concurrency values produce different keys', () => {
     const config1 = makeConfig({ conc: 64 });
     const config2 = makeConfig({ conc: 128 });
-    expect(buildMatchKey(config1)).not.toBe(buildMatchKey(config2));
+    expect(trackedConfigIdentity(config1)).not.toBe(trackedConfigIdentity(config2));
   });
 
   it('different TP values produce different keys', () => {
     const config1 = makeConfig({ tp: 4 });
     const config2 = makeConfig({ tp: 8 });
-    expect(buildMatchKey(config1)).not.toBe(buildMatchKey(config2));
+    expect(trackedConfigIdentity(config1)).not.toBe(trackedConfigIdentity(config2));
+  });
+
+  it('keeps agentic MTP and standard-decoding configs distinct', () => {
+    const standard = makeConfig({
+      benchmark_type: 'agentic_traces',
+      spec_decoding: 'none',
+    });
+    const mtp = makeConfig({
+      benchmark_type: 'agentic_traces',
+      spec_decoding: 'mtp',
+    });
+
+    expect(trackedConfigIdentity(standard)).not.toBe(trackedConfigIdentity(mtp));
+  });
+
+  it('matches an agentic tracked config only to the same point-level decode method', () => {
+    const config = makeConfig({
+      benchmark_type: 'agentic_traces',
+      spec_decoding: 'mtp',
+    });
+    const mtpPoint = makePoint({
+      benchmark_type: 'agentic_traces',
+      spec_decoding: 'mtp',
+    });
+    const standardPoint = makePoint({
+      benchmark_type: 'agentic_traces',
+      spec_decoding: 'none',
+    });
+
+    expect(trackedConfigIdentity(mtpPoint)).toBe(trackedConfigIdentity(config));
+    expect(trackedConfigIdentity(standardPoint)).not.toBe(trackedConfigIdentity(config));
   });
 });

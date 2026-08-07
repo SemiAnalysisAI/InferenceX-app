@@ -888,6 +888,9 @@ export interface TrackedConfig {
   disagg?: boolean;
   num_prefill_gpu?: number;
   num_decode_gpu?: number;
+  /** Scenario and point-level decode method used to match mixed agentic curves exactly. */
+  benchmark_type?: string;
+  spec_decoding?: string;
 }
 
 /**

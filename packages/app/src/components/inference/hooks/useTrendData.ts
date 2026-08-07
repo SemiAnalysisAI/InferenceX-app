@@ -14,24 +14,10 @@ import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import type { Model, Sequence } from '@/lib/data-mappings';
 import { computeInputCostFields, computeOutputCostFields } from '@/lib/utils';
 
+import { trackedConfigIdentity } from '../utils/point-identity';
+
 function computeAllCostFields(data: InferenceData[]): InferenceData[] {
   return computeInputCostFields(computeOutputCostFields(data));
-}
-
-function buildMatchKey(config: TrackedConfig): string {
-  let key = `${config.hwKey}|${config.precision}|${config.tp}|${config.conc}`;
-  if (config.disagg) {
-    key += `|disagg|${config.num_prefill_gpu ?? 0}|${config.num_decode_gpu ?? 0}`;
-  }
-  return key;
-}
-
-function buildPointMatchKey(point: InferenceData): string {
-  let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}`;
-  if (point.disagg) {
-    key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;
-  }
-  return key;
 }
 
 interface UseTrendDataResult {
@@ -78,12 +64,6 @@ export function useTrendData(
       rowsByDate.get(row.date)!.push(row);
     }
 
-    // Build match keys for configs
-    const configMatchKeys = new Map<string, TrackedConfig>();
-    for (const config of trackedConfigs) {
-      configMatchKeys.set(buildMatchKey(config), config);
-    }
-
     // Accumulate trend data per config per date
     const accumulator = new Map<string, Map<string, TrendDataPoint>>();
 
@@ -98,13 +78,13 @@ export function useTrendData(
         // Build lookup by match key
         const pointsByKey = new Map<string, InferenceData>();
         for (const point of processed) {
-          const key = buildPointMatchKey(point);
+          const key = trackedConfigIdentity(point);
           if (!pointsByKey.has(key)) pointsByKey.set(key, point);
         }
 
         // Match tracked configs
         for (const config of trackedConfigs.filter((c) => c.chartType === chartType)) {
-          const matchKey = buildMatchKey(config);
+          const matchKey = trackedConfigIdentity(config);
           const point = pointsByKey.get(matchKey);
           if (!point) continue;
 
