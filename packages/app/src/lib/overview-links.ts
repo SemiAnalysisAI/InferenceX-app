@@ -115,6 +115,47 @@ export function buildOverviewDashboardHref(
   return `${inferenceRoute(locale)}?${query}`;
 }
 
+function uniqueValues(values: readonly string[]): string {
+  return [...new Set(values)].join(',');
+}
+
+/**
+ * Dashboard view for one Overview 30-day cell. The two independently ranked
+ * serving envelopes are carried explicitly so the chart can show exactly the
+ * curves behind the percentage even when engine, precision, or topology changed.
+ */
+export function buildOverviewHistoryDashboardHref(
+  locale: 'en' | 'zh',
+  model: OverviewModelSummary,
+  current: OverviewConfigResult,
+  baseline: OverviewConfigResult,
+): string {
+  const currentRun = soleSourceRun(current);
+  const baselineRun = soleSourceRun(baseline);
+  const params: UrlStateParams = {
+    g_model: model.model,
+    g_rundate: current.latestDate,
+    g_runid: currentRun?.id,
+    i_seq: overviewSequence(model),
+    i_prec: uniqueValues([current.precision, baseline.precision]),
+    i_metric: 'y_costh',
+    i_xmode: 'interactivity',
+    i_gpus: uniqueValues([current.hwKey, baseline.hwKey]),
+    i_dates:
+      baselineRun === null ? baseline.latestDate : `${baseline.latestDate}~r${baselineRun.id}`,
+    i_overview_current: current.key,
+    i_overview_baseline: baseline.key,
+    i_optimal: '1',
+    i_advlabel: '1',
+  };
+
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) query.set(key, value);
+  }
+  return `${inferenceRoute(locale)}?${query}`;
+}
+
 /**
  * Model-level dashboard view: precision-neutral, because the two headline pairs
  * may select different precisions. Result-level evidence links narrow further.

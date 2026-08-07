@@ -66,7 +66,7 @@ import {
   X_AXIS_MODES,
   type XAxisMode,
 } from './hooks/useChartData';
-import { resolveComparisonEntries } from './utils/comparisonEntry';
+import { buildActiveComparisonIds, resolveComparisonEntries } from './utils/comparisonEntry';
 import {
   comparisonDefaultGroup,
   comparisonExclusionPolicy,
@@ -142,9 +142,23 @@ export function InferenceProvider({
 
   const { getUrlParam, setUrlParam } = useUrlState();
 
+  const overviewHistoryPair = useMemo(() => {
+    const currentConfigKey = getUrlParam('i_overview_current');
+    const baselineConfigKey = getUrlParam('i_overview_baseline');
+    return currentConfigKey && baselineConfigKey
+      ? { currentConfigKey, baselineConfigKey }
+      : undefined;
+  }, [getUrlParam]);
+
   const exclusion = useMemo(
-    () => resolveComparisonExclusion(selectedModel, effectiveSequence, isUnofficialRun),
-    [selectedModel, effectiveSequence, isUnofficialRun],
+    () =>
+      resolveComparisonExclusion(
+        selectedModel,
+        effectiveSequence,
+        isUnofficialRun,
+        overviewHistoryPair !== undefined,
+      ),
+    [selectedModel, effectiveSequence, isUnofficialRun, overviewHistoryPair],
   );
   const defaultExclusionGroup = useMemo(
     () => comparisonDefaultGroup(effectiveSequence, isUnofficialRun),
@@ -489,6 +503,7 @@ export function InferenceProvider({
     selectedXAxisMode,
     asOfRunId,
     dataQuickFilters,
+    overviewHistoryPair,
   );
 
   // For GPU comparison date picker — use shared availability data from global filters
@@ -962,12 +977,12 @@ export function InferenceProvider({
 
   const allDateIds = useMemo(() => {
     const dates = resolveComparisonEntries(selectedDates, selectedDateRange);
-    const allIds = new Set<string>();
-    selectedGPUs.forEach((gpu) => {
-      dates.forEach((date) => allIds.add(`${date}_${gpu}`));
-    });
-    return allIds;
-  }, [selectedDateRange, selectedDates, selectedGPUs]);
+    return buildActiveComparisonIds(
+      selectedGPUs,
+      dates,
+      overviewHistoryPair === undefined ? undefined : effectiveRunDate,
+    );
+  }, [selectedDateRange, selectedDates, selectedGPUs, overviewHistoryPair, effectiveRunDate]);
 
   const toggleActiveDate = useCallback(
     (id: string) => toggleDateRaw(id, allDateIds),

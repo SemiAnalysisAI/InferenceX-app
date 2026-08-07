@@ -118,6 +118,8 @@ export interface OverviewHistoricalComparison {
   baselineCostPerMtok: number | null;
   costDeltaPct: number | null;
   baselineDate: string | null;
+  /** Exact serving envelope that produced the historical value. */
+  baselineConfig: OverviewConfigResult | null;
 }
 
 export interface OverviewPlatformResult {
@@ -292,7 +294,13 @@ function overviewScenarioRows(
   );
 }
 
-function overviewServingSeriesKey(row: BenchmarkRow): string {
+export type OverviewServingSeriesRow = Pick<
+  BenchmarkRow,
+  'model' | 'hardware' | 'framework' | 'spec_method' | 'precision' | 'disagg' | 'is_multinode'
+> & { offload_mode?: string | null };
+
+/** Stable identity for one Overview serving envelope across topology points. */
+export function overviewServingSeriesKey(row: OverviewServingSeriesRow): string {
   return JSON.stringify([
     row.model,
     row.hardware,
@@ -725,6 +733,7 @@ export function assembleOverviewHistoricalPageData(
               baselineCostPerMtok: previous?.costPerMtok ?? null,
               costDeltaPct: null,
               baselineDate: previous === undefined ? null : overviewTierEvidenceDate(previous.read),
+              baselineConfig: previous?.read.config ?? null,
             },
           };
         }
@@ -737,6 +746,7 @@ export function assembleOverviewHistoricalPageData(
               baselineCostPerMtok: null,
               costDeltaPct: null,
               baselineDate: null,
+              baselineConfig: null,
             },
           };
         }
@@ -748,6 +758,7 @@ export function assembleOverviewHistoricalPageData(
             baselineCostPerMtok: previous.costPerMtok,
             costDeltaPct: platform.costPerMtok / previous.costPerMtok - 1,
             baselineDate: overviewTierEvidenceDate(previous.read),
+            baselineConfig: previous.read.config,
           },
         };
       }),

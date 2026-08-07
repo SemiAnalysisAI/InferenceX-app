@@ -26,6 +26,7 @@ import {
 import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmark-transform';
 import { Sequence, type Model } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
+import { overviewServingSeriesKey, type OverviewServingSeriesRow } from '@/lib/overview-data';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import {
   applyQuickFilters,
@@ -86,6 +87,16 @@ export function filterByGPU<T extends { hwKey: unknown }>(
       selectedGPUs.includes(hwKey) || (canonical !== undefined && selectedGPUs.includes(canonical))
     );
   });
+}
+
+/** Restrict one snapshot to the exact serving envelope selected by Overview. */
+export function filterOverviewHistoryRows<T extends OverviewServingSeriesRow>(
+  rows: T[],
+  configKey: string | undefined,
+): T[] {
+  return configKey === undefined
+    ? rows
+    : rows.filter((row) => overviewServingSeriesKey(row) === configKey);
 }
 
 export type RooflineDirection = 'upper_left' | 'upper_right' | 'lower_left' | 'lower_right';
@@ -208,6 +219,10 @@ export function useChartData(
    * (also applied to overlay points in ScatterGraph so both paths stay in sync).
    */
   quickFilters: QuickFilters = EMPTY_QUICK_FILTERS,
+  overviewHistoryPair?: {
+    currentConfigKey: string;
+    baselineConfigKey: string;
+  },
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
@@ -290,7 +305,10 @@ export function useChartData(
     if (!allRows) return [];
     const seqFilter = (r: { isl: number | null; osl: number | null; benchmark_type: string }) =>
       rowToSequence(r) === selectedSequence;
-    const seqFiltered = allRows.filter(seqFilter);
+    const seqFiltered = filterOverviewHistoryRows(
+      allRows.filter(seqFilter),
+      overviewHistoryPair?.currentConfigKey,
+    );
 
     // Keep only each series' latest-date rows (drops stale config_ids left behind
     // when parallelism settings change between runs). Keyed per offload variant so
@@ -302,12 +320,21 @@ export function useChartData(
     );
     if (comparisonDates.length === 0) return mainRows;
     const extraRows = comparisonQueries.flatMap((q, i) =>
-      (q.data ?? [])
-        .filter(seqFilter)
-        .map((r) => ({ ...r, date: comparisonDates[i], actualDate: r.date })),
+      filterOverviewHistoryRows(
+        (q.data ?? []).filter(seqFilter),
+        overviewHistoryPair?.baselineConfigKey,
+      ).map((r) => ({ ...r, date: comparisonDates[i], actualDate: r.date })),
     );
     return [...mainRows, ...extraRows];
-  }, [allRows, selectedSequence, comparisonDates, comparisonDataKey, selectedRunDate]);
+  }, [
+    allRows,
+    selectedSequence,
+    comparisonDates,
+    comparisonDataKey,
+    selectedRunDate,
+    overviewHistoryPair?.currentConfigKey,
+    overviewHistoryPair?.baselineConfigKey,
+  ]);
 
   // Transform filtered rows into chart data
   const { chartData, hardwareConfig: rawHardwareConfig } = useMemo(() => {

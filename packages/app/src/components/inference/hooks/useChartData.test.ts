@@ -6,6 +6,7 @@ import {
   applyAgenticPercentileToXLabel,
   buildComparisonDates,
   dedupeRowsToLatestPerConfig,
+  filterOverviewHistoryRows,
   filterByGPU,
   derivedModeRoofline,
   flipRooflineDirection,
@@ -140,6 +141,33 @@ describe('filterByGPU', () => {
 
   it('excludes when neither key nor alias matches', () => {
     expect(filterByGPU([{ hwKey: 'unknown' }], ['h100'], {})).toHaveLength(0);
+  });
+});
+
+describe('filterOverviewHistoryRows', () => {
+  it('keeps only the serving envelope encoded by the Overview history link', () => {
+    const rows = [
+      drow({ id: 1, hardware: 'mi355x', framework: 'sglang', precision: 'fp8' }),
+      drow({ id: 2, hardware: 'mi355x', framework: 'vllm', precision: 'fp4' }),
+      drow({ id: 3, hardware: 'mi355x', framework: 'sglang', precision: 'fp4' }),
+    ];
+    const key = JSON.stringify(['qwen3.5', 'mi355x', 'vllm', 'none', 'fp4', false, false, 'off']);
+
+    expect(
+      filterOverviewHistoryRows(
+        rows.map((row) => ({ ...row, model: 'qwen3.5', is_multinode: false })),
+        key,
+      ).map((row) => row.id),
+    ).toEqual([2]);
+  });
+
+  it('is a no-op outside an Overview history pair', () => {
+    const rows = [drow({ id: 1 }), drow({ id: 2 })].map((row) => ({
+      ...row,
+      model: 'qwen3.5',
+      is_multinode: false,
+    }));
+    expect(filterOverviewHistoryRows(rows, undefined)).toBe(rows);
   });
 });
 
