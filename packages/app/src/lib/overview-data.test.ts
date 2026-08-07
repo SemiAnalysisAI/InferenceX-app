@@ -17,6 +17,7 @@ import {
   overviewTierEvidenceDate,
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
+  resolveOverviewReferenceHardware,
   resolveOverviewTier,
   type OverviewModelSummary,
   type OverviewPageData,
@@ -138,6 +139,13 @@ function platformFor(
 }
 
 describe('overview engine scope and scenario selection', () => {
+  it('accepts only supported hardware references and defaults invalid input to B200', () => {
+    expect(resolveOverviewReferenceHardware('b300')).toBe('b300');
+    expect(resolveOverviewReferenceHardware(['mi355x', 'b200'])).toBe('mi355x');
+    expect(resolveOverviewReferenceHardware('not-a-gpu')).toBe('b200');
+    expect(resolveOverviewReferenceHardware(undefined)).toBe('b200');
+  });
+
   it.each([
     [undefined, 'hardware'],
     ['hardware', 'hardware'],
@@ -216,22 +224,57 @@ describe('overview engine scope and scenario selection', () => {
       (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (7200 * 3600),
       6,
     );
-    expect(byHardware.b200.costVsB200Pct).toBeNull();
+    expect(byHardware.b200.costVsReferencePct).toBeNull();
     expect(byHardware.mi355x.costPerMtok).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) / (9000 * 3600),
       6,
     );
-    expect(byHardware.mi355x.costVsB200Pct).toBeCloseTo(
+    expect(byHardware.mi355x.costVsReferencePct).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) /
         (9000 * 3600) /
         ((JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (7200 * 3600)) -
         1,
       6,
     );
-    expect(byHardware.mi355x.costVsB200Pct).toBeLessThan(0);
-    expect(byHardware.gb300.costVsB200Pct).toBeGreaterThan(0);
+    expect(byHardware.mi355x.costVsReferencePct).toBeLessThan(0);
+    expect(byHardware.gb300.costVsReferencePct).toBeGreaterThan(0);
     expect(byHardware.b300.costPerMtok).toBeNull();
-    expect(byHardware.b300.costVsB200Pct).toBeNull();
+    expect(byHardware.b300.costVsReferencePct).toBeNull();
+  });
+
+  it('computes hardware deltas against the selected reference instead of always using B200', () => {
+    const rows = [
+      ...frontier([10800, 7200, 6300, 5400], {
+        hardware: 'b200',
+        precision: Precision.FP4,
+      }),
+      ...frontier([11700, 8100, 7200, 6300], {
+        hardware: 'b300',
+        precision: Precision.FP4,
+      }),
+      ...frontier([12600, 9000, 8100, 7200], {
+        hardware: 'mi355x',
+        precision: Precision.FP4,
+      }),
+    ];
+    const summary = buildOverviewModelSummary(
+      Model.Qwen3_5,
+      rows,
+      50,
+      'community',
+      'single_turn_8k1k',
+      'b300',
+    );
+    const byHardware = Object.fromEntries(
+      summary.platforms.map((platform) => [platform.hardware, platform]),
+    );
+    const b200Cost = byHardware.b200.costPerMtok!;
+    const b300Cost = byHardware.b300.costPerMtok!;
+    const mi355xCost = byHardware.mi355x.costPerMtok!;
+
+    expect(byHardware.b300.costVsReferencePct).toBeNull();
+    expect(byHardware.b200.costVsReferencePct).toBeCloseTo(b200Cost / b300Cost - 1, 6);
+    expect(byHardware.mi355x.costVsReferencePct).toBeCloseTo(mi355xCost / b300Cost - 1, 6);
   });
 
   it('keeps a platform cost without a B200 baseline so the UI can badge it ∞', () => {
@@ -247,7 +290,7 @@ describe('overview engine scope and scenario selection', () => {
       (JULY_2026_HYPERSCALER_TCO.gb300 * 1e6) / (9000 * 3600),
       6,
     );
-    expect(gb300.costVsB200Pct).toBeNull();
+    expect(gb300.costVsReferencePct).toBeNull();
     expect(summary.platforms.find((p) => p.hardware === 'b200')?.costPerMtok).toBeNull();
   });
 
@@ -1268,7 +1311,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(dsxB200.read.value).not.toBeCloseTo(8101.968, 3);
     const dsxMi355x = deepseekAgentx.platforms.find((p) => p.hardware === 'mi355x')!;
     expect(dsxMi355x.read.value).toBe(6000);
-    expect(dsxMi355x.costVsB200Pct).toBeCloseTo(
+    expect(dsxMi355x.costVsReferencePct).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) /
         6000 /
         ((JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / 7500) -
@@ -1291,7 +1334,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       (JULY_2026_HYPERSCALER_TCO.gb300 * 1e6) / (6510 * 3600),
       6,
     );
-    expect(mmGb300.candidate.costVsB200Pct).toBeNull();
+    expect(mmGb300.candidate.costVsReferencePct).toBeNull();
 
     // Qwen: MI355X independently falls back to FP8 while B200 and B300 use FP4.
     const qwen = page.models.find((m) => m.model === Model.Qwen3_5)!;
@@ -1304,7 +1347,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     );
     expect(qwenMi.baseline.precision).toBe(Precision.FP4);
     expect(qwenMi.baseline.read.value).toBeCloseTo(6602.344);
-    expect(qwenMi.candidate.costVsB200Pct).toBeCloseTo(
+    expect(qwenMi.candidate.costVsReferencePct).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) /
         (6688 * 3600) /
         ((JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (6602.344 * 3600)) -

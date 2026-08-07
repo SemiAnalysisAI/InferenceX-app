@@ -1,13 +1,51 @@
 import { runIdFromRunUrl } from './known-issues';
 import {
   OVERVIEW_DEFAULT_COMPARISON_MODE,
+  OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   OVERVIEW_PRIMARY_TIER,
   type OverviewComparisonMode,
   type OverviewConfigResult,
   type OverviewEngineScope,
   type OverviewModelSummary,
+  type OverviewReferenceHardware,
   type OverviewTier,
 } from './overview-data';
+
+export type OverviewSearchKey = 'tier' | 'engine' | 'ref' | 'compare';
+
+const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = ['tier', 'engine', 'ref', 'compare'];
+
+/** Apply one control's destination to the latest pending overview URL.
+ * This prevents a second, fast selection from rebuilding from stale server
+ * props while the first App Router transition is still in flight. */
+export function mergeOverviewControlHref(
+  currentHref: string,
+  targetHref: string,
+  keys: readonly OverviewSearchKey[],
+): string {
+  const origin = 'https://inferencex.local';
+  const current = new URL(currentHref, origin);
+  const target = new URL(targetHref, origin);
+
+  current.pathname = target.pathname;
+  for (const key of keys) {
+    const value = target.searchParams.get(key);
+    if (value === null) current.searchParams.delete(key);
+    else current.searchParams.set(key, value);
+  }
+
+  const ordered = new URLSearchParams();
+  for (const key of OVERVIEW_SEARCH_ORDER) {
+    const value = current.searchParams.get(key);
+    if (value !== null) ordered.set(key, value);
+  }
+  for (const [key, value] of current.searchParams) {
+    if (!OVERVIEW_SEARCH_ORDER.includes(key as OverviewSearchKey)) ordered.append(key, value);
+  }
+
+  const search = ordered.toString();
+  return `${current.pathname}${search === '' ? '' : `?${search}`}${target.hash}`;
+}
 import type { UrlStateParams } from './url-state';
 
 function overviewSequence(model: OverviewModelSummary): '8k/1k' | 'agentic-traces' {
@@ -97,11 +135,15 @@ export function overviewHref(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
 ): string {
   const base = locale === 'zh' ? '/zh/overview' : '/overview';
   const query = new URLSearchParams();
   if (tier !== OVERVIEW_PRIMARY_TIER) query.set('tier', String(tier));
   if (engineScope !== 'community') query.set('engine', engineScope);
+  if (referenceHardware !== OVERVIEW_DEFAULT_REFERENCE_HARDWARE) {
+    query.set('ref', referenceHardware);
+  }
   if (comparisonMode === 'history') query.set('compare', '30d');
   const search = query.toString();
   return search === '' ? base : `${base}?${search}`;
@@ -113,8 +155,9 @@ export function overviewTierHref(
   tier: OverviewTier,
   engineScope: OverviewEngineScope = 'community',
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
 ): string {
-  return overviewHref(locale, tier, engineScope, comparisonMode);
+  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware);
 }
 
 /** Engine-scope switch preserving the active service tier. */
@@ -123,6 +166,7 @@ export function overviewEngineScopeHref(
   engineScope: OverviewEngineScope,
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
 ): string {
-  return overviewHref(locale, tier, engineScope, comparisonMode);
+  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware);
 }

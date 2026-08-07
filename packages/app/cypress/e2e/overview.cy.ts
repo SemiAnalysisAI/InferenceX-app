@@ -114,6 +114,91 @@ function textRect(element: Element) {
 }
 
 describe('Overview page', () => {
+  it('updates overview selectors with a soft URL transition instead of reloading the document', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+    cy.window().then((win) => {
+      (win as Window & { __overviewNavigationSentinel?: string }).__overviewNavigationSentinel =
+        'preserved';
+    });
+
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75');
+    cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
+
+    cy.get('[data-testid="overview-engine-scope-switcher"]')
+      .find('[data-overview-engine-scope="all"]')
+      .click();
+    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+    cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
+
+    cy.get('[data-overview-comparison="history"]').click();
+    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all&compare=30d');
+    cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
+
+    cy.go('back');
+    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+  });
+
+  it('preserves pending selections when controls are changed rapidly', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    cy.get('[data-testid="overview-engine-scope-switcher"]')
+      .find('[data-overview-engine-scope="all"]')
+      .click();
+
+    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+  });
+
+  it('uses a selectable hardware reference and preserves it across overview controls', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+
+    cy.get('[data-testid="overview-reference-select"]').click();
+    cy.get('[data-overview-reference="b300"]').click();
+    cy.location('search').should('eq', '?ref=b300');
+
+    cy.get('[data-overview-comparison="hardware"]')
+      .should('have.attr', 'aria-current', 'true')
+      .and('contain.text', 'vs B300');
+    cy.get('[data-testid="overview-desktop-matrix"] thead').within(() => {
+      cy.contains('th', 'B300 · Reference').should('exist');
+      cy.contains('th', 'B200 · Reference').should('not.exist');
+    });
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
+      platform('b300').find('[data-testid="overview-cost-delta"]').should('not.exist');
+      platform('b200').find('[data-testid="overview-cost-delta"]').should('exist');
+    });
+
+    cy.get('[data-testid="overview-tier-switcher"]')
+      .contains('a', '100')
+      .should('have.attr', 'href', '/overview?tier=100&ref=b300');
+    cy.get('[data-testid="overview-engine-scope-switcher"]')
+      .find('[data-overview-engine-scope="all"]')
+      .should('have.attr', 'href', '/overview?engine=all&ref=b300');
+    cy.get('[data-overview-comparison="history"]').should(
+      'have.attr',
+      'href',
+      '/overview?ref=b300&compare=30d',
+    );
+    cy.get('[data-testid="language-toggle"]')
+      .should('have.attr', 'href', '/zh/overview?ref=b300')
+      .click();
+    cy.location('pathname').should('eq', '/zh/overview');
+    cy.location('search').should('eq', '?ref=b300');
+    cy.get('[data-overview-comparison="hardware"]').should('contain.text', '对比 B300');
+  });
+
+  it('uses rack SKU labels when GB200 or GB300 is the comparison reference', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview?ref=gb200');
+
+    cy.get('[data-overview-comparison="hardware"]').should('contain.text', 'vs GB200 NVL72');
+    cy.get('[data-testid="overview-methodology"]').should('contain.text', 'GB200 NVL72 baseline');
+  });
+
   it('switches between B200 and 30-day comparison without losing page state', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
