@@ -10,6 +10,7 @@ import type {
 import {
   buildOverviewDashboardHref,
   detailHref,
+  mergeOverviewControlHref,
   overviewEngineScopeHref,
   overviewHref,
   overviewTierHref,
@@ -194,6 +195,24 @@ describe('overviewHref', () => {
 });
 
 describe('overview switch links', () => {
+  it('merges rapid control changes into the latest pending overview URL', () => {
+    const tierHref = mergeOverviewControlHref('/overview', '/overview?tier=75', ['tier']);
+    const engineHref = mergeOverviewControlHref(tierHref, '/overview?engine=all', ['engine']);
+    const referenceHref = mergeOverviewControlHref(engineHref, '/overview?ref=gb200', ['ref']);
+
+    expect(referenceHref).toBe('/overview?tier=75&engine=all&ref=gb200');
+  });
+
+  it('removes defaulted control params without dropping other pending selections', () => {
+    expect(
+      mergeOverviewControlHref(
+        '/zh/overview?tier=75&engine=all&ref=gb300&compare=30d',
+        '/zh/overview?tier=75&ref=gb300&compare=30d',
+        ['engine'],
+      ),
+    ).toBe('/zh/overview?tier=75&ref=gb300&compare=30d');
+  });
+
   it.each([
     ['en', 100, 'community', '/overview?tier=100'],
     ['en', 100, 'all', '/overview?tier=100&engine=all'],

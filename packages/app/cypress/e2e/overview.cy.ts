@@ -123,18 +123,33 @@ describe('Overview page', () => {
     });
 
     cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
-    cy.location('search').should('eq', '?tier=75');
+    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .find('[data-overview-engine-scope="all"]')
       .click();
-    cy.location('search').should('eq', '?tier=75&engine=all');
+    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.get('[data-overview-comparison="history"]').click();
-    cy.location('search').should('eq', '?tier=75&engine=all&compare=30d');
+    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all&compare=30d');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
+
+    cy.go('back');
+    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+  });
+
+  it('preserves pending selections when controls are changed rapidly', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    cy.get('[data-testid="overview-engine-scope-switcher"]')
+      .find('[data-overview-engine-scope="all"]')
+      .click();
+
+    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
   });
 
   it('uses a selectable hardware reference and preserves it across overview controls', () => {
@@ -174,6 +189,14 @@ describe('Overview page', () => {
     cy.location('pathname').should('eq', '/zh/overview');
     cy.location('search').should('eq', '?ref=b300');
     cy.get('[data-overview-comparison="hardware"]').should('contain.text', '对比 B300');
+  });
+
+  it('uses rack SKU labels when GB200 or GB300 is the comparison reference', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview?ref=gb200');
+
+    cy.get('[data-overview-comparison="hardware"]').should('contain.text', 'vs GB200 NVL72');
+    cy.get('[data-testid="overview-methodology"]').should('contain.text', 'GB200 NVL72 baseline');
   });
 
   it('switches between B200 and 30-day comparison without losing page state', () => {

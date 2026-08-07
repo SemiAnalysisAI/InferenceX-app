@@ -212,7 +212,7 @@ const OVERVIEW_SLICE_PRIORITY = [
 const OVERVIEW_PRECISIONS: readonly string[] = [Precision.FP4, Precision.FP8];
 /** The registry label verbatim, rack SKU included — the matrix says
  *  "GB200 NVL72", not "GB200", so a rack part is never read as a board. */
-function overviewHardwareLabel(hardware: string, model: Model): string {
+export function overviewHardwareLabel(hardware: string, model?: Model): string {
   return getHardwareConfig(hardware, model).label;
 }
 

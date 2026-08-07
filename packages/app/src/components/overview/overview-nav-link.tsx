@@ -1,10 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { startTransition, type ComponentPropsWithoutRef, type MouseEvent } from 'react';
+import { type ComponentPropsWithoutRef, type MouseEvent } from 'react';
 
 import { track } from '@/lib/analytics';
-import { notifyClientSearchChange } from '@/lib/client-navigation';
+import type { OverviewSearchKey } from '@/lib/overview-links';
+
+import { useOverviewNavigation } from './overview-navigation';
 
 interface OverviewNavAnalytics {
   control: 'comparison' | 'engine' | 'tier';
@@ -14,6 +15,7 @@ interface OverviewNavAnalytics {
 interface OverviewNavLinkProps extends ComponentPropsWithoutRef<'a'> {
   href: string;
   analytics: OverviewNavAnalytics;
+  searchKeys: readonly OverviewSearchKey[];
 }
 
 /**
@@ -24,14 +26,16 @@ interface OverviewNavLinkProps extends ComponentPropsWithoutRef<'a'> {
 export function OverviewNavLink({
   href,
   analytics,
+  searchKeys,
   onClick,
   onFocus,
   onPointerEnter,
   ...props
 }: OverviewNavLinkProps) {
-  const router = useRouter();
+  const navigation = useOverviewNavigation();
+  const resolvedHref = navigation.resolve(href, searchKeys);
 
-  const prefetch = () => router.prefetch(href);
+  const prefetch = () => navigation.prefetch(href, searchKeys);
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
     onClick?.(event);
     if (
@@ -51,14 +55,13 @@ export function OverviewNavLink({
       control: analytics.control,
       value: analytics.value,
     });
-    notifyClientSearchChange(href);
-    startTransition(() => router.replace(href, { scroll: false }));
+    navigation.push(href, searchKeys);
   };
 
   return (
     <a
       {...props}
-      href={href}
+      href={resolvedHref}
       onClick={handleClick}
       onFocus={(event) => {
         onFocus?.(event);

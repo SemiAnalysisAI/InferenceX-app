@@ -2,6 +2,7 @@ import {
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   OVERVIEW_HARDWARE,
   OVERVIEW_TIERS,
+  overviewHardwareLabel,
   type OverviewComparisonMode,
   type OverviewEngineScope,
   type OverviewHistoricalComparison,
@@ -593,7 +594,7 @@ export function DesktopOverviewMatrix({
   referenceHardware,
 }: SurfaceProps) {
   const platforms = models[0]?.platforms ?? [];
-  const referenceLabel = referenceHardware.toUpperCase();
+  const referenceLabel = overviewHardwareLabel(referenceHardware);
   return (
     <div className="hidden xl:block">
       <table data-testid="overview-desktop-matrix" className="w-full border-collapse text-sm">
@@ -687,7 +688,7 @@ export function MobileOverviewList({
   comparisonMode,
   referenceHardware,
 }: SurfaceProps) {
-  const referenceLabel = referenceHardware.toUpperCase();
+  const referenceLabel = overviewHardwareLabel(referenceHardware);
   return (
     <ul data-testid="overview-mobile-list" className="divide-y divide-border/50 xl:hidden">
       {models.map((model) => (
@@ -792,6 +793,7 @@ export function OverviewTierSwitcher({
                 referenceHardware,
               )}
               analytics={{ control: 'tier', value: String(option) }}
+              searchKeys={['tier']}
               className={`${optionClass} text-muted-foreground transition-colors hover:bg-muted hover:text-foreground`}
             >
               {option}
@@ -853,6 +855,7 @@ export function OverviewEngineScopeSwitcher({
                 referenceHardware,
               )}
               analytics={{ control: 'engine', value: option }}
+              searchKeys={['engine']}
               className={`${optionClass} text-muted-foreground transition-colors hover:bg-muted hover:text-foreground`}
             >
               {strings.engineScopeOptions[option]}
@@ -880,10 +883,10 @@ export function OverviewComparisonSwitcher({
   strings: OverviewStrings;
 }) {
   const options: OverviewComparisonMode[] = ['hardware', 'history'];
-  const referenceLabel = referenceHardware.toUpperCase();
+  const referenceLabel = overviewHardwareLabel(referenceHardware);
   const referenceOptions = OVERVIEW_HARDWARE.map((hardware) => ({
     value: hardware,
-    label: hardware.toUpperCase(),
+    label: overviewHardwareLabel(hardware),
     href: overviewHref(locale, tier, engineScope, 'hardware', hardware),
   }));
   const optionClass =
@@ -925,6 +928,7 @@ export function OverviewComparisonSwitcher({
             data-overview-comparison={option}
             href={overviewHref(locale, tier, engineScope, option, referenceHardware)}
             analytics={{ control: 'comparison', value: option }}
+            searchKeys={['compare']}
             className={optionClass}
           >
             {label}
@@ -944,7 +948,7 @@ export function OverviewMethodology({
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
 }) {
-  const referenceLabel = referenceHardware.toUpperCase();
+  const referenceLabel = overviewHardwareLabel(referenceHardware);
   return (
     <div
       data-testid="overview-methodology"

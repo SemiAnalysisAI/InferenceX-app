@@ -1,8 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { startTransition } from 'react';
-
 import {
   Select,
   SelectContent,
@@ -11,8 +8,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { track } from '@/lib/analytics';
-import { notifyClientSearchChange } from '@/lib/client-navigation';
 import type { OverviewReferenceHardware } from '@/lib/overview-data';
+
+import { useOverviewNavigation } from './overview-navigation';
 
 interface ReferenceOption {
   href: string;
@@ -29,20 +27,19 @@ export function OverviewReferenceSelect({
   options: readonly ReferenceOption[];
   value: OverviewReferenceHardware;
 }) {
-  const router = useRouter();
+  const navigation = useOverviewNavigation();
 
   return (
     <Select
       value={value}
       onOpenChange={(open) => {
-        if (open) options.forEach((option) => router.prefetch(option.href));
+        if (open) options.forEach((option) => navigation.prefetch(option.href, ['ref']));
       }}
       onValueChange={(next: OverviewReferenceHardware) => {
         const option = options.find((candidate) => candidate.value === next);
         if (option === undefined || next === value) return;
         track('overview_reference_changed', { from: value, to: next });
-        notifyClientSearchChange(option.href);
-        startTransition(() => router.replace(option.href, { scroll: false }));
+        navigation.push(option.href, ['ref']);
       }}
     >
       <SelectTrigger
