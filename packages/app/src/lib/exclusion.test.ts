@@ -310,6 +310,49 @@ describe('ATOM/SGLang comparability group', () => {
   });
 });
 
+describe('participatingGroups', () => {
+  // The fixed-sequence STP rule: only vLLM and SGLang (incl. ATOM) block each
+  // other; every other engine family sits outside the rule entirely.
+  const limitedEx = buildExclusion([{ ...STP_SPEC[0], participatingGroups: ['vllm', 'sglang'] }]);
+
+  it('ignores keys whose group is outside the list', () => {
+    expect(limitedEx.familyOf('b200_trt')).toBeNull();
+    expect(limitedEx.groupOf('b200_trt')).toBeNull();
+    expect(limitedEx.scopesOf('b200_trt')).toEqual([]);
+    expect(limitedEx.familyOf('gb300_dynamo-trt')).toBeNull();
+  });
+
+  it('still classifies listed groups, including aliased families', () => {
+    expect(limitedEx.groupOf('b200_vllm')).toBe('vllm');
+    expect(limitedEx.groupOf('gb300_dynamo-vllm')).toBe('vllm');
+    expect(limitedEx.groupOf('mi355x_atom')).toBe('sglang');
+    expect(limitedEx.groupOf('mi355x_mooncake-atom')).toBe('sglang');
+    expect(limitedEx.familyOf('mi355x_mooncake-atom')).toBe('atom');
+  });
+
+  it('leaves non-participating families selectable alongside either group', () => {
+    const proposed = new Set(['b200_vllm', 'b200_sglang', 'b200_trt']);
+    const sticky = pickStickyGroup(proposed, new Set(), limitedEx, 'vllm');
+    expect([...sticky.result].toSorted()).toEqual(['b200_trt', 'b200_vllm']);
+    expect(sticky.droppedGroups).toEqual(['sglang']);
+
+    expect(resolveExclusionToggle(new Set(['b200_vllm']), 'b200_trt', proposed, limitedEx)).toEqual(
+      { kind: 'fallthrough' },
+    );
+  });
+
+  it('falls through to a later spec when a group is excluded from an earlier one', () => {
+    // The 8K/1K chart layers the model MTP rule (all families) over the STP rule
+    // (vLLM/SGLang only), so TRTLLM stays guarded for `_mtp` keys.
+    const fixedSeqEx = buildExclusion([
+      ...MTP_SPEC,
+      { ...STP_SPEC[0], participatingGroups: ['vllm', 'sglang'] },
+    ]);
+    expect(fixedSeqEx.groupOf('b200_trt_mtp')).toBe('trt');
+    expect(fixedSeqEx.groupOf('b200_trt')).toBeNull();
+  });
+});
+
 describe('pickStickyGroup', () => {
   it('passes through when no participating keys present', () => {
     const set = new Set(['h100_vllm', 'gb300_sglang']);
