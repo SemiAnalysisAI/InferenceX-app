@@ -2,7 +2,7 @@ import {
   getModelExclusion,
   getSequenceDefaultExclusionGroup,
   getSequenceExclusion,
-  getSequenceExclusionExemptFamilies,
+  getSequenceExclusionFamilies,
   getSequenceExclusionPolicy,
 } from '@/lib/data-mappings';
 import { buildExclusion, type Exclusion, type ExclusionConflictPolicy } from '@/lib/exclusion';
@@ -37,10 +37,10 @@ export function comparisonExclusionPolicy(
  * Unofficial previews are diagnostic and intentionally allow engine families
  * to share a graph, even when the corresponding official view does not.
  *
- * The scenario's exempt families are composed onto the model specs too, so a
- * family the scenario declares comparable (8K/1K ATOM) escapes the model-level
- * variant rule as well — otherwise its MTP configs would still be grouped and
- * blocked.
+ * A scenario's `exclusionFamilies` allowlist narrows the model's variant specs
+ * as well as the sequence's own, so a family the scenario leaves out (8K/1K
+ * TRTLLM, ATOM) escapes the model-level MTP rule too — otherwise its MTP
+ * configs would still be grouped and blocked.
  */
 export function comparisonExclusion(
   model: Parameters<typeof getModelExclusion>[0],
@@ -52,9 +52,16 @@ export function comparisonExclusion(
   const specs = [...getModelExclusion(model), ...getSequenceExclusion(sequence)];
   if (specs.length === 0) return null;
 
-  const exempt = getSequenceExclusionExemptFamilies(sequence);
-  if (exempt.length === 0) return buildExclusion(specs);
+  const families = getSequenceExclusionFamilies(sequence);
+  if (!families) return buildExclusion(specs);
   return buildExclusion(
-    specs.map((spec) => ({ ...spec, exemptFamilies: [...(spec.exemptFamilies ?? []), ...exempt] })),
+    specs.map((spec) => ({
+      ...spec,
+      // Intersect rather than replace: a spec that already narrows itself keeps
+      // its own limit, and the scenario can only ever narrow further.
+      participatingFamilies: spec.participatingFamilies
+        ? spec.participatingFamilies.filter((family) => families.includes(family))
+        : families,
+    })),
   );
 }

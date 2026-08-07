@@ -120,6 +120,7 @@ describe('comparisonExclusion', () => {
         'b200_sglang',
         'b200_vllm',
         'b200_trt',
+        'b200_trt_mtp',
         'mi355x_atom',
         'mi355x_atom_mtp',
         'mi355x_sglang',
@@ -132,10 +133,12 @@ describe('comparisonExclusion', () => {
       comparisonDefaultGroup(Sequence.EightK_OneK, false),
     );
 
-    // TRTLLM STP and ATOM (STP and MTP alike) sit outside the 8K/1K rules, so
-    // they survive next to the kept vLLM configs — only SGLang is dropped.
+    // TRTLLM and ATOM sit outside the 8K/1K rules entirely — standard-token and
+    // MTP alike — so they survive next to the kept vLLM configs. Only SGLang,
+    // the one other guarded family, is dropped.
     expect([...resolved.result].toSorted()).toEqual([
       'b200_trt',
+      'b200_trt_mtp',
       'b200_vllm',
       'mi355x_atom',
       'mi355x_atom_mtp',
@@ -158,27 +161,31 @@ describe('comparisonExclusion', () => {
     expect([...resolved.result].toSorted()).toEqual(['b200_sglang', 'mi355x_vllm']);
   });
 
-  it('leaves non-participating 8K/1K engine families unguarded', () => {
+  it.each([
+    'b200_trt',
+    'b200_trt_mtp',
+    'gb300_dynamo-trt',
+    'gb300_dynamo-trt_mtp',
+    'mi355x_atom',
+    'mi355x_atom_mtp',
+    'mi355x_mooncake-atom',
+    'mi355x_mooncake-atom_mtp',
+  ])('leaves %s unguarded on the 8K/1K chart', (key) => {
+    // Only vLLM and SGLang are guarded here, on standard-token and MTP alike.
     const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, false)!;
 
-    expect(exclusion.familyOf('b200_trt')).toBeNull();
-    expect(exclusion.familyOf('gb300_dynamo-trt')).toBeNull();
-    // ATOM is exempt from every 8K/1K rule — standard-token AND MTP.
-    expect(exclusion.familyOf('mi355x_atom')).toBeNull();
-    expect(exclusion.familyOf('mi355x_mooncake-atom')).toBeNull();
-    expect(exclusion.groupOf('mi355x_mooncake-atom')).toBeNull();
-    expect(exclusion.familyOf('mi355x_atom_mtp')).toBeNull();
-    expect(exclusion.groupOf('mi355x_atom_mtp')).toBeNull();
-    expect(exclusion.groupOf('mi355x_mooncake-atom_mtp')).toBeNull();
-    // TRTLLM keeps the pre-existing MTP guard; only its STP keys are free.
-    expect(exclusion.groupOf('b200_trt_mtp')).toBe('trt');
+    expect(exclusion.familyOf(key)).toBeNull();
+    expect(exclusion.groupOf(key)).toBeNull();
+    expect(exclusion.scopesOf(key)).toEqual([]);
   });
 
-  it('keeps ATOM grouped with SGLang on the Agentic chart', () => {
+  it('keeps ATOM and TRTLLM guarded on the Agentic chart', () => {
     const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, false)!;
 
     expect(exclusion.groupOf('mi355x_atom')).toBe('sglang');
     expect(exclusion.groupOf('mi355x_atom_mtp')).toBe('sglang');
+    expect(exclusion.groupOf('b200_trt')).toBe('trt');
+    expect(exclusion.groupOf('b200_trt_mtp')).toBe('trt');
   });
 
   it('guards only the literal vLLM and SGLang families on the 8K/1K chart', () => {
@@ -334,17 +341,45 @@ describe('comparisonExclusion', () => {
       expected: 'block',
     },
     {
-      name: 'still blocks 8K/1K TRTLLM MTP against vLLM MTP',
+      name: 'allows 8K/1K TRTLLM MTP next to vLLM MTP',
       sequence: Sequence.EightK_OneK,
       active: 'b200_trt_mtp',
       candidate: 'b200_vllm_mtp',
-      expected: 'block',
+      expected: 'fallthrough',
+    },
+    {
+      name: 'allows 8K/1K TRTLLM MTP next to SGLang MTP',
+      sequence: Sequence.EightK_OneK,
+      active: 'b200_sglang_mtp',
+      candidate: 'b200_trt_mtp',
+      expected: 'fallthrough',
+    },
+    {
+      name: 'allows 8K/1K TRTLLM MTP next to ATOM MTP',
+      sequence: Sequence.EightK_OneK,
+      active: 'mi355x_atom_mtp',
+      candidate: 'gb300_dynamo-trt_mtp',
+      expected: 'fallthrough',
+    },
+    {
+      name: 'allows 8K/1K TRTLLM next to ATOM',
+      sequence: Sequence.EightK_OneK,
+      active: 'mi355x_atom',
+      candidate: 'b200_trt',
+      expected: 'fallthrough',
     },
     {
       name: 'keeps the Agentic ATOM MTP guard untouched',
       sequence: Sequence.AgenticTraces,
       active: 'mi355x_atom_mtp',
       candidate: 'mi355x_vllm_mtp',
+      expected: 'block',
+    },
+    {
+      name: 'keeps the Agentic TRTLLM guard untouched',
+      sequence: Sequence.AgenticTraces,
+      active: 'b200_trt',
+      candidate: 'b200_vllm',
       expected: 'block',
     },
     {
