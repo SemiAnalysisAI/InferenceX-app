@@ -8,6 +8,8 @@ import type {
   InferenceData,
   YAxisMetricKey,
 } from '@/components/inference/types';
+import { scatterPointConfigId } from '@/components/inference/utils/point-identity';
+import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
 
 import type { PerStepValue } from './interpolateAtTime';
 
@@ -81,12 +83,6 @@ export function computeFullRunDomain(
   return { x: safeDomain(xMin, xMax), y: safeDomain(yMin, yMax) };
 }
 
-const buildPointConfigId = (point: InferenceData): string => {
-  let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}|${point.decode_ep ?? 0}|${point.prefill_tp ?? 0}|${point.prefill_ep ?? 0}`;
-  if (point.disagg) key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;
-  return key;
-};
-
 const safeDomain = (lo: number, hi: number): [number, number] => {
   if (!Number.isFinite(lo) || !Number.isFinite(hi)) return [0, 1];
   if (lo === hi) {
@@ -155,7 +151,7 @@ export function buildReplayTimeline(
   let yMax = -Infinity;
   const dateSet = new Set<string>();
 
-  for (const row of rows) {
+  for (const row of dedupeAgenticHistoryRuns(rows)) {
     if (!selectedPrecisions.includes(row.precision)) continue;
 
     const entry = rowToAggDataEntry(row);
@@ -181,7 +177,7 @@ export function buildReplayTimeline(
     if (xVal <= 0 || yMetric <= 0) continue;
 
     const finalPoint: InferenceData = { ...point, x: xVal, y: yMetric };
-    const configId = buildPointConfigId(finalPoint);
+    const configId = scatterPointConfigId(finalPoint);
     const dateMs = Date.parse(`${row.date}T00:00:00Z`);
     if (Number.isNaN(dateMs)) continue;
 

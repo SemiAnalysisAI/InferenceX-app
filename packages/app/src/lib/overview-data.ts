@@ -74,7 +74,7 @@ export interface OverviewTierValue {
 }
 
 /** One chart-equivalent serving series. Topology and GPU-count variants may
- *  contribute points, while release/framework/spec/precision/deployment stay exact. */
+ * contribute points; agentic series may also mix point-level decode methods. */
 export interface OverviewConfigResult {
   key: string;
   dbModel: string;
@@ -292,11 +292,12 @@ function overviewScenarioRows(
 }
 
 function overviewServingSeriesKey(row: BenchmarkRow): string {
+  const specMethod = row.benchmark_type === 'agentic_traces' ? '' : row.spec_method;
   return JSON.stringify([
     row.model,
     row.hardware,
     row.framework,
-    row.spec_method,
+    specMethod,
     row.precision,
     row.disagg,
     row.is_multinode,
@@ -325,7 +326,19 @@ function buildConfigs(
       (latest, row) => (row.date > latest ? row.date : latest),
       configRows[0].date,
     );
-    const latestRows = configRows.filter((row) => row.date === latestDate);
+    let latestRows = configRows.filter((row) => row.date === latestDate);
+    if (scenario === 'agentx' && latestRows.some((row) => row.workflow_run_id !== undefined)) {
+      const winningRow = latestRows.reduce((winner, row) => {
+        const startedAt = row.run_started_at ?? '';
+        const winnerStartedAt = winner.run_started_at ?? '';
+        if (startedAt !== winnerStartedAt) return startedAt > winnerStartedAt ? row : winner;
+        return (row.workflow_run_id ?? Number.NEGATIVE_INFINITY) >
+          (winner.workflow_run_id ?? Number.NEGATIVE_INFINITY)
+          ? row
+          : winner;
+      });
+      latestRows = latestRows.filter((row) => row.workflow_run_id === winningRow.workflow_run_id);
+    }
     const config = buildConfigResult(model, scenario, latestRows[0].precision, key, latestRows);
     if (config) configs.push(config);
   }
@@ -593,7 +606,17 @@ function buildConfigResult(
   if (feed.length === 0) return null;
 
   const first = rows[0];
-  const { hardware, framework, spec_method: specMethod, disagg, is_multinode: isMultinode } = first;
+  const { hardware, framework, disagg, is_multinode: isMultinode } = first;
+  const specMethods = [...new Set(rows.map((row) => row.spec_method))];
+  const specMethod = specMethods.length === 1 ? specMethods[0] : 'mixed';
+  const specLabel =
+    specMethod === 'mixed'
+      ? specMethods
+          .map((method) =>
+            method === 'none' || method === '' ? 'STP' : resolveFrameworkPartLabel(model, method),
+          )
+          .join(' + ')
+      : resolveFrameworkPartLabel(model, specMethod);
   const sourceRunUrls = [
     ...new Set(rows.flatMap((row) => (row.run_url === null ? [] : [row.run_url]))),
   ].toSorted();
@@ -601,11 +624,17 @@ function buildConfigResult(
     key,
     dbModel: first.model,
     hardware,
-    hwKey: buildAvailabilityHwKey(hardware, framework, specMethod, disagg),
+    hwKey: buildAvailabilityHwKey(
+      hardware,
+      framework,
+      specMethod,
+      disagg,
+      scenario === 'agentx' ? 'agentic_traces' : 'single_turn',
+    ),
     framework,
     frameworkLabel: resolveFrameworkPartLabel(model, framework),
     specMethod,
-    specLabel: resolveFrameworkPartLabel(model, specMethod),
+    specLabel,
     disagg,
     isMultinode,
     precision,

@@ -78,7 +78,39 @@ describe('GET /api/v1/benchmarks/history', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual(mockRows);
-    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', ['dsr1'], 1024, 1024);
+    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith(
+      'mock-sql',
+      ['dsr1'],
+      1024,
+      1024,
+      undefined,
+    );
+  });
+
+  it('returns agentic history without numeric sequence lengths', async () => {
+    const mockRows = [{ date: '2026-03-01', benchmark_type: 'agentic_traces' }];
+    mockGetAllBenchmarksForHistory.mockResolvedValueOnce(mockRows);
+
+    const res = await GET(
+      req('/api/v1/benchmarks/history?model=DeepSeek-R1-0528&benchmarkType=agentic_traces'),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(mockRows);
+    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith(
+      'mock-sql',
+      ['dsr1'],
+      null,
+      null,
+      'agentic_traces',
+    );
+  });
+
+  it('rejects unsupported benchmark types', async () => {
+    const res = await GET(
+      req('/api/v1/benchmarks/history?model=DeepSeek-R1-0528&benchmarkType=single_turn'),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Unsupported benchmarkType' });
   });
 
   it('returns 500 when query throws', async () => {
@@ -101,6 +133,12 @@ describe('GET /api/v1/benchmarks/history', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual([]);
-    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', ['dsr1'], 1024, 8192);
+    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith(
+      'mock-sql',
+      ['dsr1'],
+      1024,
+      8192,
+      undefined,
+    );
   });
 });

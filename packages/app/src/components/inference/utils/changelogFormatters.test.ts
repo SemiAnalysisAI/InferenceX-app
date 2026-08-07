@@ -62,9 +62,9 @@ describe('changelogConfigToHwKey', () => {
     );
   });
 
-  it('keeps a trailing MTP spec method while dropping agentic metadata', () => {
+  it('drops a trailing MTP spec method from agentic legend identity', () => {
     expect(changelogConfigToHwKey('dsv4-fp4-mi355x-sglang-agentic-hicache-mtp')).toBe(
-      'mi355x_sglang_mtp',
+      'mi355x_sglang',
     );
   });
 });
@@ -95,6 +95,15 @@ describe('configKeyMatchesHwKey', () => {
   it('matches an agentic HiCache changelog key to the framework-only legend key', () => {
     expect(
       configKeyMatchesHwKey('dsv4-fp4-mi355x-mori-sglang-agentic-hicache', 'mi355x_mori-sglang'),
+    ).toBe(true);
+  });
+
+  it('matches an agentic MTP changelog key to the mixed-spec legend key', () => {
+    expect(
+      configKeyMatchesHwKey(
+        'dsv4-fp4-mi355x-mori-sglang-agentic-hicache-mtp',
+        'mi355x_mori-sglang',
+      ),
     ).toBe(true);
   });
 

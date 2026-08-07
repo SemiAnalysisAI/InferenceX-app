@@ -62,7 +62,8 @@ function inferenceRoute(locale: 'en' | 'zh'): string {
  * (mirrors `pointSpecMode` in quickFilters.ts, minus its hwKey suffix check —
  * overview `specMethod` comes straight from `spec_method`).
  */
-function dashboardSpecMode(specMethod: string): 'mtp' | 'stp' {
+function dashboardSpecMode(specMethod: string): 'mtp' | 'stp' | undefined {
+  if (specMethod === 'mixed') return undefined;
   return specMethod === 'none' || specMethod === '' ? 'stp' : 'mtp';
 }
 

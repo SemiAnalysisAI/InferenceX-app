@@ -52,6 +52,9 @@ export interface BenchmarkRow {
    */
   workers?: WorkerPower[];
   date: string;
+  /** Internal workflow identity used to keep merged agentic curves within one run. */
+  workflow_run_id?: number;
+  run_started_at?: string | null;
   run_url: string | null;
 }
 
@@ -174,9 +177,11 @@ export function fetchBenchmarkHistory(
   model: string,
   isl: number,
   osl: number,
+  benchmarkType?: 'agentic_traces',
   signal?: AbortSignal,
 ) {
   const params = new URLSearchParams({ model, isl: String(isl), osl: String(osl) });
+  if (benchmarkType) params.set('benchmarkType', benchmarkType);
   return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks/history?${params}`, signal);
 }
 

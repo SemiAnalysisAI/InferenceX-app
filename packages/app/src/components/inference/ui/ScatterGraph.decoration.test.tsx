@@ -41,7 +41,7 @@ vi.mock('@/hooks/api/use-trace-availability', () => ({
   useTraceAvailability: () => ({ data: undefined }),
 }));
 
-import ScatterGraph from './ScatterGraph';
+import ScatterGraph, { pointLabelText } from './ScatterGraph';
 
 // ── Environment stubs ────────────────────────────────────────────────────────
 class MockResizeObserver {
@@ -72,6 +72,26 @@ const HARDWARE_CONFIG = {
 const CHART_DEFINITION = { chartType: 'interactivity' } as unknown as ChartDefinition;
 
 const noop = () => {};
+
+describe('pointLabelText', () => {
+  it('labels mixed agentic points with their point-level decode mode', () => {
+    const standard = point('h100', 'fp8', 1, 1, 8);
+    standard.benchmark_type = 'agentic_traces';
+    standard.spec_decoding = 'none';
+    const mtp = { ...standard, spec_decoding: 'mtp' };
+
+    expect(pointLabelText(standard, false)).toBe('8\nC=16\nSTP');
+    expect(pointLabelText(mtp, false)).toBe('8\nC=16\nMTP');
+  });
+
+  it('keeps fixed-sequence labels unchanged', () => {
+    const fixed = point('h100', 'fp8', 1, 1, 8);
+    fixed.benchmark_type = 'single_turn';
+    fixed.spec_decoding = 'mtp';
+
+    expect(pointLabelText(fixed, false)).toBe('8\nC=16');
+  });
+});
 
 function baseInferenceState() {
   return {

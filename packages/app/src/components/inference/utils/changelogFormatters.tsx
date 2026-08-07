@@ -32,7 +32,8 @@ export function changelogConfigToHwKey(configKey: string): string | null {
   if (!framework) return null;
 
   const trailingParts = remainder.slice(framework.length).split('-').filter(Boolean);
-  const specSuffix = trailingParts.includes('mtp') ? '_mtp' : '';
+  const isAgentic = trailingParts.includes('agentic');
+  const specSuffix = !isAgentic && trailingParts.includes('mtp') ? '_mtp' : '';
   return `${gpu}_${resolveFrameworkAlias(framework)}${specSuffix}`;
 }
 

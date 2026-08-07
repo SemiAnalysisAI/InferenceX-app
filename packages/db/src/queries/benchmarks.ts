@@ -45,6 +45,9 @@ export interface BenchmarkRow {
    */
   workers?: BenchmarkWorkerRow[];
   date: string;
+  /** Internal workflow identity used to keep merged agentic curves within one run. */
+  workflow_run_id?: number;
+  run_started_at?: string | null;
   run_url: string | null;
 }
 
@@ -147,6 +150,8 @@ export async function getLatestBenchmarks(
         br.metrics,
         br.workers,
         br.date::text,
+        br.workflow_run_id,
+        wr.run_started_at::text,
         CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
       FROM benchmark_results br
       JOIN configs c ON c.id = br.config_id
@@ -194,6 +199,8 @@ export async function getLatestBenchmarks(
       lb.metrics,
       lb.workers,
       lb.date::text,
+      lb.workflow_run_id,
+      wr.run_started_at::text,
       CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
     FROM latest_benchmarks lb
     JOIN configs c ON c.id = lb.config_id
@@ -246,6 +253,8 @@ export async function getBenchmarksForRun(
       br.metrics,
       br.workers,
       br.date::text,
+      br.workflow_run_id,
+      wr.run_started_at::text,
       CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
     FROM benchmark_results br
     JOIN configs c ON c.id = br.config_id
@@ -266,10 +275,15 @@ export async function getBenchmarksForRun(
 export async function getAllBenchmarksForHistory(
   sql: DbClient,
   modelKey: string | string[],
-  isl: number,
-  osl: number,
+  isl: number | null,
+  osl: number | null,
+  benchmarkType?: string,
 ): Promise<BenchmarkRow[]> {
   const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
+  const sequenceFilter =
+    benchmarkType === 'agentic_traces'
+      ? sql`br.benchmark_type = 'agentic_traces'`
+      : sql`br.isl = ${isl} AND br.osl = ${osl}`;
   const rows = await sql`
     SELECT
       br.id,
@@ -299,11 +313,12 @@ export async function getAllBenchmarksForHistory(
       br.metrics - '{std_ttft,std_tpot,std_e2el,std_intvty,std_itl,mean_ttft,mean_tpot,mean_e2el,mean_intvty,mean_itl}'::text[] as metrics,
       br.workers,
       br.date::text,
+      br.workflow_run_id,
+      wr.run_started_at::text,
       CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
     FROM configs c
     JOIN benchmark_results br ON br.config_id = c.id
-      AND br.isl = ${isl}
-      AND br.osl = ${osl}
+      AND ${sequenceFilter}
       AND br.error IS NULL
     JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
     WHERE c.model = ANY(${modelKeys})

@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { track } from '@/lib/analytics';
+import { Sequence } from '@/lib/data-mappings';
 import { cn } from '@/lib/utils';
 
 import { buildReplayTimeline, computeFullRunDomain } from './buildReplayTimeline';
@@ -68,7 +69,12 @@ export default function ReplayPanel({
   const { selectedModel, selectedSequence, activeHwTypes } = inference;
 
   const { isl = 0, osl = 0 } = sequenceToIslOsl(selectedSequence) ?? {};
-  const history = useBenchmarkHistory(selectedModel, isl, osl);
+  const history = useBenchmarkHistory(
+    selectedModel,
+    isl,
+    osl,
+    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
+  );
 
   const effectiveX =
     chartDefinition.chartType === 'e2e'

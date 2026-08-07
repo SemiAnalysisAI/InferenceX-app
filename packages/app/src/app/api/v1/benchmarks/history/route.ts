@@ -11,18 +11,28 @@ import { loadFixture } from '@/lib/test-fixtures';
 export const dynamic = 'force-dynamic';
 
 const getCachedBenchmarkHistory = cachedQuery(
-  (modelKeys: string[], isl: number, osl: number) =>
-    getAllBenchmarksForHistory(getDb(), modelKeys, isl, osl),
-  'benchmark-history',
+  (modelKeys: string[], isl: number | null, osl: number | null, benchmarkType?: string) =>
+    getAllBenchmarksForHistory(getDb(), modelKeys, isl, osl, benchmarkType),
+  'benchmark-history-v2',
   { blobOnly: true },
 );
 
 export async function GET(request: NextRequest) {
   const model = request.nextUrl.searchParams.get('model') ?? '';
-  const isl = Number(request.nextUrl.searchParams.get('isl'));
-  const osl = Number(request.nextUrl.searchParams.get('osl'));
+  const rawIsl = request.nextUrl.searchParams.get('isl');
+  const rawOsl = request.nextUrl.searchParams.get('osl');
+  const benchmarkType = request.nextUrl.searchParams.get('benchmarkType') ?? undefined;
+  const isl = rawIsl === null ? null : Number(rawIsl);
+  const osl = rawOsl === null ? null : Number(rawOsl);
+  const isAgentic = benchmarkType === 'agentic_traces';
 
-  if (!model || !isl || !osl) {
+  if (!model) {
+    return NextResponse.json({ error: 'model, isl, and osl are required' }, { status: 400 });
+  }
+  if (benchmarkType !== undefined && !isAgentic) {
+    return NextResponse.json({ error: 'Unsupported benchmarkType' }, { status: 400 });
+  }
+  if (!isAgentic && (!isl || !osl)) {
     return NextResponse.json({ error: 'model, isl, and osl are required' }, { status: 400 });
   }
   if (FIXTURES_MODE) return cachedJson(loadFixture('benchmarks-history'));
@@ -32,7 +42,12 @@ export async function GET(request: NextRequest) {
     if (!modelKeys || modelKeys.length === 0) {
       return NextResponse.json({ error: 'Unknown model' }, { status: 400 });
     }
-    const rows = await getCachedBenchmarkHistory(modelKeys, isl, osl);
+    const rows = await getCachedBenchmarkHistory(
+      modelKeys,
+      isAgentic ? null : isl,
+      isAgentic ? null : osl,
+      benchmarkType,
+    );
     return cachedJson(rows);
   } catch (error) {
     console.error('Error fetching benchmark history:', error);

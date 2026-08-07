@@ -1090,6 +1090,33 @@ describe('overview platform selection', () => {
     );
   });
 
+  it('builds one AgentX frontier from mixed standard and MTP points', () => {
+    const summary = buildOverviewModelSummary(Model.GLM_5_2, [
+      agenticRow(40, 30, 12600, 1200, {
+        hardware: 'b200',
+        conc: 8,
+        spec_method: 'none',
+      }),
+      agenticRow(50, 25, 10800, 850, {
+        hardware: 'b200',
+        conc: 12,
+        spec_method: 'mtp',
+      }),
+      agenticRow(60, 20, 9000, 800, {
+        hardware: 'b200',
+        conc: 16,
+        spec_method: 'none',
+      }),
+    ]);
+
+    const config = summary.platforms.find(({ hardware }) => hardware === 'b200')?.read.config;
+    expect(config).toMatchObject({
+      specMethod: 'mixed',
+      specLabel: 'STP + MTP',
+      hwKey: 'b200_sglang',
+    });
+  });
+
   it('restricts AgentX points to the E2E frontier on total throughput', () => {
     // The slower-E2E point wins on output tokens but loses on total tokens, so
     // the total-token frontier drops it and the tier read becomes unreachable.

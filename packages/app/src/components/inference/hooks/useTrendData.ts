@@ -11,7 +11,8 @@ import type {
 } from '@/components/inference/types';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
-import type { Model, Sequence } from '@/lib/data-mappings';
+import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
+import { Sequence as SequenceValue, type Model, type Sequence } from '@/lib/data-mappings';
 import { computeInputCostFields, computeOutputCostFields } from '@/lib/utils';
 
 import { trackedConfigIdentity } from '../utils/point-identity';
@@ -43,6 +44,7 @@ export function useTrendData(
     trackedConfigs.length > 0 ? selectedModel : '',
     seqIslOsl?.isl ?? 0,
     seqIslOsl?.osl ?? 0,
+    selectedSequence === SequenceValue.AgenticTraces ? 'agentic_traces' : undefined,
   );
 
   const trendLines = useMemo(() => {
@@ -57,9 +59,11 @@ export function useTrendData(
     // Chart type to index: interactivity = 0, e2e = 1
     const chartTypeIndex: Record<string, number> = { interactivity: 0, e2e: 1 };
 
+    const selectedRows = dedupeAgenticHistoryRuns(allRows);
+
     // Group rows by date
     const rowsByDate = new Map<string, typeof allRows>();
-    for (const row of allRows) {
+    for (const row of selectedRows) {
       if (!rowsByDate.has(row.date)) rowsByDate.set(row.date, []);
       rowsByDate.get(row.date)!.push(row);
     }

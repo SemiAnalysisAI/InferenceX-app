@@ -70,7 +70,10 @@ import {
   generateTooltipContent,
   getPointLabel,
 } from '@/components/inference/utils/tooltipUtils';
-import { scatterPointConfigId } from '@/components/inference/utils/point-identity';
+import {
+  scatterPointConfigId,
+  trackedConfigIdentity,
+} from '@/components/inference/utils/point-identity';
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import {
   OFFLOAD_HALO_DASHARRAY,
@@ -246,9 +249,13 @@ function groupPointsByDate(points: InferenceData[]): Map<string, InferenceData[]
 const optimalPointKey = (d: InferenceData): string =>
   `${d.hwKey}_${d.precision}_${d.date}-${d.x}-${d.y}`;
 
-/** Point label lines: TP (or full parallelism label) plus the C= concurrency. */
-const pointLabelText = (d: InferenceData, advanced: boolean): string =>
-  advanced ? `${getPointLabel(d)}\nC=${d.conc}` : `${d.tp}\nC=${d.conc}`;
+/** Point label lines: TP (or full parallelism label), concurrency, then agentic decode mode. */
+export const pointLabelText = (d: InferenceData, advanced: boolean): string => {
+  const base = advanced ? `${getPointLabel(d)}\nC=${d.conc}` : `${d.tp}\nC=${d.conc}`;
+  if (d.benchmark_type !== 'agentic_traces') return base;
+  const specMethod = d.spec_decoding ?? 'none';
+  return `${base}\n${specMethod === 'none' || specMethod === '' ? 'STP' : specMethod.toUpperCase()}`;
+};
 
 // Referentially stable "no overlay data" result (see processedOverlayData).
 const EMPTY_OVERLAY_DATA: InferenceData[] = [];
@@ -821,6 +828,7 @@ const ScatterGraph = React.memo(
     }, [trackedConfigs]);
 
     const buildPointConfigId = useCallback(scatterPointConfigId, []);
+    const buildTrackedConfigId = useCallback(trackedConfigIdentity, []);
 
     // filteredData: visible points only (for scale domain calculation)
     const filteredData = useMemo(
@@ -1423,7 +1431,7 @@ const ScatterGraph = React.memo(
             yLabel,
             selectedYAxisMetric,
             hardwareConfig,
-            isTracked: trackedConfigIdsRef.current.has(buildPointConfigId(d)),
+            isTracked: trackedConfigIdsRef.current.has(buildTrackedConfigId(d)),
             runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
             hasTrace: typeof d.id === 'number' ? traceAvailability?.[d.id] === true : false,
             locale,
@@ -1450,7 +1458,7 @@ const ScatterGraph = React.memo(
           if (trackBtn) {
             trackBtn.addEventListener('click', (btnEvent) => {
               btnEvent.stopPropagation();
-              const configId = buildPointConfigId(d);
+              const configId = buildTrackedConfigId(d);
               if (trackedConfigIdsRef.current.has(configId)) removeTrackedConfig(configId);
               else addTrackedConfig(d, chartDefinition.chartType);
               chartRef.current?.dismissTooltip();
@@ -1484,7 +1492,7 @@ const ScatterGraph = React.memo(
         yLabel,
         selectedYAxisMetric,
         hardwareConfig,
-        buildPointConfigId,
+        buildTrackedConfigId,
         addTrackedConfig,
         removeTrackedConfig,
         chartDefinition.chartType,
@@ -2895,7 +2903,7 @@ const ScatterGraph = React.memo(
 
         // Tracked ring highlights
         zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
-          const isTracked = trackedConfigIdsRef.current.has(buildPointConfigId(d));
+          const isTracked = trackedConfigIdsRef.current.has(buildTrackedConfigId(d));
           d3.select(this)
             .selectAll<SVGCircleElement, boolean>('.tracked-ring')
             .data(isTracked ? [true] : [])
@@ -2932,7 +2940,7 @@ const ScatterGraph = React.memo(
           .on('dblclick', function (event, d) {
             event.stopPropagation();
             event.preventDefault();
-            const configId = buildPointConfigId(d);
+            const configId = buildTrackedConfigId(d);
             const wasTracked = trackedConfigIdsRef.current.has(configId);
             if (wasTracked) removeTrackedConfig(configId);
             else addTrackedConfig(d, chartDefinition.chartType);
@@ -2977,7 +2985,7 @@ const ScatterGraph = React.memo(
         }
       },
       [
-        buildPointConfigId,
+        buildTrackedConfigId,
         hardwareConfig,
         addTrackedConfig,
         removeTrackedConfig,

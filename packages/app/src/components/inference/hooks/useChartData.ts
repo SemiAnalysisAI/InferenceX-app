@@ -24,6 +24,10 @@ import {
   hardwareKeyMatchesAnyBase,
 } from '@/lib/constants';
 import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmark-transform';
+import {
+  dedupeAgenticHistoryRuns,
+  dedupeRowsToLatestPerConfig,
+} from '@/lib/benchmark-run-selection';
 import { Sequence, type Model } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
@@ -136,41 +140,7 @@ export function applyAgenticPercentileToXLabel(label: string, pctlWord: string):
     : `${pctlWord} ${label}`;
 }
 
-/** The dedup key fields a chart series is identified by. */
-interface DedupeRow {
-  hardware: string;
-  framework: string;
-  spec_method: string;
-  disagg: boolean;
-  precision: string;
-  offload_mode?: string | null;
-  date: string;
-}
-
-// offload_mode normalized `?? 'off'` to match the SQL layer's getBenchmarksForRun
-// lineKey — agentic offload=on and offload=off are distinct series.
-const dedupeSeriesKey = (r: DedupeRow): string =>
-  `${r.hardware}|${r.framework}|${r.spec_method}|${r.disagg}|${r.precision}|${r.offload_mode ?? 'off'}`;
-
-/**
- * For each series — (hardware, framework, spec_method, disagg, precision,
- * offload_mode) — keep only the rows from that series' most recent date. When
- * parallelism settings change between runs, old config_ids create stale points
- * under the same legend line; dropping all-but-latest removes them.
- *
- * Without `offload_mode` in the key, an offload=on sweep ingested on a LATER date
- * than the offload=off sweep would win the shared group and silently drop the
- * (earlier-dated) offload=off variant — a data-loss regression.
- */
-export function dedupeRowsToLatestPerConfig<T extends DedupeRow>(rows: T[]): T[] {
-  const maxDatePerGroup = new Map<string, string>();
-  for (const r of rows) {
-    const k = dedupeSeriesKey(r);
-    const cur = maxDatePerGroup.get(k);
-    if (!cur || r.date > cur) maxDatePerGroup.set(k, r.date);
-  }
-  return rows.filter((r) => r.date === maxDatePerGroup.get(dedupeSeriesKey(r)));
-}
+export { dedupeRowsToLatestPerConfig };
 
 export function useChartData(
   selectedModel: Model,
@@ -301,11 +271,12 @@ export function useChartData(
       selectedRunDate ? { ...r, date: selectedRunDate, actualDate: r.date } : r,
     );
     if (comparisonDates.length === 0) return mainRows;
-    const extraRows = comparisonQueries.flatMap((q, i) =>
-      (q.data ?? [])
-        .filter(seqFilter)
-        .map((r) => ({ ...r, date: comparisonDates[i], actualDate: r.date })),
-    );
+    const extraRows = comparisonQueries.flatMap((q, i) => {
+      const filtered = (q.data ?? []).filter(seqFilter);
+      const selected =
+        selectedSequence === Sequence.AgenticTraces ? dedupeAgenticHistoryRuns(filtered) : filtered;
+      return selected.map((r) => ({ ...r, date: comparisonDates[i], actualDate: r.date }));
+    });
     return [...mainRows, ...extraRows];
   }, [allRows, selectedSequence, comparisonDates, comparisonDataKey, selectedRunDate]);
 
