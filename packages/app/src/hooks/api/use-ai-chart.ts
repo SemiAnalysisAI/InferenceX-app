@@ -22,7 +22,10 @@ import {
   type ReliabilityRow,
 } from '@/lib/api';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
-import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
+import {
+  dedupeAgenticHistoryRuns,
+  dedupeRowsToLatestPerConfig,
+} from '@/lib/benchmark-run-selection';
 import {
   getNestedYValue,
   normalizeEvalHardwareKey,
@@ -401,7 +404,9 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
   const rows =
     spec.dataSource === 'history' && isAgentic
       ? dedupeAgenticHistoryRuns(fetchedRows)
-      : fetchedRows;
+      : isAgentic
+        ? dedupeRowsToLatestPerConfig(fetchedRows)
+        : fetchedRows;
 
   const { chartData } = transformBenchmarkRows(rows);
   let points = chartData[0] ?? [];
