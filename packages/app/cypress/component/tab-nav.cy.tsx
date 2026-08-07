@@ -72,11 +72,6 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
       'href',
       '/submissions?unofficialruns=12345',
     );
-    cy.get('[data-testid="tab-trigger-collectivex"]').should(
-      'have.attr',
-      'href',
-      '/collectivex?unofficialruns=12345',
-    );
     cy.get('[data-testid="tab-trigger-historical"]').should(
       'have.attr',
       'href',
@@ -116,11 +111,11 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     mountTabNav({});
     cy.get('[data-testid="tab-trigger-inference"]').should('exist');
     cy.get('[data-testid="tab-trigger-gpu-specs"]').should('exist');
-    cy.get('[data-testid="tab-trigger-collectivex"]').should('exist');
     cy.get('[data-testid="tab-trigger-submissions"]').should('exist');
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-feedback"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-ai-chart"]').should('not.exist');
+    cy.get('[data-testid="tab-trigger-collectivex"]').should('not.exist');
   });
 
   it('renders the Hidden trigger when unlocked; popover reveals gated links', () => {
@@ -129,9 +124,11 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible').and('contain.text', 'Hidden');
     // Gated links are inside the closed popover, so they're not yet in the DOM.
     cy.get('[data-testid="tab-trigger-ai-chart"]').should('not.exist');
+    cy.get('[data-testid="tab-trigger-collectivex"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-submissions"]').should('have.attr', 'href', '/submissions');
     cy.get('[data-testid="tab-trigger-hidden"]').click();
     cy.get('[data-testid="tab-hidden-popover"]').should('be.visible');
+    cy.get('[data-testid="tab-trigger-collectivex"]').should('have.attr', 'href', '/collectivex');
     cy.get('[data-testid="tab-trigger-ai-chart"]').should('have.attr', 'href', '/ai-chart');
     cy.get('[data-testid="tab-trigger-gpu-metrics"]').should('have.attr', 'href', '/gpu-metrics');
     cy.get('[data-testid="tab-hidden-popover"]')
@@ -149,11 +146,22 @@ describe('TabNav — Hidden popover for gated tabs', () => {
       'href',
       '/feedback?unofficialruns=42',
     );
+    cy.get('[data-testid="tab-trigger-collectivex"]').should(
+      'have.attr',
+      'href',
+      '/collectivex?unofficialruns=42',
+    );
   });
 
   it('highlights the Hidden trigger when the current path is one of the gated tabs', () => {
     cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
     mountTabNav({ pathname: '/feedback' });
+    cy.get('[data-testid="tab-trigger-hidden"]').should('have.class', 'border-secondary');
+  });
+
+  it('highlights the Hidden trigger on /collectivex, which is now gated', () => {
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+    mountTabNav({ pathname: '/collectivex' });
     cy.get('[data-testid="tab-trigger-hidden"]').should('have.class', 'border-secondary');
   });
 
