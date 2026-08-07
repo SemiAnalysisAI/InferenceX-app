@@ -63,6 +63,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   29654139122, // 2026-07-18 | Reason: accidental ingest while testing
   29660737166, // 2026-07-18 | Reason: accidental ingest while testing
   29702212452, // 2026-07-19 | Reason: accidental ingest while testing (e2e Test GLM-5.2 AgentX, branch feat/glm52-mi325x-agentx-full-context)
+  29741710665, // 2026-07-20 | Reason: No non-MTP AgentX — glm5.2-fp4-b300-sglang-agentic runs without speculative decoding, and GLM-5.2 agentic coding is published MTP-only per MODELS.md; the replacement arm glm5.2-fp4-b300-sglang-agentic-mtp landed in #2447 (source run of the PR #2281 DEP/conc-64 sweep)
   29811350508, // 2026-07-21 | Reason: accidental ingest while testing (e2e Test GLM-5.2 AgentX, branch explore/glm52-h200-agentx-pp-pareto)
   29819261957, // 2026-07-21 | Reason: accidental ingest while testing (e2e Test dsv4-fp4-mi355x-sglang-disagg-agentic-hicache, branch amd/agentx-v1.0-th-hicon)
   29820102138, // 2026-07-21 | Reason: accidental ingest while testing (e2e Test GLM-5.2 AgentX, branch explore/glm52-h200-agentx-pp-pareto)
