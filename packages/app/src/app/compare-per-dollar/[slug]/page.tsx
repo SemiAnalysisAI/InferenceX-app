@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // signals (verified/reproducible, what InferenceX is, named supporters)
   // before weaving the per-dollar SEO terms ("performance per dollar", "cost
   // per million tokens", "TCO-normalized") without keyword-stuffing.
-  const description = `${gpuLabel} performance per dollar on ${parsed.model.label}: verified, reproducible cost-per-million-token results from InferenceX, the independent open-source benchmark by SemiAnalysis, normalized by hyperscaler TCO. ${SUPPORTERS_LINE} See which GPU is cheaper at every interactivity level.`;
+  const description = `${gpuLabel} performance per dollar on ${parsed.model.label}: verified, reproducible cost-per-million-token results from InferenceX, the independent open-source benchmark by SemiAnalysis, normalized by hyperscaler TCO. ${SUPPORTERS_LINE} See which chip is cheaper at every interactivity level.`;
   return {
     title: `${fullLabel} — Performance per Dollar`,
     description,

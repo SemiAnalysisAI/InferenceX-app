@@ -19,6 +19,9 @@ export type {
   CollectiveXCoverage,
   CollectiveXCoveragePoint,
   CollectiveXDataset,
+  CollectiveXKvCase,
+  CollectiveXKvLatency,
+  CollectiveXKvRow,
   CollectiveXMode,
   CollectiveXOperation,
   CollectiveXOutcome,
@@ -53,7 +56,7 @@ export interface CollectiveXChartPoint {
   point: CollectiveXPoint;
 }
 
-/** A stored run's series with namespaced identity and visual-style index. */
+/** A stored run's series with namespaced identity and selection-order visual-style index. */
 export type CollectiveXRunSeries = CollectiveXSeries & {
   run_id: string;
   run_index: number;

@@ -12,7 +12,7 @@ import { ImageResponse } from 'next/og';
 import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import { canonicalCompareSlug, compareDisplayLabel, parseCompareSlug } from '@/lib/compare-slug';
 
-export const alt = 'GPU performance-per-dollar inference benchmark comparison';
+export const alt = 'Chip performance-per-dollar inference benchmark comparison';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 

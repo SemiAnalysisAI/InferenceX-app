@@ -1,4 +1,4 @@
-import type { ExclusionSpec } from './exclusion';
+import type { ExclusionConflictPolicy, ExclusionSpec } from './exclusion';
 
 export enum Model {
   Llama3_3_70B = 'Llama-3.3-70B-Instruct-FP8',
@@ -69,12 +69,15 @@ const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
 ];
 
 /**
- * AgentX STP exclusion: unsuffixed standard-token configs for the same hardware
- * SKU can't mix engine families. Different hardware may use different engines
- * on one graph. Fixed-sequence STP comparisons remain available; this rule is
- * attached only to the Agentic Traces sequence.
+ * STP exclusion: unsuffixed standard-token configs for the same hardware SKU
+ * can't mix engine families, because each engine tunes its serving path
+ * differently. Different hardware may use different engines on one graph.
+ *
+ * Which families this covers is per-scenario: AgentX applies it to every engine
+ * family while the agentic benchmark is new, whereas 8K/1K narrows it (and its
+ * MTP sibling) to vLLM and SGLang via `exclusionFamilies` below.
  */
-const AGENTIC_STP_ENGINE_EXCLUSION: ExclusionSpec[] = [
+const STP_ENGINE_EXCLUSION: ExclusionSpec[] = [
   {
     suffix: null,
     stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
@@ -82,6 +85,18 @@ const AGENTIC_STP_ENGINE_EXCLUSION: ExclusionSpec[] = [
     scope: 'hardware',
   },
 ];
+
+/**
+ * Engine families guarded on the 8K/1K chart. vLLM and SGLang tune their runs
+ * against engine-specific serving paths, so their numbers aren't directly
+ * comparable on one graph — for standard-token and MTP configs alike.
+ *
+ * Every other engine is comparable with everything here: TRTLLM, ATOM, and
+ * Mooncake ATOMesh stay freely selectable next to either engine and next to
+ * each other. Because the list is matched before `groupAliases`, ATOM escapes
+ * even though the MTP rule folds it into SGLang's comparability group.
+ */
+const EIGHTK_ONEK_EXCLUSION_FAMILIES = ['vllm', 'sglang'] as const;
 
 // Total parameter counts appended to each label so users can compare model
 // scale at a glance in the dropdown. For Llama and gpt-oss the count is
@@ -235,6 +250,26 @@ interface SequenceConfig {
   category: CategoryTag;
   kind: ScenarioKind;
   exclusion?: ExclusionSpec[];
+  /**
+   * How this scenario resolves a selection that spans several comparability
+   * groups. `clear-all` (the default) deselects every conflicting group so the
+   * user opts into one; `keep-sticky` keeps a single group so the chart still
+   * renders data on load.
+   */
+  exclusionPolicy?: ExclusionConflictPolicy;
+  /**
+   * Comparability group preferred when `keep-sticky` has to choose and the
+   * user has no prior selection to honor. Without it the tie-break is
+   * alphabetical, which would silently land on a different engine.
+   */
+  defaultExclusionGroup?: string;
+  /**
+   * The only engine families guarded on this scenario, narrowing EVERY rule in
+   * scope — the model's variant specs as well as this sequence's own. Families
+   * outside the list are comparable with everything here. Omit to let each spec
+   * decide (by default: every family participates).
+   */
+  exclusionFamilies?: readonly string[];
 }
 
 const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
@@ -258,6 +293,10 @@ const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
     compact: '8k1k',
     category: 'default',
     kind: 'fixed-seq',
+    exclusion: STP_ENGINE_EXCLUSION,
+    exclusionPolicy: 'keep-sticky',
+    defaultExclusionGroup: 'vllm',
+    exclusionFamilies: EIGHTK_ONEK_EXCLUSION_FAMILIES,
   },
   [Sequence.AgenticTraces]: {
     label: 'Agentic Traces',
@@ -265,7 +304,9 @@ const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
     compact: 'agentic',
     category: 'default',
     kind: 'agentic',
-    exclusion: AGENTIC_STP_ENGINE_EXCLUSION,
+    exclusion: STP_ENGINE_EXCLUSION,
+    exclusionPolicy: 'keep-sticky',
+    defaultExclusionGroup: 'vllm',
   },
 };
 
@@ -275,6 +316,33 @@ export function getSequenceExclusion(
 ): ExclusionSpec[] {
   if (!sequence) return [];
   return SEQUENCE_CONFIG[sequence as Sequence]?.exclusion ?? [];
+}
+
+/** Multi-group conflict policy for a sequence. Defaults to `clear-all`. */
+export function getSequenceExclusionPolicy(
+  sequence: Sequence | string | null | undefined,
+): ExclusionConflictPolicy {
+  if (!sequence) return 'clear-all';
+  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusionPolicy ?? 'clear-all';
+}
+
+/** Preferred comparability group for a sequence, or null when unconfigured. */
+export function getSequenceDefaultExclusionGroup(
+  sequence: Sequence | string | null | undefined,
+): string | null {
+  if (!sequence) return null;
+  return SEQUENCE_CONFIG[sequence as Sequence]?.defaultExclusionGroup ?? null;
+}
+
+/**
+ * The only engine families guarded on a sequence, or null when the sequence
+ * doesn't narrow its rules.
+ */
+export function getSequenceExclusionFamilies(
+  sequence: Sequence | string | null | undefined,
+): readonly string[] | null {
+  if (!sequence) return null;
+  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusionFamilies ?? null;
 }
 
 export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];

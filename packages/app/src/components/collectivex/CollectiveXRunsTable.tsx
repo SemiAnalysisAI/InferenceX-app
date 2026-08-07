@@ -12,10 +12,10 @@ import type { CollectiveXRunSummary } from './types';
 
 interface CollectiveXRunsTableProps {
   runs: CollectiveXRunSummary[];
-  runIndexById: ReadonlyMap<string, number>;
+  selectedRunIndexById: ReadonlyMap<string, number>;
   visibleRunIds: ReadonlySet<string>;
   loadingRunIds: ReadonlySet<string>;
-  deletingRunId: string | null;
+  deletingRunIds: ReadonlySet<string>;
   onVisibleChange: (runId: string, visible: boolean) => void;
   onDelete: (runId: string) => void;
 }
@@ -73,10 +73,10 @@ function formatDate(value: string, locale: 'en' | 'zh'): string {
 
 export function CollectiveXRunsTable({
   runs,
-  runIndexById,
+  selectedRunIndexById,
   visibleRunIds,
   loadingRunIds,
-  deletingRunId,
+  deletingRunIds,
   onVisibleChange,
   onDelete,
 }: CollectiveXRunsTableProps) {
@@ -109,9 +109,11 @@ export function CollectiveXRunsTable({
           {runs.map((run) => {
             const visible = visibleRunIds.has(run.run_id);
             const loading = loadingRunIds.has(run.run_id);
-            const deleting = deletingRunId === run.run_id;
+            const deleting = deletingRunIds.has(run.run_id);
             const conclusion = run.conclusion ?? t.pending;
-            const lineDasharray = collectiveXRunDasharray(runIndexById.get(run.run_id) ?? 0);
+            const selectedRunIndex = selectedRunIndexById.get(run.run_id);
+            const lineDasharray =
+              selectedRunIndex === undefined ? null : collectiveXRunDasharray(selectedRunIndex);
             return (
               <tr
                 key={run.run_id}
@@ -126,6 +128,7 @@ export function CollectiveXRunsTable({
                     <input
                       type="checkbox"
                       checked={visible}
+                      disabled={deletingRunIds.size > 0}
                       aria-label={t.showRun(run.run_id)}
                       data-testid={`collectivex-run-visible-${run.run_id}`}
                       onChange={(event) => {
@@ -143,24 +146,28 @@ export function CollectiveXRunsTable({
                 </td>
                 <td className="px-3 py-1.5 font-mono text-xs">
                   <div className="flex items-center gap-2">
-                    <svg
-                      width="24"
-                      height="10"
-                      viewBox="0 0 24 10"
-                      aria-label={t.lineStyle(run.run_id)}
-                      data-testid={`collectivex-run-line-style-${run.run_id}`}
-                      className="shrink-0 text-foreground"
-                    >
-                      <line
-                        x1="1"
-                        y1="5"
-                        x2="23"
-                        y2="5"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeDasharray={lineDasharray === 'none' ? undefined : lineDasharray}
-                      />
-                    </svg>
+                    {lineDasharray === null ? (
+                      <span aria-hidden className="block h-[10px] w-6 shrink-0" />
+                    ) : (
+                      <svg
+                        width="24"
+                        height="10"
+                        viewBox="0 0 24 10"
+                        aria-label={t.lineStyle(run.run_id)}
+                        data-testid={`collectivex-run-line-style-${run.run_id}`}
+                        className="shrink-0 text-foreground"
+                      >
+                        <line
+                          x1="1"
+                          y1="5"
+                          x2="23"
+                          y2="5"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeDasharray={lineDasharray === 'none' ? undefined : lineDasharray}
+                        />
+                      </svg>
+                    )}
                     <a
                       href={`https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${run.run_id}`}
                       target="_blank"
@@ -205,7 +212,7 @@ export function CollectiveXRunsTable({
                     size="icon"
                     aria-label={t.deleteRun(run.run_id)}
                     data-testid={`collectivex-delete-run-${run.run_id}`}
-                    disabled={deletingRunId !== null}
+                    disabled={deletingRunIds.size > 0}
                     onClick={() => onDelete(run.run_id)}
                     className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   >

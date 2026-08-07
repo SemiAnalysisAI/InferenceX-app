@@ -42,7 +42,7 @@ const GPU_COLORS = d3.schemeTableau10;
 const STRINGS = {
   en: {
     heading: 'PowerX',
-    descPre: 'Enter a GitHub Actions run ID to visualize GPU metrics over time from',
+    descPre: 'Enter a GitHub Actions run ID to visualize chip metrics over time from',
     descPost: 'artifacts.',
     relockButton: 'Re-lock feature gate',
     runIdLabel: 'Run ID',
@@ -64,13 +64,13 @@ const STRINGS = {
     metricCorrelation: 'Metric Correlation',
     resetFilter: 'Reset filter',
     downsample: 'Downsample',
-    perGpuStats: 'Per-GPU Statistics',
+    perGpuStats: 'Per-Chip Statistics',
     rows: 'rows',
   },
   zh: {
     heading: 'PowerX',
     descPre: '输入 GitHub Actions 运行 ID，可视化',
-    descPost: '产物中 GPU 指标的时间变化趋势。',
+    descPost: '产物中 Chip 指标的时间变化趋势。',
     relockButton: '重新锁定功能入口',
     runIdLabel: '运行 ID',
     runIdPlaceholder: '例如 22806827144',
@@ -91,7 +91,7 @@ const STRINGS = {
     metricCorrelation: '指标相关性',
     resetFilter: '重置筛选',
     downsample: '降采样',
-    perGpuStats: '每 GPU 统计信息',
+    perGpuStats: '每 Chip 统计信息',
     rows: '行',
   },
 } as const;
@@ -146,7 +146,7 @@ export default function GpuMetricsDisplay() {
         const response = await fetch(`/api/gpu-metrics?runId=${encodeURIComponent(runId)}`);
         const result: GpuPowerApiResponse | { error: string } = await response.json();
         if (!response.ok) {
-          throw new Error('error' in result ? result.error : 'Failed to fetch GPU metrics');
+          throw new Error('error' in result ? result.error : 'Failed to fetch chip metrics');
         }
         const apiResult = result as GpuPowerApiResponse;
         setArtifacts(apiResult.artifacts);
@@ -536,9 +536,9 @@ export default function GpuMetricsDisplay() {
                     variant="sidebar"
                     onItemRemove={removeGpu}
                     legendItems={allGpuIndices.map((gpuIndex) => ({
-                      name: `GPU ${gpuIndex}`,
+                      name: `Chip ${gpuIndex}`,
                       hw: String(gpuIndex),
-                      label: `GPU ${gpuIndex}`,
+                      label: `Chip ${gpuIndex}`,
                       color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
                       isActive: visibleGpus.has(gpuIndex),
                       onClick: () => toggleGpu(gpuIndex),
@@ -592,9 +592,9 @@ export default function GpuMetricsDisplay() {
                     variant="sidebar"
                     onItemRemove={removeGpu}
                     legendItems={allGpuIndices.map((gpuIndex) => ({
-                      name: `GPU ${gpuIndex}`,
+                      name: `Chip ${gpuIndex}`,
                       hw: String(gpuIndex),
-                      label: `GPU ${gpuIndex}`,
+                      label: `Chip ${gpuIndex}`,
                       color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
                       isActive: visibleGpus.has(gpuIndex),
                       onClick: () => toggleGpu(gpuIndex),

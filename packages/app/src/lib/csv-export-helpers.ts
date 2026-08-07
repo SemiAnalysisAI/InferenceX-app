@@ -48,9 +48,9 @@ export function inferenceChartToCsv(
     'Concurrency',
     'Date',
     // Throughput
-    'Throughput/GPU (tok/s)',
-    'Output Throughput/GPU (tok/s)',
-    'Input Throughput/GPU (tok/s)',
+    'Throughput/Chip (tok/s)',
+    'Output Throughput/Chip (tok/s)',
+    'Input Throughput/Chip (tok/s)',
     // Latency — TTFT
     'Mean TTFT (s)',
     'Median TTFT (s)',
@@ -78,8 +78,8 @@ export function inferenceChartToCsv(
     'Std E2E Latency (s)',
     // Disaggregated
     'Disaggregated',
-    'Num Prefill GPUs',
-    'Num Decode GPUs',
+    'Num Prefill Chips',
+    'Num Decode Chips',
     'Spec Decoding',
     // Parallelism
     'EP',
@@ -150,7 +150,7 @@ export function reliabilityChartToCsv(
     total: number;
   }[],
 ): CsvData {
-  const headers = ['GPU Model', 'GPU Key', 'Success Rate (%)', 'Successful Runs', 'Total Runs'];
+  const headers = ['Chip Model', 'Chip Key', 'Success Rate (%)', 'Successful Runs', 'Total Runs'];
 
   const rows = data.map((d) => [d.modelLabel, d.model, d.successRate, d.n_success, d.total]);
 
@@ -245,12 +245,12 @@ export function calculatorChartToCsv(
   getLabel?: (hwKey: string) => string,
 ): CsvData {
   const headers = [
-    'GPU',
+    'Chip',
     'Hardware Key',
     'Precision',
-    'Total Throughput (tok/s/gpu)',
-    'Output Throughput (tok/s/gpu)',
-    'Input Throughput (tok/s/gpu)',
+    'Total Throughput (tok/s/chip)',
+    'Output Throughput (tok/s/chip)',
+    'Input Throughput (tok/s/chip)',
     'Cost per Million Total Tokens ($)',
     'Cost per Million Input Tokens ($)',
     'Cost per Million Output Tokens ($)',
@@ -292,7 +292,7 @@ export function historicalTrendToCsv(
   targetInteractivity: number,
 ): CsvData {
   const headers = [
-    'GPU',
+    'Chip',
     'Hardware Key',
     'Precision',
     'Date',

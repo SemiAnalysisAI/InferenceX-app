@@ -1,7 +1,11 @@
-import { paretoFrontForDirection, type ParetoDirection } from '@/lib/chart-utils';
+import {
+  isFrontierEligible,
+  paretoFrontForDirection,
+  type ParetoDirection,
+} from '@/lib/chart-utils';
 
 import type { ClippedInferenceData, InferenceData } from '../types';
-import { e2eRestrictedSeed } from './e2eFrontier';
+import { canonicalParetoIntersection } from './canonicalFrontier';
 
 export interface FrontierContinuation {
   from: InferenceData;
@@ -32,9 +36,10 @@ export function buildFrontierContinuations(
   const visibleSet = new Set(visible);
   const clippedByPoint = new Map(clipped.map((entry) => [entry.point, entry]));
   const allPoints = [...visible, ...clipped.map((entry) => entry.point)];
-  const frontier = paretoFrontForDirection(direction)(e2eRestrictedSeed(allPoints)).toSorted(
-    (a, b) => a.x - b.x,
-  );
+  const canonicalPoints = canonicalParetoIntersection(allPoints, direction);
+  const frontier = (
+    canonicalPoints ?? paretoFrontForDirection(direction)(allPoints.filter(isFrontierEligible))
+  ).toSorted((a, b) => a.x - b.x);
   const result: FrontierContinuation[] = [];
 
   for (let index = 0; index < frontier.length - 1; index++) {

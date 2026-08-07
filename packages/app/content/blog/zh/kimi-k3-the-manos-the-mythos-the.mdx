@@ -1,0 +1,781 @@
+---
+title: 'Kimi K3：其人、其神话、其传奇'
+subtitle: 'Kimi K3 的架构：压缩记忆、跨深度注意力、潜空间专家路由，以及服务性能'
+date: '2026-08-03'
+publishDate: '2026-08-03'
+tags:
+  - inference
+  - benchmark
+  - gpu
+  - kimi
+  - vllm
+  - nvidia
+  - b200
+  - b300
+  - dynamo
+---
+
+_本文最初于 2026 年 8 月 3 日发布在 [SemiAnalysis 通讯](https://newsletter.semianalysis.com/p/kimi-k3-the-manos-the-mythos-the)。_
+
+Kimi K3 一经发布便席卷全球，横扫各大榜单，坐稳了开源前沿模型的位置。社区急于弄清 Kimi K3 究竟是怎么做到的，而支撑其性能的那些非常规技术让不少人感到意外。本文是一篇入门解析，帮助读者理解 Kimi K3 模型架构的核心技术。
+
+## Kimi Delta Attention
+
+Kimi Delta Attention（KDA）是 Kimi K3 混合注意力机制中的线性注意力层。我们从线性注意力（linear attention）出发，经由 DeltaNet、Gated DeltaNet（GDN），一路追溯到 KDA 的由来。
+
+### 线性注意力
+
+线性注意力的推导源自**去掉标准 softmax 注意力中的 softmax 运算**。下面对比两者的迭代推理公式，展示位置 t 处输出向量的计算方式：
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/softmax-vs-linear-attention.png"
+  alt="softmax 注意力输出公式与去掉指数归一化后的线性注意力输出公式对比"
+  caption="来源：[DeltaNet Explained (Part I)](https://sustcsonglin.github.io/blog/2024/deltanet-1/)"
+/>
+
+去掉 softmax 之后，我们就可以重排运算顺序，把注意力的计算复杂度从平方级降到线性：
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/linear-attention-reordering.png"
+  alt="将线性注意力求和逐步重排为一个 d×d 的运行状态矩阵 S 再与 query 相乘"
+  caption="来源：[Linear Attention and Beyond (Interactive Tutorial with Songlin Yang)](https://www.youtube.com/watch?v=d0HJvGSWw8A)"
+/>
+
+新的公式如下：
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/linear-attention-recurrence.png"
+  alt="线性注意力的递推形式：状态更新 S_t = S_t-1 + v_t k_t 转置，输出 o_t = S_t q_t"
+  caption="来源：[Linear Attention and Beyond (Interactive Tutorial with Songlin Yang)](https://www.youtube.com/watch?v=d0HJvGSWw8A)"
+/>
+
+向量 q、k、v 的维度为 _L_ × _d_。两个公式的计算复杂度都是 O(*Ld*²)，因此计算量是线性的。把新公式与 softmax 注意力的公式对比可以看到，**softmax 注意力需要访问所有历史 key 和 value 向量**，而**线性注意力把所有历史 key 和 value 向量压缩进了一个隐藏状态 S**。
+
+我们可以把这组新公式重新理解为一个**在线学习目标**。把矩阵 S 看作一块联想记忆（associative memory），它存储 key 向量 k 与 value 向量 v 之间的关联，检索时用 S 乘以 k 得到 v。于是第一个公式可以理解为**在每个位置上持续更新矩阵 S，让检索越来越准确**。最后，vt @ kt.T 这一项可以理解为损失函数 -(S @ kt.T) @ vt 对 S 的梯度。
+
+$$
+\begin{aligned}
+\textbf{Objective:}\quad
+\mathcal{L}_t(\mathbf{S})
+&=
+-\left\langle
+\mathbf{S}\mathbf{k}_t,\mathbf{v}_t
+\right\rangle
+\\[8pt]
+\textbf{SGD update:}\quad
+\mathbf{S}_t
+&=
+\mathbf{S}_{t-1}
+-\beta_t\nabla\mathcal{L}_t(\mathbf{S}_{t-1})
+\\
+&=
+\mathbf{S}_{t-1}
++\beta_t\mathbf{v}_t\mathbf{k}_t^\top
+\end{aligned}
+$$
+
+### DeltaNet
+
+在在线学习目标这一视角下可以看到，矩阵 S 的数值会无界增长：随着序列变长，新旧信息在 S 中混为一谈，训练随之变得不稳定。由于没有 softmax 来提供尺度良好且有界的输出，线性注意力在长程召回任务上通常落后于 softmax 注意力。
+
+DeltaNet 在线性注意力基础上的改进是**把损失函数换成最小化 value 检索的 L2 范数**。与线性注意力的损失函数不同，DeltaNet 的损失函数会约束 S 的增长。由此得到一条新的矩阵 S 更新规则，即 Delta Rule：
+
+$$
+\begin{aligned}
+\textbf{Objective:}\quad
+\mathcal{L}_t(\mathbf{S})
+&=
+\frac{1}{2}
+\left\|
+\mathbf{S}\mathbf{k}_t-\mathbf{v}_t
+\right\|^2
+\\[6pt]
+\textbf{SGD update:}\quad
+\mathbf{S}_t
+&=
+\mathbf{S}_{t-1}
+-\beta_t\nabla\mathcal{L}_t\!\left(\mathbf{S}_{t-1}\right)
+\\
+&=
+\mathbf{S}_{t-1}
+-\beta_t
+\left(
+\mathbf{S}_{t-1}\mathbf{k}_t-\mathbf{v}_t
+\right)
+\mathbf{k}_t^\top
+\end{aligned}
+$$
+
+来源：[Linear Attention and Beyond (Interactive Tutorial with Songlin Yang)](https://www.youtube.com/watch?v=d0HJvGSWw8A)
+
+Delta Rule 构成了 DeltaNet 注意力公式的基础：
+
+$$
+\mathbf{S}_t
+=
+\mathbf{S}_{t-1}
+-
+\beta_t
+\left(
+\mathbf{S}_{t-1}\mathbf{k}_t-\mathbf{v}_t
+\right)
+\mathbf{k}_t^\top
+$$
+
+从概念上看，Sₜ-1 @ kₜ - vₜ 表示与当前 key、value 无关的那部分关联，DeltaNet 会有针对性地把它们从记忆中剔除。
+
+### Gated DeltaNet
+
+GDN 和 KDA 都是 DeltaNet 的变体。Gated DeltaNet 在矩阵 S 上施加了 LSTM 式的遗忘门 _alpha_，让模型能够通过权重衰减来控制记忆的存活时间。KDA 更进一步，把 _alpha_ 扩展成对角矩阵，从而实现按通道（per-channel）的细粒度记忆衰减和位置感知能力。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/gdn-vs-kda-update-rule.png"
+  alt="Gated DeltaNet 使用标量遗忘门 alpha 的状态更新，与 KDA 使用 Diag(alpha) 逐通道对角衰减矩阵的更新方式对比"
+  caption="来源：[Kimi Linear](https://arxiv.org/abs/2510.26692)"
+/>
+
+### FlashKDA 算法
+
+Moonshot 为 KDA 开发了定制 kernel FlashKDA，并已[开源](https://github.com/MoonshotAI/FlashKDA/tree/master)。下面我们解析其算法并推导算术强度（arithmetic intensity）。
+
+#### 算法
+
+首先，我们从递推公式的另一种等价写法开始：
+
+```text
+u_t = beta_t * (v_t - (D_t @ S_t-1).T @ k_t)
+S_t = D_t @ S_t-1 + k_t @ u_t.T
+o_t.T = q_t.T @ S_t
+```
+
+其中 D_t 是 alpha 遗忘门构成的对角矩阵，u_t 就是 delta rule 中的 delta。decode 阶段的 kernel 基本按这个公式执行。prefill 阶段则通过把递推公式按 token 分块展开来并行化，以便在 GPU 上高效执行。假设我们展开 token i 到 j，起始状态为 S_i-1，可以得到：
+
+```text
+S_j = D_j:i @ S_i-1 + sum(D_j:t+1 @ k_t @ u_t.T, t=i:j)
+o_j.T = q_j.T @ S_j
+      = q_j.T @ D_j:i @ S_i-1 + sum(q_j.T @ D_j:t+1 @ k_t @ u_t.T, t=i:j)
+```
+
+D_j:i 指 token i 到 j 的累积衰减：D_j @ D_j-1 @ D_j-2 @ … @ D_i。写成 FlashKDA 的矩阵形式后，公式变为：
+
+```text
+S_out = D_j:i @ S_in + K_restore.T @ U
+M_qk = tril(Q_decay @ K_inv.T)
+O = Q_decay @ S_in + M_qk @ U
+```
+
+向量到矩阵的对应关系如下：
+
+- S_in 指一个 chunk 起始位置的状态
+
+- S_out 指一个 chunk 结束位置的状态
+
+- K_restore 是 D_j:t+1 @ k_t 的矩阵形式
+
+- Q_decay 是 q_j.T @ D_j:i 的矩阵形式
+
+- Q_decay @ K_inv.T 是 q_j.T @ D_j:t+1 @ k_t 的矩阵形式，由 (q_j.T @ D_j:i) @ (D_t:i^-1 @ k_t) 推导而来
+
+- M_qk 是因果掩码（causal mask），因此是一个下三角矩阵
+
+U 是展开后 u_t 的矩阵形式。为了计算它，我们施加 UT 变换并计算：
+
+```text
+B = Diag(beta) @ (V - K_decay @ S_in)
+L = StrictTril(Diag(beta) @ K_decay @ K_inv.T)
+U = (I + L)^-1 @ B
+```
+
+完整推导可参阅 [Songlin Yang 的博客文章](https://sustcsonglin.github.io/blog/2024/deltanet-2/)以及 [Kimi Linear 论文 3.1 节](https://arxiv.org/abs/2510.26692)。注意这里的 U 对应 Kimi Linear 论文中的 pseudo-value 项。
+
+在实现层面，FlashKDA 会启动 2 个 kernel：K1 和 K2。K1 并行准备 chunk 级别的张量，包括：
+
+```text
+a = exp2(cumsum(g))
+K_decay = Diag(a) @ K
+Q_decay = Diag(a) @ Q
+K_inv = Diag(a)^-1 @ K
+K_restore = a[-1] * K_inv
+L = StrictTril(Diag(beta) @ K_decay @ K_inv.T); INV = (I + L)^-1
+M_qk = tril(Q_decay @ K_inv.T)
+```
+
+这里的 `a` 是累积衰减，每个元素对应某个 token 位置上的累积衰减值。
+
+K2 执行 chunk 级别的递推计算：
+
+```text
+U = INV @ Diag(beta) @ (V - K_decay @ S)
+O = Q_decay @ S + M_qk @ U
+S = Diag(a[-1]) @ S + K_restore.T @ U
+```
+
+#### 复杂度分析
+
+下面按单个注意力头来分析复杂度。decode 阶段，关键路径上的计算为：
+
+- D_t @ S_t-1：逐元素乘法，D × D
+
+- S_t-1.T @ k_t：D × D × 1
+
+- k_t @ u_t.T：D × 1 × D
+
+- q_t.T @ S_t：1 D × D
+
+decode kernel 大约执行 `7*D²` 次 FLOP。
+
+读写 FP32 递推状态主导了访存量，因此内存流量大约为 `8*D²` 字节。
+
+prefill 阶段，K1 的关键路径在于计算 L、INV 和 M_qk。
+
+- L：C × D × C
+
+- INV：[Neumann 分解](https://github.com/MoonshotAI/FlashKDA/blob/1ce47ea3bb22c84eb9cc665028399cf35e8ffb0b/csrc/smxx/utils.cuh#L190)，执行 6 次 C × C × C 的矩阵乘法
+
+- M_qk：C × D × C
+
+对于 K2：
+
+- K_decay @ S：C × D × D
+
+- Q_decay @ S：C × D × D
+
+- M_qk @ U：C × C × D
+
+- INV @ B：C × C × D
+
+- K_restore.T @ U：D × C × D
+
+K1 与 K2 合计，FlashKDA 执行 `12*C^3 + 8*C²*D + 6*C*D²` 次 FLOP。由于以上分析是在 chunk 级别（chunk 大小为 C）进行的，假设序列长度 T `>>` C，整体 FLOP 为 `T/C * O(C*D²) = O(T*D²)`。
+
+访存量方面：
+
+- K1 读取 Q、K、g：C × D
+
+- K1 写入、K2 读取 Q_decay、K_decay、K_restore：C × D
+
+- K1 写入、K2 读取 INV、M_qk：C × C
+
+- K2 读取 V 并写出 O：C × D
+
+- K2 每个 kernel 读写 S 各一次：D × D
+
+合计下来，FlashKDA 访问 `3 * 2*C*D + 2 * (3 * 2*C*D + 2 * 2*C*C) + 2 * 2*C*D = 8*C² + 22*C*D` 字节。在 kernel 级别上，访存量为 `T/C * (8*C² + 22*C*D) + 8*D² ~ O(TC + TD + D²)`。
+
+这清楚地说明了 KDA 的计算复杂度：
+
+- prefill：计算量与访存量都与序列长度成线性关系
+
+- decode：计算量与访存量都与序列长度无关（常数级）
+
+## Kimi Linear
+
+Moonshot 训练 Kimi Linear 系列模型是为了验证其 KDA 设计，因此我们可以从 Kimi Linear 推断 Kimi K3 的架构设计。把 K3 发布的技术博客与 Kimi Linear 对照可以看到，Kimi K3 沿用了相同的共享专家数量、混合线性注意力比例，以及大体一致的注意力模块设计。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/kimi-linear-vs-kimi-k3-config.png"
+  alt="Kimi Linear 与 Kimi K3 的配置对比表，涵盖激活专家数、路由专家总数、KDA 与 MLA 比例、激活函数、输出门类型、全注意力类型、MoE 类型、token 路由方式与优化器"
+  caption="来源：SemiAnalysis"
+/>
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/kimi-k3-architecture-overview.png"
+  alt="Kimi K3 架构图，展示 Stable LatentMoE 模块、带短卷积与 L2 norm 的 KDA 模块，以及 KDA 与 Gated MLA 按 3:1 交错排列并通过 attention residual 连接回更早的 block"
+  caption="来源：[Kimi K3 Tech Blog](https://www.kimi.com/blog/kimi-k3)"
+/>
+
+上图展示了 KDA 输入端所做的运算。对 query、key、value，先做线性变换再做短卷积（short convolution）。短卷积能有效捕捉局部 token 依赖，而采用左侧 padding 的卷积可以避免破坏因果性。此外还对 query 和 key 施加 L2 norm，以稳定状态转移矩阵与输出矩阵的特征向量。在衰减记忆门方面，alpha 是低秩投影，beta 是降维投影。KDA 的输出按 head 归一化，并由一个输出遗忘门控制——在 K3 中它由线性变换实现，而 Kimi Linear 中用的是低秩投影。最后再用一个线性层混合各 head 的信息。
+
+Kimi Linear 把 KDA 与全注意力的 Multi-head Latent Attention（MLA）交错排列。Kimi Linear 的实验表明，3:1 是兼顾效果与效率的最佳 KDA 比 MLA 比例。KDA 同时还是一个很强的位置感知算子，可以取代 MLA 中的 RoPE。
+
+把 MLA 保留为全注意力是一个耐人寻味的选择，因为其他开源权重模型都在转向 Grouped Query Attention（GQA）。MLA 通过吸收（absorption）技巧降低 decode 步的计算量，代价是 prefill 步计算量增加。对于以 decode 为主的推理型负载，这是合理的取舍；但对于以 prefill 为主的 agentic 负载，额外计算的代价高而收益有限。因此，前沿开源权重模型都采用了基于 GQA 的注意力机制：GLM 5.2 的 DeepSeek Sparse Attention、DeepSeek V4 的 Compressed Sparse Attention、MiniMax M3 的 MiniMax Sparse Attention，以及 MiMo V3 的 HySparse 都建立在 GQA 之上。我们推测 Moonshot 后续的模型（比如 Kimi K4）会采用能够取代 MLA 的注意力机制。
+
+## KV cache 效率
+
+我们认为，**不应仅凭 KV cache 的空间复杂度来判断 KV cache 效率**。KV cache 大小并不是一个孤立因素，而是模型设计的产物：目前没有任何开源权重模型自带静态 KV cache 压缩技术，而模型架构本身的推理效率也会影响 KV cache 效率。KV cache 大小带来的影响还取决于模型实例部署后的总内存容量。举例来说，用宽专家并行（wide expert parallelism）部署模型与用张量并行部署，内存画像截然不同，留给 KV cache 的容量也不同。因此，我们主张同时考虑模型架构的系统效率和 KV cache 大小来理解 KV cache 效率，并用 **KV 吞吐量（KV throughput）** 来量化它。
+
+### KV 吞吐量
+
+KV 吞吐量定义为：在给定序列长度下，KV cache 大小除以 prefill 时间（首 token 时延，Time to First Token）。KV 吞吐量代表了以 PD 分离（PD disaggregation）方式稳定服务一个模型所需的最低带宽，同时也是理解 KV cache 效率的良好代理指标。prefill 时间浓缩了模型架构的效率，随着序列长度增加，我们能分别观察到访存受限与计算受限两种情形。如下表所示，序列长度越长，混合线性注意力的收益越明显。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/kv-throughput-by-sequence-length.png"
+  alt="1K、8K、32K、128K 序列长度下的 KV 吞吐量表格，对比混合架构 Kimi Linear、MiMo-V2-Flash、Qwen3.5-397B、Ring-2.5-1T 与稠密模型 MiniMax-M2.5、Qwen3-235B"
+  caption="来源：[Prefill-as-a-Service: KVCache of Next-Generation Models Could Go Cross-Datacenter](https://arxiv.org/abs/2604.15039v1)"
+/>
+
+这也是理解集群中 KV cache 向不同内存层级卸载（offload）时带宽需求的好方法。
+
+### KV cache 驻留层级
+
+KV cache 的存放位置遵循内存层次结构。首先，KV cache 驻留在 HBM——GPU 集群中最快的内存——占用模型权重和激活值剩下的容量。当 KV cache 超出 HBM 容量后，它会溢出到服务器 DRAM，这是一块容量更大但带宽更低的内存池。当 KV cache 再超出 DRAM 容量时，则溢出到 SSD 等磁盘存储。这与计算机体系结构中的缓存层次一一对应：寄存器、cache、主存、磁盘存储。
+
+这个类比在内存一致性方面同样成立。主流的分布式 KV cache 框架 Mooncake Store 支持 write-through 和 write-back 两种 KV cache 加载策略。Mooncake Store 提供一个分布式 KV cache 池，让所有 worker 都能看到全部 KV cache。在 DRAM 与下层分布式 KV cache 池之间采用 write-through 策略，在多节点场景下有多重好处：跨节点共享 prefix cache、避免张量并行 MLA 下的 KV cache 重复存储，以及节点宕机时的 KV cache 冗余。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/gpu-memory-hierarchy.png"
+  alt="GPU 内存层次金字塔，从寄存器、SHMEM L1 cache 到 L2 cache、HBM、主机 DRAM，再到 NVMe 或网络存储，并标注访问延迟与容量"
+  caption="来源：SemiAnalysis"
+/>
+
+### KDA 的 prefix cache 管理
+
+在一次请求的每个 token 位置上，Kimi K3 KDA 的递推状态大小是固定的，而标准注意力的 KV cache 会随序列长度增长。这种 KV cache 空间上的节省，代价是让 prefix cache 变得更复杂——尤其 Kimi K3 是 KDA 与 MLA 的混合注意力。
+
+粗略地说，现代推理引擎通过在已有 cache 中匹配最长 token 前缀来判断 prefix cache 是否命中。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/prefix-cache-hit.png"
+  alt="prefix cache 命中的 token 级示意图：新请求的前两个 token 与已有 KV cache 匹配，其余部分开始分叉"
+  caption="来源：SemiAnalysis"
+/>
+
+对 KDA 这类线性注意力来说，识别最长前缀成了一个难题。在不预先知道前缀边界的情况下，我们必须在每个 token 位置都缓存 KDA 的递推状态。这意味着每个 token 都有一份 cache，KV cache 内存占用又退化成随序列长度增长，使用线性注意力的意义荡然无存。为了解决这个问题，Moonshot 以较粗的粒度保存递推状态，例如 vLLM 每 32K token 缓存一次。vLLM 还会在 prompt 边界处额外缓存，因为在 agentic 负载中，新一轮对话通常从一段 prompt 的末尾开始。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/kda-cache-retention-intervals.png"
+  alt="三轮对话中基于间隔的 KDA cache 保留策略：在固定间隔和 prompt 末尾保留状态、丢弃其余状态，而 MLA 逐 token 缓存"
+  caption="来源：[Kimi K3 Is Here: Efficient Day-0 Support on vLLM](https://vllm.ai/blog/2026-07-27-k3)"
+/>
+
+这说明，尽管 KDA 这类线性注意力大幅降低了 KV cache 的内存消耗，**在真实服务场景中，它们消耗的 KV cache 内存并不是一个常数**。
+
+## Attention Residuals
+
+### 残差连接
+
+残差连接（residual connection）是让我们能够通过扩展模型深度来构建更大规模深度神经网络的关键创新之一。网络越深，表达能力越强，但直接训练很困难：早期层的信号需要一路保留到最后一层，梯度也需要从输出端一路回传到第一层而不消失。
+
+残差网络不再把整个网络建模成单一函数、只通过非线性变换传递信息，而是用恒等路径（identity path）把一个个较小的 block 连接起来。每个 block fᵢ 学习的是对其输入 xᵢ 的一个增量，由如下递推给出：
+
+$$
+x_{l+1} = x_l + f_l(x_l)
+$$
+
+恒等映射让特征可以从浅层单元一直传到任意深层单元，也为梯度提供了一条高速通道，使其不会消失。
+
+$$
+\frac{\partial x_{l+1}}{\partial x_l} = I + f_l'(x_l)
+$$
+
+残差连接虽然让我们能构建更深的网络，但也带来了新的问题。
+
+早期层会大幅影响残差流（residual stream），进而影响最终输出。正因如此，残差流随着深度增加会出现不可逆的信息损失。后续层为了在这条已被改写的残差流上产生影响，会不断放大输出增益，从而可能破坏训练稳定性。像 highway network 这样的变体虽然引入门控机制来控制信息流动，但也存在同一个关键问题：各层无法有选择地访问更早层的信息。
+
+### 时间维度与深度维度上的递推
+
+由循环神经网络主导的序列建模，采用的是同一种递推形式。
+
+$$
+h_{t+1} = h_t + f(h_t, x_{t+1})
+$$
+
+其中每一步都通过与前一状态的恒等映射实现信息直连，而序列模型面临的挑战也如出一辙：时间轴上的"深度"会稀释信号。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/residual-connections-vs-rnn-hidden-state.png"
+  alt="沿深度堆叠的残差连接与沿时间传递的 RNN 隐状态并列示意图，两者都遵循恒等映射加函数的递推形式"
+  caption="来源：SemiAnalysis"
+/>
+
+Transformer 的注意力机制打破了这一限制——它以强大但昂贵的注意力运算直接检索历史中的任意 token。
+
+### 在残差流上做注意力
+
+受序列建模中注意力机制的启发，Kimi 提出了 attention residual：在深度方向的 block 之间做注意力。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/attention-residual-equations.png"
+  alt="Attention Residuals 论文中的公式 2 和公式 3，定义逐层注意力权重 alpha 以及每层的可学习 query、key 和 value"
+  caption="来源：[Attention Residuals](https://arxiv.org/pdf/2603.15031)"
+/>
+
+标准的因果自注意力把 token _t_ 的输出计算为此前 token 表示的加权和：
+
+$$
+\mathbf{o}_t
+=
+\sum_{i=1}^{t}
+\alpha_{i\rightarrow t}\,\mathbf{v}_i,
+\qquad
+\alpha_{i\rightarrow t}
+=
+\frac{\phi(\mathbf{q}_t,\mathbf{k}_i)}
+{\sum_{j=1}^{t}\phi(\mathbf{q}_t,\mathbf{k}_j)}
+$$
+
+Attention Residuals 使用同样的注意力机制，只是把序列维度换成了深度维度。每一层不再对之前的 token 做注意力，而是对之前各层产生的表示做注意力。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/sequence-wise-vs-depth-wise-attention.png"
+  alt="对 token t1 至 t4 的序列维度注意力，与对层表示 h1 至 h4 的深度维度注意力对比"
+  caption="来源：SemiAnalysis"
+/>
+
+与标准注意力不同，这里的 query 是每层的可学习参数，而不是由当前 token 生成。
+
+$$
+\alpha_{i \to l}
+=
+\frac{\phi(\mathbf{q}_l,\mathbf{k}_i)}
+{\displaystyle\sum_{j=0}^{l-1}\phi(\mathbf{q}_l,\mathbf{k}_j)}
+$$
+
+对每一层 ℓ，我们定义：
+
+$$
+\mathbf{q}_l=\mathbf{w}_l,
+\qquad
+\mathbf{k}_i=\mathbf{v}_i=
+\begin{cases}
+\mathbf{h}_1, & i=0,\\
+f_i(\mathbf{h}_i), & 1\le i<l.
+\end{cases}
+$$
+
+图中每个彩色方块代表某个 transformer 层输出的 token 表示。正如标准因果自注意力在序列中的 token 之间做 softmax 注意力，Attention Residuals 则在此前各层产生的表示之间做 softmax 注意力。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/full-attention-residuals.png"
+  alt="Full Attention Residuals 示意图：每一层用可学习的 query 向量，对此前所有层的 key 与 value 表示做注意力"
+  caption="来源：SemiAnalysis"
+/>
+
+Attention residual 让模型能够细粒度地控制从历史层中挑选哪些输入，从而提升表达能力。
+
+### Block Attention Residuals
+
+Attention residual 需要用到此前所有层的输出来做注意力。对于分布在大量 GPU 上的大模型来说，这会带来 O(Ld) 的通信开销。为此，block attention residual 把 L 层划分为 N 个 block，每个 block 含 S 层。Block AttnRes 对已完成的 block 输出做注意力，对当前 block 则使用其不断累积的部分和。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/block-attention-residuals.png"
+  alt="Block Attention Residuals 示意图：层被分组为 block，每层对已完成的 block 表示以及当前 block 的累积部分和做注意力"
+  caption="来源：SemiAnalysis"
+/>
+
+Block Attention 相对完整 attention residual 的效果损失极小，却把通信量从 O(_Ld_) 降到了 O(_Nd_)。
+
+记 bₙⁱ 为 block _n_ 中前 _i_ 层的部分和，则有
+
+$$
+\mathbf{b}_n=\mathbf{b}_n^S,
+\qquad
+\mathbf{b}_0=\mathbf{h}_1.
+$$
+
+对于 block _n_ 中的第 _i_ 层，可用的 block 表示为
+
+$$
+\mathbf{V}_l=
+\begin{cases}
+[\mathbf{b}_0,\mathbf{b}_1,\ldots,\mathbf{b}_{n-1}]^\top,
+& i=1,\\[4pt]
+[\mathbf{b}_0,\mathbf{b}_1,\ldots,\mathbf{b}_{n-1},
+\mathbf{b}_n^{i-1}]^\top,
+& i>1.
+\end{cases}
+$$
+
+与标准注意力不同，这里的 query 不依赖输入。每一层学习一个 query 向量：
+
+$$
+\mathbf{q}_l=\mathbf{w}_l
+$$
+
+在可用 block 表示上的注意力权重计算为
+
+$$
+\boldsymbol{\alpha}_l
+=
+\operatorname{softmax}
+\left(
+\mathbf{K}_l\mathbf{w}_l
+\right).
+$$
+
+输出则是此前各层表示的加权和
+
+$$
+\mathbf{h}_l
+=
+\boldsymbol{\alpha}_l^\top\mathbf{V}_l.
+$$
+
+Attention Residuals 不再只依赖残差流来保留信息，而是让每一层都能直接、有选择地访问更早的表示。这种基于 block 的变体在保持竞争力的同时大幅降低了通信开销。
+
+相比标准残差连接，block residual 表现出更好的扩展性，计算效率提升约 1.25×，验证损失持续低于基线，且在衰减阶段差距进一步拉大。标准残差网络的输出幅值会随深度增加而增大，而 block attention 的选择性聚合使输出保持有界，梯度幅值也更稳定。
+
+### 训练
+
+与标准残差网络不同，attention residual 计算第 N 层时需要用到全部 N-1 个 block 的输入。这对流水线并行（pipeline parallelism）是个麻烦，因为所有 N 个层 block 的输出都需要跨 stage 传输。
+
+通过巧妙的跨 stage 缓存与激活重计算（activation checkpointing），Kimi 把流水线并行下的开销压到了相对标准架构仅 4%。
+
+#### 跨 stage 缓存
+
+设有 _P_ 个物理 stage 和 _V_ 个虚拟 stage，每个 block _N_ 对每个 chunk 需要 _C=PV_ 次通信。朴素做法需要为每个 stage 传输全部已累积的 block，其代价随物理 stage 和虚拟 stage 数量呈平方增长。
+
+$$
+\mathrm{Comm}_{\mathrm{naive}}
+=
+\sum_{j=1}^{C-1} jN_p \cdot d
+=
+\frac{C(C-1)}{2}N_p d
+$$
+
+通过在虚拟 stage 之间缓存输入，可以显著降低这部分通信量：在更早的层中算出的 block 可以存放在本地内存中。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/cross-stage-caching-model-split.png"
+  alt="模型层被划分为 B0 至 B4 五个 block，并映射到四张 GPU 上的两个虚拟 stage，用于跨 stage 缓存"
+  caption="来源：SemiAnalysis"
+/>
+
+在第一个虚拟 stage，所有 block 的嵌入都需要在物理 stage 内传输，每个完成的 block 存放在对应的 rank 上。在后续所有虚拟 stage 中，已缓存的 block 都可以直接复用，只有本 rank 上没有的 block 才需要传输以完成 attention residual 计算。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/cross-stage-caching-virtual-stages.png"
+  alt="按 GPU 列出的虚拟 stage 0 与虚拟 stage 1 的完成 block、缓存 block、通信 block 与生成 block 表格，展示缓存 block 无通信开销"
+  caption="来源：SemiAnalysis"
+/>
+
+这就把通信开销拆成了第一个虚拟 stage 与后续虚拟 stage 两部分。第一个虚拟 stage 仍需为所有物理层承担同样的平方级开销；而在后续虚拟 stage 中，缓存输入直接来自本地设备，只需传输 PNp 个 chunk，总通信量从 O(_C_) 降到 O(_P_)。
+
+$$
+\mathrm{Comm}_{\mathrm{cached}}
+=
+\underbrace{\frac{P(P-1)}{2}N_p d}_{\text{first virtual stage}}
++
+\underbrace{(V-1)P^2N_p d}_{\text{subsequent virtual stages}}
+$$
+
+通信量的削减与虚拟 stage 数 V 成正比。正因如此，在一次完整的前向加反向传播中，所有计算与通信都能相互重叠。
+
+#### 显存开销
+
+得益于跨 stage 缓存，所有 block 在全部 V 个虚拟 stage 中只需存储一份。配合激活重计算，用于注意力的 inter-block chunk 全部被消除。每个 stage 的激活检查点 _Pl_ 与标准架构的 H*l* 内存占用相当，因此没有额外的显存开销。
+
+### 推理
+
+由于 Attention Residuals 需要此前所有 block 的输出才能计算注意力，朴素实现会带来过多的访存。为降低开销，推理被拆分为两个阶段，分别对应自回归注意力的 prefill 与 decode：对已完成 block 的 inter-block 注意力，以及对当前运行 block 中不断累积表示的 intra-block 注意力。
+
+#### 阶段一：并行 inter-block 注意力
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/inter-block-attention-phase-1.png"
+  alt="阶段一网格图：query q12 至 q15 并行地对已完成的 block B0、B1、B2 做注意力"
+  caption="来源：SemiAnalysis"
+/>
+
+在 decode 时，我们需要用到已完成的 block 输出以及每层学到的 query 向量。所有 inter-block 层通过一次批量 query 同时对已完成 block 表示做注意力，返回输出和 softmax 统计量，后者可复用于后续计算。这一阶段类似于 prefill。
+
+#### 阶段二：串行 intra-block 注意力
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/intra-block-attention-phase-2.png"
+  alt="阶段二网格图：query q12 至 q15 依次对当前运行 block 内不断累积的部分和 b0、b1、b2 做注意力"
+  caption="来源：SemiAnalysis"
+/>
+
+这一阶段类似于 decode。与 flash attention 类似，block 内不断累积的求和可以用 online softmax 计算，再与预先算好的 inter-block 结果合并，从而减少冗余访存。
+
+采用这种两阶段设计后，IO 开销与标准残差架构相当，仅多出阶段一的 inter-block 计算，而这部分开销通过批量处理 block 内的全部 query 得到了摊薄。
+
+## LatentMoE
+
+LatentMoE 在 dispatch 操作之前压缩被路由的 token，并在 aggregation 操作之后解压。在 Kimi K3 的 Stable LatentMoE 中，他们在上投影（解压）操作之前加了一层 RMSNorm，以降低对尺度变化的敏感性并提升模型效果。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/latentmoe-block.png"
+  alt="Stable LatentMoE 模块示意图，展示共享专家、路由专家、dispatch 前的降维投影，以及 aggregation 后的 norm 加上投影"
+  caption="来源：[Kimi K3 Tech Report](https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf)"
+/>
+
+下面我们从 MoE 通信的角度解释 LatentMoE 的设计原理。正如 LatentMoE 论文所示，通信量与被路由 token 总数 _t_、激活专家数 _K_ 以及专家输入维度 _d_ 成正比，与专家并行规模 _E_ 成反比。这很可能正是 Kimi K3 latent MoE 维度大小与激活专家数配置背后的原因。Kimi K2 系列是 8 个激活专家、输入维度 7168；而 Kimi K3 的 latent 输入维度为 3584（7168 的一半），因此激活专家数可以翻倍到 16 而通信量保持不变。
+
+不过，**通信时间与计算时间之比**对于评估系统效率而言可以说更为重要（相关讨论见[这里](https://x.com/chhillee/status/2077966168304787769)和[这里](https://x.com/chhillee/status/2078130513546723531)）。这个比值代表了在吞吐受限区间内 MoE kernel 能把通信与计算重叠到何种程度的 roofline，而**专家中间维度（expert intermediate dimension）** 是唯一会影响该比值的模型配置项。具体来说，增大专家中间维度会降低该比值，也就意味着理论上可被隐藏的通信比例更高。下面我们推导这个公式：
+
+- _t_：专家并行（EP）域内的输入 token 总数
+
+- _K_：每个 token 的激活专家数
+
+- _N_：专家总数
+
+- _E_：EP 域内的 rank 数
+
+- _d_：专家输入维度
+
+- _m_：专家中间维度
+
+- _P_：每个激活元素的总通信字节数（dispatch + combine）
+
+- _F_：每 GPU 的有效 FFN 专家（按 SwiGLU 建模）计算吞吐量，FLOP/s
+
+- _B_：每 GPU 的有效单向网络带宽，B/s
+
+1. 假设专家路由均匀，每张 GPU 分到 _t \* K / E_ 个 token
+
+2. 假设专家路由均匀，平均有 _1 / E_ 的 token 本来就在源 GPU 上，因此每张 GPU 需要 dispatch _(t\*K/E) \* (1-1/E)_ 个 token
+
+3. 每个 token 是一个 d 维向量，因此每 token 的通信量为 _d \* P_
+
+4. 每张 GPU 的通信量为 _(t\*K/E) \* (1-1/E) \* d \* P_
+
+5. 通信时间 T*comm = *(t \* K \* d \* P) / (E \* B) \* (1-1/E)\_
+
+6. SwiGLU 计算包含 3 次矩阵乘法：
+
+   1. Up（第一次）投影：_d_ 到 _m_
+
+   2. Gate 投影：_d_ 到 _m_
+
+   3. Down（第二次）投影：_m_ 到 _d_
+
+因此每个 token 的计算量为 `2*d*m + 2*d*m + 2*m*d = 6*d*m` FLOP
+
+7. 每张 GPU 的计算时间为 `T_comp = (6*d*m) * (t*K/E) / F`
+
+8. 通信时间与计算时间之比为
+
+   `T_comm / T_comp`
+
+   `= ((t * K * d * P) / (E * B) * (1-1/E)) / ((6*d*m) * (t*K/E) / F)`
+
+   `= (P*F) / (6*m*B) * (1-1/E)`
+
+我们认为，这个公式也解释了为什么把专家中间维度提高到 3072 的做法不只出现在 Kimi K2 到 K3 的演进中，而是出现在近期所有开源权重模型上，包括 DeepSeek V4 Pro、MiniMax M3、MiMo V2.5 Pro 和 Inkling。随着硬件进步、专家权重精度为节省显存而降低，计算吞吐量随之上升，因此降低该比值的一条路径就是增大专家中间维度。
+
+### 分位数负载均衡（Quantile load balancing, QB）
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/quantile-balancing.png"
+  alt="三联示意图：8 个 token 路由到 4 个专家的不均衡状态、quantile balancing 的 margin 截断阈值，以及均衡后的路由结果"
+  caption="来源：[Kimi K3 report](https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf)"
+/>
+
+以往的许多负载均衡方法都需要仔细调超参。Quantile balancing 是一种无需超参、也不依赖辅助损失（aux-loss free）的负载均衡技术，由苏剑林在 [2026 年 2 月的博客文章](https://kexue.fm/archives/11619)中提出。
+
+QB 的基本原理与 aux-free 负载均衡一致：根据系统负载动态更新 router 偏置。但不同于 aux-free 方案用一个小系数去更新偏置，QB 直接依据 router 分数相对于路由截断阈值的分布来计算下一步的偏置。当 router 的负载已经比较均衡时，偏置更新自然而然会变小。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/qb-solver-algorithm.png"
+  alt="交替式 QB 求解器的伪代码：通过降序排序迭代更新逐 token 的截断值 alpha 与逐专家的偏置 beta"
+  caption="来源：[Kimi K3 report](https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf)"
+/>
+
+QB 的做法是：在当前批次的截断阈值和路由结果下，求出一个能让负载近似均衡的偏置，通过求解带约束的优化问题，并把这次更新应用到下一批次。第一个约束是每个 token 恰好被路由到 k 个专家。第二个约束是：一批 m 个 token、每个挑 k 个专家，总共产生 (mk) 次分配；要让负载在 n 个专家间均匀分布，每个专家应处理 _q=mk/n_ 个 token。
+
+每个 token 把加过偏置的 router 分数中第 (k+1) 高的那个作为截断阈值，并据此计算为均衡各专家负载所需的偏置更新量。对每个专家，QB 会把它的 router 分数与所有 token 截断阈值之间的 margin 排序，并把负偏置设为第 q+1 大的 margin，从而恰好留下 q 个 margin 高于阈值。由于 q/m=k/n，这正好是 margin 的 (1-k/n) 分位数，这也是"分位数均衡"名称的由来。
+
+## 推理性能
+
+我们正在 [InferenceX](https://inferencex.semianalysis.com/) 上持续追踪 Kimi K3 的推理性能。
+
+截至 7 月 30 日，OpenRouter 上所有服务商的价格下限均为输入每百万 token $3、输出每百万 token $15。Nvidia 和 AMD 都在 Day 0 就给出了 vLLM 配方，并支持 DRAM offload 和 DSpark 投机解码。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/openrouter-kimi-k3-providers.png"
+  alt="OpenRouter 上 Kimi K3 的服务商表格，列出 Modal、Baseten、Morph、Fireworks、Together、Moonshot AI、DigitalOcean 的输入、输出与缓存读取价格，以及延迟、吞吐量和可用率"
+  caption="来源：[OpenRouter](https://openrouter.ai/moonshotai/kimi-k3#providers)"
+/>
+
+在 InferenceX 上，我们直接基于内部录制的 Claude Code 轨迹（trace）来评测 Kimi K3 的服务性能。我们回放其中达到稳态的一小时轨迹。每轮的输入 token 中位数为 142k，输出 token 中位数为 444，每个会话的轮数中位数为 65。每轮输出 token 偏短，是 agentic harness 类负载的典型特征——agent 频繁调用工具，连编辑操作也是工具调用。
+
+相比我们此前的 8k1k/1k1k 基准测试，这套基准是一次大的跃进，因为它真实反映了现实中的 agentic 使用场景。从系统角度看，它也更贴近生产系统，能够体现包括 prefix cache 和 KV 向 DRAM 卸载在内的 KV cache 行为。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/inferencex-agentic-trace-distributions.png"
+  alt="agentic 轨迹数据集的分布直方图：每轮输入 token、每轮输出 token、每次请求未命中缓存的输入 token，以及每次会话的轮数"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/datasets)"
+/>
+
+对 Kimi K3 来说，Day 0 的 bringup 比 DSv4 更轻松，因为权重发布前的文档和准备工作更充分。合适的镜像和投机解码模型与权重同时发布。
+
+_相关阅读：[DeepSeekV4 1.6T 从 Day 0 到 Day 43 的性能演进 —— Huawei、GB300 NVL72、MI355X、B200](/zh/blog/deepseekv4-16t-day-0-to-day-43-performance)_
+
+在 Nvidia 这边，bringup 很简单。但由于模型体量太大，单个 B200 节点放不下，我们只能用 PP 才能跑起来，而 DSpark 又无法与 PP 配合使用。
+
+<Figure
+  src="/images/kimi-k3-the-manos-the-mythos-the/b200-dynamo-vllm-kimi-k3-throughput.png"
+  alt="Kimi K3 FP4 在 B200 上使用 Dynamo vLLM、TP8PP2 配置下的每 GPU token 吞吐量对 P90 交互性曲线，并发从 1 扫到 32"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/)"
+/>
+
+对 B300 来说，模型可以放进单节点，服务表现良好。扣除权重占用后，GPU HBM 只能容纳 325 万 token。在下图中，吞吐量随批量增大而上升，直到并发超过 8。这大致对应 325 万 token 的 KV cache 预算，此后 cache 开始颠簸（thrash），命中率从理论上的 95% 跌到 `<` 10%。
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+  点击查看完整 InferenceX 仪表板 →
+</DashboardCTA>
+
+_本文后续内容——B300 并发扫描、AMD MI355X 与 MI455X 的 bringup，以及 Kimi K3 完整的跨硬件服务性能对比——请见 [SemiAnalysis 通讯订阅版](https://newsletter.semianalysis.com/p/kimi-k3-the-manos-the-mythos-the)。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "什么是 Kimi Delta Attention（KDA）？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "KDA 是 Kimi K3 混合注意力机制中的线性注意力层，源自线性注意力与 DeltaNet：线性注意力去掉 softmax，把所有历史 key 和 value 压缩进单个隐藏状态 S；DeltaNet 通过最小化 value 检索的 L2 范数约束 S 的增长；Gated DeltaNet 增加了 LSTM 式的标量遗忘门 alpha；KDA 则把 alpha 扩展为对角矩阵，实现按通道的细粒度记忆衰减与位置感知。KDA 同时取代了全注意力层中的 RoPE，充当位置感知算子。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Kimi K3 中 KDA 与 MLA 的比例是多少？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "3:1，与 Kimi Linear 验证出的兼顾效果与效率的比例一致。Kimi K3 每三层 KDA 交错一层全注意力的 Gated MLA。把 MLA 保留为全注意力并不常见：GLM 5.2、DeepSeek V4、MiniMax M3 和 MiMo V3 都改用了基于 GQA 的稀疏注意力，因为 MLA 的吸收技巧是用更多 prefill 计算换取更便宜的 decode，这适合以 decode 为主的推理负载，却不适合以 prefill 为主的 agentic 负载。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "FlashKDA 的计算复杂度是多少？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "decode 阶段，计算量与访存量都与序列长度无关：每个 head 约 7*D^2 次 FLOP、8*D^2 字节访存，主要由读写 FP32 递推状态主导。prefill 阶段，FlashKDA 启动两个 kernel（K1 准备 chunk 级张量，K2 执行 chunk 级递推），每个大小为 C 的 chunk 执行 12*C^3 + 8*C^2*D + 6*C*D^2 次 FLOP，因此整体 FLOP 为 O(T*D^2)、访存量为 O(TC + TD + D^2)，均与序列长度 T 成线性关系。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "线性注意力真的能让 Kimi K3 在服务时保持常数大小的 KV cache 吗？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "并不能。KDA 在任一 token 位置上的递推状态确实是固定大小的，但 prefix cache 需要在未来请求可能续接的位置上保存状态。如果每个位置都缓存，内存占用又会退化成随序列长度增长，因此 Moonshot 以较粗粒度保存递推状态——vLLM 每 32K token 缓存一次，并在 prompt 边界额外缓存，因为 agentic 场景下新一轮通常从 prompt 末尾开始。现实中，KDA 大幅降低了 KV cache 内存，但消耗量并非常数。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "什么是 Attention Residuals 和 Block Attention Residuals？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Attention Residuals 把 softmax 注意力施加在深度维度而非序列维度上：每一层对此前各层产生的表示做注意力，使用逐层可学习的 query 向量，而不是由当前 token 生成 query。这让每一层都能直接、有选择地访问更早的表示，而不必只依赖残差流。Block Attention Residuals 把 L 层分成 N 个 block，对已完成的 block 输出加上当前 block 的累积部分和做注意力，把通信从 O(Ld) 降到 O(Nd)，同时保持效果竞争力——相比标准残差连接约有 1.25 倍的计算效率提升。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "什么是 LatentMoE？为什么专家中间维度很重要？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "LatentMoE 在 dispatch 前压缩被路由的 token，在 aggregation 后解压；Kimi K3 的 Stable LatentMoE 还在上投影前加了一层 RMSNorm。把专家输入维度从 7168 减半到 3584，可以在通信量不变的前提下把激活专家数从 8 翻倍到 16。但真正决定 MoE kernel 能隐藏多少通信的，是通信时间与计算时间之比，其表达式为 (P*F) / (6*m*B) * (1-1/E)——其中只有专家中间维度 m 属于模型配置项。这也是近期开源权重模型（包括 Kimi K3）把专家中间维度提高到 3072 的原因。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "InferenceX 如何评测 Kimi K3？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "使用内部录制的 Claude Code 真实轨迹，而非固定的 8k1k/1k1k 合成负载。我们回放一小时达到稳态的轨迹，每轮输入 token 中位数 142k、输出 token 中位数 444，每个会话轮数中位数 65。每轮输出偏短是 agentic harness 的典型特征，因为 agent 频繁调用工具。回放真实轨迹能够复现生产环境中的 KV cache 行为，包括 prefix cache 命中和 KV 向 DRAM 的卸载。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Kimi K3 在 B200 和 B300 上的服务表现如何？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Nvidia 和 AMD 都在 Day 0 提供了带 DRAM offload 和 DSpark 投机解码的 vLLM 配方，而且由于镜像和投机解码模型与权重同时发布，Day 0 bringup 比 DeepSeek V4 更顺利。Kimi K3 放不进单个 B200 节点，必须使用流水线并行，而 DSpark 无法与 PP 配合。在 B300 上模型可以放进单节点；扣除权重后 HBM 约能容纳 325 万 token 的 KV cache，吞吐量只在并发不超过 8 时随并发提升，超过之后 cache 开始颠簸，命中率从理论上的 95% 跌到 10% 以下。"
+      }
+    }
+  ]
+}`}</JsonLd>

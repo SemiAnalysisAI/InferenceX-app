@@ -25,6 +25,7 @@
     "db:backfill-aggregate-stats": "bun --env-file=../../.env src/backfill-aggregate-stats.ts",
     "db:backfill-chart-series": "bun --env-file=../../.env src/backfill-chart-series.ts",
     "db:backfill-dataset-stats": "bun --env-file=../../.env src/backfill-dataset-stats.ts",
+    "db:backfill-full-response-interactivity": "bun --env-file=../../.env src/backfill-full-response-interactivity.ts",
     "db:backfill-request-timeline": "bun --env-file=../../.env src/backfill-request-timeline.ts",
     "db:backfill-runtime-metadata": "bun --env-file=../../.env src/backfill-runtime-metadata.ts",
     "db:reset": "bun --env-file=../../.env src/reset-db.ts",

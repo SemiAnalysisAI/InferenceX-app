@@ -377,10 +377,10 @@ function variantFullSummary(i: VariantBoth): string {
       ? null
       : `${i.cheaper} is ${fmtPctDelta(i.costRatio)} cheaper per token`;
   const tputPart = i.tputTied
-    ? 'throughput per GPU is essentially tied'
+    ? 'throughput per chip is essentially tied'
     : i.tputRatio === null
       ? null
-      : `${i.faster} delivers ${fmtPctDelta(i.tputRatio)} more tok/s/GPU`;
+      : `${i.faster} delivers ${fmtPctDelta(i.tputRatio)} more tok/s/chip`;
   const both = [costPart, tputPart].filter(Boolean).join('; ');
   return both.length > 0
     ? `${both.charAt(0).toUpperCase()}${both.slice(1)}`
@@ -390,25 +390,25 @@ function variantFullSummary(i: VariantBoth): string {
 // Precision-specific "both sides" templates — mention quantization tradeoff.
 const PRECISION_BOTH_TEMPLATES: ((i: VariantBoth) => string)[] = [
   (i) =>
-    `At ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}), ${i.aLabel} delivers ${i.aValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${i.bValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.bCost)}. ${variantFullSummary(i)}. Lower-precision quantization trades model accuracy for throughput — check the evaluation page for quality impact.`,
+    `At ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}), ${i.aLabel} delivers ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${i.bValue.toFixed(0)} tok/s/chip at ${fmtCost(i.bCost)}. ${variantFullSummary(i)}. Lower-precision quantization trades model accuracy for throughput — check the evaluation page for quality impact.`,
   (i) =>
-    `${i.aLabel} posts ${i.aValue.toFixed(0)} tok/s/GPU for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}); ${i.bLabel} posts ${i.bValue.toFixed(0)} tok/s/GPU for ${fmtCost(i.bCost)}. ${variantFullSummary(i)}. Quantization-level accuracy differences are tracked on the evaluation tab.`,
+    `${i.aLabel} posts ${i.aValue.toFixed(0)} tok/s/chip for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}); ${i.bLabel} posts ${i.bValue.toFixed(0)} tok/s/chip for ${fmtCost(i.bCost)}. ${variantFullSummary(i)}. Quantization-level accuracy differences are tracked on the evaluation tab.`,
   (i) =>
-    `Throughput at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} hits ${i.aValue.toFixed(0)} tok/s/GPU, ${i.bLabel} hits ${i.bValue.toFixed(0)}. Per-million costs land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${variantFullSummary(i)}. The cost-throughput tradeoff from lower precision is only part of the picture — see the evaluation page for accuracy data.`,
+    `Throughput at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} hits ${i.aValue.toFixed(0)} tok/s/chip, ${i.bLabel} hits ${i.bValue.toFixed(0)}. Per-million costs land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${variantFullSummary(i)}. The cost-throughput tradeoff from lower precision is only part of the picture — see the evaluation page for accuracy data.`,
   (i) =>
-    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} runs ${i.aValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${i.bValue.toFixed(0)} at ${fmtCost(i.bCost)}/M. ${variantFullSummary(i)}. Precision changes affect both inference speed and model quality — consult the evaluation tab for accuracy benchmarks.`,
+    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} runs ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${i.bValue.toFixed(0)} at ${fmtCost(i.bCost)}/M. ${variantFullSummary(i)}. Precision changes affect both inference speed and model quality — consult the evaluation tab for accuracy benchmarks.`,
 ];
 
 // Spec-decode-specific "both sides" templates — mention speculative decoding.
 const SPEC_DECODE_BOTH_TEMPLATES: ((i: VariantBoth) => string)[] = [
   (i) =>
-    `At ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}), ${i.aLabel} delivers ${i.aValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${i.bValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.bCost)}. ${variantFullSummary(i)}. Speculative decoding accepts draft tokens to reduce per-token latency — gains vary by workload and prompt distribution.`,
+    `At ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}), ${i.aLabel} delivers ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${i.bValue.toFixed(0)} tok/s/chip at ${fmtCost(i.bCost)}. ${variantFullSummary(i)}. Speculative decoding accepts draft tokens to reduce per-token latency — gains vary by workload and prompt distribution.`,
   (i) =>
-    `${i.aLabel} posts ${i.aValue.toFixed(0)} tok/s/GPU for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}); ${i.bLabel} posts ${i.bValue.toFixed(0)} tok/s/GPU for ${fmtCost(i.bCost)}. ${variantFullSummary(i)}. Draft-token acceptance rates determine whether speculative decoding helps or hurts at a given concurrency level.`,
+    `${i.aLabel} posts ${i.aValue.toFixed(0)} tok/s/chip for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}); ${i.bLabel} posts ${i.bValue.toFixed(0)} tok/s/chip for ${fmtCost(i.bCost)}. ${variantFullSummary(i)}. Draft-token acceptance rates determine whether speculative decoding helps or hurts at a given concurrency level.`,
   (i) =>
-    `Throughput at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} hits ${i.aValue.toFixed(0)} tok/s/GPU, ${i.bLabel} hits ${i.bValue.toFixed(0)}. Per-million costs land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${variantFullSummary(i)}. Speculative decoding trades extra compute on draft tokens for fewer decoding steps — the payoff depends on sequence length and batch size.`,
+    `Throughput at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} hits ${i.aValue.toFixed(0)} tok/s/chip, ${i.bLabel} hits ${i.bValue.toFixed(0)}. Per-million costs land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${variantFullSummary(i)}. Speculative decoding trades extra compute on draft tokens for fewer decoding steps — the payoff depends on sequence length and batch size.`,
   (i) =>
-    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} runs ${i.aValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${i.bValue.toFixed(0)} at ${fmtCost(i.bCost)}/M. ${variantFullSummary(i)}. Gains from speculative decoding vary by workload; short-output prompts tend to benefit less.`,
+    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} runs ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${i.bValue.toFixed(0)} at ${fmtCost(i.bCost)}/M. ${variantFullSummary(i)}. Gains from speculative decoding vary by workload; short-output prompts tend to benefit less.`,
 ];
 
 // Single-side templates (shared by both kinds).
@@ -422,11 +422,11 @@ const VARIANT_SINGLE_TEMPLATES: ((args: {
   presentCost: number;
 }) => string)[] = [
   (i) =>
-    `At ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}), ${i.presentLabel} delivers ${i.presentValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.presentCost)} per million tokens; ${i.missingLabel} hasn't been benchmarked at this target.`,
+    `At ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}), ${i.presentLabel} delivers ${i.presentValue.toFixed(0)} tok/s/chip at ${fmtCost(i.presentCost)} per million tokens; ${i.missingLabel} hasn't been benchmarked at this target.`,
   (i) =>
-    `${i.presentLabel} hits ${i.presentValue.toFixed(0)} tok/s/GPU for ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}). No ${i.missingLabel} data at this operating point.`,
+    `${i.presentLabel} hits ${i.presentValue.toFixed(0)} tok/s/chip for ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}). No ${i.missingLabel} data at this operating point.`,
   (i) =>
-    `${i.presentLabel}: ${i.presentValue.toFixed(0)} tok/s/GPU, ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}). ${i.missingLabel} is unmeasured here.`,
+    `${i.presentLabel}: ${i.presentValue.toFixed(0)} tok/s/chip, ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}). ${i.missingLabel} is unmeasured here.`,
 ];
 
 // ---------------------------------------------------------------------------
@@ -515,7 +515,7 @@ export function variantJsonLdEntryFor(label: string, summary: PairSummary, posit
   ];
   if (summary.bestThroughputPerGpu !== null) {
     props.push({
-      name: 'Best Throughput per GPU (tok/s)',
+      name: 'Best Throughput per Chip (tok/s)',
       value: Number(summary.bestThroughputPerGpu.toFixed(2)),
     });
   }
@@ -584,12 +584,12 @@ export function buildVariantJsonLd(
     .map((row) => {
       const metrics: { name: string; value: string }[] = [
         { name: 'Model', value: model.displayName },
-        { name: 'GPU', value: gpuDisplayLabel },
+        { name: 'Chip', value: gpuDisplayLabel },
         { name: 'Target Interactivity (tok/s/user)', value: String(row.target) },
       ];
       if (row.a) {
         metrics.push(
-          { name: `${aLabel} Throughput (tok/s/gpu)`, value: row.a.value.toFixed(1) },
+          { name: `${aLabel} Throughput (tok/s/chip)`, value: row.a.value.toFixed(1) },
           { name: `${aLabel} Cost ($/M tok)`, value: row.a.cost.toFixed(3) },
           { name: `${aLabel} tok/s/MW`, value: row.a.tpPerMw.toFixed(0) },
           { name: `${aLabel} Concurrency`, value: String(Math.round(row.a.concurrency)) },
@@ -597,7 +597,7 @@ export function buildVariantJsonLd(
       }
       if (row.b) {
         metrics.push(
-          { name: `${bLabel} Throughput (tok/s/gpu)`, value: row.b.value.toFixed(1) },
+          { name: `${bLabel} Throughput (tok/s/chip)`, value: row.b.value.toFixed(1) },
           { name: `${bLabel} Cost ($/M tok)`, value: row.b.cost.toFixed(3) },
           { name: `${bLabel} tok/s/MW`, value: row.b.tpPerMw.toFixed(0) },
           { name: `${bLabel} Concurrency`, value: String(Math.round(row.b.concurrency)) },
@@ -656,7 +656,7 @@ export function buildVariantJsonLd(
               license: 'https://www.apache.org/licenses/LICENSE-2.0',
               isAccessibleForFree: true,
               measurementTechnique:
-                'Open-source automated GPU CI/CD inference benchmark (github.com/SemiAnalysisAI/InferenceX)',
+                'Open-source automated chip CI/CD inference benchmark (github.com/SemiAnalysisAI/InferenceX)',
               keywords,
               ...(datePublished && { datePublished }),
               ...(dateModified && { dateModified }),

@@ -14,9 +14,8 @@ import { createGzip, gzipSync } from 'node:zlib';
 
 import type postgres from 'postgres';
 
-import { computeAggregateStats } from './compute-aggregate-stats.js';
-import { computeChartSeries } from './compute-chart-series.js';
-import { computeRequestTimeline } from './compute-request-timeline.js';
+import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
+import { fullResponseMetricsFromGzip } from './full-response-interactivity.js';
 import type { ServerMetricsContext } from './server-metrics-adapters';
 
 type Sql = ReturnType<typeof postgres>;
@@ -48,6 +47,24 @@ export interface TraceReplayIngestOptions {
   progressLabel?: string;
 }
 
+export interface PreparedTraceReplay {
+  profileGz: Buffer | null;
+  profileSize: number | null;
+  serverMetricsCsv: Buffer | null;
+  serverMetricsCsvSize: number | null;
+  serverMetricsJsonGz: Buffer | null;
+  serverMetricsJsonSize: number | null;
+  aggregateStatsJson: Buffer | null;
+  chartSeriesJson: Buffer | null;
+  requestTimelineJson: Buffer | null;
+  chartWindows: number;
+  timelineRequests: number;
+  compressionMs: number;
+  computeMs: number;
+  cacheHitRates: { gpu: number; cpu: number | null } | null;
+  fullResponseMetrics: Record<string, number>;
+}
+
 function formatBytes(bytes: number | null | undefined): string {
   if (bytes === null || bytes === undefined) return 'none';
   if (bytes < 1024) return `${bytes} B`;
@@ -65,6 +82,30 @@ function elapsed(startMs: number): string {
 function jsonBuffer(value: unknown | null): Buffer | null {
   if (value === null) return null;
   return Buffer.from(JSON.stringify(structuredClone(value)), 'utf8');
+}
+
+function cacheHitRatesFromChartSeries(
+  chartSeries: Awaited<ReturnType<typeof computeTraceDerivedPayloads>>['chartSeries'],
+): PreparedTraceReplay['cacheHitRates'] {
+  if (!chartSeries || chartSeries.prefillTps.length === 0) return null;
+  const sumPrompts = chartSeries.prefillTps.reduce((sum, point) => sum + point.value, 0);
+  if (!(sumPrompts > 0)) return null;
+
+  const sumOf = (name: string): number =>
+    (chartSeries.promptTokensBySource[name] ?? []).reduce((sum, point) => sum + point.value, 0);
+  // Preserve the historical source aliases exactly: SGLang hicache reports
+  // HBM/CPU labels while vLLM LMCache reports local/external transfer labels.
+  const cpuHits = sumOf('cache hit (CPU offload)') + sumOf('external_kv_transfer');
+  const hbmFromBreakdown = sumOf('cache hit (HBM)') + sumOf('cache hit') + sumOf('local_cache_hit');
+  const gpuHits =
+    hbmFromBreakdown > 0
+      ? hbmFromBreakdown
+      : chartSeries.prefixCacheHitsTps.reduce((sum, point) => sum + point.value, 0);
+
+  return {
+    gpu: gpuHits / sumPrompts,
+    cpu: cpuHits > 0 ? cpuHits / sumPrompts : null,
+  };
 }
 
 /**
@@ -120,98 +161,111 @@ export async function uploadTraceReplayPayloadChunks(
   return part;
 }
 
-/**
- * Persist the per-point trace files and link them to `benchmarkResultIds`.
- *
- * @param sql                 Active `postgres` connection.
- * @param benchmarkResultIds  DB ids of the benchmark_results rows produced by
- *                            the same `bmk_agentic_<suffix>` artifact whose
- *                            sibling `agentic_<suffix>` directory holds these
- *                            trace files.
- * @param profileExportJsonl  Raw bytes or a file path for `profile_export.jsonl`.
- *                            Gzipped before storage; file paths stream from disk.
- * @param serverMetricsCsv    Raw bytes or a file path for `server_metrics_export.csv`.
- *                            Stored as-is.
- * @param serverMetricsJson   Raw bytes or a file path for `server_metrics_export.json` —
- *                            per-scrape time-series of every Prometheus metric.
- *                            Optional, streamed and gzipped before storage (~42x ratio).
- * @param options             Canonical framework/disagg context plus optional
- *                            progress label for CI logs.
- */
-export async function insertTraceReplay(
+/** Resolve benchmark rows which still need a trace sidecar before scheduling CPU work. */
+export async function findUnlinkedTraceReplayIds(
   sql: Sql,
   benchmarkResultIds: number[],
-  profileExportJsonl: TraceReplayInput,
-  serverMetricsCsv: TraceReplayInput,
-  serverMetricsJson: TraceReplayInput = null,
-  options: TraceReplayIngestOptions = {},
-): Promise<void> {
-  const { metricsContext = {}, progressLabel } = options;
-  const log = (message: string): void => {
-    if (progressLabel) console.log(`    trace_replay ${progressLabel}: ${message}`);
-  };
-
-  if (benchmarkResultIds.length === 0) return;
-  if (!profileExportJsonl && !serverMetricsCsv && !serverMetricsJson) return;
-
-  // Only link rows that don't already point at a trace_replay row — keeps
-  // re-ingest from inserting duplicate sibling blobs.
-  const linkStart = Date.now();
-  log(`checking ${benchmarkResultIds.length} benchmark row(s) for existing links`);
-  const unlinked = await sql<{ id: number }[]>`
+): Promise<number[]> {
+  if (benchmarkResultIds.length === 0) return [];
+  const rows = await sql<{ id: number }[]>`
     select id from benchmark_results
     where id = any(${sql.array(benchmarkResultIds)}::bigint[])
       and trace_replay_id is null
   `;
-  log(`found ${unlinked.length} unlinked row(s) (${elapsed(linkStart)})`);
-  if (unlinked.length === 0) {
-    log('skipping blob insert; all benchmark rows already linked');
-    return;
-  }
+  return rows.map((row) => row.id);
+}
 
-  const gzipStart = Date.now();
-  log('reading and compressing trace inputs');
+/**
+ * Perform the file IO and CPU-heavy derivation independently of Postgres so
+ * callers can execute this stage in worker threads.
+ */
+export async function prepareTraceReplay(
+  profileExportJsonl: TraceReplayInput,
+  serverMetricsCsv: TraceReplayInput,
+  serverMetricsJson: TraceReplayInput = null,
+  metricsContext: ServerMetricsContext = {},
+): Promise<PreparedTraceReplay> {
+  const compressionStart = Date.now();
   const [profile, csv, metricsJson] = await Promise.all([
     gzipTraceReplayInput(profileExportJsonl),
     readTraceReplayInput(serverMetricsCsv),
     gzipTraceReplayInput(serverMetricsJson),
   ]);
-  const profileGz = profile.data;
-  const profileSize = profile.sourceSize;
-  const serverMetricsCsvData = csv.data;
-  const csvSize = csv.sourceSize;
-  const metricsJsonGz = metricsJson.data;
-  const metricsJsonSize = metricsJson.sourceSize;
-  log(
-    `compressed profile=${formatBytes(profileSize)} -> ${formatBytes(profileGz?.length)}, ` +
-      `server_csv=${formatBytes(csvSize)}, ` +
-      `server_json=${formatBytes(metricsJsonSize)} -> ${formatBytes(metricsJsonGz?.length)} ` +
-      `(${elapsed(gzipStart)})`,
-  );
+  const compressionMs = Date.now() - compressionStart;
 
-  // Pre-compute aggregate stats + chart-ready time-series + per-request
-  // timeline so the detail page doesn't have to re-parse these blobs on
-  // every request. Each helper tolerates a null blob and falls back to
-  // a streaming parser for oversized server_metrics blobs.
   const computeStart = Date.now();
-  log('computing aggregate stats, chart series, and request timeline');
-  const [aggregateStats, chartSeries, requestTimeline] = await Promise.all([
-    computeAggregateStats({ profileBlob: profileGz, serverBlob: metricsJsonGz }),
-    computeChartSeries(metricsJsonGz, metricsContext),
-    Promise.resolve(computeRequestTimeline(profileGz)),
-  ]);
-  log(
-    `computed derived JSON: chart_windows=${chartSeries?.timeslicesCount ?? 0}, ` +
-      `timeline_requests=${requestTimeline?.requests.length ?? 0} (${elapsed(computeStart)})`,
+  const { aggregateStats, chartSeries, requestTimeline } = await computeTraceDerivedPayloads(
+    profile.data,
+    metricsJson.data,
+    metricsContext,
   );
+  const computeMs = Date.now() - computeStart;
+  const fullResponseMetrics = fullResponseMetricsFromGzip(profile.data);
 
-  const aggregateStatsJson = jsonBuffer(aggregateStats);
-  const chartSeriesJson = jsonBuffer(chartSeries);
-  const requestTimelineJson = jsonBuffer(requestTimeline);
+  return {
+    profileGz: profile.data,
+    profileSize: profile.sourceSize,
+    serverMetricsCsv: csv.data,
+    serverMetricsCsvSize: csv.sourceSize,
+    serverMetricsJsonGz: metricsJson.data,
+    serverMetricsJsonSize: metricsJson.sourceSize,
+    aggregateStatsJson: jsonBuffer(aggregateStats),
+    chartSeriesJson: jsonBuffer(chartSeries),
+    requestTimelineJson: jsonBuffer(requestTimeline),
+    chartWindows: chartSeries?.timeslicesCount ?? 0,
+    timelineRequests: requestTimeline?.requests.length ?? 0,
+    compressionMs,
+    computeMs,
+    cacheHitRates: cacheHitRatesFromChartSeries(chartSeries),
+    fullResponseMetrics,
+  };
+}
 
+/**
+ * Persist a prepared trace atomically. Rows are locked and rechecked here so
+ * concurrent ingest attempts cannot both attach different trace sidecars.
+ */
+export async function persistPreparedTraceReplay(
+  sql: Sql,
+  benchmarkResultIds: number[],
+  prepared: PreparedTraceReplay,
+  options: Pick<TraceReplayIngestOptions, 'progressLabel'> = {},
+): Promise<number> {
+  const { progressLabel } = options;
+  const log = (message: string): void => {
+    if (progressLabel) console.log(`    trace_replay ${progressLabel}: ${message}`);
+  };
+  if (benchmarkResultIds.length === 0) return 0;
+
+  const {
+    profileGz,
+    profileSize,
+    serverMetricsCsv,
+    serverMetricsCsvSize,
+    serverMetricsJsonGz,
+    serverMetricsJsonSize,
+    aggregateStatsJson,
+    chartSeriesJson,
+    requestTimelineJson,
+    cacheHitRates,
+    fullResponseMetrics,
+  } = prepared;
+
+  let linkedCount = 0;
   const insertStart = Date.now();
   log(`uploading trace_replay payloads in ${formatBytes(TRACE_REPLAY_UPLOAD_CHUNK_BYTES)} chunks`);
   await sql.begin(async (tx) => {
+    const unlinked = await tx<{ id: number }[]>`
+      select id from benchmark_results
+      where id = any(${tx.array(benchmarkResultIds)}::bigint[])
+        and trace_replay_id is null
+      for update
+    `;
+    if (unlinked.length === 0) {
+      log('skipping blob insert; rows were linked by another ingest');
+      return;
+    }
+
     await tx`
       create temporary table trace_replay_upload_parts (
         field text not null,
@@ -223,8 +277,8 @@ export async function insertTraceReplay(
 
     const payloads: [TraceReplayUploadField, Buffer | null][] = [
       ['profile_export_jsonl_gz', profileGz],
-      ['server_metrics_csv', serverMetricsCsvData],
-      ['server_metrics_json_gz', metricsJsonGz],
+      ['server_metrics_csv', serverMetricsCsv],
+      ['server_metrics_json_gz', serverMetricsJsonGz],
       ['aggregate_stats', aggregateStatsJson],
       ['chart_series', chartSeriesJson],
       ['request_timeline', requestTimelineJson],
@@ -263,13 +317,13 @@ export async function insertTraceReplay(
           from pg_temp.trace_replay_upload_parts
           where field = 'server_metrics_csv'
         ),
-        ${csvSize},
+        ${serverMetricsCsvSize},
         (
           select string_agg(data, ''::bytea order by part)
           from pg_temp.trace_replay_upload_parts
           where field = 'server_metrics_json_gz'
         ),
-        ${metricsJsonSize},
+        ${serverMetricsJsonSize},
         (
           select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
           from pg_temp.trace_replay_upload_parts
@@ -295,54 +349,107 @@ export async function insertTraceReplay(
     await tx`
       update benchmark_results
       set trace_replay_id = ${traceReplayId}
-      where id = any(${tx.array(unlinked.map((r) => r.id))}::bigint[])
+      where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
     `;
     log(`linked benchmark rows (${elapsed(updateStart)})`);
 
-    // Derive lifetime GPU + CPU cache hit rates from chart_series. SGLang
-    // runs don't populate these in the harness JSON; vLLM runs do but only
-    // for GPU. We always recompute to keep the derivation consistent with
-    // what the detail-page charts plot — overwriting any pre-existing value.
-    //
-    // Source label naming differs by framework / cache topology:
-    //   SGLang hicache: 'cache hit (HBM)' + 'cache hit (CPU offload)'
-    //   SGLang older:   'cache hit'      (no tier breakdown)
-    //   vLLM LMCache:   'local_cache_hit' + 'external_kv_transfer'  (+ 'local_compute' for miss)
-    //   vLLM single:    falls back to prefixCacheHitsTps total (= local cache only)
-    if (chartSeries && chartSeries.prefillTps.length > 0) {
-      const sumPrompts = chartSeries.prefillTps.reduce((s, p) => s + p.value, 0);
-      if (sumPrompts > 0) {
-        const sumOf = (name: string): number =>
-          (chartSeries.promptTokensBySource[name] ?? []).reduce((s, p) => s + p.value, 0);
-        // CPU-offload hits: SGLang hicache + vLLM LMCache external transfer.
-        const cpuHits = sumOf('cache hit (CPU offload)') + sumOf('external_kv_transfer');
-        // GPU/HBM hits from source breakdown, summed across known aliases.
-        const hbmFromBreakdown =
-          sumOf('cache hit (HBM)') + sumOf('cache hit') + sumOf('local_cache_hit');
-        // If the source breakdown has any GPU entry, use it. Otherwise fall back
-        // to total prefixCacheHitsTps sum (single-source vLLM path with no
-        // by_source metric — equals the lone cache counter's lifetime).
-        const gpuHits =
-          hbmFromBreakdown > 0
-            ? hbmFromBreakdown
-            : chartSeries.prefixCacheHitsTps.reduce((s, p) => s + p.value, 0);
-        const gpuRate = gpuHits / sumPrompts;
-        const cpuRate = cpuHits > 0 ? cpuHits / sumPrompts : null;
-        await tx`
-          update benchmark_results
-          set metrics = jsonb_set(
-            case when ${cpuRate}::numeric is not null
-              then jsonb_set(metrics, '{server_cpu_cache_hit_rate}', to_jsonb(${cpuRate}::numeric))
-              else metrics
-            end,
-            '{server_gpu_cache_hit_rate}',
-            to_jsonb(${gpuRate}::numeric)
-          )
-          where id = any(${tx.array(unlinked.map((r) => r.id))}::bigint[])
-        `;
-        log('updated cache-hit metrics from chart series');
-      }
+    if (cacheHitRates) {
+      await tx`
+        update benchmark_results
+        set metrics = jsonb_set(
+          case when ${cacheHitRates.cpu}::numeric is not null
+            then jsonb_set(
+              metrics,
+              '{server_cpu_cache_hit_rate}',
+              to_jsonb(${cacheHitRates.cpu}::numeric)
+            )
+            else metrics
+          end,
+          '{server_gpu_cache_hit_rate}',
+          to_jsonb(${cacheHitRates.gpu}::numeric)
+        )
+        where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
+      `;
+      log('updated cache-hit metrics from chart series');
     }
+    if (Object.keys(fullResponseMetrics).length > 0) {
+      await tx`
+        update benchmark_results
+        set metrics = metrics || ${tx.json(fullResponseMetrics)}
+        where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
+          and not (metrics ? 'median_full_response_itl')
+      `;
+      log('filled full-response ITL and interactivity from the AIPerf profile');
+    }
+    linkedCount = unlinked.length;
   });
-  log(`inserted trace_replay payload (${elapsed(insertStart)})`);
+  if (linkedCount > 0) log(`inserted trace_replay payload (${elapsed(insertStart)})`);
+  return linkedCount;
+}
+
+/**
+ * Persist the per-point trace files and link them to `benchmarkResultIds`.
+ *
+ * @param sql                 Active `postgres` connection.
+ * @param benchmarkResultIds  DB ids of the benchmark_results rows produced by
+ *                            the same `bmk_agentic_<suffix>` artifact whose
+ *                            sibling `agentic_<suffix>` directory holds these
+ *                            trace files.
+ * @param profileExportJsonl  Raw bytes or a file path for `profile_export.jsonl`.
+ *                            Gzipped before storage; file paths stream from disk.
+ * @param serverMetricsCsv    Raw bytes or a file path for `server_metrics_export.csv`.
+ *                            Stored as-is.
+ * @param serverMetricsJson   Raw bytes or a file path for `server_metrics_export.json` —
+ *                            per-scrape time-series of every Prometheus metric.
+ *                            Optional, streamed and gzipped before storage (~42x ratio).
+ * @param options             Canonical framework/disagg context plus optional
+ *                            progress label for CI logs.
+ */
+export async function insertTraceReplay(
+  sql: Sql,
+  benchmarkResultIds: number[],
+  profileExportJsonl: TraceReplayInput,
+  serverMetricsCsv: TraceReplayInput,
+  serverMetricsJson: TraceReplayInput = null,
+  options: TraceReplayIngestOptions = {},
+): Promise<void> {
+  const { metricsContext = {}, progressLabel } = options;
+  const log = (message: string): void => {
+    if (progressLabel) console.log(`    trace_replay ${progressLabel}: ${message}`);
+  };
+
+  if (benchmarkResultIds.length === 0) return;
+  if (!profileExportJsonl && !serverMetricsCsv && !serverMetricsJson) return;
+
+  // Only link rows that don't already point at a trace_replay row — keeps
+  // re-ingest from inserting duplicate sibling blobs.
+  const linkStart = Date.now();
+  log(`checking ${benchmarkResultIds.length} benchmark row(s) for existing links`);
+  const unlinkedIds = await findUnlinkedTraceReplayIds(sql, benchmarkResultIds);
+  log(`found ${unlinkedIds.length} unlinked row(s) (${elapsed(linkStart)})`);
+  if (unlinkedIds.length === 0) {
+    log('skipping blob insert; all benchmark rows already linked');
+    return;
+  }
+
+  log('reading and compressing trace inputs');
+  const prepared = await prepareTraceReplay(
+    profileExportJsonl,
+    serverMetricsCsv,
+    serverMetricsJson,
+    metricsContext,
+  );
+  log(
+    `compressed profile=${formatBytes(prepared.profileSize)} -> ${formatBytes(prepared.profileGz?.length)}, ` +
+      `server_csv=${formatBytes(prepared.serverMetricsCsvSize)}, ` +
+      `server_json=${formatBytes(prepared.serverMetricsJsonSize)} -> ` +
+      `${formatBytes(prepared.serverMetricsJsonGz?.length)} ` +
+      `(${(prepared.compressionMs / 1000).toFixed(1)}s)`,
+  );
+  log(
+    `computed derived JSON: chart_windows=${prepared.chartWindows}, ` +
+      `timeline_requests=${prepared.timelineRequests} ` +
+      `(${(prepared.computeMs / 1000).toFixed(1)}s)`,
+  );
+  await persistPreparedTraceReplay(sql, unlinkedIds, prepared, { progressLabel });
 }

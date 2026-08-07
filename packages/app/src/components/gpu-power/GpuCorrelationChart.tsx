@@ -139,7 +139,7 @@ const GpuCorrelationChart = React.memo(
             const color = GPU_COLORS[d.gpuIndex % GPU_COLORS.length];
             return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width:160px; user-select: ${isPinned ? 'text' : 'none'}">
             ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
-            <div class="font-semibold mb-1" style="color:${color}">GPU ${d.gpuIndex}</div>
+            <div class="font-semibold mb-1" style="color:${color}">Chip ${d.gpuIndex}</div>
             <div>${xConfig.label}: ${d.x.toFixed(1)} ${xConfig.unit}</div>
             <div>${yConfig.label}: ${d.y.toFixed(1)} ${yConfig.unit}</div>
           </div>`;

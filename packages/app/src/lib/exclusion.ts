@@ -40,6 +40,22 @@ export interface ExclusionSpec {
    */
   groupAliases?: Record<string, string>;
   /**
+   * Restrict the rule to these literal engine families, matched AFTER
+   * `stripPrefixes` but BEFORE `groupAliases`. A key whose family falls outside
+   * the list does not participate at all, so it may share a graph with
+   * anything. Omit to make every engine family participate.
+   *
+   * Matching before the aliases is what lets a rule cover vLLM vs SGLang
+   * (including `dynamo-`/`mori-` variants) while leaving ATOM — which is
+   * aliased into SGLang's group for the rules that do cover it — unrestricted.
+   *
+   * A scenario can narrow every one of its rules at once by composing its own
+   * allowlist onto each spec (see `comparisonExclusion`), which is how 8K/1K
+   * guards only vLLM and SGLang while the same model-level MTP rule keeps
+   * covering every family on other scenarios.
+   */
+  participatingFamilies?: readonly string[];
+  /**
    * Restrict mutual exclusion to configs on the same hardware SKU. Different
    * hardware may use different engine groups on the same graph.
    */
@@ -62,11 +78,17 @@ const ACTIVE_SPEC_SUFFIXES = [...SPEC_METHOD_KEYS]
 
 const GLOBAL_SCOPE = '*';
 
+/** Comparability-group id for a raw engine family under a single spec. */
+function groupForFamily(family: string, spec: ExclusionSpec): string {
+  return spec.groupAliases?.[family] ?? family;
+}
+
 /**
  * Extract the literal engine family for `hwKey` under a single spec: strip the
  * configured variant suffix (or require an unsuffixed STP key), drop the leading
  * GPU segment, then strip any configured engine-family prefix. Returns null if
- * the key doesn't participate.
+ * the key doesn't participate — either because the suffix doesn't match or
+ * because the family is outside the spec's `participatingFamilies`.
  */
 function familyForSpec(hwKey: string, spec: ExclusionSpec): string | null {
   let head: string;
@@ -86,7 +108,9 @@ function familyForSpec(hwKey: string, spec: ExclusionSpec): string | null {
       break;
     }
   }
-  return framework || null;
+  if (!framework) return null;
+  if (spec.participatingFamilies && !spec.participatingFamilies.includes(framework)) return null;
+  return framework;
 }
 
 /**
@@ -106,7 +130,7 @@ export function buildExclusion(specs: readonly ExclusionSpec[]): Exclusion {
     groupOf(hwKey: string): string | null {
       for (const spec of specs) {
         const fam = familyForSpec(hwKey, spec);
-        if (fam) return spec.groupAliases?.[fam] ?? fam;
+        if (fam) return groupForFamily(fam, spec);
       }
       return null;
     },

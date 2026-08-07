@@ -52,7 +52,7 @@ const GpuStatsTable = React.memo(({ data, metricKey }: GpuStatsTableProps) => {
   if (stats.length === 0) return null;
 
   const cols: { key: SortCol; label: string }[] = [
-    { key: 'gpuIndex', label: 'GPU' },
+    { key: 'gpuIndex', label: 'Chip' },
     { key: 'count', label: 'Samples' },
     { key: 'min', label: 'Min' },
     { key: 'max', label: 'Max' },

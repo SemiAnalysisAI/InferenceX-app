@@ -33,7 +33,7 @@ describe('ScatterGraph', () => {
           modelLabel="DeepSeek R1"
           data={data}
           xLabel="Concurrency"
-          yLabel="Throughput / GPU (tok/s)"
+          yLabel="Throughput / Chip (tok/s)"
           chartDefinition={defaultChartDef}
         />
       </div>,
@@ -59,7 +59,7 @@ describe('ScatterGraph', () => {
           modelLabel="DeepSeek R1"
           data={[]}
           xLabel="Concurrency"
-          yLabel="Throughput / GPU (tok/s)"
+          yLabel="Throughput / Chip (tok/s)"
           chartDefinition={defaultChartDef}
         />
       </div>,
@@ -102,7 +102,7 @@ describe('ScatterGraph', () => {
           modelLabel="DeepSeek R1"
           data={data}
           xLabel="Concurrency"
-          yLabel="Throughput / GPU (tok/s)"
+          yLabel="Throughput / Chip (tok/s)"
           chartDefinition={defaultChartDef}
         />
       </div>,
@@ -165,7 +165,7 @@ describe('ScatterGraph', () => {
               modelLabel={selectedModel}
               data={officialData}
               xLabel="Concurrency"
-              yLabel="Throughput / GPU (tok/s)"
+              yLabel="Throughput / Chip (tok/s)"
               chartDefinition={chartDefinition}
             />
           </div>
@@ -286,7 +286,7 @@ describe('ScatterGraph', () => {
                 modelLabel={model}
                 data={officialRows}
                 xLabel="Concurrency"
-                yLabel="Throughput / GPU (tok/s)"
+                yLabel="Throughput / Chip (tok/s)"
                 chartDefinition={chartDefinition}
                 overlayData={overlayData}
               />
@@ -322,7 +322,7 @@ describe('ScatterGraph', () => {
           modelLabel="DeepSeek R1"
           data={data}
           xLabel="Concurrency"
-          yLabel="Throughput / GPU (tok/s)"
+          yLabel="Throughput / Chip (tok/s)"
           chartDefinition={defaultChartDef}
         />
       </div>,
@@ -387,7 +387,7 @@ describe('ScatterGraph', () => {
           modelLabel="DeepSeek R1"
           data={officialData}
           xLabel="Concurrency"
-          yLabel="Throughput / GPU (tok/s)"
+          yLabel="Throughput / Chip (tok/s)"
           chartDefinition={interactivityChartDef}
           overlayData={overlayData}
         />
@@ -491,7 +491,7 @@ describe('ScatterGraph', () => {
           modelLabel="MiniMax-M3"
           data={officialData}
           xLabel="Concurrency"
-          yLabel="Throughput / GPU (tok/s)"
+          yLabel="Throughput / Chip (tok/s)"
           chartDefinition={interactivityChartDef}
           overlayData={overlayData}
         />
@@ -581,7 +581,7 @@ describe('ScatterGraph', () => {
           modelLabel="DeepSeek V4 Pro"
           data={officialData}
           xLabel="Concurrency"
-          yLabel="Throughput / GPU (tok/s)"
+          yLabel="Throughput / Chip (tok/s)"
           chartDefinition={chartDefinition}
           overlayData={overlayData}
         />
@@ -677,7 +677,7 @@ describe('ScatterGraph', () => {
           modelLabel="DeepSeek V4 Pro"
           data={officialData}
           xLabel="Concurrency"
-          yLabel="Throughput / GPU (tok/s)"
+          yLabel="Throughput / Chip (tok/s)"
           chartDefinition={chartDefinition}
           overlayData={overlayData}
         />
@@ -751,7 +751,7 @@ describe('ScatterGraph', () => {
             modelLabel="DeepSeek V4 Pro"
             data={officialData}
             xLabel="Concurrency"
-            yLabel="Throughput / GPU (tok/s)"
+            yLabel="Throughput / Chip (tok/s)"
             chartDefinition={chartDefinition}
             overlayData={showOverlay ? overlayData : undefined}
           />

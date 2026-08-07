@@ -16,16 +16,16 @@ import ReliabilityChartControls from './ChartControls';
 
 const STRINGS = {
   en: {
-    heading: 'GPU Reliability',
+    heading: 'Chip Reliability',
     description:
-      'Success rate percentages for inference runs across GPU models, showing hardware reliability for inference runs over time.',
-    captionHeading: 'Success Rate by GPU Model',
+      'Success rate percentages for inference runs across chip models, showing hardware reliability for inference runs over time.',
+    captionHeading: 'Success Rate by Chip Model',
     captionSource: 'Source: SemiAnalysis InferenceX™',
   },
   zh: {
-    heading: 'GPU 可靠性',
-    description: '各 GPU 型号推理运行的成功率百分比，展示硬件在一段时间内的推理运行可靠性。',
-    captionHeading: '各 GPU 型号成功率',
+    heading: 'Chip 可靠性',
+    description: '各 Chip 型号推理运行的成功率百分比，展示硬件在一段时间内的推理运行可靠性。',
+    captionHeading: '各 Chip 型号成功率',
     captionSource: '数据来源：SemiAnalysis InferenceX™',
   },
 } as const;

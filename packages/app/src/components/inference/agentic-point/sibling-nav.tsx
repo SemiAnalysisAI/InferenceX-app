@@ -104,7 +104,7 @@ const SORT_OPTIONS: { value: SortMode; label: string }[] = [
   { value: 'default', label: 'Default' },
   { value: 'conc', label: 'Concurrency ↑' },
   { value: 'parallelism', label: 'Parallelism' },
-  { value: 'tput', label: 'Throughput/GPU ↓' },
+  { value: 'tput', label: 'Throughput/Chip ↓' },
   { value: 'requests', label: 'Total requests ↓' },
 ];
 

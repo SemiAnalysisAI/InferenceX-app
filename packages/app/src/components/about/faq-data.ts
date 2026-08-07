@@ -54,14 +54,14 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'What is InferenceX?',
     answer:
-      'InferenceX (formerly InferenceMAX) is an open-source, vendor-neutral benchmark that continuously measures AI inference performance across GPUs and software stacks. Benchmarks re-run whenever a configuration changes, so results stay current as models and frameworks evolve.',
+      'InferenceX (formerly InferenceMAX) is an open-source, vendor-neutral benchmark that continuously measures AI inference performance across chips and software stacks. Benchmarks re-run whenever a configuration changes, so results stay current as models and frameworks evolve.',
   },
   {
     question: 'Who is behind InferenceX?',
     answer: `InferenceX is built by SemiAnalysis, an independent semiconductor and AI research firm. It is supported and trusted by ${supporterOrgs.join(', ')}. The benchmark code, data, and dashboard are all open-source on GitHub.`,
   },
   {
-    question: 'Which GPUs does InferenceX benchmark?',
+    question: 'Which chips does InferenceX benchmark?',
     answer: 'New accelerators are added as they become available.',
     list: Object.entries(gpusByVendor).map(([vendor, gpus]) => `${vendor}: ${gpus.join(', ')}`),
   },
@@ -78,7 +78,7 @@ export const FAQ_ITEMS: FaqItem[] = [
       `Frameworks: ${frameworkNames.join(', ')}`,
       `Precisions: ${[...PRECISION_KEYS].map((p) => p.toUpperCase()).join(', ')}`,
       'Runtimes: CUDA, ROCm',
-      'Disaggregated serving (separate prefill/decode GPU pools)',
+      'Disaggregated serving (separate prefill/decode chip pools)',
       'Multi-token prediction (MTP)',
       'Wide expert parallelism for MoE models',
     ],
@@ -88,8 +88,8 @@ export const FAQ_ITEMS: FaqItem[] = [
     answer: '',
     list: [
       'Interactivity (tok/s/user)',
-      'Token throughput per GPU (tok/s/gpu)',
-      'Input and output throughput per GPU',
+      'Token throughput per chip (tok/s/chip)',
+      'Input and output throughput per chip',
       'Token throughput per MW (tok/s/MW)',
       'P99 time to first token (TTFT)',
       'Cost per million tokens (total, input, output) across hyperscaler, neocloud, and rental pricing',
@@ -118,12 +118,12 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'How are results reproducible?',
     answer:
-      'Every data point on the dashboard is produced by a public GitHub Actions workflow run. The recipe (model, framework, precision, parallelism, sequence length, concurrency) is committed to the repo, the run executes on the actual target hardware, and the resulting artifacts (logs, metrics, GPU traces) are uploaded to the run page. Anyone can click through from a tooltip in any chart to the exact GitHub Actions run that produced that point.',
+      'Every data point on the dashboard is produced by a public GitHub Actions workflow run. The recipe (model, framework, precision, parallelism, sequence length, concurrency) is committed to the repo, the run executes on the actual target hardware, and the resulting artifacts (logs, metrics, chip traces) are uploaded to the run page. Anyone can click through from a tooltip in any chart to the exact GitHub Actions run that produced that point.',
   },
   {
     question: 'Where can I see the raw benchmark logs?',
     answer:
-      'Click any data point on a chart to open its tooltip. The "GitHub Actions Run" link goes directly to the workflow run that produced it. From there you can inspect the full job logs, the exact framework and driver versions, command line arguments, and download the raw artifacts including request latencies, token counts, and GPU power telemetry.',
+      'Click any data point on a chart to open its tooltip. The "GitHub Actions Run" link goes directly to the workflow run that produced it. From there you can inspect the full job logs, the exact framework and driver versions, command line arguments, and download the raw artifacts including request latencies, token counts, and chip power telemetry.',
   },
   {
     question: 'Can I rerun a benchmark myself?',
@@ -138,6 +138,6 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'Can I use InferenceX data for my own analysis?',
     answer:
-      'Yes. All data is freely available. The dashboard lets you filter by GPU, model, framework, and date range, and you can export raw CSV data directly from any chart.',
+      'Yes. All data is freely available. The dashboard lets you filter by chip, model, framework, and date range, and you can export raw CSV data directly from any chart.',
   },
 ];

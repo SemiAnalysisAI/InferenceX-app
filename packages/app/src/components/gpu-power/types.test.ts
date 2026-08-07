@@ -582,7 +582,7 @@ describe('detectAnomalies', () => {
     ];
     const anomalies = detectAnomalies(rows, 'temperature');
     const thermal = anomalies.find((a) => a.type === 'thermal')!;
-    expect(thermal.message).toContain('GPU 2');
+    expect(thermal.message).toContain('Chip 2');
     expect(thermal.message).toContain('90');
     expect(thermal.message).toContain('83');
   });

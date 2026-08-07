@@ -21,11 +21,11 @@ describe('Custom User Values', () => {
     cy.get('[data-testid="model-selector"]').should('be.visible');
   });
 
-  describe('Custom GPU Costs', () => {
+  describe('Custom Chip Costs', () => {
     it('renders the custom costs input section when custom cost metric is selected', () => {
       selectCustomCostMetric();
       cy.get('[data-testid="custom-costs-section"]').should('be.visible');
-      cy.get('[data-testid="custom-costs-section"]').should('contain.text', 'Custom GPU Costs');
+      cy.get('[data-testid="custom-costs-section"]').should('contain.text', 'Custom Chip Costs');
     });
 
     it('shows input fields pre-filled with default cost values', () => {
@@ -95,11 +95,11 @@ describe('Custom User Values', () => {
     });
   });
 
-  describe('Custom GPU Powers', () => {
+  describe('Custom Chip Powers', () => {
     it('renders the custom powers input section when custom power metric is selected', () => {
       selectCustomPowerMetric();
       cy.get('[data-testid="custom-powers-section"]').should('be.visible');
-      cy.get('[data-testid="custom-powers-section"]').should('contain.text', 'Custom GPU Powers');
+      cy.get('[data-testid="custom-powers-section"]').should('contain.text', 'Custom Chip Powers');
     });
 
     it('shows input fields pre-filled with default power values', () => {

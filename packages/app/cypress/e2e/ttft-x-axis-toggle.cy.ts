@@ -1,4 +1,4 @@
-import { unlockAgenticGate } from '../support/e2e';
+import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 
 // This spec exercises the agentic x-axis modes, which only exist when the
 // selected model resolves to the Agentic Traces scenario. The default e2e
@@ -126,6 +126,9 @@ const interceptFixedSequenceData = () => {
 describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
     interceptAgenticData();
+    // The agentic default mode is E2E Normalized Interactivity, which fetches derived metrics
+    // on first render — stub them before the visit.
+    interceptDerivedAgenticMetrics();
     cy.visit('/inference?i_seq=agentic-traces', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -136,13 +139,35 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
   });
 
-  it('shows Interactivity by default for the agentic view', () => {
+  it('shows E2E Normalized Interactivity by default for the agentic view, as the leftmost option', () => {
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Traces');
     cy.get('[data-testid="x-axis-mode-ttft"]').should('be.visible');
     cy.get('[data-testid="x-axis-mode-e2e"]').should('be.visible');
-    cy.get('[data-testid="x-axis-mode-interactivity"]')
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should('be.visible');
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]')
       .should('be.visible')
       .and('have.attr', 'aria-selected', 'true');
+    // E2E Normalized Interactivity leads the mode list for agentic.
+    cy.get('[data-testid="x-axis-mode-buttons"] [role="tab"]')
+      .first()
+      .should('have.attr', 'data-testid', 'x-axis-mode-e2e-normalized-interactivity');
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'P90 E2E Normalized Interactivity',
+    );
+    cy.get('[data-testid="chart-figure"] svg').should(
+      'contain.text',
+      'P90 E2E Normalized Interactivity (tok/s/user)',
+    );
+  });
+
+  it('switches to Interactivity and updates the heading', () => {
+    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
+      'have.attr',
+      'aria-selected',
+      'true',
+    );
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
   });
 
@@ -203,6 +228,9 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
 
   it('honors explicit label URL overrides for the agentic view', () => {
     interceptAgenticData();
+    // Fresh page load → fresh React Query cache → the default E2E Normalized Interactivity
+    // mode refetches derived metrics.
+    interceptDerivedAgenticMetrics();
     cy.visit('/inference?i_seq=agentic-traces&i_label=0&i_advlabel=0&i_linelabel=1', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -228,6 +256,42 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"] svg').should('contain.text', 'P90 End-to-end Latency (s)');
   });
 
+  it('switches back to request-level E2E Normalized Interactivity', () => {
+    // No cy.wait here: the derived metrics were fetched (and stubbed) on the
+    // initial default-mode load and are still fresh in the React Query cache
+    // (staleTime 5 min), so re-entering the mode fires no new request.
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').click();
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should(
+      'have.attr',
+      'aria-selected',
+      'true',
+    );
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'P90 E2E Normalized Interactivity',
+    );
+    cy.get('[data-testid="chart-figure"] svg').should(
+      'contain.text',
+      'P90 E2E Normalized Interactivity (tok/s/user)',
+    );
+
+    cy.get('[data-testid="percentile-selector"]').click();
+    cy.contains('[role="option"]', 'p75').click();
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'P75 E2E Normalized Interactivity',
+    );
+
+    // The percentile selector is shared page state for the whole suite —
+    // restore the p90 default so later tests assert against a known value.
+    cy.get('[data-testid="percentile-selector"]').click();
+    cy.contains('[role="option"]', 'p90').click();
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'P90 E2E Normalized Interactivity',
+    );
+  });
+
   it('switches back to Interactivity', () => {
     cy.get('[data-testid="x-axis-mode-interactivity"]').click();
     cy.get('[data-testid="x-axis-mode-interactivity"]').should(
@@ -251,6 +315,37 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
       'P75 Interactivity (tok/s/user)',
+    );
+  });
+});
+
+describe('X-axis mode URL param', () => {
+  // Regression: the reconcile effect used to run before availability resolved
+  // the sequence. It recorded the fixed-seq placeholder kind, then treated the
+  // switch to agentic as a user-driven kind change and clobbered the
+  // URL-restored mode with the agentic default (E2E Normalized Interactivity).
+  it('keeps a URL-restored mode through the agentic sequence resolving', () => {
+    interceptAgenticData();
+    interceptDerivedAgenticMetrics();
+    cy.visit('/inference?i_seq=agentic-traces&i_xmode=interactivity', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        unlockAgenticGate(win);
+      },
+    });
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Traces');
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
+      'have.attr',
+      'aria-selected',
+      'true',
+    );
+    // Assert on the rendered chart too: the clobber happened one tick after
+    // the buttons first painted, so a button-only check could pass too early.
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should(
+      'have.attr',
+      'aria-selected',
+      'false',
     );
   });
 });
@@ -369,6 +464,8 @@ const interceptAgenticDataWithOverlay = () => {
 describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', () => {
   before(() => {
     interceptAgenticDataWithOverlay();
+    // Default agentic mode is E2E Normalized Interactivity → derived metrics fetch on mount.
+    interceptDerivedAgenticMetrics();
     cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -416,5 +513,20 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
       });
       expect(total).to.be.greaterThan(0);
     });
+  });
+
+  it('e2e-normalized-interactivity mode shows suppression banner for unofficial-run overlays', () => {
+    // Derived metrics are cached from the initial default-mode load.
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').click();
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should(
+      'have.attr',
+      'aria-selected',
+      'true',
+    );
+    // The suppression message appears because isUnofficialRun is true and the
+    // mode is 'e2e-normalized-interactivity' (documented in ChartDisplay.tsx).
+    cy.contains(
+      'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
+    ).should('be.visible');
   });
 });

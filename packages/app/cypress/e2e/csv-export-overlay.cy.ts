@@ -1,4 +1,4 @@
-import { unlockAgenticGate } from '../support/e2e';
+import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 import {
   interceptOverlayRun,
   OVERLAY_RUN_BRANCH,
@@ -35,6 +35,10 @@ function readCapturedCsv(): Cypress.Chainable<string> {
 describe('Inference CSV export with an unofficial-run overlay', () => {
   before(() => {
     interceptOverlayRun();
+    // The agentic default mode is E2E Normalized Interactivity (which suppresses overlays and
+    // fetches derived metrics) — stub the fetch, then switch to the
+    // Interactivity mode this suite's overlay assertions rely on.
+    interceptDerivedAgenticMetrics();
     cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -43,6 +47,12 @@ describe('Inference CSV export with an unofficial-run overlay', () => {
       },
     });
     cy.wait('@unofficialRun');
+    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
+      'have.attr',
+      'aria-selected',
+      'true',
+    );
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should('exist');
   });
 

@@ -71,7 +71,7 @@ export default function LegendPointsDialog({
       { key: 'conc', label: 'Conc', numeric: true },
       { key: 'parallelism', label: 'Parallelism', numeric: false },
       ...(hasOffload ? [{ key: 'offload', label: 'Offload', numeric: false } as Column] : []),
-      { key: 'tputPerGpu', label: 'Tput/GPU', numeric: true },
+      { key: 'tputPerGpu', label: 'Tput/Chip', numeric: true },
       { key: 'p50Intvty', label: 'p50 Int', numeric: true },
       { key: 'p90Intvty', label: 'p90 Int', numeric: true },
       { key: 'p50Ttft', label: 'p50 TTFT', numeric: true },
@@ -204,7 +204,7 @@ export default function LegendPointsDialog({
           {isOverlay
             ? 'Unofficial overlay points have no stored benchmark records — metrics only, no detail links.'
             : 'Click a row for the point detail — agentic points open the trace detail page, fixed-seq points open the GitHub Actions run.'}{' '}
-          Interactivity in tok/s/user · TTFT in s · throughput in tok/s/gpu.
+          Interactivity in tok/s/user · TTFT in s · throughput in tok/s/chip.
         </p>
       </DialogContent>
     </Dialog>

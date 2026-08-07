@@ -5,11 +5,12 @@ import { CurrentImageContent } from '@/components/latest-image/latest-image-cont
 
 export const metadata: Metadata = {
   title: 'Current InferenceX Image',
-  description: 'Current InferenceX Docker image tags for each model, GPU SKU, and configuration.',
+  description: 'Current InferenceX Docker image tags for each model, chip SKU, and configuration.',
   alternates: { canonical: `${SITE_URL}/current-inferencex-image` },
   openGraph: {
     title: 'Current InferenceX Image | InferenceX by SemiAnalysis',
-    description: 'Current InferenceX Docker image tags for each model, GPU SKU, and configuration.',
+    description:
+      'Current InferenceX Docker image tags for each model, chip SKU, and configuration.',
     url: `${SITE_URL}/current-inferencex-image`,
   },
 };

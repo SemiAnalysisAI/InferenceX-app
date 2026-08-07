@@ -126,6 +126,39 @@ describe('cachedQuery', () => {
       expect(mockBlobSet).toHaveBeenCalledWith('bench:llama:2025-01-01', ['llama', '2025-01-01']);
     });
 
+    it('hashes oversized argument lists into a bounded deterministic key', async () => {
+      mockBlobGet.mockResolvedValue(null);
+      mockBlobSet.mockResolvedValue(undefined);
+      const fn = vi.fn((ids: number[]) => Promise.resolve(ids.length));
+      const wrapped = cachedQuery(fn, 'derived-agentic-metrics-v7', { blobOnly: true });
+      const ids = Array.from({ length: 200 }, (_, index) => 434_388 + index);
+
+      await wrapped(ids);
+      await wrapped(ids);
+
+      const firstKey = mockBlobGet.mock.calls[0]![0];
+      const secondKey = mockBlobGet.mock.calls[1]![0];
+      expect(firstKey).toBe(secondKey);
+      expect(firstKey).toMatch(/^derived-agentic-metrics-v7:sha256:[a-f0-9]{64}$/u);
+      expect(firstKey.length).toBeLessThan(128);
+      expect(mockBlobSet).toHaveBeenCalledWith(firstKey, 200);
+    });
+
+    it('serves a successful query result when the blob write fails', async () => {
+      mockBlobGet.mockResolvedValue(null);
+      mockBlobSet.mockRejectedValue(new Error('pathname is too long'));
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const fn = vi.fn((_ids: number[]) => Promise.resolve({ answer: 42 }));
+      const wrapped = cachedQuery(fn, 'derived-agentic-metrics-v7', { blobOnly: true });
+
+      await expect(wrapped([1, 2, 3])).resolves.toEqual({ answer: 42 });
+      expect(warn).toHaveBeenCalledWith(
+        '[blob cache] could not persist derived-agentic-metrics-v7; serving uncached result. pathname is too long',
+      );
+
+      warn.mockRestore();
+    });
+
     it('uses bare prefix when no args are passed', async () => {
       mockBlobGet.mockResolvedValue('cached');
       const fn = vi.fn(() => Promise.resolve('fresh'));

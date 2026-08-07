@@ -19,21 +19,21 @@ import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `InferenceX is the independent, open-source GPU inference benchmark from SemiAnalysis, with verified, reproducible nightly results. ${SUPPORTERS_LINE} Compare latency, throughput & cost head-to-head across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
+const DESCRIPTION = `InferenceX is the independent, open-source chip inference benchmark from SemiAnalysis, with verified, reproducible nightly results. ${SUPPORTERS_LINE} Compare latency, throughput & cost head-to-head across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
 
 export const metadata: Metadata = {
-  title: 'GPU Comparisons',
+  title: 'Chip Comparisons',
   description: DESCRIPTION,
   alternates: enAlternates('/compare'),
   openGraph: {
-    title: `GPU Comparisons | ${SITE_NAME}`,
+    title: `Chip Comparisons | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/compare`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: `GPU Comparisons | ${SITE_NAME}`,
+    title: `Chip Comparisons | ${SITE_NAME}`,
     description: DESCRIPTION,
   },
 };
@@ -77,7 +77,7 @@ function groupPairsByVendorForModel(
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',
-  name: `GPU Comparisons | ${SITE_NAME}`,
+  name: `Chip Comparisons | ${SITE_NAME}`,
   description: DESCRIPTION,
   url: `${SITE_URL}/compare`,
 };
@@ -99,7 +99,7 @@ export default async function CompareIndexPage() {
       <JsonLd data={jsonLd} />
       <section>
         <Card>
-          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">GPU Comparisons</h1>
+          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">Chip Comparisons</h1>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} head-to-head inference benchmark comparisons across{' '}
             {formatModelList(modelsWithPairs)}. Each page includes interactive charts for latency,
@@ -111,7 +111,7 @@ export default async function CompareIndexPage() {
               href="/compare-per-dollar"
               className="inline-flex items-center gap-2 rounded-md bg-brand px-5 py-3 text-base lg:text-lg font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
             >
-              Compare GPU performance per dollar
+              Compare Chip performance per dollar
               <span aria-hidden="true" className="text-lg lg:text-xl">
                 →
               </span>
@@ -149,7 +149,7 @@ export default async function CompareIndexPage() {
               <div>
                 <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {pairs.length} GPU pair{pairs.length === 1 ? '' : 's'} with benchmark data on{' '}
+                  {pairs.length} chip pair{pairs.length === 1 ? '' : 's'} with benchmark data on{' '}
                   {model.label}.
                 </p>
               </div>

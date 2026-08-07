@@ -42,6 +42,7 @@
     "admin:db:migrate": "bun run --cwd packages/db db:migrate",
     "admin:db:migrate:collectivex": "bun run --cwd packages/db db:migrate:collectivex",
     "admin:db:apply-overrides": "bun run --cwd packages/db db:apply-overrides",
+    "admin:db:backfill-full-response-interactivity": "bun run --cwd packages/db db:backfill-full-response-interactivity",
     "admin:db:reset": "bun run --cwd packages/db db:reset",
     "admin:db:verify": "bun run --cwd packages/db db:verify"
   },

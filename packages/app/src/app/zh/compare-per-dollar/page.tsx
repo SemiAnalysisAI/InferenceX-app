@@ -18,14 +18,14 @@ import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `哪款 GPU 每美元推理性能最高？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，提供经过验证的、可复现的测试结果。${SUPPORTERS_LINE_ZH}横向对比 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5、Qwen 3.5 等模型基于云服务商 TCO 归一化的每百万 token 成本。`;
+const DESCRIPTION = `哪款 Chip 每美元推理性能最高？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，提供经过验证的、可复现的测试结果。${SUPPORTERS_LINE_ZH}横向对比 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5、Qwen 3.5 等模型基于云服务商 TCO 归一化的每百万 token 成本。`;
 
 export const metadata: Metadata = {
-  title: 'GPU 每美元性能',
+  title: 'Chip 每美元性能',
   description: DESCRIPTION,
   alternates: zhAlternates('/compare-per-dollar'),
   openGraph: {
-    title: `GPU 每美元性能 | ${SITE_NAME}`,
+    title: `Chip 每美元性能 | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/zh/compare-per-dollar`,
     type: 'website',
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: `GPU 每美元性能 | ${SITE_NAME}`,
+    title: `Chip 每美元性能 | ${SITE_NAME}`,
     description: DESCRIPTION,
   },
 };
@@ -77,7 +77,7 @@ function groupPairsByVendorForModel(
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',
-  name: `GPU 每美元性能 | ${SITE_NAME}`,
+  name: `Chip 每美元性能 | ${SITE_NAME}`,
   description: DESCRIPTION,
   url: `${SITE_URL}/zh/compare-per-dollar`,
   inLanguage: 'zh-CN',
@@ -95,12 +95,12 @@ export default async function ComparePerDollarIndexPageZh() {
       <JsonLd data={jsonLd} />
       <section>
         <Card>
-          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">GPU 每美元性能</h1>
+          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">Chip 每美元性能</h1>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} 组每百万 token 成本的正面对比，涵盖{' '}
             {formatModelList(modelsWithPairs)}
             。性能按所属云服务商 TCO 归一化——每个页面展示每 token 成本图表及插值美元/百万 token
-            对比表格，帮助您在任意目标交互性水平下选出更经济的 GPU。
+            对比表格，帮助您在任意目标交互性水平下选出更经济的 Chip。
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -108,7 +108,7 @@ export default async function ComparePerDollarIndexPageZh() {
               href="/zh/compare"
               className="inline-flex items-center gap-2 rounded-md bg-brand px-5 py-3 text-base lg:text-lg font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
             >
-              GPU 延迟 + 吞吐量对比
+              Chip 延迟 + 吞吐量对比
               <span aria-hidden="true" className="text-lg lg:text-xl">
                 →
               </span>
@@ -146,7 +146,7 @@ export default async function ComparePerDollarIndexPageZh() {
               <div>
                 <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {pairs.length} 组 GPU 对比具有 {model.label} 的每 token 成本基准测试数据。
+                  {pairs.length} 组 Chip 对比具有 {model.label} 的每 token 成本基准测试数据。
                 </p>
               </div>
               {groups.map((group) => (

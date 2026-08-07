@@ -128,7 +128,7 @@ describe('TCO Calculator', () => {
     it('renders chart title matching the selected metric', () => {
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'Total Token Throughput per GPU');
+        .should('contain.text', 'Total Token Throughput per Chip');
     });
 
     it('renders subtitle with source', () => {
@@ -186,7 +186,7 @@ describe('TCO Calculator', () => {
     });
 
     it('shows power badges when tok/s/MW metric is selected', () => {
-      cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'All in Power/GPU');
+      cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'All in Power/Chip');
       cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'kW');
       cy.get('[data-testid="calculator-chart-section"]').should(
         'contain.text',
@@ -201,7 +201,7 @@ describe('TCO Calculator', () => {
     });
 
     it('shows TCO badges when cost metric is selected', () => {
-      cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'TCO $/GPU/hr');
+      cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'TCO $/chip/hr');
       cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', '$');
     });
 
@@ -209,7 +209,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-metric-throughput"]').click();
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'Total Token Throughput per GPU');
+        .should('contain.text', 'Total Token Throughput per Chip');
       cy.get('[data-testid="calculator-metric-power"]').click();
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
@@ -245,7 +245,7 @@ describe('TCO Calculator', () => {
 
     it('results table contains expected column headers', () => {
       cy.get('[data-testid="calculator-results-table"]').within(() => {
-        cy.get('thead').should('contain.text', 'GPU');
+        cy.get('thead').should('contain.text', 'Chip');
         cy.get('thead').should('contain.text', 'tok/s/MW');
         cy.get('thead').should('contain.text', 'Concurrency');
       });
@@ -505,7 +505,7 @@ describe('TCO Calculator', () => {
       );
       cy.get('[data-testid="calculator-chart-section"]').should(
         'contain.text',
-        'throughput per decode GPU',
+        'throughput per decode chip',
       );
     });
 
@@ -513,7 +513,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-metric-cost"]').click();
       cy.get('[data-testid="calculator-chart-section"]').should(
         'contain.text',
-        'cost per decode GPU',
+        'cost per decode chip',
       );
     });
 
@@ -521,7 +521,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-metric-power"]').click();
       cy.get('[data-testid="calculator-chart-section"]').should(
         'contain.text',
-        'throughput per decode GPU',
+        'throughput per decode chip',
       );
     });
   });
@@ -659,7 +659,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
       cy.get('[data-testid="calculator-fleet-table"]').should('be.visible');
       cy.get('[data-testid="calculator-fleet-table"]').within(() => {
-        cy.contains('th', 'GPUs').should('exist');
+        cy.contains('th', 'Chips').should('exist');
         cy.contains('th', 'Concurrent Users').should('exist');
         cy.contains('th', 'Fleet $/mo').should('exist');
         cy.get('tbody tr').should('have.length.greaterThan', 0);
@@ -712,7 +712,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calc-fleet-mw-input"]').type('0.0001');
       cy.get('[data-testid="calculator-fleet-empty"]')
         .should('be.visible')
-        .and('contain.text', 'too small to power a single GPU');
+        .and('contain.text', 'too small to power a single chip');
       cy.get('[data-testid="calculator-fleet-table"]').should('not.exist');
     });
 

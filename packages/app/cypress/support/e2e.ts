@@ -37,3 +37,30 @@ export function unlockAgenticGate(win: Window): void {
     // agentic surfaces are public regardless.
   }
 }
+
+/**
+ * Stub `/api/v1/derived-agentic-metrics` with deterministic per-id values.
+ *
+ * E2E Normalized Interactivity is the DEFAULT x-axis mode for agentic scenarios, so any spec
+ * that loads the agentic view fires this fetch on mount — without a stub the
+ * fixture server has no DB and the chart sits on its loading skeleton until
+ * the query errors out. Values are index-stable so axis positions are
+ * deterministic. Register BEFORE `cy.visit`.
+ */
+export function interceptDerivedAgenticMetrics(): void {
+  cy.intercept('GET', '/api/v1/derived-agentic-metrics*', (request) => {
+    const ids = new URL(request.url).searchParams.get('ids')?.split(',').filter(Boolean) ?? [];
+    request.reply({
+      body: Object.fromEntries(
+        ids.map((id, index) => [
+          id,
+          {
+            id: Number(id),
+            p75_e2e_norm_intvty: 40 + index,
+            p90_e2e_norm_intvty: 25 + index,
+          },
+        ]),
+      ),
+    });
+  }).as('derivedAgenticMetrics');
+}

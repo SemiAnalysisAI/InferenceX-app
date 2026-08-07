@@ -111,7 +111,7 @@ const CACHE_STRINGS = {
     offloadBackend: 'KV Offload Engine',
     transferEngine: 'KV Transfer Engine',
     router: 'Router',
-    gpuHitRate: 'GPU Cache Hit Rate',
+    gpuHitRate: 'Chip Cache Hit Rate',
     cpuHitRate: 'CPU Cache Hit Rate',
     theoreticalHitRate: 'Theoretical Cache Hit Rate',
     legacyEnabled: 'Enabled (legacy data)',
@@ -122,7 +122,7 @@ const CACHE_STRINGS = {
     offloadBackend: 'KV 卸载引擎',
     transferEngine: 'KV 传输引擎',
     router: '路由器',
-    gpuHitRate: 'GPU Cache 命中率',
+    gpuHitRate: 'Chip Cache 命中率',
     cpuHitRate: 'CPU Cache 命中率',
     theoreticalHitRate: '理论 Cache 命中率',
     legacyEnabled: '已启用（旧版数据）',
@@ -234,10 +234,10 @@ const PARALLELISM_STRINGS = {
     singleNode: 'Single-node aggregate',
     multiNode: 'Multi-node aggregate',
     disaggregated: 'Disaggregated',
-    gpuCount: (n: number) => `${n} GPU${n > 1 ? 's' : ''}`,
+    gpuCount: (n: number) => `${n} Chip${n > 1 ? 's' : ''}`,
     prefill: 'Prefill',
     decode: 'Decode',
-    gpusUnit: 'GPUs',
+    gpusUnit: 'Chips',
     tensorParallelism: 'Tensor Parallelism',
     expertParallelism: 'Expert Parallelism',
     pipelineParallelism: 'Pipeline Parallelism',
@@ -249,10 +249,10 @@ const PARALLELISM_STRINGS = {
     singleNode: '单节点聚合',
     multiNode: '多节点聚合',
     disaggregated: '分离式',
-    gpuCount: (n: number) => `${n} 个 GPU`,
+    gpuCount: (n: number) => `${n} 个 Chip`,
     prefill: '预填充',
     decode: '解码',
-    gpusUnit: '个 GPU',
+    gpusUnit: '个 Chip',
     tensorParallelism: '张量并行 (TP)',
     expertParallelism: '专家并行 (EP)',
     pipelineParallelism: '流水线并行 (PP)',
@@ -349,7 +349,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
         selectedYAxisMetric === 'y_tpPerGpu' && d['inputTputPerGpu']
           ? `
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-            <strong>Input Token Throughput per GPU:</strong> ${fmt(d['inputTputPerGpu'].y)}
+            <strong>Input Token Throughput per Chip:</strong> ${fmt(d['inputTputPerGpu'].y)}
           </div>`
           : ''
       }
@@ -357,11 +357,11 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
         selectedYAxisMetric === 'y_tpPerGpu' && d['outputTputPerGpu']
           ? `
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-            <strong>Output Token Throughput per GPU:</strong> ${fmt(d['outputTputPerGpu'].y)}
+            <strong>Output Token Throughput per Chip:</strong> ${fmt(d['outputTputPerGpu'].y)}
           </div>`
           : ''
       }
-      ${tooltipLine('Total GPUs', d.tp)}
+      ${tooltipLine('Total Chips', d.tp)}
       ${generateParallelismHTML(d, locale)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Concurrency:</strong> ${d.conc}
@@ -421,7 +421,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>${yLabel}:</strong> ${fmt(d.y)}
       </div>
-      ${tooltipLine('Total GPUs', d.tp)}
+      ${tooltipLine('Total Chips', d.tp)}
       ${generateParallelismHTML(d, locale)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Concurrency:</strong> ${d.conc}
@@ -462,7 +462,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
         <strong>Date:</strong> ${d.date}${d.actualDate && d.actualDate !== d.date ? ` <span style="opacity: 0.7">(data from ${d.actualDate})</span>` : ''}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>GPU Config:</strong> ${hardwareConfig[d.hwKey] ? getDisplayLabel(hardwareConfig[d.hwKey]) : d.hwKey}
+        <strong>Chip Config:</strong> ${hardwareConfig[d.hwKey] ? getDisplayLabel(hardwareConfig[d.hwKey]) : d.hwKey}
       </div>
       ${
         d?.image
@@ -480,7 +480,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
         selectedYAxisMetric === 'y_tpPerGpu' && d['inputTputPerGpu']
           ? `
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-            <strong>Input Token Throughput per GPU:</strong> ${fmt(d['inputTputPerGpu'].y)}
+            <strong>Input Token Throughput per Chip:</strong> ${fmt(d['inputTputPerGpu'].y)}
           </div>`
           : ''
       }
@@ -488,11 +488,11 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
         selectedYAxisMetric === 'y_tpPerGpu' && d['outputTputPerGpu']
           ? `
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-            <strong>Output Token Throughput per GPU:</strong> ${fmt(d['outputTputPerGpu'].y)}
+            <strong>Output Token Throughput per Chip:</strong> ${fmt(d['outputTputPerGpu'].y)}
           </div>`
           : ''
       }
-      ${tooltipLine('Total GPUs', d.tp)}
+      ${tooltipLine('Total Chips', d.tp)}
       ${generateParallelismHTML(d, locale)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Concurrency:</strong> ${d.conc}

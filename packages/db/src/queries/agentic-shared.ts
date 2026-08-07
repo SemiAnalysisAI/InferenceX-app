@@ -34,10 +34,13 @@ import type { DbClient } from '../connection.js';
  *
  * v6: drop the retired per-point derived metrics (normalizedSessionTimeS,
  * p90PrefillTpsPerUser, normalizedE2e400) along with the experimental chart
- * modes they fed. The bundle is now isl/osl + the server-derived kvCacheUtil
- * and prefixCacheHitRate.
+ * modes they fed.
+ *
+ * v7: add `e2elPerOsl` — percentiles of per-request E2E latency divided by
+ * OSL (seconds per output token), the inverse of the "E2E Normalized Interactivity" x-axis
+ * metric.
  */
-export const STATS_VERSION = 6;
+export const STATS_VERSION = 7;
 
 interface ProfileRecord {
   metadata?: { benchmark_phase?: string };

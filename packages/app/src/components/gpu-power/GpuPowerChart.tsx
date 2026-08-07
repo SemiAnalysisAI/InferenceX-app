@@ -129,7 +129,7 @@ const GpuMetricsChart = React.memo(
     if (allPoints.length === 0) {
       return (
         <div className="flex items-center justify-center min-h-[600px]">
-          <p className="text-muted-foreground text-sm">No GPU metrics data to display.</p>
+          <p className="text-muted-foreground text-sm">No Chip metrics data to display.</p>
         </div>
       );
     }
@@ -219,12 +219,12 @@ const GpuMetricsChart = React.memo(
             const color = GPU_COLORS[d.gpuIndex % GPU_COLORS.length];
             return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 160px; user-select: ${isPinned ? 'text' : 'none'}">
               ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
-              <div class="font-semibold mb-1" style="color: ${color}">GPU ${d.gpuIndex}</div>
+              <div class="font-semibold mb-1" style="color: ${color}">Chip ${d.gpuIndex}</div>
               <div class="text-muted-foreground">${d.seconds.toFixed(1)}s</div>
               <div class="mt-1 font-medium">${metricConfig.label}: ${d.value.toFixed(1)} ${metricConfig.unit}</div>
               <div class="text-muted-foreground">Power: ${d.raw.power.toFixed(1)} W</div>
               <div class="text-muted-foreground">Temp: ${d.raw.temperature}\u00B0C</div>
-              <div class="text-muted-foreground">GPU Util: ${d.raw.gpuUtil}%</div>
+              <div class="text-muted-foreground">Chip Util: ${d.raw.gpuUtil}%</div>
             </div>`;
           },
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.seconds),

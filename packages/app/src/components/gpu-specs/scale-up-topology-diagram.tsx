@@ -123,7 +123,7 @@ export const ScaleUpTopologyDiagram = forwardRef<
               variant="ghost"
               size="icon"
               onClick={() => navigate('prev')}
-              aria-label="Previous GPU"
+              aria-label="Previous Chip"
               data-testid="scaleup-topology-nav-prev"
             >
               <ChevronLeft className="size-5" />
@@ -134,7 +134,7 @@ export const ScaleUpTopologyDiagram = forwardRef<
                 {displayedSpec.scaleUpBandwidth} {displayedSpec.scaleUpTopology} &middot;{' '}
                 {displayedConfig.techName}
                 {displayedConfig.nodeCount > 1 &&
-                  ` · ${displayedConfig.nodeCount} nodes × ${displayedConfig.gpusPerNode} GPUs`}
+                  ` · ${displayedConfig.nodeCount} nodes × ${displayedConfig.gpusPerNode} Chips`}
                 <span className="ml-2 opacity-60">
                   ({displayedIndex + 1} / {allSpecs.length})
                 </span>
@@ -144,7 +144,7 @@ export const ScaleUpTopologyDiagram = forwardRef<
               variant="ghost"
               size="icon"
               onClick={() => navigate('next')}
-              aria-label="Next GPU"
+              aria-label="Next Chip"
               data-testid="scaleup-topology-nav-next"
             >
               <ChevronRight className="size-5" />
@@ -159,7 +159,7 @@ export const ScaleUpTopologyDiagram = forwardRef<
             </p>
             <p>
               <span className="font-medium">Bandwidth:</span> {displayedSpec.scaleUpBandwidth} per
-              GPU (unidirectional)
+              Chip (unidirectional)
             </p>
             <p>
               <span className="font-medium">Topology:</span> {displayedSpec.scaleUpTopology}
@@ -170,7 +170,7 @@ export const ScaleUpTopologyDiagram = forwardRef<
             {displayedConfig.nodeCount > 1 && (
               <p>
                 <span className="font-medium">Domain:</span> {displayedConfig.nodeCount} nodes ×{' '}
-                {displayedConfig.gpusPerNode} GPUs = {displayedConfig.gpuCount} GPUs total
+                {displayedConfig.gpusPerNode} Chips = {displayedConfig.gpuCount} Chips total
               </p>
             )}
           </div>
@@ -351,7 +351,7 @@ function renderSwitchedTopology(
       .attr('class', 'font-medium')
       .style('font-size', fontSize)
       .attr('fill', vendorColor)
-      .text(`GPU ${i}`);
+      .text(`Chip ${i}`);
   }
 
   // Subtitle label
@@ -491,7 +491,7 @@ function renderMeshTopology(
       .attr('class', 'font-medium')
       .style('font-size', fontSize)
       .attr('fill', vendorColor)
-      .text(`GPU ${i}`);
+      .text(`Chip ${i}`);
   }
 
   // Center label
@@ -691,7 +691,7 @@ function renderSwitchedNvl72Topology(
       .attr('class', 'font-medium')
       .style('font-size', fontSize)
       .attr('fill', vendorColor)
-      .text(`GPU ${i}`);
+      .text(`Chip ${i}`);
   }
 
   // Abstracted node boxes
@@ -792,7 +792,7 @@ function renderSwitchedNvl72Topology(
       .attr('class', 'fill-muted-foreground')
       .style('font-size', smallFont)
       .html(
-        `${spec.scaleUpBandwidth} &middot; ${switchCount} NVSwitches &middot; ${nodeCount} nodes &times; ${gpusPerNode} GPUs`,
+        `${spec.scaleUpBandwidth} &middot; ${switchCount} NVSwitches &middot; ${nodeCount} nodes &times; ${gpusPerNode} Chips`,
       );
   }
 }

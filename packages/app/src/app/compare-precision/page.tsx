@@ -20,21 +20,21 @@ import { canonicalPrecisionCompareSlug, precisionDisplayLabel } from '@/lib/comp
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `How does precision affect GPU inference performance? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Compare FP4, FP8, BF16, INT4, and more quantization levels head-to-head on the same GPU across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
+const DESCRIPTION = `How does precision affect chip inference performance? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Compare FP4, FP8, BF16, INT4, and more quantization levels head-to-head on the same chip across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
 
 export const metadata: Metadata = {
-  title: 'GPU Precision Comparisons',
+  title: 'Chip Precision Comparisons',
   description: DESCRIPTION,
   alternates: enAlternates('/compare-precision'),
   openGraph: {
-    title: `GPU Precision Comparisons | ${SITE_NAME}`,
+    title: `Chip Precision Comparisons | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/compare-precision`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: `GPU Precision Comparisons | ${SITE_NAME}`,
+    title: `Chip Precision Comparisons | ${SITE_NAME}`,
     description: DESCRIPTION,
   },
 };
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',
-  name: `GPU Precision Comparisons | ${SITE_NAME}`,
+  name: `Chip Precision Comparisons | ${SITE_NAME}`,
   description: DESCRIPTION,
   url: `${SITE_URL}/compare-precision`,
 };
@@ -60,12 +60,12 @@ export default async function ComparePrecisionIndexPage() {
       <section>
         <Card>
           <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">
-            GPU Precision Comparisons
+            Chip Precision Comparisons
           </h1>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} head-to-head precision comparisons across{' '}
             {formatModelList(modelsWithPairs)}. See how FP4, FP8, BF16, INT4, and more quantization
-            levels affect throughput, cost, and interactivity on the same GPU — each page renders
+            levels affect throughput, cost, and interactivity on the same chip — each page renders
             the inference chart and an interpolated comparison table.
           </p>
           <div className="mt-6 flex flex-wrap gap-3" data-testid="compare-precision-index-links">
@@ -73,7 +73,7 @@ export default async function ComparePrecisionIndexPage() {
               href="/compare"
               className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
             >
-              GPU vs GPU comparisons
+              Chip vs Chip comparisons
               <span aria-hidden="true" className="text-lg lg:text-xl">
                 →
               </span>

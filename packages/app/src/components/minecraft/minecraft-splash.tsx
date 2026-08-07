@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 
 const SPLASHES = [
   'Now with more tokens!',
-  'GPU go brrr!',
+  'Chip go brrr!',
   'Also try SGLang!',
   'Tensor cores activated!',
   'FP8 is the new FP16!',
@@ -14,7 +14,7 @@ const SPLASHES = [
   'Tokens per second!',
   'Time to first token!',
   'May contain NaN!',
-  'Works on my GPU!',
+  'Works on my Chip!',
   'DeepSeek approved!',
   'Lower latency!',
   'Higher throughput!',

@@ -52,8 +52,12 @@ import {
   getShapeKeyForPrecision,
 } from '@/lib/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { paretoFrontForDirection, type ParetoDirection } from '@/lib/chart-utils';
-import { e2eRestrictedSeed } from '@/components/inference/utils/e2eFrontier';
+import {
+  isFrontierEligible,
+  paretoFrontForDirection,
+  type ParetoDirection,
+} from '@/lib/chart-utils';
+import { canonicalParetoIntersection } from '@/components/inference/utils/canonicalFrontier';
 import { type RooflineDirection, getSpeedOverlayCorners } from '@/lib/speed-overlay';
 import type {
   ChartDefinition,
@@ -390,6 +394,8 @@ const SCATTER_STRINGS = {
   en: {
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
+    optimalInfo:
+      'On agentic, optimal points must be Pareto-optimal on the selected x-axis and also belong to the E2E Normalized Interactivity frontier.',
     labels: 'Labels',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
@@ -403,6 +409,8 @@ const SCATTER_STRINGS = {
   zh: {
     logScale: '对数缩放',
     optimalOnly: '仅最优',
+    optimalInfo:
+      '在智能体场景中，最优点既必须在当前横轴上满足 Pareto 最优，也必须属于端到端归一化交互性的 Pareto 前沿。',
     labels: '标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',
@@ -470,7 +478,6 @@ const ScatterGraph = React.memo(
       trackedConfigs,
       addTrackedConfig,
       removeTrackedConfig,
-      selectedXAxisMode,
       selectedSequence,
       selectedModel,
       quickFilters,
@@ -773,11 +780,13 @@ const ScatterGraph = React.memo(
       for (const hwKey of Object.keys(groupedData)) {
         const combined: InferenceData[] = [];
         for (const datePoints of groupPointsByDate(groupedData[hwKey]).values()) {
-          // e2eRestrictedSeed narrows to the e2e-Pareto winners when the
-          // isOnE2eFrontier flag is present (agentic non-e2e xmodes).
-          const seedPoints = e2eRestrictedSeed(datePoints);
-          if (seedPoints.length === 0) continue;
-          combined.push(...frontierFn(seedPoints));
+          // Agentic modes intersect the selected-axis Pareto frontier with the
+          // normalized north-star frontier. This keeps every drawn curve a true
+          // Pareto frontier without admitting a non-canonical winner.
+          const canonicalPoints = canonicalParetoIntersection(datePoints, dir ?? 'lower_right');
+          const front = canonicalPoints ?? frontierFn(datePoints.filter(isFrontierEligible));
+          if (front.length === 0) continue;
+          combined.push(...front);
         }
         combined.sort((a, b) => a.x - b.x);
         result[hwKey] = combined;
@@ -1011,9 +1020,8 @@ const ScatterGraph = React.memo(
       const frontierFn = paretoFrontForDirection(dir ?? 'lower_right');
       const result: Record<string, Entry> = {};
       for (const [key, group] of Object.entries(grouped)) {
-        // Same e2e-winner narrowing the official `rooflines` memo applies
-        // (flags stamped per run in processOverlayChartData).
-        const front = frontierFn(e2eRestrictedSeed(group.points));
+        const canonicalPoints = canonicalParetoIntersection(group.points, dir ?? 'lower_right');
+        const front = canonicalPoints ?? frontierFn(group.points.filter(isFrontierEligible));
         front.sort((a, b) => a.x - b.x);
         result[key] = { hwKey: group.hwKey, runIndex: group.runIndex, points: front };
       }
@@ -3190,7 +3198,7 @@ const ScatterGraph = React.memo(
               </svg>
               <h3 className="text-sm font-medium mb-1">No data available</h3>
               <p className="text-xs">
-                Please change the model, sequence, precision, date range or GPU selection.
+                Please change the model, sequence, precision, date range or chip selection.
               </p>
             </div>
           </div>
@@ -3230,7 +3238,7 @@ const ScatterGraph = React.memo(
                 <div className="text-muted-foreground text-center bg-background/80 px-4 py-2 rounded-md">
                   <p className="text-sm font-medium">No data available</p>
                   <p className="text-xs mt-1">
-                    Please change the model, sequence, precision, date range or GPU selection.
+                    Please change the model, sequence, precision, date range or chip selection.
                   </p>
                 </div>
               </div>
@@ -3360,15 +3368,10 @@ const ScatterGraph = React.memo(
                     setHideNonOptimal(checked);
                     track('latency_hide_non_optimal_toggled', { enabled: checked });
                   },
-                  // On agentic + non-e2e chart, "optimal" means "on the
-                  // e2e-latency Pareto frontier" (not a per-axis Pareto on the
-                  // current x metric). Explain that so users don't wonder why
-                  // a point sitting above the line is still considered
-                  // dominated.
-                  ...(selectedSequence === Sequence.AgenticTraces && selectedXAxisMode !== 'e2e'
+                  // Every agentic axis shares the normalized north-star set.
+                  ...(selectedSequence === Sequence.AgenticTraces
                     ? {
-                        infoTooltip:
-                          "On agentic, optimal = on the end-to-end latency Pareto frontier, so a config can't win this axis by tanking e2e. Off-frontier points may appear above the line.",
+                        infoTooltip: legendT.optimalInfo,
                       }
                     : {}),
                 },

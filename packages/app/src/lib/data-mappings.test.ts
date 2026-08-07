@@ -5,7 +5,10 @@ import {
   getModelAndSequenceFromArtifact,
   getModelLabel,
   getModelExclusion,
+  getSequenceDefaultExclusionGroup,
   getSequenceExclusion,
+  getSequenceExclusionFamilies,
+  getSequenceExclusionPolicy,
   getSequenceLabel,
   getPrecisionLabel,
   getEvalBenchmarkLabel,
@@ -218,10 +221,37 @@ describe('comparison exclusions', () => {
     expect(getModelExclusion(Model.DeepSeek_R1)).toEqual([]);
   });
 
-  it('applies the unsuffixed STP rule only to Agentic Traces', () => {
+  it('applies the unsuffixed STP rule to Agentic Traces and 8K/1K only', () => {
     expect(getSequenceExclusion(Sequence.AgenticTraces).map((spec) => spec.suffix)).toEqual([null]);
-    expect(getSequenceExclusion(Sequence.EightK_OneK)).toEqual([]);
+    expect(getSequenceExclusion(Sequence.EightK_OneK).map((spec) => spec.suffix)).toEqual([null]);
     expect(getSequenceExclusion(Sequence.OneK_OneK)).toEqual([]);
+    expect(getSequenceExclusion(Sequence.OneK_EightK)).toEqual([]);
+  });
+
+  it('guards only vLLM and SGLang on 8K/1K, every family on Agentic', () => {
+    expect(getSequenceExclusionFamilies(Sequence.EightK_OneK)).toEqual(['vllm', 'sglang']);
+    // Agentic keeps every engine family exclusive while the benchmark is new.
+    expect(getSequenceExclusionFamilies(Sequence.AgenticTraces)).toBeNull();
+    expect(getSequenceExclusionFamilies(Sequence.OneK_OneK)).toBeNull();
+  });
+
+  it('shares one STP spec between the scenarios that carry it', () => {
+    // The scenarios differ only in which families they guard, not in the rule.
+    expect(getSequenceExclusion(Sequence.EightK_OneK)).toEqual(
+      getSequenceExclusion(Sequence.AgenticTraces),
+    );
+    expect(
+      getSequenceExclusion(Sequence.EightK_OneK).map((spec) => spec.participatingFamilies),
+    ).toEqual([undefined]);
+  });
+
+  it('keeps one engine group on the scenarios that restrict STP engines', () => {
+    expect(getSequenceExclusionPolicy(Sequence.EightK_OneK)).toBe('keep-sticky');
+    expect(getSequenceExclusionPolicy(Sequence.AgenticTraces)).toBe('keep-sticky');
+    expect(getSequenceExclusionPolicy(Sequence.OneK_OneK)).toBe('clear-all');
+    expect(getSequenceDefaultExclusionGroup(Sequence.EightK_OneK)).toBe('vllm');
+    expect(getSequenceDefaultExclusionGroup(Sequence.AgenticTraces)).toBe('vllm');
+    expect(getSequenceDefaultExclusionGroup(Sequence.OneK_OneK)).toBeNull();
   });
 });
 

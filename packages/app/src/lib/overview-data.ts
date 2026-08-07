@@ -19,7 +19,12 @@ export const OVERVIEW_WORKLOAD = { isl: 8192, osl: 1024 } as const;
 export const OVERVIEW_TIERS = [30, 50, 75, 100, 150, 200] as const;
 export type OverviewTier = (typeof OVERVIEW_TIERS)[number];
 export const OVERVIEW_PRIMARY_TIER = 50;
+export const OVERVIEW_HARDWARE = ['b200', 'mi355x', 'b300', 'gb200', 'gb300'] as const;
+export type OverviewReferenceHardware = (typeof OVERVIEW_HARDWARE)[number];
+export const OVERVIEW_DEFAULT_REFERENCE_HARDWARE: OverviewReferenceHardware = 'b200';
 export type OverviewEngineScope = 'all' | 'community';
+export type OverviewComparisonMode = 'hardware' | 'history';
+export const OVERVIEW_DEFAULT_COMPARISON_MODE: OverviewComparisonMode = 'hardware';
 export type OverviewScenario = 'single_turn_8k1k' | 'agentx';
 /** Row order within a model: the single-turn workload first, AgentX below it. */
 export const OVERVIEW_SCENARIOS = ['single_turn_8k1k', 'agentx'] as const;
@@ -29,6 +34,23 @@ export function resolveOverviewEngineScope(
 ): OverviewEngineScope {
   const candidate = Array.isArray(raw) ? raw[0] : raw;
   return candidate === 'all' ? 'all' : 'community';
+}
+
+export function resolveOverviewReferenceHardware(
+  raw: string | readonly string[] | undefined,
+): OverviewReferenceHardware {
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  return (
+    OVERVIEW_HARDWARE.find((hardware) => hardware === candidate) ??
+    OVERVIEW_DEFAULT_REFERENCE_HARDWARE
+  );
+}
+
+export function resolveOverviewComparisonMode(
+  raw: string | readonly string[] | undefined,
+): OverviewComparisonMode {
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  return candidate === '30d' ? 'history' : OVERVIEW_DEFAULT_COMPARISON_MODE;
 }
 
 export function resolveOverviewTier(raw: string | string[] | undefined): OverviewTier {
@@ -89,7 +111,14 @@ export type OverviewMissingReason =
   | 'cannot_reach_at_tier'
   | 'no_exact_at_tier';
 
-export const OVERVIEW_HARDWARE = ['b200', 'mi355x', 'b300', 'gb200', 'gb300'] as const;
+export type OverviewHistoricalStatus = 'comparable' | 'no_baseline' | 'no_newer_result';
+
+export interface OverviewHistoricalComparison {
+  status: OverviewHistoricalStatus;
+  baselineCostPerMtok: number | null;
+  costDeltaPct: number | null;
+  baselineDate: string | null;
+}
 
 export interface OverviewPlatformResult {
   hardware: string;
@@ -100,9 +129,10 @@ export interface OverviewPlatformResult {
   /** $ per million TOTAL (input + output) tokens at the hyperscaler $/GPU/hr
    *  tier (`HW_REGISTRY.costh`). */
   costPerMtok: number | null;
-  /** Cost delta vs this row's B200 cell; negative = cheaper. Null on the B200
-   *  cell itself and whenever either cost is unavailable. */
-  costVsB200Pct: number | null;
+  /** Cost delta vs this row's selected reference cell; negative = cheaper.
+   *  Null on the reference cell itself and whenever either cost is unavailable. */
+  costVsReferencePct: number | null;
+  historicalComparison: OverviewHistoricalComparison | null;
 }
 
 export interface OverviewModelSummary {
@@ -116,6 +146,61 @@ export interface OverviewPageData {
   models: OverviewModelSummary[];
   tier: OverviewTier;
   engineScope: OverviewEngineScope;
+  comparisonMode: OverviewComparisonMode;
+  referenceHardware: OverviewReferenceHardware;
+  historicalWindow: OverviewHistoricalWindow | null;
+}
+
+export interface OverviewHistoricalWindow {
+  snapshotDate: string;
+  targetDate: string;
+  earliestDate: string;
+}
+
+function overviewScenarioOfRow(row: BenchmarkRow): OverviewScenario | null {
+  if (row.benchmark_type === 'agentic_traces') return 'agentx';
+  if (
+    row.benchmark_type === 'single_turn' &&
+    row.isl === OVERVIEW_WORKLOAD.isl &&
+    row.osl === OVERVIEW_WORKLOAD.osl
+  ) {
+    return 'single_turn_8k1k';
+  }
+  return null;
+}
+
+function subtractUtcDays(isoDate: string, days: number): string {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
+export function overviewSnapshotDate(
+  rowsByModel: Readonly<Record<string, readonly BenchmarkRow[]>>,
+  engineScope: OverviewEngineScope = 'community',
+): string | null {
+  const dates = Object.entries(rowsByModel).flatMap(([modelKey, rows]) => {
+    const scenarios = overviewScenariosForModel(modelKey as Model, rows);
+    return overviewEngineRows(rows, engineScope)
+      .filter((row) => {
+        const scenario = overviewScenarioOfRow(row);
+        return (
+          (OVERVIEW_HARDWARE as readonly string[]).includes(row.hardware) &&
+          scenario !== null &&
+          scenarios.includes(scenario)
+        );
+      })
+      .map((row) => row.date);
+  });
+  return dates.length === 0 ? null : (dates.toSorted().at(-1) ?? null);
+}
+
+export function overviewHistoricalWindow(snapshotDate: string): OverviewHistoricalWindow {
+  return {
+    snapshotDate,
+    targetDate: subtractUtcDays(snapshotDate, 30),
+    earliestDate: subtractUtcDays(snapshotDate, 60),
+  };
 }
 
 const OVERVIEW_SLICE_PRIORITY = [
@@ -127,7 +212,7 @@ const OVERVIEW_SLICE_PRIORITY = [
 const OVERVIEW_PRECISIONS: readonly string[] = [Precision.FP4, Precision.FP8];
 /** The registry label verbatim, rack SKU included — the matrix says
  *  "GB200 NVL72", not "GB200", so a rack part is never read as a board. */
-function overviewHardwareLabel(hardware: string, model: Model): string {
+export function overviewHardwareLabel(hardware: string, model?: Model): string {
   return getHardwareConfig(hardware, model).label;
 }
 
@@ -269,8 +354,12 @@ interface ConfigTierRead extends OverviewTierRead {
 const isInRangeTierRead = <T extends OverviewTierRead>(read: T): read is T & { value: number } =>
   read.value !== null && read.boundary === 'interpolated';
 
+export function overviewTierEvidenceDate(read: OverviewTierRead): string | null {
+  return read.evidenceDate?.to ?? read.config?.latestDate ?? null;
+}
+
 function readFreshness(read: ConfigTierRead): string {
-  return read.evidenceDate?.to ?? read.config.latestDate;
+  return overviewTierEvidenceDate(read) ?? read.config.latestDate;
 }
 
 function compareTierReads(a: ConfigTierRead, b: ConfigTierRead): number {
@@ -385,6 +474,7 @@ function buildPlatformResults(
   scenario: OverviewScenario,
   scenarioRows: readonly BenchmarkRow[],
   tier: OverviewTier,
+  referenceHardware: OverviewReferenceHardware,
 ): OverviewPlatformResult[] {
   const configs = buildConfigs(model, scenario, scenarioRows);
   const readsForHardware = (hardware: string): OverviewTierRead[] =>
@@ -409,13 +499,17 @@ function buildPlatformResults(
     };
   });
 
-  const b200Cost = platforms.find((platform) => platform.hardware === 'b200')?.costPerMtok ?? null;
+  const referenceCost =
+    platforms.find((platform) => platform.hardware === referenceHardware)?.costPerMtok ?? null;
   return platforms.map((platform) => ({
     ...platform,
-    costVsB200Pct:
-      platform.hardware === 'b200' || b200Cost === null || platform.costPerMtok === null
+    costVsReferencePct:
+      platform.hardware === referenceHardware ||
+      referenceCost === null ||
+      platform.costPerMtok === null
         ? null
-        : platform.costPerMtok / b200Cost - 1,
+        : platform.costPerMtok / referenceCost - 1,
+    historicalComparison: null,
   }));
 }
 
@@ -541,6 +635,7 @@ export function buildOverviewModelSummary(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
   scenario: OverviewScenario = overviewScenarioForModel(model, rows),
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
 ): OverviewModelSummary {
   const scopedRows = overviewEngineRows(rows, engineScope);
   const scenarioRows = overviewScenarioRows(scenario, scopedRows);
@@ -548,7 +643,7 @@ export function buildOverviewModelSummary(
     model,
     modelLabel: getModelLabel(model),
     scenario,
-    platforms: buildPlatformResults(model, scenario, scenarioRows, tier),
+    platforms: buildPlatformResults(model, scenario, scenarioRows, tier, referenceHardware),
   };
 }
 
@@ -561,15 +656,101 @@ export function assembleOverviewPageData(
   rowsByModel: Record<string, BenchmarkRow[]>,
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
 ): OverviewPageData {
   const perModel = [...DEFAULT_MODELS].map((model) => ({ model, rows: rowsByModel[model] ?? [] }));
   return {
     models: perModel.flatMap(({ model, rows }) =>
       overviewScenariosForModel(model, rows).map((scenario) =>
-        buildOverviewModelSummary(model, rows, tier, engineScope, scenario),
+        buildOverviewModelSummary(model, rows, tier, engineScope, scenario, referenceHardware),
       ),
     ),
     tier,
     engineScope,
+    comparisonMode: OVERVIEW_DEFAULT_COMPARISON_MODE,
+    referenceHardware,
+    historicalWindow: null,
+  };
+}
+
+function overviewPlatformKey(
+  model: OverviewModelSummary,
+  platform: OverviewPlatformResult,
+): string {
+  return `${model.model}|${model.scenario}|${platform.hardware}`;
+}
+
+export function assembleOverviewHistoricalPageData(
+  currentRowsByModel: Record<string, BenchmarkRow[]>,
+  baselineRowsByModel: Record<string, BenchmarkRow[]>,
+  window: OverviewHistoricalWindow,
+  tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
+  engineScope: OverviewEngineScope = 'community',
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+): OverviewPageData {
+  const current = assembleOverviewPageData(
+    currentRowsByModel,
+    tier,
+    engineScope,
+    referenceHardware,
+  );
+  const baseline = assembleOverviewPageData(
+    baselineRowsByModel,
+    tier,
+    engineScope,
+    referenceHardware,
+  );
+  const baselineByKey = new Map(
+    baseline.models.flatMap((model) =>
+      model.platforms.map((platform) => [overviewPlatformKey(model, platform), platform] as const),
+    ),
+  );
+
+  return {
+    ...current,
+    comparisonMode: 'history',
+    historicalWindow: window,
+    models: current.models.map((model) => ({
+      ...model,
+      platforms: model.platforms.map((platform) => {
+        if (platform.costPerMtok === null) return platform;
+
+        const previous = baselineByKey.get(overviewPlatformKey(model, platform));
+        const currentDate = overviewTierEvidenceDate(platform.read);
+        if (currentDate === null || currentDate <= window.targetDate) {
+          return {
+            ...platform,
+            historicalComparison: {
+              status: 'no_newer_result',
+              baselineCostPerMtok: previous?.costPerMtok ?? null,
+              costDeltaPct: null,
+              baselineDate: previous === undefined ? null : overviewTierEvidenceDate(previous.read),
+            },
+          };
+        }
+
+        if (previous === undefined || previous.costPerMtok === null) {
+          return {
+            ...platform,
+            historicalComparison: {
+              status: 'no_baseline',
+              baselineCostPerMtok: null,
+              costDeltaPct: null,
+              baselineDate: null,
+            },
+          };
+        }
+
+        return {
+          ...platform,
+          historicalComparison: {
+            status: 'comparable',
+            baselineCostPerMtok: previous.costPerMtok,
+            costDeltaPct: platform.costPerMtok / previous.costPerMtok - 1,
+            baselineDate: overviewTierEvidenceDate(previous.read),
+          },
+        };
+      }),
+    })),
   };
 }

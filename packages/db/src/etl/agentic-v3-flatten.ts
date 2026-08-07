@@ -27,8 +27,16 @@ const V3_STAT_KEYS: Record<string, string> = {
   std: 'std',
 };
 
-/** v3 `request_metrics.latency` sub-blocks → flat metric suffix (same name). */
-const V3_LATENCY_METRICS = ['ttft', 'e2el', 'itl', 'tpot', 'intvty'] as const;
+/** v3 `request_metrics.latency` sub-blocks → flat metric suffix. */
+const V3_LATENCY_METRICS: Record<string, string> = {
+  ttft: 'ttft',
+  e2el: 'e2el',
+  itl: 'itl',
+  tpot: 'tpot',
+  intvty: 'intvty',
+  full_response_itl: 'full_response_itl',
+  full_response_intvty: 'full_response_intvty',
+};
 
 /** v3 `request_metrics.tokens` sub-blocks → flat metric suffix. */
 const V3_TOKEN_METRICS: Record<string, string> = {
@@ -112,8 +120,8 @@ export function flattenAgenticAggRow(row: Record<string, any>): Record<string, a
   const flat: Record<string, number> = {};
 
   // latency distributions
-  for (const metric of V3_LATENCY_METRICS) {
-    flattenStatBlock(atPath(row, ['request_metrics', 'latency', metric]), metric, flat);
+  for (const [metric, suffix] of Object.entries(V3_LATENCY_METRICS)) {
+    flattenStatBlock(atPath(row, ['request_metrics', 'latency', metric]), suffix, flat);
   }
   // qps distribution (window_seconds / samples are intentionally not stats)
   flattenStatBlock(atPath(row, ['request_metrics', 'qps']), 'qps', flat);

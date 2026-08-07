@@ -40,10 +40,6 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: inferencex-shared-staging
-  cancel-in-progress: false
-
 jobs:
   validate:
     name: Validate staging request

@@ -7,13 +7,20 @@ import { dedupeRowsToLatestPerConfig } from '@/components/inference/hooks/useCha
 import type { BenchmarkRow } from './api';
 import { DEFAULT_MODELS, Model, Precision } from './data-mappings';
 import {
+  assembleOverviewHistoricalPageData,
   assembleOverviewPageData,
   buildOverviewModelSummary,
   overviewCostPerMtok,
+  overviewHistoricalWindow,
   overviewScenarioForModel,
+  overviewSnapshotDate,
+  overviewTierEvidenceDate,
+  resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
+  resolveOverviewReferenceHardware,
   resolveOverviewTier,
   type OverviewModelSummary,
+  type OverviewPageData,
 } from './overview-data';
 
 let nextId = 1;
@@ -120,7 +127,35 @@ function headlinePairOf(summary: OverviewModelSummary, id: string) {
   return candidate === undefined || baseline === undefined ? undefined : { candidate, baseline };
 }
 
+function platformFor(
+  page: OverviewPageData,
+  model: Model,
+  scenario: OverviewModelSummary['scenario'],
+  hardware: string,
+) {
+  return page.models
+    .find((summary) => summary.model === model && summary.scenario === scenario)
+    ?.platforms.find((platform) => platform.hardware === hardware);
+}
+
 describe('overview engine scope and scenario selection', () => {
+  it('accepts only supported hardware references and defaults invalid input to B200', () => {
+    expect(resolveOverviewReferenceHardware('b300')).toBe('b300');
+    expect(resolveOverviewReferenceHardware(['mi355x', 'b200'])).toBe('mi355x');
+    expect(resolveOverviewReferenceHardware('not-a-gpu')).toBe('b200');
+    expect(resolveOverviewReferenceHardware(undefined)).toBe('b200');
+  });
+
+  it.each([
+    [undefined, 'hardware'],
+    ['hardware', 'hardware'],
+    ['30d', 'history'],
+    [['30d'], 'history'],
+    ['unknown', 'hardware'],
+  ] as const)('resolves comparison mode %j to %s', (raw, expected) => {
+    expect(resolveOverviewComparisonMode(raw)).toBe(expected);
+  });
+
   it('assigns each active model to its configured scenario', () => {
     expect(overviewScenarioForModel(Model.Kimi_K3)).toBe('agentx');
     expect(overviewScenarioForModel(Model.GLM_5_2)).toBe('agentx');
@@ -189,22 +224,57 @@ describe('overview engine scope and scenario selection', () => {
       (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (7200 * 3600),
       6,
     );
-    expect(byHardware.b200.costVsB200Pct).toBeNull();
+    expect(byHardware.b200.costVsReferencePct).toBeNull();
     expect(byHardware.mi355x.costPerMtok).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) / (9000 * 3600),
       6,
     );
-    expect(byHardware.mi355x.costVsB200Pct).toBeCloseTo(
+    expect(byHardware.mi355x.costVsReferencePct).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) /
         (9000 * 3600) /
         ((JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (7200 * 3600)) -
         1,
       6,
     );
-    expect(byHardware.mi355x.costVsB200Pct).toBeLessThan(0);
-    expect(byHardware.gb300.costVsB200Pct).toBeGreaterThan(0);
+    expect(byHardware.mi355x.costVsReferencePct).toBeLessThan(0);
+    expect(byHardware.gb300.costVsReferencePct).toBeGreaterThan(0);
     expect(byHardware.b300.costPerMtok).toBeNull();
-    expect(byHardware.b300.costVsB200Pct).toBeNull();
+    expect(byHardware.b300.costVsReferencePct).toBeNull();
+  });
+
+  it('computes hardware deltas against the selected reference instead of always using B200', () => {
+    const rows = [
+      ...frontier([10800, 7200, 6300, 5400], {
+        hardware: 'b200',
+        precision: Precision.FP4,
+      }),
+      ...frontier([11700, 8100, 7200, 6300], {
+        hardware: 'b300',
+        precision: Precision.FP4,
+      }),
+      ...frontier([12600, 9000, 8100, 7200], {
+        hardware: 'mi355x',
+        precision: Precision.FP4,
+      }),
+    ];
+    const summary = buildOverviewModelSummary(
+      Model.Qwen3_5,
+      rows,
+      50,
+      'community',
+      'single_turn_8k1k',
+      'b300',
+    );
+    const byHardware = Object.fromEntries(
+      summary.platforms.map((platform) => [platform.hardware, platform]),
+    );
+    const b200Cost = byHardware.b200.costPerMtok!;
+    const b300Cost = byHardware.b300.costPerMtok!;
+    const mi355xCost = byHardware.mi355x.costPerMtok!;
+
+    expect(byHardware.b300.costVsReferencePct).toBeNull();
+    expect(byHardware.b200.costVsReferencePct).toBeCloseTo(b200Cost / b300Cost - 1, 6);
+    expect(byHardware.mi355x.costVsReferencePct).toBeCloseTo(mi355xCost / b300Cost - 1, 6);
   });
 
   it('keeps a platform cost without a B200 baseline so the UI can badge it ∞', () => {
@@ -220,7 +290,7 @@ describe('overview engine scope and scenario selection', () => {
       (JULY_2026_HYPERSCALER_TCO.gb300 * 1e6) / (9000 * 3600),
       6,
     );
-    expect(gb300.costVsB200Pct).toBeNull();
+    expect(gb300.costVsReferencePct).toBeNull();
     expect(summary.platforms.find((p) => p.hardware === 'b200')?.costPerMtok).toBeNull();
   });
 
@@ -591,6 +661,208 @@ describe('overview engine scope and scenario selection', () => {
       { hardware: 'gb200', precision: Precision.FP8, value: 9000 },
       { hardware: 'gb300', precision: Precision.FP4, value: 8100 },
     ]);
+  });
+});
+
+describe('overview historical window', () => {
+  it('anchors the target and floor to the latest database evidence date', () => {
+    expect(overviewHistoricalWindow('2026-08-03')).toEqual({
+      snapshotDate: '2026-08-03',
+      targetDate: '2026-07-04',
+      earliestDate: '2026-06-04',
+    });
+  });
+
+  it('returns the latest date across model buckets', () => {
+    expect(
+      overviewSnapshotDate({
+        a: [row({ date: '2026-07-30' })],
+        b: [row({ date: '2026-08-03' })],
+      }),
+    ).toBe('2026-08-03');
+  });
+
+  it('ignores newer rows that cannot appear in the overview', () => {
+    expect(
+      overviewSnapshotDate({
+        qwen: [
+          row({ date: '2026-07-30' }),
+          row({ date: '2026-08-03', hardware: 'h200' }),
+          row({ date: '2026-08-02', isl: 1024, osl: 1024 }),
+        ],
+      }),
+    ).toBe('2026-07-30');
+  });
+
+  it('ignores newer rows from scenarios excluded by the curated model layout', () => {
+    expect(
+      overviewSnapshotDate({
+        [Model.Kimi_K2_5]: [
+          row({ model: 'kimik2.5', date: '2026-07-30' }),
+          agenticRow(50, 25, 7650, 850, {
+            model: 'kimik2.5',
+            date: '2026-08-03',
+          }),
+        ],
+      }),
+    ).toBe('2026-07-30');
+  });
+
+  it('anchors the snapshot date to rows visible in the active engine scope', () => {
+    const rows = {
+      [Model.Qwen3_5]: [
+        row({ date: '2026-07-30', framework: 'sglang' }),
+        row({ date: '2026-08-03', framework: 'atom' }),
+      ],
+    };
+
+    expect(overviewSnapshotDate(rows, 'community')).toBe('2026-07-30');
+    expect(overviewSnapshotDate(rows, 'all')).toBe('2026-08-03');
+  });
+
+  it('returns null when every model bucket is empty', () => {
+    expect(overviewSnapshotDate({ a: [], b: [] })).toBeNull();
+  });
+
+  it('uses the selected tier evidence date instead of the config latest date', () => {
+    const read = buildOverviewModelSummary(Model.Qwen3_5, [
+      ...frontier([12000, 10000, 8000, 6000], { date: '2026-08-01' }),
+    ]).platforms[0].read;
+
+    expect(
+      overviewTierEvidenceDate({
+        ...read,
+        evidenceDate: { from: '2026-07-03', to: '2026-07-04' },
+      }),
+    ).toBe('2026-07-04');
+    expect(overviewTierEvidenceDate({ ...read, evidenceDate: null })).toBe('2026-08-01');
+  });
+});
+
+describe('assembleOverviewHistoricalPageData', () => {
+  const window = {
+    snapshotDate: '2026-08-03',
+    targetDate: '2026-07-04',
+    earliestDate: '2026-06-04',
+  } as const;
+  const currentRows = {
+    [Model.Qwen3_5]: [
+      ...frontier([12000, 10000, 8000, 6000], {
+        hardware: 'mi355x',
+        framework: 'sglang',
+        date: '2026-08-01',
+        precision: Precision.FP4,
+      }),
+      ...frontier([9600, 8000, 6400, 4800], {
+        hardware: 'b300',
+        framework: 'sglang',
+        date: '2026-08-02',
+        precision: Precision.FP4,
+      }),
+      ...frontier([8400, 7000, 5600, 4200], {
+        hardware: 'gb200',
+        framework: 'sglang',
+        date: '2026-07-04',
+        precision: Precision.FP4,
+      }),
+    ],
+  };
+  const baselineRows = {
+    [Model.Qwen3_5]: [
+      ...frontier([9600, 8000, 6400, 4800], {
+        hardware: 'mi355x',
+        framework: 'vllm',
+        date: '2026-06-20',
+        precision: Precision.FP4,
+      }),
+      ...frontier([8400, 7000, 5600, 4200], {
+        hardware: 'gb200',
+        framework: 'sglang',
+        date: '2026-06-20',
+        precision: Precision.FP4,
+      }),
+    ],
+  };
+
+  it('compares each current platform envelope with the same historical platform', () => {
+    const page = assembleOverviewHistoricalPageData(
+      currentRows,
+      baselineRows,
+      window,
+      50,
+      'community',
+    );
+    const platform = platformFor(page, Model.Qwen3_5, 'single_turn_8k1k', 'mi355x');
+
+    expect(page.comparisonMode).toBe('history');
+    expect(page.historicalWindow).toEqual(window);
+    expect(platform?.historicalComparison?.status).toBe('comparable');
+    expect(platform?.historicalComparison?.costDeltaPct).toBeCloseTo(-0.2, 9);
+    expect(platform?.historicalComparison?.baselineDate).toBe('2026-06-20');
+  });
+
+  it('marks a priced current cell without a baseline as no_baseline', () => {
+    const page = assembleOverviewHistoricalPageData(
+      currentRows,
+      baselineRows,
+      window,
+      50,
+      'community',
+    );
+    const comparison = platformFor(
+      page,
+      Model.Qwen3_5,
+      'single_turn_8k1k',
+      'b300',
+    )?.historicalComparison;
+
+    expect(comparison).toEqual({
+      status: 'no_baseline',
+      baselineCostPerMtok: null,
+      costDeltaPct: null,
+      baselineDate: null,
+    });
+  });
+
+  it('does not report zero improvement when current evidence is not newer than the cutoff', () => {
+    const page = assembleOverviewHistoricalPageData(
+      currentRows,
+      baselineRows,
+      window,
+      50,
+      'community',
+    );
+    const comparison = platformFor(
+      page,
+      Model.Qwen3_5,
+      'single_turn_8k1k',
+      'gb200',
+    )?.historicalComparison;
+
+    expect(comparison?.status).toBe('no_newer_result');
+    expect(comparison?.costDeltaPct).toBeNull();
+  });
+
+  it('allows the winning engine to change between snapshots', () => {
+    const page = assembleOverviewHistoricalPageData(
+      currentRows,
+      baselineRows,
+      window,
+      50,
+      'community',
+    );
+    const current = platformFor(page, Model.Qwen3_5, 'single_turn_8k1k', 'mi355x');
+    const baseline = buildOverviewModelSummary(
+      Model.Qwen3_5,
+      baselineRows[Model.Qwen3_5],
+      50,
+      'community',
+      'single_turn_8k1k',
+    ).platforms.find((platform) => platform.hardware === 'mi355x');
+
+    expect(current?.read.config?.framework).toBe('sglang');
+    expect(baseline?.read.config?.framework).toBe('vllm');
+    expect(current?.historicalComparison?.status).toBe('comparable');
   });
 });
 
@@ -1039,7 +1311,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(dsxB200.read.value).not.toBeCloseTo(8101.968, 3);
     const dsxMi355x = deepseekAgentx.platforms.find((p) => p.hardware === 'mi355x')!;
     expect(dsxMi355x.read.value).toBe(6000);
-    expect(dsxMi355x.costVsB200Pct).toBeCloseTo(
+    expect(dsxMi355x.costVsReferencePct).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) /
         6000 /
         ((JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / 7500) -
@@ -1062,7 +1334,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       (JULY_2026_HYPERSCALER_TCO.gb300 * 1e6) / (6510 * 3600),
       6,
     );
-    expect(mmGb300.candidate.costVsB200Pct).toBeNull();
+    expect(mmGb300.candidate.costVsReferencePct).toBeNull();
 
     // Qwen: MI355X independently falls back to FP8 while B200 and B300 use FP4.
     const qwen = page.models.find((m) => m.model === Model.Qwen3_5)!;
@@ -1075,7 +1347,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     );
     expect(qwenMi.baseline.precision).toBe(Precision.FP4);
     expect(qwenMi.baseline.read.value).toBeCloseTo(6602.344);
-    expect(qwenMi.candidate.costVsB200Pct).toBeCloseTo(
+    expect(qwenMi.candidate.costVsReferencePct).toBeCloseTo(
       (JULY_2026_HYPERSCALER_TCO.mi355x * 1e6) /
         (6688 * 3600) /
         ((JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (6602.344 * 3600)) -

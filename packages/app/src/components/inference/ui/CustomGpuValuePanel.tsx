@@ -37,9 +37,9 @@ const PANEL_CONFIG: Record<
   }
 > = {
   costs: {
-    title: 'Custom GPU Costs',
+    title: 'Custom Chip Costs',
     description:
-      'Enter your own TCO (Total Cost of Ownership) values for each GPU in $/GPU/hr. These values will be used to calculate custom cost metrics.',
+      'Enter your own TCO (Total Cost of Ownership) values for each chip in $/chip/hr. These values will be used to calculate custom cost metrics.',
     sectionTestId: 'custom-costs-section',
     calculateTestId: 'custom-costs-calculate',
     inputIdPrefix: 'cost-input',
@@ -48,9 +48,9 @@ const PANEL_CONFIG: Record<
     getDefaultValue: (specs) => specs.costr,
   },
   powers: {
-    title: 'Custom GPU Powers',
+    title: 'Custom Chip Powers',
     description:
-      'Enter your own Token Throughput per All in Utility MW (tok/s/MW) values for each GPU. These values will be used to calculate custom power metrics.',
+      'Enter your own Token Throughput per All in Utility MW (tok/s/MW) values for each chip. These values will be used to calculate custom power metrics.',
     sectionTestId: 'custom-powers-section',
     calculateTestId: 'custom-powers-calculate',
     // Preserve legacy input IDs so existing Cypress selectors keep passing.

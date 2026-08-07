@@ -12,8 +12,9 @@ import {
   metricValue,
   seriesMatchesSelection,
   type CollectiveXSeriesSelection,
+  collectiveXKvCell,
 } from './data';
-import type { CollectiveXPercentiles, CollectiveXSeries } from './types';
+import type { CollectiveXKvRow, CollectiveXPercentiles, CollectiveXSeries } from './types';
 import { makeCollectiveXDataset, makeCollectiveXSeries } from './test-fixture';
 
 const dataset = makeCollectiveXDataset();
@@ -124,7 +125,7 @@ describe('collectiveXSeriesForRun', () => {
 });
 
 describe('collectiveXRunDasharray', () => {
-  it('uses a solid line for the newest run and distinct patterns for following runs', () => {
+  it('uses a solid line for the first selected run and distinct patterns for following runs', () => {
     expect(collectiveXRunDasharray(0)).toBe('none');
     expect(collectiveXRunDasharray(1)).toBe('9 4');
     expect(collectiveXRunDasharray(2)).toBe('3 3');
@@ -278,5 +279,43 @@ describe('chartPoints', () => {
   it('keeps roundtrip token-rate points', () => {
     const points = chartPoints([scaleUp], 'roundtrip', 'p50', 'tokens-per-second');
     expect(points).toHaveLength(scaleUp.points.length);
+  });
+});
+
+const kvRow = (overrides: Partial<CollectiveXKvRow>): CollectiveXKvRow => ({
+  kind: 'paged',
+  isl: 32768,
+  page_tokens: 64,
+  batch: 1,
+  op: 'pull',
+  descs: 20302,
+  req_bytes: 183000000,
+  prep_ms: 1.2,
+  latency_ms: { p50: 24.8, p95: 26, min: 24.1, max: 26.4, n: 24 },
+  gbps_p50: 7.39,
+  verify_passed: true,
+  ...overrides,
+});
+
+describe('collectiveXKvCell', () => {
+  it('picks the largest-ISL pull row at the requested batch extreme', () => {
+    const rows = [
+      kvRow({ isl: 4096, gbps_p50: 5 }),
+      kvRow({ gbps_p50: 7.39 }),
+      kvRow({ batch: 16, gbps_p50: 15.12 }),
+      kvRow({ op: 'push', batch: 16, gbps_p50: 99 }),
+    ];
+    expect(collectiveXKvCell(rows, 'paged', 64, 'min')?.gbps_p50).toBe(7.39);
+    expect(collectiveXKvCell(rows, 'paged', 64, 'max')?.gbps_p50).toBe(15.12);
+  });
+
+  it('returns null for an unmeasured family', () => {
+    expect(collectiveXKvCell([kvRow({})], 'paged', 16, 'min')).toBeNull();
+    expect(collectiveXKvCell([], 'bulk', null, 'min')).toBeNull();
+  });
+
+  it('selects bulk rows by their null page size', () => {
+    const rows = [kvRow({}), kvRow({ kind: 'bulk', page_tokens: null, gbps_p50: 89.41 })];
+    expect(collectiveXKvCell(rows, 'bulk', null, 'min')?.gbps_p50).toBe(89.41);
   });
 });

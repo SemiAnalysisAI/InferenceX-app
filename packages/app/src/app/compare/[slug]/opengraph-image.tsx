@@ -10,7 +10,7 @@ import { ImageResponse } from 'next/og';
 import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import { canonicalCompareSlug, compareDisplayLabel, parseCompareSlug } from '@/lib/compare-slug';
 
-export const alt = 'GPU inference benchmark comparison';
+export const alt = 'Chip inference benchmark comparison';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -83,7 +83,7 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
   const [logoSrc, tiles] = await Promise.all([getLogoSrc(), getTiles()]);
 
   const title = compareDisplayLabel(parsed.a, parsed.b);
-  const eyebrow = `${parsed.model.label} · Head-to-head GPU benchmark`;
+  const eyebrow = `${parsed.model.label} · Head-to-head Chip benchmark`;
   // Content area is ~895px wide (1200 - 195 panel - 55*2 padding). Scale the
   // title size down for longer labels so it fits without truncating.
   const titleSize = title.length > 26 ? 80 : title.length > 18 ? 96 : 112;

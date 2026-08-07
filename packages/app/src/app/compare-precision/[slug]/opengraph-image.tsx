@@ -16,7 +16,7 @@ import {
 } from '@/lib/compare-variant-slug';
 import { BG, BLUE, getLogoSrc, getTiles, PANEL_BG } from '@/lib/og-assets';
 
-export const alt = 'GPU precision inference benchmark comparison';
+export const alt = 'Chip precision inference benchmark comparison';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 

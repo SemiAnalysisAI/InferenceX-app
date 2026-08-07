@@ -1,6 +1,7 @@
 import type {
   CollectiveXChartPoint,
   CollectiveXComponent,
+  CollectiveXKvRow,
   CollectiveXMode,
   CollectiveXOperation,
   CollectiveXPercentile,
@@ -67,7 +68,7 @@ export function collectiveXColorKey(series: CollectiveXSeries | CollectiveXRunSe
   return `${series.system.vendor}_${series.system.sku}_${series.backend}_ep${series.system.ep_size}_${series.mode}_${series.phase}_${series.precision}`;
 }
 
-/** Namespace series ids and attach the run's stable visual-style index. */
+/** Namespace series ids and attach the run's current selection-order style index. */
 export function collectiveXSeriesForRun(
   series: readonly CollectiveXSeries[],
   runId: string,
@@ -197,4 +198,27 @@ export function chartPoints(
       ];
     }),
   );
+}
+
+/**
+ * The kv table cell selector, mirroring the harness's summarize: the
+ * largest-ISL pull row of a (kind, page) family — the bandwidth-bound point —
+ * at its smallest or largest measured batch. Null when the family was not
+ * measured (e.g. a page size the sweep dropped).
+ */
+export function collectiveXKvCell(
+  rows: CollectiveXKvRow[],
+  kind: CollectiveXKvRow['kind'],
+  pageTokens: number | null,
+  batch: 'min' | 'max',
+): CollectiveXKvRow | null {
+  const matching = rows.filter(
+    (row) => row.kind === kind && row.page_tokens === pageTokens && row.op === 'pull',
+  );
+  if (matching.length === 0) return null;
+  const isl = Math.max(...matching.map((row) => row.isl));
+  const atIsl = matching.filter((row) => row.isl === isl);
+  const pick = (better: (a: number, b: number) => boolean) =>
+    atIsl.reduce((best, row) => (better(row.batch, best.batch) ? row : best));
+  return batch === 'min' ? pick((a, b) => a < b) : pick((a, b) => a > b);
 }

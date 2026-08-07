@@ -17,6 +17,7 @@
  *   INGEST_RUN_ID          — (CI mode) Workflow run ID
  *   INGEST_ARTIFACTS_PATH  — (CI mode) Local path to pre-downloaded artifacts
  *   INGEST_REPO            — (CI mode) Source repo slug (owner/name)
+ *   INGEST_TRACE_WORKERS   — Optional trace worker override (default scales with vCPUs, max 4)
  *   reused-ingest-metadata/reuse_source_run.json overrides reused rows to the
  *     original source sweep run, so public links point at the real benchmark run.
  */
@@ -50,7 +51,12 @@ import {
   bulkUpsertAvailability,
   insertServerLog,
 } from './etl/benchmark-ingest';
-import { insertTraceReplay } from './etl/trace-replay-ingest';
+import { findUnlinkedTraceReplayIds, persistPreparedTraceReplay } from './etl/trace-replay-ingest';
+import {
+  resolveTraceReplayWorkerCount,
+  TraceReplayWorkerPool,
+} from './etl/trace-replay-worker-pool';
+import { AsyncSemaphore } from './etl/async-semaphore';
 import { discoverTraceReplayArtifacts } from './etl/trace-artifact-discovery';
 import { datasetSlugFromBenchmarkRow } from './etl/dataset-provenance';
 import { mapAggEvalRow, mapEvalRow } from './etl/eval-mapper';
@@ -424,6 +430,16 @@ async function main(): Promise<void> {
     if (traceReplayPaths.size > 0) {
       console.log(`  Found ${traceReplayPaths.size} trace_replay sibling artifact(s)`);
     }
+    const traceWorkerCount = resolveTraceReplayWorkerCount();
+    const traceWorkerPool = new TraceReplayWorkerPool(traceWorkerCount);
+    const traceUploadLimiter = new AsyncSemaphore(Math.min(2, traceWorkerCount));
+    const traceTasks: Promise<void>[] = [];
+    if (traceReplayPaths.size > 0) {
+      console.log(
+        `  Trace preparation: ${traceWorkerCount} worker(s) across ${os.availableParallelism()} vCPU(s), ` +
+          `${Math.min(2, traceWorkerCount)} concurrent upload(s)`,
+      );
+    }
 
     const allBmkFiles = [...bmkFiles, ...allBmkDirs.flatMap((d) => findJsonFiles(d))];
     console.log(`  Found ${allBmkFiles.length} benchmark JSON file(s)`);
@@ -565,22 +581,62 @@ async function main(): Promise<void> {
                     `server_csv=${formatBytes(fileSize(trace.serverMetricsCsv))}, ` +
                     `server_json=${formatBytes(fileSize(trace.serverMetricsJson))}`,
                 );
-                await insertTraceReplay(
-                  sql,
-                  insertedIds,
-                  trace.profileJsonl,
-                  trace.serverMetricsCsv,
-                  trace.serverMetricsJson,
-                  {
-                    metricsContext: {
-                      framework: toInsert[0]?.config.framework,
-                      disagg: toInsert[0]?.config.disagg,
-                    },
-                    progressLabel: suffix,
-                  },
+                const linkStart = Date.now();
+                console.log(
+                  `    trace_replay ${suffix}: checking ${insertedIds.length} benchmark row(s) for existing links`,
                 );
-                totalTraceReplayLinked += insertedIds.length;
-                console.log(`    trace_replay ${suffix}: done (${elapsed(traceStart)})`);
+                const unlinkedIds = await findUnlinkedTraceReplayIds(sql, insertedIds);
+                console.log(
+                  `    trace_replay ${suffix}: found ${unlinkedIds.length} unlinked row(s) (${elapsed(linkStart)})`,
+                );
+                if (unlinkedIds.length === 0) {
+                  console.log(
+                    `    trace_replay ${suffix}: skipping blob insert; all benchmark rows already linked`,
+                  );
+                  console.log(`    trace_replay ${suffix}: done (${elapsed(traceStart)})`);
+                } else {
+                  console.log(`    trace_replay ${suffix}: queued for worker preparation`);
+                  const task = traceWorkerPool
+                    .run(
+                      {
+                        profileExportJsonl: trace.profileJsonl,
+                        serverMetricsCsv: trace.serverMetricsCsv,
+                        serverMetricsJson: trace.serverMetricsJson,
+                        metricsContext: {
+                          framework: toInsert[0]?.config.framework,
+                          disagg: toInsert[0]?.config.disagg,
+                        },
+                      },
+                      // oxlint-disable-next-line no-loop-func -- each callback closes over this iteration's block-scoped trace metadata
+                      async (prepared) => {
+                        console.log(
+                          `    trace_replay ${suffix}: compressed ` +
+                            `profile=${formatBytes(prepared.profileSize)} -> ${formatBytes(prepared.profileGz?.length)}, ` +
+                            `server_csv=${formatBytes(prepared.serverMetricsCsvSize)}, ` +
+                            `server_json=${formatBytes(prepared.serverMetricsJsonSize)} -> ` +
+                            `${formatBytes(prepared.serverMetricsJsonGz?.length)} ` +
+                            `(${(prepared.compressionMs / 1000).toFixed(1)}s)`,
+                        );
+                        console.log(
+                          `    trace_replay ${suffix}: computed derived JSON: ` +
+                            `chart_windows=${prepared.chartWindows}, ` +
+                            `timeline_requests=${prepared.timelineRequests} ` +
+                            `(${(prepared.computeMs / 1000).toFixed(1)}s)`,
+                        );
+                        const linked = await traceUploadLimiter.run(() =>
+                          persistPreparedTraceReplay(sql, unlinkedIds, prepared, {
+                            progressLabel: suffix,
+                          }),
+                        );
+                        totalTraceReplayLinked += linked;
+                        console.log(`    trace_replay ${suffix}: done (${elapsed(traceStart)})`);
+                      },
+                    )
+                    .catch((error: any) => {
+                      tracker.recordDbError(`trace_replay for ${suffix}`, error);
+                    });
+                  traceTasks.push(task);
+                }
               } catch (error: any) {
                 tracker.recordDbError(`trace_replay for ${suffix}`, error);
               }
@@ -595,6 +651,11 @@ async function main(): Promise<void> {
       }
       console.log(`    finished ${relativeFile} (${elapsed(fileStart)})`);
     }
+    if (traceTasks.length > 0) {
+      console.log(`  Waiting for ${traceTasks.length} queued trace replay task(s)`);
+      await Promise.all(traceTasks);
+    }
+    await traceWorkerPool.close();
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
     if (totalTraceReplayLinked > 0 || tracker.skips.traceReplayMissing > 0) {
       console.log(

@@ -1,4 +1,4 @@
-import { unlockAgenticGate } from '../support/e2e';
+import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 
 // ---------------------------------------------------------------------------
 // Spec-scoped fixture helpers
@@ -147,6 +147,9 @@ describe('GPU comparison agentic point detail', () => {
       );
       request.reply({ body: result });
     });
+    // The agentic default x-axis mode (E2E Normalized Interactivity) fetches derived metrics on
+    // mount; without values every point drops out of the (remapped) data set.
+    interceptDerivedAgenticMetrics();
 
     cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
       onBeforeLoad(win) {
@@ -189,7 +192,7 @@ describe('GPU comparison agentic point detail', () => {
       .should('contain', 'Offload Type: DRAM')
       .and('contain', 'KV Offload Engine: Mooncake 0.3.11.post1')
       .and('contain', 'Router: vLLM Router 0.1.14')
-      .and('contain', 'GPU Cache Hit Rate: 87.5%')
+      .and('contain', 'Chip Cache Hit Rate: 87.5%')
       .and('not.contain', 'Offload Mode');
     cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
       .should('be.visible')
@@ -206,6 +209,7 @@ describe('GPU comparison agentic point detail', () => {
       'agenticAvailability',
     );
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('agenticBenchmarks');
+    interceptDerivedAgenticMetrics();
 
     cy.visit(
       '/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_gpus=b200_sglang,b200_vllm&i_dates=2026-06-12&i_dstart=2026-06-12&i_dend=2026-06-12',

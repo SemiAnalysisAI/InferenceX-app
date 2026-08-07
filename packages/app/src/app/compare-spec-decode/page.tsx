@@ -27,21 +27,21 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `Does speculative decoding (MTP-style multi-token prediction, model-specific methods like EAGLE for MiniMax M3) improve inference throughput and cost? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Each page compares a model + GPU with the speculative decoding method ON versus OFF.`;
+const DESCRIPTION = `Does speculative decoding (MTP-style multi-token prediction, model-specific methods like EAGLE for MiniMax M3) improve inference throughput and cost? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Each page compares a model + chip with the speculative decoding method ON versus OFF.`;
 
 export const metadata: Metadata = {
-  title: 'GPU Speculative Decoding Comparisons',
+  title: 'Chip Speculative Decoding Comparisons',
   description: DESCRIPTION,
   alternates: enAlternates('/compare-spec-decode'),
   openGraph: {
-    title: `GPU Speculative Decoding Comparisons | ${SITE_NAME}`,
+    title: `Chip Speculative Decoding Comparisons | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/compare-spec-decode`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: `GPU Speculative Decoding Comparisons | ${SITE_NAME}`,
+    title: `Chip Speculative Decoding Comparisons | ${SITE_NAME}`,
     description: DESCRIPTION,
   },
 };
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',
-  name: `GPU Speculative Decoding Comparisons | ${SITE_NAME}`,
+  name: `Chip Speculative Decoding Comparisons | ${SITE_NAME}`,
   description: DESCRIPTION,
   url: `${SITE_URL}/compare-spec-decode`,
 };
@@ -84,12 +84,12 @@ export default async function CompareSpecDecodeIndexPage() {
       <section>
         <Card>
           <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">
-            GPU Speculative Decoding Comparisons
+            Chip Speculative Decoding Comparisons
           </h1>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} speculative decoding comparisons across{' '}
             {formatModelList(modelsWithPairs)}. Each page compares inference with the speculative
-            decoding method (MTP, EAGLE, etc.) enabled versus disabled on the same model and GPU —
+            decoding method (MTP, EAGLE, etc.) enabled versus disabled on the same model and chip —
             throughput, cost, and interactivity at matched operating points.
           </p>
           <div className="mt-6 flex flex-wrap gap-3" data-testid="compare-spec-decode-index-links">
@@ -97,7 +97,7 @@ export default async function CompareSpecDecodeIndexPage() {
               href="/compare"
               className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
             >
-              GPU comparisons
+              Chip comparisons
               <span aria-hidden="true" className="text-lg lg:text-xl">
                 →
               </span>

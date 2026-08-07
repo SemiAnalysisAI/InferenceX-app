@@ -6,9 +6,9 @@
  */
 describe('Y-Axis Metrics All Render Data', () => {
   const metrics = [
-    'Token Throughput per GPU',
-    'Input Token Throughput per GPU',
-    'Output Token Throughput per GPU',
+    'Token Throughput per Chip',
+    'Input Token Throughput per Chip',
+    'Output Token Throughput per Chip',
     'Token Throughput per All in Utility MW',
     'Input Token Throughput per All in Utility MW',
     'Output Token Throughput per All in Utility MW',

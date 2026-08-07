@@ -10,6 +10,7 @@ import type {
 import {
   buildOverviewDashboardHref,
   detailHref,
+  mergeOverviewControlHref,
   overviewEngineScopeHref,
   overviewHref,
   overviewTierHref,
@@ -169,9 +170,49 @@ describe('overviewHref', () => {
     expect(overviewHref('en', 50, 'community')).toBe('/overview');
     expect(overviewHref('en', 30, 'all')).toBe('/overview?tier=30&engine=all');
   });
+
+  it('adds historical comparison last and omits the default comparison mode', () => {
+    expect(overviewHref('en', 50, 'community', 'hardware')).toBe('/overview');
+    expect(overviewHref('en', 50, 'community', 'history')).toBe('/overview?compare=30d');
+    expect(overviewHref('en', 100, 'all', 'history')).toBe(
+      '/overview?tier=100&engine=all&compare=30d',
+    );
+    expect(overviewHref('zh', 100, 'all', 'history')).toBe(
+      '/zh/overview?tier=100&engine=all&compare=30d',
+    );
+  });
+
+  it('omits the B200 default reference and preserves a non-default reference in every mode', () => {
+    expect(overviewHref('en', 50, 'community', 'hardware', 'b200')).toBe('/overview');
+    expect(overviewHref('en', 50, 'community', 'hardware', 'b300')).toBe('/overview?ref=b300');
+    expect(overviewHref('en', 100, 'all', 'history', 'b300')).toBe(
+      '/overview?tier=100&engine=all&ref=b300&compare=30d',
+    );
+    expect(overviewHref('zh', 50, 'community', 'history', 'b300')).toBe(
+      '/zh/overview?ref=b300&compare=30d',
+    );
+  });
 });
 
 describe('overview switch links', () => {
+  it('merges rapid control changes into the latest pending overview URL', () => {
+    const tierHref = mergeOverviewControlHref('/overview', '/overview?tier=75', ['tier']);
+    const engineHref = mergeOverviewControlHref(tierHref, '/overview?engine=all', ['engine']);
+    const referenceHref = mergeOverviewControlHref(engineHref, '/overview?ref=gb200', ['ref']);
+
+    expect(referenceHref).toBe('/overview?tier=75&engine=all&ref=gb200');
+  });
+
+  it('removes defaulted control params without dropping other pending selections', () => {
+    expect(
+      mergeOverviewControlHref(
+        '/zh/overview?tier=75&engine=all&ref=gb300&compare=30d',
+        '/zh/overview?tier=75&ref=gb300&compare=30d',
+        ['engine'],
+      ),
+    ).toBe('/zh/overview?tier=75&ref=gb300&compare=30d');
+  });
+
   it.each([
     ['en', 100, 'community', '/overview?tier=100'],
     ['en', 100, 'all', '/overview?tier=100&engine=all'],
@@ -185,6 +226,18 @@ describe('overview switch links', () => {
     },
   );
 
+  it('preserves historical comparison when changing tiers', () => {
+    expect(overviewTierHref('en', 75, 'all', 'history')).toBe(
+      '/overview?tier=75&engine=all&compare=30d',
+    );
+  });
+
+  it('preserves the selected reference when changing tiers', () => {
+    expect(overviewTierHref('en', 75, 'all', 'hardware', 'b300')).toBe(
+      '/overview?tier=75&engine=all&ref=b300',
+    );
+  });
+
   it.each([
     ['en', 'all', 50, '/overview?engine=all'],
     ['en', 'all', 100, '/overview?tier=100&engine=all'],
@@ -197,4 +250,16 @@ describe('overview switch links', () => {
       ).toBe(expected);
     },
   );
+
+  it('preserves historical comparison when changing engine scope', () => {
+    expect(overviewEngineScopeHref('en', 'all', 50, 'history')).toBe(
+      '/overview?engine=all&compare=30d',
+    );
+  });
+
+  it('preserves the selected reference when changing engine scope', () => {
+    expect(overviewEngineScopeHref('en', 'all', 50, 'hardware', 'gb300')).toBe(
+      '/overview?engine=all&ref=gb300',
+    );
+  });
 });

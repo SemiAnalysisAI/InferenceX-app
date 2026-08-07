@@ -8,7 +8,7 @@ describe('Reliability Chart', () => {
   });
 
   it('shows the GPU Reliability heading', () => {
-    cy.contains('h2', 'GPU Reliability').should('be.visible');
+    cy.contains('h2', 'Chip Reliability').should('be.visible');
   });
 
   it('shows the date range selector', () => {

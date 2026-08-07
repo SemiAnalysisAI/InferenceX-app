@@ -34,13 +34,33 @@ import type { BenchmarkRow } from '@/lib/api';
  */
 function applyAgenticMetricAliases(raw: Record<string, number>): Record<string, number> {
   const m: Record<string, number> = { ...raw };
+  const hasFullResponseItl = ['mean', 'median', 'p75', 'p90', 'p95', 'p99', 'p99.9'].some(
+    (suffix) => typeof raw[`${suffix}_full_response_itl`] === 'number',
+  );
   for (const suffix of ['mean', 'median', 'p75', 'p90', 'p95', 'p99', 'p99.9']) {
-    const itl = raw[`${suffix}_itl`];
+    const fullResponseItl = raw[`${suffix}_full_response_itl`];
+    const itl =
+      typeof fullResponseItl === 'number' && fullResponseItl > 0
+        ? fullResponseItl
+        : hasFullResponseItl
+          ? undefined
+          : raw[`${suffix}_itl`];
     const ttlt = raw[`${suffix}_ttlt`];
     if (m[`${suffix}_e2el`] === undefined && ttlt !== undefined) m[`${suffix}_e2el`] = ttlt;
-    if (m[`${suffix}_tpot`] === undefined && itl !== undefined) m[`${suffix}_tpot`] = itl;
-    if (typeof itl === 'number' && itl > 0) m[`${suffix}_intvty`] = 1 / itl;
-    else delete m[`${suffix}_intvty`];
+    if (typeof itl === 'number' && itl > 0) {
+      m[`${suffix}_itl`] = itl;
+      if (m[`${suffix}_tpot`] === undefined) m[`${suffix}_tpot`] = itl;
+      m[`${suffix}_intvty`] = 1 / itl;
+    } else {
+      delete m[`${suffix}_itl`];
+      delete m[`${suffix}_intvty`];
+    }
+  }
+  if (typeof raw.std_full_response_itl === 'number') {
+    m.std_itl = raw.std_full_response_itl;
+  }
+  if (typeof raw.std_full_response_intvty === 'number') {
+    m.std_intvty = raw.std_full_response_intvty;
   }
   return m;
 }

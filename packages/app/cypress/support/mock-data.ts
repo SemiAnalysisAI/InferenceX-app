@@ -90,8 +90,8 @@ export function createMockChartDefinition(overrides?: Partial<ChartDefinition>):
     y: 'mean_e2el' as keyof AggDataEntry,
     y_label: 'Mean E2E Latency (ms)',
     y_tpPerGpu: 'tput_per_gpu',
-    y_tpPerGpu_label: 'Throughput / GPU (tok/s)',
-    y_tpPerGpu_title: 'Throughput per GPU',
+    y_tpPerGpu_label: 'Throughput / Chip (tok/s)',
+    y_tpPerGpu_title: 'Throughput per Chip',
     y_tpPerGpu_roofline: 'upper_right',
     ...overrides,
   };

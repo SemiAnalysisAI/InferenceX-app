@@ -9,7 +9,7 @@
  * appeared to do nothing. The legend toggle already had the overlay-aware
  * split (`unifiedToggle`); the X now shares it (`handleRemoveHwType`).
  */
-import { unlockAgenticGate } from '../support/e2e';
+import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 import {
   countVisible,
   interceptOverlayRun,
@@ -19,7 +19,13 @@ import {
 
 describe('Official legend X works while an unofficial overlay is loaded', () => {
   before(() => {
-    interceptOverlayRun();
+    // Use distinct hardware so the engine-comparison exclusion policy does
+    // not resolve the official and unofficial rows as one competing family.
+    interceptOverlayRun({ overlayHardware: 'h100' });
+    // The agentic default mode is E2E Normalized Interactivity (which suppresses overlays and
+    // fetches derived metrics) — stub the fetch, then switch to Interactivity
+    // where the overlay renders.
+    interceptDerivedAgenticMetrics();
     cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -27,6 +33,7 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
       },
     });
     cy.wait('@unofficialRun');
+    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'have.length',
@@ -60,9 +67,10 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
     cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
       expect(countVisible($dots), 'visible official points after remove').to.eq(0);
     });
-    // The overlay series is untouched (Optimal Only default keeps 4 of 5).
+    // The overlay series is untouched. Optimal Only still hides its trace-less
+    // points because unofficial rows cannot join the canonical frontier.
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(($pts) => {
-      expect(countVisible($pts), 'visible overlay X markers').to.eq(REAL_CONFIGS.length - 1);
+      expect(countVisible($pts), 'visible overlay X markers').to.eq(0);
     });
     // Inactive row: the hover affordance flips to the "+" restore indicator
     // (explicit "clicking the name brings it back"), and the Hide X is gone.

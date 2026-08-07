@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildDatasetFromNeutral } from './reader';
+import { buildDatasetFromNeutral, buildRunSummary } from './reader';
 import {
   buildDataset,
   makeCollectiveXDataset,
@@ -231,5 +231,82 @@ describe('CollectiveX artifact assembly', () => {
     expect(() =>
       buildDatasetFromNeutral(makeRawMatrix([requestedOf(shard)]), [shard], makeRunMeta()),
     ).toThrow(/version/);
+  });
+});
+
+describe('CollectiveX kv-transfer assembly', () => {
+  it('assembles kv cases beside EP coverage without cross-contamination', () => {
+    const dataset = buildDataset({ shards: [makeRawShard()], kv: [{}] });
+    expect(dataset.coverage).toHaveLength(1);
+    expect(dataset.series).toHaveLength(1);
+    expect(dataset.kv).toHaveLength(1);
+    const kase = dataset.kv![0];
+    expect(kase).toMatchObject({
+      sku: 'gb200',
+      backend: 'nixl',
+      fabric: 'rdma',
+      workload: 'kv-dsv4',
+      precision: 'fp8',
+      outcome: 'success',
+      vendor: 'nvidia',
+    });
+    expect(kase.rows).toHaveLength(4);
+    expect(kase.rows[0]).toMatchObject({
+      kind: 'paged',
+      isl: 32768,
+      page_tokens: 64,
+      batch: 1,
+      op: 'pull',
+      gbps_p50: 7.39,
+      verify_passed: true,
+    });
+    // KV cases count into the run totals (the visibility gate) but not points.
+    expect(dataset.run).toMatchObject({
+      requested_cases: 2,
+      measured_cases: 2,
+      kv_requested_cases: 1,
+      kv_measured_cases: 1,
+    });
+    expect(dataset.run.covered_skus).toContain('gb200');
+    expect(dataset.run.requested_points).toBe(10);
+  });
+
+  it('coerces the kv entrypoint string version against the numeric matrix version', () => {
+    const dataset = buildDataset({ kv: [{ version: '1' }] });
+    expect(dataset.kv![0].outcome).toBe('success');
+  });
+
+  it('carries a failed kv shard outcome and reason without rows', () => {
+    const dataset = buildDataset({
+      kv: [{ status: 'invalid', reasons: ['transfer verification failed'] }],
+    });
+    const kase = dataset.kv![0];
+    expect(kase.outcome).toBe('invalid');
+    expect(kase.reason).toBe('transfer-verification-failed');
+    expect(kase.rows).toHaveLength(0);
+    expect(dataset.run.failed_cases).toBe(1);
+  });
+
+  it('marks a requested kv case with no shard as pending', () => {
+    const dataset = buildDataset({ kv: [{ omitShard: true }] });
+    expect(dataset.kv![0]).toMatchObject({ outcome: 'pending', vendor: null, rows: [] });
+    expect(dataset.run.terminal_cases).toBe(1); // the EP shard only
+  });
+
+  it('summarizes kv case counts for the run picker', () => {
+    const dataset = buildDataset({
+      kv: [{}, { sku: 'mi355x', backend: 'mori-io', vendor: 'amd' }],
+    });
+    const summary = buildRunSummary(dataset);
+    expect(summary.kv_cases).toEqual({ requested: 2, measured: 2 });
+    expect(summary.requested_cases).toBe(3);
+  });
+
+  it('keeps a kv-only run visible through the case totals', () => {
+    const kv = buildDataset({ shards: [], kv: [{}] });
+    expect(kv.coverage).toHaveLength(0);
+    expect(kv.series).toHaveLength(0);
+    expect(kv.run.requested_cases).toBe(1);
+    expect(kv.run.covered_skus).toEqual(['gb200']);
   });
 });

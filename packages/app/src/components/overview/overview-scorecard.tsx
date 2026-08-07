@@ -1,18 +1,27 @@
 import {
+  OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  OVERVIEW_HARDWARE,
   OVERVIEW_TIERS,
+  overviewHardwareLabel,
+  type OverviewComparisonMode,
   type OverviewEngineScope,
+  type OverviewHistoricalComparison,
   type OverviewModelSummary,
   type OverviewPlatformResult,
+  type OverviewReferenceHardware,
   type OverviewTier,
 } from '@/lib/overview-data';
 import {
   buildOverviewDashboardHref,
   detailHref,
   overviewEngineScopeHref,
+  overviewHref,
   overviewTierHref,
 } from '@/lib/overview-links';
 
 import { OverviewDetailLink } from './overview-detail-link';
+import { OverviewNavLink } from './overview-nav-link';
+import { OverviewReferenceSelect } from './overview-reference-select';
 
 export type OverviewLocale = 'en' | 'zh';
 
@@ -34,8 +43,16 @@ export const OVERVIEW_STRINGS = {
       all: 'All Platforms',
       community: 'Open Source Community Engines (vLLM/SGLang)',
     },
+    comparisonNavLabel: 'Compare',
+    comparisonOptions: {
+      history: '30-day change',
+    },
+    hardwareComparisonLabel: (reference: string) => `vs ${reference}`,
+    referenceSelectorAria: 'Reference hardware',
     caption:
       'Cost per million total tokens from each platform’s best observed serving envelope for the scenario shown with each model.',
+    historyCaption:
+      'Current cost and change versus the latest validated platform result 30–60 days earlier.',
     modelHeader: 'Model · Scenario',
     scenarioLabels: {
       single_turn_8k1k: '8K/1K',
@@ -51,7 +68,7 @@ export const OVERVIEW_STRINGS = {
         ? 'Estimated from validated benchmark runs.'
         : `Estimated from validated ${topologies.join(' and ')} runs.`,
     estimatedAria: (value: string, explanation: string) => `Approximately ${value}. ${explanation}`,
-    cellStateLegend: '— = no result. ∞ = B200 baseline unavailable.',
+    cellStateLegend: (reference: string) => `— = no result. ∞ = ${reference} baseline unavailable.`,
     missingReasons: (tier: number): Record<string, string> => ({
       int4_bf16_only: 'INT4/BF16 only',
       no_scenario_data: 'no data for this scenario',
@@ -61,10 +78,15 @@ export const OVERVIEW_STRINGS = {
     standardDecodeLabel: 'STP',
     methodologyNote:
       'If a chip does not have FP4 spec decoding available, the next best available configuration is used.',
-    costDeltaAria: (pct: string, cheaper: boolean) =>
-      `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than B200`,
-    costDeltaEvenAria: 'About the same cost as B200',
-    noBaselineAria: 'No B200 baseline to compare against',
+    costDeltaAria: (pct: string, cheaper: boolean, reference: string) =>
+      `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than ${reference}`,
+    costDeltaEvenAria: (reference: string) => `About the same cost as ${reference}`,
+    noBaselineAria: (reference: string) => `No ${reference} baseline to compare against`,
+    historicalDeltaAria: (pct: string, cheaper: boolean, baselineDate: string) =>
+      `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than this platform’s ${baselineDate} result`,
+    historicalEvenAria: (baselineDate: string) =>
+      `About the same cost as this platform’s ${baselineDate} result`,
+    historyCellStateLegend: 'Platforms without a valid 30-day comparison show current cost only.',
     referenceHeader: 'Reference',
   },
   zh: {
@@ -81,7 +103,14 @@ export const OVERVIEW_STRINGS = {
       all: '所有平台',
       community: '开源社区引擎（vLLM/SGLang）',
     },
+    comparisonNavLabel: '对比方式',
+    comparisonOptions: {
+      history: '30 天变化',
+    },
+    hardwareComparisonLabel: (reference: string) => `对比 ${reference}`,
+    referenceSelectorAria: '基准硬件',
     caption: '按各模型标注的场景，基于各平台最佳观测服务包络线计算每百万总 token 成本。',
+    historyCaption: '当前成本及其相对 30–60 天前最近一次有效平台结果的变化。',
     modelHeader: '模型 · 场景',
     scenarioLabels: {
       single_turn_8k1k: '8K/1K',
@@ -97,7 +126,7 @@ export const OVERVIEW_STRINGS = {
         ? '根据已验证的基准运行结果估算。'
         : `根据已验证的 ${topologies.join(' 与 ')} 运行结果估算。`,
     estimatedAria: (value: string, explanation: string) => `约 ${value}。${explanation}`,
-    cellStateLegend: '— = 无结果。∞ = 缺少 B200 基线。',
+    cellStateLegend: (reference: string) => `— = 无结果。∞ = 缺少 ${reference} 基线。`,
     missingReasons: (tier: number): Record<string, string> => ({
       int4_bf16_only: '仅 INT4/BF16',
       no_scenario_data: '该场景暂无数据',
@@ -106,9 +135,14 @@ export const OVERVIEW_STRINGS = {
     }),
     standardDecodeLabel: 'STP',
     methodologyNote: '若某款芯片不支持 FP4 推测解码，则采用次优的可用配置。',
-    costDeltaAria: (pct: string, cheaper: boolean) => `比 B200 ${cheaper ? '便宜' : '昂贵'} ${pct}`,
-    costDeltaEvenAria: '与 B200 成本基本持平',
-    noBaselineAria: '缺少可比较的 B200 基线',
+    costDeltaAria: (pct: string, cheaper: boolean, reference: string) =>
+      `比 ${reference} ${cheaper ? '便宜' : '昂贵'} ${pct}`,
+    costDeltaEvenAria: (reference: string) => `与 ${reference} 成本基本持平`,
+    noBaselineAria: (reference: string) => `缺少可比较的 ${reference} 基线`,
+    historicalDeltaAria: (pct: string, cheaper: boolean, baselineDate: string) =>
+      `比该平台 ${baselineDate} 的结果${cheaper ? '便宜' : '昂贵'} ${pct}`,
+    historicalEvenAria: (baselineDate: string) => `与该平台 ${baselineDate} 的结果成本基本持平`,
+    historyCellStateLegend: '缺少有效 30 天对比的平台仅显示当前成本。',
     referenceHeader: '基准',
   },
 } as const;
@@ -185,7 +219,7 @@ function CellMissing({ hardware, reason }: { hardware: string; reason: string })
 const COST_DELTA_NEUTRAL_BAND = 0.05;
 /** Magnitudes at or beyond this saturate the shade ramp. */
 const COST_DELTA_SATURATION = 0.5;
-// `no-baseline` (∞) is neutral gray, never red/green: a missing B200 baseline
+// Missing comparison evidence is neutral gray, never red/green: availability
 // is not a better/worse judgment.
 const COST_DELTA_CLASS = {
   cheaper: 'text-emerald-700 dark:text-emerald-400',
@@ -196,7 +230,7 @@ const COST_DELTA_CLASS = {
 const COST_DELTA_HUE = {
   cheaper: '16 185 129',
   pricier: '239 68 68',
-  // Parity and "no B200 baseline" both read as neutral gray.
+  // Parity and missing comparison evidence both read as neutral gray.
   even: '148 163 184',
   'no-baseline': '148 163 184',
 } as const;
@@ -205,9 +239,77 @@ const COST_DELTA_NEUTRAL_ALPHA = '0.10';
 
 type CostDeltaPolarity = keyof typeof COST_DELTA_CLASS;
 
+interface DisplayedComparison {
+  status: Exclude<OverviewHistoricalComparison['status'], 'no_newer_result'>;
+  pct: number | null;
+  baselineDate: string | null;
+}
+
+function displayedComparison(
+  platform: OverviewPlatformResult,
+  comparisonMode: OverviewComparisonMode,
+  referenceHardware: OverviewReferenceHardware,
+): DisplayedComparison | null {
+  if (platform.costPerMtok === null) return null;
+  if (comparisonMode === 'history') {
+    const comparison = platform.historicalComparison;
+    return comparison?.status === 'comparable' && comparison.costDeltaPct !== null
+      ? {
+          status: comparison.status,
+          pct: comparison.costDeltaPct,
+          baselineDate: comparison.baselineDate,
+        }
+      : null;
+  }
+  if (platform.hardware === referenceHardware) return null;
+  return {
+    status: platform.costVsReferencePct === null ? 'no_baseline' : 'comparable',
+    pct: platform.costVsReferencePct,
+    baselineDate: null,
+  };
+}
+
 function costDeltaPolarity(pct: number): CostDeltaPolarity {
   if (Math.abs(pct) < COST_DELTA_NEUTRAL_BAND) return 'even';
   return pct < 0 ? 'cheaper' : 'pricier';
+}
+
+function comparisonPolarity(comparison: DisplayedComparison): CostDeltaPolarity {
+  return comparison.status !== 'comparable' || comparison.pct === null
+    ? 'no-baseline'
+    : costDeltaPolarity(comparison.pct);
+}
+
+function comparisonAria(
+  comparison: DisplayedComparison,
+  comparisonMode: OverviewComparisonMode,
+  polarity: CostDeltaPolarity,
+  formatters: Formatters,
+  strings: OverviewStrings,
+  referenceLabel: string,
+): string {
+  if (comparison.status === 'no_baseline' || comparison.pct === null) {
+    return strings.noBaselineAria(referenceLabel);
+  }
+  if (comparisonMode === 'hardware') {
+    return polarity === 'even'
+      ? strings.costDeltaEvenAria(referenceLabel)
+      : strings.costDeltaAria(
+          formatters.percentAbs.format(Math.abs(comparison.pct)),
+          polarity === 'cheaper',
+          referenceLabel,
+        );
+  }
+
+  const baselineDate =
+    comparison.baselineDate === null ? '' : formatters.shortDate(comparison.baselineDate);
+  return polarity === 'even'
+    ? strings.historicalEvenAria(baselineDate)
+    : strings.historicalDeltaAria(
+        formatters.percentAbs.format(Math.abs(comparison.pct)),
+        polarity === 'cheaper',
+        baselineDate,
+      );
 }
 
 /** Continuous shade: only background alpha tracks the magnitude, so every
@@ -224,48 +326,53 @@ function costDeltaAlpha(pct: number): string {
  */
 export function costDeltaCellStyle(
   platform: OverviewPlatformResult,
+  comparisonMode: OverviewComparisonMode = 'hardware',
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
 ): { backgroundColor: string } | undefined {
-  if (platform.costPerMtok === null) return undefined;
-  // B200 is the baseline: its null delta means "nothing to compare against
-  // itself", not the ∞ state, so it keeps the reference column's own tint.
-  if (platform.hardware === 'b200') return undefined;
-  const pct = platform.costVsB200Pct;
-  const polarity: CostDeltaPolarity = pct === null ? 'no-baseline' : costDeltaPolarity(pct);
+  const comparison = displayedComparison(platform, comparisonMode, referenceHardware);
+  if (comparison === null) return undefined;
+  const { pct } = comparison;
+  const polarity = comparisonPolarity(comparison);
   const alpha =
     pct === null || polarity === 'even' ? COST_DELTA_NEUTRAL_ALPHA : costDeltaAlpha(pct);
   return { backgroundColor: `rgb(${COST_DELTA_HUE[polarity]} / ${alpha})` };
 }
 
-/** Relative-to-B200 badge. `pct === null` means the row's B200 baseline is
- *  unavailable: the badge shows a neutral `∞` instead of a percentage. */
+/** Relative comparison badge. Missing reference evidence stays neutral and
+ *  uses `∞` instead of manufacturing a percentage. */
 function CostDeltaBadge({
-  pct,
+  comparison,
+  comparisonMode,
   hardware,
   formatters,
   strings,
+  referenceLabel,
   phoneRow,
 }: {
-  pct: number | null;
+  comparison: DisplayedComparison;
+  comparisonMode: OverviewComparisonMode;
   hardware: string;
   formatters: Formatters;
   strings: OverviewStrings;
+  referenceLabel: string;
   phoneRow: boolean;
 }) {
-  const polarity: CostDeltaPolarity = pct === null ? 'no-baseline' : costDeltaPolarity(pct);
-  const aria =
-    pct === null
-      ? strings.noBaselineAria
-      : polarity === 'even'
-        ? strings.costDeltaEvenAria
-        : strings.costDeltaAria(
-            formatters.percentAbs.format(Math.abs(pct)),
-            polarity === 'cheaper',
-          );
+  const { pct, status } = comparison;
+  const polarity = comparisonPolarity(comparison);
+  const aria = comparisonAria(
+    comparison,
+    comparisonMode,
+    polarity,
+    formatters,
+    strings,
+    referenceLabel,
+  );
   return (
     <span
       data-testid="overview-cost-delta"
       data-hardware={hardware}
       data-cost-polarity={polarity}
+      data-history-status={comparisonMode === 'history' ? status : undefined}
       title={aria}
       // The cell behind it carries the shade, so the badge itself stays
       // untinted — two washes of the same hue would double up.
@@ -285,6 +392,9 @@ function CellValue({
   member,
   formatters,
   strings,
+  comparisonMode,
+  referenceHardware,
+  referenceLabel,
   phoneRow = false,
 }: {
   locale: OverviewLocale;
@@ -292,6 +402,9 @@ function CellValue({
   member: OverviewPlatformResult;
   formatters: Formatters;
   strings: OverviewStrings;
+  comparisonMode: OverviewComparisonMode;
+  referenceHardware: OverviewReferenceHardware;
+  referenceLabel: string;
   phoneRow?: boolean;
 }) {
   const { value, config, evidenceDate, evidenceTopologies } = member.read;
@@ -343,10 +456,11 @@ function CellValue({
       ? null
       : strings.rawDashboardAria(evidenceDateLabel, model.modelLabel, stack);
   const costText = formattedValue;
+  const comparison = displayedComparison(member, comparisonMode, referenceHardware);
   return (
     <div className="min-w-0 space-y-0.5 text-sm">
       {/* Fixed cost | delta grids keep comparisons scannable on desktop and phones;
-          the delta slot is reserved even on B200 so numbers align across rows. */}
+          the delta slot is reserved on the reference too, aligning every row. */}
       <div
         className={
           phoneRow
@@ -390,12 +504,14 @@ function CellValue({
             </a>
           )}
         </span>
-        {member.hardware === 'b200' ? null : (
+        {comparison === null ? null : (
           <CostDeltaBadge
-            pct={member.costVsB200Pct}
+            comparison={comparison}
+            comparisonMode={comparisonMode}
             hardware={member.hardware}
             formatters={formatters}
             strings={strings}
+            referenceLabel={referenceLabel}
             phoneRow={phoneRow}
           />
         )}
@@ -424,6 +540,9 @@ function PlatformCell(props: {
   platform: OverviewPlatformResult;
   formatters: Formatters;
   strings: OverviewStrings;
+  comparisonMode: OverviewComparisonMode;
+  referenceHardware: OverviewReferenceHardware;
+  referenceLabel: string;
   phoneRow?: boolean;
 }) {
   return (
@@ -434,6 +553,9 @@ function PlatformCell(props: {
         member={props.platform}
         formatters={props.formatters}
         strings={props.strings}
+        comparisonMode={props.comparisonMode}
+        referenceHardware={props.referenceHardware}
+        referenceLabel={props.referenceLabel}
         phoneRow={props.phoneRow}
       />
     </div>
@@ -459,14 +581,26 @@ interface SurfaceProps {
   locale: OverviewLocale;
   formatters: Formatters;
   strings: OverviewStrings;
+  comparisonMode: OverviewComparisonMode;
+  referenceHardware: OverviewReferenceHardware;
 }
 
-export function DesktopOverviewMatrix({ models, locale, formatters, strings }: SurfaceProps) {
+export function DesktopOverviewMatrix({
+  models,
+  locale,
+  formatters,
+  strings,
+  comparisonMode,
+  referenceHardware,
+}: SurfaceProps) {
   const platforms = models[0]?.platforms ?? [];
+  const referenceLabel = overviewHardwareLabel(referenceHardware);
   return (
     <div className="hidden xl:block">
       <table data-testid="overview-desktop-matrix" className="w-full border-collapse text-sm">
-        <caption className="sr-only">{strings.caption}</caption>
+        <caption className="sr-only">
+          {comparisonMode === 'history' ? strings.historyCaption : strings.caption}
+        </caption>
         <colgroup>
           <col className="w-[22%]" />
           {platforms.map((platform) => (
@@ -486,9 +620,9 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
               <th
                 key={platform.hardware}
                 scope="col"
-                className={`px-3 py-2 text-left font-semibold ${platform.hardware === 'b200' ? 'bg-muted' : 'bg-card'}`}
+                className={`px-3 py-2 text-left font-semibold ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted' : 'bg-card'}`}
               >
-                {platform.hardware === 'b200'
+                {comparisonMode === 'hardware' && platform.hardware === referenceHardware
                   ? `${platform.hardwareLabel} · ${strings.referenceHeader}`
                   : platform.hardwareLabel}
               </th>
@@ -523,8 +657,8 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
               {model.platforms.map((platform) => (
                 <td
                   key={platform.hardware}
-                  style={costDeltaCellStyle(platform)}
-                  className={`px-3 py-4 align-top ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
+                  style={costDeltaCellStyle(platform, comparisonMode, referenceHardware)}
+                  className={`px-3 py-4 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/30' : ''}`}
                 >
                   <PlatformCell
                     locale={locale}
@@ -532,6 +666,9 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
                     platform={platform}
                     formatters={formatters}
                     strings={strings}
+                    comparisonMode={comparisonMode}
+                    referenceHardware={referenceHardware}
+                    referenceLabel={referenceLabel}
                   />
                 </td>
               ))}
@@ -543,7 +680,15 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
   );
 }
 
-export function MobileOverviewList({ models, locale, formatters, strings }: SurfaceProps) {
+export function MobileOverviewList({
+  models,
+  locale,
+  formatters,
+  strings,
+  comparisonMode,
+  referenceHardware,
+}: SurfaceProps) {
+  const referenceLabel = overviewHardwareLabel(referenceHardware);
   return (
     <ul data-testid="overview-mobile-list" className="divide-y divide-border/50 xl:hidden">
       {models.map((model) => (
@@ -561,7 +706,7 @@ export function MobileOverviewList({ models, locale, formatters, strings }: Surf
                   key={platform.hardware}
                   data-testid="overview-mobile-platform-row"
                   data-hardware={platform.hardware}
-                  style={costDeltaCellStyle(platform)}
+                  style={costDeltaCellStyle(platform, comparisonMode, referenceHardware)}
                   className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-1.5 last:border-b-0"
                 >
                   <span
@@ -576,6 +721,9 @@ export function MobileOverviewList({ models, locale, formatters, strings }: Surf
                     platform={platform}
                     formatters={formatters}
                     strings={strings}
+                    comparisonMode={comparisonMode}
+                    referenceHardware={referenceHardware}
+                    referenceLabel={referenceLabel}
                     phoneRow
                   />
                 </div>
@@ -599,16 +747,20 @@ export function MobileOverviewList({ models, locale, formatters, strings }: Surf
   );
 }
 
-/** Plain links so every view is a copyable server-rendered URL; the displayed
- *  tier is inert `aria-current` text, never a self-link. */
+/** Every option remains a copyable server-rendered URL; ordinary clicks use a
+ *  soft App Router transition and the displayed tier is never a self-link. */
 export function OverviewTierSwitcher({
   tier,
   engineScope,
+  comparisonMode,
+  referenceHardware,
   locale,
   strings,
 }: {
   tier: OverviewTier;
   engineScope: OverviewEngineScope;
+  comparisonMode: OverviewComparisonMode;
+  referenceHardware: OverviewReferenceHardware;
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
@@ -631,13 +783,21 @@ export function OverviewTierSwitcher({
               {option}
             </span>
           ) : (
-            <a
+            <OverviewNavLink
               key={option}
-              href={overviewTierHref(locale, option, engineScope)}
+              href={overviewTierHref(
+                locale,
+                option,
+                engineScope,
+                comparisonMode,
+                referenceHardware,
+              )}
+              analytics={{ control: 'tier', value: String(option) }}
+              searchKeys={['tier']}
               className={`${optionClass} text-muted-foreground transition-colors hover:bg-muted hover:text-foreground`}
             >
               {option}
-            </a>
+            </OverviewNavLink>
           ),
         )}
       </div>
@@ -646,15 +806,19 @@ export function OverviewTierSwitcher({
   );
 }
 
-/** Plain server links keep scope selection copyable and preserve the active tier. */
+/** Scope links keep their native href while preserving the other controls. */
 export function OverviewEngineScopeSwitcher({
   engineScope,
   tier,
+  comparisonMode,
+  referenceHardware,
   locale,
   strings,
 }: {
   engineScope: OverviewEngineScope;
   tier: OverviewTier;
+  comparisonMode: OverviewComparisonMode;
+  referenceHardware: OverviewReferenceHardware;
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
@@ -680,14 +844,22 @@ export function OverviewEngineScopeSwitcher({
               {strings.engineScopeOptions[option]}
             </span>
           ) : (
-            <a
+            <OverviewNavLink
               key={option}
               data-overview-engine-scope={option}
-              href={overviewEngineScopeHref(locale, option, tier)}
+              href={overviewEngineScopeHref(
+                locale,
+                option,
+                tier,
+                comparisonMode,
+                referenceHardware,
+              )}
+              analytics={{ control: 'engine', value: option }}
+              searchKeys={['engine']}
               className={`${optionClass} text-muted-foreground transition-colors hover:bg-muted hover:text-foreground`}
             >
               {strings.engineScopeOptions[option]}
-            </a>
+            </OverviewNavLink>
           ),
         )}
       </div>
@@ -695,13 +867,99 @@ export function OverviewEngineScopeSwitcher({
   );
 }
 
-export function OverviewMethodology({ strings }: { strings: OverviewStrings }) {
+export function OverviewComparisonSwitcher({
+  comparisonMode,
+  engineScope,
+  tier,
+  referenceHardware,
+  locale,
+  strings,
+}: {
+  comparisonMode: OverviewComparisonMode;
+  engineScope: OverviewEngineScope;
+  tier: OverviewTier;
+  referenceHardware: OverviewReferenceHardware;
+  locale: OverviewLocale;
+  strings: OverviewStrings;
+}) {
+  const options: OverviewComparisonMode[] = ['hardware', 'history'];
+  const referenceLabel = overviewHardwareLabel(referenceHardware);
+  const referenceOptions = OVERVIEW_HARDWARE.map((hardware) => ({
+    value: hardware,
+    label: overviewHardwareLabel(hardware),
+    href: overviewHref(locale, tier, engineScope, 'hardware', hardware),
+  }));
+  const optionClass =
+    'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 border-transparent px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors duration-200 hover:border-muted-foreground/30 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:min-w-[140px]';
+  return (
+    <nav
+      data-testid="overview-comparison-switcher"
+      aria-label={strings.comparisonNavLabel}
+      className="flex flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
+    >
+      {options.map((option) => {
+        const label =
+          option === 'hardware'
+            ? strings.hardwareComparisonLabel(referenceLabel)
+            : strings.comparisonOptions.history;
+        return option === comparisonMode ? (
+          <span
+            key={option}
+            data-overview-comparison={option}
+            aria-current="true"
+            className={`${optionClass} border-secondary text-secondary dark:border-primary dark:text-primary`}
+          >
+            {option === 'hardware' ? (
+              <span className="inline-flex items-center gap-0.5">
+                <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
+                <OverviewReferenceSelect
+                  ariaLabel={strings.referenceSelectorAria}
+                  options={referenceOptions}
+                  value={referenceHardware}
+                />
+              </span>
+            ) : (
+              label
+            )}
+          </span>
+        ) : (
+          <OverviewNavLink
+            key={option}
+            data-overview-comparison={option}
+            href={overviewHref(locale, tier, engineScope, option, referenceHardware)}
+            analytics={{ control: 'comparison', value: option }}
+            searchKeys={['compare']}
+            className={optionClass}
+          >
+            {label}
+          </OverviewNavLink>
+        );
+      })}
+    </nav>
+  );
+}
+
+export function OverviewMethodology({
+  strings,
+  comparisonMode,
+  referenceHardware,
+}: {
+  strings: OverviewStrings;
+  comparisonMode: OverviewComparisonMode;
+  referenceHardware: OverviewReferenceHardware;
+}) {
+  const referenceLabel = overviewHardwareLabel(referenceHardware);
   return (
     <div
       data-testid="overview-methodology"
       className="space-y-1 border-t border-border/50 px-4 py-3 text-xs leading-snug text-muted-foreground lg:px-6"
     >
-      <p>{strings.cellStateLegend}</p>
+      {comparisonMode === 'history' ? <p>{strings.historyCaption}</p> : null}
+      <p>
+        {comparisonMode === 'history'
+          ? strings.historyCellStateLegend
+          : strings.cellStateLegend(referenceLabel)}
+      </p>
       <p>{strings.methodologyNote}</p>
     </div>
   );

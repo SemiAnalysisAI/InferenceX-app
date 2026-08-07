@@ -55,7 +55,7 @@ describe('PointSummary', () => {
   it('hides a stale CPU cache hit rate when offload is disabled', () => {
     const html = renderToStaticMarkup(createElement(PointSummary, { meta: meta() }));
 
-    expect(html).toContain('GPU cache hit');
+    expect(html).toContain('Chip cache hit');
     expect(html).not.toContain('CPU cache hit');
   });
 

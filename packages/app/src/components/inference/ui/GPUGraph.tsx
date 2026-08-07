@@ -31,11 +31,10 @@ import {
 } from '@/lib/chart-rendering';
 import {
   isFrontierEligible,
-  paretoFrontLowerLeft,
-  paretoFrontLowerRight,
-  paretoFrontUpperLeft,
-  paretoFrontUpperRight,
+  paretoFrontForDirection,
+  type ParetoDirection,
 } from '@/lib/chart-utils';
+import { canonicalParetoIntersection } from '@/components/inference/utils/canonicalFrontier';
 import type {
   ChartDefinition,
   InferenceData,
@@ -254,24 +253,13 @@ const GPUGraph = React.memo(
     const rooflines = useMemo(() => {
       const result: Record<string, InferenceData[]> = {};
       const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
-      const dir = chartDefinition[rooflineKey] as
-        | 'upper_right'
-        | 'upper_left'
-        | 'lower_left'
-        | 'lower_right'
-        | undefined;
+      const dir = chartDefinition[rooflineKey] as ParetoDirection | undefined;
+      const frontier = paretoFrontForDirection(dir ?? 'lower_right');
       for (const key of Object.keys(groupedData)) {
-        // Exclude degenerate x <= 0 points (interactivity = 0, etc.) from the
-        // frontier so they are never drawn as optimal.
-        const eligible = groupedData[key].filter(isFrontierEligible);
-        result[key] =
-          dir === 'upper_right'
-            ? paretoFrontUpperRight(eligible)
-            : dir === 'upper_left'
-              ? paretoFrontUpperLeft(eligible)
-              : dir === 'lower_left'
-                ? paretoFrontLowerLeft(eligible)
-                : paretoFrontLowerRight(eligible);
+        const canonicalPoints = canonicalParetoIntersection(groupedData[key], dir ?? 'lower_right');
+        result[key] = (
+          canonicalPoints ?? frontier(groupedData[key].filter(isFrontierEligible))
+        ).toSorted((a, b) => a.x - b.x);
       }
       return result;
     }, [groupedData, selectedYAxisMetric, chartDefinition]);
@@ -768,7 +756,7 @@ const GPUGraph = React.memo(
               </svg>
               <h3 className="text-sm font-medium mb-1">No data available</h3>
               <p className="text-xs">
-                Please change the model, sequence, precision, date range or GPU selection.
+                Please change the model, sequence, precision, date range or chip selection.
               </p>
             </div>
           </div>

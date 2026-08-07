@@ -27,7 +27,7 @@ function MultiSelectWrapper({
       options={OPTIONS}
       value={value}
       onChange={setValue}
-      placeholder="Select GPUs..."
+      placeholder="Select Chips..."
       maxSelections={maxSelections}
       minSelections={minSelections}
       searchable={searchable}
@@ -38,7 +38,7 @@ function MultiSelectWrapper({
 describe('MultiSelect', () => {
   it('renders placeholder when no selections', () => {
     cy.mount(<MultiSelectWrapper />);
-    cy.contains('Select GPUs...').should('be.visible');
+    cy.contains('Select Chips...').should('be.visible');
   });
 
   it('click trigger opens dropdown', () => {
@@ -67,7 +67,7 @@ describe('MultiSelect', () => {
     cy.get('[data-slot="select-trigger"]').click();
     cy.get('[data-slot="select-item"]').contains('NVIDIA H100 SXM').click();
     // Badge should be gone, placeholder should return
-    cy.contains('Select GPUs...').should('be.visible');
+    cy.contains('Select Chips...').should('be.visible');
   });
 
   it('search filters options', () => {
@@ -112,7 +112,7 @@ describe('MultiSelect', () => {
     // Click clear all button
     cy.get('[aria-label="Clear all selections"]').click();
     // Placeholder should return
-    cy.contains('Select GPUs...').should('be.visible');
+    cy.contains('Select Chips...').should('be.visible');
   });
 
   it('click outside closes dropdown', () => {
