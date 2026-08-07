@@ -48,18 +48,13 @@ export interface ExclusionSpec {
    * Matching before the aliases is what lets a rule cover vLLM vs SGLang
    * (including `dynamo-`/`mori-` variants) while leaving ATOM — which is
    * aliased into SGLang's group for the rules that do cover it — unrestricted.
+   *
+   * A scenario can narrow every one of its rules at once by composing its own
+   * allowlist onto each spec (see `comparisonExclusion`), which is how 8K/1K
+   * guards only vLLM and SGLang while the same model-level MTP rule keeps
+   * covering every family on other scenarios.
    */
   participatingFamilies?: readonly string[];
-  /**
-   * Literal engine families removed from the rule, matched at the same point as
-   * `participatingFamilies` (after `stripPrefixes`, before `groupAliases`).
-   * Applied on top of `participatingFamilies` when both are set.
-   *
-   * Scenario-level exemptions are composed onto every spec of a chart, which is
-   * how a family can be declared comparable with everything on one scenario
-   * (8K/1K ATOM) while still being grouped by the same rules elsewhere.
-   */
-  exemptFamilies?: readonly string[];
   /**
    * Restrict mutual exclusion to configs on the same hardware SKU. Different
    * hardware may use different engine groups on the same graph.
@@ -92,9 +87,8 @@ function groupForFamily(family: string, spec: ExclusionSpec): string {
  * Extract the literal engine family for `hwKey` under a single spec: strip the
  * configured variant suffix (or require an unsuffixed STP key), drop the leading
  * GPU segment, then strip any configured engine-family prefix. Returns null if
- * the key doesn't participate — because the suffix doesn't match, because the
- * family is outside the spec's `participatingFamilies`, or because it is listed
- * in `exemptFamilies`.
+ * the key doesn't participate — either because the suffix doesn't match or
+ * because the family is outside the spec's `participatingFamilies`.
  */
 function familyForSpec(hwKey: string, spec: ExclusionSpec): string | null {
   let head: string;
@@ -116,7 +110,6 @@ function familyForSpec(hwKey: string, spec: ExclusionSpec): string | null {
   }
   if (!framework) return null;
   if (spec.participatingFamilies && !spec.participatingFamilies.includes(framework)) return null;
-  if (spec.exemptFamilies?.includes(framework)) return null;
   return framework;
 }
 

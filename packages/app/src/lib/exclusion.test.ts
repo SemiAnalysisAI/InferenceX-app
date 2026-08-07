@@ -367,78 +367,112 @@ describe('participatingFamilies', () => {
     },
   );
 
-  it('falls through to a later spec when a family is excluded from an earlier one', () => {
-    // The 8K/1K chart layers the model MTP rule (all families, ATOM aliased onto
-    // SGLang) over the STP rule (vLLM/SGLang only), so TRTLLM stays guarded for
-    // `_mtp` keys while its unsuffixed keys are free.
-    const fixedSeqEx = buildExclusion([
-      ...MTP_SPEC,
-      { ...STP_SPEC[0], participatingFamilies: ['vllm', 'sglang'] },
-    ]);
-    expect(fixedSeqEx.groupOf('b200_trt_mtp')).toBe('trt');
+  it('narrows a layered rule set when composed onto every spec', () => {
+    // The 8K/1K composition: the scenario's allowlist lands on the model MTP
+    // rule as well as the STP rule, so TRTLLM and ATOM are free for both.
+    const fixedSeqEx = buildExclusion(
+      [...MTP_SPEC, ...STP_SPEC].map((spec) => ({
+        ...spec,
+        participatingFamilies: ['vllm', 'sglang'],
+      })),
+    );
+    expect(fixedSeqEx.groupOf('b200_vllm_mtp')).toBe('vllm');
+    expect(fixedSeqEx.groupOf('b200_sglang_mtp')).toBe('sglang');
+    expect(fixedSeqEx.groupOf('b200_trt_mtp')).toBeNull();
     expect(fixedSeqEx.groupOf('b200_trt')).toBeNull();
+    expect(fixedSeqEx.groupOf('mi355x_atom_mtp')).toBeNull();
+    expect(fixedSeqEx.groupOf('mi355x_atom')).toBeNull();
+    expect(fixedSeqEx.groupOf('mi355x_mooncake-atom_mtp')).toBeNull();
   });
 });
 
-describe('exemptFamilies', () => {
-  // The 8K/1K composition: every spec carries the scenario's ATOM exemption, so
-  // ATOM escapes the MTP rule too — including the `atom → sglang` group alias.
-  const exemptEx = buildExclusion(
-    [...MTP_SPEC, { ...STP_SPEC[0], participatingFamilies: ['vllm', 'sglang'] }].map((spec) => ({
+describe('scenario-narrowed rule set', () => {
+  // The 8K/1K composition: the scenario's allowlist is applied to every spec, so
+  // only vLLM and SGLang are guarded — on standard-token AND MTP keys.
+  const narrowedEx = buildExclusion(
+    [...MTP_SPEC, ...STP_SPEC].map((spec) => ({
       ...spec,
-      exemptFamilies: ['atom'],
+      participatingFamilies: ['vllm', 'sglang'],
     })),
   );
 
-  it('removes the family from every rule it is composed onto', () => {
-    expect(exemptEx.familyOf('mi355x_atom')).toBeNull();
-    expect(exemptEx.familyOf('mi355x_atom_mtp')).toBeNull();
-    expect(exemptEx.groupOf('mi355x_atom_mtp')).toBeNull();
-    expect(exemptEx.groupOf('mi355x_mooncake-atom_mtp')).toBeNull();
-    expect(exemptEx.scopesOf('mi355x_atom_mtp')).toEqual([]);
+  it('frees an omitted family from every rule, variants included', () => {
+    for (const key of [
+      'mi355x_atom',
+      'mi355x_atom_mtp',
+      'mi355x_mooncake-atom',
+      'mi355x_mooncake-atom_mtp',
+      'b200_trt',
+      'b200_trt_mtp',
+      'gb300_dynamo-trt_mtp',
+    ]) {
+      expect(narrowedEx.familyOf(key)).toBeNull();
+      expect(narrowedEx.groupOf(key)).toBeNull();
+      expect(narrowedEx.scopesOf(key)).toEqual([]);
+    }
   });
 
-  it('leaves the other families guarded', () => {
-    expect(exemptEx.groupOf('mi355x_vllm_mtp')).toBe('vllm');
-    expect(exemptEx.groupOf('mi355x_sglang_mtp')).toBe('sglang');
-    expect(exemptEx.groupOf('b200_trt_mtp')).toBe('trt');
-    expect(exemptEx.groupOf('mi355x_mori-sglang')).toBe('sglang');
+  it('keeps guarding the listed families on both suffixes', () => {
+    expect(narrowedEx.groupOf('mi355x_vllm')).toBe('vllm');
+    expect(narrowedEx.groupOf('mi355x_vllm_mtp')).toBe('vllm');
+    expect(narrowedEx.groupOf('mi355x_sglang_mtp')).toBe('sglang');
+    expect(narrowedEx.groupOf('mi355x_mori-sglang')).toBe('sglang');
+    expect(narrowedEx.groupOf('gb300_dynamo-sglang_mtp')).toBe('sglang');
   });
 
-  it('lets an exempt family sit on the same graph as both engines', () => {
-    const all = new Set(['mi355x_vllm_mtp', 'mi355x_sglang_mtp', 'mi355x_atom_mtp']);
+  it.each([
+    ['mi355x_atom', 'mi355x_vllm'],
+    ['mi355x_atom', 'mi355x_sglang'],
+    ['mi355x_atom_mtp', 'mi355x_vllm_mtp'],
+    ['mi355x_atom_mtp', 'mi355x_sglang_mtp'],
+    ['b200_trt', 'b200_vllm'],
+    ['b200_trt', 'b200_sglang'],
+    ['b200_trt_mtp', 'b200_vllm_mtp'],
+    ['b200_trt_mtp', 'b200_sglang_mtp'],
+    ['b200_trt', 'mi355x_atom'],
+    ['b200_trt_mtp', 'mi355x_atom_mtp'],
+  ])('lets %s and %s share a graph in either order', (a, b) => {
+    const all = new Set([a, b]);
+    expect(resolveExclusionToggle(new Set([a]), b, all, narrowedEx)).toEqual({
+      kind: 'fallthrough',
+    });
+    expect(resolveExclusionToggle(new Set([b]), a, all, narrowedEx)).toEqual({
+      kind: 'fallthrough',
+    });
+  });
+
+  it('still blocks the two guarded engines against each other', () => {
+    const stp = new Set(['mi355x_vllm', 'mi355x_sglang']);
     expect(
-      resolveExclusionToggle(new Set(['mi355x_vllm_mtp']), 'mi355x_atom_mtp', all, exemptEx),
-    ).toEqual({ kind: 'fallthrough' });
+      resolveExclusionToggle(new Set(['mi355x_vllm']), 'mi355x_sglang', stp, narrowedEx),
+    ).toEqual({ kind: 'block', attempted: 'sglang', existing: 'vllm' });
+
+    const mtp = new Set(['b200_vllm_mtp', 'mi355x_sglang_mtp']);
     expect(
-      resolveExclusionToggle(new Set(['mi355x_atom_mtp']), 'mi355x_vllm_mtp', all, exemptEx),
-    ).toEqual({ kind: 'fallthrough' });
-    // ...but the two guarded engines still block each other.
-    expect(
-      resolveExclusionToggle(
-        new Set(['mi355x_atom_mtp', 'mi355x_vllm_mtp']),
-        'mi355x_sglang_mtp',
-        all,
-        exemptEx,
-      ),
+      resolveExclusionToggle(new Set(['b200_vllm_mtp']), 'mi355x_sglang_mtp', mtp, narrowedEx),
     ).toEqual({ kind: 'block', attempted: 'sglang', existing: 'vllm' });
   });
 
-  it('survives a resolution pass without dropping the exempt keys', () => {
+  it('survives a resolution pass without dropping the freed keys', () => {
     const proposed = new Set([
+      'b200_trt',
+      'b200_trt_mtp',
       'mi355x_atom',
       'mi355x_atom_mtp',
       'mi355x_sglang',
       'mi355x_vllm',
       'mi355x_vllm_mtp',
     ]);
-    const sticky = pickStickyGroup(proposed, new Set(), exemptEx, 'vllm');
+    const sticky = pickStickyGroup(proposed, new Set(), narrowedEx, 'vllm');
     expect([...sticky.result].toSorted()).toEqual([
+      'b200_trt',
+      'b200_trt_mtp',
       'mi355x_atom',
       'mi355x_atom_mtp',
       'mi355x_vllm',
       'mi355x_vllm_mtp',
     ]);
+    expect(sticky.droppedGroups).toEqual(['sglang']);
   });
 });
 
