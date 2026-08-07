@@ -2,6 +2,7 @@ import {
   getModelExclusion,
   getSequenceDefaultExclusionGroup,
   getSequenceExclusion,
+  getSequenceExclusionFamilies,
   getSequenceExclusionPolicy,
 } from '@/lib/data-mappings';
 import { buildExclusion, type Exclusion, type ExclusionConflictPolicy } from '@/lib/exclusion';
@@ -35,6 +36,11 @@ export function comparisonExclusionPolicy(
  * Resolve the production comparability guard for the current chart scope.
  * Unofficial previews are diagnostic and intentionally allow engine families
  * to share a graph, even when the corresponding official view does not.
+ *
+ * A scenario's `exclusionFamilies` allowlist narrows the model's variant specs
+ * as well as the sequence's own, so a family the scenario leaves out (8K/1K
+ * TRTLLM, ATOM) escapes the model-level MTP rule too — otherwise its MTP
+ * configs would still be grouped and blocked.
  */
 export function comparisonExclusion(
   model: Parameters<typeof getModelExclusion>[0],
@@ -43,10 +49,19 @@ export function comparisonExclusion(
 ): Exclusion | null {
   if (isUnofficialRun) return null;
 
-  const modelSpecs = getModelExclusion(model);
-  const sequenceSpecs = getSequenceExclusion(sequence);
-  if (modelSpecs.length === 0 && sequenceSpecs.length === 0) return null;
-  if (modelSpecs.length === 0) return buildExclusion(sequenceSpecs);
-  if (sequenceSpecs.length === 0) return buildExclusion(modelSpecs);
-  return buildExclusion([...modelSpecs, ...sequenceSpecs]);
+  const specs = [...getModelExclusion(model), ...getSequenceExclusion(sequence)];
+  if (specs.length === 0) return null;
+
+  const families = getSequenceExclusionFamilies(sequence);
+  if (!families) return buildExclusion(specs);
+  return buildExclusion(
+    specs.map((spec) => ({
+      ...spec,
+      // Intersect rather than replace: a spec that already narrows itself keeps
+      // its own limit, and the scenario can only ever narrow further.
+      participatingFamilies: spec.participatingFamilies
+        ? spec.participatingFamilies.filter((family) => families.includes(family))
+        : families,
+    })),
+  );
 }

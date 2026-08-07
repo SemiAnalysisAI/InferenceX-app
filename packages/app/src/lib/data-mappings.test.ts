@@ -7,6 +7,7 @@ import {
   getModelExclusion,
   getSequenceDefaultExclusionGroup,
   getSequenceExclusion,
+  getSequenceExclusionFamilies,
   getSequenceExclusionPolicy,
   getSequenceLabel,
   getPrecisionLabel,
@@ -227,13 +228,20 @@ describe('comparison exclusions', () => {
     expect(getSequenceExclusion(Sequence.OneK_EightK)).toEqual([]);
   });
 
-  it('limits the 8K/1K STP rule to vLLM and SGLang', () => {
-    expect(
-      getSequenceExclusion(Sequence.EightK_OneK).map((spec) => spec.participatingGroups),
-    ).toEqual([['vllm', 'sglang']]);
+  it('guards only vLLM and SGLang on 8K/1K, every family on Agentic', () => {
+    expect(getSequenceExclusionFamilies(Sequence.EightK_OneK)).toEqual(['vllm', 'sglang']);
     // Agentic keeps every engine family exclusive while the benchmark is new.
+    expect(getSequenceExclusionFamilies(Sequence.AgenticTraces)).toBeNull();
+    expect(getSequenceExclusionFamilies(Sequence.OneK_OneK)).toBeNull();
+  });
+
+  it('shares one STP spec between the scenarios that carry it', () => {
+    // The scenarios differ only in which families they guard, not in the rule.
+    expect(getSequenceExclusion(Sequence.EightK_OneK)).toEqual(
+      getSequenceExclusion(Sequence.AgenticTraces),
+    );
     expect(
-      getSequenceExclusion(Sequence.AgenticTraces).map((spec) => spec.participatingGroups),
+      getSequenceExclusion(Sequence.EightK_OneK).map((spec) => spec.participatingFamilies),
     ).toEqual([undefined]);
   });
 
