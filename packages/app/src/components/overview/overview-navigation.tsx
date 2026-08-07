@@ -97,6 +97,7 @@ export function OverviewNavigationProvider({
   );
 
   useEffect(() => {
+    ++navigationIdRef.current;
     dataCacheRef.current.set(initialHref, initialData);
     committedHrefRef.current = initialHref;
     pendingHrefRef.current = initialHref;

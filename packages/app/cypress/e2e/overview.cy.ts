@@ -182,7 +182,7 @@ describe('Overview page', () => {
     cy.intercept('GET', '**/api/v1/overview*').as('overviewJson');
     cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
     cy.wait('@overviewJson');
-    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75');
+    cy.location('search').should('eq', '?tier=75');
 
     cy.window().then((win) => {
       let overviewRequests = 0;
