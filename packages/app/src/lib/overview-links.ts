@@ -1,19 +1,27 @@
 import { runIdFromRunUrl } from './known-issues';
 import {
   OVERVIEW_DEFAULT_COMPARISON_MODE,
+  OVERVIEW_DEFAULT_MODEL_SCOPE,
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   OVERVIEW_PRIMARY_TIER,
   type OverviewComparisonMode,
   type OverviewConfigResult,
   type OverviewEngineScope,
+  type OverviewModelScope,
   type OverviewModelSummary,
   type OverviewReferenceHardware,
   type OverviewTier,
 } from './overview-data';
 
-export type OverviewSearchKey = 'tier' | 'engine' | 'ref' | 'compare';
+export type OverviewSearchKey = 'tier' | 'engine' | 'ref' | 'compare' | 'models';
 
-const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = ['tier', 'engine', 'ref', 'compare'];
+const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
+  'tier',
+  'engine',
+  'ref',
+  'compare',
+  'models',
+];
 
 /** Apply one control's destination to the latest pending overview URL.
  * This prevents a second, fast selection from rebuilding from stale server
@@ -115,6 +123,49 @@ export function buildOverviewDashboardHref(
   return `${inferenceRoute(locale)}?${query}`;
 }
 
+function uniqueValues(values: readonly string[]): string {
+  return [...new Set(values)].join(',');
+}
+
+/**
+ * Dashboard view for one Overview 30-day cell. The two independently ranked
+ * serving envelopes are carried explicitly so the chart can show exactly the
+ * curves behind the percentage even when engine, precision, or topology changed.
+ */
+export function buildOverviewHistoryDashboardHref(
+  locale: 'en' | 'zh',
+  model: OverviewModelSummary,
+  current: OverviewConfigResult,
+  baseline: OverviewConfigResult,
+): string {
+  const currentRun = soleSourceRun(current);
+  const baselineRun = soleSourceRun(baseline);
+  const params: UrlStateParams = {
+    g_model: model.model,
+    g_rundate: current.latestDate,
+    g_runid: currentRun?.id,
+    i_seq: overviewSequence(model),
+    i_prec: uniqueValues([current.precision, baseline.precision]),
+    i_metric: 'y_costh',
+    i_xmode: 'interactivity',
+    i_gpus: uniqueValues([current.hwKey, baseline.hwKey]),
+    i_dates: uniqueValues([
+      current.latestDate,
+      baselineRun === null ? baseline.latestDate : `${baseline.latestDate}~r${baselineRun.id}`,
+    ]),
+    i_overview_current: current.key,
+    i_overview_baseline: baseline.key,
+    i_optimal: '1',
+    i_advlabel: '1',
+  };
+
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) query.set(key, value);
+  }
+  return `${inferenceRoute(locale)}?${query}`;
+}
+
 /**
  * Model-level dashboard view: precision-neutral, because the two headline pairs
  * may select different precisions. Result-level evidence links narrow further.
@@ -136,6 +187,7 @@ export function overviewHref(
   engineScope: OverviewEngineScope = 'community',
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
 ): string {
   const base = locale === 'zh' ? '/zh/overview' : '/overview';
   const query = new URLSearchParams();
@@ -145,6 +197,7 @@ export function overviewHref(
     query.set('ref', referenceHardware);
   }
   if (comparisonMode === 'history') query.set('compare', '30d');
+  if (modelScope !== OVERVIEW_DEFAULT_MODEL_SCOPE) query.set('models', modelScope);
   const search = query.toString();
   return search === '' ? base : `${base}?${search}`;
 }
@@ -156,8 +209,9 @@ export function overviewTierHref(
   engineScope: OverviewEngineScope = 'community',
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
 ): string {
-  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware);
+  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware, modelScope);
 }
 
 /** Engine-scope switch preserving the active service tier. */
@@ -167,6 +221,7 @@ export function overviewEngineScopeHref(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
 ): string {
-  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware);
+  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware, modelScope);
 }

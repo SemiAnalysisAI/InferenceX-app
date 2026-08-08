@@ -26,7 +26,7 @@ import { useLocale } from '@/lib/use-locale';
 
 import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXInventory } from './CollectiveXInventory';
-import { CollectiveXKvTable } from './CollectiveXKvTable';
+import { CollectiveXKvSection } from './CollectiveXKvSection';
 import { CollectiveXRunsTable } from './CollectiveXRunsTable';
 import {
   collectiveXColorKey,
@@ -862,6 +862,9 @@ export default function CollectiveXDisplay() {
               <p className="text-sm text-muted-foreground">{t.noSeries}</p>
             </Card>
           )}
+          {/* KV-transfer cases lead for kv-only runs: the EP chart below is
+              legitimately empty for them and must not bury the selected data. */}
+          <CollectiveXKvSection datasets={datasets} runIndexById={selectedRunIndexById} />
           <Card data-testid="collectivex-main-chart" className="relative">
             <CollectiveXChart
               chartId="collectivex-explorer"
@@ -1054,7 +1057,6 @@ export default function CollectiveXDisplay() {
               />
             </div>
           </Card>
-          <CollectiveXKvTable datasets={datasets} />
           <CollectiveXInventory
             key={`${version}-${datasets.map((dataset) => `${dataset.run.run_id}:${dataset.run.run_attempt}`).join(',')}`}
             datasets={datasets}

@@ -25,6 +25,7 @@ const STRINGS = {
     shown: 'Shown',
     run: 'Run',
     result: 'Result',
+    suites: 'Suites',
     cases: 'Measured cases',
     points: 'Terminal points',
     skus: 'SKUs',
@@ -42,6 +43,7 @@ const STRINGS = {
     shown: 'Shown',
     run: 'Run',
     result: 'Result',
+    suites: 'Suites',
     cases: 'Measured cases',
     points: 'Terminal points',
     skus: 'SKUs',
@@ -54,6 +56,11 @@ const STRINGS = {
     deleteRun: (id: string) => `Delete run #${id}`,
     empty: 'No runs match this benchmark version.',
   },
+} as const;
+
+const SUITE_BADGE_CLASSES = {
+  ep: 'border-sky-600/40 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+  kv: 'border-violet-600/40 bg-violet-500/10 text-violet-700 dark:text-violet-300',
 } as const;
 
 const CONCLUSION_CLASSES: Record<string, string> = {
@@ -92,12 +99,13 @@ export function CollectiveXRunsTable({
       data-testid="collectivex-runs-table"
       className="mt-2 max-h-[28rem] overflow-auto rounded-md border"
     >
-      <table className="w-full min-w-[880px] text-sm">
+      <table className="w-full min-w-[940px] text-sm">
         <thead className="sticky top-0 z-1 bg-background">
           <tr className="border-b-2 border-border text-left text-muted-foreground">
             <th className="px-3 py-1.5 font-medium">{t.shown}</th>
             <th className="px-3 py-1.5 font-medium">{t.run}</th>
             <th className="px-3 py-1.5 font-medium">{t.result}</th>
+            <th className="px-3 py-1.5 font-medium">{t.suites}</th>
             <th className="px-3 py-1.5 text-right font-medium">{t.cases}</th>
             <th className="px-3 py-1.5 text-right font-medium">{t.points}</th>
             <th className="px-3 py-1.5 font-medium">{t.skus}</th>
@@ -112,6 +120,11 @@ export function CollectiveXRunsTable({
             const deleting = deletingRunIds.has(run.run_id);
             const conclusion = run.conclusion ?? t.pending;
             const selectedRunIndex = selectedRunIndexById.get(run.run_id);
+            // Summaries stored before the kv suite carry no kv_cases: EP-only.
+            const kvRequested = run.kv_cases?.requested ?? 0;
+            const kvMeasured = run.kv_cases?.measured ?? 0;
+            const epRequested = run.requested_cases - kvRequested;
+            const epMeasured = run.measured_cases - kvMeasured;
             const lineDasharray =
               selectedRunIndex === undefined ? null : collectiveXRunDasharray(selectedRunIndex);
             return (
@@ -190,6 +203,34 @@ export function CollectiveXRunsTable({
                   >
                     {conclusion}
                   </span>
+                </td>
+                <td className="px-3 py-1.5">
+                  <div className="flex gap-1">
+                    {epRequested > 0 && (
+                      <span
+                        title={`EP: ${epMeasured}/${epRequested} measured`}
+                        data-testid={`collectivex-run-suite-ep-${run.run_id}`}
+                        className={cn(
+                          'inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium',
+                          SUITE_BADGE_CLASSES.ep,
+                        )}
+                      >
+                        EP
+                      </span>
+                    )}
+                    {kvRequested > 0 && (
+                      <span
+                        title={`KV transfer: ${kvMeasured}/${kvRequested} measured`}
+                        data-testid={`collectivex-run-suite-kv-${run.run_id}`}
+                        className={cn(
+                          'inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium',
+                          SUITE_BADGE_CLASSES.kv,
+                        )}
+                      >
+                        KV
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-3 py-1.5 text-right tabular-nums">
                   {run.measured_cases}/{run.requested_cases}

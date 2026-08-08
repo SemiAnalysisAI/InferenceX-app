@@ -206,6 +206,15 @@ describe('comparisonExclusion', () => {
     expect(exclusion?.familyOf('b200_sglang')).toBe('sglang');
   });
 
+  it('allows the exact Overview history pair without changing normal dashboard guards', () => {
+    expect(
+      comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, false, true),
+    ).toBeNull();
+    expect(
+      comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, false, false),
+    ).not.toBeNull();
+  });
+
   it.each([
     {
       name: 'blocks Agentic STP engines on the same SKU',

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { BenchmarkRow } from './api';
+import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
+
 import { Model, Precision } from './data-mappings';
 import type { OverviewPageData } from './overview-data';
 
@@ -185,5 +187,72 @@ describe('getOverviewPageData engine scope forwarding', () => {
     expect(loadFixture).toHaveBeenCalledWith('overview-history-rows');
     expect(getCachedBenchmarks).not.toHaveBeenCalled();
     expect(getCachedBenchmarksAsOf).not.toHaveBeenCalled();
+  });
+});
+
+describe('getOverviewPageData model scope forwarding', () => {
+  it('queries deprecated and maintenance models only under the all scope', async () => {
+    const getCachedBenchmarks = vi.fn(() => Promise.resolve(rows));
+    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+    vi.doMock('@/lib/benchmark-data.server', () => ({
+      getCachedBenchmarks,
+      getCachedBenchmarksAsOf: vi.fn(),
+    }));
+    vi.doMock('@/lib/test-fixtures', () => ({ loadFixture: vi.fn() }));
+
+    const { getOverviewPageData } = await import('./overview-data.server');
+    const gptOssKeys = DISPLAY_MODEL_TO_DB[Model.GptOss] ?? [];
+    expect(gptOssKeys.length).toBeGreaterThan(0);
+
+    const defaultPage = await getOverviewPageData(50, 'community', 'hardware', 'b200', 'default');
+    const queriedByDefault = getCachedBenchmarks.mock.calls.flat(2);
+    expect(defaultPage.modelScope).toBe('default');
+    expect(defaultPage.models.some((m) => m.model === Model.GptOss)).toBe(false);
+    expect(queriedByDefault).not.toEqual(expect.arrayContaining(gptOssKeys));
+
+    getCachedBenchmarks.mockClear();
+    const allPage = await getOverviewPageData(50, 'community', 'hardware', 'b200', 'all');
+    const queriedByAll = getCachedBenchmarks.mock.calls.flat(2);
+    expect(allPage.modelScope).toBe('all');
+    expect(allPage.models.some((m) => m.model === Model.GptOss)).toBe(true);
+    expect(queriedByAll).toEqual(expect.arrayContaining(gptOssKeys));
+  });
+
+  it('anchors the history window to default models even under the all scope', async () => {
+    const gptOssKeys = DISPLAY_MODEL_TO_DB[Model.GptOss] ?? [];
+    const getCachedBenchmarks = vi.fn((keys: string[]) =>
+      Promise.resolve(
+        keys.some((key) => gptOssKeys.includes(key))
+          ? [row('b200', 'sglang', 900, '2026-07-28')]
+          : rows,
+      ),
+    );
+    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+    vi.doMock('@/lib/benchmark-data.server', () => ({
+      getCachedBenchmarks,
+      getCachedBenchmarksAsOf: vi.fn(() => Promise.resolve([])),
+    }));
+    vi.doMock('@/lib/test-fixtures', () => ({ loadFixture: vi.fn() }));
+
+    const { getOverviewPageData } = await import('./overview-data.server');
+    const page = await getOverviewPageData(50, 'community', 'history', 'b200', 'all');
+
+    expect(page.historicalWindow?.snapshotDate).toBe('2026-07-20');
+  });
+
+  it('forwards the all scope through history mode', async () => {
+    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+    vi.doMock('@/lib/benchmark-data.server', () => ({
+      getCachedBenchmarks: vi.fn(() => Promise.resolve(rows)),
+      getCachedBenchmarksAsOf: vi.fn(() => Promise.resolve([])),
+    }));
+    vi.doMock('@/lib/test-fixtures', () => ({ loadFixture: vi.fn() }));
+
+    const { getOverviewPageData } = await import('./overview-data.server');
+    const page = await getOverviewPageData(50, 'community', 'history', 'b200', 'all');
+
+    expect(page.comparisonMode).toBe('history');
+    expect(page.modelScope).toBe('all');
+    expect(page.models.some((m) => m.model === Model.GptOss)).toBe(true);
   });
 });

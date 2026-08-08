@@ -6,6 +6,7 @@ import {
   applyAgenticPercentileToXLabel,
   buildComparisonDates,
   dedupeRowsToLatestPerConfig,
+  filterOverviewHistoryRows,
   filterByGPU,
   derivedModeRoofline,
   flipRooflineDirection,
@@ -100,6 +101,17 @@ describe('buildComparisonDates', () => {
     expect(result).toEqual(['2026-02-01']);
   });
 
+  it('keeps other same-day runs but excludes the selected main run', () => {
+    const result = buildComparisonDates(
+      ['h100'],
+      ['2026-03-01~r301', '2026-03-01~r300', '2026-02-01~r200'],
+      { startDate: '', endDate: '' },
+      '2026-03-01',
+      '300',
+    );
+    expect(result).toEqual(['2026-03-01~r301', '2026-02-01~r200']);
+  });
+
   it('deduplicates dates appearing in both range and explicit list', () => {
     const result = buildComparisonDates(
       ['h100'],
@@ -140,6 +152,33 @@ describe('filterByGPU', () => {
 
   it('excludes when neither key nor alias matches', () => {
     expect(filterByGPU([{ hwKey: 'unknown' }], ['h100'], {})).toHaveLength(0);
+  });
+});
+
+describe('filterOverviewHistoryRows', () => {
+  it('keeps only the serving envelope encoded by the Overview history link', () => {
+    const rows = [
+      drow({ id: 1, hardware: 'mi355x', framework: 'sglang', precision: 'fp8' }),
+      drow({ id: 2, hardware: 'mi355x', framework: 'vllm', precision: 'fp4' }),
+      drow({ id: 3, hardware: 'mi355x', framework: 'sglang', precision: 'fp4' }),
+    ];
+    const key = JSON.stringify(['qwen3.5', 'mi355x', 'vllm', 'none', 'fp4', false, false, 'off']);
+
+    expect(
+      filterOverviewHistoryRows(
+        rows.map((row) => ({ ...row, model: 'qwen3.5', is_multinode: false })),
+        key,
+      ).map((row) => row.id),
+    ).toEqual([2]);
+  });
+
+  it('is a no-op outside an Overview history pair', () => {
+    const rows = [drow({ id: 1 }), drow({ id: 2 })].map((row) => ({
+      ...row,
+      model: 'qwen3.5',
+      is_multinode: false,
+    }));
+    expect(filterOverviewHistoryRows(rows, undefined)).toBe(rows);
   });
 });
 

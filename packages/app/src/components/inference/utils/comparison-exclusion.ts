@@ -46,8 +46,12 @@ export function comparisonExclusion(
   model: Parameters<typeof getModelExclusion>[0],
   sequence: Parameters<typeof getSequenceExclusion>[0],
   isUnofficialRun: boolean,
+  isOverviewHistoryPair = false,
 ): Exclusion | null {
-  if (isUnofficialRun) return null;
+  // The Overview percentage deliberately compares each snapshot's independently
+  // best serving envelope. Its detail link must preserve that exact pair even
+  // when the normal like-for-like engine guard would choose only one family.
+  if (isUnofficialRun || isOverviewHistoryPair) return null;
 
   const specs = [...getModelExclusion(model), ...getSequenceExclusion(sequence)];
   if (specs.length === 0) return null;

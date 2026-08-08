@@ -174,6 +174,14 @@ describe('isModelDeprecated', () => {
     expect(isModelDeprecated(Model.GLM_5)).toBe(true);
   });
 
+  it('returns true for Kimi K2.5/2.6/2.7-Code, fully retired after 2026-08-06', () => {
+    expect(isModelDeprecated(Model.Kimi_K2_5)).toBe(true);
+  });
+
+  it('keeps Kimi K3 active', () => {
+    expect(isModelDeprecated(Model.Kimi_K3)).toBe(false);
+  });
+
   it('keeps GLM-5.2 active', () => {
     expect(isModelDeprecated(Model.GLM_5_2)).toBe(false);
   });

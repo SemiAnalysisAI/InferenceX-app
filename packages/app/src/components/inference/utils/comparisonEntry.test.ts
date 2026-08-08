@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildActiveComparisonIds,
   buildRunNumbering,
   comparisonEntryDate,
   comparisonEntryLabel,
@@ -86,6 +87,23 @@ describe('comparisonEntry', () => {
       const r1 = makeRunComparisonEntry('2026-06-14', '100');
       expect(resolveComparisonEntries([r1], { startDate: '', endDate: '' })).toEqual([r1]);
     });
+  });
+
+  it('keeps the current Overview snapshot active alongside its historical run', () => {
+    expect(
+      buildActiveComparisonIds(
+        ['b200_vllm_mtp', 'b200_sglang'],
+        ['2026-07-01~r28403258484'],
+        '2026-07-12',
+      ),
+    ).toEqual(
+      new Set([
+        '2026-07-12_b200_vllm_mtp',
+        '2026-07-12_b200_sglang',
+        '2026-07-01~r28403258484_b200_vllm_mtp',
+        '2026-07-01~r28403258484_b200_sglang',
+      ]),
+    );
   });
 
   it('contains no characters that break a CSS class selector', () => {

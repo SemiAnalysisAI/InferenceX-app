@@ -3,7 +3,6 @@
 const MODEL_LABELS = [
   'DeepSeek V4 Pro 1.6T',
   'Kimi K3 2.8T',
-  'Kimi K2.5/2.6/2.7-Code 1T',
   'MiniMax M3 428B',
   'GLM5.2',
   'Qwen3.5 397B',
@@ -20,8 +19,8 @@ const PLATFORM_HEADERS = [
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
-/** Six models, three of them with both a single-turn and an AgentX row. */
-const MATRIX_ROWS = 9;
+/** Five models, three of them with both a single-turn and an AgentX row. */
+const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文多轮真实智能体场景（AgentX）';
@@ -114,30 +113,92 @@ function textRect(element: Element) {
 }
 
 describe('Overview page', () => {
-  it('updates overview selectors with a soft URL transition instead of reloading the document', () => {
+  it('updates selectors through cached overview JSON without an RSC round trip', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
+    let jsonRequests = 0;
+    let rscRequests = 0;
+    const rscUrls: string[] = [];
+    cy.intercept('GET', '**/api/v1/overview*', () => {
+      jsonRequests += 1;
+    }).as('overviewJson');
+    cy.intercept('GET', '**/overview*', (request) => {
+      const url = new URL(request.url);
+      if (
+        (url.pathname === '/overview' || url.pathname === '/zh/overview') &&
+        (url.searchParams.has('_rsc') || request.headers.rsc === '1')
+      ) {
+        rscRequests += 1;
+        rscUrls.push(`${url.pathname}${url.search}`);
+      }
+    });
     cy.window().then((win) => {
       (win as Window & { __overviewNavigationSentinel?: string }).__overviewNavigationSentinel =
         'preserved';
     });
 
     cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    cy.wait('@overviewJson');
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
+
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '50').click();
+    cy.location('search').should('eq', '');
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    cy.location('search').should('eq', '?tier=75');
+    cy.then(() => {
+      expect(jsonRequests, 'one request; both visited selections are cached').to.equal(1);
+      expect(rscUrls, 'selector RSC requests').to.deep.equal([]);
+    });
 
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .find('[data-overview-engine-scope="all"]')
       .click();
+    cy.wait('@overviewJson');
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.get('[data-overview-comparison="history"]').click();
+    cy.wait('@overviewJson');
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all&compare=30d');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.go('back');
+    cy.get('[data-overview-comparison="hardware"]', { timeout: 15_000 }).should(
+      'have.attr',
+      'aria-current',
+      'true',
+    );
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+    cy.then(() => {
+      expect(rscRequests, 'selector and popstate RSC requests').to.equal(0);
+    });
+  });
+
+  it('leaves overview through browser history without requesting overview data', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+    cy.intercept('GET', '**/api/v1/overview*').as('overviewJson');
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    cy.wait('@overviewJson');
+    cy.location('search').should('eq', '?tier=75');
+
+    cy.window().then((win) => {
+      let overviewRequests = 0;
+      const fetch = win.fetch.bind(win);
+      cy.stub(win, 'fetch').callsFake((input, init) => {
+        const url = input instanceof win.Request ? input.url : input.toString();
+        if (url.startsWith('/api/v1/overview')) {
+          overviewRequests += 1;
+          return new Promise<Response>(() => {});
+        }
+        return fetch(input, init);
+      });
+
+      win.history.pushState(win.history.state, '', '/inference');
+      win.dispatchEvent(new win.PopStateEvent('popstate', { state: win.history.state }));
+      expect(overviewRequests, 'overview requests after leaving overview').to.equal(0);
+    });
   });
 
   it('preserves pending selections when controls are changed rapidly', () => {
@@ -150,6 +211,57 @@ describe('Overview page', () => {
       .click();
 
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+  });
+
+  it('reveals deprecated and maintenance models via the bottom toggle', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+    cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('not.exist');
+
+    cy.get('[data-testid="overview-model-scope-toggle"]')
+      .find('[data-overview-model-scope="all"]')
+      .click();
+    cy.location('search').should('eq', '?models=all');
+
+    desktopModel('gpt-oss-120b')
+      .find('[data-testid="overview-model-category-badge"]')
+      .should('have.attr', 'data-category', 'deprecated')
+      .and('contain.text', 'Deprecated');
+    desktopModel('DeepSeek-R1-0528')
+      .find('[data-testid="overview-model-category-badge"]')
+      .should('have.attr', 'data-category', 'maintenance');
+    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN)
+      .find('[data-testid="overview-model-category-badge"]')
+      .should('not.exist');
+    cy.get('[data-testid="overview-desktop-model"]').then(([...rows]) => {
+      const models = rows.map((row) => row.dataset.model);
+      expect(models.indexOf('gpt-oss-120b')).to.be.greaterThan(
+        models.lastIndexOf('Qwen-3.5-397B-A17B'),
+      );
+    });
+
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    cy.location('search').should('eq', '?tier=75&models=all');
+    cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('exist');
+
+    cy.get('[data-testid="overview-model-scope-toggle"]')
+      .find('[data-overview-model-scope="default"]')
+      .click();
+    cy.location('search').should('eq', '?tier=75');
+    cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('not.exist');
+  });
+
+  it('localizes the model scope toggle and badges on the Chinese route', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/zh/overview?models=all');
+
+    cy.get('[data-testid="overview-model-scope-toggle"]').should(
+      'contain.text',
+      '隐藏已弃用与维护模式模型',
+    );
+    desktopModel('gpt-oss-120b')
+      .find('[data-testid="overview-model-category-badge"]')
+      .should('contain.text', '已弃用');
   });
 
   it('uses a selectable hardware reference and preserves it across overview controls', () => {
@@ -261,6 +373,7 @@ describe('Overview page', () => {
     cy.visit('/overview?compare=30d');
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
+      cy.contains('a', 'View details').should('not.exist');
       // Unlike the hardware view, B200 is a normal platform in the historical
       // view and receives its own change badge and heat-map tint.
       platform('b200')
@@ -281,12 +394,36 @@ describe('Overview page', () => {
         .and('have.attr', 'data-cost-polarity', 'cheaper')
         .and('contain.text', '-25%');
       platform('b300').find('[data-testid="overview-cost-delta"]').should('not.exist');
+      platform('b300').find('[data-testid="overview-history-detail-link"]').should('not.exist');
       platform('b300').then(([cell]) => {
         expect(getComputedStyle(cell.closest('td')!).backgroundColor).to.match(
           /rgba\(0, 0, 0, 0\)|transparent/,
         );
       });
       platform('gb200').find('[data-testid="overview-cost-delta"]').should('not.exist');
+      platform('mi355x')
+        .find('[data-testid="overview-history-detail-link"]')
+        .should('have.text', 'Compare curves')
+        .and('have.attr', 'href')
+        .then((href) => {
+          const url = new URL(String(href), 'https://inferencex.local');
+          expect(url.pathname).to.equal('/inference');
+          expect(url.searchParams.get('g_model')).to.equal('Qwen-3.5-397B-A17B');
+          expect(url.searchParams.get('i_metric')).to.equal('y_costh');
+          expect(url.searchParams.get('i_xmode')).to.equal('interactivity');
+          const comparisonEntries = url.searchParams.get('i_dates')?.split(',') ?? [];
+          expect(comparisonEntries).to.have.length(2);
+          expect(comparisonEntries[0]).to.equal(url.searchParams.get('g_rundate'));
+          expect(comparisonEntries[1]).to.match(/^\d{4}-\d{2}-\d{2}(?:~r\d+)?$/u);
+          const currentKey = url.searchParams.get('i_overview_current');
+          const baselineKey = url.searchParams.get('i_overview_baseline');
+          expect(currentKey).to.be.a('string');
+          expect(currentKey).not.to.equal('');
+          expect(baselineKey).to.be.a('string');
+          expect(baselineKey).not.to.equal('');
+          expect(url.searchParams.has('i_spec')).to.equal(false);
+          expect(url.searchParams.has('i_disagg')).to.equal(false);
+        });
     });
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
@@ -308,6 +445,29 @@ describe('Overview page', () => {
     expectNoVisibleDatesOrSnapshot();
   });
 
+  it('releases the exact history pair after a model change', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview?compare=30d');
+
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN)
+      .find('[data-testid="overview-history-detail-link"]')
+      .first()
+      .then(($link) => {
+        const href = String($link.attr('href'));
+        cy.visit(href);
+
+        cy.get('[data-testid="inference-chart-display"]').should('exist');
+        cy.get('[data-testid="model-selector"]').click();
+        cy.contains('[role="option"]', 'DeepSeek V4 Pro 1.6T').click();
+        cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro 1.6T');
+        cy.get('[data-testid="inference-chart-display"]').should(
+          'not.contain.text',
+          'No data available',
+        );
+        cy.get('[data-testid="chart-figure"] svg').should('exist');
+      });
+  });
+
   it('keeps the historical comparison complete and non-scrolling across desktop, tablet and phone', () => {
     for (const width of [320, 390, 768, 1024, 1279, 1280, 1440]) {
       cy.viewport(width, 900);
@@ -320,6 +480,12 @@ describe('Overview page', () => {
           expect($option[0].getBoundingClientRect().height).to.be.at.least(44);
         });
       cy.get('[data-testid="overview-cost-delta"][data-hardware="b200"]').should('exist');
+      cy.get('[data-testid="overview-history-detail-link"]')
+        .filter(':visible')
+        .first()
+        .then(([link]) => {
+          expect(link.getBoundingClientRect().height).to.be.at.least(width < 1280 ? 44 : 32);
+        });
       expectNoHorizontalOverflow();
       if (width < 1280) {
         expectNoHorizontalScroller('overview-mobile-list');
@@ -398,24 +564,12 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    desktopModel('Kimi-K2.5').within(() => {
-      cy.get('[data-testid="overview-pair-value"]').should('have.length', 3);
-      cy.get('[data-testid="overview-pair-missing"]')
-        .should('have.length', 2)
-        .then(($missing) => {
-          expect([...$missing].map((element) => element.getAttribute('title'))).to.deep.equal([
-            'no data for this scenario',
-            'no data for this scenario',
-          ]);
-        });
-      cy.get('[data-testid="overview-pair-missing"]')
-        .children('[aria-hidden="true"]')
-        .should('have.length', 2)
-        .and('have.text', '——');
-      // Standard decode is the exception, so those cells badge STP.
-      platform('b200').should('contain.text', 'SGLang · FP4 · STP');
-      platform('mi355x').should('contain.text', 'SGLang · FP4 · STP');
-      platform('b300').should('contain.text', 'SGLang · FP8 · STP');
+    // Standard decode is the exception, so that cell badges STP. Qwen's GB300
+    // slice is standard-decode only; its other platforms stay speculative.
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
+      platform('gb300').should('contain.text', 'SGLang · FP8 · STP');
+      platform('b200').should('not.contain.text', 'STP');
+      platform('mi355x').should('not.contain.text', 'STP');
     });
 
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
@@ -531,15 +685,6 @@ describe('Overview page', () => {
         expect(Math.max(r, g, b) - Math.min(r, g, b)).to.be.lessThan(60);
       });
     });
-
-    // Outside the ±5% parity band the cell carries the matching polarity.
-    desktopModel('Kimi-K2.5').within(() => {
-      platform('b300')
-        .find('[data-testid="overview-cost-delta"]')
-        .should('contain.text', '+11%')
-        .and('have.attr', 'data-cost-polarity', 'pricier');
-      expectCellTint('b300', 'rgba(239, 68, 68,');
-    });
   });
 
   it('renders the full platform matrix for every active model', () => {
@@ -625,7 +770,7 @@ describe('Overview page', () => {
         .find('[data-testid="overview-model-scenario"]')
         .should('have.text', AGENTX_LABEL);
     }
-    for (const model of ['DeepSeek-V4-Pro', 'Kimi-K2.5', 'MiniMax-M3', 'Qwen-3.5-397B-A17B']) {
+    for (const model of ['DeepSeek-V4-Pro', 'MiniMax-M3', 'Qwen-3.5-397B-A17B']) {
       desktopModel(model, SINGLE_TURN)
         .find('[data-testid="overview-model-scenario"]')
         .should('have.text', '8K/1K');
@@ -995,9 +1140,11 @@ describe('Overview page', () => {
                 expect(badgeText).not.to.equal(null);
 
                 expect(badgeRect.left - valueRect.right).to.be.at.most(8);
+                // Electron can report a 1.5 CSS-pixel font-rasterization delta;
+                // two pixels still constrains both labels to the same baseline.
                 expect(textRect(badgeText as Element).bottom).to.be.closeTo(
                   textRect(value).bottom,
-                  1,
+                  2,
                 );
               },
             );
@@ -1143,10 +1290,10 @@ describe('Overview page', () => {
     cy.get('body')
       .invoke('text')
       .should('not.match', /100 档由.+领先/);
-    desktopModel('Kimi-K2.5').within(() => {
-      cy.get('[data-testid="overview-pair-value"]').should('have.length', 3);
-      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 2);
-      platform('b200').should('contain.text', 'SGLang · FP4 · STP');
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
+      // Stack badges stay English on the Chinese page: framework, precision and
+      // the STP decode marker are all product identifiers, not UI copy.
+      platform('gb300').should('contain.text', 'SGLang · FP8 · STP');
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
     });
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {

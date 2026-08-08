@@ -26,6 +26,7 @@ import {
 import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmark-transform';
 import { Sequence, type Model } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
+import { overviewServingSeriesKey, type OverviewServingSeriesRow } from '@/lib/overview-data';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import {
   applyQuickFilters,
@@ -63,13 +64,17 @@ export function buildComparisonDates(
   selectedDates: string[],
   selectedDateRange: { startDate: string; endDate: string },
   selectedRunDate: string | undefined,
+  selectedRunId?: string,
 ): string[] {
   if (selectedGPUs.length === 0) return [];
   // Range endpoints + individually-added dates/runs (redundant same-day range
-  // endpoints dropped), minus the main run date which the primary query covers.
-  return resolveComparisonEntries(selectedDates, selectedDateRange).filter(
-    (d) => d !== selectedRunDate,
-  );
+  // endpoints dropped), minus the main date/run which the primary query covers.
+  // Other run-qualified entries on the same day are distinct overlays and stay.
+  return resolveComparisonEntries(selectedDates, selectedDateRange).filter((entry) => {
+    if (entry === selectedRunDate) return false;
+    const { runId } = parseComparisonEntry(entry);
+    return runId === undefined || runId !== selectedRunId;
+  });
 }
 
 /** Filter data by GPU key, resolving aliases to canonical keys. */
@@ -86,6 +91,16 @@ export function filterByGPU<T extends { hwKey: unknown }>(
       selectedGPUs.includes(hwKey) || (canonical !== undefined && selectedGPUs.includes(canonical))
     );
   });
+}
+
+/** Restrict one snapshot to the exact serving envelope selected by Overview. */
+export function filterOverviewHistoryRows<T extends OverviewServingSeriesRow>(
+  rows: T[],
+  configKey: string | undefined,
+): T[] {
+  return configKey === undefined
+    ? rows
+    : rows.filter((row) => overviewServingSeriesKey(row) === configKey);
 }
 
 export type RooflineDirection = 'upper_left' | 'upper_right' | 'lower_left' | 'lower_right';
@@ -195,6 +210,9 @@ export function useChartData(
    * configs that the selected run did not produce.
    */
   selectedRunId?: string,
+  /** Selected main run id, including non-contested runs, used only to avoid
+   * fetching the primary run again as a same-day comparison overlay. */
+  comparisonMainRunId?: string,
   /** Current x-axis mode. Canonical agentic-frontier stamping happens later,
    * after ChartDisplay has fetched the trace-derived normalized metric. */
   _selectedXAxisMode: XAxisMode = 'e2e',
@@ -208,6 +226,10 @@ export function useChartData(
    * (also applied to overlay points in ScatterGraph so both paths stay in sync).
    */
   quickFilters: QuickFilters = EMPTY_QUICK_FILTERS,
+  overviewHistoryPair?: {
+    currentConfigKey: string;
+    baselineConfigKey: string;
+  },
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
@@ -254,8 +276,15 @@ export function useChartData(
 
   // GPU comparison: fetch data for each additional comparison date
   const comparisonDates = useMemo(
-    () => buildComparisonDates(selectedGPUs, selectedDates, selectedDateRange, selectedRunDate),
-    [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate],
+    () =>
+      buildComparisonDates(
+        selectedGPUs,
+        selectedDates,
+        selectedDateRange,
+        selectedRunDate,
+        comparisonMainRunId,
+      ),
+    [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate, comparisonMainRunId],
   );
 
   // Each comparison entry is either a plain date (latest run that day, exact-date
@@ -290,7 +319,10 @@ export function useChartData(
     if (!allRows) return [];
     const seqFilter = (r: { isl: number | null; osl: number | null; benchmark_type: string }) =>
       rowToSequence(r) === selectedSequence;
-    const seqFiltered = allRows.filter(seqFilter);
+    const seqFiltered = filterOverviewHistoryRows(
+      allRows.filter(seqFilter),
+      overviewHistoryPair?.currentConfigKey,
+    );
 
     // Keep only each series' latest-date rows (drops stale config_ids left behind
     // when parallelism settings change between runs). Keyed per offload variant so
@@ -302,12 +334,21 @@ export function useChartData(
     );
     if (comparisonDates.length === 0) return mainRows;
     const extraRows = comparisonQueries.flatMap((q, i) =>
-      (q.data ?? [])
-        .filter(seqFilter)
-        .map((r) => ({ ...r, date: comparisonDates[i], actualDate: r.date })),
+      filterOverviewHistoryRows(
+        (q.data ?? []).filter(seqFilter),
+        overviewHistoryPair?.baselineConfigKey,
+      ).map((r) => ({ ...r, date: comparisonDates[i], actualDate: r.date })),
     );
     return [...mainRows, ...extraRows];
-  }, [allRows, selectedSequence, comparisonDates, comparisonDataKey, selectedRunDate]);
+  }, [
+    allRows,
+    selectedSequence,
+    comparisonDates,
+    comparisonDataKey,
+    selectedRunDate,
+    overviewHistoryPair?.currentConfigKey,
+    overviewHistoryPair?.baselineConfigKey,
+  ]);
 
   // Transform filtered rows into chart data
   const { chartData, hardwareConfig: rawHardwareConfig } = useMemo(() => {

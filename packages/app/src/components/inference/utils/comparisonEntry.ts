@@ -120,3 +120,17 @@ export function resolveComparisonEntries(
   entries.push(...selectedDates);
   return [...new Set(entries)];
 }
+
+/** Build the date+GPU ids consumed by the comparison chart's active-series set. */
+export function buildActiveComparisonIds(
+  selectedGPUs: readonly string[],
+  comparisonEntries: readonly string[],
+  currentDate?: string,
+): Set<string> {
+  const entries = currentDate ? [currentDate, ...comparisonEntries] : comparisonEntries;
+  const ids = new Set<string>();
+  for (const gpu of selectedGPUs) {
+    for (const entry of entries) ids.add(`${entry}_${gpu}`);
+  }
+  return ids;
+}

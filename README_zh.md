@@ -105,26 +105,27 @@ bun run dev
 以下是开发过程中的常用脚本。数据库与缓存管理的运维脚本单独列在下方。
 部分脚本可能需要额外的配置或环境变量。
 
-| 脚本                           | 说明                          |
-| ------------------------------ | ----------------------------- |
-| `bun run dev`                  | 启动开发服务器（Turbopack）   |
-| `bun run build`                | 生产构建                      |
-| `bun run start`                | 启动生产服务器                |
-| `bun run preview`              | 本地构建并启动生产服务器      |
-| `bun run typecheck`            | TypeScript 类型检查（所有包） |
-| `bun run lint`                 | 使用 oxlint 进行 lint         |
-| `bun run lint:fix`             | 自动修复 lint 问题            |
-| `bun run fmt`                  | 使用 oxfmt 检查格式           |
-| `bun run fmt:fix`              | 自动修复格式                  |
-| `bun run security`             | 安全审计                      |
-| `bun run test`                 | 运行所有测试（单元 + E2E）    |
-| `bun run test:unit`            | Vitest 单元测试               |
-| `bun run test:unit:coverage`   | Vitest 单元测试（含覆盖率）   |
-| `bun run test:e2e`             | Cypress E2E 测试              |
-| `bun run test:e2e:component`   | 仅 Cypress 组件测试           |
-| `bun run test:e2e:integration` | 仅 Cypress 集成测试           |
-| `bun run clean`                | 清除构建产物                  |
-| `bun run clean:all`            | 清除构建产物 + node_modules   |
+| 脚本                           | 说明                              |
+| ------------------------------ | --------------------------------- |
+| `bun run dev`                  | 启动开发服务器（Turbopack）       |
+| `bun run build`                | 生产构建                          |
+| `bun run start`                | 启动生产服务器                    |
+| `bun run preview`              | 本地构建并启动生产服务器          |
+| `bun run typecheck`            | TypeScript 类型检查（所有包）     |
+| `bun run lint`                 | 使用 oxlint 进行 lint             |
+| `bun run lint:fix`             | 自动修复 lint 问题                |
+| `bun run fmt`                  | 使用 oxfmt 检查格式               |
+| `bun run fmt:fix`              | 自动修复格式                      |
+| `bun run security`             | 安全审计                          |
+| `bun run test`                 | 运行所有测试（单元 + E2E）        |
+| `bun run test:unit`            | Vitest 单元测试                   |
+| `bun run test:unit:coverage`   | Vitest 单元测试（含覆盖率）       |
+| `bun run test:e2e`             | 精选的本地 Cypress smoke 测试套件 |
+| `bun run test:e2e:full`        | 完整 Cypress 组件与集成测试套件   |
+| `bun run test:e2e:component`   | 仅运行完整 Cypress 组件测试套件   |
+| `bun run test:e2e:integration` | 仅运行完整 Cypress 集成测试套件   |
+| `bun run clean`                | 清除构建产物                      |
+| `bun run clean:all`            | 清除构建产物 + node_modules       |
 
 本项目使用 Vitest 和 Cypress。请使用上表中的 `bun run test:*` 脚本；`bun test` 会调用 Bun 自带的另一套测试运行器，本项目不支持该命令。
 

@@ -6,6 +6,7 @@ import {
   type OverviewComparisonMode,
   type OverviewEngineScope,
   type OverviewHistoricalComparison,
+  type OverviewModelScope,
   type OverviewModelSummary,
   type OverviewPlatformResult,
   type OverviewReferenceHardware,
@@ -13,6 +14,7 @@ import {
 } from '@/lib/overview-data';
 import {
   buildOverviewDashboardHref,
+  buildOverviewHistoryDashboardHref,
   detailHref,
   overviewEngineScopeHref,
   overviewHref,
@@ -20,6 +22,7 @@ import {
 } from '@/lib/overview-links';
 
 import { OverviewDetailLink } from './overview-detail-link';
+import { OverviewHistoryDetailLink } from './overview-history-detail-link';
 import { OverviewNavLink } from './overview-nav-link';
 import { OverviewReferenceSelect } from './overview-reference-select';
 
@@ -61,6 +64,9 @@ export const OVERVIEW_STRINGS = {
     detailLink: 'View details',
     detailAria: (modelLabel: string, scenarioLabel: string) =>
       `View details: ${modelLabel} · ${scenarioLabel}`,
+    compareCurvesLink: 'Compare curves',
+    compareCurvesAria: (modelLabel: string, hardwareLabel: string) =>
+      `Compare current and historical ${hardwareLabel} cost curves for ${modelLabel}`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
       `Open raw source dashboard for ${evidenceDate}: ${modelLabel} · ${stack}`,
     estimatedTooltip: (topologies: readonly string[]) =>
@@ -88,6 +94,14 @@ export const OVERVIEW_STRINGS = {
       `About the same cost as this platform’s ${baselineDate} result`,
     historyCellStateLegend: 'Platforms without a valid 30-day comparison show current cost only.',
     referenceHeader: 'Reference',
+    modelScopeNavLabel: 'Inactive models',
+    modelScopeShow: 'Show deprecated & maintenance-mode models',
+    modelScopeHide: 'Hide deprecated & maintenance-mode models',
+    categoryBadges: {
+      maintenance: 'Maintenance',
+      deprecated: 'Deprecated',
+    } as Partial<Record<string, string>>,
+    categoryBadgeTitle: 'Model is no longer actively benchmarked.',
   },
   zh: {
     title: '推理每百万 token 成本',
@@ -119,6 +133,9 @@ export const OVERVIEW_STRINGS = {
     detailLink: '查看详情',
     detailAria: (modelLabel: string, scenarioLabel: string) =>
       `查看详情：${modelLabel} · ${scenarioLabel}`,
+    compareCurvesLink: '对比曲线',
+    compareCurvesAria: (modelLabel: string, hardwareLabel: string) =>
+      `对比 ${modelLabel} 在 ${hardwareLabel} 上当前与历史成本曲线`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
       `打开 ${evidenceDate} 原始数据仪表板：${modelLabel} · ${stack}`,
     estimatedTooltip: (topologies: readonly string[]) =>
@@ -144,6 +161,14 @@ export const OVERVIEW_STRINGS = {
     historicalEvenAria: (baselineDate: string) => `与该平台 ${baselineDate} 的结果成本基本持平`,
     historyCellStateLegend: '缺少有效 30 天对比的平台仅显示当前成本。',
     referenceHeader: '基准',
+    modelScopeNavLabel: '非活跃模型',
+    modelScopeShow: '显示已弃用与维护模式模型',
+    modelScopeHide: '隐藏已弃用与维护模式模型',
+    categoryBadges: {
+      maintenance: '维护模式',
+      deprecated: '已弃用',
+    } as Partial<Record<string, string>>,
+    categoryBadgeTitle: '该模型已不再进行活跃基准测试。',
   },
 } as const;
 
@@ -376,7 +401,7 @@ function CostDeltaBadge({
       title={aria}
       // The cell behind it carries the shade, so the badge itself stays
       // untinted — two washes of the same hue would double up.
-      className={`inline-flex items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-[10px] font-semibold tabular-nums ${
+      className={`inline-flex translate-y-px items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-[10px] font-semibold tabular-nums ${
         phoneRow ? 'col-start-2 justify-self-start' : 'xl:col-start-2 xl:justify-self-end'
       } ${COST_DELTA_CLASS[polarity]}`}
     >
@@ -457,6 +482,10 @@ function CellValue({
       : strings.rawDashboardAria(evidenceDateLabel, model.modelLabel, stack);
   const costText = formattedValue;
   const comparison = displayedComparison(member, comparisonMode, referenceHardware);
+  const historicalConfig =
+    comparisonMode === 'history' && member.historicalComparison?.status === 'comparable'
+      ? member.historicalComparison.baselineConfig
+      : null;
   return (
     <div className="min-w-0 space-y-0.5 text-sm">
       {/* Fixed cost | delta grids keep comparisons scannable on desktop and phones;
@@ -530,6 +559,16 @@ function CellValue({
           )}
         </div>
       )}
+      {config === null || historicalConfig === null ? null : (
+        <OverviewHistoryDetailLink
+          href={buildOverviewHistoryDashboardHref(locale, model, config, historicalConfig)}
+          model={model.model}
+          hardware={member.hardware}
+          ariaLabel={strings.compareCurvesAria(model.modelLabel, member.hardwareLabel)}
+        >
+          {strings.compareCurvesLink}
+        </OverviewHistoryDetailLink>
+      )}
     </div>
   );
 }
@@ -563,9 +602,22 @@ function PlatformCell(props: {
 }
 
 function ModelName({ model, strings }: { model: OverviewModelSummary; strings: OverviewStrings }) {
+  const badge = strings.categoryBadges[model.category];
   return (
     <div>
-      <h2 className="text-sm font-semibold leading-snug">{model.modelLabel}</h2>
+      <h2 className="text-sm font-semibold leading-snug">
+        {model.modelLabel}
+        {badge === undefined ? null : (
+          <span
+            data-testid="overview-model-category-badge"
+            data-category={model.category}
+            title={strings.categoryBadgeTitle}
+            className="ml-1.5 inline-block rounded-sm border border-border/60 px-1 py-px align-middle text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+          >
+            {badge}
+          </span>
+        )}
+      </h2>
       <p
         data-testid="overview-model-scenario"
         className="mt-0.5 text-[11px] font-normal leading-tight text-muted-foreground"
@@ -642,17 +694,19 @@ export function DesktopOverviewMatrix({
                 <ModelName model={model} strings={strings} />
                 {/* The link lives with the model it drills into, so the matrix
                     spends no column on a header that is the same every row. */}
-                <OverviewDetailLink
-                  href={detailHref(locale, model)}
-                  model={model.model}
-                  ariaLabel={strings.detailAria(
-                    model.modelLabel,
-                    strings.scenarioLabels[model.scenario],
-                  )}
-                  className="mt-1 text-xs"
-                >
-                  {strings.detailLink}
-                </OverviewDetailLink>
+                {comparisonMode === 'history' ? null : (
+                  <OverviewDetailLink
+                    href={detailHref(locale, model)}
+                    model={model.model}
+                    ariaLabel={strings.detailAria(
+                      model.modelLabel,
+                      strings.scenarioLabels[model.scenario],
+                    )}
+                    className="mt-1 text-xs"
+                  >
+                    {strings.detailLink}
+                  </OverviewDetailLink>
+                )}
               </th>
               {model.platforms.map((platform) => (
                 <td
@@ -729,17 +783,19 @@ export function MobileOverviewList({
                 </div>
               ))}
             </div>
-            <OverviewDetailLink
-              href={detailHref(locale, model)}
-              model={model.model}
-              ariaLabel={strings.detailAria(
-                model.modelLabel,
-                strings.scenarioLabels[model.scenario],
-              )}
-              className="min-h-11 w-full justify-between"
-            >
-              {strings.detailLink}
-            </OverviewDetailLink>
+            {comparisonMode === 'history' ? null : (
+              <OverviewDetailLink
+                href={detailHref(locale, model)}
+                model={model.model}
+                ariaLabel={strings.detailAria(
+                  model.modelLabel,
+                  strings.scenarioLabels[model.scenario],
+                )}
+                className="min-h-11 w-full justify-between"
+              >
+                {strings.detailLink}
+              </OverviewDetailLink>
+            )}
           </article>
         </li>
       ))}
@@ -754,6 +810,7 @@ export function OverviewTierSwitcher({
   engineScope,
   comparisonMode,
   referenceHardware,
+  modelScope,
   locale,
   strings,
 }: {
@@ -761,6 +818,7 @@ export function OverviewTierSwitcher({
   engineScope: OverviewEngineScope;
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
+  modelScope: OverviewModelScope;
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
@@ -791,6 +849,7 @@ export function OverviewTierSwitcher({
                 engineScope,
                 comparisonMode,
                 referenceHardware,
+                modelScope,
               )}
               analytics={{ control: 'tier', value: String(option) }}
               searchKeys={['tier']}
@@ -812,6 +871,7 @@ export function OverviewEngineScopeSwitcher({
   tier,
   comparisonMode,
   referenceHardware,
+  modelScope,
   locale,
   strings,
 }: {
@@ -819,6 +879,7 @@ export function OverviewEngineScopeSwitcher({
   tier: OverviewTier;
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
+  modelScope: OverviewModelScope;
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
@@ -853,6 +914,7 @@ export function OverviewEngineScopeSwitcher({
                 tier,
                 comparisonMode,
                 referenceHardware,
+                modelScope,
               )}
               analytics={{ control: 'engine', value: option }}
               searchKeys={['engine']}
@@ -872,6 +934,7 @@ export function OverviewComparisonSwitcher({
   engineScope,
   tier,
   referenceHardware,
+  modelScope,
   locale,
   strings,
 }: {
@@ -879,6 +942,7 @@ export function OverviewComparisonSwitcher({
   engineScope: OverviewEngineScope;
   tier: OverviewTier;
   referenceHardware: OverviewReferenceHardware;
+  modelScope: OverviewModelScope;
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
@@ -887,7 +951,7 @@ export function OverviewComparisonSwitcher({
   const referenceOptions = OVERVIEW_HARDWARE.map((hardware) => ({
     value: hardware,
     label: overviewHardwareLabel(hardware),
-    href: overviewHref(locale, tier, engineScope, 'hardware', hardware),
+    href: overviewHref(locale, tier, engineScope, 'hardware', hardware, modelScope),
   }));
   const optionClass =
     'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 border-transparent px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors duration-200 hover:border-muted-foreground/30 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:min-w-[140px]';
@@ -926,7 +990,7 @@ export function OverviewComparisonSwitcher({
           <OverviewNavLink
             key={option}
             data-overview-comparison={option}
-            href={overviewHref(locale, tier, engineScope, option, referenceHardware)}
+            href={overviewHref(locale, tier, engineScope, option, referenceHardware, modelScope)}
             analytics={{ control: 'comparison', value: option }}
             searchKeys={['compare']}
             className={optionClass}
@@ -935,6 +999,43 @@ export function OverviewComparisonSwitcher({
           </OverviewNavLink>
         );
       })}
+    </nav>
+  );
+}
+
+export function OverviewModelScopeToggle({
+  modelScope,
+  tier,
+  engineScope,
+  comparisonMode,
+  referenceHardware,
+  locale,
+  strings,
+}: {
+  modelScope: OverviewModelScope;
+  tier: OverviewTier;
+  engineScope: OverviewEngineScope;
+  comparisonMode: OverviewComparisonMode;
+  referenceHardware: OverviewReferenceHardware;
+  locale: OverviewLocale;
+  strings: OverviewStrings;
+}) {
+  const target: OverviewModelScope = modelScope === 'all' ? 'default' : 'all';
+  return (
+    <nav
+      data-testid="overview-model-scope-toggle"
+      aria-label={strings.modelScopeNavLabel}
+      className="border-t border-border/50 px-4 text-xs lg:px-6"
+    >
+      <OverviewNavLink
+        data-overview-model-scope={target}
+        href={overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware, target)}
+        analytics={{ control: 'models', value: target }}
+        searchKeys={['models']}
+        className="inline-flex min-h-11 items-center text-muted-foreground underline decoration-dotted underline-offset-4 transition-colors hover:text-foreground hover:decoration-solid"
+      >
+        {modelScope === 'all' ? strings.modelScopeHide : strings.modelScopeShow}
+      </OverviewNavLink>
     </nav>
   );
 }
