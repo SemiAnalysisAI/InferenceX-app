@@ -509,12 +509,31 @@ describe('TCO Calculator', () => {
       );
     });
 
-    it('shows disaggregated cost disclaimer when cost metric is selected', () => {
+    // A disagg config's input/output cost is attributed to only its prefill or
+    // decode chips, so those token types carry the caveat. The total-token cost
+    // divides by the whole chip count — the same denominator an aggregated
+    // config uses — so it must not.
+    it('shows the disaggregated cost disclaimer only for per-token-type cost', () => {
+      cy.visit('/calculator');
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
       cy.get('[data-testid="calculator-metric-cost"]').click();
-      cy.get('[data-testid="calculator-chart-section"]').should(
-        'contain.text',
-        'cost per decode chip',
-      );
+
+      // Token type defaults to Total Tokens.
+      cy.get('[data-testid="calculator-disagg-cost-note"]').should('not.be.visible');
+
+      for (const tokenType of ['Output Tokens', 'Input Tokens']) {
+        cy.get('[data-testid="calc-cost-type-selector"]').click();
+        cy.contains('[role="option"]', tokenType).click();
+        cy.get('body').type('{esc}');
+        cy.get('[data-testid="calculator-disagg-cost-note"]')
+          .should('be.visible')
+          .and('contain.text', 'cost per decode chip');
+      }
+
+      cy.get('[data-testid="calc-cost-type-selector"]').click();
+      cy.contains('[role="option"]', 'Total Tokens').click();
+      cy.get('body').type('{esc}');
+      cy.get('[data-testid="calculator-disagg-cost-note"]').should('not.be.visible');
     });
 
     it('shows disaggregated throughput disclaimer for power metric', () => {
