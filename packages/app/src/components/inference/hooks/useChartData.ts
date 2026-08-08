@@ -210,6 +210,9 @@ export function useChartData(
    * configs that the selected run did not produce.
    */
   selectedRunId?: string,
+  /** Selected main run id, including non-contested runs, used only to avoid
+   * fetching the primary run again as a same-day comparison overlay. */
+  comparisonMainRunId?: string,
   /** Current x-axis mode. Canonical agentic-frontier stamping happens later,
    * after ChartDisplay has fetched the trace-derived normalized metric. */
   _selectedXAxisMode: XAxisMode = 'e2e',
@@ -279,9 +282,9 @@ export function useChartData(
         selectedDates,
         selectedDateRange,
         selectedRunDate,
-        selectedRunId,
+        comparisonMainRunId,
       ),
-    [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate, selectedRunId],
+    [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate, comparisonMainRunId],
   );
 
   // Each comparison entry is either a plain date (latest run that day, exact-date
