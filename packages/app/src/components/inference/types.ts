@@ -823,6 +823,8 @@ export interface InferenceChartContextType {
   selectedDates: string[];
   /** Accepts a value or a state-updater fn (for safe rapid successive adds). */
   setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void;
+  /** Internal date-to-run normalization; preserves an Overview exact-pair scope. */
+  setSelectedDatesFromRunExpansion: (dates: string[] | ((prev: string[]) => string[])) => void;
   selectedDateRange: { startDate: string; endDate: string };
   setSelectedDateRange: (dateRange: { startDate: string; endDate: string }) => void;
   userCosts: Record<string, number | undefined> | null;

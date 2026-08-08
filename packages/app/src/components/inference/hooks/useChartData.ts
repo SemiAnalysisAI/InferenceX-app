@@ -64,14 +64,17 @@ export function buildComparisonDates(
   selectedDates: string[],
   selectedDateRange: { startDate: string; endDate: string },
   selectedRunDate: string | undefined,
+  selectedRunId?: string,
 ): string[] {
   if (selectedGPUs.length === 0) return [];
   // Range endpoints + individually-added dates/runs (redundant same-day range
-  // endpoints dropped), minus the plain main run date which the primary query
-  // covers. A run-qualified entry on that day is a distinct overlay and stays.
-  return resolveComparisonEntries(selectedDates, selectedDateRange).filter(
-    (entry) => entry !== selectedRunDate,
-  );
+  // endpoints dropped), minus the main date/run which the primary query covers.
+  // Other run-qualified entries on the same day are distinct overlays and stay.
+  return resolveComparisonEntries(selectedDates, selectedDateRange).filter((entry) => {
+    if (entry === selectedRunDate) return false;
+    const { runId } = parseComparisonEntry(entry);
+    return runId === undefined || runId !== selectedRunId;
+  });
 }
 
 /** Filter data by GPU key, resolving aliases to canonical keys. */
@@ -270,8 +273,15 @@ export function useChartData(
 
   // GPU comparison: fetch data for each additional comparison date
   const comparisonDates = useMemo(
-    () => buildComparisonDates(selectedGPUs, selectedDates, selectedDateRange, selectedRunDate),
-    [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate],
+    () =>
+      buildComparisonDates(
+        selectedGPUs,
+        selectedDates,
+        selectedDateRange,
+        selectedRunDate,
+        selectedRunId,
+      ),
+    [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate, selectedRunId],
   );
 
   // Each comparison entry is either a plain date (latest run that day, exact-date

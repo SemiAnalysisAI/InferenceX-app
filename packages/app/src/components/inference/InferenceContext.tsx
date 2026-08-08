@@ -1484,6 +1484,7 @@ export function InferenceProvider({
       availableGPUs,
       selectedDates,
       setSelectedDates: setSelectedDatesAndClear,
+      setSelectedDatesFromRunExpansion: setSelectedDates,
       selectedDateRange,
       setSelectedDateRange: setSelectedDateRangeAndClear,
       activeDates,
