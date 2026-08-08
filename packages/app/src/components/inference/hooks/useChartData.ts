@@ -14,7 +14,6 @@ import type {
 } from '@/components/inference/types';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
 import {
-  comparisonEntryDate,
   parseComparisonEntry,
   resolveComparisonEntries,
 } from '@/components/inference/utils/comparisonEntry';
@@ -68,9 +67,10 @@ export function buildComparisonDates(
 ): string[] {
   if (selectedGPUs.length === 0) return [];
   // Range endpoints + individually-added dates/runs (redundant same-day range
-  // endpoints dropped), minus the main run date which the primary query covers.
+  // endpoints dropped), minus the plain main run date which the primary query
+  // covers. A run-qualified entry on that day is a distinct overlay and stays.
   return resolveComparisonEntries(selectedDates, selectedDateRange).filter(
-    (entry) => comparisonEntryDate(entry) !== selectedRunDate,
+    (entry) => entry !== selectedRunDate,
   );
 }
 
