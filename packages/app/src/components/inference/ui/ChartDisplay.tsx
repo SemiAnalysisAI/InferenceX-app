@@ -216,6 +216,7 @@ export default function ChartDisplay() {
     selectedPrecisions,
     selectedDates,
     setSelectedDates,
+    setSelectedDatesFromRunExpansion,
     selectedDateRange,
     dateRangeAvailableDates,
     selectedModel,
@@ -274,7 +275,7 @@ export default function ChartDisplay() {
   useEffect(() => {
     const runConfigsByDate = new Map(changelogs.map((c) => [c.date, c.runConfigs]));
     const scope = { modelDbKeys, selectedGPUs, selectedPrecisions };
-    setSelectedDates((prev) => {
+    setSelectedDatesFromRunExpansion((prev) => {
       let changed = false;
       const out: string[] = [];
       for (const entry of prev) {
@@ -294,7 +295,14 @@ export default function ChartDisplay() {
       if (!changed) return prev;
       return [...new Set(out)];
     });
-  }, [changelogs, modelDbKeys, selectedGPUs, selectedPrecisions, selectedDates, setSelectedDates]);
+  }, [
+    changelogs,
+    modelDbKeys,
+    selectedGPUs,
+    selectedPrecisions,
+    selectedDates,
+    setSelectedDatesFromRunExpansion,
+  ]);
 
   const [viewModes, setViewModes] = useState<Record<number, InferenceViewMode>>({});
   const replayHandlesRef = useRef<Record<number, ReplayLauncherHandle | null>>({});

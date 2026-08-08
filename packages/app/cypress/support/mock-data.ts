@@ -242,6 +242,7 @@ export function createMockInferenceContext(
     ],
     selectedDates: ['2025-03-01'],
     setSelectedDates: namedStub('setSelectedDates'),
+    setSelectedDatesFromRunExpansion: namedStub('setSelectedDatesFromRunExpansion'),
     selectedDateRange: { startDate: '2025-02-01', endDate: '2025-03-01' },
     setSelectedDateRange: namedStub('setSelectedDateRange'),
     userCosts: null,

@@ -72,7 +72,7 @@ export function OverviewNavigationProvider({
       pendingHrefRef.current = href;
       setPendingHref(href);
       if (updateHistory) {
-        window.history.pushState(window.history.state, '', href);
+        History.prototype.pushState.call(window.history, window.history.state, '', href);
         notifyClientSearchChange(href);
       }
 
@@ -80,12 +80,20 @@ export function OverviewNavigationProvider({
         .then((nextData) => {
           if (navigationId !== navigationIdRef.current) return;
           committedHrefRef.current = href;
+          if (updateHistory) {
+            History.prototype.replaceState.call(window.history, window.history.state, '', href);
+          }
           setData(nextData);
         })
         .catch(() => {
           if (navigationId !== navigationIdRef.current) return;
           if (updateHistory) {
-            window.history.replaceState(window.history.state, '', committedHrefRef.current);
+            History.prototype.replaceState.call(
+              window.history,
+              window.history.state,
+              '',
+              committedHrefRef.current,
+            );
             notifyClientSearchChange(committedHrefRef.current);
             router.push(href, { scroll: false });
           } else {

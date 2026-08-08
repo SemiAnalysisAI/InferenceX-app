@@ -53,6 +53,9 @@ const URL_STATE_KEYS = [
   'i_fw',
   'i_disagg',
   'i_spec',
+  // Exact serving-envelope pair behind an Overview 30-day comparison cell.
+  'i_overview_current',
+  'i_overview_baseline',
   // Evaluation
   'e_rundate',
   'e_bench',
@@ -117,6 +120,8 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_fw: '',
   i_disagg: '',
   i_spec: '',
+  i_overview_current: '',
+  i_overview_baseline: '',
   e_rundate: '',
   e_bench: '',
   e_hc: '',

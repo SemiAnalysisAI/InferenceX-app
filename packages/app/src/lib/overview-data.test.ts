@@ -821,6 +821,7 @@ describe('assembleOverviewHistoricalPageData', () => {
       baselineCostPerMtok: null,
       costDeltaPct: null,
       baselineDate: null,
+      baselineConfig: null,
     });
   });
 
@@ -863,6 +864,8 @@ describe('assembleOverviewHistoricalPageData', () => {
     expect(current?.read.config?.framework).toBe('sglang');
     expect(baseline?.read.config?.framework).toBe('vllm');
     expect(current?.historicalComparison?.status).toBe('comparable');
+    expect(current?.historicalComparison?.baselineConfig?.framework).toBe('vllm');
+    expect(current?.historicalComparison?.baselineConfig?.key).toBe(baseline?.read.config?.key);
   });
 });
 

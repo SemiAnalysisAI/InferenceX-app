@@ -13,6 +13,7 @@ import {
 } from '@/lib/overview-data';
 import {
   buildOverviewDashboardHref,
+  buildOverviewHistoryDashboardHref,
   detailHref,
   overviewEngineScopeHref,
   overviewHref,
@@ -20,6 +21,7 @@ import {
 } from '@/lib/overview-links';
 
 import { OverviewDetailLink } from './overview-detail-link';
+import { OverviewHistoryDetailLink } from './overview-history-detail-link';
 import { OverviewNavLink } from './overview-nav-link';
 import { OverviewReferenceSelect } from './overview-reference-select';
 
@@ -61,6 +63,9 @@ export const OVERVIEW_STRINGS = {
     detailLink: 'View details',
     detailAria: (modelLabel: string, scenarioLabel: string) =>
       `View details: ${modelLabel} · ${scenarioLabel}`,
+    compareCurvesLink: 'Compare curves',
+    compareCurvesAria: (modelLabel: string, hardwareLabel: string) =>
+      `Compare current and historical ${hardwareLabel} cost curves for ${modelLabel}`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
       `Open raw source dashboard for ${evidenceDate}: ${modelLabel} · ${stack}`,
     estimatedTooltip: (topologies: readonly string[]) =>
@@ -119,6 +124,9 @@ export const OVERVIEW_STRINGS = {
     detailLink: '查看详情',
     detailAria: (modelLabel: string, scenarioLabel: string) =>
       `查看详情：${modelLabel} · ${scenarioLabel}`,
+    compareCurvesLink: '对比曲线',
+    compareCurvesAria: (modelLabel: string, hardwareLabel: string) =>
+      `对比 ${modelLabel} 在 ${hardwareLabel} 上当前与历史成本曲线`,
     rawDashboardAria: (evidenceDate: string, modelLabel: string, stack: string) =>
       `打开 ${evidenceDate} 原始数据仪表板：${modelLabel} · ${stack}`,
     estimatedTooltip: (topologies: readonly string[]) =>
@@ -376,7 +384,7 @@ function CostDeltaBadge({
       title={aria}
       // The cell behind it carries the shade, so the badge itself stays
       // untinted — two washes of the same hue would double up.
-      className={`inline-flex items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-[10px] font-semibold tabular-nums ${
+      className={`inline-flex translate-y-px items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-[10px] font-semibold tabular-nums ${
         phoneRow ? 'col-start-2 justify-self-start' : 'xl:col-start-2 xl:justify-self-end'
       } ${COST_DELTA_CLASS[polarity]}`}
     >
@@ -457,6 +465,10 @@ function CellValue({
       : strings.rawDashboardAria(evidenceDateLabel, model.modelLabel, stack);
   const costText = formattedValue;
   const comparison = displayedComparison(member, comparisonMode, referenceHardware);
+  const historicalConfig =
+    comparisonMode === 'history' && member.historicalComparison?.status === 'comparable'
+      ? member.historicalComparison.baselineConfig
+      : null;
   return (
     <div className="min-w-0 space-y-0.5 text-sm">
       {/* Fixed cost | delta grids keep comparisons scannable on desktop and phones;
@@ -529,6 +541,16 @@ function CellValue({
             stackBadge
           )}
         </div>
+      )}
+      {config === null || historicalConfig === null ? null : (
+        <OverviewHistoryDetailLink
+          href={buildOverviewHistoryDashboardHref(locale, model, config, historicalConfig)}
+          model={model.model}
+          hardware={member.hardware}
+          ariaLabel={strings.compareCurvesAria(model.modelLabel, member.hardwareLabel)}
+        >
+          {strings.compareCurvesLink}
+        </OverviewHistoryDetailLink>
       )}
     </div>
   );
@@ -642,17 +664,19 @@ export function DesktopOverviewMatrix({
                 <ModelName model={model} strings={strings} />
                 {/* The link lives with the model it drills into, so the matrix
                     spends no column on a header that is the same every row. */}
-                <OverviewDetailLink
-                  href={detailHref(locale, model)}
-                  model={model.model}
-                  ariaLabel={strings.detailAria(
-                    model.modelLabel,
-                    strings.scenarioLabels[model.scenario],
-                  )}
-                  className="mt-1 text-xs"
-                >
-                  {strings.detailLink}
-                </OverviewDetailLink>
+                {comparisonMode === 'history' ? null : (
+                  <OverviewDetailLink
+                    href={detailHref(locale, model)}
+                    model={model.model}
+                    ariaLabel={strings.detailAria(
+                      model.modelLabel,
+                      strings.scenarioLabels[model.scenario],
+                    )}
+                    className="mt-1 text-xs"
+                  >
+                    {strings.detailLink}
+                  </OverviewDetailLink>
+                )}
               </th>
               {model.platforms.map((platform) => (
                 <td
@@ -729,17 +753,19 @@ export function MobileOverviewList({
                 </div>
               ))}
             </div>
-            <OverviewDetailLink
-              href={detailHref(locale, model)}
-              model={model.model}
-              ariaLabel={strings.detailAria(
-                model.modelLabel,
-                strings.scenarioLabels[model.scenario],
-              )}
-              className="min-h-11 w-full justify-between"
-            >
-              {strings.detailLink}
-            </OverviewDetailLink>
+            {comparisonMode === 'history' ? null : (
+              <OverviewDetailLink
+                href={detailHref(locale, model)}
+                model={model.model}
+                ariaLabel={strings.detailAria(
+                  model.modelLabel,
+                  strings.scenarioLabels[model.scenario],
+                )}
+                className="min-h-11 w-full justify-between"
+              >
+                {strings.detailLink}
+              </OverviewDetailLink>
+            )}
           </article>
         </li>
       ))}
