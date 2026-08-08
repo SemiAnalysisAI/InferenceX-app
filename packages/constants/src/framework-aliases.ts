@@ -13,6 +13,7 @@ export const FW_REGISTRY: Record<string, FwEntry> = {
   'mooncake-atom': { label: 'Mooncake ATOMesh¹' },
   'mori-sglang': { label: 'MoRI SGLang' },
   sglang: { label: 'SGLang' },
+  tilert: { label: 'TileRT' },
   trt: { label: 'TRTLLM' },
   vllm: { label: 'vLLM' },
 };
