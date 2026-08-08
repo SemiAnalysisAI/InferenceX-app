@@ -101,6 +101,16 @@ describe('buildComparisonDates', () => {
     expect(result).toEqual(['2026-02-01']);
   });
 
+  it('excludes a run-qualified entry for the main run date', () => {
+    const result = buildComparisonDates(
+      ['h100'],
+      ['2026-03-01~r300', '2026-02-01~r200'],
+      { startDate: '', endDate: '' },
+      '2026-03-01',
+    );
+    expect(result).toEqual(['2026-02-01~r200']);
+  });
+
   it('deduplicates dates appearing in both range and explicit list', () => {
     const result = buildComparisonDates(
       ['h100'],

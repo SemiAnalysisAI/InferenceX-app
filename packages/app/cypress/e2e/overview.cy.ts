@@ -360,7 +360,10 @@ describe('Overview page', () => {
           expect(url.searchParams.get('g_model')).to.equal('Qwen-3.5-397B-A17B');
           expect(url.searchParams.get('i_metric')).to.equal('y_costh');
           expect(url.searchParams.get('i_xmode')).to.equal('interactivity');
-          expect(url.searchParams.get('i_dates')).to.match(/^\d{4}-\d{2}-\d{2}(?:~r\d+)?$/u);
+          const comparisonEntries = url.searchParams.get('i_dates')?.split(',') ?? [];
+          expect(comparisonEntries).to.have.length(2);
+          expect(comparisonEntries[0]).to.equal(url.searchParams.get('g_rundate'));
+          expect(comparisonEntries[1]).to.match(/^\d{4}-\d{2}-\d{2}(?:~r\d+)?$/u);
           const currentKey = url.searchParams.get('i_overview_current');
           const baselineKey = url.searchParams.get('i_overview_baseline');
           expect(currentKey).to.be.a('string');
@@ -389,6 +392,29 @@ describe('Overview page', () => {
       'exist',
     );
     expectNoVisibleDatesOrSnapshot();
+  });
+
+  it('releases the exact history pair after a model change', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview?compare=30d');
+
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN)
+      .find('[data-testid="overview-history-detail-link"]')
+      .first()
+      .then(($link) => {
+        const href = String($link.attr('href'));
+        cy.visit(href);
+
+        cy.get('[data-testid="inference-chart-display"]').should('exist');
+        cy.get('[data-testid="model-selector"]').click();
+        cy.contains('[role="option"]', 'DeepSeek V4 Pro 1.6T').click();
+        cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro 1.6T');
+        cy.get('[data-testid="inference-chart-display"]').should(
+          'not.contain.text',
+          'No data available',
+        );
+        cy.get('[data-testid="chart-figure"] svg').should('exist');
+      });
   });
 
   it('keeps the historical comparison complete and non-scrolling across desktop, tablet and phone', () => {

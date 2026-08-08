@@ -140,15 +140,19 @@ export function InferenceProvider({
   } = useGlobalFilters();
   const { isUnofficialRun } = useUnofficialRun();
 
-  const { getUrlParam, setUrlParam } = useUrlState();
+  const { getUrlParam, setUrlParam, setUrlParams } = useUrlState();
 
-  const overviewHistoryPair = useMemo(() => {
+  const [overviewHistoryPair, setOverviewHistoryPair] = useState(() => {
     const currentConfigKey = getUrlParam('i_overview_current');
     const baselineConfigKey = getUrlParam('i_overview_baseline');
     return currentConfigKey && baselineConfigKey
       ? { currentConfigKey, baselineConfigKey }
       : undefined;
-  }, [getUrlParam]);
+  });
+  const clearOverviewHistoryPair = useCallback(() => {
+    setOverviewHistoryPair(undefined);
+    setUrlParams({ i_overview_current: '', i_overview_baseline: '' });
+  }, [setUrlParams]);
 
   const exclusion = useMemo(
     () =>
@@ -692,26 +696,30 @@ export function InferenceProvider({
     setActivePresetId((prev) => (prev === null ? prev : null));
     presetHwFilterRef.current = null;
   }, []);
+  const clearScopedSelectionOnChange = useCallback(() => {
+    clearPresetOnChange();
+    clearOverviewHistoryPair();
+  }, [clearOverviewHistoryPair, clearPresetOnChange]);
   const setSelectedModelAndClear = useCallback(
     (v: typeof selectedModel) => {
       setSelectedModel(v);
-      clearPresetOnChange();
+      clearScopedSelectionOnChange();
     },
-    [setSelectedModel, clearPresetOnChange],
+    [setSelectedModel, clearScopedSelectionOnChange],
   );
   const setSelectedSequenceAndClear = useCallback(
     (v: typeof effectiveSequence) => {
       setSelectedSequence(v);
-      clearPresetOnChange();
+      clearScopedSelectionOnChange();
     },
-    [setSelectedSequence, clearPresetOnChange],
+    [setSelectedSequence, clearScopedSelectionOnChange],
   );
   const setSelectedPrecisionsAndClear = useCallback(
     (v: typeof effectivePrecisions) => {
       setSelectedPrecisions(v);
-      clearPresetOnChange();
+      clearScopedSelectionOnChange();
     },
-    [setSelectedPrecisions, clearPresetOnChange],
+    [setSelectedPrecisions, clearScopedSelectionOnChange],
   );
   const setSelectedYAxisMetricAndClear = useCallback(
     (v: string) => {
@@ -724,7 +732,7 @@ export function InferenceProvider({
     (next: string[]) => {
       if (!exclusion) {
         setSelectedGpuState(next);
-        clearPresetOnChange();
+        clearScopedSelectionOnChange();
         return;
       }
 
@@ -751,11 +759,11 @@ export function InferenceProvider({
         }
         if (decision.kind === 'silent-resolve') {
           setSelectedGpuState([...decision.result]);
-          clearPresetOnChange();
+          clearScopedSelectionOnChange();
           return;
         }
         setSelectedGpuState(next);
-        clearPresetOnChange();
+        clearScopedSelectionOnChange();
         return;
       }
 
@@ -772,9 +780,16 @@ export function InferenceProvider({
           ...exclusionResolutionFamilies(proposed, result, exclusion),
         });
       }
-      clearPresetOnChange();
+      clearScopedSelectionOnChange();
     },
-    [selectedGPUs, availableGPUs, exclusion, exclusionPolicy, clearPresetOnChange],
+    [
+      selectedGPUs,
+      availableGPUs,
+      exclusion,
+      exclusionPolicy,
+      clearPresetOnChange,
+      clearScopedSelectionOnChange,
+    ],
   );
   const setSelectedDatesAndClear = useCallback(
     // Accept a React state updater (value OR function) so callers adding several
@@ -782,16 +797,16 @@ export function InferenceProvider({
     // stale-closure race where each click overwrites the last.
     (v: SetStateAction<string[]>) => {
       setSelectedDates(v);
-      clearPresetOnChange();
+      clearScopedSelectionOnChange();
     },
-    [setSelectedDates, clearPresetOnChange],
+    [setSelectedDates, clearScopedSelectionOnChange],
   );
   const setSelectedDateRangeAndClear = useCallback(
     (v: { startDate: string; endDate: string }) => {
       setSelectedDateRange(v);
-      clearPresetOnChange();
+      clearScopedSelectionOnChange();
     },
-    [setSelectedDateRange, clearPresetOnChange],
+    [setSelectedDateRange, clearScopedSelectionOnChange],
   );
 
   const loading = chartDataLoading;
@@ -1329,6 +1344,7 @@ export function InferenceProvider({
 
   const applyPreset = useCallback(
     (preset: FavoritePreset) => {
+      clearOverviewHistoryPair();
       const version = ++presetVersionRef.current;
       const { config } = preset;
       presetGuardRef.current = true;
@@ -1373,6 +1389,7 @@ export function InferenceProvider({
       setSelectedDateRange,
       setActivePresetId,
       setHighContrast,
+      clearOverviewHistoryPair,
     ],
   );
 
@@ -1406,6 +1423,7 @@ export function InferenceProvider({
   // effectiveSelectedRunId directly (line ~499).
 
   const handleDateRangeDialogOk = () => {
+    clearOverviewHistoryPair();
     setSelectedDateRange({ startDate: '', endDate: '' });
     setSelectedDates([]);
     setShowDateRangeDialog(false);

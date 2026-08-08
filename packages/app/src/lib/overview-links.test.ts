@@ -172,7 +172,7 @@ describe('buildOverviewHistoryDashboardHref', () => {
       i_metric: 'y_costh',
       i_xmode: 'interactivity',
       i_gpus: 'mi355x_sglang_mtp,mi355x_vllm_mtp',
-      i_dates: '2026-06-10~r25700000001',
+      i_dates: '2026-07-18,2026-06-10~r25700000001',
       i_overview_current: current.key,
       i_overview_baseline: baseline.key,
       i_optimal: '1',
@@ -196,7 +196,7 @@ describe('buildOverviewHistoryDashboardHref', () => {
     expect(href.pathname).toBe('/zh/inference');
     expect(href.searchParams.get('i_gpus')).toBe('b200_sglang_mtp');
     expect(href.searchParams.get('i_prec')).toBe('fp4');
-    expect(href.searchParams.get('i_dates')).toBe('2026-06-10');
+    expect(href.searchParams.get('i_dates')).toBe('2026-07-18,2026-06-10');
   });
 });
 

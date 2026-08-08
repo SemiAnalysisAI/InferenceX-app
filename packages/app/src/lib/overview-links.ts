@@ -141,8 +141,10 @@ export function buildOverviewHistoryDashboardHref(
     i_metric: 'y_costh',
     i_xmode: 'interactivity',
     i_gpus: uniqueValues([current.hwKey, baseline.hwKey]),
-    i_dates:
+    i_dates: uniqueValues([
+      current.latestDate,
       baselineRun === null ? baseline.latestDate : `${baseline.latestDate}~r${baselineRun.id}`,
+    ]),
     i_overview_current: current.key,
     i_overview_baseline: baseline.key,
     i_optimal: '1',

@@ -14,6 +14,7 @@ import type {
 } from '@/components/inference/types';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
 import {
+  comparisonEntryDate,
   parseComparisonEntry,
   resolveComparisonEntries,
 } from '@/components/inference/utils/comparisonEntry';
@@ -69,7 +70,7 @@ export function buildComparisonDates(
   // Range endpoints + individually-added dates/runs (redundant same-day range
   // endpoints dropped), minus the main run date which the primary query covers.
   return resolveComparisonEntries(selectedDates, selectedDateRange).filter(
-    (d) => d !== selectedRunDate,
+    (entry) => comparisonEntryDate(entry) !== selectedRunDate,
   );
 }
 
