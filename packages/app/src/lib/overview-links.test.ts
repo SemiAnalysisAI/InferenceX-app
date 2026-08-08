@@ -58,6 +58,7 @@ function summary(overrides: Partial<OverviewModelSummary> = {}): OverviewModelSu
   return {
     model: Model.Qwen3_5,
     modelLabel: 'Qwen 3.5',
+    category: 'default',
     scenario: 'single_turn_8k1k',
     platforms: [],
     ...overrides,
@@ -325,6 +326,40 @@ describe('overview switch links', () => {
   it('preserves the selected reference when changing engine scope', () => {
     expect(overviewEngineScopeHref('en', 'all', 50, 'hardware', 'gb300')).toBe(
       '/overview?engine=all&ref=gb300',
+    );
+  });
+});
+
+describe('overview model scope links', () => {
+  it('appends models=all last and omits the default scope', () => {
+    expect(overviewHref('en', 50, 'community', 'hardware', 'b200', 'default')).toBe('/overview');
+    expect(overviewHref('en', 50, 'community', 'hardware', 'b200', 'all')).toBe(
+      '/overview?models=all',
+    );
+    expect(overviewHref('en', 100, 'all', 'history', 'b300', 'all')).toBe(
+      '/overview?tier=100&engine=all&ref=b300&compare=30d&models=all',
+    );
+    expect(overviewHref('zh', 50, 'community', 'hardware', 'b200', 'all')).toBe(
+      '/zh/overview?models=all',
+    );
+  });
+
+  it('preserves the model scope when changing tiers and engine scope', () => {
+    expect(overviewTierHref('en', 75, 'community', 'hardware', 'b200', 'all')).toBe(
+      '/overview?tier=75&models=all',
+    );
+    expect(overviewEngineScopeHref('en', 'all', 50, 'hardware', 'b200', 'all')).toBe(
+      '/overview?engine=all&models=all',
+    );
+  });
+
+  it('merges the models control into pending overview URLs', () => {
+    const tierHref = mergeOverviewControlHref('/overview?models=all', '/overview?tier=75', [
+      'tier',
+    ]);
+    expect(tierHref).toBe('/overview?tier=75&models=all');
+    expect(mergeOverviewControlHref(tierHref, '/overview?tier=75', ['models'])).toBe(
+      '/overview?tier=75',
     );
   });
 });

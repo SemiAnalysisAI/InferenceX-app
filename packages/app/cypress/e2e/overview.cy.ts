@@ -213,6 +213,57 @@ describe('Overview page', () => {
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
   });
 
+  it('reveals deprecated and maintenance models via the bottom toggle', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+    cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('not.exist');
+
+    cy.get('[data-testid="overview-model-scope-toggle"]')
+      .find('[data-overview-model-scope="all"]')
+      .click();
+    cy.location('search').should('eq', '?models=all');
+
+    desktopModel('gpt-oss-120b')
+      .find('[data-testid="overview-model-category-badge"]')
+      .should('have.attr', 'data-category', 'deprecated')
+      .and('contain.text', 'Deprecated');
+    desktopModel('DeepSeek-R1-0528')
+      .find('[data-testid="overview-model-category-badge"]')
+      .should('have.attr', 'data-category', 'maintenance');
+    desktopModel('DeepSeek-V4-Pro', SINGLE_TURN)
+      .find('[data-testid="overview-model-category-badge"]')
+      .should('not.exist');
+    cy.get('[data-testid="overview-desktop-model"]').then(([...rows]) => {
+      const models = rows.map((row) => row.dataset.model);
+      expect(models.indexOf('gpt-oss-120b')).to.be.greaterThan(
+        models.lastIndexOf('Qwen-3.5-397B-A17B'),
+      );
+    });
+
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    cy.location('search').should('eq', '?tier=75&models=all');
+    cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('exist');
+
+    cy.get('[data-testid="overview-model-scope-toggle"]')
+      .find('[data-overview-model-scope="default"]')
+      .click();
+    cy.location('search').should('eq', '?tier=75');
+    cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('not.exist');
+  });
+
+  it('localizes the model scope toggle and badges on the Chinese route', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/zh/overview?models=all');
+
+    cy.get('[data-testid="overview-model-scope-toggle"]').should(
+      'contain.text',
+      '隐藏已弃用与维护模式模型',
+    );
+    desktopModel('gpt-oss-120b')
+      .find('[data-testid="overview-model-category-badge"]')
+      .should('contain.text', '已弃用');
+  });
+
   it('uses a selectable hardware reference and preserves it across overview controls', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');

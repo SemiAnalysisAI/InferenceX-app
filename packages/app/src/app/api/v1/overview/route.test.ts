@@ -36,20 +36,30 @@ describe('GET /api/v1/overview', () => {
     };
     mockGetOverviewPageData.mockResolvedValueOnce(data);
 
-    const response = await GET(request('/api/v1/overview?tier=75&engine=all&compare=30d&ref=b300'));
+    const response = await GET(
+      request('/api/v1/overview?tier=75&engine=all&compare=30d&ref=b300&models=all'),
+    );
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(data);
-    expect(mockGetOverviewPageData).toHaveBeenCalledWith(75, 'all', 'history', 'b300');
+    expect(mockGetOverviewPageData).toHaveBeenCalledWith(75, 'all', 'history', 'b300', 'all');
     expect(mockCachedJson).toHaveBeenCalledWith(data);
   });
 
   it('normalizes unsupported query values to overview defaults', async () => {
     mockGetOverviewPageData.mockResolvedValueOnce({ models: [] });
 
-    await GET(request('/api/v1/overview?tier=999&engine=vendor&compare=weekly&ref=h100'));
+    await GET(
+      request('/api/v1/overview?tier=999&engine=vendor&compare=weekly&ref=h100&models=inactive'),
+    );
 
-    expect(mockGetOverviewPageData).toHaveBeenCalledWith(50, 'community', 'hardware', 'b200');
+    expect(mockGetOverviewPageData).toHaveBeenCalledWith(
+      50,
+      'community',
+      'hardware',
+      'b200',
+      'default',
+    );
   });
 
   it('returns 500 when overview assembly fails', async () => {

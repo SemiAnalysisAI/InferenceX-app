@@ -1,19 +1,27 @@
 import { runIdFromRunUrl } from './known-issues';
 import {
   OVERVIEW_DEFAULT_COMPARISON_MODE,
+  OVERVIEW_DEFAULT_MODEL_SCOPE,
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   OVERVIEW_PRIMARY_TIER,
   type OverviewComparisonMode,
   type OverviewConfigResult,
   type OverviewEngineScope,
+  type OverviewModelScope,
   type OverviewModelSummary,
   type OverviewReferenceHardware,
   type OverviewTier,
 } from './overview-data';
 
-export type OverviewSearchKey = 'tier' | 'engine' | 'ref' | 'compare';
+export type OverviewSearchKey = 'tier' | 'engine' | 'ref' | 'compare' | 'models';
 
-const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = ['tier', 'engine', 'ref', 'compare'];
+const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
+  'tier',
+  'engine',
+  'ref',
+  'compare',
+  'models',
+];
 
 /** Apply one control's destination to the latest pending overview URL.
  * This prevents a second, fast selection from rebuilding from stale server
@@ -179,6 +187,7 @@ export function overviewHref(
   engineScope: OverviewEngineScope = 'community',
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
 ): string {
   const base = locale === 'zh' ? '/zh/overview' : '/overview';
   const query = new URLSearchParams();
@@ -188,6 +197,7 @@ export function overviewHref(
     query.set('ref', referenceHardware);
   }
   if (comparisonMode === 'history') query.set('compare', '30d');
+  if (modelScope !== OVERVIEW_DEFAULT_MODEL_SCOPE) query.set('models', modelScope);
   const search = query.toString();
   return search === '' ? base : `${base}?${search}`;
 }
@@ -199,8 +209,9 @@ export function overviewTierHref(
   engineScope: OverviewEngineScope = 'community',
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
 ): string {
-  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware);
+  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware, modelScope);
 }
 
 /** Engine-scope switch preserving the active service tier. */
@@ -210,6 +221,7 @@ export function overviewEngineScopeHref(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
 ): string {
-  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware);
+  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware, modelScope);
 }

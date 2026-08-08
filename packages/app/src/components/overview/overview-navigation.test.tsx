@@ -29,6 +29,7 @@ function pageData(tier: OverviewTier): OverviewPageData {
     engineScope: 'community',
     comparisonMode: 'hardware',
     referenceHardware: 'b200',
+    modelScope: 'default',
     historicalWindow: null,
   };
 }

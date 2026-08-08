@@ -11,6 +11,7 @@ import {
   OverviewComparisonSwitcher,
   OverviewEngineScopeSwitcher,
   OverviewMethodology,
+  OverviewModelScopeToggle,
   OverviewTierSwitcher,
   overviewFormatters,
   OVERVIEW_STRINGS,
@@ -36,6 +37,7 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
         data.engineScope,
         data.comparisonMode,
         data.referenceHardware,
+        data.modelScope,
       )}
     >
       <OverviewPageBody locale={locale} />
@@ -102,6 +104,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
               engineScope={data.engineScope}
               comparisonMode={data.comparisonMode}
               referenceHardware={data.referenceHardware}
+              modelScope={data.modelScope}
               locale={locale}
               strings={strings}
             />
@@ -110,6 +113,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
               tier={data.tier}
               comparisonMode={data.comparisonMode}
               referenceHardware={data.referenceHardware}
+              modelScope={data.modelScope}
               locale={locale}
               strings={strings}
             />
@@ -122,6 +126,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
         engineScope={data.engineScope}
         tier={data.tier}
         referenceHardware={data.referenceHardware}
+        modelScope={data.modelScope}
         locale={locale}
         strings={strings}
       />
@@ -150,6 +155,15 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
           strings={strings}
           comparisonMode={data.comparisonMode}
           referenceHardware={data.referenceHardware}
+        />
+        <OverviewModelScopeToggle
+          modelScope={data.modelScope}
+          tier={data.tier}
+          engineScope={data.engineScope}
+          comparisonMode={data.comparisonMode}
+          referenceHardware={data.referenceHardware}
+          locale={locale}
+          strings={strings}
         />
       </Card>
     </section>
