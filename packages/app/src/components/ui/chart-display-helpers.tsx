@@ -154,6 +154,13 @@ export function MetricAssumptionNotes({
   const showInputCostSource = INPUT_COST_METRICS.has(selectedYAxisMetric);
   const showInputThroughputCaveat = selectedYAxisMetric === 'y_inputTputPerGpu';
   const showOutputThroughputCaveat = selectedYAxisMetric === 'y_outputTputPerGpu';
+  // Per-token-type cost only. A disagg config's prefill and decode chips are
+  // counted separately, so the input- and output-token costs are attributed to
+  // one side of the split and can't be lined up against an aggregated config.
+  // The total-token cost divides by the whole chip count, which is the same
+  // denominator an aggregated config uses, so it needs no caveat — the same
+  // split the throughput caveats above already make (input/output, not total).
+  const showCostCaveat = showOutputCostSource || showInputCostSource;
   const showJouleSource = selectedYAxisMetric.startsWith('y_j');
 
   const costValues =
@@ -186,11 +193,7 @@ export function MetricAssumptionNotes({
           </SourceLink>
         </>
       )}
-      <DisaggCaveat
-        visible={selectedYAxisMetric.startsWith('y_cost')}
-        calculationNoun="cost"
-        locale={locale}
-      />
+      <DisaggCaveat visible={showCostCaveat} calculationNoun="cost" locale={locale} />
       <DisaggCaveat
         visible={showInputThroughputCaveat}
         calculationNoun="input throughput"
