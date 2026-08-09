@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 
-/** Tailwind's `xl` breakpoint, the width at which the matrix replaces the list. */
 const QUERY = '(min-width: 80rem)';
 
 /**

@@ -164,11 +164,7 @@ describe('Overview page', () => {
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.go('back');
-    cy.get('[data-overview-comparison="hardware"]', { timeout: 15_000 }).should(
-      'have.attr',
-      'aria-current',
-      'true',
-    );
+    cy.get('[data-overview-comparison="hardware"]').should('have.attr', 'aria-current', 'true');
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
     cy.then(() => {
       expect(rscRequests, 'selector and popstate RSC requests').to.equal(0);
@@ -204,6 +200,13 @@ describe('Overview page', () => {
   it('preserves pending selections when controls are changed rapidly', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
+    // Hold the first response open so the second click lands inside the pending
+    // window; without the delay the clicks may serialize and never race.
+    cy.intercept('GET', '**/api/v1/overview*', (request) => {
+      request.continue((response) => {
+        response.setDelay(600);
+      });
+    }).as('overviewJson');
 
     cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
     cy.get('[data-testid="overview-engine-scope-switcher"]')
@@ -211,6 +214,95 @@ describe('Overview page', () => {
       .click();
 
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+    // The rendered state, not just the URL: the losing response must not win.
+    cy.get('[data-testid="overview-tier-switcher"] [aria-current="page"]', {
+      timeout: 15_000,
+    }).should('have.text', '75');
+    cy.get('[data-overview-engine-scope="all"]').should('have.attr', 'aria-current', 'true');
+    cy.location('search').should('eq', '?tier=75&engine=all');
+  });
+
+  it('shows a busy state while an uncached selection loads', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+    cy.intercept('GET', '**/api/v1/overview*', (request) => {
+      request.continue((response) => {
+        response.setDelay(800);
+      });
+    }).as('overviewJson');
+
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('exist');
+    cy.wait('@overviewJson');
+    cy.get('[data-testid="overview-page"] [aria-busy="true"]', { timeout: 15_000 }).should(
+      'not.exist',
+    );
+  });
+
+  it('rewrites one history entry when the overview request fails', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/inference');
+    cy.visit('/overview');
+    cy.intercept('GET', '**/api/v1/overview*', { statusCode: 500 }).as('overviewJsonFailure');
+
+    cy.window().then((win) => {
+      const before = win.history.length;
+      cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+      cy.wait('@overviewJsonFailure');
+      cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75');
+      // A plain `.should` would be satisfied by the transient extra entry.
+      cy.window().then((after) => {
+        expect(after.history.length - before, 'one entry for one selection').to.equal(1);
+      });
+    });
+
+    cy.go('back');
+    cy.location('search', { timeout: 15_000 }).should('eq', '');
+    cy.go('back');
+    cy.location('pathname', { timeout: 15_000 }).should('eq', '/inference');
+  });
+
+  it('warms a hovered option and derives the reference without a request', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+    let jsonRequests = 0;
+    cy.intercept('GET', '**/api/v1/overview*', () => {
+      jsonRequests += 1;
+    }).as('overviewJson');
+
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').trigger('pointerover');
+    cy.wait('@overviewJson');
+    cy.location('search').should('eq', '');
+    cy.then(() => {
+      expect(jsonRequests, 'hover warms exactly one response').to.equal(1);
+    });
+
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').click();
+    cy.location('search').should('eq', '?tier=100');
+    cy.then(() => {
+      expect(jsonRequests, 'the click reuses the warmed response').to.equal(1);
+    });
+
+    cy.get('[data-testid="overview-reference-select"]').click();
+    cy.get('[data-overview-reference="b300"]').click();
+    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=100&ref=b300');
+    cy.get('[data-overview-comparison="hardware"]').should('contain.text', 'vs B300');
+    cy.then(() => {
+      expect(jsonRequests, 'a reference change is derived, not fetched').to.equal(1);
+    });
+  });
+
+  it('keeps focus on the option the keyboard activated', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+
+    cy.get('[data-overview-comparison="history"]').click();
+    cy.get('[data-overview-comparison="history"]', { timeout: 15_000 }).should(
+      'have.attr',
+      'aria-current',
+      'true',
+    );
+    cy.focused().should('have.attr', 'data-overview-comparison', 'history');
   });
 
   it('reveals deprecated and maintenance models via the bottom toggle', () => {
