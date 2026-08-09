@@ -448,6 +448,10 @@ describe('ScatterGraph', () => {
       chartType: 'interactivity',
       y_tpPerGpu_roofline: 'upper_left',
     });
+    const officialData = [
+      createMockInferenceData({ hwKey: 'h100', x: 12, y: 350, precision: Precision.FP4 }),
+      createMockInferenceData({ hwKey: 'h100', x: 24, y: 310, precision: Precision.FP4 }),
+    ];
     const overlayData = {
       data: [
         createMockInferenceData({
@@ -468,7 +472,7 @@ describe('ScatterGraph', () => {
         <ScatterGraph
           chartId="test-scatter-singleton-overlay-label"
           modelLabel="DeepSeek R1"
-          data={[]}
+          data={officialData}
           xLabel="Concurrency"
           yLabel="Throughput / Chip (tok/s)"
           chartDefinition={interactivityChartDef}
@@ -478,8 +482,8 @@ describe('ScatterGraph', () => {
       {
         inference: {
           hardwareConfig: hwConfig,
-          activeHwTypes: new Set(),
-          hwTypesWithData: new Set(),
+          activeHwTypes: new Set(['h100']),
+          hwTypesWithData: new Set(['h100']),
           selectedPrecisions: [Precision.FP4],
           showLineLabels: true,
         },
