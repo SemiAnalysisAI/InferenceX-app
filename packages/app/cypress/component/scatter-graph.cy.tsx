@@ -455,58 +455,76 @@ describe('ScatterGraph', () => {
     const overlayData = {
       data: [
         createMockInferenceData({
-          hwKey: 'b200_trt',
+          hwKey: 'b200_tilert_mtp',
           x: 24,
           y: 310,
           precision: Precision.FP4,
           run_url: runUrl,
         }),
       ],
-      hardwareConfig: hwConfig,
+      hardwareConfig: {
+        ...hwConfig,
+        b200_tilert_mtp: {
+          name: 'b200_tilert_mtp',
+          label: 'B200',
+          suffix: '(TileRT, MTP)',
+          gpu: 'NVIDIA B200 TileRT MTP',
+        },
+      },
       label: 'tileRT',
       runUrl,
     };
+    const baseInference = createMockInferenceContext();
 
-    mountWithProviders(
-      <div style={{ width: 800, height: 600 }}>
-        <ScatterGraph
-          chartId="test-scatter-singleton-overlay-label"
-          modelLabel="DeepSeek R1"
-          data={officialData}
-          xLabel="Concurrency"
-          yLabel="Throughput / Chip (tok/s)"
-          chartDefinition={interactivityChartDef}
-          overlayData={overlayData}
-        />
-      </div>,
-      {
-        inference: {
-          hardwareConfig: hwConfig,
-          activeHwTypes: new Set(['h100']),
-          hwTypesWithData: new Set(['h100']),
-          selectedPrecisions: [Precision.FP4],
-          showLineLabels: true,
-        },
-        unofficial: {
-          activeOverlayHwTypes: new Set(['b200_trt']),
-          allOverlayHwTypes: new Set(['b200_trt']),
-          runIndexByUrl: { [runUrl]: 0, '31266452885': 0 },
-          unofficialRunInfos: [
-            {
-              id: 31266452885,
-              name: 'CI run',
-              branch: 'tileRT',
-              sha: 'abc123',
-              createdAt: '2026-08-09T00:00:00Z',
-              url: runUrl,
-              conclusion: 'success',
-              status: 'completed',
-              isNonMainBranch: true,
-            },
-          ],
-        },
+    function SingletonLabelHarness() {
+      const [showLineLabels, setShowLineLabels] = useState(true);
+      return (
+        <InferenceContext.Provider
+          value={{
+            ...baseInference,
+            hardwareConfig: hwConfig,
+            activeHwTypes: new Set(['h100']),
+            hwTypesWithData: new Set(['h100']),
+            selectedPrecisions: [Precision.FP4],
+            showLineLabels,
+            setShowLineLabels,
+          }}
+        >
+          <div style={{ width: 800, height: 600 }}>
+            <ScatterGraph
+              chartId="test-scatter-singleton-overlay-label"
+              modelLabel="DeepSeek R1"
+              data={officialData}
+              xLabel="Concurrency"
+              yLabel="Throughput / Chip (tok/s)"
+              chartDefinition={interactivityChartDef}
+              overlayData={overlayData}
+            />
+          </div>
+        </InferenceContext.Provider>
+      );
+    }
+
+    mountWithProviders(<SingletonLabelHarness />, {
+      unofficial: {
+        activeOverlayHwTypes: new Set(['b200_tilert_mtp']),
+        allOverlayHwTypes: new Set(['b200_tilert_mtp']),
+        runIndexByUrl: { [runUrl]: 0, '31266452885': 0 },
+        unofficialRunInfos: [
+          {
+            id: 31266452885,
+            name: 'CI run',
+            branch: 'tileRT',
+            sha: 'abc123',
+            createdAt: '2026-08-09T00:00:00Z',
+            url: runUrl,
+            conclusion: 'success',
+            status: 'completed',
+            isNonMainBranch: true,
+          },
+        ],
       },
-    );
+    });
 
     cy.get('#test-scatter-singleton-overlay-label svg .unofficial-overlay-pt').should(
       'have.length',
@@ -514,8 +532,17 @@ describe('ScatterGraph', () => {
     );
     cy.get('#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]')
       .should('have.length', 1)
+      .should('have.css', 'opacity', '1')
       .find('text')
-      .should('contain.text', 'tileRT');
+      .should('have.text', 'B200 (TileRT, MTP)');
+
+    cy.get('#scatter-line-labels').click();
+    cy.get('#test-scatter-singleton-overlay-label svg .line-label').should('not.exist');
+    cy.get('#scatter-line-labels').click();
+    cy.get('#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]')
+      .should('have.css', 'opacity', '1')
+      .find('text')
+      .should('have.text', 'B200 (TileRT, MTP)');
 
     cy.get('#test-scatter-singleton-overlay-label svg').then(($svg) => {
       const svg = $svg[0];

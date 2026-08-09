@@ -809,6 +809,10 @@ const ScatterGraph = React.memo(
       }
       return effectiveOfficialHwTypes;
     }, [showAllHardwareTypes, groupedData, effectiveOfficialHwTypes]);
+    const effectiveActiveLabelHwTypes = useMemo(
+      () => new Set([...effectiveActiveHwTypes, ...activeOverlayHwTypes]),
+      [effectiveActiveHwTypes, activeOverlayHwTypes],
+    );
 
     const buildPointConfigId = useCallback((point: InferenceData): string => {
       let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}|${point.decode_ep ?? 0}|${point.prefill_tp ?? 0}|${point.prefill_ep ?? 0}`;
@@ -1353,11 +1357,11 @@ const ScatterGraph = React.memo(
         .style('opacity', function () {
           return labelOpacityForActiveState(
             (this as SVGGElement).dataset,
-            effectiveActiveHwTypes,
+            effectiveActiveLabelHwTypes,
             selectedPrecisions,
           );
         });
-    }, [isPointVisible, isRooflineVisible, effectiveActiveHwTypes, selectedPrecisions]);
+    }, [isPointVisible, isRooflineVisible, effectiveActiveLabelHwTypes, selectedPrecisions]);
 
     // --- Zoom config ---
     const eventPrefix = chartDefinition.chartType === 'e2e' ? 'latency' : 'interactivity';
@@ -1869,10 +1873,15 @@ const ScatterGraph = React.memo(
                 .toSorted(([, a], [, b]) => yScale(a.points[0].y) - yScale(b.points[0].y));
 
               for (const [ovKey, group] of sortedOverlay) {
+                const precision = group.points[0]?.precision ?? '';
+                const label =
+                  group.points.length === 1
+                    ? lineLabelText(group.hwKey, precision, multiPrecision, modelLabel)
+                    : overlayLabelText(group.runIndex, group.hwKey, precision);
                 placeLabel(
                   `overlay-${ovKey}`,
                   group.hwKey,
-                  overlayLabelText(group.runIndex, group.hwKey, group.points[0]?.precision ?? ''),
+                  label,
                   overlayRunColor(group.runIndex),
                   group.points,
                   group.points.length === 1,
@@ -1916,9 +1925,13 @@ const ScatterGraph = React.memo(
                 const branchOrHw = info
                   ? `✕ ${info.branch || `run ${info.id}`}`
                   : parseHwKeyToLabel(group.hwKey, modelLabel).label;
-                const labelText = multiPrecision
-                  ? `${branchOrHw} ${getPrecisionLabel((group.points[0]?.precision ?? '') as Precision)}`
-                  : branchOrHw;
+                const precision = group.points[0]?.precision ?? '';
+                const labelText =
+                  group.points.length === 1
+                    ? lineLabelText(group.hwKey, precision, multiPrecision, modelLabel)
+                    : multiPrecision
+                      ? `${branchOrHw} ${getPrecisionLabel(precision as Precision)}`
+                      : branchOrHw;
                 const labelKey = `overlay-${ovKey}`;
                 const pt = group.points.at(-1)!;
                 lineLabels.push({
@@ -3000,7 +3013,7 @@ const ScatterGraph = React.memo(
         .style('opacity', function () {
           return labelOpacityForActiveState(
             (this as SVGGElement).dataset,
-            ir.effectiveActiveHwTypes,
+            new Set([...ir.effectiveActiveHwTypes, ...ir.activeOverlayHwTypes]),
             ir.selectedPrecisions,
           );
         });
