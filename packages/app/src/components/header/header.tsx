@@ -101,7 +101,10 @@ function LanguageToggle({
   return (
     <Link
       href={target + search}
-      prefetch={false}
+      // Only /overview rewrites this href per interaction, which would
+      // re-prefetch its force-dynamic sibling on every selector commit.
+      // Everywhere else the href is stable, so let Next prefetch it.
+      prefetch={isActive(pathname, '/overview') ? false : undefined}
       data-testid="language-toggle"
       hrefLang={isZh ? 'en' : 'zh-CN'}
       className="inline-flex items-center min-h-11 px-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
@@ -203,6 +206,12 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 )}
                 onClick={(e) => {
                   track(event);
+                  // Re-entering the active tab would refetch the route and
+                  // discard whatever selector state the URL already carries.
+                  if (isActive(pathname, href)) {
+                    e.preventDefault();
+                    return;
+                  }
                   if (href === '/overview' || href === '/inference') {
                     navigateInApp(e, router, displayHref);
                   }
@@ -269,6 +278,10 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                       )}
                       onClick={(e) => {
                         track(event);
+                        if (isActive(pathname, href)) {
+                          e.preventDefault();
+                          return;
+                        }
                         if (href === '/overview' || href === '/inference') {
                           navigateInApp(e, router, displayHref);
                         }
