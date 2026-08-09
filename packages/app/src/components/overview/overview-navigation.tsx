@@ -137,6 +137,18 @@ export function OverviewNavigationProvider({
     return () => window.removeEventListener('popstate', handlePopState);
   }, [commit]);
 
+  // A commit still in flight when the provider leaves the tree must not write
+  // history or route from a component that is gone: invalidate its generation
+  // so both settled handlers bail. Kept as its own effect — folding it into the
+  // popstate effect above would tie it to that effect's `commit` dependency and
+  // silently start cancelling live navigations.
+  useEffect(
+    () => () => {
+      ++navigationIdRef.current;
+    },
+    [],
+  );
+
   const resolve = useCallback(
     (targetHref: string, keys: readonly OverviewSearchKey[]) =>
       mergeOverviewControlHref(pendingHref, targetHref, keys),
