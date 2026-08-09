@@ -17,7 +17,7 @@ import {
   OVERVIEW_STRINGS,
   type OverviewLocale,
 } from './overview-scorecard';
-import { OverviewNavigationProvider, useOverviewNavigation } from './overview-navigation';
+import { OverviewNavigationProvider, useOverviewData } from './overview-navigation';
 
 /** The SemiAnalysis AI Cloud TCO model behind `HW_REGISTRY.costh`. */
 const OVERVIEW_SOURCE_HREF = 'https://semianalysis.com/ai-cloud-tco-model/';
@@ -40,13 +40,16 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
         data.modelScope,
       )}
     >
+      {/* Passed as `children`, never rendered inside the provider's own JSX:
+          that keeps this element's identity stable so a pending-state change
+          re-renders the provider without re-rendering the whole matrix. */}
       <OverviewPageBody locale={locale} />
     </OverviewNavigationProvider>
   );
 }
 
 function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
-  const { data } = useOverviewNavigation();
+  const data = useOverviewData();
   const strings = OVERVIEW_STRINGS[locale];
   const formatters = overviewFormatters(locale);
 

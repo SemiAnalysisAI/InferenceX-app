@@ -13,16 +13,23 @@ import {
 } from 'react';
 
 import { notifyClientSearchChange } from '@/lib/client-navigation';
-import type { OverviewPageData } from '@/lib/overview-data';
+import type { OverviewPageData, OverviewReferenceHardware } from '@/lib/overview-data';
 import { mergeOverviewControlHref, type OverviewSearchKey } from '@/lib/overview-links';
 
 interface OverviewNavigationValue {
-  data: OverviewPageData;
   prefetch: (targetHref: string, keys: readonly OverviewSearchKey[]) => void;
   resolve: (targetHref: string, keys: readonly OverviewSearchKey[]) => string;
   push: (targetHref: string, keys: readonly OverviewSearchKey[]) => void;
 }
 
+/**
+ * Three contexts, not one. A selector click moves the pending href immediately
+ * and the payload only when the request settles, so a single value would push
+ * two full matrix renders per uncached selection. Splitting them means the
+ * controls can re-render on their own while the matrix waits for real data.
+ */
+const OverviewDataContext = createContext<OverviewPageData | null>(null);
+const OverviewReferenceContext = createContext<OverviewReferenceHardware | null>(null);
 const OverviewNavigationContext = createContext<OverviewNavigationValue | null>(null);
 
 export function OverviewNavigationProvider({
@@ -134,7 +141,6 @@ export function OverviewNavigationProvider({
 
   const value = useMemo<OverviewNavigationValue>(
     () => ({
-      data,
       resolve,
       prefetch: (targetHref, keys) => {
         const href = mergeOverviewControlHref(pendingHrefRef.current, targetHref, keys);
@@ -145,18 +151,34 @@ export function OverviewNavigationProvider({
         commit(href, true);
       },
     }),
-    [commit, data, load, resolve],
+    [commit, load, resolve],
   );
 
   return (
-    <OverviewNavigationContext.Provider value={value}>
-      {children}
-    </OverviewNavigationContext.Provider>
+    <OverviewDataContext.Provider value={data}>
+      <OverviewReferenceContext.Provider value={data.referenceHardware}>
+        <OverviewNavigationContext.Provider value={value}>
+          {children}
+        </OverviewNavigationContext.Provider>
+      </OverviewReferenceContext.Provider>
+    </OverviewDataContext.Provider>
   );
 }
 
 export function useOverviewNavigation(): OverviewNavigationValue {
   const value = useContext(OverviewNavigationContext);
+  if (value === null) throw new Error('Overview controls require OverviewNavigationProvider');
+  return value;
+}
+
+export function useOverviewData(): OverviewPageData {
+  const value = useContext(OverviewDataContext);
+  if (value === null) throw new Error('Overview controls require OverviewNavigationProvider');
+  return value;
+}
+
+export function useOverviewReference(): OverviewReferenceHardware {
+  const value = useContext(OverviewReferenceContext);
   if (value === null) throw new Error('Overview controls require OverviewNavigationProvider');
   return value;
 }

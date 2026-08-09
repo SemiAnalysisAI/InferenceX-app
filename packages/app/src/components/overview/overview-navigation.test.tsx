@@ -10,7 +10,11 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-import { OverviewNavigationProvider, useOverviewNavigation } from './overview-navigation';
+import {
+  OverviewNavigationProvider,
+  useOverviewData,
+  useOverviewNavigation,
+} from './overview-navigation';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -36,8 +40,9 @@ function pageData(tier: OverviewTier): OverviewPageData {
 
 function Probe() {
   const navigation = useOverviewNavigation();
+  const data = useOverviewData();
   selectTier = () => navigation.push('/overview?tier=75', ['tier']);
-  return <output data-testid="tier">{navigation.data.tier}</output>;
+  return <output data-testid="tier">{data.tier}</output>;
 }
 
 function renderProvider(data: OverviewPageData, href: string) {
