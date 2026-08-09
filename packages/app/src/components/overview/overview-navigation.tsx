@@ -15,11 +15,41 @@ import {
 import { track } from '@/lib/analytics';
 import { notifyClientSearchChange } from '@/lib/client-navigation';
 import {
+  OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   type OverviewPageData,
   type OverviewReferenceHardware,
+  resolveOverviewComparisonMode,
+  resolveOverviewEngineScope,
+  resolveOverviewModelScope,
   resolveOverviewReferenceHardware,
+  resolveOverviewTier,
 } from '@/lib/overview-data';
-import { mergeOverviewControlHref, type OverviewSearchKey } from '@/lib/overview-links';
+import {
+  mergeOverviewControlHref,
+  OVERVIEW_SEARCH_ORDER,
+  overviewHref,
+  type OverviewSearchKey,
+} from '@/lib/overview-links';
+
+/**
+ * Cache and request identity. The payload depends only on the server-resolved
+ * params, minus `ref`, which the client derives. Equivalent URLs — explicit
+ * defaults, reordered params, campaign tags, a fragment — collapse to one key,
+ * so a `ref` change is a guaranteed hit and the CDN sees one entry per data
+ * state instead of one per link anyone has ever shared.
+ */
+function overviewDataKey(href: string): string {
+  const url = new URL(href, 'https://inferencex.local');
+  const params = url.searchParams;
+  return overviewHref(
+    url.pathname.startsWith('/zh/') ? 'zh' : 'en',
+    resolveOverviewTier(params.get('tier') ?? undefined),
+    resolveOverviewEngineScope(params.get('engine') ?? undefined),
+    resolveOverviewComparisonMode(params.get('compare') ?? undefined),
+    OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+    resolveOverviewModelScope(params.get('models') ?? undefined),
+  );
+}
 
 interface OverviewNavigationValue {
   isPending: boolean;
@@ -54,29 +84,32 @@ export function OverviewNavigationProvider({
   const pendingHrefRef = useRef(initialHref);
   const committedHrefRef = useRef(initialHref);
   const navigationIdRef = useRef(0);
-  const dataCacheRef = useRef(new Map<string, OverviewPageData>([[initialHref, initialData]]));
+  const dataCacheRef = useRef(
+    new Map<string, OverviewPageData>([[overviewDataKey(initialHref), initialData]]),
+  );
   const requestCacheRef = useRef(new Map<string, Promise<OverviewPageData>>());
 
   const load = useCallback((href: string): Promise<OverviewPageData> => {
-    const cached = dataCacheRef.current.get(href);
+    const key = overviewDataKey(href);
+    const cached = dataCacheRef.current.get(key);
     if (cached !== undefined) return Promise.resolve(cached);
 
-    const pending = requestCacheRef.current.get(href);
+    const pending = requestCacheRef.current.get(key);
     if (pending !== undefined) return pending;
 
-    const url = new URL(href, window.location.origin);
+    const url = new URL(key, window.location.origin);
     const request = fetch(`/api/v1/overview${url.search}`, {
       headers: { Accept: 'application/json' },
     })
       .then(async (response) => {
         if (!response.ok) throw new Error(`Overview request failed (${response.status})`);
         const nextData = (await response.json()) as OverviewPageData;
-        dataCacheRef.current.set(href, nextData);
+        dataCacheRef.current.set(key, nextData);
         return nextData;
       })
-      .finally(() => requestCacheRef.current.delete(href));
+      .finally(() => requestCacheRef.current.delete(key));
 
-    requestCacheRef.current.set(href, request);
+    requestCacheRef.current.set(key, request);
     return request;
   }, []);
 
@@ -141,11 +174,16 @@ export function OverviewNavigationProvider({
 
   useEffect(() => {
     ++navigationIdRef.current;
-    dataCacheRef.current.set(initialHref, initialData);
-    committedHrefRef.current = initialHref;
-    setCommittedHref(initialHref);
-    pendingHrefRef.current = initialHref;
-    setPendingHref(initialHref);
+    // Known params always come from the server-resolved props; only the extras
+    // (utm_*, gclid, a fragment) are adopted from the address bar, so a stale
+    // location can never key the cache to the wrong payload.
+    const actual = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const href = mergeOverviewControlHref(actual, initialHref, OVERVIEW_SEARCH_ORDER);
+    dataCacheRef.current.set(overviewDataKey(href), initialData);
+    committedHrefRef.current = href;
+    setCommittedHref(href);
+    pendingHrefRef.current = href;
+    setPendingHref(href);
     setData(initialData);
   }, [initialData, initialHref]);
 

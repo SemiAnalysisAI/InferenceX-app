@@ -57,7 +57,10 @@ export function mergeOverviewControlHref(
   }
 
   const search = ordered.toString();
-  return `${current.pathname}${search === '' ? '' : `?${search}`}${target.hash}`;
+  // A control href never carries a fragment, so an absent one means "keep the
+  // one already on the page" rather than "clear it".
+  const hash = target.hash === '' ? current.hash : target.hash;
+  return `${current.pathname}${search === '' ? '' : `?${search}`}${hash}`;
 }
 import type { UrlStateParams } from './url-state';
 
