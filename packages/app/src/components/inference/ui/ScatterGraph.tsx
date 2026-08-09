@@ -1801,15 +1801,18 @@ const ScatterGraph = React.memo(
                 }
                 // All candidates collide — hide this label.
                 const pt = pts[0];
+                const px = xScale(pt.x);
+                const py = yScale(pt.y);
                 lineLabels.push({
                   key,
                   hw,
                   label,
                   color,
-                  x: xScale(pt.x),
-                  y: yScale(pt.y),
+                  x: px,
+                  y: py,
                   visible: keepVisibleOnCollision,
                 });
+                if (keepVisibleOnCollision) placed.push({ x: px, y: py });
               };
 
               // Sort entries by highest y-value first (top of chart) for priority
@@ -2164,11 +2167,14 @@ const ScatterGraph = React.memo(
                       return;
                     }
                   }
+                  const px = newXScale(pts[0].x);
+                  const py = newYScale(pts[0].y);
                   zoomResults.set(key, {
-                    x: newXScale(pts[0].x),
-                    y: newYScale(pts[0].y),
+                    x: px,
+                    y: py,
                     vis: keepVisibleOnCollision,
                   });
+                  if (keepVisibleOnCollision) placed.push({ x: px, y: py });
                 };
                 for (const [key, pts] of visibleEntries) greedyPlace(key, pts, pts.length === 1);
                 for (const [ovKey, group] of overlayVisible)
