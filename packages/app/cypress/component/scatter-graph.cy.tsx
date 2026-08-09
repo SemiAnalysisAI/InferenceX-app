@@ -442,6 +442,78 @@ describe('ScatterGraph', () => {
       .should('contain.text', 'feature-branch');
   });
 
+  it('renders a line label for a singleton unofficial overlay series', () => {
+    const runUrl = 'https://github.com/x/y/actions/runs/31266452885';
+    const interactivityChartDef = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const overlayData = {
+      data: [
+        createMockInferenceData({
+          hwKey: 'b200_trt',
+          x: 24,
+          y: 310,
+          precision: Precision.FP4,
+          run_url: runUrl,
+        }),
+      ],
+      hardwareConfig: hwConfig,
+      label: 'tileRT',
+      runUrl,
+    };
+
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-singleton-overlay-label"
+          modelLabel="DeepSeek R1"
+          data={[]}
+          xLabel="Concurrency"
+          yLabel="Throughput / Chip (tok/s)"
+          chartDefinition={interactivityChartDef}
+          overlayData={overlayData}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(),
+          hwTypesWithData: new Set(),
+          selectedPrecisions: [Precision.FP4],
+          showLineLabels: true,
+        },
+        unofficial: {
+          activeOverlayHwTypes: new Set(['b200_trt']),
+          allOverlayHwTypes: new Set(['b200_trt']),
+          runIndexByUrl: { [runUrl]: 0, '31266452885': 0 },
+          unofficialRunInfos: [
+            {
+              id: 31266452885,
+              name: 'CI run',
+              branch: 'tileRT',
+              sha: 'abc123',
+              createdAt: '2026-08-09T00:00:00Z',
+              url: runUrl,
+              conclusion: 'success',
+              status: 'completed',
+              isNonMainBranch: true,
+            },
+          ],
+        },
+      },
+    );
+
+    cy.get('#test-scatter-singleton-overlay-label svg .unofficial-overlay-pt').should(
+      'have.length',
+      1,
+    );
+    cy.get('#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]')
+      .should('have.length', 1)
+      .find('text')
+      .should('contain.text', 'tileRT');
+  });
+
   it('renders M3 mtp rooflines with the EAGLE label (official + overlay)', () => {
     const interactivityChartDef = createMockChartDefinition({
       chartType: 'interactivity',

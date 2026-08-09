@@ -1863,10 +1863,7 @@ const ScatterGraph = React.memo(
                   : base;
               };
               const sortedOverlay = Object.entries(overlayRooflines)
-                .filter(
-                  ([, group]) =>
-                    ir.activeOverlayHwTypes.has(group.hwKey) && group.points.length >= 2,
-                )
+                .filter(([, group]) => ir.activeOverlayHwTypes.has(group.hwKey))
                 .toSorted(([, a], [, b]) => yScale(a.points[0].y) - yScale(b.points[0].y));
 
               for (const [ovKey, group] of sortedOverlay) {
@@ -1911,7 +1908,7 @@ const ScatterGraph = React.memo(
               // Endpoint labels for overlay rooflines too (one per (hw, runIndex)),
               // labeled with the run's branch name to mirror the overlay legend.
               for (const [ovKey, group] of Object.entries(overlayRooflines)) {
-                if (group.points.length < 2 || !ir.activeOverlayHwTypes.has(group.hwKey)) continue;
+                if (!ir.activeOverlayHwTypes.has(group.hwKey)) continue;
                 const info = unofficialRunInfos[group.runIndex];
                 const branchOrHw = info
                   ? `✕ ${info.branch || `run ${info.id}`}`
@@ -2209,7 +2206,7 @@ const ScatterGraph = React.memo(
               });
               // Overlay rooflines: per-(hw, runIndex) endpoint labels.
               for (const [ovKey, group] of Object.entries(overlayRooflines)) {
-                if (group.points.length < 2 || !ir.activeOverlayHwTypes.has(group.hwKey)) continue;
+                if (!ir.activeOverlayHwTypes.has(group.hwKey)) continue;
                 const pt = group.points.at(-1)!;
                 zoomLabels.push({
                   key: `overlay-${ovKey}`,
