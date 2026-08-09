@@ -603,6 +603,11 @@ export interface ScatterGraphProps {
    * omitted, GPUGraph falls back to gap-free numbering of the on-chart series.
    */
   runNumbering?: Map<string, number>;
+  /**
+   * Override watermark rendering for this chart. Defaults to official/unofficial
+   * based on current run context.
+   */
+  watermark?: 'logo' | 'unofficial' | 'none';
 }
 /**
  * @file types.ts

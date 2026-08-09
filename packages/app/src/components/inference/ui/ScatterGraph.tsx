@@ -440,6 +440,7 @@ const ScatterGraph = React.memo(
     pinLineLabels = false,
     xExtentOverride,
     yExtentOverride,
+    watermark,
   }: ScatterGraphProps) => {
     const {
       activeHwTypes,
@@ -3117,7 +3118,7 @@ const ScatterGraph = React.memo(
           // from the visible points), and visibility is applied via opacity.
           data={pointsData}
           margin={CHART_MARGIN}
-          watermark={getChartWatermark(isUnofficialRun)}
+          watermark={watermark ?? getChartWatermark(isUnofficialRun)}
           testId="scatter-graph"
           grabCursor={true}
           caption={caption}

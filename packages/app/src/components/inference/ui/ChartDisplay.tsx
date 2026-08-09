@@ -874,6 +874,7 @@ export default function ChartDisplay() {
                             yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                             chartDefinition={graph.chartDefinition}
                             caption={chartCaption}
+                            watermark={isUnofficialRun ? 'logo' : undefined}
                             overlayData={
                               selectUnofficialOverlayForMode(
                                 selectedXAxisMode,
