@@ -27,6 +27,7 @@ import {
 } from '@/lib/overview-data';
 import {
   mergeOverviewControlHref,
+  OVERVIEW_CLIENT_ONLY_KEYS,
   OVERVIEW_SEARCH_ORDER,
   overviewHref,
   type OverviewSearchKey,
@@ -161,10 +162,17 @@ export function OverviewNavigationProvider({
         .catch(() => {
           if (navigationId !== navigationIdRef.current) return;
           focusIntentRef.current = null;
-          // Roll the pending selection back, so a failed load cannot strand the
-          // reference on a value the page never loaded.
-          pendingHrefRef.current = committedHrefRef.current;
-          setPendingHref(committedHrefRef.current);
+          // Roll back only what failed to load. A reference chosen while this
+          // request was in flight needs no payload of its own, and the address
+          // bar keeps it either way, so dropping it here would repaint against
+          // a column the URL still claims.
+          const rolledBack = mergeOverviewControlHref(
+            committedHrefRef.current,
+            href,
+            OVERVIEW_CLIENT_ONLY_KEYS,
+          );
+          pendingHrefRef.current = rolledBack;
+          setPendingHref(rolledBack);
           if (updateHistory) {
             // The entry pushed above already carries `href`, so `replace`
             // rewrites it in place instead of stacking a duplicate the user
@@ -227,8 +235,14 @@ export function OverviewNavigationProvider({
   );
 
   /** The URL already shows the new selection while the matrix still shows the
-   *  old numbers. Consumers use this to say so. */
-  const isPending = pendingHref !== committedHref;
+   *  old numbers. Consumers use this to say so. Compared on the data key rather
+   *  than the href: a `ref` change repaints from the payload already in hand, so
+   *  reading it as a load would dim the card and have the live region announce a
+   *  request that never runs. */
+  const isPending = useMemo(
+    () => overviewDataKey(pendingHref) !== overviewDataKey(committedHref),
+    [committedHref, pendingHref],
+  );
 
   /**
    * `ref` picks which column the percentages are measured against; every cost

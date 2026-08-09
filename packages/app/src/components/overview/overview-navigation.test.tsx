@@ -351,6 +351,39 @@ describe('OverviewNavigationProvider', () => {
     expect(readProbe('reference')).toBe('b300');
   });
 
+  it('does not report a load for a reference-only change', () => {
+    const { stub } = deferredFetch();
+
+    renderProvider(pageData(50), '/overview');
+    act(() => selectReference?.());
+
+    expect(stub).not.toHaveBeenCalled();
+    expect(readProbe('reference')).toBe('b300');
+    expect(readProbe('pending')).toBe('settled');
+  });
+
+  it('keeps a reference chosen while a failing selection was in flight', async () => {
+    const { settlers } = deferredFetch();
+
+    renderProvider(pageData(50), '/overview');
+    act(() => selectTier?.());
+    // Same data key, so this joins the in-flight tier request rather than
+    // starting one of its own.
+    act(() => selectReference?.());
+
+    await act(async () => {
+      settlers[0]?.reject(new Error('network down'));
+      await Promise.resolve();
+    });
+
+    expect(settlers).toHaveLength(1);
+    expect(routerStub.replace).toHaveBeenCalledWith('/overview?tier=75&ref=b300', {
+      scroll: false,
+    });
+    expect(readProbe('tier')).toBe('50');
+    expect(readProbe('reference')).toBe('b300');
+  });
+
   it('preserves unknown params and the fragment on the first selection', () => {
     deferredFetch();
 
