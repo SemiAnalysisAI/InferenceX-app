@@ -39,6 +39,22 @@ const SCOPE_LINE = `${SCOPE_METRIC} · ${SCOPE_DIRECTION} · ${SOURCE_NOTE}`;
 const SCOPE_METRIC_ZH = '超大规模云厂商成本';
 const SCOPE_DIRECTION_ZH = '↓ 越低越好';
 const SCOPE_LINE_ZH = `${SCOPE_METRIC_ZH} · ${SCOPE_DIRECTION_ZH} · ${SOURCE_NOTE_ZH}`;
+const OVERVIEW_TIERS = [30, 50, 75, 100, 150, 200] as const;
+
+function selectOverviewTier(tier: (typeof OVERVIEW_TIERS)[number]) {
+  const targetIndex = OVERVIEW_TIERS.indexOf(tier);
+  return cy.get<HTMLInputElement>('[data-testid="overview-tier-slider"]').then(([slider]) => {
+    const view = slider.ownerDocument.defaultView;
+    if (view === null) throw new Error('Slider has no window');
+    const nativeValueSetter = Object.getOwnPropertyDescriptor(
+      view.HTMLInputElement.prototype,
+      'value',
+    )?.set;
+    if (nativeValueSetter === undefined) throw new Error('Range input has no native value setter');
+    nativeValueSetter.call(slider, String(targetIndex));
+    slider.dispatchEvent(new view.Event('input', { bubbles: true }));
+  });
+}
 
 function expectNoHorizontalOverflow() {
   cy.document().then((doc) => {
@@ -188,14 +204,14 @@ describe('Overview page', () => {
         'preserved';
     });
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    selectOverviewTier(75);
     cy.wait('@overviewJson');
     cy.location('search').should('eq', '?tier=75');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '50').click();
+    selectOverviewTier(50);
     cy.location('search').should('eq', '');
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    selectOverviewTier(75);
     cy.location('search').should('eq', '?tier=75');
     cy.then(() => {
       expect(jsonRequests, 'one request; both visited selections are cached').to.equal(1);
@@ -226,7 +242,7 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
     cy.intercept('GET', '**/api/v1/overview*').as('overviewJson');
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    selectOverviewTier(75);
     cy.wait('@overviewJson');
     cy.location('search').should('eq', '?tier=75');
 
@@ -259,7 +275,7 @@ describe('Overview page', () => {
       });
     }).as('overviewJson');
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    selectOverviewTier(75);
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .find('[data-overview-engine-scope="all"]')
       .click();
@@ -460,7 +476,7 @@ describe('Overview page', () => {
       );
     });
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    selectOverviewTier(75);
     cy.location('search').should('eq', '?tier=75&models=all');
     cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('exist');
 
@@ -507,22 +523,21 @@ describe('Overview page', () => {
       platform('b200').find('[data-testid="overview-cost-delta"]').should('exist');
     });
 
-    cy.get('[data-testid="overview-tier-switcher"]')
-      .contains('a', '100')
-      .should('have.attr', 'href', '/overview?tier=100&ref=b300');
+    selectOverviewTier(100);
+    cy.location('search').should('eq', '?tier=100&ref=b300');
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .find('[data-overview-engine-scope="all"]')
-      .should('have.attr', 'href', '/overview?engine=all&ref=b300');
+      .should('have.attr', 'href', '/overview?tier=100&engine=all&ref=b300');
     cy.get('[data-overview-comparison="30d"]').should(
       'have.attr',
       'href',
-      '/overview?ref=b300&compare=30d',
+      '/overview?tier=100&ref=b300&compare=30d',
     );
     cy.get('[data-testid="language-toggle"]')
-      .should('have.attr', 'href', '/zh/overview?ref=b300')
+      .should('have.attr', 'href', '/zh/overview?tier=100&ref=b300')
       .click();
     cy.location('pathname').should('eq', '/zh/overview');
-    cy.location('search').should('eq', '?ref=b300');
+    cy.location('search').should('eq', '?tier=100&ref=b300');
     cy.get('[data-overview-comparison="hardware"]').should('contain.text', '对比 B300');
   });
 
@@ -593,17 +608,16 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-desktop-matrix"] thead').should('contain.text', 'B200');
     cy.get('[data-testid="overview-desktop-matrix"] thead').should('not.contain.text', 'Reference');
 
-    cy.get('[data-testid="overview-tier-switcher"]')
-      .contains('a', '100')
-      .should('have.attr', 'href', '/overview?tier=100&compare=30d');
+    selectOverviewTier(100);
+    cy.location('search').should('eq', '?tier=100&compare=30d');
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .find('[data-overview-engine-scope="all"]')
-      .should('have.attr', 'href', '/overview?engine=all&compare=30d');
+      .should('have.attr', 'href', '/overview?tier=100&engine=all&compare=30d');
     cy.get('[data-testid="language-toggle"]')
-      .should('have.attr', 'href', '/zh/overview?compare=30d')
+      .should('have.attr', 'href', '/zh/overview?tier=100&compare=30d')
       .click();
     cy.location('pathname').should('eq', '/zh/overview');
-    cy.location('search').should('eq', '?compare=30d');
+    cy.location('search').should('eq', '?tier=100&compare=30d');
     cy.get('[data-testid="overview-comparison-switcher"]')
       .should('have.attr', 'aria-label', '对比方式')
       .within(() => {
@@ -1000,10 +1014,7 @@ describe('Overview page', () => {
     ).click();
     cy.location('search').should('eq', '?engine=all');
     desktopModel('GLM-5.2').find('[data-testid="overview-pair-missing"]').should('have.length', 5);
-    cy.get('[data-testid="overview-tier-switcher"]')
-      .contains('a', '100')
-      .should('have.attr', 'href', '/overview?tier=100&engine=all')
-      .click();
+    selectOverviewTier(100);
     cy.location('search').should('eq', '?tier=100&engine=all');
 
     cy.get('[data-testid="overview-engine-scope-switcher"]')
@@ -1422,7 +1433,7 @@ describe('Overview page', () => {
       .should('not.match', /∞\s*%/);
   });
 
-  it('re-renders the whole matrix at the service level the URL names, via plain links', () => {
+  it('re-renders the whole matrix from the six-stop SLO slider', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
@@ -1432,22 +1443,35 @@ describe('Overview page', () => {
       .and('contain.text', 'SLO');
     cy.get('body').should('not.contain.text', 'Service level');
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
-      cy.get('[aria-current="page"]').should('have.text', '50');
-      // 30 / 75 / 100 / 150 / 200 link out; the active 50 is inert text.
-      cy.get('a').should('have.length', 5);
-      cy.contains('a', '30').should('have.attr', 'href', '/overview?tier=30');
-      cy.contains('a', '150').should('have.attr', 'href', '/overview?tier=150');
-      cy.contains('a', '200').should('have.attr', 'href', '/overview?tier=200');
-      cy.contains('a', '100').should('have.attr', 'href', '/overview?tier=100').click();
+      cy.get('a, button').should('not.exist');
+      cy.get('[data-tier-option]').should('have.length', 6);
+      cy.get('[data-tier-option="50"]').should('have.attr', 'data-selected', 'true');
+      cy.get('[data-testid="overview-tier-slider"]')
+        .should('have.attr', 'min', '0')
+        .and('have.attr', 'max', '5')
+        .and('have.attr', 'step', '1')
+        .and('have.value', '1')
+        .and('have.attr', 'data-tier', '50')
+        .and('have.attr', 'aria-valuetext', '50 tok/s/user');
     });
+
+    selectOverviewTier(100);
 
     cy.location('search').should('eq', '?tier=100');
     // The metric line never repeats the tier — the switcher states it.
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE);
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
-      cy.get('[aria-current="page"]').should('have.text', '100');
-      cy.contains('a', '50').should('have.attr', 'href', '/overview');
+      cy.get('[data-tier-option="100"]').should('have.attr', 'data-selected', 'true');
+      cy.get('[data-testid="overview-tier-slider"]')
+        .should('have.attr', 'type', 'range')
+        .should('have.value', '3')
+        .and('have.attr', 'data-tier', '100')
+        .and('have.attr', 'aria-valuetext', '100 tok/s/user');
     });
+    selectOverviewTier(75);
+    cy.location('search').should('eq', '?tier=75');
+    selectOverviewTier(100);
+    cy.location('search').should('eq', '?tier=100');
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b200').should('contain.text', '$0.124').and('contain.text', 'FP8');
@@ -1793,7 +1817,10 @@ describe('Overview page', () => {
       .and('contain.text', 'SLO');
     cy.get('body').should('not.contain.text', '服务档位');
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
-      cy.contains('a', '50').should('have.attr', 'href', '/zh/overview');
+      cy.get('[data-testid="overview-tier-slider"]')
+        .should('have.attr', 'data-tier', '100')
+        .and('have.attr', 'aria-valuetext', '100 tok/s/用户');
+      cy.get('[data-tier-option]').should('have.length', 6);
     });
   });
 });
