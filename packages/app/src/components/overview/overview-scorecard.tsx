@@ -272,10 +272,15 @@ interface DisplayedComparison {
   baselineDate: string | null;
 }
 
+/** `referenceCost` is the reference column's cost for this row, or null when it
+ *  has no priced read. The ratio is recomputed here rather than read from
+ *  `costVsReferencePct` because the payload may have been cached for a
+ *  different reference — `ref` never reaches the server on a client commit. */
 function displayedComparison(
   platform: OverviewPlatformResult,
   comparisonMode: OverviewComparisonMode,
   referenceHardware: OverviewReferenceHardware,
+  referenceCost: number | null,
 ): DisplayedComparison | null {
   if (platform.costPerMtok === null) return null;
   if (comparisonMode === 'history') {
@@ -289,9 +294,13 @@ function displayedComparison(
       : null;
   }
   if (platform.hardware === referenceHardware) return null;
+  const pct =
+    referenceCost === null || platform.costPerMtok === null
+      ? null
+      : platform.costPerMtok / referenceCost - 1;
   return {
-    status: platform.costVsReferencePct === null ? 'no_baseline' : 'comparable',
-    pct: platform.costVsReferencePct,
+    status: pct === null ? 'no_baseline' : 'comparable',
+    pct,
     baselineDate: null,
   };
 }
@@ -355,8 +364,14 @@ export function costDeltaCellStyle(
   platform: OverviewPlatformResult,
   comparisonMode: OverviewComparisonMode = 'hardware',
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  referenceCost: number | null = null,
 ): { backgroundColor: string } | undefined {
-  const comparison = displayedComparison(platform, comparisonMode, referenceHardware);
+  const comparison = displayedComparison(
+    platform,
+    comparisonMode,
+    referenceHardware,
+    referenceCost,
+  );
   if (comparison === null) return undefined;
   const { pct } = comparison;
   const polarity = comparisonPolarity(comparison);
@@ -421,6 +436,7 @@ function CellValue({
   strings,
   comparisonMode,
   referenceHardware,
+  referenceCost,
   referenceLabel,
   phoneRow = false,
 }: {
@@ -431,6 +447,7 @@ function CellValue({
   strings: OverviewStrings;
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
+  referenceCost: number | null;
   referenceLabel: string;
   phoneRow?: boolean;
 }) {
@@ -483,7 +500,7 @@ function CellValue({
       ? null
       : strings.rawDashboardAria(evidenceDateLabel, model.modelLabel, stack);
   const costText = formattedValue;
-  const comparison = displayedComparison(member, comparisonMode, referenceHardware);
+  const comparison = displayedComparison(member, comparisonMode, referenceHardware, referenceCost);
   const historicalConfig =
     comparisonMode === 'history' && member.historicalComparison?.status === 'comparable'
       ? member.historicalComparison.baselineConfig
@@ -583,6 +600,7 @@ function PlatformCell(props: {
   strings: OverviewStrings;
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
+  referenceCost: number | null;
   referenceLabel: string;
   phoneRow?: boolean;
 }) {
@@ -596,6 +614,7 @@ function PlatformCell(props: {
         strings={props.strings}
         comparisonMode={props.comparisonMode}
         referenceHardware={props.referenceHardware}
+        referenceCost={props.referenceCost}
         referenceLabel={props.referenceLabel}
         phoneRow={props.phoneRow}
       />
@@ -684,52 +703,65 @@ export function DesktopOverviewMatrix({
           </tr>
         </thead>
         <tbody>
-          {models.map((model) => (
-            <tr
-              key={`${model.model}-${model.scenario}`}
-              data-testid="overview-desktop-model"
-              data-model={model.model}
-              data-scenario={model.scenario}
-              className="border-b border-border/50 align-top last:border-b-0"
-            >
-              <th scope="row" className="px-4 py-4 text-left align-top font-normal lg:px-6">
-                <ModelName model={model} strings={strings} />
-                {/* The link lives with the model it drills into, so the matrix
+          {models.map((model) => {
+            // One lookup per row, not one per cell. Every row carries all five
+            // platforms, so this misses only when the reference has no read.
+            const referenceCost =
+              model.platforms.find((platform) => platform.hardware === referenceHardware)
+                ?.costPerMtok ?? null;
+            return (
+              <tr
+                key={`${model.model}-${model.scenario}`}
+                data-testid="overview-desktop-model"
+                data-model={model.model}
+                data-scenario={model.scenario}
+                className="border-b border-border/50 align-top last:border-b-0"
+              >
+                <th scope="row" className="px-4 py-4 text-left align-top font-normal lg:px-6">
+                  <ModelName model={model} strings={strings} />
+                  {/* The link lives with the model it drills into, so the matrix
                     spends no column on a header that is the same every row. */}
-                {comparisonMode === 'history' ? null : (
-                  <OverviewDetailLink
-                    href={detailHref(locale, model)}
-                    model={model.model}
-                    ariaLabel={strings.detailAria(
-                      model.modelLabel,
-                      strings.scenarioLabels[model.scenario],
+                  {comparisonMode === 'history' ? null : (
+                    <OverviewDetailLink
+                      href={detailHref(locale, model)}
+                      model={model.model}
+                      ariaLabel={strings.detailAria(
+                        model.modelLabel,
+                        strings.scenarioLabels[model.scenario],
+                      )}
+                      className="mt-1 text-xs"
+                    >
+                      {strings.detailLink}
+                    </OverviewDetailLink>
+                  )}
+                </th>
+                {model.platforms.map((platform) => (
+                  <td
+                    key={platform.hardware}
+                    style={costDeltaCellStyle(
+                      platform,
+                      comparisonMode,
+                      referenceHardware,
+                      referenceCost,
                     )}
-                    className="mt-1 text-xs"
+                    className={`px-3 py-4 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/30' : ''}`}
                   >
-                    {strings.detailLink}
-                  </OverviewDetailLink>
-                )}
-              </th>
-              {model.platforms.map((platform) => (
-                <td
-                  key={platform.hardware}
-                  style={costDeltaCellStyle(platform, comparisonMode, referenceHardware)}
-                  className={`px-3 py-4 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/30' : ''}`}
-                >
-                  <PlatformCell
-                    locale={locale}
-                    model={model}
-                    platform={platform}
-                    formatters={formatters}
-                    strings={strings}
-                    comparisonMode={comparisonMode}
-                    referenceHardware={referenceHardware}
-                    referenceLabel={referenceLabel}
-                  />
-                </td>
-              ))}
-            </tr>
-          ))}
+                    <PlatformCell
+                      locale={locale}
+                      model={model}
+                      platform={platform}
+                      formatters={formatters}
+                      strings={strings}
+                      comparisonMode={comparisonMode}
+                      referenceHardware={referenceHardware}
+                      referenceCost={referenceCost}
+                      referenceLabel={referenceLabel}
+                    />
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -747,60 +779,71 @@ export function MobileOverviewList({
   const referenceLabel = overviewHardwareLabel(referenceHardware);
   return (
     <ul data-testid="overview-mobile-list" className="divide-y divide-border/50 xl:hidden">
-      {models.map((model) => (
-        <li key={`${model.model}-${model.scenario}`}>
-          <article
-            data-testid="overview-mobile-model"
-            data-model={model.model}
-            data-scenario={model.scenario}
-            className="space-y-2 px-4 py-3.5"
-          >
-            <ModelName model={model} strings={strings} />
-            <div className="grid grid-cols-1">
-              {model.platforms.map((platform) => (
-                <div
-                  key={platform.hardware}
-                  data-testid="overview-mobile-platform-row"
-                  data-hardware={platform.hardware}
-                  style={costDeltaCellStyle(platform, comparisonMode, referenceHardware)}
-                  className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-1.5 last:border-b-0"
-                >
-                  <span
-                    data-testid="overview-mobile-hardware"
-                    className="pt-0.5 text-xs font-medium text-muted-foreground"
+      {models.map((model) => {
+        const referenceCost =
+          model.platforms.find((platform) => platform.hardware === referenceHardware)
+            ?.costPerMtok ?? null;
+        return (
+          <li key={`${model.model}-${model.scenario}`}>
+            <article
+              data-testid="overview-mobile-model"
+              data-model={model.model}
+              data-scenario={model.scenario}
+              className="space-y-2 px-4 py-3.5"
+            >
+              <ModelName model={model} strings={strings} />
+              <div className="grid grid-cols-1">
+                {model.platforms.map((platform) => (
+                  <div
+                    key={platform.hardware}
+                    data-testid="overview-mobile-platform-row"
+                    data-hardware={platform.hardware}
+                    style={costDeltaCellStyle(
+                      platform,
+                      comparisonMode,
+                      referenceHardware,
+                      referenceCost,
+                    )}
+                    className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-1.5 last:border-b-0"
                   >
-                    {platform.hardwareLabel}
-                  </span>
-                  <PlatformCell
-                    locale={locale}
-                    model={model}
-                    platform={platform}
-                    formatters={formatters}
-                    strings={strings}
-                    comparisonMode={comparisonMode}
-                    referenceHardware={referenceHardware}
-                    referenceLabel={referenceLabel}
-                    phoneRow
-                  />
-                </div>
-              ))}
-            </div>
-            {comparisonMode === 'history' ? null : (
-              <OverviewDetailLink
-                href={detailHref(locale, model)}
-                model={model.model}
-                ariaLabel={strings.detailAria(
-                  model.modelLabel,
-                  strings.scenarioLabels[model.scenario],
-                )}
-                className="min-h-11 w-full justify-between"
-              >
-                {strings.detailLink}
-              </OverviewDetailLink>
-            )}
-          </article>
-        </li>
-      ))}
+                    <span
+                      data-testid="overview-mobile-hardware"
+                      className="pt-0.5 text-xs font-medium text-muted-foreground"
+                    >
+                      {platform.hardwareLabel}
+                    </span>
+                    <PlatformCell
+                      locale={locale}
+                      model={model}
+                      platform={platform}
+                      formatters={formatters}
+                      strings={strings}
+                      comparisonMode={comparisonMode}
+                      referenceHardware={referenceHardware}
+                      referenceCost={referenceCost}
+                      referenceLabel={referenceLabel}
+                      phoneRow
+                    />
+                  </div>
+                ))}
+              </div>
+              {comparisonMode === 'history' ? null : (
+                <OverviewDetailLink
+                  href={detailHref(locale, model)}
+                  model={model.model}
+                  ariaLabel={strings.detailAria(
+                    model.modelLabel,
+                    strings.scenarioLabels[model.scenario],
+                  )}
+                  className="min-h-11 w-full justify-between"
+                >
+                  {strings.detailLink}
+                </OverviewDetailLink>
+              )}
+            </article>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -981,7 +1024,6 @@ export function OverviewComparisonSwitcher({
                 <OverviewReferenceSelect
                   ariaLabel={strings.referenceSelectorAria}
                   options={referenceOptions}
-                  value={referenceHardware}
                 />
               </span>
             ) : (

@@ -15,13 +15,18 @@ import {
 
 export type OverviewSearchKey = 'tier' | 'engine' | 'ref' | 'compare' | 'models';
 
-const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
+export const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
   'tier',
   'engine',
   'ref',
   'compare',
   'models',
 ];
+
+/** Params the client resolves without asking the server. `ref` only picks which
+ *  column the percentages are measured against, and every cost that needs is
+ *  already in the payload — so it must not vary the data cache key. */
+export const OVERVIEW_CLIENT_ONLY_KEYS: readonly OverviewSearchKey[] = ['ref'];
 
 /** Apply one control's destination to the latest pending overview URL.
  * This prevents a second, fast selection from rebuilding from stale server

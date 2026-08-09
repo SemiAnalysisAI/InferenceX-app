@@ -14,7 +14,11 @@ import {
 
 import { track } from '@/lib/analytics';
 import { notifyClientSearchChange } from '@/lib/client-navigation';
-import type { OverviewPageData, OverviewReferenceHardware } from '@/lib/overview-data';
+import {
+  type OverviewPageData,
+  type OverviewReferenceHardware,
+  resolveOverviewReferenceHardware,
+} from '@/lib/overview-data';
 import { mergeOverviewControlHref, type OverviewSearchKey } from '@/lib/overview-links';
 
 interface OverviewNavigationValue {
@@ -116,6 +120,10 @@ export function OverviewNavigationProvider({
         })
         .catch(() => {
           if (navigationId !== navigationIdRef.current) return;
+          // Roll the pending selection back, so a failed load cannot strand the
+          // reference on a value the page never loaded.
+          pendingHrefRef.current = committedHrefRef.current;
+          setPendingHref(committedHrefRef.current);
           if (updateHistory) {
             // The entry pushed above already carries `href`, so `replace`
             // rewrites it in place instead of stacking a duplicate the user
@@ -176,6 +184,21 @@ export function OverviewNavigationProvider({
    *  old numbers. Consumers use this to say so. */
   const isPending = pendingHref !== committedHref;
 
+  /**
+   * `ref` picks which column the percentages are measured against; every cost
+   * it needs is already in the payload. Deriving it from the pending URL rather
+   * than the response makes a reference change instant and request-free. The
+   * synthetic origin keeps this renderable on the server, where `window` is not
+   * defined.
+   */
+  const referenceHardware = useMemo(
+    () =>
+      resolveOverviewReferenceHardware(
+        new URL(pendingHref, 'https://inferencex.local').searchParams.get('ref') ?? undefined,
+      ),
+    [pendingHref],
+  );
+
   const value = useMemo<OverviewNavigationValue>(
     () => ({
       isPending,
@@ -194,7 +217,7 @@ export function OverviewNavigationProvider({
 
   return (
     <OverviewDataContext.Provider value={data}>
-      <OverviewReferenceContext.Provider value={data.referenceHardware}>
+      <OverviewReferenceContext.Provider value={referenceHardware}>
         <OverviewNavigationContext.Provider value={value}>
           {children}
         </OverviewNavigationContext.Provider>

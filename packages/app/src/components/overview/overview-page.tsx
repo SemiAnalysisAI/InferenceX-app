@@ -23,6 +23,7 @@ import {
   OverviewNavigationProvider,
   useOverviewData,
   useOverviewNavigation,
+  useOverviewReference,
 } from './overview-navigation';
 
 /** The SemiAnalysis AI Cloud TCO model behind `HW_REGISTRY.costh`. */
@@ -82,6 +83,9 @@ function OverviewMatrixCard({ children }: { children: ReactNode }) {
 
 function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
   const data = useOverviewData();
+  // Not `data.referenceHardware`: the reference follows the URL directly, so a
+  // cached payload built for another reference still renders the right column.
+  const referenceHardware = useOverviewReference();
   const strings = OVERVIEW_STRINGS[locale];
   const formatters = overviewFormatters(locale);
 
@@ -139,7 +143,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
               tier={data.tier}
               engineScope={data.engineScope}
               comparisonMode={data.comparisonMode}
-              referenceHardware={data.referenceHardware}
+              referenceHardware={referenceHardware}
               modelScope={data.modelScope}
               locale={locale}
               strings={strings}
@@ -148,7 +152,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
               engineScope={data.engineScope}
               tier={data.tier}
               comparisonMode={data.comparisonMode}
-              referenceHardware={data.referenceHardware}
+              referenceHardware={referenceHardware}
               modelScope={data.modelScope}
               locale={locale}
               strings={strings}
@@ -161,7 +165,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
         comparisonMode={data.comparisonMode}
         engineScope={data.engineScope}
         tier={data.tier}
-        referenceHardware={data.referenceHardware}
+        referenceHardware={referenceHardware}
         modelScope={data.modelScope}
         locale={locale}
         strings={strings}
@@ -177,7 +181,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
           formatters={formatters}
           strings={strings}
           comparisonMode={data.comparisonMode}
-          referenceHardware={data.referenceHardware}
+          referenceHardware={referenceHardware}
         />
         <MobileOverviewList
           models={data.models}
@@ -185,19 +189,19 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
           formatters={formatters}
           strings={strings}
           comparisonMode={data.comparisonMode}
-          referenceHardware={data.referenceHardware}
+          referenceHardware={referenceHardware}
         />
         <OverviewMethodology
           strings={strings}
           comparisonMode={data.comparisonMode}
-          referenceHardware={data.referenceHardware}
+          referenceHardware={referenceHardware}
         />
         <OverviewModelScopeToggle
           modelScope={data.modelScope}
           tier={data.tier}
           engineScope={data.engineScope}
           comparisonMode={data.comparisonMode}
-          referenceHardware={data.referenceHardware}
+          referenceHardware={referenceHardware}
           locale={locale}
           strings={strings}
         />
