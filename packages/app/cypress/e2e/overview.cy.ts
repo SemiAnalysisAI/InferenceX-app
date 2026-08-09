@@ -1446,6 +1446,10 @@ describe('Overview page', () => {
       cy.get('a, button').should('not.exist');
       cy.get('[data-tier-option]').should('have.length', 6);
       cy.get('[data-tier-option="50"]').should('have.attr', 'data-selected', 'true');
+      cy.get('[data-testid="overview-tier-ridge"]').should('have.length', 6);
+      cy.get('[data-tier-ridge="30"]').should('have.attr', 'data-state', 'filled');
+      cy.get('[data-tier-ridge="50"]').should('have.attr', 'data-state', 'selected');
+      cy.get('[data-tier-ridge="75"]').should('have.attr', 'data-state', 'unfilled');
       cy.get('[data-testid="overview-tier-slider"]')
         .should('have.attr', 'min', '0')
         .and('have.attr', 'max', '5')
@@ -1462,6 +1466,9 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE);
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.get('[data-tier-option="100"]').should('have.attr', 'data-selected', 'true');
+      cy.get('[data-tier-ridge="75"]').should('have.attr', 'data-state', 'filled');
+      cy.get('[data-tier-ridge="100"]').should('have.attr', 'data-state', 'selected');
+      cy.get('[data-tier-ridge="150"]').should('have.attr', 'data-state', 'unfilled');
       cy.get('[data-testid="overview-tier-slider"]')
         .should('have.attr', 'type', 'range')
         .should('have.value', '3')

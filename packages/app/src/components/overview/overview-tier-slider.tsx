@@ -98,33 +98,65 @@ export function OverviewTierSlider({
     >
       <span className="shrink-0 text-muted-foreground">{label}</span>
       <div className="w-[min(18rem,calc(100vw-8.5rem))] min-w-0 pt-1">
-        <input
-          data-testid="overview-tier-slider"
-          type="range"
-          min={0}
-          max={OVERVIEW_TIERS.length - 1}
-          step={1}
-          value={selectedIndex}
-          aria-label={label}
-          aria-valuetext={`${selectedTier} ${unit}`}
-          data-tier={selectedTier}
-          onChange={handleChange}
-          onPointerDown={() => {
-            pointerActive.current = true;
-          }}
-          onPointerUp={(event) => {
-            pointerActive.current = false;
-            commit(Number(event.currentTarget.value));
-          }}
-          onPointerCancel={() => {
-            pointerActive.current = false;
-            setSelectedIndex(tierIndex(tier));
-          }}
-          className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background [&::-moz-range-progress]:h-1.5 [&::-moz-range-progress]:rounded-full [&::-moz-range-progress]:bg-foreground [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:cursor-grab [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-background [&::-moz-range-thumb]:bg-foreground [&::-moz-range-thumb]:shadow-sm [&::-moz-range-thumb]:active:cursor-grabbing [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-background [&::-webkit-slider-thumb]:bg-foreground [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:active:cursor-grabbing"
-          style={{
-            background: `linear-gradient(to right, var(--foreground) 0%, var(--foreground) ${progress}%, var(--border) ${progress}%, var(--border) 100%)`,
-          }}
-        />
+        <div className="relative h-4">
+          <input
+            data-testid="overview-tier-slider"
+            type="range"
+            min={0}
+            max={OVERVIEW_TIERS.length - 1}
+            step={1}
+            value={selectedIndex}
+            aria-label={label}
+            aria-valuetext={`${selectedTier} ${unit}`}
+            data-tier={selectedTier}
+            onChange={handleChange}
+            onPointerDown={() => {
+              pointerActive.current = true;
+            }}
+            onPointerUp={(event) => {
+              pointerActive.current = false;
+              commit(Number(event.currentTarget.value));
+            }}
+            onPointerCancel={() => {
+              pointerActive.current = false;
+              setSelectedIndex(tierIndex(tier));
+            }}
+            className="absolute top-1/2 z-10 h-1.5 w-full -translate-y-1/2 cursor-pointer appearance-none rounded-full bg-border accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background [&::-moz-range-progress]:h-1.5 [&::-moz-range-progress]:rounded-full [&::-moz-range-progress]:bg-foreground [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:cursor-grab [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-background [&::-moz-range-thumb]:bg-foreground [&::-moz-range-thumb]:shadow-sm [&::-moz-range-thumb]:active:cursor-grabbing [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-background [&::-webkit-slider-thumb]:bg-foreground [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:active:cursor-grabbing"
+            style={{
+              background: `linear-gradient(to right, var(--foreground) 0%, var(--foreground) ${progress}%, var(--border) ${progress}%, var(--border) 100%)`,
+            }}
+          />
+          <div
+            data-testid="overview-tier-ridges"
+            className="pointer-events-none absolute inset-0 z-20"
+            aria-hidden="true"
+          >
+            {OVERVIEW_TIERS.map((option, index) => {
+              const state =
+                index === selectedIndex
+                  ? 'selected'
+                  : index < selectedIndex
+                    ? 'filled'
+                    : 'unfilled';
+              return (
+                <span
+                  key={option}
+                  data-testid="overview-tier-ridge"
+                  data-tier-ridge={option}
+                  data-state={state}
+                  className={`absolute top-1/2 h-2 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${
+                    state === 'selected'
+                      ? 'opacity-0'
+                      : state === 'filled'
+                        ? 'bg-background/70'
+                        : 'bg-foreground/35'
+                  }`}
+                  style={{ left: `${(index / (OVERVIEW_TIERS.length - 1)) * 100}%` }}
+                />
+              );
+            })}
+          </div>
+        </div>
         <div className="relative mt-1 h-4 tabular-nums" aria-hidden="true">
           {OVERVIEW_TIERS.map((option, index) => (
             <span
