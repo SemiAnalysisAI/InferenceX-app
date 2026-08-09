@@ -65,6 +65,30 @@ describe('Inference ChartControls with GPUs selected', () => {
 
     cy.contains('Comparison Date Range').should('be.visible');
   });
+
+  it('flags the date range when nothing has been picked to compare against', () => {
+    mountWithProviders(<InferenceChartControls />, {
+      inference: {
+        selectedGPUs: ['h100'],
+        selectedDateRange: { startDate: '', endDate: '' },
+        selectedDates: [],
+      },
+    });
+
+    cy.contains('button', 'Select date range').should('have.class', 'animate-pulse');
+  });
+
+  it('leaves the date range unflagged when exact comparison entries are pinned', () => {
+    mountWithProviders(<InferenceChartControls />, {
+      inference: {
+        selectedGPUs: ['b200_sglang', 'b200_vllm'],
+        selectedDateRange: { startDate: '', endDate: '' },
+        selectedDates: ['2026-08-07', '2026-07-09~r27489075807'],
+      },
+    });
+
+    cy.contains('button', 'Select date range').should('not.have.class', 'animate-pulse');
+  });
 });
 
 describe('Inference ChartControls with hideGpuComparison', () => {
