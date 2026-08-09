@@ -1757,6 +1757,7 @@ const ScatterGraph = React.memo(
                 label: string,
                 color: string,
                 pts: InferenceData[],
+                keepVisibleOnCollision = false,
               ) => {
                 const candidates = [
                   pts[Math.min(1, pts.length - 1)], // near start
@@ -1807,7 +1808,7 @@ const ScatterGraph = React.memo(
                   color,
                   x: xScale(pt.x),
                   y: yScale(pt.y),
-                  visible: false,
+                  visible: keepVisibleOnCollision,
                 });
               };
 
@@ -2143,7 +2144,11 @@ const ScatterGraph = React.memo(
                 const placed: { x: number; y: number }[] = [];
                 const collides = (cx: number, cy: number) =>
                   placed.some((p) => Math.abs(p.y - cy) < LABEL_H && Math.abs(p.x - cx) < LABEL_W);
-                const greedyPlace = (key: string, pts: InferenceData[]) => {
+                const greedyPlace = (
+                  key: string,
+                  pts: InferenceData[],
+                  keepVisibleOnCollision = false,
+                ) => {
                   const candidates = [
                     pts[Math.min(1, pts.length - 1)],
                     pts[Math.floor(pts.length / 2)],
@@ -2162,7 +2167,7 @@ const ScatterGraph = React.memo(
                   zoomResults.set(key, {
                     x: newXScale(pts[0].x),
                     y: newYScale(pts[0].y),
-                    vis: false,
+                    vis: keepVisibleOnCollision,
                   });
                 };
                 for (const [key, pts] of visibleEntries) greedyPlace(key, pts, pts.length === 1);
