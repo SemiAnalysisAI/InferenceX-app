@@ -12,6 +12,7 @@ import {
   useState,
 } from 'react';
 
+import { track } from '@/lib/analytics';
 import { notifyClientSearchChange } from '@/lib/client-navigation';
 import type { OverviewPageData, OverviewReferenceHardware } from '@/lib/overview-data';
 import { mergeOverviewControlHref, type OverviewSearchKey } from '@/lib/overview-links';
@@ -107,6 +108,11 @@ export function OverviewNavigationProvider({
             History.prototype.replaceState.call(window.history, window.history.state, '', href);
           }
           setData(nextData);
+          // The pushState above is invisible to Next's router, so the app-wide
+          // pageview tracker never fires here. Emit once per committed state —
+          // in the success branch so Back/Forward is covered too, and so the
+          // failure path's `router.replace` is not double-counted.
+          track('$pageview', { $current_url: new URL(href, window.location.origin).href });
         })
         .catch(() => {
           if (navigationId !== navigationIdRef.current) return;
