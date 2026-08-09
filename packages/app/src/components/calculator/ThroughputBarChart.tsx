@@ -8,7 +8,6 @@ import { useLocale } from '@/lib/use-locale';
 import type { HardwareConfig } from '@/components/inference/types';
 import { getHardwareConfig } from '@/lib/constants';
 import { getChartWatermark } from '@/lib/data-mappings';
-import { overlayRunColor } from '@/lib/overlay-run-style';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
@@ -87,6 +86,11 @@ export function getMetricValue(
   costType: CostType,
 ): number {
   switch (barMetric) {
+    case 'maxInteractivityWithoutTileRT':
+    case 'maxInteractivityWithTileRT':
+    case 'maxInteractivity': {
+      return d.value;
+    }
     case 'power': {
       return getTpPerMwForType(d, costType);
     }
@@ -106,6 +110,11 @@ export function getMetricLabel(
 ): string {
   const tokenTypePrefix = costType === 'input' ? 'Input ' : costType === 'output' ? 'Output ' : '';
   switch (barMetric) {
+    case 'maxInteractivityWithoutTileRT':
+    case 'maxInteractivityWithTileRT':
+    case 'maxInteractivity': {
+      return 'Interactivity (tok/s/user)';
+    }
     case 'power': {
       return `${tokenTypePrefix}Tokens per Provisioned All-in Megawatt (tok/s/MW)`;
     }
@@ -127,6 +136,11 @@ export function getValueLabel(
   costType: CostType,
 ): string {
   switch (barMetric) {
+    case 'maxInteractivityWithoutTileRT':
+    case 'maxInteractivityWithTileRT':
+    case 'maxInteractivity': {
+      return `${d.value.toFixed(1)} tok/s/user`;
+    }
     case 'power': {
       return `${getTpPerMwForType(d, costType).toFixed(0)} tok/s/MW`;
     }
@@ -175,6 +189,15 @@ export function getChartTitle(
     costType === 'input' ? 'Input' : costType === 'output' ? 'Output' : 'Total';
 
   switch (barMetric) {
+    case 'maxInteractivityWithoutTileRT': {
+      return 'Maximum Interactivity per Chip (without TileRT)';
+    }
+    case 'maxInteractivityWithTileRT': {
+      return 'Maximum Interactivity per Chip (with TileRT)';
+    }
+    case 'maxInteractivity': {
+      return 'Maximum Interactivity per Chip';
+    }
     case 'power': {
       return `${tokenTypeLabel} Tokens per Provisioned All-in Megawatt at ${targetLabel}`;
     }
@@ -197,6 +220,12 @@ export function getSortedResults(
 ): InterpolatedResult[] {
   const sorted = [...results];
   switch (barMetric) {
+    case 'maxInteractivityWithoutTileRT':
+    case 'maxInteractivityWithTileRT':
+    case 'maxInteractivity': {
+      sorted.sort((a, b) => b.value - a.value);
+      return sorted;
+    }
     case 'power': {
       // Most efficient first (descending)
       sorted.sort((a, b) => getTpPerMwForType(b, costType) - getTpPerMwForType(a, costType));
@@ -267,17 +296,25 @@ export function generateTooltipHTML(
       ? 'tok/s/MW'
       : barMetric === 'cost'
         ? 'Cost'
-        : mode === 'interactivity_to_throughput'
-          ? `${tokenTypePrefix}Throughput`
-          : 'Interactivity';
+        : barMetric === 'maxInteractivity' ||
+            barMetric === 'maxInteractivityWithoutTileRT' ||
+            barMetric === 'maxInteractivityWithTileRT'
+          ? 'Interactivity'
+          : mode === 'interactivity_to_throughput'
+            ? `${tokenTypePrefix}Throughput`
+            : 'Interactivity';
   const metricUnit =
     barMetric === 'power'
       ? 'tok/s/MW'
       : barMetric === 'cost'
         ? costLabel
-        : mode === 'interactivity_to_throughput'
-          ? 'tok/s/chip'
-          : 'tok/s/user';
+        : barMetric === 'maxInteractivity' ||
+            barMetric === 'maxInteractivityWithoutTileRT' ||
+            barMetric === 'maxInteractivityWithTileRT'
+          ? 'tok/s/user'
+          : mode === 'interactivity_to_throughput'
+            ? 'tok/s/chip'
+            : 'tok/s/user';
   const metricValue = getMetricValue(d, barMetric, costType);
 
   // Get parallelism info from nearest data points
@@ -421,15 +458,10 @@ export default function ThroughputBarChart({
   const chartRef = useRef<D3ChartHandle>(null);
   const locale = useLocale();
 
-  // Color resolution: unofficial-run overlay bars take the run's palette color
-  // (so they match the banner + legend swatch — see lib/overlay-run-style.ts);
-  // official bars prefer the dynamic colorResolver, falling back to static config.
+  // Color resolution: bars use the provided resolver so calculator legend and
+  // bars stay synchronized. Fall back to foreground for safety.
   const resolveBarColor = (d: InterpolatedResult) =>
-    d.isOverlay
-      ? overlayRunColor(d.runIndex ?? 0)
-      : colorResolver
-        ? colorResolver(d.hwKey)
-        : getColor();
+    colorResolver ? colorResolver(d.hwKey) : getColor();
 
   // Stable refs to avoid re-running the D3 effect
   const hoveredBarXRef = useRef(0);
@@ -530,6 +562,13 @@ export default function ThroughputBarChart({
               return mode === 'interactivity_to_throughput'
                 ? `${getThroughputForType(d, costType).toFixed(1)} tok/s/chip`
                 : `${getThroughputForType(d, costType).toFixed(1)} tok/s/user`;
+            }
+            if (
+              barMetric === 'maxInteractivity' ||
+              barMetric === 'maxInteractivityWithoutTileRT' ||
+              barMetric === 'maxInteractivityWithTileRT'
+            ) {
+              return `${getThroughputForType(d, costType).toFixed(1)} tok/s/chip`;
             }
             const costLbl = getCostTypeLabel(costType);
             return `$${getCostForType(d, costType).toFixed(3)}${costLbl}`;

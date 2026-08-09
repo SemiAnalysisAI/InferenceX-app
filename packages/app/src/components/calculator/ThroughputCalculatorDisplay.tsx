@@ -26,7 +26,6 @@ import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { overlayRunColor } from '@/lib/overlay-run-style';
 import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -82,6 +81,9 @@ const BAR_METRIC_OPTIONS: { value: BarMetric; label: string }[] = [
   { value: 'throughput', label: 'Throughput' },
   { value: 'power', label: 'tok/s/MW' },
   { value: 'cost', label: 'Cost' },
+  { value: 'maxInteractivity', label: 'Max Interactivity' },
+  { value: 'maxInteractivityWithoutTileRT', label: 'Max Interactivity (No TileRT)' },
+  { value: 'maxInteractivityWithTileRT', label: 'Max Interactivity (TileRT)' },
 ];
 
 type CalculatorViewMode = 'chart' | 'table';
@@ -119,7 +121,7 @@ const STRINGS = {
     tokenTypePlaceholder: 'Token type',
     metricLabel: 'Metric',
     metricTooltip:
-      'The comparison metric shown in the chart. Throughput (tok/s/chip), power efficiency (tok/s/MW), or cost per million tokens.',
+      'The comparison metric shown in the chart. Throughput (tok/s/chip), power efficiency (tok/s/MW), maximum interactivity, or cost per million tokens.',
     targetLabel: 'Target Interactivity (tok/s/user)',
     targetTooltip:
       'The interactivity operating point used for interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency at different interactivity levels.',
@@ -127,6 +129,9 @@ const STRINGS = {
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic trace interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency.`,
     metricThroughput: 'Throughput',
+    metricMaxInteractivity: 'Max Interactivity',
+    metricMaxInteractivityWithoutTileRT: 'Max Interactivity (No TileRT)',
+    metricMaxInteractivityWithTileRT: 'Max Interactivity (TileRT)',
     metricCost: 'Cost',
     viewChart: 'Chart',
     viewTable: 'Table',
@@ -151,6 +156,7 @@ const STRINGS = {
     compMetricThroughput: 'throughput',
     compMetricCost: 'cost efficiency',
     compMetricPower: 'tok/s/MW',
+    compMetricMaxInteractivity: 'maximum interactivity',
     hideSkuAboveConfigLimitLabel: 'Hide if target exceeds config range',
     hideSkuAboveConfigLimitHelp:
       'When enabled, SKUs whose measured interactivity range ends below the target are hidden instead of being projected from the max edge.',
@@ -171,7 +177,7 @@ const STRINGS = {
     tokenTypePlaceholder: 'Token 类型',
     metricLabel: '指标',
     metricTooltip:
-      '图表中显示的比较指标。吞吐量（tok/s/chip）、能效（tok/s/MW）或每百万 token 成本。',
+      '图表中显示的比较指标。吞吐量（tok/s/chip）、能效（tok/s/MW）、最高交互性或每百万 token 成本。',
     targetLabel: '目标交互性 (tok/s/user)',
     targetTooltip:
       '用于插值的交互性操作点。调整滑块以比较不同交互性级别下 Chip 的吞吐量、成本和能效。',
@@ -179,6 +185,9 @@ const STRINGS = {
     targetAgenticTooltip: (percentile: string) =>
       `用于智能体轨迹插值的 ${percentile} 交互性操作点。调整滑块以比较 Chip 的吞吐量、成本和能效。`,
     metricThroughput: '吞吐量',
+    metricMaxInteractivity: '最大交互性',
+    metricMaxInteractivityWithoutTileRT: '最大交互性（不含 TileRT）',
+    metricMaxInteractivityWithTileRT: '最大交互性（含 TileRT）',
     metricCost: '成本',
     viewChart: '图表',
     viewTable: '表格',
@@ -203,6 +212,7 @@ const STRINGS = {
     compMetricThroughput: '吞吐量',
     compMetricCost: '成本效率',
     compMetricPower: 'tok/s/MW',
+    compMetricMaxInteractivity: '最大交互性',
     hideSkuAboveConfigLimitLabel: '隐藏超出配置上限的型号',
     hideSkuAboveConfigLimitHelp:
       '开启后，若目标交互性高于某个配置的实测上限，不再显示该 SKU，避免把结果投射到该配置最大边界。',
@@ -229,6 +239,15 @@ function getChartTitleZh(
       : `${targetValue} tok/s/chip 吞吐量`;
   const tokenTypeLabel = costType === 'input' ? '输入' : costType === 'output' ? '输出' : '总';
   switch (barMetric) {
+    case 'maxInteractivityWithoutTileRT': {
+      return `${targetLabel}下的单 Chip 最高交互性（不含 TileRT）`;
+    }
+    case 'maxInteractivityWithTileRT': {
+      return `${targetLabel}下的单 Chip 最高交互性（含 TileRT）`;
+    }
+    case 'maxInteractivity': {
+      return `${targetLabel}下的单 Chip 最高交互性`;
+    }
     case 'power': {
       return `${targetLabel}下每满配兆瓦${tokenTypeLabel} token 数`;
     }
@@ -321,15 +340,13 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     return viewModeOptions.map(({ testId: _testId, ...opt }) => opt);
   }, [locale, viewModeOptions]);
 
-  // Unofficial-run overlay (`?unofficialrun=…`). Overlay bars are interpolated
-  // separately from official ones and only ever reach the bar chart — the
-  // table, CSV export, and fleet planner stay official-only.
-  const { isUnofficialRun, unofficialBenchmarkRows, unofficialRunInfos, runIndexByUrl } =
-    useUnofficialRun();
-
+  // Unofficial-run rows are merged into the same interpolation path so they flow
+  // through chart, table, CSV export, and fleet planning identically to official
+  // data.
+  const { unofficialBenchmarkRows } = useUnofficialRun();
   const overlayInput = useMemo(
-    () => ({ rows: unofficialBenchmarkRows, runIndexByUrl }),
-    [unofficialBenchmarkRows, runIndexByUrl],
+    () => ({ rows: unofficialBenchmarkRows }),
+    [unofficialBenchmarkRows],
   );
 
   const {
@@ -337,13 +354,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     hardwareConfig,
     ranges,
     getResults,
-    getOverlayResults,
     loading,
     error,
     hasData,
-    hasOverlayData,
     availableHwKeys,
-    overlayAvailableHwKeys,
   } = useThroughputData(
     selectedModel,
     selectedSequence,
@@ -356,31 +370,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
   const percentileLabel = selectedPercentile.toUpperCase();
 
-  /**
-   * Hardware listed in the legend: official hardware, plus hardware that only
-   * the loaded unofficial run has data for (otherwise there'd be no way to hide
-   * an overlay-only bar).
-   *
-   * `visibleHwKeys` — seeded from this list — is the SINGLE source of truth for
-   * what the calculator draws, official bars and overlay bars alike. It is
-   * deliberately not cross-wired to the provider's shared `activeOverlayHwTypes`
-   * (which the inference and evaluation tabs read/write): two visibility sets
-   * for one legend can only drift, and every way they drift renders a legend
-   * entry whose active state contradicts the bar next to it — e.g. a selection
-   * change reseeds the local set but not the shared one, or another tab
-   * re-enables a GPU this tab has hidden.
-   *
-   * Per-tab hardware visibility is already how the calculator treats official
-   * data (it has never shared `visibleHwKeys` with the inference tab), so the
-   * overlay series simply follows the same rule. AGENTS.md's "respect
-   * `activeOverlayHwTypes`" exists so overlay points can't ignore the user's
-   * hide action; here the calculator's own legend IS that hide action, and it
-   * is respected.
-   */
-  const legendHwKeys = useMemo(() => {
-    if (!isUnofficialRun || overlayAvailableHwKeys.length === 0) return availableHwKeys;
-    return [...new Set([...availableHwKeys, ...overlayAvailableHwKeys])];
-  }, [isUnofficialRun, availableHwKeys, overlayAvailableHwKeys]);
+  const legendHwKeys = useMemo(() => availableHwKeys, [availableHwKeys]);
 
   // Dynamic vendor-aware colors for visible GPUs
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
@@ -391,7 +381,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   // Track previous available keys to detect when the GPU set changes
   const prevAvailableKeyRef = useRef<string>('');
-  const prevOverlayKeyRef = useRef<string>('');
 
   // Reset visible GPUs on a user-driven selection change. The key is the
   // selection itself PLUS the official hardware list — the selection so an
@@ -418,37 +407,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     }
   }, [selectionKey, legendHwKeys]);
 
-  // Overlay hardware arriving or leaving is additive: newly available overlay
-  // GPUs start visible, ones that are gone stop being tracked, and every other
-  // entry keeps whatever the user set.
-  useEffect(() => {
-    const key = overlayAvailableHwKeys.join(',');
-    if (key === prevOverlayKeyRef.current) return;
-    const prev = prevOverlayKeyRef.current ? prevOverlayKeyRef.current.split(',') : [];
-    prevOverlayKeyRef.current = key;
-
-    const added = overlayAvailableHwKeys.filter((k) => !prev.includes(k));
-    // Only drop hardware that has no official data either — otherwise dismissing
-    // a run would hide a GPU whose official bar is still on the chart.
-    const removed = prev.filter(
-      (k) => !overlayAvailableHwKeys.includes(k) && !availableHwKeys.includes(k),
-    );
-    if (added.length === 0 && removed.length === 0) return;
-
-    setVisibleHwKeys((cur) => {
-      const next = new Set(cur);
-      added.forEach((k) => next.add(k));
-      removed.forEach((k) => next.delete(k));
-      // Never strand the user with an empty chart. Falls back to everything
-      // that still has data, official AND overlay — on an overlay-only
-      // selection the official list is empty, so falling back to it would blank
-      // the chart while overlay bars were still available.
-      if (next.size === 0) return new Set([...availableHwKeys, ...overlayAvailableHwKeys]);
-      return next;
-    });
-  }, [overlayAvailableHwKeys, availableHwKeys]);
-
-  const hasAnyData = hasData || hasOverlayData;
+  const hasAnyData = hasData;
 
   // Clamp target into range when data changes
   useEffect(() => {
@@ -463,7 +422,14 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const results: InterpolatedResult[] = useMemo(() => {
     if (!hasData) return [];
-    return getResults(targetValue, mode, costProvider, visibleHwKeys, hideSkuAboveConfigLimit);
+    return getResults(
+      targetValue,
+      mode,
+      costProvider,
+      visibleHwKeys,
+      barMetric,
+      hideSkuAboveConfigLimit,
+    );
   }, [
     hasData,
     targetValue,
@@ -471,51 +437,18 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     costProvider,
     getResults,
     visibleHwKeys,
+    barMetric,
     hideSkuAboveConfigLimit,
   ]);
 
-  /** Branch + URL per run index, stamped onto overlay results for labels/tooltips. */
-  const runInfoByIndex = useMemo(() => {
-    const map: Record<number, { branch: string; url: string }> = {};
-    unofficialRunInfos.forEach((info, idx) => {
-      map[idx] = { branch: info.branch || `run ${info.id}`, url: info.url };
-    });
-    return map;
-  }, [unofficialRunInfos]);
-
-  const overlayResults: InterpolatedResult[] = useMemo(() => {
-    if (!hasOverlayData) return [];
-    return getOverlayResults(
-      targetValue,
-      mode,
-      costProvider,
-      visibleHwKeys,
-      runInfoByIndex,
-      hideSkuAboveConfigLimit,
-    );
-  }, [
-    hasOverlayData,
-    targetValue,
-    mode,
-    costProvider,
-    getOverlayResults,
-    visibleHwKeys,
-    runInfoByIndex,
-    hideSkuAboveConfigLimit,
-  ]);
-
-  /**
-   * Bars drawn in the chart: official + overlay. Deliberately NOT used by the
-   * table, the CSV export, or the fleet planner — those stay official-only, so
-   * an exported sheet or a fleet projection never silently mixes in numbers
-   * from an unmerged branch.
-   */
-  const barResults = useMemo(
-    () => (overlayResults.length > 0 ? [...results, ...overlayResults] : results),
-    [results, overlayResults],
-  );
+  const barResults = useMemo(() => results, [results]);
 
   const currentRange = useMemo(() => ranges.interactivity, [ranges]);
+
+  const isMaxInteractivityMetric =
+    barMetric === 'maxInteractivity' ||
+    barMetric === 'maxInteractivityWithoutTileRT' ||
+    barMetric === 'maxInteractivityWithTileRT';
 
   const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
@@ -681,8 +614,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     setSelectedBars(new Set());
   }, [barResults]);
 
-  // Generate comparison text when 2+ bars are selected. Overlay bars are
-  // selectable too, so this reads the combined chart list.
+  // Generate comparison text when 2+ bars are selected.
   const comparisonText = useMemo(() => {
     if (selectedBars.size < 2) return null;
 
@@ -696,7 +628,13 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         ? t.compMetricPower
         : barMetric === 'cost'
           ? t.compMetricCost
-          : t.compMetricThroughput;
+          : barMetric === 'maxInteractivity'
+            ? t.compMetricMaxInteractivity
+            : barMetric === 'maxInteractivityWithoutTileRT'
+              ? t.compMetricMaxInteractivity
+              : barMetric === 'maxInteractivityWithTileRT'
+                ? t.compMetricMaxInteractivity
+                : t.compMetricThroughput;
 
     // Generate pairwise comparisons — always use lower as denominator
     const comparisons: string[] = [];
@@ -713,7 +651,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                 : costType === 'output'
                   ? a.costOutput
                   : a.cost
-              : getThroughputForType(a, costType);
+              : barMetric === 'maxInteractivity' ||
+                  barMetric === 'maxInteractivityWithoutTileRT' ||
+                  barMetric === 'maxInteractivityWithTileRT'
+                ? a.value
+                : getThroughputForType(a, costType);
         const bVal =
           barMetric === 'power'
             ? getTpPerMwForType(b, costType)
@@ -723,7 +665,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                 : costType === 'output'
                   ? b.costOutput
                   : b.cost
-              : getThroughputForType(b, costType);
+              : barMetric === 'maxInteractivity' ||
+                  barMetric === 'maxInteractivityWithoutTileRT' ||
+                  barMetric === 'maxInteractivityWithTileRT'
+                ? b.value
+                : getThroughputForType(b, costType);
 
         const higher = aVal >= bVal ? a : b;
         const lower = aVal >= bVal ? b : a;
@@ -746,76 +692,24 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     }
 
     return comparisons;
-  }, [selectedBars, barResults, hardwareConfig, barMetric, costType, mode, locale, t]);
-
-  /**
-   * Overlay legend: one entry per loaded unofficial run that contributes bars
-   * to the chart, in the same palette color as its bars. Same shape as the
-   * inference scatter and evaluation bar chart legends.
-   */
-  const overlayLegendItems = useMemo(() => {
-    if (overlayResults.length === 0) return [];
-    return unofficialRunInfos
-      .map((info, idx) => {
-        if (!overlayResults.some((r) => r.runIndex === idx)) return null;
-        const branch = info.branch || `run ${info.id}`;
-        return {
-          name: `✕ unofficial-run-${info.id}`,
-          label: `✕ ${branch}`,
-          color: overlayRunColor(idx),
-          title: `${t.unofficialRun}: ${branch}`,
-          isHighlighted: true,
-          hw: `overlay-run-${info.id}`,
-          isActive: true,
-          // A label, not a series: dismissing a run happens in the banner, and
-          // counting it as removable would let the hide control empty the chart
-          // of real GPUs.
-          isRemovable: false,
-          onClick: () => {},
-          tooltip: (
-            <div className="font-normal text-xs">
-              <div className="text-red-500 font-semibold">{t.unofficialRun}</div>
-              <div>
-                {t.branch}: {branch}
-              </div>
-              {info.url && (
-                <a href={info.url} target="_blank" rel="noopener noreferrer" className="underline">
-                  {t.viewRun}
-                </a>
-              )}
-            </div>
-          ),
-        };
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null);
-  }, [overlayResults, unofficialRunInfos, t]);
+  }, [selectedBars, barResults, hardwareConfig, barMetric, costType, locale, t]);
 
   // Build legend items for ChartLegend sidebar, sorted by MODEL_ORDER (same as Inference Performance tab)
   const legendItems = useMemo(() => {
     const availableSet = new Set(legendHwKeys);
-    return [
-      ...overlayLegendItems,
-      ...Object.entries(hardwareConfig)
-        .filter(([key]) => availableSet.has(key))
-        .toSorted(([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
-        .map(([key, config]) => ({
-          name: config.name,
-          label: getDisplayLabel(config),
-          color: resolveColor(key),
-          title: config.gpu,
-          hw: key,
-          isActive: visibleHwKeys.has(key),
-          onClick: () => toggleGpuVisibility(key),
-        })),
-    ];
-  }, [
-    legendHwKeys,
-    overlayLegendItems,
-    hardwareConfig,
-    visibleHwKeys,
-    toggleGpuVisibility,
-    resolveColor,
-  ]);
+    return Object.entries(hardwareConfig)
+      .filter(([key]) => availableSet.has(key))
+      .toSorted(([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
+      .map(([key, config]) => ({
+        name: config.name,
+        label: getDisplayLabel(config),
+        color: resolveColor(key),
+        title: config.gpu,
+        hw: key,
+        isActive: visibleHwKeys.has(key),
+        onClick: () => toggleGpuVisibility(key),
+      }));
+  }, [legendHwKeys, hardwareConfig, visibleHwKeys, toggleGpuVisibility, resolveColor]);
 
   if (!loading && error) {
     console.error(error);
@@ -969,16 +863,22 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                       >
                         {opt.value === 'throughput'
                           ? t.metricThroughput
-                          : opt.value === 'cost'
-                            ? t.metricCost
-                            : 'tok/s/MW'}
+                          : opt.value === 'maxInteractivity'
+                            ? t.metricMaxInteractivity
+                            : opt.value === 'maxInteractivityWithoutTileRT'
+                              ? t.metricMaxInteractivityWithoutTileRT
+                              : opt.value === 'maxInteractivityWithTileRT'
+                                ? t.metricMaxInteractivityWithTileRT
+                                : opt.value === 'cost'
+                                  ? t.metricCost
+                                  : 'tok/s/MW'}
                       </button>
                     ))}
                   </div>
                 </div>
               </div>
               {/* Target value slider + input */}
-              {!loading && hasAnyData && (
+              {!loading && hasAnyData && !isMaxInteractivityMetric && (
                 <div className="space-y-2">
                   <LabelWithTooltip
                     htmlFor="calc-target"

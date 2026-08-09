@@ -2,7 +2,11 @@
 
 import { useCallback, useMemo } from 'react';
 
-import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
+import {
+  DB_MODEL_TO_DISPLAY,
+  resolveFrameworkAlias,
+  rowToSequence,
+} from '@semianalysisai/inferencex-constants';
 
 import type { AggDataEntry, HardwareConfig } from '@/components/inference/types';
 import { useBenchmarks } from '@/hooks/api/use-benchmarks';
@@ -11,7 +15,6 @@ import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import { getHardwareKey } from '@/lib/chart-utils';
 import { getModelSortIndex, getHardwareConfig, getGpuSpecs } from '@/lib/constants';
 import { Percentile, Sequence, type Model } from '@/lib/data-mappings';
-import { overlayRunIndex } from '@/lib/overlay-run-style';
 
 import {
   getCostField,
@@ -23,7 +26,7 @@ import {
   sign,
 } from './interpolation';
 import { restrictAgenticPointsToE2eFrontier } from '@/lib/agentic-frontier';
-import type { CostProvider, GPUDataPoint, InterpolatedResult } from './types';
+import type { BarMetric, CostProvider, GPUDataPoint, InterpolatedResult } from './types';
 
 // Re-export pure functions so existing imports from this module keep working.
 export {
@@ -45,12 +48,9 @@ export interface GroupMeta {
   hwKey: string;
   /** Set only when multiple precisions are selected, matching the group key. */
   precision?: string;
-}
-
-/** Group metadata for an unofficial-run overlay group. */
-export interface OverlayGroupMeta extends GroupMeta {
-  /** Index of the run in the loaded set — drives the overlay palette color. */
-  runIndex: number;
+  framework?: string;
+  /** Canonical framework key (e.g. `tilert`) for category filtering. */
+  isTileRT?: boolean;
 }
 
 function getAgenticMetric(
@@ -166,15 +166,15 @@ export function buildGpuGroups<M extends GroupMeta>(
 }
 
 /**
- * Optional unofficial-run overlay inputs. When a run is loaded via
- * `?unofficialrun=…`, its raw rows are interpolated into a *separate* set of
- * results so official bars keep their own Pareto frontier untouched.
+ * Optional unofficial-run inputs. When a run is loaded via
+ * `?unofficialrun=…`, rows are merged into the official dataset so it behaves as
+ * an ingested path for downstream table, CSV, and fleet calculations.
  */
 export interface OverlayInput {
   /** Raw rows from the unofficial-run API — every model, unfiltered. */
   rows: BenchmarkRow[] | null;
-  /** `run.url`/id → position in the loaded set, from the provider. */
-  runIndexByUrl: Record<string, number>;
+  /** Kept for compatibility with existing call sites; not required for merged mode. */
+  runIndexByUrl?: Record<string, number>;
 }
 
 export function useThroughputData(
@@ -198,25 +198,13 @@ export function useThroughputData(
   // Build GPUDataPoints directly from raw rows, skipping transformBenchmarkRows.
   // This avoids the expensive roofline/chart-data pipeline that isn't needed for interpolation.
   const overlayRows = overlay?.rows ?? null;
-  const runIndexByUrl = overlay?.runIndexByUrl;
 
-  const {
-    gpuDataByGroupKey,
-    gpuGroupMeta,
-    overlayGpuDataByGroupKey,
-    overlayGroupMeta,
-    hardwareConfig,
-    hasData,
-    hasOverlayData,
-  } = useMemo(() => {
+  const { gpuDataByGroupKey, gpuGroupMeta, hardwareConfig, hasData } = useMemo(() => {
     const empty = {
       gpuDataByGroupKey: {} as Record<string, GPUDataPoint[]>,
       gpuGroupMeta: {} as Record<string, GroupMeta>,
-      overlayGpuDataByGroupKey: {} as Record<string, GPUDataPoint[]>,
-      overlayGroupMeta: {} as Record<string, OverlayGroupMeta>,
       hardwareConfig: {} as HardwareConfig,
       hasData: false,
-      hasOverlayData: false,
     };
     if (!allRows) return empty;
 
@@ -227,34 +215,27 @@ export function useThroughputData(
       percentile: selectedPercentile,
     };
 
-    const official = buildGpuGroups<GroupMeta>(allRows, {
-      ...shared,
-      classify: (hwKey, row) => ({
-        key: multiPrecision ? `${hwKey}__${row.precision}` : hwKey,
-        meta: { hwKey, precision: multiPrecision ? row.precision : undefined },
-      }),
-    });
-
     // Overlay rows arrive unfiltered by model (the official path gets model
     // filtering server-side from /api/v1/benchmarks), so scope them here.
     const overlayForModel = (overlayRows ?? []).filter(
       (row) => (DB_MODEL_TO_DISPLAY[row.model] ?? row.model) === selectedModel,
     );
-    const overlayGroups = buildGpuGroups<OverlayGroupMeta>(overlayForModel, {
+    const mergedRows = [...allRows, ...overlayForModel];
+    const merged = buildGpuGroups<GroupMeta>(mergedRows, {
       ...shared,
-      classify: (hwKey, row) => {
-        const runIndex = overlayRunIndex(row.run_url, runIndexByUrl ?? {});
-        const precision = multiPrecision ? row.precision : undefined;
-        return {
-          key: `${hwKey}${precision ? `__${precision}` : ''}__run${runIndex}`,
-          meta: { hwKey, precision, runIndex },
-        };
-      },
+      classify: (hwKey, row) => ({
+        key: multiPrecision ? `${hwKey}__${row.precision}` : hwKey,
+        meta: {
+          hwKey,
+          framework: row.framework ? resolveFrameworkAlias(row.framework) : undefined,
+          isTileRT: row.framework ? resolveFrameworkAlias(row.framework) === 'tilert' : false,
+          precision: multiPrecision ? row.precision : undefined,
+        },
+      }),
     });
 
-    // Sort hardware config. Overlay-only hardware is merged in so its bars and
-    // legend entries can resolve a display label.
-    const mergedConfig = { ...overlayGroups.hwConfigMap, ...official.hwConfigMap };
+    // Hardware configs are sorted for stable legend/table ordering.
+    const mergedConfig = merged.hwConfigMap;
     const sortedKeys = Object.keys(mergedConfig).toSorted(
       (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
     );
@@ -264,13 +245,10 @@ export function useThroughputData(
     });
 
     return {
-      gpuDataByGroupKey: official.grouped,
-      gpuGroupMeta: official.groupMeta,
-      overlayGpuDataByGroupKey: overlayGroups.grouped,
-      overlayGroupMeta: overlayGroups.groupMeta,
+      gpuDataByGroupKey: merged.grouped,
+      gpuGroupMeta: merged.groupMeta,
       hardwareConfig: config,
-      hasData: Object.keys(official.grouped).length > 0,
-      hasOverlayData: Object.keys(overlayGroups.grouped).length > 0,
+      hasData: Object.keys(merged.grouped).length > 0,
     };
   }, [
     allRows,
@@ -279,7 +257,6 @@ export function useThroughputData(
     selectedPrecisions,
     selectedPercentile,
     overlayRows,
-    runIndexByUrl,
   ]);
 
   // All available GPU hardware keys from data, ordered by hardwareConfig (HARDWARE_CONFIG order)
@@ -302,20 +279,9 @@ export function useThroughputData(
     [gpuGroupMeta, orderHwKeys],
   );
 
-  /** Hardware present in the loaded unofficial run(s) for the current selection. */
-  const overlayAvailableHwKeys = useMemo(
-    () => orderHwKeys(new Set(Object.values(overlayGroupMeta).map((meta) => meta.hwKey))),
-    [overlayGroupMeta, orderHwKeys],
-  );
-
-  // Compute global ranges from GPUDataPoints. Overlay points are included so
-  // the target-interactivity slider can reach operating points that only an
-  // unofficial run covers.
+  // Compute global ranges from merged GPUDataPoints.
   const ranges = useMemo(() => {
-    const allPoints = [
-      ...Object.values(gpuDataByGroupKey).flat(),
-      ...Object.values(overlayGpuDataByGroupKey).flat(),
-    ];
+    const allPoints = Object.values(gpuDataByGroupKey).flat();
     if (allPoints.length === 0) {
       return {
         interactivity: { min: 0, max: 100 },
@@ -344,7 +310,7 @@ export function useThroughputData(
         max: Math.ceil(maxTput),
       },
     };
-  }, [gpuDataByGroupKey, overlayGpuDataByGroupKey]);
+  }, [gpuDataByGroupKey]);
 
   // Interpolate results for all GPUs at a given target value
   const getResults = useCallback(
@@ -353,18 +319,61 @@ export function useThroughputData(
       mode: 'interactivity_to_throughput' | 'throughput_to_interactivity',
       costProvider: CostProvider,
       visibleHwKeys?: Set<string>,
+      barMetric: BarMetric = 'throughput',
       hideSkuAboveConfigLimit = false,
     ): InterpolatedResult[] => {
       const results: InterpolatedResult[] = [];
 
       for (const [groupKey, points] of Object.entries(gpuDataByGroupKey)) {
-        const { hwKey, precision } = gpuGroupMeta[groupKey] ?? { hwKey: groupKey };
+        const {
+          hwKey,
+          precision,
+          isTileRT = false,
+        } = gpuGroupMeta[groupKey] ?? { hwKey: groupKey };
 
         // Skip GPUs that are not visible (legend filters by hwKey)
         if (visibleHwKeys && !visibleHwKeys.has(hwKey)) continue;
 
-        const result = interpolateForGPU(points, targetValue, mode, costProvider);
-        if (result && result.value > 0 && !(hideSkuAboveConfigLimit && result.clampedAbove)) {
+        if (barMetric === 'maxInteractivityWithTileRT' && !isTileRT) continue;
+        if (barMetric === 'maxInteractivityWithoutTileRT' && isTileRT) continue;
+
+        let result: InterpolatedResult | null;
+
+        if (
+          barMetric === 'maxInteractivity' ||
+          barMetric === 'maxInteractivityWithTileRT' ||
+          barMetric === 'maxInteractivityWithoutTileRT'
+        ) {
+          const frontier = paretoFrontUpperLeft(
+            points,
+            (p) => p.interactivity,
+            (p) => p.throughput,
+          ).toSorted((a, b) => a.interactivity - b.interactivity);
+          const frontierMaxInteractivity = frontier.at(-1);
+          if (!frontierMaxInteractivity) {
+            continue;
+          }
+          const frontierMax = interpolateForGPU(
+            points,
+            frontierMaxInteractivity.interactivity,
+            'interactivity_to_throughput',
+            costProvider,
+          );
+          if (!frontierMax) continue;
+          result = {
+            ...frontierMax,
+            value: frontierMaxInteractivity.interactivity,
+            clamped: false,
+            clampedAbove: false,
+            clampedBelow: false,
+          };
+        } else {
+          result = interpolateForGPU(points, targetValue, mode, costProvider);
+        }
+
+        if (!result) continue;
+
+        if (result.value > 0 && !(hideSkuAboveConfigLimit && result.clampedAbove)) {
           results.push({
             ...result,
             hwKey, // always the base hwKey for color/config lookup
@@ -382,66 +391,15 @@ export function useThroughputData(
     [gpuDataByGroupKey, gpuGroupMeta],
   );
 
-  /**
-   * Interpolate the unofficial-run overlay groups at the same target value.
-   * Kept separate from `getResults` so official bars keep their own Pareto
-   * frontier — overlay points never enter the official interpolation.
-   *
-   * `visibleHwKeys` is the same legend selection `getResults` is filtered by,
-   * so one legend entry governs a GPU's official and overlay bars together.
-   */
-  const getOverlayResults = useCallback(
-    (
-      targetValue: number,
-      mode: 'interactivity_to_throughput' | 'throughput_to_interactivity',
-      costProvider: CostProvider,
-      visibleHwKeys?: Set<string>,
-      runInfoByIndex?: Record<number, { branch: string; url: string }>,
-      hideSkuAboveConfigLimit = false,
-    ): InterpolatedResult[] => {
-      const results: InterpolatedResult[] = [];
-
-      for (const [groupKey, points] of Object.entries(overlayGpuDataByGroupKey)) {
-        const meta = overlayGroupMeta[groupKey];
-        if (!meta) continue;
-        if (visibleHwKeys && !visibleHwKeys.has(meta.hwKey)) continue;
-
-        const result = interpolateForGPU(points, targetValue, mode, costProvider);
-        if (result && result.value > 0 && !(hideSkuAboveConfigLimit && result.clampedAbove)) {
-          results.push({
-            ...result,
-            hwKey: meta.hwKey,
-            resultKey: groupKey,
-            precision: meta.precision,
-            isOverlay: true,
-            runIndex: meta.runIndex,
-            runLabel: runInfoByIndex?.[meta.runIndex]?.branch,
-            runUrl: runInfoByIndex?.[meta.runIndex]?.url,
-          });
-        }
-      }
-
-      results.sort((a, b) => b.value - a.value);
-
-      return results;
-    },
-    [overlayGpuDataByGroupKey, overlayGroupMeta],
-  );
-
   return {
     gpuDataByGroupKey,
     gpuGroupMeta,
-    overlayGpuDataByGroupKey,
-    overlayGroupMeta,
     hardwareConfig,
     ranges,
     getResults,
-    getOverlayResults,
     loading,
     error,
     hasData,
-    hasOverlayData,
     availableHwKeys,
-    overlayAvailableHwKeys,
   };
 }

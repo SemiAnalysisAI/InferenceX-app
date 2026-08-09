@@ -4,7 +4,13 @@ export type CostProvider = 'costh' | 'costn' | 'costr';
 
 export type CostType = 'total' | 'input' | 'output';
 
-export type BarMetric = 'throughput' | 'power' | 'cost';
+export type BarMetric =
+  | 'throughput'
+  | 'power'
+  | 'cost'
+  | 'maxInteractivity'
+  | 'maxInteractivityWithoutTileRT'
+  | 'maxInteractivityWithTileRT';
 
 export interface GPUDataPoint {
   hwKey: string;
