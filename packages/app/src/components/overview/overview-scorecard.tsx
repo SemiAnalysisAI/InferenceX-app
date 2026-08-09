@@ -102,6 +102,7 @@ export const OVERVIEW_STRINGS = {
       deprecated: 'Deprecated',
     } as Partial<Record<string, string>>,
     categoryBadgeTitle: 'Model is no longer actively benchmarked.',
+    loadingStatus: 'Loading the selected comparison…',
   },
   zh: {
     title: '推理每百万 token 成本',
@@ -169,6 +170,7 @@ export const OVERVIEW_STRINGS = {
       deprecated: '已弃用',
     } as Partial<Record<string, string>>,
     categoryBadgeTitle: '该模型已不再进行活跃基准测试。',
+    loadingStatus: '正在加载所选对比…',
   },
 } as const;
 

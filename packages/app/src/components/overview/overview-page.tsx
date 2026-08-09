@@ -1,5 +1,7 @@
 'use client';
 
+import type { ReactNode } from 'react';
+
 import { Card } from '@/components/ui/card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import type { OverviewPageData } from '@/lib/overview-data';
@@ -17,7 +19,11 @@ import {
   OVERVIEW_STRINGS,
   type OverviewLocale,
 } from './overview-scorecard';
-import { OverviewNavigationProvider, useOverviewData } from './overview-navigation';
+import {
+  OverviewNavigationProvider,
+  useOverviewData,
+  useOverviewNavigation,
+} from './overview-navigation';
 
 /** The SemiAnalysis AI Cloud TCO model behind `HW_REGISTRY.costh`. */
 const OVERVIEW_SOURCE_HREF = 'https://semianalysis.com/ai-cloud-tco-model/';
@@ -48,6 +54,32 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
   );
 }
 
+/** Both pending consumers live outside `OverviewPageBody` on purpose: reading
+ *  `isPending` there would re-render the whole matrix on every click, which is
+ *  exactly the cost the split context removes. */
+function OverviewPendingStatus({ label }: { label: string }) {
+  const { isPending } = useOverviewNavigation();
+  return (
+    <p role="status" aria-live="polite" className="sr-only">
+      {isPending ? label : ''}
+    </p>
+  );
+}
+
+function OverviewMatrixCard({ children }: { children: ReactNode }) {
+  const { isPending } = useOverviewNavigation();
+  return (
+    <Card
+      aria-busy={isPending}
+      className={`overflow-hidden p-0 transition-opacity md:p-0 xl:overflow-visible ${
+        isPending ? 'opacity-60' : ''
+      }`}
+    >
+      {children}
+    </Card>
+  );
+}
+
 function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
   const data = useOverviewData();
   const strings = OVERVIEW_STRINGS[locale];
@@ -55,6 +87,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
 
   return (
     <section data-testid="overview-page" className="flex flex-col gap-4">
+      <OverviewPendingStatus label={strings.loadingStatus} />
       <Card>
         <header>
           {/* Two rows at every width: the title, then the metric it is
@@ -137,7 +170,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
       {/* Official-only summary; uploaded runs remain in the linked dashboard. */}
       {/* Clipped on phones for the rounded corners; visible from xl so the
           desktop matrix header can stick to the page as it scrolls. */}
-      <Card className="overflow-hidden p-0 md:p-0 xl:overflow-visible">
+      <OverviewMatrixCard>
         <DesktopOverviewMatrix
           models={data.models}
           locale={locale}
@@ -168,7 +201,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
           locale={locale}
           strings={strings}
         />
-      </Card>
+      </OverviewMatrixCard>
     </section>
   );
 }

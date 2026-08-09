@@ -17,6 +17,7 @@ import type { OverviewPageData, OverviewReferenceHardware } from '@/lib/overview
 import { mergeOverviewControlHref, type OverviewSearchKey } from '@/lib/overview-links';
 
 interface OverviewNavigationValue {
+  isPending: boolean;
   prefetch: (targetHref: string, keys: readonly OverviewSearchKey[]) => void;
   resolve: (targetHref: string, keys: readonly OverviewSearchKey[]) => string;
   push: (targetHref: string, keys: readonly OverviewSearchKey[]) => void;
@@ -44,6 +45,7 @@ export function OverviewNavigationProvider({
   const router = useRouter();
   const [data, setData] = useState(initialData);
   const [pendingHref, setPendingHref] = useState(initialHref);
+  const [committedHref, setCommittedHref] = useState(initialHref);
   const pendingHrefRef = useRef(initialHref);
   const committedHrefRef = useRef(initialHref);
   const navigationIdRef = useRef(0);
@@ -87,6 +89,7 @@ export function OverviewNavigationProvider({
         .then((nextData) => {
           if (navigationId !== navigationIdRef.current) return;
           committedHrefRef.current = href;
+          setCommittedHref(href);
           if (updateHistory) {
             History.prototype.replaceState.call(window.history, window.history.state, '', href);
           }
@@ -115,6 +118,7 @@ export function OverviewNavigationProvider({
     ++navigationIdRef.current;
     dataCacheRef.current.set(initialHref, initialData);
     committedHrefRef.current = initialHref;
+    setCommittedHref(initialHref);
     pendingHrefRef.current = initialHref;
     setPendingHref(initialHref);
     setData(initialData);
@@ -139,8 +143,13 @@ export function OverviewNavigationProvider({
     [pendingHref],
   );
 
+  /** The URL already shows the new selection while the matrix still shows the
+   *  old numbers. Consumers use this to say so. */
+  const isPending = pendingHref !== committedHref;
+
   const value = useMemo<OverviewNavigationValue>(
     () => ({
+      isPending,
       resolve,
       prefetch: (targetHref, keys) => {
         const href = mergeOverviewControlHref(pendingHrefRef.current, targetHref, keys);
@@ -151,7 +160,7 @@ export function OverviewNavigationProvider({
         commit(href, true);
       },
     }),
-    [commit, load, resolve],
+    [commit, isPending, load, resolve],
   );
 
   return (
