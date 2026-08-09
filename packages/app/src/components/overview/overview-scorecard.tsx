@@ -188,7 +188,7 @@ interface Formatters {
   shortDate: (date: string) => string;
 }
 
-export function overviewFormatters(locale: OverviewLocale): Formatters {
+function buildOverviewFormatters(locale: OverviewLocale): Formatters {
   const tag = locale === 'zh' ? 'zh-CN' : 'en-US';
   const shortDateFormat = new Intl.DateTimeFormat(tag, {
     month: 'short',
@@ -212,6 +212,19 @@ export function overviewFormatters(locale: OverviewLocale): Formatters {
     percentAbs: new Intl.NumberFormat(tag, { style: 'percent', maximumFractionDigits: 0 }),
     shortDate: (date) => shortDateFormat.format(new Date(`${date}T00:00:00Z`)),
   };
+}
+
+/** Built once per locale. Constructing ICU formatters is not free and the page
+ *  body calls this on every render; the inputs are two fixed locales. */
+const FORMATTER_CACHE = new Map<OverviewLocale, Formatters>();
+
+export function overviewFormatters(locale: OverviewLocale): Formatters {
+  let cached = FORMATTER_CACHE.get(locale);
+  if (cached === undefined) {
+    cached = buildOverviewFormatters(locale);
+    FORMATTER_CACHE.set(locale, cached);
+  }
+  return cached;
 }
 
 function formatEvidenceDate(
