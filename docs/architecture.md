@@ -16,6 +16,13 @@ Some routes serve a purpose that raw DB rows cannot satisfy:
 - `tco-feed` performs server-side frontier interpolation for spreadsheet consumers that cannot run the TypeScript transforms.
 - `/api/v1/overview` is a page-owned backend-for-frontend (BFF). It returns the compact `OverviewPageData` shape used by the initial server render, allowing selector changes to update the matrix without downloading every model's raw benchmark history or triggering a React Server Component (RSC) round trip. It is not a reusable public data API.
 
+Two rules keep that BFF honest, both enforced in `overview-navigation.tsx`:
+
+- **One cache key per data state.** Requests and the in-memory cache are keyed on a canonical href rebuilt from the resolved params (`overviewDataKey`), not the address bar. Explicit defaults, reordered params and campaign tags collapse to one key, so the CDN's day-long `s-maxage` is not fragmented by link variants.
+- **`ref` never reaches that key.** The reference hardware only chooses which column the percentages are measured against, and every cost that needs is already in the payload, so the client derives it from the URL and recomputes the ratio per row. The server still resolves `ref` for SSR, shared links and no-JS.
+
+Because the selector commit uses `History.prototype.pushState` rather than Next's patched version, `useSearchParams()` and `usePathname()` stay at the load-time URL on `/overview`. Anything that needs the live URL there listens for `CLIENT_SEARCH_CHANGE_EVENT`; the provider emits its own `$pageview`. Do not add a `useSearchParams()` consumer to the overview tree.
+
 ## Hash-Based Tab Routing (Not Next.js Routes)
 
 Tabs use `window.location.hash` instead of Next.js file-based routing because:
