@@ -68,6 +68,17 @@ function isActive(pathname: string, href: string): boolean {
   return enPathname === href || enPathname.startsWith(`${href}/`);
 }
 
+/**
+ * Whether the link lands on the page already on screen. Deliberately not
+ * `isActive`, which also lights up for every sibling dashboard tab and for
+ * child routes — those are real destinations, so treating their clicks as
+ * no-ops would strand the user (Dashboard from `/evaluation`, Comparisons
+ * from `/compare/<slug>`).
+ */
+function isCurrentPage(pathname: string, displayHref: string): boolean {
+  return pathname === displayHref;
+}
+
 /** EN ↔ 中文 switcher; maps the current page to its sibling in the other language. */
 function LanguageToggle({
   pathname,
@@ -206,9 +217,9 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 )}
                 onClick={(e) => {
                   track(event);
-                  // Re-entering the active tab would refetch the route and
+                  // Re-entering the current page would refetch the route and
                   // discard whatever selector state the URL already carries.
-                  if (isActive(pathname, href)) {
+                  if (isCurrentPage(pathname, displayHref)) {
                     e.preventDefault();
                     return;
                   }
@@ -278,7 +289,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                       )}
                       onClick={(e) => {
                         track(event);
-                        if (isActive(pathname, href)) {
+                        if (isCurrentPage(pathname, displayHref)) {
                           e.preventDefault();
                           return;
                         }
