@@ -236,10 +236,11 @@ describe('comparison exclusions', () => {
     expect(getSequenceExclusion(Sequence.OneK_EightK)).toEqual([]);
   });
 
-  it('guards only vLLM and SGLang on 8K/1K, every family on Agentic', () => {
+  it('guards only vLLM and SGLang on both 8K/1K and Agentic', () => {
     expect(getSequenceExclusionFamilies(Sequence.EightK_OneK)).toEqual(['vllm', 'sglang']);
-    // Agentic keeps every engine family exclusive while the benchmark is new.
-    expect(getSequenceExclusionFamilies(Sequence.AgenticTraces)).toBeNull();
+    expect(getSequenceExclusionFamilies(Sequence.AgenticTraces)).toEqual(['vllm', 'sglang']);
+    // Deprecated fixed sequences carry no scenario rule of their own; only the
+    // model-level MTP spec applies there.
     expect(getSequenceExclusionFamilies(Sequence.OneK_OneK)).toBeNull();
   });
 
