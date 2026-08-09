@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
 
 import { useQueries } from '@tanstack/react-query';
-import { rowToSequence } from '@semianalysisai/inferencex-constants';
+import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import type {
@@ -34,6 +34,7 @@ import {
   EMPTY_QUICK_FILTERS,
   type QuickFilters,
 } from '@/components/inference/utils/quickFilters';
+import type { BenchmarkRow } from '@/lib/api';
 
 /**
  * Chart x-axis variant selected by the mode buttons above the plot. This is
@@ -226,6 +227,7 @@ export function useChartData(
    * (also applied to overlay points in ScatterGraph so both paths stay in sync).
    */
   quickFilters: QuickFilters = EMPTY_QUICK_FILTERS,
+  unofficialBenchmarkRows?: BenchmarkRow[] | null,
   overviewHistoryPair?: {
     currentConfigKey: string;
     baselineConfigKey: string;
@@ -262,14 +264,29 @@ export function useChartData(
     error: runError,
   } = useBenchmarks(selectedModel, '', enabled && Boolean(selectedRunId), selectedRunId, true);
 
+  const unofficialRowsForModel = useMemo(
+    () =>
+      (unofficialBenchmarkRows ?? []).filter(
+        (row) => (DB_MODEL_TO_DISPLAY[row.model] ?? row.model) === selectedModel,
+      ),
+    [selectedModel, unofficialBenchmarkRows],
+  );
+
   const allRows = useMemo(() => {
-    if (!selectedRunId) return baseRows;
-    // Wait for the run rows before rendering a scoped view — rendering base
-    // rows first would flash the un-scoped chart, then swap contested points.
-    if (!runRows) return undefined;
-    if (!baseRows) return runRows;
-    return mergeRunScopedRows(runRows, baseRows);
-  }, [selectedRunId, runRows, baseRows]);
+    let sourceRows: BenchmarkRow[] | undefined;
+    if (selectedRunId) {
+      // Wait for the run rows before rendering a scoped view — rendering base
+      // rows first would flash the un-scoped chart, then swap contested points.
+      if (!runRows) return undefined;
+      if (!baseRows) return runRows;
+      sourceRows = mergeRunScopedRows(runRows, baseRows);
+    } else {
+      sourceRows = baseRows;
+    }
+
+    if (unofficialRowsForModel.length === 0 || !sourceRows) return sourceRows;
+    return [...sourceRows, ...unofficialRowsForModel];
+  }, [selectedRunId, runRows, baseRows, unofficialRowsForModel]);
 
   const queryLoading = baseLoading || (Boolean(selectedRunId) && runLoading);
   const queryError = baseError ?? (selectedRunId ? runError : null);

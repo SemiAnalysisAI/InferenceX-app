@@ -310,13 +310,12 @@ export default function ChartDisplay() {
     isUnofficialRun,
     activeOverlayHwTypes,
     setActiveOverlayHwTypes,
-    localOfficialOverride,
     setLocalOfficialOverride,
   } = useUnofficialRun();
 
   // Compute overlay data for each chart type — must match useChartData processing
   const overlayDataByChartType = useMemo(() => {
-    if (!unofficialRunInfo || !getOverlayData) {
+    if (isUnofficialRun || !unofficialRunInfo || !getOverlayData) {
       return { e2e: null, interactivity: null };
     }
 
@@ -402,6 +401,7 @@ export default function ChartDisplay() {
     unofficialRunInfos,
     runIndexByUrl,
     getOverlayData,
+    isUnofficialRun,
     selectedModel,
     selectedSequence,
     selectedYAxisMetric,
@@ -447,20 +447,18 @@ export default function ChartDisplay() {
   const [appliedOverlayRowsScopeKey, setAppliedOverlayRowsScopeKey] = useState(overlayRowsScopeKey);
   const overlayRowsScopeChanged =
     isUnofficialRun && appliedOverlayRowsScopeKey !== overlayRowsScopeKey;
-  const selectedOfficialHwTypes = overlayRowsScopeChanged
-    ? officialScope
-    : isUnofficialRun
-      ? (localOfficialOverride ?? activeHwTypes)
-      : activeHwTypes;
+  const selectedOfficialHwTypes = overlayRowsScopeChanged ? officialScope : activeHwTypes;
   // Preview tables follow the same policy as ScatterGraph: preserve every
   // active engine family instead of applying the production comparison guard.
   const scopedActiveOverlayHwTypes = useMemo(() => {
+    if (isUnofficialRun) return new Set<string>();
     const activeScopedOverlayKeys = new Set(
       [...activeOverlayHwTypes].filter((key) => overlayScope.has(key)),
     );
     return overlayRowsScopeChanged ? overlayScope : activeScopedOverlayKeys;
-  }, [activeOverlayHwTypes, overlayScope, overlayRowsScopeChanged]);
+  }, [activeOverlayHwTypes, overlayScope, overlayRowsScopeChanged, isUnofficialRun]);
   useEffect(() => {
+    if (isUnofficialRun) return;
     const merged = new Set(activeOverlayHwTypes);
     overlayScope.forEach((key) => merged.delete(key));
     scopedActiveOverlayHwTypes.forEach((key) => merged.add(key));
@@ -490,6 +488,7 @@ export default function ChartDisplay() {
     scopedActiveOverlayHwTypes,
     setActiveOverlayHwTypes,
     setLocalOfficialOverride,
+    isUnofficialRun,
   ]);
 
   const visibleComparisonRows = useCallback(

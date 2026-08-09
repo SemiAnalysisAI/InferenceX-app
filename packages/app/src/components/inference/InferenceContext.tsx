@@ -134,7 +134,7 @@ export function InferenceProvider({
     availableRuns,
     workflowError,
   } = useGlobalFilters();
-  const { isUnofficialRun } = useUnofficialRun();
+  const { isUnofficialRun, unofficialBenchmarkRows } = useUnofficialRun();
 
   const { getUrlParam, setUrlParam, setUrlParams } = useUrlState();
 
@@ -501,6 +501,7 @@ export function InferenceProvider({
     selectedXAxisMode,
     asOfRunId,
     dataQuickFilters,
+    unofficialBenchmarkRows,
     overviewHistoryPair,
   );
 
