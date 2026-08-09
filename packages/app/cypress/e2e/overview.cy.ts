@@ -605,8 +605,7 @@ describe('Overview page', () => {
       platform('gb300').within(() => {
         cy.get('[data-testid="overview-pair-value"]').should('not.exist');
         cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]').should(
-          'have.attr',
-          'title',
+          'contain.text',
           'no exact @50 result',
         );
       });
@@ -911,12 +910,12 @@ describe('Overview page', () => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="mi355x"]')
           .should('contain.text', '—')
           .and('not.contain.text', '∞')
-          .and('have.attr', 'title', 'no exact @50 result');
+          .and('contain.text', 'no exact @50 result');
       });
       platform('gb300').within(() => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]')
           .should('contain.text', '—')
-          .and('have.attr', 'title', 'no exact @50 result');
+          .and('contain.text', 'no exact @50 result');
       });
       platform('b200')
         .find('[data-testid="overview-cost-evidence-link"]')
@@ -928,7 +927,7 @@ describe('Overview page', () => {
       platform('b200')
         .find('[data-testid="overview-pair-missing"]')
         .should('contain.text', '—')
-        .and('have.attr', 'title', 'no data for this scenario');
+        .and('contain.text', 'no data for this scenario');
       platform('gb300').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="gb300"]').should(
           'contain.text',
@@ -994,7 +993,7 @@ describe('Overview page', () => {
       platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="b300"]')
           .should('contain.text', '—')
-          .and('have.attr', 'title', 'cannot reach @100');
+          .and('contain.text', 'cannot reach @100');
       });
     });
 
@@ -1003,12 +1002,12 @@ describe('Overview page', () => {
       platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="b300"]')
           .should('contain.text', '—')
-          .and('have.attr', 'title', 'no exact @30 result');
+          .and('contain.text', 'no exact @30 result');
       });
       platform('b200')
         .find('[data-testid="overview-pair-missing"]')
         .should('contain.text', '—')
-        .and('have.attr', 'title', 'no exact @30 result');
+        .and('contain.text', 'no exact @30 result');
     });
     // Exact @30 read priced without a B200 baseline: cost plus the ∞ badge.
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
@@ -1064,8 +1063,7 @@ describe('Overview page', () => {
           '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
         ).should('have.text', '$0.059');
         cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]').should(
-          'have.attr',
-          'title',
+          'contain.text',
           'no exact @50 result',
         );
       });
@@ -1283,7 +1281,7 @@ describe('Overview page', () => {
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN)
       .find('[data-testid="overview-pair-missing"][data-hardware="gb300"]')
       .should('contain.text', '—')
-      .and('have.attr', 'title', '无精确 @50 结果');
+      .and('contain.text', '无精确 @50 结果');
     cy.get('body')
       .invoke('text')
       .should('not.match', /回退/);
@@ -1311,7 +1309,7 @@ describe('Overview page', () => {
       cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
       platform('b300')
         .find('[data-testid="overview-pair-missing"]')
-        .should('have.attr', 'title', '该场景暂无数据');
+        .should('contain.text', '该场景暂无数据');
     });
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
       cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL_ZH);

@@ -232,18 +232,23 @@ function missingReasonCopy(platform: OverviewPlatformResult, strings: OverviewSt
 const RAW_SOURCE_LINK_CLASS =
   'inline-flex min-h-11 items-center rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50';
 
-/** No result for this GPU. The reason survives as hover/focus/SR text only. */
+/** No result for this GPU. The reason reads as visible text, mirroring the
+ *  stack line on a populated cell — a `title` tooltip reaches neither keyboard
+ *  nor touch users, and this is the only per-cell string with no other surface. */
 function CellMissing({ hardware, reason }: { hardware: string; reason: string }) {
   return (
-    <span
+    <div
       data-testid="overview-pair-missing"
       data-hardware={hardware}
-      title={reason}
-      className="inline-flex items-baseline gap-1 text-muted-foreground"
+      className="min-w-0 space-y-0.5 text-sm text-muted-foreground"
     >
-      <span aria-hidden="true">{'—'}</span>
-      <span className="sr-only">{reason}</span>
-    </span>
+      <span>{'—'}</span>
+      {reason === '' ? null : (
+        <div className="min-w-0 text-[11px] leading-tight font-normal text-muted-foreground/70">
+          {reason}
+        </div>
+      )}
+    </div>
   );
 }
 
