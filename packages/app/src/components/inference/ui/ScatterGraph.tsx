@@ -2116,10 +2116,7 @@ const ScatterGraph = React.memo(
                 ([, a], [, b]) => newYScale(a[0].y) - newYScale(b[0].y),
               );
               const overlayVisible = Object.entries(overlayRooflines)
-                .filter(
-                  ([, group]) =>
-                    ir.activeOverlayHwTypes.has(group.hwKey) && group.points.length >= 2,
-                )
+                .filter(([, group]) => ir.activeOverlayHwTypes.has(group.hwKey))
                 .toSorted(([, a], [, b]) => newYScale(a.points[0].y) - newYScale(b.points[0].y));
 
               const zoomResults = new Map<string, { x: number; y: number; vis: boolean }>();

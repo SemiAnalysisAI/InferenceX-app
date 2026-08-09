@@ -512,6 +512,25 @@ describe('ScatterGraph', () => {
       .should('have.length', 1)
       .find('text')
       .should('contain.text', 'tileRT');
+
+    cy.get('#test-scatter-singleton-overlay-label svg').then(($svg) => {
+      const svg = $svg[0];
+      const bounds = svg.getBoundingClientRect();
+      svg.dispatchEvent(
+        new WheelEvent('wheel', {
+          deltaY: -240,
+          clientX: bounds.x + bounds.width / 2,
+          clientY: bounds.y + bounds.height / 2,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+
+    cy.get(
+      '#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]',
+    ).should('have.css', 'opacity', '1');
   });
 
   it('renders M3 mtp rooflines with the EAGLE label (official + overlay)', () => {
