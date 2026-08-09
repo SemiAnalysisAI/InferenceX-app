@@ -881,7 +881,7 @@ export function OverviewTierSwitcher({
             <span
               key={option}
               aria-current="page"
-              className={`${optionClass} bg-foreground font-semibold text-background`}
+              className={`${optionClass} bg-muted font-semibold text-foreground`}
             >
               {option}
             </span>
@@ -898,7 +898,7 @@ export function OverviewTierSwitcher({
               )}
               analytics={{ control: 'tier', value: String(option) }}
               searchKeys={['tier']}
-              className={`${optionClass} text-muted-foreground transition-colors hover:bg-muted hover:text-foreground`}
+              className={`${optionClass} text-muted-foreground transition-colors hover:text-foreground`}
             >
               {option}
             </OverviewNavLink>
@@ -945,7 +945,7 @@ export function OverviewEngineScopeSwitcher({
               key={option}
               data-overview-engine-scope={option}
               aria-current="true"
-              className={`${optionClass} bg-foreground font-semibold text-background`}
+              className={`${optionClass} bg-muted font-semibold text-foreground`}
             >
               {strings.engineScopeOptions[option]}
             </span>
@@ -963,7 +963,7 @@ export function OverviewEngineScopeSwitcher({
               )}
               analytics={{ control: 'engine', value: option }}
               searchKeys={['engine']}
-              className={`${optionClass} text-muted-foreground transition-colors hover:bg-muted hover:text-foreground`}
+              className={`${optionClass} text-muted-foreground transition-colors hover:text-foreground`}
             >
               {strings.engineScopeOptions[option]}
             </OverviewNavLink>
