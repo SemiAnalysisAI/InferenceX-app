@@ -22,11 +22,7 @@ import {
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import type {
-  InferenceChartContextType,
-  InferenceData,
-  TrackedConfig,
-} from '@/components/inference/types';
+import type { InferenceChartContextType, InferenceData } from '@/components/inference/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -45,7 +41,7 @@ import {
 import { useUrlState } from '@/hooks/useUrlState';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
-import { getHardwareConfig, getModelSortIndex, isKnownGpu, TABLEAU_10 } from '@/lib/constants';
+import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
 import { MODEL_PREFIX_MAPPING, sequenceKind } from '@/lib/data-mappings';
 import {
   EngineComparisonConflictToast,
@@ -356,9 +352,6 @@ export function InferenceProvider({
   const [userCosts, setUserCosts] = useState<Record<string, number | undefined> | null>(null);
   const [userPowers, setUserPowers] = useState<Record<string, number | undefined> | null>(null);
 
-  // --- Tracked configs state ---
-  const [trackedConfigs, setTrackedConfigs] = useState<TrackedConfig[]>([]);
-
   // --- Favorite presets state ---
   const [pendingHwFilter, setPendingHwFilter] = useState<string[] | null>(null);
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
@@ -560,64 +553,6 @@ export function InferenceProvider({
         label: getDisplayLabel(getHardwareConfig(hw, selectedModel)),
       }));
   }, [availabilityRows, dbModelKeys, effectiveSequence, effectivePrecisions, selectedModel]);
-
-  // --- Tracked config functions ---
-  const buildTrackedConfigId = useCallback((point: InferenceData): string => {
-    let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}`;
-    if (point.disagg) {
-      key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;
-    }
-    return key;
-  }, []);
-
-  const addTrackedConfig = useCallback(
-    (point: InferenceData, chartType: string) => {
-      setTrackedConfigs((prev) => {
-        const id = buildTrackedConfigId(point);
-        if (prev.some((c) => c.id === id)) {
-          return prev.filter((c) => c.id !== id);
-        }
-        if (prev.length >= 6) return prev;
-
-        const hwConfig = hardwareConfig[point.hwKey];
-        const label = hwConfig
-          ? `${getDisplayLabel(hwConfig)} — TP${point.tp} conc=${point.conc} ${point.precision.toUpperCase()}`
-          : `${point.hwKey} — TP${point.tp} conc=${point.conc} ${point.precision.toUpperCase()}`;
-
-        const color = TABLEAU_10[prev.length % TABLEAU_10.length];
-        return [
-          ...prev,
-          {
-            id,
-            hwKey: point.hwKey as string,
-            precision: point.precision,
-            tp: point.tp,
-            conc: point.conc,
-            label,
-            color,
-            chartType,
-            disagg: point.disagg,
-            num_prefill_gpu: point.num_prefill_gpu,
-            num_decode_gpu: point.num_decode_gpu,
-          },
-        ];
-      });
-    },
-    [buildTrackedConfigId, hardwareConfig],
-  );
-
-  const removeTrackedConfig = useCallback((id: string) => {
-    setTrackedConfigs((prev) => prev.filter((c) => c.id !== id));
-  }, []);
-
-  const clearTrackedConfigs = useCallback(() => {
-    setTrackedConfigs([]);
-  }, []);
-
-  // Clear tracked configs whenever the top-level selectors change
-  useEffect(() => {
-    setTrackedConfigs((prev) => (prev.length > 0 ? [] : prev));
-  }, [selectedModel, effectiveSequence, effectivePrecisions, selectedYAxisMetric]);
 
   useEffect(() => {
     if (!sequenceResolved) return;
@@ -1518,10 +1453,6 @@ export function InferenceProvider({
       setShowSpeedOverlay,
       showMinecraftOverlay,
       setShowMinecraftOverlay,
-      trackedConfigs,
-      addTrackedConfig,
-      removeTrackedConfig,
-      clearTrackedConfigs,
       setHwFilter: setPendingHwFilter,
       activePresetId,
       setActivePresetId,
@@ -1581,10 +1512,6 @@ export function InferenceProvider({
       showMinecraftOverlay,
       userCosts,
       userPowers,
-      trackedConfigs,
-      addTrackedConfig,
-      removeTrackedConfig,
-      clearTrackedConfigs,
       activePresetId,
       compareGpuPair,
     ],

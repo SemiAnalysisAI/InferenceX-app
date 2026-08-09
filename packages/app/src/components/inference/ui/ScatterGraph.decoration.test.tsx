@@ -115,9 +115,6 @@ function baseInferenceState() {
     setShowSpeedOverlay: noop,
     showMinecraftOverlay: false,
     setShowMinecraftOverlay: noop,
-    trackedConfigs: [],
-    addTrackedConfig: noop,
-    removeTrackedConfig: noop,
   };
 }
 

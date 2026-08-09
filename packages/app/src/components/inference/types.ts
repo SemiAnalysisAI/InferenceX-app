@@ -842,10 +842,6 @@ export interface InferenceChartContextType {
   availableModels: string[];
   userPowers: Record<string, number | undefined> | null;
   setUserPowers: (userPowers: Record<string, number | undefined> | null) => void;
-  trackedConfigs: TrackedConfig[];
-  addTrackedConfig: (point: InferenceData, chartType: string) => void;
-  removeTrackedConfig: (id: string) => void;
-  clearTrackedConfigs: () => void;
   setHwFilter: (filter: string[] | null) => void;
   activePresetId: string | null;
   setActivePresetId: (id: string | null) => void;
@@ -868,29 +864,6 @@ export interface CalculateUserCostsResponse {
 export type UserCostInputs = Record<string, string | undefined>;
 
 export type HardwareConfig = Record<string, HardwareEntry>;
-
-/**
- * Represents a tracked configuration for the "Performance Over Time" drill-down feature.
- * A user double-clicks a scatter chart data point to track that specific config across dates.
- */
-export interface TrackedConfig {
-  /** Unique identifier built from the config fields */
-  id: string;
-  hwKey: string;
-  precision: string;
-  tp: number;
-  conc: number;
-  /** Display label e.g. "B200 (TRTLLM) — TP4 conc=8 FP4" */
-  label: string;
-  /** Assigned color from d3.schemeTableau10 */
-  color: string;
-  /** The chart type this config was tracked from (e2e or interactivity) */
-  chartType: string;
-  /** Disaggregated inference fields for advanced matching */
-  disagg?: boolean;
-  num_prefill_gpu?: number;
-  num_decode_gpu?: number;
-}
 
 /**
  * Represents a single data point on a trend line (one date's metric value).

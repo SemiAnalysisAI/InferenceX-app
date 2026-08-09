@@ -226,8 +226,6 @@ export function attachScatterTooltipHandlers<
       d: T,
       tooltip: d3.Selection<HTMLDivElement | null, unknown, null, undefined>,
     ) => void;
-    /** Called on double-click of a point. */
-    onPointDblClick?: (event: MouseEvent, d: T) => void;
     /** Ref to current scales — when provided, avoids stale-closure bugs after scale recalculation */
     scalesRef?: React.RefObject<{ xScale: ContinuousScale; yScale: ContinuousScale } | null>;
     /** Selected precisions, in selection order; controls hover shape key. */
@@ -248,7 +246,6 @@ export function attachScatterTooltipHandlers<
     generateTooltipContent,
     trackEvent,
     onPointClick,
-    onPointDblClick,
     scalesRef,
     selectedPrecisions,
   } = config;
@@ -302,12 +299,6 @@ export function attachScatterTooltipHandlers<
       pinTooltip(d, false);
       onPointClick?.(d, tooltip);
       trackEvent?.(String(d.hwKey), d.x, d.y);
-    })
-    .on('dblclick', (event, d) => {
-      if (!onPointDblClick) return;
-      event.stopPropagation();
-      event.preventDefault();
-      onPointDblClick(event, d);
     });
 }
 

@@ -43,7 +43,6 @@ import {
   overlayRunIndex,
 } from '@/lib/overlay-run-style';
 import {
-  POINT_SIZE,
   HIT_AREA_RADIUS,
   formatLargeNumber,
   logTickFormat,
@@ -475,9 +474,6 @@ const ScatterGraph = React.memo(
       setShowSpeedOverlay,
       showMinecraftOverlay,
       setShowMinecraftOverlay,
-      trackedConfigs,
-      addTrackedConfig,
-      removeTrackedConfig,
       selectedSequence,
       selectedModel,
       quickFilters,
@@ -812,12 +808,6 @@ const ScatterGraph = React.memo(
       }
       return effectiveOfficialHwTypes;
     }, [showAllHardwareTypes, groupedData, effectiveOfficialHwTypes]);
-
-    const trackedConfigIds = useMemo(() => {
-      const ids = new Set<string>();
-      for (const config of trackedConfigs) ids.add(config.id);
-      return ids;
-    }, [trackedConfigs]);
 
     const buildPointConfigId = useCallback((point: InferenceData): string => {
       let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}|${point.decode_ep ?? 0}|${point.prefill_tp ?? 0}|${point.prefill_ep ?? 0}`;
@@ -1158,10 +1148,6 @@ const ScatterGraph = React.memo(
       [allPointLabelsByKey],
     );
 
-    // Ref for trackedConfigIds (needs to be current at event time inside D3 handlers)
-    const trackedConfigIdsRef = useRef(trackedConfigIds);
-    trackedConfigIdsRef.current = trackedConfigIds;
-
     // --- Scale Domains ---
     // When hideNonOptimal is active, compute scale domains from optimal points only
     // so the axis fits the visible data (especially important for TTFT where non-optimal
@@ -1430,7 +1416,6 @@ const ScatterGraph = React.memo(
             yLabel,
             selectedYAxisMetric,
             hardwareConfig,
-            isTracked: trackedConfigIdsRef.current.has(buildPointConfigId(d)),
             runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
             hasTrace: typeof d.id === 'number' ? traceAvailability?.[d.id] === true : false,
             locale,
@@ -1453,24 +1438,6 @@ const ScatterGraph = React.memo(
           if (!tooltipEl) return;
 
           // ── Summary-page actions ──────────────────────────────────────────
-          const trackBtn = tooltipEl.querySelector('[data-action="track-over-time"]');
-          if (trackBtn) {
-            trackBtn.addEventListener('click', (btnEvent) => {
-              btnEvent.stopPropagation();
-              const configId = buildPointConfigId(d);
-              if (trackedConfigIdsRef.current.has(configId)) removeTrackedConfig(configId);
-              else addTrackedConfig(d, chartDefinition.chartType);
-              chartRef.current?.dismissTooltip();
-              chartRef.current?.hideTooltip();
-              track('latency_point_tracked_via_tooltip', {
-                hwKey: String(d.hwKey),
-                tp: d.tp,
-                conc: d.conc,
-                precision: d.precision,
-              });
-            });
-          }
-
           // ── "View charts" real link (supports browser open-in-new-tab) ───
           const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
           if (viewBtn && typeof d.id === 'number') {
@@ -1491,10 +1458,6 @@ const ScatterGraph = React.memo(
         yLabel,
         selectedYAxisMetric,
         hardwareConfig,
-        buildPointConfigId,
-        addTrackedConfig,
-        removeTrackedConfig,
-        chartDefinition.chartType,
         // selectedPrecisions is read via interactionRef.current in the hover
         // handlers, so it isn't a dep. traceAvailability IS read directly in the
         // tooltip content closure (the "View charts" button), so rebuild the
@@ -2889,32 +2852,15 @@ const ScatterGraph = React.memo(
     const layersRef = useRef(layers);
     layersRef.current = layers;
 
-    // --- onRender: tracked rings, CSS transitions, log tick formatting, dblclick ---
+    // --- onRender: CSS transitions, offload halos, and log tick formatting ---
     const onRender = useCallback(
       (ctx: RenderContext) => {
         // Stash the render context for the decoration effect.
         lastRenderCtxRef.current = ctx;
-        const ir = interactionRef.current;
         const { zoomGroup } = ctx.layout;
 
         // CSS transitions for smooth opacity animation on hw toggle
         zoomGroup.selectAll('.dot-group').style('transition', 'opacity 150ms ease');
-
-        // Tracked ring highlights
-        zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
-          const isTracked = trackedConfigIdsRef.current.has(buildPointConfigId(d));
-          d3.select(this)
-            .selectAll<SVGCircleElement, boolean>('.tracked-ring')
-            .data(isTracked ? [true] : [])
-            .join('circle')
-            .attr('class', 'tracked-ring')
-            .attr('r', POINT_SIZE + 5)
-            .attr('fill', 'none')
-            .attr('stroke', ir.getCssColor(ir.resolveColor(d.hwKey)))
-            .attr('stroke-width', 2)
-            .attr('opacity', 0.7)
-            .attr('pointer-events', 'none');
-        });
 
         // Offload halo: dashed ring on every point that used KV offload (Pareto or not)
         zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
@@ -2933,40 +2879,6 @@ const ScatterGraph = React.memo(
             .attr('pointer-events', 'none');
         });
 
-        // Double-click to track/untrack
-        zoomGroup
-          .selectAll<SVGGElement, InferenceData>('.dot-group')
-          .on('dblclick', function (event, d) {
-            event.stopPropagation();
-            event.preventDefault();
-            const configId = buildPointConfigId(d);
-            const wasTracked = trackedConfigIdsRef.current.has(configId);
-            if (wasTracked) removeTrackedConfig(configId);
-            else addTrackedConfig(d, chartDefinition.chartType);
-
-            // Update ring DOM immediately (onRender only runs inside the D3 effect)
-            const irNow = interactionRef.current;
-            const group = d3.select(this);
-            group
-              .selectAll<SVGCircleElement, boolean>('.tracked-ring')
-              .data(wasTracked ? [] : [true])
-              .join('circle')
-              .attr('class', 'tracked-ring')
-              .attr('r', POINT_SIZE + 5)
-              .attr('fill', 'none')
-              .attr('stroke', irNow.getCssColor(irNow.resolveColor(d.hwKey)))
-              .attr('stroke-width', 2)
-              .attr('opacity', 0.7)
-              .attr('pointer-events', 'none');
-
-            track('latency_point_tracked', {
-              hwKey: String(d.hwKey),
-              tp: d.tp,
-              conc: d.conc,
-              precision: d.precision,
-            });
-          });
-
         avoidLabelCollisions(zoomGroup);
 
         // Log tick formatting on initial render
@@ -2984,11 +2896,7 @@ const ScatterGraph = React.memo(
         }
       },
       [
-        buildPointConfigId,
         hardwareConfig,
-        addTrackedConfig,
-        removeTrackedConfig,
-        chartDefinition.chartType,
         xScaleConfig._isLog,
         yScaleConfig.type,
         optimalPointKeys,
@@ -3019,7 +2927,7 @@ const ScatterGraph = React.memo(
       const zoomGroup = d3.select(svg).select<SVGGElement>('.zoom-group');
       if (zoomGroup.empty()) return;
 
-      // Dots: visibility, vendor recolor, precision shape, tracked-ring color.
+      // Dots: visibility, vendor recolor, and precision shape.
       // Hand-rolled rather than a full renderScatterPoints pass so we skip
       // re-writing label text on every point (the expensive part of the join)
       // — and, critically, never touch the animated `transform`.
@@ -3035,7 +2943,6 @@ const ScatterGraph = React.memo(
           getShapeKeyForPrecision(d.precision, ir.selectedPrecisions),
           color,
         );
-        sel.select('.tracked-ring').attr('stroke', color);
       });
 
       // Overlay X markers: Optimal Only visibility (mirrors the official dot
