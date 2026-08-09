@@ -53,7 +53,7 @@ const URL_STATE_KEYS = [
   'i_fw',
   'i_disagg',
   'i_spec',
-  // Exact serving-envelope pair behind an Overview 30-day comparison cell.
+  // Exact serving-envelope pair behind an Overview historical comparison cell.
   'i_overview_current',
   'i_overview_baseline',
   // Evaluation

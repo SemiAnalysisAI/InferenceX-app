@@ -1,25 +1,30 @@
 import { runIdFromRunUrl } from './known-issues';
 import {
   OVERVIEW_DEFAULT_COMPARISON_MODE,
+  OVERVIEW_DEFAULT_HISTORY_DAYS,
   OVERVIEW_DEFAULT_MODEL_SCOPE,
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   OVERVIEW_PRIMARY_TIER,
+  OVERVIEW_HARDWARE,
   type OverviewComparisonMode,
   type OverviewConfigResult,
   type OverviewEngineScope,
+  type OverviewHardware,
+  type OverviewHistoryDays,
   type OverviewModelScope,
   type OverviewModelSummary,
   type OverviewReferenceHardware,
   type OverviewTier,
 } from './overview-data';
 
-export type OverviewSearchKey = 'tier' | 'engine' | 'ref' | 'compare' | 'models';
+export type OverviewSearchKey = 'tier' | 'engine' | 'ref' | 'compare' | 'hw' | 'models';
 
 const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
   'tier',
   'engine',
   'ref',
   'compare',
+  'hw',
   'models',
 ];
 
@@ -128,7 +133,7 @@ function uniqueValues(values: readonly string[]): string {
 }
 
 /**
- * Dashboard view for one Overview 30-day cell. The two independently ranked
+ * Dashboard view for one Overview historical-comparison cell. The two independently ranked
  * serving envelopes are carried explicitly so the chart can show exactly the
  * curves behind the percentage even when engine, precision, or topology changed.
  */
@@ -188,6 +193,8 @@ export function overviewHref(
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+  historyDays: OverviewHistoryDays = OVERVIEW_DEFAULT_HISTORY_DAYS,
+  visibleHardware: readonly OverviewHardware[] = OVERVIEW_HARDWARE,
 ): string {
   const base = locale === 'zh' ? '/zh/overview' : '/overview';
   const query = new URLSearchParams();
@@ -196,7 +203,13 @@ export function overviewHref(
   if (referenceHardware !== OVERVIEW_DEFAULT_REFERENCE_HARDWARE) {
     query.set('ref', referenceHardware);
   }
-  if (comparisonMode === 'history') query.set('compare', '30d');
+  if (comparisonMode === 'history') query.set('compare', `${historyDays}d`);
+  if (
+    visibleHardware.length !== OVERVIEW_HARDWARE.length ||
+    visibleHardware.some((hardware, index) => hardware !== OVERVIEW_HARDWARE[index])
+  ) {
+    query.set('hw', visibleHardware.join(','));
+  }
   if (modelScope !== OVERVIEW_DEFAULT_MODEL_SCOPE) query.set('models', modelScope);
   const search = query.toString();
   return search === '' ? base : `${base}?${search}`;
@@ -210,8 +223,19 @@ export function overviewTierHref(
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+  historyDays: OverviewHistoryDays = OVERVIEW_DEFAULT_HISTORY_DAYS,
+  visibleHardware: readonly OverviewHardware[] = OVERVIEW_HARDWARE,
 ): string {
-  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware, modelScope);
+  return overviewHref(
+    locale,
+    tier,
+    engineScope,
+    comparisonMode,
+    referenceHardware,
+    modelScope,
+    historyDays,
+    visibleHardware,
+  );
 }
 
 /** Engine-scope switch preserving the active service tier. */
@@ -222,6 +246,17 @@ export function overviewEngineScopeHref(
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+  historyDays: OverviewHistoryDays = OVERVIEW_DEFAULT_HISTORY_DAYS,
+  visibleHardware: readonly OverviewHardware[] = OVERVIEW_HARDWARE,
 ): string {
-  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware, modelScope);
+  return overviewHref(
+    locale,
+    tier,
+    engineScope,
+    comparisonMode,
+    referenceHardware,
+    modelScope,
+    historyDays,
+    visibleHardware,
+  );
 }

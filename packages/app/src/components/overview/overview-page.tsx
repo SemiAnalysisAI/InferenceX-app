@@ -1,7 +1,12 @@
 'use client';
 
+import { Maximize2, Minimize2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
+import { track } from '@/lib/analytics';
 import type { OverviewPageData } from '@/lib/overview-data';
 import { overviewHref } from '@/lib/overview-links';
 
@@ -18,6 +23,7 @@ import {
   type OverviewLocale,
 } from './overview-scorecard';
 import { OverviewNavigationProvider, useOverviewNavigation } from './overview-navigation';
+import { OverviewHardwareSelect } from './overview-hardware-select';
 
 /** The SemiAnalysis AI Cloud TCO model behind `HW_REGISTRY.costh`. */
 const OVERVIEW_SOURCE_HREF = 'https://semianalysis.com/ai-cloud-tco-model/';
@@ -38,6 +44,8 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
         data.comparisonMode,
         data.referenceHardware,
         data.modelScope,
+        data.historyDays,
+        data.visibleHardware,
       )}
     >
       <OverviewPageBody locale={locale} />
@@ -47,12 +55,35 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
 
 function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
   const { data } = useOverviewNavigation();
+  const [presentation, setPresentation] = useState(false);
   const strings = OVERVIEW_STRINGS[locale];
   const formatters = overviewFormatters(locale);
 
+  useEffect(() => {
+    if (!presentation) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPresentation(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [presentation]);
+
   return (
-    <section data-testid="overview-page" className="flex flex-col gap-4">
-      <Card>
+    <section
+      data-testid="overview-page"
+      data-presentation={presentation ? 'true' : 'false'}
+      className={
+        presentation
+          ? 'fixed inset-0 z-[100] flex flex-col gap-3 overflow-auto bg-background p-3 lg:p-5'
+          : 'flex flex-col gap-4'
+      }
+    >
+      <Card className={presentation ? 'hidden' : undefined}>
         <header>
           {/* Two rows at every width: the title, then the metric it is
               measured in and where that measure comes from. */}
@@ -105,6 +136,8 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
               comparisonMode={data.comparisonMode}
               referenceHardware={data.referenceHardware}
               modelScope={data.modelScope}
+              historyDays={data.historyDays}
+              visibleHardware={data.visibleHardware}
               locale={locale}
               strings={strings}
             />
@@ -114,6 +147,8 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
               comparisonMode={data.comparisonMode}
               referenceHardware={data.referenceHardware}
               modelScope={data.modelScope}
+              historyDays={data.historyDays}
+              visibleHardware={data.visibleHardware}
               locale={locale}
               strings={strings}
             />
@@ -127,9 +162,60 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
         tier={data.tier}
         referenceHardware={data.referenceHardware}
         modelScope={data.modelScope}
+        historyDays={data.historyDays}
+        visibleHardware={data.visibleHardware}
         locale={locale}
         strings={strings}
+        hidden={presentation}
       />
+
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-end gap-4">
+          {presentation ? (
+            <div className="pb-1">
+              <h1 className="text-lg font-semibold">{strings.title}</h1>
+              <p className="text-xs text-muted-foreground">
+                {data.comparisonMode === 'history'
+                  ? `${strings.developmentSpeedLabel}: ${strings.comparisonOptions[data.historyDays]}`
+                  : strings.hardwareComparisonLabel(
+                      data.models[0]?.platforms.find(
+                        (platform) => platform.hardware === data.referenceHardware,
+                      )?.hardwareLabel ?? data.referenceHardware,
+                    )}
+              </p>
+            </div>
+          ) : null}
+          <div className="flex min-w-0 flex-col gap-1 text-xs">
+            <span className="text-muted-foreground">{strings.hardwareColumnsLabel}</span>
+            <OverviewHardwareSelect
+              locale={locale}
+              tier={data.tier}
+              engineScope={data.engineScope}
+              comparisonMode={data.comparisonMode}
+              referenceHardware={data.referenceHardware}
+              modelScope={data.modelScope}
+              historyDays={data.historyDays}
+              value={data.visibleHardware}
+              ariaLabel={strings.hardwareColumnsAria}
+            />
+          </div>
+        </div>
+        <Button
+          data-testid="overview-presentation-toggle"
+          type="button"
+          variant="outline"
+          className="min-h-11"
+          onClick={() =>
+            setPresentation((current) => {
+              track('overview_presentation_toggled', { enabled: !current });
+              return !current;
+            })
+          }
+        >
+          {presentation ? <Minimize2 /> : <Maximize2 />}
+          {presentation ? strings.exitPresentationView : strings.presentationView}
+        </Button>
+      </div>
 
       {/* Official-only summary; uploaded runs remain in the linked dashboard. */}
       {/* Clipped on phones for the rounded corners; visible from xl so the
@@ -142,6 +228,9 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
           strings={strings}
           comparisonMode={data.comparisonMode}
           referenceHardware={data.referenceHardware}
+          historyDays={data.historyDays}
+          visibleHardware={data.visibleHardware}
+          presentation={presentation}
         />
         <MobileOverviewList
           models={data.models}
@@ -150,11 +239,15 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
           strings={strings}
           comparisonMode={data.comparisonMode}
           referenceHardware={data.referenceHardware}
+          historyDays={data.historyDays}
+          visibleHardware={data.visibleHardware}
+          presentation={presentation}
         />
         <OverviewMethodology
           strings={strings}
           comparisonMode={data.comparisonMode}
           referenceHardware={data.referenceHardware}
+          historyDays={data.historyDays}
         />
         <OverviewModelScopeToggle
           modelScope={data.modelScope}
@@ -162,6 +255,8 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
           engineScope={data.engineScope}
           comparisonMode={data.comparisonMode}
           referenceHardware={data.referenceHardware}
+          historyDays={data.historyDays}
+          visibleHardware={data.visibleHardware}
           locale={locale}
           strings={strings}
         />

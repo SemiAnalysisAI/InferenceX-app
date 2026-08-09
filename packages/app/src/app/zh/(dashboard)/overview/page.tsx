@@ -7,6 +7,8 @@ import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 import {
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
+  resolveOverviewHardware,
+  resolveOverviewHistoryDays,
   resolveOverviewModelScope,
   resolveOverviewReferenceHardware,
   resolveOverviewTier,
@@ -48,6 +50,8 @@ export default async function ZhOverviewPage({ searchParams }: Props) {
     resolveOverviewComparisonMode(sp.compare),
     resolveOverviewReferenceHardware(sp.ref),
     resolveOverviewModelScope(sp.models),
+    resolveOverviewHistoryDays(sp.compare),
+    resolveOverviewHardware(sp.hw),
   );
   return <OverviewPageContent data={data} locale="zh" />;
 }

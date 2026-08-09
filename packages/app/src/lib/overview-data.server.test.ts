@@ -188,6 +188,33 @@ describe('getOverviewPageData engine scope forwarding', () => {
     expect(getCachedBenchmarks).not.toHaveBeenCalled();
     expect(getCachedBenchmarksAsOf).not.toHaveBeenCalled();
   });
+
+  it('forwards a custom development window and visible platform selection', async () => {
+    const getCachedBenchmarksAsOf = vi.fn((_keys: string[], _date: string) => Promise.resolve([]));
+    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+    vi.doMock('@/lib/benchmark-data.server', () => ({
+      getCachedBenchmarks: vi.fn(() => Promise.resolve(rows)),
+      getCachedBenchmarksAsOf,
+    }));
+    vi.doMock('@/lib/test-fixtures', () => ({ loadFixture: vi.fn() }));
+
+    const { getOverviewPageData } = await import('./overview-data.server');
+    const page = await getOverviewPageData(50, 'community', 'history', 'b200', 'default', 7, [
+      'b200',
+      'gb300',
+    ]);
+
+    expect(page.historyDays).toBe(7);
+    expect(page.visibleHardware).toEqual(['b200', 'gb300']);
+    expect(page.historicalWindow).toEqual({
+      snapshotDate: '2026-07-20',
+      targetDate: '2026-07-13',
+      earliestDate: '2026-07-06',
+    });
+    expect(getCachedBenchmarksAsOf.mock.calls.every(([, date]) => date === '2026-07-13')).toBe(
+      true,
+    );
+  });
 });
 
 describe('getOverviewPageData model scope forwarding', () => {

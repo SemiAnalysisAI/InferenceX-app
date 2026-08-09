@@ -248,6 +248,18 @@ describe('overviewHref', () => {
     );
   });
 
+  it('serializes every supported development window and visible hardware selection', () => {
+    expect(overviewHref('en', 50, 'community', 'history', 'b200', 'default', 7)).toBe(
+      '/overview?compare=7d',
+    );
+    expect(overviewHref('en', 50, 'community', 'history', 'b200', 'default', 60)).toBe(
+      '/overview?compare=60d',
+    );
+    expect(
+      overviewHref('zh', 50, 'community', 'hardware', 'b200', 'default', 30, ['b200', 'gb300']),
+    ).toBe('/zh/overview?hw=b200%2Cgb300');
+  });
+
   it('omits the B200 default reference and preserves a non-default reference in every mode', () => {
     expect(overviewHref('en', 50, 'community', 'hardware', 'b200')).toBe('/overview');
     expect(overviewHref('en', 50, 'community', 'hardware', 'b300')).toBe('/overview?ref=b300');
@@ -361,5 +373,11 @@ describe('overview model scope links', () => {
     expect(mergeOverviewControlHref(tierHref, '/overview?tier=75', ['models'])).toBe(
       '/overview?tier=75',
     );
+  });
+
+  it('merges visible hardware without dropping the active history window', () => {
+    expect(
+      mergeOverviewControlHref('/overview?compare=60d', '/overview?hw=b200%2Cgb300', ['hw']),
+    ).toBe('/overview?compare=60d&hw=b200%2Cgb300');
   });
 });

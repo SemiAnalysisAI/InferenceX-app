@@ -37,12 +37,15 @@ describe('GET /api/v1/overview', () => {
     mockGetOverviewPageData.mockResolvedValueOnce(data);
 
     const response = await GET(
-      request('/api/v1/overview?tier=75&engine=all&compare=30d&ref=b300&models=all'),
+      request('/api/v1/overview?tier=75&engine=all&compare=60d&ref=b300&models=all&hw=b300,gb300'),
     );
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(data);
-    expect(mockGetOverviewPageData).toHaveBeenCalledWith(75, 'all', 'history', 'b300', 'all');
+    expect(mockGetOverviewPageData).toHaveBeenCalledWith(75, 'all', 'history', 'b300', 'all', 60, [
+      'b300',
+      'gb300',
+    ]);
     expect(mockCachedJson).toHaveBeenCalledWith(data);
   });
 
@@ -59,6 +62,8 @@ describe('GET /api/v1/overview', () => {
       'hardware',
       'b200',
       'default',
+      30,
+      ['b200', 'mi355x', 'b300', 'gb200', 'gb300'],
     );
   });
 

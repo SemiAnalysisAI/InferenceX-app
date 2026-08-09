@@ -30,6 +30,8 @@ function pageData(tier: OverviewTier): OverviewPageData {
     comparisonMode: 'hardware',
     referenceHardware: 'b200',
     modelScope: 'default',
+    historyDays: 30,
+    visibleHardware: ['b200', 'mi355x', 'b300', 'gb200', 'gb300'],
     historicalWindow: null,
   };
 }
