@@ -401,28 +401,10 @@ describe('generateTooltipContent', () => {
     expect(html).toContain('user-select: none');
   });
 
-  it('shows "Track Over Time" button when pinned and not tracked', () => {
-    const html = generateTooltipContent(tooltipConfig({ isPinned: true, isTracked: false }));
-    expect(html).toContain('data-action="track-over-time"');
-    expect(html).toContain('Track Over Time');
-    expect(html).not.toContain('Untrack Over Time');
-  });
-
-  it('shows "Untrack Over Time" button when pinned and already tracked', () => {
-    const html = generateTooltipContent(tooltipConfig({ isPinned: true, isTracked: true }));
-    expect(html).toContain('data-action="track-over-time"');
-    expect(html).toContain('Untrack Over Time');
-  });
-
-  it('does not show Track Over Time button when not pinned', () => {
-    const html = generateTooltipContent(tooltipConfig({ isPinned: false }));
+  it('does not include the removed Track Over Time action when pinned', () => {
+    const html = generateTooltipContent(tooltipConfig({ isPinned: true }));
     expect(html).not.toContain('data-action="track-over-time"');
     expect(html).not.toContain('Track Over Time');
-  });
-
-  it('defaults isTracked to false when not provided', () => {
-    const html = generateTooltipContent(tooltipConfig({ isPinned: true }));
-    expect(html).toContain('Track Over Time');
     expect(html).not.toContain('Untrack Over Time');
   });
 });
