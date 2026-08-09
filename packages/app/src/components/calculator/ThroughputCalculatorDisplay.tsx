@@ -27,6 +27,7 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { overlayRunColor } from '@/lib/overlay-run-style';
+import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
@@ -150,6 +151,9 @@ const STRINGS = {
     compMetricThroughput: 'throughput',
     compMetricCost: 'cost efficiency',
     compMetricPower: 'tok/s/MW',
+    hideSkuAboveConfigLimitLabel: 'Hide if target exceeds config range',
+    hideSkuAboveConfigLimitHelp:
+      'When enabled, SKUs whose measured interactivity range ends below the target are hidden instead of being projected from the max edge.',
     unofficialRun: 'UNOFFICIAL RUN',
     branch: 'Branch',
     viewRun: 'View workflow run',
@@ -199,6 +203,9 @@ const STRINGS = {
     compMetricThroughput: '吞吐量',
     compMetricCost: '成本效率',
     compMetricPower: 'tok/s/MW',
+    hideSkuAboveConfigLimitLabel: '隐藏超出配置上限的型号',
+    hideSkuAboveConfigLimitHelp:
+      '开启后，若目标交互性高于某个配置的实测上限，不再显示该 SKU，避免把结果投射到该配置最大边界。',
     unofficialRun: '非官方运行',
     branch: '分支',
     viewRun: '查看工作流运行',
@@ -294,6 +301,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [highContrast, setHighContrast] = useState(false);
   const [viewMode, setViewMode] = useState<CalculatorViewMode>('chart');
+  const [hideSkuAboveConfigLimit, setHideSkuAboveConfigLimit] = useState(true);
 
   const costTypeLabels: Record<CostType, string> = useMemo(
     () => ({ total: t.totalTokens, input: t.inputTokens, output: t.outputTokens }),
@@ -455,8 +463,16 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const results: InterpolatedResult[] = useMemo(() => {
     if (!hasData) return [];
-    return getResults(targetValue, mode, costProvider, visibleHwKeys);
-  }, [hasData, targetValue, mode, costProvider, getResults, visibleHwKeys]);
+    return getResults(targetValue, mode, costProvider, visibleHwKeys, hideSkuAboveConfigLimit);
+  }, [
+    hasData,
+    targetValue,
+    mode,
+    costProvider,
+    getResults,
+    visibleHwKeys,
+    hideSkuAboveConfigLimit,
+  ]);
 
   /** Branch + URL per run index, stamped onto overlay results for labels/tooltips. */
   const runInfoByIndex = useMemo(() => {
@@ -469,7 +485,14 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const overlayResults: InterpolatedResult[] = useMemo(() => {
     if (!hasOverlayData) return [];
-    return getOverlayResults(targetValue, mode, costProvider, visibleHwKeys, runInfoByIndex);
+    return getOverlayResults(
+      targetValue,
+      mode,
+      costProvider,
+      visibleHwKeys,
+      runInfoByIndex,
+      hideSkuAboveConfigLimit,
+    );
   }, [
     hasOverlayData,
     targetValue,
@@ -478,6 +501,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     getOverlayResults,
     visibleHwKeys,
     runInfoByIndex,
+    hideSkuAboveConfigLimit,
   ]);
 
   /**
@@ -618,6 +642,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const handleViewModeChange = useCallback((value: CalculatorViewMode) => {
     setViewMode(value);
     track('calculator_view_changed', { view: value });
+  }, []);
+
+  const handleHideSkuAboveLimitChange = useCallback((checked: boolean) => {
+    setHideSkuAboveConfigLimit(checked);
+    track('calculator_hide_over_limit_toggled', { enabled: checked });
   }, []);
 
   const handleResetGpus = useCallback(() => {
@@ -1004,6 +1033,19 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                       onBlur={handleInputBlur}
                       className="w-24 h-9"
                       min={0}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <LabelWithTooltip
+                      htmlFor="calc-hide-over-limit"
+                      label={t.hideSkuAboveConfigLimitLabel}
+                      tooltip={t.hideSkuAboveConfigLimitHelp}
+                    />
+                    <Switch
+                      id="calc-hide-over-limit"
+                      checked={hideSkuAboveConfigLimit}
+                      onCheckedChange={handleHideSkuAboveLimitChange}
+                      className="shrink-0"
                     />
                   </div>
                 </div>

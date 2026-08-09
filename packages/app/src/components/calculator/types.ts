@@ -62,6 +62,16 @@ export interface InterpolatedResult {
    */
   clamped?: boolean;
   /**
+   * True when the target is above the frontier's max x (config cannot operate at
+   * this interactivity, so the bar is projected from the max edge).
+   */
+  clampedAbove?: boolean;
+  /**
+   * True when the target is below the frontier's min x (the bar is projected from
+   * the min edge).
+   */
+  clampedBelow?: boolean;
+  /**
    * True when this result was interpolated from an unofficial-run overlay
    * (`?unofficialrun=…`) rather than official DB data. Overlay results are
    * rendered in the run's palette color and never mixed into the official
