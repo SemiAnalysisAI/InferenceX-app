@@ -62,6 +62,15 @@ const DP_RANK_PALETTE = [
   '#eab308',
 ];
 
+/**
+ * Bare DP ranks read as "DP 3"; disaggregated runs get role- or worker-
+ * qualified labels from the ETL ("decode", "prefill 0", "0 (a01a)") that
+ * already name themselves, so those pass through untouched.
+ */
+function engineSeriesName(engineLabel: string): string {
+  return /^\d+$/u.test(engineLabel) ? `DP ${engineLabel}` : engineLabel;
+}
+
 export function KvCacheUtilizationCard({ sliced }: { sliced: SlicedServerSeries }) {
   return (
     <ExpandableChart
@@ -77,13 +86,17 @@ export function KvCacheUtilizationCard({ sliced }: { sliced: SlicedServerSeries 
         // than one, draw one line per rank in distinct colors so
         // load skew is visible at a glance; cluster-average sits on
         // top in white so it stands out.
-        const perEngine = serverSeries.kvCacheUsageByEngine ?? [];
+        // Phase slicing can empty an engine that only reported in the other
+        // phase — drop those so they don't take a legend slot with no line.
+        const perEngine = (serverSeries.kvCacheUsageByEngine ?? []).filter(
+          (e) => e.points.length > 0,
+        );
         const hasPerEngine = perEngine.length > 1;
         // Render order matters: per-engine first → average drawn on top.
         const series = [
           ...(hasPerEngine
             ? perEngine.map((e, i) => ({
-                name: `DP ${e.engineLabel}`,
+                name: engineSeriesName(e.engineLabel),
                 data: rollingAverage(e.points, 50),
                 color: DP_RANK_PALETTE[i % DP_RANK_PALETTE.length]!,
                 // Thin + translucent so the Avg line on top reads as

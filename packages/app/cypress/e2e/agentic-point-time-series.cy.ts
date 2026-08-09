@@ -353,3 +353,63 @@ describe('Agentic point orchestrator metric sources', () => {
     cy.get('[data-testid="throughput-series-decode"]').should('have.attr', 'aria-pressed', 'false');
   });
 });
+
+const engineSeries = (engineLabel: string, value: number) => ({
+  engineLabel,
+  points: [
+    { t: 0, value },
+    { t: 1, value: value + 0.05 },
+  ],
+});
+
+describe('Agentic point per-engine KV overlay', () => {
+  beforeEach(() => {
+    cy.intercept('GET', '/api/v1/trace-histograms*', { body: {} });
+    cy.intercept('GET', '/api/v1/benchmark-siblings*', { statusCode: 404 });
+    cy.intercept('GET', '/api/v1/request-timeline*', { statusCode: 404 });
+    cy.intercept('GET', '/api/v1/trace-server-metrics*', {
+      body: {
+        meta: pointMeta,
+        startNs: 0,
+        endNs: 2_000_000_000,
+        durationS: 2,
+        timeslicesCount: 2,
+        kvCacheUsage: [
+          { t: 0, value: 0.3 },
+          { t: 1, value: 0.35 },
+        ],
+        prefixCacheHitRate: [],
+        queueDepth: [],
+        promptTokensBySource: {},
+        prefillTps: [],
+        decodeTps: [],
+        prefixCacheHitsTps: [],
+        hostKvCacheUsage: [],
+        // Bare DP ranks plus a role-qualified engine, as the ETL emits for a
+        // disaggregated run where the decode worker reports no rank label.
+        kvCacheUsageByEngine: [
+          engineSeries('0', 0.2),
+          engineSeries('1', 0.4),
+          engineSeries('decode', 0.6),
+        ],
+        metricSources: [],
+      },
+    });
+    cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+  });
+
+  it('draws one legend entry per engine and leaves named engines unprefixed', () => {
+    cy.contains('svg', 'KV cache (%)')
+      .first()
+      .within(() => {
+        cy.contains('text', 'DP 0').should('be.visible');
+        cy.contains('text', 'DP 1').should('be.visible');
+        // Already self-describing — must NOT come out as "DP decode".
+        cy.contains('text', 'decode').should('be.visible');
+        cy.contains('text', 'DP decode').should('not.exist');
+        cy.contains('text', 'Avg').should('be.visible');
+        // One line per engine plus the average, and no duplicate chips.
+        cy.get('path[fill="none"]').should('have.length', 4);
+      });
+  });
+});

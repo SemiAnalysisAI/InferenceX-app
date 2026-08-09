@@ -65,8 +65,26 @@ import {
  * warmup block are unaffected. (v11 was a short-lived, since-reverted attempt to
  * carry kvCachePoolTokens in chart_series; that value now lives in
  * benchmark_results.metrics, derived from the server log — unrelated to this.)
+ *
+ * v13: give the KV-cache series a real per-engine identity instead of "one
+ * entry per raw series". Three independent sources of duplication were
+ * inflating `kvCacheUsageByEngine` (up to 8x — 64 lines for a run with 18
+ * real engines) and fragmenting the cluster-average `kvCacheUsage`:
+ *   1. v12's warmup merge concatenates each engine's warmup and profiling
+ *      series, so every engine appeared at least twice — and single-engine
+ *      deployments started drawing a spurious two-line "per-engine" overlay.
+ *   2. vLLM run with multiple API-server frontends exposes the *same* engine
+ *      set on every `/metrics` endpoint, so an 8-rank DP deployment scraped
+ *      from two frontends yielded 16 series for 8 engines.
+ *   3. Tensor-/pipeline-/expert-parallel ranks each report the one KV pool
+ *      they share, so a TP8 worker looked like 8 engines holding identical
+ *      values.
+ * Series are now grouped by their Prometheus label set (see
+ * `seriesIdentityKey`), and the cluster average is a real mean across those
+ * logical engines (see `averageAcrossEngines`) rather than a mean over
+ * whichever engines happened to share an exact `start_ns`.
  */
-export const CHART_SERIES_VERSION = 12;
+export const CHART_SERIES_VERSION = 13;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -303,6 +321,245 @@ function sortedEntries(m: Map<number, number>): [number, number][] {
   return [...m.entries()].toSorted((a, b) => a[0] - b[0]);
 }
 
+// ── Per-engine identity (v13) ───────────────────────────────────────────
+//
+// A "logical engine" is one KV-cache pool: one DP rank of one worker. The blob
+// stores one `RawSeries` per (scrape endpoint × phase block × label set), which
+// is NOT the same thing — see the v13 note at the top of the file.
+
+/**
+ * Ranks that shard ONE engine rather than naming a separate one. A KV cache is
+ * allocated per engine and shared by its tensor-, pipeline- and expert-parallel
+ * ranks, so every such rank reports the same pool: on a TP8 SGLang prefill
+ * worker all eight `tp_rank` series track each other to four decimal places.
+ * Treating them as separate engines drew eight identical lines for one pool.
+ *
+ * `engine` / `engine_idx` / `dp_rank` are deliberately NOT here — those DO name
+ * distinct pools (one per DP rank / engine core).
+ */
+const INTRA_ENGINE_SHARD_LABELS = new Set(['tp_rank', 'pp_rank', 'ep_rank', 'moe_ep_rank']);
+
+/**
+ * Identity of a metric series, following Prometheus semantics: the label set
+ * IS the series, and the scrape endpoint is transport rather than identity.
+ * Two `/metrics` endpoints exposing `{engine="3", model_name="X"}` are two
+ * views of one engine — which is exactly what vLLM does when it runs several
+ * API-server frontends over one DP engine group.
+ *
+ * Deployments whose endpoints really are distinct engines say so in the
+ * labels: Dynamo tags every series with `worker_id` (plus `dynamo_component`
+ * / `engine_type`), so prefill worker rank 0 and decode worker rank 0 keep
+ * separate identities here.
+ *
+ * Shard ranks are excluded (see `INTRA_ENGINE_SHARD_LABELS`). Series left with
+ * no labels at all fall back to the endpoint, which keeps label-less workers
+ * apart rather than silently fusing them.
+ */
+function seriesIdentityKey(s: RawSeries): string {
+  const labels = s.labels ?? {};
+  const names = Object.keys(labels)
+    .filter((name) => !INTRA_ENGINE_SHARD_LABELS.has(name))
+    .toSorted();
+  if (names.length === 0) return `@${s.endpoint_url ?? ''}`;
+  // Join on control characters so a name or value containing '=' or ','
+  // cannot forge another label set's key.
+  return names.map((name) => `${name}\u0001${labels[name]}`).join('\u0002');
+}
+
+/** Dynamo/SGLang name their roles differently; normalize for display. */
+const ENGINE_ROLE_BY_NATIVE_LABEL: Record<string, string> = {
+  prefill: 'prefill',
+  decode: 'decode',
+  backend: 'decode',
+};
+
+/** DP-rank-ish label under any of the names the frameworks emit. */
+function engineRankLabel(labels: Record<string, string>): string | null {
+  return labels['engine'] ?? labels['engine_idx'] ?? labels['dp_rank'] ?? null;
+}
+
+function engineRoleLabel(labels: Record<string, string>): string | null {
+  const native = labels['engine_type'] ?? labels['dynamo_component'];
+  return native ? (ENGINE_ROLE_BY_NATIVE_LABEL[native] ?? null) : null;
+}
+
+/**
+ * Short, human-readable tiebreaker for engines that would otherwise share a
+ * display label (e.g. two decode workers that each number their ranks 0..7).
+ */
+function engineDiscriminator(labels: Record<string, string>, endpointUrl: string): string | null {
+  const worker = labels['worker_id'];
+  if (worker) return worker.length > 4 ? worker.slice(-4) : worker;
+  // Fall back to the endpoint's host:port, which is what distinguishes
+  // workers when the orchestrator doesn't emit a worker id.
+  const hostPort = /^\w+:\/\/(?<hostPort>[^/]+)/u.exec(endpointUrl)?.groups?.['hostPort'];
+  return hostPort ?? (endpointUrl || null);
+}
+
+interface LogicalEngine {
+  engineLabel: string;
+  points: TimeSeriesPoint[];
+}
+
+interface EngineGroup {
+  labels: Record<string, string>;
+  /** Per endpoint, the engine's samples keyed by scrape instant. */
+  byEndpoint: Map<string, Map<number, { sum: number; count: number }>>;
+}
+
+/**
+ * Collapse a gauge's raw series into one entry per logical engine.
+ *
+ * The three kinds of duplication need three different treatments:
+ *   - Same endpoint, different phase blocks (v12's warmup merge): disjoint
+ *     time ranges, so keying by scrape instant simply unions them into one
+ *     continuous series.
+ *   - Same endpoint, same instant: intra-engine shard ranks reporting the
+ *     one pool they share, so they collapse to their mean (identical in
+ *     practice, to four decimal places).
+ *   - Different endpoints (mirrored API-server frontends): overlapping time
+ *     ranges carrying the same measurement a few hundred ms apart. Merging
+ *     them would interleave near-duplicate samples and silently halve the
+ *     span of the frontend's fixed-width rolling average, so we keep the
+ *     endpoint with the most complete coverage and drop the rest.
+ */
+function resolveLogicalEngines(
+  series: readonly RawSeries[] | undefined,
+  tOf: (ns: number) => number,
+): LogicalEngine[] {
+  const groups = new Map<string, EngineGroup>();
+  for (const s of series ?? []) {
+    const key = seriesIdentityKey(s);
+    let group = groups.get(key);
+    if (!group) {
+      group = { labels: s.labels ?? {}, byEndpoint: new Map() };
+      groups.set(key, group);
+    }
+    const endpoint = s.endpoint_url ?? '';
+    let scrapes = group.byEndpoint.get(endpoint);
+    if (!scrapes) {
+      scrapes = new Map();
+      group.byEndpoint.set(endpoint, scrapes);
+    }
+    for (const ts of s.timeslices ?? []) {
+      if (typeof ts.start_ns !== 'number' || typeof ts.avg !== 'number') continue;
+      if (!Number.isFinite(ts.avg)) continue;
+      const at = scrapes.get(ts.start_ns);
+      if (at) {
+        at.sum += ts.avg;
+        at.count++;
+      } else {
+        scrapes.set(ts.start_ns, { sum: ts.avg, count: 1 });
+      }
+    }
+  }
+
+  // Insertion order = first appearance in the blob, which is the engine order
+  // the exporter emitted; `rank` sorting below refines it when ranks exist.
+  const resolved: { label: string; discriminator: string | null; points: TimeSeriesPoint[] }[] = [];
+  for (const group of groups.values()) {
+    // Deterministic pick: most scrape instants wins, endpoint URL breaks ties.
+    let chosenEndpoint = '';
+    let chosen: Map<number, { sum: number; count: number }> | null = null;
+    for (const [endpoint, scrapes] of [...group.byEndpoint].toSorted((a, b) =>
+      a[0].localeCompare(b[0]),
+    )) {
+      if (scrapes.size > (chosen?.size ?? 0)) {
+        chosen = scrapes;
+        chosenEndpoint = endpoint;
+      }
+    }
+    if (!chosen || chosen.size === 0) continue;
+    const rank = engineRankLabel(group.labels);
+    const role = engineRoleLabel(group.labels);
+    const discriminator = engineDiscriminator(group.labels, chosenEndpoint);
+    const named = role ? (rank === null ? role : `${role} ${rank}`) : rank;
+    resolved.push({
+      // With no rank- or role-like label the worker/endpoint is the only thing
+      // that names this engine, so lead with it instead of a bare index.
+      label: named ?? discriminator ?? '',
+      discriminator,
+      points: [...chosen.entries()]
+        .toSorted((a, b) => a[0] - b[0])
+        .map(([startNs, { sum, count }]) => ({ t: tOf(startNs), value: sum / count })),
+    });
+  }
+
+  // Plain numeric ranks render in 0..N order; role-qualified and endpoint-named
+  // engines keep the order the exporter emitted them in.
+  const ordered = resolved
+    .map((engine, idx) => {
+      const numeric = Number(engine.label);
+      return { ...engine, idx, sortKey: engine.label && Number.isFinite(numeric) ? numeric : idx };
+    })
+    .toSorted((a, b) => a.sortKey - b.sortKey || a.idx - b.idx)
+    .map((engine, idx) => ({ ...engine, base: engine.label || `#${idx}` }));
+
+  // Qualify collisions (e.g. two decode workers that each number their ranks
+  // 0..7) so every legend entry names exactly one engine.
+  const baseCounts = new Map<string, number>();
+  for (const engine of ordered) baseCounts.set(engine.base, (baseCounts.get(engine.base) ?? 0) + 1);
+  const used = new Set<string>();
+  return ordered.map((engine, idx) => {
+    let engineLabel = engine.base;
+    if ((baseCounts.get(engine.base) ?? 0) > 1) {
+      const qualifier =
+        engine.discriminator && engine.discriminator !== engine.base ? engine.discriminator : idx;
+      engineLabel = `${engine.base} (${qualifier})`;
+    }
+    // Last resort, so a legend entry never stands for two lines.
+    while (used.has(engineLabel)) engineLabel = `${engineLabel}'`;
+    used.add(engineLabel);
+    return { engineLabel, points: engine.points };
+  });
+}
+
+/**
+ * Mean utilization across logical engines on the union of their scrape times.
+ *
+ * Engines are not scraped in lockstep — different workers (and occasionally a
+ * single lagging rank) sit on their own sub-second grid — so grouping on an
+ * exact `start_ns` would average whichever subset happened to share that
+ * nanosecond. On a disaggregated run that means alternating between
+ * "prefill only" and "decode only", which reads as a full-scale sawtooth
+ * rather than a cluster average.
+ *
+ * Each engine therefore holds its last scrape until its next one (a gauge
+ * keeps its value between scrapes) and contributes only inside its own
+ * observed window, so an engine that starts late or stops early neither
+ * pulls the mean toward a stale value nor drops it to zero.
+ */
+function averageAcrossEngines(engines: readonly LogicalEngine[]): TimeSeriesPoint[] {
+  const active = engines.filter((engine) => engine.points.length > 0);
+  if (active.length === 0) return [];
+  // Single engine: its own samples already are the cluster average.
+  if (active.length === 1) return active[0]!.points;
+
+  const timeline = [...new Set(active.flatMap((e) => e.points.map((p) => p.t)))].toSorted(
+    (a, b) => a - b,
+  );
+  const cursors: number[] = Array.from({ length: active.length }, () => -1);
+  const lastT = active.map((engine) => engine.points.at(-1)!.t);
+  const out: TimeSeriesPoint[] = [];
+  for (const t of timeline) {
+    let sum = 0;
+    let n = 0;
+    for (const [i, engine] of active.entries()) {
+      const points = engine.points;
+      let cursor = cursors[i]!;
+      while (cursor + 1 < points.length && points[cursor + 1]!.t <= t) cursor++;
+      cursors[i] = cursor;
+      // Before this engine's first scrape or after its last — no value to
+      // carry, so it sits out of this tick's mean entirely.
+      if (cursor < 0 || t > lastT[i]!) continue;
+      sum += points[cursor]!.value;
+      n++;
+    }
+    if (n > 0) out.push({ t, value: sum / n });
+  }
+  return out;
+}
+
 function buildSeriesFromMetrics(
   metrics: MetricsMap,
   context: ServerMetricsContext,
@@ -347,33 +604,15 @@ function buildSeriesFromMetrics(
     'vllm:gpu_cache_usage_perc',
     'sglang:token_usage',
   );
-  const kvCacheUsage: TimeSeriesPoint[] = sortedEntries(
-    aggregateByStart(kvSeries, 'avg', 'avg'),
-  ).map(([t, v]) => ({ t: tOf(t), value: v }));
-  // Per-engine breakdown of the same metric. We only emit it when there's
-  // more than one series — single-engine deployments would just duplicate
-  // the cluster-average line.
-  const kvCacheUsageByEngine: { engineLabel: string; points: TimeSeriesPoint[] }[] = [];
-  if (kvSeries && kvSeries.length > 1) {
-    // Sort by numeric engine label when present so rank 0..N renders in
-    // order; fall back to series-array index otherwise.
-    const decorated = kvSeries.map((s, idx) => {
-      const raw =
-        s.labels?.['engine'] ?? s.labels?.['engine_idx'] ?? s.labels?.['dp_rank'] ?? String(idx);
-      const numeric = Number(raw);
-      return { series: s, idx, label: raw, sortKey: Number.isFinite(numeric) ? numeric : idx };
-    });
-    decorated.sort((a, b) => a.sortKey - b.sortKey);
-    for (const { series, label } of decorated) {
-      const pts: TimeSeriesPoint[] = [];
-      for (const ts of series.timeslices ?? []) {
-        if (typeof ts.start_ns !== 'number' || typeof ts.avg !== 'number') continue;
-        if (!Number.isFinite(ts.avg)) continue;
-        pts.push({ t: tOf(ts.start_ns), value: ts.avg });
-      }
-      if (pts.length > 0) kvCacheUsageByEngine.push({ engineLabel: label, points: pts });
-    }
-  }
+  // One entry per logical engine (v13) — mirrored API-server frontends and the
+  // warmup/profiling phase split are collapsed here rather than showing up as
+  // extra "engines".
+  const engines = resolveLogicalEngines(kvSeries, tOf);
+  const kvCacheUsage: TimeSeriesPoint[] = averageAcrossEngines(engines);
+  // Per-engine breakdown of the same metric. Emitted only for genuinely
+  // multi-engine deployments — with one engine it would just duplicate the
+  // cluster-average line.
+  const kvCacheUsageByEngine = engines.length > 1 ? engines : [];
 
   // Prefix cache hit rate per scrape: Σhits.rate / Σqueries.rate across
   // engines, joined on start_ns. SGLang names: cached_tokens / prompt_tokens.

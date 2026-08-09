@@ -89,6 +89,16 @@ AIPerf defines the `server_metrics_export.json` envelope, but labels such as wor
 
 Adapters are selected from the benchmark's canonical framework, and per-worker series are only emitted for disaggregated configs with a recognized adapter. Unknown orchestrators and non-disaggregated configs retain their aggregate-only series; roles are never guessed from ports or metric names. The frontend only consumes the canonical source identity and never interprets orchestrator-native labels.
 
+### Logical Engines vs Raw Series
+
+A raw series in the blob is one `(scrape endpoint × phase block × label set)` tuple, which is **not** the same as one engine. The KV-cache chart needs one entry per _logical engine_ — one KV pool — so `compute-chart-series.ts` groups series by their Prometheus label set (`seriesIdentityKey`) rather than emitting one entry per raw series. Three kinds of duplication collapse there:
+
+- **Phase blocks.** The warmup and profiling blocks each carry their own series for the same engine. They cover disjoint time ranges, so keying by scrape instant unions them into one continuous line.
+- **Mirrored API-server frontends.** vLLM run with several API servers exposes the _same_ engine set on every `/metrics` endpoint, a few hundred ms apart. Identity ignores `endpoint_url` (Prometheus treats the label set as the series), and the endpoint with the most complete coverage wins — merging the mirrors instead would interleave near-duplicate samples and halve the effective span of the frontend's fixed-width rolling average.
+- **Intra-engine shard ranks.** `tp_rank` / `pp_rank` / `ep_rank` / `moe_ep_rank` shard one pool and all report the same utilization, so they are excluded from the identity and averaged. `engine` / `engine_idx` / `dp_rank` are _not_ excluded — those do name distinct pools.
+
+The cluster average is then a mean across those logical engines on the union of their scrape instants, with each engine holding its last sample until its next one and contributing only inside its own observed window. Grouping on an exact `start_ns` instead would average whichever engines happened to share that nanosecond — on a disaggregated run that alternates between "prefill only" and "decode only" and reads as a full-scale sawtooth.
+
 ### Agentic Dataset Provenance
 
 AIPerf exports public-dataset provenance in `metadata.dataset`, including the Hugging Face dataset ID. InferenceX preserves that object as `dataset` on each agentic aggregate benchmark row. During benchmark ingest, `ingest-ci-run.ts` derives the dashboard slug from `hf_dataset_name` (for example, `semianalysisai/cc-traces-weka-062126` becomes `cc-traces-weka-062126`) and upserts `run_datasets` for the workflow run.
