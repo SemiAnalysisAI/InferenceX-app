@@ -415,7 +415,11 @@ export default function ChartDisplay() {
   const overlayScope = useMemo(() => {
     const eligibleKeys = new Set<string>();
     for (const overlay of [overlayDataByChartType.e2e, overlayDataByChartType.interactivity]) {
-      for (const point of overlay?.data ?? []) {
+      const points = [
+        ...(overlay?.data ?? []),
+        ...(overlay?.clippedData ?? []).map((entry) => entry.point),
+      ];
+      for (const point of points) {
         const key = String(point.hwKey);
         if (
           selectedPrecisions.includes(point.precision) &&
@@ -430,7 +434,8 @@ export default function ChartDisplay() {
   const officialScope = useMemo(() => {
     const eligibleKeys = new Set<string>();
     for (const graph of graphs) {
-      for (const point of graph.data) {
+      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      for (const point of points) {
         if (
           selectedPrecisions.includes(point.precision) &&
           matchesQuickFilters(point, quickFilters)
@@ -538,7 +543,9 @@ export default function ChartDisplay() {
     if (graphs.length > 0) return graphs;
     const hasOverlay =
       (overlayDataByChartType.e2e?.data.length ?? 0) > 0 ||
-      (overlayDataByChartType.interactivity?.data.length ?? 0) > 0;
+      (overlayDataByChartType.e2e?.clippedData?.length ?? 0) > 0 ||
+      (overlayDataByChartType.interactivity?.data.length ?? 0) > 0 ||
+      (overlayDataByChartType.interactivity?.clippedData?.length ?? 0) > 0;
     if (!hasOverlay) return graphs;
     return (chartDefinitions as ChartDefinition[]).map((chartDefinition) => ({
       model: selectedModel,
@@ -835,9 +842,26 @@ export default function ChartDisplay() {
                           graph.chartDefinition.chartType,
                           overlayDataByChartType,
                         );
+                        // Display limits keep outliers off the plotted domain but
+                        // must not silently remove measured rows from the table.
+                        // Restore both official and unofficial clipped points before
+                        // applying the shared precision, quick-filter, and legend gates.
+                        const tableOfficialData = [
+                          ...graph.data,
+                          ...(graph.clippedData ?? []).map((entry) => entry.point),
+                        ];
+                        const tableOverlay = overlay
+                          ? {
+                              ...overlay,
+                              data: [
+                                ...overlay.data,
+                                ...(overlay.clippedData ?? []).map((entry) => entry.point),
+                              ],
+                            }
+                          : overlay;
                         const { officialRows, overlayRows } = visibleComparisonRows(
-                          graph.data,
-                          overlay,
+                          tableOfficialData,
+                          tableOverlay,
                         );
                         return (
                           <>

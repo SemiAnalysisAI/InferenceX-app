@@ -938,6 +938,110 @@ describe('ScatterGraph', () => {
 });
 
 describe('ChartDisplay engine comparison guard', () => {
+  it('includes cost-clipped official and unofficial points in table mode', () => {
+    const chartDefinition = createMockChartDefinition({
+      chartType: 'interactivity',
+      x: 'median_intvty',
+      x_label: 'Interactivity (tok/s/user)',
+      y_costhOutput: 'costhOutput.y',
+      y_costhOutput_label: 'Cost per Million Output Tokens ($)',
+      y_costhOutput_roofline: 'lower_right',
+      y_cost_limit: 5,
+    });
+    const officialVisible = createMockInferenceData({
+      hwKey: 'b200_sglang',
+      precision: Precision.FP4,
+      tp: 4,
+      median_intvty: 134.7,
+      costhOutput: { y: 4, roof: true },
+    });
+    const officialClipped = createMockInferenceData({
+      hwKey: 'b200_sglang',
+      precision: Precision.FP4,
+      tp: 8,
+      median_intvty: 142.1,
+      costhOutput: { y: 7.016, roof: true },
+    });
+    const runUrl = 'https://github.com/x/y/actions/runs/707';
+    const overlayVisible = createMockInferenceData({
+      hwKey: 'h100_vllm',
+      precision: Precision.FP4,
+      tp: 4,
+      median_intvty: 130,
+      costhOutput: { y: 4.5, roof: true },
+      run_url: runUrl,
+    });
+    const overlayClipped = createMockInferenceData({
+      hwKey: 'h100_vllm',
+      precision: Precision.FP4,
+      tp: 8,
+      median_intvty: 145,
+      costhOutput: { y: 7.5, roof: true },
+      run_url: runUrl,
+    });
+    const runInfo = {
+      id: 707,
+      name: 'clipped-table-overlay',
+      branch: 'clipped-table-overlay',
+      sha: 'abc707',
+      createdAt: '2026-08-09T00:00:00Z',
+      url: runUrl,
+      conclusion: 'success',
+      status: 'completed',
+      isNonMainBranch: true,
+    };
+
+    mountWithProviders(<ChartDisplay />, {
+      inference: {
+        graphs: [
+          {
+            model: Model.DeepSeek_R1,
+            sequence: Sequence.EightK_OneK,
+            chartDefinition,
+            data: [officialVisible],
+            clippedData: [{ point: officialClipped, reasons: ['cost'] }],
+          },
+        ],
+        selectedYAxisMetric: 'y_costhOutput',
+        selectedXAxisMode: 'interactivity',
+        activeHwTypes: new Set(['b200_sglang']),
+        hwTypesWithData: new Set(['b200_sglang']),
+      },
+      globalFilters: {
+        selectedModel: Model.DeepSeek_R1,
+        selectedSequence: Sequence.EightK_OneK,
+        effectiveSequence: Sequence.EightK_OneK,
+      },
+      unofficial: {
+        isUnofficialRun: true,
+        unofficialRunInfo: runInfo,
+        unofficialRunInfos: [runInfo],
+        runIndexByUrl: { [runUrl]: 0, '707': 0 },
+        getOverlayData: () => ({
+          data: [overlayVisible, overlayClipped],
+          hardwareConfig: hwConfig,
+        }),
+        activeOverlayHwTypes: new Set(['h100_vllm']),
+        allOverlayHwTypes: new Set(['h100_vllm']),
+      },
+    });
+
+    cy.get('[data-testid="inference-table-view-btn"]').click();
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 4);
+    cy.get('[data-testid="inference-results-table"] tbody')
+      .contains('tr', '7.0')
+      .should('contain.text', 'SGLang')
+      .find('td')
+      .eq(2)
+      .should('have.text', '8');
+    cy.get('[data-testid="inference-results-table"] tbody')
+      .contains('tr', '7.5')
+      .should('contain.text', 'vLLM')
+      .find('td')
+      .eq(2)
+      .should('have.text', '8');
+  });
+
   it('keeps official table rows synchronized with legend state after a scope change', () => {
     const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
     const baseInference = createMockInferenceContext();
