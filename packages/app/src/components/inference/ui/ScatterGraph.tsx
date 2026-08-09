@@ -43,7 +43,6 @@ import {
   overlayRunIndex,
 } from '@/lib/overlay-run-style';
 import {
-  POINT_SIZE,
   HIT_AREA_RADIUS,
   formatLargeNumber,
   logTickFormat,

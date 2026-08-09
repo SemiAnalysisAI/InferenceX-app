@@ -208,7 +208,6 @@ export default function ChartDisplay() {
     selectedSequence,
     selectedRunDate,
     setIsLegendExpanded,
-    logScale,
     activeHwTypes,
     activeDates,
     selectedPercentile,
