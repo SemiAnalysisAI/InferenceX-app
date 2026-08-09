@@ -564,6 +564,68 @@ describe('ScatterGraph', () => {
     ).should('have.css', 'opacity', '1');
   });
 
+  it('renders a line label for a singleton ingested hardware series', () => {
+    const interactivityChartDef = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const data = [
+      createMockInferenceData({
+        hwKey: 'b200_tilert_mtp',
+        x: 340,
+        y: 150,
+        precision: Precision.FP8,
+      }),
+      createMockInferenceData({ hwKey: 'h100', x: 300, y: 190, precision: Precision.FP8 }),
+      createMockInferenceData({ hwKey: 'h100', x: 340, y: 150, precision: Precision.FP8 }),
+    ];
+    const baseInference = createMockInferenceContext();
+
+    function IngestedSingletonLabelHarness() {
+      const [showLineLabels, setShowLineLabels] = useState(true);
+      return (
+        <InferenceContext.Provider
+          value={{
+            ...baseInference,
+            hardwareConfig: hwConfig,
+            activeHwTypes: new Set(['b200_tilert_mtp', 'h100']),
+            hwTypesWithData: new Set(['b200_tilert_mtp', 'h100']),
+            selectedPrecisions: [Precision.FP8],
+            showLineLabels,
+            setShowLineLabels,
+          }}
+        >
+          <div style={{ width: 800, height: 600 }}>
+            <ScatterGraph
+              chartId="test-scatter-ingested-singleton-label"
+              modelLabel="GLM5/5.1 744B"
+              data={data}
+              xLabel="Interactivity (tok/s/user)"
+              yLabel="Token Throughput per GPU"
+              chartDefinition={interactivityChartDef}
+            />
+          </div>
+        </InferenceContext.Provider>
+      );
+    }
+
+    mountWithProviders(<IngestedSingletonLabelHarness />, { unofficial: {} });
+
+    cy.get('#test-scatter-ingested-singleton-label svg .unofficial-overlay-pt').should('not.exist');
+    cy.get('#test-scatter-ingested-singleton-label svg .line-label[data-hw-key="b200_tilert_mtp"]')
+      .should('have.css', 'opacity', '1')
+      .find('text')
+      .should('have.text', 'B200 (TileRT, MTP)');
+
+    cy.get('#scatter-line-labels').click();
+    cy.get('#test-scatter-ingested-singleton-label svg .line-label').should('not.exist');
+    cy.get('#scatter-line-labels').click();
+    cy.get('#test-scatter-ingested-singleton-label svg .line-label[data-hw-key="b200_tilert_mtp"]')
+      .should('have.css', 'opacity', '1')
+      .find('text')
+      .should('have.text', 'B200 (TileRT, MTP)');
+  });
+
   it('renders M3 mtp rooflines with the EAGLE label (official + overlay)', () => {
     const interactivityChartDef = createMockChartDefinition({
       chartType: 'interactivity',

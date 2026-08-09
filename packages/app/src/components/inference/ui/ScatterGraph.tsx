@@ -1518,7 +1518,6 @@ const ScatterGraph = React.memo(
           const activeGradientIds = new Set<string>();
 
           Object.entries(rooflines).forEach(([key, pts]) => {
-            if (pts.length <= 1) return;
             const hw = key.split('_').slice(0, -1).join('_');
             const precision = key.split('_').pop()!;
             const visible =
@@ -1531,7 +1530,6 @@ const ScatterGraph = React.memo(
             const singleDate = byDate.size === 1;
 
             for (const [date, datePoints] of byDate) {
-              if (datePoints.length <= 1) continue;
               const entryKey = singleDate ? key : `${key}__${date}`;
               let stroke = baseStroke;
 
@@ -1586,7 +1584,10 @@ const ScatterGraph = React.memo(
           // Data join for roofline paths
           rooflinesLayer
             .selectAll<SVGPathElement, Entry>('.roofline-path')
-            .data(entries, (d) => d.key)
+            .data(
+              entries.filter((entry) => entry.points.length > 1),
+              (d) => d.key,
+            )
             .join('path')
             .attr('class', (d) => `roofline-path roofline-${d.key}`)
             .attr('data-hw-key', (d) => d.hw)
@@ -1744,7 +1745,7 @@ const ScatterGraph = React.memo(
               // precision) so each precision curve keeps its own label.
               const bestByGroup = new Map<string, (typeof entries)[0]>();
               for (const e of entries) {
-                if (!e.visible || e.points.length < 2) continue;
+                if (!e.visible) continue;
                 const groupKey = multiPrecision ? e.key : e.hw;
                 const prev = bestByGroup.get(groupKey);
                 if (!prev || e.points.length > prev.points.length) bestByGroup.set(groupKey, e);
@@ -1830,6 +1831,7 @@ const ScatterGraph = React.memo(
                   lineLabelText(entry.hw, entry.precision, multiPrecision, modelLabel),
                   ir.getCssColor(ir.resolveColor(entry.hw)),
                   entry.points,
+                  entry.points.length === 1,
                 );
               }
 
@@ -1837,7 +1839,7 @@ const ScatterGraph = React.memo(
               // D3 data-join, keyed by series key, is clean).
               const labeledKeys = new Set(lineLabels.map((l) => l.key));
               for (const entry of entries) {
-                if (entry.points.length >= 2 && !labeledKeys.has(entry.key)) {
+                if (!labeledKeys.has(entry.key)) {
                   lineLabels.push({
                     key: entry.key,
                     hw: entry.hw,
@@ -1902,7 +1904,7 @@ const ScatterGraph = React.memo(
               // (hw, precision) when multiple precisions are shown).
               const seen = new Set<string>();
               for (const entry of entries) {
-                if (entry.points.length < 2 || !entry.visible) continue;
+                if (!entry.visible) continue;
                 const groupKey = multiPrecision ? entry.key : entry.hw;
                 if (seen.has(groupKey)) continue;
                 seen.add(groupKey);
@@ -2119,7 +2121,6 @@ const ScatterGraph = React.memo(
               // when multiple precisions are shown (mirrors the static render).
               const bestByGroup = new Map<string, [string, InferenceData[]]>();
               for (const [key, pts] of Object.entries(rooflines)) {
-                if (pts.length < 2) continue;
                 const hw = key.split('_').slice(0, -1).join('_');
                 const prec = key.split('_').pop()!;
                 if (!ir.effectiveActiveHwTypes.has(hw) || !ir.selectedPrecisions.includes(prec))
@@ -2184,7 +2185,7 @@ const ScatterGraph = React.memo(
                     vis: keepVisibleOnCollision,
                   });
                 };
-                for (const [key, pts] of visibleEntries) greedyPlace(key, pts);
+                for (const [key, pts] of visibleEntries) greedyPlace(key, pts, pts.length === 1);
                 for (const [ovKey, group] of overlayVisible)
                   greedyPlace(`overlay-${ovKey}`, group.points, group.points.length === 1);
               }
@@ -2210,7 +2211,6 @@ const ScatterGraph = React.memo(
               const zoomLabels: ZoomLabel[] = [];
               const seen = new Set<string>();
               Object.entries(rooflines).forEach(([key, pts]) => {
-                if (pts.length < 2) return;
                 const hw = key.split('_').slice(0, -1).join('_');
                 const prec = key.split('_').pop()!;
                 if (!ir.effectiveActiveHwTypes.has(hw) || !ir.selectedPrecisions.includes(prec))
