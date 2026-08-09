@@ -81,7 +81,20 @@ export function OverviewNavigationProvider({
       pendingHrefRef.current = href;
       setPendingHref(href);
       if (updateHistory) {
-        History.prototype.pushState.call(window.history, window.history.state, '', href);
+        // Deliberately the pristine prototype method: `window.history.pushState`
+        // is patched by Next to dispatch a router action, and that per-click
+        // reducer run is exactly the work this route exists to avoid. The cost
+        // is that `useSearchParams()`/`usePathname()` stay at the load-time URL
+        // here — `notifyClientSearchChange` and the explicit `$pageview` in the
+        // success branch are the substitutes. Do not add a `useSearchParams()`
+        // consumer to the overview tree.
+        //
+        // Re-activating a still-pending option resolves to a byte-identical
+        // href; pushing it again would stack a Back press that goes nowhere.
+        const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        if (href !== currentHref) {
+          History.prototype.pushState.call(window.history, window.history.state, '', href);
+        }
         notifyClientSearchChange(href);
       }
 
