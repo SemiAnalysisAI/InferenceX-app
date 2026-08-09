@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import {
   createContext,
+  type MutableRefObject,
   type ReactNode,
   useCallback,
   useContext,
@@ -51,8 +52,13 @@ function overviewDataKey(href: string): string {
   );
 }
 
+export type OverviewNavControl = 'comparison' | 'engine' | 'models' | 'tier';
+
 interface OverviewNavigationValue {
   isPending: boolean;
+  /** Which switcher the user just activated with the keyboard, so the option
+   *  that replaces it can take the focus its predecessor lost on unmount. */
+  focusIntent: MutableRefObject<OverviewNavControl | null>;
   prefetch: (targetHref: string, keys: readonly OverviewSearchKey[]) => void;
   resolve: (targetHref: string, keys: readonly OverviewSearchKey[]) => string;
   push: (targetHref: string, keys: readonly OverviewSearchKey[]) => void;
@@ -84,6 +90,7 @@ export function OverviewNavigationProvider({
   const pendingHrefRef = useRef(initialHref);
   const committedHrefRef = useRef(initialHref);
   const navigationIdRef = useRef(0);
+  const focusIntentRef = useRef<OverviewNavControl | null>(null);
   const dataCacheRef = useRef(
     new Map<string, OverviewPageData>([[overviewDataKey(initialHref), initialData]]),
   );
@@ -153,6 +160,7 @@ export function OverviewNavigationProvider({
         })
         .catch(() => {
           if (navigationId !== navigationIdRef.current) return;
+          focusIntentRef.current = null;
           // Roll the pending selection back, so a failed load cannot strand the
           // reference on a value the page never loaded.
           pendingHrefRef.current = committedHrefRef.current;
@@ -240,6 +248,7 @@ export function OverviewNavigationProvider({
   const value = useMemo<OverviewNavigationValue>(
     () => ({
       isPending,
+      focusIntent: focusIntentRef,
       resolve,
       prefetch: (targetHref, keys) => {
         const href = mergeOverviewControlHref(pendingHrefRef.current, targetHref, keys);

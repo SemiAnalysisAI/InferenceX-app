@@ -1,3 +1,7 @@
+'use client';
+
+import { type ComponentPropsWithoutRef, useEffect, useRef } from 'react';
+
 import {
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   OVERVIEW_HARDWARE,
@@ -24,6 +28,7 @@ import {
 import { OverviewDetailLink } from './overview-detail-link';
 import { OverviewHistoryDetailLink } from './overview-history-detail-link';
 import { OverviewNavLink } from './overview-nav-link';
+import { type OverviewNavControl, useOverviewNavigation } from './overview-navigation';
 import { OverviewReferenceSelect } from './overview-reference-select';
 
 export type OverviewLocale = 'en' | 'zh';
@@ -848,6 +853,37 @@ export function MobileOverviewList({
   );
 }
 
+/**
+ * The active option of a switcher. It replaces the anchor the user activated,
+ * which destroys the focused node and drops focus to <body>; when the click
+ * came from the keyboard, this takes that focus back.
+ *
+ * `tabIndex={-1}` keeps a non-interactive span out of the tab order while still
+ * allowing programmatic focus.
+ */
+function ActiveSwitcherOption({
+  control,
+  children,
+  ...props
+}: ComponentPropsWithoutRef<'span'> & { control: OverviewNavControl }) {
+  const { focusIntent } = useOverviewNavigation();
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (focusIntent.current !== control) return;
+    focusIntent.current = null;
+    ref.current?.focus({ preventScroll: true });
+    // Mount-only by construction: `control` is a literal per call site and
+    // `focusIntent` is a stable ref, so this runs exactly on the commit that
+    // swapped the anchor out. Dropping the deps would consume the intent one
+    // render early and leave focus on <body>.
+  }, [control, focusIntent]);
+  return (
+    <span {...props} ref={ref} tabIndex={-1}>
+      {children}
+    </span>
+  );
+}
+
 /** Every option remains a copyable server-rendered URL; ordinary clicks use a
  *  soft App Router transition and the displayed tier is never a self-link. */
 export function OverviewTierSwitcher({
@@ -867,7 +903,8 @@ export function OverviewTierSwitcher({
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
-  const optionClass = 'inline-flex min-h-11 items-center px-3 tabular-nums';
+  const optionClass =
+    'inline-flex min-h-11 items-center px-3 tabular-nums focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring';
   return (
     <nav
       data-testid="overview-tier-switcher"
@@ -878,13 +915,14 @@ export function OverviewTierSwitcher({
       <div className="flex divide-x divide-border/60 overflow-hidden rounded-md border border-border/60">
         {OVERVIEW_TIERS.map((option) =>
           option === tier ? (
-            <span
+            <ActiveSwitcherOption
               key={option}
+              control="tier"
               aria-current="page"
               className={`${optionClass} bg-muted font-semibold text-foreground`}
             >
               {option}
-            </span>
+            </ActiveSwitcherOption>
           ) : (
             <OverviewNavLink
               key={option}
@@ -930,7 +968,7 @@ export function OverviewEngineScopeSwitcher({
 }) {
   const options: OverviewEngineScope[] = ['community', 'all'];
   const optionClass =
-    'inline-flex min-h-11 w-full items-center rounded-md border border-border/60 px-3 py-1.5 text-left leading-snug sm:w-auto';
+    'inline-flex min-h-11 w-full items-center rounded-md border border-border/60 px-3 py-1.5 text-left leading-snug focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:w-auto';
   return (
     <nav
       data-testid="overview-engine-scope-switcher"
@@ -941,14 +979,15 @@ export function OverviewEngineScopeSwitcher({
       <div className="flex w-full min-w-0 flex-col gap-1 sm:w-auto sm:flex-row">
         {options.map((option) =>
           option === engineScope ? (
-            <span
+            <ActiveSwitcherOption
               key={option}
+              control="engine"
               data-overview-engine-scope={option}
               aria-current="true"
               className={`${optionClass} bg-muted font-semibold text-foreground`}
             >
               {strings.engineScopeOptions[option]}
-            </span>
+            </ActiveSwitcherOption>
           ) : (
             <OverviewNavLink
               key={option}
@@ -1018,8 +1057,9 @@ export function OverviewComparisonSwitcher({
             ? strings.hardwareComparisonLabel(referenceLabel)
             : strings.comparisonOptions.history;
         return option === comparisonMode ? (
-          <span
+          <ActiveSwitcherOption
             key={option}
+            control="comparison"
             data-overview-comparison={option}
             aria-current="true"
             className={`${optionClass} border-secondary text-secondary dark:border-primary dark:text-primary`}
@@ -1035,7 +1075,7 @@ export function OverviewComparisonSwitcher({
             ) : (
               label
             )}
-          </span>
+          </ActiveSwitcherOption>
         ) : (
           <OverviewNavLink
             key={option}

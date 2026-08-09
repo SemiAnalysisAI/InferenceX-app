@@ -70,6 +70,11 @@ export function OverviewNavLink({
     }
 
     event.preventDefault();
+    // This anchor is about to be replaced by the active <span>, which destroys
+    // the focused node. Record where focus was so its replacement can take it.
+    if (document.activeElement === event.currentTarget) {
+      navigation.focusIntent.current = analytics.control;
+    }
     track('overview_selector_changed', {
       control: analytics.control,
       value: analytics.value,
