@@ -25,6 +25,7 @@ import {
   useOverviewNavigation,
   useOverviewReference,
 } from './overview-navigation';
+import { useWideViewport } from './use-wide-viewport';
 
 /** The SemiAnalysis AI Cloud TCO model behind `HW_REGISTRY.costh`. */
 const OVERVIEW_SOURCE_HREF = 'https://semianalysis.com/ai-cloud-tco-model/';
@@ -86,6 +87,10 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
   // Not `data.referenceHardware`: the reference follows the URL directly, so a
   // cached payload built for another reference still renders the right column.
   const referenceHardware = useOverviewReference();
+  // Both surfaces used to render on every width and hide one with CSS, so every
+  // selection built the matrix twice. The Tailwind classes stay — they carry
+  // SSR and the pre-hydration frame — and this only drops the unused one after.
+  const wide = useWideViewport();
   const strings = OVERVIEW_STRINGS[locale];
   const formatters = overviewFormatters(locale);
 
@@ -175,22 +180,26 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
       {/* Clipped on phones for the rounded corners; visible from xl so the
           desktop matrix header can stick to the page as it scrolls. */}
       <OverviewMatrixCard>
-        <DesktopOverviewMatrix
-          models={data.models}
-          locale={locale}
-          formatters={formatters}
-          strings={strings}
-          comparisonMode={data.comparisonMode}
-          referenceHardware={referenceHardware}
-        />
-        <MobileOverviewList
-          models={data.models}
-          locale={locale}
-          formatters={formatters}
-          strings={strings}
-          comparisonMode={data.comparisonMode}
-          referenceHardware={referenceHardware}
-        />
+        {wide === false ? null : (
+          <DesktopOverviewMatrix
+            models={data.models}
+            locale={locale}
+            formatters={formatters}
+            strings={strings}
+            comparisonMode={data.comparisonMode}
+            referenceHardware={referenceHardware}
+          />
+        )}
+        {wide === true ? null : (
+          <MobileOverviewList
+            models={data.models}
+            locale={locale}
+            formatters={formatters}
+            strings={strings}
+            comparisonMode={data.comparisonMode}
+            referenceHardware={referenceHardware}
+          />
+        )}
         <OverviewMethodology
           strings={strings}
           comparisonMode={data.comparisonMode}

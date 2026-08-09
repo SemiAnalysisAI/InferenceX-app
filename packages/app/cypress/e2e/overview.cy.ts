@@ -1049,7 +1049,7 @@ describe('Overview page', () => {
         .each(($option) => {
           expect($option[0].getBoundingClientRect().height).to.be.at.least(44);
         });
-      cy.get('[data-testid="overview-desktop-matrix"]').should('not.be.visible');
+      cy.get('[data-testid="overview-desktop-matrix"]').should('not.exist');
       mobileModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
         cy.get('[data-testid="overview-platform"]').should('have.length', 5);
         platform('mi355x').within(() => {
