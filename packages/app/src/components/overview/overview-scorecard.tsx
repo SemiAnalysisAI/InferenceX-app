@@ -998,8 +998,14 @@ export function OverviewComparisonSwitcher({
     label: overviewHardwareLabel(hardware),
     href: overviewHref(locale, tier, engineScope, 'hardware', hardware, modelScope),
   }));
+  // The inactive-only classes live on the inactive branch, not here: Tailwind
+  // emits `border-transparent` after `border-secondary` at equal specificity,
+  // so sharing them left the active underline invisible in light mode. Same
+  // reason for the hover border — it would grey out the active underline.
   const optionClass =
-    'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 border-transparent px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors duration-200 hover:border-muted-foreground/30 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:min-w-[140px]';
+    'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:min-w-[140px]';
+  const inactiveOptionClass =
+    'border-transparent text-muted-foreground hover:border-muted-foreground/30';
   return (
     <nav
       data-testid="overview-comparison-switcher"
@@ -1037,7 +1043,7 @@ export function OverviewComparisonSwitcher({
             href={overviewHref(locale, tier, engineScope, option, referenceHardware, modelScope)}
             analytics={{ control: 'comparison', value: option }}
             searchKeys={['compare']}
-            className={optionClass}
+            className={`${optionClass} ${inactiveOptionClass}`}
           >
             {label}
           </OverviewNavLink>
