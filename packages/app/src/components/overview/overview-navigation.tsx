@@ -98,14 +98,12 @@ export function OverviewNavigationProvider({
         .catch(() => {
           if (navigationId !== navigationIdRef.current) return;
           if (updateHistory) {
-            History.prototype.replaceState.call(
-              window.history,
-              window.history.state,
-              '',
-              committedHrefRef.current,
-            );
-            notifyClientSearchChange(committedHrefRef.current);
-            router.push(href, { scroll: false });
+            // The entry pushed above already carries `href`, so `replace`
+            // rewrites it in place instead of stacking a duplicate the user
+            // has to press Back through twice. Rewinding to the committed
+            // href first would also strand the header language toggle, which
+            // only ever hears about search changes through the event above.
+            router.replace(href, { scroll: false });
           } else {
             window.location.reload();
           }

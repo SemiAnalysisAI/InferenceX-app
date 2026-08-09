@@ -6,8 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { OverviewPageData, OverviewTier } from '@/lib/overview-data';
 
+/** One stable stub, not a fresh spy per render: a per-render spy makes
+ *  `expect(push).not.toHaveBeenCalled()` unfalsifiable. */
+const routerStub = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => routerStub,
 }));
 
 import {
@@ -56,6 +60,8 @@ function renderProvider(data: OverviewPageData, href: string) {
 }
 
 beforeEach(() => {
+  routerStub.push.mockClear();
+  routerStub.replace.mockClear();
   window.history.replaceState({}, '', '/overview');
   container = document.createElement('div');
   document.body.append(container);
