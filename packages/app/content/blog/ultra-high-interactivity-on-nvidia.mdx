@@ -1,0 +1,317 @@
+---
+title: 'Ultra-High Interactivity on NVIDIA GPUs? TileRT on InferenceX'
+subtitle: 'Can TileRT software on NVIDIA GPUs compete with Cerebras, Groq LPU, and SambaNova? Batch size 1, disaggregated engine, high-throughput prefill engine, high-interactivity decode engine'
+date: '2026-08-10'
+publishDate: '2026-08-10'
+tags:
+  - benchmark
+  - gpu
+  - inference
+  - nvidia
+  - b200
+  - gb300
+  - tilert
+  - vllm
+  - glm5
+---
+
+_Originally published on the [SemiAnalysis newsletter](https://newsletter.semianalysis.com/p/ultra-high-interactivity-on-nvidia) on August 10, 2026._
+
+Premium-priced "fast modes" are proving that users will pay more for lower latency and faster tokens, potentially yielding higher gross margins. Frontier AI labs such as OpenAI are therefore evaluating purpose-built inference systems, including Cerebras and NVIDIA Groq LPUs, that prioritize ultra-high interactivity over maximum batched throughput. Ultra-low latency matters most in interactive workloads, including real-time assistants and full-duplex voice. [OpenAI GPT-Live](https://x.com/OpenAI/status/2080378182469857576), for example, can listen and speak simultaneously, making response delay immediately perceptible to the user.
+
+GPUs perform exceptionally well at high throughput and low-to-medium interactivity, but their architecture is less suited for ultra-low-latency inference. An 8-GPU HGX B200 server provides a theoretical HBM memory bandwidth of 64 TB/s in aggregate. At batch size 1, GLM-5 at NVFP4 requires only approximately 21 GB of active-parameter traffic per generated token. The B200 HBM bandwidth roofline would therefore suggest up to 3,047 tokens/s/user without speculative decoding. In practice, GPUs come nowhere close to this limit.
+
+The gap comes from latency rather than bandwidth. The traditional GPU programming model launches and synchronizes many individual kernels, whose setup and teardown overhead becomes significant at ultra-high levels of interactivity. While these latency costs are less visible at conventional serving speeds, even with CUDA graphs, they dominate as token latency approaches the sub-millisecond Time Per Output Token (TPOT) range. Furthermore, although [GPU memory bandwidth increases by roughly 2–3× each generation, memory latency has not improved at all](https://newsletter.semianalysis.com/p/vera-rubin-nvl72-vs-gb200-nvl72-inference).
+
+While using alternative hardware is popular, there are ways to use GPUs to do this too. This is where [TileRT](https://github.com/tile-ai/TileRT)'s persistent engine comes in. TileRT statically compiles the entire decode graph into a single persistent kernel on NVIDIA GPUs, maximizing overlap across computation, memory loads and stores, and communication. On the InferenceX GLM-5 FP8 744B benchmark on a single B200 decode server, TileRT has been verified to reach up to 500 tokens/s/user, approximately 3× faster than GB300 NVL72 running traditional inference engines. Iso-cost per output token, TileRT can achieve up to 2× faster interactivity than traditional engines.
+
+We thank the TileRT maintainers for collaborating on TileRT InferenceX benchmarks, and we are also grateful to the [vLLM community](https://vllm-project.github.io/) for their design on the V1 connector. TileRT comes from the same community maintainer organization that built the widely popular [TileLang DSL](https://github.com/tile-ai/tilelang).
+
+With PD disaggregation, the hyperspecialized TileRT engine handles latency-sensitive decode while throughput-optimized engines such as vLLM and SGLang continue to serve prefill. The TileRT decode engine is already being deployed in production at Xiaomi for [MiMo V2.5 Pro UltraSpeed](https://mimo.mi.com/docs/en-US/news/latest/1000tps) and ZAI with [GLM 5.1 HighSpeed](https://www.tilert.ai/).
+
+In this article we deep dive into the TileRT InferenceX results, what TileRT is, and how it composes with the existing inference ecosystem, along with the tradeoffs and challenges of TileRT. We will also elaborate on the tradeoffs of using TileRT on standard GPUs versus ultra-low-latency specialized chips like NVIDIA Groq LPU, Cerebras, and SambaNova, weighing in on whether there is potential for TileRT software running on GPUs to disrupt these specialist chips' TAM. The [SemiAnalysis Accelerator Model](https://semianalysis.com/accelerator-hbm-model/) provides quarter-by-quarter estimates of NVIDIA LPU30, LPU40, Cerebras WSE-3 and WSE-4 shipments and much more.
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+  Click to see the full InferenceX dashboard →
+</DashboardCTA>
+
+## InferenceX
+
+InferenceX is our open-source, vendor-neutral, continuously updated AI inference benchmarking and research platform. We measure leading models, inference frameworks, and hardware across the latency-throughput Pareto frontier, tracking how real-world inference performance and economics improve over time.
+
+Our benchmark has been [widely reproduced, validated and/or supported](https://inferencemax.semianalysis.com/quotes) by almost every major buyer of compute from [Google Cloud](https://cloud.google.com/blog/products/compute/scaling-moe-inference-with-nvidia-dynamo-on-google-cloud-a4x) to [Microsoft Azure](https://blog.aks.azure.com/2025/10/24/dynamo-on-aks#enterprise-scale-inference-experiments--dynamo-with-gb200-running-on-aks) to Oracle, to Meta and many more. Furthermore, it has the support of the ML community including from vLLM, LMCache, SGLang, PyTorch, Hugging Face, and the support of major labs like OpenAI, MiniMax, ZAI, Qwen, Moonshot Kimi, etc.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/inferencex-dashboard.png"
+  alt="InferenceX dashboard showing throughput versus interactivity Pareto curves across hardware and framework configurations"
+  caption="Source: InferenceX"
+/>
+
+Star the [InferenceX GitHub repository](https://github.com/SemiAnalysisAI/InferenceX) if you find the open-source benchmark and data useful. As previously mentioned, NVIDIA has committed to submitting verifiable Vera Rubin numbers to InferenceX. We will have Google TPUv7 results soon, and AMD has committed to MI455X UALoE72 this year too.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/inferencex-github.png"
+  alt="InferenceX GitHub repository showing the open-source benchmark harness and comparative data"
+  caption="Source: InferenceX GitHub"
+/>
+
+## Throughput vs Interactivity Curve
+
+Every inference system must balance two competing goals.
+
+- **Interactivity (tok/s/user)** measures how quickly a single user receives tokens, the inverse of time per output token (TPOT). It determines whether a response feels snappy or sluggish.
+- **Throughput (tok/s/GPU)** measures how many tokens the system produces in total across all users. It largely determines the cost per token.
+
+Batching increases aggregate throughput by processing more requests together, but each user typically waits longer for each token. Small batches do the opposite: they improve per-user speed while reducing the amount of useful work each GPU completes in aggregate.
+
+A bus amortizes its cost across many passengers but makes each passenger wait for shared stops. A race car carries only one or two people and reaches the destination faster, but at much higher cost per passenger. Inference has the same trade-off: batching improves aggregate throughput and cost per token, while small batches improve per-user responsiveness. There is no one-size-fits-all operating point.
+
+In the configuration shown below, increasing interactivity from roughly 25 to 260 tokens/s/user reduces per-GPU throughput from about 5,900 to 200 tokens/s/GPU. That is roughly a 30× reduction in aggregate throughput for a 10× increase in per-user speed.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/throughput-vs-interactivity-curve.png"
+  alt="Throughput versus interactivity trade-off curve showing per-GPU throughput falling from about 5,900 to 200 tokens/s/GPU as interactivity rises from 25 to 260 tokens/s/user"
+  caption="Source: SemiAnalysis"
+/>
+
+## TileRT Results
+
+As we describe in the next section, GPUs already perform well in high-throughput scenarios but struggle in high-interactivity ones. This weakness has created an entire market segment for dataflow chips. TileRT targets the same weakness and therefore focuses exclusively on high-interactivity operating points.
+
+TileRT on B200 is in a class of its own. For the 8k/1k input/output token scenario, TileRT reached 340 tokens/s/user on an eight-GPU B200 node. The fastest result in the current dataset was previously 181.4 tokens/s/user on GB300 NVL72 with NVFP4 and MTP, making TileRT 1.9× faster on this metric. Of course, this is on batch size 1, where all that extra trouble to set up the complicated copper backplane in the case of the GB300 NVL72 does not come into play at all in boosting interactivity.
+
+Meanwhile, the fastest FP8 result was 113.6 tokens/s/user on B300 with MTP, making TileRT 3.0× faster at the same precision.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/tilert-8k1k-interactivity-chart.png"
+  alt="InferenceX 8k/1k interactivity comparison chart showing TileRT on B200 reaching 340 tokens/s/user against conventional engines"
+  caption="Source: InferenceX"
+/>
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/tilert-8k1k-vs-gb300-bar.png"
+  alt="Bar chart for the 8k/1k scenario: B200 with TileRT MTP FP8 at 340.0 tok/s/user versus GB300 NVL72 with Dynamo TRTLLM MTP FP4 at 181.4 tok/s/user"
+  caption="Source: InferenceX"
+/>
+
+At 1k/1k input/output, TileRT FP8 reached 494.2 tokens/s/user. That was 1.9× the best conventional result, at 256.3 tokens/s/user using FP4, and 3.6× the best conventional FP8 result, at 136.3 tokens/s/user. TileRT doesn't yet have FP4 support, but it is already beating non-TileRT FP4 implementations. The result is also notable because it comes from an eight-GPU B200 node rather than the 72-GPU NVLink scale-up domain of GB200 or GB300 NVL72. This comparison concerns per-user interactivity, not aggregate throughput or cost.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/tilert-1k1k-interactivity-chart.png"
+  alt="InferenceX 1k/1k interactivity comparison chart showing TileRT FP8 on B200 reaching 494.2 tokens/s/user"
+  caption="Source: InferenceX"
+/>
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/tilert-1k1k-vs-gb200-bar.png"
+  alt="Bar chart for the 1k/1k scenario: B200 with TileRT MTP FP8 at 494.2 tok/s/user versus GB200 NVL72 with Dynamo TRTLLM MTP FP4 at 256.3 tok/s/user"
+  caption="Source: InferenceX"
+/>
+
+However, there are always tradeoffs when it comes to inference. TileRT's interactivity advantage comes with lower aggregate throughput. Conventional engines can amortize weight loads and fixed kernel costs across more users as concurrency rises. At 8k/1k input/output, the GB300 FP4+MTP point at concurrency 12 delivers approximately 240 total tokens/s/GPU while maintaining 154 tokens/s/user. TileRT delivers 160.4 total tokens/s/GPU while reaching 340 tokens/s/user.
+
+The trade-off is therefore: TileRT provides much higher per-user speed, but the conventional GB300 point completes more aggregate work per GPU. TileRT as of publication also serves only one in-flight request per decode node, making this a deliberately specialized operating point rather than a general throughput configuration. Thus, with support only for a batch size of one user, TileRT is not just a race car, it is more like a private rocket ship with room for just one passenger. Engineering TileRT to support more passengers might be possible, but it is an ambitious goal.
+
+For end-to-end latency, TileRT at FP8 outperforms the best previously recorded GLM-5.1 result by 4.5× at 1k/1k and 3.0× at 8k/1k. As expected, TileRT's time to first token (TTFT) is good but not exceptional. The decisive advantage comes from the decode tail: 3.01 seconds, compared with 6.54 seconds for the best NVFP4 + MTP competitor and 18.18 seconds for MI355X.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/tilert-end-to-end-latency.png"
+  alt="End-to-end latency comparison showing TileRT's decode tail at 3.01 seconds versus 6.54 seconds for the best NVFP4 plus MTP competitor and 18.18 seconds for MI355X"
+  caption="Source: InferenceX"
+/>
+
+## But What Exactly is TileRT?
+
+We briefly introduced what TileRT does and showed some benchmark results, but let's pause and explain more deeply what TileRT is and how it works. Traditional serving engines run as thousands of separate GPU kernels launched one after another. All that setup and teardown means the GPU spends a surprising amount of time waiting, and while this setup/teardown time might not matter for low-to-medium interactivity inference, it definitely does for ultra-high interactivity inference (aka low-latency inference). Worse, each kernel writes its half-finished work out to HBM. At small batch sizes this is a bigger problem, as kernels aren't large enough to amortize launch latency, synchronization, and scheduling overhead.
+
+As mentioned earlier, when running TileRT at batch size 1 for just a single HGX H200 server (38.4 TB/s of aggregate HBM memory bandwidth), the active parameter memory bandwidth stands at 42 GB per token at MXFP8. In theory, if we were only bound by memory bandwidth, then even without speculative decoding, inference should be able to reach up to 1,000 tok/s/user interactivity. This is obviously not the case in the real world. The roadblock is that GPUs' programming and architecture model is traditionally not built for low latency. Even though memory bandwidth per GPU increases 2-3× each generation, memory latency has not improved at all, even as HBM prices continually increase.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/hbm-bandwidth-vs-latency.png"
+  alt="Chart showing GPU HBM memory bandwidth rising 2-3x per generation while memory latency stays flat"
+  caption="Source: SemiAnalysis, NVIDIA"
+/>
+
+Instead of continuously launching kernels, TileRT has the GPU continuously execute a persistent pipeline, statically compiling the whole model ahead of time into a persistent Engine Kernel: the host launches once, execution stays resident on the GPU for the whole decode lifecycle, and most runtime orchestration moves into compile time.
+
+This is different from CUDA graphs, which capture the DAGs (directed acyclic graphs) of kernel launches and memcpys once, then replay them with a single `cudaGraphLaunch`. But the kernels themselves are still separate kernels; this boundary between kernels carries device-side costs and the on-chip state is wiped at every boundary. A CUDA graph optimizes the launching of kernels, while TileRT abolishes the kernel as the unit of execution.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/cuda-graphs-vs-persistent-kernel.png"
+  alt="Diagram comparing the CUDA graphs execution model against TileRT's single persistent Engine Kernel"
+  caption="Source: SemiAnalysis"
+/>
+
+Also, through decomposing work into tile-level tasks with warp and block specialization, the runtime dynamically reschedules computation, I/O, and communication in a highly overlapped way. Inside the Engine Kernel, different warp groups take on different jobs: asynchronous data movement, tensor computation, and communication overlap. Where stages used to run serially as load → barrier → compute → barrier, they now overlap at tile granularity, and intermediate results flow forward through registers, shared memory, and L2 instead of repeatedly spilling to global memory. Effectively, each CTA (Cooperative Thread Array) becomes a small heterogeneous factory rather than a uniform SIMT (Single Instruction Multiple Threads) worker.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/tilert-warp-specialization.png"
+  alt="Visualization of TileRT warp specialization with overlapped data movement, tensor computation, and communication inside the Engine Kernel"
+  caption="Source: TileRT"
+/>
+
+The next optimization TileRT introduces is specialization extended to whole GPUs. Most TP frameworks assume all ranks execute identical logic synchronously, but sparse routing, Top-K selection, dynamic indexing, long-context attention, and MTP don't fit homogeneous scale-out well; they're not compute-heavy but depend on global information, so forcing every rank through them adds redundant work and synchronization amplification. So, if warps can specialize, so can GPUs. In GLM-5.1's attention layer, GPU 0 becomes a Sparse Indexer worker handling Top-K selection, sparse index construction, and routing, while GPUs 1 through 7 run the MLA workers doing RMSNorm, GEMM, flash sparse attention, and AllReduce.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/tilert-gpu-specialization-glm51.png"
+  alt="Diagram of TileRT GPU specialization in the GLM-5.1 attention layer, with GPU 0 as sparse indexer and GPUs 1 through 7 as MLA workers"
+  caption="Source: TileRT"
+/>
+
+Finally, instead of treating communication as an external stage, broadcasts, reductions, and synchronization execute directly inside the tile-level flow; with TileRT, an entire attention layer corresponds to a single kernel launch at the host, and execution shifts from compute → sync → compute toward a continuously overlapping compute ↔ communication ↔ compute pipeline.
+
+## PD Disaggregated Engine with vLLM and TileRT
+
+LLM inference consists of two distinct phases: prefill and decode. Prefill processes the input prompt in parallel and is primarily compute-intensive, making aggregate throughput the key performance metric. Decode generates tokens sequentially and repeatedly accesses the growing KV cache, making it memory-intensive and highly sensitive to per-token latency.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/prefill-decode-phases.png"
+  alt="Diagram of the prefill and decode phases of LLM inference"
+  caption="Source: DistServe"
+/>
+
+TileRT does not replace vLLM. vLLM remains the high-throughput prefill engine and the surrounding serving layer, including its scheduler, chunked prefill, prefix caching, OpenAI-compatible API, and operational tooling. Only latency-critical decode traffic moves to TileRT. TileRT is engineered to be a single-passenger rocket ship, and vLLM remains the plane, car, bus, and train.
+
+The prefill and decode phases can be [disaggregated](https://arxiv.org/abs/2401.09670) into separate nodes. With disagg, one shared vLLM prefill pool can feed two entirely different decode pools.
+
+- **Pool A: Ultra-high interactivity decode with TileRT.** Latency-critical requests pass through the TileRT PD Router, which instructs vLLM to generate the first token and marks the request with the destination TileRT node in `kv_transfer_params`.
+- **Pool B: General low-to-medium interactivity decode with vLLM decode.** General traffic continues through vLLM's native disaggregation proxy to a conventional vLLM decode pool.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/vllm-tilert-pd-architecture.png"
+  alt="Architecture diagram showing a shared vLLM prefill pool feeding both a TileRT ultra-high interactivity decode pool and a conventional vLLM decode pool"
+  caption="Source: vLLM and TileRT"
+/>
+
+This is done via [vLLM's MultiConnector API](https://vllm-project.github.io/2026/07/14/vllm-tilert-pd.html) that composes the TileRTConnector with its native connector. The TileRT connector claims only marked high-interactivity traffic-class requests and becomes a no-op for everything else, meaning both traffic classes can share the same prefill server. Between the prefill and decode, TileRT uses Mooncake Transfer Engine and NIXL Transfer Engine to move KV cache. In TileRT v0.1.5, each decode node serves one in-flight request at a time. The router gates dispatch and applies back-pressure when the node is occupied.
+
+## How does TileRT compare to Cerebras/Groq/SambaNova?
+
+Purpose-built inference vendors identified the same execution bottleneck years ago, but encoded more of the solution in hardware. The [SemiAnalysis Accelerator Model](https://semianalysis.com/accelerator-hbm-model/) has our quarter-by-quarter estimates of NVIDIA LPU30, LPU40, Cerebras WSE-3 and WSE-4 shipments.
+
+Groq uses deterministic, compiler-orchestrated execution and a large on-chip SRAM hierarchy. Cerebras maps computation spatially across a wafer-scale processor; the CS-3 provides approximately 900,000 cores, 44 GB of on-chip SRAM, and 21 PB/s of memory bandwidth. SambaNova maps model graphs onto reconfigurable dataflow units backed by a tiered SRAM, HBM, and DDR memory system.
+
+The silicon differs, but the systems share the same idea: latency-sensitive inference benefits from reducing runtime scheduling, operator boundaries, synchronization, and unnecessary movement through external memory. At large batch sizes, those costs are easier to amortize. At batch size 1, they occupy a much larger share of each token's latency.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/dataflow-accelerator-comparison.png"
+  alt="Comparison of dataflow accelerator architectures from Groq, Cerebras, and SambaNova against GPU-based execution"
+  caption="Source: SemiAnalysis"
+/>
+
+TileRT imports software analogues of several dataflow ideas: AoT scheduling, persistent execution, specialized workers, and tighter overlap between communication and computation. The resemblance is architectural rather than literal. TileRT still runs on a SIMT GPU with dynamic hardware scheduling, HBM, and a model-specific compiled schedule.
+
+However, TileRT is still software only: dataflow is imposed on a machine that was never specially designed for it. A GPU carries dynamic warp schedulers, a SIMT model, and an HBM hierarchy, and TileRT gets its numbers by spending enormous compiler effort convincing that machinery to impersonate a spatial pipeline through statically expanded persistent kernels, hand-carved warp specialization, and per-model compilation against pinned driver stacks. Native dataflow silicon never fights its own substrate. Purpose-built accelerators encode more of the execution model in hardware and can avoid some of the overhead TileRT must hide in software. Their advantage still depends on the model, precision, memory hierarchy, compiler quality, system scale, and serving configuration. That is why Cerebras serves a dense 70B at speeds no eight-GPU node can reach regardless of scheduling: software can approach the HBM roofline, but it cannot raise it.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/cerebras-groq-sambanova-comparison.png"
+  alt="Performance comparison between specialized dataflow accelerators and GPU-based solutions running TileRT"
+  caption="Source: SemiAnalysis"
+/>
+
+The market's early answer is that purity is negotiable. TileRT's decode engine is already in production behind Xiaomi's MiMo V2.5 Pro UltraSpeed and Z.ai's GLM-5.1 HighSpeed, and the deployment pattern is the tell. Neither company procured a new dataflow chip. They carved a speed tier out of the accelerator cluster they already ran, with vLLM keeping prefill, scheduling, and the API while TileRT takes over decode behind the same endpoint. Good enough on hardware you already own tends to beat architecturally pure on hardware you have to buy.
+
+That points at the deeper structural problem: fungibility and flexibility in prefill-decode (PD) ratio.
+
+A GPU pool is one liquid resource, excellent at prefill, excellent at high-to-medium-batch decode, and now somewhat credibly strong at ultra-interactive decode, with capacity moving between those roles as a software scheduler decision that can follow demand hour by hour. An ASIC fleet is the opposite: the ratio of speed-tier capacity to everything else is fixed in hardware the day the purchase order is signed. Changing the ratio of the physical fleet will take months to physically re-rack and re-cable. That would be fine if the workload mix were stable and known. Unfortunately, the split between users who need ordinary conversational latency and users, increasingly agents, who will pay for extreme-interactivity SLOs has a lot of different variables at play when estimating. Guess wrong with GPUs and you rebalance in software. Guess wrong with dedicated silicon and you either strand capital in idle speed machines or turn away the exact premium traffic you bought them for. On top of that, requirements may shift over time, so a correct guess will only be right for a limited period of time.
+
+Going back to the shared prefill pool mentioned earlier, providers do not need to pay the TileRT premium for all traffic. General requests can stay on throughput-optimized vLLM or SGLang decode pools, while only latency-critical requests are routed to the TileRT decode pool.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/shared-prefill-specialized-decode-pools.png"
+  alt="Diagram showing flexible resource allocation with one shared prefill pool feeding both general and latency-critical decode pools"
+  caption="Source: SemiAnalysis"
+/>
+
+None of this kills the top of the speed market. The SRAM roofline is still better, certain sizes of models still favor it, and some workloads will always want maximum tokens per second at any price. But TileRT reframes what most buyers need: not a speed machine, but a speed tier, provisioned dynamically out of the fleet they were going to own anyway. Cerebras, Groq, and SambaNova are no longer competing against a clumsy kernel-launcher. They are competing against their own execution model, running on fungible hardware, reallocated by a config file. TileRT may be a single-passenger rocket ship, but it allows providers to strap solid rocket boosters to your Metro Bus instead of having to design an entirely new launch vehicle.
+
+## Why Is TileRT Development Slow?
+
+GLM-5.1 is a generation behind, and has already been deprecated on mainline InferenceX. TileRT's model catalog is very limited, currently supporting GLM-5/5.1 and DeepSeek-V3.2. MiMo-V2.5-Pro-UltraSpeed is the result of a co-design partnership and has yet to be open-sourced.
+
+TileRT inherits ASIC vendors' biggest weakness. Static ahead-of-time compilation means a tiny model catalog, hard-pinned dependencies, and real engineering effort per new architecture. There is no fully generic path. A persistent engine kernel means the model is statically expanded ahead of time into one resident program, so decisions have to be made on tile shapes, pipeline depth, buffer residency across registers/shared memory/L2, how warp groups split between loading, compute, and communication, where collectives get fused into the tile flow, and which GPUs take specialized roles like GLM-5.1's dedicated sparse indexer rank. Change the attention mechanism or the routing scheme and much of that schedule is invalidated. Dataflow chips also face this same issue; good compilers can be notoriously difficult to create.
+
+Work is being done to simplify this, especially as software development can be accelerated with AI. [TileOPs](https://github.com/tile-ai/TileOPs) is intended to reduce this burden. Each operator is declared in a machine-readable manifest specifying its signature, workloads, and roofline model. The manifest drives code generation, testing, and benchmarking against hardware bounds rather than only against earlier implementations.
+
+AI coding agents accelerate tuning within known templates, but novel transformations still require expert judgment. A monolithic persistent kernel also reduces the usefulness of conventional per-kernel profiler timelines, making automated feedback loops more difficult.
+
+## Next steps with TileRT and InferenceX
+
+We are actively working on moving TileRT benchmarking from InferenceX's single-turn 8k/1k to our new agentic coding benchmark, which we call AgentX. This scenario replays real Claude Code and Codex traces with long-context, multi-turn requests, realistic subagent activity, and dynamic tool-use delays. Its median input length is 140k tokens, while the theoretical median cache-hit rate roofline reaches 99.2%.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/agentx-benchmark-characteristics.png"
+  alt="Chart showing AgentX benchmark characteristics including median input length of 140k tokens and a 99.2% theoretical median cache-hit rate roofline"
+  caption="Source: SemiAnalysis"
+/>
+
+This workload will test the entire TileRT and vLLM system, not just decode speed, including incremental KV transfer, prefix-cache reuse, cache retention and offloading, routing, and scheduling. The critical question is whether TileRT can transfer only the newly introduced context between turns while preserving its ultra-high interactivity advantage.
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/multi-turn-thinking.png"
+  alt="Diagram showing multi-turn request handling and the thinking process in an LLM"
+  caption="Source: DeepSeek"
+/>
+
+The second step is to move beyond just batch size one. We will also benchmark TileRT at batch sizes 2, 4, and 8. The goal is to map its throughput-interactivity Pareto frontier and identify the point at which the persistent Engine Kernel's latency advantage begins to flatten.
+
+The full perf-per-TCO analysis — TileRT's cost per million output tokens at ultra-high interactivity compared against decode at normal lower-interactivity operating points, using the [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/) as the capex and opex baseline — is available to subscribers in the [full article on the SemiAnalysis newsletter](https://newsletter.semianalysis.com/p/ultra-high-interactivity-on-nvidia).
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+  Click to see the full InferenceX dashboard →
+</DashboardCTA>
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How fast is TileRT on NVIDIA B200 compared to conventional inference engines?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On the InferenceX 8k/1k input/output scenario, TileRT reached 340 tokens/s/user on an eight-GPU B200 node, against a previous best of 181.4 tokens/s/user on GB300 NVL72 with NVFP4 and MTP, making TileRT 1.9x faster. Against the fastest FP8 result of 113.6 tokens/s/user on B300 with MTP, TileRT is 3.0x faster at the same precision. At 1k/1k, TileRT FP8 reached 494.2 tokens/s/user, 1.9x the best conventional result of 256.3 tokens/s/user using FP4 and 3.6x the best conventional FP8 result of 136.3 tokens/s/user."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is TileRT and how does it differ from CUDA graphs?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "TileRT statically compiles the entire decode graph ahead of time into a single persistent Engine Kernel on NVIDIA GPUs. The host launches once and execution stays resident on the GPU for the whole decode lifecycle, moving most runtime orchestration into compile time. CUDA graphs capture the directed acyclic graph of kernel launches and memcpys once and replay it with a single cudaGraphLaunch, but the kernels remain separate, so each kernel boundary still carries device-side cost and wipes on-chip state. A CUDA graph optimizes the launching of kernels, while TileRT abolishes the kernel as the unit of execution."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the trade-off for TileRT's higher interactivity?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "TileRT's interactivity advantage comes with lower aggregate throughput. At 8k/1k, the GB300 FP4 plus MTP point at concurrency 12 delivers approximately 240 total tokens/s/GPU while maintaining 154 tokens/s/user, whereas TileRT delivers 160.4 total tokens/s/GPU while reaching 340 tokens/s/user. TileRT as of publication serves only one in-flight request per decode node, making this a deliberately specialized operating point rather than a general throughput configuration."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does TileRT replace vLLM?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. vLLM remains the high-throughput prefill engine and the surrounding serving layer, including its scheduler, chunked prefill, prefix caching, OpenAI-compatible API, and operational tooling. Only latency-critical decode traffic moves to TileRT, via vLLM's MultiConnector API composing the TileRTConnector with the native connector. One shared vLLM prefill pool can feed both a TileRT ultra-high interactivity decode pool and a conventional vLLM decode pool. TileRT uses Mooncake Transfer Engine and NIXL Transfer Engine to move KV cache between prefill and decode."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can TileRT on GPUs displace Cerebras, Groq, and SambaNova?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "TileRT imports software analogues of dataflow ideas including ahead-of-time scheduling, persistent execution, specialized workers, and tighter compute-communication overlap, but it still runs on a SIMT GPU with dynamic hardware scheduling and an HBM hierarchy. Software can approach the HBM roofline but cannot raise it, which is why Cerebras serves a dense 70B at speeds no eight-GPU node can reach. The structural argument favoring GPUs is fungibility: a GPU pool can shift capacity between prefill, general decode, and ultra-interactive decode as a scheduler decision, while an ASIC fleet fixes that ratio in hardware on the day the purchase order is signed."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why is TileRT development slow?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Static ahead-of-time compilation means a tiny model catalog, currently GLM-5/5.1 and DeepSeek-V3.2, plus hard-pinned dependencies and real engineering effort per new architecture. A persistent engine kernel requires up-front decisions on tile shapes, pipeline depth, buffer residency across registers, shared memory and L2, how warp groups split between loading, compute and communication, where collectives fuse into the tile flow, and which GPUs take specialized roles. Changing the attention mechanism or routing scheme invalidates much of that schedule. TileOPs is intended to reduce this burden by declaring each operator in a machine-readable manifest that drives code generation, testing, and benchmarking against hardware bounds."
+      }
+    }
+  ]
+}`}</JsonLd>

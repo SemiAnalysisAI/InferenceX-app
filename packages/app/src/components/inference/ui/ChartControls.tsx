@@ -486,7 +486,10 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             availableSequences={availableSequences}
             data-testid="scenario-selector"
           />
-          {mounted && selectedSequence === Sequence.AgenticTraces && (
+          {/* AgentX publishes on P90, so the percentile control is an insider
+              affordance rather than a normal chart filter: it stays behind the
+              ↑↑↓↓ feature gate and the chart defaults to P90 without it. */}
+          {mounted && selectedSequence === Sequence.AgenticTraces && featureGateUnlocked && (
             <PercentileSelector
               value={selectedPercentile}
               onChange={(p: Percentile) => setSelectedPercentile(p)}

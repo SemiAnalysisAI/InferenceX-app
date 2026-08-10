@@ -174,9 +174,9 @@ describe('CollectiveX neutral run view', () => {
       .and('not.contain.text', 'Payload rate is derived');
   });
 
-  it('exposes the kernel-mode toggle when a run measured both modes and pins the LL series', () => {
+  it('allows both measured kernel modes to be selected together', () => {
     const withLowLatency = buildDataset({
-      shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' })],
+      shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' }), makeRawShard({ ep: 16 })],
     });
     installRuns([withLowLatency]);
     installRun(withLowLatency);
@@ -185,12 +185,33 @@ describe('CollectiveX neutral run view', () => {
     cy.wait('@run');
 
     cy.get('[data-testid="collectivex-mode-toggle"]').should('be.visible');
+    cy.get('[data-testid="collectivex-mode-toggle"] button')
+      .contains('Normal')
+      .should('have.attr', 'aria-pressed', 'true');
     cy.get('[data-testid="collectivex-main-chart"]').should('contain.text', 'deepep-v2');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
 
     cy.get('[data-testid="collectivex-mode-toggle"]').contains('Low-latency').click();
-    cy.get('[data-testid="chart-legend"]').should('contain.text', 'low-latency');
-    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+    cy.get('[data-testid="collectivex-mode-toggle"] button[aria-pressed="true"]').should(
+      'have.length',
+      2,
+    );
+    cy.get('[data-testid="chart-legend"]')
+      .should('contain.text', 'normal')
+      .and('contain.text', 'low-latency');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 2);
+
+    cy.get('[data-testid="collectivex-ep-select"]').click();
+    cy.contains('[role="option"]', 'EP16').click();
+    cy.get('[data-testid="collectivex-mode-toggle"]').should('not.exist');
+
+    cy.get('[data-testid="collectivex-ep-select"]').click();
+    cy.contains('[role="option"]', 'EP8').click();
+    cy.get('[data-testid="collectivex-mode-toggle"] button[aria-pressed="true"]').should(
+      'have.length',
+      2,
+    );
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 2);
   });
 
   it('selects the available phase when a partial run only measured prefill', () => {

@@ -65,6 +65,7 @@ describe('PARAM_DEFAULTS', () => {
   it('has empty string defaults for legend-active params', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_active).toBe('');
+    expect(PARAM_DEFAULTS.i_best).toBe('');
     expect(PARAM_DEFAULTS.e_active).toBe('');
     expect(PARAM_DEFAULTS.r_active).toBe('');
   });

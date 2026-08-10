@@ -1,0 +1,317 @@
+---
+title: '在 NVIDIA GPU 上实现超高交互性？TileRT 登陆 InferenceX'
+subtitle: '运行在 NVIDIA GPU 上的 TileRT 软件能否与 Cerebras、Groq LPU、SambaNova 竞争？批大小为 1、分离式引擎、高吞吐量预填充引擎、高交互性解码引擎'
+date: '2026-08-10'
+publishDate: '2026-08-10'
+tags:
+  - benchmark
+  - gpu
+  - inference
+  - nvidia
+  - b200
+  - gb300
+  - tilert
+  - vllm
+  - glm5
+---
+
+_本文最初于 2026 年 8 月 10 日发布在 [SemiAnalysis 通讯](https://newsletter.semianalysis.com/p/ultra-high-interactivity-on-nvidia)。_
+
+高价的"极速模式"正在证明：用户愿意为更低的延迟和更快的 token 生成付费，这有望带来更高的毛利率。因此，OpenAI 等前沿 AI 实验室正在评估专用推理系统，包括 Cerebras 与 NVIDIA Groq LPU——这类系统以超高交互性为先，而非追求最大化的批处理吞吐量。超低延迟在交互式工作负载中最为关键，例如实时助手与全双工语音。以 [OpenAI GPT-Live](https://x.com/OpenAI/status/2080378182469857576) 为例，它可以同时收听与应答，响应延迟会被用户立刻感知到。
+
+GPU 在高吞吐量与中低交互性场景下表现出色，但其架构并不适合超低延迟推理。一台 8 卡 HGX B200 服务器的理论 HBM 内存带宽合计为 64 TB/s。在批大小为 1 时，NVFP4 精度下的 GLM-5 每生成一个 token 仅需约 21 GB 的激活参数访存量。据此，B200 的 HBM 带宽屋顶线意味着在不使用投机解码的情况下可达到 3,047 tokens/s/user。而实际上，GPU 远远达不到这一上限。
+
+差距来自延迟而非带宽。传统 GPU 编程模型需要启动并同步大量独立 kernel，其启动与收尾开销在超高交互性下变得显著。在常规服务速度下这些延迟成本并不明显（即便使用 CUDA graphs 亦然），但当每 token 延迟逼近亚毫秒级的 TPOT（Time Per Output Token，每输出 token 时间）区间时，它们便占据主导。此外，尽管 [GPU 内存带宽每代提升约 2–3 倍，内存延迟却完全没有改善](https://newsletter.semianalysis.com/p/vera-rubin-nvl72-vs-gb200-nvl72-inference)。
+
+采用替代硬件是当下的热门做法，但用 GPU 同样可以做到这一点。这正是 [TileRT](https://github.com/tile-ai/TileRT) 持久化引擎的用武之地。TileRT 将整个解码计算图静态编译为 NVIDIA GPU 上的单个持久化 kernel，最大化计算、访存读写与通信之间的重叠。在 InferenceX 的 GLM-5 FP8 744B 基准测试中，单台 B200 解码服务器上的 TileRT 已被验证可达到最高 500 tokens/s/user，约为运行传统推理引擎的 GB300 NVL72 的 3 倍。在每输出 token 成本相同（iso-cost）的条件下，TileRT 可实现比传统引擎高最多 2 倍的交互性。
+
+我们感谢 TileRT 维护者在 TileRT InferenceX 基准测试上的协作，也感谢 [vLLM 社区](https://vllm-project.github.io/)在 V1 connector 上的设计。TileRT 出自与广受欢迎的 [TileLang DSL](https://github.com/tile-ai/tilelang) 同一个社区维护组织。
+
+借助 PD 分离（prefill/decode disaggregation）技术，高度专用化的 TileRT 引擎负责对延迟敏感的解码阶段，而 vLLM、SGLang 等以吞吐量为导向的引擎继续承担预填充。TileRT 解码引擎已在生产环境中落地：小米用于 [MiMo V2.5 Pro UltraSpeed](https://mimo.mi.com/docs/en-US/news/latest/1000tps)，ZAI 用于 [GLM 5.1 HighSpeed](https://www.tilert.ai/)。
+
+本文将深入解读 TileRT 的 InferenceX 结果、TileRT 究竟是什么、它如何与现有推理生态组合，以及 TileRT 的权衡与挑战。我们还将展开讨论：在标准 GPU 上使用 TileRT，与使用 NVIDIA Groq LPU、Cerebras、SambaNova 等超低延迟专用芯片相比的取舍，并评估运行在 GPU 上的 TileRT 软件是否有可能侵蚀这些专用芯片的 TAM（总可寻址市场）。[SemiAnalysis Accelerator Model](https://semianalysis.com/accelerator-hbm-model/) 提供 NVIDIA LPU30、LPU40、Cerebras WSE-3 与 WSE-4 出货量的逐季度估算等更多数据。
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+  点击查看完整的 InferenceX 仪表板 →
+</DashboardCTA>
+
+## InferenceX
+
+InferenceX 是我们开源、厂商中立、持续更新的 AI 推理基准测试与研究平台。我们在延迟—吞吐量的帕累托前沿上测量主流模型、推理框架与硬件，跟踪真实世界推理性能与经济性随时间的改进。
+
+我们的基准测试已被几乎所有主要算力买家[广泛复现、验证和／或支持](https://inferencemax.semianalysis.com/quotes)，涵盖 [Google Cloud](https://cloud.google.com/blog/products/compute/scaling-moe-inference-with-nvidia-dynamo-on-google-cloud-a4x)、[Microsoft Azure](https://blog.aks.azure.com/2025/10/24/dynamo-on-aks#enterprise-scale-inference-experiments--dynamo-with-gb200-running-on-aks)、Oracle、Meta 等众多机构。此外，它还获得了 ML 社区的支持，包括 vLLM、LMCache、SGLang、PyTorch、Hugging Face，以及 OpenAI、MiniMax、ZAI、Qwen、Moonshot Kimi 等主要实验室。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/inferencex-dashboard.png"
+  alt="InferenceX 仪表板，展示不同硬件与框架配置下的吞吐量—交互性帕累托曲线"
+  caption="来源：InferenceX"
+/>
+
+如果你觉得这个开源基准测试与数据有用，欢迎为 [InferenceX GitHub 仓库](https://github.com/SemiAnalysisAI/InferenceX)加星。如前所述，NVIDIA 已承诺向 InferenceX 提交可验证的 Vera Rubin 数据。我们很快将拿到 Google TPUv7 的结果，AMD 也已承诺在今年提交 MI455X UALoE72。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/inferencex-github.png"
+  alt="InferenceX GitHub 仓库，展示开源基准测试框架与对比数据"
+  caption="来源：InferenceX GitHub"
+/>
+
+## 吞吐量与交互性曲线
+
+任何推理系统都必须在两个相互竞争的目标之间取得平衡。
+
+- **交互性（tok/s/user）** 衡量单个用户接收 token 的速度，是 TPOT 的倒数。它决定了响应体验是流畅还是迟滞。
+- **吞吐量（tok/s/GPU）** 衡量系统在所有用户上合计产出的 token 数量，很大程度上决定了每 token 成本。
+
+批处理通过同时处理更多请求来提升总吞吐量，但每个用户等待每个 token 的时间通常更长。小批量则相反：提升单用户速度，同时降低每张 GPU 完成的有效工作量。
+
+公交车把成本分摊到许多乘客身上，但每位乘客都要为共用站点等待；赛车只载一两个人、更快抵达，但每位乘客的成本高得多。推理面临同样的取舍：批处理改善总吞吐量与每 token 成本，小批量改善单用户响应速度。不存在放之四海而皆准的工作点。
+
+在下图所示的配置中，交互性从约 25 提升到 260 tokens/s/user 时，每 GPU 吞吐量从约 5,900 降至 200 tokens/s/GPU。即单用户速度提升约 10 倍的代价，是总吞吐量下降约 30 倍。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/throughput-vs-interactivity-curve.png"
+  alt="吞吐量与交互性的权衡曲线：交互性从 25 升至 260 tokens/s/user 时，每 GPU 吞吐量从约 5,900 降至 200 tokens/s/GPU"
+  caption="来源：SemiAnalysis"
+/>
+
+## TileRT 结果
+
+正如下一节所述，GPU 在高吞吐量场景中已经表现良好，但在高交互性场景中表现吃力。这一短板催生了整个数据流（dataflow）芯片细分市场。TileRT 针对的正是同一短板，因此专注于高交互性工作点。
+
+B200 上的 TileRT 自成一档。在 8k/1k 输入／输出 token 场景下，TileRT 在 8 卡 B200 节点上达到 340 tokens/s/user。此前数据集中的最快结果是 GB300 NVL72 在 NVFP4 + MTP 下的 181.4 tokens/s/user，因此 TileRT 在该指标上快 1.9 倍。当然，这是在批大小为 1 的条件下——此时 GB300 NVL72 那套复杂铜背板所付出的额外工程代价，对提升交互性完全派不上用场。
+
+与此同时，最快的 FP8 结果是 B300 搭配 MTP 的 113.6 tokens/s/user，因此在相同精度下 TileRT 快 3.0 倍。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/tilert-8k1k-interactivity-chart.png"
+  alt="InferenceX 8k/1k 交互性对比图：B200 上的 TileRT 达到 340 tokens/s/user，对比各传统引擎"
+  caption="来源：InferenceX"
+/>
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/tilert-8k1k-vs-gb300-bar.png"
+  alt="8k/1k 场景柱状图：B200（TileRT、MTP、FP8）为 340.0 tok/s/user，GB300 NVL72（Dynamo TRTLLM、MTP、FP4）为 181.4 tok/s/user"
+  caption="来源：InferenceX"
+/>
+
+在 1k/1k 输入／输出下，TileRT FP8 达到 494.2 tokens/s/user，是使用 FP4 的最佳传统结果（256.3 tokens/s/user）的 1.9 倍，也是最佳传统 FP8 结果（136.3 tokens/s/user）的 3.6 倍。TileRT 目前尚不支持 FP4，却已经胜过非 TileRT 的 FP4 实现。这一结果同样值得注意的一点是：它来自一个 8 卡 B200 节点，而非 GB200 或 GB300 NVL72 的 72 卡 NVLink 纵向扩展域。该对比针对的是单用户交互性，而非总吞吐量或成本。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/tilert-1k1k-interactivity-chart.png"
+  alt="InferenceX 1k/1k 交互性对比图：B200 上的 TileRT FP8 达到 494.2 tokens/s/user"
+  caption="来源：InferenceX"
+/>
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/tilert-1k1k-vs-gb200-bar.png"
+  alt="1k/1k 场景柱状图：B200（TileRT、MTP、FP8）为 494.2 tok/s/user，GB200 NVL72（Dynamo TRTLLM、MTP、FP4）为 256.3 tok/s/user"
+  caption="来源：InferenceX"
+/>
+
+然而，推理领域永远存在权衡。TileRT 的交互性优势伴随着更低的总吞吐量。随着并发上升，传统引擎能把权重加载与固定的 kernel 开销分摊到更多用户身上。在 8k/1k 输入／输出下，GB300 FP4+MTP 在并发 12 时提供约 240 tokens/s/GPU 的总吞吐量，同时维持 154 tokens/s/user；而 TileRT 提供 160.4 tokens/s/GPU 的总吞吐量，交互性则达到 340 tokens/s/user。
+
+因此权衡在于：TileRT 提供高得多的单用户速度，但传统 GB300 工作点完成的每 GPU 总工作量更多。截至发文时，TileRT 每个解码节点同时只服务一个在途请求，这使其成为一个刻意专用化的工作点，而非通用的吞吐量配置。也就是说，在仅支持单用户批大小的情况下，TileRT 不只是一辆赛车，更像是一艘只能容纳一位乘客的私人火箭。让 TileRT 支持更多"乘客"或许可行，但这是一个颇具野心的目标。
+
+在端到端延迟方面，TileRT 在 FP8 下比此前记录的最佳 GLM-5.1 结果快 4.5 倍（1k/1k）与 3.0 倍（8k/1k）。不出所料，TileRT 的 TTFT（首 token 时间）表现良好但并不突出，决定性优势来自解码尾段：3.01 秒，而最佳 NVFP4 + MTP 竞争者为 6.54 秒，MI355X 为 18.18 秒。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/tilert-end-to-end-latency.png"
+  alt="端到端延迟对比：TileRT 解码尾段为 3.01 秒，最佳 NVFP4 + MTP 竞争者为 6.54 秒，MI355X 为 18.18 秒"
+  caption="来源：InferenceX"
+/>
+
+## TileRT 究竟是什么？
+
+前面简要介绍了 TileRT 的作用并展示了部分基准结果，现在让我们停下来更深入地解释 TileRT 是什么、如何工作。传统服务引擎以成千上万个独立 GPU kernel 依次启动的方式运行。这些启动与收尾意味着 GPU 花费了惊人的时间在等待上；这类开销对中低交互性推理或许无关紧要，但对超高交互性推理（即低延迟推理）影响显著。更糟的是，每个 kernel 都会把未完成的中间结果写回 HBM。在小批量下问题更严重，因为 kernel 规模不足以摊薄启动延迟、同步与调度开销。
+
+如前所述，在批大小为 1、仅使用单台 HGX H200 服务器（合计 38.4 TB/s HBM 内存带宽）时，MXFP8 精度下每 token 的激活参数访存量为 42 GB。理论上，若只受内存带宽约束，那么即便不使用投机解码，推理也应能达到最高 1,000 tok/s/user 的交互性。现实显然并非如此。症结在于 GPU 的编程与架构模型传统上并非为低延迟而设计。尽管每 GPU 内存带宽每代提升 2–3 倍，内存延迟却完全没有改善——而 HBM 价格还在持续上涨。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/hbm-bandwidth-vs-latency.png"
+  alt="图表显示 GPU HBM 内存带宽每代提升 2–3 倍，而内存延迟保持不变"
+  caption="来源：SemiAnalysis、NVIDIA"
+/>
+
+TileRT 不再持续启动 kernel，而是让 GPU 持续执行一条持久化流水线：将整个模型提前静态编译为一个持久化的 Engine Kernel——主机只启动一次，执行在整个解码生命周期内常驻 GPU，绝大部分运行时编排被前移到编译期。
+
+这与 CUDA graphs 不同：后者一次性捕获 kernel 启动与 memcpy 的 DAG（有向无环图），随后用一次 `cudaGraphLaunch` 重放。但其中的 kernel 仍是彼此独立的，kernel 边界依然带来设备侧开销，且片上状态在每次边界处被清空。CUDA graph 优化的是 kernel 的启动方式，而 TileRT 则直接取消了"kernel 作为执行单元"这一概念。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/cuda-graphs-vs-persistent-kernel.png"
+  alt="对比 CUDA graphs 执行模型与 TileRT 单一持久化 Engine Kernel 的示意图"
+  caption="来源：SemiAnalysis"
+/>
+
+此外，通过将工作分解为 tile 级任务并进行 warp 与 block 专用化，运行时以高度重叠的方式动态重排计算、I/O 与通信。在 Engine Kernel 内部，不同的 warp group 承担不同职责：异步数据搬运、张量计算与通信重叠。过去按 load → barrier → compute → barrier 串行执行的各阶段，如今在 tile 粒度上重叠进行，中间结果通过寄存器、共享内存与 L2 向前流动，而不必反复溢写到全局内存。实际效果是：每个 CTA（Cooperative Thread Array，协作线程数组）变成一座小型异构工厂，而非统一的 SIMT（Single Instruction Multiple Threads，单指令多线程）工作单元。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/tilert-warp-specialization.png"
+  alt="TileRT warp 专用化示意：Engine Kernel 内部数据搬运、张量计算与通信的重叠执行"
+  caption="来源：TileRT"
+/>
+
+TileRT 引入的下一项优化，是把专用化从 warp 扩展到整张 GPU。大多数 TP 框架假定所有 rank 同步执行完全相同的逻辑，但稀疏路由、Top-K 选择、动态索引、长上下文注意力与 MTP 并不适配同构的横向扩展；它们计算量不大却依赖全局信息，强迫每个 rank 都执行会带来冗余工作与同步放大。既然 warp 可以专用化，GPU 同样可以。在 GLM-5.1 的注意力层中，GPU 0 成为 Sparse Indexer 工作单元，负责 Top-K 选择、稀疏索引构建与路由；GPU 1 至 7 则作为 MLA 工作单元，执行 RMSNorm、GEMM、flash sparse attention 与 AllReduce。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/tilert-gpu-specialization-glm51.png"
+  alt="TileRT 在 GLM-5.1 注意力层中的 GPU 专用化示意：GPU 0 作为稀疏索引器，GPU 1–7 作为 MLA 工作单元"
+  caption="来源：TileRT"
+/>
+
+最后，通信不再被当作外部阶段：广播、归约与同步直接在 tile 级流程内部执行。在 TileRT 中，整个注意力层在主机侧只对应一次 kernel 启动，执行模式也从 compute → sync → compute 转变为持续重叠的 compute ↔ communication ↔ compute 流水线。
+
+## vLLM 与 TileRT 的 PD 分离式引擎
+
+LLM 推理由两个截然不同的阶段组成：预填充（prefill）与解码（decode）。预填充并行处理输入提示，以计算为主，关键性能指标是总吞吐量；解码逐个生成 token 并反复访问不断增长的 KV cache，以访存为主，对每 token 延迟高度敏感。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/prefill-decode-phases.png"
+  alt="LLM 推理中预填充与解码两个阶段的示意图"
+  caption="来源：DistServe"
+/>
+
+TileRT 并不取代 vLLM。vLLM 仍是高吞吐量预填充引擎及其外围服务层，包括调度器、分块预填充（chunked prefill）、前缀缓存、OpenAI 兼容 API 与运维工具。只有对延迟敏感的解码流量会转移到 TileRT。TileRT 被设计为单座火箭，而 vLLM 依然是飞机、汽车、公交与火车。
+
+预填充与解码阶段可以[分离](https://arxiv.org/abs/2401.09670)到不同节点。借助 PD 分离，一个共享的 vLLM 预填充池可以同时供给两个完全不同的解码池。
+
+- **池 A：使用 TileRT 的超高交互性解码。** 延迟关键请求经过 TileRT PD Router，由它指示 vLLM 生成首 token，并在 `kv_transfer_params` 中标记目标 TileRT 节点。
+- **池 B：使用 vLLM 解码的中低交互性通用解码。** 通用流量继续走 vLLM 原生分离式代理，进入常规 vLLM 解码池。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/vllm-tilert-pd-architecture.png"
+  alt="架构图：共享的 vLLM 预填充池同时供给 TileRT 超高交互性解码池与常规 vLLM 解码池"
+  caption="来源：vLLM 与 TileRT"
+/>
+
+这通过 [vLLM 的 MultiConnector API](https://vllm-project.github.io/2026/07/14/vllm-tilert-pd.html) 实现，它将 TileRTConnector 与原生 connector 组合在一起。TileRT connector 只接管被标记为高交互性流量类别的请求，对其余请求为空操作（no-op），因此两类流量可以共用同一台预填充服务器。在预填充与解码之间，TileRT 使用 Mooncake Transfer Engine 与 NIXL Transfer Engine 搬运 KV cache。在 TileRT v0.1.5 中，每个解码节点同时只服务一个在途请求，路由器负责节流分发，并在节点被占用时施加背压。
+
+## TileRT 与 Cerebras／Groq／SambaNova 相比如何？
+
+专用推理厂商多年前就识别出了同样的执行瓶颈，只是把更多解决方案固化进了硬件。[SemiAnalysis Accelerator Model](https://semianalysis.com/accelerator-hbm-model/) 提供了 NVIDIA LPU30、LPU40、Cerebras WSE-3 与 WSE-4 出货量的逐季度估算。
+
+Groq 采用确定性的、由编译器编排的执行模型与大容量片上 SRAM 层级结构。Cerebras 将计算在晶圆级处理器上做空间映射；CS-3 提供约 900,000 个核心、44 GB 片上 SRAM 与 21 PB/s 内存带宽。SambaNova 将模型计算图映射到可重构数据流单元上，背后是 SRAM、HBM 与 DDR 构成的分层内存系统。
+
+硅片各不相同，但这些系统共享同一思路：对延迟敏感的推理，应尽量减少运行时调度、算子边界、同步以及经由外部内存的无谓数据搬运。在大批量下，这些开销更容易被摊薄；在批大小为 1 时，它们在每个 token 的延迟中占比要大得多。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/dataflow-accelerator-comparison.png"
+  alt="Groq、Cerebras、SambaNova 数据流加速器架构与 GPU 执行模型的对比"
+  caption="来源：SemiAnalysis"
+/>
+
+TileRT 以软件方式引入了若干数据流思想：AoT（ahead-of-time，提前）调度、持久化执行、专用化工作单元，以及更紧密的通信与计算重叠。这种相似性是架构层面的，而非字面意义上的等同。TileRT 依然运行在具备动态硬件调度、HBM 与模型专用编译调度的 SIMT GPU 之上。
+
+然而，TileRT 终究只是软件：它把数据流范式强加在一台从未为此专门设计的机器上。GPU 带有动态 warp 调度器、SIMT 模型与 HBM 层级结构，而 TileRT 之所以能拿出这些数字，靠的是投入巨大的编译器工程量——用静态展开的持久化 kernel、手工雕琢的 warp 专用化，以及针对固定驱动栈的逐模型编译，去说服这套机制"扮演"一条空间流水线。原生数据流硅片从不需要与自身基底较劲。专用加速器把更多执行模型固化在硬件中，能够规避一部分 TileRT 必须靠软件掩盖的开销。它们的优势仍取决于模型、精度、内存层级、编译器质量、系统规模与服务配置。这也正是为什么 Cerebras 服务稠密 70B 模型的速度是任何 8 卡 GPU 节点无论如何调度都达不到的：软件可以逼近 HBM 屋顶线，却无法抬高它。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/cerebras-groq-sambanova-comparison.png"
+  alt="专用数据流加速器与运行 TileRT 的 GPU 方案之间的性能对比"
+  caption="来源：SemiAnalysis"
+/>
+
+市场给出的初步答案是：纯粹性可以妥协。TileRT 的解码引擎已经在小米 MiMo V2.5 Pro UltraSpeed 与 Z.ai GLM-5.1 HighSpeed 背后投入生产，而其部署方式才是关键信号。两家公司都没有采购新的数据流芯片，而是从自己已经在运行的加速器集群中划出一个"速度档位"：vLLM 保留预填充、调度与 API，TileRT 在同一端点背后接管解码。在你已经拥有的硬件上做到"足够好"，往往胜过在必须另行采购的硬件上追求"架构纯粹"。
+
+这指向了一个更深层的结构性问题：预填充—解码（PD）配比的可替换性与灵活性。
+
+GPU 池是一种流动性资源：既擅长预填充，也擅长中高批量解码，如今在超高交互性解码上也颇具可信度；容量可以按软件调度决策在这些角色之间转移，从而逐小时跟随需求变化。ASIC 机队则恰恰相反：速度档位容量与其他容量之间的比例，在采购订单签字那天就被硬件固定了；要改变实体机队的配比，需要数月的重新上架与重新布线。如果工作负载组合稳定且可预知，这本不成问题。遗憾的是，需要普通对话延迟的用户，与愿意为极端交互性 SLO 付费的用户（越来越多是智能体），两者之间的比例在估算时涉及诸多变量。用 GPU 猜错了，可以靠软件重新平衡；用专用硅片猜错了，要么让资本沉淀在闲置的高速机器上，要么只能拒绝掉当初正是为之采购的高溢价流量。更何况需求会随时间变化，因此一次正确的猜测也只在有限时间内成立。
+
+回到前文提到的共享预填充池：服务商无需为所有流量支付 TileRT 溢价。通用请求可以继续留在以吞吐量为优化目标的 vLLM 或 SGLang 解码池，只有延迟关键请求才被路由到 TileRT 解码池。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/shared-prefill-specialized-decode-pools.png"
+  alt="资源弹性分配示意：一个共享预填充池同时供给通用解码池与延迟关键解码池"
+  caption="来源：SemiAnalysis"
+/>
+
+这一切并不会终结速度市场的顶端。SRAM 屋顶线依然更优，某些规模的模型仍然更适合它，也总有一些工作负载愿意不计代价追求最高的每秒 token 数。但 TileRT 重新定义了多数买家真正需要的东西：他们要的不是一台"速度机器"，而是一个"速度档位"，从本来就要拥有的机队中动态划拨出来。Cerebras、Groq 与 SambaNova 面对的，不再是一个笨拙的 kernel 启动器，而是运行在可替换硬件上、由一份配置文件即可重新分配的、他们自己的执行模型。TileRT 或许是一艘单座火箭，但它让服务商可以给自家的城市公交绑上固体火箭助推器，而不必从头设计一款全新的运载工具。
+
+## 为什么 TileRT 的开发进展缓慢？
+
+GLM-5.1 已落后一代，在 InferenceX 主线上也已被弃用。TileRT 的模型支持范围非常有限，目前仅支持 GLM-5/5.1 与 DeepSeek-V3.2。MiMo-V2.5-Pro-UltraSpeed 是协同设计合作的产物，尚未开源。
+
+TileRT 继承了 ASIC 厂商最大的弱点。静态提前编译意味着模型目录很小、依赖被硬性锁定，且每新增一种架构都需要实打实的工程投入。这里不存在完全通用的路径：持久化 engine kernel 意味着模型被提前静态展开为一个常驻程序，因此必须就以下方面做出决策——tile 形状、流水线深度、缓冲区在寄存器／共享内存／L2 中的驻留策略、warp group 在加载／计算／通信之间如何划分、集合通信在何处融合进 tile 流程，以及哪些 GPU 承担专用角色（例如 GLM-5.1 专属的 sparse indexer rank）。一旦更换注意力机制或路由方案，这套调度的大部分都会失效。数据流芯片同样面临这一问题——好的编译器向来极难打造。
+
+业界正在设法简化这一过程，尤其是在 AI 可以加速软件开发的当下。[TileOPs](https://github.com/tile-ai/TileOPs) 旨在减轻这一负担：每个算子都以机器可读的 manifest 声明其签名、工作负载与屋顶线模型；该 manifest 驱动代码生成、测试，并以硬件上界（而不仅仅是以既往实现）为基准进行性能评测。
+
+AI 编码智能体能在已知模板内加速调优，但新颖的变换仍需专家判断。此外，单体式持久化 kernel 也削弱了传统逐 kernel 性能剖析时间线的作用，使自动化反馈闭环更加困难。
+
+## TileRT 与 InferenceX 的下一步
+
+我们正在积极推进，将 TileRT 的基准测试从 InferenceX 的单轮 8k/1k 场景扩展到我们新的智能体编码基准——AgentX。该场景回放真实的 Claude Code 与 Codex 轨迹，包含长上下文、多轮请求、真实的子智能体活动与动态工具调用延迟。其输入长度中位数为 140k tokens，理论缓存命中率中位数屋顶线可达 99.2%。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/agentx-benchmark-characteristics.png"
+  alt="AgentX 基准特征图表：输入长度中位数 140k tokens，理论缓存命中率中位数屋顶线 99.2%"
+  caption="来源：SemiAnalysis"
+/>
+
+该工作负载将检验 TileRT 与 vLLM 的整套系统，而不仅是解码速度，涵盖增量 KV 传输、前缀缓存复用、缓存保留与卸载、路由与调度。关键问题在于：TileRT 能否在轮次之间只传输新增上下文，同时保持其超高交互性优势。
+
+<Figure
+  src="/images/ultra-high-interactivity-on-nvidia/multi-turn-thinking.png"
+  alt="多轮请求处理与 LLM 思考过程示意图"
+  caption="来源：DeepSeek"
+/>
+
+第二步是突破批大小为 1 的限制。我们还将在批大小 2、4、8 下对 TileRT 进行基准测试，目标是描绘其吞吐量—交互性帕累托前沿，并找出持久化 Engine Kernel 的延迟优势开始趋于平缓的拐点。
+
+完整的每 TCO 性能分析——以 [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/) 作为各芯片 SKU 资本支出与运营支出的基线，对比 TileRT 在超高交互性下与常规较低交互性工作点下的每百万输出 token 成本——面向订阅用户，可在 [SemiAnalysis 通讯的完整文章](https://newsletter.semianalysis.com/p/ultra-high-interactivity-on-nvidia)中阅读。
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+  点击查看完整的 InferenceX 仪表板 →
+</DashboardCTA>
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "TileRT 在 NVIDIA B200 上比传统推理引擎快多少？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "在 InferenceX 的 8k/1k 输入输出场景下，TileRT 在 8 卡 B200 节点上达到 340 tokens/s/user，而此前最佳为 GB300 NVL72 在 NVFP4 与 MTP 下的 181.4 tokens/s/user，即 TileRT 快 1.9 倍。相比最快的 FP8 结果（B300 搭配 MTP 的 113.6 tokens/s/user），在相同精度下 TileRT 快 3.0 倍。在 1k/1k 下，TileRT FP8 达到 494.2 tokens/s/user，是使用 FP4 的最佳传统结果 256.3 tokens/s/user 的 1.9 倍，是最佳传统 FP8 结果 136.3 tokens/s/user 的 3.6 倍。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "TileRT 是什么，它与 CUDA graphs 有何不同？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "TileRT 将整个解码计算图提前静态编译为 NVIDIA GPU 上的单个持久化 Engine Kernel。主机只启动一次，执行在整个解码生命周期内常驻 GPU，绝大部分运行时编排被前移到编译期。CUDA graphs 一次性捕获 kernel 启动与 memcpy 的有向无环图并用一次 cudaGraphLaunch 重放，但其中的 kernel 仍彼此独立，每个 kernel 边界依然带来设备侧开销并清空片上状态。CUDA graph 优化的是 kernel 的启动方式，而 TileRT 直接取消了 kernel 作为执行单元这一概念。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "TileRT 更高交互性的代价是什么？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "TileRT 的交互性优势伴随更低的总吞吐量。在 8k/1k 下，GB300 FP4 加 MTP 在并发 12 时提供约 240 tokens/s/GPU 的总吞吐量，同时维持 154 tokens/s/user；而 TileRT 提供 160.4 tokens/s/GPU，交互性达到 340 tokens/s/user。截至发文时，TileRT 每个解码节点同时只服务一个在途请求，因此这是一个刻意专用化的工作点，而非通用吞吐量配置。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "TileRT 会取代 vLLM 吗？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "不会。vLLM 仍是高吞吐量预填充引擎及其外围服务层，包括调度器、分块预填充、前缀缓存、OpenAI 兼容 API 与运维工具。只有对延迟敏感的解码流量转移到 TileRT，通过 vLLM 的 MultiConnector API 将 TileRTConnector 与原生 connector 组合实现。一个共享的 vLLM 预填充池可同时供给 TileRT 超高交互性解码池与常规 vLLM 解码池。TileRT 使用 Mooncake Transfer Engine 与 NIXL Transfer Engine 在预填充与解码之间搬运 KV cache。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "运行在 GPU 上的 TileRT 能否取代 Cerebras、Groq 与 SambaNova？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "TileRT 以软件方式引入了数据流的若干思想，包括提前调度、持久化执行、专用化工作单元以及更紧密的计算通信重叠，但它依然运行在具备动态硬件调度与 HBM 层级结构的 SIMT GPU 之上。软件可以逼近 HBM 屋顶线却无法抬高它，这也是 Cerebras 服务稠密 70B 模型的速度是任何 8 卡 GPU 节点都无法企及的原因。有利于 GPU 的结构性论据在于可替换性：GPU 池可以按调度决策在预填充、通用解码与超高交互性解码之间转移容量，而 ASIC 机队在采购订单签字当天就把该配比固定在硬件里。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "为什么 TileRT 的开发进展缓慢？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "静态提前编译意味着模型目录很小（目前为 GLM-5/5.1 与 DeepSeek-V3.2）、依赖被硬性锁定，且每新增一种架构都需要实打实的工程投入。持久化 engine kernel 要求预先决定 tile 形状、流水线深度、缓冲区在寄存器共享内存与 L2 中的驻留策略、warp group 在加载计算与通信之间的划分、集合通信在何处融合进 tile 流程，以及哪些 GPU 承担专用角色。更换注意力机制或路由方案会使这套调度的大部分失效。TileOPs 旨在减轻该负担，它以机器可读的 manifest 声明每个算子，驱动代码生成、测试，并以硬件上界为基准进行性能评测。"
+      }
+    }
+  ]
+}`}</JsonLd>
