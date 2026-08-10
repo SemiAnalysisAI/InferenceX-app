@@ -176,7 +176,7 @@ describe('CollectiveX neutral run view', () => {
 
   it('allows both measured kernel modes to be selected together', () => {
     const withLowLatency = buildDataset({
-      shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' })],
+      shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' }), makeRawShard({ ep: 16 })],
     });
     installRuns([withLowLatency]);
     installRun(withLowLatency);
@@ -199,6 +199,18 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="chart-legend"]')
       .should('contain.text', 'normal')
       .and('contain.text', 'low-latency');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 2);
+
+    cy.get('[data-testid="collectivex-ep-select"]').click();
+    cy.contains('[role="option"]', 'EP16').click();
+    cy.get('[data-testid="collectivex-mode-toggle"]').should('not.exist');
+
+    cy.get('[data-testid="collectivex-ep-select"]').click();
+    cy.contains('[role="option"]', 'EP8').click();
+    cy.get('[data-testid="collectivex-mode-toggle"] button[aria-pressed="true"]').should(
+      'have.length',
+      2,
+    );
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 2);
   });
 

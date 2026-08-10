@@ -476,11 +476,13 @@ export default function CollectiveXDisplay() {
     if (availablePhases.length > 0 && !availablePhases.includes(phase)) {
       setPhase(availablePhases[0]);
     }
-    const validModes = modes.filter((mode) => availableModes.includes(mode));
-    if (availableModes.length > 0 && validModes.length === 0) {
+    // Keep the user's full multi-mode preference while availability cascades
+    // through EP/phase changes. In particular, an intermediate empty slice
+    // must not erase both selections; modes that become available again should
+    // still be selected. Fall back only when a settled, non-empty slice has no
+    // overlap with the preference at all.
+    if (availableModes.length > 0 && !modes.some((mode) => availableModes.includes(mode))) {
       setModes([availableModes[0]]);
-    } else if (validModes.length !== modes.length) {
-      setModes(validModes);
     }
     if (availablePrecisions.length > 0 && !availablePrecisions.includes(precision)) {
       setPrecision(availablePrecisions[0]);
