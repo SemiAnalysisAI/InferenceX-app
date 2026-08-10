@@ -1369,6 +1369,7 @@ describe('ChartDisplay engine comparison guard', () => {
         selectedSequence: Sequence.AgenticTraces,
         selectedXAxisMode: 'interactivity' as const,
         selectedXAxisMetric: 'p90_ttft',
+        bestPerSku: false,
         activeHwTypes: new Set([officialKeys[0]]),
         hwTypesWithData: new Set(officialKeys),
         resolveComparisonSelection: resolveSelection,

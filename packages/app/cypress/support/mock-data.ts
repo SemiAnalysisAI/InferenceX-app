@@ -166,6 +166,8 @@ export function createMockInferenceContext(
     toggleHwType: namedStub('toggleHwType'),
     removeHwType: namedStub('removeHwType'),
     selectAllHwTypes: namedStub('selectAllHwTypes'),
+    bestPerSku: true,
+    setBestPerSku: namedStub('setBestPerSku'),
     resolveComparisonSelection: (proposed) => ({
       result: proposed,
       keptGroup: null,

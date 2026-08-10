@@ -25,7 +25,12 @@ let mockLocal: ReturnType<typeof makeMockStorage>;
 let mockSession: ReturnType<typeof makeMockStorage>;
 
 function setNow(iso: string) {
-  vi.setSystemTime(new Date(iso));
+  // Interpret the timestamp in the local time zone to match visit-tracking's
+  // local-calendar-day logic (getFullYear/getMonth/getDate). A trailing 'Z'
+  // forces UTC parsing, which shifts the calendar day in non-UTC zones — e.g.
+  // 2026-05-15T22:00:00Z is 2026-05-16 in Asia/Singapore (UTC+8) — making the
+  // day/month boundary assertions flaky depending on where the suite runs.
+  vi.setSystemTime(new Date(iso.replace(/Z$/u, '')));
 }
 
 function currentMonth(): string {

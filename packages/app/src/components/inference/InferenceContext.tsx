@@ -69,6 +69,7 @@ import {
   comparisonExclusion as resolveComparisonExclusion,
 } from './utils/comparison-exclusion';
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
+import { bestSeriesPerSku } from './utils/best-series-per-sku';
 import {
   EMPTY_QUICK_FILTERS,
   parseDeploymentModes,
@@ -327,6 +328,9 @@ export function InferenceProvider({
   });
 
   const [hideNonOptimal, setHideNonOptimal] = useState(() => getUrlParam('i_optimal') !== '0');
+  const [bestPerSku, setBestPerSku] = useState(
+    () => activeTab === 'inference' && getUrlParam('i_best') !== '0',
+  );
   const labelScenarioKind = sequenceKind(effectiveSequence);
   const initialLabelState = useMemo(
     () =>
@@ -893,6 +897,37 @@ export function InferenceProvider({
     extractHwKey,
   );
 
+  const bestHwTypes = useMemo(() => {
+    const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
+    const graph = graphs.find((candidate) => candidate.chartDefinition.chartType === wantedType);
+    if (!graph) return hwTypesWithData;
+    const direction =
+      graph.chartDefinition[
+        `${selectedYAxisMetric}_roofline` as keyof typeof graph.chartDefinition
+      ];
+    if (
+      direction !== 'upper_right' &&
+      direction !== 'upper_left' &&
+      direction !== 'lower_left' &&
+      direction !== 'lower_right'
+    ) {
+      return hwTypesWithData;
+    }
+    const best = bestSeriesPerSku(graph.data, direction);
+    return best.size > 0 ? best : hwTypesWithData;
+  }, [graphs, hwTypesWithData, selectedXAxisMode, selectedYAxisMetric]);
+
+  const setBestPerSkuAndApply = useCallback(
+    (enabled: boolean) => {
+      setBestPerSku(enabled);
+      const target = enabled ? bestHwTypes : hwTypesWithData;
+      setActiveHwTypes(resolveHwSelection(target).result);
+      setActivePresetId(null);
+      presetHwFilterRef.current = null;
+    },
+    [bestHwTypes, hwTypesWithData, resolveHwSelection, setActiveHwTypes],
+  );
+
   // Direct fallback: apply pendingHwFilter when hwTypesWithData is already populated
   // but useChartDataFilter didn't fire (e.g. re-selecting the same preset).
   useEffect(() => {
@@ -911,6 +946,7 @@ export function InferenceProvider({
       const next = toggleComparisonSelection(activeHwTypes, hw, hwTypesWithData);
       if (!next) return;
       setActiveHwTypes(next);
+      setBestPerSku(false);
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
@@ -920,6 +956,7 @@ export function InferenceProvider({
   const removeHwType = useCallback(
     (hw: string) => {
       removeHwRaw(hw);
+      setBestPerSku(false);
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
@@ -941,6 +978,7 @@ export function InferenceProvider({
   );
   const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
   const selectAllHwTypes = useCallback(() => {
+    setBestPerSku(false);
     if (exclusion) {
       const { result, droppedGroups } = resolveHwSelection(hwTypesWithData, activeHwTypes);
       setActiveHwTypes(result);
@@ -979,7 +1017,7 @@ export function InferenceProvider({
   const precisionsKey = effectivePrecisions.join(',');
   const hwResetKey = `${selectedModel}|${effectiveSequence}|${precisionsKey}|${
     isUnofficialRun ? 'preview' : 'official'
-  }`;
+  }|${selectedYAxisMetric}|${selectedXAxisMode}`;
   const lastHwResetKeyRef = useRef('');
 
   // Restore legend-active selection from URL on first availability of
@@ -1052,23 +1090,26 @@ export function InferenceProvider({
       // Scenarios that restrict standard-token engines (8K/1K, AgentX) keep one
       // sticky group so their charts remain useful; variant-only rules retain
       // the existing clear-all behavior.
-      const { result, droppedGroups } = resolveHwSelection(hwTypesWithData);
+      const automaticSelection = bestPerSku ? bestHwTypes : hwTypesWithData;
+      const { result, droppedGroups } = resolveHwSelection(automaticSelection);
       setActiveHwTypes(result);
       if (droppedGroups.length > 0) {
         setEngineConflict({
           kind: 'resolved',
-          ...exclusionResolutionFamilies(hwTypesWithData, result, exclusion),
+          ...exclusionResolutionFamilies(automaticSelection, result, exclusion),
         });
       }
       return;
     }
-    setActiveHwTypes(hwTypesWithData);
+    setActiveHwTypes(bestPerSku ? bestHwTypes : hwTypesWithData);
   }, [
     selectedModel,
     effectiveSequence,
     precisionsKey,
     hwResetKey,
     hwTypesWithData,
+    bestHwTypes,
+    bestPerSku,
     exclusion,
     pendingActiveHwTypes,
     resolveHwSelection,
@@ -1177,6 +1218,16 @@ export function InferenceProvider({
   // it equals the full set of items with data. Keeps share URLs short.
   const iActiveStr = useMemo(() => {
     if (activeHwTypes.size === 0) return '';
+    if (bestPerSku && activeHwTypes.size === bestHwTypes.size) {
+      let same = true;
+      for (const k of activeHwTypes) {
+        if (!bestHwTypes.has(k)) {
+          same = false;
+          break;
+        }
+      }
+      if (same) return '';
+    }
     if (activeHwTypes.size === hwTypesWithData.size) {
       let same = true;
       for (const k of activeHwTypes) {
@@ -1188,7 +1239,7 @@ export function InferenceProvider({
       if (same) return '';
     }
     return [...activeHwTypes].toSorted().join(',');
-  }, [activeHwTypes, hwTypesWithData]);
+  }, [activeHwTypes, hwTypesWithData, bestHwTypes, bestPerSku]);
 
   const serializedLabelState = serializeLabelState(labelScenarioKind, {
     showPointLabels,
@@ -1205,6 +1256,7 @@ export function InferenceProvider({
       i_dstart: selectedDateRange.startDate,
       i_dend: selectedDateRange.endDate,
       i_optimal: hideNonOptimal ? '' : '0',
+      i_best: bestPerSku ? '' : '0',
       i_label: serializedLabelState.i_label,
       i_hc: highContrast ? '1' : '',
       i_log: logScale ? '1' : '',
@@ -1234,6 +1286,7 @@ export function InferenceProvider({
       selectedDates,
       selectedDateRange,
       hideNonOptimal,
+      bestPerSku,
       showPointLabels,
       highContrast,
       logScale,
@@ -1374,6 +1427,8 @@ export function InferenceProvider({
       toggleHwType,
       removeHwType,
       selectAllHwTypes,
+      bestPerSku,
+      setBestPerSku: setBestPerSkuAndApply,
       resolveComparisonSelection: resolveHwSelection,
       toggleComparisonSelection,
       hardwareConfig,
@@ -1465,6 +1520,8 @@ export function InferenceProvider({
       toggleHwType,
       removeHwType,
       selectAllHwTypes,
+      bestPerSku,
+      setBestPerSkuAndApply,
       resolveHwSelection,
       toggleComparisonSelection,
 
