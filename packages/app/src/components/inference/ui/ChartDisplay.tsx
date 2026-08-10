@@ -760,6 +760,13 @@ export default function ChartDisplay() {
                         graph.model,
                         graph.sequence,
                         visibleOverlayRowsForExport,
+                        {
+                          yHeader: metricLabel(graph.chartDefinition, selectedYAxisMetric, locale),
+                          yPath: (graph.chartDefinition as ChartDefinition)[
+                            selectedYAxisMetric
+                          ] as string,
+                          xHeader: graph.chartDefinition.x_label,
+                        },
                       );
                       // Match warnings against the same series the chart annotates,
                       // including visible unofficial-run overlay series.

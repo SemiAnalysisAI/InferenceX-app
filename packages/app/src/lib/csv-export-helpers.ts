@@ -17,6 +17,22 @@ interface CsvData {
   rows: (string | number | boolean | null | undefined)[][];
 }
 
+export interface InferenceCsvDisplayedMetrics {
+  yHeader: string;
+  yPath: string;
+  xHeader: string;
+}
+
+function nestedMetric(point: InferenceData, path: string): number | '' {
+  const [key, nestedKey] = path.split('.');
+  const value = point[key as keyof InferenceData];
+  if (nestedKey && typeof value === 'object' && value !== null && nestedKey in value) {
+    const nestedValue = (value as Record<string, unknown>)[nestedKey];
+    return typeof nestedValue === 'number' ? nestedValue : '';
+  }
+  return typeof value === 'number' ? value : '';
+}
+
 /** Preserve a real zero while leaving source metrics that were not measured blank. */
 function benchmarkMetric(point: InferenceData, key: string): number | '' {
   if (point.rawMetricKeys && !point.rawMetricKeys.includes(key)) return '';
@@ -34,6 +50,7 @@ export function inferenceChartToCsv(
   model: string,
   sequence: string,
   overlayData: InferenceData[] = [],
+  displayedMetrics?: InferenceCsvDisplayedMetrics,
 ): CsvData {
   const islOsl = sequenceToIslOsl(sequence);
   const headers = [
@@ -89,51 +106,70 @@ export function inferenceChartToCsv(
     'Run URL',
   ];
 
+  const displayedColumns = displayedMetrics
+    ? [
+        {
+          header: displayedMetrics.yHeader,
+          value: (point: InferenceData) => nestedMetric(point, displayedMetrics.yPath),
+        },
+        { header: displayedMetrics.xHeader, value: (point: InferenceData) => point.x },
+      ].filter(
+        (column, index, columns) =>
+          !headers.includes(column.header) &&
+          columns.findIndex((candidate) => candidate.header === column.header) === index,
+      )
+    : [];
+  headers.splice(10, 0, ...displayedColumns.map((column) => column.header));
+
   const rows = [...data, ...overlayData]
     .filter((d) => !d.hidden)
-    .map((d) => [
-      model,
-      islOsl?.isl ?? '',
-      islOsl?.osl ?? '',
-      d.hw ?? '',
-      d.hwKey,
-      d.framework ?? '',
-      d.precision,
-      d.tp,
-      d.conc,
-      d.date,
-      benchmarkMetric(d, 'tput_per_gpu'),
-      benchmarkMetric(d, 'output_tput_per_gpu'),
-      benchmarkMetric(d, 'input_tput_per_gpu'),
-      benchmarkMetric(d, 'mean_ttft'),
-      benchmarkMetric(d, 'median_ttft'),
-      benchmarkMetric(d, 'p99_ttft'),
-      benchmarkMetric(d, 'std_ttft'),
-      benchmarkMetric(d, 'mean_tpot'),
-      benchmarkMetric(d, 'median_tpot'),
-      benchmarkMetric(d, 'p99_tpot'),
-      benchmarkMetric(d, 'std_tpot'),
-      benchmarkMetric(d, 'mean_intvty'),
-      benchmarkMetric(d, 'median_intvty'),
-      benchmarkMetric(d, 'p99_intvty'),
-      benchmarkMetric(d, 'std_intvty'),
-      benchmarkMetric(d, 'mean_itl'),
-      benchmarkMetric(d, 'median_itl'),
-      benchmarkMetric(d, 'p99_itl'),
-      benchmarkMetric(d, 'std_itl'),
-      benchmarkMetric(d, 'mean_e2el'),
-      benchmarkMetric(d, 'median_e2el'),
-      benchmarkMetric(d, 'p99_e2el'),
-      benchmarkMetric(d, 'std_e2el'),
-      d.disagg ?? false,
-      d.num_prefill_gpu ?? '',
-      d.num_decode_gpu ?? '',
-      d.spec_decoding ?? '',
-      d.ep ?? '',
-      d.dp_attention ?? '',
-      d.is_multinode ?? '',
-      d.run_url ?? '',
-    ]);
+    .map((d) => {
+      const row = [
+        model,
+        islOsl?.isl ?? '',
+        islOsl?.osl ?? '',
+        d.hw ?? '',
+        d.hwKey,
+        d.framework ?? '',
+        d.precision,
+        d.tp,
+        d.conc,
+        d.date,
+        benchmarkMetric(d, 'tput_per_gpu'),
+        benchmarkMetric(d, 'output_tput_per_gpu'),
+        benchmarkMetric(d, 'input_tput_per_gpu'),
+        benchmarkMetric(d, 'mean_ttft'),
+        benchmarkMetric(d, 'median_ttft'),
+        benchmarkMetric(d, 'p99_ttft'),
+        benchmarkMetric(d, 'std_ttft'),
+        benchmarkMetric(d, 'mean_tpot'),
+        benchmarkMetric(d, 'median_tpot'),
+        benchmarkMetric(d, 'p99_tpot'),
+        benchmarkMetric(d, 'std_tpot'),
+        benchmarkMetric(d, 'mean_intvty'),
+        benchmarkMetric(d, 'median_intvty'),
+        benchmarkMetric(d, 'p99_intvty'),
+        benchmarkMetric(d, 'std_intvty'),
+        benchmarkMetric(d, 'mean_itl'),
+        benchmarkMetric(d, 'median_itl'),
+        benchmarkMetric(d, 'p99_itl'),
+        benchmarkMetric(d, 'std_itl'),
+        benchmarkMetric(d, 'mean_e2el'),
+        benchmarkMetric(d, 'median_e2el'),
+        benchmarkMetric(d, 'p99_e2el'),
+        benchmarkMetric(d, 'std_e2el'),
+        d.disagg ?? false,
+        d.num_prefill_gpu ?? '',
+        d.num_decode_gpu ?? '',
+        d.spec_decoding ?? '',
+        d.ep ?? '',
+        d.dp_attention ?? '',
+        d.is_multinode ?? '',
+        d.run_url ?? '',
+      ];
+      row.splice(10, 0, ...displayedColumns.map((column) => column.value(d)));
+      return row;
+    });
 
   return { headers, rows };
 }
