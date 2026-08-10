@@ -78,6 +78,48 @@ describe('GET /api/v1/benchmarks', () => {
     );
   });
 
+  it('returns a compact, single-sequence calculator response', async () => {
+    mockGetLatestBenchmarks.mockResolvedValueOnce([
+      {
+        benchmark_type: 'single_turn',
+        isl: 1024,
+        osl: 1024,
+        metrics: { tput_per_gpu: 100, median_intvty: 30, avg_power_w: 700 },
+        workers: [{ rank: 0 }],
+      },
+      {
+        benchmark_type: 'single_turn',
+        isl: 8192,
+        osl: 1024,
+        metrics: { tput_per_gpu: 80, median_intvty: 20 },
+      },
+    ]);
+
+    const res = await GET(
+      req('/api/v1/benchmarks?model=DeepSeek-R1-0528&view=calculator&sequence=1k%2F1k'),
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([
+      {
+        benchmark_type: 'single_turn',
+        isl: 1024,
+        osl: 1024,
+        metrics: { tput_per_gpu: 100, median_intvty: 30 },
+      },
+    ]);
+  });
+
+  it('rejects an unknown calculator sequence', async () => {
+    const res = await GET(
+      req('/api/v1/benchmarks?model=DeepSeek-R1-0528&view=calculator&sequence=unknown'),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Unknown calculator sequence' });
+    expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
+  });
+
   it('passes exact=true when query param set', async () => {
     mockGetLatestBenchmarks.mockResolvedValueOnce([]);
 
