@@ -980,15 +980,35 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
               {/* Target value slider + input */}
               {!loading && hasAnyData && (
                 <div className="space-y-2">
-                  <LabelWithTooltip
-                    htmlFor="calc-target"
-                    label={
-                      isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
-                    }
-                    tooltip={
-                      isAgenticSequence ? t.targetAgenticTooltip(percentileLabel) : t.targetTooltip
-                    }
-                  />
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <LabelWithTooltip
+                      htmlFor="calc-target"
+                      label={
+                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                      }
+                      tooltip={
+                        isAgenticSequence
+                          ? t.targetAgenticTooltip(percentileLabel)
+                          : t.targetTooltip
+                      }
+                    />
+                    <div
+                      className="flex items-center gap-2"
+                      data-testid="calculator-hide-over-limit-control"
+                    >
+                      <LabelWithTooltip
+                        htmlFor="calc-hide-over-limit"
+                        label={t.hideSkuAboveConfigLimitLabel}
+                        tooltip={t.hideSkuAboveConfigLimitHelp}
+                      />
+                      <Switch
+                        id="calc-hide-over-limit"
+                        checked={hideSkuAboveConfigLimit}
+                        onCheckedChange={handleHideSkuAboveLimitChange}
+                        className="shrink-0"
+                      />
+                    </div>
+                  </div>
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
                       <input
@@ -1033,22 +1053,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                       onBlur={handleInputBlur}
                       className="w-24 h-9"
                       min={0}
-                    />
-                  </div>
-                  <div
-                    className="flex items-center gap-2 pt-1"
-                    data-testid="calculator-hide-over-limit-control"
-                  >
-                    <LabelWithTooltip
-                      htmlFor="calc-hide-over-limit"
-                      label={t.hideSkuAboveConfigLimitLabel}
-                      tooltip={t.hideSkuAboveConfigLimitHelp}
-                    />
-                    <Switch
-                      id="calc-hide-over-limit"
-                      checked={hideSkuAboveConfigLimit}
-                      onCheckedChange={handleHideSkuAboveLimitChange}
-                      className="shrink-0"
                     />
                   </div>
                 </div>
