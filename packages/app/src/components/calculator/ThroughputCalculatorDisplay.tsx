@@ -3,6 +3,7 @@
 import { track } from '@/lib/analytics';
 import Link from 'next/link';
 import { BarChart3, Table2 } from 'lucide-react';
+import { useFeatureGate } from '@/lib/use-feature-gate';
 import { useLocale } from '@/lib/use-locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -354,6 +355,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   );
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
+  // AgentX publishes on P90, so the percentile control is an insider affordance
+  // rather than a normal filter: it stays behind the ↑↑↓↓ feature gate, matching
+  // the inference chart, and the calculator defaults to P90 without it.
+  const featureGateUnlocked = useFeatureGate();
   const percentileLabel = selectedPercentile.toUpperCase();
 
   /**
@@ -866,7 +871,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   onOpenChange={handleDropdownOpenChange('sequence')}
                   availableSequences={availableSequences}
                 />
-                {isAgenticSequence && (
+                {isAgenticSequence && featureGateUnlocked && (
                   <PercentileSelector
                     id="calc-percentile"
                     data-testid="calc-percentile-selector"
