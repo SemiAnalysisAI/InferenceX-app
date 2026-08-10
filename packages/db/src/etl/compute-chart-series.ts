@@ -436,11 +436,23 @@ function engineDiscriminator(
 }
 
 /**
- * Mirrored frontends report the same pool, so their means agree to a few
- * thousandths in practice; genuinely different workers on the same labels
- * (a router in front of several replicas) sit far apart. This threshold is
- * an absolute gap on a 0..1 gauge, comfortably above scrape jitter and well
- * below any real load difference.
+ * Absolute gap between two endpoints' whole-run means, on a 0..1 gauge, below
+ * which they are treated as mirrors of one engine rather than two engines
+ * sharing a label set.
+ *
+ * Measured mirrors sit far under this: the three two-endpoint vLLM configs in
+ * the corpus differ by 0.03%-2.19% of their means (under 0.001 absolute, even
+ * on the heavily loaded rows), while a genuinely distinct prefill and decode
+ * worker differ by ~0.08. So both sides have roughly 4x of margin.
+ *
+ * Residual limitation, accepted deliberately: two independent replicas behind
+ * a round-robin router would have similar means BY DESIGN and would still be
+ * fused, showing one line instead of two. That case degrades the per-engine
+ * overlay but not the cluster average — averaging two engines that track each
+ * other gives the same number either way — whereas the case this does catch
+ * (replicas under uneven load) is the one where fusing would make the average
+ * itself wrong. Distinguishing the former needs lag-aligned pointwise
+ * comparison, which no data in the corpus currently justifies.
  */
 const MIRROR_MEAN_TOLERANCE = 0.02;
 
