@@ -1035,7 +1035,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                       min={0}
                     />
                   </div>
-                  <div className="flex items-center justify-between gap-3 pt-1">
+                  <div
+                    className="flex items-center gap-2 pt-1"
+                    data-testid="calculator-hide-over-limit-control"
+                  >
                     <LabelWithTooltip
                       htmlFor="calc-hide-over-limit"
                       label={t.hideSkuAboveConfigLimitLabel}

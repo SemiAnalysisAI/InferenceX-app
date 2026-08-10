@@ -150,6 +150,14 @@ describe('TCO Calculator', () => {
       });
     });
 
+    it('places the config-range toggle beside its label', () => {
+      cy.get('[data-testid="calculator-hide-over-limit-control"]').then(($control) => {
+        const label = $control.children().first()[0].getBoundingClientRect();
+        const toggle = $control.find('button[role="switch"]')[0].getBoundingClientRect();
+        expect(toggle.left - label.right).to.be.lessThan(12);
+      });
+    });
+
     it('does not show badges when throughput metric is selected', () => {
       cy.get('[data-testid="calculator-cost-badges"]').should('not.exist');
     });
