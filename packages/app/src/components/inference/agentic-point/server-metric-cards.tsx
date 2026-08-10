@@ -86,25 +86,29 @@ export function KvCacheUtilizationCard({ sliced }: { sliced: SlicedServerSeries 
         // than one, draw one line per rank in distinct colors so
         // load skew is visible at a glance; cluster-average sits on
         // top in white so it stands out.
-        // Phase slicing can empty an engine that only reported in the other
-        // phase — drop those so they don't take a legend slot with no line.
-        const perEngine = (serverSeries.kvCacheUsageByEngine ?? []).filter(
-          (e) => e.points.length > 0,
-        );
-        const hasPerEngine = perEngine.length > 1;
+        const allEngines = serverSeries.kvCacheUsageByEngine ?? [];
+        // Decide off the point's own engine count, not the phase-sliced one:
+        // this also drives the average line's name, color and stroke, so
+        // keying it to the slice would make the chart change identity when
+        // you switch between the Warmup and Profiling tabs.
+        const hasPerEngine = allEngines.length > 1;
+        // Colors come from the unsliced position so a rank keeps its color
+        // across phases; engines with no points in this phase are dropped
+        // afterwards so they don't take a legend slot with no line.
+        const perEngine = allEngines
+          .map((e, i) => ({
+            name: engineSeriesName(e.engineLabel),
+            data: rollingAverage(e.points, 50),
+            color: DP_RANK_PALETTE[i % DP_RANK_PALETTE.length]!,
+            // Thin + translucent so the Avg line on top reads as
+            // the headline number, not just one more series.
+            strokeWidth: 1,
+            strokeOpacity: 0.5,
+          }))
+          .filter((s) => s.data.length > 0);
         // Render order matters: per-engine first → average drawn on top.
         const series = [
-          ...(hasPerEngine
-            ? perEngine.map((e, i) => ({
-                name: engineSeriesName(e.engineLabel),
-                data: rollingAverage(e.points, 50),
-                color: DP_RANK_PALETTE[i % DP_RANK_PALETTE.length]!,
-                // Thin + translucent so the Avg line on top reads as
-                // the headline number, not just one more series.
-                strokeWidth: 1,
-                strokeOpacity: 0.5,
-              }))
-            : []),
+          ...(hasPerEngine ? perEngine : []),
           {
             name: hasHost
               ? 'Chip HBM (avg n=50)'

@@ -129,9 +129,10 @@ export interface ChartSeries {
    */
   hostKvCacheUsage: TimeSeriesPoint[];
   /**
-   * Per-DP-rank KV cache utilization (0..1 each). One entry per engine
-   * series found in the raw metric, ordered by the `engine` label when
-   * present and by series-array index otherwise. Empty for single-engine
+   * Per-DP-rank KV cache utilization (0..1 each). One entry per LOGICAL
+   * engine — one KV pool — not per raw series; see `resolveLogicalEngines`
+   * for how mirrored endpoints, phase blocks and shard ranks collapse.
+   * Ordered by role, then numeric rank, then worker. Empty for single-engine
    * deployments — the average `kvCacheUsage` line covers that case alone.
    * The detail page overlays these on the same chart so DEP load skew is
    * visible without changing the headline number.
@@ -331,8 +332,9 @@ function sortedEntries(m: Map<number, number>): [number, number][] {
  * Ranks that shard ONE engine rather than naming a separate one. A KV cache is
  * allocated per engine and shared by its tensor-, pipeline- and expert-parallel
  * ranks, so every such rank reports the same pool: on a TP8 SGLang prefill
- * worker all eight `tp_rank` series track each other to four decimal places.
- * Treating them as separate engines drew eight identical lines for one pool.
+ * worker the eight `tp_rank` series agree to ~4 decimal places on average
+ * (with rare single-scrape transients where one rank spikes alone).
+ * Treating them as separate engines drew eight near-identical lines per pool.
  *
  * `engine` / `engine_idx` / `dp_rank` are deliberately NOT here — those DO name
  * distinct pools (one per DP rank / engine core).
@@ -373,55 +375,140 @@ const ENGINE_ROLE_BY_NATIVE_LABEL: Record<string, string> = {
   backend: 'decode',
 };
 
+/** Label lookup that treats blank values as absent. */
+function labelOrNull(labels: Record<string, string>, ...names: string[]): string | null {
+  for (const name of names) {
+    const value = labels[name]?.trim();
+    if (value) return value;
+  }
+  return null;
+}
+
 /** DP-rank-ish label under any of the names the frameworks emit. */
 function engineRankLabel(labels: Record<string, string>): string | null {
-  return labels['engine'] ?? labels['engine_idx'] ?? labels['dp_rank'] ?? null;
+  return labelOrNull(labels, 'engine', 'engine_idx', 'dp_rank');
 }
 
 function engineRoleLabel(labels: Record<string, string>): string | null {
-  const native = labels['engine_type'] ?? labels['dynamo_component'];
-  return native ? (ENGINE_ROLE_BY_NATIVE_LABEL[native] ?? null) : null;
+  // Try each source in turn rather than taking the first that EXISTS: an
+  // aggregated dynamo-sglang worker carries engine_type="unified" (which maps
+  // to no role) alongside dynamo_component="backend", and stopping at the
+  // first present label would resolve the role to null.
+  for (const name of ['engine_type', 'dynamo_component']) {
+    const native = labelOrNull(labels, name);
+    const role = native ? ENGINE_ROLE_BY_NATIVE_LABEL[native] : undefined;
+    if (role) return role;
+  }
+  return null;
+}
+
+/** Rank as a sort key. Only plain digit strings sort numerically. */
+function engineRankSortKey(rank: string | null): number {
+  return rank !== null && /^\d+$/u.test(rank) ? Number(rank) : Number.POSITIVE_INFINITY;
+}
+
+/** Prefill before decode; unroled engines last. Stable across runs. */
+const ROLE_SORT_ORDER: Record<string, number> = { prefill: 0, decode: 1 };
+function engineRoleSortKey(role: string | null): number {
+  return role === null ? 2 : (ROLE_SORT_ORDER[role] ?? 2);
+}
+
+/** `scheme://host:port/path` -> `host:port`, the human-facing part. */
+function endpointHostPort(endpointUrl: string): string | null {
+  const hostPort = /^\w+:\/\/(?<hostPort>[^/]+)/u.exec(endpointUrl)?.groups?.['hostPort'];
+  return hostPort ?? (endpointUrl || null);
 }
 
 /**
  * Short, human-readable tiebreaker for engines that would otherwise share a
  * display label (e.g. two decode workers that each number their ranks 0..7).
+ * `preferEndpoint` is set when the engines being separated came from the same
+ * worker, so the worker id cannot tell them apart.
  */
-function engineDiscriminator(labels: Record<string, string>, endpointUrl: string): string | null {
-  const worker = labels['worker_id'];
+function engineDiscriminator(
+  labels: Record<string, string>,
+  endpointUrl: string,
+  preferEndpoint = false,
+): string | null {
+  const worker = preferEndpoint ? null : labelOrNull(labels, 'worker_id');
   if (worker) return worker.length > 4 ? worker.slice(-4) : worker;
-  // Fall back to the endpoint's host:port, which is what distinguishes
-  // workers when the orchestrator doesn't emit a worker id.
-  const hostPort = /^\w+:\/\/(?<hostPort>[^/]+)/u.exec(endpointUrl)?.groups?.['hostPort'];
-  return hostPort ?? (endpointUrl || null);
+  return endpointHostPort(endpointUrl);
 }
+
+/**
+ * Mirrored frontends report the same pool, so their means agree to a few
+ * thousandths in practice; genuinely different workers on the same labels
+ * (a router in front of several replicas) sit far apart. This threshold is
+ * an absolute gap on a 0..1 gauge, comfortably above scrape jitter and well
+ * below any real load difference.
+ */
+const MIRROR_MEAN_TOLERANCE = 0.02;
 
 interface LogicalEngine {
   engineLabel: string;
   points: TimeSeriesPoint[];
 }
 
+/** One endpoint's samples for one identity, keyed by scrape instant. */
+type ScrapeMap = Map<number, { sum: number; count: number }>;
+
 interface EngineGroup {
   labels: Record<string, string>;
-  /** Per endpoint, the engine's samples keyed by scrape instant. */
-  byEndpoint: Map<string, Map<number, { sum: number; count: number }>>;
+  byEndpoint: Map<string, ScrapeMap>;
+}
+
+/** An engine after endpoint resolution, before its display label is composed. */
+interface ResolvedEngine {
+  rank: string | null;
+  role: string | null;
+  discriminator: string | null;
+  order: number;
+  points: TimeSeriesPoint[];
+}
+
+function scrapesToPoints(scrapes: ScrapeMap, tOf: (ns: number) => number): TimeSeriesPoint[] {
+  return [...scrapes.entries()]
+    .toSorted((a, b) => a[0] - b[0])
+    .map(([startNs, { sum, count }]) => ({ t: tOf(startNs), value: sum / count }));
+}
+
+function meanOf(scrapes: ScrapeMap): number {
+  let total = 0;
+  for (const { sum, count } of scrapes.values()) total += sum / count;
+  return scrapes.size === 0 ? 0 : total / scrapes.size;
+}
+
+/** Wall-clock span covered, so a dense-but-truncated mirror can't win. */
+function spanOf(scrapes: ScrapeMap): number {
+  let lo = Number.POSITIVE_INFINITY;
+  let hi = Number.NEGATIVE_INFINITY;
+  for (const ns of scrapes.keys()) {
+    if (ns < lo) lo = ns;
+    if (ns > hi) hi = ns;
+  }
+  return hi >= lo ? hi - lo : 0;
 }
 
 /**
  * Collapse a gauge's raw series into one entry per logical engine.
  *
  * The three kinds of duplication need three different treatments:
- *   - Same endpoint, different phase blocks (v12's warmup merge): disjoint
- *     time ranges, so keying by scrape instant simply unions them into one
- *     continuous series.
- *   - Same endpoint, same instant: intra-engine shard ranks reporting the
- *     one pool they share, so they collapse to their mean (identical in
- *     practice, to four decimal places).
- *   - Different endpoints (mirrored API-server frontends): overlapping time
- *     ranges carrying the same measurement a few hundred ms apart. Merging
- *     them would interleave near-duplicate samples and silently halve the
- *     span of the frontend's fixed-width rolling average, so we keep the
- *     endpoint with the most complete coverage and drop the rest.
+ *   - Same endpoint, different phase blocks (v12's warmup merge): keying by
+ *     scrape instant unions them into one series. The blocks' first/last
+ *     bounds can look overlapping (profiling often emits one boundary sample
+ *     then gaps until warmup ends) but they never share an instant, so the
+ *     union neither drops nor double-counts a scrape.
+ *   - Same endpoint, same instant: intra-engine shard ranks reporting the one
+ *     pool they share, so they collapse to their mean (they agree to ~4 decimal
+ *     places on average, with rare single-scrape transients).
+ *   - Different endpoints reporting the same identity: usually mirrored
+ *     API-server frontends carrying the same measurement a few hundred ms
+ *     apart. Merging those would interleave near-duplicate samples and halve
+ *     the effective span of the frontend's fixed-width rolling average, so the
+ *     best-covered endpoint wins and the rest are dropped — but ONLY when their
+ *     values agree. Endpoints that disagree are genuinely different engines
+ *     behind one label (a router in front of several replicas), and dropping
+ *     one would silently lose an engine, so those are kept separate instead.
  */
 function resolveLogicalEngines(
   series: readonly RawSeries[] | undefined,
@@ -442,8 +529,8 @@ function resolveLogicalEngines(
       group.byEndpoint.set(endpoint, scrapes);
     }
     for (const ts of s.timeslices ?? []) {
-      if (typeof ts.start_ns !== 'number' || typeof ts.avg !== 'number') continue;
-      if (!Number.isFinite(ts.avg)) continue;
+      if (typeof ts.start_ns !== 'number' || !Number.isFinite(ts.start_ns)) continue;
+      if (typeof ts.avg !== 'number' || !Number.isFinite(ts.avg)) continue;
       const at = scrapes.get(ts.start_ns);
       if (at) {
         at.sum += ts.avg;
@@ -454,63 +541,97 @@ function resolveLogicalEngines(
     }
   }
 
-  // Insertion order = first appearance in the blob, which is the engine order
-  // the exporter emitted; `rank` sorting below refines it when ranks exist.
-  const resolved: { label: string; discriminator: string | null; points: TimeSeriesPoint[] }[] = [];
+  const resolved: ResolvedEngine[] = [];
   for (const group of groups.values()) {
-    // Deterministic pick: most scrape instants wins, endpoint URL breaks ties.
-    let chosenEndpoint = '';
-    let chosen: Map<number, { sum: number; count: number }> | null = null;
-    for (const [endpoint, scrapes] of [...group.byEndpoint].toSorted((a, b) =>
-      a[0].localeCompare(b[0]),
-    )) {
-      if (scrapes.size > (chosen?.size ?? 0)) {
-        chosen = scrapes;
-        chosenEndpoint = endpoint;
-      }
-    }
-    if (!chosen || chosen.size === 0) continue;
+    const endpoints = [...group.byEndpoint]
+      .filter(([, scrapes]) => scrapes.size > 0)
+      // Endpoint URL keeps the walk deterministic before any ranking.
+      .toSorted((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    if (endpoints.length === 0) continue;
+
     const rank = engineRankLabel(group.labels);
     const role = engineRoleLabel(group.labels);
-    const discriminator = engineDiscriminator(group.labels, chosenEndpoint);
-    const named = role ? (rank === null ? role : `${role} ${rank}`) : rank;
-    resolved.push({
-      // With no rank- or role-like label the worker/endpoint is the only thing
-      // that names this engine, so lead with it instead of a bare index.
-      label: named ?? discriminator ?? '',
-      discriminator,
-      points: [...chosen.entries()]
-        .toSorted((a, b) => a[0] - b[0])
-        .map(([startNs, { sum, count }]) => ({ t: tOf(startNs), value: sum / count })),
+    const push = (endpointUrl: string, scrapes: ScrapeMap, preferEndpoint: boolean) => {
+      resolved.push({
+        rank,
+        role,
+        discriminator: engineDiscriminator(group.labels, endpointUrl, preferEndpoint),
+        order: resolved.length,
+        points: scrapesToPoints(scrapes, tOf),
+      });
+    };
+
+    if (endpoints.length === 1) {
+      push(endpoints[0]![0], endpoints[0]![1], false);
+      continue;
+    }
+
+    const means = endpoints.map(([, scrapes]) => meanOf(scrapes));
+    const mirrored = Math.max(...means) - Math.min(...means) <= MIRROR_MEAN_TOLERANCE;
+    if (!mirrored) {
+      // Same labels, different measurements: distinct engines, not mirrors.
+      for (const [endpointUrl, scrapes] of endpoints) push(endpointUrl, scrapes, true);
+      continue;
+    }
+    // Mirrors: keep the endpoint that covers the most wall-clock, breaking
+    // ties on sample count and then URL, so a dense but truncated mirror
+    // cannot shorten the engine's series.
+    const best = endpoints.reduce((a, b) => {
+      const sa = spanOf(a[1]);
+      const sb = spanOf(b[1]);
+      if (sb !== sa) return sb > sa ? b : a;
+      if (b[1].size !== a[1].size) return b[1].size > a[1].size ? b : a;
+      return a;
     });
+    push(best[0], best[1], false);
   }
 
-  // Plain numeric ranks render in 0..N order; role-qualified and endpoint-named
-  // engines keep the order the exporter emitted them in.
-  const ordered = resolved
-    .map((engine, idx) => {
-      const numeric = Number(engine.label);
-      return { ...engine, idx, sortKey: engine.label && Number.isFinite(numeric) ? numeric : idx };
-    })
-    .toSorted((a, b) => a.sortKey - b.sortKey || a.idx - b.idx)
-    .map((engine, idx) => ({ ...engine, base: engine.label || `#${idx}` }));
+  // Sort on the identity's components, never on the composed string: role
+  // first, then numeric rank, then worker, then blob order. Sorting a label
+  // like "decode 3" lexically (or falling back to array index) scrambled DP
+  // ranks on multi-worker runs.
+  const ordered = resolved.toSorted(
+    (a, b) =>
+      engineRoleSortKey(a.role) - engineRoleSortKey(b.role) ||
+      engineRankSortKey(a.rank) - engineRankSortKey(b.rank) ||
+      (a.discriminator ?? '').localeCompare(b.discriminator ?? '') ||
+      a.order - b.order,
+  );
+
+  // Only name the role when there is more than one, otherwise every engine on
+  // an aggregated deployment reads "decode 0", "decode 1", ... for no reason.
+  const roles = new Set(ordered.map((e) => e.role).filter((r) => r !== null));
+  const showRole = roles.size > 1;
+  const withBase = ordered.map((engine, idx) => {
+    const named =
+      showRole && engine.role
+        ? engine.rank === null
+          ? engine.role
+          : `${engine.role} ${engine.rank}`
+        : engine.rank;
+    // Nothing rank- or role-like to go on: the worker/endpoint is the only
+    // thing that names this engine, so lead with it rather than a bare index.
+    return { ...engine, base: named ?? engine.discriminator ?? `#${idx}` };
+  });
 
   // Qualify collisions (e.g. two decode workers that each number their ranks
-  // 0..7) so every legend entry names exactly one engine.
+  // 0..7) so every legend entry names exactly one line.
   const baseCounts = new Map<string, number>();
-  for (const engine of ordered) baseCounts.set(engine.base, (baseCounts.get(engine.base) ?? 0) + 1);
+  for (const engine of withBase) {
+    baseCounts.set(engine.base, (baseCounts.get(engine.base) ?? 0) + 1);
+  }
   const used = new Set<string>();
-  return ordered.map((engine, idx) => {
-    let engineLabel = engine.base;
-    if ((baseCounts.get(engine.base) ?? 0) > 1) {
-      const qualifier =
-        engine.discriminator && engine.discriminator !== engine.base ? engine.discriminator : idx;
-      engineLabel = `${engine.base} (${qualifier})`;
+  return withBase.map((engine) => {
+    let label = engine.base;
+    if ((baseCounts.get(engine.base) ?? 0) > 1 && engine.discriminator) {
+      label = `${engine.base} (${engine.discriminator})`;
     }
-    // Last resort, so a legend entry never stands for two lines.
-    while (used.has(engineLabel)) engineLabel = `${engineLabel}'`;
-    used.add(engineLabel);
-    return { engineLabel, points: engine.points };
+    // The discriminator isn't guaranteed unique either; fall back to a counter
+    // so a legend entry never stands for two lines.
+    let candidate = label;
+    for (let n = 2; used.has(candidate); n++) candidate = `${label} #${n}`;
+    used.add(candidate);
+    return { engineLabel: candidate, points: engine.points };
   });
 }
 
@@ -527,7 +648,8 @@ function resolveLogicalEngines(
  * Each engine therefore holds its last scrape until its next one (a gauge
  * keeps its value between scrapes) and contributes only inside its own
  * observed window, so an engine that starts late or stops early neither
- * pulls the mean toward a stale value nor drops it to zero.
+ * pulls the mean toward a stale value nor drops it to zero. A hole in the
+ * middle of that window is bounded too — see `carryLimitSeconds`.
  */
 function averageAcrossEngines(engines: readonly LogicalEngine[]): TimeSeriesPoint[] {
   const active = engines.filter((engine) => engine.points.length > 0);
@@ -540,6 +662,7 @@ function averageAcrossEngines(engines: readonly LogicalEngine[]): TimeSeriesPoin
   );
   const cursors: number[] = Array.from({ length: active.length }, () => -1);
   const lastT = active.map((engine) => engine.points.at(-1)!.t);
+  const carryLimit = active.map((engine) => carryLimitSeconds(engine.points));
   const out: TimeSeriesPoint[] = [];
   for (const t of timeline) {
     let sum = 0;
@@ -552,12 +675,33 @@ function averageAcrossEngines(engines: readonly LogicalEngine[]): TimeSeriesPoin
       // Before this engine's first scrape or after its last — no value to
       // carry, so it sits out of this tick's mean entirely.
       if (cursor < 0 || t > lastT[i]!) continue;
+      // Inside the window but far past the last sample: the engine stopped
+      // reporting for a while, so don't average in a stale reading.
+      if (t - points[cursor]!.t > carryLimit[i]!) continue;
       sum += points[cursor]!.value;
       n++;
     }
     if (n > 0) out.push({ t, value: sum / n });
   }
   return out;
+}
+
+/**
+ * How long one engine's last sample may stand in for it: 5x its own median
+ * scrape gap. A dropped scrape or two still carries (real runs sit at 1 Hz
+ * with gaps never above ~1 s), but a long reporting hole drops the engine
+ * out of the mean instead of pinning it to a minutes-old value.
+ */
+function carryLimitSeconds(points: readonly TimeSeriesPoint[]): number {
+  if (points.length < 2) return Number.POSITIVE_INFINITY;
+  const gaps: number[] = [];
+  for (let i = 1; i < points.length; i++) {
+    const gap = points[i]!.t - points[i - 1]!.t;
+    if (gap > 0) gaps.push(gap);
+  }
+  if (gaps.length === 0) return Number.POSITIVE_INFINITY;
+  gaps.sort((a, b) => a - b);
+  return 5 * gaps[gaps.length >> 1]!;
 }
 
 function buildSeriesFromMetrics(

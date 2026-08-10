@@ -499,12 +499,76 @@ describe('computeChartSeries', () => {
         ),
       ),
     );
-    expect(cs?.kvCacheUsageByEngine.map((e) => e.engineLabel)).toEqual(['prefill 0', 'prefill 1']);
+    // Both engines are prefill, so naming the role would add nothing.
+    expect(cs?.kvCacheUsageByEngine.map((e) => e.engineLabel)).toEqual(['0', '1']);
     expect(cs?.kvCacheUsage).toEqual([{ t: 0, value: 0.5 }]);
   });
 
+  it('keeps DP ranks in rank order regardless of the order the exporter emits', async () => {
+    // Regression: role-qualified labels used to sort by blob position, so a
+    // multi-worker aggregated deployment came out as [decode 3, decode 1,
+    // decode 0, decode 2] with the palette indexed by that scrambled order.
+    const cs = await computeChartSeries(
+      kvBlob(
+        [3, 1, 0, 2].map((rank) =>
+          kvSeriesFor(
+            `http://10.30.1.${100 + rank}:7500/metrics`,
+            { engine: String(rank), dynamo_component: 'backend', worker_id: `w${rank}` },
+            [[0, [0.25, 0.5, 0.75, 1][rank]!]],
+          ),
+        ),
+      ),
+      { framework: 'dynamo-vllm', disagg: false },
+    );
+    // Every engine is a decode worker, so the role is dropped and the bare
+    // ranks render in 0..N order — with each rank's own data still attached.
+    expect(cs?.kvCacheUsageByEngine.map((e) => e.engineLabel)).toEqual(['0', '1', '2', '3']);
+    expect(cs?.kvCacheUsageByEngine.map((e) => e.points[0]!.value)).toEqual([0.25, 0.5, 0.75, 1]);
+  });
+
+  it('names the role only when engines actually differ in role', async () => {
+    const cs = await computeChartSeries(
+      kvBlob([
+        kvSeriesFor(
+          'http://10.0.0.2:7502/metrics',
+          { dp_rank: '0', engine_type: 'decode', worker_id: 'dec' },
+          [[0, 0.6]],
+        ),
+        kvSeriesFor(
+          'http://10.0.0.1:7500/metrics',
+          { dp_rank: '0', engine_type: 'prefill', worker_id: 'pre' },
+          [[0, 0.2]],
+        ),
+      ]),
+    );
+    // Mixed roles -> role is shown, and prefill sorts ahead of decode.
+    expect(cs?.kvCacheUsageByEngine.map((e) => e.engineLabel)).toEqual(['prefill 0', 'decode 0']);
+  });
+
+  it('falls through to dynamo_component when engine_type has no role mapping', async () => {
+    // Aggregated dynamo-sglang workers carry engine_type="unified" (no role)
+    // alongside dynamo_component. Stopping at the first present label would
+    // resolve the role to null and lose the prefill/decode distinction.
+    const cs = await computeChartSeries(
+      kvBlob([
+        kvSeriesFor(
+          'http://10.0.0.1:7500/metrics',
+          { engine_type: 'unified', dynamo_component: 'prefill', worker_id: 'pre', dp_rank: '0' },
+          [[0, 0.2]],
+        ),
+        kvSeriesFor(
+          'http://10.0.0.2:7502/metrics',
+          { engine_type: 'unified', dynamo_component: 'backend', worker_id: 'dec', dp_rank: '0' },
+          [[0, 0.6]],
+        ),
+      ]),
+    );
+    expect(cs?.kvCacheUsageByEngine.map((e) => e.engineLabel)).toEqual(['prefill 0', 'decode 0']);
+  });
+
   it('qualifies engines whose display label would otherwise collide', async () => {
-    // Two decode workers that each number their ranks from 0.
+    // Two decode workers that each number their ranks from 0. One role, so the
+    // rank alone is the base and the worker id disambiguates.
     const cs = await computeChartSeries(
       kvBlob([
         kvSeriesFor(
@@ -519,10 +583,69 @@ describe('computeChartSeries', () => {
         ),
       ]),
     );
+    expect(cs?.kvCacheUsageByEngine.map((e) => e.engineLabel)).toEqual(['0 (a01a)', '0 (b01b)']);
+  });
+
+  it('keeps same-label endpoints apart when their values disagree', async () => {
+    // Two independent replicas behind a router share an identical label set.
+    // Treating them as mirrors and dropping one would silently lose an engine.
+    const labels = { engine_type: 'unified', model_name: 'm', tp_rank: '0' };
+    const cs = await computeChartSeries(
+      kvBlob([
+        kvSeriesFor('http://node-a:8888/metrics', labels, [
+          [0, 0.1],
+          [1e9, 0.1],
+        ]),
+        kvSeriesFor('http://node-b:8888/metrics', labels, [
+          [0, 0.9],
+          [1e9, 0.9],
+        ]),
+      ]),
+    );
     expect(cs?.kvCacheUsageByEngine.map((e) => e.engineLabel)).toEqual([
-      'decode 0 (a01a)',
-      'decode 0 (b01b)',
+      'node-a:8888',
+      'node-b:8888',
     ]);
+    expect(cs?.kvCacheUsage).toEqual([
+      { t: 0, value: 0.5 },
+      { t: 1, value: 0.5 },
+    ]);
+  });
+
+  it('prefers the mirror that covers the most wall-clock, not the densest', async () => {
+    // A truncated but high-frequency mirror must not shorten the engine.
+    const labels = { engine: '0', model_name: 'm' };
+    const long: [number, number][] = Array.from({ length: 11 }, (_, i) => [i * 1e9, 0.5]);
+    const dense: [number, number][] = Array.from({ length: 12 }, (_, i) => [i * 1e8, 0.5]);
+    const cs = await computeChartSeries(
+      kvBlob([
+        kvSeriesFor('http://a:8000/metrics', labels, dense),
+        kvSeriesFor('http://b:8000/metrics', labels, long),
+      ]),
+    );
+    // Same values -> mirrors -> one engine, and it must span the full 10 s.
+    expect(cs?.kvCacheUsage).toHaveLength(11);
+    expect(cs?.kvCacheUsage.at(-1)?.t).toBe(10);
+  });
+
+  it('drops an engine from the mean while it stops reporting', async () => {
+    // A carries 1 for t=0..9, goes silent for 300 s, then returns. B reports 0
+    // throughout. During the hole the mean must be B alone, not (1+0)/2.
+    const a: [number, number][] = [];
+    const b: [number, number][] = [];
+    for (let i = 0; i < 10; i++) a.push([i * 1e9, 1]);
+    for (let i = 310; i < 320; i++) a.push([i * 1e9, 1]);
+    for (let i = 0; i < 320; i++) b.push([i * 1e9, 0]);
+    const cs = await computeChartSeries(
+      kvBlob([
+        kvSeriesFor('http://a:8000/metrics', { engine: '0' }, a),
+        kvSeriesFor('http://a:8000/metrics', { engine: '1' }, b),
+      ]),
+    );
+    const at = (t: number) => cs?.kvCacheUsage.find((p) => p.t === t)?.value;
+    expect(at(5)).toBe(0.5); // both reporting
+    expect(at(150)).toBe(0); // A silent -> excluded, B alone
+    expect(at(315)).toBe(0.5); // A back
   });
 
   it('averages engines on unaligned scrape grids without sawtoothing', async () => {
