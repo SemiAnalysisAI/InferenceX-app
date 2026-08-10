@@ -190,7 +190,10 @@ export function useThroughputData(
     data: allRows,
     isLoading: queryLoading,
     error: queryError,
-  } = useBenchmarks(selectedModel, selectedRunDate);
+  } = useBenchmarks(selectedModel, selectedRunDate, true, undefined, undefined, {
+    type: 'calculator',
+    sequence: selectedSequence,
+  });
 
   const loading = queryLoading || !allRows;
   const error = queryError ? queryError.message : null;
