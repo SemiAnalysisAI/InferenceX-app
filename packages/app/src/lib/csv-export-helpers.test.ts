@@ -121,6 +121,25 @@ describe('inferenceChartToCsv', () => {
     expect(rows.every((row) => row.length === headers.length)).toBe(true);
   });
 
+  it('does not duplicate an agentic P99 X metric already in the fixed schema', () => {
+    const { headers, rows } = inferenceChartToCsv(
+      [makePoint({ x: 35 })],
+      'agentx-model',
+      'agentic',
+      [],
+      {
+        yHeader: 'Cost per Million Total Tokens ($)',
+        yPath: 'costh.y',
+        xHeader: 'P99 Interactivity (tok/s/user)',
+      },
+    );
+
+    expect(headers.filter((header) => header === 'P99 Interactivity (tok/s/user)')).toHaveLength(1);
+    expect(rows[0][headers.indexOf('P99 Interactivity (tok/s/user)')]).toBe(35);
+    expect(new Set(headers).size).toBe(headers.length);
+    expect(rows[0]).toHaveLength(headers.length);
+  });
+
   it('labels raw latency statistics as seconds without changing their values', () => {
     const issueMetrics = {
       mean_ttft: 1.615576321,
