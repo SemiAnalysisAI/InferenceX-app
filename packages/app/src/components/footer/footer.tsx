@@ -28,6 +28,7 @@ const STRINGS = {
     supporters: 'Supporters',
     datasets: 'Datasets',
     articles: 'Articles',
+    apiReference: 'API Reference',
     gpuReliability: 'Chip Reliability',
     perfPerDollar: 'Performance per Dollar',
     glossary: 'AI Inference Glossary',
@@ -56,6 +57,7 @@ const STRINGS = {
     datasets: '数据集',
     articles: '文章',
     gpuReliability: 'Chip 可靠性',
+    apiReference: 'API 参考文档',
     perfPerDollar: '每美元性能',
     glossary: 'AI 推理术语表',
     languageLink: 'English',
@@ -209,6 +211,14 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 {t.articles}
+              </Link>
+              <Link
+                data-testid="footer-link-api"
+                href={`${prefix}/api`}
+                onClick={() => track('footer_api_clicked')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.apiReference}
               </Link>
               <Link
                 data-testid="footer-link-reliability"
