@@ -17,6 +17,22 @@ interface CsvData {
   rows: (string | number | boolean | null | undefined)[][];
 }
 
+export interface InferenceCsvDisplayedMetrics {
+  yHeader: string;
+  yPath: string;
+  xHeader: string;
+}
+
+function nestedMetric(point: InferenceData, path: string): number | '' {
+  const [key, nestedKey] = path.split('.');
+  const value = point[key as keyof InferenceData];
+  if (nestedKey && typeof value === 'object' && value !== null && nestedKey in value) {
+    const nestedValue = (value as Record<string, unknown>)[nestedKey];
+    return typeof nestedValue === 'number' ? nestedValue : '';
+  }
+  return typeof value === 'number' ? value : '';
+}
+
 /** Preserve a real zero while leaving source metrics that were not measured blank. */
 function benchmarkMetric(point: InferenceData, key: string): number | '' {
   if (point.rawMetricKeys && !point.rawMetricKeys.includes(key)) return '';
@@ -34,6 +50,7 @@ export function inferenceChartToCsv(
   model: string,
   sequence: string,
   overlayData: InferenceData[] = [],
+  displayedMetrics?: InferenceCsvDisplayedMetrics,
 ): CsvData {
   const islOsl = sequenceToIslOsl(sequence);
   const headers = [
@@ -47,6 +64,7 @@ export function inferenceChartToCsv(
     'TP',
     'Concurrency',
     'Date',
+    ...(displayedMetrics ? [displayedMetrics.yHeader, displayedMetrics.xHeader] : []),
     // Throughput
     'Throughput/Chip (tok/s)',
     'Output Throughput/Chip (tok/s)',
@@ -102,6 +120,7 @@ export function inferenceChartToCsv(
       d.tp,
       d.conc,
       d.date,
+      ...(displayedMetrics ? [nestedMetric(d, displayedMetrics.yPath), d.x] : []),
       benchmarkMetric(d, 'tput_per_gpu'),
       benchmarkMetric(d, 'output_tput_per_gpu'),
       benchmarkMetric(d, 'input_tput_per_gpu'),
