@@ -442,6 +442,159 @@ describe('ScatterGraph', () => {
       .should('contain.text', 'feature-branch');
   });
 
+  it('renders a line label for a singleton unofficial overlay series', () => {
+    const runUrl = 'https://github.com/x/y/actions/runs/31266452885';
+    const interactivityChartDef = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const overlayData = {
+      data: [
+        createMockInferenceData({
+          hwKey: 'b200_trt',
+          x: 24,
+          y: 310,
+          precision: Precision.FP4,
+          run_url: runUrl,
+        }),
+      ],
+      hardwareConfig: hwConfig,
+      label: 'tileRT',
+      runUrl,
+    };
+
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-singleton-overlay-label"
+          modelLabel="DeepSeek R1"
+          data={[]}
+          xLabel="Concurrency"
+          yLabel="Throughput / Chip (tok/s)"
+          chartDefinition={interactivityChartDef}
+          overlayData={overlayData}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(),
+          hwTypesWithData: new Set(),
+          selectedPrecisions: [Precision.FP4],
+          showLineLabels: true,
+        },
+        unofficial: {
+          activeOverlayHwTypes: new Set(['b200_trt']),
+          allOverlayHwTypes: new Set(['b200_trt']),
+          runIndexByUrl: { [runUrl]: 0, '31266452885': 0 },
+          unofficialRunInfos: [
+            {
+              id: 31266452885,
+              name: 'CI run',
+              branch: 'tileRT',
+              sha: 'abc123',
+              createdAt: '2026-08-09T00:00:00Z',
+              url: runUrl,
+              conclusion: 'success',
+              status: 'completed',
+              isNonMainBranch: true,
+            },
+          ],
+        },
+      },
+    );
+
+    cy.get('#test-scatter-singleton-overlay-label svg .unofficial-overlay-pt').should(
+      'have.length',
+      1,
+    );
+    cy.get('#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]')
+      .should('have.length', 1)
+      .find('text')
+      .should('contain.text', 'tileRT');
+
+    cy.get('#test-scatter-singleton-overlay-label svg').then(($svg) => {
+      const svg = $svg[0];
+      const bounds = svg.getBoundingClientRect();
+      svg.dispatchEvent(
+        new WheelEvent('wheel', {
+          deltaY: -240,
+          clientX: bounds.x + bounds.width / 2,
+          clientY: bounds.y + bounds.height / 2,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+
+    cy.get(
+      '#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]',
+    ).should('have.css', 'opacity', '1');
+  });
+
+  it('renders a line label for a singleton ingested hardware series', () => {
+    const interactivityChartDef = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const data = [
+      createMockInferenceData({
+        hwKey: 'b200_tilert_mtp',
+        x: 340,
+        y: 150,
+        precision: Precision.FP8,
+      }),
+      createMockInferenceData({ hwKey: 'h100', x: 300, y: 190, precision: Precision.FP8 }),
+      createMockInferenceData({ hwKey: 'h100', x: 340, y: 150, precision: Precision.FP8 }),
+    ];
+    const baseInference = createMockInferenceContext();
+
+    function IngestedSingletonLabelHarness() {
+      const [showLineLabels, setShowLineLabels] = useState(true);
+      return (
+        <InferenceContext.Provider
+          value={{
+            ...baseInference,
+            hardwareConfig: hwConfig,
+            activeHwTypes: new Set(['b200_tilert_mtp', 'h100']),
+            hwTypesWithData: new Set(['b200_tilert_mtp', 'h100']),
+            selectedPrecisions: [Precision.FP8],
+            showLineLabels,
+            setShowLineLabels,
+          }}
+        >
+          <div style={{ width: 800, height: 600 }}>
+            <ScatterGraph
+              chartId="test-scatter-ingested-singleton-label"
+              modelLabel="GLM5/5.1 744B"
+              data={data}
+              xLabel="Interactivity (tok/s/user)"
+              yLabel="Token Throughput per GPU"
+              chartDefinition={interactivityChartDef}
+            />
+          </div>
+        </InferenceContext.Provider>
+      );
+    }
+
+    mountWithProviders(<IngestedSingletonLabelHarness />, { unofficial: {} });
+
+    cy.get('#test-scatter-ingested-singleton-label svg .unofficial-overlay-pt').should('not.exist');
+    cy.get('#test-scatter-ingested-singleton-label svg .line-label[data-hw-key="b200_tilert_mtp"]')
+      .should('have.css', 'opacity', '1')
+      .find('text')
+      .should('have.text', 'B200 (TileRT, MTP)');
+
+    cy.get('#scatter-line-labels').click();
+    cy.get('#test-scatter-ingested-singleton-label svg .line-label').should('not.exist');
+    cy.get('#scatter-line-labels').click();
+    cy.get('#test-scatter-ingested-singleton-label svg .line-label[data-hw-key="b200_tilert_mtp"]')
+      .should('have.css', 'opacity', '1')
+      .find('text')
+      .should('have.text', 'B200 (TileRT, MTP)');
+  });
+
   it('renders M3 mtp rooflines with the EAGLE label (official + overlay)', () => {
     const interactivityChartDef = createMockChartDefinition({
       chartType: 'interactivity',
@@ -785,6 +938,110 @@ describe('ScatterGraph', () => {
 });
 
 describe('ChartDisplay engine comparison guard', () => {
+  it('includes cost-clipped official and unofficial points in table mode', () => {
+    const chartDefinition = createMockChartDefinition({
+      chartType: 'interactivity',
+      x: 'median_intvty',
+      x_label: 'Interactivity (tok/s/user)',
+      y_costhOutput: 'costhOutput.y',
+      y_costhOutput_label: 'Cost per Million Output Tokens ($)',
+      y_costhOutput_roofline: 'lower_right',
+      y_cost_limit: 5,
+    });
+    const officialVisible = createMockInferenceData({
+      hwKey: 'b200_sglang',
+      precision: Precision.FP4,
+      tp: 4,
+      median_intvty: 134.7,
+      costhOutput: { y: 4, roof: true },
+    });
+    const officialClipped = createMockInferenceData({
+      hwKey: 'b200_sglang',
+      precision: Precision.FP4,
+      tp: 8,
+      median_intvty: 142.1,
+      costhOutput: { y: 7.016, roof: true },
+    });
+    const runUrl = 'https://github.com/x/y/actions/runs/707';
+    const overlayVisible = createMockInferenceData({
+      hwKey: 'h100_vllm',
+      precision: Precision.FP4,
+      tp: 4,
+      median_intvty: 130,
+      costhOutput: { y: 4.5, roof: true },
+      run_url: runUrl,
+    });
+    const overlayClipped = createMockInferenceData({
+      hwKey: 'h100_vllm',
+      precision: Precision.FP4,
+      tp: 8,
+      median_intvty: 145,
+      costhOutput: { y: 7.5, roof: true },
+      run_url: runUrl,
+    });
+    const runInfo = {
+      id: 707,
+      name: 'clipped-table-overlay',
+      branch: 'clipped-table-overlay',
+      sha: 'abc707',
+      createdAt: '2026-08-09T00:00:00Z',
+      url: runUrl,
+      conclusion: 'success',
+      status: 'completed',
+      isNonMainBranch: true,
+    };
+
+    mountWithProviders(<ChartDisplay />, {
+      inference: {
+        graphs: [
+          {
+            model: Model.DeepSeek_R1,
+            sequence: Sequence.EightK_OneK,
+            chartDefinition,
+            data: [officialVisible],
+            clippedData: [{ point: officialClipped, reasons: ['cost'] }],
+          },
+        ],
+        selectedYAxisMetric: 'y_costhOutput',
+        selectedXAxisMode: 'interactivity',
+        activeHwTypes: new Set(['b200_sglang']),
+        hwTypesWithData: new Set(['b200_sglang']),
+      },
+      globalFilters: {
+        selectedModel: Model.DeepSeek_R1,
+        selectedSequence: Sequence.EightK_OneK,
+        effectiveSequence: Sequence.EightK_OneK,
+      },
+      unofficial: {
+        isUnofficialRun: true,
+        unofficialRunInfo: runInfo,
+        unofficialRunInfos: [runInfo],
+        runIndexByUrl: { [runUrl]: 0, '707': 0 },
+        getOverlayData: () => ({
+          data: [overlayVisible, overlayClipped],
+          hardwareConfig: hwConfig,
+        }),
+        activeOverlayHwTypes: new Set(['h100_vllm']),
+        allOverlayHwTypes: new Set(['h100_vllm']),
+      },
+    });
+
+    cy.get('[data-testid="inference-table-view-btn"]').click();
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 4);
+    cy.get('[data-testid="inference-results-table"] tbody')
+      .contains('tr', '7.0')
+      .should('contain.text', 'SGLang')
+      .find('td')
+      .eq(2)
+      .should('have.text', '8');
+    cy.get('[data-testid="inference-results-table"] tbody')
+      .contains('tr', '7.5')
+      .should('contain.text', 'vLLM')
+      .find('td')
+      .eq(2)
+      .should('have.text', '8');
+  });
+
   it('keeps official table rows synchronized with legend state after a scope change', () => {
     const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
     const baseInference = createMockInferenceContext();
