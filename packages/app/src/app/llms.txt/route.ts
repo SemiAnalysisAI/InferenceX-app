@@ -14,6 +14,8 @@ export async function GET() {
     '',
     `- [Dashboard](${SITE_URL})`,
     `- [Articles](${SITE_URL}/blog)`,
+    `- [API Reference](${SITE_URL}/api)`,
+    `- [OpenAPI 3.1 Specification](${SITE_URL}/api/openapi.json)`,
     `- [RSS Feed](${SITE_URL}/feed.xml)`,
     `- [Full content for LLMs](${SITE_URL}/llms-full.txt)`,
     `- [GitHub](https://github.com/SemiAnalysisAI/InferenceX)`,
