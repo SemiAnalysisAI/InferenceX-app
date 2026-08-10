@@ -23,6 +23,8 @@ import {
   overviewTierEvidenceDate,
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
+  resolveOverviewHardware,
+  resolveOverviewHistoryDays,
   resolveOverviewModelScope,
   resolveOverviewReferenceHardware,
   resolveOverviewTier,
@@ -157,10 +159,21 @@ describe('overview engine scope and scenario selection', () => {
     [undefined, 'hardware'],
     ['hardware', 'hardware'],
     ['30d', 'history'],
+    ['7d', 'history'],
+    ['60d', 'history'],
+    ['14d', 'hardware'],
     [['30d'], 'history'],
     ['unknown', 'hardware'],
   ] as const)('resolves comparison mode %j to %s', (raw, expected) => {
     expect(resolveOverviewComparisonMode(raw)).toBe(expected);
+  });
+
+  it('resolves development windows and visible hardware in canonical matrix order', () => {
+    expect(resolveOverviewHistoryDays('7d')).toBe(7);
+    expect(resolveOverviewHistoryDays('60d')).toBe(60);
+    expect(resolveOverviewHistoryDays('14d')).toBe(30);
+    expect(resolveOverviewHardware('gb300,b200')).toEqual(['b200', 'gb300']);
+    expect(resolveOverviewHardware('h100')).toEqual(['b200', 'mi355x', 'b300', 'gb200', 'gb300']);
   });
 
   it('assigns each active model to its configured scenario', () => {
@@ -677,6 +690,19 @@ describe('overview historical window', () => {
       snapshotDate: '2026-08-03',
       targetDate: '2026-07-04',
       earliestDate: '2026-06-04',
+    });
+  });
+
+  it('supports one-week and two-month comparison windows', () => {
+    expect(overviewHistoricalWindow('2026-08-03', 7)).toEqual({
+      snapshotDate: '2026-08-03',
+      targetDate: '2026-07-27',
+      earliestDate: '2026-07-20',
+    });
+    expect(overviewHistoricalWindow('2026-08-03', 60)).toEqual({
+      snapshotDate: '2026-08-03',
+      targetDate: '2026-06-04',
+      earliestDate: '2026-04-05',
     });
   });
 

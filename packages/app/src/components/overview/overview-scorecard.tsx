@@ -1,10 +1,13 @@
 import {
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   OVERVIEW_HARDWARE,
+  OVERVIEW_HISTORY_WINDOWS,
   OVERVIEW_TIERS,
   overviewHardwareLabel,
   type OverviewComparisonMode,
   type OverviewEngineScope,
+  type OverviewHardware,
+  type OverviewHistoryDays,
   type OverviewHistoricalComparison,
   type OverviewModelScope,
   type OverviewModelSummary,
@@ -48,14 +51,21 @@ export const OVERVIEW_STRINGS = {
     },
     comparisonNavLabel: 'Compare',
     comparisonOptions: {
-      history: '30-day change',
+      7: '1 week',
+      30: '30 days',
+      60: '2 months',
     },
+    developmentSpeedLabel: 'Development speed',
+    hardwareColumnsLabel: 'Platforms',
+    hardwareColumnsAria: 'Visible platform columns',
+    presentationView: 'Presentation view',
+    exitPresentationView: 'Exit presentation view',
     hardwareComparisonLabel: (reference: string) => `vs ${reference}`,
     referenceSelectorAria: 'Reference hardware',
     caption:
       'Cost per million total tokens from each platform’s best observed serving envelope for the scenario shown with each model.',
-    historyCaption:
-      'Current cost and change versus the latest validated platform result 30–60 days earlier.',
+    historyCaption: (days: number) =>
+      `Current cost and change versus the latest validated platform result ${days}–${days * 2} days earlier.`,
     modelHeader: 'Model · Scenario',
     scenarioLabels: {
       single_turn_8k1k: '8K/1K',
@@ -92,7 +102,8 @@ export const OVERVIEW_STRINGS = {
       `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than this platform’s ${baselineDate} result`,
     historicalEvenAria: (baselineDate: string) =>
       `About the same cost as this platform’s ${baselineDate} result`,
-    historyCellStateLegend: 'Platforms without a valid 30-day comparison show current cost only.',
+    historyCellStateLegend: (days: number) =>
+      `Platforms without a valid ${days}-day comparison show current cost only.`,
     referenceHeader: 'Reference',
     modelScopeNavLabel: 'Inactive models',
     modelScopeShow: 'Show deprecated & maintenance-mode models',
@@ -119,12 +130,20 @@ export const OVERVIEW_STRINGS = {
     },
     comparisonNavLabel: '对比方式',
     comparisonOptions: {
-      history: '30 天变化',
+      7: '1 周',
+      30: '30 天',
+      60: '2 个月',
     },
+    developmentSpeedLabel: '开发速度',
+    hardwareColumnsLabel: '平台',
+    hardwareColumnsAria: '可见平台列',
+    presentationView: '演示视图',
+    exitPresentationView: '退出演示视图',
     hardwareComparisonLabel: (reference: string) => `对比 ${reference}`,
     referenceSelectorAria: '基准硬件',
     caption: '按各模型标注的场景，基于各平台最佳观测服务包络线计算每百万总 token 成本。',
-    historyCaption: '当前成本及其相对 30–60 天前最近一次有效平台结果的变化。',
+    historyCaption: (days: number) =>
+      `当前成本及其相对 ${days}–${days * 2} 天前最近一次有效平台结果的变化。`,
     modelHeader: '模型 · 场景',
     scenarioLabels: {
       single_turn_8k1k: '8K/1K',
@@ -159,7 +178,7 @@ export const OVERVIEW_STRINGS = {
     historicalDeltaAria: (pct: string, cheaper: boolean, baselineDate: string) =>
       `比该平台 ${baselineDate} 的结果${cheaper ? '便宜' : '昂贵'} ${pct}`,
     historicalEvenAria: (baselineDate: string) => `与该平台 ${baselineDate} 的结果成本基本持平`,
-    historyCellStateLegend: '缺少有效 30 天对比的平台仅显示当前成本。',
+    historyCellStateLegend: (days: number) => `缺少有效 ${days} 天对比的平台仅显示当前成本。`,
     referenceHeader: '基准',
     modelScopeNavLabel: '非活跃模型',
     modelScopeShow: '显示已弃用与维护模式模型',
@@ -635,6 +654,9 @@ interface SurfaceProps {
   strings: OverviewStrings;
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
+  historyDays: OverviewHistoryDays;
+  visibleHardware: OverviewHardware[];
+  presentation?: boolean;
 }
 
 export function DesktopOverviewMatrix({
@@ -644,14 +666,20 @@ export function DesktopOverviewMatrix({
   strings,
   comparisonMode,
   referenceHardware,
+  historyDays,
+  visibleHardware,
+  presentation = false,
 }: SurfaceProps) {
-  const platforms = models[0]?.platforms ?? [];
+  const visible = new Set(visibleHardware);
+  const platforms = (models[0]?.platforms ?? []).filter((platform) =>
+    visible.has(platform.hardware as OverviewHardware),
+  );
   const referenceLabel = overviewHardwareLabel(referenceHardware);
   return (
-    <div className="hidden xl:block">
+    <div className={presentation ? 'block' : 'hidden xl:block'}>
       <table data-testid="overview-desktop-matrix" className="w-full border-collapse text-sm">
         <caption className="sr-only">
-          {comparisonMode === 'history' ? strings.historyCaption : strings.caption}
+          {comparisonMode === 'history' ? strings.historyCaption(historyDays) : strings.caption}
         </caption>
         <colgroup>
           <col className="w-[22%]" />
@@ -708,24 +736,26 @@ export function DesktopOverviewMatrix({
                   </OverviewDetailLink>
                 )}
               </th>
-              {model.platforms.map((platform) => (
-                <td
-                  key={platform.hardware}
-                  style={costDeltaCellStyle(platform, comparisonMode, referenceHardware)}
-                  className={`px-3 py-4 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/30' : ''}`}
-                >
-                  <PlatformCell
-                    locale={locale}
-                    model={model}
-                    platform={platform}
-                    formatters={formatters}
-                    strings={strings}
-                    comparisonMode={comparisonMode}
-                    referenceHardware={referenceHardware}
-                    referenceLabel={referenceLabel}
-                  />
-                </td>
-              ))}
+              {model.platforms
+                .filter((platform) => visible.has(platform.hardware as OverviewHardware))
+                .map((platform) => (
+                  <td
+                    key={platform.hardware}
+                    style={costDeltaCellStyle(platform, comparisonMode, referenceHardware)}
+                    className={`${presentation ? 'px-2 py-2' : 'px-3 py-4'} align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/30' : ''}`}
+                  >
+                    <PlatformCell
+                      locale={locale}
+                      model={model}
+                      platform={platform}
+                      formatters={formatters}
+                      strings={strings}
+                      comparisonMode={comparisonMode}
+                      referenceHardware={referenceHardware}
+                      referenceLabel={referenceLabel}
+                    />
+                  </td>
+                ))}
             </tr>
           ))}
         </tbody>
@@ -741,10 +771,16 @@ export function MobileOverviewList({
   strings,
   comparisonMode,
   referenceHardware,
+  visibleHardware,
+  presentation = false,
 }: SurfaceProps) {
   const referenceLabel = overviewHardwareLabel(referenceHardware);
+  const visible = new Set(visibleHardware);
   return (
-    <ul data-testid="overview-mobile-list" className="divide-y divide-border/50 xl:hidden">
+    <ul
+      data-testid="overview-mobile-list"
+      className={`${presentation ? 'hidden' : 'divide-y divide-border/50 xl:hidden'}`}
+    >
       {models.map((model) => (
         <li key={`${model.model}-${model.scenario}`}>
           <article
@@ -755,33 +791,35 @@ export function MobileOverviewList({
           >
             <ModelName model={model} strings={strings} />
             <div className="grid grid-cols-1">
-              {model.platforms.map((platform) => (
-                <div
-                  key={platform.hardware}
-                  data-testid="overview-mobile-platform-row"
-                  data-hardware={platform.hardware}
-                  style={costDeltaCellStyle(platform, comparisonMode, referenceHardware)}
-                  className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-1.5 last:border-b-0"
-                >
-                  <span
-                    data-testid="overview-mobile-hardware"
-                    className="pt-0.5 text-xs font-medium text-muted-foreground"
+              {model.platforms
+                .filter((platform) => visible.has(platform.hardware as OverviewHardware))
+                .map((platform) => (
+                  <div
+                    key={platform.hardware}
+                    data-testid="overview-mobile-platform-row"
+                    data-hardware={platform.hardware}
+                    style={costDeltaCellStyle(platform, comparisonMode, referenceHardware)}
+                    className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-1.5 last:border-b-0"
                   >
-                    {platform.hardwareLabel}
-                  </span>
-                  <PlatformCell
-                    locale={locale}
-                    model={model}
-                    platform={platform}
-                    formatters={formatters}
-                    strings={strings}
-                    comparisonMode={comparisonMode}
-                    referenceHardware={referenceHardware}
-                    referenceLabel={referenceLabel}
-                    phoneRow
-                  />
-                </div>
-              ))}
+                    <span
+                      data-testid="overview-mobile-hardware"
+                      className="pt-0.5 text-xs font-medium text-muted-foreground"
+                    >
+                      {platform.hardwareLabel}
+                    </span>
+                    <PlatformCell
+                      locale={locale}
+                      model={model}
+                      platform={platform}
+                      formatters={formatters}
+                      strings={strings}
+                      comparisonMode={comparisonMode}
+                      referenceHardware={referenceHardware}
+                      referenceLabel={referenceLabel}
+                      phoneRow
+                    />
+                  </div>
+                ))}
             </div>
             {comparisonMode === 'history' ? null : (
               <OverviewDetailLink
@@ -811,6 +849,8 @@ export function OverviewTierSwitcher({
   comparisonMode,
   referenceHardware,
   modelScope,
+  historyDays,
+  visibleHardware,
   locale,
   strings,
 }: {
@@ -819,6 +859,8 @@ export function OverviewTierSwitcher({
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
   modelScope: OverviewModelScope;
+  historyDays: OverviewHistoryDays;
+  visibleHardware: OverviewHardware[];
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
@@ -850,6 +892,8 @@ export function OverviewTierSwitcher({
                 comparisonMode,
                 referenceHardware,
                 modelScope,
+                historyDays,
+                visibleHardware,
               )}
               analytics={{ control: 'tier', value: String(option) }}
               searchKeys={['tier']}
@@ -872,6 +916,8 @@ export function OverviewEngineScopeSwitcher({
   comparisonMode,
   referenceHardware,
   modelScope,
+  historyDays,
+  visibleHardware,
   locale,
   strings,
 }: {
@@ -880,6 +926,8 @@ export function OverviewEngineScopeSwitcher({
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
   modelScope: OverviewModelScope;
+  historyDays: OverviewHistoryDays;
+  visibleHardware: OverviewHardware[];
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
@@ -915,6 +963,8 @@ export function OverviewEngineScopeSwitcher({
                 comparisonMode,
                 referenceHardware,
                 modelScope,
+                historyDays,
+                visibleHardware,
               )}
               analytics={{ control: 'engine', value: option }}
               searchKeys={['engine']}
@@ -935,71 +985,120 @@ export function OverviewComparisonSwitcher({
   tier,
   referenceHardware,
   modelScope,
+  historyDays,
+  visibleHardware,
   locale,
   strings,
+  hidden = false,
 }: {
   comparisonMode: OverviewComparisonMode;
   engineScope: OverviewEngineScope;
   tier: OverviewTier;
   referenceHardware: OverviewReferenceHardware;
   modelScope: OverviewModelScope;
+  historyDays: OverviewHistoryDays;
+  visibleHardware: OverviewHardware[];
   locale: OverviewLocale;
   strings: OverviewStrings;
+  hidden?: boolean;
 }) {
-  const options: OverviewComparisonMode[] = ['hardware', 'history'];
   const referenceLabel = overviewHardwareLabel(referenceHardware);
   const referenceOptions = OVERVIEW_HARDWARE.map((hardware) => ({
     value: hardware,
     label: overviewHardwareLabel(hardware),
-    href: overviewHref(locale, tier, engineScope, 'hardware', hardware, modelScope),
+    href: overviewHref(
+      locale,
+      tier,
+      engineScope,
+      'hardware',
+      hardware,
+      modelScope,
+      historyDays,
+      visibleHardware,
+    ),
   }));
   const optionClass =
     'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 border-transparent px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors duration-200 hover:border-muted-foreground/30 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:min-w-[140px]';
   return (
-    <nav
+    <div
       data-testid="overview-comparison-switcher"
       aria-label={strings.comparisonNavLabel}
-      className="flex flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
+      className={hidden ? 'hidden' : 'flex flex-col items-center gap-2'}
     >
-      {options.map((option) => {
-        const label =
-          option === 'hardware'
-            ? strings.hardwareComparisonLabel(referenceLabel)
-            : strings.comparisonOptions.history;
-        return option === comparisonMode ? (
+      <nav
+        aria-label={strings.comparisonNavLabel}
+        className="flex flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
+      >
+        {comparisonMode === 'hardware' ? (
           <span
-            key={option}
-            data-overview-comparison={option}
+            data-overview-comparison="hardware"
             aria-current="true"
             className={`${optionClass} border-secondary text-secondary dark:border-primary dark:text-primary`}
           >
-            {option === 'hardware' ? (
-              <span className="inline-flex items-center gap-0.5">
-                <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
-                <OverviewReferenceSelect
-                  ariaLabel={strings.referenceSelectorAria}
-                  options={referenceOptions}
-                  value={referenceHardware}
-                />
-              </span>
-            ) : (
-              label
-            )}
+            <span className="inline-flex items-center gap-0.5">
+              <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
+              <OverviewReferenceSelect
+                ariaLabel={strings.referenceSelectorAria}
+                options={referenceOptions}
+                value={referenceHardware}
+              />
+            </span>
           </span>
         ) : (
           <OverviewNavLink
-            key={option}
-            data-overview-comparison={option}
-            href={overviewHref(locale, tier, engineScope, option, referenceHardware, modelScope)}
-            analytics={{ control: 'comparison', value: option }}
+            data-overview-comparison="hardware"
+            href={overviewHref(
+              locale,
+              tier,
+              engineScope,
+              'hardware',
+              referenceHardware,
+              modelScope,
+              historyDays,
+              visibleHardware,
+            )}
+            analytics={{ control: 'comparison', value: 'hardware' }}
             searchKeys={['compare']}
             className={optionClass}
           >
-            {label}
+            {strings.hardwareComparisonLabel(referenceLabel)}
           </OverviewNavLink>
-        );
-      })}
-    </nav>
+        )}
+        {OVERVIEW_HISTORY_WINDOWS.map((days) =>
+          comparisonMode === 'history' && days === historyDays ? (
+            <span
+              key={days}
+              data-overview-comparison={`${days}d`}
+              aria-current="true"
+              className={`${optionClass} border-secondary text-secondary dark:border-primary dark:text-primary`}
+            >
+              {strings.comparisonOptions[days]}
+            </span>
+          ) : (
+            <OverviewNavLink
+              key={days}
+              data-overview-comparison={`${days}d`}
+              href={overviewHref(
+                locale,
+                tier,
+                engineScope,
+                'history',
+                referenceHardware,
+                modelScope,
+                days,
+                visibleHardware,
+              )}
+              analytics={{ control: 'comparison', value: `${days}d` }}
+              searchKeys={['compare']}
+              className={optionClass}
+            >
+              {strings.comparisonOptions[days]}
+            </OverviewNavLink>
+          ),
+        )}
+      </nav>
+      <span className="text-xs text-muted-foreground">{strings.developmentSpeedLabel}</span>
+    </div>
   );
 }
 
@@ -1009,6 +1108,8 @@ export function OverviewModelScopeToggle({
   engineScope,
   comparisonMode,
   referenceHardware,
+  historyDays,
+  visibleHardware,
   locale,
   strings,
 }: {
@@ -1017,6 +1118,8 @@ export function OverviewModelScopeToggle({
   engineScope: OverviewEngineScope;
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
+  historyDays: OverviewHistoryDays;
+  visibleHardware: OverviewHardware[];
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
@@ -1029,7 +1132,16 @@ export function OverviewModelScopeToggle({
     >
       <OverviewNavLink
         data-overview-model-scope={target}
-        href={overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware, target)}
+        href={overviewHref(
+          locale,
+          tier,
+          engineScope,
+          comparisonMode,
+          referenceHardware,
+          target,
+          historyDays,
+          visibleHardware,
+        )}
         analytics={{ control: 'models', value: target }}
         searchKeys={['models']}
         className="inline-flex min-h-11 items-center text-muted-foreground underline decoration-dotted underline-offset-4 transition-colors hover:text-foreground hover:decoration-solid"
@@ -1044,10 +1156,12 @@ export function OverviewMethodology({
   strings,
   comparisonMode,
   referenceHardware,
+  historyDays,
 }: {
   strings: OverviewStrings;
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
+  historyDays: OverviewHistoryDays;
 }) {
   const referenceLabel = overviewHardwareLabel(referenceHardware);
   return (
@@ -1055,10 +1169,10 @@ export function OverviewMethodology({
       data-testid="overview-methodology"
       className="space-y-1 border-t border-border/50 px-4 py-3 text-xs leading-snug text-muted-foreground lg:px-6"
     >
-      {comparisonMode === 'history' ? <p>{strings.historyCaption}</p> : null}
+      {comparisonMode === 'history' ? <p>{strings.historyCaption(historyDays)}</p> : null}
       <p>
         {comparisonMode === 'history'
-          ? strings.historyCellStateLegend
+          ? strings.historyCellStateLegend(historyDays)
           : strings.cellStateLegend(referenceLabel)}
       </p>
       <p>{strings.methodologyNote}</p>

@@ -158,7 +158,7 @@ describe('Overview page', () => {
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
-    cy.get('[data-overview-comparison="history"]').click();
+    cy.get('[data-overview-comparison="30d"]').click();
     cy.wait('@overviewJson');
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all&compare=30d');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
@@ -290,7 +290,7 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .find('[data-overview-engine-scope="all"]')
       .should('have.attr', 'href', '/overview?engine=all&ref=b300');
-    cy.get('[data-overview-comparison="history"]').should(
+    cy.get('[data-overview-comparison="30d"]').should(
       'have.attr',
       'href',
       '/overview?ref=b300&compare=30d',
@@ -311,14 +311,14 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-methodology"]').should('contain.text', 'GB200 NVL72 baseline');
   });
 
-  it('switches between B200 and 30-day comparison without losing page state', () => {
+  it('switches among hardware and development-speed windows without losing page state', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
     cy.get('[data-testid="overview-page"]')
       .children('[data-testid="overview-comparison-switcher"]')
       .should('have.length', 1)
-      .and('have.class', 'justify-center');
+      .and('have.class', 'items-center');
     cy.get('[data-testid="overview-comparison-switcher"]')
       .should('have.attr', 'aria-label', 'Compare')
       .within(() => {
@@ -331,15 +331,21 @@ describe('Overview page', () => {
             expect(style.borderBottomWidth).to.equal('2px');
             expect(style.backgroundColor).to.match(/rgba\(0, 0, 0, 0\)|transparent/);
           });
-        cy.get('[data-overview-comparison="history"]')
+        cy.get('[data-overview-comparison="7d"]')
+          .should('have.attr', 'href', '/overview?compare=7d')
+          .and('have.text', '1 week');
+        cy.get('[data-overview-comparison="60d"]')
+          .should('have.attr', 'href', '/overview?compare=60d')
+          .and('have.text', '2 months');
+        cy.get('[data-overview-comparison="30d"]')
           .should('have.attr', 'href', '/overview?compare=30d')
-          .and('have.text', '30-day change')
+          .and('have.text', '30 days')
           .click();
       });
 
     cy.location('search').should('eq', '?compare=30d');
     cy.get('[data-testid="overview-comparison-switcher"]')
-      .find('[data-overview-comparison="history"]')
+      .find('[data-overview-comparison="30d"]')
       .should('have.attr', 'aria-current', 'true')
       .and('match', 'span');
     cy.get('[data-testid="overview-desktop-matrix"] thead').should('contain.text', 'B200');
@@ -360,12 +366,52 @@ describe('Overview page', () => {
       .should('have.attr', 'aria-label', '对比方式')
       .within(() => {
         cy.get('[data-overview-comparison="hardware"]').should('have.text', '对比 B200');
-        cy.get('[data-overview-comparison="history"]')
+        cy.get('[data-overview-comparison="30d"]')
           .should('have.attr', 'aria-current', 'true')
-          .and('have.text', '30 天变化');
+          .and('have.text', '30 天');
       });
     cy.contains('当前成本及其相对 30–60 天前最近一次有效平台结果的变化。').should('exist');
     cy.contains('缺少有效 30 天对比的平台仅显示当前成本。').should('exist');
+  });
+
+  it('customizes platform columns and opens a focused presentation view', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview?compare=60d');
+
+    cy.get('[data-testid="overview-hardware-select"]')
+      .should('have.attr', 'aria-label', 'Visible platform columns')
+      .click();
+    cy.contains('[role="option"]', 'B300').click();
+
+    cy.location('search').should('eq', '?compare=60d&hw=b200%2Cmi355x%2Cgb200%2Cgb300');
+    cy.get('[data-testid="overview-desktop-matrix"] thead th').then(($headers) => {
+      expect([...$headers].map((header) => header.textContent?.trim())).to.deep.equal([
+        'Model · Scenario',
+        'B200',
+        'MI355X',
+        'GB200 NVL72',
+        'GB300 NVL72',
+      ]);
+    });
+    cy.get('[data-testid="overview-platform"][data-hardware="b300"]').should('not.exist');
+
+    cy.get('[data-testid="overview-presentation-toggle"]')
+      .should('have.text', 'Presentation view')
+      .click();
+    cy.get('[data-testid="overview-page"]')
+      .should('have.attr', 'data-presentation', 'true')
+      .and('have.class', 'fixed');
+    cy.get('[data-testid="overview-desktop-matrix"]').should('be.visible');
+    cy.get('[data-testid="overview-mobile-list"]').should('not.be.visible');
+    cy.get('body').should('have.css', 'overflow', 'hidden');
+    cy.get('[data-testid="overview-presentation-toggle"]').should(
+      'have.text',
+      'Exit presentation view',
+    );
+
+    cy.get('body').type('{esc}');
+    cy.get('[data-testid="overview-page"]').should('have.attr', 'data-presentation', 'false');
+    cy.get('body').should('not.have.css', 'overflow', 'hidden');
   });
 
   it('compares each platform with its own validated result from 30–60 days earlier', () => {

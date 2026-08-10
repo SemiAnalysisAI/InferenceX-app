@@ -43,6 +43,7 @@ interface MultiSelectProps {
   clearSearchLabel?: string;
   selectedSuffix?: string;
   minimumPrefix?: string;
+  ariaLabel?: string;
 }
 
 function MultiSelect({
@@ -69,6 +70,7 @@ function MultiSelect({
   clearSearchLabel = 'Clear search',
   selectedSuffix = ' selected',
   minimumPrefix = 'Minimum: ',
+  ariaLabel,
 }: MultiSelectProps) {
   const [internalIsOpen, setInternalIsOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -257,6 +259,7 @@ function MultiSelect({
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         aria-controls={listboxId}
+        aria-label={ariaLabel}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         data-slot="select-trigger"

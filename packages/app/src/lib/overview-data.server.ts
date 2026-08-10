@@ -8,6 +8,7 @@ import {
   assembleOverviewHistoricalPageData,
   assembleOverviewPageData,
   OVERVIEW_DEFAULT_COMPARISON_MODE,
+  OVERVIEW_DEFAULT_HISTORY_DAYS,
   OVERVIEW_DEFAULT_MODEL_SCOPE,
   OVERVIEW_PRIMARY_TIER,
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
@@ -16,6 +17,8 @@ import {
   overviewSnapshotDate,
   type OverviewComparisonMode,
   type OverviewEngineScope,
+  type OverviewHardware,
+  type OverviewHistoryDays,
   type OverviewModelScope,
   type OverviewPageData,
   type OverviewReferenceHardware,
@@ -43,6 +46,8 @@ export async function getOverviewPageData(
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+  historyDays: OverviewHistoryDays = OVERVIEW_DEFAULT_HISTORY_DAYS,
+  visibleHardware?: OverviewHardware[],
 ): Promise<OverviewPageData> {
   const models = overviewModelsForScope(modelScope);
   // Synthetic rows go through the same assemblers as the live path, so a
@@ -57,10 +62,11 @@ export async function getOverviewPageData(
       engineScope,
       referenceHardware,
       modelScope,
+      visibleHardware,
     );
   }
 
-  // Note (wenyao): the 30-day window must not move when inactive models are
+  // Note (wenyao): the selected history window must not move when inactive models are
   // revealed — a maintenance model can still post occasional runs, and a newer
   // one would silently shift the cost deltas already shown on default rows.
   // Anchor the snapshot to the default models in every scope.
@@ -82,12 +88,14 @@ export async function getOverviewPageData(
         engineScope,
         referenceHardware,
         modelScope,
+        visibleHardware,
       ),
       comparisonMode: 'history',
+      historyDays,
     };
   }
 
-  const window = overviewHistoricalWindow(snapshotDate);
+  const window = overviewHistoricalWindow(snapshotDate, historyDays);
   const unboundedBaselineRows = FIXTURES_MODE
     ? loadFixture<Record<string, BenchmarkRow[]>>('overview-history-rows')
     : await loadRowsByModel(models, (keys) => getCachedBenchmarksAsOf(keys, window.targetDate));
@@ -106,5 +114,7 @@ export async function getOverviewPageData(
     engineScope,
     referenceHardware,
     modelScope,
+    historyDays,
+    visibleHardware,
   );
 }

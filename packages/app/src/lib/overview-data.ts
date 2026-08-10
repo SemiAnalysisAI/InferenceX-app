@@ -30,6 +30,10 @@ export type OverviewTier = (typeof OVERVIEW_TIERS)[number];
 export const OVERVIEW_PRIMARY_TIER = 50;
 export const OVERVIEW_HARDWARE = ['b200', 'mi355x', 'b300', 'gb200', 'gb300'] as const;
 export type OverviewReferenceHardware = (typeof OVERVIEW_HARDWARE)[number];
+export type OverviewHardware = OverviewReferenceHardware;
+export const OVERVIEW_HISTORY_WINDOWS = [7, 30, 60] as const;
+export type OverviewHistoryDays = (typeof OVERVIEW_HISTORY_WINDOWS)[number];
+export const OVERVIEW_DEFAULT_HISTORY_DAYS: OverviewHistoryDays = 30;
 export const OVERVIEW_DEFAULT_REFERENCE_HARDWARE: OverviewReferenceHardware = 'b200';
 export type OverviewEngineScope = 'all' | 'community';
 export type OverviewComparisonMode = 'hardware' | 'history';
@@ -61,7 +65,30 @@ export function resolveOverviewComparisonMode(
   raw: string | readonly string[] | undefined,
 ): OverviewComparisonMode {
   const candidate = Array.isArray(raw) ? raw[0] : raw;
-  return candidate === '30d' ? 'history' : OVERVIEW_DEFAULT_COMPARISON_MODE;
+  return OVERVIEW_HISTORY_WINDOWS.some((days) => candidate === `${days}d`)
+    ? 'history'
+    : OVERVIEW_DEFAULT_COMPARISON_MODE;
+}
+
+export function resolveOverviewHistoryDays(
+  raw: string | readonly string[] | undefined,
+): OverviewHistoryDays {
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  const days = Number(candidate?.replace(/d$/u, ''));
+  return (
+    OVERVIEW_HISTORY_WINDOWS.find((windowDays) => windowDays === days) ??
+    OVERVIEW_DEFAULT_HISTORY_DAYS
+  );
+}
+
+export function resolveOverviewHardware(
+  raw: string | readonly string[] | undefined,
+): OverviewHardware[] {
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  if (candidate === undefined) return [...OVERVIEW_HARDWARE];
+  const requested = new Set(candidate.split(','));
+  const hardware = OVERVIEW_HARDWARE.filter((value) => requested.has(value));
+  return hardware.length === 0 ? [...OVERVIEW_HARDWARE] : hardware;
 }
 
 export function resolveOverviewModelScope(
@@ -179,6 +206,8 @@ export interface OverviewPageData {
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
   modelScope: OverviewModelScope;
+  historyDays: OverviewHistoryDays;
+  visibleHardware: OverviewHardware[];
   historicalWindow: OverviewHistoricalWindow | null;
 }
 
@@ -226,11 +255,14 @@ export function overviewSnapshotDate(
   return dates.length === 0 ? null : (dates.toSorted().at(-1) ?? null);
 }
 
-export function overviewHistoricalWindow(snapshotDate: string): OverviewHistoricalWindow {
+export function overviewHistoricalWindow(
+  snapshotDate: string,
+  days: OverviewHistoryDays = OVERVIEW_DEFAULT_HISTORY_DAYS,
+): OverviewHistoricalWindow {
   return {
     snapshotDate,
-    targetDate: subtractUtcDays(snapshotDate, 30),
-    earliestDate: subtractUtcDays(snapshotDate, 60),
+    targetDate: subtractUtcDays(snapshotDate, days),
+    earliestDate: subtractUtcDays(snapshotDate, days * 2),
   };
 }
 
@@ -695,6 +727,7 @@ export function assembleOverviewPageData(
   engineScope: OverviewEngineScope = 'community',
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+  visibleHardware: OverviewHardware[] = [...OVERVIEW_HARDWARE],
 ): OverviewPageData {
   const perModel = overviewModelsForScope(modelScope).map((model) => ({
     model,
@@ -711,6 +744,8 @@ export function assembleOverviewPageData(
     comparisonMode: OVERVIEW_DEFAULT_COMPARISON_MODE,
     referenceHardware,
     modelScope,
+    historyDays: OVERVIEW_DEFAULT_HISTORY_DAYS,
+    visibleHardware,
     historicalWindow: null,
   };
 }
@@ -730,6 +765,8 @@ export function assembleOverviewHistoricalPageData(
   engineScope: OverviewEngineScope = 'community',
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+  historyDays: OverviewHistoryDays = OVERVIEW_DEFAULT_HISTORY_DAYS,
+  visibleHardware: OverviewHardware[] = [...OVERVIEW_HARDWARE],
 ): OverviewPageData {
   const current = assembleOverviewPageData(
     currentRowsByModel,
@@ -737,6 +774,7 @@ export function assembleOverviewHistoricalPageData(
     engineScope,
     referenceHardware,
     modelScope,
+    visibleHardware,
   );
   const baseline = assembleOverviewPageData(
     baselineRowsByModel,
@@ -744,6 +782,7 @@ export function assembleOverviewHistoricalPageData(
     engineScope,
     referenceHardware,
     modelScope,
+    visibleHardware,
   );
   const baselineByKey = new Map(
     baseline.models.flatMap((model) =>
@@ -754,6 +793,7 @@ export function assembleOverviewHistoricalPageData(
   return {
     ...current,
     comparisonMode: 'history',
+    historyDays,
     historicalWindow: window,
     models: current.models.map((model) => ({
       ...model,

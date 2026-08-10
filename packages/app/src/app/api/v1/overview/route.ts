@@ -4,6 +4,8 @@ import { cachedJson } from '@/lib/api-cache';
 import {
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
+  resolveOverviewHardware,
+  resolveOverviewHistoryDays,
   resolveOverviewModelScope,
   resolveOverviewReferenceHardware,
   resolveOverviewTier,
@@ -22,6 +24,8 @@ export async function GET(request: NextRequest) {
       resolveOverviewComparisonMode(params.get('compare') ?? undefined),
       resolveOverviewReferenceHardware(params.get('ref') ?? undefined),
       resolveOverviewModelScope(params.get('models') ?? undefined),
+      resolveOverviewHistoryDays(params.get('compare') ?? undefined),
+      resolveOverviewHardware(params.get('hw') ?? undefined),
     );
     return cachedJson(data);
   } catch (error) {
