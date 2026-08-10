@@ -149,7 +149,7 @@ describe('seriesMatchesSelection', () => {
   const base: CollectiveXSeriesSelection = {
     epSize: 8,
     phase: 'decode',
-    mode: 'normal',
+    modes: ['normal'],
     precision: 'bf16',
   };
 
@@ -160,8 +160,16 @@ describe('seriesMatchesSelection', () => {
   it('rejects a series whose EP, phase, mode, or precision differs from the selection', () => {
     expect(seriesMatchesSelection(scaleUp, { ...base, epSize: 16 })).toBe(false);
     expect(seriesMatchesSelection(scaleUp, { ...base, phase: 'prefill' })).toBe(false);
-    expect(seriesMatchesSelection(scaleUp, { ...base, mode: 'low-latency' })).toBe(false);
+    expect(seriesMatchesSelection(scaleUp, { ...base, modes: ['low-latency'] })).toBe(false);
     expect(seriesMatchesSelection(scaleUp, { ...base, precision: 'fp8' })).toBe(false);
+  });
+
+  it('matches every selected kernel mode', () => {
+    const lowLatency = makeCollectiveXSeries({ mode: 'low-latency' });
+    const bothModes = { ...base, modes: ['normal', 'low-latency'] as const };
+
+    expect(seriesMatchesSelection(scaleUp, bothModes)).toBe(true);
+    expect(seriesMatchesSelection(lowLatency, bothModes)).toBe(true);
   });
 });
 

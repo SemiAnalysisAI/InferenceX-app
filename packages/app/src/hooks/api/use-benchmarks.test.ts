@@ -68,6 +68,21 @@ describe('benchmarkQueryOptions', () => {
     expect(a.queryKey).not.toEqual(b.queryKey);
   });
 
+  it('separates compact calculator sequences from the raw benchmark cache', () => {
+    const raw = benchmarkQueryOptions('m', '2026-03-01');
+    const calculator = benchmarkQueryOptions('m', '2026-03-01', true, false, undefined, false, {
+      type: 'calculator',
+      sequence: '1k/1k',
+    });
+    const otherSequence = benchmarkQueryOptions('m', '2026-03-01', true, false, undefined, false, {
+      type: 'calculator',
+      sequence: '8k/1k',
+    });
+
+    expect(calculator.queryKey).not.toEqual(raw.queryKey);
+    expect(calculator.queryKey).not.toEqual(otherSequence.queryKey);
+  });
+
   it('is enabled when model is non-empty', () => {
     const opts = benchmarkQueryOptions('DeepSeek-R1-0528', '2026-03-01');
     expect(opts.enabled).toBe(true);
