@@ -24,6 +24,8 @@ const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文多轮真实智能体场景（AgentX）';
+/** Shared by both locales: the scenario is named after its acronym. */
+const AGENTX_SHORT = 'AgentX';
 
 const PAGE_TITLE = 'Inference Cost per Million Tokens';
 const PAGE_TITLE_ZH = '推理每百万 token 成本';
@@ -56,6 +58,21 @@ function expectNoHorizontalScroller(testId: string) {
       .map((el) => `${el.tagName} ${el.scrollWidth}>${el.clientWidth}`);
     expect(scrollers, `horizontally scrollable inside ${testId}`).to.deep.equal([]);
   });
+}
+
+/**
+ * The row header shows the acronym so the 22%-wide model column stays one line,
+ * and keeps the full scenario name for assistive tech and the hover title. Both
+ * strings are in the cell, so assert the two layers rather than their
+ * concatenation. Scenarios already named by a short label render one node.
+ */
+function expectAgentxScenario(fullLabel: string) {
+  cy.get('[data-testid="overview-model-scenario"]')
+    .should('have.attr', 'title', fullLabel)
+    .within(() => {
+      cy.get('.sr-only').should('have.text', fullLabel);
+      cy.get('[aria-hidden="true"]').should('have.text', AGENTX_SHORT);
+    });
 }
 
 /** Visible dates and snapshot framing must be gone; evidence stays in labels. */
@@ -315,8 +332,11 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    cy.get('[data-testid="overview-page"]')
-      .children('[data-testid="overview-comparison-switcher"]')
+    // The tabs sit inside the surface handed to the Fullscreen API so that
+    // presenting keeps them with the matrix, which costs them their old spot as
+    // a direct child of the page.
+    cy.get('[data-testid="overview-presentation-surface"]')
+      .find('[data-testid="overview-comparison-switcher"]')
       .should('have.length', 1)
       .and('have.class', 'justify-center');
     cy.get('[data-testid="overview-comparison-switcher"]')
@@ -540,7 +560,7 @@ describe('Overview page', () => {
     });
 
     desktopModel('GLM-5.2').within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL);
+      expectAgentxScenario(AGENTX_LABEL);
       cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
     });
     cy.get(
@@ -781,9 +801,9 @@ describe('Overview page', () => {
       cy.get('[data-testid="overview-desktop-matrix"]').should('contain.text', label);
     }
     for (const model of ['Kimi-K3', 'GLM-5.2']) {
-      desktopModel(model)
-        .find('[data-testid="overview-model-scenario"]')
-        .should('have.text', AGENTX_LABEL);
+      desktopModel(model).within(() => {
+        expectAgentxScenario(AGENTX_LABEL);
+      });
     }
     for (const model of ['DeepSeek-V4-Pro', 'MiniMax-M3', 'Qwen-3.5-397B-A17B']) {
       desktopModel(model, SINGLE_TURN)
@@ -806,7 +826,7 @@ describe('Overview page', () => {
     });
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL);
+      expectAgentxScenario(AGENTX_LABEL);
       cy.contains('DeepSeek V4 Pro 1.6T').should('exist');
       // Priced from the AgentX rows alone — the single-turn sweep never leaks in.
       cy.get(
@@ -1322,14 +1342,14 @@ describe('Overview page', () => {
         .and('have.attr', 'title', '缺少可比较的 B200 基线');
     });
     desktopModel('GLM-5.2').within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL_ZH);
+      expectAgentxScenario(AGENTX_LABEL_ZH);
       cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
       platform('b300')
         .find('[data-testid="overview-pair-missing"]')
         .should('have.attr', 'title', '该场景暂无数据');
     });
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL_ZH);
+      expectAgentxScenario(AGENTX_LABEL_ZH);
       cy.get(
         '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
       ).should('have.text', '$0.064');
