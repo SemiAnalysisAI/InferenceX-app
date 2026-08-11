@@ -484,19 +484,19 @@ describe('processOverlayChartData', () => {
   });
 
   it('leaves the canonical flag unset for metrics with no roofline direction', () => {
-    // y_measuredAvgPower has no `_roofline`, so no canonical
-    // restriction applies. The official path leaves the flag undefined and
-    // draws the roofline unrestricted; the overlay must do the same — an
-    // all-false stamping here would seed an EMPTY overlay frontier and (with
-    // Optimal Only on) hide every overlay point.
+    // A metric the chart config does not define has no `_roofline`, so no
+    // canonical restriction applies. The official path leaves the flag
+    // undefined and draws the roofline unrestricted; the overlay must do the
+    // same — an all-false stamping here would seed an EMPTY overlay frontier
+    // and (with Optimal Only on) hide every overlay point.
     const data = [
       pt({
-        measuredAvgPower: { y: 700, roof: false },
+        noRooflineDirection: { y: 700, roof: false },
         p90_intvty: 100,
         p90_e2el: 10,
       } as any),
     ];
-    const result = processOverlayChartData(data, 'interactivity', 'y_measuredAvgPower', null, {
+    const result = processOverlayChartData(data, 'interactivity', 'y_noRooflineDirection', null, {
       isAgentic: true,
       selectedPercentile: 'p90',
       restrictToNormalizedFrontier: true,

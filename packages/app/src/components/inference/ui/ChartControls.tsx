@@ -158,7 +158,6 @@ const METRIC_GROUPS: {
       'y_measuredJPerOutputToken',
       'y_measuredJPerTotalToken',
     ],
-    gated: true,
   },
   { label: 'Custom User Values', labelZh: '自定义值', metrics: ['y_costUser', 'y_powerUser'] },
 ];
