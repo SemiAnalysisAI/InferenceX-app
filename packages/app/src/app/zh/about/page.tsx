@@ -81,6 +81,41 @@ export default function AboutPageZh() {
           </Card>
         </section>
 
+        <section id="agentx" className="scroll-mt-24">
+          <Card>
+            <h2 className="text-lg font-semibold mb-2">AgentX：真实世界智能体推理</h2>
+            <p className="text-muted-foreground mb-3">
+              AgentX 将 InferenceX 从单轮 prompt
+              扩展到编码智能体实际使用模型的场景：长程多轮会话、共享前缀、记录的思考时间、并行子智能体，以及持续的
+              KV cache 复用。工作负载采用公开的智能体编码轨迹和合成 prompt
+              文本，在不回放用户私密内容的前提下，保留 token 长度、cache
+              共享结构、时序与子智能体拓扑。
+            </p>
+            <p className="text-muted-foreground mb-4">
+              NVIDIA 在 AIPerf 中实现了 AgentX MVP 场景。固定回放规则包括
+              streaming、生成完整指定输出、warmup、循环会话之间的 cache
+              busting、忠实保留轮次间时序，以及最低稳态运行时长，使不同服务引擎与硬件的结果能够直接比较。在多
+              replica 部署中，会话感知路由会让每个会话尽量落到持有其共享 KV 前缀的 replica 上。
+            </p>
+            <div className="flex flex-wrap gap-3 text-sm">
+              <Link
+                href="/zh/blog/agentx-how-the-benchmark-works-faq"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
+              >
+                阅读 AgentX FAQ
+              </Link>
+              <Link
+                href="https://docs.nvidia.com/aiperf/aiperf/benchmark-modes/semi-analysis-agent-x-how-the-benchmark-works-faq"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
+              >
+                NVIDIA AIPerf 文档
+              </Link>
+            </div>
+          </Card>
+        </section>
+
         <section id="reproducibility" className="scroll-mt-24">
           <Card>
             <h2 className="text-lg font-semibold mb-2">可复现性</h2>

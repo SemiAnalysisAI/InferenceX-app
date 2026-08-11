@@ -1,0 +1,139 @@
+---
+title: 'AgentX: How the Benchmark Works'
+subtitle: 'A practical FAQ for running realistic agentic-coding inference workloads with Nvidia AIPerf'
+date: 2026-08-11
+publishDate: 2026-08-11
+tags: ['AgentX', 'AIPerf', 'Agentic AI', 'Benchmarking']
+---
+
+AgentX measures inference the way a coding agent actually uses a model: long, multi-turn sessions with shared prefixes, pauses between turns, parallel subagents, and repeated KV-cache reuse. It is a scenario in AIPerf built around public agentic-coding traces and a fixed replay recipe, so results from different serving stacks can be compared on the same workload.
+
+This FAQ explains the benchmark's operating model, the settings that protect comparability, and the deployment details most likely to affect a run.
+
+## What does AgentX measure?
+
+Traditional load tests often send unrelated single-turn prompts at a fixed request rate. AgentX instead keeps a configurable number of complete session trees alive. A root coding conversation may spawn child conversations, wait for them, and resume after they finish. Each turn carries the accumulated message history, creating the long shared prefixes and bursty fan-out seen in real agent systems.
+
+The prompt text is synthesized, but the workload shape comes from recorded sessions: input and output lengths, prefix-sharing relationships, subagent topology, and inter-turn timing. This preserves the parts that matter to schedulers, routers, and prefix caches without replaying private user content.
+
+## Where does the workload come from?
+
+The scenario uses SemiAnalysis public Weka-format agentic-coding trace corpora. For reproducible comparisons, choose a date-pinned corpus rather than the rolling alias. A `_256k` variant removes individual requests above the 256K-token range and is the better match for servers with a context window around that size.
+
+The short `semianalysis_cc_traces_weka` name is the legacy corpus without subagents. Use a dated corpus or a `with_subagents` alias when you want AgentX fan-out behavior.
+
+## What does the scenario lock?
+
+Passing `--scenario inferencex-agentx-mvp` selects agentic replay and enforces the settings that define a comparable run:
+
+- Streaming is enabled so time to first token (TTFT) and inter-token latency (ITL) can be measured.
+- `ignore_eos:true` makes the server generate the requested output length instead of stopping early.
+- Recorded per-turn delays remain intact; only globally idle time is capped at 10 seconds.
+- `first_turn_prefix` cache busting gives every replayed conversation a unique first-turn marker. This prevents recycled traces from producing artificial cross-session cache hits while retaining cache reuse inside a session.
+- A valid run lasts at least 900 seconds; the default is 1,800 seconds.
+- Warmup primes a deep prefix before profiling begins.
+- A random seed is always present and is recorded in the artifacts.
+
+Conflicting locked flags fail during configuration. `--unsafe-override` can bypass some safeguards for pipeline testing, but the output is marked `submission_valid: false` and should not be compared with valid results.
+
+## What is the minimal command?
+
+Replace the URL, model, corpus, and concurrency with values for your deployment:
+
+```bash
+aiperf profile \
+  --scenario inferencex-agentx-mvp \
+  --url http://localhost:8000 \
+  --model YOUR_MODEL \
+  --endpoint-type chat \
+  --public-dataset semianalysis_cc_traces_weka_062126 \
+  --concurrency 256
+```
+
+AIPerf fills in the scenario defaults and writes results under `./artifacts/`. Pin `--random-seed` when you want exact replay sampling and reconstructed-dataset cache reuse across runs. Add `--tokenizer` when the model name exposed by the server is not a resolvable Hugging Face tokenizer.
+
+## Why does AgentX use streaming chat completions?
+
+The recorded workload is represented as multi-turn message arrays, which map naturally to an OpenAI-compatible chat-completions endpoint. Streaming exposes first-token and token-to-token timing; a non-streaming response cannot provide those core latency measurements.
+
+`--use-server-token-count` changes only metric accounting. It trusts the server's usage fields when local tokenization differs because of a tokenizer revision or invisible chat-template overhead. It does not change prompt construction.
+
+## What does concurrency mean?
+
+Concurrency is the number of live session trees, not the number of in-flight HTTP requests. A session can fan out into several child conversations, so instantaneous request concurrency may exceed the configured value.
+
+There is intentionally no request-rate control in this scenario. Offered load is produced by the number of active sessions together with their recorded think times and fan-out patterns. This makes `--concurrency` the primary load dial.
+
+## Why can the first run take so long?
+
+Before traffic starts, AIPerf downloads the corpus and reconstructs it into tokenized, cache-aware conversation trees. The result is stored in a memory-mapped disk cache. With the same corpus, tokenizer, reconstruction settings, entry count, and random seed, later runs can restore that prepared dataset in seconds.
+
+For a cold run, the default configuration timeout may be too short. Raise both timeouts together, keeping the service timeout at least as large as the dataset timeout:
+
+```bash
+export AIPERF_DATASET_CONFIGURATION_TIMEOUT=1800
+export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800
+```
+
+The visible run then proceeds through dataset configuration, warmup, timed profiling, and finally drain/export. The configured benchmark duration covers only profiling, so total wall time is longer.
+
+## Can I run a short smoke test?
+
+A valid run cannot be shorter than 900 seconds. For a cheap but valid check, use low concurrency and keep the 900-second minimum. `--num-dataset-entries` reduces reconstruction work, but it also changes the workload and should not be used for a result you plan to compare or submit.
+
+For a minutes-long connectivity test, use `--unsafe-override` with a short duration and accept the invalid stamp. A useful workflow is to keep the full corpus and pin the random seed during this shakeout; the subsequent valid run can reuse the reconstructed dataset cache.
+
+## How do I know the load generator is not the bottleneck?
+
+AIPerf distributes work across worker processes and reports worker health every two seconds. Treat the high-CPU warning as a saturation signal: add client cores or another load-generator host before trusting the result. The dashboard also exposes worker CPU, in-flight requests, and high-load state.
+
+For deeper diagnosis, `--show-trace-timing` separates time spent waiting for a free pooled client connection from time waiting on the server's first byte. A healthy worker CPU profile and little connection-pool blocking are strong evidence that the measured limit is server-side.
+
+## Why do connection resets appear partway through a run?
+
+Client and server keep-alive settings may disagree. If an idle connection remains in AIPerf's pool longer than the server keeps it open, the client may reuse a socket that the server has already closed. Set the client keep-alive below the server value; for a server with a five-second keep-alive, for example:
+
+```bash
+export AIPERF_HTTP_KEEPALIVE_TIMEOUT=4
+```
+
+This often appears during paced profiling rather than warmup because warmup connections do not remain idle as long.
+
+## How should multi-replica routing work?
+
+Conversation-aware routing is essential when a router fronts several replicas. Every turn resends a large shared prefix. If turns from one conversation land on different workers, prefix-cache reuse collapses and the benchmark measures routing scatter rather than the serving stack's cache capability.
+
+AIPerf assigns a stable correlation ID to each conversation; subagents receive their own stable IDs. Two routing strategies are available:
+
+- Prefix-aware routing matches message history against cached prefixes. SGLang Model Gateway provides `cache_aware`; Dynamo provides KV-aware routing with `--router-mode kv`.
+- Sticky routing maps the AIPerf correlation ID to a router session header. AIPerf supports SGLang's `X-SMG-Routing-Key`, Dynamo's session headers, and a generic `X-Session-ID` integration through environment variables.
+
+These routing controls are not scenario-locked because they change request placement rather than request content. Compare them against round-robin routing to quantify the benefit of conversation affinity.
+
+## Which metrics should I inspect?
+
+AgentX reports familiar request and token metrics—TTFT, ITL, end-to-end latency, output throughput, and error rates—alongside workload-specific signals. The most useful AgentX additions describe prefix-cache behavior, context overflow, session and subagent execution, worker saturation, and whether the run complied with the scenario.
+
+Always check `submission_valid` before comparing runs. A context-overflow rate above the configured threshold, cancellation, unsafe overrides, or other scenario violations can invalidate an otherwise complete artifact.
+
+## Practical rules of thumb
+
+- Match the corpus to the server's context window; prefer the `_256k` corpus for a roughly 256K server.
+- Use date-pinned corpora and a pinned random seed for comparisons.
+- Keep cache busting enabled. Disabling it inflates cache-hit results when traces recycle.
+- Preserve recorded timing. Compressing individual trace delays changes cache-TTL behavior and the overlap between sessions.
+- Monitor client CPU and connection-pool wait time before calling a result server-bound.
+- Use conversation-aware routing for every multi-replica deployment.
+- Do not interpret synthesized prompt prose; the benchmark preserves token and cache structure, not semantic content.
+
+## Credits and further reading
+
+_Adapted from [AIPerf AgentX documentation](https://docs.nvidia.com/aiperf/aiperf/benchmark-modes/semi-analysis-agent-x-how-the-benchmark-works-faq). The [upstream source](https://github.com/ai-dynamo/aiperf/blob/main/docs/tutorials/agentx-mvp.md) is maintained by NVIDIA and licensed under Apache-2.0._
+
+AgentX is a SemiAnalysis InferenceX benchmark implemented with AIPerf. AIPerf's documentation and implementation are the authoritative references for the current CLI, scenario locks, environment variables, and artifact schema:
+
+- [SemiAnalysis AgentX: How the Benchmark Works (FAQ) — Nvidia AIPerf documentation](https://docs.nvidia.com/aiperf/aiperf/benchmark-modes/semi-analysis-agent-x-how-the-benchmark-works-faq)
+- [AgentX MVP tutorial source — `ai-dynamo/aiperf`](https://github.com/ai-dynamo/aiperf/blob/main/docs/tutorials/agentx-mvp.md)
+- [Nvidia AIPerf repository](https://github.com/ai-dynamo/aiperf)
+
+Thanks to the AIPerf team for implementing and documenting the scenario, and to Callan Fox and Weka for the underlying agentic-coding trace work.

@@ -1,0 +1,139 @@
+---
+title: 'AgentX：基准测试如何工作'
+subtitle: '使用 Nvidia AIPerf 运行真实智能体编码推理工作负载的实用 FAQ'
+date: 2026-08-11
+publishDate: 2026-08-11
+tags: ['AgentX', 'AIPerf', 'Agentic AI', 'Benchmarking']
+---
+
+AgentX 按照编码智能体实际使用模型的方式衡量推理性能：长程多轮会话、共享前缀、轮次间停顿、并行子智能体以及持续的 KV cache 复用。它是 AIPerf 中的一套场景，基于公开的智能体编码轨迹与固定回放规则，使不同服务栈的结果能够在同一工作负载下进行比较。
+
+这份 FAQ 介绍基准测试的运行机制、保障可比性的配置，以及最容易影响测试结果的部署细节。
+
+## AgentX 衡量什么？
+
+传统负载测试通常以固定请求速率发送互不相关的单轮 prompt。AgentX 则维持指定数量的完整会话树。根编码会话可以创建子会话、等待子会话结束，再继续执行。每一轮都会携带累计的消息历史，从而重现真实智能体系统中的长共享前缀与突发式 fan-out。
+
+Prompt 文本是合成的，但工作负载形态来自真实会话记录：输入与输出长度、前缀共享关系、子智能体拓扑以及轮次间时间间隔。这样既不会回放用户的私密内容，又保留了对调度器、路由器和 prefix cache 真正重要的特征。
+
+## 工作负载来自哪里？
+
+该场景使用 SemiAnalysis 公开的 Weka 格式智能体编码轨迹语料。需要进行可复现比较时，应选择带日期的固定语料，而不是滚动更新的别名。`_256k` 变体会移除超过 256K token 范围的单个请求，更适合上下文窗口约为 256K 的服务器。
+
+简短名称 `semianalysis_cc_traces_weka` 指向不含子智能体的旧版语料。若要测试 AgentX 的 fan-out 行为，请使用带日期的语料或 `with_subagents` 别名。
+
+## 场景锁定了哪些配置？
+
+传入 `--scenario inferencex-agentx-mvp` 会选择智能体回放模式，并强制执行决定结果可比性的配置：
+
+- 开启 streaming，以便测量首 token 延迟（TTFT）和 token 间延迟（ITL）。
+- `ignore_eos:true` 要求服务器生成指定长度的输出，而不是提前停止。
+- 保留原始轮次间延迟；仅将整个系统的全局空闲时间限制在 10 秒以内。
+- `first_turn_prefix` cache busting 会为每次回放的会话加入唯一首轮标记，避免循环使用轨迹时产生虚假的跨会话 cache hit，同时保留会话内部的 cache 复用。
+- 有效测试至少运行 900 秒，默认运行 1,800 秒。
+- 正式测量前通过 warmup 预热深层前缀。
+- 每次运行都有随机种子，并记录在产物中。
+
+与锁定配置冲突的 flag 会在配置阶段直接报错。`--unsafe-override` 可用于绕过部分保护以验证流水线，但输出会标记为 `submission_valid: false`，不应与有效结果比较。
+
+## 最简运行命令是什么？
+
+请根据部署替换 URL、模型、语料和 concurrency：
+
+```bash
+aiperf profile \
+  --scenario inferencex-agentx-mvp \
+  --url http://localhost:8000 \
+  --model YOUR_MODEL \
+  --endpoint-type chat \
+  --public-dataset semianalysis_cc_traces_weka_062126 \
+  --concurrency 256
+```
+
+AIPerf 会补齐场景默认值，并将结果写入 `./artifacts/`。若要精确复现回放采样并跨测试复用重建后的数据集 cache，请固定 `--random-seed`。当服务器暴露的模型名称无法解析为 Hugging Face tokenizer 时，请额外传入 `--tokenizer`。
+
+## 为什么 AgentX 使用 streaming chat completions？
+
+记录的工作负载由多轮消息数组表示，与 OpenAI 兼容的 chat-completions endpoint 自然匹配。Streaming 可以观测首 token 和 token 间时序；非 streaming 响应无法提供这些核心延迟指标。
+
+`--use-server-token-count` 只改变指标统计方式。当本地 tokenizer 因版本差异或客户端不可见的 chat template 开销而与服务器不一致时，该 flag 会采用服务器返回的 usage 字段。它不会改变 prompt 的构造方式。
+
+## Concurrency 表示什么？
+
+Concurrency 表示同时存活的会话树数量，而不是正在进行的 HTTP 请求数。一个会话可能 fan-out 为多个子会话，因此瞬时请求并发数可以高于配置值。
+
+该场景有意不提供请求速率控制。负载由活跃会话数量、记录的思考时间以及 fan-out 模式共同产生，因此 `--concurrency` 是主要负载调节项。
+
+## 为什么第一次运行可能很久？
+
+发送流量前，AIPerf 会下载语料，并将其重建为完成 token 化且带有 cache 结构的会话树。结果会存入 memory-mapped 磁盘 cache。只要语料、tokenizer、重建配置、条目数量和随机种子相同，后续测试通常可以在数秒内恢复准备好的数据集。
+
+冷启动时，默认配置超时可能不足。应同时提高以下两个超时，并保证 service timeout 不小于 dataset timeout：
+
+```bash
+export AIPERF_DATASET_CONFIGURATION_TIMEOUT=1800
+export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800
+```
+
+可见流程依次为数据集配置、warmup、定时 profiling，以及最后的 drain/export。配置的 benchmark duration 仅覆盖 profiling，因此总耗时会更长。
+
+## 可以先跑一个短 smoke test 吗？
+
+有效测试不能短于 900 秒。若要以较低成本完成有效检查，可以降低 concurrency，但仍需保留 900 秒下限。`--num-dataset-entries` 能减少重建工作量，但也会改变工作负载，因此不应将这种结果用于正式比较或提交。
+
+如需在几分钟内检查连通性，可配合短 duration 使用 `--unsafe-override`，并接受 invalid 标记。一个实用做法是在 shakeout 阶段保留完整语料并固定随机种子，使后续有效测试可以复用重建后的数据集 cache。
+
+## 如何确认负载生成器不是瓶颈？
+
+AIPerf 会将工作分配到多个 worker process，并每两秒上报健康状态。应将高 CPU 警告视为客户端饱和信号；在信任结果前，需要增加客户端 CPU core 或增加负载生成器主机。仪表板也会展示 worker CPU、进行中的请求数和 high-load 状态。
+
+如需深入诊断，`--show-trace-timing` 可以区分等待连接池中空闲连接的时间与等待服务器返回首字节的时间。Worker CPU 正常且连接池阻塞很少，才有充分依据认为测得的瓶颈位于服务器端。
+
+## 为什么运行中途会出现 connection reset？
+
+客户端与服务器的 keep-alive 配置可能不一致。如果 AIPerf 连接池保留空闲连接的时间比服务器更长，客户端可能复用一个已经被服务器关闭的 socket。应将客户端 keep-alive 设置为低于服务器值。例如，服务器 keep-alive 为 5 秒时：
+
+```bash
+export AIPERF_HTTP_KEEPALIVE_TIMEOUT=4
+```
+
+该问题通常出现在按记录节奏运行的 profiling 阶段，而不是 warmup，因为 warmup 连接的空闲时间较短。
+
+## 多 replica 应如何路由？
+
+当路由器连接多个 replica 时，必须使用会话感知路由。每一轮都会重新发送很长的共享前缀。如果同一会话的各轮落在不同 worker 上，prefix cache 复用会大幅下降，基准测试最终衡量的是路由分散程度，而不是服务栈的 cache 能力。
+
+AIPerf 会为每个会话分配稳定的 correlation ID；子智能体则拥有各自的稳定 ID。可采用两种路由策略：
+
+- 前缀感知路由根据消息历史匹配已缓存的前缀。SGLang Model Gateway 提供 `cache_aware`，Dynamo 则通过 `--router-mode kv` 提供 KV-aware routing。
+- Sticky routing 将 AIPerf correlation ID 映射到路由器 session header。AIPerf 可通过环境变量对接 SGLang 的 `X-SMG-Routing-Key`、Dynamo session header，以及通用的 `X-Session-ID`。
+
+这些路由配置不会被场景锁定，因为它们改变的是请求落点，而不是请求内容。可以将其与 round-robin 路由做 A/B 对比，从而量化会话亲和性的收益。
+
+## 应重点查看哪些指标？
+
+AgentX 会报告常见的请求与 token 指标，包括 TTFT、ITL、端到端延迟、输出吞吐量和错误率，同时提供工作负载特有的信号。最有价值的 AgentX 附加指标描述 prefix cache 行为、上下文溢出、会话与子智能体执行、worker 饱和状态，以及测试是否符合场景规范。
+
+比较测试前必须检查 `submission_valid`。上下文溢出率超过阈值、测试被取消、使用 unsafe override 或其他场景违规，都可能使一个已经生成完整产物的测试失效。
+
+## 实用原则
+
+- 让语料与服务器上下文窗口匹配；约 256K 的服务器优先使用 `_256k` 语料。
+- 正式比较使用带日期的固定语料和固定随机种子。
+- 保持 cache busting 开启；关闭后，循环使用轨迹会夸大 cache-hit 结果。
+- 保留记录的时序；压缩单条轨迹的延迟会改变 cache TTL 行为和会话重叠程度。
+- 在判断结果受服务器限制前，先监控客户端 CPU 和连接池等待时间。
+- 所有多 replica 部署都应使用会话感知路由。
+- 不要解读合成 prompt 的语义；基准测试保留的是 token 与 cache 结构，而非文本含义。
+
+## 致谢与延伸阅读
+
+_本文改编自 [AIPerf AgentX 文档](https://docs.nvidia.com/aiperf/aiperf/benchmark-modes/semi-analysis-agent-x-how-the-benchmark-works-faq)。[上游源文件](https://github.com/ai-dynamo/aiperf/blob/main/docs/tutorials/agentx-mvp.md)由 NVIDIA 维护，并采用 Apache-2.0 许可证。_
+
+AgentX 是使用 AIPerf 实现的 SemiAnalysis InferenceX 基准测试。关于当前 CLI、场景锁定规则、环境变量和产物 schema，请以 AIPerf 的文档与实现为准：
+
+- [SemiAnalysis AgentX：基准测试如何工作（FAQ）— Nvidia AIPerf 文档](https://docs.nvidia.com/aiperf/aiperf/benchmark-modes/semi-analysis-agent-x-how-the-benchmark-works-faq)
+- [AgentX MVP 教程源文件 — `ai-dynamo/aiperf`](https://github.com/ai-dynamo/aiperf/blob/main/docs/tutorials/agentx-mvp.md)
+- [Nvidia AIPerf repository](https://github.com/ai-dynamo/aiperf)
+
+感谢 AIPerf 团队实现并记录这一场景，也感谢 Callan Fox 与 Weka 为底层智能体编码轨迹所做的工作。

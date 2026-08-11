@@ -83,6 +83,43 @@ export default function AboutPage() {
           </Card>
         </section>
 
+        <section id="agentx" className="scroll-mt-24">
+          <Card>
+            <h2 className="text-lg font-semibold mb-2">AgentX: Real-World Agentic Inference</h2>
+            <p className="text-muted-foreground mb-3">
+              AgentX extends InferenceX beyond single-turn prompts by measuring inference as a
+              coding agent actually uses a model: long multi-turn sessions, shared prefixes,
+              recorded think times, parallel subagents, and repeated KV-cache reuse. The workload
+              uses public agentic-coding traces with synthetic prompt text, preserving token
+              lengths, cache-sharing structure, timing, and subagent topology without replaying
+              private user content.
+            </p>
+            <p className="text-muted-foreground mb-4">
+              NVIDIA implements the AgentX MVP scenario in AIPerf. Its fixed replay rules—streaming,
+              full requested outputs, warmup, cache busting between recycled sessions, faithful
+              inter-turn timing, and a minimum steady-state duration—make results comparable across
+              serving engines and hardware. In multi-replica deployments, conversation-aware routing
+              keeps each session close to the replica holding its shared KV prefix.
+            </p>
+            <div className="flex flex-wrap gap-3 text-sm">
+              <Link
+                href="/blog/agentx-how-the-benchmark-works-faq"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
+              >
+                Read the AgentX FAQ
+              </Link>
+              <Link
+                href="https://docs.nvidia.com/aiperf/aiperf/benchmark-modes/semi-analysis-agent-x-how-the-benchmark-works-faq"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
+              >
+                NVIDIA AIPerf documentation
+              </Link>
+            </div>
+          </Card>
+        </section>
+
         <section id="reproducibility" className="scroll-mt-24">
           <Card>
             <h2 className="text-lg font-semibold mb-2">Reproducibility</h2>
