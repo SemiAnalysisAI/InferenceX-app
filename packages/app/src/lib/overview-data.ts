@@ -119,6 +119,11 @@ export interface OverviewConfigResult {
   latestDate: string;
 }
 
+/** What actually reaches the client. `tierValues` is the interpolation input —
+ *  the server reads it to produce a tier's value and nothing renders it, so it
+ *  is stripped before serialization rather than shipped and ignored. */
+export type OverviewConfigView = Omit<OverviewConfigResult, 'tierValues'>;
+
 export interface OverviewTierRead {
   tier: number;
   value: number | null;
@@ -126,7 +131,7 @@ export interface OverviewTierRead {
   estimated: boolean;
   evidenceDate: { from: string; to: string } | null;
   evidenceTopologies: string[];
-  config: OverviewConfigResult | null;
+  config: OverviewConfigView | null;
 }
 
 /** Why a platform shows `∞`. `cannot_reach_at_tier` = every
@@ -146,7 +151,7 @@ export interface OverviewHistoricalComparison {
   costDeltaPct: number | null;
   baselineDate: string | null;
   /** Exact serving envelope that produced the historical value. */
-  baselineConfig: OverviewConfigResult | null;
+  baselineConfig: OverviewConfigView | null;
 }
 
 export interface OverviewPlatformResult {
@@ -383,7 +388,7 @@ function readConfigAtTier(config: OverviewConfigResult, tier: number): OverviewT
 }
 
 interface ConfigTierRead extends OverviewTierRead {
-  config: OverviewConfigResult;
+  config: OverviewConfigView;
 }
 
 /** In-range reads only: a clamped or unreachable read remains a coverage gap. */
@@ -430,7 +435,7 @@ function nonComparableAsMissing(
     : { ...read, value: null, estimated: false, evidenceDate: null, evidenceTopologies: [] };
 }
 
-function configPriorityIndex(config: OverviewConfigResult): number {
+function configPriorityIndex(config: OverviewConfigView): number {
   return OVERVIEW_SLICE_PRIORITY.findIndex(
     ({ speculative, precision }) =>
       speculative === isSpeculativeDecode(config.specMethod) && precision === config.precision,
@@ -444,7 +449,10 @@ function selectPlatformRead(
 ): OverviewTierRead {
   const reads = configs
     .filter((config) => config.hardware === hardware)
-    .map((config): ConfigTierRead => ({ ...readConfigAtTier(config, tier), config }));
+    .map((config): ConfigTierRead => {
+      const { tierValues: _tierValues, ...view } = config;
+      return { ...readConfigAtTier(config, tier), config: view };
+    });
 
   for (const priority of OVERVIEW_SLICE_PRIORITY) {
     const exact = reads

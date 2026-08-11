@@ -1,5 +1,7 @@
 'use client';
 
+import type { ReactNode } from 'react';
+
 import { Card } from '@/components/ui/card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import type { OverviewPageData } from '@/lib/overview-data';
@@ -17,7 +19,13 @@ import {
   OVERVIEW_STRINGS,
   type OverviewLocale,
 } from './overview-scorecard';
-import { OverviewNavigationProvider, useOverviewNavigation } from './overview-navigation';
+import {
+  OverviewNavigationProvider,
+  useOverviewData,
+  useOverviewNavigation,
+  useOverviewReference,
+} from './overview-navigation';
+import { useWideViewport } from './use-wide-viewport';
 
 /** The SemiAnalysis AI Cloud TCO model behind `HW_REGISTRY.costh`. */
 const OVERVIEW_SOURCE_HREF = 'https://semianalysis.com/ai-cloud-tco-model/';
@@ -40,18 +48,55 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
         data.modelScope,
       )}
     >
+      {/* Passed as `children`, never rendered inside the provider's own JSX:
+          that keeps this element's identity stable so a pending-state change
+          re-renders the provider without re-rendering the whole matrix. */}
       <OverviewPageBody locale={locale} />
     </OverviewNavigationProvider>
   );
 }
 
+/** Both pending consumers live outside `OverviewPageBody` on purpose: reading
+ *  `isPending` there would re-render the whole matrix on every click, which is
+ *  exactly the cost the split context removes. */
+function OverviewPendingStatus({ label }: { label: string }) {
+  const { isPending } = useOverviewNavigation();
+  return (
+    <p role="status" aria-live="polite" className="sr-only">
+      {isPending ? label : ''}
+    </p>
+  );
+}
+
+function OverviewMatrixCard({ children }: { children: ReactNode }) {
+  const { isPending } = useOverviewNavigation();
+  return (
+    <Card
+      aria-busy={isPending}
+      className={`overflow-hidden p-0 transition-opacity md:p-0 xl:overflow-visible ${
+        isPending ? 'opacity-60' : ''
+      }`}
+    >
+      {children}
+    </Card>
+  );
+}
+
 function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
-  const { data } = useOverviewNavigation();
+  const data = useOverviewData();
+  // Not `data.referenceHardware`: the reference follows the URL directly, so a
+  // cached payload built for another reference still renders the right column.
+  const referenceHardware = useOverviewReference();
+  // Both surfaces used to render on every width and hide one with CSS, so every
+  // selection built the matrix twice. The Tailwind classes stay — they carry
+  // SSR and the pre-hydration frame — and this only drops the unused one after.
+  const wide = useWideViewport();
   const strings = OVERVIEW_STRINGS[locale];
   const formatters = overviewFormatters(locale);
 
   return (
     <section data-testid="overview-page" className="flex flex-col gap-4">
+      <OverviewPendingStatus label={strings.loadingStatus} />
       <Card>
         <header>
           {/* Two rows at every width: the title, then the metric it is
@@ -103,7 +148,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
               tier={data.tier}
               engineScope={data.engineScope}
               comparisonMode={data.comparisonMode}
-              referenceHardware={data.referenceHardware}
+              referenceHardware={referenceHardware}
               modelScope={data.modelScope}
               locale={locale}
               strings={strings}
@@ -112,7 +157,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
               engineScope={data.engineScope}
               tier={data.tier}
               comparisonMode={data.comparisonMode}
-              referenceHardware={data.referenceHardware}
+              referenceHardware={referenceHardware}
               modelScope={data.modelScope}
               locale={locale}
               strings={strings}
@@ -125,7 +170,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
         comparisonMode={data.comparisonMode}
         engineScope={data.engineScope}
         tier={data.tier}
-        referenceHardware={data.referenceHardware}
+        referenceHardware={referenceHardware}
         modelScope={data.modelScope}
         locale={locale}
         strings={strings}
@@ -134,38 +179,42 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
       {/* Official-only summary; uploaded runs remain in the linked dashboard. */}
       {/* Clipped on phones for the rounded corners; visible from xl so the
           desktop matrix header can stick to the page as it scrolls. */}
-      <Card className="overflow-hidden p-0 md:p-0 xl:overflow-visible">
-        <DesktopOverviewMatrix
-          models={data.models}
-          locale={locale}
-          formatters={formatters}
-          strings={strings}
-          comparisonMode={data.comparisonMode}
-          referenceHardware={data.referenceHardware}
-        />
-        <MobileOverviewList
-          models={data.models}
-          locale={locale}
-          formatters={formatters}
-          strings={strings}
-          comparisonMode={data.comparisonMode}
-          referenceHardware={data.referenceHardware}
-        />
+      <OverviewMatrixCard>
+        {wide === false ? null : (
+          <DesktopOverviewMatrix
+            models={data.models}
+            locale={locale}
+            formatters={formatters}
+            strings={strings}
+            comparisonMode={data.comparisonMode}
+            referenceHardware={referenceHardware}
+          />
+        )}
+        {wide === true ? null : (
+          <MobileOverviewList
+            models={data.models}
+            locale={locale}
+            formatters={formatters}
+            strings={strings}
+            comparisonMode={data.comparisonMode}
+            referenceHardware={referenceHardware}
+          />
+        )}
         <OverviewMethodology
           strings={strings}
           comparisonMode={data.comparisonMode}
-          referenceHardware={data.referenceHardware}
+          referenceHardware={referenceHardware}
         />
         <OverviewModelScopeToggle
           modelScope={data.modelScope}
           tier={data.tier}
           engineScope={data.engineScope}
           comparisonMode={data.comparisonMode}
-          referenceHardware={data.referenceHardware}
+          referenceHardware={referenceHardware}
           locale={locale}
           strings={strings}
         />
-      </Card>
+      </OverviewMatrixCard>
     </section>
   );
 }
