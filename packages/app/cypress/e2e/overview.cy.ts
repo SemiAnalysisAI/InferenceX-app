@@ -623,6 +623,43 @@ describe('Overview page', () => {
     }
   });
 
+  // Clicking the control, not just building its href: the matrix reads from a
+  // client data cache, and a cache keyed without the row params moves the
+  // address bar while leaving every row on screen.
+  it('narrows the matrix when the row filter is clicked in either comparison mode', () => {
+    cy.viewport(1280, 900);
+
+    for (const [href, attribute, key, sentence] of [
+      ['/overview?compare=30d', 'data-overview-row-scope', 'rows=changed', 'no 30-day change'],
+      [
+        '/overview',
+        'data-overview-hardware-row-scope',
+        'hwrows=priced',
+        'no result on any platform',
+      ],
+    ] as const) {
+      cy.visit(href);
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
+
+      cy.get(`a[${attribute}]`)
+        .should('contain.text', 'Hide ')
+        .invoke('text')
+        .then((label) => {
+          const hidden = Number(/\d+/.exec(label)?.[0]);
+          expect(hidden, `hidden row count in "${label}"`).to.be.greaterThan(0);
+
+          cy.get(`a[${attribute}]`).click();
+          cy.location('search').should('contain', key);
+          cy.get('[data-testid="overview-desktop-model"]').should(
+            'have.length',
+            MATRIX_ROWS - hidden,
+          );
+          // The action label names the click, so it flips once the scope lands.
+          cy.get(`a[${attribute}]`).should('contain.text', `Show ${hidden} rows with ${sentence}`);
+        });
+    }
+  });
+
   it('defaults to community engine scope and switches with canonical links preserving tier and locale', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');

@@ -21,8 +21,10 @@ import {
   type OverviewReferenceHardware,
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
+  resolveOverviewHardwareRowScope,
   resolveOverviewModelScope,
   resolveOverviewReferenceHardware,
+  resolveOverviewRowScope,
   resolveOverviewTier,
 } from '@/lib/overview-data';
 import {
@@ -39,6 +41,10 @@ import {
  * defaults, reordered params, campaign tags, a fragment — collapse to one key,
  * so a `ref` change is a guaranteed hit and the CDN sees one entry per data
  * state instead of one per link anyone has ever shared.
+ *
+ * Every param the server reads has to appear here. Both row scopes do: each
+ * narrows the rows the response carries, and the dormant one still reaches the
+ * payload so a tab switch can restore the other mode's answer.
  */
 function overviewDataKey(href: string): string {
   const url = new URL(href, 'https://inferencex.local');
@@ -50,6 +56,8 @@ function overviewDataKey(href: string): string {
     resolveOverviewComparisonMode(params.get('compare') ?? undefined),
     OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
     resolveOverviewModelScope(params.get('models') ?? undefined),
+    resolveOverviewRowScope(params.get('rows') ?? undefined),
+    resolveOverviewHardwareRowScope(params.get('hwrows') ?? undefined),
   );
 }
 

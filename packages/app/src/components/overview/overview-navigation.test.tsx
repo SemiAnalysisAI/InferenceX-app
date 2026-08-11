@@ -33,6 +33,8 @@ let root: Root;
 let selectTier: (() => void) | undefined;
 let selectEngine: (() => void) | undefined;
 let selectReference: (() => void) | undefined;
+let selectRowScope: (() => void) | undefined;
+let selectHardwareRowScope: (() => void) | undefined;
 let prefetchTier: (() => void) | undefined;
 
 function pageData(tier: OverviewTier): OverviewPageData {
@@ -58,6 +60,8 @@ function Probe() {
   selectTier = () => navigation.push('/overview?tier=75', ['tier']);
   selectEngine = () => navigation.push('/overview?engine=all', ['engine']);
   selectReference = () => navigation.push('/overview?ref=b300', ['ref']);
+  selectRowScope = () => navigation.push('/overview?compare=30d&rows=changed', ['rows']);
+  selectHardwareRowScope = () => navigation.push('/overview?hwrows=priced', ['hwrows']);
   prefetchTier = () => navigation.prefetch('/overview?tier=75', ['tier']);
   return (
     <>
@@ -109,6 +113,8 @@ afterEach(() => {
   selectTier = undefined;
   selectEngine = undefined;
   selectReference = undefined;
+  selectRowScope = undefined;
+  selectHardwareRowScope = undefined;
   prefetchTier = undefined;
   vi.unstubAllGlobals();
 });
@@ -386,6 +392,32 @@ describe('OverviewNavigationProvider', () => {
     });
     expect(readProbe('tier')).toBe('50');
     expect(readProbe('reference')).toBe('b300');
+  });
+
+  // Both row scopes narrow the rows the server sends, so neither may collapse
+  // into the unfiltered payload's cache key the way `ref` deliberately does.
+  it('requests a narrowed matrix for each row scope instead of reusing the full one', () => {
+    deferredFetch();
+
+    renderProvider(pageData(50), '/overview?compare=30d');
+    act(() => selectRowScope?.());
+
+    expect(fetch).toHaveBeenCalledWith('/api/v1/overview?compare=30d&rows=changed', {
+      headers: { Accept: 'application/json' },
+    });
+    expect(readProbe('pending')).toBe('pending');
+  });
+
+  it('requests a narrowed matrix for the hardware row scope', () => {
+    deferredFetch();
+
+    renderProvider(pageData(50), '/overview');
+    act(() => selectHardwareRowScope?.());
+
+    expect(fetch).toHaveBeenCalledWith('/api/v1/overview?hwrows=priced', {
+      headers: { Accept: 'application/json' },
+    });
+    expect(readProbe('pending')).toBe('pending');
   });
 
   it('preserves unknown params and the fragment on the first selection', () => {
