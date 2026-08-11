@@ -323,11 +323,19 @@ export function interpolateForGPU(
   const outputTpPerMw = buildMetric((p) => p.outputTpPerMw);
   const concurrency = Math.round(buildMetric((p) => p.concurrency));
 
-  let lowerIdx = 0;
-  for (let i = 0; i < sorted.length - 1; i++) {
-    if (getInputValue(sorted[i]) <= clampedTarget) lowerIdx = i;
+  let nearestPoints: GPUDataPoint[];
+  if (clampedTarget <= minInput) {
+    nearestPoints = [sorted[0]];
+  } else if (clampedTarget >= maxInput) {
+    nearestPoints = [sorted.at(-1)!];
+  } else {
+    let lowerIdx = 0;
+    for (let i = 0; i < sorted.length - 1; i++) {
+      if (getInputValue(sorted[i]) <= clampedTarget) lowerIdx = i;
+    }
+    const upperIdx = lowerIdx + 1;
+    nearestPoints = [sorted[lowerIdx], sorted[upperIdx]];
   }
-  const upperIdx = Math.min(lowerIdx + 1, sorted.length - 1);
 
   return {
     hwKey,
@@ -342,7 +350,7 @@ export function interpolateForGPU(
     inputTpPerMw,
     outputTpPerMw,
     concurrency,
-    nearestPoints: [sorted[lowerIdx], sorted[upperIdx]],
+    nearestPoints,
     clamped,
     clampedAbove,
     clampedBelow,

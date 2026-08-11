@@ -17,7 +17,7 @@ import type {
 export interface CollectiveXSeriesSelection {
   epSize: number;
   phase: CollectiveXPhase;
-  mode: CollectiveXMode;
+  modes: readonly CollectiveXMode[];
   precision: CollectiveXPrecision;
 }
 
@@ -90,7 +90,7 @@ export function seriesMatchesSelection(
   return (
     series.system.ep_size === selection.epSize &&
     series.phase === selection.phase &&
-    series.mode === selection.mode &&
+    selection.modes.includes(series.mode) &&
     series.precision === selection.precision
   );
 }

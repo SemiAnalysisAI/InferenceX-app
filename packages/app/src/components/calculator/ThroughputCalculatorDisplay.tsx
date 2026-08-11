@@ -3,6 +3,7 @@
 import { track } from '@/lib/analytics';
 import Link from 'next/link';
 import { BarChart3, Table2 } from 'lucide-react';
+import { useFeatureGate } from '@/lib/use-feature-gate';
 import { useLocale } from '@/lib/use-locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -354,6 +355,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   );
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
+  // AgentX publishes on P90, so the percentile control is an insider affordance
+  // rather than a normal filter: it stays behind the ↑↑↓↓ feature gate, matching
+  // the inference chart, and the calculator defaults to P90 without it.
+  const featureGateUnlocked = useFeatureGate();
   const percentileLabel = selectedPercentile.toUpperCase();
 
   /**
@@ -866,7 +871,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   onOpenChange={handleDropdownOpenChange('sequence')}
                   availableSequences={availableSequences}
                 />
-                {isAgenticSequence && (
+                {isAgenticSequence && featureGateUnlocked && (
                   <PercentileSelector
                     id="calc-percentile"
                     data-testid="calc-percentile-selector"
@@ -980,15 +985,35 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
               {/* Target value slider + input */}
               {!loading && hasAnyData && (
                 <div className="space-y-2">
-                  <LabelWithTooltip
-                    htmlFor="calc-target"
-                    label={
-                      isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
-                    }
-                    tooltip={
-                      isAgenticSequence ? t.targetAgenticTooltip(percentileLabel) : t.targetTooltip
-                    }
-                  />
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <LabelWithTooltip
+                      htmlFor="calc-target"
+                      label={
+                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                      }
+                      tooltip={
+                        isAgenticSequence
+                          ? t.targetAgenticTooltip(percentileLabel)
+                          : t.targetTooltip
+                      }
+                    />
+                    <div
+                      className="flex items-center gap-2"
+                      data-testid="calculator-hide-over-limit-control"
+                    >
+                      <LabelWithTooltip
+                        htmlFor="calc-hide-over-limit"
+                        label={t.hideSkuAboveConfigLimitLabel}
+                        tooltip={t.hideSkuAboveConfigLimitHelp}
+                      />
+                      <Switch
+                        id="calc-hide-over-limit"
+                        checked={hideSkuAboveConfigLimit}
+                        onCheckedChange={handleHideSkuAboveLimitChange}
+                        className="shrink-0"
+                      />
+                    </div>
+                  </div>
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
                       <input
@@ -1033,19 +1058,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                       onBlur={handleInputBlur}
                       className="w-24 h-9"
                       min={0}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-3 pt-1">
-                    <LabelWithTooltip
-                      htmlFor="calc-hide-over-limit"
-                      label={t.hideSkuAboveConfigLimitLabel}
-                      tooltip={t.hideSkuAboveConfigLimitHelp}
-                    />
-                    <Switch
-                      id="calc-hide-over-limit"
-                      checked={hideSkuAboveConfigLimit}
-                      onCheckedChange={handleHideSkuAboveLimitChange}
-                      className="shrink-0"
                     />
                   </div>
                 </div>
