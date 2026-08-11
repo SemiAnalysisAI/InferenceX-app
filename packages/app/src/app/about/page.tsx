@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
 import { FAQ_ITEMS } from '@/components/about/faq-data';
+import { AgentXFaq } from '@/components/about/agentx-faq';
 import { JsonLd } from '@/components/json-ld';
 import { enAlternates } from '@/lib/i18n';
 import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-constants';
@@ -82,6 +83,8 @@ export default function AboutPage() {
             </p>
           </Card>
         </section>
+
+        <AgentXFaq locale="en" />
 
         <section id="reproducibility" className="scroll-mt-24">
           <Card>
