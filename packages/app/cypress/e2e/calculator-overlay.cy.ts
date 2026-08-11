@@ -71,7 +71,9 @@ describe('TCO calculator — unofficial run overlay', () => {
       );
       cy.wait('@unofficialRun');
 
-      cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
+      // Gate locked here, so the percentile control is absent; the chart still
+      // computes on the P90 default, asserted on the heading below.
+      cy.get('[data-testid="calc-percentile-selector"]').should('not.exist');
       cy.get(BARS).should('have.length', 2);
       cy.get(Y_TICKS).should('contain.text', OVERLAY_RUN_BRANCH);
       cy.get('[data-testid="calculator-chart-section"] h2')

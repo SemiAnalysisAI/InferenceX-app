@@ -743,6 +743,9 @@ export interface InferenceChartContextType {
   toggleHwType: (hw: string) => void;
   removeHwType: (hw: string) => void;
   selectAllHwTypes: () => void;
+  /** Whether clean dashboard loads automatically keep the best configuration per physical SKU. */
+  bestPerSku: boolean;
+  setBestPerSku: (enabled: boolean) => void;
   /** Resolve automatic official + `overlay:` hardware selections under the active scope rule. */
   resolveComparisonSelection: (
     proposed: Set<string>,

@@ -28,6 +28,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import type { ChartDefinition, DeploymentMode, SpecMode } from '@/components/inference/types';
+import { resolveComparisonEntries } from '@/components/inference/utils/comparisonEntry';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
@@ -240,6 +241,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     selectedGPUs,
     setSelectedGPUs,
     availableGPUs,
+    selectedDates,
     selectedDateRange,
     setSelectedDateRange,
     dateRangeAvailableDates,
@@ -483,7 +485,10 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             availableSequences={availableSequences}
             data-testid="scenario-selector"
           />
-          {mounted && selectedSequence === Sequence.AgenticTraces && (
+          {/* AgentX publishes on P90, so the percentile control is an insider
+              affordance rather than a normal chart filter: it stays behind the
+              ↑↑↓↓ feature gate and the chart defaults to P90 without it. */}
+          {mounted && selectedSequence === Sequence.AgenticTraces && featureGateUnlocked && (
             <PercentileSelector
               value={selectedPercentile}
               onChange={(p: Percentile) => setSelectedPercentile(p)}
@@ -612,8 +617,10 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                 availableDates={dateRangeAvailableDates}
                 isCheckingAvailableDates={isCheckingAvailableDates}
                 className={
-                  selectedGPUs.length > 0 &&
-                  (!selectedDateRange.startDate || !selectedDateRange.endDate)
+                  // Note (wenyao): a pinned run (`date~rID`) can only reach the chart through
+                  // selectedDates, never through a range, so demanding a range here raises a
+                  // false alarm on comparisons that are already complete.
+                  resolveComparisonEntries(selectedDates, selectedDateRange).length === 0
                     ? 'border-red-500 ring-4 ring-red-500/40 animate-pulse'
                     : ''
                 }

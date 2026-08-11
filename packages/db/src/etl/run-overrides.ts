@@ -88,6 +88,7 @@ export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new
   [28911223583, new Set([3])], // 2026-07-09 | DeepSeek-V4 FP4 MI355X vLLM agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [28955639528, new Set([3])], // 2026-07-09 | DeepSeek-V4 FP4 B200/B300 SGLang agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [29376853679, new Set([1])], // 2026-07-20 | DeepSeek-V4 FP4 MI355X Mori-SGLang disaggregated agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
+  [29385297092, new Set([4])], // 2026-07-16 | DeepSeek-V4 FP4 GB300 Dynamo-SGLang MTP agentic | Reason: Outdated AgentX harness
   [29413860950, new Set([3])], // 2026-07-16 | DeepSeek-V4 FP4 MI355X SGLang HiCache agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [29445892486, new Set([2])], // 2026-07-16 | DeepSeek-V4 FP4 B200 vLLM agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [29486959583, new Set([2])], // 2026-07-16 | DeepSeek-V4 FP4 B300 vLLM agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness

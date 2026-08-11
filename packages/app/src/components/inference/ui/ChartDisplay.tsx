@@ -24,6 +24,7 @@ import {
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { canonicalNormalizedFrontierIds } from '@/components/inference/utils/canonicalFrontier';
+import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { Card } from '@/components/ui/card';
@@ -209,6 +210,7 @@ export default function ChartDisplay() {
     selectedRunDate,
     setIsLegendExpanded,
     activeHwTypes,
+    bestPerSku,
     activeDates,
     selectedPercentile,
     compareGpuPair,
@@ -415,7 +417,11 @@ export default function ChartDisplay() {
   const overlayScope = useMemo(() => {
     const eligibleKeys = new Set<string>();
     for (const overlay of [overlayDataByChartType.e2e, overlayDataByChartType.interactivity]) {
-      for (const point of overlay?.data ?? []) {
+      const points = [
+        ...(overlay?.data ?? []),
+        ...(overlay?.clippedData ?? []).map((entry) => entry.point),
+      ];
+      for (const point of points) {
         const key = String(point.hwKey);
         if (
           selectedPrecisions.includes(point.precision) &&
@@ -430,7 +436,8 @@ export default function ChartDisplay() {
   const officialScope = useMemo(() => {
     const eligibleKeys = new Set<string>();
     for (const graph of graphs) {
-      for (const point of graph.data) {
+      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      for (const point of points) {
         if (
           selectedPrecisions.includes(point.precision) &&
           matchesQuickFilters(point, quickFilters)
@@ -441,6 +448,37 @@ export default function ChartDisplay() {
     }
     return eligibleKeys;
   }, [graphs, selectedPrecisions, quickFilters]);
+  const scopedBestSelections = useMemo(() => {
+    if (!bestPerSku) return { official: officialScope, overlay: overlayScope };
+    const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
+    const graph = graphs.find((candidate) => candidate.chartDefinition.chartType === wantedType);
+    const direction =
+      graph?.chartDefinition[`${selectedYAxisMetric}_roofline` as keyof ChartDefinition];
+    if (
+      !graph ||
+      (direction !== 'upper_right' &&
+        direction !== 'upper_left' &&
+        direction !== 'lower_left' &&
+        direction !== 'lower_right')
+    ) {
+      return { official: officialScope, overlay: overlayScope };
+    }
+    const overlay = overlayDataByChartType[wantedType];
+    const officialBest = bestSeriesPerSku(graph.data, direction);
+    const overlayBest = bestSeriesPerSku(overlay?.data ?? [], direction);
+    return {
+      official: officialBest.size > 0 ? officialBest : officialScope,
+      overlay: overlayBest.size > 0 ? overlayBest : overlayScope,
+    };
+  }, [
+    bestPerSku,
+    graphs,
+    officialScope,
+    overlayDataByChartType,
+    overlayScope,
+    selectedXAxisMode,
+    selectedYAxisMetric,
+  ]);
   const overlayRowsScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(
     ',',
   )}|${unofficialRunInfos.map((run) => run.url).join(',')}`;
@@ -458,8 +496,8 @@ export default function ChartDisplay() {
     const activeScopedOverlayKeys = new Set(
       [...activeOverlayHwTypes].filter((key) => overlayScope.has(key)),
     );
-    return overlayRowsScopeChanged ? overlayScope : activeScopedOverlayKeys;
-  }, [activeOverlayHwTypes, overlayScope, overlayRowsScopeChanged]);
+    return overlayRowsScopeChanged ? scopedBestSelections.overlay : activeScopedOverlayKeys;
+  }, [activeOverlayHwTypes, overlayScope, overlayRowsScopeChanged, scopedBestSelections.overlay]);
   useEffect(() => {
     const merged = new Set(activeOverlayHwTypes);
     overlayScope.forEach((key) => merged.delete(key));
@@ -477,7 +515,7 @@ export default function ChartDisplay() {
     // A scope change can render once before its official graphs arrive. Do not
     // persist that transient empty set as an intentional legend selection.
     if (overlayRowsScopeChanged && (!loading || officialScope.size > 0)) {
-      setLocalOfficialOverride(officialScope);
+      setLocalOfficialOverride(scopedBestSelections.official);
       setAppliedOverlayRowsScopeKey(overlayRowsScopeKey);
     }
   }, [
@@ -486,6 +524,7 @@ export default function ChartDisplay() {
     activeOverlayHwTypes,
     loading,
     officialScope,
+    scopedBestSelections.official,
     overlayScope,
     scopedActiveOverlayHwTypes,
     setActiveOverlayHwTypes,
@@ -538,7 +577,9 @@ export default function ChartDisplay() {
     if (graphs.length > 0) return graphs;
     const hasOverlay =
       (overlayDataByChartType.e2e?.data.length ?? 0) > 0 ||
-      (overlayDataByChartType.interactivity?.data.length ?? 0) > 0;
+      (overlayDataByChartType.e2e?.clippedData?.length ?? 0) > 0 ||
+      (overlayDataByChartType.interactivity?.data.length ?? 0) > 0 ||
+      (overlayDataByChartType.interactivity?.clippedData?.length ?? 0) > 0;
     if (!hasOverlay) return graphs;
     return (chartDefinitions as ChartDefinition[]).map((chartDefinition) => ({
       model: selectedModel,
@@ -719,6 +760,13 @@ export default function ChartDisplay() {
                         graph.model,
                         graph.sequence,
                         visibleOverlayRowsForExport,
+                        {
+                          yHeader: metricLabel(graph.chartDefinition, selectedYAxisMetric, locale),
+                          yPath: (graph.chartDefinition as ChartDefinition)[
+                            selectedYAxisMetric
+                          ] as string,
+                          xHeader: graph.chartDefinition.x_label,
+                        },
                       );
                       // Match warnings against the same series the chart annotates,
                       // including visible unofficial-run overlay series.
@@ -835,9 +883,26 @@ export default function ChartDisplay() {
                           graph.chartDefinition.chartType,
                           overlayDataByChartType,
                         );
+                        // Display limits keep outliers off the plotted domain but
+                        // must not silently remove measured rows from the table.
+                        // Restore both official and unofficial clipped points before
+                        // applying the shared precision, quick-filter, and legend gates.
+                        const tableOfficialData = [
+                          ...graph.data,
+                          ...(graph.clippedData ?? []).map((entry) => entry.point),
+                        ];
+                        const tableOverlay = overlay
+                          ? {
+                              ...overlay,
+                              data: [
+                                ...overlay.data,
+                                ...(overlay.clippedData ?? []).map((entry) => entry.point),
+                              ],
+                            }
+                          : overlay;
                         const { officialRows, overlayRows } = visibleComparisonRows(
-                          graph.data,
-                          overlay,
+                          tableOfficialData,
+                          tableOverlay,
                         );
                         return (
                           <>

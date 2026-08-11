@@ -6,9 +6,11 @@ import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 import {
   getBenchmarksForRun,
   getLatestBenchmarks,
+  type BenchmarkRow,
 } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
 import { loadFixture } from '@/lib/test-fixtures';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +30,13 @@ const getCachedBenchmarksForRun = cachedQuery(
   { blobOnly: true },
 );
 
+const getCachedCalculatorBenchmarks = cachedQuery(
+  async (dbModelKeys: string[], sequence: string, date?: string) =>
+    toCalculatorBenchmarkRows(await getLatestBenchmarks(getDb(), dbModelKeys, date), sequence),
+  'benchmarks-calculator',
+  { blobOnly: true },
+);
+
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const model = params.get('model') ?? '';
@@ -38,17 +47,29 @@ export async function GET(request: NextRequest) {
   const runId = runIdParam && /^\d+$/u.test(runIdParam) ? runIdParam : undefined;
   // exactRun=true → return exactly this run's results (GPU comparison of same-day runs).
   const exactRun = params.get('exactRun') === 'true';
+  const view = params.get('view');
+  const sequence = params.get('sequence') ?? '';
   const dbModelKeys = DISPLAY_MODEL_TO_DB[model];
   if (!dbModelKeys || dbModelKeys.length === 0) {
     return NextResponse.json({ error: 'Unknown model' }, { status: 400 });
   }
-  if (FIXTURES_MODE) return cachedJson(loadFixture('benchmarks'));
+  if (view === 'calculator' && !['1k/1k', '1k/8k', '8k/1k', 'agentic-traces'].includes(sequence)) {
+    return NextResponse.json({ error: 'Unknown calculator sequence' }, { status: 400 });
+  }
+  if (FIXTURES_MODE) {
+    const fixture = loadFixture<BenchmarkRow[]>('benchmarks');
+    return cachedJson(
+      view === 'calculator' ? toCalculatorBenchmarkRows(fixture, sequence) : fixture,
+    );
+  }
 
   try {
     const rows =
-      exactRun && runId
-        ? await getCachedBenchmarksForRun(dbModelKeys, runId)
-        : await getCachedBenchmarks(dbModelKeys, date, exact || undefined, runId);
+      view === 'calculator'
+        ? await getCachedCalculatorBenchmarks(dbModelKeys, sequence, date)
+        : exactRun && runId
+          ? await getCachedBenchmarksForRun(dbModelKeys, runId)
+          : await getCachedBenchmarks(dbModelKeys, date, exact || undefined, runId);
     return cachedJson(rows);
   } catch (error) {
     console.error('Error fetching benchmarks:', error);

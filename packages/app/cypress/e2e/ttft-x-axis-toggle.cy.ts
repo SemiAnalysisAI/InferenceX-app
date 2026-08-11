@@ -348,6 +348,23 @@ describe('X-axis mode URL param', () => {
       'false',
     );
   });
+
+  // AgentX publishes on P90, so the percentile control is insider-only. With
+  // the gate locked it must not render, and the chart must still plot P90.
+  it('hides the percentile selector behind the feature gate and defaults to P90', () => {
+    interceptAgenticData();
+    interceptDerivedAgenticMetrics();
+    cy.visit('/inference?i_seq=agentic-traces', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.removeItem('inferencex-feature-gate');
+      },
+    });
+
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Traces');
+    cy.get('[data-testid="percentile-selector"]').should('not.exist');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90');
+  });
 });
 
 describe('Default scenario', () => {
