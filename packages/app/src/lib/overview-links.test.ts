@@ -380,12 +380,15 @@ describe('overview row scope links', () => {
     );
   });
 
-  it('drops the row scope in hardware mode, where every row has a comparison', () => {
+  it('keeps the row scope on the URL in hardware mode, where it is dormant', () => {
+    // The 30-day tab is off screen, so the key changes nothing on the rendered
+    // matrix. It is still the only record of that tab's answer, and dropping it
+    // here is what used to lose the filter on refresh or a shared link.
     expect(overviewHref('en', 50, 'community', 'hardware', 'b200', 'default', 'changed')).toBe(
-      '/overview',
+      '/overview?rows=changed',
     );
     expect(overviewHref('en', 75, 'community', 'hardware', 'b200', 'all', 'changed')).toBe(
-      '/overview?tier=75&models=all',
+      '/overview?tier=75&models=all&rows=changed',
     );
   });
 
@@ -430,19 +433,23 @@ describe('overview hardware row scope links', () => {
     ).toBe('/zh/overview?hwrows=priced');
   });
 
-  it('drops the hardware row scope in history mode, which filters on its own terms', () => {
+  it('keeps the hardware row scope on the URL in history mode, where it is dormant', () => {
     expect(overviewHref('en', 50, 'community', 'history', 'b200', 'default', 'all', 'priced')).toBe(
-      '/overview?compare=30d',
+      '/overview?compare=30d&hwrows=priced',
     );
   });
 
-  it('never writes both row scopes into one URL, since only one mode is on screen', () => {
+  it('writes both row scopes at once, so a URL rebuilt from page data keeps them', () => {
+    // Every href the page builds comes from the current page data, including
+    // the one the client router starts from on first load. Emitting only the
+    // active mode's key there erased the other tab's filter on refresh and on
+    // any shared link carrying both.
     expect(
       overviewHref('en', 50, 'community', 'history', 'b200', 'default', 'changed', 'priced'),
-    ).toBe('/overview?compare=30d&rows=changed');
+    ).toBe('/overview?compare=30d&rows=changed&hwrows=priced');
     expect(
       overviewHref('en', 50, 'community', 'hardware', 'b200', 'default', 'changed', 'priced'),
-    ).toBe('/overview?hwrows=priced');
+    ).toBe('/overview?rows=changed&hwrows=priced');
   });
 
   it('preserves the hardware row scope when changing tiers and engine scope', () => {
@@ -470,6 +477,33 @@ describe('overview hardware row scope links', () => {
 
     expect(mergeOverviewControlHref(narrowed, '/overview', ['compare'])).toBe(
       '/overview?rows=changed&hwrows=priced',
+    );
+  });
+
+  it('lets the models control reset both scopes without clearing the dormant one', () => {
+    // The models toggle owns `models` plus both row keys, because revealing
+    // inactive models resets them. A merged key the target href does not carry
+    // is deleted, so hiding — which resets nothing — has to restate both.
+    const current = '/overview?compare=30d&models=all&rows=changed&hwrows=priced';
+    const keys = ['models', 'rows', 'hwrows'] as const;
+
+    const hiding = overviewHref(
+      'en',
+      50,
+      'community',
+      'history',
+      'b200',
+      'default',
+      'changed',
+      'priced',
+    );
+    expect(mergeOverviewControlHref(current, hiding, keys)).toBe(
+      '/overview?compare=30d&rows=changed&hwrows=priced',
+    );
+
+    const revealing = overviewHref('en', 50, 'community', 'history', 'b200', 'all', 'all', 'all');
+    expect(mergeOverviewControlHref(current, revealing, keys)).toBe(
+      '/overview?compare=30d&models=all',
     );
   });
 });

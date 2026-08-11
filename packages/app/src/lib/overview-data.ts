@@ -779,8 +779,11 @@ export function applyOverviewRowScope(
   data: OverviewPageData,
   rowScope: OverviewRowScope,
 ): OverviewPageData {
+  // Hardware mode filters on its own terms, but the reader's answer here is
+  // still carried so a tab switch can restore it. Only the count is zeroed:
+  // there is no control to label while this mode is off screen.
   if (data.comparisonMode !== 'history') {
-    return { ...data, rowScope: 'all', unchangedRowCount: 0 };
+    return { ...data, rowScope, unchangedRowCount: 0 };
   }
 
   const changed = data.models.filter(overviewRowHasHistoricalChange);
@@ -812,8 +815,9 @@ export function applyOverviewHardwareRowScope(
   data: OverviewPageData,
   hardwareRowScope: OverviewHardwareRowScope,
 ): OverviewPageData {
+  // Carried rather than cleared, for the same reason as the history scope.
   if (data.comparisonMode !== 'hardware') {
-    return { ...data, hardwareRowScope: 'all', emptyRowCount: 0 };
+    return { ...data, hardwareRowScope, emptyRowCount: 0 };
   }
 
   const priced = data.models.filter(overviewRowHasAnyCost);

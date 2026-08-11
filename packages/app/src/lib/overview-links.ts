@@ -213,15 +213,13 @@ export function overviewHref(
   }
   if (comparisonMode === 'history') query.set('compare', '30d');
   if (modelScope !== OVERVIEW_DEFAULT_MODEL_SCOPE) query.set('models', modelScope);
-  // Each mode filters rows on its own terms, so each carries its own key and
-  // only the active one is written. The other mode's key survives a tab switch
-  // regardless: `mergeOverviewControlHref` rewrites only the keys the clicked
-  // control owns, which is what lets the two toggles remember themselves
-  // independently.
-  if (comparisonMode === 'history' && rowScope !== OVERVIEW_DEFAULT_ROW_SCOPE) {
-    query.set('rows', rowScope);
-  }
-  if (comparisonMode === 'hardware' && hardwareRowScope !== OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE) {
+  // Each mode filters rows on its own terms and carries its own key. Both are
+  // written whenever they are set, including the one whose mode is off screen:
+  // that dormant key is the only record of the other tab's answer, and a URL
+  // rebuilt from page data — on first load, on refresh, or from a shared link —
+  // has nothing else to restore it from.
+  if (rowScope !== OVERVIEW_DEFAULT_ROW_SCOPE) query.set('rows', rowScope);
+  if (hardwareRowScope !== OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE) {
     query.set('hwrows', hardwareRowScope);
   }
   // `rows=changed` and `hwrows=priced` are the only values ever emitted; `all`

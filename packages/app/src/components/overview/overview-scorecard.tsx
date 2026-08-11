@@ -1039,7 +1039,7 @@ export function OverviewComparisonSwitcher({
       'hardware',
       hardware,
       modelScope,
-      OVERVIEW_DEFAULT_ROW_SCOPE,
+      rowScope,
       hardwareRowScope,
     ),
   }));

@@ -1531,12 +1531,14 @@ describe('overview row scope', () => {
     }
   });
 
-  it('leaves hardware mode untouched, where every row carries a comparison', () => {
+  it('filters nothing in hardware mode but still carries the reader’s answer', () => {
     const page = assembleOverviewPageData(currentRows, 50, 'community');
     const scoped = applyOverviewRowScope(page, 'changed');
 
     expect(scoped.models).toHaveLength(page.models.length);
-    expect(scoped.rowScope).toBe('all');
+    // Carried, not cleared: the page rebuilds its own URL from this data, so
+    // clearing it here is what dropped the 30-day filter on a tab switch back.
+    expect(scoped.rowScope).toBe('changed');
     expect(scoped.unchangedRowCount).toBe(0);
   });
 
@@ -1615,12 +1617,12 @@ describe('overview hardware row scope', () => {
     expect(kept.every((m) => m.platforms.every((p) => p.costVsReferencePct === null))).toBe(true);
   });
 
-  it('leaves history mode untouched, where the 30-day scope owns the filtering', () => {
+  it('filters nothing in history mode but still carries the reader’s answer', () => {
     const page = assembleOverviewHistoricalPageData(currentRows, {}, window, 50, 'community');
     const scoped = applyOverviewHardwareRowScope(page, 'priced');
 
     expect(scoped.models).toHaveLength(page.models.length);
-    expect(scoped.hardwareRowScope).toBe('all');
+    expect(scoped.hardwareRowScope).toBe('priced');
     expect(scoped.emptyRowCount).toBe(0);
   });
 
