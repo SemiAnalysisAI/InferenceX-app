@@ -11,6 +11,7 @@ import { track } from '@/lib/analytics';
 import type { OverviewReferenceHardware } from '@/lib/overview-data';
 
 import { useOverviewNavigation } from './overview-navigation';
+import { useIsPresenting } from './overview-presentation';
 
 interface ReferenceOption {
   href: string;
@@ -28,6 +29,11 @@ export function OverviewReferenceSelect({
   value: OverviewReferenceHardware;
 }) {
   const navigation = useOverviewNavigation();
+  // A portalled menu lands on `document.body`, which is outside the element the
+  // browser is showing fullscreen and outside the `zoom` the matrix is scaled
+  // by. Rendering it in place keeps it both visible and the same size as the
+  // tab that opened it.
+  const presenting = useIsPresenting();
 
   return (
     <Select
@@ -50,7 +56,7 @@ export function OverviewReferenceSelect({
       >
         <SelectValue>{options.find((option) => option.value === value)?.label}</SelectValue>
       </SelectTrigger>
-      <SelectContent align="center">
+      <SelectContent align="center" portalled={!presenting}>
         {options.map((option) => (
           <SelectItem
             key={option.value}

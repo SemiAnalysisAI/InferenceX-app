@@ -1,19 +1,30 @@
 import { runIdFromRunUrl } from './known-issues';
 import {
   OVERVIEW_DEFAULT_COMPARISON_MODE,
+  OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
   OVERVIEW_DEFAULT_MODEL_SCOPE,
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  OVERVIEW_DEFAULT_ROW_SCOPE,
   OVERVIEW_PRIMARY_TIER,
   type OverviewComparisonMode,
   type OverviewConfigResult,
   type OverviewEngineScope,
+  type OverviewHardwareRowScope,
   type OverviewModelScope,
   type OverviewModelSummary,
   type OverviewReferenceHardware,
+  type OverviewRowScope,
   type OverviewTier,
 } from './overview-data';
 
-export type OverviewSearchKey = 'tier' | 'engine' | 'ref' | 'compare' | 'models';
+export type OverviewSearchKey =
+  | 'tier'
+  | 'engine'
+  | 'ref'
+  | 'compare'
+  | 'models'
+  | 'rows'
+  | 'hwrows';
 
 const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
   'tier',
@@ -21,6 +32,8 @@ const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
   'ref',
   'compare',
   'models',
+  'rows',
+  'hwrows',
 ];
 
 /** Apply one control's destination to the latest pending overview URL.
@@ -188,6 +201,8 @@ export function overviewHref(
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+  rowScope: OverviewRowScope = OVERVIEW_DEFAULT_ROW_SCOPE,
+  hardwareRowScope: OverviewHardwareRowScope = OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
 ): string {
   const base = locale === 'zh' ? '/zh/overview' : '/overview';
   const query = new URLSearchParams();
@@ -198,6 +213,19 @@ export function overviewHref(
   }
   if (comparisonMode === 'history') query.set('compare', '30d');
   if (modelScope !== OVERVIEW_DEFAULT_MODEL_SCOPE) query.set('models', modelScope);
+  // Each mode filters rows on its own terms, so each carries its own key and
+  // only the active one is written. The other mode's key survives a tab switch
+  // regardless: `mergeOverviewControlHref` rewrites only the keys the clicked
+  // control owns, which is what lets the two toggles remember themselves
+  // independently.
+  if (comparisonMode === 'history' && rowScope !== OVERVIEW_DEFAULT_ROW_SCOPE) {
+    query.set('rows', rowScope);
+  }
+  if (comparisonMode === 'hardware' && hardwareRowScope !== OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE) {
+    query.set('hwrows', hardwareRowScope);
+  }
+  // `rows=changed` and `hwrows=priced` are the only values ever emitted; `all`
+  // is the default and stays out of the URL so the canonical link is unchanged.
   const search = query.toString();
   return search === '' ? base : `${base}?${search}`;
 }
@@ -210,8 +238,19 @@ export function overviewTierHref(
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+  rowScope: OverviewRowScope = OVERVIEW_DEFAULT_ROW_SCOPE,
+  hardwareRowScope: OverviewHardwareRowScope = OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
 ): string {
-  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware, modelScope);
+  return overviewHref(
+    locale,
+    tier,
+    engineScope,
+    comparisonMode,
+    referenceHardware,
+    modelScope,
+    rowScope,
+    hardwareRowScope,
+  );
 }
 
 /** Engine-scope switch preserving the active service tier. */
@@ -222,6 +261,17 @@ export function overviewEngineScopeHref(
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+  rowScope: OverviewRowScope = OVERVIEW_DEFAULT_ROW_SCOPE,
+  hardwareRowScope: OverviewHardwareRowScope = OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
 ): string {
-  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware, modelScope);
+  return overviewHref(
+    locale,
+    tier,
+    engineScope,
+    comparisonMode,
+    referenceHardware,
+    modelScope,
+    rowScope,
+    hardwareRowScope,
+  );
 }

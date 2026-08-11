@@ -5,10 +5,14 @@ import type { BenchmarkRow } from '@/lib/api';
 import { getCachedBenchmarks, getCachedBenchmarksAsOf } from '@/lib/benchmark-data.server';
 import type { Model } from '@/lib/data-mappings';
 import {
+  applyOverviewHardwareRowScope,
+  applyOverviewRowScope,
   assembleOverviewHistoricalPageData,
   assembleOverviewPageData,
   OVERVIEW_DEFAULT_COMPARISON_MODE,
+  OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
   OVERVIEW_DEFAULT_MODEL_SCOPE,
+  OVERVIEW_DEFAULT_ROW_SCOPE,
   OVERVIEW_PRIMARY_TIER,
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   overviewHistoricalWindow,
@@ -16,9 +20,11 @@ import {
   overviewSnapshotDate,
   type OverviewComparisonMode,
   type OverviewEngineScope,
+  type OverviewHardwareRowScope,
   type OverviewModelScope,
   type OverviewPageData,
   type OverviewReferenceHardware,
+  type OverviewRowScope,
   type OverviewTier,
 } from '@/lib/overview-data';
 import { loadFixture } from '@/lib/test-fixtures';
@@ -43,7 +49,13 @@ export async function getOverviewPageData(
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+  rowScope: OverviewRowScope = OVERVIEW_DEFAULT_ROW_SCOPE,
+  hardwareRowScope: OverviewHardwareRowScope = OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
 ): Promise<OverviewPageData> {
+  // Each filter is a no-op outside its own comparison mode, so both run on
+  // every path and the active one is whichever the matrix is actually in.
+  const scopeRows = (data: OverviewPageData): OverviewPageData =>
+    applyOverviewHardwareRowScope(applyOverviewRowScope(data, rowScope), hardwareRowScope);
   const models = overviewModelsForScope(modelScope);
   // Synthetic rows go through the same assemblers as the live path, so a
   // contract drift breaks fixture tests instead of stranding the page.
@@ -51,12 +63,14 @@ export async function getOverviewPageData(
     ? loadFixture<Record<string, BenchmarkRow[]>>('overview-rows')
     : await loadRowsByModel(models, getCachedBenchmarks);
   if (comparisonMode === 'hardware') {
-    return assembleOverviewPageData(
-      currentRowsByModel,
-      tier,
-      engineScope,
-      referenceHardware,
-      modelScope,
+    return scopeRows(
+      assembleOverviewPageData(
+        currentRowsByModel,
+        tier,
+        engineScope,
+        referenceHardware,
+        modelScope,
+      ),
     );
   }
 
@@ -75,7 +89,7 @@ export async function getOverviewPageData(
       : currentRowsByModel;
   const snapshotDate = overviewSnapshotDate(snapshotRows, engineScope);
   if (snapshotDate === null) {
-    return {
+    return scopeRows({
       ...assembleOverviewPageData(
         currentRowsByModel,
         tier,
@@ -84,7 +98,7 @@ export async function getOverviewPageData(
         modelScope,
       ),
       comparisonMode: 'history',
-    };
+    });
   }
 
   const window = overviewHistoricalWindow(snapshotDate);
@@ -98,13 +112,15 @@ export async function getOverviewPageData(
     ]),
   );
 
-  return assembleOverviewHistoricalPageData(
-    currentRowsByModel,
-    baselineRowsByModel,
-    window,
-    tier,
-    engineScope,
-    referenceHardware,
-    modelScope,
+  return scopeRows(
+    assembleOverviewHistoricalPageData(
+      currentRowsByModel,
+      baselineRowsByModel,
+      window,
+      tier,
+      engineScope,
+      referenceHardware,
+      modelScope,
+    ),
   );
 }

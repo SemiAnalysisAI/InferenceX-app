@@ -36,6 +36,19 @@ export type OverviewComparisonMode = 'hardware' | 'history';
 export const OVERVIEW_DEFAULT_COMPARISON_MODE: OverviewComparisonMode = 'hardware';
 export type OverviewModelScope = 'default' | 'all';
 export const OVERVIEW_DEFAULT_MODEL_SCOPE: OverviewModelScope = 'default';
+/** History mode only: `changed` narrows the matrix to rows that moved in the
+ *  window. It is opt-in — the default shows every row, because an unchanged row
+ *  still carries current cost the reader came to audit. Ignored in hardware
+ *  mode, where every row carries a comparison. */
+export type OverviewRowScope = 'changed' | 'all';
+export const OVERVIEW_DEFAULT_ROW_SCOPE: OverviewRowScope = 'all';
+/** Hardware mode only: `priced` drops rows that quote no platform at all, which
+ *  carry neither a cost nor a comparison and exist purely to say "not measured".
+ *  Deliberately not "rows without a delta against the reference": that would
+ *  delete rows pricing three chips just because the reference happens to miss
+ *  this scenario, and the count would swing with the chosen reference. */
+export type OverviewHardwareRowScope = 'priced' | 'all';
+export const OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE: OverviewHardwareRowScope = 'all';
 export type OverviewScenario = 'single_turn_8k1k' | 'agentx';
 /** Row order within a model: the single-turn workload first, AgentX below it. */
 export const OVERVIEW_SCENARIOS = ['single_turn_8k1k', 'agentx'] as const;
@@ -69,6 +82,20 @@ export function resolveOverviewModelScope(
 ): OverviewModelScope {
   const candidate = Array.isArray(raw) ? raw[0] : raw;
   return candidate === 'all' ? 'all' : OVERVIEW_DEFAULT_MODEL_SCOPE;
+}
+
+export function resolveOverviewRowScope(
+  raw: string | readonly string[] | undefined,
+): OverviewRowScope {
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  return candidate === 'changed' ? 'changed' : OVERVIEW_DEFAULT_ROW_SCOPE;
+}
+
+export function resolveOverviewHardwareRowScope(
+  raw: string | readonly string[] | undefined,
+): OverviewHardwareRowScope {
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  return candidate === 'priced' ? 'priced' : OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE;
 }
 
 // Note (wenyao): row order is a contract — defaults, then maintenance, then
@@ -179,6 +206,15 @@ export interface OverviewPageData {
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
   modelScope: OverviewModelScope;
+  rowScope: OverviewRowScope;
+  hardwareRowScope: OverviewHardwareRowScope;
+  /** Rows with no 30-day change, counted over the full matrix regardless of the
+   *  active scope, so the toggle can name the same number in both directions.
+   *  Zero outside history mode and whenever filtering would change nothing. */
+  unchangedRowCount: number;
+  /** Rows quoting no platform at all, counted the same way for hardware mode.
+   *  Zero outside hardware mode and whenever filtering would change nothing. */
+  emptyRowCount: number;
   historicalWindow: OverviewHistoricalWindow | null;
 }
 
@@ -711,8 +747,84 @@ export function assembleOverviewPageData(
     comparisonMode: OVERVIEW_DEFAULT_COMPARISON_MODE,
     referenceHardware,
     modelScope,
+    rowScope: 'all',
+    hardwareRowScope: 'all',
+    unchangedRowCount: 0,
+    emptyRowCount: 0,
     historicalWindow: null,
   };
+}
+
+/** A row earns its place in the 30-day matrix when at least one platform has a
+ *  baseline to compare against. `comparable` is the only status carrying a
+ *  `costDeltaPct`, so it is the same predicate the cells render from. */
+export function overviewRowHasHistoricalChange(model: OverviewModelSummary): boolean {
+  return model.platforms.some((platform) => platform.historicalComparison?.status === 'comparable');
+}
+
+/**
+ * Counts the rows that did not move, and narrows the matrix to the ones that
+ * did when the reader opted in.
+ *
+ * Hardware mode passes straight through. So does a window in which nothing is
+ * comparable — filtering to nothing tells the reader less than the unfiltered
+ * matrix, and the empty state is indistinguishable from a data outage.
+ *
+ * Note: an unchanged row is not an empty row. It routinely carries current
+ * costs that exist nowhere else on the page — on the live site Kimi K3's only
+ * row has no 30-day baseline yet still prices three platforms. That is why
+ * narrowing is opt-in rather than the default.
+ */
+export function applyOverviewRowScope(
+  data: OverviewPageData,
+  rowScope: OverviewRowScope,
+): OverviewPageData {
+  if (data.comparisonMode !== 'history') {
+    return { ...data, rowScope: 'all', unchangedRowCount: 0 };
+  }
+
+  const changed = data.models.filter(overviewRowHasHistoricalChange);
+  const unchangedRowCount = data.models.length - changed.length;
+  if (changed.length === 0 || unchangedRowCount === 0) {
+    return { ...data, rowScope: 'all', unchangedRowCount: 0 };
+  }
+
+  return rowScope === 'changed'
+    ? { ...data, models: changed, rowScope: 'changed', unchangedRowCount }
+    : { ...data, rowScope: 'all', unchangedRowCount };
+}
+
+/** A row earns its place in the hardware matrix as soon as one platform quotes
+ *  a cost. One price is still a fact about the row; zero prices is a row of
+ *  dashes saying only that nothing was measured. */
+export function overviewRowHasAnyCost(model: OverviewModelSummary): boolean {
+  return model.platforms.some((platform) => platform.costPerMtok !== null);
+}
+
+/**
+ * The hardware-mode counterpart of {@link applyOverviewRowScope}: counts the
+ * rows that price nothing, and drops them when the reader opts in.
+ *
+ * History mode passes straight through, as does a matrix where every row is
+ * empty — filtering to nothing would read as an outage rather than a filter.
+ */
+export function applyOverviewHardwareRowScope(
+  data: OverviewPageData,
+  hardwareRowScope: OverviewHardwareRowScope,
+): OverviewPageData {
+  if (data.comparisonMode !== 'hardware') {
+    return { ...data, hardwareRowScope: 'all', emptyRowCount: 0 };
+  }
+
+  const priced = data.models.filter(overviewRowHasAnyCost);
+  const emptyRowCount = data.models.length - priced.length;
+  if (priced.length === 0 || emptyRowCount === 0) {
+    return { ...data, hardwareRowScope: 'all', emptyRowCount: 0 };
+  }
+
+  return hardwareRowScope === 'priced'
+    ? { ...data, models: priced, hardwareRowScope: 'priced', emptyRowCount }
+    : { ...data, hardwareRowScope: 'all', emptyRowCount };
 }
 
 function overviewPlatformKey(

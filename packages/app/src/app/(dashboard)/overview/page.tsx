@@ -7,8 +7,10 @@ import { enAlternates } from '@/lib/i18n';
 import {
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
+  resolveOverviewHardwareRowScope,
   resolveOverviewModelScope,
   resolveOverviewReferenceHardware,
+  resolveOverviewRowScope,
   resolveOverviewTier,
 } from '@/lib/overview-data';
 import { getOverviewPageData } from '@/lib/overview-data.server';
@@ -47,6 +49,8 @@ export default async function OverviewPage({ searchParams }: Props) {
     resolveOverviewComparisonMode(sp.compare),
     resolveOverviewReferenceHardware(sp.ref),
     resolveOverviewModelScope(sp.models),
+    resolveOverviewRowScope(sp.rows),
+    resolveOverviewHardwareRowScope(sp.hwrows),
   );
   return <OverviewPageContent data={data} locale="en" />;
 }

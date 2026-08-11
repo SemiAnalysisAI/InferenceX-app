@@ -1,15 +1,18 @@
 import {
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  OVERVIEW_DEFAULT_ROW_SCOPE,
   OVERVIEW_HARDWARE,
   OVERVIEW_TIERS,
   overviewHardwareLabel,
   type OverviewComparisonMode,
   type OverviewEngineScope,
+  type OverviewHardwareRowScope,
   type OverviewHistoricalComparison,
   type OverviewModelScope,
   type OverviewModelSummary,
   type OverviewPlatformResult,
   type OverviewReferenceHardware,
+  type OverviewRowScope,
   type OverviewTier,
 } from '@/lib/overview-data';
 import {
@@ -61,6 +64,13 @@ export const OVERVIEW_STRINGS = {
       single_turn_8k1k: '8K/1K',
       agentx: 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)',
     },
+    // Rendered in the row header; the full label above stays the accessible
+    // name and the hover title, so nothing is lost by not wrapping it to three
+    // lines in a 22%-wide column.
+    scenarioLabelsShort: {
+      single_turn_8k1k: '8K/1K',
+      agentx: 'AgentX',
+    },
     detailLink: 'View details',
     detailAria: (modelLabel: string, scenarioLabel: string) =>
       `View details: ${modelLabel} · ${scenarioLabel}`,
@@ -97,6 +107,30 @@ export const OVERVIEW_STRINGS = {
     modelScopeNavLabel: 'Inactive models',
     modelScopeShow: 'Show deprecated & maintenance-mode models',
     modelScopeHide: 'Hide deprecated & maintenance-mode models',
+    rowScopeNavLabel: 'Rows without a 30-day change',
+    rowScopeShow: (count: number) =>
+      `Show ${count} ${count === 1 ? 'row' : 'rows'} with no 30-day change`,
+    rowScopeHide: (count: number) =>
+      `Hide ${count} ${count === 1 ? 'row' : 'rows'} with no 30-day change`,
+    hardwareRowScopeNavLabel: 'Rows with no result',
+    hardwareRowScopeShow: (count: number) =>
+      `Show ${count} ${count === 1 ? 'row' : 'rows'} with no result on any platform`,
+    hardwareRowScopeHide: (count: number) =>
+      `Hide ${count} ${count === 1 ? 'row' : 'rows'} with no result on any platform`,
+    // Short forms of the sentences above, for the presentation toolbar. They
+    // carry the same verb, so they flip with the scope the same way; the
+    // sentence with the count stays on the accessible name.
+    rowScopeChipHide: 'Hide unchanged',
+    rowScopeChipShow: 'Show all rows',
+    hardwareRowScopeChipHide: 'Hide blanks',
+    hardwareRowScopeChipShow: 'Show all rows',
+    modelScopeChipShow: 'Show inactive',
+    modelScopeChipHide: 'Hide inactive',
+    presentEnter: 'Present',
+    presentExit: 'Exit',
+    presentEnterAria: 'Show the matrix full screen',
+    presentExitAria: 'Leave full screen',
+    presentShortcutHint: 'Arrow keys switch views · Esc exits',
     categoryBadges: {
       maintenance: 'Maintenance',
       deprecated: 'Deprecated',
@@ -129,6 +163,10 @@ export const OVERVIEW_STRINGS = {
     scenarioLabels: {
       single_turn_8k1k: '8K/1K',
       agentx: '长上下文多轮真实智能体场景（AgentX）',
+    },
+    scenarioLabelsShort: {
+      single_turn_8k1k: '8K/1K',
+      agentx: 'AgentX',
     },
     detailLink: '查看详情',
     detailAria: (modelLabel: string, scenarioLabel: string) =>
@@ -164,6 +202,23 @@ export const OVERVIEW_STRINGS = {
     modelScopeNavLabel: '非活跃模型',
     modelScopeShow: '显示已弃用与维护模式模型',
     modelScopeHide: '隐藏已弃用与维护模式模型',
+    rowScopeNavLabel: '30 天内无变化的行',
+    rowScopeShow: (count: number) => `显示 ${count} 行 30 天内无变化的数据`,
+    rowScopeHide: (count: number) => `隐藏 ${count} 行 30 天内无变化的数据`,
+    hardwareRowScopeNavLabel: '无结果的行',
+    hardwareRowScopeShow: (count: number) => `显示 ${count} 行所有平台均无结果的数据`,
+    hardwareRowScopeHide: (count: number) => `隐藏 ${count} 行所有平台均无结果的数据`,
+    rowScopeChipHide: '隐藏无变化',
+    rowScopeChipShow: '显示全部行',
+    hardwareRowScopeChipHide: '隐藏空行',
+    hardwareRowScopeChipShow: '显示全部行',
+    modelScopeChipShow: '显示停用模型',
+    modelScopeChipHide: '隐藏停用模型',
+    presentEnter: '演示',
+    presentExit: '退出',
+    presentEnterAria: '全屏展示矩阵',
+    presentExitAria: '退出全屏',
+    presentShortcutHint: '方向键切换视图 · Esc 退出',
     categoryBadges: {
       maintenance: '维护模式',
       deprecated: '已弃用',
@@ -603,6 +658,8 @@ function PlatformCell(props: {
 
 function ModelName({ model, strings }: { model: OverviewModelSummary; strings: OverviewStrings }) {
   const badge = strings.categoryBadges[model.category];
+  const label = strings.scenarioLabels[model.scenario];
+  const shortLabel = strings.scenarioLabelsShort[model.scenario];
   return (
     <div>
       <h2 className="text-sm font-semibold leading-snug">
@@ -620,9 +677,17 @@ function ModelName({ model, strings }: { model: OverviewModelSummary; strings: O
       </h2>
       <p
         data-testid="overview-model-scenario"
+        title={label}
         className="mt-0.5 text-[11px] font-normal leading-tight text-muted-foreground"
       >
-        {strings.scenarioLabels[model.scenario]}
+        {shortLabel === label ? (
+          label
+        ) : (
+          <>
+            <span className="sr-only">{label}</span>
+            <span aria-hidden="true">{shortLabel}</span>
+          </>
+        )}
       </p>
     </div>
   );
@@ -690,7 +755,7 @@ export function DesktopOverviewMatrix({
               data-scenario={model.scenario}
               className="border-b border-border/50 align-top last:border-b-0"
             >
-              <th scope="row" className="px-4 py-4 text-left align-top font-normal lg:px-6">
+              <th scope="row" className="px-4 py-2.5 text-left align-top font-normal lg:px-6">
                 <ModelName model={model} strings={strings} />
                 {/* The link lives with the model it drills into, so the matrix
                     spends no column on a header that is the same every row. */}
@@ -712,7 +777,7 @@ export function DesktopOverviewMatrix({
                 <td
                   key={platform.hardware}
                   style={costDeltaCellStyle(platform, comparisonMode, referenceHardware)}
-                  className={`px-3 py-4 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/30' : ''}`}
+                  className={`px-3 py-2.5 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/30' : ''}`}
                 >
                   <PlatformCell
                     locale={locale}
@@ -811,6 +876,8 @@ export function OverviewTierSwitcher({
   comparisonMode,
   referenceHardware,
   modelScope,
+  rowScope,
+  hardwareRowScope,
   locale,
   strings,
 }: {
@@ -819,6 +886,8 @@ export function OverviewTierSwitcher({
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
   modelScope: OverviewModelScope;
+  rowScope: OverviewRowScope;
+  hardwareRowScope: OverviewHardwareRowScope;
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
@@ -850,6 +919,8 @@ export function OverviewTierSwitcher({
                 comparisonMode,
                 referenceHardware,
                 modelScope,
+                rowScope,
+                hardwareRowScope,
               )}
               analytics={{ control: 'tier', value: String(option) }}
               searchKeys={['tier']}
@@ -872,6 +943,8 @@ export function OverviewEngineScopeSwitcher({
   comparisonMode,
   referenceHardware,
   modelScope,
+  rowScope,
+  hardwareRowScope,
   locale,
   strings,
 }: {
@@ -880,6 +953,8 @@ export function OverviewEngineScopeSwitcher({
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
   modelScope: OverviewModelScope;
+  rowScope: OverviewRowScope;
+  hardwareRowScope: OverviewHardwareRowScope;
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
@@ -915,6 +990,8 @@ export function OverviewEngineScopeSwitcher({
                 comparisonMode,
                 referenceHardware,
                 modelScope,
+                rowScope,
+                hardwareRowScope,
               )}
               analytics={{ control: 'engine', value: option }}
               searchKeys={['engine']}
@@ -935,6 +1012,8 @@ export function OverviewComparisonSwitcher({
   tier,
   referenceHardware,
   modelScope,
+  rowScope,
+  hardwareRowScope,
   locale,
   strings,
 }: {
@@ -943,6 +1022,8 @@ export function OverviewComparisonSwitcher({
   tier: OverviewTier;
   referenceHardware: OverviewReferenceHardware;
   modelScope: OverviewModelScope;
+  rowScope: OverviewRowScope;
+  hardwareRowScope: OverviewHardwareRowScope;
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
@@ -951,7 +1032,16 @@ export function OverviewComparisonSwitcher({
   const referenceOptions = OVERVIEW_HARDWARE.map((hardware) => ({
     value: hardware,
     label: overviewHardwareLabel(hardware),
-    href: overviewHref(locale, tier, engineScope, 'hardware', hardware, modelScope),
+    href: overviewHref(
+      locale,
+      tier,
+      engineScope,
+      'hardware',
+      hardware,
+      modelScope,
+      OVERVIEW_DEFAULT_ROW_SCOPE,
+      hardwareRowScope,
+    ),
   }));
   const optionClass =
     'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 border-transparent px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors duration-200 hover:border-muted-foreground/30 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:min-w-[140px]';
@@ -990,7 +1080,16 @@ export function OverviewComparisonSwitcher({
           <OverviewNavLink
             key={option}
             data-overview-comparison={option}
-            href={overviewHref(locale, tier, engineScope, option, referenceHardware, modelScope)}
+            href={overviewHref(
+              locale,
+              tier,
+              engineScope,
+              option,
+              referenceHardware,
+              modelScope,
+              rowScope,
+              hardwareRowScope,
+            )}
             analytics={{ control: 'comparison', value: option }}
             searchKeys={['compare']}
             className={optionClass}
@@ -1003,39 +1102,229 @@ export function OverviewComparisonSwitcher({
   );
 }
 
+/**
+ * Where a scope toggle is drawn. `section` is the underlined sentence beneath
+ * the matrix; `toolbar` is the button that replaces it while presenting, where
+ * the sentence does not fit.
+ */
+type OverviewScopeToggleVariant = 'section' | 'toolbar';
+
+const SCOPE_SENTENCE_CLASS =
+  'inline-flex min-h-11 items-center text-muted-foreground underline decoration-dotted underline-offset-4 transition-colors hover:text-foreground hover:decoration-solid';
+
+/**
+ * Matches Exit, so the right end of the deck toolbar reads as one row of
+ * actions. Deliberately not filled-when-engaged: these labels name the click
+ * rather than the state, and a filled "Show all rows" contradicts itself.
+ */
+const SCOPE_CHIP_CLASS =
+  'inline-flex min-h-11 items-center whitespace-nowrap rounded-md border border-border/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground';
+
 export function OverviewModelScopeToggle({
   modelScope,
   tier,
   engineScope,
   comparisonMode,
   referenceHardware,
+  rowScope,
+  hardwareRowScope,
   locale,
   strings,
+  variant = 'section',
 }: {
   modelScope: OverviewModelScope;
   tier: OverviewTier;
   engineScope: OverviewEngineScope;
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
+  rowScope: OverviewRowScope;
+  hardwareRowScope: OverviewHardwareRowScope;
   locale: OverviewLocale;
   strings: OverviewStrings;
+  variant?: OverviewScopeToggleVariant;
 }) {
   const target: OverviewModelScope = modelScope === 'all' ? 'default' : 'all';
+  // Inactive models rarely post a 30-day change, so revealing them under the
+  // changed-only scope would filter them straight back out and read as a dead
+  // link. Asking for more models asks for more rows.
+  const targetRowScope: OverviewRowScope = target === 'all' ? 'all' : rowScope;
+  // Same trap in hardware mode, and a deeper one: an inactive model is the most
+  // likely to have no result on any platform, which is exactly what the
+  // priced-only scope removes.
+  const targetHardwareRowScope: OverviewHardwareRowScope =
+    target === 'all' ? 'all' : hardwareRowScope;
+  const sentence = modelScope === 'all' ? strings.modelScopeHide : strings.modelScopeShow;
+  const link = (
+    <OverviewNavLink
+      data-overview-model-scope={target}
+      href={overviewHref(
+        locale,
+        tier,
+        engineScope,
+        comparisonMode,
+        referenceHardware,
+        target,
+        targetRowScope,
+        targetHardwareRowScope,
+      )}
+      analytics={{ control: 'models', value: target }}
+      searchKeys={['models', 'rows', 'hwrows']}
+      aria-label={variant === 'toolbar' ? sentence : undefined}
+      title={variant === 'toolbar' ? sentence : undefined}
+      className={variant === 'toolbar' ? SCOPE_CHIP_CLASS : SCOPE_SENTENCE_CLASS}
+    >
+      {variant === 'toolbar'
+        ? modelScope === 'all'
+          ? strings.modelScopeChipHide
+          : strings.modelScopeChipShow
+        : sentence}
+    </OverviewNavLink>
+  );
+  if (variant === 'toolbar') return link;
   return (
     <nav
       data-testid="overview-model-scope-toggle"
       aria-label={strings.modelScopeNavLabel}
       className="border-t border-border/50 px-4 text-xs lg:px-6"
     >
-      <OverviewNavLink
-        data-overview-model-scope={target}
-        href={overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware, target)}
-        analytics={{ control: 'models', value: target }}
-        searchKeys={['models']}
-        className="inline-flex min-h-11 items-center text-muted-foreground underline decoration-dotted underline-offset-4 transition-colors hover:text-foreground hover:decoration-solid"
-      >
-        {modelScope === 'all' ? strings.modelScopeHide : strings.modelScopeShow}
-      </OverviewNavLink>
+      {link}
+    </nav>
+  );
+}
+
+/**
+ * Opt-in narrowing to the rows that moved in the window, and the way back.
+ * Rendered only when the two scopes would differ, so a fully-comparable window
+ * shows no dead control.
+ */
+export function OverviewRowScopeToggle({
+  rowScope,
+  unchangedRowCount,
+  tier,
+  engineScope,
+  referenceHardware,
+  modelScope,
+  locale,
+  strings,
+  variant = 'section',
+}: {
+  rowScope: OverviewRowScope;
+  unchangedRowCount: number;
+  tier: OverviewTier;
+  engineScope: OverviewEngineScope;
+  referenceHardware: OverviewReferenceHardware;
+  modelScope: OverviewModelScope;
+  locale: OverviewLocale;
+  strings: OverviewStrings;
+  variant?: OverviewScopeToggleVariant;
+}) {
+  if (unchangedRowCount === 0) return null;
+  const target: OverviewRowScope = rowScope === 'all' ? 'changed' : 'all';
+  const sentence =
+    rowScope === 'all'
+      ? strings.rowScopeHide(unchangedRowCount)
+      : strings.rowScopeShow(unchangedRowCount);
+  const link = (
+    <OverviewNavLink
+      data-overview-row-scope={target}
+      href={overviewHref(
+        locale,
+        tier,
+        engineScope,
+        'history',
+        referenceHardware,
+        modelScope,
+        target,
+      )}
+      analytics={{ control: 'rows', value: target }}
+      searchKeys={['rows']}
+      aria-label={variant === 'toolbar' ? sentence : undefined}
+      title={variant === 'toolbar' ? sentence : undefined}
+      className={variant === 'toolbar' ? SCOPE_CHIP_CLASS : SCOPE_SENTENCE_CLASS}
+    >
+      {variant === 'toolbar'
+        ? rowScope === 'all'
+          ? strings.rowScopeChipHide
+          : strings.rowScopeChipShow
+        : sentence}
+    </OverviewNavLink>
+  );
+  if (variant === 'toolbar') return link;
+  return (
+    <nav
+      data-testid="overview-row-scope-toggle"
+      aria-label={strings.rowScopeNavLabel}
+      className="border-t border-border/50 px-4 text-xs lg:px-6"
+    >
+      {link}
+    </nav>
+  );
+}
+
+/** The hardware-mode sibling of {@link OverviewRowScopeToggle}. Kept separate
+ *  rather than parameterised: the two filters answer different questions, name
+ *  different counts, and each mode remembers its own answer. */
+export function OverviewHardwareRowScopeToggle({
+  hardwareRowScope,
+  emptyRowCount,
+  tier,
+  engineScope,
+  referenceHardware,
+  modelScope,
+  locale,
+  strings,
+  variant = 'section',
+}: {
+  hardwareRowScope: OverviewHardwareRowScope;
+  emptyRowCount: number;
+  tier: OverviewTier;
+  engineScope: OverviewEngineScope;
+  referenceHardware: OverviewReferenceHardware;
+  modelScope: OverviewModelScope;
+  locale: OverviewLocale;
+  strings: OverviewStrings;
+  variant?: OverviewScopeToggleVariant;
+}) {
+  if (emptyRowCount === 0) return null;
+  const target: OverviewHardwareRowScope = hardwareRowScope === 'all' ? 'priced' : 'all';
+  const sentence =
+    hardwareRowScope === 'all'
+      ? strings.hardwareRowScopeHide(emptyRowCount)
+      : strings.hardwareRowScopeShow(emptyRowCount);
+  const link = (
+    <OverviewNavLink
+      data-overview-hardware-row-scope={target}
+      href={overviewHref(
+        locale,
+        tier,
+        engineScope,
+        'hardware',
+        referenceHardware,
+        modelScope,
+        OVERVIEW_DEFAULT_ROW_SCOPE,
+        target,
+      )}
+      analytics={{ control: 'hwrows', value: target }}
+      searchKeys={['hwrows']}
+      aria-label={variant === 'toolbar' ? sentence : undefined}
+      title={variant === 'toolbar' ? sentence : undefined}
+      className={variant === 'toolbar' ? SCOPE_CHIP_CLASS : SCOPE_SENTENCE_CLASS}
+    >
+      {variant === 'toolbar'
+        ? hardwareRowScope === 'all'
+          ? strings.hardwareRowScopeChipHide
+          : strings.hardwareRowScopeChipShow
+        : sentence}
+    </OverviewNavLink>
+  );
+  if (variant === 'toolbar') return link;
+  return (
+    <nav
+      data-testid="overview-hardware-row-scope-toggle"
+      aria-label={strings.hardwareRowScopeNavLabel}
+      className="border-t border-border/50 px-4 text-xs lg:px-6"
+    >
+      {link}
     </nav>
   );
 }
