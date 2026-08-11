@@ -100,6 +100,7 @@ export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new
   [30133534310, new Set([1])], // 2026-07-24 | GLM-5.2 FP8 H200 Dynamo-SGLang 1P2D agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [30133535261, new Set([1])], // 2026-07-24 | GLM-5.2 FP8 H200 Dynamo-SGLang 2P2D agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [30133570824, new Set([1])], // 2026-07-24 | GLM-5.2 FP8 H200 Dynamo-SGLang 2P4D agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
+  [30231719317, new Set([1])], // 2026-07-27 | DeepSeek-V4 FP4 GB300 Dynamo-vLLM MTP agentic | Reason: Outdated AgentX harness
 ]);
 
 export interface BenchmarkPointKey {
