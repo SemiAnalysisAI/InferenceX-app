@@ -468,6 +468,21 @@ describe('Overview page', () => {
       });
   });
 
+  it('does not flag the comparison date range after following a history cell', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview?compare=30d');
+
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN)
+      .find('[data-testid="overview-history-detail-link"]')
+      .first()
+      .then(($link) => {
+        cy.visit(String($link.attr('href')));
+
+        cy.contains('Comparison Date Range').should('be.visible');
+        cy.contains('button', 'Select date range').should('not.have.class', 'animate-pulse');
+      });
+  });
+
   it('keeps the historical comparison complete and non-scrolling across desktop, tablet and phone', () => {
     for (const width of [320, 390, 768, 1024, 1279, 1280, 1440]) {
       cy.viewport(width, 900);

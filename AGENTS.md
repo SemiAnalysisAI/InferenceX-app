@@ -91,6 +91,24 @@ initial server render so selector changes can update the matrix without transfer
 raw benchmark history or triggering a React Server Component (RSC) round trip. It is a page-owned
 backend-for-frontend (BFF), not a reusable public data API.
 
+### API Documentation Synchronization
+
+The public API reference at `/api` and `/zh/api`, plus the OpenAPI 3.1 document at
+`/api/openapi.json`, are generated from `packages/app/src/lib/api-documentation.ts`.
+
+**Any change to an API route, request parameter, response shape, status code, authentication,
+caching behavior, or shared API type MUST update the documentation registry in the same change.**
+Keep `packages/app/src/lib/api-route-catalog.ts` synchronized with every handler under
+`packages/app/src/app/api/`; the catalog classifies unpublished routes and records review digests
+for handlers and shared contract sources. Do not update a digest without first confirming whether
+the human reference, Chinese copy, examples, or OpenAPI schema also need changes.
+
+Run the synchronization guard from `packages/app`:
+
+```bash
+bun --env-file=../../.env vitest run src/lib/api-route-catalog.test.ts
+```
+
 Static content routes (no DB):
 
 - `/blog` — blog listing (statically generated from MDX files in `content/blog/`)
