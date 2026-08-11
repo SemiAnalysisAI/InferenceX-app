@@ -92,11 +92,13 @@ export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new
   [29413860950, new Set([3])], // 2026-07-16 | DeepSeek-V4 FP4 MI355X SGLang HiCache agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [29445892486, new Set([2])], // 2026-07-16 | DeepSeek-V4 FP4 B200 vLLM agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [29486959583, new Set([2])], // 2026-07-16 | DeepSeek-V4 FP4 B300 vLLM agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
+  [29506569772, new Set([2])], // 2026-07-16 | Kimi K2.5 FP4 B300 vLLM MTP agentic | Reason: AgentX is no longer supported for this model
   [29651235293, new Set([1])], // 2026-08-07 | GLM-5.2 NVFP4 B300 SGLang single-node agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [29657732517, new Set([1])], // 2026-07-18 | GLM-5.2 FP8 MI325X SGLang 1M agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [29682242847, new Set([1])], // 2026-08-07 | GLM-5.2 NVFP4 B300 SGLang agentic HiCache | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [29706766201, new Set([5])], // 2026-07-21 | DeepSeek-V4 FP4 B300 vLLM LMCache agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [29706772949, new Set([3])], // 2026-07-21 | DeepSeek-V4 FP4 B200 vLLM LMCache agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
+  [29765418393, new Set([5])], // 2026-07-20 | MiniMax M2.7 FP4 B200 SGLang MTP agentic | Reason: AgentX is no longer supported for this model
   [30133534310, new Set([1])], // 2026-07-24 | GLM-5.2 FP8 H200 Dynamo-SGLang 1P2D agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [30133535261, new Set([1])], // 2026-07-24 | GLM-5.2 FP8 H200 Dynamo-SGLang 2P2D agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
   [30133570824, new Set([1])], // 2026-07-24 | GLM-5.2 FP8 H200 Dynamo-SGLang 2P4D agentic | Reason: Non MTP which we aren't focusing on for AgentX as well as outdated AgentX harness
