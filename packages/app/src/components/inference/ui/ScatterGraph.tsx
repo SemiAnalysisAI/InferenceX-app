@@ -91,6 +91,7 @@ import {
   renderKnownIssueAnnotations,
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
+import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import { changelogConfigToHwKey } from '@/components/inference/utils/changelogFormatters';
 import {
   buildFrontierContinuations,
@@ -393,6 +394,7 @@ const SCATTER_STRINGS = {
   en: {
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
+    bestPerSku: 'Best per SKU',
     optimalInfo:
       'On agentic, optimal points must be Pareto-optimal on the selected x-axis and also belong to the E2E Normalized Interactivity frontier.',
     labels: 'Labels',
@@ -408,6 +410,7 @@ const SCATTER_STRINGS = {
   zh: {
     logScale: '对数缩放',
     optimalOnly: '仅最优',
+    bestPerSku: '每个 SKU 仅显示最佳配置',
     optimalInfo:
       '在智能体场景中，最优点既必须在当前横轴上满足 Pareto 最优，也必须属于端到端归一化交互性的 Pareto 前沿。',
     labels: '标签',
@@ -443,6 +446,8 @@ const ScatterGraph = React.memo(
   }: ScatterGraphProps) => {
     const {
       activeHwTypes,
+      bestPerSku,
+      setBestPerSku,
       hardwareConfig: contextHardwareConfig,
       toggleHwType,
       removeHwType,
@@ -3259,6 +3264,37 @@ const ScatterGraph = React.memo(
                 track('latency_legend_expanded', { expanded });
               }}
               switches={[
+                {
+                  id: 'scatter-best-per-sku',
+                  label: legendT.bestPerSku,
+                  checked: bestPerSku,
+                  onCheckedChange: (checked: boolean) => {
+                    setBestPerSku(checked);
+                    if (overlayData) {
+                      if (checked) {
+                        const direction =
+                          chartDefinition[
+                            `${selectedYAxisMetric}_roofline` as keyof ChartDefinition
+                          ];
+                        if (
+                          direction === 'upper_right' ||
+                          direction === 'upper_left' ||
+                          direction === 'lower_left' ||
+                          direction === 'lower_right'
+                        ) {
+                          const selection = bestSeriesPerSku(data, direction);
+                          for (const key of bestSeriesPerSku(overlayData.data, direction)) {
+                            selection.add(`overlay:${key}`);
+                          }
+                          commitUnifiedSelection(selection);
+                        }
+                      } else {
+                        resetUnifiedSelection();
+                      }
+                    }
+                    track('inference_best_per_sku_toggled', { enabled: checked });
+                  },
+                },
                 ...(selectedYAxisMetric === 'y_inputTputPerGpu'
                   ? []
                   : [

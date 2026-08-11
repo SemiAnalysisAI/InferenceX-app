@@ -45,6 +45,7 @@ const B200_KIMI = 'b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar';
 const SGLANG_056 = 'sglang-0-5-6-b200-deepseek-r1-fp4-up-to-1-8x';
 const VR_RUBIN = 'vera-rubin-nvl72-vs-gb200-nvl72-inference';
 const KIMI_K3 = 'kimi-k3-the-manos-the-mythos-the';
+const TILERT = 'ultra-high-interactivity-on-nvidia';
 
 const entries = [
   {
@@ -119,7 +120,7 @@ const entries = [
       'InferenceX plots tokens per second per user against throughput or cost. Iso-interactivity tables interpolate each system’s Pareto frontier at the same token rate so the comparison holds user experience constant.',
     measurement: { label: 'Typical unit', value: 'tokens/second/user (tok/s/user)' },
     relatedTerms: ['time-per-output-token', 'throughput', 'iso-interactivity', 'latency'],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, MI355X_KIMI],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, MI355X_KIMI, TILERT],
   },
   {
     slug: 'latency',
@@ -176,7 +177,7 @@ const entries = [
       'InferenceX often presents the reciprocal measure, tok/s/user, because higher is visually better. Recipe tables may include TPOT directly, especially when comparing scheduler or kernel changes at matched concurrency.',
     measurement: { label: 'Relationship', value: 'interactivity ≈ 1000 / TPOT(ms)' },
     relatedTerms: ['interactivity', 'time-to-first-token', 'decode', 'concurrency'],
-    articleSlugs: [INFERENCEX_V2, SGLANG_056, MI355X_GLM5],
+    articleSlugs: [INFERENCEX_V2, SGLANG_056, MI355X_GLM5, TILERT],
   },
   {
     slug: 'concurrency',
@@ -398,7 +399,7 @@ const entries = [
     benchmarkContext:
       'InferenceX decode performance appears as tok/s/user and aggregate tok/s/chip across concurrency. Output sequence length, batch shape, precision, and parallelism must match for a fair comparison.',
     relatedTerms: ['prefill', 'time-per-output-token', 'kv-cache', 'speculative-decoding'],
-    articleSlugs: [INFERENCEX_V2, GB300_DSV4, SGLANG_056],
+    articleSlugs: [INFERENCEX_V2, GB300_DSV4, SGLANG_056, TILERT],
   },
   {
     slug: 'kv-cache',
@@ -459,7 +460,7 @@ const entries = [
     benchmarkContext:
       'A disagg label identifies the serving layout, not its performance. Judge it from the prefill and decode world sizes, TP/EP layout, framework, network domain, and the interactivity range where its frontier leads.',
     relatedTerms: ['prefill', 'decode', 'kv-cache', 'nvidia-dynamo', 'wide-expert-parallelism'],
-    articleSlugs: [INFERENCEX_V2, GB200_R1, GB300_DSV4, GB200_KIMI],
+    articleSlugs: [INFERENCEX_V2, GB200_R1, GB300_DSV4, GB200_KIMI, TILERT],
   },
   {
     slug: 'speculative-decoding',
@@ -874,7 +875,7 @@ const entries = [
     benchmarkContext:
       'InferenceX recipes pin container images and therefore a concrete CUDA stack. Historical comparisons can isolate the effect of an engine image bump on otherwise identical hardware and configuration.',
     relatedTerms: ['inference-engine', 'nvfp4', 'nvlink', 'rocm', 'tensorrt-llm'],
-    articleSlugs: [SGLANG_056, B200_GLM5, INFERENCEX_V2],
+    articleSlugs: [SGLANG_056, B200_GLM5, INFERENCEX_V2, TILERT],
   },
   {
     slug: 'rocm',
@@ -909,7 +910,7 @@ const entries = [
     benchmarkContext:
       'InferenceX treats vLLM as one engine option and pins the exact image in each recipe. Engine name alone does not set a fixed performance level, so comparisons must match model, precision, workload, and topology.',
     relatedTerms: ['inference-engine', 'nvidia-dynamo', 'kv-cache', 'sglang', 'rocm'],
-    articleSlugs: [MI355X_KIMI, GB200_KIMI, B200_MINIMAX, B200_KIMI, KIMI_K3],
+    articleSlugs: [MI355X_KIMI, GB200_KIMI, B200_MINIMAX, B200_KIMI, KIMI_K3, TILERT],
   },
   {
     slug: 'sglang',

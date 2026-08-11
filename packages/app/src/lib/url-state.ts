@@ -33,6 +33,7 @@ const URL_STATE_KEYS = [
   'i_dstart',
   'i_dend',
   'i_optimal',
+  'i_best',
   'i_label',
   // Legacy alias of `i_label` with inverted semantics — read-only on load so
   // pre-rename share links (?i_nolabel=1) keep hiding point labels even if the
@@ -105,6 +106,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_dstart: '',
   i_dend: '',
   i_optimal: '',
+  i_best: '',
   i_label: '',
   i_nolabel: '',
   i_hc: '',
