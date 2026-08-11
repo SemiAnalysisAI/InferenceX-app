@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
 import { FAQ_ITEMS_ZH } from '@/components/about/faq-data-zh';
+import { AgentXFaq } from '@/components/about/agentx-faq';
 import { JsonLd } from '@/components/json-ld';
 import { zhAlternates, ZH_OG_LOCALE, ZH_LANG_TAG } from '@/lib/i18n';
 import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-constants';
@@ -80,6 +81,8 @@ export default function AboutPageZh() {
             </p>
           </Card>
         </section>
+
+        <AgentXFaq locale="zh" />
 
         <section id="reproducibility" className="scroll-mt-24">
           <Card>

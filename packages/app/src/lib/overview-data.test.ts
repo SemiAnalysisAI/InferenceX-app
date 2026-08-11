@@ -375,6 +375,25 @@ describe('overview engine scope and scenario selection', () => {
     expect(page).not.toHaveProperty('datasetThroughDate');
   });
 
+  it('keeps the tier interpolation input off the wire', () => {
+    const page = assembleOverviewPageData(
+      {
+        [Model.Qwen3_5]: [
+          row({ framework: 'dynamo-vllm', date: '2026-07-20' }),
+          row({ framework: 'atom', date: '2026-07-21' }),
+        ],
+      },
+      50,
+    );
+
+    // The reads that back the matrix must exist, or the assertion below passes
+    // vacuously on an empty payload.
+    expect(page.models.some((model) => model.platforms.some((p) => p.read.config !== null))).toBe(
+      true,
+    );
+    expect(JSON.stringify(page)).not.toContain('tierValues');
+  });
+
   it('ranks same-bucket configs by total throughput even when output ranking disagrees', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, [
       row({

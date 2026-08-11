@@ -10,7 +10,7 @@ import {
 import { track } from '@/lib/analytics';
 import type { OverviewReferenceHardware } from '@/lib/overview-data';
 
-import { useOverviewNavigation } from './overview-navigation';
+import { useOverviewNavigation, useOverviewReference } from './overview-navigation';
 import { useIsPresenting } from './overview-presentation';
 
 interface ReferenceOption {
@@ -22,13 +22,16 @@ interface ReferenceOption {
 export function OverviewReferenceSelect({
   ariaLabel,
   options,
-  value,
 }: {
   ariaLabel: string;
   options: readonly ReferenceOption[];
-  value: OverviewReferenceHardware;
 }) {
   const navigation = useOverviewNavigation();
+  // Read from context, not from the payload: the reference is derived from the
+  // URL, so the trigger reflects a second choice made during a pending load
+  // instead of silently discarding it. Nothing to prefetch — a reference change
+  // costs no request.
+  const value = useOverviewReference();
   // A portalled menu lands on `document.body`, which is outside the element the
   // browser is showing fullscreen and outside the `zoom` the matrix is scaled
   // by. Rendering it in place keeps it both visible and the same size as the
@@ -38,9 +41,6 @@ export function OverviewReferenceSelect({
   return (
     <Select
       value={value}
-      onOpenChange={(open) => {
-        if (open) options.forEach((option) => navigation.prefetch(option.href, ['ref']));
-      }}
       onValueChange={(next: OverviewReferenceHardware) => {
         const option = options.find((candidate) => candidate.value === next);
         if (option === undefined || next === value) return;
