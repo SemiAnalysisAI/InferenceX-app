@@ -281,7 +281,7 @@ export const apiRouteCatalog = [
       en: 'Page-owned BFF aggregation whose tier, comparison, and calculator projections are coupled to the overview UI.',
       zh: '由页面拥有的 BFF 聚合；其档位、比较和计算器投影与概览界面紧密耦合。',
     },
-    sourceSha256: '7c9830baae39d533ba7db36d44fe520f89cb36b32ffc54ef29404693d0b6b120',
+    sourceSha256: '499089d01754aa470d0ced953d9818d7d2e620dd3521685099924750249f13e2',
   },
   {
     source: 'src/app/api/v1/reliability/route.ts',
