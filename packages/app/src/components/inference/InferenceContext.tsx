@@ -470,6 +470,7 @@ export function InferenceProvider({
 
   const {
     graphs,
+    selectionPoints,
     loading: chartDataLoading,
     error: chartDataError,
     hardwareConfig,
@@ -771,6 +772,10 @@ export function InferenceProvider({
       ),
     [graphs, effectivePrecisions],
   );
+  const hwSelectablePoints = useMemo(
+    () => selectionPoints.filter((point) => effectivePrecisions.includes(point.precision)),
+    [selectionPoints, effectivePrecisions],
+  );
   const extractHwKey = useCallback((point: InferenceData) => point.hwKey as string, []);
 
   const comparisonExclusion = useMemo(
@@ -887,34 +892,50 @@ export function InferenceProvider({
     [resolveHwSelection, setActiveHwTypes, setActiveHwTypesDispatch],
   );
 
-  const hwTypesWithData = useChartDataFilter(
-    hwFilteredPoints,
+  // `selectableHwTypes` is the universe the legend selection lives in: every
+  // config in scope for the current model / sequence / precision, whether or
+  // not it carries the selected y-metric. `hwTypesWithData` stays metric-aware
+  // and drives what the legend renders and what the chart draws. Keeping the
+  // two apart is what makes a y-axis switch non-destructive — the selection is
+  // never intersected with metric coverage, so nothing has to be restored when
+  // the user switches back.
+  const selectableHwTypes = useChartDataFilter(
+    hwSelectablePoints,
     setActiveHwTypesWithFilter,
     extractHwKey,
   );
+  const hwTypesWithData = useMemo(
+    () => new Set(hwFilteredPoints.map(extractHwKey)),
+    [hwFilteredPoints, extractHwKey],
+  );
 
-  // Direct fallback: apply pendingHwFilter when hwTypesWithData is already populated
+  // Direct fallback: apply pendingHwFilter when selectableHwTypes is already populated
   // but useChartDataFilter didn't fire (e.g. re-selecting the same preset).
   useEffect(() => {
-    if (!pendingHwFilter || hwTypesWithData.size === 0) return;
+    if (!pendingHwFilter || selectableHwTypes.size === 0) return;
     const filtered = new Set(
-      [...hwTypesWithData].filter((k) => matchesPresetHwFilter(k, pendingHwFilter, selectedModel)),
+      [...selectableHwTypes].filter((k) =>
+        matchesPresetHwFilter(k, pendingHwFilter, selectedModel),
+      ),
     );
     if (filtered.size > 0) {
       setActiveHwTypes(resolveHwSelection(filtered).result);
       setPendingHwFilter(null);
     }
-  }, [pendingHwFilter, hwTypesWithData, selectedModel, resolveHwSelection, setActiveHwTypes]);
+  }, [pendingHwFilter, selectableHwTypes, selectedModel, resolveHwSelection, setActiveHwTypes]);
 
   const toggleHwType = useCallback(
     (hw: string) => {
-      const next = toggleComparisonSelection(activeHwTypes, hw, hwTypesWithData);
+      // Toggle against the selection universe, not the metric-filtered legend:
+      // computeToggle's "everything is on, so solo this one" branch compares
+      // set sizes, and activeHwTypes is sized against selectableHwTypes.
+      const next = toggleComparisonSelection(activeHwTypes, hw, selectableHwTypes);
       if (!next) return;
       setActiveHwTypes(next);
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
-    [activeHwTypes, hwTypesWithData, setActiveHwTypes, toggleComparisonSelection],
+    [activeHwTypes, selectableHwTypes, setActiveHwTypes, toggleComparisonSelection],
   );
 
   const removeHwType = useCallback(
@@ -942,20 +963,20 @@ export function InferenceProvider({
   const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
   const selectAllHwTypes = useCallback(() => {
     if (exclusion) {
-      const { result, droppedGroups } = resolveHwSelection(hwTypesWithData, activeHwTypes);
+      const { result, droppedGroups } = resolveHwSelection(selectableHwTypes, activeHwTypes);
       setActiveHwTypes(result);
       if (droppedGroups.length > 0) {
         setEngineConflict({
           kind: 'resolved',
-          ...exclusionResolutionFamilies(hwTypesWithData, result, exclusion),
+          ...exclusionResolutionFamilies(selectableHwTypes, result, exclusion),
         });
       }
       return;
     }
-    selectAllHwRaw(hwTypesWithData);
+    selectAllHwRaw(selectableHwTypes);
   }, [
     selectAllHwRaw,
-    hwTypesWithData,
+    selectableHwTypes,
     activeHwTypes,
     exclusion,
     resolveHwSelection,
@@ -973,7 +994,7 @@ export function InferenceProvider({
   // Skip the reset when a preset hw filter is pending — the fallback effect below handles it.
   // When a preset is still active (presetHwFilterRef), re-apply the filter instead of resetting
   // to all GPUs — this handles deferred effectivePrecisions changes from late availability data.
-  // Track the last applied key with a ref and include hwTypesWithData in the deps so the
+  // Track the last applied key with a ref and include selectableHwTypes in the deps so the
   // reset commits as soon as data for the new model arrives — without this, switching models
   // bails on the empty-data tick and never re-fires, leaving the legend at the prior intersection.
   const precisionsKey = effectivePrecisions.join(',');
@@ -983,26 +1004,26 @@ export function InferenceProvider({
   const lastHwResetKeyRef = useRef('');
 
   // Restore legend-active selection from URL on first availability of
-  // hwTypesWithData. Sets lastHwResetKeyRef so the reset effect below treats
+  // selectableHwTypes. Sets lastHwResetKeyRef so the reset effect below treats
   // the current key as already-applied and bails. Empty intersections fall back
   // to all available configs before the active exclusion policy is applied.
   useEffect(() => {
     if (!pendingActiveHwTypes) return;
     if (pendingHwFilterRef.current) return;
-    if (hwTypesWithData.size === 0) return;
+    if (selectableHwTypes.size === 0) return;
     // Match exact hwKeys (URL-restored) AND bare GPU prefixes (used by
     // /compare/[a]-vs-[b] pages, which know the GPU key but not which framework
     // configs exist for it).
     const prefixes = [...pendingActiveHwTypes].filter((k) => !k.includes('_'));
     let restored = new Set(
-      [...hwTypesWithData].filter(
+      [...selectableHwTypes].filter(
         (k) =>
           pendingActiveHwTypes.has(k) || prefixes.some((p) => k.startsWith(`${p}_`) || k === p),
       ),
     );
     // Empty intersection (e.g. URL referenced GPUs no longer in availability,
     // or every referenced key disappeared) falls back to all available configs.
-    if (restored.size === 0) restored = hwTypesWithData;
+    if (restored.size === 0) restored = selectableHwTypes;
     if (exclusion) {
       const proposed = restored;
       const resolved = resolveHwSelection(restored, new Set());
@@ -1019,7 +1040,7 @@ export function InferenceProvider({
     setPendingActiveHwTypes(null);
   }, [
     pendingActiveHwTypes,
-    hwTypesWithData,
+    selectableHwTypes,
     exclusion,
     selectedModel,
     effectiveSequence,
@@ -1032,13 +1053,13 @@ export function InferenceProvider({
   useEffect(() => {
     if (pendingHwFilterRef.current) return;
     if (pendingActiveHwTypes) return;
-    if (hwTypesWithData.size === 0) return;
+    if (selectableHwTypes.size === 0) return;
     if (lastHwResetKeyRef.current === hwResetKey) return;
     lastHwResetKeyRef.current = hwResetKey;
     const presetFilter = presetHwFilterRef.current;
     if (presetFilter) {
       const filtered = new Set(
-        [...hwTypesWithData].filter((k) => matchesPresetHwFilter(k, presetFilter, selectedModel)),
+        [...selectableHwTypes].filter((k) => matchesPresetHwFilter(k, presetFilter, selectedModel)),
       );
       if (filtered.size > 0) {
         // Presets explicitly choose configs. Resolve any engine conflict
@@ -1052,23 +1073,23 @@ export function InferenceProvider({
       // Scenarios that restrict standard-token engines (8K/1K, AgentX) keep one
       // sticky group so their charts remain useful; variant-only rules retain
       // the existing clear-all behavior.
-      const { result, droppedGroups } = resolveHwSelection(hwTypesWithData);
+      const { result, droppedGroups } = resolveHwSelection(selectableHwTypes);
       setActiveHwTypes(result);
       if (droppedGroups.length > 0) {
         setEngineConflict({
           kind: 'resolved',
-          ...exclusionResolutionFamilies(hwTypesWithData, result, exclusion),
+          ...exclusionResolutionFamilies(selectableHwTypes, result, exclusion),
         });
       }
       return;
     }
-    setActiveHwTypes(hwTypesWithData);
+    setActiveHwTypes(selectableHwTypes);
   }, [
     selectedModel,
     effectiveSequence,
     precisionsKey,
     hwResetKey,
-    hwTypesWithData,
+    selectableHwTypes,
     exclusion,
     pendingActiveHwTypes,
     resolveHwSelection,
@@ -1174,13 +1195,15 @@ export function InferenceProvider({
   // ── URL sync ──────────────────────────────────────────────────────────────
 
   // Serialize the legend-active set, omitting (empty string → URL default) when
-  // it equals the full set of items with data. Keeps share URLs short.
+  // it equals the full selectable set. Comparing against the selectable set
+  // rather than the metric-filtered one keeps a Measured Energy axis from
+  // baking that axis's coverage into the share URL. Keeps share URLs short.
   const iActiveStr = useMemo(() => {
     if (activeHwTypes.size === 0) return '';
-    if (activeHwTypes.size === hwTypesWithData.size) {
+    if (activeHwTypes.size === selectableHwTypes.size) {
       let same = true;
       for (const k of activeHwTypes) {
-        if (!hwTypesWithData.has(k)) {
+        if (!selectableHwTypes.has(k)) {
           same = false;
           break;
         }
@@ -1188,7 +1211,7 @@ export function InferenceProvider({
       if (same) return '';
     }
     return [...activeHwTypes].toSorted().join(',');
-  }, [activeHwTypes, hwTypesWithData]);
+  }, [activeHwTypes, selectableHwTypes]);
 
   const serializedLabelState = serializeLabelState(labelScenarioKind, {
     showPointLabels,

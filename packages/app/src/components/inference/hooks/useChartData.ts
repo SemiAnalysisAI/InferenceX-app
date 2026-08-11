@@ -187,6 +187,26 @@ export function dedupeRowsToLatestPerConfig<T extends DedupeRow>(rows: T[]): T[]
   return rows.filter((r) => r.date === maxDatePerGroup.get(dedupeSeriesKey(r)));
 }
 
+/**
+ * Coarse filters that apply to every y-axis metric: the explicit GPU picks, the
+ * vendor / deployment / spec quick-filter pills, and the two-GPU compare scope.
+ * Deliberately excludes the y-metric coverage filter, so the result is the set
+ * of configs the user could have selected regardless of which axis is drawn.
+ */
+export function applyScopeFilters(
+  points: InferenceData[],
+  selectedGPUs: string[],
+  quickFilters: QuickFilters,
+  compareGpuPair?: readonly [string, string] | null,
+): InferenceData[] {
+  let scoped = filterByGPU(points, selectedGPUs, GPU_ALIAS_TO_CANONICAL);
+  scoped = applyQuickFilters(scoped, quickFilters);
+  if (compareGpuPair) {
+    scoped = scoped.filter((d) => hardwareKeyMatchesAnyBase(String(d.hwKey), compareGpuPair));
+  }
+  return scoped;
+}
+
 export function useChartData(
   selectedModel: Model,
   selectedSequence: Sequence,
@@ -515,20 +535,15 @@ export function useChartData(
 
     const result = stableChartDefinitions.map(
       ({ chartDefinition, metricKey, xAxisField }, index) => {
-        let filteredData = dataSource[index] || [];
-
-        // Filter by selected GPUs if any
-        filteredData = filterByGPU(filteredData, selectedGPUs, GPU_ALIAS_TO_CANONICAL);
-
-        // Quick filters (vendor / deployment / mtp-stp) — coarse pre-filter that
-        // also prunes the legend and rooflines since they derive from this set.
-        filteredData = applyQuickFilters(filteredData, quickFilters);
-
-        if (compareGpuPair) {
-          filteredData = filteredData.filter((d) =>
-            hardwareKeyMatchesAnyBase(String(d.hwKey), compareGpuPair),
-          );
-        }
+        // Quick filters (vendor / deployment / mtp-stp) are part of this coarse
+        // pre-filter, which also prunes the legend and rooflines since they
+        // derive from this set.
+        const filteredData = applyScopeFilters(
+          dataSource[index] || [],
+          selectedGPUs,
+          quickFilters,
+          compareGpuPair,
+        );
 
         // Filter to points that have the selected metric, then remap x/y.
         // Intentional cost/TTFT outliers are partitioned only after this step
@@ -589,5 +604,17 @@ export function useChartData(
     quickFilters,
   ]);
 
-  return { graphs, loading, error, hardwareConfig, availableQuickFilters };
+  // Points that pass every scope filter but NOT the y-metric coverage filter.
+  // The legend's active set must be reconciled against these, never against
+  // `graphs`: reconcileActiveSet intersects the user's selection with the set
+  // it is handed and never re-widens, so reconciling against metric-filtered
+  // data permanently deletes every config without telemetry for the selected
+  // axis (the Measured Energy axes) the moment that axis is picked. Both chart
+  // definitions are built from the same rows, so index 0 carries every hw key.
+  const selectionPoints = useMemo(
+    () => applyScopeFilters(chartData[0] ?? [], selectedGPUs, quickFilters, compareGpuPair),
+    [chartData, selectedGPUs, quickFilters, compareGpuPair],
+  );
+
+  return { graphs, selectionPoints, loading, error, hardwareConfig, availableQuickFilters };
 }
