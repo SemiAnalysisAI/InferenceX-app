@@ -422,9 +422,39 @@ until the next interaction. Fixing it means giving `useD3ChartRenderer` a
 latest-context ref, which every zoomable chart shares; it is deliberately not done as
 part of this section. The Cypress spec waits out the transition for this reason.
 
+Every rung links its run in the pinned tooltip, not just the opening and closing
+sweeps the table links. Intermediate rungs are exactly where a superseded-but-never-
+purged anomalous run would sit, so leaving them unlinked would have removed the audit
+trail at the one place the trust argument depends on it.
+
 The rule's group is `.lower()`ed on every draw. `renderLines` keeps its paths across
 re-renders through a data join while this layer removes and re-appends, so without
 that the dashed rule climbs above the lines after the first repaint.
+
+### Known visual limitation: the palette is not colourblind-safe here
+
+An adversarial review ran the series colours through a CVD validator and the result
+is worth recording rather than hiding. With the default fleet the chart draws four
+NVIDIA chips plus one AMD chip, which under the site-wide vendor convention
+(`dynamic-colors.ts` gives NVIDIA the green hue zone and AMD the red one) means four
+greens and a red. Seven of ten adjacent pairs fail: worst are MI355X↔B200 at ΔE 1.2
+for protanopia — indistinguishable, and those two lines cross mid-plot — and
+GB200↔GB300 at ΔE 7.7 for normal vision.
+
+This is a property of the vendor convention every chart and legend shares, not of
+this section, so it is deliberately **not** worked around locally: giving this one
+chart its own palette would desync it from the sidebar legend and from every other
+calculator chart. Two things are unavailable as local mitigations too — marker shape
+already encodes _precision_ app-wide and there are only four shapes for five-plus
+chips, and `POINT_SIZE` is a shared constant with no per-layer override, so the dots
+cannot be enlarged to the 8px spec here alone. What the chart does carry is a
+non-colour decoder: every line is named at its right end. Fixing the palette
+properly means re-stepping the vendor zones in `dynamic-colors.ts` for all charts.
+
+Related, and also left alone: the rollout ramps and the post-last-sweep hold are
+assumptions drawn in the same stroke as the measured window, with only the step dots
+marking measurements. The ramp input and the notes say so in words; distinguishing
+them visually was considered and declined to keep one line per chip readable.
 
 ### Token price defaults to break-even
 

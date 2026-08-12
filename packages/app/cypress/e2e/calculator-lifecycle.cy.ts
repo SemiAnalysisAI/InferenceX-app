@@ -138,6 +138,20 @@ describe('Calculator — Fleet Lifecycle', () => {
       });
   });
 
+  it('links the run behind any step, not just the first and last', () => {
+    // The table links only the opening and closing sweeps. Intermediate rungs are
+    // exactly where an anomalous run that was never purged would sit, so pinning
+    // one has to expose its run — otherwise that rung is auditable nowhere.
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .dot-group').last().click();
+    cy.get('[data-chart-tooltip] a')
+      .should('have.length.greaterThan', 0)
+      .first()
+      .should('have.attr', 'href')
+      .and('match', /^https?:\/\//u);
+    // The pin is left in place: the next test's zoom dismisses it, and the
+    // tooltip is a portal outside the SVG so it does not disturb what follows.
+  });
+
   it('zooms the time axis, as its own instructions promise', () => {
     xAxisTicks().then((before) => {
       cy.get('[data-testid="calculator-lifecycle-chart-svg"]').trigger('wheel', {

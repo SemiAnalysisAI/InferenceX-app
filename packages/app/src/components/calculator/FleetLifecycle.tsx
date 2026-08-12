@@ -131,6 +131,8 @@ const STRINGS = {
     tipCost: 'Cost/day',
     tipCumulative: 'Cumulative',
     tipSinceFirst: 'Since first run',
+    tipRunLink: 'Open run',
+    tipRunHint: 'Click the point to open its run',
     assumptions: (tier: string, chips: string, release: string) =>
       `Anchored at the ${release} release. Fleet sized by facility power at ${chips}; cost = chips × ${tier} $/chip/hr, flat for the whole window. Revenue is priced on the selected token type and reduced by the availability haircut. Price, ramp, MTBI, recovery and horizon are your assumptions — the throughput steps are not.`,
     source: 'Source: ',
@@ -205,6 +207,8 @@ const STRINGS = {
     tipCost: '每日成本',
     tipCumulative: '累计',
     tipSinceFirst: '相比首次运行',
+    tipRunLink: '查看运行',
+    tipRunHint: '点击该点可查看其运行记录',
     assumptions: (tier: string, chips: string, release: string) =>
       `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = Chip 数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、爬坡期、平均无故障间隔、恢复时间与测算期为你的假设——吞吐量台阶不是。`,
     source: '来源：',
@@ -532,7 +536,10 @@ export default function FleetLifecycle({
       rows.map((r) => {
         // Step risers are keyed by month so the tooltip can name the run behind
         // each one; months come from the same arithmetic the schedule used.
-        const stepInfo = new Map<number, { date: string; config: string; factor: number }>();
+        const stepInfo = new Map<
+          number,
+          { date: string; config: string; factor: number; runUrls: string[] }
+        >();
         for (const step of r.progression.steps) {
           const month = (Date.parse(`${step.date}T00:00:00Z`) - anchorMs) / MS_PER_MONTH;
           // The config is now the thing that changes along the line, so name the
@@ -544,6 +551,7 @@ export default function FleetLifecycle({
             date: step.date,
             config: [software === '—' ? '' : software, detail].filter(Boolean).join(' · '),
             factor: step.factorOverFirst,
+            runUrls: step.runUrls,
           });
         }
         return {
@@ -848,6 +856,8 @@ export default function FleetLifecycle({
                 revenuePerDay: t.tipRevenue,
                 costPerDay: t.tipCost,
                 cumulative: t.tipCumulative,
+                runLink: t.tipRunLink,
+                runHint: t.tipRunHint,
                 sinceFirst: t.tipSinceFirst,
               }}
             />

@@ -29,8 +29,8 @@ export interface LifecycleChartSeries {
   label: string;
   color: string;
   series: LifecycleSeries;
-  /** Run date and config label for each step riser, keyed by month. */
-  stepInfo: Map<number, { date: string; config: string; factor: number }>;
+  /** Run date, config label and run links for each step riser, keyed by month. */
+  stepInfo: Map<number, { date: string; config: string; factor: number; runUrls: string[] }>;
 }
 
 /** A hovered step riser — one measured config improvement. */
@@ -59,6 +59,8 @@ interface FleetLifecycleChartProps {
     costPerDay: string;
     cumulative: string;
     sinceFirst: string;
+    runLink: string;
+    runHint: string;
   };
   breakEvenLabel: string;
   legendElement?: React.ReactNode;
@@ -419,6 +421,25 @@ const FleetLifecycleChart = React.memo(
             <div class="text-muted-foreground">${escapeHtml(labels.costPerDay)}: ${money(point.cost)}</div>
             <div class="mt-1">${escapeHtml(labels.cumulative)}: ${money(point.cumulative)}</div>
             ${factor ? `<div class="text-muted-foreground">${escapeHtml(labels.sinceFirst)}:${escapeHtml(factor)}</div>` : ''}
+            ${
+              // Every rung links its run, not just the first and last. The table
+              // only links the opening and closing sweeps, so without this the
+              // intermediate rungs — exactly where an anomalous run that was never
+              // purged would sit — have no audit trail anywhere in the UI. Pin the
+              // tooltip (click the dot) to follow one.
+              isPinned && info?.runUrls.length
+                ? `<div class="mt-1">${info.runUrls
+                    .map(
+                      (url, i) =>
+                        `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="text-primary underline mr-2">${escapeHtml(labels.runLink)}${
+                          info.runUrls.length > 1 ? ` ${i + 1}` : ''
+                        }</a>`,
+                    )
+                    .join('')}</div>`
+                : info?.runUrls.length
+                  ? `<div class="mt-1 text-muted-foreground">${escapeHtml(labels.runHint)}</div>`
+                  : ''
+            }
           </div>`;
         },
         getRulerX: (d: StepMarker, xScale: any) => xScale(d.x),
