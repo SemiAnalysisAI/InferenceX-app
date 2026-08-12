@@ -33,6 +33,8 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
       },
     });
     cy.wait('@unofficialRun');
+    // Interactivity is nested under the Advanced menu on agentic charts.
+    cy.get('[data-testid="x-axis-mode-advanced"]').click();
     cy.get('[data-testid="x-axis-mode-interactivity"]').click();
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(

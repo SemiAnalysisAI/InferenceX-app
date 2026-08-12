@@ -123,6 +123,21 @@ const interceptFixedSequenceData = () => {
   cy.intercept('GET', '/api/v1/benchmarks*', { body: fixedSequenceBenchmarks }).as('benchmarks');
 };
 
+/**
+ * On agentic charts, Interactivity / E2E Latency / TTFT live inside the
+ * "Advanced" menu rather than as top-level tabs, so they must be revealed
+ * before they can be clicked. The menu closes on select, so the post-select
+ * assertion targets the trigger, which carries the active state and the
+ * selected metric's label.
+ */
+function selectAdvancedXAxisMode(mode: 'interactivity' | 'e2e' | 'ttft', label: string) {
+  cy.get('[data-testid="x-axis-mode-advanced"]').click();
+  cy.get(`[data-testid="x-axis-mode-${mode}"]`).click();
+  cy.get('[data-testid="x-axis-mode-advanced"]')
+    .should('have.attr', 'data-state', 'active')
+    .and('contain.text', label);
+}
+
 describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
     interceptAgenticData();
@@ -141,9 +156,13 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
 
   it('shows E2E Normalized Interactivity by default for the agentic view, as the leftmost option', () => {
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Traces');
-    cy.get('[data-testid="x-axis-mode-ttft"]').should('be.visible');
-    cy.get('[data-testid="x-axis-mode-e2e"]').should('be.visible');
-    cy.get('[data-testid="x-axis-mode-interactivity"]').should('be.visible');
+    // The three per-request latency modes are nested under Advanced on agentic.
+    cy.get('[data-testid="x-axis-mode-ttft"]').should('not.exist');
+    cy.get('[data-testid="x-axis-mode-e2e"]').should('not.exist');
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should('not.exist');
+    cy.get('[data-testid="x-axis-mode-advanced"]')
+      .should('be.visible')
+      .and('have.attr', 'data-state', 'inactive');
     cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]')
       .should('be.visible')
       .and('have.attr', 'aria-selected', 'true');
@@ -162,12 +181,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   });
 
   it('switches to Interactivity and updates the heading', () => {
-    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
-    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
-      'have.attr',
-      'aria-selected',
-      'true',
-    );
+    selectAdvancedXAxisMode('interactivity', 'Interactivity');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
   });
 
@@ -206,12 +220,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
 
   it('shows the selected percentile in the Interactivity axis label', () => {
     // Explicitly select the mode — do not rely on the agentic default mode.
-    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
-    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
-      'have.attr',
-      'aria-selected',
-      'true',
-    );
+    selectAdvancedXAxisMode('interactivity', 'Interactivity');
     // Agentic plots percentile fields (p90_intvty), so the axis label carries it.
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
@@ -243,14 +252,12 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   });
 
   it('switches the x-axis to TTFT and updates the heading', () => {
-    cy.get('[data-testid="x-axis-mode-ttft"]').click();
-    cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
+    selectAdvancedXAxisMode('ttft', 'TTFT');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
   });
 
   it('switches the x-axis to E2E Latency and updates the heading', () => {
-    cy.get('[data-testid="x-axis-mode-e2e"]').click();
-    cy.get('[data-testid="x-axis-mode-e2e"]').should('have.attr', 'aria-selected', 'true');
+    selectAdvancedXAxisMode('e2e', 'E2E Latency');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'End-to-end Latency');
     cy.get('[data-testid="chart-figure"] svg').should('contain.text', 'P90 End-to-end Latency (s)');
   });
@@ -291,13 +298,36 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     );
   });
 
-  it('switches back to Interactivity', () => {
-    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
-    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
+  // Documents the intended pairing of the Advanced menu with manual tab
+  // activation: focus may move to the lone remaining tab without the x-axis
+  // snapping back to it. The load-bearing guard for manual activation is the
+  // 8K/1K test below, where focus-activation is directly observable; this one
+  // states the agentic-side expectation.
+  it('keeps the Advanced selection when the remaining tab is focused', () => {
+    selectAdvancedXAxisMode('ttft', 'TTFT');
+
+    // Let the popover finish closing first: Radix restores focus to its own
+    // trigger on close, which would otherwise win the race against the focus
+    // below and mask the revert this test is guarding against.
+    cy.get('[data-testid="x-axis-mode-advanced-menu"]').should('not.exist');
+    cy.get('[data-testid="x-axis-mode-advanced"]').should('have.focus');
+
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').focus();
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should('have.focus');
+
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should(
       'have.attr',
       'aria-selected',
-      'true',
+      'false',
     );
+    cy.get('[data-testid="x-axis-mode-advanced"]')
+      .should('have.attr', 'data-state', 'active')
+      .and('contain.text', 'TTFT');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
+  });
+
+  it('switches back to Interactivity', () => {
+    selectAdvancedXAxisMode('interactivity', 'Interactivity');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
@@ -308,7 +338,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   it('follows the percentile selector in the Interactivity axis label', () => {
     // Select p75 here rather than inheriting it from another test — the axis
     // label must track the selector on its own.
-    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
+    selectAdvancedXAxisMode('interactivity', 'Interactivity');
     cy.get('[data-testid="percentile-selector"]').click();
     cy.contains('[role="option"]', 'p75').click();
     cy.get('[data-testid="chart-figure"] svg').should(
@@ -333,11 +363,9 @@ describe('X-axis mode URL param', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Traces');
-    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
-      'have.attr',
-      'aria-selected',
-      'true',
-    );
+    cy.get('[data-testid="x-axis-mode-advanced"]')
+      .should('have.attr', 'data-state', 'active')
+      .and('contain.text', 'Interactivity');
     // Assert on the rendered chart too: the clobber happened one tick after
     // the buttons first painted, so a button-only check could pass too early.
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
@@ -396,6 +424,53 @@ describe('Label defaults for fixed-sequence scenarios', () => {
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
+  });
+
+  // Radix Tabs activates on focus by default, which would switch the x-axis
+  // (and redraw the chart) just from tabbing through the strip. The Tabs root
+  // sets activationMode="manual" to prevent that. Pins the intended behavior;
+  // note that focus-activation proved timing-dependent to reproduce, so treat
+  // this as a behavioral assertion rather than a proven pre-fix reproduction.
+  it('does not switch the x-axis merely by focusing another tab', () => {
+    interceptFixedSequenceData();
+    cy.visit('/inference?i_seq=8k%2F1k', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+
+    cy.get('[data-testid="x-axis-mode-ttft"]').click();
+    cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
+
+    cy.get('[data-testid="x-axis-mode-interactivity"]').focus();
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should('have.focus');
+
+    // Focus moved, selection did not.
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
+      'have.attr',
+      'aria-selected',
+      'false',
+    );
+    cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
+  });
+
+  // Only agentic nests the latency modes: E2E Normalized Interactivity is
+  // agentic-only, so collapsing them here would leave an empty tab strip.
+  it('keeps the flat x-axis strip with no Advanced menu', () => {
+    interceptFixedSequenceData();
+    cy.visit('/inference?i_seq=8k%2F1k', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+
+    cy.get('[data-testid="x-axis-mode-buttons"]').should('be.visible');
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should('be.visible');
+    cy.get('[data-testid="x-axis-mode-e2e"]').should('be.visible');
+    cy.get('[data-testid="x-axis-mode-ttft"]').should('be.visible');
+    cy.get('[data-testid="x-axis-mode-advanced"]').should('not.exist');
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should('not.exist');
+    cy.get('[data-testid="x-axis-mode-buttons"] [role="tab"]').should('have.length', 3);
   });
 
   it('honors explicit label URL overrides', () => {
@@ -495,12 +570,7 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
 
   it('shows overlay (unofficial-run) watermark SVG when an overlay is loaded', () => {
     // Explicitly select Interactivity — do not rely on the agentic default mode.
-    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
-    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
-      'have.attr',
-      'aria-selected',
-      'true',
-    );
+    selectAdvancedXAxisMode('interactivity', 'Interactivity');
     // The unofficial-run pattern watermark appears when isUnofficialRun is true.
     cy.get('[data-testid="inference-chart-display"] svg pattern[id^="unofficial-pattern-"]').should(
       'exist',
@@ -516,8 +586,7 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
   });
 
   it('switches to ttft x-axis mode and renders SVG with overlay points', () => {
-    cy.get('[data-testid="x-axis-mode-ttft"]').click();
-    cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
+    selectAdvancedXAxisMode('ttft', 'TTFT');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
     // Overlay points render as triangles or circles inside the chart SVG.
     cy.get('[data-testid="inference-chart-display"] svg').should('exist');
