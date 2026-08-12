@@ -114,6 +114,32 @@ jobs:
             echo "reset-staging-database=$RESET_STAGING_DATABASE"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Report staging start
+        env:
+          RUN_ID: ${{ steps.request.outputs.run-id }}
+          RUN_DATE: ${{ steps.request.outputs.run-date }}
+          PR_NUMBER: ${{ steps.request.outputs.pr-number }}
+          REQUESTED_BY: ${{ steps.request.outputs.requested-by }}
+          COMMENT_ID: ${{ steps.request.outputs.comment-id }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ secrets.PAT }}
+          script: |
+            await github.rest.repos.createDispatchEvent({
+              owner: 'SemiAnalysisAI',
+              repo: 'InferenceX',
+              event_type: 'stage-results-started',
+              client_payload: {
+                'source-repository': `${context.repo.owner}/${context.repo.repo}`,
+                'pr-number': process.env.PR_NUMBER,
+                'run-id': process.env.RUN_ID,
+                'run-date': process.env.RUN_DATE,
+                'requested-by': process.env.REQUESTED_BY,
+                'comment-id': process.env.COMMENT_ID,
+                'app-run-id': String(context.runId),
+              },
+            });
+
   sync-staging-branch:
     name: Fast-forward Git staging branch
     needs: validate
