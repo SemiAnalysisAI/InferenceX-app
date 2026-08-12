@@ -121,3 +121,62 @@ Agentic interactivity follows the same definition as the main inference chart:
 `b300Rows` in `cypress/support/overlay-fixtures.ts` covers the agentic calculator
 path; `singleTurnRows` remains the fixture for fixed-sequence visibility and
 sequence-switching behavior.
+
+## Reciprocal Metrics Are Derived, Not Splined
+
+`$/M tok` and `J/token` are a per-chip constant divided by a throughput
+(`$/GPU-hr x 1e6 / (tok/s x 3600)`, `W / (tok/s)`). `interpolateForGPU`,
+`maxInteractivityAtCost` and `interpolateMetricAtInteractivity` therefore spline
+the **throughput** those metrics divide and re-derive the metric, rather than
+splining the metric itself.
+
+Splining them directly averages reciprocals. Because `1/x` is convex, the result
+sits away from the value implied by the interpolated throughput — by
+`(1+r)^2/(4r)` for a knot pair whose throughputs differ by `r`, which reaches
+~25x on sparsely swept frontiers (`r` up to 103). Measured over the captured
+fixture: the two agree exactly at all 470 frontier knots, and between knots the
+splined read is higher 73.6% of the time (median 1.057, p95 3.97, max 25.3, min
+0.95 — the direction is usual, not universal, because Steffen slopes make the
+cubic undershoot the chord in some brackets).
+
+`/inference` is the tiebreak: it plots these metrics only at measured points
+(`lib/chart-utils.ts:380`, `roof: false`), so its values are the oracle and they
+satisfy `metric x throughput = constant` by construction. Leave-one-out over 144
+held-out interior knots:
+
+| method                  | mean err | p50   | p90    | p99     | closer to oracle |
+| ----------------------- | -------- | ----- | ------ | ------- | ---------------- |
+| splined metric          | 162.8%   | 86.3% | 528.1% | 1402.1% | 36 / 144         |
+| derived from throughput | 42.2%    | 23.0% | 72.0%  | 245.3%  | **108 / 144**    |
+
+Deriving is ~4x closer and preserves the identity; splining broke it by a median
+71.6% and up to 2026%, reporting operating points no real config could occupy.
+
+### The consistency guard
+
+`recoverReciprocalNumerator` returns the constant only if **every** usable point
+agrees on it (1e-9 relative). That guard is what licenses the rewrite, and it is
+not theoretical: the `measured*` energy keys have a numerator measured per point
+rather than a constant, so they are excluded from `RECIPROCAL_OF_THROUGHPUT` and
+still splined directly. When the guard fails, all three call sites fall back to
+splining — so synthetic or hand-built points whose cost is unrelated to their
+throughput keep their previous behaviour instead of being silently rewritten.
+
+The rate is recovered across **all three token types at once** (`recoverCostRate`).
+Checking one family alone and falling back to another would recover a rate from
+output tokens and then apply it to total throughput; the existing
+`maxInteractivityAtCost` tests caught exactly that mistake.
+
+### Impact on published numbers
+
+Costs come down, since they were the overstated side. Over 555 unclamped reads
+(dsr1 8k/1k, targets 20-75), new/old:
+
+| metric         | p05   | p50   | p95   | min   | within 1% | within 10% |
+| -------------- | ----- | ----- | ----- | ----- | --------- | ---------- |
+| $/M tok total  | 0.379 | 0.963 | 1.026 | 0.039 | 19.1%     | 66.5%      |
+| $/M tok output | 0.220 | 0.948 | 1.026 | 0.020 | 17.8%     | 61.3%      |
+| $/M tok input  | 0.553 | 0.976 | 1.026 | 0.100 | 27.6%     | 75.0%      |
+
+Two-thirds of reads move under 10%; the tail is the sparsely swept disaggregated
+configs, which is also where the old numbers were least defensible.

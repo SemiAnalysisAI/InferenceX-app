@@ -159,6 +159,99 @@ export function getCostField(
 }
 
 /**
+ * Recover the constant numerator `c` of a metric that is defined as
+ * `c / throughput`, from any frontier point that carries both values.
+ *
+ * Cost per million tokens is `$/GPU-hr x 1e6 / (tok/s x 3600)` and energy per
+ * token is `W / (tok/s)`: both are a per-chip constant divided by a throughput,
+ * and the constant is identical at every point of a config. Recovering it from
+ * the points avoids threading the hardware registry into this module, which must
+ * stay dependency-free for the Python port.
+ *
+ * Why this exists: splining such a metric directly is wrong. It averages
+ * reciprocals, and `1/x` is convex, so the interpolated metric diverges from the
+ * value implied by the interpolated throughput — by `(1+r)^2/(4r)` for a knot
+ * pair whose throughputs differ by `r`, and `r` reaches ~100 on sparsely swept
+ * frontiers. Measured on real frontiers, the splined read is the higher one
+ * 73.6% of the time (median 1.057, max 25.3, min 0.95 — Steffen slopes let the
+ * cubic undershoot the chord in some brackets, so the direction is usual rather
+ * than universal). Deriving from the interpolated throughput preserves the
+ * identity `metric x throughput = c` that the per-point values on /inference obey
+ * by construction, and lands ~4x closer to held-out measured points. See
+ * docs/tco-calculator.md.
+ *
+ * Returns null unless EVERY usable point agrees on the constant. That check is
+ * the safety rail: the identity is what licenses re-deriving the metric, so a
+ * metric whose numerator actually varies per point (measured power, say) must
+ * fall back to being splined directly rather than have its values silently
+ * rewritten from one point's ratio.
+ */
+export function recoverReciprocalNumerator(
+  values: readonly number[],
+  throughputs: readonly number[],
+): number | null {
+  // Dashboard values come from one getGpuSpecs(hwKey) lookup, so they agree to
+  // float rounding (~1e-16). The tolerance is far looser than that on purpose:
+  // the Python port is fed hand-assembled JSON for blog tables, where costs are
+  // written to a few decimals and a 1e-9 gate would silently reject them and
+  // fall back to the worse method. 0.1% still comfortably rejects what this
+  // guard is for — a numerator that genuinely varies per point, like measured
+  // power, which moves by whole percent across a sweep. And a numerator varying
+  // by less than 0.1% makes deriving and splining agree anyway.
+  const RELATIVE_TOLERANCE = 1e-3;
+  let numerator: number | null = null;
+
+  for (let i = 0; i < values.length; i += 1) {
+    const value = values[i];
+    const throughput = throughputs[i];
+    if (value === undefined || throughput === undefined) continue;
+    if (!(value > 0) || !(throughput > 0)) continue;
+
+    const candidate = value * throughput;
+    if (numerator === null) {
+      numerator = candidate;
+    } else if (Math.abs(candidate - numerator) > Math.abs(numerator) * RELATIVE_TOLERANCE) {
+      return null;
+    }
+  }
+
+  return numerator;
+}
+
+/** Evaluate a `numerator / throughput` metric at an interpolated throughput. */
+export function reciprocalMetricAt(numerator: number | null, throughput: number): number {
+  if (numerator === null || !(throughput > 0)) return 0;
+  return numerator / throughput;
+}
+
+/**
+ * The single provider rate that must explain every cost field on these points,
+ * or null if it does not.
+ *
+ * All three token types share one `$/GPU-hr x 1e6/3600` and differ only in the
+ * throughput they divide, so consistency has to be checked across all of them
+ * together. Checking one family in isolation and falling back to another would
+ * recover a rate from output tokens and then apply it to total throughput.
+ */
+function recoverCostRate(
+  sorted: readonly GPUDataPoint[],
+  costProvider: CostProvider,
+): number | null {
+  return recoverReciprocalNumerator(
+    [
+      ...sorted.map((p) => getCostField(p, costProvider, 'total')),
+      ...sorted.map((p) => getCostField(p, costProvider, 'output')),
+      ...sorted.map((p) => getCostField(p, costProvider, 'input')),
+    ],
+    [
+      ...sorted.map((p) => p.throughput),
+      ...sorted.map((p) => p.outputThroughput),
+      ...sorted.map((p) => p.inputThroughput),
+    ],
+  );
+}
+
+/**
  * Given a set of data points for a single GPU, find the maximum interactivity
  * (tok/s/user) whose interpolated cost per million tokens stays at or below
  * `targetCost`, using the same Pareto frontier + monotone spline as
@@ -195,12 +288,30 @@ export function maxInteractivityAtCost(
   }
 
   const xs = sorted.map((p) => p.interactivity);
-  const ys = sorted.map(getCost);
+  // Cost is derived from the interpolated throughput of the selected token type,
+  // exactly as interpolateForGPU does it — otherwise this inverse lookup would
+  // answer against a different cost curve than the bars the user is reading.
+  const getTput = (p: GPUDataPoint) =>
+    costType === 'input'
+      ? p.inputThroughput
+      : costType === 'output'
+        ? p.outputThroughput
+        : p.throughput;
+  const tputs = sorted.map(getTput);
+  const costs = sorted.map(getCost);
+  // Same decision as interpolateForGPU, so the inverse lookup and the bars can
+  // never answer against different cost curves.
+  const rate = recoverCostRate(sorted, costProvider);
+  // Spline whichever series the identity licenses: the throughput when cost is
+  // genuinely `rate / throughput`, otherwise cost itself (previous behaviour).
+  const ys = rate === null ? costs : tputs;
   const slopes = monotoneSlopes(xs, ys);
-  // Same overshoot clamp as interpolateForGPU's buildMetric
+  // Same overshoot clamp as interpolateForGPU's buildMetric.
   const lo = Math.min(...ys);
   const hi = Math.max(...ys);
-  const costAt = (x: number) => Math.max(lo, Math.min(hi, hermiteInterpolate(xs, ys, slopes, x)));
+  const splineAt = (x: number) => Math.max(lo, Math.min(hi, hermiteInterpolate(xs, ys, slopes, x)));
+  const costAt = (x: number) =>
+    rate === null ? splineAt(x) : reciprocalMetricAt(rate, splineAt(x));
 
   const minX = xs[0];
   const maxX = xs.at(-1)!;
@@ -315,9 +426,28 @@ export function interpolateForGPU(
   const value = buildMetric(getOutputValue);
   const outputTputValue = buildMetric((p) => p.outputThroughput);
   const inputTputValue = buildMetric((p) => p.inputThroughput);
-  const cost = buildMetric((p) => getCostField(p, costProvider, 'total'));
-  const costInput = buildMetric((p) => getCostField(p, costProvider, 'input'));
-  const costOutput = buildMetric((p) => getCostField(p, costProvider, 'output'));
+
+  // Cost is `$/GPU-hr / tokens` — a constant over a throughput — so it is
+  // derived from the interpolated throughput rather than splined itself. See
+  // `recoverReciprocalNumerator`. In throughput_to_interactivity mode the target
+  // axis *is* total throughput, so the clamped target is the value to divide by.
+  const totalTputAtTarget = mode === 'interactivity_to_throughput' ? value : clampedTarget;
+  const rate = recoverCostRate(sorted, costProvider);
+  // `rate === null` means these points do not obey the identity, so the metric
+  // is splined directly as before rather than rewritten from one point's ratio.
+  const cost =
+    rate === null
+      ? buildMetric((p) => getCostField(p, costProvider, 'total'))
+      : reciprocalMetricAt(rate, totalTputAtTarget);
+  const costInput =
+    rate === null
+      ? buildMetric((p) => getCostField(p, costProvider, 'input'))
+      : reciprocalMetricAt(rate, inputTputValue);
+  const costOutput =
+    rate === null
+      ? buildMetric((p) => getCostField(p, costProvider, 'output'))
+      : reciprocalMetricAt(rate, outputTputValue);
+
   const tpPerMw = buildMetric((p) => p.tpPerMw);
   const inputTpPerMw = buildMetric((p) => p.inputTpPerMw);
   const outputTpPerMw = buildMetric((p) => p.outputTpPerMw);
