@@ -518,26 +518,28 @@ export const CAROUSEL_ORGS = [
   'Microsoft',
   'Meta Superintelligence Labs',
   'Oracle',
-  'Together AI',
   'vLLM',
   'GPU Mode',
   'PyTorch Foundation',
   'CoreWeave',
-  'Nebius',
   'TensorWave',
   'SGLang',
   'WEKA',
   'Stanford',
   'Hugging Face',
   'Lambda',
-  'UC San Diego',
   'Red Hat',
-  'White House',
   'SambaNova',
   'TileRT',
 ] as const;
 
-/** Display label overrides for carousel orgs. */
+/**
+ * Display label overrides for carousel orgs.
+ *
+ * `Together AI` is not currently in CAROUSEL_ORGS, so its override is inert —
+ * it is kept so the card reads "Tri Dao" rather than "Together AI" if the org
+ * is added back to the carousel.
+ */
 export const CAROUSEL_LABELS: Record<string, string> = {
   'Together AI': 'Tri Dao',
   'PyTorch Foundation': 'PyTorch',
