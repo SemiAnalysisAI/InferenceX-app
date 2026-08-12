@@ -1,0 +1,258 @@
+/**
+ * All-time best operating point per hwKey — pure, no React.
+ *
+ * The calculator reads one run date: whatever the latest sweep measured is what
+ * a chip is credited with. That understates hardware whose best config was
+ * found earlier and has since been superseded by a sweep exploring a different
+ * part of the space. Measured against production history, ~37% of configs have
+ * their best read at the target on an earlier date, worth up to ~3.6× — so for
+ * a fleet-lifecycle projection, where the question is "what can this chip do?"
+ * rather than "what did last week's sweep do?", the all-time best is the honest
+ * number.
+ *
+ * Two rules make that defensible rather than merely flattering:
+ *
+ * 1. **Clamped reads are discarded.** `interpolateForGPU` always returns a
+ *    value, clamping the target into each frontier's measured range, which at a
+ *    low target credits a sweep's peak throughput at an interactivity it never
+ *    served. Searching every date multiplies the chances of picking up such an
+ *    edge read — at target 20 tok/s/user, 63% of naive winners are clamped — so
+ *    this module applies the no-extrapolation rule instead (the same rule
+ *    `useInterpolatedTrendData` uses) and reports the hwKeys it thereby has no
+ *    read for, rather than silently dropping them.
+ * 2. **Provenance travels with the number.** Every winner carries its date and
+ *    run URL, because the run date stamped above the calculator no longer
+ *    describes it.
+ *
+ * Precisions are pooled into one frontier per hwKey: the question is what the
+ * chip's best config achieves, and precision is part of the config.
+ */
+
+import type { BenchmarkRow } from '@/lib/api';
+import { Percentile, type Sequence } from '@/lib/data-mappings';
+
+import { interpolateForGPU } from './interpolation';
+import { buildGpuGroups, type GroupMeta } from './useThroughputData';
+import type { CalculatorMode, CostProvider, GPUDataPoint, InterpolatedResult } from './types';
+
+/** Separator for the `hwKey|date` group key. Dates never contain a pipe. */
+const KEY_SEP = '|';
+
+interface DatedGroupMeta extends GroupMeta {
+  date: string;
+}
+
+export interface HistoricalBestEntry {
+  hwKey: string;
+  /** Run date the winning frontier was measured on. */
+  date: string;
+  /** Run URLs contributing to that date's frontier — usually one. */
+  runUrls: string[];
+  /** The winning read, unclamped by construction. */
+  result: InterpolatedResult;
+  /** Rank value the winner was chosen by, from the caller's `rank`. */
+  rankValue: number;
+  /** Dates with rows for this hwKey. */
+  datesConsidered: number;
+  /** Dates that produced an unclamped read at the target. */
+  datesMeasured: number;
+  /** Latest date with rows, whether or not it won. */
+  latestDate: string;
+  /** True when an earlier date beat the latest one — the feature doing its job. */
+  supersededLatest: boolean;
+  /** Rank value of the latest date's read, when it had an unclamped one. */
+  latestRankValue: number | null;
+}
+
+export interface HistoricalUnmeasured {
+  hwKey: string;
+  /** Widest measured range of the mode's input metric across all dates. */
+  measuredMin: number;
+  measuredMax: number;
+  datesConsidered: number;
+}
+
+export interface HistoricalBestOutcome {
+  /** Winners, ranked best first. */
+  best: HistoricalBestEntry[];
+  /** hwKeys with data that was never measured at the target. Never silently dropped. */
+  unmeasured: HistoricalUnmeasured[];
+  /** Distinct run dates present in the input. */
+  datesSeen: number;
+}
+
+/** One run date's sweep for one hwKey, ready to interpolate. */
+export interface DatedSweep {
+  date: string;
+  points: GPUDataPoint[];
+  /** Run URLs pooled into this date. */
+  runUrls: string[];
+}
+
+/** History grouped per hwKey per date — the expensive half, independent of the target. */
+export interface HistoryGroups {
+  byHwKey: Map<string, DatedSweep[]>;
+  datesSeen: number;
+}
+
+export interface GroupHistoryOptions {
+  rows: BenchmarkRow[];
+  sequence: Sequence;
+  precisions: string[];
+  /** Agentic percentile; ignored for fixed sequences. */
+  percentile?: Percentile;
+  /**
+   * Restricts grouping. Callers driving a legend should leave this unset and
+   * filter for display instead, so toggling a legend entry does not rebuild
+   * every frontier.
+   */
+  visibleHwKeys?: Set<string>;
+}
+
+/**
+ * Stage one: bucket raw history rows into one sweep per (hwKey, date).
+ *
+ * Split from selection so a caller can memoize this on the rows and re-run only
+ * the read when the target interactivity moves.
+ */
+export function groupHistoryByHwKeyAndDate(options: GroupHistoryOptions): HistoryGroups {
+  const { rows, sequence, precisions, percentile = Percentile.P90, visibleHwKeys } = options;
+  if (rows.length === 0 || precisions.length === 0) {
+    return { byHwKey: new Map(), datesSeen: 0 };
+  }
+
+  // Collected during classification so it covers exactly the rows that survive
+  // buildGpuGroups' sequence/precision/hardware filters.
+  const runUrlsByGroup = new Map<string, Set<string>>();
+
+  const { grouped, groupMeta } = buildGpuGroups<DatedGroupMeta>(rows, {
+    sequence,
+    precisions,
+    percentile,
+    classify: (hwKey, row) => {
+      if (visibleHwKeys && !visibleHwKeys.has(hwKey)) return null;
+      if (!row.date) return null;
+      const key = `${hwKey}${KEY_SEP}${row.date}`;
+      if (row.run_url) {
+        const urls = runUrlsByGroup.get(key) ?? new Set<string>();
+        urls.add(row.run_url);
+        runUrlsByGroup.set(key, urls);
+      }
+      return { key, meta: { hwKey, date: row.date } };
+    },
+  });
+
+  const byHwKey = new Map<string, DatedSweep[]>();
+  const allDates = new Set<string>();
+  for (const [groupKey, points] of Object.entries(grouped)) {
+    const meta = groupMeta[groupKey];
+    if (!meta || points.length === 0) continue;
+    allDates.add(meta.date);
+    const list = byHwKey.get(meta.hwKey) ?? [];
+    list.push({
+      date: meta.date,
+      points,
+      runUrls: [...(runUrlsByGroup.get(groupKey) ?? [])],
+    });
+    byHwKey.set(meta.hwKey, list);
+  }
+
+  return { byHwKey, datesSeen: allDates.size };
+}
+
+export interface SelectBestOptions {
+  targetValue: number;
+  mode: CalculatorMode;
+  costProvider: CostProvider;
+  /**
+   * Ranks candidate reads. Callers pass the cost-matrix accessor for the
+   * selected token type — `(r) => getTpPerMwForType(r, costType)` — so the
+   * winner is chosen on the same basis the fleet is sized by.
+   */
+  rank: (result: InterpolatedResult) => number;
+}
+
+/**
+ * Stage two: read every date's frontier at the target and keep each hwKey's
+ * best unclamped result.
+ */
+export function selectBestFromGroups(
+  groups: HistoryGroups,
+  options: SelectBestOptions,
+): HistoricalBestOutcome {
+  const { targetValue, mode, costProvider, rank } = options;
+  const { byHwKey, datesSeen } = groups;
+
+  const getInputValue = (p: GPUDataPoint) =>
+    mode === 'interactivity_to_throughput' ? p.interactivity : p.throughput;
+
+  const best: HistoricalBestEntry[] = [];
+  const unmeasured: HistoricalUnmeasured[] = [];
+
+  for (const [hwKey, dated] of byHwKey) {
+    const latestDate = dated.reduce((a, b) => (b.date > a ? b.date : a), dated[0]!.date);
+
+    let winner: { sweep: DatedSweep; result: InterpolatedResult; rankValue: number } | null = null;
+    let latestRankValue: number | null = null;
+    let datesMeasured = 0;
+
+    for (const sweep of dated) {
+      const result = interpolateForGPU(sweep.points, targetValue, mode, costProvider);
+      // The no-extrapolation rule: a clamped read is the frontier's nearest
+      // edge, not a measurement at the target, and must not win.
+      if (!result || result.clamped || !(result.value > 0)) continue;
+
+      datesMeasured += 1;
+      const rankValue = rank(result);
+      if (!Number.isFinite(rankValue)) continue;
+      if (sweep.date === latestDate) latestRankValue = rankValue;
+      if (!winner || rankValue > winner.rankValue) winner = { sweep, result, rankValue };
+    }
+
+    if (!winner) {
+      let measuredMin = Infinity;
+      let measuredMax = -Infinity;
+      for (const { points } of dated) {
+        for (const p of points) {
+          const v = getInputValue(p);
+          if (v < measuredMin) measuredMin = v;
+          if (v > measuredMax) measuredMax = v;
+        }
+      }
+      unmeasured.push({
+        hwKey,
+        measuredMin: Number.isFinite(measuredMin) ? measuredMin : 0,
+        measuredMax: Number.isFinite(measuredMax) ? measuredMax : 0,
+        datesConsidered: dated.length,
+      });
+      continue;
+    }
+
+    best.push({
+      hwKey,
+      date: winner.sweep.date,
+      runUrls: winner.sweep.runUrls,
+      // The result's own resultKey is the dated group key; the caller keys on
+      // hwKey, so restate it here.
+      result: { ...winner.result, hwKey, resultKey: hwKey },
+      rankValue: winner.rankValue,
+      datesConsidered: dated.length,
+      datesMeasured,
+      latestDate,
+      supersededLatest: winner.sweep.date !== latestDate,
+      latestRankValue,
+    });
+  }
+
+  best.sort((a, b) => b.rankValue - a.rankValue || a.hwKey.localeCompare(b.hwKey));
+  unmeasured.sort((a, b) => a.hwKey.localeCompare(b.hwKey));
+
+  return { best, unmeasured, datesSeen };
+}
+
+/** Convenience composition of both stages, for callers with no memoization needs. */
+export function selectHistoricalBest(
+  options: GroupHistoryOptions & SelectBestOptions,
+): HistoricalBestOutcome {
+  return selectBestFromGroups(groupHistoryByHwKeyAndDate(options), options);
+}

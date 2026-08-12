@@ -73,6 +73,13 @@ const URL_STATE_KEYS = [
   // Calculator (fleet planner)
   'c_mw',
   'c_costcap',
+  // Calculator (fleet lifecycle) — token price plus the four timing assumptions
+  'c_price',
+  'c_ttfi',
+  'c_ramp',
+  'c_mtbi',
+  'c_rec',
+  'c_life',
 ] as const;
 
 export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
@@ -137,6 +144,14 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   r_active: '',
   c_mw: '',
   c_costcap: '',
+  // Empty means "use the component's default": the price default is derived
+  // from the cheapest visible chip's break-even, which is not a constant.
+  c_price: '',
+  c_ttfi: '6',
+  c_ramp: '6',
+  c_mtbi: '24',
+  c_rec: '12',
+  c_life: '60',
 };
 
 /** Which param prefixes are relevant per tab. */

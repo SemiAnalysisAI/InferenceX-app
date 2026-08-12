@@ -8,6 +8,7 @@ import { useLocale } from '@/lib/use-locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import CalculatorTable from '@/components/calculator/CalculatorTable';
+import FleetLifecycle from '@/components/calculator/FleetLifecycle';
 import FleetPlanner from '@/components/calculator/FleetPlanner';
 import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
 import { GlobalFilterProvider, useGlobalFilters } from '@/components/GlobalFilterContext';
@@ -28,6 +29,7 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { overlayRunColor } from '@/lib/overlay-run-style';
+import { readUrlParams, writeUrlParams } from '@/lib/url-state';
 import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -298,6 +300,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const [barMetric, setBarMetric] = useState<BarMetric>('throughput');
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
   const [visibleHwKeys, setVisibleHwKeys] = useState<Set<string>>(new Set());
+  // Owned here, not in FleetPlanner, because the lifecycle section sizes its
+  // fleets from the same budget and the same `c_mw` param.
+  const [mwInput, setMwInput] = useState<string>(() => readUrlParams().c_mw ?? '');
   const [selectedBars, setSelectedBars] = useState<Set<string>>(new Set());
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [highContrast, setHighContrast] = useState(false);
@@ -386,6 +391,17 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     if (!isUnofficialRun || overlayAvailableHwKeys.length === 0) return availableHwKeys;
     return [...new Set([...availableHwKeys, ...overlayAvailableHwKeys])];
   }, [isUnofficialRun, availableHwKeys, overlayAvailableHwKeys]);
+
+  const handleMwInputChange = useCallback((raw: string) => {
+    setMwInput(raw);
+    const parsed = parseFloat(raw);
+    writeUrlParams({ c_mw: Number.isFinite(parsed) && parsed > 0 ? raw : '' });
+  }, []);
+
+  const mw = useMemo(() => {
+    const parsed = parseFloat(mwInput);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }, [mwInput]);
 
   // Dynamic vendor-aware colors for visible GPUs
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
@@ -1357,6 +1373,27 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           costType={costType}
           targetValue={targetValue}
           visibleHwKeys={visibleHwKeys}
+          mwInput={mwInput}
+          onMwInputChange={handleMwInputChange}
+        />
+      )}
+
+      {/* Fleet lifecycle: all-time-best config projected over a fleet's life.
+          Official results only — see the overlay note in the section. */}
+      {!loading && hasData && (
+        <FleetLifecycle
+          hardwareConfig={hardwareConfig}
+          costProvider={costProvider}
+          costType={costType}
+          targetValue={targetValue}
+          mode={mode}
+          visibleHwKeys={visibleHwKeys}
+          selectedModel={selectedModel}
+          selectedSequence={selectedSequence}
+          selectedPrecisions={selectedPrecisions}
+          selectedPercentile={selectedPercentile}
+          mw={mw}
+          colorResolver={resolveColor}
         />
       )}
     </div>

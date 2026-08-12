@@ -326,7 +326,7 @@ export function useInterpolatedTrendData({
     enabled ? selectedModel : '',
     seqIslOsl?.isl ?? 0,
     seqIslOsl?.osl ?? 0,
-    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
+    selectedSequence === Sequence.AgenticTraces ? { benchmarkType: 'agentic_traces' } : undefined,
   );
 
   // Build lightweight InferenceData points grouped by date and hwKey.

@@ -32,6 +32,12 @@ interface FleetPlannerProps {
   /** Legend visibility by base hwKey — the cost-cap card must not depend on
    * `results`, which is filtered at the current slider target. */
   visibleHwKeys: Set<string>;
+  /**
+   * Facility power budget, owned by the page so the lifecycle section reads the
+   * same value from the same `c_mw` param.
+   */
+  mwInput: string;
+  onMwInputChange: (raw: string) => void;
 }
 
 const STRINGS = {
@@ -153,20 +159,21 @@ export default function FleetPlanner({
   costType,
   targetValue,
   visibleHwKeys,
+  mwInput,
+  onMwInputChange,
 }: FleetPlannerProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
 
-  const [mwInput, setMwInput] = useState<string>(() => readUrlParams().c_mw ?? '');
   const [costCapInput, setCostCapInput] = useState<string>(() => readUrlParams().c_costcap ?? '');
 
   const mw = useMemo(() => parsePositive(mwInput), [mwInput]);
   const costCap = useMemo(() => parsePositive(costCapInput), [costCapInput]);
 
-  const handleMwChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setMwInput(e.target.value);
-    writeUrlParams({ c_mw: parsePositive(e.target.value) ? e.target.value : '' });
-  }, []);
+  const handleMwChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => onMwInputChange(e.target.value),
+    [onMwInputChange],
+  );
 
   const handleMwBlur = useCallback(() => {
     track('calculator_fleet_mw_set', { mw: mwInput });

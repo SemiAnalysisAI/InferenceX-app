@@ -162,3 +162,156 @@ The rate is recovered across **all three token types at once** (`recoverCostRate
 Checking one family alone and falling back to another would recover a rate from
 output tokens and then apply it to total throughput; the existing
 `maxInteractivityAtCost` tests caught exactly that mistake.
+
+## Fleet Lifecycle (`FleetLifecycle.tsx`)
+
+Everything above answers "which chip is cheapest at this interactivity, right
+now?". This section answers "what does a fleet of it earn and cost across its
+life?" — the shape around the operating point, which no benchmark measures.
+
+### Why it reads the full run history
+
+The rest of the calculator reads one run date, so a chip is credited with
+whatever its latest sweep found. Measured against production history for dsr1
+8k/1k (7,715 rows, 134 dates), roughly 37% of configs have their best read at a
+typical target on an **earlier** date, worth up to ~3.6× — usually because a
+later sweep explored a different part of the space rather than because the chip
+got worse. For a lifecycle projection the honest number is the best config the
+chip has ever demonstrated, so this section is the one place that reads
+`/api/v1/benchmarks/history` instead of `/api/v1/benchmarks`.
+
+That is only defensible with two rules, both in `historical-best.ts`:
+
+- **Clamped reads are discarded, not clamped.** `interpolateForGPU` always
+  returns a value, clamping the target into each frontier's measured range.
+  Searching every date multiplies the chance of picking up such an edge read —
+  at target 20 tok/s/user, 63% of naive winners are clamped, which would credit
+  a sweep's peak throughput at an interactivity it never served. This section
+  therefore applies the no-extrapolation rule (the same one
+  `useInterpolatedTrendData` uses) and lists the hwKeys it consequently has no
+  read for, with their measured ranges. Chips are never silently dropped: at a
+  low or extreme target that empty list _is_ the finding.
+- **Provenance travels with every number.** Each row renders its winning date
+  and links its run, because the run date stamped above the chart no longer
+  describes these numbers. A row whose winner beat the latest date is marked.
+  There is no per-row trust annotation in the data — `PURGED_RUNS` is
+  destructive so retracted runs cannot win, but a merely-superseded run can now
+  win permanently — so the run link is the audit trail.
+
+Precisions are pooled into one frontier per hwKey: the question is what the
+chip's best config does, and precision is part of the config.
+
+### Two-stage memoization
+
+`groupHistoryByHwKeyAndDate` (rows → one sweep per hwKey per date) is separate
+from `selectBestFromGroups` (read every frontier at the target) so moving the
+interactivity slider re-reads without rebuilding ~790 frontiers, each of which
+costs ten splines. For the same reason the hook computes **every** hwKey and the
+component filters by `visibleHwKeys` for display — filtering in the data layer
+would rebuild every frontier on each legend toggle.
+
+### `view=calculator` on the history route
+
+The history response is ~8.6 MB per model. `useHistoricalBest` gates the fetch
+on a facility power budget being set, and requests `view=calculator` to trim it
+to the calculator's metric allowlist (~24% smaller).
+
+**That trim must stay opt-in.** `CALCULATOR_METRIC_KEYS` excludes the
+measured-power metrics Historical Trends plots, so applying it to every history
+response would silently blank those charts. `measured-power-overlay.cy.ts` is
+the regression guard.
+
+### Lifecycle math (`lifecycle.ts`)
+
+Pure and React-free, like `fleet.ts`. Two conventions the numbers depend on:
+
+- **Cost tracks energised capacity, not utilisation.** Racks bill from the
+  moment they are powered, so cost runs at full rate through TTFI and the ramp —
+  before a single token is sold — and tapers only over decommissioning. That is
+  what makes the early months negative, which is the point of the chart. An
+  earlier iteration billed full cost through decommissioning while revenue fell
+  to zero, producing a large negative transient that dominated the y-axis and
+  was pure artifact; `lifecycle.test.ts` pins this.
+- **Interrupts are an availability haircut, not drawn events.** A 24-day MTBI
+  over a five-year life is ~75 interruptions; at any sane chart width each is far
+  under a pixel, so drawing them yields aliasing noise rather than information.
+  They scale the plateau via `mtbi / (mtbi + recovery)`.
+
+A blank or zero MTBI means "no interruptions modelled", not "always down" — the
+input is an optional refinement and a hostile default would be worse than none.
+
+### Token price defaults to break-even
+
+Break-even is per-chip, so a single global price input needs one anchor: the
+**cheapest visible chip's** break-even, i.e. the competitive floor at which that
+chip earns exactly nothing and everything pricier is underwater. It re-seeds when
+the tier, token type or target changes, and stops the moment the user edits the
+field (or arrives with `c_price` in the URL); a reset link restores it. The
+figure comes from the TCO model — everything above that line is the user's
+assumption, and the section says so.
+
+It is derived as `costPerHour / fleetTokPerSec` for that fleet, so the plotted
+margin is exactly zero at the default.
+
+That is deliberately **not** the `$/M tok` the calculator's cost bars show for
+the same config, and the reason is worth recording because it is a property of
+the existing calculator rather than of this section.
+
+`interpolateForGPU` splines every metric independently. Per point,
+`cost = $/GPU-hr / (tput x 3600)` — cost is a **convex** function of throughput —
+so splining the cost values directly lands above the curve implied by splining
+throughput (Jensen), by a gap that widens with knot spacing. Measured over the
+captured fixture across every frontier and every date:
+
+| target sits…         | n   | median ratio | p95    | max     | share biased high |
+| -------------------- | --- | ------------ | ------ | ------- | ----------------- |
+| exactly on a knot    | 470 | 1.0000       | 1.0000 | 1.0000  | 0%                |
+| midway between knots | 307 | 1.0568       | 3.9661 | 25.3237 | 73.6%             |
+
+(ratio = splined `result.cost` / cost derived from the splined throughput.)
+
+Agreement at every knot and one-sided divergence between them identifies this
+as interpolation bias, not a modelling disagreement.
+
+Scored against the oracle, the splined read is simply **less accurate**.
+`/inference` plots cost only at measured points, as `specs.costh / tokensPerHour`
+(`lib/chart-utils.ts:380`, `roof: false`). Holding out each interior frontier
+knot in turn, rebuilding the frontier from the rest and predicting the held-out
+point's real cost:
+
+| method                          | mean err | p50   | p90    | p99     | closer to oracle |
+| ------------------------------- | -------- | ----- | ------ | ------- | ---------------- |
+| splined `result.cost`           | 162.8%   | 86.3% | 528.1% | 1402.1% | 36 / 144         |
+| derived `k / interpolated tput` | 42.2%    | 23.0% | 72.0%  | 245.3%  | **108 / 144**    |
+
+The structural argument is stronger still. That oracle construction makes
+`cost x throughput = $/GPU-hr` an identity at every real point. Splining the two
+independently breaks it: the calculator's pair violates it by a median 71.6% and
+up to 2026%, i.e. it reports an operating point no real config could occupy.
+Deriving cost from the interpolated throughput satisfies the identity by
+construction.
+
+This section therefore derives break-even from throughput, which also keeps it
+consistent with the fleet planner directly above (fleet cost is
+`gpus x $/GPU-hr`, a constant with no interpolation in it, so no other price can
+zero the plotted margin).
+
+**Follow-up worth taking.** The same defect affects the calculator's own cost
+bars and table, not just this section: `interpolateForGPU` should build `cost`
+from its interpolated throughput rather than splining the cost values. That is a
+small change, but it lives in a Python-synced function (`iso_interactivity.py`)
+and would move published cost numbers, so it needs its own change. Until then the
+price tooltip states the direction of the divergence.
+
+### Overlay exemption
+
+This section is official-only, and unlike the fleet planner that is not a policy
+choice: unofficial runs are not ingested, so `/api/v1/benchmarks/history` cannot
+serve them. Taking AGENTS.md's documented exemption; the section states the
+exclusion in its own note rather than leaving a silent gap.
+
+### URL params
+
+`c_price`, `c_ttfi`, `c_ramp`, `c_mtbi`, `c_rec`, `c_life`. The MW budget is
+`c_mw`, owned by `ThroughputCalculatorDisplay` and passed to both the fleet
+planner and this section so one input drives both.
