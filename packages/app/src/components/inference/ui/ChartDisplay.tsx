@@ -194,7 +194,9 @@ function AdvancedXAxisMenu({
       <PopoverTrigger
         data-testid="x-axis-mode-advanced"
         data-state={active ? 'active' : 'inactive'}
-        aria-label={labels.advanced}
+        // No aria-label: the accessible name comes from the visible text, so
+        // screen readers announce "Advanced: TTFT" rather than a bare
+        // "Advanced" that hides which metric the x-axis is plotting.
         className={cn(
           'relative inline-flex items-center justify-center gap-1.5',
           'border-b-2 border-transparent px-4 py-2',
@@ -1149,7 +1151,16 @@ export default function ChartDisplay() {
           <CustomPowers loading={loading} />
         </section>
       )}
+      {/*
+        Manual activation: with Radix's default automatic mode, merely focusing
+        a trigger fires onValueChange. On agentic the strip renders a single tab
+        while the selected mode may live in the Advanced menu, so tabbing to
+        that lone trigger would silently snap the x-axis back to E2E Normalized
+        Interactivity. Manual activation also suits a control whose every change
+        redraws the chart — arrow keys move focus, Enter/Space commits.
+      */}
       <Tabs
+        activationMode="manual"
         value={selectedXAxisMode}
         onValueChange={(value) => {
           setSelectedXAxisMode(value as XAxisMode);

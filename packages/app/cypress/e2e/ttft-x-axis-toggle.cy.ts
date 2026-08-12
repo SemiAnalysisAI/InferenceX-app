@@ -298,6 +298,34 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     );
   });
 
+  // Documents the intended pairing of the Advanced menu with manual tab
+  // activation: focus may move to the lone remaining tab without the x-axis
+  // snapping back to it. The load-bearing guard for manual activation is the
+  // 8K/1K test below, where focus-activation is directly observable; this one
+  // states the agentic-side expectation.
+  it('keeps the Advanced selection when the remaining tab is focused', () => {
+    selectAdvancedXAxisMode('ttft', 'TTFT');
+
+    // Let the popover finish closing first: Radix restores focus to its own
+    // trigger on close, which would otherwise win the race against the focus
+    // below and mask the revert this test is guarding against.
+    cy.get('[data-testid="x-axis-mode-advanced-menu"]').should('not.exist');
+    cy.get('[data-testid="x-axis-mode-advanced"]').should('have.focus');
+
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').focus();
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should('have.focus');
+
+    cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should(
+      'have.attr',
+      'aria-selected',
+      'false',
+    );
+    cy.get('[data-testid="x-axis-mode-advanced"]')
+      .should('have.attr', 'data-state', 'active')
+      .and('contain.text', 'TTFT');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
+  });
+
   it('switches back to Interactivity', () => {
     selectAdvancedXAxisMode('interactivity', 'Interactivity');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
@@ -396,6 +424,34 @@ describe('Label defaults for fixed-sequence scenarios', () => {
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
+  });
+
+  // Radix Tabs activates on focus by default, which would switch the x-axis
+  // (and redraw the chart) just from tabbing through the strip. The Tabs root
+  // sets activationMode="manual" to prevent that. Pins the intended behavior;
+  // note that focus-activation proved timing-dependent to reproduce, so treat
+  // this as a behavioral assertion rather than a proven pre-fix reproduction.
+  it('does not switch the x-axis merely by focusing another tab', () => {
+    interceptFixedSequenceData();
+    cy.visit('/inference?i_seq=8k%2F1k', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+
+    cy.get('[data-testid="x-axis-mode-ttft"]').click();
+    cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
+
+    cy.get('[data-testid="x-axis-mode-interactivity"]').focus();
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should('have.focus');
+
+    // Focus moved, selection did not.
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
+      'have.attr',
+      'aria-selected',
+      'false',
+    );
+    cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
   });
 
   // Only agentic nests the latency modes: E2E Normalized Interactivity is
