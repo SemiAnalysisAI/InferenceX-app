@@ -74,29 +74,29 @@ describe('getParetoLabel', () => {
     expect(getParetoLabel(point)).toBe('TP1');
   });
 
-  it('appends "+KV" when kv_offloading tier is set', () => {
+  it('appends "+ CPU KV Offloading" when kv_offloading tier is set', () => {
     const point = makePoint({ tp: 4, kv_offloading: 'dram' });
-    expect(getParetoLabel(point)).toBe('TP4+KV');
+    expect(getParetoLabel(point)).toBe('TP4 + CPU KV Offloading');
   });
 
-  it('does not append "+KV" when kv_offloading is "none"', () => {
+  it('does not append "+ CPU KV Offloading" when kv_offloading is "none"', () => {
     const point = makePoint({ tp: 4, kv_offloading: 'none' });
     expect(getParetoLabel(point)).toBe('TP4');
   });
 
-  it('appends "+KV" for legacy offload_mode="on" rows', () => {
+  it('appends "+ CPU KV Offloading" for legacy offload_mode="on" rows', () => {
     const point = makePoint({ tp: 8, offload_mode: 'on' });
-    expect(getParetoLabel(point)).toBe('TP8+KV');
+    expect(getParetoLabel(point)).toBe('TP8 + CPU KV Offloading');
   });
 
-  it('does not append "+KV" for legacy offload_mode="off" rows', () => {
+  it('does not append "+ CPU KV Offloading" for legacy offload_mode="off" rows', () => {
     const point = makePoint({ tp: 8, offload_mode: 'off' });
     expect(getParetoLabel(point)).toBe('TP8');
   });
 
-  it('appends "+KV" to full parallelism labels too', () => {
+  it('appends "+ CPU KV Offloading" to full parallelism labels too', () => {
     const point = makePoint({ tp: 8, ep: 8, dp_attention: true, kv_offloading: 'dram' });
-    expect(getParetoLabel(point)).toBe('DEP8+KV');
+    expect(getParetoLabel(point)).toBe('DEP8 + CPU KV Offloading');
   });
 
   it('kv_offloading="none" wins over legacy offload_mode="on"', () => {
@@ -151,8 +151,12 @@ describe('parseLabelComponents', () => {
   });
 
   it('parses the KV offload marker as its own component', () => {
-    expect(parseLabelComponents('TP8+KV')).toEqual(['TP8', 'KV']);
-    expect(parseLabelComponents('2xEP4+1xDPAEP32+KV')).toEqual(['EP4', 'DPAEP32', 'KV']);
+    expect(parseLabelComponents('TP8 + CPU KV Offloading')).toEqual(['TP8', 'CPU KV Offloading']);
+    expect(parseLabelComponents('2xEP4+1xDPAEP32 + CPU KV Offloading')).toEqual([
+      'EP4',
+      'DPAEP32',
+      'CPU KV Offloading',
+    ]);
   });
 });
 
@@ -175,8 +179,9 @@ describe('labelSimilarity', () => {
   });
 
   it('returns partial similarity between offload-on and offload-off of the same parallelism', () => {
-    // "TP8" → ["TP8"], "TP8+KV" → ["TP8", "KV"]; shared TP8 → 1/2
-    expect(labelSimilarity('TP8', 'TP8+KV')).toBeCloseTo(0.5);
+    // "TP8" → ["TP8"], "TP8 + CPU KV Offloading" → ["TP8", "CPU KV Offloading"];
+    // shared TP8 → 1/2
+    expect(labelSimilarity('TP8', 'TP8 + CPU KV Offloading')).toBeCloseTo(0.5);
   });
 
   it('returns higher similarity for more shared components', () => {

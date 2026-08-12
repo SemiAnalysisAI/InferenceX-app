@@ -29,15 +29,15 @@ export interface ParetoPointLabel {
  * offload-on/off transitions of the same parallelism a partial
  * {@link labelSimilarity} (smooth-ish gradient blend) instead of 0.
  */
-export const KV_OFFLOAD_LABEL_SUFFIX = '+KV';
+export const KV_OFFLOAD_LABEL_SUFFIX = ' + CPU KV Offloading';
 
 /**
  * Returns a Pareto frontier label for a data point.
  * Always prefixes with "TP" for simple numeric labels (legacy data without ep).
  * For data with ep/dp_attention, uses the full parallelism label.
- * Points that ran with KV offload enabled get a "+KV" suffix so gradient
- * segments and pill labels distinguish offload-on from offload-off, matching
- * the dashed-halo point decoration.
+ * Points that ran with KV offload enabled get a " + CPU KV Offloading"
+ * suffix so gradient segments and pill labels distinguish offload-on from
+ * offload-off, matching the dashed-halo point decoration.
  */
 export const getParetoLabel = (d: InferenceData): string => {
   const label = getPointLabel(d);
@@ -51,12 +51,14 @@ export const getParetoLabel = (d: InferenceData): string => {
  * E.g. "1xDPAEP4+1xDPAEP32" → ["DPAEP4", "DPAEP32"]
  * E.g. "TP8" → ["TP8"], "TEP8" → ["TEP8"], "DEP8" → ["DEP8"]
  * E.g. "2xEP4+1xDPAEP32" → ["EP4", "DPAEP32"]
- * E.g. "TP8+KV" → ["TP8", "KV"] (KV offload marker counts as a component,
- * so "TP8" vs "TP8+KV" share TP8 and blend at the boundary)
+ * E.g. "TP8 + CPU KV Offloading" → ["TP8", "CPU KV Offloading"] (the KV
+ * offload marker counts as a component, so "TP8" vs "TP8 + CPU KV Offloading"
+ * share TP8 and blend at the boundary)
  */
 export const parseLabelComponents = (label: string): string[] => {
-  // Split multinode labels on "+"
-  const parts = label.split('+');
+  // Split multinode labels on "+" (trim so the spaced KV-offload suffix
+  // yields clean components that match their unspaced counterparts)
+  const parts = label.split('+').map((p) => p.trim());
   return parts.map((p) => {
     // Strip the leading "NxNNN" multiplier (e.g., "1x" or "3x")
     const match = p.match(/^\d+x(?<strategy>.+)$/u);
