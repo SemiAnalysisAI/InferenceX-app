@@ -15,7 +15,8 @@ import { getHardwareKey } from '@/lib/chart-utils';
 import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
-import type { Model, Sequence } from '@/lib/data-mappings';
+import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
+import { Sequence, type Model } from '@/lib/data-mappings';
 
 // Trend points never sit on a roofline — they're synthetic per-(date, config)
 // aggregates, not the per-load Pareto-frontier points the chart marks. Hardcode
@@ -246,6 +247,7 @@ export function useInterpolatedTrendData({
     enabled ? selectedModel : '',
     seqIslOsl?.isl ?? 0,
     seqIslOsl?.osl ?? 0,
+    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
   );
 
   // Build lightweight InferenceData points grouped by date and hwKey.
@@ -255,7 +257,7 @@ export function useInterpolatedTrendData({
 
     const result = new Map<string, Map<string, InferenceData[]>>();
 
-    for (const row of allRows) {
+    for (const row of dedupeAgenticHistoryRuns(allRows)) {
       if (!selectedPrecisions.includes(row.precision)) continue;
 
       const point = rowToLightweightPoint(row);

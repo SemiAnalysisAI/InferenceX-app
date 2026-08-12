@@ -108,7 +108,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmarks',
-    sourceSha256: 'daf24b2a08ab021782084fc6e5e145013fca518e58d18837355a088e040f257b',
+    sourceSha256: '37b5a31613a9c5a2e1de35758551dfdbbb8b920fcd6ae6baeedf973c8802bc2c',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/route.ts',
@@ -116,7 +116,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmark-history',
-    sourceSha256: 'f99940aabe91d315e33e0e645342d83ace227fc014de029d16868284e158be40',
+    sourceSha256: 'd4b3d2ad8ed6e35df70c6b651f71c9d86b6e1dad9c3eaf6eadc2a8591318d1fb',
   },
   {
     source: 'src/app/api/v1/collectivex/latest/route.ts',
@@ -353,7 +353,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-workflow-info',
-    sourceSha256: 'ec497811abc666e4bf970b6e722fde3a7fefc25a87d6b4e5897a605e22c84ee8',
+    sourceSha256: 'b7b0f215e9bf2c766ce2d4c9a13090504c1704a67f697af3a2fd1f318de1e6d6',
   },
 ] as const satisfies readonly ApiRouteCatalogEntry[];
 
@@ -380,7 +380,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api.ts',
-    sourceSha256: '7824444f73bd1331ad06cc62060de08446f9d20661fa77030a254d6125b3636a',
+    sourceSha256: '03809377af6c2ee938169a065e06dccb25d983d7171a54b998ffa08dd970d306',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
@@ -436,7 +436,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '05e97742b831d1afdcb8dec1d764fd9b3d4a54564e93da4ceea778f8533c5c49',
+    sourceSha256: 'bb2f2cd28d8e4cea7b556561235da43d6a33363dc2c6d1f0b13408193d04298e',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',
@@ -532,7 +532,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/workflow-info.ts',
-    sourceSha256: 'a588811952d152ecb5ca3725e565f3f829c7bbdfd14a795b261a11bfa82fe00a',
+    sourceSha256: 'b6611604d41ab69c00cb804ad255d4cbc9f70e41e84ad43330538558956f9eb6',
     reviewArea: {
       en: 'Availability rows plus workflow runs, changelogs, configurations, and run coverage responses.',
       zh: '可用配置行以及工作流运行、变更记录、配置和运行覆盖响应。',

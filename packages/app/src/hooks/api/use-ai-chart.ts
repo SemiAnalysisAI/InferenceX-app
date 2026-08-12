@@ -23,6 +23,10 @@ import {
 } from '@/lib/api';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import {
+  dedupeAgenticHistoryRuns,
+  dedupeRowsToLatestPerConfig,
+} from '@/lib/benchmark-run-selection';
+import {
   getNestedYValue,
   normalizeEvalHardwareKey,
   generateHighContrastColors,
@@ -391,11 +395,24 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
   }
 
   // Benchmarks or History
-  const { isl, osl } = sequenceToIslOsl(spec.sequence);
-  const rows =
+  const isAgentic = spec.sequence === 'agentic-traces';
+  const { isl, osl } = isAgentic ? { isl: 0, osl: 0 } : sequenceToIslOsl(spec.sequence);
+  const fetchedRows =
     spec.dataSource === 'history'
-      ? await fetchBenchmarkHistory(spec.model, isl, osl)
+      ? await fetchBenchmarkHistory(
+          spec.model,
+          isl,
+          osl,
+          undefined,
+          isAgentic ? 'agentic_traces' : undefined,
+        )
       : await fetchBenchmarks(spec.model);
+  const rows =
+    spec.dataSource === 'history' && isAgentic
+      ? dedupeAgenticHistoryRuns(fetchedRows)
+      : isAgentic
+        ? dedupeRowsToLatestPerConfig(fetchedRows)
+        : fetchedRows;
 
   const { chartData } = transformBenchmarkRows(rows);
   let points = chartData[0] ?? [];

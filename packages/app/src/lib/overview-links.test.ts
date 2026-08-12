@@ -135,6 +135,17 @@ describe('buildOverviewDashboardHref', () => {
       'i_spec=mtp',
     );
   });
+
+  it('does not filter an AgentX mixed-spec curve to only one decode method', () => {
+    const href = buildOverviewDashboardHref(
+      'en',
+      summary({ scenario: 'agentx' }),
+      config({ specMethod: 'mixed', hwKey: 'b200_sglang' }),
+    );
+
+    expect(href).toContain('i_seq=agentic-traces');
+    expect(href).not.toContain('i_spec=');
+  });
 });
 
 describe('buildOverviewHistoryDashboardHref', () => {

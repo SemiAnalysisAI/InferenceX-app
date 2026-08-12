@@ -523,7 +523,13 @@ export function InferenceProvider({
       if (rowToSequence(r) !== effectiveSequence) return false;
       if (!effectivePrecisions.includes(r.precision)) return false;
       if (!r.hardware) return false;
-      const hwKey = buildAvailabilityHwKey(r.hardware, r.framework, r.spec_method, r.disagg);
+      const hwKey = buildAvailabilityHwKey(
+        r.hardware,
+        r.framework,
+        r.spec_method,
+        r.disagg,
+        r.benchmark_type,
+      );
       return selectedGPUs.includes(hwKey);
     });
     const dates = [...new Set(rows.map((r) => r.date))].toSorted();
@@ -548,7 +554,13 @@ export function InferenceProvider({
       if (rowToSequence(r) !== effectiveSequence) continue;
       if (!effectivePrecisions.includes(r.precision)) continue;
       if (!r.hardware) continue;
-      const hwKey = buildAvailabilityHwKey(r.hardware, r.framework, r.spec_method, r.disagg);
+      const hwKey = buildAvailabilityHwKey(
+        r.hardware,
+        r.framework,
+        r.spec_method,
+        r.disagg,
+        r.benchmark_type,
+      );
       if (isKnownGpu(hwKey)) hwKeys.add(hwKey);
     }
     return [...hwKeys]

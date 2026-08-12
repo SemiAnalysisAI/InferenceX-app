@@ -196,7 +196,12 @@ export const Y_AXIS_METRICS = [
 export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
 
 /**
- * Determines the correct hardware key based on the hardware name and MTP status.
+ * Determines the chart-series hardware key.
+ *
+ * Fixed-sequence curves keep speculative decoding in their identity. Agentic
+ * curves deliberately do not: one production curve may choose a speculative
+ * method for some load points and standard decoding for others. The point
+ * still carries `spec_decoding` for filters, tooltips, and point-level keys.
  */
 export const getHardwareKey = (entry: AggDataEntry): string => {
   let normalizedHwName = entry.hw.split('-')[0];
@@ -215,10 +220,12 @@ export const getHardwareKey = (entry: AggDataEntry): string => {
       normalizedHwName = candidateDirect;
     }
   }
-  if (entry.mtp === 'on' || entry['spec_decoding'] === 'mtp') {
-    normalizedHwName = `${normalizedHwName}_mtp`;
-  } else if (entry['spec_decoding'] && entry['spec_decoding'] !== 'none') {
-    normalizedHwName = `${normalizedHwName}_${entry['spec_decoding']}`;
+  if (entry.benchmark_type !== 'agentic_traces') {
+    if (entry.mtp === 'on' || entry['spec_decoding'] === 'mtp') {
+      normalizedHwName = `${normalizedHwName}_mtp`;
+    } else if (entry['spec_decoding'] && entry['spec_decoding'] !== 'none') {
+      normalizedHwName = `${normalizedHwName}_${entry['spec_decoding']}`;
+    }
   }
   return normalizedHwName;
 };
@@ -270,6 +277,7 @@ export function buildAvailabilityHwKey(
   framework?: string,
   specMethod?: string,
   disagg?: boolean,
+  benchmarkType?: string,
 ): string {
   let hwKey = hardware.split('-')[0];
   const fw = framework ? resolveFrameworkAlias(framework) : undefined;
@@ -285,8 +293,10 @@ export function buildAvailabilityHwKey(
       hwKey = candidateDirect;
     }
   }
-  if (specMethod === 'mtp') hwKey = `${hwKey}_mtp`;
-  else if (specMethod && specMethod !== 'none') hwKey = `${hwKey}_${specMethod}`;
+  if (benchmarkType !== 'agentic_traces') {
+    if (specMethod === 'mtp') hwKey = `${hwKey}_mtp`;
+    else if (specMethod && specMethod !== 'none') hwKey = `${hwKey}_${specMethod}`;
+  }
   return hwKey;
 }
 

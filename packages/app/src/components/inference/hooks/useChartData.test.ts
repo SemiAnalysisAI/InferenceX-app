@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
 
 import type { InferenceData } from '@/components/inference/types';
 import { EMPTY_QUICK_FILTERS } from '@/components/inference/utils/quickFilters';
@@ -24,7 +25,10 @@ interface DedupeInput {
   disagg: boolean;
   precision: string;
   offload_mode?: string | null;
+  benchmark_type?: string;
   date: string;
+  workflow_run_id?: number;
+  run_started_at?: string | null;
 }
 
 const drow = (over: Partial<DedupeInput> = {}): DedupeInput => ({
@@ -85,6 +89,160 @@ describe('dedupeRowsToLatestPerConfig', () => {
       drow({ id: 2, offload_mode: 'off', date: '2026-06-03' }),
     ];
     expect(dedupeRowsToLatestPerConfig(rows).map((r) => r.id)).toEqual([2]);
+  });
+
+  it('dedupes mixed agentic spec methods as one curve', () => {
+    const rows = [
+      drow({ id: 1, benchmark_type: 'agentic_traces', spec_method: 'none', date: '2026-06-01' }),
+      drow({ id: 2, benchmark_type: 'agentic_traces', spec_method: 'mtp', date: '2026-06-03' }),
+      drow({ id: 3, benchmark_type: 'agentic_traces', spec_method: 'eagle', date: '2026-06-03' }),
+    ];
+
+    expect(dedupeRowsToLatestPerConfig(rows).map((r) => r.id)).toEqual([2, 3]);
+  });
+
+  it('continues deduping fixed-sequence spec methods independently', () => {
+    const rows = [
+      drow({ id: 1, benchmark_type: 'single_turn', spec_method: 'none', date: '2026-06-01' }),
+      drow({ id: 2, benchmark_type: 'single_turn', spec_method: 'mtp', date: '2026-06-03' }),
+    ];
+
+    expect(dedupeRowsToLatestPerConfig(rows).map((r) => r.id)).toEqual([1, 2]);
+  });
+
+  it('keeps mixed agentic points from only the newest same-day workflow run', () => {
+    const rows = [
+      drow({
+        id: 1,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'none',
+        workflow_run_id: 10,
+        run_started_at: '2026-06-03T10:00:00Z',
+      }),
+      drow({
+        id: 2,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'mtp',
+        workflow_run_id: 10,
+        run_started_at: '2026-06-03T10:00:00Z',
+      }),
+      drow({
+        id: 3,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'mtp',
+        workflow_run_id: 11,
+        run_started_at: '2026-06-03T12:00:00Z',
+      }),
+    ];
+
+    expect(dedupeRowsToLatestPerConfig(rows).map((r) => r.id)).toEqual([3]);
+  });
+
+  it('keeps every spec method produced by the winning agentic workflow run', () => {
+    const rows = [
+      drow({
+        id: 1,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'none',
+        workflow_run_id: 12,
+        run_started_at: '2026-06-03T12:00:00Z',
+      }),
+      drow({
+        id: 2,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'mtp',
+        workflow_run_id: 12,
+        run_started_at: '2026-06-03T12:00:00Z',
+      }),
+      drow({
+        id: 3,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'eagle',
+        workflow_run_id: 12,
+        run_started_at: '2026-06-03T12:00:00Z',
+      }),
+    ];
+
+    expect(dedupeRowsToLatestPerConfig(rows).map((r) => r.spec_method)).toEqual([
+      'none',
+      'mtp',
+      'eagle',
+    ]);
+  });
+});
+
+describe('dedupeAgenticHistoryRuns', () => {
+  it('keeps the newest agentic workflow per series on each date', () => {
+    const rows = [
+      drow({
+        id: 1,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'none',
+        workflow_run_id: 20,
+        run_started_at: '2026-06-01T10:00:00Z',
+      }),
+      drow({
+        id: 2,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'mtp',
+        workflow_run_id: 21,
+        run_started_at: '2026-06-01T12:00:00Z',
+      }),
+      drow({
+        id: 3,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'none',
+        date: '2026-06-02',
+        workflow_run_id: 22,
+        run_started_at: '2026-06-02T10:00:00Z',
+      }),
+    ];
+
+    expect(dedupeAgenticHistoryRuns(rows).map((row) => row.id)).toEqual([2, 3]);
+  });
+
+  it('keeps mixed spec points together in the winning workflow on every date', () => {
+    const rows = [
+      drow({
+        id: 1,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'none',
+        workflow_run_id: 30,
+        run_started_at: '2026-06-01T10:00:00Z',
+      }),
+      drow({
+        id: 2,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'mtp',
+        workflow_run_id: 30,
+        run_started_at: '2026-06-01T10:00:00Z',
+      }),
+      drow({
+        id: 3,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'eagle',
+        date: '2026-06-02',
+        workflow_run_id: 31,
+        run_started_at: '2026-06-02T10:00:00Z',
+      }),
+      drow({
+        id: 4,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'none',
+        date: '2026-06-02',
+        workflow_run_id: 31,
+        run_started_at: '2026-06-02T10:00:00Z',
+      }),
+    ];
+
+    expect(
+      dedupeAgenticHistoryRuns(rows).map((row) => [row.date, row.workflow_run_id, row.spec_method]),
+    ).toEqual([
+      ['2026-06-01', 30, 'none'],
+      ['2026-06-01', 30, 'mtp'],
+      ['2026-06-02', 31, 'eagle'],
+      ['2026-06-02', 31, 'none'],
+    ]);
   });
 });
 

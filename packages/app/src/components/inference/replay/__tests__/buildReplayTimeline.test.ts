@@ -216,6 +216,45 @@ describe('buildReplayTimeline', () => {
     expect(t.configs.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('keeps overlapping agentic MTP and standard-decoding replay points distinct', () => {
+    const rows = [
+      baseRow({
+        benchmark_type: 'agentic_traces',
+        spec_method: 'none',
+        isl: null,
+        osl: null,
+        metrics: { tput_per_gpu: 1000, median_itl: 0.02 },
+      }),
+      baseRow({
+        benchmark_type: 'agentic_traces',
+        spec_method: 'mtp',
+        isl: null,
+        osl: null,
+        metrics: { tput_per_gpu: 1200, median_itl: 1 / 55 },
+      }),
+    ];
+
+    const t = buildReplayTimeline(rows, interactivityChartDef, 'y_tpPerGpu', null, ['fp4']);
+    expect(t.configs).toHaveLength(2);
+    expect(new Set(t.configs.map((config) => config.hwKey))).toEqual(new Set(['h100_trt']));
+    expect(t.configs.map((config) => config.configId).toSorted()).toEqual([
+      'h100_trt|fp4|0|32|0|0|0|spec-mtp',
+      'h100_trt|fp4|0|32|0|0|0|spec-none',
+    ]);
+  });
+
+  it('preserves fixed-sequence replay identity when offload metadata differs', () => {
+    const rows = [
+      baseRow({ benchmark_type: 'single_turn', offload_mode: 'off' }),
+      baseRow({ benchmark_type: 'single_turn', offload_mode: 'on' }),
+    ];
+
+    const t = buildReplayTimeline(rows, interactivityChartDef, 'y_tpPerGpu', null, ['fp4']);
+    expect(t.configs).toHaveLength(1);
+    expect(t.configs[0].configId).not.toContain('offload');
+    expect(t.configs[0].configId).not.toContain('spec-');
+  });
+
   it('computes a global x/y domain spanning all observations', () => {
     const rows = [
       baseRow({ date: '2025-01-01', metrics: { tput_per_gpu: 100, median_intvty: 10 } }),

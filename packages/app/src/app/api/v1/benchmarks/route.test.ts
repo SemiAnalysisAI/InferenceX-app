@@ -64,6 +64,41 @@ describe('GET /api/v1/benchmarks', () => {
     );
   });
 
+  it('does not expose agentic run-selection metadata on fixed-sequence rows', async () => {
+    mockGetLatestBenchmarks.mockResolvedValueOnce([
+      {
+        id: 1,
+        benchmark_type: 'single_turn',
+        workflow_run_id: 42,
+        run_started_at: '2026-08-12T10:00:00Z',
+      },
+    ]);
+
+    const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528'));
+    expect(await res.json()).toEqual([{ id: 1, benchmark_type: 'single_turn' }]);
+  });
+
+  it('keeps run-selection metadata on agentic rows', async () => {
+    mockGetLatestBenchmarks.mockResolvedValueOnce([
+      {
+        id: 1,
+        benchmark_type: 'agentic_traces',
+        workflow_run_id: 42,
+        run_started_at: '2026-08-12T10:00:00Z',
+      },
+    ]);
+
+    const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528'));
+    expect(await res.json()).toEqual([
+      {
+        id: 1,
+        benchmark_type: 'agentic_traces',
+        workflow_run_id: 42,
+        run_started_at: '2026-08-12T10:00:00Z',
+      },
+    ]);
+  });
+
   it('passes date param to query when provided', async () => {
     mockGetLatestBenchmarks.mockResolvedValueOnce([]);
 

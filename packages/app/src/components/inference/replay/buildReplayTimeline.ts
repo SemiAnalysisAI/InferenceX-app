@@ -8,6 +8,8 @@ import type {
   InferenceData,
   YAxisMetricKey,
 } from '@/components/inference/types';
+import { agenticSpecDecodingKeySuffix } from '@/components/inference/utils/point-identity';
+import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
 
 import type { PerStepValue } from './interpolateAtTime';
 
@@ -81,10 +83,12 @@ export function computeFullRunDomain(
   return { x: safeDomain(xMin, xMax), y: safeDomain(yMin, yMax) };
 }
 
-const buildPointConfigId = (point: InferenceData): string => {
+const buildReplayPointConfigId = (point: InferenceData): string => {
   let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}|${point.decode_ep ?? 0}|${point.prefill_tp ?? 0}|${point.prefill_ep ?? 0}`;
   if (point.disagg) key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;
-  return key;
+  // Preserve the pre-existing replay identity for fixed-sequence points. Agentic
+  // curves need only the decode-method suffix because their hwKey now merges it.
+  return key + agenticSpecDecodingKeySuffix(point);
 };
 
 const safeDomain = (lo: number, hi: number): [number, number] => {
@@ -155,7 +159,7 @@ export function buildReplayTimeline(
   let yMax = -Infinity;
   const dateSet = new Set<string>();
 
-  for (const row of rows) {
+  for (const row of dedupeAgenticHistoryRuns(rows)) {
     if (!selectedPrecisions.includes(row.precision)) continue;
 
     const entry = rowToAggDataEntry(row);
@@ -181,7 +185,7 @@ export function buildReplayTimeline(
     if (xVal <= 0 || yMetric <= 0) continue;
 
     const finalPoint: InferenceData = { ...point, x: xVal, y: yMetric };
-    const configId = buildPointConfigId(finalPoint);
+    const configId = buildReplayPointConfigId(finalPoint);
     const dateMs = Date.parse(`${row.date}T00:00:00Z`);
     if (Number.isNaN(dateMs)) continue;
 

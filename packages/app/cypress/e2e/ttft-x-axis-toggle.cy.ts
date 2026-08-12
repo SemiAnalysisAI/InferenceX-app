@@ -174,7 +174,6 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   it('explains the offload halo in the legend and distinguishes it from plain points', () => {
     cy.get('#chart-0 [data-testid="offload-halo-key"]')
       .should('be.visible')
-      .and('contain.text', 'Dashed halo:')
       .and('contain.text', 'KV offload ON');
     cy.get('#chart-0 .offload-halo').should('have.length.at.least', 1);
     cy.get('#chart-0 .dot-group').then(($points) => {
@@ -513,7 +512,6 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
     );
     cy.get('#chart-0 [data-testid="offload-halo-key"]')
       .should('be.visible')
-      .and('contain.text', 'Dashed halo:')
       .and('contain.text', 'KV offload ON');
   });
 

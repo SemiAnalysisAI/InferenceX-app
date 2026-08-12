@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
 import type { BenchmarkRow } from '@/lib/api';
+import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
 
 import {
   mergeRunScopedRows,
@@ -737,6 +738,89 @@ describe('transformBenchmarkRows — hardware key resolution', () => {
     const point = chartData.flat()[0];
     expect(point.hwKey).toBe('h200_trt_mtp');
     expect(hardwareConfig).toHaveProperty('h200_trt_mtp');
+  });
+
+  it('groups none, MTP, and EAGLE agentic points into one hardware series', () => {
+    const rows = [
+      makeRow({
+        benchmark_type: 'agentic_traces',
+        hardware: 'h200',
+        framework: 'trt',
+        spec_method: 'none',
+      }),
+      makeRow({
+        benchmark_type: 'agentic_traces',
+        hardware: 'h200',
+        framework: 'trt',
+        spec_method: 'mtp',
+      }),
+      makeRow({
+        benchmark_type: 'agentic_traces',
+        hardware: 'h200',
+        framework: 'trt',
+        spec_method: 'eagle',
+      }),
+    ];
+
+    const { chartData, hardwareConfig } = transformBenchmarkRows(rows);
+    expect(Object.keys(hardwareConfig)).toEqual(['h200_trt']);
+    expect(chartData[0].map((point) => point.hwKey)).toEqual(['h200_trt', 'h200_trt', 'h200_trt']);
+    expect(chartData[0].map((point) => point.spec_decoding)).toEqual(['none', 'mtp', 'eagle']);
+  });
+
+  it('keeps one mixed-spec agentic series identity across comparison dates', () => {
+    const rows = dedupeAgenticHistoryRuns([
+      makeRow({
+        id: 1,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'none',
+        conc: 8,
+        date: '2026-06-01',
+        workflow_run_id: 30,
+        run_started_at: '2026-06-01T10:00:00Z',
+      }),
+      makeRow({
+        id: 2,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'mtp',
+        conc: 16,
+        date: '2026-06-01',
+        workflow_run_id: 30,
+        run_started_at: '2026-06-01T10:00:00Z',
+      }),
+      makeRow({
+        id: 3,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'eagle',
+        conc: 32,
+        date: '2026-06-02',
+        workflow_run_id: 31,
+        run_started_at: '2026-06-02T10:00:00Z',
+      }),
+      makeRow({
+        id: 4,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'none',
+        conc: 64,
+        date: '2026-06-02',
+        workflow_run_id: 31,
+        run_started_at: '2026-06-02T10:00:00Z',
+      }),
+    ]);
+
+    const { chartData, hardwareConfig } = transformBenchmarkRows(rows);
+    const pointsByDate = Object.groupBy(chartData[0], (point) => point.date);
+
+    expect(Object.keys(hardwareConfig)).toEqual(['h200_trt']);
+    expect(pointsByDate['2026-06-01']?.map((point) => point.spec_decoding)).toEqual([
+      'none',
+      'mtp',
+    ]);
+    expect(pointsByDate['2026-06-02']?.map((point) => point.spec_decoding)).toEqual([
+      'eagle',
+      'none',
+    ]);
+    expect(new Set(chartData[0].map((point) => point.hwKey))).toEqual(new Set(['h200_trt']));
   });
 
   it('handles AMD hardware with vllm framework', () => {

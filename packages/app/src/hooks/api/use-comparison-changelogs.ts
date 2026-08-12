@@ -43,6 +43,7 @@ export function useComparisonChangelogs(
   selectedGPUs: string[],
   selectedDateRange: { startDate: string; endDate: string },
   availableDates: string[],
+  benchmarkType?: 'agentic_traces',
 ) {
   const hasGPUs = selectedGPUs.length > 0;
   const hasDateRange = Boolean(selectedDateRange.startDate) && Boolean(selectedDateRange.endDate);
@@ -64,8 +65,9 @@ export function useComparisonChangelogs(
 
   const queries = useQueries({
     queries: datesToQuery.map((date) => ({
-      queryKey: ['workflow-info', date],
-      queryFn: ({ signal }: { signal: AbortSignal }) => fetchWorkflowInfo(date, signal),
+      queryKey: benchmarkType ? ['workflow-info', date, benchmarkType] : ['workflow-info', date],
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchWorkflowInfo(date, signal, benchmarkType),
       enabled: hasGPUs,
     })),
   });

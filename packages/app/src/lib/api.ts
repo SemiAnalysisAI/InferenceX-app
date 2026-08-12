@@ -52,6 +52,9 @@ export interface BenchmarkRow {
    */
   workers?: WorkerPower[];
   date: string;
+  /** Internal workflow identity used to keep merged agentic curves within one run. */
+  workflow_run_id?: number;
+  run_started_at?: string | null;
   run_url: string | null;
 }
 
@@ -179,16 +182,21 @@ export function fetchBenchmarkHistory(
   isl: number,
   osl: number,
   signal?: AbortSignal,
+  benchmarkType?: 'agentic_traces',
 ) {
   const params = new URLSearchParams({ model, isl: String(isl), osl: String(osl) });
+  if (benchmarkType) params.set('benchmarkType', benchmarkType);
   return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks/history?${params}`, signal);
 }
 
-export function fetchWorkflowInfo(date: string, signal?: AbortSignal) {
-  return fetchJson<WorkflowInfoResponse>(
-    `/api/v1/workflow-info?date=${encodeURIComponent(date)}`,
-    signal,
-  );
+export function fetchWorkflowInfo(
+  date: string,
+  signal?: AbortSignal,
+  benchmarkType?: 'agentic_traces',
+) {
+  const params = new URLSearchParams({ date });
+  if (benchmarkType) params.set('benchmarkType', benchmarkType);
+  return fetchJson<WorkflowInfoResponse>(`/api/v1/workflow-info?${params}`, signal);
 }
 
 export interface AvailabilityRow {
