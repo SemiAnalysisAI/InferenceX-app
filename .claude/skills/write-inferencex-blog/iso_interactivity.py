@@ -19,14 +19,11 @@ Pipeline:
      frontier to prevent cubic-spline overshoots above/below the data.
 
 Reciprocal metrics ($/M tok, J/token) are a special case: they are a per-chip
-constant divided by a throughput, so they are NOT splined directly. Splining
-them averages reciprocals, and 1/x is convex, so the result diverges from the
-value implied by the interpolated throughput — by (1+r)^2/(4r) for a knot pair
-whose throughputs differ by r, reaching 25x on sparsely swept frontiers (higher
-73.6% of the time on real data; Steffen slopes can undershoot the chord). Pass
-`reciprocal_of='throughput'` (or the matching output/input throughput key) to
-spline that throughput and re-derive the metric, which is what the dashboard
-does. See docs/tco-calculator.md.
+constant divided by a throughput, so they are NOT splined independently. Two
+independent splines need not preserve `metric * throughput = constant` between
+measured knots. Pass `reciprocal_of='throughput'` (or the matching output/input
+throughput key) to spline that throughput and re-derive the metric, which is what
+the dashboard does. See docs/tco-calculator.md for a reproducible measurement.
 
 Usage as a module:
     from iso_interactivity import interpolate_metric, pareto_front_upper_left
@@ -156,7 +153,7 @@ def hermite_interpolate(
 
 
 def recover_reciprocal_numerator(
-    values: list[float], throughputs: list[float]
+    values: list[Optional[float]], throughputs: list[Optional[float]]
 ) -> Optional[float]:
     """Recover the constant `c` of a metric defined as `c / throughput`.
 
@@ -234,16 +231,23 @@ def interpolate_metric(
             return sorted_front[0].get(metric_key)
         return None
 
-    # Matches TS `extractMetric(...) ?? 0`: missing metric on a frontier
-    # point falls back to 0 instead of raising KeyError. Use `.get` so the
-    # CLI returns null cleanly instead of dying with a traceback.
-    ys = [(p.get(metric_key) if p.get(metric_key) is not None else 0) for p in sorted_front]
+    # The TS helper returns null if any frontier point lacks the requested
+    # metric. Do the same here: coercing a missing value to zero would create a
+    # synthetic knot and make blog output diverge from the dashboard.
+    ys: list[float] = []
+    for point in sorted_front:
+        value = point.get(metric_key)
+        if value is None:
+            return None
+        ys.append(value)
 
     if reciprocal_of is not None:
-        tputs = [
-            (p.get(reciprocal_of) if p.get(reciprocal_of) is not None else 0)
-            for p in sorted_front
-        ]
+        tputs: list[float] = []
+        for point in sorted_front:
+            throughput = point.get(reciprocal_of)
+            if throughput is None:
+                return None
+            tputs.append(throughput)
         numerator = recover_reciprocal_numerator(ys, tputs)
         # None means these points do not obey the identity — fall through and
         # spline the metric directly, matching the TS fallback.

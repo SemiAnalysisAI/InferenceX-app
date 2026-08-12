@@ -168,17 +168,12 @@ export function getCostField(
  * the points avoids threading the hardware registry into this module, which must
  * stay dependency-free for the Python port.
  *
- * Why this exists: splining such a metric directly is wrong. It averages
- * reciprocals, and `1/x` is convex, so the interpolated metric diverges from the
- * value implied by the interpolated throughput — by `(1+r)^2/(4r)` for a knot
- * pair whose throughputs differ by `r`, and `r` reaches ~100 on sparsely swept
- * frontiers. Measured on real frontiers, the splined read is the higher one
- * 73.6% of the time (median 1.057, max 25.3, min 0.95 — Steffen slopes let the
- * cubic undershoot the chord in some brackets, so the direction is usual rather
- * than universal). Deriving from the interpolated throughput preserves the
- * identity `metric x throughput = c` that the per-point values on /inference obey
- * by construction, and lands ~4x closer to held-out measured points. See
- * docs/tco-calculator.md.
+ * Why this exists: independently splining the reciprocal metric and throughput
+ * produces two curves that need not satisfy `metric x throughput = c` between
+ * measured knots. Deriving from the interpolated throughput preserves that
+ * defining identity. The numerical effect depends on frontier density and can
+ * move either direction with Steffen splines; see docs/tco-calculator.md for a
+ * dated, reproducible measurement against the live API.
  *
  * Returns null unless EVERY usable point agrees on the constant. That check is
  * the safety rail: the identity is what licenses re-deriving the metric, so a

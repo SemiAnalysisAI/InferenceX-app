@@ -98,8 +98,8 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
 /**
  * Metrics defined as a per-chip constant divided by a throughput, mapped to the
  * throughput metric they divide. These are interpolated by splining that
- * throughput and re-deriving, never by splining the metric itself — `1/x` is
- * convex, so splining it overstates the value between measured points. See
+ * throughput and re-deriving, never by splining the metric independently, so
+ * the interpolated pair preserves `metric x throughput = constant`. See
  * `recoverReciprocalNumerator` and docs/tco-calculator.md.
  *
  * The `measured*` energy keys are deliberately absent: their numerator is

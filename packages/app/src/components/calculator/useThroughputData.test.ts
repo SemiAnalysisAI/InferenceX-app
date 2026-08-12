@@ -1,3 +1,6 @@
+import { spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
@@ -16,6 +19,21 @@ import {
   recoverReciprocalNumerator,
   sign,
 } from './useThroughputData';
+
+const PYTHON_INTERPOLATION_HELPER = resolve(
+  import.meta.dirname,
+  '../../../../..',
+  '.claude/skills/write-inferencex-blog/iso_interactivity.py',
+);
+
+function interpolateWithPython(request: Record<string, unknown>): number | null {
+  const result = spawnSync('python3', [PYTHON_INTERPOLATION_HELPER], {
+    input: JSON.stringify(request),
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) throw new Error(`Python interpolation failed: ${result.stderr}`);
+  return (JSON.parse(result.stdout) as { value: number | null }).value;
+}
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -1393,11 +1411,40 @@ describe('interpolateForGPU cost derivation', () => {
     }
   });
 
-  it('matches the Python port bundled with the blog skill', () => {
-    // iso_interactivity.py, same frontier and target, reciprocal_of=throughput.
-    // Drift here means blog tables diverge from the live chart — see AGENTS.md.
-    const r = interpolateForGPU(frontier, 42, 'interactivity_to_throughput', 'costh')!;
-    expect(r.cost).toBeCloseTo(0.44517072882391184, 12);
+  it('matches the Python blog helper', () => {
+    const target = 42;
+    const typescriptValue = interpolateForGPU(
+      frontier,
+      target,
+      'interactivity_to_throughput',
+      'costh',
+    )!.cost;
+    const pythonValue = interpolateWithPython({
+      points: frontier.map((point) => ({
+        interactivity: point.interactivity,
+        throughput: point.throughput,
+        cost: point.costh,
+      })),
+      target_iv: target,
+      metric_key: 'cost',
+      reciprocal_of: 'throughput',
+    });
+
+    expect(pythonValue).toBeCloseTo(typescriptValue, 14);
+  });
+
+  it('makes the Python helper return null when reciprocal throughput is missing', () => {
+    const pythonValue = interpolateWithPython({
+      points: [
+        { interactivity: 10, throughput: 1000, output_throughput: 800, joules: 2 },
+        { interactivity: 30, throughput: 500, joules: 4 },
+      ],
+      target_iv: 20,
+      metric_key: 'joules',
+      reciprocal_of: 'output_throughput',
+    });
+
+    expect(pythonValue).toBeNull();
   });
 
   it('is exact at a measured point, where both methods agree anyway', () => {

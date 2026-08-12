@@ -193,7 +193,7 @@ The Python helper is a 1:1 port of these three TypeScript functions:
 
 Plus the wrapper `interpolateMetricAtInteractivity` in `packages/app/src/components/inference/hooks/useInterpolatedTrendData.ts` which composes them with the "no extrapolation → return null" rule.
 
-Plus `recoverReciprocalNumerator` in `interpolation.ts`, which decides whether a metric is splined directly or derived from the interpolated throughput. $/M tok and J/token are a per-chip constant over a throughput, so splining them averages reciprocals and overstates the value between knots; both TS and Python spline that throughput and re-derive instead. See `docs/tco-calculator.md` for the measurements.
+Plus `recoverReciprocalNumerator` in `interpolation.ts`, which decides whether a metric is splined directly or derived from the interpolated throughput. $/M tok and J/token are a per-chip constant over a throughput, so independently splining the metric breaks that identity between knots; both TS and Python spline the throughput and re-derive instead. See `docs/tco-calculator.md` for the reproducible measurement.
 
 **Rule: any PR that changes any of those four TypeScript functions MUST also update `.claude/skills/write-inferencex-blog/iso_interactivity.py` in the same commit.** Drift between the TS and Python implementations means the blog tables will silently diverge from the live chart on the very next post — readers will see one number in the table and a different one in the chart they click through to. This includes:
 
