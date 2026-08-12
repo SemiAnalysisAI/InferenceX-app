@@ -132,6 +132,59 @@ describe('GPUGraph', () => {
     cy.get('[data-testid="gpu-graph"] svg .visible-shape').should('have.length.greaterThan', 0);
   });
 
+  it('shows agentic spec decoding as a dashed plus and composes it with offload', () => {
+    const data = [
+      createMockInferenceData({
+        hwKey: 'h100',
+        x: 32,
+        y: 180,
+        date: '2025-03-01',
+        precision: Precision.FP4,
+        benchmark_type: 'agentic_traces',
+        spec_decoding: 'mtp',
+        offload_mode: 'on',
+      }),
+      createMockInferenceData({
+        hwKey: 'h100',
+        x: 64,
+        y: 210,
+        date: '2025-03-01',
+        precision: Precision.FP4,
+        benchmark_type: 'agentic_traces',
+        spec_decoding: 'none',
+        offload_mode: 'off',
+      }),
+    ];
+
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <GPUGraph
+          chartId="test-gpu-agentic-decorations"
+          modelLabel="DeepSeek R1"
+          data={data}
+          xLabel="Concurrency"
+          yLabel="Throughput / Chip (tok/s)"
+          chartDefinition={defaultChartDef}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          selectedGPUs: ['h100'],
+          selectedDates: ['2025-03-01'],
+          selectedDateRange: { startDate: '', endDate: '' },
+          activeDates: new Set(['2025-03-01_h100']),
+          selectedPrecisions: [Precision.FP4],
+        },
+      },
+    );
+
+    cy.get('#test-gpu-agentic-decorations svg .spec-decode-marker').should('have.length', 1);
+    cy.get('#test-gpu-agentic-decorations svg .offload-halo').should('have.length', 1);
+    cy.get('#test-gpu-agentic-decorations [data-testid="spec-decode-marker-key"]').should('exist');
+    cy.get('#test-gpu-agentic-decorations [data-testid="offload-halo-key"]').should('exist');
+  });
+
   it('renders date line labels along each roofline when showLineLabels is on', () => {
     // Two GPUs × two dates with enough points each to form rooflines.
     const data = [

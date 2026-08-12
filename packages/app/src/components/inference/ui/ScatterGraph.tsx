@@ -77,6 +77,13 @@ import {
   OFFLOAD_HALO_STROKE_WIDTH,
   OffloadHaloLegendKey,
 } from '@/components/inference/ui/OffloadHaloLegendKey';
+import {
+  SPEC_DECODE_MARKER_DASHARRAY,
+  SPEC_DECODE_MARKER_PATH,
+  SPEC_DECODE_MARKER_STROKE_WIDTH,
+  SpecDecodeLegendKey,
+  hasAgenticSpecDecoding,
+} from '@/components/inference/ui/SpecDecodeLegendKey';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import {
   type ParetoPointLabel,
@@ -200,6 +207,38 @@ const getXPath = (size: number) => {
   return `M ${-s} ${-s} L ${s} ${s} M ${s} ${-s} L ${-s} ${s}`;
 };
 
+/** Apply the two independent point decorations; either, both, or neither may render. */
+function renderPointDecorations(
+  group: d3.Selection<SVGGElement, InferenceData, null, undefined>,
+  point: InferenceData,
+  stroke: string,
+): void {
+  group
+    .selectAll<SVGCircleElement, boolean>('.offload-halo')
+    .data(point.offload_mode === 'on' ? [true] : [])
+    .join('circle')
+    .attr('class', 'offload-halo')
+    .attr('r', OFFLOAD_HALO_RADIUS)
+    .attr('fill', 'none')
+    .attr('stroke', stroke)
+    .attr('stroke-width', OFFLOAD_HALO_STROKE_WIDTH)
+    .attr('stroke-dasharray', OFFLOAD_HALO_DASHARRAY)
+    .attr('opacity', 0.9)
+    .attr('pointer-events', 'none');
+  group
+    .selectAll<SVGPathElement, boolean>('.spec-decode-marker')
+    .data(hasAgenticSpecDecoding(point) ? [true] : [])
+    .join('path')
+    .attr('class', 'spec-decode-marker')
+    .attr('d', SPEC_DECODE_MARKER_PATH)
+    .attr('fill', 'none')
+    .attr('stroke', stroke)
+    .attr('stroke-width', SPEC_DECODE_MARKER_STROKE_WIDTH)
+    .attr('stroke-dasharray', SPEC_DECODE_MARKER_DASHARRAY)
+    .attr('stroke-linecap', 'round')
+    .attr('pointer-events', 'none');
+}
+
 const formatChangelogDescription = (desc: string | string[]): React.JSX.Element => {
   if (typeof desc === 'string') {
     return (
@@ -246,13 +285,9 @@ function groupPointsByDate(points: InferenceData[]): Map<string, InferenceData[]
 const optimalPointKey = (d: InferenceData): string =>
   `${d.hwKey}_${d.precision}_${d.date}-${d.x}-${d.y}`;
 
-/** Point label lines, with an extra line only when agentic speculative decoding is active. */
-export const pointLabelText = (d: InferenceData, advanced: boolean): string => {
-  const base = advanced ? `${getPointLabel(d)}\nC=${d.conc}` : `${d.tp}\nC=${d.conc}`;
-  if (d.benchmark_type !== 'agentic_traces') return base;
-  const specMethod = d.spec_decoding ?? 'none';
-  return specMethod === 'none' || specMethod === '' ? base : `${base}\n${specMethod.toUpperCase()}`;
-};
+/** Point label lines. Decode mode is shown by a point marker instead of text. */
+export const pointLabelText = (d: InferenceData, advanced: boolean): string =>
+  advanced ? `${getPointLabel(d)}\nC=${d.conc}` : `${d.tp}\nC=${d.conc}`;
 
 // Referentially stable "no overlay data" result (see processedOverlayData).
 const EMPTY_OVERLAY_DATA: InferenceData[] = [];
@@ -1056,6 +1091,12 @@ const ScatterGraph = React.memo(
       () =>
         pointsData.some((point) => point.offload_mode === 'on') ||
         processedOverlayData.some((point) => point.offload_mode === 'on'),
+      [pointsData, processedOverlayData],
+    );
+    const hasSpecDecodeMarker = useMemo(
+      () =>
+        pointsData.some(hasAgenticSpecDecoding) ||
+        processedOverlayData.some(hasAgenticSpecDecoding),
       [pointsData, processedOverlayData],
     );
 
@@ -2389,6 +2430,17 @@ const ScatterGraph = React.memo(
                   overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
                 );
 
+              // Point decorations compose independently: offload adds the
+              // dashed halo, while agentic speculative decoding adds a dashed
+              // plus. A point using both displays both markers.
+              overlayPoints.each(function (d) {
+                renderPointDecorations(
+                  d3.select(this),
+                  d,
+                  overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
+                );
+              });
+
               // Labels
               const showLabels = showPointLabels && !showGradientLabels;
               overlayPoints.each(function (d) {
@@ -2864,7 +2916,7 @@ const ScatterGraph = React.memo(
     const layersRef = useRef(layers);
     layersRef.current = layers;
 
-    // --- onRender: CSS transitions, offload halos, and log tick formatting ---
+    // --- onRender: CSS transitions, point decorations, and log tick formatting ---
     const onRender = useCallback(
       (ctx: RenderContext) => {
         // Stash the render context for the decoration effect.
@@ -2876,19 +2928,7 @@ const ScatterGraph = React.memo(
 
         // Offload halo: dashed ring on every point that used KV offload (Pareto or not)
         zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
-          const showHalo = d.offload_mode === 'on';
-          d3.select(this)
-            .selectAll<SVGCircleElement, boolean>('.offload-halo')
-            .data(showHalo ? [true] : [])
-            .join('circle')
-            .attr('class', 'offload-halo')
-            .attr('r', OFFLOAD_HALO_RADIUS)
-            .attr('fill', 'none')
-            .attr('stroke', 'var(--foreground)')
-            .attr('stroke-width', OFFLOAD_HALO_STROKE_WIDTH)
-            .attr('stroke-dasharray', OFFLOAD_HALO_DASHARRAY)
-            .attr('opacity', 0.9)
-            .attr('pointer-events', 'none');
+          renderPointDecorations(d3.select(this), d, 'var(--foreground)');
         });
 
         avoidLabelCollisions(zoomGroup);
@@ -2955,6 +2995,9 @@ const ScatterGraph = React.memo(
           getShapeKeyForPrecision(d.precision, ir.selectedPrecisions),
           color,
         );
+        // A precision toggle may replace and append the visible SVG shape.
+        // Keep decorations above that shape after the swap.
+        sel.selectAll('.offload-halo, .spec-decode-marker').raise();
       });
 
       // Overlay X markers: Optimal Only visibility (mirrors the official dot
@@ -3429,7 +3472,14 @@ const ScatterGraph = React.memo(
                   : []
               }
               precisionIndicators={selectedPrecisions}
-              keyIndicators={hasOffloadHalo ? <OffloadHaloLegendKey /> : undefined}
+              keyIndicators={
+                hasOffloadHalo || hasSpecDecodeMarker ? (
+                  <>
+                    {hasOffloadHalo && <OffloadHaloLegendKey />}
+                    {hasSpecDecodeMarker && <SpecDecodeLegendKey />}
+                  </>
+                ) : undefined
+              }
               enableTooltips={true}
             />
           }

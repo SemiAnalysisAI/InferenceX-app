@@ -62,6 +62,13 @@ import {
   OFFLOAD_HALO_STROKE_WIDTH,
   OffloadHaloLegendKey,
 } from '@/components/inference/ui/OffloadHaloLegendKey';
+import {
+  SPEC_DECODE_MARKER_DASHARRAY,
+  SPEC_DECODE_MARKER_PATH,
+  SPEC_DECODE_MARKER_STROKE_WIDTH,
+  SpecDecodeLegendKey,
+  hasAgenticSpecDecoding,
+} from '@/components/inference/ui/SpecDecodeLegendKey';
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 
@@ -140,6 +147,7 @@ const GPUGraph = React.memo(
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
     const hasOffloadHalo = useMemo(() => data.some((point) => point.offload_mode === 'on'), [data]);
+    const hasSpecDecodeMarker = useMemo(() => data.some(hasAgenticSpecDecoding), [data]);
 
     // Shared date+GPU pairs. `dates` holds comparison-series entries (plain dates
     // and/or specific-run entries); a same-day range endpoint is dropped when that
@@ -931,6 +939,18 @@ const GPUGraph = React.memo(
                 .attr('stroke-dasharray', OFFLOAD_HALO_DASHARRAY)
                 .attr('opacity', 0.9)
                 .attr('pointer-events', 'none');
+              d3.select(this)
+                .selectAll<SVGPathElement, boolean>('.spec-decode-marker')
+                .data(hasAgenticSpecDecoding(d) ? [true] : [])
+                .join('path')
+                .attr('class', 'spec-decode-marker')
+                .attr('d', SPEC_DECODE_MARKER_PATH)
+                .attr('fill', 'none')
+                .attr('stroke', 'var(--foreground)')
+                .attr('stroke-width', SPEC_DECODE_MARKER_STROKE_WIDTH)
+                .attr('stroke-dasharray', SPEC_DECODE_MARKER_DASHARRAY)
+                .attr('stroke-linecap', 'round')
+                .attr('pointer-events', 'none');
             });
         }}
         legendElement={
@@ -1030,7 +1050,14 @@ const GPUGraph = React.memo(
               },
             ]}
             precisionIndicators={selectedPrecisions}
-            keyIndicators={hasOffloadHalo ? <OffloadHaloLegendKey /> : undefined}
+            keyIndicators={
+              hasOffloadHalo || hasSpecDecodeMarker ? (
+                <>
+                  {hasOffloadHalo && <OffloadHaloLegendKey />}
+                  {hasSpecDecodeMarker && <SpecDecodeLegendKey />}
+                </>
+              ) : undefined
+            }
           />
         }
       />
