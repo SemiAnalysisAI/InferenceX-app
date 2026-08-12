@@ -40,6 +40,12 @@ on:
 
 permissions: {}
 
+concurrency:
+  # Do not ingest staged benchmark runs while the scheduled production restore
+  # is replacing the shared staging database (or vice versa).
+  group: staging-database-maintenance
+  cancel-in-progress: false
+
 jobs:
   validate:
     name: Validate staging request
