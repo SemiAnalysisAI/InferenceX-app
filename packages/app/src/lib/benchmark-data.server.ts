@@ -5,6 +5,7 @@ import {
 } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 import { cachedQuery } from '@/lib/api-cache';
+import { agenticWorkflowMetadataOnly } from '@/lib/agentic-workflow-metadata';
 import { loadFixture } from '@/lib/test-fixtures';
 
 /** Cache slot is keyed on the dbKeys array. Both `/compare/<slug>` and
@@ -14,7 +15,7 @@ export const getCachedBenchmarks = cachedQuery(
   (dbModelKeys: string[]) => {
     if (FIXTURES_MODE) return Promise.resolve(loadFixture<BenchmarkRow[]>('benchmarks'));
 
-    return getLatestBenchmarks(getDb(), dbModelKeys);
+    return getLatestBenchmarks(getDb(), dbModelKeys).then(agenticWorkflowMetadataOnly);
   },
   'benchmarks-agentic-run-metadata',
   { blobOnly: true },
@@ -26,7 +27,7 @@ export const getCachedBenchmarksAsOf = cachedQuery(
   (dbModelKeys: string[], date: string) => {
     if (FIXTURES_MODE) return Promise.resolve(loadFixture<BenchmarkRow[]>('benchmarks'));
 
-    return getLatestBenchmarks(getDb(), dbModelKeys, date);
+    return getLatestBenchmarks(getDb(), dbModelKeys, date).then(agenticWorkflowMetadataOnly);
   },
   'benchmarks-as-of-agentic-run-metadata',
   { blobOnly: true },

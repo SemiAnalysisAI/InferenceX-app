@@ -246,12 +246,12 @@ function groupPointsByDate(points: InferenceData[]): Map<string, InferenceData[]
 const optimalPointKey = (d: InferenceData): string =>
   `${d.hwKey}_${d.precision}_${d.date}-${d.x}-${d.y}`;
 
-/** Point label lines: TP (or full parallelism label), concurrency, then agentic decode mode. */
+/** Point label lines, with an extra line only when agentic speculative decoding is active. */
 export const pointLabelText = (d: InferenceData, advanced: boolean): string => {
   const base = advanced ? `${getPointLabel(d)}\nC=${d.conc}` : `${d.tp}\nC=${d.conc}`;
   if (d.benchmark_type !== 'agentic_traces') return base;
   const specMethod = d.spec_decoding ?? 'none';
-  return `${base}\n${specMethod === 'none' || specMethod === '' ? 'STP' : specMethod.toUpperCase()}`;
+  return specMethod === 'none' || specMethod === '' ? base : `${base}\n${specMethod.toUpperCase()}`;
 };
 
 // Referentially stable "no overlay data" result (see processedOverlayData).

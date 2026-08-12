@@ -80,7 +80,7 @@ describe('pointLabelText', () => {
     standard.spec_decoding = 'none';
     const mtp = { ...standard, spec_decoding: 'mtp' };
 
-    expect(pointLabelText(standard, false)).toBe('8\nC=16\nSTP');
+    expect(pointLabelText(standard, false)).toBe('8\nC=16');
     expect(pointLabelText(mtp, false)).toBe('8\nC=16\nMTP');
   });
 
