@@ -1,5 +1,6 @@
 import type { InferenceData } from '@/components/inference/types';
 import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
+import { isKvOffloadEnabled } from '@/lib/kv-offload';
 
 // Color palette for Pareto frontier section labels
 export const PARETO_LABEL_COLORS = [
@@ -22,17 +23,27 @@ export interface ParetoPointLabel {
 }
 
 /**
+ * Suffix appended to the Pareto label when a point ran with KV cache
+ * offloading enabled. Uses the "+" separator so it parses as its own
+ * sub-strategy component in {@link parseLabelComponents}, which gives
+ * offload-on/off transitions of the same parallelism a partial
+ * {@link labelSimilarity} (smooth-ish gradient blend) instead of 0.
+ */
+export const KV_OFFLOAD_LABEL_SUFFIX = '+KV';
+
+/**
  * Returns a Pareto frontier label for a data point.
  * Always prefixes with "TP" for simple numeric labels (legacy data without ep).
  * For data with ep/dp_attention, uses the full parallelism label.
+ * Points that ran with KV offload enabled get a "+KV" suffix so gradient
+ * segments and pill labels distinguish offload-on from offload-off, matching
+ * the dashed-halo point decoration.
  */
 export const getParetoLabel = (d: InferenceData): string => {
   const label = getPointLabel(d);
   // If the label is just a number (no parallelism info), prefix with "TP"
-  if (/^\d+$/u.test(label)) {
-    return `TP${label}`;
-  }
-  return label;
+  const base = /^\d+$/u.test(label) ? `TP${label}` : label;
+  return isKvOffloadEnabled(d) ? `${base}${KV_OFFLOAD_LABEL_SUFFIX}` : base;
 };
 
 /**
@@ -40,6 +51,8 @@ export const getParetoLabel = (d: InferenceData): string => {
  * E.g. "1xDPAEP4+1xDPAEP32" → ["DPAEP4", "DPAEP32"]
  * E.g. "TP8" → ["TP8"], "TEP8" → ["TEP8"], "DEP8" → ["DEP8"]
  * E.g. "2xEP4+1xDPAEP32" → ["EP4", "DPAEP32"]
+ * E.g. "TP8+KV" → ["TP8", "KV"] (KV offload marker counts as a component,
+ * so "TP8" vs "TP8+KV" share TP8 and blend at the boundary)
  */
 export const parseLabelComponents = (label: string): string[] => {
   // Split multinode labels on "+"
