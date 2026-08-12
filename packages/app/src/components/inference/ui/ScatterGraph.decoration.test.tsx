@@ -236,7 +236,7 @@ describe('ScatterGraph toggle decoration', () => {
     unmount();
   });
 
-  it('composes agentic spec decoding and KV-offload point decorations', () => {
+  it('keeps speculative decoding out of point decorations and shows only KV offload', () => {
     const standard = {
       ...point('h100', 'fp8', 1, 1, 1),
       benchmark_type: 'agentic_traces',
@@ -262,19 +262,21 @@ describe('ScatterGraph toggle decoration', () => {
       offload_mode: 'off',
     } as InferenceData;
 
+    inferenceState.current = {
+      ...baseInferenceState(),
+      selectedSequence: 'agentic-traces',
+    };
     const { container, unmount } = mountChart({
       data: [standard, mtp, mtpWithOffload, fixedMtp],
     });
     const groups = dotGroups(container);
 
-    expect(groups[0].querySelector('.spec-decode-marker')).toBeNull();
-    expect(groups[1].querySelector('.spec-decode-marker')).not.toBeNull();
+    expect(container.querySelector('.spec-decode-marker')).toBeNull();
     expect(groups[1].querySelector('.offload-halo')).toBeNull();
-    expect(groups[2].querySelector('.spec-decode-marker')).not.toBeNull();
     expect(groups[2].querySelector('.offload-halo')).not.toBeNull();
-    expect(groups[3].querySelector('.spec-decode-marker')).toBeNull();
-    expect(container.querySelector('[data-testid="spec-decode-marker-key"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="spec-decode-marker-key"]')).toBeNull();
     expect(container.querySelector('[data-testid="offload-halo-key"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="agentic-optimization-note"]')).not.toBeNull();
     unmount();
   });
 
@@ -348,28 +350,6 @@ describe('ScatterGraph toggle decoration', () => {
     expect(shape.tagName.toLowerCase()).toBe('rect');
     expect(shape.dataset.shapeKey).toBe('square');
     expect(rebuildCount()).toBe(buildsAfterMount);
-    unmount();
-  });
-
-  it('keeps the spec marker above a point after a precision-shape swap', () => {
-    const agenticFp4 = {
-      ...point('h100', 'fp4', 40, 400, 4),
-      benchmark_type: 'agentic_traces',
-      spec_decoding: 'mtp',
-    } as InferenceData;
-    const { container, rerender, unmount } = mountChart({
-      data: [POINTS[0], agenticFp4, POINTS[1]],
-    });
-
-    inferenceState.current = {
-      ...inferenceState.current,
-      selectedPrecisions: ['fp8', 'fp4'],
-    };
-    rerender();
-
-    const fp4Dot = dotGroups(container, 'h100').find((d) => d.dataset.precision === 'fp4')!;
-    expect(fp4Dot.querySelector('.visible-shape')!.tagName.toLowerCase()).toBe('rect');
-    expect(fp4Dot.lastElementChild).toBe(fp4Dot.querySelector('.spec-decode-marker'));
     unmount();
   });
 
@@ -462,7 +442,7 @@ describe('ScatterGraph toggle decoration', () => {
     unmount();
   });
 
-  it('composes spec decoding and offload decorations on unofficial-run points', () => {
+  it('keeps speculative decoding out of unofficial-run point decorations', () => {
     const runUrl = 'https://github.com/o/r/actions/runs/123';
     const overlayPoints = [
       {
@@ -497,7 +477,7 @@ describe('ScatterGraph toggle decoration', () => {
     });
     const groups = [...container.querySelectorAll<SVGGElement>('.unofficial-overlay-pt')];
 
-    expect(groups[0].querySelector('.spec-decode-marker')).not.toBeNull();
+    expect(groups[0].querySelector('.spec-decode-marker')).toBeNull();
     expect(groups[0].querySelector('.offload-halo')).not.toBeNull();
     expect(groups[1].querySelector('.spec-decode-marker')).toBeNull();
     expect(groups[1].querySelector('.offload-halo')).toBeNull();
