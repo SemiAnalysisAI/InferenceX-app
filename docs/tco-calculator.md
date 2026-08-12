@@ -271,11 +271,11 @@ per measured improvement — and turns it into a revenue staircase over calendar
 time against a flat cost line:
 
 ```
-revenue │           ┌────── each step is a config that beat the ones before
-        │       ┌───┘
-        │   ,─┘
-────────┼──╯───────────────────────────────  cost: flat, the racks
-        │ ╱ ramp to full load
+revenue │              ,──── each config rolls out to its own numbers
+        │         ,───╯
+        │    ,───╯
+────────┼──╱──────────────────────────────  cost: flat once built out
+        │ ╱ first rollout also energises the racks
         └──────────────────────────────────▶  months since model release
 ```
 
@@ -285,28 +285,27 @@ optimisation history into a single number held constant for years, so every chip
 drew the same assumed shape. The steps are measured; only the ramp survived, and
 it survived as an explicit user assumption.
 
-**The ramp and the steps compose.** `rampFractionAt` returns the fraction of full
-load carried at a month, and it scales whichever config is in force rather than
-replacing it — so a sweep that lands mid-ramp is still a step, just a step at a
-fraction of full load. The ramp is measured from the chip's **own** first measured
-config, not from the model's release: a chip first benchmarked three months in did
-not spend those three months ramping.
+**A config is rolled out, not switched on.** So every config gets its own ramp:
+when it lands, the fleet climbs from whatever it was already serving to that
+config's numbers over `rampMonths`. The first config climbs from zero, and that
+first rollout is also when the racks are energised — so cost ramps with it and the
+line opens at exactly zero rather than at a full-cost deficit.
+
+A rollout starts from the level the previous one **actually reached**, not from the
+previous config's nominal rate. With a ramp longer than the gap between sweeps that
+matters: the second config picks up mid-climb instead of jumping, so the line stays
+continuous no matter how the ramp length and the sweep cadence interact.
 
 Four conventions the numbers depend on:
 
-- **Cost is flat, including through the ramp.** It is `chips × $/chip/hr`, and
-  neither term moves when a config improves — the racks bill the same whatever the
-  software does, and they bill from the moment they are energised rather than the
-  moment they are loaded. So the ramp is paid for in full while it earns a
-  fraction, which is what puts the opening months below the rule and delays
-  payback. That gap is the return on software progress.
+- **Cost tracks energised capacity, then holds flat.** It is `chips × $/chip/hr`,
+  and capacity is bought once — so cost ramps only over the first rollout, and no
+  later config moves it. Because revenue and cost ramp together there, margin
+  during the buildout is simply a fraction of the steady-state margin.
 - **The ramp is an assumption; the steps are not.** It defaults to a nominal
-  quarter (`c_ramp`), and 0 means "already at full load".
-- **A config holds until the next one lands**, so the line is a step
-  (`d3.curveStepAfter`), not a smooth ramp. Drawing it curved would assert the
-  fleet got gradually faster between sweeps, which is not what happened. Markers
-  are drawn only on risers, so every dot on the chart is a sweep the user can
-  open.
+  quarter (`c_ramp`), and 0 means every config takes effect instantly.
+- **Markers sit at the release instant** — the foot of each rollout, not its top —
+  so every dot on the chart is a sweep the user can open.
 - **Interrupts are an availability haircut, not drawn events.** A 24-day MTBI
   over a multi-year window is thousands of interruptions; at any sane chart width
   each is far under a pixel, so drawing them yields aliasing noise rather than
@@ -314,6 +313,14 @@ Four conventions the numbers depend on:
 
 A blank or zero MTBI means "no interruptions modelled", not "always down" — the
 input is an optional refinement and a hostile default would be worse than none.
+
+**Known limitation: `paybackMonth` is weak under this cost model.** Nothing is paid
+up front — cost is a rental rate that ramps with capacity — so a fleet whose
+steady-state margin is positive has a positive margin from the first instant, and
+cumulative margin never dips below zero. Payback therefore collapses to "is margin
+positive", reporting ~0 months rather than a recovery period. Giving it real meaning
+needs capex in the model, which the TCO source treats as amortised into $/chip/hr;
+until then read the column as a yes/no.
 
 ### Anchoring and the x axis
 
@@ -338,23 +345,22 @@ before appending. The chart re-renders into the same zoom group, so appending
 unconditionally leaves a stale rule and a duplicate "break-even" label behind at
 the previous y-scale on every data change.
 
-### Why the ramp is a custom layer, not a second `line` layer
+### One line layer, interpolated linearly
 
-The ramp is continuous and the steps are square, so they need different curve
-interpolations — `curveMonotoneX` and `curveStepAfter`. The obvious implementation
-is two `line` layers, and it does not work: `useD3ChartRenderer` renders **every**
-layer into one shared `renderGroup`, and `renderLines` does a keyed join on
-`.line-path`. Two line layers with the same series keys therefore join against each
-other's paths, and the second silently overwrites the first — one of the two
-segments just vanishes.
+Because every riser is now a sampled rollout curve and every plateau is flat, the
+shape is already in the points: `curveLinear` draws exactly what was computed. A
+step curve would flatten the rollouts back into stairs, and a spline would overshoot
+on the near-vertical ones (a zero-length ramp emits two samples at the same month to
+force a true vertical).
 
-So the ramp is a `type:'custom'` layer owning `.lifecycle-ramp-path`, drawn with
-`d3.line` directly, and idempotent for the same reason the zero rule is. The two
-segments share the junction point (`points` filtered at `rampEndMonth` from both
-sides) so the join is seamless.
-
-This is worth remembering before adding any second layer of an existing type to a
-`D3Chart`: the shared render group makes layer keys non-isolating.
+An intermediate version drew the ramp and the steps as two `line` layers with
+different curves. **That does not work, and the reason is worth recording:**
+`useD3ChartRenderer` renders every layer into one shared `renderGroup`, and
+`renderLines` does a keyed join on `.line-path`. Two line layers with the same
+series keys join against each other's paths, and the second silently overwrites the
+first — one of the two segments just vanishes. Before adding a second layer of an
+existing type to a `D3Chart`, remember that the shared render group makes layer keys
+non-isolating; a `type:'custom'` layer with its own class is the way out.
 
 ### Token price defaults to break-even
 

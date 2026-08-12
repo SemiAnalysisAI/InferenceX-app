@@ -70,25 +70,15 @@ const FleetLifecycleChart = React.memo(
   }: FleetLifecycleChartProps) => {
     const toMs = useCallback((month: number) => anchorMs + month * MS_PER_MONTH, [anchorMs]);
 
-    const { lineDataRecord, rampDataRecord, markers, bySafeKey } = useMemo(() => {
+    const { lineDataRecord, markers, bySafeKey } = useMemo(() => {
       const record: Record<string, { x: number; y: number }[]> = {};
-      const ramp: Record<string, { x: number; y: number }[]> = {};
       const flat: StepMarker[] = [];
       const lookup = new Map<string, LifecycleChartSeries>();
 
       for (const entry of data) {
         const key = safeKey(entry.key);
         lookup.set(key, entry);
-        const { rampEndMonth } = entry.series;
-        // The ramp is a continuous curve and the steps are not, so they are drawn
-        // as separate layers with different interpolations. They share the
-        // junction point, which keeps the join seamless.
-        const steady = entry.series.points.filter((p) => p.month >= rampEndMonth);
-        record[key] = steady.map((p) => ({ x: toMs(p.month), y: p.margin }));
-        const rampPoints = entry.series.points.filter((p) => p.month <= rampEndMonth);
-        if (rampPoints.length > 1) {
-          ramp[key] = rampPoints.map((p) => ({ x: toMs(p.month), y: p.margin }));
-        }
+        record[key] = entry.series.points.map((p) => ({ x: toMs(p.month), y: p.margin }));
         // Markers mark measured config changes and nothing else — no rug of
         // synthetic samples, and every dot is a sweep the user can look up.
         for (const p of entry.series.points) {
@@ -102,7 +92,7 @@ const FleetLifecycleChart = React.memo(
           });
         }
       }
-      return { lineDataRecord: record, rampDataRecord: ramp, markers: flat, bySafeKey: lookup };
+      return { lineDataRecord: record, markers: flat, bySafeKey: lookup };
     }, [data, toMs]);
 
     const xScaleConfig = useMemo<ScaleConfig>(() => {
@@ -169,51 +159,9 @@ const FleetLifecycleChart = React.memo(
       [breakEvenLabel],
     );
 
-    /**
-     * The ramp segment, drawn by hand rather than as a second `line` layer.
-     *
-     * Every layer renders into one shared group and `renderLines` joins on
-     * `.line-path` keyed by series, so a second line layer with the same series
-     * keys would match the first layer's paths and overwrite their geometry —
-     * one of the two segments would simply vanish. A custom layer owns its own
-     * class, which sidesteps that entirely.
-     *
-     * Idempotent for the same reason the zero rule is: this re-renders into the
-     * group it already drew into.
-     */
-    const renderRamp = useCallback(
-      (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) => {
-        zoomGroup.selectAll('.lifecycle-ramp').remove();
-        const entries = Object.entries(rampDataRecord);
-        if (entries.length === 0) return;
-
-        const line = d3
-          .line<{ x: number; y: number }>()
-          .x((d) => (ctx.xScale as d3.ScaleTime<number, number>)(d.x))
-          .y((d) => (ctx.yScale as d3.ScaleLinear<number, number>)(d.y))
-          // Load builds continuously, so this half really is a curve.
-          .curve(d3.curveMonotoneX);
-
-        const group = zoomGroup.append('g').attr('class', 'lifecycle-ramp');
-        for (const [key, points] of entries) {
-          const path = line(points);
-          if (!path) continue;
-          group
-            .append('path')
-            .attr('class', `lifecycle-ramp-path lifecycle-ramp-${key}`)
-            .attr('d', path)
-            .attr('fill', 'none')
-            .attr('stroke', bySafeKey.get(key)?.color ?? '#888')
-            .attr('stroke-width', 2);
-        }
-      },
-      [rampDataRecord, bySafeKey],
-    );
-
     const layers = useMemo(
       () => [
         { type: 'custom' as const, key: 'lifecycle-zero', render: renderZeroRule },
-        { type: 'custom' as const, key: 'lifecycle-ramp', render: renderRamp },
         {
           type: 'line' as const,
           key: 'lifecycle-lines',
@@ -221,10 +169,11 @@ const FleetLifecycleChart = React.memo(
           config: {
             getColor: (key: string) => bySafeKey.get(key)?.color ?? '#888',
             strokeWidth: 2,
-            // A config holds until the next one lands, so this half is a step,
-            // not a smooth ramp. Drawing it curved would imply the fleet got
-            // gradually faster between sweeps, which is not what happened.
-            curve: d3.curveStepAfter,
+            // Every riser is a rollout curve and every plateau is flat, and the
+            // samples already carry that shape — so interpolate linearly and draw
+            // exactly what was computed. A step curve would flatten the rollouts
+            // into stairs; a spline would overshoot on the near-vertical ones.
+            curve: d3.curveLinear,
           },
         },
         {
@@ -236,7 +185,7 @@ const FleetLifecycleChart = React.memo(
           },
         },
       ],
-      [renderZeroRule, renderRamp, lineDataRecord, markers, bySafeKey],
+      [renderZeroRule, lineDataRecord, markers, bySafeKey],
     );
 
     const tooltipConfig = useMemo(
@@ -263,7 +212,7 @@ const FleetLifecycleChart = React.memo(
         },
         getRulerX: (d: StepMarker, xScale: any) => xScale(d.x),
         getRulerY: (d: StepMarker, yScale: any) => yScale(d.y),
-        attachToLayer: 3,
+        attachToLayer: 2,
       }),
       [bySafeKey, labels],
     );

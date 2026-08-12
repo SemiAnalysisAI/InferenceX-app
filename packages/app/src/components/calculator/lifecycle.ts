@@ -12,38 +12,38 @@
  * baseline, then FP4 with graphs and FlashMLA, then AITER GEMMs and Triton SWA,
  * then fused kernels — each step lifting the frontier.
  *
- *   revenue │           ┌────── each step is a config that beat the ones before
- *           │       ┌───┘
- *           │   ,─┘
- *   ────────┼──╯───────────────────────────────  cost: flat, the racks
- *           │ ╱ ramp to full load
+ *   revenue │              ,──── each config rolls out to its own numbers
+ *           │         ,───╯
+ *           │    ,───╯
+ *   ────────┼──╱──────────────────────────────  cost: flat once built out
+ *           │ ╱ first rollout also energises the racks
  *           └──────────────────────────────────▶  months since model release
  *
- * So revenue ramps to full load, then becomes a staircase over calendar time —
- * one step per measured improvement — while cost is a constant, because the racks
- * bill the same whatever the software does. That makes the gap between them the
- * return on software progress, which is the thing no single benchmark date can
- * show.
+ * A config does not take effect the instant a sweep finds it: it is rolled out.
+ * So every config gets its own ramp, climbing from whatever the fleet was already
+ * serving to that config's numbers. The first config climbs from zero, and that
+ * first rollout is also when the racks are energised — so cost ramps with it and
+ * the fleet starts at exactly zero rather than at a full-cost deficit.
  *
- * The ramp and the steps compose rather than sit end to end: the ramp is a
- * fraction of full load, and it scales whichever config is in force. A step that
- * lands mid-ramp is still a step.
+ * After the buildout cost is constant: later rollouts are software landing on
+ * chips that are already billing. That makes the gap between the lines the return
+ * on software progress, which is the thing no single benchmark date can show.
  *
  * Three conventions worth stating:
  *
- * 1. **Cost is flat, including through the ramp.** It is `chips x $/chip/hr`, and
- *    neither term moves when a config improves. Racks bill from the moment they
- *    are energised, not from the moment they are fully loaded, so the ramp is paid
- *    for in full while it earns a fraction. Early months are therefore underwater
- *    at prices the later configs clear comfortably — that is the shape, not a bug.
+ * 1. **Cost tracks energised capacity, then holds flat.** It is
+ *    `chips x $/chip/hr`, and capacity is bought once — so cost ramps only over
+ *    the first rollout and neither term moves when a config improves afterwards.
+ *    Because revenue and cost ramp together, margin during the buildout is simply
+ *    a fraction of the steady-state margin, and the line opens at zero.
  * 2. **The ramp is an assumption; the steps are not.** Ramp length is a user
- *    input, defaulting to a nominal quarter. It is measured from the fleet's first
- *    measured config, because that is when this hardware started serving.
+ *    input, defaulting to a nominal quarter, and it applies to every rollout.
+ *    Which configs exist, when, and how fast they ran are all measured.
  * 3. **Interrupts are an availability haircut, not drawn events.** A 24-day MTBI
  *    over a multi-year window is thousands of events, each far under a pixel, so
  *    drawing them is aliasing noise. They scale revenue instead.
  *
- * The lifecycle assumptions here (price, MTBI, recovery, horizon) are user
+ * The lifecycle assumptions here (price, ramp, MTBI, recovery, horizon) are user
  * inputs, and callers must present them as such. The throughput steps are not:
  * they are measured.
  */
@@ -63,15 +63,16 @@ export interface LifecycleAssumptions {
   /** Sale price of output tokens, $/M tok. Defaults to break-even upstream. */
   pricePerMTok: number;
   /**
-   * Months to bring the fleet to full load from its first measured config. Zero
-   * means "already at full load". This is an assumption, not a measurement.
+   * Months for a config to roll out across the fleet. Applies to every config;
+   * on the first it also covers energising the racks. Zero means each config
+   * takes effect instantly. An assumption, not a measurement.
    */
   rampMonths: number;
 }
 
 /**
- * A measured config improvement: from `month` onwards, the fleet serves
- * `fleetTokPerSec` until the next step.
+ * A measured config improvement: from `month` onwards the fleet rolls out to
+ * `fleetTokPerSec`, and holds it until the next step.
  */
 export interface ThroughputStep {
   /** Months since the anchor date (the model's release), >= 0. */
@@ -86,7 +87,7 @@ export interface LifecycleInputs {
    * first measured on the model — before that there is no data, so no line.
    */
   steps: readonly ThroughputStep[];
-  /** Fleet TCO for the selected tier ($/hr). Constant: configs don't change it. */
+  /** Fleet TCO for the selected tier ($/hr) at full capacity. Configs don't move it. */
   costPerHour: number;
   /** End of the modelled window, months since the anchor. */
   horizonMonths: number;
@@ -106,25 +107,22 @@ export interface LifecyclePoint {
   cumulative: number;
   /** True at the instant a new config takes effect — the riser of the step. */
   isStep: boolean;
-  /**
-   * True while the fleet is still ramping to full load. The ramp is a continuous
-   * curve, unlike the steps, so the chart draws it as its own segment.
-   */
+  /** True while a rollout is still climbing, i.e. not yet at its config's rate. */
   isRamp: boolean;
 }
 
 export interface LifecycleSeries {
   /**
-   * One point per step, one per ramp sample, and a closing point at the horizon.
-   * With `curveStepAfter` a value holds until the next x, so the steps need no
-   * duplicated tread points.
+   * Densely sampled across every rollout, plus the flat stretch each config holds
+   * and a closing point at the horizon. Interpolate linearly to draw them: the
+   * shape is already in the samples.
    */
   points: LifecyclePoint[];
   /** Revenue at the latest config, $/day. */
   revenuePerDay: number;
   /** Revenue at the first measured config, $/day. */
   firstRevenuePerDay: number;
-  /** Flat cost rate, $/day. */
+  /** Cost rate once the fleet is built out, $/day. Flat from then on. */
   costPerDay: number;
   /** Margin at the latest config, $/day. */
   marginPerDay: number;
@@ -140,7 +138,11 @@ export interface LifecycleSeries {
   /** Month of the first measured config. */
   startMonth: number;
   endMonth: number;
-  /** Month the ramp completes. Equals `startMonth` when no ramp is modelled. */
+  /**
+   * Month the first rollout completes — i.e. when the fleet is fully energised.
+   * Equals `startMonth` when no ramp is modelled. Later rollouts have their own
+   * windows; this one is called out because it is the only one that moves cost.
+   */
   rampEndMonth: number;
   /** Number of measured improvements, i.e. steps after the first. */
   improvementCount: number;
@@ -181,7 +183,7 @@ function revenuePerDayFor(
   return ((fleetTokPerSec * SECONDS_PER_DAY) / TOKENS_PER_MILLION) * pricePerMTok * availability;
 }
 
-/** Samples across the ramp. Enough that a smoothstep reads as a curve, not stairs. */
+/** Samples per rollout. Enough that a smoothstep reads as a curve, not stairs. */
 const RAMP_SAMPLES = 24;
 
 /** Smoothstep: eases in and out, so the ramp has no kink at either end. */
@@ -192,11 +194,11 @@ function smoothstep(t: number): number {
 }
 
 /**
- * Fraction of full load the fleet is carrying at `month`.
+ * Progress through a ramp that began at `startMonth`, in [0, 1].
  *
- * The ramp is measured from the fleet's first measured config, not from the
- * model's release: that is when this hardware started serving, and a chip first
- * benchmarked three months in did not spend those three months ramping.
+ * Used twice: once per config rollout, and once for the capacity buildout that
+ * rides along with the first rollout. Ramps are timed from the event that starts
+ * them — a config lands and then rolls out — never from the model's release.
  */
 export function rampFractionAt(month: number, startMonth: number, rampMonths: number): number {
   if (!Number.isFinite(rampMonths) || rampMonths <= 0) return 1;
@@ -235,56 +237,93 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
   const applied = ordered.filter((s) => s.month < endMonth);
   if (applied.length === 0) return null;
 
-  /** The config in force at `month` — the last one to have landed by then. */
-  const rateAt = (month: number): number => {
-    let rate = applied[0]!.fleetTokPerSec;
-    for (const step of applied) {
-      if (step.month > month) break;
-      rate = step.fleetTokPerSec;
+  /**
+   * One rollout per config: when it lands, the fleet climbs from whatever it was
+   * already serving to that config's numbers over the ramp window. `from` is the
+   * level actually reached by the previous rollout, so a config landing before the
+   * previous one finished rolling out starts from there rather than jumping.
+   */
+  const rollouts: { start: number; end: number; from: number; to: number }[] = [];
+  for (const step of applied) {
+    const previous = rollouts.at(-1);
+    const from = previous ? levelWithin(previous, step.month) : 0;
+    rollouts.push({
+      start: step.month,
+      end: Math.min(step.month + rampMonths, endMonth),
+      from,
+      to: step.fleetTokPerSec,
+    });
+  }
+
+  /** Throughput at `month` within one rollout, clamped to its end level. */
+  function levelWithin(
+    rollout: { start: number; end: number; from: number; to: number },
+    month: number,
+  ): number {
+    const fraction = rampFractionAt(month, rollout.start, rampMonths);
+    return rollout.from + (rollout.to - rollout.from) * fraction;
+  }
+
+  // Capacity is bought once, so only the first rollout energises racks. Later
+  // rollouts are software landing on chips that are already billing.
+  const capacityAt = (month: number) => rampFractionAt(month, startMonth, rampMonths);
+
+  // Build the samples in order: each rollout contributes its ramp, then the flat
+  // stretch it holds until the next one lands.
+  const samples: { month: number; level: number; isStep: boolean; isRamp: boolean }[] = [];
+  for (let i = 0; i < rollouts.length; i += 1) {
+    const rollout = rollouts[i]!;
+    const next = rollouts[i + 1];
+    const holdUntil = next ? Math.min(next.start, endMonth) : endMonth;
+    const rampEnd = Math.min(rollout.end, holdUntil);
+
+    if (rampEnd > rollout.start) {
+      for (let s = 0; s <= RAMP_SAMPLES; s += 1) {
+        const month = rollout.start + ((rampEnd - rollout.start) * s) / RAMP_SAMPLES;
+        samples.push({
+          month,
+          level: levelWithin(rollout, month),
+          isStep: s === 0,
+          isRamp: s < RAMP_SAMPLES,
+        });
+      }
+    } else {
+      // No ramp window at all: emit the incumbent level at this instant first so
+      // the line rises vertically instead of sloping into the new config.
+      if (i > 0)
+        samples.push({ month: rollout.start, level: rollout.from, isStep: false, isRamp: false });
+      samples.push({ month: rollout.start, level: rollout.to, isStep: true, isRamp: false });
     }
-    return rate;
-  };
 
-  // Breakpoints: every step, the horizon, and enough samples across the ramp for
-  // it to read as a curve. Steps inside the ramp still show as steps — the ramp
-  // scales whatever config is in force rather than replacing it.
-  const months = new Map<number, boolean>();
-  const mark = (month: number, isStep: boolean) =>
-    months.set(month, (months.get(month) ?? false) || isStep);
-
-  mark(startMonth, true);
-  if (rampEndMonth > startMonth) {
-    for (let i = 1; i <= RAMP_SAMPLES; i += 1) {
-      mark(startMonth + ((rampEndMonth - startMonth) * i) / RAMP_SAMPLES, false);
+    if (holdUntil > rampEnd) {
+      samples.push({
+        month: holdUntil,
+        level: levelWithin(rollout, rampEnd),
+        isStep: false,
+        isRamp: false,
+      });
     }
   }
-  for (const step of applied) mark(step.month, true);
-  mark(endMonth, false);
-
-  const ordinates = [...months.entries()]
-    .toSorted((a, b) => a[0] - b[0])
-    .map(([month, isStep]) => {
-      const fraction = rampFractionAt(month, startMonth, rampMonths);
-      const revenue = revenuePerDayFor(rateAt(month), price, availability) * fraction;
-      return { month, isStep, fraction, revenue };
-    });
 
   const points: LifecyclePoint[] = [];
   let cumulative = 0;
   let paybackMonth: number | null = null;
 
-  for (let i = 0; i < ordinates.length; i += 1) {
-    const here = ordinates[i]!;
+  const rateOf = (sample: { month: number; level: number }) => ({
+    revenue: revenuePerDayFor(sample.level, price, availability),
+    cost: costPerDay * capacityAt(sample.month),
+  });
+
+  for (let i = 0; i < samples.length; i += 1) {
+    const here = samples[i]!;
+    const { revenue, cost } = rateOf(here);
     if (i > 0) {
-      const prev = ordinates[i - 1]!;
-      // Over [prev, here) the config in force is the one that held at `prev`,
-      // while the ramp fraction moves continuously — so hold the rate and average
-      // the fraction. Averaging the revenues instead would credit a step's new
-      // config for the stretch before it landed.
-      const heldRevenue =
-        revenuePerDayFor(rateAt(prev.month), price, availability) *
-        ((prev.fraction + here.fraction) / 2);
-      const margin = heldRevenue - costPerDay;
+      const prev = samples[i - 1]!;
+      // Both revenue and cost vary continuously between samples, so trapezoid.
+      // Sample density is what makes this accurate; a forced vertical shares its
+      // month with the previous sample and so contributes nothing.
+      const previous = rateOf(prev);
+      const margin = (previous.revenue - previous.cost + (revenue - cost)) / 2;
       const days = (here.month - prev.month) * DAYS_PER_MONTH;
       const before = cumulative;
       cumulative += margin * days;
@@ -295,12 +334,12 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
     }
     points.push({
       month: here.month,
-      revenue: here.revenue,
-      cost: costPerDay,
-      margin: here.revenue - costPerDay,
+      revenue,
+      cost,
+      margin: revenue - cost,
       cumulative,
       isStep: here.isStep,
-      isRamp: here.month < rampEndMonth,
+      isRamp: here.isRamp,
     });
   }
 

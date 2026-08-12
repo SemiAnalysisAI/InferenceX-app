@@ -17,6 +17,14 @@ import { unlockAgenticGate } from '../support/e2e';
 const firstRowCell = (index: number) =>
   cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').first().find('td').eq(index);
 
+/** Vertex count of the first plotted line — a sampled rollout curve has many. */
+const lineVertices = () =>
+  cy
+    .get('[data-testid="calculator-lifecycle-chart-svg"] path.line-path')
+    .first()
+    .invoke('attr', 'd')
+    .then((d) => (d ?? '').split('L').length);
+
 describe('Calculator — Fleet Lifecycle', () => {
   before(() => {
     cy.window().then((win) => {
@@ -134,32 +142,27 @@ describe('Calculator — Fleet Lifecycle', () => {
       .should('match', /^\d+(?:\.\d+)?×$/u);
   });
 
-  it('ramps to full load before the steps take over', () => {
-    // The ramp is a separate, curved segment; the steps are square. Both must be
-    // drawn, and the ramp must respond to its input.
-    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-ramp-path').should(
-      'have.length.greaterThan',
-      0,
-    );
+  it('rolls each config out over the ramp instead of stepping instantly', () => {
     cy.get('[data-testid="calc-lifecycle-ramp-input"]').should('have.value', '3');
-    // A longer ramp earns less over the same window, so cumulative margin falls.
-    firstRowCell(11)
-      .invoke('text')
-      .then((short) => {
-        cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
-        cy.get('[data-testid="calc-lifecycle-ramp-input"]').type('18');
-        firstRowCell(11)
-          .invoke('text')
-          .should((long) => expect(long).to.not.equal(short));
-        // Back to no ramp at all: the fleet starts at full load.
-        cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
-        cy.get('[data-testid="calc-lifecycle-ramp-input"]').type('0');
-        cy.get('body').then(($b) => {
-          expect(
-            $b.find('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-ramp-path').length,
-          ).to.equal(0);
+    lineVertices().then((curved) => {
+      // Rollouts are sampled into curves, so the line cannot be a bare staircase.
+      expect(curved).to.be.greaterThan(20);
+      // A longer ramp reaches each config's numbers later, so it earns less.
+      firstRowCell(11)
+        .invoke('text')
+        .then((short) => {
+          cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
+          cy.get('[data-testid="calc-lifecycle-ramp-input"]').type('18');
+          firstRowCell(11)
+            .invoke('text')
+            .should((long) => expect(long).to.not.equal(short));
+          // Ramp 0 means configs take effect instantly — a pure staircase, which
+          // needs far fewer vertices than the sampled curves.
+          cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
+          cy.get('[data-testid="calc-lifecycle-ramp-input"]').type('0');
+          lineVertices().should((stepped) => expect(stepped).to.be.lessThan(curved));
         });
-      });
+    });
   });
 
   it('a shorter MTBI lowers availability', () => {

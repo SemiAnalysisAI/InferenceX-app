@@ -197,63 +197,73 @@ describe('computeLifecycle', () => {
   describe('ramp', () => {
     const ramped = { ...base, assumptions: { ...assumptions, rampMonths: 3 } };
 
-    it('starts at zero revenue and reaches full load at the end of the ramp', () => {
+    it('starts the first config at zero and maxes out at its numbers', () => {
       const series = computeLifecycle(ramped)!;
       expect(series.rampEndMonth).toBe(3);
       const first = series.points[0]!;
-      // Nothing is being served yet, so the fleet is down its full cost.
+      // Nothing served and nothing energised, so the fleet is at exactly zero —
+      // not down its full cost. Capacity ramps with the first rollout.
       expect(first.revenue).toBeCloseTo(0, 6);
-      expect(first.margin).toBeCloseTo(-costPerHour * HOURS_PER_DAY, 6);
-      // At the end of the ramp the config in force is serving at full rate.
+      expect(first.cost).toBeCloseTo(0, 6);
+      expect(first.margin).toBeCloseTo(0, 6);
+      // At the end of its rollout the first config is serving its full rate.
       const atRampEnd = series.points.find((p) => p.month === 3)!;
-      expect(atRampEnd.revenue).toBeCloseTo(rev(900_000), 6);
+      expect(atRampEnd.revenue).toBeCloseTo(rev(400_000), 6);
+      expect(atRampEnd.cost).toBeCloseTo(costPerHour * HOURS_PER_DAY, 6);
     });
 
-    it('rises monotonically through the ramp', () => {
+    it('gives every config its own rollout, from the incumbent level to its own', () => {
       const series = computeLifecycle(ramped)!;
-      const during = series.points.filter((p) => p.month <= 3);
-      expect(during.length).toBeGreaterThan(5);
-      for (let i = 1; i < during.length; i += 1) {
-        expect(during[i]!.revenue).toBeGreaterThanOrEqual(during[i - 1]!.revenue);
+      const risers = series.points.filter((p) => p.isStep);
+      expect(risers.map((p) => p.month)).toEqual([0, 3, 6]);
+      // The second config starts from the first's level, not from zero.
+      expect(risers[1]!.revenue).toBeCloseTo(rev(400_000), 6);
+      // ...and maxes out at its own by the end of its window.
+      const atSix = series.points.find((p) => p.month === 6)!;
+      expect(atSix.revenue).toBeCloseTo(rev(900_000), 6);
+      const atNine = series.points.find((p) => p.month === 9)!;
+      expect(atNine.revenue).toBeCloseTo(rev(1_600_000), 6);
+    });
+
+    it('rises monotonically, with no jump at a rollout boundary', () => {
+      const series = computeLifecycle(ramped)!;
+      for (let i = 1; i < series.points.length; i += 1) {
+        expect(series.points[i]!.revenue).toBeGreaterThanOrEqual(
+          series.points[i - 1]!.revenue - 1e-6,
+        );
       }
     });
 
-    it('marks ramp points so the chart can curve them and step the rest', () => {
-      const series = computeLifecycle(ramped)!;
-      expect(series.points.filter((p) => p.isRamp).every((p) => p.month < 3)).toBe(true);
-      expect(series.points.filter((p) => !p.isRamp).every((p) => p.month >= 3)).toBe(true);
-      // The junction is shared, so the two drawn segments join without a gap.
-      expect(series.points.some((p) => p.month === 3)).toBe(true);
-    });
-
-    it('scales whichever config is in force rather than replacing it', () => {
-      // The 3-month step lands exactly at the ramp end here, so use a longer ramp
-      // to put a step strictly inside it.
+    it('starts a rollout from where the previous one actually got to', () => {
+      // A 12-month ramp cannot finish before the next config lands at month 3, so
+      // the second rollout must pick up mid-climb rather than from 400k.
       const series = computeLifecycle({
         ...base,
         assumptions: { ...assumptions, rampMonths: 12 },
       })!;
       const risers = series.points.filter((p) => p.isStep);
-      expect(risers.map((p) => p.month)).toEqual([0, 3, 6]);
-      // Mid-ramp steps are still steps, but at a fraction of full load.
-      const atSix = risers.find((p) => p.month === 6)!;
-      expect(atSix.revenue).toBeGreaterThan(0);
-      expect(atSix.revenue).toBeLessThan(rev(1_600_000));
+      const second = risers[1]!;
+      expect(second.month).toBe(3);
+      expect(second.revenue).toBeGreaterThan(0);
+      expect(second.revenue).toBeLessThan(rev(400_000));
     });
 
-    it('delays payback, because the ramp is paid for in full while it earns a fraction', () => {
+    it('ramps cost with energised capacity, then holds it flat', () => {
+      const series = computeLifecycle(ramped)!;
+      const full = costPerHour * HOURS_PER_DAY;
+      // Capacity is bought once, so only the first rollout moves cost.
+      const during = series.points.filter((p) => p.month < 3);
+      expect(during.length).toBeGreaterThan(5);
+      for (const p of during) expect(p.cost).toBeLessThan(full);
+      for (const after of series.points.filter((point) => point.month >= 3)) {
+        expect(after.cost).toBeCloseTo(full, 6);
+      }
+    });
+
+    it('earns less over the window than a fleet that starts at full load', () => {
       const flat = computeLifecycle(base)!;
       const series = computeLifecycle(ramped)!;
-      expect(series.paybackMonth).not.toBeNull();
-      expect(series.paybackMonth!).toBeGreaterThan(flat.paybackMonth!);
       expect(series.lifetimeMargin).toBeLessThan(flat.lifetimeMargin);
-    });
-
-    it('keeps cost flat through the ramp — racks bill from the moment they are energised', () => {
-      const series = computeLifecycle(ramped)!;
-      for (const p of series.points) {
-        expect(p.cost).toBeCloseTo(costPerHour * HOURS_PER_DAY, 6);
-      }
     });
 
     it('treats a zero or nonsensical ramp as "already at full load"', () => {
@@ -264,11 +274,12 @@ describe('computeLifecycle', () => {
         })!;
         expect(series.rampEndMonth).toBe(series.startMonth);
         expect(series.points[0]!.revenue).toBeCloseTo(rev(400_000), 6);
+        expect(series.points[0]!.cost).toBeCloseTo(costPerHour * HOURS_PER_DAY, 6);
         expect(series.points.some((p) => p.isRamp)).toBe(false);
       }
     });
 
-    it('reports the end-of-window rate, which is past the ramp', () => {
+    it('reports the end-of-window rate, which is past every rollout', () => {
       const series = computeLifecycle(ramped)!;
       expect(series.revenuePerDay).toBeCloseTo(rev(1_600_000), 6);
     });
