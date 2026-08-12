@@ -1,7 +1,7 @@
 'use client';
 
 import * as d3 from 'd3';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 
 import { formatLargeNumber } from '@/lib/chart-rendering';
 import { getChartWatermark } from '@/lib/data-mappings';
@@ -115,6 +115,20 @@ const FleetLifecycleChart = React.memo(
       return { lineDataRecord: record, markers: flat, bySafeKey: lookup };
     }, [data, toMs, valueOf]);
 
+    /**
+     * What the custom layers should draw *now*.
+     *
+     * The zoom behaviour installed by a render captures that render's layer
+     * callbacks, and `d3.zoom`'s double-click reset is a transition — so its
+     * trailing events can fire after a later render has already redrawn. A stale
+     * callback then re-appends what the new render just removed: switch the axis to
+     * revenue mid-reset and the break-even rule comes back and stays, because
+     * nothing renders again afterwards. Reading through a ref keeps every draw,
+     * stale closure or not, consistent with the current props.
+     */
+    const latest = useRef({ metric, lineDataRecord, bySafeKey });
+    latest.current = { metric, lineDataRecord, bySafeKey };
+
     const xScaleConfig = useMemo<ScaleConfig>(() => {
       let min = Infinity;
       let max = -Infinity;
@@ -162,10 +176,13 @@ const FleetLifecycleChart = React.memo(
         // Zero is break-even only for margin. On a revenue axis it is just the
         // bottom of the scale, and labelling it "break-even" would be a lie: each
         // chip breaks even at its own cost line, not at zero revenue.
-        if (metric !== 'margin') return;
+        if (latest.current.metric !== 'margin') return;
         if (!Number.isFinite(y)) return;
 
-        const group = zoomGroup.append('g').attr('class', 'lifecycle-zero-rule');
+        // Lowered explicitly: `renderLines` keeps its paths in place across
+        // re-renders via a data join, while this layer removes and re-appends, so
+        // without this the rule climbs above the lines after the first repaint.
+        const group = zoomGroup.append('g').attr('class', 'lifecycle-zero-rule').lower();
         group
           .append('line')
           .attr('x1', 0)
@@ -186,7 +203,7 @@ const FleetLifecycleChart = React.memo(
           .attr('font-size', 10)
           .text(breakEvenLabel);
       },
-      [breakEvenLabel, metric],
+      [breakEvenLabel],
     );
 
     const renderZeroRule = useCallback(
@@ -219,23 +236,58 @@ const FleetLifecycleChart = React.memo(
      * width, so they would be clipped away entirely.
      */
     const drawSeriesLabels = useCallback(
-      (ctx: RenderContext, yScale: d3.ScaleLinear<number, number>) => {
+      (
+        ctx: RenderContext,
+        xScale: d3.ScaleTime<number, number>,
+        yScale: d3.ScaleLinear<number, number>,
+      ) => {
         const group = ctx.layout.g;
         group.selectAll('.lifecycle-series-label').remove();
 
-        const placed = Object.entries(lineDataRecord)
+        // Where the plot is cut off, in data units. Panning moves it, so the label
+        // must follow the line's *visible* end, not its last data point.
+        const edge = Number(xScale.invert(ctx.width));
+
+        const { lineDataRecord: lines, bySafeKey: lookup } = latest.current;
+        const placed = Object.entries(lines)
           .flatMap(([key, points]) => {
+            const entry = lookup.get(key);
             const last = points.at(-1);
-            const entry = bySafeKey.get(key);
-            if (!last || !entry) return [];
-            const y = yScale(last.y);
-            if (!Number.isFinite(y)) return [];
-            // Zooming can push a line's end value outside the visible range;
+            const first = points[0];
+            if (!entry || !last || !first) return [];
+            // Panned entirely past the right edge: there is no line to name.
+            if (first.x > edge) return [];
+
+            let value = last.y;
+            let x = xScale(last.x);
+            if (last.x > edge) {
+              // The line runs off the edge. Interpolate the segment that straddles
+              // it, so the label sits level with where the line actually leaves.
+              x = ctx.width;
+              for (let i = 1; i < points.length; i += 1) {
+                const before = points[i - 1]!;
+                const after = points[i]!;
+                if (after.x < edge) continue;
+                const span = after.x - before.x;
+                const t = span > 0 ? (edge - before.x) / span : 0;
+                value = before.y + (after.y - before.y) * t;
+                break;
+              }
+            }
+
+            const y = yScale(value);
+            if (!Number.isFinite(y) || !Number.isFinite(x)) return [];
+            // Zooming the y axis can push the end value outside the visible range;
             // pin the label to the nearest edge rather than let it escape.
             const top = LABEL_HALF_HEIGHT;
             const bottom = ctx.height - LABEL_HALF_HEIGHT;
             return [
-              { label: entry.label, color: entry.color, y: Math.min(Math.max(y, top), bottom) },
+              {
+                label: entry.label,
+                color: entry.color,
+                x: Math.min(Math.max(x, 0), ctx.width) + 6,
+                y: Math.min(Math.max(y, top), bottom),
+              },
             ];
           })
           .toSorted((a, b) => a.y - b.y);
@@ -254,11 +306,11 @@ const FleetLifecycleChart = React.memo(
           for (const entry of placed) entry.y = Math.max(entry.y - overflow, LABEL_HALF_HEIGHT);
         }
 
-        for (const { label, color, y } of placed) {
+        for (const { label, color, x, y } of placed) {
           group
             .append('text')
             .attr('class', 'lifecycle-series-label')
-            .attr('x', ctx.width + 6)
+            .attr('x', x)
             .attr('y', y)
             .attr('dominant-baseline', 'middle')
             .attr('fill', color)
@@ -267,24 +319,28 @@ const FleetLifecycleChart = React.memo(
             .text(label);
         }
       },
-      [lineDataRecord, bySafeKey],
+      [],
     );
 
     const renderSeriesLabels = useCallback(
       (_zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) =>
-        drawSeriesLabels(ctx, ctx.yScale as d3.ScaleLinear<number, number>),
+        drawSeriesLabels(
+          ctx,
+          ctx.xScale as d3.ScaleTime<number, number>,
+          ctx.yScale as d3.ScaleLinear<number, number>,
+        ),
       [drawSeriesLabels],
     );
 
     const zoomSeriesLabels = useCallback(
-      (_zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) =>
+      (_zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) => {
+        const zoomed = ctx as { newXScale?: unknown; newYScale?: unknown };
         drawSeriesLabels(
           ctx,
-          ((ctx as { newYScale?: unknown }).newYScale ?? ctx.yScale) as d3.ScaleLinear<
-            number,
-            number
-          >,
-        ),
+          (zoomed.newXScale ?? ctx.xScale) as d3.ScaleTime<number, number>,
+          (zoomed.newYScale ?? ctx.yScale) as d3.ScaleLinear<number, number>,
+        );
+      },
       [drawSeriesLabels],
     );
 
@@ -389,6 +445,13 @@ const FleetLifecycleChart = React.memo(
       [yLabel],
     );
 
+    // x only: the y axis is a money scale whose zero line is the whole point, and
+    // rescaling it would move break-even under the reader. Matches TrendChart.
+    const zoomConfig = useMemo(
+      () => ({ enabled: true, axes: 'x' as const, scaleExtent: [1, 10] as [number, number] }),
+      [],
+    );
+
     return (
       <D3Chart<StepMarker>
         chartId="fleet-lifecycle"
@@ -402,6 +465,8 @@ const FleetLifecycleChart = React.memo(
         xAxis={xAxisConfig}
         yAxis={yAxisConfig}
         layers={layers}
+        zoom={zoomConfig}
+        instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a point to pin tooltip"
         tooltip={tooltipConfig}
         legendElement={legendElement}
         caption={caption}

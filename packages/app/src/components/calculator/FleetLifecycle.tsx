@@ -27,6 +27,7 @@ import FleetLifecycleChart, {
 } from './FleetLifecycleChart';
 import { mergeProgressionsByChip, type ChipProgression } from './historical-best';
 import {
+  availabilityFromInterrupts,
   breakEvenPricePerMTok,
   computeLifecycle,
   type LifecycleAssumptions,
@@ -437,6 +438,18 @@ export default function FleetLifecycle({
     });
   }, [mw, anchorMs, visibleProgressions, costProvider, costType, targetValue]);
 
+  // Interrupts sell fewer tokens off the same racks, so they raise break-even.
+  // The seeded price has to carry the same haircut the plotted margin does, or
+  // the default lands slightly below break-even instead of on it.
+  const availability = useMemo(
+    () =>
+      availabilityFromInterrupts(
+        parseNonNegative(mtbiInput) ?? 0,
+        parseNonNegative(recoveryInput) ?? 0,
+      ),
+    [mtbiInput, recoveryInput],
+  );
+
   /**
    * Break-even of the cheapest visible fleet at its latest config — the
    * competitive floor as it stands today, not as it stood at release.
@@ -446,12 +459,12 @@ export default function FleetLifecycle({
     for (const { steps, costPerHour } of fleets) {
       const latest = steps.at(-1);
       if (!latest) continue;
-      const price = breakEvenPricePerMTok(costPerHour, latest.fleetTokPerSec);
+      const price = breakEvenPricePerMTok(costPerHour, latest.fleetTokPerSec, availability);
       if (price === null) continue;
       if (cheapest === null || price < cheapest) cheapest = price;
     }
     return cheapest;
-  }, [fleets]);
+  }, [fleets, availability]);
 
   // Seed and re-seed the price from break-even until the user takes it over.
   useEffect(() => {

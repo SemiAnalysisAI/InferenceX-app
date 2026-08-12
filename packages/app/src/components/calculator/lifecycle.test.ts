@@ -62,9 +62,45 @@ describe('breakEvenPricePerMTok', () => {
     expect(series.marginPerDay).toBeCloseTo(0, 6);
   });
 
+  it('rises by the interrupt haircut, and still zeroes the margin', () => {
+    // The same racks sell fewer tokens when interrupted, so break-even is higher.
+    // Without the availability argument the seeded "break-even" price leaves the
+    // cheapest fleet a few percent under water.
+    const fleetTokPerSec = 1_000_000;
+    const costPerHour = 12_345;
+    const availability = availabilityFromInterrupts(24, 12);
+    const flat = breakEvenPricePerMTok(costPerHour, fleetTokPerSec)!;
+    const haircut = breakEvenPricePerMTok(costPerHour, fleetTokPerSec, availability)!;
+    expect(haircut).toBeCloseTo(flat / availability, 10);
+
+    const series = computeLifecycle({
+      steps: [{ month: 0, fleetTokPerSec }],
+      costPerHour,
+      horizonMonths: 24,
+      assumptions: { ...assumptions, pricePerMTok: haircut },
+    })!;
+    expect(series.availability).toBeCloseTo(availability, 10);
+    expect(series.marginPerDay).toBeCloseTo(0, 6);
+
+    // The unadjusted price is the defect being pinned: it reads as break-even
+    // but plots a loss.
+    const naive = computeLifecycle({
+      steps: [{ month: 0, fleetTokPerSec }],
+      costPerHour,
+      horizonMonths: 24,
+      assumptions: { ...assumptions, pricePerMTok: flat },
+    })!;
+    expect(naive.marginPerDay).toBeLessThan(0);
+  });
+
   it('returns null when no tokens are produced', () => {
     expect(breakEvenPricePerMTok(100, 0)).toBeNull();
     expect(breakEvenPricePerMTok(100, NaN)).toBeNull();
+  });
+
+  it('returns null for an impossible availability', () => {
+    expect(breakEvenPricePerMTok(100, 1000, 0)).toBeNull();
+    expect(breakEvenPricePerMTok(100, 1000, NaN)).toBeNull();
   });
 });
 
@@ -276,6 +312,92 @@ describe('computeLifecycle', () => {
       const series = computeLifecycle(ramped)!;
       expect(series.revenuePerDay).toBeCloseTo(rev(1_600_000), 6);
     });
+
+    it('integrates a rollout to the analytic area under the smoothstep', () => {
+      // A full smoothstep is odd-symmetric about its midpoint, so its mean is
+      // exactly half the end level. Pins the trapezoid path, which every other
+      // integration test dodges by using rampMonths: 0.
+      const series = computeLifecycle({
+        steps: [{ month: 0, fleetTokPerSec: 1_600_000 }],
+        costPerHour,
+        horizonMonths: 6,
+        assumptions: { ...assumptions, rampMonths: 6 },
+      })!;
+      const cost = costPerHour * HOURS_PER_DAY;
+      const expected = (rev(1_600_000) * 0.5 - cost) * 6 * DAYS_PER_MONTH;
+      expect(series.lifetimeMargin).toBeCloseTo(expected, 4);
+    });
+
+    it('still flags a rollout as ramping when the next config cuts it short', () => {
+      // The last sample of a pre-empted rollout is mid-climb, so it must not
+      // read as "at full load".
+      const series = computeLifecycle({
+        steps: [
+          { month: 0, fleetTokPerSec: 400_000 },
+          { month: 3, fleetTokPerSec: 1_600_000 },
+        ],
+        costPerHour,
+        horizonMonths: 24,
+        assumptions: { ...assumptions, rampMonths: 12 },
+      })!;
+      const cutShort = series.points.filter((p) => p.month === 3 && !p.isStep);
+      expect(cutShort.length).toBeGreaterThan(0);
+      for (const point of cutShort) {
+        expect(point.revenue).toBeLessThan(rev(400_000));
+        expect(point.isRamp).toBe(true);
+      }
+    });
+
+    it('collapses configs landing in the same month, keeping the best', () => {
+      // Same-day rungs share a month. The superseded one must not get a
+      // zero-width rollout, which would spike the line to a rate never served.
+      const series = computeLifecycle({
+        steps: [
+          { month: 0, fleetTokPerSec: 400_000 },
+          { month: 6, fleetTokPerSec: 900_000 },
+          { month: 6, fleetTokPerSec: 1_600_000 },
+        ],
+        costPerHour,
+        horizonMonths: 24,
+        assumptions: { ...assumptions, rampMonths: 3 },
+      })!;
+      // One riser per month, not two.
+      expect(series.points.filter((p) => p.isStep).map((p) => p.month)).toEqual([0, 6]);
+      expect(series.improvementCount).toBe(1);
+      // The superseded config's full rate is never plotted, and the level only
+      // ever climbs.
+      for (const point of series.points) {
+        expect(point.revenue).toBeLessThanOrEqual(rev(1_600_000) + 1e-6);
+      }
+      for (let i = 1; i < series.points.length; i += 1) {
+        expect(series.points[i]!.revenue).toBeGreaterThanOrEqual(
+          series.points[i - 1]!.revenue - 1e-6,
+        );
+      }
+    });
+  });
+
+  it('interpolates payback inside the stretch that crosses zero', () => {
+    // Priced so the opening config loses money for three months and the next one
+    // digs the fleet out. The crossing is then closed-form, which pins the
+    // interpolation rather than just bracketing it.
+    const price = 3;
+    const series = computeLifecycle({
+      ...base,
+      steps: [
+        { month: 0, fleetTokPerSec: 400_000 },
+        { month: 3, fleetTokPerSec: 1_600_000 },
+      ],
+      assumptions: { ...assumptions, mtbiDays: 0, pricePerMTok: price },
+    })!;
+    const cost = costPerHour * HOURS_PER_DAY;
+    const perDay = (tput: number) => ((tput * 86_400) / 1e6) * price;
+    const first = perDay(400_000) - cost;
+    const second = perDay(1_600_000) - cost;
+    expect(first).toBeLessThan(0);
+    expect(second).toBeGreaterThan(0);
+    // Three months of losses repaid at the second config's rate.
+    expect(series.paybackMonth!).toBeCloseTo(3 + (-first * 3) / second, 6);
   });
 
   it('returns null without steps, a cost basis or a horizon past the first run', () => {

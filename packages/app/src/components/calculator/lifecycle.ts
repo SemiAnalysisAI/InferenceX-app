@@ -116,17 +116,29 @@ export interface LifecycleSeries {
    * shape is already in the samples.
    */
   points: LifecyclePoint[];
-  /** Revenue at the latest config, $/day. */
+  /**
+   * Revenue at the end of the window, $/day — the latest config at whatever level
+   * its rollout has reached by then. Equal to that config's full rate only if the
+   * rollout finished before the horizon and no later config pre-empted it.
+   */
   revenuePerDay: number;
-  /** Revenue at the first measured config, $/day. */
+  /**
+   * Revenue at the first measured config's full rate, $/day. A rollout still
+   * climbing when the next config lands never attains it; it is the rate that
+   * config was measured at, which is what makes it comparable across chips.
+   */
   firstRevenuePerDay: number;
   /** Flat cost rate, $/day. */
   costPerDay: number;
-  /** Margin at the latest config, $/day. */
+  /** `revenuePerDay` − cost, $/day. */
   marginPerDay: number;
-  /** Margin at the first measured config, $/day. */
+  /** `firstRevenuePerDay` − cost, $/day. */
   firstMarginPerDay: number;
-  /** Latest revenue ÷ first revenue — what software progress has been worth. */
+  /**
+   * Latest config's throughput ÷ the first's — what software progress has been
+   * worth. A ratio of measured rates, deliberately independent of the rollout
+   * assumption, so it does not move when the ramp input changes.
+   */
   improvementFactor: number;
   availability: number;
   /** Months since the anchor at which cumulative margin first turns positive. */
@@ -165,11 +177,19 @@ export function availabilityFromInterrupts(mtbiDays: number, recoveryHours: numb
  * Price at which revenue exactly covers cost at a given throughput, $/M tok.
  *
  * Derived from the fleet's own cost and throughput, so the margin this module
- * plots is exactly zero at this price.
+ * plots is exactly zero at this price — which is why `availability` belongs here.
+ * Interrupts cost the same racks fewer billable tokens, so the break-even price
+ * rises by exactly the haircut; ignoring it returns a price at which this
+ * module's own margin is negative.
  */
-export function breakEvenPricePerMTok(costPerHour: number, fleetTokPerSec: number): number | null {
+export function breakEvenPricePerMTok(
+  costPerHour: number,
+  fleetTokPerSec: number,
+  availability = 1,
+): number | null {
   if (!(fleetTokPerSec > 0) || !Number.isFinite(costPerHour)) return null;
-  return (costPerHour / (fleetTokPerSec * 3600)) * TOKENS_PER_MILLION;
+  if (!(availability > 0) || !Number.isFinite(availability)) return null;
+  return (costPerHour / (fleetTokPerSec * 3600 * availability)) * TOKENS_PER_MILLION;
 }
 
 /** Revenue rate in $/day for a throughput, price and availability. */
@@ -211,10 +231,25 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
   const { steps, costPerHour, horizonMonths, assumptions } = inputs;
   if (steps.length === 0 || !Number.isFinite(costPerHour)) return null;
 
-  const ordered = [...steps]
+  const sorted = [...steps]
     .filter((s) => Number.isFinite(s.month) && s.fleetTokPerSec > 0)
     .toSorted((a, b) => a.month - b.month);
-  if (ordered.length === 0) return null;
+  if (sorted.length === 0) return null;
+
+  // Two configs can land in the same month — the progression feeding this keeps
+  // every rung that beat the incumbent, and same-day rungs share a month. Only
+  // the best of them ever serves traffic, so collapse them. Emitting both would
+  // give the superseded config a zero-width rollout, which spikes the line to a
+  // full rate the fleet never reached and marks two risers at one instant.
+  const ordered: ThroughputStep[] = [];
+  for (const step of sorted) {
+    const previous = ordered.at(-1);
+    if (previous && previous.month === step.month) {
+      if (step.fleetTokPerSec > previous.fleetTokPerSec) ordered[ordered.length - 1] = step;
+      continue;
+    }
+    ordered.push(step);
+  }
 
   const startMonth = ordered[0]!.month;
   const endMonth = Math.max(horizonMonths, startMonth);
@@ -278,7 +313,9 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
           month,
           level: levelWithin(rollout, month),
           isStep: s === 0,
-          isRamp: s < RAMP_SAMPLES,
+          // A rollout cut short by the next config is still climbing at its last
+          // sample, so the flag follows the level, not the sample index.
+          isRamp: s < RAMP_SAMPLES || rampEnd < rollout.end,
         });
       }
     } else {

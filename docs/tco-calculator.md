@@ -389,10 +389,42 @@ matter:
   bottom. A line ending at the very top or (after a zoom) outside the visible range
   is pinned to the nearest edge rather than allowed to escape the SVG.
 
+Under an x zoom or pan, a line's last data point can sit well outside the plot, so
+the label is placed at the value where the line **crosses the visible right edge**
+(interpolated on the straddling segment), not at its final value. A line that ends
+inside the plot is labelled at its own end instead, and one panned entirely out of
+view is not labelled at all. Getting this wrong is not cosmetic: the two chips that
+are still climbing at the horizon read several million dollars a day lower at a
+zoomed-in edge than at their plateau.
+
 Both the labels and the break-even rule are `type:'custom'` layers, and **both
 declare `onZoom` as well as `render`**. A custom layer without `onZoom` stays pinned
 to the base scales while the lines move, so a zoomed chart shows break-even — or a
-chip's name — at the wrong height.
+chip's name — at the wrong height. This only matters because the chart passes
+`zoom={{enabled: true, axes: 'x'}}`; it shipped for a while with the wrapper's
+default caption promising shift+scroll zoom and no `zoom` prop at all, which made
+both `onZoom` handlers dead code and the caption a lie. A Cypress test now asserts
+the axis actually moves. Zoom is x-only on purpose: rescaling y would slide
+break-even under the reader.
+
+The custom layers read the current metric and line data through a **ref**, not
+through the closure they were created in. The zoom behaviour installed by a render
+captures that render's callbacks, and d3's double-click reset is a transition, so its
+trailing events can fire after a later render has already redrawn — a stale callback
+then re-appends what the new render removed. Switch to the revenue axis during a
+reset animation and the break-even rule used to come back and stay, because nothing
+renders again afterwards.
+
+**Known limitation, in the shared renderer rather than here:** those same trailing
+events also repaint the axes and grid from the scales captured when the transition
+started, so changing the metric inside the ~750ms reset window leaves a stale y axis
+until the next interaction. Fixing it means giving `useD3ChartRenderer` a
+latest-context ref, which every zoomable chart shares; it is deliberately not done as
+part of this section. The Cypress spec waits out the transition for this reason.
+
+The rule's group is `.lower()`ed on every draw. `renderLines` keeps its paths across
+re-renders through a data join while this layer removes and re-appends, so without
+that the dashed rule climbs above the lines after the first repaint.
 
 ### Token price defaults to break-even
 

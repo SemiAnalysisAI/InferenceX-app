@@ -17,6 +17,10 @@ import { unlockAgenticGate } from '../support/e2e';
 const firstRowCell = (index: number) =>
   cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').first().find('td').eq(index);
 
+/** The time-axis tick labels, as one string — changes when the x domain moves. */
+const xAxisTicks = () =>
+  cy.get('[data-testid="calculator-lifecycle-chart-svg"] .x-axis .tick text').invoke('text');
+
 /** All text in the chart SVG, including the axis labels. */
 const chartText = () => cy.get('[data-testid="calculator-lifecycle-chart-svg"]').invoke('text');
 
@@ -132,6 +136,36 @@ describe('Calculator — Fleet Lifecycle', () => {
       .then((label) => {
         cy.get('[data-testid="calculator-lifecycle-table"]').should('contain', String(label));
       });
+  });
+
+  it('zooms the time axis, as its own instructions promise', () => {
+    xAxisTicks().then((before) => {
+      cy.get('[data-testid="calculator-lifecycle-chart-svg"]').trigger('wheel', {
+        deltaY: -400,
+        shiftKey: true,
+        clientX: 700,
+        clientY: 300,
+        bubbles: true,
+      });
+      // The axis has to actually move: the chart advertises shift+scroll zoom in
+      // its caption, and for a while it advertised it without wiring it up.
+      xAxisTicks().should('not.equal', before);
+      // Double-click resets, as the same caption promises. Also leaves the chart
+      // unzoomed for the tests that follow — they share this page.
+      cy.get('[data-testid="calculator-lifecycle-chart-svg"]').dblclick();
+      xAxisTicks().should('equal', before);
+      // d3's reset is a ~750ms transition whose trailing events repaint the axes
+      // from the scales captured when it started. Let it finish before the next
+      // test changes the metric, or that repaint lands on top of the new axis.
+      cy.wait(900);
+    });
+    // The chip labels survive the zoom, one per line, still inside the SVG.
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] path.line-path').then((lines) => {
+      cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-series-label').should(
+        'have.length',
+        lines.length,
+      );
+    });
   });
 
   it('switches the y axis between margin and revenue', () => {
