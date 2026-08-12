@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { getModelReleaseDate } from '@semianalysisai/inferencex-constants';
+
 import type { HardwareConfig } from '@/components/inference/types';
 import { Card } from '@/components/ui/card';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
@@ -19,16 +21,16 @@ import { getDisplayLabel } from '@/lib/utils';
 
 import { computeFleetStats, formatCompact } from './fleet';
 import FleetLifecycleChart, { type LifecycleChartSeries } from './FleetLifecycleChart';
-import type { HistoricalBestEntry } from './historical-best';
+import type { HistoricalProgression } from './historical-best';
 import {
   breakEvenPricePerMTok,
   computeLifecycle,
-  DECOMMISSION_MONTHS,
   type LifecycleAssumptions,
   type LifecycleSeries,
+  type ThroughputStep,
 } from './lifecycle';
 import { getCostProviderLabel, getThroughputForType } from './ThroughputBarChart';
-import type { CalculatorMode, CostProvider, CostType } from './types';
+import type { CalculatorMode, CostProvider, CostType, InterpolatedResult } from './types';
 import { useHistoricalBest } from './useHistoricalBest';
 
 interface FleetLifecycleProps {
@@ -54,45 +56,43 @@ const STRINGS = {
   en: {
     title: 'Fleet Lifecycle',
     description:
-      "Project margin per day across a fleet's life, using each chip's best config ever measured at the target interactivity — not just its latest run.",
+      'A fixed fleet, from the day the model shipped. The chips never change; the software serving them does — so each step is a config that beat every config before it, and the gap to the flat cost line is the return on that work.',
     needMw:
       'Enter a facility power budget in the Fleet Projection section above to project lifecycle economics.',
     unsupportedSequence:
       'Not available for Agentic Traces: run history is keyed by input/output sequence length, which agentic traces do not have. Pick a fixed sequence to use this section.',
+    noReleaseDate:
+      'No release date is on file for this model, so the timeline is anchored to its first benchmark run instead.',
     loading: 'Loading run history…',
     errorPrefix: 'Could not load run history: ',
     noneMeasured:
       'No chip was measured at this interactivity on any run date. Move the target interactivity slider into a measured range — the ranges each chip has been measured over are listed below.',
     priceLabel: 'Token Price ($/M tok)',
     priceTooltip:
-      "Sale price of tokens. Defaults to the price that exactly zeroes the cheapest visible fleet's margin — the competitive floor, at which that chip earns nothing and every pricier chip is underwater. Derived from that fleet's TCO cost and its interpolated throughput, so between measured points it reads lower than the $/M tok the cost chart shows for the same config: that figure splines cost directly, and cost curves with 1/throughput, so interpolating it overstates cost away from a measured point. The two agree exactly at every measured point. Everything above this line is your assumption, not a measurement.",
+      "Sale price of tokens. Defaults to the price that exactly zeroes the cheapest visible fleet's margin at its latest config — the competitive floor, at which that chip earns nothing and every pricier chip is underwater. Derived from that fleet's TCO cost and its interpolated throughput. Everything above this line is your assumption, not a measurement.",
     priceReset: 'Reset to break-even',
-    ttfiLabel: 'Time to First Inference (months)',
-    ttfiTooltip:
-      'Months from committing capital to serving the first billable token. Cost accrues through this whole period; revenue does not.',
-    rampLabel: 'Ramp (months)',
-    rampTooltip:
-      'Months from the first token to full serving rate, as capacity and utilisation come up.',
     mtbiLabel: 'MTBI (days)',
     mtbiTooltip:
-      'Mean time between interruptions. Combined with recovery time this becomes an availability haircut on the plateau revenue rate. Leave blank to model no interruptions.',
+      'Mean time between interruptions. Combined with recovery time this becomes an availability haircut on revenue. Leave blank to model no interruptions.',
     recoveryLabel: 'Recovery (hours)',
     recoveryTooltip: 'Hours to restore service after one interruption.',
-    lifeLabel: 'Useful Life (months)',
-    lifeTooltip:
-      'Months of service at full rate after the ramp completes, before decommissioning begins.',
+    horizonLabel: 'Horizon (months from release)',
+    horizonTooltip:
+      "How far past the model's release date to project. Past the last sweep the latest config is held flat — that is what the fleet earns if optimisation stops, not a forecast of further gains.",
     colChip: 'Chip',
-    colDate: 'Best Run',
-    colTpPerMw: (tokenType: string) => `${tokenType}tok/s/MW`,
+    colFirst: 'First Run',
+    colLatest: 'Latest Best',
+    colSteps: 'Improvements',
+    colGain: 'Gain',
+    colTpPerMw: (tokenType: string) => `${tokenType}tok/s/MW now`,
     colRevenue: 'Revenue $/day',
     colCost: 'Cost $/day',
     colMargin: 'Margin $/day',
     colPayback: 'Payback',
-    colLifetime: 'Lifetime Margin',
+    colLifetime: 'Cumulative Margin',
     colAvailability: 'Availability',
     never: 'Never',
     monthsSuffix: 'mo',
-    supersededTitle: 'Superseded the latest run',
     unmeasuredTitle: 'Not measured at this interactivity',
     unmeasuredIntro:
       'These chips have run history for this scenario but were never measured at the target interactivity, so no honest number exists for them. Their measured ranges:',
@@ -102,59 +102,59 @@ const STRINGS = {
     disagg:
       ' Disaggregated inference configurations report throughput per decode chip or per prefill chip rather than per total chip, so their fleet sizes, costs and margins are not an apples-to-apples comparison with aggregated configs. They are drawn with dashed lines.',
     hybrid:
-      " Throughput comes from the best run date shown per row; power and $/chip/hr are today's values from the TCO model. Interpolated reads outside a run's measured interactivity range are excluded rather than clamped, so a chip only appears if it was genuinely measured at the target.",
+      " Each step is a measured run date whose interpolated throughput at the target beat every earlier date; a sweep that failed to beat the incumbent is not a step, because the fleet kept serving the config it already had. Power and $/chip/hr are today's values from the TCO model, and cost is flat because neither moves when a config improves. Reads outside a run's measured interactivity range are excluded rather than clamped.",
     overlayExempt:
       ' Unofficial runs loaded via a run link are not shown here — the run-history API serves ingested official results only.',
     chartY: 'Margin ($/day)',
-    chartMonth: 'Months from capital commitment',
     chartBreakEven: 'break-even',
-    tipMeasured: 'Measured',
+    tipDate: 'Measured',
+    tipConfig: 'Config',
     tipMargin: 'Margin/day',
     tipRevenue: 'Revenue/day',
     tipCost: 'Cost/day',
     tipCumulative: 'Cumulative',
-    assumptions: (tier: string, chips: string) =>
-      `Fleet sized by facility power at ${chips}. Cost = chips × ${tier} $/chip/hr and accrues from the moment capacity is energised, tapering over ${DECOMMISSION_MONTHS} months of decommissioning; revenue is priced on the selected token type and reduced by the availability haircut. Lifecycle timings above are your assumptions — no benchmark measures them.`,
+    tipSinceFirst: 'Since first run',
+    assumptions: (tier: string, chips: string, release: string) =>
+      `Anchored at the ${release} release. Fleet sized by facility power at ${chips}; cost = chips × ${tier} $/chip/hr, flat for the whole window. Revenue is priced on the selected token type and reduced by the availability haircut. Price, MTBI, recovery and horizon are your assumptions — the throughput steps are not.`,
     source: 'Source: ',
   },
   zh: {
     title: '集群生命周期',
     description:
-      '按每款 Chip 在目标交互性下历史最佳配置（而非仅最新一次运行）测算其整个生命周期内的每日利润。',
+      '固定集群自模型发布之日起的表现。Chip 从未更换，变化的是为其提供服务的软件——因此每一级台阶都是一个优于此前所有配置的新配置，而与水平成本线之间的差距即为这些工作带来的回报。',
     needMw: '请在上方「集群规模测算」中输入设施功率预算，以测算生命周期经济性。',
     unsupportedSequence:
       '不支持 Agentic Traces：运行历史以输入/输出序列长度为键，而 agentic traces 没有该字段。请选择固定序列以使用本模块。',
+    noReleaseDate: '该模型暂无发布日期记录，时间轴改以其首次基准测试运行为起点。',
     loading: '正在加载运行历史……',
     errorPrefix: '无法加载运行历史：',
     noneMeasured:
       '在任何运行日期下都没有 Chip 在该交互性下被实测过。请将目标交互性滑块移入已实测区间——各 Chip 的实测区间见下方列表。',
     priceLabel: 'Token 价格 ($/M tok)',
     priceTooltip:
-      'Token 售价。默认取使当前可见集群中成本最低者利润恰好为零的价格——即竞争底线：该价格下这款 Chip 不赚不亏，而所有更贵的 Chip 均为亏损。该值由该集群的 TCO 成本与其插值吞吐量推导，因此在实测点之间会低于成本图中同一配置的 $/M tok：后者直接对成本做样条插值，而成本与吞吐量成反比（1/throughput）为凸函数，因此在远离实测点处会高估成本。两者在每个实测点上完全一致。高于该线的部分属于你的假设，而非实测值。',
+      'Token 售价。默认取使当前可见集群中成本最低者在其最新配置下利润恰好为零的价格——即竞争底线：该价格下这款 Chip 不赚不亏，而所有更贵的 Chip 均为亏损。该值由该集群的 TCO 成本与其插值吞吐量推导。高于该线的部分属于你的假设，而非实测值。',
     priceReset: '重置为保本价',
-    ttfiLabel: '首次推理时间 (月)',
-    ttfiTooltip: '从投入资本到产出第一个可计费 token 的月数。该阶段持续产生成本，但没有收入。',
-    rampLabel: '爬坡期 (月)',
-    rampTooltip: '从第一个 token 到满负荷服务的月数，期间容量与利用率逐步提升。',
     mtbiLabel: '平均无故障间隔 (天)',
-    mtbiTooltip:
-      '平均中断间隔时间。与恢复时间共同构成对稳定期收入速率的可用性折损。留空表示不建模中断。',
+    mtbiTooltip: '平均中断间隔时间。与恢复时间共同构成对收入的可用性折损。留空表示不建模中断。',
     recoveryLabel: '恢复时间 (小时)',
     recoveryTooltip: '一次中断后恢复服务所需的小时数。',
-    lifeLabel: '可用寿命 (月)',
-    lifeTooltip: '爬坡完成后、退役开始前，按满负荷服务的月数。',
+    horizonLabel: '测算期 (自发布起月数)',
+    horizonTooltip:
+      '自模型发布日期起向后测算的月数。在最后一次扫描之后，最新配置将保持不变——这代表若优化停止时集群的收益，而非对后续提升的预测。',
     colChip: 'Chip',
-    colDate: '最佳运行',
-    colTpPerMw: (tokenType: string) => `${tokenType} tok/s/MW`,
+    colFirst: '首次运行',
+    colLatest: '最新最佳',
+    colSteps: '提升次数',
+    colGain: '提升倍数',
+    colTpPerMw: (tokenType: string) => `当前${tokenType} tok/s/MW`,
     colRevenue: '收入 $/天',
     colCost: '成本 $/天',
     colMargin: '利润 $/天',
     colPayback: '回本时间',
-    colLifetime: '生命周期利润',
+    colLifetime: '累计利润',
     colAvailability: '可用性',
     never: '无法回本',
     monthsSuffix: '个月',
-    supersededTitle: '优于最新一次运行',
     unmeasuredTitle: '该交互性下无实测数据',
     unmeasuredIntro:
       '以下 Chip 在该场景下有运行历史，但从未在目标交互性下被实测，因此无法给出可靠数值。其实测区间：',
@@ -164,31 +164,30 @@ const STRINGS = {
     disagg:
       '解耦推理配置按解码 Chip 或预填充 Chip 报告吞吐量，而非按 Chip 总数，因此其集群规模、成本与利润和聚合配置并非同类比较。此类配置以虚线绘制。',
     hybrid:
-      '吞吐量来自每行所示的最佳运行日期；功率与 $/chip/hr 为 TCO 模型的当前值。超出某次运行实测交互性区间的插值结果会被排除而非钳制，因此只有在目标交互性下确有实测的 Chip 才会出现。',
+      '每一级台阶都是一个实测运行日期，其在目标交互性下的插值吞吐量优于此前所有日期；未能超越现有配置的扫描不构成台阶，因为集群仍在运行原有配置。功率与 $/chip/hr 为 TCO 模型的当前值，成本保持水平，因为配置提升不会改变这两项。超出某次运行实测交互性区间的结果会被排除而非钳制。',
     overlayExempt:
       '通过运行链接加载的非官方运行不会显示在此——运行历史 API 仅提供已入库的官方结果。',
     chartY: '利润 ($/天)',
-    chartMonth: '自投入资本起的月数',
     chartBreakEven: '保本线',
-    tipMeasured: '实测于',
+    tipDate: '实测于',
+    tipConfig: '配置',
     tipMargin: '每日利润',
     tipRevenue: '每日收入',
     tipCost: '每日成本',
     tipCumulative: '累计',
-    assumptions: (tier: string, chips: string) =>
-      `集群规模按 ${chips} 的设施功率测算。成本 = Chip 数 × ${tier} $/chip/hr，自容量通电起开始计入，并在 ${DECOMMISSION_MONTHS} 个月的退役期内递减；收入按所选 token 类型计价，并扣除可用性折损。上方生命周期时间参数为你的假设——没有任何基准测试可以测量它们。`,
+    tipSinceFirst: '相比首次运行',
+    assumptions: (tier: string, chips: string, release: string) =>
+      `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = Chip 数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、平均无故障间隔、恢复时间与测算期为你的假设——吞吐量台阶不是。`,
     source: '来源：',
   },
 } as const;
 
-/** Defaults chosen to be recognisable planning figures, not precise claims. */
 const DEFAULTS = {
-  ttfiMonths: 6,
-  rampMonths: 6,
   mtbiDays: 24,
   recoveryHours: 12,
-  lifeMonths: 60,
 };
+
+const MS_PER_MONTH = (365.25 / 12) * 24 * 3600 * 1000;
 
 function parseNonNegative(raw: string): number | null {
   const parsed = parseFloat(raw);
@@ -201,7 +200,7 @@ function getLabel(hwKey: string, hardwareConfig: HardwareConfig): string {
 }
 
 /**
- * Signed money. Carries a trillions step: a lifetime margin at a
+ * Signed money. Carries a trillions step: a cumulative margin at a
  * hyperscaler-sized power budget genuinely reaches it, and `$1532.50B` is
  * harder to read than `$1.53T`.
  */
@@ -215,8 +214,29 @@ function formatMoney(value: number): string {
   return `${sign}$${abs.toFixed(0)}`;
 }
 
+/** Short label for the config behind a step, for the tooltip. */
+function configLabel(result: InterpolatedResult): string {
+  const point = result.nearestPoints[0];
+  if (!point) return '';
+  const parts = [point.precision?.toUpperCase()].filter(Boolean) as string[];
+  if (point.disagg) parts.push('disagg');
+  if (result.concurrency > 0) parts.push(`conc ${result.concurrency}`);
+  return parts.join(' · ');
+}
+
+/** A run date, linked to its workflow run when one is recorded. */
+function runLink(date: string, runUrls: string[]) {
+  if (runUrls.length === 0) return <>{date}</>;
+  return (
+    <Link href={runUrls[0]!} target="_blank" className="underline hover:text-foreground">
+      {date}
+      <ExternalLinkIcon />
+    </Link>
+  );
+}
+
 interface LifecycleRow {
-  entry: HistoricalBestEntry;
+  progression: HistoricalProgression;
   label: string;
   tpPerMw: number;
   disagg: boolean;
@@ -254,31 +274,46 @@ export default function FleetLifecycle({
     enabled: Boolean(mw),
   });
 
-  const [ttfiInput, setTtfiInput] = useState(
-    () => readUrlParams().c_ttfi ?? String(DEFAULTS.ttfiMonths),
-  );
-  const [rampInput, setRampInput] = useState(
-    () => readUrlParams().c_ramp ?? String(DEFAULTS.rampMonths),
-  );
   const [mtbiInput, setMtbiInput] = useState(
     () => readUrlParams().c_mtbi ?? String(DEFAULTS.mtbiDays),
   );
   const [recoveryInput, setRecoveryInput] = useState(
     () => readUrlParams().c_rec ?? String(DEFAULTS.recoveryHours),
   );
-  const [lifeInput, setLifeInput] = useState(
-    () => readUrlParams().c_life ?? String(DEFAULTS.lifeMonths),
-  );
+  const [horizonInput, setHorizonInput] = useState(() => readUrlParams().c_life ?? '');
+  // Like the price, the horizon is seeded from the data until the user takes it
+  // over: a fixed 60-month default spends most of the axis on a flat tail
+  // projecting the last config forward, which carries no information.
+  const horizonEdited = useRef(Boolean(readUrlParams().c_life));
   const [priceInput, setPriceInput] = useState(() => readUrlParams().c_price ?? '');
   // A price arriving from the URL is the user's, so it must not be overwritten
   // by the break-even default.
   const priceEdited = useRef(Boolean(readUrlParams().c_price));
 
-  // Visible winners, in the legend's terms. Filtering here rather than in the
-  // data hook means a legend toggle never rebuilds a frontier.
-  const visibleBest = useMemo(
-    () => historical.best.filter((entry) => visibleHwKeys.has(entry.hwKey)),
-    [historical.best, visibleHwKeys],
+  /**
+   * Anchor for the timeline. The model's release date is the honest zero — the
+   * question is how far the software has come since the weights existed. Models
+   * without a sourced release date fall back to their first measured run.
+   */
+  const releaseDate = getModelReleaseDate(selectedModel);
+  const visibleProgressions = useMemo(
+    () => historical.progressions.filter((p) => visibleHwKeys.has(p.hwKey)),
+    [historical.progressions, visibleHwKeys],
+  );
+
+  const anchorDate = useMemo(() => {
+    if (releaseDate) return releaseDate;
+    let earliest: string | null = null;
+    for (const p of visibleProgressions) {
+      const first = p.steps[0]?.date;
+      if (first && (earliest === null || first < earliest)) earliest = first;
+    }
+    return earliest;
+  }, [releaseDate, visibleProgressions]);
+
+  const anchorMs = useMemo(
+    () => (anchorDate ? Date.parse(`${anchorDate}T00:00:00Z`) : Number.NaN),
+    [anchorDate],
   );
 
   const visibleUnmeasured = useMemo(
@@ -286,31 +321,71 @@ export default function FleetLifecycle({
     [historical.unmeasured, visibleHwKeys],
   );
 
-  /** Per-chip fleet sizing at the winning operating point. */
-  const fleets = useMemo(() => {
-    if (!mw) return [];
-    return visibleBest.flatMap((entry) => {
-      const specs = getGpuSpecs(entry.hwKey);
-      const stats = computeFleetStats({
-        mw,
-        powerKwPerGpu: specs.power,
-        costPerGpuHour: specs[costProvider],
-        tputPerGpu: getThroughputForType(entry.result, costType),
-        outputTputPerGpu: entry.result.outputTputValue,
-        interactivity: targetValue,
-      });
-      return stats ? [{ entry, stats }] : [];
-    });
-  }, [mw, visibleBest, costProvider, costType, targetValue]);
+  /** Months from the anchor to the last measured sweep, across visible chips. */
+  const measuredMonths = useMemo(() => {
+    if (!Number.isFinite(anchorMs)) return null;
+    let latest = -Infinity;
+    for (const p of visibleProgressions) {
+      const last = p.steps.at(-1)?.date;
+      if (!last) continue;
+      latest = Math.max(latest, (Date.parse(`${last}T00:00:00Z`) - anchorMs) / MS_PER_MONTH);
+    }
+    return Number.isFinite(latest) ? latest : null;
+  }, [anchorMs, visibleProgressions]);
+
+  useEffect(() => {
+    if (horizonEdited.current || measuredMonths === null) return;
+    // A short tail past the last sweep so the final step is readable rather than
+    // pinned to the right edge.
+    setHorizonInput(String(Math.max(1, Math.ceil(measuredMonths + 2))));
+  }, [measuredMonths]);
+
+  const horizonMonths = parseNonNegative(horizonInput) ?? 0;
 
   /**
-   * Break-even of the cheapest visible fleet — the competitive floor, and the
-   * only anchor a single global price input can honestly default to.
+   * Per chip: the step schedule (one rung per measured improvement) plus the flat
+   * fleet cost. Chip count and $/chip/hr do not move when a config improves, so
+   * cost is computed once from the opening rung.
+   */
+  const fleets = useMemo(() => {
+    if (!mw || !Number.isFinite(anchorMs)) return [];
+    return visibleProgressions.flatMap((progression) => {
+      const specs = getGpuSpecs(progression.hwKey);
+      const steps: ThroughputStep[] = [];
+      let costPerHour: number | null = null;
+
+      for (const step of progression.steps) {
+        const stats = computeFleetStats({
+          mw,
+          powerKwPerGpu: specs.power,
+          costPerGpuHour: specs[costProvider],
+          tputPerGpu: getThroughputForType(step.result, costType),
+          outputTputPerGpu: step.result.outputTputValue,
+          interactivity: targetValue,
+        });
+        if (!stats) continue;
+        costPerHour ??= stats.costPerHour;
+        steps.push({
+          month: (Date.parse(`${step.date}T00:00:00Z`) - anchorMs) / MS_PER_MONTH,
+          fleetTokPerSec: stats.fleetTokPerSec,
+        });
+      }
+
+      if (steps.length === 0 || costPerHour === null) return [];
+      return [{ progression, steps, costPerHour }];
+    });
+  }, [mw, anchorMs, visibleProgressions, costProvider, costType, targetValue]);
+
+  /**
+   * Break-even of the cheapest visible fleet at its latest config — the
+   * competitive floor as it stands today, not as it stood at release.
    */
   const breakEven = useMemo(() => {
     let cheapest: number | null = null;
-    for (const { stats } of fleets) {
-      const price = breakEvenPricePerMTok(stats.costPerHour, stats.fleetTokPerSec);
+    for (const { steps, costPerHour } of fleets) {
+      const latest = steps.at(-1);
+      if (!latest) continue;
+      const price = breakEvenPricePerMTok(costPerHour, latest.fleetTokPerSec);
       if (price === null) continue;
       if (cheapest === null || price < cheapest) cheapest = price;
     }
@@ -325,61 +400,64 @@ export default function FleetLifecycle({
 
   const assumptions = useMemo<LifecycleAssumptions>(
     () => ({
-      ttfiMonths: parseNonNegative(ttfiInput) ?? 0,
-      rampMonths: parseNonNegative(rampInput) ?? 0,
       mtbiDays: parseNonNegative(mtbiInput) ?? 0,
       recoveryHours: parseNonNegative(recoveryInput) ?? 0,
-      lifeMonths: parseNonNegative(lifeInput) ?? 0,
       pricePerMTok: parseNonNegative(priceInput) ?? 0,
     }),
-    [ttfiInput, rampInput, mtbiInput, recoveryInput, lifeInput, priceInput],
+    [mtbiInput, recoveryInput, priceInput],
   );
 
   const rows = useMemo<LifecycleRow[]>(
     () =>
-      fleets.flatMap(({ entry, stats }) => {
-        const series = computeLifecycle({
-          fleetTokPerSec: stats.fleetTokPerSec,
-          costPerHour: stats.costPerHour,
-          assumptions,
-        });
+      fleets.flatMap(({ progression, steps, costPerHour }) => {
+        const series = computeLifecycle({ steps, costPerHour, horizonMonths, assumptions });
         if (!series) return [];
+        const latest = progression.steps.at(-1)!;
         return [
           {
-            entry,
-            label: getLabel(entry.hwKey, hardwareConfig),
-            tpPerMw: entry.rankValue,
-            disagg: entry.result.nearestPoints.some((p) => p.disagg),
+            progression,
+            label: getLabel(progression.hwKey, hardwareConfig),
+            tpPerMw: latest.rankValue,
+            disagg: latest.result.nearestPoints.some((p) => p.disagg),
             series,
           },
         ];
       }),
-    [fleets, assumptions, hardwareConfig],
+    [fleets, horizonMonths, assumptions, hardwareConfig],
   );
 
   const hasDisagg = useMemo(() => rows.some((r) => r.disagg), [rows]);
 
   const chartData = useMemo<LifecycleChartSeries[]>(
     () =>
-      rows.map((r) => ({
-        key: r.entry.hwKey,
-        label: r.label,
-        color: colorResolver(r.entry.hwKey),
-        date: r.entry.date,
-        disagg: r.disagg,
-        series: r.series,
-      })),
-    [rows, colorResolver],
+      rows.map((r) => {
+        // Step risers are keyed by month so the tooltip can name the run behind
+        // each one; months come from the same arithmetic the schedule used.
+        const stepInfo = new Map<number, { date: string; config: string; factor: number }>();
+        for (const step of r.progression.steps) {
+          const month = (Date.parse(`${step.date}T00:00:00Z`) - anchorMs) / MS_PER_MONTH;
+          stepInfo.set(month, {
+            date: step.date,
+            config: configLabel(step.result),
+            factor: step.factorOverFirst,
+          });
+        }
+        return {
+          key: r.progression.hwKey,
+          label: r.label,
+          color: colorResolver(r.progression.hwKey),
+          disagg: r.disagg,
+          series: r.series,
+          stepInfo,
+        };
+      }),
+    [rows, colorResolver, anchorMs],
   );
 
   const tokenTypeLabel = costType === 'input' ? 'input ' : costType === 'output' ? 'output ' : '';
 
   const handleAssumption = useCallback(
-    (
-      setter: (v: string) => void,
-      param: 'c_ttfi' | 'c_ramp' | 'c_mtbi' | 'c_rec' | 'c_life',
-      event: string,
-    ) =>
+    (setter: (v: string) => void, param: 'c_mtbi' | 'c_rec' | 'c_life', event: string) =>
       (e: React.ChangeEvent<HTMLInputElement>) => {
         const raw = e.target.value;
         setter(raw);
@@ -413,37 +491,35 @@ export default function FleetLifecycle({
         className: 'font-medium whitespace-nowrap',
       },
       {
-        header: t.colDate,
-        // Provenance is not optional here: the number no longer comes from the
-        // run date stamped above the chart.
-        cell: (r) =>
-          r.entry.runUrls.length > 0 ? (
-            <span className="whitespace-nowrap">
-              <Link
-                href={r.entry.runUrls[0]!}
-                target="_blank"
-                className="underline hover:text-foreground"
-              >
-                {r.entry.date}
-                <ExternalLinkIcon />
-              </Link>
-              {r.entry.supersededLatest && (
-                <span className="ml-1 text-amber-600" title={t.supersededTitle}>
-                  ↑
-                </span>
-              )}
-            </span>
-          ) : (
-            <span className="whitespace-nowrap">
-              {r.entry.date}
-              {r.entry.supersededLatest && (
-                <span className="ml-1 text-amber-600" title={t.supersededTitle}>
-                  ↑
-                </span>
-              )}
-            </span>
-          ),
-        sortValue: (r) => r.entry.date,
+        header: t.colFirst,
+        // Provenance is not optional: every rung of the line is a real sweep.
+        cell: (r) => {
+          const first = r.progression.steps[0]!;
+          return <span className="whitespace-nowrap">{runLink(first.date, first.runUrls)}</span>;
+        },
+        sortValue: (r) => r.progression.steps[0]!.date,
+      },
+      {
+        header: t.colLatest,
+        cell: (r) => {
+          const latest = r.progression.steps.at(-1)!;
+          return <span className="whitespace-nowrap">{runLink(latest.date, latest.runUrls)}</span>;
+        },
+        sortValue: (r) => r.progression.steps.at(-1)!.date,
+      },
+      {
+        header: t.colSteps,
+        align: 'right',
+        cell: (r) => String(r.series.improvementCount),
+        sortValue: (r) => r.series.improvementCount,
+        className: 'tabular-nums',
+      },
+      {
+        header: t.colGain,
+        align: 'right',
+        cell: (r) => `${r.series.improvementFactor.toFixed(2)}×`,
+        sortValue: (r) => r.series.improvementFactor,
+        className: 'tabular-nums',
       },
       {
         header: t.colTpPerMw(tokenTypeLabel),
@@ -503,33 +579,16 @@ export default function FleetLifecycle({
     [t, tokenTypeLabel],
   );
 
-  const assumptionInputs: {
-    id: string;
-    label: string;
-    tooltip: string;
-    value: string;
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  }[] = [
+  const assumptionInputs = [
     {
-      id: 'calc-lifecycle-ttfi',
-      label: t.ttfiLabel,
-      tooltip: t.ttfiTooltip,
-      value: ttfiInput,
-      onChange: handleAssumption(setTtfiInput, 'c_ttfi', 'calculator_lifecycle_ttfi_set'),
-    },
-    {
-      id: 'calc-lifecycle-ramp',
-      label: t.rampLabel,
-      tooltip: t.rampTooltip,
-      value: rampInput,
-      onChange: handleAssumption(setRampInput, 'c_ramp', 'calculator_lifecycle_ramp_set'),
-    },
-    {
-      id: 'calc-lifecycle-life',
-      label: t.lifeLabel,
-      tooltip: t.lifeTooltip,
-      value: lifeInput,
-      onChange: handleAssumption(setLifeInput, 'c_life', 'calculator_lifecycle_life_set'),
+      id: 'calc-lifecycle-horizon',
+      label: t.horizonLabel,
+      tooltip: t.horizonTooltip,
+      value: horizonInput,
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        horizonEdited.current = true;
+        handleAssumption(setHorizonInput, 'c_life', 'calculator_lifecycle_horizon_set')(e);
+      },
     },
     {
       id: 'calc-lifecycle-mtbi',
@@ -627,7 +686,7 @@ export default function FleetLifecycle({
           ))}
         </div>
 
-        {rows.length > 0 ? (
+        {rows.length > 0 && Number.isFinite(anchorMs) ? (
           <>
             <DataTable
               data={rows}
@@ -637,15 +696,17 @@ export default function FleetLifecycle({
             />
             <FleetLifecycleChart
               data={chartData}
+              anchorMs={anchorMs}
               yLabel={t.chartY}
               breakEvenLabel={t.chartBreakEven}
               labels={{
-                month: t.chartMonth,
+                date: t.tipDate,
+                config: t.tipConfig,
                 marginPerDay: t.tipMargin,
                 revenuePerDay: t.tipRevenue,
                 costPerDay: t.tipCost,
                 cumulative: t.tipCumulative,
-                measured: t.tipMeasured,
+                sinceFirst: t.tipSinceFirst,
               }}
             />
           </>
@@ -672,6 +733,15 @@ export default function FleetLifecycle({
           </div>
         )}
 
+        {!releaseDate && rows.length > 0 && (
+          <p
+            className="text-muted-foreground text-xs"
+            data-testid="calculator-lifecycle-no-release"
+          >
+            <strong>{t.note}</strong> {t.noReleaseDate}
+          </p>
+        )}
+
         {hasDisagg && (
           <p className="text-muted-foreground text-xs border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
             <strong>{t.note}</strong>
@@ -687,7 +757,7 @@ export default function FleetLifecycle({
 
         <div>
           <p className="text-xs text-muted-foreground mt-1">
-            {t.assumptions(getCostProviderLabel(costProvider), `${mw} MW`)}
+            {t.assumptions(getCostProviderLabel(costProvider), `${mw} MW`, anchorDate ?? '—')}
           </p>
           <p className="text-muted-foreground mt-1">
             <small>

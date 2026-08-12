@@ -2,26 +2,39 @@
  * Pure fleet lifecycle math — no React, no 'use client'.
  *
  * `fleet.ts` answers "what does this fleet earn and cost per hour, right now?".
- * This answers "what does it earn and cost across its life?" — the shape around
- * the operating point rather than the operating point itself:
+ * This answers "what has it earned and cost since the model shipped?" — and the
+ * shape of that answer is measured, not assumed.
  *
- *   ├─ TTFI ──┤├─ ramp ─┤├────────── plateau ──────────┤├─ decom ─┤
- *   nothing    revenue    revenue at full rate, less     racks
- *   billable   ramps up   the interrupt haircut          power down
+ * A fixed fleet's revenue is not flat. The chips do not change, but the software
+ * serving them does: over the months after a model's release, sweeps find better
+ * configs, and each one raises the tokens the same hardware delivers at the same
+ * interactivity. MI355X on DeepSeek-V4-Pro is the clearest example — an FP8
+ * baseline, then FP4 with graphs and FlashMLA, then AITER GEMMs and Triton SWA,
+ * then fused kernels — each step lifting the frontier.
  *
- * Two conventions the numbers depend on, both deliberate:
+ *   revenue │        ┌────── each step is a config that beat the ones before
+ *           │    ┌───┘
+ *           │ ┌──┘
+ *   ────────┼─┴─────────────────────────────────  cost: flat, the racks
+ *           └──────────────────────────────────▶  months since model release
  *
- * 1. **Cost tracks energised capacity, not utilisation.** Racks bill from the
- *    moment they are powered, so cost is at full rate through the ramp — before
- *    a single token is sold — and tapers only as they are decommissioned. This
- *    is what makes the early months negative, which is the point of the chart.
- * 2. **Interrupts are an availability haircut, not drawn events.** A 24-day
- *    MTBI over a 5-year life is ~75 interrupts; at any sane chart width each is
- *    far under a pixel, so drawing them produces aliasing noise rather than
- *    information. They scale the plateau instead.
+ * So revenue is a staircase over calendar time, one step per measured
+ * improvement, and cost is a constant — the racks bill the same whatever the
+ * software does. That makes the gap between them the return on software
+ * progress, which is the thing no single benchmark date can show.
  *
- * None of the lifecycle assumptions come from a benchmark — they are user
- * inputs, and callers must present them as such.
+ * Two conventions worth stating:
+ *
+ * 1. **Cost is flat.** It is `chips x $/chip/hr`, and neither term moves when a
+ *    config improves. Early months can therefore be underwater at a price the
+ *    later configs clear comfortably.
+ * 2. **Interrupts are an availability haircut, not drawn events.** A 24-day MTBI
+ *    over a multi-year window is thousands of events, each far under a pixel, so
+ *    drawing them is aliasing noise. They scale revenue instead.
+ *
+ * The lifecycle assumptions here (price, MTBI, recovery, horizon) are user
+ * inputs, and callers must present them as such. The throughput steps are not:
+ * they are measured.
  */
 
 /** 24h × 365d ÷ 12 — matches `HOURS_PER_MONTH` in fleet.ts. */
@@ -29,69 +42,81 @@ const HOURS_PER_MONTH = 730;
 const HOURS_PER_DAY = 24;
 const DAYS_PER_MONTH = HOURS_PER_MONTH / HOURS_PER_DAY;
 const TOKENS_PER_MILLION = 1e6;
-
-/** Months spent powering down at end of life, over which cost tapers to zero. */
-export const DECOMMISSION_MONTHS = 4;
-
-/** Samples per month. 4 keeps ~250 points over a 5-year life — enough for a smooth ramp. */
-const SAMPLES_PER_MONTH = 4;
+const SECONDS_PER_DAY = 86_400;
 
 export interface LifecycleAssumptions {
-  /** Months from order to first billable inference. Revenue is zero before this. */
-  ttfiMonths: number;
-  /** Months from first token to full rate, as capacity and utilisation ramp. */
-  rampMonths: number;
-  /** Mean time between interruptions, in days. */
+  /** Mean time between interruptions, in days. Zero means none modelled. */
   mtbiDays: number;
   /** Hours to recover from one interruption. */
   recoveryHours: number;
-  /** Months of useful service at full rate, after the ramp completes. */
-  lifeMonths: number;
   /** Sale price of output tokens, $/M tok. Defaults to break-even upstream. */
   pricePerMTok: number;
 }
 
+/**
+ * A measured config improvement: from `month` onwards, the fleet serves
+ * `fleetTokPerSec` until the next step.
+ */
+export interface ThroughputStep {
+  /** Months since the anchor date (the model's release), >= 0. */
+  month: number;
+  /** Fleet throughput for the selected token type once this config lands. */
+  fleetTokPerSec: number;
+}
+
 export interface LifecycleInputs {
   /**
-   * Fleet throughput for the selected token type (tok/s), from
-   * `computeFleetStats`. Revenue is billed on this, so a caller measuring
-   * blended tokens bills blended tokens.
+   * Chronological, non-empty. The first step's month is when this hardware was
+   * first measured on the model — before that there is no data, so no line.
    */
-  fleetTokPerSec: number;
-  /** Fleet TCO for the selected tier ($/hr), from `computeFleetStats`. */
+  steps: readonly ThroughputStep[];
+  /** Fleet TCO for the selected tier ($/hr). Constant: configs don't change it. */
   costPerHour: number;
+  /** End of the modelled window, months since the anchor. */
+  horizonMonths: number;
   assumptions: LifecycleAssumptions;
 }
 
 export interface LifecyclePoint {
-  /** Months since the capital was committed (t=0), not since first token. */
+  /** Months since the anchor date. */
   month: number;
-  /** Revenue rate at this instant, $/day. */
+  /** Revenue rate, $/day. */
   revenue: number;
-  /** Cost rate at this instant, $/day. */
+  /** Cost rate, $/day. */
   cost: number;
   /** revenue − cost, $/day. */
   margin: number;
-  /** Cumulative margin from t=0 to here, $. */
+  /** Cumulative margin from the first step to here, $. */
   cumulative: number;
+  /** True at the instant a new config takes effect — the riser of the step. */
+  isStep: boolean;
 }
 
 export interface LifecycleSeries {
+  /** Two points per step (riser + tread) so a step renders square. */
   points: LifecyclePoint[];
-  /** Plateau revenue rate, $/day, after the interrupt haircut. */
+  /** Revenue at the latest config, $/day. */
   revenuePerDay: number;
-  /** Plateau cost rate, $/day. */
+  /** Revenue at the first measured config, $/day. */
+  firstRevenuePerDay: number;
+  /** Flat cost rate, $/day. */
   costPerDay: number;
-  /** Plateau margin rate, $/day. */
+  /** Margin at the latest config, $/day. */
   marginPerDay: number;
-  /** Fraction of wall-clock time the fleet is serving, 0–1. */
+  /** Margin at the first measured config, $/day. */
+  firstMarginPerDay: number;
+  /** Latest revenue ÷ first revenue — what software progress has been worth. */
+  improvementFactor: number;
   availability: number;
-  /** Months from t=0 until cumulative margin first turns positive; null if never. */
+  /** Months since the anchor at which cumulative margin first turns positive. */
   paybackMonth: number | null;
-  /** Cumulative margin at the end of the decommissioning taper, $. */
+  /** Cumulative margin over the whole window, $. */
   lifetimeMargin: number;
-  /** End of the modelled window, months from t=0. */
+  /** Month of the first measured config. */
+  startMonth: number;
   endMonth: number;
+  /** Number of measured improvements, i.e. steps after the first. */
+  improvementCount: number;
 }
 
 /**
@@ -106,109 +131,112 @@ export interface LifecycleSeries {
 export function availabilityFromInterrupts(mtbiDays: number, recoveryHours: number): number {
   if (!Number.isFinite(mtbiDays) || mtbiDays <= 0) return 1;
   if (!Number.isFinite(recoveryHours) || recoveryHours <= 0) return 1;
-  const recoveryDays = recoveryHours / HOURS_PER_DAY;
-  return mtbiDays / (mtbiDays + recoveryDays);
+  return mtbiDays / (mtbiDays + recoveryHours / HOURS_PER_DAY);
 }
 
 /**
- * Price at which plateau revenue exactly covers plateau cost, $/M tok.
+ * Price at which revenue exactly covers cost at a given throughput, $/M tok.
  *
- * This is the same quantity the calculator already reports as a config's
- * $/M tok cost — it is derived from the SemiAnalysis TCO model, not invented
- * here — recomputed at fleet scale so it stays consistent with `costPerHour`.
- * Returns null when it is undefined (a fleet producing no tokens has no
- * break-even price).
+ * Derived from the fleet's own cost and throughput, so the margin this module
+ * plots is exactly zero at this price.
  */
 export function breakEvenPricePerMTok(costPerHour: number, fleetTokPerSec: number): number | null {
   if (!(fleetTokPerSec > 0) || !Number.isFinite(costPerHour)) return null;
-  const tokensPerHour = fleetTokPerSec * 3600;
-  return (costPerHour / tokensPerHour) * TOKENS_PER_MILLION;
+  return (costPerHour / (fleetTokPerSec * 3600)) * TOKENS_PER_MILLION;
 }
 
-/** Smoothstep: 0→1 with zero slope at both ends. Ramps read as S-curves, not corners. */
-function smoothstep(x: number): number {
-  if (x <= 0) return 0;
-  if (x >= 1) return 1;
-  return x * x * (3 - 2 * x);
-}
-
-function clampNonNegative(value: number): number {
-  return Number.isFinite(value) && value > 0 ? value : 0;
+/** Revenue rate in $/day for a throughput, price and availability. */
+function revenuePerDayFor(
+  fleetTokPerSec: number,
+  pricePerMTok: number,
+  availability: number,
+): number {
+  return ((fleetTokPerSec * SECONDS_PER_DAY) / TOKENS_PER_MILLION) * pricePerMTok * availability;
 }
 
 /**
- * Returns null when the projection is meaningless: no throughput, no cost
- * basis, or no useful life to project over.
+ * Returns null when the projection is meaningless: no steps, no cost basis, or a
+ * horizon that ends before the first measured config.
  */
 export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | null {
-  const { fleetTokPerSec, costPerHour, assumptions } = inputs;
-  if (!(fleetTokPerSec > 0) || !Number.isFinite(costPerHour)) return null;
+  const { steps, costPerHour, horizonMonths, assumptions } = inputs;
+  if (steps.length === 0 || !Number.isFinite(costPerHour)) return null;
 
-  const ttfi = clampNonNegative(assumptions.ttfiMonths);
-  const ramp = clampNonNegative(assumptions.rampMonths);
-  const life = clampNonNegative(assumptions.lifeMonths);
-  const price = clampNonNegative(assumptions.pricePerMTok);
-  if (!(life > 0)) return null;
+  const ordered = [...steps]
+    .filter((s) => Number.isFinite(s.month) && s.fleetTokPerSec > 0)
+    .toSorted((a, b) => a.month - b.month);
+  if (ordered.length === 0) return null;
+
+  const startMonth = ordered[0]!.month;
+  const endMonth = Math.max(horizonMonths, startMonth);
+  if (!(endMonth > startMonth)) return null;
 
   const availability = availabilityFromInterrupts(assumptions.mtbiDays, assumptions.recoveryHours);
-
-  const tokensPerDay = fleetTokPerSec * 3600 * HOURS_PER_DAY;
-  const fullRevenuePerDay = (tokensPerDay / TOKENS_PER_MILLION) * price * availability;
+  const price =
+    Number.isFinite(assumptions.pricePerMTok) && assumptions.pricePerMTok > 0
+      ? assumptions.pricePerMTok
+      : 0;
   const costPerDay = costPerHour * HOURS_PER_DAY;
 
-  // Phase boundaries, months from t=0.
-  const rampStart = ttfi;
-  const plateauStart = rampStart + ramp;
-  const plateauEnd = plateauStart + life;
-  const endMonth = plateauEnd + DECOMMISSION_MONTHS;
-
   const points: LifecyclePoint[] = [];
-  const steps = Math.max(1, Math.round(endMonth * SAMPLES_PER_MONTH));
-  const dt = endMonth / steps;
-
   let cumulative = 0;
   let paybackMonth: number | null = null;
-  let prevMargin = 0;
 
-  for (let i = 0; i <= steps; i += 1) {
-    const month = i * dt;
+  const push = (month: number, fleetTokPerSec: number, isStep: boolean) => {
+    const revenue = revenuePerDayFor(fleetTokPerSec, price, availability);
+    points.push({
+      month,
+      revenue,
+      cost: costPerDay,
+      margin: revenue - costPerDay,
+      cumulative,
+      isStep,
+    });
+  };
 
-    // Revenue: nothing until first inference, then a smooth ramp, then flat,
-    // then falls away with the capacity being decommissioned.
-    let revenueFraction: number;
-    if (month < rampStart) revenueFraction = 0;
-    else if (month < plateauStart) {
-      revenueFraction = ramp > 0 ? smoothstep((month - rampStart) / ramp) : 1;
-    } else if (month < plateauEnd) revenueFraction = 1;
-    else revenueFraction = 1 - smoothstep((month - plateauEnd) / DECOMMISSION_MONTHS);
+  for (let i = 0; i < ordered.length; i += 1) {
+    const step = ordered[i]!;
+    if (step.month >= endMonth) break;
+    const next = ordered[i + 1];
+    // A config holds until the next one lands, or until the horizon.
+    const until = next && next.month < endMonth ? next.month : endMonth;
 
-    // Cost: energised capacity. Full rate from t=0 — the racks are drawing
-    // power and accruing TCO through the whole pre-revenue period — tapering
-    // only as they are powered down.
-    const costFraction =
-      month < plateauEnd ? 1 : 1 - smoothstep((month - plateauEnd) / DECOMMISSION_MONTHS);
+    // Riser: the new config takes effect at this instant.
+    push(step.month, step.fleetTokPerSec, true);
 
-    const revenue = fullRevenuePerDay * revenueFraction;
-    const cost = costPerDay * costFraction;
-    const margin = revenue - cost;
+    // Accrue the flat stretch this config serves, then emit its far end.
+    const margin = revenuePerDayFor(step.fleetTokPerSec, price, availability) - costPerDay;
+    cumulative += margin * (until - step.month) * DAYS_PER_MONTH;
 
-    // Trapezoidal integration over the interval that just closed.
-    if (i > 0) cumulative += ((prevMargin + margin) / 2) * dt * DAYS_PER_MONTH;
-    prevMargin = margin;
+    if (paybackMonth === null && cumulative > 0 && margin > 0) {
+      // Solve for the instant within this stretch where cumulative crosses zero.
+      const beforeStretch = cumulative - margin * (until - step.month) * DAYS_PER_MONTH;
+      paybackMonth = step.month + -beforeStretch / (margin * DAYS_PER_MONTH);
+    }
 
-    if (paybackMonth === null && cumulative > 0) paybackMonth = month;
-
-    points.push({ month, revenue, cost, margin, cumulative });
+    push(until, step.fleetTokPerSec, false);
   }
+
+  if (points.length === 0) return null;
+
+  const firstTput = ordered[0]!.fleetTokPerSec;
+  const lastApplied = ordered.filter((s) => s.month < endMonth).at(-1) ?? ordered[0]!;
+  const revenuePerDay = revenuePerDayFor(lastApplied.fleetTokPerSec, price, availability);
+  const firstRevenuePerDay = revenuePerDayFor(firstTput, price, availability);
 
   return {
     points,
-    revenuePerDay: fullRevenuePerDay,
+    revenuePerDay,
+    firstRevenuePerDay,
     costPerDay,
-    marginPerDay: fullRevenuePerDay - costPerDay,
+    marginPerDay: revenuePerDay - costPerDay,
+    firstMarginPerDay: firstRevenuePerDay - costPerDay,
+    improvementFactor: firstTput > 0 ? lastApplied.fleetTokPerSec / firstTput : 1,
     availability,
     paybackMonth,
     lifetimeMargin: cumulative,
+    startMonth,
     endMonth,
+    improvementCount: Math.max(0, ordered.filter((s) => s.month < endMonth).length - 1),
   };
 }

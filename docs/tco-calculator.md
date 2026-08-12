@@ -166,8 +166,8 @@ output tokens and then apply it to total throughput; the existing
 ## Fleet Lifecycle (`FleetLifecycle.tsx`)
 
 Everything above answers "which chip is cheapest at this interactivity, right
-now?". This section answers "what does a fleet of it earn and cost across its
-life?" — the shape around the operating point, which no benchmark measures.
+now?". This section answers "what has a fleet of it earned and cost since the
+model shipped?" — and the answer is measured, not assumed.
 
 ### Why it reads the full run history
 
@@ -179,6 +179,15 @@ later sweep explored a different part of the space rather than because the chip
 got worse. For a lifecycle projection the honest number is the best config the
 chip has ever demonstrated, so this section is the one place that reads
 `/api/v1/benchmarks/history` instead of `/api/v1/benchmarks`.
+
+It reads more than the winner, though: `bestSoFarProgression` returns each
+hwKey's **running maximum** over run dates — the sequence of dates whose
+interpolated read at the target beat every date before it. That progression is
+the section's subject. A sweep that failed to beat the incumbent is not a step,
+because the fleet kept serving the config it already had, and the last rung of
+the staircase is by construction the same all-time best the table reports
+(`selectBestFromGroups` and `bestSoFarProgression` share one selection basis, so
+the headline figure can never disagree with the plotted line).
 
 That is only defensible with two rules, both in `historical-best.ts`:
 
@@ -223,22 +232,65 @@ the regression guard.
 
 ### Lifecycle math (`lifecycle.ts`)
 
-Pure and React-free, like `fleet.ts`. Two conventions the numbers depend on:
+Pure and React-free, like `fleet.ts`. It takes a `ThroughputStep[]` — one entry
+per measured improvement — and turns it into a revenue staircase over calendar
+time against a flat cost line:
 
-- **Cost tracks energised capacity, not utilisation.** Racks bill from the
-  moment they are powered, so cost runs at full rate through TTFI and the ramp —
-  before a single token is sold — and tapers only over decommissioning. That is
-  what makes the early months negative, which is the point of the chart. An
-  earlier iteration billed full cost through decommissioning while revenue fell
-  to zero, producing a large negative transient that dominated the y-axis and
-  was pure artifact; `lifecycle.test.ts` pins this.
+```
+revenue │        ┌────── each step is a config that beat the ones before
+        │    ┌───┘
+        │ ┌──┘
+────────┼─┴─────────────────────────────────  cost: flat, the racks
+        └──────────────────────────────────▶  months since model release
+```
+
+An earlier iteration modelled a TTFI delay, a smoothstep ramp to a flat plateau
+and a decommissioning taper. That was all assumption, and it collapsed each
+chip's optimisation history into a single number held constant for years — so
+every chip drew the same shape and the configs visibly never changed. The
+measured progression is both more honest and the actual finding.
+
+Three conventions the numbers depend on:
+
+- **Cost is flat.** It is `chips × $/chip/hr`, and neither term moves when a
+  config improves — the racks bill the same whatever the software does. That is
+  what makes the gap between the lines the return on software progress, and what
+  makes early months legitimately underwater at a price the later configs clear.
+- **A config holds until the next one lands**, so the line is a step
+  (`d3.curveStepAfter`), not a smooth ramp. Drawing it curved would assert the
+  fleet got gradually faster between sweeps, which is not what happened. Markers
+  are drawn only on risers, so every dot on the chart is a sweep the user can
+  open.
 - **Interrupts are an availability haircut, not drawn events.** A 24-day MTBI
-  over a five-year life is ~75 interruptions; at any sane chart width each is far
-  under a pixel, so drawing them yields aliasing noise rather than information.
-  They scale the plateau via `mtbi / (mtbi + recovery)`.
+  over a multi-year window is thousands of interruptions; at any sane chart width
+  each is far under a pixel, so drawing them yields aliasing noise rather than
+  information. They scale revenue via `mtbi / (mtbi + recovery)`.
 
 A blank or zero MTBI means "no interruptions modelled", not "always down" — the
 input is an optional refinement and a hostile default would be worse than none.
+
+### Anchoring and the x axis
+
+Time is measured from the model's release date, from `MODEL_RELEASE_DATES` in
+`@semianalysisai/inferencex-constants` (DeepSeek-V4-Pro: 2026-04-24, confirmed
+against `/api/v1/availability`, whose first `dsv4` row is that date). A model with
+no release date on file falls back to its earliest measured run, and the caption
+states which anchor is in use. A chip's line starts at its **own** first measured
+run, not at the anchor: before that there is no data, so there is no line.
+
+The horizon defaults to the measured window rather than a fixed number of months,
+and stops re-seeding once the user edits it. A fixed 60-month default left ~80% of
+the chart as flat tail extrapolated from the last sweep.
+
+The time scale passes `nice: false`. `buildScale` niceing is on by default
+(`scale-builders.ts:35`), which rounds a multi-year span out to whole years and
+leaves dead space before the release date and after the horizon; both ends of this
+domain are meaningful.
+
+The zero rule is a `type:'custom'` layer, and it removes `.lifecycle-zero-rule`
+before appending. The chart re-renders into the same zoom group, so appending
+unconditionally leaves a stale rule and a duplicate "break-even" label behind at
+the previous y-scale on every data change.
 
 ### Token price defaults to break-even
 
@@ -251,7 +303,10 @@ figure comes from the TCO model — everything above that line is the user's
 assumption, and the section says so.
 
 It is derived as `costPerHour / fleetTokPerSec` for that fleet, so the plotted
-margin is exactly zero at the default.
+margin is exactly zero at the default — for that chip, at its **latest** config.
+Under the default price every other series therefore sits below the rule, and each
+one's own earlier steps sit lower still. That is the competitive floor being read
+correctly, not a scaling bug; raising the price lifts the whole fleet.
 
 That is deliberately **not** the `$/M tok` the calculator's cost bars show for
 the same config, and the reason is worth recording because it is a property of
@@ -312,6 +367,8 @@ exclusion in its own note rather than leaving a silent gap.
 
 ### URL params
 
-`c_price`, `c_ttfi`, `c_ramp`, `c_mtbi`, `c_rec`, `c_life`. The MW budget is
+`c_price`, `c_life` (horizon), `c_mtbi`, `c_rec`. The first two default to `''` in
+`PARAM_DEFAULTS` because their real defaults are derived, not constant — see the
+comment there. The MW budget is
 `c_mw`, owned by `ThroughputCalculatorDisplay` and passed to both the fleet
 planner and this section so one input drives both.

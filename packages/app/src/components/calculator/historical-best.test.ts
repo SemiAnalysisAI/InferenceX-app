@@ -4,6 +4,7 @@ import type { BenchmarkRow } from '@/lib/api';
 import { Sequence } from '@/lib/data-mappings';
 
 import {
+  bestSoFarProgression,
   groupHistoryByHwKeyAndDate,
   selectBestFromGroups,
   selectHistoricalBest,
@@ -349,5 +350,119 @@ describe('selectHistoricalBest', () => {
     ];
     expect(selectHistoricalBest(options(rows)).best).toEqual([]);
     expect(selectHistoricalBest(options(rows)).datesSeen).toBe(0);
+  });
+});
+
+describe('bestSoFarProgression', () => {
+  it('keeps only the dates that beat every earlier date', () => {
+    // The MI355X shape: a baseline, a big jump, a regression that must not
+    // register, then another jump.
+    const rows = [
+      ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 400 : 200)),
+      ...[30, 60].map((iv) => sweep('2026-05-02', iv, iv === 30 ? 900 : 500)),
+      // A sweep exploring elsewhere that came out worse at the target — the
+      // fleet kept serving the config it already had, so this is not a step.
+      ...[30, 60].map((iv) => sweep('2026-05-10', iv, iv === 30 ? 700 : 400)),
+      ...[30, 60].map((iv) => sweep('2026-05-27', iv, iv === 30 ? 1600 : 800)),
+    ];
+
+    const groups = groupHistoryByHwKeyAndDate(options(rows));
+    const progressions = bestSoFarProgression(groups, { ...options(rows), targetValue: 45 });
+
+    expect(progressions).toHaveLength(1);
+    const p = progressions[0]!;
+    expect(p.steps.map((s) => s.date)).toEqual(['2026-04-25', '2026-05-02', '2026-05-27']);
+    expect(p.datesMeasured).toBe(4);
+    expect(p.datesConsidered).toBe(4);
+  });
+
+  it('is strictly increasing in rank value', () => {
+    const rows = [
+      ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 400 : 200)),
+      ...[30, 60].map((iv) => sweep('2026-05-02', iv, iv === 30 ? 900 : 500)),
+      ...[30, 60].map((iv) => sweep('2026-05-27', iv, iv === 30 ? 1600 : 800)),
+    ];
+    const groups = groupHistoryByHwKeyAndDate(options(rows));
+    const p = bestSoFarProgression(groups, { ...options(rows), targetValue: 45 }).at(0)!;
+    for (let i = 1; i < p.steps.length; i += 1) {
+      expect(p.steps[i]!.rankValue).toBeGreaterThan(p.steps[i - 1]!.rankValue);
+    }
+  });
+
+  it('reports each step gain over the opening config, with the first at 1', () => {
+    const rows = [
+      ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 400 : 200)),
+      ...[30, 60].map((iv) => sweep('2026-05-27', iv, iv === 30 ? 1600 : 800)),
+    ];
+    const groups = groupHistoryByHwKeyAndDate(options(rows));
+    const p = bestSoFarProgression(groups, { ...options(rows), targetValue: 45 }).at(0)!;
+    expect(p.steps[0]!.factorOverFirst).toBe(1);
+    expect(p.steps.at(-1)!.factorOverFirst).toBeCloseTo(
+      p.steps.at(-1)!.rankValue / p.steps[0]!.rankValue,
+      9,
+    );
+    expect(p.steps.at(-1)!.factorOverFirst).toBeGreaterThan(1);
+  });
+
+  it('never lets a clamped read become a step', () => {
+    // April tops out at 30 tok/s/user; at a target of 45 it must not contribute,
+    // so the progression opens at the May sweep.
+    const rows = [
+      ...[10, 30].map((iv) => sweep('2026-04-25', iv, iv === 10 ? 6000 : 5000)),
+      ...[40, 60].map((iv) => sweep('2026-05-02', iv, iv === 40 ? 800 : 500)),
+    ];
+    const groups = groupHistoryByHwKeyAndDate(options(rows));
+    const p = bestSoFarProgression(groups, { ...options(rows), targetValue: 45 }).at(0)!;
+    expect(p.steps.map((s) => s.date)).toEqual(['2026-05-02']);
+    expect(p.steps[0]!.result.clamped).toBeFalsy();
+  });
+
+  it('carries the run URLs for every step', () => {
+    const runA = 'https://github.com/org/repo/actions/runs/111';
+    const runB = 'https://github.com/org/repo/actions/runs/222';
+    const rows = [
+      ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 400 : 200, { run_url: runA })),
+      ...[30, 60].map((iv) => sweep('2026-05-27', iv, iv === 30 ? 1600 : 800, { run_url: runB })),
+    ];
+    const groups = groupHistoryByHwKeyAndDate(options(rows));
+    const p = bestSoFarProgression(groups, { ...options(rows), targetValue: 45 }).at(0)!;
+    expect(p.steps.map((s) => s.runUrls)).toEqual([[runA], [runB]]);
+  });
+
+  it('ends at the same config the all-time best selection reports', () => {
+    // The staircase's last rung and the headline figure must agree, or the table
+    // would contradict the chart.
+    const rows = [
+      ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 400 : 200)),
+      ...[30, 60].map((iv) => sweep('2026-05-27', iv, iv === 30 ? 1600 : 800)),
+      ...[30, 60].map((iv) => sweep('2026-06-10', iv, iv === 30 ? 900 : 500)),
+    ];
+    const opts = { ...options(rows), targetValue: 45 };
+    const groups = groupHistoryByHwKeyAndDate(opts);
+    const best = selectBestFromGroups(groups, opts).best[0]!;
+    const p = bestSoFarProgression(groups, opts).at(0)!;
+    expect(p.steps.at(-1)!.date).toBe(best.date);
+    expect(p.steps.at(-1)!.rankValue).toBeCloseTo(best.rankValue, 9);
+  });
+
+  it('tracks each chip separately, ranked by its latest best', () => {
+    const rows = [
+      ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 1400 : 900)),
+      ...[30, 60].map((iv) =>
+        sweep('2026-04-25', iv, iv === 30 ? 400 : 200, { hardware: 'h200', precision: 'fp8' }),
+      ),
+    ];
+    const opts = { ...options(rows), precisions: ['fp4', 'fp8'], targetValue: 45 };
+    const progressions = bestSoFarProgression(groupHistoryByHwKeyAndDate(opts), opts);
+    expect(progressions).toHaveLength(2);
+    expect(progressions[0]!.steps.at(-1)!.rankValue).toBeGreaterThan(
+      progressions[1]!.steps.at(-1)!.rankValue,
+    );
+  });
+
+  it('omits chips with no unclamped read at all', () => {
+    const rows = [70, 90].map((iv) => sweep('2026-04-25', iv, iv === 70 ? 400 : 200));
+    const opts = { ...options(rows), targetValue: 20 };
+    expect(bestSoFarProgression(groupHistoryByHwKeyAndDate(opts), opts)).toEqual([]);
   });
 });

@@ -43,10 +43,12 @@ describe('Calculator — Fleet Lifecycle', () => {
     cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
     cy.get('[data-testid="calculator-lifecycle-table"]', { timeout: 30_000 }).should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-table"]').within(() => {
-      cy.contains('th', 'Best Run').should('exist');
+      cy.contains('th', 'First Run').should('exist');
+      cy.contains('th', 'Latest Best').should('exist');
+      cy.contains('th', 'Improvements').should('exist');
       cy.contains('th', 'Margin $/day').should('exist');
       cy.contains('th', 'Payback').should('exist');
-      cy.contains('th', 'Lifetime Margin').should('exist');
+      cy.contains('th', 'Cumulative Margin').should('exist');
       cy.get('tbody tr').should('have.length.greaterThan', 0);
     });
     cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
@@ -56,6 +58,9 @@ describe('Calculator — Fleet Lifecycle', () => {
     // The caption's run date no longer describes these numbers, so each row
     // carries its own date and links its run.
     firstRowCell(1)
+      .invoke('text')
+      .should('match', /\d{4}-\d{2}-\d{2}/u);
+    firstRowCell(2)
       .invoke('text')
       .should('match', /\d{4}-\d{2}-\d{2}/u);
   });
@@ -76,8 +81,8 @@ describe('Calculator — Fleet Lifecycle', () => {
     cy.get('[data-testid="calc-lifecycle-price-input"]').clear();
     cy.get('[data-testid="calc-lifecycle-price-input"]').type('50');
     // Margin $/day column: positive, so no leading minus.
-    firstRowCell(5).invoke('text').should('match', /^\$/u);
-    firstRowCell(6)
+    firstRowCell(8).invoke('text').should('match', /^\$/u);
+    firstRowCell(9)
       .invoke('text')
       .should('match', /\d+(?:\.\d+)? mo/u);
   });
@@ -99,29 +104,44 @@ describe('Calculator — Fleet Lifecycle', () => {
     cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should('exist');
   });
 
-  it('a longer useful life increases lifetime margin', () => {
-    cy.get('[data-testid="calc-lifecycle-life-input"]').clear();
-    cy.get('[data-testid="calc-lifecycle-life-input"]').type('24');
-    firstRowCell(7)
+  it('a longer horizon increases cumulative margin', () => {
+    cy.get('[data-testid="calc-lifecycle-horizon-input"]').clear();
+    cy.get('[data-testid="calc-lifecycle-horizon-input"]').type('24');
+    firstRowCell(10)
       .invoke('text')
       .then((short) => {
-        cy.get('[data-testid="calc-lifecycle-life-input"]').clear();
-        cy.get('[data-testid="calc-lifecycle-life-input"]').type('96');
-        firstRowCell(7)
+        cy.get('[data-testid="calc-lifecycle-horizon-input"]').clear();
+        cy.get('[data-testid="calc-lifecycle-horizon-input"]').type('96');
+        firstRowCell(10)
           .invoke('text')
           .should((long) => expect(long).to.not.equal(short));
       });
   });
 
+  it('tracks measured config improvements as steps, not one flat plateau', () => {
+    // The point of the section: a chip's revenue follows its optimisation
+    // history, so at least one chip must show more than zero improvements.
+    cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').then(($rows) => {
+      const improvements = [...$rows].map((row) =>
+        Number.parseInt(row.querySelectorAll('td')[3]!.textContent ?? '0', 10),
+      );
+      expect(Math.max(...improvements)).to.be.greaterThan(0);
+    });
+    // Gain over the opening config is reported as a multiple.
+    firstRowCell(4)
+      .invoke('text')
+      .should('match', /^\d+(?:\.\d+)?×$/u);
+  });
+
   it('a shorter MTBI lowers availability', () => {
     cy.get('[data-testid="calc-lifecycle-mtbi-input"]').clear();
     cy.get('[data-testid="calc-lifecycle-mtbi-input"]').type('60');
-    firstRowCell(8)
+    firstRowCell(11)
       .invoke('text')
       .then((high) => {
         cy.get('[data-testid="calc-lifecycle-mtbi-input"]').clear();
         cy.get('[data-testid="calc-lifecycle-mtbi-input"]').type('2');
-        firstRowCell(8)
+        firstRowCell(11)
           .invoke('text')
           .should((low) => {
             expect(Number.parseFloat(low)).to.be.lessThan(Number.parseFloat(high));
@@ -132,7 +152,7 @@ describe('Calculator — Fleet Lifecycle', () => {
   it('states the hybrid basis and the unofficial-run exclusion', () => {
     // Today's TCO rates on a dated operating point, and no overlay support.
     cy.get('[data-testid="calculator-lifecycle-section"]')
-      .should('contain.text', 'power and $/chip/hr are today')
+      .should('contain.text', 'Power and $/chip/hr are today')
       .and('contain.text', 'Unofficial runs loaded via a run link are not shown here');
     cy.get('[data-testid="calculator-lifecycle-section"]').should(
       'contain.text',
@@ -231,13 +251,13 @@ describe('Calculator — Fleet Lifecycle in Chinese', () => {
     cy.get('[data-testid="calculator-lifecycle-table"]', { timeout: 30_000 }).should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('contain.text', 'Token 价格')
-      .and('contain.text', '最佳运行')
-      .and('contain.text', '生命周期利润')
+      .and('contain.text', '首次运行')
+      .and('contain.text', '累计利润')
       .and('contain.text', '来源：');
     // Nothing from the English table leaks through.
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('not.contain.text', 'Enter a facility power budget')
-      .and('not.contain.text', 'Lifetime Margin')
-      .and('not.contain.text', 'Best Run');
+      .and('not.contain.text', 'Cumulative Margin')
+      .and('not.contain.text', 'First Run');
   });
 });

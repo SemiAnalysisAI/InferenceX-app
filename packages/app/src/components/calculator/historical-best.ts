@@ -256,3 +256,93 @@ export function selectHistoricalBest(
 ): HistoricalBestOutcome {
   return selectBestFromGroups(groupHistoryByHwKeyAndDate(options), options);
 }
+
+/** One rung of a chip's best-so-far progression. */
+export interface ProgressionStep {
+  /** Run date this config was measured on. */
+  date: string;
+  /** Run URLs pooled into that date. */
+  runUrls: string[];
+  /** The read at this date — the new best-so-far. */
+  result: InterpolatedResult;
+  /** Rank value of this read. Strictly greater than the previous rung's. */
+  rankValue: number;
+  /** rankValue ÷ the first rung's, i.e. gain over the opening config. */
+  factorOverFirst: number;
+}
+
+export interface HistoricalProgression {
+  hwKey: string;
+  /** Chronological, strictly improving. First rung is the opening measurement. */
+  steps: ProgressionStep[];
+  /** Dates that produced an unclamped read, improving or not. */
+  datesMeasured: number;
+  datesConsidered: number;
+}
+
+/**
+ * Each hwKey's best-so-far progression at the target, in calendar order.
+ *
+ * `selectBestFromGroups` answers "what is the best this chip has ever done?".
+ * This answers "how did it get there?" — the running maximum over run dates,
+ * keeping only the dates that improved on everything before them. That staircase
+ * is what a fixed fleet's revenue actually followed: the chips never changed,
+ * the software serving them did.
+ *
+ * Same two rules as the best-of selection: clamped reads never count, and every
+ * rung keeps its date and run URLs so the step can be traced to the sweep that
+ * produced it.
+ */
+export function bestSoFarProgression(
+  groups: HistoryGroups,
+  options: SelectBestOptions,
+): HistoricalProgression[] {
+  const { targetValue, mode, costProvider, rank } = options;
+  const progressions: HistoricalProgression[] = [];
+
+  for (const [hwKey, dated] of groups.byHwKey) {
+    const chronological = [...dated].toSorted((a, b) => a.date.localeCompare(b.date));
+    const steps: ProgressionStep[] = [];
+    let best = -Infinity;
+    let datesMeasured = 0;
+
+    for (const sweep of chronological) {
+      const result = interpolateForGPU(sweep.points, targetValue, mode, costProvider);
+      if (!result || result.clamped || !(result.value > 0)) continue;
+      const rankValue = rank(result);
+      if (!Number.isFinite(rankValue) || rankValue <= 0) continue;
+
+      datesMeasured += 1;
+      // Only rungs: a sweep that failed to beat the incumbent leaves the fleet
+      // serving the config it already had, so it is not a step in the line.
+      if (rankValue <= best) continue;
+      best = rankValue;
+      steps.push({
+        date: sweep.date,
+        runUrls: sweep.runUrls,
+        result: { ...result, hwKey, resultKey: hwKey },
+        rankValue,
+        // Filled in below, once the opening rung is known.
+        factorOverFirst: 1,
+      });
+    }
+
+    if (steps.length === 0) continue;
+    const firstRank = steps[0]!.rankValue;
+    for (const step of steps) step.factorOverFirst = step.rankValue / firstRank;
+
+    progressions.push({
+      hwKey,
+      steps,
+      datesMeasured,
+      datesConsidered: dated.length,
+    });
+  }
+
+  progressions.sort(
+    (a, b) =>
+      (b.steps.at(-1)?.rankValue ?? 0) - (a.steps.at(-1)?.rankValue ?? 0) ||
+      a.hwKey.localeCompare(b.hwKey),
+  );
+  return progressions;
+}

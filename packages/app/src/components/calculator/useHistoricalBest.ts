@@ -9,12 +9,14 @@ import { useStableValue } from '@/hooks/useStableValue';
 import { Percentile, type Model, type Sequence } from '@/lib/data-mappings';
 
 import {
+  bestSoFarProgression,
   groupHistoryByHwKeyAndDate,
   selectBestFromGroups,
   type HistoricalBestOutcome,
+  type HistoricalProgression,
 } from './historical-best';
 import { getTpPerMwForType } from './ThroughputBarChart';
-import type { CalculatorMode, CostProvider, CostType } from './types';
+import type { CalculatorMode, CostProvider, CostType, InterpolatedResult } from './types';
 
 const EMPTY: HistoricalBestOutcome = { best: [], unmeasured: [], datesSeen: 0 };
 
@@ -35,6 +37,8 @@ export interface UseHistoricalBestOptions {
 }
 
 export interface UseHistoricalBestResult extends HistoricalBestOutcome {
+  /** Each chip's best-so-far staircase over run dates, for the lifecycle chart. */
+  progressions: HistoricalProgression[];
   loading: boolean;
   error: string | null;
   /**
@@ -90,21 +94,28 @@ export function useHistoricalBest(options: UseHistoricalBestOptions): UseHistori
     return groupHistoryByHwKeyAndDate({ rows, sequence, precisions, percentile });
   }, [rows, sequence, precisions, percentile]);
 
-  // Stage two — re-read the frontiers at the current operating point.
-  const outcome = useMemo(() => {
-    if (!groups) return EMPTY;
-    return selectBestFromGroups(groups, {
+  // Stage two — re-read the frontiers at the current operating point. Both the
+  // all-time best and the progression share one selection basis, so the table's
+  // headline figure is always the last rung of the plotted staircase.
+  const selection = useMemo(() => {
+    if (!groups) return { outcome: EMPTY, progressions: [] as HistoricalProgression[] };
+    const selectOptions = {
       targetValue,
       mode,
       costProvider,
       // The cost matrix's own accessor decides the winner, so the ranking basis
       // always matches the selected token type.
-      rank: (result) => getTpPerMwForType(result, costType),
-    });
+      rank: (result: InterpolatedResult) => getTpPerMwForType(result, costType),
+    };
+    return {
+      outcome: selectBestFromGroups(groups, selectOptions),
+      progressions: bestSoFarProgression(groups, selectOptions),
+    };
   }, [groups, targetValue, mode, costProvider, costType]);
 
   return {
-    ...outcome,
+    ...selection.outcome,
+    progressions: selection.progressions,
     loading: enabled && !unsupportedSequence && (isLoading || !rows),
     error: error ? error.message : null,
     unsupportedSequence,

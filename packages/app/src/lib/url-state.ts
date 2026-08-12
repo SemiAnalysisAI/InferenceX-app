@@ -73,10 +73,9 @@ const URL_STATE_KEYS = [
   // Calculator (fleet planner)
   'c_mw',
   'c_costcap',
-  // Calculator (fleet lifecycle) — token price plus the four timing assumptions
+  // Calculator (fleet lifecycle) — token price plus the interrupt/horizon inputs.
+  // No ramp param: the ramp is measured from run history, not assumed.
   'c_price',
-  'c_ttfi',
-  'c_ramp',
   'c_mtbi',
   'c_rec',
   'c_life',
@@ -144,14 +143,14 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   r_active: '',
   c_mw: '',
   c_costcap: '',
-  // Empty means "use the component's default": the price default is derived
-  // from the cheapest visible chip's break-even, which is not a constant.
+  // Empty means "use the component's default", which for these two is derived
+  // rather than constant: the price from the cheapest visible chip's break-even,
+  // the horizon from the measured run window. A non-empty default here would be
+  // stripped from share links and silently re-derived on load.
   c_price: '',
-  c_ttfi: '6',
-  c_ramp: '6',
+  c_life: '',
   c_mtbi: '24',
   c_rec: '12',
-  c_life: '60',
 };
 
 /** Which param prefixes are relevant per tab. */
