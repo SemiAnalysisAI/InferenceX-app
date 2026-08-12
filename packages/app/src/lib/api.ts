@@ -105,7 +105,6 @@ export interface RunConfigRow {
   framework: string;
   spec_method: string;
   disagg: boolean;
-  benchmark_type: string;
 }
 
 export interface WorkflowInfoResponse {
@@ -182,19 +181,22 @@ export function fetchBenchmarkHistory(
   model: string,
   isl: number,
   osl: number,
-  benchmarkType?: 'agentic_traces',
   signal?: AbortSignal,
+  benchmarkType?: 'agentic_traces',
 ) {
   const params = new URLSearchParams({ model, isl: String(isl), osl: String(osl) });
   if (benchmarkType) params.set('benchmarkType', benchmarkType);
   return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks/history?${params}`, signal);
 }
 
-export function fetchWorkflowInfo(date: string, signal?: AbortSignal) {
-  return fetchJson<WorkflowInfoResponse>(
-    `/api/v1/workflow-info?date=${encodeURIComponent(date)}`,
-    signal,
-  );
+export function fetchWorkflowInfo(
+  date: string,
+  signal?: AbortSignal,
+  benchmarkType?: 'agentic_traces',
+) {
+  const params = new URLSearchParams({ date });
+  if (benchmarkType) params.set('benchmarkType', benchmarkType);
+  return fetchJson<WorkflowInfoResponse>(`/api/v1/workflow-info?${params}`, signal);
 }
 
 export interface AvailabilityRow {

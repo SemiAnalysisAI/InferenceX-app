@@ -243,6 +243,18 @@ describe('buildReplayTimeline', () => {
     ]);
   });
 
+  it('preserves fixed-sequence replay identity when offload metadata differs', () => {
+    const rows = [
+      baseRow({ benchmark_type: 'single_turn', offload_mode: 'off' }),
+      baseRow({ benchmark_type: 'single_turn', offload_mode: 'on' }),
+    ];
+
+    const t = buildReplayTimeline(rows, interactivityChartDef, 'y_tpPerGpu', null, ['fp4']);
+    expect(t.configs).toHaveLength(1);
+    expect(t.configs[0].configId).not.toContain('offload');
+    expect(t.configs[0].configId).not.toContain('spec-');
+  });
+
   it('computes a global x/y domain spanning all observations', () => {
     const rows = [
       baseRow({ date: '2025-01-01', metrics: { tput_per_gpu: 100, median_intvty: 10 } }),

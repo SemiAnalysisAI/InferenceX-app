@@ -9,8 +9,10 @@ export function useBenchmarkHistory(
   benchmarkType?: 'agentic_traces',
 ) {
   return useQuery({
-    queryKey: ['benchmark-history', model, isl, osl, benchmarkType],
-    queryFn: ({ signal }) => fetchBenchmarkHistory(model, isl, osl, benchmarkType, signal),
+    queryKey: benchmarkType
+      ? ['benchmark-history', model, isl, osl, benchmarkType]
+      : ['benchmark-history', model, isl, osl],
+    queryFn: ({ signal }) => fetchBenchmarkHistory(model, isl, osl, signal, benchmarkType),
     enabled: Boolean(model && (benchmarkType === 'agentic_traces' || (isl && osl))),
   });
 }

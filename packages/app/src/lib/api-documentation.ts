@@ -234,9 +234,11 @@ const benchmarkRowSchema = objectSchemaWithOptional(
     metrics: metricMapSchema,
     workers: arraySchema(workerPowerSchema),
     date: { type: 'string', format: 'date' },
+    workflow_run_id: integerSchema,
+    run_started_at: { type: ['string', 'null'], format: 'date-time' },
     run_url: nullableStringSchema,
   },
-  ['workers'],
+  ['workers', 'workflow_run_id', 'run_started_at'],
 );
 const benchmarkRowsSchema = arraySchema(benchmarkRowSchema);
 const benchmarkExample = [
@@ -591,6 +593,16 @@ export const apiOperations: readonly ApiOperation[] = [
         '2026-08-08',
       ),
       parameter(
+        'benchmarkType',
+        'query',
+        false,
+        'string',
+        'Set to agentic_traces to scope per-run configuration coverage to Agentic Traces.',
+        '设为 agentic_traces 可将每次运行的配置覆盖限定为 Agentic Traces。',
+        { type: 'string', enum: ['agentic_traces'] },
+        'agentic_traces',
+      ),
+      parameter(
         'exact',
         'query',
         false,
@@ -660,7 +672,7 @@ export const apiOperations: readonly ApiOperation[] = [
       parameter(
         'model',
         'query',
-        false,
+        true,
         'string',
         'Display model name.',
         '展示模型名称。',
@@ -670,7 +682,7 @@ export const apiOperations: readonly ApiOperation[] = [
       parameter(
         'isl',
         'query',
-        true,
+        false,
         'integer',
         'Positive input sequence length in tokens. Required unless benchmarkType=agentic_traces.',
         '正整数输入序列长度，单位为 token；除非 benchmarkType=agentic_traces，否则必填。',
@@ -702,8 +714,8 @@ export const apiOperations: readonly ApiOperation[] = [
       success('Historical benchmark rows.', '历史基准行。', benchmarkRowsSchema, benchmarkExample),
       errorResponse(
         '400',
-        'Required parameters are missing, benchmarkType is unsupported, or the model is unsupported.',
-        '必填参数缺失、benchmarkType 不受支持，或模型不受支持。',
+        'Required parameters are missing or the model is unsupported.',
+        '必填参数缺失或模型不受支持。',
         'Missing required parameters',
       ),
       errorResponse('500', 'The history query failed.', '历史查询失败。', 'Internal server error'),

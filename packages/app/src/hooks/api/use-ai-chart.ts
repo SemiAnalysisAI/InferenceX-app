@@ -399,7 +399,13 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
   const { isl, osl } = isAgentic ? { isl: 0, osl: 0 } : sequenceToIslOsl(spec.sequence);
   const fetchedRows =
     spec.dataSource === 'history'
-      ? await fetchBenchmarkHistory(spec.model, isl, osl, isAgentic ? 'agentic_traces' : undefined)
+      ? await fetchBenchmarkHistory(
+          spec.model,
+          isl,
+          osl,
+          undefined,
+          isAgentic ? 'agentic_traces' : undefined,
+        )
       : await fetchBenchmarks(spec.model);
   const rows =
     spec.dataSource === 'history' && isAgentic

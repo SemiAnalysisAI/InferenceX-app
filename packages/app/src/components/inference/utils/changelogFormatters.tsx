@@ -20,7 +20,10 @@ const CHANGELOG_FRAMEWORK_KEYS = [
  * `agentic`, `hicache`, and `pcp` after the serving framework; those are not
  * framework labels and must not become part of the legend identity.
  */
-export function changelogConfigToHwKey(configKey: string): string | null {
+export function changelogConfigToHwKey(
+  configKey: string,
+  benchmarkType?: 'single_turn' | 'agentic_traces',
+): string | null {
   const parts = configKey.toLowerCase().split('-');
   const gpu = parts[2];
   const remainder = parts.slice(3).join('-');
@@ -33,7 +36,13 @@ export function changelogConfigToHwKey(configKey: string): string | null {
 
   const trailingParts = remainder.slice(framework.length).split('-').filter(Boolean);
   const isAgentic = trailingParts.includes('agentic');
-  const specSuffix = !isAgentic && trailingParts.includes('mtp') ? '_mtp' : '';
+  if (benchmarkType === 'agentic_traces' && !isAgentic) return null;
+  const specSuffix =
+    benchmarkType === 'agentic_traces' && isAgentic
+      ? ''
+      : trailingParts.includes('mtp')
+        ? '_mtp'
+        : '';
   return `${gpu}_${resolveFrameworkAlias(framework)}${specSuffix}`;
 }
 
@@ -63,8 +72,12 @@ export function formatChangelogDescription(desc: string | string[]) {
  * Check if a changelog config key matches a hwKey.
  * Normalizes both to hyphen-separated form for comparison.
  */
-export function configKeyMatchesHwKey(configKey: string, hwKey: string): boolean {
-  return changelogConfigToHwKey(configKey) === hwKey;
+export function configKeyMatchesHwKey(
+  configKey: string,
+  hwKey: string,
+  benchmarkType?: 'single_turn' | 'agentic_traces',
+): boolean {
+  return changelogConfigToHwKey(configKey, benchmarkType) === hwKey;
 }
 
 export function formatConfigKeys(key: string) {

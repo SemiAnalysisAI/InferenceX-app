@@ -7,13 +7,20 @@ import { getAllBenchmarksForHistory } from '@semianalysisai/inferencex-db/querie
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
 import { loadFixture } from '@/lib/test-fixtures';
+import { agenticWorkflowMetadataOnly } from '@/lib/agentic-workflow-metadata';
 
 export const dynamic = 'force-dynamic';
 
 const getCachedBenchmarkHistory = cachedQuery(
-  (modelKeys: string[], isl: number | null, osl: number | null, benchmarkType?: string) =>
-    getAllBenchmarksForHistory(getDb(), modelKeys, isl, osl, benchmarkType),
-  'benchmark-history-v2',
+  (modelKeys: string[], isl: number, osl: number) =>
+    getAllBenchmarksForHistory(getDb(), modelKeys, isl, osl),
+  'benchmark-history',
+  { blobOnly: true },
+);
+const getCachedAgenticBenchmarkHistory = cachedQuery(
+  (modelKeys: string[]) =>
+    getAllBenchmarksForHistory(getDb(), modelKeys, null, null, 'agentic_traces'),
+  'benchmark-history-agentic',
   { blobOnly: true },
 );
 
@@ -29,9 +36,6 @@ export async function GET(request: NextRequest) {
   if (!model) {
     return NextResponse.json({ error: 'model, isl, and osl are required' }, { status: 400 });
   }
-  if (benchmarkType !== undefined && !isAgentic) {
-    return NextResponse.json({ error: 'Unsupported benchmarkType' }, { status: 400 });
-  }
   if (!isAgentic && (!isl || !osl)) {
     return NextResponse.json({ error: 'model, isl, and osl are required' }, { status: 400 });
   }
@@ -42,13 +46,10 @@ export async function GET(request: NextRequest) {
     if (!modelKeys || modelKeys.length === 0) {
       return NextResponse.json({ error: 'Unknown model' }, { status: 400 });
     }
-    const rows = await getCachedBenchmarkHistory(
-      modelKeys,
-      isAgentic ? null : isl,
-      isAgentic ? null : osl,
-      benchmarkType,
-    );
-    return cachedJson(rows);
+    const rows = isAgentic
+      ? await getCachedAgenticBenchmarkHistory(modelKeys)
+      : await getCachedBenchmarkHistory(modelKeys, isl!, osl!);
+    return cachedJson(agenticWorkflowMetadataOnly(rows));
   } catch (error) {
     console.error('Error fetching benchmark history:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -750,14 +750,19 @@ const ScatterGraph = React.memo(
           const hwKeys = cl.entries.flatMap((entry: any) =>
             (entry.config_keys ?? entry['config-keys'] ?? [])
               .filter((key: string) => selectedPrecisions.includes(key.split('-')[1]))
-              .map(changelogConfigToHwKey)
+              .map((key: string) =>
+                changelogConfigToHwKey(
+                  key,
+                  selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
+                ),
+              )
               .filter((key: string | null): key is string => key !== null),
           );
           return new Set(hwKeys);
         }
       }
       return new Set<string>();
-    }, [availableRuns, selectedRunId, selectedPrecisions]);
+    }, [availableRuns, selectedRunId, selectedPrecisions, selectedSequence]);
 
     // --- Data Processing ---
     const groupedData = useMemo(

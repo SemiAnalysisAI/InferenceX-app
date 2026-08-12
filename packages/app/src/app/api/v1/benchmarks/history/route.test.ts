@@ -78,13 +78,7 @@ describe('GET /api/v1/benchmarks/history', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual(mockRows);
-    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith(
-      'mock-sql',
-      ['dsr1'],
-      1024,
-      1024,
-      undefined,
-    );
+    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', ['dsr1'], 1024, 1024);
   });
 
   it('returns agentic history without numeric sequence lengths', async () => {
@@ -105,12 +99,15 @@ describe('GET /api/v1/benchmarks/history', () => {
     );
   });
 
-  it('rejects unsupported benchmark types', async () => {
+  it('preserves fixed-sequence behavior when benchmarkType=single_turn is supplied', async () => {
+    mockGetAllBenchmarksForHistory.mockResolvedValueOnce([]);
     const res = await GET(
-      req('/api/v1/benchmarks/history?model=DeepSeek-R1-0528&benchmarkType=single_turn'),
+      req(
+        '/api/v1/benchmarks/history?model=DeepSeek-R1-0528&isl=1024&osl=1024&benchmarkType=single_turn',
+      ),
     );
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: 'Unsupported benchmarkType' });
+    expect(res.status).toBe(200);
+    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', ['dsr1'], 1024, 1024);
   });
 
   it('returns 500 when query throws', async () => {
@@ -133,12 +130,6 @@ describe('GET /api/v1/benchmarks/history', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual([]);
-    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith(
-      'mock-sql',
-      ['dsr1'],
-      1024,
-      8192,
-      undefined,
-    );
+    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', ['dsr1'], 1024, 8192);
   });
 });

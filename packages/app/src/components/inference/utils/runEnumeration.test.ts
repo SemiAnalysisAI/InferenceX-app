@@ -16,7 +16,6 @@ function rc(over: Partial<RunConfigRow>): RunConfigRow {
     framework: 'vllm',
     spec_method: 'none',
     disagg: false,
-    benchmark_type: 'single_turn',
     ...over,
   };
 }
@@ -25,6 +24,7 @@ const SCOPE = {
   modelDbKeys: ['minimaxm3'],
   selectedGPUs: ['mi300x_vllm'],
   selectedPrecisions: ['fp8'],
+  benchmarkType: 'single_turn' as const,
 };
 
 describe('dataRunsForDate', () => {
@@ -69,10 +69,10 @@ describe('dataRunsForDate', () => {
 
   it('maps agentic MTP and non-MTP run coverage to one GPU series', () => {
     const rows = [
-      rc({ github_run_id: 1, spec_method: 'none', benchmark_type: 'agentic_traces' }),
-      rc({ github_run_id: 2, spec_method: 'mtp', benchmark_type: 'agentic_traces' }),
+      rc({ github_run_id: 1, spec_method: 'none' }),
+      rc({ github_run_id: 2, spec_method: 'mtp' }),
     ];
-    const runs = dataRunsForDate(rows, SCOPE);
+    const runs = dataRunsForDate(rows, { ...SCOPE, benchmarkType: 'agentic_traces' });
     expect(runs.map((r) => r.runId)).toEqual(['1', '2']);
   });
 

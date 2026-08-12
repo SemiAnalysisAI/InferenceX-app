@@ -16,7 +16,7 @@ export const getCachedBenchmarks = cachedQuery(
 
     return getLatestBenchmarks(getDb(), dbModelKeys);
   },
-  'benchmarks',
+  'benchmarks-agentic-run-metadata',
   { blobOnly: true },
 );
 
@@ -28,6 +28,6 @@ export const getCachedBenchmarksAsOf = cachedQuery(
 
     return getLatestBenchmarks(getDb(), dbModelKeys, date);
   },
-  'benchmarks-as-of',
+  'benchmarks-as-of-agentic-run-metadata',
   { blobOnly: true },
 );

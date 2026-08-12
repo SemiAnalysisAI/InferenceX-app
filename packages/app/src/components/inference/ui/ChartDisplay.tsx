@@ -43,7 +43,7 @@ import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import {
   type Model,
   type Precision,
-  type Sequence,
+  Sequence,
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
@@ -218,12 +218,21 @@ export default function ChartDisplay() {
     setSelectedXAxisMode,
     quickFilters,
   } = useInference();
+  const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
+    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
+  const workflowInfoBenchmarkType =
+    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined;
 
   const {
     changelogs,
     loading: changelogsLoading,
     totalDatesQueried,
-  } = useComparisonChangelogs(selectedGPUs, selectedDateRange, dateRangeAvailableDates);
+  } = useComparisonChangelogs(
+    selectedGPUs,
+    selectedDateRange,
+    dateRangeAvailableDates,
+    workflowInfoBenchmarkType,
+  );
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -232,7 +241,6 @@ export default function ChartDisplay() {
     () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
     [selectedModel],
   );
-
   // Stable run numbering shared by the changelog and the chart legend: each of a
   // date's runs gets a fixed 1-based number (by start time) regardless of which
   // are on the chart, so the two surfaces always show the same #N for a run and a
@@ -241,14 +249,17 @@ export default function ChartDisplay() {
   const runNumbering = useMemo(() => {
     const map = new Map<string, number>();
     for (const c of changelogs) {
-      dataRunsForDate(c.runConfigs, { modelDbKeys, selectedGPUs, selectedPrecisions }).forEach(
-        (run, idx) => {
-          map.set(makeRunComparisonEntry(c.date, run.runId), idx + 1);
-        },
-      );
+      dataRunsForDate(c.runConfigs, {
+        modelDbKeys,
+        selectedGPUs,
+        selectedPrecisions,
+        benchmarkType: selectedBenchmarkType,
+      }).forEach((run, idx) => {
+        map.set(makeRunComparisonEntry(c.date, run.runId), idx + 1);
+      });
     }
     return map;
-  }, [changelogs, modelDbKeys, selectedGPUs, selectedPrecisions]);
+  }, [changelogs, modelDbKeys, selectedGPUs, selectedPrecisions, selectedBenchmarkType]);
 
   // Expand a plain-date selection into one entry per run once that date's runs are
   // known. Picking a date that has multiple runs shows each run as its own series
@@ -257,7 +268,12 @@ export default function ChartDisplay() {
   // in sync. Idempotent: after expansion no expandable plain date remains.
   useEffect(() => {
     const runConfigsByDate = new Map(changelogs.map((c) => [c.date, c.runConfigs]));
-    const scope = { modelDbKeys, selectedGPUs, selectedPrecisions };
+    const scope = {
+      modelDbKeys,
+      selectedGPUs,
+      selectedPrecisions,
+      benchmarkType: selectedBenchmarkType,
+    };
     setSelectedDatesFromRunExpansion((prev) => {
       let changed = false;
       const out: string[] = [];
@@ -283,6 +299,7 @@ export default function ChartDisplay() {
     modelDbKeys,
     selectedGPUs,
     selectedPrecisions,
+    selectedBenchmarkType,
     selectedDates,
     setSelectedDatesFromRunExpansion,
   ]);
@@ -998,6 +1015,7 @@ export default function ChartDisplay() {
                 selectedGPUs={selectedGPUs}
                 selectedPrecisions={selectedPrecisions}
                 modelDbKeys={modelDbKeys}
+                selectedSequence={selectedSequence}
                 loading={changelogsLoading}
                 totalDatesQueried={totalDatesQueried}
                 selectedDates={selectedDates}
