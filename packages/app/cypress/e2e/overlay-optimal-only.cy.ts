@@ -25,13 +25,13 @@ describe('Overlay points follow canonical Optimal Only policy (agentic interacti
       },
     });
     cy.wait('@unofficialRun');
+    // Interactivity is nested under the Advanced menu on agentic charts.
+    cy.get('[data-testid="x-axis-mode-advanced"]').click();
     cy.get('[data-testid="x-axis-mode-interactivity"]').click();
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
-    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
-      'have.attr',
-      'aria-selected',
-      'true',
-    );
+    cy.get('[data-testid="x-axis-mode-advanced"]')
+      .should('have.attr', 'data-state', 'active')
+      .and('contain.text', 'Interactivity');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'have.length',
       REAL_CONFIGS.length,
