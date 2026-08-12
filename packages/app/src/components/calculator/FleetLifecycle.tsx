@@ -107,6 +107,8 @@ const STRINGS = {
       'These chips have run history for this scenario but were never measured at the target interactivity, so no honest number exists for them. Their measured ranges:',
     unmeasuredRange: (min: number, max: number, dates: number) =>
       `measured ${min.toFixed(1)}–${max.toFixed(1)} tok/s/user across ${dates} run ${dates === 1 ? 'date' : 'dates'}`,
+    unplottable: (chips: string) =>
+      `No fleet could be sized for ${chips} at this power budget — the chip has no registered power figure, or its measured throughput sizes to nothing. Listed rather than dropped so the chart is never quietly missing a chip.`,
     note: 'Note:',
     disagg:
       ' Disaggregated inference configurations report throughput per decode chip or per prefill chip rather than per total chip, so a step won by a disaggregated config is not sized on quite the same basis as one won by an aggregated config. Both compete for the same line, since the question is what the silicon can be made to do — and the config named on each step says which kind won it.',
@@ -179,6 +181,8 @@ const STRINGS = {
       '以下 Chip 在该场景下有运行历史，但从未在目标交互性下被实测，因此无法给出可靠数值。其实测区间：',
     unmeasuredRange: (min: number, max: number, dates: number) =>
       `实测区间 ${min.toFixed(1)}–${max.toFixed(1)} tok/s/user，共 ${dates} 个运行日期`,
+    unplottable: (chips: string) =>
+      `在该功率预算下无法为 ${chips} 组建集群——该 Chip 缺少已登记的功耗数据，或其实测吞吐无法组成任何规模。此处列出而非直接剔除，以免图表静默遗漏 Chip。`,
     note: '注意：',
     disagg:
       '解耦推理配置按解码 Chip 或预填充 Chip 报告吞吐量，而非按 Chip 总数，因此其集群规模、成本与利润和聚合配置并非同类比较。因此由解耦配置取得的台阶与由聚合配置取得的台阶在集群规模基准上并不完全一致。两者均可竞争同一 Chip 的曲线——每一级台阶标注的配置即说明其类型。',
@@ -406,9 +410,14 @@ export default function FleetLifecycle({
    * fleet cost. Chip count and $/chip/hr do not move when a config improves, so
    * cost is computed once from the opening rung.
    */
-  const fleets = useMemo(() => {
-    if (!mw || !Number.isFinite(anchorMs)) return [];
-    return visibleProgressions.flatMap((progression) => {
+  const { fleets, unplottable } = useMemo(() => {
+    if (!mw || !Number.isFinite(anchorMs)) return { fleets: [], unplottable: [] };
+    // Chips that survived selection but cannot be turned into a fleet — no
+    // registered power figure for the base GPU, or a throughput that sizes to
+    // nothing. They are named below rather than dropped: a chip that is in the
+    // legend and in no row, with no explanation, reads as a bug in the data.
+    const absent: string[] = [];
+    const sized = visibleProgressions.flatMap((progression) => {
       // Power and $/chip/hr come from the base GPU, so they are identical across
       // the hwKeys pooled into this line — which is what keeps cost flat even
       // though the winning config changes.
@@ -422,7 +431,10 @@ export default function FleetLifecycle({
           powerKwPerGpu: specs.power,
           costPerGpuHour: specs[costProvider],
           tputPerGpu: getThroughputForType(step.result, costType),
-          outputTputPerGpu: step.result.outputTputValue,
+          // Through the accessor even though this one is always the output rate:
+          // the cost-matrix rule exists so every throughput read goes through one
+          // chokepoint, and a direct field read silently diverges if it gains logic.
+          outputTputPerGpu: getThroughputForType(step.result, 'output'),
           interactivity: targetValue,
         });
         if (!stats) continue;
@@ -433,9 +445,13 @@ export default function FleetLifecycle({
         });
       }
 
-      if (steps.length === 0 || costPerHour === null) return [];
+      if (steps.length === 0 || costPerHour === null) {
+        absent.push(progression.baseGpu);
+        return [];
+      }
       return [{ progression, steps, costPerHour }];
     });
+    return { fleets: sized, unplottable: absent };
   }, [mw, anchorMs, visibleProgressions, costProvider, costType, targetValue]);
 
   // Interrupts sell fewer tokens off the same racks, so they raise break-even.
@@ -857,6 +873,16 @@ export default function FleetLifecycle({
               ))}
             </ul>
           </div>
+        )}
+
+        {unplottable.length > 0 && (
+          <p
+            className="text-muted-foreground text-xs"
+            data-testid="calculator-lifecycle-unplottable"
+          >
+            <strong>{t.note}</strong>{' '}
+            {t.unplottable(unplottable.map((gpu) => getLabel(gpu, hardwareConfig)).join(', '))}
+          </p>
         )}
 
         {!releaseDate && rows.length > 0 && (
