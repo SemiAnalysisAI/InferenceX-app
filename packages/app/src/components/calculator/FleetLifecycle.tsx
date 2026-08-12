@@ -11,6 +11,7 @@ import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { track } from '@/lib/analytics';
 import { getGpuSpecs, getHardwareConfig } from '@/lib/constants';
@@ -20,7 +21,10 @@ import { useLocale } from '@/lib/use-locale';
 import { getDisplayLabel } from '@/lib/utils';
 
 import { computeFleetStats, formatCompact } from './fleet';
-import FleetLifecycleChart, { type LifecycleChartSeries } from './FleetLifecycleChart';
+import FleetLifecycleChart, {
+  type LifecycleChartSeries,
+  type LifecycleMetric,
+} from './FleetLifecycleChart';
 import { mergeProgressionsByChip, type ChipProgression } from './historical-best';
 import {
   breakEvenPricePerMTok,
@@ -109,7 +113,13 @@ const STRINGS = {
       " One line per chip, not per software config: at any moment it follows whichever framework, precision and speculative-decoding combination was ahead, so the config serving the fleet changes along the line and each step names the one that took over. Legend entries still filter configs, which removes them from candidacy. Each step is a measured run date whose interpolated throughput at the target beat every earlier date; a sweep that failed to beat the incumbent is not a step, because the fleet kept serving the config it already had. A config does not take effect the instant a sweep finds it, so each one rolls out over the ramp window, climbing from what the fleet already served to its own numbers. Power and $/chip/hr are today's values from the TCO model, and cost is flat throughout because no config moves either term — it is the same silicon either way. Reads outside a run's measured interactivity range are excluded rather than clamped.",
     overlayExempt:
       ' Unofficial runs loaded via a run link are not shown here — the run-history API serves ingested official results only.',
+    metricLabel: 'Y Axis',
+    metricTooltip:
+      'Which per-day rate to plot. Margin is revenue minus the flat fleet cost, so the break-even rule shows which side of it a fleet is on. Revenue drops the cost term, which makes the rollouts easier to compare across chips of very different cost — but a chip being higher no longer means it is more profitable.',
+    metricMargin: 'Margin',
+    metricRevenue: 'Revenue',
     chartY: 'Margin ($/day)',
+    chartYRevenue: 'Revenue ($/day)',
     chartBreakEven: 'break-even',
     tipDate: 'Measured',
     tipConfig: 'Config',
@@ -175,7 +185,13 @@ const STRINGS = {
       '每个 Chip 一条曲线，而非每个软件配置一条：曲线在任一时刻都跟随当时领先的框架、精度与投机解码组合，因此服务集群的配置会沿曲线变化，每一级台阶都标注接管的配置。图例项仍可筛选配置，被隐藏的配置将不参与竞争。每一级台阶都是一个实测运行日期，其在目标交互性下的插值吞吐量优于此前所有日期；未能超越现有配置的扫描不构成台阶，因为集群仍在运行原有配置。配置不会在扫描发现的瞬间生效，因此每个配置都会在推广期内从集群当前已提供的水平爬升至其自身水平。功率与 $/chip/hr 为 TCO 模型的当前值，成本在整个期间保持水平，因为任何配置都不会改变这两项——两种情况下都是同一款芯片。超出某次运行实测交互性区间的结果会被排除而非钳制。',
     overlayExempt:
       '通过运行链接加载的非官方运行不会显示在此——运行历史 API 仅提供已入库的官方结果。',
+    metricLabel: 'Y 轴',
+    metricTooltip:
+      '选择绘制哪一项日均指标。利润为收入减去水平的集群成本，因此保本线可显示集群位于其哪一侧。收入则不计成本项，便于在成本差异很大的 Chip 之间比较推广曲线——但此时位置更高并不代表更赚钱。',
+    metricMargin: '利润',
+    metricRevenue: '收入',
     chartY: '利润 ($/天)',
+    chartYRevenue: '收入 ($/天)',
     chartBreakEven: '保本线',
     tipDate: '实测于',
     tipConfig: '配置',
@@ -318,6 +334,9 @@ export default function FleetLifecycle({
   // over: a fixed 60-month default spends most of the axis on a flat tail
   // projecting the last config forward, which carries no information.
   const horizonEdited = useRef(Boolean(readUrlParams().c_life));
+  const [yMetric, setYMetric] = useState<LifecycleMetric>(() =>
+    readUrlParams().c_ly === 'revenue' ? 'revenue' : 'margin',
+  );
   const [priceInput, setPriceInput] = useState(() => readUrlParams().c_price ?? '');
   // A price arriving from the URL is the user's, so it must not be overwritten
   // by the break-even default.
@@ -521,6 +540,12 @@ export default function FleetLifecycle({
       },
     [],
   );
+
+  const handleMetricChange = useCallback((value: LifecycleMetric) => {
+    setYMetric(value);
+    writeUrlParams({ c_ly: value === 'margin' ? '' : value });
+    track('calculator_lifecycle_metric_set', { value });
+  }, []);
 
   const handlePriceChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
@@ -739,6 +764,23 @@ export default function FleetLifecycle({
               )}
             </div>
           </div>
+          <div className="flex flex-col space-y-1.5">
+            <LabelWithTooltip label={t.metricLabel} tooltip={t.metricTooltip} />
+            <SegmentedToggle<LifecycleMetric>
+              value={yMetric}
+              onValueChange={handleMetricChange}
+              ariaLabel={t.metricLabel}
+              testId="calc-lifecycle-metric"
+              options={[
+                { value: 'margin', label: t.metricMargin, testId: 'calc-lifecycle-metric-margin' },
+                {
+                  value: 'revenue',
+                  label: t.metricRevenue,
+                  testId: 'calc-lifecycle-metric-revenue',
+                },
+              ]}
+            />
+          </div>
           {assumptionInputs.map((input) => (
             <div key={input.id} className="flex flex-col space-y-1.5">
               <LabelWithTooltip htmlFor={input.id} label={input.label} tooltip={input.tooltip} />
@@ -766,8 +808,9 @@ export default function FleetLifecycle({
             />
             <FleetLifecycleChart
               data={chartData}
+              metric={yMetric}
               anchorMs={anchorMs}
-              yLabel={t.chartY}
+              yLabel={yMetric === 'revenue' ? t.chartYRevenue : t.chartY}
               breakEvenLabel={t.chartBreakEven}
               labels={{
                 date: t.tipDate,

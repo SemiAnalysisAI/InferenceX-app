@@ -31,8 +31,12 @@ interface StepMarker {
   month: number;
 }
 
+/** Which per-day rate the y axis plots. */
+export type LifecycleMetric = 'margin' | 'revenue';
+
 interface FleetLifecycleChartProps {
   data: LifecycleChartSeries[];
+  metric: LifecycleMetric;
   /** Anchor for the x axis — the model's release date, as a timestamp. */
   anchorMs: number;
   yLabel: string;
@@ -61,6 +65,7 @@ const money = (value: number) => `${value < 0 ? '-$' : '$'}${formatLargeNumber(M
 const FleetLifecycleChart = React.memo(
   ({
     data,
+    metric,
     anchorMs,
     yLabel,
     labels,
@@ -69,6 +74,10 @@ const FleetLifecycleChart = React.memo(
     caption,
   }: FleetLifecycleChartProps) => {
     const toMs = useCallback((month: number) => anchorMs + month * MS_PER_MONTH, [anchorMs]);
+    const valueOf = useCallback(
+      (point: LifecyclePoint) => (metric === 'revenue' ? point.revenue : point.margin),
+      [metric],
+    );
 
     const { lineDataRecord, markers, bySafeKey } = useMemo(() => {
       const record: Record<string, { x: number; y: number }[]> = {};
@@ -78,14 +87,14 @@ const FleetLifecycleChart = React.memo(
       for (const entry of data) {
         const key = safeKey(entry.key);
         lookup.set(key, entry);
-        record[key] = entry.series.points.map((p) => ({ x: toMs(p.month), y: p.margin }));
+        record[key] = entry.series.points.map((p) => ({ x: toMs(p.month), y: valueOf(p) }));
         // Markers mark measured config changes and nothing else — no rug of
         // synthetic samples, and every dot is a sweep the user can look up.
         for (const p of entry.series.points) {
           if (!p.isStep) continue;
           flat.push({
             x: toMs(p.month),
-            y: p.margin,
+            y: valueOf(p),
             precision: 'fp4',
             seriesKey: key,
             month: p.month,
@@ -93,7 +102,7 @@ const FleetLifecycleChart = React.memo(
         }
       }
       return { lineDataRecord: record, markers: flat, bySafeKey: lookup };
-    }, [data, toMs]);
+    }, [data, toMs, valueOf]);
 
     const xScaleConfig = useMemo<ScaleConfig>(() => {
       let min = Infinity;
@@ -114,14 +123,16 @@ const FleetLifecycleChart = React.memo(
       let max = 0;
       for (const entry of data) {
         for (const p of entry.series.points) {
-          if (p.margin < min) min = p.margin;
-          if (p.margin > max) max = p.margin;
+          const value = valueOf(p);
+          if (value < min) min = value;
+          if (value > max) max = value;
         }
       }
-      // Always include zero: the chart is about which side of it you are on.
+      // Always include zero. For margin that is the whole question — which side of
+      // break-even a fleet is on; for revenue it is the floor a rollout starts from.
       const span = max - min || Math.max(Math.abs(max), 1);
       return { type: 'linear', domain: [min - span * 0.05, max + span * 0.05], nice: true };
-    }, [data]);
+    }, [data, valueOf]);
 
     /**
      * The break-even rule. No reference-line layer exists to reuse, and a custom
@@ -133,6 +144,10 @@ const FleetLifecycleChart = React.memo(
       (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) => {
         const y = (ctx.yScale as d3.ScaleLinear<number, number>)(0);
         zoomGroup.selectAll('.lifecycle-zero-rule').remove();
+        // Zero is break-even only for margin. On a revenue axis it is just the
+        // bottom of the scale, and labelling it "break-even" would be a lie: each
+        // chip breaks even at its own cost line, not at zero revenue.
+        if (metric !== 'margin') return;
         if (!Number.isFinite(y)) return;
 
         const group = zoomGroup.append('g').attr('class', 'lifecycle-zero-rule');
@@ -156,7 +171,7 @@ const FleetLifecycleChart = React.memo(
           .attr('font-size', 10)
           .text(breakEvenLabel);
       },
-      [breakEvenLabel],
+      [breakEvenLabel, metric],
     );
 
     const layers = useMemo(
@@ -203,8 +218,15 @@ const FleetLifecycleChart = React.memo(
             <div class="font-semibold mb-1" style="color: ${escapeHtml(entry.color)}">${escapeHtml(entry.label)}</div>
             <div class="text-muted-foreground">${escapeHtml(labels.date)}: ${escapeHtml(info?.date ?? '')}</div>
             ${info?.config ? `<div class="text-muted-foreground">${escapeHtml(labels.config)}: ${escapeHtml(info.config)}</div>` : ''}
-            <div class="mt-1 font-medium">${escapeHtml(labels.marginPerDay)}: ${money(point.margin)}</div>
-            <div class="text-muted-foreground">${escapeHtml(labels.revenuePerDay)}: ${money(point.revenue)}</div>
+            ${
+              // Lead with whichever rate the axis is plotting; the other two stay
+              // as context so the tooltip never depends on the axis to be read.
+              metric === 'revenue'
+                ? `<div class="mt-1 font-medium">${escapeHtml(labels.revenuePerDay)}: ${money(point.revenue)}</div>
+            <div class="text-muted-foreground">${escapeHtml(labels.marginPerDay)}: ${money(point.margin)}</div>`
+                : `<div class="mt-1 font-medium">${escapeHtml(labels.marginPerDay)}: ${money(point.margin)}</div>
+            <div class="text-muted-foreground">${escapeHtml(labels.revenuePerDay)}: ${money(point.revenue)}</div>`
+            }
             <div class="text-muted-foreground">${escapeHtml(labels.costPerDay)}: ${money(point.cost)}</div>
             <div class="mt-1">${escapeHtml(labels.cumulative)}: ${money(point.cumulative)}</div>
             ${factor ? `<div class="text-muted-foreground">${escapeHtml(labels.sinceFirst)}:${escapeHtml(factor)}</div>` : ''}
@@ -214,7 +236,7 @@ const FleetLifecycleChart = React.memo(
         getRulerY: (d: StepMarker, yScale: any) => yScale(d.y),
         attachToLayer: 2,
       }),
-      [bySafeKey, labels],
+      [bySafeKey, labels, metric],
     );
 
     const xAxisConfig = useMemo(

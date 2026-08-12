@@ -73,10 +73,12 @@ const URL_STATE_KEYS = [
   // Calculator (fleet planner)
   'c_mw',
   'c_costcap',
-  // Calculator (fleet lifecycle) — token price plus the ramp/interrupt/horizon
-  // assumptions. The throughput steps are measured; these four are not.
+  // Calculator (fleet lifecycle) — token price and the ramp/interrupt/horizon
+  // assumptions (the throughput steps are measured; those four are not), plus
+  // which metric the chart plots.
   'c_price',
   'c_ramp',
+  'c_ly',
   'c_mtbi',
   'c_rec',
   'c_life',
@@ -150,6 +152,8 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   // stripped from share links and silently re-derived on load.
   c_price: '',
   c_life: '',
+  // Empty means the default y metric (margin).
+  c_ly: '',
   c_ramp: '3',
   c_mtbi: '24',
   c_rec: '12',

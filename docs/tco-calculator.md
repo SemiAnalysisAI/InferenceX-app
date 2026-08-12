@@ -337,6 +337,26 @@ before appending. The chart re-renders into the same zoom group, so appending
 unconditionally leaves a stale rule and a duplicate "break-even" label behind at
 the previous y-scale on every data change.
 
+### Y-axis selector (margin / revenue)
+
+`c_ly` switches the chart between margin/day (default) and revenue/day. The table
+is unchanged — it already carries both columns — so this only affects the plot.
+
+Two things move with it, and both matter for honesty:
+
+- **The break-even rule is drawn only for margin.** Zero is break-even on a margin
+  axis; on a revenue axis it is just the bottom of the scale, and each chip breaks
+  even at its **own** cost line rather than at zero revenue. Labelling the zero
+  gridline "break-even" there would be false, so `renderZeroRule` returns early.
+  Per-chip cost rules would be the honest equivalent but add one horizontal line
+  per series, which is why they are not drawn.
+- **The tooltip leads with whichever rate is plotted**, and still lists all three
+  (revenue, margin, cost), so it never depends on the axis to be read.
+
+Revenue mode is for comparing rollout _shapes_ across chips whose costs differ a
+lot; a chip sitting higher there does not mean it is more profitable. The control's
+tooltip says so.
+
 ### One line layer, interpolated linearly
 
 Because every riser is now a sampled rollout curve and every plateau is flat, the
@@ -429,7 +449,7 @@ exclusion in its own note rather than leaving a silent gap.
 
 ### URL params
 
-`c_price`, `c_life` (horizon), `c_ramp`, `c_mtbi`, `c_rec`. The first two default to
+`c_price`, `c_life` (horizon), `c_ramp`, `c_mtbi`, `c_rec`, `c_ly` (y-axis metric). The first two default to
 `''` in `PARAM_DEFAULTS` because their real defaults are derived, not constant — see
 the comment there. The MW budget is
 `c_mw`, owned by `ThroughputCalculatorDisplay` and passed to both the fleet

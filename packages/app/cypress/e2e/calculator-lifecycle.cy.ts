@@ -17,6 +17,9 @@ import { unlockAgenticGate } from '../support/e2e';
 const firstRowCell = (index: number) =>
   cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').first().find('td').eq(index);
 
+/** All text in the chart SVG, including the axis labels. */
+const chartText = () => cy.get('[data-testid="calculator-lifecycle-chart-svg"]').invoke('text');
+
 /** Vertex count of the first plotted line — a sampled rollout curve has many. */
 const lineVertices = () =>
   cy
@@ -110,6 +113,29 @@ describe('Calculator — Fleet Lifecycle', () => {
       0,
     );
     // The break-even rule is what makes the sign of the margin readable.
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should('exist');
+  });
+
+  it('switches the y axis between margin and revenue', () => {
+    chartText().should('contain', 'Margin ($/day)');
+    // Break-even is meaningful on a margin axis, so the rule is drawn.
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should('exist');
+
+    cy.get('[data-testid="calc-lifecycle-metric-revenue"]').click();
+    chartText().should('contain', 'Revenue ($/day)');
+    // Zero is not break-even on a revenue axis — each chip breaks even at its own
+    // cost line — so the rule must not be drawn claiming otherwise.
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should(
+      'not.exist',
+    );
+    // Revenue drops the cost term, so nothing plotted can be negative.
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .y-axis').should(
+      'not.contain.text',
+      '-$',
+    );
+
+    cy.get('[data-testid="calc-lifecycle-metric-margin"]').click();
+    chartText().should('contain', 'Margin ($/day)');
     cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should('exist');
   });
 
