@@ -7,6 +7,8 @@ import {
   hermiteInterpolate,
   monotoneSlopes,
   paretoFrontUpperLeft,
+  recoverReciprocalNumerator,
+  reciprocalMetricAt,
 } from '@/components/calculator/useThroughputData';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { getHardwareKey } from '@/lib/chart-utils';
@@ -94,6 +96,34 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
 }
 
 /**
+ * Metrics defined as a per-chip constant divided by a throughput, mapped to the
+ * throughput metric they divide. These are interpolated by splining that
+ * throughput and re-deriving, never by splining the metric independently, so
+ * the interpolated pair preserves `metric x throughput = constant`. See
+ * `recoverReciprocalNumerator` and docs/tco-calculator.md.
+ *
+ * The `measured*` energy keys are deliberately absent: their numerator is
+ * measured per point rather than a constant, so the identity does not hold and
+ * splining them directly remains correct.
+ */
+const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
+  // $/M tok = $/GPU-hr x 1e6 / (tok/s x 3600)
+  costh: 'tpPerGpu',
+  costn: 'tpPerGpu',
+  costr: 'tpPerGpu',
+  costhOutput: 'outputTputPerGpu',
+  costnOutput: 'outputTputPerGpu',
+  costrOutput: 'outputTputPerGpu',
+  costhi: 'inputTputPerGpu',
+  costni: 'inputTputPerGpu',
+  costri: 'inputTputPerGpu',
+  // J/token = W / (tok/s)
+  jTotal: 'tpPerGpu',
+  jOutput: 'outputTputPerGpu',
+  jInput: 'inputTputPerGpu',
+};
+
+/**
  * Interpolate a selected metric at a target interactivity for a set of InferenceData points
  * from a single GPU. Uses Pareto front (throughput-based frontier) + monotone cubic Hermite spline.
  *
@@ -139,6 +169,27 @@ export function interpolateMetricAtInteractivity(
     const v = extractMetric(p, metricKey);
     if (v === null) return null;
     metricYs.push(v);
+  }
+
+  // Cost and energy per token are `constant / throughput`. Spline that
+  // throughput and re-derive rather than splining the metric, so the value
+  // agrees with the per-point figures on the inference chart.
+  const throughputKey = RECIPROCAL_OF_THROUGHPUT[metricKey];
+  if (throughputKey) {
+    const tputYs: number[] = [];
+    for (const p of sorted) {
+      const v = extractMetric(p, throughputKey);
+      if (v === null) return null;
+      tputYs.push(v);
+    }
+    const numerator = recoverReciprocalNumerator(metricYs, tputYs);
+    // null means these points do not obey the identity — fall through and spline
+    // the metric directly rather than rewrite it from one point's ratio.
+    if (numerator !== null) {
+      const tputSlopes = monotoneSlopes(xs, tputYs);
+      const tput = hermiteInterpolate(xs, tputYs, tputSlopes, targetInteractivity);
+      return reciprocalMetricAt(numerator, Math.max(0, tput));
+    }
   }
 
   // Monotone cubic Hermite spline interpolation

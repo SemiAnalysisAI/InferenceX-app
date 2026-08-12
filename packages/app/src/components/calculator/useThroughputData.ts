@@ -20,6 +20,8 @@ import {
   maxInteractivityAtCost,
   monotoneSlopes,
   paretoFrontUpperLeft,
+  reciprocalMetricAt,
+  recoverReciprocalNumerator,
   sign,
 } from './interpolation';
 import { restrictAgenticPointsToE2eFrontier } from '@/lib/agentic-frontier';
@@ -33,6 +35,8 @@ export {
   maxInteractivityAtCost,
   monotoneSlopes,
   paretoFrontUpperLeft,
+  reciprocalMetricAt,
+  recoverReciprocalNumerator,
   sign,
 };
 
