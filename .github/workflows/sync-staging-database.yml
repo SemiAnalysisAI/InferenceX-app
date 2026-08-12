@@ -1,0 +1,130 @@
+name: Sync staging database
+
+on:
+  # GitHub cron has no true "every N days" interval: */3 in day-of-month
+  # restarts at each month boundary. Run daily at 04:00 Central and use the
+  # preflight job's epoch-day guard to keep an exact three-calendar-day cadence.
+  schedule:
+    - cron: '0 4 * * *'
+      timezone: America/Chicago
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: staging-database-maintenance
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Check three-day cadence
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      should-sync: ${{ steps.cadence.outputs.should-sync }}
+    steps:
+      - name: Check schedule
+        id: cadence
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "should-sync=true" >> "$GITHUB_OUTPUT"
+            echo "Manual run requested; bypassing the cadence guard."
+            exit 0
+          fi
+
+          epoch_day=$(( $(date -u +%s) / 86400 ))
+          if (( epoch_day % 3 == 0 )); then
+            echo "should-sync=true" >> "$GITHUB_OUTPUT"
+            echo "This is a scheduled sync day."
+          else
+            echo "should-sync=false" >> "$GITHUB_OUTPUT"
+            echo "Not a scheduled sync day; the next daily trigger will check again."
+          fi
+
+  sync:
+    name: Restore staging from production
+    needs: preflight
+    if: needs.preflight.outputs.should-sync == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions: {}
+    steps:
+      - name: Restore staging from production head
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "::error::NEON_API_KEY and NEON_PROJECT_ID are required"
+            exit 1
+          fi
+
+          api="https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID"
+          branches=$(curl --retry 3 --retry-all-errors -sSf \
+            -H "Authorization: Bearer $NEON_API_KEY" \
+            "$api/branches?limit=100")
+          production_branch_id=$(jq -r '.branches[] | select(.default == true) | .id' <<<"$branches" | head -n 1)
+          staging_branch_id=$(jq -r '.branches[] | select(.name == "staging") | .id' <<<"$branches" | head -n 1)
+
+          if [ -z "$production_branch_id" ] || [ "$production_branch_id" = "null" ]; then
+            echo "::error::Neon default production branch was not found"
+            exit 1
+          fi
+          if [ -z "$staging_branch_id" ] || [ "$staging_branch_id" = "null" ]; then
+            echo "::error::Neon branch named staging was not found"
+            exit 1
+          fi
+          if [ "$production_branch_id" = "$staging_branch_id" ]; then
+            echo "::error::Refusing to restore the production branch"
+            exit 1
+          fi
+
+          payload=$(jq -cn \
+            --arg source_branch_id "$production_branch_id" \
+            '{source_branch_id: $source_branch_id}')
+          # Do not automatically retry this non-idempotent restore request. If
+          # the response is lost, another POST could start a second restore.
+          curl -sSf -X POST \
+            -H "Authorization: Bearer $NEON_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "$api/branches/$staging_branch_id/restore" >/dev/null
+
+          for attempt in $(seq 1 60); do
+            branch=$(curl --retry 3 --retry-all-errors -sSf \
+              -H "Authorization: Bearer $NEON_API_KEY" \
+              "$api/branches/$staging_branch_id")
+            state=$(jq -r '.branch.current_state' <<<"$branch")
+            pending=$(jq -r '.branch.pending_state // empty' <<<"$branch")
+            if [ "$state" = "ready" ] && [ -z "$pending" ]; then
+              echo "Neon staging branch is synced and ready."
+              exit 0
+            fi
+            echo "Waiting for Neon staging branch (state=$state, pending=${pending:-none}, attempt=$attempt/60)"
+            sleep 10
+          done
+
+          echo "::error::Timed out waiting for the Neon staging branch restore"
+          exit 1
+
+      - name: Invalidate staging cache
+        env:
+          STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL }}
+          VERCEL_STAGING_BYPASS_SECRET: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$STAGING_SITE_URL" ] || [ -z "$VERCEL_STAGING_BYPASS_SECRET" ]; then
+            echo "::error::STAGING_SITE_URL and VERCEL_STAGING_BYPASS_SECRET are required"
+            exit 1
+          fi
+
+          curl --retry 3 --retry-all-errors -sSf -X POST \
+            "${STAGING_SITE_URL%/}/api/v1/invalidate" \
+            -H "x-vercel-protection-bypass: $VERCEL_STAGING_BYPASS_SECRET"
