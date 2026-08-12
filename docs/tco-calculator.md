@@ -374,6 +374,26 @@ first — one of the two segments just vanishes. Before adding a second layer of
 existing type to a `D3Chart`, remember that the shared render group makes layer keys
 non-isolating; a `type:'custom'` layer with its own class is the way out.
 
+### End-of-line chip labels
+
+Each line is named by its chip at its right end, in the line's own colour, so a
+series can be identified without crossing back to the sidebar legend. Two details
+matter:
+
+- The labels sit **past the plot width** (`x = width + 6`, with `CHART_MARGIN.right`
+  widened to hold them), and `clipContent` defaults to true — layers render into a
+  clipped zoom group, which would erase them entirely. They are drawn into
+  `ctx.layout.g`, the unclipped parent, instead.
+- End values cluster, so labels are placed by a greedy pass that pushes each label
+  down to keep `LABEL_MIN_GAP`, then slides the whole block up if it has run off the
+  bottom. A line ending at the very top or (after a zoom) outside the visible range
+  is pinned to the nearest edge rather than allowed to escape the SVG.
+
+Both the labels and the break-even rule are `type:'custom'` layers, and **both
+declare `onZoom` as well as `render`**. A custom layer without `onZoom` stays pinned
+to the base scales while the lines move, so a zoomed chart shows break-even — or a
+chip's name — at the wrong height.
+
 ### Token price defaults to break-even
 
 Break-even is per-chip, so a single global price input needs one anchor: the

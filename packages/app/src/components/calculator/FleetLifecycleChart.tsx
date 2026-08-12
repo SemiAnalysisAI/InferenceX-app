@@ -10,7 +10,18 @@ import { escapeHtml } from '@/lib/utils';
 
 import type { LifecyclePoint, LifecycleSeries } from './lifecycle';
 
-const CHART_MARGIN = { top: 20, right: 40, bottom: 50, left: 70 };
+// Right margin holds the end-of-line chip labels, which sit outside the plot.
+const CHART_MARGIN = { top: 20, right: 104, bottom: 50, left: 70 };
+
+/** Minimum vertical gap between end-of-line labels, px. */
+const LABEL_MIN_GAP = 13;
+
+/**
+ * Half the label's cap height, near enough. Labels are centred on their line's
+ * end value, so a series plateauing at the very top of the domain would have
+ * half its glyphs above the SVG edge without this inset.
+ */
+const LABEL_HALF_HEIGHT = 6;
 
 /** One plotted series: an hwKey's margin staircase since the model shipped. */
 export interface LifecycleChartSeries {
@@ -140,9 +151,13 @@ const FleetLifecycleChart = React.memo(
      * appending unconditionally leaves a stale rule behind at the previous
      * y-scale on every data change.
      */
-    const renderZeroRule = useCallback(
-      (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) => {
-        const y = (ctx.yScale as d3.ScaleLinear<number, number>)(0);
+    const drawZeroRule = useCallback(
+      (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        ctx: RenderContext,
+        yScale: d3.ScaleLinear<number, number>,
+      ) => {
+        const y = yScale(0);
         zoomGroup.selectAll('.lifecycle-zero-rule').remove();
         // Zero is break-even only for margin. On a revenue axis it is just the
         // bottom of the scale, and labelling it "break-even" would be a lie: each
@@ -174,9 +189,113 @@ const FleetLifecycleChart = React.memo(
       [breakEvenLabel, metric],
     );
 
+    const renderZeroRule = useCallback(
+      (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) =>
+        drawZeroRule(zoomGroup, ctx, ctx.yScale as d3.ScaleLinear<number, number>),
+      [drawZeroRule],
+    );
+
+    // Without this the rule stays pinned to the base scale while the lines move,
+    // so a zoomed chart shows break-even in the wrong place.
+    const zoomZeroRule = useCallback(
+      (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) =>
+        drawZeroRule(
+          zoomGroup,
+          ctx,
+          ((ctx as { newYScale?: unknown }).newYScale ?? ctx.yScale) as d3.ScaleLinear<
+            number,
+            number
+          >,
+        ),
+      [drawZeroRule],
+    );
+
+    /**
+     * Chip names at the right end of each line, so a series can be identified
+     * without crossing back to the legend.
+     *
+     * Drawn into `ctx.layout.g` rather than the zoom group: layers render into a
+     * clipped group (`clipContent` defaults to true), and these sit past the plot
+     * width, so they would be clipped away entirely.
+     */
+    const drawSeriesLabels = useCallback(
+      (ctx: RenderContext, yScale: d3.ScaleLinear<number, number>) => {
+        const group = ctx.layout.g;
+        group.selectAll('.lifecycle-series-label').remove();
+
+        const placed = Object.entries(lineDataRecord)
+          .flatMap(([key, points]) => {
+            const last = points.at(-1);
+            const entry = bySafeKey.get(key);
+            if (!last || !entry) return [];
+            const y = yScale(last.y);
+            if (!Number.isFinite(y)) return [];
+            // Zooming can push a line's end value outside the visible range;
+            // pin the label to the nearest edge rather than let it escape.
+            const top = LABEL_HALF_HEIGHT;
+            const bottom = ctx.height - LABEL_HALF_HEIGHT;
+            return [
+              { label: entry.label, color: entry.color, y: Math.min(Math.max(y, top), bottom) },
+            ];
+          })
+          .toSorted((a, b) => a.y - b.y);
+
+        // Nudge downwards so near-identical end values stay legible.
+        for (let i = 1; i < placed.length; i += 1) {
+          const previous = placed[i - 1]!;
+          const current = placed[i]!;
+          if (current.y - previous.y < LABEL_MIN_GAP) current.y = previous.y + LABEL_MIN_GAP;
+        }
+
+        // Nudging only ever pushes down, so the stack can run off the bottom.
+        // Slide the whole block back up by the overflow, keeping the gaps.
+        const overflow = (placed.at(-1)?.y ?? 0) - (ctx.height - LABEL_HALF_HEIGHT);
+        if (overflow > 0) {
+          for (const entry of placed) entry.y = Math.max(entry.y - overflow, LABEL_HALF_HEIGHT);
+        }
+
+        for (const { label, color, y } of placed) {
+          group
+            .append('text')
+            .attr('class', 'lifecycle-series-label')
+            .attr('x', ctx.width + 6)
+            .attr('y', y)
+            .attr('dominant-baseline', 'middle')
+            .attr('fill', color)
+            .attr('font-size', 11)
+            .attr('font-weight', 500)
+            .text(label);
+        }
+      },
+      [lineDataRecord, bySafeKey],
+    );
+
+    const renderSeriesLabels = useCallback(
+      (_zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) =>
+        drawSeriesLabels(ctx, ctx.yScale as d3.ScaleLinear<number, number>),
+      [drawSeriesLabels],
+    );
+
+    const zoomSeriesLabels = useCallback(
+      (_zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) =>
+        drawSeriesLabels(
+          ctx,
+          ((ctx as { newYScale?: unknown }).newYScale ?? ctx.yScale) as d3.ScaleLinear<
+            number,
+            number
+          >,
+        ),
+      [drawSeriesLabels],
+    );
+
     const layers = useMemo(
       () => [
-        { type: 'custom' as const, key: 'lifecycle-zero', render: renderZeroRule },
+        {
+          type: 'custom' as const,
+          key: 'lifecycle-zero',
+          render: renderZeroRule,
+          onZoom: zoomZeroRule,
+        },
         {
           type: 'line' as const,
           key: 'lifecycle-lines',
@@ -199,8 +318,22 @@ const FleetLifecycleChart = React.memo(
             getColor: (d: StepMarker) => bySafeKey.get(d.seriesKey)?.color ?? '#888',
           },
         },
+        {
+          type: 'custom' as const,
+          key: 'lifecycle-series-labels',
+          render: renderSeriesLabels,
+          onZoom: zoomSeriesLabels,
+        },
       ],
-      [renderZeroRule, lineDataRecord, markers, bySafeKey],
+      [
+        renderZeroRule,
+        zoomZeroRule,
+        renderSeriesLabels,
+        zoomSeriesLabels,
+        lineDataRecord,
+        markers,
+        bySafeKey,
+      ],
     );
 
     const tooltipConfig = useMemo(

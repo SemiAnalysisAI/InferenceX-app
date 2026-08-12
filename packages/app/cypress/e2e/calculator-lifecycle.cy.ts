@@ -116,6 +116,24 @@ describe('Calculator — Fleet Lifecycle', () => {
     cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should('exist');
   });
 
+  it('names each line with its chip at the right edge', () => {
+    // One label per line, so a series is identifiable without the legend.
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] path.line-path').then((lines) => {
+      cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-series-label').should(
+        'have.length',
+        lines.length,
+      );
+    });
+    // The label text is a chip name, matching the table's first column.
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-series-label')
+      .first()
+      .invoke('text')
+      .should('match', /\S/u)
+      .then((label) => {
+        cy.get('[data-testid="calculator-lifecycle-table"]').should('contain', String(label));
+      });
+  });
+
   it('switches the y axis between margin and revenue', () => {
     chartText().should('contain', 'Margin ($/day)');
     // Break-even is meaningful on a margin axis, so the rule is drawn.
