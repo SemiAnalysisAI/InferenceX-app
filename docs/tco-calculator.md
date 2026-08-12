@@ -274,8 +274,8 @@ time against a flat cost line:
 revenue │              ,──── each config rolls out to its own numbers
         │         ,───╯
         │    ,───╯
-────────┼──╱──────────────────────────────  cost: flat once built out
-        │ ╱ first rollout also energises the racks
+────────┼──╱──────────────────────────────  cost: flat, the racks
+        │ ╱ the first config rolls out from zero
         └──────────────────────────────────▶  months since model release
 ```
 
@@ -287,9 +287,8 @@ it survived as an explicit user assumption.
 
 **A config is rolled out, not switched on.** So every config gets its own ramp:
 when it lands, the fleet climbs from whatever it was already serving to that
-config's numbers over `rampMonths`. The first config climbs from zero, and that
-first rollout is also when the racks are energised — so cost ramps with it and the
-line opens at exactly zero rather than at a full-cost deficit.
+config's numbers over `rampMonths`. The first config climbs from zero — nothing is
+being served before it lands.
 
 A rollout starts from the level the previous one **actually reached**, not from the
 previous config's nominal rate. With a ramp longer than the gap between sweeps that
@@ -298,10 +297,11 @@ continuous no matter how the ramp length and the sweep cadence interact.
 
 Four conventions the numbers depend on:
 
-- **Cost tracks energised capacity, then holds flat.** It is `chips × $/chip/hr`,
-  and capacity is bought once — so cost ramps only over the first rollout, and no
-  later config moves it. Because revenue and cost ramp together there, margin
-  during the buildout is simply a fraction of the steady-state margin.
+- **Cost is flat, including through every rollout.** It is `chips × $/chip/hr`, and
+  neither term moves when a config rolls out — racks bill from the moment they are
+  energised, not from the moment they are loaded. So the opening rollout is paid for
+  in full while it earns its way up from zero, which is what puts the first months
+  below the rule and gives payback its meaning.
 - **The ramp is an assumption; the steps are not.** It defaults to a nominal
   quarter (`c_ramp`), and 0 means every config takes effect instantly.
 - **Markers sit at the release instant** — the foot of each rollout, not its top —
@@ -313,14 +313,6 @@ Four conventions the numbers depend on:
 
 A blank or zero MTBI means "no interruptions modelled", not "always down" — the
 input is an optional refinement and a hostile default would be worse than none.
-
-**Known limitation: `paybackMonth` is weak under this cost model.** Nothing is paid
-up front — cost is a rental rate that ramps with capacity — so a fleet whose
-steady-state margin is positive has a positive margin from the first instant, and
-cumulative margin never dips below zero. Payback therefore collapses to "is margin
-positive", reporting ~0 months rather than a recovery period. Giving it real meaning
-needs capex in the model, which the TCO source treats as amortised into $/chip/hr;
-until then read the column as a yes/no.
 
 ### Anchoring and the x axis
 

@@ -106,7 +106,7 @@ const STRINGS = {
     disagg:
       ' Disaggregated inference configurations report throughput per decode chip or per prefill chip rather than per total chip, so a step won by a disaggregated config is not sized on quite the same basis as one won by an aggregated config. Both compete for the same line, since the question is what the silicon can be made to do — and the config named on each step says which kind won it.',
     hybrid:
-      " One line per chip, not per software config: at any moment it follows whichever framework, precision and speculative-decoding combination was ahead, so the config serving the fleet changes along the line and each step names the one that took over. Legend entries still filter configs, which removes them from candidacy. Each step is a measured run date whose interpolated throughput at the target beat every earlier date; a sweep that failed to beat the incumbent is not a step, because the fleet kept serving the config it already had. A config does not take effect the instant a sweep finds it, so each one rolls out over the ramp window, climbing from what the fleet already served to its own numbers. Power and $/chip/hr are today's values from the TCO model; cost ramps over the first rollout, as the racks are energised, and is flat after that because no later config moves it — it is the same silicon either way. Reads outside a run's measured interactivity range are excluded rather than clamped.",
+      " One line per chip, not per software config: at any moment it follows whichever framework, precision and speculative-decoding combination was ahead, so the config serving the fleet changes along the line and each step names the one that took over. Legend entries still filter configs, which removes them from candidacy. Each step is a measured run date whose interpolated throughput at the target beat every earlier date; a sweep that failed to beat the incumbent is not a step, because the fleet kept serving the config it already had. A config does not take effect the instant a sweep finds it, so each one rolls out over the ramp window, climbing from what the fleet already served to its own numbers. Power and $/chip/hr are today's values from the TCO model, and cost is flat throughout because no config moves either term — it is the same silicon either way. Reads outside a run's measured interactivity range are excluded rather than clamped.",
     overlayExempt:
       ' Unofficial runs loaded via a run link are not shown here — the run-history API serves ingested official results only.',
     chartY: 'Margin ($/day)',
@@ -144,7 +144,7 @@ const STRINGS = {
     recoveryTooltip: '一次中断后恢复服务所需的小时数。',
     rampLabel: '爬坡期 (月)',
     rampTooltip:
-      '一个配置在集群中完成推广所需的月数。每个配置都有各自的推广曲线：从集群当前已提供的水平爬升至新配置的水平。首个配置从零开始爬升，并在此过程中完成机架通电，因此成本随之爬升，曲线自零起步。这是您的假设而非实测值；设为 0 表示配置立即生效。',
+      '一个配置在集群中完成推广所需的月数。每个配置都有各自的推广曲线：从集群当前已提供的水平爬升至新配置的水平，首个配置从零开始爬升。成本在整个期间按满额计入——机架自通电起即开始计费，而非自满载起——因此首次推广在爬升过程中已需承担全额成本。这是您的假设而非实测值；设为 0 表示配置立即生效。',
     horizonLabel: '测算期 (自发布起月数)',
     horizonTooltip:
       '自模型发布日期起向后测算的月数。在最后一次扫描之后，最新配置将保持不变——这代表若优化停止时集群的收益，而非对后续提升的预测。',
@@ -172,7 +172,7 @@ const STRINGS = {
     disagg:
       '解耦推理配置按解码 Chip 或预填充 Chip 报告吞吐量，而非按 Chip 总数，因此其集群规模、成本与利润和聚合配置并非同类比较。因此由解耦配置取得的台阶与由聚合配置取得的台阶在集群规模基准上并不完全一致。两者均可竞争同一 Chip 的曲线——每一级台阶标注的配置即说明其类型。',
     hybrid:
-      '每个 Chip 一条曲线，而非每个软件配置一条：曲线在任一时刻都跟随当时领先的框架、精度与投机解码组合，因此服务集群的配置会沿曲线变化，每一级台阶都标注接管的配置。图例项仍可筛选配置，被隐藏的配置将不参与竞争。每一级台阶都是一个实测运行日期，其在目标交互性下的插值吞吐量优于此前所有日期；未能超越现有配置的扫描不构成台阶，因为集群仍在运行原有配置。配置不会在扫描发现的瞬间生效，因此每个配置都会在推广期内从集群当前已提供的水平爬升至其自身水平。功率与 $/chip/hr 为 TCO 模型的当前值；成本在首次推广期间随机架通电而爬升，此后保持水平，因为后续配置不会改变它——两种情况下都是同一款芯片。超出某次运行实测交互性区间的结果会被排除而非钳制。',
+      '每个 Chip 一条曲线，而非每个软件配置一条：曲线在任一时刻都跟随当时领先的框架、精度与投机解码组合，因此服务集群的配置会沿曲线变化，每一级台阶都标注接管的配置。图例项仍可筛选配置，被隐藏的配置将不参与竞争。每一级台阶都是一个实测运行日期，其在目标交互性下的插值吞吐量优于此前所有日期；未能超越现有配置的扫描不构成台阶，因为集群仍在运行原有配置。配置不会在扫描发现的瞬间生效，因此每个配置都会在推广期内从集群当前已提供的水平爬升至其自身水平。功率与 $/chip/hr 为 TCO 模型的当前值，成本在整个期间保持水平，因为任何配置都不会改变这两项——两种情况下都是同一款芯片。超出某次运行实测交互性区间的结果会被排除而非钳制。',
     overlayExempt:
       '通过运行链接加载的非官方运行不会显示在此——运行历史 API 仅提供已入库的官方结果。',
     chartY: '利润 ($/天)',

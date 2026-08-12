@@ -15,27 +15,25 @@
  *   revenue │              ,──── each config rolls out to its own numbers
  *           │         ,───╯
  *           │    ,───╯
- *   ────────┼──╱──────────────────────────────  cost: flat once built out
- *           │ ╱ first rollout also energises the racks
+ *   ────────┼──╱──────────────────────────────  cost: flat, the racks
+ *           │ ╱ the first config rolls out from zero
  *           └──────────────────────────────────▶  months since model release
  *
  * A config does not take effect the instant a sweep finds it: it is rolled out.
  * So every config gets its own ramp, climbing from whatever the fleet was already
- * serving to that config's numbers. The first config climbs from zero, and that
- * first rollout is also when the racks are energised — so cost ramps with it and
- * the fleet starts at exactly zero rather than at a full-cost deficit.
+ * serving to that config's numbers. The first config climbs from zero — nothing is
+ * being served before it lands.
  *
- * After the buildout cost is constant: later rollouts are software landing on
- * chips that are already billing. That makes the gap between the lines the return
- * on software progress, which is the thing no single benchmark date can show.
+ * Cost is constant throughout, so the gap between the lines is the return on
+ * software progress, which is the thing no single benchmark date can show.
  *
  * Three conventions worth stating:
  *
- * 1. **Cost tracks energised capacity, then holds flat.** It is
- *    `chips x $/chip/hr`, and capacity is bought once — so cost ramps only over
- *    the first rollout and neither term moves when a config improves afterwards.
- *    Because revenue and cost ramp together, margin during the buildout is simply
- *    a fraction of the steady-state margin, and the line opens at zero.
+ * 1. **Cost is flat, including through every rollout.** It is `chips x $/chip/hr`,
+ *    and neither term moves when a config rolls out — racks bill from the moment
+ *    they are energised, not from the moment they are loaded. So the first rollout
+ *    is paid for in full while it earns its way up from zero, which is what puts
+ *    the opening months below the rule and gives payback its meaning.
  * 2. **The ramp is an assumption; the steps are not.** Ramp length is a user
  *    input, defaulting to a nominal quarter, and it applies to every rollout.
  *    Which configs exist, when, and how fast they ran are all measured.
@@ -63,9 +61,9 @@ export interface LifecycleAssumptions {
   /** Sale price of output tokens, $/M tok. Defaults to break-even upstream. */
   pricePerMTok: number;
   /**
-   * Months for a config to roll out across the fleet. Applies to every config;
-   * on the first it also covers energising the racks. Zero means each config
-   * takes effect instantly. An assumption, not a measurement.
+   * Months for a config to roll out across the fleet. Applies to every config,
+   * including the first, which rolls out from zero. Zero means each config takes
+   * effect instantly. An assumption, not a measurement.
    */
   rampMonths: number;
 }
@@ -87,7 +85,7 @@ export interface LifecycleInputs {
    * first measured on the model — before that there is no data, so no line.
    */
   steps: readonly ThroughputStep[];
-  /** Fleet TCO for the selected tier ($/hr) at full capacity. Configs don't move it. */
+  /** Fleet TCO for the selected tier ($/hr). Constant: configs don't change it. */
   costPerHour: number;
   /** End of the modelled window, months since the anchor. */
   horizonMonths: number;
@@ -122,7 +120,7 @@ export interface LifecycleSeries {
   revenuePerDay: number;
   /** Revenue at the first measured config, $/day. */
   firstRevenuePerDay: number;
-  /** Cost rate once the fleet is built out, $/day. Flat from then on. */
+  /** Flat cost rate, $/day. */
   costPerDay: number;
   /** Margin at the latest config, $/day. */
   marginPerDay: number;
@@ -139,9 +137,9 @@ export interface LifecycleSeries {
   startMonth: number;
   endMonth: number;
   /**
-   * Month the first rollout completes — i.e. when the fleet is fully energised.
+   * Month the first rollout completes — when the opening config is fully deployed.
    * Equals `startMonth` when no ramp is modelled. Later rollouts have their own
-   * windows; this one is called out because it is the only one that moves cost.
+   * windows; this one is called out because it is where revenue leaves zero.
    */
   rampEndMonth: number;
   /** Number of measured improvements, i.e. steps after the first. */
@@ -264,10 +262,6 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
     return rollout.from + (rollout.to - rollout.from) * fraction;
   }
 
-  // Capacity is bought once, so only the first rollout energises racks. Later
-  // rollouts are software landing on chips that are already billing.
-  const capacityAt = (month: number) => rampFractionAt(month, startMonth, rampMonths);
-
   // Build the samples in order: each rollout contributes its ramp, then the flat
   // stretch it holds until the next one lands.
   const samples: { month: number; level: number; isStep: boolean; isRamp: boolean }[] = [];
@@ -309,21 +303,20 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
   let cumulative = 0;
   let paybackMonth: number | null = null;
 
-  const rateOf = (sample: { month: number; level: number }) => ({
-    revenue: revenuePerDayFor(sample.level, price, availability),
-    cost: costPerDay * capacityAt(sample.month),
-  });
+  const revenueOf = (sample: { level: number }) =>
+    revenuePerDayFor(sample.level, price, availability);
 
   for (let i = 0; i < samples.length; i += 1) {
     const here = samples[i]!;
-    const { revenue, cost } = rateOf(here);
+    const revenue = revenueOf(here);
+    const cost = costPerDay;
     if (i > 0) {
       const prev = samples[i - 1]!;
-      // Both revenue and cost vary continuously between samples, so trapezoid.
-      // Sample density is what makes this accurate; a forced vertical shares its
-      // month with the previous sample and so contributes nothing.
-      const previous = rateOf(prev);
-      const margin = (previous.revenue - previous.cost + (revenue - cost)) / 2;
+      // Revenue varies continuously between samples while cost does not, so
+      // trapezoid the revenue and subtract the flat cost. Sample density is what
+      // makes this accurate; a forced vertical shares its month with the previous
+      // sample and so contributes nothing.
+      const margin = (revenueOf(prev) + revenue) / 2 - costPerDay;
       const days = (here.month - prev.month) * DAYS_PER_MONTH;
       const before = cumulative;
       cumulative += margin * days;

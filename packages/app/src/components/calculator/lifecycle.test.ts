@@ -197,19 +197,16 @@ describe('computeLifecycle', () => {
   describe('ramp', () => {
     const ramped = { ...base, assumptions: { ...assumptions, rampMonths: 3 } };
 
-    it('starts the first config at zero and maxes out at its numbers', () => {
+    it('starts the first config at zero revenue and maxes out at its numbers', () => {
       const series = computeLifecycle(ramped)!;
       expect(series.rampEndMonth).toBe(3);
       const first = series.points[0]!;
-      // Nothing served and nothing energised, so the fleet is at exactly zero —
-      // not down its full cost. Capacity ramps with the first rollout.
+      // Nothing is being served yet, but the racks are already billing.
       expect(first.revenue).toBeCloseTo(0, 6);
-      expect(first.cost).toBeCloseTo(0, 6);
-      expect(first.margin).toBeCloseTo(0, 6);
+      expect(first.margin).toBeCloseTo(-costPerHour * HOURS_PER_DAY, 6);
       // At the end of its rollout the first config is serving its full rate.
       const atRampEnd = series.points.find((p) => p.month === 3)!;
       expect(atRampEnd.revenue).toBeCloseTo(rev(400_000), 6);
-      expect(atRampEnd.cost).toBeCloseTo(costPerHour * HOURS_PER_DAY, 6);
     });
 
     it('gives every config its own rollout, from the incumbent level to its own', () => {
@@ -248,21 +245,18 @@ describe('computeLifecycle', () => {
       expect(second.revenue).toBeLessThan(rev(400_000));
     });
 
-    it('ramps cost with energised capacity, then holds it flat', () => {
+    it('keeps cost flat through every rollout — racks bill once energised', () => {
       const series = computeLifecycle(ramped)!;
       const full = costPerHour * HOURS_PER_DAY;
-      // Capacity is bought once, so only the first rollout moves cost.
-      const during = series.points.filter((p) => p.month < 3);
-      expect(during.length).toBeGreaterThan(5);
-      for (const p of during) expect(p.cost).toBeLessThan(full);
-      for (const after of series.points.filter((point) => point.month >= 3)) {
-        expect(after.cost).toBeCloseTo(full, 6);
-      }
+      expect(series.points.length).toBeGreaterThan(20);
+      for (const p of series.points) expect(p.cost).toBeCloseTo(full, 6);
     });
 
-    it('earns less over the window than a fleet that starts at full load', () => {
+    it('delays payback, because the first rollout is paid for while it earns its way up', () => {
       const flat = computeLifecycle(base)!;
       const series = computeLifecycle(ramped)!;
+      expect(series.paybackMonth).not.toBeNull();
+      expect(series.paybackMonth!).toBeGreaterThan(flat.paybackMonth!);
       expect(series.lifetimeMargin).toBeLessThan(flat.lifetimeMargin);
     });
 
@@ -274,7 +268,6 @@ describe('computeLifecycle', () => {
         })!;
         expect(series.rampEndMonth).toBe(series.startMonth);
         expect(series.points[0]!.revenue).toBeCloseTo(rev(400_000), 6);
-        expect(series.points[0]!.cost).toBeCloseTo(costPerHour * HOURS_PER_DAY, 6);
         expect(series.points.some((p) => p.isRamp)).toBe(false);
       }
     });
