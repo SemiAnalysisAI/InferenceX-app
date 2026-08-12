@@ -5,7 +5,16 @@ import type { BenchmarkRow } from './api';
 import { rowToAggDataEntry } from './benchmark-transform';
 import { buildAvailabilityHwKey } from './chart-utils';
 import { getGpuSpecs, getHardwareConfig } from './constants';
-import { DEFAULT_MODELS, getModelLabel, Model, Precision } from './data-mappings';
+import {
+  DEFAULT_MODELS,
+  DEPRECATED_MODELS,
+  getModelCategory,
+  getModelLabel,
+  MAINTENANCE_MODELS,
+  Model,
+  Precision,
+  type CategoryTag,
+} from './data-mappings';
 import { frameworkFamily } from './framework-family';
 import {
   computeTierReads,
@@ -25,6 +34,8 @@ export const OVERVIEW_DEFAULT_REFERENCE_HARDWARE: OverviewReferenceHardware = 'b
 export type OverviewEngineScope = 'all' | 'community';
 export type OverviewComparisonMode = 'hardware' | 'history';
 export const OVERVIEW_DEFAULT_COMPARISON_MODE: OverviewComparisonMode = 'hardware';
+export type OverviewModelScope = 'default' | 'all';
+export const OVERVIEW_DEFAULT_MODEL_SCOPE: OverviewModelScope = 'default';
 export type OverviewScenario = 'single_turn_8k1k' | 'agentx';
 /** Row order within a model: the single-turn workload first, AgentX below it. */
 export const OVERVIEW_SCENARIOS = ['single_turn_8k1k', 'agentx'] as const;
@@ -53,6 +64,22 @@ export function resolveOverviewComparisonMode(
   return candidate === '30d' ? 'history' : OVERVIEW_DEFAULT_COMPARISON_MODE;
 }
 
+export function resolveOverviewModelScope(
+  raw: string | readonly string[] | undefined,
+): OverviewModelScope {
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  return candidate === 'all' ? 'all' : OVERVIEW_DEFAULT_MODEL_SCOPE;
+}
+
+// Note (wenyao): row order is a contract — defaults, then maintenance, then
+// deprecated, each in MODEL_CONFIG declaration order; the overview e2e asserts
+// inactive rows always sit below the default rows.
+export function overviewModelsForScope(scope: OverviewModelScope): Model[] {
+  return scope === 'all'
+    ? [...DEFAULT_MODELS, ...MAINTENANCE_MODELS, ...DEPRECATED_MODELS]
+    : [...DEFAULT_MODELS];
+}
+
 export function resolveOverviewTier(raw: string | string[] | undefined): OverviewTier {
   const candidate = Number(Array.isArray(raw) ? raw[0] : raw);
   return OVERVIEW_TIERS.find((tier) => tier === candidate) ?? OVERVIEW_PRIMARY_TIER;
@@ -74,7 +101,7 @@ export interface OverviewTierValue {
 }
 
 /** One chart-equivalent serving series. Topology and GPU-count variants may
- * contribute points; agentic series may also mix point-level decode methods. */
+ *  contribute points, while release/framework/spec/precision/deployment stay exact. */
 export interface OverviewConfigResult {
   key: string;
   dbModel: string;
@@ -92,6 +119,11 @@ export interface OverviewConfigResult {
   latestDate: string;
 }
 
+/** What actually reaches the client. `tierValues` is the interpolation input —
+ *  the server reads it to produce a tier's value and nothing renders it, so it
+ *  is stripped before serialization rather than shipped and ignored. */
+export type OverviewConfigView = Omit<OverviewConfigResult, 'tierValues'>;
+
 export interface OverviewTierRead {
   tier: number;
   value: number | null;
@@ -99,7 +131,7 @@ export interface OverviewTierRead {
   estimated: boolean;
   evidenceDate: { from: string; to: string } | null;
   evidenceTopologies: string[];
-  config: OverviewConfigResult | null;
+  config: OverviewConfigView | null;
 }
 
 /** Why a platform shows `∞`. `cannot_reach_at_tier` = every
@@ -118,6 +150,8 @@ export interface OverviewHistoricalComparison {
   baselineCostPerMtok: number | null;
   costDeltaPct: number | null;
   baselineDate: string | null;
+  /** Exact serving envelope that produced the historical value. */
+  baselineConfig: OverviewConfigView | null;
 }
 
 export interface OverviewPlatformResult {
@@ -138,6 +172,7 @@ export interface OverviewPlatformResult {
 export interface OverviewModelSummary {
   model: Model;
   modelLabel: string;
+  category: CategoryTag;
   scenario: OverviewScenario;
   platforms: OverviewPlatformResult[];
 }
@@ -148,6 +183,7 @@ export interface OverviewPageData {
   engineScope: OverviewEngineScope;
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
+  modelScope: OverviewModelScope;
   historicalWindow: OverviewHistoricalWindow | null;
 }
 
@@ -291,7 +327,13 @@ function overviewScenarioRows(
   );
 }
 
-function overviewServingSeriesKey(row: BenchmarkRow): string {
+export type OverviewServingSeriesRow = Pick<
+  BenchmarkRow,
+  'model' | 'hardware' | 'framework' | 'spec_method' | 'precision' | 'disagg' | 'is_multinode'
+> & { offload_mode?: string | null; benchmark_type?: string };
+
+/** Stable identity for one Overview serving envelope across topology points. */
+export function overviewServingSeriesKey(row: OverviewServingSeriesRow): string {
   const specMethod = row.benchmark_type === 'agentic_traces' ? '' : row.spec_method;
   return JSON.stringify([
     row.model,
@@ -359,7 +401,7 @@ function readConfigAtTier(config: OverviewConfigResult, tier: number): OverviewT
 }
 
 interface ConfigTierRead extends OverviewTierRead {
-  config: OverviewConfigResult;
+  config: OverviewConfigView;
 }
 
 /** In-range reads only: a clamped or unreachable read remains a coverage gap. */
@@ -406,7 +448,7 @@ function nonComparableAsMissing(
     : { ...read, value: null, estimated: false, evidenceDate: null, evidenceTopologies: [] };
 }
 
-function configPriorityIndex(config: OverviewConfigResult): number {
+function configPriorityIndex(config: OverviewConfigView): number {
   return OVERVIEW_SLICE_PRIORITY.findIndex(
     ({ speculative, precision }) =>
       speculative === isSpeculativeDecode(config.specMethod) && precision === config.precision,
@@ -420,7 +462,10 @@ function selectPlatformRead(
 ): OverviewTierRead {
   const reads = configs
     .filter((config) => config.hardware === hardware)
-    .map((config): ConfigTierRead => ({ ...readConfigAtTier(config, tier), config }));
+    .map((config): ConfigTierRead => {
+      const { tierValues: _tierValues, ...view } = config;
+      return { ...readConfigAtTier(config, tier), config: view };
+    });
 
   for (const priority of OVERVIEW_SLICE_PRIORITY) {
     const exact = reads
@@ -670,6 +715,7 @@ export function buildOverviewModelSummary(
   return {
     model,
     modelLabel: getModelLabel(model),
+    category: getModelCategory(model),
     scenario,
     platforms: buildPlatformResults(model, scenario, scenarioRows, tier, referenceHardware),
   };
@@ -685,8 +731,12 @@ export function assembleOverviewPageData(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
 ): OverviewPageData {
-  const perModel = [...DEFAULT_MODELS].map((model) => ({ model, rows: rowsByModel[model] ?? [] }));
+  const perModel = overviewModelsForScope(modelScope).map((model) => ({
+    model,
+    rows: rowsByModel[model] ?? [],
+  }));
   return {
     models: perModel.flatMap(({ model, rows }) =>
       overviewScenariosForModel(model, rows).map((scenario) =>
@@ -697,6 +747,7 @@ export function assembleOverviewPageData(
     engineScope,
     comparisonMode: OVERVIEW_DEFAULT_COMPARISON_MODE,
     referenceHardware,
+    modelScope,
     historicalWindow: null,
   };
 }
@@ -715,18 +766,21 @@ export function assembleOverviewHistoricalPageData(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
 ): OverviewPageData {
   const current = assembleOverviewPageData(
     currentRowsByModel,
     tier,
     engineScope,
     referenceHardware,
+    modelScope,
   );
   const baseline = assembleOverviewPageData(
     baselineRowsByModel,
     tier,
     engineScope,
     referenceHardware,
+    modelScope,
   );
   const baselineByKey = new Map(
     baseline.models.flatMap((model) =>
@@ -753,6 +807,7 @@ export function assembleOverviewHistoricalPageData(
               baselineCostPerMtok: previous?.costPerMtok ?? null,
               costDeltaPct: null,
               baselineDate: previous === undefined ? null : overviewTierEvidenceDate(previous.read),
+              baselineConfig: previous?.read.config ?? null,
             },
           };
         }
@@ -765,6 +820,7 @@ export function assembleOverviewHistoricalPageData(
               baselineCostPerMtok: null,
               costDeltaPct: null,
               baselineDate: null,
+              baselineConfig: null,
             },
           };
         }
@@ -776,6 +832,7 @@ export function assembleOverviewHistoricalPageData(
             baselineCostPerMtok: previous.costPerMtok,
             costDeltaPct: platform.costPerMtok / previous.costPerMtok - 1,
             baselineDate: overviewTierEvidenceDate(previous.read),
+            baselineConfig: previous.read.config,
           },
         };
       }),

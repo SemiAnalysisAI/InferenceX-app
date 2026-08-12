@@ -12,6 +12,8 @@ import {
   metricValue,
   seriesMatchesSelection,
   type CollectiveXSeriesSelection,
+  collectiveXKvChartPoints,
+  type CollectiveXKvRunCase,
   collectiveXKvCell,
 } from './data';
 import type { CollectiveXKvRow, CollectiveXPercentiles, CollectiveXSeries } from './types';
@@ -147,7 +149,7 @@ describe('seriesMatchesSelection', () => {
   const base: CollectiveXSeriesSelection = {
     epSize: 8,
     phase: 'decode',
-    mode: 'normal',
+    modes: ['normal'],
     precision: 'bf16',
   };
 
@@ -158,8 +160,16 @@ describe('seriesMatchesSelection', () => {
   it('rejects a series whose EP, phase, mode, or precision differs from the selection', () => {
     expect(seriesMatchesSelection(scaleUp, { ...base, epSize: 16 })).toBe(false);
     expect(seriesMatchesSelection(scaleUp, { ...base, phase: 'prefill' })).toBe(false);
-    expect(seriesMatchesSelection(scaleUp, { ...base, mode: 'low-latency' })).toBe(false);
+    expect(seriesMatchesSelection(scaleUp, { ...base, modes: ['low-latency'] })).toBe(false);
     expect(seriesMatchesSelection(scaleUp, { ...base, precision: 'fp8' })).toBe(false);
+  });
+
+  it('matches every selected kernel mode', () => {
+    const lowLatency = makeCollectiveXSeries({ mode: 'low-latency' });
+    const bothModes = { ...base, modes: ['normal', 'low-latency'] as const };
+
+    expect(seriesMatchesSelection(scaleUp, bothModes)).toBe(true);
+    expect(seriesMatchesSelection(lowLatency, bothModes)).toBe(true);
   });
 });
 
@@ -282,7 +292,10 @@ describe('chartPoints', () => {
   });
 });
 
-const kvRow = (overrides: Partial<CollectiveXKvRow>): CollectiveXKvRow => ({
+const kvRow = ({
+  latency_p50,
+  ...overrides
+}: Partial<CollectiveXKvRow> & { latency_p50?: number }): CollectiveXKvRow => ({
   kind: 'paged',
   isl: 32768,
   page_tokens: 64,
@@ -294,6 +307,17 @@ const kvRow = (overrides: Partial<CollectiveXKvRow>): CollectiveXKvRow => ({
   latency_ms: { p50: 24.8, p95: 26, min: 24.1, max: 26.4, n: 24 },
   gbps_p50: 7.39,
   verify_passed: true,
+  ...(latency_p50 === undefined
+    ? {}
+    : {
+        latency_ms: {
+          p50: latency_p50,
+          p95: latency_p50 * 1.05,
+          min: latency_p50 * 0.98,
+          max: latency_p50 * 1.1,
+          n: 24,
+        },
+      }),
   ...overrides,
 });
 
@@ -317,5 +341,86 @@ describe('collectiveXKvCell', () => {
   it('selects bulk rows by their null page size', () => {
     const rows = [kvRow({}), kvRow({ kind: 'bulk', page_tokens: null, gbps_p50: 89.41 })];
     expect(collectiveXKvCell(rows, 'bulk', null, 'min')?.gbps_p50).toBe(89.41);
+  });
+});
+
+describe('collectiveXKvChartPoints', () => {
+  const kase = (
+    rows: (Partial<CollectiveXKvRow> & { latency_p50?: number })[],
+    overrides = {},
+  ): CollectiveXKvRunCase => ({
+    case_id: 'gb200-nixl-kv-dsv4-rdma-xfer-ep2-paged-fp8',
+    label: 'gb200 · nixl · rdma · kv-dsv4 · fp8',
+    disposition: 'runnable',
+    sku: 'gb200',
+    vendor: 'nvidia',
+    backend: 'nixl',
+    fabric: 'rdma',
+    workload: 'kv-dsv4',
+    precision: 'fp8',
+    topology: {
+      ep_size: 2,
+      nodes: 2,
+      gpus_per_node: 1,
+      scale_up_domain: 72,
+      scale_up_transport: 'mnnvl',
+      scale_out_transport: 'rdma',
+      topology_class: 'gb200-kv-rdma',
+    },
+    outcome: 'success',
+    reason: null,
+    detail: null,
+    rows: rows.map(kvRow),
+    run_id: '318',
+    run_index: 1,
+    ...overrides,
+  });
+
+  it('plots batch scaling at the largest measured ISL', () => {
+    const points = collectiveXKvChartPoints(
+      [
+        kase([
+          { isl: 4096, batch: 1, gbps_p50: 5 },
+          { isl: 32768, batch: 1, gbps_p50: 7.39 },
+          { isl: 32768, batch: 16, gbps_p50: 15.12 },
+          { isl: 32768, batch: 16, op: 'push', gbps_p50: 99 },
+          { isl: 32768, batch: 1, page_tokens: 16, gbps_p50: 2.72 },
+        ]),
+      ],
+      { x: 'batch', y: 'bandwidth', op: 'pull', pageTokens: 64 },
+    );
+    expect(points.map((point) => [point.x, point.y])).toEqual([
+      [1, 7.39],
+      [16, 15.12],
+    ]);
+    expect(points[0].seriesId).toBe('318:gb200-nixl-kv-dsv4-rdma-xfer-ep2-paged-fp8');
+    expect(points[0].seriesLabel).toContain('#318');
+  });
+
+  it('plots ISL scaling at batch 1 with latency as the metric', () => {
+    const points = collectiveXKvChartPoints(
+      [
+        kase([
+          { isl: 512, batch: 1, latency_p50: 0.5 },
+          { isl: 32768, batch: 1, latency_p50: 24.8 },
+          { isl: 32768, batch: 16, latency_p50: 193.7 },
+        ]),
+      ],
+      { x: 'isl', y: 'latency', op: 'pull', pageTokens: 64 },
+    );
+    expect(points.map((point) => [point.x, point.y])).toEqual([
+      [512, 0.5],
+      [32768, 24.8],
+    ]);
+  });
+
+  it('skips cases with no rows for the selected family', () => {
+    const points = collectiveXKvChartPoints([kase([{ kind: 'bulk', page_tokens: null }])], {
+      x: 'batch',
+      y: 'bandwidth',
+      op: 'pull',
+      pageTokens: 64,
+    });
+    expect(points).toEqual([]);
   });
 });

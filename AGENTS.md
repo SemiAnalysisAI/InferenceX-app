@@ -78,6 +78,7 @@ API routes (`packages/app/src/app/api/v1/`):
   assembled through the shared reader (the one deliberate exception to the raw-rows rule below);
   `runs/[runId]` also handles admin DELETE. See [CollectiveX](./docs/collectivex.md).
 - `tco-feed?model=dsv4&workloads=1024x1024,8192x1024&tiers=30,50,75,100&format=csv` — per-hardware Pareto-frontier output-throughput reads at fixed interactivity tiers, for external spreadsheet TCO models (Excel Power Query); `view=scores` (optional `weights`, `workload_weights`, `alpha`) folds them into one tier-weighted, workload-blended, output-equivalent score per hardware
+- `overview?tier=50&engine=community&compare=30d&ref=b200` — a compact, cached page-data response used only by `/overview` selector navigation
 
 **API routes return raw DB data** — no presentation logic. Frontend handles all transformations.
 Exceptions: the CollectiveX routes assemble raw stored documents through the shared reader in
@@ -85,7 +86,28 @@ Exceptions: the CollectiveX routes assemble raw stored documents through the sha
 `tco-feed`, which runs the calculator's frontier interpolation server-side because its consumers
 (spreadsheets) cannot execute the TS transforms — its assumptions (tier weights, workload mix, α)
 enter only as explicit query params with documented defaults, so a published sheet's URL fully
-records its methodology.
+records its methodology; and `overview`, which assembles the same `OverviewPageData` used for the
+initial server render so selector changes can update the matrix without transferring every model's
+raw benchmark history or triggering a React Server Component (RSC) round trip. It is a page-owned
+backend-for-frontend (BFF), not a reusable public data API.
+
+### API Documentation Synchronization
+
+The public API reference at `/api` and `/zh/api`, plus the OpenAPI 3.1 document at
+`/api/openapi.json`, are generated from `packages/app/src/lib/api-documentation.ts`.
+
+**Any change to an API route, request parameter, response shape, status code, authentication,
+caching behavior, or shared API type MUST update the documentation registry in the same change.**
+Keep `packages/app/src/lib/api-route-catalog.ts` synchronized with every handler under
+`packages/app/src/app/api/`; the catalog classifies unpublished routes and records review digests
+for handlers and shared contract sources. Do not update a digest without first confirming whether
+the human reference, Chinese copy, examples, or OpenAPI schema also need changes.
+
+Run the synchronization guard from `packages/app`:
+
+```bash
+bun --env-file=../../.env vitest run src/lib/api-route-catalog.test.ts
+```
 
 Static content routes (no DB):
 
@@ -171,11 +193,14 @@ The Python helper is a 1:1 port of these three TypeScript functions:
 
 Plus the wrapper `interpolateMetricAtInteractivity` in `packages/app/src/components/inference/hooks/useInterpolatedTrendData.ts` which composes them with the "no extrapolation → return null" rule.
 
+Plus `recoverReciprocalNumerator` in `interpolation.ts`, which decides whether a metric is splined directly or derived from the interpolated throughput. $/M tok and J/token are a per-chip constant over a throughput, so independently splining the metric breaks that identity between knots; both TS and Python spline the throughput and re-derive instead. See `docs/tco-calculator.md` for the reproducible measurement.
+
 **Rule: any PR that changes any of those four TypeScript functions MUST also update `.claude/skills/write-inferencex-blog/iso_interactivity.py` in the same commit.** Drift between the TS and Python implementations means the blog tables will silently diverge from the live chart on the very next post — readers will see one number in the table and a different one in the chart they click through to. This includes:
 
 - Changing the Pareto frontier definition (upper-left → lower-left, or adding tie-breaking rules)
 - Switching from Steffen's monotone slopes to a different spline construction (Fritsch-Carlson, natural cubic, etc.)
 - Loosening or tightening the extrapolation rule (currently: return `null` outside `[min x, max x]`)
+- Changing which metrics are derived from throughput rather than splined, or the tolerance that decides whether the data obeys `metric x throughput = constant`
 - Adjusting the Y-clamp behavior that prevents spline overshoot
 
 The Python file has a header comment explaining the pipeline and a `_cli()` entrypoint for stdin/stdout JSON usage. When you update it, keep the structure 1:1 with the TS so future readers can diff the two files line by line. Run the helper against a known dataset and confirm the outputs match what the chart renders before merging.

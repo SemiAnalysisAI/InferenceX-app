@@ -1,3 +1,6 @@
+import { spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
@@ -13,8 +16,24 @@ import {
   maxInteractivityAtCost,
   monotoneSlopes,
   paretoFrontUpperLeft,
+  recoverReciprocalNumerator,
   sign,
 } from './useThroughputData';
+
+const PYTHON_INTERPOLATION_HELPER = resolve(
+  import.meta.dirname,
+  '../../../../..',
+  '.claude/skills/write-inferencex-blog/iso_interactivity.py',
+);
+
+function interpolateWithPython(request: Record<string, unknown>): number | null {
+  const result = spawnSync('python3', [PYTHON_INTERPOLATION_HELPER], {
+    input: JSON.stringify(request),
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) throw new Error(`Python interpolation failed: ${result.stderr}`);
+  return (JSON.parse(result.stdout) as { value: number | null }).value;
+}
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -332,8 +351,8 @@ describe('interpolateForGPU', () => {
 
   it('clamps target to the pareto-front input range instead of returning null', () => {
     const points = [
-      makePoint({ interactivity: 20, throughput: 500 }),
-      makePoint({ interactivity: 40, throughput: 300 }),
+      makePoint({ interactivity: 20, throughput: 500, tp: 4 }),
+      makePoint({ interactivity: 40, throughput: 300, tp: 8 }),
     ];
     const below = interpolateForGPU(points, 10, 'interactivity_to_throughput', 'costh');
     const above = interpolateForGPU(points, 50, 'interactivity_to_throughput', 'costh');
@@ -341,6 +360,19 @@ describe('interpolateForGPU', () => {
     expect(above).not.toBeNull();
     expect(below!.value).toBe(500);
     expect(above!.value).toBe(300);
+    expect(below!.nearestPoints).toEqual([expect.objectContaining({ interactivity: 20, tp: 4 })]);
+    expect(above!.nearestPoints).toEqual([expect.objectContaining({ interactivity: 40, tp: 8 })]);
+  });
+
+  it('uses the exact endpoint as the sole metadata source', () => {
+    const points = [
+      makePoint({ interactivity: 20, throughput: 500, tp: 4 }),
+      makePoint({ interactivity: 40, throughput: 300, tp: 8 }),
+    ];
+
+    const result = interpolateForGPU(points, 40, 'interactivity_to_throughput', 'costh');
+
+    expect(result?.nearestPoints).toEqual([expect.objectContaining({ interactivity: 40, tp: 8 })]);
   });
 
   it('returns the single point value when target matches exactly', () => {
@@ -1300,5 +1332,181 @@ describe('interpolateForGPU clamped flag', () => {
     expect(interpolateForGPU(single, 90, 'interactivity_to_throughput', 'costh')?.clamped).toBe(
       true,
     );
+  });
+});
+
+// =========================================================================
+// Reciprocal metrics — cost is derived from throughput, not splined
+// =========================================================================
+
+describe('recoverReciprocalNumerator', () => {
+  it('recovers the constant when every point agrees', () => {
+    expect(recoverReciprocalNumerator([1, 2, 4], [400, 200, 100])).toBe(400);
+  });
+
+  it('tolerates float rounding, which is all production data shows', () => {
+    const k = 516.6666666666666;
+    const tputs = [1234.5, 987.65, 321.098];
+    const values = tputs.map((t) => k / t);
+    expect(recoverReciprocalNumerator(values, tputs)).toBeCloseTo(k, 9);
+  });
+
+  it('returns null when the points disagree — the numerator is not constant', () => {
+    // This is the safety rail: a metric whose numerator varies per point (e.g.
+    // measured power) must not have its values rewritten from one point's ratio.
+    expect(recoverReciprocalNumerator([1, 2], [400, 300])).toBeNull();
+  });
+
+  it('accepts costs rounded for publication but rejects a percent-level drift', () => {
+    // The tolerance is 0.1%. Blog tables are hand-assembled from costs written
+    // to a few decimals, and iso_interactivity.py must not silently fall back on
+    // them; a numerator that genuinely varies moves far more than this.
+    expect(
+      recoverReciprocalNumerator([0.0964, 0.2892, 0.6427, 1.928], [6000, 2000, 900, 300]),
+    ).not.toBeNull();
+    // 1% apart — rejected.
+    expect(recoverReciprocalNumerator([1, 2.02], [400, 200])).toBeNull();
+  });
+
+  it('skips unusable pairs rather than treating them as disagreement', () => {
+    expect(recoverReciprocalNumerator([0, 1, 2], [400, 400, 200])).toBe(400);
+    expect(recoverReciprocalNumerator([1, 2], [0, 200])).toBe(400);
+  });
+
+  it('returns null when no pair is usable', () => {
+    expect(recoverReciprocalNumerator([0, 0], [100, 200])).toBeNull();
+    expect(recoverReciprocalNumerator([], [])).toBeNull();
+  });
+});
+
+describe('interpolateForGPU cost derivation', () => {
+  /** Points obeying the real identity: cost = rate / throughput. */
+  const RATE = 578.4; // $/GPU-hr x 1e6 / 3600
+  const consistent = (interactivity: number, throughput: number) =>
+    makePoint({
+      interactivity,
+      throughput,
+      outputThroughput: throughput,
+      inputThroughput: throughput,
+      costh: RATE / throughput,
+      costhOutput: RATE / throughput,
+      costhi: RATE / throughput,
+    });
+
+  const frontier = [
+    consistent(10, 6000),
+    consistent(30, 2000),
+    consistent(55, 900),
+    consistent(80, 300),
+  ];
+
+  it('keeps cost x throughput equal to the provider rate between measured points', () => {
+    // The identity /inference's per-point values obey by construction. Splining
+    // cost independently breaks it by up to 25x on sparse frontiers.
+    for (const target of [15, 20, 42, 60, 75]) {
+      const r = interpolateForGPU(frontier, target, 'interactivity_to_throughput', 'costh')!;
+      expect(r.cost * r.value).toBeCloseTo(RATE, 6);
+      expect(r.costOutput * r.outputTputValue).toBeCloseTo(RATE, 6);
+      expect(r.costInput * r.inputTputValue).toBeCloseTo(RATE, 6);
+    }
+  });
+
+  it('matches the Python blog helper', () => {
+    const target = 42;
+    const typescriptValue = interpolateForGPU(
+      frontier,
+      target,
+      'interactivity_to_throughput',
+      'costh',
+    )!.cost;
+    const pythonValue = interpolateWithPython({
+      points: frontier.map((point) => ({
+        interactivity: point.interactivity,
+        throughput: point.throughput,
+        cost: point.costh,
+      })),
+      target_iv: target,
+      metric_key: 'cost',
+      reciprocal_of: 'throughput',
+    });
+
+    expect(pythonValue).toBeCloseTo(typescriptValue, 14);
+  });
+
+  it('makes the Python helper return null when reciprocal throughput is missing', () => {
+    const pythonValue = interpolateWithPython({
+      points: [
+        { interactivity: 10, throughput: 1000, output_throughput: 800, joules: 2 },
+        { interactivity: 30, throughput: 500, joules: 4 },
+      ],
+      target_iv: 20,
+      metric_key: 'joules',
+      reciprocal_of: 'output_throughput',
+    });
+
+    expect(pythonValue).toBeNull();
+  });
+
+  it('is exact at a measured point, where both methods agree anyway', () => {
+    const r = interpolateForGPU(frontier, 30, 'interactivity_to_throughput', 'costh')!;
+    expect(r.value).toBeCloseTo(2000, 6);
+    expect(r.cost).toBeCloseTo(RATE / 2000, 9);
+  });
+
+  it('reads below the old splined value on a two-knot bracket, near (1+r)^2/(4r)', () => {
+    // The mechanism: splining cost averages reciprocals (arithmetic mean) while
+    // deriving takes the reciprocal of an average (harmonic mean), and
+    // AM/HM = (1+r)^2/(4r) for throughputs differing by r. Steffen slopes make
+    // even a two-knot spline a slight cubic rather than a chord, so the match is
+    // close but not exact. Beyond two knots the cubic can undershoot the chord,
+    // so the direction is usual but not universal — measured at 73.6% high over
+    // real frontiers, min 0.95. See docs/tco-calculator.md.
+    const t1 = 6000;
+    const t2 = 300;
+    const xs = [10, 80];
+    const pair = [consistent(xs[0]!, t1), consistent(xs[1]!, t2)];
+    const mid = (xs[0]! + xs[1]!) / 2;
+
+    const derived = interpolateForGPU(pair, mid, 'interactivity_to_throughput', 'costh')!.cost;
+    // Reconstruct the previous behaviour: spline the cost values themselves.
+    const costs = [RATE / t1, RATE / t2];
+    const splined = hermiteInterpolate(xs, costs, monotoneSlopes(xs, costs), mid);
+
+    expect(derived).toBeLessThan(splined);
+    const r = t1 / t2;
+    expect(splined / derived).toBeCloseTo((1 + r) ** 2 / (4 * r), 0);
+    // and the derived value still satisfies the identity, which splining does not
+    const at = interpolateForGPU(pair, mid, 'interactivity_to_throughput', 'costh')!;
+    expect(at.cost * at.value).toBeCloseTo(RATE, 6);
+  });
+
+  it('falls back to splining when the points do not obey the identity', () => {
+    // Synthetic points whose cost is unrelated to throughput keep the old
+    // behaviour rather than being silently rewritten.
+    const inconsistent = [
+      makePoint({ interactivity: 10, throughput: 1000, costh: 0.2 }),
+      makePoint({ interactivity: 40, throughput: 200, costh: 2 }),
+    ];
+    const r = interpolateForGPU(inconsistent, 25, 'interactivity_to_throughput', 'costh')!;
+    expect(r.cost).toBeGreaterThan(0.2);
+    expect(r.cost).toBeLessThan(2);
+    // Not the derived value, which would have been 200/interpolated-throughput.
+    expect(r.cost * r.value).not.toBeCloseTo(200, 3);
+  });
+
+  it('derives cost from the target axis in throughput_to_interactivity mode', () => {
+    const r = interpolateForGPU(frontier, 1500, 'throughput_to_interactivity', 'costh')!;
+    // In reverse mode the target IS total throughput, so cost follows from it.
+    expect(r.cost).toBeCloseTo(RATE / 1500, 9);
+  });
+
+  it('agrees with maxInteractivityAtCost on the derived curve', () => {
+    const budget = 0.45;
+    const iv = maxInteractivityAtCost(frontier, budget, 'costh', 'total')!;
+    expect(iv).not.toBeNull();
+    const at = interpolateForGPU(frontier, iv, 'interactivity_to_throughput', 'costh')!;
+    expect(at.cost).toBeLessThanOrEqual(budget + 1e-6);
+    const above = interpolateForGPU(frontier, iv + 1, 'interactivity_to_throughput', 'costh')!;
+    expect(above.cost).toBeGreaterThan(budget);
   });
 });

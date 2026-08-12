@@ -21,6 +21,10 @@ describe('FRAMEWORK_LABELS', () => {
   it('labels the canonical llmd-vllm framework "llm-d vLLM"', () => {
     expect(FRAMEWORK_LABELS['llmd-vllm']).toBe('llm-d vLLM');
   });
+
+  it('labels the canonical tilert framework "TileRT"', () => {
+    expect(FRAMEWORK_LABELS['tilert']).toBe('TileRT');
+  });
 });
 
 describe('MODEL_SPEC_METHOD_LABELS', () => {

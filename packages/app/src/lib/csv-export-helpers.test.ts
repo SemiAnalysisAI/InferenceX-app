@@ -101,6 +101,45 @@ describe('inferenceChartToCsv', () => {
     expect(row[p99IntIdx]).toBe(35);
   });
 
+  it('exports the derived Y metric and X value displayed by the table', () => {
+    const data = [makePoint({ x: 42, costh: { y: 0.512, roof: false } })];
+    const overlay = makePoint({
+      x: 37,
+      hwKey: 'b200-sxm-vllm',
+      costh: { y: 0.431, roof: false },
+    });
+    const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k', [overlay], {
+      yHeader: 'Cost per Million Total Tokens ($)',
+      yPath: 'costh.y',
+      xHeader: 'Interactivity (tok/s/user)',
+    });
+
+    expect(rows[0][headers.indexOf('Cost per Million Total Tokens ($)')]).toBe(0.512);
+    expect(rows[0][headers.indexOf('Interactivity (tok/s/user)')]).toBe(42);
+    expect(rows[1][headers.indexOf('Cost per Million Total Tokens ($)')]).toBe(0.431);
+    expect(rows[1][headers.indexOf('Interactivity (tok/s/user)')]).toBe(37);
+    expect(rows.every((row) => row.length === headers.length)).toBe(true);
+  });
+
+  it('does not duplicate an agentic P99 X metric already in the fixed schema', () => {
+    const { headers, rows } = inferenceChartToCsv(
+      [makePoint({ x: 35 })],
+      'agentx-model',
+      'agentic',
+      [],
+      {
+        yHeader: 'Cost per Million Total Tokens ($)',
+        yPath: 'costh.y',
+        xHeader: 'P99 Interactivity (tok/s/user)',
+      },
+    );
+
+    expect(headers.filter((header) => header === 'P99 Interactivity (tok/s/user)')).toHaveLength(1);
+    expect(rows[0][headers.indexOf('P99 Interactivity (tok/s/user)')]).toBe(35);
+    expect(new Set(headers).size).toBe(headers.length);
+    expect(rows[0]).toHaveLength(headers.length);
+  });
+
   it('labels raw latency statistics as seconds without changing their values', () => {
     const issueMetrics = {
       mean_ttft: 1.615576321,

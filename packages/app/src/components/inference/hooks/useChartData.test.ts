@@ -3,10 +3,15 @@ import { describe, it, expect } from 'vitest';
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
 
+import type { InferenceData } from '@/components/inference/types';
+import { EMPTY_QUICK_FILTERS } from '@/components/inference/utils/quickFilters';
+
 import {
   applyAgenticPercentileToXLabel,
+  applyScopeFilters,
   buildComparisonDates,
   dedupeRowsToLatestPerConfig,
+  filterOverviewHistoryRows,
   filterByGPU,
   derivedModeRoofline,
   flipRooflineDirection,
@@ -182,6 +187,17 @@ describe('buildComparisonDates', () => {
     expect(result).toEqual(['2026-02-01']);
   });
 
+  it('keeps other same-day runs but excludes the selected main run', () => {
+    const result = buildComparisonDates(
+      ['h100'],
+      ['2026-03-01~r301', '2026-03-01~r300', '2026-02-01~r200'],
+      { startDate: '', endDate: '' },
+      '2026-03-01',
+      '300',
+    );
+    expect(result).toEqual(['2026-03-01~r301', '2026-02-01~r200']);
+  });
+
   it('deduplicates dates appearing in both range and explicit list', () => {
     const result = buildComparisonDates(
       ['h100'],
@@ -222,6 +238,33 @@ describe('filterByGPU', () => {
 
   it('excludes when neither key nor alias matches', () => {
     expect(filterByGPU([{ hwKey: 'unknown' }], ['h100'], {})).toHaveLength(0);
+  });
+});
+
+describe('filterOverviewHistoryRows', () => {
+  it('keeps only the serving envelope encoded by the Overview history link', () => {
+    const rows = [
+      drow({ id: 1, hardware: 'mi355x', framework: 'sglang', precision: 'fp8' }),
+      drow({ id: 2, hardware: 'mi355x', framework: 'vllm', precision: 'fp4' }),
+      drow({ id: 3, hardware: 'mi355x', framework: 'sglang', precision: 'fp4' }),
+    ];
+    const key = JSON.stringify(['qwen3.5', 'mi355x', 'vllm', 'none', 'fp4', false, false, 'off']);
+
+    expect(
+      filterOverviewHistoryRows(
+        rows.map((row) => ({ ...row, model: 'qwen3.5', is_multinode: false })),
+        key,
+      ).map((row) => row.id),
+    ).toEqual([2]);
+  });
+
+  it('is a no-op outside an Overview history pair', () => {
+    const rows = [drow({ id: 1 }), drow({ id: 2 })].map((row) => ({
+      ...row,
+      model: 'qwen3.5',
+      is_multinode: false,
+    }));
+    expect(filterOverviewHistoryRows(rows, undefined)).toBe(rows);
   });
 });
 
@@ -322,5 +365,59 @@ describe('derived higher-is-better x-axis rooflines', () => {
   it('leaves the corner alone for a lower-is-better derived metric', () => {
     expect(derivedModeRoofline('upper_right', false)).toBe('upper_right');
     expect(derivedModeRoofline(undefined, true)).toBeUndefined();
+  });
+});
+
+const scopePoint = (hwKey: string, extra: Record<string, unknown> = {}): InferenceData =>
+  ({
+    x: 10,
+    y: 100,
+    hwKey,
+    model: 'DeepSeek-V4-Pro',
+    date: '2026-08-01',
+    tp: 8,
+    conc: 16,
+    precision: 'fp8',
+    framework: hwKey.split('_')[1],
+    disagg: false,
+    spec_method: 'none',
+    ...extra,
+  }) as unknown as InferenceData;
+
+describe('applyScopeFilters', () => {
+  // The legend's selection universe is built from this filter chain. It must
+  // depend on the GPU picker / quick filters / compare scope and on nothing
+  // else — in particular NOT on which y-axis metric is drawn. See the
+  // `selectionPoints` comment in useChartData: reconcileActiveSet intersects
+  // the user's legend selection with whatever set it is handed and never
+  // re-widens, so a universe that shrinks when a Measured Energy axis is
+  // picked deletes the telemetry-less configs for good.
+  const withTelemetry = scopePoint('b200_sglang', { measuredAvgPower: { y: 900, roof: false } });
+  const withoutTelemetry = scopePoint('h200_vllm');
+  const points = [withTelemetry, withoutTelemetry];
+
+  it('keeps configs that carry no measured-power telemetry', () => {
+    const scoped = applyScopeFilters(points, [], EMPTY_QUICK_FILTERS, null);
+    expect(scoped.map((p) => p.hwKey)).toEqual(['b200_sglang', 'h200_vllm']);
+  });
+
+  it('still applies the GPU picker', () => {
+    const scoped = applyScopeFilters(points, ['b200_sglang'], EMPTY_QUICK_FILTERS, null);
+    expect(scoped.map((p) => p.hwKey)).toEqual(['b200_sglang']);
+  });
+
+  it('still applies the framework quick filter', () => {
+    const scoped = applyScopeFilters(
+      points,
+      [],
+      { ...EMPTY_QUICK_FILTERS, frameworks: ['vllm'] },
+      null,
+    );
+    expect(scoped.map((p) => p.hwKey)).toEqual(['h200_vllm']);
+  });
+
+  it('still applies the two-GPU compare scope', () => {
+    const scoped = applyScopeFilters(points, [], EMPTY_QUICK_FILTERS, ['h200', 'mi355x']);
+    expect(scoped.map((p) => p.hwKey)).toEqual(['h200_vllm']);
   });
 });

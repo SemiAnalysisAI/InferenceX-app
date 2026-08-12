@@ -12,6 +12,7 @@ export function benchmarkQueryOptions(
   runId?: string,
   /** When true with a runId, fetch exactly that run's results (GPU comparison). */
   exactRun?: boolean,
+  view?: { type: 'calculator'; sequence: string },
 ) {
   return {
     queryKey: [
@@ -21,9 +22,10 @@ export function benchmarkQueryOptions(
       exact ? 'exact' : 'latest',
       runId ?? 'all',
       exactRun ? 'run' : 'asof',
+      ...(view ? ([view.type, view.sequence] as const) : []),
     ] as const,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchBenchmarks(model, date, exact, signal, runId, exactRun),
+      fetchBenchmarks(model, date, exact, signal, runId, exactRun, view),
     enabled: enabled && Boolean(model),
   };
 }
@@ -34,8 +36,9 @@ export function useBenchmarks(
   enabled = true,
   runId?: string,
   exactRun?: boolean,
+  view?: { type: 'calculator'; sequence: string },
 ) {
   return useQuery(
-    benchmarkQueryOptions(model, date ?? 'latest', enabled, undefined, runId, exactRun),
+    benchmarkQueryOptions(model, date ?? 'latest', enabled, undefined, runId, exactRun, view),
   );
 }

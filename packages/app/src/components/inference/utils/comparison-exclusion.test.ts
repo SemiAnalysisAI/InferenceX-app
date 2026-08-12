@@ -179,31 +179,63 @@ describe('comparisonExclusion', () => {
     expect(exclusion.scopesOf(key)).toEqual([]);
   });
 
-  it('keeps ATOM and TRTLLM guarded on the Agentic chart', () => {
-    const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, false)!;
+  // ATOM and TRTLLM sit outside the guarded families on both scenarios, so they
+  // do not participate at all and stay comparable with every other engine.
+  it.each([Sequence.AgenticTraces, Sequence.EightK_OneK])(
+    'leaves ATOM and TRTLLM unguarded on %s',
+    (sequence) => {
+      const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, sequence, false)!;
 
-    expect(exclusion.groupOf('mi355x_atom')).toBe('sglang');
-    expect(exclusion.groupOf('mi355x_atom_mtp')).toBe('sglang');
-    expect(exclusion.groupOf('b200_trt')).toBe('trt');
-    expect(exclusion.groupOf('b200_trt_mtp')).toBe('trt');
-  });
+      expect(exclusion.groupOf('mi355x_atom')).toBeNull();
+      expect(exclusion.groupOf('mi355x_atom_mtp')).toBeNull();
+      expect(exclusion.groupOf('b200_trt')).toBeNull();
+      expect(exclusion.groupOf('b200_trt_mtp')).toBeNull();
+    },
+  );
 
-  it('guards only the literal vLLM and SGLang families on the 8K/1K chart', () => {
-    const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, false)!;
+  it.each([Sequence.AgenticTraces, Sequence.EightK_OneK])(
+    'guards only the literal vLLM and SGLang families on %s',
+    (sequence) => {
+      const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, sequence, false)!;
 
-    expect(exclusion.groupOf('b200_vllm')).toBe('vllm');
-    expect(exclusion.groupOf('gb300_dynamo-vllm')).toBe('vllm');
-    expect(exclusion.groupOf('gb200_llmd-vllm')).toBe('vllm');
-    expect(exclusion.groupOf('b200_sglang')).toBe('sglang');
-    expect(exclusion.groupOf('gb300_dynamo-sglang')).toBe('sglang');
-    expect(exclusion.groupOf('mi355x_mori-sglang')).toBe('sglang');
-  });
+      expect(exclusion.groupOf('b200_vllm')).toBe('vllm');
+      expect(exclusion.groupOf('gb300_dynamo-vllm')).toBe('vllm');
+      expect(exclusion.groupOf('gb200_llmd-vllm')).toBe('vllm');
+      expect(exclusion.groupOf('b200_sglang')).toBe('sglang');
+      expect(exclusion.groupOf('gb300_dynamo-sglang')).toBe('sglang');
+      expect(exclusion.groupOf('mi355x_mori-sglang')).toBe('sglang');
+    },
+  );
+
+  // The guard exists to stop two engines being read off one SKU's curve, so
+  // every participating key is scoped to its own hardware and never globally.
+  it.each([Sequence.AgenticTraces, Sequence.EightK_OneK, Sequence.OneK_OneK])(
+    'scopes both standard-token and MTP guards to a single SKU on %s',
+    (sequence) => {
+      const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, sequence, false)!;
+
+      for (const key of ['b200_vllm', 'b200_vllm_mtp', 'b200_sglang', 'b200_sglang_mtp']) {
+        const scopes = exclusion.scopesOf(key);
+        if (scopes.length === 0) continue; // key not guarded on this scenario
+        expect(scopes).toEqual(['b200']);
+      }
+    },
+  );
 
   it('keeps the engine-family guard for official Agentic Traces charts', () => {
     const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, false);
 
     expect(exclusion?.familyOf('b200_vllm')).toBe('vllm');
     expect(exclusion?.familyOf('b200_sglang')).toBe('sglang');
+  });
+
+  it('allows the exact Overview history pair without changing normal dashboard guards', () => {
+    expect(
+      comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, false, true),
+    ).toBeNull();
+    expect(
+      comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, false, false),
+    ).not.toBeNull();
   });
 
   it.each([
@@ -250,10 +282,10 @@ describe('comparisonExclusion', () => {
       expected: 'fallthrough',
     },
     {
-      name: 'blocks Agentic cross-engine MTP globally',
+      name: 'blocks Agentic cross-engine MTP on the same SKU',
       sequence: Sequence.AgenticTraces,
       active: 'b200_sglang_mtp',
-      candidate: 'mi355x_vllm_mtp',
+      candidate: 'b200_vllm_mtp',
       expected: 'block',
     },
     {
@@ -334,10 +366,17 @@ describe('comparisonExclusion', () => {
       expected: 'fallthrough',
     },
     {
-      name: 'still blocks 8K/1K cross-engine MTP globally',
+      name: 'allows 8K/1K cross-engine MTP on different SKUs',
       sequence: Sequence.EightK_OneK,
       active: 'b200_sglang_mtp',
       candidate: 'mi355x_vllm_mtp',
+      expected: 'fallthrough',
+    },
+    {
+      name: 'still blocks 8K/1K cross-engine MTP on the same SKU',
+      sequence: Sequence.EightK_OneK,
+      active: 'b200_sglang_mtp',
+      candidate: 'b200_vllm_mtp',
       expected: 'block',
     },
     {
@@ -368,19 +407,63 @@ describe('comparisonExclusion', () => {
       candidate: 'b200_trt',
       expected: 'fallthrough',
     },
+    // Agentic now guards the same two families as 8K/1K, so ATOM and TRTLLM are
+    // comparable with everything there too.
     {
-      name: 'keeps the Agentic ATOM MTP guard untouched',
+      name: 'allows Agentic ATOM MTP next to vLLM MTP on the same SKU',
       sequence: Sequence.AgenticTraces,
       active: 'mi355x_atom_mtp',
       candidate: 'mi355x_vllm_mtp',
-      expected: 'block',
+      expected: 'fallthrough',
     },
     {
-      name: 'keeps the Agentic TRTLLM guard untouched',
+      name: 'allows Agentic TRTLLM next to vLLM on the same SKU',
       sequence: Sequence.AgenticTraces,
       active: 'b200_trt',
       candidate: 'b200_vllm',
+      expected: 'fallthrough',
+    },
+    {
+      name: 'allows Agentic TRTLLM next to SGLang on the same SKU',
+      sequence: Sequence.AgenticTraces,
+      active: 'b200_sglang',
+      candidate: 'b200_trt',
+      expected: 'fallthrough',
+    },
+    {
+      name: 'allows Agentic TRTLLM MTP next to ATOM MTP on the same SKU',
+      sequence: Sequence.AgenticTraces,
+      active: 'mi355x_atom_mtp',
+      candidate: 'mi355x_trt_mtp',
+      expected: 'fallthrough',
+    },
+    {
+      name: 'still blocks Agentic vLLM against SGLang on the same SKU',
+      sequence: Sequence.AgenticTraces,
+      active: 'b200_sglang',
+      candidate: 'b200_vllm',
       expected: 'block',
+    },
+    {
+      name: 'still blocks Agentic cross-engine MTP on the same SKU',
+      sequence: Sequence.AgenticTraces,
+      active: 'b200_sglang_mtp',
+      candidate: 'b200_vllm_mtp',
+      expected: 'block',
+    },
+    {
+      name: 'allows Agentic cross-engine MTP on different SKUs',
+      sequence: Sequence.AgenticTraces,
+      active: 'b200_sglang_mtp',
+      candidate: 'mi355x_vllm_mtp',
+      expected: 'fallthrough',
+    },
+    {
+      name: 'allows Agentic vLLM and SGLang on different SKUs',
+      sequence: Sequence.AgenticTraces,
+      active: 'b200_sglang',
+      candidate: 'mi355x_vllm',
+      expected: 'fallthrough',
     },
     {
       name: 'allows 8K/1K STP engines on different SKUs',
@@ -425,11 +508,18 @@ describe('comparisonExclusion', () => {
       expected: 'fallthrough',
     },
     {
-      name: 'blocks fixed-sequence cross-engine MTP globally',
+      name: 'blocks fixed-sequence cross-engine MTP on the same SKU',
+      sequence: Sequence.OneK_OneK,
+      active: 'b200_sglang_mtp',
+      candidate: 'b200_vllm_mtp',
+      expected: 'block',
+    },
+    {
+      name: 'allows fixed-sequence cross-engine MTP on different SKUs',
       sequence: Sequence.OneK_OneK,
       active: 'b200_sglang_mtp',
       candidate: 'mi355x_vllm_mtp',
-      expected: 'block',
+      expected: 'fallthrough',
     },
   ] as const)('$name', ({ sequence, active, candidate, expected }) => {
     const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, sequence, false)!;

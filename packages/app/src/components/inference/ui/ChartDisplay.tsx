@@ -3,7 +3,7 @@ import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, Table2, X } from 'lucide-react';
+import { BarChart3, Table2 } from 'lucide-react';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import { useInference } from '@/components/inference/InferenceContext';
@@ -12,7 +12,6 @@ import type {
   HardwareConfig,
   InferenceData,
   OverlayData,
-  TrendDataPoint,
 } from '@/components/inference/types';
 import {
   processOverlayChartDataWithClipping,
@@ -25,6 +24,7 @@ import {
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { canonicalNormalizedFrontierIds } from '@/components/inference/utils/canonicalFrontier';
+import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { Card } from '@/components/ui/card';
@@ -38,13 +38,6 @@ import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
 import { getDisplayLabel } from '@/lib/utils';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import {
@@ -67,7 +60,6 @@ import {
   useDerivedAgenticMetrics,
   type DerivedAgenticMetric,
 } from '@/hooks/api/use-derived-agentic-metrics';
-import { useTrendData } from '@/components/inference/hooks/useTrendData';
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useLocale } from '@/lib/use-locale';
@@ -78,7 +70,6 @@ import CustomCosts from './CustomCosts';
 import CustomPowers from './CustomPowers';
 import GPUGraph from './GPUGraph';
 import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLauncher';
-import TrendChart from './TrendChart';
 
 const ModelArchitectureDiagram = dynamic(() => import('./ModelArchitectureDiagram'), {
   ssr: false,
@@ -101,9 +92,6 @@ const STRINGS = {
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
     selectDateRange: 'Select a date range or add a run to view chip comparison',
-    performanceOverTime: 'Performance Over Time',
-    performanceOverTimeDesc:
-      'Double-click points on the scatter chart to track configurations over time.',
     viewMode: 'View mode',
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
@@ -120,8 +108,6 @@ const STRINGS = {
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
     selectDateRange: '请选择日期范围或添加运行以查看 Chip 对比',
-    performanceOverTime: '性能趋势',
-    performanceOverTimeDesc: '双击散点图上的数据点以追踪配置随时间的变化。',
     viewMode: '视图模式',
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
@@ -198,8 +184,8 @@ const VIEW_MODE_OPTIONS: SegmentedToggleOption<InferenceViewMode>[] = [
 ];
 
 /**
- * Renders the inference chart cards, captions, overlay controls, and trend drill-down dialog for
- * the current filtered benchmark data.
+ * Renders the inference chart cards, captions, and overlay controls for the current filtered
+ * benchmark data.
  */
 export default function ChartDisplay() {
   const locale = useLocale();
@@ -216,17 +202,15 @@ export default function ChartDisplay() {
     selectedPrecisions,
     selectedDates,
     setSelectedDates,
+    setSelectedDatesFromRunExpansion,
     selectedDateRange,
     dateRangeAvailableDates,
     selectedModel,
     selectedSequence,
     selectedRunDate,
     setIsLegendExpanded,
-    trackedConfigs,
-    removeTrackedConfig,
-    clearTrackedConfigs,
-    logScale,
     activeHwTypes,
+    bestPerSku,
     activeDates,
     selectedPercentile,
     compareGpuPair,
@@ -274,7 +258,7 @@ export default function ChartDisplay() {
   useEffect(() => {
     const runConfigsByDate = new Map(changelogs.map((c) => [c.date, c.runConfigs]));
     const scope = { modelDbKeys, selectedGPUs, selectedPrecisions };
-    setSelectedDates((prev) => {
+    setSelectedDatesFromRunExpansion((prev) => {
       let changed = false;
       const out: string[] = [];
       for (const entry of prev) {
@@ -294,7 +278,14 @@ export default function ChartDisplay() {
       if (!changed) return prev;
       return [...new Set(out)];
     });
-  }, [changelogs, modelDbKeys, selectedGPUs, selectedPrecisions, selectedDates, setSelectedDates]);
+  }, [
+    changelogs,
+    modelDbKeys,
+    selectedGPUs,
+    selectedPrecisions,
+    selectedDates,
+    setSelectedDatesFromRunExpansion,
+  ]);
 
   const [viewModes, setViewModes] = useState<Record<number, InferenceViewMode>>({});
   const replayHandlesRef = useRef<Record<number, ReplayLauncherHandle | null>>({});
@@ -426,7 +417,11 @@ export default function ChartDisplay() {
   const overlayScope = useMemo(() => {
     const eligibleKeys = new Set<string>();
     for (const overlay of [overlayDataByChartType.e2e, overlayDataByChartType.interactivity]) {
-      for (const point of overlay?.data ?? []) {
+      const points = [
+        ...(overlay?.data ?? []),
+        ...(overlay?.clippedData ?? []).map((entry) => entry.point),
+      ];
+      for (const point of points) {
         const key = String(point.hwKey);
         if (
           selectedPrecisions.includes(point.precision) &&
@@ -441,7 +436,8 @@ export default function ChartDisplay() {
   const officialScope = useMemo(() => {
     const eligibleKeys = new Set<string>();
     for (const graph of graphs) {
-      for (const point of graph.data) {
+      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      for (const point of points) {
         if (
           selectedPrecisions.includes(point.precision) &&
           matchesQuickFilters(point, quickFilters)
@@ -452,6 +448,37 @@ export default function ChartDisplay() {
     }
     return eligibleKeys;
   }, [graphs, selectedPrecisions, quickFilters]);
+  const scopedBestSelections = useMemo(() => {
+    if (!bestPerSku) return { official: officialScope, overlay: overlayScope };
+    const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
+    const graph = graphs.find((candidate) => candidate.chartDefinition.chartType === wantedType);
+    const direction =
+      graph?.chartDefinition[`${selectedYAxisMetric}_roofline` as keyof ChartDefinition];
+    if (
+      !graph ||
+      (direction !== 'upper_right' &&
+        direction !== 'upper_left' &&
+        direction !== 'lower_left' &&
+        direction !== 'lower_right')
+    ) {
+      return { official: officialScope, overlay: overlayScope };
+    }
+    const overlay = overlayDataByChartType[wantedType];
+    const officialBest = bestSeriesPerSku(graph.data, direction);
+    const overlayBest = bestSeriesPerSku(overlay?.data ?? [], direction);
+    return {
+      official: officialBest.size > 0 ? officialBest : officialScope,
+      overlay: overlayBest.size > 0 ? overlayBest : overlayScope,
+    };
+  }, [
+    bestPerSku,
+    graphs,
+    officialScope,
+    overlayDataByChartType,
+    overlayScope,
+    selectedXAxisMode,
+    selectedYAxisMetric,
+  ]);
   const overlayRowsScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(
     ',',
   )}|${unofficialRunInfos.map((run) => run.url).join(',')}`;
@@ -469,8 +496,8 @@ export default function ChartDisplay() {
     const activeScopedOverlayKeys = new Set(
       [...activeOverlayHwTypes].filter((key) => overlayScope.has(key)),
     );
-    return overlayRowsScopeChanged ? overlayScope : activeScopedOverlayKeys;
-  }, [activeOverlayHwTypes, overlayScope, overlayRowsScopeChanged]);
+    return overlayRowsScopeChanged ? scopedBestSelections.overlay : activeScopedOverlayKeys;
+  }, [activeOverlayHwTypes, overlayScope, overlayRowsScopeChanged, scopedBestSelections.overlay]);
   useEffect(() => {
     const merged = new Set(activeOverlayHwTypes);
     overlayScope.forEach((key) => merged.delete(key));
@@ -488,7 +515,7 @@ export default function ChartDisplay() {
     // A scope change can render once before its official graphs arrive. Do not
     // persist that transient empty set as an intentional legend selection.
     if (overlayRowsScopeChanged && (!loading || officialScope.size > 0)) {
-      setLocalOfficialOverride(officialScope);
+      setLocalOfficialOverride(scopedBestSelections.official);
       setAppliedOverlayRowsScopeKey(overlayRowsScopeKey);
     }
   }, [
@@ -497,6 +524,7 @@ export default function ChartDisplay() {
     activeOverlayHwTypes,
     loading,
     officialScope,
+    scopedBestSelections.official,
     overlayScope,
     scopedActiveOverlayHwTypes,
     setActiveOverlayHwTypes,
@@ -533,54 +561,6 @@ export default function ChartDisplay() {
     [selectedPrecisions, quickFilters, selectedOfficialHwTypes, scopedActiveOverlayHwTypes],
   );
 
-  // Resolve x-axis field per chart type for trend data
-  const xAxisFieldByChartType = useMemo(() => {
-    const result: Record<string, string> = {};
-    for (const g of graphs) {
-      const ct = g.chartDefinition.chartType;
-      if (ct === 'e2e' && selectedE2eXAxisMetric) {
-        result[ct] = selectedE2eXAxisMetric;
-      }
-      // interactivity uses chart-config defaults; no override needed here
-    }
-    return result;
-  }, [graphs, selectedE2eXAxisMetric]);
-
-  // Trend data for "Performance Over Time" drill-down
-  const { trendLines } = useTrendData(
-    trackedConfigs,
-    selectedModel as Model,
-    selectedSequence as Sequence,
-    selectedYAxisMetric,
-    xAxisFieldByChartType,
-  );
-
-  // Get the current Y-axis label from the first graph's chart definition
-  const currentYLabel = useMemo(() => {
-    if (graphs.length === 0) return '';
-    return metricLabel(graphs[0].chartDefinition, selectedYAxisMetric, locale);
-  }, [graphs, selectedYAxisMetric, locale]);
-
-  // Derive x-axis trend lines by swapping each point's x → value
-  const xTrendLines = useMemo(() => {
-    const result = new Map<string, TrendDataPoint[]>();
-    for (const [configId, points] of trendLines) {
-      result.set(
-        configId,
-        points.map((p) => ({ ...p, value: p.x })),
-      );
-    }
-    return result;
-  }, [trendLines]);
-
-  // Get the current X-axis label from the chart definition matching the tracked config's chart type
-  const currentXLabel = useMemo(() => {
-    if (trackedConfigs.length === 0 || graphs.length === 0) return '';
-    const chartType = trackedConfigs[0].chartType;
-    const matchingGraph = graphs.find((g) => g.chartDefinition.chartType === chartType);
-    return matchingGraph?.chartDefinition.x_label || '';
-  }, [trackedConfigs, graphs]);
-
   if (!loading && error) {
     console.error(error);
     throw new Error('Something went wrong.');
@@ -597,7 +577,9 @@ export default function ChartDisplay() {
     if (graphs.length > 0) return graphs;
     const hasOverlay =
       (overlayDataByChartType.e2e?.data.length ?? 0) > 0 ||
-      (overlayDataByChartType.interactivity?.data.length ?? 0) > 0;
+      (overlayDataByChartType.e2e?.clippedData?.length ?? 0) > 0 ||
+      (overlayDataByChartType.interactivity?.data.length ?? 0) > 0 ||
+      (overlayDataByChartType.interactivity?.clippedData?.length ?? 0) > 0;
     if (!hasOverlay) return graphs;
     return (chartDefinitions as ChartDefinition[]).map((chartDefinition) => ({
       model: selectedModel,
@@ -778,6 +760,13 @@ export default function ChartDisplay() {
                         graph.model,
                         graph.sequence,
                         visibleOverlayRowsForExport,
+                        {
+                          yHeader: metricLabel(graph.chartDefinition, selectedYAxisMetric, locale),
+                          yPath: (graph.chartDefinition as ChartDefinition)[
+                            selectedYAxisMetric
+                          ] as string,
+                          xHeader: graph.chartDefinition.x_label,
+                        },
                       );
                       // Match warnings against the same series the chart annotates,
                       // including visible unofficial-run overlay series.
@@ -894,9 +883,26 @@ export default function ChartDisplay() {
                           graph.chartDefinition.chartType,
                           overlayDataByChartType,
                         );
+                        // Display limits keep outliers off the plotted domain but
+                        // must not silently remove measured rows from the table.
+                        // Restore both official and unofficial clipped points before
+                        // applying the shared precision, quick-filter, and legend gates.
+                        const tableOfficialData = [
+                          ...graph.data,
+                          ...(graph.clippedData ?? []).map((entry) => entry.point),
+                        ];
+                        const tableOverlay = overlay
+                          ? {
+                              ...overlay,
+                              data: [
+                                ...overlay.data,
+                                ...(overlay.clippedData ?? []).map((entry) => entry.point),
+                              ],
+                            }
+                          : overlay;
                         const { officialRows, overlayRows } = visibleComparisonRows(
-                          graph.data,
-                          overlay,
+                          tableOfficialData,
+                          tableOverlay,
                         );
                         return (
                           <>
@@ -1054,87 +1060,6 @@ export default function ChartDisplay() {
         </TabsList>
       </Tabs>
       <div className="flex flex-col gap-4">{displayGraphs}</div>
-
-      {/* Performance Over Time — Modal Drill-Down */}
-      <Dialog
-        open={
-          trackedConfigs.length > 0 &&
-          !(selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0)
-        }
-        onOpenChange={(open) => {
-          if (!open) {
-            clearTrackedConfigs();
-            track('inference_trend_cleared', {
-              configCount: trackedConfigs.length,
-              model: selectedModel,
-              metric: selectedYAxisMetric,
-            });
-          }
-        }}
-      >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{t.performanceOverTime}</DialogTitle>
-            <DialogDescription>{t.performanceOverTimeDesc}</DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {trackedConfigs.map((config) => (
-              <span
-                key={config.id}
-                data-testid="tracked-config-badge"
-                className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium"
-                style={{ borderColor: config.color, color: config.color }}
-              >
-                <span
-                  className="inline-block size-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: config.color }}
-                />
-                {config.label}
-                <button
-                  type="button"
-                  className="ml-1 hover:opacity-70"
-                  onClick={() => {
-                    removeTrackedConfig(config.id);
-                    track('inference_trend_point_removed', { config: config.hwKey });
-                  }}
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className="relative">
-            <ChartButtons
-              chartId="y-trend"
-              analyticsPrefix="inference"
-              zoomResetEvent="d3chart_zoom_reset_y-trend"
-            />
-            <TrendChart
-              chartId="y-trend"
-              trendLines={trendLines}
-              lineConfigs={trackedConfigs}
-              yLabel={currentYLabel}
-              logScale={logScale}
-              selectedPrecisions={selectedPrecisions}
-            />
-          </div>
-          <div className="relative">
-            <ChartButtons
-              chartId="x-trend"
-              analyticsPrefix="inference"
-              zoomResetEvent="d3chart_zoom_reset_x-trend"
-            />
-            <TrendChart
-              chartId="x-trend"
-              trendLines={xTrendLines}
-              lineConfigs={trackedConfigs}
-              yLabel={currentXLabel}
-              logScale={logScale}
-              selectedPrecisions={selectedPrecisions}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

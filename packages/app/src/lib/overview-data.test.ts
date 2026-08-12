@@ -5,7 +5,13 @@ import overviewRowsFixture from '../../cypress/fixtures/api/overview-rows.json';
 import { dedupeRowsToLatestPerConfig } from '@/components/inference/hooks/useChartData';
 
 import type { BenchmarkRow } from './api';
-import { DEFAULT_MODELS, Model, Precision } from './data-mappings';
+import {
+  DEFAULT_MODELS,
+  DEPRECATED_MODELS,
+  MAINTENANCE_MODELS,
+  Model,
+  Precision,
+} from './data-mappings';
 import {
   assembleOverviewHistoricalPageData,
   assembleOverviewPageData,
@@ -17,6 +23,7 @@ import {
   overviewTierEvidenceDate,
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
+  resolveOverviewModelScope,
   resolveOverviewReferenceHardware,
   resolveOverviewTier,
   type OverviewModelSummary,
@@ -358,6 +365,25 @@ describe('overview engine scope and scenario selection', () => {
 
     expect(page.engineScope).toBe('community');
     expect(page).not.toHaveProperty('datasetThroughDate');
+  });
+
+  it('keeps the tier interpolation input off the wire', () => {
+    const page = assembleOverviewPageData(
+      {
+        [Model.Qwen3_5]: [
+          row({ framework: 'dynamo-vllm', date: '2026-07-20' }),
+          row({ framework: 'atom', date: '2026-07-21' }),
+        ],
+      },
+      50,
+    );
+
+    // The reads that back the matrix must exist, or the assertion below passes
+    // vacuously on an empty payload.
+    expect(page.models.some((model) => model.platforms.some((p) => p.read.config !== null))).toBe(
+      true,
+    );
+    expect(JSON.stringify(page)).not.toContain('tierValues');
   });
 
   it('ranks same-bucket configs by total throughput even when output ranking disagrees', () => {
@@ -821,6 +847,7 @@ describe('assembleOverviewHistoricalPageData', () => {
       baselineCostPerMtok: null,
       costDeltaPct: null,
       baselineDate: null,
+      baselineConfig: null,
     });
   });
 
@@ -863,6 +890,8 @@ describe('assembleOverviewHistoricalPageData', () => {
     expect(current?.read.config?.framework).toBe('sglang');
     expect(baseline?.read.config?.framework).toBe('vllm');
     expect(current?.historicalComparison?.status).toBe('comparable');
+    expect(current?.historicalComparison?.baselineConfig?.framework).toBe('vllm');
+    expect(current?.historicalComparison?.baselineConfig?.key).toBe(baseline?.read.config?.key);
   });
 });
 
@@ -1415,5 +1444,54 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     const communityGlmB300 = headlinePairOf(communityGlm, 'b300-vs-b200')!;
     expect(communityGlmB300.candidate.read.value).toBeNull();
     expect(communityGlmB300.candidate.missingReason).toBe('no_scenario_data');
+  });
+});
+
+describe('overview model scope', () => {
+  it('resolves valid model scopes and defaults invalid values to default', () => {
+    expect(resolveOverviewModelScope('all')).toBe('all');
+    expect(resolveOverviewModelScope(['all', 'default'])).toBe('all');
+    expect(resolveOverviewModelScope('default')).toBe('default');
+    expect(resolveOverviewModelScope('deprecated')).toBe('default');
+    expect(resolveOverviewModelScope('')).toBe('default');
+    expect(resolveOverviewModelScope(undefined)).toBe('default');
+  });
+
+  it('renders only default-category models under the default scope', () => {
+    const page = assembleOverviewPageData({});
+    expect(new Set(page.models.map((m) => m.model))).toEqual(new Set(DEFAULT_MODELS));
+    expect(page.modelScope).toBe('default');
+  });
+
+  it("appends maintenance then deprecated rows after defaults under scope 'all'", () => {
+    const page = assembleOverviewPageData({}, 50, 'community', 'b200', 'all');
+    const orderedUniqueModels = [...new Set(page.models.map((m) => m.model))];
+    expect(orderedUniqueModels).toEqual([
+      ...DEFAULT_MODELS,
+      ...MAINTENANCE_MODELS,
+      ...DEPRECATED_MODELS,
+    ]);
+    expect(page.modelScope).toBe('all');
+  });
+
+  it('stamps each model summary with its category', () => {
+    const page = assembleOverviewPageData({}, 50, 'community', 'b200', 'all');
+    const categoryOf = (model: Model) => page.models.find((m) => m.model === model)?.category;
+    expect(categoryOf(Model.DeepSeek_V4_Pro)).toBe('default');
+    expect(categoryOf(Model.DeepSeek_R1)).toBe('maintenance');
+    expect(categoryOf(Model.GLM_5)).toBe('deprecated');
+    expect(categoryOf(Model.GptOss)).toBe('deprecated');
+  });
+
+  it('forwards the model scope through the historical assembler', () => {
+    const window = overviewHistoricalWindow('2026-07-20');
+    const page = assembleOverviewHistoricalPageData({}, {}, window, 50, 'community', 'b200', 'all');
+    const orderedUniqueModels = [...new Set(page.models.map((m) => m.model))];
+    expect(orderedUniqueModels).toEqual([
+      ...DEFAULT_MODELS,
+      ...MAINTENANCE_MODELS,
+      ...DEPRECATED_MODELS,
+    ]);
+    expect(page.modelScope).toBe('all');
   });
 });

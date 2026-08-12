@@ -1,6 +1,7 @@
 import type {
   CollectiveXChartPoint,
   CollectiveXComponent,
+  CollectiveXKvCase,
   CollectiveXKvRow,
   CollectiveXMode,
   CollectiveXOperation,
@@ -16,7 +17,7 @@ import type {
 export interface CollectiveXSeriesSelection {
   epSize: number;
   phase: CollectiveXPhase;
-  mode: CollectiveXMode;
+  modes: readonly CollectiveXMode[];
   precision: CollectiveXPrecision;
 }
 
@@ -89,7 +90,7 @@ export function seriesMatchesSelection(
   return (
     series.system.ep_size === selection.epSize &&
     series.phase === selection.phase &&
-    series.mode === selection.mode &&
+    selection.modes.includes(series.mode) &&
     series.precision === selection.precision
   );
 }
@@ -221,4 +222,63 @@ export function collectiveXKvCell(
   const pick = (better: (a: number, b: number) => boolean) =>
     atIsl.reduce((best, row) => (better(row.batch, best.batch) ? row : best));
   return batch === 'min' ? pick((a, b) => a < b) : pick((a, b) => a > b);
+}
+
+/** A kv case namespaced by its run, with the run's selection-order style index. */
+export type CollectiveXKvRunCase = CollectiveXKvCase & { run_id: string; run_index: number };
+
+export interface CollectiveXKvChartSelection {
+  x: 'batch' | 'isl';
+  y: 'bandwidth' | 'latency';
+  op: 'pull' | 'push';
+  pageTokens: number;
+}
+
+export interface CollectiveXKvChartPoint {
+  seriesId: string;
+  seriesLabel: string;
+  colorKey: string;
+  x: number;
+  y: number;
+  row: CollectiveXKvRow;
+}
+
+export function collectiveXKvColorKey(kase: CollectiveXKvCase): string {
+  return `${kase.vendor ?? 'unknown'}_${kase.sku}_${kase.backend}_${kase.fabric}_${kase.precision}`;
+}
+
+export function collectiveXKvLegendLabel(kase: CollectiveXKvCase): string {
+  return `${kase.sku.toUpperCase()} · ${kase.backend} · ${kase.fabric} · ${kase.precision}`;
+}
+
+/**
+ * Chart points for the kv view. Batch on the x axis reads at the largest
+ * measured ISL (the bandwidth-bound point, where concurrency scaling is the
+ * story); ISL on the x axis reads at batch 1 (a single request's handoff).
+ * Paged rows only: the single-descriptor bulk ceiling stays a table column.
+ */
+export function collectiveXKvChartPoints(
+  cases: readonly CollectiveXKvRunCase[],
+  selection: CollectiveXKvChartSelection,
+): CollectiveXKvChartPoint[] {
+  return cases.flatMap((kase) => {
+    const matching = kase.rows.filter(
+      (row) =>
+        row.kind === 'paged' && row.op === selection.op && row.page_tokens === selection.pageTokens,
+    );
+    if (matching.length === 0) return [];
+    const rows =
+      selection.x === 'batch'
+        ? matching.filter((row) => row.isl === Math.max(...matching.map((item) => item.isl)))
+        : matching.filter((row) => row.batch === 1);
+    const seriesId = `${kase.run_id}:${kase.case_id}`;
+    return rows.map((row) => ({
+      seriesId,
+      seriesLabel: `#${kase.run_id} · ${collectiveXKvLegendLabel(kase)}`,
+      colorKey: collectiveXKvColorKey(kase),
+      x: selection.x === 'batch' ? row.batch : row.isl,
+      y: selection.y === 'bandwidth' ? row.gbps_p50 : row.latency_ms.p50,
+      row,
+    }));
+  });
 }

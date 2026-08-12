@@ -164,12 +164,17 @@ export function fetchBenchmarks(
   runId?: string,
   /** When true with a runId, fetch exactly that run's results (GPU comparison). */
   exactRun?: boolean,
+  view?: { type: 'calculator'; sequence: string },
 ) {
   const params = new URLSearchParams({ model });
   if (date) params.set('date', date);
   if (exact) params.set('exact', 'true');
   if (runId) params.set('runId', runId);
   if (exactRun) params.set('exactRun', 'true');
+  if (view) {
+    params.set('view', view.type);
+    params.set('sequence', view.sequence);
+  }
   return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks?${params}`, signal);
 }
 

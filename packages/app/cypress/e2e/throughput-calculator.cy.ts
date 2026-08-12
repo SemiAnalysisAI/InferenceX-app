@@ -2,6 +2,7 @@ import {
   availability as agenticAvailability,
   b300Rows as agenticB300Rows,
 } from '../support/overlay-fixtures';
+import { unlockAgenticGate } from '../support/e2e';
 
 describe('TCO Calculator', () => {
   // ---------------------------------------------------------------------------
@@ -147,6 +148,19 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('input[type="range"]').should('exist');
         cy.get('input[type="number"]').should('exist');
+      });
+    });
+
+    it('places the config-range toggle beside its label above the slider', () => {
+      cy.get('[data-testid="calculator-hide-over-limit-control"]').then(($control) => {
+        const label = $control.children().first()[0].getBoundingClientRect();
+        const toggle = $control.find('button[role="switch"]')[0].getBoundingClientRect();
+        const slider = $control
+          .closest('[data-testid="calculator-controls"]')
+          .find('input[type="range"]')[0]
+          .getBoundingClientRect();
+        expect(toggle.left - label.right).to.be.lessThan(12);
+        expect(toggle.bottom).to.be.lessThan(slider.top);
       });
     });
 
@@ -509,12 +523,31 @@ describe('TCO Calculator', () => {
       );
     });
 
-    it('shows disaggregated cost disclaimer when cost metric is selected', () => {
+    // A disagg config's input/output cost is attributed to only its prefill or
+    // decode chips, so those token types carry the caveat. The total-token cost
+    // divides by the whole chip count — the same denominator an aggregated
+    // config uses — so it must not.
+    it('shows the disaggregated cost disclaimer only for per-token-type cost', () => {
+      cy.visit('/calculator');
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
       cy.get('[data-testid="calculator-metric-cost"]').click();
-      cy.get('[data-testid="calculator-chart-section"]').should(
-        'contain.text',
-        'cost per decode chip',
-      );
+
+      // Token type defaults to Total Tokens.
+      cy.get('[data-testid="calculator-disagg-cost-note"]').should('not.be.visible');
+
+      for (const tokenType of ['Output Tokens', 'Input Tokens']) {
+        cy.get('[data-testid="calc-cost-type-selector"]').click();
+        cy.contains('[role="option"]', tokenType).click();
+        cy.get('body').type('{esc}');
+        cy.get('[data-testid="calculator-disagg-cost-note"]')
+          .should('be.visible')
+          .and('contain.text', 'cost per decode chip');
+      }
+
+      cy.get('[data-testid="calc-cost-type-selector"]').click();
+      cy.contains('[role="option"]', 'Total Tokens').click();
+      cy.get('body').type('{esc}');
+      cy.get('[data-testid="calculator-disagg-cost-note"]').should('not.be.visible');
     });
 
     it('shows disaggregated throughput disclaimer for power metric', () => {
@@ -582,6 +615,9 @@ describe('TCO Calculator', () => {
       cy.visit('/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          // The percentile control sits behind the ↑↑↓↓ gate; unlock it so the
+          // specs below can still exercise switching to P75.
+          unlockAgenticGate(win);
         },
       });
       cy.wait('@agenticBenchmarks');
@@ -631,6 +667,29 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
         .should('contain.text', 'P75 Interactivity');
+    });
+
+    // AgentX publishes on P90, so the percentile control is insider-only. With
+    // the gate locked it must not render at all, and the calculator must still
+    // compute on P90.
+    it('hides the percentile selector behind the feature gate and defaults to P90', () => {
+      cy.visit('/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          win.localStorage.removeItem('inferencex-feature-gate');
+        },
+      });
+      cy.wait('@agenticBenchmarks');
+
+      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic Traces');
+      cy.get('[data-testid="calc-percentile-selector"]').should('not.exist');
+      cy.get('[data-testid="calculator-chart-section"] h2')
+        .first()
+        .should('contain.text', 'P90 Interactivity');
+      cy.get('[data-testid="calculator-controls"]').should(
+        'contain.text',
+        'Target P90 Interactivity',
+      );
     });
   });
 

@@ -9,6 +9,7 @@ import type {
 } from './overview-data';
 import {
   buildOverviewDashboardHref,
+  buildOverviewHistoryDashboardHref,
   detailHref,
   mergeOverviewControlHref,
   overviewEngineScopeHref,
@@ -57,6 +58,7 @@ function summary(overrides: Partial<OverviewModelSummary> = {}): OverviewModelSu
   return {
     model: Model.Qwen3_5,
     modelLabel: 'Qwen 3.5',
+    category: 'default',
     scenario: 'single_turn_8k1k',
     platforms: [],
     ...overrides,
@@ -143,6 +145,70 @@ describe('buildOverviewDashboardHref', () => {
 
     expect(href).toContain('i_seq=agentic-traces');
     expect(href).not.toContain('i_spec=');
+  });
+});
+
+describe('buildOverviewHistoryDashboardHref', () => {
+  it('pins the independently selected current and historical serving envelopes', () => {
+    const current = config({
+      key: '["qwen3.5","mi355x","sglang","mtp","fp8",false,false,"off"]',
+      hardware: 'mi355x',
+      hwKey: 'mi355x_sglang_mtp',
+      precision: Precision.FP8,
+      latestDate: '2026-07-18',
+      sourceRunUrls: ['https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26714221123'],
+    });
+    const baseline = config({
+      key: '["qwen3.5","mi355x","vllm","mtp","fp4",false,false,"off"]',
+      hardware: 'mi355x',
+      hwKey: 'mi355x_vllm_mtp',
+      framework: 'vllm',
+      frameworkLabel: 'vLLM',
+      precision: Precision.FP4,
+      latestDate: '2026-06-10',
+      sourceRunUrls: ['https://github.com/SemiAnalysisAI/InferenceX/actions/runs/25700000001'],
+    });
+
+    const href = new URL(
+      buildOverviewHistoryDashboardHref('en', summary(), current, baseline),
+      'https://inferencex.local',
+    );
+
+    expect(href.pathname).toBe('/inference');
+    expect(Object.fromEntries(href.searchParams)).toMatchObject({
+      g_model: Model.Qwen3_5,
+      g_rundate: '2026-07-18',
+      g_runid: '26714221123',
+      i_seq: '8k/1k',
+      i_prec: 'fp8,fp4',
+      i_metric: 'y_costh',
+      i_xmode: 'interactivity',
+      i_gpus: 'mi355x_sglang_mtp,mi355x_vllm_mtp',
+      i_dates: '2026-07-18,2026-06-10~r25700000001',
+      i_overview_current: current.key,
+      i_overview_baseline: baseline.key,
+      i_optimal: '1',
+      i_advlabel: '1',
+    });
+    expect(href.searchParams.has('i_spec')).toBe(false);
+    expect(href.searchParams.has('i_disagg')).toBe(false);
+  });
+
+  it('deduplicates shared GPU keys and precisions while keeping both dates', () => {
+    const current = config();
+    const baseline = config({
+      latestDate: '2026-06-10',
+      sourceRunUrls: [],
+    });
+    const href = new URL(
+      buildOverviewHistoryDashboardHref('zh', summary(), current, baseline),
+      'https://inferencex.local',
+    );
+
+    expect(href.pathname).toBe('/zh/inference');
+    expect(href.searchParams.get('i_gpus')).toBe('b200_sglang_mtp');
+    expect(href.searchParams.get('i_prec')).toBe('fp4');
+    expect(href.searchParams.get('i_dates')).toBe('2026-07-18,2026-06-10');
   });
 });
 
@@ -271,6 +337,40 @@ describe('overview switch links', () => {
   it('preserves the selected reference when changing engine scope', () => {
     expect(overviewEngineScopeHref('en', 'all', 50, 'hardware', 'gb300')).toBe(
       '/overview?engine=all&ref=gb300',
+    );
+  });
+});
+
+describe('overview model scope links', () => {
+  it('appends models=all last and omits the default scope', () => {
+    expect(overviewHref('en', 50, 'community', 'hardware', 'b200', 'default')).toBe('/overview');
+    expect(overviewHref('en', 50, 'community', 'hardware', 'b200', 'all')).toBe(
+      '/overview?models=all',
+    );
+    expect(overviewHref('en', 100, 'all', 'history', 'b300', 'all')).toBe(
+      '/overview?tier=100&engine=all&ref=b300&compare=30d&models=all',
+    );
+    expect(overviewHref('zh', 50, 'community', 'hardware', 'b200', 'all')).toBe(
+      '/zh/overview?models=all',
+    );
+  });
+
+  it('preserves the model scope when changing tiers and engine scope', () => {
+    expect(overviewTierHref('en', 75, 'community', 'hardware', 'b200', 'all')).toBe(
+      '/overview?tier=75&models=all',
+    );
+    expect(overviewEngineScopeHref('en', 'all', 50, 'hardware', 'b200', 'all')).toBe(
+      '/overview?engine=all&models=all',
+    );
+  });
+
+  it('merges the models control into pending overview URLs', () => {
+    const tierHref = mergeOverviewControlHref('/overview?models=all', '/overview?tier=75', [
+      'tier',
+    ]);
+    expect(tierHref).toBe('/overview?tier=75&models=all');
+    expect(mergeOverviewControlHref(tierHref, '/overview?tier=75', ['models'])).toBe(
+      '/overview?tier=75',
     );
   });
 });

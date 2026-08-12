@@ -33,6 +33,7 @@ const URL_STATE_KEYS = [
   'i_dstart',
   'i_dend',
   'i_optimal',
+  'i_best',
   'i_label',
   // Legacy alias of `i_label` with inverted semantics — read-only on load so
   // pre-rename share links (?i_nolabel=1) keep hiding point labels even if the
@@ -53,6 +54,9 @@ const URL_STATE_KEYS = [
   'i_fw',
   'i_disagg',
   'i_spec',
+  // Exact serving-envelope pair behind an Overview 30-day comparison cell.
+  'i_overview_current',
+  'i_overview_baseline',
   // Evaluation
   'e_rundate',
   'e_bench',
@@ -102,6 +106,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_dstart: '',
   i_dend: '',
   i_optimal: '',
+  i_best: '',
   i_label: '',
   i_nolabel: '',
   i_hc: '',
@@ -117,6 +122,8 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_fw: '',
   i_disagg: '',
   i_spec: '',
+  i_overview_current: '',
+  i_overview_baseline: '',
   e_rundate: '',
   e_bench: '',
   e_hc: '',

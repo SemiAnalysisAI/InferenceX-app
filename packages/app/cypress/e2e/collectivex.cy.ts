@@ -174,9 +174,9 @@ describe('CollectiveX neutral run view', () => {
       .and('not.contain.text', 'Payload rate is derived');
   });
 
-  it('exposes the kernel-mode toggle when a run measured both modes and pins the LL series', () => {
+  it('allows both measured kernel modes to be selected together', () => {
     const withLowLatency = buildDataset({
-      shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' })],
+      shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' }), makeRawShard({ ep: 16 })],
     });
     installRuns([withLowLatency]);
     installRun(withLowLatency);
@@ -185,12 +185,33 @@ describe('CollectiveX neutral run view', () => {
     cy.wait('@run');
 
     cy.get('[data-testid="collectivex-mode-toggle"]').should('be.visible');
+    cy.get('[data-testid="collectivex-mode-toggle"] button')
+      .contains('Normal')
+      .should('have.attr', 'aria-pressed', 'true');
     cy.get('[data-testid="collectivex-main-chart"]').should('contain.text', 'deepep-v2');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
 
     cy.get('[data-testid="collectivex-mode-toggle"]').contains('Low-latency').click();
-    cy.get('[data-testid="chart-legend"]').should('contain.text', 'low-latency');
-    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+    cy.get('[data-testid="collectivex-mode-toggle"] button[aria-pressed="true"]').should(
+      'have.length',
+      2,
+    );
+    cy.get('[data-testid="chart-legend"]')
+      .should('contain.text', 'normal')
+      .and('contain.text', 'low-latency');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 2);
+
+    cy.get('[data-testid="collectivex-ep-select"]').click();
+    cy.contains('[role="option"]', 'EP16').click();
+    cy.get('[data-testid="collectivex-mode-toggle"]').should('not.exist');
+
+    cy.get('[data-testid="collectivex-ep-select"]').click();
+    cy.contains('[role="option"]', 'EP8').click();
+    cy.get('[data-testid="collectivex-mode-toggle"] button[aria-pressed="true"]').should(
+      'have.length',
+      2,
+    );
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 2);
   });
 
   it('selects the available phase when a partial run only measured prefill', () => {
@@ -523,12 +544,49 @@ describe('CollectiveX kv-transfer card', () => {
       'contain.text',
       `${kvDataset.run.measured_cases}/${kvDataset.run.requested_cases}`,
     );
+    // The runs table distinguishes the run's suites: this run carries both.
+    cy.get(`[data-testid="collectivex-run-suite-ep-${kvDataset.run.run_id}"]`).should('be.visible');
+    cy.get(`[data-testid="collectivex-run-suite-kv-${kvDataset.run.run_id}"]`).should('be.visible');
   });
 
-  it('renders no kv card for an EP-only run', () => {
+  it('plots the kv chart and switches metric, axis, and page size', () => {
+    installRuns([kvDataset]);
+    installRun(kvDataset);
+    openCollectiveX();
+    // Default view: aggregate GB/s vs batch at the largest ISL, page 64, pull.
+    // The measured fixture case carries paged-64 rows at batch 1 and 16.
+    cy.get('[data-testid="collectivex-kv-chart"]').should('be.visible');
+    cy.get('[data-testid="collectivex-kv-chart"] circle').should('have.length', 2);
+    cy.get('[data-testid="collectivex-kv-chart"]').should(
+      'contain.text',
+      'Aggregate pull bandwidth at p50 (GB/s)',
+    );
+    // Metric toggle swaps the y axis to burst latency.
+    cy.get('[data-testid="collectivex-kv-metric-toggle"]').contains('button', 'ms').click();
+    cy.get('[data-testid="collectivex-kv-chart"]').should(
+      'contain.text',
+      'Burst completion latency p50 (ms)',
+    );
+    // ISL on the x axis pins batch 1: one paged-64 row in the fixture.
+    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', 'ISL').click();
+    cy.get('[data-testid="collectivex-kv-chart"] circle').should('have.length', 1);
+    // Page 16 keeps a single batch-1 row.
+    cy.get('[data-testid="collectivex-kv-page-toggle"]').contains('button', '16').click();
+    cy.get('[data-testid="collectivex-kv-chart"] circle').should('have.length', 1);
+    // The kv section renders above the EP explorer chart.
+    cy.get('[data-testid="collectivex-kv-table"]').then(($kv) => {
+      cy.get('[data-testid="collectivex-main-chart"]').then(($chart) => {
+        expect($kv[0].compareDocumentPosition($chart[0]) & 4).to.equal(4);
+      });
+    });
+  });
+
+  it('renders no kv card and no KV suite badge for an EP-only run', () => {
     installRuns();
     installRun();
     openCollectiveX();
     cy.get('[data-testid="collectivex-kv-table"]').should('not.exist');
+    cy.get(`[data-testid="collectivex-run-suite-ep-${runId}"]`).should('be.visible');
+    cy.get(`[data-testid="collectivex-run-suite-kv-${runId}"]`).should('not.exist');
   });
 });

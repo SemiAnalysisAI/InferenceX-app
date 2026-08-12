@@ -3,6 +3,7 @@
 import { track } from '@/lib/analytics';
 import Link from 'next/link';
 import { BarChart3, Table2 } from 'lucide-react';
+import { useFeatureGate } from '@/lib/use-feature-gate';
 import { useLocale } from '@/lib/use-locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -27,6 +28,7 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { overlayRunColor } from '@/lib/overlay-run-style';
+import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
@@ -150,6 +152,9 @@ const STRINGS = {
     compMetricThroughput: 'throughput',
     compMetricCost: 'cost efficiency',
     compMetricPower: 'tok/s/MW',
+    hideSkuAboveConfigLimitLabel: 'Hide if target exceeds config range',
+    hideSkuAboveConfigLimitHelp:
+      'When enabled, SKUs whose measured interactivity range ends below the target are hidden instead of being projected from the max edge.',
     unofficialRun: 'UNOFFICIAL RUN',
     branch: 'Branch',
     viewRun: 'View workflow run',
@@ -199,6 +204,9 @@ const STRINGS = {
     compMetricThroughput: '吞吐量',
     compMetricCost: '成本效率',
     compMetricPower: 'tok/s/MW',
+    hideSkuAboveConfigLimitLabel: '隐藏超出配置上限的型号',
+    hideSkuAboveConfigLimitHelp:
+      '开启后，若目标交互性高于某个配置的实测上限，不再显示该 SKU，避免把结果投射到该配置最大边界。',
     unofficialRun: '非官方运行',
     branch: '分支',
     viewRun: '查看工作流运行',
@@ -294,6 +302,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [highContrast, setHighContrast] = useState(false);
   const [viewMode, setViewMode] = useState<CalculatorViewMode>('chart');
+  const [hideSkuAboveConfigLimit, setHideSkuAboveConfigLimit] = useState(true);
 
   const costTypeLabels: Record<CostType, string> = useMemo(
     () => ({ total: t.totalTokens, input: t.inputTokens, output: t.outputTokens }),
@@ -346,6 +355,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   );
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
+  // AgentX publishes on P90, so the percentile control is an insider affordance
+  // rather than a normal filter: it stays behind the ↑↑↓↓ feature gate, matching
+  // the inference chart, and the calculator defaults to P90 without it.
+  const featureGateUnlocked = useFeatureGate();
   const percentileLabel = selectedPercentile.toUpperCase();
 
   /**
@@ -455,8 +468,16 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const results: InterpolatedResult[] = useMemo(() => {
     if (!hasData) return [];
-    return getResults(targetValue, mode, costProvider, visibleHwKeys);
-  }, [hasData, targetValue, mode, costProvider, getResults, visibleHwKeys]);
+    return getResults(targetValue, mode, costProvider, visibleHwKeys, hideSkuAboveConfigLimit);
+  }, [
+    hasData,
+    targetValue,
+    mode,
+    costProvider,
+    getResults,
+    visibleHwKeys,
+    hideSkuAboveConfigLimit,
+  ]);
 
   /** Branch + URL per run index, stamped onto overlay results for labels/tooltips. */
   const runInfoByIndex = useMemo(() => {
@@ -469,7 +490,14 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const overlayResults: InterpolatedResult[] = useMemo(() => {
     if (!hasOverlayData) return [];
-    return getOverlayResults(targetValue, mode, costProvider, visibleHwKeys, runInfoByIndex);
+    return getOverlayResults(
+      targetValue,
+      mode,
+      costProvider,
+      visibleHwKeys,
+      runInfoByIndex,
+      hideSkuAboveConfigLimit,
+    );
   }, [
     hasOverlayData,
     targetValue,
@@ -478,6 +506,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     getOverlayResults,
     visibleHwKeys,
     runInfoByIndex,
+    hideSkuAboveConfigLimit,
   ]);
 
   /**
@@ -618,6 +647,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const handleViewModeChange = useCallback((value: CalculatorViewMode) => {
     setViewMode(value);
     track('calculator_view_changed', { view: value });
+  }, []);
+
+  const handleHideSkuAboveLimitChange = useCallback((checked: boolean) => {
+    setHideSkuAboveConfigLimit(checked);
+    track('calculator_hide_over_limit_toggled', { enabled: checked });
   }, []);
 
   const handleResetGpus = useCallback(() => {
@@ -837,7 +871,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   onOpenChange={handleDropdownOpenChange('sequence')}
                   availableSequences={availableSequences}
                 />
-                {isAgenticSequence && (
+                {isAgenticSequence && featureGateUnlocked && (
                   <PercentileSelector
                     id="calc-percentile"
                     data-testid="calc-percentile-selector"
@@ -951,15 +985,35 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
               {/* Target value slider + input */}
               {!loading && hasAnyData && (
                 <div className="space-y-2">
-                  <LabelWithTooltip
-                    htmlFor="calc-target"
-                    label={
-                      isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
-                    }
-                    tooltip={
-                      isAgenticSequence ? t.targetAgenticTooltip(percentileLabel) : t.targetTooltip
-                    }
-                  />
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <LabelWithTooltip
+                      htmlFor="calc-target"
+                      label={
+                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                      }
+                      tooltip={
+                        isAgenticSequence
+                          ? t.targetAgenticTooltip(percentileLabel)
+                          : t.targetTooltip
+                      }
+                    />
+                    <div
+                      className="flex items-center gap-2"
+                      data-testid="calculator-hide-over-limit-control"
+                    >
+                      <LabelWithTooltip
+                        htmlFor="calc-hide-over-limit"
+                        label={t.hideSkuAboveConfigLimitLabel}
+                        tooltip={t.hideSkuAboveConfigLimitHelp}
+                      />
+                      <Switch
+                        id="calc-hide-over-limit"
+                        checked={hideSkuAboveConfigLimit}
+                        onCheckedChange={handleHideSkuAboveLimitChange}
+                        className="shrink-0"
+                      />
+                    </div>
+                  </div>
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
                       <input
@@ -1147,12 +1201,22 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                           </p>
                         </>
                       )}
+                      {/* Per-token-type cost only: the input- and output-token
+                          costs are attributed to one side of a disagg config's
+                          prefill/decode split, while the total-token cost uses
+                          the whole chip count — the same denominator an
+                          aggregated config uses — so it needs no caveat. */}
                       <div
                         className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                          barMetric === 'cost' ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
+                          barMetric === 'cost' && costType !== 'total'
+                            ? 'max-h-20 opacity-100'
+                            : 'max-h-0 opacity-0'
                         }`}
                       >
-                        <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
+                        <p
+                          data-testid="calculator-disagg-cost-note"
+                          className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1"
+                        >
                           <strong>{t.note}</strong>
                           {t.disaggCost}
                         </p>

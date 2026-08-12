@@ -8,11 +8,10 @@ import { usePathname } from 'next/navigation';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const showTabNav = pathname !== '/overview' && pathname !== '/zh/overview';
   const content = (
     <main className="relative">
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
-        {showTabNav && <TabNav />}
+        <TabNav />
         {children}
       </div>
     </main>
@@ -24,7 +23,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <UnofficialRunProvider>
         <main className="relative">
           <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
-            {showTabNav && <TabNav />}
+            <TabNav />
             <GlobalFilterProvider>{children}</GlobalFilterProvider>
           </div>
         </main>

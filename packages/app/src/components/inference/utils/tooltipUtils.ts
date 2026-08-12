@@ -25,8 +25,6 @@ export interface TooltipConfig {
   selectedYAxisMetric: string;
   /** Hardware configuration for looking up labels */
   hardwareConfig: HardwareConfig;
-  /** Whether this config is already being tracked */
-  isTracked?: boolean;
   /** URL to the GitHub Actions workflow run */
   runUrl?: string;
   /**
@@ -389,15 +387,6 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       ${generateAgenticHTML(d, locale)}
       ${runLinkHTML(runUrl)}
       ${viewChartsButtonHTML(isPinned, Boolean(hasTrace), d.id)}
-      ${
-        isPinned
-          ? `<button data-action="track-over-time" style="
-              margin-top: 8px; width: 100%; padding: 4px 8px; font-size: 11px; font-weight: 500;
-              border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
-              background: var(--accent); color: var(--accent-foreground);
-            ">${config.isTracked ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-1px;margin-right:4px;"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>Untrack Over Time' : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-1px;margin-right:4px;"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>Track Over Time'}</button>`
-          : ''
-      }
     </div>
   `;
 };

@@ -3,10 +3,11 @@ import type { Metadata } from 'next';
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { OverviewPageContent } from '@/components/overview/overview-page';
-import { enAlternates } from '@/lib/i18n';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 import {
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
+  resolveOverviewModelScope,
   resolveOverviewReferenceHardware,
   resolveOverviewTier,
 } from '@/lib/overview-data';
@@ -15,21 +16,22 @@ import { getOverviewPageData } from '@/lib/overview-data.server';
 export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
-  'Compare hyperscaler cost per million total tokens across MI355X, B200, B300, GB200 and GB300 using the scenario shown for each active model.';
+  '按各活跃模型标注的场景，对比 MI355X、B200、B300、GB200 与 GB300 的每百万总 token 超大规模云成本。';
 
 export const metadata: Metadata = {
-  title: 'Inference Cost Overview',
+  title: '推理成本总览',
   description: DESCRIPTION,
-  alternates: enAlternates('/overview'),
+  alternates: zhAlternates('/overview'),
   openGraph: {
-    title: `Inference Cost Overview | ${SITE_NAME}`,
+    title: `推理成本总览 | ${SITE_NAME}`,
     description: DESCRIPTION,
-    url: `${SITE_URL}/overview`,
+    url: `${SITE_URL}/zh/overview`,
     type: 'website',
+    locale: ZH_OG_LOCALE,
   },
   twitter: {
     card: 'summary_large_image',
-    title: `Inference Cost Overview | ${SITE_NAME}`,
+    title: `推理成本总览 | ${SITE_NAME}`,
     description: DESCRIPTION,
   },
 };
@@ -38,13 +40,14 @@ interface Props {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function OverviewPage({ searchParams }: Props) {
+export default async function ZhOverviewPage({ searchParams }: Props) {
   const sp = await searchParams;
   const data = await getOverviewPageData(
     resolveOverviewTier(sp.tier),
     resolveOverviewEngineScope(sp.engine),
     resolveOverviewComparisonMode(sp.compare),
     resolveOverviewReferenceHardware(sp.ref),
+    resolveOverviewModelScope(sp.models),
   );
-  return <OverviewPageContent data={data} locale="en" />;
+  return <OverviewPageContent data={data} locale="zh" />;
 }

@@ -20,6 +20,8 @@ import {
   maxInteractivityAtCost,
   monotoneSlopes,
   paretoFrontUpperLeft,
+  reciprocalMetricAt,
+  recoverReciprocalNumerator,
   sign,
 } from './interpolation';
 import { restrictAgenticPointsToE2eFrontier } from '@/lib/agentic-frontier';
@@ -33,6 +35,8 @@ export {
   maxInteractivityAtCost,
   monotoneSlopes,
   paretoFrontUpperLeft,
+  reciprocalMetricAt,
+  recoverReciprocalNumerator,
   sign,
 };
 
@@ -190,7 +194,10 @@ export function useThroughputData(
     data: allRows,
     isLoading: queryLoading,
     error: queryError,
-  } = useBenchmarks(selectedModel, selectedRunDate);
+  } = useBenchmarks(selectedModel, selectedRunDate, true, undefined, undefined, {
+    type: 'calculator',
+    sequence: selectedSequence,
+  });
 
   const loading = queryLoading || !allRows;
   const error = queryError ? queryError.message : null;
@@ -353,6 +360,7 @@ export function useThroughputData(
       mode: 'interactivity_to_throughput' | 'throughput_to_interactivity',
       costProvider: CostProvider,
       visibleHwKeys?: Set<string>,
+      hideSkuAboveConfigLimit = false,
     ): InterpolatedResult[] => {
       const results: InterpolatedResult[] = [];
 
@@ -363,7 +371,7 @@ export function useThroughputData(
         if (visibleHwKeys && !visibleHwKeys.has(hwKey)) continue;
 
         const result = interpolateForGPU(points, targetValue, mode, costProvider);
-        if (result && result.value > 0) {
+        if (result && result.value > 0 && !(hideSkuAboveConfigLimit && result.clampedAbove)) {
           results.push({
             ...result,
             hwKey, // always the base hwKey for color/config lookup
@@ -396,6 +404,7 @@ export function useThroughputData(
       costProvider: CostProvider,
       visibleHwKeys?: Set<string>,
       runInfoByIndex?: Record<number, { branch: string; url: string }>,
+      hideSkuAboveConfigLimit = false,
     ): InterpolatedResult[] => {
       const results: InterpolatedResult[] = [];
 
@@ -405,7 +414,7 @@ export function useThroughputData(
         if (visibleHwKeys && !visibleHwKeys.has(meta.hwKey)) continue;
 
         const result = interpolateForGPU(points, targetValue, mode, costProvider);
-        if (result && result.value > 0) {
+        if (result && result.value > 0 && !(hideSkuAboveConfigLimit && result.clampedAbove)) {
           results.push({
             ...result,
             hwKey: meta.hwKey,

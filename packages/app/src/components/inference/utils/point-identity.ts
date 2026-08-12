@@ -1,4 +1,4 @@
-import type { InferenceData, TrackedConfig } from '@/components/inference/types';
+import type { InferenceData } from '@/components/inference/types';
 
 interface AgenticSpecIdentity {
   benchmark_type?: string;
@@ -21,13 +21,4 @@ export function scatterPointConfigId(point: InferenceData): string {
   // It remains point identity to avoid collapsing overlapping MTP/STP results.
   key += agenticSpecDecodingKeySuffix(point);
   return key;
-}
-
-/** Stable identity for a point selected in the performance-over-time view. */
-export function trackedConfigIdentity(point: InferenceData | TrackedConfig): string {
-  let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}`;
-  if (point.disagg) {
-    key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;
-  }
-  return key + agenticSpecDecodingKeySuffix(point);
 }

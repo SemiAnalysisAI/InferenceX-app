@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 
-import { scatterPointConfigId, trackedConfigIdentity } from './point-identity';
+import { scatterPointConfigId } from './point-identity';
 
 const point = (overrides: Partial<InferenceData>): InferenceData =>
   ({
@@ -44,31 +44,5 @@ describe('scatterPointConfigId', () => {
     );
 
     expect(off).not.toBe(on);
-  });
-});
-
-describe('trackedConfigIdentity', () => {
-  it('keeps agentic MTP and standard-decoding trend selections distinct', () => {
-    const standard = trackedConfigIdentity(
-      point({ benchmark_type: 'agentic_traces', spec_decoding: 'none' }),
-    );
-    const mtp = trackedConfigIdentity(
-      point({ benchmark_type: 'agentic_traces', spec_decoding: 'mtp' }),
-    );
-
-    expect(standard).not.toBe(mtp);
-    expect(standard).toContain('|spec-none');
-    expect(mtp).toContain('|spec-mtp');
-  });
-
-  it('keeps fixed-sequence identity behavior unchanged', () => {
-    const standard = trackedConfigIdentity(
-      point({ benchmark_type: 'single_turn', spec_decoding: 'none' }),
-    );
-    const mtp = trackedConfigIdentity(
-      point({ benchmark_type: 'single_turn', spec_decoding: 'mtp' }),
-    );
-
-    expect(standard).toBe(mtp);
   });
 });

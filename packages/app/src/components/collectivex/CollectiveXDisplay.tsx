@@ -26,7 +26,7 @@ import { useLocale } from '@/lib/use-locale';
 
 import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXInventory } from './CollectiveXInventory';
-import { CollectiveXKvTable } from './CollectiveXKvTable';
+import { CollectiveXKvSection } from './CollectiveXKvSection';
 import { CollectiveXRunsTable } from './CollectiveXRunsTable';
 import {
   collectiveXColorKey,
@@ -368,7 +368,7 @@ export default function CollectiveXDisplay() {
   const [phase, setPhase] = useState<CollectiveXPhase>('decode');
   // Normal (throughput) kernels are the baseline; the availability effect
   // below falls back when a slice only measured low-latency kernels.
-  const [mode, setMode] = useState<CollectiveXMode>('normal');
+  const [modes, setModes] = useState<CollectiveXMode[]>(['normal']);
   // Prefer FP8 when the run measured it; the availability effect below falls
   // back to bf16 for runs (or EP/phase slices) without FP8 series.
   const [precision, setPrecision] = useState<CollectiveXPrecision>('fp8');
@@ -459,12 +459,12 @@ export default function CollectiveXDisplay() {
           combinedSeries
             .filter(
               (item) =>
-                item.system.ep_size === epSize && item.phase === phase && item.mode === mode,
+                item.system.ep_size === epSize && item.phase === phase && modes.includes(item.mode),
             )
             .map((item) => item.precision),
         ),
       ].toSorted(),
-    [combinedSeries, epSize, mode, phase],
+    [combinedSeries, epSize, modes, phase],
   );
   const precisionOptions: SegmentedToggleOption<CollectiveXPrecision>[] = availablePrecisions.map(
     (value) => ({ value, label: t.precision[value] }),
@@ -476,8 +476,13 @@ export default function CollectiveXDisplay() {
     if (availablePhases.length > 0 && !availablePhases.includes(phase)) {
       setPhase(availablePhases[0]);
     }
-    if (availableModes.length > 0 && !availableModes.includes(mode)) {
-      setMode(availableModes[0]);
+    // Keep the user's full multi-mode preference while availability cascades
+    // through EP/phase changes. In particular, an intermediate empty slice
+    // must not erase both selections; modes that become available again should
+    // still be selected. Fall back only when a settled, non-empty slice has no
+    // overlap with the preference at all.
+    if (availableModes.length > 0 && !modes.some((mode) => availableModes.includes(mode))) {
+      setModes([availableModes[0]]);
     }
     if (availablePrecisions.length > 0 && !availablePrecisions.includes(precision)) {
       setPrecision(availablePrecisions[0]);
@@ -488,13 +493,13 @@ export default function CollectiveXDisplay() {
     availablePhases,
     availablePrecisions,
     epSize,
-    mode,
+    modes,
     phase,
     precision,
   ]);
   const seriesSelection = useMemo<CollectiveXSeriesSelection>(
-    () => ({ epSize, phase, mode, precision }),
-    [epSize, mode, phase, precision],
+    () => ({ epSize, phase, modes, precision }),
+    [epSize, modes, phase, precision],
   );
   // SKU and EP determine topology; V1 fixes routing. EP, phase, kernel mode,
   // and precision are needed before the library/SKU comparison filters.
@@ -862,6 +867,9 @@ export default function CollectiveXDisplay() {
               <p className="text-sm text-muted-foreground">{t.noSeries}</p>
             </Card>
           )}
+          {/* KV-transfer cases lead for kv-only runs: the EP chart below is
+              legitimately empty for them and must not bury the selected data. */}
+          <CollectiveXKvSection datasets={datasets} runIndexById={selectedRunIndexById} />
           <Card data-testid="collectivex-main-chart" className="relative">
             <CollectiveXChart
               chartId="collectivex-explorer"
@@ -968,16 +976,38 @@ export default function CollectiveXDisplay() {
               </ControlGroup>
               {availableModes.length > 1 && (
                 <ControlGroup label={t.modeControl}>
-                  <SegmentedToggle
-                    value={mode}
-                    options={modeOptions}
-                    onValueChange={(next) => {
-                      setMode(next);
-                      track('collectivex_mode_changed', { mode: next });
-                    }}
-                    ariaLabel={t.modeAria}
-                    testId="collectivex-mode-toggle"
-                  />
+                  <div
+                    className="inline-flex items-center gap-0.5 rounded-lg border border-border p-0.5"
+                    role="group"
+                    aria-label={t.modeAria}
+                    data-testid="collectivex-mode-toggle"
+                  >
+                    {modeOptions.map((option) => {
+                      const selected = modes.includes(option.value);
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          aria-pressed={selected}
+                          className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                            selected
+                              ? 'bg-muted text-foreground'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                          onClick={() => {
+                            const next = selected
+                              ? modes.filter((mode) => mode !== option.value)
+                              : [...modes, option.value];
+                            if (next.length === 0) return;
+                            setModes(next);
+                            track('collectivex_mode_changed', { modes: next });
+                          }}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </ControlGroup>
               )}
               <ControlGroup label={t.precisionControl}>
@@ -1054,7 +1084,6 @@ export default function CollectiveXDisplay() {
               />
             </div>
           </Card>
-          <CollectiveXKvTable datasets={datasets} />
           <CollectiveXInventory
             key={`${version}-${datasets.map((dataset) => `${dataset.run.run_id}:${dataset.run.run_attempt}`).join(',')}`}
             datasets={datasets}

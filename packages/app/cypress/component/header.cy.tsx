@@ -39,11 +39,10 @@ function rectOf(selector: string) {
 describe('Header', () => {
   let mockRouter: ReturnType<typeof createMockRouter>;
 
-  beforeEach(() => {
-    mockRouter = createMockRouter();
+  function mountHeader(pathname: string) {
     cy.mount(
       <AppRouterContext.Provider value={mockRouter}>
-        <PathnameContext.Provider value="/">
+        <PathnameContext.Provider value={pathname}>
           <QueryClientProvider client={queryClient}>
             <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
               <Header />
@@ -52,6 +51,11 @@ describe('Header', () => {
         </PathnameContext.Provider>
       </AppRouterContext.Provider>,
     );
+  }
+
+  beforeEach(() => {
+    mockRouter = createMockRouter();
+    mountHeader('/');
   });
 
   it('displays the InferenceX title', () => {
@@ -74,6 +78,20 @@ describe('Header', () => {
     cy.wrap(mockRouter.push).should('have.been.calledOnceWith', '/overview');
     cy.tick(250);
     cy.wrap(mockRouter.push).should('have.been.calledTwice');
+  });
+
+  it('makes a click on the tab already showing a no-op', () => {
+    mountHeader('/overview');
+    cy.get('[data-testid="nav-link-overview"]').click();
+    cy.wrap(mockRouter.push).should('not.have.been.called');
+  });
+
+  it('still navigates to Dashboard from a sibling dashboard tab', () => {
+    // `/evaluation` lights up the Dashboard tab but is a different page, so the
+    // no-op guard must not fire — otherwise the link is dead on nine routes.
+    mountHeader('/evaluation');
+    cy.get('[data-testid="nav-link-dashboard"]').click();
+    cy.wrap(mockRouter.push).should('have.been.calledWith', '/inference');
   });
 
   it('shows Dashboard nav link', () => {
