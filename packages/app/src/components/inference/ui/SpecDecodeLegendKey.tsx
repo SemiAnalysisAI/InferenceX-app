@@ -22,20 +22,14 @@ export function hasAgenticSpecDecoding(point: SpecDecodePoint): boolean {
 }
 
 const STRINGS = {
-  en: {
-    marker: 'Dashed +:',
-    meaning: 'Speculative decoding',
-  },
-  zh: {
-    marker: '虚线 +：',
-    meaning: '推测解码',
-  },
+  en: 'Speculative decoding',
+  zh: '推测解码',
 } as const;
 
 /** Legend key for the dashed plus drawn over agentic speculative-decoding points. */
 export function SpecDecodeLegendKey() {
   const locale = useLocale();
-  const t = STRINGS[locale];
+  const label = STRINGS[locale];
 
   return (
     <div
@@ -60,10 +54,7 @@ export function SpecDecodeLegendKey() {
           strokeLinecap="round"
         />
       </svg>
-      <span className="min-w-0 leading-tight">
-        <span className="block">{t.marker}</span>
-        <span className="block">{t.meaning}</span>
-      </span>
+      <span className="min-w-0 leading-tight">{label}</span>
     </div>
   );
 }

@@ -34,10 +34,7 @@ export function OffloadHaloLegendKey() {
           strokeDasharray={OFFLOAD_HALO_DASHARRAY}
         />
       </svg>
-      <span className="min-w-0 leading-tight">
-        <span className="block">Dashed halo:</span>
-        <span className="block">KV offload ON</span>
-      </span>
+      <span className="min-w-0 leading-tight">KV offload ON</span>
     </div>
   );
 }
