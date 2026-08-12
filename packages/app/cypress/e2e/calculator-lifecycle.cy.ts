@@ -43,6 +43,7 @@ describe('Calculator — Fleet Lifecycle', () => {
     cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
     cy.get('[data-testid="calculator-lifecycle-table"]', { timeout: 30_000 }).should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-table"]').within(() => {
+      cy.contains('th', 'Config Now').should('exist');
       cy.contains('th', 'First Run').should('exist');
       cy.contains('th', 'Latest Best').should('exist');
       cy.contains('th', 'Improvements').should('exist');
@@ -57,10 +58,10 @@ describe('Calculator — Fleet Lifecycle', () => {
   it('every row is traceable to the dated run it came from', () => {
     // The caption's run date no longer describes these numbers, so each row
     // carries its own date and links its run.
-    firstRowCell(1)
+    firstRowCell(2)
       .invoke('text')
       .should('match', /\d{4}-\d{2}-\d{2}/u);
-    firstRowCell(2)
+    firstRowCell(3)
       .invoke('text')
       .should('match', /\d{4}-\d{2}-\d{2}/u);
   });
@@ -81,8 +82,8 @@ describe('Calculator — Fleet Lifecycle', () => {
     cy.get('[data-testid="calc-lifecycle-price-input"]').clear();
     cy.get('[data-testid="calc-lifecycle-price-input"]').type('50');
     // Margin $/day column: positive, so no leading minus.
-    firstRowCell(8).invoke('text').should('match', /^\$/u);
-    firstRowCell(9)
+    firstRowCell(9).invoke('text').should('match', /^\$/u);
+    firstRowCell(10)
       .invoke('text')
       .should('match', /\d+(?:\.\d+)? mo/u);
   });
@@ -107,12 +108,12 @@ describe('Calculator — Fleet Lifecycle', () => {
   it('a longer horizon increases cumulative margin', () => {
     cy.get('[data-testid="calc-lifecycle-horizon-input"]').clear();
     cy.get('[data-testid="calc-lifecycle-horizon-input"]').type('24');
-    firstRowCell(10)
+    firstRowCell(11)
       .invoke('text')
       .then((short) => {
         cy.get('[data-testid="calc-lifecycle-horizon-input"]').clear();
         cy.get('[data-testid="calc-lifecycle-horizon-input"]').type('96');
-        firstRowCell(10)
+        firstRowCell(11)
           .invoke('text')
           .should((long) => expect(long).to.not.equal(short));
       });
@@ -123,12 +124,12 @@ describe('Calculator — Fleet Lifecycle', () => {
     // history, so at least one chip must show more than zero improvements.
     cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').then(($rows) => {
       const improvements = [...$rows].map((row) =>
-        Number.parseInt(row.querySelectorAll('td')[3]!.textContent ?? '0', 10),
+        Number.parseInt(row.querySelectorAll('td')[4]!.textContent ?? '0', 10),
       );
       expect(Math.max(...improvements)).to.be.greaterThan(0);
     });
     // Gain over the opening config is reported as a multiple.
-    firstRowCell(4)
+    firstRowCell(5)
       .invoke('text')
       .should('match', /^\d+(?:\.\d+)?×$/u);
   });
@@ -136,12 +137,12 @@ describe('Calculator — Fleet Lifecycle', () => {
   it('a shorter MTBI lowers availability', () => {
     cy.get('[data-testid="calc-lifecycle-mtbi-input"]').clear();
     cy.get('[data-testid="calc-lifecycle-mtbi-input"]').type('60');
-    firstRowCell(11)
+    firstRowCell(12)
       .invoke('text')
       .then((high) => {
         cy.get('[data-testid="calc-lifecycle-mtbi-input"]').clear();
         cy.get('[data-testid="calc-lifecycle-mtbi-input"]').type('2');
-        firstRowCell(11)
+        firstRowCell(12)
           .invoke('text')
           .should((low) => {
             expect(Number.parseFloat(low)).to.be.lessThan(Number.parseFloat(high));
@@ -160,13 +161,30 @@ describe('Calculator — Fleet Lifecycle', () => {
     );
   });
 
+  it('draws one row per chip, pooling its software configs', () => {
+    // The history holds many hwKeys per chip (b200_sglang, b200_trtllm, …) and
+    // they are one piece of silicon, so the chip must not repeat down the table.
+    cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').then(($rows) => {
+      const chips = [...$rows].map((row) => row.querySelectorAll('td')[0]!.textContent?.trim());
+      expect(chips.length).to.be.greaterThan(0);
+      expect(new Set(chips).size).to.equal(chips.length);
+    });
+    // And each row names the config it ended up on, since that changes along the line.
+    firstRowCell(1).invoke('text').should('not.be.empty');
+  });
+
   it('follows legend visibility', () => {
+    // Legend entries are configs and clicking one isolates it. Configs sit one
+    // level below the lines now, so isolating a single config leaves at most one
+    // chip — and none at all when that config was never measured at the target,
+    // which is a legitimate state rather than a broken chart.
     cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').then(($rows) => {
       const fullCount = $rows.length;
+      expect(fullCount).to.be.greaterThan(1);
       cy.get('.sidebar-legend label').first().click();
       cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').should(
-        'have.length.lessThan',
-        fullCount,
+        'have.length.at.most',
+        1,
       );
       cy.get('.sidebar-legend label').first().click();
       cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').should(
@@ -251,6 +269,7 @@ describe('Calculator — Fleet Lifecycle in Chinese', () => {
     cy.get('[data-testid="calculator-lifecycle-table"]', { timeout: 30_000 }).should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('contain.text', 'Token 价格')
+      .and('contain.text', '当前配置')
       .and('contain.text', '首次运行')
       .and('contain.text', '累计利润')
       .and('contain.text', '来源：');

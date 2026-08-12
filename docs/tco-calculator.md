@@ -180,8 +180,37 @@ got worse. For a lifecycle projection the honest number is the best config the
 chip has ever demonstrated, so this section is the one place that reads
 `/api/v1/benchmarks/history` instead of `/api/v1/benchmarks`.
 
-It reads more than the winner, though: `bestSoFarProgression` returns each
-hwKey's **running maximum** over run dates — the sequence of dates whose
+### One line per chip, not per config
+
+`hwKey` encodes the software, so a single piece of silicon appears in the history
+many times over: `b200_trtllm`, `b200_sglang`, `b200_sglang_mtp` and so on are all
+one B200. Drawing a line each says a fleet operator ran seven fleets, when they ran
+one and kept re-deploying it onto whichever config was ahead. `mergeProgressionsByChip`
+therefore collapses a chip's hwKeys into their **upper envelope**, and the winning
+config becomes part of what each step reports (`Config Now` in the table, named per
+rung in the tooltip).
+
+Three consequences worth knowing:
+
+- **Disagg is grouped separately** (`b200` vs `b200|disagg`). Disaggregated configs
+  report throughput per decode or prefill chip, so their fleet sizing is on a
+  different basis; pooling them would switch that basis mid-line at whichever step
+  happened to win, silently. The chip label carries a `(disagg)` marker, since
+  otherwise two rows read as the same chip.
+- **The legend still filters hwKeys**, one level below the lines — hiding a config
+  removes it from candidacy. Because the legend isolates on click, isolating a
+  single config leaves at most one chip, and none at all when that config was never
+  measured at the target. That is a real state, and `calculator-lifecycle.cy.ts`
+  asserts it rather than assuming a row always survives.
+- **Colour resolves from the winning hwKey**, not the base GPU. The palette is
+  built over the _active_ hwKeys, so a bare base key falls through to the fallback
+  grey — which silently drained the colour out of every series when first wired.
+
+Cost stays flat across the merge because power and $/chip/hr come from the base
+GPU: it is the same silicon whichever framework is in front.
+
+`bestSoFarProgression` supplies the per-hwKey input: each hwKey's **running
+maximum** over run dates — the sequence of dates whose
 interpolated read at the target beat every date before it. That progression is
 the section's subject. A sweep that failed to beat the incumbent is not a step,
 because the fleet kept serving the config it already had, and the last rung of

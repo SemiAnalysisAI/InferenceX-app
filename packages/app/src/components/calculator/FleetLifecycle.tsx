@@ -21,7 +21,7 @@ import { getDisplayLabel } from '@/lib/utils';
 
 import { computeFleetStats, formatCompact } from './fleet';
 import FleetLifecycleChart, { type LifecycleChartSeries } from './FleetLifecycleChart';
-import type { HistoricalProgression } from './historical-best';
+import { mergeProgressionsByChip, type ChipProgression } from './historical-best';
 import {
   breakEvenPricePerMTok,
   computeLifecycle,
@@ -80,6 +80,8 @@ const STRINGS = {
     horizonTooltip:
       "How far past the model's release date to project. Past the last sweep the latest config is held flat — that is what the fleet earns if optimisation stops, not a forecast of further gains.",
     colChip: 'Chip',
+    colConfigNow: 'Config Now',
+    disaggSuffix: '(disagg)',
     colFirst: 'First Run',
     colLatest: 'Latest Best',
     colSteps: 'Improvements',
@@ -102,7 +104,7 @@ const STRINGS = {
     disagg:
       ' Disaggregated inference configurations report throughput per decode chip or per prefill chip rather than per total chip, so their fleet sizes, costs and margins are not an apples-to-apples comparison with aggregated configs. They are drawn with dashed lines.',
     hybrid:
-      " Each step is a measured run date whose interpolated throughput at the target beat every earlier date; a sweep that failed to beat the incumbent is not a step, because the fleet kept serving the config it already had. Power and $/chip/hr are today's values from the TCO model, and cost is flat because neither moves when a config improves. Reads outside a run's measured interactivity range are excluded rather than clamped.",
+      " One line per chip, not per software config: at any moment it follows whichever framework, precision and speculative-decoding combination was ahead, so the config serving the fleet changes along the line and each step names the one that took over. Legend entries still filter configs, which removes them from candidacy. Each step is a measured run date whose interpolated throughput at the target beat every earlier date; a sweep that failed to beat the incumbent is not a step, because the fleet kept serving the config it already had. Power and $/chip/hr are today's values from the TCO model, and cost is flat because neither moves when a config improves — it is the same silicon either way. Reads outside a run's measured interactivity range are excluded rather than clamped.",
     overlayExempt:
       ' Unofficial runs loaded via a run link are not shown here — the run-history API serves ingested official results only.',
     chartY: 'Margin ($/day)',
@@ -142,6 +144,8 @@ const STRINGS = {
     horizonTooltip:
       '自模型发布日期起向后测算的月数。在最后一次扫描之后，最新配置将保持不变——这代表若优化停止时集群的收益，而非对后续提升的预测。',
     colChip: 'Chip',
+    colConfigNow: '当前配置',
+    disaggSuffix: '(解耦)',
     colFirst: '首次运行',
     colLatest: '最新最佳',
     colSteps: '提升次数',
@@ -164,7 +168,7 @@ const STRINGS = {
     disagg:
       '解耦推理配置按解码 Chip 或预填充 Chip 报告吞吐量，而非按 Chip 总数，因此其集群规模、成本与利润和聚合配置并非同类比较。此类配置以虚线绘制。',
     hybrid:
-      '每一级台阶都是一个实测运行日期，其在目标交互性下的插值吞吐量优于此前所有日期；未能超越现有配置的扫描不构成台阶，因为集群仍在运行原有配置。功率与 $/chip/hr 为 TCO 模型的当前值，成本保持水平，因为配置提升不会改变这两项。超出某次运行实测交互性区间的结果会被排除而非钳制。',
+      '每个 Chip 一条曲线，而非每个软件配置一条：曲线在任一时刻都跟随当时领先的框架、精度与投机解码组合，因此服务集群的配置会沿曲线变化，每一级台阶都标注接管的配置。图例项仍可筛选配置，被隐藏的配置将不参与竞争。每一级台阶都是一个实测运行日期，其在目标交互性下的插值吞吐量优于此前所有日期；未能超越现有配置的扫描不构成台阶，因为集群仍在运行原有配置。功率与 $/chip/hr 为 TCO 模型的当前值，成本保持水平，因为配置提升不会改变这两项——两种情况下都是同一款芯片。超出某次运行实测交互性区间的结果会被排除而非钳制。',
     overlayExempt:
       '通过运行链接加载的非官方运行不会显示在此——运行历史 API 仅提供已入库的官方结果。',
     chartY: '利润 ($/天)',
@@ -197,6 +201,21 @@ function parseNonNegative(raw: string): number | null {
 function getLabel(hwKey: string, hardwareConfig: HardwareConfig): string {
   const config = hardwareConfig[hwKey] || getHardwareConfig(hwKey);
   return config ? getDisplayLabel(config) : hwKey;
+}
+
+/**
+ * The software half of a hwKey's label — what distinguishes it from bare silicon.
+ * Display labels put it in parentheses ("B200 (SGLang, MTP)"); when they don't,
+ * fall back to the hwKey's own suffix so the cell is never blank for a config
+ * that genuinely differs.
+ */
+function configSuffix(hwKey: string, baseGpu: string, hardwareConfig: HardwareConfig): string {
+  if (hwKey === baseGpu) return '—';
+  const label = getLabel(hwKey, hardwareConfig);
+  const parenthetical = /\((?<inner>[^)]*)\)/u.exec(label);
+  if (parenthetical?.groups?.inner) return parenthetical.groups.inner;
+  const suffix = hwKey.slice(baseGpu.length).replace(/^_/u, '').replaceAll('_', ', ');
+  return suffix || '—';
 }
 
 /**
@@ -236,8 +255,12 @@ function runLink(date: string, runUrls: string[]) {
 }
 
 interface LifecycleRow {
-  progression: HistoricalProgression;
+  progression: ChipProgression;
   label: string;
+  /** The config the chip is running at the latest rung, e.g. "SGLang, MTP". */
+  configNow: string;
+  /** A real hwKey to resolve the series colour from. */
+  colorKey: string;
   tpPerMw: number;
   disagg: boolean;
   series: LifecycleSeries;
@@ -296,8 +319,14 @@ export default function FleetLifecycle({
    * without a sourced release date fall back to their first measured run.
    */
   const releaseDate = getModelReleaseDate(selectedModel);
+  /**
+   * One series per chip, not per hwKey. The legend still filters hwKeys, so
+   * hiding a framework removes it from candidacy for its chip's envelope — the
+   * legend stays the control it always was, one level below the lines.
+   */
   const visibleProgressions = useMemo(
-    () => historical.progressions.filter((p) => visibleHwKeys.has(p.hwKey)),
+    () =>
+      mergeProgressionsByChip(historical.progressions.filter((p) => visibleHwKeys.has(p.hwKey))),
     [historical.progressions, visibleHwKeys],
   );
 
@@ -350,7 +379,10 @@ export default function FleetLifecycle({
   const fleets = useMemo(() => {
     if (!mw || !Number.isFinite(anchorMs)) return [];
     return visibleProgressions.flatMap((progression) => {
-      const specs = getGpuSpecs(progression.hwKey);
+      // Power and $/chip/hr come from the base GPU, so they are identical across
+      // the hwKeys pooled into this line — which is what keeps cost flat even
+      // though the winning config changes.
+      const specs = getGpuSpecs(progression.baseGpu);
       const steps: ThroughputStep[] = [];
       let costPerHour: number | null = null;
 
@@ -413,12 +445,24 @@ export default function FleetLifecycle({
         const series = computeLifecycle({ steps, costPerHour, horizonMonths, assumptions });
         if (!series) return [];
         const latest = progression.steps.at(-1)!;
+        const latestHwKey = latest.result.hwKey ?? progression.baseGpu;
         return [
           {
             progression,
-            label: getLabel(progression.hwKey, hardwareConfig),
+            // The chip, not the config: the config is what changes along the line.
+            // Disagg is a separate line on the same silicon, so it has to be
+            // marked here or two rows read as the same chip.
+            label:
+              getLabel(progression.baseGpu, hardwareConfig) +
+              (progression.disagg ? ` ${t.disaggSuffix}` : ''),
+            configNow: configSuffix(latestHwKey, progression.baseGpu, hardwareConfig),
+            // The palette is built over the *active* hwKeys, so a bare base key
+            // resolves to the fallback grey. Colour the line by the config it is
+            // running now, which is both a real key and the legend entry a reader
+            // would look for.
+            colorKey: latestHwKey,
             tpPerMw: latest.rankValue,
-            disagg: latest.result.nearestPoints.some((p) => p.disagg),
+            disagg: progression.disagg,
             series,
           },
         ];
@@ -436,16 +480,21 @@ export default function FleetLifecycle({
         const stepInfo = new Map<number, { date: string; config: string; factor: number }>();
         for (const step of r.progression.steps) {
           const month = (Date.parse(`${step.date}T00:00:00Z`) - anchorMs) / MS_PER_MONTH;
+          // The config is now the thing that changes along the line, so name the
+          // framework that took over here, not just its precision.
+          const hwKey = step.result.hwKey ?? r.progression.baseGpu;
+          const software = configSuffix(hwKey, r.progression.baseGpu, hardwareConfig);
+          const detail = configLabel(step.result);
           stepInfo.set(month, {
             date: step.date,
-            config: configLabel(step.result),
+            config: [software === '—' ? '' : software, detail].filter(Boolean).join(' · '),
             factor: step.factorOverFirst,
           });
         }
         return {
-          key: r.progression.hwKey,
+          key: r.progression.key,
           label: r.label,
-          color: colorResolver(r.progression.hwKey),
+          color: colorResolver(r.colorKey),
           disagg: r.disagg,
           series: r.series,
           stepInfo,
@@ -489,6 +538,14 @@ export default function FleetLifecycle({
         cell: (r) => r.label,
         sortValue: (r) => r.label,
         className: 'font-medium whitespace-nowrap',
+      },
+      {
+        header: t.colConfigNow,
+        // The line is one chip across many configs, so which config it ended on
+        // is part of reading the row.
+        cell: (r) => <span className="whitespace-nowrap">{r.configNow}</span>,
+        sortValue: (r) => r.configNow,
+        className: 'text-muted-foreground',
       },
       {
         header: t.colFirst,

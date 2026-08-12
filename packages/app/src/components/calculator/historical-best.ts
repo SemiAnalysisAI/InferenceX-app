@@ -346,3 +346,98 @@ export function bestSoFarProgression(
   );
   return progressions;
 }
+
+/** True when a read came from disaggregated points, whose fleet math differs. */
+function resultIsDisagg(result: InterpolatedResult): boolean {
+  return result.nearestPoints.some((p) => p.disagg);
+}
+
+export interface ChipProgression {
+  /** Group key: the base GPU, suffixed for disagg. Stable across steps. */
+  key: string;
+  /** Base GPU registry key, e.g. `b200` — the silicon the fleet is built from. */
+  baseGpu: string;
+  disagg: boolean;
+  /**
+   * The pooled running maximum. Each rung carries its own `result`, so the hwKey
+   * serving the fleet can differ from one rung to the next.
+   */
+  steps: ProgressionStep[];
+  /** Every hwKey that contributed a rung, in the order they took over. */
+  hwKeysUsed: string[];
+}
+
+/**
+ * Collapse per-hwKey progressions into one per chip — the best way to run that
+ * silicon at any given time.
+ *
+ * A single piece of hardware appears in the history under many hwKeys, because
+ * hwKey encodes the software: `b200_trtllm`, `b200_sglang`, `b200_sglang_mtp`
+ * and so on are all one B200. Drawing a line each says a fleet operator ran
+ * seven fleets, when they ran one and kept re-deploying it onto whichever config
+ * was ahead. So the fleet's line is the upper envelope over that chip's hwKeys,
+ * and a rung's winning config is part of what the rung reports.
+ *
+ * Because each input progression is already a running maximum, the pointwise
+ * maximum over them is the running maximum of their union — so this merges by
+ * walking the rungs in date order and keeping the ones that beat the incumbent.
+ *
+ * **Disagg is grouped separately.** Disaggregated configs report throughput per
+ * decode or per prefill chip rather than per total chip, so their fleet sizes and
+ * costs are on a different basis. Pooling them into the aggregated line would
+ * switch that basis mid-line at whichever step happened to win, silently.
+ */
+export function mergeProgressionsByChip(
+  progressions: readonly HistoricalProgression[],
+): ChipProgression[] {
+  const byChip = new Map<string, { baseGpu: string; disagg: boolean; steps: ProgressionStep[] }>();
+
+  for (const progression of progressions) {
+    const baseGpu = progression.hwKey.split('_')[0] ?? progression.hwKey;
+    // A hwKey is disagg or not as a whole; its latest rung is the cheapest read.
+    const disagg = resultIsDisagg(progression.steps.at(-1)!.result);
+    const key = disagg ? `${baseGpu}|disagg` : baseGpu;
+    const entry = byChip.get(key) ?? { baseGpu, disagg, steps: [] };
+    entry.steps.push(...progression.steps);
+    byChip.set(key, entry);
+  }
+
+  const chips: ChipProgression[] = [];
+  for (const [key, { baseGpu, disagg, steps: pooled }] of byChip) {
+    // Date order, and within a date the stronger read first so it is the one
+    // that becomes the rung.
+    const candidates = [...pooled].toSorted(
+      (a, b) => a.date.localeCompare(b.date) || b.rankValue - a.rankValue,
+    );
+
+    const steps: ProgressionStep[] = [];
+    const hwKeysUsed: string[] = [];
+    let best = -Infinity;
+    for (const candidate of candidates) {
+      if (candidate.rankValue <= best) continue;
+      best = candidate.rankValue;
+      steps.push(candidate);
+      const hwKey = candidate.result.hwKey;
+      if (hwKey && hwKeysUsed.at(-1) !== hwKey) hwKeysUsed.push(hwKey);
+    }
+
+    if (steps.length === 0) continue;
+    const firstRank = steps[0]!.rankValue;
+    // factorOverFirst is relative to the merged opening rung, which is not
+    // necessarily the opening rung of the hwKey that rung came from.
+    chips.push({
+      key,
+      baseGpu,
+      disagg,
+      steps: steps.map((s) => ({ ...s, factorOverFirst: s.rankValue / firstRank })),
+      hwKeysUsed,
+    });
+  }
+
+  chips.sort(
+    (a, b) =>
+      (b.steps.at(-1)?.rankValue ?? 0) - (a.steps.at(-1)?.rankValue ?? 0) ||
+      a.key.localeCompare(b.key),
+  );
+  return chips;
+}

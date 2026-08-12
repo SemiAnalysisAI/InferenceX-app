@@ -6,6 +6,7 @@ import { Sequence } from '@/lib/data-mappings';
 import {
   bestSoFarProgression,
   groupHistoryByHwKeyAndDate,
+  mergeProgressionsByChip,
   selectBestFromGroups,
   selectHistoricalBest,
   type GroupHistoryOptions,
@@ -464,5 +465,113 @@ describe('bestSoFarProgression', () => {
     const rows = [70, 90].map((iv) => sweep('2026-04-25', iv, iv === 70 ? 400 : 200));
     const opts = { ...options(rows), targetValue: 20 };
     expect(bestSoFarProgression(groupHistoryByHwKeyAndDate(opts), opts)).toEqual([]);
+  });
+});
+
+describe('mergeProgressionsByChip', () => {
+  /** Two frameworks on one B300, each improving on its own dates. */
+  const twoFrameworks = [
+    // sglang: opens strong, then a modest gain.
+    ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 900 : 500)),
+    ...[30, 60].map((iv) => sweep('2026-06-01', iv, iv === 30 ? 1000 : 600)),
+    // trtllm: starts behind, then overtakes.
+    ...[30, 60].map((iv) =>
+      sweep('2026-05-02', iv, iv === 30 ? 600 : 300, { framework: 'trtllm' }),
+    ),
+    ...[30, 60].map((iv) =>
+      sweep('2026-07-04', iv, iv === 30 ? 1600 : 800, { framework: 'trtllm' }),
+    ),
+  ];
+
+  const mergeAt = (rows: BenchmarkRow[], targetValue = 45) => {
+    const opts = { ...options(rows), targetValue };
+    return mergeProgressionsByChip(bestSoFarProgression(groupHistoryByHwKeyAndDate(opts), opts));
+  };
+
+  it('draws one line per chip, not one per software config', () => {
+    // Four hwKey-level progressions' worth of history, one piece of silicon.
+    const chips = mergeAt(twoFrameworks);
+    expect(chips).toHaveLength(1);
+    expect(chips[0]!.baseGpu).toBe('b300');
+    expect(chips[0]!.key).toBe('b300');
+  });
+
+  it('follows whichever config is ahead at each moment', () => {
+    const chips = mergeAt(twoFrameworks);
+    const steps = chips[0]!.steps;
+    // trtllm's 2026-05-02 read (600) loses to sglang's incumbent 900, so it is
+    // not a rung; its 2026-07-04 read (1600) takes over and is.
+    expect(steps.map((s) => s.date)).toEqual(['2026-04-25', '2026-06-01', '2026-07-04']);
+    expect(steps.map((s) => s.result.hwKey)).toEqual(['b300_sglang', 'b300_sglang', 'b300_trt']);
+    expect(chips[0]!.hwKeysUsed).toEqual(['b300_sglang', 'b300_trt']);
+  });
+
+  it('is monotonic, so a losing config never pulls the line down', () => {
+    const steps = mergeAt(twoFrameworks)[0]!.steps;
+    for (let i = 1; i < steps.length; i += 1) {
+      expect(steps[i]!.rankValue).toBeGreaterThan(steps[i - 1]!.rankValue);
+    }
+  });
+
+  it('measures gain against the merged opening rung, not the winner own first run', () => {
+    const steps = mergeAt(twoFrameworks)[0]!.steps;
+    expect(steps[0]!.factorOverFirst).toBe(1);
+    // The last rung is trtllm's, but the gain is over sglang's opening read —
+    // that is what the fleet actually improved from.
+    expect(steps.at(-1)!.factorOverFirst).toBeCloseTo(
+      steps.at(-1)!.rankValue / steps[0]!.rankValue,
+      9,
+    );
+    expect(steps.at(-1)!.factorOverFirst).toBeGreaterThan(1);
+  });
+
+  it('keeps disagg on its own line — its fleet math is not the same basis', () => {
+    const rows = [
+      ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 900 : 500)),
+      // Same silicon, but throughput is reported per decode chip, so pooling it
+      // would switch the fleet-sizing basis mid-line.
+      ...[30, 60].map((iv) =>
+        sweep('2026-05-02', iv, iv === 30 ? 1600 : 800, {
+          framework: 'sglang-disagg',
+          disagg: true,
+        }),
+      ),
+    ];
+    const chips = mergeAt(rows);
+    expect(chips).toHaveLength(2);
+    const disagg = chips.find((c) => c.disagg)!;
+    const aggregated = chips.find((c) => !c.disagg)!;
+    expect(disagg.baseGpu).toBe('b300');
+    expect(aggregated.baseGpu).toBe('b300');
+    expect(disagg.key).not.toBe(aggregated.key);
+    // The stronger disagg read must not have become a rung on the aggregated line.
+    expect(aggregated.steps.map((s) => s.date)).toEqual(['2026-04-25']);
+  });
+
+  it('separates distinct silicon', () => {
+    const rows = [
+      ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 900 : 500)),
+      ...[30, 60].map((iv) =>
+        sweep('2026-05-02', iv, iv === 30 ? 1600 : 800, { hardware: 'b200' }),
+      ),
+    ];
+    const chips = mergeAt(rows);
+    expect(chips.map((c) => c.baseGpu).toSorted()).toEqual(['b200', 'b300']);
+  });
+
+  it('ranks chips by where they ended up', () => {
+    const rows = [
+      ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 900 : 500)),
+      ...[30, 60].map((iv) =>
+        sweep('2026-05-02', iv, iv === 30 ? 1600 : 800, { hardware: 'b200' }),
+      ),
+    ];
+    const chips = mergeAt(rows);
+    expect(chips[0]!.baseGpu).toBe('b200');
+    expect(chips[0]!.steps.at(-1)!.rankValue).toBeGreaterThan(chips[1]!.steps.at(-1)!.rankValue);
+  });
+
+  it('returns nothing for no progressions', () => {
+    expect(mergeProgressionsByChip([])).toEqual([]);
   });
 });
