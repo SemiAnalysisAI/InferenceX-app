@@ -1,7 +1,10 @@
 import { POINT_SIZE } from '@/lib/chart-rendering';
 import { useLocale } from '@/lib/use-locale';
+import { OFFLOAD_HALO_RADIUS } from '@/components/inference/ui/OffloadHaloLegendKey';
 
-export const SPEC_DECODE_MARKER_SIZE = POINT_SIZE + 1.5;
+// Match the plus diameter to the KV-offload halo so combined markers share
+// one clean outer boundary.
+export const SPEC_DECODE_MARKER_SIZE = OFFLOAD_HALO_RADIUS;
 export const SPEC_DECODE_MARKER_STROKE_WIDTH = 1.5;
 export const SPEC_DECODE_MARKER_DASHARRAY = '2 1.5';
 export const SPEC_DECODE_MARKER_PATH = `M ${-SPEC_DECODE_MARKER_SIZE} 0 H ${SPEC_DECODE_MARKER_SIZE} M 0 ${-SPEC_DECODE_MARKER_SIZE} V ${SPEC_DECODE_MARKER_SIZE}`;
