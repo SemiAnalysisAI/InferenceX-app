@@ -192,11 +192,16 @@ rung in the tooltip).
 
 Three consequences worth knowing:
 
-- **Disagg is grouped separately** (`b200` vs `b200|disagg`). Disaggregated configs
-  report throughput per decode or prefill chip, so their fleet sizing is on a
-  different basis; pooling them would switch that basis mid-line at whichever step
-  happened to win, silently. The chip label carries a `(disagg)` marker, since
-  otherwise two rows read as the same chip.
+- **Disagg competes for the same line.** Disaggregated configs report throughput
+  per decode or prefill chip, so a step won by one is not sized on quite the same
+  basis as a step won by an aggregated config; an earlier iteration split them into
+  two lines for that reason. They are pooled by product decision — the operator's
+  question is what the silicon can be made to do — so the caveat travels with the
+  step instead: `ChipProgression.disagg` flags a chip whose progression involves
+  any, the amber note explains the basis, and the config named on each step says
+  which kind won it. Per-line dashing was dropped when this changed, because a
+  single line can now contain both and a dashed stroke would assert something
+  untrue of half of it.
 - **The legend still filters hwKeys**, one level below the lines — hiding a config
   removes it from candidacy. Because the legend isolates on click, isolating a
   single config leaves at most one chip, and none at all when that config was never
@@ -266,25 +271,37 @@ per measured improvement — and turns it into a revenue staircase over calendar
 time against a flat cost line:
 
 ```
-revenue │        ┌────── each step is a config that beat the ones before
-        │    ┌───┘
-        │ ┌──┘
-────────┼─┴─────────────────────────────────  cost: flat, the racks
+revenue │           ┌────── each step is a config that beat the ones before
+        │       ┌───┘
+        │   ,─┘
+────────┼──╯───────────────────────────────  cost: flat, the racks
+        │ ╱ ramp to full load
         └──────────────────────────────────▶  months since model release
 ```
 
-An earlier iteration modelled a TTFI delay, a smoothstep ramp to a flat plateau
-and a decommissioning taper. That was all assumption, and it collapsed each
-chip's optimisation history into a single number held constant for years — so
-every chip drew the same shape and the configs visibly never changed. The
-measured progression is both more honest and the actual finding.
+An earlier iteration modelled a TTFI delay, a ramp to a flat plateau and a
+decommissioning taper, with no measured steps at all. That collapsed each chip's
+optimisation history into a single number held constant for years, so every chip
+drew the same assumed shape. The steps are measured; only the ramp survived, and
+it survived as an explicit user assumption.
 
-Three conventions the numbers depend on:
+**The ramp and the steps compose.** `rampFractionAt` returns the fraction of full
+load carried at a month, and it scales whichever config is in force rather than
+replacing it — so a sweep that lands mid-ramp is still a step, just a step at a
+fraction of full load. The ramp is measured from the chip's **own** first measured
+config, not from the model's release: a chip first benchmarked three months in did
+not spend those three months ramping.
 
-- **Cost is flat.** It is `chips × $/chip/hr`, and neither term moves when a
-  config improves — the racks bill the same whatever the software does. That is
-  what makes the gap between the lines the return on software progress, and what
-  makes early months legitimately underwater at a price the later configs clear.
+Four conventions the numbers depend on:
+
+- **Cost is flat, including through the ramp.** It is `chips × $/chip/hr`, and
+  neither term moves when a config improves — the racks bill the same whatever the
+  software does, and they bill from the moment they are energised rather than the
+  moment they are loaded. So the ramp is paid for in full while it earns a
+  fraction, which is what puts the opening months below the rule and delays
+  payback. That gap is the return on software progress.
+- **The ramp is an assumption; the steps are not.** It defaults to a nominal
+  quarter (`c_ramp`), and 0 means "already at full load".
 - **A config holds until the next one lands**, so the line is a step
   (`d3.curveStepAfter`), not a smooth ramp. Drawing it curved would assert the
   fleet got gradually faster between sweeps, which is not what happened. Markers
@@ -320,6 +337,24 @@ The zero rule is a `type:'custom'` layer, and it removes `.lifecycle-zero-rule`
 before appending. The chart re-renders into the same zoom group, so appending
 unconditionally leaves a stale rule and a duplicate "break-even" label behind at
 the previous y-scale on every data change.
+
+### Why the ramp is a custom layer, not a second `line` layer
+
+The ramp is continuous and the steps are square, so they need different curve
+interpolations — `curveMonotoneX` and `curveStepAfter`. The obvious implementation
+is two `line` layers, and it does not work: `useD3ChartRenderer` renders **every**
+layer into one shared `renderGroup`, and `renderLines` does a keyed join on
+`.line-path`. Two line layers with the same series keys therefore join against each
+other's paths, and the second silently overwrites the first — one of the two
+segments just vanishes.
+
+So the ramp is a `type:'custom'` layer owning `.lifecycle-ramp-path`, drawn with
+`d3.line` directly, and idempotent for the same reason the zero rule is. The two
+segments share the junction point (`points` filtered at `rampEndMonth` from both
+sides) so the join is seamless.
+
+This is worth remembering before adding any second layer of an existing type to a
+`D3Chart`: the shared render group makes layer keys non-isolating.
 
 ### Token price defaults to break-even
 
@@ -396,8 +431,8 @@ exclusion in its own note rather than leaving a silent gap.
 
 ### URL params
 
-`c_price`, `c_life` (horizon), `c_mtbi`, `c_rec`. The first two default to `''` in
-`PARAM_DEFAULTS` because their real defaults are derived, not constant — see the
-comment there. The MW budget is
+`c_price`, `c_life` (horizon), `c_ramp`, `c_mtbi`, `c_rec`. The first two default to
+`''` in `PARAM_DEFAULTS` because their real defaults are derived, not constant — see
+the comment there. The MW budget is
 `c_mw`, owned by `ThroughputCalculatorDisplay` and passed to both the fleet
 planner and this section so one input drives both.

@@ -134,6 +134,34 @@ describe('Calculator — Fleet Lifecycle', () => {
       .should('match', /^\d+(?:\.\d+)?×$/u);
   });
 
+  it('ramps to full load before the steps take over', () => {
+    // The ramp is a separate, curved segment; the steps are square. Both must be
+    // drawn, and the ramp must respond to its input.
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-ramp-path').should(
+      'have.length.greaterThan',
+      0,
+    );
+    cy.get('[data-testid="calc-lifecycle-ramp-input"]').should('have.value', '3');
+    // A longer ramp earns less over the same window, so cumulative margin falls.
+    firstRowCell(11)
+      .invoke('text')
+      .then((short) => {
+        cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
+        cy.get('[data-testid="calc-lifecycle-ramp-input"]').type('18');
+        firstRowCell(11)
+          .invoke('text')
+          .should((long) => expect(long).to.not.equal(short));
+        // Back to no ramp at all: the fleet starts at full load.
+        cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
+        cy.get('[data-testid="calc-lifecycle-ramp-input"]').type('0');
+        cy.get('body').then(($b) => {
+          expect(
+            $b.find('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-ramp-path').length,
+          ).to.equal(0);
+        });
+      });
+  });
+
   it('a shorter MTBI lowers availability', () => {
     cy.get('[data-testid="calc-lifecycle-mtbi-input"]').clear();
     cy.get('[data-testid="calc-lifecycle-mtbi-input"]').type('60');

@@ -56,7 +56,7 @@ const STRINGS = {
   en: {
     title: 'Fleet Lifecycle',
     description:
-      'A fixed fleet, from the day the model shipped. The chips never change; the software serving them does — so each step is a config that beat every config before it, and the gap to the flat cost line is the return on that work.',
+      'A fixed fleet, from the day the model shipped. It ramps to full load, and from there the chips never change while the software serving them does — so each step is a config that beat every config before it, and the gap to the flat cost line is the return on that work.',
     needMw:
       'Enter a facility power budget in the Fleet Projection section above to project lifecycle economics.',
     unsupportedSequence:
@@ -76,12 +76,14 @@ const STRINGS = {
       'Mean time between interruptions. Combined with recovery time this becomes an availability haircut on revenue. Leave blank to model no interruptions.',
     recoveryLabel: 'Recovery (hours)',
     recoveryTooltip: 'Hours to restore service after one interruption.',
+    rampLabel: 'Ramp (months)',
+    rampTooltip:
+      'Months to bring the fleet to full load, from its first measured config. Revenue follows a smoothstep over this window while cost runs at full rate — racks bill from the moment they are energised, not from the moment they are loaded. Your assumption, not a measurement; set it to 0 to start at full load.',
     horizonLabel: 'Horizon (months from release)',
     horizonTooltip:
       "How far past the model's release date to project. Past the last sweep the latest config is held flat — that is what the fleet earns if optimisation stops, not a forecast of further gains.",
     colChip: 'Chip',
     colConfigNow: 'Config Now',
-    disaggSuffix: '(disagg)',
     colFirst: 'First Run',
     colLatest: 'Latest Best',
     colSteps: 'Improvements',
@@ -102,7 +104,7 @@ const STRINGS = {
       `measured ${min.toFixed(1)}–${max.toFixed(1)} tok/s/user across ${dates} run ${dates === 1 ? 'date' : 'dates'}`,
     note: 'Note:',
     disagg:
-      ' Disaggregated inference configurations report throughput per decode chip or per prefill chip rather than per total chip, so their fleet sizes, costs and margins are not an apples-to-apples comparison with aggregated configs. They are drawn with dashed lines.',
+      ' Disaggregated inference configurations report throughput per decode chip or per prefill chip rather than per total chip, so a step won by a disaggregated config is not sized on quite the same basis as one won by an aggregated config. Both compete for the same line, since the question is what the silicon can be made to do — and the config named on each step says which kind won it.',
     hybrid:
       " One line per chip, not per software config: at any moment it follows whichever framework, precision and speculative-decoding combination was ahead, so the config serving the fleet changes along the line and each step names the one that took over. Legend entries still filter configs, which removes them from candidacy. Each step is a measured run date whose interpolated throughput at the target beat every earlier date; a sweep that failed to beat the incumbent is not a step, because the fleet kept serving the config it already had. Power and $/chip/hr are today's values from the TCO model, and cost is flat because neither moves when a config improves — it is the same silicon either way. Reads outside a run's measured interactivity range are excluded rather than clamped.",
     overlayExempt:
@@ -117,13 +119,13 @@ const STRINGS = {
     tipCumulative: 'Cumulative',
     tipSinceFirst: 'Since first run',
     assumptions: (tier: string, chips: string, release: string) =>
-      `Anchored at the ${release} release. Fleet sized by facility power at ${chips}; cost = chips × ${tier} $/chip/hr, flat for the whole window. Revenue is priced on the selected token type and reduced by the availability haircut. Price, MTBI, recovery and horizon are your assumptions — the throughput steps are not.`,
+      `Anchored at the ${release} release. Fleet sized by facility power at ${chips}; cost = chips × ${tier} $/chip/hr, flat for the whole window. Revenue is priced on the selected token type and reduced by the availability haircut. Price, ramp, MTBI, recovery and horizon are your assumptions — the throughput steps are not.`,
     source: 'Source: ',
   },
   zh: {
     title: '集群生命周期',
     description:
-      '固定集群自模型发布之日起的表现。Chip 从未更换，变化的是为其提供服务的软件——因此每一级台阶都是一个优于此前所有配置的新配置，而与水平成本线之间的差距即为这些工作带来的回报。',
+      '固定集群自模型发布之日起的表现。集群先爬坡至满载，此后 Chip 从未更换，变化的是为其提供服务的软件——因此每一级台阶都是一个优于此前所有配置的新配置，而与水平成本线之间的差距即为这些工作带来的回报。',
     needMw: '请在上方「集群规模测算」中输入设施功率预算，以测算生命周期经济性。',
     unsupportedSequence:
       '不支持 Agentic Traces：运行历史以输入/输出序列长度为键，而 agentic traces 没有该字段。请选择固定序列以使用本模块。',
@@ -140,12 +142,14 @@ const STRINGS = {
     mtbiTooltip: '平均中断间隔时间。与恢复时间共同构成对收入的可用性折损。留空表示不建模中断。',
     recoveryLabel: '恢复时间 (小时)',
     recoveryTooltip: '一次中断后恢复服务所需的小时数。',
+    rampLabel: '爬坡期 (月)',
+    rampTooltip:
+      '自首个实测配置起，集群达到满载所需的月数。在此期间收入按平滑曲线上升，而成本始终按满额计入——机架自通电起即开始计费，而非自满载起。这是您的假设而非实测值；设为 0 表示从满载开始。',
     horizonLabel: '测算期 (自发布起月数)',
     horizonTooltip:
       '自模型发布日期起向后测算的月数。在最后一次扫描之后，最新配置将保持不变——这代表若优化停止时集群的收益，而非对后续提升的预测。',
     colChip: 'Chip',
     colConfigNow: '当前配置',
-    disaggSuffix: '(解耦)',
     colFirst: '首次运行',
     colLatest: '最新最佳',
     colSteps: '提升次数',
@@ -166,7 +170,7 @@ const STRINGS = {
       `实测区间 ${min.toFixed(1)}–${max.toFixed(1)} tok/s/user，共 ${dates} 个运行日期`,
     note: '注意：',
     disagg:
-      '解耦推理配置按解码 Chip 或预填充 Chip 报告吞吐量，而非按 Chip 总数，因此其集群规模、成本与利润和聚合配置并非同类比较。此类配置以虚线绘制。',
+      '解耦推理配置按解码 Chip 或预填充 Chip 报告吞吐量，而非按 Chip 总数，因此其集群规模、成本与利润和聚合配置并非同类比较。因此由解耦配置取得的台阶与由聚合配置取得的台阶在集群规模基准上并不完全一致。两者均可竞争同一 Chip 的曲线——每一级台阶标注的配置即说明其类型。',
     hybrid:
       '每个 Chip 一条曲线，而非每个软件配置一条：曲线在任一时刻都跟随当时领先的框架、精度与投机解码组合，因此服务集群的配置会沿曲线变化，每一级台阶都标注接管的配置。图例项仍可筛选配置，被隐藏的配置将不参与竞争。每一级台阶都是一个实测运行日期，其在目标交互性下的插值吞吐量优于此前所有日期；未能超越现有配置的扫描不构成台阶，因为集群仍在运行原有配置。功率与 $/chip/hr 为 TCO 模型的当前值，成本保持水平，因为配置提升不会改变这两项——两种情况下都是同一款芯片。超出某次运行实测交互性区间的结果会被排除而非钳制。',
     overlayExempt:
@@ -181,7 +185,7 @@ const STRINGS = {
     tipCumulative: '累计',
     tipSinceFirst: '相比首次运行',
     assumptions: (tier: string, chips: string, release: string) =>
-      `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = Chip 数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、平均无故障间隔、恢复时间与测算期为你的假设——吞吐量台阶不是。`,
+      `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = Chip 数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、爬坡期、平均无故障间隔、恢复时间与测算期为你的假设——吞吐量台阶不是。`,
     source: '来源：',
   },
 } as const;
@@ -189,6 +193,9 @@ const STRINGS = {
 const DEFAULTS = {
   mtbiDays: 24,
   recoveryHours: 12,
+  // A nominal quarter to bring a fleet to full load. Purely an assumption, and
+  // labelled as one — no measurement in this repo speaks to it.
+  rampMonths: 3,
 };
 
 const MS_PER_MONTH = (365.25 / 12) * 24 * 3600 * 1000;
@@ -302,6 +309,9 @@ export default function FleetLifecycle({
   );
   const [recoveryInput, setRecoveryInput] = useState(
     () => readUrlParams().c_rec ?? String(DEFAULTS.recoveryHours),
+  );
+  const [rampInput, setRampInput] = useState(
+    () => readUrlParams().c_ramp ?? String(DEFAULTS.rampMonths),
   );
   const [horizonInput, setHorizonInput] = useState(() => readUrlParams().c_life ?? '');
   // Like the price, the horizon is seeded from the data until the user takes it
@@ -435,8 +445,9 @@ export default function FleetLifecycle({
       mtbiDays: parseNonNegative(mtbiInput) ?? 0,
       recoveryHours: parseNonNegative(recoveryInput) ?? 0,
       pricePerMTok: parseNonNegative(priceInput) ?? 0,
+      rampMonths: parseNonNegative(rampInput) ?? 0,
     }),
-    [mtbiInput, recoveryInput, priceInput],
+    [mtbiInput, recoveryInput, priceInput, rampInput],
   );
 
   const rows = useMemo<LifecycleRow[]>(
@@ -450,11 +461,7 @@ export default function FleetLifecycle({
           {
             progression,
             // The chip, not the config: the config is what changes along the line.
-            // Disagg is a separate line on the same silicon, so it has to be
-            // marked here or two rows read as the same chip.
-            label:
-              getLabel(progression.baseGpu, hardwareConfig) +
-              (progression.disagg ? ` ${t.disaggSuffix}` : ''),
+            label: getLabel(progression.baseGpu, hardwareConfig),
             configNow: configSuffix(latestHwKey, progression.baseGpu, hardwareConfig),
             // The palette is built over the *active* hwKeys, so a bare base key
             // resolves to the fallback grey. Colour the line by the config it is
@@ -495,7 +502,6 @@ export default function FleetLifecycle({
           key: r.progression.key,
           label: r.label,
           color: colorResolver(r.colorKey),
-          disagg: r.disagg,
           series: r.series,
           stepInfo,
         };
@@ -506,7 +512,7 @@ export default function FleetLifecycle({
   const tokenTypeLabel = costType === 'input' ? 'input ' : costType === 'output' ? 'output ' : '';
 
   const handleAssumption = useCallback(
-    (setter: (v: string) => void, param: 'c_mtbi' | 'c_rec' | 'c_life', event: string) =>
+    (setter: (v: string) => void, param: 'c_mtbi' | 'c_rec' | 'c_life' | 'c_ramp', event: string) =>
       (e: React.ChangeEvent<HTMLInputElement>) => {
         const raw = e.target.value;
         setter(raw);
@@ -646,6 +652,13 @@ export default function FleetLifecycle({
         horizonEdited.current = true;
         handleAssumption(setHorizonInput, 'c_life', 'calculator_lifecycle_horizon_set')(e);
       },
+    },
+    {
+      id: 'calc-lifecycle-ramp',
+      label: t.rampLabel,
+      tooltip: t.rampTooltip,
+      value: rampInput,
+      onChange: handleAssumption(setRampInput, 'c_ramp', 'calculator_lifecycle_ramp_set'),
     },
     {
       id: 'calc-lifecycle-mtbi',

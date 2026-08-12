@@ -525,11 +525,10 @@ describe('mergeProgressionsByChip', () => {
     expect(steps.at(-1)!.factorOverFirst).toBeGreaterThan(1);
   });
 
-  it('keeps disagg on its own line — its fleet math is not the same basis', () => {
+  it('lets disagg compete for the same line as aggregated configs', () => {
     const rows = [
       ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 900 : 500)),
-      // Same silicon, but throughput is reported per decode chip, so pooling it
-      // would switch the fleet-sizing basis mid-line.
+      // Same silicon, run disaggregated, and stronger at the target.
       ...[30, 60].map((iv) =>
         sweep('2026-05-02', iv, iv === 30 ? 1600 : 800, {
           framework: 'sglang-disagg',
@@ -538,14 +537,17 @@ describe('mergeProgressionsByChip', () => {
       ),
     ];
     const chips = mergeAt(rows);
-    expect(chips).toHaveLength(2);
-    const disagg = chips.find((c) => c.disagg)!;
-    const aggregated = chips.find((c) => !c.disagg)!;
-    expect(disagg.baseGpu).toBe('b300');
-    expect(aggregated.baseGpu).toBe('b300');
-    expect(disagg.key).not.toBe(aggregated.key);
-    // The stronger disagg read must not have become a rung on the aggregated line.
-    expect(aggregated.steps.map((s) => s.date)).toEqual(['2026-04-25']);
+    expect(chips).toHaveLength(1);
+    const chip = chips[0]!;
+    expect(chip.baseGpu).toBe('b300');
+    // Both rungs are on the one line, and the disagg run took over.
+    expect(chip.steps.map((s) => s.date)).toEqual(['2026-04-25', '2026-05-02']);
+    // The chip is flagged so the section can carry the basis caveat.
+    expect(chip.disagg).toBe(true);
+  });
+
+  it('does not flag a chip as disagg when none of its rungs are', () => {
+    expect(mergeAt(twoFrameworks)[0]!.disagg).toBe(false);
   });
 
   it('separates distinct silicon', () => {

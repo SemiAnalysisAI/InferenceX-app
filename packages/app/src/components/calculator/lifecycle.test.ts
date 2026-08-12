@@ -19,6 +19,9 @@ const assumptions: LifecycleAssumptions = {
   recoveryHours: 12,
   // Comfortably above the fixture's break-even, so the base case pays back.
   pricePerMTok: 10,
+  // The step behaviour is what most of these tests are about, so they start at
+  // full load. The ramp has its own describe block below.
+  rampMonths: 0,
 };
 
 describe('availabilityFromInterrupts', () => {
@@ -78,17 +81,17 @@ describe('computeLifecycle', () => {
 
   it('holds each config flat until the next one lands', () => {
     const series = computeLifecycle(base)!;
-    // Two points per step: the riser and the far end of the tread.
+    // One point per step plus a closing point at the horizon: with curveStepAfter
+    // a value holds until the next x, so that is the whole staircase.
     const risers = series.points.filter((p) => p.isStep);
     expect(risers.map((p) => p.month)).toEqual([0, 3, 6]);
-    // Revenue is constant across a tread, and rises only at a riser.
-    const treads = series.points.filter((p) => !p.isStep);
-    expect(treads).toHaveLength(3);
-    for (let i = 0; i < risers.length; i += 1) {
-      expect(treads[i]!.revenue).toBeCloseTo(risers[i]!.revenue, 6);
-    }
     expect(risers[1]!.revenue).toBeGreaterThan(risers[0]!.revenue);
     expect(risers[2]!.revenue).toBeGreaterThan(risers[1]!.revenue);
+    // The closing point carries the last config forward to the horizon.
+    const last = series.points.at(-1)!;
+    expect(last.isStep).toBe(false);
+    expect(last.month).toBe(24);
+    expect(last.revenue).toBeCloseTo(risers[2]!.revenue, 6);
   });
 
   it('keeps cost flat — a better config does not change chips or their price', () => {
@@ -189,6 +192,86 @@ describe('computeLifecycle', () => {
       ],
     })!;
     expect(series.points.filter((p) => p.isStep).map((p) => p.month)).toEqual([0, 6]);
+  });
+
+  describe('ramp', () => {
+    const ramped = { ...base, assumptions: { ...assumptions, rampMonths: 3 } };
+
+    it('starts at zero revenue and reaches full load at the end of the ramp', () => {
+      const series = computeLifecycle(ramped)!;
+      expect(series.rampEndMonth).toBe(3);
+      const first = series.points[0]!;
+      // Nothing is being served yet, so the fleet is down its full cost.
+      expect(first.revenue).toBeCloseTo(0, 6);
+      expect(first.margin).toBeCloseTo(-costPerHour * HOURS_PER_DAY, 6);
+      // At the end of the ramp the config in force is serving at full rate.
+      const atRampEnd = series.points.find((p) => p.month === 3)!;
+      expect(atRampEnd.revenue).toBeCloseTo(rev(900_000), 6);
+    });
+
+    it('rises monotonically through the ramp', () => {
+      const series = computeLifecycle(ramped)!;
+      const during = series.points.filter((p) => p.month <= 3);
+      expect(during.length).toBeGreaterThan(5);
+      for (let i = 1; i < during.length; i += 1) {
+        expect(during[i]!.revenue).toBeGreaterThanOrEqual(during[i - 1]!.revenue);
+      }
+    });
+
+    it('marks ramp points so the chart can curve them and step the rest', () => {
+      const series = computeLifecycle(ramped)!;
+      expect(series.points.filter((p) => p.isRamp).every((p) => p.month < 3)).toBe(true);
+      expect(series.points.filter((p) => !p.isRamp).every((p) => p.month >= 3)).toBe(true);
+      // The junction is shared, so the two drawn segments join without a gap.
+      expect(series.points.some((p) => p.month === 3)).toBe(true);
+    });
+
+    it('scales whichever config is in force rather than replacing it', () => {
+      // The 3-month step lands exactly at the ramp end here, so use a longer ramp
+      // to put a step strictly inside it.
+      const series = computeLifecycle({
+        ...base,
+        assumptions: { ...assumptions, rampMonths: 12 },
+      })!;
+      const risers = series.points.filter((p) => p.isStep);
+      expect(risers.map((p) => p.month)).toEqual([0, 3, 6]);
+      // Mid-ramp steps are still steps, but at a fraction of full load.
+      const atSix = risers.find((p) => p.month === 6)!;
+      expect(atSix.revenue).toBeGreaterThan(0);
+      expect(atSix.revenue).toBeLessThan(rev(1_600_000));
+    });
+
+    it('delays payback, because the ramp is paid for in full while it earns a fraction', () => {
+      const flat = computeLifecycle(base)!;
+      const series = computeLifecycle(ramped)!;
+      expect(series.paybackMonth).not.toBeNull();
+      expect(series.paybackMonth!).toBeGreaterThan(flat.paybackMonth!);
+      expect(series.lifetimeMargin).toBeLessThan(flat.lifetimeMargin);
+    });
+
+    it('keeps cost flat through the ramp — racks bill from the moment they are energised', () => {
+      const series = computeLifecycle(ramped)!;
+      for (const p of series.points) {
+        expect(p.cost).toBeCloseTo(costPerHour * HOURS_PER_DAY, 6);
+      }
+    });
+
+    it('treats a zero or nonsensical ramp as "already at full load"', () => {
+      for (const rampMonths of [0, -1, NaN]) {
+        const series = computeLifecycle({
+          ...base,
+          assumptions: { ...assumptions, rampMonths },
+        })!;
+        expect(series.rampEndMonth).toBe(series.startMonth);
+        expect(series.points[0]!.revenue).toBeCloseTo(rev(400_000), 6);
+        expect(series.points.some((p) => p.isRamp)).toBe(false);
+      }
+    });
+
+    it('reports the end-of-window rate, which is past the ramp', () => {
+      const series = computeLifecycle(ramped)!;
+      expect(series.revenuePerDay).toBeCloseTo(rev(1_600_000), 6);
+    });
   });
 
   it('returns null without steps, a cost basis or a horizon past the first run', () => {
