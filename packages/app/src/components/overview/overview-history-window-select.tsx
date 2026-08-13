@@ -10,7 +10,7 @@ import {
 import { track } from '@/lib/analytics';
 import type { OverviewHistoryWindowKey } from '@/lib/overview-data';
 
-import { useOverviewNavigation } from './overview-navigation';
+import { useOverviewComparisonMode, useOverviewNavigation } from './overview-navigation';
 
 interface WindowOption {
   href: string;
@@ -20,7 +20,7 @@ interface WindowOption {
 
 export function OverviewHistoryWindowSelect({
   ariaLabel,
-  value,
+  value: committedValue,
   options,
 }: {
   ariaLabel: string;
@@ -28,6 +28,12 @@ export function OverviewHistoryWindowSelect({
   options: readonly WindowOption[];
 }) {
   const navigation = useOverviewNavigation();
+  // Control the trigger from the pending URL so a window chosen during a slow
+  // load shows immediately and re-selecting the previous window undoes it
+  // instead of being dropped by the `next === value` guard. A pending switch
+  // back to hardware mode carries no window, so keep the committed one.
+  const pendingMode = useOverviewComparisonMode();
+  const value = pendingMode === 'hardware' ? committedValue : pendingMode;
 
   return (
     <Select
