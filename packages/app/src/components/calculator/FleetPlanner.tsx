@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { track } from '@/lib/analytics';
 import type { HardwareConfig } from '@/components/inference/types';
 import { Card } from '@/components/ui/card';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
@@ -42,6 +43,7 @@ interface FleetPlannerProps {
 
 const STRINGS = {
   en: {
+    toggleSection: 'Expand or fold this section',
     fleetTitle: 'Fleet Projection',
     fleetDescription:
       'Size a deployment by facility power: how many chips fit in your megawatt budget, and what they serve at the target interactivity above.',
@@ -82,6 +84,7 @@ const STRINGS = {
     tokenTypeOutput: 'output ',
   },
   zh: {
+    toggleSection: '展开或折叠此板块',
     fleetTitle: '集群规模测算',
     fleetDescription:
       '按设施功率规划部署：在给定兆瓦预算内可容纳多少 Chip，以及在上方目标交互性下的服务能力。',
@@ -418,93 +421,101 @@ export default function FleetPlanner({
     <TooltipProvider delayDuration={0}>
       <section data-testid="calculator-fleet-section">
         <Card>
-          <div className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">{t.fleetTitle}</h2>
+          <CollapsibleSection
+            title={t.fleetTitle}
+            toggleLabel={t.toggleSection}
+            testId="calculator-fleet-collapse"
+            onToggle={(open) => track('calculator_section_toggled', { section: 'fleet', open })}
+          >
+            <div className="flex flex-col gap-4">
               <p className="text-muted-foreground text-sm">{t.fleetDescription}</p>
-            </div>
-            <div className="flex flex-col space-y-1.5 max-w-48">
-              <LabelWithTooltip htmlFor="calc-fleet-mw" label={t.mwLabel} tooltip={t.mwTooltip} />
-              <Input
-                id="calc-fleet-mw"
-                data-testid="calc-fleet-mw-input"
-                type="number"
-                min={0}
-                step="any"
-                placeholder={t.mwPlaceholder}
-                value={mwInput}
-                onChange={handleMwChange}
-                onBlur={handleMwBlur}
-                className="w-32 h-9"
-              />
-            </div>
-            {mw && fleetRows.length > 0 ? (
-              <>
-                <DataTable
-                  data={fleetRows}
-                  columns={fleetColumns}
-                  testId="calculator-fleet-table"
-                  analyticsPrefix="calculator_fleet_table"
+              <div className="flex flex-col space-y-1.5 max-w-48">
+                <LabelWithTooltip htmlFor="calc-fleet-mw" label={t.mwLabel} tooltip={t.mwTooltip} />
+                <Input
+                  id="calc-fleet-mw"
+                  data-testid="calc-fleet-mw-input"
+                  type="number"
+                  min={0}
+                  step="any"
+                  placeholder={t.mwPlaceholder}
+                  value={mwInput}
+                  onChange={handleMwChange}
+                  onBlur={handleMwBlur}
+                  className="w-32 h-9"
                 />
-                {disaggBanner}
-                {assumptionsFooter}
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground" data-testid="calculator-fleet-empty">
-                {/* Empty with MW set has two causes: nothing visible to project
-                    (legend/slider filtered everything) vs. a budget below one GPU. */}
-                {mw ? (results.length > 0 ? t.fleetTooSmall : t.fleetNoGpus) : t.fleetEmpty}
-              </p>
-            )}
-          </div>
+              </div>
+              {mw && fleetRows.length > 0 ? (
+                <>
+                  <DataTable
+                    data={fleetRows}
+                    columns={fleetColumns}
+                    testId="calculator-fleet-table"
+                    analyticsPrefix="calculator_fleet_table"
+                  />
+                  {disaggBanner}
+                  {assumptionsFooter}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground" data-testid="calculator-fleet-empty">
+                  {/* Empty with MW set has two causes: nothing visible to project
+                      (legend/slider filtered everything) vs. a budget below one GPU. */}
+                  {mw ? (results.length > 0 ? t.fleetTooSmall : t.fleetNoGpus) : t.fleetEmpty}
+                </p>
+              )}
+            </div>
+          </CollapsibleSection>
         </Card>
       </section>
 
       <section data-testid="calculator-costcap-section">
         <Card>
-          <div className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">{t.costCapTitle}</h2>
+          <CollapsibleSection
+            title={t.costCapTitle}
+            toggleLabel={t.toggleSection}
+            testId="calculator-costcap-collapse"
+            onToggle={(open) => track('calculator_section_toggled', { section: 'costcap', open })}
+          >
+            <div className="flex flex-col gap-4">
               <p className="text-muted-foreground text-sm">{t.costCapDescription}</p>
-            </div>
-            <div className="flex flex-col space-y-1.5 max-w-48">
-              <LabelWithTooltip
-                htmlFor="calc-costcap"
-                label={t.costCapLabel}
-                tooltip={t.costCapTooltip}
-              />
-              <Input
-                id="calc-costcap"
-                data-testid="calc-costcap-input"
-                type="number"
-                min={0}
-                step="any"
-                placeholder={t.costCapPlaceholder}
-                value={costCapInput}
-                onChange={handleCostCapChange}
-                onBlur={handleCostCapBlur}
-                className="w-32 h-9"
-              />
-            </div>
-            {costCap && costCapRows.length > 0 ? (
-              <>
-                <DataTable
-                  data={costCapRows}
-                  columns={costCapColumns}
-                  testId="calculator-costcap-table"
-                  analyticsPrefix="calculator_costcap_table"
+              <div className="flex flex-col space-y-1.5 max-w-48">
+                <LabelWithTooltip
+                  htmlFor="calc-costcap"
+                  label={t.costCapLabel}
+                  tooltip={t.costCapTooltip}
                 />
-                {disaggBanner}
-                {assumptionsFooter}
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground" data-testid="calculator-costcap-empty">
-                {/* With a valid target set, empty means nothing is legend-visible
-                    (unreachable GPUs still produce rows). */}
-                {costCap ? t.costCapNoGpus : t.costCapEmpty}
-              </p>
-            )}
-          </div>
+                <Input
+                  id="calc-costcap"
+                  data-testid="calc-costcap-input"
+                  type="number"
+                  min={0}
+                  step="any"
+                  placeholder={t.costCapPlaceholder}
+                  value={costCapInput}
+                  onChange={handleCostCapChange}
+                  onBlur={handleCostCapBlur}
+                  className="w-32 h-9"
+                />
+              </div>
+              {costCap && costCapRows.length > 0 ? (
+                <>
+                  <DataTable
+                    data={costCapRows}
+                    columns={costCapColumns}
+                    testId="calculator-costcap-table"
+                    analyticsPrefix="calculator_costcap_table"
+                  />
+                  {disaggBanner}
+                  {assumptionsFooter}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground" data-testid="calculator-costcap-empty">
+                  {/* With a valid target set, empty means nothing is legend-visible
+                      (unreachable GPUs still produce rows). */}
+                  {costCap ? t.costCapNoGpus : t.costCapEmpty}
+                </p>
+              )}
+            </div>
+          </CollapsibleSection>
         </Card>
       </section>
     </TooltipProvider>

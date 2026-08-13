@@ -63,6 +63,28 @@ Adding another context provider to the nesting hierarchy would increase re-rende
 
 Click-to-compare uses `resultKey` (not hwKey) because multi-precision mode produces multiple bars per GPU. Comparison ratios use the lower value as denominator (ratio >= 1.0). Both metric and token type are reflected in the comparison text to avoid ambiguity.
 
+## Folding sections away (`CollapsibleSection`)
+
+The page is long — chart, fleet projection, cost target, lifecycle — and most readers
+want one of them at a time. The chart section, Fleet Projection and Interactivity
+Within a Cost Target each carry a chevron toggle (`components/ui/collapsible-section.tsx`).
+
+Two decisions in that component:
+
+- **Folded means unmounted, not hidden.** These bodies hold D3 charts and tables, and
+  leaving them mounted under `display: none` keeps them measuring and re-rendering
+  off-screen for a reader who said they are not interested. The trade is that chart
+  zoom and a frozen tooltip do not survive a fold.
+- **`titleWhenOpen`.** The two fleet-planner sections own their `<h2>`, so the header
+  shows the title always. The chart section's title lives in the chart's own caption
+  (and is part of the PNG export), so its header shows the title **only while
+  folded** — two copies would be worse than none. That is why `getChartTitle` is
+  hoisted out of the caption in `ThroughputCalculatorDisplay`: the fold header needs
+  the same words, and they carry the current metric and target.
+
+State is local `useState`, not a URL param: it is a reading preference, not a view of
+the data worth sharing in a link.
+
 ## Unofficial-Run Overlays (`?unofficialrun=`)
 
 A loaded unofficial run contributes an extra bar per (hardware × run) to the bar chart, in the run's palette color (`overlayRunColor`) and labeled `B300 (✕ my-branch)`. The label keeps the branch inside the same paren group as the precision so the `twoRowYAxisLabels({ split: 'parens' })` y-axis customizer still splits it into two rows.

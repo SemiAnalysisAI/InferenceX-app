@@ -14,6 +14,7 @@ import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
 import { GlobalFilterProvider, useGlobalFilters } from '@/components/GlobalFilterContext';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegend from '@/components/ui/chart-legend';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
@@ -134,6 +135,7 @@ const STRINGS = {
     viewChart: 'Chart',
     viewTable: 'Table',
     viewModeAria: 'View mode',
+    toggleSection: 'Expand or fold this section',
     errorLoading: 'Error loading data. Please try a different selection.',
     clickToCompare: 'selected. Click another bar to compare.',
     clearSelection: 'Clear selection',
@@ -186,6 +188,7 @@ const STRINGS = {
     viewChart: '图表',
     viewTable: '表格',
     viewModeAria: '显示模式',
+    toggleSection: '展开或折叠此板块',
     errorLoading: '加载数据出错，请尝试其他选择。',
     clickToCompare: '已选中。点击另一个柱状图进行对比。',
     clearSelection: '清除选择',
@@ -838,6 +841,28 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     resolveColor,
   ]);
 
+  // Hoisted out of the caption because the fold header needs the same words: a
+  // folded section shows only its title, and it has to be this chart's title
+  // rather than a static one, since the title carries the metric and target.
+  const chartTitle =
+    locale === 'zh'
+      ? getChartTitleZh(
+          barMetric,
+          mode,
+          targetValue,
+          costType,
+          costProvider,
+          isAgenticSequence ? selectedPercentile : undefined,
+        )
+      : getChartTitle(
+          barMetric,
+          mode,
+          targetValue,
+          costType,
+          costProvider,
+          isAgenticSequence ? selectedPercentile : undefined,
+        );
+
   if (!loading && error) {
     console.error(error);
     return (
@@ -1085,240 +1110,232 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
       {/* Chart / Table */}
       <section data-testid="calculator-chart-section">
-        <figure data-testid="calculator-figure" className="relative rounded-lg">
-          <ChartButtons
-            chartId="calculator-chart"
-            analyticsPrefix="calculator"
-            zoomResetEvent="d3chart_zoom_reset_calculator-chart"
-            onExportCsv={handleExportCsv}
-            setIsLegendExpanded={setIsLegendExpanded}
-            exportFileName={`InferenceX_calculator_${selectedModel}`}
-            leadingControls={
-              <SegmentedToggle
-                value={viewMode}
-                options={viewModeOptions}
-                onValueChange={handleViewModeChange}
-                ariaLabel={t.viewModeAria}
-                testId="calculator-view-toggle"
-                className="shrink-0"
-              />
-            }
-          />
-          <Card>
-            {loading ? (
-              <Skeleton className="h-125 w-full" />
-            ) : (
-              <>
-                {(() => {
-                  const captionContent = (
-                    <>
-                      <div className="flex items-start justify-between gap-4">
-                        <h2 className="text-lg font-semibold">
-                          {locale === 'zh'
-                            ? getChartTitleZh(
-                                barMetric,
-                                mode,
-                                targetValue,
-                                costType,
-                                costProvider,
-                                isAgenticSequence ? selectedPercentile : undefined,
-                              )
-                            : getChartTitle(
-                                barMetric,
-                                mode,
-                                targetValue,
-                                costType,
-                                costProvider,
-                                isAgenticSequence ? selectedPercentile : undefined,
-                              )}
-                        </h2>
-                        <SegmentedToggle
-                          value={viewMode}
-                          options={mobileViewModeOptions}
-                          onValueChange={handleViewModeChange}
-                          ariaLabel={t.viewModeAria}
-                          className="md:hidden shrink-0"
-                        />
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {getModelLabel(selectedModel)} •{' '}
-                        {selectedPrecisions
-                          .map((p) => getPrecisionLabel(p as Precision))
-                          .join(', ')}{' '}
-                        • {getSequenceLabel(selectedSequence, locale)} • {t.source}SemiAnalysis
-                        InferenceX™
-                        {selectedRunDate && (
+        <CollapsibleSection
+          title={chartTitle}
+          // The chart's own caption already carries this title, so the header
+          // shows it only while folded.
+          titleWhenOpen={false}
+          toggleLabel={t.toggleSection}
+          testId="calculator-chart-collapse"
+          onToggle={(open) => track('calculator_section_toggled', { section: 'chart', open })}
+        >
+          <figure data-testid="calculator-figure" className="relative rounded-lg">
+            <ChartButtons
+              chartId="calculator-chart"
+              analyticsPrefix="calculator"
+              zoomResetEvent="d3chart_zoom_reset_calculator-chart"
+              onExportCsv={handleExportCsv}
+              setIsLegendExpanded={setIsLegendExpanded}
+              exportFileName={`InferenceX_calculator_${selectedModel}`}
+              leadingControls={
+                <SegmentedToggle
+                  value={viewMode}
+                  options={viewModeOptions}
+                  onValueChange={handleViewModeChange}
+                  ariaLabel={t.viewModeAria}
+                  testId="calculator-view-toggle"
+                  className="shrink-0"
+                />
+              }
+            />
+            <Card>
+              {loading ? (
+                <Skeleton className="h-125 w-full" />
+              ) : (
+                <>
+                  {(() => {
+                    const captionContent = (
+                      <>
+                        <div className="flex items-start justify-between gap-4">
+                          <h2 className="text-lg font-semibold">{chartTitle}</h2>
+                          <SegmentedToggle
+                            value={viewMode}
+                            options={mobileViewModeOptions}
+                            onValueChange={handleViewModeChange}
+                            ariaLabel={t.viewModeAria}
+                            className="md:hidden shrink-0"
+                          />
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          {getModelLabel(selectedModel)} •{' '}
+                          {selectedPrecisions
+                            .map((p) => getPrecisionLabel(p as Precision))
+                            .join(', ')}{' '}
+                          • {getSequenceLabel(selectedSequence, locale)} • {t.source}SemiAnalysis
+                          InferenceX™
+                          {selectedRunDate && (
+                            <>
+                              {t.updated}
+                              {selectedRunDate}
+                            </>
+                          )}
+                        </p>
+                        {barMetric === 'power' && barResults.length > 0 && (
                           <>
-                            {t.updated}
-                            {selectedRunDate}
+                            <p
+                              className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center"
+                              data-testid="calculator-cost-badges"
+                            >
+                              {t.allInPower}
+                              {Object.entries(HW_REGISTRY).map(([base, specs]) => (
+                                <Badge key={base} variant="outline">
+                                  {base.toUpperCase()}: {specs.power}kW
+                                </Badge>
+                              ))}
+                            </p>
+                            <p className="text-muted-foreground">
+                              <small>
+                                {t.source}
+                                <Link
+                                  target="_blank"
+                                  className="underline hover:text-foreground"
+                                  href="https://semianalysis.com/datacenter-industry-model/"
+                                >
+                                  SemiAnalysis Datacenter Industry Model
+                                  <ExternalLinkIcon />
+                                </Link>
+                              </small>
+                            </p>
                           </>
                         )}
-                      </p>
-                      {barMetric === 'power' && barResults.length > 0 && (
-                        <>
-                          <p
-                            className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center"
-                            data-testid="calculator-cost-badges"
-                          >
-                            {t.allInPower}
-                            {Object.entries(HW_REGISTRY).map(([base, specs]) => (
-                              <Badge key={base} variant="outline">
-                                {base.toUpperCase()}: {specs.power}kW
-                              </Badge>
-                            ))}
-                          </p>
-                          <p className="text-muted-foreground">
-                            <small>
-                              {t.source}
-                              <Link
-                                target="_blank"
-                                className="underline hover:text-foreground"
-                                href="https://semianalysis.com/datacenter-industry-model/"
-                              >
-                                SemiAnalysis Datacenter Industry Model
-                                <ExternalLinkIcon />
-                              </Link>
-                            </small>
-                          </p>
-                        </>
-                      )}
-                      {barMetric === 'cost' && barResults.length > 0 && (
-                        <>
-                          <p
-                            className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center"
-                            data-testid="calculator-cost-badges"
-                          >
-                            {t.tcoPerHr}
-                            {Object.entries(HW_REGISTRY).map(([base, specs]) => (
-                              <Badge key={base} variant="outline">
-                                {base.toUpperCase()}: $
-                                {(costProvider === 'costh'
-                                  ? specs.costh
-                                  : costProvider === 'costn'
-                                    ? specs.costn
-                                    : specs.costr
-                                ).toFixed(2)}
-                                /hr
-                              </Badge>
-                            ))}
-                          </p>
-                          <p className="text-muted-foreground">
-                            <small>
-                              {t.source}
-                              <Link
-                                target="_blank"
-                                className="underline hover:text-foreground"
-                                href="https://semianalysis.com/ai-cloud-tco-model/"
-                              >
-                                SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
-                                <ExternalLinkIcon />
-                              </Link>
-                            </small>
-                          </p>
-                        </>
-                      )}
-                      {/* Per-token-type cost only: the input- and output-token
+                        {barMetric === 'cost' && barResults.length > 0 && (
+                          <>
+                            <p
+                              className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center"
+                              data-testid="calculator-cost-badges"
+                            >
+                              {t.tcoPerHr}
+                              {Object.entries(HW_REGISTRY).map(([base, specs]) => (
+                                <Badge key={base} variant="outline">
+                                  {base.toUpperCase()}: $
+                                  {(costProvider === 'costh'
+                                    ? specs.costh
+                                    : costProvider === 'costn'
+                                      ? specs.costn
+                                      : specs.costr
+                                  ).toFixed(2)}
+                                  /hr
+                                </Badge>
+                              ))}
+                            </p>
+                            <p className="text-muted-foreground">
+                              <small>
+                                {t.source}
+                                <Link
+                                  target="_blank"
+                                  className="underline hover:text-foreground"
+                                  href="https://semianalysis.com/ai-cloud-tco-model/"
+                                >
+                                  SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
+                                  <ExternalLinkIcon />
+                                </Link>
+                              </small>
+                            </p>
+                          </>
+                        )}
+                        {/* Per-token-type cost only: the input- and output-token
                           costs are attributed to one side of a disagg config's
                           prefill/decode split, while the total-token cost uses
                           the whole chip count — the same denominator an
                           aggregated config uses — so it needs no caveat. */}
-                      <div
-                        className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                          barMetric === 'cost' && costType !== 'total'
-                            ? 'max-h-20 opacity-100'
-                            : 'max-h-0 opacity-0'
-                        }`}
-                      >
-                        <p
-                          data-testid="calculator-disagg-cost-note"
-                          className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1"
+                        <div
+                          className={`overflow-hidden transition-all duration-200 ease-in-out ${
+                            barMetric === 'cost' && costType !== 'total'
+                              ? 'max-h-20 opacity-100'
+                              : 'max-h-0 opacity-0'
+                          }`}
                         >
-                          <strong>{t.note}</strong>
-                          {t.disaggCost}
-                        </p>
-                      </div>
-                      <div
-                        className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                          barMetric === 'throughput' || barMetric === 'power'
-                            ? 'max-h-20 opacity-100'
-                            : 'max-h-0 opacity-0'
-                        }`}
-                      >
-                        <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
-                          <strong>{t.note}</strong>
-                          {t.disaggThroughput}
-                        </p>
-                      </div>
-                      <UnofficialDomainNotice />
-                    </>
-                  );
+                          <p
+                            data-testid="calculator-disagg-cost-note"
+                            className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1"
+                          >
+                            <strong>{t.note}</strong>
+                            {t.disaggCost}
+                          </p>
+                        </div>
+                        <div
+                          className={`overflow-hidden transition-all duration-200 ease-in-out ${
+                            barMetric === 'throughput' || barMetric === 'power'
+                              ? 'max-h-20 opacity-100'
+                              : 'max-h-0 opacity-0'
+                          }`}
+                        >
+                          <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
+                            <strong>{t.note}</strong>
+                            {t.disaggThroughput}
+                          </p>
+                        </div>
+                        <UnofficialDomainNotice />
+                      </>
+                    );
 
-                  return viewMode === 'chart' ? (
-                    <ThroughputBarChart
-                      caption={captionContent}
-                      results={barResults}
-                      hardwareConfig={hardwareConfig}
-                      mode={mode}
-                      targetValue={targetValue}
-                      barMetric={barMetric}
-                      costType={costType}
-                      runUrl={runUrl}
-                      selectedBars={selectedBars}
-                      onBarSelect={handleBarSelect}
-                      colorResolver={resolveColor}
-                      legendElement={
-                        legendHwKeys.length > 0 ? (
-                          <ChartLegend
-                            variant="sidebar"
-                            legendItems={legendItems}
-                            onItemRemove={removeGpu}
-                            isLegendExpanded={isLegendExpanded}
-                            onExpandedChange={(expanded) => {
-                              setIsLegendExpanded(expanded);
-                              track('calculator_legend_expanded', { expanded });
-                            }}
-                            switches={[
-                              {
-                                id: 'calc-high-contrast',
-                                label: t.highContrast,
-                                checked: highContrast,
-                                onCheckedChange: (checked: boolean) => {
-                                  setHighContrast(checked);
-                                  track('calculator_high_contrast_toggled', { enabled: checked });
-                                },
-                              },
-                            ]}
-                            actions={
-                              visibleHwKeys.size < legendHwKeys.length
-                                ? [
-                                    {
-                                      id: 'calc-reset-filter',
-                                      label: t.resetFilter,
-                                      onClick: handleResetGpus,
-                                    },
-                                  ]
-                                : []
-                            }
-                            enableTooltips={true}
-                          />
-                        ) : undefined
-                      }
-                    />
-                  ) : (
-                    <>
-                      <figcaption>{captionContent}</figcaption>
-                      <CalculatorTable
-                        results={results}
-                        costType={costType}
+                    return viewMode === 'chart' ? (
+                      <ThroughputBarChart
+                        caption={captionContent}
+                        results={barResults}
                         hardwareConfig={hardwareConfig}
+                        mode={mode}
+                        targetValue={targetValue}
+                        barMetric={barMetric}
+                        costType={costType}
+                        runUrl={runUrl}
+                        selectedBars={selectedBars}
+                        onBarSelect={handleBarSelect}
+                        colorResolver={resolveColor}
+                        legendElement={
+                          legendHwKeys.length > 0 ? (
+                            <ChartLegend
+                              variant="sidebar"
+                              legendItems={legendItems}
+                              onItemRemove={removeGpu}
+                              isLegendExpanded={isLegendExpanded}
+                              onExpandedChange={(expanded) => {
+                                setIsLegendExpanded(expanded);
+                                track('calculator_legend_expanded', { expanded });
+                              }}
+                              switches={[
+                                {
+                                  id: 'calc-high-contrast',
+                                  label: t.highContrast,
+                                  checked: highContrast,
+                                  onCheckedChange: (checked: boolean) => {
+                                    setHighContrast(checked);
+                                    track('calculator_high_contrast_toggled', { enabled: checked });
+                                  },
+                                },
+                              ]}
+                              actions={
+                                visibleHwKeys.size < legendHwKeys.length
+                                  ? [
+                                      {
+                                        id: 'calc-reset-filter',
+                                        label: t.resetFilter,
+                                        onClick: handleResetGpus,
+                                      },
+                                    ]
+                                  : []
+                              }
+                              enableTooltips={true}
+                            />
+                          ) : undefined
+                        }
                       />
-                    </>
-                  );
-                })()}
-              </>
-            )}
-          </Card>
-        </figure>
+                    ) : (
+                      <>
+                        <figcaption>{captionContent}</figcaption>
+                        <CalculatorTable
+                          results={results}
+                          costType={costType}
+                          hardwareConfig={hardwareConfig}
+                        />
+                      </>
+                    );
+                  })()}
+                </>
+              )}
+            </Card>
+          </figure>
+        </CollapsibleSection>
       </section>
 
       {/* Comparison banner — only shown in chart view */}

@@ -802,4 +802,52 @@ describe('TCO Calculator', () => {
       });
     });
   });
+
+  describe('folding sections away', () => {
+    before(() => {
+      cy.window().then((win) => {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      });
+      cy.visit('/calculator');
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
+    });
+
+    it('folds the chart away, keeping its title as the handle', () => {
+      // Folded means unmounted, not hidden: these bodies hold D3 charts, and a
+      // reader who folded one should not still be paying to render it.
+      cy.get('[data-testid="calculator-chart-collapse"]').click();
+      cy.get('[data-testid="calculator-figure"]').should('not.exist');
+      // The title only appears in the header once folded — while open the chart's
+      // own caption carries it, and two copies would be worse than none.
+      cy.get('[data-testid="calculator-chart-section"] h2')
+        .should('have.length', 1)
+        .and('contain.text', 'Total Token Throughput per Chip');
+
+      cy.get('[data-testid="calculator-chart-collapse"]').click();
+      cy.get('[data-testid="calculator-figure"]').should('be.visible');
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
+    });
+
+    it('folds each fleet planner section independently', () => {
+      cy.get('[data-testid="calc-fleet-mw-input"]').should('be.visible');
+      cy.get('[data-testid="calculator-fleet-collapse"]').click();
+      cy.get('[data-testid="calc-fleet-mw-input"]').should('not.exist');
+      // Folding one section leaves its neighbour alone.
+      cy.get('[data-testid="calc-costcap-input"]').should('be.visible');
+      // The heading stays put, so the folded section still says what it is.
+      cy.get('[data-testid="calculator-fleet-section"]').should('contain.text', 'Fleet Projection');
+
+      cy.get('[data-testid="calculator-costcap-collapse"]').click();
+      cy.get('[data-testid="calc-costcap-input"]').should('not.exist');
+      cy.get('[data-testid="calculator-costcap-section"]').should(
+        'contain.text',
+        'Interactivity Within a Cost Target',
+      );
+
+      cy.get('[data-testid="calculator-fleet-collapse"]').click();
+      cy.get('[data-testid="calc-fleet-mw-input"]').should('be.visible');
+      cy.get('[data-testid="calculator-costcap-collapse"]').click();
+      cy.get('[data-testid="calc-costcap-input"]').should('be.visible');
+    });
+  });
 });
