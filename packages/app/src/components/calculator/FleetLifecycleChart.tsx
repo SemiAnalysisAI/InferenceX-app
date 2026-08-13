@@ -5,7 +5,12 @@ import React, { useCallback, useMemo, useRef } from 'react';
 
 import { formatLargeNumber } from '@/lib/chart-rendering';
 import { getChartWatermark } from '@/lib/data-mappings';
-import { D3Chart, type RenderContext, type ScaleConfig } from '@/lib/d3-chart/D3Chart';
+import {
+  D3Chart,
+  type D3ChartHandle,
+  type RenderContext,
+  type ScaleConfig,
+} from '@/lib/d3-chart/D3Chart';
 import { escapeHtml } from '@/lib/utils';
 
 import type { LifecyclePoint, LifecycleSeries } from './lifecycle';
@@ -42,6 +47,51 @@ interface StepMarker {
   month: number;
 }
 
+/**
+ * Hover positions the readout can snap to: a uniform grid across the window.
+ *
+ * The alternative — snapping to the sample points themselves — reads badly here,
+ * because sample density varies by two orders of magnitude along a line. Each
+ * rollout carries 24 samples over its ramp (a day or two apart) while a plateau
+ * carries a single sample spanning months, so the cursor would crawl through a
+ * riser and then jump a year. A uniform grid moves at a constant speed, and at
+ * this count each slice is well under a pixel wide unzoomed.
+ */
+const HOVER_SLICE_COUNT = 1200;
+
+/**
+ * How near a slice must be to a step for the readout to include that step's
+ * config and run links, in slices.
+ *
+ * A step's own instant almost never coincides with a grid slice, and at this
+ * density a slice is a fraction of a pixel — so matching by equality would make
+ * the run links unreachable by pointing at the dot, which is the only place a
+ * reader would think to look for them. Four slices is about three pixels
+ * unzoomed: near enough to mean "that dot", far enough to be hittable.
+ */
+const STEP_MATCH_SLICES = 4;
+
+/** One position on the time axis the readout can rest at. */
+interface HoverSlice {
+  /** Timestamp, ms. */
+  x: number;
+}
+
+/** A measured config change, placed on the time axis. */
+interface StepAt {
+  x: number;
+  seriesKey: string;
+  month: number;
+}
+
+/** One series' state at a hovered slice. */
+interface SliceReading {
+  label: string;
+  color: string;
+  value: number;
+  cumulative: number;
+}
+
 /** Which per-day rate the y axis plots. */
 export type LifecycleMetric = 'margin' | 'revenue';
 
@@ -63,6 +113,8 @@ interface FleetLifecycleChartProps {
     runHint: string;
   };
   breakEvenLabel: string;
+  /** Localised hint under the chart. */
+  instructions: string;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
 }
@@ -83,9 +135,11 @@ const FleetLifecycleChart = React.memo(
     yLabel,
     labels,
     breakEvenLabel,
+    instructions,
     legendElement,
     caption,
   }: FleetLifecycleChartProps) => {
+    const chartRef = useRef<D3ChartHandle | null>(null);
     const toMs = useCallback((month: number) => anchorMs + month * MS_PER_MONTH, [anchorMs]);
     const valueOf = useCallback(
       (point: LifecyclePoint) => (metric === 'revenue' ? point.revenue : point.margin),
@@ -116,6 +170,32 @@ const FleetLifecycleChart = React.memo(
       }
       return { lineDataRecord: record, markers: flat, bySafeKey: lookup };
     }, [data, toMs, valueOf]);
+
+    /** The grid the hover readout snaps to, plus where the steps sit on it. */
+    const { hoverSlices, stepsOnAxis, sliceSpacing } = useMemo(() => {
+      let min = Infinity;
+      let max = -Infinity;
+      for (const entry of data) {
+        min = Math.min(min, toMs(entry.series.startMonth));
+        max = Math.max(max, toMs(entry.series.endMonth));
+      }
+      if (!Number.isFinite(min) || !(max > min)) {
+        return { hoverSlices: [], stepsOnAxis: [], sliceSpacing: 0 };
+      }
+
+      const spacing = (max - min) / HOVER_SLICE_COUNT;
+      const slices: HoverSlice[] = Array.from({ length: HOVER_SLICE_COUNT + 1 }, (_, i) => ({
+        x: min + i * spacing,
+      }));
+      const steps: StepAt[] = [];
+      for (const entry of data) {
+        for (const point of entry.series.points) {
+          if (!point.isStep) continue;
+          steps.push({ x: toMs(point.month), seriesKey: safeKey(entry.key), month: point.month });
+        }
+      }
+      return { hoverSlices: slices, stepsOnAxis: steps, sliceSpacing: spacing };
+    }, [data, toMs]);
 
     /**
      * What the custom layers should draw *now*.
@@ -394,59 +474,162 @@ const FleetLifecycleChart = React.memo(
       ],
     );
 
+    /**
+     * A series' plotted rate and cumulative margin at an arbitrary instant.
+     *
+     * Interpolates linearly between samples, which is exactly what the line does
+     * (`curveLinear`), so the readout always agrees with the pixel under the rule.
+     * Returns null outside the series' own window — a chip first measured a year
+     * after release has no line, and so no number, before then.
+     */
+    const readingAt = useCallback(
+      (entry: LifecycleChartSeries, month: number): SliceReading | null => {
+        const points = entry.series.points;
+        const first = points[0];
+        const last = points.at(-1);
+        if (!first || !last) return null;
+        if (month < first.month || month > last.month) return null;
+
+        let lo = 0;
+        let hi = points.length - 1;
+        while (lo < hi) {
+          const mid = (lo + hi + 1) >> 1;
+          if (points[mid]!.month <= month) lo = mid;
+          else hi = mid - 1;
+        }
+        const before = points[lo]!;
+        const after = points[Math.min(lo + 1, points.length - 1)]!;
+        const span = after.month - before.month;
+        const t = span > 0 ? (month - before.month) / span : 0;
+        const lerp = (a: number, b: number) => a + (b - a) * t;
+        return {
+          label: entry.label,
+          color: entry.color,
+          value: lerp(valueOf(before), valueOf(after)),
+          cumulative: lerp(before.cumulative, after.cumulative),
+        };
+      },
+      [valueOf],
+    );
+
+    const sliceDate = useMemo(() => d3.timeFormat('%d %b %Y'), []);
+
+    /**
+     * Was the readout frozen when the current click started?
+     *
+     * Written by a capture-phase listener on the SVG, so it is settled before the
+     * plot overlay's own bubble-phase handler pins the new slice. Reading the
+     * pinned state afterwards would always say "frozen" and the toggle below could
+     * never tell a freeze from a release.
+     */
+    const wasFrozen = useRef(false);
+
+    const handleRender = useCallback((ctx: RenderContext) => {
+      // Named listener, so re-renders replace it rather than stacking copies.
+      ctx.layout.svg.on(
+        'click.lifecycle-freeze',
+        () => {
+          wasFrozen.current = chartRef.current?.isPinned() ?? false;
+        },
+        { capture: true },
+      );
+    }, []);
+
+    /**
+     * The hover readout: every visible chip's number at the instant under the
+     * rule, in one popup.
+     *
+     * Per-point tooltips answered "what is this dot?", which is the wrong question
+     * for this chart — the lines are only interesting against each other, and a
+     * reader comparing two chips at one date had to hover twice and hold the first
+     * number in their head. This reads every line at once. Steps keep their
+     * detail: any step nearest this slice contributes its config and, once frozen,
+     * its run links, so the per-rung audit trail survives.
+     */
     const tooltipConfig = useMemo(
       () => ({
-        rulerType: 'crosshair' as const,
-        content: (d: StepMarker, isPinned: boolean) => {
-          const entry = bySafeKey.get(d.seriesKey);
-          if (!entry) return '';
-          const point =
-            entry.series.points.find((p) => p.isStep && p.month === d.month) ??
-            (entry.series.points[0] as LifecyclePoint);
-          const info = entry.stepInfo.get(d.month);
-          const factor = info && info.factor > 1.005 ? ` (${info.factor.toFixed(2)}x)` : '';
-          return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 220px; user-select: ${isPinned ? 'text' : 'none'};">
-            <div class="font-semibold mb-1" style="color: ${escapeHtml(entry.color)}">${escapeHtml(entry.label)}</div>
-            <div class="text-muted-foreground">${escapeHtml(labels.date)}: ${escapeHtml(info?.date ?? '')}</div>
-            ${info?.config ? `<div class="text-muted-foreground">${escapeHtml(labels.config)}: ${escapeHtml(info.config)}</div>` : ''}
+        rulerType: 'vertical' as const,
+        proximityHover: true,
+        getDataX: (d: HoverSlice) => d.x,
+        content: (d: HoverSlice, isPinned: boolean) => {
+          const month = (d.x - anchorMs) / MS_PER_MONTH;
+          const readings: SliceReading[] = [];
+          for (const entry of data) {
+            const reading = readingAt(entry, month);
+            if (reading) readings.push(reading);
+          }
+          readings.sort((a, b) => b.value - a.value);
+
+          const valueHeader = metric === 'revenue' ? labels.revenuePerDay : labels.marginPerDay;
+          const rows = readings
+            .map(
+              (r) =>
+                `<tr><td class="pr-3 whitespace-nowrap" style="color: ${escapeHtml(r.color)}">${escapeHtml(r.label)}</td>
+                <td class="pr-3 text-right tabular-nums font-medium">${money(r.value)}</td>
+                <td class="text-right tabular-nums text-muted-foreground">${money(r.cumulative)}</td></tr>`,
+            )
+            .join('');
+
+          const tolerance = sliceSpacing * STEP_MATCH_SLICES;
+          const steps = stepsOnAxis
+            .filter((step) => Math.abs(step.x - d.x) <= tolerance)
+            .flatMap((step) => {
+              const entry = bySafeKey.get(step.seriesKey);
+              const info = entry?.stepInfo.get(step.month);
+              if (!entry || !info) return [];
+              const factor = info.factor > 1.005 ? ` (${info.factor.toFixed(2)}x)` : '';
+              const links =
+                // Every rung links its run, not just the first and last. The table
+                // only links the opening and closing sweeps, so without this the
+                // intermediate rungs — exactly where an anomalous run that was
+                // never purged would sit — have no audit trail anywhere in the UI.
+                // Freeze the readout (click) to follow one.
+                info.runUrls.length === 0
+                  ? ''
+                  : isPinned
+                    ? ` ${info.runUrls
+                        .map(
+                          (url, i) =>
+                            `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="text-primary underline mr-2">${escapeHtml(labels.runLink)}${
+                              info.runUrls.length > 1 ? ` ${i + 1}` : ''
+                            }</a>`,
+                        )
+                        .join('')}`
+                    : ` <span class="text-muted-foreground">${escapeHtml(labels.runHint)}</span>`;
+              return [
+                `<div class="mt-1">
+                  <span style="color: ${escapeHtml(entry.color)}">${escapeHtml(entry.label)}</span>
+                  <span class="text-muted-foreground"> ${escapeHtml(labels.config)}: ${escapeHtml(info.config)}${escapeHtml(factor)} · ${escapeHtml(labels.date)} ${escapeHtml(info.date)}</span>${links}
+                </div>`,
+              ];
+            })
+            .join('');
+
+          return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 240px; user-select: ${isPinned ? 'text' : 'none'};">
+            <div class="font-semibold mb-1">${escapeHtml(sliceDate(new Date(d.x)))}</div>
             ${
-              // Lead with whichever rate the axis is plotting; the other two stay
-              // as context so the tooltip never depends on the axis to be read.
-              metric === 'revenue'
-                ? `<div class="mt-1 font-medium">${escapeHtml(labels.revenuePerDay)}: ${money(point.revenue)}</div>
-            <div class="text-muted-foreground">${escapeHtml(labels.marginPerDay)}: ${money(point.margin)}</div>`
-                : `<div class="mt-1 font-medium">${escapeHtml(labels.marginPerDay)}: ${money(point.margin)}</div>
-            <div class="text-muted-foreground">${escapeHtml(labels.revenuePerDay)}: ${money(point.revenue)}</div>`
+              rows
+                ? `<table class="w-full"><thead><tr class="text-muted-foreground font-normal">
+                    <th></th>
+                    <th class="pr-3 text-right font-normal">${escapeHtml(valueHeader)}</th>
+                    <th class="text-right font-normal">${escapeHtml(labels.cumulative)}</th>
+                  </tr></thead><tbody>${rows}</tbody></table>`
+                : ''
             }
-            <div class="text-muted-foreground">${escapeHtml(labels.costPerDay)}: ${money(point.cost)}</div>
-            <div class="mt-1">${escapeHtml(labels.cumulative)}: ${money(point.cumulative)}</div>
-            ${factor ? `<div class="text-muted-foreground">${escapeHtml(labels.sinceFirst)}:${escapeHtml(factor)}</div>` : ''}
-            ${
-              // Every rung links its run, not just the first and last. The table
-              // only links the opening and closing sweeps, so without this the
-              // intermediate rungs — exactly where an anomalous run that was never
-              // purged would sit — have no audit trail anywhere in the UI. Pin the
-              // tooltip (click the dot) to follow one.
-              isPinned && info?.runUrls.length
-                ? `<div class="mt-1">${info.runUrls
-                    .map(
-                      (url, i) =>
-                        `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="text-primary underline mr-2">${escapeHtml(labels.runLink)}${
-                          info.runUrls.length > 1 ? ` ${i + 1}` : ''
-                        }</a>`,
-                    )
-                    .join('')}</div>`
-                : info?.runUrls.length
-                  ? `<div class="mt-1 text-muted-foreground">${escapeHtml(labels.runHint)}</div>`
-                  : ''
-            }
+            ${steps}
           </div>`;
         },
-        getRulerX: (d: StepMarker, xScale: any) => xScale(d.x),
-        getRulerY: (d: StepMarker, yScale: any) => yScale(d.y),
-        attachToLayer: 2,
+        getRulerX: (d: HoverSlice, xScale: any) => xScale(d.x),
+        onPointClick: () => {
+          // The overlay pins on every click, so a second click would just re-pin.
+          // `wasFrozen` is read in the capture phase, before that pin lands, which
+          // makes the same gesture a toggle: click to freeze, click to release.
+          if (!wasFrozen.current) return;
+          chartRef.current?.dismissTooltip();
+          chartRef.current?.hideTooltip();
+        },
       }),
-      [bySafeKey, labels, metric],
+      [anchorMs, bySafeKey, data, labels, metric, readingAt, sliceDate, sliceSpacing, stepsOnAxis],
     );
 
     const xAxisConfig = useMemo(
@@ -474,9 +657,10 @@ const FleetLifecycleChart = React.memo(
     );
 
     return (
-      <D3Chart<StepMarker>
+      <D3Chart<HoverSlice>
+        ref={chartRef}
         chartId="fleet-lifecycle"
-        data={markers}
+        data={hoverSlices}
         height={420}
         margin={CHART_MARGIN}
         watermark={getChartWatermark()}
@@ -487,8 +671,9 @@ const FleetLifecycleChart = React.memo(
         yAxis={yAxisConfig}
         layers={layers}
         zoom={zoomConfig}
-        instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a point to pin tooltip"
+        instructions={instructions}
         tooltip={tooltipConfig}
+        onRender={handleRender}
         legendElement={legendElement}
         caption={caption}
       />

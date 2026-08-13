@@ -132,7 +132,9 @@ const STRINGS = {
     tipCumulative: 'Cumulative',
     tipSinceFirst: 'Since first run',
     tipRunLink: 'Open run',
-    tipRunHint: 'Click the point to open its run',
+    tipRunHint: 'Freeze the readout to open its run',
+    chartInstructions:
+      'Hover to read every chip at that date · Click to freeze the readout, click again to release · Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     assumptions: (tier: string, chips: string, release: string) =>
       `Anchored at the ${release} release. Fleet sized by facility power at ${chips}; cost = chips × ${tier} $/chip/hr, flat for the whole window. Revenue is priced on the selected token type and reduced by the availability haircut. Price, ramp, MTBI, recovery and horizon are your assumptions — the throughput steps are not.`,
     source: 'Source: ',
@@ -208,7 +210,9 @@ const STRINGS = {
     tipCumulative: '累计',
     tipSinceFirst: '相比首次运行',
     tipRunLink: '查看运行',
-    tipRunHint: '点击该点可查看其运行记录',
+    tipRunHint: '冻结读数后可查看其运行记录',
+    chartInstructions:
+      '悬停可读取该日期下所有 Chip 的数值 · 点击可冻结读数，再次点击解除 · Shift+滚轮 横向缩放 · 拖动平移 · 双击重置',
     assumptions: (tier: string, chips: string, release: string) =>
       `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = Chip 数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、爬坡期、平均无故障间隔、恢复时间与测算期为你的假设——吞吐量台阶不是。`,
     source: '来源：',
@@ -849,6 +853,7 @@ export default function FleetLifecycle({
               anchorMs={anchorMs}
               yLabel={yMetric === 'revenue' ? t.chartYRevenue : t.chartY}
               breakEvenLabel={t.chartBreakEven}
+              instructions={t.chartInstructions}
               labels={{
                 date: t.tipDate,
                 config: t.tipConfig,

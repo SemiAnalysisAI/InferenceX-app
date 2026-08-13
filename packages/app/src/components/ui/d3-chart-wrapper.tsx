@@ -10,9 +10,11 @@ import { createPortal } from 'react-dom';
  * coordinates by the d3 layer.
  */
 function PortalTooltip({
+  chartId,
   tooltipRef,
   pinned,
 }: {
+  chartId: string;
   tooltipRef: React.RefObject<HTMLDivElement | null>;
   pinned: boolean;
 }) {
@@ -21,7 +23,7 @@ function PortalTooltip({
   const node = (
     <div
       ref={tooltipRef}
-      data-chart-tooltip
+      data-chart-tooltip={chartId}
       style={{
         position: 'fixed',
         left: 0,
@@ -111,7 +113,11 @@ export function D3ChartWrapper({
                 rise above sibling chart cards' stacking contexts. The d3 layer
                 writes viewport-coords into style.left/top — see
                 computeTooltipPosition. */}
-            <PortalTooltip tooltipRef={tooltipRef} pinned={Boolean(pinnedPoint)} />
+            <PortalTooltip
+              chartId={chartId}
+              tooltipRef={tooltipRef}
+              pinned={Boolean(pinnedPoint)}
+            />
             {noDataOverlay}
           </div>
           <p className="no-export text-xs text-muted-foreground text-center mt-2">{instructions}</p>

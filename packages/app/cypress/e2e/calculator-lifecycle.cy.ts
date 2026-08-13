@@ -21,6 +21,27 @@ const firstRowCell = (index: number) =>
 const xAxisTicks = () =>
   cy.get('[data-testid="calculator-lifecycle-chart-svg"] .x-axis .tick text').invoke('text');
 
+/** The rect that owns hover for the whole plot area. */
+const plotOverlay = () =>
+  cy.get('[data-testid="calculator-lifecycle-chart-svg"] .proximity-overlay');
+
+/** Move the cursor to a fraction of the way across the plot. */
+const hoverPlot = (fraction: number) =>
+  plotOverlay().then(($rect) => {
+    const width = $rect[0]!.getBoundingClientRect().width;
+    plotOverlay().trigger('mousemove', width * fraction, 40);
+  });
+
+/** Click at a fraction of the way across the plot. */
+const clickPlot = (fraction: number) =>
+  plotOverlay().then(($rect) => {
+    const width = $rect[0]!.getBoundingClientRect().width;
+    plotOverlay().click(width * fraction, 40);
+  });
+
+/** This chart's tooltip: a portal on <body>, keyed by chart id. */
+const readout = () => cy.get('[data-chart-tooltip="fleet-lifecycle"]');
+
 /** All text in the chart SVG, including the axis labels. */
 const chartText = () => cy.get('[data-testid="calculator-lifecycle-chart-svg"]').invoke('text');
 
@@ -36,6 +57,11 @@ describe('Calculator — Fleet Lifecycle', () => {
   before(() => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      // The reproducibility nudge is on a 1.5s timer, and showing a toast
+      // re-renders the chart tree — which rewrites the portal tooltip's inline
+      // styles and wipes an open hover readout. That is app-wide behaviour, not
+      // something this section can fix, so suppress the nudge rather than race it.
+      win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
     });
     cy.visit('/calculator');
     cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
@@ -138,12 +164,81 @@ describe('Calculator — Fleet Lifecycle', () => {
       });
   });
 
+  it('reads every plotted chip at the hovered date, not just one point', () => {
+    // Hovering anywhere in the plot has to answer "what is each chip doing here?".
+    // Per-point tooltips could not: comparing two chips at one date meant hovering
+    // twice and holding the first number in your head.
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] path.line-path').then((lines) => {
+      // Late in the window, where every chip has been measured — a chip first
+      // measured mid-window has no line, and so no row, before that.
+      hoverPlot(0.9);
+      cy.get('[data-testid="calculator-lifecycle-chart-svg"] .ruler-group').should(
+        'have.css',
+        'display',
+        'block',
+      );
+      cy.get('[data-testid="calculator-lifecycle-chart-svg"] .vertical-ruler').should('exist');
+      // One row per line, each with a money figure, under the hovered date.
+      // Not `:visible` — Cypress treats a fixed-position element as hidden when
+      // something else answers elementFromPoint at its centre, and an unfrozen
+      // readout sets pointer-events: none, so the plot answers instead.
+      readout()
+        .should('have.css', 'display', 'block')
+        .and('contain.text', '$')
+        .invoke('text')
+        .should('match', /\d{2} \w{3} \d{4}/u);
+      readout().find('tbody tr').should('have.length', lines.length);
+    });
+    // Earlier than the newest chip's first measurement, that chip has no number
+    // to give, and the readout says nothing rather than inventing one.
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] path.line-path').then((lines) => {
+      hoverPlot(0.05);
+      readout()
+        .find('tbody tr')
+        .should('have.length.greaterThan', 0)
+        .and('have.length.lessThan', lines.length);
+    });
+  });
+
+  it('freezes the readout on click, and releases it on the next click', () => {
+    hoverPlot(0.4);
+    readout()
+      .invoke('text')
+      .then((hovered) => {
+        // The date is what identifies a readout; the rest of the text legitimately
+        // changes on freeze, since a frozen step swaps its hint for a run link.
+        const frozenDate = /\d{2} \w{3} \d{4}/u.exec(hovered)?.[0];
+        expect(frozenDate, 'a date in the hover readout').to.be.a('string');
+        clickPlot(0.4);
+        readout()
+          .should('have.css', 'pointer-events', 'auto')
+          .and('contain.text', String(frozenDate));
+        // Frozen means frozen: moving the cursor elsewhere must not re-read.
+        hoverPlot(0.7);
+        readout().should('contain.text', String(frozenDate));
+        // The same gesture releases it, so the reader is never stuck with a
+        // stale readout pinned over the lines.
+        clickPlot(0.7);
+        readout().should('have.css', 'display', 'none');
+      });
+  });
+
   it('links the run behind any step, not just the first and last', () => {
     // The table links only the opening and closing sweeps. Intermediate rungs are
-    // exactly where an anomalous run that was never purged would sit, so pinning
+    // exactly where an anomalous run that was never purged would sit, so freezing
     // one has to expose its run — otherwise that rung is auditable nowhere.
-    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .dot-group').last().click();
-    cy.get('[data-chart-tooltip] a')
+    // The hover grid never lands exactly on a step's instant, so steps are pinned
+    // to their nearest slice; this asserts that pinning works from a dot's own x.
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .dot-group')
+      .last()
+      .invoke('attr', 'transform')
+      .then((transform) => {
+        const x = Number(/translate\((?<x>[-\d.]+)/u.exec(String(transform))?.groups?.x);
+        expect(x).to.be.a('number');
+        cy.get('[data-testid="calculator-lifecycle-chart-svg"] .proximity-overlay').click(x, 40);
+      });
+    readout()
+      .find('a')
       .should('have.length.greaterThan', 0)
       .first()
       .should('have.attr', 'href')

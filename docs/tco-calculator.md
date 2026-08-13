@@ -350,8 +350,8 @@ Two things move with it, and both matter for honesty:
   gridline "break-even" there would be false, so `renderZeroRule` returns early.
   Per-chip cost rules would be the honest equivalent but add one horizontal line
   per series, which is why they are not drawn.
-- **The tooltip leads with whichever rate is plotted**, and still lists all three
-  (revenue, margin, cost), so it never depends on the axis to be read.
+- **The readout's value column follows the plotted rate**, with cumulative margin
+  beside it, so it never depends on the axis to be read.
 
 Revenue mode is for comparing rollout _shapes_ across chips whose costs differ a
 lot; a chip sitting higher there does not mean it is more profitable. The control's
@@ -422,7 +422,48 @@ until the next interaction. Fixing it means giving `useD3ChartRenderer` a
 latest-context ref, which every zoomable chart shares; it is deliberately not done as
 part of this section. The Cypress spec waits out the transition for this reason.
 
-Every rung links its run in the pinned tooltip, not just the opening and closing
+### The hover readout: one rule, every chip
+
+Hovering anywhere in the plot draws a vertical rule and reads **every** plotted chip
+at that instant into one popup; clicking freezes it, and clicking again releases it.
+This replaced per-dot tooltips, which answered "what is this dot?" — the wrong
+question for a chart whose lines are only interesting against each other. Comparing
+two chips at one date meant hovering twice and holding the first number in your head.
+
+It is built on `TooltipConfig`'s `proximityHover` + `getDataX`, so the shared
+renderer's overlay rect owns hover for the plot area. Three consequences worth
+knowing:
+
+- **The hover positions are a uniform grid** (`HOVER_SLICE_COUNT` slices across the
+  window), not the sample points. Sample density varies by two orders of magnitude
+  along a line — 24 samples across each rollout ramp, one across a multi-month
+  plateau — so snapping to samples makes the cursor crawl through a riser and then
+  jump a year. Values come from linear interpolation between the bracketing samples,
+  which is exactly what `curveLinear` draws, so the number always matches the pixel.
+  A chip has no row before its own first measurement rather than a fabricated one.
+- **Steps match by proximity, not equality** (`STEP_MATCH_SLICES`). A slice is a
+  fraction of a pixel, so a step's instant essentially never coincides with one;
+  matching exactly would make the run links unreachable by pointing at the dot,
+  which is the only place a reader looks for them.
+- **The dots no longer own hover.** The overlay rect sits above them, so a Cypress
+  test cannot click a `.dot-group` — it clicks the overlay at the dot's x instead.
+
+Freeze is a toggle, which the shared overlay handler cannot express on its own: it
+pins on every click, so a second click would just re-pin. A capture-phase listener on
+the SVG records whether the readout was already frozen _before_ the pin lands, and
+`onPointClick` dismisses when it was. Reading the pinned state afterwards would
+always say "frozen".
+
+Two testing notes, both about the portal tooltip rather than this chart. It is keyed
+`data-chart-tooltip="<chartId>"` so a page with several charts can be asserted
+per-chart. And `:visible` does not work on an **unfrozen** readout: Cypress treats a
+fixed-position element as hidden when something else answers `elementFromPoint` at
+its centre, and an unfrozen readout sets `pointer-events: none`, so the plot answers
+instead. Assert `display` instead. Relatedly, any toast nudge re-renders the chart
+tree and rewrites the portal's inline styles, wiping an open hover readout — app-wide
+behaviour, which the spec sidesteps by suppressing the timed nudge.
+
+Every rung links its run in the frozen readout, not just the opening and closing
 sweeps the table links. Intermediate rungs are exactly where a superseded-but-never-
 purged anomalous run would sit, so leaving them unlinked would have removed the audit
 trail at the one place the trust argument depends on it.
