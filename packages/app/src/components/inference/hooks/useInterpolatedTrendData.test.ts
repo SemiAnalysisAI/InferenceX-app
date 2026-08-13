@@ -156,6 +156,30 @@ describe('interpolateMetricAtInteractivity', () => {
     expect(result!).toBeLessThan(3.5);
   });
 
+  it.each([
+    'measuredJPerSuccessfulQuery',
+    'measuredWhPerSuccessfulQuery',
+    'measuredPowerPercentTdp',
+  ] as const)('interpolates the derived measured metric %s', (metricKey) => {
+    const points = [
+      makePoint({
+        x: 20,
+        tpPerGpu: { y: 800, roof: false },
+        [metricKey]: { y: 80, roof: false },
+      }),
+      makePoint({
+        x: 60,
+        tpPerGpu: { y: 400, roof: false },
+        [metricKey]: { y: 40, roof: false },
+      }),
+    ];
+
+    const result = interpolateMetricAtInteractivity(points, 40, metricKey);
+    expect(result).not.toBeNull();
+    expect(result!).toBeGreaterThan(40);
+    expect(result!).toBeLessThan(80);
+  });
+
   it('returns null when metric field is missing from data points', () => {
     const points = [
       makePoint({ x: 20, tpPerGpu: { y: 800, roof: false } }),

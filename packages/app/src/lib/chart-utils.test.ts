@@ -28,7 +28,7 @@ vi.mock('@/lib/constants', async (importOriginal) => {
   return {
     ...actual,
     getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
-    getGpuSpecs: vi.fn(() => ({ power: 700, costh: 2.8, costn: 1.4, costr: 0.7 })),
+    getGpuSpecs: vi.fn(() => ({ power: 700, tdp: 700, costh: 2.8, costn: 1.4, costr: 0.7 })),
   };
 });
 
@@ -1331,6 +1331,29 @@ describe('createChartDataPoint measured power fields', () => {
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.measuredJPerOutputToken).toBeDefined();
     expect(point.measuredJPerOutputToken!.y).toBe(8.4);
+  });
+
+  it('derives J/query, Wh/query, and percent TDP from validated source fields', () => {
+    const e = entry({ avg_power_w: 560, joules_per_successful_query: 1800 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+
+    expect(point.measuredJPerSuccessfulQuery?.y).toBe(1800);
+    expect(point.measuredWhPerSuccessfulQuery?.y).toBe(0.5);
+    expect(point.measuredPowerPercentTdp?.y).toBe(80);
+  });
+
+  it('omits derived query and TDP axes when their inputs are absent', () => {
+    const point = createChartDataPoint(
+      '2025-01-01',
+      entry(),
+      'median_e2el',
+      'tput_per_gpu',
+      'h100',
+    );
+
+    expect(point.measuredJPerSuccessfulQuery).toBeUndefined();
+    expect(point.measuredWhPerSuccessfulQuery).toBeUndefined();
+    expect(point.measuredPowerPercentTdp).toBeUndefined();
   });
 
   it('omits both fields when neither is on the entry', () => {

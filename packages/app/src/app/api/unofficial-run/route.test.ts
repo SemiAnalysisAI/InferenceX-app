@@ -144,6 +144,55 @@ describe('normalizeArtifactRows', () => {
     expect(m.mean_e2el).toBe(1.5);
   });
 
+  it.each([
+    {
+      name: 'boolean verdict and junk-suffixed schema',
+      input: { power_valid: true, power_metric_schema_version: '2garbage' },
+      expectedVerdict: 0,
+      expectedSchema: undefined,
+    },
+    {
+      name: 'garbage verdict and valid numeric schema',
+      input: { power_valid: 'garbage', power_metric_schema_version: 2 },
+      expectedVerdict: 0,
+      expectedSchema: 2,
+    },
+    {
+      name: 'canonical numeric strings',
+      input: { power_valid: '1', power_metric_schema_version: '2' },
+      expectedVerdict: 1,
+      expectedSchema: 2,
+    },
+    {
+      name: 'explicit invalid verdict',
+      input: { power_valid: 0, power_metric_schema_version: 2 },
+      expectedVerdict: 0,
+      expectedSchema: 2,
+    },
+    {
+      name: 'legacy row without power contract fields',
+      input: {},
+      expectedVerdict: undefined,
+      expectedSchema: undefined,
+    },
+  ])(
+    'normalizes overlay power contract discriminators: $name',
+    ({ input, expectedVerdict, expectedSchema }) => {
+      const [row] = normalizeArtifactRows([rawRow(input)], '2026-03-01');
+
+      if (expectedVerdict === undefined) {
+        expect(row.metrics).not.toHaveProperty('power_valid');
+      } else {
+        expect(row.metrics.power_valid).toBe(expectedVerdict);
+      }
+      if (expectedSchema === undefined) {
+        expect(row.metrics).not.toHaveProperty('power_metric_schema_version');
+      } else {
+        expect(row.metrics.power_metric_schema_version).toBe(expectedSchema);
+      }
+    },
+  );
+
   it('surfaces pipeline-parallelism fields in metrics (auto-capture)', () => {
     // pp has no configs-table column: the frontend reads it from the metrics
     // JSONB (rowToAggDataEntry), so the overlay route must keep passing it

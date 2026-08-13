@@ -30,6 +30,12 @@ const MEASURED_POWER_METRICS = [
   'y_measuredDecodeAvgPower',
 ] as const;
 
+const DERIVED_POWER_METRICS = [
+  'y_measuredJPerSuccessfulQuery',
+  'y_measuredWhPerSuccessfulQuery',
+  'y_measuredPowerPercentTdp',
+] as const;
+
 const defs = chartDefinitions as unknown as ChartDefinition[];
 const interactivityDef = defs.find((d) => d.chartType === 'interactivity')!;
 const e2eDef = defs.find((d) => d.chartType === 'e2e')!;
@@ -131,6 +137,15 @@ describe('measured-power Pareto direction', () => {
       for (const metric of MEASURED_POWER_METRICS) {
         expect(declaredDirection(chartDef, metric)).toMatch(/^lower_/u);
       }
+    }
+  });
+
+  it.each(DERIVED_POWER_METRICS)('%s is bilingual and lower-is-better', (metric) => {
+    for (const chartDef of [interactivityDef, e2eDef]) {
+      expect(chartDef[metric]).toMatch(/\.y$/u);
+      expect(chartDef[`${metric}_label`]).toBeTruthy();
+      expect(chartDef[`${metric}_labelZh`]).toBeTruthy();
+      expect(declaredDirection(chartDef, metric)).toMatch(/^lower_/u);
     }
   });
 });
