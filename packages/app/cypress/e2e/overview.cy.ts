@@ -50,6 +50,9 @@ function expectNoHorizontalScroller(testId: string) {
       .filter(
         (el) =>
           !el.classList.contains('sr-only') &&
+          // Radix selects render an aria-hidden native <select> clipped to 1px,
+          // which Firefox reports as scrollable; hidden elements cannot scroll.
+          el.getAttribute('aria-hidden') !== 'true' &&
           getComputedStyle(el).display !== 'inline' &&
           el.scrollWidth > el.clientWidth + 1,
       )
