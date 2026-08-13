@@ -39,6 +39,21 @@ const clickPlot = (fraction: number) =>
     plotOverlay().click(width * fraction, 40);
   });
 
+/**
+ * Plot x of the last step dot. Steps are matched to hover positions by proximity,
+ * so this is the x a reader points at to ask about a measured config.
+ */
+const stepX = () =>
+  cy
+    .get('[data-testid="calculator-lifecycle-chart-svg"] .dot-group')
+    .last()
+    .invoke('attr', 'transform')
+    .then((transform) => {
+      const x = Number(/translate\((?<x>[-\d.]+)/u.exec(String(transform))?.groups?.x);
+      expect(x, 'a numeric dot x').to.be.a('number');
+      return x;
+    });
+
 /** This chart's tooltip: a portal on <body>, keyed by chart id. */
 const readout = () => cy.get('[data-chart-tooltip="fleet-lifecycle"]');
 
@@ -206,7 +221,7 @@ describe('Calculator — Fleet Lifecycle', () => {
       .invoke('text')
       .then((hovered) => {
         // The date is what identifies a readout; the rest of the text legitimately
-        // changes on freeze, since a frozen step swaps its hint for a run link.
+        // changes on freeze, since freezing adds any step's config detail.
         const frozenDate = /\d{2} \w{3} \d{4}/u.exec(hovered)?.[0];
         expect(frozenDate, 'a date in the hover readout').to.be.a('string');
         clickPlot(0.4);
@@ -223,20 +238,29 @@ describe('Calculator — Fleet Lifecycle', () => {
       });
   });
 
+  it('keeps config detail out of the hover readout, showing it only once frozen', () => {
+    // Hovering is for scanning: the popup keeps one shape wherever the cursor is.
+    // A step block appearing as the cursor crosses a dot reflows the rows under
+    // the reader and buries the comparison they came for.
+    stepX().then((x) => {
+      plotOverlay().trigger('mousemove', x, 40);
+      readout().should('have.css', 'display', 'block').and('not.contain.text', 'Config');
+      plotOverlay().click(x, 40);
+      readout().should('contain.text', 'Config');
+      // Leave nothing frozen for the next test.
+      plotOverlay().click(x, 40);
+    });
+  });
+
   it('links the run behind any step, not just the first and last', () => {
     // The table links only the opening and closing sweeps. Intermediate rungs are
     // exactly where an anomalous run that was never purged would sit, so freezing
     // one has to expose its run — otherwise that rung is auditable nowhere.
-    // The hover grid never lands exactly on a step's instant, so steps are pinned
-    // to their nearest slice; this asserts that pinning works from a dot's own x.
-    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .dot-group')
-      .last()
-      .invoke('attr', 'transform')
-      .then((transform) => {
-        const x = Number(/translate\((?<x>[-\d.]+)/u.exec(String(transform))?.groups?.x);
-        expect(x).to.be.a('number');
-        cy.get('[data-testid="calculator-lifecycle-chart-svg"] .proximity-overlay').click(x, 40);
-      });
+    // The hover grid never lands exactly on a step's instant, so steps match by
+    // proximity; this asserts that freezing works from a dot's own x.
+    stepX().then((x) => {
+      plotOverlay().click(x, 40);
+    });
     readout()
       .find('a')
       .should('have.length.greaterThan', 0)

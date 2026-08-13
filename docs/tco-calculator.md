@@ -467,6 +467,11 @@ knowing:
   fraction of a pixel, so a step's instant essentially never coincides with one;
   matching exactly would make the run links unreachable by pointing at the dot,
   which is the only place a reader looks for them.
+- **A step's config detail is frozen-only.** Hovering is for scanning, and the popup
+  keeps one shape wherever the cursor is; a step block appearing as the cursor
+  crosses a dot reflows the rows under the reader and buries the comparison they
+  came for. A click means "tell me about this instant", which is where the config,
+  its gain over the first run, and its run links belong.
 - **The dots no longer own hover.** The overlay rect sits above them, so a Cypress
   test cannot click a `.dot-group` — it clicks the overlay at the dot's x instead.
 

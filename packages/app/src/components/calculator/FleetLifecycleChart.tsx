@@ -110,7 +110,6 @@ interface FleetLifecycleChartProps {
     cumulative: string;
     sinceFirst: string;
     runLink: string;
-    runHint: string;
   };
   breakEvenLabel: string;
   /** Localised hint under the chart. */
@@ -570,40 +569,42 @@ const FleetLifecycleChart = React.memo(
             )
             .join('');
 
+          // Config detail is frozen-only. On hover the popup is a scanning tool —
+          // one line per chip, the same shape wherever the cursor is — and a step
+          // block appearing under it as the cursor crosses a dot both reflows the
+          // rows and buries the comparison the reader came for. A click says "tell
+          // me about this instant", and that is when the detail belongs.
           const tolerance = sliceSpacing * STEP_MATCH_SLICES;
-          const steps = stepsOnAxis
-            .filter((step) => Math.abs(step.x - d.x) <= tolerance)
-            .flatMap((step) => {
-              const entry = bySafeKey.get(step.seriesKey);
-              const info = entry?.stepInfo.get(step.month);
-              if (!entry || !info) return [];
-              const factor = info.factor > 1.005 ? ` (${info.factor.toFixed(2)}x)` : '';
-              const links =
-                // Every rung links its run, not just the first and last. The table
-                // only links the opening and closing sweeps, so without this the
-                // intermediate rungs — exactly where an anomalous run that was
-                // never purged would sit — have no audit trail anywhere in the UI.
-                // Freeze the readout (click) to follow one.
-                info.runUrls.length === 0
-                  ? ''
-                  : isPinned
-                    ? ` ${info.runUrls
-                        .map(
-                          (url, i) =>
-                            `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="text-primary underline mr-2">${escapeHtml(labels.runLink)}${
-                              info.runUrls.length > 1 ? ` ${i + 1}` : ''
-                            }</a>`,
-                        )
-                        .join('')}`
-                    : ` <span class="text-muted-foreground">${escapeHtml(labels.runHint)}</span>`;
-              return [
-                `<div class="mt-1">
+          const steps = isPinned
+            ? stepsOnAxis
+                .filter((step) => Math.abs(step.x - d.x) <= tolerance)
+                .flatMap((step) => {
+                  const entry = bySafeKey.get(step.seriesKey);
+                  const info = entry?.stepInfo.get(step.month);
+                  if (!entry || !info) return [];
+                  const factor = info.factor > 1.005 ? ` (${info.factor.toFixed(2)}x)` : '';
+                  // Every rung links its run, not just the first and last. The
+                  // table only links the opening and closing sweeps, so without
+                  // this the intermediate rungs — exactly where an anomalous run
+                  // that was never purged would sit — have no audit trail
+                  // anywhere in the UI.
+                  const links = info.runUrls
+                    .map(
+                      (url, i) =>
+                        `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="text-primary underline mr-2">${escapeHtml(labels.runLink)}${
+                          info.runUrls.length > 1 ? ` ${i + 1}` : ''
+                        }</a>`,
+                    )
+                    .join('');
+                  return [
+                    `<div class="mt-1">
                   <span style="color: ${escapeHtml(entry.color)}">${escapeHtml(entry.label)}</span>
-                  <span class="text-muted-foreground"> ${escapeHtml(labels.config)}: ${escapeHtml(info.config)}${escapeHtml(factor)} · ${escapeHtml(labels.date)} ${escapeHtml(info.date)}</span>${links}
+                  <span class="text-muted-foreground"> ${escapeHtml(labels.config)}: ${escapeHtml(info.config)}${escapeHtml(factor)} · ${escapeHtml(labels.date)} ${escapeHtml(info.date)}</span>${links ? ` ${links}` : ''}
                 </div>`,
-              ];
-            })
-            .join('');
+                  ];
+                })
+                .join('')
+            : '';
 
           return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 240px; user-select: ${isPinned ? 'text' : 'none'};">
             <div class="font-semibold mb-1">${escapeHtml(sliceDate(new Date(d.x)))}</div>

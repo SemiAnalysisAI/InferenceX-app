@@ -132,7 +132,6 @@ const STRINGS = {
     tipCumulative: 'Cumulative',
     tipSinceFirst: 'Since first run',
     tipRunLink: 'Open run',
-    tipRunHint: 'Freeze the readout to open its run',
     chartInstructions:
       'Hover to read every chip at that date · Click to freeze the readout, click again to release · Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     assumptions: (tier: string, chips: string, release: string) =>
@@ -210,7 +209,6 @@ const STRINGS = {
     tipCumulative: '累计',
     tipSinceFirst: '相比首次运行',
     tipRunLink: '查看运行',
-    tipRunHint: '冻结读数后可查看其运行记录',
     chartInstructions:
       '悬停可读取该日期下所有 Chip 的数值 · 点击可冻结读数，再次点击解除 · Shift+滚轮 横向缩放 · 拖动平移 · 双击重置',
     assumptions: (tier: string, chips: string, release: string) =>
@@ -862,7 +860,6 @@ export default function FleetLifecycle({
                 costPerDay: t.tipCost,
                 cumulative: t.tipCumulative,
                 runLink: t.tipRunLink,
-                runHint: t.tipRunHint,
                 sinceFirst: t.tipSinceFirst,
               }}
             />
