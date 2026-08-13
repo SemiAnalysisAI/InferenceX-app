@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -7,6 +8,7 @@ import { getModelReleaseDate } from '@semianalysisai/inferencex-constants';
 
 import type { HardwareConfig } from '@/components/inference/types';
 import { Card } from '@/components/ui/card';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
@@ -35,6 +37,7 @@ import {
   type ThroughputStep,
 } from './lifecycle';
 import { getCostProviderLabel, getThroughputForType } from './ThroughputBarChart';
+import { useInteractivitySurface } from './useInteractivitySurface';
 import type { CalculatorMode, CostProvider, CostType, InterpolatedResult } from './types';
 import { useHistoricalBest } from './useHistoricalBest';
 
@@ -56,6 +59,16 @@ interface FleetLifecycleProps {
   /** Resolves a series colour from the calculator's theme palette. */
   colorResolver: (hwKey: string) => string;
 }
+
+/**
+ * three.js is several hundred KB and only this one view needs it, so the surface
+ * loads on first expand — the section is folded by default, and `CollapsibleSection`
+ * unmounts a folded body, so a reader who never opens it never fetches it.
+ */
+const FleetLifecycleSurface = dynamic(() => import('./FleetLifecycleSurface'), {
+  ssr: false,
+  loading: () => null,
+});
 
 const STRINGS = {
   en: {
@@ -134,6 +147,10 @@ const STRINGS = {
     tipRunLink: 'Open run',
     chartInstructions:
       'Hover to read every chip at that date · Click to freeze the readout, click again to release · Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
+    surfaceTitle: 'Interactivity Surface',
+    surfaceToggle: 'Expand or fold this section',
+    surfaceDescription:
+      'The same fleets with interactivity as a third axis. The chart above answers the question at one operating point; this shows that the answer has a shape in that direction — the config that wins at a low interactivity is often not the one that wins at a high one, so each chip is a surface rather than a line. Rotate it to read the ridges. Screen-only: no export, and the price, ramp, MTBI, recovery and horizon above apply here unchanged.',
     assumptions: (tier: string, chips: string, release: string) =>
       `Anchored at the ${release} release. Fleet sized by facility power at ${chips}; cost = chips × ${tier} $/chip/hr, flat for the whole window. Revenue is priced on the selected token type and reduced by the availability haircut. Price, ramp, MTBI, recovery and horizon are your assumptions — the throughput steps are not.`,
     source: 'Source: ',
@@ -211,6 +228,10 @@ const STRINGS = {
     tipRunLink: '查看运行',
     chartInstructions:
       '悬停可读取该日期下所有 Chip 的数值 · 点击可冻结读数，再次点击解除 · Shift+滚轮 横向缩放 · 拖动平移 · 双击重置',
+    surfaceTitle: '交互性曲面',
+    surfaceToggle: '展开或折叠此板块',
+    surfaceDescription:
+      '同一批集群，以交互性作为第三个坐标轴。上方图表回答的是单一操作点下的问题，而此处展示该答案在交互性方向上的形状——在低交互性下取胜的配置往往并非在高交互性下取胜的配置，因此每款 Chip 呈现为一个曲面而非一条曲线。可旋转查看其脊线。仅供屏幕查看：不支持导出；上方的价格、爬坡期、平均无故障间隔、恢复时间与测算期在此同样适用。',
     assumptions: (tier: string, chips: string, release: string) =>
       `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = Chip 数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、爬坡期、平均无故障间隔、恢复时间与测算期为你的假设——吞吐量台阶不是。`,
     source: '来源：',
@@ -532,6 +553,30 @@ export default function FleetLifecycle({
   );
 
   const hasDisagg = useMemo(() => rows.some((r) => r.disagg), [rows]);
+
+  /**
+   * The 3D view is folded by default and its body unmounts when folded, so both the
+   * grid build and the three.js bundle are paid only by a reader who opens it.
+   */
+  const [surfaceOpen, setSurfaceOpen] = useState(false);
+  const surfaceGrid = useInteractivitySurface({
+    groups: historical.groups,
+    visibleHwKeys,
+    mode,
+    costProvider,
+    costType,
+    mw,
+    anchorMs,
+    horizonMonths,
+    assumptions,
+    currentZ: targetValue,
+    labelFor: (baseGpu) => getLabel(baseGpu, hardwareConfig),
+    // Colour by the base GPU's latest config, matching the 2D lines: the palette is
+    // built over active hwKeys, so a bare base key would resolve to fallback grey.
+    colorFor: (baseGpu) =>
+      colorResolver(rows.find((r) => r.progression.baseGpu === baseGpu)?.colorKey ?? baseGpu),
+    enabled: surfaceOpen,
+  });
 
   const chartData = useMemo<LifecycleChartSeries[]>(
     () =>
@@ -863,6 +908,32 @@ export default function FleetLifecycle({
                 sinceFirst: t.tipSinceFirst,
               }}
             />
+            <section data-testid="calculator-lifecycle-surface-section">
+              <CollapsibleSection
+                title={t.surfaceTitle}
+                toggleLabel={t.surfaceToggle}
+                testId="calculator-lifecycle-surface-collapse"
+                onToggle={(open) => {
+                  setSurfaceOpen(open);
+                  track('calculator_surface_toggled', { open });
+                }}
+                defaultOpen={false}
+              >
+                <div className="flex flex-col gap-2">
+                  <p className="text-muted-foreground text-sm">{t.surfaceDescription}</p>
+                  {surfaceGrid ? (
+                    <FleetLifecycleSurface grid={surfaceGrid} />
+                  ) : (
+                    <p
+                      className="text-muted-foreground text-sm"
+                      data-testid="calculator-lifecycle-surface-thin"
+                    >
+                      {t.noneMeasured}
+                    </p>
+                  )}
+                </div>
+              </CollapsibleSection>
+            </section>
           </>
         ) : (
           <p className="text-sm text-muted-foreground" data-testid="calculator-lifecycle-none">

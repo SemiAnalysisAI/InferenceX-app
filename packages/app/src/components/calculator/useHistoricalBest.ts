@@ -14,6 +14,7 @@ import {
   selectBestFromGroups,
   type HistoricalBestOutcome,
   type HistoricalProgression,
+  type HistoryGroups,
 } from './historical-best';
 import { getTpPerMwForType } from './ThroughputBarChart';
 import type { CalculatorMode, CostProvider, CostType, InterpolatedResult } from './types';
@@ -39,6 +40,13 @@ export interface UseHistoricalBestOptions {
 export interface UseHistoricalBestResult extends HistoricalBestOutcome {
   /** Each chip's best-so-far staircase over run dates, for the lifecycle chart. */
   progressions: HistoricalProgression[];
+  /**
+   * Stage one's output — sweeps bucketed per (hwKey, date), independent of the
+   * target. Exposed so a consumer that needs the same history at *many* targets
+   * (the interactivity surface) can re-read these frontiers rather than pay for
+   * the grouping again; it is the expensive half.
+   */
+  groups: HistoryGroups | null;
   loading: boolean;
   error: string | null;
   /**
@@ -116,6 +124,7 @@ export function useHistoricalBest(options: UseHistoricalBestOptions): UseHistori
   return {
     ...selection.outcome,
     progressions: selection.progressions,
+    groups: groups ?? null,
     loading: enabled && !unsupportedSequence && (isLoading || !rows),
     error: error ? error.message : null,
     unsupportedSequence,

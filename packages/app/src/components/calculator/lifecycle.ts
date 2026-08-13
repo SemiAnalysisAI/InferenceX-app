@@ -159,6 +159,39 @@ export interface LifecycleSeries {
 }
 
 /**
+ * A sampled series' value at an arbitrary month, or null outside its own window.
+ *
+ * Linear between samples, which is exactly what a `curveLinear` line draws through
+ * them — so a readout built on this always agrees with the pixel under the cursor.
+ * Null rather than a clamp at the ends: a chip first measured a year after release
+ * has no line before then, and so no number either.
+ */
+export function valueAtMonth(
+  points: readonly LifecyclePoint[],
+  month: number,
+  pick: (point: LifecyclePoint) => number,
+): number | null {
+  const first = points[0];
+  const last = points.at(-1);
+  if (!first || !last) return null;
+  if (month < first.month || month > last.month) return null;
+
+  let lo = 0;
+  let hi = points.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (points[mid]!.month <= month) lo = mid;
+    else hi = mid - 1;
+  }
+  const before = points[lo]!;
+  const after = points[Math.min(lo + 1, points.length - 1)]!;
+  const span = after.month - before.month;
+  const t = span > 0 ? (month - before.month) / span : 0;
+  const a = pick(before);
+  return a + (pick(after) - a) * t;
+}
+
+/**
  * Fraction of wall-clock time the fleet is serving traffic.
  *
  *   availability = mtbi / (mtbi + recovery)

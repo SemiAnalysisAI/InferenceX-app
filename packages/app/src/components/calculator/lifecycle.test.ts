@@ -4,7 +4,9 @@ import {
   availabilityFromInterrupts,
   breakEvenPricePerMTok,
   computeLifecycle,
+  valueAtMonth,
   type LifecycleAssumptions,
+  type LifecyclePoint,
   type ThroughputStep,
 } from './lifecycle';
 
@@ -407,5 +409,51 @@ describe('computeLifecycle', () => {
     expect(
       computeLifecycle({ ...base, steps: [{ month: 30, fleetTokPerSec: 1 }], horizonMonths: 24 }),
     ).toBeNull();
+  });
+});
+
+const point = (month: number, margin: number): LifecyclePoint => ({
+  month,
+  revenue: margin + 100,
+  cost: 100,
+  margin,
+  cumulative: margin * 10,
+  isStep: false,
+  isRamp: false,
+});
+
+const margin = (p: LifecyclePoint) => p.margin;
+
+describe('valueAtMonth', () => {
+  const points = [point(2, 0), point(4, 200), point(9, 200)];
+
+  it('interpolates linearly between samples, matching what the line draws', () => {
+    expect(valueAtMonth(points, 3, margin)).toBeCloseTo(100, 9);
+    expect(valueAtMonth(points, 2, margin)).toBeCloseTo(0, 9);
+    expect(valueAtMonth(points, 4, margin)).toBeCloseTo(200, 9);
+    expect(valueAtMonth(points, 6.5, margin)).toBeCloseTo(200, 9);
+  });
+
+  it('returns null outside the series window instead of clamping to its ends', () => {
+    // A chip first measured a year after release has no line before then, so it
+    // has no number either — the readout and the surface both depend on this.
+    expect(valueAtMonth(points, 1.9, margin)).toBeNull();
+    expect(valueAtMonth(points, 9.1, margin)).toBeNull();
+    expect(valueAtMonth([], 3, margin)).toBeNull();
+  });
+
+  it('reads whichever field the caller picks', () => {
+    expect(valueAtMonth(points, 3, (p) => p.cumulative)).toBeCloseTo(1000, 9);
+    expect(valueAtMonth(points, 3, (p) => p.cost)).toBeCloseTo(100, 9);
+  });
+
+  it('does not divide by zero on samples that share a month', () => {
+    // Forced verticals emit two samples at one instant, which is how a config
+    // landing with no ramp window draws as a riser. Reading exactly at the riser
+    // gives the level the fleet serves *from* that instant — the top of the step,
+    // matching what `isStep` means — rather than the level it just left.
+    const vertical = [point(1, 0), point(3, 0), point(3, 500), point(6, 500)];
+    expect(valueAtMonth(vertical, 3, margin)).toBeCloseTo(500, 9);
+    expect(valueAtMonth(vertical, 4.5, margin)).toBeCloseTo(500, 9);
   });
 });

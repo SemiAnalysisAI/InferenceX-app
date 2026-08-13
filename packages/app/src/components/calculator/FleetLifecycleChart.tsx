@@ -13,7 +13,7 @@ import {
 } from '@/lib/d3-chart/D3Chart';
 import { escapeHtml } from '@/lib/utils';
 
-import type { LifecyclePoint, LifecycleSeries } from './lifecycle';
+import { valueAtMonth, type LifecyclePoint, type LifecycleSeries } from './lifecycle';
 
 // Right margin holds the end-of-line chip labels, which sit outside the plot.
 const CHART_MARGIN = { top: 20, right: 104, bottom: 50, left: 70 };
@@ -484,29 +484,10 @@ const FleetLifecycleChart = React.memo(
     const readingAt = useCallback(
       (entry: LifecycleChartSeries, month: number): SliceReading | null => {
         const points = entry.series.points;
-        const first = points[0];
-        const last = points.at(-1);
-        if (!first || !last) return null;
-        if (month < first.month || month > last.month) return null;
-
-        let lo = 0;
-        let hi = points.length - 1;
-        while (lo < hi) {
-          const mid = (lo + hi + 1) >> 1;
-          if (points[mid]!.month <= month) lo = mid;
-          else hi = mid - 1;
-        }
-        const before = points[lo]!;
-        const after = points[Math.min(lo + 1, points.length - 1)]!;
-        const span = after.month - before.month;
-        const t = span > 0 ? (month - before.month) / span : 0;
-        const lerp = (a: number, b: number) => a + (b - a) * t;
-        return {
-          label: entry.label,
-          color: entry.color,
-          value: lerp(valueOf(before), valueOf(after)),
-          cumulative: lerp(before.cumulative, after.cumulative),
-        };
+        const value = valueAtMonth(points, month, valueOf);
+        const cumulative = valueAtMonth(points, month, (p) => p.cumulative);
+        if (value === null || cumulative === null) return null;
+        return { label: entry.label, color: entry.color, value, cumulative };
       },
       [valueOf],
     );

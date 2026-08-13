@@ -499,6 +499,88 @@ The rule's group is `.lower()`ed on every draw. `renderLines` keeps its paths ac
 re-renders through a data join while this layer removes and re-appends, so without
 that the dashed rule climbs above the lines after the first repaint.
 
+### Interactivity Surface (the 3D view)
+
+A folded section under the 2D chart plots the same fleets with **interactivity as a
+third axis**: x = time, y = margin $/day, z = interactivity, one shaded surface per
+chip, rotatable (`FleetLifecycleSurface.tsx` + `surface/`, data in
+`interactivity-surface.ts`).
+
+The reason it exists is a property of the data, not a wish for a 3D chart: **which
+config wins changes with interactivity.** The winner is `getTpPerMwForType` read _at
+the target_, so per slice the argmax date, the winning hwKey, the rung count and even
+which chips appear at all are different. The 2D line is therefore not a slice you can
+slide sideways — each slice is its own staircase, and the surface is where that
+becomes visible.
+
+Four decisions that are easy to get wrong, and why:
+
+- **Slices are never interpolated into one another.** Each slice's risers land on its
+  own run dates, so blending adjacent slices would invent risers on dates nothing was
+  measured. Every slice is evaluated independently and sampled onto one shared time
+  grid; z is the axis you read across, not one you interpolate along.
+- **Holes are drawn as holes.** Reads outside a run's measured range are excluded, not
+  clamped, so coverage is banded: measured on the shipped fixture, the fraction of
+  sweeps covering a given interactivity peaks near 65% and falls to ~2% at both ends
+  of the axis, and 37 of 197 sweeps have single-point frontiers that can never
+  contribute. `buildSurfaceGeometry` indexes a quad only when all four corners carry a
+  value, so gaps terminate the mesh instead of bridging it — and the caption says so.
+- **One price for the whole surface.** Re-seeding break-even per slice would zero the
+  margin along every slice at once, flattening the crossing into a plane and
+  destroying the cross-slice comparison. The section's own price applies unchanged, so
+  the zero contour is a real answer: where this fleet, at the price you set, stops
+  losing money.
+- **The frontier is prepared once and read many times.** `interpolateForGPU` bakes the
+  target into its last step and builds ten splines per call; twenty slices that way is
+  ~160k spline builds. `prepareFrontier` hoists the Pareto pass and the slope solves
+  out and narrows to the three metrics a fleet needs, which is ~2.4k solves plus cheap
+  Hermite evaluations. It **composes** `paretoFrontUpperLeft` / `monotoneSlopes` /
+  `hermiteInterpolate` and changes none of them, because AGENTS.md hard-syncs those
+  with a Python port.
+
+That last point duplicates the 1D module's selection rules, so
+`interactivity-surface.test.ts` pins the duplication: `stepsAtInteractivity` must agree
+with `bestSoFarProgression` + `mergeProgressionsByChip` slice by slice, and
+`prepareFrontier` must agree with `interpolateForGPU` at every target inside a range.
+Both were mutation-checked — clamping instead of refusing to extrapolate fails five
+tests. Note the per-hwKey running-max gate is _not_ pinned and cannot be: the pooled
+merge runs its own running maximum and drops the same candidates, so removing that
+gate leaves every test green. It is an early filter, not the rule that makes a
+staircase.
+
+Rendering notes worth keeping:
+
+- **Rotation is three's own `OrbitControls`**, instantiated imperatively (not via R3F
+  `extend()` — it is not an `Object3D`, and imperative lets its `change` event drive
+  `invalidate()` for on-demand rendering). No new dependency: `three` and
+  `@react-three/fiber` were already here. Elevation is clamped short of horizontal so
+  the floor never flips overhead.
+- **Surfaces are opaque.** Transparency sorts per object by bounding-sphere distance,
+  and five surfaces spanning one volume have near-identical centres, so the order flips
+  mid-rotation and they pop in front of each other. Only two things are translucent:
+  the break-even plane (one quad, `depthWrite: false`) and dimmed non-focused chips
+  (one group, so the sort is trivial).
+- **Colour must go through a canvas probe.** `THREE.Color` cannot parse `oklch()` and
+  yields **black** silently — and this palette is oklch. `surface/surfaceColors.ts`
+  resolves every colour through a 2d context first.
+- **Labels are DOM, reprojected per frame**, not sprite textures: they inherit the
+  theme and the font stack, stay crisp at any zoom, and are assertable in tests. Which
+  edges carry them is recomputed from the camera azimuth each frame
+  (`pickAxisEdges`) — and the value axis deliberately avoids the corner where the time
+  and interactivity ticks converge, because three tick families at one corner are
+  unreadable.
+- **Isolating a chip is the most valuable control here**, more than the rotation:
+  height fields occlude each other from every angle, and under the vendor palette four
+  of the five chips are greens. Hence the chip row above the canvas.
+- **No export.** The PNG path clones the DOM and re-renders through html-to-image, and
+  `cloneNode` does not carry a canvas bitmap, so a WebGL view would export as an empty
+  rectangle. The 2D chart stays the exportable artefact.
+- **No WebGL → a named note.** The context is probed _before_ a `<Canvas>` is
+  constructed, so on a GPU-less runner nothing mounts and nothing hangs; a lost context
+  after a successful probe swaps to the same note. The section is also folded by
+  default, so three.js is not in the initial payload and the grid is not built for a
+  reader who never opens it.
+
 ### Known visual limitation: the palette is not colourblind-safe here
 
 An adversarial review ran the series colours through a CVD validator and the result
