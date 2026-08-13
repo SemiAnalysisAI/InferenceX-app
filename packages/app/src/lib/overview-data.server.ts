@@ -83,11 +83,11 @@ export async function getOverviewPageData(
         referenceHardware,
         modelScope,
       ),
-      comparisonMode: 'history',
+      comparisonMode,
     };
   }
 
-  const window = overviewHistoricalWindow(snapshotDate);
+  const window = overviewHistoricalWindow(snapshotDate, comparisonMode);
   const unboundedBaselineRows = FIXTURES_MODE
     ? loadFixture<Record<string, BenchmarkRow[]>>('overview-history-rows')
     : await loadRowsByModel(models, (keys) => getCachedBenchmarksAsOf(keys, window.targetDate));

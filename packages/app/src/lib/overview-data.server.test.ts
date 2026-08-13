@@ -144,13 +144,14 @@ describe('getOverviewPageData engine scope forwarding', () => {
     vi.doMock('@/lib/test-fixtures', () => ({ loadFixture: vi.fn() }));
 
     const { getOverviewPageData } = await import('./overview-data.server');
-    const page = await getOverviewPageData(50, 'community', 'history');
+    const page = await getOverviewPageData(50, 'community', '30d');
     const qwen = page.models.find((model) => model.model === Model.Qwen3_5);
     const mi355x = qwen?.platforms.find(({ hardware }) => hardware === 'mi355x');
     const b300 = qwen?.platforms.find(({ hardware }) => hardware === 'b300');
 
-    expect(page.comparisonMode).toBe('history');
+    expect(page.comparisonMode).toBe('30d');
     expect(page.historicalWindow).toEqual({
+      key: '30d',
       snapshotDate: '2026-07-20',
       targetDate: '2026-06-20',
       earliestDate: '2026-05-21',
@@ -180,9 +181,9 @@ describe('getOverviewPageData engine scope forwarding', () => {
     vi.doMock('@/lib/test-fixtures', () => ({ loadFixture }));
 
     const { getOverviewPageData } = await import('./overview-data.server');
-    const page = await getOverviewPageData(50, 'community', 'history');
+    const page = await getOverviewPageData(50, 'community', '30d');
 
-    expect(page.comparisonMode).toBe('history');
+    expect(page.comparisonMode).toBe('30d');
     expect(loadFixture).toHaveBeenCalledWith('overview-rows');
     expect(loadFixture).toHaveBeenCalledWith('overview-history-rows');
     expect(getCachedBenchmarks).not.toHaveBeenCalled();
@@ -235,7 +236,7 @@ describe('getOverviewPageData model scope forwarding', () => {
     vi.doMock('@/lib/test-fixtures', () => ({ loadFixture: vi.fn() }));
 
     const { getOverviewPageData } = await import('./overview-data.server');
-    const page = await getOverviewPageData(50, 'community', 'history', 'b200', 'all');
+    const page = await getOverviewPageData(50, 'community', '30d', 'b200', 'all');
 
     expect(page.historicalWindow?.snapshotDate).toBe('2026-07-20');
   });
@@ -249,9 +250,9 @@ describe('getOverviewPageData model scope forwarding', () => {
     vi.doMock('@/lib/test-fixtures', () => ({ loadFixture: vi.fn() }));
 
     const { getOverviewPageData } = await import('./overview-data.server');
-    const page = await getOverviewPageData(50, 'community', 'history', 'b200', 'all');
+    const page = await getOverviewPageData(50, 'community', '30d', 'b200', 'all');
 
-    expect(page.comparisonMode).toBe('history');
+    expect(page.comparisonMode).toBe('30d');
     expect(page.modelScope).toBe('all');
     expect(page.models.some((m) => m.model === Model.GptOss)).toBe(true);
   });

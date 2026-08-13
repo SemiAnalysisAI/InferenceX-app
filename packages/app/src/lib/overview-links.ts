@@ -205,7 +205,7 @@ export function overviewHref(
   if (referenceHardware !== OVERVIEW_DEFAULT_REFERENCE_HARDWARE) {
     query.set('ref', referenceHardware);
   }
-  if (comparisonMode === 'history') query.set('compare', '30d');
+  if (comparisonMode !== 'hardware') query.set('compare', comparisonMode);
   if (modelScope !== OVERVIEW_DEFAULT_MODEL_SCOPE) query.set('models', modelScope);
   const search = query.toString();
   return search === '' ? base : `${base}?${search}`;

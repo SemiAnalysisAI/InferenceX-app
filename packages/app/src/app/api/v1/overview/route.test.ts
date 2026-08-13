@@ -29,7 +29,7 @@ describe('GET /api/v1/overview', () => {
     const data = {
       tier: 75,
       engineScope: 'all',
-      comparisonMode: 'history',
+      comparisonMode: '30d',
       referenceHardware: 'b300',
       models: [],
       historicalWindow: null,
@@ -42,7 +42,7 @@ describe('GET /api/v1/overview', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(data);
-    expect(mockGetOverviewPageData).toHaveBeenCalledWith(75, 'all', 'history', 'b300', 'all');
+    expect(mockGetOverviewPageData).toHaveBeenCalledWith(75, 'all', '30d', 'b300', 'all');
     expect(mockCachedJson).toHaveBeenCalledWith(data);
   });
 

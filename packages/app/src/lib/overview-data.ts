@@ -32,7 +32,18 @@ export const OVERVIEW_HARDWARE = ['b200', 'mi355x', 'b300', 'gb200', 'gb300'] as
 export type OverviewReferenceHardware = (typeof OVERVIEW_HARDWARE)[number];
 export const OVERVIEW_DEFAULT_REFERENCE_HARDWARE: OverviewReferenceHardware = 'b200';
 export type OverviewEngineScope = 'all' | 'community';
-export type OverviewComparisonMode = 'hardware' | 'history';
+export const OVERVIEW_HISTORY_WINDOWS = ['7d', '30d', '60d', '90d'] as const;
+export type OverviewHistoryWindowKey = (typeof OVERVIEW_HISTORY_WINDOWS)[number];
+export const OVERVIEW_DEFAULT_HISTORY_WINDOW: OverviewHistoryWindowKey = '30d';
+export const OVERVIEW_HISTORY_WINDOW_DAYS: Record<OverviewHistoryWindowKey, number> = {
+  '7d': 7,
+  '30d': 30,
+  '60d': 60,
+  '90d': 90,
+};
+/** A history mode IS its window key, so `?compare=<key>` alone determines the
+ *  payload and every href/caching path threads the window with no extra param. */
+export type OverviewComparisonMode = 'hardware' | OverviewHistoryWindowKey;
 export const OVERVIEW_DEFAULT_COMPARISON_MODE: OverviewComparisonMode = 'hardware';
 export type OverviewModelScope = 'default' | 'all';
 export const OVERVIEW_DEFAULT_MODEL_SCOPE: OverviewModelScope = 'default';
@@ -61,7 +72,10 @@ export function resolveOverviewComparisonMode(
   raw: string | readonly string[] | undefined,
 ): OverviewComparisonMode {
   const candidate = Array.isArray(raw) ? raw[0] : raw;
-  return candidate === '30d' ? 'history' : OVERVIEW_DEFAULT_COMPARISON_MODE;
+  return (
+    OVERVIEW_HISTORY_WINDOWS.find((window) => window === candidate) ??
+    OVERVIEW_DEFAULT_COMPARISON_MODE
+  );
 }
 
 export function resolveOverviewModelScope(
@@ -188,6 +202,7 @@ export interface OverviewPageData {
 }
 
 export interface OverviewHistoricalWindow {
+  key: OverviewHistoryWindowKey;
   snapshotDate: string;
   targetDate: string;
   earliestDate: string;
@@ -231,11 +246,19 @@ export function overviewSnapshotDate(
   return dates.length === 0 ? null : (dates.toSorted().at(-1) ?? null);
 }
 
-export function overviewHistoricalWindow(snapshotDate: string): OverviewHistoricalWindow {
+/** Baseline band is one window-width wide ([snapshot−2w, snapshot−w]): wide
+ *  enough that a benchmark cadence sparser than the window still finds a
+ *  baseline, without ever reaching into results newer than the window. */
+export function overviewHistoricalWindow(
+  snapshotDate: string,
+  key: OverviewHistoryWindowKey = OVERVIEW_DEFAULT_HISTORY_WINDOW,
+): OverviewHistoricalWindow {
+  const days = OVERVIEW_HISTORY_WINDOW_DAYS[key];
   return {
+    key,
     snapshotDate,
-    targetDate: subtractUtcDays(snapshotDate, 30),
-    earliestDate: subtractUtcDays(snapshotDate, 60),
+    targetDate: subtractUtcDays(snapshotDate, days),
+    earliestDate: subtractUtcDays(snapshotDate, days * 2),
   };
 }
 
@@ -790,7 +813,7 @@ export function assembleOverviewHistoricalPageData(
 
   return {
     ...current,
-    comparisonMode: 'history',
+    comparisonMode: window.key,
     historicalWindow: window,
     models: current.models.map((model) => ({
       ...model,
