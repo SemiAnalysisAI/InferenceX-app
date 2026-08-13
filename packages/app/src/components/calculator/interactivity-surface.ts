@@ -1,5 +1,6 @@
 /**
- * The Fleet Lifecycle surface: margin over (time × interactivity).
+ * The Fleet Lifecycle surface: revenue or margin over (time × interactivity),
+ * following the same y-axis selector as the 2D chart.
  *
  * The 2D lifecycle chart plots one staircase per chip at ONE interactivity — the
  * calculator's slider target. That hides the most interesting fact in the run
@@ -35,6 +36,21 @@
  *    that way is ~160k spline builds. So this prepares each frontier once and
  *    reads it at every slice — and only for the three metrics a fleet needs.
  *
+ * **Which way does the surface tilt along z?** Down, and steeply. Chip count is
+ * fixed by the power budget and price is one scalar, so revenue tracks tok/s/chip —
+ * and on the Pareto frontier that falls as interactivity rises, because faster
+ * tokens per user means smaller batches. Measured on the shipped fixture: of 197
+ * sweeps, tok/s/chip is lower at the top of the frontier's own range than at the
+ * bottom in 160, unchanged in the 37 single-point frontiers, and **higher in none**.
+ *
+ * So a surface that climbs along z is never that trend reversing — it is the winner
+ * changing at a coverage boundary. B300 on the fixture jumps 5,009 → 14,275 tok/s
+ * between the 15.1 and 18.5 tok/s/user slices, and the reason is visible in the
+ * rungs: below 18.5 the only readable config is `b300_dynamo-trt@2026-02-07`,
+ * because the 2.85×-better `b300_dynamo-trt_mtp@2026-01-28` was never swept that
+ * slow and so cannot be read there at all. The cliff is where a benchmark stops,
+ * not where the economics turn — which is exactly why the holes are drawn as holes.
+ *
  * The selection rules are the 1D module's, deliberately duplicated rather than
  * re-derived: clamped reads never count, a sweep that fails to beat the incumbent
  * is not a rung, and a chip's line is the upper envelope over its hwKeys.
@@ -52,8 +68,10 @@ import type { HistoryGroups } from './historical-best';
 import { hermiteInterpolate, monotoneSlopes, paretoFrontUpperLeft } from './interpolation';
 import {
   computeLifecycle,
+  metricValue,
   valueAtMonth,
   type LifecycleAssumptions,
+  type LifecycleMetric,
   type ThroughputStep,
 } from './lifecycle';
 import type { CalculatorMode, CostProvider, CostType, GPUDataPoint } from './types';
@@ -66,7 +84,7 @@ export interface SurfaceChip {
   color: string;
   /** True when any rung on any slice came from a disaggregated run. */
   disagg: boolean;
-  /** `cells[zIndex][timeIndex]` — margin $/day, or null where nothing was measured. */
+  /** `cells[zIndex][timeIndex]` — the grid's metric in $/day, or null where nothing was measured. */
   cells: (number | null)[][];
   /** Slices this chip appears on at all, for the coverage disclosure. */
   slicesCovered: number;
@@ -74,6 +92,13 @@ export interface SurfaceChip {
 
 export interface SurfaceGrid {
   chips: SurfaceChip[];
+  /**
+   * Which rate the cells hold, mirroring the 2D chart's y-axis selector. Carried on
+   * the grid rather than passed alongside it so a view cannot label an axis with one
+   * metric while drawing another — and so the break-even plane, which only means
+   * something for margin, can be suppressed for revenue.
+   */
+  metric: LifecycleMetric;
   /** Shared time samples, ms. */
   times: number[];
   /** Shared interactivity slices, tok/s/user, ascending and log-spaced. */
@@ -345,6 +370,11 @@ export interface SurfaceGridOptions {
   visibleHwKeys?: ReadonlySet<string>;
   mode: CalculatorMode;
   /**
+   * Which rate to fill the cells with — the 2D chart's y-axis selector, shared so
+   * the two views never disagree about what is being plotted.
+   */
+  metric: LifecycleMetric;
+  /**
    * Retained for API symmetry with the 1D path even though the grid reads cost
    * through `specsFor`: callers pass the same options object to both.
    */
@@ -386,12 +416,17 @@ export const TIME_SAMPLES = 120;
  * crossing into a plane and destroying the cross-slice comparison the third axis
  * exists for. One price means the zero contour is a real answer: it is where this
  * fleet, at the price you set, stops losing money.
+ *
+ * On the revenue metric the same price still applies, but zero is then just the
+ * floor rather than a threshold — cost is not subtracted, so nothing crosses it.
+ * Callers must not draw a break-even plane over a revenue grid.
  */
 export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | null {
   const {
     groups,
     visibleHwKeys,
     mode,
+    metric,
     costType,
     mw,
     anchorMs,
@@ -475,7 +510,7 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
       }
       const row = cells[zi]!;
       for (let ti = 0; ti < monthOf.length; ti += 1) {
-        const value = valueAtMonth(series.points, monthOf[ti]!, (p) => p.margin);
+        const value = valueAtMonth(series.points, monthOf[ti]!, (p) => metricValue(p, metric));
         if (value === null) continue;
         row[ti] = value;
         if (value < yMin) yMin = value;
@@ -505,5 +540,5 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
   // as missing data unless the caller says why.
   const empty = [...seen].filter((key) => !cellsByChip.has(key)).toSorted();
 
-  return { chips, times, zs, currentZ, yMin, yMax, empty };
+  return { chips, metric, times, zs, currentZ, yMin, yMax, empty };
 }

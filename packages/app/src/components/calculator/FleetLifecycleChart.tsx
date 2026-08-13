@@ -13,7 +13,13 @@ import {
 } from '@/lib/d3-chart/D3Chart';
 import { escapeHtml } from '@/lib/utils';
 
-import { valueAtMonth, type LifecyclePoint, type LifecycleSeries } from './lifecycle';
+import {
+  metricValue,
+  valueAtMonth,
+  type LifecycleMetric,
+  type LifecyclePoint,
+  type LifecycleSeries,
+} from './lifecycle';
 
 // Right margin holds the end-of-line chip labels, which sit outside the plot.
 const CHART_MARGIN = { top: 20, right: 104, bottom: 50, left: 70 };
@@ -92,8 +98,8 @@ interface SliceReading {
   cumulative: number;
 }
 
-/** Which per-day rate the y axis plots. */
-export type LifecycleMetric = 'margin' | 'revenue';
+/** Which per-day rate the y axis plots. Defined in `lifecycle.ts`, which the 3D surface also selects on. */
+export type { LifecycleMetric } from './lifecycle';
 
 interface FleetLifecycleChartProps {
   data: LifecycleChartSeries[];
@@ -140,10 +146,7 @@ const FleetLifecycleChart = React.memo(
   }: FleetLifecycleChartProps) => {
     const chartRef = useRef<D3ChartHandle | null>(null);
     const toMs = useCallback((month: number) => anchorMs + month * MS_PER_MONTH, [anchorMs]);
-    const valueOf = useCallback(
-      (point: LifecyclePoint) => (metric === 'revenue' ? point.revenue : point.margin),
-      [metric],
-    );
+    const valueOf = useCallback((point: LifecyclePoint) => metricValue(point, metric), [metric]);
 
     const { lineDataRecord, markers, bySafeKey } = useMemo(() => {
       const record: Record<string, { x: number; y: number }[]> = {};

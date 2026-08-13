@@ -279,20 +279,28 @@ function Chrome({
         <lineBasicMaterial color={chrome.axis} transparent opacity={0.5} />
       </lineSegments>
       {/*
-        Break-even. `makeScales` puts value 0 at world y 0, so this needs no offset
-        — and depthWrite:false means it tints what is behind it without ever
-        occluding a surface.
+        Break-even, positioned wherever value 0 falls in the box — which is *not*
+        world y 0 unless the margin range happens to straddle zero symmetrically.
+        depthWrite:false means it tints what is behind it without ever occluding a
+        surface.
+
+        Margin only. On a revenue grid nothing is subtracted, so zero is the floor
+        of the axis rather than a threshold anything crosses; a plane there would
+        read as a break-even line the reader could compare against, which is
+        exactly the wrong inference to invite.
       */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
-        <planeGeometry args={[BOX.w, BOX.d]} />
-        <meshBasicMaterial
-          color={chrome.breakEven}
-          transparent
-          opacity={0.13}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
+      {grid.metric === 'margin' && (
+        <mesh position={[0, scales.yOf(0), 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
+          <planeGeometry args={[BOX.w, BOX.d]} />
+          <meshBasicMaterial
+            color={chrome.breakEven}
+            transparent
+            opacity={0.13}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      )}
     </group>
   );
 }

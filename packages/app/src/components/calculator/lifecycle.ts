@@ -159,6 +159,18 @@ export interface LifecycleSeries {
 }
 
 /**
+ * Which rate a view plots. Revenue is the gross line; margin subtracts the flat
+ * cost. Lives here rather than in a chart component because both the 2D chart and
+ * the 3D surface select on it, and the surface's grid builder is pure.
+ */
+export type LifecycleMetric = 'margin' | 'revenue';
+
+/** The rate a metric names, for reading off a sampled point. */
+export function metricValue(point: LifecyclePoint, metric: LifecycleMetric): number {
+  return metric === 'revenue' ? point.revenue : point.margin;
+}
+
+/**
  * A sampled series' value at an arbitrary month, or null outside its own window.
  *
  * Linear between samples, which is exactly what a `curveLinear` line draws through

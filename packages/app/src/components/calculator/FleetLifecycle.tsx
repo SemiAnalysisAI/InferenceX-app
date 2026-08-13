@@ -150,7 +150,7 @@ const STRINGS = {
     surfaceTitle: 'Interactivity Surface',
     surfaceToggle: 'Expand or fold this section',
     surfaceDescription:
-      'The same fleets with interactivity as a third axis. The chart above answers the question at one operating point; this shows that the answer has a shape in that direction — the config that wins at a low interactivity is often not the one that wins at a high one, so each chip is a surface rather than a line. Rotate it to read the ridges. Screen-only: no export, and the price, ramp, MTBI, recovery and horizon above apply here unchanged.',
+      'The same fleets with interactivity as a third axis. The chart above answers the question at one operating point; this shows that the answer has a shape in that direction — the config that wins at a low interactivity is often not the one that wins at a high one, so each chip is a surface rather than a line. Rotate it to read the ridges. Screen-only: no export, and the Y axis, price, ramp, MTBI, recovery and horizon above all apply here unchanged.',
     assumptions: (tier: string, chips: string, release: string) =>
       `Anchored at the ${release} release. Fleet sized by facility power at ${chips}; cost = chips × ${tier} $/chip/hr, flat for the whole window. Revenue is priced on the selected token type and reduced by the availability haircut. Price, ramp, MTBI, recovery and horizon are your assumptions — the throughput steps are not.`,
     source: 'Source: ',
@@ -231,7 +231,7 @@ const STRINGS = {
     surfaceTitle: '交互性曲面',
     surfaceToggle: '展开或折叠此板块',
     surfaceDescription:
-      '同一批集群，以交互性作为第三个坐标轴。上方图表回答的是单一操作点下的问题，而此处展示该答案在交互性方向上的形状——在低交互性下取胜的配置往往并非在高交互性下取胜的配置，因此每款 Chip 呈现为一个曲面而非一条曲线。可旋转查看其脊线。仅供屏幕查看：不支持导出；上方的价格、爬坡期、平均无故障间隔、恢复时间与测算期在此同样适用。',
+      '同一批集群，以交互性作为第三个坐标轴。上方图表回答的是单一操作点下的问题，而此处展示该答案在交互性方向上的形状——在低交互性下取胜的配置往往并非在高交互性下取胜的配置，因此每款 Chip 呈现为一个曲面而非一条曲线。可旋转查看其脊线。仅供屏幕查看：不支持导出；上方的 Y 轴、价格、爬坡期、平均无故障间隔、恢复时间与测算期在此同样适用。',
     assumptions: (tier: string, chips: string, release: string) =>
       `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = Chip 数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、爬坡期、平均无故障间隔、恢复时间与测算期为你的假设——吞吐量台阶不是。`,
     source: '来源：',
@@ -563,6 +563,9 @@ export default function FleetLifecycle({
     groups: historical.groups,
     visibleHwKeys,
     mode,
+    // The surface follows the 2D chart's y axis rather than carrying its own
+    // selector: two controls for one question is how the two views drift apart.
+    metric: yMetric,
     costProvider,
     costType,
     mw,

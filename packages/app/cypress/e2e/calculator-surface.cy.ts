@@ -94,6 +94,21 @@ describe('Calculator — Interactivity Surface', () => {
     });
   });
 
+  it('follows the 2D chart’s y-axis selector', () => {
+    // One selector drives both views. Asserting on the axis title is the cheap
+    // proxy for "the cells hold the metric the label claims" — the value itself is
+    // pinned in the unit tests, which can compare the two grids cell by cell.
+    hasWebgl().then((webgl) => {
+      if (!webgl) return;
+      cy.get('[data-testid="calc-lifecycle-metric-revenue"]').click();
+      surfaceSection().should('contain.text', 'Revenue ($/day)');
+      surfaceSection().should('not.contain.text', 'Margin ($/day)');
+      cy.get('[data-testid="calc-lifecycle-metric-margin"]').click();
+      surfaceSection().should('contain.text', 'Margin ($/day)');
+      surfaceSection().should('not.contain.text', 'Revenue ($/day)');
+    });
+  });
+
   it('releases the context when folded away again', () => {
     // testIsolation is off in this repo, so a leaked GL context would accumulate
     // across the rest of the spec file — browsers cap them at around sixteen.

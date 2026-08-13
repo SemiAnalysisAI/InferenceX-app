@@ -3,6 +3,7 @@
 import { Canvas } from '@react-three/fiber';
 import * as d3 from 'd3';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { PerspectiveCamera, Vector3 } from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 import { useReducedMotion } from '@/components/inference/replay/useReducedMotion';
@@ -11,7 +12,7 @@ import { formatLargeNumber } from '@/lib/chart-rendering';
 import { useLocale } from '@/lib/use-locale';
 
 import type { SurfaceGrid } from './interactivity-surface';
-import { DEFAULT_CAMERA, ORBIT_TARGET } from './surface/OrbitRig';
+import { DEFAULT_CAMERA, frameBox, ORBIT_TARGET } from './surface/OrbitRig';
 import {
   SurfaceScene,
   type ChromePalette,
@@ -31,12 +32,16 @@ const STRINGS = {
       'Drag to rotate · Shift+Scroll to zoom · Double-click to reset · Hover a surface to read it',
     axisTime: 'Date',
     axisValue: 'Margin ($/day)',
+    axisValueRevenue: 'Revenue ($/day)',
     axisInteractivity: 'Interactivity (tok/s/user)',
     tipMargin: 'Margin/day',
+    tipRevenue: 'Revenue/day',
     tipInteractivity: 'Interactivity',
     tipNearest: 'nearest measured sample',
     ariaSummary:
       'Three-dimensional surface: fleet margin per day over time and target interactivity, one surface per chip. Rotatable.',
+    ariaSummaryRevenue:
+      'Three-dimensional surface: fleet revenue per day over time and target interactivity, one surface per chip. Rotatable.',
     currentSlice: 'Slider interactivity',
     focusHint: 'Isolate a chip:',
     focusAll: 'All',
@@ -50,11 +55,15 @@ const STRINGS = {
     instructions: '拖动旋转 · Shift+滚轮 缩放 · 双击重置 · 悬停曲面可读取数值',
     axisTime: '日期',
     axisValue: '利润 ($/天)',
+    axisValueRevenue: '收入 ($/天)',
     axisInteractivity: '交互性 (tok/s/user)',
     tipMargin: '每日利润',
+    tipRevenue: '每日收入',
     tipInteractivity: '交互性',
     tipNearest: '最近的实测样本',
     ariaSummary: '三维曲面：集群每日利润随时间与目标交互性的变化，每款 Chip 一个曲面，可旋转。',
+    ariaSummaryRevenue:
+      '三维曲面：集群每日收入随时间与目标交互性的变化，每款 Chip 一个曲面，可旋转。',
     currentSlice: '滑块交互性',
     focusHint: '单独查看某款 Chip：',
     focusAll: '全部',
@@ -62,6 +71,14 @@ const STRINGS = {
       '空缺处表示该 Chip 在这些交互性下没有任何实测数据——超出运行实测区间的结果会被排除，而不做外推。',
   },
 } as const;
+
+/**
+ * Canvas height. Taller than the 2D chart on purpose: the value axis is the box's
+ * vertical extent, so height here buys resolution in the quantity being read, not
+ * just whitespace. One constant because the probing placeholder has to match it
+ * exactly — a mismatch makes the page jump when the probe resolves.
+ */
+const CANVAS_HEIGHT = 'h-125 md:h-160';
 
 /** Signed money, negative rendered as -$X rather than $-X — matches the 2D chart. */
 const money = (value: number) => `${value < 0 ? '-$' : '$'}${formatLargeNumber(Math.abs(value))}`;
@@ -120,6 +137,14 @@ export default function FleetLifecycleSurface({
    */
   const [focused, setFocused] = useState<string | null>(focusedKeyProp);
   const focusedKey = focusedKeyProp ?? focused;
+
+  /**
+   * Which rate the grid holds. Read off the grid rather than taken as its own prop,
+   * so the axis title cannot end up naming a metric the cells do not contain.
+   */
+  const revenue = grid.metric === 'revenue';
+  const axisValue = revenue ? t.axisValueRevenue : t.axisValue;
+  const tipValue = revenue ? t.tipRevenue : t.tipMargin;
 
   const scales = useMemo(
     () => makeScales({ times: grid.times, zs: grid.zs, yMin: grid.yMin, yMax: grid.yMax }),
@@ -180,10 +205,10 @@ export default function FleetLifecycleSurface({
     specs.push(
       { id: 'title-x', text: t.axisTime, axis: 'x', world: 0, title: true },
       { id: 'title-z', text: t.axisInteractivity, axis: 'z', world: 0, title: true },
-      { id: 'title-y', text: t.axisValue, axis: 'y', world: 0, title: true },
+      { id: 'title-y', text: axisValue, axis: 'y', world: 0, title: true },
     );
     return specs;
-  }, [grid.times, grid.zs, grid.yMin, grid.yMax, t.axisTime, t.axisInteractivity, t.axisValue]);
+  }, [grid.times, grid.zs, grid.yMin, grid.yMax, t.axisTime, t.axisInteractivity, axisValue]);
 
   const onHover = useCallback((read: HoverRead | null) => {
     // Only re-render when the readout's content would actually change, so dragging
@@ -212,9 +237,11 @@ export default function FleetLifecycleSurface({
 
   const resetCamera = useCallback(() => {
     const controls = controlsRef.current;
-    if (!controls) return;
-    controls.object.position.set(...DEFAULT_CAMERA);
+    if (!(controls?.object instanceof PerspectiveCamera)) return;
     controls.target.set(...ORBIT_TARGET);
+    // Through `frameBox`, so a reset lands at the fitted distance for the current
+    // aspect ratio rather than the raw default vector's length.
+    frameBox(controls.object, controls.target, new Vector3(...DEFAULT_CAMERA));
     controls.update();
   }, []);
 
@@ -236,7 +263,7 @@ export default function FleetLifecycleSurface({
     );
   }
   // Reserve the height while probing so expanding the section does not jump.
-  if (support === 'probing') return <div className="h-105 w-full" aria-hidden />;
+  if (support === 'probing') return <div className={`${CANVAS_HEIGHT} w-full`} aria-hidden />;
 
   const hoveredChip = hover ? chips.find((chip) => chip.key === hover.chipKey) : undefined;
 
@@ -246,10 +273,10 @@ export default function FleetLifecycleSurface({
         ref={wrapperRef}
         onWheelCapture={gateWheel}
         onDoubleClick={resetCamera}
-        className="relative h-105 w-full select-none overflow-hidden rounded-md"
+        className={`relative ${CANVAS_HEIGHT} w-full select-none overflow-hidden rounded-md`}
         data-testid="calculator-lifecycle-surface"
         role="img"
-        aria-label={t.ariaSummary}
+        aria-label={revenue ? t.ariaSummaryRevenue : t.ariaSummary}
       >
         <Canvas
           frameloop="demand"
@@ -310,7 +337,7 @@ export default function FleetLifecycleSurface({
               {hover.interactivity.toFixed(hover.interactivity >= 100 ? 0 : 1)} tok/s/user
             </div>
             <div className="mt-1 font-medium">
-              {t.tipMargin}: {money(hover.value)}
+              {tipValue}: {money(hover.value)}
             </div>
             {hover.cell && (
               <div className="mt-1 text-[10px] text-muted-foreground">

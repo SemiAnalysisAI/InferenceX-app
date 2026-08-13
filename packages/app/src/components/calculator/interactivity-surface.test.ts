@@ -254,6 +254,7 @@ describe('buildSurfaceGrid', () => {
     buildSurfaceGrid({
       groups: groupsOf(),
       mode: MODE,
+      metric: 'margin' as const,
       costProvider: COST_PROVIDER,
       costType: COST_TYPE,
       mw: 10,
@@ -317,5 +318,68 @@ describe('buildSurfaceGrid', () => {
     // At zero price there is no revenue anywhere, so every live cell is exactly
     // the flat cost — one number across the whole surface.
     for (const v of values) expect(v).toBeCloseTo(values[0]!, 6);
+  });
+
+  describe('the y-axis metric', () => {
+    it('carries the metric on the grid so a view cannot mislabel the axis', () => {
+      expect(build()!.metric).toBe('margin');
+      expect(build({ metric: 'revenue' })!.metric).toBe('revenue');
+    });
+
+    it('separates revenue from margin by exactly the flat cost, everywhere', () => {
+      // The two metrics differ by cost alone, and cost does not depend on time,
+      // interactivity or which config won — so the gap between the surfaces must be
+      // one number per chip. This is the pin that catches the metric being applied
+      // somewhere that also moves the throughput steps.
+      const margin = build({ metric: 'margin' })!;
+      const revenue = build({ metric: 'revenue' })!;
+      expect(revenue.chips.map((c) => c.key)).toEqual(margin.chips.map((c) => c.key));
+
+      for (const [ci, chip] of revenue.chips.entries()) {
+        const other = margin.chips[ci]!;
+        const gaps: number[] = [];
+        for (const [zi, row] of chip.cells.entries()) {
+          for (const [ti, value] of row.entries()) {
+            const marginValue = other.cells[zi]![ti];
+            // Holes must fall in the same places: coverage is a property of the
+            // run history, not of which rate is being plotted.
+            expect(value === null).toBe(marginValue === null);
+            if (value === null || marginValue === null) continue;
+            gaps.push(value - marginValue);
+          }
+        }
+        expect(gaps.length).toBeGreaterThan(0);
+        for (const gap of gaps) expect(gap).toBeCloseTo(gaps[0]!, 6);
+        expect(gaps[0]!).toBeGreaterThan(0);
+      }
+    });
+
+    it('keeps revenue non-negative, so zero is the floor rather than a threshold', () => {
+      // Which is why the view suppresses the break-even plane on a revenue grid:
+      // nothing can cross a line the data never goes below.
+      const grid = build({ metric: 'revenue' })!;
+      const values = grid.chips
+        .flatMap((c) => c.cells.flat())
+        .filter((v): v is number => v !== null);
+      expect(values.length).toBeGreaterThan(0);
+      for (const v of values) expect(v).toBeGreaterThanOrEqual(0);
+      expect(grid.yMin).toBe(0);
+      expect(grid.yMax).toBeGreaterThan(0);
+    });
+
+    it('falls as interactivity rises, within one winning config', () => {
+      // The physics: chips are fixed by the power budget and price is one scalar,
+      // so revenue tracks tok/s/chip — which drops as batches shrink. A rise along
+      // z is therefore never this trend reversing; it is the winner changing at a
+      // coverage boundary, so this compares slices that share a winning rung.
+      const grid = build({ metric: 'revenue' })!;
+      const chip = grid.chips.find((c) => c.key === 'b300')!;
+      const lastTime = grid.times.length - 1;
+      const readable = chip.cells
+        .map((row, zi) => ({ zi, value: row[lastTime] }))
+        .filter((r): r is { zi: number; value: number } => r.value !== null);
+      expect(readable.length).toBeGreaterThan(2);
+      expect(readable.at(-1)!.value).toBeLessThan(readable[0]!.value);
+    });
   });
 });

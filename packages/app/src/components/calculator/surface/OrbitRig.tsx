@@ -1,9 +1,11 @@
 'use client';
 
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect } from 'react';
-import { TOUCH } from 'three';
+import { useCallback, useEffect, useRef } from 'react';
+import { PerspectiveCamera, TOUCH, Vector3 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+
+import { fitCameraDistance } from './surfaceScales';
 
 /**
  * Camera + rotation.
@@ -22,8 +24,26 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
  *   `invalidate()`, which is what makes on-demand rendering work at all.
  */
 
+/**
+ * Default bearing. Only the *direction* of this vector is used — the distance along it
+ * is computed from the container's aspect ratio by `fitCameraDistance`, so the same
+ * viewpoint frames the box on a tall desktop panel and a narrow phone alike.
+ */
 export const DEFAULT_CAMERA: [number, number, number] = [2.45, 1.7, 2.85];
 export const ORBIT_TARGET: [number, number, number] = [0, 0.05, 0];
+
+/**
+ * Move the camera to the fitted distance, keeping whatever bearing it already has.
+ *
+ * Exported so the double-click reset and the re-fit on resize share one definition;
+ * a reset that used the raw `DEFAULT_CAMERA` distance would undo the fit.
+ */
+export function frameBox(camera: PerspectiveCamera, target: Vector3, bearing?: Vector3): void {
+  const direction = (bearing ?? new Vector3().subVectors(camera.position, target)).clone();
+  if (direction.lengthSq() === 0) direction.set(...DEFAULT_CAMERA);
+  direction.normalize().multiplyScalar(fitCameraDistance(camera.aspect, camera.fov));
+  camera.position.copy(target).add(direction);
+}
 
 /**
  * OrbitControls has no "this gesture does nothing" constant; its touch handler
@@ -51,6 +71,26 @@ export function OrbitRig({ reduced, onDragChange, controlsRef }: OrbitRigProps) 
   const camera = useThree((state) => state.camera);
   const domElement = useThree((state) => state.gl.domElement);
   const invalidate = useThree((state) => state.invalidate);
+  const size = useThree((state) => state.size);
+
+  /**
+   * The distance the last fit set. A reader who has zoomed deliberately should not
+   * have that undone by an unrelated resize, so a re-fit only applies while the
+   * camera is still sitting where the previous fit put it.
+   */
+  const fittedDistance = useRef<number | null>(null);
+
+  const refit = useCallback(
+    (bearing?: Vector3) => {
+      const controls = controlsRef.current;
+      if (!controls || !(camera instanceof PerspectiveCamera)) return;
+      frameBox(camera, controls.target, bearing);
+      fittedDistance.current = camera.position.distanceTo(controls.target);
+      controls.update();
+      invalidate();
+    },
+    [camera, controlsRef, invalidate],
+  );
 
   useEffect(() => {
     const controls = new OrbitControls(camera, domElement);
@@ -81,17 +121,15 @@ export function OrbitRig({ reduced, onDragChange, controlsRef }: OrbitRigProps) 
       invalidate();
     };
     const onDoubleClick = () => {
-      camera.position.set(...DEFAULT_CAMERA);
       controls.target.set(...ORBIT_TARGET);
-      controls.update();
-      invalidate();
+      refit(new Vector3(...DEFAULT_CAMERA));
     };
 
     controls.addEventListener('change', onChange);
     controls.addEventListener('start', onStart);
     controls.addEventListener('end', onEnd);
     domElement.addEventListener('dblclick', onDoubleClick);
-    invalidate();
+    refit(new Vector3(...DEFAULT_CAMERA));
 
     return () => {
       controls.removeEventListener('change', onChange);
@@ -101,7 +139,18 @@ export function OrbitRig({ reduced, onDragChange, controlsRef }: OrbitRigProps) 
       controls.dispose();
       controlsRef.current = null;
     };
-  }, [camera, domElement, invalidate, reduced, onDragChange, controlsRef]);
+  }, [camera, domElement, invalidate, reduced, onDragChange, controlsRef, refit]);
+
+  // Re-frame when the container resizes — the fit depends on the aspect ratio, and a
+  // fixed distance either pads a tall panel with dead space or crops a narrow one.
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls || fittedDistance.current === null) return;
+    const current = camera.position.distanceTo(controls.target);
+    // Left alone if the reader has zoomed since the last fit: their choice wins.
+    if (Math.abs(current - fittedDistance.current) > fittedDistance.current * 0.01) return;
+    refit();
+  }, [size.width, size.height, camera, controlsRef, refit]);
 
   // Damping needs pumping, and under on-demand rendering the `change` event keeps
   // scheduling frames while momentum bleeds off.

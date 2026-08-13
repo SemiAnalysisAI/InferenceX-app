@@ -502,9 +502,9 @@ that the dashed rule climbs above the lines after the first repaint.
 ### Interactivity Surface (the 3D view)
 
 A folded section under the 2D chart plots the same fleets with **interactivity as a
-third axis**: x = time, y = margin $/day, z = interactivity, one shaded surface per
-chip, rotatable (`FleetLifecycleSurface.tsx` + `surface/`, data in
-`interactivity-surface.ts`).
+third axis**: x = time, y = the 2D chart's selected metric in $/day, z = interactivity,
+one shaded surface per chip, rotatable (`FleetLifecycleSurface.tsx` + `surface/`, data
+in `interactivity-surface.ts`).
 
 The reason it exists is a property of the data, not a wish for a 3D chart: **which
 config wins changes with interactivity.** The winner is `getTpPerMwForType` read _at
@@ -513,7 +513,23 @@ which chips appear at all are different. The 2D line is therefore not a slice yo
 slide sideways — each slice is its own staircase, and the surface is where that
 becomes visible.
 
-Four decisions that are easy to get wrong, and why:
+**Which way does the surface tilt along z?** Down, steeply, and that is the physics
+rather than a quirk of the fixture: chip count is fixed by the power budget and price is
+one scalar, so revenue tracks tok/s/chip — and on the Pareto frontier that _falls_ as
+interactivity rises, because faster tokens per user means smaller batches. Measured
+across the shipped fixture's 197 sweeps, tok/s/chip is lower at the top of the
+frontier's own range than at the bottom in 160, unchanged in the 37 single-point
+frontiers, and **higher in none**.
+
+So a surface that climbs along z is never that trend reversing — it is the **winner
+changing at a coverage boundary**. B300 jumps 5,009 → 14,275 tok/s between the 15.1 and
+18.5 tok/s/user slices on the fixture, and the rungs say why: below 18.5 the only
+readable config is `b300_dynamo-trt@2026-02-07`, because the 2.85×-better
+`b300_dynamo-trt_mtp@2026-01-28` was never swept that slow and so cannot be read there
+at all. The cliff marks where a benchmark stops, not where the economics turn. Read
+those step-ups as a gap in coverage, and treat them as a hint about what to sweep next.
+
+Five decisions that are easy to get wrong, and why:
 
 - **Slices are never interpolated into one another.** Each slice's risers land on its
   own run dates, so blending adjacent slices would invent risers on dates nothing was
@@ -530,6 +546,13 @@ Four decisions that are easy to get wrong, and why:
   destroying the cross-slice comparison. The section's own price applies unchanged, so
   the zero contour is a real answer: where this fleet, at the price you set, stops
   losing money.
+- **The y axis is the 2D chart's selector, not a second control.** `SurfaceGrid` carries
+  its own `metric`, so a view cannot label an axis with one rate and draw another — and
+  the break-even plane is suppressed on a revenue grid, where nothing is subtracted and
+  zero is the floor rather than a threshold anything crosses. The unit tests pin the
+  relationship: the two grids differ by exactly the flat cost, in every live cell, and
+  their holes fall in identical places, because coverage is a property of the run
+  history and not of which rate is plotted.
 - **The frontier is prepared once and read many times.** `interpolateForGPU` bakes the
   target into its last step and builds ten splines per call; twenty slices that way is
   ~160k spline builds. `prepareFrontier` hoists the Pareto pass and the slope solves
@@ -560,6 +583,19 @@ Rendering notes worth keeping:
   mid-rotation and they pop in front of each other. Only two things are translucent:
   the break-even plane (one quad, `depthWrite: false`) and dimmed non-focused chips
   (one group, so the sort is trivial).
+- **The value axis fills the box; break-even is positioned, not assumed.** It is
+  tempting to offset the value range so that $0 lands on world y 0 — then the
+  break-even plane needs no offset and "above water" is a sign test on a coordinate.
+  That only fits when zero sits at the middle of the range: a margin range of
+  −$250k…+$50k, or a revenue grid whose floor _is_ zero, maps outside ±h/2 and the
+  surface draws **outside the frame it is inside**. So all three axes span the box the
+  same way and the plane sits at `yOf(0)`.
+- **The camera distance is fitted to the aspect ratio.** `fov` is the _vertical_ angle,
+  so a fixed camera position pads a tall panel with dead space and crops a narrow phone
+  viewport. `fitCameraDistance` fits the box's bounding **sphere** — bearing-independent,
+  so the framing does not breathe as the reader rotates — and the double-click reset
+  goes through the same function. A resize re-fits only while the camera is still where
+  the last fit put it, so a deliberate zoom survives one.
 - **Colour must go through a canvas probe.** `THREE.Color` cannot parse `oklch()` and
   yields **black** silently — and this palette is oklch. `surface/surfaceColors.ts`
   resolves every colour through a 2d context first.

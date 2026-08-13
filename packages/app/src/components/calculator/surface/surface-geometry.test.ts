@@ -4,7 +4,7 @@ import { buildIsolineArrays } from './buildIsoline';
 import { buildSurfaceArrays, cellFromFace } from './buildSurfaceGeometry';
 import { pickAxisEdges } from './pickAxisEdges';
 import { darken, lighten } from './surfaceColors';
-import { BOX, makeScales } from './surfaceScales';
+import { BOX, fitCameraDistance, makeScales } from './surfaceScales';
 
 /**
  * Everything under test here is deliberately free of three.js, because the test
@@ -20,16 +20,56 @@ const scales = makeScales({ times, zs, yMin: -100, yMax: 300 });
 const full: (number | null)[][] = zs.map((_, zi) => times.map((_t, ti) => zi * 10 + ti));
 
 describe('makeScales', () => {
-  it('spans the box and puts break-even at world zero', () => {
+  it('makes every axis span exactly the box it is drawn inside', () => {
     expect(scales.xOf(times[0]!)).toBeCloseTo(-BOX.w / 2, 9);
     expect(scales.xOf(times.at(-1)!)).toBeCloseTo(BOX.w / 2, 9);
     expect(scales.zOf(zs[0]!)).toBeCloseTo(-BOX.d / 2, 9);
     expect(scales.zOf(zs.at(-1)!)).toBeCloseTo(BOX.d / 2, 9);
-    // The zero plane needs no offset because value 0 maps to world y 0 exactly,
-    // which is what makes "above water" a sign test.
-    expect(scales.yOf(0)).toBeCloseTo(0, 9);
-    expect(scales.yOf(-100)).toBeCloseTo(-BOX.h * 0.25, 9);
-    expect(scales.yOf(300)).toBeCloseTo(BOX.h * 0.75, 9);
+    expect(scales.yOf(-100)).toBeCloseTo(-BOX.h / 2, 9);
+    expect(scales.yOf(300)).toBeCloseTo(BOX.h / 2, 9);
+    // Break-even is a quarter of the way up this range, not the middle: the value
+    // axis fills the frame like the other two, and the plane is positioned at
+    // `yOf(0)` rather than assumed to be at the origin.
+    expect(scales.yOf(0)).toBeCloseTo(-BOX.h * 0.25, 9);
+  });
+
+  it('keeps an asymmetric range inside the frame — including a zero floor', () => {
+    // The bug this pins: offsetting the range to put value 0 at world 0 maps a
+    // range that does not straddle zero symmetrically outside ±h/2, and the surface
+    // then draws outside the box frame. Revenue always has a zero floor, so this
+    // was reachable from the UI by switching the y-axis selector.
+    for (const [yMin, yMax] of [
+      [0, 250],
+      [-250, 50],
+      [-5, 500],
+    ]) {
+      const s = makeScales({ times, zs, yMin: yMin!, yMax: yMax! });
+      expect(s.yOf(yMin!)).toBeCloseTo(-BOX.h / 2, 9);
+      expect(s.yOf(yMax!)).toBeCloseTo(BOX.h / 2, 9);
+      // Break-even stays inside the box whenever zero is inside the range.
+      expect(Math.abs(s.yOf(0))).toBeLessThanOrEqual(BOX.h / 2 + 1e-9);
+    }
+  });
+
+  it('fits the camera to the aspect ratio, both ways', () => {
+    const radius = Math.hypot(BOX.w, BOX.h, BOX.d) / 2;
+    // Whatever the shape of the container, the box's bounding sphere must subtend no
+    // more than the field of view — otherwise a corner clips at some bearing.
+    for (const aspect of [0.5, 0.9, 1, 1.875, 3]) {
+      const distance = fitCameraDistance(aspect, 45);
+      const halfVertical = (45 * Math.PI) / 360;
+      const halfHorizontal = Math.atan(Math.tan(halfVertical) * aspect);
+      expect(Math.asin(radius / distance)).toBeLessThanOrEqual(
+        Math.min(halfVertical, halfHorizontal) + 1e-9,
+      );
+    }
+    // A narrower container needs more distance: horizontal field is what binds there.
+    expect(fitCameraDistance(0.6, 45)).toBeGreaterThan(fitCameraDistance(1.9, 45));
+    // Past square the vertical field binds, so widening further changes nothing.
+    expect(fitCameraDistance(3, 45)).toBeCloseTo(fitCameraDistance(9, 45), 9);
+    // A zero or NaN aspect (a container measured before layout) must not divide away.
+    expect(Number.isFinite(fitCameraDistance(0, 45))).toBe(true);
+    expect(Number.isFinite(fitCameraDistance(Number.NaN, 45))).toBe(true);
   });
 
   it('spaces the interactivity axis logarithmically', () => {

@@ -88,8 +88,8 @@ export function buildSurfaceArrays(
       const value = row[ti] ?? null;
       const o = at(zi, ti) * 3;
       positions[o] = xs[ti]!;
-      // Holes sit on the break-even plane and are never indexed; parking them at a
-      // finite coordinate keeps the bounding sphere sane for raycast culling.
+      // Holes are never indexed, so where they sit is invisible; parking them at the
+      // box centre keeps the bounding sphere sane for raycast culling.
       positions[o + 1] = value === null ? 0 : scales.yOf(value);
       positions[o + 2] = zws[zi]!;
       if (value !== null) filled += 1;
