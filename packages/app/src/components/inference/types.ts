@@ -137,6 +137,8 @@ export interface AggDataEntry {
   'p99.9_e2el': number;
   // Measured GPU telemetry (emitted by runner's aggregate_power.py).
   // Optional because historical runs predate the fields.
+  power_valid?: number;
+  power_metric_schema_version?: number;
   avg_power_w?: number;
   joules_per_output_token?: number;
   joules_per_total_token?: number;
@@ -145,13 +147,13 @@ export interface AggDataEntry {
   // and decode workers (single-node disagg or multinode disagg). Single-node
   // aggregated configs leave these undefined.
   // - prefill_avg_power_w / decode_avg_power_w: mean per-GPU draw (W) within each role
-  // - joules_per_input_token: prefill_energy / total_input_tokens (prefill GPUs only)
-  // The disagg decode-only J/output is carried by joules_per_output_token above
-  // (the runner overrides it to decode_energy / total_output_tokens on disagg) —
-  // there is no separate _decode field.
+  // Unprefixed joules fields are whole-deployment metrics in schema version 2.
+  // Explicit prefill/decode keys retain role-local energy breakdowns.
   prefill_avg_power_w?: number;
   decode_avg_power_w?: number;
   joules_per_input_token?: number;
+  prefill_joules_per_input_token?: number;
+  decode_joules_per_output_token?: number;
   // Cluster-wide GPU telemetry beyond power (temperature, utilization, memory).
   // Emitted by aggregate_power.py when the perfmon CSVs include the matching
   // sample columns. Optional because older runs (and runs without the relevant

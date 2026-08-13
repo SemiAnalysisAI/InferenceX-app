@@ -17,6 +17,14 @@ import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import type { BenchmarkRow } from '@/lib/api';
 
 /**
+ * Producer schema version whose unprefixed `joules_per_*` fields are documented
+ * as whole-deployment energy. Mirrors `POWER_METRIC_SCHEMA_VERSION` in the
+ * runner's `utils/aggregate_power.py`; bump both together when the semantics of
+ * those fields change again.
+ */
+const WHOLE_DEPLOYMENT_ENERGY_SCHEMA_VERSION = 2;
+
+/**
  * Agentic trace-replay runs (`benchmark_type === 'agentic_traces'`) emit ttft/ttlt/itl
  * but not the intvty/e2el/tpot keys the chart pipeline expects. Bridge them here:
  *   e2el   ≡ ttlt   (time-to-last-token == end-to-end latency)
@@ -95,6 +103,16 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   const aggregateDpAttention = aggregateUsesPrefill
     ? row.prefill_dp_attention
     : row.decode_dp_attention;
+  // An explicit invalid verdict is authoritative. Legacy rows without the
+  // verdict remain eligible so historical single-node measurements do not
+  // disappear. Unversioned disaggregated joules are withheld because their
+  // unprefixed fields changed from role-local to whole-deployment semantics.
+  const measuredPowerValid = m.power_valid !== 0;
+  // Match the version exactly rather than `>= 2`: an open bound would silently
+  // admit a future schema whose semantics changed again, which is the exact
+  // failure that made versioning necessary in the first place.
+  const hasWholeDeploymentEnergySemantics =
+    !row.disagg || m.power_metric_schema_version === WHOLE_DEPLOYMENT_ENERGY_SCHEMA_VERSION;
   // Prefer the dedicated column (added in migration 004); fall back to the
   // legacy stash inside `metrics` for any rows ingested before that column
   // existed.
@@ -168,15 +186,31 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     // Measured GPU telemetry (runner's aggregate_power.py). Left undefined for
     // rows predating the field so downstream chart code can distinguish
     // "no measurement" from "0 W" via createChartDataPoint's typeof guard.
-    avg_power_w: m.avg_power_w,
-    joules_per_output_token: m.joules_per_output_token,
-    joules_per_total_token: m.joules_per_total_token,
-    // Multinode / disagg-only role splits — same undefined-for-legacy pattern.
-    // (disagg's decode-only J/output is carried by joules_per_output_token above,
-    // which the runner overrides to the per-stage value — no separate _decode key.)
-    prefill_avg_power_w: m.prefill_avg_power_w,
-    decode_avg_power_w: m.decode_avg_power_w,
-    joules_per_input_token: m.joules_per_input_token,
+    power_valid: m.power_valid,
+    power_metric_schema_version: m.power_metric_schema_version,
+    avg_power_w: measuredPowerValid ? m.avg_power_w : undefined,
+    joules_per_output_token:
+      measuredPowerValid && hasWholeDeploymentEnergySemantics
+        ? m.joules_per_output_token
+        : undefined,
+    joules_per_total_token:
+      measuredPowerValid && hasWholeDeploymentEnergySemantics
+        ? m.joules_per_total_token
+        : undefined,
+    // Role power remains unambiguous across schema versions. Version 2 also
+    // publishes explicit role energy alongside whole-deployment joules.
+    prefill_avg_power_w: measuredPowerValid ? m.prefill_avg_power_w : undefined,
+    decode_avg_power_w: measuredPowerValid ? m.decode_avg_power_w : undefined,
+    joules_per_input_token:
+      measuredPowerValid && hasWholeDeploymentEnergySemantics
+        ? m.joules_per_input_token
+        : undefined,
+    prefill_joules_per_input_token: measuredPowerValid
+      ? m.prefill_joules_per_input_token
+      : undefined,
+    decode_joules_per_output_token: measuredPowerValid
+      ? m.decode_joules_per_output_token
+      : undefined,
     // Cluster-wide GPU telemetry beyond power. Emitted when the perfmon CSVs
     // include the corresponding sample columns; left undefined otherwise so
     // the chart layer can distinguish "no measurement" from a real zero.
@@ -187,7 +221,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     // Per-worker measured power. Surfaced on BenchmarkRow as a sibling of the
     // scalar `metrics` dict (see api.ts). Narrow defensively so a malformed
     // payload can't poison downstream consumers.
-    workers: Array.isArray(row.workers) ? row.workers : undefined,
+    workers: measuredPowerValid && Array.isArray(row.workers) ? row.workers : undefined,
     disagg: row.disagg,
     num_prefill_gpu: row.num_prefill_gpu,
     num_decode_gpu: row.num_decode_gpu,
