@@ -76,7 +76,7 @@ export const apiRouteCatalog = [
       en: 'UI-only overlay for unofficial workflow artifacts; upstream artifact availability and shape are not stable.',
       zh: '仅供界面叠加非官方工作流制品；上游制品的可用性和结构并不稳定。',
     },
-    sourceSha256: 'ef85fec8468757b0122c5fcebde78527c2efe62f9fedc95799cad56a457a8f04',
+    sourceSha256: '4a3f3da8399c741c26f0f502d44b1870a8ccdc05775edfd6ea3dee4e020df25c',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',
@@ -380,7 +380,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api.ts',
-    sourceSha256: '322e9b3fe99c63bdfaf84fbb9a01654cd5bf3719d2234ddf4502aac024ae32b3',
+    sourceSha256: '18323e38cb50d20fd535ecb2d87d89131180664721d2ffb95f9ec5843c9d55e4',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
@@ -444,7 +444,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '78ae678a3467112eddc8cb40ac5371d728b0820f0138e406eb7693831520e85e',
+    sourceSha256: '11e1bb637dc0d8c338fffebabcbe1864068d08b8b8b1dad1e1e17718eca851dd',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',

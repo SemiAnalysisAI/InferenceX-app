@@ -225,6 +225,7 @@ async function ingestSupplementalBmk(
       osl: number | null;
       conc: number;
       image: string | null;
+      recipeFingerprint: string | null;
       metrics: Record<string, number>;
     }[] = [];
 
@@ -279,6 +280,7 @@ async function ingestSupplementalBmk(
         osl: entry.osl,
         conc: entry.conc,
         image: entry.image,
+        recipeFingerprint: null,
         metrics: entry.metrics,
       });
     }

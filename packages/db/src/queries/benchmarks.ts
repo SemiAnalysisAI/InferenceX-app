@@ -36,6 +36,8 @@ export interface BenchmarkRow {
   conc: number;
   offload_mode: string;
   image: string | null;
+  /** Producer-generated identity for the complete recipe; null on legacy rows. */
+  recipe_fingerprint?: string | null;
   metrics: Record<string, number>;
   /**
    * Per-worker measured-power breakdown emitted on multinode / disagg runs.
@@ -105,7 +107,7 @@ export async function getLatestBenchmarks(
     // Rank every run for each line, choose the newest seed under the requested
     // date/run cutoff, then walk backward only while the current run is append-only
     // and the image remains identical. DISTINCT ON makes the newest contributor win
-    // per concurrency without mixing ordinary snapshots.
+    // per recipe and concurrency without mixing ordinary snapshots.
     const rows = await sql`
       WITH RECURSIVE run_lines AS (
         SELECT
@@ -184,7 +186,8 @@ export async function getLatestBenchmarks(
           AND older.image = current.root_image
       ), selected_points AS (
         SELECT DISTINCT ON (
-          br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode, br.conc
+          br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
+          br.recipe_fingerprint, br.conc
         ) br.*, cr.snapshot_date, cr.snapshot_workflow_run_id
         FROM curve_runs cr
         JOIN benchmark_results br
@@ -204,7 +207,7 @@ export async function getLatestBenchmarks(
         WHERE br.error IS NULL
         ORDER BY
           br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
-          br.conc, cr.run_rank
+          br.recipe_fingerprint, br.conc, cr.run_rank
       )
       SELECT
         br.id,
@@ -231,6 +234,7 @@ export async function getLatestBenchmarks(
         br.osl,
         br.conc,
         br.image,
+        br.recipe_fingerprint,
         br.metrics,
         br.workers,
         br.date::text,
@@ -276,6 +280,7 @@ export async function getLatestBenchmarks(
       lb.osl,
       lb.conc,
       lb.image,
+      lb.recipe_fingerprint,
       lb.metrics,
       lb.workers,
       lb.date::text,
@@ -372,7 +377,8 @@ export async function getBenchmarksForRun(
         AND older.image = current.root_image
     ), selected_points AS (
       SELECT DISTINCT ON (
-        br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode, br.conc
+        br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
+        br.recipe_fingerprint, br.conc
       ) br.*, cr.snapshot_date, cr.snapshot_workflow_run_id
       FROM curve_runs cr
       JOIN benchmark_results br
@@ -392,7 +398,7 @@ export async function getBenchmarksForRun(
       WHERE br.error IS NULL
       ORDER BY
         br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
-        br.conc, cr.run_rank
+        br.recipe_fingerprint, br.conc, cr.run_rank
     )
     SELECT
       br.id,
@@ -419,6 +425,7 @@ export async function getBenchmarksForRun(
       br.osl,
       br.conc,
       br.image,
+      br.recipe_fingerprint,
       br.metrics,
       br.workers,
       br.date::text,
@@ -517,7 +524,8 @@ export async function getAllBenchmarksForHistory(
     ), selected_points AS (
       SELECT DISTINCT ON (
         cr.snapshot_workflow_run_id,
-        br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode, br.conc
+        br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
+        br.recipe_fingerprint, br.conc
       ) br.*, cr.snapshot_date, cr.snapshot_workflow_run_id
       FROM curve_runs cr
       JOIN benchmark_results br
@@ -538,7 +546,7 @@ export async function getAllBenchmarksForHistory(
       ORDER BY
         cr.snapshot_workflow_run_id,
         br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
-        br.conc, cr.run_rank
+        br.recipe_fingerprint, br.conc, cr.run_rank
     )
     SELECT
       br.id,
@@ -565,6 +573,7 @@ export async function getAllBenchmarksForHistory(
       br.osl,
       br.conc,
       br.image,
+      br.recipe_fingerprint,
       br.metrics - '{std_ttft,std_tpot,std_e2el,std_intvty,std_itl,mean_ttft,mean_tpot,mean_e2el,mean_intvty,mean_itl}'::text[] as metrics,
       br.workers,
       br.date::text,

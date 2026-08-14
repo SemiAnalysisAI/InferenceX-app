@@ -623,12 +623,13 @@ async function main(): Promise<void> {
               osl: row.osl,
               conc: row.conc,
               offloadMode: row.offloadMode,
+              recipeFingerprint: row.recipeFingerprint,
             })
           ) {
             console.log(
               `  [${result.dateDir}] skipped purged benchmark point: config ${configId}, ` +
                 `${row.benchmarkType}, isl ${row.isl}, osl ${row.osl}, conc ${row.conc}, ` +
-                `offload ${row.offloadMode}`,
+                `offload ${row.offloadMode}, recipe ${row.recipeFingerprint ?? 'legacy'}`,
             );
             continue;
           }

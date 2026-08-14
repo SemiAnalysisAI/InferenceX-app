@@ -1,25 +1,31 @@
 -- ============================================================
--- APPEND-ONLY CURVES
+-- BENCHMARK RECIPE FINGERPRINTS
 -- ============================================================
 --
--- A normal sweep remains a complete immutable line snapshot. An explicitly
--- append-only sweep contributes only new generated points, so the latest curve
--- may span a consecutive chain of append-only runs plus the nearest full snapshot.
+-- A generated recipe can differ in fields that are not normalized into configs
+-- (for example pipeline parallelism or launcher settings). Keep those variants
+-- distinct even when they share topology, scenario, and concurrency. Historical
+-- rows remain NULL and retain the previous one-point-per-natural-key behavior.
 
-alter table workflow_runs
-  add column append_only boolean not null default false;
+alter table benchmark_results
+  add column recipe_fingerprint text;
 
-alter table changelog_entries
-  add column append_only boolean not null default false;
+alter table benchmark_results
+  drop constraint benchmark_results_unique;
+
+alter table benchmark_results
+  add constraint benchmark_results_unique unique nulls not distinct (
+    workflow_run_id,
+    config_id,
+    benchmark_type,
+    isl,
+    osl,
+    conc,
+    offload_mode,
+    recipe_fingerprint
+  );
 
 drop materialized view if exists latest_benchmarks;
-
--- `select *` in a view is expanded at creation time, so recreate it to expose
--- workflow_runs.append_only to downstream queries.
-create or replace view latest_workflow_runs as
-select distinct on (github_run_id) *
-from workflow_runs
-order by github_run_id, run_attempt desc;
 
 create materialized view latest_benchmarks as
 with recursive run_lines as (
@@ -97,7 +103,13 @@ with recursive run_lines as (
     and older.image = current.root_image
 )
 select distinct on (
-  br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode, br.conc
+  br.config_id,
+  br.benchmark_type,
+  br.isl,
+  br.osl,
+  br.offload_mode,
+  br.recipe_fingerprint,
+  br.conc
 )
   br.*,
   cr.snapshot_date,
@@ -119,10 +131,24 @@ join configs point_c
   and case when br.benchmark_type = 'agentic_traces' then '' else point_c.spec_method end = cr.line_spec_method
 where br.error is null
 order by
-  br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode, br.conc,
+  br.config_id,
+  br.benchmark_type,
+  br.isl,
+  br.osl,
+  br.offload_mode,
+  br.recipe_fingerprint,
+  br.conc,
   cr.run_rank;
 
 create unique index latest_benchmarks_pk
-  on latest_benchmarks (config_id, conc, isl, osl, benchmark_type, offload_mode)
+  on latest_benchmarks (
+    config_id,
+    conc,
+    isl,
+    osl,
+    benchmark_type,
+    offload_mode,
+    recipe_fingerprint
+  )
   nulls not distinct;
 create index latest_benchmarks_model_idx on latest_benchmarks (config_id);

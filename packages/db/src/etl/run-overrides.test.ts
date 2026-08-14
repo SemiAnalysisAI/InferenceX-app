@@ -95,6 +95,11 @@ describe('PURGED_BENCHMARK_POINTS', () => {
       expect(point.osl === null || point.osl > 0).toBe(true);
       expect(point.conc).toBeGreaterThan(0);
       expect(point.offloadMode).not.toBe('');
+      expect(
+        point.recipeFingerprint === undefined ||
+          point.recipeFingerprint === null ||
+          point.recipeFingerprint !== '',
+      ).toBe(true);
       const identity = [
         point.githubRunId,
         point.runAttempt,
@@ -104,6 +109,7 @@ describe('PURGED_BENCHMARK_POINTS', () => {
         point.osl,
         point.conc,
         point.offloadMode,
+        point.recipeFingerprint ?? null,
       ].join('|');
       expect(unique.has(identity), `duplicate point override: ${identity}`).toBe(false);
       unique.add(identity);
@@ -152,6 +158,7 @@ describe('isBenchmarkPointPurged', () => {
       osl: 1024,
       conc: 1,
       offloadMode: 'none',
+      recipeFingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     };
     const registry = PURGED_BENCHMARK_POINTS as PurgedBenchmarkPoint[];
     registry.push(point);
@@ -169,6 +176,50 @@ describe('isBenchmarkPointPurged', () => {
         isBenchmarkPointPurged(point.githubRunId, point.runAttempt, {
           ...point,
           offloadMode: 'cpu',
+        }),
+      ).toBe(false);
+      expect(
+        isBenchmarkPointPurged(point.githubRunId, point.runAttempt, {
+          ...point,
+          recipeFingerprint: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        }),
+      ).toBe(false);
+      expect(
+        isBenchmarkPointPurged(point.githubRunId, point.runAttempt, {
+          ...point,
+          recipeFingerprint: null,
+        }),
+      ).toBe(false);
+    } finally {
+      registry.splice(registry.indexOf(point), 1);
+    }
+  });
+
+  it('treats omitted and null fingerprints as the same legacy identity', () => {
+    const point: PurgedBenchmarkPoint = {
+      githubRunId: 1,
+      runAttempt: 1,
+      configId: 1,
+      benchmarkType: 'single_turn',
+      isl: 1024,
+      osl: 1024,
+      conc: 1,
+      offloadMode: 'none',
+    };
+    const registry = PURGED_BENCHMARK_POINTS as PurgedBenchmarkPoint[];
+    registry.push(point);
+
+    try {
+      expect(
+        isBenchmarkPointPurged(point.githubRunId, point.runAttempt, {
+          ...point,
+          recipeFingerprint: null,
+        }),
+      ).toBe(true);
+      expect(
+        isBenchmarkPointPurged(point.githubRunId, point.runAttempt, {
+          ...point,
+          recipeFingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         }),
       ).toBe(false);
     } finally {

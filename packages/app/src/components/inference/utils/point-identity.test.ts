@@ -45,4 +45,26 @@ describe('scatterPointConfigId', () => {
 
     expect(off).not.toBe(on);
   });
+
+  it('keeps recipe variants at the same topology and concurrency distinct', () => {
+    const recipeA = scatterPointConfigId(
+      point({
+        recipe_fingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      }),
+    );
+    const recipeB = scatterPointConfigId(
+      point({
+        recipe_fingerprint: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      }),
+    );
+
+    expect(recipeA).not.toBe(recipeB);
+    expect(recipeA).toContain(
+      '|recipe-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    );
+  });
+
+  it('preserves the legacy key when no recipe fingerprint exists', () => {
+    expect(scatterPointConfigId(point({}))).not.toContain('|recipe-');
+  });
 });

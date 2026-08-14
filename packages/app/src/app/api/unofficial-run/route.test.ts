@@ -144,6 +144,21 @@ describe('normalizeArtifactRows', () => {
     expect(m.mean_e2el).toBe(1.5);
   });
 
+  it('preserves recipe identity for unofficial overlays', () => {
+    const rows = normalizeArtifactRows(
+      [
+        rawRow({
+          recipe_fingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        }),
+      ],
+      '2026-03-01',
+    );
+
+    expect(rows[0].recipe_fingerprint).toBe(
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    );
+  });
+
   it('surfaces pipeline-parallelism fields in metrics (auto-capture)', () => {
     // pp has no configs-table column: the frontend reads it from the metrics
     // JSONB (rowToAggDataEntry), so the overlay route must keep passing it

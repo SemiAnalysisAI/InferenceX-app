@@ -116,6 +116,8 @@ export interface BenchmarkPointKey {
   osl: number | null;
   conc: number;
   offloadMode: string;
+  /** Producer recipe identity. Omit or set null only for legacy rows. */
+  recipeFingerprint?: string | null;
 }
 
 export interface PurgedBenchmarkPoint extends BenchmarkPointKey {
@@ -126,7 +128,8 @@ export interface PurgedBenchmarkPoint extends BenchmarkPointKey {
 /**
  * Individual benchmark rows to skip on ingest and delete from the DB.
  * Keep a dated reason comment beside every entry for auditability:
- * `{ githubRunId, runAttempt, configId, benchmarkType, isl, osl, conc, offloadMode }`.
+ * `{ githubRunId, runAttempt, configId, benchmarkType, isl, osl, conc, offloadMode,
+ * recipeFingerprint }`. Omitted fingerprints target only legacy NULL rows.
  */
 export const PURGED_BENCHMARK_POINTS: readonly PurgedBenchmarkPoint[] = [];
 
@@ -148,7 +151,8 @@ export function isBenchmarkPointPurged(
       candidate.isl === point.isl &&
       candidate.osl === point.osl &&
       candidate.conc === point.conc &&
-      candidate.offloadMode === point.offloadMode,
+      candidate.offloadMode === point.offloadMode &&
+      (candidate.recipeFingerprint ?? null) === (point.recipeFingerprint ?? null),
   );
 }
 

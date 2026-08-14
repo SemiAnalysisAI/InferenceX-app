@@ -27,8 +27,10 @@ describe('append-only benchmark snapshots', () => {
     expect(query).toContain('current.images_complete');
     expect(query).toContain('older.image = current.root_image');
     expect(query).toContain('older.line_spec_method = current.line_spec_method');
+    expect(query).toContain('benchmark_type, isl, osl, offload_mode ORDER BY date DESC');
     expect(query).toContain('point_c.id = br.config_id');
-    expect(query).toContain('br.conc, cr.run_rank');
+    expect(query).toContain('br.recipe_fingerprint, br.conc, cr.run_rank');
+    expect(query).toContain('br.recipe_fingerprint,');
     expect(query).toContain('br.workflow_run_id, wr.run_started_at::text');
     expect(query).toContain('br.snapshot_date::text AS curve_date');
     expect(query).toContain('snapshot_wr.id = br.snapshot_workflow_run_id');
@@ -43,6 +45,7 @@ describe('append-only benchmark snapshots', () => {
     expect(query).toContain('FROM latest_benchmarks lb');
     expect(query).toContain('lb.date::text, lb.workflow_run_id');
     expect(query).toContain('lb.snapshot_date::text AS curve_date');
+    expect(query).toContain('lb.recipe_fingerprint,');
     expect(query).toContain('snapshot_wr.id = lb.snapshot_workflow_run_id');
   });
 
@@ -54,6 +57,7 @@ describe('append-only benchmark snapshots', () => {
     const query = captured.query();
     expect(query).toContain('FROM ranked_runs UNION ALL');
     expect(query).toContain('cr.snapshot_workflow_run_id, br.config_id');
+    expect(query).toContain('br.recipe_fingerprint, br.conc, cr.run_rank');
     expect(query).toContain('br.snapshot_date::text AS curve_date');
     expect(query).toContain('ORDER BY br.snapshot_date, c.id, br.conc');
   });

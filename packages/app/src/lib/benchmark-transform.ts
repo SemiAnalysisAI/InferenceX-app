@@ -115,6 +115,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   return {
     rawMetricKeys: Object.keys(m),
     id: isPersistedBenchmarkId(numericId) ? numericId : undefined,
+    recipe_fingerprint: row.recipe_fingerprint ?? undefined,
     hw: row.hardware,
     framework: row.framework,
     model: DB_MODEL_TO_DISPLAY[row.model] ?? row.model,
@@ -273,6 +274,7 @@ const runScopeKey = (r: BenchmarkRow): string =>
     r.isl,
     r.osl,
     r.offload_mode ?? 'off',
+    r.recipe_fingerprint ?? null,
   ]);
 
 /**

@@ -41,6 +41,8 @@ export interface BenchmarkRow {
   /** KV-cache offload mode. Defaults to 'off' for fixed-sequence rows. */
   offload_mode: string;
   image: string | null;
+  /** Producer-generated complete-recipe identity; null/absent on legacy rows. */
+  recipe_fingerprint?: string | null;
   metrics: Record<string, number>;
   /**
    * Per-worker measured power for multinode / disagg runs. The runner emits

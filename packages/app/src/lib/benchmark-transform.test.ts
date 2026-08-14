@@ -197,6 +197,18 @@ describe('rowToAggDataEntry', () => {
     expect(entryNull.image).toBeUndefined();
   });
 
+  it('passes recipe fingerprint through to chart point identity', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        recipe_fingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      }),
+    );
+
+    expect(entry.recipe_fingerprint).toBe(
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    );
+  });
+
   it('passes runtime cache metadata through to chart points', () => {
     const entry = rowToAggDataEntry(
       makeRow({
@@ -1119,6 +1131,27 @@ describe('mergeRunScopedRows', () => {
     const merged = mergeRunScopedRows(runRows, baseRows);
 
     expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 91]);
+  });
+
+  it('carries forward sibling recipe variants at the same topology and concurrency', () => {
+    const runRows = [
+      vllmRun({
+        id: 10,
+        conc: 64,
+        recipe_fingerprint: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      }),
+    ];
+    const baseRows = [
+      vllmRun({
+        id: 90,
+        conc: 64,
+        recipe_fingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      }),
+    ];
+
+    const merged = mergeRunScopedRows(runRows, baseRows);
+
+    expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 90]);
   });
 
   it('scopes per benchmark_type — an agentic run does not hide fixed-seq carry-forward', () => {

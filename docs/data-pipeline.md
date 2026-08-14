@@ -31,7 +31,8 @@ Every INSERT uses `ON CONFLICT DO UPDATE` or `DO NOTHING`. This means:
 - **Partial failures recover**: If ingest crashes mid-batch, re-running picks up where it left off.
 - **No cleanup needed**: No "delete old data first" step that could leave the DB empty on failure.
 
-The unique constraints match natural keys (e.g., `(workflow_run_id, config_id, isl, osl, conc)` for benchmarks), not surrogate keys.
+The unique constraints match natural keys (for benchmarks, workflow/config/scenario,
+concurrency, offload mode, and the nullable recipe fingerprint), not surrogate keys.
 
 ### Append-Only Curve Extensions
 
@@ -40,23 +41,30 @@ the prior run as a unit, so partial re-sweeps cannot silently stitch points from
 different recipes. A changelog containing only `append-only: true` entries marks the
 one narrow exception. The latest-curve queries then walk backward through consecutive
 append-only runs and include the nearest full snapshot, selecting the newest producer
-for each concurrency.
+for each recipe and concurrency. The producer stamps every new point with a deterministic
+`recipe_fingerprint`, so variants that share the app's normalized topology and concurrency
+remain separate. Historical rows have a null fingerprint and retain their legacy identity.
 
 The chain continues only while the image is identical. Each returned benchmark row
 keeps its original workflow-run ID and run URL, so extending a curve does not erase
 point provenance; `curve_date` and `curve_workflow_run_id` carry the separate logical
 snapshot identity used by charts and history. InferenceX CI separately verifies that
-the generated matrix changed only by adding concurrency values; image, launcher,
-topology, recipe, and benchmark logic changes must use a normal full snapshot.
+the generated matrix is strictly additive: existing recipes and points are immutable,
+while newly added concurrency points or complete recipe variants may run as deltas.
+All appended points must retain the target curve's image, and benchmark-affecting code
+changes must be isolated to the new points.
 
 ### Audited Point Purges
 
 `packages/db/src/etl/run-overrides.ts` is the durable audit record for exceptional
 data removal. Use `PURGED_BENCHMARK_POINTS` when a valid workflow run contains a
 specific invalid result, such as a server hang. Each record names `githubRunId`,
-`runAttempt`, `configId`, `benchmarkType`, `isl`, `osl`, `conc`, and `offloadMode`,
-with a dated reason comment. The full identity is required because one run can
-contain multiple serving configurations at the same sequence lengths and concurrency.
+`runAttempt`, `configId`, `benchmarkType`, `isl`, `osl`, `conc`, `offloadMode`, and
+the optional nullable `recipeFingerprint`, with a dated reason comment. A fingerprint
+targets exactly that recipe; omitting it or setting it to null targets only legacy rows
+whose stored fingerprint is null. The full identity is required because one run can
+contain multiple serving configurations and recipes at the same sequence lengths and
+concurrency.
 
 `bun run db:apply-overrides` previews every matching row and requires confirmation
 before deleting it in a transaction. It also removes unreferenced server logs and
