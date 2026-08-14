@@ -1,6 +1,5 @@
 import { resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants';
 
-import { restrictAgenticPointsToE2eFrontier } from './agentic-frontier';
 import type { BenchmarkRow } from './api';
 import { rowToAggDataEntry } from './benchmark-transform';
 import { buildAvailabilityHwKey } from './chart-utils';
@@ -639,7 +638,7 @@ function buildAgenticTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
       },
     ];
   });
-  return computeTierReads(restrictAgenticPointsToE2eFrontier(points), OVERVIEW_TIERS);
+  return computeTierReads(points, OVERVIEW_TIERS);
 }
 
 /** Single-turn 8K/1K: frontier points at the chart's stored interactivity,
