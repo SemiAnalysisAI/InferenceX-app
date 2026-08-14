@@ -114,7 +114,28 @@ export function OrbitRig({ reduced, onDragChange, controlsRef }: OrbitRigProps) 
     controls.touches.TWO = TOUCH.DOLLY_ROTATE;
     domElement.style.touchAction = 'pan-y';
 
-    const onChange = () => invalidate();
+    /**
+     * Publish the camera's spherical position on the canvas.
+     *
+     * The one thing about this view that no other test can see: a WebGL canvas has no
+     * DOM to assert on, so "the reader's viewpoint survived" is otherwise untestable —
+     * and it has already been broken once, by a rebuilt rig re-framing the camera.
+     * Three rounded numbers are enough to catch it and cost one dataset write per
+     * change event.
+     */
+    const publish = () => {
+      const offset = camera.position.clone().sub(controls.target);
+      domElement.dataset.orbit = [
+        Math.atan2(offset.x, offset.z).toFixed(3),
+        Math.acos(Math.min(1, Math.max(-1, offset.y / (offset.length() || 1)))).toFixed(3),
+        offset.length().toFixed(3),
+      ].join(',');
+    };
+
+    const onChange = () => {
+      publish();
+      invalidate();
+    };
     const onStart = () => onDragChange(true);
     const onEnd = () => {
       onDragChange(false);
@@ -129,7 +150,13 @@ export function OrbitRig({ reduced, onDragChange, controlsRef }: OrbitRigProps) 
     controls.addEventListener('start', onStart);
     controls.addEventListener('end', onEnd);
     domElement.addEventListener('dblclick', onDoubleClick);
-    refit(new Vector3(...DEFAULT_CAMERA));
+    // Frame the box on first mount only. This effect also re-runs whenever its inputs
+    // change identity, and re-framing there would yank the camera back to the default
+    // bearing mid-session — which is what the reader experiences as a drag snapping
+    // back the moment they let go.
+    if (fittedDistance.current === null) refit(new Vector3(...DEFAULT_CAMERA));
+    else invalidate();
+    publish();
 
     return () => {
       controls.removeEventListener('change', onChange);

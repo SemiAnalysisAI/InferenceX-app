@@ -16,6 +16,8 @@ const hasWebgl = () =>
 
 const surfaceSection = () => cy.get('[data-testid="calculator-lifecycle-surface-section"]');
 
+const surfaceCanvas = () => cy.get('[data-testid="calculator-lifecycle-surface"] canvas');
+
 describe('Calculator — Interactivity Surface', () => {
   before(() => {
     cy.window().then((win) => {
@@ -109,6 +111,60 @@ describe('Calculator — Interactivity Surface', () => {
       cy.get('[data-testid="calc-lifecycle-metric-margin"]').click();
       surfaceSection().should('contain.text', 'Margin ($/day)');
       surfaceSection().should('not.contain.text', 'Revenue ($/day)');
+    });
+  });
+
+  it('keeps the viewpoint after a drag, and restores it on double-click', () => {
+    // A rebuilt rig used to re-frame the camera, so any re-render during a drag —
+    // the hover readout alone causes several — snapped the view back to the default
+    // bearing the instant the pointer was released. A canvas has no DOM to assert on,
+    // so the rig publishes its spherical position to `data-orbit`.
+    hasWebgl().then((webgl) => {
+      if (!webgl) return;
+      // OrbitControls captures the pointer, and a synthetic pointerdown is not a real
+      // active pointer, so the browser throws. Stubbing capture leaves the orbit maths
+      // and the effect lifecycle — the things under test — untouched.
+      surfaceCanvas().then(($canvas) => {
+        const element = $canvas[0]!;
+        element.setPointerCapture = () => undefined;
+        element.releasePointerCapture = () => undefined;
+      });
+      surfaceCanvas().should('have.attr', 'data-orbit');
+      surfaceCanvas()
+        .invoke('attr', 'data-orbit')
+        .then((before) => {
+          surfaceCanvas()
+            .trigger('pointerdown', { button: 0, clientX: 400, clientY: 300, force: true })
+            .trigger('pointermove', { clientX: 520, clientY: 330, force: true })
+            .trigger('pointerup', { force: true });
+          // Well past the damping glide: the viewpoint must still be the new one.
+          cy.wait(600);
+          surfaceCanvas().invoke('attr', 'data-orbit').should('not.eq', before);
+
+          surfaceCanvas()
+            .invoke('attr', 'data-orbit')
+            .then((dragged) => {
+              // The actual regression: a React re-render must not disturb the camera.
+              // In the app the hover readout re-renders the moment the drag ends,
+              // which is why the snap-back appeared exactly on release; isolating a
+              // chip is the same re-render, provoked deterministically rather than
+              // depending on a raycast landing on a surface.
+              cy.get('[data-testid^="calculator-surface-focus-"]')
+                .not('[data-testid="calculator-surface-focus-all"]')
+                .first()
+                .click();
+              cy.wait(300);
+              surfaceCanvas().invoke('attr', 'data-orbit').should('eq', dragged);
+              cy.get('[data-testid="calculator-surface-focus-all"]').click();
+              cy.wait(300);
+              surfaceCanvas().invoke('attr', 'data-orbit').should('eq', dragged);
+
+              // Double-click is the way back, and it must actually go back.
+              surfaceCanvas().dblclick({ force: true });
+              cy.wait(300);
+              surfaceCanvas().invoke('attr', 'data-orbit').should('eq', before);
+            });
+        });
     });
   });
 

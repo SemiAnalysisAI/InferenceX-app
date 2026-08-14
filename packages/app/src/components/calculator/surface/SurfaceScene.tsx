@@ -1,7 +1,7 @@
 'use client';
 
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
@@ -449,9 +449,15 @@ export function SurfaceScene({
   draggingRef,
 }: SurfaceSceneProps) {
   const invalidate = useThree((state) => state.invalidate);
-  const onDragChange = (dragging: boolean) => {
-    draggingRef.current = dragging;
-  };
+  // Stable, because `OrbitRig` rebuilds its controls when this identity changes and a
+  // rebuilt rig re-frames the camera. An inline closure here would throw away the
+  // reader's viewpoint on any re-render — the hover readout alone causes several.
+  const onDragChange = useCallback(
+    (dragging: boolean) => {
+      draggingRef.current = dragging;
+    },
+    [draggingRef],
+  );
 
   // On-demand rendering: repaint when the data or the palette changes, not on a loop.
   useEffect(() => invalidate(), [invalidate, grid, chips, chrome, focusedKey]);
