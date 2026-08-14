@@ -16,6 +16,11 @@ import {
 } from './data-mappings';
 import { frameworkFamily } from './framework-family';
 import {
+  benchmarkCurveDate,
+  benchmarkCurveRunStartedAt,
+  benchmarkCurveWorkflowRunId,
+} from './benchmark-run-selection';
+import {
   computeTierReads,
   singleTurnInteractivity,
   type TcoTierBoundary,
@@ -240,7 +245,7 @@ export function overviewSnapshotDate(
           scenarios.includes(scenario)
         );
       })
-      .map((row) => row.date);
+      .map(benchmarkCurveDate);
   });
   return dates.length === 0 ? null : (dates.toSorted().at(-1) ?? null);
 }
@@ -387,21 +392,26 @@ function buildConfigs(
   const configs: OverviewConfigResult[] = [];
   for (const [key, configRows] of rowsByConfig) {
     const latestDate = configRows.reduce(
-      (latest, row) => (row.date > latest ? row.date : latest),
-      configRows[0].date,
+      (latest, row) => (benchmarkCurveDate(row) > latest ? benchmarkCurveDate(row) : latest),
+      benchmarkCurveDate(configRows[0]),
     );
-    let latestRows = configRows.filter((row) => row.date === latestDate);
-    if (scenario === 'agentx' && latestRows.some((row) => row.workflow_run_id !== undefined)) {
+    let latestRows = configRows.filter((row) => benchmarkCurveDate(row) === latestDate);
+    if (
+      scenario === 'agentx' &&
+      latestRows.some((row) => benchmarkCurveWorkflowRunId(row) !== undefined)
+    ) {
       const winningRow = latestRows.reduce((winner, row) => {
-        const startedAt = row.run_started_at ?? '';
-        const winnerStartedAt = winner.run_started_at ?? '';
+        const startedAt = benchmarkCurveRunStartedAt(row) ?? '';
+        const winnerStartedAt = benchmarkCurveRunStartedAt(winner) ?? '';
         if (startedAt !== winnerStartedAt) return startedAt > winnerStartedAt ? row : winner;
-        return (row.workflow_run_id ?? Number.NEGATIVE_INFINITY) >
-          (winner.workflow_run_id ?? Number.NEGATIVE_INFINITY)
+        return (benchmarkCurveWorkflowRunId(row) ?? Number.NEGATIVE_INFINITY) >
+          (benchmarkCurveWorkflowRunId(winner) ?? Number.NEGATIVE_INFINITY)
           ? row
           : winner;
       });
-      latestRows = latestRows.filter((row) => row.workflow_run_id === winningRow.workflow_run_id);
+      latestRows = latestRows.filter(
+        (row) => benchmarkCurveWorkflowRunId(row) === benchmarkCurveWorkflowRunId(winningRow),
+      );
     }
     const config = buildConfigResult(model, scenario, latestRows[0].precision, key, latestRows);
     if (config) configs.push(config);
@@ -467,7 +477,13 @@ function nonComparableAsMissing(
   if (read === undefined) return nullTierRead(tier);
   return isInRangeTierRead(read)
     ? read
-    : { ...read, value: null, estimated: false, evidenceDate: null, evidenceTopologies: [] };
+    : {
+        ...read,
+        value: null,
+        estimated: false,
+        evidenceDate: null,
+        evidenceTopologies: [],
+      };
 }
 
 function configPriorityIndex(config: OverviewConfigView): number {
@@ -633,7 +649,7 @@ function buildAgenticTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
         interactivity,
         e2eLatency,
         throughput: totalThroughput,
-        date: row.date,
+        date: benchmarkCurveDate(row),
         evidenceLabel: topologyEvidence(row),
       },
     ];
@@ -654,7 +670,7 @@ function buildSingleTurnTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] 
       {
         interactivity,
         throughput: totalTput * deployedGpuFactor(row),
-        date: row.date,
+        date: benchmarkCurveDate(row),
         evidenceLabel: topologyEvidence(row),
       },
     ];

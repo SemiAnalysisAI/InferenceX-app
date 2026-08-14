@@ -15,13 +15,16 @@ import { getHardwareKey } from '@/lib/chart-utils';
 import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
-import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
+import { benchmarkCurveDate, dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
 import { Sequence, type Model } from '@/lib/data-mappings';
 
 // Trend points never sit on a roofline — they're synthetic per-(date, config)
 // aggregates, not the per-load Pareto-frontier points the chart marks. Hardcode
 // roof:false so the field shape lines up with InferenceData without a cast.
-const wrapMetric = (n: number): { y: number; roof: boolean } => ({ y: n, roof: false });
+const wrapMetric = (n: number): { y: number; roof: boolean } => ({
+  y: n,
+  roof: false,
+});
 
 /**
  * Build a lightweight InferenceData-compatible point from a raw BenchmarkRow.
@@ -55,7 +58,7 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
     precision: row.precision,
     tp: row.decode_tp,
     conc: row.conc,
-    date: row.date,
+    date: benchmarkCurveDate(row),
     tpPerGpu: wrapMetric(tput),
     outputTputPerGpu: wrapMetric(outputTput),
     inputTputPerGpu: wrapMetric(inputTput),
@@ -78,19 +81,39 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
       ? { measuredAvgPower: { y: entry.avg_power_w, roof: false } }
       : {}),
     ...(typeof entry.joules_per_output_token === 'number'
-      ? { measuredJPerOutputToken: { y: entry.joules_per_output_token, roof: false } }
+      ? {
+          measuredJPerOutputToken: {
+            y: entry.joules_per_output_token,
+            roof: false,
+          },
+        }
       : {}),
     ...(typeof entry.joules_per_total_token === 'number'
-      ? { measuredJPerTotalToken: { y: entry.joules_per_total_token, roof: false } }
+      ? {
+          measuredJPerTotalToken: {
+            y: entry.joules_per_total_token,
+            roof: false,
+          },
+        }
       : {}),
     ...(typeof entry.prefill_avg_power_w === 'number'
-      ? { measuredPrefillAvgPower: { y: entry.prefill_avg_power_w, roof: false } }
+      ? {
+          measuredPrefillAvgPower: {
+            y: entry.prefill_avg_power_w,
+            roof: false,
+          },
+        }
       : {}),
     ...(typeof entry.decode_avg_power_w === 'number'
       ? { measuredDecodeAvgPower: { y: entry.decode_avg_power_w, roof: false } }
       : {}),
     ...(typeof entry.joules_per_input_token === 'number'
-      ? { measuredJPerInputToken: { y: entry.joules_per_input_token, roof: false } }
+      ? {
+          measuredJPerInputToken: {
+            y: entry.joules_per_input_token,
+            roof: false,
+          },
+        }
       : {}),
   };
   return point;
@@ -263,10 +286,11 @@ export function useInterpolatedTrendData({
       const point = rowToLightweightPoint(row);
       if (!point) continue;
 
-      let dateMap = result.get(row.date);
+      const curveDate = benchmarkCurveDate(row);
+      let dateMap = result.get(curveDate);
       if (!dateMap) {
         dateMap = new Map();
-        result.set(row.date, dateMap);
+        result.set(curveDate, dateMap);
       }
 
       const hwKey = point.hwKey as string;
@@ -319,7 +343,12 @@ export function useInterpolatedTrendData({
         // Extend line to today if the last point is before today
         const last = points.at(-1)!;
         if (last.date < today) {
-          points.push({ date: today, value: last.value, x: last.x, synthetic: true });
+          points.push({
+            date: today,
+            value: last.value,
+            x: last.x,
+            synthetic: true,
+          });
         }
         lines.set(groupKey, points);
         // Return base hwKey for legend filtering
@@ -353,7 +382,12 @@ export function useInterpolatedTrendData({
   }, [isLoading]);
 
   if (!enabled) {
-    return { trendLines: new Map(), hwKeysWithData: [], loading: false, progress: 0 };
+    return {
+      trendLines: new Map(),
+      hwKeysWithData: [],
+      loading: false,
+      progress: 0,
+    };
   }
 
   return { trendLines, hwKeysWithData, loading: isLoading, progress };

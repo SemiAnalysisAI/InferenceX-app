@@ -84,6 +84,8 @@ export interface AggDataEntry {
   rawMetricKeys?: string[];
   /** Stable per-point id from benchmark_results — for trace_replay lookups. */
   id?: number;
+  /** Stable identity for recipe variants that share topology and concurrency. */
+  recipe_fingerprint?: string;
   hw: string;
   mtp?: string;
   hwKey: string;
@@ -905,5 +907,6 @@ export interface ChangelogMetadata {
     pr_link: string | null;
     head_ref?: string;
     evals_only?: boolean;
+    append_only?: boolean;
   }[];
 }

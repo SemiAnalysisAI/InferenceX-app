@@ -41,6 +41,8 @@ export interface BenchmarkRow {
   /** KV-cache offload mode. Defaults to 'off' for fixed-sequence rows. */
   offload_mode: string;
   image: string | null;
+  /** Producer-generated complete-recipe identity; null/absent on legacy rows. */
+  recipe_fingerprint?: string | null;
   metrics: Record<string, number>;
   /**
    * Per-worker measured power for multinode / disagg runs. The runner emits
@@ -56,6 +58,10 @@ export interface BenchmarkRow {
   workflow_run_id?: number;
   run_started_at?: string | null;
   run_url: string | null;
+  /** Logical curve snapshot; producer date/run fields above retain point provenance. */
+  curve_date?: string;
+  curve_workflow_run_id?: number;
+  curve_run_started_at?: string | null;
 }
 
 export interface WorkflowRunRow {
@@ -76,6 +82,7 @@ export interface ChangelogRow {
   config_keys: string[];
   description: string;
   pr_link: string | null;
+  append_only?: boolean;
 }
 
 export interface DateConfigRow {
@@ -184,7 +191,11 @@ export function fetchBenchmarkHistory(
   signal?: AbortSignal,
   benchmarkType?: 'agentic_traces',
 ) {
-  const params = new URLSearchParams({ model, isl: String(isl), osl: String(osl) });
+  const params = new URLSearchParams({
+    model,
+    isl: String(isl),
+    osl: String(osl),
+  });
   if (benchmarkType) params.set('benchmarkType', benchmarkType);
   return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks/history?${params}`, signal);
 }
