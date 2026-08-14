@@ -22,6 +22,10 @@ describe('quote carousel membership', () => {
     expect(new Set(CAROUSEL_ORGS).size).toBe(CAROUSEL_ORGS.length);
   });
 
+  it('features Mooncake in the landing carousel', () => {
+    expect(CAROUSEL_ORGS).toContain('Mooncake');
+  });
+
   it.each(OFF_CAROUSEL_ONLY)('excludes %s from the carousel', (org) => {
     expect((CAROUSEL_ORGS as readonly string[]).includes(org)).toBe(false);
   });
