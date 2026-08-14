@@ -180,10 +180,18 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
   );
 
   if (!presenting) {
+    // Same three-column skeleton as the presenting toolbar below: the tabs
+    // keep the matrix centre and Present anchors the right edge as an action,
+    // instead of trailing the tabs and reading as a third view.
     return (
-      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
-        {views}
-        <OverviewPresentToggle strings={strings} />
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:grid md:grid-cols-[1fr_auto_1fr]">
+        <div className="hidden md:block" />
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:justify-self-center">
+          {views}
+        </div>
+        <div className="md:justify-self-end">
+          <OverviewPresentToggle strings={strings} />
+        </div>
       </div>
     );
   }
@@ -257,7 +265,7 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
 
 /** The half of the page that goes fullscreen: the view tabs and the matrix. */
 function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
-  const { data } = useOverviewNavigation();
+  const { data, pending } = useOverviewNavigation();
   const { presenting } = useOverviewPresentation();
   const strings = OVERVIEW_STRINGS[locale];
   const formatters = overviewFormatters(locale);
@@ -269,7 +277,14 @@ function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
       {/* Official-only summary; uploaded runs remain in the linked dashboard. */}
       {/* Clipped on phones for the rounded corners; visible from xl so the
           desktop matrix header can stick to the page as it scrolls. */}
-      <Card className="overflow-hidden p-0 md:p-0 xl:overflow-visible">
+      {/* The 150ms delay keeps cache hits and fast responses from flickering;
+          only a fetch still in flight past it dims the stale matrix. */}
+      <Card
+        data-pending={pending}
+        className={`overflow-hidden p-0 transition-opacity duration-200 md:p-0 xl:overflow-visible ${
+          pending ? 'opacity-60 delay-150' : 'opacity-100'
+        }`}
+      >
         <DesktopOverviewMatrix
           models={data.models}
           locale={locale}
@@ -291,47 +306,52 @@ function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
           />
         )}
         {presenting ? null : (
-          <>
+          /* One footer bar instead of three stacked link rows: the notes keep
+             the left edge, the scope chips keep the right, and the card ends
+             on a single rule. */
+          <div className="flex flex-col gap-x-6 gap-y-2 border-t border-border/50 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
             <OverviewMethodology
               strings={strings}
               comparisonMode={data.comparisonMode}
               referenceHardware={data.referenceHardware}
             />
-            {data.comparisonMode === 'history' ? (
-              <OverviewRowScopeToggle
+            <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
+              {data.comparisonMode === 'history' ? (
+                <OverviewRowScopeToggle
+                  rowScope={data.rowScope}
+                  unchangedRowCount={data.unchangedRowCount}
+                  tier={data.tier}
+                  engineScope={data.engineScope}
+                  referenceHardware={data.referenceHardware}
+                  modelScope={data.modelScope}
+                  locale={locale}
+                  strings={strings}
+                />
+              ) : (
+                <OverviewHardwareRowScopeToggle
+                  hardwareRowScope={data.hardwareRowScope}
+                  emptyRowCount={data.emptyRowCount}
+                  tier={data.tier}
+                  engineScope={data.engineScope}
+                  referenceHardware={data.referenceHardware}
+                  modelScope={data.modelScope}
+                  locale={locale}
+                  strings={strings}
+                />
+              )}
+              <OverviewModelScopeToggle
+                modelScope={data.modelScope}
+                tier={data.tier}
+                engineScope={data.engineScope}
+                comparisonMode={data.comparisonMode}
+                referenceHardware={data.referenceHardware}
                 rowScope={data.rowScope}
-                unchangedRowCount={data.unchangedRowCount}
-                tier={data.tier}
-                engineScope={data.engineScope}
-                referenceHardware={data.referenceHardware}
-                modelScope={data.modelScope}
-                locale={locale}
-                strings={strings}
-              />
-            ) : (
-              <OverviewHardwareRowScopeToggle
                 hardwareRowScope={data.hardwareRowScope}
-                emptyRowCount={data.emptyRowCount}
-                tier={data.tier}
-                engineScope={data.engineScope}
-                referenceHardware={data.referenceHardware}
-                modelScope={data.modelScope}
                 locale={locale}
                 strings={strings}
               />
-            )}
-            <OverviewModelScopeToggle
-              modelScope={data.modelScope}
-              tier={data.tier}
-              engineScope={data.engineScope}
-              comparisonMode={data.comparisonMode}
-              referenceHardware={data.referenceHardware}
-              rowScope={data.rowScope}
-              hardwareRowScope={data.hardwareRowScope}
-              locale={locale}
-              strings={strings}
-            />
-          </>
+            </div>
+          </div>
         )}
       </Card>
     </>

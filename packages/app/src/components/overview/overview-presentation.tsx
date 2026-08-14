@@ -210,8 +210,24 @@ export function OverviewPresentToggle({ strings }: { strings: OverviewStrings })
       aria-pressed={presenting}
       aria-label={presenting ? strings.presentExitAria : strings.presentEnterAria}
       title={strings.presentShortcutHint}
-      className="inline-flex min-h-11 items-center rounded-md border border-border/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="inline-flex min-h-11 items-center gap-x-1.5 rounded-md border border-border/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
     >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="size-3.5"
+      >
+        {presenting ? (
+          <path d="M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4" />
+        ) : (
+          <path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4" />
+        )}
+      </svg>
       {presenting ? strings.presentExit : strings.presentEnter}
     </button>
   );

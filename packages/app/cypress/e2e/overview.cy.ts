@@ -255,10 +255,12 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/zh/overview?models=all');
 
-    cy.get('[data-testid="overview-model-scope-toggle"]').should(
-      'contain.text',
-      '隐藏已弃用与维护模式模型',
-    );
+    // The chip carries the short label; the full sentence stays on the
+    // accessible name and hover title.
+    cy.get('[data-testid="overview-model-scope-toggle"]')
+      .should('contain.text', '隐藏停用模型')
+      .find('[data-overview-model-scope="default"]')
+      .should('have.attr', 'aria-label', '隐藏已弃用与维护模式模型');
     desktopModel('gpt-oss-120b')
       .find('[data-testid="overview-model-category-badge"]')
       .should('contain.text', '已弃用');
