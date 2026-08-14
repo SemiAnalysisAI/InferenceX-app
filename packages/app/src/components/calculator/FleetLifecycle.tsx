@@ -150,7 +150,7 @@ const STRINGS = {
     surfaceTitle: 'Interactivity Surface',
     surfaceToggle: 'Expand or fold this section',
     surfaceDescription:
-      'The same fleets with interactivity as a third axis. The chart above answers the question at one operating point; this shows that the answer has a shape in that direction — the config that wins at a low interactivity is often not the one that wins at a high one, so each chip is a surface rather than a line. Rotate it to read the ridges. Screen-only: no export, and the Y axis, price, ramp, MTBI, recovery and horizon above all apply here unchanged.',
+      'The same fleets with interactivity as a third axis: what the fleet you would deploy for your target earns if users turn out to want faster or slower tokens. A fleet runs one config at a time, so the configs are fixed once at the slider interactivity — that slice is exactly the line above — and every other slice re-reads those same runs. Away from the slider this is therefore what your chosen fleet delivers, not the best config for that speed. Rotate it to read the shape. Screen-only: no export, and the Y axis, price, ramp, MTBI, recovery and horizon above all apply here unchanged.',
     assumptions: (tier: string, chips: string, release: string) =>
       `Anchored at the ${release} release. Fleet sized by facility power at ${chips}; cost = chips × ${tier} $/chip/hr, flat for the whole window. Revenue is priced on the selected token type and reduced by the availability haircut. Price, ramp, MTBI, recovery and horizon are your assumptions — the throughput steps are not.`,
     source: 'Source: ',
@@ -231,7 +231,7 @@ const STRINGS = {
     surfaceTitle: '交互性曲面',
     surfaceToggle: '展开或折叠此板块',
     surfaceDescription:
-      '同一批集群，以交互性作为第三个坐标轴。上方图表回答的是单一操作点下的问题，而此处展示该答案在交互性方向上的形状——在低交互性下取胜的配置往往并非在高交互性下取胜的配置，因此每款 Chip 呈现为一个曲面而非一条曲线。可旋转查看其脊线。仅供屏幕查看：不支持导出；上方的 Y 轴、价格、爬坡期、平均无故障间隔、恢复时间与测算期在此同样适用。',
+      '同一批集群，以交互性作为第三个坐标轴：为你的目标交互性所部署的集群，在用户实际需要更快或更慢的 token 时会有怎样的表现。集群同一时刻只运行一套配置，因此配置在滑块所在的交互性上一次性确定——该切片即上方的曲线——其余切片只是把同一批运行结果按各自的交互性重新读取。因此在偏离滑块的位置，图中呈现的是你所选集群的表现，而非该速度下的最优配置。可旋转查看其形状。仅供屏幕查看：不支持导出；上方的 Y 轴、价格、爬坡期、平均无故障间隔、恢复时间与测算期在此同样适用。',
     assumptions: (tier: string, chips: string, release: string) =>
       `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = Chip 数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、爬坡期、平均无故障间隔、恢复时间与测算期为你的假设——吞吐量台阶不是。`,
     source: '来源：',

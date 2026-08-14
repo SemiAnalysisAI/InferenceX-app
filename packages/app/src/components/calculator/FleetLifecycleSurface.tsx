@@ -43,6 +43,8 @@ const STRINGS = {
     ariaSummaryRevenue:
       'Three-dimensional surface: fleet revenue per day over time and target interactivity, one surface per chip. Rotatable.',
     currentSlice: 'Slider interactivity',
+    fixedHere:
+      'configs are fixed at this slice, so elsewhere this is that fleet read faster or slower — not the best config for that speed',
     focusHint: 'Isolate a chip:',
     focusAll: 'All',
     holes:
@@ -65,6 +67,8 @@ const STRINGS = {
     ariaSummaryRevenue:
       '三维曲面：集群每日收入随时间与目标交互性的变化，每款 Chip 一个曲面，可旋转。',
     currentSlice: '滑块交互性',
+    fixedHere:
+      '配置在此切片上确定，因此在其他位置呈现的是同一批配置按不同速度读取的结果，而非该速度下的最优配置',
     focusHint: '单独查看某款 Chip：',
     focusAll: '全部',
     holes:
@@ -100,13 +104,15 @@ interface FleetLifecycleSurfaceProps {
 }
 
 /**
- * The Fleet Lifecycle as a surface: margin over (time × interactivity), one shaded
- * surface per chip, rotatable.
+ * The Fleet Lifecycle as a surface: the selected rate over (time × interactivity),
+ * one shaded surface per chip, rotatable.
  *
- * The 2D chart answers the question at one interactivity. This one shows that the
- * answer *has* a shape in that direction — a config that wins at 30 tok/s/user is
- * often not the one that wins at 150, so each chip's staircase is a ridge line
- * across the interactivity axis rather than a curve you could slide sideways.
+ * The 2D chart answers the question at one interactivity. This one asks what the
+ * fleet you would deploy for that target earns if users turn out to want faster or
+ * slower tokens — so the configs are fixed at the slider's slice (which is therefore
+ * identical to the line above) and every other slice re-reads those same runs. Away
+ * from the slider that is the fleet you chose, not the best config for that speed,
+ * which is why the caption says so out loud.
  *
  * Deliberately a screen-only view: no PNG or CSV export. The export path clones the
  * DOM and re-renders it through html-to-image, and `cloneNode` does not carry a
@@ -394,8 +400,8 @@ export default function FleetLifecycleSurface({
 
       <p className="no-export text-center text-xs text-muted-foreground">{t.instructions}</p>
       <p className="text-xs text-muted-foreground">
-        {t.currentSlice}: {grid.currentZ.toFixed(grid.currentZ >= 100 ? 0 : 1)} tok/s/user ·{' '}
-        {t.holes}
+        {t.currentSlice}: {grid.currentZ.toFixed(grid.currentZ >= 100 ? 0 : 1)} tok/s/user —{' '}
+        {t.fixedHere}. {t.holes}
       </p>
     </div>
   );

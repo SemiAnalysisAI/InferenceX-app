@@ -62,6 +62,9 @@ describe('Calculator — Interactivity Surface', () => {
     // legitimately has gaps. Saying so is load-bearing, not decoration.
     surfaceSection().should('contain.text', 'Gaps are interactivity levels no run measured');
     surfaceSection().should('contain.text', 'Slider interactivity');
+    // And the limitation of holding one config across the axis: away from the
+    // slider this is the chosen fleet, not the best config for that speed.
+    surfaceSection().should('contain.text', 'not the best config for that speed');
   });
 
   it('isolates one chip, since overlapping surfaces occlude each other', () => {

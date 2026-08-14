@@ -3,28 +3,43 @@
  * following the same y-axis selector as the 2D chart.
  *
  * The 2D lifecycle chart plots one staircase per chip at ONE interactivity — the
- * calculator's slider target. That hides the most interesting fact in the run
- * history: **which config wins changes with interactivity.** A chip's all-time
- * best at 30 tok/s/user is routinely a different sweep, from a different date,
- * than its best at 150. The staircase is a function of the operating point, not a
- * curve you can slide sideways.
+ * calculator's slider target. This adds the interactivity axis back, and answers:
+ * **the fleet I would deploy for my target, what does it earn if users turn out to
+ * want faster or slower tokens than I planned for?**
  *
- * So this evaluates the whole 1D pipeline once per interactivity slice and
- * assembles the results into a grid a 3D view can draw:
+ * 🔴 The rule that shapes everything: **a fleet runs one config at a time.** So the
+ * rungs are chosen ONCE, at the target, by exactly the 1D pipeline — and every slice
+ * then re-reads *those same sweeps* at its own interactivity. A date has one config
+ * across the whole z axis, because that is what a deployed fleet has.
+ *
+ * The tempting alternative is to re-derive the best-so-far staircase per slice, so
+ * each slice shows its own winner. That draws something no operator can buy: at one
+ * instant it has the fleet running config A for the users who want 20 tok/s/user and
+ * config B for the users who want 120, which is two fleets. It also puts step changes
+ * along z wherever the winner flips, and those cliffs read as economics when they are
+ * really just the boundary of where a sweep was run.
+ *
+ * The cost of the honest rule is worth stating plainly, because it is a real
+ * limitation of the view: **away from the target, the surface is not the best this
+ * chip could do.** A config picked for 35 tok/s/user may be beaten at 120 by one the
+ * fleet passed over, and this surface will not show that — it shows what the fleet
+ * you chose actually delivers there. Callers must say so.
+ *
+ * The grid a 3D view draws:
  *
  *        margin/day
  *          ▲     ╱▔▔▔▔▔╲          one surface per chip
- *          │   ╱╱       ╲╲        ridges across z = configs that only win
- *          │ ╱╱___________╲╲      in a band of interactivity
+ *          │   ╱╱       ╲╲        the slice at the target IS the 2D chart's line
+ *          │ ╱╱___________╲╲      elsewhere: the same configs, read faster/slower
  *          └──────────────────▶ time
  *           ╲
  *            ▼ interactivity
  *
  * Three properties of the data drive every decision here:
  *
- * 1. **Rungs are not aligned across slices.** Each slice's risers land on its own
- *    run dates, so slices are never interpolated into one another — every slice is
- *    evaluated independently and sampled onto one shared time grid.
+ * 1. **Rungs are not aligned across slices.** A rung exists on a slice only where its
+ *    own sweep was measured, so slices are never interpolated into one another —
+ *    every slice is evaluated independently and sampled onto one shared time grid.
  * 2. **Holes are real, banded and large.** A read outside a run's measured
  *    interactivity range is dropped rather than clamped, exactly as
  *    `historical-best.ts` does it, so a cell can honestly have no value. At the
@@ -43,20 +58,20 @@
  * sweeps, tok/s/chip is lower at the top of the frontier's own range than at the
  * bottom in 160, unchanged in the 37 single-point frontiers, and **higher in none**.
  *
- * So a surface that climbs along z is never that trend reversing — it is the winner
- * changing at a coverage boundary. B300 on the fixture jumps 5,009 → 14,275 tok/s
- * between the 15.1 and 18.5 tok/s/user slices, and the reason is visible in the
- * rungs: below 18.5 the only readable config is `b300_dynamo-trt@2026-02-07`,
- * because the 2.85×-better `b300_dynamo-trt_mtp@2026-01-28` was never swept that
- * slow and so cannot be read there at all. The cliff is where a benchmark stops,
- * not where the economics turn — which is exactly why the holes are drawn as holes.
+ * Holding the config fixed is what lets that read cleanly. With a per-slice winner
+ * the same fixture jumps 5,009 → 14,275 tok/s between the 15.1 and 18.5 tok/s/user
+ * slices — not because the economics turn, but because below 18.5 the 2.85×-better
+ * `b300_dynamo-trt_mtp@2026-01-28` was never swept and a weaker config inherits the
+ * slice. Fixing the rungs turns that artefact back into what it is: a hole.
  *
  * The selection rules are the 1D module's, deliberately duplicated rather than
  * re-derived: clamped reads never count, a sweep that fails to beat the incumbent
  * is not a rung, and a chip's line is the upper envelope over its hwKeys.
- * `interactivity-surface.test.ts` pins that duplication by asserting this module
- * agrees with `bestSoFarProgression` + `mergeProgressionsByChip` slice by slice.
- * If either side drifts, that test fails.
+ * `interactivity-surface.test.ts` pins that duplication by asserting
+ * `stepsAtInteractivity` agrees with `bestSoFarProgression` +
+ * `mergeProgressionsByChip` at every target. If either side drifts, that test fails —
+ * and because the grid selects at the calculator's own target, that agreement is also
+ * what makes the slice at the target identical to the 2D chart's line.
  *
  * Nothing here imports React, and nothing here edits the interpolation
  * primitives — `paretoFrontUpperLeft`, `monotoneSlopes` and `hermiteInterpolate`
@@ -254,6 +269,14 @@ export interface SurfaceStep {
   tput: number;
   outputTput: number;
   disagg: boolean;
+  /**
+   * The sweep this rung came from, still readable at other interactivities.
+   *
+   * This is what lets the surface hold one config per date across the whole z axis:
+   * the rung is selected once, then re-read along z instead of a new winner being
+   * chosen per slice.
+   */
+  frontier: FrontierReader;
 }
 
 /** Frontiers for every (hwKey, date), prepared once and read at every slice. */
@@ -316,6 +339,7 @@ export function stepsAtInteractivity(
         tput: read.tput,
         outputTput: read.outputTput,
         disagg: read.disagg,
+        frontier,
       });
       pooled.set(baseGpu, list);
     }
@@ -359,6 +383,25 @@ export function measuredInteractivitySpan(prepared: PreparedGroups): [number, nu
     for (const { frontier } of dated) {
       if (frontier.min < min) min = frontier.min;
       if (frontier.max > max) max = frontier.max;
+    }
+  }
+  return Number.isFinite(min) && max > min ? [min, max] : null;
+}
+
+/**
+ * The span the *chosen* configs actually cover.
+ *
+ * Narrower than `measuredInteractivitySpan`, and that is the point: once the rungs
+ * are fixed at the target, sweeps that never appear on any fleet cannot contribute a
+ * cell, so an axis drawn to their envelope would be mostly empty.
+ */
+export function spanOfSteps(chosen: Map<string, SurfaceStep[]>): [number, number] | null {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const steps of chosen.values()) {
+    for (const step of steps) {
+      if (step.frontier.min < min) min = step.frontier.min;
+      if (step.frontier.max > max) max = step.frontier.max;
     }
   }
   return Number.isFinite(min) && max > min ? [min, max] : null;
@@ -443,7 +486,12 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
   const prepared = prepareGroups(groups, mode, costType);
   if (prepared.size === 0) return null;
 
-  const span = measuredInteractivitySpan(prepared);
+  // The config timeline is chosen ONCE, at the calculator's target — see the note on
+  // this function. Every slice then re-reads these same rungs.
+  const chosen = stepsAtInteractivity(prepared, currentZ, visibleHwKeys);
+  if (chosen.size === 0) return null;
+
+  const span = spanOfSteps(chosen);
   if (!span) return null;
   const zs = options.zs ?? logSpacedSlices(span[0], span[1], SLICE_COUNT);
   if (zs.length === 0) return null;
@@ -463,23 +511,27 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
   let yMin = 0;
   let yMax = 0;
 
-  for (let zi = 0; zi < zs.length; zi += 1) {
-    const merged = stepsAtInteractivity(prepared, zs[zi]!, visibleHwKeys);
+  for (const [baseGpu, steps] of chosen) {
+    seen.add(baseGpu);
+    const specs = specsFor(baseGpu);
+    if (!specs) continue;
+    if (steps.some((s) => s.disagg)) disaggByChip.set(baseGpu, true);
 
-    for (const [baseGpu, steps] of merged) {
-      seen.add(baseGpu);
-      const specs = specsFor(baseGpu);
-      if (!specs) continue;
-
+    for (let zi = 0; zi < zs.length; zi += 1) {
       const throughputSteps: ThroughputStep[] = [];
       let costPerHour: number | null = null;
       for (const step of steps) {
+        // The rung's own sweep, re-read at this interactivity. A rung whose sweep was
+        // never measured this fast or this slow simply does not exist on this slice —
+        // the fleet still ran that config, but nothing says what it did here.
+        const read = step.frontier.read(zs[zi]!);
+        if (!read || !(read.value > 0)) continue;
         const stats = computeFleetStats({
           mw,
           powerKwPerGpu: specs.powerKwPerGpu,
           costPerGpuHour: specs.costPerGpuHour,
-          tputPerGpu: step.tput,
-          outputTputPerGpu: step.outputTput,
+          tputPerGpu: read.tput,
+          outputTputPerGpu: read.outputTput,
           interactivity: zs[zi]!,
         });
         if (!stats) continue;
@@ -516,7 +568,6 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
         if (value < yMin) yMin = value;
         if (value > yMax) yMax = value;
       }
-      if (steps.some((s) => s.disagg)) disaggByChip.set(baseGpu, true);
     }
   }
 

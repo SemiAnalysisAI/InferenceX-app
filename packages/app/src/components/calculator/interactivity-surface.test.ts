@@ -320,6 +320,58 @@ describe('buildSurfaceGrid', () => {
     for (const v of values) expect(v).toBeCloseTo(values[0]!, 6);
   });
 
+  describe('one config per date, across the whole interactivity axis', () => {
+    // A fleet runs one config at a time. The rungs are chosen once at the target and
+    // re-read along z; they are never re-derived per slice, which would draw a fleet
+    // running config A for slow users and config B for fast ones at the same instant.
+
+    it('never borrows a config the target could not have chosen', () => {
+      // At 50 tok/s/user the b300_trt sweep (measured 60..140) is unreadable, so it
+      // is not on the timeline — and must not reappear on the fast slices, which is
+      // exactly what a per-slice winner would do. The axis therefore stops at 80,
+      // where the chosen sglang sweeps stop, rather than running out to 140.
+      const grid = build({ currentZ: 50 })!;
+      expect(grid.zs.at(-1)).toBeLessThanOrEqual(80 + 1e-9);
+      expect(grid.zs[0]).toBeGreaterThanOrEqual(20 - 1e-9);
+    });
+
+    it('follows the target to a different config, and drops chips that cannot serve it', () => {
+      // At 100 the position reverses: only b300_trt can be read, and b200 (40..70)
+      // cannot serve this target at all, so it has no fleet to plot.
+      const grid = build({ currentZ: 100 })!;
+      expect(grid.chips.map((c) => c.key)).toEqual(['b300']);
+      expect(grid.zs[0]).toBeGreaterThanOrEqual(60 - 1e-9);
+      expect(grid.zs.at(-1)).toBeLessThanOrEqual(140 + 1e-9);
+    });
+
+    it('falls monotonically along z, because one config’s frontier does', () => {
+      // The payoff of holding the config fixed. A Pareto frontier trades throughput
+      // for interactivity monotonically, so with the rungs held still, revenue can
+      // only fall as users demand faster tokens — no cliffs, and every gap is a gap.
+      // (Guaranteed while the rung set is stable; a rung dropping out at some slice
+      // can only remove a level, and on this fixture the later rung is the stronger
+      // one at every readable slice.)
+      const grid = build({ metric: 'revenue' })!;
+      for (const chip of grid.chips) {
+        for (let ti = 0; ti < grid.times.length; ti += 1) {
+          const along = grid.zs
+            .map((_z, zi) => grid.chips.find((c) => c.key === chip.key)!.cells[zi]![ti])
+            .filter((v): v is number => v !== null);
+          for (let i = 1; i < along.length; i += 1) {
+            expect(along[i]!, `${chip.key} t=${ti} z=${i}`).toBeLessThanOrEqual(
+              along[i - 1]! + 1e-6,
+            );
+          }
+        }
+      }
+    });
+
+    // That the slice at the target IS the 2D chart's line needs no test of its own:
+    // the grid selects its rungs with `stepsAtInteractivity` at exactly `currentZ`,
+    // and the equivalence pin above already asserts that function agrees with
+    // `bestSoFarProgression` + `mergeProgressionsByChip` at every target.
+  });
+
   describe('the y-axis metric', () => {
     it('carries the metric on the grid so a view cannot mislabel the axis', () => {
       expect(build()!.metric).toBe('margin');

@@ -506,12 +506,25 @@ third axis**: x = time, y = the 2D chart's selected metric in $/day, z = interac
 one shaded surface per chip, rotatable (`FleetLifecycleSurface.tsx` + `surface/`, data
 in `interactivity-surface.ts`).
 
-The reason it exists is a property of the data, not a wish for a 3D chart: **which
-config wins changes with interactivity.** The winner is `getTpPerMwForType` read _at
-the target_, so per slice the argmax date, the winning hwKey, the rung count and even
-which chips appear at all are different. The 2D line is therefore not a slice you can
-slide sideways — each slice is its own staircase, and the surface is where that
-becomes visible.
+It answers: **the fleet I would deploy for my target, what does it earn if users turn
+out to want faster or slower tokens than I planned for?**
+
+🔴 The rule that shapes everything: **a fleet runs one config at a time.** The rungs
+are chosen once, at the calculator's target, by exactly the 1D pipeline
+(`stepsAtInteractivity` at `currentZ`) — so the slice at the slider _is_ the 2D
+chart's line — and every other slice re-reads **those same sweeps** at its own
+interactivity. A date has one config across the whole z axis, because that is what a
+deployed fleet has.
+
+The tempting alternative is to re-derive the best-so-far staircase per slice. It draws
+something no operator can buy: at one instant, the fleet running config A for users who
+want 20 tok/s/user and config B for users who want 120 — two fleets. It also puts step
+changes along z wherever the winner flips, and those cliffs read as economics when they
+are really the boundary of where a sweep happens to have been run.
+
+The cost of the honest rule has to be stated in the UI, and is: **away from the target,
+the surface is not the best that chip could do.** A config picked for 35 tok/s/user may
+be beaten at 120 by one the fleet passed over. The caption says so.
 
 **Which way does the surface tilt along z?** Down, steeply, and that is the physics
 rather than a quirk of the fixture: chip count is fixed by the power budget and price is
@@ -521,20 +534,20 @@ across the shipped fixture's 197 sweeps, tok/s/chip is lower at the top of the
 frontier's own range than at the bottom in 160, unchanged in the 37 single-point
 frontiers, and **higher in none**.
 
-So a surface that climbs along z is never that trend reversing — it is the **winner
-changing at a coverage boundary**. B300 jumps 5,009 → 14,275 tok/s between the 15.1 and
-18.5 tok/s/user slices on the fixture, and the rungs say why: below 18.5 the only
-readable config is `b300_dynamo-trt@2026-02-07`, because the 2.85×-better
-`b300_dynamo-trt_mtp@2026-01-28` was never swept that slow and so cannot be read there
-at all. The cliff marks where a benchmark stops, not where the economics turn. Read
-those step-ups as a gap in coverage, and treat them as a hint about what to sweep next.
+Holding the config fixed is what lets that read cleanly, and is the strongest argument
+for the rule. With a per-slice winner the same fixture jumps 5,009 → 14,275 tok/s
+between the 15.1 and 18.5 tok/s/user slices — not because the economics turn, but
+because below 18.5 the 2.85×-better `b300_dynamo-trt_mtp@2026-01-28` was never swept and
+a weaker config inherits the slice. Fixing the rungs turns that artefact back into what
+it always was: a hole. The unit tests pin exactly this, and the previous implementation
+fails all three.
 
 Five decisions that are easy to get wrong, and why:
 
-- **Slices are never interpolated into one another.** Each slice's risers land on its
-  own run dates, so blending adjacent slices would invent risers on dates nothing was
-  measured. Every slice is evaluated independently and sampled onto one shared time
-  grid; z is the axis you read across, not one you interpolate along.
+- **Slices are never interpolated into one another.** A rung exists on a slice only
+  where its own sweep was measured, so blending adjacent slices would invent risers on
+  dates nothing was measured. Every slice is evaluated independently and sampled onto
+  one shared time grid; z is the axis you read across, not one you interpolate along.
 - **Holes are drawn as holes.** Reads outside a run's measured range are excluded, not
   clamped, so coverage is banded: measured on the shipped fixture, the fraction of
   sweeps covering a given interactivity peaks near 65% and falls to ~2% at both ends
@@ -563,7 +576,9 @@ Five decisions that are easy to get wrong, and why:
 
 That last point duplicates the 1D module's selection rules, so
 `interactivity-surface.test.ts` pins the duplication: `stepsAtInteractivity` must agree
-with `bestSoFarProgression` + `mergeProgressionsByChip` slice by slice, and
+with `bestSoFarProgression` + `mergeProgressionsByChip` at every target — which is also
+what makes the slider's slice identical to the 2D line, since the grid selects there —
+and
 `prepareFrontier` must agree with `interpolateForGPU` at every target inside a range.
 Both were mutation-checked — clamping instead of refusing to extrapolate fails five
 tests. Note the per-hwKey running-max gate is _not_ pinned and cannot be: the pooled
