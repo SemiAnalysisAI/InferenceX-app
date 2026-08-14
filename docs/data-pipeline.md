@@ -101,6 +101,18 @@ The cluster average is then a mean across those logical engines on the union of 
 
 Engines are ordered by role, then numeric rank, then worker — never by the composed display string, which would sort `"decode 10"` before `"decode 2"` and scramble DP ranks. The role is only shown when engines actually differ in role, so an aggregated deployment reads `DP 0…DP 3` rather than `decode 0…decode 3`.
 
+### Summed Series and the Canonical Grid
+
+The same "components aren't scraped in lockstep" problem hits the **summed** series — prefill/decode/prefix-hit rates, queue depth, host KV usage, and the prompt-token source breakdown — but it cannot be solved the same way. A mean is scale-free, so `averageAcrossEngines` can evaluate on the union of scrape instants; a sum is not. `cumulativeUniqueInputTokens` turns these rates into token totals with `sum += value` and `rollingAverage` is a sample-count mean, so both only stay correct at **one point per scrape bucket**.
+
+Summing on an exact `start_ns` emitted one point per component per tick, each holding that component's share alone. Downstream that reads as a comb: the rolling average mixed the real samples with the other components' structural gaps and drew roughly 1/N of the cluster total. Two shapes produced it in the corpus — a disaggregated run puts every worker on its own `/metrics` endpoint and its own sub-second offset (~7× low on the 7-worker rows), and even a single-endpoint SGLang run splits its token counters into `is_streaming="true"`/`"false"` series ~16 ms apart, where the `"false"` half is an all-zero run for a fully streaming benchmark (2.2× low).
+
+Every summed series is therefore evaluated by `sumOntoGrid` on one canonical grid at the blob's native scrape cadence (`canonicalTickNs`, the median gap of the best-sampled series), with each component holding its last sample between its own scrapes and contributing only inside its observed window. The lattice is anchored at `t=0` and shared by every metric, so the pairs that get divided or added downstream (hits/queries, used/total, running+waiting) land on identical `t` values — anchoring each metric at its own first sample instead silently emptied the prefix-cache-hit-rate chart, because `sglang:cached_tokens` starts ~0.18 s off the grid `sglang:prompt_tokens` starts on.
+
+Mirrored endpoints are collapsed here too, on a **relative** tolerance rather than the gauge path's absolute one — a throughput mean is O(10⁵), so an absolute threshold would never fire and every mirror would be counted twice. This is a correction as well as a de-duplication: the two-API-server vLLM rows were double-counting their queue depth and token totals exactly 2× before v14.
+
+Nothing groups on an exact `start_ns` any more; `aggregateByStart` was removed in v14.
+
 ### Agentic Dataset Provenance
 
 AIPerf exports public-dataset provenance in `metadata.dataset`, including the Hugging Face dataset ID. InferenceX preserves that object as `dataset` on each agentic aggregate benchmark row. During benchmark ingest, `ingest-ci-run.ts` derives the dashboard slug from `hf_dataset_name` (for example, `semianalysisai/cc-traces-weka-062126` becomes `cc-traces-weka-062126`) and upserts `run_datasets` for the workflow run.

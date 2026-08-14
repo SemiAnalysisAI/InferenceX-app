@@ -83,8 +83,30 @@ import {
  * `seriesIdentityKey`), and the cluster average is a real mean across those
  * logical engines (see `averageAcrossEngines`) rather than a mean over
  * whichever engines happened to share an exact `start_ns`.
+ *
+ * v14: give the SUMMED series the same treatment v13 gave the averaged one.
+ * Components of a metric are not scraped in lockstep — a disaggregated run
+ * puts every worker on its own `/metrics` endpoint and its own sub-second
+ * offset, and even a single-endpoint SGLang run splits its token counters into
+ * `is_streaming="true"`/`"false"` series ~16 ms apart — so summing on an exact
+ * `start_ns` emitted one point per component per tick, each carrying that
+ * component's share alone instead of the cluster total. The detail page reads
+ * those as a comb: `rollingAverage` is a sample-count mean, so it averaged the
+ * real samples together with the other components' structural gaps and drew
+ * roughly 1/N of the actual throughput (measured: 2.2x low on an 8-rank SGLang
+ * DP run, ~7x low on the 7-worker disaggregated rows).
+ *
+ * Every summed series — prefill/decode/prefix-hit rates, queue depth, host KV
+ * usage and the prompt-token source breakdown — is now evaluated on one
+ * canonical grid at the blob's native scrape cadence (`canonicalTickNs`), with
+ * each component holding its last sample between its own scrapes
+ * (`sumOntoGrid`). The grid has to be uniform, not the union of scrape
+ * instants the way `averageAcrossEngines` does it: a mean is scale-free but a
+ * sum is not, and `cumulativeUniqueInputTokens` turns these rates into token
+ * totals with `sum += value`, which only stays correct at one point per
+ * scrape bucket.
  */
-export const CHART_SERIES_VERSION = 13;
+export const CHART_SERIES_VERSION = 14;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -289,38 +311,11 @@ export function computeChartSeriesFromMetricPhases(
   return buildSeriesFromMetrics(mergePhaseMetrics(profiling, warmup), context);
 }
 
-/**
- * Aggregate one timeslice field across all series of a metric, indexed by
- * `start_ns`. Multi-engine vllm deployments report one series per engine —
- * the cluster value is the sum (for running/waiting/throughput counters)
- * or the average (for kv_cache_usage_perc, a per-engine fraction).
- */
-function aggregateByStart(
-  series: readonly RawSeries[] | undefined,
-  field: 'avg' | 'rate',
-  combine: 'sum' | 'avg',
-): Map<number, number> {
-  const sums = new Map<number, number>();
-  const counts = new Map<number, number>();
-  for (const s of series ?? []) {
-    for (const ts of s.timeslices ?? []) {
-      if (typeof ts.start_ns !== 'number') continue;
-      const v = ts[field];
-      if (typeof v !== 'number' || !Number.isFinite(v)) continue;
-      sums.set(ts.start_ns, (sums.get(ts.start_ns) ?? 0) + v);
-      counts.set(ts.start_ns, (counts.get(ts.start_ns) ?? 0) + 1);
-    }
-  }
-  if (combine === 'sum') return sums;
-  const out = new Map<number, number>();
-  for (const [t, s] of sums) out.set(t, s / (counts.get(t) ?? 1));
-  return out;
-}
-
-/** Stable order: emit one point per unique start_ns, chronologically. */
-function sortedEntries(m: Map<number, number>): [number, number][] {
-  return [...m.entries()].toSorted((a, b) => a[0] - b[0]);
-}
+// Note: v14 removed `aggregateByStart`/`sortedEntries`. Nothing groups on an
+// exact `start_ns` any more — averaged series go through `averageAcrossEngines`
+// and summed ones through `sumOntoGrid`, both of which treat a component's
+// samples as a step function rather than requiring components to share a
+// nanosecond.
 
 // ── Per-engine identity (v13) ───────────────────────────────────────────
 //
@@ -456,6 +451,38 @@ function engineDiscriminator(
  */
 const MIRROR_MEAN_TOLERANCE = 0.02;
 
+/**
+ * Same idea as `MIRROR_MEAN_TOLERANCE`, but for counter rates (v14), where an
+ * absolute threshold is meaningless — a token-throughput mean is O(10^5), so
+ * the gauge tolerance would never fire and every mirror would be counted twice.
+ *
+ * Expressed as a fraction of the larger mean. The measured mirrors in the
+ * corpus differ by 0.03%-2.19% of their means, and a router endpoint that
+ * aggregates several workers differs from any single worker by far more than
+ * 5%, so this sits above the observed mirror spread with room to spare while
+ * staying well below a genuine difference.
+ */
+const MIRROR_RATE_RELATIVE_TOLERANCE = 0.05;
+
+/**
+ * Do these endpoints' whole-run means agree closely enough to be two views of
+ * one series rather than two different ones?
+ *
+ * Gauges keep v13's absolute test unchanged — they are 0..1 fractions (or small
+ * request counts) whose mirrors agree almost exactly. Rates need a relative
+ * test because their magnitude is unbounded.
+ */
+function looksMirrored(means: readonly number[], field: 'avg' | 'rate'): boolean {
+  const spread = Math.max(...means) - Math.min(...means);
+  if (field === 'avg') return spread <= MIRROR_MEAN_TOLERANCE;
+  const scale = Math.max(...means.map((m) => Math.abs(m)));
+  // Two endpoints that both read ~0 are mirrors of an idle series, not two
+  // engines: fall back to the absolute test so the relative one can't divide
+  // by a vanishing scale.
+  if (scale === 0) return true;
+  return spread <= MIRROR_RATE_RELATIVE_TOLERANCE * scale;
+}
+
 interface LogicalEngine {
   engineLabel: string;
   points: TimeSeriesPoint[];
@@ -522,10 +549,11 @@ function spanOf(scrapes: ScrapeMap): number {
  *     behind one label (a router in front of several replicas), and dropping
  *     one would silently lose an engine, so those are kept separate instead.
  */
-function resolveLogicalEngines(
+function resolveComponents(
   series: readonly RawSeries[] | undefined,
   tOf: (ns: number) => number,
-): LogicalEngine[] {
+  field: 'avg' | 'rate' = 'avg',
+): ResolvedEngine[] {
   const groups = new Map<string, EngineGroup>();
   for (const s of series ?? []) {
     const key = seriesIdentityKey(s);
@@ -542,13 +570,14 @@ function resolveLogicalEngines(
     }
     for (const ts of s.timeslices ?? []) {
       if (typeof ts.start_ns !== 'number' || !Number.isFinite(ts.start_ns)) continue;
-      if (typeof ts.avg !== 'number' || !Number.isFinite(ts.avg)) continue;
+      const value = ts[field];
+      if (typeof value !== 'number' || !Number.isFinite(value)) continue;
       const at = scrapes.get(ts.start_ns);
       if (at) {
-        at.sum += ts.avg;
+        at.sum += value;
         at.count++;
       } else {
-        scrapes.set(ts.start_ns, { sum: ts.avg, count: 1 });
+        scrapes.set(ts.start_ns, { sum: value, count: 1 });
       }
     }
   }
@@ -579,7 +608,7 @@ function resolveLogicalEngines(
     }
 
     const means = endpoints.map(([, scrapes]) => meanOf(scrapes));
-    const mirrored = Math.max(...means) - Math.min(...means) <= MIRROR_MEAN_TOLERANCE;
+    const mirrored = looksMirrored(means, field);
     if (!mirrored) {
       // Same labels, different measurements: distinct engines, not mirrors.
       for (const [endpointUrl, scrapes] of endpoints) push(endpointUrl, scrapes, true);
@@ -602,13 +631,21 @@ function resolveLogicalEngines(
   // first, then numeric rank, then worker, then blob order. Sorting a label
   // like "decode 3" lexically (or falling back to array index) scrambled DP
   // ranks on multi-worker runs.
-  const ordered = resolved.toSorted(
+  return resolved.toSorted(
     (a, b) =>
       engineRoleSortKey(a.role) - engineRoleSortKey(b.role) ||
       engineRankSortKey(a.rank) - engineRankSortKey(b.rank) ||
       (a.discriminator ?? '').localeCompare(b.discriminator ?? '') ||
       a.order - b.order,
   );
+}
+
+/** Collapse a gauge's raw series into one labelled entry per logical engine. */
+function resolveLogicalEngines(
+  series: readonly RawSeries[] | undefined,
+  tOf: (ns: number) => number,
+): LogicalEngine[] {
+  const ordered = resolveComponents(series, tOf, 'avg');
 
   // Only name the role when there is more than one, otherwise every engine on
   // an aggregated deployment reads "decode 0", "decode 1", ... for no reason.
@@ -716,6 +753,173 @@ function carryLimitSeconds(points: readonly TimeSeriesPoint[]): number {
   return 5 * gaps[gaps.length >> 1]!;
 }
 
+// ── Canonical scrape grid for summed series (v14) ───────────────────────
+//
+// `averageAcrossEngines` can evaluate on the union of scrape instants because
+// a mean is scale-free: adding more evaluation points doesn't change the level.
+// A SUM cannot. Its consumers on the detail page treat one point as one
+// one-second bucket — `cumulativeUniqueInputTokens` does `sum += value` to turn
+// a token *rate* into a token *total*, and `rollingAverage` is a sample-count
+// mean — so the emitted grid has to be uniform and at the native scrape
+// cadence, or the totals and the levels both move.
+
+/** Widest interval we will ever call a scrape cadence, in ns (5 minutes). */
+const MAX_TICK_NS = 300 * 1e9;
+/** Hard cap on emitted ticks, so a malformed cadence can't blow up the row. */
+const MAX_GRID_TICKS = 500_000;
+/**
+ * Slack when snapping a component's first/last sample to the lattice, as a
+ * fraction of a tick. A sample sitting a floating-point hair outside the grid
+ * should still get its tick rather than losing an endpoint.
+ */
+const GRID_EPSILON = 1e-6;
+
+/**
+ * The blob's native scrape interval, in nanoseconds.
+ *
+ * Taken as the median gap of the single series with the most timeslices: that
+ * series is by construction the best-sampled view of the run, and a median
+ * shrugs off the one-off boundary gap that the profiling block leaves where
+ * warmup used to be. Returns null when nothing in the blob has two samples to
+ * compare, in which case callers fall back to the pre-v14 exact-instant path.
+ */
+function canonicalTickNs(metrics: MetricsMap): number | null {
+  let best: readonly RawSlice[] | null = null;
+  for (const metricMeta of Object.values(metrics)) {
+    for (const s of metricMeta?.series ?? []) {
+      const ts = s.timeslices ?? [];
+      if (ts.length > (best?.length ?? 0)) best = ts;
+    }
+  }
+  if (!best || best.length < 2) return null;
+  const gaps: number[] = [];
+  for (let i = 1; i < best.length; i++) {
+    const a = best[i - 1]!.start_ns;
+    const b = best[i]!.start_ns;
+    if (typeof a !== 'number' || typeof b !== 'number') continue;
+    const gap = b - a;
+    if (gap > 0 && gap <= MAX_TICK_NS) gaps.push(gap);
+  }
+  if (gaps.length === 0) return null;
+  gaps.sort((a, b) => a - b);
+  const median = gaps[gaps.length >> 1]!;
+  return median > 0 ? median : null;
+}
+
+/**
+ * Evaluate a step-held component at `t`, or null when it has nothing to say.
+ *
+ * `cursor` is carried across calls so the whole sweep stays linear; callers
+ * must visit `t` in ascending order.
+ */
+interface StepCursor {
+  points: readonly TimeSeriesPoint[];
+  carryLimit: number;
+  cursor: number;
+}
+
+function stepValueAt(state: StepCursor, t: number): number | null {
+  const { points } = state;
+  while (state.cursor + 1 < points.length && points[state.cursor + 1]!.t <= t) state.cursor++;
+  // Outside the component's own observed window it contributes nothing, so a
+  // worker that starts late or stops early neither invents load nor forces a
+  // zero into the cluster total.
+  if (state.cursor < 0 || t > points.at(-1)!.t) return null;
+  // Inside the window but long past the last sample: the component stopped
+  // reporting, so don't carry a stale reading across the hole.
+  if (t - points[state.cursor]!.t > state.carryLimit) return null;
+  return points[state.cursor]!.value;
+}
+
+/**
+ * Sum components onto a uniform grid at the native scrape cadence.
+ *
+ * Components of one metric are NOT scraped in lockstep: a disaggregated run
+ * gives every worker its own `/metrics` endpoint on its own sub-second offset,
+ * and even a single-endpoint SGLang run splits its token counters into
+ * `is_streaming="true"`/`"false"` series that sit ~16 ms apart. Summing on an
+ * exact `start_ns` therefore emitted one point per component per tick, each
+ * holding that component's share alone. Downstream that reads as a comb —
+ * `rollingAverage` averages the real samples together with the other
+ * components' structural gaps, so an 8-worker run's throughput chart drew
+ * roughly an eighth of the actual tokens/sec.
+ *
+ * Each component instead holds its last sample between scrapes (its rate is a
+ * step function over its bucket) and the grid samples the sum once per tick.
+ * Returns an empty array when there is nothing to place on a grid.
+ */
+function sumOntoGrid(
+  components: readonly (readonly TimeSeriesPoint[])[],
+  tickS: number | null,
+): TimeSeriesPoint[] {
+  const active = components.filter((points) => points.length > 0);
+  if (active.length === 0) return [];
+  const first = Math.min(...active.map((points) => points[0]!.t));
+  const last = Math.max(...active.map((points) => points.at(-1)!.t));
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return [];
+
+  // Every summed series shares one lattice anchored at t=0, so metrics that
+  // are divided by one another downstream (hit rate = hits/queries, host KV
+  // usage = used/total, queue depth = running+waiting) land on identical `t`
+  // values and can be joined. Anchoring each metric at its OWN first sample
+  // instead silently emptied the hit-rate chart, because `sglang:cached_tokens`
+  // starts ~0.18 s off the grid `sglang:prompt_tokens` starts on and the two
+  // lattices then never share a point.
+  //
+  // With no inferable cadence (every series carrying a single timeslice, as in
+  // the smallest fixtures) fall back to the union of the components' own
+  // instants: still a step-held sum rather than an exact-instant one, just
+  // without a regular grid to place it on.
+  let timeline: number[];
+  if (tickS && tickS > 0) {
+    const firstTick = Math.ceil(first / tickS - GRID_EPSILON);
+    const lastTick = Math.floor(last / tickS + GRID_EPSILON);
+    const ticks = lastTick - firstTick + 1;
+    if (ticks < 1 || ticks > MAX_GRID_TICKS) return [];
+    timeline = Array.from({ length: ticks }, (_, i) => (firstTick + i) * tickS);
+  } else {
+    timeline = [...new Set(active.flatMap((points) => points.map((p) => p.t)))].toSorted(
+      (a, b) => a - b,
+    );
+  }
+
+  const states: StepCursor[] = active.map((points) => ({
+    points,
+    carryLimit: carryLimitSeconds(points),
+    cursor: -1,
+  }));
+  const out: TimeSeriesPoint[] = [];
+  for (const t of timeline) {
+    let sum = 0;
+    let n = 0;
+    for (const state of states) {
+      const value = stepValueAt(state, t);
+      if (value === null) continue;
+      sum += value;
+      n++;
+    }
+    // No component covers this tick — emit nothing rather than a false zero.
+    if (n > 0) out.push({ t, value: sum });
+  }
+  return out;
+}
+
+/** `sumOntoGrid` over a metric's raw series, resolved to logical components. */
+function summedSeries(
+  series: readonly RawSeries[] | undefined,
+  tOf: (ns: number) => number,
+  field: 'avg' | 'rate',
+  tickS: number | null,
+): TimeSeriesPoint[] {
+  const components = resolveComponents(series, tOf, field).map((c) => c.points);
+  return sumOntoGrid(components, tickS);
+}
+
+/** Index a grid series by `t` so two of them can be divided tick-for-tick. */
+function byT(points: readonly TimeSeriesPoint[]): Map<number, number> {
+  return new Map(points.map((p) => [p.t, p.value]));
+}
+
 function buildSeriesFromMetrics(
   metrics: MetricsMap,
   context: ServerMetricsContext,
@@ -742,6 +946,12 @@ function buildSeriesFromMetrics(
   }
   if (!Number.isFinite(startNs)) startNs = 0;
   const tOf = (ns: number) => (ns - (originStartNs ?? startNs)) / 1e9;
+  // Grid spacing for every summed series (v14). Null when the blob has nothing
+  // with two comparable samples, in which case `sumOntoGrid` emits only the
+  // single-component case and multi-component metrics come out empty rather
+  // than fragmented.
+  const tickNs = canonicalTickNs(metrics);
+  const tickS = tickNs === null ? null : tickNs / 1e9;
 
   // Pick the first metric name whose series array has any data; fallback
   // chain lets the same code path serve both vllm:* and sglang:* blobs.
@@ -778,19 +988,21 @@ function buildSeriesFromMetrics(
     'vllm:prompt_tokens',
     'sglang:prompt_tokens',
   );
-  const hitsByT = aggregateByStart(hitsSeries, 'rate', 'sum');
-  const qsByT = aggregateByStart(qsSeries, 'rate', 'sum');
+  const hitsOnGrid = summedSeries(hitsSeries, tOf, 'rate', tickS);
+  const qsOnGrid = summedSeries(qsSeries, tOf, 'rate', tickS);
+  const qsByT = byT(qsOnGrid);
   const prefixCacheHitRate: TimeSeriesPoint[] = [];
-  for (const [t, h] of sortedEntries(hitsByT)) {
+  for (const { t, value: h } of hitsOnGrid) {
     const q = qsByT.get(t);
-    if (q !== undefined && q > 0) prefixCacheHitRate.push({ t: tOf(t), value: h / q });
+    if (q !== undefined && q > 0) prefixCacheHitRate.push({ t, value: h / q });
   }
 
   // Queue depth: sum running + waiting across engines per timeslice.
   const runSeries = pickSeries('vllm:num_requests_running', 'sglang:num_running_reqs');
   const waitSeries = pickSeries('vllm:num_requests_waiting', 'sglang:num_queue_reqs');
-  const runByT = aggregateByStart(runSeries, 'avg', 'sum');
-  const waitByT = aggregateByStart(waitSeries, 'avg', 'sum');
+  const runOnGrid = summedSeries(runSeries, tOf, 'avg', tickS);
+  const waitByT = byT(summedSeries(waitSeries, tOf, 'avg', tickS));
+  const runByT = byT(runOnGrid);
   const queueDepth: QueueDepthPoint[] = [];
   // Union of timestamps so we surface activity even if one of the gauges
   // didn't report a sample on a given tick.
@@ -798,18 +1010,14 @@ function buildSeriesFromMetrics(
   for (const t of [...allTimes].toSorted((a, b) => a - b)) {
     const running = runByT.get(t) ?? 0;
     const waiting = waitByT.get(t) ?? 0;
-    queueDepth.push({ t: tOf(t), running, waiting, total: running + waiting });
+    queueDepth.push({ t, running, waiting, total: running + waiting });
   }
 
-  // Throughput: sum the counter `rate` (already per-second) across engines.
-  // Takes a fallback chain so vllm:* and sglang:* both work.
-  const counterRate = (...names: string[]): TimeSeriesPoint[] => {
-    const s = pickSeries(...names);
-    return sortedEntries(aggregateByStart(s, 'rate', 'sum')).map(([t, v]) => ({
-      t: tOf(t),
-      value: v,
-    }));
-  };
+  // Throughput: sum the counter `rate` (already per-second) across engines,
+  // on the canonical grid. Takes a fallback chain so vllm:* and sglang:* both
+  // work.
+  const counterRate = (...names: string[]): TimeSeriesPoint[] =>
+    summedSeries(pickSeries(...names), tOf, 'rate', tickS);
   const prefillTps = counterRate('vllm:prompt_tokens', 'sglang:prompt_tokens');
   const decodeTps = counterRate('vllm:generation_tokens', 'sglang:generation_tokens');
   // Tokens served from prefix cache per scrape. Lets the frontend derive
@@ -819,21 +1027,19 @@ function buildSeriesFromMetrics(
   // SGLang hicache: host-pool KV cache utilization as used/total per
   // timeslice. Both metrics are gauges in absolute tokens. Total stays
   // constant (it's the pool size), used fluctuates.
-  const hostUsedByT = aggregateByStart(
-    metrics['sglang:hicache_host_used_tokens']?.series,
-    'avg',
-    'sum',
-  );
-  const hostTotalByT = aggregateByStart(
-    metrics['sglang:hicache_host_total_tokens']?.series,
-    'avg',
-    'sum',
+  const hostTotalByT = byT(
+    summedSeries(metrics['sglang:hicache_host_total_tokens']?.series, tOf, 'avg', tickS),
   );
   const hostKvCacheUsage: TimeSeriesPoint[] = [];
-  for (const [t, used] of sortedEntries(hostUsedByT)) {
+  for (const { t, value: used } of summedSeries(
+    metrics['sglang:hicache_host_used_tokens']?.series,
+    tOf,
+    'avg',
+    tickS,
+  )) {
     const total = hostTotalByT.get(t);
     if (total !== undefined && total > 0) {
-      hostKvCacheUsage.push({ t: tOf(t), value: used / total });
+      hostKvCacheUsage.push({ t, value: used / total });
     }
   }
 
@@ -844,22 +1050,18 @@ function buildSeriesFromMetrics(
   //   sglang: sglang:realtime_tokens uses a `mode` label with values
   //         {prefill_cache, prefill_compute, decode}. Filter to prefill_*
   //         since decode isn't prompt-token volume.
-  const promptBySrcByT = new Map<string, Map<number, number>>();
-  // Sum a series' per-scrape rates into the bucket for `label`. The bucket is
-  // created even when the series has no valid timeslices — the SGLang fallback
-  // below is gated on `promptBySrcByT.size === 0`, so an empty vllm breakdown
-  // must still suppress it.
+  // Collect the raw series per source label first, then sum each source onto
+  // the canonical grid — same reason as the other summed metrics: a source's
+  // per-worker series sit on their own scrape offsets, so adding them by exact
+  // instant would emit one partial-sum point per worker per tick.
+  const promptBySrc = new Map<string, RawSeries[]>();
+  // The bucket is created even when the series has no valid timeslices — the
+  // SGLang fallback below is gated on `promptBySrc.size === 0`, so an empty
+  // vllm breakdown must still suppress it.
   const addSeriesRates = (label: string, series: RawSeries): void => {
-    let byT = promptBySrcByT.get(label);
-    if (!byT) {
-      byT = new Map<number, number>();
-      promptBySrcByT.set(label, byT);
-    }
-    for (const ts of series.timeslices ?? []) {
-      if (typeof ts.rate === 'number' && typeof ts.start_ns === 'number') {
-        byT.set(ts.start_ns, (byT.get(ts.start_ns) ?? 0) + ts.rate);
-      }
-    }
+    const existing = promptBySrc.get(label);
+    if (existing) existing.push(series);
+    else promptBySrc.set(label, [series]);
   };
   for (const series of metrics['vllm:prompt_tokens_by_source']?.series ?? []) {
     const labels = series.labels ?? {};
@@ -872,7 +1074,7 @@ function buildSeriesFromMetrics(
   //     series carries a `cache_source` label ("device" = HBM, "host" = CPU
   //     offload via hicache). Current runs have only `device`; when hicache
   //     runs land, additional series will appear and the chart will split.
-  if (promptBySrcByT.size === 0) {
+  if (promptBySrc.size === 0) {
     for (const series of metrics['sglang:realtime_tokens']?.series ?? []) {
       const labels = series.labels ?? {};
       const mode = labels['mode'] ?? 'unknown';
@@ -900,11 +1102,10 @@ function buildSeriesFromMetrics(
     }
   }
   const promptTokensBySource: Record<string, TimeSeriesPoint[]> = {};
-  for (const [source, byT] of promptBySrcByT) {
-    const arr: TimeSeriesPoint[] = [];
-    for (const [t, v] of sortedEntries(byT)) {
-      if (v > 0) arr.push({ t: tOf(t), value: v });
-    }
+  for (const [source, seriesForSource] of promptBySrc) {
+    // Idle ticks are dropped rather than emitted as zeros: this feeds a
+    // cumulative stacked area, so a zero adds nothing but payload.
+    const arr = summedSeries(seriesForSource, tOf, 'rate', tickS).filter((p) => p.value > 0);
     if (arr.length > 0) promptTokensBySource[source] = arr;
   }
 

@@ -707,3 +707,199 @@ describe('computeChartSeries', () => {
     expect(result?.metricSources).toEqual([]);
   });
 });
+
+// ── Summed series on the canonical grid (v14) ───────────────────────────
+//
+// Components of one metric are not scraped in lockstep. Summing them on an
+// exact `start_ns` emitted one point per component per tick, each holding that
+// component's share alone — a comb that `rollingAverage` (a sample-count mean)
+// then read as a fraction of the real cluster total.
+
+/** A counter series for one component, sampled at `1 Hz` from `startNs`. */
+function rateSeriesFor(
+  endpoint_url: string,
+  labels: Record<string, string>,
+  startNs: number,
+  rates: number[],
+) {
+  return {
+    endpoint_url,
+    labels,
+    timeslices: rates.map((rate, i) => ({
+      start_ns: startNs + i * 1e9,
+      end_ns: startNs + (i + 1) * 1e9,
+      rate,
+    })),
+  };
+}
+
+function rateBlob(metricName: string, series: unknown[]) {
+  return gzipSync(Buffer.from(JSON.stringify({ metrics: { [metricName]: { series } } })));
+}
+
+/** Σ of a rate series ≈ total tokens, which is what the cumulative charts read. */
+function total(points: { value: number }[] | undefined): number {
+  return (points ?? []).reduce((a, p) => a + p.value, 0);
+}
+
+describe('computeChartSeries summed series', () => {
+  it('sums components scraped on offset grids instead of emitting a comb', async () => {
+    // Two workers at 1 Hz, 16 ms out of phase — the real SGLang/vLLM pattern.
+    // Grouping on an exact start_ns produced 6 points alternating 100 and 20;
+    // the cluster was never once reported as its actual 120 tok/s.
+    const cs = await computeChartSeries(
+      rateBlob('vllm:prompt_tokens', [
+        rateSeriesFor('http://a:8000/metrics', { worker_id: 'a' }, 0, [100, 100, 100]),
+        rateSeriesFor('http://b:8000/metrics', { worker_id: 'b' }, 0.016e9, [20, 20, 20]),
+      ]),
+    );
+    expect(cs?.prefillTps).toEqual([
+      { t: 0, value: 100 },
+      { t: 1, value: 120 },
+      { t: 2, value: 120 },
+    ]);
+  });
+
+  it('ignores a label split that reports nothing rather than halving the rate', async () => {
+    // SGLang splits its token counters by `is_streaming`. When every request
+    // streams, the "false" series is a full-length run of zeros on its own
+    // grid, and interleaving it dragged the rolling average down ~2.2x.
+    const cs = await computeChartSeries(
+      rateBlob('sglang:generation_tokens', [
+        rateSeriesFor('http://a:8000/metrics', { is_streaming: 'false' }, 0, [0, 0, 0, 0]),
+        rateSeriesFor('http://a:8000/metrics', { is_streaming: 'true' }, 0.016e9, [80, 90, 70, 60]),
+      ]),
+    );
+    expect(cs?.decodeTps.map((p) => p.value)).toEqual([0, 80, 90, 70]);
+  });
+
+  it('preserves the token total, which the cumulative charts read as a sum', async () => {
+    // `cumulativeUniqueInputTokens` does `sum += value`, so regridding must not
+    // move Σ — one point per one-second bucket, no more and no less. Components
+    // already on the grid round-trip exactly.
+    const rates = [10, 40, 0, 25, 5];
+    const aligned = await computeChartSeries(
+      rateBlob('vllm:prompt_tokens', [
+        rateSeriesFor('http://a:8000/metrics', { worker_id: 'a' }, 0, rates),
+        rateSeriesFor('http://b:8000/metrics', { worker_id: 'b' }, 0, rates),
+      ]),
+    );
+    expect(total(aligned?.prefillTps)).toBe(160);
+    expect(aligned?.prefillTps.map((p) => p.t)).toEqual([0, 1, 2, 3, 4]);
+
+    // An off-grid component is read at each tick through its own step
+    // function, so Σ can differ by at most the one trailing bucket that falls
+    // past the last whole tick (here worker b's final 5). On a real 4000-tick
+    // row that edge is invisible: points 439817's prefill and decode totals
+    // both came out byte-identical to the pre-v14 values.
+    const offset = await computeChartSeries(
+      rateBlob('vllm:prompt_tokens', [
+        rateSeriesFor('http://a:8000/metrics', { worker_id: 'a' }, 0, rates),
+        rateSeriesFor('http://b:8000/metrics', { worker_id: 'b' }, 0.4e9, rates),
+      ]),
+    );
+    expect(total(offset?.prefillTps)).toBe(155);
+    expect(offset?.prefillTps.map((p) => p.t)).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it('counts mirrored API-server frontends once, not twice', async () => {
+    // vLLM with two API servers exposes the same engine on both /metrics
+    // endpoints. Summing both double-counted every token — measured at exactly
+    // 2x on the stored rows for points 439201 and 439263.
+    const cs = await computeChartSeries(
+      rateBlob('vllm:prompt_tokens', [
+        rateSeriesFor('http://localhost:8888/metrics', { engine: '0' }, 0, [500, 500, 500]),
+        rateSeriesFor('http://localhost:8889/metrics', { engine: '0' }, 0.019e9, [500, 500, 500]),
+      ]),
+    );
+    expect(cs?.prefillTps.map((p) => p.value)).toEqual([500, 500, 500]);
+  });
+
+  it('keeps endpoints that disagree, which are engines rather than mirrors', async () => {
+    // Same label set on two endpoints but very different levels: a router in
+    // front of two replicas. Dropping one would silently lose half the load.
+    const cs = await computeChartSeries(
+      rateBlob('vllm:prompt_tokens', [
+        rateSeriesFor('http://localhost:8888/metrics', { engine: '0' }, 0, [100, 100, 100]),
+        rateSeriesFor('http://localhost:8889/metrics', { engine: '0' }, 0, [900, 900, 900]),
+      ]),
+    );
+    expect(cs?.prefillTps.map((p) => p.value)).toEqual([1000, 1000, 1000]);
+  });
+
+  it('puts divided metrics on one lattice so the hit rate survives', async () => {
+    // Regression guard: anchoring each metric's grid at its own first sample
+    // put hits on ...x.18 and queries on ...x.00, so the join found no shared
+    // instant and the prefix-cache-hit-rate chart came out empty.
+    const cs = await computeChartSeries(
+      gzipSync(
+        Buffer.from(
+          JSON.stringify({
+            metrics: {
+              'vllm:prefix_cache_hits': {
+                series: [
+                  rateSeriesFor('http://a:8000/metrics', { engine: '0' }, 0.18e9, [75, 75]),
+                  rateSeriesFor('http://a:8000/metrics', { engine: '1' }, 0.34e9, [75, 75]),
+                ],
+              },
+              'vllm:prefix_cache_queries': {
+                series: [
+                  rateSeriesFor('http://a:8000/metrics', { engine: '0' }, 0, [100, 100]),
+                  rateSeriesFor('http://a:8000/metrics', { engine: '1' }, 0.5e9, [100, 100]),
+                ],
+              },
+            },
+          }),
+        ),
+      ),
+    );
+    expect(cs?.prefixCacheHitRate.length).toBeGreaterThan(0);
+    for (const point of cs!.prefixCacheHitRate) {
+      expect(Number.isInteger(point.t)).toBe(true);
+      expect(point.value).toBeCloseTo(0.75, 5);
+    }
+  });
+
+  it('sums queue depth across workers on their own scrape offsets', async () => {
+    const json = JSON.stringify({
+      metrics: {
+        'vllm:num_requests_running': {
+          series: [0, 1, 2, 3].map((w) => ({
+            endpoint_url: `http://10.0.0.${w}:7500/metrics`,
+            labels: { worker_id: `w${w}` },
+            timeslices: [
+              { start_ns: w * 0.01e9, end_ns: w * 0.01e9 + 1e9, avg: 2 },
+              { start_ns: w * 0.01e9 + 1e9, end_ns: w * 0.01e9 + 2e9, avg: 2 },
+            ],
+          })),
+        },
+        'vllm:num_requests_waiting': {
+          series: [0, 1, 2, 3].map((w) => ({
+            endpoint_url: `http://10.0.0.${w}:7500/metrics`,
+            labels: { worker_id: `w${w}` },
+            timeslices: [
+              { start_ns: w * 0.01e9, end_ns: w * 0.01e9 + 1e9, avg: 1 },
+              { start_ns: w * 0.01e9 + 1e9, end_ns: w * 0.01e9 + 2e9, avg: 1 },
+            ],
+          })),
+        },
+      },
+    });
+    const cs = await computeChartSeries(gzipSync(Buffer.from(json)));
+    // Four workers x (2 running + 1 waiting) once the last one has reported.
+    expect(cs?.queueDepth.at(-1)).toEqual({ t: 1, running: 8, waiting: 4, total: 12 });
+  });
+
+  it('leaves a single-component metric on a plain one-per-tick grid', async () => {
+    const cs = await computeChartSeries(
+      rateBlob('vllm:generation_tokens', [
+        rateSeriesFor('http://a:8000/metrics', { engine: '0' }, 0, [10, 20, 30]),
+      ]),
+    );
+    expect(cs?.decodeTps).toEqual([
+      { t: 0, value: 10 },
+      { t: 1, value: 20 },
+      { t: 2, value: 30 },
+    ]);
+  });
+});
