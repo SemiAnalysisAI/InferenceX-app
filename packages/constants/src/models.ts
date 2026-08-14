@@ -77,3 +77,45 @@ export function rowToSequence(row: {
   if (row.isl === null || row.osl === null) return null;
   return islOslToSequence(row.isl, row.osl);
 }
+
+/**
+ * Model release dates, keyed by frontend display name (YYYY-MM-DD, UTC).
+ *
+ * **This is the only release-date table in the repo, and it must stay that way.**
+ * These dates were per-entry `releaseDate` fields on `MODEL_ARCHITECTURES`, which
+ * is the wrong home for them: a date that captions a diagram is the same fact as
+ * a date that anchors a revenue axis, and two copies of one fact drift. Callers
+ * go through `getModelReleaseDate`.
+ *
+ * **What the date means:** the day the weights became publicly downloadable — not
+ * the announcement, and not the day InferenceX started benchmarking the model.
+ * Inference optimisation cannot begin before the weights are out, so that
+ * publication is the honest zero for any "how far has this come since it
+ * shipped?" axis. Where a display name groups point releases (`GLM-5` covers
+ * both GLM-5 and GLM-5.1), the date is the *earliest* release in the bucket,
+ * because that is when the bucket's weights first existed.
+ *
+ * A date here must never postdate the model's first InferenceX sweep — a model
+ * cannot be benchmarked before it exists. That is the check that catches a wrong
+ * entry, and it is why these are worth sourcing individually rather than
+ * defaulting to whatever `MODELS.md` lists as the date the model was added.
+ *
+ * Only add an entry you can source, and cite the source in a comment.
+ * `getModelReleaseDate` returns null otherwise, so callers fall back to the
+ * earliest date they actually have data for.
+ */
+export const MODEL_RELEASE_DATES: Record<string, string> = {
+  'DeepSeek-R1-0528': '2025-05-28',
+  'Llama-3.3-70B-Instruct-FP8': '2024-12-06',
+  'Llama-3.1-70B-Instruct-FP8-KV': '2024-07-23',
+  'gpt-oss-120b': '2025-06-13',
+  'Kimi-K2.5': '2026-01-27',
+  'Kimi-K3': '2026-06-13',
+  'MiniMax-M2.5': '2025-10-25',
+  'DeepSeek-V4-Pro': '2026-06-08',
+};
+
+/** Release date for a display model name, or null when we have no sourced date. */
+export function getModelReleaseDate(displayModel: string): string | null {
+  return MODEL_RELEASE_DATES[displayModel] ?? null;
+}

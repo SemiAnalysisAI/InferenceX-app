@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 
+import { getModelReleaseDate } from '@semianalysisai/inferencex-constants';
+
 import { Badge } from '@/components/ui/badge';
 import type { Model } from '@/lib/data-mappings';
 import {
@@ -2266,6 +2268,9 @@ export default function ModelArchitectureDiagram({
   const containerRef = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
   const arch = getModelArchitecture(model);
+  // Read from the one release-date table rather than a copy on `arch` — see the
+  // note in `ModelArchitecture`. `model` is the display name the table is keyed by.
+  const releaseDate = getModelReleaseDate(model);
 
   const toggleBlock = useCallback(
     (blockId: string) => {
@@ -2441,10 +2446,10 @@ export default function ModelArchitectureDiagram({
               </div>
             </div>
           )}
-          {arch.developer && arch.releaseDate && (
+          {arch.developer && releaseDate && (
             <p className="text-xs text-muted-foreground mt-2">
               Released by {arch.developer} on{' '}
-              {new Date(arch.releaseDate).toLocaleDateString('en-US', {
+              {new Date(releaseDate).toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric',
