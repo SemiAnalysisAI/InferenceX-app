@@ -17,6 +17,7 @@ import { track } from '@/lib/analytics';
 import { notifyClientSearchChange } from '@/lib/client-navigation';
 import {
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  type OverviewComparisonMode,
   type OverviewPageData,
   type OverviewReferenceHardware,
   resolveOverviewComparisonMode,
@@ -73,6 +74,7 @@ interface OverviewNavigationValue {
  */
 const OverviewDataContext = createContext<OverviewPageData | null>(null);
 const OverviewReferenceContext = createContext<OverviewReferenceHardware | null>(null);
+const OverviewComparisonContext = createContext<OverviewComparisonMode | null>(null);
 const OverviewNavigationContext = createContext<OverviewNavigationValue | null>(null);
 
 export function OverviewNavigationProvider({
@@ -259,6 +261,17 @@ export function OverviewNavigationProvider({
     [pendingHref],
   );
 
+  // Derived from the pending URL, not the settled payload, so the window
+  // selector reflects a choice whose request is still in flight — including
+  // re-selecting the previous window to undo it.
+  const comparisonMode = useMemo(
+    () =>
+      resolveOverviewComparisonMode(
+        new URL(pendingHref, 'https://inferencex.local').searchParams.get('compare') ?? undefined,
+      ),
+    [pendingHref],
+  );
+
   const value = useMemo<OverviewNavigationValue>(
     () => ({
       isPending,
@@ -279,9 +292,11 @@ export function OverviewNavigationProvider({
   return (
     <OverviewDataContext.Provider value={data}>
       <OverviewReferenceContext.Provider value={referenceHardware}>
-        <OverviewNavigationContext.Provider value={value}>
-          {children}
-        </OverviewNavigationContext.Provider>
+        <OverviewComparisonContext.Provider value={comparisonMode}>
+          <OverviewNavigationContext.Provider value={value}>
+            {children}
+          </OverviewNavigationContext.Provider>
+        </OverviewComparisonContext.Provider>
       </OverviewReferenceContext.Provider>
     </OverviewDataContext.Provider>
   );
@@ -301,6 +316,12 @@ export function useOverviewData(): OverviewPageData {
 
 export function useOverviewReference(): OverviewReferenceHardware {
   const value = useContext(OverviewReferenceContext);
+  if (value === null) throw new Error('Overview controls require OverviewNavigationProvider');
+  return value;
+}
+
+export function useOverviewComparisonMode(): OverviewComparisonMode {
+  const value = useContext(OverviewComparisonContext);
   if (value === null) throw new Error('Overview controls require OverviewNavigationProvider');
   return value;
 }

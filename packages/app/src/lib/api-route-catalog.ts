@@ -387,6 +387,14 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: 'src/lib/overview-data.ts',
+    sourceSha256: '7757b32c1769bf4e25e8dd156ba049830ab25b8e3cf345d718cfad46adfd8e43',
+    reviewArea: {
+      en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
+      zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
+    },
+  },
+  {
     source: 'src/lib/tco-feed.ts',
     sourceSha256: '52d95a0c867513e6f6e3aaace4d066e69a28495ac593b89821b7b81d7475861a',
     reviewArea: {
