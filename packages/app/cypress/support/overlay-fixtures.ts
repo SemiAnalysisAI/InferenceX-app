@@ -4,8 +4,11 @@
  * The benchmark values are the real numbers from GitHub run 29682242847
  * (GLM5.2 B300 agentic hicache, offload=on rows):
  *   conc, p90_intvty (tok/s/user), tput_per_gpu, p90_e2el (s)
- * C=4 is dominated on e2e by C=8 (12874 tok/s @ 33.1s vs 9415 @ 48.0s), which
- * makes the set a ready-made probe for the e2e-restricted frontier behaviors.
+ * C=4 is dominated on e2e by C=8 (12874 tok/s @ 33.1s vs 9415 @ 48.0s). That
+ * used to make the set a probe for the e2e-restricted frontier; #736 removed
+ * that gating, so on the interactivity axes all five are Pareto-optimal —
+ * throughput falls monotonically as interactivity rises. Use
+ * `DOMINATED_CONFIG` when a test needs a point Optimal Only will actually drop.
  */
 export const DEFAULT_MODEL_DB_KEY = 'dsv4';
 export const AGENTIC_DATE = '2026-07-19';
@@ -39,9 +42,21 @@ export const metricsFor = (intvty: number, tput: number, e2el: number): Record<s
   input_tput_per_gpu: tput * 0.7,
 });
 
+/**
+ * A sixth config that is dominated on the *interactivity* axes: C=8 beats it on
+ * both interactivity (68.5 > 60) and throughput (12874 > 5000). Since #736 the
+ * Pareto frontier is computed from the selected axes alone, so this is the point
+ * Optimal Only must drop — the e2e-dominated C=4 above no longer is one.
+ */
+export const DOMINATED_CONFIG: [number, number, number, number] = [6, 60, 5000, 40];
+
 let idCursor = 900000;
-export const b300Rows = (runUrl: string | null, hardware = 'b300') =>
-  REAL_CONFIGS.map(([conc, intvty, tput, e2el]) => ({
+export const b300Rows = (
+  runUrl: string | null,
+  hardware = 'b300',
+  configs: [number, number, number, number][] = REAL_CONFIGS,
+) =>
+  configs.map(([conc, intvty, tput, e2el]) => ({
     id: runUrl ? 0 : idCursor++,
     hardware,
     framework: 'sglang',
@@ -81,8 +96,18 @@ export const availability = [
   },
 ];
 
-/** Intercept availability + benchmarks + unofficial-run with the B300 fixture. */
-export const interceptOverlayRun = ({ overlayHardware = 'b300' } = {}) => {
+/**
+ * Intercept availability + benchmarks + unofficial-run with the B300 fixture.
+ * `overlayConfigs` overrides only the overlay run's rows, leaving the official
+ * rows as the standard five.
+ */
+export const interceptOverlayRun = ({
+  overlayHardware = 'b300',
+  overlayConfigs = REAL_CONFIGS,
+}: {
+  overlayHardware?: string;
+  overlayConfigs?: [number, number, number, number][];
+} = {}) => {
   cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', { body: b300Rows(null) }).as('benchmarks');
   cy.intercept('GET', '/api/unofficial-run*', {
@@ -100,7 +125,7 @@ export const interceptOverlayRun = ({ overlayHardware = 'b300' } = {}) => {
           isNonMainBranch: true,
         },
       ],
-      benchmarks: b300Rows(OVERLAY_RUN_URL, overlayHardware),
+      benchmarks: b300Rows(OVERLAY_RUN_URL, overlayHardware, overlayConfigs),
       evaluations: [],
     },
   }).as('unofficialRun');
