@@ -101,6 +101,21 @@ const ROWS: BenchmarkRow[] = [
   sweep('2026-02-01', 70, 380, { hardware: 'b200' }),
 ];
 
+/**
+ * Staggered ranges: the later, stronger config was only swept 45..90, so below 45 the
+ * fleet's own history after 2026-03-05 was never measured. Real run history looks like
+ * this constantly — `ROWS` does not, because its sweeps share ranges, which is why a
+ * monotonicity assertion over `ROWS` alone passes vacuously.
+ */
+const STAGGERED_ROWS: BenchmarkRow[] = [
+  sweep('2026-01-05', 20, 1000),
+  sweep('2026-01-05', 50, 700),
+  sweep('2026-01-05', 90, 300),
+  sweep('2026-03-05', 45, 1500),
+  sweep('2026-03-05', 70, 1100),
+  sweep('2026-03-05', 90, 800),
+];
+
 function groupsOf(rows: BenchmarkRow[] = ROWS) {
   return groupHistoryByHwKeyAndDate({
     rows,
@@ -344,23 +359,54 @@ describe('buildSurfaceGrid', () => {
       expect(grid.zs.at(-1)).toBeLessThanOrEqual(140 + 1e-9);
     });
 
+    it('holes the dates whose config was never measured at that slice', () => {
+      // Below 45 the fleet's history after 2026-03-05 is unmeasured, and must read as
+      // a hole rather than silently reverting to the config it replaced. Reverting is
+      // what puts two different configs on one date across slices.
+      const grid = build({
+        groups: groupsOf(STAGGERED_ROWS),
+        currentZ: 50,
+        zs: [25, 50, 80],
+        assumptions: { ...assumptions, rampMonths: 0 },
+      })!;
+      const chip = grid.chips.find((c) => c.key === 'b300')!;
+      const late = grid.times.findIndex((ms) => ms >= Date.parse('2026-06-01T00:00:00Z'));
+      expect(late).toBeGreaterThan(-1);
+      // z = 25 is inside the first config's range but outside the second's.
+      expect(chip.cells[0]![late]).toBeNull();
+      // z = 50 and 80 are inside both, so the late date is measured there.
+      expect(chip.cells[1]![late]).not.toBeNull();
+      expect(chip.cells[2]![late]).not.toBeNull();
+      // The early period is readable at z = 25, since the config then covered it.
+      const early = grid.times.findIndex((ms) => ms >= Date.parse('2026-02-01T00:00:00Z'));
+      expect(chip.cells[0]![early]).not.toBeNull();
+    });
+
     it('falls monotonically along z, because one config’s frontier does', () => {
-      // The payoff of holding the config fixed. A Pareto frontier trades throughput
-      // for interactivity monotonically, so with the rungs held still, revenue can
-      // only fall as users demand faster tokens — no cliffs, and every gap is a gap.
-      // (Guaranteed while the rung set is stable; a rung dropping out at some slice
-      // can only remove a level, and on this fixture the later rung is the stronger
-      // one at every readable slice.)
-      const grid = build({ metric: 'revenue' })!;
-      for (const chip of grid.chips) {
-        for (let ti = 0; ti < grid.times.length; ti += 1) {
-          const along = grid.zs
-            .map((_z, zi) => grid.chips.find((c) => c.key === chip.key)!.cells[zi]![ti])
-            .filter((v): v is number => v !== null);
-          for (let i = 1; i < along.length; i += 1) {
-            expect(along[i]!, `${chip.key} t=${ti} z=${i}`).toBeLessThanOrEqual(
-              along[i - 1]! + 1e-6,
-            );
+      // The payoff of holding the config fixed at every date. A Pareto frontier trades
+      // throughput for interactivity monotonically, so at a given date the value is
+      // one config's frontier read — or two blended by a ramp whose weights depend on
+      // the date alone. Either way it can only fall as users demand faster tokens.
+      // Any rise means a different config crept onto one slice.
+      //
+      // `STAGGERED_ROWS` is what makes this bite: reverting to a superseded config
+      // where the current one is unmeasured produces exactly such a rise.
+      for (const rows of [ROWS, STAGGERED_ROWS]) {
+        for (const currentZ of [50, 70]) {
+          const grid = build({ groups: groupsOf(rows), metric: 'revenue', currentZ });
+          if (!grid) continue;
+          for (const chip of grid.chips) {
+            for (let ti = 0; ti < grid.times.length; ti += 1) {
+              const along = chip.cells
+                .map((row) => row[ti]!)
+                .filter((v): v is number => v !== null);
+              for (let i = 1; i < along.length; i += 1) {
+                expect(
+                  along[i]!,
+                  `${chip.key} @z${currentZ} t=${ti} step ${i}`,
+                ).toBeLessThanOrEqual(along[i - 1]! + 1e-6);
+              }
+            }
           }
         }
       }

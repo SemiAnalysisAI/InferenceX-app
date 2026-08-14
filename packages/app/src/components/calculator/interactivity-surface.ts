@@ -444,6 +444,38 @@ export interface SurfaceGridOptions {
 
 const MS_PER_MONTH = (365.25 / 12) * 24 * 3600 * 1000;
 
+/**
+ * Rungs whose rollout starts from a level this slice cannot see.
+ *
+ * A config ramps up from whatever the fleet was already serving. If the config before
+ * it was never measured at this interactivity, that starting level is unknown here, so
+ * the ramp — and only the ramp — is not a real number. The plateau after it is this
+ * config's own rate and is fine.
+ *
+ * Contamination chains: a rung that ramps from a rung which was itself still ramping
+ * from an unmeasured level inherits the problem, but only while that earlier rollout
+ * was still climbing.
+ */
+function contaminatedRungs(
+  reads: readonly (FrontierRead | null)[],
+  months: readonly number[],
+  rampMonths: number,
+): boolean[] {
+  const suspect: boolean[] = [];
+  for (let i = 0; i < reads.length; i += 1) {
+    if (i === 0 || !reads[i]) {
+      suspect[i] = false;
+      continue;
+    }
+    if (!reads[i - 1]) {
+      suspect[i] = true;
+      continue;
+    }
+    suspect[i] = suspect[i - 1]! && months[i]! < months[i - 1]! + rampMonths;
+  }
+  return suspect;
+}
+
 /** Slices across the interactivity axis. Twenty reads as a surface without melting a laptop. */
 export const SLICE_COUNT = 20;
 
@@ -503,6 +535,10 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
       (_, i) => anchorMs + (horizonMonths * MS_PER_MONTH * i) / (TIME_SAMPLES - 1),
     );
   const monthOf = times.map((ms) => (ms - anchorMs) / MS_PER_MONTH);
+  const rampMonths =
+    Number.isFinite(assumptions.rampMonths) && assumptions.rampMonths > 0
+      ? assumptions.rampMonths
+      : 0;
 
   /** cells per chip, filled slice by slice. */
   const cellsByChip = new Map<string, (number | null)[][]>();
@@ -517,15 +553,24 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
     if (!specs) continue;
     if (steps.some((s) => s.disagg)) disaggByChip.set(baseGpu, true);
 
+    const rungMonths = steps.map(
+      (step) => (Date.parse(`${step.date}T00:00:00Z`) - anchorMs) / MS_PER_MONTH,
+    );
+
     for (let zi = 0; zi < zs.length; zi += 1) {
+      // The rungs' own sweeps, re-read at this interactivity. A rung whose sweep was
+      // never measured this fast or this slow has no value here — the fleet still ran
+      // that config, but nothing measured says what it did at this speed.
+      const reads = steps.map((step) => {
+        const read = step.frontier.read(zs[zi]!);
+        return read && read.value > 0 ? read : null;
+      });
+      if (reads.every((read) => read === null)) continue;
+
       const throughputSteps: ThroughputStep[] = [];
       let costPerHour: number | null = null;
-      for (const step of steps) {
-        // The rung's own sweep, re-read at this interactivity. A rung whose sweep was
-        // never measured this fast or this slow simply does not exist on this slice —
-        // the fleet still ran that config, but nothing says what it did here.
-        const read = step.frontier.read(zs[zi]!);
-        if (!read || !(read.value > 0)) continue;
+      for (const [i, read] of reads.entries()) {
+        if (!read) continue;
         const stats = computeFleetStats({
           mw,
           powerKwPerGpu: specs.powerKwPerGpu,
@@ -538,10 +583,7 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
         // Chip count and $/chip/hr come from the base GPU, so cost is flat across
         // both axes — the same invariant the 2D section relies on.
         costPerHour ??= stats.costPerHour;
-        throughputSteps.push({
-          month: (Date.parse(`${step.date}T00:00:00Z`) - anchorMs) / MS_PER_MONTH,
-          fleetTokPerSec: stats.fleetTokPerSec,
-        });
+        throughputSteps.push({ month: rungMonths[i]!, fleetTokPerSec: stats.fleetTokPerSec });
       }
       if (throughputSteps.length === 0 || costPerHour === null) continue;
 
@@ -553,6 +595,8 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
       });
       if (!series) continue;
 
+      const suspect = contaminatedRungs(reads, rungMonths, rampMonths);
+
       let cells = cellsByChip.get(baseGpu);
       if (!cells) {
         cells = Array.from({ length: zs.length }, () =>
@@ -562,7 +606,23 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
       }
       const row = cells[zi]!;
       for (let ti = 0; ti < monthOf.length; ti += 1) {
-        const value = valueAtMonth(series.points, monthOf[ti]!, (p) => metricValue(p, metric));
+        const month = monthOf[ti]!;
+        // Which config the fleet is running at this instant. Fixed by the timeline,
+        // so it is the same config on every slice — that is the whole rule.
+        let governing = -1;
+        for (let i = 0; i < rungMonths.length; i += 1) {
+          if (rungMonths[i]! <= month) governing = i;
+        }
+        if (governing < 0) continue;
+        // The config in effect here was never measured at this interactivity: a hole,
+        // not the previous config. Falling back would put a different config at this
+        // date on this slice than on the next one, which is the bug this guards.
+        if (!reads[governing]) continue;
+        // Still rolling out from a level this slice cannot see — the ramp would start
+        // from the wrong place. Once it completes, the level is this config's own.
+        if (suspect[governing] && month < rungMonths[governing]! + rampMonths) continue;
+
+        const value = valueAtMonth(series.points, month, (p) => metricValue(p, metric));
         if (value === null) continue;
         row[ti] = value;
         if (value < yMin) yMin = value;

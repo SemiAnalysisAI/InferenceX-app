@@ -522,9 +522,28 @@ want 20 tok/s/user and config B for users who want 120 — two fleets. It also p
 changes along z wherever the winner flips, and those cliffs read as economics when they
 are really the boundary of where a sweep happens to have been run.
 
+Fixing the winner is only half of it, and the other half is easy to miss. A rung whose
+sweep was never measured at some slice cannot contribute there — and if that date's cell
+then falls back to the config it replaced, the timeline changes with z again and the
+same bug is back one level down. It shows up as a **rippling** surface. So a date whose
+config is unmeasured at a slice is a **hole**, never the previous config. (Rollouts need
+one extra guard: a ramp climbs from whatever the fleet was serving before, so if the
+previous config is unmeasured at that slice the ramp — and only the ramp — is unknown
+too. `contaminatedRungs` computes that, including chains through rollouts that were
+themselves still climbing.)
+
+That is what makes the surface monotone in z, and monotonicity is the check worth
+running: at a fixed date the value is one config's frontier read, or two blended by a
+ramp whose weights depend on the date alone, so it can only fall as users demand faster
+tokens. Measured over the shipped fixture at four targets — ~33k live cells — the
+current code has **zero** violations; the fallback version had 79–132 per target, with
+jumps up to 440×.
+
 The cost of the honest rule has to be stated in the UI, and is: **away from the target,
 the surface is not the best that chip could do.** A config picked for 35 tok/s/user may
-be beaten at 120 by one the fleet passed over. The caption says so.
+be beaten at 120 by one the fleet passed over. The caption says so. It also costs
+coverage — about 12% of cells on the fixture become holes — which is the right trade:
+those cells were previously showing a config the fleet had already replaced.
 
 **Which way does the surface tilt along z?** Down, steeply, and that is the physics
 rather than a quirk of the fixture: chip count is fixed by the power budget and price is
