@@ -131,7 +131,7 @@ const STRINGS = {
       ' Unofficial runs loaded via a run link are not shown here — the run-history API serves ingested official results only.',
     metricLabel: 'Y Axis',
     metricTooltip:
-      'Which per-day rate to plot. Margin is revenue minus the flat fleet cost, so the break-even rule shows which side of it a fleet is on. Revenue drops the cost term, which makes the rollouts easier to compare across chips of very different cost — but a chip being higher no longer means it is more profitable.',
+      'What to plot. Margin is the per-day revenue minus the flat fleet cost, so the break-even rule shows which side of it a fleet is on. Revenue is the same rate with the cost term dropped, which makes rollouts easier to compare across chips of very different cost — but a chip being higher no longer means it is more profitable. Cumulative Revenue is the running total taken in since launch, not a rate; it compounds that caveat, because the largest area under a revenue curve may still never have covered its cost.',
     metricMargin: 'Margin',
     metricRevenue: 'Revenue',
     metricCumulativeRevenue: 'Cum. Revenue',
@@ -215,7 +215,7 @@ const STRINGS = {
       '通过运行链接加载的非官方运行不会显示在此——运行历史 API 仅提供已入库的官方结果。',
     metricLabel: 'Y 轴',
     metricTooltip:
-      '选择绘制哪一项日均指标。利润为收入减去水平的集群成本，因此保本线可显示集群位于其哪一侧。收入则不计成本项，便于在成本差异很大的 Chip 之间比较推广曲线——但此时位置更高并不代表更赚钱。',
+      '选择绘制的内容。利润为日均收入减去水平的集群成本，因此保本线可显示集群位于其哪一侧。收入为同一日均指标去掉成本项，便于在成本差异很大的 Chip 之间比较推广曲线——但此时位置更高并不代表更赚钱。累计收入是自上线以来的累计总额，而非日均指标；它进一步放大了上述注意事项——收入曲线下面积最大的 Chip 仍可能从未收回成本。',
     metricMargin: '利润',
     metricRevenue: '收入',
     metricCumulativeRevenue: '累计收入',

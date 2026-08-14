@@ -57,6 +57,17 @@ const stepX = () =>
 /** This chart's tooltip: a portal on <body>, keyed by chart id. */
 const readout = () => cy.get('[data-chart-tooltip="fleet-lifecycle"]');
 
+/**
+ * A table money cell as a number. Cells are compact ($1.2M, -$430k), so comparing
+ * their text lexically is meaningless — these have to be parsed to be compared.
+ */
+const money = (text: string): number => {
+  const match = /^(?<sign>-?)\$(?<value>[\d.]+)(?<suffix>[kMB])?/u.exec(text.trim());
+  if (!match?.groups) throw new Error(`not a money cell: ${text}`);
+  const scale = { k: 1e3, M: 1e6, B: 1e9 }[match.groups.suffix ?? ''] ?? 1;
+  return Number(match.groups.value) * scale * (match.groups.sign ? -1 : 1);
+};
+
 /** All text in the chart SVG, including the axis labels. */
 const chartText = () => cy.get('[data-testid="calculator-lifecycle-chart-svg"]').invoke('text');
 
@@ -335,17 +346,32 @@ describe('Calculator — Fleet Lifecycle', () => {
     cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should('exist');
   });
 
-  it('a longer horizon increases cumulative margin', () => {
+  it('a longer horizon accumulates more of whatever the daily margin is', () => {
+    // Direction, not just difference: a regression that moved this the wrong way
+    // would satisfy a bare `not.equal` while inverting the finding. The direction
+    // is not "up" — the price defaults to the cheapest chip's break-even, so the
+    // first row is typically losing money, and more months of a negative rate is a
+    // deeper hole. Reading the sign off the $/day column keeps the assertion true
+    // of the physics rather than of one fixture's profitability.
     cy.get('[data-testid="calc-lifecycle-horizon-input"]').clear();
     cy.get('[data-testid="calc-lifecycle-horizon-input"]').type('24');
-    firstRowCell(11)
+    firstRowCell(9)
       .invoke('text')
-      .then((short) => {
-        cy.get('[data-testid="calc-lifecycle-horizon-input"]').clear();
-        cy.get('[data-testid="calc-lifecycle-horizon-input"]').type('96');
+      .then((perDay) => {
+        const sign = Math.sign(money(perDay));
+        expect(sign, 'a non-zero daily margin to accumulate').to.not.equal(0);
         firstRowCell(11)
           .invoke('text')
-          .should((long) => expect(long).to.not.equal(short));
+          .then((short) => {
+            cy.get('[data-testid="calc-lifecycle-horizon-input"]').clear();
+            cy.get('[data-testid="calc-lifecycle-horizon-input"]').type('96');
+            firstRowCell(11)
+              .invoke('text')
+              .should((long) => {
+                const delta = (money(long) - money(short)) * sign;
+                expect(delta, 'cumulative margin moves with the daily rate').to.be.greaterThan(0);
+              });
+          });
       });
   });
 
@@ -375,9 +401,10 @@ describe('Calculator — Fleet Lifecycle', () => {
         .then((short) => {
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').type('18');
+          // "Earns less" is the claim, so assert less — not merely different.
           firstRowCell(11)
             .invoke('text')
-            .should((long) => expect(long).to.not.equal(short));
+            .should((long) => expect(money(long)).to.be.lessThan(money(short)));
           // Ramp 0 means configs take effect instantly — a pure staircase, which
           // needs far fewer vertices than the sampled curves.
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();

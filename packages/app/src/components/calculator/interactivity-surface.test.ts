@@ -18,7 +18,7 @@ import {
 } from './interactivity-surface';
 import { interpolateForGPU } from './interpolation';
 import { getTpPerMwForType } from './ThroughputBarChart';
-import type { InterpolatedResult } from './types';
+import type { CostType, InterpolatedResult } from './types';
 
 const MODE = 'interactivity_to_throughput' as const;
 const COST_PROVIDER = 'costh' as const;
@@ -114,6 +114,51 @@ const STAGGERED_ROWS: BenchmarkRow[] = [
   sweep('2026-03-05', 45, 1500),
   sweep('2026-03-05', 70, 1100),
   sweep('2026-03-05', 90, 800),
+];
+
+/**
+ * Three configs where the middle one is invisible at the slow slices: A covers 20..60,
+ * B only 45..90, C 20..90. At z = 30 that puts a hole in the middle of the fleet's own
+ * history; at z = 70 it removes the first rung, so there is no origin to integrate from.
+ * Both are ordinary shapes in real run history, and both are fatal to a running total.
+ */
+const HOLE_ROWS: BenchmarkRow[] = [
+  sweep('2026-01-05', 20, 1000),
+  sweep('2026-01-05', 40, 700),
+  sweep('2026-01-05', 60, 400),
+  sweep('2026-03-05', 45, 1500),
+  sweep('2026-03-05', 70, 1100),
+  sweep('2026-03-05', 90, 800),
+  sweep('2026-06-05', 20, 3000),
+  sweep('2026-06-05', 50, 2400),
+  sweep('2026-06-05', 90, 1600),
+];
+
+/** A sweep whose prefill:decode mix shifts along the frontier, as disagg runs do. */
+const mixRow = (interactivity: number, tputPerGpu: number, inputTput: number): BenchmarkRow =>
+  makeRow({
+    id: Math.round(interactivity * 1000 + tputPerGpu),
+    disagg: true,
+    conc: Math.round(tputPerGpu / interactivity),
+    metrics: {
+      median_intvty: interactivity,
+      tput_per_gpu: tputPerGpu,
+      input_tput_per_gpu: inputTput,
+      output_tput_per_gpu: tputPerGpu - inputTput,
+    },
+  });
+
+/**
+ * Total throughput falls 1000 → 800 → 600, so every point survives the Pareto pass,
+ * while the input share rises 300 → 550. The shipped fixture does this for real —
+ * `mi355x_mori-sglang` (8k/1k, 2026-05-28) rises 13× on input throughput mid-range.
+ * `sweep` cannot express it: it splits input/output 70/30 proportionally to total, so
+ * its input reads fall wherever total does.
+ */
+const DISAGG_MIX_ROWS: BenchmarkRow[] = [
+  mixRow(20, 1000, 300),
+  mixRow(60, 800, 500),
+  mixRow(100, 600, 550),
 ];
 
 function groupsOf(rows: BenchmarkRow[] = ROWS) {
@@ -382,12 +427,16 @@ describe('buildSurfaceGrid', () => {
       expect(chip.cells[0]![early]).not.toBeNull();
     });
 
-    it('falls monotonically along z, because one config’s frontier does', () => {
-      // The payoff of holding the config fixed at every date. A Pareto frontier trades
-      // throughput for interactivity monotonically, so at a given date the value is
-      // one config's frontier read — or two blended by a ramp whose weights depend on
-      // the date alone. Either way it can only fall as users demand faster tokens.
-      // Any rise means a different config crept onto one slice.
+    it('falls monotonically along z under total-token pricing, because the frontier y does', () => {
+      // The payoff of holding the config fixed at every date — and a guarantee rather
+      // than a tendency, but only for `costType: 'total'` (which `COST_TYPE` pins),
+      // where the throughput read IS the Pareto frontier's own y axis. A Pareto
+      // frontier trades throughput for interactivity monotonically, so at a given date
+      // the value is one config's frontier read — or two blended by a ramp whose
+      // weights depend on the date alone. Either way it can only fall as users demand
+      // faster tokens. Any rise means a different config crept onto one slice.
+      // Input/output reads are not that axis and carry no such guarantee; the disagg
+      // test below pins that difference.
       //
       // `STAGGERED_ROWS` is what makes this bite: reverting to a superseded config
       // where the current one is unmeasured produces exactly such a rise.
@@ -410,6 +459,74 @@ describe('buildSurfaceGrid', () => {
           }
         }
       }
+    });
+
+    it('makes no such promise for input-token pricing, where the disagg mix shifts', () => {
+      // Same grid, two pricings. For total tokens the read is the frontier's own y
+      // axis and falling is a theorem. For input tokens it is not: this sweep's input
+      // tok/s/chip rises 300 → 550 across its measured range while total falls, so the
+      // surface honestly rises with it. That is measured data, not a config leaking
+      // across slices — the one-config-per-date rule still holds; the priced token mix
+      // is what moves. If this test ever fails because the input grid became monotone,
+      // the caveat in the module header and the docs is stale, not vindicated.
+      const risesAlongZ = (costType: CostType): number => {
+        const grid = buildSurfaceGrid({
+          groups: groupHistoryByHwKeyAndDate({
+            rows: DISAGG_MIX_ROWS,
+            sequence: Sequence.OneK_OneK,
+            precisions: ['fp4'],
+          }),
+          mode: MODE,
+          metric: 'revenue',
+          costProvider: COST_PROVIDER,
+          costType,
+          mw: 10,
+          anchorMs,
+          horizonMonths: 12,
+          assumptions,
+          currentZ: 60,
+          labelFor: (key) => key.toUpperCase(),
+          colorFor: () => '#123456',
+          specsFor: () => ({ powerKwPerGpu: 1.2, costPerGpuHour: 3 }),
+        })!;
+        let rises = 0;
+        for (const chip of grid.chips) {
+          for (let ti = 0; ti < grid.times.length; ti += 1) {
+            const along = chip.cells.map((row) => row[ti]!).filter((v): v is number => v !== null);
+            for (let i = 1; i < along.length; i += 1) {
+              if (along[i]! > along[i - 1]! + 1e-6) rises += 1;
+            }
+          }
+        }
+        return rises;
+      };
+      expect(risesAlongZ('total')).toBe(0);
+      expect(risesAlongZ('input')).toBeGreaterThan(0);
+    });
+
+    it('holes a rollout that would ramp from a level this slice never measured', () => {
+      // `contaminatedRungs` only bites with a non-zero ramp, which every other grid
+      // test sets to 0 — so without this the whole suppression is dead code. At z = 25
+      // the first config is readable and the second is not, so the third ramps from a
+      // level this slice cannot see: its ramp window is a hole, and the plateau after
+      // it — the config's own rate — is not.
+      const rampMonths = 3;
+      const grid = build({
+        groups: groupsOf(HOLE_ROWS),
+        metric: 'revenue',
+        zs: [25, 50],
+        currentZ: 50,
+        assumptions: { ...assumptions, rampMonths },
+      })!;
+      const row = grid.chips.find((c) => c.key === 'b300')!.cells[0]!;
+      const rungMs = Date.parse('2026-06-05T00:00:00Z');
+      const rampEndMs = rungMs + rampMonths * 30.436875 * 24 * 3600 * 1000;
+      const during = grid.times.findIndex((ms) => ms >= rungMs && ms < rampEndMs);
+      const after = grid.times.findIndex((ms) => ms >= rampEndMs);
+      expect(during).toBeGreaterThan(-1);
+      expect(after).toBeGreaterThan(-1);
+      expect(row[during]).toBeNull();
+      expect(row[after]).not.toBeNull();
     });
 
     // That the slice at the target IS the 2D chart's line needs no test of its own:
@@ -478,6 +595,74 @@ describe('buildSurfaceGrid', () => {
       }
       // Never negative: no cost is subtracted from it.
       expect(grid.yMin).toBe(0);
+    });
+
+    it('plots cumulative revenue, not cumulative margin', () => {
+      // Shape alone cannot tell the two apart — both climb with time and fall along
+      // z — so this pins the quantity: at zero price there is no revenue to
+      // accumulate and every live cell is exactly zero, while cumulative margin
+      // would be the fleet's cost, deeply negative.
+      const grid = build({
+        metric: 'cumulativeRevenue',
+        assumptions: { ...assumptions, pricePerMTok: 0 },
+      })!;
+      const values = grid.chips
+        .flatMap((c) => c.cells.flat())
+        .filter((v): v is number => v !== null);
+      expect(values.length).toBeGreaterThan(0);
+      for (const v of values) expect(v).toBe(0);
+    });
+
+    it('ends a running total at its first gap instead of resuming after it', () => {
+      // A rate cell depends only on the config governing at that instant, so it can
+      // honestly resume once the fleet reaches a config this slice can see. A total
+      // cannot: the interval it skipped is inside every later value. Left to resume,
+      // the cells after the gap integrate the *previous* config's rate across a window
+      // the fleet actually spent on a faster one — on this fixture an understatement
+      // of ≥ $1.72B, ≥ 7.7% of the total, presented as a measured number.
+      const grid = build({
+        groups: groupsOf(HOLE_ROWS),
+        metric: 'cumulativeRevenue',
+        zs: [30, 50, 70],
+        currentZ: 50,
+      })!;
+      const cells = grid.chips.find((c) => c.key === 'b300')!.cells;
+
+      // z = 30: the middle config was never swept this slow, so the row ends there.
+      const row = cells[0]!;
+      const first = row.findIndex((v) => v !== null);
+      expect(first).toBeGreaterThan(-1);
+      const gap = row.findIndex((v, i) => i > first && v === null);
+      expect(gap).toBeGreaterThan(first);
+      expect(row.slice(gap).every((v) => v === null)).toBe(true);
+
+      // z = 70: the first rung is missing, so there is no origin and no total.
+      expect(cells[2]!.every((v) => v === null)).toBe(true);
+
+      // A fully covered slice is untouched by any of this.
+      expect(cells[1]!.some((v) => v !== null)).toBe(true);
+    });
+
+    it('lets the rates resume after a gap, because a rate carries no history', () => {
+      // The other half of the rule above: truncation is for running totals only.
+      // Holing a rate cell after the fleet has reached a measured config would be
+      // discarding a number the data fully supports.
+      for (const metric of ['margin', 'revenue'] as const) {
+        const grid = build({
+          groups: groupsOf(HOLE_ROWS),
+          metric,
+          zs: [30, 50, 70],
+          currentZ: 50,
+        })!;
+        const row = grid.chips.find((c) => c.key === 'b300')!.cells[0]!;
+        const first = row.findIndex((v) => v !== null);
+        const gap = row.findIndex((v, i) => i > first && v === null);
+        expect(gap, metric).toBeGreaterThan(first);
+        expect(
+          row.slice(gap).some((v) => v !== null),
+          metric,
+        ).toBe(true);
+      }
     });
 
     it('keeps revenue non-negative, so zero is the floor rather than a threshold', () => {

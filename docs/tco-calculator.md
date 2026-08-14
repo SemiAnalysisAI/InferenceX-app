@@ -544,12 +544,14 @@ previous config is unmeasured at that slice the ramp — and only the ramp — i
 too. `contaminatedRungs` computes that, including chains through rollouts that were
 themselves still climbing.)
 
-That is what makes the surface monotone in z, and monotonicity is the check worth
-running: at a fixed date the value is one config's frontier read, or two blended by a
-ramp whose weights depend on the date alone, so it can only fall as users demand faster
-tokens. Measured over the shipped fixture at four targets — ~33k live cells — the
-current code has **zero** violations; the fallback version had 79–132 per target, with
-jumps up to 440×.
+That is what makes the surface monotone in z **under total-token pricing**, and
+monotonicity is the check worth running there: at a fixed date the value is one config's
+frontier read, or two blended by a ramp whose weights depend on the date alone, so it
+can only fall as users demand faster tokens. Measured over the shipped fixture at four
+targets with total-token pricing — ~33k live cells — the current code has **zero**
+violations; the fallback version had 79–132 per target, with jumps up to 440×. At
+input-token pricing the same grids legitimately contain rises (below), so monotonicity
+is a valid regression check for `costType: 'total'` only.
 
 The cost of the honest rule has to be stated in the UI, and is: **away from the target,
 the surface is not the best that chip could do.** A config picked for 35 tok/s/user may
@@ -557,13 +559,37 @@ be beaten at 120 by one the fleet passed over. The caption says so. It also cost
 coverage — about 12% of cells on the fixture become holes — which is the right trade:
 those cells were previously showing a config the fleet had already replaced.
 
-**Which way does the surface tilt along z?** Down, steeply, and that is the physics
-rather than a quirk of the fixture: chip count is fixed by the power budget and price is
-one scalar, so revenue tracks tok/s/chip — and on the Pareto frontier that _falls_ as
-interactivity rises, because faster tokens per user means smaller batches. Measured
-across the shipped fixture's 197 sweeps, tok/s/chip is lower at the top of the
-frontier's own range than at the bottom in 160, unchanged in the 37 single-point
-frontiers, and **higher in none**.
+**Which way does the surface tilt along z?** For total-token pricing, down — and that is
+a theorem, not a measurement: chip count is fixed by the power budget and price is one
+scalar, so revenue tracks tok/s/chip, and for total tokens that number is the Pareto
+frontier's own y axis, which `paretoFrontUpperLeft` constructs strictly decreasing in
+interactivity. The fixture agrees because it must: across the shipped fixture's 197
+sweeps (1k/1k, fp8 + fp4), tok/s/chip falls across the frontier's own range in all 160
+multi-point frontiers and is flat in the 37 single-point ones.
+
+For input- and output-token pricing the guarantee does not exist. Those throughput reads
+are not the axis the frontier is built on (`tputOf` returns `inputThroughput` /
+`outputThroughput`, while the frontier is built on total), and on disaggregated sweeps
+the prefill:decode mix shifts along the frontier, so input tok/s/chip can rise as
+interactivity rises. On the same fixture, 12 sweeps rise on input throughput inside
+their range (worst: `mi355x_mori-sglang`, 8k/1k, 2026-05-28, +13× mid-range), one rises
+end to end (`b300_dynamo-trt`, 1k/1k, 2026-02-07: 6,710 → 8,818 tok/s/chip), and grids
+built at input pricing carry z-rises of up to ~4% per slice step. This is reachable in
+the shipped product — the Token Type dropdown feeds the surface directly, though it is
+not a URL param, so a shared link always reopens at total. Such a rise is measured data,
+not a config leaking across slices: the one-config-per-date rule still holds; it is the
+priced token mix that moves.
+
+**A running total cannot span a hole.** The rate metrics resume after a gap, correctly:
+a rate at a given date depends only on the config governing then. A running total does
+not — it contains every interval before it, and where a rung the fleet actually ran is
+missing from a slice's timeline, `computeLifecycle` integrates that window at the
+previous config's rate, which the staircase says was slower. On a 12-month window with
+one 3-month hole that understates the total by ≥ $1.72B, ≥ 7.7%, in every later cell,
+with nothing on screen to say so. So a cumulative row ends at its first gap, and a slice
+missing its _first_ rung shows nothing at all — otherwise the totals compared along z
+would cover different windows (9.88 months against 11.80 on the test fixture), which is
+not a comparison. Rates are deliberately left alone.
 
 Holding the config fixed is what lets that read cleanly, and is the strongest argument
 for the rule. With a per-slice winner the same fixture jumps 5,009 → 14,275 tok/s

@@ -51,12 +51,30 @@
  *    that way is ~160k spline builds. So this prepares each frontier once and
  *    reads it at every slice — and only for the three metrics a fleet needs.
  *
- * **Which way does the surface tilt along z?** Down, and steeply. Chip count is
- * fixed by the power budget and price is one scalar, so revenue tracks tok/s/chip —
- * and on the Pareto frontier that falls as interactivity rises, because faster
- * tokens per user means smaller batches. Measured on the shipped fixture: of 197
- * sweeps, tok/s/chip is lower at the top of the frontier's own range than at the
- * bottom in 160, unchanged in the 37 single-point frontiers, and **higher in none**.
+ * **Which way does the surface tilt along z?** For total-token pricing: down, and
+ * guaranteed. Chip count is fixed by the power budget and price is one scalar, so
+ * revenue tracks the throughput read — and for `costType === 'total'` that read is
+ * the Pareto frontier's own y axis, which `paretoFrontUpperLeft` constructs strictly
+ * decreasing in interactivity. That is a theorem about the selection, not an
+ * observation about the data: on the shipped fixture (1k/1k, fp8 + fp4, 197 sweeps)
+ * all 160 multi-point frontiers fall across their own range and the 37 singletons are
+ * flat, because they cannot do anything else.
+ *
+ * For input- or output-token pricing there is **no such guarantee**: those reads are
+ * not the axis the frontier is built on, and on disaggregated sweeps the
+ * prefill:decode mix shifts along the frontier, so input tok/s/chip can genuinely
+ * rise with interactivity. The shipped fixture does it — `mi355x_mori-sglang`
+ * (8k/1k, 2026-05-28) rises 13× mid-range on input throughput — and grids built at
+ * `costType === 'input'` carry z-rises of up to ~4% per slice step. A rise there is
+ * measured data, not a config leaking across slices: the one-config-per-date rule
+ * still holds; it is the priced token mix that moves.
+ *
+ * **A running total cannot span a hole.** Where a rung the fleet ran is missing from
+ * a slice's timeline, the integral across that window is the previous config's rate
+ * standing in for a faster one, and every later total carries the error invisibly. So
+ * cumulative rows stop at their first gap, and a slice missing its first rung shows
+ * nothing at all. The rates are left to resume after a gap, because a rate depends
+ * only on the config governing at that instant.
  *
  * Holding the config fixed is what lets that read cleanly. With a per-slice winner
  * the same fixture jumps 5,009 → 14,275 tok/s between the 15.1 and 18.5 tok/s/user
@@ -83,6 +101,7 @@ import type { HistoryGroups } from './historical-best';
 import { hermiteInterpolate, monotoneSlopes, paretoFrontUpperLeft } from './interpolation';
 import {
   computeLifecycle,
+  isCumulative,
   metricValue,
   valueAtMonth,
   type LifecycleAssumptions,
@@ -568,6 +587,11 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
       if (reads.every((read) => read === null)) continue;
 
       const throughputSteps: ThroughputStep[] = [];
+      // Which rungs actually reached the integrated timeline. Keyed off the push
+      // below rather than off `reads`, because a readable rung is still dropped
+      // when it cannot be sized — and the integral is what a running total must
+      // be judged against, not the reads it was built from.
+      const onTimeline = reads.map(() => false);
       let costPerHour: number | null = null;
       for (const [i, read] of reads.entries()) {
         if (!read) continue;
@@ -583,6 +607,7 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
         // Chip count and $/chip/hr come from the base GPU, so cost is flat across
         // both axes — the same invariant the 2D section relies on.
         costPerHour ??= stats.costPerHour;
+        onTimeline[i] = true;
         throughputSteps.push({ month: rungMonths[i]!, fleetTokPerSec: stats.fleetTokPerSec });
       }
       if (throughputSteps.length === 0 || costPerHour === null) continue;
@@ -597,6 +622,19 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
 
       const suspect = contaminatedRungs(reads, rungMonths, rampMonths);
 
+      // A running total inherits every interval before it. Where a rung the fleet
+      // actually ran is missing from this slice's timeline, the integral across that
+      // window is a fiction — the previous config's rate standing in for one the
+      // staircase says was faster — and every later total silently carries it. A rate
+      // can honestly resume after such a gap, because it depends only on the config
+      // governing at that instant; a total cannot. So a cumulative row stops at its
+      // first gap, and a slice missing its first rung has no origin to integrate from
+      // and shows nothing at all. Otherwise the totals compared along z would cover
+      // different windows, which is not a comparison.
+      const firstGap = onTimeline.indexOf(false);
+      const truncateFrom =
+        isCumulative(metric) && firstGap !== -1 ? rungMonths[firstGap]! : Number.POSITIVE_INFINITY;
+
       let cells = cellsByChip.get(baseGpu);
       if (!cells) {
         cells = Array.from({ length: zs.length }, () =>
@@ -607,6 +645,7 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
       const row = cells[zi]!;
       for (let ti = 0; ti < monthOf.length; ti += 1) {
         const month = monthOf[ti]!;
+        if (month >= truncateFrom) continue;
         // Which config the fleet is running at this instant. Fixed by the timeline,
         // so it is the same config on every slice — that is the whole rule.
         let governing = -1;
