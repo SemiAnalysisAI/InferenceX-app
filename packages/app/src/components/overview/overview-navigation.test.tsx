@@ -41,7 +41,12 @@ function pageData(tier: OverviewTier): OverviewPageData {
 function Probe() {
   const navigation = useOverviewNavigation();
   selectTier = () => navigation.push('/overview?tier=75', ['tier']);
-  return <output data-testid="tier">{navigation.data.tier}</output>;
+  return (
+    <>
+      <output data-testid="tier">{navigation.data.tier}</output>
+      <output data-testid="pending">{String(navigation.pending)}</output>
+    </>
+  );
 }
 
 function renderProvider(data: OverviewPageData, href: string) {
@@ -97,5 +102,60 @@ describe('OverviewNavigationProvider', () => {
     });
 
     expect(container.querySelector('[data-testid="tier"]')?.textContent).toBe('100');
+  });
+
+  it('reports pending only while a selector response is in flight', async () => {
+    let resolveSelectorRequest: ((response: Response) => void) | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveSelectorRequest = resolve;
+          }),
+      ),
+    );
+
+    renderProvider(pageData(50), '/overview');
+    const pending = () => container.querySelector('[data-testid="pending"]')?.textContent;
+    expect(pending()).toBe('false');
+
+    act(() => selectTier?.());
+    expect(pending()).toBe('true');
+
+    await act(async () => {
+      resolveSelectorRequest?.(Response.json(pageData(75)));
+      await Promise.resolve();
+    });
+
+    expect(pending()).toBe('false');
+    expect(container.querySelector('[data-testid="tier"]')?.textContent).toBe('75');
+  });
+
+  it('clears pending when the selector request fails', async () => {
+    let rejectSelectorRequest: ((reason: Error) => void) | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((_resolve, reject) => {
+            rejectSelectorRequest = reject;
+          }),
+      ),
+    );
+
+    renderProvider(pageData(50), '/overview');
+    act(() => selectTier?.());
+    expect(container.querySelector('[data-testid="pending"]')?.textContent).toBe('true');
+
+    await act(async () => {
+      rejectSelectorRequest?.(new Error('offline'));
+      await Promise.resolve();
+    });
+
+    // The failed selection falls back to a router navigation; the matrix must
+    // not be left permanently dimmed over the data it still shows.
+    expect(container.querySelector('[data-testid="pending"]')?.textContent).toBe('false');
+    expect(container.querySelector('[data-testid="tier"]')?.textContent).toBe('50');
   });
 });
