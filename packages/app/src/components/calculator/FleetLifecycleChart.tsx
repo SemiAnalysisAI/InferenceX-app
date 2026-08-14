@@ -112,7 +112,9 @@ interface FleetLifecycleChartProps {
     config: string;
     marginPerDay: string;
     revenuePerDay: string;
+    cumulativeRevenue: string;
     costPerDay: string;
+    /** Names the running total column, which is cumulative *margin* whatever the y axis plots. */
     cumulative: string;
     sinceFirst: string;
     runLink: string;
@@ -543,7 +545,12 @@ const FleetLifecycleChart = React.memo(
           }
           readings.sort((a, b) => b.value - a.value);
 
-          const valueHeader = metric === 'revenue' ? labels.revenuePerDay : labels.marginPerDay;
+          const valueHeader =
+            metric === 'revenue'
+              ? labels.revenuePerDay
+              : metric === 'cumulativeRevenue'
+                ? labels.cumulativeRevenue
+                : labels.marginPerDay;
           const rows = readings
             .map(
               (r) =>

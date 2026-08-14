@@ -359,25 +359,37 @@ before appending. The chart re-renders into the same zoom group, so appending
 unconditionally leaves a stale rule and a duplicate "break-even" label behind at
 the previous y-scale on every data change.
 
-### Y-axis selector (margin / revenue)
+### Y-axis selector (margin / revenue / cumulative revenue)
 
-`c_ly` switches the chart between margin/day (default) and revenue/day. The table
-is unchanged — it already carries both columns — so this only affects the plot.
+`c_ly` switches the chart between margin/day (default), revenue/day, and cumulative
+revenue. The table is unchanged — it already carries both rates and cumulative
+margin — so this only affects the plot.
 
-Two things move with it, and both matter for honesty:
+Three things move with it, and they all matter for honesty:
 
 - **The break-even rule is drawn only for margin.** Zero is break-even on a margin
   axis; on a revenue axis it is just the bottom of the scale, and each chip breaks
   even at its **own** cost line rather than at zero revenue. Labelling the zero
   gridline "break-even" there would be false, so `renderZeroRule` returns early.
   Per-chip cost rules would be the honest equivalent but add one horizontal line
-  per series, which is why they are not drawn.
-- **The readout's value column follows the plotted rate**, with cumulative margin
-  beside it, so it never depends on the axis to be read.
+  per series, which is why they are not drawn. Cumulative revenue is the same case:
+  a running total that starts at zero and only grows.
+- **The readout's value column follows the plotted quantity**, with cumulative
+  margin beside it, so it never depends on the axis to be read.
+- **Cumulative revenue is accumulated, not derived.** `LifecyclePoint` carries a
+  second running total, `cumulativeRevenue`, integrated by the same trapezoid over
+  the same intervals as `cumulative` (cumulative margin). It is tempting to
+  reconstruct it as `cumulative + costPerDay × elapsed`, and that identity holds
+  only when every interval carries the same flat cost — which is true today but is
+  a property of the assumptions, not of the shape. Accumulating both keeps the two
+  curves exactly one flat cost apart by construction, which is what makes them
+  comparable, and `isCumulative(metric)` is what the axis formatting and the
+  break-even suppression key off rather than a per-metric special case.
 
 Revenue mode is for comparing rollout _shapes_ across chips whose costs differ a
-lot; a chip sitting higher there does not mean it is more profitable. The control's
-tooltip says so.
+lot; a chip sitting higher there does not mean it is more profitable. Cumulative
+revenue compounds that caveat — a chip with the largest area under its revenue
+curve may still never have covered its cost. The control's tooltip says so.
 
 ### One line layer, interpolated linearly
 
@@ -579,9 +591,13 @@ Five decisions that are easy to get wrong, and why:
   the zero contour is a real answer: where this fleet, at the price you set, stops
   losing money.
 - **The y axis is the 2D chart's selector, not a second control.** `SurfaceGrid` carries
-  its own `metric`, so a view cannot label an axis with one rate and draw another — and
-  the break-even plane is suppressed on a revenue grid, where nothing is subtracted and
-  zero is the floor rather than a threshold anything crosses. The unit tests pin the
+  its own `metric` — margin, revenue, or cumulative revenue — so a view cannot label an
+  axis with one quantity and draw another; the break-even plane is drawn only on a
+  margin grid, since on the other two nothing is subtracted and zero is the floor rather
+  than a threshold anything crosses. On a cumulative grid the surface rises along time
+  and still falls along z, which is the same finding the rate surfaces show, integrated:
+  faster tokens per user buy fewer tokens per chip, so the area under the curve shrinks
+  too. The unit tests pin the
   relationship: the two grids differ by exactly the flat cost, in every live cell, and
   their holes fall in identical places, because coverage is a property of the run
   history and not of which rate is plotted.
@@ -751,7 +767,10 @@ exclusion in its own note rather than leaving a silent gap.
 
 ### URL params
 
-`c_price`, `c_life` (horizon), `c_ramp`, `c_mtbi`, `c_rec`, `c_ly` (y-axis metric). The first two default to
+`c_price`, `c_life` (horizon), `c_ramp`, `c_mtbi`, `c_rec`, `c_ly` (y-axis metric —
+`margin` | `revenue` | `cumulativeRevenue`, parsed against that allowlist so a stale
+or hand-edited link falls back to `margin` rather than seeding an unknown metric).
+The first two default to
 `''` in `PARAM_DEFAULTS` because their real defaults are derived, not constant — see
 the comment there. The MW budget is
 `c_mw`, owned by `ThroughputCalculatorDisplay` and passed to both the fleet

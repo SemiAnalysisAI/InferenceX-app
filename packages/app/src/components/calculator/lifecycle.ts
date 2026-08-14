@@ -103,6 +103,17 @@ export interface LifecyclePoint {
   margin: number;
   /** Cumulative margin from the first step to here, $. */
   cumulative: number;
+  /**
+   * Cumulative *revenue* from the first step to here, $ — the area under the
+   * revenue curve, with no cost subtracted.
+   *
+   * Separate from `cumulative` rather than derived from it, because
+   * `cumulative + cost x elapsed` only reproduces it when the two are integrated
+   * over identical intervals, and a caller reading at an arbitrary month has no
+   * elapsed term to hand. Accumulated by the same trapezoid rule so the two agree
+   * exactly at every sample.
+   */
+  cumulativeRevenue: number;
   /** True at the instant a new config takes effect — the riser of the step. */
   isStep: boolean;
   /** True while a rollout is still climbing, i.e. not yet at its config's rate. */
@@ -159,15 +170,28 @@ export interface LifecycleSeries {
 }
 
 /**
- * Which rate a view plots. Revenue is the gross line; margin subtracts the flat
- * cost. Lives here rather than in a chart component because both the 2D chart and
- * the 3D surface select on it, and the surface's grid builder is pure.
+ * What a view plots. `margin` and `revenue` are rates in $/day; `cumulativeRevenue`
+ * is the area under the revenue curve since the fleet's first config, in $.
+ *
+ * Lives here rather than in a chart component because both the 2D chart and the 3D
+ * surface select on it, and the surface's grid builder is pure.
+ *
+ * Note the unit change: a caller that formats an axis or a tooltip must ask
+ * `isCumulative` rather than assume $/day, and anything anchored to zero as
+ * break-even (the 2D rule, the 3D plane) applies to `margin` alone.
  */
-export type LifecycleMetric = 'margin' | 'revenue';
+export type LifecycleMetric = 'margin' | 'revenue' | 'cumulativeRevenue';
 
-/** The rate a metric names, for reading off a sampled point. */
+/** True when the metric is a running total in $ rather than a rate in $/day. */
+export function isCumulative(metric: LifecycleMetric): boolean {
+  return metric === 'cumulativeRevenue';
+}
+
+/** The quantity a metric names, for reading off a sampled point. */
 export function metricValue(point: LifecyclePoint, metric: LifecycleMetric): number {
-  return metric === 'revenue' ? point.revenue : point.margin;
+  if (metric === 'revenue') return point.revenue;
+  if (metric === 'cumulativeRevenue') return point.cumulativeRevenue;
+  return point.margin;
 }
 
 /**
@@ -383,6 +407,7 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
 
   const points: LifecyclePoint[] = [];
   let cumulative = 0;
+  let cumulativeRevenue = 0;
   let paybackMonth: number | null = null;
 
   const revenueOf = (sample: { level: number }) =>
@@ -398,10 +423,14 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
       // trapezoid the revenue and subtract the flat cost. Sample density is what
       // makes this accurate; a forced vertical shares its month with the previous
       // sample and so contributes nothing.
-      const margin = (revenueOf(prev) + revenue) / 2 - costPerDay;
+      const meanRevenue = (revenueOf(prev) + revenue) / 2;
+      const margin = meanRevenue - costPerDay;
       const days = (here.month - prev.month) * DAYS_PER_MONTH;
       const before = cumulative;
       cumulative += margin * days;
+      // Same interval, same trapezoid: the two running totals stay exactly one
+      // flat cost apart, which is what makes them comparable on one chart.
+      cumulativeRevenue += meanRevenue * days;
       if (paybackMonth === null && before <= 0 && cumulative > 0 && margin > 0) {
         // -before / margin is the days still owed at `prev`; convert to months.
         paybackMonth = prev.month + -before / margin / DAYS_PER_MONTH;
@@ -413,6 +442,7 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
       cost,
       margin: revenue - cost,
       cumulative,
+      cumulativeRevenue,
       isStep: here.isStep,
       isRamp: here.isRamp,
     });

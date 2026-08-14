@@ -319,6 +319,17 @@ describe('Calculator — Fleet Lifecycle', () => {
       '-$',
     );
 
+    // Cumulative revenue is a running total in $, not a rate in $/day. Zero is
+    // where every chip starts rather than a threshold anything crosses, so the
+    // break-even rule stays off here too. (The axis does carry one negative tick:
+    // the domain is padded 5% below its floor, which on a tens-of-millions span
+    // rounds to a visible one. That is scale padding, not plotted data.)
+    cy.get('[data-testid="calc-lifecycle-metric-cumulative-revenue"]').click();
+    chartText().should('contain', 'Cumulative Revenue ($)');
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should(
+      'not.exist',
+    );
+
     cy.get('[data-testid="calc-lifecycle-metric-margin"]').click();
     chartText().should('contain', 'Margin ($/day)');
     cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should('exist');

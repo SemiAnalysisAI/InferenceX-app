@@ -33,15 +33,19 @@ const STRINGS = {
     axisTime: 'Date',
     axisValue: 'Margin ($/day)',
     axisValueRevenue: 'Revenue ($/day)',
+    axisValueCumulativeRevenue: 'Cumulative Revenue ($)',
     axisInteractivity: 'Interactivity (tok/s/user)',
     tipMargin: 'Margin/day',
     tipRevenue: 'Revenue/day',
+    tipCumulativeRevenue: 'Cumulative revenue',
     tipInteractivity: 'Interactivity',
     tipNearest: 'nearest measured sample',
     ariaSummary:
       'Three-dimensional surface: fleet margin per day over time and target interactivity, one surface per chip. Rotatable.',
     ariaSummaryRevenue:
       'Three-dimensional surface: fleet revenue per day over time and target interactivity, one surface per chip. Rotatable.',
+    ariaSummaryCumulativeRevenue:
+      'Three-dimensional surface: cumulative fleet revenue over time and target interactivity, one surface per chip. Rotatable.',
     currentSlice: 'Slider interactivity',
     fixedHere:
       'configs are fixed at this slice, so elsewhere this is that fleet read faster or slower — not the best config for that speed',
@@ -58,14 +62,18 @@ const STRINGS = {
     axisTime: '日期',
     axisValue: '利润 ($/天)',
     axisValueRevenue: '收入 ($/天)',
+    axisValueCumulativeRevenue: '累计收入 ($)',
     axisInteractivity: '交互性 (tok/s/user)',
     tipMargin: '每日利润',
     tipRevenue: '每日收入',
+    tipCumulativeRevenue: '累计收入',
     tipInteractivity: '交互性',
     tipNearest: '最近的实测样本',
     ariaSummary: '三维曲面：集群每日利润随时间与目标交互性的变化，每款 Chip 一个曲面，可旋转。',
     ariaSummaryRevenue:
       '三维曲面：集群每日收入随时间与目标交互性的变化，每款 Chip 一个曲面，可旋转。',
+    ariaSummaryCumulativeRevenue:
+      '三维曲面：集群累计收入随时间与目标交互性的变化，每款 Chip 一个曲面，可旋转。',
     currentSlice: '滑块交互性',
     fixedHere:
       '配置在此切片上确定，因此在其他位置呈现的是同一批配置按不同速度读取的结果，而非该速度下的最优配置',
@@ -148,9 +156,24 @@ export default function FleetLifecycleSurface({
    * Which rate the grid holds. Read off the grid rather than taken as its own prop,
    * so the axis title cannot end up naming a metric the cells do not contain.
    */
-  const revenue = grid.metric === 'revenue';
-  const axisValue = revenue ? t.axisValueRevenue : t.axisValue;
-  const tipValue = revenue ? t.tipRevenue : t.tipMargin;
+  const axisValue =
+    grid.metric === 'revenue'
+      ? t.axisValueRevenue
+      : grid.metric === 'cumulativeRevenue'
+        ? t.axisValueCumulativeRevenue
+        : t.axisValue;
+  const tipValue =
+    grid.metric === 'revenue'
+      ? t.tipRevenue
+      : grid.metric === 'cumulativeRevenue'
+        ? t.tipCumulativeRevenue
+        : t.tipMargin;
+  const ariaSummary =
+    grid.metric === 'revenue'
+      ? t.ariaSummaryRevenue
+      : grid.metric === 'cumulativeRevenue'
+        ? t.ariaSummaryCumulativeRevenue
+        : t.ariaSummary;
 
   const scales = useMemo(
     () => makeScales({ times: grid.times, zs: grid.zs, yMin: grid.yMin, yMax: grid.yMax }),
@@ -282,7 +305,7 @@ export default function FleetLifecycleSurface({
         className={`relative ${CANVAS_HEIGHT} w-full select-none overflow-hidden rounded-md`}
         data-testid="calculator-lifecycle-surface"
         role="img"
-        aria-label={revenue ? t.ariaSummaryRevenue : t.ariaSummary}
+        aria-label={ariaSummary}
       >
         <Canvas
           frameloop="demand"

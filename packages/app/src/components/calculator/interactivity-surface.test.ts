@@ -452,6 +452,34 @@ describe('buildSurfaceGrid', () => {
       }
     });
 
+    it('carries cumulative revenue too, growing along time and falling along z', () => {
+      // A running total in $, not a rate — so it must climb with time. Along z it
+      // still falls, because it integrates a quantity that falls along z.
+      const grid = build({ metric: 'cumulativeRevenue' })!;
+      expect(grid.metric).toBe('cumulativeRevenue');
+      for (const chip of grid.chips) {
+        for (const [zi, row] of chip.cells.entries()) {
+          const overTime = row.filter((v): v is number => v !== null);
+          for (let i = 1; i < overTime.length; i += 1) {
+            expect(overTime[i]!, `${chip.key} z=${zi} t=${i}`).toBeGreaterThanOrEqual(
+              overTime[i - 1]! - 1e-6,
+            );
+          }
+        }
+        const lastTime = grid.times.length - 1;
+        const alongZ = chip.cells
+          .map((row) => row[lastTime]!)
+          .filter((v): v is number => v !== null);
+        for (let i = 1; i < alongZ.length; i += 1) {
+          expect(alongZ[i]!, `${chip.key} along z at ${i}`).toBeLessThanOrEqual(
+            alongZ[i - 1]! + 1e-6,
+          );
+        }
+      }
+      // Never negative: no cost is subtracted from it.
+      expect(grid.yMin).toBe(0);
+    });
+
     it('keeps revenue non-negative, so zero is the floor rather than a threshold', () => {
       // Which is why the view suppresses the break-even plane on a revenue grid:
       // nothing can cross a line the data never goes below.

@@ -108,6 +108,9 @@ describe('Calculator — Interactivity Surface', () => {
       cy.get('[data-testid="calc-lifecycle-metric-revenue"]').click();
       surfaceSection().should('contain.text', 'Revenue ($/day)');
       surfaceSection().should('not.contain.text', 'Margin ($/day)');
+      cy.get('[data-testid="calc-lifecycle-metric-cumulative-revenue"]').click();
+      surfaceSection().should('contain.text', 'Cumulative Revenue ($)');
+      surfaceSection().should('not.contain.text', 'Revenue ($/day)');
       cy.get('[data-testid="calc-lifecycle-metric-margin"]').click();
       surfaceSection().should('contain.text', 'Margin ($/day)');
       surfaceSection().should('not.contain.text', 'Revenue ($/day)');

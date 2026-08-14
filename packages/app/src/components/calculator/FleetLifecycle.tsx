@@ -134,15 +134,18 @@ const STRINGS = {
       'Which per-day rate to plot. Margin is revenue minus the flat fleet cost, so the break-even rule shows which side of it a fleet is on. Revenue drops the cost term, which makes the rollouts easier to compare across chips of very different cost — but a chip being higher no longer means it is more profitable.',
     metricMargin: 'Margin',
     metricRevenue: 'Revenue',
+    metricCumulativeRevenue: 'Cum. Revenue',
     chartY: 'Margin ($/day)',
     chartYRevenue: 'Revenue ($/day)',
+    chartYCumulativeRevenue: 'Cumulative Revenue ($)',
     chartBreakEven: 'break-even',
     tipDate: 'Measured',
     tipConfig: 'Config',
     tipMargin: 'Margin/day',
     tipRevenue: 'Revenue/day',
+    tipCumulativeRevenue: 'Cumulative revenue',
     tipCost: 'Cost/day',
-    tipCumulative: 'Cumulative',
+    tipCumulative: 'Cumulative margin',
     tipSinceFirst: 'Since first run',
     tipRunLink: 'Open run',
     chartInstructions:
@@ -215,15 +218,18 @@ const STRINGS = {
       '选择绘制哪一项日均指标。利润为收入减去水平的集群成本，因此保本线可显示集群位于其哪一侧。收入则不计成本项，便于在成本差异很大的 Chip 之间比较推广曲线——但此时位置更高并不代表更赚钱。',
     metricMargin: '利润',
     metricRevenue: '收入',
+    metricCumulativeRevenue: '累计收入',
     chartY: '利润 ($/天)',
     chartYRevenue: '收入 ($/天)',
+    chartYCumulativeRevenue: '累计收入 ($)',
     chartBreakEven: '保本线',
     tipDate: '实测于',
     tipConfig: '配置',
     tipMargin: '每日利润',
     tipRevenue: '每日收入',
+    tipCumulativeRevenue: '累计收入',
     tipCost: '每日成本',
-    tipCumulative: '累计',
+    tipCumulative: '累计利润',
     tipSinceFirst: '相比首次运行',
     tipRunLink: '查看运行',
     chartInstructions:
@@ -366,9 +372,12 @@ export default function FleetLifecycle({
   // over: a fixed 60-month default spends most of the axis on a flat tail
   // projecting the last config forward, which carries no information.
   const horizonEdited = useRef(Boolean(readUrlParams().c_life));
-  const [yMetric, setYMetric] = useState<LifecycleMetric>(() =>
-    readUrlParams().c_ly === 'revenue' ? 'revenue' : 'margin',
-  );
+  const [yMetric, setYMetric] = useState<LifecycleMetric>(() => {
+    const seeded = readUrlParams().c_ly;
+    // Allowlisted rather than cast: the param is user-editable, and an unknown
+    // value must fall back to the default instead of reaching `metricValue`.
+    return seeded === 'revenue' || seeded === 'cumulativeRevenue' ? seeded : 'margin';
+  });
   const [priceInput, setPriceInput] = useState(() => readUrlParams().c_price ?? '');
   // A price arriving from the URL is the user's, so it must not be overwritten
   // by the break-even default.
@@ -865,6 +874,11 @@ export default function FleetLifecycle({
                   label: t.metricRevenue,
                   testId: 'calc-lifecycle-metric-revenue',
                 },
+                {
+                  value: 'cumulativeRevenue',
+                  label: t.metricCumulativeRevenue,
+                  testId: 'calc-lifecycle-metric-cumulative-revenue',
+                },
               ]}
             />
           </div>
@@ -897,7 +911,13 @@ export default function FleetLifecycle({
               data={chartData}
               metric={yMetric}
               anchorMs={anchorMs}
-              yLabel={yMetric === 'revenue' ? t.chartYRevenue : t.chartY}
+              yLabel={
+                yMetric === 'revenue'
+                  ? t.chartYRevenue
+                  : yMetric === 'cumulativeRevenue'
+                    ? t.chartYCumulativeRevenue
+                    : t.chartY
+              }
               breakEvenLabel={t.chartBreakEven}
               instructions={t.chartInstructions}
               labels={{
@@ -905,6 +925,7 @@ export default function FleetLifecycle({
                 config: t.tipConfig,
                 marginPerDay: t.tipMargin,
                 revenuePerDay: t.tipRevenue,
+                cumulativeRevenue: t.tipCumulativeRevenue,
                 costPerDay: t.tipCost,
                 cumulative: t.tipCumulative,
                 runLink: t.tipRunLink,

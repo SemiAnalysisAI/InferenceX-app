@@ -402,6 +402,47 @@ describe('computeLifecycle', () => {
     expect(series.paybackMonth!).toBeCloseTo(3 + (-first * 3) / second, 6);
   });
 
+  describe('cumulative revenue', () => {
+    it('is the running area under the revenue curve, cost never subtracted', () => {
+      const series = computeLifecycle(base)!;
+      const first = series.points[0]!;
+      const last = series.points.at(-1)!;
+      // Nothing has been earned at the first sample, and it only ever grows —
+      // unlike cumulative margin, which starts underwater whenever price is low.
+      expect(first.cumulativeRevenue).toBe(0);
+      for (const [i, point] of series.points.entries()) {
+        if (i === 0) continue;
+        expect(point.cumulativeRevenue).toBeGreaterThanOrEqual(
+          series.points[i - 1]!.cumulativeRevenue,
+        );
+      }
+      expect(last.cumulativeRevenue).toBeGreaterThan(0);
+    });
+
+    it('stays exactly one flat cost above cumulative margin', () => {
+      // The invariant that makes the two comparable on one chart: both are
+      // trapezoided over the same intervals, so their difference is cost x elapsed
+      // and nothing else. A separate accumulator that drifted would fail here.
+      const series = computeLifecycle(base)!;
+      const costPerDay = costPerHour * HOURS_PER_DAY;
+      for (const point of series.points) {
+        const elapsedDays = (point.month - series.startMonth) * DAYS_PER_MONTH;
+        expect(point.cumulativeRevenue - point.cumulative).toBeCloseTo(costPerDay * elapsedDays, 4);
+      }
+    });
+
+    it('is zero at every sample when the price is zero', () => {
+      const series = computeLifecycle({
+        ...base,
+        assumptions: { ...assumptions, pricePerMTok: 0 },
+      })!;
+      for (const point of series.points) expect(point.cumulativeRevenue).toBe(0);
+      // Cumulative margin is then pure accumulated cost, which is the check that
+      // the two accumulators are not accidentally the same variable.
+      expect(series.points.at(-1)!.cumulative).toBeLessThan(0);
+    });
+  });
+
   it('returns null without steps, a cost basis or a horizon past the first run', () => {
     expect(computeLifecycle({ ...base, steps: [] })).toBeNull();
     expect(computeLifecycle({ ...base, costPerHour: NaN })).toBeNull();
@@ -418,6 +459,7 @@ const point = (month: number, margin: number): LifecyclePoint => ({
   cost: 100,
   margin,
   cumulative: margin * 10,
+  cumulativeRevenue: (margin + 100) * 10,
   isStep: false,
   isRamp: false,
 });
