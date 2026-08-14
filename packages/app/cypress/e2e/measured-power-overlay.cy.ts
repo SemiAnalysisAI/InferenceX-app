@@ -8,7 +8,6 @@ describe('Measured power on unofficial-run overlay', () => {
     cy.visit('/inference?unofficialrun=26312107787', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.setItem('inferencex-feature-gate', '1');
       },
     });
     cy.get('[data-testid="inference-chart-display"]', { timeout: 30_000 }).should('exist');
@@ -19,7 +18,7 @@ describe('Measured power on unofficial-run overlay', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click();
     cy.get('[data-slot="select-content"]').should('exist');
 
-    // Verify the gated "Measured Energy" group + both options. The select list is a
+    // Verify the "Measured Energy" group + both options. The select list is a
     // scroll container (max-h-72 overflow-y-auto), and this group sits below the fold,
     // so scroll each target into view before asserting visibility.
     cy.contains('[data-slot="select-content"]', 'Measured Energy')

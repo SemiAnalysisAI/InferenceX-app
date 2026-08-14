@@ -38,6 +38,14 @@ export function navigateInApp(
   }
 
   event.preventDefault();
+  const from = window.location.pathname;
+  const target = new URL(href, window.location.origin).pathname;
   router.push(href);
-  window.setTimeout(() => router.push(href), 250);
+  // Retry only while nothing has moved. Once the pathname has changed — to this
+  // target, or to a later navigation the user started — a second push only
+  // re-renders the destination, cancels its in-flight work and stacks a
+  // duplicate history entry.
+  window.setTimeout(() => {
+    if (window.location.pathname === from && from !== target) router.push(href);
+  }, 250);
 }

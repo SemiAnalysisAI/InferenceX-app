@@ -1,5 +1,7 @@
 'use client';
 
+import type { ReactNode } from 'react';
+
 import { Card } from '@/components/ui/card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import type { OverviewPageData } from '@/lib/overview-data';
@@ -19,13 +21,19 @@ import {
   OVERVIEW_STRINGS,
   type OverviewLocale,
 } from './overview-scorecard';
-import { OverviewNavigationProvider, useOverviewNavigation } from './overview-navigation';
+import {
+  OverviewNavigationProvider,
+  useOverviewData,
+  useOverviewNavigation,
+  useOverviewReference,
+} from './overview-navigation';
 import {
   OverviewPresentationProvider,
   OverviewPresentationSurface,
   OverviewPresentToggle,
   useOverviewPresentation,
 } from './overview-presentation';
+import { useWideViewport } from './use-wide-viewport';
 
 /** The SemiAnalysis AI Cloud TCO model behind `HW_REGISTRY.costh`. */
 const OVERVIEW_SOURCE_HREF = 'https://semianalysis.com/ai-cloud-tco-model/';
@@ -50,6 +58,10 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
         data.hardwareRowScope,
       )}
     >
+      {/* Passed as `children`, never rendered inside the provider's own JSX:
+          that keeps this element's identity stable so a pending-state change
+          re-renders the provider without re-rendering the whole matrix. The
+          presentation provider is in the same slot for the same reason. */}
       <OverviewPresentationProvider locale={locale}>
         <OverviewPageBody locale={locale} />
       </OverviewPresentationProvider>
@@ -57,13 +69,43 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
   );
 }
 
+/** Both pending consumers live outside `OverviewPageBody` on purpose: reading
+ *  `isPending` there would re-render the whole matrix on every click, which is
+ *  exactly the cost the split context removes. */
+function OverviewPendingStatus({ label }: { label: string }) {
+  const { isPending } = useOverviewNavigation();
+  return (
+    <p role="status" aria-live="polite" className="sr-only">
+      {isPending ? label : ''}
+    </p>
+  );
+}
+
+function OverviewMatrixCard({ children }: { children: ReactNode }) {
+  const { isPending } = useOverviewNavigation();
+  return (
+    <Card
+      aria-busy={isPending}
+      className={`overflow-hidden p-0 transition-opacity md:p-0 xl:overflow-visible ${
+        isPending ? 'opacity-60' : ''
+      }`}
+    >
+      {children}
+    </Card>
+  );
+}
+
 function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
-  const { data } = useOverviewNavigation();
+  const data = useOverviewData();
+  // Not `data.referenceHardware`: the reference follows the URL directly, so a
+  // cached payload built for another reference still renders the right column.
+  const referenceHardware = useOverviewReference();
   const { presenting } = useOverviewPresentation();
   const strings = OVERVIEW_STRINGS[locale];
 
   return (
     <section data-testid="overview-page" className="flex flex-col gap-4">
+      <OverviewPendingStatus label={strings.loadingStatus} />
       {/* Held in a stable child slot: swapping the header out for the surface
           would remount the surface and drop the browser out of fullscreen. The
           browser already stops painting it, so this only keeps the hidden
@@ -123,7 +165,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
                 tier={data.tier}
                 engineScope={data.engineScope}
                 comparisonMode={data.comparisonMode}
-                referenceHardware={data.referenceHardware}
+                referenceHardware={referenceHardware}
                 modelScope={data.modelScope}
                 rowScope={data.rowScope}
                 hardwareRowScope={data.hardwareRowScope}
@@ -134,7 +176,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
                 engineScope={data.engineScope}
                 tier={data.tier}
                 comparisonMode={data.comparisonMode}
-                referenceHardware={data.referenceHardware}
+                referenceHardware={referenceHardware}
                 modelScope={data.modelScope}
                 rowScope={data.rowScope}
                 hardwareRowScope={data.hardwareRowScope}
@@ -161,7 +203,8 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
  * letting a centred row push the tabs off-centre and read Exit as a third tab.
  */
 function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
-  const { data } = useOverviewNavigation();
+  const data = useOverviewData();
+  const referenceHardware = useOverviewReference();
   const { presenting } = useOverviewPresentation();
   const strings = OVERVIEW_STRINGS[locale];
 
@@ -170,7 +213,7 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
       comparisonMode={data.comparisonMode}
       engineScope={data.engineScope}
       tier={data.tier}
-      referenceHardware={data.referenceHardware}
+      referenceHardware={referenceHardware}
       modelScope={data.modelScope}
       rowScope={data.rowScope}
       hardwareRowScope={data.hardwareRowScope}
@@ -206,7 +249,7 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
           tier={data.tier}
           engineScope={data.engineScope}
           comparisonMode={data.comparisonMode}
-          referenceHardware={data.referenceHardware}
+          referenceHardware={referenceHardware}
           modelScope={data.modelScope}
           rowScope={data.rowScope}
           hardwareRowScope={data.hardwareRowScope}
@@ -227,7 +270,7 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
             unchangedRowCount={data.unchangedRowCount}
             tier={data.tier}
             engineScope={data.engineScope}
-            referenceHardware={data.referenceHardware}
+            referenceHardware={referenceHardware}
             modelScope={data.modelScope}
             locale={locale}
             strings={strings}
@@ -239,7 +282,7 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
             emptyRowCount={data.emptyRowCount}
             tier={data.tier}
             engineScope={data.engineScope}
-            referenceHardware={data.referenceHardware}
+            referenceHardware={referenceHardware}
             modelScope={data.modelScope}
             locale={locale}
             strings={strings}
@@ -251,7 +294,7 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
           tier={data.tier}
           engineScope={data.engineScope}
           comparisonMode={data.comparisonMode}
-          referenceHardware={data.referenceHardware}
+          referenceHardware={referenceHardware}
           rowScope={data.rowScope}
           hardwareRowScope={data.hardwareRowScope}
           locale={locale}
@@ -265,10 +308,27 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
 
 /** The half of the page that goes fullscreen: the view tabs and the matrix. */
 function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
-  const { data, pending } = useOverviewNavigation();
+  const data = useOverviewData();
+  const referenceHardware = useOverviewReference();
   const { presenting } = useOverviewPresentation();
+  // Both surfaces used to render on every width and hide one with CSS, so every
+  // selection built the matrix twice. The Tailwind classes stay — they carry
+  // SSR and the pre-hydration frame — and this only drops the unused one after.
+  const wide = useWideViewport();
   const strings = OVERVIEW_STRINGS[locale];
   const formatters = overviewFormatters(locale);
+
+  const matrix = (
+    <DesktopOverviewMatrix
+      models={data.models}
+      locale={locale}
+      formatters={formatters}
+      strings={strings}
+      comparisonMode={data.comparisonMode}
+      referenceHardware={referenceHardware}
+      presenting={presenting}
+    />
+  );
 
   return (
     <>
@@ -277,83 +337,75 @@ function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
       {/* Official-only summary; uploaded runs remain in the linked dashboard. */}
       {/* Clipped on phones for the rounded corners; visible from xl so the
           desktop matrix header can stick to the page as it scrolls. */}
-      {/* The 150ms delay keeps cache hits and fast responses from flickering;
-          only a fetch still in flight past it dims the stale matrix. */}
-      <Card
-        data-pending={pending}
-        className={`overflow-hidden p-0 transition-opacity duration-200 md:p-0 xl:overflow-visible ${
-          pending ? 'opacity-60 delay-150' : 'opacity-100'
-        }`}
-      >
-        <DesktopOverviewMatrix
-          models={data.models}
-          locale={locale}
-          formatters={formatters}
-          strings={strings}
-          comparisonMode={data.comparisonMode}
-          referenceHardware={data.referenceHardware}
-        />
-        {/* Presenting fixes the layout width at the desktop breakpoint, so the
-            phone list would only ever be dead weight behind the matrix. */}
-        {presenting ? null : (
-          <MobileOverviewList
-            models={data.models}
-            locale={locale}
-            formatters={formatters}
-            strings={strings}
-            comparisonMode={data.comparisonMode}
-            referenceHardware={data.referenceHardware}
-          />
-        )}
-        {presenting ? null : (
-          /* One footer bar instead of three stacked link rows: the notes keep
-             the left edge, the scope chips keep the right, and the card ends
-             on a single rule. */
-          <div className="flex flex-col gap-x-6 gap-y-2 border-t border-border/50 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
-            <OverviewMethodology
-              strings={strings}
-              comparisonMode={data.comparisonMode}
-              referenceHardware={data.referenceHardware}
-            />
-            <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
-              {data.comparisonMode === 'history' ? (
-                <OverviewRowScopeToggle
-                  rowScope={data.rowScope}
-                  unchangedRowCount={data.unchangedRowCount}
-                  tier={data.tier}
-                  engineScope={data.engineScope}
-                  referenceHardware={data.referenceHardware}
-                  modelScope={data.modelScope}
-                  locale={locale}
-                  strings={strings}
-                />
-              ) : (
-                <OverviewHardwareRowScopeToggle
-                  hardwareRowScope={data.hardwareRowScope}
-                  emptyRowCount={data.emptyRowCount}
-                  tier={data.tier}
-                  engineScope={data.engineScope}
-                  referenceHardware={data.referenceHardware}
-                  modelScope={data.modelScope}
-                  locale={locale}
-                  strings={strings}
-                />
-              )}
-              <OverviewModelScopeToggle
-                modelScope={data.modelScope}
-                tier={data.tier}
-                engineScope={data.engineScope}
-                comparisonMode={data.comparisonMode}
-                referenceHardware={data.referenceHardware}
-                rowScope={data.rowScope}
-                hardwareRowScope={data.hardwareRowScope}
+      <OverviewMatrixCard>
+        {/* A deck lays out at a fixed width and is scaled by `zoom`, so the
+            viewport no longer decides which surface fits: the matrix is the
+            slide at every projector size and the phone list would only ever be
+            dead weight behind it. */}
+        {presenting ? (
+          matrix
+        ) : (
+          <>
+            {wide === false ? null : matrix}
+            {wide === true ? null : (
+              <MobileOverviewList
+                models={data.models}
                 locale={locale}
+                formatters={formatters}
                 strings={strings}
+                comparisonMode={data.comparisonMode}
+                referenceHardware={referenceHardware}
               />
+            )}
+            {/* One footer bar instead of three stacked link rows: the notes
+                keep the left edge, the scope chips keep the right, and the card
+                ends on a single rule. */}
+            <div className="flex flex-col gap-x-6 gap-y-2 border-t border-border/50 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+              <OverviewMethodology
+                strings={strings}
+                comparisonMode={data.comparisonMode}
+                referenceHardware={referenceHardware}
+              />
+              <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
+                {data.comparisonMode === 'history' ? (
+                  <OverviewRowScopeToggle
+                    rowScope={data.rowScope}
+                    unchangedRowCount={data.unchangedRowCount}
+                    tier={data.tier}
+                    engineScope={data.engineScope}
+                    referenceHardware={referenceHardware}
+                    modelScope={data.modelScope}
+                    locale={locale}
+                    strings={strings}
+                  />
+                ) : (
+                  <OverviewHardwareRowScopeToggle
+                    hardwareRowScope={data.hardwareRowScope}
+                    emptyRowCount={data.emptyRowCount}
+                    tier={data.tier}
+                    engineScope={data.engineScope}
+                    referenceHardware={referenceHardware}
+                    modelScope={data.modelScope}
+                    locale={locale}
+                    strings={strings}
+                  />
+                )}
+                <OverviewModelScopeToggle
+                  modelScope={data.modelScope}
+                  tier={data.tier}
+                  engineScope={data.engineScope}
+                  comparisonMode={data.comparisonMode}
+                  referenceHardware={referenceHardware}
+                  rowScope={data.rowScope}
+                  hardwareRowScope={data.hardwareRowScope}
+                  locale={locale}
+                  strings={strings}
+                />
+              </div>
             </div>
-          </div>
+          </>
         )}
-      </Card>
+      </OverviewMatrixCard>
     </>
   );
 }

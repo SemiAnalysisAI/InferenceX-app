@@ -24,6 +24,8 @@ const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文多轮真实智能体场景（AgentX）';
+/** Shared by both locales: the scenario is named after its acronym. */
+const AGENTX_SHORT = 'AgentX';
 
 const PAGE_TITLE = 'Inference Cost per Million Tokens';
 const PAGE_TITLE_ZH = '推理每百万 token 成本';
@@ -56,6 +58,21 @@ function expectNoHorizontalScroller(testId: string) {
       .map((el) => `${el.tagName} ${el.scrollWidth}>${el.clientWidth}`);
     expect(scrollers, `horizontally scrollable inside ${testId}`).to.deep.equal([]);
   });
+}
+
+/**
+ * The row header shows the acronym so the 22%-wide model column stays one line,
+ * and keeps the full scenario name for assistive tech and the hover title. Both
+ * strings are in the cell, so assert the two layers rather than their
+ * concatenation. Scenarios already named by a short label render one node.
+ */
+function expectAgentxScenario(fullLabel: string) {
+  cy.get('[data-testid="overview-model-scenario"]')
+    .should('have.attr', 'title', fullLabel)
+    .within(() => {
+      cy.get('.sr-only').should('have.text', fullLabel);
+      cy.get('[aria-hidden="true"]').should('have.text', AGENTX_SHORT);
+    });
 }
 
 /** Visible dates and snapshot framing must be gone; evidence stays in labels. */
@@ -164,11 +181,7 @@ describe('Overview page', () => {
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.go('back');
-    cy.get('[data-overview-comparison="hardware"]', { timeout: 15_000 }).should(
-      'have.attr',
-      'aria-current',
-      'true',
-    );
+    cy.get('[data-overview-comparison="hardware"]').should('have.attr', 'aria-current', 'true');
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
     cy.then(() => {
       expect(rscRequests, 'selector and popstate RSC requests').to.equal(0);
@@ -204,6 +217,13 @@ describe('Overview page', () => {
   it('preserves pending selections when controls are changed rapidly', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
+    // Hold the first response open so the second click lands inside the pending
+    // window; without the delay the clicks may serialize and never race.
+    cy.intercept('GET', '**/api/v1/overview*', (request) => {
+      request.continue((response) => {
+        response.setDelay(600);
+      });
+    }).as('overviewJson');
 
     cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
     cy.get('[data-testid="overview-engine-scope-switcher"]')
@@ -211,6 +231,95 @@ describe('Overview page', () => {
       .click();
 
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+    // The rendered state, not just the URL: the losing response must not win.
+    cy.get('[data-testid="overview-tier-switcher"] [aria-current="page"]', {
+      timeout: 15_000,
+    }).should('have.text', '75');
+    cy.get('[data-overview-engine-scope="all"]').should('have.attr', 'aria-current', 'true');
+    cy.location('search').should('eq', '?tier=75&engine=all');
+  });
+
+  it('shows a busy state while an uncached selection loads', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+    cy.intercept('GET', '**/api/v1/overview*', (request) => {
+      request.continue((response) => {
+        response.setDelay(800);
+      });
+    }).as('overviewJson');
+
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('exist');
+    cy.wait('@overviewJson');
+    cy.get('[data-testid="overview-page"] [aria-busy="true"]', { timeout: 15_000 }).should(
+      'not.exist',
+    );
+  });
+
+  it('rewrites one history entry when the overview request fails', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/inference');
+    cy.visit('/overview');
+    cy.intercept('GET', '**/api/v1/overview*', { statusCode: 500 }).as('overviewJsonFailure');
+
+    cy.window().then((win) => {
+      const before = win.history.length;
+      cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+      cy.wait('@overviewJsonFailure');
+      cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75');
+      // A plain `.should` would be satisfied by the transient extra entry.
+      cy.window().then((after) => {
+        expect(after.history.length - before, 'one entry for one selection').to.equal(1);
+      });
+    });
+
+    cy.go('back');
+    cy.location('search', { timeout: 15_000 }).should('eq', '');
+    cy.go('back');
+    cy.location('pathname', { timeout: 15_000 }).should('eq', '/inference');
+  });
+
+  it('warms a hovered option and derives the reference without a request', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+    let jsonRequests = 0;
+    cy.intercept('GET', '**/api/v1/overview*', () => {
+      jsonRequests += 1;
+    }).as('overviewJson');
+
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').trigger('pointerover');
+    cy.wait('@overviewJson');
+    cy.location('search').should('eq', '');
+    cy.then(() => {
+      expect(jsonRequests, 'hover warms exactly one response').to.equal(1);
+    });
+
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').click();
+    cy.location('search').should('eq', '?tier=100');
+    cy.then(() => {
+      expect(jsonRequests, 'the click reuses the warmed response').to.equal(1);
+    });
+
+    cy.get('[data-testid="overview-reference-select"]').click();
+    cy.get('[data-overview-reference="b300"]').click();
+    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=100&ref=b300');
+    cy.get('[data-overview-comparison="hardware"]').should('contain.text', 'vs B300');
+    cy.then(() => {
+      expect(jsonRequests, 'a reference change is derived, not fetched').to.equal(1);
+    });
+  });
+
+  it('keeps focus on the option the keyboard activated', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+
+    cy.get('[data-overview-comparison="history"]').click();
+    cy.get('[data-overview-comparison="history"]', { timeout: 15_000 }).should(
+      'have.attr',
+      'aria-current',
+      'true',
+    );
+    cy.focused().should('have.attr', 'data-overview-comparison', 'history');
   });
 
   it('reveals deprecated and maintenance models via the bottom toggle', () => {
@@ -317,8 +426,11 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    cy.get('[data-testid="overview-page"]')
-      .children('[data-testid="overview-comparison-switcher"]')
+    // The tabs sit inside the surface handed to the Fullscreen API so that
+    // presenting keeps them with the matrix, which costs them their old spot as
+    // a direct child of the page.
+    cy.get('[data-testid="overview-presentation-surface"]')
+      .find('[data-testid="overview-comparison-switcher"]')
       .should('have.length', 1)
       .and('have.class', 'justify-center');
     cy.get('[data-testid="overview-comparison-switcher"]')
@@ -513,6 +625,43 @@ describe('Overview page', () => {
     }
   });
 
+  // Clicking the control, not just building its href: the matrix reads from a
+  // client data cache, and a cache keyed without the row params moves the
+  // address bar while leaving every row on screen.
+  it('narrows the matrix when the row filter is clicked in either comparison mode', () => {
+    cy.viewport(1280, 900);
+
+    for (const [href, attribute, key, sentence] of [
+      ['/overview?compare=30d', 'data-overview-row-scope', 'rows=changed', 'no 30-day change'],
+      [
+        '/overview',
+        'data-overview-hardware-row-scope',
+        'hwrows=priced',
+        'no result on any platform',
+      ],
+    ] as const) {
+      cy.visit(href);
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
+
+      cy.get(`a[${attribute}]`)
+        .should('contain.text', 'Hide ')
+        .invoke('text')
+        .then((label) => {
+          const hidden = Number(/\d+/.exec(label)?.[0]);
+          expect(hidden, `hidden row count in "${label}"`).to.be.greaterThan(0);
+
+          cy.get(`a[${attribute}]`).click();
+          cy.location('search').should('contain', key);
+          cy.get('[data-testid="overview-desktop-model"]').should(
+            'have.length',
+            MATRIX_ROWS - hidden,
+          );
+          // The action label names the click, so it flips once the scope lands.
+          cy.get(`a[${attribute}]`).should('contain.text', `Show ${hidden} rows with ${sentence}`);
+        });
+    }
+  });
+
   it('defaults to community engine scope and switches with canonical links preserving tier and locale', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
@@ -542,7 +691,7 @@ describe('Overview page', () => {
     });
 
     desktopModel('GLM-5.2').within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL);
+      expectAgentxScenario(AGENTX_LABEL);
       cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
     });
     cy.get(
@@ -622,8 +771,7 @@ describe('Overview page', () => {
       platform('gb300').within(() => {
         cy.get('[data-testid="overview-pair-value"]').should('not.exist');
         cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]').should(
-          'have.attr',
-          'title',
+          'contain.text',
           'no exact @50 result',
         );
       });
@@ -783,9 +931,9 @@ describe('Overview page', () => {
       cy.get('[data-testid="overview-desktop-matrix"]').should('contain.text', label);
     }
     for (const model of ['Kimi-K3', 'GLM-5.2']) {
-      desktopModel(model)
-        .find('[data-testid="overview-model-scenario"]')
-        .should('have.text', AGENTX_LABEL);
+      desktopModel(model).within(() => {
+        expectAgentxScenario(AGENTX_LABEL);
+      });
     }
     for (const model of ['DeepSeek-V4-Pro', 'MiniMax-M3', 'Qwen-3.5-397B-A17B']) {
       desktopModel(model, SINGLE_TURN)
@@ -808,7 +956,7 @@ describe('Overview page', () => {
     });
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL);
+      expectAgentxScenario(AGENTX_LABEL);
       cy.contains('DeepSeek V4 Pro 1.6T').should('exist');
       // Priced from the AgentX rows alone — the single-turn sweep never leaks in.
       cy.get(
@@ -928,12 +1076,12 @@ describe('Overview page', () => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="mi355x"]')
           .should('contain.text', '—')
           .and('not.contain.text', '∞')
-          .and('have.attr', 'title', 'no exact @50 result');
+          .and('contain.text', 'no exact @50 result');
       });
       platform('gb300').within(() => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]')
           .should('contain.text', '—')
-          .and('have.attr', 'title', 'no exact @50 result');
+          .and('contain.text', 'no exact @50 result');
       });
       platform('b200')
         .find('[data-testid="overview-cost-evidence-link"]')
@@ -945,7 +1093,7 @@ describe('Overview page', () => {
       platform('b200')
         .find('[data-testid="overview-pair-missing"]')
         .should('contain.text', '—')
-        .and('have.attr', 'title', 'no data for this scenario');
+        .and('contain.text', 'no data for this scenario');
       platform('gb300').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="gb300"]').should(
           'contain.text',
@@ -1011,7 +1159,7 @@ describe('Overview page', () => {
       platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="b300"]')
           .should('contain.text', '—')
-          .and('have.attr', 'title', 'cannot reach @100');
+          .and('contain.text', 'cannot reach @100');
       });
     });
 
@@ -1020,12 +1168,12 @@ describe('Overview page', () => {
       platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="b300"]')
           .should('contain.text', '—')
-          .and('have.attr', 'title', 'no exact @30 result');
+          .and('contain.text', 'no exact @30 result');
       });
       platform('b200')
         .find('[data-testid="overview-pair-missing"]')
         .should('contain.text', '—')
-        .and('have.attr', 'title', 'no exact @30 result');
+        .and('contain.text', 'no exact @30 result');
     });
     // Exact @30 read priced without a B200 baseline: cost plus the ∞ badge.
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
@@ -1067,7 +1215,7 @@ describe('Overview page', () => {
         .each(($option) => {
           expect($option[0].getBoundingClientRect().height).to.be.at.least(44);
         });
-      cy.get('[data-testid="overview-desktop-matrix"]').should('not.be.visible');
+      cy.get('[data-testid="overview-desktop-matrix"]').should('not.exist');
       mobileModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
         cy.get('[data-testid="overview-platform"]').should('have.length', 5);
         platform('mi355x').within(() => {
@@ -1081,8 +1229,7 @@ describe('Overview page', () => {
           '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
         ).should('have.text', '$0.059');
         cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]').should(
-          'have.attr',
-          'title',
+          'contain.text',
           'no exact @50 result',
         );
       });
@@ -1300,7 +1447,7 @@ describe('Overview page', () => {
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN)
       .find('[data-testid="overview-pair-missing"][data-hardware="gb300"]')
       .should('contain.text', '—')
-      .and('have.attr', 'title', '无精确 @50 结果');
+      .and('contain.text', '无精确 @50 结果');
     cy.get('body')
       .invoke('text')
       .should('not.match', /回退/);
@@ -1324,14 +1471,14 @@ describe('Overview page', () => {
         .and('have.attr', 'title', '缺少可比较的 B200 基线');
     });
     desktopModel('GLM-5.2').within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL_ZH);
+      expectAgentxScenario(AGENTX_LABEL_ZH);
       cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
       platform('b300')
         .find('[data-testid="overview-pair-missing"]')
-        .should('have.attr', 'title', '该场景暂无数据');
+        .should('contain.text', '该场景暂无数据');
     });
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL_ZH);
+      expectAgentxScenario(AGENTX_LABEL_ZH);
       cy.get(
         '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
       ).should('have.text', '$0.064');

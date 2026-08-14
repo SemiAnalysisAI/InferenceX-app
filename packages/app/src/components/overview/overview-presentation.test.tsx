@@ -11,7 +11,12 @@ vi.mock('next/navigation', () => ({
 }));
 
 import { OverviewNavigationProvider } from './overview-navigation';
-import type { OverviewStrings } from './overview-scorecard';
+import {
+  DesktopOverviewMatrix,
+  overviewFormatters,
+  OVERVIEW_STRINGS,
+  type OverviewStrings,
+} from './overview-scorecard';
 import {
   OverviewPresentationProvider,
   OverviewPresentationSurface,
@@ -167,5 +172,34 @@ describe('OverviewPresentationSurface', () => {
     render();
     expect(toggle()).toBeNull();
     expect(surface()).not.toBeNull();
+  });
+});
+
+const matrix = (presenting: boolean) => (
+  <DesktopOverviewMatrix
+    models={[]}
+    locale="en"
+    formatters={overviewFormatters('en')}
+    strings={OVERVIEW_STRINGS.en}
+    comparisonMode="hardware"
+    referenceHardware="b200"
+    presenting={presenting}
+  />
+);
+
+describe('DesktopOverviewMatrix', () => {
+  it('drops the viewport gate while presenting so a narrow projector still gets a matrix', () => {
+    const gate = () =>
+      container.querySelector('[data-testid="overview-desktop-matrix"]')?.parentElement?.className;
+
+    act(() => root.render(matrix(false)));
+    expect(gate()).toBe('hidden xl:block');
+
+    // `xl` asks whether the viewport can hold the matrix. That is the right
+    // question on the page and the wrong one on a deck, which lays out at a
+    // fixed width and is scaled by `zoom`: keeping it would blank the slide on
+    // any projector under 1280px, since presenting also drops the phone list.
+    act(() => root.render(matrix(true)));
+    expect(gate()).toBe('block');
   });
 });

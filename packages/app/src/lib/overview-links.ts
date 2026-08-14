@@ -7,7 +7,7 @@ import {
   OVERVIEW_DEFAULT_ROW_SCOPE,
   OVERVIEW_PRIMARY_TIER,
   type OverviewComparisonMode,
-  type OverviewConfigResult,
+  type OverviewConfigView,
   type OverviewEngineScope,
   type OverviewHardwareRowScope,
   type OverviewModelScope,
@@ -26,7 +26,7 @@ export type OverviewSearchKey =
   | 'rows'
   | 'hwrows';
 
-const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
+export const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
   'tier',
   'engine',
   'ref',
@@ -35,6 +35,11 @@ const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
   'rows',
   'hwrows',
 ];
+
+/** Params the client resolves without asking the server. `ref` only picks which
+ *  column the percentages are measured against, and every cost that needs is
+ *  already in the payload — so it must not vary the data cache key. */
+export const OVERVIEW_CLIENT_ONLY_KEYS: readonly OverviewSearchKey[] = ['ref'];
 
 /** Apply one control's destination to the latest pending overview URL.
  * This prevents a second, fast selection from rebuilding from stale server
@@ -65,7 +70,10 @@ export function mergeOverviewControlHref(
   }
 
   const search = ordered.toString();
-  return `${current.pathname}${search === '' ? '' : `?${search}`}${target.hash}`;
+  // A control href never carries a fragment, so an absent one means "keep the
+  // one already on the page" rather than "clear it".
+  const hash = target.hash === '' ? current.hash : target.hash;
+  return `${current.pathname}${search === '' ? '' : `?${search}`}${hash}`;
 }
 import type { UrlStateParams } from './url-state';
 
@@ -93,7 +101,7 @@ function dashboardSpecMode(specMethod: string): 'mtp' | 'stp' {
  * helpers below read this one predicate, so the `g_runid` pin and the source-run
  * link can never disagree about whether a single run backs the configuration.
  */
-function soleSourceRun(config: OverviewConfigResult): { url: string; id: string } | null {
+function soleSourceRun(config: OverviewConfigView): { url: string; id: string } | null {
   if (config.sourceRunUrls.length !== 1) return null;
   const url = config.sourceRunUrls[0];
   const id = runIdFromRunUrl(url);
@@ -113,7 +121,7 @@ function soleSourceRun(config: OverviewConfigResult): { url: string; id: string 
 export function buildOverviewDashboardHref(
   locale: 'en' | 'zh',
   model: OverviewModelSummary,
-  config: OverviewConfigResult,
+  config: OverviewConfigView,
 ): string {
   const params: UrlStateParams = {
     g_model: model.model,
@@ -148,8 +156,8 @@ function uniqueValues(values: readonly string[]): string {
 export function buildOverviewHistoryDashboardHref(
   locale: 'en' | 'zh',
   model: OverviewModelSummary,
-  current: OverviewConfigResult,
-  baseline: OverviewConfigResult,
+  current: OverviewConfigView,
+  baseline: OverviewConfigView,
 ): string {
   const currentRun = soleSourceRun(current);
   const baselineRun = soleSourceRun(baseline);

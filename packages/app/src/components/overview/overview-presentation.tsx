@@ -14,7 +14,11 @@ import {
 import type { OverviewComparisonMode } from '@/lib/overview-data';
 import { overviewHref } from '@/lib/overview-links';
 
-import { useOverviewNavigation } from './overview-navigation';
+import {
+  useOverviewData,
+  useOverviewNavigation,
+  useOverviewReference,
+} from './overview-navigation';
 import type { OverviewLocale, OverviewStrings } from './overview-scorecard';
 
 /**
@@ -75,7 +79,11 @@ export function OverviewPresentationProvider({
   locale: OverviewLocale;
   children: ReactNode;
 }) {
-  const { data, push } = useOverviewNavigation();
+  const data = useOverviewData();
+  // Same reason the matrix reads it here: the reference follows the URL, so a
+  // payload still cached from another reference must not rewrite it.
+  const referenceHardware = useOverviewReference();
+  const { push } = useOverviewNavigation();
   const surfaceRef = useRef<HTMLDivElement>(null);
   const scalerRef = useRef<HTMLDivElement>(null);
   const [presenting, setPresenting] = useState(false);
@@ -145,7 +153,7 @@ export function OverviewPresentationProvider({
           data.tier,
           data.engineScope,
           target,
-          data.referenceHardware,
+          referenceHardware,
           data.modelScope,
         ),
         ['compare'],
@@ -153,7 +161,7 @@ export function OverviewPresentationProvider({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [presenting, data, locale, push]);
+  }, [presenting, data, referenceHardware, locale, push]);
 
   return (
     <OverviewPresentationContext.Provider

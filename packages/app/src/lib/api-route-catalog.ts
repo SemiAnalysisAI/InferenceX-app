@@ -278,8 +278,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'Page-owned BFF aggregation whose tier, comparison, and calculator projections are coupled to the overview UI.',
-      zh: '由页面拥有的 BFF 聚合；其档位、比较和计算器投影与概览界面紧密耦合。',
+      en: 'Page-owned BFF aggregation whose tier, comparison, row-scope, and calculator projections are coupled to the overview UI.',
+      zh: '由页面拥有的 BFF 聚合；其档位、比较、行范围和计算器投影与概览界面紧密耦合。',
     },
     sourceSha256: '499089d01754aa470d0ced953d9818d7d2e620dd3521685099924750249f13e2',
   },
