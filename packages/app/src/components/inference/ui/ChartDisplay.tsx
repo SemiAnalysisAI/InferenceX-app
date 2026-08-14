@@ -49,7 +49,12 @@ import {
   sequenceKind,
 } from '@/lib/data-mappings';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
-import { isAgenticOnlyXAxisMode, type XAxisMode } from '@/components/inference/hooks/useChartData';
+import {
+  derivedModeRoofline,
+  isAgenticOnlyXAxisMode,
+  type RooflineDirection,
+  type XAxisMode,
+} from '@/components/inference/hooks/useChartData';
 import {
   useDerivedAgenticMetrics,
   type DerivedAgenticMetric,
@@ -637,6 +642,13 @@ export default function ChartDisplay() {
       return visibleGraphs.map((graph) => ({ ...graph, data: [], clippedData: [] }));
     }
     return visibleGraphs.map((graph) => {
+      const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof typeof graph.chartDefinition;
+      const configuredCorner = graph.chartDefinition[rooflineKey] as RooflineDirection | undefined;
+      const derivedCorner =
+        graph.chartDefinition.chartType === 'e2e'
+          ? derivedModeRoofline(configuredCorner, true)
+          : configuredCorner;
+
       const preparePoint = (point: InferenceData): InferenceData | null => {
         const pointId = isPersistedBenchmarkId(point.id) ? point.id : null;
         if (!derivedSpec) return point;
@@ -664,6 +676,7 @@ export default function ChartDisplay() {
         ...graph.chartDefinition,
         x_label: xLabelFn(selectedPercentile.toUpperCase()),
         y_latency_limit: undefined,
+        ...(derivedCorner ? { [rooflineKey]: derivedCorner } : {}),
       };
       return { ...graph, chartDefinition, data, clippedData };
     });
@@ -673,6 +686,7 @@ export default function ChartDisplay() {
     derivedTargetIds.length,
     visibleGraphs,
     derivedMetrics,
+    selectedYAxisMetric,
     selectedPercentile,
     locale,
   ]);
