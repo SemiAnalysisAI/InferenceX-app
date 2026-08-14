@@ -905,5 +905,6 @@ export interface ChangelogMetadata {
     pr_link: string | null;
     head_ref?: string;
     evals_only?: boolean;
+    append_only?: boolean;
   }[];
 }

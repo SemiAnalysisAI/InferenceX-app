@@ -45,10 +45,14 @@ export interface BenchmarkRow {
    */
   workers?: BenchmarkWorkerRow[];
   date: string;
-  /** Internal workflow identity used to keep merged agentic curves within one run. */
+  /** Producer identity and timestamp; preserved for per-point provenance. */
   workflow_run_id?: number;
   run_started_at?: string | null;
   run_url: string | null;
+  /** Logical snapshot identity. Set when an append-only run carries older points forward. */
+  curve_date?: string;
+  curve_workflow_run_id?: number;
+  curve_run_started_at?: string | null;
 }
 
 /**
@@ -56,12 +60,10 @@ export interface BenchmarkRow {
  * up to a given date. Multiple keys support point-release grouping — e.g. passing
  * `['glm5', 'glm5.1']` unions both buckets under the one display.
  *
- * Selection unit is the LINE, not the point: for each line
- * `(config_id, benchmark_type, isl, osl, offload_mode)` we pick the single newest workflow run that
- * produced data for it (newest date, then latest sweep, then highest run id) and return
- * EVERY concurrency that one run measured — and nothing from any other run. A partial
- * re-sweep therefore truncates the line to its own concurrencies rather than stitching the
- * skipped ones from an older run. This guarantees a line never mixes runs/dates.
+ * Selection unit is the LINE, not the point. Normally each line comes entirely from
+ * its newest workflow run. Runs explicitly marked append-only are the sole exception:
+ * their new points extend the immediately preceding same-image curve, including a
+ * consecutive chain of append-only runs back to the nearest full snapshot.
  *
  * The frontend filters by sequence client-side. This eliminates API round-trips when
  * switching sequences — the data is already cached by React Query.
@@ -84,7 +86,7 @@ export async function getLatestBenchmarks(
   if (date) {
     // Date-filtered: use the base table (the view only has the absolute latest).
     // exact=true: only this exact date (GPU comparison); exact=false (default): as of this date.
-    const dateFilter = exact ? sql`br.date = ${date}::date` : sql`br.date <= ${date}::date`;
+    const dateFilter = exact ? sql`r.date = ${date}::date` : sql`r.date <= ${date}::date`;
     // "As of run" filter (main chart only): keep results whose run started no later
     // than the selected run. run_started_at is an absolute timestamp, so this also
     // naturally includes all earlier-date runs. NULLs (pre-migration-003 runs that
@@ -93,34 +95,116 @@ export async function getLatestBenchmarks(
     const runFilter =
       !exact && asOfRunId
         ? sql`AND (
-            wr.run_started_at IS NULL
-            OR wr.run_started_at <= COALESCE(
+            r.run_started_at IS NULL
+            OR r.run_started_at <= COALESCE(
               (SELECT lwr.run_started_at FROM latest_workflow_runs lwr WHERE lwr.github_run_id = ${Number(asOfRunId)}),
               'infinity'::timestamptz
             )
           )`
         : sql``;
-    // winners: the single newest run per LINE
-    // (config_id, benchmark_type, isl, osl, offload_mode) under the
-    // date/run cutoff. br.date is a calendar day, so two same-day sweeps tie on date — break
-    // by wr.run_started_at (latest sweep wins), then br.workflow_run_id so exactly one run wins
-    // even when run_started_at is equal/null. The outer join then pulls EVERY concurrency that
-    // winning run measured for the line, so the line is built from one run only (no carry-forward
-    // of concurrencies a partial re-sweep skipped).
+    // Rank every run for each line, choose the newest seed under the requested
+    // date/run cutoff, then walk backward only while the current run is append-only
+    // and the image remains identical. DISTINCT ON makes the newest contributor win
+    // per concurrency without mixing ordinary snapshots.
     const rows = await sql`
-      WITH winners AS (
-        SELECT DISTINCT ON (br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode)
-          br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
-          br.workflow_run_id AS winning_run_id
+      WITH RECURSIVE run_lines AS (
+        SELECT
+          c.model, c.hardware, c.framework, c.precision, c.disagg,
+          CASE WHEN br.benchmark_type = 'agentic_traces' THEN '' ELSE c.spec_method END AS line_spec_method,
+          br.benchmark_type, br.isl, br.osl, br.offload_mode,
+          br.workflow_run_id, br.date, wr.run_started_at, wr.github_run_id,
+          wr.append_only, min(br.image) AS image,
+          count(DISTINCT br.image) AS image_count,
+          bool_and(br.image IS NOT NULL) AS images_complete
         FROM benchmark_results br
         JOIN configs c ON c.id = br.config_id
         JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
         WHERE c.model = ANY(${modelKeys})
           AND br.error IS NULL
-          AND ${dateFilter}
+        GROUP BY
+          c.model, c.hardware, c.framework, c.precision, c.disagg,
+          CASE WHEN br.benchmark_type = 'agentic_traces' THEN '' ELSE c.spec_method END,
+          br.benchmark_type, br.isl, br.osl, br.offload_mode,
+          br.workflow_run_id, br.date, wr.run_started_at, wr.github_run_id, wr.append_only
+      ), ranked_runs AS (
+        SELECT run_lines.*,
+          row_number() OVER (
+            PARTITION BY
+              model, hardware, framework, precision, disagg, line_spec_method,
+              benchmark_type, isl, osl, offload_mode
+            ORDER BY date DESC, run_started_at DESC NULLS LAST, workflow_run_id DESC
+          ) AS run_rank
+        FROM run_lines
+      ), seed_runs AS (
+        SELECT DISTINCT ON (
+          r.model, r.hardware, r.framework, r.precision, r.disagg,
+          r.line_spec_method, r.benchmark_type, r.isl, r.osl, r.offload_mode
+        )
+          r.*
+        FROM ranked_runs r
+        WHERE ${dateFilter}
           ${runFilter}
-        ORDER BY br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
-                 br.date DESC, wr.run_started_at DESC NULLS LAST, br.workflow_run_id DESC
+        ORDER BY
+          r.model, r.hardware, r.framework, r.precision, r.disagg,
+          r.line_spec_method, r.benchmark_type, r.isl, r.osl, r.offload_mode,
+          r.date DESC, r.run_started_at DESC NULLS LAST, r.workflow_run_id DESC
+      ), curve_runs AS (
+        SELECT
+          seed_runs.*,
+          seed_runs.image AS root_image,
+          seed_runs.date AS snapshot_date,
+          seed_runs.workflow_run_id AS snapshot_workflow_run_id
+        FROM seed_runs
+
+        UNION ALL
+
+        SELECT
+          older.*,
+          current.root_image,
+          current.snapshot_date,
+          current.snapshot_workflow_run_id
+        FROM curve_runs current
+        JOIN ranked_runs older
+          ON older.model = current.model
+          AND older.hardware = current.hardware
+          AND older.framework = current.framework
+          AND older.precision = current.precision
+          AND older.disagg = current.disagg
+          AND older.line_spec_method = current.line_spec_method
+          AND older.benchmark_type = current.benchmark_type
+          AND older.isl IS NOT DISTINCT FROM current.isl
+          AND older.osl IS NOT DISTINCT FROM current.osl
+          AND older.offload_mode = current.offload_mode
+          AND older.run_rank = current.run_rank + 1
+        WHERE current.append_only
+          AND current.image_count = 1
+          AND current.images_complete
+          AND older.image_count = 1
+          AND older.images_complete
+          AND older.image = current.root_image
+      ), selected_points AS (
+        SELECT DISTINCT ON (
+          br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode, br.conc
+        ) br.*, cr.snapshot_date, cr.snapshot_workflow_run_id
+        FROM curve_runs cr
+        JOIN benchmark_results br
+          ON br.workflow_run_id = cr.workflow_run_id
+          AND br.benchmark_type = cr.benchmark_type
+          AND br.isl IS NOT DISTINCT FROM cr.isl
+          AND br.osl IS NOT DISTINCT FROM cr.osl
+          AND br.offload_mode = cr.offload_mode
+        JOIN configs point_c
+          ON point_c.id = br.config_id
+          AND point_c.model = cr.model
+          AND point_c.hardware = cr.hardware
+          AND point_c.framework = cr.framework
+          AND point_c.precision = cr.precision
+          AND point_c.disagg = cr.disagg
+          AND CASE WHEN br.benchmark_type = 'agentic_traces' THEN '' ELSE point_c.spec_method END = cr.line_spec_method
+        WHERE br.error IS NULL
+        ORDER BY
+          br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
+          br.conc, cr.run_rank
       )
       SELECT
         br.id,
@@ -152,18 +236,14 @@ export async function getLatestBenchmarks(
         br.date::text,
         br.workflow_run_id,
         wr.run_started_at::text,
-        CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
-      FROM benchmark_results br
+        CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url,
+        br.snapshot_date::text AS curve_date,
+        br.snapshot_workflow_run_id AS curve_workflow_run_id,
+        snapshot_wr.run_started_at::text AS curve_run_started_at
+      FROM selected_points br
       JOIN configs c ON c.id = br.config_id
       JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
-      JOIN winners w
-        ON w.config_id = br.config_id
-        AND w.benchmark_type = br.benchmark_type
-        AND w.isl IS NOT DISTINCT FROM br.isl
-        AND w.osl IS NOT DISTINCT FROM br.osl
-        AND w.offload_mode = br.offload_mode
-        AND w.winning_run_id = br.workflow_run_id
-      WHERE br.error IS NULL
+      JOIN latest_workflow_runs snapshot_wr ON snapshot_wr.id = br.snapshot_workflow_run_id
       ORDER BY br.config_id, br.conc, br.isl, br.osl
     `;
     return rows as unknown as BenchmarkRow[];
@@ -201,10 +281,14 @@ export async function getLatestBenchmarks(
       lb.date::text,
       lb.workflow_run_id,
       wr.run_started_at::text,
-      CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
+      CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url,
+      lb.snapshot_date::text AS curve_date,
+      lb.snapshot_workflow_run_id AS curve_workflow_run_id,
+      snapshot_wr.run_started_at::text AS curve_run_started_at
     FROM latest_benchmarks lb
     JOIN configs c ON c.id = lb.config_id
     JOIN latest_workflow_runs wr ON wr.id = lb.workflow_run_id
+    JOIN latest_workflow_runs snapshot_wr ON snapshot_wr.id = lb.snapshot_workflow_run_id
     WHERE c.model = ANY(${modelKeys})
     ORDER BY lb.config_id, lb.conc, lb.isl, lb.osl, lb.date DESC
   `;
@@ -212,11 +296,9 @@ export async function getLatestBenchmarks(
 }
 
 /**
- * Fetch the benchmark results produced by ONE specific workflow run (by GitHub
- * run id). Unlike {@link getLatestBenchmarks}, this returns exactly what that run
- * measured — used by the GPU comparison view to plot individual same-day runs as
- * distinct series (e.g. comparing a day-zero sweep against a same-day re-sweep).
- * Returns an empty array if the run produced no results for the model.
+ * Fetch the curve snapshot represented by one workflow run. Ordinary runs return
+ * exactly their own points; append-only runs also include the immediately preceding
+ * same-image curve chain. Used by GPU comparison for same-day run snapshots.
  */
 export async function getBenchmarksForRun(
   sql: DbClient,
@@ -225,7 +307,94 @@ export async function getBenchmarksForRun(
 ): Promise<BenchmarkRow[]> {
   const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
   const rows = await sql`
-    SELECT DISTINCT ON (br.config_id, br.conc, br.isl, br.osl, br.offload_mode)
+    WITH RECURSIVE run_lines AS (
+      SELECT
+        c.model, c.hardware, c.framework, c.precision, c.disagg,
+        CASE WHEN br.benchmark_type = 'agentic_traces' THEN '' ELSE c.spec_method END AS line_spec_method,
+        br.benchmark_type, br.isl, br.osl, br.offload_mode,
+        br.workflow_run_id, br.date, wr.run_started_at, wr.github_run_id,
+        wr.append_only, min(br.image) AS image,
+        count(DISTINCT br.image) AS image_count,
+        bool_and(br.image IS NOT NULL) AS images_complete
+      FROM benchmark_results br
+      JOIN configs c ON c.id = br.config_id
+      JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
+      WHERE c.model = ANY(${modelKeys})
+        AND br.error IS NULL
+      GROUP BY
+        c.model, c.hardware, c.framework, c.precision, c.disagg,
+        CASE WHEN br.benchmark_type = 'agentic_traces' THEN '' ELSE c.spec_method END,
+        br.benchmark_type, br.isl, br.osl, br.offload_mode,
+        br.workflow_run_id, br.date, wr.run_started_at, wr.github_run_id, wr.append_only
+    ), ranked_runs AS (
+      SELECT run_lines.*,
+        row_number() OVER (
+          PARTITION BY
+            model, hardware, framework, precision, disagg, line_spec_method,
+            benchmark_type, isl, osl, offload_mode
+          ORDER BY date DESC, run_started_at DESC NULLS LAST, workflow_run_id DESC
+        ) AS run_rank
+      FROM run_lines
+    ), curve_runs AS (
+      SELECT
+        ranked_runs.*,
+        ranked_runs.image AS root_image,
+        ranked_runs.date AS snapshot_date,
+        ranked_runs.workflow_run_id AS snapshot_workflow_run_id
+      FROM ranked_runs
+      WHERE github_run_id = ${Number(githubRunId)}
+
+      UNION ALL
+
+      SELECT
+        older.*,
+        current.root_image,
+        current.snapshot_date,
+        current.snapshot_workflow_run_id
+      FROM curve_runs current
+      JOIN ranked_runs older
+        ON older.model = current.model
+        AND older.hardware = current.hardware
+        AND older.framework = current.framework
+        AND older.precision = current.precision
+        AND older.disagg = current.disagg
+        AND older.line_spec_method = current.line_spec_method
+        AND older.benchmark_type = current.benchmark_type
+        AND older.isl IS NOT DISTINCT FROM current.isl
+        AND older.osl IS NOT DISTINCT FROM current.osl
+        AND older.offload_mode = current.offload_mode
+        AND older.run_rank = current.run_rank + 1
+      WHERE current.append_only
+        AND current.image_count = 1
+        AND current.images_complete
+        AND older.image_count = 1
+        AND older.images_complete
+        AND older.image = current.root_image
+    ), selected_points AS (
+      SELECT DISTINCT ON (
+        br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode, br.conc
+      ) br.*, cr.snapshot_date, cr.snapshot_workflow_run_id
+      FROM curve_runs cr
+      JOIN benchmark_results br
+        ON br.workflow_run_id = cr.workflow_run_id
+        AND br.benchmark_type = cr.benchmark_type
+        AND br.isl IS NOT DISTINCT FROM cr.isl
+        AND br.osl IS NOT DISTINCT FROM cr.osl
+        AND br.offload_mode = cr.offload_mode
+      JOIN configs point_c
+        ON point_c.id = br.config_id
+        AND point_c.model = cr.model
+        AND point_c.hardware = cr.hardware
+        AND point_c.framework = cr.framework
+        AND point_c.precision = cr.precision
+        AND point_c.disagg = cr.disagg
+        AND CASE WHEN br.benchmark_type = 'agentic_traces' THEN '' ELSE point_c.spec_method END = cr.line_spec_method
+      WHERE br.error IS NULL
+      ORDER BY
+        br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
+        br.conc, cr.run_rank
+    )
+    SELECT
       br.id,
       c.hardware,
       c.framework,
@@ -255,23 +424,20 @@ export async function getBenchmarksForRun(
       br.date::text,
       br.workflow_run_id,
       wr.run_started_at::text,
-      CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
-    FROM benchmark_results br
+      CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url,
+      br.snapshot_date::text AS curve_date,
+      br.snapshot_workflow_run_id AS curve_workflow_run_id,
+      snapshot_wr.run_started_at::text AS curve_run_started_at
+    FROM selected_points br
     JOIN configs c ON c.id = br.config_id
     JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
-    WHERE c.model = ANY(${modelKeys})
-      AND br.error IS NULL
-      AND wr.github_run_id = ${Number(githubRunId)}
-    ORDER BY br.config_id, br.conc, br.isl, br.osl, br.offload_mode, br.date DESC
+    JOIN latest_workflow_runs snapshot_wr ON snapshot_wr.id = br.snapshot_workflow_run_id
+    ORDER BY br.config_id, br.conc, br.isl, br.osl, br.offload_mode
   `;
   return rows as unknown as BenchmarkRow[];
 }
 
-/**
- * Fetch ALL benchmark results for a model + sequence across ALL dates.
- * No DISTINCT ON — returns every successful result, one per (config, conc, date).
- * Used by Historical Trends and Performance Over Time features.
- */
+/** Fetch every logical curve snapshot across time for historical views. */
 export async function getAllBenchmarksForHistory(
   sql: DbClient,
   modelKey: string | string[],
@@ -285,6 +451,95 @@ export async function getAllBenchmarksForHistory(
       ? sql`br.benchmark_type = 'agentic_traces'`
       : sql`br.isl = ${isl} AND br.osl = ${osl}`;
   const rows = await sql`
+    WITH RECURSIVE run_lines AS (
+      SELECT
+        c.model, c.hardware, c.framework, c.precision, c.disagg,
+        CASE WHEN br.benchmark_type = 'agentic_traces' THEN '' ELSE c.spec_method END AS line_spec_method,
+        br.benchmark_type, br.isl, br.osl, br.offload_mode,
+        br.workflow_run_id, br.date, wr.run_started_at, wr.github_run_id,
+        wr.append_only, min(br.image) AS image,
+        count(DISTINCT br.image) AS image_count,
+        bool_and(br.image IS NOT NULL) AS images_complete
+      FROM benchmark_results br
+      JOIN configs c ON c.id = br.config_id
+      JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
+      WHERE c.model = ANY(${modelKeys})
+        AND ${sequenceFilter}
+        AND br.error IS NULL
+      GROUP BY
+        c.model, c.hardware, c.framework, c.precision, c.disagg,
+        CASE WHEN br.benchmark_type = 'agentic_traces' THEN '' ELSE c.spec_method END,
+        br.benchmark_type, br.isl, br.osl, br.offload_mode,
+        br.workflow_run_id, br.date, wr.run_started_at, wr.github_run_id, wr.append_only
+    ), ranked_runs AS (
+      SELECT run_lines.*,
+        row_number() OVER (
+          PARTITION BY
+            model, hardware, framework, precision, disagg, line_spec_method,
+            benchmark_type, isl, osl, offload_mode
+          ORDER BY date DESC, run_started_at DESC NULLS LAST, workflow_run_id DESC
+        ) AS run_rank
+      FROM run_lines
+    ), curve_runs AS (
+      SELECT
+        ranked_runs.*,
+        ranked_runs.image AS root_image,
+        ranked_runs.date AS snapshot_date,
+        ranked_runs.workflow_run_id AS snapshot_workflow_run_id
+      FROM ranked_runs
+
+      UNION ALL
+
+      SELECT
+        older.*,
+        current.root_image,
+        current.snapshot_date,
+        current.snapshot_workflow_run_id
+      FROM curve_runs current
+      JOIN ranked_runs older
+        ON older.model = current.model
+        AND older.hardware = current.hardware
+        AND older.framework = current.framework
+        AND older.precision = current.precision
+        AND older.disagg = current.disagg
+        AND older.line_spec_method = current.line_spec_method
+        AND older.benchmark_type = current.benchmark_type
+        AND older.isl IS NOT DISTINCT FROM current.isl
+        AND older.osl IS NOT DISTINCT FROM current.osl
+        AND older.offload_mode = current.offload_mode
+        AND older.run_rank = current.run_rank + 1
+      WHERE current.append_only
+        AND current.image_count = 1
+        AND current.images_complete
+        AND older.image_count = 1
+        AND older.images_complete
+        AND older.image = current.root_image
+    ), selected_points AS (
+      SELECT DISTINCT ON (
+        cr.snapshot_workflow_run_id,
+        br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode, br.conc
+      ) br.*, cr.snapshot_date, cr.snapshot_workflow_run_id
+      FROM curve_runs cr
+      JOIN benchmark_results br
+        ON br.workflow_run_id = cr.workflow_run_id
+        AND br.benchmark_type = cr.benchmark_type
+        AND br.isl IS NOT DISTINCT FROM cr.isl
+        AND br.osl IS NOT DISTINCT FROM cr.osl
+        AND br.offload_mode = cr.offload_mode
+      JOIN configs point_c
+        ON point_c.id = br.config_id
+        AND point_c.model = cr.model
+        AND point_c.hardware = cr.hardware
+        AND point_c.framework = cr.framework
+        AND point_c.precision = cr.precision
+        AND point_c.disagg = cr.disagg
+        AND CASE WHEN br.benchmark_type = 'agentic_traces' THEN '' ELSE point_c.spec_method END = cr.line_spec_method
+      WHERE br.error IS NULL
+      ORDER BY
+        cr.snapshot_workflow_run_id,
+        br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
+        br.conc, cr.run_rank
+    )
     SELECT
       br.id,
       c.hardware,
@@ -315,14 +570,15 @@ export async function getAllBenchmarksForHistory(
       br.date::text,
       br.workflow_run_id,
       wr.run_started_at::text,
-      CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
-    FROM configs c
-    JOIN benchmark_results br ON br.config_id = c.id
-      AND ${sequenceFilter}
-      AND br.error IS NULL
+      CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url,
+      br.snapshot_date::text AS curve_date,
+      br.snapshot_workflow_run_id AS curve_workflow_run_id,
+      snapshot_wr.run_started_at::text AS curve_run_started_at
+    FROM selected_points br
+    JOIN configs c ON c.id = br.config_id
     JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
-    WHERE c.model = ANY(${modelKeys})
-    ORDER BY br.date, c.id, br.conc
+    JOIN latest_workflow_runs snapshot_wr ON snapshot_wr.id = br.snapshot_workflow_run_id
+    ORDER BY br.snapshot_date, c.id, br.conc
   `;
   return rows as unknown as BenchmarkRow[];
 }

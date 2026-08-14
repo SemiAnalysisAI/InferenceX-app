@@ -67,6 +67,7 @@ import {
   type ChangelogEntry,
   parseChangelogEntries,
   ingestChangelogEntries,
+  hasAppendOnlyFlag,
   hasEvalsOnlyFlag,
 } from './etl/changelog-ingest';
 
@@ -289,6 +290,53 @@ async function main(): Promise<void> {
     ? workflowGhInfo.createdAt.split('T')[0]
     : new Date().toISOString().split('T')[0];
 
+  // Parse changelog metadata before creating the workflow row: append-only is a
+  // run-level curve-selection contract used by the latest-benchmark queries.
+  const changelogDir = path.join(artifactsDir, ARTIFACT_NAMES.changelog);
+  const changelogFiles = findJsonFiles(changelogDir);
+  const parsedChangelogs: {
+    baseRef: string;
+    headRef: string;
+    entries: ChangelogEntry[];
+  }[] = [];
+  for (const file of changelogFiles) {
+    const data = readJson(file) as Record<string, any> | null;
+    if (!data || typeof data !== 'object') continue;
+    const baseRef = String(data.base_ref ?? '');
+    const headRef = String(data.head_ref ?? '');
+    if (!baseRef || !headRef) continue;
+    const entries = parseChangelogEntries(data.entries);
+    if (entries.length > 0) parsedChangelogs.push({ baseRef, headRef, entries });
+  }
+  if (parsedChangelogs.length === 0) {
+    const headRef = workflowGhInfo?.headBranch ?? workflowGhInfo?.headSha ?? `run-${runIdStr}`;
+    // Prefer the workflow's display name: it describes the sweep, while the head
+    // commit message often describes an unrelated code change.
+    const fallbackDescription =
+      workflowGhInfo?.name?.trim() ||
+      workflowGhInfo?.headCommitMessage?.trim().split('\n')[0]?.trim() ||
+      `GitHub Actions run ${runIdStr}`;
+
+    parsedChangelogs.push({
+      baseRef: 'unknown',
+      headRef,
+      entries: [
+        {
+          configKeys: [],
+          description: fallbackDescription,
+          prLink: null,
+          evalsOnly: false,
+          appendOnly: false,
+        },
+      ],
+    });
+    console.log(
+      `  No changelog metadata artifact found; using fallback changelog: ${fallbackDescription}`,
+    );
+  }
+  const appendOnly = hasAppendOnlyFlag(parsedChangelogs);
+  const evalsOnly = hasEvalsOnlyFlag(parsedChangelogs);
+
   const workflowRunId = await getOrCreateWorkflowRun({
     githubRunId: runId,
     runAttempt: runAttemptNum,
@@ -300,6 +348,7 @@ async function main(): Promise<void> {
     headSha: workflowGhInfo?.headSha,
     htmlUrl: reusedIngestMetadata?.sourceRunUrl,
     createdAt: workflowGhInfo?.createdAt || triggerGhInfo?.createdAt || new Date().toISOString(),
+    appendOnly,
     ghInfo: workflowGhInfo,
   });
   if (workflowRunId === null) {
@@ -337,49 +386,6 @@ async function main(): Promise<void> {
   const missingDatasets = new Set<string>();
 
   // ── Check for evals-only flag in changelog ────────────────────────────
-  const changelogDir = path.join(artifactsDir, ARTIFACT_NAMES.changelog);
-  const changelogFiles = findJsonFiles(changelogDir);
-  const parsedChangelogs: {
-    baseRef: string;
-    headRef: string;
-    entries: ChangelogEntry[];
-  }[] = [];
-  for (const file of changelogFiles) {
-    const data = readJson(file) as Record<string, any> | null;
-    if (!data || typeof data !== 'object') continue;
-    const baseRef = String(data.base_ref ?? '');
-    const headRef = String(data.head_ref ?? '');
-    if (!baseRef || !headRef) continue;
-    const entries = parseChangelogEntries(data.entries);
-    if (entries.length > 0) parsedChangelogs.push({ baseRef, headRef, entries });
-  }
-  if (parsedChangelogs.length === 0) {
-    const headRef = workflowGhInfo?.headBranch ?? workflowGhInfo?.headSha ?? `run-${runIdStr}`;
-    // Prefer the workflow's display name ("e2e Test - B300 DSv4 AgentX vLLM 1h
-    // + 10m warmup") — it describes the sweep; the head commit message usually
-    // describes an unrelated code change.
-    const fallbackDescription =
-      workflowGhInfo?.name?.trim() ||
-      workflowGhInfo?.headCommitMessage?.trim().split('\n')[0]?.trim() ||
-      `GitHub Actions run ${runIdStr}`;
-
-    parsedChangelogs.push({
-      baseRef: 'unknown',
-      headRef,
-      entries: [
-        {
-          configKeys: [],
-          description: fallbackDescription,
-          prLink: null,
-          evalsOnly: false,
-        },
-      ],
-    });
-    console.log(
-      `  No changelog metadata artifact found; using fallback changelog: ${fallbackDescription}`,
-    );
-  }
-  const evalsOnly = hasEvalsOnlyFlag(parsedChangelogs);
   if (evalsOnly) {
     console.log('\n  ⚠ evals-only run detected — skipping benchmark and stats ingest');
   }

@@ -10,7 +10,18 @@ export interface BenchmarkSeriesRow {
   date: string;
   workflow_run_id?: number;
   run_started_at?: string | null;
+  curve_date?: string;
+  curve_workflow_run_id?: number;
+  curve_run_started_at?: string | null;
 }
+
+export const benchmarkCurveDate = (row: BenchmarkSeriesRow): string => row.curve_date ?? row.date;
+
+export const benchmarkCurveWorkflowRunId = (row: BenchmarkSeriesRow): number | undefined =>
+  row.curve_workflow_run_id ?? row.workflow_run_id;
+
+export const benchmarkCurveRunStartedAt = (row: BenchmarkSeriesRow): string | null | undefined =>
+  row.curve_run_started_at ?? row.run_started_at;
 
 const seriesKey = (row: BenchmarkSeriesRow): string => {
   const specMethod = row.benchmark_type === 'agentic_traces' ? '' : row.spec_method;
@@ -18,19 +29,20 @@ const seriesKey = (row: BenchmarkSeriesRow): string => {
 };
 
 function isLaterRun(candidate: BenchmarkSeriesRow, current: BenchmarkSeriesRow): boolean {
-  const startedAt = candidate.run_started_at ?? '';
-  const currentStartedAt = current.run_started_at ?? '';
+  const startedAt = benchmarkCurveRunStartedAt(candidate) ?? '';
+  const currentStartedAt = benchmarkCurveRunStartedAt(current) ?? '';
   return (
     startedAt > currentStartedAt ||
     (startedAt === currentStartedAt &&
-      (candidate.workflow_run_id ?? Number.NEGATIVE_INFINITY) >
-        (current.workflow_run_id ?? Number.NEGATIVE_INFINITY))
+      (benchmarkCurveWorkflowRunId(candidate) ?? Number.NEGATIVE_INFINITY) >
+        (benchmarkCurveWorkflowRunId(current) ?? Number.NEGATIVE_INFINITY))
   );
 }
 
 function isWinningRun(row: BenchmarkSeriesRow, winner: BenchmarkSeriesRow): boolean {
   return (
-    row.run_started_at === winner.run_started_at && row.workflow_run_id === winner.workflow_run_id
+    benchmarkCurveRunStartedAt(row) === benchmarkCurveRunStartedAt(winner) &&
+    benchmarkCurveWorkflowRunId(row) === benchmarkCurveWorkflowRunId(winner)
   );
 }
 
@@ -40,12 +52,12 @@ export function dedupeRowsToLatestPerConfig<T extends BenchmarkSeriesRow>(rows: 
   for (const row of rows) {
     const key = seriesKey(row);
     const current = winnerPerGroup.get(key);
-    if (!current || row.date > current.date) {
+    if (!current || benchmarkCurveDate(row) > benchmarkCurveDate(current)) {
       winnerPerGroup.set(key, row);
       continue;
     }
     if (
-      row.date === current.date &&
+      benchmarkCurveDate(row) === benchmarkCurveDate(current) &&
       row.benchmark_type === 'agentic_traces' &&
       isLaterRun(row, current)
     ) {
@@ -54,7 +66,7 @@ export function dedupeRowsToLatestPerConfig<T extends BenchmarkSeriesRow>(rows: 
   }
   return rows.filter((row) => {
     const winner = winnerPerGroup.get(seriesKey(row));
-    if (!winner || row.date !== winner.date) return false;
+    if (!winner || benchmarkCurveDate(row) !== benchmarkCurveDate(winner)) return false;
     return row.benchmark_type !== 'agentic_traces' || isWinningRun(row, winner);
   });
 }
@@ -64,13 +76,13 @@ export function dedupeAgenticHistoryRuns<T extends BenchmarkSeriesRow>(rows: T[]
   const winnerPerDateAndSeries = new Map<string, T>();
   for (const row of rows) {
     if (row.benchmark_type !== 'agentic_traces') continue;
-    const key = `${row.date}|${seriesKey(row)}`;
+    const key = `${benchmarkCurveDate(row)}|${seriesKey(row)}`;
     const current = winnerPerDateAndSeries.get(key);
     if (!current || isLaterRun(row, current)) winnerPerDateAndSeries.set(key, row);
   }
   return rows.filter((row) => {
     if (row.benchmark_type !== 'agentic_traces') return true;
-    const winner = winnerPerDateAndSeries.get(`${row.date}|${seriesKey(row)}`);
+    const winner = winnerPerDateAndSeries.get(`${benchmarkCurveDate(row)}|${seriesKey(row)}`);
     return winner !== undefined && isWinningRun(row, winner);
   });
 }

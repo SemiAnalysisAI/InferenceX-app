@@ -18,6 +18,7 @@ export interface ChangelogRow {
   config_keys: string[];
   description: string;
   pr_link: string | null;
+  append_only: boolean;
 }
 
 export interface DateConfigRow {
@@ -56,7 +57,8 @@ export async function getChangelogByDate(sql: DbClient, date: string): Promise<C
       cl.head_ref,
       cl.config_keys,
       cl.description,
-      cl.pr_link
+      cl.pr_link,
+      cl.append_only
     FROM changelog_entries cl
     JOIN latest_workflow_runs wr ON wr.id = cl.workflow_run_id
     WHERE cl.date = ${date}::date

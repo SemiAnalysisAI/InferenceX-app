@@ -25,6 +25,7 @@ import {
 } from '@/lib/constants';
 import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmark-transform';
 import {
+  benchmarkCurveDate,
   dedupeAgenticHistoryRuns,
   dedupeRowsToLatestPerConfig as dedupeLatestBenchmarkSeries,
 } from '@/lib/benchmark-run-selection';
@@ -341,9 +342,11 @@ export function useChartData(
     // an offload=on sweep can't hide a differently-dated offload=off series.
     const deduped = dedupeRowsToLatestPerConfig(seqFiltered);
 
-    const mainRows = deduped.map((r) =>
-      selectedRunDate ? { ...r, date: selectedRunDate, actualDate: r.date } : r,
-    );
+    const mainRows = deduped.map((r) => ({
+      ...r,
+      date: selectedRunDate ?? benchmarkCurveDate(r),
+      actualDate: r.date,
+    }));
     if (comparisonDates.length === 0) return mainRows;
     const extraRows = comparisonQueries.flatMap((q, i) => {
       const filtered = filterOverviewHistoryRows(
@@ -352,7 +355,11 @@ export function useChartData(
       );
       const selected =
         selectedSequence === Sequence.AgenticTraces ? dedupeAgenticHistoryRuns(filtered) : filtered;
-      return selected.map((r) => ({ ...r, date: comparisonDates[i], actualDate: r.date }));
+      return selected.map((r) => ({
+        ...r,
+        date: comparisonDates[i],
+        actualDate: r.date,
+      }));
     });
     return [...mainRows, ...extraRows];
   }, [
@@ -368,7 +375,10 @@ export function useChartData(
   // Transform filtered rows into chart data
   const { chartData, hardwareConfig: rawHardwareConfig } = useMemo(() => {
     if (rows.length === 0)
-      return { chartData: [] as InferenceData[][], hardwareConfig: {} as HardwareConfig };
+      return {
+        chartData: [] as InferenceData[][],
+        hardwareConfig: {} as HardwareConfig,
+      };
     return transformBenchmarkRows(rows, selectedPercentile);
   }, [rows, selectedPercentile]);
 
@@ -611,5 +621,12 @@ export function useChartData(
     [chartData, selectedGPUs, quickFilters, compareGpuPair],
   );
 
-  return { graphs, selectionPoints, loading, error, hardwareConfig, availableQuickFilters };
+  return {
+    graphs,
+    selectionPoints,
+    loading,
+    error,
+    hardwareConfig,
+    availableQuickFilters,
+  };
 }

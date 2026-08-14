@@ -23,8 +23,9 @@ const getCachedBenchmarks = cachedQuery(
   { blobOnly: true },
 );
 
-// Exactly one run's results (GPU comparison of individual same-day runs). Cached
-// under a distinct key prefix so it never collides with the latest/as-of query.
+// One logical run snapshot (GPU comparison of individual same-day runs). For an
+// append-only run this includes its same-image predecessor chain. Cached under a
+// distinct key prefix so it never collides with the latest/as-of query.
 const getCachedBenchmarksForRun = cachedQuery(
   (dbModelKeys: string[], runId: string) => getBenchmarksForRun(getDb(), dbModelKeys, runId),
   'benchmarks-run-agentic-run-metadata',

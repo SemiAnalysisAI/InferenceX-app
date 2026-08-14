@@ -33,6 +33,22 @@ Every INSERT uses `ON CONFLICT DO UPDATE` or `DO NOTHING`. This means:
 
 The unique constraints match natural keys (e.g., `(workflow_run_id, config_id, isl, osl, conc)` for benchmarks), not surrogate keys.
 
+### Append-Only Curve Extensions
+
+Normal workflow runs are complete line snapshots: the latest run for a line replaces
+the prior run as a unit, so partial re-sweeps cannot silently stitch points from
+different recipes. A changelog containing only `append-only: true` entries marks the
+one narrow exception. The latest-curve queries then walk backward through consecutive
+append-only runs and include the nearest full snapshot, selecting the newest producer
+for each concurrency.
+
+The chain continues only while the image is identical. Each returned benchmark row
+keeps its original workflow-run ID and run URL, so extending a curve does not erase
+point provenance; `curve_date` and `curve_workflow_run_id` carry the separate logical
+snapshot identity used by charts and history. InferenceX CI separately verifies that
+the generated matrix changed only by adding concurrency values; image, launcher,
+topology, recipe, and benchmark logic changes must use a normal full snapshot.
+
 ### Audited Point Purges
 
 `packages/db/src/etl/run-overrides.ts` is the durable audit record for exceptional

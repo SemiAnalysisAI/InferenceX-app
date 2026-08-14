@@ -61,6 +61,7 @@ interface RunInfo {
       description: string;
       pr_link: string | null;
       head_ref: string;
+      append_only?: boolean;
     }[];
   };
 }
@@ -134,6 +135,7 @@ function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
             description: c.description,
             pr_link: c.pr_link,
             head_ref: c.head_ref,
+            append_only: c.append_only,
           })),
         },
       }),
