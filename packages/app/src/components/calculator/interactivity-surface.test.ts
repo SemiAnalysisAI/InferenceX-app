@@ -134,6 +134,19 @@ const HOLE_ROWS: BenchmarkRow[] = [
   sweep('2026-06-05', 90, 1600),
 ];
 
+/**
+ * `HOLE_ROWS` plus a fourth config, also unmeasured below 45. At z = 30 the fleet's
+ * coverage then reads present-missing-present-missing, which is what separates ending
+ * the row at the first gap from ending it at the last: the stretch between the two
+ * gaps is readable, and is still downstream of a window this slice cannot account for.
+ */
+const TWO_GAP_ROWS: BenchmarkRow[] = [
+  ...HOLE_ROWS,
+  sweep('2026-09-05', 45, 5000),
+  sweep('2026-09-05', 70, 4200),
+  sweep('2026-09-05', 90, 3500),
+];
+
 /** A sweep whose prefill:decode mix shifts along the frontier, as disagg runs do. */
 const mixRow = (interactivity: number, tputPerGpu: number, inputTput: number): BenchmarkRow =>
   makeRow({
@@ -641,6 +654,26 @@ describe('buildSurfaceGrid', () => {
 
       // A fully covered slice is untouched by any of this.
       expect(cells[1]!.some((v) => v !== null)).toBe(true);
+    });
+
+    it('ends the row at the first gap, not the last, when there are several', () => {
+      // With two gaps the stretch between them is perfectly readable — and still
+      // downstream of the first missing window, so it may not be shown. Ending at the
+      // last gap instead would republish exactly the cells the fix exists to remove,
+      // and every single-gap fixture reads identically under both rules, so only a
+      // two-gap shape can tell them apart.
+      const grid = build({
+        groups: groupsOf(TWO_GAP_ROWS),
+        metric: 'cumulativeRevenue',
+        zs: [30, 50, 70],
+        currentZ: 50,
+      })!;
+      const row = grid.chips.find((c) => c.key === 'b300')!.cells[0]!;
+      const first = row.findIndex((v) => v !== null);
+      expect(first).toBeGreaterThan(-1);
+      const gap = row.findIndex((v, i) => i > first && v === null);
+      expect(gap).toBeGreaterThan(first);
+      expect(row.slice(gap).every((v) => v === null)).toBe(true);
     });
 
     it('lets the rates resume after a gap, because a rate carries no history', () => {

@@ -587,10 +587,12 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
       if (reads.every((read) => read === null)) continue;
 
       const throughputSteps: ThroughputStep[] = [];
-      // Which rungs actually reached the integrated timeline. Keyed off the push
-      // below rather than off `reads`, because a readable rung is still dropped
-      // when it cannot be sized — and the integral is what a running total must
-      // be judged against, not the reads it was built from.
+      // Which rungs actually reached the integrated timeline. Today this is exactly
+      // `reads[i] !== null`, because the only way to lose a readable rung below is a
+      // sizing failure and those depend on mw and per-GPU power alone — - fixed for
+      // the whole chip. It is recorded from the push anyway so that what a running
+      // total is judged against is the timeline the integral was built from, rather
+      // than a second list that happens to agree.
       const onTimeline = reads.map(() => false);
       let costPerHour: number | null = null;
       for (const [i, read] of reads.entries()) {
@@ -630,7 +632,9 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
       // governing at that instant; a total cannot. So a cumulative row stops at its
       // first gap, and a slice missing its first rung has no origin to integrate from
       // and shows nothing at all. Otherwise the totals compared along z would cover
-      // different windows, which is not a comparison.
+      // different windows, which is not a comparison. Where there is more than one
+      // gap it is the FIRST that ends the row — everything past it is downstream of a
+      // window this slice cannot account for, including the stretches it can see.
       const firstGap = onTimeline.indexOf(false);
       const truncateFrom =
         isCumulative(metric) && firstGap !== -1 ? rungMonths[firstGap]! : Number.POSITIVE_INFINITY;
