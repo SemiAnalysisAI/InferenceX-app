@@ -18,6 +18,8 @@ import { mergeOverviewControlHref, type OverviewSearchKey } from '@/lib/overview
 
 interface OverviewNavigationValue {
   data: OverviewPageData;
+  /** True while `data` still shows the previous selection during a fetch. */
+  pending: boolean;
   prefetch: (targetHref: string, keys: readonly OverviewSearchKey[]) => void;
   resolve: (targetHref: string, keys: readonly OverviewSearchKey[]) => string;
   push: (targetHref: string, keys: readonly OverviewSearchKey[]) => void;
@@ -36,6 +38,7 @@ export function OverviewNavigationProvider({
 }) {
   const router = useRouter();
   const [data, setData] = useState(initialData);
+  const [pending, setPending] = useState(false);
   const [pendingHref, setPendingHref] = useState(initialHref);
   const pendingHrefRef = useRef(initialHref);
   const committedHrefRef = useRef(initialHref);
@@ -47,8 +50,8 @@ export function OverviewNavigationProvider({
     const cached = dataCacheRef.current.get(href);
     if (cached !== undefined) return Promise.resolve(cached);
 
-    const pending = requestCacheRef.current.get(href);
-    if (pending !== undefined) return pending;
+    const inFlight = requestCacheRef.current.get(href);
+    if (inFlight !== undefined) return inFlight;
 
     const url = new URL(href, window.location.origin);
     const request = fetch(`/api/v1/overview${url.search}`, {
@@ -71,6 +74,7 @@ export function OverviewNavigationProvider({
       const navigationId = ++navigationIdRef.current;
       pendingHrefRef.current = href;
       setPendingHref(href);
+      setPending(true);
       if (updateHistory) {
         History.prototype.pushState.call(window.history, window.history.state, '', href);
         notifyClientSearchChange(href);
@@ -84,9 +88,11 @@ export function OverviewNavigationProvider({
             History.prototype.replaceState.call(window.history, window.history.state, '', href);
           }
           setData(nextData);
+          setPending(false);
         })
         .catch(() => {
           if (navigationId !== navigationIdRef.current) return;
+          setPending(false);
           if (updateHistory) {
             History.prototype.replaceState.call(
               window.history,
@@ -111,6 +117,7 @@ export function OverviewNavigationProvider({
     pendingHrefRef.current = initialHref;
     setPendingHref(initialHref);
     setData(initialData);
+    setPending(false);
   }, [initialData, initialHref]);
 
   useEffect(() => {
@@ -135,6 +142,7 @@ export function OverviewNavigationProvider({
   const value = useMemo<OverviewNavigationValue>(
     () => ({
       data,
+      pending,
       resolve,
       prefetch: (targetHref, keys) => {
         const href = mergeOverviewControlHref(pendingHrefRef.current, targetHref, keys);
@@ -145,7 +153,7 @@ export function OverviewNavigationProvider({
         commit(href, true);
       },
     }),
-    [commit, data, load, resolve],
+    [commit, data, load, pending, resolve],
   );
 
   return (

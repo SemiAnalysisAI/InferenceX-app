@@ -1103,14 +1103,11 @@ export function OverviewComparisonSwitcher({
 }
 
 /**
- * Where a scope toggle is drawn. `section` is the underlined sentence beneath
- * the matrix; `toolbar` is the button that replaces it while presenting, where
- * the sentence does not fit.
+ * Where a scope toggle is drawn. `section` is the chip in the footer bar
+ * beneath the matrix; `toolbar` is the same chip riding the deck toolbar while
+ * presenting, where the count badge would be noise at projection size.
  */
 type OverviewScopeToggleVariant = 'section' | 'toolbar';
-
-const SCOPE_SENTENCE_CLASS =
-  'inline-flex min-h-11 items-center text-muted-foreground underline decoration-dotted underline-offset-4 transition-colors hover:text-foreground hover:decoration-solid';
 
 /**
  * Matches Exit, so the right end of the deck toolbar reads as one row of
@@ -1119,6 +1116,19 @@ const SCOPE_SENTENCE_CLASS =
  */
 const SCOPE_CHIP_CLASS =
   'inline-flex min-h-11 items-center whitespace-nowrap rounded-md border border-border/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground';
+
+/** The count the chip's short label elides; the full sentence stays on the
+ *  accessible name, so the badge is presentation only. */
+function ScopeChipCount({ count }: { count: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] leading-none tabular-nums"
+    >
+      {count}
+    </span>
+  );
+}
 
 export function OverviewModelScopeToggle({
   modelScope,
@@ -1169,15 +1179,11 @@ export function OverviewModelScopeToggle({
       )}
       analytics={{ control: 'models', value: target }}
       searchKeys={['models', 'rows', 'hwrows']}
-      aria-label={variant === 'toolbar' ? sentence : undefined}
-      title={variant === 'toolbar' ? sentence : undefined}
-      className={variant === 'toolbar' ? SCOPE_CHIP_CLASS : SCOPE_SENTENCE_CLASS}
+      aria-label={sentence}
+      title={sentence}
+      className={SCOPE_CHIP_CLASS}
     >
-      {variant === 'toolbar'
-        ? modelScope === 'all'
-          ? strings.modelScopeChipHide
-          : strings.modelScopeChipShow
-        : sentence}
+      {modelScope === 'all' ? strings.modelScopeChipHide : strings.modelScopeChipShow}
     </OverviewNavLink>
   );
   if (variant === 'toolbar') return link;
@@ -1185,7 +1191,7 @@ export function OverviewModelScopeToggle({
     <nav
       data-testid="overview-model-scope-toggle"
       aria-label={strings.modelScopeNavLabel}
-      className="border-t border-border/50 px-4 text-xs lg:px-6"
+      className="text-xs"
     >
       {link}
     </nav>
@@ -1238,15 +1244,12 @@ export function OverviewRowScopeToggle({
       )}
       analytics={{ control: 'rows', value: target }}
       searchKeys={['rows']}
-      aria-label={variant === 'toolbar' ? sentence : undefined}
-      title={variant === 'toolbar' ? sentence : undefined}
-      className={variant === 'toolbar' ? SCOPE_CHIP_CLASS : SCOPE_SENTENCE_CLASS}
+      aria-label={sentence}
+      title={sentence}
+      className={SCOPE_CHIP_CLASS}
     >
-      {variant === 'toolbar'
-        ? rowScope === 'all'
-          ? strings.rowScopeChipHide
-          : strings.rowScopeChipShow
-        : sentence}
+      {rowScope === 'all' ? strings.rowScopeChipHide : strings.rowScopeChipShow}
+      {variant === 'section' ? <ScopeChipCount count={unchangedRowCount} /> : null}
     </OverviewNavLink>
   );
   if (variant === 'toolbar') return link;
@@ -1254,7 +1257,7 @@ export function OverviewRowScopeToggle({
     <nav
       data-testid="overview-row-scope-toggle"
       aria-label={strings.rowScopeNavLabel}
-      className="border-t border-border/50 px-4 text-xs lg:px-6"
+      className="text-xs"
     >
       {link}
     </nav>
@@ -1306,15 +1309,14 @@ export function OverviewHardwareRowScopeToggle({
       )}
       analytics={{ control: 'hwrows', value: target }}
       searchKeys={['hwrows']}
-      aria-label={variant === 'toolbar' ? sentence : undefined}
-      title={variant === 'toolbar' ? sentence : undefined}
-      className={variant === 'toolbar' ? SCOPE_CHIP_CLASS : SCOPE_SENTENCE_CLASS}
+      aria-label={sentence}
+      title={sentence}
+      className={SCOPE_CHIP_CLASS}
     >
-      {variant === 'toolbar'
-        ? hardwareRowScope === 'all'
-          ? strings.hardwareRowScopeChipHide
-          : strings.hardwareRowScopeChipShow
-        : sentence}
+      {hardwareRowScope === 'all'
+        ? strings.hardwareRowScopeChipHide
+        : strings.hardwareRowScopeChipShow}
+      {variant === 'section' ? <ScopeChipCount count={emptyRowCount} /> : null}
     </OverviewNavLink>
   );
   if (variant === 'toolbar') return link;
@@ -1322,7 +1324,7 @@ export function OverviewHardwareRowScopeToggle({
     <nav
       data-testid="overview-hardware-row-scope-toggle"
       aria-label={strings.hardwareRowScopeNavLabel}
-      className="border-t border-border/50 px-4 text-xs lg:px-6"
+      className="text-xs"
     >
       {link}
     </nav>
@@ -1342,7 +1344,7 @@ export function OverviewMethodology({
   return (
     <div
       data-testid="overview-methodology"
-      className="space-y-1 border-t border-border/50 px-4 py-3 text-xs leading-snug text-muted-foreground lg:px-6"
+      className="space-y-1 text-xs leading-snug text-muted-foreground"
     >
       {comparisonMode === 'history' ? <p>{strings.historyCaption}</p> : null}
       <p>
