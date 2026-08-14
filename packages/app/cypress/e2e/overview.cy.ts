@@ -656,8 +656,13 @@ describe('Overview page', () => {
             'have.length',
             MATRIX_ROWS - hidden,
           );
-          // The action label names the click, so it flips once the scope lands.
-          cy.get(`a[${attribute}]`).should('contain.text', `Show ${hidden} rows with ${sentence}`);
+          // The action label names the click, so it flips once the scope
+          // lands; the chip keeps the short label and the counted sentence
+          // rides the accessible name.
+          cy.get(`a[${attribute}]`)
+            .should('contain.text', 'Show all rows')
+            .and('contain.text', String(hidden))
+            .and('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`);
         });
     }
   });
