@@ -541,6 +541,7 @@ export const CAROUSEL_ORGS = [
   'Red Hat',
   'SambaNova',
   'TileRT',
+  'Mooncake',
 ] as const;
 
 /**
