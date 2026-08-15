@@ -140,6 +140,9 @@ export function OverviewPresentationProvider({
     if (!presenting) return undefined;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      // Key repeat would oscillate between the two views and spam fetches;
+      // one page per physical press.
+      if (event.repeat) return;
       // Two views, so either arrow means "the other one" — the audience reads
       // it as paging through slides.
       const target: OverviewComparisonMode =
