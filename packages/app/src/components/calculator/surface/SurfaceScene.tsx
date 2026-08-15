@@ -41,8 +41,6 @@ export interface ChromePalette {
   axis: string;
   grid: string;
   breakEven: string;
-  sky: string;
-  ground: string;
 }
 
 interface SurfaceSceneProps {

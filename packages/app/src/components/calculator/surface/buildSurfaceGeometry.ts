@@ -152,12 +152,20 @@ export function buildSurfaceArrays(
       const b = at(zi, ti + 1);
       const c = at(zi + 1, ti + 1);
       const d = at(zi + 1, ti);
+      // Counter-clockwise seen from above, so the geometric normal agrees in sign
+      // with the shading normal built above. x grows with `ti` and world z with
+      // `zi`, so (a,b,c) would wind clockwise and face the floor. That matters
+      // because the material is DoubleSide: three.js decides facing from the
+      // projected winding and negates the shading normal on back faces, so the
+      // wrong order lights most of the surface as if lit from below — and which
+      // part is "most" moves as the reader orbits, which reads as a terrace in
+      // the data. Face order is unchanged, so `faceToCell` still indexes cells.
       index[ip] = a;
-      index[ip + 1] = b;
-      index[ip + 2] = c;
+      index[ip + 1] = c;
+      index[ip + 2] = b;
       index[ip + 3] = a;
-      index[ip + 4] = c;
-      index[ip + 5] = d;
+      index[ip + 4] = d;
+      index[ip + 5] = c;
       ip += 6;
       faceToCell[qp] = zi * CELL_STRIDE + ti;
       qp += 1;

@@ -145,6 +145,33 @@ describe('buildSurfaceArrays', () => {
     }
   });
 
+  it('winds every triangle to face the same way its normals do', () => {
+    // The test above checks the *shading* normals; this one checks the index
+    // buffer, which is a separate decision and was for a while the opposite one.
+    // It matters because the material is DoubleSide: three.js takes facing from
+    // the projected winding and negates the shading normal on back faces, so a
+    // surface wound the wrong way lights as if from below over whichever part
+    // faces away — a boundary that sweeps as the camera orbits and reads as a
+    // step in the data. Recomputed from `positions` so it pins the emitted
+    // geometry rather than the arithmetic that produced it.
+    const arrays = buildSurfaceArrays(full, scales, times, zs);
+    expect(arrays.index.length).toBeGreaterThan(0);
+    const at = (i: number): [number, number, number] => [
+      arrays.positions[i * 3]!,
+      arrays.positions[i * 3 + 1]!,
+      arrays.positions[i * 3 + 2]!,
+    ];
+    for (let i = 0; i < arrays.index.length; i += 3) {
+      const [ax, , az] = at(arrays.index[i]!);
+      const [bx, , bz] = at(arrays.index[i + 1]!);
+      const [cx, , cz] = at(arrays.index[i + 2]!);
+      // y of the cross product of (b-a) and (c-a) — the only component whose
+      // sign decides which side of a height field the triangle presents.
+      const ny = (bz - az) * (cx - ax) - (bx - ax) * (cz - az);
+      expect(ny).toBeGreaterThan(0);
+    }
+  });
+
   it('tilts the normal in the direction the surface climbs', () => {
     // Rising along time only: the normal must lean backwards along x and stay
     // square in z.
