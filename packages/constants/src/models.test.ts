@@ -70,8 +70,10 @@ describe('MODEL_RELEASE_DATES', () => {
   });
 
   it('returns null rather than throwing for a model with no sourced date', () => {
-    expect(getModelReleaseDate('GLM-5.2')).toBeNull();
+    // Every model shipped today has a date, so this documents the fallback path
+    // that a future model arrives on rather than an existing gap.
     expect(getModelReleaseDate('not-a-model')).toBeNull();
+    expect(getModelReleaseDate('')).toBeNull();
   });
 });
 
