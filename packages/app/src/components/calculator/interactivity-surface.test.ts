@@ -164,7 +164,8 @@ const mixRow = (interactivity: number, tputPerGpu: number, inputTput: number): B
 /**
  * Total throughput falls 1000 → 800 → 600, so every point survives the Pareto pass,
  * while the input share rises 300 → 550. The shipped fixture does this for real —
- * `mi355x_mori-sglang` (8k/1k, 2026-05-28) rises 13× on input throughput mid-range.
+ * `mi355x_mori-sglang` (8k/1k, 2026-05-28) rises 1.4× on input throughput mid-range
+ * while its total falls 47× over the same range.
  * `sweep` cannot express it: it splits input/output 70/30 proportionally to total, so
  * its input reads fall wherever total does.
  */
@@ -453,20 +454,39 @@ describe('buildSurfaceGrid', () => {
       //
       // `STAGGERED_ROWS` is what makes this bite: reverting to a superseded config
       // where the current one is unmeasured produces exactly such a rise.
-      for (const rows of [ROWS, STAGGERED_ROWS]) {
+      //
+      // The ramp is swept because this used to be asserted only at 0, and the one
+      // real breach of the guarantee needed a nonzero ramp to appear: a rung
+      // unreadable at one slice is dropped there, which moves where the previous
+      // rollout's ramp ends, which used to move the sample spacing with it.
+      //
+      // Note these fixtures do NOT reproduce that on their own — they were checked
+      // against the old sampler at every ramp below and stayed monotone; it took
+      // the shipped fixture to surface it. The pin that actually fails when the
+      // sampler regresses is `ramp sampling is anchored, not proportional` in
+      // lifecycle.test.ts, which is where the invariant lives. This sweep is the
+      // cheap outer guard, kept because it is the layer a reader looks at.
+      for (const rows of [ROWS, STAGGERED_ROWS, HOLE_ROWS]) {
         for (const currentZ of [50, 70]) {
-          const grid = build({ groups: groupsOf(rows), metric: 'revenue', currentZ });
-          if (!grid) continue;
-          for (const chip of grid.chips) {
-            for (let ti = 0; ti < grid.times.length; ti += 1) {
-              const along = chip.cells
-                .map((row) => row[ti]!)
-                .filter((v): v is number => v !== null);
-              for (let i = 1; i < along.length; i += 1) {
-                expect(
-                  along[i]!,
-                  `${chip.key} @z${currentZ} t=${ti} step ${i}`,
-                ).toBeLessThanOrEqual(along[i - 1]! + 1e-6);
+          for (const rampMonths of [0, 1, 3, 6]) {
+            const grid = build({
+              groups: groupsOf(rows),
+              metric: 'revenue',
+              currentZ,
+              assumptions: { ...assumptions, rampMonths },
+            });
+            if (!grid) continue;
+            for (const chip of grid.chips) {
+              for (let ti = 0; ti < grid.times.length; ti += 1) {
+                const along = chip.cells
+                  .map((row) => row[ti]!)
+                  .filter((v): v is number => v !== null);
+                for (let i = 1; i < along.length; i += 1) {
+                  expect(
+                    along[i]!,
+                    `${chip.key} @z${currentZ} ramp${rampMonths} t=${ti} step ${i}`,
+                  ).toBeLessThanOrEqual(along[i - 1]! + 1e-6);
+                }
               }
             }
           }

@@ -572,7 +572,8 @@ are not the axis the frontier is built on (`tputOf` returns `inputThroughput` /
 `outputThroughput`, while the frontier is built on total), and on disaggregated sweeps
 the prefill:decode mix shifts along the frontier, so input tok/s/chip can rise as
 interactivity rises. On the same fixture, 12 sweeps rise on input throughput inside
-their range (worst: `mi355x_mori-sglang`, 8k/1k, 2026-05-28, +13× mid-range), one rises
+their range (worst: `mi355x_mori-sglang`, 8k/1k, 2026-05-28, +1.4× mid-range — its total
+falls 47× over the same range, which is the figure that used to be quoted here), one rises
 end to end (`b300_dynamo-trt`, 1k/1k, 2026-02-07: 6,710 → 8,818 tok/s/chip), and grids
 built at input pricing carry z-rises of up to ~4% per slice step. This is reachable in
 the shipped product — the Token Type dropdown feeds the surface directly, though it is

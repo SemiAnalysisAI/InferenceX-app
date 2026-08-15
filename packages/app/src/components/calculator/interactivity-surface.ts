@@ -51,20 +51,34 @@
  *    that way is ~160k spline builds. So this prepares each frontier once and
  *    reads it at every slice — and only for the three metrics a fleet needs.
  *
- * **Which way does the surface tilt along z?** For total-token pricing: down, and
- * guaranteed. Chip count is fixed by the power budget and price is one scalar, so
- * revenue tracks the throughput read — and for `costType === 'total'` that read is
- * the Pareto frontier's own y axis, which `paretoFrontUpperLeft` constructs strictly
- * decreasing in interactivity. That is a theorem about the selection, not an
- * observation about the data: on the shipped fixture (1k/1k, fp8 + fp4, 197 sweeps)
- * all 160 multi-point frontiers fall across their own range and the 37 singletons are
- * flat, because they cannot do anything else.
+ * **Which way does the surface tilt along z?** For total-token pricing: down. Chip
+ * count is fixed by the power budget and price is one scalar, so revenue tracks the
+ * throughput read — and for `costType === 'total'` that read is the Pareto frontier's
+ * own y axis, which `paretoFrontUpperLeft` constructs strictly decreasing in
+ * interactivity. That much is a theorem about the selection, not an observation about
+ * the data: on the shipped fixture (1k/1k, fp8 + fp4, 197 sweeps) all 160 multi-point
+ * frontiers fall across their own range and the 37 singletons are flat, because they
+ * cannot do anything else.
+ *
+ * The selection guaranteeing it is not the same as the plot showing it, and for a
+ * while it did not. What a slice plots is `computeLifecycle`'s reconstruction of the
+ * rungs readable there, and a rung unreadable at one slice is dropped from that
+ * slice's timeline — which moves where the previous rollout's ramp ends. While the
+ * ramp was sampled by cutting that window into a fixed number of pieces, the sample
+ * spacing moved with it, so two slices reconstructed the identical governing config
+ * on different grids and disagreed by more than the selection ever could. Real, on
+ * the real fixture, invisible at `rampMonths: 0` and present at the shipped default
+ * of 3. The sampler is now anchored to a cadence fixed by `rampMonths` alone
+ * (`lifecycle.ts`, and the pin lives there because the invariant is not about this
+ * module), which restores the guarantee: 0 rises in ~415k cross-slice comparisons at
+ * every ramp from 0 to 12.
  *
  * For input- or output-token pricing there is **no such guarantee**: those reads are
  * not the axis the frontier is built on, and on disaggregated sweeps the
  * prefill:decode mix shifts along the frontier, so input tok/s/chip can genuinely
  * rise with interactivity. The shipped fixture does it — `mi355x_mori-sglang`
- * (8k/1k, 2026-05-28) rises 13× mid-range on input throughput — and grids built at
+ * (8k/1k, 2026-05-28) rises 1.4× mid-range on input throughput while its total falls
+ * 47× across the same range — and grids built at
  * `costType === 'input'` carry z-rises of up to ~4% per slice step. A rise there is
  * measured data, not a config leaking across slices: the one-config-per-date rule
  * still holds; it is the priced token mix that moves.
@@ -102,6 +116,7 @@ import { hermiteInterpolate, monotoneSlopes, paretoFrontUpperLeft } from './inte
 import {
   computeLifecycle,
   isCumulative,
+  MS_PER_MONTH,
   metricValue,
   valueAtMonth,
   type LifecycleAssumptions,
@@ -460,8 +475,6 @@ export interface SurfaceGridOptions {
   /** All-in power (kW) and $/chip/hr for a base GPU, or null when unregistered. */
   specsFor: (baseGpu: string) => { powerKwPerGpu: number; costPerGpuHour: number } | null;
 }
-
-const MS_PER_MONTH = (365.25 / 12) * 24 * 3600 * 1000;
 
 /**
  * Rungs whose rollout starts from a level this slice cannot see.

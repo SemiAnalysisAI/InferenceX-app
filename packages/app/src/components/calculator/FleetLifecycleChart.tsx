@@ -15,6 +15,7 @@ import { escapeHtml } from '@/lib/utils';
 
 import {
   metricValue,
+  MS_PER_MONTH,
   valueAtMonth,
   type LifecycleMetric,
   type LifecyclePoint,
@@ -125,8 +126,6 @@ interface FleetLifecycleChartProps {
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
 }
-
-const MS_PER_MONTH = (365.25 / 12) * 24 * 3600 * 1000;
 
 /** CSS class names derive from series keys, so strip separators as TrendChart does. */
 const safeKey = (key: string) => key.replaceAll(/[|_\s]/gu, '-');

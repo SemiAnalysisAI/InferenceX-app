@@ -46,10 +46,25 @@
  * they are measured.
  */
 
-/** 24h × 365d ÷ 12 — matches `HOURS_PER_MONTH` in fleet.ts. */
-const HOURS_PER_MONTH = 730;
 const HOURS_PER_DAY = 24;
-const DAYS_PER_MONTH = HOURS_PER_MONTH / HOURS_PER_DAY;
+
+/**
+ * Calendar month, in days — 365.25 ÷ 12.
+ *
+ * Deliberately not `HOURS_PER_MONTH / 24`. That constant is 730 (a flat 365-day
+ * year), which is the right convention for `costPerMonth` in fleet.ts, where it
+ * is a billing figure. It is the wrong one here: the x axis converts dates to
+ * months with 365.25 ÷ 12 (`MS_PER_MONTH` below), and this constant converts
+ * those months back to days to integrate. Two calendars across one round trip
+ * understated every interval by 0.068% — small, but it is the only conversion
+ * factor in the model that existed twice with two values, and the integral it
+ * feeds is the section's headline number.
+ */
+export const DAYS_PER_MONTH = 365.25 / 12;
+
+/** The same month, in milliseconds. Shared so the axis and the integral agree. */
+export const MS_PER_MONTH = DAYS_PER_MONTH * HOURS_PER_DAY * 3600 * 1000;
+
 const TOKENS_PER_MILLION = 1e6;
 const SECONDS_PER_DAY = 86_400;
 
@@ -270,8 +285,18 @@ function revenuePerDayFor(
   return ((fleetTokPerSec * SECONDS_PER_DAY) / TOKENS_PER_MILLION) * pricePerMTok * availability;
 }
 
-/** Samples per rollout. Enough that a smoothstep reads as a curve, not stairs. */
+/**
+ * Samples per full ramp window. Enough that a smoothstep reads as a curve rather
+ * than stairs. A rollout cut short by the next config gets proportionally fewer,
+ * because the cadence is fixed — see the sampling loop.
+ */
 const RAMP_SAMPLES = 24;
+
+/**
+ * Month tolerance for "this sample is already the ramp's end". Guards against
+ * emitting a duplicate at `rampEnd` when the cadence happens to land on it.
+ */
+const EPSILON_MONTHS = 1e-9;
 
 /** Smoothstep: eases in and out, so the ramp has no kink at either end. */
 function smoothstep(t: number): number {
@@ -376,17 +401,40 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
     const rampEnd = Math.min(rollout.end, holdUntil);
 
     if (rampEnd > rollout.start) {
-      for (let s = 0; s <= RAMP_SAMPLES; s += 1) {
-        const month = rollout.start + ((rampEnd - rollout.start) * s) / RAMP_SAMPLES;
+      // A fixed cadence anchored at the rollout's start — deliberately not the
+      // window divided into a fixed count.
+      //
+      // `levelWithin` is a smoothstep, which is convex over the first half of its
+      // window, so reading between samples with a straight line overestimates by
+      // an amount that grows with the spacing. Dividing the window into
+      // RAMP_SAMPLES pieces makes that spacing a function of `rampEnd` — and
+      // `rampEnd` depends on whether the *next* config is present. That is fine
+      // for one line, which is self-consistent, but the interactivity surface
+      // compares slices, and a rung unreadable at one slice is dropped there and
+      // kept at the next. Two slices would then reconstruct the identical
+      // governing config on different grids and disagree, which showed up as the
+      // surface rising along z where the selection guarantees it must fall.
+      // A cadence fixed by `rampMonths` — a user assumption, shared by every
+      // slice — puts the samples at the same months either way.
+      const spacing = rampMonths / RAMP_SAMPLES;
+      let s = 0;
+      for (; rollout.start + spacing * s < rampEnd - EPSILON_MONTHS; s += 1) {
+        const month = rollout.start + spacing * s;
         samples.push({
           month,
           level: levelWithin(rollout, month),
           isStep: s === 0,
-          // A rollout cut short by the next config is still climbing at its last
-          // sample, so the flag follows the level, not the sample index.
-          isRamp: s < RAMP_SAMPLES || rampEnd < rollout.end,
+          isRamp: true,
         });
       }
+      samples.push({
+        month: rampEnd,
+        level: levelWithin(rollout, rampEnd),
+        isStep: s === 0,
+        // A rollout cut short by the next config is still climbing at its last
+        // sample, so the flag follows the level, not the sample index.
+        isRamp: rampEnd < rollout.end,
+      });
     } else {
       // No ramp window at all: emit the incumbent level at this instant first so
       // the line rises vertically instead of sloping into the new config.

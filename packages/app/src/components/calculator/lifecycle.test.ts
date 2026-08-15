@@ -11,7 +11,7 @@ import {
 } from './lifecycle';
 
 const HOURS_PER_DAY = 24;
-const DAYS_PER_MONTH = 730 / 24;
+const DAYS_PER_MONTH = 365.25 / 12;
 
 /** Hand-computed revenue $/day at the fixture's price and availability. */
 const rev = (tput: number) => ((tput * 86_400) / 1e6) * 10 * (24 / 24.5);
@@ -497,5 +497,70 @@ describe('valueAtMonth', () => {
     const vertical = [point(1, 0), point(3, 0), point(3, 500), point(6, 500)];
     expect(valueAtMonth(vertical, 3, margin)).toBeCloseTo(500, 9);
     expect(valueAtMonth(vertical, 4.5, margin)).toBeCloseTo(500, 9);
+  });
+});
+
+describe('ramp sampling is anchored, not proportional', () => {
+  // The interactivity surface reads one lifecycle per (chip, interactivity slice)
+  // and then compares those slices against each other. A rung that no sweep
+  // measured at a given slice is dropped from that slice's timeline, so the
+  // *same* governing config can be followed by a different next rung — or by
+  // none — depending on the slice. That changes where the governing rollout's
+  // ramp ends.
+  //
+  // Nothing about the underlying curve changes: `levelWithin` is a function of
+  // the rollout's own start, from, to and the user's rampMonths. Only the
+  // reconstruction can move, and it must not, or two slices disagree about a
+  // config they both ran and the surface rises along an axis the selection
+  // guarantees it falls along.
+  const ramped: LifecycleAssumptions = { ...assumptions, rampMonths: 3 };
+
+  it('reconstructs a governing rollout identically whether or not it is cut short', () => {
+    const alone = computeLifecycle({
+      steps: [{ month: 0, fleetTokPerSec: 1000 }],
+      costPerHour: 100,
+      horizonMonths: 12,
+      assumptions: ramped,
+    })!;
+    // Same first rung; a second lands at 1.5, halfway through the first ramp, and
+    // truncates it. Before 1.5 the fleet is running the identical rollout.
+    const truncated = computeLifecycle({
+      steps: [
+        { month: 0, fleetTokPerSec: 1000 },
+        { month: 1.5, fleetTokPerSec: 3000 },
+      ],
+      costPerHour: 100,
+      horizonMonths: 12,
+      assumptions: ramped,
+    })!;
+
+    for (const month of [0.1, 0.2, 0.35, 0.5, 0.75, 1, 1.2, 1.4]) {
+      const a = valueAtMonth(alone.points, month, (p) => p.revenue);
+      const b = valueAtMonth(truncated.points, month, (p) => p.revenue);
+      // Guard the guard: a mistyped accessor yields NaN, and `expect(NaN).toBe(NaN)`
+      // passes, so without this the comparison below would hold no matter what
+      // the sampler did.
+      expect(Number.isFinite(a), `month ${month} readable`).toBe(true);
+      // Bit-equal, not merely close: the sample months are the same months, so
+      // the interpolation is the same arithmetic on the same numbers. Dividing
+      // the ramp window into a fixed number of pieces instead would put the
+      // samples of the truncated run at different months and break this.
+      expect(b, `month ${month}`).toBe(a);
+    }
+  });
+
+  it('spaces ramp samples by the assumption, so a shorter window gets fewer', () => {
+    // The flip side of the guarantee above: resolution is fixed in months, so a
+    // rollout cut short carries proportionally fewer samples rather than the
+    // same count squeezed into less time. Equal spacing is the whole mechanism.
+    const series = computeLifecycle({
+      steps: [{ month: 0, fleetTokPerSec: 1000 }],
+      costPerHour: 100,
+      horizonMonths: 12,
+      assumptions: ramped,
+    })!;
+    const rampMonthsSampled = series.points.filter((p) => p.month <= 3).map((p) => p.month);
+    const gaps = rampMonthsSampled.slice(1).map((m, i) => m - rampMonthsSampled[i]!);
+    for (const gap of gaps) expect(gap).toBeCloseTo(3 / 24, 9);
   });
 });
