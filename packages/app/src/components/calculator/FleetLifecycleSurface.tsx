@@ -2,6 +2,7 @@
 
 import { Canvas } from '@react-three/fiber';
 import * as d3 from 'd3';
+import { useTheme } from 'next-themes';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { PerspectiveCamera, Vector3 } from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -95,12 +96,34 @@ const CANVAS_HEIGHT = 'h-125 md:h-160';
 /** Signed money, negative rendered as -$X rather than $-X — matches the 2D chart. */
 const money = (value: number) => `${value < 0 ? '-$' : '$'}${formatLargeNumber(Math.abs(value))}`;
 
+/**
+ * Index of the grid line closest to `value`.
+ *
+ * The raycast reports which quad was hit, and a quad's cell index is its origin
+ * corner — fine for looking the cell up, wrong to print under a label that says
+ * "nearest". On a 20-slice log axis a quad spans a factor of ~1.22, so the origin
+ * can be a full slice away from where the reader is actually pointing. The hover
+ * carries the interpolated position, so snap to the closest line instead and make
+ * the label true. `values` is ascending, but short enough that a scan is cheaper
+ * than a bisect and impossible to get wrong.
+ */
+function nearestIndex(values: readonly number[], value: number): number {
+  let best = 0;
+  let bestGap = Infinity;
+  for (const [i, candidate] of values.entries()) {
+    const gap = Math.abs(candidate - value);
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = i;
+    }
+  }
+  return best;
+}
+
 const CHROME_VARS: Record<keyof ChromePalette, string> = {
   axis: '--border',
   grid: '--border-alt',
   breakEven: '--muted-foreground',
-  sky: '--background',
-  ground: '--card',
 };
 
 interface FleetLifecycleSurfaceProps {
@@ -136,6 +159,7 @@ export default function FleetLifecycleSurface({
   const t = STRINGS[locale];
   const support = useWebglSupport();
   const reduced = useReducedMotion();
+  const { resolvedTheme } = useTheme();
 
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const labelRefs = useRef<(HTMLElement | null)[]>([]);
@@ -192,10 +216,14 @@ export default function FleetLifecycleSurface({
       axis: read(CHROME_VARS.axis, '#888888'),
       grid: read(CHROME_VARS.grid, '#666666'),
       breakEven: read(CHROME_VARS.breakEven, '#999999'),
-      sky: read(CHROME_VARS.sky, '#ffffff'),
-      ground: read(CHROME_VARS.ground, '#dddddd'),
     };
-  }, []);
+    // Re-read on theme change, the same way `useThemeColors` does. These are
+    // snapshots of CSS custom properties taken into WebGL, where the cascade
+    // cannot reach them, so an empty dependency list leaves the frame, grid and
+    // break-even plane painted in the outgoing theme. `--muted-foreground`
+    // inverts between themes, so the break-even plane — already at 0.13 opacity
+    // — all but disappears against the ground it is drawn on.
+  }, [resolvedTheme]);
 
   /** Chip colours, resolved once through the same probe. */
   const chips = useMemo(
@@ -371,9 +399,11 @@ export default function FleetLifecycleSurface({
             {hover.cell && (
               <div className="mt-1 text-[10px] text-muted-foreground">
                 {t.tipNearest}:{' '}
-                {d3.timeFormat('%d %b %Y')(new Date(grid.times[hover.cell.ti] ?? 0))}
+                {d3.timeFormat('%d %b %Y')(
+                  new Date(grid.times[nearestIndex(grid.times, hover.ms)] ?? 0),
+                )}
                 {' · '}
-                {(grid.zs[hover.cell.zi] ?? 0).toFixed(1)} tok/s/user
+                {(grid.zs[nearestIndex(grid.zs, hover.interactivity)] ?? 0).toFixed(1)} tok/s/user
               </div>
             )}
           </div>

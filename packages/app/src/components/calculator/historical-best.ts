@@ -31,7 +31,7 @@
 import type { BenchmarkRow } from '@/lib/api';
 import { Percentile, type Sequence } from '@/lib/data-mappings';
 
-import { interpolateForGPU } from './interpolation';
+import { interpolateForGPU, paretoFrontUpperLeft } from './interpolation';
 import { buildGpuGroups, type GroupMeta } from './useThroughputData';
 import type { CalculatorMode, CostProvider, GPUDataPoint, InterpolatedResult } from './types';
 
@@ -66,9 +66,14 @@ export interface HistoricalBestEntry {
 
 export interface HistoricalUnmeasured {
   hwKey: string;
-  /** Widest measured range of the mode's input metric across all dates. */
-  measuredMin: number;
-  measuredMax: number;
+  /**
+   * Nearest value on each side of the target that some date's Pareto frontier
+   * actually reached, or null where nothing was measured on that side. Not a
+   * range: no single sweep spans the target — that is why this hwKey is here —
+   * so quoting one interval would claim coverage that does not exist.
+   */
+  nearestBelow: number | null;
+  nearestAbove: number | null;
   datesConsidered: number;
 }
 
@@ -185,6 +190,10 @@ export function selectBestFromGroups(
 
   const getInputValue = (p: GPUDataPoint) =>
     mode === 'interactivity_to_throughput' ? p.interactivity : p.throughput;
+  // The frontier's other axis. Only the unmeasured disclosure below needs it,
+  // to rebuild the same Pareto front `interpolateForGPU` read from.
+  const getOutputValue = (p: GPUDataPoint) =>
+    mode === 'interactivity_to_throughput' ? p.throughput : p.interactivity;
 
   const best: HistoricalBestEntry[] = [];
   const unmeasured: HistoricalUnmeasured[] = [];
@@ -210,19 +219,35 @@ export function selectBestFromGroups(
     }
 
     if (!winner) {
-      let measuredMin = Infinity;
-      let measuredMax = -Infinity;
+      // What rejected this hwKey was per-date and per-frontier: no single sweep's
+      // Pareto front spans the target. So the disclosure has to be per-date and
+      // per-frontier too. Taking the union of every raw point across every date
+      // — which this did — yields an interval no sweep ever covered, and one that
+      // can contain the very target the chip was just excluded at: a reader sees
+      // "measured 6.7-18.5" next to a target of 8 and concludes the exclusion is
+      // broken. Two dates bracketing a gap is enough to produce that, and so is a
+      // frontier narrower than its own raw points.
+      //
+      // Reported instead: the nearest frontier value on each side of the target.
+      // That is the honest shape of the miss — how far the target sits from
+      // anything measured — and it cannot imply coverage, because a frontier
+      // value on both sides of the target within one date would have made the
+      // read succeed.
+      let nearestBelow: number | null = null;
+      let nearestAbove: number | null = null;
       for (const { points } of dated) {
-        for (const p of points) {
+        const front = paretoFrontUpperLeft([...points], getInputValue, getOutputValue);
+        for (const p of front) {
           const v = getInputValue(p);
-          if (v < measuredMin) measuredMin = v;
-          if (v > measuredMax) measuredMax = v;
+          if (!Number.isFinite(v)) continue;
+          if (v <= targetValue && (nearestBelow === null || v > nearestBelow)) nearestBelow = v;
+          if (v >= targetValue && (nearestAbove === null || v < nearestAbove)) nearestAbove = v;
         }
       }
       unmeasured.push({
         hwKey,
-        measuredMin: Number.isFinite(measuredMin) ? measuredMin : 0,
-        measuredMax: Number.isFinite(measuredMax) ? measuredMax : 0,
+        nearestBelow,
+        nearestAbove,
         datesConsidered: dated.length,
       });
       continue;

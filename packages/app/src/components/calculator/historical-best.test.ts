@@ -167,10 +167,34 @@ describe('selectHistoricalBest', () => {
     const { best, unmeasured } = selectHistoricalBest(options(rows, { targetValue: 20 }));
     expect(best).toEqual([]);
     expect(unmeasured).toHaveLength(1);
-    // The measured range lets the UI explain *why* there is no number.
-    expect(unmeasured[0]!.measuredMin).toBe(60);
-    expect(unmeasured[0]!.measuredMax).toBe(90);
+    // The nearest measured point lets the UI explain *why* there is no number.
+    // Everything this chip has is above the target, so there is no value below.
+    expect(unmeasured[0]!.nearestBelow).toBeNull();
+    expect(unmeasured[0]!.nearestAbove).toBe(60);
     expect(unmeasured[0]!.datesConsidered).toBe(1);
+  });
+
+  it('never reports a neighbourhood that brackets the target it just excluded', () => {
+    // Two dates, each a single point, on opposite sides of the target. The old
+    // disclosure took the union of raw points across dates and reported
+    // "measured 20.0-80.0" for a target of 50 — an interval no sweep covered,
+    // which reads as a bug in the exclusion rather than an explanation of it.
+    // Neither date can be read at 50: a one-point frontier is only readable at
+    // its own interactivity.
+    const rows = [sweep('2026-06-01', 20, 1000), sweep('2026-07-01', 80, 400)];
+
+    const { best, unmeasured } = selectHistoricalBest(options(rows, { targetValue: 50 }));
+    expect(best).toEqual([]);
+    expect(unmeasured).toHaveLength(1);
+    const entry = unmeasured[0]!;
+    expect(entry.nearestBelow).toBe(20);
+    expect(entry.nearestAbove).toBe(80);
+    expect(entry.datesConsidered).toBe(2);
+    // The claim the pair makes is "nothing at 50", not "measured 20 through 80".
+    // Whatever is reported, the target must not sit strictly inside a span any
+    // single date covered — no such date exists, or there would be a winner.
+    expect(entry.nearestBelow).toBeLessThan(50);
+    expect(entry.nearestAbove).toBeGreaterThan(50);
   });
 
   it('ranks by the injected accessor, not by throughput', () => {

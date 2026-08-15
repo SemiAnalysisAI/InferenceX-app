@@ -32,6 +32,7 @@ import {
   availabilityFromInterrupts,
   breakEvenPricePerMTok,
   computeLifecycle,
+  MS_PER_MONTH,
   type LifecycleAssumptions,
   type LifecycleSeries,
   type ThroughputStep,
@@ -96,7 +97,7 @@ const STRINGS = {
     recoveryTooltip: 'Hours to restore service after one interruption.',
     rampLabel: 'Ramp (months)',
     rampTooltip:
-      'Months for a config to roll out across the fleet. Every config gets one: it climbs from whatever the fleet was already serving to the new config\u2019s numbers. The first config climbs from zero and energises the racks as it goes, so cost ramps with it and the line opens at exactly zero. Your assumption, not a measurement; set it to 0 for configs that take effect instantly.',
+      'Months for a config to roll out across the fleet. Every config gets one: it climbs from whatever the fleet was already serving to the new config\u2019s numbers, and the first climbs from zero. Cost runs at full rate throughout \u2014 racks bill from the moment they are energised, not from the moment they are loaded \u2014 so the first rollout opens at a full day\u2019s cost against no revenue, which is the deepest the margin line ever goes. Your assumption, not a measurement; set it to 0 for configs that take effect instantly.',
     horizonLabel: 'Horizon (months from release)',
     horizonTooltip:
       "How far past the model's release date to project. Past the last sweep the latest config is held flat — that is what the fleet earns if optimisation stops, not a forecast of further gains.",
@@ -117,9 +118,16 @@ const STRINGS = {
     monthsSuffix: 'mo',
     unmeasuredTitle: 'Not measured at this interactivity',
     unmeasuredIntro:
-      'These chips have run history for this scenario but were never measured at the target interactivity, so no honest number exists for them. Their measured ranges:',
-    unmeasuredRange: (min: number, max: number, dates: number) =>
-      `measured ${min.toFixed(1)}–${max.toFixed(1)} tok/s/user across ${dates} run ${dates === 1 ? 'date' : 'dates'}`,
+      'These chips have run history for this scenario but no single run date was measured across the target interactivity, so no honest number exists for them. The nearest interactivity each one actually reached:',
+    unmeasuredRange: (below: number | null, above: number | null, dates: number) => {
+      const dateLabel = `${dates} run ${dates === 1 ? 'date' : 'dates'}`;
+      if (below === null && above === null) return `nothing measured (${dateLabel})`;
+      if (below === null)
+        return `nothing below; nearest above ${above!.toFixed(1)} tok/s/user (${dateLabel})`;
+      if (above === null)
+        return `nearest below ${below.toFixed(1)} tok/s/user; nothing above (${dateLabel})`;
+      return `nearest ${below.toFixed(1)} below and ${above.toFixed(1)} above, tok/s/user (${dateLabel})`;
+    },
     unplottable: (chips: string) =>
       `No fleet could be sized for ${chips} at this power budget — the chip has no registered power figure, or its measured throughput sizes to nothing. Listed rather than dropped so the chart is never quietly missing a chip.`,
     note: 'Note:',
@@ -180,7 +188,7 @@ const STRINGS = {
     recoveryTooltip: '一次中断后恢复服务所需的小时数。',
     rampLabel: '爬坡期 (月)',
     rampTooltip:
-      '一个配置在集群中完成推广所需的月数。每个配置都有各自的推广曲线：从集群当前已提供的水平爬升至新配置的水平，首个配置从零开始爬升。成本在整个期间按满额计入——机架自通电起即开始计费，而非自满载起——因此首次推广在爬升过程中已需承担全额成本。这是您的假设而非实测值；设为 0 表示配置立即生效。',
+      '一个配置在集群中完成推广所需的月数。每个配置都有各自的推广曲线：从集群当前已提供的水平爬升至新配置的水平，首个配置从零开始爬升。成本在整个期间按满额计入——机架自通电起即开始计费，而非自满载起——因此首次推广开始时即需承担一整天的成本而收入为零，这正是利润率曲线的全程最低点。这是您的假设而非实测值；设为 0 表示配置立即生效。',
     horizonLabel: '测算期 (自发布起月数)',
     horizonTooltip:
       '自模型发布日期起向后测算的月数。在最后一次扫描之后，最新配置将保持不变——这代表若优化停止时集群的收益，而非对后续提升的预测。',
@@ -201,9 +209,16 @@ const STRINGS = {
     monthsSuffix: '个月',
     unmeasuredTitle: '该交互性下无实测数据',
     unmeasuredIntro:
-      '以下 Chip 在该场景下有运行历史，但从未在目标交互性下被实测，因此无法给出可靠数值。其实测区间：',
-    unmeasuredRange: (min: number, max: number, dates: number) =>
-      `实测区间 ${min.toFixed(1)}–${max.toFixed(1)} tok/s/user，共 ${dates} 个运行日期`,
+      '以下 Chip 在该场景下有运行历史，但没有任何单次运行的实测范围覆盖目标交互性，因此无法给出可靠数值。各自最接近的实测交互性：',
+    unmeasuredRange: (below: number | null, above: number | null, dates: number) => {
+      const dateLabel = `共 ${dates} 个运行日期`;
+      if (below === null && above === null) return `无实测数据（${dateLabel}）`;
+      if (below === null)
+        return `下方无实测；上方最近 ${above!.toFixed(1)} tok/s/user（${dateLabel}）`;
+      if (above === null)
+        return `下方最近 ${below.toFixed(1)} tok/s/user；上方无实测（${dateLabel}）`;
+      return `最近实测为下方 ${below.toFixed(1)}、上方 ${above.toFixed(1)} tok/s/user（${dateLabel}）`;
+    },
     unplottable: (chips: string) =>
       `在该功率预算下无法为 ${chips} 组建集群——该 Chip 缺少已登记的功耗数据，或其实测吞吐无法组成任何规模。此处列出而非直接剔除，以免图表静默遗漏 Chip。`,
     note: '注意：',
@@ -251,8 +266,6 @@ const DEFAULTS = {
   // labelled as one — no measurement in this repo speaks to it.
   rampMonths: 3,
 };
-
-const MS_PER_MONTH = (365.25 / 12) * 24 * 3600 * 1000;
 
 function parseNonNegative(raw: string): number | null {
   const parsed = parseFloat(raw);
@@ -975,7 +988,7 @@ export default function FleetLifecycle({
               {visibleUnmeasured.map((u) => (
                 <li key={u.hwKey}>
                   {getLabel(u.hwKey, hardwareConfig)} —{' '}
-                  {t.unmeasuredRange(u.measuredMin, u.measuredMax, u.datesConsidered)}
+                  {t.unmeasuredRange(u.nearestBelow, u.nearestAbove, u.datesConsidered)}
                 </li>
               ))}
             </ul>
