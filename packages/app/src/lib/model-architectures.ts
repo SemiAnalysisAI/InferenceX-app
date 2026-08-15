@@ -90,8 +90,12 @@ export interface ModelArchitecture {
   contextWindow?: number;
   /** Special architectural features */
   features?: string[];
-  /** Release date (YYYY-MM-DD) */
-  releaseDate?: string;
+  // No `releaseDate` here, deliberately. A model's release date is the same fact
+  // the Fleet Lifecycle time axis anchors on, so it lives once in
+  // `MODEL_RELEASE_DATES` (`@semianalysisai/inferencex-constants`) and is read
+  // through `getModelReleaseDate(arch.model)`. While this file kept its own copy
+  // the two disagreed: DeepSeek-V4-Pro was listed here as releasing six weeks
+  // after its own first benchmark run, and both values were rendered to users.
   /** Developer/Organization */
   developer?: string;
   /** Link to model card or paper */
@@ -171,7 +175,6 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
       'Auxiliary-loss-free Load Balancing',
       'Multi-Token Prediction',
     ],
-    releaseDate: '2025-05-28',
     developer: 'DeepSeek',
     sourceUrl: 'https://huggingface.co/deepseek-ai/DeepSeek-R1-0528',
   },
@@ -237,7 +240,6 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
       'FP4 Experts + FP8 Mixed Precision',
       'Muon Optimizer',
     ],
-    releaseDate: '2026-06-08',
     developer: 'DeepSeek',
     sourceUrl: 'https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro',
   },
@@ -255,7 +257,6 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     ffnDim: 28672,
     contextWindow: 128000,
     features: ['Grouped Query Attention', 'RoPE'],
-    releaseDate: '2024-12-06',
     developer: 'Meta',
     sourceUrl: 'https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct',
   },
@@ -273,7 +274,6 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     ffnDim: 28672,
     contextWindow: 128000,
     features: ['Grouped Query Attention', 'RoPE'],
-    releaseDate: '2024-07-23',
     developer: 'Meta',
     sourceUrl: 'https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct',
   },
@@ -316,7 +316,6 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
       'YaRN RoPE (factor=32)',
       'MXFP4 Quantization',
     ],
-    releaseDate: '2025-06-13',
     developer: 'OpenAI',
     sourceUrl: 'https://huggingface.co/openai/gpt-oss-120b',
   },
@@ -338,7 +337,6 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     denseFFNDim: 18432,
     contextWindow: 262144,
     features: ['Multi-head Latent Attention', 'DeepSeek-style MoE', 'YaRN RoPE'],
-    releaseDate: '2026-01-27',
     developer: 'Moonshot AI',
     sourceUrl: 'https://huggingface.co/moonshotai/Kimi-K2.5',
   },
@@ -407,7 +405,6 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
       'Native Multimodality (text/image/video)',
       'MXFP4 Quantization',
     ],
-    releaseDate: '2026-06-13',
     developer: 'Moonshot AI',
     sourceUrl: 'https://huggingface.co/moonshotai/Kimi-K3',
   },
@@ -435,7 +432,6 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
       'Multi-Token Prediction (3 modules)',
       'FP8 Quantization',
     ],
-    releaseDate: '2025-10-25',
     developer: 'MiniMax',
     sourceUrl: 'https://huggingface.co/MiniMaxAI/MiniMax-M2',
   },
