@@ -1175,17 +1175,20 @@ describe('overview platform selection', () => {
     });
   });
 
-  it('restricts AgentX points to the E2E frontier on total throughput', () => {
-    // The slower-E2E point wins on output tokens but loses on total tokens, so
-    // the total-token frontier drops it and the tier read becomes unreachable.
+  it('reads AgentX tiers from every measured point, not just the E2E frontier', () => {
+    // The second point is dominated on total tokens (8100 < 9000) and slower on
+    // E2E (25 > 20). Until #736 the E2E frontier dropped it, leaving only the
+    // interactivity-40 point, which cannot reach the tier-50 read — so the tier
+    // came back null. That gating was removed deliberately, so the point now
+    // stands and the read lands on it exactly.
     const summary = buildOverviewModelSummary(Model.GLM_5_2, [
       agenticRow(40, 20, 9000, 500, { hardware: 'b200', conc: 8 }),
       agenticRow(50, 25, 8100, 900, { hardware: 'b200', conc: 12 }),
     ]);
 
     const b200 = summary.platforms.find(({ hardware }) => hardware === 'b200')!;
-    expect(b200.read.value).toBeNull();
-    expect(b200.missingReason).toBe('cannot_reach_at_tier');
+    expect(b200.read.value).toBe(8100);
+    expect(b200.missingReason).toBeNull();
   });
 
   it('reports scenario-level missing coverage when AgentX rows lack usable P90 metrics', () => {
