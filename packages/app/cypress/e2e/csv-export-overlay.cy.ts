@@ -47,10 +47,9 @@ describe('Inference CSV export with an unofficial-run overlay', () => {
       },
     });
     cy.wait('@unofficialRun');
-    // Interactivity is nested under the Advanced menu on agentic charts.
-    cy.get('[data-testid="x-axis-mode-advanced"]').click();
+    // Interactivity is a flat tab since #736 removed the Advanced menu.
     cy.get('[data-testid="x-axis-mode-interactivity"]').click();
-    cy.get('[data-testid="x-axis-mode-advanced"]')
+    cy.get('[data-testid="x-axis-mode-interactivity"]')
       .should('have.attr', 'data-state', 'active')
       .and('contain.text', 'Interactivity');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should('exist');

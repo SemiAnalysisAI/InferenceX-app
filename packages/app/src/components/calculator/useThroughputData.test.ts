@@ -1216,7 +1216,7 @@ describe('buildGpuGroups', () => {
     });
   });
 
-  it('restricts agentic interpolation to the same date-scoped e2e Pareto winners as the chart', () => {
+  it('keeps every agentic point for interpolation now that the e2e frontier is gone', () => {
     const agenticRow = (
       conc: number,
       interactivity: number,
@@ -1243,9 +1243,9 @@ describe('buildGpuGroups', () => {
     const { grouped } = buildGpuGroups(
       [
         agenticRow(1, 100, 20, 900),
-        agenticRow(2, 80, 30, 800), // e2e-dominated by concurrency 1
+        agenticRow(2, 80, 30, 800), // e2e-dominated by concurrency 1, still kept
         agenticRow(4, 60, 40, 1200),
-        // A different date gets its own e2e frontier and must survive.
+        // A different date must survive alongside the same-date points.
         agenticRow(8, 40, 50, 700, '2026-07-20'),
       ],
       {
@@ -1257,7 +1257,7 @@ describe('buildGpuGroups', () => {
     );
 
     const points = Object.values(grouped)[0];
-    expect(points.map((point) => point.concurrency).toSorted()).toEqual([1, 4, 8]);
+    expect(points.map((point) => point.concurrency).toSorted()).toEqual([1, 2, 4, 8]);
   });
 
   it('keeps agentic overlay frontiers isolated per unofficial run', () => {

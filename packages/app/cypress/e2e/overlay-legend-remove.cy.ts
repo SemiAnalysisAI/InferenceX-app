@@ -33,8 +33,7 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
       },
     });
     cy.wait('@unofficialRun');
-    // Interactivity is nested under the Advanced menu on agentic charts.
-    cy.get('[data-testid="x-axis-mode-advanced"]').click();
+    // Interactivity is a flat tab since #736 removed the Advanced menu.
     cy.get('[data-testid="x-axis-mode-interactivity"]').click();
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
@@ -69,10 +68,11 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
     cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
       expect(countVisible($dots), 'visible official points after remove').to.eq(0);
     });
-    // The overlay series is untouched. Optimal Only still hides its trace-less
-    // points because unofficial rows cannot join the canonical frontier.
+    // The overlay series is untouched and stays visible: #736 dropped the
+    // E2E-frontier restriction, so Optimal Only no longer prunes trace-less
+    // unofficial points.
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(($pts) => {
-      expect(countVisible($pts), 'visible overlay X markers').to.eq(0);
+      expect(countVisible($pts), 'visible overlay X markers').to.eq(REAL_CONFIGS.length);
     });
     // Inactive row: the hover affordance flips to the "+" restore indicator
     // (explicit "clicking the name brings it back"), and the Hide X is gone.
