@@ -1,6 +1,7 @@
+import { MODEL_RELEASE_DATES, getModelReleaseDate } from '@semianalysisai/inferencex-constants';
 import { describe, expect, it } from 'vitest';
 
-import { Model } from '@/lib/data-mappings';
+import { MODEL_OPTIONS, Model } from '@/lib/data-mappings';
 
 import {
   type SubBlockFlow,
@@ -19,6 +20,48 @@ import {
   sharedExpertCount,
   MODEL_ARCHITECTURES,
 } from './model-architectures';
+
+describe('MODEL_RELEASE_DATES coverage', () => {
+  it('has a sourced date for every model the user can select', () => {
+    // Without a date the Fleet Lifecycle axis falls back to the model's first
+    // benchmark run, which reads as "this is when the model appeared" when it is
+    // really "this is when we got to it" — for gpt-oss that gap is five weeks.
+    // A model whose release date genuinely cannot be sourced belongs in an
+    // explicit allowlist here, so the gap stays visible; do not delete the test.
+    const missing = MODEL_OPTIONS.filter((model) => !getModelReleaseDate(model));
+    expect(missing).toEqual([]);
+  });
+
+  it('anchors each model to its weights publication, not its first sweep', () => {
+    // Pinned so a silent revert fails. Every one of these predates the model's
+    // first InferenceX sweep, which is the invariant that caught the four wrong
+    // dates: a model cannot be benchmarked before its weights exist.
+    expect(getModelReleaseDate(Model.Kimi_K3)).toBe('2026-07-27');
+    expect(getModelReleaseDate(Model.GLM_5_2)).toBe('2026-06-13');
+    expect(getModelReleaseDate(Model.MiniMax_M3)).toBe('2026-06-07');
+    expect(getModelReleaseDate(Model.DeepSeek_V4_Pro)).toBe('2026-04-24');
+    expect(getModelReleaseDate(Model.GLM_5)).toBe('2026-02-13');
+    expect(getModelReleaseDate(Model.Qwen3_5)).toBe('2026-02-16');
+    expect(getModelReleaseDate(Model.MiniMax_M2_5)).toBe('2026-02-12');
+    expect(getModelReleaseDate(Model.Kimi_K2_5)).toBe('2026-01-27');
+    expect(getModelReleaseDate(Model.GptOss)).toBe('2025-08-05');
+    expect(getModelReleaseDate(Model.DeepSeek_R1)).toBe('2025-05-28');
+    expect(getModelReleaseDate(Model.Llama3_3_70B)).toBe('2024-12-06');
+    expect(getModelReleaseDate(Model.Llama3_1_70B)).toBe('2024-07-23');
+  });
+
+  it('names a real model, so no entry is dead weight', () => {
+    // The table is keyed by string because it lives in the constants package,
+    // below the `Model` enum. A key that matches no model never throws — the
+    // lookup returns null and every caller quietly falls back to its own
+    // default, so a typo here is invisible until someone notices the axis is
+    // anchored to the wrong date. This is the only place both are in scope.
+    const displayNames = new Set<string>(Object.values(Model));
+    for (const model of Object.keys(MODEL_RELEASE_DATES)) {
+      expect(displayNames.has(model), `${model} matches no Model display name`).toBe(true);
+    }
+  });
+});
 
 describe('MODEL_ARCHITECTURES', () => {
   it('has architecture data for all supported models', () => {
@@ -40,6 +83,28 @@ describe('MODEL_ARCHITECTURES', () => {
       expect(MODEL_ARCHITECTURES[model]!.totalParams).toBeGreaterThan(0);
       expect(MODEL_ARCHITECTURES[model]!.activeParams).toBeGreaterThan(0);
     }
+  });
+
+  it('carries no release date of its own, so there is nothing to diverge from', () => {
+    // This is the guard on the refactor, not a style rule. When each entry kept
+    // its own `releaseDate`, this file and MODEL_RELEASE_DATES disagreed about
+    // DeepSeek-V4-Pro — one of them had it releasing six weeks after its own
+    // first benchmark run — and both were rendered to users. Re-adding the field
+    // here recreates that, so the test fails on the field itself rather than
+    // waiting for the values to drift.
+    for (const [model, arch] of Object.entries(MODEL_ARCHITECTURES)) {
+      expect(arch, model).toBeDefined();
+      expect(Object.keys(arch!), model).not.toContain('releaseDate');
+    }
+  });
+
+  it('sources every architecture caption from the one release-date table', () => {
+    // The diagram prints "Released by {developer} on {date}", so an entry with a
+    // developer and no date silently drops the whole caption.
+    const missing = Object.values(MODEL_ARCHITECTURES)
+      .filter((arch) => arch?.developer && !getModelReleaseDate(arch.model))
+      .map((arch) => arch!.model);
+    expect(missing).toEqual([]);
   });
 
   it('ensures dense models have equal active and total params', () => {
@@ -143,7 +208,9 @@ describe('getModelArchitecture', () => {
     expect(arch?.numKVHeads).toBe(8);
     expect(arch?.ffnDim).toBe(28672);
     expect(arch?.vocabSize).toBe(128256);
-    expect(arch?.releaseDate).toBe('2024-07-23');
+    // The release date is no longer carried here; it lives once in
+    // MODEL_RELEASE_DATES and is asserted in the constants package.
+    expect(getModelReleaseDate(Model.Llama3_1_70B)).toBe('2024-07-23');
   });
 
   it('returns architecture for DeepSeek R1 with MoE and MLA details', () => {
