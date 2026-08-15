@@ -124,11 +124,11 @@ export const OVERVIEW_STRINGS = {
     modelScopeNavLabel: 'Inactive models',
     modelScopeShow: 'Show deprecated & maintenance-mode models',
     modelScopeHide: 'Hide deprecated & maintenance-mode models',
-    rowScopeNavLabel: 'Rows without a 30-day change',
-    rowScopeShow: (count: number) =>
-      `Show ${count} ${count === 1 ? 'row' : 'rows'} with no 30-day change`,
-    rowScopeHide: (count: number) =>
-      `Hide ${count} ${count === 1 ? 'row' : 'rows'} with no 30-day change`,
+    rowScopeNavLabel: (days: number) => `Rows without a ${days}-day change`,
+    rowScopeShow: (count: number, days: number) =>
+      `Show ${count} ${count === 1 ? 'row' : 'rows'} with no ${days}-day change`,
+    rowScopeHide: (count: number, days: number) =>
+      `Hide ${count} ${count === 1 ? 'row' : 'rows'} with no ${days}-day change`,
     hardwareRowScopeNavLabel: 'Rows with no result',
     hardwareRowScopeShow: (count: number) =>
       `Show ${count} ${count === 1 ? 'row' : 'rows'} with no result on any platform`,
@@ -228,9 +228,9 @@ export const OVERVIEW_STRINGS = {
     modelScopeNavLabel: '非活跃模型',
     modelScopeShow: '显示已弃用与维护模式模型',
     modelScopeHide: '隐藏已弃用与维护模式模型',
-    rowScopeNavLabel: '30 天内无变化的行',
-    rowScopeShow: (count: number) => `显示 ${count} 行 30 天内无变化的数据`,
-    rowScopeHide: (count: number) => `隐藏 ${count} 行 30 天内无变化的数据`,
+    rowScopeNavLabel: (days: number) => `${days} 天内无变化的行`,
+    rowScopeShow: (count: number, days: number) => `显示 ${count} 行 ${days} 天内无变化的数据`,
+    rowScopeHide: (count: number, days: number) => `隐藏 ${count} 行 ${days} 天内无变化的数据`,
     hardwareRowScopeNavLabel: '无结果的行',
     hardwareRowScopeShow: (count: number) => `显示 ${count} 行所有平台均无结果的数据`,
     hardwareRowScopeHide: (count: number) => `隐藏 ${count} 行所有平台均无结果的数据`,
@@ -1369,6 +1369,7 @@ export function OverviewModelScopeToggle({
 export function OverviewRowScopeToggle({
   rowScope,
   unchangedRowCount,
+  windowDays,
   tier,
   engineScope,
   referenceHardware,
@@ -1378,6 +1379,9 @@ export function OverviewRowScopeToggle({
   variant = 'section',
 }: {
   rowScope: OverviewRowScope;
+  /** Days of the active history window; the copy must name the window the
+   *  filter actually reads. */
+  windowDays: number;
   unchangedRowCount: number;
   tier: OverviewTier;
   engineScope: OverviewEngineScope;
@@ -1391,8 +1395,8 @@ export function OverviewRowScopeToggle({
   const target: OverviewRowScope = rowScope === 'all' ? 'changed' : 'all';
   const sentence =
     rowScope === 'all'
-      ? strings.rowScopeHide(unchangedRowCount)
-      : strings.rowScopeShow(unchangedRowCount);
+      ? strings.rowScopeHide(unchangedRowCount, windowDays)
+      : strings.rowScopeShow(unchangedRowCount, windowDays);
   const link = (
     <OverviewNavLink
       data-overview-row-scope={target}
@@ -1419,7 +1423,7 @@ export function OverviewRowScopeToggle({
   return (
     <nav
       data-testid="overview-row-scope-toggle"
-      aria-label={strings.rowScopeNavLabel}
+      aria-label={strings.rowScopeNavLabel(windowDays)}
       className="text-xs"
     >
       {link}

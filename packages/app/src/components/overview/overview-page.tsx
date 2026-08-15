@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import { Card } from '@/components/ui/card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import type { OverviewPageData } from '@/lib/overview-data';
+import { OVERVIEW_HISTORY_WINDOW_DAYS, type OverviewPageData } from '@/lib/overview-data';
 import { overviewHref } from '@/lib/overview-links';
 
 import {
@@ -278,6 +278,7 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
         ) : (
           <OverviewRowScopeToggle
             variant="toolbar"
+            windowDays={OVERVIEW_HISTORY_WINDOW_DAYS[data.comparisonMode]}
             rowScope={data.rowScope}
             unchangedRowCount={data.unchangedRowCount}
             tier={data.tier}
@@ -380,6 +381,7 @@ function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
                   />
                 ) : (
                   <OverviewRowScopeToggle
+                    windowDays={OVERVIEW_HISTORY_WINDOW_DAYS[data.comparisonMode]}
                     rowScope={data.rowScope}
                     unchangedRowCount={data.unchangedRowCount}
                     tier={data.tier}
