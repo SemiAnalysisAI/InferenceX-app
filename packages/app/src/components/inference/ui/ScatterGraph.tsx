@@ -69,6 +69,7 @@ import {
   generateTooltipContent,
   getPointLabel,
 } from '@/components/inference/utils/tooltipUtils';
+import { scatterPointConfigId } from '@/components/inference/utils/point-identity';
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import {
   OFFLOAD_HALO_DASHARRAY,
@@ -76,6 +77,7 @@ import {
   OFFLOAD_HALO_STROKE_WIDTH,
   OffloadHaloLegendKey,
 } from '@/components/inference/ui/OffloadHaloLegendKey';
+import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import {
   type ParetoPointLabel,
@@ -199,6 +201,26 @@ const getXPath = (size: number) => {
   return `M ${-s} ${-s} L ${s} ${s} M ${s} ${-s} L ${-s} ${s}`;
 };
 
+/** Render the KV-offload halo around a point when applicable. */
+function renderOffloadHalo(
+  group: d3.Selection<SVGGElement, InferenceData, null, undefined>,
+  point: InferenceData,
+  stroke: string,
+): void {
+  group
+    .selectAll<SVGCircleElement, boolean>('.offload-halo')
+    .data(point.offload_mode === 'on' ? [true] : [])
+    .join('circle')
+    .attr('class', 'offload-halo')
+    .attr('r', OFFLOAD_HALO_RADIUS)
+    .attr('fill', 'none')
+    .attr('stroke', stroke)
+    .attr('stroke-width', OFFLOAD_HALO_STROKE_WIDTH)
+    .attr('stroke-dasharray', OFFLOAD_HALO_DASHARRAY)
+    .attr('opacity', 0.9)
+    .attr('pointer-events', 'none');
+}
+
 const formatChangelogDescription = (desc: string | string[]): React.JSX.Element => {
   if (typeof desc === 'string') {
     return (
@@ -245,8 +267,8 @@ function groupPointsByDate(points: InferenceData[]): Map<string, InferenceData[]
 const optimalPointKey = (d: InferenceData): string =>
   `${d.hwKey}_${d.precision}_${d.date}-${d.x}-${d.y}`;
 
-/** Point label lines: TP (or full parallelism label) plus the C= concurrency. */
-const pointLabelText = (d: InferenceData, advanced: boolean): string =>
+/** Point label lines. Decode mode is shown by a point marker instead of text. */
+export const pointLabelText = (d: InferenceData, advanced: boolean): string =>
   advanced ? `${getPointLabel(d)}\nC=${d.conc}` : `${d.tp}\nC=${d.conc}`;
 
 // Referentially stable "no overlay data" result (see processedOverlayData).
@@ -395,8 +417,7 @@ const SCATTER_STRINGS = {
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
     bestPerSku: 'Best per SKU',
-    optimalInfo:
-      'On agentic, optimal points must be Pareto-optimal on the selected x-axis and also belong to the E2E Normalized Interactivity frontier.',
+    optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     labels: 'Labels',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
@@ -411,8 +432,7 @@ const SCATTER_STRINGS = {
     logScale: '对数缩放',
     optimalOnly: '仅最优',
     bestPerSku: '每个 SKU 仅显示最佳配置',
-    optimalInfo:
-      '在智能体场景中，最优点既必须在当前横轴上满足 Pareto 最优，也必须属于端到端归一化交互性的 Pareto 前沿。',
+    optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
     labels: '标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',
@@ -745,14 +765,19 @@ const ScatterGraph = React.memo(
           const hwKeys = cl.entries.flatMap((entry: any) =>
             (entry.config_keys ?? entry['config-keys'] ?? [])
               .filter((key: string) => selectedPrecisions.includes(key.split('-')[1]))
-              .map(changelogConfigToHwKey)
+              .map((key: string) =>
+                changelogConfigToHwKey(
+                  key,
+                  selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
+                ),
+              )
               .filter((key: string | null): key is string => key !== null),
           );
           return new Set(hwKeys);
         }
       }
       return new Set<string>();
-    }, [availableRuns, selectedRunId, selectedPrecisions]);
+    }, [availableRuns, selectedRunId, selectedPrecisions, selectedSequence]);
 
     // --- Data Processing ---
     const groupedData = useMemo(
@@ -814,15 +839,7 @@ const ScatterGraph = React.memo(
       return effectiveOfficialHwTypes;
     }, [showAllHardwareTypes, groupedData, effectiveOfficialHwTypes]);
 
-    const buildPointConfigId = useCallback((point: InferenceData): string => {
-      let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}|${point.decode_ep ?? 0}|${point.prefill_tp ?? 0}|${point.prefill_ep ?? 0}`;
-      if (point.disagg) key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;
-      // Agentic runs emit two rows per (config, conc) — one offload=on, one off.
-      // Without this suffix, d3's data join treats them as the same point and
-      // drops one variant (along with its halo).
-      if (point.offload_mode) key += `|offload-${point.offload_mode}`;
-      return key;
-    }, []);
+    const buildPointConfigId = useCallback(scatterPointConfigId, []);
 
     // filteredData: visible points only (for scale domain calculation)
     const filteredData = useMemo(
@@ -1056,7 +1073,6 @@ const ScatterGraph = React.memo(
         processedOverlayData.some((point) => point.offload_mode === 'on'),
       [pointsData, processedOverlayData],
     );
-
     // Bulk presence lookup for agentic points: which ids have a stored
     // trace_replay blob → controls the "View charts" button in the pinned
     // tooltip. We deliberately don't fetch the histograms themselves here;
@@ -2387,6 +2403,16 @@ const ScatterGraph = React.memo(
                   overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
                 );
 
+              // Match official points: KV offload is the only persistent
+              // point decoration. Decode method remains in the tooltip.
+              overlayPoints.each(function (d) {
+                renderOffloadHalo(
+                  d3.select(this),
+                  d,
+                  overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
+                );
+              });
+
               // Labels
               const showLabels = showPointLabels && !showGradientLabels;
               overlayPoints.each(function (d) {
@@ -2874,19 +2900,7 @@ const ScatterGraph = React.memo(
 
         // Offload halo: dashed ring on every point that used KV offload (Pareto or not)
         zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
-          const showHalo = d.offload_mode === 'on';
-          d3.select(this)
-            .selectAll<SVGCircleElement, boolean>('.offload-halo')
-            .data(showHalo ? [true] : [])
-            .join('circle')
-            .attr('class', 'offload-halo')
-            .attr('r', OFFLOAD_HALO_RADIUS)
-            .attr('fill', 'none')
-            .attr('stroke', 'var(--foreground)')
-            .attr('stroke-width', OFFLOAD_HALO_STROKE_WIDTH)
-            .attr('stroke-dasharray', OFFLOAD_HALO_DASHARRAY)
-            .attr('opacity', 0.9)
-            .attr('pointer-events', 'none');
+          renderOffloadHalo(d3.select(this), d, 'var(--foreground)');
         });
 
         avoidLabelCollisions(zoomGroup);
@@ -2953,6 +2967,9 @@ const ScatterGraph = React.memo(
           getShapeKeyForPrecision(d.precision, ir.selectedPrecisions),
           color,
         );
+        // A precision toggle may replace and append the visible SVG shape.
+        // Keep the offload halo above that shape after the swap.
+        sel.selectAll('.offload-halo').raise();
       });
 
       // Overlay X markers: Optimal Only visibility (mirrors the official dot
@@ -3427,7 +3444,14 @@ const ScatterGraph = React.memo(
                   : []
               }
               precisionIndicators={selectedPrecisions}
-              keyIndicators={hasOffloadHalo ? <OffloadHaloLegendKey /> : undefined}
+              keyIndicators={
+                hasOffloadHalo || selectedSequence === Sequence.AgenticTraces ? (
+                  <>
+                    {hasOffloadHalo && <OffloadHaloLegendKey />}
+                    {selectedSequence === Sequence.AgenticTraces && <AgenticOptimizationNote />}
+                  </>
+                ) : undefined
+              }
               enableTooltips={true}
             />
           }

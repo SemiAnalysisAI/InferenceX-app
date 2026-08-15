@@ -33,6 +33,24 @@ describe('countCurvesByPrecision', () => {
   it('returns {} for no rows', () => {
     expect(countCurvesByPrecision([])).toEqual({});
   });
+
+  it('counts mixed agentic spec methods as one rendered curve', () => {
+    const base = { ...row('fp8', 'b200'), benchmark_type: 'agentic_traces' };
+    const counts = countCurvesByPrecision([
+      base,
+      { ...base, spec_method: 'mtp' },
+      { ...base, spec_method: 'eagle' },
+    ]);
+
+    expect(counts).toEqual({ fp8: 1 });
+  });
+
+  it('continues counting fixed-sequence spec methods as separate curves', () => {
+    const base = { ...row('fp8', 'b200'), benchmark_type: 'single_turn' };
+    const counts = countCurvesByPrecision([base, { ...base, spec_method: 'mtp' }]);
+
+    expect(counts).toEqual({ fp8: 2 });
+  });
 });
 
 describe('pickDefaultPrecisions', () => {

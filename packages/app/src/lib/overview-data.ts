@@ -1,6 +1,5 @@
 import { resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants';
 
-import { restrictAgenticPointsToE2eFrontier } from './agentic-frontier';
 import type { BenchmarkRow } from './api';
 import { rowToAggDataEntry } from './benchmark-transform';
 import { buildAvailabilityHwKey } from './chart-utils';
@@ -17,6 +16,11 @@ import {
 } from './data-mappings';
 import { frameworkFamily } from './framework-family';
 import {
+  benchmarkCurveDate,
+  benchmarkCurveRunStartedAt,
+  benchmarkCurveWorkflowRunId,
+} from './benchmark-run-selection';
+import {
   computeTierReads,
   singleTurnInteractivity,
   type TcoTierBoundary,
@@ -32,7 +36,18 @@ export const OVERVIEW_HARDWARE = ['b200', 'mi355x', 'b300', 'gb200', 'gb300'] as
 export type OverviewReferenceHardware = (typeof OVERVIEW_HARDWARE)[number];
 export const OVERVIEW_DEFAULT_REFERENCE_HARDWARE: OverviewReferenceHardware = 'b200';
 export type OverviewEngineScope = 'all' | 'community';
-export type OverviewComparisonMode = 'hardware' | 'history';
+export const OVERVIEW_HISTORY_WINDOWS = ['7d', '30d', '60d', '90d'] as const;
+export type OverviewHistoryWindowKey = (typeof OVERVIEW_HISTORY_WINDOWS)[number];
+export const OVERVIEW_DEFAULT_HISTORY_WINDOW: OverviewHistoryWindowKey = '30d';
+export const OVERVIEW_HISTORY_WINDOW_DAYS: Record<OverviewHistoryWindowKey, number> = {
+  '7d': 7,
+  '30d': 30,
+  '60d': 60,
+  '90d': 90,
+};
+/** A history mode IS its window key, so `?compare=<key>` alone determines the
+ *  payload and every href/caching path threads the window with no extra param. */
+export type OverviewComparisonMode = 'hardware' | OverviewHistoryWindowKey;
 export const OVERVIEW_DEFAULT_COMPARISON_MODE: OverviewComparisonMode = 'hardware';
 export type OverviewModelScope = 'default' | 'all';
 export const OVERVIEW_DEFAULT_MODEL_SCOPE: OverviewModelScope = 'default';
@@ -74,7 +89,10 @@ export function resolveOverviewComparisonMode(
   raw: string | readonly string[] | undefined,
 ): OverviewComparisonMode {
   const candidate = Array.isArray(raw) ? raw[0] : raw;
-  return candidate === '30d' ? 'history' : OVERVIEW_DEFAULT_COMPARISON_MODE;
+  return (
+    OVERVIEW_HISTORY_WINDOWS.find((window) => window === candidate) ??
+    OVERVIEW_DEFAULT_COMPARISON_MODE
+  );
 }
 
 export function resolveOverviewModelScope(
@@ -224,6 +242,7 @@ export interface OverviewPageData {
 }
 
 export interface OverviewHistoricalWindow {
+  key: OverviewHistoryWindowKey;
   snapshotDate: string;
   targetDate: string;
   earliestDate: string;
@@ -262,16 +281,24 @@ export function overviewSnapshotDate(
           scenarios.includes(scenario)
         );
       })
-      .map((row) => row.date);
+      .map(benchmarkCurveDate);
   });
   return dates.length === 0 ? null : (dates.toSorted().at(-1) ?? null);
 }
 
-export function overviewHistoricalWindow(snapshotDate: string): OverviewHistoricalWindow {
+/** Baseline band is one window-width wide ([snapshot−2w, snapshot−w]): wide
+ *  enough that a benchmark cadence sparser than the window still finds a
+ *  baseline, without ever reaching into results newer than the window. */
+export function overviewHistoricalWindow(
+  snapshotDate: string,
+  key: OverviewHistoryWindowKey = OVERVIEW_DEFAULT_HISTORY_WINDOW,
+): OverviewHistoricalWindow {
+  const days = OVERVIEW_HISTORY_WINDOW_DAYS[key];
   return {
+    key,
     snapshotDate,
-    targetDate: subtractUtcDays(snapshotDate, 30),
-    earliestDate: subtractUtcDays(snapshotDate, 60),
+    targetDate: subtractUtcDays(snapshotDate, days),
+    earliestDate: subtractUtcDays(snapshotDate, days * 2),
   };
 }
 
@@ -366,15 +393,16 @@ function overviewScenarioRows(
 export type OverviewServingSeriesRow = Pick<
   BenchmarkRow,
   'model' | 'hardware' | 'framework' | 'spec_method' | 'precision' | 'disagg' | 'is_multinode'
-> & { offload_mode?: string | null };
+> & { offload_mode?: string | null; benchmark_type?: string };
 
 /** Stable identity for one Overview serving envelope across topology points. */
 export function overviewServingSeriesKey(row: OverviewServingSeriesRow): string {
+  const specMethod = row.benchmark_type === 'agentic_traces' ? '' : row.spec_method;
   return JSON.stringify([
     row.model,
     row.hardware,
     row.framework,
-    row.spec_method,
+    specMethod,
     row.precision,
     row.disagg,
     row.is_multinode,
@@ -400,10 +428,27 @@ function buildConfigs(
   const configs: OverviewConfigResult[] = [];
   for (const [key, configRows] of rowsByConfig) {
     const latestDate = configRows.reduce(
-      (latest, row) => (row.date > latest ? row.date : latest),
-      configRows[0].date,
+      (latest, row) => (benchmarkCurveDate(row) > latest ? benchmarkCurveDate(row) : latest),
+      benchmarkCurveDate(configRows[0]),
     );
-    const latestRows = configRows.filter((row) => row.date === latestDate);
+    let latestRows = configRows.filter((row) => benchmarkCurveDate(row) === latestDate);
+    if (
+      scenario === 'agentx' &&
+      latestRows.some((row) => benchmarkCurveWorkflowRunId(row) !== undefined)
+    ) {
+      const winningRow = latestRows.reduce((winner, row) => {
+        const startedAt = benchmarkCurveRunStartedAt(row) ?? '';
+        const winnerStartedAt = benchmarkCurveRunStartedAt(winner) ?? '';
+        if (startedAt !== winnerStartedAt) return startedAt > winnerStartedAt ? row : winner;
+        return (benchmarkCurveWorkflowRunId(row) ?? Number.NEGATIVE_INFINITY) >
+          (benchmarkCurveWorkflowRunId(winner) ?? Number.NEGATIVE_INFINITY)
+          ? row
+          : winner;
+      });
+      latestRows = latestRows.filter(
+        (row) => benchmarkCurveWorkflowRunId(row) === benchmarkCurveWorkflowRunId(winningRow),
+      );
+    }
     const config = buildConfigResult(model, scenario, latestRows[0].precision, key, latestRows);
     if (config) configs.push(config);
   }
@@ -468,7 +513,13 @@ function nonComparableAsMissing(
   if (read === undefined) return nullTierRead(tier);
   return isInRangeTierRead(read)
     ? read
-    : { ...read, value: null, estimated: false, evidenceDate: null, evidenceTopologies: [] };
+    : {
+        ...read,
+        value: null,
+        estimated: false,
+        evidenceDate: null,
+        evidenceTopologies: [],
+      };
 }
 
 function configPriorityIndex(config: OverviewConfigView): number {
@@ -634,12 +685,12 @@ function buildAgenticTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
         interactivity,
         e2eLatency,
         throughput: totalThroughput,
-        date: row.date,
+        date: benchmarkCurveDate(row),
         evidenceLabel: topologyEvidence(row),
       },
     ];
   });
-  return computeTierReads(restrictAgenticPointsToE2eFrontier(points), OVERVIEW_TIERS);
+  return computeTierReads(points, OVERVIEW_TIERS);
 }
 
 /** Single-turn 8K/1K: frontier points at the chart's stored interactivity,
@@ -655,7 +706,7 @@ function buildSingleTurnTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] 
       {
         interactivity,
         throughput: totalTput * deployedGpuFactor(row),
-        date: row.date,
+        date: benchmarkCurveDate(row),
         evidenceLabel: topologyEvidence(row),
       },
     ];
@@ -674,7 +725,17 @@ function buildConfigResult(
   if (feed.length === 0) return null;
 
   const first = rows[0];
-  const { hardware, framework, spec_method: specMethod, disagg, is_multinode: isMultinode } = first;
+  const { hardware, framework, disagg, is_multinode: isMultinode } = first;
+  const specMethods = [...new Set(rows.map((row) => row.spec_method))];
+  const specMethod = specMethods.length === 1 ? specMethods[0] : 'mixed';
+  const specLabel =
+    specMethod === 'mixed'
+      ? specMethods
+          .map((method) =>
+            method === 'none' || method === '' ? 'STP' : resolveFrameworkPartLabel(model, method),
+          )
+          .join(' + ')
+      : resolveFrameworkPartLabel(model, specMethod);
   const sourceRunUrls = [
     ...new Set(rows.flatMap((row) => (row.run_url === null ? [] : [row.run_url]))),
   ].toSorted();
@@ -682,11 +743,17 @@ function buildConfigResult(
     key,
     dbModel: first.model,
     hardware,
-    hwKey: buildAvailabilityHwKey(hardware, framework, specMethod, disagg),
+    hwKey: buildAvailabilityHwKey(
+      hardware,
+      framework,
+      specMethod,
+      disagg,
+      scenario === 'agentx' ? 'agentic_traces' : 'single_turn',
+    ),
     framework,
     frameworkLabel: resolveFrameworkPartLabel(model, framework),
     specMethod,
-    specLabel: resolveFrameworkPartLabel(model, specMethod),
+    specLabel,
     disagg,
     isMultinode,
     precision,
@@ -790,7 +857,7 @@ export function applyOverviewRowScope(
   // Hardware mode filters on its own terms, but the reader's answer here is
   // still carried so a tab switch can restore it. Only the count is zeroed:
   // there is no control to label while this mode is off screen.
-  if (data.comparisonMode !== 'history') {
+  if (data.comparisonMode === 'hardware') {
     return { ...data, rowScope, unchangedRowCount: 0 };
   }
 
@@ -877,7 +944,7 @@ export function assembleOverviewHistoricalPageData(
 
   return {
     ...current,
-    comparisonMode: 'history',
+    comparisonMode: window.key,
     historicalWindow: window,
     models: current.models.map((model) => ({
       ...model,

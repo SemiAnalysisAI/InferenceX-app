@@ -8,10 +8,29 @@ import { kvCachePoolTokensFromServerLog } from './server-log-metrics';
 
 type Sql = ReturnType<typeof postgres>;
 
+type BenchmarkPointIdentity = Pick<
+  BenchmarkParams,
+  'benchmarkType' | 'isl' | 'osl' | 'conc' | 'offloadMode' | 'recipeFingerprint'
+> & { configId: number };
+
+/** Stable in-batch identity matching benchmark_results_unique. */
+export function benchmarkPointIngestKey(row: BenchmarkPointIdentity): string {
+  return JSON.stringify([
+    row.configId,
+    row.benchmarkType,
+    row.isl,
+    row.osl,
+    row.conc,
+    row.offloadMode,
+    row.recipeFingerprint,
+  ]);
+}
+
 /**
  * Bulk-insert benchmark results for a single artifact in one DB round-trip using `UNNEST`.
- * Rows are deduplicated within the batch on the conflict key `(config_id, isl, osl, conc)`
- * before sending, because Postgres rejects an `ON CONFLICT DO UPDATE` statement that
+ * Rows are deduplicated within the batch on the persisted point identity, including
+ * the producer's recipe fingerprint when present, before sending because Postgres
+ * rejects an `ON CONFLICT DO UPDATE` statement that
  * would update the same row twice in a single query.
  *
  * @param sql - Active `postgres` connection.
@@ -30,13 +49,10 @@ export async function bulkIngestBenchmarkRows(
 
   // Postgres rejects ON CONFLICT DO UPDATE if the same conflict key appears
   // more than once in a single batch. Deduplicate within the batch, keeping
-  // the last occurrence (last metrics for each unique config/benchmark_type/isl/osl/conc/offload_mode).
+  // the last occurrence for each unique recipe/config/scenario/concurrency point.
   const seen = new Map<string, BenchmarkParams & { configId: number }>();
   for (const r of rows) {
-    seen.set(
-      `${r.configId}-${r.benchmarkType}-${r.isl ?? ''}-${r.osl ?? ''}-${r.conc}-${r.offloadMode}`,
-      r,
-    );
+    seen.set(benchmarkPointIngestKey(r), r);
   }
   const deduped = [...seen.values()];
 
@@ -47,6 +63,7 @@ export async function bulkIngestBenchmarkRows(
   const osls = deduped.map((r) => r.osl);
   const concs = deduped.map((r) => r.conc);
   const images = deduped.map((r) => r.image);
+  const recipeFingerprints = deduped.map((r) => r.recipeFingerprint);
   const metricsJsons = deduped.map((r) => JSON.stringify(r.metrics));
   // workers is optional — encode missing values as JSON null so the JSONB
   // unnest input has a homogeneous type (jsonb[]) and stores SQL NULL in the
@@ -58,7 +75,7 @@ export async function bulkIngestBenchmarkRows(
   const result = await sql<{ inserted: boolean; id: number }[]>`
     insert into benchmark_results (
       workflow_run_id, config_id, benchmark_type, offload_mode, date,
-      isl, osl, conc, image, metrics, workers
+      isl, osl, conc, image, recipe_fingerprint, metrics, workers
     )
     select
       ${workflowRunId},
@@ -70,9 +87,13 @@ export async function bulkIngestBenchmarkRows(
       unnest(${sql.array(osls)}::int[]),
       unnest(${sql.array(concs)}::int[]),
       unnest(${sql.array(images)}),
+      unnest(${sql.array(recipeFingerprints)}),
       unnest(${sql.array(metricsJsons)}::jsonb[]),
       unnest(${sql.array(workersJsons)}::jsonb[])
-    on conflict (workflow_run_id, config_id, benchmark_type, isl, osl, conc, offload_mode)
+    on conflict (
+      workflow_run_id, config_id, benchmark_type, isl, osl, conc, offload_mode,
+      recipe_fingerprint
+    )
     do update set
       -- Replace metrics with the fresh artifact values, but carry over
       -- kv_cache_pool_tokens: it is derived from the server log at

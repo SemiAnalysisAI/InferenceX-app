@@ -8,8 +8,9 @@ import { Precision, PRECISION_OPTIONS } from './data-mappings';
  * showing a near-empty chart on first load. Instead we default to whichever
  * precision has the most data, with a guard against committing to a sparse one.
  *
- * "Curves" = distinct (hardware, framework, spec_method, disagg) series that
- * would render for a precision — i.e. how many lines the chart draws.
+ * "Curves" = distinct chart series that would render for a precision. Fixed-
+ * sequence series include `spec_method`; agentic series do not because one line
+ * can contain points from multiple speculative-decoding methods.
  */
 
 /**
@@ -26,6 +27,7 @@ interface CurveRow {
   framework: string;
   spec_method: string;
   disagg: boolean;
+  benchmark_type?: string;
 }
 
 /** Count distinct curves per precision from already-filtered rows (model + sequence). */
@@ -37,7 +39,8 @@ export function countCurvesByPrecision(rows: CurveRow[]): Record<string, number>
       curves = new Set();
       seen.set(r.precision, curves);
     }
-    curves.add(`${r.hardware}|${r.framework}|${r.spec_method}|${r.disagg}`);
+    const specMethod = r.benchmark_type === 'agentic_traces' ? '' : r.spec_method;
+    curves.add(`${r.hardware}|${r.framework}|${specMethod}|${r.disagg}`);
   }
   const counts: Record<string, number> = {};
   for (const [precision, curves] of seen) counts[precision] = curves.size;

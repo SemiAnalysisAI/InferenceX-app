@@ -29,7 +29,7 @@ describe('GET /api/v1/overview', () => {
     const data = {
       tier: 75,
       engineScope: 'all',
-      comparisonMode: 'history',
+      comparisonMode: '30d',
       referenceHardware: 'b300',
       models: [],
       historicalWindow: null,
@@ -47,7 +47,7 @@ describe('GET /api/v1/overview', () => {
     expect(mockGetOverviewPageData).toHaveBeenCalledWith(
       75,
       'all',
-      'history',
+      '30d',
       'b300',
       'all',
       'changed',

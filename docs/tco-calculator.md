@@ -121,3 +121,36 @@ Agentic interactivity follows the same definition as the main inference chart:
 `b300Rows` in `cypress/support/overlay-fixtures.ts` covers the agentic calculator
 path; `singleTurnRows` remains the fixture for fixed-sequence visibility and
 sequence-switching behavior.
+
+## Reciprocal Metrics Are Derived, Not Splined
+
+`$/M tok` and `J/token` are a per-chip constant divided by a throughput
+(`$/GPU-hr x 1e6 / (tok/s x 3600)`, `W / (tok/s)`). `interpolateForGPU`,
+`maxInteractivityAtCost` and `interpolateMetricAtInteractivity` therefore spline
+the **throughput** those metrics divide and re-derive the metric, rather than
+splining the metric itself.
+
+Independently splining the reciprocal metric and throughput creates two curves
+that need not satisfy `metric x throughput = constant` between measured knots.
+The direction and size of the difference depend on frontier density and can
+change as benchmark runs land. Re-deriving the metric preserves its definition
+at every interpolated point.
+
+`/inference` plots these metrics only at measured points (`lib/chart-utils.ts`,
+`roof: false`), where both methods agree exactly. Leave-one-out measurements can
+compare interpolation models on a fixed snapshot, but they must not be presented
+as permanent impact figures for the changing live dataset.
+
+### The consistency guard
+
+`recoverReciprocalNumerator` returns the constant only if **every** usable point
+agrees on it within 0.1% (`1e-3` relative). That guard is what licenses the
+rewrite. The `measured*` energy keys have a numerator measured per point rather
+than a constant, so they are excluded from `RECIPROCAL_OF_THROUGHPUT` and still
+splined directly. When the guard fails, all three call sites fall back to
+splining.
+
+The rate is recovered across **all three token types at once** (`recoverCostRate`).
+Checking one family alone and falling back to another would recover a rate from
+output tokens and then apply it to total throughput; the existing
+`maxInteractivityAtCost` tests caught exactly that mistake.

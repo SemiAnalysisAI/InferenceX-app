@@ -52,6 +52,9 @@ function expectNoHorizontalScroller(testId: string) {
       .filter(
         (el) =>
           !el.classList.contains('sr-only') &&
+          // Radix selects render an aria-hidden native <select> clipped to 1px,
+          // which Firefox reports as scrollable; hidden elements cannot scroll.
+          el.getAttribute('aria-hidden') !== 'true' &&
           getComputedStyle(el).display !== 'inline' &&
           el.scrollWidth > el.clientWidth + 1,
       )
@@ -175,7 +178,7 @@ describe('Overview page', () => {
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
-    cy.get('[data-overview-comparison="history"]').click();
+    cy.get('[data-overview-comparison="30d"]').click();
     cy.wait('@overviewJson');
     cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all&compare=30d');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
@@ -313,13 +316,13 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    cy.get('[data-overview-comparison="history"]').click();
-    cy.get('[data-overview-comparison="history"]', { timeout: 15_000 }).should(
+    cy.get('[data-overview-comparison="30d"]').click();
+    cy.get('[data-overview-comparison="30d"]', { timeout: 15_000 }).should(
       'have.attr',
       'aria-current',
       'true',
     );
-    cy.focused().should('have.attr', 'data-overview-comparison', 'history');
+    cy.focused().should('have.attr', 'data-overview-comparison', '30d');
   });
 
   it('reveals deprecated and maintenance models via the bottom toggle', () => {
@@ -401,7 +404,7 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .find('[data-overview-engine-scope="all"]')
       .should('have.attr', 'href', '/overview?engine=all&ref=b300');
-    cy.get('[data-overview-comparison="history"]').should(
+    cy.get('[data-overview-comparison="30d"]').should(
       'have.attr',
       'href',
       '/overview?ref=b300&compare=30d',
@@ -445,15 +448,15 @@ describe('Overview page', () => {
             expect(style.borderBottomWidth).to.equal('2px');
             expect(style.backgroundColor).to.match(/rgba\(0, 0, 0, 0\)|transparent/);
           });
-        cy.get('[data-overview-comparison="history"]')
+        cy.get('[data-overview-comparison="30d"]')
           .should('have.attr', 'href', '/overview?compare=30d')
-          .and('have.text', '30-day change')
+          .and('have.text', 'Change over time')
           .click();
       });
 
     cy.location('search').should('eq', '?compare=30d');
     cy.get('[data-testid="overview-comparison-switcher"]')
-      .find('[data-overview-comparison="history"]')
+      .find('[data-overview-comparison="30d"]')
       .should('have.attr', 'aria-current', 'true')
       .and('match', 'span');
     cy.get('[data-testid="overview-desktop-matrix"] thead').should('contain.text', 'B200');
@@ -474,12 +477,32 @@ describe('Overview page', () => {
       .should('have.attr', 'aria-label', '对比方式')
       .within(() => {
         cy.get('[data-overview-comparison="hardware"]').should('have.text', '对比 B200');
-        cy.get('[data-overview-comparison="history"]')
+        cy.get('[data-overview-comparison="30d"]')
           .should('have.attr', 'aria-current', 'true')
-          .and('have.text', '30 天变化');
+          .and('have.text', '对比 1 个月前');
       });
     cy.contains('当前成本及其相对 30–60 天前最近一次有效平台结果的变化。').should('exist');
     cy.contains('缺少有效 30 天对比的平台仅显示当前成本。').should('exist');
+  });
+
+  it('switches the history window through the embedded selector', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview?compare=30d');
+
+    cy.get('[data-testid="overview-history-window-select"]').click();
+    cy.get('[data-overview-window="7d"]').click();
+    cy.location('search', { timeout: 15_000 }).should('eq', '?compare=7d');
+    cy.get('[data-overview-comparison="7d"]').should('have.attr', 'aria-current', 'true');
+    cy.contains(
+      'Current cost and change versus the latest validated platform result 7–14 days earlier.',
+    ).should('exist');
+
+    cy.get('[data-testid="overview-history-window-select"]').click();
+    cy.get('[data-overview-window="90d"]').click();
+    cy.location('search', { timeout: 15_000 }).should('eq', '?compare=90d');
+    cy.contains(
+      'Current cost and change versus the latest validated platform result 90–180 days earlier.',
+    ).should('exist');
   });
 
   it('compares each platform with its own validated result from 30–60 days earlier', () => {

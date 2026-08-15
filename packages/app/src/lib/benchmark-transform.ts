@@ -115,6 +115,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   return {
     rawMetricKeys: Object.keys(m),
     id: isPersistedBenchmarkId(numericId) ? numericId : undefined,
+    recipe_fingerprint: row.recipe_fingerprint ?? undefined,
     hw: row.hardware,
     framework: row.framework,
     model: DB_MODEL_TO_DISPLAY[row.model] ?? row.model,
@@ -249,14 +250,32 @@ export function withPercentile(key: string, percentile: string): string {
   return key.replace(/^(?:mean|median|p75|p90|p95|p99|p99\.9)_/u, `${percentile}_`);
 }
 
-// Replacement granularity for single-run scoping: the changelog config_key
-// tuple (model-precision-hardware-framework) plus benchmark_type AND offload_mode.
-// benchmark_type keeps an agentic-only run from hiding the same config's
-// fixed-seq carry-forward; offload_mode keeps a run that produced only one
-// offload variant (e.g. offload=on) from claiming — and thereby suppressing —
-// the other variant's (offload=off) base rows, which are a distinct series.
+// Replacement granularity for single-run scoping is an exact generated topology.
+// An append-only run may touch one TP/EP search-space row while the displayed
+// curve also contains sibling topologies from the preceding snapshot.
 const runScopeKey = (r: BenchmarkRow): string =>
-  `${r.model}|${r.precision}|${r.hardware}|${r.framework}|${r.benchmark_type}|${r.offload_mode ?? 'off'}`;
+  JSON.stringify([
+    r.model,
+    r.precision,
+    r.hardware,
+    r.framework,
+    r.spec_method,
+    r.disagg,
+    r.is_multinode,
+    r.prefill_tp,
+    r.prefill_ep,
+    r.prefill_dp_attention,
+    r.prefill_num_workers,
+    r.decode_tp,
+    r.decode_ep,
+    r.decode_dp_attention,
+    r.decode_num_workers,
+    r.benchmark_type,
+    r.isl,
+    r.osl,
+    r.offload_mode ?? 'off',
+    r.recipe_fingerprint ?? null,
+  ]);
 
 /**
  * Merge run-scoped benchmark rows with the normal latest-per-config rows.
@@ -269,8 +288,8 @@ const runScopeKey = (r: BenchmarkRow): string =>
  * e.g. selecting one of two same-day vLLM runs made the day's SGLang curve
  * vanish because it lived in a different workflow run.
  *
- * Run rows win for every (model, precision, hardware, framework,
- * benchmark_type) group they cover; base rows fill in the rest.
+ * Run rows win for every exact generated topology they cover; base rows fill
+ * in sibling topologies and unrelated series.
  */
 export function mergeRunScopedRows(
   runRows: BenchmarkRow[],

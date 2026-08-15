@@ -415,6 +415,28 @@ describe('mapBenchmarkRow', () => {
     });
   });
 
+  describe('recipe fingerprint', () => {
+    it('preserves the producer fingerprint outside metrics', () => {
+      const result = mapBenchmarkRow(
+        makeV1Row({
+          recipe_fingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        }),
+        createSkipTracker(),
+      );
+
+      expect(result!.recipeFingerprint).toBe(
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      );
+      expect(result!.metrics).not.toHaveProperty('recipe_fingerprint');
+    });
+
+    it('uses null for legacy artifacts without a fingerprint', () => {
+      const result = mapBenchmarkRow(makeV1Row(), createSkipTracker());
+
+      expect(result!.recipeFingerprint).toBeNull();
+    });
+  });
+
   describe('spec_decoding', () => {
     it('normalizes spec_decoding to lowercase', () => {
       const tracker = createSkipTracker();

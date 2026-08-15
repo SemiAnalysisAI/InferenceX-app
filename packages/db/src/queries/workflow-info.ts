@@ -18,6 +18,7 @@ export interface ChangelogRow {
   config_keys: string[];
   description: string;
   pr_link: string | null;
+  append_only: boolean;
 }
 
 export interface DateConfigRow {
@@ -56,7 +57,8 @@ export async function getChangelogByDate(sql: DbClient, date: string): Promise<C
       cl.head_ref,
       cl.config_keys,
       cl.description,
-      cl.pr_link
+      cl.pr_link,
+      cl.append_only
     FROM changelog_entries cl
     JOIN latest_workflow_runs wr ON wr.id = cl.workflow_run_id
     WHERE cl.date = ${date}::date
@@ -84,7 +86,12 @@ export interface RunConfigRow {
  * shipped data without a changelog entry still surfaces — the comparison UI uses
  * this to enumerate every run on a date, not just runs with changelog notes.
  */
-export async function getRunConfigsByDate(sql: DbClient, date: string): Promise<RunConfigRow[]> {
+export async function getRunConfigsByDate(
+  sql: DbClient,
+  date: string,
+  benchmarkType?: 'agentic_traces',
+): Promise<RunConfigRow[]> {
+  const benchmarkTypeFilter = benchmarkType ? sql`AND br.benchmark_type = ${benchmarkType}` : sql``;
   const rows = await sql`
     SELECT DISTINCT
       wr.github_run_id,
@@ -102,6 +109,7 @@ export async function getRunConfigsByDate(sql: DbClient, date: string): Promise<
     JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
     WHERE br.date = ${date}::date
       AND br.error IS NULL
+      ${benchmarkTypeFilter}
   `;
   return rows as unknown as RunConfigRow[];
 }

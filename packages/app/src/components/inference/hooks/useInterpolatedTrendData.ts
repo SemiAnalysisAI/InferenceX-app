@@ -7,18 +7,24 @@ import {
   hermiteInterpolate,
   monotoneSlopes,
   paretoFrontUpperLeft,
+  recoverReciprocalNumerator,
+  reciprocalMetricAt,
 } from '@/components/calculator/useThroughputData';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { getHardwareKey } from '@/lib/chart-utils';
 import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
-import type { Model, Sequence } from '@/lib/data-mappings';
+import { benchmarkCurveDate, dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
+import { Sequence, type Model } from '@/lib/data-mappings';
 
 // Trend points never sit on a roofline — they're synthetic per-(date, config)
 // aggregates, not the per-load Pareto-frontier points the chart marks. Hardcode
 // roof:false so the field shape lines up with InferenceData without a cast.
-const wrapMetric = (n: number): { y: number; roof: boolean } => ({ y: n, roof: false });
+const wrapMetric = (n: number): { y: number; roof: boolean } => ({
+  y: n,
+  roof: false,
+});
 
 /**
  * Build a lightweight InferenceData-compatible point from a raw BenchmarkRow.
@@ -52,7 +58,7 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
     precision: row.precision,
     tp: row.decode_tp,
     conc: row.conc,
-    date: row.date,
+    date: benchmarkCurveDate(row),
     tpPerGpu: wrapMetric(tput),
     outputTputPerGpu: wrapMetric(outputTput),
     inputTputPerGpu: wrapMetric(inputTput),
@@ -75,23 +81,71 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
       ? { measuredAvgPower: { y: entry.avg_power_w, roof: false } }
       : {}),
     ...(typeof entry.joules_per_output_token === 'number'
-      ? { measuredJPerOutputToken: { y: entry.joules_per_output_token, roof: false } }
+      ? {
+          measuredJPerOutputToken: {
+            y: entry.joules_per_output_token,
+            roof: false,
+          },
+        }
       : {}),
     ...(typeof entry.joules_per_total_token === 'number'
-      ? { measuredJPerTotalToken: { y: entry.joules_per_total_token, roof: false } }
+      ? {
+          measuredJPerTotalToken: {
+            y: entry.joules_per_total_token,
+            roof: false,
+          },
+        }
       : {}),
     ...(typeof entry.prefill_avg_power_w === 'number'
-      ? { measuredPrefillAvgPower: { y: entry.prefill_avg_power_w, roof: false } }
+      ? {
+          measuredPrefillAvgPower: {
+            y: entry.prefill_avg_power_w,
+            roof: false,
+          },
+        }
       : {}),
     ...(typeof entry.decode_avg_power_w === 'number'
       ? { measuredDecodeAvgPower: { y: entry.decode_avg_power_w, roof: false } }
       : {}),
     ...(typeof entry.joules_per_input_token === 'number'
-      ? { measuredJPerInputToken: { y: entry.joules_per_input_token, roof: false } }
+      ? {
+          measuredJPerInputToken: {
+            y: entry.joules_per_input_token,
+            roof: false,
+          },
+        }
       : {}),
   };
   return point;
 }
+
+/**
+ * Metrics defined as a per-chip constant divided by a throughput, mapped to the
+ * throughput metric they divide. These are interpolated by splining that
+ * throughput and re-deriving, never by splining the metric independently, so
+ * the interpolated pair preserves `metric x throughput = constant`. See
+ * `recoverReciprocalNumerator` and docs/tco-calculator.md.
+ *
+ * The `measured*` energy keys are deliberately absent: their numerator is
+ * measured per point rather than a constant, so the identity does not hold and
+ * splining them directly remains correct.
+ */
+const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
+  // $/M tok = $/GPU-hr x 1e6 / (tok/s x 3600)
+  costh: 'tpPerGpu',
+  costn: 'tpPerGpu',
+  costr: 'tpPerGpu',
+  costhOutput: 'outputTputPerGpu',
+  costnOutput: 'outputTputPerGpu',
+  costrOutput: 'outputTputPerGpu',
+  costhi: 'inputTputPerGpu',
+  costni: 'inputTputPerGpu',
+  costri: 'inputTputPerGpu',
+  // J/token = W / (tok/s)
+  jTotal: 'tpPerGpu',
+  jOutput: 'outputTputPerGpu',
+  jInput: 'inputTputPerGpu',
+};
 
 /**
  * Interpolate a selected metric at a target interactivity for a set of InferenceData points
@@ -139,6 +193,27 @@ export function interpolateMetricAtInteractivity(
     const v = extractMetric(p, metricKey);
     if (v === null) return null;
     metricYs.push(v);
+  }
+
+  // Cost and energy per token are `constant / throughput`. Spline that
+  // throughput and re-derive rather than splining the metric, so the value
+  // agrees with the per-point figures on the inference chart.
+  const throughputKey = RECIPROCAL_OF_THROUGHPUT[metricKey];
+  if (throughputKey) {
+    const tputYs: number[] = [];
+    for (const p of sorted) {
+      const v = extractMetric(p, throughputKey);
+      if (v === null) return null;
+      tputYs.push(v);
+    }
+    const numerator = recoverReciprocalNumerator(metricYs, tputYs);
+    // null means these points do not obey the identity — fall through and spline
+    // the metric directly rather than rewrite it from one point's ratio.
+    if (numerator !== null) {
+      const tputSlopes = monotoneSlopes(xs, tputYs);
+      const tput = hermiteInterpolate(xs, tputYs, tputSlopes, targetInteractivity);
+      return reciprocalMetricAt(numerator, Math.max(0, tput));
+    }
   }
 
   // Monotone cubic Hermite spline interpolation
@@ -195,6 +270,7 @@ export function useInterpolatedTrendData({
     enabled ? selectedModel : '',
     seqIslOsl?.isl ?? 0,
     seqIslOsl?.osl ?? 0,
+    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
   );
 
   // Build lightweight InferenceData points grouped by date and hwKey.
@@ -204,16 +280,17 @@ export function useInterpolatedTrendData({
 
     const result = new Map<string, Map<string, InferenceData[]>>();
 
-    for (const row of allRows) {
+    for (const row of dedupeAgenticHistoryRuns(allRows)) {
       if (!selectedPrecisions.includes(row.precision)) continue;
 
       const point = rowToLightweightPoint(row);
       if (!point) continue;
 
-      let dateMap = result.get(row.date);
+      const curveDate = benchmarkCurveDate(row);
+      let dateMap = result.get(curveDate);
       if (!dateMap) {
         dateMap = new Map();
-        result.set(row.date, dateMap);
+        result.set(curveDate, dateMap);
       }
 
       const hwKey = point.hwKey as string;
@@ -266,7 +343,12 @@ export function useInterpolatedTrendData({
         // Extend line to today if the last point is before today
         const last = points.at(-1)!;
         if (last.date < today) {
-          points.push({ date: today, value: last.value, x: last.x, synthetic: true });
+          points.push({
+            date: today,
+            value: last.value,
+            x: last.x,
+            synthetic: true,
+          });
         }
         lines.set(groupKey, points);
         // Return base hwKey for legend filtering
@@ -300,7 +382,12 @@ export function useInterpolatedTrendData({
   }, [isLoading]);
 
   if (!enabled) {
-    return { trendLines: new Map(), hwKeysWithData: [], loading: false, progress: 0 };
+    return {
+      trendLines: new Map(),
+      hwKeysWithData: [],
+      loading: false,
+      progress: 0,
+    };
   }
 
   return { trendLines, hwKeysWithData, loading: isLoading, progress };

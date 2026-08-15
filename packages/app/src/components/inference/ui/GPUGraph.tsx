@@ -8,7 +8,7 @@ import { useTheme } from 'next-themes';
 import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import { getChartWatermark } from '@/lib/data-mappings';
+import { getChartWatermark, Sequence } from '@/lib/data-mappings';
 import { generateGpuDateColors } from '@/lib/dynamic-colors';
 import { useLocale } from '@/lib/use-locale';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
@@ -62,6 +62,7 @@ import {
   OFFLOAD_HALO_STROKE_WIDTH,
   OffloadHaloLegendKey,
 } from '@/components/inference/ui/OffloadHaloLegendKey';
+import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 
@@ -115,6 +116,7 @@ const GPUGraph = React.memo(
       selectedGPUs,
       selectedDateRange,
       selectedDates,
+      selectedSequence,
       setSelectedDates,
       toggleActiveDate,
       removeActiveDate,
@@ -1030,7 +1032,14 @@ const GPUGraph = React.memo(
               },
             ]}
             precisionIndicators={selectedPrecisions}
-            keyIndicators={hasOffloadHalo ? <OffloadHaloLegendKey /> : undefined}
+            keyIndicators={
+              hasOffloadHalo || selectedSequence === Sequence.AgenticTraces ? (
+                <>
+                  {hasOffloadHalo && <OffloadHaloLegendKey />}
+                  {selectedSequence === Sequence.AgenticTraces && <AgenticOptimizationNote />}
+                </>
+              ) : undefined
+            }
           />
         }
       />

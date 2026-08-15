@@ -24,6 +24,7 @@ const SCOPE = {
   modelDbKeys: ['minimaxm3'],
   selectedGPUs: ['mi300x_vllm'],
   selectedPrecisions: ['fp8'],
+  benchmarkType: 'single_turn' as const,
 };
 
 describe('dataRunsForDate', () => {
@@ -64,6 +65,15 @@ describe('dataRunsForDate', () => {
     ];
     const runs = dataRunsForDate(rows, { ...SCOPE, selectedGPUs: ['mi300x_vllm_mtp'] });
     expect(runs.map((r) => r.runId)).toEqual(['2']);
+  });
+
+  it('maps agentic MTP and non-MTP run coverage to one GPU series', () => {
+    const rows = [
+      rc({ github_run_id: 1, spec_method: 'none' }),
+      rc({ github_run_id: 2, spec_method: 'mtp' }),
+    ];
+    const runs = dataRunsForDate(rows, { ...SCOPE, benchmarkType: 'agentic_traces' });
+    expect(runs.map((r) => r.runId)).toEqual(['1', '2']);
   });
 
   it('excludes runs for other models, precisions, and GPUs', () => {

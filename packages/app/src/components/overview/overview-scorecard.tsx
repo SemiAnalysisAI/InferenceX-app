@@ -3,9 +3,12 @@
 import { type ComponentPropsWithoutRef, useEffect, useRef } from 'react';
 
 import {
+  OVERVIEW_DEFAULT_HISTORY_WINDOW,
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   OVERVIEW_DEFAULT_ROW_SCOPE,
   OVERVIEW_HARDWARE,
+  OVERVIEW_HISTORY_WINDOW_DAYS,
+  OVERVIEW_HISTORY_WINDOWS,
   OVERVIEW_TIERS,
   overviewHardwareLabel,
   type OverviewComparisonMode,
@@ -30,6 +33,7 @@ import {
 
 import { OverviewDetailLink } from './overview-detail-link';
 import { OverviewHistoryDetailLink } from './overview-history-detail-link';
+import { OverviewHistoryWindowSelect } from './overview-history-window-select';
 import { OverviewNavLink } from './overview-nav-link';
 import { type OverviewNavControl, useOverviewNavigation } from './overview-navigation';
 import { OverviewReferenceSelect } from './overview-reference-select';
@@ -56,14 +60,21 @@ export const OVERVIEW_STRINGS = {
     },
     comparisonNavLabel: 'Compare',
     comparisonOptions: {
-      history: '30-day change',
+      history: 'Change over time',
     },
+    historyWindowOptions: {
+      '7d': '1 week ago',
+      '30d': '1 month ago',
+      '60d': '2 months ago',
+      '90d': '3 months ago',
+    } as Record<string, string>,
+    historyWindowSelectAria: 'Comparison window',
     hardwareComparisonLabel: (reference: string) => `vs ${reference}`,
     referenceSelectorAria: 'Reference hardware',
     caption:
       'Cost per million total tokens from each platform’s best observed serving envelope for the scenario shown with each model.',
-    historyCaption:
-      'Current cost and change versus the latest validated platform result 30–60 days earlier.',
+    historyCaption: (days: number) =>
+      `Current cost and change versus the latest validated platform result ${days}–${days * 2} days earlier.`,
     modelHeader: 'Model · Scenario',
     scenarioLabels: {
       single_turn_8k1k: '8K/1K',
@@ -107,7 +118,8 @@ export const OVERVIEW_STRINGS = {
       `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than this platform’s ${baselineDate} result`,
     historicalEvenAria: (baselineDate: string) =>
       `About the same cost as this platform’s ${baselineDate} result`,
-    historyCellStateLegend: 'Platforms without a valid 30-day comparison show current cost only.',
+    historyCellStateLegend: (days: number) =>
+      `Platforms without a valid ${days}-day comparison show current cost only.`,
     referenceHeader: 'Reference',
     modelScopeNavLabel: 'Inactive models',
     modelScopeShow: 'Show deprecated & maintenance-mode models',
@@ -159,12 +171,20 @@ export const OVERVIEW_STRINGS = {
     },
     comparisonNavLabel: '对比方式',
     comparisonOptions: {
-      history: '30 天变化',
+      history: '历史变化',
     },
+    historyWindowOptions: {
+      '7d': '1 周前',
+      '30d': '1 个月前',
+      '60d': '2 个月前',
+      '90d': '3 个月前',
+    } as Record<string, string>,
+    historyWindowSelectAria: '对比时间窗口',
     hardwareComparisonLabel: (reference: string) => `对比 ${reference}`,
     referenceSelectorAria: '基准硬件',
     caption: '按各模型标注的场景，基于各平台最佳观测服务包络线计算每百万总 token 成本。',
-    historyCaption: '当前成本及其相对 30–60 天前最近一次有效平台结果的变化。',
+    historyCaption: (days: number) =>
+      `当前成本及其相对 ${days}–${days * 2} 天前最近一次有效平台结果的变化。`,
     modelHeader: '模型 · 场景',
     scenarioLabels: {
       single_turn_8k1k: '8K/1K',
@@ -203,7 +223,7 @@ export const OVERVIEW_STRINGS = {
     historicalDeltaAria: (pct: string, cheaper: boolean, baselineDate: string) =>
       `比该平台 ${baselineDate} 的结果${cheaper ? '便宜' : '昂贵'} ${pct}`,
     historicalEvenAria: (baselineDate: string) => `与该平台 ${baselineDate} 的结果成本基本持平`,
-    historyCellStateLegend: '缺少有效 30 天对比的平台仅显示当前成本。',
+    historyCellStateLegend: (days: number) => `缺少有效 ${days} 天对比的平台仅显示当前成本。`,
     referenceHeader: '基准',
     modelScopeNavLabel: '非活跃模型',
     modelScopeShow: '显示已弃用与维护模式模型',
@@ -361,7 +381,7 @@ function displayedComparison(
   referenceCost: number | null,
 ): DisplayedComparison | null {
   if (platform.costPerMtok === null) return null;
-  if (comparisonMode === 'history') {
+  if (comparisonMode !== 'hardware') {
     const comparison = platform.historicalComparison;
     return comparison?.status === 'comparable' && comparison.costDeltaPct !== null
       ? {
@@ -492,7 +512,7 @@ function CostDeltaBadge({
       data-testid="overview-cost-delta"
       data-hardware={hardware}
       data-cost-polarity={polarity}
-      data-history-status={comparisonMode === 'history' ? status : undefined}
+      data-history-status={comparisonMode === 'hardware' ? undefined : status}
       title={aria}
       // The cell behind it carries the shade, so the badge itself stays
       // untinted — two washes of the same hue would double up.
@@ -580,7 +600,7 @@ function CellValue({
   const costText = formattedValue;
   const comparison = displayedComparison(member, comparisonMode, referenceHardware, referenceCost);
   const historicalConfig =
-    comparisonMode === 'history' && member.historicalComparison?.status === 'comparable'
+    comparisonMode !== 'hardware' && member.historicalComparison?.status === 'comparable'
       ? member.historicalComparison.baselineConfig
       : null;
   return (
@@ -765,7 +785,9 @@ export function DesktopOverviewMatrix({
     <div className={presenting ? 'block' : 'hidden xl:block'}>
       <table data-testid="overview-desktop-matrix" className="w-full border-collapse text-sm">
         <caption className="sr-only">
-          {comparisonMode === 'history' ? strings.historyCaption : strings.caption}
+          {comparisonMode === 'hardware'
+            ? strings.caption
+            : strings.historyCaption(OVERVIEW_HISTORY_WINDOW_DAYS[comparisonMode])}
         </caption>
         <colgroup>
           <col className="w-[22%]" />
@@ -814,7 +836,7 @@ export function DesktopOverviewMatrix({
                   <ModelName model={model} strings={strings} />
                   {/* The link lives with the model it drills into, so the matrix
                     spends no column on a header that is the same every row. */}
-                  {comparisonMode === 'history' ? null : (
+                  {comparisonMode === 'hardware' && (
                     <OverviewDetailLink
                       href={detailHref(locale, model)}
                       model={model.model}
@@ -920,7 +942,7 @@ export function MobileOverviewList({
                   </div>
                 ))}
               </div>
-              {comparisonMode === 'history' ? null : (
+              {comparisonMode === 'hardware' && (
                 <OverviewDetailLink
                   href={detailHref(locale, model)}
                   model={model.model}
@@ -1134,7 +1156,6 @@ export function OverviewComparisonSwitcher({
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
-  const options: OverviewComparisonMode[] = ['hardware', 'history'];
   const referenceLabel = overviewHardwareLabel(referenceHardware);
   const referenceOptions = OVERVIEW_HARDWARE.map((hardware) => ({
     value: hardware,
@@ -1150,6 +1171,11 @@ export function OverviewComparisonSwitcher({
       hardwareRowScope,
     ),
   }));
+  const windowOptions = OVERVIEW_HISTORY_WINDOWS.map((window) => ({
+    value: window,
+    label: strings.historyWindowOptions[window],
+    href: overviewHref(locale, tier, engineScope, window, referenceHardware, modelScope),
+  }));
   // The inactive-only classes live on the inactive branch, not here: Tailwind
   // emits `border-transparent` after `border-secondary` at equal specificity,
   // so sharing them left the active underline invisible in light mode. Same
@@ -1164,53 +1190,77 @@ export function OverviewComparisonSwitcher({
       aria-label={strings.comparisonNavLabel}
       className="flex flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
     >
-      {options.map((option) => {
-        const label =
-          option === 'hardware'
-            ? strings.hardwareComparisonLabel(referenceLabel)
-            : strings.comparisonOptions.history;
-        return option === comparisonMode ? (
-          <ActiveSwitcherOption
-            key={option}
-            control="comparison"
-            data-overview-comparison={option}
-            aria-current="true"
-            className={`${optionClass} border-secondary text-secondary dark:border-primary dark:text-primary`}
-          >
-            {option === 'hardware' ? (
-              <span className="inline-flex items-center gap-0.5">
-                <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
-                <OverviewReferenceSelect
-                  ariaLabel={strings.referenceSelectorAria}
-                  options={referenceOptions}
-                />
-              </span>
-            ) : (
-              label
-            )}
-          </ActiveSwitcherOption>
-        ) : (
-          <OverviewNavLink
-            key={option}
-            data-overview-comparison={option}
-            href={overviewHref(
-              locale,
-              tier,
-              engineScope,
-              option,
-              referenceHardware,
-              modelScope,
-              rowScope,
-              hardwareRowScope,
-            )}
-            analytics={{ control: 'comparison', value: option }}
-            searchKeys={['compare']}
-            className={`${optionClass} ${inactiveOptionClass}`}
-          >
-            {label}
-          </OverviewNavLink>
-        );
-      })}
+      {comparisonMode === 'hardware' ? (
+        <ActiveSwitcherOption
+          control="comparison"
+          data-overview-comparison="hardware"
+          aria-current="true"
+          className={`${optionClass} border-secondary text-secondary dark:border-primary dark:text-primary`}
+        >
+          <span className="inline-flex items-center gap-0.5">
+            <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
+            <OverviewReferenceSelect
+              ariaLabel={strings.referenceSelectorAria}
+              options={referenceOptions}
+            />
+          </span>
+        </ActiveSwitcherOption>
+      ) : (
+        <OverviewNavLink
+          data-overview-comparison="hardware"
+          href={overviewHref(
+            locale,
+            tier,
+            engineScope,
+            'hardware',
+            referenceHardware,
+            modelScope,
+            rowScope,
+            hardwareRowScope,
+          )}
+          analytics={{ control: 'comparison', value: 'hardware' }}
+          searchKeys={['compare']}
+          className={`${optionClass} ${inactiveOptionClass}`}
+        >
+          {strings.hardwareComparisonLabel(referenceLabel)}
+        </OverviewNavLink>
+      )}
+      {comparisonMode === 'hardware' ? (
+        <OverviewNavLink
+          data-overview-comparison={OVERVIEW_DEFAULT_HISTORY_WINDOW}
+          href={overviewHref(
+            locale,
+            tier,
+            engineScope,
+            OVERVIEW_DEFAULT_HISTORY_WINDOW,
+            referenceHardware,
+            modelScope,
+            rowScope,
+            hardwareRowScope,
+          )}
+          analytics={{ control: 'comparison', value: OVERVIEW_DEFAULT_HISTORY_WINDOW }}
+          searchKeys={['compare']}
+          className={`${optionClass} ${inactiveOptionClass}`}
+        >
+          {strings.comparisonOptions.history}
+        </OverviewNavLink>
+      ) : (
+        <ActiveSwitcherOption
+          control="comparison"
+          data-overview-comparison={comparisonMode}
+          aria-current="true"
+          className={`${optionClass} border-secondary text-secondary dark:border-primary dark:text-primary`}
+        >
+          <span className="inline-flex items-center gap-0.5">
+            <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
+            <OverviewHistoryWindowSelect
+              ariaLabel={strings.historyWindowSelectAria}
+              value={comparisonMode}
+              options={windowOptions}
+            />
+          </span>
+        </ActiveSwitcherOption>
+      )}
     </nav>
   );
 }
@@ -1350,7 +1400,7 @@ export function OverviewRowScopeToggle({
         locale,
         tier,
         engineScope,
-        'history',
+        OVERVIEW_DEFAULT_HISTORY_WINDOW,
         referenceHardware,
         modelScope,
         target,
@@ -1459,11 +1509,13 @@ export function OverviewMethodology({
       data-testid="overview-methodology"
       className="space-y-1 text-xs leading-snug text-muted-foreground"
     >
-      {comparisonMode === 'history' ? <p>{strings.historyCaption}</p> : null}
+      {comparisonMode === 'hardware' ? null : (
+        <p>{strings.historyCaption(OVERVIEW_HISTORY_WINDOW_DAYS[comparisonMode])}</p>
+      )}
       <p>
-        {comparisonMode === 'history'
-          ? strings.historyCellStateLegend
-          : strings.cellStateLegend(referenceLabel)}
+        {comparisonMode === 'hardware'
+          ? strings.cellStateLegend(referenceLabel)
+          : strings.historyCellStateLegend(OVERVIEW_HISTORY_WINDOW_DAYS[comparisonMode])}
       </p>
       <p>{strings.methodologyNote}</p>
     </div>

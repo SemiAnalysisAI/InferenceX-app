@@ -20,9 +20,10 @@ import {
   maxInteractivityAtCost,
   monotoneSlopes,
   paretoFrontUpperLeft,
+  reciprocalMetricAt,
+  recoverReciprocalNumerator,
   sign,
 } from './interpolation';
-import { restrictAgenticPointsToE2eFrontier } from '@/lib/agentic-frontier';
 import type { CostProvider, GPUDataPoint, InterpolatedResult } from './types';
 
 // Re-export pure functions so existing imports from this module keep working.
@@ -33,6 +34,8 @@ export {
   maxInteractivityAtCost,
   monotoneSlopes,
   paretoFrontUpperLeft,
+  reciprocalMetricAt,
+  recoverReciprocalNumerator,
   sign,
 };
 
@@ -148,18 +151,6 @@ export function buildGpuGroups<M extends GroupMeta>(
       inputTpPerMw: power && power > 0 ? (inputTput * 1000) / power : 0,
       outputTpPerMw: power && power > 0 ? (outputTput * 1000) / power : 0,
     });
-  }
-
-  if (sequence === Sequence.AgenticTraces) {
-    for (const groupKey of Object.keys(grouped)) {
-      const restricted = restrictAgenticPointsToE2eFrontier(grouped[groupKey]);
-      if (restricted.length === 0) {
-        delete grouped[groupKey];
-        delete groupMeta[groupKey];
-      } else {
-        grouped[groupKey] = restricted;
-      }
-    }
   }
 
   return { grouped, groupMeta, hwConfigMap };

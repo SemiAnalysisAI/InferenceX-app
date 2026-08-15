@@ -81,6 +81,35 @@ describe('GET /api/v1/benchmarks/history', () => {
     expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', ['dsr1'], 1024, 1024);
   });
 
+  it('returns agentic history without numeric sequence lengths', async () => {
+    const mockRows = [{ date: '2026-03-01', benchmark_type: 'agentic_traces' }];
+    mockGetAllBenchmarksForHistory.mockResolvedValueOnce(mockRows);
+
+    const res = await GET(
+      req('/api/v1/benchmarks/history?model=DeepSeek-R1-0528&benchmarkType=agentic_traces'),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(mockRows);
+    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith(
+      'mock-sql',
+      ['dsr1'],
+      null,
+      null,
+      'agentic_traces',
+    );
+  });
+
+  it('preserves fixed-sequence behavior when benchmarkType=single_turn is supplied', async () => {
+    mockGetAllBenchmarksForHistory.mockResolvedValueOnce([]);
+    const res = await GET(
+      req(
+        '/api/v1/benchmarks/history?model=DeepSeek-R1-0528&isl=1024&osl=1024&benchmarkType=single_turn',
+      ),
+    );
+    expect(res.status).toBe(200);
+    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', ['dsr1'], 1024, 1024);
+  });
+
   it('returns 500 when query throws', async () => {
     mockGetAllBenchmarksForHistory.mockRejectedValueOnce(new Error('DB error'));
 

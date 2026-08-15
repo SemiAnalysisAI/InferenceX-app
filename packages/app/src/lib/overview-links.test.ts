@@ -135,6 +135,17 @@ describe('buildOverviewDashboardHref', () => {
       'i_spec=mtp',
     );
   });
+
+  it('does not filter an AgentX mixed-spec curve to only one decode method', () => {
+    const href = buildOverviewDashboardHref(
+      'en',
+      summary({ scenario: 'agentx' }),
+      config({ specMethod: 'mixed', hwKey: 'b200_sglang' }),
+    );
+
+    expect(href).toContain('i_seq=agentic-traces');
+    expect(href).not.toContain('i_spec=');
+  });
 });
 
 describe('buildOverviewHistoryDashboardHref', () => {
@@ -239,11 +250,9 @@ describe('overviewHref', () => {
 
   it('adds historical comparison last and omits the default comparison mode', () => {
     expect(overviewHref('en', 50, 'community', 'hardware')).toBe('/overview');
-    expect(overviewHref('en', 50, 'community', 'history')).toBe('/overview?compare=30d');
-    expect(overviewHref('en', 100, 'all', 'history')).toBe(
-      '/overview?tier=100&engine=all&compare=30d',
-    );
-    expect(overviewHref('zh', 100, 'all', 'history')).toBe(
+    expect(overviewHref('en', 50, 'community', '30d')).toBe('/overview?compare=30d');
+    expect(overviewHref('en', 100, 'all', '30d')).toBe('/overview?tier=100&engine=all&compare=30d');
+    expect(overviewHref('zh', 100, 'all', '30d')).toBe(
       '/zh/overview?tier=100&engine=all&compare=30d',
     );
   });
@@ -251,10 +260,10 @@ describe('overviewHref', () => {
   it('omits the B200 default reference and preserves a non-default reference in every mode', () => {
     expect(overviewHref('en', 50, 'community', 'hardware', 'b200')).toBe('/overview');
     expect(overviewHref('en', 50, 'community', 'hardware', 'b300')).toBe('/overview?ref=b300');
-    expect(overviewHref('en', 100, 'all', 'history', 'b300')).toBe(
+    expect(overviewHref('en', 100, 'all', '30d', 'b300')).toBe(
       '/overview?tier=100&engine=all&ref=b300&compare=30d',
     );
-    expect(overviewHref('zh', 50, 'community', 'history', 'b300')).toBe(
+    expect(overviewHref('zh', 50, 'community', '30d', 'b300')).toBe(
       '/zh/overview?ref=b300&compare=30d',
     );
   });
@@ -293,7 +302,7 @@ describe('overview switch links', () => {
   );
 
   it('preserves historical comparison when changing tiers', () => {
-    expect(overviewTierHref('en', 75, 'all', 'history')).toBe(
+    expect(overviewTierHref('en', 75, 'all', '30d')).toBe(
       '/overview?tier=75&engine=all&compare=30d',
     );
   });
@@ -318,7 +327,7 @@ describe('overview switch links', () => {
   );
 
   it('preserves historical comparison when changing engine scope', () => {
-    expect(overviewEngineScopeHref('en', 'all', 50, 'history')).toBe(
+    expect(overviewEngineScopeHref('en', 'all', 50, '30d')).toBe(
       '/overview?engine=all&compare=30d',
     );
   });
@@ -336,7 +345,7 @@ describe('overview model scope links', () => {
     expect(overviewHref('en', 50, 'community', 'hardware', 'b200', 'all')).toBe(
       '/overview?models=all',
     );
-    expect(overviewHref('en', 100, 'all', 'history', 'b300', 'all')).toBe(
+    expect(overviewHref('en', 100, 'all', '30d', 'b300', 'all')).toBe(
       '/overview?tier=100&engine=all&ref=b300&compare=30d&models=all',
     );
     expect(overviewHref('zh', 50, 'community', 'hardware', 'b200', 'all')).toBe(
@@ -366,16 +375,16 @@ describe('overview model scope links', () => {
 
 describe('overview row scope links', () => {
   it('leaves the canonical 30-day URL untouched and appends rows=changed last', () => {
-    expect(overviewHref('en', 50, 'community', 'history', 'b200', 'default', 'all')).toBe(
+    expect(overviewHref('en', 50, 'community', '30d', 'b200', 'default', 'all')).toBe(
       '/overview?compare=30d',
     );
-    expect(overviewHref('en', 50, 'community', 'history', 'b200', 'default', 'changed')).toBe(
+    expect(overviewHref('en', 50, 'community', '30d', 'b200', 'default', 'changed')).toBe(
       '/overview?compare=30d&rows=changed',
     );
-    expect(overviewHref('en', 100, 'all', 'history', 'b300', 'all', 'changed')).toBe(
+    expect(overviewHref('en', 100, 'all', '30d', 'b300', 'all', 'changed')).toBe(
       '/overview?tier=100&engine=all&ref=b300&compare=30d&models=all&rows=changed',
     );
-    expect(overviewHref('zh', 50, 'community', 'history', 'b200', 'default', 'changed')).toBe(
+    expect(overviewHref('zh', 50, 'community', '30d', 'b200', 'default', 'changed')).toBe(
       '/zh/overview?compare=30d&rows=changed',
     );
   });
@@ -393,10 +402,10 @@ describe('overview row scope links', () => {
   });
 
   it('preserves the row scope when changing tiers and engine scope', () => {
-    expect(overviewTierHref('en', 75, 'community', 'history', 'b200', 'default', 'changed')).toBe(
+    expect(overviewTierHref('en', 75, 'community', '30d', 'b200', 'default', 'changed')).toBe(
       '/overview?tier=75&compare=30d&rows=changed',
     );
-    expect(overviewEngineScopeHref('en', 'all', 50, 'history', 'b200', 'default', 'changed')).toBe(
+    expect(overviewEngineScopeHref('en', 'all', 50, '30d', 'b200', 'default', 'changed')).toBe(
       '/overview?engine=all&compare=30d&rows=changed',
     );
   });
@@ -434,7 +443,7 @@ describe('overview hardware row scope links', () => {
   });
 
   it('keeps the hardware row scope on the URL in history mode, where it is dormant', () => {
-    expect(overviewHref('en', 50, 'community', 'history', 'b200', 'default', 'all', 'priced')).toBe(
+    expect(overviewHref('en', 50, 'community', '30d', 'b200', 'default', 'all', 'priced')).toBe(
       '/overview?compare=30d&hwrows=priced',
     );
   });
@@ -444,9 +453,9 @@ describe('overview hardware row scope links', () => {
     // the one the client router starts from on first load. Emitting only the
     // active mode's key there erased the other tab's filter on refresh and on
     // any shared link carrying both.
-    expect(
-      overviewHref('en', 50, 'community', 'history', 'b200', 'default', 'changed', 'priced'),
-    ).toBe('/overview?compare=30d&rows=changed&hwrows=priced');
+    expect(overviewHref('en', 50, 'community', '30d', 'b200', 'default', 'changed', 'priced')).toBe(
+      '/overview?compare=30d&rows=changed&hwrows=priced',
+    );
     expect(
       overviewHref('en', 50, 'community', 'hardware', 'b200', 'default', 'changed', 'priced'),
     ).toBe('/overview?rows=changed&hwrows=priced');
@@ -491,7 +500,7 @@ describe('overview hardware row scope links', () => {
       'en',
       50,
       'community',
-      'history',
+      '30d',
       'b200',
       'default',
       'changed',
@@ -501,7 +510,7 @@ describe('overview hardware row scope links', () => {
       '/overview?compare=30d&rows=changed&hwrows=priced',
     );
 
-    const revealing = overviewHref('en', 50, 'community', 'history', 'b200', 'all', 'all', 'all');
+    const revealing = overviewHref('en', 50, 'community', '30d', 'b200', 'all', 'all', 'all');
     expect(mergeOverviewControlHref(current, revealing, keys)).toBe(
       '/overview?compare=30d&models=all',
     );

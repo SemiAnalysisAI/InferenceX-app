@@ -2,6 +2,7 @@ import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
 import type { BenchmarkRow } from '@/lib/api';
+import { benchmarkCurveDate } from '@/lib/benchmark-run-selection';
 import { getCachedBenchmarks, getCachedBenchmarksAsOf } from '@/lib/benchmark-data.server';
 import type { Model } from '@/lib/data-mappings';
 import {
@@ -97,18 +98,22 @@ export async function getOverviewPageData(
         referenceHardware,
         modelScope,
       ),
-      comparisonMode: 'history',
+      comparisonMode,
     });
   }
 
-  const window = overviewHistoricalWindow(snapshotDate);
+  const window = overviewHistoricalWindow(snapshotDate, comparisonMode);
   const unboundedBaselineRows = FIXTURES_MODE
     ? loadFixture<Record<string, BenchmarkRow[]>>('overview-history-rows')
     : await loadRowsByModel(models, (keys) => getCachedBenchmarksAsOf(keys, window.targetDate));
   const baselineRowsByModel = Object.fromEntries(
     Object.entries(unboundedBaselineRows).map(([model, rows]) => [
       model,
-      rows.filter((row) => row.date >= window.earliestDate && row.date <= window.targetDate),
+      rows.filter(
+        (row) =>
+          benchmarkCurveDate(row) >= window.earliestDate &&
+          benchmarkCurveDate(row) <= window.targetDate,
+      ),
     ]),
   );
 

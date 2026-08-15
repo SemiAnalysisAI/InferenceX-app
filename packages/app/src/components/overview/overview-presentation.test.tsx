@@ -41,7 +41,7 @@ const HISTORY_DATA: OverviewPageData = {
   models: [],
   tier: 50,
   engineScope: 'all',
-  comparisonMode: 'history',
+  comparisonMode: '30d',
   referenceHardware: 'b200',
   modelScope: 'default',
   rowScope: 'all',

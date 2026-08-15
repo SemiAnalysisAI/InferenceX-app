@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
 import type { BenchmarkRow } from '@/lib/api';
+import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
 
 import {
   mergeRunScopedRows,
@@ -196,6 +197,18 @@ describe('rowToAggDataEntry', () => {
     expect(entryNull.image).toBeUndefined();
   });
 
+  it('passes recipe fingerprint through to chart point identity', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        recipe_fingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      }),
+    );
+
+    expect(entry.recipe_fingerprint).toBe(
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    );
+  });
+
   it('passes runtime cache metadata through to chart points', () => {
     const entry = rowToAggDataEntry(
       makeRow({
@@ -221,7 +234,11 @@ describe('rowToAggDataEntry', () => {
   it('passes through measured power telemetry fields when present', () => {
     const entry = rowToAggDataEntry(
       makeRow({
-        metrics: { tput_per_gpu: 100, avg_power_w: 685.5, joules_per_output_token: 8.4 },
+        metrics: {
+          tput_per_gpu: 100,
+          avg_power_w: 685.5,
+          joules_per_output_token: 8.4,
+        },
       }),
     );
     expect(entry.avg_power_w).toBe(685.5);
@@ -257,9 +274,24 @@ describe('rowToAggDataEntry', () => {
 
   it('passes through per-worker measured power array intact', () => {
     const workers = [
-      { role: 'prefill' as const, worker_idx: 0, num_gpus: 4, avg_power_w: 588.4 },
-      { role: 'prefill' as const, worker_idx: 1, num_gpus: 4, avg_power_w: 601.2 },
-      { role: 'decode' as const, worker_idx: 0, num_gpus: 8, avg_power_w: 712.1 },
+      {
+        role: 'prefill' as const,
+        worker_idx: 0,
+        num_gpus: 4,
+        avg_power_w: 588.4,
+      },
+      {
+        role: 'prefill' as const,
+        worker_idx: 1,
+        num_gpus: 4,
+        avg_power_w: 601.2,
+      },
+      {
+        role: 'decode' as const,
+        worker_idx: 0,
+        num_gpus: 8,
+        avg_power_w: 712.1,
+      },
       { role: 'frontend' as const, worker_idx: 0, num_gpus: 0, avg_power_w: 0 },
     ];
     const entry = rowToAggDataEntry(makeRow({ workers }));
@@ -428,7 +460,12 @@ describe('transformBenchmarkRows', () => {
 
   it('labels M3 mtp configs with the "M3 EAGLE" suffix', () => {
     const rows = [
-      makeRow({ model: 'minimaxm3', hardware: 'h100', framework: 'vllm', spec_method: 'mtp' }),
+      makeRow({
+        model: 'minimaxm3',
+        hardware: 'h100',
+        framework: 'vllm',
+        spec_method: 'mtp',
+      }),
     ];
     const { hardwareConfig } = transformBenchmarkRows(rows);
     const entry = hardwareConfig['h100_vllm_mtp'];
@@ -438,7 +475,12 @@ describe('transformBenchmarkRows', () => {
 
   it('keeps the generic MTP suffix for non-M3 mtp configs', () => {
     const rows = [
-      makeRow({ model: 'dsr1', hardware: 'h200', framework: 'sglang', spec_method: 'mtp' }),
+      makeRow({
+        model: 'dsr1',
+        hardware: 'h200',
+        framework: 'sglang',
+        spec_method: 'mtp',
+      }),
     ];
     const { hardwareConfig } = transformBenchmarkRows(rows);
     const entry = hardwareConfig['h200_sglang_mtp'];
@@ -739,6 +781,89 @@ describe('transformBenchmarkRows — hardware key resolution', () => {
     expect(hardwareConfig).toHaveProperty('h200_trt_mtp');
   });
 
+  it('groups none, MTP, and EAGLE agentic points into one hardware series', () => {
+    const rows = [
+      makeRow({
+        benchmark_type: 'agentic_traces',
+        hardware: 'h200',
+        framework: 'trt',
+        spec_method: 'none',
+      }),
+      makeRow({
+        benchmark_type: 'agentic_traces',
+        hardware: 'h200',
+        framework: 'trt',
+        spec_method: 'mtp',
+      }),
+      makeRow({
+        benchmark_type: 'agentic_traces',
+        hardware: 'h200',
+        framework: 'trt',
+        spec_method: 'eagle',
+      }),
+    ];
+
+    const { chartData, hardwareConfig } = transformBenchmarkRows(rows);
+    expect(Object.keys(hardwareConfig)).toEqual(['h200_trt']);
+    expect(chartData[0].map((point) => point.hwKey)).toEqual(['h200_trt', 'h200_trt', 'h200_trt']);
+    expect(chartData[0].map((point) => point.spec_decoding)).toEqual(['none', 'mtp', 'eagle']);
+  });
+
+  it('keeps one mixed-spec agentic series identity across comparison dates', () => {
+    const rows = dedupeAgenticHistoryRuns([
+      makeRow({
+        id: 1,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'none',
+        conc: 8,
+        date: '2026-06-01',
+        workflow_run_id: 30,
+        run_started_at: '2026-06-01T10:00:00Z',
+      }),
+      makeRow({
+        id: 2,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'mtp',
+        conc: 16,
+        date: '2026-06-01',
+        workflow_run_id: 30,
+        run_started_at: '2026-06-01T10:00:00Z',
+      }),
+      makeRow({
+        id: 3,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'eagle',
+        conc: 32,
+        date: '2026-06-02',
+        workflow_run_id: 31,
+        run_started_at: '2026-06-02T10:00:00Z',
+      }),
+      makeRow({
+        id: 4,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'none',
+        conc: 64,
+        date: '2026-06-02',
+        workflow_run_id: 31,
+        run_started_at: '2026-06-02T10:00:00Z',
+      }),
+    ]);
+
+    const { chartData, hardwareConfig } = transformBenchmarkRows(rows);
+    const pointsByDate = Object.groupBy(chartData[0], (point) => point.date);
+
+    expect(Object.keys(hardwareConfig)).toEqual(['h200_trt']);
+    expect(pointsByDate['2026-06-01']?.map((point) => point.spec_decoding)).toEqual([
+      'none',
+      'mtp',
+    ]);
+    expect(pointsByDate['2026-06-02']?.map((point) => point.spec_decoding)).toEqual([
+      'eagle',
+      'none',
+    ]);
+    expect(new Set(chartData[0].map((point) => point.hwKey))).toEqual(new Set(['h200_trt']));
+  });
+
   it('handles AMD hardware with vllm framework', () => {
     const rows = [makeRow({ hardware: 'mi300x', framework: 'vllm' })];
     const { chartData, hardwareConfig } = transformBenchmarkRows(rows);
@@ -948,9 +1073,21 @@ describe('transformBenchmarkRows — dp_attention narrowing', () => {
 
 describe('mergeRunScopedRows', () => {
   const vllmRun = (over: Partial<BenchmarkRow> = {}) =>
-    makeRow({ model: 'dsv4', hardware: 'b300', framework: 'vllm', precision: 'fp4', ...over });
+    makeRow({
+      model: 'dsv4',
+      hardware: 'b300',
+      framework: 'vllm',
+      precision: 'fp4',
+      ...over,
+    });
   const sglangBase = (over: Partial<BenchmarkRow> = {}) =>
-    makeRow({ model: 'dsv4', hardware: 'b300', framework: 'sglang', precision: 'fp4', ...over });
+    makeRow({
+      model: 'dsv4',
+      hardware: 'b300',
+      framework: 'sglang',
+      precision: 'fp4',
+      ...over,
+    });
 
   it('pins configs the run covers to the run rows, replacing base rows', () => {
     const runRows = [vllmRun({ id: 10, conc: 32 }), vllmRun({ id: 11, conc: 64 })];
@@ -984,6 +1121,39 @@ describe('mergeRunScopedRows', () => {
     expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 90, 91, 92]);
   });
 
+  it('carries forward sibling topologies when an append run touches only one', () => {
+    const runRows = [vllmRun({ id: 10, decode_tp: 8, conc: 128 })];
+    const baseRows = [
+      vllmRun({ id: 90, decode_tp: 8, conc: 64 }),
+      vllmRun({ id: 91, decode_tp: 4, conc: 32 }),
+    ];
+
+    const merged = mergeRunScopedRows(runRows, baseRows);
+
+    expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 91]);
+  });
+
+  it('carries forward sibling recipe variants at the same topology and concurrency', () => {
+    const runRows = [
+      vllmRun({
+        id: 10,
+        conc: 64,
+        recipe_fingerprint: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      }),
+    ];
+    const baseRows = [
+      vllmRun({
+        id: 90,
+        conc: 64,
+        recipe_fingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      }),
+    ];
+
+    const merged = mergeRunScopedRows(runRows, baseRows);
+
+    expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 90]);
+  });
+
   it('scopes per benchmark_type — an agentic run does not hide fixed-seq carry-forward', () => {
     const runRows = [vllmRun({ id: 10, benchmark_type: 'agentic_traces' })];
     const baseRows = [
@@ -1006,7 +1176,14 @@ describe('rowToAggDataEntry — agentic interactivity invariant', () => {
   // interactivity selector is slow-tail, so we always derive intvty = 1/itl and
   // discard the artifact value. Mirrors the ingest mapper + backfill.
   const agentic = (metrics: Record<string, number>) =>
-    rowToAggDataEntry(makeRow({ benchmark_type: 'agentic_traces', isl: null, osl: null, metrics }));
+    rowToAggDataEntry(
+      makeRow({
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        metrics,
+      }),
+    );
 
   it('overrides an artifact-supplied (fast-tail) *_intvty with 1/*_itl', () => {
     const entry = agentic({

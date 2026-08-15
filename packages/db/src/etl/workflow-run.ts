@@ -148,6 +148,7 @@ export function createWorkflowRunServices(sql: Sql, githubToken?: string) {
     conclusion?: string | null;
     htmlUrl?: string | null;
     runStartedAt?: string | null;
+    appendOnly?: boolean;
     ghInfo?: GithubRunInfo | null;
   }): Promise<number | null> {
     const attempt = params.runAttempt ?? params.ghInfo?.runAttempt ?? 0;
@@ -166,16 +167,18 @@ export function createWorkflowRunServices(sql: Sql, githubToken?: string) {
     const runStartedAt = gh?.runStartedAt ?? params.runStartedAt ?? null;
     const headSha = gh?.headSha ?? params.headSha ?? null;
     const headBranch = gh?.headBranch ?? params.headBranch ?? null;
+    const appendOnly = params.appendOnly ?? false;
 
     const [row] = await sql`
       insert into workflow_runs (
         github_run_id, run_attempt, name, status, conclusion,
-        head_sha, head_branch, html_url, created_at, run_started_at, date
+        head_sha, head_branch, html_url, created_at, run_started_at, date, append_only
       ) values (
         ${params.githubRunId}, ${attempt}, ${name},
         ${status}, ${conclusion},
         ${headSha}, ${headBranch}, ${htmlUrl},
-        ${createdAt}::timestamptz, ${runStartedAt}::timestamptz, ${params.date}::date
+        ${createdAt}::timestamptz, ${runStartedAt}::timestamptz, ${params.date}::date,
+        ${appendOnly}
       )
       on conflict (github_run_id, run_attempt)
       do update set
@@ -186,7 +189,8 @@ export function createWorkflowRunServices(sql: Sql, githubToken?: string) {
         created_at     = excluded.created_at,
         run_started_at = excluded.run_started_at,
         head_sha       = excluded.head_sha,
-        head_branch    = excluded.head_branch
+        head_branch    = excluded.head_branch,
+        append_only    = excluded.append_only
       returning id
     `;
 

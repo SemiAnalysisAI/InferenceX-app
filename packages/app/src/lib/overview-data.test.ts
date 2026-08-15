@@ -164,8 +164,11 @@ describe('overview engine scope and scenario selection', () => {
   it.each([
     [undefined, 'hardware'],
     ['hardware', 'hardware'],
-    ['30d', 'history'],
-    [['30d'], 'history'],
+    ['7d', '7d'],
+    ['30d', '30d'],
+    ['60d', '60d'],
+    ['90d', '90d'],
+    [['30d'], '30d'],
     ['unknown', 'hardware'],
   ] as const)('resolves comparison mode %j to %s', (raw, expected) => {
     expect(resolveOverviewComparisonMode(raw)).toBe(expected);
@@ -701,11 +704,28 @@ describe('overview engine scope and scenario selection', () => {
 describe('overview historical window', () => {
   it('anchors the target and floor to the latest database evidence date', () => {
     expect(overviewHistoricalWindow('2026-08-03')).toEqual({
+      key: '30d',
       snapshotDate: '2026-08-03',
       targetDate: '2026-07-04',
       earliestDate: '2026-06-04',
     });
   });
+
+  it.each([
+    ['7d', '2026-07-27', '2026-07-20'],
+    ['60d', '2026-06-04', '2026-04-05'],
+    ['90d', '2026-05-05', '2026-02-04'],
+  ] as const)(
+    'sizes the %s window to its day count with a window-wide floor',
+    (key, target, earliest) => {
+      expect(overviewHistoricalWindow('2026-08-03', key)).toEqual({
+        key,
+        snapshotDate: '2026-08-03',
+        targetDate: target,
+        earliestDate: earliest,
+      });
+    },
+  );
 
   it('returns the latest date across model buckets', () => {
     expect(
@@ -775,6 +795,7 @@ describe('overview historical window', () => {
 
 describe('assembleOverviewHistoricalPageData', () => {
   const window = {
+    key: '30d',
     snapshotDate: '2026-08-03',
     targetDate: '2026-07-04',
     earliestDate: '2026-06-04',
@@ -828,7 +849,7 @@ describe('assembleOverviewHistoricalPageData', () => {
     );
     const platform = platformFor(page, Model.Qwen3_5, 'single_turn_8k1k', 'mi355x');
 
-    expect(page.comparisonMode).toBe('history');
+    expect(page.comparisonMode).toBe('30d');
     expect(page.historicalWindow).toEqual(window);
     expect(platform?.historicalComparison?.status).toBe('comparable');
     expect(platform?.historicalComparison?.costDeltaPct).toBeCloseTo(-0.2, 9);
@@ -1125,6 +1146,33 @@ describe('overview platform selection', () => {
       (JULY_2026_HYPERSCALER_TCO.b200 * 1e6) / (10800 * 3600),
       6,
     );
+  });
+
+  it('builds one AgentX frontier from mixed standard and MTP points', () => {
+    const summary = buildOverviewModelSummary(Model.GLM_5_2, [
+      agenticRow(40, 30, 12600, 1200, {
+        hardware: 'b200',
+        conc: 8,
+        spec_method: 'none',
+      }),
+      agenticRow(50, 25, 10800, 850, {
+        hardware: 'b200',
+        conc: 12,
+        spec_method: 'mtp',
+      }),
+      agenticRow(60, 20, 9000, 800, {
+        hardware: 'b200',
+        conc: 16,
+        spec_method: 'none',
+      }),
+    ]);
+
+    const config = summary.platforms.find(({ hardware }) => hardware === 'b200')?.read.config;
+    expect(config).toMatchObject({
+      specMethod: 'mixed',
+      specLabel: 'STP + MTP',
+      hwKey: 'b200_sglang',
+    });
   });
 
   it('restricts AgentX points to the E2E frontier on total throughput', () => {
@@ -1479,6 +1527,7 @@ describe('overview model scope', () => {
 
 describe('overview row scope', () => {
   const window = {
+    key: '30d',
     snapshotDate: '2026-08-03',
     targetDate: '2026-07-04',
     earliestDate: '2026-06-04',
@@ -1573,6 +1622,7 @@ describe('overview row scope', () => {
 
 describe('overview hardware row scope', () => {
   const window = {
+    key: '30d',
     snapshotDate: '2026-08-03',
     targetDate: '2026-07-04',
     earliestDate: '2026-06-04',

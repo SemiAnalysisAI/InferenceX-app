@@ -23,7 +23,6 @@ import {
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
-import { canonicalNormalizedFrontierIds } from '@/components/inference/utils/canonicalFrontier';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
@@ -43,7 +42,7 @@ import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import {
   type Model,
   type Precision,
-  type Sequence,
+  Sequence,
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
@@ -218,12 +217,21 @@ export default function ChartDisplay() {
     setSelectedXAxisMode,
     quickFilters,
   } = useInference();
+  const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
+    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
+  const workflowInfoBenchmarkType =
+    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined;
 
   const {
     changelogs,
     loading: changelogsLoading,
     totalDatesQueried,
-  } = useComparisonChangelogs(selectedGPUs, selectedDateRange, dateRangeAvailableDates);
+  } = useComparisonChangelogs(
+    selectedGPUs,
+    selectedDateRange,
+    dateRangeAvailableDates,
+    workflowInfoBenchmarkType,
+  );
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -232,7 +240,6 @@ export default function ChartDisplay() {
     () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
     [selectedModel],
   );
-
   // Stable run numbering shared by the changelog and the chart legend: each of a
   // date's runs gets a fixed 1-based number (by start time) regardless of which
   // are on the chart, so the two surfaces always show the same #N for a run and a
@@ -241,14 +248,17 @@ export default function ChartDisplay() {
   const runNumbering = useMemo(() => {
     const map = new Map<string, number>();
     for (const c of changelogs) {
-      dataRunsForDate(c.runConfigs, { modelDbKeys, selectedGPUs, selectedPrecisions }).forEach(
-        (run, idx) => {
-          map.set(makeRunComparisonEntry(c.date, run.runId), idx + 1);
-        },
-      );
+      dataRunsForDate(c.runConfigs, {
+        modelDbKeys,
+        selectedGPUs,
+        selectedPrecisions,
+        benchmarkType: selectedBenchmarkType,
+      }).forEach((run, idx) => {
+        map.set(makeRunComparisonEntry(c.date, run.runId), idx + 1);
+      });
     }
     return map;
-  }, [changelogs, modelDbKeys, selectedGPUs, selectedPrecisions]);
+  }, [changelogs, modelDbKeys, selectedGPUs, selectedPrecisions, selectedBenchmarkType]);
 
   // Expand a plain-date selection into one entry per run once that date's runs are
   // known. Picking a date that has multiple runs shows each run as its own series
@@ -257,7 +267,12 @@ export default function ChartDisplay() {
   // in sync. Idempotent: after expansion no expandable plain date remains.
   useEffect(() => {
     const runConfigsByDate = new Map(changelogs.map((c) => [c.date, c.runConfigs]));
-    const scope = { modelDbKeys, selectedGPUs, selectedPrecisions };
+    const scope = {
+      modelDbKeys,
+      selectedGPUs,
+      selectedPrecisions,
+      benchmarkType: selectedBenchmarkType,
+    };
     setSelectedDatesFromRunExpansion((prev) => {
       let changed = false;
       const out: string[] = [];
@@ -283,6 +298,7 @@ export default function ChartDisplay() {
     modelDbKeys,
     selectedGPUs,
     selectedPrecisions,
+    selectedBenchmarkType,
     selectedDates,
     setSelectedDatesFromRunExpansion,
   ]);
@@ -358,9 +374,6 @@ export default function ChartDisplay() {
         {
           isAgentic,
           selectedPercentile,
-          // Unofficial rows lack persisted request traces, so they cannot be
-          // admitted to the normalized north-star frontier on any agentic axis.
-          restrictToNormalizedFrontier: isAgentic,
         },
       );
 
@@ -599,9 +612,7 @@ export default function ChartDisplay() {
   const isAgenticSequence = sequenceKind(selectedSequence) === 'agentic';
   const useDerivedXAxis = isAgenticSequence && isAgenticOnlyXAxisMode(selectedXAxisMode);
   const derivedTargetIds = useMemo(() => {
-    // Every agentic x-axis is classified by the normalized north-star
-    // frontier, so all modes need the persisted trace-derived metric.
-    if (!isAgenticSequence) return [] as number[];
+    if (!useDerivedXAxis) return [] as number[];
     const ids = new Set<number>();
     for (const graph of visibleGraphs) {
       const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
@@ -612,11 +623,11 @@ export default function ChartDisplay() {
       }
     }
     return [...ids];
-  }, [isAgenticSequence, visibleGraphs]);
+  }, [useDerivedXAxis, visibleGraphs]);
   const derivedQuery = useDerivedAgenticMetrics(derivedTargetIds, isAgenticSequence);
   const derivedMetrics = derivedQuery.data;
-  const isCanonicalFrontierLoading =
-    isAgenticSequence &&
+  const isDerivedXAxisLoading =
+    useDerivedXAxis &&
     derivedTargetIds.length > 0 &&
     (derivedQuery.isPending || derivedQuery.isFetching) &&
     !derivedMetrics;
@@ -626,40 +637,25 @@ export default function ChartDisplay() {
     if (!isAgenticSequence) return visibleGraphs;
     if (!derivedMetrics) {
       // Legacy AgentX axes can still render transient/non-persisted rows, which
-      // have no ids to request. Persisted rows remain gated on their derived
-      // metrics so every displayed frontier can enforce canonical eligibility.
+      // have no ids to request.
       if (!derivedSpec && derivedTargetIds.length === 0) return visibleGraphs;
       return visibleGraphs.map((graph) => ({ ...graph, data: [], clippedData: [] }));
     }
     return visibleGraphs.map((graph) => {
       const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof typeof graph.chartDefinition;
-      // The normalized axis is higher-is-better. Compute its true Pareto
-      // direction once, regardless of which x-axis is currently displayed.
       const configuredCorner = graph.chartDefinition[rooflineKey] as RooflineDirection | undefined;
-      const canonicalCorner =
+      const derivedCorner =
         graph.chartDefinition.chartType === 'e2e'
           ? derivedModeRoofline(configuredCorner, true)
           : configuredCorner;
-      const allPoints = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
-      const canonicalIds = canonicalNormalizedFrontierIds(
-        allPoints,
-        derivedMetrics,
-        selectedPercentile,
-        canonicalCorner,
-      );
 
       const preparePoint = (point: InferenceData): InferenceData | null => {
         const pointId = isPersistedBenchmarkId(point.id) ? point.id : null;
-        const stamped = {
-          ...point,
-          isOnNormalizedInteractivityFrontier:
-            canonicalIds === null ? undefined : pointId !== null && canonicalIds.has(pointId),
-        };
-        if (!derivedSpec) return stamped;
+        if (!derivedSpec) return point;
         if (pointId === null) return null;
         const raw = derivedSpec.value(derivedMetrics[pointId], selectedPercentile);
         if (raw === null || raw === undefined || !Number.isFinite(raw)) return null;
-        return { ...stamped, x: derivedSpec.toX(raw) };
+        return { ...point, x: derivedSpec.toX(raw) };
       };
 
       const data = graph.data
@@ -680,7 +676,7 @@ export default function ChartDisplay() {
         ...graph.chartDefinition,
         x_label: xLabelFn(selectedPercentile.toUpperCase()),
         y_latency_limit: undefined,
-        ...(canonicalCorner ? { [rooflineKey]: canonicalCorner } : {}),
+        ...(derivedCorner ? { [rooflineKey]: derivedCorner } : {}),
       };
       return { ...graph, chartDefinition, data, clippedData };
     });
@@ -696,7 +692,7 @@ export default function ChartDisplay() {
   ]);
 
   const displayGraphs =
-    isFirstLoad || isCanonicalFrontierLoading
+    isFirstLoad || isDerivedXAxisLoading
       ? [
           <Card key="skeleton-0">
             <Skeleton className="h-7 w-2/4 mb-1" />
@@ -998,6 +994,7 @@ export default function ChartDisplay() {
                 selectedGPUs={selectedGPUs}
                 selectedPrecisions={selectedPrecisions}
                 modelDbKeys={modelDbKeys}
+                selectedSequence={selectedSequence}
                 loading={changelogsLoading}
                 totalDatesQueried={totalDatesQueried}
                 selectedDates={selectedDates}
@@ -1043,10 +1040,9 @@ export default function ChartDisplay() {
           className="flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
         >
           {X_AXIS_MODE_BUTTONS.filter(({ value }) => {
-            if (!isAgenticOnlyXAxisMode(value)) return true;
             // Before mount, render all buttons so SSR and first client render match.
             if (!mounted) return true;
-            return isAgenticSequence;
+            return !isAgenticOnlyXAxisMode(value) || isAgenticSequence;
           }).map(({ value, label, labelZh }) => (
             <TabsTrigger
               key={value}

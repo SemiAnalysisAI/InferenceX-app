@@ -16,6 +16,7 @@ import {
 import { makeRunComparisonEntry } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
 import { getHardwareConfig } from '@/lib/constants';
+import { Sequence, type Sequence as SequenceType } from '@/lib/data-mappings';
 import { getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 
 /** Git Commit and Workflow Run external links for a run, each shown when known. */
@@ -72,6 +73,7 @@ interface ComparisonChangelogProps {
    * model-scoped).
    */
   modelDbKeys: string[];
+  selectedSequence: SequenceType;
   loading?: boolean;
   totalDatesQueried: number;
   selectedDates: string[];
@@ -88,6 +90,7 @@ export default function ComparisonChangelog({
   selectedGPUs,
   selectedPrecisions,
   modelDbKeys,
+  selectedSequence,
   loading,
   totalDatesQueried,
   selectedDates,
@@ -98,6 +101,10 @@ export default function ComparisonChangelog({
   firstAvailableDate,
 }: ComparisonChangelogProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const benchmarkType =
+    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
+  const changelogBenchmarkType =
+    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined;
 
   // Filter changelog entries to only show those matching selected GPUs and precisions.
   // Always keep range endpoints and first appearance date visible.
@@ -120,7 +127,7 @@ export default function ComparisonChangelog({
           return (
             modelDbKeys.some((m) => key.startsWith(`${m}-`)) &&
             precSet.has(precision) &&
-            selectedGPUs.some((gpu) => configKeyMatchesHwKey(key, gpu))
+            selectedGPUs.some((gpu) => configKeyMatchesHwKey(key, gpu, changelogBenchmarkType))
           );
         }),
       ),
@@ -136,7 +143,14 @@ export default function ComparisonChangelog({
     return mapped
       .filter((item) => item.entries.length > 0 || pinnedDates.has(item.date))
       .toSorted((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [changelogs, modelDbKeys, selectedGPUs, selectedPrecisions, pinnedDates]);
+  }, [
+    changelogs,
+    modelDbKeys,
+    selectedGPUs,
+    selectedPrecisions,
+    pinnedDates,
+    changelogBenchmarkType,
+  ]);
 
   const datesOnChart = useMemo(() => {
     const set = new Set(selectedDates);
@@ -156,10 +170,10 @@ export default function ComparisonChangelog({
         return (
           modelDbKeys.some((m) => key.startsWith(`${m}-`)) &&
           precSet.has(precision) &&
-          selectedGPUs.some((gpu) => configKeyMatchesHwKey(key, gpu))
+          selectedGPUs.some((gpu) => configKeyMatchesHwKey(key, gpu, changelogBenchmarkType))
         );
       });
-  }, [modelDbKeys, selectedPrecisions, selectedGPUs]);
+  }, [modelDbKeys, selectedPrecisions, selectedGPUs, changelogBenchmarkType]);
 
   /**
    * Every run that produced data for the selected config on a date, earliest
@@ -173,6 +187,7 @@ export default function ComparisonChangelog({
         modelDbKeys,
         selectedGPUs,
         selectedPrecisions,
+        benchmarkType,
       }).map((run) => {
         const cl = clByRun.get(run.runId);
         return {
@@ -183,7 +198,7 @@ export default function ComparisonChangelog({
         };
       });
     },
-    [modelDbKeys, selectedGPUs, selectedPrecisions, entryMatchesSelection],
+    [modelDbKeys, selectedGPUs, selectedPrecisions, benchmarkType, entryMatchesSelection],
   );
 
   // Entries the "Add all to chart" button would add: every run not yet on the
@@ -219,7 +234,9 @@ export default function ComparisonChangelog({
     if (selectedGPUs.length <= 1) return '';
     return selectedGPUs
       .filter((gpu) =>
-        entries.some((e) => e.config_keys.some((k) => configKeyMatchesHwKey(k, gpu))),
+        entries.some((e) =>
+          e.config_keys.some((k) => configKeyMatchesHwKey(k, gpu, changelogBenchmarkType)),
+        ),
       )
       .map((gpu) => getDisplayLabel(getHardwareConfig(gpu, displayModel)))
       .join(', ');

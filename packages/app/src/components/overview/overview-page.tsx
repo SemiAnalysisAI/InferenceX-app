@@ -263,11 +263,11 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
           is already 355px of SLO, and moving the tabs off the matrix centre to
           make room there would cost more than it buys. */}
       <div className="flex items-center gap-x-2 justify-self-end">
-        {data.comparisonMode === 'history' ? (
-          <OverviewRowScopeToggle
+        {data.comparisonMode === 'hardware' ? (
+          <OverviewHardwareRowScopeToggle
             variant="toolbar"
-            rowScope={data.rowScope}
-            unchangedRowCount={data.unchangedRowCount}
+            hardwareRowScope={data.hardwareRowScope}
+            emptyRowCount={data.emptyRowCount}
             tier={data.tier}
             engineScope={data.engineScope}
             referenceHardware={referenceHardware}
@@ -276,10 +276,10 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
             strings={strings}
           />
         ) : (
-          <OverviewHardwareRowScopeToggle
+          <OverviewRowScopeToggle
             variant="toolbar"
-            hardwareRowScope={data.hardwareRowScope}
-            emptyRowCount={data.emptyRowCount}
+            rowScope={data.rowScope}
+            unchangedRowCount={data.unchangedRowCount}
             tier={data.tier}
             engineScope={data.engineScope}
             referenceHardware={referenceHardware}
@@ -367,10 +367,10 @@ function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
                 referenceHardware={referenceHardware}
               />
               <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
-                {data.comparisonMode === 'history' ? (
-                  <OverviewRowScopeToggle
-                    rowScope={data.rowScope}
-                    unchangedRowCount={data.unchangedRowCount}
+                {data.comparisonMode === 'hardware' ? (
+                  <OverviewHardwareRowScopeToggle
+                    hardwareRowScope={data.hardwareRowScope}
+                    emptyRowCount={data.emptyRowCount}
                     tier={data.tier}
                     engineScope={data.engineScope}
                     referenceHardware={referenceHardware}
@@ -379,9 +379,9 @@ function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
                     strings={strings}
                   />
                 ) : (
-                  <OverviewHardwareRowScopeToggle
-                    hardwareRowScope={data.hardwareRowScope}
-                    emptyRowCount={data.emptyRowCount}
+                  <OverviewRowScopeToggle
+                    rowScope={data.rowScope}
+                    unchangedRowCount={data.unchangedRowCount}
                     tier={data.tier}
                     engineScope={data.engineScope}
                     referenceHardware={referenceHardware}

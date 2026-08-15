@@ -12,6 +12,7 @@ export interface ChangelogEntry {
   description: string;
   prLink: string | null;
   evalsOnly: boolean;
+  appendOnly: boolean;
 }
 
 /**
@@ -39,7 +40,8 @@ export function parseChangelogEntries(raw: unknown): ChangelogEntry[] {
       description.match(/\bPR:\s*(?<url>https?:\/\/\S+)/u)?.[1] ??
       null;
     const evalsOnly = item['evals-only'] === true;
-    out.push({ configKeys, description, prLink, evalsOnly });
+    const appendOnly = item['append-only'] === true;
+    out.push({ configKeys, description, prLink, evalsOnly, appendOnly });
   }
   return out;
 }
@@ -50,6 +52,19 @@ export function parseChangelogEntries(raw: unknown): ChangelogEntry[] {
  */
 export function hasEvalsOnlyFlag(changelogs: { entries: ChangelogEntry[] }[]): boolean {
   return changelogs.some((c) => c.entries.some((e) => e.evalsOnly));
+}
+
+/**
+ * Return whether this run extends existing curves. Mixed metadata is rejected because
+ * append-only is stored and resolved at workflow-run scope.
+ */
+export function hasAppendOnlyFlag(changelogs: { entries: ChangelogEntry[] }[]): boolean {
+  const entries = changelogs.flatMap((changelog) => changelog.entries);
+  const appendOnlyEntries = entries.filter((entry) => entry.appendOnly);
+  if (appendOnlyEntries.length > 0 && appendOnlyEntries.length !== entries.length) {
+    throw new Error('append-only changelog entries cannot be mixed with regular entries');
+  }
+  return appendOnlyEntries.length > 0;
 }
 
 /**
@@ -77,17 +92,18 @@ export async function ingestChangelogEntries(
   for (const e of entries) {
     const [row] = await sql`
       insert into changelog_entries (
-        workflow_run_id, date, base_ref, head_ref, config_keys, description, pr_link
+        workflow_run_id, date, base_ref, head_ref, config_keys, description, pr_link, append_only
       ) values (
         ${workflowRunId}, ${date}, ${baseRef}, ${headRef},
-        ${sql.array(e.configKeys)}, ${e.description}, ${e.prLink}
+        ${sql.array(e.configKeys)}, ${e.description}, ${e.prLink}, ${e.appendOnly}
       )
       on conflict (workflow_run_id, base_ref, head_ref)
       do update set
         date = excluded.date,
         config_keys = excluded.config_keys,
         description = excluded.description,
-        pr_link = excluded.pr_link
+        pr_link = excluded.pr_link,
+        append_only = excluded.append_only
       returning id
     `;
     if (row) written++;

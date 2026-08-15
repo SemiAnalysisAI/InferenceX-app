@@ -76,7 +76,7 @@ export const apiRouteCatalog = [
       en: 'UI-only overlay for unofficial workflow artifacts; upstream artifact availability and shape are not stable.',
       zh: '仅供界面叠加非官方工作流制品；上游制品的可用性和结构并不稳定。',
     },
-    sourceSha256: 'ef85fec8468757b0122c5fcebde78527c2efe62f9fedc95799cad56a457a8f04',
+    sourceSha256: '4a3f3da8399c741c26f0f502d44b1870a8ccdc05775edfd6ea3dee4e020df25c',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',
@@ -108,7 +108,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmarks',
-    sourceSha256: 'daf24b2a08ab021782084fc6e5e145013fca518e58d18837355a088e040f257b',
+    sourceSha256: '49fea92d0bd2eacd3babb2a9e6091af0ebf2dbde4462e826274712449b1534a9',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/route.ts',
@@ -116,7 +116,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmark-history',
-    sourceSha256: 'f99940aabe91d315e33e0e645342d83ace227fc014de029d16868284e158be40',
+    sourceSha256: 'd4b3d2ad8ed6e35df70c6b651f71c9d86b6e1dad9c3eaf6eadc2a8591318d1fb',
   },
   {
     source: 'src/app/api/v1/collectivex/latest/route.ts',
@@ -353,7 +353,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-workflow-info',
-    sourceSha256: 'ec497811abc666e4bf970b6e722fde3a7fefc25a87d6b4e5897a605e22c84ee8',
+    sourceSha256: 'b7b0f215e9bf2c766ce2d4c9a13090504c1704a67f697af3a2fd1f318de1e6d6',
   },
 ] as const satisfies readonly ApiRouteCatalogEntry[];
 
@@ -380,10 +380,18 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api.ts',
-    sourceSha256: '7824444f73bd1331ad06cc62060de08446f9d20661fa77030a254d6125b3636a',
+    sourceSha256: '18323e38cb50d20fd535ecb2d87d89131180664721d2ffb95f9ec5843c9d55e4',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
+    },
+  },
+  {
+    source: 'src/lib/overview-data.ts',
+    sourceSha256: 'f54940c63a16d1c97a491b901aebcf9cb8893023eefef9f80ddace8936cabba8',
+    reviewArea: {
+      en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
+      zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
     },
   },
   {
@@ -436,7 +444,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '05e97742b831d1afdcb8dec1d764fd9b3d4a54564e93da4ceea778f8533c5c49',
+    sourceSha256: '11e1bb637dc0d8c338fffebabcbe1864068d08b8b8b1dad1e1e17718eca851dd',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',
@@ -532,7 +540,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/workflow-info.ts',
-    sourceSha256: 'a588811952d152ecb5ca3725e565f3f829c7bbdfd14a795b261a11bfa82fe00a',
+    sourceSha256: '7e7d6fc965a47655fe9fa6feb6d8282eff58c2aedca1bcdb59ac1e8c91128d31',
     reviewArea: {
       en: 'Availability rows plus workflow runs, changelogs, configurations, and run coverage responses.',
       zh: '可用配置行以及工作流运行、变更记录、配置和运行覆盖响应。',

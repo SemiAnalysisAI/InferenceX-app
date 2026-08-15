@@ -11,7 +11,7 @@ import {
   useState,
 } from 'react';
 
-import type { OverviewComparisonMode } from '@/lib/overview-data';
+import { OVERVIEW_DEFAULT_HISTORY_WINDOW, type OverviewComparisonMode } from '@/lib/overview-data';
 import { overviewHref } from '@/lib/overview-links';
 
 import {
@@ -143,7 +143,7 @@ export function OverviewPresentationProvider({
       // Two views, so either arrow means "the other one" — the audience reads
       // it as paging through slides.
       const target: OverviewComparisonMode =
-        data.comparisonMode === 'history' ? 'hardware' : 'history';
+        data.comparisonMode === 'hardware' ? OVERVIEW_DEFAULT_HISTORY_WINDOW : 'hardware';
       event.preventDefault();
       // Only `compare` is merged out of this href, so both row scopes stay on
       // the URL as they are and there is nothing to pass for them here.

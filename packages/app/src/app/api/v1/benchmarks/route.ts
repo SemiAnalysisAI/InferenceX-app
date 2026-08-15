@@ -11,6 +11,7 @@ import {
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
+import { agenticWorkflowMetadataOnly } from '@/lib/agentic-workflow-metadata';
 import { loadFixture } from '@/lib/test-fixtures';
 
 export const dynamic = 'force-dynamic';
@@ -18,22 +19,23 @@ export const dynamic = 'force-dynamic';
 const getCachedBenchmarks = cachedQuery(
   (dbModelKeys: string[], date?: string, exact?: boolean, runId?: string) =>
     getLatestBenchmarks(getDb(), dbModelKeys, date, exact, runId),
-  'benchmarks',
+  'benchmarks-agentic-run-metadata',
   { blobOnly: true },
 );
 
-// Exactly one run's results (GPU comparison of individual same-day runs). Cached
-// under a distinct key prefix so it never collides with the latest/as-of query.
+// One logical run snapshot (GPU comparison of individual same-day runs). For an
+// append-only run this includes its same-image predecessor chain. Cached under a
+// distinct key prefix so it never collides with the latest/as-of query.
 const getCachedBenchmarksForRun = cachedQuery(
   (dbModelKeys: string[], runId: string) => getBenchmarksForRun(getDb(), dbModelKeys, runId),
-  'benchmarks-run',
+  'benchmarks-run-agentic-run-metadata',
   { blobOnly: true },
 );
 
 const getCachedCalculatorBenchmarks = cachedQuery(
   async (dbModelKeys: string[], sequence: string, date?: string) =>
     toCalculatorBenchmarkRows(await getLatestBenchmarks(getDb(), dbModelKeys, date), sequence),
-  'benchmarks-calculator',
+  'benchmarks-calculator-agentic-run-metadata',
   { blobOnly: true },
 );
 
@@ -70,7 +72,7 @@ export async function GET(request: NextRequest) {
         : exactRun && runId
           ? await getCachedBenchmarksForRun(dbModelKeys, runId)
           : await getCachedBenchmarks(dbModelKeys, date, exact || undefined, runId);
-    return cachedJson(rows);
+    return cachedJson(agenticWorkflowMetadataOnly(rows));
   } catch (error) {
     console.error('Error fetching benchmarks:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

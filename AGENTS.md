@@ -193,11 +193,14 @@ The Python helper is a 1:1 port of these three TypeScript functions:
 
 Plus the wrapper `interpolateMetricAtInteractivity` in `packages/app/src/components/inference/hooks/useInterpolatedTrendData.ts` which composes them with the "no extrapolation → return null" rule.
 
+Plus `recoverReciprocalNumerator` in `interpolation.ts`, which decides whether a metric is splined directly or derived from the interpolated throughput. $/M tok and J/token are a per-chip constant over a throughput, so independently splining the metric breaks that identity between knots; both TS and Python spline the throughput and re-derive instead. See `docs/tco-calculator.md` for the reproducible measurement.
+
 **Rule: any PR that changes any of those four TypeScript functions MUST also update `.claude/skills/write-inferencex-blog/iso_interactivity.py` in the same commit.** Drift between the TS and Python implementations means the blog tables will silently diverge from the live chart on the very next post — readers will see one number in the table and a different one in the chart they click through to. This includes:
 
 - Changing the Pareto frontier definition (upper-left → lower-left, or adding tie-breaking rules)
 - Switching from Steffen's monotone slopes to a different spline construction (Fritsch-Carlson, natural cubic, etc.)
 - Loosening or tightening the extrapolation rule (currently: return `null` outside `[min x, max x]`)
+- Changing which metrics are derived from throughput rather than splined, or the tolerance that decides whether the data obeys `metric x throughput = constant`
 - Adjusting the Y-clamp behavior that prevents spline overshoot
 
 The Python file has a header comment explaining the pipeline and a `_cli()` entrypoint for stdin/stdout JSON usage. When you update it, keep the structure 1:1 with the TS so future readers can diff the two files line by line. Run the helper against a known dataset and confirm the outputs match what the chart renders before merging.

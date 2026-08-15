@@ -24,6 +24,11 @@ import {
   hardwareKeyMatchesAnyBase,
 } from '@/lib/constants';
 import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmark-transform';
+import {
+  benchmarkCurveDate,
+  dedupeAgenticHistoryRuns,
+  dedupeRowsToLatestPerConfig as dedupeLatestBenchmarkSeries,
+} from '@/lib/benchmark-run-selection';
 import { Sequence, type Model } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
 import { overviewServingSeriesKey, type OverviewServingSeriesRow } from '@/lib/overview-data';
@@ -159,32 +164,20 @@ interface DedupeRow {
   disagg: boolean;
   precision: string;
   offload_mode?: string | null;
+  benchmark_type?: string;
   date: string;
+  workflow_run_id?: number;
+  run_started_at?: string | null;
 }
 
 // offload_mode normalized `?? 'off'` to match the SQL layer's getBenchmarksForRun
 // lineKey — agentic offload=on and offload=off are distinct series.
-const dedupeSeriesKey = (r: DedupeRow): string =>
-  `${r.hardware}|${r.framework}|${r.spec_method}|${r.disagg}|${r.precision}|${r.offload_mode ?? 'off'}`;
-
 /**
- * For each series — (hardware, framework, spec_method, disagg, precision,
- * offload_mode) — keep only the rows from that series' most recent date. When
- * parallelism settings change between runs, old config_ids create stale points
- * under the same legend line; dropping all-but-latest removes them.
- *
- * Without `offload_mode` in the key, an offload=on sweep ingested on a LATER date
- * than the offload=off sweep would win the shared group and silently drop the
- * (earlier-dated) offload=off variant — a data-loss regression.
+ * Keep only the newest workflow run for each chart series. Agentic series omit
+ * point-level spec decoding from their curve identity; fixed-sequence series do not.
  */
 export function dedupeRowsToLatestPerConfig<T extends DedupeRow>(rows: T[]): T[] {
-  const maxDatePerGroup = new Map<string, string>();
-  for (const r of rows) {
-    const k = dedupeSeriesKey(r);
-    const cur = maxDatePerGroup.get(k);
-    if (!cur || r.date > cur) maxDatePerGroup.set(k, r.date);
-  }
-  return rows.filter((r) => r.date === maxDatePerGroup.get(dedupeSeriesKey(r)));
+  return dedupeLatestBenchmarkSeries(rows);
 }
 
 /**
@@ -349,16 +342,25 @@ export function useChartData(
     // an offload=on sweep can't hide a differently-dated offload=off series.
     const deduped = dedupeRowsToLatestPerConfig(seqFiltered);
 
-    const mainRows = deduped.map((r) =>
-      selectedRunDate ? { ...r, date: selectedRunDate, actualDate: r.date } : r,
-    );
+    const mainRows = deduped.map((r) => ({
+      ...r,
+      date: selectedRunDate ?? benchmarkCurveDate(r),
+      actualDate: r.date,
+    }));
     if (comparisonDates.length === 0) return mainRows;
-    const extraRows = comparisonQueries.flatMap((q, i) =>
-      filterOverviewHistoryRows(
+    const extraRows = comparisonQueries.flatMap((q, i) => {
+      const filtered = filterOverviewHistoryRows(
         (q.data ?? []).filter(seqFilter),
         overviewHistoryPair?.baselineConfigKey,
-      ).map((r) => ({ ...r, date: comparisonDates[i], actualDate: r.date })),
-    );
+      );
+      const selected =
+        selectedSequence === Sequence.AgenticTraces ? dedupeAgenticHistoryRuns(filtered) : filtered;
+      return selected.map((r) => ({
+        ...r,
+        date: comparisonDates[i],
+        actualDate: r.date,
+      }));
+    });
     return [...mainRows, ...extraRows];
   }, [
     allRows,
@@ -373,7 +375,10 @@ export function useChartData(
   // Transform filtered rows into chart data
   const { chartData, hardwareConfig: rawHardwareConfig } = useMemo(() => {
     if (rows.length === 0)
-      return { chartData: [] as InferenceData[][], hardwareConfig: {} as HardwareConfig };
+      return {
+        chartData: [] as InferenceData[][],
+        hardwareConfig: {} as HardwareConfig,
+      };
     return transformBenchmarkRows(rows, selectedPercentile);
   }, [rows, selectedPercentile]);
 
@@ -616,5 +621,12 @@ export function useChartData(
     [chartData, selectedGPUs, quickFilters, compareGpuPair],
   );
 
-  return { graphs, selectionPoints, loading, error, hardwareConfig, availableQuickFilters };
+  return {
+    graphs,
+    selectionPoints,
+    loading,
+    error,
+    hardwareConfig,
+    availableQuickFilters,
+  };
 }

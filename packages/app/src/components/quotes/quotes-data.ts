@@ -267,6 +267,16 @@ export const QUOTES: Quote[] = [
     link: 'https://www.linkedin.com/in/rodrigo-liang/',
   },
   {
+    text: "TileRT's ultra-low-latency inference requires abolishing the kernel as the unit of execution, not just launching kernels faster. InferenceX™'s open, reproducible, and continuously updated benchmarks gave us fair & neutral stage to verify what a persistent Engine Kernel can deliver — 500 tokens/s/user on frontier open models from a single B200 node. We look forward to continuing this collaboration as InferenceX expands into long context Agentic benchmarks.",
+    textZh:
+      'TileRT 的超低延迟推理要求彻底废除以 kernel 作为执行单元的范式，而不只是把 kernel 启动得更快。InferenceX™ 开放、可复现且持续更新的基准测试为我们提供了一个公平、中立的舞台，用以验证常驻式 Engine Kernel 的真实能力——在单个 B200 节点上，于前沿开源模型达到 500 tokens/s/user。随着 InferenceX 扩展到长上下文 Agentic 基准测试，我们期待继续这一合作。',
+    name: 'TileRT Team',
+    title: '',
+    org: 'TileRT',
+    logo: 'tilert.webp',
+    link: 'https://www.tilert.ai/',
+  },
+  {
     text: 'Open collaboration is driving the next era of AI innovation. The open-source InferenceMAX benchmark gives the community transparent, nightly results that inspire trust and accelerate progress. It highlights the competitive TCO performance of our AMD Instinct MI300, MI325X, and MI355X GPUs across diverse workloads, underscoring the strength of our platform and our commitment to giving developers real-time visibility into our software progress.',
     textZh:
       '开放协作正在推动 AI 创新的下一个时代。开源的 InferenceMAX 基准测试为社区提供透明的每夜结果，激发信任并加速进步。它突出了我们 AMD Instinct MI300、MI325X 和 MI355X GPU 在多样化工作负载中极具竞争力的 TCO 表现，彰显了我们平台的实力以及我们致力于让开发者实时了解软件进展的承诺。',
@@ -492,6 +502,16 @@ export const QUOTES: Quote[] = [
     logo: 'lmcache.webp',
     link: 'https://www.linkedin.com/in/yihuacheng-215133327/',
   },
+  {
+    text: 'Mooncake makes KV cache a first-class system resource for disaggregated LLM serving. Real-world performance depends on the full configuration model, hardware, prefill/decode topology, parallelism strategy, and workload. InferenceX™ tests Mooncake across a broad and growing range of configurations, openly and reproducibly, giving the community a clear view of the tradeoffs and helping us improve the system faster.',
+    textZh:
+      'Mooncake 将 KV cache 作为分离式 LLM 推理中的一等系统资源。真实性能取决于完整的配置组合——模型、硬件、预填充/解码拓扑、并行策略和工作负载。InferenceX™ 以开放、可复现的方式，在持续扩展的丰富配置上测试 Mooncake，让社区清晰了解其中的权衡，也帮助我们更快地改进系统。',
+    name: 'Mooncake Team',
+    title: '',
+    org: 'Mooncake',
+    logo: 'kvcache-ai.svg',
+    link: 'https://kvcache.ai/',
+  },
 ];
 
 /**
@@ -508,25 +528,29 @@ export const CAROUSEL_ORGS = [
   'Microsoft',
   'Meta Superintelligence Labs',
   'Oracle',
-  'Together AI',
   'vLLM',
   'GPU Mode',
   'PyTorch Foundation',
   'CoreWeave',
-  'Nebius',
   'TensorWave',
   'SGLang',
   'WEKA',
   'Stanford',
   'Hugging Face',
   'Lambda',
-  'UC San Diego',
   'Red Hat',
-  'White House',
   'SambaNova',
+  'TileRT',
+  'Mooncake',
 ] as const;
 
-/** Display label overrides for carousel orgs. */
+/**
+ * Display label overrides for carousel orgs.
+ *
+ * `Together AI` is not currently in CAROUSEL_ORGS, so its override is inert —
+ * it is kept so the card reads "Tri Dao" rather than "Together AI" if the org
+ * is added back to the carousel.
+ */
 export const CAROUSEL_LABELS: Record<string, string> = {
   'Together AI': 'Tri Dao',
   'PyTorch Foundation': 'PyTorch',

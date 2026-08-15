@@ -18,11 +18,20 @@ Pipeline:
   6. Clamp the interpolated metric value to [min(ys), max(ys)] of the
      frontier to prevent cubic-spline overshoots above/below the data.
 
+Reciprocal metrics ($/M tok, J/token) are a special case: they are a per-chip
+constant divided by a throughput, so they are NOT splined independently. Two
+independent splines need not preserve `metric * throughput = constant` between
+measured knots. Pass `reciprocal_of='throughput'` (or the matching output/input
+throughput key) to spline that throughput and re-derive the metric, which is what
+the dashboard does. See docs/tco-calculator.md for a reproducible measurement.
+
 Usage as a module:
     from iso_interactivity import interpolate_metric, pareto_front_upper_left
     # points: list of dicts with at least 'interactivity' and 'throughput',
     # plus whatever metric you want to interpolate.
-    cost = interpolate_metric(points, target_iv=18.0, metric_key='cost_per_M')
+    # cost/energy are reciprocal in throughput — name the throughput they divide
+    cost = interpolate_metric(points, target_iv=18.0, metric_key='cost_per_M',
+                              reciprocal_of='throughput')
 
 Usage as a script (JSON input on stdin, JSON output on stdout):
     echo '{"points":[...], "target_iv":18.0, "metric_key":"throughput"}' \\
@@ -143,12 +152,43 @@ def hermite_interpolate(
     return h00 * ys[lo] + h10 * hh * m[lo] + h01 * ys[hi] + h11 * hh * m[hi]
 
 
+def recover_reciprocal_numerator(
+    values: list[Optional[float]], throughputs: list[Optional[float]]
+) -> Optional[float]:
+    """Recover the constant `c` of a metric defined as `c / throughput`.
+
+    1:1 with `recoverReciprocalNumerator` in
+    packages/app/src/components/calculator/interpolation.ts. Returns None unless
+    EVERY usable point agrees on the constant: the identity is what licenses
+    re-deriving the metric, so data whose numerator actually varies per point
+    must fall back to being splined directly.
+    """
+    # 0.1%, matching the TS side. Deliberately loose: blog tables are assembled
+    # from costs written to a few decimals, and a tight gate would silently
+    # reject them and fall back to splining. Still rejects a numerator that
+    # genuinely varies per point (measured power moves by whole percent).
+    relative_tolerance = 1e-3
+    numerator: Optional[float] = None
+    for value, throughput in zip(values, throughputs):
+        if value is None or throughput is None:
+            continue
+        if not value > 0 or not throughput > 0:
+            continue
+        candidate = value * throughput
+        if numerator is None:
+            numerator = candidate
+        elif abs(candidate - numerator) > abs(numerator) * relative_tolerance:
+            return None
+    return numerator
+
+
 def interpolate_metric(
     points: list[dict],
     target_iv: float,
     metric_key: str = 'throughput',
     iv_key: str = 'interactivity',
     tput_key: str = 'throughput',
+    reciprocal_of: Optional[str] = None,
 ) -> Optional[float]:
     """Interpolate `metric_key` at `target_iv` using the chart's algorithm.
 
@@ -160,6 +200,12 @@ def interpolate_metric(
     of which metric you're interpolating — this matches the chart, where the
     frontier is defined by the upper-left throughput envelope and other metrics
     (cost, energy, TPOT, ...) are derived values at frontier points.
+
+    `reciprocal_of` names the throughput key a metric divides, for metrics of the
+    form `constant / throughput` ($/M tok, J/token). Set it for those metrics:
+    that throughput is splined and the metric re-derived, matching the dashboard.
+    Leave it None for metrics splined directly (throughput itself, tok/s/MW,
+    latency, and measured energy — whose numerator varies per point).
     """
     if not points:
         return None
@@ -185,10 +231,36 @@ def interpolate_metric(
             return sorted_front[0].get(metric_key)
         return None
 
-    # Matches TS `extractMetric(...) ?? 0`: missing metric on a frontier
-    # point falls back to 0 instead of raising KeyError. Use `.get` so the
-    # CLI returns null cleanly instead of dying with a traceback.
-    ys = [(p.get(metric_key) if p.get(metric_key) is not None else 0) for p in sorted_front]
+    # The TS helper returns null if any frontier point lacks the requested
+    # metric. Do the same here: coercing a missing value to zero would create a
+    # synthetic knot and make blog output diverge from the dashboard.
+    ys: list[float] = []
+    for point in sorted_front:
+        value = point.get(metric_key)
+        if value is None:
+            return None
+        ys.append(value)
+
+    if reciprocal_of is not None:
+        tputs: list[float] = []
+        for point in sorted_front:
+            throughput = point.get(reciprocal_of)
+            if throughput is None:
+                return None
+            tputs.append(throughput)
+        numerator = recover_reciprocal_numerator(ys, tputs)
+        # None means these points do not obey the identity — fall through and
+        # spline the metric directly, matching the TS fallback.
+        if numerator is not None:
+            tput_slopes = monotone_slopes(xs, tputs)
+            tput = hermite_interpolate(xs, tputs, tput_slopes, target_iv)
+            # Clamp the throughput, as the TS side does, then derive; cost then
+            # cannot overshoot the frontier's own cost range either.
+            tput = max(min(tputs), min(max(tputs), tput))
+            if tput <= 0:
+                return 0.0
+            return numerator / tput
+
     slopes = monotone_slopes(xs, ys)
     raw = hermite_interpolate(xs, ys, slopes, target_iv)
 
@@ -203,7 +275,8 @@ def interpolate_metric(
 
 
 def _cli() -> None:
-    """Stdin: {"points": [...], "target_iv": N, "metric_key": "..."}
+    """Stdin: {"points": [...], "target_iv": N, "metric_key": "...",
+               "reciprocal_of": "throughput" for $/M tok and J/token}
     Stdout: {"value": N or null}"""
     req = json.loads(sys.stdin.read())
     value = interpolate_metric(
@@ -212,6 +285,7 @@ def _cli() -> None:
         metric_key=req.get('metric_key', 'throughput'),
         iv_key=req.get('iv_key', 'interactivity'),
         tput_key=req.get('tput_key', 'throughput'),
+        reciprocal_of=req.get('reciprocal_of'),
     )
     json.dump({'value': value}, sys.stdout)
     sys.stdout.write('\n')

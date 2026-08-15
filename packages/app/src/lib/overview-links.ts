@@ -91,7 +91,8 @@ function inferenceRoute(locale: 'en' | 'zh'): string {
  * (mirrors `pointSpecMode` in quickFilters.ts, minus its hwKey suffix check —
  * overview `specMethod` comes straight from `spec_method`).
  */
-function dashboardSpecMode(specMethod: string): 'mtp' | 'stp' {
+function dashboardSpecMode(specMethod: string): 'mtp' | 'stp' | undefined {
+  if (specMethod === 'mixed') return undefined;
   return specMethod === 'none' || specMethod === '' ? 'stp' : 'mtp';
 }
 
@@ -219,7 +220,7 @@ export function overviewHref(
   if (referenceHardware !== OVERVIEW_DEFAULT_REFERENCE_HARDWARE) {
     query.set('ref', referenceHardware);
   }
-  if (comparisonMode === 'history') query.set('compare', '30d');
+  if (comparisonMode !== 'hardware') query.set('compare', comparisonMode);
   if (modelScope !== OVERVIEW_DEFAULT_MODEL_SCOPE) query.set('models', modelScope);
   // Each mode filters rows on its own terms and carries its own key. Both are
   // written whenever they are set, including the one whose mode is off screen:

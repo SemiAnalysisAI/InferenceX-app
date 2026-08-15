@@ -290,10 +290,12 @@ async function previewBenchmarkPointPurge(
       AND br.osl IS NOT DISTINCT FROM ${point.osl}
       AND br.conc = ${point.conc}
       AND br.offload_mode = ${point.offloadMode}
+      AND br.recipe_fingerprint IS NOT DISTINCT FROM ${point.recipeFingerprint ?? null}
   `;
   const description =
     `config ${point.configId}, ${point.benchmarkType}, isl ${point.isl}, ` +
-    `osl ${point.osl}, conc ${point.conc}, offload ${point.offloadMode}`;
+    `osl ${point.osl}, conc ${point.conc}, offload ${point.offloadMode}, ` +
+    `recipe ${point.recipeFingerprint ?? 'legacy'}`;
   if (rows.length === 0) {
     console.log(`    ${description}, not in DB, skipping.`);
     return null;
