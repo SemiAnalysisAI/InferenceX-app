@@ -209,6 +209,14 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     decode_tp: row.disagg ? row.decode_tp : aggregateTp,
     decode_ep: row.disagg ? row.decode_ep : aggregateEp,
     decode_pp: row.disagg ? m.decode_pp : aggregatePp,
+    // Context-parallel widths are emitted by the runtime into metrics JSONB.
+    // Preserve both role-shaped values even for aggregate deployments: the
+    // tooltip collapses the transport-only role names for aggregate serving,
+    // while disaggregated serving displays the values per role.
+    prefill_dcp_size: m.prefill_dcp_size ?? m.dcp_size,
+    decode_dcp_size: m.decode_dcp_size ?? m.dcp_size,
+    prefill_pcp_size: m.prefill_pcp_size ?? m.pcp_size,
+    decode_pcp_size: m.decode_pcp_size ?? m.pcp_size,
     decode_dp_attention: row.disagg ? row.decode_dp_attention : aggregateDpAttention,
     decode_num_workers: row.decode_num_workers,
     image: row.image ?? undefined,

@@ -142,6 +142,41 @@ describe('tooltip parallelism — standard (ep field present)', () => {
     }
   });
 
+  it('shows aggregate DCP and PCP widths when they are greater than one', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          tp: 8,
+          ep: 1,
+          prefill_dcp_size: 1,
+          decode_dcp_size: 8,
+          prefill_pcp_size: 4,
+          decode_pcp_size: 1,
+        }),
+      }),
+    );
+
+    expect(html).toContain('<strong>Decode Context Parallelism (DCP):</strong> 8');
+    expect(html).toContain('<strong>Prefill Context Parallelism (PCP):</strong> 4');
+  });
+
+  it('hides default DCP and PCP widths', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          tp: 8,
+          ep: 1,
+          prefill_dcp_size: 1,
+          decode_dcp_size: 1,
+          prefill_pcp_size: 1,
+          decode_pcp_size: 1,
+        }),
+      }),
+    );
+
+    expect(html).not.toContain('Context Parallelism');
+  });
+
   it('omits Expert Parallelism line when ep is null', () => {
     const d = pt({ tp: 4 });
     (d as any).ep = null;
@@ -236,6 +271,33 @@ describe('tooltip parallelism — multinode disagg', () => {
     expect(html).not.toContain('PP: 1');
   });
 
+  it('shows per-role DCP and PCP in disaggregated tooltips', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          tp: 16,
+          ep: 1,
+          is_multinode: true,
+          disagg: true,
+          prefill_tp: 8,
+          prefill_ep: 1,
+          prefill_dcp_size: 2,
+          prefill_pcp_size: 4,
+          decode_tp: 8,
+          decode_ep: 1,
+          decode_dcp_size: 8,
+          decode_pcp_size: 1,
+          num_prefill_gpu: 8,
+          num_decode_gpu: 8,
+        }),
+      }),
+    );
+
+    expect(html).toMatch(/<strong>Prefill:<\/strong>[^<]*DCP: 2, PCP: 4,/u);
+    expect(html).toMatch(/<strong>Decode:<\/strong>[^<]*DCP: 8,/u);
+    expect(html).not.toContain('PCP: 1');
+  });
+
   it('shows "?" for missing GPU count fields', () => {
     const html = generateTooltipContent(
       tooltipConfig({
@@ -289,6 +351,18 @@ describe('tooltip parallelism — zh locale', () => {
     expect(html).toContain('张量并行 (TP)');
     expect(html).toContain('流水线并行 (PP)');
     expect(html).not.toContain('Tensor Parallelism');
+  });
+
+  it('localizes DCP and PCP labels', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({ tp: 8, ep: 1, decode_dcp_size: 8, prefill_pcp_size: 4 }),
+        locale: 'zh',
+      }),
+    );
+
+    expect(html).toContain('解码上下文并行 (DCP)');
+    expect(html).toContain('预填充上下文并行 (PCP)');
   });
 
   it('localizes the old-data parallelism strategy line', () => {

@@ -12,11 +12,15 @@ function sibling(overrides: Partial<BenchmarkSibling> = {}): BenchmarkSibling {
     decode_tp: 0,
     decode_ep: 0,
     decode_pp: 1,
+    decode_dcp_size: null,
+    decode_pcp_size: null,
     decode_dp_attention: false,
     decode_num_workers: 0,
     prefill_tp: 8,
     prefill_ep: 1,
     prefill_pp: 2,
+    prefill_dcp_size: null,
+    prefill_pcp_size: null,
     prefill_dp_attention: false,
     prefill_num_workers: 1,
     num_prefill_gpu: 16,
@@ -40,6 +44,19 @@ describe('chipLabel', () => {
     expect(chipLabel(sibling({ decode_tp: 8, decode_ep: 1 }))).toBe('TP8PP2 • c=2');
   });
 
+  it('uses the shared point-label format for aggregate DCP and PCP', () => {
+    expect(
+      chipLabel(
+        sibling({
+          prefill_dcp_size: 8,
+          decode_dcp_size: 8,
+          prefill_pcp_size: 1,
+          decode_pcp_size: 1,
+        }),
+      ),
+    ).toBe('TP8PP2/DCP8 • c=2');
+  });
+
   it('keeps prefill and decode roles separate only for disaggregated serving', () => {
     expect(
       chipLabel(
@@ -48,9 +65,13 @@ describe('chipLabel', () => {
           decode_tp: 8,
           decode_ep: 1,
           decode_pp: 1,
+          prefill_dcp_size: 2,
+          prefill_pcp_size: 4,
+          decode_dcp_size: 8,
+          decode_pcp_size: 1,
           decode_num_workers: 1,
         }),
       ),
-    ).toBe('1xTP8PP2+1xTP8 • c=2');
+    ).toBe('1xTP8PP2/DCP2/PCP4+1xTP8/DCP8 • c=2');
   });
 });

@@ -31,6 +31,17 @@ describe('configSegmentLabel', () => {
     expect(configSegmentLabel(8, 1, false, 0)).toBe('TP8');
     expect(configSegmentLabel(8, 1, false, undefined)).toBe('TP8');
   });
+
+  it('appends non-default DCP and PCP as slash-delimited segments', () => {
+    expect(configSegmentLabel(8, 1, false, 1, 8, 1)).toBe('TP8/DCP8');
+    expect(configSegmentLabel(8, 1, false, 1, 8, 4)).toBe('TP8/DCP8/PCP4');
+    expect(configSegmentLabel(8, 8, false, 2, 8, 4)).toBe('TEP8PP2/DCP8/PCP4');
+  });
+
+  it('omits default DCP and PCP widths', () => {
+    expect(configSegmentLabel(8, 1, false, undefined, 1, 1)).toBe('TP8');
+    expect(configSegmentLabel(8, 1, false, undefined, 0, undefined)).toBe('TP8');
+  });
 });
 
 describe('parallelismLabel', () => {
@@ -92,6 +103,27 @@ describe('parallelismLabel', () => {
         decodeNumWorkers: 1,
       }),
     ).toBe('2xTP8PP2+1xTP8');
+  });
+
+  it('applies per-role DCP and PCP to multinode-disagg segments', () => {
+    expect(
+      parallelismLabel({
+        tp: 8,
+        ep: 1,
+        disagg: true,
+        isMultinode: true,
+        prefillTp: 8,
+        prefillEp: 1,
+        prefillDcp: 2,
+        prefillPcp: 4,
+        prefillNumWorkers: 1,
+        decodeTp: 8,
+        decodeEp: 1,
+        decodeDcp: 8,
+        decodePcp: 1,
+        decodeNumWorkers: 1,
+      }),
+    ).toBe('1xTP8/DCP2/PCP4+1xTP8/DCP8');
   });
 
   it('drops the decode segment when the decode pool is absent (0 workers, tp 0)', () => {

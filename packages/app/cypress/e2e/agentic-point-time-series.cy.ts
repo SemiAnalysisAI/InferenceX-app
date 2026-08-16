@@ -23,11 +23,54 @@ const timelineRequest = (
   ...overrides,
 });
 
+const benchmarkSiblings = {
+  sku: {
+    hardware: 'b300',
+    framework: 'vllm',
+    model: 'kimik3',
+    precision: 'fp4',
+    spec_method: 'mtp',
+    benchmark_type: 'agentic_traces',
+    github_run_id: 31893747354,
+    date: '2026-08-15',
+    dataset_slug: null,
+  },
+  siblings: [
+    {
+      id: 206885,
+      conc: 8,
+      offload_mode: 'off',
+      decode_tp: 8,
+      decode_ep: 1,
+      decode_pp: 1,
+      decode_dcp_size: 8,
+      decode_pcp_size: 1,
+      decode_dp_attention: false,
+      decode_num_workers: 0,
+      prefill_tp: 8,
+      prefill_ep: 1,
+      prefill_pp: 1,
+      prefill_dcp_size: 8,
+      prefill_pcp_size: 1,
+      prefill_dp_attention: false,
+      prefill_num_workers: 0,
+      num_prefill_gpu: 8,
+      num_decode_gpu: 8,
+      disagg: false,
+      is_multinode: false,
+      tput_per_gpu: 1.2,
+      total_requests: 395,
+      is_current: true,
+      has_trace: true,
+    },
+  ],
+};
+
 describe('Agentic point request metric time series', () => {
   before(() => {
     cy.intercept('GET', '/api/v1/trace-histograms*', { body: {} });
     cy.intercept('GET', '/api/v1/trace-server-metrics*', { body: null });
-    cy.intercept('GET', '/api/v1/benchmark-siblings*', { statusCode: 404 });
+    cy.intercept('GET', '/api/v1/benchmark-siblings*', { body: benchmarkSiblings });
     cy.intercept('GET', '/api/v1/request-timeline*', {
       body: {
         version: 3,
@@ -66,6 +109,10 @@ describe('Agentic point request metric time series', () => {
       },
     });
     cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+  });
+
+  it('uses the shared topology label for the active agentic point', () => {
+    cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
   });
 
   it('renders rolling P90 interactivity and TTFT by default using profiling requests only', () => {

@@ -5,7 +5,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import type { BenchmarkSibling, BenchmarkSku } from '@/hooks/api/use-benchmark-siblings';
-import { parallelismLabel } from '@/components/inference/utils/parallelism-label';
+import {
+  meaningfulParallelismSize,
+  parallelismLabel,
+} from '@/components/inference/utils/parallelism-label';
 import {
   Select,
   SelectContent,
@@ -71,6 +74,12 @@ export function chipLabel(s: BenchmarkSibling): string {
     !s.disagg && (s.prefill_pp !== null || s.decode_pp !== null)
       ? Math.max(s.prefill_pp ?? 1, s.decode_pp ?? 1)
       : undefined;
+  const aggregateDcp = s.disagg
+    ? undefined
+    : meaningfulParallelismSize(s.prefill_dcp_size, s.decode_dcp_size);
+  const aggregatePcp = s.disagg
+    ? undefined
+    : meaningfulParallelismSize(s.prefill_pcp_size, s.decode_pcp_size);
   // Same parallelism labeler the chart points use (TP/EP/TEP/DEP/DPA…).
   const parallel = parallelismLabel({
     tp: usePrefill ? s.prefill_tp : s.decode_tp,
@@ -80,17 +89,31 @@ export function chipLabel(s: BenchmarkSibling): string {
         ? (s.prefill_pp ?? undefined)
         : (s.decode_pp ?? undefined)
       : aggregatePp,
+    dcp: s.disagg
+      ? usePrefill
+        ? (s.prefill_dcp_size ?? undefined)
+        : (s.decode_dcp_size ?? undefined)
+      : aggregateDcp,
+    pcp: s.disagg
+      ? usePrefill
+        ? (s.prefill_pcp_size ?? undefined)
+        : (s.decode_pcp_size ?? undefined)
+      : aggregatePcp,
     dpAttention: usePrefill ? s.prefill_dp_attention : s.decode_dp_attention,
     disagg: s.disagg,
     isMultinode: s.is_multinode,
     prefillTp: s.prefill_tp,
     prefillEp: s.prefill_ep,
     prefillPp: s.prefill_pp ?? undefined,
+    prefillDcp: s.prefill_dcp_size ?? undefined,
+    prefillPcp: s.prefill_pcp_size ?? undefined,
     prefillDpAttention: s.prefill_dp_attention,
     prefillNumWorkers: s.prefill_num_workers,
     decodeTp: s.decode_tp,
     decodeEp: s.decode_ep,
     decodePp: s.decode_pp ?? undefined,
+    decodeDcp: s.decode_dcp_size ?? undefined,
+    decodePcp: s.decode_pcp_size ?? undefined,
     decodeDpAttention: s.decode_dp_attention,
     decodeNumWorkers: s.decode_num_workers,
   });
@@ -111,12 +134,16 @@ const SORT_OPTIONS: { value: SortMode; label: string }[] = [
 // Group key for the "parallelism" sort: ep first (so TP/EP1 sorts ahead of
 // EP/TEP/DEP groups), then tp, then dp-attention, then disagg — every config
 // of one parallelism lands together, ordered by concurrency within.
-const parallelRank = (s: BenchmarkSibling): [number, number, number, number, number] => {
+const parallelRank = (
+  s: BenchmarkSibling,
+): [number, number, number, number, number, number, number] => {
   const usePrefill = !s.disagg && s.decode_tp <= 0 && s.prefill_tp > 0;
   return [
     usePrefill ? s.prefill_ep : s.decode_ep,
     usePrefill ? s.prefill_tp : s.decode_tp,
     (usePrefill ? s.prefill_pp : s.decode_pp) ?? 1,
+    (usePrefill ? s.prefill_dcp_size : s.decode_dcp_size) ?? 1,
+    (usePrefill ? s.prefill_pcp_size : s.decode_pcp_size) ?? 1,
     (usePrefill ? s.prefill_dp_attention : s.decode_dp_attention) ? 1 : 0,
     s.disagg ? 1 : 0,
   ];
