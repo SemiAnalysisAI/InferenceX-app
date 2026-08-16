@@ -146,6 +146,19 @@ function kvBlob(profiling: unknown[], warmup: unknown[] = []) {
   );
 }
 
+function buildTrtllmSeries(
+  endpoint_url: string,
+  dynamo_component: 'prefill' | 'backend',
+  value: number,
+  field: 'rate' | 'avg',
+) {
+  return {
+    endpoint_url,
+    labels: { dynamo_component, worker_id: `${dynamo_component}-worker` },
+    timeslices: [{ start_ns: 0, end_ns: 1e9, [field]: value }],
+  };
+}
+
 describe('computeChartSeries', () => {
   it('returns null when the blob is null', async () => {
     expect(await computeChartSeries(null)).toBeNull();
@@ -707,6 +720,70 @@ describe('computeChartSeries', () => {
     });
 
     expect(result?.metricSources).toEqual([]);
+  });
+
+  it('extracts native TensorRT-LLM metrics and preserves disaggregated worker roles', async () => {
+    const prefillUrl = 'http://prefill-a.internal.test:7500/metrics';
+    const decodeUrl = 'http://decode-a.internal.test:7501/metrics';
+    const json = JSON.stringify({
+      metrics: {
+        trtllm_kv_cache_utilization: {
+          series: [
+            buildTrtllmSeries(prefillUrl, 'prefill', 0.3, 'avg'),
+            buildTrtllmSeries(decodeUrl, 'backend', 0.7, 'avg'),
+          ],
+        },
+        trtllm_kv_cache_host_utilization: {
+          series: [buildTrtllmSeries(prefillUrl, 'prefill', 0.25, 'avg')],
+        },
+        trtllm_prompt_tokens_total: {
+          series: [
+            buildTrtllmSeries(prefillUrl, 'prefill', 100, 'rate'),
+            buildTrtllmSeries(decodeUrl, 'backend', 200, 'rate'),
+          ],
+        },
+        trtllm_prompt_cached_tokens_total: {
+          series: [
+            buildTrtllmSeries(prefillUrl, 'prefill', 40, 'rate'),
+            buildTrtllmSeries(decodeUrl, 'backend', 80, 'rate'),
+          ],
+        },
+        trtllm_generation_tokens_total: {
+          series: [buildTrtllmSeries(decodeUrl, 'backend', 50, 'rate')],
+        },
+        trtllm_num_requests_running: {
+          series: [
+            buildTrtllmSeries(prefillUrl, 'prefill', 2, 'avg'),
+            buildTrtllmSeries(decodeUrl, 'backend', 3, 'avg'),
+          ],
+        },
+        trtllm_num_requests_waiting: {
+          series: [buildTrtllmSeries(decodeUrl, 'backend', 4, 'avg')],
+        },
+      },
+    });
+
+    const result = await computeChartSeries(gzipSync(Buffer.from(json)), {
+      framework: 'trtllm',
+      disagg: true,
+    });
+
+    expect(result?.kvCacheUsage).toEqual([{ t: 0, value: 0.5 }]);
+    expect(result?.hostKvCacheUsage).toEqual([{ t: 0, value: 0.25 }]);
+    expect(result?.prefixCacheHitRate).toEqual([{ t: 0, value: 0.4 }]);
+    expect(result?.queueDepth).toEqual([{ t: 0, running: 5, waiting: 4, total: 9 }]);
+    expect(result?.prefillTps).toEqual([{ t: 0, value: 300 }]);
+    expect(result?.decodeTps).toEqual([{ t: 0, value: 50 }]);
+    expect(result?.promptTokensBySource).toEqual({
+      'cache hit (HBM)': [{ t: 0, value: 120 }],
+      'compute (miss)': [{ t: 0, value: 180 }],
+    });
+    expect(result?.metricSources.map(({ source }) => [source.role, source.endpointUrl])).toEqual([
+      ['prefill', prefillUrl],
+      ['decode', decodeUrl],
+    ]);
+    expect(result?.metricSources[0]?.promptTps).toEqual([{ t: 0, value: 100 }]);
+    expect(result?.metricSources[1]?.generationTps).toEqual([{ t: 0, value: 50 }]);
   });
 });
 

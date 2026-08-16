@@ -129,6 +129,47 @@ describe('extractServerMetricSamples', () => {
     expect(out.kvCacheUtil).toEqual([]);
     expect(out.prefixCacheHitRate).toEqual([]);
   });
+
+  it('extracts TensorRT-LLM KV utilization and prefix cache hit rate', () => {
+    const json = JSON.stringify({
+      metrics: {
+        trtllm_kv_cache_utilization: {
+          series: [
+            {
+              timeslices: [
+                { start_ns: 0, avg: 0.2 },
+                { start_ns: 1, avg: 0.6 },
+              ],
+            },
+          ],
+        },
+        trtllm_prompt_cached_tokens_total: {
+          series: [
+            {
+              timeslices: [
+                { start_ns: 0, rate: 70 },
+                { start_ns: 1, rate: 20 },
+              ],
+            },
+          ],
+        },
+        trtllm_prompt_tokens_total: {
+          series: [
+            {
+              timeslices: [
+                { start_ns: 0, rate: 100 },
+                { start_ns: 1, rate: 50 },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+    const out = extractServerMetricSamples(json);
+    expect(out.kvCacheUtil).toEqual([0.2, 0.6]);
+    expect(out.prefixCacheHitRate).toEqual([0.7, 0.4]);
+  });
 });
 
 /** The write-back payload as bound to the UPDATE (a partial aggregate_stats). */

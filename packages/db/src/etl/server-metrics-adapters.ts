@@ -78,6 +78,37 @@ const dynamoAdapter: ServerMetricsAdapter = {
   },
 };
 
+const trtllmAdapter: ServerMetricsAdapter = {
+  id: 'trtllm',
+  matches: ({ framework }) => framework?.toLowerCase().includes('trt') ?? false,
+  identifySource(series) {
+    const labels = series.labels ?? {};
+    const nativeRole = labels['disaggregation_mode'] ?? labels['dynamo_component'] ?? null;
+    const role: MetricSourceRole =
+      nativeRole === 'prefill'
+        ? 'prefill'
+        : nativeRole === 'decode' || nativeRole === 'backend'
+          ? 'decode'
+          : nativeRole === 'aggregated'
+            ? 'combined'
+            : 'unknown';
+    const endpointUrl = series.endpoint_url ?? null;
+    const workerId = labels['worker_id'] ?? null;
+    const dpRank = labels['dp_rank'] ?? null;
+    const engine = labels['engine'] ?? labels['engine_idx'] ?? null;
+    return {
+      id: stableId('trtllm', [role, endpointUrl, workerId, dpRank, engine]),
+      adapter: 'trtllm',
+      role,
+      endpointUrl,
+      nativeRole,
+      workerId,
+      dpRank,
+      engine,
+    };
+  },
+};
+
 const genericAdapter: ServerMetricsAdapter = {
   id: 'generic',
   matches: () => true,
@@ -100,7 +131,7 @@ const genericAdapter: ServerMetricsAdapter = {
   },
 };
 
-const ADAPTERS: readonly ServerMetricsAdapter[] = [dynamoAdapter, genericAdapter];
+const ADAPTERS: readonly ServerMetricsAdapter[] = [trtllmAdapter, dynamoAdapter, genericAdapter];
 
 export function selectServerMetricsAdapter(context: ServerMetricsContext): ServerMetricsAdapter {
   return ADAPTERS.find((adapter) => adapter.matches(context)) ?? genericAdapter;
