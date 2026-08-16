@@ -679,10 +679,12 @@ function ModelName({ model, strings }: { model: OverviewModelSummary; strings: O
             className="ml-1.5 inline-block rounded-sm border border-border/60 px-1 py-px align-middle text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
           >
             {badge}
-            {/* `title` reaches a hovering mouse and nothing else. The badge is
-                an abbreviation, so without this the reason it exists is
-                unavailable to touch, keyboard and screen-reader users. */}
-            <span className="sr-only">{strings.categoryBadgeTitle}</span>
+            {/* `title` reaches a hovering mouse and nothing else, so a screen
+                reader announced this badge as a bare label with no reason
+                attached. `normal-case` because the badge's `uppercase` inherits
+                and browsers expose the transformed string to the accessibility
+                tree, which turns the sentence into shouted, mis-parsed words. */}
+            <span className="sr-only normal-case">{strings.categoryBadgeTitle}</span>
           </span>
         )}
       </h2>
