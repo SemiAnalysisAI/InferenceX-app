@@ -5,7 +5,10 @@ import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
-import { parallelismLabel } from '@/components/inference/utils/parallelism-label';
+import {
+  meaningfulParallelismSize,
+  parallelismLabel,
+} from '@/components/inference/utils/parallelism-label';
 import {
   cacheImplementationLabel,
   offloadTypeLabel,
@@ -59,28 +62,37 @@ const asBool = (v: boolean | string | undefined): boolean | undefined =>
  * Delegates to the shared {@link parallelismLabel} so the chart points and the
  * agentic sibling navigator describe a config identically.
  */
-export const getPointLabel = (d: InferenceData): string =>
-  parallelismLabel({
+export const getPointLabel = (d: InferenceData): string => {
+  const aggregateDcp = meaningfulParallelismSize(d.prefill_dcp_size, d.decode_dcp_size);
+  const aggregatePcp = meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size);
+  return parallelismLabel({
     // InferenceData.tp is the TOTAL GPU count (createChartDataPoint folds pp
     // into it for aggregated rows) — the label wants the actual TP width, so
     // prefer the raw decode_tp and keep d.tp only as a legacy fallback.
     tp: d.decode_tp ?? d.tp,
     ep: d.ep,
     pp: d.pp,
+    dcp: d.disagg ? (d.decode_dcp_size ?? d.prefill_dcp_size) : aggregateDcp,
+    pcp: d.disagg ? (d.decode_pcp_size ?? d.prefill_pcp_size) : aggregatePcp,
     dpAttention: asBool(d.dp_attention),
     disagg: d.disagg,
     isMultinode: d.is_multinode,
     prefillTp: d.prefill_tp,
     prefillEp: d.prefill_ep,
     prefillPp: d.prefill_pp,
+    prefillDcp: d.prefill_dcp_size,
+    prefillPcp: d.prefill_pcp_size,
     prefillDpAttention: asBool(d.prefill_dp_attention),
     prefillNumWorkers: d.prefill_num_workers,
     decodeTp: d.decode_tp,
     decodeEp: d.decode_ep,
     decodePp: d.decode_pp,
+    decodeDcp: d.decode_dcp_size,
+    decodePcp: d.decode_pcp_size,
     decodeDpAttention: asBool(d.decode_dp_attention),
     decodeNumWorkers: d.decode_num_workers,
   });
+};
 
 const runLinkHTML = (runUrl?: string) =>
   runUrl
@@ -255,6 +267,8 @@ const PARALLELISM_STRINGS = {
     tensorParallelism: 'Tensor Parallelism',
     expertParallelism: 'Expert Parallelism',
     pipelineParallelism: 'Pipeline Parallelism',
+    decodeContextParallelism: 'Decode Context Parallelism (DCP)',
+    prefillContextParallelism: 'Prefill Context Parallelism (PCP)',
     dpAttention: 'DP Attention',
   },
   zh: {
@@ -270,9 +284,18 @@ const PARALLELISM_STRINGS = {
     tensorParallelism: '张量并行 (TP)',
     expertParallelism: '专家并行 (EP)',
     pipelineParallelism: '流水线并行 (PP)',
+    decodeContextParallelism: '解码上下文并行 (DCP)',
+    prefillContextParallelism: '预填充上下文并行 (PCP)',
     dpAttention: 'DP Attention',
   },
 } as const;
+
+const contextParallelismParts = (dcp?: number, pcp?: number): string => {
+  const parts: string[] = [];
+  if (dcp !== undefined && dcp > 1) parts.push(`DCP: ${dcp}`);
+  if (pcp !== undefined && pcp > 1) parts.push(`PCP: ${pcp}`);
+  return parts.length > 0 ? `${parts.join(', ')}, ` : '';
+};
 
 /**
  * Generates HTML for the parallelism configuration section of a tooltip.
@@ -283,11 +306,18 @@ const PARALLELISM_STRINGS = {
 const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): string => {
   const t = PARALLELISM_STRINGS[locale];
   const deployment = d.disagg ? t.disaggregated : d.is_multinode ? t.multiNode : t.singleNode;
+  const aggregateDcp = meaningfulParallelismSize(d.prefill_dcp_size, d.decode_dcp_size);
+  const aggregatePcp = meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size);
   if (
     (d.ep === null || d.ep === undefined) &&
     (d.prefill_ep === null || d.prefill_ep === undefined)
   ) {
-    return tooltipLine(t.deployment, deployment) + tooltipLine(t.strategy, t.gpuCount(d.tp));
+    return (
+      tooltipLine(t.deployment, deployment) +
+      tooltipLine(t.strategy, t.gpuCount(d.tp)) +
+      (aggregateDcp ? tooltipLine(t.decodeContextParallelism, aggregateDcp) : '') +
+      (aggregatePcp ? tooltipLine(t.prefillContextParallelism, aggregatePcp) : '')
+    );
   }
 
   if (d.is_multinode && d.disagg) {
@@ -301,13 +331,15 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
     const ddpa = d.decode_dp_attention ?? d.dp_attention ?? false;
     const pw = d.prefill_num_workers ?? 1;
     const dw = d.decode_num_workers ?? 1;
+    const prefillContext = contextParallelismParts(d.prefill_dcp_size, d.prefill_pcp_size);
+    const decodeContext = contextParallelismParts(d.decode_dcp_size, d.decode_pcp_size);
     return `
       ${tooltipLine(t.deployment, deployment)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${t.prefill}:</strong> ${d.num_prefill_gpu ?? '?'} ${t.gpusUnit}, TP: ${ptp}, ${ppp > 1 ? `PP: ${ppp}, ` : ''}EP: ${pep}, DPA: ${pdpa ? 'True' : 'False'}, Workers: ${pw}
+        <strong>${t.prefill}:</strong> ${d.num_prefill_gpu ?? '?'} ${t.gpusUnit}, TP: ${ptp}, ${ppp > 1 ? `PP: ${ppp}, ` : ''}${prefillContext}EP: ${pep}, DPA: ${pdpa ? 'True' : 'False'}, Workers: ${pw}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${t.decode}:</strong> ${d.num_decode_gpu ?? '?'} ${t.gpusUnit}, TP: ${dtp}, ${dpp > 1 ? `PP: ${dpp}, ` : ''}EP: ${dep}, DPA: ${ddpa ? 'True' : 'False'}, Workers: ${dw}
+        <strong>${t.decode}:</strong> ${d.num_decode_gpu ?? '?'} ${t.gpusUnit}, TP: ${dtp}, ${dpp > 1 ? `PP: ${dpp}, ` : ''}${decodeContext}EP: ${dep}, DPA: ${ddpa ? 'True' : 'False'}, Workers: ${dw}
       </div>`;
   }
 
@@ -315,6 +347,8 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
     ${tooltipLine(t.deployment, deployment)}
     ${tooltipLine(t.tensorParallelism, d.decode_tp ?? d.tp)}
     ${d.pp !== null && d.pp !== undefined && d.pp > 1 ? tooltipLine(t.pipelineParallelism, d.pp) : ''}
+    ${aggregateDcp ? tooltipLine(t.decodeContextParallelism, aggregateDcp) : ''}
+    ${aggregatePcp ? tooltipLine(t.prefillContextParallelism, aggregatePcp) : ''}
     ${d.ep !== null && d.ep !== undefined ? tooltipLine(t.expertParallelism, d.ep) : ''}
     ${tooltipLine(t.dpAttention, d.dp_attention ? 'True' : 'False')}`;
 };

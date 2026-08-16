@@ -13,9 +13,9 @@ export const dynamic = 'force-dynamic';
 
 const getCachedSiblings = cachedQuery(
   (id: number): Promise<BenchmarkSiblings | null> => getBenchmarkSiblings(getDb(), id),
-  // v2 adds PP and makes the aggregate topology explicit. Roll the blob
-  // namespace so old TP0 sibling payloads cannot survive the schema change.
-  'benchmark-siblings-v2',
+  // v3 adds DCP/PCP. Roll the blob namespace so cached sibling payloads gain
+  // the complete parallelism mapping used by chart point labels.
+  'benchmark-siblings-v3',
 );
 
 /**

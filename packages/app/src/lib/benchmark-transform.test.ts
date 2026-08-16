@@ -68,6 +68,40 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('rowToAggDataEntry', () => {
+  it('preserves DCP and PCP metrics for point tooltips', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: {
+          prefill_dcp_size: 2,
+          decode_dcp_size: 8,
+          prefill_pcp_size: 4,
+          decode_pcp_size: 1,
+        },
+      }),
+    );
+
+    expect(entry.prefill_dcp_size).toBe(2);
+    expect(entry.decode_dcp_size).toBe(8);
+    expect(entry.prefill_pcp_size).toBe(4);
+    expect(entry.decode_pcp_size).toBe(1);
+  });
+
+  it('mirrors aggregate artifact DCP and PCP widths into both topology roles', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: {
+          dcp_size: 8,
+          pcp_size: 1,
+        },
+      }),
+    );
+
+    expect(entry.prefill_dcp_size).toBe(8);
+    expect(entry.decode_dcp_size).toBe(8);
+    expect(entry.prefill_pcp_size).toBe(1);
+    expect(entry.decode_pcp_size).toBe(1);
+  });
+
   it('maps hardware and framework fields', () => {
     const entry = rowToAggDataEntry(makeRow());
     expect(entry.hw).toBe('h200');
