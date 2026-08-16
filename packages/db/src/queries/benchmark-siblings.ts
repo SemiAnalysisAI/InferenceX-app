@@ -15,11 +15,15 @@ export interface BenchmarkSibling {
   decode_tp: number;
   decode_ep: number;
   decode_pp: number | null;
+  decode_dcp_size: number | null;
+  decode_pcp_size: number | null;
   decode_dp_attention: boolean;
   decode_num_workers: number;
   prefill_tp: number;
   prefill_ep: number;
   prefill_pp: number | null;
+  prefill_dcp_size: number | null;
+  prefill_pcp_size: number | null;
   prefill_dp_attention: boolean;
   prefill_num_workers: number;
   num_prefill_gpu: number;
@@ -93,8 +97,24 @@ export async function getBenchmarkSiblings(
     select
       br.id, br.conc, br.offload_mode,
       c.decode_tp, c.decode_ep, (br.metrics->>'decode_pp')::int as decode_pp,
+      coalesce(
+        (br.metrics->>'decode_dcp_size')::int,
+        (br.metrics->>'dcp_size')::int
+      ) as decode_dcp_size,
+      coalesce(
+        (br.metrics->>'decode_pcp_size')::int,
+        (br.metrics->>'pcp_size')::int
+      ) as decode_pcp_size,
       c.decode_dp_attention, c.decode_num_workers,
       c.prefill_tp, c.prefill_ep, (br.metrics->>'prefill_pp')::int as prefill_pp,
+      coalesce(
+        (br.metrics->>'prefill_dcp_size')::int,
+        (br.metrics->>'dcp_size')::int
+      ) as prefill_dcp_size,
+      coalesce(
+        (br.metrics->>'prefill_pcp_size')::int,
+        (br.metrics->>'pcp_size')::int
+      ) as prefill_pcp_size,
       c.prefill_dp_attention, c.prefill_num_workers,
       c.num_prefill_gpu, c.num_decode_gpu, c.disagg, c.is_multinode,
       (br.metrics->>'tput_per_gpu')::float8 as tput_per_gpu,
@@ -120,11 +140,15 @@ export async function getBenchmarkSiblings(
     decode_tp: number;
     decode_ep: number;
     decode_pp: number | null;
+    decode_dcp_size: number | null;
+    decode_pcp_size: number | null;
     decode_dp_attention: boolean;
     decode_num_workers: number;
     prefill_tp: number;
     prefill_ep: number;
     prefill_pp: number | null;
+    prefill_dcp_size: number | null;
+    prefill_pcp_size: number | null;
     prefill_dp_attention: boolean;
     prefill_num_workers: number;
     num_prefill_gpu: number;
@@ -143,11 +167,15 @@ export async function getBenchmarkSiblings(
     decode_tp: r.decode_tp,
     decode_ep: r.decode_ep,
     decode_pp: r.decode_pp === null ? null : Number(r.decode_pp),
+    decode_dcp_size: r.decode_dcp_size === null ? null : Number(r.decode_dcp_size),
+    decode_pcp_size: r.decode_pcp_size === null ? null : Number(r.decode_pcp_size),
     decode_dp_attention: r.decode_dp_attention,
     decode_num_workers: r.decode_num_workers,
     prefill_tp: r.prefill_tp,
     prefill_ep: r.prefill_ep,
     prefill_pp: r.prefill_pp === null ? null : Number(r.prefill_pp),
+    prefill_dcp_size: r.prefill_dcp_size === null ? null : Number(r.prefill_dcp_size),
+    prefill_pcp_size: r.prefill_pcp_size === null ? null : Number(r.prefill_pcp_size),
     prefill_dp_attention: r.prefill_dp_attention,
     prefill_num_workers: r.prefill_num_workers,
     num_prefill_gpu: r.num_prefill_gpu,

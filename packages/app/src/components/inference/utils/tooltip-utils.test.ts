@@ -99,6 +99,25 @@ describe('getPointLabel', () => {
     expect(getPointLabel(pt({ tp: 4, ep: 1 }))).toBe('TP4');
   });
 
+  it('includes DCP and PCP in the point label when non-default', () => {
+    expect(
+      getPointLabel(
+        pt({
+          tp: 8,
+          decode_tp: 8,
+          ep: 1,
+          prefill_dcp_size: 8,
+          decode_dcp_size: 8,
+          prefill_pcp_size: 1,
+          decode_pcp_size: 1,
+        }),
+      ),
+    ).toBe('TP8/DCP8');
+    expect(
+      getPointLabel(pt({ tp: 8, decode_tp: 8, ep: 1, decode_dcp_size: 8, prefill_pcp_size: 4 })),
+    ).toBe('TP8/DCP8/PCP4');
+  });
+
   it('returns "DPATP4" when ep is 1 and dp_attention is true', () => {
     expect(getPointLabel(pt({ tp: 4, ep: 1, dp_attention: true }))).toBe('DPATP4');
   });
@@ -164,7 +183,11 @@ describe('generateTooltipContent', () => {
     // link to /inference/agentic/0, a doomed lookup.
     for (const badId of [0, Number.NaN]) {
       const html = generateTooltipContent(
-        tooltipConfig({ data: pt({ id: badId }), isPinned: true, hasTrace: true }),
+        tooltipConfig({
+          data: pt({ id: badId }),
+          isPinned: true,
+          hasTrace: true,
+        }),
       );
       expect(html).not.toContain('data-action="view-charts"');
     }
@@ -473,6 +496,17 @@ describe('generateOverlayTooltipContent', () => {
     expect(html).toContain('<strong>CPU Cache Hit Rate:</strong> 42.0%');
   });
 
+  it('shows DCP and PCP for unofficial-run points', () => {
+    const html = generateOverlayTooltipContent(
+      overlayConfig({
+        data: pt({ ep: 1, decode_dcp_size: 8, prefill_pcp_size: 4 }),
+      }),
+    );
+
+    expect(html).toContain('<strong>Decode Context Parallelism (DCP):</strong> 8');
+    expect(html).toContain('<strong>Prefill Context Parallelism (PCP):</strong> 4');
+  });
+
   it('shows point-level speculative decoding for mixed agentic overlays', () => {
     const mtp = generateOverlayTooltipContent(
       overlayConfig({
@@ -554,6 +588,17 @@ describe('generateGPUGraphTooltipContent', () => {
   it('includes precision in uppercase', () => {
     const html = generateGPUGraphTooltipContent(tooltipConfig({ data: pt({ precision: 'bf16' }) }));
     expect(html).toContain('BF16');
+  });
+
+  it('shows DCP and PCP in comparison point tooltips', () => {
+    const html = generateGPUGraphTooltipContent(
+      tooltipConfig({
+        data: pt({ ep: 1, decode_dcp_size: 8, prefill_pcp_size: 4 }),
+      }),
+    );
+
+    expect(html).toContain('<strong>Decode Context Parallelism (DCP):</strong> 8');
+    expect(html).toContain('<strong>Prefill Context Parallelism (PCP):</strong> 4');
   });
 
   it('splits image and SHA onto separate lines', () => {

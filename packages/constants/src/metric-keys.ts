@@ -171,6 +171,10 @@ export const METRIC_KEYS = new Set([
   // (rowToAggDataEntry in benchmark-transform.ts).
   'prefill_pp',
   'decode_pp',
+  // Aggregate artifacts emit one context-parallel width, while disaggregated
+  // artifacts may emit a separate value for each role.
+  'dcp_size',
+  'pcp_size',
   'prefill_dcp_size',
   'decode_dcp_size',
   'prefill_pcp_size',

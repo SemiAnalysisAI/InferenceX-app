@@ -100,7 +100,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-benchmark-siblings',
-    sourceSha256: '36b00e5d1c761e6a76e2c0454d9be4a15b7ccb7f3af5bdccd8ac61b6e5ff5312',
+    sourceSha256: '2b20de8b2b67ed53027eba478068f8f22ae7e3843ac38423e8ce6b27c1f74fd6',
   },
   {
     source: 'src/app/api/v1/benchmarks/route.ts',
@@ -439,7 +439,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmark-siblings.ts',
-    sourceSha256: '5a2b7e902c3003a0b3dbf3f402cc4b6b40648a1e014a218ab39dcbfd35c80f42',
+    sourceSha256: '07d3d1bf93820091d1014b14bf954555edcec422c05e575ad87142f9845e4156',
     reviewArea: {
       en: 'Benchmark sibling SKU metadata and sibling navigation row shape.',
       zh: '基准同组 SKU 元数据和同组导航行结构。',
