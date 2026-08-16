@@ -22,8 +22,12 @@ vi.mock('@/lib/d3-chart/chart-setup', { spy: true });
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'dark' }) }));
 // The legend is React-rendered (covered elsewhere) — keep the tree light.
+const legendState = vi.hoisted(() => ({ current: null as Record<string, any> | null }));
 vi.mock('@/components/ui/chart-legend', () => ({
-  default: ({ keyIndicators }: { keyIndicators?: React.ReactNode }) => keyIndicators ?? null,
+  default: (props: Record<string, any>) => {
+    legendState.current = props;
+    return props.keyIndicators ?? null;
+  },
 }));
 
 const inferenceState = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
@@ -218,6 +222,7 @@ beforeEach(() => {
   } as DOMRect);
   inferenceState.current = baseInferenceState();
   overlayState.current = baseOverlayState();
+  legendState.current = null;
   vi.mocked(setupChartStructure).mockClear();
 });
 
@@ -439,6 +444,149 @@ describe('ScatterGraph toggle decoration', () => {
 
     expect(container.querySelectorAll('.unofficial-overlay-pt')).toHaveLength(2);
     expect(rebuildCount()).toBe(buildsAfterMount);
+    unmount();
+  });
+
+  it('refreshes official and overlay winners while Best per SKU is enabled', () => {
+    const setLocalOfficialOverride = vi.fn();
+    const setActiveOverlayHwTypes = vi.fn();
+    const officialPoints = [
+      point('h100_vllm', 'fp8', 10, 10, 1),
+      point('h100_vllm', 'fp8', 20, 10, 2),
+      point('h100_trt', 'fp8', 10, 20, 1),
+      point('h100_trt', 'fp8', 20, 20, 2),
+    ];
+    const runUrl = 'https://github.com/o/r/actions/runs/123';
+    const overlayPoints = [
+      point('b200_vllm', 'fp8', 10, 5, 1),
+      point('b200_vllm', 'fp8', 20, 5, 2),
+      point('b200_trt', 'fp8', 10, 15, 1),
+      point('b200_trt', 'fp8', 20, 15, 2),
+    ].map((entry) => ({ ...entry, run_url: runUrl }));
+
+    inferenceState.current = {
+      ...baseInferenceState(),
+      activeHwTypes: new Set(['h100_vllm']),
+      hwTypesWithData: new Set(['h100_vllm', 'h100_trt']),
+      bestPerSku: true,
+      setBestPerSku: noop,
+      selectedYAxisMetric: 'y',
+    };
+    overlayState.current = {
+      ...baseOverlayState(),
+      isUnofficialRun: true,
+      activeOverlayHwTypes: new Set(['b200_vllm']),
+      allOverlayHwTypes: new Set(['b200_vllm', 'b200_trt']),
+      localOfficialOverride: new Set(['h100_vllm']),
+      setLocalOfficialOverride,
+      setActiveOverlayHwTypes,
+      runIndexByUrl: { [runUrl]: 0 },
+      unofficialRunInfos: [{ id: '123', branch: 'test-branch', url: runUrl }],
+    };
+
+    const { unmount } = mountChart({
+      data: officialPoints,
+      chartDefinition: {
+        chartType: 'interactivity',
+        y_roofline: 'upper_right',
+      } as unknown as ChartDefinition,
+      overlayData: {
+        data: overlayPoints,
+        hardwareConfig: HARDWARE_CONFIG,
+      } as unknown as Parameters<typeof ScatterGraph>[0]['overlayData'],
+    });
+
+    expect(setLocalOfficialOverride).toHaveBeenCalledWith(new Set(['h100_trt']));
+    expect(setActiveOverlayHwTypes).toHaveBeenCalledWith(new Set(['b200_trt']));
+    unmount();
+  });
+
+  it('falls back to the full official and overlay scopes when no best series is scoreable', () => {
+    const setLocalOfficialOverride = vi.fn();
+    const setActiveOverlayHwTypes = vi.fn();
+    const officialPoints = [
+      point('h100_vllm', 'fp8', 0, 10, 1),
+      point('h100_trt', 'fp8', 0, 20, 1),
+    ];
+    const runUrl = 'https://github.com/o/r/actions/runs/123';
+    const overlayPoints = [
+      point('b200_vllm', 'fp8', 0, 5, 1),
+      point('b200_trt', 'fp8', 0, 15, 1),
+    ].map((entry) => ({ ...entry, run_url: runUrl }));
+
+    inferenceState.current = {
+      ...baseInferenceState(),
+      activeHwTypes: new Set(['h100_vllm']),
+      hwTypesWithData: new Set(['h100_vllm', 'h100_trt']),
+      bestPerSku: true,
+      setBestPerSku: noop,
+      selectedYAxisMetric: 'y',
+    };
+    overlayState.current = {
+      ...baseOverlayState(),
+      isUnofficialRun: true,
+      activeOverlayHwTypes: new Set(['b200_vllm']),
+      allOverlayHwTypes: new Set(['b200_vllm', 'b200_trt']),
+      localOfficialOverride: new Set(['h100_vllm']),
+      setLocalOfficialOverride,
+      setActiveOverlayHwTypes,
+      runIndexByUrl: { [runUrl]: 0 },
+      unofficialRunInfos: [{ id: '123', branch: 'test-branch', url: runUrl }],
+    };
+
+    const { unmount } = mountChart({
+      data: officialPoints,
+      chartDefinition: {
+        chartType: 'interactivity',
+        y_roofline: 'upper_right',
+      } as unknown as ChartDefinition,
+      overlayData: {
+        data: overlayPoints,
+        hardwareConfig: HARDWARE_CONFIG,
+      } as unknown as Parameters<typeof ScatterGraph>[0]['overlayData'],
+    });
+
+    expect(setLocalOfficialOverride).toHaveBeenCalledWith(new Set(['h100_vllm', 'h100_trt']));
+    expect(setActiveOverlayHwTypes).toHaveBeenCalledWith(new Set(['b200_vllm', 'b200_trt']));
+    unmount();
+  });
+
+  it('disables Best per SKU for overlay edits without applying a context selection', () => {
+    const setBestPerSku = vi.fn();
+    const runUrl = 'https://github.com/o/r/actions/runs/123';
+    const overlayPoints = [
+      { ...point('h100', 'fp8', 30, 300, 2), run_url: runUrl },
+      { ...point('h100', 'fp8', 35, 350, 4), run_url: runUrl },
+    ];
+    inferenceState.current = {
+      ...baseInferenceState(),
+      bestPerSku: true,
+      setBestPerSku,
+    };
+    overlayState.current = {
+      ...baseOverlayState(),
+      isUnofficialRun: true,
+      activeOverlayHwTypes: new Set(['h100']),
+      allOverlayHwTypes: new Set(['h100']),
+      runIndexByUrl: { [runUrl]: 0 },
+      unofficialRunInfos: [{ id: '123', branch: 'test-branch', url: runUrl }],
+    };
+
+    const { unmount } = mountChart({
+      overlayData: {
+        data: overlayPoints,
+        hardwareConfig: HARDWARE_CONFIG,
+      } as unknown as Parameters<typeof ScatterGraph>[0]['overlayData'],
+    });
+    const officialItem = legendState.current!.legendItems.find(
+      (item: { hw: string }) => item.hw === 'h100',
+    );
+
+    act(() => officialItem.onClick());
+    expect(setBestPerSku).toHaveBeenLastCalledWith(false, { applySelection: false });
+
+    act(() => legendState.current!.onItemRemove('h100'));
+    expect(setBestPerSku).toHaveBeenLastCalledWith(false, { applySelection: false });
     unmount();
   });
 

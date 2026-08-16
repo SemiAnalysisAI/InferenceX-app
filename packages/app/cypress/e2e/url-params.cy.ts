@@ -43,6 +43,71 @@ describe('URL Parameter Persistence', () => {
       cy.get('.sidebar-legend').first().should('be.visible');
       cy.get('.sidebar-legend').first().should('not.have.class', 'bg-accent');
     });
+
+    it('preserves a legend subset when chart metrics change', () => {
+      visitWithDismissedModal('/inference');
+
+      cy.get('[data-testid="chart-legend"] input[type="checkbox"]:checked').should(
+        'have.length.greaterThan',
+        1,
+      );
+      cy.get('[data-testid="chart-legend"] [role="button"][aria-label^="Hide "]')
+        .first()
+        .closest('li')
+        .find('input[type="checkbox"]')
+        .invoke('attr', 'id')
+        .then((hiddenInputId) => {
+          expect(hiddenInputId).to.be.a('string');
+          expect(hiddenInputId).to.have.length.greaterThan(0);
+          const selector = `#${CSS.escape(hiddenInputId!)}`;
+
+          cy.get(selector).parent().find('[role="button"][aria-label^="Hide "]').click();
+          cy.get(selector).should('not.be.checked');
+
+          cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+          cy.contains('[role="option"]', 'All-in Provisioned Joules per Total Token').click({
+            force: true,
+          });
+          cy.get(selector).should('not.be.checked');
+
+          cy.get('[data-testid="x-axis-mode-ttft"]').click();
+          cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
+          cy.get(selector).should('not.be.checked');
+        });
+    });
+
+    it('refreshes the automatic Best per SKU selection when the metric changes', () => {
+      visitWithDismissedModal('/inference');
+
+      cy.get('[data-testid="scatter-best-per-sku"]')
+        .should('have.attr', 'data-state', 'checked')
+        .then(() =>
+          cy
+            .get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked')
+            .then(($inputs) => [...$inputs].map((input) => input.id).toSorted()),
+        )
+        .then((before) => {
+          cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+          cy.contains(
+            '[role="option"]',
+            'Cost per Million Total Tokens (Owning - Hyperscaler)',
+          ).click({ force: true });
+
+          cy.get('[data-testid="scatter-best-per-sku"]').should(
+            'have.attr',
+            'data-state',
+            'checked',
+          );
+          cy.get('[data-testid="x-axis-mode-ttft"]').click();
+          cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
+          cy.get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked').then(
+            ($inputs) => {
+              const after = [...$inputs].map((input) => input.id).toSorted();
+              expect(after, 'metric-specific Best per SKU winners').not.to.deep.equal(before);
+            },
+          );
+        });
+    });
   });
 
   describe('Inference Y-axis metric', () => {
