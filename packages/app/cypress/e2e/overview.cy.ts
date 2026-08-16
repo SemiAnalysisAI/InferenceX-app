@@ -159,7 +159,7 @@ describe('Overview page', () => {
 
     cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
     cy.wait('@overviewJson');
-    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75');
+    cy.location('search').should('eq', '?tier=75');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.get('[data-testid="overview-tier-switcher"]').contains('a', '50').click();
@@ -175,17 +175,17 @@ describe('Overview page', () => {
       .find('[data-overview-engine-scope="all"]')
       .click();
     cy.wait('@overviewJson');
-    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+    cy.location('search').should('eq', '?tier=75&engine=all');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.get('[data-overview-comparison="30d"]').click();
     cy.wait('@overviewJson');
-    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all&compare=30d');
+    cy.location('search').should('eq', '?tier=75&engine=all&compare=30d');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.go('back');
     cy.get('[data-overview-comparison="hardware"]').should('have.attr', 'aria-current', 'true');
-    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+    cy.location('search').should('eq', '?tier=75&engine=all');
     cy.then(() => {
       expect(rscRequests, 'selector and popstate RSC requests').to.equal(0);
     });
@@ -233,8 +233,11 @@ describe('Overview page', () => {
       .find('[data-overview-engine-scope="all"]')
       .click();
 
-    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+    cy.location('search').should('eq', '?tier=75&engine=all');
     // The rendered state, not just the URL: the losing response must not win.
+    // Keeps its explicit timeout because it waits on the real API through
+    // `request.continue` plus the delay above — unlike the URL assertions
+    // around it, which the click resolves synchronously.
     cy.get('[data-testid="overview-tier-switcher"] [aria-current="page"]', {
       timeout: 15_000,
     }).should('have.text', '75');
@@ -254,9 +257,7 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
     cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('exist');
     cy.wait('@overviewJson');
-    cy.get('[data-testid="overview-page"] [aria-busy="true"]', { timeout: 15_000 }).should(
-      'not.exist',
-    );
+    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('not.exist');
   });
 
   it('rewrites one history entry when the overview request fails', () => {
@@ -269,7 +270,7 @@ describe('Overview page', () => {
       const before = win.history.length;
       cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
       cy.wait('@overviewJsonFailure');
-      cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75');
+      cy.location('search').should('eq', '?tier=75');
       // A plain `.should` would be satisfied by the transient extra entry.
       cy.window().then((after) => {
         expect(after.history.length - before, 'one entry for one selection').to.equal(1);
@@ -277,9 +278,9 @@ describe('Overview page', () => {
     });
 
     cy.go('back');
-    cy.location('search', { timeout: 15_000 }).should('eq', '');
+    cy.location('search').should('eq', '');
     cy.go('back');
-    cy.location('pathname', { timeout: 15_000 }).should('eq', '/inference');
+    cy.location('pathname').should('eq', '/inference');
   });
 
   it('warms a hovered option and derives the reference without a request', () => {
@@ -305,7 +306,7 @@ describe('Overview page', () => {
 
     cy.get('[data-testid="overview-reference-select"]').click();
     cy.get('[data-overview-reference="b300"]').click();
-    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=100&ref=b300');
+    cy.location('search').should('eq', '?tier=100&ref=b300');
     cy.get('[data-overview-comparison="hardware"]').should('contain.text', 'vs B300');
     cy.then(() => {
       expect(jsonRequests, 'a reference change is derived, not fetched').to.equal(1);
@@ -317,6 +318,8 @@ describe('Overview page', () => {
     cy.visit('/overview');
 
     cy.get('[data-overview-comparison="30d"]').click();
+    // Explicit timeout retained: this waits on a real /api/v1/overview response,
+    // not a client-side URL change.
     cy.get('[data-overview-comparison="30d"]', { timeout: 15_000 }).should(
       'have.attr',
       'aria-current',
@@ -338,7 +341,8 @@ describe('Overview page', () => {
     desktopModel('gpt-oss-120b')
       .find('[data-testid="overview-model-category-badge"]')
       .should('have.attr', 'data-category', 'deprecated')
-      .and('contain.text', 'Deprecated');
+      .and('contain.text', 'Deprecated')
+      .and('contain.text', 'Model is no longer actively benchmarked.');
     desktopModel('DeepSeek-R1-0528')
       .find('[data-testid="overview-model-category-badge"]')
       .should('have.attr', 'data-category', 'maintenance');
@@ -375,7 +379,8 @@ describe('Overview page', () => {
       .should('have.attr', 'aria-label', '隐藏已弃用与维护模式模型');
     desktopModel('gpt-oss-120b')
       .find('[data-testid="overview-model-category-badge"]')
-      .should('contain.text', '已弃用');
+      .should('contain.text', '已弃用')
+      .and('contain.text', '该模型已不再进行活跃基准测试。');
   });
 
   it('uses a selectable hardware reference and preserves it across overview controls', () => {
@@ -491,7 +496,7 @@ describe('Overview page', () => {
 
     cy.get('[data-testid="overview-history-window-select"]').click();
     cy.get('[data-overview-window="7d"]').click();
-    cy.location('search', { timeout: 15_000 }).should('eq', '?compare=7d');
+    cy.location('search').should('eq', '?compare=7d');
     cy.get('[data-overview-comparison="7d"]').should('have.attr', 'aria-current', 'true');
     cy.contains(
       'Current cost and change versus the latest validated platform result 7–14 days earlier.',
@@ -499,7 +504,7 @@ describe('Overview page', () => {
 
     cy.get('[data-testid="overview-history-window-select"]').click();
     cy.get('[data-overview-window="90d"]').click();
-    cy.location('search', { timeout: 15_000 }).should('eq', '?compare=90d');
+    cy.location('search').should('eq', '?compare=90d');
     cy.contains(
       'Current cost and change versus the latest validated platform result 90–180 days earlier.',
     ).should('exist');
