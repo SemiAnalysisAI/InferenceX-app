@@ -679,6 +679,10 @@ function ModelName({ model, strings }: { model: OverviewModelSummary; strings: O
             className="ml-1.5 inline-block rounded-sm border border-border/60 px-1 py-px align-middle text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
           >
             {badge}
+            {/* `title` reaches a hovering mouse and nothing else. The badge is
+                an abbreviation, so without this the reason it exists is
+                unavailable to touch, keyboard and screen-reader users. */}
+            <span className="sr-only">{strings.categoryBadgeTitle}</span>
           </span>
         )}
       </h2>
