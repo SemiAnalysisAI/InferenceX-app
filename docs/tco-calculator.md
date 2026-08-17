@@ -785,6 +785,28 @@ small change, but it lives in a Python-synced function (`iso_interactivity.py`)
 and would move published cost numbers, so it needs its own change. Until then the
 price tooltip states the direction of the divergence.
 
+### Margin per megawatt
+
+A fourth y-axis metric, `marginPerMw` (`c_ly=marginPerMw`), plotting the same
+`revenue − TCO` in `$/MW/day`. Two things about it are worth being explicit,
+because a reader could reasonably expect more of it than it delivers:
+
+- **It re-ranks almost nothing.** Every chip in this section is sized to the same
+  power budget, so per-MW margin is `margin` divided by very nearly the same
+  number for every series. The only spread comes from how completely each chip's
+  power density fills the budget. What the metric buys is a figure that does not
+  move when the budget does — the unit a power-constrained plan is written in —
+  not a new ordering.
+- **The denominator is provisioned power, not the budget.** `chips × kW/chip ÷ 1000`,
+  because chip counts are whole and the remainder of the budget is stranded. Using
+  the typed budget would credit each chip with power it never provisioned. An
+  unusable figure (no registered power, a budget too small for one chip) leaves the
+  metric at zero rather than dividing by it.
+
+Because the rescale is by a positive constant, zero is still break-even — hence
+`isBreakEvenAnchored`, which is what the 2D chart's dashed rule and the 3D
+surface's plane test rather than comparing against `'margin'` directly.
+
 ### Agentic traces, and cached input tokens
 
 The section refused Agentic Traces until it was shown that the refusal's stated
@@ -863,7 +885,7 @@ exclusion in its own note rather than leaving a silent gap.
 
 `c_price`, `c_life` (horizon), `c_ramp`, `c_cache` (cached-input price, % — agentic
 only), `c_mtbi`, `c_rec`, `c_ly` (y-axis metric —
-`margin` | `revenue` | `cumulativeRevenue`, parsed against that allowlist so a stale
+`margin` | `marginPerMw` | `revenue` | `cumulativeRevenue`, parsed against that allowlist so a stale
 or hand-edited link falls back to `margin` rather than seeding an unknown metric).
 The first two default to
 `''` in `PARAM_DEFAULTS` because their real defaults are derived, not constant — see

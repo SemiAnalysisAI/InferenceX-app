@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   availabilityFromInterrupts,
   billableTokPerSec,
+  isBreakEvenAnchored,
+  metricValue,
   breakEvenPricePerMTok,
   computeLifecycle,
   valueAtMonth,
@@ -13,6 +15,9 @@ import {
 
 const HOURS_PER_DAY = 24;
 const DAYS_PER_MONTH = 365.25 / 12;
+
+/** A 10 MW fleet, so $/MW/day is the daily margin over ten. */
+const PROVISIONED_MW = 10;
 
 /** Hand-computed revenue $/day at the fixture's price and availability. */
 const rev = (tput: number) => ((tput * 86_400) / 1e6) * 10 * (24 / 24.5);
@@ -59,6 +64,7 @@ describe('breakEvenPricePerMTok', () => {
     const series = computeLifecycle({
       steps: [{ month: 0, billableTokPerSec: tokPerSec }],
       costPerHour,
+      provisionedMw: PROVISIONED_MW,
       horizonMonths: 24,
       assumptions: { ...assumptions, mtbiDays: 0, pricePerMTok: price },
     })!;
@@ -79,6 +85,7 @@ describe('breakEvenPricePerMTok', () => {
     const series = computeLifecycle({
       steps: [{ month: 0, billableTokPerSec: tokPerSec }],
       costPerHour,
+      provisionedMw: PROVISIONED_MW,
       horizonMonths: 24,
       assumptions: { ...assumptions, pricePerMTok: haircut },
     })!;
@@ -90,6 +97,7 @@ describe('breakEvenPricePerMTok', () => {
     const naive = computeLifecycle({
       steps: [{ month: 0, billableTokPerSec: tokPerSec }],
       costPerHour,
+      provisionedMw: PROVISIONED_MW,
       horizonMonths: 24,
       assumptions: { ...assumptions, pricePerMTok: flat },
     })!;
@@ -116,7 +124,13 @@ describe('computeLifecycle', () => {
     { month: 3, billableTokPerSec: 900_000 },
     { month: 6, billableTokPerSec: 1_600_000 },
   ];
-  const base = { steps, costPerHour, horizonMonths: 24, assumptions };
+  const base = {
+    steps,
+    costPerHour,
+    provisionedMw: PROVISIONED_MW,
+    horizonMonths: 24,
+    assumptions,
+  };
 
   it('holds each config flat until the next one lands', () => {
     const series = computeLifecycle(base)!;
@@ -323,6 +337,7 @@ describe('computeLifecycle', () => {
       const series = computeLifecycle({
         steps: [{ month: 0, billableTokPerSec: 1_600_000 }],
         costPerHour,
+        provisionedMw: PROVISIONED_MW,
         horizonMonths: 6,
         assumptions: { ...assumptions, rampMonths: 6 },
       })!;
@@ -340,6 +355,7 @@ describe('computeLifecycle', () => {
           { month: 3, billableTokPerSec: 1_600_000 },
         ],
         costPerHour,
+        provisionedMw: PROVISIONED_MW,
         horizonMonths: 24,
         assumptions: { ...assumptions, rampMonths: 12 },
       })!;
@@ -361,6 +377,7 @@ describe('computeLifecycle', () => {
           { month: 6, billableTokPerSec: 1_600_000 },
         ],
         costPerHour,
+        provisionedMw: PROVISIONED_MW,
         horizonMonths: 24,
         assumptions: { ...assumptions, rampMonths: 3 },
       })!;
@@ -463,6 +480,7 @@ const point = (month: number, margin: number): LifecyclePoint => ({
   revenue: margin + 100,
   cost: 100,
   margin,
+  marginPerMw: margin / PROVISIONED_MW,
   cumulative: margin * 10,
   cumulativeRevenue: (margin + 100) * 10,
   isStep: false,
@@ -524,6 +542,7 @@ describe('ramp sampling is anchored, not proportional', () => {
     const alone = computeLifecycle({
       steps: [{ month: 0, billableTokPerSec: 1000 }],
       costPerHour: 100,
+      provisionedMw: PROVISIONED_MW,
       horizonMonths: 12,
       assumptions: ramped,
     })!;
@@ -535,6 +554,7 @@ describe('ramp sampling is anchored, not proportional', () => {
         { month: 1.5, billableTokPerSec: 3000 },
       ],
       costPerHour: 100,
+      provisionedMw: PROVISIONED_MW,
       horizonMonths: 12,
       assumptions: ramped,
     })!;
@@ -561,6 +581,7 @@ describe('ramp sampling is anchored, not proportional', () => {
     const series = computeLifecycle({
       steps: [{ month: 0, billableTokPerSec: 1000 }],
       costPerHour: 100,
+      provisionedMw: PROVISIONED_MW,
       horizonMonths: 12,
       assumptions: ramped,
     })!;
@@ -620,5 +641,65 @@ describe('billableTokPerSec', () => {
   it('ignores an unusable input rate instead of producing NaN', () => {
     expect(billableTokPerSec(total, Number.NaN, 0.92, 0.1, 'total')).toBe(total);
     expect(billableTokPerSec(total, 0, 0.92, 0.1, 'total')).toBe(total);
+  });
+});
+
+describe('margin per megawatt', () => {
+  const costPerHour = 10_000;
+  const steps: ThroughputStep[] = [
+    { month: 0, billableTokPerSec: 400_000 },
+    { month: 6, billableTokPerSec: 1_600_000 },
+  ];
+  const base = {
+    steps,
+    costPerHour,
+    provisionedMw: PROVISIONED_MW,
+    horizonMonths: 24,
+    assumptions,
+  };
+
+  it('is the daily margin divided by the power actually provisioned', () => {
+    const series = computeLifecycle(base)!;
+    for (const p of series.points) {
+      expect(p.marginPerMw).toBeCloseTo(p.margin / PROVISIONED_MW, 9);
+    }
+  });
+
+  it('divides by provisioned power, so a denser fleet on the same budget reads higher', () => {
+    // Two fleets earning the same $/day, one occupying half the power. Per MW
+    // they are a factor of two apart even though `margin` cannot tell them apart.
+    const wide = computeLifecycle(base)!;
+    const dense = computeLifecycle({ ...base, provisionedMw: PROVISIONED_MW / 2 })!;
+    expect(dense.points.at(-1)!.margin).toBeCloseTo(wide.points.at(-1)!.margin, 9);
+    expect(dense.points.at(-1)!.marginPerMw).toBeCloseTo(wide.points.at(-1)!.marginPerMw * 2, 9);
+  });
+
+  it('crosses zero at the same instant margin does', () => {
+    // The rescale is by a positive constant, which is what licenses the chart's
+    // break-even rule and the surface's plane to stay at y = 0 on this metric.
+    const series = computeLifecycle(base)!;
+    for (const p of series.points) {
+      expect(Math.sign(p.marginPerMw)).toBe(Math.sign(p.margin));
+    }
+    expect(isBreakEvenAnchored('marginPerMw')).toBe(true);
+    expect(isBreakEvenAnchored('revenue')).toBe(false);
+    expect(isBreakEvenAnchored('cumulativeRevenue')).toBe(false);
+  });
+
+  it('stays at zero rather than dividing by an unusable power figure', () => {
+    for (const provisionedMw of [0, -1, Number.NaN]) {
+      const series = computeLifecycle({ ...base, provisionedMw })!;
+      for (const p of series.points) {
+        expect(Number.isFinite(p.marginPerMw)).toBe(true);
+        expect(p.marginPerMw).toBe(0);
+      }
+    }
+  });
+
+  it('is selected by metricValue', () => {
+    const series = computeLifecycle(base)!;
+    const p = series.points.at(-1)!;
+    expect(metricValue(p, 'marginPerMw')).toBe(p.marginPerMw);
+    expect(metricValue(p, 'margin')).toBe(p.margin);
   });
 });

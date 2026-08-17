@@ -14,6 +14,7 @@ import {
 import { escapeHtml } from '@/lib/utils';
 
 import {
+  isBreakEvenAnchored,
   metricValue,
   MS_PER_MONTH,
   valueAtMonth,
@@ -261,7 +262,7 @@ const FleetLifecycleChart = React.memo(
         // Zero is break-even only for margin. On a revenue axis it is just the
         // bottom of the scale, and labelling it "break-even" would be a lie: each
         // chip breaks even at its own cost line, not at zero revenue.
-        if (latest.current.metric !== 'margin') return;
+        if (!isBreakEvenAnchored(latest.current.metric)) return;
         if (!Number.isFinite(y)) return;
 
         // Lowered explicitly: `renderLines` keeps its paths in place across

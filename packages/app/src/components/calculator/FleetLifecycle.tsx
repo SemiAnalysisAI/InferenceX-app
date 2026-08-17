@@ -145,9 +145,11 @@ const STRINGS = {
     metricTooltip:
       'What to plot. Margin is the per-day revenue minus the flat fleet cost, so the break-even rule shows which side of it a fleet is on. Revenue is the same rate with the cost term dropped, which makes rollouts easier to compare across chips of very different cost — but a chip being higher no longer means it is more profitable. Cumulative Revenue is the running total taken in since launch, not a rate; it compounds that caveat, because the largest area under a revenue curve may still never have covered its cost.',
     metricMargin: 'Margin',
+    metricMarginPerMw: 'Margin/MW',
     metricRevenue: 'Revenue',
     metricCumulativeRevenue: 'Cum. Revenue',
     chartY: 'Margin ($/day)',
+    chartYMarginPerMw: 'Margin ($/MW/day)',
     chartYRevenue: 'Revenue ($/day)',
     chartYCumulativeRevenue: 'Cumulative Revenue ($)',
     chartBreakEven: 'break-even',
@@ -239,9 +241,11 @@ const STRINGS = {
     metricTooltip:
       '选择绘制的内容。利润为日均收入减去水平的集群成本，因此保本线可显示集群位于其哪一侧。收入为同一日均指标去掉成本项，便于在成本差异很大的 Chip 之间比较推广曲线——但此时位置更高并不代表更赚钱。累计收入是自上线以来的累计总额，而非日均指标；它进一步放大了上述注意事项——收入曲线下面积最大的 Chip 仍可能从未收回成本。',
     metricMargin: '利润',
+    metricMarginPerMw: '每 MW 利润',
     metricRevenue: '收入',
     metricCumulativeRevenue: '累计收入',
     chartY: '利润 ($/天)',
+    chartYMarginPerMw: '每 MW 利润 ($/MW/天)',
     chartYRevenue: '收入 ($/天)',
     chartYCumulativeRevenue: '累计收入 ($)',
     chartBreakEven: '保本线',
@@ -415,7 +419,9 @@ export default function FleetLifecycle({
     const seeded = readUrlParams().c_ly;
     // Allowlisted rather than cast: the param is user-editable, and an unknown
     // value must fall back to the default instead of reaching `metricValue`.
-    return seeded === 'revenue' || seeded === 'cumulativeRevenue' ? seeded : 'margin';
+    return seeded === 'revenue' || seeded === 'cumulativeRevenue' || seeded === 'marginPerMw'
+      ? seeded
+      : 'margin';
   });
   const [priceInput, setPriceInput] = useState(() => readUrlParams().c_price ?? '');
   // A price arriving from the URL is the user's, so it must not be overwritten
@@ -499,6 +505,9 @@ export default function FleetLifecycle({
       const specs = getGpuSpecs(progression.baseGpu);
       const steps: ThroughputStep[] = [];
       let costPerHour: number | null = null;
+      // Power the fleet actually occupies, not the budget: chip counts are whole,
+      // so the last fraction of a chip's worth of the budget is never provisioned.
+      let provisionedMw: number | null = null;
 
       for (const step of progression.steps) {
         const stats = computeFleetStats({
@@ -514,6 +523,7 @@ export default function FleetLifecycle({
         });
         if (!stats) continue;
         costPerHour ??= stats.costPerHour;
+        provisionedMw ??= (stats.gpus * specs.power) / 1000;
         steps.push({
           month: (Date.parse(`${step.date}T00:00:00Z`) - anchorMs) / MS_PER_MONTH,
           // Sized on the physical rate, billed on the discounted one. `gpus` is
@@ -531,11 +541,11 @@ export default function FleetLifecycle({
         });
       }
 
-      if (steps.length === 0 || costPerHour === null) {
+      if (steps.length === 0 || costPerHour === null || provisionedMw === null) {
         absent.push(progression.baseGpu);
         return [];
       }
-      return [{ progression, steps, costPerHour }];
+      return [{ progression, steps, costPerHour, provisionedMw }];
     });
     return { fleets: sized, unplottable: absent };
   }, [mw, anchorMs, visibleProgressions, costProvider, costType, targetValue, cacheReadRatio]);
@@ -586,8 +596,14 @@ export default function FleetLifecycle({
 
   const rows = useMemo<LifecycleRow[]>(
     () =>
-      fleets.flatMap(({ progression, steps, costPerHour }) => {
-        const series = computeLifecycle({ steps, costPerHour, horizonMonths, assumptions });
+      fleets.flatMap(({ progression, steps, costPerHour, provisionedMw }) => {
+        const series = computeLifecycle({
+          steps,
+          costPerHour,
+          provisionedMw,
+          horizonMonths,
+          assumptions,
+        });
         if (!series) return [];
         const latest = progression.steps.at(-1)!;
         const latestHwKey = latest.result.hwKey ?? progression.baseGpu;
@@ -939,6 +955,11 @@ export default function FleetLifecycle({
               options={[
                 { value: 'margin', label: t.metricMargin, testId: 'calc-lifecycle-metric-margin' },
                 {
+                  value: 'marginPerMw',
+                  label: t.metricMarginPerMw,
+                  testId: 'calc-lifecycle-metric-margin-per-mw',
+                },
+                {
                   value: 'revenue',
                   label: t.metricRevenue,
                   testId: 'calc-lifecycle-metric-revenue',
@@ -985,7 +1006,9 @@ export default function FleetLifecycle({
                   ? t.chartYRevenue
                   : yMetric === 'cumulativeRevenue'
                     ? t.chartYCumulativeRevenue
-                    : t.chartY
+                    : yMetric === 'marginPerMw'
+                      ? t.chartYMarginPerMw
+                      : t.chartY
               }
               breakEvenLabel={t.chartBreakEven}
               instructions={t.chartInstructions}

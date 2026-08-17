@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 import type { SurfaceChip, SurfaceGrid } from '../interactivity-surface';
+import { isBreakEvenAnchored } from '../lifecycle';
 
 import { buildIsolineArrays } from './buildIsoline';
 import { buildSurfaceArrays, cellFromFace } from './buildSurfaceGeometry';
@@ -287,7 +288,7 @@ function Chrome({
         read as a break-even line the reader could compare against, which is
         exactly the wrong inference to invite.
       */}
-      {grid.metric === 'margin' && (
+      {isBreakEvenAnchored(grid.metric) && (
         <mesh position={[0, scales.yOf(0), 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
           <planeGeometry args={[BOX.w, BOX.d]} />
           <meshBasicMaterial

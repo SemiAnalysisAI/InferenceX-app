@@ -149,6 +149,17 @@ export interface LifecycleInputs {
   steps: readonly ThroughputStep[];
   /** Fleet TCO for the selected tier ($/hr). Constant: configs don't change it. */
   costPerHour: number;
+  /**
+   * Facility power this fleet actually occupies, MW — `chips x kW/chip / 1000`,
+   * **not** the budget the user typed. Chip counts are whole, so a fleet fills
+   * its budget to within one chip and the remainder is stranded power nobody is
+   * paying for capacity in. Dividing by the nominal budget would credit each
+   * chip with power it never provisioned.
+   *
+   * Only used to express the per-MW metric. Zero or negative leaves that metric
+   * at zero rather than dividing by it.
+   */
+  provisionedMw: number;
   /** End of the modelled window, months since the anchor. */
   horizonMonths: number;
   assumptions: LifecycleAssumptions;
@@ -163,6 +174,17 @@ export interface LifecyclePoint {
   cost: number;
   /** revenue − cost, $/day. */
   margin: number;
+  /**
+   * The same margin per megawatt provisioned, $/MW/day.
+   *
+   * Worth being clear about what this does and does not add. Every chip in the
+   * section is sized to the same power budget, so this is very nearly `margin`
+   * divided by a constant and it re-ranks almost nothing — the only spread comes
+   * from how completely each chip's power density fills the budget. What it buys
+   * is a figure that does not move when the budget does, which is the unit a
+   * power-constrained plan is actually written in.
+   */
+  marginPerMw: number;
   /** Cumulative margin from the first step to here, $. */
   cumulative: number;
   /**
@@ -242,17 +264,27 @@ export interface LifecycleSeries {
  * `isCumulative` rather than assume $/day, and anything anchored to zero as
  * break-even (the 2D rule, the 3D plane) applies to `margin` alone.
  */
-export type LifecycleMetric = 'margin' | 'revenue' | 'cumulativeRevenue';
+export type LifecycleMetric = 'margin' | 'marginPerMw' | 'revenue' | 'cumulativeRevenue';
 
 /** True when the metric is a running total in $ rather than a rate in $/day. */
 export function isCumulative(metric: LifecycleMetric): boolean {
   return metric === 'cumulativeRevenue';
 }
 
+/**
+ * True when zero on this metric means break-even, so a view may draw a rule (2D)
+ * or a plane (3D) there. Per-MW margin is still revenue − cost, only rescaled by
+ * a positive number, so its zero crossing is the same instant as `margin`'s.
+ */
+export function isBreakEvenAnchored(metric: LifecycleMetric): boolean {
+  return metric === 'margin' || metric === 'marginPerMw';
+}
+
 /** The quantity a metric names, for reading off a sampled point. */
 export function metricValue(point: LifecyclePoint, metric: LifecycleMetric): number {
   if (metric === 'revenue') return point.revenue;
   if (metric === 'cumulativeRevenue') return point.cumulativeRevenue;
+  if (metric === 'marginPerMw') return point.marginPerMw;
   return point.margin;
 }
 
@@ -365,7 +397,10 @@ export function rampFractionAt(month: number, startMonth: number, rampMonths: nu
  * horizon that ends before the first measured config.
  */
 export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | null {
-  const { steps, costPerHour, horizonMonths, assumptions } = inputs;
+  const { steps, costPerHour, provisionedMw, horizonMonths, assumptions } = inputs;
+  // Guarded rather than trusted: an unregistered chip or a budget too small for
+  // one chip must leave the per-MW metric flat at zero, not NaN or Infinity.
+  const perMw = Number.isFinite(provisionedMw) && provisionedMw > 0 ? 1 / provisionedMw : 0;
   if (steps.length === 0 || !Number.isFinite(costPerHour)) return null;
 
   const sorted = [...steps]
@@ -532,6 +567,7 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
       revenue,
       cost,
       margin: revenue - cost,
+      marginPerMw: (revenue - cost) * perMw,
       cumulative,
       cumulativeRevenue,
       isStep: here.isStep,

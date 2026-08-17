@@ -640,6 +640,7 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
       // than a second list that happens to agree.
       const onTimeline = reads.map(() => false);
       let costPerHour: number | null = null;
+      let provisionedMw: number | null = null;
       for (const [i, read] of reads.entries()) {
         if (!read) continue;
         const stats = computeFleetStats({
@@ -654,6 +655,9 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
         // Chip count and $/chip/hr come from the base GPU, so cost is flat across
         // both axes — the same invariant the 2D section relies on.
         costPerHour ??= stats.costPerHour;
+        // Whole chips, so the fleet occupies slightly less than the budget — the
+        // 2D section divides by the same actually-provisioned figure.
+        provisionedMw ??= (stats.gpus * specs.powerKwPerGpu) / 1000;
         onTimeline[i] = true;
         // Sized on the physical rate, billed on the discounted one — `gpus` is
         // whole chips either way, so this is exactly `stats.fleetTokPerSec` when
@@ -671,11 +675,12 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
             ),
         });
       }
-      if (throughputSteps.length === 0 || costPerHour === null) continue;
+      if (throughputSteps.length === 0 || costPerHour === null || provisionedMw === null) continue;
 
       const series = computeLifecycle({
         steps: throughputSteps,
         costPerHour,
+        provisionedMw,
         horizonMonths,
         assumptions,
       });

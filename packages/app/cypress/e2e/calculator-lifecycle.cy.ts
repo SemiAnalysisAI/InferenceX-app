@@ -348,6 +348,31 @@ describe('Calculator — Fleet Lifecycle', () => {
     cy.get('[data-testid="calc-lifecycle-metric-margin"]').click();
     chartText().should('contain', 'Margin ($/day)');
     cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should('exist');
+
+    // Margin per MW is the same quantity in the unit a power-constrained plan is
+    // written in, so it is a positive rescale: zero is still break-even and the
+    // rule stays. The axis ticks must differ from the $/day ones captured just
+    // above — the fleet is several MW, so a metric that was relabelled but never
+    // divided would reproduce them exactly. Comparing against any other metric's
+    // axis would pass without the division ever happening.
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .y-axis')
+      .invoke('text')
+      .then((perDay) => {
+        cy.get('[data-testid="calc-lifecycle-metric-margin-per-mw"]').click();
+        chartText().should('contain', 'Margin ($/MW/day)');
+        cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should(
+          'exist',
+        );
+        cy.get('[data-testid="calculator-lifecycle-chart-svg"] .y-axis')
+          .invoke('text')
+          .should((perMw) => {
+            expect(perMw, 'the per-MW axis is not the $/day axis relabelled').to.not.equal(perDay);
+          });
+      });
+
+    cy.get('[data-testid="calc-lifecycle-metric-margin"]').click();
+    chartText().should('contain', 'Margin ($/day)');
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should('exist');
   });
 
   it('a longer horizon accumulates more of whatever the daily margin is', () => {
