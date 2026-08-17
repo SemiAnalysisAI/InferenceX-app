@@ -76,7 +76,7 @@ const STRINGS = {
     costCapNoGpus: 'No chips are visible to evaluate — enable hardware in the chart legend.',
     note: 'Note:',
     disaggFleet:
-      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report throughput per decode chip or per prefill chip, rather than per total chip count — fleet sizes and costs for those configs are not an apples-to-apples comparison with aggregated configs.',
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall. Chip counts, $/hr and $/mo compare directly — they come from the power budget and the TCO model, which do not distinguish the two kinds — and concurrent users is re-based onto chips overall. What does not compare is the fleet-throughput column on the Input and Output token types, which inherits that per-pool basis and reads high by a median 2× (up to 18×). On Total it is per chip overall for both kinds.',
     assumptions: (tier: string) =>
       `Assumes 100% utilization at this operating point and owned-datacenter economics: fleet cost = chips × ${tier} $/chip/hr, months = 730 hr. Facility power is all-in per-chip power (host, networking, cooling), not bare TDP.`,
     source: 'Source: ',
@@ -116,7 +116,7 @@ const STRINGS = {
     costCapNoGpus: '当前无可见 Chip 可评估——请在图表图例中启用硬件。',
     note: '注意：',
     disaggFleet:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 Chip 或预填充 Chip 报告吞吐量，而非按 Chip 总数——这类配置的集群规模与成本和聚合配置并非同类比较。',
+      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充 Chip 与解码 Chip 报告，而非按 Chip 总数。Chip 数量、$/hr 与 $/mo 可直接比较——它们来自功率预算与 TCO 模型，二者不区分部署方式——并发用户数亦已改按 Chip 总数计。不可比较的是「输入」与「输出」token 类型下的集群吞吐量列，它沿用了上述按池计的口径，数值中位数偏高 2 倍（最高 18 倍）。在「总计」口径下，两种部署方式均按 Chip 总数计。',
     assumptions: (tier: string) =>
       `假设该操作点下 100% 利用率及自有数据中心经济模型：集群成本 = Chip 数 × ${tier} $/chip/hr，每月按 730 小时计。设施功率为每 Chip 全含功率（主机、网络、散热），非裸 TDP。`,
     source: '来源：',

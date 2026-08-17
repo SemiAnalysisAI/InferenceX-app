@@ -517,10 +517,13 @@ describe('TCO Calculator', () => {
         'contain.text',
         'Disaggregated inference configurations',
       );
-      cy.get('[data-testid="calculator-chart-section"]').should(
-        'contain.text',
-        'throughput per decode chip',
-      );
+      cy.get('[data-testid="calculator-chart-section"]')
+        // The direction is the point of the warning, not the phrasing: on these
+        // token types a disaggregated config reads high. Asserting the old wording
+        // alone let the note be reworded into something that no longer said which
+        // way it was wrong.
+        .should('contain.text', 'per prefill chip and per decode chip')
+        .and('contain.text', 'reads faster per chip than it is');
     });
 
     // A disagg config's input/output cost is attributed to only its prefill or
@@ -541,7 +544,10 @@ describe('TCO Calculator', () => {
         cy.get('body').type('{esc}');
         cy.get('[data-testid="calculator-disagg-cost-note"]')
           .should('be.visible')
-          .and('contain.text', 'cost per decode chip');
+          .and('contain.text', 'per prefill chip and per decode chip')
+          // Cheaper, specifically — the flattering direction is what a reader
+          // comparing costs needs told.
+          .and('contain.text', 'reads cheaper than it is');
       }
 
       cy.get('[data-testid="calc-cost-type-selector"]').click();
@@ -552,10 +558,13 @@ describe('TCO Calculator', () => {
 
     it('shows disaggregated throughput disclaimer for power metric', () => {
       cy.get('[data-testid="calculator-metric-power"]').click();
-      cy.get('[data-testid="calculator-chart-section"]').should(
-        'contain.text',
-        'throughput per decode chip',
-      );
+      cy.get('[data-testid="calculator-chart-section"]')
+        // The direction is the point of the warning, not the phrasing: on these
+        // token types a disaggregated config reads high. Asserting the old wording
+        // alone let the note be reworded into something that no longer said which
+        // way it was wrong.
+        .should('contain.text', 'per prefill chip and per decode chip')
+        .and('contain.text', 'reads faster per chip than it is');
     });
   });
 

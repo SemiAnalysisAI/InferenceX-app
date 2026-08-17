@@ -994,6 +994,35 @@ choice: unofficial runs are not ingested, so `/api/v1/benchmarks/history` cannot
 serve them. Taking AGENTS.md's documented exemption; the section states the
 exclusion in its own note rather than leaving a silent gap.
 
+### What is still not apples-to-apples, and why it was left alone
+
+The bar chart, the cost matrix and Fleet Projection's throughput column still show
+`input_tput_per_gpu` / `output_tput_per_gpu` on their reported per-prefill / per-decode
+basis, and their `$/M tok` with them. On the Input and Output token types a disaggregated
+config therefore reads **faster per chip and cheaper per token than it is** — a median 2×,
+up to 18× on input and 7× on output across run history. Total-token figures are unaffected.
+
+That was a deliberate decision not to move published numbers, taken after establishing
+that the two cannot be fixed independently: **per-token-type cost is not stored data.**
+`interpolateForGPU` recovers the constant `$/chip-hr × 1e6/3600` from the points and
+re-derives cost as `rate ÷ throughput` — verified on all 37 disaggregated sweeps in the
+fixture, where the rate is recovered every time and `cost × throughput` holds to 1e-6 on
+the interpolated result for all three token types. So:
+
+- re-basing the point's `costhi` has no effect, because `costInput` is recomputed from
+  `inputTputValue` downstream;
+- re-basing the divisor instead would break the identity `recoverReciprocalNumerator`
+  licenses, which `maxInteractivityAtCost` depends on — the cost-cap card would answer
+  against a different cost curve than the bars, the one thing its comment says must never
+  happen;
+- and dividing the displayed `$/chip-hr` by the displayed throughput would stop giving the
+  displayed cost, for disaggregated rows only.
+
+Fixing cost alone is therefore not available. The choice is all of it or none of it, and
+the notes now carry the correction instead: which figures are affected (Input and Output,
+never Total), in which direction (flattering), by how much, and that the Fleet Lifecycle
+section next to them is deliberately on a different basis.
+
 ### Chart and table are tabs, with the figure's own header
 
 The section renders as a `<figure>` in the same shape as the bar chart above it and

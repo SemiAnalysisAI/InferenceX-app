@@ -150,9 +150,9 @@ const STRINGS = {
     updated: ' • Updated: ',
     note: 'Note:',
     disaggCost:
-      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) calculate cost per decode chip or per prefill chip, rather than per total chip count. This makes direct cost comparison with aggregated configs not an apples-to-apples comparison.',
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall, and $/M tok is derived from those rates — so on the Input and Output token types a disaggregated config reads cheaper than it is, by a median 2× and up to 18× across run history. Total-token cost is unaffected: it comes from throughput per chip overall, which both kinds report on the same basis. The Fleet Lifecycle section below deliberately differs — it derives its per-token-type figures from that total, so everything there is on one denominator.',
     disaggThroughput:
-      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) calculate throughput per decode chip or per prefill chip, rather than per total chip count. This makes direct throughput comparison with aggregated configs not an apples-to-apples comparison.',
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall — divided by fewer chips, so on the Input and Output token types a disaggregated config reads faster per chip than it is, by a median 2× and up to 18× on input and 7× on output. Total throughput is unaffected: both kinds report it per chip overall. The Fleet Lifecycle section below deliberately differs — it derives its per-token-type figures from that total, so everything there is on one denominator.',
     compMetricThroughput: 'throughput',
     compMetricCost: 'cost efficiency',
     compMetricPower: 'tok/s/MW',
@@ -203,9 +203,9 @@ const STRINGS = {
     updated: ' • 更新于：',
     note: '注意：',
     disaggCost:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 Chip 或预填充 Chip 计算成本，而非按 Chip 总数。因此与聚合配置的直接成本对比并非同类比较。',
+      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充 Chip 与解码 Chip 报告，而非按 Chip 总数，而 $/M tok 由这些速率推导——因此在「输入」与「输出」token 类型下，解耦配置显示的成本低于实际，中位数偏低 2 倍，在运行历史中最高达 18 倍。总计口径的成本不受影响：它来自按 Chip 总数计的吞吐量，两种部署方式在该口径上一致。下方的「集群生命周期」模块与此有意不同——它由该总量推导各 token 类型的数值，因此那里的所有数字都在同一分母上。',
     disaggThroughput:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 Chip 或预填充 Chip 计算吞吐量，而非按 Chip 总数。因此与聚合配置的直接吞吐量对比并非同类比较。',
+      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充 Chip 与解码 Chip 报告，而非按 Chip 总数——由于除以的芯片数更少，在「输入」与「输出」token 类型下，解耦配置显示的每芯片吞吐量高于实际，中位数偏高 2 倍，输入最高达 18 倍、输出最高达 7 倍。总计口径的吞吐量不受影响：两种部署方式均按 Chip 总数报告。下方的「集群生命周期」模块与此有意不同——它由该总量推导各 token 类型的数值，因此那里的所有数字都在同一分母上。',
     compMetricThroughput: '吞吐量',
     compMetricCost: '成本效率',
     compMetricPower: 'tok/s/MW',
