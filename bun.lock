@@ -143,8 +143,6 @@
     "cypress",
   ],
   "overrides": {
-    "@actions/http-client>undici": "6.28.0",
-    "@vercel/blob>undici": "6.28.0",
     "brace-expansion": "5.0.9",
     "dompurify": "3.4.13",
     "fast-uri": "4.1.2",
