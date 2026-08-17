@@ -143,6 +143,8 @@
     "cypress",
   ],
   "overrides": {
+    "@actions/http-client>undici": "6.28.0",
+    "@vercel/blob>undici": "6.28.0",
     "brace-expansion": "5.0.9",
     "dompurify": "3.4.13",
     "fast-uri": "4.1.2",
@@ -151,7 +153,7 @@
     "js-yaml": "3.15.1",
     "jsdom": "30.0.1",
     "nanoid": "3.3.18",
-    "undici": "6.28.0",
+    "undici": "8.10.0",
   },
   "packages": {
     "@actions/core": ["@actions/core@2.0.3", "", { "dependencies": { "@actions/exec": "2.0.0", "@actions/http-client": "3.0.2" } }, "sha512-Od9Thc3T1mQJYddvVPM4QGiLUewdh+3txmDYHHxoNdkqysR1MbCT+rFOtNUxYAz+7+6RIsqipVahY2GJqGPyxA=="],
@@ -2192,7 +2194,7 @@
 
     "typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
-    "undici": ["undici@6.28.0", "", {}, "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="],
+    "undici": ["undici@8.10.0", "", {}, "sha512-HvltHd7avK13QIw/oLe4qoOLyoVSoafqJ2jYOrtMRBkbYT31eiBQ8O0ehRKZiEZCMEyLFQNIADpgCWC5fALvYQ=="],
 
     "undici-types": ["undici-types@8.3.0", "", {}, "sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ=="],
 
