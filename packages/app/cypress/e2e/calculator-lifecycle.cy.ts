@@ -124,6 +124,20 @@ describe('Calculator — Fleet Lifecycle', () => {
     // No cached-input assumption on a fixed sequence: those runs record no cache
     // hits at all, so the control would be a knob that moves nothing.
     cy.get('[data-testid="calc-lifecycle-cache-input"]').should('not.exist');
+    // Both prices are seeded as a pair, output at 4x input — roughly where the
+    // major vendors price. Asserted here, on a page nothing has edited yet: the
+    // spec shares one page across tests, so a later assertion would be reading
+    // whatever ratio an earlier test happened to leave behind.
+    cy.get('[data-testid="calc-lifecycle-price-input"]')
+      .invoke('val')
+      .then((input) => {
+        expect(Number(input)).to.be.greaterThan(0);
+        cy.get('[data-testid="calc-lifecycle-output-price-input"]')
+          .invoke('val')
+          .should((output) => {
+            expect(Number(output)).to.be.closeTo(Number(input) * 4, Number(input) * 0.01);
+          });
+      });
   });
 
   it('every row is traceable to the dated run it came from', () => {
@@ -164,6 +178,42 @@ describe('Calculator — Fleet Lifecycle', () => {
     cy.get('[data-testid="calc-lifecycle-price-input"]')
       .invoke('val')
       .then((val) => expect(Number(val)).to.be.lessThan(50));
+  });
+
+  it('bills the two streams apart — the output price alone moves margin', () => {
+    // On 8k/1k output is a ninth of the tokens, so a blended single price could
+    // not respond to this at all.
+    cy.get('[data-testid="calc-lifecycle-price-input"]').clear().type('10');
+    cy.get('[data-testid="calc-lifecycle-output-price-input"]').clear().type('10');
+    firstRowCell(9)
+      .invoke('text')
+      .then((before) => {
+        cy.get('[data-testid="calc-lifecycle-output-price-input"]').clear().type('500');
+        firstRowCell(9)
+          .invoke('text')
+          .should((after) => {
+            expect(money(after)).to.be.greaterThan(money(before));
+          });
+      });
+  });
+
+  it('resets both prices together, keeping the ratio the user set', () => {
+    // Break-even with two prices is a line, so the reset has to pick a point on
+    // it: the one that preserves the ratio currently in the fields.
+    cy.get('[data-testid="calc-lifecycle-price-input"]').clear().type('10');
+    cy.get('[data-testid="calc-lifecycle-output-price-input"]').clear().type('30');
+    cy.get('[data-testid="calc-lifecycle-price-reset"]').click();
+    cy.get('[data-testid="calc-lifecycle-price-input"]')
+      .invoke('val')
+      .then((input) => {
+        expect(Number(input)).to.be.greaterThan(0);
+        cy.get('[data-testid="calc-lifecycle-output-price-input"]')
+          .invoke('val')
+          .should((output) => {
+            // 3x in, 3x out — not the 4x default, and not one field left behind.
+            expect(Number(output)).to.be.closeTo(Number(input) * 3, Number(input) * 0.01);
+          });
+      });
   });
 
   it('renders the lifecycle chart with one line per visible chip', () => {

@@ -18,7 +18,7 @@ import {
 } from './interactivity-surface';
 import { interpolateForGPU } from './interpolation';
 import { getTpPerMwForType } from './ThroughputBarChart';
-import type { CostType, GPUDataPoint, InterpolatedResult } from './types';
+import type { GPUDataPoint, InterpolatedResult } from './types';
 
 const MODE = 'interactivity_to_throughput' as const;
 const COST_PROVIDER = 'costh' as const;
@@ -346,7 +346,13 @@ describe('slice geometry helpers', () => {
 
 describe('buildSurfaceGrid', () => {
   const anchorMs = Date.parse('2026-01-01T00:00:00Z');
-  const assumptions = { mtbiDays: 0, recoveryHours: 0, pricePerMTok: 40, rampMonths: 0 };
+  const assumptions = {
+    mtbiDays: 0,
+    recoveryHours: 0,
+    inputPricePerMTok: 40,
+    outputPricePerMTok: 40,
+    rampMonths: 0,
+  };
 
   const build = (over: Partial<Parameters<typeof buildSurfaceGrid>[0]> = {}) =>
     buildSurfaceGrid({
@@ -449,7 +455,9 @@ describe('buildSurfaceGrid', () => {
   it('holds cost flat across both axes, so only throughput moves the surface', () => {
     // Cost is chips × $/chip/hr, and neither term depends on interactivity or on
     // which config won — so a chip's cost floor must be identical on every slice.
-    const grid = build({ assumptions: { ...assumptions, pricePerMTok: 0 } })!;
+    const grid = build({
+      assumptions: { ...assumptions, inputPricePerMTok: 0, outputPricePerMTok: 0 },
+    })!;
     const b300 = grid.chips.find((c) => c.key === 'b300')!;
     const values = b300.cells.flat().filter((v): v is number => v !== null);
     expect(values.length).toBeGreaterThan(0);
@@ -558,15 +566,17 @@ describe('buildSurfaceGrid', () => {
       }
     });
 
-    it('makes no such promise for input-token pricing, where the disagg mix shifts', () => {
-      // Same grid, two pricings. For total tokens the read is the frontier's own y
-      // axis and falling is a theorem. For input tokens it is not: this sweep's input
-      // tok/s/chip rises 300 → 550 across its measured range while total falls, so the
-      // surface honestly rises with it. That is measured data, not a config leaking
-      // across slices — the one-config-per-date rule still holds; the priced token mix
-      // is what moves. If this test ever fails because the input grid became monotone,
-      // the caveat in the module header and the docs is stale, not vindicated.
-      const risesAlongZ = (costType: CostType): number => {
+    it('makes no such promise once the two streams are priced apart', () => {
+      // Same grid, two pricings. Priced alike, revenue is proportional to the
+      // frontier's own y axis and falling along z is a theorem. Priced apart it is
+      // not: this sweep's input tok/s/chip rises 300 → 550 across its measured
+      // range while total falls, so a revenue figure that leans on the input
+      // stream honestly rises with it. That is measured data, not a config leaking
+      // across slices — the one-config-per-date rule still holds; the priced token
+      // mix is what moves. If this ever fails because the input-weighted grid
+      // became monotone, the caveat in the module header and the docs is stale,
+      // not vindicated.
+      const risesAlongZ = (inputPricePerMTok: number, outputPricePerMTok: number): number => {
         const grid = buildSurfaceGrid({
           groups: groupHistoryByHwKeyAndDate({
             rows: DISAGG_MIX_ROWS,
@@ -577,11 +587,11 @@ describe('buildSurfaceGrid', () => {
           cacheReadRatio: 1,
           metric: 'revenue',
           costProvider: COST_PROVIDER,
-          costType,
+          costType: COST_TYPE,
           mw: 10,
           anchorMs,
           horizonMonths: 12,
-          assumptions,
+          assumptions: { ...assumptions, inputPricePerMTok, outputPricePerMTok },
           currentZ: 60,
           labelFor: (key) => key.toUpperCase(),
           colorFor: () => '#123456',
@@ -598,8 +608,14 @@ describe('buildSurfaceGrid', () => {
         }
         return rises;
       };
-      expect(risesAlongZ('total')).toBe(0);
-      expect(risesAlongZ('input')).toBeGreaterThan(0);
+      // Priced alike: revenue is p x (input + output) = p x total, the frontier's
+      // own axis, so it falls along z everywhere.
+      expect(risesAlongZ(40, 40)).toBe(0);
+      // Weighted onto the input stream, it does not.
+      expect(risesAlongZ(40, 0)).toBeGreaterThan(0);
+      // And the cost type no longer has anything to do with it — revenue counts
+      // both streams whichever basis the cost matrix is expressed in.
+      expect(risesAlongZ(40, 40)).toBe(0);
     });
 
     it('holes a rollout that would ramp from a level this slice never measured', () => {
@@ -702,7 +718,7 @@ describe('buildSurfaceGrid', () => {
       // would be the fleet's cost, deeply negative.
       const grid = build({
         metric: 'cumulativeRevenue',
-        assumptions: { ...assumptions, pricePerMTok: 0 },
+        assumptions: { ...assumptions, inputPricePerMTok: 0, outputPricePerMTok: 0 },
       })!;
       const values = grid.chips
         .flatMap((c) => c.cells.flat())

@@ -46,8 +46,6 @@
  * they are measured.
  */
 
-import type { CostType } from './types';
-
 const HOURS_PER_DAY = 24;
 
 /**
@@ -71,7 +69,7 @@ const TOKENS_PER_MILLION = 1e6;
 const SECONDS_PER_DAY = 86_400;
 
 /**
- * The share of a fleet's tokens an operator can charge full price for.
+ * Input tokens an operator can charge the fresh-token price for, tok/s.
  *
  * Agentic traces run at a median 133:1 input:output token ratio with a median
  * 92% prefix-cache hit rate, and providers bill a cache read at a fraction of a
@@ -91,20 +89,18 @@ const SECONDS_PER_DAY = 86_400;
  * @param cacheHitRate   cached fraction of those input tokens, or undefined when unmeasured.
  * @param cacheReadRatio price of a cached token as a fraction of a fresh one (1 = no discount).
  */
-export function billableTokPerSec(
-  base: number,
+export function billableInputRate(
   inputTput: number,
   cacheHitRate: number | undefined,
   cacheReadRatio: number,
-  costType: CostType,
 ): number {
-  // Output tokens are generated, never served from a prefix cache.
-  if (costType === 'output') return base;
-  if (typeof cacheHitRate !== 'number' || !Number.isFinite(cacheHitRate)) return base;
-  if (!Number.isFinite(inputTput) || inputTput <= 0) return base;
+  if (!Number.isFinite(inputTput) || inputTput <= 0) return 0;
+  if (typeof cacheHitRate !== 'number' || !Number.isFinite(cacheHitRate)) return inputTput;
   const hit = Math.max(0, Math.min(1, cacheHitRate));
   const ratio = Math.max(0, Math.min(1, cacheReadRatio));
-  return Math.max(0, base - inputTput * hit * (1 - ratio));
+  // A cache read still sells, just for less: `hit` of the stream at `ratio` of
+  // the price is the same revenue as `hit * ratio` of the stream at full price.
+  return inputTput * (1 - hit * (1 - ratio));
 }
 
 export interface LifecycleAssumptions {
@@ -112,8 +108,20 @@ export interface LifecycleAssumptions {
   mtbiDays: number;
   /** Hours to recover from one interruption. */
   recoveryHours: number;
-  /** Sale price of output tokens, $/M tok. Defaults to break-even upstream. */
-  pricePerMTok: number;
+  /**
+   * Sale price of input tokens, $/M tok. Defaults to break-even upstream.
+   *
+   * Cached input tokens are already discounted into the step's billable input
+   * rate — see {@link billableInputRate} — so this is the fresh-token price.
+   */
+  inputPricePerMTok: number;
+  /**
+   * Sale price of output tokens, $/M tok. Separate because providers bill them
+   * at a multiple of input, and the two streams are wildly unequal: 8:1 on a
+   * fixed 8k/1k sequence and ~130:1 on agentic traces, so a single blended price
+   * hides which side of the workload the money is actually on.
+   */
+  outputPricePerMTok: number;
   /**
    * Months for a config to roll out across the fleet. Applies to every config,
    * including the first, which rolls out from zero. Zero means each config takes
@@ -130,15 +138,43 @@ export interface ThroughputStep {
   /** Months since the anchor date (the model's release), >= 0. */
   month: number;
   /**
-   * Fleet throughput for the selected token type once this config lands, in
-   * tokens the operator can *bill* — see {@link billableTokPerSec}.
+   * Fleet input tokens once this config lands, tok/s, already reduced for the
+   * share served from cache — see {@link billableInputRate}.
    *
    * Deliberately not named `fleetTokPerSec` like {@link FleetStats}: that one is
-   * the physical rate the racks deliver, and the two diverge whenever a
-   * workload serves input tokens from cache. The Fleet Projection section
-   * reports the physical rate; revenue here is charged on this one.
+   * the physical rate the racks deliver, and the two diverge whenever a workload
+   * serves input tokens from cache. The Fleet Projection section reports the
+   * physical rate; revenue here is charged on these two.
    */
-  billableTokPerSec: number;
+  billableInputTokPerSec: number;
+  /** Fleet output tokens once this config lands, tok/s. Never cached. */
+  outputTokPerSec: number;
+}
+
+/**
+ * The token rate a break-even solve should be handed, given the price ratio the
+ * user has set: input tokens plus output tokens weighted by how much more an
+ * output token sells for. Feeding this to {@link breakEvenPricePerMTok} returns
+ * the input price that zeroes the margin while preserving that ratio.
+ */
+export function effectiveTokPerSec(
+  inputTokPerSec: number,
+  outputTokPerSec: number,
+  outputPriceMultiple: number,
+): number {
+  const multiple =
+    Number.isFinite(outputPriceMultiple) && outputPriceMultiple > 0 ? outputPriceMultiple : 0;
+  return inputTokPerSec + outputTokPerSec * multiple;
+}
+
+/** A price is only a price when it is finite and positive; anything else is free. */
+function nonNegativePrice(value: number): number {
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/** Tokens a step sells per second, both streams. Price-independent. */
+function stepTokPerSec(step: ThroughputStep): number {
+  return step.billableInputTokPerSec + step.outputTokPerSec;
 }
 
 export interface LifecycleInputs {
@@ -232,7 +268,9 @@ export interface LifecycleSeries {
   /**
    * Latest config's throughput ÷ the first's — what software progress has been
    * worth. A ratio of measured rates, deliberately independent of the rollout
-   * assumption, so it does not move when the ramp input changes.
+   * assumption, so it does not move when the ramp input changes — and of both
+   * prices, so it stays a statement about the hardware and not about billing.
+   * Counted over both token streams.
    */
   improvementFactor: number;
   availability: number;
@@ -344,6 +382,12 @@ export function availabilityFromInterrupts(mtbiDays: number, recoveryHours: numb
  * Interrupts cost the same racks fewer billable tokens, so the break-even price
  * rises by exactly the haircut; ignoring it returns a price at which this
  * module's own margin is negative.
+ *
+ * With two prices, break-even is a line rather than a point: any (input, output)
+ * pair on it zeroes the margin. Callers resolve that by fixing the ratio between
+ * the two and passing the **effective** rate — `billableInput + ratio x output` —
+ * which makes the answer the input price, and the output price `ratio x` it. See
+ * {@link effectiveTokPerSec}.
  */
 export function breakEvenPricePerMTok(
   costPerHour: number,
@@ -356,8 +400,26 @@ export function breakEvenPricePerMTok(
 }
 
 /** Revenue rate in $/day for a throughput, price and availability. */
-function revenuePerDayFor(tokPerSec: number, pricePerMTok: number, availability: number): number {
-  return ((tokPerSec * SECONDS_PER_DAY) / TOKENS_PER_MILLION) * pricePerMTok * availability;
+function revenuePerDayFor(revenuePerSec: number, availability: number): number {
+  return revenuePerSec * SECONDS_PER_DAY * availability;
+}
+
+/**
+ * What a step sells per second, in dollars — the quantity the rollout ramps.
+ *
+ * Both streams belong to one config and roll out together, so ramping their
+ * priced sum is exactly ramping each and pricing after. Carrying one scalar
+ * through the integral keeps the trapezoid rule and the payback search unchanged.
+ */
+function revenuePerSecOf(
+  step: ThroughputStep,
+  inputPricePerMTok: number,
+  outputPricePerMTok: number,
+): number {
+  return (
+    (step.billableInputTokPerSec * inputPricePerMTok + step.outputTokPerSec * outputPricePerMTok) /
+    TOKENS_PER_MILLION
+  );
 }
 
 /**
@@ -404,7 +466,7 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
   if (steps.length === 0 || !Number.isFinite(costPerHour)) return null;
 
   const sorted = [...steps]
-    .filter((s) => Number.isFinite(s.month) && s.billableTokPerSec > 0)
+    .filter((s) => Number.isFinite(s.month) && stepTokPerSec(s) > 0)
     .toSorted((a, b) => a.month - b.month);
   if (sorted.length === 0) return null;
 
@@ -417,7 +479,7 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
   for (const step of sorted) {
     const previous = ordered.at(-1);
     if (previous && previous.month === step.month) {
-      if (step.billableTokPerSec > previous.billableTokPerSec) ordered[ordered.length - 1] = step;
+      if (stepTokPerSec(step) > stepTokPerSec(previous)) ordered[ordered.length - 1] = step;
       continue;
     }
     ordered.push(step);
@@ -428,10 +490,8 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
   if (!(endMonth > startMonth)) return null;
 
   const availability = availabilityFromInterrupts(assumptions.mtbiDays, assumptions.recoveryHours);
-  const price =
-    Number.isFinite(assumptions.pricePerMTok) && assumptions.pricePerMTok > 0
-      ? assumptions.pricePerMTok
-      : 0;
+  const inputPrice = nonNegativePrice(assumptions.inputPricePerMTok);
+  const outputPrice = nonNegativePrice(assumptions.outputPricePerMTok);
   const costPerDay = costPerHour * HOURS_PER_DAY;
   const rampMonths =
     Number.isFinite(assumptions.rampMonths) && assumptions.rampMonths > 0
@@ -456,7 +516,7 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
       start: step.month,
       end: Math.min(step.month + rampMonths, endMonth),
       from,
-      to: step.billableTokPerSec,
+      to: revenuePerSecOf(step, inputPrice, outputPrice),
     });
   }
 
@@ -536,8 +596,8 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
   let cumulativeRevenue = 0;
   let paybackMonth: number | null = null;
 
-  const revenueOf = (sample: { level: number }) =>
-    revenuePerDayFor(sample.level, price, availability);
+  // `level` is already dollars per second — see `revenuePerSecOf`.
+  const revenueOf = (sample: { level: number }) => revenuePerDayFor(sample.level, availability);
 
   for (let i = 0; i < samples.length; i += 1) {
     const here = samples[i]!;
@@ -577,13 +637,16 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
 
   if (points.length === 0) return null;
 
-  const firstTput = applied[0]!.billableTokPerSec;
+  const firstTput = stepTokPerSec(applied[0]!);
   const lastApplied = applied.at(-1)!;
   // Reported rates are what the fleet earns at the end of the window — which is
   // the latest config at whatever load it has reached by then.
   const last = points.at(-1)!;
   const revenuePerDay = last.revenue;
-  const firstRevenuePerDay = revenuePerDayFor(firstTput, price, availability);
+  const firstRevenuePerDay = revenuePerDayFor(
+    revenuePerSecOf(applied[0]!, inputPrice, outputPrice),
+    availability,
+  );
 
   return {
     points,
@@ -592,7 +655,7 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
     costPerDay,
     marginPerDay: revenuePerDay - costPerDay,
     firstMarginPerDay: firstRevenuePerDay - costPerDay,
-    improvementFactor: firstTput > 0 ? lastApplied.billableTokPerSec / firstTput : 1,
+    improvementFactor: firstTput > 0 ? stepTokPerSec(lastApplied) / firstTput : 1,
     availability,
     paybackMonth,
     lifetimeMargin: cumulative,

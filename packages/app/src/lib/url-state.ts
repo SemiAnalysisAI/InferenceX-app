@@ -77,6 +77,9 @@ const URL_STATE_KEYS = [
   // assumptions (the throughput steps are measured; those four are not), plus
   // which metric the chart plots.
   'c_price',
+  // Output-token price. Input keeps `c_price`, so a link written before the
+  // split still seeds the field it always seeded.
+  'c_oprice',
   'c_ramp',
   // What a cached input token sells for, as a % of the price. Agentic only —
   // fixed sequences record no cache hits for it to apply to.
@@ -154,6 +157,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   // the horizon from the measured run window. A non-empty default here would be
   // stripped from share links and silently re-derived on load.
   c_price: '',
+  c_oprice: '',
   c_life: '',
   // Empty means the default y metric (margin).
   c_ly: '',

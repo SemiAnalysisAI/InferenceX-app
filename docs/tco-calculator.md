@@ -785,6 +785,43 @@ small change, but it lives in a Python-synced function (`iso_interactivity.py`)
 and would move published cost numbers, so it needs its own change. Until then the
 price tooltip states the direction of the divergence.
 
+### Input and output are priced separately
+
+Revenue is `input x inputPrice + output x outputPrice`, not one blended price
+against one throughput. The two streams are wildly unequal and the split is
+measured, not assumed — `input_tput_per_gpu` and `output_tput_per_gpu` are
+already on every row, the same figures `/inference` plots:
+
+| scenario       | input : output throughput                                                    |
+| -------------- | ---------------------------------------------------------------------------- |
+| fixed 8k/1k    | 8.0 : 1 (p10 7.9, p90 8.0 — it is the sequence shape, not per-config spread) |
+| agentic traces | ~130 : 1 (p10 114, p90 145)                                                  |
+
+At a 4x output premium on 8k/1k, output is a ninth of the tokens and a third of
+the revenue, so a blended price is not a rounding difference. Three consequences:
+
+- **Revenue no longer depends on the Input/Output/Total cost-type selector.** The
+  fleet sells everything it produces; the selector still drives the cost matrix,
+  the bar chart, and which config wins the staircase. This also retires a live
+  trap — on `costType=output` the old model counted revenue from a ninth of the
+  tokens while cost covered the whole rack.
+- **Break-even is a line, not a point.** Any (input, output) pair on it zeroes the
+  margin. The section resolves that by fixing the ratio currently in the two
+  fields and solving the input price against `effectiveTokPerSec` —
+  `billableInput + multiple x output` — so a reset scales both and lands back on
+  the line at the ratio the user chose. Unseeded, the pair starts at 4x, which is
+  roughly where the major vendors price (DeepSeek publishes $0.27 / $1.10).
+- **Gain stays a token multiple.** `improvementFactor` counts both streams and no
+  price, so it remains a statement about the hardware. The fixture that pins this
+  grows the streams _disproportionately_ — input flat, output tripled — because a
+  proportional one cannot tell "counted both" from "counted input only".
+
+Cached input tokens are discounted into the input stream before pricing (see
+below), so the input price is the fresh-token price.
+
+`c_price` is the input price — unchanged, so a link written before the split
+still seeds the field it always seeded — and `c_oprice` the output price.
+
 ### Margin per megawatt
 
 A fourth y-axis metric, `marginPerMw` (`c_ly=marginPerMw`), plotting the same
@@ -824,18 +861,22 @@ What did need real work is the revenue term. Measured against production history
 | median GPU prefix-cache hit rate | **0.92** (min 0.005, p90 0.96) | metric **absent on every row** |
 | rows carrying a hit rate         | 217/223 DSV4, 45/45 GLM-5.2    | 0/1245, 0/541                  |
 
-A single blended `$/M tok` against the raw token rate therefore bills ~13.5k tok/s
+Charging the input price against the raw input rate therefore bills ~13.5k tok/s
 of which ~92% are cache _reads_, which providers charge a fraction of the fresh
-input rate for. On `total` or `input` pricing that overstates agentic margin by
-close to an order of magnitude; on `output` pricing (111 tok/s) every fleet is
-permanently underwater. At 8:1 with no prefix reuse, one price is a fair
-simplification — at 133:1 with 92% hits it is a wrong number.
+input rate for — overstating agentic margin by close to an order of magnitude. At
+8:1 with no prefix reuse the distinction is immaterial; at 133:1 with 92% hits it
+is the dominant term.
 
-So the fleet is sized on the physical rate and **billed on a discounted one**:
+So the fleet is sized on the physical rate and the **input stream is discounted
+before it is priced**:
 
 ```
-billableTokPerSec = base − inputTput × clamp01(cacheHitRate) × (1 − cacheReadRatio)
+billableInputTokPerSec = inputTput × (1 − clamp01(cacheHitRate) × (1 − cacheReadRatio))
 ```
+
+Selling `hit` of the stream at `ratio` of the price is exactly the same revenue as
+selling `hit × ratio` of it at full price, which is why one factor on the rate
+does the whole job and the input price stays the fresh-token price.
 
 Three properties are worth stating, because they are what make this safe:
 

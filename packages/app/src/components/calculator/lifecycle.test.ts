@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   availabilityFromInterrupts,
-  billableTokPerSec,
+  billableInputRate,
+  effectiveTokPerSec,
   isBreakEvenAnchored,
   metricValue,
   breakEvenPricePerMTok,
@@ -26,7 +27,8 @@ const assumptions: LifecycleAssumptions = {
   mtbiDays: 24,
   recoveryHours: 12,
   // Comfortably above the fixture's break-even, so the base case pays back.
-  pricePerMTok: 10,
+  inputPricePerMTok: 10,
+  outputPricePerMTok: 0,
   // The step behaviour is what most of these tests are about, so they start at
   // full load. The ramp has its own describe block below.
   rampMonths: 0,
@@ -62,11 +64,11 @@ describe('breakEvenPricePerMTok', () => {
     const costPerHour = 12_345;
     const price = breakEvenPricePerMTok(costPerHour, tokPerSec)!;
     const series = computeLifecycle({
-      steps: [{ month: 0, billableTokPerSec: tokPerSec }],
+      steps: [{ month: 0, billableInputTokPerSec: tokPerSec, outputTokPerSec: 0 }],
       costPerHour,
       provisionedMw: PROVISIONED_MW,
       horizonMonths: 24,
-      assumptions: { ...assumptions, mtbiDays: 0, pricePerMTok: price },
+      assumptions: { ...assumptions, mtbiDays: 0, inputPricePerMTok: price, outputPricePerMTok: 0 },
     })!;
     expect(series.marginPerDay).toBeCloseTo(0, 6);
   });
@@ -83,11 +85,11 @@ describe('breakEvenPricePerMTok', () => {
     expect(haircut).toBeCloseTo(flat / availability, 10);
 
     const series = computeLifecycle({
-      steps: [{ month: 0, billableTokPerSec: tokPerSec }],
+      steps: [{ month: 0, billableInputTokPerSec: tokPerSec, outputTokPerSec: 0 }],
       costPerHour,
       provisionedMw: PROVISIONED_MW,
       horizonMonths: 24,
-      assumptions: { ...assumptions, pricePerMTok: haircut },
+      assumptions: { ...assumptions, inputPricePerMTok: haircut, outputPricePerMTok: 0 },
     })!;
     expect(series.availability).toBeCloseTo(availability, 10);
     expect(series.marginPerDay).toBeCloseTo(0, 6);
@@ -95,11 +97,11 @@ describe('breakEvenPricePerMTok', () => {
     // The unadjusted price is the defect being pinned: it reads as break-even
     // but plots a loss.
     const naive = computeLifecycle({
-      steps: [{ month: 0, billableTokPerSec: tokPerSec }],
+      steps: [{ month: 0, billableInputTokPerSec: tokPerSec, outputTokPerSec: 0 }],
       costPerHour,
       provisionedMw: PROVISIONED_MW,
       horizonMonths: 24,
-      assumptions: { ...assumptions, pricePerMTok: flat },
+      assumptions: { ...assumptions, inputPricePerMTok: flat, outputPricePerMTok: 0 },
     })!;
     expect(naive.marginPerDay).toBeLessThan(0);
   });
@@ -120,9 +122,9 @@ describe('computeLifecycle', () => {
   // Three measured configs: the opening sweep, then two improvements — the
   // shape MI355X showed on DeepSeek-V4-Pro.
   const steps: ThroughputStep[] = [
-    { month: 0, billableTokPerSec: 400_000 },
-    { month: 3, billableTokPerSec: 900_000 },
-    { month: 6, billableTokPerSec: 1_600_000 },
+    { month: 0, billableInputTokPerSec: 400_000, outputTokPerSec: 0 },
+    { month: 3, billableInputTokPerSec: 900_000, outputTokPerSec: 0 },
+    { month: 6, billableInputTokPerSec: 1_600_000, outputTokPerSec: 0 },
   ];
   const base = {
     steps,
@@ -164,7 +166,7 @@ describe('computeLifecycle', () => {
 
   it('scales revenue with throughput, price and availability', () => {
     const series = computeLifecycle(base)!;
-    const expected = ((1_600_000 * 86_400) / 1e6) * assumptions.pricePerMTok * (24 / 24.5);
+    const expected = ((1_600_000 * 86_400) / 1e6) * assumptions.inputPricePerMTok * (24 / 24.5);
     expect(series.revenuePerDay).toBeCloseTo(expected, 6);
     expect(series.availability).toBeCloseTo(24 / 24.5, 10);
   });
@@ -181,7 +183,7 @@ describe('computeLifecycle', () => {
     // A chip first measured three months after release has no line before then.
     const late = computeLifecycle({
       ...base,
-      steps: [{ month: 3, billableTokPerSec: 400_000 }],
+      steps: [{ month: 3, billableInputTokPerSec: 400_000, outputTokPerSec: 0 }],
     })!;
     expect(late.startMonth).toBe(3);
     expect(late.points[0]!.month).toBe(3);
@@ -208,7 +210,7 @@ describe('computeLifecycle', () => {
   it('reports no payback for a fleet that never covers its cost', () => {
     const series = computeLifecycle({
       ...base,
-      assumptions: { ...assumptions, pricePerMTok: 0 },
+      assumptions: { ...assumptions, inputPricePerMTok: 0, outputPricePerMTok: 0 },
     })!;
     expect(series.paybackMonth).toBeNull();
     expect(series.lifetimeMargin).toBeLessThan(0);
@@ -219,7 +221,7 @@ describe('computeLifecycle', () => {
     const price = breakEvenPricePerMTok(costPerHour, 700_000)!;
     const series = computeLifecycle({
       ...base,
-      assumptions: { ...assumptions, mtbiDays: 0, pricePerMTok: price },
+      assumptions: { ...assumptions, mtbiDays: 0, inputPricePerMTok: price, outputPricePerMTok: 0 },
     })!;
     const risers = series.points.filter((p) => p.isStep);
     expect(risers[0]!.margin).toBeLessThan(0);
@@ -238,10 +240,10 @@ describe('computeLifecycle', () => {
     const series = computeLifecycle({
       ...base,
       steps: [
-        { month: 6, billableTokPerSec: 1_600_000 },
-        { month: 0, billableTokPerSec: 400_000 },
-        { month: 3, billableTokPerSec: 0 }, // no throughput — dropped
-        { month: NaN, billableTokPerSec: 500_000 }, // unusable month — dropped
+        { month: 6, billableInputTokPerSec: 1_600_000, outputTokPerSec: 0 },
+        { month: 0, billableInputTokPerSec: 400_000, outputTokPerSec: 0 },
+        { month: 3, billableInputTokPerSec: 0, outputTokPerSec: 0 }, // no throughput — dropped
+        { month: NaN, billableInputTokPerSec: 500_000, outputTokPerSec: 0 }, // unusable month — dropped
       ],
     })!;
     expect(series.points.filter((p) => p.isStep).map((p) => p.month)).toEqual([0, 6]);
@@ -335,7 +337,7 @@ describe('computeLifecycle', () => {
       // exactly half the end level. Pins the trapezoid path, which every other
       // integration test dodges by using rampMonths: 0.
       const series = computeLifecycle({
-        steps: [{ month: 0, billableTokPerSec: 1_600_000 }],
+        steps: [{ month: 0, billableInputTokPerSec: 1_600_000, outputTokPerSec: 0 }],
         costPerHour,
         provisionedMw: PROVISIONED_MW,
         horizonMonths: 6,
@@ -351,8 +353,8 @@ describe('computeLifecycle', () => {
       // read as "at full load".
       const series = computeLifecycle({
         steps: [
-          { month: 0, billableTokPerSec: 400_000 },
-          { month: 3, billableTokPerSec: 1_600_000 },
+          { month: 0, billableInputTokPerSec: 400_000, outputTokPerSec: 0 },
+          { month: 3, billableInputTokPerSec: 1_600_000, outputTokPerSec: 0 },
         ],
         costPerHour,
         provisionedMw: PROVISIONED_MW,
@@ -372,9 +374,9 @@ describe('computeLifecycle', () => {
       // zero-width rollout, which would spike the line to a rate never served.
       const series = computeLifecycle({
         steps: [
-          { month: 0, billableTokPerSec: 400_000 },
-          { month: 6, billableTokPerSec: 900_000 },
-          { month: 6, billableTokPerSec: 1_600_000 },
+          { month: 0, billableInputTokPerSec: 400_000, outputTokPerSec: 0 },
+          { month: 6, billableInputTokPerSec: 900_000, outputTokPerSec: 0 },
+          { month: 6, billableInputTokPerSec: 1_600_000, outputTokPerSec: 0 },
         ],
         costPerHour,
         provisionedMw: PROVISIONED_MW,
@@ -405,10 +407,10 @@ describe('computeLifecycle', () => {
     const series = computeLifecycle({
       ...base,
       steps: [
-        { month: 0, billableTokPerSec: 400_000 },
-        { month: 3, billableTokPerSec: 1_600_000 },
+        { month: 0, billableInputTokPerSec: 400_000, outputTokPerSec: 0 },
+        { month: 3, billableInputTokPerSec: 1_600_000, outputTokPerSec: 0 },
       ],
-      assumptions: { ...assumptions, mtbiDays: 0, pricePerMTok: price },
+      assumptions: { ...assumptions, mtbiDays: 0, inputPricePerMTok: price, outputPricePerMTok: 0 },
     })!;
     const cost = costPerHour * HOURS_PER_DAY;
     const perDay = (tput: number) => ((tput * 86_400) / 1e6) * price;
@@ -452,7 +454,7 @@ describe('computeLifecycle', () => {
     it('is zero at every sample when the price is zero', () => {
       const series = computeLifecycle({
         ...base,
-        assumptions: { ...assumptions, pricePerMTok: 0 },
+        assumptions: { ...assumptions, inputPricePerMTok: 0, outputPricePerMTok: 0 },
       })!;
       for (const point of series.points) expect(point.cumulativeRevenue).toBe(0);
       // Cumulative margin is then pure accumulated cost, which is the check that
@@ -468,7 +470,7 @@ describe('computeLifecycle', () => {
     expect(
       computeLifecycle({
         ...base,
-        steps: [{ month: 30, billableTokPerSec: 1 }],
+        steps: [{ month: 30, billableInputTokPerSec: 1, outputTokPerSec: 0 }],
         horizonMonths: 24,
       }),
     ).toBeNull();
@@ -540,7 +542,7 @@ describe('ramp sampling is anchored, not proportional', () => {
 
   it('reconstructs a governing rollout identically whether or not it is cut short', () => {
     const alone = computeLifecycle({
-      steps: [{ month: 0, billableTokPerSec: 1000 }],
+      steps: [{ month: 0, billableInputTokPerSec: 1000, outputTokPerSec: 0 }],
       costPerHour: 100,
       provisionedMw: PROVISIONED_MW,
       horizonMonths: 12,
@@ -550,8 +552,8 @@ describe('ramp sampling is anchored, not proportional', () => {
     // truncates it. Before 1.5 the fleet is running the identical rollout.
     const truncated = computeLifecycle({
       steps: [
-        { month: 0, billableTokPerSec: 1000 },
-        { month: 1.5, billableTokPerSec: 3000 },
+        { month: 0, billableInputTokPerSec: 1000, outputTokPerSec: 0 },
+        { month: 1.5, billableInputTokPerSec: 3000, outputTokPerSec: 0 },
       ],
       costPerHour: 100,
       provisionedMw: PROVISIONED_MW,
@@ -579,7 +581,7 @@ describe('ramp sampling is anchored, not proportional', () => {
     // rollout cut short carries proportionally fewer samples rather than the
     // same count squeezed into less time. Equal spacing is the whole mechanism.
     const series = computeLifecycle({
-      steps: [{ month: 0, billableTokPerSec: 1000 }],
+      steps: [{ month: 0, billableInputTokPerSec: 1000, outputTokPerSec: 0 }],
       costPerHour: 100,
       provisionedMw: PROVISIONED_MW,
       horizonMonths: 12,
@@ -591,64 +593,170 @@ describe('ramp sampling is anchored, not proportional', () => {
   });
 });
 
-describe('billableTokPerSec', () => {
-  // A fleet whose total rate is dominated by input tokens, most of them cached —
-  // the agentic shape: production runs sit near 133:1 input:output with a median
-  // 92% hit rate.
-  const total = 13_636;
+describe('billableInputRate', () => {
+  // The agentic shape: input tokens dominate and most are served from cache.
   const input = 13_525;
 
   it('is an exact identity where nothing was measured, which is every fixed sequence', () => {
     // Not "close to": fixed-sequence rows carry no cache metric on any row, so
     // this path must return the caller's own number bit-for-bit. Anything else
     // would move 8k/1k margins as a side effect of an agentic feature.
-    for (const costType of ['total', 'input', 'output'] as const) {
-      expect(billableTokPerSec(total, input, undefined, 0.1, costType)).toBe(total);
-    }
+    expect(billableInputRate(input, undefined, 0.1)).toBe(input);
   });
 
   it('is an exact identity at a 100% cached price, whatever the hit rate', () => {
-    expect(billableTokPerSec(total, input, 0.92, 1, 'total')).toBe(total);
-    expect(billableTokPerSec(total, input, 1, 1, 'input')).toBe(total);
+    expect(billableInputRate(input, 0.92, 1)).toBe(input);
+    expect(billableInputRate(input, 1, 1)).toBe(input);
   });
 
-  it('discounts only the cached share of input tokens', () => {
-    // 92% of 13,525 input tok/s bill at 10%, so 0.92 × 13,525 × 0.9 comes off.
-    const expected = total - input * 0.92 * 0.9;
-    expect(billableTokPerSec(total, input, 0.92, 0.1, 'total')).toBeCloseTo(expected, 9);
-    // The size of the correction is the point of the feature: at this mix the
-    // billable rate is a small fraction of the raw one.
-    expect(expected / total).toBeLessThan(0.25);
-  });
-
-  it('leaves output pricing alone — generated tokens are never cache reads', () => {
-    expect(billableTokPerSec(111, input, 0.92, 0.1, 'output')).toBe(111);
+  it('bills the cached share at the cached fraction of the price', () => {
+    // 92% of the stream sells at 10%, the other 8% at full price.
+    expect(billableInputRate(input, 0.92, 0.1)).toBeCloseTo(input * (1 - 0.92 * 0.9), 9);
+    // At this mix the billable input rate collapses to a sixth of the raw one,
+    // which is the size of the correction the feature exists for.
+    expect(billableInputRate(input, 0.92, 0.1) / input).toBeLessThan(0.2);
   });
 
   it('clamps a hit rate the data reports above 1 rather than billing negative tokens', () => {
     // Real rows report up to 1.185. Left unclamped that would discount more
     // input tokens than were served.
-    const clamped = billableTokPerSec(total, input, 1.185, 0, 'total');
-    expect(clamped).toBe(billableTokPerSec(total, input, 1, 0, 'total'));
-    expect(clamped).toBeGreaterThanOrEqual(0);
+    expect(billableInputRate(input, 1.185, 0)).toBe(billableInputRate(input, 1, 0));
+    expect(billableInputRate(input, 1.185, 0)).toBeGreaterThanOrEqual(0);
   });
 
-  it('never returns less than zero when the discount exceeds the base rate', () => {
-    // `input` pricing on a frontier whose splined input rate exceeds the total.
-    expect(billableTokPerSec(100, 10_000, 1, 0, 'total')).toBe(0);
+  it('is zero for an unusable input rate rather than NaN', () => {
+    expect(billableInputRate(Number.NaN, 0.9, 0.1)).toBe(0);
+    expect(billableInputRate(0, 0.9, 0.1)).toBe(0);
+    expect(billableInputRate(-5, 0.9, 0.1)).toBe(0);
+  });
+});
+
+describe('input and output prices', () => {
+  const costPerHour = 1000;
+  const IN = 800_000;
+  const OUT = 100_000;
+  const twoStream = {
+    steps: [{ month: 0, billableInputTokPerSec: IN, outputTokPerSec: OUT }],
+    costPerHour,
+    provisionedMw: PROVISIONED_MW,
+    horizonMonths: 12,
+    assumptions: { ...assumptions, inputPricePerMTok: 0.27, outputPricePerMTok: 1.1 },
+  };
+
+  it('charges each stream its own price', () => {
+    const series = computeLifecycle(twoStream)!;
+    const expected = ((IN * 0.27 + OUT * 1.1) / 1e6) * 86_400 * availabilityFromInterrupts(24, 12);
+    expect(series.revenuePerDay).toBeCloseTo(expected, 6);
   });
 
-  it('ignores an unusable input rate instead of producing NaN', () => {
-    expect(billableTokPerSec(total, Number.NaN, 0.92, 0.1, 'total')).toBe(total);
-    expect(billableTokPerSec(total, 0, 0.92, 0.1, 'total')).toBe(total);
+  it('is not a blended single price — the split changes the answer', () => {
+    // The same 900k tok/s at one blended price cannot reproduce it: output is a
+    // ninth of the tokens and a third of the revenue at these prices.
+    const blended = computeLifecycle({
+      ...twoStream,
+      assumptions: { ...assumptions, inputPricePerMTok: 0.27, outputPricePerMTok: 0.27 },
+    })!;
+    expect(blended.revenuePerDay).toBeLessThan(computeLifecycle(twoStream)!.revenuePerDay);
+    const outputShare = (OUT * 1.1) / (IN * 0.27 + OUT * 1.1);
+    expect(outputShare).toBeGreaterThan(0.3);
+  });
+
+  it('raising only the output price raises revenue, leaving cost alone', () => {
+    const dearer = computeLifecycle({
+      ...twoStream,
+      assumptions: { ...assumptions, inputPricePerMTok: 0.27, outputPricePerMTok: 2.2 },
+    })!;
+    const base = computeLifecycle(twoStream)!;
+    expect(dearer.revenuePerDay).toBeGreaterThan(base.revenuePerDay);
+    expect(dearer.costPerDay).toBe(base.costPerDay);
+    // Exactly the output term doubled, nothing else.
+    expect(dearer.revenuePerDay - base.revenuePerDay).toBeCloseTo(
+      ((OUT * 1.1) / 1e6) * 86_400 * availabilityFromInterrupts(24, 12),
+      6,
+    );
+  });
+
+  it('reports a gain that neither price can move, counted over both streams', () => {
+    // "Gain" is a statement about the hardware, so it counts tokens, not dollars.
+    // The streams grow disproportionately on purpose: input is flat and only
+    // output improves, so a gain counted on the input stream alone would read
+    // 1.0x and a gain counted on both reads 1.222x. A proportional fixture
+    // cannot tell those apart.
+    const stepped = {
+      ...twoStream,
+      steps: [
+        { month: 0, billableInputTokPerSec: IN, outputTokPerSec: OUT },
+        { month: 3, billableInputTokPerSec: IN, outputTokPerSec: OUT * 3 },
+      ],
+    };
+    const cheap = computeLifecycle(stepped)!;
+    const dear = computeLifecycle({
+      ...stepped,
+      assumptions: { ...assumptions, inputPricePerMTok: 50, outputPricePerMTok: 1 },
+    })!;
+    expect(cheap.improvementFactor).toBeCloseTo((IN + OUT * 3) / (IN + OUT), 9);
+    expect(cheap.improvementFactor).toBeGreaterThan(1.2);
+    // Same tokens, wildly different prices, same gain.
+    expect(dear.improvementFactor).toBeCloseTo(cheap.improvementFactor, 9);
+  });
+
+  it('keeps a step whose tokens are real even when both prices are zero', () => {
+    // A zero price is a legitimate what-if, not a reason to drop the config from
+    // the timeline — the staircase is measured, the prices are assumptions.
+    const free = computeLifecycle({
+      ...twoStream,
+      assumptions: { ...assumptions, inputPricePerMTok: 0, outputPricePerMTok: 0 },
+    })!;
+    expect(free.points.length).toBeGreaterThan(0);
+    expect(free.revenuePerDay).toBe(0);
+    expect(free.marginPerDay).toBeCloseTo(-free.costPerDay, 6);
+  });
+});
+
+describe('effectiveTokPerSec', () => {
+  it('weights output tokens by how much more they sell for', () => {
+    expect(effectiveTokPerSec(800_000, 100_000, 4)).toBe(800_000 + 400_000);
+  });
+
+  it('is what makes a two-price break-even a single solve', () => {
+    // Break-even on the effective rate returns an input price which, paired with
+    // `multiple x` that output price, zeroes the margin exactly.
+    const costPerHour = 1000;
+    const IN = 800_000;
+    const OUT = 100_000;
+    const multiple = 4;
+    const inputPrice = breakEvenPricePerMTok(
+      costPerHour,
+      effectiveTokPerSec(IN, OUT, multiple),
+      1,
+    )!;
+    const series = computeLifecycle({
+      steps: [{ month: 0, billableInputTokPerSec: IN, outputTokPerSec: OUT }],
+      costPerHour,
+      provisionedMw: PROVISIONED_MW,
+      horizonMonths: 12,
+      assumptions: {
+        mtbiDays: 0,
+        recoveryHours: 0,
+        rampMonths: 0,
+        inputPricePerMTok: inputPrice,
+        outputPricePerMTok: inputPrice * multiple,
+      },
+    })!;
+    expect(series.marginPerDay).toBeCloseTo(0, 6);
+  });
+
+  it('treats an unusable multiple as output earning nothing', () => {
+    expect(effectiveTokPerSec(100, 50, Number.NaN)).toBe(100);
+    expect(effectiveTokPerSec(100, 50, -1)).toBe(100);
   });
 });
 
 describe('margin per megawatt', () => {
   const costPerHour = 10_000;
   const steps: ThroughputStep[] = [
-    { month: 0, billableTokPerSec: 400_000 },
-    { month: 6, billableTokPerSec: 1_600_000 },
+    { month: 0, billableInputTokPerSec: 400_000, outputTokPerSec: 0 },
+    { month: 6, billableInputTokPerSec: 1_600_000, outputTokPerSec: 0 },
   ];
   const base = {
     steps,

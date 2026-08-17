@@ -114,7 +114,7 @@ import { computeFleetStats } from './fleet';
 import type { HistoryGroups } from './historical-best';
 import { hermiteInterpolate, monotoneSlopes, paretoFrontUpperLeft } from './interpolation';
 import {
-  billableTokPerSec,
+  billableInputRate,
   computeLifecycle,
   isCumulative,
   MS_PER_MONTH,
@@ -659,20 +659,15 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
         // 2D section divides by the same actually-provisioned figure.
         provisionedMw ??= (stats.gpus * specs.powerKwPerGpu) / 1000;
         onTimeline[i] = true;
-        // Sized on the physical rate, billed on the discounted one — `gpus` is
-        // whole chips either way, so this is exactly `stats.fleetTokPerSec` when
-        // there is no cached fraction to discount.
+        // Sized on the physical rate, billed per stream at its own price. Both
+        // are read straight off the frontier rather than through the cost-type
+        // accessor: the fleet sells everything it produces, whichever token type
+        // the cost matrix above is currently expressed in.
         throughputSteps.push({
           month: rungMonths[i]!,
-          billableTokPerSec:
-            stats.gpus *
-            billableTokPerSec(
-              read.tput,
-              read.inputTput,
-              read.cacheHitRate,
-              cacheReadRatio,
-              costType,
-            ),
+          billableInputTokPerSec:
+            stats.gpus * billableInputRate(read.inputTput, read.cacheHitRate, cacheReadRatio),
+          outputTokPerSec: stats.gpus * read.outputTput,
         });
       }
       if (throughputSteps.length === 0 || costPerHour === null || provisionedMw === null) continue;

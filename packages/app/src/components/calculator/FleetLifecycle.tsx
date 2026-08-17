@@ -30,9 +30,10 @@ import FleetLifecycleChart, {
 import { mergeProgressionsByChip, type ChipProgression } from './historical-best';
 import {
   availabilityFromInterrupts,
-  billableTokPerSec,
+  billableInputRate,
   breakEvenPricePerMTok,
   computeLifecycle,
+  effectiveTokPerSec,
   MS_PER_MONTH,
   type LifecycleAssumptions,
   type LifecycleSeries,
@@ -85,9 +86,11 @@ const STRINGS = {
     errorPrefix: 'Could not load run history: ',
     noneMeasured:
       'No chip was measured at this interactivity on any run date. Move the target interactivity slider into a measured range — the ranges each chip has been measured over are listed below.',
-    priceLabel: 'Token Price ($/M tok)',
+    priceLabel: 'Token Price — input, output ($/M tok)',
+    priceInputLabel: 'Input token price, $ per million',
+    outputPriceInputLabel: 'Output token price, $ per million',
     priceTooltip:
-      "Sale price of tokens. Defaults to the price that exactly zeroes the cheapest visible fleet's margin at its latest config — the competitive floor, at which that chip earns nothing and every pricier chip is underwater. Derived from that fleet's TCO cost and its interpolated throughput. Everything above this line is your assumption, not a measurement.",
+      "Sale price of tokens, input and output separately — providers bill output at a multiple of input, and the two streams are wildly unequal: 8 input tokens per output token on a fixed 8k/1k sequence, around 130 on agentic traces. Revenue counts both, whichever token type the cost matrix above is set to. The pair defaults to the prices that exactly zero the cheapest visible fleet's margin at its latest config — the competitive floor, at which that chip earns nothing and every pricier chip is underwater — seeded at 4x output over input, which is roughly where the major vendors price. Break-even with two prices is a line rather than a point, so a reset scales both and keeps whatever ratio you have set. Everything above that line is your assumption, not a measurement.",
     priceReset: 'Reset to break-even',
     mtbiLabel: 'MTBI (days)',
     mtbiTooltip:
@@ -182,9 +185,11 @@ const STRINGS = {
     errorPrefix: '无法加载运行历史：',
     noneMeasured:
       '在任何运行日期下都没有 Chip 在该交互性下被实测过。请将目标交互性滑块移入已实测区间——各 Chip 的实测区间见下方列表。',
-    priceLabel: 'Token 价格 ($/M tok)',
+    priceLabel: 'Token 价格 — 输入、输出 ($/M tok)',
+    priceInputLabel: '输入 token 价格，$/百万',
+    outputPriceInputLabel: '输出 token 价格，$/百万',
     priceTooltip:
-      'Token 售价。默认取使当前可见集群中成本最低者在其最新配置下利润恰好为零的价格——即竞争底线：该价格下这款 Chip 不赚不亏，而所有更贵的 Chip 均为亏损。该值由该集群的 TCO 成本与其插值吞吐量推导。高于该线的部分属于你的假设，而非实测值。',
+      'Token 售价，输入与输出分别设定——服务商对输出 token 的计价通常是输入的数倍，而两类 token 的数量极不均衡：固定 8k/1k 序列下每个输出 token 对应 8 个输入 token，agentic traces 下约为 130 个。无论上方成本矩阵选择哪种 token 类型，收入均同时计入两者。二者默认取使当前可见集群中成本最低者在其最新配置下利润恰好为零的价格——即竞争底线：该价格下这款 Chip 不赚不亏，而所有更贵的 Chip 均为亏损——并按输出为输入 4 倍的比例设定，这与主流厂商的定价大致相当。在双价格下保本点是一条直线而非一个点，因此重置会按你当前设定的比例同时缩放两个价格。高于该线的部分属于你的假设，而非实测值。',
     priceReset: '重置为保本价',
     mtbiLabel: '平均无故障间隔 (天)',
     mtbiTooltip: '平均中断间隔时间。与恢复时间共同构成对收入的可用性折损。留空表示不建模中断。',
@@ -282,7 +287,27 @@ const DEFAULTS = {
    * An assumption like the rest; the cached *fraction* it applies to is measured.
    */
   cachedInputPct: 10,
+  /**
+   * An output token sells for four times an input one until the user says
+   * otherwise — DeepSeek's own published API pricing is $0.27 / $1.10, and the
+   * major vendors sit between 2x and 5x. Only used to seed the pair and to hold
+   * their ratio through a reset; once both fields exist they are what is billed.
+   */
+  outputPriceMultiple: 4,
 };
+
+/**
+ * A price for a field, in as few digits as say it.
+ *
+ * `toFixed(4)` alone is wrong at the bottom of the range: a fleet cheap enough,
+ * or a ratio small enough, produces a real price below 0.00005 and rounds it to
+ * "0.0000" — a field that reads as "these tokens are free" when they are not.
+ * Small values fall back to significant digits instead.
+ */
+function formatPrice(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0';
+  return value < 0.0001 ? value.toPrecision(3) : value.toFixed(4);
+}
 
 function parseNonNegative(raw: string): number | null {
   const parsed = parseFloat(raw);
@@ -424,9 +449,26 @@ export default function FleetLifecycle({
       : 'margin';
   });
   const [priceInput, setPriceInput] = useState(() => readUrlParams().c_price ?? '');
+  const [outputPriceInput, setOutputPriceInput] = useState(() => readUrlParams().c_oprice ?? '');
   // A price arriving from the URL is the user's, so it must not be overwritten
-  // by the break-even default.
-  const priceEdited = useRef(Boolean(readUrlParams().c_price));
+  // by the break-even default. Either field counts: they are seeded as a pair,
+  // so re-seeding one after the user set the other would silently move the ratio
+  // they chose.
+  const priceEdited = useRef(Boolean(readUrlParams().c_price ?? readUrlParams().c_oprice));
+  /**
+   * Ratio the pair is seeded at, and restored to by a reset.
+   *
+   * State rather than derived from the two fields: deriving it would make the
+   * seed depend on the values the seed just wrote, and the re-seed that follows a
+   * reset would read the ratio it had itself produced. Only a user edit moves it,
+   * so a reader who set 3x gets 3x back rather than the default.
+   */
+  const [seedMultiple, setSeedMultiple] = useState(() => {
+    const input = parseNonNegative(readUrlParams().c_price ?? '');
+    const output = parseNonNegative(readUrlParams().c_oprice ?? '');
+    if (input !== null && input > 0 && output !== null && output > 0) return output / input;
+    return DEFAULTS.outputPriceMultiple;
+  });
 
   /**
    * Anchor for the timeline. The model's release date is the honest zero — the
@@ -526,18 +568,14 @@ export default function FleetLifecycle({
         provisionedMw ??= (stats.gpus * specs.power) / 1000;
         steps.push({
           month: (Date.parse(`${step.date}T00:00:00Z`) - anchorMs) / MS_PER_MONTH,
-          // Sized on the physical rate, billed on the discounted one. `gpus` is
-          // whole chips either way, so this is exactly `stats.fleetTokPerSec`
-          // wherever no cached fraction was measured — every fixed sequence.
-          billableTokPerSec:
+          // Sized on the physical rate, billed per stream at its own price. Both
+          // streams are read directly rather than through the cost-type
+          // accessor: the fleet sells everything it produces, whichever token
+          // type the cost matrix above happens to be expressed in.
+          billableInputTokPerSec:
             stats.gpus *
-            billableTokPerSec(
-              getThroughputForType(step.result, costType),
-              step.result.inputTputValue,
-              step.result.cacheHitRate,
-              cacheReadRatio,
-              costType,
-            ),
+            billableInputRate(step.result.inputTputValue, step.result.cacheHitRate, cacheReadRatio),
+          outputTokPerSec: stats.gpus * step.result.outputTputValue,
         });
       }
 
@@ -566,32 +604,42 @@ export default function FleetLifecycle({
    * Break-even of the cheapest visible fleet at its latest config — the
    * competitive floor as it stands today, not as it stood at release.
    */
+
   const breakEven = useMemo(() => {
     let cheapest: number | null = null;
     for (const { steps, costPerHour } of fleets) {
       const latest = steps.at(-1);
       if (!latest) continue;
-      const price = breakEvenPricePerMTok(costPerHour, latest.billableTokPerSec, availability);
+      // Two prices make break-even a line, not a point. Fixing the ratio picks
+      // one solution off it: solve the input price against a rate that already
+      // counts each output token as `multiple` input tokens' worth of revenue.
+      const price = breakEvenPricePerMTok(
+        costPerHour,
+        effectiveTokPerSec(latest.billableInputTokPerSec, latest.outputTokPerSec, seedMultiple),
+        availability,
+      );
       if (price === null) continue;
       if (cheapest === null || price < cheapest) cheapest = price;
     }
     return cheapest;
-  }, [fleets, availability]);
+  }, [fleets, availability, seedMultiple]);
 
-  // Seed and re-seed the price from break-even until the user takes it over.
+  // Seed and re-seed both prices from break-even until the user takes them over.
   useEffect(() => {
     if (priceEdited.current || breakEven === null) return;
-    setPriceInput(breakEven.toFixed(4));
-  }, [breakEven]);
+    setPriceInput(formatPrice(breakEven));
+    setOutputPriceInput(formatPrice(breakEven * seedMultiple));
+  }, [breakEven, seedMultiple]);
 
   const assumptions = useMemo<LifecycleAssumptions>(
     () => ({
       mtbiDays: parseNonNegative(mtbiInput) ?? 0,
       recoveryHours: parseNonNegative(recoveryInput) ?? 0,
-      pricePerMTok: parseNonNegative(priceInput) ?? 0,
+      inputPricePerMTok: parseNonNegative(priceInput) ?? 0,
+      outputPricePerMTok: parseNonNegative(outputPriceInput) ?? 0,
       rampMonths: parseNonNegative(rampInput) ?? 0,
     }),
-    [mtbiInput, recoveryInput, priceInput, rampInput],
+    [mtbiInput, recoveryInput, priceInput, outputPriceInput, rampInput],
   );
 
   const rows = useMemo<LifecycleRow[]>(
@@ -724,20 +772,49 @@ export default function FleetLifecycle({
     track('calculator_lifecycle_metric_set', { value });
   }, []);
 
-  const handlePriceChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    priceEdited.current = true;
-    setPriceInput(raw);
-    writeUrlParams({ c_price: parseNonNegative(raw) === null ? '' : raw });
-    track('calculator_lifecycle_price_set', { value: raw });
-  }, []);
+  const handlePriceChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value;
+      priceEdited.current = true;
+      setPriceInput(raw);
+      const input = parseNonNegative(raw);
+      const output = parseNonNegative(outputPriceInput);
+      if (input !== null && input > 0 && output !== null && output > 0) {
+        setSeedMultiple(output / input);
+      }
+      writeUrlParams({ c_price: parseNonNegative(raw) === null ? '' : raw });
+      track('calculator_lifecycle_price_set', { value: raw });
+    },
+    [outputPriceInput],
+  );
+
+  const handleOutputPriceChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value;
+      priceEdited.current = true;
+      setOutputPriceInput(raw);
+      const input = parseNonNegative(priceInput);
+      const output = parseNonNegative(raw);
+      if (input !== null && input > 0 && output !== null && output > 0) {
+        setSeedMultiple(output / input);
+      }
+      writeUrlParams({ c_oprice: parseNonNegative(raw) === null ? '' : raw });
+      track('calculator_lifecycle_output_price_set', { value: raw });
+    },
+    [priceInput],
+  );
 
   const handlePriceReset = useCallback(() => {
     priceEdited.current = false;
-    if (breakEven !== null) setPriceInput(breakEven.toFixed(4));
-    writeUrlParams({ c_price: '' });
+    if (breakEven !== null) {
+      // Scale both, keeping whatever ratio the user had set — the pair is what
+      // break-even is solved for, so resetting one alone would land off the line.
+      setPriceInput(formatPrice(breakEven));
+      setOutputPriceInput(formatPrice(breakEven * seedMultiple));
+    }
+    writeUrlParams({ c_price: '', c_oprice: '' });
     track('calculator_lifecycle_price_reset', {});
-  }, [breakEven]);
+  }, [breakEven, seedMultiple]);
 
   const columns = useMemo<DataTableColumn<LifecycleRow>[]>(
     () => [
@@ -931,7 +1008,19 @@ export default function FleetLifecycle({
                 step="any"
                 value={priceInput}
                 onChange={handlePriceChange}
-                className="w-32 h-9"
+                aria-label={t.priceInputLabel}
+                className="w-24 h-9"
+              />
+              <Input
+                id="calc-lifecycle-output-price"
+                data-testid="calc-lifecycle-output-price-input"
+                type="number"
+                min={0}
+                step="any"
+                value={outputPriceInput}
+                onChange={handleOutputPriceChange}
+                aria-label={t.outputPriceInputLabel}
+                className="w-24 h-9"
               />
               {priceEdited.current && breakEven !== null && (
                 <button
