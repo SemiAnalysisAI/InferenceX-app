@@ -83,6 +83,44 @@ function cacheHitRateOf(m: Record<string, number>): number | null {
 }
 
 /**
+ * Fraction of a config's tokens that are input tokens.
+ *
+ * The obvious formula — `input / (input + output)` off the per-GPU rates — is
+ * wrong for disaggregated runs, and wrong by a lot. Those rows report
+ * `input_tput_per_gpu` per *prefill* chip and `output_tput_per_gpu` per *decode*
+ * chip, while `tput_per_gpu` is per chip overall. Across production history the
+ * two rates sum to between 1.0x and 16.1x the total, exactly tracking
+ * `(prefill + decode) x (isl/prefill + osl/decode) / (isl + osl)`. Aggregated
+ * rows sum to 1.0000x on all 937 of them.
+ *
+ * So: trust the measured rates when they are self-consistent, and fall back to
+ * the structural mix when they are not. For a fixed sequence the structural mix
+ * is exactly ISL:OSL — every request has that shape, so no config can change it.
+ * For agentic traces it is the run's own prompt:generation token counts.
+ *
+ * Returns null when nothing in the row pins the mix down.
+ */
+function inputTokenShare(row: BenchmarkRow, inputTput: number, outputTput: number): number | null {
+  const tput = row.metrics.tput_per_gpu ?? 0;
+  const sum = inputTput + outputTput;
+  // Self-consistent: the rates share the denominator `tput_per_gpu` uses, so the
+  // split they imply is the measured one. 1% covers float noise, not a
+  // prefill/decode mismatch (the smallest of those in production is 1.63x).
+  if (tput > 0 && sum > 0 && Math.abs(sum / tput - 1) <= 0.01) return inputTput / sum;
+
+  const { isl, osl } = row;
+  if (typeof isl === 'number' && typeof osl === 'number' && isl + osl > 0) {
+    return isl / (isl + osl);
+  }
+  const prompt = row.metrics.total_prompt_tokens;
+  const generated = row.metrics.total_generation_tokens;
+  if (typeof prompt === 'number' && typeof generated === 'number' && prompt + generated > 0) {
+    return prompt / (prompt + generated);
+  }
+  return sum > 0 ? inputTput / sum : null;
+}
+
+/**
  * Build `GPUDataPoint` groups from raw benchmark rows.
  *
  * Shared by the official and the unofficial-run overlay paths so both are
@@ -129,6 +167,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
     const cacheHitRate = cacheHitRateOf(m);
+    const tokenShare = inputTokenShare(row, inputTput, outputTput);
     const specs = getGpuSpecs(hwKey);
     const power = specs.power;
 
@@ -151,6 +190,7 @@ export function buildGpuGroups<M extends GroupMeta>(
       outputThroughput: outputTput,
       inputThroughput: inputTput,
       ...(cacheHitRate === null ? {} : { cacheHitRate }),
+      ...(tokenShare === null ? {} : { inputTokenShare: tokenShare }),
       concurrency: row.conc,
       tp: row.decode_tp,
       precision: row.precision,

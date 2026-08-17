@@ -73,15 +73,23 @@
  * module), which restores the guarantee: 0 rises in ~415k cross-slice comparisons at
  * every ramp from 0 to 12.
  *
- * For input- or output-token pricing there is **no such guarantee**: those reads are
- * not the axis the frontier is built on, and on disaggregated sweeps the
- * prefill:decode mix shifts along the frontier, so input tok/s/chip can genuinely
- * rise with interactivity. The shipped fixture does it — `mi355x_mori-sglang`
- * (8k/1k, 2026-05-28) rises 1.4× mid-range on input throughput while its total falls
- * 47× across the same range — and grids built at
- * `costType === 'input'` carry z-rises of up to ~4% per slice step. A rise there is
- * measured data, not a config leaking across slices: the one-config-per-date rule
- * still holds; it is the priced token mix that moves.
+ * That guarantee now covers **every** pricing, which it did not before. Revenue is
+ * `total x (share x inputPrice + (1 - share) x outputPrice)` — a positive multiple of
+ * the frontier's own axis whenever the token mix holds — and on a fixed sequence the
+ * mix *is* the sequence shape, so it holds to within 0.2% across all of production
+ * history. Measured on the shipped fixture: 0 rises in 27,837 cross-slice comparisons
+ * across 8k/1k and 1k/1k, at ramp 0 and 3, priced alike, at 4x output, and at
+ * output-only.
+ *
+ * The caveat that used to sit here — that input-token pricing carried z-rises of up
+ * to ~4% — was an artifact, not a finding. Disaggregated rows report
+ * `input_tput_per_gpu` per prefill chip and `output_tput_per_gpu` per decode chip
+ * while `tput_per_gpu` is per chip overall, so reading the two rates directly billed
+ * a disagg config for up to 16x the tokens its chips served, and the "rising input
+ * throughput" was the denominator moving. Revenue is now split off the total by a
+ * share instead (`splitTokenStreams`). A workload whose mix genuinely shifts per
+ * config — agentic traces, where it is measured rather than structural — can still
+ * break monotonicity, and that is real data when it happens.
  *
  * **A running total cannot span a hole.** Where a rung the fleet ran is missing from
  * a slice's timeline, the integral across that window is the previous config's rate
@@ -114,7 +122,7 @@ import { computeFleetStats } from './fleet';
 import type { HistoryGroups } from './historical-best';
 import { hermiteInterpolate, monotoneSlopes, paretoFrontUpperLeft } from './interpolation';
 import {
-  billableInputRate,
+  splitTokenStreams,
   computeLifecycle,
   isCumulative,
   MS_PER_MONTH,
@@ -182,14 +190,25 @@ export interface FrontierRead {
   tput: number;
   /** Output throughput, tok/s/chip — concurrent users divide by this. */
   outputTput: number;
-  /** Input throughput, tok/s/chip — the base the cached-token discount applies to. */
+  /** Input throughput, tok/s/chip. Kept for parity with the 1D read. */
   inputTput: number;
+  /**
+   * Total tokens per chip overall — the only rate commensurate with how the fleet
+   * is sized and costed, and so the one revenue is charged on. See
+   * {@link splitTokenStreams}.
+   */
+  totalTput: number;
   /**
    * Cached fraction of input tokens, or undefined when the frontier did not
    * carry a measured rate on every point. Same rule as the 1D path, so both
    * views discount the same tokens.
    */
   cacheHitRate?: number;
+  /**
+   * Input share of tokens, or undefined when the frontier did not pin it down on
+   * every point. Same rule as the 1D path.
+   */
+  inputTokenShare?: number;
   /** tok/s/MW for the selected token type: the ranking basis. */
   rank: number;
   /** True when the bracketing frontier points came from a disaggregated run. */
@@ -271,7 +290,9 @@ export function prepareFrontier(
               tput: tputOf(only),
               outputTput: only.outputThroughput,
               inputTput: only.inputThroughput,
+              totalTput: only.throughput,
               cacheHitRate: only.cacheHitRate,
+              inputTokenShare: only.inputTokenShare,
               rank: rankOf(only),
               disagg: Boolean(only.disagg),
             }
@@ -290,6 +311,10 @@ export function prepareFrontier(
     xs,
     sorted.map((p) => p.inputThroughput),
   );
+  const readTotalTput = metricReader(
+    xs,
+    sorted.map((p) => p.throughput),
+  );
   const readRank = metricReader(xs, sorted.map(rankOf));
   // All-or-nothing, exactly as `interpolateForGPU` decides it — a frontier that
   // is only partly measured opts out rather than having zeros splined into it.
@@ -297,6 +322,12 @@ export function prepareFrontier(
     ? metricReader(
         xs,
         sorted.map((p) => p.cacheHitRate!),
+      )
+    : null;
+  const readInputTokenShare = sorted.every((p) => typeof p.inputTokenShare === 'number')
+    ? metricReader(
+        xs,
+        sorted.map((p) => p.inputTokenShare!),
       )
     : null;
 
@@ -312,7 +343,9 @@ export function prepareFrontier(
         tput: readTput(target),
         outputTput: readOutputTput(target),
         inputTput: readInputTput(target),
+        totalTput: readTotalTput(target),
         cacheHitRate: readCacheHitRate ? readCacheHitRate(target) : undefined,
+        inputTokenShare: readInputTokenShare ? readInputTokenShare(target) : undefined,
         rank: readRank(target),
         disagg: bracket(target).some((p) => p.disagg),
       };
@@ -659,15 +692,17 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
         // 2D section divides by the same actually-provisioned figure.
         provisionedMw ??= (stats.gpus * specs.powerKwPerGpu) / 1000;
         onTimeline[i] = true;
-        // Sized on the physical rate, billed per stream at its own price. Both
-        // are read straight off the frontier rather than through the cost-type
-        // accessor: the fleet sells everything it produces, whichever token type
-        // the cost matrix above is currently expressed in.
+        // Always the total-token rate, never the cost-type one, split by the
+        // measured mix — same basis as the 2D section, so the slider slice and
+        // the line agree cell for cell.
         throughputSteps.push({
           month: rungMonths[i]!,
-          billableInputTokPerSec:
-            stats.gpus * billableInputRate(read.inputTput, read.cacheHitRate, cacheReadRatio),
-          outputTokPerSec: stats.gpus * read.outputTput,
+          ...splitTokenStreams(
+            stats.gpus * read.totalTput,
+            read.inputTokenShare,
+            read.cacheHitRate,
+            cacheReadRatio,
+          ),
         });
       }
       if (throughputSteps.length === 0 || costPerHour === null || provisionedMw === null) continue;

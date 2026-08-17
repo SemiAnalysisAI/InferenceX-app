@@ -14,9 +14,41 @@ import { unlockAgenticGate } from '../support/e2e';
 //  - agentic traces have no ISL/OSL, so history is keyed on benchmark_type
 //    instead, and their cached input tokens bill at a discount.
 
-/** Nth cell of the first lifecycle table row. */
-const firstRowCell = (index: number) =>
-  cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').first().find('td').eq(index);
+/**
+ * This figure's export menu button. Scoped: the bar chart above has its own, and
+ * `export-button` is not unique across the page.
+ */
+const exportMenu = () =>
+  cy.get('[data-testid="calculator-lifecycle-figure"]').find('[data-testid="export-button"]');
+
+/** Switch the section to the table tab. Idempotent — clicking the active tab is a no-op. */
+const showTable = () => cy.get('[data-testid="calculator-lifecycle-table-view-btn"]').click();
+
+/** Switch the section back to the chart tab. */
+const showChart = () => cy.get('[data-testid="calculator-lifecycle-chart-view-btn"]').click();
+
+/**
+ * Put the section back on the chart tab if it has one rendered.
+ *
+ * `testIsolation` is false, so all of these tests share one page and one tab
+ * state. Without this, a test that reads the table leaves the next one looking
+ * for a chart that is not mounted — an ordering coupling that fails in whichever
+ * order the file happens to be written in. Tolerant of the tab not existing yet:
+ * before a power budget is entered there is no figure at all.
+ */
+const resetToChart = () =>
+  cy.get('body').then(($body) => {
+    if ($body.find('[data-testid="calculator-lifecycle-chart-view-btn"]').length > 0) showChart();
+  });
+
+/**
+ * Nth cell of the first lifecycle table row. Switches to the table tab first: the
+ * section opens on the chart, and these assertions are about the numbers.
+ */
+const firstRowCell = (index: number) => {
+  showTable();
+  return cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').first().find('td').eq(index);
+};
 
 /** The time-axis tick labels, as one string — changes when the x domain moves. */
 const xAxisTicks = () =>
@@ -94,6 +126,8 @@ describe('Calculator — Fleet Lifecycle', () => {
     cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
   });
 
+  beforeEach(resetToChart);
+
   it('renders the section with a prompt for a power budget, and fetches nothing yet', () => {
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('be.visible')
@@ -109,7 +143,11 @@ describe('Calculator — Fleet Lifecycle', () => {
   it('entering a MW budget in the fleet planner drives the lifecycle table', () => {
     // One budget, one `c_mw` param, both sections.
     cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
-    cy.get('[data-testid="calculator-lifecycle-table"]', { timeout: 30_000 }).should('be.visible');
+    // The figure opens on the chart; the table is the other tab.
+    cy.get('[data-testid="calculator-lifecycle-figure"]', { timeout: 30_000 }).should('be.visible');
+    cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
+    showTable();
+    cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-table"]').within(() => {
       cy.contains('th', 'Config Now').should('exist');
       cy.contains('th', 'First Run').should('exist');
@@ -121,6 +159,9 @@ describe('Calculator — Fleet Lifecycle', () => {
       cy.get('tbody tr').should('have.length.greaterThan', 0);
     });
     cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
+    // No search box over one row per chip — every one of them is named in the
+    // legend and on the chart already.
+    cy.get('[data-testid="calculator-lifecycle-table"] input[type="text"]').should('not.exist');
     // No cached-input assumption on a fixed sequence: those runs record no cache
     // hits at all, so the control would be a knob that moves nothing.
     cy.get('[data-testid="calc-lifecycle-cache-input"]').should('not.exist');
@@ -138,6 +179,42 @@ describe('Calculator — Fleet Lifecycle', () => {
             expect(Number(output)).to.be.closeTo(Number(input) * 4, Number(input) * 0.01);
           });
       });
+  });
+
+  it('puts the chart and the table on their own tabs, with a header on both', () => {
+    // The header is the figure's own caption, so it survives the switch — a reader
+    // on the table tab still sees what model, scenario and target they are reading.
+    cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
+      cy.contains('h2', 'Fleet Lifecycle').should('be.visible');
+      cy.contains('tok/s/user').should('be.visible');
+    });
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"]').should('be.visible');
+    cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
+
+    showTable();
+    cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"]').should('not.exist');
+    cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
+      cy.contains('h2', 'Fleet Lifecycle').should('be.visible');
+    });
+
+    showChart();
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"]').should('be.visible');
+  });
+
+  it('offers a download, and disables the PNG where a PNG is meaningless', () => {
+    exportMenu().should('be.visible').click();
+    cy.get('[data-testid="export-csv-button"]').should('be.visible');
+    // On the chart a PNG is a real artefact.
+    cy.get('[data-testid="export-png-button"]').should('not.have.attr', 'aria-disabled', 'true');
+    cy.get('body').type('{esc}');
+
+    showTable();
+    exportMenu().click();
+    // A PNG of a paginated HTML table is not; the CSV is the export for that view.
+    cy.get('[data-testid="export-png-button"]').should('have.attr', 'aria-disabled', 'true');
+    cy.get('[data-testid="export-csv-button"]').should('be.visible');
+    cy.get('body').type('{esc}');
   });
 
   it('every row is traceable to the dated run it came from', () => {
@@ -160,6 +237,7 @@ describe('Calculator — Fleet Lifecycle', () => {
       .then((val) => expect(Number(val)).to.be.greaterThan(0));
     // Break-even means the cheapest chip earns nothing: some row is at/near zero
     // margin, and none of the visible fleet is comfortably profitable there.
+    showTable();
     cy.get('[data-testid="calculator-lifecycle-table"]').should('contain.text', 'Never');
   });
 
@@ -240,6 +318,7 @@ describe('Calculator — Fleet Lifecycle', () => {
       .invoke('text')
       .should('match', /\S/u)
       .then((label) => {
+        showTable();
         cy.get('[data-testid="calculator-lifecycle-table"]').should('contain', String(label));
       });
   });
@@ -455,6 +534,7 @@ describe('Calculator — Fleet Lifecycle', () => {
   });
 
   it('tracks measured config improvements as steps, not one flat plateau', () => {
+    showTable();
     // The point of the section: a chip's revenue follows its optimisation
     // history, so at least one chip must show more than zero improvements.
     cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').then(($rows) => {
@@ -470,6 +550,8 @@ describe('Calculator — Fleet Lifecycle', () => {
   });
 
   it('rolls each config out over the ramp instead of stepping instantly', () => {
+    // Reads both views, so it switches deliberately: `firstRowCell` moves to the
+    // table, and the vertex counts are only meaningful on the chart.
     cy.get('[data-testid="calc-lifecycle-ramp-input"]').should('have.value', '3');
     lineVertices().then((curved) => {
       // Rollouts are sampled into curves, so the line cannot be a bare staircase.
@@ -488,6 +570,7 @@ describe('Calculator — Fleet Lifecycle', () => {
           // needs far fewer vertices than the sampled curves.
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').type('0');
+          showChart();
           lineVertices().should((stepped) => expect(stepped).to.be.lessThan(curved));
         });
     });
@@ -521,6 +604,7 @@ describe('Calculator — Fleet Lifecycle', () => {
   });
 
   it('draws one row per chip, pooling its software configs', () => {
+    showTable();
     // The history holds many hwKeys per chip (b200_sglang, b200_trtllm, …) and
     // they are one piece of silicon, so the chip must not repeat down the table.
     cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').then(($rows) => {
@@ -533,6 +617,7 @@ describe('Calculator — Fleet Lifecycle', () => {
   });
 
   it('follows legend visibility', () => {
+    showTable();
     // Legend entries are configs and clicking one isolates it. Configs sit one
     // level below the lines now, so isolating a single config leaves at most one
     // chip — and none at all when that config was never measured at the target,
@@ -631,7 +716,9 @@ describe('Calculator — Fleet Lifecycle with agentic traces', () => {
     cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic');
     cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
     cy.wait('@agenticHistory');
-    cy.get('[data-testid="calculator-lifecycle-table"]', { timeout: 30_000 }).should('be.visible');
+    cy.get('[data-testid="calculator-lifecycle-figure"]', { timeout: 30_000 }).should('be.visible');
+    showTable();
+    cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
   });
 
   it('projects a lifecycle from history that has no ISL/OSL to key on', () => {
@@ -696,7 +783,10 @@ describe('Calculator — Fleet Lifecycle in Chinese', () => {
       .should('contain.text', '集群生命周期')
       .and('contain.text', '设施功率预算');
     cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
-    cy.get('[data-testid="calculator-lifecycle-table"]', { timeout: 30_000 }).should('be.visible');
+    cy.get('[data-testid="calculator-lifecycle-figure"]', { timeout: 30_000 }).should('be.visible');
+    // The table headers this test checks are on the other tab now.
+    showTable();
+    cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('contain.text', 'Token 价格')
       .and('contain.text', '当前配置')

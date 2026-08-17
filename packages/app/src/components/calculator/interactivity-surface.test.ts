@@ -147,7 +147,11 @@ const TWO_GAP_ROWS: BenchmarkRow[] = [
   sweep('2026-09-05', 90, 3500),
 ];
 
-/** A sweep whose prefill:decode mix shifts along the frontier, as disagg runs do. */
+/**
+ * A sweep whose token mix shifts along the frontier while staying self-consistent —
+ * the two rates always sum to the total, so `inputTokenShare` reads them rather than
+ * falling back to the sequence shape.
+ */
 const mixRow = (interactivity: number, tputPerGpu: number, inputTput: number): BenchmarkRow =>
   makeRow({
     id: Math.round(interactivity * 1000 + tputPerGpu),
@@ -163,11 +167,16 @@ const mixRow = (interactivity: number, tputPerGpu: number, inputTput: number): B
 
 /**
  * Total throughput falls 1000 → 800 → 600, so every point survives the Pareto pass,
- * while the input share rises 300 → 550. The shipped fixture does this for real —
- * `mi355x_mori-sglang` (8k/1k, 2026-05-28) rises 1.4× on input throughput mid-range
- * while its total falls 47× over the same range.
- * `sweep` cannot express it: it splits input/output 70/30 proportionally to total, so
- * its input reads fall wherever total does.
+ * while the input share rises 0.30 → 0.63 → 0.92. `sweep` cannot express that: it
+ * splits input/output 70/30 proportionally to total, so its share never moves.
+ *
+ * **Synthetic on purpose, and no real fixed sequence looks like this.** On 8k/1k every
+ * request is 8192 in / 1024 out, so the mix is the sequence shape and the share is
+ * constant to within 0.2% across all of production history. The claim that used to sit
+ * here — that `mi355x_mori-sglang` rises 1.4× on input throughput mid-range — was the
+ * disaggregated denominator artifact `splitTokenStreams` now removes, not a mix shift.
+ * What this fixture stands in for is the case that remains real: agentic traces, where
+ * the mix is measured per config rather than fixed by the scenario.
  */
 const DISAGG_MIX_ROWS: BenchmarkRow[] = [
   mixRow(20, 1000, 300),
@@ -608,14 +617,14 @@ describe('buildSurfaceGrid', () => {
         }
         return rises;
       };
-      // Priced alike: revenue is p x (input + output) = p x total, the frontier's
-      // own axis, so it falls along z everywhere.
+      // Priced alike: revenue is p x total, the frontier's own axis, so it falls
+      // along z everywhere.
       expect(risesAlongZ(40, 40)).toBe(0);
-      // Weighted onto the input stream, it does not.
+      // Priced apart, on a fixture whose share moves from 0.30 to 0.92, it does
+      // not. Real fixed sequences cannot do this — their share is the scenario —
+      // so on the shipped fixture every pricing is monotone (0 rises in 27,837
+      // comparisons). This guards the mechanism for the case that can: agentic.
       expect(risesAlongZ(40, 0)).toBeGreaterThan(0);
-      // And the cost type no longer has anything to do with it — revenue counts
-      // both streams whichever basis the cost matrix is expressed in.
-      expect(risesAlongZ(40, 40)).toBe(0);
     });
 
     it('holes a rollout that would ramp from a level this slice never measured', () => {

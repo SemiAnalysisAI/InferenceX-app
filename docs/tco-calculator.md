@@ -567,19 +567,16 @@ interactivity. The fixture agrees because it must: across the shipped fixture's 
 sweeps (1k/1k, fp8 + fp4), tok/s/chip falls across the frontier's own range in all 160
 multi-point frontiers and is flat in the 37 single-point ones.
 
-For input- and output-token pricing the guarantee does not exist. Those throughput reads
-are not the axis the frontier is built on (`tputOf` returns `inputThroughput` /
-`outputThroughput`, while the frontier is built on total), and on disaggregated sweeps
-the prefill:decode mix shifts along the frontier, so input tok/s/chip can rise as
-interactivity rises. On the same fixture, 12 sweeps rise on input throughput inside
-their range (worst: `mi355x_mori-sglang`, 8k/1k, 2026-05-28, +1.4× mid-range — its total
-falls 47× over the same range, which is the figure that used to be quoted here), one rises
-end to end (`b300_dynamo-trt`, 1k/1k, 2026-02-07: 6,710 → 8,818 tok/s/chip), and grids
-built at input pricing carry z-rises of up to ~4% per slice step. This is reachable in
-the shipped product — the Token Type dropdown feeds the surface directly, though it is
-not a URL param, so a shared link always reopens at total. Such a rise is measured data,
-not a config leaking across slices: the one-config-per-date rule still holds; it is the
-priced token mix that moves.
+The guarantee now covers every pricing, which it did not before. Revenue is
+`total × (share × inputPrice + (1 − share) × outputPrice)`, a positive multiple of the
+frontier's own axis whenever the token mix holds — and on a fixed sequence the mix _is_
+the sequence shape, constant to within 0.2% across all of production history. Measured
+on the shipped fixture: **0 rises in 27,837 cross-slice comparisons**, over 8k/1k and
+1k/1k, at ramp 0 and 3, priced alike, at 4× output, and at output-only.
+
+The caveat that used to sit here — 12 sweeps rising on input throughput, grids at input
+pricing carrying z-rises of up to ~4% per slice step — was an **artifact, not a
+finding**. See "The disaggregated token-split trap" below.
 
 **A running total cannot span a hole.** The rate metrics resume after a gap, correctly:
 a rate at a given date depends only on the config governing then. A running total does
@@ -822,6 +819,42 @@ below), so the input price is the fresh-token price.
 `c_price` is the input price — unchanged, so a link written before the split
 still seeds the field it always seeded — and `c_oprice` the output price.
 
+### The disaggregated token-split trap
+
+`input_tput_per_gpu` is per **prefill** chip, `output_tput_per_gpu` per **decode** chip,
+and `tput_per_gpu` per chip **overall**. Three denominators. On an aggregated run they
+coincide and the two rates sum to the total on all 937 production rows. On a
+disaggregated run they do not, and the gap is large: across 308 disagg rows the two
+rates sum to between 1.00× and **16.11×** the total, tracking
+`(prefill + decode) × (isl/prefill + osl/decode) / (isl + osl)` to four decimals.
+
+Pricing the two streams off those rates therefore billed a disaggregated config for
+tokens its chips never served. The visible symptom was a **dip**: MI355X on
+DeepSeek-V4-Pro 8k/1k stepped from `mori-sglang` (disaggregated, 2026-07-22) to
+`atom_mtp` (aggregated, 2026-07-28) with a _higher_ total tok/s/MW — a legitimate
+best-so-far rung — and the margin line fell, because the outgoing config had been
+credited with ~2× its tokens. Eleven such dips existed across 215 step transitions on
+eight interactivity targets; every one was a handover where the prefill:decode split
+changed or disappeared.
+
+The fix is to charge revenue on a **share of the per-chip total**, never on the two
+rates directly (`splitTokenStreams`), with the share recovered as:
+
+1. `input / (input + output)` when those agree with `tput_per_gpu` to within 1% — every
+   aggregated row, where the measurement is self-consistent and is the truth;
+2. otherwise `isl / (isl + osl)` — for a fixed sequence the mix is the sequence shape,
+   and no config can change it;
+3. otherwise the run's own `total_prompt_tokens : total_generation_tokens` — agentic
+   traces, which have no ISL/OSL;
+4. otherwise nothing is charged as input, which understates revenue rather than
+   inventing a mix.
+
+After the fix: 0 dips across the same 215 transitions, and the streams sum to the rate
+the fleet was sized and costed on by construction. A corollary worth stating: on a fixed
+sequence the input/output split changes the **level** and the break-even price, but it
+cannot reorder chips, because the mix is the same for all of them. On agentic traces the
+mix is measured per config, so there it can.
+
 ### Margin per megawatt
 
 A fourth y-axis metric, `marginPerMw` (`c_ly=marginPerMw`), plotting the same
@@ -921,6 +954,25 @@ This section is official-only, and unlike the fleet planner that is not a policy
 choice: unofficial runs are not ingested, so `/api/v1/benchmarks/history` cannot
 serve them. Taking AGENTS.md's documented exemption; the section states the
 exclusion in its own note rather than leaving a silent gap.
+
+### Chart and table are tabs, with the figure's own header
+
+The section renders as a `<figure>` in the same shape as the bar chart above it and
+the `/inference` charts: a `ChartButtons` row carrying a Chart/Table `SegmentedToggle`
+and the PNG/CSV export menu, and a caption with the title plus the provenance a reader
+needs — model, scenario, target interactivity, power budget, source. The caption is
+passed to the chart as its `caption` and rendered as a `<figcaption>` in the table view,
+so switching tabs never loses the heading.
+
+PNG export is disabled on the table tab: a picture of a paginated HTML table is not an
+artefact anyone wants. The CSV is the export for that view, and it carries the
+assumptions in its notes preamble — a CSV read six months later cannot be reconstructed
+from the rows alone.
+
+The table's search box is off (`searchable={false}` on `DataTable`). It is one row per
+chip, and every chip is already named in the legend and on the chart; a search field
+over five rows is furniture. The prop is new and defaults to true, so no other table
+changed.
 
 ### URL params
 

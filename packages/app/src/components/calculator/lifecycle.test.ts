@@ -5,6 +5,7 @@ import {
   billableInputRate,
   effectiveTokPerSec,
   isBreakEvenAnchored,
+  splitTokenStreams,
   metricValue,
   breakEvenPricePerMTok,
   computeLifecycle,
@@ -809,5 +810,77 @@ describe('margin per megawatt', () => {
     const p = series.points.at(-1)!;
     expect(metricValue(p, 'marginPerMw')).toBe(p.marginPerMw);
     expect(metricValue(p, 'margin')).toBe(p.margin);
+  });
+});
+
+describe('splitTokenStreams', () => {
+  // 8k/1k: every request is 8192 in / 1024 out, so the share is the sequence shape.
+  const SHARE = 8192 / 9216;
+
+  it('splits the per-chip total by the measured mix', () => {
+    const { billableInputTokPerSec, outputTokPerSec } = splitTokenStreams(
+      9000,
+      SHARE,
+      undefined,
+      1,
+    );
+    expect(billableInputTokPerSec).toBeCloseTo(9000 * SHARE, 9);
+    expect(outputTokPerSec).toBeCloseTo(9000 * (1 - SHARE), 9);
+    // The whole point: the two streams add back up to the rate the fleet was
+    // sized and costed on. Reading the per-GPU rates directly did not.
+    expect(billableInputTokPerSec + outputTokPerSec).toBeCloseTo(9000, 6);
+  });
+
+  it('cannot bill more tokens than the chips served, whatever the reported rates', () => {
+    // A disaggregated run reports input per prefill chip and output per decode
+    // chip, so those two summed reach 16x the per-chip total in production. Any
+    // share is still a share: the streams sum to the total.
+    for (const share of [0, 0.5, SHARE, 1]) {
+      const s = splitTokenStreams(1000, share, undefined, 1);
+      expect(s.billableInputTokPerSec + s.outputTokPerSec).toBeCloseTo(1000, 6);
+    }
+  });
+
+  it('clamps a share outside [0,1] rather than producing a negative stream', () => {
+    expect(splitTokenStreams(1000, 1.5, undefined, 1).outputTokPerSec).toBe(0);
+    expect(splitTokenStreams(1000, -0.5, undefined, 1).billableInputTokPerSec).toBe(0);
+  });
+
+  it('charges nothing as input when the mix is unknown', () => {
+    // Understating revenue beats inventing a mix.
+    const s = splitTokenStreams(1000, undefined, undefined, 1);
+    expect(s.billableInputTokPerSec).toBe(0);
+    expect(s.outputTokPerSec).toBe(1000);
+  });
+
+  it('applies the cached discount to the input stream only', () => {
+    const plain = splitTokenStreams(1000, 0.9, undefined, 0.1);
+    const cached = splitTokenStreams(1000, 0.9, 0.5, 0.1);
+    expect(cached.outputTokPerSec).toBeCloseTo(plain.outputTokPerSec, 9);
+    expect(cached.billableInputTokPerSec).toBeLessThan(plain.billableInputTokPerSec);
+    // Half the input stream at a tenth of the price.
+    expect(cached.billableInputTokPerSec).toBeCloseTo(900 * (1 - 0.5 * 0.9), 9);
+  });
+
+  it('is zero for an unusable total', () => {
+    for (const total of [0, -1, Number.NaN]) {
+      const s = splitTokenStreams(total, 0.9, undefined, 1);
+      expect(s.billableInputTokPerSec).toBe(0);
+      expect(s.outputTokPerSec).toBe(0);
+    }
+  });
+
+  it('keeps revenue monotone in the total when the mix holds — the dip regression', () => {
+    // The MI355X dip: 2026-07-22 mori-sglang (disaggregated) handed over to
+    // 2026-07-28 atom_mtp (aggregated) with a HIGHER total tok/s/MW, yet the
+    // plotted margin fell, because the disagg run's input/output rates were on a
+    // prefill/decode denominator and billed up to 16x the tokens its chips served.
+    // Split from the total instead and a rank that rose cannot make revenue fall.
+    const revenue = (total: number) => {
+      const s = splitTokenStreams(total, SHARE, undefined, 1);
+      return s.billableInputTokPerSec * 0.27 + s.outputTokPerSec * 1.1;
+    };
+    // The two real per-chip totals from that handover, in order.
+    expect(revenue(2336)).toBeLessThan(revenue(2618));
   });
 });

@@ -1200,6 +1200,82 @@ describe('buildGpuGroups', () => {
     });
   });
 
+  describe('input token share', () => {
+    const only = (row: BenchmarkRow) => {
+      const { grouped } = buildGpuGroups([row], { ...shared, classify: singlePrecisionClassify });
+      return Object.values(grouped)[0][0];
+    };
+
+    it('takes the share from the rates when they agree with the total', () => {
+      // Self-consistent (700 + 300 = 1000), so the measured split is the split —
+      // even where it disagrees with the sequence shape.
+      const point = only(
+        makeRow({
+          metrics: {
+            median_intvty: 50,
+            tput_per_gpu: 1000,
+            input_tput_per_gpu: 700,
+            output_tput_per_gpu: 300,
+          },
+        }),
+      );
+      expect(point.inputTokenShare).toBeCloseTo(0.7, 9);
+    });
+
+    it('falls back to ISL:OSL when the rates are on a different denominator', () => {
+      // The disaggregated shape, with the real arithmetic: 16 prefill + 8 decode
+      // chips serving 8192:1024. Input is per prefill chip (6400/16 = 400),
+      // output per decode chip (800/8 = 100), total per chip overall
+      // (7200/24 = 300). The rates sum to 1.667x the total, and the split they
+      // imply — 0.8 — is not the split the workload has, which is 8192/9216.
+      const point = only(
+        makeRow({
+          disagg: true,
+          isl: 1024,
+          osl: 1024,
+          metrics: {
+            median_intvty: 50,
+            tput_per_gpu: 300,
+            input_tput_per_gpu: 400,
+            output_tput_per_gpu: 100,
+          },
+        }),
+      );
+      // 1k/1k here, because that is the sequence this describe block selects.
+      expect(point.inputTokenShare).toBeCloseTo(0.5, 9);
+      expect(point.inputTokenShare).not.toBeCloseTo(0.8, 2);
+    });
+
+    it('falls back to the run token counts when there is no fixed sequence', () => {
+      // Agentic traces have no ISL/OSL to fall back to, so the run's own
+      // prompt:generation counts pin the mix instead.
+      const { grouped } = buildGpuGroups(
+        [
+          makeRow({
+            disagg: true,
+            benchmark_type: 'agentic_traces',
+            isl: null,
+            osl: null,
+            metrics: {
+              p90_itl: 1 / 50,
+              tput_per_gpu: 300,
+              input_tput_per_gpu: 400,
+              output_tput_per_gpu: 100,
+              total_prompt_tokens: 9000,
+              total_generation_tokens: 1000,
+            },
+          }),
+        ],
+        {
+          sequence: Sequence.AgenticTraces,
+          precisions: ['fp4'],
+          classify: singlePrecisionClassify,
+        },
+      );
+      expect(Object.values(grouped)[0][0].inputTokenShare).toBeCloseTo(0.9, 9);
+    });
+  });
+
   it('drops rows whose isl/osl do not match the selected sequence', () => {
     const { grouped } = buildGpuGroups(
       [makeRow({ isl: 8192, osl: 1024 }), makeRow({ isl: null, osl: null })],

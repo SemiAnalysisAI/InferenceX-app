@@ -1,5 +1,6 @@
 'use client';
 
+import { BarChart3, Table2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -13,11 +14,19 @@ import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { ChartButtons } from '@/components/ui/chart-buttons';
+import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { track } from '@/lib/analytics';
+import { exportToCsv } from '@/lib/csv-export';
 import { getGpuSpecs, getHardwareConfig } from '@/lib/constants';
-import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
+import {
+  getModelLabel,
+  getSequenceLabel,
+  Sequence,
+  type Model,
+  type Percentile,
+} from '@/lib/data-mappings';
 import { readUrlParams, writeUrlParams } from '@/lib/url-state';
 import { useLocale } from '@/lib/use-locale';
 import { getDisplayLabel } from '@/lib/utils';
@@ -30,7 +39,7 @@ import FleetLifecycleChart, {
 import { mergeProgressionsByChip, type ChipProgression } from './historical-best';
 import {
   availabilityFromInterrupts,
-  billableInputRate,
+  splitTokenStreams,
   breakEvenPricePerMTok,
   computeLifecycle,
   effectiveTokPerSec,
@@ -73,9 +82,30 @@ const FleetLifecycleSurface = dynamic(() => import('./FleetLifecycleSurface'), {
   loading: () => null,
 });
 
+type LifecycleView = 'chart' | 'table';
+
+const LIFECYCLE_VIEW_OPTIONS: SegmentedToggleOption<LifecycleView>[] = [
+  {
+    value: 'chart',
+    label: 'Chart',
+    icon: <BarChart3 className="size-3.5" />,
+    testId: 'calculator-lifecycle-chart-view-btn',
+  },
+  {
+    value: 'table',
+    label: 'Table',
+    icon: <Table2 className="size-3.5" />,
+    testId: 'calculator-lifecycle-table-view-btn',
+  },
+];
+
 const STRINGS = {
   en: {
     title: 'Fleet Lifecycle',
+    viewChart: 'Chart',
+    viewTable: 'Table',
+    viewAria: 'View mode',
+    captionTarget: (target: number) => `${target.toFixed(0)} tok/s/user`,
     description:
       'A fixed fleet, from the day the model shipped. The chips never change; the software serving them does — so each rollout is a config that beat every config before it, climbing from what the fleet already served to its own numbers, and the gap to the cost line is the return on that work.',
     needMw:
@@ -177,6 +207,10 @@ const STRINGS = {
   },
   zh: {
     title: '集群生命周期',
+    viewChart: '图表',
+    viewTable: '表格',
+    viewAria: '显示模式',
+    captionTarget: (target: number) => `${target.toFixed(0)} tok/s/用户`,
     description:
       '固定集群自模型发布之日起的表现。Chip 从未更换，变化的是为其提供服务的软件——每一次推广都是一个优于此前所有配置的新配置，从集群当前已提供的水平爬升至其自身水平，而与成本线之间的差距即为这些工作带来的回报。',
     needMw: '请在上方「集群规模测算」中输入设施功率预算，以测算生命周期经济性。',
@@ -568,14 +602,16 @@ export default function FleetLifecycle({
         provisionedMw ??= (stats.gpus * specs.power) / 1000;
         steps.push({
           month: (Date.parse(`${step.date}T00:00:00Z`) - anchorMs) / MS_PER_MONTH,
-          // Sized on the physical rate, billed per stream at its own price. Both
-          // streams are read directly rather than through the cost-type
-          // accessor: the fleet sells everything it produces, whichever token
-          // type the cost matrix above happens to be expressed in.
-          billableInputTokPerSec:
-            stats.gpus *
-            billableInputRate(step.result.inputTputValue, step.result.cacheHitRate, cacheReadRatio),
-          outputTokPerSec: stats.gpus * step.result.outputTputValue,
+          // Always the total-token rate, never the cost-type one: the fleet sells
+          // everything it produces, whichever token type the cost matrix above is
+          // expressed in. Split by the measured mix so both streams stay on the
+          // per-chip denominator the fleet was sized and costed on.
+          ...splitTokenStreams(
+            stats.gpus * getThroughputForType(step.result, 'total'),
+            step.result.inputTokenShare,
+            step.result.cacheHitRate,
+            cacheReadRatio,
+          ),
         });
       }
 
@@ -692,6 +728,31 @@ export default function FleetLifecycle({
    * grid build and the three.js bundle are paid only by a reader who opens it.
    */
   const [surfaceOpen, setSurfaceOpen] = useState(false);
+  const [view, setView] = useState<LifecycleView>('chart');
+
+  const viewOptions = useMemo<SegmentedToggleOption<LifecycleView>[]>(
+    () =>
+      LIFECYCLE_VIEW_OPTIONS.map((option) => ({
+        ...option,
+        label: option.value === 'chart' ? t.viewChart : t.viewTable,
+      })),
+    [t],
+  );
+
+  /**
+   * The same options without test ids. The toggle is rendered twice — once in the
+   * button row, once in the caption for narrow screens — and two elements sharing
+   * a test id makes every `cy.click` on it ambiguous.
+   */
+  const mobileViewOptions = useMemo<SegmentedToggleOption<LifecycleView>[]>(
+    () => viewOptions.map(({ testId: _testId, ...option }) => option),
+    [viewOptions],
+  );
+
+  const handleViewChange = useCallback((value: LifecycleView) => {
+    setView(value);
+    track('calculator_lifecycle_view_changed', { view: value });
+  }, []);
   const surfaceGrid = useInteractivitySurface({
     groups: historical.groups,
     visibleHwKeys,
@@ -815,6 +876,83 @@ export default function FleetLifecycle({
     writeUrlParams({ c_price: '', c_oprice: '' });
     track('calculator_lifecycle_price_reset', {});
   }, [breakEven, seedMultiple]);
+
+  /**
+   * The table's own numbers, not the chart's samples: one row per chip, which is
+   * what a reader who asked for this section is comparing.
+   */
+  const handleExportCsv = useCallback(() => {
+    const headers = [
+      t.colChip,
+      t.colConfigNow,
+      t.colFirst,
+      t.colLatest,
+      t.colSteps,
+      t.colGain,
+      t.colRevenue,
+      t.colCost,
+      t.colMargin,
+      t.colPayback,
+      t.colLifetime,
+      t.colAvailability,
+    ];
+    const body = rows.map((r) => [
+      r.label,
+      r.configNow,
+      r.progression.steps[0]?.date ?? '',
+      r.progression.steps.at(-1)?.date ?? '',
+      r.series.improvementCount,
+      r.series.improvementFactor,
+      r.series.revenuePerDay,
+      r.series.costPerDay,
+      r.series.marginPerDay,
+      r.series.paybackMonth ?? '',
+      r.series.lifetimeMargin,
+      r.series.availability,
+    ]);
+    exportToCsv(`InferenceX_fleet_lifecycle_${selectedModel}`, headers, body, [
+      // The assumptions are not in the rows, and a CSV read six months later
+      // cannot be reconstructed without them.
+      `Assumptions: input $${priceInput}/M tok, output $${outputPriceInput}/M tok, ramp ${rampInput} mo, MTBI ${mtbiInput} d, recovery ${recoveryInput} h, horizon ${horizonInput} mo, power ${mw ?? ''} MW`,
+    ]);
+  }, [
+    rows,
+    t,
+    selectedModel,
+    priceInput,
+    outputPriceInput,
+    rampInput,
+    mtbiInput,
+    recoveryInput,
+    horizonInput,
+    mw,
+  ]);
+
+  /**
+   * The figure's own header, in the same shape the bar chart above uses: title,
+   * then the provenance a reader needs to know what they are looking at. The
+   * chart renders it as its caption; the table view renders it as a figcaption,
+   * so switching tabs never loses the heading.
+   */
+  const caption = (
+    <>
+      <div className="flex items-start justify-between gap-4">
+        <h2 className="text-lg font-semibold">{t.title}</h2>
+        <SegmentedToggle
+          value={view}
+          options={mobileViewOptions}
+          onValueChange={handleViewChange}
+          ariaLabel={t.viewAria}
+          className="md:hidden shrink-0"
+        />
+      </div>
+      <p className="text-sm text-muted-foreground mb-2">
+        {getModelLabel(selectedModel)} • {getSequenceLabel(selectedSequence, locale)} •{' '}
+        {t.captionTarget(targetValue)}
+        {mw ? ` • ${mw} MW` : ''} • {t.source}SemiAnalysis
+      </p>
+    </>
+  );
 
   const columns = useMemo<DataTableColumn<LifecycleRow>[]>(
     () => [
@@ -1079,40 +1217,70 @@ export default function FleetLifecycle({
         </div>
 
         {rows.length > 0 && Number.isFinite(anchorMs) ? (
-          <>
-            <DataTable
-              data={rows}
-              columns={columns}
-              testId="calculator-lifecycle-table"
-              analyticsPrefix="calculator_lifecycle_table"
-            />
-            <FleetLifecycleChart
-              data={chartData}
-              metric={yMetric}
-              anchorMs={anchorMs}
-              yLabel={
-                yMetric === 'revenue'
-                  ? t.chartYRevenue
-                  : yMetric === 'cumulativeRevenue'
-                    ? t.chartYCumulativeRevenue
-                    : yMetric === 'marginPerMw'
-                      ? t.chartYMarginPerMw
-                      : t.chartY
+          <figure data-testid="calculator-lifecycle-figure" className="relative rounded-lg">
+            <ChartButtons
+              chartId="fleet-lifecycle"
+              analyticsPrefix="calculator_lifecycle"
+              zoomResetEvent="d3chart_zoom_reset_fleet-lifecycle"
+              onExportCsv={handleExportCsv}
+              exportFileName={`InferenceX_fleet_lifecycle_${selectedModel}`}
+              // A PNG of a paginated HTML table is not a useful artefact; the CSV
+              // is the export for that view.
+              hideImageExport={view === 'table'}
+              leadingControls={
+                <SegmentedToggle
+                  value={view}
+                  options={viewOptions}
+                  onValueChange={handleViewChange}
+                  ariaLabel={t.viewAria}
+                  testId="calculator-lifecycle-view-toggle"
+                  className="shrink-0"
+                />
               }
-              breakEvenLabel={t.chartBreakEven}
-              instructions={t.chartInstructions}
-              labels={{
-                date: t.tipDate,
-                config: t.tipConfig,
-                marginPerDay: t.tipMargin,
-                revenuePerDay: t.tipRevenue,
-                cumulativeRevenue: t.tipCumulativeRevenue,
-                costPerDay: t.tipCost,
-                cumulative: t.tipCumulative,
-                runLink: t.tipRunLink,
-                sinceFirst: t.tipSinceFirst,
-              }}
             />
+            {view === 'table' ? (
+              <>
+                <figcaption>{caption}</figcaption>
+                <DataTable
+                  data={rows}
+                  columns={columns}
+                  testId="calculator-lifecycle-table"
+                  analyticsPrefix="calculator_lifecycle_table"
+                  // One row per chip, every one of them named in the legend and on
+                  // the chart. A search box over five rows is furniture.
+                  searchable={false}
+                />
+              </>
+            ) : (
+              <FleetLifecycleChart
+                data={chartData}
+                metric={yMetric}
+                anchorMs={anchorMs}
+                yLabel={
+                  yMetric === 'revenue'
+                    ? t.chartYRevenue
+                    : yMetric === 'cumulativeRevenue'
+                      ? t.chartYCumulativeRevenue
+                      : yMetric === 'marginPerMw'
+                        ? t.chartYMarginPerMw
+                        : t.chartY
+                }
+                caption={caption}
+                breakEvenLabel={t.chartBreakEven}
+                instructions={t.chartInstructions}
+                labels={{
+                  date: t.tipDate,
+                  config: t.tipConfig,
+                  marginPerDay: t.tipMargin,
+                  revenuePerDay: t.tipRevenue,
+                  cumulativeRevenue: t.tipCumulativeRevenue,
+                  costPerDay: t.tipCost,
+                  cumulative: t.tipCumulative,
+                  runLink: t.tipRunLink,
+                  sinceFirst: t.tipSinceFirst,
+                }}
+              />
+            )}
             <section data-testid="calculator-lifecycle-surface-section">
               <CollapsibleSection
                 title={t.surfaceTitle}
@@ -1139,7 +1307,7 @@ export default function FleetLifecycle({
                 </div>
               </CollapsibleSection>
             </section>
-          </>
+          </figure>
         ) : (
           <p className="text-sm text-muted-foreground" data-testid="calculator-lifecycle-none">
             {t.noneMeasured}

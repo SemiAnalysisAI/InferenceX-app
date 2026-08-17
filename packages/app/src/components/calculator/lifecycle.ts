@@ -167,6 +167,39 @@ export function effectiveTokPerSec(
   return inputTokPerSec + outputTokPerSec * multiple;
 }
 
+/**
+ * Split a per-chip total token rate into the two streams revenue is charged on.
+ *
+ * Takes a *share* rather than two rates because the two rates are not always on
+ * the same denominator: a disaggregated run reports input per prefill chip and
+ * output per decode chip, while the total — the figure the fleet is sized and
+ * costed on — is per chip overall. Reading the rates directly billed a
+ * disaggregated config for up to 16x the tokens its chips actually served, which
+ * put a visible dip in the margin line the moment a later, genuinely better
+ * aggregated config took over. See `inputTokenShare` in `useThroughputData.ts`.
+ *
+ * With no share to hand, nothing is charged as input: understating revenue beats
+ * inventing a mix.
+ */
+export function splitTokenStreams(
+  totalTokPerSec: number,
+  inputTokenShare: number | undefined,
+  cacheHitRate: number | undefined,
+  cacheReadRatio: number,
+): { billableInputTokPerSec: number; outputTokPerSec: number } {
+  if (!Number.isFinite(totalTokPerSec) || totalTokPerSec <= 0) {
+    return { billableInputTokPerSec: 0, outputTokPerSec: 0 };
+  }
+  const share =
+    typeof inputTokenShare === 'number' && Number.isFinite(inputTokenShare)
+      ? Math.max(0, Math.min(1, inputTokenShare))
+      : 0;
+  return {
+    billableInputTokPerSec: billableInputRate(totalTokPerSec * share, cacheHitRate, cacheReadRatio),
+    outputTokPerSec: totalTokPerSec * (1 - share),
+  };
+}
+
 /** A price is only a price when it is finite and positive; anything else is free. */
 function nonNegativePrice(value: number): number {
   return Number.isFinite(value) && value > 0 ? value : 0;

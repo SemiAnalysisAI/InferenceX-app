@@ -34,6 +34,18 @@ export interface GPUDataPoint {
    * absence is what makes cached-input billing a no-op outside agentic traces.
    */
   cacheHitRate?: number;
+  /**
+   * Fraction of the tokens this config serves that are input tokens.
+   *
+   * Not simply `inputThroughput / (inputThroughput + outputThroughput)`: on a
+   * disaggregated run those two are per *prefill* and per *decode* chip while
+   * `throughput` is per chip overall, so they sum to as much as 16x the total.
+   * Revenue is charged on the fleet's chips, so it has to use the same
+   * denominator the fleet is sized and costed on — hence a share applied to
+   * `throughput` rather than the two rates read directly. See `inputTokenShare`
+   * in `useThroughputData.ts` for how the share is recovered.
+   */
+  inputTokenShare?: number;
   concurrency: number;
   tp: number;
   precision: string;
@@ -73,6 +85,18 @@ export interface InterpolatedResult {
    * fixed-sequence frontier). See {@link GPUDataPoint.cacheHitRate}.
    */
   cacheHitRate?: number;
+  /**
+   * Fraction of the tokens this config serves that are input tokens.
+   *
+   * Not simply `inputThroughput / (inputThroughput + outputThroughput)`: on a
+   * disaggregated run those two are per *prefill* and per *decode* chip while
+   * `throughput` is per chip overall, so they sum to as much as 16x the total.
+   * Revenue is charged on the fleet's chips, so it has to use the same
+   * denominator the fleet is sized and costed on — hence a share applied to
+   * `throughput` rather than the two rates read directly. See `inputTokenShare`
+   * in `useThroughputData.ts` for how the share is recovered.
+   */
+  inputTokenShare?: number;
   concurrency: number; // concurrency at that operating point
   nearestPoints: GPUDataPoint[]; // the data points used for interpolation
   /**

@@ -28,7 +28,8 @@ describe('Calculator — Interactivity Surface', () => {
     cy.visit('/calculator');
     cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
     cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
-    cy.get('[data-testid="calculator-lifecycle-table"]', { timeout: 30_000 }).should('be.visible');
+    // The table is behind a tab now; the figure is what proves the section rendered.
+    cy.get('[data-testid="calculator-lifecycle-figure"]', { timeout: 30_000 }).should('be.visible');
   });
 
   it('stays folded, and mounts nothing 3D until asked', () => {
@@ -201,7 +202,8 @@ describe('Calculator — Interactivity Surface without WebGL', () => {
     });
     cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
     cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
-    cy.get('[data-testid="calculator-lifecycle-table"]', { timeout: 30_000 }).should('be.visible');
+    // The table is behind a tab now; the figure is what proves the section rendered.
+    cy.get('[data-testid="calculator-lifecycle-figure"]', { timeout: 30_000 }).should('be.visible');
   });
 
   it('falls back to a note and leaves the 2D chart working', () => {
