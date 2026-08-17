@@ -250,8 +250,11 @@ export const CHART_METRIC_KEYS = new Set([
   'trtllm_kv_cache_utilization',
   'trtllm_kv_cache_host_utilization',
   'trtllm_kv_cache_hit_rate',
+  'trtllm_prompt_cached_tokens',
   'trtllm_prompt_cached_tokens_total',
+  'trtllm_prompt_tokens',
   'trtllm_prompt_tokens_total',
+  'trtllm_generation_tokens',
   'trtllm_generation_tokens_total',
   'trtllm_num_requests_running',
   'trtllm_num_requests_waiting',
@@ -1004,12 +1007,14 @@ function buildSeriesFromMetrics(
   const hitsSeries = pickSeries(
     'vllm:prefix_cache_hits',
     'sglang:cached_tokens',
+    'trtllm_prompt_cached_tokens',
     'trtllm_prompt_cached_tokens_total',
   );
   const qsSeries = pickSeries(
     'vllm:prefix_cache_queries',
     'vllm:prompt_tokens',
     'sglang:prompt_tokens',
+    'trtllm_prompt_tokens',
     'trtllm_prompt_tokens_total',
   );
   const hitsOnGrid = summedSeries(hitsSeries, tOf, 'rate', tickS);
@@ -1021,11 +1026,11 @@ function buildSeriesFromMetrics(
     if (q !== undefined && q > 0) prefixCacheHitRate.push({ t, value: h / q });
   }
   if (prefixCacheHitRate.length === 0) {
-    for (const [t, value] of sortedEntries(
-      aggregateByStart(metrics['trtllm_kv_cache_hit_rate']?.series, 'avg', 'avg'),
-    )) {
-      prefixCacheHitRate.push({ t: tOf(t), value });
-    }
+    prefixCacheHitRate.push(
+      ...averageAcrossEngines(
+        resolveLogicalEngines(metrics['trtllm_kv_cache_hit_rate']?.series, tOf),
+      ),
+    );
   }
 
   // Queue depth: sum running + waiting across engines per timeslice.
@@ -1060,11 +1065,13 @@ function buildSeriesFromMetrics(
   const prefillTps = counterRate(
     'vllm:prompt_tokens',
     'sglang:prompt_tokens',
+    'trtllm_prompt_tokens',
     'trtllm_prompt_tokens_total',
   );
   const decodeTps = counterRate(
     'vllm:generation_tokens',
     'sglang:generation_tokens',
+    'trtllm_generation_tokens',
     'trtllm_generation_tokens_total',
   );
   // Tokens served from prefix cache per scrape. Lets the frontend derive
@@ -1072,6 +1079,7 @@ function buildSeriesFromMetrics(
   const prefixCacheHitsTps = counterRate(
     'vllm:prefix_cache_hits',
     'sglang:cached_tokens',
+    'trtllm_prompt_cached_tokens',
     'trtllm_prompt_cached_tokens_total',
   );
 
@@ -1094,11 +1102,11 @@ function buildSeriesFromMetrics(
     }
   }
   if (hostKvCacheUsage.length === 0) {
-    for (const [t, value] of sortedEntries(
-      aggregateByStart(metrics['trtllm_kv_cache_host_utilization']?.series, 'avg', 'avg'),
-    )) {
-      hostKvCacheUsage.push({ t: tOf(t), value });
-    }
+    hostKvCacheUsage.push(
+      ...averageAcrossEngines(
+        resolveLogicalEngines(metrics['trtllm_kv_cache_host_utilization']?.series, tOf),
+      ),
+    );
   }
 
   // Per-source prompt tokens — sum across engines per source label.
@@ -1159,33 +1167,38 @@ function buildSeriesFromMetrics(
       addSeriesRates(label, series);
     }
   }
-  if (promptBySrcByT.size === 0) {
-    const promptByT = aggregateByStart(
-      metrics['trtllm_prompt_tokens_total']?.series,
-      'rate',
-      'sum',
-    );
-    const cachedByT = aggregateByStart(
-      metrics['trtllm_prompt_cached_tokens_total']?.series,
-      'rate',
-      'sum',
-    );
-    const cachedSeries: RawSeries = { timeslices: [] };
-    const computedSeries: RawSeries = { timeslices: [] };
-    for (const [t, prompt] of promptByT) {
-      const cached = Math.max(0, cachedByT.get(t) ?? 0);
-      cachedSeries.timeslices!.push({ start_ns: t, rate: cached });
-      computedSeries.timeslices!.push({ start_ns: t, rate: Math.max(0, prompt - cached) });
-    }
-    addSeriesRates('cache hit (HBM)', cachedSeries);
-    addSeriesRates('compute (miss)', computedSeries);
-  }
   const promptTokensBySource: Record<string, TimeSeriesPoint[]> = {};
   for (const [source, seriesForSource] of promptBySrc) {
     // Idle ticks are dropped rather than emitted as zeros: this feeds a
     // cumulative stacked area, so a zero adds nothing but payload.
     const arr = summedSeries(seriesForSource, tOf, 'rate', tickS).filter((p) => p.value > 0);
     if (arr.length > 0) promptTokensBySource[source] = arr;
+  }
+  if (Object.keys(promptTokensBySource).length === 0) {
+    const promptPoints = summedSeries(
+      pickSeries('trtllm_prompt_tokens', 'trtllm_prompt_tokens_total'),
+      tOf,
+      'rate',
+      tickS,
+    );
+    const cachedByT = byT(
+      summedSeries(
+        pickSeries('trtllm_prompt_cached_tokens', 'trtllm_prompt_cached_tokens_total'),
+        tOf,
+        'rate',
+        tickS,
+      ),
+    );
+    const cached: TimeSeriesPoint[] = [];
+    const computed: TimeSeriesPoint[] = [];
+    for (const { t, value: prompt } of promptPoints) {
+      const cachedValue = Math.max(0, cachedByT.get(t) ?? 0);
+      if (cachedValue > 0) cached.push({ t, value: cachedValue });
+      const computedValue = Math.max(0, prompt - cachedValue);
+      if (computedValue > 0) computed.push({ t, value: computedValue });
+    }
+    if (cached.length > 0) promptTokensBySource['cache hit (HBM)'] = cached;
+    if (computed.length > 0) promptTokensBySource['compute (miss)'] = computed;
   }
 
   const metricSources: MetricSourceSeries[] = [];

@@ -736,19 +736,19 @@ describe('computeChartSeries', () => {
         trtllm_kv_cache_host_utilization: {
           series: [buildTrtllmSeries(prefillUrl, 'prefill', 0.25, 'avg')],
         },
-        trtllm_prompt_tokens_total: {
+        trtllm_prompt_tokens: {
           series: [
             buildTrtllmSeries(prefillUrl, 'prefill', 100, 'rate'),
             buildTrtllmSeries(decodeUrl, 'backend', 200, 'rate'),
           ],
         },
-        trtllm_prompt_cached_tokens_total: {
+        trtllm_prompt_cached_tokens: {
           series: [
             buildTrtllmSeries(prefillUrl, 'prefill', 40, 'rate'),
             buildTrtllmSeries(decodeUrl, 'backend', 80, 'rate'),
           ],
         },
-        trtllm_generation_tokens_total: {
+        trtllm_generation_tokens: {
           series: [buildTrtllmSeries(decodeUrl, 'backend', 50, 'rate')],
         },
         trtllm_num_requests_running: {

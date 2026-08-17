@@ -143,7 +143,7 @@ describe('extractServerMetricSamples', () => {
             },
           ],
         },
-        trtllm_prompt_cached_tokens_total: {
+        trtllm_prompt_cached_tokens: {
           series: [
             {
               timeslices: [
@@ -153,7 +153,7 @@ describe('extractServerMetricSamples', () => {
             },
           ],
         },
-        trtllm_prompt_tokens_total: {
+        trtllm_prompt_tokens: {
           series: [
             {
               timeslices: [

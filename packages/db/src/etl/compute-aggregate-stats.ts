@@ -195,7 +195,9 @@ export const AGGREGATE_SERVER_METRIC_KEYS = new Set([
   'vllm:gpu_prefix_cache_queries',
   'trtllm_kv_cache_utilization',
   'trtllm_kv_cache_hit_rate',
+  'trtllm_prompt_cached_tokens',
   'trtllm_prompt_cached_tokens_total',
+  'trtllm_prompt_tokens',
   'trtllm_prompt_tokens_total',
 ]);
 

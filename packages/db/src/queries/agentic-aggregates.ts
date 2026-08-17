@@ -168,6 +168,7 @@ export function extractServerMetricSamples(json: string): {
     'vllm:prefix_cache_hits',
     'vllm:gpu_prefix_cache_hits',
     'sglang:cached_tokens',
+    'trtllm_prompt_cached_tokens',
     'trtllm_prompt_cached_tokens_total',
   );
   const queriesAll = pickFirstNonEmpty(
@@ -176,6 +177,7 @@ export function extractServerMetricSamples(json: string): {
     'vllm:gpu_prefix_cache_queries',
     'vllm:prompt_tokens',
     'sglang:prompt_tokens',
+    'trtllm_prompt_tokens',
     'trtllm_prompt_tokens_total',
   );
   const hitsByT = aggregateSeriesByStart(hitsAll, 'rate', 'sum');
@@ -214,7 +216,9 @@ const TARGET_METRIC_KEYS = new Set([
   // TensorRT-LLM
   'trtllm_kv_cache_utilization',
   'trtllm_kv_cache_hit_rate',
+  'trtllm_prompt_cached_tokens',
   'trtllm_prompt_cached_tokens_total',
+  'trtllm_prompt_tokens',
   'trtllm_prompt_tokens_total',
 ]);
 
