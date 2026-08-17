@@ -17,6 +17,8 @@ export interface UseInteractivitySurfaceOptions {
   metric: LifecycleMetric;
   costProvider: CostProvider;
   costType: CostType;
+  /** Cached-token price as a fraction of a fresh one — shared with the 2D section. */
+  cacheReadRatio: number;
   mw: number | null;
   anchorMs: number;
   horizonMonths: number;
@@ -50,6 +52,7 @@ export function useInteractivitySurface(
     metric,
     costProvider,
     costType,
+    cacheReadRatio,
     mw,
     anchorMs,
     horizonMonths,
@@ -69,6 +72,7 @@ export function useInteractivitySurface(
       metric,
       costProvider,
       costType,
+      cacheReadRatio,
       mw,
       anchorMs,
       horizonMonths,
@@ -92,6 +96,7 @@ export function useInteractivitySurface(
     metric,
     costProvider,
     costType,
+    cacheReadRatio,
     mw,
     anchorMs,
     horizonMonths,

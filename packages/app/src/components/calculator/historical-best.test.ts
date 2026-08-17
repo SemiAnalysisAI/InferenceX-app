@@ -601,3 +601,110 @@ describe('mergeProgressionsByChip', () => {
     expect(mergeProgressionsByChip([])).toEqual([]);
   });
 });
+
+describe('agentic traces', () => {
+  /** An agentic sweep point: no ISL/OSL, interactivity read at the percentile. */
+  function agenticSweep(
+    date: string,
+    interactivity: number,
+    tputPerGpu: number,
+    cacheHitRate?: number,
+  ): BenchmarkRow {
+    return makeRow({
+      id: Math.round(interactivity * 1000 + tputPerGpu),
+      date,
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      conc: Math.round(tputPerGpu / interactivity),
+      metrics: {
+        // Agentic interactivity is always derived as 1/itl — `*_intvty` straight
+        // off the artifact is dropped, the harness definition having drifted.
+        p90_itl: 1 / interactivity,
+        p90_e2el: 10,
+        tput_per_gpu: tputPerGpu,
+        // The agentic mix: input tokens dominate by two orders of magnitude.
+        output_tput_per_gpu: tputPerGpu * 0.008,
+        input_tput_per_gpu: tputPerGpu * 0.992,
+        ...(cacheHitRate === undefined ? {} : { server_gpu_cache_hit_rate: cacheHitRate }),
+      },
+    });
+  }
+
+  const agenticRows = [
+    agenticSweep('2026-08-07', 40, 800, 0.9),
+    agenticSweep('2026-08-07', 80, 500, 0.95),
+    agenticSweep('2026-08-14', 40, 1000, 0.88),
+    agenticSweep('2026-08-14', 80, 700, 0.93),
+  ];
+
+  it('groups rows that have no ISL/OSL, keyed on the agentic sequence', () => {
+    // The section refused agentic traces on the premise that history could not be
+    // keyed without ISL/OSL. It can: `rowToSequence` keys on benchmark_type.
+    const groups = groupHistoryByHwKeyAndDate({
+      rows: agenticRows,
+      sequence: Sequence.AgenticTraces,
+      precisions: ['fp4'],
+    });
+    expect(groups.datesSeen).toBe(2);
+    const dated = [...groups.byHwKey.values()][0]!;
+    expect(dated).toHaveLength(2);
+    expect(dated[0]!.points).toHaveLength(2);
+    // And the interactivity came from the percentile metric, not median_intvty.
+    expect(dated[0]!.points.map((p) => p.interactivity).toSorted((a, b) => a - b)).toEqual([
+      40, 80,
+    ]);
+  });
+
+  it('reads a cached fraction at the operating point, and none for fixed sequences', () => {
+    const agentic = selectBestFromGroups(
+      groupHistoryByHwKeyAndDate({
+        rows: agenticRows,
+        sequence: Sequence.AgenticTraces,
+        precisions: ['fp4'],
+      }),
+      {
+        targetValue: 60,
+        mode: 'interactivity_to_throughput',
+        costProvider: 'costh',
+        rank: rankByThroughput,
+      },
+    );
+    expect(agentic.best).toHaveLength(1);
+    const rate = agentic.best[0]!.result.cacheHitRate!;
+    expect(rate).toBeGreaterThan(0.88);
+    expect(rate).toBeLessThan(0.95);
+
+    // The same pipeline on fixed-sequence rows reports nothing to discount.
+    const fixed = selectBestFromGroups(
+      groupHistoryByHwKeyAndDate(
+        options([sweep('2026-07-19', 40, 800), sweep('2026-07-19', 80, 500)]),
+      ),
+      {
+        targetValue: 60,
+        mode: 'interactivity_to_throughput',
+        costProvider: 'costh',
+        rank: rankByThroughput,
+      },
+    );
+    expect(fixed.best[0]!.result.cacheHitRate).toBeUndefined();
+  });
+
+  it('still builds a best-so-far staircase when a later date wins', () => {
+    const progressions = bestSoFarProgression(
+      groupHistoryByHwKeyAndDate({
+        rows: agenticRows,
+        sequence: Sequence.AgenticTraces,
+        precisions: ['fp4'],
+      }),
+      {
+        targetValue: 60,
+        mode: 'interactivity_to_throughput',
+        costProvider: 'costh',
+        rank: rankByThroughput,
+      },
+    );
+    expect(progressions).toHaveLength(1);
+    expect(progressions[0]!.steps.map((s) => s.date)).toEqual(['2026-08-07', '2026-08-14']);
+  });
+});

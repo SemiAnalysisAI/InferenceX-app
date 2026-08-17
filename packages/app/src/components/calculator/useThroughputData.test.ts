@@ -389,6 +389,73 @@ describe('interpolateForGPU', () => {
     expect(result!.nearestPoints).toHaveLength(1);
   });
 
+  describe('cached-input fraction', () => {
+    // 300 → 500 tok/s across the range so the frontier is well formed; the cache
+    // rate is what these assertions are about.
+    const withCache = (rates: (number | undefined)[]) =>
+      rates.map((cacheHitRate, i) =>
+        makePoint({
+          interactivity: 20 + i * 20,
+          throughput: 500 - i * 100,
+          inputThroughput: 400 - i * 80,
+          ...(cacheHitRate === undefined ? {} : { cacheHitRate }),
+        }),
+      );
+
+    it('interpolates the rate between measured points', () => {
+      const result = interpolateForGPU(
+        withCache([0.4, 0.8]),
+        30,
+        'interactivity_to_throughput',
+        'costh',
+      );
+      // Halfway along the frontier, so between the two measured rates and
+      // strictly inside them — not pinned to either end.
+      expect(result!.cacheHitRate).toBeGreaterThan(0.4);
+      expect(result!.cacheHitRate).toBeLessThan(0.8);
+    });
+
+    it('stays inside the frontier range rather than overshooting', () => {
+      const result = interpolateForGPU(
+        withCache([0.1, 0.9, 0.2]),
+        45,
+        'interactivity_to_throughput',
+        'costh',
+      );
+      expect(result!.cacheHitRate).toBeGreaterThanOrEqual(0.1);
+      expect(result!.cacheHitRate).toBeLessThanOrEqual(0.9);
+    });
+
+    it('is undefined when no point carries a rate — every fixed sequence', () => {
+      const result = interpolateForGPU(
+        withCache([undefined, undefined]),
+        30,
+        'interactivity_to_throughput',
+        'costh',
+      );
+      expect(result!.cacheHitRate).toBeUndefined();
+    });
+
+    it('opts the whole frontier out when only some points carry a rate', () => {
+      // Splining a 0 in for the unmeasured point would invent a dip in the
+      // cached fraction and overstate the billable rate there. Opting out bills
+      // every input token at full price instead — wrong in the safe direction.
+      const result = interpolateForGPU(
+        withCache([0.9, undefined]),
+        30,
+        'interactivity_to_throughput',
+        'costh',
+      );
+      expect(result!.cacheHitRate).toBeUndefined();
+    });
+
+    it('carries the rate through the single-point path too', () => {
+      const points = [makePoint({ interactivity: 30, throughput: 500, cacheHitRate: 0.77 })];
+      const result = interpolateForGPU(points, 25, 'interactivity_to_throughput', 'costh');
+      expect(result!.cacheHitRate).toBe(0.77);
+    });
+  });
+
   it('single GPU clamps any target to the lone pareto-front point', () => {
     const points = [makePoint({ interactivity: 30, throughput: 500 })];
     const result = interpolateForGPU(points, 25, 'interactivity_to_throughput', 'costh');
@@ -1080,6 +1147,57 @@ describe('buildGpuGroups', () => {
     // Cost per million tokens is derived, not passed through.
     expect(first.costh).toBeGreaterThan(0);
     expect(first.tpPerMw).toBeGreaterThan(0);
+  });
+
+  describe('cached-input fraction', () => {
+    const withMetrics = (extra: Record<string, number>) =>
+      makeRow({
+        metrics: {
+          median_intvty: 50,
+          tput_per_gpu: 900,
+          output_tput_per_gpu: 300,
+          input_tput_per_gpu: 600,
+          ...extra,
+        },
+      });
+    const only = (row: BenchmarkRow) => {
+      const { grouped } = buildGpuGroups([row], {
+        ...shared,
+        classify: singlePrecisionClassify,
+      });
+      return Object.values(grouped)[0][0];
+    };
+
+    it('is absent when the row records no cache metric — every fixed-sequence row', () => {
+      // Not zero: absent. Zero would mean "measured, and nothing was cached",
+      // which is a claim the data does not make.
+      expect(only(makeRow()).cacheHitRate).toBeUndefined();
+    });
+
+    it('sums the GPU and external hit rates', () => {
+      // Disjoint in the measured data: across production rows carrying both, the
+      // sum never exceeds 1 nor the theoretical ceiling.
+      expect(
+        only(withMetrics({ server_gpu_cache_hit_rate: 0.66, server_external_cache_hit_rate: 0.25 }))
+          .cacheHitRate,
+      ).toBeCloseTo(0.91, 10);
+    });
+
+    it('reads either metric alone', () => {
+      expect(only(withMetrics({ server_gpu_cache_hit_rate: 0.4 })).cacheHitRate).toBeCloseTo(
+        0.4,
+        10,
+      );
+      expect(only(withMetrics({ server_external_cache_hit_rate: 0.3 })).cacheHitRate).toBeCloseTo(
+        0.3,
+        10,
+      );
+    });
+
+    it('clamps into [0,1] — real rows report a GPU rate as high as 1.185', () => {
+      expect(only(withMetrics({ server_gpu_cache_hit_rate: 1.185 })).cacheHitRate).toBe(1);
+      expect(only(withMetrics({ server_gpu_cache_hit_rate: -0.2 })).cacheHitRate).toBe(0);
+    });
   });
 
   it('drops rows whose isl/osl do not match the selected sequence', () => {

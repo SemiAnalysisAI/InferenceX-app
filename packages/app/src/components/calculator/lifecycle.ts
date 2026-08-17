@@ -46,6 +46,8 @@
  * they are measured.
  */
 
+import type { CostType } from './types';
+
 const HOURS_PER_DAY = 24;
 
 /**
@@ -68,6 +70,43 @@ export const MS_PER_MONTH = DAYS_PER_MONTH * HOURS_PER_DAY * 3600 * 1000;
 const TOKENS_PER_MILLION = 1e6;
 const SECONDS_PER_DAY = 86_400;
 
+/**
+ * The share of a fleet's tokens an operator can charge full price for.
+ *
+ * Agentic traces run at a median 133:1 input:output token ratio with a median
+ * 92% prefix-cache hit rate, and providers bill a cache read at a fraction of a
+ * fresh input token. Charging one blended price against the raw token rate
+ * therefore overstates agentic margin by close to an order of magnitude. Fixed
+ * sequences carry no cache metric on any row, so `cacheHitRate` is undefined
+ * there and this returns `base` untouched.
+ *
+ * Expressed as a *subtraction* from the caller's throughput rather than as
+ * `output + billableInput`, so the result is exactly `base` whenever there is
+ * nothing to discount — no rounding drift against the independently splined
+ * total, and no behaviour change outside agentic traces by construction rather
+ * than by luck.
+ *
+ * @param base           tok/s for the selected token type — the undiscounted rate.
+ * @param inputTput      tok/s of input tokens, the only stream a cache can serve.
+ * @param cacheHitRate   cached fraction of those input tokens, or undefined when unmeasured.
+ * @param cacheReadRatio price of a cached token as a fraction of a fresh one (1 = no discount).
+ */
+export function billableTokPerSec(
+  base: number,
+  inputTput: number,
+  cacheHitRate: number | undefined,
+  cacheReadRatio: number,
+  costType: CostType,
+): number {
+  // Output tokens are generated, never served from a prefix cache.
+  if (costType === 'output') return base;
+  if (typeof cacheHitRate !== 'number' || !Number.isFinite(cacheHitRate)) return base;
+  if (!Number.isFinite(inputTput) || inputTput <= 0) return base;
+  const hit = Math.max(0, Math.min(1, cacheHitRate));
+  const ratio = Math.max(0, Math.min(1, cacheReadRatio));
+  return Math.max(0, base - inputTput * hit * (1 - ratio));
+}
+
 export interface LifecycleAssumptions {
   /** Mean time between interruptions, in days. Zero means none modelled. */
   mtbiDays: number;
@@ -85,13 +124,21 @@ export interface LifecycleAssumptions {
 
 /**
  * A measured config improvement: from `month` onwards the fleet rolls out to
- * `fleetTokPerSec`, and holds it until the next step.
+ * `billableTokPerSec`, and holds it until the next step.
  */
 export interface ThroughputStep {
   /** Months since the anchor date (the model's release), >= 0. */
   month: number;
-  /** Fleet throughput for the selected token type once this config lands. */
-  fleetTokPerSec: number;
+  /**
+   * Fleet throughput for the selected token type once this config lands, in
+   * tokens the operator can *bill* — see {@link billableTokPerSec}.
+   *
+   * Deliberately not named `fleetTokPerSec` like {@link FleetStats}: that one is
+   * the physical rate the racks deliver, and the two diverge whenever a
+   * workload serves input tokens from cache. The Fleet Projection section
+   * reports the physical rate; revenue here is charged on this one.
+   */
+  billableTokPerSec: number;
 }
 
 export interface LifecycleInputs {
@@ -268,21 +315,17 @@ export function availabilityFromInterrupts(mtbiDays: number, recoveryHours: numb
  */
 export function breakEvenPricePerMTok(
   costPerHour: number,
-  fleetTokPerSec: number,
+  tokPerSec: number,
   availability = 1,
 ): number | null {
-  if (!(fleetTokPerSec > 0) || !Number.isFinite(costPerHour)) return null;
+  if (!(tokPerSec > 0) || !Number.isFinite(costPerHour)) return null;
   if (!(availability > 0) || !Number.isFinite(availability)) return null;
-  return (costPerHour / (fleetTokPerSec * 3600 * availability)) * TOKENS_PER_MILLION;
+  return (costPerHour / (tokPerSec * 3600 * availability)) * TOKENS_PER_MILLION;
 }
 
 /** Revenue rate in $/day for a throughput, price and availability. */
-function revenuePerDayFor(
-  fleetTokPerSec: number,
-  pricePerMTok: number,
-  availability: number,
-): number {
-  return ((fleetTokPerSec * SECONDS_PER_DAY) / TOKENS_PER_MILLION) * pricePerMTok * availability;
+function revenuePerDayFor(tokPerSec: number, pricePerMTok: number, availability: number): number {
+  return ((tokPerSec * SECONDS_PER_DAY) / TOKENS_PER_MILLION) * pricePerMTok * availability;
 }
 
 /**
@@ -326,7 +369,7 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
   if (steps.length === 0 || !Number.isFinite(costPerHour)) return null;
 
   const sorted = [...steps]
-    .filter((s) => Number.isFinite(s.month) && s.fleetTokPerSec > 0)
+    .filter((s) => Number.isFinite(s.month) && s.billableTokPerSec > 0)
     .toSorted((a, b) => a.month - b.month);
   if (sorted.length === 0) return null;
 
@@ -339,7 +382,7 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
   for (const step of sorted) {
     const previous = ordered.at(-1);
     if (previous && previous.month === step.month) {
-      if (step.fleetTokPerSec > previous.fleetTokPerSec) ordered[ordered.length - 1] = step;
+      if (step.billableTokPerSec > previous.billableTokPerSec) ordered[ordered.length - 1] = step;
       continue;
     }
     ordered.push(step);
@@ -378,7 +421,7 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
       start: step.month,
       end: Math.min(step.month + rampMonths, endMonth),
       from,
-      to: step.fleetTokPerSec,
+      to: step.billableTokPerSec,
     });
   }
 
@@ -498,7 +541,7 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
 
   if (points.length === 0) return null;
 
-  const firstTput = applied[0]!.fleetTokPerSec;
+  const firstTput = applied[0]!.billableTokPerSec;
   const lastApplied = applied.at(-1)!;
   // Reported rates are what the fleet earns at the end of the window — which is
   // the latest config at whatever load it has reached by then.
@@ -513,7 +556,7 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
     costPerDay,
     marginPerDay: revenuePerDay - costPerDay,
     firstMarginPerDay: firstRevenuePerDay - costPerDay,
-    improvementFactor: firstTput > 0 ? lastApplied.fleetTokPerSec / firstTput : 1,
+    improvementFactor: firstTput > 0 ? lastApplied.billableTokPerSec / firstTput : 1,
     availability,
     paybackMonth,
     lifetimeMargin: cumulative,

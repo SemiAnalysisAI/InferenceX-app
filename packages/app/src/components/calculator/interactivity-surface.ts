@@ -114,6 +114,7 @@ import { computeFleetStats } from './fleet';
 import type { HistoryGroups } from './historical-best';
 import { hermiteInterpolate, monotoneSlopes, paretoFrontUpperLeft } from './interpolation';
 import {
+  billableTokPerSec,
   computeLifecycle,
   isCumulative,
   MS_PER_MONTH,
@@ -181,6 +182,14 @@ export interface FrontierRead {
   tput: number;
   /** Output throughput, tok/s/chip — concurrent users divide by this. */
   outputTput: number;
+  /** Input throughput, tok/s/chip — the base the cached-token discount applies to. */
+  inputTput: number;
+  /**
+   * Cached fraction of input tokens, or undefined when the frontier did not
+   * carry a measured rate on every point. Same rule as the 1D path, so both
+   * views discount the same tokens.
+   */
+  cacheHitRate?: number;
   /** tok/s/MW for the selected token type: the ranking basis. */
   rank: number;
   /** True when the bracketing frontier points came from a disaggregated run. */
@@ -204,7 +213,7 @@ function metricReader(xs: number[], ys: number[]): (target: number) => number {
  *
  * This is `interpolateForGPU`'s prologue — Pareto front, sort, per-metric slopes —
  * hoisted out so it is paid once instead of once per slice, and narrowed to the
- * three metrics a fleet projection needs out of that function's ten.
+ * five metrics a fleet projection needs out of that function's eleven.
  */
 export function prepareFrontier(
   points: readonly GPUDataPoint[],
@@ -261,6 +270,8 @@ export function prepareFrontier(
               value: getOutput(only),
               tput: tputOf(only),
               outputTput: only.outputThroughput,
+              inputTput: only.inputThroughput,
+              cacheHitRate: only.cacheHitRate,
               rank: rankOf(only),
               disagg: Boolean(only.disagg),
             }
@@ -275,7 +286,19 @@ export function prepareFrontier(
     xs,
     sorted.map((p) => p.outputThroughput),
   );
+  const readInputTput = metricReader(
+    xs,
+    sorted.map((p) => p.inputThroughput),
+  );
   const readRank = metricReader(xs, sorted.map(rankOf));
+  // All-or-nothing, exactly as `interpolateForGPU` decides it — a frontier that
+  // is only partly measured opts out rather than having zeros splined into it.
+  const readCacheHitRate = sorted.every((p) => typeof p.cacheHitRate === 'number')
+    ? metricReader(
+        xs,
+        sorted.map((p) => p.cacheHitRate!),
+      )
+    : null;
 
   return {
     min,
@@ -288,6 +311,8 @@ export function prepareFrontier(
         value: readValue(target),
         tput: readTput(target),
         outputTput: readOutputTput(target),
+        inputTput: readInputTput(target),
+        cacheHitRate: readCacheHitRate ? readCacheHitRate(target) : undefined,
         rank: readRank(target),
         disagg: bracket(target).some((p) => p.disagg),
       };
@@ -457,6 +482,12 @@ export interface SurfaceGridOptions {
    */
   costProvider: CostProvider;
   costType: CostType;
+  /**
+   * Price of a cached input token as a fraction of a fresh one. Shared with the
+   * 2D section so both views bill the same tokens; 1 disables the discount, and
+   * it has no effect at all where no cache rate was measured.
+   */
+  cacheReadRatio: number;
   /** Facility power budget, MW. */
   mw: number;
   /** x origin: the model's release date, as a timestamp. */
@@ -535,6 +566,7 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
     mode,
     metric,
     costType,
+    cacheReadRatio,
     mw,
     anchorMs,
     horizonMonths,
@@ -623,7 +655,21 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
         // both axes — the same invariant the 2D section relies on.
         costPerHour ??= stats.costPerHour;
         onTimeline[i] = true;
-        throughputSteps.push({ month: rungMonths[i]!, fleetTokPerSec: stats.fleetTokPerSec });
+        // Sized on the physical rate, billed on the discounted one — `gpus` is
+        // whole chips either way, so this is exactly `stats.fleetTokPerSec` when
+        // there is no cached fraction to discount.
+        throughputSteps.push({
+          month: rungMonths[i]!,
+          billableTokPerSec:
+            stats.gpus *
+            billableTokPerSec(
+              read.tput,
+              read.inputTput,
+              read.cacheHitRate,
+              cacheReadRatio,
+              costType,
+            ),
+        });
       }
       if (throughputSteps.length === 0 || costPerHour === null) continue;
 

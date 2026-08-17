@@ -49,11 +49,6 @@ export interface UseHistoricalBestResult extends HistoricalBestOutcome {
   groups: HistoryGroups | null;
   loading: boolean;
   error: string | null;
-  /**
-   * True when the selected scenario has no ISL/OSL to query history by. The
-   * history endpoint is keyed on ISL/OSL, and agentic traces have neither.
-   */
-  unsupportedSequence: boolean;
 }
 
 /**
@@ -83,16 +78,21 @@ export function useHistoricalBest(options: UseHistoricalBestOptions): UseHistori
     (prev, next) => prev.length === next.length && prev.every((p, i) => p === next[i]),
   );
 
+  // Agentic traces have no ISL/OSL to key history by; the endpoint takes a
+  // `benchmarkType` instead and drops the sequence filter server-side. The
+  // `view` trim is a no-op there for the same reason — no sequence to key the
+  // metric allowlist on — so those rows come back whole, which is affordable
+  // because the agentic payload is a fraction of a fixed-sequence one.
   const islOsl = sequenceToIslOsl(sequence);
-  const unsupportedSequence = islOsl === null;
 
   const {
     data: rows,
     isLoading,
     error,
   } = useBenchmarkHistory(model, islOsl?.isl ?? 0, islOsl?.osl ?? 0, {
+    ...(islOsl === null ? { benchmarkType: 'agentic_traces' as const } : {}),
     view: 'calculator',
-    enabled: enabled && !unsupportedSequence,
+    enabled,
   });
 
   // Stage one — the expensive half. Independent of the target, so moving the
@@ -125,8 +125,7 @@ export function useHistoricalBest(options: UseHistoricalBestOptions): UseHistori
     ...selection.outcome,
     progressions: selection.progressions,
     groups: groups ?? null,
-    loading: enabled && !unsupportedSequence && (isLoading || !rows),
+    loading: enabled && (isLoading || !rows),
     error: error ? error.message : null,
-    unsupportedSequence,
   };
 }

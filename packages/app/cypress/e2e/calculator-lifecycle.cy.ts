@@ -11,7 +11,8 @@ import { unlockAgenticGate } from '../support/e2e';
 //  - clamped (never-measured-at-target) reads are excluded rather than clamped,
 //    so chips can legitimately be absent and must be explained, not dropped;
 //  - the token price defaults to the cheapest visible chip's break-even;
-//  - agentic traces have no ISL/OSL, so the section is genuinely unsupported.
+//  - agentic traces have no ISL/OSL, so history is keyed on benchmark_type
+//    instead, and their cached input tokens bill at a discount.
 
 /** Nth cell of the first lifecycle table row. */
 const firstRowCell = (index: number) =>
@@ -120,6 +121,9 @@ describe('Calculator — Fleet Lifecycle', () => {
       cy.get('tbody tr').should('have.length.greaterThan', 0);
     });
     cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
+    // No cached-input assumption on a fixed sequence: those runs record no cache
+    // hits at all, so the control would be a knob that moves nothing.
+    cy.get('[data-testid="calc-lifecycle-cache-input"]').should('not.exist');
   });
 
   it('every row is traceable to the dated run it came from', () => {
@@ -498,6 +502,32 @@ describe('Calculator — Fleet Lifecycle', () => {
 });
 
 describe('Calculator — Fleet Lifecycle with agentic traces', () => {
+  // Two run dates so the staircase has a step in it, and a measured cache hit
+  // rate on every row so the cached-input discount has something to apply to.
+  // The shared history fixture carries ZERO agentic rows, so this spec serves
+  // its own — the pattern gpu-compare-agentic-detail.cy.ts uses.
+  const LATER_DATE = '2026-07-26';
+  const historyRows = () => {
+    const day1 = agenticB300Rows(null).map((row) => ({
+      ...row,
+      metrics: { ...row.metrics, server_gpu_cache_hit_rate: 0.9 } as Record<string, number>,
+    }));
+    // A later, faster sweep: the improvement the section exists to show.
+    const day2 = day1.map((row) => ({
+      ...row,
+      id: row.id + 5000,
+      date: LATER_DATE,
+      metrics: {
+        ...row.metrics,
+        tput_per_gpu: row.metrics.tput_per_gpu * 1.4,
+        output_tput_per_gpu: row.metrics.output_tput_per_gpu * 1.4,
+        input_tput_per_gpu: row.metrics.input_tput_per_gpu * 1.4,
+      },
+    }));
+    const b300 = [...day1, ...day2];
+    return [...b300, ...b300.map((row) => ({ ...row, id: row.id + 20000, hardware: 'b200' }))];
+  };
+
   before(() => {
     // Agentic rows have null ISL/OSL, which the default fixture model has none
     // of — so serve them the same way the main calculator spec does.
@@ -507,8 +537,12 @@ describe('Calculator — Fleet Lifecycle with agentic traces', () => {
       body: [
         ...agenticAvailability,
         ...agenticAvailability.map((row) => ({ ...row, hardware: 'b200' })),
+        ...agenticAvailability.map((row) => ({ ...row, date: LATER_DATE })),
       ],
     });
+    cy.intercept('GET', '/api/v1/benchmarks/history*', { body: historyRows() }).as(
+      'agenticHistory',
+    );
     cy.intercept('GET', '/api/v1/benchmarks*', { body: [...b300Rows, ...b200Rows] }).as(
       'agenticBenchmarks',
     );
@@ -519,15 +553,56 @@ describe('Calculator — Fleet Lifecycle with agentic traces', () => {
       },
     });
     cy.wait('@agenticBenchmarks');
-    cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic Traces');
+    cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic');
+    cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
+    cy.wait('@agenticHistory');
+    cy.get('[data-testid="calculator-lifecycle-table"]', { timeout: 30_000 }).should('be.visible');
   });
 
-  it('states that history cannot be keyed for agentic traces', () => {
-    // Not an empty card: the reason is structural and the user needs it.
-    cy.get('[data-testid="calculator-lifecycle-unsupported"]')
-      .should('be.visible')
-      .and('contain.text', 'Agentic Traces');
-    cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
+  it('projects a lifecycle from history that has no ISL/OSL to key on', () => {
+    // The section used to refuse this outright. The endpoint keys agentic
+    // history on benchmark_type instead, so there is a real projection here.
+    cy.get('[data-testid="calculator-lifecycle-unsupported"]').should('not.exist');
+    cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').should(
+      'have.length.greaterThan',
+      0,
+    );
+  });
+
+  it('raises the break-even price it seeds, because fewer tokens are billable', () => {
+    cy.get('[data-testid="calc-lifecycle-cache-input"]').should('have.value', '10');
+    // While the price is still auto-seeded, the discount does NOT move margin —
+    // break-even re-solves to keep the cheapest fleet at zero either way. What it
+    // moves is the price you need to charge, which is the economically
+    // interesting statement: discounting 90% of a 133:1 input mix means asking
+    // materially more per token to stand still.
+    cy.get('[data-testid="calc-lifecycle-price-input"]')
+      .invoke('val')
+      .then((discountedPrice) => {
+        cy.get('[data-testid="calc-lifecycle-cache-input"]').clear().type('100');
+        cy.get('[data-testid="calc-lifecycle-price-input"]')
+          .invoke('val')
+          .should((fullPrice) => {
+            expect(Number(discountedPrice)).to.be.greaterThan(Number(fullPrice));
+          });
+      });
+  });
+
+  it('lowers margin at a fixed price, where the discount has nowhere to hide', () => {
+    // Take the price over so it stops re-seeding; now the cached-token discount
+    // lands where a reader would expect it — on the margin.
+    cy.get('[data-testid="calc-lifecycle-cache-input"]').clear().type('100');
+    cy.get('[data-testid="calc-lifecycle-price-input"]').clear().type('500');
+    firstRowCell(9)
+      .invoke('text')
+      .then((full) => {
+        cy.get('[data-testid="calc-lifecycle-cache-input"]').clear().type('10');
+        firstRowCell(9)
+          .invoke('text')
+          .should((discounted) => {
+            expect(money(discounted)).to.be.lessThan(money(full));
+          });
+      });
   });
 });
 

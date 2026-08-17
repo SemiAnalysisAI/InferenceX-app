@@ -393,6 +393,7 @@ export function interpolateForGPU(
       tpPerMw: sorted[0].tpPerMw,
       inputTpPerMw: sorted[0].inputTpPerMw,
       outputTpPerMw: sorted[0].outputTpPerMw,
+      cacheHitRate: sorted[0].cacheHitRate,
       concurrency: sorted[0].concurrency,
       nearestPoints: [sorted[0]],
       clamped,
@@ -448,6 +449,16 @@ export function interpolateForGPU(
   const outputTpPerMw = buildMetric((p) => p.outputTpPerMw);
   const concurrency = Math.round(buildMetric((p) => p.concurrency));
 
+  // Only splined when every frontier point carries a measured rate. All absent
+  // is the fixed-sequence case, where there is no cache to discount. A *mixed*
+  // frontier is the interesting one: substituting 0 for the missing points
+  // would invent a dip in the cached fraction, so the whole sweep opts out and
+  // its input tokens bill at full price — understating margin rather than
+  // overstating it, which is the safe direction for this number to be wrong in.
+  const cacheHitRate = sorted.every((p) => typeof p.cacheHitRate === 'number')
+    ? buildMetric((p) => p.cacheHitRate!)
+    : undefined;
+
   let nearestPoints: GPUDataPoint[];
   if (clampedTarget <= minInput) {
     nearestPoints = [sorted[0]];
@@ -474,6 +485,7 @@ export function interpolateForGPU(
     tpPerMw,
     inputTpPerMw,
     outputTpPerMw,
+    cacheHitRate,
     concurrency,
     nearestPoints,
     clamped,

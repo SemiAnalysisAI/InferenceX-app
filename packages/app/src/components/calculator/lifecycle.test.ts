@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   availabilityFromInterrupts,
+  billableTokPerSec,
   breakEvenPricePerMTok,
   computeLifecycle,
   valueAtMonth,
@@ -52,11 +53,11 @@ describe('breakEvenPricePerMTok', () => {
   });
 
   it('is the price that zeroes the margin at that throughput', () => {
-    const fleetTokPerSec = 1_000_000;
+    const tokPerSec = 1_000_000;
     const costPerHour = 12_345;
-    const price = breakEvenPricePerMTok(costPerHour, fleetTokPerSec)!;
+    const price = breakEvenPricePerMTok(costPerHour, tokPerSec)!;
     const series = computeLifecycle({
-      steps: [{ month: 0, fleetTokPerSec }],
+      steps: [{ month: 0, billableTokPerSec: tokPerSec }],
       costPerHour,
       horizonMonths: 24,
       assumptions: { ...assumptions, mtbiDays: 0, pricePerMTok: price },
@@ -68,15 +69,15 @@ describe('breakEvenPricePerMTok', () => {
     // The same racks sell fewer tokens when interrupted, so break-even is higher.
     // Without the availability argument the seeded "break-even" price leaves the
     // cheapest fleet a few percent under water.
-    const fleetTokPerSec = 1_000_000;
+    const tokPerSec = 1_000_000;
     const costPerHour = 12_345;
     const availability = availabilityFromInterrupts(24, 12);
-    const flat = breakEvenPricePerMTok(costPerHour, fleetTokPerSec)!;
-    const haircut = breakEvenPricePerMTok(costPerHour, fleetTokPerSec, availability)!;
+    const flat = breakEvenPricePerMTok(costPerHour, tokPerSec)!;
+    const haircut = breakEvenPricePerMTok(costPerHour, tokPerSec, availability)!;
     expect(haircut).toBeCloseTo(flat / availability, 10);
 
     const series = computeLifecycle({
-      steps: [{ month: 0, fleetTokPerSec }],
+      steps: [{ month: 0, billableTokPerSec: tokPerSec }],
       costPerHour,
       horizonMonths: 24,
       assumptions: { ...assumptions, pricePerMTok: haircut },
@@ -87,7 +88,7 @@ describe('breakEvenPricePerMTok', () => {
     // The unadjusted price is the defect being pinned: it reads as break-even
     // but plots a loss.
     const naive = computeLifecycle({
-      steps: [{ month: 0, fleetTokPerSec }],
+      steps: [{ month: 0, billableTokPerSec: tokPerSec }],
       costPerHour,
       horizonMonths: 24,
       assumptions: { ...assumptions, pricePerMTok: flat },
@@ -111,9 +112,9 @@ describe('computeLifecycle', () => {
   // Three measured configs: the opening sweep, then two improvements — the
   // shape MI355X showed on DeepSeek-V4-Pro.
   const steps: ThroughputStep[] = [
-    { month: 0, fleetTokPerSec: 400_000 },
-    { month: 3, fleetTokPerSec: 900_000 },
-    { month: 6, fleetTokPerSec: 1_600_000 },
+    { month: 0, billableTokPerSec: 400_000 },
+    { month: 3, billableTokPerSec: 900_000 },
+    { month: 6, billableTokPerSec: 1_600_000 },
   ];
   const base = { steps, costPerHour, horizonMonths: 24, assumptions };
 
@@ -166,7 +167,7 @@ describe('computeLifecycle', () => {
     // A chip first measured three months after release has no line before then.
     const late = computeLifecycle({
       ...base,
-      steps: [{ month: 3, fleetTokPerSec: 400_000 }],
+      steps: [{ month: 3, billableTokPerSec: 400_000 }],
     })!;
     expect(late.startMonth).toBe(3);
     expect(late.points[0]!.month).toBe(3);
@@ -223,10 +224,10 @@ describe('computeLifecycle', () => {
     const series = computeLifecycle({
       ...base,
       steps: [
-        { month: 6, fleetTokPerSec: 1_600_000 },
-        { month: 0, fleetTokPerSec: 400_000 },
-        { month: 3, fleetTokPerSec: 0 }, // no throughput — dropped
-        { month: NaN, fleetTokPerSec: 500_000 }, // unusable month — dropped
+        { month: 6, billableTokPerSec: 1_600_000 },
+        { month: 0, billableTokPerSec: 400_000 },
+        { month: 3, billableTokPerSec: 0 }, // no throughput — dropped
+        { month: NaN, billableTokPerSec: 500_000 }, // unusable month — dropped
       ],
     })!;
     expect(series.points.filter((p) => p.isStep).map((p) => p.month)).toEqual([0, 6]);
@@ -320,7 +321,7 @@ describe('computeLifecycle', () => {
       // exactly half the end level. Pins the trapezoid path, which every other
       // integration test dodges by using rampMonths: 0.
       const series = computeLifecycle({
-        steps: [{ month: 0, fleetTokPerSec: 1_600_000 }],
+        steps: [{ month: 0, billableTokPerSec: 1_600_000 }],
         costPerHour,
         horizonMonths: 6,
         assumptions: { ...assumptions, rampMonths: 6 },
@@ -335,8 +336,8 @@ describe('computeLifecycle', () => {
       // read as "at full load".
       const series = computeLifecycle({
         steps: [
-          { month: 0, fleetTokPerSec: 400_000 },
-          { month: 3, fleetTokPerSec: 1_600_000 },
+          { month: 0, billableTokPerSec: 400_000 },
+          { month: 3, billableTokPerSec: 1_600_000 },
         ],
         costPerHour,
         horizonMonths: 24,
@@ -355,9 +356,9 @@ describe('computeLifecycle', () => {
       // zero-width rollout, which would spike the line to a rate never served.
       const series = computeLifecycle({
         steps: [
-          { month: 0, fleetTokPerSec: 400_000 },
-          { month: 6, fleetTokPerSec: 900_000 },
-          { month: 6, fleetTokPerSec: 1_600_000 },
+          { month: 0, billableTokPerSec: 400_000 },
+          { month: 6, billableTokPerSec: 900_000 },
+          { month: 6, billableTokPerSec: 1_600_000 },
         ],
         costPerHour,
         horizonMonths: 24,
@@ -387,8 +388,8 @@ describe('computeLifecycle', () => {
     const series = computeLifecycle({
       ...base,
       steps: [
-        { month: 0, fleetTokPerSec: 400_000 },
-        { month: 3, fleetTokPerSec: 1_600_000 },
+        { month: 0, billableTokPerSec: 400_000 },
+        { month: 3, billableTokPerSec: 1_600_000 },
       ],
       assumptions: { ...assumptions, mtbiDays: 0, pricePerMTok: price },
     })!;
@@ -448,7 +449,11 @@ describe('computeLifecycle', () => {
     expect(computeLifecycle({ ...base, costPerHour: NaN })).toBeNull();
     expect(computeLifecycle({ ...base, horizonMonths: 0 })).toBeNull();
     expect(
-      computeLifecycle({ ...base, steps: [{ month: 30, fleetTokPerSec: 1 }], horizonMonths: 24 }),
+      computeLifecycle({
+        ...base,
+        steps: [{ month: 30, billableTokPerSec: 1 }],
+        horizonMonths: 24,
+      }),
     ).toBeNull();
   });
 });
@@ -517,7 +522,7 @@ describe('ramp sampling is anchored, not proportional', () => {
 
   it('reconstructs a governing rollout identically whether or not it is cut short', () => {
     const alone = computeLifecycle({
-      steps: [{ month: 0, fleetTokPerSec: 1000 }],
+      steps: [{ month: 0, billableTokPerSec: 1000 }],
       costPerHour: 100,
       horizonMonths: 12,
       assumptions: ramped,
@@ -526,8 +531,8 @@ describe('ramp sampling is anchored, not proportional', () => {
     // truncates it. Before 1.5 the fleet is running the identical rollout.
     const truncated = computeLifecycle({
       steps: [
-        { month: 0, fleetTokPerSec: 1000 },
-        { month: 1.5, fleetTokPerSec: 3000 },
+        { month: 0, billableTokPerSec: 1000 },
+        { month: 1.5, billableTokPerSec: 3000 },
       ],
       costPerHour: 100,
       horizonMonths: 12,
@@ -554,7 +559,7 @@ describe('ramp sampling is anchored, not proportional', () => {
     // rollout cut short carries proportionally fewer samples rather than the
     // same count squeezed into less time. Equal spacing is the whole mechanism.
     const series = computeLifecycle({
-      steps: [{ month: 0, fleetTokPerSec: 1000 }],
+      steps: [{ month: 0, billableTokPerSec: 1000 }],
       costPerHour: 100,
       horizonMonths: 12,
       assumptions: ramped,
@@ -562,5 +567,58 @@ describe('ramp sampling is anchored, not proportional', () => {
     const rampMonthsSampled = series.points.filter((p) => p.month <= 3).map((p) => p.month);
     const gaps = rampMonthsSampled.slice(1).map((m, i) => m - rampMonthsSampled[i]!);
     for (const gap of gaps) expect(gap).toBeCloseTo(3 / 24, 9);
+  });
+});
+
+describe('billableTokPerSec', () => {
+  // A fleet whose total rate is dominated by input tokens, most of them cached —
+  // the agentic shape: production runs sit near 133:1 input:output with a median
+  // 92% hit rate.
+  const total = 13_636;
+  const input = 13_525;
+
+  it('is an exact identity where nothing was measured, which is every fixed sequence', () => {
+    // Not "close to": fixed-sequence rows carry no cache metric on any row, so
+    // this path must return the caller's own number bit-for-bit. Anything else
+    // would move 8k/1k margins as a side effect of an agentic feature.
+    for (const costType of ['total', 'input', 'output'] as const) {
+      expect(billableTokPerSec(total, input, undefined, 0.1, costType)).toBe(total);
+    }
+  });
+
+  it('is an exact identity at a 100% cached price, whatever the hit rate', () => {
+    expect(billableTokPerSec(total, input, 0.92, 1, 'total')).toBe(total);
+    expect(billableTokPerSec(total, input, 1, 1, 'input')).toBe(total);
+  });
+
+  it('discounts only the cached share of input tokens', () => {
+    // 92% of 13,525 input tok/s bill at 10%, so 0.92 × 13,525 × 0.9 comes off.
+    const expected = total - input * 0.92 * 0.9;
+    expect(billableTokPerSec(total, input, 0.92, 0.1, 'total')).toBeCloseTo(expected, 9);
+    // The size of the correction is the point of the feature: at this mix the
+    // billable rate is a small fraction of the raw one.
+    expect(expected / total).toBeLessThan(0.25);
+  });
+
+  it('leaves output pricing alone — generated tokens are never cache reads', () => {
+    expect(billableTokPerSec(111, input, 0.92, 0.1, 'output')).toBe(111);
+  });
+
+  it('clamps a hit rate the data reports above 1 rather than billing negative tokens', () => {
+    // Real rows report up to 1.185. Left unclamped that would discount more
+    // input tokens than were served.
+    const clamped = billableTokPerSec(total, input, 1.185, 0, 'total');
+    expect(clamped).toBe(billableTokPerSec(total, input, 1, 0, 'total'));
+    expect(clamped).toBeGreaterThanOrEqual(0);
+  });
+
+  it('never returns less than zero when the discount exceeds the base rate', () => {
+    // `input` pricing on a frontier whose splined input rate exceeds the total.
+    expect(billableTokPerSec(100, 10_000, 1, 0, 'total')).toBe(0);
+  });
+
+  it('ignores an unusable input rate instead of producing NaN', () => {
+    expect(billableTokPerSec(total, Number.NaN, 0.92, 0.1, 'total')).toBe(total);
+    expect(billableTokPerSec(total, 0, 0.92, 0.1, 'total')).toBe(total);
   });
 });

@@ -78,6 +78,9 @@ const URL_STATE_KEYS = [
   // which metric the chart plots.
   'c_price',
   'c_ramp',
+  // What a cached input token sells for, as a % of the price. Agentic only —
+  // fixed sequences record no cache hits for it to apply to.
+  'c_cache',
   'c_ly',
   'c_mtbi',
   'c_rec',
@@ -155,6 +158,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   // Empty means the default y metric (margin).
   c_ly: '',
   c_ramp: '3',
+  c_cache: '10',
   c_mtbi: '24',
   c_rec: '12',
 };

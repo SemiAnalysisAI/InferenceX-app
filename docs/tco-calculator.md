@@ -785,6 +785,73 @@ small change, but it lives in a Python-synced function (`iso_interactivity.py`)
 and would move published cost numbers, so it needs its own change. Until then the
 price tooltip states the direction of the divergence.
 
+### Agentic traces, and cached input tokens
+
+The section refused Agentic Traces until it was shown that the refusal's stated
+reason — "run history is keyed by input/output sequence length" — was no longer
+true. `/api/v1/benchmarks/history` takes `benchmarkType=agentic_traces` and drops
+the ISL/OSL filter server-side; `buildGpuGroups` already maps agentic rows and
+already takes a percentile. Only the fetch in `useHistoricalBest` had to change.
+
+What did need real work is the revenue term. Measured against production history
+(`inferencex.semianalysis.com`, DeepSeek-V4-Pro and GLM-5.2, August 2026):
+
+|                                  | agentic                        | fixed 8k/1k                    |
+| -------------------------------- | ------------------------------ | ------------------------------ |
+| median input:output token ratio  | **133:1**                      | ~8:1                           |
+| median GPU prefix-cache hit rate | **0.92** (min 0.005, p90 0.96) | metric **absent on every row** |
+| rows carrying a hit rate         | 217/223 DSV4, 45/45 GLM-5.2    | 0/1245, 0/541                  |
+
+A single blended `$/M tok` against the raw token rate therefore bills ~13.5k tok/s
+of which ~92% are cache _reads_, which providers charge a fraction of the fresh
+input rate for. On `total` or `input` pricing that overstates agentic margin by
+close to an order of magnitude; on `output` pricing (111 tok/s) every fleet is
+permanently underwater. At 8:1 with no prefix reuse, one price is a fair
+simplification — at 133:1 with 92% hits it is a wrong number.
+
+So the fleet is sized on the physical rate and **billed on a discounted one**:
+
+```
+billableTokPerSec = base − inputTput × clamp01(cacheHitRate) × (1 − cacheReadRatio)
+```
+
+Three properties are worth stating, because they are what make this safe:
+
+- **It is a subtraction, not a recomposition.** Writing it as
+  `output + billableInput` would re-derive the total from two independently
+  splined series and drift against it. As a subtraction the result is _exactly_
+  `base` whenever there is nothing to discount.
+- **Fixed sequences are unaffected by construction.** They carry no cache metric
+  on any row, so `cacheHitRate` is `undefined` and the term is zero — not "close
+  to zero", identical. That is asserted with `toBe`, not `toBeCloseTo`.
+- **A partly-measured frontier opts out.** `interpolateForGPU` splines the rate
+  only when _every_ frontier point carries one; substituting 0 for the missing
+  points would invent a dip in the cached fraction and overstate the billable
+  rate. Opting out bills every input token at full price instead — wrong in the
+  direction that understates margin.
+
+`cacheReadRatio` is the one user input here, labelled `Cached input (% of price)`
+and defaulting to 10% (the ratio DeepSeek and Anthropic both publish). The cached
+_fraction_ it multiplies is measured per config, not assumed. The control is
+hidden for fixed sequences rather than shown as a no-op. There is no circularity
+with the break-even seed: billable throughput depends only on the ratio, and
+break-even then solves the price given that throughput.
+
+**What counts as cached.** `server_gpu_cache_hit_rate + server_external_cache_hit_rate`,
+clamped to `[0,1]`. Summed rather than maxed because the two are disjoint in the
+measured data: across the 153 production rows carrying both, the sum never
+exceeds 1.0 (max 0.972) and never exceeds `theoretical_cache_hit_rate` in any of
+the 64 rows with a meaningful external figure. The clamp is not decorative — the
+GPU figure alone reaches 1.185 on rows without an external one.
+
+**A limitation the UI discloses.** Agentic run history is roughly a week deep:
+DSV4 has 7 run dates with 4 of 19 configs measured on more than one; GLM-5.2 has
+4 dates and **0 of 9** configs on more than one. Fixed 8k/1k has 61 dates over
+3.7 months with 30 of 45 configs on several. Since this section plots a
+best-so-far staircase, agentic lines are often a single rung. When no visible
+chip has two, the section says so — a flat line here is a gap in the history, not
+a finding about the hardware. This resolves itself as runs accumulate.
+
 ### Overlay exemption
 
 This section is official-only, and unlike the fleet planner that is not a policy
@@ -794,7 +861,8 @@ exclusion in its own note rather than leaving a silent gap.
 
 ### URL params
 
-`c_price`, `c_life` (horizon), `c_ramp`, `c_mtbi`, `c_rec`, `c_ly` (y-axis metric —
+`c_price`, `c_life` (horizon), `c_ramp`, `c_cache` (cached-input price, % — agentic
+only), `c_mtbi`, `c_rec`, `c_ly` (y-axis metric —
 `margin` | `revenue` | `cumulativeRevenue`, parsed against that allowlist so a stale
 or hand-edited link falls back to `margin` rather than seeding an unknown metric).
 The first two default to

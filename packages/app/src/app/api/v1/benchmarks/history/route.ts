@@ -34,9 +34,10 @@ const getCachedAgenticBenchmarkHistory = cachedQuery(
  * charts. The sequence is derived from the route's own isl/osl rather than
  * taken as a parameter, so the two can never disagree.
  *
- * Agentic requests carry no isl/osl and so have no sequence to key on — which is
- * also why the calculator's lifecycle section refuses agentic traces outright.
- * Those responses pass through untrimmed rather than guessing a sequence.
+ * Agentic requests carry no isl/osl and so have no sequence to key on. Those
+ * responses pass through untrimmed rather than guessing a sequence — the trim is
+ * a payload optimisation, and the agentic payload is a fraction of a fixed one.
+ * The calculator's lifecycle section consumes them either way.
  */
 function applyCalculatorView<
   T extends {

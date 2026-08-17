@@ -66,6 +66,23 @@ function getAgenticMetric(
 }
 
 /**
+ * Fraction of a row's input tokens served from cache, or null when the row
+ * carries no cache metric at all — which is every fixed-sequence row.
+ *
+ * The GPU and external figures are summed rather than maxed: they are disjoint
+ * in the measured data (across production rows carrying both, the sum never
+ * exceeds 1, nor `theoretical_cache_hit_rate`). The clamp is not decorative —
+ * the GPU figure alone reaches 1.185 on some rows.
+ */
+function cacheHitRateOf(m: Record<string, number>): number | null {
+  const gpu = m.server_gpu_cache_hit_rate;
+  const external = m.server_external_cache_hit_rate;
+  if (typeof gpu !== 'number' && typeof external !== 'number') return null;
+  const sum = (typeof gpu === 'number' ? gpu : 0) + (typeof external === 'number' ? external : 0);
+  return Math.max(0, Math.min(1, sum));
+}
+
+/**
  * Build `GPUDataPoint` groups from raw benchmark rows.
  *
  * Shared by the official and the unofficial-run overlay paths so both are
@@ -111,6 +128,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     const tput = m.tput_per_gpu ?? 0;
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
+    const cacheHitRate = cacheHitRateOf(m);
     const specs = getGpuSpecs(hwKey);
     const power = specs.power;
 
@@ -132,6 +150,7 @@ export function buildGpuGroups<M extends GroupMeta>(
       throughput: tput,
       outputThroughput: outputTput,
       inputThroughput: inputTput,
+      ...(cacheHitRate === null ? {} : { cacheHitRate }),
       concurrency: row.conc,
       tp: row.decode_tp,
       precision: row.precision,

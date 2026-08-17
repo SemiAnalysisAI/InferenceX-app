@@ -18,7 +18,7 @@ import {
 } from './interactivity-surface';
 import { interpolateForGPU } from './interpolation';
 import { getTpPerMwForType } from './ThroughputBarChart';
-import type { CostType, InterpolatedResult } from './types';
+import type { CostType, GPUDataPoint, InterpolatedResult } from './types';
 
 const MODE = 'interactivity_to_throughput' as const;
 const COST_PROVIDER = 'costh' as const;
@@ -201,25 +201,49 @@ describe('prepareFrontier', () => {
     // The whole point of the prepared reader is to be the 1D read without paying
     // for ten splines per slice. If it ever disagrees, the surface is lying.
     const groups = groupsOf();
-    for (const [hwKey, dated] of groups.byHwKey) {
-      for (const sweepAt of dated) {
-        const reader = prepareFrontier(sweepAt.points, MODE, COST_TYPE);
-        expect(reader, hwKey).not.toBeNull();
-        for (const target of [20, 33.3, 50, 62.5, 80, 100, 140]) {
-          const canonical = interpolateForGPU(sweepAt.points, target, MODE, COST_PROVIDER);
-          const mine = reader!.read(target);
-          if (!canonical || canonical.clamped) {
-            expect(mine, `${hwKey} @ ${target}`).toBeNull();
-            continue;
+    // Run the pin twice: once over the fixtures as shipped (no cache metric, the
+    // fixed-sequence shape) and once with a rate injected on every point (the
+    // agentic shape). Without the second pass the cached-fraction reader would be
+    // pinned only against `undefined === undefined`, which no mutant can fail.
+    const variants: [string, (p: GPUDataPoint) => GPUDataPoint][] = [
+      ['as measured', (p) => p],
+      [
+        'with cache rates',
+        (p) => ({ ...p, cacheHitRate: Math.min(1, 0.3 + p.interactivity / 200) }),
+      ],
+    ];
+    for (const [label, decorate] of variants) {
+      for (const [hwKey, dated] of groups.byHwKey) {
+        for (const sweepAt of dated) {
+          const points = sweepAt.points.map(decorate);
+          const reader = prepareFrontier(points, MODE, COST_TYPE);
+          expect(reader, hwKey).not.toBeNull();
+          for (const target of [20, 33.3, 50, 62.5, 80, 100, 140]) {
+            const where = `${label} ${hwKey} @ ${target}`;
+            const canonical = interpolateForGPU(points, target, MODE, COST_PROVIDER);
+            const mine = reader!.read(target);
+            if (!canonical || canonical.clamped) {
+              expect(mine, where).toBeNull();
+              continue;
+            }
+            expect(mine, where).not.toBeNull();
+            expect(mine!.value).toBeCloseTo(canonical.value, 6);
+            expect(mine!.tput).toBeCloseTo(canonical.value, 6);
+            expect(mine!.outputTput).toBeCloseTo(canonical.outputTputValue, 6);
+            expect(mine!.inputTput, where).toBeCloseTo(canonical.inputTputValue, 6);
+            expect(mine!.rank).toBeCloseTo(rank(canonical), 6);
+            if (canonical.cacheHitRate === undefined) {
+              expect(mine!.cacheHitRate, where).toBeUndefined();
+            } else {
+              expect(mine!.cacheHitRate, where).toBeCloseTo(canonical.cacheHitRate, 6);
+            }
           }
-          expect(mine, `${hwKey} @ ${target}`).not.toBeNull();
-          expect(mine!.value).toBeCloseTo(canonical.value, 6);
-          expect(mine!.tput).toBeCloseTo(canonical.value, 6);
-          expect(mine!.outputTput).toBeCloseTo(canonical.outputTputValue, 6);
-          expect(mine!.rank).toBeCloseTo(rank(canonical), 6);
         }
       }
     }
+    // The decorated pass must actually have exercised the branch it exists for.
+    const decorated = [...groups.byHwKey.values()][0]![0]!.points.map(variants[1]![1]);
+    expect(prepareFrontier(decorated, MODE, COST_TYPE)!.read(50)!.cacheHitRate).toBeGreaterThan(0);
   });
 
   it('refuses to extrapolate past the measured range', () => {
@@ -330,6 +354,10 @@ describe('buildSurfaceGrid', () => {
       mode: MODE,
       metric: 'margin' as const,
       costProvider: COST_PROVIDER,
+      // No cached-token discount: these fixtures carry no measured hit rate, so
+      // the ratio is inert here either way. Pinned at 1 so a future fixture that
+      // does carry one cannot silently change every assertion in this file.
+      cacheReadRatio: 1,
       costType: COST_TYPE,
       mw: 10,
       anchorMs,
@@ -354,6 +382,42 @@ describe('buildSurfaceGrid', () => {
     // question the surface exists to answer.
     expect(grid.yMin).toBeLessThanOrEqual(0);
     expect(grid.yMax).toBeGreaterThanOrEqual(0);
+  });
+
+  it('bills cached input tokens at the discounted rate across the whole surface', () => {
+    // Give every point a measured cache rate, then price cached tokens at 10%.
+    // The margin must fall everywhere the fixture is solvent, and the two ends of
+    // the ratio must bracket it — this is the agentic correction, seen in 3D.
+    const cached = groupsOf();
+    for (const dated of cached.byHwKey.values()) {
+      for (const dateSweep of dated) {
+        dateSweep.points = dateSweep.points.map((p) => ({ ...p, cacheHitRate: 0.9 }));
+      }
+    }
+    const full = build({ groups: cached, cacheReadRatio: 1 })!;
+    const discounted = build({ groups: cached, cacheReadRatio: 0.1 })!;
+
+    let compared = 0;
+    for (const [ci, chip] of discounted.chips.entries()) {
+      for (const [zi, row] of chip.cells.entries()) {
+        for (const [ti, value] of row.entries()) {
+          const before = full.chips[ci]!.cells[zi]![ti];
+          if (value === null || before === null) {
+            // Coverage is a property of the frontier, not of the price, so the
+            // holes must land in exactly the same places.
+            expect(value).toBe(before);
+            continue;
+          }
+          expect(value).toBeLessThan(before);
+          compared += 1;
+        }
+      }
+    }
+    expect(compared).toBeGreaterThan(0);
+
+    // And a ratio of 1 is the untouched surface: no discount, no drift.
+    const plain = build()!;
+    expect(full.chips[0]!.cells).toEqual(plain.chips[0]!.cells);
   });
 
   it('leaves holes where nothing was measured rather than filling them', () => {
@@ -510,6 +574,7 @@ describe('buildSurfaceGrid', () => {
             precisions: ['fp4'],
           }),
           mode: MODE,
+          cacheReadRatio: 1,
           metric: 'revenue',
           costProvider: COST_PROVIDER,
           costType,

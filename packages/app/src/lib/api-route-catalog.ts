@@ -116,7 +116,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmark-history',
-    sourceSha256: 'b358c52f4b1f94e3d3c0b337cd0eee063b1a6f897b2107093d3194af7e7c21dc',
+    sourceSha256: 'e04ab815e58ccfa828345d68a9ba1ba7b1c80cb65e77b789118db8d014464534',
   },
   {
     source: 'src/app/api/v1/collectivex/latest/route.ts',

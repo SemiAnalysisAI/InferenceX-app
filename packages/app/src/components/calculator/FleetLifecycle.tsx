@@ -17,7 +17,7 @@ import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { track } from '@/lib/analytics';
 import { getGpuSpecs, getHardwareConfig } from '@/lib/constants';
-import type { Model, Percentile, Sequence } from '@/lib/data-mappings';
+import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { readUrlParams, writeUrlParams } from '@/lib/url-state';
 import { useLocale } from '@/lib/use-locale';
 import { getDisplayLabel } from '@/lib/utils';
@@ -30,6 +30,7 @@ import FleetLifecycleChart, {
 import { mergeProgressionsByChip, type ChipProgression } from './historical-best';
 import {
   availabilityFromInterrupts,
+  billableTokPerSec,
   breakEvenPricePerMTok,
   computeLifecycle,
   MS_PER_MONTH,
@@ -78,8 +79,6 @@ const STRINGS = {
       'A fixed fleet, from the day the model shipped. The chips never change; the software serving them does — so each rollout is a config that beat every config before it, climbing from what the fleet already served to its own numbers, and the gap to the cost line is the return on that work.',
     needMw:
       'Enter a facility power budget in the Fleet Projection section above to project lifecycle economics.',
-    unsupportedSequence:
-      'Not available for Agentic Traces: run history is keyed by input/output sequence length, which agentic traces do not have. Pick a fixed sequence to use this section.',
     noReleaseDate:
       'No release date is on file for this model, so the timeline is anchored to its first benchmark run instead.',
     loading: 'Loading run history…',
@@ -101,6 +100,11 @@ const STRINGS = {
     horizonLabel: 'Horizon (months from release)',
     horizonTooltip:
       "How far past the model's release date to project. Past the last sweep the latest config is held flat — that is what the fleet earns if optimisation stops, not a forecast of further gains.",
+    cacheLabel: 'Cached input (% of price)',
+    cacheTooltip:
+      'What a cached input token sells for, as a percentage of the price above. Agentic traces reuse enormous prefixes — a median 133 input tokens per output token, of which a median 92% are served from cache on these runs — and providers bill a cache read at a fraction of a fresh token, so charging full price for all of them overstates margin by close to an order of magnitude. The cached fraction is measured per config, not assumed; only the percentage is yours. Set it to 100 to bill every token the same. Fixed sequences record no cache hits at all, which is why this input only appears for agentic traces.',
+    singleRung:
+      'Every chip here has been measured on a single run date, so each line is one config held flat — the staircase this section exists to show needs several dates per config, and agentic trace history does not go back far enough yet. The levels are measured; the absence of steps is a gap in the history, not a finding about the hardware.',
     colChip: 'Chip',
     colConfigNow: 'Config Now',
     colFirst: 'First Run',
@@ -171,8 +175,6 @@ const STRINGS = {
     description:
       '固定集群自模型发布之日起的表现。Chip 从未更换，变化的是为其提供服务的软件——每一次推广都是一个优于此前所有配置的新配置，从集群当前已提供的水平爬升至其自身水平，而与成本线之间的差距即为这些工作带来的回报。',
     needMw: '请在上方「集群规模测算」中输入设施功率预算，以测算生命周期经济性。',
-    unsupportedSequence:
-      '不支持 Agentic Traces：运行历史以输入/输出序列长度为键，而 agentic traces 没有该字段。请选择固定序列以使用本模块。',
     noReleaseDate: '该模型暂无发布日期记录，时间轴改以其首次基准测试运行为起点。',
     loading: '正在加载运行历史……',
     errorPrefix: '无法加载运行历史：',
@@ -192,6 +194,11 @@ const STRINGS = {
     horizonLabel: '测算期 (自发布起月数)',
     horizonTooltip:
       '自模型发布日期起向后测算的月数。在最后一次扫描之后，最新配置将保持不变——这代表若优化停止时集群的收益，而非对后续提升的预测。',
+    cacheLabel: '缓存输入 (占价格百分比)',
+    cacheTooltip:
+      '一个缓存输入 token 的售价，以上方价格的百分比表示。Agentic traces 会复用极长的前缀——中位数为每个输出 token 对应 133 个输入 token，其中中位数 92% 在本批运行中由缓存提供——而服务商对缓存读取仅按新鲜 token 价格的一小部分计费，因此若对全部 token 按满价计费，将使利润被高估近一个数量级。缓存占比按各配置实测得出，并非假设；仅该百分比属于您的假设。设为 100 表示所有 token 同价。固定序列完全没有缓存命中记录，因此该输入项仅在 Agentic Traces 下出现。',
+    singleRung:
+      '此处每款 Chip 都只有单一运行日期的实测数据，因此每条线都是一个配置的水平延伸——本模块所要呈现的阶梯需要同一配置在多个日期上的数据，而 agentic traces 的历史尚不够长。图中的水平值是实测的；缺少台阶反映的是历史数据的空缺，而非关于硬件的结论。',
     colChip: 'Chip',
     colConfigNow: '当前配置',
     colFirst: '首次运行',
@@ -265,6 +272,12 @@ const DEFAULTS = {
   // A nominal quarter to bring a fleet to full load. Purely an assumption, and
   // labelled as one — no measurement in this repo speaks to it.
   rampMonths: 3,
+  /**
+   * A cached input token sells for a tenth of a fresh one — the ratio DeepSeek
+   * and Anthropic both publish, and the order of magnitude the others sit at.
+   * An assumption like the rest; the cached *fraction* it applies to is measured.
+   */
+  cachedInputPct: 10,
 };
 
 function parseNonNegative(raw: string): number | null {
@@ -380,6 +393,19 @@ export default function FleetLifecycle({
   const [rampInput, setRampInput] = useState(
     () => readUrlParams().c_ramp ?? String(DEFAULTS.rampMonths),
   );
+  const [cacheInput, setCacheInput] = useState(
+    () => readUrlParams().c_cache ?? String(DEFAULTS.cachedInputPct),
+  );
+  /**
+   * Only agentic runs record a cache hit rate, so only they can be discounted.
+   * The control is hidden elsewhere rather than shown as a no-op — a knob that
+   * moves nothing is worse than no knob.
+   */
+  const isAgentic = selectedSequence === Sequence.AgenticTraces;
+  const cacheReadRatio = isAgentic
+    ? Math.min(1, (parseNonNegative(cacheInput) ?? DEFAULTS.cachedInputPct) / 100)
+    : 1;
+
   const [horizonInput, setHorizonInput] = useState(() => readUrlParams().c_life ?? '');
   // Like the price, the horizon is seeded from the data until the user takes it
   // over: a fixed 60-month default spends most of the axis on a flat tail
@@ -490,7 +516,18 @@ export default function FleetLifecycle({
         costPerHour ??= stats.costPerHour;
         steps.push({
           month: (Date.parse(`${step.date}T00:00:00Z`) - anchorMs) / MS_PER_MONTH,
-          fleetTokPerSec: stats.fleetTokPerSec,
+          // Sized on the physical rate, billed on the discounted one. `gpus` is
+          // whole chips either way, so this is exactly `stats.fleetTokPerSec`
+          // wherever no cached fraction was measured — every fixed sequence.
+          billableTokPerSec:
+            stats.gpus *
+            billableTokPerSec(
+              getThroughputForType(step.result, costType),
+              step.result.inputTputValue,
+              step.result.cacheHitRate,
+              cacheReadRatio,
+              costType,
+            ),
         });
       }
 
@@ -501,7 +538,7 @@ export default function FleetLifecycle({
       return [{ progression, steps, costPerHour }];
     });
     return { fleets: sized, unplottable: absent };
-  }, [mw, anchorMs, visibleProgressions, costProvider, costType, targetValue]);
+  }, [mw, anchorMs, visibleProgressions, costProvider, costType, targetValue, cacheReadRatio]);
 
   // Interrupts sell fewer tokens off the same racks, so they raise break-even.
   // The seeded price has to carry the same haircut the plotted margin does, or
@@ -524,7 +561,7 @@ export default function FleetLifecycle({
     for (const { steps, costPerHour } of fleets) {
       const latest = steps.at(-1);
       if (!latest) continue;
-      const price = breakEvenPricePerMTok(costPerHour, latest.fleetTokPerSec, availability);
+      const price = breakEvenPricePerMTok(costPerHour, latest.billableTokPerSec, availability);
       if (price === null) continue;
       if (cheapest === null || price < cheapest) cheapest = price;
     }
@@ -577,6 +614,16 @@ export default function FleetLifecycle({
   const hasDisagg = useMemo(() => rows.some((r) => r.disagg), [rows]);
 
   /**
+   * Every plotted chip is a single measured date, so no line has a step in it.
+   * Worth saying out loud: a flat line here means the history is one date deep,
+   * not that the software stopped improving.
+   */
+  const allSingleRung = useMemo(
+    () => rows.length > 0 && rows.every((r) => r.progression.steps.length < 2),
+    [rows],
+  );
+
+  /**
    * The 3D view is folded by default and its body unmounts when folded, so both the
    * grid build and the three.js bundle are paid only by a reader who opens it.
    */
@@ -590,6 +637,7 @@ export default function FleetLifecycle({
     metric: yMetric,
     costProvider,
     costType,
+    cacheReadRatio,
     mw,
     anchorMs,
     horizonMonths,
@@ -640,7 +688,11 @@ export default function FleetLifecycle({
   const tokenTypeLabel = costType === 'input' ? 'input ' : costType === 'output' ? 'output ' : '';
 
   const handleAssumption = useCallback(
-    (setter: (v: string) => void, param: 'c_mtbi' | 'c_rec' | 'c_life' | 'c_ramp', event: string) =>
+    (
+      setter: (v: string) => void,
+      param: 'c_mtbi' | 'c_rec' | 'c_life' | 'c_ramp' | 'c_cache',
+      event: string,
+    ) =>
       (e: React.ChangeEvent<HTMLInputElement>) => {
         const raw = e.target.value;
         setter(raw);
@@ -794,6 +846,17 @@ export default function FleetLifecycle({
       value: rampInput,
       onChange: handleAssumption(setRampInput, 'c_ramp', 'calculator_lifecycle_ramp_set'),
     },
+    ...(isAgentic
+      ? [
+          {
+            id: 'calc-lifecycle-cache',
+            label: t.cacheLabel,
+            tooltip: t.cacheTooltip,
+            value: cacheInput,
+            onChange: handleAssumption(setCacheInput, 'c_cache', 'calculator_lifecycle_cache_set'),
+          },
+        ]
+      : []),
     {
       id: 'calc-lifecycle-mtbi',
       label: t.mtbiLabel,
@@ -811,13 +874,6 @@ export default function FleetLifecycle({
   ];
 
   const body = () => {
-    if (historical.unsupportedSequence) {
-      return (
-        <p className="text-sm text-muted-foreground" data-testid="calculator-lifecycle-unsupported">
-          {t.unsupportedSequence}
-        </p>
-      );
-    }
     if (!mw) {
       return (
         <p className="text-sm text-muted-foreground" data-testid="calculator-lifecycle-empty">
@@ -1002,6 +1058,15 @@ export default function FleetLifecycle({
           >
             <strong>{t.note}</strong>{' '}
             {t.unplottable(unplottable.map((gpu) => getLabel(gpu, hardwareConfig)).join(', '))}
+          </p>
+        )}
+
+        {allSingleRung && (
+          <p
+            className="text-muted-foreground text-xs border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1"
+            data-testid="calculator-lifecycle-single-rung"
+          >
+            <strong>{t.note}</strong> {t.singleRung}
           </p>
         )}
 
