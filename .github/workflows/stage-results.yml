@@ -40,6 +40,10 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: stage-results
+  cancel-in-progress: false
+
 jobs:
   validate:
     name: Validate staging request
