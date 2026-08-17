@@ -39,6 +39,7 @@ import FleetLifecycleChart, {
 import { mergeProgressionsByChip, type ChipProgression } from './historical-best';
 import {
   availabilityFromInterrupts,
+  outputTokPerChip,
   splitTokenStreams,
   breakEvenPricePerMTok,
   computeLifecycle,
@@ -169,7 +170,7 @@ const STRINGS = {
       `No fleet could be sized for ${chips} at this power budget — the chip has no registered power figure, or its measured throughput sizes to nothing. Listed rather than dropped so the chart is never quietly missing a chip.`,
     note: 'Note:',
     disagg:
-      ' Disaggregated inference configurations report throughput per decode chip or per prefill chip rather than per total chip, so a step won by a disaggregated config is not sized on quite the same basis as one won by an aggregated config. Both compete for the same line, since the question is what the silicon can be made to do — and the config named on each step says which kind won it.',
+      ' A step can be won by a disaggregated configuration, and the handover is a like-for-like comparison: tok/s/chip is reported per chip overall for both kinds, and prefill and decode chips are the same silicon, so neither the sizing nor the cost line moves at the switch. What the fleet does change is its shape — the winning config’s prefill:decode ratio is assumed to apply across the whole fleet from the moment that config rolls out, which in practice is a redeployment the ramp window stands in for rather than a measurement. The config named on each step says which kind won it.',
     hybrid:
       " One line per chip, not per software config: at any moment it follows whichever framework, precision and speculative-decoding combination was ahead, so the config serving the fleet changes along the line and each step names the one that took over. Legend entries still filter configs, which removes them from candidacy. Each step is a measured run date whose interpolated throughput at the target beat every earlier date; a sweep that failed to beat the incumbent is not a step, because the fleet kept serving the config it already had. A config does not take effect the instant a sweep finds it, so each one rolls out over the ramp window, climbing from what the fleet already served to its own numbers. Power and $/chip/hr are today's values from the TCO model, and cost is flat throughout because no config moves either term — it is the same silicon either way. Reads outside a run's measured interactivity range are excluded rather than clamped.",
     overlayExempt:
@@ -271,7 +272,7 @@ const STRINGS = {
       `在该功率预算下无法为 ${chips} 组建集群——该 Chip 缺少已登记的功耗数据，或其实测吞吐无法组成任何规模。此处列出而非直接剔除，以免图表静默遗漏 Chip。`,
     note: '注意：',
     disagg:
-      '解耦推理配置按解码 Chip 或预填充 Chip 报告吞吐量，而非按 Chip 总数，因此其集群规模、成本与利润和聚合配置并非同类比较。因此由解耦配置取得的台阶与由聚合配置取得的台阶在集群规模基准上并不完全一致。两者均可竞争同一 Chip 的曲线——每一级台阶标注的配置即说明其类型。',
+      '台阶可以由解耦配置取得，且该次交接是同类比较：两种部署方式的 tok/s/chip 均按 Chip 总数报告，且预填充与解码使用的是同一种硅片，因此切换时集群规模与成本线均不发生变化。真正改变的是集群的形态——自该配置开始推广起，其预填充:解码比例被假定应用于整个集群，这在实际中是一次重新部署，由爬坡期窗口代为体现，而非实测值。每一级台阶标注的配置即说明其类型。',
     hybrid:
       '每个 Chip 一条曲线，而非每个软件配置一条：曲线在任一时刻都跟随当时领先的框架、精度与投机解码组合，因此服务集群的配置会沿曲线变化，每一级台阶都标注接管的配置。图例项仍可筛选配置，被隐藏的配置将不参与竞争。每一级台阶都是一个实测运行日期，其在目标交互性下的插值吞吐量优于此前所有日期；未能超越现有配置的扫描不构成台阶，因为集群仍在运行原有配置。配置不会在扫描发现的瞬间生效，因此每个配置都会在推广期内从集群当前已提供的水平爬升至其自身水平。功率与 $/chip/hr 为 TCO 模型的当前值，成本在整个期间保持水平，因为任何配置都不会改变这两项——两种情况下都是同一款芯片。超出某次运行实测交互性区间的结果会被排除而非钳制。',
     overlayExempt:
@@ -594,7 +595,11 @@ export default function FleetLifecycle({
           // Through the accessor even though this one is always the output rate:
           // the cost-matrix rule exists so every throughput read goes through one
           // chokepoint, and a direct field read silently diverges if it gains logic.
-          outputTputPerGpu: getThroughputForType(step.result, 'output'),
+          outputTputPerGpu: outputTokPerChip(
+            getThroughputForType(step.result, 'total'),
+            step.result.inputTokenShare,
+            getThroughputForType(step.result, 'output'),
+          ),
           interactivity: targetValue,
         });
         if (!stats) continue;

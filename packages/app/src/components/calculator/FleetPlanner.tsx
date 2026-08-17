@@ -19,6 +19,7 @@ import { useLocale } from '@/lib/use-locale';
 
 import { computeFleetStats, formatCompact, type FleetStats } from './fleet';
 import { interpolateForGPU, maxInteractivityAtCost } from './interpolation';
+import { outputTokPerChip } from './lifecycle';
 import { getCostProviderLabel, getThroughputForType } from './ThroughputBarChart';
 import type { CostProvider, CostType, GPUDataPoint, InterpolatedResult } from './types';
 
@@ -202,7 +203,12 @@ export default function FleetPlanner({
         powerKwPerGpu: specs.power,
         costPerGpuHour: specs[costProvider],
         tputPerGpu: getThroughputForType(result, costType),
-        outputTputPerGpu: result.outputTputValue,
+        // Per chip overall, not per decode chip — see `outputTokPerChip`.
+        outputTputPerGpu: outputTokPerChip(
+          result.value,
+          result.inputTokenShare,
+          result.outputTputValue,
+        ),
         interactivity: targetValue,
       });
       if (stats) rows.push({ result, stats });
@@ -266,7 +272,11 @@ export default function FleetPlanner({
               powerKwPerGpu: specs.power,
               costPerGpuHour: specs[costProvider],
               tputPerGpu: getThroughputForType(atIv, costType),
-              outputTputPerGpu: atIv.outputTputValue,
+              outputTputPerGpu: outputTokPerChip(
+                atIv.value,
+                atIv.inputTokenShare,
+                atIv.outputTputValue,
+              ),
               interactivity: maxIv,
             })
           : null;

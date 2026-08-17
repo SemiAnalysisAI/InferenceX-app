@@ -5,6 +5,7 @@ import {
   billableInputRate,
   effectiveTokPerSec,
   isBreakEvenAnchored,
+  outputTokPerChip,
   splitTokenStreams,
   metricValue,
   breakEvenPricePerMTok,
@@ -882,5 +883,33 @@ describe('splitTokenStreams', () => {
     };
     // The two real per-chip totals from that handover, in order.
     expect(revenue(2336)).toBeLessThan(revenue(2618));
+  });
+});
+
+describe('outputTokPerChip', () => {
+  it('is the reported rate when nothing pins the mix down', () => {
+    // Every aggregated run: unchanged by this helper, bit for bit.
+    expect(outputTokPerChip(1000, undefined, 123)).toBe(123);
+  });
+
+  it('re-bases a per-decode-chip rate onto chips overall', () => {
+    // The real shape: 8 prefill + 8 decode on 8k/1k. Output is reported per decode
+    // chip, so it reads 2x what the fleet's chips overall deliver. Concurrent users
+    // are a count of output streams, so that 2x lands straight on the figure.
+    const share = 8192 / 9216;
+    const perDecodeChip = 6.857;
+    const perChipOverall = outputTokPerChip(30.689, share, perDecodeChip);
+    expect(perChipOverall).toBeCloseTo(30.689 * (1 - share), 6);
+    expect(perDecodeChip / perChipOverall).toBeCloseTo(2, 1);
+  });
+
+  it('clamps a nonsensical share instead of returning a negative rate', () => {
+    expect(outputTokPerChip(1000, 1.5, 50)).toBe(0);
+    expect(outputTokPerChip(1000, -1, 50)).toBe(1000);
+  });
+
+  it('is zero for an unusable total', () => {
+    expect(outputTokPerChip(0, 0.5, 50)).toBe(0);
+    expect(outputTokPerChip(Number.NaN, 0.5, 50)).toBe(0);
   });
 });

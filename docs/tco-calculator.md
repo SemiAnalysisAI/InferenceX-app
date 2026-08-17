@@ -837,6 +837,25 @@ credited with ~2× its tokens. Eleven such dips existed across 215 step transiti
 eight interactivity targets; every one was a handover where the prefill:decode split
 changed or disappeared.
 
+`tput_per_gpu` itself is **not** affected: it is per chip overall for both kinds, which
+reproduces exactly from the absolute rates and the chip counts — on the first disagg row
+in production, `(54.521×8 + 6.857×8) / 16 = 30.68886 = tput_per_gpu` to five decimals.
+So the ranking, the sizing and the cost line were always comparable across an
+aggregated→disaggregated handover; it was only the two per-stream rates that were not.
+The section's disagg note used to claim otherwise and has been corrected.
+
+One place had the same defect and is fixed alongside: **concurrent users**, which divided
+the per-_decode_-chip output rate into a whole-fleet chip count and so overstated the
+stream count by `(prefill + decode) / decode` — median 2×, up to 7× in production history.
+It now uses `outputTokPerChip`, which re-bases onto chips overall and is a bit-for-bit
+no-op wherever no share is known.
+
+What remains an assumption rather than a measurement: the winning config's prefill:decode
+ratio is taken to apply across the whole fleet from the moment it rolls out. A switch from
+aggregated to disaggregated serving is a redeployment, and the ramp window is what stands
+in for it. Chip counts also will not generally divide into the config's ratio, a remainder
+bounded by one config-unit that the model ignores.
+
 The fix is to charge revenue on a **share of the per-chip total**, never on the two
 rates directly (`splitTokenStreams`), with the share recovered as:
 

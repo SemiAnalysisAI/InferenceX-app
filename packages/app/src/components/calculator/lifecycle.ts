@@ -200,6 +200,30 @@ export function splitTokenStreams(
   };
 }
 
+/**
+ * Output tokens per chip **overall**, for a fleet sized on chips overall.
+ *
+ * `outputThroughput` is per *decode* chip on a disaggregated run, so dividing it
+ * into a whole-fleet chip count overstates the output rate by
+ * `(prefill + decode) / decode` — a median of 2x and up to 7x in production
+ * history. Concurrent users are a count of output streams, so that error lands
+ * directly on the figure a reader is most likely to quote.
+ *
+ * Falls back to the reported rate where no share is known, which is the same
+ * number as before for every aggregated run.
+ */
+export function outputTokPerChip(
+  totalTokPerChip: number,
+  inputTokenShare: number | undefined,
+  reportedOutputTokPerChip: number,
+): number {
+  if (typeof inputTokenShare !== 'number' || !Number.isFinite(inputTokenShare)) {
+    return reportedOutputTokPerChip;
+  }
+  if (!Number.isFinite(totalTokPerChip) || totalTokPerChip <= 0) return 0;
+  return totalTokPerChip * (1 - Math.max(0, Math.min(1, inputTokenShare)));
+}
+
 /** A price is only a price when it is finite and positive; anything else is free. */
 function nonNegativePrice(value: number): number {
   return Number.isFinite(value) && value > 0 ? value : 0;

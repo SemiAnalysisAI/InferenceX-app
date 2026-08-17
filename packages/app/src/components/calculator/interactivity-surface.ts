@@ -122,6 +122,7 @@ import { computeFleetStats } from './fleet';
 import type { HistoryGroups } from './historical-best';
 import { hermiteInterpolate, monotoneSlopes, paretoFrontUpperLeft } from './interpolation';
 import {
+  outputTokPerChip,
   splitTokenStreams,
   computeLifecycle,
   isCumulative,
@@ -681,7 +682,7 @@ export function buildSurfaceGrid(options: SurfaceGridOptions): SurfaceGrid | nul
           powerKwPerGpu: specs.powerKwPerGpu,
           costPerGpuHour: specs.costPerGpuHour,
           tputPerGpu: read.tput,
-          outputTputPerGpu: read.outputTput,
+          outputTputPerGpu: outputTokPerChip(read.totalTput, read.inputTokenShare, read.outputTput),
           interactivity: zs[zi]!,
         });
         if (!stats) continue;
