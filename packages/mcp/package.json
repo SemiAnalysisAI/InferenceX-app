@@ -13,14 +13,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@semianalysisai/inferencex-constants": "workspace:*",
     "@semianalysisai/inferencex-db": "workspace:*",
     "postgres": "^3.4.9",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.2.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
   }

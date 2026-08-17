@@ -29,6 +29,7 @@ function createMockRouter() {
     back: cy.stub(),
     forward: cy.stub(),
     prefetch: cy.stub().resolves(),
+    bfcacheId: '',
   };
 }
 
