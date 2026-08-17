@@ -4,8 +4,10 @@ import { cachedJson } from '@/lib/api-cache';
 import {
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
+  resolveOverviewHardwareRowScope,
   resolveOverviewModelScope,
   resolveOverviewReferenceHardware,
+  resolveOverviewRowScope,
   resolveOverviewTier,
 } from '@/lib/overview-data';
 import { getOverviewPageData } from '@/lib/overview-data.server';
@@ -22,6 +24,8 @@ export async function GET(request: NextRequest) {
       resolveOverviewComparisonMode(params.get('compare') ?? undefined),
       resolveOverviewReferenceHardware(params.get('ref') ?? undefined),
       resolveOverviewModelScope(params.get('models') ?? undefined),
+      resolveOverviewRowScope(params.get('rows') ?? undefined),
+      resolveOverviewHardwareRowScope(params.get('hwrows') ?? undefined),
     );
     return cachedJson(data);
   } catch (error) {

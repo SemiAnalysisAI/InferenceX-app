@@ -278,10 +278,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'Page-owned BFF aggregation whose tier, comparison, and calculator projections are coupled to the overview UI.',
-      zh: '由页面拥有的 BFF 聚合；其档位、比较和计算器投影与概览界面紧密耦合。',
+      en: 'Page-owned BFF aggregation whose tier, comparison, row-scope, and calculator projections are coupled to the overview UI.',
+      zh: '由页面拥有的 BFF 聚合；其档位、比较、行范围和计算器投影与概览界面紧密耦合。',
     },
-    sourceSha256: '7c9830baae39d533ba7db36d44fe520f89cb36b32ffc54ef29404693d0b6b120',
+    sourceSha256: '499089d01754aa470d0ced953d9818d7d2e620dd3521685099924750249f13e2',
   },
   {
     source: 'src/app/api/v1/reliability/route.ts',
@@ -388,7 +388,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/overview-data.ts',
-    sourceSha256: '36f61fe9eaca105bd524b066f73a0be828192b9e43acbdb73531288851a4e1e3',
+    sourceSha256: 'f54940c63a16d1c97a491b901aebcf9cb8893023eefef9f80ddace8936cabba8',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',

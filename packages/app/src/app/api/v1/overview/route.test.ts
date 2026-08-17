@@ -37,12 +37,22 @@ describe('GET /api/v1/overview', () => {
     mockGetOverviewPageData.mockResolvedValueOnce(data);
 
     const response = await GET(
-      request('/api/v1/overview?tier=75&engine=all&compare=30d&ref=b300&models=all'),
+      request(
+        '/api/v1/overview?tier=75&engine=all&compare=30d&ref=b300&models=all&rows=changed&hwrows=priced',
+      ),
     );
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(data);
-    expect(mockGetOverviewPageData).toHaveBeenCalledWith(75, 'all', '30d', 'b300', 'all');
+    expect(mockGetOverviewPageData).toHaveBeenCalledWith(
+      75,
+      'all',
+      '30d',
+      'b300',
+      'all',
+      'changed',
+      'priced',
+    );
     expect(mockCachedJson).toHaveBeenCalledWith(data);
   });
 
@@ -50,7 +60,9 @@ describe('GET /api/v1/overview', () => {
     mockGetOverviewPageData.mockResolvedValueOnce({ models: [] });
 
     await GET(
-      request('/api/v1/overview?tier=999&engine=vendor&compare=weekly&ref=h100&models=inactive'),
+      request(
+        '/api/v1/overview?tier=999&engine=vendor&compare=weekly&ref=h100&models=inactive&rows=some&hwrows=blank',
+      ),
     );
 
     expect(mockGetOverviewPageData).toHaveBeenCalledWith(
@@ -59,6 +71,8 @@ describe('GET /api/v1/overview', () => {
       'hardware',
       'b200',
       'default',
+      'all',
+      'all',
     );
   });
 

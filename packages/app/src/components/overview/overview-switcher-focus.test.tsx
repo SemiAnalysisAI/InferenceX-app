@@ -32,6 +32,10 @@ function pageData(tier: OverviewTier): OverviewPageData {
     comparisonMode: 'hardware',
     referenceHardware: 'b200',
     modelScope: 'default',
+    rowScope: 'all',
+    hardwareRowScope: 'all',
+    unchangedRowCount: 0,
+    emptyRowCount: 0,
     historicalWindow: null,
   };
 }
@@ -47,6 +51,8 @@ function Body() {
       comparisonMode={data.comparisonMode}
       referenceHardware={data.referenceHardware}
       modelScope={data.modelScope}
+      rowScope={data.rowScope}
+      hardwareRowScope={data.hardwareRowScope}
       locale="en"
       strings={OVERVIEW_STRINGS.en}
     />
