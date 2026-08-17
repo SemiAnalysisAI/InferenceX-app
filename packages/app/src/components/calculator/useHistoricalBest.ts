@@ -16,7 +16,7 @@ import {
   type HistoricalProgression,
   type HistoryGroups,
 } from './historical-best';
-import { getTpPerMwForType } from './ThroughputBarChart';
+import { getComparableTpPerMwForType } from './ThroughputBarChart';
 import type { CalculatorMode, CostProvider, CostType, InterpolatedResult } from './types';
 
 const EMPTY: HistoricalBestOutcome = { best: [], unmeasured: [], datesSeen: 0 };
@@ -112,8 +112,10 @@ export function useHistoricalBest(options: UseHistoricalBestOptions): UseHistori
       mode,
       costProvider,
       // The cost matrix's own accessor decides the winner, so the ranking basis
-      // always matches the selected token type.
-      rank: (result: InterpolatedResult) => getTpPerMwForType(result, costType),
+      // always matches the selected token type — but on a per-total-chip basis,
+      // because a ranking has to be apples-to-apples even where a bar chart can
+      // get away with a footnote. See `getComparableTpPerMwForType`.
+      rank: (result: InterpolatedResult) => getComparableTpPerMwForType(result, costType),
     };
     return {
       outcome: selectBestFromGroups(groups, selectOptions),

@@ -259,10 +259,16 @@ export function prepareFrontier(
     if (costType === 'output') return p.outputThroughput;
     return getOutput(p);
   };
+  // Per-total-chip, matching the 1D path's `getComparableTpPerMwForType`: a
+  // disaggregated run reports its input and output rates per prefill and per
+  // decode chip, so ranking on them raw hands steps to configs that only look
+  // better because they were divided by fewer chips.
   const rankOf = (p: GPUDataPoint) => {
-    if (costType === 'input') return p.inputTpPerMw;
-    if (costType === 'output') return p.outputTpPerMw;
-    return p.tpPerMw;
+    if (costType === 'total') return p.tpPerMw;
+    const raw = costType === 'input' ? p.inputTpPerMw : p.outputTpPerMw;
+    if (typeof p.inputTokenShare !== 'number' || !Number.isFinite(p.inputTokenShare)) return raw;
+    const share = Math.max(0, Math.min(1, p.inputTokenShare));
+    return p.tpPerMw * (costType === 'input' ? share : 1 - share);
   };
 
   /** Frontier points bracketing a target — the 1D path's `nearestPoints`. */

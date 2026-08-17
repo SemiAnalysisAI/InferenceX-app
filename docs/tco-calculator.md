@@ -856,8 +856,8 @@ aggregated to disaggregated serving is a redeployment, and the ramp window is wh
 in for it. Chip counts also will not generally divide into the config's ratio, a remainder
 bounded by one config-unit that the model ignores.
 
-The fix is to charge revenue on a **share of the per-chip total**, never on the two
-rates directly (`splitTokenStreams`), with the share recovered as:
+The fix is to use a **share of the per-chip total** wherever a token-type figure is
+needed, never the two rates directly, with the share recovered as:
 
 1. `input / (input + output)` when those agree with `tput_per_gpu` to within 1% — every
    aggregated row, where the measurement is self-consistent and is the truth;
@@ -869,7 +869,27 @@ rates directly (`splitTokenStreams`), with the share recovered as:
    inventing a mix.
 
 After the fix: 0 dips across the same 215 transitions, and the streams sum to the rate
-the fleet was sized and costed on by construction. A corollary worth stating: on a fixed
+the fleet was sized and costed on by construction.
+
+**Selection needed the same correction, and it is a second bug.** Fixing revenue alone
+left the _ranking_ — which config wins each step — reading `inputTpPerMw` /
+`outputTpPerMw` raw, so a disaggregated config could win a rung purely for having been
+divided by fewer chips. Measured across seven interactivity targets: on total pricing the
+basis makes no difference (46 of 46 chip-winners identical, confirming `tput_per_gpu` is
+genuinely per total chip), but on **output** pricing 10 of 46 winners change and 5 are
+handed to a disagg config a comparable basis rejects; on **input**, 17 of 46 change.
+`mi355x_mooncake-atom@2026-06-12` won the output ranking at 25 and 30 tok/s/user on the
+raw basis; on a comparable one `mi355x_atom_mtp@2026-07-28` wins.
+
+So `getComparableTpPerMwForType` splits `tpPerMw` by the same share, and both the 2D
+selection (`useHistoricalBest`) and the 3D reader (`prepareFrontier`'s `rankOf`) use it.
+For an aggregated config it is an exact identity — the rates already sum to the total, so
+`tpPerMw × share` _is_ `inputTpPerMw` — so only disaggregated rows move.
+
+The bar chart and cost matrix above still show the raw per-prefill / per-decode figures
+with their existing disclaimer, deliberately: a chart the reader is told how to interpret
+can carry a footnote, and changing the headline chart's numbers is a separate decision.
+What is no longer acceptable is a _ranking_ that silently picks a winner on that basis. A corollary worth stating: on a fixed
 sequence the input/output split changes the **level** and the break-even price, but it
 cannot reorder chips, because the mix is the same for all of them. On agentic traces the
 mix is measured per config, so there it can.

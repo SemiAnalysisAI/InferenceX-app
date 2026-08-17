@@ -17,7 +17,11 @@ import {
   stepsAtInteractivity,
 } from './interactivity-surface';
 import { interpolateForGPU } from './interpolation';
-import { getTpPerMwForType } from './ThroughputBarChart';
+import {
+  getComparableTpPerMwForType,
+  getThroughputForType,
+  getTpPerMwForType,
+} from './ThroughputBarChart';
 import type { GPUDataPoint, InterpolatedResult } from './types';
 
 const MODE = 'interactivity_to_throughput' as const;
@@ -220,39 +224,56 @@ describe('prepareFrontier', () => {
         'with cache rates',
         (p) => ({ ...p, cacheHitRate: Math.min(1, 0.3 + p.interactivity / 200) }),
       ],
+      // A disaggregated shape: the share disagrees with what the two rates imply,
+      // which is the only case where the comparable rank differs from the raw one.
+      // Without this the rank assertion below passes on either basis.
+      ['with a disagg split', (p) => ({ ...p, inputTokenShare: 8192 / 9216 })],
     ];
-    for (const [label, decorate] of variants) {
-      for (const [hwKey, dated] of groups.byHwKey) {
-        for (const sweepAt of dated) {
-          const points = sweepAt.points.map(decorate);
-          const reader = prepareFrontier(points, MODE, COST_TYPE);
-          expect(reader, hwKey).not.toBeNull();
-          for (const target of [20, 33.3, 50, 62.5, 80, 100, 140]) {
-            const where = `${label} ${hwKey} @ ${target}`;
-            const canonical = interpolateForGPU(points, target, MODE, COST_PROVIDER);
-            const mine = reader!.read(target);
-            if (!canonical || canonical.clamped) {
-              expect(mine, where).toBeNull();
-              continue;
-            }
-            expect(mine, where).not.toBeNull();
-            expect(mine!.value).toBeCloseTo(canonical.value, 6);
-            expect(mine!.tput).toBeCloseTo(canonical.value, 6);
-            expect(mine!.outputTput).toBeCloseTo(canonical.outputTputValue, 6);
-            expect(mine!.inputTput, where).toBeCloseTo(canonical.inputTputValue, 6);
-            expect(mine!.rank).toBeCloseTo(rank(canonical), 6);
-            if (canonical.cacheHitRate === undefined) {
-              expect(mine!.cacheHitRate, where).toBeUndefined();
-            } else {
-              expect(mine!.cacheHitRate, where).toBeCloseTo(canonical.cacheHitRate, 6);
+    // Ranking is per token type, and only input/output are corrected — so the pin
+    // has to run at something other than `total` to see the correction at all.
+    for (const costType of ['total', 'input', 'output'] as const)
+      for (const [label, decorate] of variants) {
+        for (const [hwKey, dated] of groups.byHwKey) {
+          for (const sweepAt of dated) {
+            const points = sweepAt.points.map(decorate);
+            const reader = prepareFrontier(points, MODE, costType);
+            expect(reader, hwKey).not.toBeNull();
+            for (const target of [20, 33.3, 50, 62.5, 80, 100, 140]) {
+              const where = `${costType} ${label} ${hwKey} @ ${target}`;
+              const canonical = interpolateForGPU(points, target, MODE, COST_PROVIDER);
+              const mine = reader!.read(target);
+              if (!canonical || canonical.clamped) {
+                expect(mine, where).toBeNull();
+                continue;
+              }
+              expect(mine, where).not.toBeNull();
+              expect(mine!.value).toBeCloseTo(canonical.value, 6);
+              expect(mine!.tput, where).toBeCloseTo(getThroughputForType(canonical, costType), 6);
+              expect(mine!.outputTput).toBeCloseTo(canonical.outputTputValue, 6);
+              expect(mine!.inputTput, where).toBeCloseTo(canonical.inputTputValue, 6);
+              expect(mine!.rank, where).toBeCloseTo(
+                getComparableTpPerMwForType(canonical, costType),
+                6,
+              );
+              if (canonical.cacheHitRate === undefined) {
+                expect(mine!.cacheHitRate, where).toBeUndefined();
+              } else {
+                expect(mine!.cacheHitRate, where).toBeCloseTo(canonical.cacheHitRate, 6);
+              }
             }
           }
         }
       }
-    }
-    // The decorated pass must actually have exercised the branch it exists for.
-    const decorated = [...groups.byHwKey.values()][0]![0]!.points.map(variants[1]![1]);
-    expect(prepareFrontier(decorated, MODE, COST_TYPE)!.read(50)!.cacheHitRate).toBeGreaterThan(0);
+    // The decorated passes must actually have exercised the branches they exist for.
+    const firstSweep = [...groups.byHwKey.values()][0]![0]!.points;
+    const cached = firstSweep.map(variants[1]![1]);
+    expect(prepareFrontier(cached, MODE, COST_TYPE)!.read(50)!.cacheHitRate).toBeGreaterThan(0);
+    // And the disagg split must genuinely move the rank, or the assertion above is
+    // comparing two identical numbers.
+    const split = firstSweep.map(variants[2]![1]);
+    const rawRank = prepareFrontier(firstSweep, MODE, 'output')!.read(50)!.rank;
+    const fixedRank = prepareFrontier(split, MODE, 'output')!.read(50)!.rank;
+    expect(fixedRank).not.toBeCloseTo(rawRank, 2);
   });
 
   it('refuses to extrapolate past the measured range', () => {
