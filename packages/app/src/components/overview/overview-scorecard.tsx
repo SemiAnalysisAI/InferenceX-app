@@ -42,7 +42,7 @@ export type OverviewLocale = 'en' | 'zh';
 
 export const OVERVIEW_STRINGS = {
   en: {
-    title: 'Inference Cost per Million Tokens',
+    title: 'Agentic Inference Costs',
     // The active tier is not repeated here — the SLO selector below already
     // states it.
     scopeMetric: 'Hyperscaler cost',
@@ -156,7 +156,7 @@ export const OVERVIEW_STRINGS = {
     loadingStatus: 'Loading the selected comparison…',
   },
   zh: {
-    title: '推理每百万 token 成本',
+    title: '智能体推理成本',
     scopeMetric: '超大规模云（hyperscaler）成本',
     scopeDirection: '↓ 越低越好',
     scopeAria: '超大规模云（hyperscaler）每百万总 token 成本，越低越好。',

@@ -21,18 +21,18 @@ const DESCRIPTION =
   'Compare hyperscaler cost per million total tokens across MI355X, B200, B300, GB200, and GB300 for the AgentX long-context, multi-turn coding scenario and fixed-sequence scenarios where data is available.';
 
 export const metadata: Metadata = {
-  title: 'Agentic Inference Cost Overview',
+  title: 'Agentic Inference Costs',
   description: DESCRIPTION,
   alternates: enAlternates('/overview'),
   openGraph: {
-    title: `Agentic Inference Cost Overview | ${SITE_NAME}`,
+    title: `Agentic Inference Costs | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/overview`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: `Agentic Inference Cost Overview | ${SITE_NAME}`,
+    title: `Agentic Inference Costs | ${SITE_NAME}`,
     description: DESCRIPTION,
   },
 };
