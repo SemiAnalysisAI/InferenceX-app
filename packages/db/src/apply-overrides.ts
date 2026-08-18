@@ -19,6 +19,7 @@
 import { isDeepStrictEqual } from 'node:util';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
+import { configCacheKey } from './etl/config-cache.js';
 import { type Sql, createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
 import { jsonbParam } from './lib/backfill-runner.js';
 import {
@@ -255,7 +256,8 @@ function benchmarkPointBackfillIsApplied(
 
 function benchmarkPointDescription(backfill: BenchmarkPointBackfill): string {
   return (
-    `run ${backfill.githubRunId} attempt ${backfill.runAttempt}, config ${backfill.configId}, ` +
+    `run ${backfill.githubRunId} attempt ${backfill.runAttempt}, ` +
+    `config ${configCacheKey(backfill.config)} (production id ${backfill.productionConfigId}), ` +
     `${backfill.benchmarkType}, isl ${backfill.isl}, osl ${backfill.osl}, ` +
     `conc ${backfill.conc}, offload ${backfill.offloadMode}, ` +
     `recipe ${backfill.recipeFingerprint ?? 'legacy'}`
@@ -268,13 +270,31 @@ async function previewBenchmarkPointBackfill(
 ): Promise<BenchmarkPointBackfillTarget | null> {
   const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
   const offloadModes = [...new Set([backfill.offloadMode, desiredOffloadMode])];
+  const { config } = backfill;
   const rows = await sql`
     SELECT br.id, br.offload_mode, br.metrics
     FROM benchmark_results br
     JOIN workflow_runs wr ON wr.id = br.workflow_run_id
+    JOIN configs c ON c.id = br.config_id
     WHERE wr.github_run_id = ${backfill.githubRunId}
       AND wr.run_attempt = ${backfill.runAttempt}
-      AND br.config_id = ${backfill.configId}
+      AND c.hardware = ${config.hardware}
+      AND c.framework = ${config.framework}
+      AND c.model = ${config.model}
+      AND c.precision = ${config.precision}
+      AND c.spec_method = ${config.specMethod}
+      AND c.disagg = ${config.disagg}
+      AND c.is_multinode = ${config.isMultinode}
+      AND c.prefill_tp = ${config.prefillTp}
+      AND c.prefill_ep = ${config.prefillEp}
+      AND c.prefill_dp_attention = ${config.prefillDpAttn}
+      AND c.prefill_num_workers = ${config.prefillNumWorkers}
+      AND c.decode_tp = ${config.decodeTp}
+      AND c.decode_ep = ${config.decodeEp}
+      AND c.decode_dp_attention = ${config.decodeDpAttn}
+      AND c.decode_num_workers = ${config.decodeNumWorkers}
+      AND c.num_prefill_gpu = ${config.numPrefillGpu}
+      AND c.num_decode_gpu = ${config.numDecodeGpu}
       AND br.benchmark_type = ${backfill.benchmarkType}
       AND br.isl IS NOT DISTINCT FROM ${backfill.isl}
       AND br.osl IS NOT DISTINCT FROM ${backfill.osl}

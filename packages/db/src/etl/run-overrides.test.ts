@@ -17,6 +17,26 @@ import {
   validateRunBackfills,
 } from './run-overrides';
 
+const EXAMPLE_CONFIG = {
+  hardware: 'gb300',
+  framework: 'dynamo-vllm',
+  model: 'dsv4',
+  precision: 'fp4',
+  specMethod: 'mtp',
+  disagg: true,
+  isMultinode: true,
+  prefillTp: 8,
+  prefillEp: 8,
+  prefillDpAttn: true,
+  prefillNumWorkers: 1,
+  decodeTp: 8,
+  decodeEp: 8,
+  decodeDpAttn: true,
+  decodeNumWorkers: 1,
+  numPrefillGpu: 8,
+  numDecodeGpu: 8,
+} as const;
+
 function examplePointBackfill(
   overrides: Partial<BenchmarkPointBackfill> = {},
 ): BenchmarkPointBackfill {
@@ -25,7 +45,8 @@ function examplePointBackfill(
     reason: 'Artifact omitted the offload metadata.',
     githubRunId: 123,
     runAttempt: 1,
-    configId: 456,
+    productionConfigId: 456,
+    config: EXAMPLE_CONFIG,
     benchmarkType: 'agentic_traces',
     isl: null,
     osl: null,
@@ -68,12 +89,23 @@ describe('audited run backfills', () => {
     expect(() => validateRunBackfills([], [first, second])).toThrow(/collides/u);
   });
 
+  it('rejects duplicate stable selectors even when production config IDs differ', () => {
+    const first = examplePointBackfill();
+    const second = examplePointBackfill({
+      id: 'run-123-duplicate-stable-selector',
+      productionConfigId: 999,
+    });
+
+    expect(() => validateRunBackfills([], [first, second])).toThrow(/duplicate.*selector/u);
+  });
+
   it('applies point corrections during ingest and synchronizes offload metadata', () => {
     const backfill = examplePointBackfill();
     const registry = BENCHMARK_POINT_BACKFILLS as BenchmarkPointBackfill[];
     registry.push(backfill);
     const point = {
       configId: 456,
+      config: EXAMPLE_CONFIG,
       benchmarkType: 'agentic_traces',
       isl: null,
       osl: null,
@@ -99,6 +131,56 @@ describe('audited run backfills', () => {
       expect(otherAttempt.backfillId).toBeNull();
       // GCS fallback has no attempt metadata and intentionally matches by run + point.
       expect(applyBenchmarkPointBackfill(123, undefined, point).backfillId).toBe(backfill.id);
+    } finally {
+      registry.splice(registry.indexOf(backfill), 1);
+    }
+  });
+
+  it('matches point backfills by stable config dimensions across database branches', () => {
+    const backfill = examplePointBackfill();
+    const registry = BENCHMARK_POINT_BACKFILLS as BenchmarkPointBackfill[];
+    registry.push(backfill);
+
+    try {
+      const applied = applyBenchmarkPointBackfill(123, 1, {
+        configId: 999,
+        config: { ...EXAMPLE_CONFIG },
+        benchmarkType: 'agentic_traces',
+        isl: null,
+        osl: null,
+        conc: 64,
+        offloadMode: 'off',
+        recipeFingerprint: null,
+        metrics: { median_itl: 0.1 },
+      });
+
+      expect(applied.backfillId).toBe(backfill.id);
+      expect(applied.point.configId).toBe(999);
+      expect(applied.point.offloadMode).toBe('on');
+    } finally {
+      registry.splice(registry.indexOf(backfill), 1);
+    }
+  });
+
+  it('does not match a different stable config that reuses the production config ID', () => {
+    const backfill = examplePointBackfill();
+    const registry = BENCHMARK_POINT_BACKFILLS as BenchmarkPointBackfill[];
+    registry.push(backfill);
+
+    try {
+      const applied = applyBenchmarkPointBackfill(123, 1, {
+        configId: 456,
+        config: { ...EXAMPLE_CONFIG, decodeTp: 16, numDecodeGpu: 16 },
+        benchmarkType: 'agentic_traces',
+        isl: null,
+        osl: null,
+        conc: 64,
+        offloadMode: 'off',
+        recipeFingerprint: null,
+        metrics: { median_itl: 0.1 },
+      });
+
+      expect(applied.backfillId).toBeNull();
     } finally {
       registry.splice(registry.indexOf(backfill), 1);
     }

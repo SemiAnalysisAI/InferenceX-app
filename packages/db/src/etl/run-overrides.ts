@@ -30,6 +30,8 @@
  *       in the run id into the following link: https://github.com/SemiAnalysisAI/InferenceX/actions/runs/{run_id_here}
  */
 
+import { type ConfigParams, configCacheKey } from './config-cache';
+
 export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
   [22806827144, 'success'], // 2026-03-07 | dsr1 fp8 h200 SGLang 0.5.7→0.5.9 bump | Reason: database upload step failed
   [22792161490, 'success'], // 2026-03-07 | GLM-5 fp8 mi355x SGLang benchmark add | Reason: database upload step failed
@@ -265,9 +267,20 @@ export type JsonValue =
   | readonly JsonValue[]
   | { readonly [key: string]: JsonValue };
 
-export interface BenchmarkPointBackfill extends BenchmarkPointKey, AuditedBackfill {
+export interface BenchmarkPointBackfill extends AuditedBackfill {
   githubRunId: number;
   runAttempt: number;
+  /** Production ID retained for audit logs only. Never use it to match another DB branch. */
+  productionConfigId: number;
+  /** Stable configuration dimensions shared by production, staging, and rebuilt databases. */
+  config: ConfigParams;
+  benchmarkType: string;
+  isl: number | null;
+  osl: number | null;
+  conc: number;
+  offloadMode: string;
+  /** Producer recipe identity. Omit or set null only for legacy rows. */
+  recipeFingerprint?: string | null;
   set: {
     /** Updates both the first-class column and metrics.offload_mode. */
     offloadMode?: 'on' | 'off';
@@ -288,7 +301,14 @@ export interface BenchmarkPointBackfill extends BenchmarkPointKey, AuditedBackfi
  *   reason: 'The artifact omitted offload metadata for this point.',
  *   githubRunId: 123,
  *   runAttempt: 1,
- *   configId: 456,
+ *   productionConfigId: 456,
+ *   config: {
+ *     hardware: 'gb300', framework: 'dynamo-vllm', model: 'dsv4',
+ *     precision: 'fp4', specMethod: 'mtp', disagg: true, isMultinode: true,
+ *     prefillTp: 8, prefillEp: 8, prefillDpAttn: true, prefillNumWorkers: 1,
+ *     decodeTp: 8, decodeEp: 8, decodeDpAttn: true, decodeNumWorkers: 1,
+ *     numPrefillGpu: 8, numDecodeGpu: 8,
+ *   },
  *   benchmarkType: 'agentic_traces',
  *   isl: null,
  *   osl: null,
@@ -301,23 +321,107 @@ export interface BenchmarkPointBackfill extends BenchmarkPointKey, AuditedBackfi
  *   },
  * }
  */
+function disaggregatedConfig(
+  base: Pick<ConfigParams, 'hardware' | 'framework' | 'model' | 'precision' | 'specMethod'>,
+  prefill: { tp: number; ep: number; dpAttn: boolean; numWorkers: number },
+  decode: { tp: number; ep: number; dpAttn: boolean; numWorkers: number },
+): ConfigParams {
+  return {
+    ...base,
+    disagg: true,
+    isMultinode: true,
+    prefillTp: prefill.tp,
+    prefillEp: prefill.ep,
+    prefillDpAttn: prefill.dpAttn,
+    prefillNumWorkers: prefill.numWorkers,
+    decodeTp: decode.tp,
+    decodeEp: decode.ep,
+    decodeDpAttn: decode.dpAttn,
+    decodeNumWorkers: decode.numWorkers,
+    numPrefillGpu: prefill.tp * prefill.numWorkers,
+    numDecodeGpu: decode.tp * decode.numWorkers,
+  };
+}
+
+const QWEN35_GB300_DYNAMO_TRT = {
+  hardware: 'gb300',
+  framework: 'dynamo-trt',
+  model: 'qwen3.5',
+  precision: 'fp4',
+  specMethod: 'mtp',
+} as const;
+
+const DSV4_GB200_DYNAMO_VLLM = {
+  hardware: 'gb200',
+  framework: 'dynamo-vllm',
+  model: 'dsv4',
+  precision: 'fp4',
+  specMethod: 'mtp',
+} as const;
+
 export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
   // The source recipes in run 31633154542 attach MooncakeStoreConnector to
   // every disaggregated worker and allocate a 180 GB Mooncake segment per
   // node. The master matrix omitted the corresponding offload annotation.
   ...(
     [
-      [2106, 256, null],
-      [2334, 1152, null],
-      [2336, 1024, null],
+      [
+        2106,
+        256,
+        null,
+        disaggregatedConfig(
+          {
+            hardware: 'gb300',
+            framework: 'dynamo-vllm',
+            model: 'dsv4',
+            precision: 'fp4',
+            specMethod: 'mtp',
+          },
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        2334,
+        1152,
+        null,
+        disaggregatedConfig(
+          {
+            hardware: 'gb300',
+            framework: 'dynamo-vllm',
+            model: 'dsv4',
+            precision: 'fp4',
+            specMethod: 'mtp',
+          },
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 2 },
+          { tp: 12, ep: 12, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        2336,
+        1024,
+        null,
+        disaggregatedConfig(
+          {
+            hardware: 'gb300',
+            framework: 'dynamo-vllm',
+            model: 'dsv4',
+            precision: 'fp4',
+            specMethod: 'mtp',
+          },
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 2 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
     ] as const
-  ).map(([configId, conc, recipeFingerprint]) => ({
-    id: `run-31633154542-config-${configId}-conc-${conc}-mooncake-offload`,
+  ).map(([productionConfigId, conc, recipeFingerprint, config]) => ({
+    id: `run-31633154542-config-${productionConfigId}-conc-${conc}-mooncake-offload`,
     reason:
       'The runtime recipe enabled MooncakeStoreConnector, but the artifact reported this AgentX point as non-offloaded.',
     githubRunId: 31633154542,
     runAttempt: 2,
-    configId,
+    productionConfigId,
+    config,
     benchmarkType: 'agentic_traces',
     isl: null,
     osl: null,
@@ -340,20 +444,75 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
   // declared NIXL transfer, so all six artifacts lost the offload identity.
   ...(
     [
-      [2360, 7, '5c282408e21b662cf5afbef0d26a63ad2fb19bb66ca3b431763a1c40628f3036'],
-      [2361, 96, 'da36b834945785abfa06c44f742684db7a96af49542d9012019063d552dc7393'],
-      [2362, 704, '60e4361ec00fd8a94a700b7ae9dbb4d8b6cf4095b1553f098af45551669fcf1f'],
-      [2363, 52, 'd7fccb3572037431f39757640d090ab1204bb27ac57ff0f9f9a635e9cefb5867'],
-      [2364, 565, 'a6017a5c8a675fb4f1f74e49bb0091f172e6ea357a1bb1b2d6577eb661c9f1c5'],
-      [2365, 44, 'ac8406a4d46f3711732aa352c801bbd1eb7c3545b2982c5d2c56520fa8288342'],
+      [
+        2360,
+        7,
+        '5c282408e21b662cf5afbef0d26a63ad2fb19bb66ca3b431763a1c40628f3036',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
+          { tp: 8, ep: 8, dpAttn: false, numWorkers: 7 },
+        ),
+      ],
+      [
+        2361,
+        96,
+        'da36b834945785abfa06c44f742684db7a96af49542d9012019063d552dc7393',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 2, ep: 2, dpAttn: false, numWorkers: 2 },
+          { tp: 8, ep: 8, dpAttn: false, numWorkers: 3 },
+        ),
+      ],
+      [
+        2362,
+        704,
+        '60e4361ec00fd8a94a700b7ae9dbb4d8b6cf4095b1553f098af45551669fcf1f',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 3 },
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 2 },
+        ),
+      ],
+      [
+        2363,
+        52,
+        'd7fccb3572037431f39757640d090ab1204bb27ac57ff0f9f9a635e9cefb5867',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 1, ep: 1, dpAttn: true, numWorkers: 2 },
+          { tp: 2, ep: 2, dpAttn: false, numWorkers: 2 },
+        ),
+      ],
+      [
+        2364,
+        565,
+        'a6017a5c8a675fb4f1f74e49bb0091f172e6ea357a1bb1b2d6577eb661c9f1c5',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 3 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        2365,
+        44,
+        'ac8406a4d46f3711732aa352c801bbd1eb7c3545b2982c5d2c56520fa8288342',
+        disaggregatedConfig(
+          QWEN35_GB300_DYNAMO_TRT,
+          { tp: 1, ep: 1, dpAttn: true, numWorkers: 1 },
+          { tp: 2, ep: 2, dpAttn: false, numWorkers: 1 },
+        ),
+      ],
     ] as const
-  ).map(([configId, conc, recipeFingerprint]) => ({
-    id: `run-31927376673-config-${configId}-conc-${conc}-native-offload`,
+  ).map(([productionConfigId, conc, recipeFingerprint, config]) => ({
+    id: `run-31927376673-config-${productionConfigId}-conc-${conc}-native-offload`,
     reason:
       'The TensorRT-LLM runtime recipe configured a native host KV cache, but the artifact reported this AgentX point as non-offloaded.',
     githubRunId: 31927376673,
     runAttempt: 1,
-    configId,
+    productionConfigId,
+    config,
     benchmarkType: 'agentic_traces',
     isl: null,
     osl: null,
@@ -377,18 +536,55 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
   // run do not attach the connector and are intentionally excluded.
   ...(
     [
-      [1012, 128, 'b01cb33e392b60b01e2f498ea7300118c6046e074556199a3fe9a7208cf7929e'],
-      [1012, 256, '856babb1e00e524c7eddca689e1345d1a97a41f6743c5d5c109347444581aeef'],
-      [2374, 576, 'd7afa7f01be968e02911263a9792bb1200ca27de702b5e79d7907e6d46adfc44'],
-      [2375, 512, '47a4969f521268bccc1a3efd97a5ceaf231ff33ab13fa6fe3f9cadf48573f2b1'],
+      [
+        1012,
+        128,
+        'b01cb33e392b60b01e2f498ea7300118c6046e074556199a3fe9a7208cf7929e',
+        disaggregatedConfig(
+          DSV4_GB200_DYNAMO_VLLM,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 1 },
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        1012,
+        256,
+        '856babb1e00e524c7eddca689e1345d1a97a41f6743c5d5c109347444581aeef',
+        disaggregatedConfig(
+          DSV4_GB200_DYNAMO_VLLM,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 1 },
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        2374,
+        576,
+        'd7afa7f01be968e02911263a9792bb1200ca27de702b5e79d7907e6d46adfc44',
+        disaggregatedConfig(
+          DSV4_GB200_DYNAMO_VLLM,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 2 },
+          { tp: 12, ep: 12, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        2375,
+        512,
+        '47a4969f521268bccc1a3efd97a5ceaf231ff33ab13fa6fe3f9cadf48573f2b1',
+        disaggregatedConfig(
+          DSV4_GB200_DYNAMO_VLLM,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 2 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
     ] as const
-  ).map(([configId, conc, recipeFingerprint]) => ({
-    id: `run-31965016666-config-${configId}-conc-${conc}-mooncake-offload`,
+  ).map(([productionConfigId, conc, recipeFingerprint, config]) => ({
+    id: `run-31965016666-config-${productionConfigId}-conc-${conc}-mooncake-offload`,
     reason:
       'The runtime recipe enabled MooncakeStoreConnector, but the artifact reported this AgentX point as non-offloaded.',
     githubRunId: 31965016666,
     runAttempt: 2,
-    configId,
+    productionConfigId,
+    config,
     benchmarkType: 'agentic_traces',
     isl: null,
     osl: null,
@@ -423,9 +619,67 @@ function pointIdentity(
   ]);
 }
 
+function backfillPointIdentity(
+  backfill: BenchmarkPointBackfill,
+  offloadMode: string = backfill.offloadMode,
+): string {
+  return JSON.stringify([
+    backfill.githubRunId,
+    backfill.runAttempt,
+    configCacheKey(backfill.config),
+    backfill.benchmarkType,
+    backfill.isl,
+    backfill.osl,
+    backfill.conc,
+    offloadMode,
+    backfill.recipeFingerprint ?? null,
+  ]);
+}
+
+function backfillProductionPointIdentity(
+  backfill: BenchmarkPointBackfill,
+  offloadMode: string = backfill.offloadMode,
+): string {
+  return pointIdentity({
+    githubRunId: backfill.githubRunId,
+    runAttempt: backfill.runAttempt,
+    configId: backfill.productionConfigId,
+    benchmarkType: backfill.benchmarkType,
+    isl: backfill.isl,
+    osl: backfill.osl,
+    conc: backfill.conc,
+    offloadMode,
+    recipeFingerprint: backfill.recipeFingerprint,
+  });
+}
+
 function validatePositiveInteger(value: number, label: string, id: string): void {
   if (!Number.isInteger(value) || value <= 0) {
     throw new Error(`${id}: ${label} must be a positive integer`);
+  }
+}
+
+function validateBackfillConfig(config: ConfigParams, id: string): void {
+  for (const [label, value] of Object.entries({
+    hardware: config.hardware,
+    framework: config.framework,
+    model: config.model,
+    precision: config.precision,
+    specMethod: config.specMethod,
+  })) {
+    if (value.length === 0) throw new Error(`${id}: config.${label} must not be empty`);
+  }
+  for (const [label, value] of Object.entries({
+    prefillTp: config.prefillTp,
+    prefillEp: config.prefillEp,
+    prefillNumWorkers: config.prefillNumWorkers,
+    decodeTp: config.decodeTp,
+    decodeEp: config.decodeEp,
+    decodeNumWorkers: config.decodeNumWorkers,
+    numPrefillGpu: config.numPrefillGpu,
+    numDecodeGpu: config.numDecodeGpu,
+  })) {
+    validatePositiveInteger(value, `config.${label}`, id);
   }
 }
 
@@ -486,7 +740,8 @@ export function validateRunBackfills(
   }
 
   for (const backfill of points) {
-    validatePositiveInteger(backfill.configId, 'configId', backfill.id);
+    validatePositiveInteger(backfill.productionConfigId, 'productionConfigId', backfill.id);
+    validateBackfillConfig(backfill.config, backfill.id);
     validatePositiveInteger(backfill.conc, 'conc', backfill.id);
     if (backfill.benchmarkType.length === 0 || backfill.offloadMode.length === 0) {
       throw new Error(`${backfill.id}: benchmarkType and offloadMode must not be empty`);
@@ -514,16 +769,14 @@ export function validateRunBackfills(
     const overlap = mergeKeys.find((key) => removeKeys.includes(key));
     if (overlap) throw new Error(`${backfill.id}: metric ${overlap} is both merged and removed`);
 
-    const sourceIdentity = pointIdentity(backfill);
+    const sourceIdentity = backfillPointIdentity(backfill);
     if (pointSourceIdentities.has(sourceIdentity)) {
       throw new Error(`${backfill.id}: duplicate benchmark point selector ${sourceIdentity}`);
     }
     pointSourceIdentities.set(sourceIdentity, backfill.id);
 
-    const desiredIdentity = pointIdentity({
-      ...backfill,
-      offloadMode: backfill.set.offloadMode ?? backfill.offloadMode,
-    });
+    const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
+    const desiredIdentity = backfillPointIdentity(backfill, desiredOffloadMode);
     if (pointDesiredIdentities.has(desiredIdentity)) {
       throw new Error(`${backfill.id}: desired point identity collides with another backfill`);
     }
@@ -532,7 +785,10 @@ export function validateRunBackfills(
     if (
       PURGED_BENCHMARK_POINTS.some((purged) => {
         const purgedIdentity = pointIdentity(purged);
-        return purgedIdentity === sourceIdentity || purgedIdentity === desiredIdentity;
+        return (
+          purgedIdentity === backfillProductionPointIdentity(backfill) ||
+          purgedIdentity === backfillProductionPointIdentity(backfill, desiredOffloadMode)
+        );
       })
     ) {
       throw new Error(`${backfill.id}: source or desired point is already being purged`);
@@ -550,6 +806,7 @@ export function validateRunBackfills(
 }
 
 interface BackfillablePoint extends BenchmarkPointKey {
+  config: ConfigParams;
   metrics: Record<string, unknown>;
 }
 
@@ -628,9 +885,12 @@ export function applyChangelogBackfills<T extends BackfillableChangelogEntry>(
   return { changelogs: corrected, backfillIds };
 }
 
-function matchesBenchmarkPoint(point: BenchmarkPointKey, selector: BenchmarkPointKey): boolean {
+function matchesBenchmarkPoint(
+  point: BackfillablePoint,
+  selector: BenchmarkPointBackfill,
+): boolean {
   return (
-    point.configId === selector.configId &&
+    configCacheKey(point.config) === configCacheKey(selector.config) &&
     point.benchmarkType === selector.benchmarkType &&
     point.isl === selector.isl &&
     point.osl === selector.osl &&
