@@ -2,7 +2,7 @@ import type { ComponentPropsWithoutRef } from 'react';
 
 import { cn } from '@/lib/utils';
 
-export function NewBadge({ className, ...props }: ComponentPropsWithoutRef<'span'>) {
+export function NewBadge({ children, className, ...props }: ComponentPropsWithoutRef<'span'>) {
   return (
     <span
       className={cn(
@@ -10,6 +10,8 @@ export function NewBadge({ className, ...props }: ComponentPropsWithoutRef<'span
         className,
       )}
       {...props}
-    />
+    >
+      <span className="relative -top-px">{children}</span>
+    </span>
   );
 }

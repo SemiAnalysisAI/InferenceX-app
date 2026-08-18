@@ -70,6 +70,21 @@ describe('Landing nudges — modals', () => {
           expect(size.height).to.eq(sizes[0].height);
         }
         expect(sizes[0]).to.deep.eq({ width: 32, height: 16 });
+
+        for (const badge of $badges) {
+          const label = badge.firstElementChild;
+          expect(label, 'badge label').not.to.eq(null);
+
+          const badgeRect = badge.getBoundingClientRect();
+          const labelRect = label!.getBoundingClientRect();
+          const horizontalOffset =
+            labelRect.left + labelRect.width / 2 - (badgeRect.left + badgeRect.width / 2);
+          const verticalOffset =
+            labelRect.top + labelRect.height / 2 - (badgeRect.top + badgeRect.height / 2);
+
+          expect(horizontalOffset).to.be.closeTo(0, 0.1);
+          expect(verticalOffset).to.eq(-1);
+        }
       });
     // Only one overlay at a time — star modal should not appear
     cy.get('[data-testid="github-star-modal"]').should('not.exist');
