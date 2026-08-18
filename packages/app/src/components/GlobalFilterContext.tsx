@@ -184,11 +184,17 @@ export function GlobalFilterProvider({
   // URL `i_seq`, or a manual pick). Until then the per-model default applies —
   // without this flag the initial `8k/1k` state is indistinguishable from a
   // deliberate 8K/1K selection, and the model default could never win.
-  const [sequenceExplicit, setSequenceExplicit] = useState<boolean>(() => {
-    if (initialSequence) return true;
-    const urlSeq = getUrlParam('i_seq');
-    return Boolean(urlSeq && Object.values(Sequence).includes(urlSeq as Sequence));
-  });
+  //
+  // Deliberately NOT seeded from `i_seq` here: this flag feeds the scenario
+  // label rendered during the pre-availability window, and `getUrlParam` sees
+  // the query string on the client but not on the server. Reading it in the
+  // initializer would render a different label on each side and fail
+  // hydration. The layout effect below applies `i_seq` (flag included) after
+  // the first commit and before paint, which is how every other URL param
+  // lands.
+  const [sequenceExplicit, setSequenceExplicit] = useState<boolean>(
+    () => initialSequence !== undefined,
+  );
   const setSelectedSequence = useCallback((sequence: Sequence) => {
     setSelectedSequenceRaw(sequence);
     setSequenceExplicit(true);
