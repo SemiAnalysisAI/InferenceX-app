@@ -137,7 +137,99 @@ export interface PurgedBenchmarkPoint extends BenchmarkPointKey {
  * `{ githubRunId, runAttempt, configId, benchmarkType, isl, osl, conc, offloadMode,
  * recipeFingerprint }`. Omitted fingerprints target only legacy NULL rows.
  */
-export const PURGED_BENCHMARK_POINTS: readonly PurgedBenchmarkPoint[] = [];
+export const PURGED_BENCHMARK_POINTS: readonly PurgedBenchmarkPoint[] = [
+  // 2026-08-03 | Point 438205 | Qwen3.5 FP4 B300 SGLang MTP, TP2/EP2, conc 32.
+  // Reason: the one-hour AgentX profile stopped after 3,102s, then emitted no requests for 538s.
+  {
+    githubRunId: 30730541420,
+    runAttempt: 1,
+    configId: 744,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: 32,
+    offloadMode: 'on',
+    recipeFingerprint: null,
+  },
+  // 2026-08-03 | Point 438197 | Qwen3.5 FP4 B300 SGLang MTP, TP2/EP2, conc 34.
+  // Reason: the one-hour AgentX profile stopped after 373s, then emitted no requests for 3,267s.
+  {
+    githubRunId: 30730541420,
+    runAttempt: 1,
+    configId: 744,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: 34,
+    offloadMode: 'on',
+    recipeFingerprint: null,
+  },
+  // 2026-08-03 | Point 438193 | Qwen3.5 FP4 B300 SGLang MTP, TP2/EP2, conc 38.
+  // Reason: the one-hour AgentX profile stopped after 2,994s, then emitted no requests for 646s.
+  {
+    githubRunId: 30730541420,
+    runAttempt: 1,
+    configId: 744,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: 38,
+    offloadMode: 'on',
+    recipeFingerprint: null,
+  },
+  // 2026-08-03 | Point 438195 | Qwen3.5 FP4 B300 SGLang MTP, TP2/EP2, conc 40.
+  // Reason: the one-hour AgentX profile stopped after 692s, then emitted no requests for 2,948s.
+  {
+    githubRunId: 30730541420,
+    runAttempt: 1,
+    configId: 744,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: 40,
+    offloadMode: 'on',
+    recipeFingerprint: null,
+  },
+  // 2026-08-03 | Point 438207 | Qwen3.5 FP4 B300 SGLang MTP, TP2/EP2, conc 48.
+  // Reason: the one-hour AgentX profile stopped after 1,033s, then emitted no requests for 2,607s.
+  {
+    githubRunId: 30730541420,
+    runAttempt: 1,
+    configId: 744,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: 48,
+    offloadMode: 'on',
+    recipeFingerprint: null,
+  },
+  // 2026-08-03 | Point 438211 | Qwen3.5 FP4 B300 SGLang MTP, TP2/EP2, conc 56.
+  // Reason: the one-hour AgentX profile stopped after 2,073s, then emitted no requests for 1,568s.
+  {
+    githubRunId: 30730541420,
+    runAttempt: 1,
+    configId: 744,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: 56,
+    offloadMode: 'on',
+    recipeFingerprint: null,
+  },
+  // 2026-08-03 | Point 438242 | Qwen3.5 FP4 B200 SGLang MTP, TP4/EP1, conc 76.
+  // Reason: the one-hour AgentX profile stopped after 20s, then emitted no requests for 3,620s.
+  {
+    githubRunId: 30758866378,
+    runAttempt: 1,
+    configId: 754,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: 76,
+    offloadMode: 'on',
+    recipeFingerprint: null,
+  },
+];
 
 interface AuditedBackfill {
   /** Stable, descriptive identifier used in logs and review history. */
