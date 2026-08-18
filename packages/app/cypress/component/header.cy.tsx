@@ -167,8 +167,27 @@ describe('Header', () => {
     cy.wrap(mockRouter.push).should('have.been.calledTwice');
   });
 
-  it('keeps every primary link inside the header at the desktop breakpoint', () => {
-    cy.viewport(1024, 720);
+  it('uses the hamburger without horizontal overflow from 1009 through 1024 CSS pixels', () => {
+    [1009, 1012, 1020, 1024].forEach((width) => {
+      cy.viewport(width, 720);
+      cy.get('[data-testid="nav-link-dashboard"]').should('not.be.visible');
+      cy.get('[data-testid="mobile-menu-toggle"]').should('be.visible');
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth, `${width}px document scrollWidth`).to.be.at.most(
+          doc.documentElement.clientWidth,
+        );
+      });
+      cy.get('[data-testid="header"]').then(($header) => {
+        const header = $header[0];
+        expect(header.scrollWidth, `${width}px header scrollWidth`).to.be.at.most(
+          header.clientWidth,
+        );
+      });
+    });
+  });
+
+  it('keeps every primary link inside the header at the xl desktop breakpoint', () => {
+    cy.viewport(1280, 720);
     cy.get('[data-testid="header"]').then(($header) => {
       const header = $header[0];
       const bounds = header.getBoundingClientRect();

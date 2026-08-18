@@ -208,7 +208,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden items-center gap-1 xl:flex">
             {navLinks.map(({ href, displayHref, label, testId, event }) => (
               <Link
                 key={href}
@@ -253,7 +253,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             <ModeToggle />
 
             {/* Mobile hamburger */}
-            <div ref={menuRef} className="relative lg:hidden">
+            <div ref={menuRef} className="relative xl:hidden">
               <button
                 type="button"
                 data-testid="mobile-menu-toggle"
