@@ -1,47 +1,45 @@
 import type { Metadata } from 'next';
 
-import { JsonLd } from '@/components/json-ld';
 import { AgentXMethodology } from '@/components/datasets/agentx-methodology';
 import { DatasetList } from '@/components/datasets/dataset-list';
-import { zhAlternates, ZH_OG_LOCALE, ZH_LANG_TAG } from '@/lib/i18n';
+import { JsonLd } from '@/components/json-ld';
+import { enAlternates } from '@/lib/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const DESCRIPTION =
-  'InferenceX agentic 基准测试所回放的真实 Claude Code 对话 trace——方法论、分布及逐对话火焰图。';
+  'AgentX replays workload shapes derived from opt-in Claude Code sessions. Explore its methodology, distributions, and per-conversation flamegraphs.';
 
 export const metadata: Metadata = {
-  title: 'Agentic 数据集',
+  title: 'AgentX Methodology and Datasets',
   description: DESCRIPTION,
-  alternates: zhAlternates('/datasets'),
+  alternates: enAlternates('/agentx'),
   openGraph: {
-    title: 'Agentic 数据集 | InferenceX',
+    title: 'AgentX Methodology and Datasets | InferenceX',
     description: DESCRIPTION,
-    url: `${SITE_URL}/zh/datasets`,
-    locale: ZH_OG_LOCALE,
+    url: `${SITE_URL}/agentx`,
   },
-  twitter: { title: 'Agentic 数据集 | InferenceX', description: DESCRIPTION },
+  twitter: { title: 'AgentX Methodology and Datasets | InferenceX', description: DESCRIPTION },
 };
 
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',
-  name: 'InferenceX Agentic 数据集',
+  name: 'InferenceX AgentX Datasets',
   description: DESCRIPTION,
-  url: `${SITE_URL}/zh/datasets`,
-  inLanguage: ZH_LANG_TAG,
+  url: `${SITE_URL}/agentx`,
 };
 
-export default function DatasetsPageZh() {
+export default function AgentXPage() {
   return (
     <main className="relative">
       <JsonLd data={jsonLd} />
       <div className="container mx-auto flex flex-col gap-6 px-4 pb-8 lg:px-8">
         <section>
-          <AgentXMethodology locale="zh" />
+          <AgentXMethodology locale="en" />
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold text-foreground">数据集</h2>
+          <h2 className="text-lg font-semibold text-foreground">Datasets</h2>
           <DatasetList />
         </section>
       </div>

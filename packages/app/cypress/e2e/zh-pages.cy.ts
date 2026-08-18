@@ -27,10 +27,10 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/');
     });
 
-    it('header links to the Chinese datasets page', () => {
-      cy.get('[data-testid="nav-link-datasets"]')
-        .should('contain.text', '数据集')
-        .and('have.attr', 'href', '/zh/datasets');
+    it('header links to the Chinese AgentX page', () => {
+      cy.get('[data-testid="nav-link-agentx"]')
+        .should('contain.text', 'AgentX')
+        .and('have.attr', 'href', '/zh/agentx');
     });
 
     it('footer renders in Chinese with zh-internal links', () => {
@@ -38,9 +38,9 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="footer-link-supporters"]')
         .should('contain.text', '支持者')
         .and('have.attr', 'href', '/zh/quotes');
-      cy.get('[data-testid="footer-link-datasets"]')
-        .should('contain.text', '数据集')
-        .and('have.attr', 'href', '/zh/datasets');
+      cy.get('[data-testid="footer-link-agentx"]')
+        .should('contain.text', 'AgentX')
+        .and('have.attr', 'href', '/zh/agentx');
       cy.get('[data-testid="footer-link-articles"]')
         .should('contain.text', '文章')
         .and('have.attr', 'href', '/zh/blog');

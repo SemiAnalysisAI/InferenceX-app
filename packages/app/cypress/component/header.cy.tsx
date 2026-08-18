@@ -105,21 +105,21 @@ describe('Header', () => {
     cy.get('[data-testid="nav-link-compare"]').should('have.attr', 'href', '/compare');
   });
 
-  it('shows Datasets as a top-level nav link and highlights dataset child pages', () => {
-    cy.get('[data-testid="nav-link-datasets"]')
+  it('shows AgentX as a top-level nav link and highlights AgentX child pages', () => {
+    cy.get('[data-testid="nav-link-agentx"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/datasets');
+      .and('have.attr', 'href', '/agentx');
 
-    mountHeader('/datasets/claude-code-traces');
-    cy.get('[data-testid="nav-link-datasets"]').should('have.class', 'text-brand');
+    mountHeader('/agentx/claude-code-traces');
+    cy.get('[data-testid="nav-link-agentx"]').should('have.class', 'text-brand');
   });
 
-  it('keeps Datasets in the Chinese navigation tree', () => {
-    mountHeader('/zh/datasets');
-    cy.get('[data-testid="nav-link-datasets"]')
+  it('keeps AgentX in the Chinese navigation tree', () => {
+    mountHeader('/zh/agentx');
+    cy.get('[data-testid="nav-link-agentx"]')
       .should('be.visible')
-      .and('contain.text', '数据集')
-      .and('have.attr', 'href', '/zh/datasets')
+      .and('contain.text', 'AgentX')
+      .and('have.attr', 'href', '/zh/agentx')
       .and('have.class', 'text-brand');
   });
 
@@ -151,7 +151,7 @@ describe('Header', () => {
       cy.contains('a', 'Overview').should('be.visible').and('have.attr', 'href', '/overview');
       cy.contains('a', 'Dashboard').should('be.visible').and('have.attr', 'href', '/inference');
       cy.contains('a', 'Comparisons').should('be.visible').and('have.attr', 'href', '/compare');
-      cy.contains('a', 'Datasets').should('be.visible').and('have.attr', 'href', '/datasets');
+      cy.contains('a', 'AgentX').should('be.visible').and('have.attr', 'href', '/agentx');
       cy.contains('a', 'Supporters').should('not.exist');
       cy.contains('a', 'Articles').should('not.exist');
     });
@@ -237,7 +237,7 @@ describe('Header', () => {
       cy.get('[data-testid="mobile-menu-toggle"]').click();
       cy.get('[data-testid="mobile-menu"]').should('be.visible');
       cy.get('[data-testid="mobile-menu"]').within(() => {
-        ['Home', 'Overview', 'Dashboard', 'Comparisons', 'Datasets', 'About'].forEach((label) => {
+        ['Home', 'Overview', 'Dashboard', 'Comparisons', 'AgentX', 'About'].forEach((label) => {
           cy.contains('a', label).should('be.visible');
         });
         ['Supporters', 'Articles'].forEach((label) => {

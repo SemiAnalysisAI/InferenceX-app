@@ -50,10 +50,10 @@ const NAV_LINKS = [
     event: 'header_compare_clicked',
   },
   {
-    href: '/datasets',
-    label: 'Datasets',
-    testId: 'nav-link-datasets',
-    event: 'header_datasets_clicked',
+    href: '/agentx',
+    label: 'AgentX',
+    testId: 'nav-link-agentx',
+    event: 'header_agentx_clicked',
   },
   { href: '/about', label: 'About', testId: 'nav-link-about', event: 'header_about_clicked' },
 ] as const;

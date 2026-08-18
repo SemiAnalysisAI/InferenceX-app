@@ -46,7 +46,7 @@ function DatasetCard({ d, locale }: { d: DatasetRecord; locale: 'en' | 'zh' }) {
   const prefix = locale === 'zh' ? '/zh' : '';
   return (
     <Link
-      href={`${prefix}/datasets/${d.slug}`}
+      href={`${prefix}/agentx/${d.slug}`}
       onClick={() => track('datasets_card_clicked', { slug: d.slug })}
       className="block transition-colors hover:[&_*]:border-primary/40"
     >

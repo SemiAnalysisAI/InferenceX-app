@@ -13,6 +13,8 @@ export async function GET() {
     `## Links`,
     '',
     `- [Dashboard](${SITE_URL})`,
+    `- [AgentX](${SITE_URL}/agentx)`,
+    `- [AgentX Methodology](${SITE_URL}/agentx/methodology)`,
     `- [Articles](${SITE_URL}/blog)`,
     `- [API Reference](${SITE_URL}/api)`,
     `- [OpenAPI 3.1 Specification](${SITE_URL}/api/openapi.json)`,

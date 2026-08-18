@@ -11,7 +11,7 @@ export type RowMode = 'conversation' | 'worker';
 /**
  * The dataset conversation id for a request: the cid with any subagent/forked
  * suffix (`::sa:…`, `::fa:…`) stripped. This is exactly the `conv_id` stored in
- * dataset_conversations, so it deep-links into /datasets/<slug>/conversations/.
+ * dataset_conversations, so it deep-links into /agentx/<slug>/conversations/.
  */
 export function datasetConvId(cid: string): string {
   const i = cid.indexOf('::');
@@ -51,7 +51,7 @@ export function conversationHref(datasetSlug: string, req: RequestRecord): strin
   }
   const sa = subagentIdOf(req.cid);
   if (sa && !params.has('inner')) params.set('sa', sa);
-  return `/datasets/${datasetSlug}/conversations/${encodeURIComponent(convId)}?${params.toString()}`;
+  return `/agentx/${datasetSlug}/conversations/${encodeURIComponent(convId)}?${params.toString()}`;
 }
 
 /** Human label for where a request came from (raw trace index or replay turn). */

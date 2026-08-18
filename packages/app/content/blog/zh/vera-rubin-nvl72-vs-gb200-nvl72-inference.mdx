@@ -223,7 +223,7 @@ CoreWeave 性能结果的第二个细节是他们使用的是 DeepSeek R1 671B�
 
 有趣的是，CoreWeave 选择 DeepSeek R1 671B 在理论上反而更有利于 Blackwell 基线，而非 Rubin。Rubin 的主要优势在于更大的 HBM 容量、更大的 CPU DRAM 容量和更高的 HBM 带宽，这意味着 Rubin 更适合 Fable 5、Gemini Pro、Kimi K3、Qwen3.8 2.4T 这类多万亿参数模型。
 
-第三点值得注意的是，CoreWeave 只使用了单轮 8k/1k 输入/输出 token。理论上，Agentic Coding 这类多轮长上下文工作负载在 Rubin 上应有更好表现（得益于其更大的 HBM 容量和带宽），但简单的单轮基准测试无法体现这一点。[我们即将推出的 AgentX 基准测试场景由 Weka、LMCache、vLLM/SGLang 社区、Nvidia、AMD 及社区众多伙伴合作打造，将提供真实的 agentic 工作负载来评测推理性能。](https://inferencex.semianalysis.com/datasets/cc-traces-weka-062126)我们鼓励所有人采用这一推理基准测试！
+第三点值得注意的是，CoreWeave 只使用了单轮 8k/1k 输入/输出 token。理论上，Agentic Coding 这类多轮长上下文工作负载在 Rubin 上应有更好表现（得益于其更大的 HBM 容量和带宽），但简单的单轮基准测试无法体现这一点。[我们即将推出的 AgentX 基准测试场景由 Weka、LMCache、vLLM/SGLang 社区、Nvidia、AMD 及社区众多伙伴合作打造，将提供真实的 agentic 工作负载来评测推理性能。](https://inferencex.semianalysis.com/zh/agentx/cc-traces-weka-062126)我们鼓励所有人采用这一推理基准测试！
 
 最后，我们注意到 CoreWeave 的测试是在一台没有 scale-out 网络的预量产机架上完成的。具体来说，CoreWeave 使用的是 Dell 工程样机（Engineering Sample，ES）机架。我们仍然认为这些结果有价值：它们启用了宽 EP 和 PD 分离，用到了 NVL72 的 scale-up 背板，证明其工作良好。这块背板在 GB200 NVL72 Oberon 爬坡期间曾面临诸多可靠性挑战，[我们在加速器模型中有过记录。](https://semianalysis.com/accelerator-hbm-model/)
 

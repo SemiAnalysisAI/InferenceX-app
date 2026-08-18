@@ -1,13 +1,14 @@
 import { Card } from '@/components/ui/card';
+import { AgentXMethodologyLink } from './agentx-methodology-link';
 
 type Locale = 'en' | 'zh';
 
 const CONTENT = {
   en: {
     eyebrow: 'AgentX v1.0 methodology',
-    title: 'Agentic Benchmark Datasets',
+    title: 'AgentX Benchmark Datasets',
     intro:
-      'AgentX replays the workload shape of real Claude Code sessions, not their private text. Each benchmark request is reconstructed from anonymized trace metadata so the serving system sees the original context growth, prefix reuse, subagent branching, and request timing as closely as client-visible data allows.',
+      'AgentX derives replay workloads from opt-in Claude Code sessions. The published traces remove prompt, code, and tool payloads while retaining request lengths, prefix reuse, subagent branches, and timing.',
     processTitle: 'How an AgentX run is built',
     steps: [
       {
@@ -16,7 +17,7 @@ const CONTENT = {
           'An opt-in HTTP proxy records request and response timing, token counts, conversation IDs, and subagent IDs as sessions run.',
       },
       {
-        title: 'Anonymize',
+        title: 'Transform',
         description:
           'Original prompts, source code, tool arguments, and tool results are removed. Inputs become session-scoped chained hashes in 64-token blocks, preserving matching prefixes without revealing content.',
       },
@@ -41,7 +42,7 @@ const CONTENT = {
       { value: '444', label: 'median output tokens / request' },
       { value: '44%', label: 'sessions with subagents' },
     ],
-    controlsTitle: 'Controls that keep comparisons meaningful',
+    controlsTitle: 'Replay controls',
     controls: [
       {
         title: 'Steady-state start',
@@ -66,13 +67,12 @@ const CONTENT = {
     ],
     readingTitle: 'How to read AgentX results',
     reading:
-      'Concurrency means concurrent agent clients, not a fixed request batch. Because AgentX is closed loop, faster configurations complete more requests and can encounter a slightly different workload mix; this variation is most visible at low concurrency. Read throughput together with time to first token (TTFT) and interactivity rather than treating any one latency statistic as the complete result.',
+      'Concurrency means concurrent agent clients, not a fixed request batch. AgentX is closed loop, so faster configurations complete more requests and can encounter a slightly different workload mix. This variation is most visible at low concurrency. Report throughput with time to first token (TTFT) and interactivity; a single latency statistic does not describe the full run.',
     qualityNote:
-      'Synthetic content preserves workload behavior; AgentX measures serving-system performance, not model answer quality.',
-    limitsTitle: 'Reconstruction boundaries',
+      'AgentX measures serving-system performance. Its synthetic payloads do not support model-quality evaluation.',
     limits:
-      'The client cannot observe provider-side chat templates, proprietary tokenizers, server tools, encrypted reasoning content, or the exact token expansion of images and documents. AgentX uses deterministic placeholders and model-specific padding to approximate those hidden inputs. The benchmark is designed to preserve request lengths, timing, conversation topology, and KV-reuse patterns—not to reproduce private conversations verbatim.',
-    variantsTitle: 'Dataset variants',
+      'The client cannot observe provider-side chat templates, proprietary tokenizers, server tools, encrypted reasoning content, or the exact token expansion of images and documents. AgentX uses deterministic placeholders and model-specific padding for those inputs. The resulting traces reproduce request lengths, timing, conversation topology, and KV-reuse patterns. They do not contain the original conversations.',
+    variantsLabel: 'Dataset variants',
     variants: [
       {
         title: 'full',
@@ -84,12 +84,13 @@ const CONTENT = {
           'A context-limited variant for models and inference engines configured with a maximum context of 256k tokens.',
       },
     ],
+    methodologyCta: 'Read the full methodology',
   },
   zh: {
     eyebrow: 'AgentX v1.0 方法论',
-    title: 'Agentic 基准测试数据集',
+    title: 'AgentX 基准测试数据集',
     intro:
-      'AgentX 回放的是真实 Claude Code 会话的工作负载形态，而非其中的私有原文。每个基准测试请求都根据匿名化 trace 元数据重建，使推理系统在客户端可观测信息范围内，尽可能复现原始上下文增长、prefix 复用、subagent 分支和请求节奏。',
+      'AgentX 根据自愿提供的 Claude Code 会话生成回放负载。公开 trace 会移除 prompt、代码和 tool payload，同时保留请求长度、prefix 复用、subagent 分支和时间信息。',
     processTitle: 'AgentX 如何构建一次回放',
     steps: [
       {
@@ -98,7 +99,7 @@ const CONTENT = {
           '参与者主动启用 HTTP 代理后，代理会在会话运行期间记录请求与响应时间、token 数、conversation ID 和 subagent ID。',
       },
       {
-        title: '匿名化',
+        title: '转换',
         description:
           '原始 prompt、源代码、tool argument 和 tool result 均会移除。Input 按 64-token block 转换为会话内串联 hash，在不暴露内容的前提下保留相同 prefix。',
       },
@@ -123,7 +124,7 @@ const CONTENT = {
       { value: '444', label: '单请求 output token 中位数' },
       { value: '44%', label: '包含 subagent 的会话' },
     ],
-    controlsTitle: '保证结果可比性的控制措施',
+    controlsTitle: '回放控制',
     controls: [
       {
         title: '从稳态开始',
@@ -148,12 +149,11 @@ const CONTENT = {
     ],
     readingTitle: '如何解读 AgentX 结果',
     reading:
-      '这里的 concurrency 表示同时运行的 agent 客户端数量，而不是固定 request batch。AgentX 是 closed-loop 基准测试：更快的配置会完成更多请求，因此遇到的工作负载组合可能略有不同，低并发时这种波动更明显。解读结果时应同时考虑吞吐量、首 token 延迟（TTFT）和 interactivity，不能用单一 latency 指标概括整体表现。',
-    qualityNote: '合成内容用于保留工作负载行为；AgentX 衡量的是推理系统性能，而不是模型回答质量。',
-    limitsTitle: '重建范围与限制',
+      '这里的 concurrency 表示同时运行的 agent 客户端数量，不是固定 request batch。AgentX 采用 closed-loop 模式，因此更快的配置会完成更多请求，遇到的负载组合也可能略有不同；这种波动在低并发时最明显。报告结果时，应同时给出吞吐量、首 token 延迟（TTFT）和 interactivity，单一 latency 指标不足以描述完整运行。',
+    qualityNote: 'AgentX 衡量推理系统性能。合成 payload 不适合评估模型回答质量。',
     limits:
-      '客户端无法观测服务端 chat template、专有 tokenizer、服务端 tool、加密的 reasoning 内容，也无法精确得知图片和文档最终展开成多少 token。AgentX 使用确定性 placeholder 和针对不同模型校准的 padding 来近似这些隐藏输入。基准测试的目标是保留请求长度、时间关系、对话拓扑和 KV 复用模式，而不是逐字还原私有会话。',
-    variantsTitle: '数据集变体',
+      '客户端无法观测服务端 chat template、专有 tokenizer、服务端 tool、加密的 reasoning 内容，也无法精确得知图片和文档最终展开成多少 token。AgentX 使用确定性 placeholder 和针对不同模型校准的 padding 处理这些输入。重建后的 trace 会复现请求长度、时间关系、对话拓扑和 KV 复用模式，但不包含原始会话。',
+    variantsLabel: '数据集变体',
     variants: [
       {
         title: 'full',
@@ -164,6 +164,7 @@ const CONTENT = {
         description: '面向最大上下文配置为 256k token 的模型与推理引擎的限制版。',
       },
     ],
+    methodologyCta: '深入了解 AgentX 方法论',
   },
 } as const;
 
@@ -206,7 +207,7 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
           </h2>
           <p className="text-sm leading-6 text-muted-foreground">{t.datasetIntro}</p>
           <div className="mt-4 border-y border-border/70 py-4">
-            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+            <p className="mb-3 font-mono text-xs font-semibold tracking-[0.2em] text-brand uppercase">
               {t.profileLabel}
             </p>
             <dl className="grid grid-cols-2 gap-x-5 gap-y-4 lg:grid-cols-4">
@@ -220,6 +221,17 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
               ))}
             </dl>
           </div>
+          <ul
+            aria-label={t.variantsLabel}
+            className="mt-4 space-y-1.5 text-sm leading-6 text-muted-foreground"
+          >
+            {t.variants.map((variant) => (
+              <li key={variant.title}>
+                <strong className="font-semibold text-foreground">{variant.title}</strong>:{' '}
+                {variant.description}
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section aria-labelledby="agentx-controls-title">
@@ -246,27 +258,16 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
           <p className="mt-3 border-l-2 border-primary bg-primary/5 px-4 py-3 text-sm font-medium leading-6 text-foreground">
             {t.qualityNote}
           </p>
-        </section>
-
-        <section aria-labelledby="agentx-limits-title">
-          <h2 id="agentx-limits-title" className="mb-2 text-base font-semibold text-foreground">
-            {t.limitsTitle}
-          </h2>
-          <p className="text-sm leading-6 text-muted-foreground">{t.limits}</p>
-        </section>
-
-        <section aria-labelledby="agentx-variants-title">
-          <h2 id="agentx-variants-title" className="mb-2 text-base font-semibold text-foreground">
-            {t.variantsTitle}
-          </h2>
-          <ul className="space-y-1.5 text-sm leading-6 text-muted-foreground">
-            {t.variants.map((variant) => (
-              <li key={variant.title}>
-                <strong className="font-semibold text-foreground">{variant.title}</strong> —{' '}
-                {variant.description}
-              </li>
-            ))}
-          </ul>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">{t.limits}</p>
+          <AgentXMethodologyLink
+            href={locale === 'zh' ? '/zh/agentx/methodology' : '/agentx/methodology'}
+            analyticsEvent="agentx_methodology_opened"
+            analyticsTarget="compact-overview"
+            data-testid="agentx-methodology-cta"
+            className="mt-4 inline-flex min-h-11 items-center rounded-md border border-primary/40 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
+          >
+            {t.methodologyCta} →
+          </AgentXMethodologyLink>
         </section>
       </div>
     </Card>

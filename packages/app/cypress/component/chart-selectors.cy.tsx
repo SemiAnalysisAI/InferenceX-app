@@ -140,7 +140,7 @@ describe('Chart Selectors', () => {
         .should('not.contain.text', 'Agentic');
     });
 
-    it('explains the agentic workload in a tooltip that links to /datasets', () => {
+    it('explains the agentic workload in a tooltip that links to /agentx', () => {
       cy.mount(<ScenarioSelectorHarness />);
       cy.get('[data-testid="scenario-agentic-info"]').trigger('pointermove', {
         pointerType: 'mouse',
@@ -151,7 +151,7 @@ describe('Chart Selectors', () => {
       );
       cy.get('[data-testid="scenario-agentic-info-link"]')
         .should('be.visible')
-        .and('have.attr', 'href', '/datasets');
+        .and('have.attr', 'href', '/agentx');
     });
 
     it('hides the agentic explainer on fixed-sequence scenarios', () => {

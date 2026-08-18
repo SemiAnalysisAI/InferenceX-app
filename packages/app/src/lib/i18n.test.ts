@@ -57,8 +57,8 @@ describe('hasZhSibling', () => {
   });
 
   it('matches datasets, gated tabs, and agentic detail pages', () => {
-    expect(hasZhSibling('/datasets')).toBe(true);
-    expect(hasZhSibling('/datasets/some-set/conversations/abc123')).toBe(true);
+    expect(hasZhSibling('/agentx')).toBe(true);
+    expect(hasZhSibling('/agentx/some-set/conversations/abc123')).toBe(true);
     expect(hasZhSibling('/ai-chart')).toBe(true);
     expect(hasZhSibling('/current-inferencex-image')).toBe(true);
     expect(hasZhSibling('/feedback')).toBe(true);
@@ -107,8 +107,8 @@ describe('switchLocalePath', () => {
   });
 
   it('switches datasets pages within the language trees', () => {
-    expect(switchLocalePath('/datasets')).toBe('/zh/datasets');
-    expect(switchLocalePath('/zh/datasets/some-set')).toBe('/datasets/some-set');
+    expect(switchLocalePath('/agentx')).toBe('/zh/agentx');
+    expect(switchLocalePath('/zh/agentx/some-set')).toBe('/agentx/some-set');
   });
 
   it('falls back to the other homepage for unmirrored paths', () => {

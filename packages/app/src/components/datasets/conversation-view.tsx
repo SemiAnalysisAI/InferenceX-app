@@ -14,8 +14,8 @@ const STRINGS = {
   en: {
     loading: 'Loading conversation…',
     notFound: 'Conversation not found.',
-    backToDataset: 'Back to dataset',
-    breadcrumbDatasets: 'Datasets',
+    backToDataset: 'Back to AgentX dataset',
+    breadcrumbDatasets: 'AgentX',
     breadcrumbConversation: 'conversation',
     mainTurns: 'Main turns',
     subagentGroups: 'Subagent groups',
@@ -30,8 +30,8 @@ const STRINGS = {
   zh: {
     loading: '正在加载对话…',
     notFound: '未找到对话。',
-    backToDataset: '返回数据集',
-    breadcrumbDatasets: '数据集',
+    backToDataset: '返回 AgentX 数据集',
+    breadcrumbDatasets: 'AgentX',
     breadcrumbConversation: '对话',
     mainTurns: '主轮次',
     subagentGroups: 'Subagent 组',
@@ -69,7 +69,7 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
     return (
       <div className="py-12 text-center text-sm text-destructive">
         {t.notFound}{' '}
-        <Link href={`${prefix}/datasets/${slug}`} className="text-primary underline">
+        <Link href={`${prefix}/agentx/${slug}`} className="text-primary underline">
           {t.backToDataset}
         </Link>
       </div>
@@ -82,11 +82,11 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
     <div className="flex flex-col gap-6">
       <div>
         <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Link href={`${prefix}/datasets`} className="hover:text-foreground">
+          <Link href={`${prefix}/agentx`} className="hover:text-foreground">
             {t.breadcrumbDatasets}
           </Link>
           <span>/</span>
-          <Link href={`${prefix}/datasets/${slug}`} className="hover:text-foreground">
+          <Link href={`${prefix}/agentx/${slug}`} className="hover:text-foreground">
             {slug}
           </Link>
           <span>/</span>

@@ -77,9 +77,9 @@ describe('First-load navigation', () => {
     cy.location('pathname').should('eq', '/compare');
   });
 
-  it('navigates to datasets from the header with one click', () => {
-    cy.get('[data-testid="nav-link-datasets"]').should('have.attr', 'href', '/datasets').click();
-    cy.location('pathname').should('eq', '/datasets');
+  it('navigates to AgentX from the header with one click', () => {
+    cy.get('[data-testid="nav-link-agentx"]').should('have.attr', 'href', '/agentx').click();
+    cy.location('pathname').should('eq', '/agentx');
   });
 
   it('navigates to overview and the full dashboard from the landing CTAs', () => {

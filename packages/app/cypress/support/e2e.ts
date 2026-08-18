@@ -19,14 +19,14 @@ Cypress.on('window:before:load', (win) => {
  * Seed the shared feature-gate flag (the same localStorage key the ↑↑↓↓ konami
  * unlock writes — see use-feature-gate.ts).
  *
- * The agentic surfaces (the "Agentic" scenario, /datasets,
- * /inference/agentic/[id], and the Datasets nav link) are now PUBLIC by default
+ * The agentic surfaces (the "Agentic" scenario, /agentx,
+ * /inference/agentic/[id], and the AgentX nav link) are now PUBLIC by default
  * — they no longer sit behind this gate — so agentic specs no longer need it.
  * The helper is retained as a harmless no-op for those specs (and still unlocks
  * the remaining hidden features: the "Hidden" tab dropdown and Measured Energy).
  *
  * Call from a spec's `cy.visit(..., { onBeforeLoad })`:
- *   cy.visit('/datasets/x', { onBeforeLoad: unlockAgenticGate });
+ *   cy.visit('/agentx/x', { onBeforeLoad: unlockAgenticGate });
  * or compose inside an existing hook: `unlockAgenticGate(win)`.
  */
 export function unlockAgenticGate(win: Window): void {
