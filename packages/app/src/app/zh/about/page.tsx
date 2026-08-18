@@ -22,22 +22,22 @@ const faqJsonLd = {
   })),
 };
 
+const ABOUT_DESCRIPTION =
+  'InferenceX 是一个独立、厂商中立、可复现的基准测试平台，覆盖 AgentX 长上下文多轮智能体编码与固定序列 AI 推理，并对比各类加速器和服务栈。';
+
 export const metadata: Metadata = {
   title: '关于',
-  description:
-    'InferenceX 是一个独立、厂商中立、可复现的基准测试平台，持续测试各类 AI 加速器上的推理软件性能。',
+  description: ABOUT_DESCRIPTION,
   alternates: zhAlternates('/about'),
   openGraph: {
     title: '关于 | InferenceX',
-    description:
-      'InferenceX 是一个独立、厂商中立、可复现的基准测试平台，持续测试各类 AI 加速器上的推理软件性能。',
+    description: ABOUT_DESCRIPTION,
     url: `${SITE_URL}/zh/about`,
     locale: ZH_OG_LOCALE,
   },
   twitter: {
     title: '关于 | InferenceX',
-    description:
-      'InferenceX 是一个独立、厂商中立、可复现的基准测试平台，持续测试各类 AI 加速器上的推理软件性能。',
+    description: ABOUT_DESCRIPTION,
   },
 };
 
@@ -49,7 +49,7 @@ export default function AboutPageZh() {
         <section>
           <Card>
             <h2 className="text-lg font-semibold mb-2">
-              开源持续推理基准测试——受万亿美元级吉瓦规模 Token 工厂运营者的信赖
+              开源持续 AgentX 智能体与 AI 推理基准测试——受万亿美元级吉瓦规模 Token 工厂运营者的信赖
             </h2>
             <p className="text-muted-foreground mb-2">
               随着世界以指数级速度迈向
@@ -57,8 +57,9 @@ export default function AboutPageZh() {
             </p>
             <p className="text-muted-foreground mb-2">
               <strong>InferenceX&trade;</strong>（原名
-              InferenceMAX）是我们独立、厂商中立、可复现的基准测试平台，通过持续测试实际可用于 ML
-              社区的各类 AI 加速器上的推理软件来解决这些问题。
+              InferenceMAX）是我们独立、厂商中立、可复现的基准测试平台。它既测试固定序列推理服务，也测试
+              AgentX——我们的长上下文多轮智能体编码工作负载，并覆盖 ML 社区实际可用的各类 AI
+              加速器与服务栈。
             </p>
             <p className="text-muted-foreground">
               我们的开放数据与洞察已被 ML 社区广泛采用，包括万亿美元级 Token 工厂和 AI

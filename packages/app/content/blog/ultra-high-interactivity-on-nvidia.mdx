@@ -3,6 +3,7 @@ title: 'Ultra-High Interactivity on NVIDIA GPUs? TileRT on InferenceX'
 subtitle: 'Can TileRT software on NVIDIA GPUs compete with Cerebras, Groq LPU, and SambaNova? Batch size 1, disaggregated engine, high-throughput prefill engine, high-interactivity decode engine'
 date: '2026-08-10'
 publishDate: '2026-08-10'
+modifiedDate: '2026-08-18'
 tags:
   - benchmark
   - gpu
@@ -13,6 +14,8 @@ tags:
   - tilert
   - vllm
   - glm5
+  - agentx
+  - agentic
 ---
 
 _Originally published on the [SemiAnalysis newsletter](https://newsletter.semianalysis.com/p/ultra-high-interactivity-on-nvidia) on August 10, 2026._
@@ -235,9 +238,9 @@ Work is being done to simplify this, especially as software development can be a
 
 AI coding agents accelerate tuning within known templates, but novel transformations still require expert judgment. A monolithic persistent kernel also reduces the usefulness of conventional per-kernel profiler timelines, making automated feedback loops more difficult.
 
-## Next steps with TileRT and InferenceX
+## Next steps with TileRT
 
-We are actively working on moving TileRT benchmarking from InferenceX's single-turn 8k/1k to our new agentic coding benchmark, which we call AgentX. This scenario replays real Claude Code and Codex traces with long-context, multi-turn requests, realistic subagent activity, and dynamic tool-use delays. Its median input length is 140k tokens, while the theoretical median cache-hit rate roofline reaches 99.2%.
+AgentX, InferenceX's agentic coding benchmark, is now live for supported models and serving stacks. It replays privacy-preserving workload shapes derived from real Claude Code and Codex sessions, with long-context, multi-turn requests, realistic subagent activity, and dynamic tool-use delays. Its median input length is 140k tokens, while the theoretical median cache-hit rate roofline reaches 99.2%. Extending TileRT benchmarking from its current single-turn 8k/1k workload to AgentX remains the next step for this serving stack.
 
 <Figure
   src="/images/ultra-high-interactivity-on-nvidia/agentx-benchmark-characteristics.png"
@@ -245,7 +248,7 @@ We are actively working on moving TileRT benchmarking from InferenceX's single-t
   caption="Source: SemiAnalysis"
 />
 
-This workload will test the entire TileRT and vLLM system, not just decode speed, including incremental KV transfer, prefix-cache reuse, cache retention and offloading, routing, and scheduling. The critical question is whether TileRT can transfer only the newly introduced context between turns while preserving its ultra-high interactivity advantage.
+For TileRT, this workload will test the entire TileRT and vLLM system, not just decode speed, including incremental KV transfer, prefix-cache reuse, cache retention and offloading, routing, and scheduling. The critical question is whether TileRT can transfer only the newly introduced context between turns while preserving its ultra-high interactivity advantage.
 
 <Figure
   src="/images/ultra-high-interactivity-on-nvidia/multi-turn-thinking.png"

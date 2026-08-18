@@ -5,6 +5,7 @@ describe('Chinese (/zh) pages', () => {
     });
 
     it('renders the Chinese landing content', () => {
+      cy.get('[data-testid="intro-section"]').should('contain.text', 'AgentX 智能体');
       cy.contains('h2', '探索 InferenceX').should('exist');
       cy.contains('快速对比').should('exist');
     });
@@ -34,7 +35,10 @@ describe('Chinese (/zh) pages', () => {
     });
 
     it('footer renders in Chinese with zh-internal links', () => {
-      cy.get('[data-testid="footer-brand-description"]').should('contain.text', '开源推理基准测试');
+      cy.get('[data-testid="footer-brand-description"]').should(
+        'contain.text',
+        'AgentX 智能体编码',
+      );
       cy.get('[data-testid="footer-link-supporters"]')
         .should('contain.text', '支持者')
         .and('have.attr', 'href', '/zh/quotes');
@@ -62,7 +66,8 @@ describe('Chinese (/zh) pages', () => {
 
     it('renders the Chinese SEO intro above the chart', () => {
       cy.get('[data-testid="zh-tab-intro"]').within(() => {
-        cy.contains('h1', 'AI 推理基准测试').should('exist');
+        cy.contains('h1', 'AgentX 智能体与 AI 推理基准测试').should('exist');
+        cy.contains('长上下文、多轮').should('exist');
       });
     });
 

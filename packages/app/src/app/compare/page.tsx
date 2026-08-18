@@ -19,7 +19,7 @@ import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `InferenceX is the independent, open-source chip inference benchmark from SemiAnalysis, with verified, reproducible nightly results. ${SUPPORTERS_LINE} Compare latency, throughput & cost head-to-head across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
+const DESCRIPTION = `InferenceX is the independent, open-source chip inference benchmark from SemiAnalysis, with verified, reproducible results updated as configurations change. ${SUPPORTERS_LINE} Compare latency, throughput & cost head-to-head across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
 
 export const metadata: Metadata = {
   title: 'Chip Comparisons',

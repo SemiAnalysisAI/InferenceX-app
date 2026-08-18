@@ -9,13 +9,13 @@ const SITE_URL = 'https://inferencex.semianalysis.com';
 const STRINGS = {
   en: {
     shareText:
-      'Check out InferenceX — open-source ML inference benchmarks comparing chips across real-world workloads. Transparent, up-to-date data for the ML community.',
+      'Explore InferenceX — open-source AgentX agentic coding and fixed-sequence AI inference benchmarks with reproducible, continuously updated chip performance data.',
     twitter: 'Share on X (Twitter)',
     linkedin: 'Share on LinkedIn',
   },
   zh: {
     shareText:
-      '来看 InferenceX——开源 ML 推理基准测试，跨真实工作负载对比 Chip 性能。为 ML 社区提供透明、最新的数据。',
+      '探索 InferenceX——开源测试 AgentX 智能体编码与固定序列 AI 推理，提供可复现、持续更新的 Chip 性能数据。',
     twitter: '分享到 X（推特）',
     linkedin: '分享到 LinkedIn',
   },

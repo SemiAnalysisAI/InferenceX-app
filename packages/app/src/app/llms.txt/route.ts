@@ -8,7 +8,7 @@ export async function GET() {
   const lines = [
     `# ${SITE_NAME} by ${AUTHOR_NAME}`,
     '',
-    `> ${SITE_NAME} is the open-source AI inference benchmark dashboard. We compare chip performance for LLM inference across NVIDIA GB200, H100, AMD MI355X, and more.`,
+    `> ${SITE_NAME} is an open-source agentic inference benchmark dashboard. It compares the AgentX long-context, multi-turn coding scenario with fixed-sequence serving across NVIDIA, AMD, and other accelerators using public runs.`,
     '',
     `## Links`,
     '',

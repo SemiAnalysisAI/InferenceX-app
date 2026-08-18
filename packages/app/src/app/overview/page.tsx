@@ -18,21 +18,21 @@ import { getOverviewPageData } from '@/lib/overview-data.server';
 export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
-  'Compare hyperscaler cost per million total tokens across MI355X, B200, B300, GB200 and GB300 using the scenario shown for each active model.';
+  'Compare hyperscaler cost per million total tokens across MI355X, B200, B300, GB200, and GB300 for both AgentX agentic coding and fixed-sequence scenarios where data is available.';
 
 export const metadata: Metadata = {
-  title: 'Inference Cost Overview',
+  title: 'AgentX & AI Inference Cost Overview',
   description: DESCRIPTION,
   alternates: enAlternates('/overview'),
   openGraph: {
-    title: `Inference Cost Overview | ${SITE_NAME}`,
+    title: `AgentX & AI Inference Cost Overview | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/overview`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: `Inference Cost Overview | ${SITE_NAME}`,
+    title: `AgentX & AI Inference Cost Overview | ${SITE_NAME}`,
     description: DESCRIPTION,
   },
 };

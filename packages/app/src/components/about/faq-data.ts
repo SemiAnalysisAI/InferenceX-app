@@ -54,7 +54,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'What is InferenceX?',
     answer:
-      'InferenceX (formerly InferenceMAX) is an open-source, vendor-neutral benchmark that continuously measures AI inference performance across chips and software stacks. Benchmarks re-run whenever a configuration changes, so results stay current as models and frameworks evolve.',
+      'InferenceX (formerly InferenceMAX) is an open-source, vendor-neutral benchmark that continuously measures fixed-sequence and AgentX agentic coding inference performance across chips and software stacks. Benchmarks re-run whenever a configuration changes, so results stay current as models and frameworks evolve.',
   },
   {
     question: 'Who is behind InferenceX?',
@@ -68,7 +68,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'Which AI models are tested?',
     answer:
-      'Each model is tested across multiple sequence length configurations (1k/1k, 1k/8k, 8k/1k tokens) and concurrency levels.',
+      'Models are tested across the fixed-sequence configurations available for them (1k/1k, 1k/8k, and 8k/1k tokens) and multiple concurrency levels. Supported models with corresponding data also include AgentX long-context, multi-turn agentic coding runs.',
     list: modelNames,
   },
   {
@@ -92,6 +92,7 @@ export const FAQ_ITEMS: FaqItem[] = [
       'Input and output throughput per chip',
       'Token throughput per MW (tok/s/MW)',
       'P99 time to first token (TTFT)',
+      'AgentX end-to-end latency, ITL, output throughput, prefix-cache behavior, and session/subagent execution',
       'Cost per million tokens (total, input, output) across hyperscaler, neocloud, and rental pricing',
       'Joules per token (total, input, output)',
       'Custom user-defined cost and power calculations',
@@ -113,7 +114,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'How is InferenceX different from other AI benchmarks?',
     answer:
-      'Most AI benchmarks are static, point-in-time measurements where participants submit purpose-built images that do not reflect real-world serving performance. InferenceX runs continuously on real hardware with fully reproducible configurations. Every recipe is in the repo, benchmark logs are visible on GitHub Actions, and all results are auditable end-to-end.',
+      'Most AI benchmarks are static, point-in-time measurements where participants submit purpose-built images that do not reflect real-world serving performance. InferenceX runs reproducible fixed-sequence and AgentX agentic coding workloads on real hardware. Every recipe is in the repo, benchmark logs are visible on GitHub Actions, and all results are auditable end-to-end.',
   },
   {
     question: 'How are results reproducible?',

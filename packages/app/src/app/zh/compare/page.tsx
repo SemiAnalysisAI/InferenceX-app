@@ -18,7 +18,7 @@ import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `InferenceX 是 SemiAnalysis 推出的独立开源 Chip 推理基准测试平台，提供经过验证的、可复现的每夜测试结果。${SUPPORTERS_LINE_ZH}横向对比 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5、Qwen 3.5 等模型的延迟、吞吐量与成本。`;
+const DESCRIPTION = `InferenceX 是 SemiAnalysis 推出的独立开源 Chip 推理基准测试平台，提供经过验证、可复现并随配置变化更新的测试结果。${SUPPORTERS_LINE_ZH}横向对比 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5、Qwen 3.5 等模型的延迟、吞吐量与成本。`;
 
 export const metadata: Metadata = {
   title: 'Chip 对比',

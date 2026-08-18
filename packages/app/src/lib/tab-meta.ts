@@ -4,9 +4,9 @@ import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 import { hasZhSibling, languageAlternates } from '@/lib/i18n';
 
 export const LANDING_META = {
-  title: 'Open Source AI Inference Benchmark',
+  title: 'Open-Source AgentX & AI Inference Benchmark',
   description:
-    'Compare AI inference performance across chips and frameworks. Real benchmarks on NVIDIA GB200, B200, AMD MI355X, and more. Free, open-source, continuously updated.',
+    'Compare AgentX long-context, multi-turn agentic coding and fixed-sequence AI inference across chips and frameworks. Reproducible NVIDIA and AMD benchmark runs, continuously updated.',
 };
 
 export const VALID_TABS = [
@@ -28,9 +28,9 @@ export type TabKey = (typeof VALID_TABS)[number];
 
 export const TAB_META: Record<TabKey, { title: string; description: string }> = {
   inference: {
-    title: 'AI Inference Benchmarks',
+    title: 'AgentX & AI Inference Benchmarks',
     description:
-      'Compare AI inference latency, throughput, and time-to-first-token across chips and providers. Real benchmarks on NVIDIA GB200, H100, AMD MI355X, and more.',
+      'Compare AgentX agentic coding and fixed-sequence AI inference latency, throughput, cost, and time-to-first-token across chips and serving frameworks.',
   },
   evaluation: {
     title: 'LLM Evaluation Results',

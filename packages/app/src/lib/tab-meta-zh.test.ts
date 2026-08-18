@@ -5,6 +5,7 @@ import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { isValidTab, TAB_META } from './tab-meta';
 import {
   isZhTab,
+  LANDING_META_ZH,
   TAB_INTRO_ZH,
   TAB_LABELS_ZH,
   TAB_META_ZH,
@@ -13,6 +14,16 @@ import {
 } from './tab-meta-zh';
 
 const HAN_REGEX = /\p{Script=Han}/u;
+
+describe('AgentX Chinese positioning', () => {
+  it('mirrors the English AgentX and fixed-sequence scope', () => {
+    expect(LANDING_META_ZH.title).toMatch(/AgentX.*智能体/u);
+    expect(LANDING_META_ZH.description).toMatch(/AgentX.*长上下文多轮智能体编码/u);
+    expect(LANDING_META_ZH.description).toContain('固定序列');
+    expect(TAB_META_ZH.inference.title).toMatch(/AgentX.*智能体/u);
+    expect(TAB_INTRO_ZH.inference).toContain('固定序列');
+  });
+});
 
 describe('ZH_TAB_KEYS', () => {
   it.each(ZH_TAB_KEYS)('mirrors a valid English tab "%s"', (tab) => {

@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { getTabTitle, isValidTab, TAB_META, VALID_TABS } from './tab-meta';
+import { getTabTitle, isValidTab, LANDING_META, TAB_META, VALID_TABS } from './tab-meta';
+
+describe('AgentX positioning', () => {
+  it('describes AgentX without hiding the fixed-sequence benchmark', () => {
+    expect(LANDING_META.title).toContain('AgentX');
+    expect(LANDING_META.description).toMatch(/AgentX.*agentic coding/u);
+    expect(LANDING_META.description).toContain('fixed-sequence');
+    expect(TAB_META.inference.title).toContain('AgentX');
+    expect(TAB_META.inference.description).toContain('fixed-sequence');
+  });
+});
 
 describe('isValidTab', () => {
   it.each(VALID_TABS)('returns true for valid tab "%s"', (tab) => {

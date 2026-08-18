@@ -21,21 +21,21 @@ const faqJsonLd = {
   })),
 };
 
+const ABOUT_DESCRIPTION =
+  'InferenceX is an independent, vendor-neutral, reproducible benchmark for AgentX long-context, multi-turn agentic coding and fixed-sequence AI inference across accelerators and serving stacks.';
+
 export const metadata: Metadata = {
   title: 'About',
-  description:
-    'InferenceX is an independent, vendor neutral, reproducible benchmark which continuously benchmarks inference software across a wide range of AI accelerators.',
+  description: ABOUT_DESCRIPTION,
   alternates: enAlternates('/about'),
   openGraph: {
     title: 'About | InferenceX',
-    description:
-      'InferenceX is an independent, vendor neutral, reproducible benchmark which continuously benchmarks inference software across a wide range of AI accelerators.',
+    description: ABOUT_DESCRIPTION,
     url: `${SITE_URL}/about`,
   },
   twitter: {
     title: 'About | InferenceX',
-    description:
-      'InferenceX is an independent, vendor neutral, reproducible benchmark which continuously benchmarks inference software across a wide range of AI accelerators.',
+    description: ABOUT_DESCRIPTION,
   },
 };
 
@@ -47,8 +47,8 @@ export default function AboutPage() {
         <section>
           <Card>
             <h2 className="text-lg font-semibold mb-2">
-              Open Source Continuous Inference Benchmark trusted by Operators of Trillion Dollar
-              GigaWatt Scale Token Factories
+              Open-Source Continuous AgentX & AI Inference Benchmark Trusted by Operators of
+              Trillion-Dollar, GigaWatt-Scale Token Factories
             </h2>
             <p className="text-muted-foreground mb-2">
               As the world progresses exponentially towards AGI, software development and model
@@ -58,9 +58,9 @@ export default function AboutPage() {
             </p>
             <p className="text-muted-foreground mb-2">
               <strong>InferenceX&trade;</strong> (formerly InferenceMAX) is our independent, vendor
-              neutral, reproducible benchmark which addresses these issues by continuously
-              benchmarking inference software across a wide range of AI accelerators that are
-              actually available to the ML community.
+              neutral, reproducible benchmark. It measures both fixed-sequence serving and AgentX,
+              our long-context, multi-turn agentic coding workload, across AI accelerators and
+              serving stacks available to the ML community.
             </p>
             <p className="text-muted-foreground">
               Our open data & insights are widely adopted by the ML community, capacity planning
