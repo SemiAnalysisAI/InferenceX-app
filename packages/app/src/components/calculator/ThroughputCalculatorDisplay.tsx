@@ -126,7 +126,7 @@ const STRINGS = {
       'The interactivity operating point used for interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency at different interactivity levels.',
     targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
-      `The ${percentile} interactivity operating point used for agentic trace interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency.`,
+      `The ${percentile} interactivity operating point used for agentic workload interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency.`,
     metricThroughput: 'Throughput',
     metricCost: 'Cost',
     viewChart: 'Chart',
@@ -178,7 +178,7 @@ const STRINGS = {
       '用于插值的交互性操作点。调整滑块以比较不同交互性级别下 Chip 的吞吐量、成本和能效。',
     targetAgenticLabel: (percentile: string) => `目标 ${percentile} 交互性 (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
-      `用于智能体轨迹插值的 ${percentile} 交互性操作点。调整滑块以比较 Chip 的吞吐量、成本和能效。`,
+      `用于智能体工作负载插值的 ${percentile} 交互性操作点。调整滑块以比较 Chip 的吞吐量、成本和能效。`,
     metricThroughput: '吞吐量',
     metricCost: '成本',
     viewChart: '图表',

@@ -34,7 +34,56 @@ describe('resolveEffectiveSequence', () => {
     });
   });
 
-  describe('honors a valid selection (rule 2a)', () => {
+  describe('availability-driven AgentX default (rule 2)', () => {
+    it('opens the Agentic scenario whenever the model has data and the user has not chosen', () => {
+      expect(
+        resolveEffectiveSequence({
+          selectedSequence: Sequence.EightK_OneK,
+          availableSequences: [Sequence.EightK_OneK, Sequence.AgenticTraces],
+          availabilityLoaded: true,
+          sequenceExplicit: false,
+        }),
+      ).toBe(Sequence.AgenticTraces);
+    });
+
+    it('yields to an explicit selection', () => {
+      // A shared `?i_seq=8k-1k` link (or a manual pick) must stay on 8K/1K.
+      expect(
+        resolveEffectiveSequence({
+          selectedSequence: Sequence.EightK_OneK,
+          availableSequences: [Sequence.EightK_OneK, Sequence.AgenticTraces],
+          availabilityLoaded: true,
+          sequenceExplicit: true,
+        }),
+      ).toBe(Sequence.EightK_OneK);
+    });
+
+    it('keeps the app default when the model has no Agentic data', () => {
+      expect(
+        resolveEffectiveSequence({
+          selectedSequence: Sequence.EightK_OneK,
+          availableSequences: [Sequence.EightK_OneK],
+          availabilityLoaded: true,
+          sequenceExplicit: false,
+        }),
+      ).toBe(Sequence.EightK_OneK);
+    });
+
+    it('does not apply before availability has loaded', () => {
+      // The static fallback list contains every scenario, so applying the
+      // AgentX preference here would fetch rows the model may not have.
+      expect(
+        resolveEffectiveSequence({
+          selectedSequence: Sequence.EightK_OneK,
+          availableSequences: [Sequence.EightK_OneK, Sequence.AgenticTraces],
+          availabilityLoaded: false,
+          sequenceExplicit: false,
+        }),
+      ).toBeNull();
+    });
+  });
+
+  describe('honors a valid selection (rule 3a)', () => {
     it('keeps AgenticTraces when the model actually has agentic data (dsr1 case)', () => {
       // DeepSeek-R1 in the seeded DB has both agentic and 8k/1k — an explicit
       // agentic selection (e.g. a shared ?i_seq= link) must survive.
@@ -58,7 +107,7 @@ describe('resolveEffectiveSequence', () => {
     });
   });
 
-  describe('fallback ordering when the selection is unavailable (rule 2b/2c)', () => {
+  describe('fallback ordering when the selection is unavailable (rule 3b/3c)', () => {
     it('for a fixed-seq-only model, an agentic selection falls back to 8k/1k, not the raw first entry (llama70b case)', () => {
       // Llama-3.3-70B has only 8k/1k in the seeded DB. An agentic selection is
       // unavailable, so it must resolve to a fixed-seq scenario — here the sole

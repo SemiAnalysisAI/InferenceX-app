@@ -1,13 +1,14 @@
 import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 
 // This spec exercises the agentic x-axis modes, which only exist when the
-// selected model resolves to the Agentic Traces scenario. The default e2e
-// fixtures (cypress/fixtures/api/*.json) have NO agentic rows for any model, and
-// the app default scenario is 8K/1K, so bare /inference always resolves to a
-// fixed-seq scenario. We therefore inject agentic availability + benchmark rows
-// for the default model VIA SPEC-SCOPED INTERCEPTS (not the shared fixtures) and
-// visit with an explicit ?i_seq=agentic-traces so this test — and only this
-// test — sees the agentic view.
+// selected model resolves to the Agentic scenario. The default e2e
+// fixtures (cypress/fixtures/api/*.json) have NO agentic rows for any model, so
+// bare /inference always resolves to a fixed-seq scenario there. We therefore
+// inject agentic availability + benchmark rows for the default model VIA
+// SPEC-SCOPED INTERCEPTS (not the shared fixtures) so this spec — and only this
+// spec — sees the agentic view. Most cases still pass ?i_seq=agentic-traces
+// explicitly; the "Default scenario" block below covers the implicit path,
+// where availability opens the agentic scenario on its own.
 const DEFAULT_MODEL_DB_KEY = 'dsv4'; // DeepSeek-V4-Pro is the default model
 const AGENTIC_DATE = '2026-06-12';
 
@@ -46,8 +47,8 @@ const agenticGpus = [
   { hardware: 'b300', framework: 'vllm', disagg: false },
 ];
 
-// Availability: default model has BOTH agentic and fixed-seq. The agentic view
-// is selected explicitly via ?i_seq=agentic-traces (the app default is 8K/1K).
+// Availability: default model has BOTH agentic and fixed-seq, so the scenario
+// the chart lands on is a real choice rather than the only option.
 const agenticAvailability = [
   ...agenticGpus.map((g) => ({
     model: DEFAULT_MODEL_DB_KEY,
@@ -118,6 +119,19 @@ const interceptAgenticData = () => {
   cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('benchmarks');
 };
 
+// Same rows re-keyed to another model to prove the default follows availability
+// rather than a hard-coded model registry.
+const OTHER_MODEL_DB_KEY = 'dsr1';
+const otherModelAvailability = agenticAvailability.map((row) => ({
+  ...row,
+  model: OTHER_MODEL_DB_KEY,
+}));
+const otherModelBenchmarks = agenticBenchmarks.map((row, index) => ({
+  ...row,
+  id: 920000 + index,
+  model: OTHER_MODEL_DB_KEY,
+}));
+
 const interceptFixedSequenceData = () => {
   cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', { body: fixedSequenceBenchmarks }).as('benchmarks');
@@ -163,7 +177,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   });
 
   it('defaults the agentic view to Interactivity, with all four modes as flat tabs', () => {
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Traces');
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     // #736 made every latency mode a top-level tab and moved the default off E2E
     // Normalized Interactivity, which still leads the strip without being selected.
     cy.get('[data-testid="x-axis-mode-advanced"]').should('not.exist');
@@ -259,7 +273,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
         unlockAgenticGate(win);
       },
     });
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Traces');
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
@@ -371,7 +385,7 @@ describe('X-axis mode URL param', () => {
         unlockAgenticGate(win);
       },
     });
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Traces');
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     cy.get('[data-testid="x-axis-mode-ttft"]')
       .should('have.attr', 'aria-selected', 'true')
       .and('contain.text', 'TTFT');
@@ -397,27 +411,60 @@ describe('X-axis mode URL param', () => {
       },
     });
 
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Traces');
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     cy.get('[data-testid="percentile-selector"]').should('not.exist');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90');
   });
 });
 
 describe('Default scenario', () => {
-  it('bare /inference defaults to 8K / 1K even when the model has agentic data', () => {
-    // Availability contains BOTH agentic and fixed-seq rows for the default
-    // model; the default selection must still resolve to 8K/1K, not agentic.
-    interceptFixedSequenceData();
+  it('bare /inference opens on the Agentic scenario when the model has corresponding data', () => {
+    // Availability contains BOTH agentic and fixed-seq rows for DeepSeek-V4-Pro,
+    // so the untouched 8K/1K selection must not win.
+    interceptAgenticData();
+    interceptDerivedAgenticMetrics();
     cy.visit('/inference', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
     });
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+    // The explainer sits beside the trigger, linking out to the dataset page.
+    cy.get('[data-testid="scenario-agentic-info"]').should('exist');
+    cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90');
+  });
+
+  it('keeps 8K / 1K when the link asks for it explicitly', () => {
+    // An explicit selection always beats the availability-driven default.
+    interceptFixedSequenceData();
+    cy.visit('/inference?i_seq=8k%2F1k', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+    cy.get('[data-testid="scenario-agentic-info"]').should('not.exist');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     // Fixed-seq plots the mean field — no percentile prefix on the axis label.
     cy.get('[data-testid="chart-figure"] svg').should('contain.text', 'Interactivity (tok/s/user)');
     cy.get('[data-testid="chart-figure"] svg').should('not.contain.text', 'P90 Interactivity');
+  });
+
+  it('opens the Agentic scenario for another model with corresponding data', () => {
+    // DeepSeek-R1 is intentionally outside the original hard-coded model list;
+    // its agentic availability must still make the Agentic scenario the default.
+    cy.intercept('GET', '/api/v1/availability', { body: otherModelAvailability }).as(
+      'availability',
+    );
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: otherModelBenchmarks }).as('benchmarks');
+    cy.visit('/inference?g_model=DeepSeek-R1-0528', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+    cy.get('[data-testid="scenario-agentic-info"]').should('exist');
   });
 });
 

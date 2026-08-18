@@ -624,7 +624,7 @@ describe('TCO Calculator', () => {
     });
 
     it('renders throughput and cost calculations from null-ISL/OSL agentic rows', () => {
-      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic Traces');
+      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic');
       cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
       cy.get('[data-testid="calculator-no-data"]').should('not.exist');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
@@ -681,7 +681,7 @@ describe('TCO Calculator', () => {
       });
       cy.wait('@agenticBenchmarks');
 
-      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic Traces');
+      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic');
       cy.get('[data-testid="calc-percentile-selector"]').should('not.exist');
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()

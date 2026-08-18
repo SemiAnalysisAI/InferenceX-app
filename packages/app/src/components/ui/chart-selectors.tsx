@@ -41,14 +41,15 @@ const STRINGS = {
       'Input Sequence Length / Output Sequence Length. Defines the number of input and output tokens for the benchmark (e.g., 1K/8K means 1,024 input tokens and 8,192 output tokens).',
     scenario: 'Scenario',
     scenarioTooltip:
-      'Benchmark scenario. Fixed Sequence Length runs use a defined input/output token count (ISL/OSL). Agentic Traces replay real agentic workloads with variable inputs/outputs.',
+      'Benchmark scenario. Fixed Sequence Length runs use a defined input/output token count (ISL/OSL). The Agentic scenario replays real agentic workloads with variable inputs/outputs.',
+    agenticScenarioTooltip: 'Realistic Long Context Multi Turn Agentic Workload with Sub Agents.',
+    agenticScenarioLearnMore: 'Learn More Here',
     latencyPercentile: 'Latency Percentile',
     latencyPercentileTooltip:
       'Percentile of the latency distribution used for the chart x-axis on agentic runs.',
     precision: 'Precision',
     precisionTooltip:
       "Numerical precision used for model weights. Lower precision like 'FP4' uses less memory and increases throughput but may slightly reduce accuracy compared to higher precisions like 'FP8'.",
-    agenticGroup: 'Agentic',
     fixedSequenceLength: 'Fixed Sequence Length',
     deprecated: 'Deprecated',
     deprecatedSequenceReason:
@@ -62,13 +63,14 @@ const STRINGS = {
       '输入序列长度 / 输出序列长度（Input Sequence Length / Output Sequence Length）。定义基准测试的输入和输出 token 数量（如 1K/8K 表示 1,024 个输入 token 和 8,192 个输出 token）。',
     scenario: '场景',
     scenarioTooltip:
-      '基准测试场景。Fixed Sequence Length 使用预设的输入/输出 token 数（ISL/OSL）。Agentic Traces 回放具有可变输入/输出的真实智能体工作负载。',
+      '基准测试场景。Fixed Sequence Length 使用预设的输入/输出 token 数（ISL/OSL）。Agentic 场景回放具有可变输入/输出的真实智能体工作负载。',
+    agenticScenarioTooltip: '真实的长上下文、多轮、带子智能体（sub-agent）的智能体工作负载。',
+    agenticScenarioLearnMore: '点此了解更多',
     latencyPercentile: '延迟分位数',
     latencyPercentileTooltip: '用于智能体运行图表 X 轴的延迟分布分位数。',
     precision: '精度',
     precisionTooltip:
       '模型权重的数值精度。FP4 等低精度占用更少显存并提高吞吐量，但与 FP8 等高精度相比可能略微降低准确度。',
-    agenticGroup: '智能体',
     fixedSequenceLength: '固定序列长度',
     deprecated: '已弃用',
     deprecatedSequenceReason: 'CI 容量已重新分配给智能体编程和多轮对话场景。',
@@ -91,6 +93,47 @@ function CategorySectionTitle({ label, reason }: { label: string; reason: string
         </TooltipContent>
       </TooltipRoot>
     </span>
+  );
+}
+
+/**
+ * Info affordance shown next to the scenario selector while an agentic scenario
+ * is selected. The agentic workload isn't self-describing from its name alone,
+ * and it's now the opening scenario for the AgentX models — so the explainer
+ * sits beside the closed trigger rather than inside the dropdown, where the
+ * "learn more" link would be swallowed by the select's outside-click handling.
+ */
+function AgenticScenarioInfo({
+  tooltip,
+  learnMore,
+  href,
+}: {
+  tooltip: string;
+  learnMore: string;
+  href: string;
+}) {
+  return (
+    <TooltipRoot>
+      <TooltipTrigger asChild>
+        <Info
+          className="size-3.5 shrink-0 text-muted-foreground cursor-help"
+          data-testid="scenario-agentic-info"
+        />
+      </TooltipTrigger>
+      <TooltipContent side="top" collisionPadding={10} className="z-[130]">
+        <span>
+          {tooltip}{' '}
+          <a
+            href={href}
+            className="underline underline-offset-2"
+            data-testid="scenario-agentic-info-link"
+            onClick={() => track('selector_scenario_datasets_link')}
+          >
+            {learnMore}
+          </a>
+        </span>
+      </TooltipContent>
+    </TooltipRoot>
   );
 }
 
@@ -309,62 +352,75 @@ export function ScenarioSelector({
   const fixedSeq = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'fixed-seq');
   const agentic = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'agentic');
   const fixedGroups = groupByCategory(fixedSeq, (s) => getSequenceCategory(s as Sequence));
+  const isAgenticSelected = sequenceKind(value as Sequence) === 'agentic';
 
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
       <LabelWithTooltip htmlFor={id} label={t.scenario} tooltip={t.scenarioTooltip} />
-      <Select
-        value={value}
-        onValueChange={(v) => {
-          track('selector_scenario_changed', { scenario: v });
-          onChange(v as Sequence);
-        }}
-        open={open}
-        onOpenChange={onOpenChange}
-      >
-        <SelectTrigger id={id} data-testid={testId} className="w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {/* Agentic group listed first when available (display order only —
-              the app default scenario is 8K/1K). */}
-          {agentic.length > 0 && (
-            <SelectGroup>
-              <SelectLabel>{t.agenticGroup}</SelectLabel>
-              {agentic.map((seq) => (
-                <SelectItem key={seq} value={seq}>
-                  {getSequenceLabel(seq as Sequence, locale)}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          )}
-          {fixedSeq.length > 0 && (
-            <SelectGroup>
-              <SelectLabel>{t.fixedSequenceLength}</SelectLabel>
-              {fixedGroups.default.map((seq) => (
-                <SelectItem key={seq} value={seq}>
-                  {getSequenceLabel(seq as Sequence, locale)}
-                </SelectItem>
-              ))}
-              {fixedGroups.deprecated.length > 0 && (
-                <>
-                  <SelectLabel>
-                    <CategorySectionTitle
-                      label={t.deprecated}
-                      reason={t.deprecatedSequenceReason}
-                    />
-                  </SelectLabel>
-                  {fixedGroups.deprecated.map((seq) => (
-                    <SelectItem key={seq} value={seq}>
-                      {getSequenceLabel(seq as Sequence, locale)}
-                    </SelectItem>
-                  ))}
-                </>
-              )}
-            </SelectGroup>
-          )}
-        </SelectContent>
-      </Select>
+      <div className="flex items-center gap-1.5">
+        <Select
+          value={value}
+          onValueChange={(v) => {
+            track('selector_scenario_changed', { scenario: v });
+            onChange(v as Sequence);
+          }}
+          open={open}
+          onOpenChange={onOpenChange}
+        >
+          <SelectTrigger id={id} data-testid={testId} className="w-full min-w-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {/* Agentic entries listed first when available (display order only
+                — availability decides which scenario opens by default). They
+                carry no group header: they are named "Agentic" themselves, so a
+                heading above them would just repeat the word. They stay in their
+                own SelectGroup so the "Fixed Sequence Length" heading below
+                still reads as a separate section. */}
+            {agentic.length > 0 && (
+              <SelectGroup>
+                {agentic.map((seq) => (
+                  <SelectItem key={seq} value={seq}>
+                    {getSequenceLabel(seq as Sequence, locale)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
+            {fixedSeq.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>{t.fixedSequenceLength}</SelectLabel>
+                {fixedGroups.default.map((seq) => (
+                  <SelectItem key={seq} value={seq}>
+                    {getSequenceLabel(seq as Sequence, locale)}
+                  </SelectItem>
+                ))}
+                {fixedGroups.deprecated.length > 0 && (
+                  <>
+                    <SelectLabel>
+                      <CategorySectionTitle
+                        label={t.deprecated}
+                        reason={t.deprecatedSequenceReason}
+                      />
+                    </SelectLabel>
+                    {fixedGroups.deprecated.map((seq) => (
+                      <SelectItem key={seq} value={seq}>
+                        {getSequenceLabel(seq as Sequence, locale)}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
+              </SelectGroup>
+            )}
+          </SelectContent>
+        </Select>
+        {isAgenticSelected && (
+          <AgenticScenarioInfo
+            tooltip={t.agenticScenarioTooltip}
+            learnMore={t.agenticScenarioLearnMore}
+            href={locale === 'zh' ? '/zh/datasets' : '/datasets'}
+          />
+        )}
+      </div>
     </div>
   );
 }
