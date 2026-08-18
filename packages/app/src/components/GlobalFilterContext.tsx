@@ -42,13 +42,12 @@ const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
 
 // Placeholder for the public (non-null) `effectiveSequence` during the window
-// before availability has loaded. It must be a fixed-seq scenario — never
-// AgenticTraces — so the scenario selector doesn't flash "Agentic Traces" for a
-// fixed-seq-only model while the chart shows its loading skeleton. `8k/1k` is
-// the app default scenario. Consumers that must not act on an unresolved
-// sequence gate on `sequenceResolved` instead.
+// before availability has loaded. It stays on the fixed-sequence app default
+// until availability confirms whether the selected model has AgentX data, so a
+// fixed-seq-only model never flashes an agentic label. Consumers that must not
+// act on an unresolved sequence gate on `sequenceResolved` instead.
 // (Declared after the import block so it never references `Sequence` above its import.)
-const PRE_AVAILABILITY_SEQUENCE = Sequence.EightK_OneK;
+const APP_DEFAULT_SEQUENCE = Sequence.EightK_OneK;
 
 interface RunInfo {
   runId: string;
@@ -168,14 +167,35 @@ export function GlobalFilterProvider({
     () => initialModel ?? Model.DeepSeek_V4_Pro,
   );
 
-  const [selectedSequence, setSelectedSequence] = useState<Sequence>(() => {
+  const [selectedSequence, setSelectedSequenceRaw] = useState<Sequence>(() => {
     if (initialSequence) return initialSequence;
     const urlSeq = getUrlParam('i_seq');
     if (urlSeq && Object.values(Sequence).includes(urlSeq as Sequence)) return urlSeq as Sequence;
-    // Default to the 8K/1K fixed-seq scenario; the effectiveSequence fallback
-    // below handles models that lack it (e.g. agentic-only models).
+    // Default to the 8K/1K fixed-seq scenario; the effectiveSequence resolution
+    // below prefers the Agentic scenario when availability confirms the model
+    // has corresponding data, and handles models that lack 8K/1K entirely.
     return Sequence.EightK_OneK;
   });
+  // Whether the scenario was chosen explicitly (seeded `initialSequence` prop,
+  // URL `i_seq`, or a manual pick). Until then the availability-driven AgentX
+  // default applies —
+  // without this flag the initial `8k/1k` state is indistinguishable from a
+  // deliberate 8K/1K selection, and the Agentic scenario could never win.
+  //
+  // Deliberately NOT seeded from `i_seq` here: this flag feeds the scenario
+  // label rendered during the pre-availability window, and `getUrlParam` sees
+  // the query string on the client but not on the server. Reading it in the
+  // initializer would render a different label on each side and fail
+  // hydration. The layout effect below applies `i_seq` (flag included) after
+  // the first commit and before paint, which is how every other URL param
+  // lands.
+  const [sequenceExplicit, setSequenceExplicit] = useState<boolean>(
+    () => initialSequence !== undefined,
+  );
+  const setSelectedSequence = useCallback((sequence: Sequence) => {
+    setSelectedSequenceRaw(sequence);
+    setSequenceExplicit(true);
+  }, []);
 
   const initialValidPrecisions = useMemo(
     () =>
@@ -329,20 +349,21 @@ export function GlobalFilterProvider({
   // — we surface that as `sequenceResolved` so InferenceContext can gate the
   // benchmark fetch until the real sequence is known (no agentic fetch fires for
   // a fixed-seq-only model). For the non-null public `effectiveSequence` value
-  // we substitute a fixed-seq scenario (never AgenticTraces) during that window
-  // so the scenario selector never flashes "Agentic Traces"; the chart shows its
-  // normal loading skeleton until `sequenceResolved` flips true.
+  // we retain the fixed-sequence placeholder until availability confirms the
+  // AgentX scenario exists; the chart shows its normal loading skeleton until
+  // `sequenceResolved` flips true.
   const resolvedSequence = useMemo(
     () =>
       resolveEffectiveSequence({
         selectedSequence,
         availableSequences,
         availabilityLoaded,
+        sequenceExplicit,
       }),
-    [selectedSequence, availableSequences, availabilityLoaded],
+    [selectedSequence, availableSequences, availabilityLoaded, sequenceExplicit],
   );
   const sequenceResolved = resolvedSequence !== null;
-  const effectiveSequence = resolvedSequence ?? PRE_AVAILABILITY_SEQUENCE;
+  const effectiveSequence = resolvedSequence ?? APP_DEFAULT_SEQUENCE;
 
   // Precisions available for the selected model + sequence (DB ∪ unofficial run)
   const availablePrecisions = useMemo(() => {
