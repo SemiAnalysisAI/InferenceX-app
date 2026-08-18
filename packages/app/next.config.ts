@@ -40,6 +40,7 @@ const nextConfig: NextConfig = {
     ...(process.env.GITHUB_ACTIONS === 'true' && { turbopackFileSystemCacheForBuild: true }),
   },
   images: {
+    qualities: [75, 100],
     remotePatterns: [
       { hostname: 'placehold.co' },
       { hostname: 'substack-post-media.s3.amazonaws.com' },

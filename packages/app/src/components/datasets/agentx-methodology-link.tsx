@@ -9,6 +9,7 @@ interface AgentXMethodologyLinkProps extends Omit<React.ComponentProps<typeof Li
   analyticsEvent:
     | 'agentx_methodology_opened'
     | 'agentx_methodology_returned'
+    | 'agentx_methodology_figure_opened'
     | 'agentx_methodology_source_opened';
   analyticsTarget?: string;
 }

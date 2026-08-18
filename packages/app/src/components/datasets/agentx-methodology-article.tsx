@@ -434,25 +434,50 @@ interface FigureCopy {
   caption: string;
 }
 
-function MethodFigure({ figure, copy }: { figure: FigureKey; copy: FigureCopy }) {
+function MethodFigure({
+  figure,
+  copy,
+  locale,
+}: {
+  figure: FigureKey;
+  copy: FigureCopy;
+  locale: Locale;
+}) {
   const asset = FIGURE_ASSETS[figure];
   return (
-    <figure
-      className="my-7 overflow-hidden rounded-xl border border-border/70 bg-card"
-      data-testid={`agentx-methodology-figure-${figure}`}
+    <AgentXMethodologyLink
+      href={asset.src}
+      analyticsEvent="agentx_methodology_figure_opened"
+      analyticsTarget={figure}
+      target="_blank"
+      rel="noopener noreferrer"
+      prefetch={false}
+      aria-label={`${copy.alt} ${
+        locale === 'zh' ? '打开原始分辨率图片。' : 'Open the full-resolution image.'
+      }`}
+      className="group my-7 block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <Image
-        src={asset.src}
-        alt={copy.alt}
-        width={asset.width}
-        height={asset.height}
-        sizes="(max-width: 768px) 100vw, 1152px"
-        className="h-auto w-full"
-      />
-      <figcaption className="border-t border-border/70 px-4 py-3 text-sm leading-6 text-muted-foreground">
-        {copy.caption}
-      </figcaption>
-    </figure>
+      <figure
+        className="overflow-hidden rounded-xl border border-border/70 bg-card transition-colors group-hover:border-primary/50"
+        data-testid={`agentx-methodology-figure-${figure}`}
+      >
+        <Image
+          src={asset.src}
+          alt={copy.alt}
+          width={asset.width}
+          height={asset.height}
+          sizes="(max-width: 768px) 100vw, 1152px"
+          quality={100}
+          className="h-auto w-full"
+        />
+        <figcaption className="border-t border-border/70 px-4 py-3 text-sm leading-6 text-muted-foreground">
+          <span className="block">{copy.caption}</span>
+          <span className="mt-1 inline-block font-medium text-foreground underline decoration-border underline-offset-4 transition-colors group-hover:text-primary group-hover:decoration-primary">
+            {locale === 'zh' ? '查看原始分辨率图片' : 'View full-resolution image'} ↗
+          </span>
+        </figcaption>
+      </figure>
+    </AgentXMethodologyLink>
   );
 }
 
@@ -512,61 +537,75 @@ export function AgentXMethodologyArticle({ locale }: { locale: Locale }) {
         <section aria-labelledby="collection">
           <SectionHeading id="collection">{t.collectionTitle}</SectionHeading>
           <Paragraphs items={t.collectionParagraphs} />
-          <MethodFigure figure="corpus" copy={t.figures.corpus} />
-          <MethodFigure figure="hashRatio" copy={t.figures.hashRatio} />
+          <MethodFigure figure="corpus" copy={t.figures.corpus} locale={locale} />
+          <MethodFigure figure="hashRatio" copy={t.figures.hashRatio} locale={locale} />
         </section>
 
         <section aria-labelledby="dataset" className="mt-14">
           <SectionHeading id="dataset">{t.datasetTitle}</SectionHeading>
           <Paragraphs items={t.datasetParagraphs} />
-          <MethodFigure figure="traceRecord" copy={t.figures.traceRecord} />
-          <MethodFigure figure="requestDistributions" copy={t.figures.requestDistributions} />
+          <MethodFigure figure="traceRecord" copy={t.figures.traceRecord} locale={locale} />
+          <MethodFigure
+            figure="requestDistributions"
+            copy={t.figures.requestDistributions}
+            locale={locale}
+          />
           <MethodFigure
             figure="requestDistributions256k"
             copy={t.figures.requestDistributions256k}
+            locale={locale}
           />
-          <MethodFigure figure="subagentDistributions" copy={t.figures.subagentDistributions} />
+          <MethodFigure
+            figure="subagentDistributions"
+            copy={t.figures.subagentDistributions}
+            locale={locale}
+          />
           <MethodFigure
             figure="subagentDistributions256k"
             copy={t.figures.subagentDistributions256k}
+            locale={locale}
           />
         </section>
 
         <section aria-labelledby="replay" className="mt-14">
           <SectionHeading id="replay">{t.replayTitle}</SectionHeading>
           <Paragraphs items={t.replayParagraphs} />
-          <MethodFigure figure="replayLinear" copy={t.figures.replayLinear} />
-          <MethodFigure figure="replaySingle" copy={t.figures.replaySingle} />
-          <MethodFigure figure="replayJoined" copy={t.figures.replayJoined} />
-          <MethodFigure figure="replayTwo" copy={t.figures.replayTwo} />
-          <MethodFigure figure="replayFlatspawn" copy={t.figures.replayFlatspawn} />
-          <MethodFigure figure="replaySidecars" copy={t.figures.replaySidecars} />
-          <MethodFigure figure="replayMulti" copy={t.figures.replayMulti} />
+          <MethodFigure figure="replayLinear" copy={t.figures.replayLinear} locale={locale} />
+          <MethodFigure figure="replaySingle" copy={t.figures.replaySingle} locale={locale} />
+          <MethodFigure figure="replayJoined" copy={t.figures.replayJoined} locale={locale} />
+          <MethodFigure figure="replayTwo" copy={t.figures.replayTwo} locale={locale} />
+          <MethodFigure figure="replayFlatspawn" copy={t.figures.replayFlatspawn} locale={locale} />
+          <MethodFigure figure="replaySidecars" copy={t.figures.replaySidecars} locale={locale} />
+          <MethodFigure figure="replayMulti" copy={t.figures.replayMulti} locale={locale} />
         </section>
 
         <section aria-labelledby="measurement" className="mt-14">
           <SectionHeading id="measurement">{t.measurementTitle}</SectionHeading>
           <Paragraphs items={t.measurementParagraphs} />
-          <MethodFigure figure="queueDepth" copy={t.figures.queueDepth} />
-          <MethodFigure figure="pareto" copy={t.figures.pareto} />
+          <MethodFigure figure="queueDepth" copy={t.figures.queueDepth} locale={locale} />
+          <MethodFigure figure="pareto" copy={t.figures.pareto} locale={locale} />
         </section>
 
         <section aria-labelledby="warmup" className="mt-14">
           <SectionHeading id="warmup">{t.warmupTitle}</SectionHeading>
           <Paragraphs items={t.warmupParagraphs} />
-          <MethodFigure figure="warmup" copy={t.figures.warmup} />
+          <MethodFigure figure="warmup" copy={t.figures.warmup} locale={locale} />
           <div className="grid gap-6 lg:grid-cols-2">
-            <MethodFigure figure="warmupCache" copy={t.figures.warmupCache} />
-            <MethodFigure figure="profilingCache" copy={t.figures.profilingCache} />
+            <MethodFigure figure="warmupCache" copy={t.figures.warmupCache} locale={locale} />
+            <MethodFigure figure="profilingCache" copy={t.figures.profilingCache} locale={locale} />
           </div>
         </section>
 
         <section aria-labelledby="acceptance" className="mt-14">
           <SectionHeading id="acceptance">{t.acceptanceTitle}</SectionHeading>
           <Paragraphs items={t.acceptanceParagraphs} />
-          <MethodFigure figure="acceptanceControls" copy={t.figures.acceptanceControls} />
+          <MethodFigure
+            figure="acceptanceControls"
+            copy={t.figures.acceptanceControls}
+            locale={locale}
+          />
           <div className="mx-auto max-w-xl">
-            <MethodFigure figure="goldenAl" copy={t.figures.goldenAl} />
+            <MethodFigure figure="goldenAl" copy={t.figures.goldenAl} locale={locale} />
           </div>
         </section>
 

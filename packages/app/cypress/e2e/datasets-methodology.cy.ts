@@ -56,6 +56,14 @@ describe('AgentX dataset methodology', () => {
       cy.contains('following one-hour profiling window').should('be.visible');
       cy.contains('capped at 3 TB').should('be.visible');
       cy.get('figure[data-testid^="agentx-methodology-figure-"]').should('have.length', 21);
+      cy.get('[data-testid="agentx-methodology-figure-corpus"]')
+        .should('contain.text', 'View full-resolution image')
+        .parent('a')
+        .should('have.attr', 'href', '/images/agentx-methodology/corpus-scale.png')
+        .and('have.attr', 'target', '_blank');
+      cy.get('[data-testid="agentx-methodology-figure-corpus"] img')
+        .invoke('attr', 'src')
+        .should('include', 'q=100');
       [
         'requestDistributions256k',
         'subagentDistributions256k',
@@ -87,6 +95,10 @@ describe('AgentX dataset methodology', () => {
       cy.contains('有向无环图（DAG）').should('be.visible');
       cy.contains('上限为 3 TB').should('be.visible');
       cy.get('figure[data-testid^="agentx-methodology-figure-"]').should('have.length', 21);
+      cy.get('[data-testid="agentx-methodology-figure-corpus"]')
+        .should('contain.text', '查看原始分辨率图片')
+        .parent('a')
+        .should('have.attr', 'href', '/images/agentx-methodology/corpus-scale.png');
     });
 
     cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/agentx/methodology');
