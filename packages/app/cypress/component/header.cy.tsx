@@ -105,9 +105,26 @@ describe('Header', () => {
     cy.get('[data-testid="nav-link-compare"]').should('have.attr', 'href', '/compare');
   });
 
+  it('shows Datasets as a top-level nav link and highlights dataset child pages', () => {
+    cy.get('[data-testid="nav-link-datasets"]')
+      .should('be.visible')
+      .and('have.attr', 'href', '/datasets');
+
+    mountHeader('/datasets/claude-code-traces');
+    cy.get('[data-testid="nav-link-datasets"]').should('have.class', 'text-brand');
+  });
+
+  it('keeps Datasets in the Chinese navigation tree', () => {
+    mountHeader('/zh/datasets');
+    cy.get('[data-testid="nav-link-datasets"]')
+      .should('be.visible')
+      .and('contain.text', '数据集')
+      .and('have.attr', 'href', '/zh/datasets')
+      .and('have.class', 'text-brand');
+  });
+
   it('keeps footer destinations out of the primary nav', () => {
     cy.get('[data-testid="nav-link-supporters"]').should('not.exist');
-    cy.get('[data-testid="nav-link-datasets"]').should('not.exist');
     cy.get('[data-testid="nav-link-blog"]').should('not.exist');
   });
 
@@ -134,8 +151,8 @@ describe('Header', () => {
       cy.contains('a', 'Overview').should('be.visible').and('have.attr', 'href', '/overview');
       cy.contains('a', 'Dashboard').should('be.visible').and('have.attr', 'href', '/inference');
       cy.contains('a', 'Comparisons').should('be.visible').and('have.attr', 'href', '/compare');
+      cy.contains('a', 'Datasets').should('be.visible').and('have.attr', 'href', '/datasets');
       cy.contains('a', 'Supporters').should('not.exist');
-      cy.contains('a', 'Datasets').should('not.exist');
       cy.contains('a', 'Articles').should('not.exist');
     });
   });
@@ -148,6 +165,21 @@ describe('Header', () => {
     cy.wrap(mockRouter.push).should('have.been.calledOnceWith', '/overview');
     cy.tick(250);
     cy.wrap(mockRouter.push).should('have.been.calledTwice');
+  });
+
+  it('keeps every primary link inside the header at the desktop breakpoint', () => {
+    cy.viewport(1024, 720);
+    cy.get('[data-testid="header"]').then(($header) => {
+      const header = $header[0];
+      const bounds = header.getBoundingClientRect();
+      expect(header.scrollWidth, 'header scrollWidth').to.be.at.most(header.clientWidth);
+
+      cy.get('[data-testid^="nav-link-"]:visible').each(($link) => {
+        const rect = $link[0].getBoundingClientRect();
+        expect(rect.left, `${$link.text()} left edge`).to.be.at.least(bounds.left - EPSILON);
+        expect(rect.right, `${$link.text()} right edge`).to.be.at.most(bounds.right + EPSILON);
+      });
+    });
   });
 
   describe('at 320x700', () => {
@@ -205,10 +237,10 @@ describe('Header', () => {
       cy.get('[data-testid="mobile-menu-toggle"]').click();
       cy.get('[data-testid="mobile-menu"]').should('be.visible');
       cy.get('[data-testid="mobile-menu"]').within(() => {
-        ['Home', 'Overview', 'Dashboard', 'Comparisons', 'About'].forEach((label) => {
+        ['Home', 'Overview', 'Dashboard', 'Comparisons', 'Datasets', 'About'].forEach((label) => {
           cy.contains('a', label).should('be.visible');
         });
-        ['Supporters', 'Datasets', 'Articles'].forEach((label) => {
+        ['Supporters', 'Articles'].forEach((label) => {
           cy.contains('a', label).should('not.exist');
         });
       });

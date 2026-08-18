@@ -27,6 +27,12 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/');
     });
 
+    it('header links to the Chinese datasets page', () => {
+      cy.get('[data-testid="nav-link-datasets"]')
+        .should('contain.text', '数据集')
+        .and('have.attr', 'href', '/zh/datasets');
+    });
+
     it('footer renders in Chinese with zh-internal links', () => {
       cy.get('[data-testid="footer-brand-description"]').should('contain.text', '开源推理基准测试');
       cy.get('[data-testid="footer-link-supporters"]')

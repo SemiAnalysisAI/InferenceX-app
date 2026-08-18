@@ -143,6 +143,7 @@ export const NAV_LABELS_ZH: Record<string, string> = {
   '/overview': '总览',
   '/inference': '仪表板',
   '/compare': 'Chip 对比',
+  '/datasets': '数据集',
   '/about': '关于',
 };
 
