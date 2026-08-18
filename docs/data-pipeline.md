@@ -78,6 +78,44 @@ conservative fallback prevents a failed GitHub lookup from restoring a suppresse
 point. It can only suppress an identical point from another attempt while that
 attempt remains unknown.
 
+### Audited Run Backfills
+
+Exceptional metadata corrections use the same reviewed, automatically enforced ledger
+as purges. Add a `CHANGELOG_BACKFILLS` or `BENCHMARK_POINT_BACKFILLS` entry in
+`packages/db/src/etl/run-overrides.ts`; never add a one-off production SQL statement.
+Every entry has a stable kebab-case `id`, a human-readable `reason`, an exact run attempt,
+and the target table's complete natural-key selector. The source-control history records
+who approved the correction and why, while the stable ID appears in ingest and apply logs.
+
+Changelog backfills select `(githubRunId, runAttempt, baseRef, headRef)` and can patch
+`configKeys`, `description`, `prLink`, or `appendOnly`. An `appendOnly` correction updates
+both `changelog_entries.append_only` and `workflow_runs.append_only` atomically because
+the materialized benchmark view reads the run-level value.
+
+Benchmark point backfills use the same complete point selector as audited point purges:
+`githubRunId`, `runAttempt`, `configId`, `benchmarkType`, `isl`, `osl`, `conc`,
+`offloadMode`, and nullable `recipeFingerprint`. Their `set` block supports a shallow
+`metricsMerge`, top-level `metricsRemove`, and `offloadMode`. Setting `offloadMode`
+updates both the first-class column and `metrics.offload_mode`; for example, a missed CPU
+KV offload annotation can set `offloadMode: 'on'` and merge `kv_offloading` plus backend
+metadata in one correction. Unrelated metrics remain unchanged.
+
+Run `bun run admin:db:apply-overrides` to preview the exact rows, reasons, and patches;
+the command requires confirmation unless passed `--yes`. It fails before writing when a
+target is missing, when a point's desired identity already exists, or when registry
+validation finds an overlap or duplicate. Writes are verified against the declared state
+and `latest_benchmarks` is refreshed afterward. Merges to `master` run the same command in
+CI, followed by database verification, cache invalidation, and cache warmup.
+
+Point corrections are additionally applied before each CI or GCS benchmark insert. This
+prevents a later idempotent re-ingest from restoring the artifact's original value. The
+ingest tracks source and desired identities across the run and fails on a collision instead
+of silently collapsing two distinct artifact points. When GCS cannot recover an attempt
+number, it follows the purge path's conservative fallback and matches the exact run and
+point across attempts; the log records the applied backfill ID. Changelog corrections are
+likewise applied to artifact metadata before `appendOnly`/`evalsOnly` run semantics are
+resolved and before the changelog is upserted.
+
 ### Why Two Connection Types
 
 | Connection                      | Library     | Use Case                             | Why                                                                                                  |
