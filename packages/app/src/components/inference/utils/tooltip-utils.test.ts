@@ -524,6 +524,21 @@ describe('generateOverlayTooltipContent', () => {
     expect(standardZh).toContain('<strong>投机解码:</strong> 关闭');
   });
 
+  it('labels Kimi-K3 speculative decoding "DSpark" rather than the generic MTP', () => {
+    const html = generateOverlayTooltipContent(
+      overlayConfig({
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          model: 'Kimi-K3',
+          spec_decoding: 'mtp',
+        }),
+      }),
+    );
+
+    expect(html).toContain('<strong>Speculative Decoding:</strong> DSpark');
+    expect(html).not.toContain('<strong>Speculative Decoding:</strong> MTP');
+  });
+
   it('hides stale CPU cache hits for unofficial overlays without offload', () => {
     const html = generateOverlayTooltipContent(
       overlayConfig({

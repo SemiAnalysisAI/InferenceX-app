@@ -31,11 +31,19 @@ describe('MODEL_SPEC_METHOD_LABELS', () => {
   it('maps MiniMax-M3 mtp to "M3 EAGLE"', () => {
     expect(MODEL_SPEC_METHOD_LABELS['MiniMax-M3']?.mtp).toBe('M3 EAGLE');
   });
+
+  it('maps Kimi-K3 mtp to "DSpark"', () => {
+    expect(MODEL_SPEC_METHOD_LABELS['Kimi-K3']?.mtp).toBe('DSpark');
+  });
 });
 
 describe('resolveFrameworkPartLabel', () => {
   it('renders M3 mtp as "M3 EAGLE"', () => {
     expect(resolveFrameworkPartLabel('MiniMax-M3', 'mtp')).toBe('M3 EAGLE');
+  });
+
+  it('renders K3 mtp as "DSpark"', () => {
+    expect(resolveFrameworkPartLabel('Kimi-K3', 'mtp')).toBe('DSpark');
   });
 
   it('keeps the generic MTP label for other models', () => {
@@ -44,6 +52,10 @@ describe('resolveFrameworkPartLabel', () => {
 
   it('keeps the generic MTP label when no model is provided', () => {
     expect(resolveFrameworkPartLabel(undefined, 'mtp')).toBe('MTP');
+  });
+
+  it('keeps the generic MTP label for sibling Kimi models', () => {
+    expect(resolveFrameworkPartLabel('Kimi-K2.5', 'mtp')).toBe('MTP');
   });
 
   it('falls back to FRAMEWORK_LABELS for non-overridden parts even for M3', () => {
