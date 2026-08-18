@@ -5,6 +5,7 @@ import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { isValidTab, TAB_META } from './tab-meta';
 import {
   isZhTab,
+  LANDING_META_ZH,
   TAB_INTRO_ZH,
   TAB_LABELS_ZH,
   TAB_META_ZH,
@@ -13,6 +14,19 @@ import {
 } from './tab-meta-zh';
 
 const HAN_REGEX = /\p{Script=Han}/u;
+
+describe('Chinese agentic inference positioning', () => {
+  it('uses the category name for titles and AgentX for the scenario', () => {
+    expect(LANDING_META_ZH.title).toContain('智能体推理基准测试');
+    expect(LANDING_META_ZH.title).not.toContain('AgentX');
+    expect(LANDING_META_ZH.description).toMatch(/AgentX.*场景/u);
+    expect(LANDING_META_ZH.description).toContain('固定序列');
+    expect(TAB_META_ZH.inference.title).toContain('智能体推理基准测试');
+    expect(TAB_META_ZH.inference.title).not.toContain('AgentX');
+    expect(TAB_META_ZH.inference.description).toMatch(/AgentX.*工作负载/u);
+    expect(TAB_INTRO_ZH.inference).toContain('固定序列');
+  });
+});
 
 describe('ZH_TAB_KEYS', () => {
   it.each(ZH_TAB_KEYS)('mirrors a valid English tab "%s"', (tab) => {

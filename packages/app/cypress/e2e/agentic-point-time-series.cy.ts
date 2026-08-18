@@ -235,7 +235,7 @@ describe('Agentic point request metric time series', () => {
 
   it('restores the request timeline view after browser Back from a dataset route', () => {
     cy.window().then((win) => {
-      win.history.pushState({}, '', '/datasets/test-dataset/conversations/conversation-1');
+      win.history.pushState({}, '', '/agentx/test-dataset/conversations/conversation-1');
     });
     cy.go('back');
     cy.location('pathname').should('eq', '/inference/agentic/206885');

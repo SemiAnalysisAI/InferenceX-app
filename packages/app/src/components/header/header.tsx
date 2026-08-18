@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 
 import { ModeToggle } from '@/components/ui/mode-toggle';
+import { NewBadge } from '@/components/ui/new-badge';
 import { MinecraftToggles } from '@/components/minecraft/minecraft-toggles';
 import { CLIENT_SEARCH_CHANGE_EVENT, navigateInApp } from '@/lib/client-navigation';
 import { hasZhSibling, isZhPathname, switchLocalePath, ZH_PREFIX, zhPath } from '@/lib/i18n';
@@ -29,7 +30,18 @@ const DASHBOARD_TABS = [
   '/current-inferencex-image',
 ];
 
-const NAV_LINKS = [
+interface NavLink {
+  href: string;
+  label: string;
+  testId: string;
+  event: string;
+  badge?: {
+    en: string;
+    zh: string;
+  };
+}
+
+const NAV_LINKS: readonly NavLink[] = [
   { href: '/', label: 'Home', testId: 'nav-link-home', event: 'header_home_clicked' },
   {
     href: '/overview',
@@ -50,10 +62,11 @@ const NAV_LINKS = [
     event: 'header_compare_clicked',
   },
   {
-    href: '/datasets',
-    label: 'Datasets',
-    testId: 'nav-link-datasets',
-    event: 'header_datasets_clicked',
+    href: '/agentx',
+    label: 'AgentX',
+    testId: 'nav-link-agentx',
+    event: 'header_agentx_clicked',
+    badge: { en: 'NEW', zh: '新' },
   },
   { href: '/about', label: 'About', testId: 'nav-link-about', event: 'header_about_clicked' },
 ] as const;
@@ -148,9 +161,14 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
     ? NAV_LINKS.map((link) => ({
         ...link,
         label: NAV_LABELS_ZH[link.href] ?? link.label,
+        badgeLabel: link.badge?.zh,
         displayHref: hasZhSibling(link.href) ? zhPath(link.href) : link.href,
       }))
-    : NAV_LINKS.map((link) => ({ ...link, displayHref: link.href }));
+    : NAV_LINKS.map((link) => ({
+        ...link,
+        badgeLabel: link.badge?.en,
+        displayHref: link.href,
+      }));
 
   // Close menu on route change
   useEffect(() => {
@@ -208,15 +226,15 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-1">
-            {navLinks.map(({ href, displayHref, label, testId, event }) => (
+          <nav className="hidden items-center gap-1 xl:flex">
+            {navLinks.map(({ href, displayHref, label, badgeLabel, testId, event }) => (
               <Link
                 key={href}
                 data-testid={testId}
                 href={displayHref}
                 prefetch={isActive(pathname, href) ? false : undefined}
                 className={cn(
-                  'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
                   isActive(pathname, href)
                     ? 'text-brand bg-brand/10'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted',
@@ -234,7 +252,12 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                   }
                 }}
               >
-                {label}
+                <span>{label}</span>
+                {badgeLabel && (
+                  <NewBadge data-nav-badge="agentx" data-new-badge="agentx-nav">
+                    {badgeLabel}
+                  </NewBadge>
+                )}
               </Link>
             ))}
           </nav>
@@ -253,7 +276,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             <ModeToggle />
 
             {/* Mobile hamburger */}
-            <div ref={menuRef} className="relative lg:hidden">
+            <div ref={menuRef} className="relative xl:hidden">
               <button
                 type="button"
                 data-testid="mobile-menu-toggle"
@@ -282,7 +305,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                   data-testid="mobile-menu"
                   className="absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-40"
                 >
-                  {navLinks.map(({ href, displayHref, label, event }) => (
+                  {navLinks.map(({ href, displayHref, label, badgeLabel, event }) => (
                     <Link
                       key={href}
                       href={displayHref}
@@ -304,7 +327,16 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                         }
                       }}
                     >
-                      {label}
+                      <span>{label}</span>
+                      {badgeLabel && (
+                        <NewBadge
+                          data-nav-badge="agentx"
+                          data-new-badge="agentx-nav"
+                          className="ml-1.5"
+                        >
+                          {badgeLabel}
+                        </NewBadge>
+                      )}
                     </Link>
                   ))}
                   <span className="flex items-center gap-2 px-3 sm:hidden">

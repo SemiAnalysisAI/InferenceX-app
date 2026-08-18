@@ -47,8 +47,8 @@ describe('First-load navigation', () => {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-starred');
         win.localStorage.removeItem('inferencex-star-modal-dismissed');
-        win.localStorage.removeItem('inferencex-kimi-k3-modal-dismissed');
-        win.localStorage.removeItem('inferencex-kimi-k3-banner-dismissed');
+        win.localStorage.removeItem('inferencex-agentic-results-modal-dismissed');
+        win.localStorage.removeItem('inferencex-agentic-results-banner-dismissed');
       },
     });
 
@@ -77,9 +77,14 @@ describe('First-load navigation', () => {
     cy.location('pathname').should('eq', '/compare');
   });
 
-  it('navigates to datasets from the header with one click', () => {
-    cy.get('[data-testid="nav-link-datasets"]').should('have.attr', 'href', '/datasets').click();
-    cy.location('pathname').should('eq', '/datasets');
+  it('navigates to AgentX from the header with one click', () => {
+    cy.get('[data-testid="nav-link-agentx"]')
+      .should('have.attr', 'href', '/agentx')
+      .find('[data-nav-badge="agentx"]')
+      .should('be.visible')
+      .and('have.text', 'NEW');
+    cy.get('[data-testid="nav-link-agentx"]').click();
+    cy.location('pathname').should('eq', '/agentx');
   });
 
   it('navigates to overview and the full dashboard from the landing CTAs', () => {

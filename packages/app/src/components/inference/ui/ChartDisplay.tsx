@@ -82,7 +82,7 @@ const STRINGS = {
   en: {
     inferencePerformance: 'Inference Performance',
     inferencePerformanceDesc:
-      'Inference performance metrics across different models, hardware configurations, and serving parameters.',
+      'Agentic inference metrics from the AgentX scenario and fixed-sequence inference metrics across models, hardware configurations, and serving parameters.',
     chart: 'Chart',
     table: 'Table',
     sourceUnofficial: 'Source: UNOFFICIAL',
@@ -98,7 +98,8 @@ const STRINGS = {
   },
   zh: {
     inferencePerformance: '推理性能',
-    inferencePerformanceDesc: '不同模型、硬件配置和服务参数下的推理性能指标。',
+    inferencePerformanceDesc:
+      '不同模型、硬件配置和服务参数下，来自 AgentX 场景的智能体推理指标与固定序列推理指标。',
     chart: '图表',
     table: '表格',
     sourceUnofficial: '来源：非官方',

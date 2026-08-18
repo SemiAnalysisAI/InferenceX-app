@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { DatasetDetail } from '@/components/datasets/dataset-detail';
-import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n';
+import { languageAlternates } from '@/lib/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 interface Props {
@@ -10,23 +10,21 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const title = `${slug} | Agentic 数据集`;
-  const description = `${slug} agentic trace 数据集的分布、token 统计及逐对话火焰图。`;
+  const title = `${slug} | AgentX Datasets`;
+  const description = `Distributions, token statistics, and per-conversation flamegraphs for the ${slug} agentic trace dataset.`;
   return {
     title,
     description,
-    alternates: zhAlternates(`/datasets/${slug}`),
-    openGraph: {
-      title: `${title} | InferenceX`,
-      description,
-      url: `${SITE_URL}/zh/datasets/${slug}`,
-      locale: ZH_OG_LOCALE,
+    alternates: {
+      canonical: `${SITE_URL}/agentx/${slug}`,
+      languages: languageAlternates(`/agentx/${slug}`),
     },
+    openGraph: { title: `${title} | InferenceX`, description, url: `${SITE_URL}/agentx/${slug}` },
     twitter: { title: `${title} | InferenceX`, description },
   };
 }
 
-export default async function DatasetDetailPageZh({ params }: Props) {
+export default async function DatasetDetailPage({ params }: Props) {
   const { slug } = await params;
   return (
     <main className="relative">

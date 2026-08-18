@@ -11,13 +11,15 @@ import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 
 const title = 'AI Inference Glossary';
 const description =
-  'Clear, technically grounded definitions for LLM inference benchmarks, serving metrics, distributed parallelism, numerical precision, chip hardware, and inference software.';
+  'Clear, technically grounded definitions for agentic inference, LLM benchmarks, serving metrics, distributed parallelism, numerical precision, chip hardware, and inference software.';
 
 export const metadata: Metadata = {
   title,
   description,
   keywords: [
     'AI inference glossary',
+    'agentic inference glossary',
+    'AgentX benchmark terms',
     'LLM inference terms',
     'GPU benchmark terminology',
     'inference serving glossary',
@@ -100,9 +102,9 @@ export default function GlossaryPage() {
                   The language behind the inference curve.
                 </h1>
                 <p className="mt-6 max-w-3xl text-base leading-7 text-muted-foreground md:text-lg md:leading-8">
-                  Definitions for the metrics, serving techniques, numerical formats, and
-                  distributed systems concepts used across InferenceX. Based on measured behavior,
-                  not vendor peak specifications.
+                  Definitions for agentic inference, benchmark metrics, serving techniques,
+                  numerical formats, and distributed systems concepts used across InferenceX.
+                  Entries describe measured behavior and published benchmark recipes.
                 </p>
               </div>
 
@@ -173,6 +175,9 @@ export default function GlossaryPage() {
               speedups on unchanged chips.
             </p>
             <div className="mt-5 flex flex-wrap gap-3 text-sm font-medium">
+              <Link href="/agentx/methodology" className="text-brand hover:underline">
+                AgentX methodology →
+              </Link>
               <Link href="/blog" className="text-brand hover:underline">
                 Browse technical articles →
               </Link>

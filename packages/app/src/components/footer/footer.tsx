@@ -12,7 +12,7 @@ import { StarButton } from './footer-star-cta';
 const STRINGS = {
   en: {
     description:
-      'Continuous open-source inference benchmarking. Real-world, reproducible, auditable performance data trusted by trillion dollar AI infrastructure operators like OpenAI, Meta, Oracle, Microsoft, etc.',
+      'InferenceX continuously benchmarks agentic and fixed-sequence AI inference, including AgentX results. Each result links to its public run.',
     semianalysis: 'SemiAnalysis',
     mainSite: 'Main Site',
     newsletter: 'Newsletter',
@@ -26,7 +26,7 @@ const STRINGS = {
     frontend: 'Frontend',
     more: 'More',
     supporters: 'Supporters',
-    datasets: 'Datasets',
+    agentx: 'AgentX',
     articles: 'Articles',
     apiReference: 'API Reference',
     gpuReliability: 'Chip Reliability',
@@ -40,7 +40,7 @@ const STRINGS = {
   },
   zh: {
     description:
-      '持续的开源推理基准测试。真实、可复现、可审计的性能数据，获得 OpenAI、Meta、Oracle、Microsoft 等万亿美元级 AI 基础设施运营方的信赖。',
+      'InferenceX 持续开展智能体推理与固定序列 AI 推理基准测试，并提供 AgentX 结果。每项结果均链接至对应的公开运行。',
     semianalysis: 'SemiAnalysis',
     mainSite: '官方网站',
     newsletter: '订阅通讯',
@@ -54,7 +54,7 @@ const STRINGS = {
     frontend: '前端仓库',
     more: '更多',
     supporters: '支持者',
-    datasets: '数据集',
+    agentx: 'AgentX',
     articles: '文章',
     gpuReliability: 'Chip 可靠性',
     apiReference: 'API 参考文档',
@@ -197,12 +197,12 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 {t.supporters}
               </Link>
               <Link
-                data-testid="footer-link-datasets"
-                href={`${prefix}/datasets`}
-                onClick={() => track('footer_datasets_clicked')}
+                data-testid="footer-link-agentx"
+                href={`${prefix}/agentx`}
+                onClick={() => track('footer_agentx_clicked')}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                {t.datasets}
+                {t.agentx}
               </Link>
               <Link
                 data-testid="footer-link-articles"

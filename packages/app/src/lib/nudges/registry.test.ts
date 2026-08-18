@@ -62,14 +62,14 @@ describe('NUDGE_REGISTRY integrity', () => {
   it('contains the expected set of migrated nudges', () => {
     const ids = NUDGE_REGISTRY.map((n) => n.id).toSorted();
     expect(ids).toEqual([
+      'agentic-results-launch-banner',
+      'agentic-results-launch-modal',
       'eval-samples',
       'export',
       'feedback-modal',
       'filter-hint',
       'github-star-modal',
       'gradient-label',
-      'kimi-k3-launch-banner',
-      'kimi-k3-launch-modal',
       'reproducibility',
       'star-nudge',
     ]);

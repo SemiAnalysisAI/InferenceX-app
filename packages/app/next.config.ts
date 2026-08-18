@@ -12,6 +12,20 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],
   serverExternalPackages: ['shiki'],
+  redirects() {
+    return Promise.resolve([
+      {
+        source: '/datasets/:path*',
+        destination: '/agentx/:path*',
+        permanent: true,
+      },
+      {
+        source: '/zh/datasets/:path*',
+        destination: '/zh/agentx/:path*',
+        permanent: true,
+      },
+    ]);
+  },
   experimental: {
     optimizePackageImports: ['lucide-react', 'd3', '@tanstack/react-query'],
     // NOTE: experimental.inlineCss was evaluated (2026-07) for the PageSpeed
@@ -26,6 +40,7 @@ const nextConfig: NextConfig = {
     ...(process.env.GITHUB_ACTIONS === 'true' && { turbopackFileSystemCacheForBuild: true }),
   },
   images: {
+    qualities: [75, 100],
     remotePatterns: [
       { hostname: 'placehold.co' },
       { hostname: 'substack-post-media.s3.amazonaws.com' },

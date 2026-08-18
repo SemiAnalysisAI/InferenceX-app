@@ -75,7 +75,7 @@ describe('DatasetList', () => {
     cy.contains('cc-traces-weka (256k)').should('be.visible');
     cy.contains('1,234').should('be.visible'); // conversation_count, localized
     cy.contains('82%').should('be.visible'); // cachedPct
-    cy.get('a[href="/datasets/cc-traces-weka-full"]').should('exist');
+    cy.get('a[href="/agentx/cc-traces-weka-full"]').should('exist');
   });
 
   it('shows the empty state when no datasets are ingested', () => {

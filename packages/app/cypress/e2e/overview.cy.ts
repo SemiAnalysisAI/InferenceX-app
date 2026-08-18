@@ -27,8 +27,8 @@ const AGENTX_LABEL_ZH = '长上下文多轮真实智能体场景（AgentX）';
 /** Shared by both locales: the scenario is named after its acronym. */
 const AGENTX_SHORT = 'AgentX';
 
-const PAGE_TITLE = 'Inference Cost per Million Tokens';
-const PAGE_TITLE_ZH = '推理每百万 token 成本';
+const PAGE_TITLE = 'Agentic Inference Costs';
+const PAGE_TITLE_ZH = '智能体推理成本';
 const SOURCE_NOTE = 'Source: InferenceX & SemiAnalysis Market July 2026 AI Cloud TCO Model';
 const SOURCE_LINK_TEXT = 'SemiAnalysis Market July 2026 AI Cloud TCO Model';
 const SOURCE_NOTE_ZH = '来源：InferenceX 与 SemiAnalysis Market July 2026 AI Cloud TCO Model';

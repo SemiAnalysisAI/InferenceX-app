@@ -11,11 +11,11 @@ import { SITE_URL, SITE_NAME, AUTHOR_NAME } from '@semianalysisai/inferencex-con
 
 export const metadata: Metadata = {
   title: '文章',
-  description: `${SITE_NAME} by ${AUTHOR_NAME} 的技术文章——AI 推理基准测试、Chip 性能分析与 ML 基础设施洞见。`,
+  description: `${SITE_NAME} by ${AUTHOR_NAME} 发布关于智能体推理基准测试、AgentX 结果、Chip 性能与 ML 基础设施的技术文章。`,
   alternates: zhAlternates('/blog'),
   openGraph: {
     title: `文章 | ${SITE_NAME} by ${AUTHOR_NAME}`,
-    description: 'AI 推理基准测试洞见与 Chip 性能分析。',
+    description: '关于智能体推理基准测试、AgentX 结果与 Chip 性能的文章。',
     url: `${SITE_URL}/zh/blog`,
     locale: ZH_OG_LOCALE,
   },
@@ -51,7 +51,7 @@ export default async function ZhBlogPage({
           <Card>
             <h2 className="text-2xl lg:text-4xl font-bold tracking-tight">文章</h2>
             <p className="mt-3 text-base lg:text-lg text-muted-foreground">
-              关于 AI 推理基准测试、Chip 性能与 ML 基础设施的深度洞见。
+              关于智能体推理、AgentX 结果、Chip 性能与 ML 基础设施的文章。
             </p>
             <p className="text-sm text-muted-foreground">
               不熟悉相关概念？{' '}

@@ -19,6 +19,7 @@ import type { NudgeDefinition, NudgeTrigger } from '@/lib/nudges/types';
 import { LANDING_BANNER_DISMISSED_ATTRIBUTE } from '@/lib/nudges/landing-banner';
 import { BottomToast } from '@/components/ui/bottom-toast';
 import { Button } from '@/components/ui/button';
+import { NewBadge } from '@/components/ui/new-badge';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -433,9 +434,9 @@ function ModalRenderer({
               <Icon className={`size-5 ${content.iconClassName ?? ''}`} />
               {localized(locale, content.title, content.titleZh)}
               {content.badge && (
-                <span className="ml-1 inline-flex items-center rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm">
+                <NewBadge data-new-badge="launch-modal" className="ml-1">
                   {localized(locale, content.badge, content.badgeZh)}
-                </span>
+                </NewBadge>
               )}
             </h2>
             <p id={`${idPrefix}-description`} className="text-sm text-muted-foreground">
@@ -535,9 +536,9 @@ function BannerRenderer({
                 {localized(locale, content.title, content.titleZh)}
               </span>
               {content.badge && (
-                <span className="ml-2 inline-flex items-center gap-1.5 align-middle rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm">
+                <NewBadge data-new-badge="launch-banner" className="ml-2 align-middle">
                   {localized(locale, content.badge, content.badgeZh)}
-                </span>
+                </NewBadge>
               )}
             </p>
             <p className="text-xs text-muted-foreground leading-snug truncate">
@@ -545,7 +546,7 @@ function BannerRenderer({
             </p>
           </div>
           <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-brand shrink-0 group-hover:translate-x-0.5 transition-transform duration-200">
-            {rs.explore}
+            {localized(locale, content.linkLabel ?? rs.explore, content.linkLabelZh)}
             <ArrowRight className="size-3.5" />
           </span>
         </div>

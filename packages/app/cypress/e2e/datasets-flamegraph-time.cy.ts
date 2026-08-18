@@ -95,7 +95,7 @@ describe('Dataset conversation flamegraph timing', () => {
         },
       },
     });
-    cy.visit('/datasets/test-dataset/conversations/conversation-1', {
+    cy.visit('/agentx/test-dataset/conversations/conversation-1', {
       onBeforeLoad: unlockAgenticGate,
     });
   });

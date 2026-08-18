@@ -96,6 +96,9 @@ export interface NudgeContent {
   href?: string;
   /** Called when the banner link is clicked (for analytics). */
   onLinkClick?: () => void;
+  /** Short action label shown at the end of the banner link. */
+  linkLabel?: string;
+  linkLabelZh?: string;
 }
 
 // ---------------------------------------------------------------------------

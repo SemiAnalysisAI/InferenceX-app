@@ -5,6 +5,7 @@ describe('Chinese (/zh) pages', () => {
     });
 
     it('renders the Chinese landing content', () => {
+      cy.get('[data-testid="intro-section"]').should('contain.text', '智能体推理基准测试');
       cy.contains('h2', '探索 InferenceX').should('exist');
       cy.contains('快速对比').should('exist');
     });
@@ -27,20 +28,20 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/');
     });
 
-    it('header links to the Chinese datasets page', () => {
-      cy.get('[data-testid="nav-link-datasets"]')
-        .should('contain.text', '数据集')
-        .and('have.attr', 'href', '/zh/datasets');
+    it('header links to the Chinese AgentX page', () => {
+      cy.get('[data-testid="nav-link-agentx"]')
+        .should('contain.text', 'AgentX')
+        .and('have.attr', 'href', '/zh/agentx');
     });
 
     it('footer renders in Chinese with zh-internal links', () => {
-      cy.get('[data-testid="footer-brand-description"]').should('contain.text', '开源推理基准测试');
+      cy.get('[data-testid="footer-brand-description"]').should('contain.text', '智能体推理');
       cy.get('[data-testid="footer-link-supporters"]')
         .should('contain.text', '支持者')
         .and('have.attr', 'href', '/zh/quotes');
-      cy.get('[data-testid="footer-link-datasets"]')
-        .should('contain.text', '数据集')
-        .and('have.attr', 'href', '/zh/datasets');
+      cy.get('[data-testid="footer-link-agentx"]')
+        .should('contain.text', 'AgentX')
+        .and('have.attr', 'href', '/zh/agentx');
       cy.get('[data-testid="footer-link-articles"]')
         .should('contain.text', '文章')
         .and('have.attr', 'href', '/zh/blog');
@@ -62,7 +63,8 @@ describe('Chinese (/zh) pages', () => {
 
     it('renders the Chinese SEO intro above the chart', () => {
       cy.get('[data-testid="zh-tab-intro"]').within(() => {
-        cy.contains('h1', 'AI 推理基准测试').should('exist');
+        cy.contains('h1', '智能体推理基准测试').should('exist');
+        cy.contains('长上下文、多轮').should('exist');
       });
     });
 

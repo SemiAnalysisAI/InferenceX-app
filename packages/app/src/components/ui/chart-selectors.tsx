@@ -127,7 +127,7 @@ function AgenticScenarioInfo({
             href={href}
             className="underline underline-offset-2"
             data-testid="scenario-agentic-info-link"
-            onClick={() => track('selector_scenario_datasets_link')}
+            onClick={() => track('selector_scenario_agentx_link')}
           >
             {learnMore}
           </a>
@@ -417,7 +417,7 @@ export function ScenarioSelector({
           <AgenticScenarioInfo
             tooltip={t.agenticScenarioTooltip}
             learnMore={t.agenticScenarioLearnMore}
-            href={locale === 'zh' ? '/zh/datasets' : '/datasets'}
+            href={locale === 'zh' ? '/zh/agentx' : '/agentx'}
           />
         )}
       </div>

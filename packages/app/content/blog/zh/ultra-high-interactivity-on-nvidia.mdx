@@ -3,6 +3,7 @@ title: '在 NVIDIA GPU 上实现超高交互性？TileRT 登陆 InferenceX'
 subtitle: '运行在 NVIDIA GPU 上的 TileRT 软件能否与 Cerebras、Groq LPU、SambaNova 竞争？批大小为 1、分离式引擎、高吞吐量预填充引擎、高交互性解码引擎'
 date: '2026-08-10'
 publishDate: '2026-08-10'
+modifiedDate: '2026-08-18'
 tags:
   - benchmark
   - gpu
@@ -13,6 +14,8 @@ tags:
   - tilert
   - vllm
   - glm5
+  - agentx
+  - agentic
 ---
 
 _本文最初于 2026 年 8 月 10 日发布在 [SemiAnalysis 通讯](https://newsletter.semianalysis.com/p/ultra-high-interactivity-on-nvidia)。_
@@ -235,9 +238,9 @@ TileRT 继承了 ASIC 厂商最大的弱点。静态提前编译意味着模型�
 
 AI 编码智能体能在已知模板内加速调优，但新颖的变换仍需专家判断。此外，单体式持久化 kernel 也削弱了传统逐 kernel 性能剖析时间线的作用，使自动化反馈闭环更加困难。
 
-## TileRT 与 InferenceX 的下一步
+## TileRT 的下一步
 
-我们正在积极推进，将 TileRT 的基准测试从 InferenceX 的单轮 8k/1k 场景扩展到我们新的智能体编码基准——AgentX。该场景回放真实的 Claude Code 与 Codex 轨迹，包含长上下文、多轮请求、真实的子智能体活动与动态工具调用延迟。其输入长度中位数为 140k tokens，理论缓存命中率中位数屋顶线可达 99.2%。
+InferenceX 的长上下文多轮编码场景 AgentX 现已在具备对应数据的模型与服务栈上正式上线。它回放从真实 Claude Code 与 Codex 会话衍生出的隐私保护工作负载形态，包含长上下文、多轮请求、真实的 subagent 活动与动态工具调用延迟。其输入长度中位数为 140k tokens，理论缓存命中率中位数屋顶线可达 99.2%。对 TileRT 而言，下一步仍是将目前的单轮 8k/1k 基准测试扩展到 AgentX。
 
 <Figure
   src="/images/ultra-high-interactivity-on-nvidia/agentx-benchmark-characteristics.png"

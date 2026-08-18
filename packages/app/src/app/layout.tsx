@@ -54,6 +54,11 @@ export const metadata: Metadata = {
   },
   description: DESCRIPTION,
   keywords: [
+    'AgentX scenario',
+    'agentic inference benchmark',
+    'agentic coding benchmark',
+    'long context inference benchmark',
+    'multi-turn inference benchmark',
     'AI inference benchmark',
     'GPU benchmark',
     'LLM benchmark',
@@ -160,7 +165,7 @@ const jsonLd = {
       '@id': `${SITE_URL}/#application`,
       name: SITE_NAME,
       description:
-        'Open-source AI inference benchmark dashboard. Compare chip performance for LLM inference across NVIDIA GB200, H100, AMD MI355X, and more.',
+        'InferenceX is an open-source agentic inference benchmark dashboard. It compares the AgentX long-context, multi-turn coding scenario with fixed-sequence serving across NVIDIA, AMD, and other accelerators.',
       url: SITE_URL,
       applicationCategory: 'DeveloperApplication',
       operatingSystem: 'Web',

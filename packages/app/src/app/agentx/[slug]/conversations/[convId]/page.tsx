@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     alternates: {
-      canonical: `${SITE_URL}/datasets/${slug}/conversations/${encodeURIComponent(convId)}`,
+      canonical: `${SITE_URL}/agentx/${slug}/conversations/${encodeURIComponent(convId)}`,
     },
     robots: { index: false }, // per-conversation pages are too numerous to index
   };

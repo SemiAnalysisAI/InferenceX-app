@@ -3,9 +3,9 @@ export const SITE_URL = 'https://inferencex.semianalysis.com';
 export const AUTHOR_NAME = 'SemiAnalysis';
 export const AUTHOR_URL = 'https://semianalysis.com';
 export const AUTHOR_HANDLE = '@SemiAnalysis_';
-export const SITE_TITLE = `${SITE_NAME} by ${AUTHOR_NAME} — AI Inference Benchmark`;
+export const SITE_TITLE = `${SITE_NAME} by ${AUTHOR_NAME} — Agentic Inference Benchmark`;
 export const DESCRIPTION =
-  'InferenceX is the open-source AI inference benchmark that matches the rapid pace of modern AI development. Powered by one of the largest open-source chip CI/CD fleets with NVIDIA GB200, AMD MI355X & many more.';
+  'InferenceX is an open-source agentic inference benchmark. It compares the AgentX long-context, multi-turn coding scenario with fixed-sequence serving on NVIDIA, AMD, and other accelerators.';
 /**
  * Social-proof line woven into page meta descriptions to lift search CTR. The
  * named supporters mirror the published /quotes supporters page so the copy
@@ -21,7 +21,7 @@ export const OG_IMAGE = `${SITE_URL}/og-image.png`;
  * names (InferenceX, SemiAnalysis, GPU SKUs) stay in English per the
  * translation quality bar in AGENTS.md.
  */
-export const SITE_TITLE_ZH = `${SITE_NAME} by ${AUTHOR_NAME} — AI 推理基准测试`;
+export const SITE_TITLE_ZH = `${SITE_NAME} by ${AUTHOR_NAME} — 智能体推理基准测试`;
 export const DESCRIPTION_ZH =
-  'InferenceX 是紧跟现代 AI 发展节奏的开源 AI 推理基准测试，由规模领先的开源 Chip CI/CD 集群持续驱动，涵盖 NVIDIA GB200、AMD MI355X 等众多硬件。';
+  'InferenceX 是开源智能体推理基准测试平台，对比 AgentX 长上下文多轮编码场景与固定序列服务在 NVIDIA、AMD 等加速器上的性能。';
 export const SUPPORTERS_LINE_ZH = '获得 OpenAI、Microsoft 与 PyTorch 基金会的支持。';
