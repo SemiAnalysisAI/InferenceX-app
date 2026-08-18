@@ -84,6 +84,18 @@ describe('Landing nudges — modals', () => {
 
           expect(horizontalOffset).to.be.closeTo(0, 0.1);
           expect(verticalOffset).to.eq(0);
+
+          // The label box can sit dead centre while the glyphs themselves spill
+          // out of it, so measure the rendered text and not just its container.
+          const range = badge.ownerDocument.createRange();
+          range.selectNodeContents(label!);
+          const inkRect = range.getBoundingClientRect();
+          const inkOffset =
+            inkRect.left + inkRect.width / 2 - (badgeRect.left + badgeRect.width / 2);
+
+          expect(inkRect.left, 'label ink stays inside the pill').to.be.at.least(badgeRect.left);
+          expect(inkRect.right, 'label ink stays inside the pill').to.be.at.most(badgeRect.right);
+          expect(inkOffset, 'label ink is centred').to.be.closeTo(0, 0.5);
         }
       });
     // Only one overlay at a time — star modal should not appear
