@@ -24,7 +24,7 @@ export interface LegendPointsDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Series label, e.g. "B300 (vLLM)". */
   title: string;
-  /** Context line, e.g. "DeepSeek V4 Pro · Agentic Traces". */
+  /** Context line, e.g. "DeepSeek V4 Pro · Agentic Workloads". */
   subtitle: string;
   /** Legend swatch color for this series (overlayRunColor for overlay runs). */
   accentColor: string;

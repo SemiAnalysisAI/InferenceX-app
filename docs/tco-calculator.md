@@ -102,7 +102,7 @@ The reset's early-out guards on the **merged** list, not the official one. An em
 - **Clamped values.** `interpolateForGPU` clamps the target into each series' measured range and always returns a value, so a bar can be showing its nearest edge point rather than an interpolation. This is pre-existing across GPUs with different ranges, but widening the slider to cover overlay operating points makes it reachable for every official bar at once — which would turn a side-by-side overlay delta into a real-vs-clamped comparison. Results carry a `clamped` flag and the tooltip says so. (Narrowing the slider back is not the fix: it only moves the clamping onto the overlay bars, and an overlay-only model loses its bounds entirely.)
 - **Escaping.** The tooltip is a hand-built HTML string injected with `.html()`, and branch names and run URLs come from the GitHub API for whatever run id the user pasted. Everything untrusted goes through `escapeHtml` (`lib/utils`). The y-axis tick labels render the same branch but go through d3 `.text()`, and the legend entry is React — both already safe.
 
-The calculator supports both fixed-sequence and Agentic Traces scenarios through
+The calculator supports both fixed-sequence and Agentic Workloads scenarios through
 the shared `rowToSequence` classifier. Agentic rows carry null `isl`/`osl`, so
 filtering them by numeric sequence lengths would silently drop every point.
 

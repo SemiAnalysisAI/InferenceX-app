@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   getModelAndSequence,
   getModelAndSequenceFromArtifact,
+  getModelDefaultSequence,
   getModelLabel,
   getModelExclusion,
   getSequenceDefaultExclusionGroup,
@@ -288,6 +289,29 @@ describe('getModelLabel', () => {
 });
 
 // ===========================================================================
+// getModelDefaultSequence
+// ===========================================================================
+describe('getModelDefaultSequence', () => {
+  it('opens the actively benchmarked AgentX models on Agentic Workloads', () => {
+    for (const model of [Model.DeepSeek_V4_Pro, Model.MiniMax_M3, Model.GLM_5_2, Model.Qwen3_5]) {
+      expect(getModelDefaultSequence(model)).toBe(Sequence.AgenticTraces);
+    }
+  });
+
+  it('returns null for models that keep the app-wide 8K/1K default', () => {
+    expect(getModelDefaultSequence(Model.Llama3_3_70B)).toBeNull();
+    expect(getModelDefaultSequence(Model.DeepSeek_R1)).toBeNull();
+    expect(getModelDefaultSequence(Model.Kimi_K3)).toBeNull();
+  });
+
+  it('returns null for unknown or missing models', () => {
+    expect(getModelDefaultSequence('NewModel-XYZ' as Model)).toBeNull();
+    expect(getModelDefaultSequence(null)).toBeNull();
+    expect(getModelDefaultSequence(undefined)).toBeNull();
+  });
+});
+
+// ===========================================================================
 // getSequenceLabel
 // ===========================================================================
 describe('getSequenceLabel', () => {
@@ -295,11 +319,11 @@ describe('getSequenceLabel', () => {
     expect(getSequenceLabel(Sequence.OneK_OneK)).toBe('1K / 1K');
     expect(getSequenceLabel(Sequence.OneK_EightK)).toBe('1K / 8K');
     expect(getSequenceLabel(Sequence.EightK_OneK)).toBe('8K / 1K');
-    expect(getSequenceLabel(Sequence.AgenticTraces)).toBe('Agentic Traces');
+    expect(getSequenceLabel(Sequence.AgenticTraces)).toBe('Agentic Workloads');
   });
 
   it('returns the Chinese agentic scenario label for the zh locale', () => {
-    expect(getSequenceLabel(Sequence.AgenticTraces, 'zh')).toBe('智能体轨迹');
+    expect(getSequenceLabel(Sequence.AgenticTraces, 'zh')).toBe('智能体工作负载');
   });
 
   it('falls back to the sequence value for unknown sequence', () => {

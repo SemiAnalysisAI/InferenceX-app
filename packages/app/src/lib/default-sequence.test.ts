@@ -34,7 +34,75 @@ describe('resolveEffectiveSequence', () => {
     });
   });
 
-  describe('honors a valid selection (rule 2a)', () => {
+  describe('per-model default (rule 2)', () => {
+    it('opens on the model default when the user has not chosen a scenario', () => {
+      // DeepSeek-V4-Pro declares Agentic Workloads as its opening scenario, so
+      // the untouched `8k/1k` initial state must not win.
+      expect(
+        resolveEffectiveSequence({
+          selectedSequence: Sequence.EightK_OneK,
+          availableSequences: [Sequence.EightK_OneK, Sequence.AgenticTraces],
+          availabilityLoaded: true,
+          modelDefaultSequence: Sequence.AgenticTraces,
+          sequenceExplicit: false,
+        }),
+      ).toBe(Sequence.AgenticTraces);
+    });
+
+    it('yields to an explicit selection', () => {
+      // A shared `?i_seq=8k-1k` link (or a manual pick) on an agentic-default
+      // model must stay on 8K/1K.
+      expect(
+        resolveEffectiveSequence({
+          selectedSequence: Sequence.EightK_OneK,
+          availableSequences: [Sequence.EightK_OneK, Sequence.AgenticTraces],
+          availabilityLoaded: true,
+          modelDefaultSequence: Sequence.AgenticTraces,
+          sequenceExplicit: true,
+        }),
+      ).toBe(Sequence.EightK_OneK);
+    });
+
+    it('ignores the model default when that scenario has no data for the run', () => {
+      expect(
+        resolveEffectiveSequence({
+          selectedSequence: Sequence.EightK_OneK,
+          availableSequences: [Sequence.EightK_OneK],
+          availabilityLoaded: true,
+          modelDefaultSequence: Sequence.AgenticTraces,
+          sequenceExplicit: false,
+        }),
+      ).toBe(Sequence.EightK_OneK);
+    });
+
+    it('does not apply before availability has loaded', () => {
+      // The static fallback list contains every scenario, so applying the model
+      // default here would fetch agentic rows the model may not have.
+      expect(
+        resolveEffectiveSequence({
+          selectedSequence: Sequence.EightK_OneK,
+          availableSequences: [Sequence.EightK_OneK, Sequence.AgenticTraces],
+          availabilityLoaded: false,
+          modelDefaultSequence: Sequence.AgenticTraces,
+          sequenceExplicit: false,
+        }),
+      ).toBeNull();
+    });
+
+    it('leaves models without a declared default on the app default', () => {
+      expect(
+        resolveEffectiveSequence({
+          selectedSequence: Sequence.EightK_OneK,
+          availableSequences: [Sequence.EightK_OneK, Sequence.AgenticTraces],
+          availabilityLoaded: true,
+          modelDefaultSequence: null,
+          sequenceExplicit: false,
+        }),
+      ).toBe(Sequence.EightK_OneK);
+    });
+  });
+
+  describe('honors a valid selection (rule 3a)', () => {
     it('keeps AgenticTraces when the model actually has agentic data (dsr1 case)', () => {
       // DeepSeek-R1 in the seeded DB has both agentic and 8k/1k — an explicit
       // agentic selection (e.g. a shared ?i_seq= link) must survive.
@@ -58,7 +126,7 @@ describe('resolveEffectiveSequence', () => {
     });
   });
 
-  describe('fallback ordering when the selection is unavailable (rule 2b/2c)', () => {
+  describe('fallback ordering when the selection is unavailable (rule 3b/3c)', () => {
     it('for a fixed-seq-only model, an agentic selection falls back to 8k/1k, not the raw first entry (llama70b case)', () => {
       // Llama-3.3-70B has only 8k/1k in the seeded DB. An agentic selection is
       // unavailable, so it must resolve to a fixed-seq scenario — here the sole
