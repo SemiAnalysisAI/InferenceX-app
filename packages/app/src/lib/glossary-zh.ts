@@ -8,6 +8,7 @@ import {
 export const GLOSSARY_CATEGORY_LABELS_ZH: Readonly<Record<GlossaryCategory, string>> = {
   'Benchmark metrics': '基准指标',
   Serving: '推理服务',
+  'Agentic inference': '智能体推理',
   Parallelism: '并行策略',
   Hardware: '硬件',
   'Numerical precision': '数值精度',
@@ -40,6 +41,88 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '推理既是模型问题，也是系统问题。用户体验取决于延迟和交互性，运营成本则取决于吞吐量、利用率、功耗与硬件成本；只优化其中一个维度，往往会牺牲另一个维度。',
     benchmarkContext:
       'InferenceX 测试完整的推理方案，因为芯片峰值规格无法代表实际服务性能。每条曲线都对应明确的模型、引擎、精度、并行策略、Chip 系统、序列长度和并发扫描。',
+  },
+  'agentic-inference': {
+    term: '智能体推理',
+    aliases: ['agentic inference', 'AI 智能体推理', 'agent 推理'],
+    plainEnglish:
+      '智能体会通过多次模型请求完成一项任务，期间可能调用工具、保留会话状态，也可能把部分工作交给 subagent。',
+    definition:
+      '智能体推理是为 AI agent 提供模型服务的过程。此类 agent 会在多个轮次间保留状态、调用工具、复用不断增长的上下文，并可能并行运行 subagent。',
+    explanation:
+      '一次智能体会话会在模型请求、工具执行和等待之间交替。后续请求通常携带大部分历史对话，因此 prefix cache 和 KV cache 容量会直接影响速度与成本。并行 subagent 还会产生各自具有时间关系和上下文增长过程的请求分支。',
+    significance:
+      '固定 input 和 output 长度无法覆盖智能体带来的全部服务压力。长共享前缀会改变 cache 行为，工具等待会让流量呈现突发性，并行分支则会争用推理容量。同一组软硬件在这种请求模式下可能出现不同的性能排序。',
+    benchmarkContext:
+      'InferenceX 使用 AgentX 测量智能体推理。AgentX 与固定序列场景回答不同的容量问题，应分别比较。AgentX 采用闭环会话回放，同一会话中的后续请求会受前一轮完成时间影响。',
+  },
+  agentx: {
+    term: 'AgentX',
+    aliases: ['AgentX 基准测试', 'AgentX 场景'],
+    plainEnglish: 'AgentX 是 InferenceX 用来测试完整长上下文、多轮编码智能体会话的工作负载。',
+    definition:
+      'AgentX 是 InferenceX 的智能体推理基准测试场景，其工作负载形状来自自愿提供的编码智能体轨迹，并在移除原始内容后构建。',
+    explanation:
+      'AgentX 使用确定性合成 token 重建会话结构。回放会保留请求长度、轮次间隔、共享前缀增长、工具等待以及主 agent 与 subagent 的依赖关系；原始提示词、生成代码和工具 payload 不会进入测试数据。推理栈只接收请求模式。',
+    significance:
+      '长上下文考验 KV cache 容量，重复前缀考验 cache 复用，分支时序则考验请求调度。这些影响在短小独立请求中较少出现。最终曲线反映推理系统在智能体流量下的整体表现。',
+    benchmarkContext:
+      '具备对应数据的模型默认显示 Agentic 场景。比较 AgentX 结果时，应使用兼容设置下的其他 AgentX 运行，并同时查看吞吐量、延迟与交互性。固定序列场景适合分析传统请求流。',
+  },
+  'agentic-coding-workload': {
+    term: '智能体编码工作负载',
+    aliases: ['agentic coding workload', '编码智能体工作负载', '软件工程智能体工作负载'],
+    plainEnglish:
+      '编码智能体读取代码仓库、修改代码并运行工具，随后继续请求模型，直到完成任务；这一连串请求就是智能体编码工作负载。',
+    definition:
+      '智能体编码工作负载由软件 agent 产生，包含多轮模型生成、代码仓库检查、工具调用、代码修改以及委派给 subagent 的子任务。',
+    explanation:
+      '随着 agent 累积指令、文件、工具结果和历史回答，请求长度会持续增长。许多轮次会复用较大的共享前缀。工具执行造成不均匀的停顿，subagent 则可能生成时间重叠的请求分支，因此其流量形状与固定长度提示词不同。',
+    significance:
+      '编码智能体可能通过一串相互依赖的调用让推理系统持续工作数分钟甚至数小时。Cache 策略、调度公平性、内存容量和尾延迟都会影响任务进度，仅看峰值 decode 吞吐量无法描述这种体验。',
+    benchmarkContext:
+      'AgentX 使用从轨迹提取的请求形状与确定性合成内容表示该工作负载。它测量推理系统性能。模型能否完成编码任务需要单独做质量评估，因此质量分数与 AgentX 服务结果应分别解读。',
+  },
+  'trace-replay': {
+    term: '轨迹回放',
+    aliases: ['trace replay', '工作负载回放', '会话回放'],
+    plainEnglish:
+      '轨迹回放重现已记录会话的请求大小、先后关系与时间间隔，让基准测试按照原始工作负载的节奏发送请求。',
+    definition:
+      '轨迹回放是一种基准测试方法，它把记录下来的请求关系、长度和时间信息转化为可重复运行的系统工作负载。',
+    explanation:
+      '回放可以保留由主 agent 轮次、并行 subagent 分支和辅助请求组成的有向图。确定性合成 token 会替换私有内容，同时保留 token 数量与前缀关系。轮次间记录的停顿则重现 agent 使用工具或等待依赖项的时间。',
+    significance:
+      '这种方法能够表达独立提示词列表缺少的流量特征，也能使用相同会话形状重复比较不同软硬件。AgentX 会在公开回放数据前移除源会话内容。',
+    benchmarkContext:
+      'AgentX 通过 AIPerf 回放由轨迹衍生的会话。固定 seed 决定会话采样、起点和合成内容。对外结果只统计 cache warmup 后的 profiling 窗口，使多次运行聚焦于稳态服务表现。',
+  },
+  'closed-loop-benchmark': {
+    term: '闭环基准测试',
+    aliases: ['closed-loop benchmark', '闭环负载测试', '闭环工作负载'],
+    plainEnglish:
+      '在闭环基准测试中，每个模拟用户会等待当前步骤完成，再按照该会话的依赖关系发送下一步请求。',
+    definition:
+      '闭环基准测试中的客户端会在前一个依赖请求完成后生成新工作，同时遵循工作负载记录的等待时间和分支结构。',
+    explanation:
+      'Concurrency 表示活跃客户端或会话数量，同时存在的请求数会随时间变化。更快的系统更早完成轮次，因此会在同一个 profiling 窗口内发出更多请求。每条采样会话的推进速度取决于请求完成时间，实际请求组合可能有小幅变化。',
+    significance:
+      '这种负载模型符合交互式 agent 的运行方式，因为下一步动作依赖上一步结果。响应更快时，会话也会更快地产生后续工作，所以吞吐量与延迟相互关联。低并发运行的采样波动通常会比大型请求池更明显。',
+    benchmarkContext:
+      'AgentX 使用闭环 concurrency。该数值表示同时运行的 agent 客户端数量；request batch 会随着会话推进而变化。解读结果时需要结合吞吐量、首 token 延迟与交互性。',
+  },
+  subagent: {
+    term: '子智能体',
+    aliases: ['subagent', 'child agent', '委派智能体'],
+    plainEnglish: '子智能体由主 agent 启动，负责同一任务中的较小部分，并可能与其他工作同时运行。',
+    definition:
+      '子智能体是一次受委派的 agent 执行，拥有独立会话状态和模型请求，并通过任务关系与依赖关系连接到父会话。',
+    explanation:
+      '主 agent 可以启动一个或多个 subagent，稍后再使用它们的结果。Subagent 的请求可能与父会话或其他分支重叠，从而形成会话图中的分支。每个分支可以增长独立上下文，同时复用部分初始指令或代码仓库状态。',
+    significance:
+      'Subagent 会让智能体流量不再完全串行。一个用户任务可能在短时间内产生多条长上下文请求，调度策略会影响各分支的完成速度。系统总吞吐量上升时，单个分支仍可能等待更久。',
+    benchmarkContext:
+      'AgentX 会保留轨迹衍生工作负载中的 subagent 分支及其依赖关系。委派质量不在测试范围内。基准测试测量推理系统如何处理由此产生的并行请求、共享前缀和完成时序。',
   },
   'inference-engine': {
     term: '推理引擎',
