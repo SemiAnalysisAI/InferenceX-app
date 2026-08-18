@@ -212,11 +212,13 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
             </p>
             <dl className="grid grid-cols-2 gap-x-5 gap-y-4 lg:grid-cols-4">
               {t.stats.map((stat) => (
-                <div key={stat.label}>
-                  <dd className="font-mono text-lg font-semibold tabular-nums text-foreground">
+                <div key={stat.label} className="flex flex-col">
+                  <dt className="order-2 mt-0.5 text-xs leading-5 text-muted-foreground">
+                    {stat.label}
+                  </dt>
+                  <dd className="order-1 font-mono text-lg font-semibold tabular-nums text-foreground">
                     {stat.value}
                   </dd>
-                  <dt className="mt-0.5 text-xs leading-5 text-muted-foreground">{stat.label}</dt>
                 </div>
               ))}
             </dl>

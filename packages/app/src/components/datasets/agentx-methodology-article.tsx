@@ -424,11 +424,11 @@ export function AgentXMethodologyArticle({ locale }: { locale: Locale }) {
         <p className="mt-5 max-w-3xl text-lg leading-8 text-muted-foreground">{t.lead}</p>
         <dl className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border/70 bg-border/70 lg:grid-cols-4">
           {t.facts.map((fact) => (
-            <div key={fact.label} className="bg-card px-4 py-5">
-              <dd className="font-mono text-xl font-semibold tabular-nums text-foreground">
+            <div key={fact.label} className="flex flex-col bg-card px-4 py-5">
+              <dt className="order-2 mt-1 text-sm leading-5 text-muted-foreground">{fact.label}</dt>
+              <dd className="order-1 font-mono text-xl font-semibold tabular-nums text-foreground">
                 {fact.value}
               </dd>
-              <dt className="mt-1 text-sm leading-5 text-muted-foreground">{fact.label}</dt>
             </div>
           ))}
         </dl>
