@@ -209,7 +209,111 @@ export interface BenchmarkPointBackfill extends BenchmarkPointKey, AuditedBackfi
  *   },
  * }
  */
-export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [];
+export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
+  // The source recipes in run 31633154542 attach MooncakeStoreConnector to
+  // every disaggregated worker and allocate a 180 GB Mooncake segment per
+  // node. The master matrix omitted the corresponding offload annotation.
+  ...(
+    [
+      [2106, 256, null],
+      [2334, 1152, null],
+      [2336, 1024, null],
+    ] as const
+  ).map(([configId, conc, recipeFingerprint]) => ({
+    id: `run-31633154542-config-${configId}-conc-${conc}-mooncake-offload`,
+    reason:
+      'The runtime recipe enabled MooncakeStoreConnector, but the artifact reported this AgentX point as non-offloaded.',
+    githubRunId: 31633154542,
+    runAttempt: 2,
+    configId,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc,
+    offloadMode: 'off',
+    recipeFingerprint,
+    set: {
+      offloadMode: 'on' as const,
+      metricsRemove: ['allocated_cpu_dram_gb'],
+      metricsMerge: {
+        kv_offloading: 'dram',
+        kv_offload_backend: 'mooncake',
+        kv_offload_backend_version: '0.3.11.post1',
+      },
+    },
+  })),
+
+  // Every TensorRT-LLM recipe in run 31927376673 configures a 128 GiB native
+  // host KV cache on both prefill and decode workers. The master matrix only
+  // declared NIXL transfer, so all six artifacts lost the offload identity.
+  ...(
+    [
+      [2360, 7, '5c282408e21b662cf5afbef0d26a63ad2fb19bb66ca3b431763a1c40628f3036'],
+      [2361, 96, 'da36b834945785abfa06c44f742684db7a96af49542d9012019063d552dc7393'],
+      [2362, 704, '60e4361ec00fd8a94a700b7ae9dbb4d8b6cf4095b1553f098af45551669fcf1f'],
+      [2363, 52, 'd7fccb3572037431f39757640d090ab1204bb27ac57ff0f9f9a635e9cefb5867'],
+      [2364, 565, 'a6017a5c8a675fb4f1f74e49bb0091f172e6ea357a1bb1b2d6577eb661c9f1c5'],
+      [2365, 44, 'ac8406a4d46f3711732aa352c801bbd1eb7c3545b2982c5d2c56520fa8288342'],
+    ] as const
+  ).map(([configId, conc, recipeFingerprint]) => ({
+    id: `run-31927376673-config-${configId}-conc-${conc}-native-offload`,
+    reason:
+      'The TensorRT-LLM runtime recipe configured a native host KV cache, but the artifact reported this AgentX point as non-offloaded.',
+    githubRunId: 31927376673,
+    runAttempt: 1,
+    configId,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc,
+    offloadMode: 'off',
+    recipeFingerprint,
+    set: {
+      offloadMode: 'on' as const,
+      metricsRemove: ['allocated_cpu_dram_gb'],
+      metricsMerge: {
+        kv_offloading: 'dram',
+        kv_offload_backend: 'native',
+        kv_offload_backend_version: '1.3.0rc24',
+      },
+    },
+  })),
+
+  // The four disaggregated recipes in run 31965016666 attach
+  // MooncakeStoreConnector to NIXL through MultiConnector and allocate a
+  // 140 GB Mooncake segment per node. The three aggregate points in the same
+  // run do not attach the connector and are intentionally excluded.
+  ...(
+    [
+      [1012, 128, 'b01cb33e392b60b01e2f498ea7300118c6046e074556199a3fe9a7208cf7929e'],
+      [1012, 256, '856babb1e00e524c7eddca689e1345d1a97a41f6743c5d5c109347444581aeef'],
+      [2374, 576, 'd7afa7f01be968e02911263a9792bb1200ca27de702b5e79d7907e6d46adfc44'],
+      [2375, 512, '47a4969f521268bccc1a3efd97a5ceaf231ff33ab13fa6fe3f9cadf48573f2b1'],
+    ] as const
+  ).map(([configId, conc, recipeFingerprint]) => ({
+    id: `run-31965016666-config-${configId}-conc-${conc}-mooncake-offload`,
+    reason:
+      'The runtime recipe enabled MooncakeStoreConnector, but the artifact reported this AgentX point as non-offloaded.',
+    githubRunId: 31965016666,
+    runAttempt: 2,
+    configId,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc,
+    offloadMode: 'off',
+    recipeFingerprint,
+    set: {
+      offloadMode: 'on' as const,
+      metricsRemove: ['allocated_cpu_dram_gb'],
+      metricsMerge: {
+        kv_offloading: 'dram',
+        kv_offload_backend: 'mooncake',
+        kv_offload_backend_version: '0.3.11.post1',
+      },
+    },
+  })),
+];
 
 function pointIdentity(
   point: BenchmarkPointKey & { githubRunId: number; runAttempt: number },
