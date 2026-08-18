@@ -8,7 +8,7 @@ import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 const STRINGS = {
   en: {
     eyebrow: 'AgentX / live results',
-    title: 'Compare AgentX inference results',
+    title: 'Compare real world, agentic inference results',
     description:
       'Real-world agentic inference results for Kimi K3, DeepSeek V4 Pro, MiniMax M3, Qwen 3.5, and GLM 5.2. Compare throughput, interactivity, time to first token, and cost across serving stacks and accelerator platforms.',
     dashboard: 'Open the AgentX dashboard',
@@ -18,7 +18,7 @@ const STRINGS = {
   },
   zh: {
     eyebrow: 'AgentX / 实时结果',
-    title: '对比 AgentX 推理结果',
+    title: '对比真实场景下的智能体推理结果',
     description:
       '查看 Kimi K3、DeepSeek V4 Pro、MiniMax M3、Qwen 3.5 与 GLM 5.2 的真实智能体推理结果，对比不同 serving stack 与加速平台的吞吐量、交互速度、首 token 延迟和成本。',
     dashboard: '打开 AgentX 仪表板',

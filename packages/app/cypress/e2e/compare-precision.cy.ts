@@ -8,7 +8,7 @@ describe('Compare precision index page', () => {
   it('leads the /compare index with AgentX results and keeps fixed-sequence tools', () => {
     cy.visit('/compare');
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-      cy.get('h1').should('have.text', 'Compare AgentX inference results');
+      cy.get('h1').should('have.text', 'Compare real world, agentic inference results');
       cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
       cy.get('[data-testid="compare-agentx-model-kimi-k3"]').should(
         'have.attr',
@@ -35,7 +35,7 @@ describe('Compare precision index page', () => {
   it('ships the same AgentX-first hierarchy on the Simplified Chinese page', () => {
     cy.visit('/zh/compare');
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-      cy.get('h1').should('have.text', '对比 AgentX 推理结果');
+      cy.get('h1').should('have.text', '对比真实场景下的智能体推理结果');
       cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
       cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should(
         'have.attr',
