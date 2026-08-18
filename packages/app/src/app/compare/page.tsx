@@ -1,15 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { enAlternates } from '@/lib/i18n';
 
+import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
@@ -19,21 +15,22 @@ import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `InferenceX is the independent, open-source chip inference benchmark from SemiAnalysis, with verified, reproducible results updated as configurations change. ${SUPPORTERS_LINE} Compare latency, throughput & cost head-to-head across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
+const DESCRIPTION =
+  'Compare AgentX agentic inference results for Kimi K3, DeepSeek V4 Pro, MiniMax M3, Qwen 3.5, and GLM 5.2, plus fixed-sequence chip comparisons.';
 
 export const metadata: Metadata = {
-  title: 'Chip Comparisons',
+  title: 'AgentX Inference Comparisons',
   description: DESCRIPTION,
   alternates: enAlternates('/compare'),
   openGraph: {
-    title: `Chip Comparisons | ${SITE_NAME}`,
+    title: `AgentX Inference Comparisons | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/compare`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: `Chip Comparisons | ${SITE_NAME}`,
+    title: `AgentX Inference Comparisons | ${SITE_NAME}`,
     description: DESCRIPTION,
   },
 };
@@ -77,7 +74,7 @@ function groupPairsByVendorForModel(
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',
-  name: `Chip Comparisons | ${SITE_NAME}`,
+  name: `AgentX Inference Comparisons | ${SITE_NAME}`,
   description: DESCRIPTION,
   url: `${SITE_URL}/compare`,
 };
@@ -97,19 +94,27 @@ export default async function CompareIndexPage() {
   return (
     <>
       <JsonLd data={jsonLd} />
-      <section>
+      <AgentXCompareHero locale="en" />
+
+      <section id="fixed-sequence-comparisons" data-testid="compare-fixed-sequence-catalog">
         <Card>
-          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">Chip Comparisons</h1>
+          <p className="font-mono text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+            Fixed-sequence catalog
+          </p>
+          <h2 className="mt-2 text-2xl font-bold tracking-tight lg:text-3xl">
+            Controlled workload comparisons
+          </h2>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} head-to-head inference benchmark comparisons across{' '}
             {formatModelList(modelsWithPairs)}. Each page includes interactive charts for latency,
-            throughput, and cost metrics, plus an interpolated comparison table.
+            throughput, and cost metrics on fixed input and output lengths, plus an interpolated
+            comparison table.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               data-testid="compare-index-per-dollar-link"
               href="/compare-per-dollar"
-              className="inline-flex items-center gap-2 rounded-md bg-brand px-5 py-3 text-base lg:text-lg font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
             >
               Compare Chip performance per dollar
               <span aria-hidden="true" className="text-lg lg:text-xl">
