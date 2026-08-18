@@ -77,6 +77,11 @@ describe('First-load navigation', () => {
     cy.location('pathname').should('eq', '/compare');
   });
 
+  it('navigates to datasets from the header with one click', () => {
+    cy.get('[data-testid="nav-link-datasets"]').should('have.attr', 'href', '/datasets').click();
+    cy.location('pathname').should('eq', '/datasets');
+  });
+
   it('navigates to overview and the full dashboard from the landing CTAs', () => {
     cy.get('[data-testid="landing-overview-link"]')
       .should('have.attr', 'href', '/overview')
