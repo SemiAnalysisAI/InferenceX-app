@@ -55,7 +55,19 @@ describe('AgentX dataset methodology', () => {
       cy.contains('directed acyclic graph (DAG)').should('be.visible');
       cy.contains('following one-hour profiling window').should('be.visible');
       cy.contains('capped at 3 TB').should('be.visible');
-      cy.get('figure[data-testid^="agentx-methodology-figure-"]').should('have.length', 16);
+      cy.get('figure[data-testid^="agentx-methodology-figure-"]').should('have.length', 21);
+      [
+        'requestDistributions256k',
+        'subagentDistributions256k',
+        'replayJoined',
+        'replayFlatspawn',
+        'replaySidecars',
+      ].forEach((figure) => {
+        cy.get(`[data-testid="agentx-methodology-figure-${figure}"] img`)
+          .should('be.visible')
+          .invoke('attr', 'alt')
+          .should('not.be.empty');
+      });
       cy.get('a[href="https://arxiv.org/abs/2604.09557"]').should('exist');
       cy.contains('mostly vibe coded').should('not.exist');
       cy.contains('Distillation is bad').should('not.exist');
@@ -74,7 +86,7 @@ describe('AgentX dataset methodology', () => {
       cy.contains('2026 年 6 月 21 日构建').should('be.visible');
       cy.contains('有向无环图（DAG）').should('be.visible');
       cy.contains('上限为 3 TB').should('be.visible');
-      cy.get('figure[data-testid^="agentx-methodology-figure-"]').should('have.length', 16);
+      cy.get('figure[data-testid^="agentx-methodology-figure-"]').should('have.length', 21);
     });
 
     cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/agentx/methodology');

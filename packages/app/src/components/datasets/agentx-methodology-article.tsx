@@ -7,38 +7,63 @@ type Locale = 'en' | 'zh';
 const ASSET_ROOT = '/images/agentx-methodology';
 
 const FIGURE_ASSETS = {
-  corpus: { src: `${ASSET_ROOT}/corpus-scale.png`, width: 2048, height: 965 },
-  hashRatio: { src: `${ASSET_ROOT}/hash-token-ratio.png`, width: 2048, height: 1799 },
-  traceRecord: { src: `${ASSET_ROOT}/weka-trace-record.png`, width: 1812, height: 2048 },
+  corpus: { src: `${ASSET_ROOT}/corpus-scale.png`, width: 4200, height: 1980 },
+  hashRatio: { src: `${ASSET_ROOT}/hash-token-ratio.png`, width: 4200, height: 3690 },
+  traceRecord: { src: `${ASSET_ROOT}/weka-trace-record.png`, width: 4200, height: 4746 },
   requestDistributions: {
     src: `${ASSET_ROOT}/request-distributions.png`,
-    width: 2048,
-    height: 2004,
+    width: 4200,
+    height: 4110,
+  },
+  requestDistributions256k: {
+    src: `${ASSET_ROOT}/request-distributions-256k.png`,
+    width: 4200,
+    height: 4110,
   },
   subagentDistributions: {
     src: `${ASSET_ROOT}/subagent-distributions.png`,
-    width: 2048,
-    height: 1390,
+    width: 4200,
+    height: 2850,
   },
-  replayLinear: { src: `${ASSET_ROOT}/replay-linear.png`, width: 2048, height: 1169 },
+  subagentDistributions256k: {
+    src: `${ASSET_ROOT}/subagent-distributions-256k.png`,
+    width: 4200,
+    height: 2850,
+  },
+  replayLinear: { src: `${ASSET_ROOT}/replay-linear.png`, width: 4200, height: 2397 },
   replaySingle: {
     src: `${ASSET_ROOT}/replay-single-subagent.png`,
-    width: 2048,
-    height: 1729,
+    width: 4200,
+    height: 3546,
+  },
+  replayJoined: {
+    src: `${ASSET_ROOT}/replay-two-subagents-joined.png`,
+    width: 4200,
+    height: 4080,
   },
   replayTwo: {
     src: `${ASSET_ROOT}/replay-two-subagents.png`,
-    width: 1920,
-    height: 2048,
+    width: 4200,
+    height: 4479,
+  },
+  replayFlatspawn: {
+    src: `${ASSET_ROOT}/replay-flatspawn.png`,
+    width: 4200,
+    height: 4134,
+  },
+  replaySidecars: {
+    src: `${ASSET_ROOT}/replay-subagent-sidecars.png`,
+    width: 4200,
+    height: 4818,
   },
   replayMulti: {
     src: `${ASSET_ROOT}/replay-multi-subagent.png`,
-    width: 1677,
-    height: 2048,
+    width: 4200,
+    height: 5130,
   },
   queueDepth: { src: `${ASSET_ROOT}/request-queue-depth.png`, width: 1360, height: 612 },
   pareto: { src: `${ASSET_ROOT}/pareto-b200-minimax-m3.png`, width: 2048, height: 1167 },
-  warmup: { src: `${ASSET_ROOT}/warmup-snapshot.png`, width: 2048, height: 1322 },
+  warmup: { src: `${ASSET_ROOT}/warmup-snapshot.png`, width: 4200, height: 2712 },
   warmupCache: { src: `${ASSET_ROOT}/warmup-cache-sources.png`, width: 2048, height: 895 },
   profilingCache: {
     src: `${ASSET_ROOT}/profiling-cache-sources.png`,
@@ -136,10 +161,20 @@ const CONTENT = {
         caption:
           'Request distributions in the published v1.0 corpus. The median request has 142,016 input tokens and 444 output tokens.',
       },
+      requestDistributions256k: {
+        alt: 'Log-scale inter-turn latency, input length, and output length distributions for the AgentX 256k dataset variant.',
+        caption:
+          'After requests above the 256k input cap are removed, the variant retains 68,266 requests. Median input length is 88,768 tokens; median output length is 376 tokens.',
+      },
       subagentDistributions: {
         alt: 'Distributions of subagent wall-clock duration and number of subagent groups per session.',
         caption:
           'The 175 sessions with subagents contain 1,697 groups. Median group duration is 2.27 minutes, and the median participating session has four groups.',
+      },
+      subagentDistributions256k: {
+        alt: 'Subagent group duration and groups-per-session distributions for the AgentX 256k dataset variant.',
+        caption:
+          'The 256k variant retains 1,697 subagent groups. Median duration is 2.27 minutes, and p95 duration is 18.5 minutes.',
       },
       replayLinear: {
         alt: 'A linear four-request trace converted from recorded timing into a replay dependency chain.',
@@ -151,10 +186,25 @@ const CONTENT = {
         caption:
           'One subagent branch spawns after the first main request and joins before the next dependent main request.',
       },
+      replayJoined: {
+        alt: 'Two subagent chains branching from a main agent and rejoining at one dependency gate.',
+        caption:
+          'Two subagent chains spawn after the same main request and share one join gate before the main chain resumes.',
+      },
       replayTwo: {
         alt: 'Two parallel subagents joining the main agent and a one-off auxiliary request that does not rejoin.',
         caption:
           'Parallel subagents share a join gate. The auxiliary request runs independently and has no join edge.',
+      },
+      replayFlatspawn: {
+        alt: 'Two subagent chains and one auxiliary request running in parallel before a three-way join.',
+        caption:
+          'A flat-spawn group runs two subagent chains and one auxiliary request in parallel, then joins all three before the main chain resumes.',
+      },
+      replaySidecars: {
+        alt: 'Two subagent chains and two plain sidecar requests running in parallel before one join gate.',
+        caption:
+          'Two plain sidecar requests without duration metadata run beside two subagent chains. Replay waits for all four at one join.',
       },
       replayMulti: {
         alt: 'Four parallel subagents grouped by two join points, plus an auxiliary request, shown as a replay dependency graph.',
@@ -280,10 +330,20 @@ const CONTENT = {
         caption:
           'v1.0 公开语料的请求分布。单请求 input token 中位数为 142,016，output token 中位数为 444。',
       },
+      requestDistributions256k: {
+        alt: 'AgentX 256k 数据集变体中轮次间延迟、input 长度与 output 长度的对数分布。',
+        caption:
+          '移除超过 256k input 上限的请求后，该变体保留 68,266 个请求。input token 中位数为 88,768，output token 中位数为 376。',
+      },
       subagentDistributions: {
         alt: 'Subagent wall-clock duration 以及每个会话中 subagent group 数量的分布。',
         caption:
           '175 个包含 subagent 的会话共有 1,697 个 group。Group 时长中位数为 2.27 分钟；这些会话的 group 数中位数为 4。',
+      },
+      subagentDistributions256k: {
+        alt: 'AgentX 256k 数据集变体中的 subagent group 时长与每会话 group 数分布。',
+        caption:
+          '256k 变体保留 1,697 个 subagent group。时长中位数为 2.27 分钟，p95 为 18.5 分钟。',
       },
       replayLinear: {
         alt: '线性四请求 trace 根据记录时间转换为回放依赖链。',
@@ -294,9 +354,23 @@ const CONTENT = {
         caption:
           'Subagent 分支在第一个主请求后启动，并在下一个依赖它的主请求前通过 join gate 汇合。',
       },
+      replayJoined: {
+        alt: '两条 subagent 链从主 agent 分支，并在同一个依赖 gate 汇合。',
+        caption: '两条 subagent 链在同一个主请求完成后启动，并在主链继续前共用一个 join gate。',
+      },
       replayTwo: {
         alt: '两个并行 subagent 汇合到主 agent，另有一个不会汇合的一次性辅助请求。',
         caption: '并行 subagent 共享 join gate；辅助请求独立运行，不带 join edge。',
+      },
+      replayFlatspawn: {
+        alt: '两条 subagent 链与一个辅助请求并行运行，随后通过三路 join 汇合。',
+        caption:
+          'Flat-spawn group 并行运行两条 subagent 链和一个辅助请求，三者汇合后主链才继续执行。',
+      },
+      replaySidecars: {
+        alt: '两条 subagent 链与两个普通 sidecar 请求并行运行，随后汇合到同一个 join gate。',
+        caption:
+          '两个不带 duration 元数据的普通 sidecar 请求与两条 subagent 链并行运行；回放会在同一个 join 等待四者完成。',
       },
       replayMulti: {
         alt: '四个并行 subagent 按两个 join point 分组，并带有辅助请求的回放依赖图。',
@@ -447,7 +521,15 @@ export function AgentXMethodologyArticle({ locale }: { locale: Locale }) {
           <Paragraphs items={t.datasetParagraphs} />
           <MethodFigure figure="traceRecord" copy={t.figures.traceRecord} />
           <MethodFigure figure="requestDistributions" copy={t.figures.requestDistributions} />
+          <MethodFigure
+            figure="requestDistributions256k"
+            copy={t.figures.requestDistributions256k}
+          />
           <MethodFigure figure="subagentDistributions" copy={t.figures.subagentDistributions} />
+          <MethodFigure
+            figure="subagentDistributions256k"
+            copy={t.figures.subagentDistributions256k}
+          />
         </section>
 
         <section aria-labelledby="replay" className="mt-14">
@@ -455,7 +537,10 @@ export function AgentXMethodologyArticle({ locale }: { locale: Locale }) {
           <Paragraphs items={t.replayParagraphs} />
           <MethodFigure figure="replayLinear" copy={t.figures.replayLinear} />
           <MethodFigure figure="replaySingle" copy={t.figures.replaySingle} />
+          <MethodFigure figure="replayJoined" copy={t.figures.replayJoined} />
           <MethodFigure figure="replayTwo" copy={t.figures.replayTwo} />
+          <MethodFigure figure="replayFlatspawn" copy={t.figures.replayFlatspawn} />
+          <MethodFigure figure="replaySidecars" copy={t.figures.replaySidecars} />
           <MethodFigure figure="replayMulti" copy={t.figures.replayMulti} />
         </section>
 

@@ -72,7 +72,7 @@ describe('Landing nudges — modals', () => {
         expect(sizes[0]).to.deep.eq({ width: 32, height: 16 });
 
         for (const badge of $badges) {
-          const label = badge.firstElementChild;
+          const label = badge.querySelector('[data-new-badge-label]');
           expect(label, 'badge label').not.to.eq(null);
 
           const badgeRect = badge.getBoundingClientRect();
@@ -83,7 +83,7 @@ describe('Landing nudges — modals', () => {
             labelRect.top + labelRect.height / 2 - (badgeRect.top + badgeRect.height / 2);
 
           expect(horizontalOffset).to.be.closeTo(0, 0.1);
-          expect(verticalOffset).to.eq(-1);
+          expect(verticalOffset).to.eq(0);
         }
       });
     // Only one overlay at a time — star modal should not appear
