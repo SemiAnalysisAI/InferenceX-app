@@ -21,14 +21,12 @@ import { Sequence } from './data-mappings';
  *    on a non-null result (a loading skeleton covers this window, which is
  *    short).
  *
- * 2. **Per-model default.** `selectedSequence` starts at the app-wide default
+ * 2. **Availability-driven default.** `selectedSequence` starts at the app-wide default
  *    (`8k/1k`) until the user actually picks something, so it can't distinguish
  *    "the user wants 8K/1K" from "nobody has chosen yet". `sequenceExplicit`
- *    makes that distinction: while it is false, a model that declares a
- *    `modelDefaultSequence` (see `getModelDefaultSequence`) opens on that
- *    scenario if it has data for it — that's how the AgentX models open on
- *    Agentic Workloads instead of 8K/1K. Any explicit selection turns the flag
- *    on and this rule stops applying.
+ *    makes that distinction: while it is false, any model with Agentic Workloads
+ *    data opens on that scenario instead of 8K/1K. Any explicit selection turns
+ *    the flag on and this rule stops applying.
  *
  * 3. **Fallback ordering.** Otherwise: keep the user's `selectedSequence` if the
  *    model has it. Otherwise fall back to a sensible fixed-seq scenario.
@@ -41,28 +39,21 @@ export function resolveEffectiveSequence({
   selectedSequence,
   availableSequences,
   availabilityLoaded,
-  modelDefaultSequence = null,
   sequenceExplicit = false,
 }: {
   selectedSequence: Sequence;
   availableSequences: Sequence[];
   availabilityLoaded: boolean;
-  /** The selected model's preferred opening scenario, or null for the app default. */
-  modelDefaultSequence?: Sequence | null;
   /** Whether `selectedSequence` came from a real user/route choice. */
   sequenceExplicit?: boolean;
 }): Sequence | null {
   // Rule 1: do not commit to a sequence before we know what the model has.
   if (!availabilityLoaded) return null;
 
-  // Rule 2: nobody has chosen yet — open on the model's preferred scenario when
-  // the model actually has data for it.
-  if (
-    !sequenceExplicit &&
-    modelDefaultSequence !== null &&
-    availableSequences.includes(modelDefaultSequence)
-  ) {
-    return modelDefaultSequence;
+  // Rule 2: nobody has chosen yet — prefer the real AgentX workload whenever
+  // availability confirms that the selected model has data for it.
+  if (!sequenceExplicit && availableSequences.includes(Sequence.AgenticTraces)) {
+    return Sequence.AgenticTraces;
   }
 
   // Rule 3a: honor the user's / default selection when the model supports it.

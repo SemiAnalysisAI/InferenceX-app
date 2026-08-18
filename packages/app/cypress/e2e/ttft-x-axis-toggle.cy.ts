@@ -8,8 +8,7 @@ import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2
 // SPEC-SCOPED INTERCEPTS (not the shared fixtures) so this spec — and only this
 // spec — sees the agentic view. Most cases still pass ?i_seq=agentic-traces
 // explicitly; the "Default scenario" block below covers the implicit path,
-// where DeepSeek-V4-Pro's per-model default opens the agentic scenario on its
-// own.
+// where availability opens the agentic scenario on its own.
 const DEFAULT_MODEL_DB_KEY = 'dsv4'; // DeepSeek-V4-Pro is the default model
 const AGENTIC_DATE = '2026-06-12';
 
@@ -120,14 +119,14 @@ const interceptAgenticData = () => {
   cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('benchmarks');
 };
 
-// Same rows re-keyed to a model that declares no per-model default scenario, so
-// the "app default wins" branch stays covered.
-const OTHER_MODEL_DB_KEY = 'dsr1'; // DeepSeek-R1-0528 declares no default scenario
+// Same rows re-keyed to another model to prove the default follows availability
+// rather than a hard-coded model registry.
+const OTHER_MODEL_DB_KEY = 'dsr1';
 const otherModelAvailability = agenticAvailability.map((row) => ({
   ...row,
   model: OTHER_MODEL_DB_KEY,
 }));
-const otherModelBenchmarks = fixedSequenceBenchmarks.map((row, index) => ({
+const otherModelBenchmarks = agenticBenchmarks.map((row, index) => ({
   ...row,
   id: 920000 + index,
   model: OTHER_MODEL_DB_KEY,
@@ -419,10 +418,9 @@ describe('X-axis mode URL param', () => {
 });
 
 describe('Default scenario', () => {
-  it('bare /inference opens on Agentic Workloads for a model that declares it', () => {
+  it('bare /inference opens on Agentic Workloads when the model has corresponding data', () => {
     // Availability contains BOTH agentic and fixed-seq rows for DeepSeek-V4-Pro,
-    // which declares Agentic Workloads as its opening scenario — so the
-    // untouched 8K/1K selection must not win.
+    // so the untouched 8K/1K selection must not win.
     interceptAgenticData();
     interceptDerivedAgenticMetrics();
     cy.visit('/inference', {
@@ -438,7 +436,7 @@ describe('Default scenario', () => {
   });
 
   it('keeps 8K / 1K when the link asks for it explicitly', () => {
-    // An explicit selection always beats the per-model default.
+    // An explicit selection always beats the availability-driven default.
     interceptFixedSequenceData();
     cy.visit('/inference?i_seq=8k%2F1k', {
       onBeforeLoad(win) {
@@ -453,9 +451,9 @@ describe('Default scenario', () => {
     cy.get('[data-testid="chart-figure"] svg').should('not.contain.text', 'P90 Interactivity');
   });
 
-  it('leaves a model without a declared default on 8K / 1K', () => {
-    // DeepSeek-R1 has agentic rows here too, but declares no opening scenario,
-    // so it keeps the app-wide 8K/1K default.
+  it('opens Agentic Workloads for another model with corresponding data', () => {
+    // DeepSeek-R1 is intentionally outside the original hard-coded model list;
+    // its agentic availability must still make Agentic Workloads the default.
     cy.intercept('GET', '/api/v1/availability', { body: otherModelAvailability }).as(
       'availability',
     );
@@ -465,8 +463,8 @@ describe('Default scenario', () => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
     });
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
-    cy.get('[data-testid="scenario-agentic-info"]').should('not.exist');
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Workloads');
+    cy.get('[data-testid="scenario-agentic-info"]').should('exist');
   });
 });
 

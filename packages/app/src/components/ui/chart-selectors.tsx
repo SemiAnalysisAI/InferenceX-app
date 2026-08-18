@@ -374,7 +374,7 @@ export function ScenarioSelector({
           </SelectTrigger>
           <SelectContent>
             {/* Agentic group listed first when available (display order only —
-                the per-model default decides which scenario opens). */}
+                availability decides which scenario opens by default). */}
             {agentic.length > 0 && (
               <SelectGroup>
                 <SelectLabel>{t.agenticGroup}</SelectLabel>

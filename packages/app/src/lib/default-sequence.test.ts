@@ -34,71 +34,52 @@ describe('resolveEffectiveSequence', () => {
     });
   });
 
-  describe('per-model default (rule 2)', () => {
-    it('opens on the model default when the user has not chosen a scenario', () => {
-      // DeepSeek-V4-Pro declares Agentic Workloads as its opening scenario, so
-      // the untouched `8k/1k` initial state must not win.
+  describe('availability-driven AgentX default (rule 2)', () => {
+    it('opens Agentic Workloads whenever the model has data and the user has not chosen', () => {
       expect(
         resolveEffectiveSequence({
           selectedSequence: Sequence.EightK_OneK,
           availableSequences: [Sequence.EightK_OneK, Sequence.AgenticTraces],
           availabilityLoaded: true,
-          modelDefaultSequence: Sequence.AgenticTraces,
           sequenceExplicit: false,
         }),
       ).toBe(Sequence.AgenticTraces);
     });
 
     it('yields to an explicit selection', () => {
-      // A shared `?i_seq=8k-1k` link (or a manual pick) on an agentic-default
-      // model must stay on 8K/1K.
+      // A shared `?i_seq=8k-1k` link (or a manual pick) must stay on 8K/1K.
       expect(
         resolveEffectiveSequence({
           selectedSequence: Sequence.EightK_OneK,
           availableSequences: [Sequence.EightK_OneK, Sequence.AgenticTraces],
           availabilityLoaded: true,
-          modelDefaultSequence: Sequence.AgenticTraces,
           sequenceExplicit: true,
         }),
       ).toBe(Sequence.EightK_OneK);
     });
 
-    it('ignores the model default when that scenario has no data for the run', () => {
+    it('keeps the app default when the model has no Agentic Workloads data', () => {
       expect(
         resolveEffectiveSequence({
           selectedSequence: Sequence.EightK_OneK,
           availableSequences: [Sequence.EightK_OneK],
           availabilityLoaded: true,
-          modelDefaultSequence: Sequence.AgenticTraces,
           sequenceExplicit: false,
         }),
       ).toBe(Sequence.EightK_OneK);
     });
 
     it('does not apply before availability has loaded', () => {
-      // The static fallback list contains every scenario, so applying the model
-      // default here would fetch agentic rows the model may not have.
+      // The static fallback list contains every scenario, so applying the
+      // AgentX preference here would fetch rows the model may not have.
       expect(
         resolveEffectiveSequence({
           selectedSequence: Sequence.EightK_OneK,
           availableSequences: [Sequence.EightK_OneK, Sequence.AgenticTraces],
           availabilityLoaded: false,
-          modelDefaultSequence: Sequence.AgenticTraces,
           sequenceExplicit: false,
         }),
       ).toBeNull();
-    });
-
-    it('leaves models without a declared default on the app default', () => {
-      expect(
-        resolveEffectiveSequence({
-          selectedSequence: Sequence.EightK_OneK,
-          availableSequences: [Sequence.EightK_OneK, Sequence.AgenticTraces],
-          availabilityLoaded: true,
-          modelDefaultSequence: null,
-          sequenceExplicit: false,
-        }),
-      ).toBe(Sequence.EightK_OneK);
     });
   });
 

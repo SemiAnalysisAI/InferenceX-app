@@ -39,9 +39,9 @@ File: `packages/app/src/components/GlobalFilterContext.tsx`
 
 **Effective (auto-corrected) values** (derived, not settable directly):
 
-- `effectiveSequence` — the model's per-model default scenario while the user has made no explicit
-  choice (`getModelDefaultSequence`, e.g. Agentic Workloads for the AgentX models), otherwise
-  `selectedSequence` if valid for the current model, else 8K/1K, else first available
+- `effectiveSequence` — Agentic Workloads while the user has made no explicit choice and the model
+  has corresponding availability, otherwise `selectedSequence` if valid for the current model,
+  else 8K/1K, else first available
 - `effectivePrecisions` — subset of `selectedPrecisions` that are available; falls back to `[availablePrecisions[0]]`
 - `effectiveRunDate` — latest available date unless user explicitly picked one
 
@@ -192,7 +192,7 @@ GlobalFilterProvider
   → selectedModel     (user pick)
   → modelRows         = availabilityRows filtered to selectedModel (internal memo)
   → availableSequences = unique sequences in modelRows
-  → effectiveSequence  = model default (if unchosen and in availableSequences),
+  → effectiveSequence  = Agentic Workloads (if unchosen and in availableSequences),
                          else selectedSequence if in availableSequences,
                          else 8k/1k if available, else availableSequences[0]
   → availablePrecisions = unique precisions in modelRows where sequence = effectiveSequence

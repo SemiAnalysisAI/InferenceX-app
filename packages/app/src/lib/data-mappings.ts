@@ -370,36 +370,6 @@ export function getSequenceExclusionFamilies(
 export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];
 
 /**
- * Scenario a model opens on when the user hasn't picked one.
- *
- * The app-wide default is 8K/1K (see `resolveEffectiveSequence`), but for the
- * models we actively benchmark on AgentX the agentic workload — long-context,
- * multi-turn, sub-agent traces — is the representative view, so those models
- * open on it instead. Models absent from this map keep the 8K/1K default.
- *
- * This is a *default*, not a pin: an explicit selection (a `?i_seq=` link, a
- * route-seeded `initialSequence`, or a manual pick in the selector) always
- * wins, and the entry is ignored when the model has no agentic rows for the
- * selected run date.
- *
- * Declared here rather than in `MODEL_CONFIG` because `Sequence` is defined
- * below that object — referencing it there would read the enum before it is
- * initialized.
- */
-const MODEL_DEFAULT_SEQUENCE: Partial<Record<Model, Sequence>> = {
-  [Model.DeepSeek_V4_Pro]: Sequence.AgenticTraces,
-  [Model.MiniMax_M3]: Sequence.AgenticTraces,
-  [Model.GLM_5_2]: Sequence.AgenticTraces,
-  [Model.Qwen3_5]: Sequence.AgenticTraces,
-};
-
-/** Preferred opening scenario for a model, or null when it uses the app default. */
-export function getModelDefaultSequence(model: Model | string | null | undefined): Sequence | null {
-  if (!model) return null;
-  return MODEL_DEFAULT_SEQUENCE[model as Model] ?? null;
-}
-
-/**
  * Percentile of the latency distribution used for the chart x-axis when
  * viewing agentic traces. Agentic rows carry median/p75/p90/p95/p99/p99.9
  * variants for ttft, ttlt (=e2el), and itl (and intvty derived from itl);

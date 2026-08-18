@@ -26,7 +26,6 @@ import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import {
-  getModelDefaultSequence,
   Model,
   MODEL_OPTIONS,
   Precision,
@@ -43,13 +42,10 @@ const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
 
 // Placeholder for the public (non-null) `effectiveSequence` during the window
-// before availability has loaded: the scenario the model is *expected* to open
-// on — its per-model default when the user hasn't chosen, otherwise `8k/1k`,
-// the app default scenario. Guessing the model's own default keeps the selector
-// from flashing "8K / 1K" on an agentic-default model (and, as before, from
-// flashing an agentic label on a fixed-seq-only model) while the chart shows its
-// loading skeleton. It stays a guess: consumers that must not act on an
-// unresolved sequence gate on `sequenceResolved` instead.
+// before availability has loaded. It stays on the fixed-sequence app default
+// until availability confirms whether the selected model has AgentX data, so a
+// fixed-seq-only model never flashes an agentic label. Consumers that must not
+// act on an unresolved sequence gate on `sequenceResolved` instead.
 // (Declared after the import block so it never references `Sequence` above its import.)
 const APP_DEFAULT_SEQUENCE = Sequence.EightK_OneK;
 
@@ -176,14 +172,15 @@ export function GlobalFilterProvider({
     const urlSeq = getUrlParam('i_seq');
     if (urlSeq && Object.values(Sequence).includes(urlSeq as Sequence)) return urlSeq as Sequence;
     // Default to the 8K/1K fixed-seq scenario; the effectiveSequence resolution
-    // below handles per-model defaults (e.g. the AgentX models, which open on
-    // Agentic Workloads) and models that lack 8K/1K entirely.
+    // below prefers Agentic Workloads when availability confirms the model has
+    // corresponding data, and handles models that lack 8K/1K entirely.
     return Sequence.EightK_OneK;
   });
   // Whether the scenario was chosen explicitly (seeded `initialSequence` prop,
-  // URL `i_seq`, or a manual pick). Until then the per-model default applies —
+  // URL `i_seq`, or a manual pick). Until then the availability-driven AgentX
+  // default applies —
   // without this flag the initial `8k/1k` state is indistinguishable from a
-  // deliberate 8K/1K selection, and the model default could never win.
+  // deliberate 8K/1K selection, and Agentic Workloads could never win.
   //
   // Deliberately NOT seeded from `i_seq` here: this flag feeds the scenario
   // label rendered during the pre-availability window, and `getUrlParam` sees
@@ -352,37 +349,21 @@ export function GlobalFilterProvider({
   // — we surface that as `sequenceResolved` so InferenceContext can gate the
   // benchmark fetch until the real sequence is known (no agentic fetch fires for
   // a fixed-seq-only model). For the non-null public `effectiveSequence` value
-  // we substitute the scenario the model is expected to open on during that
-  // window, so the scenario selector doesn't flash a label it will immediately
-  // replace; the chart shows its normal loading skeleton until
+  // we retain the fixed-sequence placeholder until availability confirms the
+  // AgentX scenario exists; the chart shows its normal loading skeleton until
   // `sequenceResolved` flips true.
-  const modelDefaultSequence = useMemo(
-    () => getModelDefaultSequence(selectedModel),
-    [selectedModel],
-  );
   const resolvedSequence = useMemo(
     () =>
       resolveEffectiveSequence({
         selectedSequence,
         availableSequences,
         availabilityLoaded,
-        modelDefaultSequence,
         sequenceExplicit,
       }),
-    [
-      selectedSequence,
-      availableSequences,
-      availabilityLoaded,
-      modelDefaultSequence,
-      sequenceExplicit,
-    ],
+    [selectedSequence, availableSequences, availabilityLoaded, sequenceExplicit],
   );
   const sequenceResolved = resolvedSequence !== null;
-  const preAvailabilitySequence =
-    !sequenceExplicit && modelDefaultSequence !== null
-      ? modelDefaultSequence
-      : APP_DEFAULT_SEQUENCE;
-  const effectiveSequence = resolvedSequence ?? preAvailabilitySequence;
+  const effectiveSequence = resolvedSequence ?? APP_DEFAULT_SEQUENCE;
 
   // Precisions available for the selected model + sequence (DB ∪ unofficial run)
   const availablePrecisions = useMemo(() => {
