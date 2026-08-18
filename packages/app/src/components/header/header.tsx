@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 
 import { ModeToggle } from '@/components/ui/mode-toggle';
+import { NewBadge } from '@/components/ui/new-badge';
 import { MinecraftToggles } from '@/components/minecraft/minecraft-toggles';
 import { CLIENT_SEARCH_CHANGE_EVENT, navigateInApp } from '@/lib/client-navigation';
 import { hasZhSibling, isZhPathname, switchLocalePath, ZH_PREFIX, zhPath } from '@/lib/i18n';
@@ -253,12 +254,9 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
               >
                 <span>{label}</span>
                 {badgeLabel && (
-                  <span
-                    data-nav-badge="agentx"
-                    className="inline-flex items-center rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold leading-none tracking-wider text-primary-foreground shadow-sm"
-                  >
+                  <NewBadge data-nav-badge="agentx" data-new-badge="agentx-nav">
                     {badgeLabel}
-                  </span>
+                  </NewBadge>
                 )}
               </Link>
             ))}
@@ -331,12 +329,13 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                     >
                       <span>{label}</span>
                       {badgeLabel && (
-                        <span
+                        <NewBadge
                           data-nav-badge="agentx"
-                          className="ml-1.5 inline-flex items-center rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold leading-none tracking-wider text-primary-foreground shadow-sm"
+                          data-new-badge="agentx-nav"
+                          className="ml-1.5"
                         >
                           {badgeLabel}
-                        </span>
+                        </NewBadge>
                       )}
                     </Link>
                   ))}

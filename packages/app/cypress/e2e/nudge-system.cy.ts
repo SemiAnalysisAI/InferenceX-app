@@ -58,6 +58,19 @@ describe('Landing nudges — modals', () => {
       .and('contain.text', 'Kimi K3, DeepSeek-V4-Pro, MiniMax-M3, Qwen3.5 397B, and GLM-5.2')
       .and('contain.text', 'View results')
       .and('match', 'div[role="dialog"][aria-modal="false"]');
+    cy.get('[data-new-badge]')
+      .should('have.length', 3)
+      .then(($badges) => {
+        const sizes = [...$badges].map((badge) => {
+          const rect = badge.getBoundingClientRect();
+          return { width: rect.width, height: rect.height };
+        });
+        for (const size of sizes) {
+          expect(size.width).to.eq(sizes[0].width);
+          expect(size.height).to.eq(sizes[0].height);
+        }
+        expect(sizes[0]).to.deep.eq({ width: 32, height: 16 });
+      });
     // Only one overlay at a time — star modal should not appear
     cy.get('[data-testid="github-star-modal"]').should('not.exist');
   });
