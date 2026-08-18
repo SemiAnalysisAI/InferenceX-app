@@ -41,7 +41,7 @@ const STRINGS = {
       'Input Sequence Length / Output Sequence Length. Defines the number of input and output tokens for the benchmark (e.g., 1K/8K means 1,024 input tokens and 8,192 output tokens).',
     scenario: 'Scenario',
     scenarioTooltip:
-      'Benchmark scenario. Fixed Sequence Length runs use a defined input/output token count (ISL/OSL). Agentic Workloads replay real agentic workloads with variable inputs/outputs.',
+      'Benchmark scenario. Fixed Sequence Length runs use a defined input/output token count (ISL/OSL). The Agentic scenario replays real agentic workloads with variable inputs/outputs.',
     agenticScenarioTooltip: 'Realistic Long Context Multi Turn Agentic Workload with Sub Agents.',
     agenticScenarioLearnMore: 'Learn More Here',
     latencyPercentile: 'Latency Percentile',
@@ -50,7 +50,6 @@ const STRINGS = {
     precision: 'Precision',
     precisionTooltip:
       "Numerical precision used for model weights. Lower precision like 'FP4' uses less memory and increases throughput but may slightly reduce accuracy compared to higher precisions like 'FP8'.",
-    agenticGroup: 'Agentic',
     fixedSequenceLength: 'Fixed Sequence Length',
     deprecated: 'Deprecated',
     deprecatedSequenceReason:
@@ -64,7 +63,7 @@ const STRINGS = {
       '输入序列长度 / 输出序列长度（Input Sequence Length / Output Sequence Length）。定义基准测试的输入和输出 token 数量（如 1K/8K 表示 1,024 个输入 token 和 8,192 个输出 token）。',
     scenario: '场景',
     scenarioTooltip:
-      '基准测试场景。Fixed Sequence Length 使用预设的输入/输出 token 数（ISL/OSL）。Agentic Workloads 回放具有可变输入/输出的真实智能体工作负载。',
+      '基准测试场景。Fixed Sequence Length 使用预设的输入/输出 token 数（ISL/OSL）。Agentic 场景回放具有可变输入/输出的真实智能体工作负载。',
     agenticScenarioTooltip: '真实的长上下文、多轮、带子智能体（sub-agent）的智能体工作负载。',
     agenticScenarioLearnMore: '点此了解更多',
     latencyPercentile: '延迟分位数',
@@ -72,7 +71,6 @@ const STRINGS = {
     precision: '精度',
     precisionTooltip:
       '模型权重的数值精度。FP4 等低精度占用更少显存并提高吞吐量，但与 FP8 等高精度相比可能略微降低准确度。',
-    agenticGroup: '智能体',
     fixedSequenceLength: '固定序列长度',
     deprecated: '已弃用',
     deprecatedSequenceReason: 'CI 容量已重新分配给智能体编程和多轮对话场景。',
@@ -373,11 +371,14 @@ export function ScenarioSelector({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {/* Agentic group listed first when available (display order only —
-                availability decides which scenario opens by default). */}
+            {/* Agentic entries listed first when available (display order only
+                — availability decides which scenario opens by default). They
+                carry no group header: they are named "Agentic" themselves, so a
+                heading above them would just repeat the word. They stay in their
+                own SelectGroup so the "Fixed Sequence Length" heading below
+                still reads as a separate section. */}
             {agentic.length > 0 && (
               <SelectGroup>
-                <SelectLabel>{t.agenticGroup}</SelectLabel>
                 {agentic.map((seq) => (
                   <SelectItem key={seq} value={seq}>
                     {getSequenceLabel(seq as Sequence, locale)}

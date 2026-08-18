@@ -172,15 +172,15 @@ export function GlobalFilterProvider({
     const urlSeq = getUrlParam('i_seq');
     if (urlSeq && Object.values(Sequence).includes(urlSeq as Sequence)) return urlSeq as Sequence;
     // Default to the 8K/1K fixed-seq scenario; the effectiveSequence resolution
-    // below prefers Agentic Workloads when availability confirms the model has
-    // corresponding data, and handles models that lack 8K/1K entirely.
+    // below prefers the Agentic scenario when availability confirms the model
+    // has corresponding data, and handles models that lack 8K/1K entirely.
     return Sequence.EightK_OneK;
   });
   // Whether the scenario was chosen explicitly (seeded `initialSequence` prop,
   // URL `i_seq`, or a manual pick). Until then the availability-driven AgentX
   // default applies —
   // without this flag the initial `8k/1k` state is indistinguishable from a
-  // deliberate 8K/1K selection, and Agentic Workloads could never win.
+  // deliberate 8K/1K selection, and the Agentic scenario could never win.
   //
   // Deliberately NOT seeded from `i_seq` here: this flag feeds the scenario
   // label rendered during the pre-availability window, and `getUrlParam` sees

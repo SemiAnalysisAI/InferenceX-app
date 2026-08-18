@@ -128,12 +128,16 @@ describe('Chart Selectors', () => {
   });
 
   describe('ScenarioSelector', () => {
-    it('labels the agentic scenario "Agentic Workloads"', () => {
+    it('labels the agentic scenario "Agentic"', () => {
       cy.mount(<ScenarioSelectorHarness />);
-      cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Workloads');
+      cy.get('[data-testid="scenario-selector"]').should('have.text', 'Agentic');
       cy.get('[data-testid="scenario-selector"]').click();
-      cy.contains('[role="option"]', 'Agentic Workloads').should('be.visible');
+      cy.contains('[role="option"]', 'Agentic').should('be.visible');
       cy.contains('[role="option"]', 'Agentic Traces').should('not.exist');
+      // The lone agentic entry needs no "Agentic" heading above it.
+      cy.get('[data-slot="select-content"]')
+        .find('[data-slot="select-label"]')
+        .should('not.contain.text', 'Agentic');
     });
 
     it('explains the agentic workload in a tooltip that links to /datasets', () => {
@@ -157,7 +161,7 @@ describe('Chart Selectors', () => {
 
       // ...and appears as soon as the user picks the agentic scenario.
       cy.get('[data-testid="scenario-selector"]').click();
-      cy.contains('[role="option"]', 'Agentic Workloads').click();
+      cy.contains('[role="option"]', 'Agentic').click();
       cy.get('[data-testid="scenario-agentic-info"]').should('exist');
     });
   });

@@ -1,7 +1,7 @@
 import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 
 // This spec exercises the agentic x-axis modes, which only exist when the
-// selected model resolves to the Agentic Workloads scenario. The default e2e
+// selected model resolves to the Agentic scenario. The default e2e
 // fixtures (cypress/fixtures/api/*.json) have NO agentic rows for any model, so
 // bare /inference always resolves to a fixed-seq scenario there. We therefore
 // inject agentic availability + benchmark rows for the default model VIA
@@ -177,7 +177,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   });
 
   it('defaults the agentic view to Interactivity, with all four modes as flat tabs', () => {
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Workloads');
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     // #736 made every latency mode a top-level tab and moved the default off E2E
     // Normalized Interactivity, which still leads the strip without being selected.
     cy.get('[data-testid="x-axis-mode-advanced"]').should('not.exist');
@@ -273,7 +273,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
         unlockAgenticGate(win);
       },
     });
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Workloads');
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
@@ -385,7 +385,7 @@ describe('X-axis mode URL param', () => {
         unlockAgenticGate(win);
       },
     });
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Workloads');
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     cy.get('[data-testid="x-axis-mode-ttft"]')
       .should('have.attr', 'aria-selected', 'true')
       .and('contain.text', 'TTFT');
@@ -411,14 +411,14 @@ describe('X-axis mode URL param', () => {
       },
     });
 
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Workloads');
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     cy.get('[data-testid="percentile-selector"]').should('not.exist');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90');
   });
 });
 
 describe('Default scenario', () => {
-  it('bare /inference opens on Agentic Workloads when the model has corresponding data', () => {
+  it('bare /inference opens on the Agentic scenario when the model has corresponding data', () => {
     // Availability contains BOTH agentic and fixed-seq rows for DeepSeek-V4-Pro,
     // so the untouched 8K/1K selection must not win.
     interceptAgenticData();
@@ -428,7 +428,7 @@ describe('Default scenario', () => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
     });
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Workloads');
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     // The explainer sits beside the trigger, linking out to the dataset page.
     cy.get('[data-testid="scenario-agentic-info"]').should('exist');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
@@ -451,9 +451,9 @@ describe('Default scenario', () => {
     cy.get('[data-testid="chart-figure"] svg').should('not.contain.text', 'P90 Interactivity');
   });
 
-  it('opens Agentic Workloads for another model with corresponding data', () => {
+  it('opens the Agentic scenario for another model with corresponding data', () => {
     // DeepSeek-R1 is intentionally outside the original hard-coded model list;
-    // its agentic availability must still make Agentic Workloads the default.
+    // its agentic availability must still make the Agentic scenario the default.
     cy.intercept('GET', '/api/v1/availability', { body: otherModelAvailability }).as(
       'availability',
     );
@@ -463,7 +463,7 @@ describe('Default scenario', () => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
     });
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Workloads');
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     cy.get('[data-testid="scenario-agentic-info"]').should('exist');
   });
 });

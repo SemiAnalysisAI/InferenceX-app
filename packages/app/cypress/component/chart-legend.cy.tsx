@@ -232,7 +232,7 @@ function LegendWithPointsTable() {
             if (!open) setOpenSeries(null);
           }}
           title={isOverlay ? '✕ my-branch' : 'B300 (vLLM)'}
-          subtitle="DeepSeek V4 Pro · Agentic Workloads"
+          subtitle="DeepSeek V4 Pro · Agentic"
           accentColor={isOverlay ? '#dc2626' : '#2b83ba'}
           rows={buildLegendPointsRows(isOverlay ? OVERLAY_POINTS : OFFICIAL_POINTS, isOverlay)}
           isOverlay={isOverlay}
@@ -258,7 +258,7 @@ describe('ChartLegend points-table icon + dialog', () => {
     cy.get('[data-testid="legend-points-dialog"]').should('contain.text', 'B300 (vLLM)');
     cy.get('[data-testid="legend-points-dialog"]').should(
       'contain.text',
-      'DeepSeek V4 Pro · Agentic Workloads',
+      'DeepSeek V4 Pro · Agentic',
     );
     // Two rows, conc ascending, linked to the agentic detail pages
     cy.get('[data-testid="legend-points-row"]').should('have.length', 2);

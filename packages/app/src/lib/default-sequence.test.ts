@@ -35,7 +35,7 @@ describe('resolveEffectiveSequence', () => {
   });
 
   describe('availability-driven AgentX default (rule 2)', () => {
-    it('opens Agentic Workloads whenever the model has data and the user has not chosen', () => {
+    it('opens the Agentic scenario whenever the model has data and the user has not chosen', () => {
       expect(
         resolveEffectiveSequence({
           selectedSequence: Sequence.EightK_OneK,
@@ -58,7 +58,7 @@ describe('resolveEffectiveSequence', () => {
       ).toBe(Sequence.EightK_OneK);
     });
 
-    it('keeps the app default when the model has no Agentic Workloads data', () => {
+    it('keeps the app default when the model has no Agentic data', () => {
       expect(
         resolveEffectiveSequence({
           selectedSequence: Sequence.EightK_OneK,

@@ -4,7 +4,7 @@ import { Sequence } from './data-mappings';
  * Effective-sequence resolution.
  *
  * `selectedSequence` defaults to {@link Sequence.EightK_OneK}, but the user may
- * have selected a scenario the model doesn't offer (e.g. Agentic Workloads via a
+ * have selected a scenario the model doesn't offer (e.g. the Agentic scenario via a
  * shared `?i_seq=` link on a fixed-seq-only model). This helper turns the raw
  * user/default selection into the sequence the chart should actually render,
  * given what the selected model offers.
@@ -24,9 +24,9 @@ import { Sequence } from './data-mappings';
  * 2. **Availability-driven default.** `selectedSequence` starts at the app-wide default
  *    (`8k/1k`) until the user actually picks something, so it can't distinguish
  *    "the user wants 8K/1K" from "nobody has chosen yet". `sequenceExplicit`
- *    makes that distinction: while it is false, any model with Agentic Workloads
- *    data opens on that scenario instead of 8K/1K. Any explicit selection turns
- *    the flag on and this rule stops applying.
+ *    makes that distinction: while it is false, any model with Agentic data
+ *    opens on that scenario instead of 8K/1K. Any explicit selection turns the
+ *    flag on and this rule stops applying.
  *
  * 3. **Fallback ordering.** Otherwise: keep the user's `selectedSequence` if the
  *    model has it. Otherwise fall back to a sensible fixed-seq scenario.

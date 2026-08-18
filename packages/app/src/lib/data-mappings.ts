@@ -320,8 +320,8 @@ const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
     exclusionFamilies: GUARDED_ENGINE_FAMILIES,
   },
   [Sequence.AgenticTraces]: {
-    label: 'Agentic Workloads',
-    labelZh: '智能体工作负载',
+    label: 'Agentic',
+    labelZh: '智能体',
     compact: 'agentic',
     category: 'default',
     kind: 'agentic',
