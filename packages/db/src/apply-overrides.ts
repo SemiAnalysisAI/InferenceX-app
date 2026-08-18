@@ -20,6 +20,7 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
 import { type Sql, createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
+import { jsonbParam } from './lib/backfill-runner.js';
 import {
   type BenchmarkPointBackfill,
   type ChangelogBackfill,
@@ -183,6 +184,53 @@ async function applyChangelogBackfill(target: ChangelogBackfillTarget): Promise<
 interface BenchmarkPointBackfillTarget {
   backfill: BenchmarkPointBackfill;
   resultId: number;
+  metrics: Record<string, unknown>;
+}
+
+function asMetricsRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function benchmarkPointMetricsPatch(backfill: BenchmarkPointBackfill): Record<string, unknown> {
+  const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
+  return {
+    ...backfill.set.metricsMerge,
+    ...(backfill.set.offloadMode === undefined ? {} : { offload_mode: desiredOffloadMode }),
+  };
+}
+
+/**
+ * Recognize the exact malformed value written by the first benchmark-point
+ * backfill implementation. It concatenated a metrics object with a JSONB
+ * string, producing `[originalMetrics, "{...patch}"]`.
+ */
+function recoverMalformedBenchmarkPointMetrics(
+  value: unknown,
+  backfill: BenchmarkPointBackfill,
+): Record<string, unknown> | null {
+  if (!Array.isArray(value) || value.length !== 2) return null;
+  const originalMetrics = asMetricsRecord(value[0]);
+  if (!originalMetrics || typeof value[1] !== 'string') return null;
+
+  try {
+    const appendedPatch = JSON.parse(value[1]) as unknown;
+    if (!isDeepStrictEqual(appendedPatch, benchmarkPointMetricsPatch(backfill))) return null;
+  } catch {
+    return null;
+  }
+  return originalMetrics;
+}
+
+function patchedBenchmarkPointMetrics(
+  sourceMetrics: Record<string, unknown>,
+  backfill: BenchmarkPointBackfill,
+): Record<string, unknown> {
+  const metrics = { ...sourceMetrics };
+  for (const key of backfill.set.metricsRemove ?? []) delete metrics[key];
+  Object.assign(metrics, benchmarkPointMetricsPatch(backfill));
+  return metrics;
 }
 
 function benchmarkPointBackfillIsApplied(
@@ -191,7 +239,8 @@ function benchmarkPointBackfillIsApplied(
 ): boolean {
   const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
   if (row.offload_mode !== desiredOffloadMode) return false;
-  const metrics = row.metrics as Record<string, unknown>;
+  const metrics = asMetricsRecord(row.metrics);
+  if (!metrics) return false;
   if (backfill.set.offloadMode !== undefined && metrics.offload_mode !== desiredOffloadMode) {
     return false;
   }
@@ -246,29 +295,41 @@ async function previewBenchmarkPointBackfill(
     console.log('      already applied.');
     return null;
   }
-  if (row.offload_mode === desiredOffloadMode && desiredOffloadMode !== backfill.offloadMode) {
+
+  const malformedMetrics = recoverMalformedBenchmarkPointMetrics(row.metrics, backfill);
+  if (
+    row.offload_mode === desiredOffloadMode &&
+    desiredOffloadMode !== backfill.offloadMode &&
+    malformedMetrics === null
+  ) {
     throw new Error(
       `${backfill.id}: source identity is missing and the desired identity has unexpected data`,
     );
   }
+  const sourceMetrics = asMetricsRecord(row.metrics) ?? malformedMetrics;
+  if (!sourceMetrics) {
+    throw new Error(`${backfill.id}: benchmark metrics have an unexpected JSON shape`);
+  }
+  if (malformedMetrics) {
+    console.log('      repair malformed metrics written by the previous backfill attempt');
+  }
   console.log(`      set ${JSON.stringify(backfill.set)}`);
-  return { backfill, resultId: row.id as number };
+  return {
+    backfill,
+    resultId: row.id as number,
+    metrics: patchedBenchmarkPointMetrics(sourceMetrics, backfill),
+  };
 }
 
 async function applyBenchmarkPointBackfillToDatabase(
   target: BenchmarkPointBackfillTarget,
 ): Promise<void> {
-  const { backfill, resultId } = target;
+  const { backfill, resultId, metrics } = target;
   const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
-  const metricsMerge: Record<string, unknown> = { ...backfill.set.metricsMerge };
-  if (backfill.set.offloadMode !== undefined) {
-    metricsMerge.offload_mode = desiredOffloadMode;
-  }
   const [updated] = await sql`
     UPDATE benchmark_results
     SET offload_mode = ${desiredOffloadMode},
-        metrics = (metrics - ${backfill.set.metricsRemove ?? []}::text[])
-          || ${JSON.stringify(metricsMerge)}::jsonb
+        metrics = ${jsonbParam(sql, metrics)}
     WHERE id = ${resultId}
     RETURNING id
   `;
