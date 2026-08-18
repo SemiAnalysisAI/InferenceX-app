@@ -7,7 +7,9 @@ import { COMPARE_MODEL_SLUGS } from './compare-slug';
 import {
   compareMetaDescription,
   computeCompareImageRows,
+  computeCompareTableData,
   KNOWN_MODELS,
+  KNOWN_SEQUENCES,
   META_DESCRIPTION_MAX,
   type SsrInterpolatedRow,
 } from './compare-ssr';
@@ -20,6 +22,10 @@ let nextStubId = 1;
 describe('compare URL validators', () => {
   it('accepts GLM-5.2 as a model override', () => {
     expect(KNOWN_MODELS.has('GLM-5.2')).toBe(true);
+  });
+
+  it('accepts AgentX as a comparison scenario override', () => {
+    expect(KNOWN_SEQUENCES.has('agentic-traces')).toBe(true);
   });
 });
 
@@ -68,6 +74,60 @@ function pairRows(): BenchmarkRow[] {
     stubRow({ hardware: 'b200', conc: 128, metrics: { tput_per_gpu: 250, median_intvty: 40 } }),
   ];
 }
+
+function agenticPairRows(): BenchmarkRow[] {
+  return [
+    stubRow({
+      hardware: 'h200',
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      conc: 16,
+      metrics: { tput_per_gpu: 800, p90_itl: 0.1 },
+    }),
+    stubRow({
+      hardware: 'h200',
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      conc: 32,
+      metrics: { tput_per_gpu: 600, p90_itl: 0.05 },
+    }),
+    stubRow({
+      hardware: 'b200',
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      conc: 16,
+      metrics: { tput_per_gpu: 900, p90_itl: 0.1 },
+    }),
+    stubRow({
+      hardware: 'b200',
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      conc: 32,
+      metrics: { tput_per_gpu: 700, p90_itl: 0.05 },
+    }),
+  ];
+}
+
+describe('computeCompareTableData', () => {
+  it('builds AgentX comparison rows from p90 full-response interactivity', () => {
+    const result = computeCompareTableData(
+      agenticPairRows(),
+      'h200',
+      'b200',
+      'agentic-traces',
+      'fp8',
+    );
+
+    expect(result.interactivityRange).toEqual({ min: 10, max: 20 });
+    expect(result.defaultTargets).toEqual([13, 15, 18]);
+    expect(result.ssrRows).toHaveLength(3);
+    expect(result.ssrRows.every((row) => row.a !== null && row.b !== null)).toBe(true);
+  });
+});
 
 describe('computeCompareImageRows', () => {
   const range = { min: 10, max: 40 };

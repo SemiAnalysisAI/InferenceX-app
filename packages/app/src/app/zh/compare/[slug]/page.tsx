@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
+import { comparisonScenarioForModel } from '@/lib/compare-agentx';
 import { pickPairDefaults } from '@/lib/compare-pair-defaults';
 import {
   canonicalCompareSlug,
@@ -56,7 +57,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // Stat-led Chinese meta description from the interpolated head-to-head numbers
   // at the slug's default operating point (falls back to boilerplate when thin).
   const rows = await getCachedBenchmarks(parsed.model.dbKeys);
-  const { sequence, precision } = pickPairDefaults(rows, parsed.a, parsed.b);
+  const { sequence, precision } = pickPairDefaults(
+    rows,
+    parsed.a,
+    parsed.b,
+    comparisonScenarioForModel(parsed.model).sequence,
+  );
   const { ssrRows } = computeCompareTableData(rows, parsed.a, parsed.b, sequence, precision);
   const description = compareMetaDescriptionZh(parsed.model, parsed.a, parsed.b, ssrRows);
 
@@ -106,6 +112,7 @@ export default async function ComparePageZh({ params, searchParams }: Props) {
     rows,
     parsed.a,
     parsed.b,
+    comparisonScenarioForModel(parsed.model).sequence,
   );
 
   const urlSeq = pickString(sp.i_seq);

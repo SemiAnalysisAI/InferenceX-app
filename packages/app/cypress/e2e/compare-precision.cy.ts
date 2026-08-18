@@ -21,15 +21,25 @@ describe('Compare precision index page', () => {
         '/agentx/methodology',
       );
     });
-    cy.get('[data-testid="compare-fixed-sequence-catalog"]')
-      .should('contain.text', 'Controlled workload comparisons')
-      .and('contain.text', 'fixed input and output lengths');
+    cy.get('[data-testid="compare-model-catalog"]')
+      .should('contain.text', 'AgentX and 8K→1K results')
+      .and('contain.text', 'Each card identifies its scenario');
     cy.get('[data-testid="compare-index-precision-link"]')
       .should('have.attr', 'href', '/compare-precision')
       .and('contain.text', 'Compare precisions');
     cy.get('[data-testid="compare-index-spec-decode-link"]')
       .should('have.attr', 'href', '/compare-spec-decode')
       .and('contain.text', 'Compare speculative decoding');
+    cy.get('#deepseek-v4 a[data-scenario="AgentX"]')
+      .first()
+      .should('contain.text', 'AgentX')
+      .and('have.attr', 'href')
+      .and('match', /\?i_seq=agentic-traces$/u);
+    cy.get('#deepseek-r1 a[data-scenario="8K→1K"]')
+      .first()
+      .should('contain.text', '8K→1K')
+      .and('have.attr', 'href')
+      .and('match', /\?i_seq=8k%2F1k$/u);
   });
 
   it('ships the same AgentX-first hierarchy on the Simplified Chinese page', () => {
@@ -48,10 +58,11 @@ describe('Compare precision index page', () => {
         '/zh/agentx/methodology',
       );
     });
-    cy.get('[data-testid="compare-fixed-sequence-catalog"]').should(
-      'contain.text',
-      '受控工作负载对比',
-    );
+    cy.get('[data-testid="compare-model-catalog"]').should('contain.text', 'AgentX 与 8K→1K 结果');
+    cy.get('#deepseek-v4 a[data-scenario="AgentX"]')
+      .first()
+      .should('have.attr', 'href')
+      .and('match', /^\/zh\/compare\/.+\?i_seq=agentic-traces$/u);
   });
 
   it('renders the /compare-per-dollar index with precision and spec-decode CTA links', () => {

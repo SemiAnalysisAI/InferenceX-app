@@ -9,6 +9,7 @@ import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
 import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
 import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
 import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
@@ -96,19 +97,19 @@ export default async function CompareIndexPage() {
       <JsonLd data={jsonLd} />
       <AgentXCompareHero locale="en" />
 
-      <section id="fixed-sequence-comparisons" data-testid="compare-fixed-sequence-catalog">
+      <section id="model-comparisons" data-testid="compare-model-catalog">
         <Card>
           <p className="font-mono text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-            Fixed-sequence catalog
+            Comparison catalog
           </p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight lg:text-3xl">
-            Controlled workload comparisons
+            AgentX and 8K→1K results
           </h2>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} head-to-head inference benchmark comparisons across{' '}
-            {formatModelList(modelsWithPairs)}. Each page includes interactive charts for latency,
-            throughput, and cost metrics on fixed input and output lengths, plus an interpolated
-            comparison table.
+            {formatModelList(modelsWithPairs)}. Models with AgentX data open long-context,
+            multi-turn trace replay results. Models not yet covered by AgentX open the controlled
+            8K→1K workload. Each card identifies its scenario.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -148,6 +149,7 @@ export default async function CompareIndexPage() {
       {modelsWithPairs.map((model) => {
         const pairs = comparablePairsByModel.get(model.slug) ?? [];
         const groups = groupPairsByVendorForModel(model, pairs);
+        const scenario = comparisonScenarioForModel(model);
         return (
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
@@ -172,10 +174,11 @@ export default async function CompareIndexPage() {
                       return (
                         <ComparePairCardLink
                           key={slug}
-                          href={`/compare/${slug}`}
+                          href={comparisonPairHref('en', slug, model)}
                           slug={slug}
                           label={label}
                           archLine={archLine}
+                          scenarioLabel={scenario.label}
                         />
                       );
                     })}

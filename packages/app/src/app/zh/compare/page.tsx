@@ -7,6 +7,7 @@ import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
 import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
 import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
 import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
@@ -92,16 +93,19 @@ export default async function CompareIndexPageZh() {
       <JsonLd data={jsonLd} />
       <AgentXCompareHero locale="zh" />
 
-      <section id="fixed-sequence-comparisons" data-testid="compare-fixed-sequence-catalog">
+      <section id="model-comparisons" data-testid="compare-model-catalog">
         <Card>
           <p className="font-mono text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-            定长序列对比资料库
+            对比结果目录
           </p>
-          <h2 className="mt-2 text-2xl font-bold tracking-tight lg:text-3xl">受控工作负载对比</h2>
+          <h2 className="mt-2 text-2xl font-bold tracking-tight lg:text-3xl">
+            AgentX 与 8K→1K 结果
+          </h2>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} 组推理基准测试的正面对比，涵盖{' '}
             {formatModelList(modelsWithPairs)}
-            。每个页面均针对固定输入与输出长度，提供延迟、吞吐量和成本指标的交互式图表，以及插值对比表格。
+            。已有 AgentX 数据的模型默认打开长上下文、多轮 trace replay 结果；尚未纳入 AgentX
+            的模型默认打开受控的 8K→1K 工作负载。每张卡片均标明对应场景。
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -141,6 +145,7 @@ export default async function CompareIndexPageZh() {
       {modelsWithPairs.map((model) => {
         const pairs = comparablePairsByModel.get(model.slug) ?? [];
         const groups = groupPairsByVendorForModel(model, pairs);
+        const scenario = comparisonScenarioForModel(model);
         return (
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
@@ -164,10 +169,11 @@ export default async function CompareIndexPageZh() {
                       return (
                         <ComparePairCardLink
                           key={slug}
-                          href={`/zh/compare/${slug}`}
+                          href={comparisonPairHref('zh', slug, model)}
                           slug={slug}
                           label={label}
                           archLine={archLine}
+                          scenarioLabel={scenario.label}
                         />
                       );
                     })}

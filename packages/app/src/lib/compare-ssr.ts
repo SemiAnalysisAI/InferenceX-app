@@ -14,6 +14,7 @@ import {
   AUTHOR_NAME,
   AUTHOR_URL,
   HW_REGISTRY,
+  rowToSequence,
   SITE_NAME,
   SITE_URL,
   sequenceToIslOsl,
@@ -55,7 +56,7 @@ export const KNOWN_MODELS = new Set([
   'GLM-5.2',
   'DeepSeek-V4-Pro',
 ]);
-export const KNOWN_SEQUENCES = new Set(['1k/1k', '1k/8k', '8k/1k']);
+export const KNOWN_SEQUENCES = new Set(['1k/1k', '1k/8k', '8k/1k', 'agentic-traces']);
 export const KNOWN_PRECISIONS = new Set(['fp4', 'fp4fp8', 'fp8', 'bf16', 'int4', 'nvfp4', 'mxfp4']);
 
 export function pickString(value: string | string[] | undefined): string | undefined {
@@ -168,6 +169,74 @@ export function buildGpuDataPoints(
   return points;
 }
 
+function buildAgenticGpuDataPoints(
+  rows: BenchmarkRow[],
+  hw: string,
+  precision: string,
+  specMethod?: string,
+): GPUDataPoint[] {
+  const points: GPUDataPoint[] = [];
+  for (const row of rows) {
+    if (row.hardware !== hw) continue;
+    if (rowToSequence(row) !== 'agentic-traces') continue;
+    if (row.precision !== precision) continue;
+    if (specMethod !== undefined && row.spec_method !== specMethod) continue;
+
+    const entry = rowToAggDataEntry(row);
+    const hwKey = getHardwareKey(entry);
+    if (!getHardwareConfig(hwKey)) continue;
+
+    const interactivity = entry.p90_intvty;
+    if (!Number.isFinite(interactivity) || interactivity <= 0) continue;
+
+    const tput = entry.tput_per_gpu;
+    const outputTput = entry.output_tput_per_gpu || tput;
+    const inputTput = entry.input_tput_per_gpu;
+    const specs = getGpuSpecs(hwKey);
+    const power = specs.power;
+
+    points.push({
+      hwKey,
+      interactivity,
+      throughput: tput,
+      outputThroughput: outputTput,
+      inputThroughput: inputTput,
+      concurrency: row.conc,
+      tp: row.decode_tp,
+      precision: row.precision,
+      ep: row.decode_ep,
+      dp_attention: row.decode_dp_attention,
+      disagg: row.disagg,
+      costh: computeGpuCost(specs.costh, tput),
+      costn: computeGpuCost(specs.costn, tput),
+      costr: computeGpuCost(specs.costr, tput),
+      costhi: computeGpuCost(specs.costh, inputTput),
+      costni: computeGpuCost(specs.costn, inputTput),
+      costri: computeGpuCost(specs.costr, inputTput),
+      costhOutput: computeGpuCost(specs.costh, outputTput),
+      costnOutput: computeGpuCost(specs.costn, outputTput),
+      costrOutput: computeGpuCost(specs.costr, outputTput),
+      tpPerMw: power && power > 0 ? (tput * 1000) / power : 0,
+      inputTpPerMw: power && power > 0 ? (inputTput * 1000) / power : 0,
+      outputTpPerMw: power && power > 0 ? (outputTput * 1000) / power : 0,
+    });
+  }
+  return points;
+}
+
+function buildGpuDataPointsForSequence(
+  rows: BenchmarkRow[],
+  hw: string,
+  sequence: string,
+  precision: string,
+): GPUDataPoint[] {
+  if (sequence === 'agentic-traces') {
+    return buildAgenticGpuDataPoints(rows, hw, precision);
+  }
+  const islOsl = sequenceToIslOsl(sequence);
+  return islOsl ? buildGpuDataPoints(rows, hw, islOsl.isl, islOsl.osl, precision) : [];
+}
+
 function interactivityRangeOf(pts: GPUDataPoint[]): { min: number; max: number } | null {
   if (pts.length === 0) return null;
   let min = Infinity;
@@ -195,11 +264,8 @@ export function computeCompareTableData(
   const empty = { defaultTargets: [], ssrRows: [], interactivityRange: { min: 0, max: 100 } };
   if (!sequence || !precision) return empty;
 
-  const islOsl = sequenceToIslOsl(sequence);
-  if (!islOsl) return empty;
-
-  const pointsA = buildGpuDataPoints(rows, a, islOsl.isl, islOsl.osl, precision);
-  const pointsB = buildGpuDataPoints(rows, b, islOsl.isl, islOsl.osl, precision);
+  const pointsA = buildGpuDataPointsForSequence(rows, a, sequence, precision);
+  const pointsB = buildGpuDataPointsForSequence(rows, b, sequence, precision);
 
   if (pointsA.length === 0 && pointsB.length === 0) return empty;
 
@@ -269,11 +335,8 @@ export function computeCompareImageRows(
 ): SsrInterpolatedRow[] {
   if (!sequence || !precision || interactivityRange.max <= interactivityRange.min) return [];
 
-  const islOsl = sequenceToIslOsl(sequence);
-  if (!islOsl) return [];
-
-  const pointsA = buildGpuDataPoints(rows, a, islOsl.isl, islOsl.osl, precision);
-  const pointsB = buildGpuDataPoints(rows, b, islOsl.isl, islOsl.osl, precision);
+  const pointsA = buildGpuDataPointsForSequence(rows, a, sequence, precision);
+  const pointsB = buildGpuDataPointsForSequence(rows, b, sequence, precision);
   if (pointsA.length === 0 && pointsB.length === 0) return [];
 
   const sampleCount = 17;

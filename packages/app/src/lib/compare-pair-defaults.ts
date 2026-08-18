@@ -1,4 +1,4 @@
-import { islOslToSequence } from '@semianalysisai/inferencex-constants';
+import { rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 // Picks the (sequence, precision) that maximises overlap of distinct
@@ -8,14 +8,14 @@ export function pickPairDefaults(
   rows: BenchmarkRow[],
   a: string,
   b: string,
+  preferredSequence?: string,
 ): { sequence: string | null; precision: string | null } {
   const tally = new Map<string, { both: number; either: number }>();
   const seenA = new Map<string, Set<string>>();
   const seenB = new Map<string, Set<string>>();
   for (const row of rows) {
     if (row.hardware !== a && row.hardware !== b) continue;
-    if (row.isl === null || row.osl === null) continue;
-    const seq = islOslToSequence(row.isl, row.osl);
+    const seq = rowToSequence(row);
     if (!seq) continue;
     const key = `${seq}|${row.precision}`;
     const variantId = `${row.framework}|${row.spec_method}|${row.conc}`;
@@ -36,6 +36,11 @@ export function pickPairDefaults(
   }
   if (tally.size === 0) return { sequence: null, precision: null };
   const best = [...tally.entries()].toSorted((left, right) => {
+    if (preferredSequence) {
+      const leftPreferred = left[0].startsWith(`${preferredSequence}|`);
+      const rightPreferred = right[0].startsWith(`${preferredSequence}|`);
+      if (leftPreferred !== rightPreferred) return leftPreferred ? -1 : 1;
+    }
     if (left[1].both !== right[1].both) return right[1].both - left[1].both;
     return right[1].either - left[1].either;
   })[0];
