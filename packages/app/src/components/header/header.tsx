@@ -29,7 +29,18 @@ const DASHBOARD_TABS = [
   '/current-inferencex-image',
 ];
 
-const NAV_LINKS = [
+interface NavLink {
+  href: string;
+  label: string;
+  testId: string;
+  event: string;
+  badge?: {
+    en: string;
+    zh: string;
+  };
+}
+
+const NAV_LINKS: readonly NavLink[] = [
   { href: '/', label: 'Home', testId: 'nav-link-home', event: 'header_home_clicked' },
   {
     href: '/overview',
@@ -54,6 +65,7 @@ const NAV_LINKS = [
     label: 'AgentX',
     testId: 'nav-link-agentx',
     event: 'header_agentx_clicked',
+    badge: { en: 'NEW', zh: '新' },
   },
   { href: '/about', label: 'About', testId: 'nav-link-about', event: 'header_about_clicked' },
 ] as const;
@@ -148,9 +160,14 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
     ? NAV_LINKS.map((link) => ({
         ...link,
         label: NAV_LABELS_ZH[link.href] ?? link.label,
+        badgeLabel: link.badge?.zh,
         displayHref: hasZhSibling(link.href) ? zhPath(link.href) : link.href,
       }))
-    : NAV_LINKS.map((link) => ({ ...link, displayHref: link.href }));
+    : NAV_LINKS.map((link) => ({
+        ...link,
+        badgeLabel: link.badge?.en,
+        displayHref: link.href,
+      }));
 
   // Close menu on route change
   useEffect(() => {
@@ -209,14 +226,14 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
 
           {/* Desktop nav */}
           <nav className="hidden items-center gap-1 xl:flex">
-            {navLinks.map(({ href, displayHref, label, testId, event }) => (
+            {navLinks.map(({ href, displayHref, label, badgeLabel, testId, event }) => (
               <Link
                 key={href}
                 data-testid={testId}
                 href={displayHref}
                 prefetch={isActive(pathname, href) ? false : undefined}
                 className={cn(
-                  'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
                   isActive(pathname, href)
                     ? 'text-brand bg-brand/10'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted',
@@ -234,7 +251,15 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                   }
                 }}
               >
-                {label}
+                <span>{label}</span>
+                {badgeLabel && (
+                  <span
+                    data-nav-badge="agentx"
+                    className="inline-flex items-center rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold leading-none tracking-wider text-primary-foreground shadow-sm"
+                  >
+                    {badgeLabel}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>
@@ -282,7 +307,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                   data-testid="mobile-menu"
                   className="absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-40"
                 >
-                  {navLinks.map(({ href, displayHref, label, event }) => (
+                  {navLinks.map(({ href, displayHref, label, badgeLabel, event }) => (
                     <Link
                       key={href}
                       href={displayHref}
@@ -304,7 +329,15 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                         }
                       }}
                     >
-                      {label}
+                      <span>{label}</span>
+                      {badgeLabel && (
+                        <span
+                          data-nav-badge="agentx"
+                          className="ml-1.5 inline-flex items-center rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold leading-none tracking-wider text-primary-foreground shadow-sm"
+                        >
+                          {badgeLabel}
+                        </span>
+                      )}
                     </Link>
                   ))}
                   <span className="flex items-center gap-2 px-3 sm:hidden">

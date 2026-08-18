@@ -545,7 +545,7 @@ function BannerRenderer({
             </p>
           </div>
           <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-brand shrink-0 group-hover:translate-x-0.5 transition-transform duration-200">
-            {rs.explore}
+            {localized(locale, content.linkLabel ?? rs.explore, content.linkLabelZh)}
             <ArrowRight className="size-3.5" />
           </span>
         </div>

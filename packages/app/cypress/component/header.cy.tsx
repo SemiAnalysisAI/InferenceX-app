@@ -108,7 +108,9 @@ describe('Header', () => {
   it('shows AgentX as a top-level nav link and highlights AgentX child pages', () => {
     cy.get('[data-testid="nav-link-agentx"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/agentx');
+      .and('have.attr', 'href', '/agentx')
+      .find('[data-nav-badge="agentx"]')
+      .should('have.text', 'NEW');
 
     mountHeader('/agentx/claude-code-traces');
     cy.get('[data-testid="nav-link-agentx"]').should('have.class', 'text-brand');
@@ -121,6 +123,9 @@ describe('Header', () => {
       .and('contain.text', 'AgentX')
       .and('have.attr', 'href', '/zh/agentx')
       .and('have.class', 'text-brand');
+    cy.get('[data-testid="nav-link-agentx"]')
+      .find('[data-nav-badge="agentx"]')
+      .should('have.text', '新');
   });
 
   it('keeps footer destinations out of the primary nav', () => {
@@ -151,7 +156,11 @@ describe('Header', () => {
       cy.contains('a', 'Overview').should('be.visible').and('have.attr', 'href', '/overview');
       cy.contains('a', 'Dashboard').should('be.visible').and('have.attr', 'href', '/inference');
       cy.contains('a', 'Comparisons').should('be.visible').and('have.attr', 'href', '/compare');
-      cy.contains('a', 'AgentX').should('be.visible').and('have.attr', 'href', '/agentx');
+      cy.contains('a', 'AgentX')
+        .should('be.visible')
+        .and('have.attr', 'href', '/agentx')
+        .find('[data-nav-badge="agentx"]')
+        .should('have.text', 'NEW');
       cy.contains('a', 'Supporters').should('not.exist');
       cy.contains('a', 'Articles').should('not.exist');
     });

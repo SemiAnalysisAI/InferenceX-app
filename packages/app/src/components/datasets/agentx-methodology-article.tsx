@@ -56,7 +56,7 @@ const FIGURE_ASSETS = {
 const CONTENT = {
   en: {
     eyebrow: 'Field guide / AI infrastructure',
-    title: 'AgentX methodology',
+    title: 'AgentX Methodology',
     lead: 'AgentX converts opt-in Claude Code proxy traces into deterministic AIPerf workloads. This page documents how collection metadata becomes a replay and which controls define a valid benchmark result.',
     facts: [
       { value: '393', label: 'published sessions' },

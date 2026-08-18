@@ -14,8 +14,8 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
-    'inferencex-kimi-k3-modal-dismissed',
-    'inferencex-kimi-k3-banner-dismissed',
+    'inferencex-agentic-results-modal-dismissed',
+    'inferencex-agentic-results-banner-dismissed',
     'inferencex-reproducibility-nudge-shown',
     'inferencex-star-nudge-shown',
     'inferencex-export-nudge-shown',
@@ -48,12 +48,33 @@ describe('Landing nudges — modals', () => {
       onBeforeLoad: clearAllNudgeStorage,
     });
     // Banner (inline) and modal (overlay) occupy independent slots
-    cy.get('[data-testid="launch-banner"]').should('be.visible');
+    cy.get('[data-testid="launch-banner"]')
+      .should('be.visible')
+      .and('contain.text', 'Agentic benchmark results are live')
+      .and('contain.text', 'View results');
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
+      .and('contain.text', 'Real-world agentic inference benchmark results are live')
+      .and('contain.text', 'Kimi K3, DeepSeek-V4-Pro, MiniMax-M3, Qwen3.5 397B, and GLM-5.2')
+      .and('contain.text', 'View results')
       .and('match', 'div[role="dialog"][aria-modal="false"]');
     // Only one overlay at a time — star modal should not appear
     cy.get('[data-testid="github-star-modal"]').should('not.exist');
+  });
+
+  it('localizes the agentic benchmark launch title in Chinese', () => {
+    cy.visit('/zh', {
+      onBeforeLoad: clearAllNudgeStorage,
+    });
+    cy.get('[data-testid="launch-banner"]')
+      .should('be.visible')
+      .and('contain.text', '智能体基准测试结果已上线')
+      .and('contain.text', '查看结果');
+    cy.get('[data-testid="launch-modal"]')
+      .should('be.visible')
+      .and('contain.text', '真实场景智能体推理基准测试结果已上线')
+      .and('contain.text', 'Kimi K3、DeepSeek-V4-Pro、MiniMax-M3、Qwen3.5 397B 与 GLM-5.2')
+      .and('contain.text', '查看结果');
   });
 
   it('dismissing launch modal persists — not shown on reload', () => {
@@ -68,19 +89,18 @@ describe('Landing nudges — modals', () => {
     cy.get('[data-testid="launch-modal"]').should('not.exist');
   });
 
-  it('launch modal Explore action persists dismissal in localStorage', () => {
+  it('launch modal View results action opens Agentic Traces and persists dismissal', () => {
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-modal"]').should('be.visible');
 
-    // The action writes localStorage synchronously before navigation. Check
-    // the storage value before the navigation completes; combined with the
-    // "Maybe Later" persists-across-reload test, this covers the explore
-    // path without needing to stub window.location.
+    // The action records engagement and opens the Agentic Traces results.
     cy.get('[data-testid="launch-modal-action"]').click();
+    cy.location('pathname').should('eq', '/inference');
+    cy.location('search').should('include', 'i_seq=agentic-traces');
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-kimi-k3-modal-dismissed')).to.eq('1');
+      expect(win.localStorage.getItem('inferencex-agentic-results-modal-dismissed')).to.eq('1');
     });
   });
 
@@ -88,7 +108,7 @@ describe('Landing nudges — modals', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
-        win.localStorage.setItem('inferencex-kimi-k3-modal-dismissed', '1');
+        win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
       },
     });
     cy.get('[data-testid="launch-modal"]').should('not.exist');
@@ -99,7 +119,7 @@ describe('Landing nudges — modals', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
-        win.localStorage.setItem('inferencex-kimi-k3-modal-dismissed', '1');
+        win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
       },
     });
     cy.get('[data-testid="github-star-modal"]').should('be.visible');
@@ -117,7 +137,7 @@ describe('Landing nudges — modals', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
-        win.localStorage.setItem('inferencex-kimi-k3-modal-dismissed', '1');
+        win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
       },
     });
     cy.get('[data-testid="github-star-modal"]').should('be.visible');
@@ -178,7 +198,7 @@ describe('Landing nudges — banner', () => {
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
       // Only the X button should persist a dismissal — show alone must not.
-      expect(win.localStorage.getItem('inferencex-kimi-k3-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-agentic-results-banner-dismissed')).to.eq(null);
     });
   });
 
@@ -189,11 +209,12 @@ describe('Landing nudges — banner', () => {
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.get('[data-testid="launch-banner"]').click();
     cy.location('pathname', { timeout: 10000 }).should('eq', '/inference');
+    cy.location('search').should('include', 'i_seq=agentic-traces');
 
     // Body click must not write the dismissal key — the banner should still
     // render on a fresh visit to landing.
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-kimi-k3-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-agentic-results-banner-dismissed')).to.eq(null);
     });
 
     cy.visit('/');
@@ -354,8 +375,8 @@ describe('Nudge scope isolation', () => {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
         // Dismiss all landing nudges so nothing blocks visibility checks
-        win.localStorage.setItem('inferencex-kimi-k3-modal-dismissed', '1');
-        win.localStorage.setItem('inferencex-kimi-k3-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
+        win.localStorage.setItem('inferencex-agentic-results-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },
     });

@@ -50,7 +50,7 @@ describe('AgentX dataset methodology', () => {
     cy.visit('/agentx/methodology', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="agentx-methodology-article"]').within(() => {
-      cy.get('h1').should('have.text', 'AgentX methodology');
+      cy.get('h1').should('have.text', 'AgentX Methodology');
       cy.contains('393 sessions built on June 21, 2026').should('be.visible');
       cy.contains('directed acyclic graph (DAG)').should('be.visible');
       cy.contains('following one-hour profiling window').should('be.visible');
