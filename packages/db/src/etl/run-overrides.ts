@@ -19,6 +19,12 @@
  * run attempt and skip them on every future ingest. Each entry uses the row's durable
  * database natural key, which can be queried from the linked dashboard point.
  *
+ * CHANGELOG_BACKFILLS — correct stored changelog metadata for one exact run attempt
+ * and base/head ref pair.
+ *
+ * BENCHMARK_POINT_BACKFILLS — correct metrics and/or offload identity for one exact
+ * benchmark point. These are applied both during ingest and against existing DB rows.
+ *
  * Note: GitHub deletes old workflow runs over time so these overrides may not be applicable forever,
  *       but we should keep them around for historical reference. You can find these on github (if available) by filling
  *       in the run id into the following link: https://github.com/SemiAnalysisAI/InferenceX/actions/runs/{run_id_here}
@@ -132,6 +138,380 @@ export interface PurgedBenchmarkPoint extends BenchmarkPointKey {
  * recipeFingerprint }`. Omitted fingerprints target only legacy NULL rows.
  */
 export const PURGED_BENCHMARK_POINTS: readonly PurgedBenchmarkPoint[] = [];
+
+interface AuditedBackfill {
+  /** Stable, descriptive identifier used in logs and review history. */
+  id: string;
+  /** Why artifact data is being corrected instead of re-running the benchmark. */
+  reason: string;
+}
+
+export interface ChangelogBackfill extends AuditedBackfill {
+  githubRunId: number;
+  runAttempt: number;
+  baseRef: string;
+  headRef: string;
+  set: {
+    configKeys?: readonly string[];
+    description?: string;
+    prLink?: string | null;
+    appendOnly?: boolean;
+  };
+}
+
+/**
+ * Audited corrections to changelog rows already produced by workflow artifacts.
+ * Selectors use the table's complete durable identity. `set` is a partial patch.
+ */
+export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [];
+
+export type JsonValue =
+  | boolean
+  | number
+  | string
+  | null
+  | readonly JsonValue[]
+  | { readonly [key: string]: JsonValue };
+
+export interface BenchmarkPointBackfill extends BenchmarkPointKey, AuditedBackfill {
+  githubRunId: number;
+  runAttempt: number;
+  set: {
+    /** Updates both the first-class column and metrics.offload_mode. */
+    offloadMode?: 'on' | 'off';
+    /** Shallow JSONB merge; existing unrelated metrics are preserved. */
+    metricsMerge?: Readonly<Record<string, JsonValue>>;
+    /** Top-level metric keys to remove before metricsMerge is applied. */
+    metricsRemove?: readonly string[];
+  };
+}
+
+/**
+ * Audited corrections to individual benchmark points. The selector is the row's
+ * complete pre-backfill natural identity; `set` contains only the desired changes.
+ *
+ * Example:
+ * {
+ *   id: 'run-123-attempt-1-conc-64-enable-offload',
+ *   reason: 'The artifact omitted offload metadata for this point.',
+ *   githubRunId: 123,
+ *   runAttempt: 1,
+ *   configId: 456,
+ *   benchmarkType: 'agentic_traces',
+ *   isl: null,
+ *   osl: null,
+ *   conc: 64,
+ *   offloadMode: 'off',
+ *   recipeFingerprint: null,
+ *   set: {
+ *     offloadMode: 'on',
+ *     metricsMerge: { kv_offloading: 'dram', kv_offload_backend: 'lmcache' },
+ *   },
+ * }
+ */
+export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [];
+
+function pointIdentity(
+  point: BenchmarkPointKey & { githubRunId: number; runAttempt: number },
+): string {
+  return JSON.stringify([
+    point.githubRunId,
+    point.runAttempt,
+    point.configId,
+    point.benchmarkType,
+    point.isl,
+    point.osl,
+    point.conc,
+    point.offloadMode,
+    point.recipeFingerprint ?? null,
+  ]);
+}
+
+function validatePositiveInteger(value: number, label: string, id: string): void {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${id}: ${label} must be a positive integer`);
+  }
+}
+
+/** Validate the backfill ledger before an ingest or database write starts. */
+export function validateRunBackfills(
+  changelogs: readonly ChangelogBackfill[] = CHANGELOG_BACKFILLS,
+  points: readonly BenchmarkPointBackfill[] = BENCHMARK_POINT_BACKFILLS,
+): void {
+  const ids = new Set<string>();
+  const changelogIdentities = new Set<string>();
+  const pointSourceIdentities = new Map<string, string>();
+  const pointDesiredIdentities = new Map<string, string>();
+
+  for (const backfill of [...changelogs, ...points]) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(backfill.id)) {
+      throw new Error(`${backfill.id || '<empty>'}: id must be lowercase kebab-case`);
+    }
+    if (ids.has(backfill.id)) throw new Error(`duplicate backfill id: ${backfill.id}`);
+    ids.add(backfill.id);
+    if (backfill.reason.trim().length === 0) {
+      throw new Error(`${backfill.id}: reason must not be empty`);
+    }
+    validatePositiveInteger(backfill.githubRunId, 'githubRunId', backfill.id);
+    validatePositiveInteger(backfill.runAttempt, 'runAttempt', backfill.id);
+    if (PURGED_RUNS.has(backfill.githubRunId)) {
+      throw new Error(`${backfill.id}: run is already in PURGED_RUNS`);
+    }
+    if (PURGED_RUN_ATTEMPTS.get(backfill.githubRunId)?.has(backfill.runAttempt)) {
+      throw new Error(`${backfill.id}: run attempt is already in PURGED_RUN_ATTEMPTS`);
+    }
+  }
+
+  for (const backfill of changelogs) {
+    if (backfill.baseRef.length === 0 || backfill.headRef.length === 0) {
+      throw new Error(`${backfill.id}: baseRef and headRef must not be empty`);
+    }
+    if (
+      backfill.set.configKeys === undefined &&
+      backfill.set.description === undefined &&
+      backfill.set.prLink === undefined &&
+      backfill.set.appendOnly === undefined
+    ) {
+      throw new Error(`${backfill.id}: set must change at least one field`);
+    }
+    if (backfill.set.configKeys?.some((key) => key.length === 0)) {
+      throw new Error(`${backfill.id}: configKeys must not contain empty values`);
+    }
+    const identity = JSON.stringify([
+      backfill.githubRunId,
+      backfill.runAttempt,
+      backfill.baseRef,
+      backfill.headRef,
+    ]);
+    if (changelogIdentities.has(identity)) {
+      throw new Error(`${backfill.id}: duplicate changelog selector ${identity}`);
+    }
+    changelogIdentities.add(identity);
+  }
+
+  for (const backfill of points) {
+    validatePositiveInteger(backfill.configId, 'configId', backfill.id);
+    validatePositiveInteger(backfill.conc, 'conc', backfill.id);
+    if (backfill.benchmarkType.length === 0 || backfill.offloadMode.length === 0) {
+      throw new Error(`${backfill.id}: benchmarkType and offloadMode must not be empty`);
+    }
+    if (backfill.isl !== null) validatePositiveInteger(backfill.isl, 'isl', backfill.id);
+    if (backfill.osl !== null) validatePositiveInteger(backfill.osl, 'osl', backfill.id);
+    if (backfill.recipeFingerprint === '') {
+      throw new Error(`${backfill.id}: recipeFingerprint must be null or non-empty`);
+    }
+    const mergeKeys = Object.keys(backfill.set.metricsMerge ?? {});
+    const removeKeys = backfill.set.metricsRemove ?? [];
+    if (
+      backfill.set.offloadMode === undefined &&
+      mergeKeys.length === 0 &&
+      removeKeys.length === 0
+    ) {
+      throw new Error(`${backfill.id}: set must change at least one field`);
+    }
+    if (mergeKeys.includes('offload_mode') || removeKeys.includes('offload_mode')) {
+      throw new Error(`${backfill.id}: use set.offloadMode to change metrics.offload_mode`);
+    }
+    if (new Set(removeKeys).size !== removeKeys.length || removeKeys.some((key) => key === '')) {
+      throw new Error(`${backfill.id}: metricsRemove keys must be unique and non-empty`);
+    }
+    const overlap = mergeKeys.find((key) => removeKeys.includes(key));
+    if (overlap) throw new Error(`${backfill.id}: metric ${overlap} is both merged and removed`);
+
+    const sourceIdentity = pointIdentity(backfill);
+    if (pointSourceIdentities.has(sourceIdentity)) {
+      throw new Error(`${backfill.id}: duplicate benchmark point selector ${sourceIdentity}`);
+    }
+    pointSourceIdentities.set(sourceIdentity, backfill.id);
+
+    const desiredIdentity = pointIdentity({
+      ...backfill,
+      offloadMode: backfill.set.offloadMode ?? backfill.offloadMode,
+    });
+    if (pointDesiredIdentities.has(desiredIdentity)) {
+      throw new Error(`${backfill.id}: desired point identity collides with another backfill`);
+    }
+    pointDesiredIdentities.set(desiredIdentity, backfill.id);
+
+    if (
+      PURGED_BENCHMARK_POINTS.some((purged) => {
+        const purgedIdentity = pointIdentity(purged);
+        return purgedIdentity === sourceIdentity || purgedIdentity === desiredIdentity;
+      })
+    ) {
+      throw new Error(`${backfill.id}: source or desired point is already being purged`);
+    }
+  }
+
+  for (const [identity, desiredBy] of pointDesiredIdentities) {
+    const selectedBy = pointSourceIdentities.get(identity);
+    if (selectedBy !== undefined && selectedBy !== desiredBy) {
+      throw new Error(
+        `${desiredBy}: desired point identity collides with selector from ${selectedBy}`,
+      );
+    }
+  }
+}
+
+interface BackfillablePoint extends BenchmarkPointKey {
+  metrics: Record<string, unknown>;
+}
+
+export interface AppliedBenchmarkPointBackfill<T extends BackfillablePoint> {
+  point: T;
+  backfillId: string | null;
+  sourceIdentity: string;
+  desiredIdentity: string;
+}
+
+interface BackfillableChangelogEntry {
+  configKeys: string[];
+  description: string;
+  prLink: string | null;
+  appendOnly: boolean;
+}
+
+interface BackfillableChangelog<T extends BackfillableChangelogEntry> {
+  baseRef: string;
+  headRef: string;
+  entries: T[];
+}
+
+/** Apply changelog corrections before artifact metadata is written to PostgreSQL. */
+export function applyChangelogBackfills<T extends BackfillableChangelogEntry>(
+  githubRunId: number,
+  runAttempt: number | null | undefined,
+  changelogs: readonly BackfillableChangelog<T>[],
+): { changelogs: BackfillableChangelog<T>[]; backfillIds: string[] } {
+  const relevant = CHANGELOG_BACKFILLS.filter(
+    (backfill) =>
+      backfill.githubRunId === githubRunId &&
+      (runAttempt === null || runAttempt === undefined || backfill.runAttempt === runAttempt),
+  );
+  const corrected = changelogs.map((changelog) => ({
+    ...changelog,
+    entries: [...changelog.entries],
+  }));
+  const backfillIds: string[] = [];
+
+  for (const changelog of corrected) {
+    const matches = relevant.filter(
+      (backfill) =>
+        backfill.baseRef === changelog.baseRef && backfill.headRef === changelog.headRef,
+    );
+    if (matches.length > 1) {
+      throw new Error(
+        `changelog matches multiple backfills: ${matches.map((backfill) => backfill.id).join(', ')}`,
+      );
+    }
+    const [backfill] = matches;
+    if (!backfill || changelog.entries.length === 0) continue;
+
+    const { appendOnly } = backfill.set;
+    if (appendOnly !== undefined) {
+      changelog.entries = changelog.entries.map((entry) => ({
+        ...entry,
+        appendOnly,
+      }));
+    }
+    // ingestChangelogEntries upserts every entry onto the same (run, base, head)
+    // identity, so the final artifact entry is the row that persists.
+    const entryIndex = changelog.entries.length - 1;
+    const entry = changelog.entries[entryIndex];
+    changelog.entries[entryIndex] = {
+      ...entry,
+      ...(backfill.set.configKeys === undefined
+        ? {}
+        : { configKeys: [...backfill.set.configKeys] }),
+      ...(backfill.set.description === undefined ? {} : { description: backfill.set.description }),
+      ...(backfill.set.prLink === undefined ? {} : { prLink: backfill.set.prLink }),
+    };
+    backfillIds.push(backfill.id);
+  }
+
+  return { changelogs: corrected, backfillIds };
+}
+
+function matchesBenchmarkPoint(point: BenchmarkPointKey, selector: BenchmarkPointKey): boolean {
+  return (
+    point.configId === selector.configId &&
+    point.benchmarkType === selector.benchmarkType &&
+    point.isl === selector.isl &&
+    point.osl === selector.osl &&
+    point.conc === selector.conc &&
+    point.offloadMode === selector.offloadMode &&
+    (point.recipeFingerprint ?? null) === (selector.recipeFingerprint ?? null)
+  );
+}
+
+/** Apply one point patch to an ingest row before it reaches PostgreSQL. */
+export function applyBenchmarkPointBackfill<T extends BackfillablePoint>(
+  githubRunId: number,
+  runAttempt: number | null | undefined,
+  point: T,
+): AppliedBenchmarkPointBackfill<T> {
+  const sourceIdentity = JSON.stringify([
+    point.configId,
+    point.benchmarkType,
+    point.isl,
+    point.osl,
+    point.conc,
+    point.offloadMode,
+    point.recipeFingerprint ?? null,
+  ]);
+  const matches = BENCHMARK_POINT_BACKFILLS.filter(
+    (backfill) =>
+      backfill.githubRunId === githubRunId &&
+      (runAttempt === null || runAttempt === undefined || backfill.runAttempt === runAttempt) &&
+      matchesBenchmarkPoint(point, backfill),
+  );
+  if (matches.length > 1) {
+    throw new Error(
+      `benchmark point matches multiple backfills: ${matches.map((b) => b.id).join(', ')}`,
+    );
+  }
+  const [backfill] = matches;
+  if (!backfill) {
+    return { point, backfillId: null, sourceIdentity, desiredIdentity: sourceIdentity };
+  }
+
+  const metrics = { ...point.metrics };
+  for (const key of backfill.set.metricsRemove ?? []) delete metrics[key];
+  Object.assign(metrics, backfill.set.metricsMerge);
+  const offloadMode = backfill.set.offloadMode ?? point.offloadMode;
+  if (backfill.set.offloadMode !== undefined) metrics.offload_mode = offloadMode;
+  const patched = { ...point, offloadMode, metrics };
+  const desiredIdentity = JSON.stringify([
+    patched.configId,
+    patched.benchmarkType,
+    patched.isl,
+    patched.osl,
+    patched.conc,
+    patched.offloadMode,
+    patched.recipeFingerprint ?? null,
+  ]);
+  return {
+    point: patched,
+    backfillId: backfill.id,
+    sourceIdentity,
+    desiredIdentity,
+  };
+}
+
+/** Fail if two distinct artifact points collapse onto one identity after correction. */
+export function recordBackfilledPointIdentity(
+  seen: Map<string, string>,
+  sourceIdentity: string,
+  desiredIdentity: string,
+): void {
+  const existingSource = seen.get(desiredIdentity);
+  if (existingSource !== undefined && existingSource !== sourceIdentity) {
+    throw new Error(
+      `benchmark point backfill collision: ${existingSource} and ${sourceIdentity} both become ${desiredIdentity}`,
+    );
+  }
+  seen.set(desiredIdentity, sourceIdentity);
+}
 
 /**
  * True when this exact benchmark result is suppressed. When an ingest source

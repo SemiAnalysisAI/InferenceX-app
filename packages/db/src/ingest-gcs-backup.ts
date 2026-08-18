@@ -32,7 +32,14 @@ import path from 'path';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
-import { isBenchmarkPointPurged, PURGED_RUNS } from './etl/run-overrides';
+import {
+  applyBenchmarkPointBackfill,
+  applyChangelogBackfills,
+  isBenchmarkPointPurged,
+  PURGED_RUNS,
+  recordBackfilledPointIdentity,
+  validateRunBackfills,
+} from './etl/run-overrides';
 import { createSkipTracker, type Skips } from './etl/skip-tracker';
 import { GPU_KEYS, parseIslOsl } from './etl/normalizers';
 import { createConfigCache } from './etl/config-cache';
@@ -458,7 +465,11 @@ async function mapWorkflowDir(
     if (entries.length > 0) changelogs.push({ baseRef, headRef, entries });
   }
 
-  const evalsOnly = hasEvalsOnlyFlag(changelogs);
+  const correctedChangelogs = applyChangelogBackfills(githubRunId, ghInfo?.runAttempt, changelogs);
+  for (const backfillId of correctedChangelogs.backfillIds) {
+    warnings.push(`  [${dateDir}] applied changelog backfill ${backfillId}`);
+  }
+  const evalsOnly = hasEvalsOnlyFlag(correctedChangelogs.changelogs);
   if (evalsOnly) {
     console.log(
       `  [${dateDir}] evals-only run ${githubRunId} — skipping ${bmkZips.length} benchmark ZIP(s) and ${statsRows.length} stats row(s)`,
@@ -477,7 +488,7 @@ async function mapWorkflowDir(
     bmkZips: evalsOnly ? [] : bmkZips,
     statsRows: evalsOnly ? [] : statsRows,
     evalRows,
-    changelogs,
+    changelogs: correctedChangelogs.changelogs,
     evalsOnly,
     localSkips: {
       badZip: local.skips.badZip,
@@ -497,6 +508,7 @@ async function mapWorkflowDir(
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  validateRunBackfills();
   console.log('=== db:ingest:gcs ===');
   console.log(
     'This will ingest all GCS backup ZIP artifacts into the database.\n' +
@@ -610,33 +622,51 @@ async function main(): Promise<void> {
     if (workflowRunId === null) return wr;
 
     const allInserted: (BenchmarkParams & { configId: number })[] = [];
+    const seenPointIdentities = new Map<string, string>();
     for (const { zipFile, rows, serverLogPath } of result.bmkZips) {
       const toInsert: (BenchmarkParams & { configId: number })[] = [];
       for (const row of rows) {
+        let configId: number;
         try {
-          const configId = await getOrCreateConfig(row.config);
-          if (
-            isBenchmarkPointPurged(result.githubRunId, result.ghInfo?.runAttempt, {
-              configId,
-              benchmarkType: row.benchmarkType,
-              isl: row.isl,
-              osl: row.osl,
-              conc: row.conc,
-              offloadMode: row.offloadMode,
-              recipeFingerprint: row.recipeFingerprint,
-            })
-          ) {
-            console.log(
-              `  [${result.dateDir}] skipped purged benchmark point: config ${configId}, ` +
-                `${row.benchmarkType}, isl ${row.isl}, osl ${row.osl}, conc ${row.conc}, ` +
-                `offload ${row.offloadMode}, recipe ${row.recipeFingerprint ?? 'legacy'}`,
-            );
-            continue;
-          }
-          toInsert.push({ ...row, configId });
+          configId = await getOrCreateConfig(row.config);
         } catch (error: any) {
           tracker.recordDbError(`config for ${zipFile}`, error);
+          continue;
         }
+        if (
+          isBenchmarkPointPurged(result.githubRunId, result.ghInfo?.runAttempt, {
+            configId,
+            benchmarkType: row.benchmarkType,
+            isl: row.isl,
+            osl: row.osl,
+            conc: row.conc,
+            offloadMode: row.offloadMode,
+            recipeFingerprint: row.recipeFingerprint,
+          })
+        ) {
+          console.log(
+            `  [${result.dateDir}] skipped purged benchmark point: config ${configId}, ` +
+              `${row.benchmarkType}, isl ${row.isl}, osl ${row.osl}, conc ${row.conc}, ` +
+              `offload ${row.offloadMode}, recipe ${row.recipeFingerprint ?? 'legacy'}`,
+          );
+          continue;
+        }
+        const applied = applyBenchmarkPointBackfill(result.githubRunId, result.ghInfo?.runAttempt, {
+          ...row,
+          configId,
+        });
+        recordBackfilledPointIdentity(
+          seenPointIdentities,
+          applied.sourceIdentity,
+          applied.desiredIdentity,
+        );
+        if (applied.backfillId) {
+          console.log(
+            `  [${result.dateDir}] applied benchmark point backfill ` +
+              `${applied.backfillId}: config ${configId}, conc ${row.conc}`,
+          );
+        }
+        toInsert.push(applied.point);
       }
       if (toInsert.length > 0) {
         try {

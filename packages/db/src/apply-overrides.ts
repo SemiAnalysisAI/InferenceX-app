@@ -1,9 +1,11 @@
 /**
  * Enforce all run-overrides.ts entries against the DB:
  *   1. Patch conclusions for CONCLUSION_OVERRIDES
- *   2. Purge runs listed in PURGED_RUNS
- *   3. Purge specific attempts listed in PURGED_RUN_ATTEMPTS
- *   4. Purge individual benchmark points listed in PURGED_BENCHMARK_POINTS
+ *   2. Patch changelogs listed in CHANGELOG_BACKFILLS
+ *   3. Patch benchmark points listed in BENCHMARK_POINT_BACKFILLS
+ *   4. Purge runs listed in PURGED_RUNS
+ *   5. Purge specific attempts listed in PURGED_RUN_ATTEMPTS
+ *   6. Purge individual benchmark points listed in PURGED_BENCHMARK_POINTS
  * Previews changes (read-only), then confirms before writing.
  *
  * Usage:
@@ -14,14 +16,21 @@
  * Use this command directly only for local preview or manual recovery.
  */
 
+import { isDeepStrictEqual } from 'node:util';
+
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
 import { type Sql, createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
 import {
+  type BenchmarkPointBackfill,
+  type ChangelogBackfill,
   type PurgedBenchmarkPoint,
+  BENCHMARK_POINT_BACKFILLS,
+  CHANGELOG_BACKFILLS,
   CONCLUSION_OVERRIDES,
   PURGED_BENCHMARK_POINTS,
   PURGED_RUN_ATTEMPTS,
   PURGED_RUNS,
+  validateRunBackfills,
 } from './etl/run-overrides.js';
 
 const sql = createAdminSql({
@@ -71,6 +80,200 @@ async function applyConclusions(stale: StaleRow[]): Promise<void> {
     `;
     console.log(`    ${githubRunId} → ${expected}`);
   }
+}
+
+// ── Audited backfills ────────────────────────────────────────────────────────
+
+interface ChangelogBackfillTarget {
+  backfill: ChangelogBackfill;
+  changelogId: number;
+  workflowRunId: number;
+}
+
+function changelogBackfillIsApplied(
+  row: Record<string, unknown>,
+  backfill: ChangelogBackfill,
+): boolean {
+  const { set } = backfill;
+  return (
+    (set.configKeys === undefined || isDeepStrictEqual(row.config_keys, [...set.configKeys])) &&
+    (set.description === undefined || row.description === set.description) &&
+    (set.prLink === undefined || row.pr_link === set.prLink) &&
+    (set.appendOnly === undefined ||
+      (row.changelog_append_only === set.appendOnly && row.run_append_only === set.appendOnly))
+  );
+}
+
+/** Resolve one exact changelog row and return it only when its patch is stale. */
+async function previewChangelogBackfill(
+  backfill: ChangelogBackfill,
+): Promise<ChangelogBackfillTarget | null> {
+  const rows = await sql`
+    SELECT cl.id, cl.workflow_run_id, cl.config_keys, cl.description, cl.pr_link,
+           cl.append_only AS changelog_append_only, wr.append_only AS run_append_only
+    FROM changelog_entries cl
+    JOIN workflow_runs wr ON wr.id = cl.workflow_run_id
+    WHERE wr.github_run_id = ${backfill.githubRunId}
+      AND wr.run_attempt = ${backfill.runAttempt}
+      AND cl.base_ref = ${backfill.baseRef}
+      AND cl.head_ref = ${backfill.headRef}
+  `;
+  if (rows.length !== 1) {
+    throw new Error(
+      `${backfill.id}: expected exactly one changelog row, found ${rows.length} ` +
+        `(run ${backfill.githubRunId} attempt ${backfill.runAttempt}, ` +
+        `${backfill.baseRef}..${backfill.headRef})`,
+    );
+  }
+  const [row] = rows;
+  console.log(
+    `    ${backfill.id}: run ${backfill.githubRunId} attempt ${backfill.runAttempt}, ` +
+      `${backfill.baseRef}..${backfill.headRef}`,
+  );
+  console.log(`      reason: ${backfill.reason}`);
+  if (changelogBackfillIsApplied(row, backfill)) {
+    console.log('      already applied.');
+    return null;
+  }
+  console.log(`      set ${JSON.stringify(backfill.set)}`);
+  return {
+    backfill,
+    changelogId: row.id as number,
+    workflowRunId: row.workflow_run_id as number,
+  };
+}
+
+async function applyChangelogBackfill(target: ChangelogBackfillTarget): Promise<void> {
+  const { backfill, changelogId, workflowRunId } = target;
+  await sql.begin(async (_tx) => {
+    const tx = _tx as unknown as Sql;
+    if (backfill.set.configKeys !== undefined) {
+      await tx`
+        UPDATE changelog_entries
+        SET config_keys = ${[...backfill.set.configKeys]}
+        WHERE id = ${changelogId}
+      `;
+    }
+    if (backfill.set.description !== undefined) {
+      await tx`
+        UPDATE changelog_entries SET description = ${backfill.set.description}
+        WHERE id = ${changelogId}
+      `;
+    }
+    if (backfill.set.prLink !== undefined) {
+      await tx`
+        UPDATE changelog_entries SET pr_link = ${backfill.set.prLink}
+        WHERE id = ${changelogId}
+      `;
+    }
+    if (backfill.set.appendOnly !== undefined) {
+      await tx`
+        UPDATE changelog_entries SET append_only = ${backfill.set.appendOnly}
+        WHERE id = ${changelogId}
+      `;
+      await tx`
+        UPDATE workflow_runs SET append_only = ${backfill.set.appendOnly}
+        WHERE id = ${workflowRunId}
+      `;
+    }
+  });
+  console.log(`    ${backfill.id} patched.`);
+}
+
+interface BenchmarkPointBackfillTarget {
+  backfill: BenchmarkPointBackfill;
+  resultId: number;
+}
+
+function benchmarkPointBackfillIsApplied(
+  row: Record<string, unknown>,
+  backfill: BenchmarkPointBackfill,
+): boolean {
+  const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
+  if (row.offload_mode !== desiredOffloadMode) return false;
+  const metrics = row.metrics as Record<string, unknown>;
+  if (backfill.set.offloadMode !== undefined && metrics.offload_mode !== desiredOffloadMode) {
+    return false;
+  }
+  for (const [key, value] of Object.entries(backfill.set.metricsMerge ?? {})) {
+    if (!isDeepStrictEqual(metrics[key], value)) return false;
+  }
+  for (const key of backfill.set.metricsRemove ?? []) {
+    if (Object.hasOwn(metrics, key)) return false;
+  }
+  return true;
+}
+
+function benchmarkPointDescription(backfill: BenchmarkPointBackfill): string {
+  return (
+    `run ${backfill.githubRunId} attempt ${backfill.runAttempt}, config ${backfill.configId}, ` +
+    `${backfill.benchmarkType}, isl ${backfill.isl}, osl ${backfill.osl}, ` +
+    `conc ${backfill.conc}, offload ${backfill.offloadMode}, ` +
+    `recipe ${backfill.recipeFingerprint ?? 'legacy'}`
+  );
+}
+
+/** Resolve one source/desired point identity and fail closed on ambiguity. */
+async function previewBenchmarkPointBackfill(
+  backfill: BenchmarkPointBackfill,
+): Promise<BenchmarkPointBackfillTarget | null> {
+  const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
+  const offloadModes = [...new Set([backfill.offloadMode, desiredOffloadMode])];
+  const rows = await sql`
+    SELECT br.id, br.offload_mode, br.metrics
+    FROM benchmark_results br
+    JOIN workflow_runs wr ON wr.id = br.workflow_run_id
+    WHERE wr.github_run_id = ${backfill.githubRunId}
+      AND wr.run_attempt = ${backfill.runAttempt}
+      AND br.config_id = ${backfill.configId}
+      AND br.benchmark_type = ${backfill.benchmarkType}
+      AND br.isl IS NOT DISTINCT FROM ${backfill.isl}
+      AND br.osl IS NOT DISTINCT FROM ${backfill.osl}
+      AND br.conc = ${backfill.conc}
+      AND br.offload_mode = ANY(${offloadModes})
+      AND br.recipe_fingerprint IS NOT DISTINCT FROM ${backfill.recipeFingerprint ?? null}
+  `;
+  if (rows.length !== 1) {
+    throw new Error(
+      `${backfill.id}: expected exactly one source or desired benchmark row, ` +
+        `found ${rows.length} (${benchmarkPointDescription(backfill)})`,
+    );
+  }
+  const [row] = rows;
+  console.log(`    ${backfill.id}: ${benchmarkPointDescription(backfill)}`);
+  console.log(`      reason: ${backfill.reason}`);
+  if (benchmarkPointBackfillIsApplied(row, backfill)) {
+    console.log('      already applied.');
+    return null;
+  }
+  if (row.offload_mode === desiredOffloadMode && desiredOffloadMode !== backfill.offloadMode) {
+    throw new Error(
+      `${backfill.id}: source identity is missing and the desired identity has unexpected data`,
+    );
+  }
+  console.log(`      set ${JSON.stringify(backfill.set)}`);
+  return { backfill, resultId: row.id as number };
+}
+
+async function applyBenchmarkPointBackfillToDatabase(
+  target: BenchmarkPointBackfillTarget,
+): Promise<void> {
+  const { backfill, resultId } = target;
+  const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
+  const metricsMerge: Record<string, unknown> = { ...backfill.set.metricsMerge };
+  if (backfill.set.offloadMode !== undefined) {
+    metricsMerge.offload_mode = desiredOffloadMode;
+  }
+  const [updated] = await sql`
+    UPDATE benchmark_results
+    SET offload_mode = ${desiredOffloadMode},
+        metrics = (metrics - ${backfill.set.metricsRemove ?? []}::text[])
+          || ${JSON.stringify(metricsMerge)}::jsonb
+    WHERE id = ${resultId}
+    RETURNING id
+  `;
+  if (!updated) throw new Error(`${backfill.id}: benchmark row disappeared before update`);
+  console.log(`    ${backfill.id} patched.`);
 }
 
 // ── Purge ─────────────────────────────────────────────────────────────────────
@@ -314,6 +517,7 @@ async function purgeBenchmarkPoints(resultIds: number[]): Promise<void> {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  validateRunBackfills();
   console.log('=== apply-overrides ===');
 
   // Phase 1: preview (read-only)
@@ -329,6 +533,30 @@ async function main(): Promise<void> {
   } else {
     console.log('\n  Conclusions: all up to date.');
   }
+
+  const changelogBackfillTargets: ChangelogBackfillTarget[] = [];
+  if (CHANGELOG_BACKFILLS.length > 0) {
+    console.log(`\n  Changelog backfills (${CHANGELOG_BACKFILLS.length}):`);
+    for (const backfill of CHANGELOG_BACKFILLS) {
+      const target = await previewChangelogBackfill(backfill);
+      if (target) changelogBackfillTargets.push(target);
+    }
+  } else {
+    console.log('\n  Changelog backfills: none registered.');
+  }
+  if (changelogBackfillTargets.length > 0) hasWork = true;
+
+  const benchmarkPointBackfillTargets: BenchmarkPointBackfillTarget[] = [];
+  if (BENCHMARK_POINT_BACKFILLS.length > 0) {
+    console.log(`\n  Benchmark point backfills (${BENCHMARK_POINT_BACKFILLS.length}):`);
+    for (const backfill of BENCHMARK_POINT_BACKFILLS) {
+      const target = await previewBenchmarkPointBackfill(backfill);
+      if (target) benchmarkPointBackfillTargets.push(target);
+    }
+  } else {
+    console.log('\n  Benchmark point backfills: none registered.');
+  }
+  if (benchmarkPointBackfillTargets.length > 0) hasWork = true;
 
   const purgeTargets = [...PURGED_RUNS];
   const found: PurgeTarget[] = [];
@@ -395,6 +623,20 @@ async function main(): Promise<void> {
     await applyConclusions(stale);
   }
 
+  if (changelogBackfillTargets.length > 0) {
+    console.log('\n  Patching changelogs...');
+    for (const target of changelogBackfillTargets) {
+      await applyChangelogBackfill(target);
+    }
+  }
+
+  if (benchmarkPointBackfillTargets.length > 0) {
+    console.log('\n  Patching benchmark points...');
+    for (const target of benchmarkPointBackfillTargets) {
+      await applyBenchmarkPointBackfillToDatabase(target);
+    }
+  }
+
   if (found.length > 0) {
     console.log('\n  Purging runs...');
     for (const { wrIds } of found) {
@@ -409,7 +651,17 @@ async function main(): Promise<void> {
     }
   }
 
-  // Phase 4: refresh mat view
+  // Phase 4: verify every requested backfill reached its declared state.
+  for (const backfill of CHANGELOG_BACKFILLS) {
+    const staleTarget = await previewChangelogBackfill(backfill);
+    if (staleTarget) throw new Error(`${backfill.id}: changelog verification failed`);
+  }
+  for (const backfill of BENCHMARK_POINT_BACKFILLS) {
+    const staleTarget = await previewBenchmarkPointBackfill(backfill);
+    if (staleTarget) throw new Error(`${backfill.id}: benchmark point verification failed`);
+  }
+
+  // Phase 5: refresh mat view
   await refreshLatestBenchmarks(sql);
 
   console.log('\n=== apply-overrides complete ===');
