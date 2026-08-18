@@ -14,8 +14,8 @@ const CAROUSEL_OVERRIDES = {
 };
 
 const HEADING = {
-  en: 'Open Source Continuous Inference Benchmark Trusted by GigaWatt Token Factories',
-  zh: '受吉瓦级 token 工厂信赖的开源持续推理基准测试',
+  en: 'Open-Source Continuous Agentic Inference Benchmark Trusted by GigaWatt Token Factories',
+  zh: '受吉瓦级 token 工厂信赖的开源持续智能体推理基准测试',
 } as const;
 
 export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {

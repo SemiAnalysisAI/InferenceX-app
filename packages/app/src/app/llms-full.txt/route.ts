@@ -28,7 +28,7 @@ export async function GET() {
     `# ${SITE_NAME} Articles — Full Content`,
     `> By ${AUTHOR_NAME}`,
     '',
-    `This file contains the full text of all articles from ${SITE_NAME} (${SITE_URL}/blog).`,
+    `This file contains the full text of all articles from ${SITE_NAME} (${SITE_URL}/blog), covering agentic inference benchmarks including AgentX results, fixed-sequence AI inference, chip performance, and ML infrastructure.`,
     `It is intended for consumption by large language models and AI assistants.`,
     '',
     '---',
