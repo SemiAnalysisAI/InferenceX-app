@@ -4,9 +4,9 @@ import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 import { hasZhSibling, languageAlternates } from '@/lib/i18n';
 
 export const LANDING_META = {
-  title: 'Open-Source AgentX & AI Inference Benchmark',
+  title: 'Open-Source Agentic Inference Benchmark',
   description:
-    'Compare AgentX long-context, multi-turn agentic coding and fixed-sequence AI inference across chips and frameworks. Reproducible NVIDIA and AMD benchmark runs, continuously updated.',
+    "Compare AgentX, InferenceX's long-context, multi-turn coding scenario, with fixed-sequence AI inference across chips and frameworks. Public NVIDIA and AMD runs update when configurations change.",
 };
 
 export const VALID_TABS = [
@@ -28,9 +28,9 @@ export type TabKey = (typeof VALID_TABS)[number];
 
 export const TAB_META: Record<TabKey, { title: string; description: string }> = {
   inference: {
-    title: 'AgentX & AI Inference Benchmarks',
+    title: 'Agentic Inference Benchmarks',
     description:
-      'Compare AgentX agentic coding and fixed-sequence AI inference latency, throughput, cost, and time-to-first-token across chips and serving frameworks.',
+      'Compare latency, throughput, cost, and time-to-first-token for agentic and fixed-sequence AI inference across chips and serving frameworks. AgentX supplies the long-context, multi-turn coding workload.',
   },
   evaluation: {
     title: 'LLM Evaluation Results',

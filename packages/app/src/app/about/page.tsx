@@ -22,7 +22,7 @@ const faqJsonLd = {
 };
 
 const ABOUT_DESCRIPTION =
-  'InferenceX is an independent, vendor-neutral, reproducible benchmark for AgentX long-context, multi-turn agentic coding and fixed-sequence AI inference across accelerators and serving stacks.';
+  'InferenceX benchmarks agentic and fixed-sequence AI inference across accelerators and serving stacks. AgentX is its long-context, multi-turn coding scenario.';
 
 export const metadata: Metadata = {
   title: 'About',
@@ -47,7 +47,7 @@ export default function AboutPage() {
         <section>
           <Card>
             <h2 className="text-lg font-semibold mb-2">
-              Open-Source Continuous AgentX & AI Inference Benchmark Trusted by Operators of
+              Open-Source Continuous Agentic Inference Benchmark Trusted by Operators of
               Trillion-Dollar, GigaWatt-Scale Token Factories
             </h2>
             <p className="text-muted-foreground mb-2">

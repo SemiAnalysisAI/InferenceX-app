@@ -240,7 +240,7 @@ AI 编码智能体能在已知模板内加速调优，但新颖的变换仍需�
 
 ## TileRT 的下一步
 
-InferenceX 的智能体编码基准 AgentX 现已在具备对应数据的模型与服务栈上正式上线。它回放从真实 Claude Code 与 Codex 会话衍生出的隐私保护工作负载形态，包含长上下文、多轮请求、真实的 subagent 活动与动态工具调用延迟。其输入长度中位数为 140k tokens，理论缓存命中率中位数屋顶线可达 99.2%。对 TileRT 而言，下一步仍是将目前的单轮 8k/1k 基准测试扩展到 AgentX。
+InferenceX 的长上下文多轮编码场景 AgentX 现已在具备对应数据的模型与服务栈上正式上线。它回放从真实 Claude Code 与 Codex 会话衍生出的隐私保护工作负载形态，包含长上下文、多轮请求、真实的 subagent 活动与动态工具调用延迟。其输入长度中位数为 140k tokens，理论缓存命中率中位数屋顶线可达 99.2%。对 TileRT 而言，下一步仍是将目前的单轮 8k/1k 基准测试扩展到 AgentX。
 
 <Figure
   src="/images/ultra-high-interactivity-on-nvidia/agentx-benchmark-characteristics.png"
@@ -248,7 +248,7 @@ InferenceX 的智能体编码基准 AgentX 现已在具备对应数据的模型�
   caption="来源：SemiAnalysis"
 />
 
-对 TileRT 而言，该工作负载将检验 TileRT 与 vLLM 的整套系统，而不仅是解码速度，涵盖增量 KV 传输、prefix cache 复用、cache 保留与卸载、路由与调度。关键问题在于：TileRT 能否在轮次之间只传输新增上下文，同时保持其超高交互性优势。
+该工作负载将检验 TileRT 与 vLLM 的整套系统，而不仅是解码速度，涵盖增量 KV 传输、前缀缓存复用、缓存保留与卸载、路由与调度。关键问题在于：TileRT 能否在轮次之间只传输新增上下文，同时保持其超高交互性优势。
 
 <Figure
   src="/images/ultra-high-interactivity-on-nvidia/multi-turn-thinking.png"

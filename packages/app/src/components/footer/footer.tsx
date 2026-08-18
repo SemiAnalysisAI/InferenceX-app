@@ -12,7 +12,7 @@ import { StarButton } from './footer-star-cta';
 const STRINGS = {
   en: {
     description:
-      'Continuous open-source benchmarking for AgentX agentic coding and fixed-sequence AI inference. Reproducible, auditable performance data trusted by leading AI infrastructure operators.',
+      'InferenceX continuously benchmarks agentic and fixed-sequence AI inference, including AgentX results. Each result links to its public run.',
     semianalysis: 'SemiAnalysis',
     mainSite: 'Main Site',
     newsletter: 'Newsletter',
@@ -40,7 +40,7 @@ const STRINGS = {
   },
   zh: {
     description:
-      '持续开源测试 AgentX 智能体编码与固定序列 AI 推理。性能数据可复现、可审计，获得领先 AI 基础设施运营方的信赖。',
+      'InferenceX 持续开展智能体推理与固定序列 AI 推理基准测试，并提供 AgentX 结果。每项结果均链接至对应的公开运行。',
     semianalysis: 'SemiAnalysis',
     mainSite: '官方网站',
     newsletter: '订阅通讯',

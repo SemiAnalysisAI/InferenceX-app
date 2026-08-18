@@ -15,12 +15,15 @@ import {
 
 const HAN_REGEX = /\p{Script=Han}/u;
 
-describe('AgentX Chinese positioning', () => {
-  it('mirrors the English AgentX and fixed-sequence scope', () => {
-    expect(LANDING_META_ZH.title).toMatch(/AgentX.*智能体/u);
-    expect(LANDING_META_ZH.description).toMatch(/AgentX.*长上下文多轮智能体编码/u);
+describe('Chinese agentic inference positioning', () => {
+  it('uses the category name for titles and AgentX for the scenario', () => {
+    expect(LANDING_META_ZH.title).toContain('智能体推理基准测试');
+    expect(LANDING_META_ZH.title).not.toContain('AgentX');
+    expect(LANDING_META_ZH.description).toMatch(/AgentX.*场景/u);
     expect(LANDING_META_ZH.description).toContain('固定序列');
-    expect(TAB_META_ZH.inference.title).toMatch(/AgentX.*智能体/u);
+    expect(TAB_META_ZH.inference.title).toContain('智能体推理基准测试');
+    expect(TAB_META_ZH.inference.title).not.toContain('AgentX');
+    expect(TAB_META_ZH.inference.description).toMatch(/AgentX.*工作负载/u);
     expect(TAB_INTRO_ZH.inference).toContain('固定序列');
   });
 });

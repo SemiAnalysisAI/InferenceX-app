@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: `${SITE_NAME} by ${AUTHOR_NAME}`,
     short_name: SITE_NAME,
     description:
-      'Open-source AgentX and AI inference benchmark. Compare agentic and fixed-sequence serving performance across NVIDIA, AMD, and more.',
+      'Open-source agentic inference benchmark. Compare the AgentX scenario and fixed-sequence serving performance across NVIDIA, AMD, and more.',
     start_url: '/',
     display: 'standalone',
     background_color: '#09090b',

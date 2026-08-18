@@ -16,7 +16,7 @@ const STRINGS = {
       'Start with a concise cost overview spanning AgentX and fixed-sequence workloads, or open the full dashboard for every available model, chip, framework, and metric.',
     fullDashboard: 'Full Dashboard',
     platformCoverage:
-      'AgentX replays long-context, multi-turn agentic coding workloads with shared prefixes, pauses, and subagent activity. Results are available wherever supported data exists, alongside the fixed-sequence benchmarks across NVIDIA and AMD platforms.',
+      'AgentX is our long-context, multi-turn coding scenario. It replays workloads with shared prefixes, pauses, and subagent activity wherever supported data exists. Fixed-sequence benchmarks remain available across NVIDIA and AMD platforms.',
     overview: 'Overview',
     reproTitle: 'Every Result Is Transparently done through Public GitHub Actions Automation',
     reproP1:
@@ -45,7 +45,7 @@ const STRINGS = {
       '先查看覆盖 AgentX 与固定序列工作负载的精简成本总览，或打开完整仪表板，探索所有已有数据的模型、Chip、框架与指标。',
     fullDashboard: '完整仪表板',
     platformCoverage:
-      'AgentX 回放具有共享前缀、轮次间停顿与 subagent 活动的长上下文多轮智能体编码工作负载。在具备对应数据的模型与平台上提供 AgentX 结果，并保留覆盖 NVIDIA 与 AMD 平台的固定序列基准测试。',
+      'AgentX 是我们的长上下文多轮编码场景，回放具有共享前缀、轮次间停顿与 subagent 活动的工作负载。在具备对应数据的模型与平台上提供 AgentX 结果，并保留覆盖 NVIDIA 与 AMD 平台的固定序列基准测试。',
     overview: '总览',
     reproTitle: '每一条结果都通过公开的 GitHub Actions 自动化流程透明产生',
     reproP1:

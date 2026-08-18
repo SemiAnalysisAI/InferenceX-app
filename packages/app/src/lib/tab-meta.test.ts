@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import { getTabTitle, isValidTab, LANDING_META, TAB_META, VALID_TABS } from './tab-meta';
 
-describe('AgentX positioning', () => {
-  it('describes AgentX without hiding the fixed-sequence benchmark', () => {
-    expect(LANDING_META.title).toContain('AgentX');
-    expect(LANDING_META.description).toMatch(/AgentX.*agentic coding/u);
+describe('agentic inference positioning', () => {
+  it('uses agentic inference for the category and AgentX for the scenario', () => {
+    expect(LANDING_META.title).toContain('Agentic Inference Benchmark');
+    expect(LANDING_META.title).not.toContain('AgentX');
+    expect(LANDING_META.description).toMatch(/AgentX.*scenario/u);
     expect(LANDING_META.description).toContain('fixed-sequence');
-    expect(TAB_META.inference.title).toContain('AgentX');
+    expect(TAB_META.inference.title).toContain('Agentic Inference');
+    expect(TAB_META.inference.title).not.toContain('AgentX');
+    expect(TAB_META.inference.description).toMatch(/AgentX.*workload/u);
     expect(TAB_META.inference.description).toContain('fixed-sequence');
   });
 });

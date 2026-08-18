@@ -54,7 +54,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'What is InferenceX?',
     answer:
-      'InferenceX (formerly InferenceMAX) is an open-source, vendor-neutral benchmark that continuously measures fixed-sequence and AgentX agentic coding inference performance across chips and software stacks. Benchmarks re-run whenever a configuration changes, so results stay current as models and frameworks evolve.',
+      'InferenceX (formerly InferenceMAX) continuously measures agentic and fixed-sequence inference performance across chips and software stacks. AgentX is its long-context, multi-turn coding scenario. Runs repeat whenever a configuration changes.',
   },
   {
     question: 'Who is behind InferenceX?',
@@ -92,7 +92,7 @@ export const FAQ_ITEMS: FaqItem[] = [
       'Input and output throughput per chip',
       'Token throughput per MW (tok/s/MW)',
       'P99 time to first token (TTFT)',
-      'AgentX end-to-end latency, ITL, output throughput, prefix-cache behavior, and session/subagent execution',
+      'For AgentX: end-to-end latency, ITL, output throughput, prefix-cache behavior, and session/subagent execution',
       'Cost per million tokens (total, input, output) across hyperscaler, neocloud, and rental pricing',
       'Joules per token (total, input, output)',
       'Custom user-defined cost and power calculations',
@@ -114,7 +114,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'How is InferenceX different from other AI benchmarks?',
     answer:
-      'Most AI benchmarks are static, point-in-time measurements where participants submit purpose-built images that do not reflect real-world serving performance. InferenceX runs reproducible fixed-sequence and AgentX agentic coding workloads on real hardware. Every recipe is in the repo, benchmark logs are visible on GitHub Actions, and all results are auditable end-to-end.',
+      'InferenceX runs fixed-sequence workloads and the AgentX long-context, multi-turn coding scenario on real hardware. Test recipes are in the repository, and each result links to its GitHub Actions run.',
   },
   {
     question: 'How are results reproducible?',

@@ -9,13 +9,13 @@ const SITE_URL = 'https://inferencex.semianalysis.com';
 const STRINGS = {
   en: {
     shareText:
-      'Explore InferenceX — open-source AgentX agentic coding and fixed-sequence AI inference benchmarks with reproducible, continuously updated chip performance data.',
+      'Explore InferenceX: open-source agentic and fixed-sequence AI inference benchmarks, including AgentX results from public chip runs.',
     twitter: 'Share on X (Twitter)',
     linkedin: 'Share on LinkedIn',
   },
   zh: {
     shareText:
-      '探索 InferenceX——开源测试 AgentX 智能体编码与固定序列 AI 推理，提供可复现、持续更新的 Chip 性能数据。',
+      '探索 InferenceX：开源测试智能体推理与固定序列 AI 推理，并提供来自公开 Chip 运行的 AgentX 结果。',
     twitter: '分享到 X（推特）',
     linkedin: '分享到 LinkedIn',
   },
