@@ -155,7 +155,9 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     category: 'maintenance',
   },
   [Model.GLM_5]: { label: 'GLM5/5.1 744B', prefix: 'glm5', category: 'deprecated' },
-  [Model.GLM_5_2]: { label: 'GLM5.2', prefix: 'glm5.2', category: 'default' },
+  // GLM-5.2 and GLM-5.3 share the same architecture and inference profile, so
+  // the selector presents both releases over the existing GLM-5.2 data bucket.
+  [Model.GLM_5_2]: { label: 'GLM5.2/GLM5.3', prefix: 'glm5.2', category: 'default' },
   [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
   [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'deprecated' },
   [Model.MiniMax_M2_5]: {

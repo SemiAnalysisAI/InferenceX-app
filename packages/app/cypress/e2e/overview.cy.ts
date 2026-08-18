@@ -4,7 +4,7 @@ const MODEL_LABELS = [
   'DeepSeek V4 Pro 1.6T',
   'Kimi K3 2.8T',
   'MiniMax M3 428B',
-  'GLM5.2',
+  'GLM5.2/GLM5.3',
   'Qwen3.5 397B',
 ];
 
