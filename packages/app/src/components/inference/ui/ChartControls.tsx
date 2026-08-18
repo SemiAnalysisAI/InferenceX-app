@@ -16,6 +16,7 @@ import {
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { QuickRangeChips } from '@/components/ui/quick-range-chips';
 import {
   Select,
   SelectContent,
@@ -625,6 +626,14 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                     : ''
                 }
               />
+              {dateRangeAvailableDates && dateRangeAvailableDates.length >= 2 && (
+                <QuickRangeChips
+                  availableDates={dateRangeAvailableDates}
+                  currentRange={selectedDateRange}
+                  onApply={handleDateRangeChange}
+                  source="inline"
+                />
+              )}
             </div>
           )}
         </div>

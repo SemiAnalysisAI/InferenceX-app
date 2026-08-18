@@ -25,6 +25,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { QuickRangeChips } from '@/components/ui/quick-range-chips';
 import { cn } from '@/lib/utils';
 
 export interface DateRange {
@@ -180,6 +181,19 @@ export function DateRangePicker({
               )}
             </DialogDescription>
           </DialogHeader>
+          {availableDates && availableDates.length >= 2 && (
+            <div className="flex items-center gap-3 pt-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Quick range:
+              </span>
+              <QuickRangeChips
+                availableDates={availableDates}
+                currentRange={tempRange}
+                onApply={(range) => setTempRange(range)}
+                source="dialog"
+              />
+            </div>
+          )}
           <div className="py-4 relative">
             <CalendarGrid
               dateRange={tempRange}
@@ -240,59 +254,7 @@ export function DateRangePicker({
               )}
           </div>
           {error && <p className="text-md text-center text-red-500">{error}</p>}
-          <DialogFooter className="flex-row justify-between sm:justify-between">
-            {availableDates && availableDates.length >= 2 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  {
-                    label: 'Max Range',
-                    getRange: () => ({
-                      startDate: availableDates[0],
-                      endDate: availableDates.at(-1)!,
-                    }),
-                  },
-                  {
-                    label: 'Last 90 Days',
-                    getRange: () => {
-                      const cutoff = new Date();
-                      cutoff.setDate(cutoff.getDate() - 90);
-                      const cutoffStr = cutoff.toISOString().slice(0, 10);
-                      const filtered = availableDates.filter((d) => d >= cutoffStr);
-                      if (filtered.length < 2) return null;
-                      return { startDate: filtered[0], endDate: filtered.at(-1)! };
-                    },
-                  },
-                  {
-                    label: 'Last 30 Days',
-                    getRange: () => {
-                      const cutoff = new Date();
-                      cutoff.setDate(cutoff.getDate() - 30);
-                      const cutoffStr = cutoff.toISOString().slice(0, 10);
-                      const filtered = availableDates.filter((d) => d >= cutoffStr);
-                      if (filtered.length < 2) return null;
-                      return { startDate: filtered[0], endDate: filtered.at(-1)! };
-                    },
-                  },
-                ].map(({ label, getRange }) => {
-                  const range = getRange();
-                  if (!range) return null;
-                  return (
-                    <Button
-                      key={label}
-                      variant="outline"
-                      onClick={() => {
-                        setTempRange(range);
-                        track('date_range_picker_quick_select', { label });
-                      }}
-                    >
-                      {label}
-                    </Button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div />
-            )}
+          <DialogFooter>
             <div className="flex gap-2">
               <DialogClose asChild>
                 <Button variant="outline" onClick={handleCancel}>
