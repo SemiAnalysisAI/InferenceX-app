@@ -52,17 +52,17 @@ export function AgentXCompareHero({
     <section data-testid="compare-agentx-primary">
       <Card className="overflow-hidden p-0 md:p-0">
         <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(19rem,0.85fr)]">
-          <div className="flex flex-col justify-center p-6 md:p-8 lg:p-10">
+          <div className="flex flex-col justify-center px-6 py-5 md:px-8 md:py-6 lg:px-10 lg:py-7">
             <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
               {t.eyebrow}
             </p>
-            <Heading className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-foreground lg:text-5xl">
+            <Heading className="mt-3 max-w-2xl text-[1.5rem]/[1.8rem] font-semibold tracking-tight text-foreground lg:text-[2.4rem]/[2.4rem]">
               {t.title}
             </Heading>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground lg:text-lg">
+            <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground lg:text-lg">
               {t.description}
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap gap-3">
               <CompareIndexTrackedLink
                 data-testid="compare-agentx-overview-link"
                 href={`${prefix}/overview`}
@@ -87,7 +87,7 @@ export function AgentXCompareHero({
                 <ArrowRight aria-hidden="true" className="size-4" />
               </CompareIndexTrackedLink>
             </div>
-            <div className="mt-3 flex flex-wrap gap-3">
+            <div className="mt-2 flex flex-wrap gap-3">
               <CompareIndexTrackedLink
                 data-testid="compare-agentx-methodology-link"
                 href={`${prefix}/agentx`}
@@ -113,7 +113,7 @@ export function AgentXCompareHero({
                   analyticsTarget={model.slug}
                   analyticsSurface={surface}
                   appNavigation
-                  className="group flex min-h-16 items-center justify-between gap-4 px-5 py-3 transition-colors hover:bg-brand/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  className="group flex min-h-14 items-center justify-between gap-4 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 >
                   <span className="min-w-0">
                     <span className="block text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
