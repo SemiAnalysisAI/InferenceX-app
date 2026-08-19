@@ -18,8 +18,10 @@ import {
   PADDING_RIGHT,
   ROW_GAP,
   ROW_HEIGHT,
+  ROW_SPAN,
   TIMELINE_BODY_MAX_HEIGHT,
   timelineSvgHeight,
+  visibleTimelineRowRange,
 } from './timeline-layout';
 import {
   buildRequestTimelineRows,
@@ -108,6 +110,8 @@ export function RequestTimelineView({
   const [rowMode, setRowMode] = useState<RowMode>('conversation');
   const [phaseFilter, setPhaseFilter] = useState<PhaseFilter>('profiling');
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(TIMELINE_BODY_MAX_HEIGHT);
 
   // The scroll container (vertical row scroll + horizontal chart scroll) and a
   // ref mirror of the live view state, so click-through can snapshot the exact
@@ -264,6 +268,21 @@ export function RequestTimelineView({
   }, [pointId]);
 
   const svgHeight = timelineSvgHeight(rows.length);
+  const visibleRange = useMemo(
+    () => visibleTimelineRowRange(rows.length, scrollTop, viewportHeight),
+    [rows.length, scrollTop, viewportHeight],
+  );
+  const visibleRows = rows.slice(visibleRange.start, visibleRange.end);
+
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const updateHeight = () => setViewportHeight(element.clientHeight);
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [rows.length]);
 
   // Native (non-passive) wheel handler: React's synthetic onWheel is attached
   // passively, so preventDefault there is silently ignored and shift+scroll
@@ -456,25 +475,28 @@ export function RequestTimelineView({
             window's bottom edge (rather than the bottom of the tall content). */}
         <div
           ref={scrollRef}
+          data-testid="request-timeline-scroll"
           className="overflow-auto"
           style={{ maxHeight: TIMELINE_BODY_MAX_HEIGHT }}
+          onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
         >
           <div className="flex w-max">
             {/* Label column — pinned left (sticky) so it stays put during
                 horizontal scroll, while scrolling vertically with the rows. */}
             <div
               className="sticky left-0 z-10 flex-shrink-0 border-r border-border/60 bg-card"
-              style={{ width: LABEL_WIDTH }}
+              style={{ width: LABEL_WIDTH, height: svgHeight }}
             >
               <div
-                className="border-b border-border/60 flex items-end px-2 pb-1"
+                className="sticky top-0 z-20 border-b border-border/60 bg-card flex items-end px-2 pb-1"
                 style={{ height: HEADER_HEIGHT }}
               >
                 <span className="text-[9px] font-mono font-bold uppercase tracking-[0.15em] text-muted-foreground">
                   {rowMode === 'conversation' ? 'Conversation' : 'Worker'}
                 </span>
               </div>
-              {rows.map((row) => {
+              {visibleRows.map((row, visibleIndex) => {
+                const rowIndex = visibleRange.start + visibleIndex;
                 const isSubagentRow = row.kind === 'subagent';
                 const isChildRow = row.kind === 'stream' || row.kind === 'aux';
                 const isExpandable = isSubagentRow && (row.streamCount ?? 1) > 1;
@@ -485,6 +507,10 @@ export function RequestTimelineView({
                     data-timeline-row-kind={row.kind}
                     className="flex items-center gap-1 overflow-hidden pr-2"
                     style={{
+                      position: 'absolute',
+                      top: HEADER_HEIGHT + rowIndex * ROW_SPAN,
+                      left: 0,
+                      right: 0,
                       height: ROW_HEIGHT + ROW_GAP,
                       paddingLeft: 4 + row.depth * 10,
                     }}
@@ -535,12 +561,13 @@ export function RequestTimelineView({
             {/* Chart column — horizontal scrolling is handled by the window
                 container above so its scrollbar stays pinned to the window's
                 bottom edge; double-click anywhere resets the zoom. */}
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0" style={{ height: svgHeight }}>
               <svg
                 ref={zoomSvgRef}
+                data-testid="request-timeline-svg"
                 width={CHART_WIDTH}
-                height={svgHeight}
-                className="block"
+                height={viewportHeight}
+                className="sticky top-0 block bg-card"
                 style={{ cursor: isZoomed ? 'grab' : 'crosshair' }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
@@ -549,7 +576,10 @@ export function RequestTimelineView({
                 onDoubleClick={resetZoom}
               >
                 <TimelineBars
-                  rows={rows}
+                  rows={visibleRows}
+                  firstRowIndex={visibleRange.start}
+                  scrollTop={scrollTop}
+                  viewportHeight={viewportHeight}
                   expandedSubagents={expandedSubagents}
                   dataStart={dataStart}
                   vStart={vStart}
@@ -568,7 +598,7 @@ export function RequestTimelineView({
                     x1={cursor.xPx}
                     x2={cursor.xPx}
                     y1={0}
-                    y2={svgHeight}
+                    y2={viewportHeight}
                     stroke="currentColor"
                     strokeWidth={1}
                     opacity={0.45}

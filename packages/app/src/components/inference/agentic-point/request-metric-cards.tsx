@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import type { RequestTimeline } from '@/hooks/api/use-request-timeline';
+import type { RequestChartData } from '@/hooks/api/use-request-chart-data';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics';
 
@@ -47,16 +47,18 @@ export function RequestMetricOverTime({
 }: {
   title: string;
   metric: RequestMetric;
-  timeline: RequestTimeline | null | undefined;
+  timeline: RequestChartData | null | undefined;
   isLoading: boolean;
   latencySelector?: boolean;
 }) {
   const [percentile, setPercentile] = useState<RequestPercentile>('p90');
   const [latencyMetric, setLatencyMetric] = useState<'ttft' | 'e2e'>('ttft');
   const selectedMetric = latencySelector ? latencyMetric : metric;
-  const result = timeline
-    ? rollingRequestMetric(timeline.requests, selectedMetric, percentile, 50)
-    : null;
+  const result = useMemo(
+    () =>
+      timeline ? rollingRequestMetric(timeline.requests, selectedMetric, percentile, 50) : null,
+    [timeline, selectedMetric, percentile],
+  );
   const metricLabel =
     selectedMetric === 'ttft' ? 'TTFT' : selectedMetric === 'e2e' ? 'E2E latency' : 'Interactivity';
   const color =
@@ -151,7 +153,7 @@ export function SequenceMetricCard({
 }: {
   metric: 'isl' | 'osl';
   /** Phase-scoped timeline — distribution values + in-flight are both derived from it. */
-  timeline: RequestTimeline | null | undefined;
+  timeline: RequestChartData | null | undefined;
   timelineLoading: boolean;
 }) {
   const [view, setView] = useState<SequenceMetricView>('distribution');
@@ -160,11 +162,19 @@ export function SequenceMetricCard({
   const testPrefix = `${metric}-metric`;
   // Per-request ISL/OSL for the selected phase (request_timeline carries both,
   // so the distribution honours the warmup/profiling toggle for free).
-  const values = timeline
-    ? timeline.requests
-        .map((r) => r[metric])
-        .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
-    : undefined;
+  const values = useMemo(
+    () =>
+      timeline
+        ? timeline.requests
+            .map((r) => r[metric])
+            .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+        : undefined,
+    [timeline, metric],
+  );
+  const inflightData = useMemo(
+    () => (timeline ? averageSequenceLengthInFlight(timeline.requests, metric) : null),
+    [timeline, metric],
+  );
   return (
     <ExpandableChart
       title={view === 'distribution' ? `${fullName} distribution` : `Average ${acronym} in flight`}
@@ -193,7 +203,7 @@ export function SequenceMetricCard({
           return timelineLoading ? <ChartSkeleton /> : <ChartEmpty />;
         }
         if (!timeline) return timelineLoading ? <ChartSkeleton /> : <ChartEmpty />;
-        const raw = averageSequenceLengthInFlight(timeline.requests, metric);
+        const raw = inflightData ?? [];
         return (
           <div>
             {metric === 'osl' && (

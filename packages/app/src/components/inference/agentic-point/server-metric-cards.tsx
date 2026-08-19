@@ -1,7 +1,9 @@
 'use client';
 
-import type { RequestTimeline } from '@/hooks/api/use-request-timeline';
-import type { MetricSourceSeries, QueueDepthPoint } from '@/hooks/api/use-trace-server-metrics';
+import { useMemo } from 'react';
+
+import type { RequestChartData } from '@/hooks/api/use-request-chart-data';
+import type { MetricSourceDescriptor, QueueDepthPoint } from '@/hooks/api/use-trace-server-metrics';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics';
 
@@ -160,11 +162,15 @@ export function RequestActivityCard({
   onViewChange,
 }: {
   sliced: SlicedServerSeries;
-  phaseTimeline: RequestTimeline | null;
+  phaseTimeline: RequestChartData | null;
   timelineLoading: boolean;
   view: RequestActivityView;
   onViewChange: (view: RequestActivityView) => void;
 }) {
+  const completedRequests = useMemo(
+    () => (phaseTimeline ? cumulativeCompletedRequests(phaseTimeline.requests) : null),
+    [phaseTimeline],
+  );
   return (
     <ExpandableChart
       title={view === 'queue' ? 'Request queue depth' : 'Cumulative completed requests'}
@@ -193,7 +199,7 @@ export function RequestActivityCard({
               series={[
                 {
                   name: 'Completed requests',
-                  data: cumulativeCompletedRequests(phaseTimeline.requests),
+                  data: completedRequests ?? [],
                   color: '#3b82f6',
                   strokeWidth: 2.5,
                 },
@@ -294,7 +300,7 @@ export function ThroughputCard({
   onSelectedChange,
 }: {
   sliced: SlicedServerSeries;
-  selectedSource: MetricSourceSeries | undefined;
+  selectedSource: MetricSourceDescriptor | undefined;
   selected: ReadonlySet<ThroughputSeriesKey>;
   onSelectedChange: (next: ReadonlySet<ThroughputSeriesKey>) => void;
 }) {
@@ -435,11 +441,20 @@ export function InflightUniqueTokensCard({
   timelineLoading,
   kvCachePoolTokens,
 }: {
-  phaseTimeline: RequestTimeline | null;
+  phaseTimeline: RequestChartData | null;
   timelineLoading: boolean;
   /** KV-cache pool size in tokens (vLLM only) — drawn as a constant ceiling. */
   kvCachePoolTokens: number | null;
 }) {
+  const inflightSeries = useMemo(() => {
+    if (!phaseTimeline) return null;
+    const raw = inflightUniqueTokens(phaseTimeline.requests);
+    return {
+      raw,
+      smoothed: timeRollingAverage(raw, 30),
+      cumulative: cumulativeTimeAverage(raw),
+    };
+  }, [phaseTimeline]);
   return (
     <ExpandableChart
       title="Unique input tokens in flight"
@@ -456,8 +471,8 @@ export function InflightUniqueTokensCard({
         // independent (cross-conv prefix sharing adds <1pp in
         // practice). Smooth with a 30s time-weighted rolling average
         // so brief turn-handoff dips don't dominate the chart.
-        const raw = inflightUniqueTokens(phaseTimeline.requests);
-        const smoothed = timeRollingAverage(raw, 30);
+        const raw = inflightSeries?.raw ?? [];
+        const smoothed = inflightSeries?.smoothed ?? [];
         // KV-cache pool size (vLLM only) drawn as a constant ceiling so
         // you can see how close the working set gets to eviction
         // pressure. Phase-independent — it's a static config value.
@@ -474,7 +489,7 @@ export function InflightUniqueTokensCard({
               },
               {
                 name: 'Cumulative average',
-                data: cumulativeTimeAverage(raw),
+                data: inflightSeries?.cumulative ?? [],
                 color: '#ef4444',
                 strokeWidth: 3,
               },

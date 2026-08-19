@@ -22,13 +22,21 @@ import {
 import type { DbClient } from '../connection.js';
 import { writeBackTraceReplayJsonb } from './agentic-shared';
 
-export type { TimeSeriesPoint, QueueDepthPoint } from '../etl/compute-chart-series';
+export type {
+  MetricSourceSeries,
+  QueueDepthPoint,
+  TimeSeriesPoint,
+} from '../etl/compute-chart-series';
 
 // The endpoint payload combines chart_series with separately queried point
 // metadata. Keep a composite response version so metadata-shape changes roll
 // the blob-cache namespace without forcing an expensive chart_series backfill.
-const POINT_META_VERSION = 3;
+const POINT_META_VERSION = 4;
 export const TRACE_SERVER_METRICS_VERSION = CHART_SERIES_VERSION * 100 + POINT_META_VERSION;
+
+export interface MetricSourceDescriptor {
+  source: MetricSourceSeries['source'];
+}
 
 export interface PointMeta {
   id: number;
@@ -101,8 +109,12 @@ export interface TraceServerMetrics {
    */
   kvCachePoolTokens: number | null;
   /** Orchestrator-normalized metrics grouped by endpoint/worker. */
-  metricSources: MetricSourceSeries[];
+  metricSources: MetricSourceDescriptor[];
 }
+
+type ChartSeriesSummary = Omit<ChartSeries, 'metricSources'> & {
+  metricSources: MetricSourceDescriptor[];
+};
 
 interface RawMetaRow extends PointMeta {
   trace_replay_id: number | null;
@@ -148,8 +160,9 @@ function buildMeta(row: RawMetaRow): PointMeta {
 
 function merge(
   meta: PointMeta,
-  series: ChartSeries,
+  series: Omit<ChartSeries, 'metricSources'>,
   kvCachePoolTokens: number | null,
+  metricSources: MetricSourceDescriptor[],
 ): TraceServerMetrics {
   return {
     meta,
@@ -170,7 +183,14 @@ function merge(
     // v8+ field; older chart_series rows lack it → omit per-engine overlay.
     kvCacheUsageByEngine: series.kvCacheUsageByEngine ?? [],
     // v9+ field; old rows are served without a source selector until backfilled.
-    metricSources: series.metricSources ?? [],
+    metricSources,
+  };
+}
+
+function summarizeSeries(series: ChartSeries): ChartSeriesSummary {
+  return {
+    ...series,
+    metricSources: (series.metricSources ?? []).map(({ source }) => ({ source })),
   };
 }
 
@@ -212,7 +232,8 @@ export async function getTraceServerMetrics(
 
   // Fast path: pre-computed chart_series at the current version.
   if (row.chart_series && Number(row.chart_series.version) === CHART_SERIES_VERSION) {
-    return merge(meta, row.chart_series, kvCachePoolTokens);
+    const summary = summarizeSeries(row.chart_series);
+    return merge(meta, summary, kvCachePoolTokens, summary.metricSources);
   }
 
   // Slow path only: fetch the large raw blob after establishing that the
@@ -241,5 +262,60 @@ export async function getTraceServerMetrics(
   // (no-ops on a read-only replica). trace_replay_id is non-null on this path.
   writeBackTraceReplayJsonb(sql, 'chart_series', row.trace_replay_id, series);
 
-  return merge(meta, series, kvCachePoolTokens);
+  const summary = summarizeSeries(series);
+  return merge(meta, summary, kvCachePoolTokens, summary.metricSources);
+}
+
+interface RawMetricSourceRow {
+  trace_replay_id: number | null;
+  has_blob: boolean;
+  chart_series_version: number | null;
+  framework: string;
+  disagg: boolean;
+  metric_source: MetricSourceSeries | null;
+}
+
+/** Fetch one source's full series only after the user selects it. */
+export async function getTraceServerMetricSource(
+  sql: DbClient,
+  benchmarkResultId: number,
+  sourceId: string,
+): Promise<MetricSourceSeries | null> {
+  const rows = (await sql`
+    select
+      br.trace_replay_id,
+      (atr.server_metrics_json_gz is not null) as has_blob,
+      (atr.chart_series->>'version')::int as chart_series_version,
+      c.framework,
+      c.disagg,
+      (
+        select metric_source
+        from jsonb_array_elements(atr.chart_series->'metricSources') as metric_source
+        where metric_source->'source'->>'id' = ${sourceId}
+        limit 1
+      ) as metric_source
+    from benchmark_results br
+    join configs c on c.id = br.config_id
+    left join agentic_trace_replay atr on atr.id = br.trace_replay_id
+    where br.id = ${benchmarkResultId}
+  `) as unknown as RawMetricSourceRow[];
+  const row = rows[0];
+  if (!row || !row.has_blob || row.trace_replay_id === null) return null;
+
+  if (row.chart_series_version === CHART_SERIES_VERSION) return row.metric_source;
+
+  const blobRows = (await sql`
+    select server_metrics_json_gz as blob
+    from agentic_trace_replay
+    where id = ${row.trace_replay_id}
+  `) as unknown as RawBlobRow[];
+  const blob = blobRows[0]?.blob;
+  if (!blob) return null;
+  const series = await computeChartSeries(blob, {
+    framework: row.framework,
+    disagg: row.disagg,
+  });
+  if (!series) return null;
+  writeBackTraceReplayJsonb(sql, 'chart_series', row.trace_replay_id, series);
+  return series.metricSources.find(({ source }) => source.id === sourceId) ?? null;
 }

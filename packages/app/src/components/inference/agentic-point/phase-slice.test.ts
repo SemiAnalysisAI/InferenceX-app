@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import type { RequestRecord, RequestTimeline } from '@/hooks/api/use-request-timeline';
+import type { RequestChartData } from '@/hooks/api/use-request-chart-data';
 import {
   phaseBoundaryNs,
   phaseBoundarySec,
   requestsForPhase,
   sliceServerSeriesByPhase,
+  sliceRequestChartDataByPhase,
   sliceTimelineByPhase,
   timelineHasWarmup,
   type ServerSeriesLike,
@@ -208,5 +210,47 @@ describe('sliceTimelineByPhase', () => {
     expect(out.requests[0]!.ack).toBe(20);
     // startNs shifts forward by the boundary offset so absolute time is preserved
     expect(out.startNs).toBe(1_100);
+  });
+});
+
+describe('sliceRequestChartDataByPhase', () => {
+  it('filters and rebases the compact request payload without Gantt-only fields', () => {
+    const data: RequestChartData = {
+      version: 1,
+      timelineVersion: 5,
+      startNs: 1_000,
+      endNs: 4_000,
+      durationS: 3,
+      requests: [
+        {
+          cid: 'warmup',
+          phase: 'warmup',
+          start: 0,
+          end: 50,
+          ttftMs: 1,
+          tpotMs: 2,
+          isl: 3,
+          osl: 4,
+          cancelled: false,
+        },
+        {
+          cid: 'profiling',
+          phase: 'profiling',
+          start: 100,
+          end: 300,
+          ttftMs: 5,
+          tpotMs: 6,
+          isl: 7,
+          osl: 8,
+          cancelled: false,
+        },
+      ],
+    };
+
+    const result = sliceRequestChartDataByPhase(data, 'profiling');
+    expect(result.requests).toEqual([
+      expect.objectContaining({ cid: 'profiling', start: 0, end: 200 }),
+    ]);
+    expect(result.startNs).toBe(1_100);
   });
 });

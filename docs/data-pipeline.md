@@ -133,6 +133,24 @@ minus TTFT, then divides by `output_sequence_length - 1`. The same helper powers
 the one-time `db:backfill-full-response-interactivity` data migration, keeping
 historical rows and newly ingested rows on one definition.
 
+### Agentic Point-Detail Payloads
+
+The point-detail page deliberately splits its immutable trace data by use case.
+The default charts fetch `request-chart-data`, a dictionary-encoded tuple
+projection containing only conversation, phase, request timing, latency, and
+sequence-length fields. The source-rich `request-timeline` document is fetched
+only after the user opens the Timeline view. Likewise, `trace-server-metrics`
+returns the aggregate series plus source descriptors; a selected endpoint's
+full arrays come from `trace-server-metric-source` on demand.
+
+This split is a scale invariant, not only a transport optimization. A high-
+throughput point can contain more than 150,000 requests and several copies of
+each server series. Reusing either full document for the default view multiplies
+JSON parsing, React Query memory, and cache-transfer cost by data the visible
+charts do not consume. The Timeline view also virtualizes rows, so the number of
+SVG bar/link nodes is bounded by the scroll viewport rather than total request
+count.
+
 ## Frontend Transform Pipeline
 
 ### Why transformBenchmarkRows Exists

@@ -43,7 +43,12 @@ export function useBulkIdsQuery<T>(
 }
 
 /** Single-payload query for one benchmark_results id; 404 resolves to null. */
-export function useByIdQuery<T>(endpoint: string, id: number | null, enabled: boolean) {
+export function useByIdQuery<T, TSelected = T>(
+  endpoint: string,
+  id: number | null,
+  enabled: boolean,
+  select?: (data: T) => TSelected,
+) {
   return useQuery({
     queryKey: [endpoint, id] as const,
     queryFn: async ({ signal }): Promise<T | null> => {
@@ -55,5 +60,7 @@ export function useByIdQuery<T>(endpoint: string, id: number | null, enabled: bo
     },
     enabled,
     staleTime: STALE_TIME_MS,
+    select: (data): TSelected | null =>
+      data === null ? null : (select?.(data) ?? (data as unknown as TSelected)),
   });
 }

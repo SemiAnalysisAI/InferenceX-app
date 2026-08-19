@@ -23,46 +23,75 @@ const timelineRequest = (
   ...overrides,
 });
 
+const requestChartPayload = (requests: ReturnType<typeof timelineRequest>[]) => {
+  const cids = [...new Set(requests.map((request) => request.cid))];
+  const phases = [...new Set(requests.map((request) => request.phase))];
+  return {
+    version: 501,
+    timelineVersion: 5,
+    startNs: 0,
+    endNs: 7_000_000_000,
+    durationS: 7,
+    cids,
+    phases,
+    requests: requests.map((request) => [
+      cids.indexOf(request.cid),
+      phases.indexOf(request.phase),
+      request.start,
+      request.end,
+      request.ttftMs,
+      request.tpotMs,
+      request.isl,
+      request.osl,
+      request.cancelled ? 1 : 0,
+    ]),
+  };
+};
+
 describe('Agentic point request metric time series', () => {
-  before(() => {
+  beforeEach(() => {
+    const requests = [
+      timelineRequest(0, 100, 10),
+      timelineRequest(1, 200, 20),
+      timelineRequest(2, 400, 25),
+      timelineRequest(3, 800, 40),
+      timelineRequest(4, 1600, 80),
+      timelineRequest(5, 3200, 160, { phase: 'warmup' }),
+      timelineRequest(6, 6400, 320, { cancelled: true }),
+      timelineRequest(7, 0, 0, {
+        cid: 'conversation-1::sa:subagent_001_abcd',
+        credit: 1_100_000_000,
+        start: 1_100_000_000,
+        end: 1_900_000_000,
+        ttftMs: null,
+        tpotMs: null,
+        isl: null,
+        osl: null,
+      }),
+      timelineRequest(8, 0, 0, {
+        cid: 'conversation-1::sa:subagent_001_abcd:aux:011',
+        credit: 1_200_000_000,
+        start: 1_200_000_000,
+        end: 1_800_000_000,
+        ttftMs: null,
+        tpotMs: null,
+        isl: null,
+        osl: null,
+      }),
+    ];
     cy.intercept('GET', '/api/v1/trace-histograms*', { body: {} });
     cy.intercept('GET', '/api/v1/trace-server-metrics*', { body: null });
     cy.intercept('GET', '/api/v1/benchmark-siblings*', { statusCode: 404 });
+    cy.intercept('GET', '/api/v1/request-chart-data*', {
+      body: requestChartPayload(requests),
+    });
     cy.intercept('GET', '/api/v1/request-timeline*', {
       body: {
         version: 3,
         startNs: 0,
         endNs: 7_000_000_000,
         durationS: 7,
-        requests: [
-          timelineRequest(0, 100, 10),
-          timelineRequest(1, 200, 20),
-          timelineRequest(2, 400, 25),
-          timelineRequest(3, 800, 40),
-          timelineRequest(4, 1600, 80),
-          timelineRequest(5, 3200, 160, { phase: 'warmup' }),
-          timelineRequest(6, 6400, 320, { cancelled: true }),
-          timelineRequest(7, 0, 0, {
-            cid: 'conversation-1::sa:subagent_001_abcd',
-            credit: 1_100_000_000,
-            start: 1_100_000_000,
-            end: 1_900_000_000,
-            ttftMs: null,
-            tpotMs: null,
-            isl: null,
-            osl: null,
-          }),
-          timelineRequest(8, 0, 0, {
-            cid: 'conversation-1::sa:subagent_001_abcd:aux:011',
-            credit: 1_200_000_000,
-            start: 1_200_000_000,
-            end: 1_800_000_000,
-            ttftMs: null,
-            tpotMs: null,
-            isl: null,
-            osl: null,
-          }),
-        ],
+        requests,
       },
     });
     cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
@@ -187,6 +216,8 @@ describe('Agentic point request metric time series', () => {
   });
 
   it('restores the request timeline view after browser Back from a dataset route', () => {
+    cy.get('[data-testid="detail-view-timeline"]').click();
+    cy.get('[data-testid="timeline-total-idle-time"]').should('be.visible');
     cy.window().then((win) => {
       win.history.pushState({}, '', '/datasets/test-dataset/conversations/conversation-1');
     });
@@ -202,6 +233,49 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="unique-input-inflight-chart"]').within(() => {
       cy.get('svg').should('contain.text', 'Cumulative average');
       cy.get('svg path[stroke="#ef4444"]').should('have.length', 1);
+    });
+  });
+});
+
+describe('Agentic request timeline virtualization', () => {
+  const requests = Array.from({ length: 2_000 }, (_, index) =>
+    timelineRequest(index, 10, 10, {
+      cid: `conversation-${String(index).padStart(4, '0')}`,
+      credit: index * 1_000_000_000,
+      start: index * 1_000_000_000,
+      end: (index + 1) * 1_000_000_000,
+    }),
+  );
+
+  beforeEach(() => {
+    cy.intercept('GET', '/api/v1/trace-server-metrics*', { body: null });
+    cy.intercept('GET', '/api/v1/benchmark-siblings*', { statusCode: 404 });
+    cy.intercept('GET', '/api/v1/request-chart-data*', { statusCode: 404 });
+    cy.intercept('GET', '/api/v1/request-timeline*', {
+      body: {
+        version: 5,
+        startNs: 0,
+        endNs: 2_000_000_000_000,
+        durationS: 2_000,
+        requests,
+      },
+    });
+    cy.visit('/inference/agentic/206885?view=timeline', { onBeforeLoad: unlockAgenticGate });
+  });
+
+  it('keeps row labels and SVG request bars bounded to the viewport', () => {
+    cy.get('[data-testid="request-timeline-scroll"]').should('be.visible');
+    cy.get('[data-timeline-row-kind]').should(($rows) => {
+      expect($rows.length).to.be.lessThan(40);
+    });
+    cy.get('[data-testid="request-timeline-svg"] rect').should(($bars) => {
+      expect($bars.length).to.be.lessThan(100);
+    });
+
+    cy.get('[data-testid="request-timeline-scroll"]').scrollTo('bottom');
+    cy.get('[data-timeline-row-kind]').should('contain.text', 'conversation-1999');
+    cy.get('[data-timeline-row-kind]').should(($rows) => {
+      expect($rows.length).to.be.lessThan(40);
     });
   });
 });
@@ -279,7 +353,12 @@ describe('Agentic point orchestrator metric sources', () => {
     );
     cy.intercept('GET', '/api/v1/trace-histograms*', { body: {} });
     cy.intercept('GET', '/api/v1/benchmark-siblings*', { statusCode: 404 });
+    cy.intercept('GET', '/api/v1/request-chart-data*', { statusCode: 404 });
     cy.intercept('GET', '/api/v1/request-timeline*', { statusCode: 404 });
+    cy.intercept('GET', '/api/v1/trace-server-metric-source*', (request) => {
+      const source = new URL(request.url).searchParams.get('source');
+      request.reply({ body: source === decode.source.id ? decode : prefill });
+    });
     cy.intercept('GET', '/api/v1/trace-server-metrics*', {
       body: {
         meta: pointMeta,
@@ -296,7 +375,7 @@ describe('Agentic point orchestrator metric sources', () => {
         prefixCacheHitsTps: prefill.prefixCacheHitsTps,
         hostKvCacheUsage: [],
         kvCacheUsageByEngine: [],
-        metricSources: [prefill, decode],
+        metricSources: [{ source: prefill.source }, { source: decode.source }],
       },
     });
     cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
@@ -366,6 +445,7 @@ describe('Agentic point per-engine KV overlay', () => {
   beforeEach(() => {
     cy.intercept('GET', '/api/v1/trace-histograms*', { body: {} });
     cy.intercept('GET', '/api/v1/benchmark-siblings*', { statusCode: 404 });
+    cy.intercept('GET', '/api/v1/request-chart-data*', { statusCode: 404 });
     cy.intercept('GET', '/api/v1/request-timeline*', { statusCode: 404 });
     cy.intercept('GET', '/api/v1/trace-server-metrics*', {
       body: {

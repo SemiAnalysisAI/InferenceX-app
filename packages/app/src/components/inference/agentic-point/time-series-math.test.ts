@@ -135,6 +135,15 @@ describe('rollingRequestMetric', () => {
       { t: 2, value: 0.2 },
     ]);
   });
+
+  it('computes exact cumulative percentiles for a large reverse-ordered latency set', () => {
+    const requests = Array.from({ length: 25_000 }, (_, index) =>
+      request(index + 1, 25_000 - index, 10),
+    );
+    const result = rollingRequestMetric(requests, 'ttft', 'p90');
+    expect(result.cumulative).toHaveLength(requests.length);
+    expect(result.cumulative.at(-1)?.value).toBeCloseTo(22.5001, 4);
+  });
 });
 
 describe('timeRollingAverage', () => {
@@ -176,6 +185,16 @@ describe('timeRollingAverage', () => {
     expect(timeRollingAverage([], 30)).toEqual([]);
     const data = [{ t: 0, value: 1 }];
     expect(timeRollingAverage(data, 0)).toBe(data);
+  });
+
+  it('handles a six-figure event series without rescanning each prefix', () => {
+    const data = Array.from({ length: 100_000 }, (_, index) => ({
+      t: index / 10,
+      value: 7,
+    }));
+    const result = timeRollingAverage(data, 30);
+    expect(result).toHaveLength(data.length);
+    expect(result.at(-1)?.value).toBeCloseTo(7, 9);
   });
 });
 

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { CHART_SERIES_VERSION, type ChartSeries } from '../etl/compute-chart-series';
 import type { DbClient } from '../connection.js';
 
-import { getTraceServerMetrics } from './trace-server-metrics';
+import { getTraceServerMetrics, getTraceServerMetricSource } from './trace-server-metrics';
 
 function currentSeries(): ChartSeries {
   return {
@@ -131,5 +131,48 @@ describe('getTraceServerMetrics', () => {
 
     await expect(getTraceServerMetrics(sql, 42)).resolves.toBeNull();
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe('getTraceServerMetricSource', () => {
+  it('returns only the selected source from a current precomputed series', async () => {
+    const metricSource = {
+      source: {
+        id: 'decode-0',
+        adapter: 'vllm',
+        role: 'decode' as const,
+        endpointUrl: null,
+        nativeRole: null,
+        workerId: 'worker-0',
+        dpRank: null,
+        engine: null,
+      },
+      kvCacheUsage: [],
+      prefixCacheHitRate: [],
+      queueDepth: [],
+      promptTokensBySource: {},
+      promptTps: [{ t: 0, value: 10 }],
+      generationTps: [{ t: 0, value: 20 }],
+      prefixCacheHitsTps: [],
+      hostKvCacheUsage: [],
+      kvCacheUsageByEngine: [],
+    };
+    const { sql, calls } = mockSql([
+      [
+        {
+          trace_replay_id: 7,
+          has_blob: true,
+          chart_series_version: CHART_SERIES_VERSION,
+          framework: 'dynamo-vllm',
+          disagg: true,
+          metric_source: metricSource,
+        },
+      ],
+    ]);
+
+    await expect(getTraceServerMetricSource(sql, 42, 'decode-0')).resolves.toEqual(metricSource);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("metric_source->'source'->>'id'");
+    expect(calls[0]).not.toContain('server_metrics_json_gz as blob');
   });
 });

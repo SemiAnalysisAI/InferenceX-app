@@ -1,6 +1,6 @@
 'use client';
 
-import type { MetricSource, MetricSourceSeries } from '@/hooks/api/use-trace-server-metrics';
+import type { MetricSource, MetricSourceDescriptor } from '@/hooks/api/use-trace-server-metrics';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import {
   Select,
@@ -58,8 +58,8 @@ export function MetricSourceToolbar({
   hasWarmup: boolean;
   phase: StagePhase;
   onPhaseChange: (phase: StagePhase) => void;
-  metricSources: MetricSourceSeries[];
-  selectedSource: MetricSourceSeries | undefined;
+  metricSources: MetricSourceDescriptor[];
+  selectedSource: MetricSourceDescriptor | undefined;
   onSourceChange: (id: string) => void;
   /** Adapter reported in analytics when the selected source lookup misses. */
   fallbackAdapter: string | undefined;

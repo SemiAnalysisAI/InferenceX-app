@@ -5,7 +5,7 @@
  * here is unit-testable in isolation (see time-series-math.test.ts).
  */
 
-import type { RequestRecord } from '@/hooks/api/use-request-timeline';
+import type { RequestChartRecord } from '@/hooks/api/use-request-chart-data';
 import type { TimeSeriesPoint } from '@/hooks/api/use-trace-server-metrics';
 
 /** One drawable line in a TimeSeriesChart. */
@@ -96,7 +96,7 @@ export function interpAt(data: TimeSeriesPoint[], t: number): number | null {
  * P90 interactivity = 1 / P90 TPOT (a conservative tail-latency view).
  */
 export function rollingRequestMetric(
-  requests: readonly RequestRecord[],
+  requests: readonly RequestChartRecord[],
   metric: RequestMetric,
   percentile: RequestPercentile,
   windowSize = 50,
@@ -132,17 +132,44 @@ export function rollingRequestMetric(
     const latencyMs = quantile(sorted, q);
     return { t, value: metric === 'interactivity' ? 1000 / latencyMs : latencyMs / 1000 };
   });
-  const prefixLatencies: number[] = [];
-  const cumulative = samples.map(({ t, latencyMs }) => {
-    let lo = 0;
-    let hi = prefixLatencies.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (prefixLatencies[mid]! <= latencyMs) lo = mid + 1;
-      else hi = mid;
+
+  // Exact expanding percentiles without inserting into a growing sorted array
+  // (which is O(n²) from repeated `splice` shifts on six-figure request sets).
+  // Coordinate-compress all observed values, then track prefix counts in a
+  // Fenwick tree so insertion and kth-value lookup are both O(log n).
+  const latencyValues = [...new Set(samples.map(({ latencyMs }) => latencyMs))].toSorted(
+    (a, b) => a - b,
+  );
+  const latencyIndex = new Map(latencyValues.map((value, index) => [value, index + 1]));
+  const counts = new Uint32Array(latencyValues.length + 1);
+  const addLatency = (index: number) => {
+    for (let cursor = index; cursor < counts.length; cursor += cursor & -cursor) {
+      counts[cursor]! += 1;
     }
-    prefixLatencies.splice(lo, 0, latencyMs);
-    const cumulativeLatencyMs = quantile(prefixLatencies, q);
+  };
+  const kthLatency = (zeroBasedRank: number): number => {
+    let index = 0;
+    let target = zeroBasedRank + 1;
+    let step = 1;
+    while (step * 2 < counts.length) step *= 2;
+    for (; step > 0; step >>= 1) {
+      const next = index + step;
+      if (next < counts.length && counts[next]! < target) {
+        index = next;
+        target -= counts[next]!;
+      }
+    }
+    return latencyValues[index]!;
+  };
+  const cumulative = samples.map(({ t, latencyMs }, index) => {
+    addLatency(latencyIndex.get(latencyMs)!);
+    const count = index + 1;
+    const position = (count - 1) * q;
+    const lowRank = Math.floor(position);
+    const highRank = Math.ceil(position);
+    const low = kthLatency(lowRank);
+    const high = kthLatency(highRank);
+    const cumulativeLatencyMs = low + (high - low) * (position - lowRank);
     return {
       t,
       value: metric === 'interactivity' ? 1000 / cumulativeLatencyMs : cumulativeLatencyMs / 1000,
@@ -162,23 +189,27 @@ export function rollingRequestMetric(
  */
 export function timeRollingAverage(data: TimeSeriesPoint[], windowS: number): TimeSeriesPoint[] {
   if (data.length === 0 || windowS <= 0) return data;
+  // Prefix integral of the input step function. `areaAt[i]` is the integral
+  // from t=0 through data[i].t, with the first value extended back to zero.
+  // A moving left cursor then evaluates every trailing window in O(n) total.
+  const areaAt = new Float64Array(data.length);
+  areaAt[0] = data[0]!.value * data[0]!.t;
+  for (let index = 1; index < data.length; index += 1) {
+    const previous = data[index - 1]!;
+    const current = data[index]!;
+    areaAt[index] = areaAt[index - 1]! + previous.value * (current.t - previous.t);
+  }
   const out: TimeSeriesPoint[] = Array.from({ length: data.length });
+  let left = 0;
   for (let i = 0; i < data.length; i++) {
     const tEnd = data[i]!.t;
     const tStart = Math.max(0, tEnd - windowS);
-    // Find the first sample j whose t is >= tStart; the step value at
-    // tStart is data[j-1].value if j > 0, else data[0].value.
-    let j = 0;
-    while (j < data.length && data[j]!.t < tStart) j++;
-    let prevT = tStart;
-    let prevV = j > 0 ? data[j - 1]!.value : data[0]!.value;
-    let area = 0;
-    for (; j <= i; j++) {
-      const curT = data[j]!.t;
-      area += prevV * (curT - prevT);
-      prevT = curT;
-      prevV = data[j]!.value;
-    }
+    while (left + 1 <= i && data[left + 1]!.t <= tStart) left += 1;
+    const areaAtStart =
+      tStart <= data[0]!.t
+        ? data[0]!.value * tStart
+        : areaAt[left]! + data[left]!.value * (tStart - data[left]!.t);
+    const area = areaAt[i]! - areaAtStart;
     const dur = tEnd - tStart;
     out[i] = { t: tEnd, value: dur > 0 ? area / dur : data[i]!.value };
   }
@@ -262,7 +293,9 @@ export function cumulativeTimeAverage(data: TimeSeriesPoint[]): TimeSeriesPoint[
  * Cumulative count of successfully completed (non-cancelled) requests by end
  * time. Phase is the caller's concern — pass a phase-scoped timeline.
  */
-export function cumulativeCompletedRequests(requests: readonly RequestRecord[]): TimeSeriesPoint[] {
+export function cumulativeCompletedRequests(
+  requests: readonly RequestChartRecord[],
+): TimeSeriesPoint[] {
   const completionTimes = requests
     .filter((request) => !request.cancelled)
     .map((request) => request.end / 1e9)
@@ -277,7 +310,7 @@ export function cumulativeCompletedRequests(requests: readonly RequestRecord[]):
  * OSL uses the request's final observed length across its whole lifetime.
  */
 export function averageSequenceLengthInFlight(
-  requests: readonly RequestRecord[],
+  requests: readonly RequestChartRecord[],
   metric: 'isl' | 'osl',
 ): TimeSeriesPoint[] {
   const events = new Map<number, { tokenDelta: number; countDelta: number }>();
