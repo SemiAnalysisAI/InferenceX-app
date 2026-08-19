@@ -28,6 +28,9 @@ describe('AgentX dataset methodology', () => {
       cy.get('[data-testid="agentx-methodology-cta"]')
         .should('contain.text', 'Read the full methodology')
         .and('have.attr', 'href', '/agentx/methodology');
+      cy.get('[data-testid="agentx-results-cta"]')
+        .should('contain.text', 'View AgentX Performance Results')
+        .and('have.attr', 'href', '/overview');
     });
   });
 
@@ -43,6 +46,9 @@ describe('AgentX dataset methodology', () => {
       cy.get('[data-testid="agentx-methodology-cta"]')
         .should('contain.text', '深入了解 AgentX 方法论')
         .and('have.attr', 'href', '/zh/agentx/methodology');
+      cy.get('[data-testid="agentx-results-cta"]')
+        .should('contain.text', '查看 AgentX 性能结果')
+        .and('have.attr', 'href', '/zh/overview');
     });
   });
 
