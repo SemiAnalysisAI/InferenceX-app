@@ -123,8 +123,8 @@ describe('First-load navigation', () => {
         .should('contain.text', 'Full dashboard')
         .and('have.attr', 'href', '/inference?g_model=Kimi-K3&i_seq=agentic-traces&i_optimal=1');
       cy.get('[data-testid="compare-agentx-methodology-link"]')
-        .should('contain.text', 'Read the full methodology')
-        .and('have.attr', 'href', '/agentx/methodology');
+        .should('contain.text', 'Methodology Deep Dive')
+        .and('have.attr', 'href', '/agentx');
       cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
     });
     cy.get('[data-testid="compare-agentx-overview-link"]').click();

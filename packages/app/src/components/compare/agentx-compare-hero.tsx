@@ -13,7 +13,7 @@ const STRINGS = {
       'Long Context Multi Turn Inference Performance for Kimi K3 2.8T, DeepSeek v4 Pro-813, GLM 5.3 744B, MiniMax M3 430B, Qwen 3.5. Compare Across MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, etc.',
     overview: 'Overview',
     dashboard: 'Full dashboard',
-    methodology: 'Read the full methodology',
+    methodology: 'Methodology Deep Dive',
     ledgerTitle: 'Models with AgentX results',
     modelAction: 'View results',
   },
@@ -24,7 +24,7 @@ const STRINGS = {
       'Kimi K3 2.8T、DeepSeek v4 Pro-813、GLM 5.3 744B、MiniMax M3 430B、Qwen 3.5 的长上下文多轮推理性能，跨 MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100、RTX Pro 等平台进行对比。',
     overview: '总览',
     dashboard: '完整仪表板',
-    methodology: '阅读完整方法论',
+    methodology: '方法论深度解析',
     ledgerTitle: '已有 AgentX 结果的模型',
     modelAction: '查看结果',
   },
@@ -90,7 +90,7 @@ export function AgentXCompareHero({
             <div className="mt-3 flex flex-wrap gap-3">
               <CompareIndexTrackedLink
                 data-testid="compare-agentx-methodology-link"
-                href={`${prefix}/agentx/methodology`}
+                href={`${prefix}/agentx`}
                 analyticsEvent="compare_agentx_methodology_clicked"
                 analyticsSurface={surface}
                 className="inline-flex min-h-11 items-center rounded-md border border-border px-5 py-2.5 font-semibold text-foreground transition-colors hover:bg-muted"
