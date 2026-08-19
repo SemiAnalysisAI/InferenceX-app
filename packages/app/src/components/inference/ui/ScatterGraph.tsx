@@ -398,16 +398,19 @@ const parseHwKeyToLabel = (hwKey: string, model?: string): { name: string; label
 };
 
 // Line-label text for a curve. When more than one precision is shown, each curve
-// is its own line, so append the precision (e.g. "B200 (vLLM) FP8") to keep the
-// FP4 and FP8 curves of the same hardware distinguishable.
+// is its own line, so place the precision between the GPU and engine (e.g.
+// "B200 FP8 (vLLM)") to keep the primary identifiers together.
 const lineLabelText = (
   hwKey: string,
   precision: string,
   includePrecision: boolean,
   model?: string,
 ): string => {
-  const base = parseHwKeyToLabel(hwKey, model).label;
-  return includePrecision ? `${base} ${getPrecisionLabel(precision as Precision)}` : base;
+  const config = getHardwareConfig(hwKey, model);
+  if (!includePrecision) return getDisplayLabel(config);
+  return [config.label, getPrecisionLabel(precision as Precision), config.suffix]
+    .filter(Boolean)
+    .join(' ');
 };
 
 const pointCountEn = (count: number) => `${count} ${count === 1 ? 'point' : 'points'}`;
@@ -1882,9 +1885,10 @@ const ScatterGraph = React.memo(
                 precision: string,
               ): string => {
                 const info = unofficialRunInfos[runIndex];
-                const base = info
-                  ? `✕ ${info.branch || `run ${info.id}`}`
-                  : parseHwKeyToLabel(hwKey, modelLabel).label;
+                if (!info) {
+                  return lineLabelText(hwKey, precision, multiPrecision, modelLabel);
+                }
+                const base = `✕ ${info.branch || `run ${info.id}`}`;
                 return multiPrecision
                   ? `${base} ${getPrecisionLabel(precision as Precision)}`
                   : base;
@@ -1937,12 +1941,12 @@ const ScatterGraph = React.memo(
               for (const [ovKey, group] of Object.entries(overlayRooflines)) {
                 if (!ir.activeOverlayHwTypes.has(group.hwKey)) continue;
                 const info = unofficialRunInfos[group.runIndex];
-                const branchOrHw = info
-                  ? `✕ ${info.branch || `run ${info.id}`}`
-                  : parseHwKeyToLabel(group.hwKey, modelLabel).label;
-                const labelText = multiPrecision
-                  ? `${branchOrHw} ${getPrecisionLabel((group.points[0]?.precision ?? '') as Precision)}`
-                  : branchOrHw;
+                const precision = group.points[0]?.precision ?? '';
+                const labelText = info
+                  ? multiPrecision
+                    ? `✕ ${info.branch || `run ${info.id}`} ${getPrecisionLabel(precision as Precision)}`
+                    : `✕ ${info.branch || `run ${info.id}`}`
+                  : lineLabelText(group.hwKey, precision, multiPrecision, modelLabel);
                 const labelKey = `overlay-${ovKey}`;
                 const pt = group.points.at(-1)!;
                 lineLabels.push({
@@ -2027,28 +2031,33 @@ const ScatterGraph = React.memo(
             const config = getHardwareConfig(d.hw, modelLabel);
             const hardwareLabel = getDisplayLabel(config);
             const isHardwareLabel =
-              d.label === hardwareLabel || d.label.startsWith(`${hardwareLabel} `);
-            const trailingLabel = isHardwareLabel ? d.label.slice(hardwareLabel.length) : '';
+              d.label === hardwareLabel || d.label.startsWith(`${config.label} `);
+            const remainingLabel = isHardwareLabel ? d.label.slice(config.label.length) : '';
+            const engineLabel = config.suffix ? ` ${config.suffix}` : '';
+            const precisionLabel =
+              engineLabel && remainingLabel.endsWith(engineLabel)
+                ? remainingLabel.slice(0, -engineLabel.length)
+                : remainingLabel;
             const segments = isHardwareLabel
               ? [
                   { className: 'll-gpu', text: config.label, fill: 'white', weight: '700' },
+                  ...(precisionLabel
+                    ? [
+                        {
+                          className: 'll-precision',
+                          text: precisionLabel,
+                          fill: 'white',
+                          weight: '600',
+                        },
+                      ]
+                    : []),
                   ...(config.suffix
                     ? [
                         {
                           className: 'll-engine',
-                          text: ` ${config.suffix}`,
+                          text: engineLabel,
                           fill: '#d1d5db',
                           weight: '400',
-                        },
-                      ]
-                    : []),
-                  ...(trailingLabel
-                    ? [
-                        {
-                          className: 'll-precision',
-                          text: trailingLabel,
-                          fill: 'white',
-                          weight: '600',
                         },
                       ]
                     : []),
