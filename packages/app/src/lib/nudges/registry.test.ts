@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { NUDGE_REGISTRY } from './registry';
+import { NUDGE_REGISTRY, TELEMETRY_TUTORIAL_STORAGE_KEY } from './registry';
 
 describe('NUDGE_REGISTRY integrity', () => {
   it('has no duplicate IDs', () => {
@@ -21,7 +21,7 @@ describe('NUDGE_REGISTRY integrity', () => {
 
   it('every entry has a valid scope', () => {
     for (const nudge of NUDGE_REGISTRY) {
-      expect(['dashboard', 'landing', 'evaluation']).toContain(nudge.scope);
+      expect(['dashboard', 'landing', 'evaluation', 'agentic-detail']).toContain(nudge.scope);
     }
   });
 
@@ -64,6 +64,7 @@ describe('NUDGE_REGISTRY integrity', () => {
     expect(ids).toEqual([
       'agentic-results-launch-banner',
       'agentic-results-launch-modal',
+      'agentx-telemetry-tutorial',
       'eval-samples',
       'export',
       'feedback-modal',
@@ -81,6 +82,17 @@ describe('NUDGE_REGISTRY integrity', () => {
     // cypress/support/e2e.ts seeds this key so the backdrop can't cover the
     // UI under test; a rename here has to be mirrored there.
     expect(launch?.storageKey).toBe('inferencex-agentic-results-modal-dismissed');
+  });
+
+  it('renders the telemetry tutorial as an uncentered card on the agentic detail scope', () => {
+    const tutorial = NUDGE_REGISTRY.find((n) => n.id === 'agentx-telemetry-tutorial');
+    expect(tutorial?.scope).toBe('agentic-detail');
+    // A backdrop would cover the very charts the tutorial describes.
+    expect(tutorial?.content.centered).toBeUndefined();
+    // cypress/support/e2e.ts seeds this key so the card can't sit over the
+    // charts under test; a rename here has to be mirrored there.
+    expect(tutorial?.storageKey).toBe(TELEMETRY_TUTORIAL_STORAGE_KEY);
+    expect(TELEMETRY_TUTORIAL_STORAGE_KEY).toBe('inferencex-agentx-telemetry-tutorial-dismissed');
   });
 
   it('preserves testId for every entry', () => {

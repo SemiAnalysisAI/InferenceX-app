@@ -119,6 +119,13 @@ export interface NudgeAnalyticsOverrides {
 
 export type NudgeType = 'toast' | 'modal' | 'banner';
 
+/**
+ * Which NudgeEngine instance owns a nudge. One engine mounts per scope, so a
+ * new scope needs a matching `<NudgeEngine scope="…" />` on the surface it
+ * names — `agentic-detail` mounts on /inference/agentic/[id].
+ */
+export type NudgeScope = 'dashboard' | 'landing' | 'evaluation' | 'agentic-detail';
+
 export interface NudgeDefinition {
   id: string;
   type: NudgeType;
@@ -130,7 +137,7 @@ export interface NudgeDefinition {
   /** Higher priority wins when multiple nudges are eligible simultaneously. */
   priority: number;
   /** Which NudgeEngine instance manages this nudge. */
-  scope: 'dashboard' | 'landing' | 'evaluation';
+  scope: NudgeScope;
   /**
    * Render an immediate banner in the server response so hydration cannot
    * insert it above existing content and cause a layout shift.

@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  BookOpen,
   Download,
   MessageSquareText,
   Palette,
@@ -41,6 +42,19 @@ function isOnInferenceTab(): boolean {
   const segments = window.location.pathname.split('/').filter(Boolean);
   if (segments[0] === 'zh') segments.shift();
   return (segments[0] ?? 'inference') === 'inference';
+}
+
+/**
+ * The telemetry tutorial lives at /agentx/telemetry and /zh/agentx/telemetry.
+ * The nudge fires from a client callback rather than a server-rendered link,
+ * so it resolves the locale from the pathname at click time.
+ */
+export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
+
+function telemetryTutorialHref(): string {
+  if (typeof window === 'undefined') return '/agentx/telemetry';
+  const isZh = window.location.pathname.split('/').filter(Boolean)[0] === 'zh';
+  return isZh ? '/zh/agentx/telemetry' : '/agentx/telemetry';
 }
 
 // ---------------------------------------------------------------------------
@@ -403,6 +417,50 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       dismissed: 'agentic_results_banner_dismissed',
       action: 'agentic_results_banner_clicked',
       properties: { banner_id: 'agentic-results-launch', scenario: 'agentic-traces' },
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // Agentic point-detail modal
+  // -------------------------------------------------------------------------
+  {
+    id: 'agentx-telemetry-tutorial',
+    type: 'modal',
+    // The detail page is chart-dense and its data arrives asynchronously;
+    // waiting lets the charts paint before the card slides in.
+    trigger: { type: 'timer', delayMs: 2500 },
+    dismissal: { type: 'permanent' },
+    storageKey: TELEMETRY_TUTORIAL_STORAGE_KEY,
+    priority: 40,
+    scope: 'agentic-detail',
+    content: {
+      icon: BookOpen,
+      iconClassName: 'text-brand',
+      title: 'New to these charts?',
+      titleZh: '第一次看这些图表？',
+      description:
+        'The telemetry tutorial explains every chart on this page — the sequence-length distributions, the cache and queue series, the request timeline, and the per-conversation flamegraph.',
+      descriptionZh:
+        '遥测数据教程会讲解本页的每一张图表——序列长度分布、cache 与队列相关曲线、请求时间线，以及单会话火焰图。',
+      testId: 'telemetry-tutorial-modal',
+      // Deliberately NOT centered: a backdrop here would cover the charts the
+      // tutorial is describing. A bottom-right card leaves the page usable.
+      containerClassName: 'border-brand/40',
+      dismissLabel: 'Not now',
+      dismissLabelZh: '暂不需要',
+      primaryAction: {
+        label: 'Read the tutorial',
+        labelZh: '阅读教程',
+        icon: <ArrowRight className="size-4" />,
+        onClick: () => {
+          window.location.href = telemetryTutorialHref();
+        },
+      },
+    },
+    analytics: {
+      shown: 'agentx_telemetry_modal_shown',
+      dismissed: 'agentx_telemetry_modal_dismissed',
+      action: 'agentx_telemetry_modal_opened',
     },
   },
 ];
