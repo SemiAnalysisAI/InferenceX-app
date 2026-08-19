@@ -16,7 +16,7 @@ import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
-  '对比 Kimi K3、DeepSeek V4 Pro、MiniMax M3、Qwen 3.5 与 GLM 5.2 的 AgentX 智能体推理结果，并浏览定长序列芯片对比。';
+  '对比 Kimi K3、DeepSeek V4 Pro、MiniMax M3、Qwen 3.5 与 GLM 5.3 的 AgentX 智能体推理结果，并浏览定长序列芯片对比。';
 
 export const metadata: Metadata = {
   title: 'AgentX 智能体推理对比',

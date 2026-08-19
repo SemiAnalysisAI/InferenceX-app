@@ -97,7 +97,10 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     slug: 'glm-5-2',
     displayName: 'GLM-5.2',
     dbKeys: ['glm5.2'],
-    label: 'GLM 5.2',
+    // GLM-5.2 and GLM-5.3 share one data bucket (see MODEL_CONFIG); the card
+    // shows the current release. `slug`, `displayName`, and `dbKeys` stay on
+    // 5.2 so URLs and the `g_model` param keep resolving.
+    label: 'GLM 5.3 744B',
     seoName: 'GLM-5.2',
   },
   {

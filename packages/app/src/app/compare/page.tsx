@@ -17,7 +17,7 @@ import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
 export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
-  'Compare AgentX agentic inference results for Kimi K3, DeepSeek V4 Pro, MiniMax M3, Qwen 3.5, and GLM 5.2, plus fixed-sequence chip comparisons.';
+  'Compare AgentX agentic inference results for Kimi K3, DeepSeek V4 Pro, MiniMax M3, Qwen 3.5, and GLM 5.3, plus fixed-sequence chip comparisons.';
 
 export const metadata: Metadata = {
   title: 'AgentX Inference Comparisons',
