@@ -346,6 +346,9 @@ describe('ScatterGraph', () => {
       chartType: 'interactivity',
       y_tpPerGpu_roofline: 'upper_left',
     });
+    const runId = 32177976542;
+    const runBranch = 'qwen3.5-fp4-gb200-dynamo-sglang-agentic-mtp-pareto-refresh';
+    const runUrl = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId}`;
     const officialData = [
       createMockInferenceData({ hwKey: 'h100', x: 8, y: 240, precision: Precision.FP4 }),
       createMockInferenceData({ hwKey: 'h100', x: 16, y: 200, precision: Precision.FP4 }),
@@ -358,26 +361,26 @@ describe('ScatterGraph', () => {
           x: 8,
           y: 320,
           precision: Precision.FP4,
-          run_url: 'https://github.com/x/y/actions/runs/12345',
+          run_url: runUrl,
         }),
         createMockInferenceData({
           hwKey: 'b200_trt',
           x: 16,
           y: 280,
           precision: Precision.FP4,
-          run_url: 'https://github.com/x/y/actions/runs/12345',
+          run_url: runUrl,
         }),
         createMockInferenceData({
           hwKey: 'b200_trt',
           x: 32,
           y: 220,
           precision: Precision.FP4,
-          run_url: 'https://github.com/x/y/actions/runs/12345',
+          run_url: runUrl,
         }),
       ],
       hardwareConfig: hwConfig,
-      label: 'feature-branch',
-      runUrl: 'https://github.com/x/y/actions/runs/12345',
+      label: runBranch,
+      runUrl,
     };
 
     mountWithProviders(
@@ -403,15 +406,15 @@ describe('ScatterGraph', () => {
         unofficial: {
           activeOverlayHwTypes: new Set(['b200_trt']),
           allOverlayHwTypes: new Set(['b200_trt']),
-          runIndexByUrl: { 'https://github.com/x/y/actions/runs/12345': 0, '12345': 0 },
+          runIndexByUrl: { [runUrl]: 0, [String(runId)]: 0 },
           unofficialRunInfos: [
             {
-              id: 12345,
+              id: runId,
               name: 'CI run',
-              branch: 'feature-branch',
-              sha: 'abc123',
-              createdAt: '2026-05-01T00:00:00Z',
-              url: 'https://github.com/x/y/actions/runs/12345',
+              branch: runBranch,
+              sha: '7a4a06b',
+              createdAt: '2026-08-18T19:40:51Z',
+              url: runUrl,
               conclusion: 'success',
               status: 'completed',
               isNonMainBranch: true,
@@ -435,11 +438,15 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-overlay-labels svg .line-label')
       .filter('[data-line-key]:not([data-line-key^="overlay-"])')
       .should('have.length.greaterThan', 0);
-    // Overlay label text is the run's branch name (matching the overlay legend),
-    // not the hw label.
+    // The exact branch that crashed the production page remains visible in the
+    // overlay line label and legend after ScatterGraph's render-time updates.
     cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
       .find('text')
-      .should('contain.text', 'feature-branch');
+      .should('contain.text', runBranch);
+    cy.get('#test-scatter-overlay-labels [data-testid="chart-legend"]').should(
+      'contain.text',
+      runBranch,
+    );
   });
 
   it('renders a line label for a singleton unofficial overlay series', () => {

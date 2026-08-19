@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Profiler, useState } from 'react';
 
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
@@ -79,6 +79,41 @@ describe('ChartLegend (sidebar variant)', () => {
   it('renders legend with items', () => {
     cy.get('.sidebar-legend').should('be.visible');
     cy.get('.sidebar-legend label').should('have.length', 4);
+  });
+
+  it('derives long unofficial labels without a nested update', () => {
+    const branch = 'qwen3.5-fp4-gb200-dynamo-sglang-agentic-mtp-pareto-refresh';
+    const onRender = cy.spy().as('legendRender');
+
+    cy.mount(
+      <Profiler id="long-unofficial-run-legend" onRender={onRender}>
+        <ChartLegend
+          legendItems={[
+            {
+              ...MOCK_ITEMS[0],
+              name: 'unofficial-run-32177976542',
+              label: `✕ ${branch}`,
+            },
+          ]}
+          isLegendExpanded={true}
+          onExpandedChange={() => {}}
+          variant="sidebar"
+        />
+      </Profiler>,
+    );
+
+    cy.get('[data-testid="chart-legend"]').should('contain.text', branch);
+    cy.get('@legendRender').should((renderSpy) => {
+      // Cypress loses the Sinon spy type when resolving an alias.
+      const profilerSpy = renderSpy as unknown as {
+        getCalls: () => { args: unknown[] }[];
+      };
+      const calls = profilerSpy.getCalls();
+      expect(
+        calls.map(({ args }) => args[1]),
+        'React render phases',
+      ).not.to.include('nested-update');
+    });
   });
 
   it('legend items have colored dots', () => {
