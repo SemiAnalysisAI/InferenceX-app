@@ -972,12 +972,64 @@ hidden for fixed sequences rather than shown as a no-op. There is no circularity
 with the break-even seed: billable throughput depends only on the ratio, and
 break-even then solves the price given that throughput.
 
-**What counts as cached.** `server_gpu_cache_hit_rate + server_external_cache_hit_rate`,
-clamped to `[0,1]`. Summed rather than maxed because the two are disjoint in the
-measured data: across the 153 production rows carrying both, the sum never
-exceeds 1.0 (max 0.972) and never exceeds `theoretical_cache_hit_rate` in any of
-the 64 rows with a meaningful external figure. The clamp is not decorative — the
-GPU figure alone reaches 1.185 on rows without an external one.
+**What counts as cached.** Three tiers are reported and they do not all stack, so
+the rule is conditional rather than a sum. Measured across 326 production agentic
+rows, each checked against its own `theoretical_cache_hit_rate` ceiling:
+
+| row shape                    | rows | `gpu+ext` > ceiling | `gpu+ext+cpu` > ceiling |
+| ---------------------------- | ---- | ------------------- | ----------------------- |
+| external absent, CPU absent  | 92   | 8                   | 8                       |
+| external absent, **CPU > 0** | 26   | 0                   | **0**                   |
+| external > 0, CPU > 0        | 106  | 1                   | **56**                  |
+| external 0, CPU 0            | 96   | 0                   | 0                       |
+
+The middle two rows carry the decision. Where an external rate is reported,
+adding CPU on top breaches the ceiling 56 times out of 106 — the router-side
+external figure already contains the offload tier, so summing double-counts it.
+Where no external rate is reported the CPU tier is real and disjoint: 0 breaches
+across all 26, every one of them an offload-on row. Hence `cacheHitRateOf` adds
+external when present and CPU only in its absence.
+
+Dropping the CPU tier outright, which this did until 2026-08-19, understated the
+cached share on those 26 rows by a median 5.54pp (p90 39.7pp, max 76.9pp — the
+median CPU rate is 0.055 but the tail is long). An understated cached share bills
+more input at the fresh price, so it **overstates** revenue: on those rows the
+input revenue leg was too high by a median 27%, p90 67%. That is the opposite
+direction from the all-or-nothing rule below, which deliberately errs
+conservative, and the reason this was worth a branch. Fleet-wide the median hit
+rate moves only 0.9255 → 0.9279, because 294 of 320 rows are unaffected.
+
+Two honest caveats on the rule. A reported external `0` is treated as a
+measurement that suppresses CPU rather than as an absence, on the reasoning that a
+router reporting zero external hits has still accounted for the offload tier —
+but **no production row currently has external `0` alongside a non-zero CPU rate**,
+so that branch is a deliberate choice about an unobserved shape, covered by a test
+rather than by data. Separately, `gpu` alone already breaches the ceiling on 8
+rows that report neither of the other tiers; that is a data-quality question about
+those rows, partly masked by the `[0,1]` clamp, and this rule neither causes nor
+fixes it.
+
+The clamp to `[0,1]` is not decorative — the GPU figure alone reaches 1.185 on
+rows without an external one.
+
+**Interpolating the cached fraction is safe, and this is the evidence.** The rate
+is splined along the frontier like any other metric, which raises the fair
+objection that two adjacent frontier points can describe different serving
+regimes. Measured by leave-one-out over 141 interior points of 26 production
+frontiers — drop the point, read its interactivity from its neighbours, compare to
+what was measured there:
+
+| metric                                 | median | p90    | max     |
+| -------------------------------------- | ------ | ------ | ------- |
+| cache hit rate, absolute error         | 0.0076 | 0.0631 | 0.4890  |
+| throughput, relative error _(control)_ | 8.60%  | 34.85% | 245.79% |
+
+At the median the hit rate is off by 0.8% relative, against 8.6% for the
+throughput the whole calculator already rests on — so the cached fraction is about
+an order of magnitude better behaved than the number nobody questions. Adjacent
+frontier points differ by under one percentage point at the median (p90 0.079,
+max 0.510). The wide 0.005–0.96 spread quoted above is across _all_ of a chip's
+configs, not along a single Pareto frontier, which is what the spline walks.
 
 **A limitation the UI discloses.** Agentic run history is roughly a week deep:
 DSV4 has 7 run dates with 4 of 19 configs measured on more than one; GLM-5.2 has

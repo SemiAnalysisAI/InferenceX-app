@@ -1183,6 +1183,48 @@ describe('buildGpuGroups', () => {
       ).toBeCloseTo(0.91, 10);
     });
 
+    // The three tiers do not all stack. These three cases are the shapes the
+    // production data actually comes in; see `cacheHitRateOf` for the counts.
+    it('ignores the CPU tier when an external rate is reported — external already counts it', () => {
+      // The shape of 106 of 132 production rows with a non-zero CPU rate. Adding
+      // CPU here is what breached `theoretical_cache_hit_rate` on 56 of them.
+      expect(
+        only(
+          withMetrics({
+            server_gpu_cache_hit_rate: 0.819,
+            server_external_cache_hit_rate: 0.06,
+            server_cpu_cache_hit_rate: 0.067,
+          }),
+        ).cacheHitRate,
+      ).toBeCloseTo(0.879, 10);
+    });
+
+    it('adds the CPU tier when no external rate is reported', () => {
+      // The shape of the 26 offload-on rows with no external figure, where
+      // `gpu + cpu` breaches the ceiling 0 times. Dropping CPU understated the
+      // cached share by ~5.5pp on these, which overstates revenue.
+      expect(
+        only(withMetrics({ server_gpu_cache_hit_rate: 0.771, server_cpu_cache_hit_rate: 0.055 }))
+          .cacheHitRate,
+      ).toBeCloseTo(0.826, 10);
+    });
+
+    it('reads the CPU tier alone, and an external rate of zero still suppresses it', () => {
+      expect(only(withMetrics({ server_cpu_cache_hit_rate: 0.5 })).cacheHitRate).toBeCloseTo(
+        0.5,
+        10,
+      );
+      // A reported zero is a measurement, not an absence: the router saw no
+      // external hits, and it is still the figure that accounts for the offload
+      // tier. Reading 0.5 here would double-count. No production row has this
+      // shape today, so this pins a deliberate choice about unobserved data —
+      // it is not a regression test for something measured.
+      expect(
+        only(withMetrics({ server_external_cache_hit_rate: 0, server_cpu_cache_hit_rate: 0.5 }))
+          .cacheHitRate,
+      ).toBe(0);
+    });
+
     it('reads either metric alone', () => {
       expect(only(withMetrics({ server_gpu_cache_hit_rate: 0.4 })).cacheHitRate).toBeCloseTo(
         0.4,
