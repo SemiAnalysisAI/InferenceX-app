@@ -47,6 +47,7 @@ const SGLANG_056 = 'sglang-0-5-6-b200-deepseek-r1-fp4-up-to-1-8x';
 const VR_RUBIN = 'vera-rubin-nvl72-vs-gb200-nvl72-inference';
 const KIMI_K3 = 'kimi-k3-the-manos-the-mythos-the';
 const TILERT = 'ultra-high-interactivity-on-nvidia';
+const AGENT_BENCHMARK = 'agentic-benchmark-agent-benchmark-guide';
 
 const entries = [
   {
@@ -83,7 +84,7 @@ const entries = [
     benchmarkContext:
       'InferenceX uses AgentX to measure agentic inference. Read AgentX results alongside fixed-sequence scenarios because they answer different capacity questions. AgentX reports the behavior of a closed-loop session replay instead of treating every request as an independent batch item.',
     relatedTerms: ['agentx', 'agentic-coding-workload', 'subagent', 'prefix-caching', 'kv-cache'],
-    articleSlugs: [TILERT, VR_RUBIN, INFERENCEX_V2],
+    articleSlugs: [AGENT_BENCHMARK, TILERT, VR_RUBIN, INFERENCEX_V2],
   },
   {
     slug: 'agentx',
@@ -107,7 +108,7 @@ const entries = [
       'closed-loop-benchmark',
       'subagent',
     ],
-    articleSlugs: [TILERT, VR_RUBIN],
+    articleSlugs: [AGENT_BENCHMARK, TILERT, VR_RUBIN],
   },
   {
     slug: 'agentic-coding-workload',
@@ -125,7 +126,7 @@ const entries = [
     benchmarkContext:
       'AgentX represents this workload with trace-derived request shapes and deterministic synthetic content. It measures inference-system performance. Model coding quality requires a separate evaluation, so quality scores and AgentX serving results answer separate questions.',
     relatedTerms: ['agentic-inference', 'agentx', 'subagent', 'prefix-caching', 'trace-replay'],
-    articleSlugs: [TILERT, VR_RUBIN, INFERENCEX_V2],
+    articleSlugs: [AGENT_BENCHMARK, TILERT, VR_RUBIN, INFERENCEX_V2],
   },
   {
     slug: 'trace-replay',
@@ -143,7 +144,7 @@ const entries = [
     benchmarkContext:
       'AgentX replays trace-derived sessions through AIPerf. A fixed seed selects sessions, starting points, and synthetic content. Reported results cover the profiling window after cache warmup, which keeps run-to-run comparisons focused on steady-state serving behavior.',
     relatedTerms: ['agentx', 'closed-loop-benchmark', 'subagent', 'concurrency', 'kv-cache'],
-    articleSlugs: [TILERT, VR_RUBIN],
+    articleSlugs: [AGENT_BENCHMARK, TILERT, VR_RUBIN],
   },
   {
     slug: 'closed-loop-benchmark',
@@ -161,7 +162,7 @@ const entries = [
     benchmarkContext:
       'AgentX uses closed-loop concurrency. Its concurrency value is the number of agent clients; request batch size changes as the sessions advance. Read throughput, time to first token, and interactivity together.',
     relatedTerms: ['agentx', 'trace-replay', 'concurrency', 'throughput', 'latency'],
-    articleSlugs: [TILERT, INFERENCEX_V2],
+    articleSlugs: [AGENT_BENCHMARK, TILERT, INFERENCEX_V2],
   },
   {
     slug: 'subagent',
