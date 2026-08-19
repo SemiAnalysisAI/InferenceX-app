@@ -50,7 +50,7 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     slug: 'deepseek-v4',
     displayName: 'DeepSeek-V4-Pro',
     dbKeys: ['dsv4'],
-    label: 'DeepSeek V4 Pro 1.6T',
+    label: 'DeepSeekv4 Pro 0813 1.6T',
     seoName: 'DeepSeek V4 Pro',
   },
   {
