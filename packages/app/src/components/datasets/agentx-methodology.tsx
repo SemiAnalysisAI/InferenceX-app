@@ -85,6 +85,7 @@ const CONTENT = {
       },
     ],
     methodologyCta: 'Read the full methodology',
+    resultsCta: 'View AgentX Performance Results',
   },
   zh: {
     eyebrow: 'AgentX v1.0 方法论',
@@ -165,6 +166,7 @@ const CONTENT = {
       },
     ],
     methodologyCta: '深入了解 AgentX 方法论',
+    resultsCta: '查看 AgentX 性能结果',
   },
 } as const;
 
@@ -179,6 +181,15 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
         </p>
         <h1 className="text-xl font-semibold text-foreground">{t.title}</h1>
         <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">{t.intro}</p>
+        <AgentXMethodologyLink
+          href={locale === 'zh' ? '/zh/overview' : '/overview'}
+          analyticsEvent="agentx_results_opened"
+          analyticsTarget="methodology-header"
+          data-testid="agentx-results-cta"
+          className="mt-4 inline-flex min-h-11 items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          {t.resultsCta} →
+        </AgentXMethodologyLink>
       </header>
 
       <div className="space-y-8 px-5 py-6 sm:px-6">

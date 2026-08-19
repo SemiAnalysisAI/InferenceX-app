@@ -36,7 +36,10 @@ describe('Chinese (/zh) pages', () => {
     });
 
     it('footer renders in Chinese with zh-internal links', () => {
-      cy.get('[data-testid="footer-brand-description"]').should('contain.text', '智能体推理');
+      cy.get('[data-testid="footer-brand-description"]').should(
+        'contain.text',
+        '持续的开源推理基准测试',
+      );
       cy.get('[data-testid="footer-link-supporters"]')
         .should('contain.text', '支持者')
         .and('have.attr', 'href', '/zh/quotes');
