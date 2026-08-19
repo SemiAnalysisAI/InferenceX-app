@@ -312,6 +312,25 @@ describe('rollingRatioFromComponents', () => {
       { t: 1, value: 0.5 },
     ]);
   });
+
+  it('retains hit-only ticks omitted from the stored ratio timeline', () => {
+    const result = rollingRatioFromComponents(
+      [{ t: 1, value: 0 }],
+      [
+        { t: 0, value: 100 },
+        { t: 1, value: 0 },
+      ],
+      [{ t: 1, value: 100 }],
+      3,
+    );
+
+    // t=0 has hits but no queries, while the matching query delta lands at
+    // t=1. The centered window must retain both halves: 100 / 100 = 100%.
+    expect(result).toEqual([
+      { t: 0, value: 1 },
+      { t: 1, value: 1 },
+    ]);
+  });
 });
 
 describe('cumulativeAverage', () => {

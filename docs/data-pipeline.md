@@ -120,9 +120,10 @@ are valid. The displayed line is instead a centered 50-sample ratio of sums —
 `Σ(cache-hit rate) / Σ(cache-query rate)` — computed in O(n) with prefix sums. The query-rate
 denominator is recovered from the stored pointwise ratio and hit rate, preserving vLLM's
 `prefix_cache_queries` semantics; prompt-token rate is only a proxy weight for zero-hit intervals
-where `hits / ratio` cannot be inverted. Only after that volume-weighted aggregation is the
-semantic `[0, 1]` bound applied as a guard against residual counter timing skew. Older rows
-without the component rate series retain the stored-ratio fallback.
+where `hits / ratio` cannot be inverted. Hit-counter ticks with no stored ratio (zero queries) are
+also unioned back into the window rather than dropped. Only after that volume-weighted
+aggregation is the semantic `[0, 1]` bound applied as a guard against residual counter timing
+skew. Older rows without the component rate series retain the stored-ratio fallback.
 
 ### Agentic Dataset Provenance
 

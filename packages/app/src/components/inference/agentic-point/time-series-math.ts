@@ -321,27 +321,66 @@ export function rollingRatioFromComponents(
   windowSize: number,
   upperBound = 1,
 ): TimeSeriesPoint[] {
-  const numeratorByT = new Map(numerator.map((point) => [point.t, Math.max(0, point.value)]));
+  const ratioByT = new Map<number, number>();
+  for (const point of ratio) {
+    if (!Number.isFinite(point.t) || !Number.isFinite(point.value) || point.value < 0) continue;
+    ratioByT.set(point.t, point.value);
+  }
+  const numeratorByT = new Map<number, number>();
+  for (const point of numerator) {
+    if (!Number.isFinite(point.t) || !Number.isFinite(point.value)) continue;
+    numeratorByT.set(point.t, (numeratorByT.get(point.t) ?? 0) + Math.max(0, point.value));
+  }
   const fallbackByT = new Map(
     zeroRatioDenominator.map((point) => [point.t, Math.max(0, point.value)]),
   );
   const recoveredNumerator: TimeSeriesPoint[] = [];
   const recoveredDenominator: TimeSeriesPoint[] = [];
 
-  for (const point of ratio) {
-    if (!Number.isFinite(point.t) || !Number.isFinite(point.value) || point.value < 0) continue;
-    const observedNumerator = numeratorByT.get(point.t) ?? 0;
-    const fallbackDenominator = fallbackByT.get(point.t) ?? 0;
+  // The stored ratio omits `queries=0` ticks, but a lagging hit counter can
+  // still publish a positive numerator there. Walk the sorted union so those
+  // hits participate in the same centered window as their adjacent queries.
+  const timeline: number[] = [];
+  let ratioIndex = 0;
+  let numeratorIndex = 0;
+  while (ratioIndex < ratio.length || numeratorIndex < numerator.length) {
+    while (ratioIndex < ratio.length && !Number.isFinite(ratio[ratioIndex]!.t)) ratioIndex++;
+    while (numeratorIndex < numerator.length && !Number.isFinite(numerator[numeratorIndex]!.t)) {
+      numeratorIndex++;
+    }
+    const ratioT = ratio[ratioIndex]?.t ?? Infinity;
+    const numeratorT = numerator[numeratorIndex]?.t ?? Infinity;
+    const t = Math.min(ratioT, numeratorT);
+    if (!Number.isFinite(t)) break;
+    if (timeline.at(-1) !== t) timeline.push(t);
+    while (ratio[ratioIndex]?.t === t) ratioIndex++;
+    while (numerator[numeratorIndex]?.t === t) numeratorIndex++;
+  }
+
+  for (const t of timeline) {
+    const pointRatio = ratioByT.get(t);
+    const observedNumerator = numeratorByT.get(t) ?? 0;
+    // No stored ratio means the ETL saw no positive query denominator. Keep
+    // a zero denominator entry so a hit-only tick is not silently dropped.
+    if (pointRatio === undefined) {
+      if (observedNumerator > 0) {
+        recoveredNumerator.push({ t, value: observedNumerator });
+        recoveredDenominator.push({ t, value: 0 });
+      }
+      continue;
+    }
+
+    const fallbackDenominator = fallbackByT.get(t) ?? 0;
     const denominator =
-      point.value > 0 && observedNumerator > 0
-        ? observedNumerator / point.value
+      pointRatio > 0 && observedNumerator > 0
+        ? observedNumerator / pointRatio
         : fallbackDenominator;
     if (!Number.isFinite(denominator) || denominator <= 0) continue;
 
-    recoveredDenominator.push({ t: point.t, value: denominator });
+    recoveredDenominator.push({ t, value: denominator });
     recoveredNumerator.push({
-      t: point.t,
-      value: observedNumerator > 0 ? observedNumerator : point.value * denominator,
+      t,
+      value: observedNumerator > 0 ? observedNumerator : pointRatio * denominator,
     });
   }
 
