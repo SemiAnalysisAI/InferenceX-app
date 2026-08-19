@@ -76,7 +76,7 @@ export const apiRouteCatalog = [
       en: 'UI-only overlay for unofficial workflow artifacts; upstream artifact availability and shape are not stable.',
       zh: '仅供界面叠加非官方工作流制品；上游制品的可用性和结构并不稳定。',
     },
-    sourceSha256: 'ef85fec8468757b0122c5fcebde78527c2efe62f9fedc95799cad56a457a8f04',
+    sourceSha256: '4a3f3da8399c741c26f0f502d44b1870a8ccdc05775edfd6ea3dee4e020df25c',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',
@@ -100,7 +100,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-benchmark-siblings',
-    sourceSha256: '36b00e5d1c761e6a76e2c0454d9be4a15b7ccb7f3af5bdccd8ac61b6e5ff5312',
+    sourceSha256: '2b20de8b2b67ed53027eba478068f8f22ae7e3843ac38423e8ce6b27c1f74fd6',
   },
   {
     source: 'src/app/api/v1/benchmarks/route.ts',
@@ -108,7 +108,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmarks',
-    sourceSha256: '37b5a31613a9c5a2e1de35758551dfdbbb8b920fcd6ae6baeedf973c8802bc2c',
+    sourceSha256: '49fea92d0bd2eacd3babb2a9e6091af0ebf2dbde4462e826274712449b1534a9',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/route.ts',
@@ -278,10 +278,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'Page-owned BFF aggregation whose tier, comparison, and calculator projections are coupled to the overview UI.',
-      zh: '由页面拥有的 BFF 聚合；其档位、比较和计算器投影与概览界面紧密耦合。',
+      en: 'Page-owned BFF aggregation whose tier, comparison, row-scope, and calculator projections are coupled to the overview UI.',
+      zh: '由页面拥有的 BFF 聚合；其档位、比较、行范围和计算器投影与概览界面紧密耦合。',
     },
-    sourceSha256: '7c9830baae39d533ba7db36d44fe520f89cb36b32ffc54ef29404693d0b6b120',
+    sourceSha256: '499089d01754aa470d0ced953d9818d7d2e620dd3521685099924750249f13e2',
   },
   {
     source: 'src/app/api/v1/reliability/route.ts',
@@ -380,7 +380,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api.ts',
-    sourceSha256: '03809377af6c2ee938169a065e06dccb25d983d7171a54b998ffa08dd970d306',
+    sourceSha256: '18323e38cb50d20fd535ecb2d87d89131180664721d2ffb95f9ec5843c9d55e4',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
@@ -388,7 +388,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/overview-data.ts',
-    sourceSha256: '7757b32c1769bf4e25e8dd156ba049830ab25b8e3cf345d718cfad46adfd8e43',
+    sourceSha256: 'f54940c63a16d1c97a491b901aebcf9cb8893023eefef9f80ddace8936cabba8',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -404,7 +404,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../constants/src/models.ts',
-    sourceSha256: 'dca2b25f754adf90ac1bda31c5eb52503e3b3e8c72e684f10724c177c1317fac',
+    // Reviewed again for the release-date corrections: values inside
+    // MODEL_RELEASE_DATES only. No published model name, alias, or parameter enum
+    // is touched, and no endpoint exposes a release date, so the docs stand.
+    sourceSha256: 'f8f46a341bf57384c0080c2ed75d867801142675ded08225281cf7c102236628',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
@@ -436,7 +439,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmark-siblings.ts',
-    sourceSha256: '5a2b7e902c3003a0b3dbf3f402cc4b6b40648a1e014a218ab39dcbfd35c80f42',
+    sourceSha256: '07d3d1bf93820091d1014b14bf954555edcec422c05e575ad87142f9845e4156',
     reviewArea: {
       en: 'Benchmark sibling SKU metadata and sibling navigation row shape.',
       zh: '基准同组 SKU 元数据和同组导航行结构。',
@@ -444,7 +447,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: 'bb2f2cd28d8e4cea7b556561235da43d6a33363dc2c6d1f0b13408193d04298e',
+    sourceSha256: '11e1bb637dc0d8c338fffebabcbe1864068d08b8b8b1dad1e1e17718eca851dd',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',
@@ -540,7 +543,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/workflow-info.ts',
-    sourceSha256: 'b6611604d41ab69c00cb804ad255d4cbc9f70e41e84ad43330538558956f9eb6',
+    sourceSha256: '7e7d6fc965a47655fe9fa6feb6d8282eff58c2aedca1bcdb59ac1e8c91128d31',
     reviewArea: {
       en: 'Availability rows plus workflow runs, changelogs, configurations, and run coverage responses.',
       zh: '可用配置行以及工作流运行、变更记录、配置和运行覆盖响应。',

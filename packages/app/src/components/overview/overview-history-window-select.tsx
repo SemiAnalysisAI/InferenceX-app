@@ -11,6 +11,7 @@ import { track } from '@/lib/analytics';
 import type { OverviewHistoryWindowKey } from '@/lib/overview-data';
 
 import { useOverviewComparisonMode, useOverviewNavigation } from './overview-navigation';
+import { useIsPresenting } from './overview-presentation';
 
 interface WindowOption {
   href: string;
@@ -34,6 +35,10 @@ export function OverviewHistoryWindowSelect({
   // back to hardware mode carries no window, so keep the committed one.
   const pendingMode = useOverviewComparisonMode();
   const value = pendingMode === 'hardware' ? committedValue : pendingMode;
+  // Same reason as the reference select: `document.body` sits outside both the
+  // fullscreen element and the CSS `zoom`, so a portalled menu would be
+  // invisible or unscaled while presenting.
+  const presenting = useIsPresenting();
 
   return (
     <Select
@@ -53,7 +58,7 @@ export function OverviewHistoryWindowSelect({
       >
         <SelectValue>{options.find((option) => option.value === value)?.label}</SelectValue>
       </SelectTrigger>
-      <SelectContent align="center">
+      <SelectContent align="center" portalled={!presenting}>
         {options.map((option) => (
           <SelectItem key={option.value} value={option.value} data-overview-window={option.value}>
             {option.label}

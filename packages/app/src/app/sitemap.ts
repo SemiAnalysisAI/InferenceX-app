@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 
+import { AGENTX_OPTIMIZATION_SLUGS } from '@/lib/agentx-optimizations';
 import { getAllPosts } from '@/lib/blog';
 import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import { canonicalCompareSlug } from '@/lib/compare-slug';
@@ -94,7 +95,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 0.8,
     }),
-    ...localizedPair('/datasets', { lastModified: now, changeFrequency: 'weekly', priority: 0.6 }),
+    ...localizedPair('/agentx', { lastModified: now, changeFrequency: 'weekly', priority: 0.6 }),
+    ...localizedPair('/agentx/methodology', {
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    }),
+    ...localizedPair('/agentx/optimizations', {
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    }),
+    ...AGENTX_OPTIMIZATION_SLUGS.flatMap((slug) =>
+      localizedPair(`/agentx/optimizations/${slug}`, {
+        lastModified: now,
+        changeFrequency: 'monthly' as const,
+        priority: 0.6,
+      }),
+    ),
     ...localizedPair('/api', { lastModified: now, changeFrequency: 'monthly', priority: 0.7 }),
     ...localizedPair('/blog', { lastModified: now, changeFrequency: 'weekly', priority: 0.8 }),
     ...localizedPair('/glossary', {

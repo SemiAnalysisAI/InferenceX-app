@@ -28,8 +28,8 @@ const STRINGS = {
   en: {
     loading: 'Loading dataset…',
     notFound: 'Dataset not found.',
-    backToDatasets: 'Back to datasets',
-    breadcrumbDatasets: '← Datasets',
+    backToDatasets: 'Back to AgentX',
+    breadcrumbDatasets: '← AgentX',
     viewOnHf: 'View on HuggingFace ↗',
     conversations: 'Conversations',
     medianReqConvo: 'Median requests / convo',
@@ -70,8 +70,8 @@ const STRINGS = {
   zh: {
     loading: '正在加载数据集…',
     notFound: '未找到数据集。',
-    backToDatasets: '返回数据集列表',
-    breadcrumbDatasets: '← 数据集',
+    backToDatasets: '返回 AgentX',
+    breadcrumbDatasets: '← AgentX',
     viewOnHf: '在 HuggingFace 查看 ↗',
     conversations: '对话数',
     medianReqConvo: '每对话中位请求数',
@@ -142,7 +142,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
     return (
       <div className="py-12 text-center text-sm text-destructive">
         {t.notFound}{' '}
-        <Link href={`${prefix}/datasets`} className="text-primary underline">
+        <Link href={`${prefix}/agentx`} className="text-primary underline">
           {t.backToDatasets}
         </Link>
       </div>
@@ -160,7 +160,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
       <div>
         <div className="mb-1 flex items-center gap-2">
           <Link
-            href={`${prefix}/datasets`}
+            href={`${prefix}/agentx`}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
             {t.breadcrumbDatasets}
@@ -333,7 +333,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
                   >
                     <td className="px-3 py-2">
                       <Link
-                        href={`${prefix}/datasets/${slug}/conversations/${encodeURIComponent(c.conv_id)}`}
+                        href={`${prefix}/agentx/${slug}/conversations/${encodeURIComponent(c.conv_id)}`}
                         onClick={() => track('datasets_conversation_clicked', { slug })}
                         className="font-mono text-xs text-primary hover:underline"
                       >

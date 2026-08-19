@@ -502,6 +502,16 @@ export const QUOTES: Quote[] = [
     logo: 'lmcache.webp',
     link: 'https://www.linkedin.com/in/yihuacheng-215133327/',
   },
+  {
+    text: 'Mooncake makes KV cache a first-class system resource for disaggregated LLM serving. Real-world performance depends on the full configuration model, hardware, prefill/decode topology, parallelism strategy, and workload. InferenceX™ tests Mooncake across a broad and growing range of configurations, openly and reproducibly, giving the community a clear view of the tradeoffs and helping us improve the system faster.',
+    textZh:
+      'Mooncake 将 KV cache 作为分离式 LLM 推理中的一等系统资源。真实性能取决于完整的配置组合——模型、硬件、预填充/解码拓扑、并行策略和工作负载。InferenceX™ 以开放、可复现的方式，在持续扩展的丰富配置上测试 Mooncake，让社区清晰了解其中的权衡，也帮助我们更快地改进系统。',
+    name: 'Mooncake Team',
+    title: '',
+    org: 'Mooncake',
+    logo: 'kvcache-ai.svg',
+    link: 'https://kvcache.ai/',
+  },
 ];
 
 /**
@@ -531,6 +541,7 @@ export const CAROUSEL_ORGS = [
   'Red Hat',
   'SambaNova',
   'TileRT',
+  'Mooncake',
 ] as const;
 
 /**

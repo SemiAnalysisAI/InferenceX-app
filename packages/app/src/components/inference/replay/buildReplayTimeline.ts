@@ -86,6 +86,7 @@ export function computeFullRunDomain(
 const buildReplayPointConfigId = (point: InferenceData): string => {
   let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}|${point.decode_ep ?? 0}|${point.prefill_tp ?? 0}|${point.prefill_ep ?? 0}`;
   if (point.disagg) key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;
+  if (point.recipe_fingerprint) key += `|recipe-${point.recipe_fingerprint}`;
   // Preserve the pre-existing replay identity for fixed-sequence points. Agentic
   // curves need only the decode-method suffix because their hwKey now merges it.
   return key + agenticSpecDecodingKeySuffix(point);

@@ -3,7 +3,7 @@ import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, Check, ChevronDown, Table2 } from 'lucide-react';
+import { BarChart3, Table2 } from 'lucide-react';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import { useInference } from '@/components/inference/InferenceContext';
@@ -23,14 +23,12 @@ import {
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
-import { canonicalNormalizedFrontierIds } from '@/components/inference/utils/canonicalFrontier';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
@@ -38,7 +36,7 @@ import { metricLabel, metricTitle } from '@/lib/chart-utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
-import { cn, getDisplayLabel } from '@/lib/utils';
+import { getDisplayLabel } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import {
@@ -63,7 +61,6 @@ import {
 } from '@/hooks/api/use-derived-agentic-metrics';
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import type { Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 
 import ChartControls from './ChartControls';
@@ -85,7 +82,7 @@ const STRINGS = {
   en: {
     inferencePerformance: 'Inference Performance',
     inferencePerformanceDesc:
-      'Inference performance metrics across different models, hardware configurations, and serving parameters.',
+      'Agentic inference metrics from the AgentX scenario and fixed-sequence inference metrics across models, hardware configurations, and serving parameters.',
     chart: 'Chart',
     table: 'Table',
     sourceUnofficial: 'Source: UNOFFICIAL',
@@ -98,12 +95,11 @@ const STRINGS = {
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
       pctl ? `vs. ${pctl} End-to-end Latency` : 'vs. End-to-end Latency',
-    advancedXAxis: 'Advanced',
-    advancedXAxisWith: (label: string) => `Advanced: ${label}`,
   },
   zh: {
     inferencePerformance: '推理性能',
-    inferencePerformanceDesc: '不同模型、硬件配置和服务参数下的推理性能指标。',
+    inferencePerformanceDesc:
+      '不同模型、硬件配置和服务参数下，来自 AgentX 场景的智能体推理指标与固定序列推理指标。',
     chart: '图表',
     table: '表格',
     sourceUnofficial: '来源：非官方',
@@ -115,8 +111,6 @@ const STRINGS = {
     viewMode: '视图模式',
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
-    advancedXAxis: '高级',
-    advancedXAxisWith: (label: string) => `高级：${label}`,
   },
 } as const;
 
@@ -151,103 +145,6 @@ const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string; labelZh: string }[
   { value: 'e2e', label: 'E2E Latency', labelZh: '端到端延迟' },
   { value: 'ttft', label: 'TTFT', labelZh: 'TTFT' },
 ];
-
-/**
- * X-axis modes tucked behind the "Advanced" menu on agentic charts.
- *
- * AgentX headlines E2E Normalized Interactivity, so the three per-request
- * latency views are secondary there and would otherwise crowd the strip. They
- * stay flat top-level tabs on every other scenario: E2E Normalized
- * Interactivity is agentic-only, so collapsing them elsewhere would leave the
- * strip with nothing in it.
- */
-const ADVANCED_X_AXIS_MODES: readonly XAxisMode[] = ['interactivity', 'e2e', 'ttft'];
-
-const isAdvancedXAxisMode = (mode: XAxisMode): boolean => ADVANCED_X_AXIS_MODES.includes(mode);
-
-/**
- * "Advanced" x-axis picker for agentic charts. Styled to sit in the tab strip
- * beside the real tabs, but it is a menu button rather than a `TabsTrigger`:
- * Radix would otherwise treat it as a fifth tab stop and steal arrow-key
- * navigation from the modes inside it. The active mode's label is shown on the
- * trigger so the strip still says which metric the x-axis is plotting.
- */
-function AdvancedXAxisMenu({
-  selected,
-  onSelect,
-  locale,
-  labels,
-}: {
-  selected: XAxisMode;
-  onSelect: (mode: XAxisMode) => void;
-  locale: Locale;
-  labels: { advanced: string; advancedWith: (label: string) => string };
-}) {
-  const [open, setOpen] = useState(false);
-  const active = isAdvancedXAxisMode(selected);
-  const options = X_AXIS_MODE_BUTTONS.filter(({ value }) => isAdvancedXAxisMode(value));
-  const activeLabel = options.find(({ value }) => value === selected);
-  const activeText = activeLabel && (locale === 'zh' ? activeLabel.labelZh : activeLabel.label);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        data-testid="x-axis-mode-advanced"
-        data-state={active ? 'active' : 'inactive'}
-        // No aria-label: the accessible name comes from the visible text, so
-        // screen readers announce "Advanced: TTFT" rather than a bare
-        // "Advanced" that hides which metric the x-axis is plotting.
-        className={cn(
-          'relative inline-flex items-center justify-center gap-1.5',
-          'border-b-2 border-transparent px-4 py-2',
-          'text-sm font-semibold whitespace-nowrap',
-          'text-muted-foreground hover:border-muted-foreground/30',
-          'data-[state=active]:text-secondary dark:data-[state=active]:text-primary',
-          'data-[state=active]:border-secondary dark:data-[state=active]:border-primary',
-          'transition-colors duration-200',
-          'focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring',
-          'min-w-[130px] sm:min-w-[140px] flex-1 sm:flex-initial cursor-pointer',
-        )}
-      >
-        {active && activeText ? labels.advancedWith(activeText) : labels.advanced}
-        <ChevronDown
-          className={cn('size-4 transition-transform', open && 'rotate-180')}
-          aria-hidden
-        />
-      </PopoverTrigger>
-      <PopoverContent align="center" className="w-52 p-1" data-testid="x-axis-mode-advanced-menu">
-        <ul className="flex flex-col">
-          {options.map(({ value, label, labelZh }) => {
-            const isActive = value === selected;
-            return (
-              <li key={value}>
-                <button
-                  type="button"
-                  data-testid={`x-axis-mode-${value}`}
-                  aria-current={isActive}
-                  onClick={() => {
-                    setOpen(false);
-                    onSelect(value);
-                  }}
-                  className={cn(
-                    'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm',
-                    'cursor-pointer transition-colors',
-                    isActive
-                      ? 'bg-accent text-secondary dark:text-primary font-medium'
-                      : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                  )}
-                >
-                  {locale === 'zh' ? labelZh : label}
-                  {isActive && <Check className="size-4" aria-hidden />}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 /** Presentation and data plumbing for trace-derived agentic x-axis modes. */
 interface DerivedXModeSpec {
@@ -478,9 +375,6 @@ export default function ChartDisplay() {
         {
           isAgentic,
           selectedPercentile,
-          // Unofficial rows lack persisted request traces, so they cannot be
-          // admitted to the normalized north-star frontier on any agentic axis.
-          restrictToNormalizedFrontier: isAgentic,
         },
       );
 
@@ -719,9 +613,7 @@ export default function ChartDisplay() {
   const isAgenticSequence = sequenceKind(selectedSequence) === 'agentic';
   const useDerivedXAxis = isAgenticSequence && isAgenticOnlyXAxisMode(selectedXAxisMode);
   const derivedTargetIds = useMemo(() => {
-    // Every agentic x-axis is classified by the normalized north-star
-    // frontier, so all modes need the persisted trace-derived metric.
-    if (!isAgenticSequence) return [] as number[];
+    if (!useDerivedXAxis) return [] as number[];
     const ids = new Set<number>();
     for (const graph of visibleGraphs) {
       const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
@@ -732,11 +624,11 @@ export default function ChartDisplay() {
       }
     }
     return [...ids];
-  }, [isAgenticSequence, visibleGraphs]);
+  }, [useDerivedXAxis, visibleGraphs]);
   const derivedQuery = useDerivedAgenticMetrics(derivedTargetIds, isAgenticSequence);
   const derivedMetrics = derivedQuery.data;
-  const isCanonicalFrontierLoading =
-    isAgenticSequence &&
+  const isDerivedXAxisLoading =
+    useDerivedXAxis &&
     derivedTargetIds.length > 0 &&
     (derivedQuery.isPending || derivedQuery.isFetching) &&
     !derivedMetrics;
@@ -746,40 +638,25 @@ export default function ChartDisplay() {
     if (!isAgenticSequence) return visibleGraphs;
     if (!derivedMetrics) {
       // Legacy AgentX axes can still render transient/non-persisted rows, which
-      // have no ids to request. Persisted rows remain gated on their derived
-      // metrics so every displayed frontier can enforce canonical eligibility.
+      // have no ids to request.
       if (!derivedSpec && derivedTargetIds.length === 0) return visibleGraphs;
       return visibleGraphs.map((graph) => ({ ...graph, data: [], clippedData: [] }));
     }
     return visibleGraphs.map((graph) => {
       const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof typeof graph.chartDefinition;
-      // The normalized axis is higher-is-better. Compute its true Pareto
-      // direction once, regardless of which x-axis is currently displayed.
       const configuredCorner = graph.chartDefinition[rooflineKey] as RooflineDirection | undefined;
-      const canonicalCorner =
+      const derivedCorner =
         graph.chartDefinition.chartType === 'e2e'
           ? derivedModeRoofline(configuredCorner, true)
           : configuredCorner;
-      const allPoints = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
-      const canonicalIds = canonicalNormalizedFrontierIds(
-        allPoints,
-        derivedMetrics,
-        selectedPercentile,
-        canonicalCorner,
-      );
 
       const preparePoint = (point: InferenceData): InferenceData | null => {
         const pointId = isPersistedBenchmarkId(point.id) ? point.id : null;
-        const stamped = {
-          ...point,
-          isOnNormalizedInteractivityFrontier:
-            canonicalIds === null ? undefined : pointId !== null && canonicalIds.has(pointId),
-        };
-        if (!derivedSpec) return stamped;
+        if (!derivedSpec) return point;
         if (pointId === null) return null;
         const raw = derivedSpec.value(derivedMetrics[pointId], selectedPercentile);
         if (raw === null || raw === undefined || !Number.isFinite(raw)) return null;
-        return { ...stamped, x: derivedSpec.toX(raw) };
+        return { ...point, x: derivedSpec.toX(raw) };
       };
 
       const data = graph.data
@@ -800,7 +677,7 @@ export default function ChartDisplay() {
         ...graph.chartDefinition,
         x_label: xLabelFn(selectedPercentile.toUpperCase()),
         y_latency_limit: undefined,
-        ...(canonicalCorner ? { [rooflineKey]: canonicalCorner } : {}),
+        ...(derivedCorner ? { [rooflineKey]: derivedCorner } : {}),
       };
       return { ...graph, chartDefinition, data, clippedData };
     });
@@ -816,7 +693,7 @@ export default function ChartDisplay() {
   ]);
 
   const displayGraphs =
-    isFirstLoad || isCanonicalFrontierLoading
+    isFirstLoad || isDerivedXAxisLoading
       ? [
           <Card key="skeleton-0">
             <Skeleton className="h-7 w-2/4 mb-1" />
@@ -1151,16 +1028,7 @@ export default function ChartDisplay() {
           <CustomPowers loading={loading} />
         </section>
       )}
-      {/*
-        Manual activation: with Radix's default automatic mode, merely focusing
-        a trigger fires onValueChange. On agentic the strip renders a single tab
-        while the selected mode may live in the Advanced menu, so tabbing to
-        that lone trigger would silently snap the x-axis back to E2E Normalized
-        Interactivity. Manual activation also suits a control whose every change
-        redraws the chart — arrow keys move focus, Enter/Space commits.
-      */}
       <Tabs
-        activationMode="manual"
         value={selectedXAxisMode}
         onValueChange={(value) => {
           setSelectedXAxisMode(value as XAxisMode);
@@ -1173,11 +1041,9 @@ export default function ChartDisplay() {
           className="flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
         >
           {X_AXIS_MODE_BUTTONS.filter(({ value }) => {
-            // Before mount, render the flat strip so SSR and first client render match.
+            // Before mount, render all buttons so SSR and first client render match.
             if (!mounted) return true;
-            if (isAgenticOnlyXAxisMode(value)) return isAgenticSequence;
-            // On agentic these three move into the Advanced menu below.
-            return !(isAgenticSequence && isAdvancedXAxisMode(value));
+            return !isAgenticOnlyXAxisMode(value) || isAgenticSequence;
           }).map(({ value, label, labelZh }) => (
             <TabsTrigger
               key={value}
@@ -1188,17 +1054,6 @@ export default function ChartDisplay() {
               {locale === 'zh' ? labelZh : label}
             </TabsTrigger>
           ))}
-          {mounted && isAgenticSequence && (
-            <AdvancedXAxisMenu
-              selected={selectedXAxisMode}
-              onSelect={(mode) => {
-                setSelectedXAxisMode(mode);
-                track('latency_x_axis_mode_selected', { mode });
-              }}
-              locale={locale}
-              labels={{ advanced: t.advancedXAxis, advancedWith: t.advancedXAxisWith }}
-            />
-          )}
         </TabsList>
       </Tabs>
       <div className="flex flex-col gap-4">{displayGraphs}</div>

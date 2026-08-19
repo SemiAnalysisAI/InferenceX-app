@@ -13,7 +13,7 @@ const STRINGS = {
   en: {
     exploreInferenceX: 'Explore InferenceX',
     exploreInferenceXLead:
-      'Start with a concise cost overview across active models and key platforms, or open the full dashboard for every model, chip, framework, and metric.',
+      'Start with a concise cost overview across active models and key platforms, or open the full dashboard for every model, chip, framework, and metric. AgentX is our long-context, multi-turn coding scenario.',
     fullDashboard: 'Full Dashboard',
     platformCoverage:
       'Compare NVIDIA GB300 NVL72, GB200 NVL72, B300, B200, H200, H100, AMD MI355X, MI325X, MI300X and soon VR200 NVL72, AMD MI455X UALoE72, TPUv7 Ironwood, etc across DeepSeekv4 Pro, Qwen, Kimi, GLM, MiniMax, gpt-oss, Llama and other models.',
@@ -42,7 +42,7 @@ const STRINGS = {
   zh: {
     exploreInferenceX: '探索 InferenceX',
     exploreInferenceXLead:
-      '先查看活跃模型与关键平台的精简成本总览，或打开完整仪表板，探索所有模型、Chip、框架与指标。',
+      '先查看活跃模型与关键平台的精简成本总览，或打开完整仪表板，探索所有模型、Chip、框架与指标。AgentX 是我们的长上下文多轮编码场景。',
     fullDashboard: '完整仪表板',
     platformCoverage:
       '跨 DeepSeekv4 Pro、Qwen、Kimi、GLM、MiniMax、gpt-oss、Llama 等模型，对比 NVIDIA GB300 NVL72、GB200 NVL72、B300、B200、H200、H100、AMD MI355X、MI325X、MI300X，以及即将上线的 VR200 NVL72、AMD MI455X UALoE72、TPUv7 Ironwood 等硬件。',

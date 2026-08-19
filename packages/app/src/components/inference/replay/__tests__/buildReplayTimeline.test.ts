@@ -216,6 +216,31 @@ describe('buildReplayTimeline', () => {
     expect(t.configs.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('keeps same-coordinate recipe variants as separate replay timelines', () => {
+    const rows = [
+      baseRow({
+        recipe_fingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        metrics: { tput_per_gpu: 400, median_intvty: 20 },
+      }),
+      baseRow({
+        recipe_fingerprint: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        metrics: { tput_per_gpu: 500, median_intvty: 25 },
+      }),
+    ];
+
+    const timeline = buildReplayTimeline(rows, interactivityChartDef, 'y_tpPerGpu', null, ['fp4']);
+
+    expect(timeline.dates).toEqual(['2025-01-01']);
+    expect(timeline.configs).toHaveLength(2);
+    expect(timeline.configs.map(({ configId }) => configId).toSorted()).toEqual([
+      'h100_trt|fp4|0|32|0|0|0|recipe-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'h100_trt|fp4|0|32|0|0|0|recipe-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    ]);
+    expect(timeline.configs.map(({ stepValues }) => stepValues[0].y).toSorted()).toEqual([
+      400, 500,
+    ]);
+  });
+
   it('keeps overlapping agentic MTP and standard-decoding replay points distinct', () => {
     const rows = [
       baseRow({

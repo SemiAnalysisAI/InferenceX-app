@@ -29,6 +29,9 @@ interface DedupeInput {
   date: string;
   workflow_run_id?: number;
   run_started_at?: string | null;
+  curve_date?: string;
+  curve_workflow_run_id?: number;
+  curve_run_started_at?: string | null;
 }
 
 const drow = (over: Partial<DedupeInput> = {}): DedupeInput => ({
@@ -93,9 +96,24 @@ describe('dedupeRowsToLatestPerConfig', () => {
 
   it('dedupes mixed agentic spec methods as one curve', () => {
     const rows = [
-      drow({ id: 1, benchmark_type: 'agentic_traces', spec_method: 'none', date: '2026-06-01' }),
-      drow({ id: 2, benchmark_type: 'agentic_traces', spec_method: 'mtp', date: '2026-06-03' }),
-      drow({ id: 3, benchmark_type: 'agentic_traces', spec_method: 'eagle', date: '2026-06-03' }),
+      drow({
+        id: 1,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'none',
+        date: '2026-06-01',
+      }),
+      drow({
+        id: 2,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'mtp',
+        date: '2026-06-03',
+      }),
+      drow({
+        id: 3,
+        benchmark_type: 'agentic_traces',
+        spec_method: 'eagle',
+        date: '2026-06-03',
+      }),
     ];
 
     expect(dedupeRowsToLatestPerConfig(rows).map((r) => r.id)).toEqual([2, 3]);
@@ -103,8 +121,18 @@ describe('dedupeRowsToLatestPerConfig', () => {
 
   it('continues deduping fixed-sequence spec methods independently', () => {
     const rows = [
-      drow({ id: 1, benchmark_type: 'single_turn', spec_method: 'none', date: '2026-06-01' }),
-      drow({ id: 2, benchmark_type: 'single_turn', spec_method: 'mtp', date: '2026-06-03' }),
+      drow({
+        id: 1,
+        benchmark_type: 'single_turn',
+        spec_method: 'none',
+        date: '2026-06-01',
+      }),
+      drow({
+        id: 2,
+        benchmark_type: 'single_turn',
+        spec_method: 'mtp',
+        date: '2026-06-03',
+      }),
     ];
 
     expect(dedupeRowsToLatestPerConfig(rows).map((r) => r.id)).toEqual([1, 2]);
@@ -168,6 +196,52 @@ describe('dedupeRowsToLatestPerConfig', () => {
       'mtp',
       'eagle',
     ]);
+  });
+
+  it('keeps cross-day points carried into one append-only snapshot', () => {
+    const rows = [
+      drow({
+        id: 1,
+        date: '2026-06-01',
+        workflow_run_id: 10,
+        curve_date: '2026-06-03',
+        curve_workflow_run_id: 12,
+        curve_run_started_at: '2026-06-03T12:00:00Z',
+      }),
+      drow({
+        id: 2,
+        date: '2026-06-03',
+        workflow_run_id: 12,
+        curve_date: '2026-06-03',
+        curve_workflow_run_id: 12,
+        curve_run_started_at: '2026-06-03T12:00:00Z',
+      }),
+    ];
+
+    expect(dedupeRowsToLatestPerConfig(rows).map((r) => r.id)).toEqual([1, 2]);
+  });
+
+  it('keeps same-day agentic points carried from an earlier producer run', () => {
+    const rows = [
+      drow({
+        id: 1,
+        benchmark_type: 'agentic_traces',
+        workflow_run_id: 20,
+        run_started_at: '2026-06-03T10:00:00Z',
+        curve_workflow_run_id: 21,
+        curve_run_started_at: '2026-06-03T12:00:00Z',
+      }),
+      drow({
+        id: 2,
+        benchmark_type: 'agentic_traces',
+        workflow_run_id: 21,
+        run_started_at: '2026-06-03T12:00:00Z',
+        curve_workflow_run_id: 21,
+        curve_run_started_at: '2026-06-03T12:00:00Z',
+      }),
+    ];
+
+    expect(dedupeRowsToLatestPerConfig(rows).map((r) => r.id)).toEqual([1, 2]);
   });
 });
 
@@ -320,9 +394,19 @@ describe('filterByGPU', () => {
 describe('filterOverviewHistoryRows', () => {
   it('keeps only the serving envelope encoded by the Overview history link', () => {
     const rows = [
-      drow({ id: 1, hardware: 'mi355x', framework: 'sglang', precision: 'fp8' }),
+      drow({
+        id: 1,
+        hardware: 'mi355x',
+        framework: 'sglang',
+        precision: 'fp8',
+      }),
       drow({ id: 2, hardware: 'mi355x', framework: 'vllm', precision: 'fp4' }),
-      drow({ id: 3, hardware: 'mi355x', framework: 'sglang', precision: 'fp4' }),
+      drow({
+        id: 3,
+        hardware: 'mi355x',
+        framework: 'sglang',
+        precision: 'fp4',
+      }),
     ];
     const key = JSON.stringify(['qwen3.5', 'mi355x', 'vllm', 'none', 'fp4', false, false, 'off']);
 
@@ -468,7 +552,9 @@ describe('applyScopeFilters', () => {
   // the user's legend selection with whatever set it is handed and never
   // re-widens, so a universe that shrinks when a Measured Energy axis is
   // picked deletes the telemetry-less configs for good.
-  const withTelemetry = scopePoint('b200_sglang', { measuredAvgPower: { y: 900, roof: false } });
+  const withTelemetry = scopePoint('b200_sglang', {
+    measuredAvgPower: { y: 900, roof: false },
+  });
   const withoutTelemetry = scopePoint('h200_vllm');
   const points = [withTelemetry, withoutTelemetry];
 

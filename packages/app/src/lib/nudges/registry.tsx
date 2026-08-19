@@ -284,41 +284,47 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // Landing modals
   // -------------------------------------------------------------------------
   {
-    id: 'kimi-k3-launch-modal',
+    id: 'agentic-results-launch-modal',
     type: 'modal',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
-    storageKey: 'inferencex-kimi-k3-modal-dismissed',
+    storageKey: 'inferencex-agentic-results-modal-dismissed',
     priority: 50,
     scope: 'landing',
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'Kimi K3 is live',
-      titleZh: 'Kimi K3 已上线',
+      title: 'Real-world agentic inference benchmark results are live',
+      titleZh: '真实场景智能体推理基准测试结果已上线',
       description:
-        'Day-zero benchmarks for Kimi K3 are now available across the latest NVIDIA and AMD chips. Results are experimental — see how the new model performs across hardware.',
+        'Compare AgentX results for Kimi K3, DeepSeek-V4-Pro-0813, MiniMax-M3, Qwen3.5 397B, and GLM-5.3 across supported chips and serving stacks.',
       descriptionZh:
-        'Kimi K3 的首日基准测试数据现已覆盖最新的 NVIDIA 和 AMD Chip。结果为实验性数据——来看看新模型在不同硬件上的表现。',
+        '查看 Kimi K3、DeepSeek-V4-Pro-0813、MiniMax-M3、Qwen3.5 397B 与 GLM-5.3 在支持 Chip 和推理服务栈上的 AgentX 结果。',
+      // Both buckets carry two releases on one architecture (GLM-5.2/5.3, the
+      // V4-Pro April preview and the 0813 GA); name the newer one, as the
+      // model selector does for GLM.
       testId: 'launch-modal',
       containerClassName: 'border-brand/40',
+      // Launch announcement — centered with a backdrop so it reads as the
+      // page's headline moment instead of a bottom-right corner card.
+      centered: true,
       badge: 'New',
       badgeZh: '最新',
       dismissLabel: 'Maybe Later',
       dismissLabelZh: '稍后再看',
       primaryAction: {
-        label: 'Explore',
-        labelZh: '开始探索',
+        label: 'View results',
+        labelZh: '查看结果',
         icon: <ArrowRight className="size-4" />,
         onClick: () => {
-          window.location.href = '/inference?preset=kimi-k3-launch';
+          window.location.href = '/inference?i_seq=agentic-traces';
         },
       },
     },
     analytics: {
-      shown: 'kimi_k3_modal_shown',
-      dismissed: 'kimi_k3_modal_dismissed',
-      action: 'kimi_k3_modal_explored',
+      shown: 'agentic_results_modal_shown',
+      dismissed: 'agentic_results_modal_dismissed',
+      action: 'agentic_results_modal_viewed',
     },
   },
   {
@@ -365,7 +371,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // Landing banner
   // -------------------------------------------------------------------------
   {
-    id: 'kimi-k3-launch-banner',
+    id: 'agentic-results-launch-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -376,23 +382,25 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'Kimi K3 benchmarks are live',
-      titleZh: 'Kimi K3 基准测试已上线',
-      description: 'First inference numbers across NVIDIA and AMD chips, click to explore.',
-      descriptionZh: 'NVIDIA 和 AMD Chip 的首批推理数据，点击探索。',
+      title: 'Agentic benchmark results are live',
+      titleZh: '智能体基准测试结果已上线',
+      description: 'Compare AgentX across supported models, chips, and serving stacks.',
+      descriptionZh: '对比 AgentX 在支持模型、Chip 与推理服务栈上的表现。',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: '/inference?preset=kimi-k3-launch',
+      href: '/inference?i_seq=agentic-traces',
+      linkLabel: 'View results',
+      linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = '/inference?preset=kimi-k3-launch';
+        window.location.href = '/inference?i_seq=agentic-traces';
       },
     },
     analytics: {
-      shown: 'launch_banner_shown',
-      dismissed: 'launch_banner_dismissed',
-      action: 'launch_banner_clicked',
-      properties: { banner_id: 'kimi-k3-launch', preset_id: 'kimi-k3-launch' },
+      shown: 'agentic_results_banner_shown',
+      dismissed: 'agentic_results_banner_dismissed',
+      action: 'agentic_results_banner_clicked',
+      properties: { banner_id: 'agentic-results-launch', scenario: 'agentic-traces' },
     },
   },
 ];

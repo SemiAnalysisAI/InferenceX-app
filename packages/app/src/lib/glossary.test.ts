@@ -55,6 +55,16 @@ describe('glossary content', () => {
     }
   });
 
+  it('defines the AgentX workload and its agentic inference concepts', () => {
+    expect(GLOSSARY_CATEGORIES).toContain('Agentic inference');
+    expect(getGlossaryEntry('agentic-inference')?.category).toBe('Agentic inference');
+    expect(getGlossaryEntry('agentx')?.definition).toContain('agentic inference benchmark');
+    expect(getGlossaryEntry('agentic-coding-workload')?.relatedTerms).toContain('agentx');
+    expect(getGlossaryEntry('trace-replay')?.benchmarkContext).toContain('AIPerf');
+    expect(getGlossaryEntry('closed-loop-benchmark')?.benchmarkContext).toContain('agent clients');
+    expect(getGlossaryEntry('subagent')?.relatedTerms).toContain('trace-replay');
+  });
+
   it('links every glossary source to a real article and covers the complete article library', () => {
     const entries = getAllGlossaryEntries();
     const referencedArticles = new Set(entries.flatMap((entry) => entry.articleSlugs));
@@ -107,6 +117,12 @@ describe('Chinese glossary content', () => {
   });
 
   it('resolves canonical slugs and walks the Chinese term order without gaps', () => {
+    expect(GLOSSARY_CATEGORY_LABELS_ZH['Agentic inference']).toBe('智能体推理');
+    expect(getZhGlossaryEntry('agentic-inference')?.term).toBe('智能体推理');
+    expect(getZhGlossaryEntry('agentx')?.term).toBe('AgentX');
+    expect(getZhGlossaryEntry('trace-replay')?.term).toBe('轨迹回放');
+    expect(getZhGlossaryEntry('closed-loop-benchmark')?.term).toBe('闭环基准测试');
+    expect(getZhGlossaryEntry('subagent')?.term).toBe('子智能体');
     expect(getZhGlossaryEntry('multi-token-prediction')?.term).toBe('多 token 预测');
     expect(getZhGlossaryEntry('not-a-real-term')).toBeUndefined();
 

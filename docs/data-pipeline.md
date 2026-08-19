@@ -31,16 +31,40 @@ Every INSERT uses `ON CONFLICT DO UPDATE` or `DO NOTHING`. This means:
 - **Partial failures recover**: If ingest crashes mid-batch, re-running picks up where it left off.
 - **No cleanup needed**: No "delete old data first" step that could leave the DB empty on failure.
 
-The unique constraints match natural keys (e.g., `(workflow_run_id, config_id, isl, osl, conc)` for benchmarks), not surrogate keys.
+The unique constraints match natural keys (for benchmarks, workflow/config/scenario,
+concurrency, offload mode, and the nullable recipe fingerprint), not surrogate keys.
+
+### Append-Only Curve Extensions
+
+Normal workflow runs are complete line snapshots: the latest run for a line replaces
+the prior run as a unit, so partial re-sweeps cannot silently stitch points from
+different recipes. A changelog containing only `append-only: true` entries marks the
+one narrow exception. The latest-curve queries then walk backward through consecutive
+append-only runs and include the nearest full snapshot, selecting the newest producer
+for each recipe and concurrency. The producer stamps every new point with a deterministic
+`recipe_fingerprint`, so variants that share the app's normalized topology and concurrency
+remain separate. Historical rows have a null fingerprint and retain their legacy identity.
+
+The chain continues only while the image is identical. Each returned benchmark row
+keeps its original workflow-run ID and run URL, so extending a curve does not erase
+point provenance; `curve_date` and `curve_workflow_run_id` carry the separate logical
+snapshot identity used by charts and history. InferenceX CI separately verifies that
+the generated matrix is strictly additive: existing recipes and points are immutable,
+while newly added concurrency points or complete recipe variants may run as deltas.
+All appended points must retain the target curve's image, and benchmark-affecting code
+changes must be isolated to the new points.
 
 ### Audited Point Purges
 
 `packages/db/src/etl/run-overrides.ts` is the durable audit record for exceptional
 data removal. Use `PURGED_BENCHMARK_POINTS` when a valid workflow run contains a
 specific invalid result, such as a server hang. Each record names `githubRunId`,
-`runAttempt`, `configId`, `benchmarkType`, `isl`, `osl`, `conc`, and `offloadMode`,
-with a dated reason comment. The full identity is required because one run can
-contain multiple serving configurations at the same sequence lengths and concurrency.
+`runAttempt`, `configId`, `benchmarkType`, `isl`, `osl`, `conc`, `offloadMode`, and
+the optional nullable `recipeFingerprint`, with a dated reason comment. A fingerprint
+targets exactly that recipe; omitting it or setting it to null targets only legacy rows
+whose stored fingerprint is null. The full identity is required because one run can
+contain multiple serving configurations and recipes at the same sequence lengths and
+concurrency.
 
 `bun run db:apply-overrides` previews every matching row and requires confirmation
 before deleting it in a transaction. It also removes unreferenced server logs and
@@ -53,6 +77,44 @@ metadata, it matches the same run and full point identity across attempts. This
 conservative fallback prevents a failed GitHub lookup from restoring a suppressed
 point. It can only suppress an identical point from another attempt while that
 attempt remains unknown.
+
+### Audited Run Backfills
+
+Exceptional metadata corrections use the same reviewed, automatically enforced ledger
+as purges. Add a `CHANGELOG_BACKFILLS` or `BENCHMARK_POINT_BACKFILLS` entry in
+`packages/db/src/etl/run-overrides.ts`; never add a one-off production SQL statement.
+Every entry has a stable kebab-case `id`, a human-readable `reason`, an exact run attempt,
+and the target table's complete natural-key selector. The source-control history records
+who approved the correction and why, while the stable ID appears in ingest and apply logs.
+
+Changelog backfills select `(githubRunId, runAttempt, baseRef, headRef)` and can patch
+`configKeys`, `description`, `prLink`, or `appendOnly`. An `appendOnly` correction updates
+both `changelog_entries.append_only` and `workflow_runs.append_only` atomically because
+the materialized benchmark view reads the run-level value.
+
+Benchmark point backfills use the same complete point selector as audited point purges:
+`githubRunId`, `runAttempt`, `configId`, `benchmarkType`, `isl`, `osl`, `conc`,
+`offloadMode`, and nullable `recipeFingerprint`. Their `set` block supports a shallow
+`metricsMerge`, top-level `metricsRemove`, and `offloadMode`. Setting `offloadMode`
+updates both the first-class column and `metrics.offload_mode`; for example, a missed CPU
+KV offload annotation can set `offloadMode: 'on'` and merge `kv_offloading` plus backend
+metadata in one correction. Unrelated metrics remain unchanged.
+
+Run `bun run admin:db:apply-overrides` to preview the exact rows, reasons, and patches;
+the command requires confirmation unless passed `--yes`. It fails before writing when a
+target is missing, when a point's desired identity already exists, or when registry
+validation finds an overlap or duplicate. Writes are verified against the declared state
+and `latest_benchmarks` is refreshed afterward. Merges to `master` run the same command in
+CI, followed by database verification, cache invalidation, and cache warmup.
+
+Point corrections are additionally applied before each CI or GCS benchmark insert. This
+prevents a later idempotent re-ingest from restoring the artifact's original value. The
+ingest tracks source and desired identities across the run and fails on a collision instead
+of silently collapsing two distinct artifact points. When GCS cannot recover an attempt
+number, it follows the purge path's conservative fallback and matches the exact run and
+point across attempts; the log records the applied backfill ID. Changelog corrections are
+likewise applied to artifact metadata before `appendOnly`/`evalsOnly` run semantics are
+resolved and before the changelog is upserted.
 
 ### Why Two Connection Types
 

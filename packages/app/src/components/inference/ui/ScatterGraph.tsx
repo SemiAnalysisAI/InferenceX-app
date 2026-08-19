@@ -417,8 +417,7 @@ const SCATTER_STRINGS = {
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
     bestPerSku: 'Best per SKU',
-    optimalInfo:
-      'On agentic, optimal points must be Pareto-optimal on the selected x-axis and also belong to the E2E Normalized Interactivity frontier.',
+    optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     labels: 'Labels',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
@@ -433,8 +432,7 @@ const SCATTER_STRINGS = {
     logScale: '对数缩放',
     optimalOnly: '仅最优',
     bestPerSku: '每个 SKU 仅显示最佳配置',
-    optimalInfo:
-      '在智能体场景中，最优点既必须在当前横轴上满足 Pareto 最优，也必须属于端到端归一化交互性的 Pareto 前沿。',
+    optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
     labels: '标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',

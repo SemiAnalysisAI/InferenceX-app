@@ -372,3 +372,147 @@ describe('overview model scope links', () => {
     );
   });
 });
+
+describe('overview row scope links', () => {
+  it('leaves the canonical 30-day URL untouched and appends rows=changed last', () => {
+    expect(overviewHref('en', 50, 'community', '30d', 'b200', 'default', 'all')).toBe(
+      '/overview?compare=30d',
+    );
+    expect(overviewHref('en', 50, 'community', '30d', 'b200', 'default', 'changed')).toBe(
+      '/overview?compare=30d&rows=changed',
+    );
+    expect(overviewHref('en', 100, 'all', '30d', 'b300', 'all', 'changed')).toBe(
+      '/overview?tier=100&engine=all&ref=b300&compare=30d&models=all&rows=changed',
+    );
+    expect(overviewHref('zh', 50, 'community', '30d', 'b200', 'default', 'changed')).toBe(
+      '/zh/overview?compare=30d&rows=changed',
+    );
+  });
+
+  it('keeps the row scope on the URL in hardware mode, where it is dormant', () => {
+    // The 30-day tab is off screen, so the key changes nothing on the rendered
+    // matrix. It is still the only record of that tab's answer, and dropping it
+    // here is what used to lose the filter on refresh or a shared link.
+    expect(overviewHref('en', 50, 'community', 'hardware', 'b200', 'default', 'changed')).toBe(
+      '/overview?rows=changed',
+    );
+    expect(overviewHref('en', 75, 'community', 'hardware', 'b200', 'all', 'changed')).toBe(
+      '/overview?tier=75&models=all&rows=changed',
+    );
+  });
+
+  it('preserves the row scope when changing tiers and engine scope', () => {
+    expect(overviewTierHref('en', 75, 'community', '30d', 'b200', 'default', 'changed')).toBe(
+      '/overview?tier=75&compare=30d&rows=changed',
+    );
+    expect(overviewEngineScopeHref('en', 'all', 50, '30d', 'b200', 'default', 'changed')).toBe(
+      '/overview?engine=all&compare=30d&rows=changed',
+    );
+  });
+
+  it('merges the rows control into pending overview URLs', () => {
+    const narrowed = mergeOverviewControlHref(
+      '/overview?compare=30d',
+      '/overview?compare=30d&rows=changed',
+      ['rows'],
+    );
+    expect(narrowed).toBe('/overview?compare=30d&rows=changed');
+    expect(mergeOverviewControlHref(narrowed, '/overview?tier=75', ['tier'])).toBe(
+      '/overview?tier=75&compare=30d&rows=changed',
+    );
+    expect(mergeOverviewControlHref(narrowed, '/overview?compare=30d', ['rows'])).toBe(
+      '/overview?compare=30d',
+    );
+  });
+});
+
+describe('overview hardware row scope links', () => {
+  it('leaves the canonical URL untouched and appends hwrows=priced last', () => {
+    expect(overviewHref('en', 50, 'community', 'hardware', 'b200', 'default', 'all', 'all')).toBe(
+      '/overview',
+    );
+    expect(
+      overviewHref('en', 50, 'community', 'hardware', 'b200', 'default', 'all', 'priced'),
+    ).toBe('/overview?hwrows=priced');
+    expect(overviewHref('en', 100, 'all', 'hardware', 'b300', 'all', 'all', 'priced')).toBe(
+      '/overview?tier=100&engine=all&ref=b300&models=all&hwrows=priced',
+    );
+    expect(
+      overviewHref('zh', 50, 'community', 'hardware', 'b200', 'default', 'all', 'priced'),
+    ).toBe('/zh/overview?hwrows=priced');
+  });
+
+  it('keeps the hardware row scope on the URL in history mode, where it is dormant', () => {
+    expect(overviewHref('en', 50, 'community', '30d', 'b200', 'default', 'all', 'priced')).toBe(
+      '/overview?compare=30d&hwrows=priced',
+    );
+  });
+
+  it('writes both row scopes at once, so a URL rebuilt from page data keeps them', () => {
+    // Every href the page builds comes from the current page data, including
+    // the one the client router starts from on first load. Emitting only the
+    // active mode's key there erased the other tab's filter on refresh and on
+    // any shared link carrying both.
+    expect(overviewHref('en', 50, 'community', '30d', 'b200', 'default', 'changed', 'priced')).toBe(
+      '/overview?compare=30d&rows=changed&hwrows=priced',
+    );
+    expect(
+      overviewHref('en', 50, 'community', 'hardware', 'b200', 'default', 'changed', 'priced'),
+    ).toBe('/overview?rows=changed&hwrows=priced');
+  });
+
+  it('preserves the hardware row scope when changing tiers and engine scope', () => {
+    expect(
+      overviewTierHref('en', 75, 'community', 'hardware', 'b200', 'default', 'all', 'priced'),
+    ).toBe('/overview?tier=75&hwrows=priced');
+    expect(
+      overviewEngineScopeHref('en', 'all', 50, 'hardware', 'b200', 'default', 'all', 'priced'),
+    ).toBe('/overview?engine=all&hwrows=priced');
+  });
+
+  it('lets each mode keep its own filter across a tab switch', () => {
+    // The comparison switcher owns only `compare`, so the scope belonging to the
+    // mode being left stays in the URL and is waiting when the reader returns.
+    const hardware = mergeOverviewControlHref('/overview', '/overview?hwrows=priced', ['hwrows']);
+    expect(hardware).toBe('/overview?hwrows=priced');
+
+    const history = mergeOverviewControlHref(hardware, '/overview?compare=30d', ['compare']);
+    expect(history).toBe('/overview?compare=30d&hwrows=priced');
+
+    const narrowed = mergeOverviewControlHref(history, '/overview?compare=30d&rows=changed', [
+      'rows',
+    ]);
+    expect(narrowed).toBe('/overview?compare=30d&rows=changed&hwrows=priced');
+
+    expect(mergeOverviewControlHref(narrowed, '/overview', ['compare'])).toBe(
+      '/overview?rows=changed&hwrows=priced',
+    );
+  });
+
+  it('lets the models control reset both scopes without clearing the dormant one', () => {
+    // The models toggle owns `models` plus both row keys, because revealing
+    // inactive models resets them. A merged key the target href does not carry
+    // is deleted, so hiding — which resets nothing — has to restate both.
+    const current = '/overview?compare=30d&models=all&rows=changed&hwrows=priced';
+    const keys = ['models', 'rows', 'hwrows'] as const;
+
+    const hiding = overviewHref(
+      'en',
+      50,
+      'community',
+      '30d',
+      'b200',
+      'default',
+      'changed',
+      'priced',
+    );
+    expect(mergeOverviewControlHref(current, hiding, keys)).toBe(
+      '/overview?compare=30d&rows=changed&hwrows=priced',
+    );
+
+    const revealing = overviewHref('en', 50, 'community', '30d', 'b200', 'all', 'all', 'all');
+    expect(mergeOverviewControlHref(current, revealing, keys)).toBe(
+      '/overview?compare=30d&models=all',
+    );
+  });
+});

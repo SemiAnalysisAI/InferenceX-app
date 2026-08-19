@@ -62,17 +62,25 @@ describe('NUDGE_REGISTRY integrity', () => {
   it('contains the expected set of migrated nudges', () => {
     const ids = NUDGE_REGISTRY.map((n) => n.id).toSorted();
     expect(ids).toEqual([
+      'agentic-results-launch-banner',
+      'agentic-results-launch-modal',
       'eval-samples',
       'export',
       'feedback-modal',
       'filter-hint',
       'github-star-modal',
       'gradient-label',
-      'kimi-k3-launch-banner',
-      'kimi-k3-launch-modal',
       'reproducibility',
       'star-nudge',
     ]);
+  });
+
+  it('renders the agentic launch modal centered, with the dismissed key e2e suppresses', () => {
+    const launch = NUDGE_REGISTRY.find((n) => n.id === 'agentic-results-launch-modal');
+    expect(launch?.content.centered).toBe(true);
+    // cypress/support/e2e.ts seeds this key so the backdrop can't cover the
+    // UI under test; a rename here has to be mirrored there.
+    expect(launch?.storageKey).toBe('inferencex-agentic-results-modal-dismissed');
   });
 
   it('preserves testId for every entry', () => {

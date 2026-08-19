@@ -115,14 +115,12 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
   const filteredReliabilityData = useMemo(() => {
     const selectedRangeData = dateRangeSuccessRateData[dateRange];
     if (!selectedRangeData) return [];
-    return Object.entries(selectedRangeData).map(
-      ([model, stats]): ModelSuccessRateData => ({
-        model,
-        successRate: stats.rate,
-        total: stats.total,
-        n_success: stats.n_success,
-      }),
-    );
+    return Object.entries(selectedRangeData).map(([model, stats]): ModelSuccessRateData => ({
+      model,
+      successRate: stats.rate,
+      total: stats.total,
+      n_success: stats.n_success,
+    }));
   }, [dateRangeSuccessRateData, dateRange]);
 
   const chartData = useMemo(

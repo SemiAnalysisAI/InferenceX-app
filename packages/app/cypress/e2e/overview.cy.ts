@@ -4,7 +4,7 @@ const MODEL_LABELS = [
   'DeepSeek V4 Pro 1.6T',
   'Kimi K3 2.8T',
   'MiniMax M3 428B',
-  'GLM5.2',
+  'GLM5.2/GLM5.3',
   'Qwen3.5 397B',
 ];
 
@@ -24,9 +24,11 @@ const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文多轮真实智能体场景（AgentX）';
+/** Shared by both locales: the scenario is named after its acronym. */
+const AGENTX_SHORT = 'AgentX';
 
-const PAGE_TITLE = 'Inference Cost per Million Tokens';
-const PAGE_TITLE_ZH = '推理每百万 token 成本';
+const PAGE_TITLE = 'Agentic Inference Costs';
+const PAGE_TITLE_ZH = '智能体推理成本';
 const SOURCE_NOTE = 'Source: InferenceX & SemiAnalysis Market July 2026 AI Cloud TCO Model';
 const SOURCE_LINK_TEXT = 'SemiAnalysis Market July 2026 AI Cloud TCO Model';
 const SOURCE_NOTE_ZH = '来源：InferenceX 与 SemiAnalysis Market July 2026 AI Cloud TCO Model';
@@ -59,6 +61,21 @@ function expectNoHorizontalScroller(testId: string) {
       .map((el) => `${el.tagName} ${el.scrollWidth}>${el.clientWidth}`);
     expect(scrollers, `horizontally scrollable inside ${testId}`).to.deep.equal([]);
   });
+}
+
+/**
+ * The row header shows the acronym so the 22%-wide model column stays one line,
+ * and keeps the full scenario name for assistive tech and the hover title. Both
+ * strings are in the cell, so assert the two layers rather than their
+ * concatenation. Scenarios already named by a short label render one node.
+ */
+function expectAgentxScenario(fullLabel: string) {
+  cy.get('[data-testid="overview-model-scenario"]')
+    .should('have.attr', 'title', fullLabel)
+    .within(() => {
+      cy.get('.sr-only').should('have.text', fullLabel);
+      cy.get('[aria-hidden="true"]').should('have.text', AGENTX_SHORT);
+    });
 }
 
 /** Visible dates and snapshot framing must be gone; evidence stays in labels. */
@@ -142,7 +159,7 @@ describe('Overview page', () => {
 
     cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
     cy.wait('@overviewJson');
-    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75');
+    cy.location('search').should('eq', '?tier=75');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.get('[data-testid="overview-tier-switcher"]').contains('a', '50').click();
@@ -158,17 +175,17 @@ describe('Overview page', () => {
       .find('[data-overview-engine-scope="all"]')
       .click();
     cy.wait('@overviewJson');
-    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+    cy.location('search').should('eq', '?tier=75&engine=all');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.get('[data-overview-comparison="30d"]').click();
     cy.wait('@overviewJson');
-    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all&compare=30d');
+    cy.location('search').should('eq', '?tier=75&engine=all&compare=30d');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
     cy.go('back');
     cy.get('[data-overview-comparison="hardware"]').should('have.attr', 'aria-current', 'true');
-    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+    cy.location('search').should('eq', '?tier=75&engine=all');
     cy.then(() => {
       expect(rscRequests, 'selector and popstate RSC requests').to.equal(0);
     });
@@ -216,8 +233,11 @@ describe('Overview page', () => {
       .find('[data-overview-engine-scope="all"]')
       .click();
 
-    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75&engine=all');
+    cy.location('search').should('eq', '?tier=75&engine=all');
     // The rendered state, not just the URL: the losing response must not win.
+    // Keeps its explicit timeout because it waits on the real API through
+    // `request.continue` plus the delay above — unlike the URL assertions
+    // around it, which the click resolves synchronously.
     cy.get('[data-testid="overview-tier-switcher"] [aria-current="page"]', {
       timeout: 15_000,
     }).should('have.text', '75');
@@ -237,9 +257,7 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
     cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('exist');
     cy.wait('@overviewJson');
-    cy.get('[data-testid="overview-page"] [aria-busy="true"]', { timeout: 15_000 }).should(
-      'not.exist',
-    );
+    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('not.exist');
   });
 
   it('rewrites one history entry when the overview request fails', () => {
@@ -252,7 +270,7 @@ describe('Overview page', () => {
       const before = win.history.length;
       cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
       cy.wait('@overviewJsonFailure');
-      cy.location('search', { timeout: 15_000 }).should('eq', '?tier=75');
+      cy.location('search').should('eq', '?tier=75');
       // A plain `.should` would be satisfied by the transient extra entry.
       cy.window().then((after) => {
         expect(after.history.length - before, 'one entry for one selection').to.equal(1);
@@ -260,9 +278,9 @@ describe('Overview page', () => {
     });
 
     cy.go('back');
-    cy.location('search', { timeout: 15_000 }).should('eq', '');
+    cy.location('search').should('eq', '');
     cy.go('back');
-    cy.location('pathname', { timeout: 15_000 }).should('eq', '/inference');
+    cy.location('pathname').should('eq', '/inference');
   });
 
   it('warms a hovered option and derives the reference without a request', () => {
@@ -288,7 +306,7 @@ describe('Overview page', () => {
 
     cy.get('[data-testid="overview-reference-select"]').click();
     cy.get('[data-overview-reference="b300"]').click();
-    cy.location('search', { timeout: 15_000 }).should('eq', '?tier=100&ref=b300');
+    cy.location('search').should('eq', '?tier=100&ref=b300');
     cy.get('[data-overview-comparison="hardware"]').should('contain.text', 'vs B300');
     cy.then(() => {
       expect(jsonRequests, 'a reference change is derived, not fetched').to.equal(1);
@@ -300,6 +318,8 @@ describe('Overview page', () => {
     cy.visit('/overview');
 
     cy.get('[data-overview-comparison="30d"]').click();
+    // Explicit timeout retained: this waits on a real /api/v1/overview response,
+    // not a client-side URL change.
     cy.get('[data-overview-comparison="30d"]', { timeout: 15_000 }).should(
       'have.attr',
       'aria-current',
@@ -321,7 +341,8 @@ describe('Overview page', () => {
     desktopModel('gpt-oss-120b')
       .find('[data-testid="overview-model-category-badge"]')
       .should('have.attr', 'data-category', 'deprecated')
-      .and('contain.text', 'Deprecated');
+      .and('contain.text', 'Deprecated')
+      .and('contain.text', 'Model is no longer actively benchmarked.');
     desktopModel('DeepSeek-R1-0528')
       .find('[data-testid="overview-model-category-badge"]')
       .should('have.attr', 'data-category', 'maintenance');
@@ -350,13 +371,16 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/zh/overview?models=all');
 
-    cy.get('[data-testid="overview-model-scope-toggle"]').should(
-      'contain.text',
-      '隐藏已弃用与维护模式模型',
-    );
+    // The chip carries the short label; the full sentence stays on the
+    // accessible name and hover title.
+    cy.get('[data-testid="overview-model-scope-toggle"]')
+      .should('contain.text', '隐藏停用模型')
+      .find('[data-overview-model-scope="default"]')
+      .should('have.attr', 'aria-label', '隐藏已弃用与维护模式模型');
     desktopModel('gpt-oss-120b')
       .find('[data-testid="overview-model-category-badge"]')
-      .should('contain.text', '已弃用');
+      .should('contain.text', '已弃用')
+      .and('contain.text', '该模型已不再进行活跃基准测试。');
   });
 
   it('uses a selectable hardware reference and preserves it across overview controls', () => {
@@ -410,8 +434,11 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    cy.get('[data-testid="overview-page"]')
-      .children('[data-testid="overview-comparison-switcher"]')
+    // The tabs sit inside the surface handed to the Fullscreen API so that
+    // presenting keeps them with the matrix, which costs them their old spot as
+    // a direct child of the page.
+    cy.get('[data-testid="overview-presentation-surface"]')
+      .find('[data-testid="overview-comparison-switcher"]')
       .should('have.length', 1)
       .and('have.class', 'justify-center');
     cy.get('[data-testid="overview-comparison-switcher"]')
@@ -469,7 +496,7 @@ describe('Overview page', () => {
 
     cy.get('[data-testid="overview-history-window-select"]').click();
     cy.get('[data-overview-window="7d"]').click();
-    cy.location('search', { timeout: 15_000 }).should('eq', '?compare=7d');
+    cy.location('search').should('eq', '?compare=7d');
     cy.get('[data-overview-comparison="7d"]').should('have.attr', 'aria-current', 'true');
     cy.contains(
       'Current cost and change versus the latest validated platform result 7–14 days earlier.',
@@ -477,7 +504,7 @@ describe('Overview page', () => {
 
     cy.get('[data-testid="overview-history-window-select"]').click();
     cy.get('[data-overview-window="90d"]').click();
-    cy.location('search', { timeout: 15_000 }).should('eq', '?compare=90d');
+    cy.location('search').should('eq', '?compare=90d');
     cy.contains(
       'Current cost and change versus the latest validated platform result 90–180 days earlier.',
     ).should('exist');
@@ -626,6 +653,48 @@ describe('Overview page', () => {
     }
   });
 
+  // Clicking the control, not just building its href: the matrix reads from a
+  // client data cache, and a cache keyed without the row params moves the
+  // address bar while leaving every row on screen.
+  it('narrows the matrix when the row filter is clicked in either comparison mode', () => {
+    cy.viewport(1280, 900);
+
+    for (const [href, attribute, key, sentence] of [
+      ['/overview?compare=30d', 'data-overview-row-scope', 'rows=changed', 'no 30-day change'],
+      [
+        '/overview',
+        'data-overview-hardware-row-scope',
+        'hwrows=priced',
+        'no result on any platform',
+      ],
+    ] as const) {
+      cy.visit(href);
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
+
+      cy.get(`a[${attribute}]`)
+        .should('contain.text', 'Hide ')
+        .invoke('text')
+        .then((label) => {
+          const hidden = Number(/\d+/.exec(label)?.[0]);
+          expect(hidden, `hidden row count in "${label}"`).to.be.greaterThan(0);
+
+          cy.get(`a[${attribute}]`).click();
+          cy.location('search').should('contain', key);
+          cy.get('[data-testid="overview-desktop-model"]').should(
+            'have.length',
+            MATRIX_ROWS - hidden,
+          );
+          // The action label names the click, so it flips once the scope
+          // lands; the chip keeps the short label and the counted sentence
+          // rides the accessible name.
+          cy.get(`a[${attribute}]`)
+            .should('contain.text', 'Show all rows')
+            .and('contain.text', String(hidden))
+            .and('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`);
+        });
+    }
+  });
+
   it('defaults to community engine scope and switches with canonical links preserving tier and locale', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
@@ -655,7 +724,7 @@ describe('Overview page', () => {
     });
 
     desktopModel('GLM-5.2').within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL);
+      expectAgentxScenario(AGENTX_LABEL);
       cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
     });
     cy.get(
@@ -895,9 +964,9 @@ describe('Overview page', () => {
       cy.get('[data-testid="overview-desktop-matrix"]').should('contain.text', label);
     }
     for (const model of ['Kimi-K3', 'GLM-5.2']) {
-      desktopModel(model)
-        .find('[data-testid="overview-model-scenario"]')
-        .should('have.text', AGENTX_LABEL);
+      desktopModel(model).within(() => {
+        expectAgentxScenario(AGENTX_LABEL);
+      });
     }
     for (const model of ['DeepSeek-V4-Pro', 'MiniMax-M3', 'Qwen-3.5-397B-A17B']) {
       desktopModel(model, SINGLE_TURN)
@@ -920,7 +989,7 @@ describe('Overview page', () => {
     });
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL);
+      expectAgentxScenario(AGENTX_LABEL);
       cy.contains('DeepSeek V4 Pro 1.6T').should('exist');
       // Priced from the AgentX rows alone — the single-turn sweep never leaks in.
       cy.get(
@@ -1435,14 +1504,14 @@ describe('Overview page', () => {
         .and('have.attr', 'title', '缺少可比较的 B200 基线');
     });
     desktopModel('GLM-5.2').within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL_ZH);
+      expectAgentxScenario(AGENTX_LABEL_ZH);
       cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
       platform('b300')
         .find('[data-testid="overview-pair-missing"]')
         .should('contain.text', '该场景暂无数据');
     });
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
-      cy.get('[data-testid="overview-model-scenario"]').should('have.text', AGENTX_LABEL_ZH);
+      expectAgentxScenario(AGENTX_LABEL_ZH);
       cy.get(
         '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
       ).should('have.text', '$0.064');

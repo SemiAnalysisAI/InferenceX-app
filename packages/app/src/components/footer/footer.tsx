@@ -26,7 +26,7 @@ const STRINGS = {
     frontend: 'Frontend',
     more: 'More',
     supporters: 'Supporters',
-    datasets: 'Datasets',
+    agentx: 'AgentX',
     articles: 'Articles',
     apiReference: 'API Reference',
     gpuReliability: 'Chip Reliability',
@@ -54,7 +54,7 @@ const STRINGS = {
     frontend: '前端仓库',
     more: '更多',
     supporters: '支持者',
-    datasets: '数据集',
+    agentx: 'AgentX',
     articles: '文章',
     gpuReliability: 'Chip 可靠性',
     apiReference: 'API 参考文档',
@@ -197,12 +197,12 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 {t.supporters}
               </Link>
               <Link
-                data-testid="footer-link-datasets"
-                href={`${prefix}/datasets`}
-                onClick={() => track('footer_datasets_clicked')}
+                data-testid="footer-link-agentx"
+                href={`${prefix}/agentx`}
+                onClick={() => track('footer_agentx_clicked')}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                {t.datasets}
+                {t.agentx}
               </Link>
               <Link
                 data-testid="footer-link-articles"

@@ -619,7 +619,7 @@ export function InferenceProvider({
       // — fall through to the default snap below.
       return;
     }
-    handleSetXAxisMode(kind === 'agentic' ? 'e2e-normalized-interactivity' : 'interactivity');
+    handleSetXAxisMode('interactivity');
   }, [sequenceResolved, effectiveSequence, selectedXAxisMode, handleSetXAxisMode]);
 
   // Reconcile selectedE2eXAxisMetric whenever the mode, sequence kind, or

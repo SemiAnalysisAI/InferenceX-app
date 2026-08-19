@@ -277,7 +277,7 @@ describe('getModelLabel', () => {
     expect(getModelLabel(Model.Qwen3_5)).toBe('Qwen3.5 397B');
     expect(getModelLabel(Model.Kimi_K2_5)).toBe('Kimi K2.5/2.6/2.7-Code 1T');
     expect(getModelLabel(Model.GLM_5)).toBe('GLM5/5.1 744B');
-    expect(getModelLabel(Model.GLM_5_2)).toBe('GLM5.2');
+    expect(getModelLabel(Model.GLM_5_2)).toBe('GLM5.2/GLM5.3');
     expect(getModelLabel(Model.MiniMax_M2_5)).toBe('MiniMax M2.5/2.7 230B');
   });
 
@@ -295,11 +295,11 @@ describe('getSequenceLabel', () => {
     expect(getSequenceLabel(Sequence.OneK_OneK)).toBe('1K / 1K');
     expect(getSequenceLabel(Sequence.OneK_EightK)).toBe('1K / 8K');
     expect(getSequenceLabel(Sequence.EightK_OneK)).toBe('8K / 1K');
-    expect(getSequenceLabel(Sequence.AgenticTraces)).toBe('Agentic Traces');
+    expect(getSequenceLabel(Sequence.AgenticTraces)).toBe('Agentic');
   });
 
   it('returns the Chinese agentic scenario label for the zh locale', () => {
-    expect(getSequenceLabel(Sequence.AgenticTraces, 'zh')).toBe('智能体轨迹');
+    expect(getSequenceLabel(Sequence.AgenticTraces, 'zh')).toBe('智能体');
   });
 
   it('falls back to the sequence value for unknown sequence', () => {

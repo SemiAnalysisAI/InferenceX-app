@@ -2,11 +2,12 @@ import { useState } from 'react';
 
 import {
   ModelSelector,
+  ScenarioSelector,
   SequenceSelector,
   PrecisionSelector,
 } from '@/components/ui/chart-selectors';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { Model } from '@/lib/data-mappings';
+import { Model, Sequence } from '@/lib/data-mappings';
 
 function ModelSelectorHarness() {
   const [value, setValue] = useState('DeepSeek-R1-0528');
@@ -37,6 +38,20 @@ function SequenceSelectorHarness() {
         onChange={setValue}
         availableSequences={['1024_128', '1024_8192', '8192_1024']}
         data-testid="sequence-selector"
+      />
+    </TooltipProvider>
+  );
+}
+
+function ScenarioSelectorHarness({ initial = Sequence.AgenticTraces }: { initial?: Sequence }) {
+  const [value, setValue] = useState<string>(initial);
+  return (
+    <TooltipProvider delayDuration={0}>
+      <ScenarioSelector
+        value={value}
+        onChange={setValue}
+        availableSequences={[Sequence.EightK_OneK, Sequence.AgenticTraces]}
+        data-testid="scenario-selector"
       />
     </TooltipProvider>
   );
@@ -109,6 +124,45 @@ describe('Chart Selectors', () => {
       cy.get('[data-testid="sequence-selector"]').click();
       cy.get('[role="option"]').last().click();
       cy.get('[data-testid="sequence-selector"]').should('not.contain', '1K / 128');
+    });
+  });
+
+  describe('ScenarioSelector', () => {
+    it('labels the agentic scenario "Agentic"', () => {
+      cy.mount(<ScenarioSelectorHarness />);
+      cy.get('[data-testid="scenario-selector"]').should('have.text', 'Agentic');
+      cy.get('[data-testid="scenario-selector"]').click();
+      cy.contains('[role="option"]', 'Agentic').should('be.visible');
+      cy.contains('[role="option"]', 'Agentic Traces').should('not.exist');
+      // The lone agentic entry needs no "Agentic" heading above it.
+      cy.get('[data-slot="select-content"]')
+        .find('[data-slot="select-label"]')
+        .should('not.contain.text', 'Agentic');
+    });
+
+    it('explains the agentic workload in a tooltip that links to /agentx', () => {
+      cy.mount(<ScenarioSelectorHarness />);
+      cy.get('[data-testid="scenario-agentic-info"]').trigger('pointermove', {
+        pointerType: 'mouse',
+      });
+
+      cy.contains('Realistic Long Context Multi Turn Agentic Workload with Sub Agents.').should(
+        'be.visible',
+      );
+      cy.get('[data-testid="scenario-agentic-info-link"]')
+        .should('be.visible')
+        .and('have.attr', 'href', '/agentx');
+    });
+
+    it('hides the agentic explainer on fixed-sequence scenarios', () => {
+      cy.mount(<ScenarioSelectorHarness initial={Sequence.EightK_OneK} />);
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+      cy.get('[data-testid="scenario-agentic-info"]').should('not.exist');
+
+      // ...and appears as soon as the user picks the agentic scenario.
+      cy.get('[data-testid="scenario-selector"]').click();
+      cy.contains('[role="option"]', 'Agentic').click();
+      cy.get('[data-testid="scenario-agentic-info"]').should('exist');
     });
   });
 

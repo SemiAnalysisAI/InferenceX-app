@@ -36,7 +36,14 @@ import {
   listRunArtifacts,
 } from './lib/github-artifacts';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
-import { isBenchmarkPointPurged, isRunAttemptPurged } from './etl/run-overrides';
+import {
+  applyBenchmarkPointBackfill,
+  applyChangelogBackfills,
+  isBenchmarkPointPurged,
+  isRunAttemptPurged,
+  recordBackfilledPointIdentity,
+  validateRunBackfills,
+} from './etl/run-overrides';
 import { createSkipTracker } from './etl/skip-tracker';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices } from './etl/workflow-run';
@@ -67,6 +74,7 @@ import {
   type ChangelogEntry,
   parseChangelogEntries,
   ingestChangelogEntries,
+  hasAppendOnlyFlag,
   hasEvalsOnlyFlag,
 } from './etl/changelog-ingest';
 
@@ -232,6 +240,7 @@ function findJsonFiles(dir: string): string[] {
 // ── Main ────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  validateRunBackfills();
   const tracker = createSkipTracker();
   const configCache = createConfigCache(sql);
   const { getOrCreateConfig, preloadConfigs } = configCache;
@@ -289,6 +298,61 @@ async function main(): Promise<void> {
     ? workflowGhInfo.createdAt.split('T')[0]
     : new Date().toISOString().split('T')[0];
 
+  // Parse changelog metadata before creating the workflow row: append-only is a
+  // run-level curve-selection contract used by the latest-benchmark queries.
+  const changelogDir = path.join(artifactsDir, ARTIFACT_NAMES.changelog);
+  const changelogFiles = findJsonFiles(changelogDir);
+  const parsedChangelogs: {
+    baseRef: string;
+    headRef: string;
+    entries: ChangelogEntry[];
+  }[] = [];
+  for (const file of changelogFiles) {
+    const data = readJson(file) as Record<string, any> | null;
+    if (!data || typeof data !== 'object') continue;
+    const baseRef = String(data.base_ref ?? '');
+    const headRef = String(data.head_ref ?? '');
+    if (!baseRef || !headRef) continue;
+    const entries = parseChangelogEntries(data.entries);
+    if (entries.length > 0) parsedChangelogs.push({ baseRef, headRef, entries });
+  }
+  if (parsedChangelogs.length === 0) {
+    const headRef = workflowGhInfo?.headBranch ?? workflowGhInfo?.headSha ?? `run-${runIdStr}`;
+    // Prefer the workflow's display name: it describes the sweep, while the head
+    // commit message often describes an unrelated code change.
+    const fallbackDescription =
+      workflowGhInfo?.name?.trim() ||
+      workflowGhInfo?.headCommitMessage?.trim().split('\n')[0]?.trim() ||
+      `GitHub Actions run ${runIdStr}`;
+
+    parsedChangelogs.push({
+      baseRef: 'unknown',
+      headRef,
+      entries: [
+        {
+          configKeys: [],
+          description: fallbackDescription,
+          prLink: null,
+          evalsOnly: false,
+          appendOnly: false,
+        },
+      ],
+    });
+    console.log(
+      `  No changelog metadata artifact found; using fallback changelog: ${fallbackDescription}`,
+    );
+  }
+  const { changelogs, backfillIds: changelogBackfillIds } = applyChangelogBackfills(
+    runIdNum,
+    runAttemptNum,
+    parsedChangelogs,
+  );
+  for (const backfillId of changelogBackfillIds) {
+    console.log(`  Applied changelog backfill ${backfillId}`);
+  }
+  const appendOnly = hasAppendOnlyFlag(changelogs);
+  const evalsOnly = hasEvalsOnlyFlag(changelogs);
+
   const workflowRunId = await getOrCreateWorkflowRun({
     githubRunId: runId,
     runAttempt: runAttemptNum,
@@ -300,6 +364,7 @@ async function main(): Promise<void> {
     headSha: workflowGhInfo?.headSha,
     htmlUrl: reusedIngestMetadata?.sourceRunUrl,
     createdAt: workflowGhInfo?.createdAt || triggerGhInfo?.createdAt || new Date().toISOString(),
+    appendOnly,
     ghInfo: workflowGhInfo,
   });
   if (workflowRunId === null) {
@@ -337,49 +402,6 @@ async function main(): Promise<void> {
   const missingDatasets = new Set<string>();
 
   // ── Check for evals-only flag in changelog ────────────────────────────
-  const changelogDir = path.join(artifactsDir, ARTIFACT_NAMES.changelog);
-  const changelogFiles = findJsonFiles(changelogDir);
-  const parsedChangelogs: {
-    baseRef: string;
-    headRef: string;
-    entries: ChangelogEntry[];
-  }[] = [];
-  for (const file of changelogFiles) {
-    const data = readJson(file) as Record<string, any> | null;
-    if (!data || typeof data !== 'object') continue;
-    const baseRef = String(data.base_ref ?? '');
-    const headRef = String(data.head_ref ?? '');
-    if (!baseRef || !headRef) continue;
-    const entries = parseChangelogEntries(data.entries);
-    if (entries.length > 0) parsedChangelogs.push({ baseRef, headRef, entries });
-  }
-  if (parsedChangelogs.length === 0) {
-    const headRef = workflowGhInfo?.headBranch ?? workflowGhInfo?.headSha ?? `run-${runIdStr}`;
-    // Prefer the workflow's display name ("e2e Test - B300 DSv4 AgentX vLLM 1h
-    // + 10m warmup") — it describes the sweep; the head commit message usually
-    // describes an unrelated code change.
-    const fallbackDescription =
-      workflowGhInfo?.name?.trim() ||
-      workflowGhInfo?.headCommitMessage?.trim().split('\n')[0]?.trim() ||
-      `GitHub Actions run ${runIdStr}`;
-
-    parsedChangelogs.push({
-      baseRef: 'unknown',
-      headRef,
-      entries: [
-        {
-          configKeys: [],
-          description: fallbackDescription,
-          prLink: null,
-          evalsOnly: false,
-        },
-      ],
-    });
-    console.log(
-      `  No changelog metadata artifact found; using fallback changelog: ${fallbackDescription}`,
-    );
-  }
-  const evalsOnly = hasEvalsOnlyFlag(parsedChangelogs);
   if (evalsOnly) {
     console.log('\n  ⚠ evals-only run detected — skipping benchmark and stats ingest');
   }
@@ -442,6 +464,7 @@ async function main(): Promise<void> {
     }
 
     const allBmkFiles = [...bmkFiles, ...allBmkDirs.flatMap((d) => findJsonFiles(d))];
+    const seenPointIdentities = new Map<string, string>();
     console.log(`  Found ${allBmkFiles.length} benchmark JSON file(s)`);
 
     for (const [fileIndex, file] of allBmkFiles.entries()) {
@@ -480,28 +503,47 @@ async function main(): Promise<void> {
 
       const toInsert = [];
       for (const row of rows) {
+        let configId: number;
         try {
-          const configId = await getOrCreateConfig(row.config);
-          if (
-            isBenchmarkPointPurged(runIdNum, runAttemptNum, {
-              configId,
-              benchmarkType: row.benchmarkType,
-              isl: row.isl,
-              osl: row.osl,
-              conc: row.conc,
-              offloadMode: row.offloadMode,
-            })
-          ) {
-            console.log(
-              `    skipped purged benchmark point: config ${configId}, ${row.benchmarkType}, ` +
-                `isl ${row.isl}, osl ${row.osl}, conc ${row.conc}, offload ${row.offloadMode}`,
-            );
-            continue;
-          }
-          toInsert.push({ ...row, configId });
+          configId = await getOrCreateConfig(row.config);
         } catch (error: any) {
           tracker.recordDbError(`config for ${path.basename(file)}`, error);
+          continue;
         }
+        if (
+          isBenchmarkPointPurged(runIdNum, runAttemptNum, {
+            configId,
+            benchmarkType: row.benchmarkType,
+            isl: row.isl,
+            osl: row.osl,
+            conc: row.conc,
+            offloadMode: row.offloadMode,
+            recipeFingerprint: row.recipeFingerprint,
+          })
+        ) {
+          console.log(
+            `    skipped purged benchmark point: config ${configId}, ${row.benchmarkType}, ` +
+              `isl ${row.isl}, osl ${row.osl}, conc ${row.conc}, offload ${row.offloadMode}, ` +
+              `recipe ${row.recipeFingerprint ?? 'legacy'}`,
+          );
+          continue;
+        }
+        const applied = applyBenchmarkPointBackfill(runIdNum, runAttemptNum, {
+          ...row,
+          configId,
+        });
+        recordBackfilledPointIdentity(
+          seenPointIdentities,
+          applied.sourceIdentity,
+          applied.desiredIdentity,
+        );
+        if (applied.backfillId) {
+          console.log(
+            `    applied benchmark point backfill ${applied.backfillId}: ` +
+              `config ${configId}, conc ${row.conc}`,
+          );
+        }
+        toInsert.push(applied.point);
       }
       console.log(`    rows with resolved configs: ${toInsert.length}`);
 
@@ -857,7 +899,7 @@ async function main(): Promise<void> {
   // ── Ingest changelog (already parsed above for evals-only check) ─────
 
   console.log('\n--- Changelog ---');
-  for (const { baseRef, headRef, entries } of parsedChangelogs) {
+  for (const { baseRef, headRef, entries } of changelogs) {
     try {
       const written = await ingestChangelogEntries(
         sql,

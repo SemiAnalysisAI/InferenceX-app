@@ -32,6 +32,26 @@ describe('QuotesContent', () => {
     cy.get('button[aria-label^="Jump to"]').should('have.length', uniqueOrgsWithLogo.length);
   });
 
+  it('renders the Mooncake team quote with the KVCache.AI identity', () => {
+    cy.get('#quote-mooncake').within(() => {
+      cy.contains('Mooncake makes KV cache a first-class system resource').should('be.visible');
+      cy.contains('a', 'Mooncake Team')
+        .should('have.attr', 'href', 'https://kvcache.ai/')
+        .and('have.attr', 'target', '_blank');
+      cy.get('img[alt="Mooncake"]')
+        .should('have.attr', 'src', '/logos/kvcache-ai.svg')
+        .and(($logo) => {
+          expect(($logo[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+        });
+    });
+
+    cy.mount(<QuotesContent locale="zh" />);
+    cy.get('#quote-mooncake').should(
+      'contain.text',
+      'Mooncake 将 KV cache 作为分离式 LLM 推理中的一等系统资源',
+    );
+  });
+
   it('scrolls to the matching quote when a logo is clicked', () => {
     const targetOrg = uniqueOrgsWithLogo[0];
 

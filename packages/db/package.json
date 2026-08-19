@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
-    "@noble/ciphers": "^2.2.0",
+    "@noble/ciphers": "^2.3.0",
     "@semianalysisai/inferencex-constants": "workspace:*",
     "postgres": "^3.4.9",
     "stream-chain": "^4.2.5",
@@ -43,7 +43,7 @@
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.2.0",
     "@types/stream-json": "^1.7.8",
     "@vitest/coverage-v8": "^4.1.10",
     "adm-zip": "^0.6.0",
