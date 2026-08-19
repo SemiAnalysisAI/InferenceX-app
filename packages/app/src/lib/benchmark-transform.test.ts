@@ -134,6 +134,7 @@ describe('rowToAggDataEntry', () => {
         metrics: {
           median_itl: 0.000003,
           median_intvty: 333_333,
+          median_tpot: 0.00245,
           median_full_response_itl: 0.005,
           median_full_response_intvty: 200,
           std_full_response_itl: 0.001,
@@ -143,7 +144,10 @@ describe('rowToAggDataEntry', () => {
     );
 
     expect(entry.median_itl).toBe(0.005);
-    expect(entry.median_tpot).toBe(0.005);
+    // The ordinary decode TPOT remains available to table consumers even
+    // though chart interactivity is canonicalized from full-response ITL.
+    expect(entry.median_tpot).toBe(0.00245);
+    expect(entry.median_tpot_intvty).toBe(333_333);
     expect(entry.median_intvty).toBe(200);
     expect(entry.std_itl).toBe(0.001);
     expect(entry.std_intvty).toBe(20);

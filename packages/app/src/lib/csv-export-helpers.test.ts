@@ -64,6 +64,7 @@ describe('inferenceChartToCsv', () => {
     expect(headers).toContain('Mean TTFT (s)');
     expect(headers).toContain('P99 TTFT (s)');
     expect(headers).toContain('Mean Interactivity (tok/s/user)');
+    expect(headers).toContain('P50 Interactivity (tok/s/user)');
     expect(headers).toContain('Mean E2E Latency (s)');
     expect(headers).toContain('Disaggregated');
     expect(headers).toContain('EP');
@@ -71,6 +72,27 @@ describe('inferenceChartToCsv', () => {
     expect(headers).toContain('Run URL');
     expect(rows).toHaveLength(1);
     expect(rows[0]).toHaveLength(headers.length);
+  });
+
+  it('exports P50 interactivity from median TPOT for official and overlay AgentX rows', () => {
+    const official = makePoint({
+      benchmark_type: 'agentic_traces',
+      median_tpot: 0.00245,
+      median_tpot_intvty: 407.50337,
+      median_intvty: 1315.8,
+    });
+    const overlay = makePoint({
+      id: undefined,
+      benchmark_type: 'agentic_traces',
+      median_tpot: 0.00245,
+      median_tpot_intvty: 407.50337,
+      median_intvty: 1312.6527,
+    });
+    const { headers, rows } = inferenceChartToCsv([official], 'MiniMax-M3', 'agentic', [overlay]);
+    const p50Index = headers.indexOf('P50 Interactivity (tok/s/user)');
+
+    expect(rows[0][p50Index]).toBeCloseTo(407.50337, 5);
+    expect(rows[1][p50Index]).toBeCloseTo(407.50337, 5);
   });
 
   it('includes Model, ISL, and OSL columns from model and sequence', () => {

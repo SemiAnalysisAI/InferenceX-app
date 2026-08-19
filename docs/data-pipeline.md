@@ -165,6 +165,14 @@ percentile. Current aggregate artifacts provide the namespaced
 `*_full_response_itl` fields directly. During ingest those fields replace the
 legacy visible-content ITL values in the canonical `*_itl` and `*_intvty` keys.
 
+The inference results table deliberately keeps **P50 Interactivity** on the
+ordinary decode-cadence definition, `1 / median_tpot`. This is the P50 `intvty`
+reported by AIPerf and is distinct from the full-response interactivity used by
+the AgentX chart and its slow-tail percentile selector. CSV exports use the same
+table definition. Ingest preserves AIPerf's unrounded value as
+`median_tpot_intvty`; older rows fall back to `1 / median_tpot`, then to their
+stored `median_intvty` value when TPOT is unavailable.
+
 For artifacts produced before the aggregate field existed, trace-replay ingest
 reconstructs each request's decode interval from the retained lifecycle duration
 minus TTFT, then divides by `output_sequence_length - 1`. The same helper powers

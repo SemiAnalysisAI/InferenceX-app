@@ -76,6 +76,16 @@ function applyAgenticMetricAliases(raw: Record<string, number>): Record<string, 
 /** Convert a DB benchmark row to an AggDataEntry. */
 export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   const isAgentic = row.benchmark_type === 'agentic_traces';
+  const originalMedianInteractivity = row.metrics.median_intvty;
+  const fullResponseMedianInteractivity = row.metrics.median_full_response_intvty;
+  const medianTpotInteractivity =
+    row.metrics.median_tpot_intvty ??
+    (isAgentic &&
+    typeof originalMedianInteractivity === 'number' &&
+    originalMedianInteractivity > 0 &&
+    originalMedianInteractivity !== fullResponseMedianInteractivity
+      ? originalMedianInteractivity
+      : undefined);
   const m = isAgentic ? applyAgenticMetricAliases(row.metrics) : row.metrics;
   // Non-disaggregated multinode artifacts historically stored their one
   // aggregate engine topology in the prefill-shaped fields and left the
@@ -154,6 +164,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     'p99.9_ttft': m['p99.9_ttft'] ?? 0,
     mean_tpot: m.mean_tpot ?? 0,
     median_tpot: m.median_tpot ?? 0,
+    median_tpot_intvty: medianTpotInteractivity,
     std_tpot: m.std_tpot ?? 0,
     p75_tpot: m.p75_tpot ?? 0,
     p90_tpot: m.p90_tpot ?? 0,
