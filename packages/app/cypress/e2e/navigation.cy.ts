@@ -126,6 +126,19 @@ describe('First-load navigation', () => {
         .should('contain.text', 'Methodology Deep Dive')
         .and('have.attr', 'href', '/agentx');
       cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
+      // Editorial order, not alphabetical — see FEATURED_AGENTX_MODEL_SLUGS.
+      cy.get('[data-testid^="compare-agentx-model-"]').then(($rows) => {
+        const slugs = [...$rows].map((row) =>
+          (row.dataset.testid ?? '').replace('compare-agentx-model-', ''),
+        );
+        expect(slugs).to.deep.equal([
+          'kimi-k3',
+          'deepseek-v4',
+          'glm-5-2',
+          'minimax-m3',
+          'qwen-3-5',
+        ]);
+      });
     });
     cy.get('[data-testid="compare-agentx-overview-link"]').click();
     cy.location('pathname').should('eq', '/overview');

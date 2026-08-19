@@ -13,9 +13,9 @@ describe('AgentX comparison links', () => {
     expect(FEATURED_AGENTX_MODELS.map((model) => model.slug)).toEqual([
       'kimi-k3',
       'deepseek-v4',
+      'glm-5-2',
       'minimax-m3',
       'qwen-3-5',
-      'glm-5-2',
     ]);
   });
 
