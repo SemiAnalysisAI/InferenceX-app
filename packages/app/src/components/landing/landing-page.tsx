@@ -67,6 +67,13 @@ const STRINGS = {
   },
 } as const;
 
+/**
+ * Quick Comparisons is hidden for now. The card, its `quickComparisons*`
+ * strings, `CuratedViewCard`, and `FAVORITE_PRESETS` are all left in place —
+ * flip this to `true` to bring the section back.
+ */
+const SHOW_QUICK_COMPARISONS = false;
+
 export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
   const t = STRINGS[locale];
   // Internal links stay within the current language tree.
@@ -167,19 +174,21 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
             </div>
           </Card>
 
-          {/* Right - Curated Presets */}
-          <Card>
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="size-5 shrink-0 text-brand" />
-              <h2 className="text-lg font-semibold">{t.quickComparisons}</h2>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">{t.quickComparisonsDesc}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {FAVORITE_PRESETS.filter((preset) => !preset.hidden).map((preset) => (
-                <CuratedViewCard key={preset.id} preset={preset} />
-              ))}
-            </div>
-          </Card>
+          {/* Right - Curated Presets (temporarily hidden, see SHOW_QUICK_COMPARISONS) */}
+          {SHOW_QUICK_COMPARISONS && (
+            <Card data-testid="landing-quick-comparisons">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="size-5 shrink-0 text-brand" />
+                <h2 className="text-lg font-semibold">{t.quickComparisons}</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">{t.quickComparisonsDesc}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {FAVORITE_PRESETS.filter((preset) => !preset.hidden).map((preset) => (
+                  <CuratedViewCard key={preset.id} preset={preset} />
+                ))}
+              </div>
+            </Card>
+          )}
         </section>
       </div>
     </main>
