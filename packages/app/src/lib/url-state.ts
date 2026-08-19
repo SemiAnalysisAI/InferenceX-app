@@ -23,6 +23,7 @@ const URL_STATE_KEYS = [
   'i_seq',
   'i_prec',
   'i_metric',
+  'i_cost_display',
   'i_pctl',
   'i_xmetric',
   'i_e2e_xmetric',
@@ -96,6 +97,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   // "default") or it would silently revert to the per-model auto default on reload.
   i_prec: '',
   i_metric: 'y_tpPerGpu',
+  i_cost_display: 'tokens-per-dollar',
   i_pctl: 'p90',
   i_xmetric: 'p90_ttft',
   i_e2e_xmetric: 'p90_ttft',

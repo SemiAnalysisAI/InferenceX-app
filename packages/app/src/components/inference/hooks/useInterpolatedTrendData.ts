@@ -2,7 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
-import type { InferenceData, TrendDataPoint, YAxisMetricKey } from '@/components/inference/types';
+import type {
+  CostDisplayMode,
+  InferenceData,
+  TrendDataPoint,
+  YAxisMetricKey,
+} from '@/components/inference/types';
+import { displayTokenCostValue, isTokenCostMetric } from '@/components/inference/cost-display';
 import {
   hermiteInterpolate,
   monotoneSlopes,
@@ -253,6 +259,7 @@ interface UseInterpolatedTrendDataParams {
   selectedSequence: Sequence;
   selectedPrecisions: string[];
   selectedYAxisMetric: string;
+  costDisplayMode: CostDisplayMode;
   targetInteractivity: number;
   availableDates: string[];
   enabled: boolean;
@@ -277,6 +284,7 @@ export function useInterpolatedTrendData({
   selectedSequence,
   selectedPrecisions,
   selectedYAxisMetric,
+  costDisplayMode,
   targetInteractivity,
   enabled,
 }: UseInterpolatedTrendDataParams): UseInterpolatedTrendDataResult {
@@ -336,11 +344,14 @@ export function useInterpolatedTrendData({
           metricKey,
         );
         if (interpolated === null) continue;
+        const displayValue = isTokenCostMetric(selectedYAxisMetric)
+          ? displayTokenCostValue(interpolated, costDisplayMode)
+          : interpolated;
 
         if (!resultMap.has(groupKey)) resultMap.set(groupKey, new Map());
         resultMap.get(groupKey)!.set(date, {
           date,
-          value: interpolated,
+          value: displayValue,
           x: targetInteractivity,
         });
       }
@@ -376,7 +387,7 @@ export function useInterpolatedTrendData({
     }
 
     return { trendLines: lines, hwKeysWithData: keysWithData };
-  }, [dateGroupedData, targetInteractivity, selectedYAxisMetric]);
+  }, [dateGroupedData, targetInteractivity, selectedYAxisMetric, costDisplayMode]);
 
   // Artificial progress that ramps up while the API call is in flight
   const [progress, setProgress] = useState(0);

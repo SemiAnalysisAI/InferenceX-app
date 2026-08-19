@@ -7,7 +7,19 @@
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 
-import type { ChartDefinition, ClippedInferenceData, InferenceData, YAxisMetricKey } from './types';
+import type {
+  ChartDefinition,
+  ClippedInferenceData,
+  CostDisplayMode,
+  InferenceData,
+  YAxisMetricKey,
+} from './types';
+import {
+  applyCostDisplayToChartDefinition,
+  DEFAULT_COST_DISPLAY_MODE,
+  displayTokenCostValue,
+  isTokenCostMetric,
+} from './cost-display';
 
 /**
  * Select the matching unofficial-run overlay for a chart mode. E2E Normalized Interactivity
@@ -142,6 +154,7 @@ export function processOverlayChartData(
     isAgentic?: boolean;
     selectedPercentile?: string;
     restrictToNormalizedFrontier?: boolean;
+    costDisplayMode?: CostDisplayMode;
   },
 ): InferenceData[] {
   return processOverlayChartDataWithClipping(
@@ -166,10 +179,19 @@ export function processOverlayChartDataWithClipping(
     isAgentic?: boolean;
     selectedPercentile?: string;
     restrictToNormalizedFrontier?: boolean;
+    costDisplayMode?: CostDisplayMode;
   },
 ): ProcessedChartData {
-  const chartDef = (chartDefinitions as ChartDefinition[]).find((d) => d.chartType === chartType);
-  if (!chartDef) return { data: [], clippedData: [] };
+  const baseChartDef = (chartDefinitions as ChartDefinition[]).find(
+    (d) => d.chartType === chartType,
+  );
+  if (!baseChartDef) return { data: [], clippedData: [] };
+  const costDisplayMode = options?.costDisplayMode ?? DEFAULT_COST_DISPLAY_MODE;
+  const chartDef = applyCostDisplayToChartDefinition(
+    baseChartDef,
+    selectedYAxisMetric,
+    costDisplayMode,
+  );
 
   const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
   const isAgentic = options?.isAgentic === true;
@@ -189,9 +211,22 @@ export function processOverlayChartDataWithClipping(
   const processedData = data
     .filter((d) => metricKey in d)
     .map((d: InferenceData) => {
-      const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
+      const storedYValue = (d[metricKey] as { y: number })?.y ?? d.y;
+      const yValue = isTokenCostMetric(selectedYAxisMetric)
+        ? displayTokenCostValue(storedYValue, costDisplayMode)
+        : storedYValue;
       const xValue = (d as any)[xAxisField] ?? d.x;
-      return { ...d, x: xValue, y: yValue };
+      return {
+        ...d,
+        ...(isTokenCostMetric(selectedYAxisMetric) && {
+          [metricKey]: {
+            ...(d[metricKey] as { y: number; roof?: boolean }),
+            y: yValue,
+          },
+        }),
+        x: xValue,
+        y: yValue,
+      };
     });
 
   // The normalized metric is derived from persisted request traces, which an

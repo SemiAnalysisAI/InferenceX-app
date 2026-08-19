@@ -51,13 +51,15 @@ describe('URL Parameter Persistence', () => {
 
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
-        'Cost per Million Total Tokens (Owning - Hyperscaler)',
+        'Total Token Cost (Owning - Hyperscaler)',
       );
+
+      cy.get('[data-testid="cost-display-selector"]').should('contain.text', 'Tokens per $1');
 
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg text[transform="rotate(-90)"]')
-        .should('have.text', 'Cost per Million Total Tokens ($)');
+        .should('have.text', 'Total Tokens per $1 (tok/$)');
     });
 
     it('changing Y-axis metric via dropdown updates SVG axis label', () => {
@@ -69,14 +71,27 @@ describe('URL Parameter Persistence', () => {
         .should('contain.text', 'Throughput');
 
       cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-      cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').click({
+      cy.contains('[role="option"]', 'Total Token Cost (Owning - Hyperscaler)').click({
         force: true,
       });
 
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg text[transform="rotate(-90)"]')
-        .should('have.text', 'Cost per Million Total Tokens ($)');
+        .should('have.text', 'Total Tokens per $1 (tok/$)');
+    });
+
+    it('cost display URL param and dropdown switch to cost per million tokens', () => {
+      visitWithDismissedModal('/inference?i_metric=y_costh&i_cost_display=cost-per-million');
+
+      cy.get('[data-testid="cost-display-selector"]').should(
+        'contain.text',
+        'Cost per Million Tokens',
+      );
+      cy.get('[data-testid="scatter-graph"]')
+        .first()
+        .find('svg text[transform="rotate(-90)"]')
+        .should('have.text', 'Cost per Million Total Tokens ($/M tok)');
     });
 
     it('selecting a Y-axis metric updates the displayed value', () => {

@@ -85,6 +85,9 @@ const availability = [
 const visitOverflowChart = (withOverlay: boolean) => {
   cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', { body: rows(null) }).as('benchmarks');
+  cy.intercept('GET', '/api/v1/workflow-info*', {
+    body: { runs: [], changelogs: [], configs: [] },
+  }).as('workflowInfo');
   if (withOverlay) {
     cy.intercept('GET', '/api/unofficial-run*', {
       body: {
@@ -109,7 +112,7 @@ const visitOverflowChart = (withOverlay: boolean) => {
 
   const overlayParam = withOverlay ? `&unofficialrun=${OVERLAY_RUN_ID}` : '';
   cy.visit(
-    `/inference?g_model=${MODEL_DISPLAY}&g_rundate=${RUN_DATE}&i_seq=8k%2F1k&i_metric=y_costh&i_xmode=ttft&i_optimal=0${overlayParam}`,
+    `/inference?g_model=${MODEL_DISPLAY}&g_rundate=${RUN_DATE}&i_seq=8k%2F1k&i_metric=y_costh&i_cost_display=cost-per-million&i_xmode=ttft&i_optimal=0${overlayParam}`,
     {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));

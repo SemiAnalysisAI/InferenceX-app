@@ -92,6 +92,20 @@ describe('MetricAssumptionNotes', () => {
     );
   });
 
+  it('describes the reciprocal cost view when cost per million is selected', () => {
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costhOutput"
+        costDisplayMode="cost-per-million"
+      />,
+    );
+
+    expect(getVisibleCaveatText()).toContain(
+      'calculate cost per million tokens per decode chip or per prefill chip',
+    );
+    expect(getVisibleCaveatText()).toContain('token cost comparison');
+  });
+
   // The prefill/decode split only skews per-token-type purchasing power; the
   // total-token metric divides by the whole chip count, exactly as an aggregated
   // config does, so it must not carry the caveat.

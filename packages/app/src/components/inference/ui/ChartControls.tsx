@@ -27,7 +27,13 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
-import type { ChartDefinition, DeploymentMode, SpecMode } from '@/components/inference/types';
+import type {
+  ChartDefinition,
+  CostDisplayMode,
+  DeploymentMode,
+  SpecMode,
+} from '@/components/inference/types';
+import { isTokenCostMetric, tokenCostMetricTitle } from '@/components/inference/cost-display';
 import { resolveComparisonEntries } from '@/components/inference/utils/comparisonEntry';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
@@ -37,7 +43,12 @@ const STRINGS = {
   en: {
     yAxisMetric: 'Y-Axis Metric',
     yAxisMetricTooltip:
-      "The performance metric displayed on the chart's Y-axis. Options include throughput (tokens/sec), tokens purchasable per $1, and custom user-defined values.",
+      "The performance metric displayed on the chart's Y-axis. Cost metrics use the separate Cost Display control to choose their unit.",
+    costDisplay: 'Cost Display',
+    costDisplayTooltip:
+      'Show token cost as how many tokens $1 can buy or as the cost of one million tokens.',
+    tokensPerDollar: 'Tokens per $1',
+    costPerMillion: 'Cost per Million Tokens',
     xAxisMetric: 'X-Axis Metric',
     xAxisMetricTooltip:
       "The latency metric displayed on the chart's X-axis: P90 Time To First Token.",
@@ -69,8 +80,11 @@ const STRINGS = {
   },
   zh: {
     yAxisMetric: 'Y 轴指标',
-    yAxisMetricTooltip:
-      '图表 Y 轴显示的性能指标。包括吞吐量（token/秒）、每 1 美元可购买的 token 数以及自定义用户值。',
+    yAxisMetricTooltip: '图表 Y 轴显示的性能指标。成本指标可通过单独的成本显示控件选择单位。',
+    costDisplay: '成本显示',
+    costDisplayTooltip: '将 token 成本显示为每 1 美元可购买的 token 数或每百万 token 成本。',
+    tokensPerDollar: '每 1 美元可购买的 token 数',
+    costPerMillion: '每百万 token 成本',
     xAxisMetric: 'X 轴指标',
     xAxisMetricTooltip: '图表 X 轴显示的延迟指标：P90 Time To First Token。',
     xAxisScale: 'X 轴刻度',
@@ -128,18 +142,18 @@ const METRIC_GROUPS: {
     ],
   },
   {
-    label: 'Total Tokens per $1',
-    labelZh: '每 1 美元可购买的总 token 数',
+    label: 'Total Token Cost',
+    labelZh: '总 token 成本',
     metrics: ['y_costh', 'y_costn', 'y_costr'],
   },
   {
-    label: 'Output Tokens per $1',
-    labelZh: '每 1 美元可购买的输出 token 数',
+    label: 'Output Token Cost',
+    labelZh: '输出 token 成本',
     metrics: ['y_costhOutput', 'y_costnOutput', 'y_costrOutput'],
   },
   {
-    label: 'Input Tokens per $1',
-    labelZh: '每 1 美元可购买的输入 token 数',
+    label: 'Input Token Cost',
+    labelZh: '输入 token 成本',
     metrics: ['y_costhi', 'y_costni', 'y_costri'],
   },
   {
@@ -238,6 +252,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     setSelectedPrecisions,
     selectedYAxisMetric,
     setSelectedYAxisMetric,
+    costDisplayMode,
+    setCostDisplayMode,
     selectedPercentile,
     setSelectedPercentile,
     graphs,
@@ -288,6 +304,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             .map((m) => ({
               value: m,
               label:
+                tokenCostMetricTitle(m, locale) ??
                 (locale === 'zh' ? METRIC_TITLE_ZH_MAP.get(m) : undefined) ??
                 METRIC_TITLE_MAP.get(m)!,
             })),
@@ -342,6 +359,11 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
       metric_group: metricGroupMap.get(value) ?? 'Unknown',
     });
     setTimeout(trackCombinedFilters, 0);
+  };
+
+  const handleCostDisplayModeChange = (value: CostDisplayMode) => {
+    setCostDisplayMode(value);
+    track('inference_cost_display_selected', { mode: value });
   };
 
   const handleGPUChange = (value: string[]) => {
@@ -528,6 +550,29 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
               clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
             />
           </div>
+
+          {mounted && isTokenCostMetric(selectedYAxisMetric) && (
+            <div className="flex flex-col space-y-1.5 lg:col-span-1">
+              <LabelWithTooltip
+                htmlFor="cost-display-select"
+                label={t.costDisplay}
+                tooltip={t.costDisplayTooltip}
+              />
+              <Select onValueChange={handleCostDisplayModeChange} value={costDisplayMode}>
+                <SelectTrigger
+                  id="cost-display-select"
+                  data-testid="cost-display-selector"
+                  className="w-full"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent portalled={false}>
+                  <SelectItem value="tokens-per-dollar">{t.tokensPerDollar}</SelectItem>
+                  <SelectItem value="cost-per-million">{t.costPerMillion}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
             isInputMetric &&

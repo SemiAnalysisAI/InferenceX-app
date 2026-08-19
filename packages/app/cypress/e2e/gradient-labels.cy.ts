@@ -112,6 +112,11 @@ const selectMetricAndEnableGradient = (metricLabel: string) => {
   cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
 };
 
+const selectCostPerMillion = () => {
+  cy.get('[data-testid="cost-display-selector"]').click({ force: true });
+  cy.contains('[role="option"]', 'Cost per Million Tokens').click({ force: true });
+};
+
 describe('Gradient Labels with non-default Y-axis metrics', () => {
   // Regression tests: gradient labels must render SVG linearGradient defs
   // for metrics that use paretoFrontLowerRight (cost, energy).
@@ -127,7 +132,8 @@ describe('Gradient Labels with non-default Y-axis metrics', () => {
   });
 
   it('gradient defs render for cost metric (lower_right roofline)', () => {
-    selectMetricAndEnableGradient('Cost per Million Total Tokens (Owning - Hyperscaler)');
+    selectMetricAndEnableGradient('Total Token Cost (Owning - Hyperscaler)');
+    selectCostPerMillion();
 
     // SVG must contain at least one linearGradient used for roofline coloring
     cy.get(
@@ -156,7 +162,8 @@ describe('Gradient Labels with non-default Y-axis metrics', () => {
 
   it('pill labels render for cost metric', () => {
     cy.get('#scatter-gradient-labels').click();
-    selectMetricAndEnableGradient('Cost per Million Total Tokens (Owning - Hyperscaler)');
+    selectMetricAndEnableGradient('Total Token Cost (Owning - Hyperscaler)');
+    selectCostPerMillion();
 
     // Parallelism pill labels should be present
     cy.get('[data-testid="scatter-graph"] svg g.parallelism-label').should(

@@ -1,7 +1,7 @@
 const selectCustomCostMetric = () => {
   cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
   cy.get('[role="option"]')
-    .contains('Cost per Million Total Tokens (Custom User Values)')
+    .contains('Total Token Cost (Custom User Values)')
     .click({ force: true });
 };
 
@@ -24,7 +24,7 @@ describe('Custom User Values', () => {
   describe('Custom Chip Costs', () => {
     it('renders the custom costs input section when custom cost metric is selected', () => {
       selectCustomCostMetric();
-      cy.get('[data-testid="custom-costs-section"]').should('be.visible');
+      cy.get('[data-testid="custom-costs-section"]').scrollIntoView().should('be.visible');
       cy.get('[data-testid="custom-costs-section"]').should('contain.text', 'Custom Chip Costs');
     });
 
@@ -98,7 +98,7 @@ describe('Custom User Values', () => {
   describe('Custom Chip Powers', () => {
     it('renders the custom powers input section when custom power metric is selected', () => {
       selectCustomPowerMetric();
-      cy.get('[data-testid="custom-powers-section"]').should('be.visible');
+      cy.get('[data-testid="custom-powers-section"]').scrollIntoView().should('be.visible');
       cy.get('[data-testid="custom-powers-section"]').should('contain.text', 'Custom Chip Powers');
     });
 

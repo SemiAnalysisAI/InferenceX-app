@@ -16,6 +16,11 @@ import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { getHardwareConfig } from '@/lib/constants';
+import {
+  applyCostDisplayToChartDefinition,
+  displayTokenCostValue,
+  isTokenCostMetric,
+} from '@/components/inference/cost-display';
 
 import ScatterGraph from './ScatterGraph';
 
@@ -27,6 +32,7 @@ export function UnofficialChartDisplay() {
     selectedSequence,
     selectedPrecisions,
     selectedYAxisMetric,
+    costDisplayMode,
     setSelectedModel,
     setSelectedSequence,
   } = useInference();
@@ -73,7 +79,12 @@ export function UnofficialChartDisplay() {
 
     const chartData = unofficialChartData[dataKey];
 
-    return (chartDefinitions as ChartDefinition[]).map((chartDef) => {
+    return (chartDefinitions as ChartDefinition[]).map((baseChartDef) => {
+      const chartDef = applyCostDisplayToChartDefinition(
+        baseChartDef,
+        selectedYAxisMetric,
+        costDisplayMode,
+      );
       const dataForChart = chartDef.chartType === 'e2e' ? chartData.e2e : chartData.interactivity;
 
       const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
@@ -81,11 +92,20 @@ export function UnofficialChartDisplay() {
       const processedData =
         dataForChart.data.length > 0 && metricKey in dataForChart.data[0]
           ? dataForChart.data.map((d: InferenceData) => {
-              const yValue = (d[metricKey] as { y: number })?.y || d.y;
+              const storedYValue = (d[metricKey] as { y: number })?.y || d.y;
+              const yValue = isTokenCostMetric(selectedYAxisMetric)
+                ? displayTokenCostValue(storedYValue, costDisplayMode)
+                : storedYValue;
               const roof = (d[metricKey] as { roof: boolean })?.roof ?? false;
 
               return {
                 ...d,
+                ...(isTokenCostMetric(selectedYAxisMetric) && {
+                  [metricKey]: {
+                    ...(d[metricKey] as { y: number; roof?: boolean }),
+                    y: yValue,
+                  },
+                }),
                 y: yValue,
                 roof,
               };
@@ -111,7 +131,14 @@ export function UnofficialChartDisplay() {
         ),
       };
     });
-  }, [unofficialChartData, dataKey, selectedYAxisMetric, selectedModel, selectedSequence]);
+  }, [
+    unofficialChartData,
+    dataKey,
+    selectedYAxisMetric,
+    costDisplayMode,
+    selectedModel,
+    selectedSequence,
+  ]);
 
   if (loading) {
     return (

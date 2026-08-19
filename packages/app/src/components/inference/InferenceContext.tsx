@@ -22,7 +22,11 @@ import {
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import type { InferenceChartContextType, InferenceData } from '@/components/inference/types';
+import type {
+  CostDisplayMode,
+  InferenceChartContextType,
+  InferenceData,
+} from '@/components/inference/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -55,6 +59,7 @@ import {
   type ExclusionConflictPolicy,
 } from '@/lib/exclusion';
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
+import { parseCostDisplayMode } from './cost-display';
 
 import {
   isAgenticOnlyXAxisMode,
@@ -236,6 +241,9 @@ export function InferenceProvider({
   }, [selectedGpuResolution, setUrlParam]);
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(
     () => getUrlParam('i_metric') || initialYAxisMetric || 'y_tpPerGpu',
+  );
+  const [costDisplayMode, setCostDisplayMode] = useState<CostDisplayMode>(() =>
+    parseCostDisplayMode(getUrlParam('i_cost_display')),
   );
   const [selectedXAxisMetric, setSelectedXAxisMetric] = useState<string | null>(
     () => getUrlParam('i_xmetric') || 'p90_ttft',
@@ -484,6 +492,7 @@ export function InferenceProvider({
     effectiveSequence,
     effectivePrecisions,
     selectedYAxisMetric,
+    costDisplayMode,
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
     selectedGPUs,
@@ -1285,6 +1294,7 @@ export function InferenceProvider({
   useUrlStateSync(
     {
       i_metric: selectedYAxisMetric,
+      i_cost_display: costDisplayMode,
       i_pctl: selectedPercentile,
       i_gpus: selectedGPUs.join(','),
       i_dates: selectedDates.join(','),
@@ -1313,6 +1323,7 @@ export function InferenceProvider({
     },
     [
       selectedYAxisMetric,
+      costDisplayMode,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedXAxisMode,
@@ -1503,6 +1514,8 @@ export function InferenceProvider({
       workflowInfo,
       selectedYAxisMetric,
       setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
+      costDisplayMode,
+      setCostDisplayMode,
       selectedPercentile,
       setSelectedPercentile,
       selectedGPUs,
@@ -1569,6 +1582,7 @@ export function InferenceProvider({
       effectiveSequence,
       effectivePrecisions,
       selectedYAxisMetric,
+      costDisplayMode,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedXAxisMode,

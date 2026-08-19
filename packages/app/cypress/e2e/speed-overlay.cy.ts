@@ -37,11 +37,16 @@ describe('Bus / Race Car Speed Overlay', () => {
     cy.get('[data-testid="speed-overlay-car"]').should('have.attr', 'data-corner', 'bottom-right');
   });
 
-  it('switching to a cost metric flips the bus to bottom-left, car to top-right', () => {
+  it('tokens per dollar keeps the upper corner; cost per million flips it lower', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
     cy.get('[role="option"]')
-      .contains('Cost per Million Total Tokens (Owning - Hyperscaler)')
+      .contains('Total Token Cost (Owning - Hyperscaler)')
       .click({ force: true });
+    cy.get('[data-testid="speed-overlay-bus"]').should('have.attr', 'data-corner', 'top-left');
+    cy.get('[data-testid="speed-overlay-car"]').should('have.attr', 'data-corner', 'bottom-right');
+
+    cy.get('[data-testid="cost-display-selector"]').click({ force: true });
+    cy.contains('[role="option"]', 'Cost per Million Tokens').click({ force: true });
     cy.get('[data-testid="speed-overlay-bus"]').should('have.attr', 'data-corner', 'bottom-left');
     cy.get('[data-testid="speed-overlay-car"]').should('have.attr', 'data-corner', 'top-right');
   });
@@ -193,7 +198,7 @@ describe('Y-Axis Metric Search', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
     cy.get('[data-slot="select-content"]')
       .find('input[placeholder="Search..."]')
-      .type('cost per million total');
+      .type('total token cost');
     cy.get('[data-slot="select-content"]')
       .find('[role="option"]')
       .contains('3 Year Rental')

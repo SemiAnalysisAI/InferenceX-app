@@ -317,6 +317,17 @@ describe('processOverlayChartData', () => {
     expect(result.map((point) => point.y)).toEqual([500_000, 2_000_000]);
   });
 
+  it('renders unofficial-run cost per million as the reciprocal of tokens per dollar', () => {
+    const data = [pt({ costh: { y: 2_000_000, roof: false }, median_intvty: 20 } as any)];
+    const result = processOverlayChartData(data, 'interactivity', 'y_costh', null, {
+      costDisplayMode: 'cost-per-million',
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].y).toBe(0.5);
+    expect(result[0].costh.y).toBe(0.5);
+  });
+
   it('does not classify unofficial-run purchasing-power points as cost overflows', () => {
     const visible = pt({
       costh: { y: 500_000, roof: false },

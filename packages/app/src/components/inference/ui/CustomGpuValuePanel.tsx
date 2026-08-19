@@ -60,9 +60,9 @@ const PANEL_CONFIG: Record<
     title: 'Custom Chip Costs',
     titleZh: '自定义 Chip 成本',
     description:
-      'Enter your own TCO (Total Cost of Ownership) values for each chip in $/chip/hr. These values determine how many tokens $1 can buy.',
+      'Enter your own TCO (Total Cost of Ownership) values for each chip in $/chip/hr. These values determine the selected token cost metric.',
     descriptionZh:
-      '输入每个 Chip 的自定义 TCO（总拥有成本），单位为 $/chip/hr。这些值用于计算每 1 美元可购买的 token 数。',
+      '输入每个 Chip 的自定义 TCO（总拥有成本），单位为 $/chip/hr。这些值用于计算所选 token 成本指标。',
     sectionTestId: 'custom-costs-section',
     calculateTestId: 'custom-costs-calculate',
     inputIdPrefix: 'cost-input',

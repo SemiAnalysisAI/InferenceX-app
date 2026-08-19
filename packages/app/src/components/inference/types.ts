@@ -392,6 +392,7 @@ export type YAxisMetricKey =
  * @property {'up' | 'down'} roofline - Specifies the direction of the roofline calculation (e.g., "up" for higher is better, "down" for lower is better).
  */
 export type InferenceChartType = 'e2e' | 'interactivity';
+export type CostDisplayMode = 'tokens-per-dollar' | 'cost-per-million';
 
 export interface ChartDefinition {
   [key: string]: string | number | undefined;
@@ -812,6 +813,8 @@ export interface InferenceChartContextType {
   workflowInfo: any;
   selectedYAxisMetric: string;
   setSelectedYAxisMetric: (metric: string) => void;
+  costDisplayMode: CostDisplayMode;
+  setCostDisplayMode: (mode: CostDisplayMode) => void;
   /** Latency percentile for the x-axis under agentic scenarios (median/p90/p99/p99.9). */
   selectedPercentile: string;
   setSelectedPercentile: (p: string) => void;

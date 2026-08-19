@@ -8,6 +8,7 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { ShareButton } from '@/components/ui/share-button';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { useLocale } from '@/lib/use-locale';
+import type { CostDisplayMode } from '@/components/inference/types';
 import type { Locale } from '@/lib/i18n';
 
 // Keep these metric-key groups in sync with chart-utils/chart configs when new source-backed
@@ -138,10 +139,12 @@ export function ChartShareActions() {
 
 export function MetricAssumptionNotes({
   selectedYAxisMetric,
+  costDisplayMode = 'tokens-per-dollar',
   includeAllPowerThroughputMetrics = true,
   includePowerThroughputCaveat = true,
 }: {
   selectedYAxisMetric: string;
+  costDisplayMode?: CostDisplayMode;
   // Historical trends only annotates y_tpPerMw and intentionally omits per-MW caveats to preserve
   // the tab's existing caption contract while sharing the same helper as inference.
   includeAllPowerThroughputMetrics?: boolean;
@@ -197,8 +200,10 @@ export function MetricAssumptionNotes({
       )}
       <DisaggCaveat
         visible={showCostCaveat}
-        calculationNoun="tokens per $1"
-        comparisonNoun="purchasing power"
+        calculationNoun={
+          costDisplayMode === 'tokens-per-dollar' ? 'tokens per $1' : 'cost per million tokens'
+        }
+        comparisonNoun={costDisplayMode === 'tokens-per-dollar' ? 'purchasing power' : 'token cost'}
         locale={locale}
       />
       <DisaggCaveat
