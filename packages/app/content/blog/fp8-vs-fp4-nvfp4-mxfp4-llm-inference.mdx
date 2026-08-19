@@ -1,0 +1,227 @@
+---
+title: 'FP8 vs FP4 vs NVFP4 vs MXFP4 for LLM Inference'
+subtitle: 'How 8-bit floats, 4-bit elements, block scales, storage overhead, hardware support, and model quality differ in production LLM serving'
+seoDescription: 'FP8, FP4, NVFP4, and MXFP4 compared: bit layouts, block scaling, memory cost, hardware support, accuracy, and deployment trade-offs.'
+date: '2026-08-19'
+publishDate: '2026-08-19'
+tags:
+  - inference
+  - quantization
+  - fp8
+  - fp4
+  - nvfp4
+  - mxfp4
+  - gpu
+  - nvidia
+  - amd
+  - blackwell
+---
+
+FP8 and FP4 are often presented as two rungs on a simple precision ladder: FP4 is half the bits, therefore twice the speed. Real LLM inference is not that simple. **FP8 names an element format, generic FP4 is incomplete without a scaling recipe, and MXFP4 and NVFP4 use the same E2M1 4-bit values with materially different block scales.** Those choices change memory footprint, quantization error, portability, and which GPU kernels can execute the model efficiently.
+
+The short version is:
+
+- **FP8** is the mature, higher-fidelity baseline. E4M3 is common for inference; E5M2 trades precision for greater range.
+- **FP4** usually means an E2M1 element, but “FP4” alone does not tell you how values are scaled or accumulated.
+- **MXFP4** is the vendor-neutral Open Compute Project (OCP) microscaling recipe: 32 E2M1 values share one E8M0 power-of-two scale.
+- **NVFP4** uses finer-grained scaling: 16 E2M1 values share an FP8 E4M3 scale, combined with one FP32 scale for the tensor.
+- A native FP4 matrix path can offer roughly twice FP8's peak arithmetic rate and about half the weight traffic, but **it does not guarantee twice the end-to-end tokens per second**.
+
+This guide separates the datatype from the quantization recipe, works through the storage math, and explains which format fits which inference deployment.
+
+## FP8 vs FP4 vs MXFP4 vs NVFP4 at a glance
+
+| Format           | Element encoding                    | Shared scaling                                      | Canonical group size |                               Nominal storage | Main advantage                               | Main trade-off                                    |
+| ---------------- | ----------------------------------- | --------------------------------------------------- | -------------------: | --------------------------------------------: | -------------------------------------------- | ------------------------------------------------- |
+| FP8 E4M3         | 1 sign, 4 exponent, 3 mantissa bits | Recipe-dependent; often tensor or block scaling     |               Varies |              8 bits/value plus scale overhead | Mature support and better numerical fidelity | Roughly twice the element storage of FP4          |
+| FP8 E5M2         | 1 sign, 5 exponent, 2 mantissa bits | Recipe-dependent                                    |               Varies |              8 bits/value plus scale overhead | Much wider range than E4M3                   | Less precision around each exponent               |
+| Generic FP4 E2M1 | 1 sign, 2 exponent, 1 mantissa bit  | Not specified by the datatype                       |        Not specified |                   4 bits/value before scaling | Small payload                                | Not a complete deployment recipe                  |
+| MXFP4            | FP4 E2M1                            | One E8M0 power-of-two scale                         |            32 values |                               4.25 bits/value | Open, portable microscaling format           | Larger group and coarse scale can increase error  |
+| NVFP4            | FP4 E2M1                            | One E4M3 scale per block plus one FP32 tensor scale |            16 values | 4.5 bits/value plus an amortized tensor scale | Finer, non-power-of-two local scaling        | NVIDIA-specific recipe and slightly more metadata |
+
+The storage values above describe canonical one-dimensional block layouts. A framework may use a different layout for weights, activations, or transposes. For example, NVIDIA Transformer Engine also documents two-dimensional 16×16 scaling for NVFP4 weights during training. Always inspect the actual checkpoint and kernel recipe rather than relying on the four-character precision label.
+
+## The element formats: E4M3, E5M2, and E2M1
+
+Floating-point names describe how a fixed number of bits is divided. “E4M3” means four exponent bits and three mantissa bits, plus one sign bit. “E2M1” means two exponent bits, one mantissa bit, and one sign bit.
+
+<Figure
+  src="/images/fp8-vs-fp4-nvfp4-mxfp4/fp8-fp4-bit-layout-comparison.png"
+  alt="Bit-layout comparison for FP8 E4M3, FP8 E5M2, and FP4 E2M1 showing the sign, exponent, and mantissa cells in each format"
+  caption="Bit layouts used by FP8 and FP4 inference recipes. Sources: [FP8 Formats for Deep Learning](https://arxiv.org/abs/2209.05433) and [NVIDIA Transformer Engine NVFP4 documentation](https://docs.nvidia.com/deeplearning/transformer-engine/user-guide/features/low_precision_training/nvfp4/nvfp4.html)."
+/>
+
+### FP8 E4M3: the usual inference-oriented FP8
+
+FP8 E4M3 allocates more bits to the mantissa than E5M2, giving it more closely spaced representable values at a given magnitude. Its maximum finite magnitude is approximately 448. That range is far smaller than BF16 or FP16, so an inference stack normally scales tensors or blocks before converting them to E4M3.
+
+For weights and forward activations, E4M3 is often the practical FP8 choice: the model usually benefits more from the extra precision than from E5M2's enormous range. But the phrase “an FP8 model” is still incomplete. Per-tensor scaling, per-channel scaling, block scaling, calibration method, outlier handling, accumulator precision, and which layers remain in BF16 can all change quality and performance.
+
+### FP8 E5M2: more range, fewer significant bits
+
+FP8 E5M2 reaches approximately 57,344 in magnitude but has only two mantissa bits. That makes it useful where range is more important than fine spacing—gradients during training are the classic example. An inference checkpoint labeled only “FP8” is therefore worth interrogating: E4M3 and E5M2 are not interchangeable encodings.
+
+### FP4 E2M1: only 16 encodings before scaling
+
+The E2M1 element has one sign bit, two exponent bits, and one mantissa bit. Before a shared scale is applied, its non-negative magnitudes are only 0, 0.5, 1, 1.5, 2, 3, 4, and 6. The negative encodings mirror the positive values.
+
+This tiny codebook is why the scale matters so much. One scale maps those values onto the local magnitude of a weight or activation block. A poor scale wastes codes or clips outliers; a well-chosen scale lets the same 4-bit element approximate a useful local distribution.
+
+That leads to the most important terminology rule in this article: **FP4 E2M1 is an element datatype; MXFP4 and NVFP4 are quantization recipes around that datatype.**
+
+## MXFP4: 32 values share an E8M0 scale
+
+[MXFP4](https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf) is part of the OCP Microscaling Formats specification. A canonical MXFP4 block contains:
+
+- 32 FP4 E2M1 elements; and
+- one 8-bit E8M0 scale shared by the block.
+
+E8M0 has an exponent but no mantissa, so its scale is a power of two. Multiplication by a power of two is hardware-friendly, and the OCP specification gives accelerator and software vendors one interoperable layout. AMD CDNA 4 exposes native MXFP4 matrix performance, and NVIDIA's newer stacks also support microscaling formats. OpenAI's `gpt-oss` checkpoints demonstrate the portability benefit in practice: their MoE weights ship natively in MXFP4.
+
+The numerical cost is that 32 values—potentially including an outlier and many much smaller neighbors—must agree on one coarse scale. The values retain their individual E2M1 exponents, but the shared block scale cannot land between powers of two.
+
+## NVFP4: smaller blocks and a richer scale
+
+[NVFP4](https://developer.nvidia.com/blog/introducing-nvfp4-for-efficient-and-accurate-low-precision-inference/) also stores E2M1 values, but its hierarchy is different:
+
+$$
+x = x_{E2M1} \times s_{E4M3} \times s_{FP32}
+$$
+
+For the documented one-dimensional recipe:
+
+- 16 consecutive FP4 values share a local FP8 E4M3 scale;
+- the E4M3 scale can represent values between powers of two; and
+- one FP32 global scale aligns the full tensor with the combined E4M3 × E2M1 range.
+
+<Figure
+  src="/images/fp8-vs-fp4-nvfp4-mxfp4/mxfp4-vs-nvfp4-block-scaling.png"
+  alt="MXFP4 versus NVFP4 block-scaling diagram: MXFP4 shares one E8M0 power-of-two scale across 32 FP4 values, while NVFP4 uses an E4M3 scale for each 16-value block and one FP32 scale per tensor"
+  caption="Canonical one-dimensional scaling granularity for MXFP4 and NVFP4. Sources: [OCP MX specification](https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf) and [NVIDIA NVFP4 documentation](https://docs.nvidia.com/deeplearning/transformer-engine/user-guide/features/low_precision_training/nvfp4/nvfp4.html)."
+/>
+
+NVFP4 therefore spends more metadata to fit each local distribution more closely. Compared with MXFP4, it halves the one-dimensional group size and upgrades the group scale from exponent-only E8M0 to E4M3. This generally reduces quantization error, but it is not a universal accuracy guarantee: calibration, layer sensitivity, activation outliers, model architecture, and the quantizer implementation still matter.
+
+NVFP4 is also a recipe tied to NVIDIA's Blackwell-era software and hardware path. If a model must move unchanged across accelerator vendors, MXFP4's open specification can be the more attractive contract even when NVFP4 provides a finer local fit on supported NVIDIA GPUs.
+
+## How much memory does each format actually use?
+
+“FP4 uses half the memory of FP8” is directionally right for element payloads, but block scales make the exact ratio less tidy.
+
+For 64 values in a canonical one-dimensional layout:
+
+- FP8 payload: `64 × 8 = 512` bits, before any recipe-specific scale metadata.
+- Bare FP4 elements: `64 × 4 = 256` bits, but this is not yet a complete quantization recipe.
+- MXFP4: `256 + (2 × 8) = 272` bits, or 4.25 bits/value.
+- NVFP4: `256 + (4 × 8) = 288` bits, or 4.5 bits/value, plus one FP32 global scale amortized across the tensor.
+
+<Figure
+  src="/images/fp8-vs-fp4-nvfp4-mxfp4/fp8-fp4-storage-comparison.png"
+  alt="Storage comparison for 64 values: FP8 uses 512 payload bits, bare FP4 uses 256 bits before scaling, MXFP4 uses 272 bits with block scales, and NVFP4 uses 288 bits plus one amortized FP32 tensor scale"
+  caption="Canonical storage calculation for 64 values. MXFP4 uses two E8M0 block scales; one-dimensional NVFP4 uses four E4M3 block scales plus one global FP32 tensor scale amortized over the tensor."
+/>
+
+At one trillion parameters, those idealized weight payloads are approximately:
+
+| Weight format                    | Idealized storage for 1T parameters |
+| -------------------------------- | ----------------------------------: |
+| FP8 elements                     |                             1.00 TB |
+| FP4 elements before scales       |                             0.50 TB |
+| MXFP4                            |                            0.531 TB |
+| One-dimensional NVFP4 block data |      0.563 TB plus one tensor scale |
+
+An actual checkpoint is larger. Embeddings, normalization weights, attention layers, metadata, alignment padding, and sensitive tensors may remain at higher precision. During serving, the GPU also needs KV cache, activations, communication buffers, CUDA or ROCm workspaces, and the inference engine itself. Quantizing weights does not make all of those allocations disappear.
+
+## Does FP4 make inference twice as fast as FP8?
+
+Sometimes the relevant kernel can approach that ratio. The end-to-end server usually cannot.
+
+Native 4-bit matrix hardware can process more elements per cycle than an 8-bit path, and a 4-bit weight stream consumes roughly half the bandwidth. Those are powerful advantages in matrix multiplications and weight-bandwidth-bound decode. But production tokens per second also include:
+
+- attention and KV-cache reads;
+- routing and all-to-all communication for Mixture-of-Experts models;
+- collective latency across GPUs or racks;
+- dequantization, scale loads, and tensor layout conversions;
+- normalization, sampling, and non-GEMM kernels;
+- CPU scheduling and request serialization; and
+- cache misses, prefix reuse, and prefill/decode imbalance.
+
+A kernel benchmark proves a kernel. It does not prove user-visible interactivity or aggregate server throughput. Compare formats at the same model quality, input/output distribution, concurrency, percentile latency, and serving features. InferenceX plots this as a [throughput-interactivity Pareto frontier](/glossary/pareto-frontier) rather than reporting one maximum-throughput point.
+
+## Hardware and software support matter more than the checkpoint suffix
+
+Low-bit files can run almost anywhere by dequantizing into a wider type, but that does not mean the hardware executes native low-bit matrix instructions.
+
+- NVIDIA Hopper made FP8 a first-class Tensor Core path. It remains a strong compatibility baseline for H100/H200-era deployments.
+- NVIDIA Blackwell adds native 4-bit floating-point paths and the NVFP4 recipe in its software stack.
+- AMD CDNA 4, including MI350X and MI355X, advertises native MXFP4 matrix throughput under the open microscaling format.
+- Older GPUs may save storage by loading a 4-bit checkpoint but lose the expected compute benefit to conversion overhead or unsupported kernels.
+
+The serving engine must also implement the exact model, quantizer, layout, and kernel combination. Support in [vLLM](/glossary/vllm), [SGLang](/glossary/sglang), or [TensorRT-LLM](/glossary/tensorrt-llm) is not implied merely because the GPU specification lists FP4. Fused attention, MoE kernels, speculative decoding, and distributed strategies may mature at different times for each format.
+
+## Which format should you choose?
+
+### Choose FP8 when compatibility and quality are the priority
+
+FP8 is the conservative low-precision default when the model must run across Hopper, Blackwell, and modern AMD accelerators, or when a 4-bit recipe has not been validated on the target workload. It uses more weight memory and bandwidth, but it typically needs fewer numerical concessions and has the most mature production tooling.
+
+### Choose MXFP4 when portability or an MXFP4-native model matters
+
+MXFP4 is compelling when the checkpoint already ships in the format, as `gpt-oss` does, or when one standardized representation must cross vendor boundaries. Its 4.25-bit canonical storage is extremely compact. Validate quality carefully for models or layers with outliers because 32 values share one power-of-two scale.
+
+### Choose NVFP4 for a fine-grained Blackwell FP4 path
+
+NVFP4 is attractive on a supported NVIDIA Blackwell stack when the smaller 16-value groups and richer E4M3 scales preserve more quality than a coarser FP4 recipe. The deployment must actually use native NVFP4 kernels; silently dequantizing into FP8 or BF16 can preserve correctness while erasing much of the performance thesis.
+
+### Never choose “FP4” without asking what it means
+
+For any result labeled only FP4, ask:
+
+1. Is the element E2M1?
+2. What is the block size?
+3. What type is the block scale?
+4. Is there a tensor-level scale?
+5. Are weights and activations both quantized?
+6. Which layers remain in BF16 or FP8?
+7. What precision is used for accumulation?
+8. Is the kernel native on the tested GPU?
+9. What evaluation shows the quality delta?
+
+Without those answers, “FP4” is a marketing category, not a reproducible configuration.
+
+## What to measure before deploying
+
+Quantization should be evaluated as a system, not only as perplexity or peak FLOPs.
+
+- **Model quality:** task evaluations, long-context behavior, tool use, and any architecture-specific regressions.
+- **Latency:** [time to first token](/glossary/time-to-first-token) and [time per output token](/glossary/time-per-output-token), at a stated percentile.
+- **Throughput:** total tokens per chip or server at matched interactivity.
+- **Memory:** weights, [KV cache](/glossary/kv-cache), workspaces, and offload capacity.
+- **Economics:** [cost per million tokens](/glossary/cost-per-million-tokens) at the speed users actually receive.
+- **Operational support:** stable kernels, distributed compatibility, observability, and fallbacks.
+
+<DashboardCTA href="/inference">Compare live FP8 and FP4 inference results →</DashboardCTA>
+
+## Frequently asked questions
+
+### Is NVFP4 the same as FP4?
+
+No. FP4 E2M1 describes the 4-bit element. NVFP4 is a complete hierarchical scaling recipe around E2M1: a local E4M3 scale for each 16-value block and one FP32 scale for the tensor in the documented one-dimensional layout.
+
+### Is MXFP4 the same as NVFP4?
+
+No. Both use E2M1 values, but canonical MXFP4 shares one E8M0 power-of-two scale across 32 values. One-dimensional NVFP4 shares an E4M3 scale across 16 values and adds a global FP32 tensor scale.
+
+### Is FP4 always faster than FP8?
+
+No. Native FP4 matrix operations and reduced weight traffic can be faster, but unsupported kernels, dequantization, communication, attention, KV-cache traffic, and scheduling can limit or erase the gain. Measure end-to-end throughput at matched latency and quality.
+
+### Which FP8 format is better for LLM inference, E4M3 or E5M2?
+
+E4M3 is commonly preferred for inference weights and forward activations because it provides an extra mantissa bit. E5M2 provides much more range and is commonly associated with gradients in training. The correct choice still depends on scaling and the tensors being quantized.
+
+### How much memory does MXFP4 save versus FP8?
+
+The canonical MXFP4 block uses 4.25 bits/value versus 8 bits/value for the FP8 element payload, a 46.875% reduction before any FP8 scale metadata or higher-precision tensors are counted. Actual model memory savings are smaller because checkpoints and serving systems contain more than quantized weights.
+
+_Related: [B200 NVFP4 vs H200 INT4 on Kimi K2.5/K2.6 — Up to 2.95× Better Performance per Dollar](/blog/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar)_

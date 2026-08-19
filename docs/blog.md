@@ -93,7 +93,7 @@ RSS 2.0 with Dublin Core and Atom extensions. Includes all posts with title, lin
 
 ### Sitemap Integration
 
-Blog index at priority 0.8 (weekly), individual posts at priority 0.7 (monthly, uses `modifiedDate` if present).
+Blog index at priority 0.8 (weekly), individual posts at priority 0.7 (monthly, uses `modifiedDate` if present). Local images referenced through `<Figure>` (`src`, `srcLight`, or `srcDark`) or Markdown image syntax are emitted on each post's sitemap entry so image crawlers can discover the article's diagrams and figures.
 
 ### JSON-LD
 

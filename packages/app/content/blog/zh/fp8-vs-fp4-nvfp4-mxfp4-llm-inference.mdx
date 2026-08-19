@@ -1,0 +1,227 @@
+---
+title: 'LLM 推理中的 FP8、FP4、NVFP4 与 MXFP4 对比'
+subtitle: '解析 8-bit 浮点、4-bit 元素、块级缩放、存储开销、硬件支持与模型质量在生产级 LLM 服务中的差异'
+seoDescription: '全面对比 FP8、FP4、NVFP4 与 MXFP4：bit 布局、块级缩放、显存成本、硬件支持、精度及部署取舍。'
+date: '2026-08-19'
+publishDate: '2026-08-19'
+tags:
+  - inference
+  - quantization
+  - fp8
+  - fp4
+  - nvfp4
+  - mxfp4
+  - gpu
+  - nvidia
+  - amd
+  - blackwell
+---
+
+FP8 与 FP4 经常被描述为精度阶梯上相邻的两级：FP4 的 bit 数只有一半，因此速度就是两倍。但真实的 LLM 推理远没有这么简单。**FP8 指的是元素格式，泛称 FP4 若不说明缩放方案就并不完整，而 MXFP4 与 NVFP4 虽然都采用 E2M1 4-bit 数值，却使用了截然不同的块级缩放方式。**这些选择会改变显存占用、量化误差、可移植性，以及 GPU kernel 能否高效执行模型。
+
+先给出简要结论：
+
+- **FP8** 是较成熟、数值保真度更高的基准方案。E4M3 常用于推理；E5M2 则用精度换取更大的动态范围。
+- **FP4** 通常指 E2M1 元素，但仅写“FP4”并不能说明数值如何缩放或累加。
+- **MXFP4** 是 Open Compute Project（OCP，开放计算项目）的厂商中立 microscaling 方案：32 个 E2M1 数值共享一个 E8M0 的 2 的幂次缩放因子。
+- **NVFP4** 的缩放粒度更细：每 16 个 E2M1 数值共享一个 FP8 E4M3 缩放因子，并再结合一个 tensor 级 FP32 缩放因子。
+- 原生 FP4 矩阵路径的峰值算术吞吐量可达到 FP8 的约两倍，权重流量也接近减半，但**端到端 token/s 并不会自动翻倍**。
+
+本文会把 datatype（数据类型）与量化方案分开，逐步计算存储开销，并说明不同推理部署分别适合哪一种格式。
+
+## FP8、FP4、MXFP4 与 NVFP4 一览
+
+| 格式          | 元素编码                                 | 共享缩放                                                | 标准分组大小 |                             名义存储 | 主要优势                         | 主要取舍                             |
+| ------------- | ---------------------------------------- | ------------------------------------------------------- | -----------: | -----------------------------------: | -------------------------------- | ------------------------------------ |
+| FP8 E4M3      | 1 个符号 bit、4 个指数 bit、3 个尾数 bit | 取决于具体方案；常见 tensor 级或块级缩放                |       不固定 |               8 bit/值，另加缩放开销 | 支持成熟，数值保真度更高         | 元素存储量约为 FP4 的两倍            |
+| FP8 E5M2      | 1 个符号 bit、5 个指数 bit、2 个尾数 bit | 取决于具体方案                                          |       不固定 |               8 bit/值，另加缩放开销 | 动态范围远大于 E4M3              | 同一指数区间内的精度更低             |
+| 泛称 FP4 E2M1 | 1 个符号 bit、2 个指数 bit、1 个尾数 bit | datatype 本身并未规定                                   |       未规定 |                    缩放前为 4 bit/值 | payload 很小                     | 不是完整的部署方案                   |
+| MXFP4         | FP4 E2M1                                 | 一个 E8M0 的 2 的幂次缩放因子                           |      32 个值 |                          4.25 bit/值 | 开放、可移植的 microscaling 格式 | 分组更大且缩放较粗，量化误差可能更高 |
+| NVFP4         | FP4 E2M1                                 | 每个块一个 E4M3 缩放因子，再加一个 FP32 tensor 缩放因子 |      16 个值 | 4.5 bit/值，另加摊薄后的 tensor 缩放 | 局部缩放更细，且不限于 2 的幂次  | NVIDIA 专属方案，metadata 略多       |
+
+上述存储量对应标准的一维块布局。框架可能针对权重、activation（激活）或转置使用不同布局。例如，NVIDIA Transformer Engine 还记录了训练期间针对 NVFP4 权重使用二维 16×16 缩放的方法。因此，不能只看四个字符的精度标签，必须检查实际 checkpoint 与 kernel 方案。
+
+## 元素格式：E4M3、E5M2 与 E2M1
+
+浮点格式名称描述的是固定 bit 数如何分配。“E4M3”表示 4 个指数 bit 与 3 个尾数 bit，此外还有 1 个符号 bit；“E2M1”则表示 2 个指数 bit、1 个尾数 bit 与 1 个符号 bit。
+
+<Figure
+  src="/images/fp8-vs-fp4-nvfp4-mxfp4/fp8-fp4-bit-layout-comparison.png"
+  alt="FP8 E4M3、FP8 E5M2 与 FP4 E2M1 的 bit 布局对比，分别标出各格式中的符号、指数与尾数单元"
+  caption="FP8 与 FP4 推理方案采用的 bit 布局。来源：[FP8 Formats for Deep Learning](https://arxiv.org/abs/2209.05433) 与 [NVIDIA Transformer Engine NVFP4 文档](https://docs.nvidia.com/deeplearning/transformer-engine/user-guide/features/low_precision_training/nvfp4/nvfp4.html)。"
+/>
+
+### FP8 E4M3：推理中最常见的 FP8
+
+FP8 E4M3 分配给尾数的 bit 比 E5M2 更多，因此在相同数量级下能表示间距更小的数值。其最大有限绝对值约为 448。这个范围远小于 BF16 或 FP16，所以推理栈通常会先缩放 tensor 或块，再将其转换为 E4M3。
+
+对于权重与前向 activation，E4M3 往往是更实用的 FP8 选择：模型通常更需要额外精度，而不是 E5M2 极大的动态范围。但“FP8 模型”这一说法依然不完整。tensor 级缩放、channel 级缩放、块级缩放、校准方法、异常值处理、累加精度，以及哪些层仍保留 BF16，都会影响质量与性能。
+
+### FP8 E5M2：范围更大，有效精度更低
+
+FP8 E5M2 的最大绝对值约为 57,344，但尾数只有 2 bit。因此，当动态范围比细粒度数值间距更重要时，它更有价值——训练中的 gradient（梯度）就是典型场景。看到只标注“FP8”的推理 checkpoint 时，应继续确认具体格式：E4M3 与 E5M2 并不是可以互换的编码。
+
+### FP4 E2M1：缩放前只有 16 种编码
+
+E2M1 元素包含 1 个符号 bit、2 个指数 bit 与 1 个尾数 bit。应用共享缩放因子之前，其非负绝对值只有 0、0.5、1、1.5、2、3、4 与 6；负数编码与正数镜像对应。
+
+正因为 codebook 如此有限，缩放因子才至关重要。一个缩放因子会把这些数值映射到某个权重块或 activation 块的局部数量级。选择不当会浪费编码或裁剪异常值；选择得当，则能让同一个 4-bit 元素逼近有意义的局部分布。
+
+由此得到本文最重要的术语规则：**FP4 E2M1 是元素 datatype；MXFP4 与 NVFP4 才是围绕该 datatype 构建的量化方案。**
+
+## MXFP4：32 个值共享一个 E8M0 缩放因子
+
+[MXFP4](https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf) 属于 OCP Microscaling Formats 规范。标准 MXFP4 块包含：
+
+- 32 个 FP4 E2M1 元素；
+- 整个块共享一个 8-bit E8M0 缩放因子。
+
+E8M0 有指数、没有尾数，因此它的缩放值一定是 2 的幂次。乘以 2 的幂次对硬件很友好，而 OCP 规范也为 accelerator 与软件厂商提供了统一、可互操作的布局。AMD CDNA 4 提供原生 MXFP4 矩阵性能，NVIDIA 的新一代软件栈也支持 microscaling 格式。OpenAI 的 `gpt-oss` checkpoint 则展示了这种可移植性的实际价值：其 MoE 权重以原生 MXFP4 形式发布。
+
+数值上的代价是，32 个值必须共用一个较粗的缩放因子；这个块里可能同时存在一个异常值和许多远小于它的数值。每个元素仍保留自己的 E2M1 指数，但共享块缩放无法落在两个 2 的幂次之间。
+
+## NVFP4：更小的块与更丰富的缩放值
+
+[NVFP4](https://developer.nvidia.com/blog/introducing-nvfp4-for-efficient-and-accurate-low-precision-inference/) 同样存储 E2M1 数值，但层级结构不同：
+
+$$
+x = x_{E2M1} \times s_{E4M3} \times s_{FP32}
+$$
+
+在文档记录的一维方案中：
+
+- 每 16 个连续 FP4 数值共享一个局部 FP8 E4M3 缩放因子；
+- E4M3 缩放值可以落在 2 的幂次之间；
+- 一个 FP32 全局缩放因子将完整 tensor 对齐到 E4M3 × E2M1 的组合表示范围。
+
+<Figure
+  src="/images/fp8-vs-fp4-nvfp4-mxfp4/mxfp4-vs-nvfp4-block-scaling.png"
+  alt="MXFP4 与 NVFP4 的块级缩放对比：MXFP4 的 32 个 FP4 数值共享一个 E8M0 的 2 的幂次缩放因子；NVFP4 每 16 个数值使用一个 E4M3 缩放因子，并为整个 tensor 使用一个 FP32 缩放因子"
+  caption="MXFP4 与 NVFP4 的标准一维缩放粒度。来源：[OCP MX 规范](https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf) 与 [NVIDIA NVFP4 文档](https://docs.nvidia.com/deeplearning/transformer-engine/user-guide/features/low_precision_training/nvfp4/nvfp4.html)。"
+/>
+
+因此，NVFP4 用更多 metadata 换取了更贴近局部分布的拟合能力。与 MXFP4 相比，它把一维分组大小减半，并把组级缩放从仅含指数的 E8M0 升级为 E4M3。这通常会降低量化误差，但并不构成普遍的精度保证：校准方法、层敏感度、activation 异常值、模型架构与量化器实现仍然重要。
+
+NVFP4 也是与 NVIDIA Blackwell 时代软硬件路径绑定的方案。如果模型需要以同一个 checkpoint 跨不同 accelerator 厂商部署，那么即便 NVFP4 在支持它的 NVIDIA GPU 上能提供更细的局部拟合，MXFP4 的开放规范仍可能是更合适的接口契约。
+
+## 每种格式究竟占用多少显存？
+
+“FP4 的显存只有 FP8 的一半”对于元素 payload 而言方向正确，但加入块级缩放后，精确比例就没有这么整齐。
+
+对于标准一维布局中的 64 个值：
+
+- FP8 payload：`64 × 8 = 512` bit，尚未计入方案特定的缩放 metadata。
+- 裸 FP4 元素：`64 × 4 = 256` bit，但此时仍不是完整量化方案。
+- MXFP4：`256 + (2 × 8) = 272` bit，即 4.25 bit/值。
+- NVFP4：`256 + (4 × 8) = 288` bit，即 4.5 bit/值，此外还有一个在整个 tensor 上摊薄的 FP32 全局缩放因子。
+
+<Figure
+  src="/images/fp8-vs-fp4-nvfp4-mxfp4/fp8-fp4-storage-comparison.png"
+  alt="64 个值的存储量对比：FP8 使用 512 bit payload，裸 FP4 在缩放前使用 256 bit，MXFP4 加入块级缩放后使用 272 bit，NVFP4 使用 288 bit 并另有一个摊薄的 FP32 tensor 缩放因子"
+  caption="64 个值的标准存储量计算。MXFP4 使用两个 E8M0 块缩放；一维 NVFP4 使用四个 E4M3 块缩放，并另有一个在整个 tensor 上摊薄的 FP32 全局缩放因子。"
+/>
+
+对于 1T 参数，理想化的纯权重 payload 约为：
+
+| 权重格式          |              1T 参数的理想化存储量 |
+| ----------------- | ---------------------------------: |
+| FP8 元素          |                            1.00 TB |
+| 缩放前的 FP4 元素 |                            0.50 TB |
+| MXFP4             |                           0.531 TB |
+| 一维 NVFP4 块数据 | 0.563 TB，另加一个 tensor 缩放因子 |
+
+实际 checkpoint 会更大。embedding、normalization 权重、attention 层、metadata、对齐 padding 与敏感 tensor 可能继续保留较高精度。服务期间，GPU 还需要 KV cache、activation、通信 buffer、CUDA 或 ROCm workspace，以及推理引擎本身。权重量化并不会让这些分配全部消失。
+
+## FP4 会让推理速度达到 FP8 的两倍吗？
+
+某些相关 kernel 有可能接近这个比例，但端到端服务器通常做不到。
+
+原生 4-bit 矩阵硬件每个周期可以处理比 8-bit 路径更多的元素，4-bit 权重流也只消耗约一半带宽。这对矩阵乘法与受权重带宽限制的 decode 非常有利。但生产环境中的 token/s 还包括：
+
+- attention 与 KV-cache 读取；
+- Mixture-of-Experts 模型的路由与 all-to-all 通信；
+- GPU 或机架之间的 collective 延迟；
+- 反量化、缩放读取与 tensor 布局转换；
+- normalization、sampling 与非 GEMM kernel；
+- CPU 调度与请求序列化；
+- cache miss、prefix 复用，以及 prefill/decode 失衡。
+
+kernel 基准测试只能证明某个 kernel，无法直接证明用户感知的交互性或服务器总吞吐量。格式对比必须使用相同的模型质量、输入输出分布、并发数、延迟百分位与服务功能。InferenceX 因此绘制[吞吐量—交互性 Pareto frontier](/zh/glossary/pareto-frontier)，而不是只报告一个最大吞吐量点。
+
+## 硬件与软件支持比 checkpoint 后缀更重要
+
+低 bit 文件几乎可以通过反量化为更宽格式在任何硬件上运行，但这并不意味着硬件真正执行了原生低 bit 矩阵指令。
+
+- NVIDIA Hopper 将 FP8 变成一等公民的 Tensor Core 路径，是 H100/H200 时代部署的可靠兼容性基准。
+- NVIDIA Blackwell 增加原生 4-bit 浮点路径，并在软件栈中提供 NVFP4 方案。
+- AMD CDNA 4（包括 MI350X 与 MI355X）按照开放 microscaling 格式提供原生 MXFP4 矩阵吞吐量。
+- 较旧 GPU 可能通过加载 4-bit checkpoint 节省存储，却因转换开销或缺少支持的 kernel 而无法得到预期的计算收益。
+
+服务引擎还必须实现精确对应的模型、量化器、布局与 kernel 组合。GPU 规格表列出 FP4，并不意味着 [vLLM](/zh/glossary/vllm)、[SGLang](/zh/glossary/sglang) 或 [TensorRT-LLM](/zh/glossary/tensorrt-llm) 自动支持它。fused attention、MoE kernel、speculative decoding 与分布式策略在不同格式上的成熟时间也可能不同。
+
+## 应该选择哪种格式？
+
+### 优先考虑兼容性与质量时选择 FP8
+
+如果模型需要跨 Hopper、Blackwell 与现代 AMD accelerator 运行，或者目标 workload 尚未验证过 4-bit 方案，那么 FP8 是更稳妥的低精度默认选择。它需要更多权重显存与带宽，但通常数值妥协更少，生产工具链也最成熟。
+
+### 重视可移植性或模型原生采用 MXFP4 时选择 MXFP4
+
+如果 checkpoint 本身就以 MXFP4 发布——例如 `gpt-oss`——或者同一表示需要跨厂商部署，MXFP4 很有吸引力。其标准存储密度只有 4.25 bit/值。对于包含异常值的模型或层，需要格外验证质量，因为 32 个值必须共享一个 2 的幂次缩放因子。
+
+### 在 Blackwell 上需要细粒度 FP4 路径时选择 NVFP4
+
+在受支持的 NVIDIA Blackwell 栈上，如果较小的 16-value 分组与更丰富的 E4M3 缩放能够比粗粒度 FP4 方案保留更多质量，NVFP4 会很有吸引力。但部署必须真正使用原生 NVFP4 kernel；若系统悄悄反量化为 FP8 或 BF16，正确性可能得以保留，性能优势却会大幅削弱。
+
+### 看到“FP4”时，必须继续追问
+
+对于任何只标注 FP4 的结果，都应该确认：
+
+1. 元素是否为 E2M1？
+2. 块大小是多少？
+3. 块级缩放采用什么类型？
+4. 是否还有 tensor 级缩放？
+5. 权重与 activation 是否都被量化？
+6. 哪些层仍保留 BF16 或 FP8？
+7. 累加采用什么精度？
+8. kernel 是否在测试 GPU 上原生执行？
+9. 哪些 evaluation 证明了质量变化？
+
+缺少这些答案时，“FP4”只是营销分类，不是可复现配置。
+
+## 部署前应该测量什么？
+
+评估量化时，需要把它当作完整系统，而不只是 perplexity 或峰值 FLOPs。
+
+- **模型质量：**任务 evaluation、长上下文行为、工具调用，以及架构特有的回归。
+- **延迟：**明确百分位的 [Time to First Token](/zh/glossary/time-to-first-token) 与 [Time per Output Token](/zh/glossary/time-per-output-token)。
+- **吞吐量：**在相同交互性下，每颗芯片或每台服务器的总 token 数。
+- **显存：**权重、[KV cache](/zh/glossary/kv-cache)、workspace 与 offload 容量。
+- **经济性：**用户实际获得的速度下，[每百万 token 成本](/zh/glossary/cost-per-million-tokens)。
+- **运维支持：**稳定 kernel、分布式兼容性、可观测性与 fallback。
+
+<DashboardCTA href="/zh/inference">对比实时 FP8 与 FP4 推理结果 →</DashboardCTA>
+
+## 常见问题
+
+### NVFP4 就是 FP4 吗？
+
+不是。FP4 E2M1 描述的是 4-bit 元素；NVFP4 则是围绕 E2M1 构建的完整层级缩放方案。在文档记录的一维布局中，每个 16-value 块使用一个局部 E4M3 缩放因子，整个 tensor 再使用一个 FP32 缩放因子。
+
+### MXFP4 与 NVFP4 相同吗？
+
+不同。两者都使用 E2M1 数值，但标准 MXFP4 的 32 个值共享一个 E8M0 的 2 的幂次缩放因子；一维 NVFP4 的 16 个值共享一个 E4M3 缩放因子，并增加一个 FP32 全局 tensor 缩放。
+
+### FP4 一定比 FP8 快吗？
+
+不一定。原生 FP4 矩阵运算与更少的权重流量可能更快，但缺少支持的 kernel、反量化、通信、attention、KV-cache 流量与调度都可能限制甚至抵消收益。应该在相同延迟与质量下测量端到端吞吐量。
+
+### LLM 推理应该选择 FP8 E4M3 还是 E5M2？
+
+E4M3 多一个尾数 bit，因此通常更适合推理权重与前向 activation。E5M2 的动态范围大得多，常与训练 gradient 相关。最终选择仍取决于缩放方案与被量化的 tensor。
+
+### MXFP4 相比 FP8 能节省多少显存？
+
+标准 MXFP4 块为 4.25 bit/值，FP8 元素 payload 为 8 bit/值；在尚未计算 FP8 缩放 metadata 或更高精度 tensor 时，前者减少 46.875%。实际模型节省比例会更低，因为 checkpoint 与服务系统不只包含量化权重。
+
+_延伸阅读：[Kimi K2.5/K2.6 上的 B200 NVFP4 对比 H200 INT4——每美元性能最高提升 2.95 倍](/zh/blog/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar)_

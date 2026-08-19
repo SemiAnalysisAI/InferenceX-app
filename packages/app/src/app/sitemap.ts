@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 import { AGENTX_OPTIMIZATION_SLUGS } from '@/lib/agentx-optimizations';
-import { getAllPosts } from '@/lib/blog';
+import { extractBlogImagePaths, getAllPosts, getPostBySlug } from '@/lib/blog';
 import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import { canonicalCompareSlug } from '@/lib/compare-slug';
 import {
@@ -128,7 +128,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }),
     ),
     ...getAllPosts().flatMap((post) => {
+      const result = getPostBySlug(post.slug);
       const entry = {
+        images: result
+          ? extractBlogImagePaths(result.raw).map((src) => `${BASE_URL}${src}`)
+          : undefined,
         lastModified: new Date(`${post.modifiedDate ?? post.date}T00:00:00Z`).toISOString(),
         changeFrequency: 'monthly' as const,
         priority: 0.7,

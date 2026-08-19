@@ -188,6 +188,30 @@ export function extractHeadings(rawMdx: string): TocHeading[] {
   return headings;
 }
 
+/**
+ * Return local article image paths in first-appearance order so the sitemap can
+ * expose media-rich posts to image crawlers. Supports the custom Figure
+ * component (including themed variants) and standard Markdown images.
+ */
+export function extractBlogImagePaths(rawMdx: string): string[] {
+  const paths: string[] = [];
+  const seen = new Set<string>();
+  const add = (src: string | undefined) => {
+    if (!src?.startsWith('/images/') || seen.has(src)) return;
+    seen.add(src);
+    paths.push(src);
+  };
+
+  for (const match of rawMdx.matchAll(/(?:src|srcLight|srcDark)="(?<src>\/images\/[^"]+)"/gu)) {
+    add(match.groups?.src);
+  }
+  for (const match of rawMdx.matchAll(/!\[[^\]]*\]\((?<src>\/images\/[^\s)]+)(?:\s+[^)]*)?\)/gu)) {
+    add(match.groups?.src);
+  }
+
+  return paths;
+}
+
 export function getPostBySlug(
   slug: string,
   locale: BlogLocale = 'en',

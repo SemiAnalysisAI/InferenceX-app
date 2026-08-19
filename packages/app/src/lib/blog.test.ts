@@ -10,6 +10,7 @@ import {
   buildBlogBreadcrumbJsonLd,
   buildBlogBreadcrumbJsonLdZh,
   buildBlogPostingJsonLd,
+  extractBlogImagePaths,
   extractHeadings,
   getAdjacentPosts,
   getAllPosts,
@@ -597,6 +598,37 @@ describe('extractHeadings', () => {
     const headings = extractHeadings(mdx);
     expect(headings[0].id).toBe('intro');
     expect(headings[1].id).toBe('intro-2');
+  });
+});
+
+describe('extractBlogImagePaths', () => {
+  it('extracts Figure, themed Figure, and Markdown images in source order', () => {
+    const mdx = `
+<Figure src="/images/formats/bit-layout.png" alt="Bit layout" />
+<Figure
+  srcLight="/images/formats/scaling-light.png"
+  srcDark="/images/formats/scaling-dark.png"
+/>
+![Storage comparison](/images/formats/storage.png)
+`;
+
+    expect(extractBlogImagePaths(mdx)).toEqual([
+      '/images/formats/bit-layout.png',
+      '/images/formats/scaling-light.png',
+      '/images/formats/scaling-dark.png',
+      '/images/formats/storage.png',
+    ]);
+  });
+
+  it('deduplicates paths and ignores external or non-image asset URLs', () => {
+    const mdx = `
+<Figure src="/images/formats/bit-layout.png" />
+<Figure src="/images/formats/bit-layout.png" />
+<Figure src="https://cdn.example.com/external.png" />
+[Download](/files/results.csv)
+`;
+
+    expect(extractBlogImagePaths(mdx)).toEqual(['/images/formats/bit-layout.png']);
   });
 });
 
