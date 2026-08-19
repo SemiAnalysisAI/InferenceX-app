@@ -10,7 +10,7 @@ const STRINGS = {
     eyebrow: 'AgentX / live results',
     title: 'Compare Realistic Agentic Inference Perf',
     description:
-      'Long Context Multi Turn Inference Performance for Kimi K3 2.8T, DeepSeek v4 Pro-813, GLM 5.3 744B, MiniMax M3 430B, Qwen 3.5. Compare Across MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, etc.',
+      'Long Context Multi Turn Inference Performance. Compare Across MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, etc.',
     overview: 'Overview',
     dashboard: 'Full dashboard',
     methodology: 'Methodology Deep Dive',
@@ -21,7 +21,7 @@ const STRINGS = {
     eyebrow: 'AgentX / 实时结果',
     title: '对比真实场景下的智能体推理性能',
     description:
-      'Kimi K3 2.8T、DeepSeek v4 Pro-813、GLM 5.3 744B、MiniMax M3 430B、Qwen 3.5 的长上下文多轮推理性能，跨 MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100、RTX Pro 等平台进行对比。',
+      '长上下文多轮推理性能，跨 MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100、RTX Pro 等平台进行对比。',
     overview: '总览',
     dashboard: '完整仪表板',
     methodology: '方法论深度解析',
