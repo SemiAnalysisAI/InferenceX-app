@@ -85,16 +85,26 @@ describe('interpolateMetricAtInteractivity', () => {
     expect(result!).toBeGreaterThanOrEqual(0);
   });
 
-  it('works with cost metrics (costh)', () => {
+  it('interpolates tokens per dollar as a throughput-proportional metric', () => {
     const points = [
-      makePoint({ x: 20, tpPerGpu: { y: 800, roof: false }, costh: { y: 1, roof: false } }),
-      makePoint({ x: 40, tpPerGpu: { y: 600, roof: false }, costh: { y: 1.5, roof: false } }),
-      makePoint({ x: 60, tpPerGpu: { y: 400, roof: false }, costh: { y: 2, roof: false } }),
+      makePoint({
+        x: 20,
+        tpPerGpu: { y: 800, roof: false },
+        costh: { y: 800_000, roof: false },
+      }),
+      makePoint({
+        x: 40,
+        tpPerGpu: { y: 600, roof: false },
+        costh: { y: 600_000, roof: false },
+      }),
+      makePoint({
+        x: 60,
+        tpPerGpu: { y: 400, roof: false },
+        costh: { y: 400_000, roof: false },
+      }),
     ];
     const result = interpolateMetricAtInteractivity(points, 30, 'costh');
-    expect(result).not.toBeNull();
-    expect(result!).toBeGreaterThan(0.9);
-    expect(result!).toBeLessThan(1.6);
+    expect(result).toBeCloseTo(700_000, 0);
   });
 
   it('filters dominated points via Pareto front', () => {

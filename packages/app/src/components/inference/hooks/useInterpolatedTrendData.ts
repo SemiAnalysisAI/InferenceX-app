@@ -43,9 +43,9 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
   const specs = getGpuSpecs(hwKey);
   const power = specs.power;
 
-  const tokPerHr = (tput * 3600) / 1_000_000;
-  const outTokPerHr = (outputTput * 3600) / 1_000_000;
-  const inTokPerHr = (inputTput * 3600) / 1_000_000;
+  const tokPerHr = tput * 3600;
+  const outTokPerHr = outputTput * 3600;
+  const inTokPerHr = inputTput * 3600;
 
   // Build metric objects matching InferenceData shape. Measured-power keys are
   // only set when the runner-side aggregate_power.py emitted them — leaving the
@@ -63,16 +63,17 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
     outputTputPerGpu: wrapMetric(outputTput),
     inputTputPerGpu: wrapMetric(inputTput),
     tpPerMw: wrapMetric(power > 0 ? (tput * 1000) / power : 0),
-    // Cost per million tokens (total / output / input)
-    costh: wrapMetric(tokPerHr ? specs.costh / tokPerHr : 0),
-    costn: wrapMetric(tokPerHr ? specs.costn / tokPerHr : 0),
-    costr: wrapMetric(tokPerHr ? specs.costr / tokPerHr : 0),
-    costhOutput: wrapMetric(outTokPerHr ? specs.costh / outTokPerHr : 0),
-    costnOutput: wrapMetric(outTokPerHr ? specs.costn / outTokPerHr : 0),
-    costrOutput: wrapMetric(outTokPerHr ? specs.costr / outTokPerHr : 0),
-    costhi: wrapMetric(inTokPerHr ? specs.costh / inTokPerHr : 0),
-    costni: wrapMetric(inTokPerHr ? specs.costn / inTokPerHr : 0),
-    costri: wrapMetric(inTokPerHr ? specs.costr / inTokPerHr : 0),
+    // Tokens purchasable per $1 (total / output / input). Legacy field names
+    // remain stable for saved metric URLs and historical-series identifiers.
+    costh: wrapMetric(specs.costh ? tokPerHr / specs.costh : 0),
+    costn: wrapMetric(specs.costn ? tokPerHr / specs.costn : 0),
+    costr: wrapMetric(specs.costr ? tokPerHr / specs.costr : 0),
+    costhOutput: wrapMetric(specs.costh ? outTokPerHr / specs.costh : 0),
+    costnOutput: wrapMetric(specs.costn ? outTokPerHr / specs.costn : 0),
+    costrOutput: wrapMetric(specs.costr ? outTokPerHr / specs.costr : 0),
+    costhi: wrapMetric(specs.costh ? inTokPerHr / specs.costh : 0),
+    costni: wrapMetric(specs.costn ? inTokPerHr / specs.costn : 0),
+    costri: wrapMetric(specs.costr ? inTokPerHr / specs.costr : 0),
     // Energy: J/token = W / tok/s
     jTotal: wrapMetric(power > 0 && tput ? (power * 1000) / tput : 0),
     ...(outputTput ? { jOutput: wrapMetric(power > 0 ? (power * 1000) / outputTput : 0) } : {}),
@@ -94,16 +95,8 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
  * splining them directly remains correct.
  */
 const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
-  // $/M tok = $/GPU-hr x 1e6 / (tok/s x 3600)
-  costh: 'tpPerGpu',
-  costn: 'tpPerGpu',
-  costr: 'tpPerGpu',
-  costhOutput: 'outputTputPerGpu',
-  costnOutput: 'outputTputPerGpu',
-  costrOutput: 'outputTputPerGpu',
-  costhi: 'inputTputPerGpu',
-  costni: 'inputTputPerGpu',
-  costri: 'inputTputPerGpu',
+  // The legacy cost* fields are tokens/$ and therefore directly proportional
+  // to throughput; monotone interpolation preserves that proportionality.
   // J/token = W / (tok/s)
   jTotal: 'tpPerGpu',
   jOutput: 'outputTputPerGpu',

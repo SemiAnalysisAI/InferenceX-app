@@ -16,8 +16,8 @@ const CHART_DEF = {
   y_tpPerGpu_title: 'Token Throughput per GPU',
   y_tpPerGpu_roofline: 'upper_left',
   y_costh: 'costh.y',
-  y_costh_label: 'Cost per Million Total Tokens ($)',
-  y_costh_roofline: 'lower_right',
+  y_costh_label: 'Total Tokens per $1 (tok/$)',
+  y_costh_roofline: 'upper_left',
 } as unknown as ChartDefinition;
 
 function makePoint(overrides: Partial<InferenceData>): InferenceData {
@@ -59,21 +59,21 @@ describe('InferenceTable sorting logic', () => {
     expect(getNestedYValue(sorted[2], yPath)).toBe(100);
   });
 
-  it('sorts by Y value ascending for lower_right roofline (cost)', () => {
+  it('sorts tokens-per-dollar purchasing power descending', () => {
     const points = [
-      makePoint({ costh: { y: 0.8, roof: false } }),
-      makePoint({ costh: { y: 0.2, roof: true } }),
-      makePoint({ costh: { y: 0.5, roof: false } }),
+      makePoint({ costh: { y: 800_000, roof: false } }),
+      makePoint({ costh: { y: 200_000, roof: false } }),
+      makePoint({ costh: { y: 1_500_000, roof: true } }),
     ];
 
     const yPath = CHART_DEF.y_costh as string;
     const sorted = [...points].toSorted(
-      (a, b) => getNestedYValue(a, yPath) - getNestedYValue(b, yPath),
+      (a, b) => getNestedYValue(b, yPath) - getNestedYValue(a, yPath),
     );
 
-    expect(getNestedYValue(sorted[0], yPath)).toBe(0.2);
-    expect(getNestedYValue(sorted[1], yPath)).toBe(0.5);
-    expect(getNestedYValue(sorted[2], yPath)).toBe(0.8);
+    expect(getNestedYValue(sorted[0], yPath)).toBe(1_500_000);
+    expect(getNestedYValue(sorted[1], yPath)).toBe(800_000);
+    expect(getNestedYValue(sorted[2], yPath)).toBe(200_000);
   });
 });
 
@@ -83,7 +83,7 @@ describe('getNestedYValue', () => {
     expect(getNestedYValue(point, 'tpPerGpu.y')).toBe(42);
   });
 
-  it('resolves nested cost metric path (costh.y)', () => {
+  it('resolves the legacy cost-key purchasing-power path (costh.y)', () => {
     const point = makePoint({ costh: { y: 1.23, roof: false } });
     expect(getNestedYValue(point, 'costh.y')).toBe(1.23);
   });

@@ -63,6 +63,8 @@ function SourceLink({
 
 const NOUN_ZH: Record<string, string> = {
   cost: '成本',
+  'tokens per $1': '每 1 美元可购买的 token 数',
+  'purchasing power': '购买力',
   'input throughput': '输入吞吐量',
   'output throughput': '输出吞吐量',
   power: '功耗',
@@ -154,10 +156,10 @@ export function MetricAssumptionNotes({
   const showInputCostSource = INPUT_COST_METRICS.has(selectedYAxisMetric);
   const showInputThroughputCaveat = selectedYAxisMetric === 'y_inputTputPerGpu';
   const showOutputThroughputCaveat = selectedYAxisMetric === 'y_outputTputPerGpu';
-  // Per-token-type cost only. A disagg config's prefill and decode chips are
-  // counted separately, so the input- and output-token costs are attributed to
+  // Per-token-type purchasing power only. A disagg config's prefill and decode chips are
+  // counted separately, so input/output purchasing power is attributed to
   // one side of the split and can't be lined up against an aggregated config.
-  // The total-token cost divides by the whole chip count, which is the same
+  // The total-token metric uses the whole chip count, which is the same
   // denominator an aggregated config uses, so it needs no caveat — the same
   // split the throughput caveats above already make (input/output, not total).
   const showCostCaveat = showOutputCostSource || showInputCostSource;
@@ -193,7 +195,12 @@ export function MetricAssumptionNotes({
           </SourceLink>
         </>
       )}
-      <DisaggCaveat visible={showCostCaveat} calculationNoun="cost" locale={locale} />
+      <DisaggCaveat
+        visible={showCostCaveat}
+        calculationNoun="tokens per $1"
+        comparisonNoun="purchasing power"
+        locale={locale}
+      />
       <DisaggCaveat
         visible={showInputThroughputCaveat}
         calculationNoun="input throughput"

@@ -302,6 +302,7 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
   outputTputPerMw?: { y: number; roof: boolean };
+  // Tokens purchasable per $1. Legacy cost* keys preserve shared URL compatibility.
   costh: { y: number; roof: boolean };
   costn: { y: number; roof: boolean };
   costr: { y: number; roof: boolean };
@@ -439,7 +440,7 @@ export interface ChartDefinition {
   y_costr_label?: string;
   y_costr_title?: string;
   y_costr_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  // Cost per million output tokens
+  // Output tokens purchasable per $1 (legacy cost* keys preserve shared URLs)
   y_costhOutput?: string;
   y_costhOutput_label?: string;
   y_costhOutput_title?: string;
@@ -452,7 +453,7 @@ export interface ChartDefinition {
   y_costrOutput_label?: string;
   y_costrOutput_title?: string;
   y_costrOutput_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  // Cost per million input tokens
+  // Input tokens purchasable per $1 (legacy cost* keys preserve shared URLs)
   y_costhi?: string;
   y_costhi_label?: string;
   y_costhi_title?: string;

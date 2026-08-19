@@ -70,7 +70,7 @@ export function formatNumber(tickItem: number) {
 }
 
 /**
- * Calculate costs for each GPU using the formula
+ * Calculate how many tokens $1 buys for each GPU using the user-provided hourly cost.
  * GPUs with prefixes (TRT, MTP) will inherit values from their base parent
  */
 export function calculateCostsForGpus(
@@ -88,16 +88,15 @@ export function calculateCostsForGpus(
     }
     if (userCostPerHour !== undefined) {
       const tputPerGpu = item.tpPerGpu.y;
-      const tokensPerHour = (tputPerGpu * 3600) / 1000000;
-      const costPerMillion = userCostPerHour / tokensPerHour;
-      const costRounded = parseFloat(costPerMillion.toFixed(3));
+      const tokensPerDollar = userCostPerHour > 0 ? (tputPerGpu * 3600) / userCostPerHour : 0;
+      const tokensRounded = parseFloat(tokensPerDollar.toFixed(3));
 
-      // Return the data with costUser property and updated y value
+      // Preserve the legacy costUser key for existing shared URLs.
       return {
         ...item,
-        y: costRounded, // Update the main y value for chart rendering
+        y: tokensRounded, // Update the main y value for chart rendering
         costUser: {
-          y: costRounded,
+          y: tokensRounded,
           roof: false, // Always false for user-calculated values
         },
       };
@@ -183,11 +182,10 @@ export function getDisplayLabel(config: { label: string; suffix?: string }): str
 }
 
 /**
- * Computes missing output cost fields (costhOutput, costnOutput, costrOutput) for data points.
+ * Computes missing output purchasing-power fields for historical data points.
  * This handles backwards compatibility with historical data that doesn't have these fields.
  *
- * The calculation is: costPerHour / outputTokensPerHour
- * where outputTokensPerHour = (outputTputPerGpu * 3600) / 1000000
+ * The calculation is: outputTokensPerHour / costPerHour.
  *
  * If outputTputPerGpu is not available, falls back to using the total throughput ratio.
  */
@@ -204,12 +202,11 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
     // Get output throughput - either from outputTputPerGpu or estimate from total throughput
     // For sequence pairs like 1k/8k (ISL/OSL), output tokens dominate, typically ~87.5% of total
     const outputTputPerGpu = item.outputTputPerGpu?.y ?? item.tpPerGpu.y * 0.875;
-    const outputTokensPerHour = (outputTputPerGpu * 3600) / 1000000;
+    const outputTokensPerHour = outputTputPerGpu * 3600;
 
-    // Calculate output cost per million tokens for each cost type
-    const costhOutput = outputTokensPerHour > 0 ? specs.costh / outputTokensPerHour : 0;
-    const costnOutput = outputTokensPerHour > 0 ? specs.costn / outputTokensPerHour : 0;
-    const costrOutput = outputTokensPerHour > 0 ? specs.costr / outputTokensPerHour : 0;
+    const costhOutput = specs.costh > 0 ? outputTokensPerHour / specs.costh : 0;
+    const costnOutput = specs.costn > 0 ? outputTokensPerHour / specs.costn : 0;
+    const costrOutput = specs.costr > 0 ? outputTokensPerHour / specs.costr : 0;
 
     return {
       ...item,
@@ -230,11 +227,10 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
 }
 
 /**
- * Computes missing input cost fields (costhi, costni, costri) at runtime.
+ * Computes missing input purchasing-power fields at runtime.
  * This handles backwards compatibility with historical data that doesn't have these fields.
  *
- * The calculation is: costPerHour / inputTokensPerHour
- * where inputTokensPerHour = (inputTputPerGpu * 3600) / 1000000
+ * The calculation is: inputTokensPerHour / costPerHour.
  *
  * If inputTputPerGpu is not available, falls back to using a portion of total throughput.
  */
@@ -370,12 +366,11 @@ export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
     // Get input throughput - either from inputTputPerGpu or estimate from total throughput
     // For sequence pairs like 1k/8k (ISL/OSL), input tokens are typically ~12.5% of total
     const inputTputPerGpu = item.inputTputPerGpu?.y ?? item.tpPerGpu.y * 0.125;
-    const inputTokensPerHour = (inputTputPerGpu * 3600) / 1000000;
+    const inputTokensPerHour = inputTputPerGpu * 3600;
 
-    // Calculate input cost per million tokens for each cost type
-    const costhi = inputTokensPerHour > 0 ? specs.costh / inputTokensPerHour : 0;
-    const costni = inputTokensPerHour > 0 ? specs.costn / inputTokensPerHour : 0;
-    const costri = inputTokensPerHour > 0 ? specs.costr / inputTokensPerHour : 0;
+    const costhi = specs.costh > 0 ? inputTokensPerHour / specs.costh : 0;
+    const costni = specs.costn > 0 ? inputTokensPerHour / specs.costn : 0;
+    const costri = specs.costr > 0 ? inputTokensPerHour / specs.costr : 0;
 
     return {
       ...item,

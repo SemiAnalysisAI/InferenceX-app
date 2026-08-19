@@ -18,12 +18,14 @@ Pipeline:
   6. Clamp the interpolated metric value to [min(ys), max(ys)] of the
      frontier to prevent cubic-spline overshoots above/below the data.
 
-Reciprocal metrics ($/M tok, J/token) are a special case: they are a per-chip
-constant divided by a throughput, so they are NOT splined independently. Two
-independent splines need not preserve `metric * throughput = constant` between
+Reciprocal metrics ($/M tok in blog tables, J/token) are a special case: they are
+a per-chip constant divided by a throughput, so they are NOT splined independently.
+Two independent splines need not preserve `metric * throughput = constant` between
 measured knots. Pass `reciprocal_of='throughput'` (or the matching output/input
-throughput key) to spline that throughput and re-derive the metric, which is what
-the dashboard does. See docs/tco-calculator.md for a reproducible measurement.
+throughput key) to spline that throughput and re-derive the metric. The live
+inference charts display tokens/$ instead; that purchasing-power metric is directly
+proportional to throughput and can be splined normally. See docs/tco-calculator.md
+for a reproducible measurement.
 
 Usage as a module:
     from iso_interactivity import interpolate_metric, pareto_front_upper_left

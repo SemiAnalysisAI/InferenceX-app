@@ -308,43 +308,39 @@ describe('processOverlayChartData', () => {
     expect(result[0].x).toBe(0.5);
   });
 
-  it('applies cost limit filtering', () => {
+  it('keeps all unofficial-run tokens-per-dollar points without the former cost clamp', () => {
     const data = [
-      pt({ costh: { y: 0.5, roof: false }, median_intvty: 10 } as any),
-      pt({ costh: { y: 100, roof: false }, median_intvty: 20 } as any),
+      pt({ costh: { y: 500_000, roof: false }, median_intvty: 10 } as any),
+      pt({ costh: { y: 2_000_000, roof: false }, median_intvty: 20 } as any),
     ];
-    // interactivity chart config has y_cost_limit: 5
     const result = processOverlayChartData(data, 'interactivity', 'y_costh', null);
-    expect(result).toHaveLength(1);
-    expect(result[0].y).toBe(0.5);
+    expect(result.map((point) => point.y)).toEqual([500_000, 2_000_000]);
   });
 
-  it('retains clipped unofficial-run points for the overflow continuation path', () => {
+  it('does not classify unofficial-run purchasing-power points as cost overflows', () => {
     const visible = pt({
-      costh: { y: 0.5, roof: false },
+      costh: { y: 500_000, roof: false },
       median_intvty: 10,
       run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
     } as any);
-    const clipped = pt({
-      costh: { y: 100, roof: false },
+    const highValue = pt({
+      costh: { y: 2_000_000, roof: false },
       median_intvty: 20,
       run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
     } as any);
 
     const result = processOverlayChartDataWithClipping(
-      [visible, clipped],
+      [visible, highValue],
       'interactivity',
       'y_costh',
       null,
     );
 
-    expect(result.data).toHaveLength(1);
-    expect(result.clippedData).toEqual([
-      {
-        point: expect.objectContaining({ x: 20, y: 100, run_url: clipped.run_url }),
-        reasons: ['cost'],
-      },
+    expect(result.data).toEqual([
+      expect.objectContaining({ x: 10, y: 500_000, run_url: visible.run_url }),
+      expect.objectContaining({ x: 20, y: 2_000_000, run_url: highValue.run_url }),
     ]);
+    expect(result.clippedData).toEqual([]);
   });
 
   // Regression: overlay points must sit on the SAME x column as the official run.

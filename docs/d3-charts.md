@@ -64,7 +64,7 @@ Different metrics need different "optimal" directions:
 | ----------- | -------------- | --------------------------------------------------------- |
 | upper_right | High x, high y | (not currently used)                                      |
 | upper_left  | Low x, high y  | Interactivity chart: low latency (x), high throughput (y) |
-| lower_right | High x, low y  | Cost chart: high interactivity (x), low cost (y)          |
+| lower_right | High x, low y  | Energy chart: high interactivity (x), low J/token (y)     |
 | lower_left  | Low x, low y   | (not currently used)                                      |
 
 The direction is declared per-metric in `inference-chart-config.json`, not computed. This makes the roofline direction a data concern, not a rendering concern.

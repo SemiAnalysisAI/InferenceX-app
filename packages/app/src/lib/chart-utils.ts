@@ -323,9 +323,9 @@ export function createChartDataPoint(
   const outputTputPerGpu = entry.output_tput_per_gpu ?? 0;
   const inputTputPerGpu = entry.input_tput_per_gpu ?? 0;
 
-  const tokensPerHour = (tputPerGpu * 3600) / 1000000;
-  const outputTokensPerHour = (outputTputPerGpu * 3600) / 1000000;
-  const inputTokensPerHour = (inputTputPerGpu * 3600) / 1000000;
+  const tokensPerHour = tputPerGpu * 3600;
+  const outputTokensPerHour = outputTputPerGpu * 3600;
+  const inputTokensPerHour = inputTputPerGpu * 3600;
 
   return {
     // Spread all AggDataEntry fields (raw stats, metadata, etc.)
@@ -389,45 +389,46 @@ export function createChartDataPoint(
         }
       : {}),
 
-    // Cost fields (combined throughput)
+    // Purchasing-power fields (combined throughput). The legacy `cost*` keys
+    // stay stable so existing `i_metric=y_costh` share links keep working.
     costh: {
-      y: hardwarePower && tokensPerHour ? specs.costh / tokensPerHour : 0,
+      y: specs.costh ? tokensPerHour / specs.costh : 0,
       roof: false,
     },
     costn: {
-      y: hardwarePower && tokensPerHour ? specs.costn / tokensPerHour : 0,
+      y: specs.costn ? tokensPerHour / specs.costn : 0,
       roof: false,
     },
     costr: {
-      y: hardwarePower && tokensPerHour ? specs.costr / tokensPerHour : 0,
+      y: specs.costr ? tokensPerHour / specs.costr : 0,
       roof: false,
     },
 
-    // Cost per million output tokens
+    // Output tokens purchasable per dollar
     costhOutput: {
-      y: hardwarePower && outputTokensPerHour ? specs.costh / outputTokensPerHour : 0,
+      y: specs.costh ? outputTokensPerHour / specs.costh : 0,
       roof: false,
     },
     costnOutput: {
-      y: hardwarePower && outputTokensPerHour ? specs.costn / outputTokensPerHour : 0,
+      y: specs.costn ? outputTokensPerHour / specs.costn : 0,
       roof: false,
     },
     costrOutput: {
-      y: hardwarePower && outputTokensPerHour ? specs.costr / outputTokensPerHour : 0,
+      y: specs.costr ? outputTokensPerHour / specs.costr : 0,
       roof: false,
     },
 
-    // Cost per million input tokens
+    // Input tokens purchasable per dollar
     costhi: {
-      y: hardwarePower && inputTokensPerHour ? specs.costh / inputTokensPerHour : 0,
+      y: specs.costh ? inputTokensPerHour / specs.costh : 0,
       roof: false,
     },
     costni: {
-      y: hardwarePower && inputTokensPerHour ? specs.costn / inputTokensPerHour : 0,
+      y: specs.costn ? inputTokensPerHour / specs.costn : 0,
       roof: false,
     },
     costri: {
-      y: hardwarePower && inputTokensPerHour ? specs.costr / inputTokensPerHour : 0,
+      y: specs.costr ? inputTokensPerHour / specs.costr : 0,
       roof: false,
     },
 
