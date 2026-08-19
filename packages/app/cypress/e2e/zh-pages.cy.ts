@@ -8,7 +8,11 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="intro-section"]').should('contain.text', '智能体推理基准测试');
       cy.get('[data-testid="splash-text"]').should('have.text', 'AgentX 来了！！');
       cy.contains('h2', '探索 InferenceX').should('exist');
-      cy.contains('快速对比').should('exist');
+      // Quick Comparisons is hidden behind SHOW_QUICK_COMPARISONS in
+      // landing-page.tsx; the card and its Chinese strings still exist in the
+      // source, so assert it is not rendered rather than dropping the check.
+      cy.get('[data-testid="landing-quick-comparisons"]').should('not.exist');
+      cy.contains('快速对比').should('not.exist');
     });
 
     it('links to the Chinese overview and full dashboard', () => {

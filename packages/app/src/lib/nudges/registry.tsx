@@ -399,9 +399,8 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       title: 'Agentic benchmark results are live',
       titleZh: '智能体基准测试结果已上线',
       description:
-        "AgentX is the World's First Fully Realistic Open Sourced 1 Mil+ Long Context Length, Multi-Turn Agentic Benchmark",
-      descriptionZh:
-        'AgentX 是全球首个完全贴近真实场景、开源的百万级 (1M+) 长上下文多轮智能体基准测试',
+        "AgentX is the World's First Fully Open Source Realistic 1Mil+ Long Context, Multi Turn Benchmark",
+      descriptionZh: 'AgentX 是全球首个完全开源、贴近真实场景的百万级 (1M+) 长上下文多轮基准测试',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
