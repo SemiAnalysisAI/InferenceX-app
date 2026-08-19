@@ -20,6 +20,7 @@ import {
   applyCostDisplayToChartDefinition,
   displayTokenCostValue,
   isTokenCostMetric,
+  storedMetricYValue,
 } from '@/components/inference/cost-display';
 
 import ScatterGraph from './ScatterGraph';
@@ -92,7 +93,7 @@ export function UnofficialChartDisplay() {
       const processedData =
         dataForChart.data.length > 0 && metricKey in dataForChart.data[0]
           ? dataForChart.data.map((d: InferenceData) => {
-              const storedYValue = (d[metricKey] as { y: number })?.y || d.y;
+              const storedYValue = storedMetricYValue(d[metricKey], d.y);
               const yValue = isTokenCostMetric(selectedYAxisMetric)
                 ? displayTokenCostValue(storedYValue, costDisplayMode)
                 : storedYValue;

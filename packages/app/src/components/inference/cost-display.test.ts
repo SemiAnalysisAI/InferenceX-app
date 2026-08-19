@@ -6,6 +6,7 @@ import {
   displayTokenCostValue,
   isTokenCostMetric,
   parseCostDisplayMode,
+  storedMetricYValue,
   tokenCostMetricTitle,
 } from './cost-display';
 
@@ -20,6 +21,11 @@ describe('cost display', () => {
     expect(displayTokenCostValue(2_000_000, 'tokens-per-dollar')).toBe(2_000_000);
     expect(displayTokenCostValue(2_000_000, 'cost-per-million')).toBe(0.5);
     expect(displayTokenCostValue(0, 'cost-per-million')).toBe(0);
+  });
+
+  it('preserves a stored zero instead of falling back to throughput', () => {
+    expect(storedMetricYValue({ y: 0 }, 42)).toBe(0);
+    expect(storedMetricYValue(undefined, 42)).toBe(42);
   });
 
   it('recognizes only selectable token-cost metrics', () => {

@@ -63,6 +63,11 @@ export function displayTokenCostValue(tokensPerDollar: number, mode: CostDisplay
   return tokensPerDollar > 0 ? 1_000_000 / tokensPerDollar : 0;
 }
 
+/** Preserve a real zero metric value; only absent values fall back to the point's base y. */
+export function storedMetricYValue(metric: unknown, fallback: number): number {
+  return (metric as { y?: number } | null | undefined)?.y ?? fallback;
+}
+
 /** Neutral option title used in the Y-axis dropdown; display units live in their own control. */
 export function tokenCostMetricTitle(metric: string, locale: 'en' | 'zh'): string | undefined {
   const config = COST_METRICS[metric];
