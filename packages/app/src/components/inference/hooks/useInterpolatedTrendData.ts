@@ -95,8 +95,6 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
  * splining them directly remains correct.
  */
 const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
-  // The legacy cost* fields are tokens/$ and therefore directly proportional
-  // to throughput; monotone interpolation preserves that proportionality.
   // J/token = W / (tok/s)
   jTotal: 'tpPerGpu',
   jOutput: 'outputTputPerGpu',
@@ -104,8 +102,50 @@ const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> 
 };
 
 /**
+ * Purchasing-power metrics mapped to the throughput they scale. Their Pareto
+ * knots must come from this throughput too: choosing the total-throughput
+ * frontier for output/input tokens can select a different serving envelope
+ * from the corresponding tokens-per-dollar chart.
+ */
+const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
+  costh: 'tpPerGpu',
+  costn: 'tpPerGpu',
+  costr: 'tpPerGpu',
+  costhOutput: 'outputTputPerGpu',
+  costnOutput: 'outputTputPerGpu',
+  costrOutput: 'outputTputPerGpu',
+  costhi: 'inputTputPerGpu',
+  costni: 'inputTputPerGpu',
+  costri: 'inputTputPerGpu',
+};
+
+function recoverProportionalMultiplier(
+  values: readonly number[],
+  throughputs: readonly number[],
+): number | null {
+  const RELATIVE_TOLERANCE = 1e-3;
+  let multiplier: number | null = null;
+
+  for (let i = 0; i < values.length; i += 1) {
+    const value = values[i];
+    const throughput = throughputs[i];
+    if (value === undefined || throughput === undefined) continue;
+    if (!(value > 0) || !(throughput > 0)) continue;
+
+    const candidate = value / throughput;
+    if (multiplier === null) {
+      multiplier = candidate;
+    } else if (Math.abs(candidate - multiplier) > Math.abs(multiplier) * RELATIVE_TOLERANCE) {
+      return null;
+    }
+  }
+
+  return multiplier;
+}
+
+/**
  * Interpolate a selected metric at a target interactivity for a set of InferenceData points
- * from a single GPU. Uses Pareto front (throughput-based frontier) + monotone cubic Hermite spline.
+ * from a single GPU. Uses a throughput-based Pareto front + monotone cubic Hermite spline.
  *
  * Exported for unit testing.
  */
@@ -116,11 +156,19 @@ export function interpolateMetricAtInteractivity(
 ): number | null {
   if (points.length === 0) return null;
 
-  // Build Pareto front on interactivity(x) vs throughput(y)
+  // Tokens/$ uses the corresponding total/output/input throughput frontier so
+  // its knots exactly match the throughput/interactivity serving envelope.
+  const proportionalThroughputKey = PROPORTIONAL_TO_THROUGHPUT[metricKey];
+  const frontierThroughputKey = proportionalThroughputKey ?? 'tpPerGpu';
+  for (const point of points) {
+    if (extractMetric(point, frontierThroughputKey) === null) return null;
+  }
+
+  // Build Pareto front on interactivity(x) vs the applicable throughput(y).
   const frontier = paretoFrontUpperLeft<InferenceData>(
     points,
     (p) => p.x,
-    (p) => p.tpPerGpu.y,
+    (p) => extractMetric(p, frontierThroughputKey)!,
   );
   if (frontier.length === 0) return null;
 
@@ -151,9 +199,21 @@ export function interpolateMetricAtInteractivity(
     metricYs.push(v);
   }
 
-  // Cost and energy per token are `constant / throughput`. Spline that
-  // throughput and re-derive rather than splining the metric, so the value
-  // agrees with the per-point figures on the inference chart.
+  // Tokens/$ is `throughput * 3600 / hourlyCost`. Spline the matching
+  // throughput and apply that constant multiplier so the purchasing-power
+  // curve cannot drift from its throughput/interactivity Pareto curve.
+  if (proportionalThroughputKey) {
+    const tputYs = sorted.map((p) => extractMetric(p, proportionalThroughputKey)!);
+    const multiplier = recoverProportionalMultiplier(metricYs, tputYs);
+    if (multiplier !== null) {
+      const tputSlopes = monotoneSlopes(xs, tputYs);
+      const tput = hermiteInterpolate(xs, tputYs, tputSlopes, targetInteractivity);
+      return Math.max(0, tput) * multiplier;
+    }
+  }
+
+  // Energy per token is `constant / throughput`. Spline that throughput and
+  // re-derive rather than splining the metric, preserving the identity.
   const throughputKey = RECIPROCAL_OF_THROUGHPUT[metricKey];
   if (throughputKey) {
     const tputYs: number[] = [];

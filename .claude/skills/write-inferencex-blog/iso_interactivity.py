@@ -7,7 +7,8 @@ packages/app/src/components/calculator/interpolation.ts and
 packages/app/src/components/inference/hooks/useInterpolatedTrendData.ts.
 
 Pipeline:
-  1. Build the upper-left Pareto frontier on (interactivity, throughput).
+  1. Build the upper-left Pareto frontier on (interactivity, throughput). For a
+     proportional metric, use the total/output/input throughput it scales.
   2. Sort the frontier by interactivity ascending.
   3. Build monotone cubic Hermite slopes (Steffen 1990 method, same as
      d3.curveMonotoneX) over the frontier knots for the metric of interest.
@@ -24,7 +25,9 @@ Two independent splines need not preserve `metric * throughput = constant` betwe
 measured knots. Pass `reciprocal_of='throughput'` (or the matching output/input
 throughput key) to spline that throughput and re-derive the metric. The live
 inference charts display tokens/$ instead; that purchasing-power metric is directly
-proportional to throughput and can be splined normally. See docs/tco-calculator.md
+proportional to throughput. Pass `proportional_to='throughput'` (or the matching
+output/input throughput key) so it uses the same Pareto knots and spline as that
+throughput before applying the recovered multiplier. See docs/tco-calculator.md
 for a reproducible measurement.
 
 Usage as a module:
@@ -184,6 +187,25 @@ def recover_reciprocal_numerator(
     return numerator
 
 
+def recover_proportional_multiplier(
+    values: list[Optional[float]], throughputs: list[Optional[float]]
+) -> Optional[float]:
+    """Recover the constant `k` of a metric defined as `throughput * k`."""
+    relative_tolerance = 1e-3
+    multiplier: Optional[float] = None
+    for value, throughput in zip(values, throughputs):
+        if value is None or throughput is None:
+            continue
+        if not value > 0 or not throughput > 0:
+            continue
+        candidate = value / throughput
+        if multiplier is None:
+            multiplier = candidate
+        elif abs(candidate - multiplier) > abs(multiplier) * relative_tolerance:
+            return None
+    return multiplier
+
+
 def interpolate_metric(
     points: list[dict],
     target_iv: float,
@@ -191,6 +213,7 @@ def interpolate_metric(
     iv_key: str = 'interactivity',
     tput_key: str = 'throughput',
     reciprocal_of: Optional[str] = None,
+    proportional_to: Optional[str] = None,
 ) -> Optional[float]:
     """Interpolate `metric_key` at `target_iv` using the chart's algorithm.
 
@@ -198,16 +221,19 @@ def interpolate_metric(
     the chart code does not extrapolate. Blog tables should render this as
     `_unreachable_` in that row.
 
-    The Pareto frontier is ALWAYS built on (interactivity, throughput) regardless
-    of which metric you're interpolating — this matches the chart, where the
-    frontier is defined by the upper-left throughput envelope and other metrics
-    (cost, energy, TPOT, ...) are derived values at frontier points.
+    The Pareto frontier is built on (interactivity, throughput). For tokens/$,
+    `proportional_to` names the total/output/input throughput it scales; that
+    throughput also supplies the frontier knots so both curves stay aligned.
 
     `reciprocal_of` names the throughput key a metric divides, for metrics of the
     form `constant / throughput` ($/M tok, J/token). Set it for those metrics:
     that throughput is splined and the metric re-derived, matching the dashboard.
     Leave it None for metrics splined directly (throughput itself, tok/s/MW,
     latency, and measured energy — whose numerator varies per point).
+
+    `proportional_to` names the throughput key for metrics of the form
+    `throughput * constant` (tokens/$). That throughput is splined and the
+    recovered multiplier applied, matching the dashboard.
     """
     if not points:
         return None
@@ -215,7 +241,7 @@ def interpolate_metric(
     frontier = pareto_front_upper_left(
         points,
         get_x=lambda p: p[iv_key],
-        get_y=lambda p: p[tput_key],
+        get_y=lambda p: p[proportional_to or tput_key],
     )
     if not frontier:
         return None
@@ -242,6 +268,19 @@ def interpolate_metric(
         if value is None:
             return None
         ys.append(value)
+
+    if proportional_to is not None:
+        tputs: list[float] = []
+        for point in sorted_front:
+            throughput = point.get(proportional_to)
+            if throughput is None:
+                return None
+            tputs.append(throughput)
+        multiplier = recover_proportional_multiplier(ys, tputs)
+        if multiplier is not None:
+            tput_slopes = monotone_slopes(xs, tputs)
+            tput = hermite_interpolate(xs, tputs, tput_slopes, target_iv)
+            return max(0.0, tput) * multiplier
 
     if reciprocal_of is not None:
         tputs: list[float] = []
@@ -278,7 +317,8 @@ def interpolate_metric(
 
 def _cli() -> None:
     """Stdin: {"points": [...], "target_iv": N, "metric_key": "...",
-               "reciprocal_of": "throughput" for $/M tok and J/token}
+               "reciprocal_of": "throughput" for $/M tok and J/token,
+               "proportional_to": "throughput" for tokens/$}
     Stdout: {"value": N or null}"""
     req = json.loads(sys.stdin.read())
     value = interpolate_metric(
@@ -288,6 +328,7 @@ def _cli() -> None:
         iv_key=req.get('iv_key', 'interactivity'),
         tput_key=req.get('tput_key', 'throughput'),
         reciprocal_of=req.get('reciprocal_of'),
+        proportional_to=req.get('proportional_to'),
     )
     json.dump({'value': value}, sys.stdout)
     sys.stdout.write('\n')
