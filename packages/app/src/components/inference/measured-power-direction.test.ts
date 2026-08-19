@@ -30,7 +30,10 @@ const MEASURED_POWER_METRICS = [
   'y_measuredDecodeAvgPower',
 ] as const;
 
-const QUERY_ENERGY_METRICS = ['y_measuredJPerSuccessfulQuery', 'y_measuredWhPerSuccessfulQuery'] as const;
+const QUERY_ENERGY_METRICS = [
+  'y_measuredJPerSuccessfulQuery',
+  'y_measuredWhPerSuccessfulQuery',
+] as const;
 
 const defs = chartDefinitions as unknown as ChartDefinition[];
 const interactivityDef = defs.find((d) => d.chartType === 'interactivity')!;

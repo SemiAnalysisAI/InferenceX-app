@@ -832,8 +832,7 @@ export function markRooflinePoints(
       if (newPoint.measuredJPerTotalToken) newPoint.measuredJPerTotalToken.roof = false;
       if (newPoint.measuredJPerInputToken) newPoint.measuredJPerInputToken.roof = false;
       if (newPoint.measuredJPerSuccessfulQuery) newPoint.measuredJPerSuccessfulQuery.roof = false;
-      if (newPoint.measuredWhPerSuccessfulQuery)
-        newPoint.measuredWhPerSuccessfulQuery.roof = false;
+      if (newPoint.measuredWhPerSuccessfulQuery) newPoint.measuredWhPerSuccessfulQuery.roof = false;
 
       for (const chartDefYKey of Y_AXIS_METRICS) {
         const rooflinePoints = computedRooflines[hwKey]?.[chartDefYKey];
