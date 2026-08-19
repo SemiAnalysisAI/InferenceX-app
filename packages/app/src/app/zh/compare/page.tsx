@@ -1,16 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE_ZH,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
+import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
 import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
 import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
 import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
@@ -18,14 +15,15 @@ import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `InferenceX 是 SemiAnalysis 推出的独立开源 Chip 推理基准测试平台，提供经过验证、可复现并随配置变化更新的测试结果。${SUPPORTERS_LINE_ZH}横向对比 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5、Qwen 3.5 等模型的延迟、吞吐量与成本。`;
+const DESCRIPTION =
+  '对比 Kimi K3、DeepSeek V4 Pro、MiniMax M3、Qwen 3.5 与 GLM 5.2 的 AgentX 智能体推理结果，并浏览定长序列芯片对比。';
 
 export const metadata: Metadata = {
-  title: 'Chip 对比',
+  title: 'AgentX 智能体推理对比',
   description: DESCRIPTION,
   alternates: zhAlternates('/compare'),
   openGraph: {
-    title: `Chip 对比 | ${SITE_NAME}`,
+    title: `AgentX 智能体推理对比 | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/zh/compare`,
     type: 'website',
@@ -33,7 +31,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: `Chip 对比 | ${SITE_NAME}`,
+    title: `AgentX 智能体推理对比 | ${SITE_NAME}`,
     description: DESCRIPTION,
   },
 };
@@ -77,7 +75,7 @@ function groupPairsByVendorForModel(
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',
-  name: `Chip 对比 | ${SITE_NAME}`,
+  name: `AgentX 智能体推理对比 | ${SITE_NAME}`,
   description: DESCRIPTION,
   url: `${SITE_URL}/zh/compare`,
   inLanguage: 'zh-CN',
@@ -93,19 +91,27 @@ export default async function CompareIndexPageZh() {
   return (
     <>
       <JsonLd data={jsonLd} />
-      <section>
+      <AgentXCompareHero locale="zh" />
+
+      <section id="model-comparisons" data-testid="compare-model-catalog">
         <Card>
-          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">Chip 对比</h1>
+          <p className="font-mono text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+            对比结果目录
+          </p>
+          <h2 className="mt-2 text-2xl font-bold tracking-tight lg:text-3xl">
+            AgentX 与 8K→1K 结果
+          </h2>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} 组推理基准测试的正面对比，涵盖{' '}
             {formatModelList(modelsWithPairs)}
-            。每个页面均包含延迟、吞吐量和成本指标的交互式图表，以及插值对比表格。
+            。已有 AgentX 数据的模型默认打开长上下文、多轮 trace replay 结果；尚未纳入 AgentX
+            的模型默认打开受控的 8K→1K 工作负载。每张卡片均标明对应场景。
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               data-testid="compare-index-per-dollar-link-zh"
               href="/zh/compare-per-dollar"
-              className="inline-flex items-center gap-2 rounded-md bg-brand px-5 py-3 text-base lg:text-lg font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
             >
               Chip 每美元性能对比
               <span aria-hidden="true" className="text-lg lg:text-xl">
@@ -139,6 +145,7 @@ export default async function CompareIndexPageZh() {
       {modelsWithPairs.map((model) => {
         const pairs = comparablePairsByModel.get(model.slug) ?? [];
         const groups = groupPairsByVendorForModel(model, pairs);
+        const scenario = comparisonScenarioForModel(model);
         return (
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
@@ -162,10 +169,11 @@ export default async function CompareIndexPageZh() {
                       return (
                         <ComparePairCardLink
                           key={slug}
-                          href={`/zh/compare/${slug}`}
+                          href={comparisonPairHref('zh', slug, model)}
                           slug={slug}
                           label={label}
                           archLine={archLine}
+                          scenarioLabel={scenario.label}
                         />
                       );
                     })}

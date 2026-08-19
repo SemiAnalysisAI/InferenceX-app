@@ -5,14 +5,64 @@ describe('Compare precision index page', () => {
     });
   });
 
-  it('renders the /compare index with precision and spec-decode CTA links', () => {
+  it('leads the /compare index with AgentX results and keeps fixed-sequence tools', () => {
     cy.visit('/compare');
+    cy.get('[data-testid="compare-agentx-primary"]').within(() => {
+      cy.get('h1').should('have.text', 'Compare real world, agentic inference results');
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
+      cy.get('[data-testid="compare-agentx-model-kimi-k3"]').should(
+        'have.attr',
+        'href',
+        '/inference?g_model=Kimi-K3&i_seq=agentic-traces&i_optimal=1',
+      );
+      cy.get('[data-testid="compare-agentx-methodology-link"]').should(
+        'have.attr',
+        'href',
+        '/agentx/methodology',
+      );
+    });
+    cy.get('[data-testid="compare-model-catalog"]')
+      .should('contain.text', 'AgentX and 8K→1K results')
+      .and('contain.text', 'Each card identifies its scenario');
     cy.get('[data-testid="compare-index-precision-link"]')
       .should('have.attr', 'href', '/compare-precision')
       .and('contain.text', 'Compare precisions');
     cy.get('[data-testid="compare-index-spec-decode-link"]')
       .should('have.attr', 'href', '/compare-spec-decode')
       .and('contain.text', 'Compare speculative decoding');
+    cy.get('#deepseek-v4 a[data-scenario="AgentX"]')
+      .first()
+      .should('contain.text', 'AgentX')
+      .and('have.attr', 'href')
+      .and('match', /\?i_seq=agentic-traces$/u);
+    cy.get('#deepseek-r1 a[data-scenario="8K→1K"]')
+      .first()
+      .should('contain.text', '8K→1K')
+      .and('have.attr', 'href')
+      .and('match', /\?i_seq=8k%2F1k$/u);
+  });
+
+  it('ships the same AgentX-first hierarchy on the Simplified Chinese page', () => {
+    cy.visit('/zh/compare');
+    cy.get('[data-testid="compare-agentx-primary"]').within(() => {
+      cy.get('h1').should('have.text', '对比真实场景下的智能体推理结果');
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
+      cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should(
+        'have.attr',
+        'href',
+        '/zh/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_optimal=1',
+      );
+      cy.get('[data-testid="compare-agentx-methodology-link"]').should(
+        'have.attr',
+        'href',
+        '/zh/agentx/methodology',
+      );
+    });
+    cy.get('[data-testid="compare-model-catalog"]').should('contain.text', 'AgentX 与 8K→1K 结果');
+    cy.get('#deepseek-v4 a[data-scenario="AgentX"]')
+      .first()
+      .should('have.attr', 'href')
+      .and('match', /^\/zh\/compare\/.+\?i_seq=agentic-traces$/u);
   });
 
   it('renders the /compare-per-dollar index with precision and spec-decode CTA links', () => {
