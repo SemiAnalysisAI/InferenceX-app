@@ -42,8 +42,9 @@ interface NavLink {
 }
 
 const NAV_LINKS: readonly NavLink[] = [
-  // AgentX leads the nav: it is the flagship benchmark, and the surface every
-  // other entry ultimately explains.
+  { href: '/', label: 'Home', testId: 'nav-link-home', event: 'header_home_clicked' },
+  // AgentX sits directly after Home: it is the flagship benchmark, and the
+  // surface every entry below it ultimately explains.
   {
     href: '/agentx',
     label: 'AgentX',
@@ -51,7 +52,6 @@ const NAV_LINKS: readonly NavLink[] = [
     event: 'header_agentx_clicked',
     badge: { en: 'NEW', zh: '新' },
   },
-  { href: '/', label: 'Home', testId: 'nav-link-home', event: 'header_home_clicked' },
   {
     href: '/overview',
     label: 'Overview',

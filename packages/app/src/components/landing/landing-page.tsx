@@ -1,6 +1,7 @@
 import { ArrowRight, BarChart3, ShieldCheck, Sparkles } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
+import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { IntroSection } from '@/components/intro-section';
 import { LandingPageAnalytics, LandingTrackedLink } from '@/components/landing/landing-analytics';
 import { CuratedViewCard } from '@/components/landing/curated-view-card';
@@ -83,6 +84,12 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
       <LandingPageAnalytics />
       <NudgeEngine scope="landing" />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
+        {/* Same AgentX hero that leads /compare, above the quote carousel. The
+            landing page owns no h1 of its own, but keep this an h2 so the hero
+            stays a section within the page rather than retitling the whole
+            site. */}
+        <AgentXCompareHero locale={locale} headingLevel="h2" surface="landing" />
+
         <IntroSection locale={locale} />
 
         {/* Split: exploration entry points vs presets */}

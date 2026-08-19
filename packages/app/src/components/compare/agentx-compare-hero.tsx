@@ -8,29 +8,45 @@ import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 const STRINGS = {
   en: {
     eyebrow: 'AgentX / live results',
-    title: 'Compare real world, agentic inference results',
+    title: 'Compare Realistic Agentic Inference Perf',
     description:
-      'Real-world agentic inference results for Kimi K3, DeepSeek V4 Pro, MiniMax M3, Qwen 3.5, and GLM 5.2. Compare throughput, interactivity, time to first token, and cost across serving stacks and accelerator platforms.',
-    dashboard: 'Open the AgentX dashboard',
-    methodology: 'Read the methodology',
+      'Long Context Multi Turn Inference Performance. Compare Across MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, etc.',
+    overview: 'Overview',
+    dashboard: 'Full dashboard',
+    methodology: 'Methodology Deep Dive',
     ledgerTitle: 'Models with AgentX results',
     modelAction: 'View results',
   },
   zh: {
     eyebrow: 'AgentX / 实时结果',
-    title: '对比真实场景下的智能体推理结果',
+    title: '对比真实场景下的智能体推理性能',
     description:
-      '查看 Kimi K3、DeepSeek V4 Pro、MiniMax M3、Qwen 3.5 与 GLM 5.2 的真实智能体推理结果，对比不同 serving stack 与加速平台的吞吐量、交互速度、首 token 延迟和成本。',
-    dashboard: '打开 AgentX 仪表板',
-    methodology: '阅读方法论',
+      '长上下文多轮推理性能，跨 MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100、RTX Pro 等平台进行对比。',
+    overview: '总览',
+    dashboard: '完整仪表板',
+    methodology: '方法论深度解析',
     ledgerTitle: '已有 AgentX 结果的模型',
     modelAction: '查看结果',
   },
 } as const;
 
-export function AgentXCompareHero({ locale }: { locale: 'en' | 'zh' }) {
+/**
+ * The hero leads `/compare` and the landing page. `/compare` owns the page
+ * `h1`; the landing page renders the hero under its own section flow, so the
+ * caller picks the heading level rather than shipping a second `h1`.
+ */
+export function AgentXCompareHero({
+  locale,
+  headingLevel = 'h1',
+  surface = 'compare',
+}: {
+  locale: 'en' | 'zh';
+  headingLevel?: 'h1' | 'h2';
+  surface?: 'compare' | 'landing';
+}) {
   const t = STRINGS[locale];
   const prefix = locale === 'zh' ? '/zh' : '';
+  const Heading = headingLevel;
 
   return (
     <section data-testid="compare-agentx-primary">
@@ -40,27 +56,43 @@ export function AgentXCompareHero({ locale }: { locale: 'en' | 'zh' }) {
             <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
               {t.eyebrow}
             </p>
-            <h1 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-foreground lg:text-5xl">
+            <Heading className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-foreground lg:text-5xl">
               {t.title}
-            </h1>
+            </Heading>
             <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground lg:text-lg">
               {t.description}
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <CompareIndexTrackedLink
+                data-testid="compare-agentx-overview-link"
+                href={`${prefix}/overview`}
+                analyticsEvent="compare_agentx_overview_clicked"
+                analyticsSurface={surface}
+                appNavigation
+                className="inline-flex min-h-11 items-center gap-2 rounded-md bg-brand px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
+              >
+                {t.overview}
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </CompareIndexTrackedLink>
+              <CompareIndexTrackedLink
                 data-testid="compare-agentx-dashboard-link"
                 href={agentxDashboardHref(locale, FEATURED_AGENTX_MODELS[0])}
                 analyticsEvent="compare_agentx_dashboard_clicked"
                 analyticsTarget="kimi-k3"
-                className="inline-flex min-h-11 items-center gap-2 rounded-md bg-brand px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
+                analyticsSurface={surface}
+                appNavigation
+                className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-5 py-2.5 font-semibold text-foreground transition-colors hover:bg-muted"
               >
                 {t.dashboard}
                 <ArrowRight aria-hidden="true" className="size-4" />
               </CompareIndexTrackedLink>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-3">
               <CompareIndexTrackedLink
                 data-testid="compare-agentx-methodology-link"
-                href={`${prefix}/agentx/methodology`}
+                href={`${prefix}/agentx`}
                 analyticsEvent="compare_agentx_methodology_clicked"
+                analyticsSurface={surface}
                 className="inline-flex min-h-11 items-center rounded-md border border-border px-5 py-2.5 font-semibold text-foreground transition-colors hover:bg-muted"
               >
                 {t.methodology}
@@ -69,9 +101,8 @@ export function AgentXCompareHero({ locale }: { locale: 'en' | 'zh' }) {
           </div>
 
           <div className="border-t border-border/70 bg-muted/15 lg:border-t-0 lg:border-l">
-            <div className="border-b border-border/70 px-5 py-3 font-mono text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-              {t.ledgerTitle}
-            </div>
+            {/* The visible ledger header is dropped; `ledgerTitle` stays as the
+                nav's accessible name so screen readers still get the label. */}
             <nav aria-label={t.ledgerTitle} className="divide-y divide-border/70">
               {FEATURED_AGENTX_MODELS.map((model) => (
                 <CompareIndexTrackedLink
@@ -80,6 +111,8 @@ export function AgentXCompareHero({ locale }: { locale: 'en' | 'zh' }) {
                   href={agentxDashboardHref(locale, model)}
                   analyticsEvent="compare_agentx_model_clicked"
                   analyticsTarget={model.slug}
+                  analyticsSurface={surface}
+                  appNavigation
                   className="group flex min-h-16 items-center justify-between gap-4 px-5 py-3 transition-colors hover:bg-brand/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 >
                   <span className="min-w-0">
