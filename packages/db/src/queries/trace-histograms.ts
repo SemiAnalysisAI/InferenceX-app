@@ -14,7 +14,7 @@
 
 import { gunzipSync } from 'node:zlib';
 
-import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
+import { REQUEST_TIMELINE_VERSION } from '../etl/compute-request-timeline';
 
 import type { DbClient } from '../connection.js';
 
@@ -38,18 +38,22 @@ const MAX_FALLBACK_BLOB_BYTES = 24 * 1024 * 1024;
 interface TimelineRow {
   benchmark_result_id: number;
   trace_replay_id: number;
-  request_timeline: RequestTimeline | null;
+  /** Version of the stored timeline, read WITHOUT shipping the document. */
+  timeline_version: number | null;
+  /** ISL per completed request, unnested server-side (see the query below). */
+  isl: (number | null)[] | null;
+  osl: (number | null)[] | null;
   has_blob: boolean;
 }
 
-function histogramFromTimeline(id: number, timeline: RequestTimeline): TraceHistogramPoint {
-  const isl: number[] = [];
-  const osl: number[] = [];
-  for (const request of timeline.requests) {
-    if (typeof request.isl === 'number' && Number.isFinite(request.isl)) isl.push(request.isl);
-    if (typeof request.osl === 'number' && Number.isFinite(request.osl)) osl.push(request.osl);
+/** Postgres hands back `number[]`; drop anything non-finite defensively. */
+function finiteNumbers(values: (number | null)[] | null): number[] {
+  const out: number[] = [];
+  for (const value of values ?? []) {
+    const n = Number(value);
+    if (value !== null && Number.isFinite(n)) out.push(n);
   }
-  return { id, isl, osl };
+  return out;
 }
 
 export async function getTraceHistograms(
@@ -62,11 +66,28 @@ export async function getTraceHistograms(
   const fallbackRows: TimelineRow[] = [];
   for (let i = 0; i < benchmarkResultIds.length; i += QUERY_CHUNK_SIZE) {
     const chunk = benchmarkResultIds.slice(i, i + QUERY_CHUNK_SIZE);
+    // Project the two arrays out in SQL instead of selecting
+    // `atr.request_timeline` whole. The timeline carries ~18 fields per
+    // request, so shipping the document to extract two integers per request
+    // moved 61 MB of JSON for a 151k-request point — past the Neon HTTP
+    // driver's 64 MiB response cap, which failed the whole request with
+    // `507 response is too large` and left the distribution charts empty on
+    // exactly the biggest runs. Unnesting server-side sends ~600 KB instead.
     const chunkRows = (await sql`
       select
         br.id as benchmark_result_id,
         atr.id as trace_replay_id,
-        atr.request_timeline,
+        (atr.request_timeline->>'version')::int as timeline_version,
+        (
+          select array_agg((r->>'isl')::numeric order by ord)
+          from jsonb_array_elements(atr.request_timeline->'requests') with ordinality x(r, ord)
+          where jsonb_typeof(r->'isl') = 'number'
+        ) as isl,
+        (
+          select array_agg((r->>'osl')::numeric order by ord)
+          from jsonb_array_elements(atr.request_timeline->'requests') with ordinality x(r, ord)
+          where jsonb_typeof(r->'osl') = 'number'
+        ) as osl,
         (atr.profile_export_jsonl_gz is not null) as has_blob
       from benchmark_results br
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
@@ -75,10 +96,10 @@ export async function getTraceHistograms(
     for (const row of chunkRows) {
       const id = Number(row.benchmark_result_id);
       if (
-        row.request_timeline &&
-        Number(row.request_timeline.version) === REQUEST_TIMELINE_VERSION
+        row.timeline_version !== null &&
+        Number(row.timeline_version) === REQUEST_TIMELINE_VERSION
       ) {
-        result[id] = histogramFromTimeline(id, row.request_timeline);
+        result[id] = { id, isl: finiteNumbers(row.isl), osl: finiteNumbers(row.osl) };
       } else if (row.has_blob) {
         fallbackRows.push(row);
       }
