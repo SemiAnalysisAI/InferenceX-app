@@ -73,25 +73,33 @@ export async function getRequestTimeline(
   // a time so the response size scales with the chunk rather than the run.
   if (row.timeline_version !== null && Number(row.timeline_version) === REQUEST_TIMELINE_VERSION) {
     const total = Number(row.request_count ?? 0);
-    const requests: RequestRecordRow[] = [];
-    for (let offset = 0; offset < total; offset += REQUESTS_PER_CHUNK) {
-      const chunk = (await sql`
-        select coalesce(jsonb_agg(r order by ord), '[]'::jsonb) as requests
-        from (
-          select r, ord
-          from agentic_trace_replay atr,
-               jsonb_array_elements(atr.request_timeline->'requests') with ordinality x(r, ord)
-          where atr.id = ${row.trace_replay_id}
-            and ord > ${offset}
-            and ord <= ${offset + REQUESTS_PER_CHUNK}
-        ) slice
-      `) as unknown as { requests: RequestRecordRow[] }[];
-      const slice = chunk[0]?.requests ?? [];
-      // A shorter-than-requested slice means the array ended early (the row
-      // changed under us); stop rather than spin on empty round trips.
-      requests.push(...slice);
-      if (slice.length < REQUESTS_PER_CHUNK) break;
-    }
+    // Every slice re-expands the whole array before discarding what falls
+    // outside its window, so each costs the same regardless of offset
+    // (measured: 0.72s / 0.74s / 0.62s at offsets 0 / 60k / 140k on a 151k
+    // point). They do not depend on each other, so issue them together and
+    // pay one slice's latency instead of the sum — 8 sequential slices were
+    // ~5.6s of the 12.8s that point took to serve.
+    const offsets: number[] = [];
+    for (let offset = 0; offset < total; offset += REQUESTS_PER_CHUNK) offsets.push(offset);
+    const slices = await Promise.all(
+      offsets.map(async (offset) => {
+        const chunk = (await sql`
+          select coalesce(jsonb_agg(r order by ord), '[]'::jsonb) as requests
+          from (
+            select r, ord
+            from agentic_trace_replay atr,
+                 jsonb_array_elements(atr.request_timeline->'requests') with ordinality x(r, ord)
+            where atr.id = ${row.trace_replay_id}
+              and ord > ${offset}
+              and ord <= ${offset + REQUESTS_PER_CHUNK}
+          ) slice
+        `) as unknown as { requests: RequestRecordRow[] }[];
+        return chunk[0]?.requests ?? [];
+      }),
+    );
+    // Offsets are ascending and each slice is ordered, so concatenating in
+    // offset order preserves the original request order.
+    const requests: RequestRecordRow[] = slices.flat();
     return {
       version: Number(row.timeline_version),
       startNs: Number(row.start_ns ?? 0),
