@@ -1,0 +1,136 @@
+---
+title: 'A Brief Overview of Agentic Workloads'
+subtitle: 'Multi-turn sessions, long contexts, and near-total prefix reuse make agentic inference a systems problem, and change what a benchmark has to measure'
+seoDescription: 'What defines an agentic workload: multi-turn sessions, long context, high prefix reuse, and bursty subagent fan-out, and why benchmarking them is a systems problem.'
+date: '2026-08-19'
+publishDate: '2026-08-19'
+tags:
+  - agentic
+  - agents
+  - agentx
+  - benchmark
+  - inference
+---
+
+At a high level, an [agentic workload](/glossary/agentic-coding-workload) is characterized by four things:
+
+- **Multi-turn.** A session includes tens or hundreds of user and assistant interactions, compared to a handful in a chatbot scenario.
+- **Long context.** Between system prompts, tool definitions, and the sheer number of turns, context accumulates quickly.
+- **High [prefix reuse](/glossary/prefix-caching).** The conversation progresses linearly, with the output of turn _n-1_ concatenated into the input of turn _n_, so most context can be served from [KV cache](/glossary/kv-cache) rather than recomputed. How much depends on the storage available to hold KV tensors. As _n_ grows, the ratio of cached to uncached input tends toward 1.
+- **Bursty [subagent](/glossary/subagent) fan-out.** A turn can launch several short-lived subagents at once, which creates spiky KV cache allocation and eviction patterns.
+
+<Figure
+  src="/images/brief-overview-of-agentic-workloads/context-accumulation.png"
+  alt="Diagram of four agentic turns showing context accumulating downward: each turn's input contains the previous turn's full input plus its output, with the shared portion highlighted as cached from the previous turn"
+  caption="Context accumulation across four turns of an agentic session. Everything highlighted is served from cache; only the newest output and tool results are uncached."
+/>
+
+## Agentic inference is a systems problem
+
+Considering the characteristics above, benchmarking these workloads is fundamentally different from the existing fixed-sequence-length benchmarks.
+
+Because prefix reuse is so high, KV tensors have to move efficiently across nodes and ranks — the job of transfer layers like NIXL, MORI-IO, and [Mooncake](/agentx/optimizations/mooncake). Conversations then have to be routed to the node or rank where their prefix already resides in order to maximize cache hit rate, which is what llm-d, [Dynamo](/agentx/optimizations/dynamo), and the vLLM and SGLang routers do. Long-context conversations stress HBM capacity for KV cache and force offload to slower memory tiers such as DRAM and SSD, which has to be done efficiently — Mooncake Store, [LMCache](/agentx/optimizations/lmcache), vLLM's CPU offloading, and SGLang HiCache all attack this layer.
+
+This is in contrast to fixed-sequence-length, single-turn workloads, where prefix reuse is not relevant and inference performance is largely reflective of baseline chip and kernel performance. That does not make the plethora of fixed-sequence-length data on InferenceX less important. Stripping away the complexities of agentic serving gives a clear picture of how low-level inference optimizations are progressing, and provides the baseline that AgentX results are read against.
+
+## Building a realistic replay corpus
+
+To make the AgentX workloads as realistic as possible, we collected an initial corpus of 393 internal SemiAnalysis Claude Code traces to replay. To anonymize the content while keeping the original prefix-reuse pattern intact, we use a method similar to [Qwen-Bailian](https://github.com/alibaba-edu/qwen-bailian-usagetraces-anon), one of the earliest corpora of production traces. We then use [AIPerf](https://github.com/ai-dynamo/aiperf) to reconstruct the traces according to the original schedule of requests, at varying levels of concurrent clients.
+
+Reconstructing subagent structure required changes in Claude Code itself. We worked with Anthropic to ship two features that make the AgentX dataset possible, both adding agent-instance identity to outgoing requests so that parallel branches can be told apart at the proxy:
+
+- [anthropics/claude-code #49207](https://github.com/anthropics/claude-code/issues/49207) — add an agent instance ID (`x-claude-code-agent-id`) and its parent ID (`x-claude-code-parent-agent-id`) to API request headers, so interleaved subagent requests are attributable instead of collapsing into one session-level stream.
+- [anthropics/claude-code #66761](https://github.com/anthropics/claude-code/issues/66761) — extend those same headers to subagents spawned by the `Workflow` tool's fan-out, which previously carried only the parent conversation's session ID.
+
+Without those headers, a session that fans out N concurrent subagents is indistinguishable from N unrelated conversations, and the spawn and join dependencies that shape the [replay graph](/glossary/trace-replay) cannot be recovered.
+
+The full dataset rules, distributions, and source links are published in the [AgentX methodology](/agentx/methodology), and the concrete engine changes this workload has already exposed are tracked in the [AgentX optimization tracker](/agentx/optimizations).
+
+## Acknowledgments
+
+Thanks to the Anthropic staff who shipped the agent-identification headers in Claude Code, and to the Alibaba and NVIDIA teams behind Qwen-Bailian and AIPerf, whose work the AgentX replay pipeline builds on.
+
+<DashboardCTA href="/inference?i_seq=agentic-traces">
+  Compare live AgentX inference results →
+</DashboardCTA>
+
+## Frequently asked questions
+
+### What is an agentic workload?
+
+An agentic workload is inference traffic generated by AI agents rather than by a person typing into a chat box. It is characterized by multi-turn sessions of tens to hundreds of interactions, long contexts built from system prompts and tool definitions, very high prefix reuse across turns, and bursts of short-lived subagents.
+
+### Why does prefix reuse matter so much for agentic inference?
+
+Each turn's input contains the previous turn's input plus its output, so nearly all of the context has already been processed. If the KV tensors for that prefix are still resident, the prefill work is skipped. As a session grows, the ratio of cached to uncached input tends toward 1, so cache capacity and cache hit rate dominate the cost of serving.
+
+### How is benchmarking an agentic workload different from a fixed-sequence-length benchmark?
+
+A fixed-sequence-length benchmark sends independent requests with a set input and output length, so prefix reuse is not a factor and the result mostly reflects chip and kernel performance. An agentic benchmark replays dependent sessions where context grows, prefixes are shared, and subagents fan out, which makes KV transfer, prefix-aware routing, and offload tiering part of what is being measured.
+
+### What does bursty subagent fan-out do to the KV cache?
+
+A single turn can spawn several subagents at once. Each one allocates its own KV cache, runs briefly, and finishes, so cache pressure arrives in spikes rather than a steady state. Schedulers and eviction policies tuned for uniform request streams behave differently under that pattern.
+
+### How was the AgentX replay corpus built?
+
+We collected 393 internal SemiAnalysis Claude Code traces and anonymized them with a block-hash method similar to Qwen-Bailian, preserving prefix relationships without preserving content. AIPerf then reconstructs the traces on their original request schedule across varying levels of concurrent clients.
+
+### Do fixed-sequence-length benchmarks still matter?
+
+Yes. Fixed-sequence-length results isolate low-level chip and kernel performance without the complexity of agentic serving, which makes them the baseline that AgentX results are interpreted against.
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is an agentic workload?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "An agentic workload is inference traffic generated by AI agents rather than by a person typing into a chat box. It is characterized by multi-turn sessions of tens to hundreds of interactions, long contexts built from system prompts and tool definitions, very high prefix reuse across turns, and bursts of short-lived subagents."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does prefix reuse matter so much for agentic inference?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Each turn's input contains the previous turn's input plus its output, so nearly all of the context has already been processed. If the KV tensors for that prefix are still resident, the prefill work is skipped. As a session grows, the ratio of cached to uncached input tends toward 1, so cache capacity and cache hit rate dominate the cost of serving."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How is benchmarking an agentic workload different from a fixed-sequence-length benchmark?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A fixed-sequence-length benchmark sends independent requests with a set input and output length, so prefix reuse is not a factor and the result mostly reflects chip and kernel performance. An agentic benchmark replays dependent sessions where context grows, prefixes are shared, and subagents fan out, which makes KV transfer, prefix-aware routing, and offload tiering part of what is being measured."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What does bursty subagent fan-out do to the KV cache?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A single turn can spawn several subagents at once. Each one allocates its own KV cache, runs briefly, and finishes, so cache pressure arrives in spikes rather than a steady state. Schedulers and eviction policies tuned for uniform request streams behave differently under that pattern."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How was the AgentX replay corpus built?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "We collected 393 internal SemiAnalysis Claude Code traces and anonymized them with a block-hash method similar to Qwen-Bailian, preserving prefix relationships without preserving content. AIPerf then reconstructs the traces on their original request schedule across varying levels of concurrent clients."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do fixed-sequence-length benchmarks still matter?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Fixed-sequence-length results isolate low-level chip and kernel performance without the complexity of agentic serving, which makes them the baseline that AgentX results are interpreted against."
+      }
+    }
+  ]
+}`}</JsonLd>
