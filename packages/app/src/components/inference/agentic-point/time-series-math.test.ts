@@ -14,6 +14,7 @@ import {
   interpAt,
   maxTimeSeriesValue,
   rollingAverage,
+  rollingRatioFromComponents,
   rollingRatioOfSums,
   rollingRequestMetric,
   timeRollingAverage,
@@ -263,6 +264,53 @@ describe('rollingRatioOfSums', () => {
 
     expect(result).toHaveLength(denominator.length);
     expect(result.at(-1)?.value).toBeCloseTo(0.8, 12);
+  });
+});
+
+describe('rollingRatioFromComponents', () => {
+  it('preserves the stored query denominator when hits exceed prompt throughput', () => {
+    const result = rollingRatioFromComponents(
+      [
+        { t: 0, value: 0.5 },
+        { t: 1, value: 0.5 },
+      ],
+      [
+        { t: 0, value: 200 },
+        { t: 1, value: 200 },
+      ],
+      [
+        { t: 0, value: 100 },
+        { t: 1, value: 100 },
+      ],
+      2,
+    );
+
+    // The original query rate is 200 / 0.5 = 400. Using prompt throughput
+    // as the denominator would incorrectly clamp both intervals to 100%.
+    expect(result.map((point) => point.value)).toEqual([0.5, 0.5]);
+  });
+
+  it('uses prompt throughput only to weight a zero-hit interval', () => {
+    const result = rollingRatioFromComponents(
+      [
+        { t: 0, value: 0 },
+        { t: 1, value: 0.5 },
+      ],
+      [
+        { t: 0, value: 0 },
+        { t: 1, value: 50 },
+      ],
+      [
+        { t: 0, value: 100 },
+        { t: 1, value: 100 },
+      ],
+      2,
+    );
+
+    expect(result).toEqual([
+      { t: 0, value: 0.25 },
+      { t: 1, value: 0.5 },
+    ]);
   });
 });
 

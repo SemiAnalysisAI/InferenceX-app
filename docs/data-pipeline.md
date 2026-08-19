@@ -117,10 +117,12 @@ The detail page does not average the resulting per-tick cache-hit ratios. Cache-
 prompt-token counters can publish logically related deltas in adjacent scrape buckets, so a
 quiet denominator bucket can make a pointwise ratio exceed 100% even though the run-wide totals
 are valid. The displayed line is instead a centered 50-sample ratio of sums —
-`Σ(cache-hit rate) / Σ(prompt-token rate)` — computed in O(n) with prefix sums. Only after that
-volume-weighted aggregation is the semantic `[0, 1]` bound applied as a guard against residual
-counter timing skew. Older rows without the component rate series retain the stored-ratio
-fallback.
+`Σ(cache-hit rate) / Σ(cache-query rate)` — computed in O(n) with prefix sums. The query-rate
+denominator is recovered from the stored pointwise ratio and hit rate, preserving vLLM's
+`prefix_cache_queries` semantics; prompt-token rate is only a proxy weight for zero-hit intervals
+where `hits / ratio` cannot be inverted. Only after that volume-weighted aggregation is the
+semantic `[0, 1]` bound applied as a guard against residual counter timing skew. Older rows
+without the component rate series retain the stored-ratio fallback.
 
 ### Agentic Dataset Provenance
 

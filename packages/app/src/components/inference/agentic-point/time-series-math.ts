@@ -306,6 +306,49 @@ export function rollingRatioOfSums(
 }
 
 /**
+ * Volume-weight a stored ratio without substituting a different denominator.
+ *
+ * `ratio = numerator / denominator`, so a positive interval lets us recover
+ * the original denominator exactly as `numerator / ratio`. This matters for
+ * vLLM, where prefix-cache queries are not interchangeable with prompt-token
+ * throughput. A zero-hit interval cannot be inverted; only there do we use
+ * the supplied denominator proxy to retain its zero-valued weight.
+ */
+export function rollingRatioFromComponents(
+  ratio: TimeSeriesPoint[],
+  numerator: TimeSeriesPoint[],
+  zeroRatioDenominator: TimeSeriesPoint[],
+  windowSize: number,
+  upperBound = 1,
+): TimeSeriesPoint[] {
+  const numeratorByT = new Map(numerator.map((point) => [point.t, Math.max(0, point.value)]));
+  const fallbackByT = new Map(
+    zeroRatioDenominator.map((point) => [point.t, Math.max(0, point.value)]),
+  );
+  const recoveredNumerator: TimeSeriesPoint[] = [];
+  const recoveredDenominator: TimeSeriesPoint[] = [];
+
+  for (const point of ratio) {
+    if (!Number.isFinite(point.t) || !Number.isFinite(point.value) || point.value < 0) continue;
+    const observedNumerator = numeratorByT.get(point.t) ?? 0;
+    const fallbackDenominator = fallbackByT.get(point.t) ?? 0;
+    const denominator =
+      point.value > 0 && observedNumerator > 0
+        ? observedNumerator / point.value
+        : fallbackDenominator;
+    if (!Number.isFinite(denominator) || denominator <= 0) continue;
+
+    recoveredDenominator.push({ t: point.t, value: denominator });
+    recoveredNumerator.push({
+      t: point.t,
+      value: observedNumerator > 0 ? observedNumerator : point.value * denominator,
+    });
+  }
+
+  return rollingRatioOfSums(recoveredNumerator, recoveredDenominator, windowSize, upperBound);
+}
+
+/**
  * Expanding-window cumulative mean from index 0..i.
  *
  * `burnInS` suppresses rendering during the unstable startup interval while

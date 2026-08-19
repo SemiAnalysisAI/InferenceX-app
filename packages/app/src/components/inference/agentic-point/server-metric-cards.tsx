@@ -20,7 +20,7 @@ import {
   buildThroughputChartSeries,
   inflightUniqueTokens,
   rollingAverage,
-  rollingRatioOfSums,
+  rollingRatioFromComponents,
   timeRollingAverage,
   toggleThroughputSeries,
   type ThroughputSeriesKey,
@@ -267,7 +267,8 @@ export function PrefixCacheHitRateCard({ sliced }: { sliced: SlicedServerSeries 
   const hitRateData = useMemo(() => {
     if (!sliced) return [];
     const serverSeries = sliced.series;
-    const weighted = rollingRatioOfSums(
+    const weighted = rollingRatioFromComponents(
+      serverSeries.prefixCacheHitRate,
       serverSeries.prefixCacheHitsTps,
       serverSeries.prefillTps,
       50,
