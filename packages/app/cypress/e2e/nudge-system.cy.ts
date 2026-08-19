@@ -55,7 +55,7 @@ describe('Landing nudges — modals', () => {
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
       .and('contain.text', 'Real-world agentic inference benchmark results are live')
-      .and('contain.text', 'Kimi K3, DeepSeek-V4-Pro, MiniMax-M3, Qwen3.5 397B, and GLM-5.2')
+      .and('contain.text', 'Kimi K3, DeepSeek-V4-Pro-0813, MiniMax-M3, Qwen3.5 397B, and GLM-5.3')
       .and('contain.text', 'View results')
       // Centered launch modal: a real backdrop-backed dialog, not a corner card.
       .and('match', 'div[role="dialog"][aria-modal="true"]');
@@ -114,7 +114,7 @@ describe('Landing nudges — modals', () => {
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
       .and('contain.text', '真实场景智能体推理基准测试结果已上线')
-      .and('contain.text', 'Kimi K3、DeepSeek-V4-Pro、MiniMax-M3、Qwen3.5 397B 与 GLM-5.2')
+      .and('contain.text', 'Kimi K3、DeepSeek-V4-Pro-0813、MiniMax-M3、Qwen3.5 397B 与 GLM-5.3')
       .and('contain.text', '查看结果');
   });
 

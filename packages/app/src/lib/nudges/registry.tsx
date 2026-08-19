@@ -297,9 +297,12 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       title: 'Real-world agentic inference benchmark results are live',
       titleZh: '真实场景智能体推理基准测试结果已上线',
       description:
-        'Compare AgentX results for Kimi K3, DeepSeek-V4-Pro, MiniMax-M3, Qwen3.5 397B, and GLM-5.2 across supported chips and serving stacks.',
+        'Compare AgentX results for Kimi K3, DeepSeek-V4-Pro-0813, MiniMax-M3, Qwen3.5 397B, and GLM-5.3 across supported chips and serving stacks.',
       descriptionZh:
-        '查看 Kimi K3、DeepSeek-V4-Pro、MiniMax-M3、Qwen3.5 397B 与 GLM-5.2 在支持 Chip 和推理服务栈上的 AgentX 结果。',
+        '查看 Kimi K3、DeepSeek-V4-Pro-0813、MiniMax-M3、Qwen3.5 397B 与 GLM-5.3 在支持 Chip 和推理服务栈上的 AgentX 结果。',
+      // Both buckets carry two releases on one architecture (GLM-5.2/5.3, the
+      // V4-Pro April preview and the 0813 GA); name the newer one, as the
+      // model selector does for GLM.
       testId: 'launch-modal',
       containerClassName: 'border-brand/40',
       // Launch announcement — centered with a backdrop so it reads as the
