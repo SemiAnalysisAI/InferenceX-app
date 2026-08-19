@@ -10,6 +10,7 @@
  * launch modal call `keepLaunchModal()` instead — see below.
  */
 let suppressLaunchModal = true;
+let suppressTelemetryTutorial = true;
 
 /**
  * Opt the whole spec out of the launch-modal suppression.
@@ -24,11 +25,27 @@ export function keepLaunchModal(): void {
   suppressLaunchModal = false;
 }
 
+/**
+ * Opt the whole spec out of the telemetry-tutorial suppression, for the same
+ * reason as `keepLaunchModal` — the card is seeded on `cy.reload()` too, so a
+ * per-visit `onBeforeLoad` clear cannot own its state.
+ *
+ * The card is a bottom-right modal on /inference/agentic/[id]. It has no
+ * backdrop, but it sits over the last chart in the grid, so agentic specs
+ * suppress it by default.
+ */
+export function keepTelemetryTutorial(): void {
+  suppressTelemetryTutorial = false;
+}
+
 Cypress.on('window:before:load', (win) => {
   try {
     win.localStorage.setItem('inferencex-feedback-modal-snoozed', String(Date.now()));
     if (suppressLaunchModal) {
       win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
+    }
+    if (suppressTelemetryTutorial) {
+      win.localStorage.setItem('inferencex-agentx-telemetry-tutorial-dismissed', '1');
     }
   } catch {
     // localStorage unavailable — fine, the test will just see the modal.

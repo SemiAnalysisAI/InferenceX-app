@@ -9,6 +9,7 @@ import { useAgenticAggregates } from '@/hooks/api/use-agentic-aggregates';
 import { useRequestTimeline } from '@/hooks/api/use-request-timeline';
 import { useTraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
 import { useBenchmarkSiblings } from '@/hooks/api/use-benchmark-siblings';
+import { NudgeEngine } from '@/components/nudge-engine';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
@@ -212,6 +213,10 @@ export function AgenticPointDetail({ id }: Props) {
 
   return (
     <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4 py-6">
+      {/* Points readers at /agentx/telemetry, which explains every chart below.
+          Non-centered, so the card never covers the charts it describes. */}
+      <NudgeEngine scope="agentic-detail" />
+
       <div className="flex items-center gap-2">
         <button
           type="button"
