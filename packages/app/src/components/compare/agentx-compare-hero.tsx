@@ -8,9 +8,9 @@ import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 const STRINGS = {
   en: {
     eyebrow: 'AgentX / live results',
-    title: 'Compare real world, agentic inference results',
+    title: 'Compare Realistic Agentic Inference Perf',
     description:
-      'Real-world agentic inference results for Kimi K3, DeepSeek V4 Pro, MiniMax M3, Qwen 3.5, and GLM 5.2. Compare throughput, interactivity, time to first token, and cost across serving stacks and accelerator platforms.',
+      'Long Context Multi Turn Inference Performance for Kimi K3 2.8T, DeepSeek v4 Pro-813, GLM 5.3 744B, MiniMax M3 430B, Qwen 3.5. Compare Across MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, etc.',
     overview: 'Overview',
     dashboard: 'Full dashboard',
     methodology: 'Read the full methodology',
@@ -19,9 +19,9 @@ const STRINGS = {
   },
   zh: {
     eyebrow: 'AgentX / 实时结果',
-    title: '对比真实场景下的智能体推理结果',
+    title: '对比真实场景下的智能体推理性能',
     description:
-      '查看 Kimi K3、DeepSeek V4 Pro、MiniMax M3、Qwen 3.5 与 GLM 5.2 的真实智能体推理结果，对比不同 serving stack 与加速平台的吞吐量、交互速度、首 token 延迟和成本。',
+      'Kimi K3 2.8T、DeepSeek v4 Pro-813、GLM 5.3 744B、MiniMax M3 430B、Qwen 3.5 的长上下文多轮推理性能，跨 MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100、RTX Pro 等平台进行对比。',
     overview: '总览',
     dashboard: '完整仪表板',
     methodology: '阅读完整方法论',
@@ -68,6 +68,7 @@ export function AgentXCompareHero({
                 href={`${prefix}/overview`}
                 analyticsEvent="compare_agentx_overview_clicked"
                 analyticsSurface={surface}
+                appNavigation
                 className="inline-flex min-h-11 items-center gap-2 rounded-md bg-brand px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
               >
                 {t.overview}
@@ -79,6 +80,7 @@ export function AgentXCompareHero({
                 analyticsEvent="compare_agentx_dashboard_clicked"
                 analyticsTarget="kimi-k3"
                 analyticsSurface={surface}
+                appNavigation
                 className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-5 py-2.5 font-semibold text-foreground transition-colors hover:bg-muted"
               >
                 {t.dashboard}
@@ -111,6 +113,7 @@ export function AgentXCompareHero({
                   analyticsEvent="compare_agentx_model_clicked"
                   analyticsTarget={model.slug}
                   analyticsSurface={surface}
+                  appNavigation
                   className="group flex min-h-16 items-center justify-between gap-4 px-5 py-3 transition-colors hover:bg-brand/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 >
                   <span className="min-w-0">

@@ -114,7 +114,7 @@ describe('First-load navigation', () => {
   it('leads the landing page with the AgentX hero and its three CTAs', () => {
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
       // The hero owns /compare's h1; on the landing page it is a section heading.
-      cy.get('h2').should('have.text', 'Compare real world, agentic inference results');
+      cy.get('h2').should('have.text', 'Compare Realistic Agentic Inference Perf');
       cy.get('h1').should('not.exist');
       cy.get('[data-testid="compare-agentx-overview-link"]')
         .should('contain.text', 'Overview')
