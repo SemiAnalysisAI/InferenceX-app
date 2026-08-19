@@ -101,9 +101,8 @@ export function AgentXCompareHero({
           </div>
 
           <div className="border-t border-border/70 bg-muted/15 lg:border-t-0 lg:border-l">
-            <div className="border-b border-border/70 px-5 py-3 font-mono text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-              {t.ledgerTitle}
-            </div>
+            {/* The visible ledger header is dropped; `ledgerTitle` stays as the
+                nav's accessible name so screen readers still get the label. */}
             <nav aria-label={t.ledgerTitle} className="divide-y divide-border/70">
               {FEATURED_AGENTX_MODELS.map((model) => (
                 <CompareIndexTrackedLink
