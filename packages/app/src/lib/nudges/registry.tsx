@@ -384,8 +384,10 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       iconClassName: 'text-brand',
       title: 'Agentic benchmark results are live',
       titleZh: '智能体基准测试结果已上线',
-      description: 'Compare AgentX across supported models, chips, and serving stacks.',
-      descriptionZh: '对比 AgentX 在支持模型、Chip 与推理服务栈上的表现。',
+      description:
+        "AgentX is the World's First Fully Realistic Open Sourced 1 Mil+ Long Context Length, Multi-Turn Agentic Benchmark",
+      descriptionZh:
+        'AgentX 是全球首个完全贴近真实场景、开源的百万级 (1M+) 长上下文多轮智能体基准测试',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
