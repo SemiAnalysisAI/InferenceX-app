@@ -35,6 +35,17 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   }
 }
 
+/**
+ * Banner-only state: everything cleared except the launch modal, which stays
+ * dismissed. The modal is centered behind a full-screen backdrop, and that
+ * backdrop covers the banner — including its dismiss button — whenever both
+ * are eligible. These tests are about the banner, so keep the modal out.
+ */
+function clearBannerNudgeStorage(win: Cypress.AUTWindow) {
+  clearAllNudgeStorage(win);
+  win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
+}
+
 // `cypress.config.ts` runs with `testIsolation: false` — the browser context
 // (incl. localStorage / sessionStorage) survives across tests in this spec.
 // Defensively clear before each test so a missed `onBeforeLoad` in any test
@@ -227,7 +238,7 @@ describe('Landing nudges — banner', () => {
   it('shows launch banner on landing page', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
-        clearAllNudgeStorage(win);
+        clearBannerNudgeStorage(win);
         // Dismiss modals so the banner (highest priority at 60) is the active nudge.
         // Actually the banner has priority 60 > launch modal 50, so it should show first.
         // But the engine only shows one nudge at a time; the banner wins because of priority.
@@ -241,7 +252,7 @@ describe('Landing nudges — banner', () => {
 
   it('banner renders within container constraints (not full-width)', () => {
     cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
+      onBeforeLoad: clearBannerNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     // The banner's parent section has the container class for width constraints
@@ -250,7 +261,7 @@ describe('Landing nudges — banner', () => {
 
   it('dismissing the banner persists across reloads', () => {
     cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
+      onBeforeLoad: clearBannerNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.get('[data-testid="launch-banner-dismiss"]').click();
@@ -262,7 +273,7 @@ describe('Landing nudges — banner', () => {
 
   it('rendering the banner does not write its dismissal storage key', () => {
     cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
+      onBeforeLoad: clearBannerNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
@@ -273,7 +284,7 @@ describe('Landing nudges — banner', () => {
 
   it('clicking the banner body navigates without persisting dismissal', () => {
     cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
+      onBeforeLoad: clearBannerNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.get('[data-testid="launch-banner"]').click();
