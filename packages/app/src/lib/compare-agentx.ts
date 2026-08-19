@@ -3,9 +3,9 @@ import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
 const FEATURED_AGENTX_MODEL_SLUGS = [
   'kimi-k3',
   'deepseek-v4',
+  'glm-5-2',
   'minimax-m3',
   'qwen-3-5',
-  'glm-5-2',
 ] as const;
 
 const FEATURED_AGENTX_MODEL_SET = new Set<string>(FEATURED_AGENTX_MODEL_SLUGS);
