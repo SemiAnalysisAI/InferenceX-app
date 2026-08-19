@@ -2023,7 +2023,45 @@ const ScatterGraph = React.memo(
           // Two-pass text/bbox sizing — same batching rationale as the
           // parallelism labels above.
           llSel.each(function (d) {
-            d3.select(this).select<SVGTextElement>('.ll-text').text(d.label);
+            const text = d3.select(this).select<SVGTextElement>('.ll-text');
+            const config = getHardwareConfig(d.hw, modelLabel);
+            const hardwareLabel = getDisplayLabel(config);
+            const isHardwareLabel =
+              d.label === hardwareLabel || d.label.startsWith(`${hardwareLabel} `);
+            const trailingLabel = isHardwareLabel ? d.label.slice(hardwareLabel.length) : '';
+            const segments = isHardwareLabel
+              ? [
+                  { className: 'll-gpu', text: config.label, fill: 'white', weight: '700' },
+                  ...(config.suffix
+                    ? [
+                        {
+                          className: 'll-engine',
+                          text: ` ${config.suffix}`,
+                          fill: '#d1d5db',
+                          weight: '400',
+                        },
+                      ]
+                    : []),
+                  ...(trailingLabel
+                    ? [
+                        {
+                          className: 'll-precision',
+                          text: trailingLabel,
+                          fill: 'white',
+                          weight: '600',
+                        },
+                      ]
+                    : []),
+                ]
+              : [{ className: 'll-plain', text: d.label, fill: 'white', weight: '600' }];
+            text
+              .selectAll<SVGTSpanElement, (typeof segments)[number]>('tspan')
+              .data(segments, (segment) => segment.className)
+              .join('tspan')
+              .attr('class', (segment) => segment.className)
+              .attr('fill', (segment) => segment.fill)
+              .attr('font-weight', (segment) => segment.weight)
+              .text((segment) => segment.text);
           });
           const llMeasured: { node: SVGGElement; d: LineLabel; bbox: DOMRect }[] = [];
           llSel.each(function (d) {

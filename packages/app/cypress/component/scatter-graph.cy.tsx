@@ -440,6 +440,9 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
       .find('text')
       .should('contain.text', 'feature-branch');
+    cy.get(
+      '#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-gpu',
+    ).should('not.exist');
   });
 
   it('renders a line label for a singleton unofficial overlay series', () => {
@@ -585,6 +588,16 @@ describe('ScatterGraph', () => {
       .should('have.css', 'opacity', '1')
       .find('text')
       .should('have.text', 'B200 (TileRT, MTP)');
+    cy.get(
+      '#test-scatter-ingested-singleton-label svg .line-label[data-hw-key="b200_tilert_mtp"] .ll-gpu',
+    )
+      .should('have.text', 'B200')
+      .and('have.attr', 'font-weight', '700');
+    cy.get(
+      '#test-scatter-ingested-singleton-label svg .line-label[data-hw-key="b200_tilert_mtp"] .ll-engine',
+    )
+      .should('have.text', ' (TileRT, MTP)')
+      .and('have.attr', 'fill', '#d1d5db');
 
     cy.get('#scatter-line-labels').click();
     cy.get('#test-scatter-ingested-singleton-label svg .line-label').should('not.exist');
@@ -676,6 +689,12 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"]')
       .find('text')
       .should('contain.text', 'EAGLE');
+    cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"] .ll-gpu')
+      .should('have.text', 'B200')
+      .and('have.attr', 'font-weight', '700');
+    cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"] .ll-engine')
+      .should('contain.text', 'EAGLE')
+      .and('have.attr', 'fill', '#d1d5db');
     // No label should show the generic MTP token for M3.
     cy.get('#test-scatter-m3-eagle svg .line-label text').should('not.contain.text', 'MTP');
   });
