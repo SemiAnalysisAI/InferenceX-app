@@ -6,6 +6,12 @@
  * permanent-suppress ("starred") cross-nudge mechanism.
  */
 
+import { keepLaunchModal } from '../support/e2e';
+
+// This spec owns launch-modal state, so it opts out of the global suppression
+// in cypress/support/e2e.ts rather than fighting it per visit.
+keepLaunchModal();
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -142,6 +148,11 @@ describe('Landing nudges — modals', () => {
     cy.get('[data-testid="launch-modal"]').should('be.visible');
     cy.get('[data-testid="launch-modal-dismiss"]').click();
     cy.get('[data-testid="launch-modal"]').should('not.exist');
+    // Assert the write itself, not just the absence after reload — the latter
+    // is only meaningful because this spec opted out of the global seeding.
+    cy.window().then((win) => {
+      expect(win.localStorage.getItem('inferencex-agentic-results-modal-dismissed')).to.eq('1');
+    });
 
     cy.reload();
     cy.get('[data-testid="launch-modal"]').should('not.exist');

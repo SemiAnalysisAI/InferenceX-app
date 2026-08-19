@@ -4,15 +4,32 @@
  *
  * Suppresses the two centered modals (feedback-modal on the dashboard, the
  * agentic-results launch modal on the landing page) so their backdrops don't
- * sit on top of the UI under test. Specs that want to exercise either flow
- * can clear `inferencex-feedback-modal-snoozed` /
- * `inferencex-agentic-results-modal-dismissed` in their own `onBeforeLoad`,
- * which runs after this hook.
+ * sit on top of the UI under test. Specs that want to exercise the
+ * feedback-modal flow can clear `inferencex-feedback-modal-snoozed` in their
+ * own `onBeforeLoad`, which runs after this hook; specs that exercise the
+ * launch modal call `keepLaunchModal()` instead — see below.
  */
+let suppressLaunchModal = true;
+
+/**
+ * Opt the whole spec out of the launch-modal suppression.
+ *
+ * Clearing the key in a visit's `onBeforeLoad` is not enough: this hook also
+ * fires on `cy.reload()`, which takes no `onBeforeLoad`, so the key would be
+ * re-seeded behind the test and a "still dismissed after reload" assertion
+ * would pass even if dismissal never persisted anything. Call this at the top
+ * of any spec that owns launch-modal state.
+ */
+export function keepLaunchModal(): void {
+  suppressLaunchModal = false;
+}
+
 Cypress.on('window:before:load', (win) => {
   try {
     win.localStorage.setItem('inferencex-feedback-modal-snoozed', String(Date.now()));
-    win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
+    if (suppressLaunchModal) {
+      win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
+    }
   } catch {
     // localStorage unavailable — fine, the test will just see the modal.
   }
