@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { AgentXMethodology } from '@/components/datasets/agentx-methodology';
+import { AgentXOptimizationsCallout } from '@/components/datasets/agentx-optimizations-callout';
 import { DatasetList } from '@/components/datasets/dataset-list';
 import { JsonLd } from '@/components/json-ld';
 import { enAlternates } from '@/lib/i18n';
@@ -36,6 +37,10 @@ export default function AgentXPage() {
       <div className="container mx-auto flex flex-col gap-6 px-4 pb-8 lg:px-8">
         <section>
           <AgentXMethodology locale="en" />
+        </section>
+
+        <section>
+          <AgentXOptimizationsCallout locale="en" />
         </section>
 
         <section className="flex flex-col gap-3">

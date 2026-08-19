@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { AgentXMethodology } from '@/components/datasets/agentx-methodology';
+import { AgentXOptimizationsCallout } from '@/components/datasets/agentx-optimizations-callout';
 import { DatasetList } from '@/components/datasets/dataset-list';
 import { JsonLd } from '@/components/json-ld';
 import { zhAlternates, ZH_LANG_TAG, ZH_OG_LOCALE } from '@/lib/i18n';
@@ -38,6 +39,10 @@ export default function AgentXPageZh() {
       <div className="container mx-auto flex flex-col gap-6 px-4 pb-8 lg:px-8">
         <section>
           <AgentXMethodology locale="zh" />
+        </section>
+
+        <section>
+          <AgentXOptimizationsCallout locale="zh" />
         </section>
 
         <section className="flex flex-col gap-3">
