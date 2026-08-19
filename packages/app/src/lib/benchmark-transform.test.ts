@@ -290,13 +290,18 @@ describe('rowToAggDataEntry', () => {
   it('passes through multinode / disagg role-split power scalars when present', () => {
     const entry = rowToAggDataEntry(
       makeRow({
+        disagg: true,
         metrics: {
           tput_per_gpu: 100,
+          power_valid: 1,
+          power_metric_schema_version: 2,
           prefill_avg_power_w: 612.3,
           decode_avg_power_w: 701.5,
           joules_per_input_token: 1.2,
-          // disagg: joules_per_output_token IS the per-stage decode value.
           joules_per_output_token: 9.7,
+          joules_per_total_token: 0.8,
+          prefill_joules_per_input_token: 0.4,
+          decode_joules_per_output_token: 5.1,
         },
       }),
     );
@@ -304,6 +309,86 @@ describe('rowToAggDataEntry', () => {
     expect(entry.decode_avg_power_w).toBe(701.5);
     expect(entry.joules_per_input_token).toBe(1.2);
     expect(entry.joules_per_output_token).toBe(9.7);
+    expect(entry.joules_per_total_token).toBe(0.8);
+    expect(entry.prefill_joules_per_input_token).toBe(0.4);
+    expect(entry.decode_joules_per_output_token).toBe(5.1);
+  });
+
+  it('withholds ambiguous unversioned disagg joules while preserving role watts', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        disagg: true,
+        metrics: {
+          avg_power_w: 650,
+          prefill_avg_power_w: 612.3,
+          decode_avg_power_w: 701.5,
+          joules_per_input_token: 1.2,
+          joules_per_output_token: 9.7,
+          joules_per_total_token: 0.8,
+        },
+      }),
+    );
+
+    expect(entry.avg_power_w).toBe(650);
+    expect(entry.prefill_avg_power_w).toBe(612.3);
+    expect(entry.decode_avg_power_w).toBe(701.5);
+    expect(entry.joules_per_input_token).toBeUndefined();
+    expect(entry.joules_per_output_token).toBeUndefined();
+    expect(entry.joules_per_total_token).toBeUndefined();
+  });
+
+  it('withholds disagg joules stamped with an unrecognized future schema version', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        disagg: true,
+        metrics: {
+          power_valid: 1,
+          power_metric_schema_version: 3,
+          avg_power_w: 650,
+          prefill_avg_power_w: 612.3,
+          joules_per_input_token: 1.2,
+          joules_per_output_token: 9.7,
+          joules_per_total_token: 0.8,
+        },
+      }),
+    );
+
+    expect(entry.avg_power_w).toBe(650);
+    expect(entry.prefill_avg_power_w).toBe(612.3);
+    expect(entry.joules_per_input_token).toBeUndefined();
+    expect(entry.joules_per_output_token).toBeUndefined();
+    expect(entry.joules_per_total_token).toBeUndefined();
+  });
+
+  it('treats explicit power_valid=0 as authoritative and scrubs measured power', () => {
+    const workers = [{ role: 'agg', worker_idx: 0, num_gpus: 8, avg_power_w: 685.5 }];
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: {
+          power_valid: 0,
+          power_metric_schema_version: 2,
+          avg_power_w: 685.5,
+          joules_per_input_token: 1.2,
+          joules_per_output_token: 8.4,
+          joules_per_total_token: 0.8,
+          prefill_avg_power_w: 612.3,
+          decode_avg_power_w: 701.5,
+          prefill_joules_per_input_token: 0.4,
+          decode_joules_per_output_token: 5.1,
+        },
+        workers,
+      }),
+    );
+
+    expect(entry.avg_power_w).toBeUndefined();
+    expect(entry.joules_per_input_token).toBeUndefined();
+    expect(entry.joules_per_output_token).toBeUndefined();
+    expect(entry.joules_per_total_token).toBeUndefined();
+    expect(entry.prefill_avg_power_w).toBeUndefined();
+    expect(entry.decode_avg_power_w).toBeUndefined();
+    expect(entry.prefill_joules_per_input_token).toBeUndefined();
+    expect(entry.decode_joules_per_output_token).toBeUndefined();
+    expect(entry.workers).toBeUndefined();
   });
 
   it('passes through per-worker measured power array intact', () => {
