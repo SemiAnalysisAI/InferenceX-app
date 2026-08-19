@@ -699,7 +699,9 @@ export const calculateRoofline = (
     | `measuredDecodeAvgPower.y`
     | `measuredJPerOutputToken.y`
     | `measuredJPerTotalToken.y`
-    | `measuredJPerInputToken.y`,
+    | `measuredJPerInputToken.y`
+    | `measuredJPerSuccessfulQuery.y`
+    | `measuredWhPerSuccessfulQuery.y`,
   rooflineDirection: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right',
 ): InferenceData[] => {
   // Exclude degenerate x <= 0 points (see isFrontierEligible) so they never
@@ -777,7 +779,9 @@ export function computeAllRooflines(
             | `measuredDecodeAvgPower.y`
             | `measuredJPerOutputToken.y`
             | `measuredJPerTotalToken.y`
-            | `measuredJPerInputToken.y`,
+            | `measuredJPerInputToken.y`
+            | `measuredJPerSuccessfulQuery.y`
+            | `measuredWhPerSuccessfulQuery.y`,
           rooflineDirection,
         );
       }
@@ -827,6 +831,9 @@ export function markRooflinePoints(
       if (newPoint.measuredJPerOutputToken) newPoint.measuredJPerOutputToken.roof = false;
       if (newPoint.measuredJPerTotalToken) newPoint.measuredJPerTotalToken.roof = false;
       if (newPoint.measuredJPerInputToken) newPoint.measuredJPerInputToken.roof = false;
+      if (newPoint.measuredJPerSuccessfulQuery) newPoint.measuredJPerSuccessfulQuery.roof = false;
+      if (newPoint.measuredWhPerSuccessfulQuery)
+        newPoint.measuredWhPerSuccessfulQuery.roof = false;
 
       for (const chartDefYKey of Y_AXIS_METRICS) {
         const rooflinePoints = computedRooflines[hwKey]?.[chartDefYKey];
@@ -904,6 +911,16 @@ export function markRooflinePoints(
           newPoint.measuredJPerTotalToken.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_measuredJPerInputToken' && newPoint.measuredJPerInputToken) {
           newPoint.measuredJPerInputToken.roof = onCurrentRoofline;
+        } else if (
+          chartDefYKey === 'y_measuredJPerSuccessfulQuery' &&
+          newPoint.measuredJPerSuccessfulQuery
+        ) {
+          newPoint.measuredJPerSuccessfulQuery.roof = onCurrentRoofline;
+        } else if (
+          chartDefYKey === 'y_measuredWhPerSuccessfulQuery' &&
+          newPoint.measuredWhPerSuccessfulQuery
+        ) {
+          newPoint.measuredWhPerSuccessfulQuery.roof = onCurrentRoofline;
         }
       }
       finalProcessedData.push(newPoint);
