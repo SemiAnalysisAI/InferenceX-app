@@ -76,11 +76,17 @@ function applyAgenticMetricAliases(raw: Record<string, number>): Record<string, 
 /** Convert a DB benchmark row to an AggDataEntry. */
 export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   const isAgentic = row.benchmark_type === 'agentic_traces';
+  // Postgres bigint comes through the SQL client as a string; coerce it. Raw
+  // unofficial-run artifact rows have no persisted id, which also lets us
+  // distinguish their pre-alias metrics from already-normalized DB rows.
+  const numericId = typeof row.id === 'number' ? row.id : Number(row.id);
+  const isPersisted = isPersistedBenchmarkId(numericId);
   const originalMedianInteractivity = row.metrics.median_intvty;
   const fullResponseMedianInteractivity = row.metrics.median_full_response_intvty;
   const medianTpotInteractivity =
     row.metrics.median_tpot_intvty ??
-    (isAgentic &&
+    (!isPersisted &&
+    isAgentic &&
     typeof originalMedianInteractivity === 'number' &&
     originalMedianInteractivity > 0 &&
     originalMedianInteractivity !== fullResponseMedianInteractivity
@@ -134,15 +140,9 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     const value = rawMetrics[key];
     return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
   };
-  // Postgres bigint comes through the SQL client as a string; coerce it. Overlay
-  // rows (transformed live from raw artifacts) carry no id, so `Number(undefined)`
-  // is NaN — collapse any non-persisted value to undefined so downstream link /
-  // fetch sites (guarded by isPersistedBenchmarkId) skip it cleanly rather than
-  // emitting `?ids=NaN` or an `/inference/agentic/NaN` link.
-  const numericId = typeof row.id === 'number' ? row.id : Number(row.id);
   return {
     rawMetricKeys: Object.keys(m),
-    id: isPersistedBenchmarkId(numericId) ? numericId : undefined,
+    id: isPersisted ? numericId : undefined,
     recipe_fingerprint: row.recipe_fingerprint ?? undefined,
     hw: row.hardware,
     framework: row.framework,
