@@ -1055,6 +1055,7 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(metrics.median_full_response_itl).toBe(0.004);
     expect(metrics.p75_full_response_itl).toBe(0.006);
     expect(metrics.median_itl).toBe(0.004);
+    expect(metrics.median_tpot_intvty).toBeCloseTo(27.19411, 2);
     expect(metrics.p75_intvty).toBeCloseTo(1 / 0.006, 6);
     expect(metrics.std_itl).toBe(0.001);
     expect(metrics.std_intvty).toBe(20);

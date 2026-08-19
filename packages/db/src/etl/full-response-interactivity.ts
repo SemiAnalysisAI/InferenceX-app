@@ -165,6 +165,16 @@ export function preferFullResponseMetrics(metrics: Record<string, number>): Reco
   );
   if (!hasFullResponse) return out;
 
+  const medianTpotInteractivity = out.median_intvty;
+  if (
+    typeof medianTpotInteractivity === 'number' &&
+    Number.isFinite(medianTpotInteractivity) &&
+    medianTpotInteractivity > 0 &&
+    out.median_tpot_intvty === undefined
+  ) {
+    out.median_tpot_intvty = medianTpotInteractivity;
+  }
+
   for (const stat of FULL_RESPONSE_STAT_KEYS) {
     delete out[`${stat}_itl`];
     delete out[`${stat}_intvty`];

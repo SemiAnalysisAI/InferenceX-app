@@ -8,6 +8,7 @@
  */
 
 import type { InferenceData, TrendDataPoint } from '@/components/inference/types';
+import { p50Interactivity } from '@/lib/interactivity-metrics';
 import type { SubmissionVolumeRow } from '@/lib/submissions-types';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
@@ -38,6 +39,18 @@ function benchmarkMetric(point: InferenceData, key: string): number | '' {
   if (point.rawMetricKeys && !point.rawMetricKeys.includes(key)) return '';
   const value = point[key as keyof InferenceData];
   return typeof value === 'number' ? value : '';
+}
+
+function p50InteractivityMetric(point: InferenceData): number | '' {
+  if (
+    point.rawMetricKeys &&
+    !point.rawMetricKeys.includes('median_tpot_intvty') &&
+    !point.rawMetricKeys.includes('median_tpot') &&
+    !point.rawMetricKeys.includes('median_intvty')
+  ) {
+    return '';
+  }
+  return p50Interactivity(point);
 }
 
 /**
@@ -80,7 +93,7 @@ export function inferenceChartToCsv(
     'Std TPOT (s)',
     // Interactivity
     'Mean Interactivity (tok/s/user)',
-    'Median Interactivity (tok/s/user)',
+    'P50 Interactivity (tok/s/user)',
     'P99 Interactivity (tok/s/user)',
     'Std Interactivity (tok/s/user)',
     // ITL
@@ -147,7 +160,7 @@ export function inferenceChartToCsv(
         benchmarkMetric(d, 'p99_tpot'),
         benchmarkMetric(d, 'std_tpot'),
         benchmarkMetric(d, 'mean_intvty'),
-        benchmarkMetric(d, 'median_intvty'),
+        p50InteractivityMetric(d),
         benchmarkMetric(d, 'p99_intvty'),
         benchmarkMetric(d, 'std_intvty'),
         benchmarkMetric(d, 'mean_itl'),

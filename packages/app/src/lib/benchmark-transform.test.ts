@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
 import type { BenchmarkRow } from '@/lib/api';
 import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
+import { p50Interactivity } from '@/lib/interactivity-metrics';
 
 import {
   mergeRunScopedRows,
@@ -130,10 +131,12 @@ describe('rowToAggDataEntry', () => {
   it('prefers full-response AgentX ITL and interactivity for artifact overlays', () => {
     const entry = rowToAggDataEntry(
       makeRow({
+        id: undefined,
         benchmark_type: 'agentic_traces',
         metrics: {
           median_itl: 0.000003,
           median_intvty: 333_333,
+          median_tpot: 0.00245,
           median_full_response_itl: 0.005,
           median_full_response_intvty: 200,
           std_full_response_itl: 0.001,
@@ -143,10 +146,38 @@ describe('rowToAggDataEntry', () => {
     );
 
     expect(entry.median_itl).toBe(0.005);
-    expect(entry.median_tpot).toBe(0.005);
+    // The ordinary decode TPOT remains available to table consumers even
+    // though chart interactivity is canonicalized from full-response ITL.
+    expect(entry.median_tpot).toBe(0.00245);
+    expect(entry.median_tpot_intvty).toBe(333_333);
     expect(entry.median_intvty).toBe(200);
     expect(entry.std_itl).toBe(0.001);
     expect(entry.std_intvty).toBe(20);
+  });
+
+  it('does not mistake rounded full-response interactivity for persisted artifact P50', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        id: 440_025,
+        hardware: 'b200',
+        framework: 'trt',
+        model: 'minimaxm3',
+        benchmark_type: 'agentic_traces',
+        conc: 15,
+        prefill_tp: 4,
+        decode_tp: 4,
+        metrics: {
+          median_tpot: 0.00247,
+          median_intvty: 1 / 0.00077,
+          median_full_response_itl: 0.00077,
+          median_full_response_intvty: 1296.21319,
+        },
+      }),
+    );
+
+    expect(entry.median_tpot_intvty).toBeUndefined();
+    expect(entry.median_intvty).toBeCloseTo(1 / 0.00077, 10);
+    expect(p50Interactivity(entry)).toBeCloseTo(1 / 0.00247, 10);
   });
 
   it('defaults missing metrics to 0', () => {

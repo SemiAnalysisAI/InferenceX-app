@@ -108,6 +108,8 @@ export interface AggDataEntry {
   mean_tpot: number;
   mean_intvty: number;
   median_tpot: number;
+  /** Original AIPerf P50 decode interactivity before AgentX full-response canonicalization. */
+  median_tpot_intvty?: number;
   median_intvty: number;
   std_tpot: number;
   std_intvty: number;

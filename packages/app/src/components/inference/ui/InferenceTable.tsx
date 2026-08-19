@@ -5,15 +5,44 @@ import { useMemo } from 'react';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { getHardwareConfig } from '@/lib/constants';
-import { getNestedYValue } from '@/lib/chart-utils';
+import { getNestedYValue, metricLabel } from '@/lib/chart-utils';
 import { sortRowsByYMetric } from '@/components/inference/ui/inference-table-sort';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
+import { p50Interactivity } from '@/lib/interactivity-metrics';
+import { useLocale } from '@/lib/use-locale';
 import { getDisplayLabel } from '@/lib/utils';
 
 interface InferenceTableProps {
   data: InferenceData[];
   chartDefinition: ChartDefinition;
   selectedYAxisMetric: string;
+}
+
+const STRINGS = {
+  en: {
+    chip: 'Chip',
+    precision: 'Precision',
+    concurrency: 'Conc',
+    throughputPerChip: 'Throughput/Chip (tok/s)',
+    medianTtft: 'Median TTFT (ms)',
+    p50Interactivity: 'P50 Interactivity (tok/s/user)',
+  },
+  zh: {
+    chip: 'Chip',
+    precision: '精度',
+    concurrency: '并发数',
+    throughputPerChip: '吞吐量/Chip (tok/s)',
+    medianTtft: '中位 TTFT (ms)',
+    p50Interactivity: 'P50 交互性 (tok/s/user)',
+  },
+} as const;
+
+function xAxisLabel(label: string, locale: 'en' | 'zh'): string {
+  if (locale === 'en') return label;
+  return label
+    .replace('Time To First Token', '首 token 延迟（TTFT）')
+    .replace('End-to-end Latency', '端到端延迟')
+    .replace('Interactivity', '交互性');
 }
 
 /** Format a number for table display — picks sensible precision based on magnitude. */
@@ -30,9 +59,11 @@ export default function InferenceTable({
   chartDefinition,
   selectedYAxisMetric,
 }: InferenceTableProps) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
-  const yLabel = chartDefinition[`${selectedYAxisMetric}_label` as keyof ChartDefinition] as string;
-  const xLabel = chartDefinition.x_label;
+  const yLabel = metricLabel(chartDefinition, selectedYAxisMetric, locale);
+  const xLabel = xAxisLabel(chartDefinition.x_label, locale);
 
   const sorted = useMemo(
     () => sortRowsByYMetric(data, chartDefinition, selectedYAxisMetric),
@@ -42,13 +73,13 @@ export default function InferenceTable({
   const columns = useMemo<DataTableColumn<InferenceData>[]>(
     () => [
       {
-        header: 'Chip',
+        header: t.chip,
         cell: (row) => getDisplayLabel(getHardwareConfig(row.hwKey, row.model)),
         sortValue: (row) => getDisplayLabel(getHardwareConfig(row.hwKey, row.model)),
         className: 'font-medium whitespace-nowrap',
       },
       {
-        header: 'Precision',
+        header: t.precision,
         cell: (row) => (row.precision ? getPrecisionLabel(row.precision as Precision) : ''),
         sortValue: (row) => row.precision ?? '',
         className: 'whitespace-nowrap',
@@ -61,7 +92,7 @@ export default function InferenceTable({
         className: 'tabular-nums',
       },
       {
-        header: 'Conc',
+        header: t.concurrency,
         align: 'right',
         cell: (row) => row.conc,
         sortValue: (row) => row.conc,
@@ -82,28 +113,28 @@ export default function InferenceTable({
         className: 'tabular-nums',
       },
       {
-        header: 'Throughput/Chip (tok/s)',
+        header: t.throughputPerChip,
         align: 'right',
         cell: (row) => fmt(row.tput_per_gpu ?? 0, 1),
         sortValue: (row) => row.tput_per_gpu ?? 0,
         className: 'tabular-nums',
       },
       {
-        header: 'Median TTFT (ms)',
+        header: t.medianTtft,
         align: 'right',
         cell: (row) => fmt((row.median_ttft ?? 0) * 1000, 0),
         sortValue: (row) => row.median_ttft ?? 0,
         className: 'tabular-nums',
       },
       {
-        header: 'Median Interactivity (tok/s)',
+        header: t.p50Interactivity,
         align: 'right',
-        cell: (row) => fmt(row.median_intvty ?? 0, 1),
-        sortValue: (row) => row.median_intvty ?? 0,
+        cell: (row) => fmt(p50Interactivity(row), 1),
+        sortValue: p50Interactivity,
         className: 'tabular-nums',
       },
     ],
-    [yPath, yLabel, xLabel],
+    [t, yPath, yLabel, xLabel],
   );
 
   return (

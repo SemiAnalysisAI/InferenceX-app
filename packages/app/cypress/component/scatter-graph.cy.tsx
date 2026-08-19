@@ -952,7 +952,9 @@ describe('ChartDisplay engine comparison guard', () => {
       hwKey: 'b200_sglang',
       precision: Precision.FP4,
       tp: 4,
-      median_intvty: 134.7,
+      median_tpot: 0.00245,
+      median_tpot_intvty: 407.50337,
+      median_intvty: 1315.8,
       costhOutput: { y: 4, roof: true },
     });
     const officialClipped = createMockInferenceData({
@@ -967,7 +969,9 @@ describe('ChartDisplay engine comparison guard', () => {
       hwKey: 'h100_vllm',
       precision: Precision.FP4,
       tp: 4,
-      median_intvty: 130,
+      median_tpot: 0.00245,
+      median_tpot_intvty: 407.50337,
+      median_intvty: 1312.6527,
       costhOutput: { y: 4.5, roof: true },
       run_url: runUrl,
     });
@@ -1027,15 +1031,33 @@ describe('ChartDisplay engine comparison guard', () => {
     });
 
     cy.get('[data-testid="inference-table-view-btn"]').click();
+    cy.get('[data-testid="inference-results-table"] thead').should(
+      'contain.text',
+      'P50 Interactivity (tok/s/user)',
+    );
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 4);
     cy.get('[data-testid="inference-results-table"] tbody')
-      .contains('tr', '7.0')
+      .contains('td', /^4\.0$/u)
+      .parent('tr')
+      .find('td')
+      .last()
+      .should('have.text', '407.5');
+    cy.get('[data-testid="inference-results-table"] tbody')
+      .contains('td', /^4\.5$/u)
+      .parent('tr')
+      .find('td')
+      .last()
+      .should('have.text', '407.5');
+    cy.get('[data-testid="inference-results-table"] tbody')
+      .contains('td', /^7\.0$/u)
+      .parent('tr')
       .should('contain.text', 'SGLang')
       .find('td')
       .eq(2)
       .should('have.text', '8');
     cy.get('[data-testid="inference-results-table"] tbody')
-      .contains('tr', '7.5')
+      .contains('td', /^7\.5$/u)
+      .parent('tr')
       .should('contain.text', 'vLLM')
       .find('td')
       .eq(2)

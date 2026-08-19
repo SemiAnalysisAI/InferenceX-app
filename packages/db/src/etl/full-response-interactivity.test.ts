@@ -104,6 +104,7 @@ describe('preferFullResponseMetrics', () => {
 
     expect(metrics.median_itl).toBe(0.005);
     expect(metrics.median_intvty).toBe(200);
+    expect(metrics.median_tpot_intvty).toBe(333_333);
     expect(metrics).not.toHaveProperty('p99_itl');
     expect(metrics).not.toHaveProperty('p99_intvty');
   });

@@ -62,6 +62,9 @@ export const METRIC_KEYS = new Set([
   'p99_intvty',
   'p99.9_intvty',
   'std_intvty',
+  // AIPerf's ordinary decode-cadence P50 (1 / median TPOT). AgentX ingest
+  // preserves it before full-response interactivity replaces median_intvty.
+  'median_tpot_intvty',
   // Full-response AgentX timing. These namespaced fields preserve provenance;
   // ingest mirrors them onto the canonical *_itl / *_intvty chart fields.
   'median_full_response_itl',
