@@ -113,6 +113,15 @@ Mirrored endpoints are collapsed here too, on a **relative** tolerance rather th
 
 Nothing groups on an exact `start_ns` any more; `aggregateByStart` was removed in v14.
 
+The detail page does not average the resulting per-tick cache-hit ratios. Cache-hit and
+prompt-token counters can publish logically related deltas in adjacent scrape buckets, so a
+quiet denominator bucket can make a pointwise ratio exceed 100% even though the run-wide totals
+are valid. The displayed line is instead a centered 50-sample ratio of sums —
+`Σ(cache-hit rate) / Σ(prompt-token rate)` — computed in O(n) with prefix sums. Only after that
+volume-weighted aggregation is the semantic `[0, 1]` bound applied as a guard against residual
+counter timing skew. Older rows without the component rate series retain the stored-ratio
+fallback.
+
 ### Agentic Dataset Provenance
 
 AIPerf exports public-dataset provenance in `metadata.dataset`, including the Hugging Face dataset ID. InferenceX preserves that object as `dataset` on each agentic aggregate benchmark row. During benchmark ingest, `ingest-ci-run.ts` derives the dashboard slug from `hf_dataset_name` (for example, `semianalysisai/cc-traces-weka-062126` becomes `cc-traces-weka-062126`) and upserts `run_datasets` for the workflow run.

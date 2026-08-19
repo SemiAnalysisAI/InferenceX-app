@@ -20,6 +20,7 @@ import {
   buildThroughputChartSeries,
   inflightUniqueTokens,
   rollingAverage,
+  rollingRatioOfSums,
   timeRollingAverage,
   toggleThroughputSeries,
   type ThroughputSeriesKey,
@@ -263,20 +264,31 @@ export function RequestActivityCard({
 }
 
 export function PrefixCacheHitRateCard({ sliced }: { sliced: SlicedServerSeries }) {
+  const hitRateData = useMemo(() => {
+    if (!sliced) return [];
+    const serverSeries = sliced.series;
+    const weighted = rollingRatioOfSums(
+      serverSeries.prefixCacheHitsTps,
+      serverSeries.prefillTps,
+      50,
+    );
+    // Older stored rows may not have the component rate series. Preserve
+    // their existing chart rather than turning it into an empty state.
+    return weighted.length > 0 ? weighted : rollingAverage(serverSeries.prefixCacheHitRate, 50);
+  }, [sliced]);
+
   return (
     <ExpandableChart
       title="Prefix cache hit rate per interval"
       render={(expanded) => {
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
         if (!sliced) return <ChartSkeleton />;
-        const serverSeries = sliced.series;
         return (
           <TimeSeriesChart
             series={[
               {
                 name: 'Chip (HBM, avg n=50)',
-                data: rollingAverage(serverSeries.prefixCacheHitRate, 50),
-                rawData: serverSeries.prefixCacheHitRate,
+                data: hitRateData,
                 color: '#a855f7',
                 strokeWidth: 2,
               },

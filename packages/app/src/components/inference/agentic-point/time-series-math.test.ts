@@ -14,6 +14,7 @@ import {
   interpAt,
   maxTimeSeriesValue,
   rollingAverage,
+  rollingRatioOfSums,
   rollingRequestMetric,
   timeRollingAverage,
   toggleThroughputSeries,
@@ -207,6 +208,61 @@ describe('rollingAverage', () => {
   it('passes through window sizes of 1 or less', () => {
     const data = [{ t: 0, value: 5 }];
     expect(rollingAverage(data, 1)).toBe(data);
+  });
+});
+
+describe('rollingRatioOfSums', () => {
+  it('weights cache-hit ratios by token volume instead of averaging interval ratios', () => {
+    const result = rollingRatioOfSums(
+      [
+        { t: 0, value: 0 },
+        { t: 1, value: 100 },
+        { t: 2, value: 0 },
+      ],
+      [
+        { t: 0, value: 100 },
+        { t: 1, value: 0 },
+        { t: 2, value: 100 },
+      ],
+      3,
+    );
+
+    // The middle interval has a zero denominator and would yield an infinite
+    // pointwise ratio. Across the shared window it is 100 / 200 = 50%.
+    expect(result[1]).toEqual({ t: 1, value: 0.5 });
+    expect(result.every((point) => point.value <= 1)).toBe(true);
+  });
+
+  it('treats a missing numerator tick as zero and bounds residual timing skew', () => {
+    const result = rollingRatioOfSums(
+      [
+        { t: 1, value: 50 },
+        { t: 3, value: 110 },
+      ],
+      [
+        { t: 0, value: 100 },
+        { t: 1, value: 100 },
+        { t: 2, value: 100 },
+        { t: 3, value: 100 },
+      ],
+      1,
+    );
+
+    expect(result).toEqual([
+      { t: 0, value: 0 },
+      { t: 1, value: 0.5 },
+      { t: 2, value: 0 },
+      { t: 3, value: 1 },
+    ]);
+  });
+
+  it('handles six-figure series in linear time', () => {
+    const denominator = Array.from({ length: 100_000 }, (_, t) => ({ t, value: 100 }));
+    const numerator = denominator.map(({ t }) => ({ t, value: 80 }));
+    const result = rollingRatioOfSums(numerator, denominator, 50);
+
+    expect(result).toHaveLength(denominator.length);
+    expect(result.at(-1)?.value).toBeCloseTo(0.8, 12);
   });
 });
 

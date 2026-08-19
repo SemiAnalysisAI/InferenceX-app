@@ -236,6 +236,76 @@ export function rollingAverage(data: TimeSeriesPoint[], windowSize: number): Tim
 }
 
 /**
+ * Centered, volume-weighted ratio over matching rate series.
+ *
+ * Counter families that describe one logical fraction can publish their
+ * deltas in adjacent scrape buckets. Averaging the pointwise ratios gives a
+ * tiny-denominator bucket the same weight as a million-token bucket and can
+ * therefore produce impossible percentages. Sum the rates over the window
+ * first, then divide. The semantic upper bound is applied only after that
+ * aggregation as a guard against residual counter timing skew.
+ *
+ * The denominator owns the timeline. Missing numerator samples contribute
+ * zero, which is the correct interpretation for a no-hit interval.
+ */
+export function rollingRatioOfSums(
+  numerator: TimeSeriesPoint[],
+  denominator: TimeSeriesPoint[],
+  windowSize: number,
+  upperBound = 1,
+): TimeSeriesPoint[] {
+  if (denominator.length === 0 || windowSize <= 0) return [];
+
+  const numeratorByT = new Map<number, number>();
+  for (const point of numerator) {
+    if (!Number.isFinite(point.t) || !Number.isFinite(point.value)) continue;
+    numeratorByT.set(point.t, (numeratorByT.get(point.t) ?? 0) + Math.max(0, point.value));
+  }
+
+  // The ETL emits sorted canonical-grid series. Coalesce defensively so a
+  // duplicate denominator timestamp cannot receive the numerator twice.
+  const rows: { t: number; numerator: number; denominator: number }[] = [];
+  for (const point of denominator) {
+    if (!Number.isFinite(point.t) || !Number.isFinite(point.value)) continue;
+    const previous = rows.at(-1);
+    if (previous?.t === point.t) {
+      previous.denominator += Math.max(0, point.value);
+      continue;
+    }
+    rows.push({
+      t: point.t,
+      numerator: numeratorByT.get(point.t) ?? 0,
+      denominator: Math.max(0, point.value),
+    });
+  }
+  if (rows.length === 0) return [];
+
+  const numeratorPrefix = new Float64Array(rows.length + 1);
+  const denominatorPrefix = new Float64Array(rows.length + 1);
+  for (let i = 0; i < rows.length; i++) {
+    numeratorPrefix[i + 1] = numeratorPrefix[i]! + rows[i]!.numerator;
+    denominatorPrefix[i + 1] = denominatorPrefix[i]! + rows[i]!.denominator;
+  }
+
+  const leftSpan = Math.floor((windowSize - 1) / 2);
+  const rightSpan = windowSize - leftSpan - 1;
+  const boundedUpper = Number.isFinite(upperBound) ? Math.max(0, upperBound) : Infinity;
+  const out: TimeSeriesPoint[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const start = Math.max(0, i - leftSpan);
+    const end = Math.min(rows.length, i + rightSpan + 1);
+    const denominatorSum = denominatorPrefix[end]! - denominatorPrefix[start]!;
+    if (denominatorSum <= 0) continue;
+    const numeratorSum = numeratorPrefix[end]! - numeratorPrefix[start]!;
+    out.push({
+      t: rows[i]!.t,
+      value: Math.min(boundedUpper, Math.max(0, numeratorSum / denominatorSum)),
+    });
+  }
+  return out;
+}
+
+/**
  * Expanding-window cumulative mean from index 0..i.
  *
  * `burnInS` suppresses rendering during the unstable startup interval while
