@@ -185,7 +185,7 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
         <h1 className="text-xl font-semibold text-foreground">{t.title}</h1>
         <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">{t.intro}</p>
         <AgentXMethodologyLink
-          href={locale === 'zh' ? '/zh/overview' : '/overview'}
+          href={locale === 'zh' ? '/zh/inference' : '/inference'}
           analyticsEvent="agentx_results_opened"
           analyticsTarget="methodology-header"
           data-testid="agentx-results-cta"
