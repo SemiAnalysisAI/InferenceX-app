@@ -181,7 +181,6 @@
     "y_measuredPowerPercentTdp_labelZh": "实测平均功耗（TDP 占比）",
     "y_measuredPowerPercentTdp_title": "Measured Average Power as Percent of TDP",
     "y_measuredPowerPercentTdp_titleZh": "实测平均功耗占 TDP 百分比",
-    "y_measuredPowerPercentTdp_roofline": "lower_right",
     "y_cost_limit": 5,
     "y_latency_limit": 60
   },
@@ -366,7 +365,6 @@
     "y_measuredPowerPercentTdp_labelZh": "实测平均功耗（TDP 占比）",
     "y_measuredPowerPercentTdp_title": "Measured Average Power as Percent of TDP",
     "y_measuredPowerPercentTdp_titleZh": "实测平均功耗占 TDP 百分比",
-    "y_measuredPowerPercentTdp_roofline": "lower_left",
     "y_cost_limit": 5,
     "y_latency_limit": 60
   }

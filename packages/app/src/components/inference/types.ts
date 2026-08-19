@@ -526,7 +526,9 @@ export interface ChartDefinition {
   y_measuredPowerPercentTdp?: string;
   y_measuredPowerPercentTdp_label?: string;
   y_measuredPowerPercentTdp_title?: string;
-  y_measuredPowerPercentTdp_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  // No `_roofline`: %TDP is a utilization gauge, not an efficiency frontier —
+  // there is no corner along which a config is "better", so the axis
+  // deliberately declares no Pareto direction.
   y_cost_limit?: number;
   y_latency_limit?: number;
 }
