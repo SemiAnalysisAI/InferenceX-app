@@ -6,6 +6,7 @@ describe('Chinese (/zh) pages', () => {
 
     it('renders the Chinese landing content', () => {
       cy.get('[data-testid="intro-section"]').should('contain.text', '智能体推理基准测试');
+      cy.get('[data-testid="splash-text"]').should('have.text', 'AgentX 来了！！');
       cy.contains('h2', '探索 InferenceX').should('exist');
       cy.contains('快速对比').should('exist');
     });

@@ -410,17 +410,40 @@
 
 .splash-text {
   display: inline-block;
-  color: #ffff00;
+  /* Light mode paints this over a white card, where flat #ffff00 all but
+     disappears — keep the Minecraft yellow but ring it with a dark outline. */
+  color: #ffcc00;
   font-weight: bold;
   font-size: 0.85rem;
   white-space: nowrap;
-  text-shadow: 2px 2px 0px #3f3f00;
+  text-shadow:
+    1px 1px 0 #4a3800,
+    1px -1px 0 #4a3800,
+    -1px 1px 0 #4a3800,
+    -1px -1px 0 #4a3800,
+    2px 2px 0 #4a3800;
+  /* The keyframes re-declare this; keeping it on the element means the splash
+     still sits where it belongs when the animation is off (reduced motion). */
+  transform: translate(2rem, 2.25rem) rotate(10deg);
   animation: splash-bounce 1.5s ease-in-out infinite;
   transform-origin: center;
   /* Always use Minecraft font & style regardless of active theme */
   font-family: var(--font-minecraft, 'Monocraft', monospace) !important;
   -webkit-font-smoothing: none;
   -moz-osx-font-smoothing: unset;
+}
+
+/* Dark backgrounds need no outline — this is the original title-screen look. */
+.dark .splash-text,
+.minecraft .splash-text {
+  color: #ffff00;
+  text-shadow: 2px 2px 0px #3f3f00;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-text {
+    animation: none;
+  }
 }
 
 @media (min-width: 640px) {
