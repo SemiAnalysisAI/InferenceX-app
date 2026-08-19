@@ -95,13 +95,6 @@ export default function InferenceTable({
         sortValue: (row) => row.median_ttft ?? 0,
         className: 'tabular-nums',
       },
-      {
-        header: 'Median Interactivity (tok/s)',
-        align: 'right',
-        cell: (row) => fmt(row.median_intvty ?? 0, 1),
-        sortValue: (row) => row.median_intvty ?? 0,
-        className: 'tabular-nums',
-      },
     ],
     [yPath, yLabel, xLabel],
   );

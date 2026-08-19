@@ -1114,6 +1114,57 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('@setLocalOfficialOverride').should('not.have.been.called');
   });
 
+  it('renders the table columns without a Median Interactivity column', () => {
+    // Mirror the real interactivity chart: x IS interactivity, which is what
+    // made the separate median column a duplicate.
+    const chartDefinition = createMockChartDefinition({
+      chartType: 'interactivity',
+      x: 'median_intvty',
+      x_label: 'Interactivity (tok/s/user)',
+    });
+    const row = createMockInferenceData({
+      hwKey: 'b200_sglang',
+      hw: 'Official SGLang',
+      model: Model.DeepSeek_V4_Pro,
+      precision: Precision.FP4,
+    });
+
+    mountWithProviders(<ChartDisplay />, {
+      inference: {
+        graphs: [
+          {
+            model: Model.DeepSeek_V4_Pro,
+            sequence: Sequence.AgenticTraces,
+            chartDefinition,
+            data: [row],
+          },
+        ],
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        selectedXAxisMode: 'interactivity',
+        activeHwTypes: new Set(['b200_sglang']),
+        hwTypesWithData: new Set(['b200_sglang']),
+      },
+      globalFilters: {
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        effectiveSequence: Sequence.AgenticTraces,
+      },
+      unofficial: {},
+    });
+
+    cy.get('[data-testid="inference-table-view-btn"]').click();
+    cy.get('[data-testid="inference-results-table"] thead th').then(($headers) => {
+      const headers = [...$headers].map((th) => (th.textContent ?? '').trim());
+      // Interactivity is already the x-axis column on the interactivity chart,
+      // so the median column duplicated it. Assert both that the column is gone
+      // and that exactly one interactivity column remains, so a rename cannot
+      // quietly reintroduce the duplicate.
+      expect(headers).to.not.include('Median Interactivity (tok/s)');
+      expect(headers.filter((h) => h.toLowerCase().includes('interactivity'))).to.have.length(1);
+    });
+  });
+
   it('keeps same-hardware cross-engine AgentX STP rows out of table mode', () => {
     const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
     const sglangRow = createMockInferenceData({
