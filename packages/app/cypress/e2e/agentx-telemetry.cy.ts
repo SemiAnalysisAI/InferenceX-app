@@ -126,6 +126,17 @@ describe('AgentX telemetry tutorial — popup on the agentic point-detail page',
     );
   });
 
+  it('is the only card in the corner — dashboard nudges stay off this route', () => {
+    // The detail page sits inside the (dashboard) route group, so the dashboard
+    // NudgeEngine would otherwise mount here too and stack its own bottom-right
+    // cards under the tutorial. `reproducibility` (1.5s timer, no conditions) is
+    // the one that always fires, so it is the canary for the carve-out in
+    // DashboardShell.
+    cy.get('[data-testid="telemetry-tutorial-modal"]', { timeout: 10_000 }).should('be.visible');
+    cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
+    cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
+  });
+
   it('opens the tutorial from its primary action', () => {
     cy.get('[data-testid="telemetry-tutorial-modal-action"]', { timeout: 10_000 }).click();
     cy.location('pathname').should('eq', '/agentx/telemetry');
@@ -135,8 +146,12 @@ describe('AgentX telemetry tutorial — popup on the agentic point-detail page',
     cy.get('[data-testid="telemetry-tutorial-modal-dismiss"]', { timeout: 10_000 }).click();
     cy.get('[data-testid="telemetry-tutorial-modal"]').should('not.exist');
     cy.reload();
-    // Long enough to outlast the 2.5s trigger delay had dismissal not persisted.
     cy.get('[data-testid="detail-view-toggle"]').should('exist');
-    cy.get('[data-testid="telemetry-tutorial-modal"]', { timeout: 6_000 }).should('not.exist');
+    // A `not.exist` assertion passes on its FIRST check, so a timeout would not
+    // outlast the nudge's 2.5s trigger delay — the card could still appear
+    // afterwards and the test would have gone green. Burn the delay first, then
+    // assert absence, so this only passes if dismissal actually persisted.
+    cy.wait(3_500);
+    cy.get('[data-testid="telemetry-tutorial-modal"]').should('not.exist');
   });
 });
