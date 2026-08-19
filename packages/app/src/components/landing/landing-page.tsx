@@ -84,12 +84,13 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
       <LandingPageAnalytics />
       <NudgeEngine scope="landing" />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
-        <IntroSection locale={locale} />
-
-        {/* Same AgentX hero that leads /compare. The landing page owns no h1 of
-            its own, but keep this an h2 so the hero stays a section within the
-            page rather than retitling the whole site. */}
+        {/* Same AgentX hero that leads /compare, above the quote carousel. The
+            landing page owns no h1 of its own, but keep this an h2 so the hero
+            stays a section within the page rather than retitling the whole
+            site. */}
         <AgentXCompareHero locale={locale} headingLevel="h2" surface="landing" />
+
+        <IntroSection locale={locale} />
 
         {/* Split: exploration entry points vs presets */}
         <section className="flex flex-col gap-4 pb-8">
