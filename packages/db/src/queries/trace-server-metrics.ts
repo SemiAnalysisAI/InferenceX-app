@@ -187,10 +187,90 @@ function merge(
   };
 }
 
+/** Mean of several engine series, matched on scrape instant. */
+function meanOfEngines(engines: readonly { points: TimeSeriesPoint[] }[]): TimeSeriesPoint[] {
+  const active = engines.filter((engine) => engine.points.length > 0);
+  if (active.length === 0) return [];
+  if (active.length === 1) return active[0]!.points;
+  // Engines inside one worker are scraped together, so they share instants and
+  // a pointwise mean is exact. A `t` only some of them reported averages those,
+  // rather than counting the absent ones as zero.
+  const byT = new Map<number, { sum: number; n: number }>();
+  for (const engine of active) {
+    for (const point of engine.points) {
+      const at = byT.get(point.t);
+      if (at) {
+        at.sum += point.value;
+        at.n++;
+      } else {
+        byT.set(point.t, { sum: point.value, n: 1 });
+      }
+    }
+  }
+  return [...byT.entries()]
+    .toSorted((a, b) => a[0] - b[0])
+    .map(([t, { sum, n }]) => ({ t, value: sum / n }));
+}
+
+/**
+ * All-endpoints KV overlay: one line per WORKER, averaged over the ranks it
+ * owns.
+ *
+ * `chart_series.kvCacheUsageByEngine` is per rank, which stops being readable
+ * on a PD-disaggregated run — 6 prefill workers at DP4 plus a decode worker is
+ * 28 lines, and ranks inside one worker track each other closely, so the
+ * comparison worth seeing is worker-vs-worker.
+ *
+ * Derived here rather than in the ETL because everything it needs is already
+ * stored: each source carries its own per-rank breakdown, and this layer is
+ * the last place that sees it before `metricSources` is trimmed to
+ * descriptors. Keeping it out of `chart_series` means no version bump and no
+ * backfill for what is a presentation choice.
+ *
+ * Returns null when collapsing would not help — a single worker, or a run with
+ * no per-source data, keeps the per-rank overlay, which is exactly where rank
+ * skew is the signal.
+ */
+function collapseKvByWorker(
+  sources: readonly MetricSourceSeries[],
+): { engineLabel: string; points: TimeSeriesPoint[] }[] | null {
+  if (sources.length < 2) return null;
+  const entries = sources
+    .map((entry) => ({ source: entry.source, engines: entry.kvCacheUsageByEngine ?? [] }))
+    .filter((entry) => entry.engines.length > 0);
+  if (entries.length < 2) return null;
+  // Already one engine per worker — nothing to average, so leave the stored
+  // labels alone rather than relabelling for no gain.
+  const totalEngines = entries.reduce((sum, entry) => sum + entry.engines.length, 0);
+  if (totalEngines <= entries.length) return null;
+
+  const workersPerRole = new Map<string, number>();
+  for (const { source } of entries) {
+    workersPerRole.set(source.role, (workersPerRole.get(source.role) ?? 0) + 1);
+  }
+  const used = new Set<string>();
+  return entries.map(({ source, engines }, index) => {
+    const worker = source.workerId;
+    const short = worker && worker.length > 4 ? worker.slice(-4) : worker;
+    // Qualify by worker only when the role actually has several, so a lone
+    // decode worker reads "decode" rather than "decode 0842".
+    const base =
+      (workersPerRole.get(source.role) ?? 0) > 1 && short
+        ? `${source.role} ${short}`
+        : (source.role ?? short ?? `#${index}`);
+    let label = base;
+    for (let n = 2; used.has(label); n++) label = `${base} #${n}`;
+    used.add(label);
+    return { engineLabel: label, points: meanOfEngines(engines) };
+  });
+}
+
 function summarizeSeries(series: ChartSeries): ChartSeriesSummary {
+  const sources = series.metricSources ?? [];
   return {
     ...series,
-    metricSources: (series.metricSources ?? []).map(({ source }) => ({ source })),
+    kvCacheUsageByEngine: collapseKvByWorker(sources) ?? series.kvCacheUsageByEngine ?? [],
+    metricSources: sources.map(({ source }) => ({ source })),
   };
 }
 

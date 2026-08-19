@@ -120,16 +120,8 @@ import {
  * per-rank detail stays reachable as that source's own
  * `kvCacheUsageByEngine`.
  *
- * v16: on the all-endpoints view, collapse the KV per-engine overlay to one
- * line per WORKER, averaged over the ranks it owns. A PD-disaggregated run
- * draws a line per DP rank otherwise — 6 prefill workers at DP4 plus a decode
- * worker is 28 lines, and ranks inside a worker track each other closely, so
- * the readable comparison is worker-vs-worker. Runs with a single worker (or
- * no worker labels at all, as on a plain DP deployment) keep the per-rank
- * overlay, which is exactly where rank skew is the signal. Per-source series
- * are unaffected, so selecting one worker still shows its individual ranks.
  */
-export const CHART_SERIES_VERSION = 16;
+export const CHART_SERIES_VERSION = 15;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -667,61 +659,6 @@ function resolveComponents(
   );
 }
 
-/**
- * Collapse engines into one entry per WORKER, averaging the ranks it owns.
- *
- * On a PD-disaggregated run the per-rank overlay stops being readable: 6
- * prefill workers at DP4 plus a decode worker draw 28 lines, and the ranks
- * inside one worker track each other closely, so the useful comparison is
- * worker-vs-worker. Returns null when collapsing would not help — a single
- * worker (or no worker labels at all, as on a plain DP deployment) keeps the
- * per-rank overlay, which is exactly where rank skew is the point.
- *
- * The per-source series keep their per-rank breakdown either way, so selecting
- * one worker still shows its individual ranks.
- */
-function collapseEnginesByWorker(engines: readonly ResolvedEngine[]): LogicalEngine[] | null {
-  if (engines.length < 2) return null;
-  const groups = new Map<string, ResolvedEngine[]>();
-  for (const engine of engines) {
-    // Keep roles apart: a prefill and a decode worker sharing an endpoint are
-    // still two lines.
-    const key = `${engine.role ?? ''}\u0001${engine.workerKey ?? ''}`;
-    const bucket = groups.get(key);
-    if (bucket) bucket.push(engine);
-    else groups.set(key, [engine]);
-  }
-  // Nothing to collapse (already one engine per worker), or everything folds
-  // into a single line — either way the per-rank view is the better one.
-  if (groups.size === engines.length || groups.size < 2) return null;
-
-  const workersPerRole = new Map<string, number>();
-  for (const [key] of groups) {
-    const role = key.split('\u0001')[0] ?? '';
-    workersPerRole.set(role, (workersPerRole.get(role) ?? 0) + 1);
-  }
-
-  const out: LogicalEngine[] = [];
-  const used = new Set<string>();
-  for (const members of groups.values()) {
-    const first = members[0]!;
-    const role = first.role ?? '';
-    const shortWorker =
-      first.workerKey && first.workerKey.length > 4 ? first.workerKey.slice(-4) : first.workerKey;
-    // Only qualify by worker when the role actually has several of them, so a
-    // lone decode worker reads "decode" rather than "decode 0842".
-    const base =
-      (workersPerRole.get(role) ?? 0) > 1 && shortWorker
-        ? `${role || 'engine'} ${shortWorker}`
-        : role || (shortWorker ?? `#${out.length}`);
-    let label = base;
-    for (let n = 2; used.has(label); n++) label = `${base} #${n}`;
-    used.add(label);
-    out.push({ engineLabel: label, points: averageAcrossEngines(members) });
-  }
-  return out;
-}
-
 /** Collapse a gauge's raw series into one labelled entry per logical engine. */
 function resolveLogicalEngines(
   series: readonly RawSeries[] | undefined,
@@ -1057,19 +994,12 @@ function buildSeriesFromMetrics(
   // One entry per logical engine (v13) — mirrored API-server frontends and the
   // warmup/profiling phase split are collapsed here rather than showing up as
   // extra "engines".
-  const kvComponents = resolveComponents(kvSeries, tOf, 'avg');
   const engines = resolveLogicalEngines(kvSeries, tOf);
   const kvCacheUsage: TimeSeriesPoint[] = averageAcrossEngines(engines);
   // Per-engine breakdown of the same metric. Emitted only for genuinely
   // multi-engine deployments — with one engine it would just duplicate the
   // cluster-average line.
-  //
-  // On the all-endpoints view of a multi-worker run this collapses to one line
-  // per worker (mean of the ranks it owns); `includeMetricSources` is false on
-  // the recursive per-source call, so drilling into one worker still shows its
-  // individual ranks.
-  const byWorker = includeMetricSources ? collapseEnginesByWorker(kvComponents) : null;
-  const kvCacheUsageByEngine = byWorker ?? (engines.length > 1 ? engines : []);
+  const kvCacheUsageByEngine = engines.length > 1 ? engines : [];
 
   // Prefix cache hit rate per scrape: Σhits.rate / Σqueries.rate across
   // engines, joined on start_ns. SGLang names: cached_tokens / prompt_tokens.

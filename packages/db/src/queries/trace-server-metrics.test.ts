@@ -176,3 +176,96 @@ describe('getTraceServerMetricSource', () => {
     expect(calls[0]).not.toContain('server_metrics_json_gz as blob');
   });
 });
+
+// ── All-endpoints KV overlay collapses per worker ───────────────────────
+//
+// `chart_series.kvCacheUsageByEngine` is per DP rank. On a PD-disaggregated
+// run that is unreadable (6 prefill workers x DP4 + decode = 28 lines), so the
+// read layer averages each worker's ranks into one line. Derived here, not in
+// the ETL, so it needs no CHART_SERIES_VERSION bump or backfill.
+
+/** One metric source (worker) owning `ranks` engines, each at a flat value. */
+function workerSource(role: string, workerId: string, ranks: number[]) {
+  return {
+    source: {
+      id: `dynamo|${role}|${workerId}`,
+      adapter: 'dynamo',
+      role,
+      endpointUrl: `http://10.0.0.1:7500/metrics`,
+      nativeRole: role,
+      workerId,
+      dpRank: null,
+      engine: null,
+    },
+    kvCacheUsage: [],
+    prefixCacheHitRate: [],
+    queueDepth: [],
+    promptTokensBySource: {},
+    promptTps: [],
+    generationTps: [],
+    prefixCacheHitsTps: [],
+    hostKvCacheUsage: [],
+    kvCacheUsageByEngine: ranks.map((value, i) => ({
+      engineLabel: `${role} ${i}`,
+      points: [
+        { t: 0, value },
+        { t: 1, value },
+      ],
+    })),
+  };
+}
+
+describe('getTraceServerMetrics all-endpoints KV overlay', () => {
+  function run(metricSources: unknown[], fallback: unknown[] = []) {
+    const series = {
+      ...currentSeries(),
+      kvCacheUsageByEngine: fallback,
+      metricSources,
+    } as unknown as ChartSeries;
+    const { sql } = mockSql([[metaRow({ chart_series: series })]]);
+    return getTraceServerMetrics(sql, 42);
+  }
+
+  it("averages each worker's ranks into one line", async () => {
+    const result = await run([
+      workerSource('prefill', 'wpre-aaaa', [0.1, 0.3]),
+      workerSource('prefill', 'wpre-bbbb', [0.5, 0.7]),
+      workerSource('decode', 'wdec-cccc', [0.3, 0.5]),
+    ]);
+    expect(result?.kvCacheUsageByEngine.map((e) => e.engineLabel)).toEqual([
+      'prefill aaaa',
+      'prefill bbbb',
+      'decode',
+    ]);
+    expect(result?.kvCacheUsageByEngine.map((e) => e.points[0]!.value)).toEqual([0.2, 0.6, 0.4]);
+  });
+
+  it('keeps the stored per-rank overlay for a single-worker run', async () => {
+    // A plain DP deployment has no per-source data; rank skew is the signal
+    // there, so the stored per-rank lines must survive untouched.
+    const perRank = [
+      { engineLabel: '0', points: [{ t: 0, value: 0.1 }] },
+      { engineLabel: '1', points: [{ t: 0, value: 0.9 }] },
+    ];
+    const result = await run([], perRank);
+    expect(result?.kvCacheUsageByEngine).toEqual(perRank);
+  });
+
+  it('leaves workers that already own one engine each alone', async () => {
+    const perRank = [{ engineLabel: 'prefill 0', points: [{ t: 0, value: 0.2 }] }];
+    const result = await run(
+      [workerSource('prefill', 'wpre-aaaa', [0.2]), workerSource('decode', 'wdec-cccc', [0.4])],
+      perRank,
+    );
+    expect(result?.kvCacheUsageByEngine).toEqual(perRank);
+  });
+
+  it('still trims metricSources to descriptors', async () => {
+    const result = await run([
+      workerSource('prefill', 'wpre-aaaa', [0.1, 0.3]),
+      workerSource('decode', 'wdec-cccc', [0.3, 0.5]),
+    ]);
+    expect(result?.metricSources).toHaveLength(2);
+    expect(Object.keys(result!.metricSources[0]!)).toEqual(['source']);
+  });
+});
