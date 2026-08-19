@@ -1,6 +1,8 @@
 // Merged from tabs.cy.ts and first-load-navigation.cy.ts
 // to reduce per-file Cypress startup overhead (~500ms per file)
 
+import { keepLaunchModal } from '../support/e2e';
+
 describe('Chart Section Tabs — E2E', () => {
   before(() => {
     cy.window().then((win) => {
@@ -42,6 +44,9 @@ describe('Chart Section Tabs — E2E', () => {
 });
 
 describe('First-load navigation', () => {
+  // These specs need the launch modal to actually show on first load.
+  before(keepLaunchModal);
+
   beforeEach(() => {
     cy.visit('/', {
       onBeforeLoad(win) {
