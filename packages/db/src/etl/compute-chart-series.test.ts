@@ -779,6 +779,97 @@ function dynamoBlob(series: unknown[]) {
   );
 }
 
+/** kv_cache_usage_perc for one worker, one series per DP rank. */
+function kvWorkerRanks(
+  endpoint_url: string,
+  dynamo_component: 'prefill' | 'backend',
+  worker_id: string,
+  ranks: number[],
+  valueAt: (rank: number) => number,
+) {
+  return ranks.map((dp) => ({
+    endpoint_url,
+    labels: { dynamo_component, worker_id, dp_rank: String(dp) },
+    timeslices: [
+      { start_ns: 0, end_ns: 1e9, avg: valueAt(dp) },
+      { start_ns: 1e9, end_ns: 2e9, avg: valueAt(dp) },
+    ],
+  }));
+}
+
+describe('all-endpoints KV overlay (v16)', () => {
+  it('collapses a PD-disagg run to one line per worker, averaging its ranks', async () => {
+    const cs = await computeChartSeries(
+      kvBlob([
+        // Two prefill workers at DP2 plus one decode worker at DP2: six ranks,
+        // three workers. Ranks average to 0.2 / 0.6 / 0.4 respectively.
+        ...kvWorkerRanks('http://10.0.0.1:7500/metrics', 'prefill', 'wpre-aaaa', [0, 1], (dp) =>
+          dp === 0 ? 0.1 : 0.3,
+        ),
+        ...kvWorkerRanks('http://10.0.0.2:7500/metrics', 'prefill', 'wpre-bbbb', [0, 1], (dp) =>
+          dp === 0 ? 0.5 : 0.7,
+        ),
+        ...kvWorkerRanks('http://10.0.0.3:7502/metrics', 'backend', 'wdec-cccc', [0, 1], (dp) =>
+          dp === 0 ? 0.3 : 0.5,
+        ),
+      ]),
+      { framework: 'dynamo-vllm', disagg: true },
+    );
+    // Prefill has two workers so it is worker-qualified; decode has one, so it
+    // stays plain.
+    expect(cs?.kvCacheUsageByEngine.map((e) => e.engineLabel)).toEqual([
+      'prefill aaaa',
+      'prefill bbbb',
+      'decode',
+    ]);
+    expect(cs?.kvCacheUsageByEngine.map((e) => e.points[0]!.value)).toEqual([0.2, 0.6, 0.4]);
+  });
+
+  it('keeps the per-rank overlay for a single-worker DP deployment', async () => {
+    // Plain DP8-style run: rank skew is the whole reason the overlay exists,
+    // so collapsing to one line would destroy the signal.
+    const cs = await computeChartSeries(
+      kvBlob(
+        [0, 1, 2, 3].map((dp) =>
+          kvSeriesFor('http://localhost:8000/metrics', { engine: String(dp) }, [[0, 0.1 * dp]]),
+        ),
+      ),
+    );
+    expect(cs?.kvCacheUsageByEngine.map((e) => e.engineLabel)).toEqual(['0', '1', '2', '3']);
+  });
+
+  it('leaves a run whose workers already own one engine each alone', async () => {
+    const cs = await computeChartSeries(
+      kvBlob([
+        ...kvWorkerRanks('http://10.0.0.1:7500/metrics', 'prefill', 'wpre-aaaa', [0], () => 0.2),
+        ...kvWorkerRanks('http://10.0.0.2:7502/metrics', 'backend', 'wdec-cccc', [0], () => 0.4),
+      ]),
+      { framework: 'dynamo-vllm', disagg: true },
+    );
+    // One engine per worker already — labels stay the ETL's role+rank form.
+    expect(cs?.kvCacheUsageByEngine).toHaveLength(2);
+    expect(cs?.kvCacheUsageByEngine.map((e) => e.points[0]!.value)).toEqual([0.2, 0.4]);
+  });
+
+  it('still exposes each worker per rank on its own source', async () => {
+    const cs = await computeChartSeries(
+      kvBlob([
+        ...kvWorkerRanks('http://10.0.0.1:7500/metrics', 'prefill', 'wpre-aaaa', [0, 1], (dp) =>
+          dp === 0 ? 0.1 : 0.3,
+        ),
+        ...kvWorkerRanks('http://10.0.0.2:7502/metrics', 'backend', 'wdec-cccc', [0, 1], (dp) =>
+          dp === 0 ? 0.3 : 0.5,
+        ),
+      ]),
+      { framework: 'dynamo-vllm', disagg: true },
+    );
+    // Top level: one line per worker. Drill-down: that worker's two ranks.
+    expect(cs?.kvCacheUsageByEngine).toHaveLength(2);
+    const prefill = cs?.metricSources.find(({ source }) => source.workerId === 'wpre-aaaa');
+    expect(prefill?.kvCacheUsageByEngine).toHaveLength(2);
+  });
+});
+
 describe('metric source identity', () => {
   it("collapses a worker's sglang dp_rank series into one source", async () => {
     const cs = await computeChartSeries(
