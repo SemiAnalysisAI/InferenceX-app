@@ -325,10 +325,12 @@ describe('computeChartSeries', () => {
     });
 
     expect(result?.metricSources).toHaveLength(3);
+    // engine/dpRank are null at worker granularity (v15) — a source spans
+    // every engine the worker owns.
     expect(result?.metricSources.map(({ source: s }) => [s.role, s.workerId, s.engine])).toEqual([
-      ['prefill', 'prefill-a', '0'],
-      ['prefill', 'prefill-b', '0'],
-      ['decode', 'decode-a', '0'],
+      ['prefill', 'prefill-a', null],
+      ['prefill', 'prefill-b', null],
+      ['decode', 'decode-a', null],
     ]);
     const prefillA = result?.metricSources.find(({ source: s }) => s.workerId === 'prefill-a');
     const decode = result?.metricSources.find(({ source: s }) => s.role === 'decode');
@@ -741,6 +743,133 @@ function rateBlob(metricName: string, series: unknown[]) {
 function total(points: { value: number }[] | undefined): number {
   return (points ?? []).reduce((a, p) => a + p.value, 0);
 }
+
+// ── Metric-source identity is one WORKER (v15) ──────────────────────────
+//
+// `dp_rank` (sglang) and `engine` (vllm) name engines INSIDE a worker. Keying
+// the source on them split each worker into 4-5 identical-looking dropdown
+// entries — a 6-prefill/1-decode run listed 35 "endpoints" for 7 workers.
+
+/** One worker's series for `metric`, one entry per sub-engine label. */
+function workerSeries(
+  endpoint_url: string,
+  dynamo_component: 'prefill' | 'backend',
+  worker_id: string,
+  subLabel: 'dp_rank' | 'engine',
+  subValues: string[],
+  value: number,
+  field: 'rate' | 'avg' = 'rate',
+) {
+  return subValues.map((v) => ({
+    endpoint_url,
+    labels: { dynamo_component, worker_id, [subLabel]: v },
+    timeslices: [{ start_ns: 0, end_ns: 1e9, [field]: value }],
+  }));
+}
+
+function dynamoBlob(series: unknown[]) {
+  return gzipSync(
+    Buffer.from(
+      JSON.stringify({
+        metrics: {
+          'vllm:prompt_tokens': { series },
+        },
+      }),
+    ),
+  );
+}
+
+describe('metric source identity', () => {
+  it("collapses a worker's sglang dp_rank series into one source", async () => {
+    const cs = await computeChartSeries(
+      dynamoBlob([
+        ...workerSeries(
+          'http://10.0.0.1:7500/metrics',
+          'prefill',
+          'w-pre',
+          'dp_rank',
+          ['0', '1', '2', '3'],
+          25,
+        ),
+        ...workerSeries(
+          'http://10.0.0.2:7502/metrics',
+          'backend',
+          'w-dec',
+          'dp_rank',
+          ['0', '1', '2', '3'],
+          10,
+        ),
+      ]),
+      { framework: 'dynamo-sglang', disagg: true },
+    );
+    expect(cs?.metricSources.map(({ source: s }) => [s.role, s.workerId])).toEqual([
+      ['prefill', 'w-pre'],
+      ['decode', 'w-dec'],
+    ]);
+    // The worker's four ranks are summed into its one source, not listed apart.
+    const prefill = cs?.metricSources.find(({ source: s }) => s.workerId === 'w-pre');
+    expect(prefill?.promptTps).toEqual([{ t: 0, value: 100 }]);
+  });
+
+  it("collapses a worker's vllm engine series into one source", async () => {
+    // vllm labels the sub-engine `engine` and leaves dp_rank unset, so the
+    // duplication arrives under a different label than sglang's.
+    const cs = await computeChartSeries(
+      dynamoBlob([
+        ...workerSeries(
+          'http://10.0.0.1:7500/metrics',
+          'prefill',
+          'w-pre',
+          'engine',
+          ['0', '1', '2', '3'],
+          25,
+        ),
+      ]),
+      { framework: 'dynamo-vllm', disagg: true },
+    );
+    expect(cs?.metricSources).toHaveLength(1);
+    expect(cs?.metricSources[0]!.source.workerId).toBe('w-pre');
+    expect(cs?.metricSources[0]!.promptTps).toEqual([{ t: 0, value: 100 }]);
+  });
+
+  it('keeps a worker whole when it also emits an unlabelled aggregate series', async () => {
+    // sglang emits one series with no dp_rank alongside the per-rank ones,
+    // which used to show up as a fifth entry for the same worker.
+    const cs = await computeChartSeries(
+      dynamoBlob([
+        {
+          endpoint_url: 'http://10.0.0.1:7500/metrics',
+          labels: { dynamo_component: 'prefill', worker_id: 'w-pre' },
+          timeslices: [{ start_ns: 0, end_ns: 1e9, rate: 7 }],
+        },
+        ...workerSeries(
+          'http://10.0.0.1:7500/metrics',
+          'prefill',
+          'w-pre',
+          'dp_rank',
+          ['0', '1'],
+          25,
+        ),
+      ]),
+      { framework: 'dynamo-sglang', disagg: true },
+    );
+    expect(cs?.metricSources).toHaveLength(1);
+    expect(cs?.metricSources[0]!.source.dpRank).toBeNull();
+    expect(cs?.metricSources[0]!.source.engine).toBeNull();
+  });
+
+  it('keeps distinct workers apart even when their ranks collide', async () => {
+    const cs = await computeChartSeries(
+      dynamoBlob([
+        ...workerSeries('http://10.0.0.1:7500/metrics', 'prefill', 'w-a', 'dp_rank', ['0'], 5),
+        ...workerSeries('http://10.0.0.2:7500/metrics', 'prefill', 'w-b', 'dp_rank', ['0'], 5),
+        ...workerSeries('http://10.0.0.3:7500/metrics', 'prefill', 'w-c', 'dp_rank', ['0'], 5),
+      ]),
+      { framework: 'dynamo-vllm', disagg: true },
+    );
+    expect(cs?.metricSources.map(({ source: s }) => s.workerId)).toEqual(['w-a', 'w-b', 'w-c']);
+  });
+});
 
 describe('computeChartSeries summed series', () => {
   it('sums components scraped on offset grids instead of emitting a comb', async () => {

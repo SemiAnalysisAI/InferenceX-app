@@ -105,8 +105,22 @@ import {
  * sum is not, and `cumulativeUniqueInputTokens` turns these rates into token
  * totals with `sum += value`, which only stays correct at one point per
  * scrape bucket.
+ *
+ * v15: a metric SOURCE is one worker, not one engine inside it. The source
+ * identity carried `dp_rank` (sglang) and `engine` (vllm), which name engines
+ * *within* a worker, so the detail page's endpoint picker listed each worker
+ * once per rank: a 6-prefill/1-decode run offered 35 "endpoints" for 7
+ * workers, reading `Prefill - <id>` five times in a row. SGLang also emits an
+ * unlabelled aggregate series alongside the per-rank ones, which became a
+ * fifth entry for the same worker; vllm leaves `dp_rank` unset and duplicates
+ * under `engine` instead, so the same bug wore a different label per
+ * framework. Identity is now `(role, worker)` — see `seriesIdentityKey`'s
+ * sibling reasoning in `server-metrics-adapters.ts`. Each worker's ranks
+ * aggregate into its one source (throughput summed, KV averaged) and the
+ * per-rank detail stays reachable as that source's own
+ * `kvCacheUsageByEngine`.
  */
-export const CHART_SERIES_VERSION = 14;
+export const CHART_SERIES_VERSION = 15;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
