@@ -15,13 +15,14 @@ export const TABLEAU_10 = [
 ] as const;
 
 export interface GpuSpecs {
+  tdp: number;
   power: number;
   costh: number;
   costn: number;
   costr: number;
 }
 
-const DEFAULT_SPECS: GpuSpecs = { power: 0, costh: 0, costn: 0, costr: 0 };
+const DEFAULT_SPECS: GpuSpecs = { tdp: 0, power: 0, costh: 0, costn: 0, costr: 0 };
 
 /**
  * Look up power/cost specs for a hardware key by extracting the base GPU name.
@@ -31,7 +32,13 @@ export function getGpuSpecs(hwKey: string): GpuSpecs {
   const base = hwKey.split(/[-_]/u)[0];
   const entry = HW_REGISTRY[base];
   if (!entry) return DEFAULT_SPECS;
-  return { power: entry.power, costh: entry.costh, costn: entry.costn, costr: entry.costr };
+  return {
+    tdp: entry.tdp,
+    power: entry.power,
+    costh: entry.costh,
+    costn: entry.costn,
+    costr: entry.costr,
+  };
 }
 
 /** Build the vendor prefix string for the `gpu` tooltip field. */

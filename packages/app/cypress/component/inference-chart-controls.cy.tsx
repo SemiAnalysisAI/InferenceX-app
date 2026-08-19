@@ -41,6 +41,36 @@ describe('Inference ChartControls', () => {
     cy.get('@setSelectedYAxisMetric').should('have.been.calledOnce');
   });
 
+  it('lists and selects the schema-v2 derived axes in the Measured Energy group', () => {
+    const options = [
+      {
+        key: 'y_measuredJPerSuccessfulQuery',
+        label: 'Measured Joules per Successful Query',
+      },
+      {
+        key: 'y_measuredWhPerSuccessfulQuery',
+        label: 'Measured Watt-hours per Successful Query',
+      },
+      {
+        key: 'y_measuredPowerPercentTdp',
+        label: 'Measured Average Power as Percent of TDP',
+      },
+    ];
+
+    for (const option of options) {
+      cy.get('[data-testid="yaxis-metric-selector"]').click();
+      cy.contains('Measured Energy')
+        .parent()
+        .within(() => {
+          cy.contains('[role="option"]', option.label)
+            .scrollIntoView()
+            .should('be.visible')
+            .click();
+        });
+      cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', option.key);
+    }
+  });
+
   it('hides the GPU comparison section when no GPUs are selected', () => {
     // Default mock: selectedGPUs = [] — GPU date range pickers should not render
     cy.contains('Comparison Date Range').should('not.exist');

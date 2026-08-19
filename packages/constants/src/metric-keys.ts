@@ -135,6 +135,7 @@ export const METRIC_KEYS = new Set([
   // power_metric_schema_version: version 2 defines every unprefixed
   //                              joules_per_* field as whole-deployment energy
   // avg_power_w:             mean per-GPU draw (W) during the load window
+  // joules_per_successful_query: whole-deployment energy / successful requests
   // joules_per_output_token: energy / total_output_tokens. CLUSTER-WIDE on
   //                          schema-version-2 rows, including disaggregated runs.
   // joules_per_total_token:  total_system_energy / (total_input + total_output)
@@ -143,6 +144,7 @@ export const METRIC_KEYS = new Set([
   'power_valid',
   'power_metric_schema_version',
   'avg_power_w',
+  'joules_per_successful_query',
   'joules_per_output_token',
   'joules_per_total_token',
   // multinode / disagg role splits (emitted only when the deployment has

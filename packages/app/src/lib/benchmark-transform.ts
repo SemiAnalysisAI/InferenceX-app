@@ -190,6 +190,10 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     power_valid: m.power_valid,
     power_metric_schema_version: m.power_metric_schema_version,
     avg_power_w: measuredPowerValid ? m.avg_power_w : undefined,
+    joules_per_successful_query:
+      measuredPowerValid && hasWholeDeploymentEnergySemantics
+        ? m.joules_per_successful_query
+        : undefined,
     joules_per_output_token:
       measuredPowerValid && hasWholeDeploymentEnergySemantics
         ? m.joules_per_output_token
@@ -215,10 +219,10 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     // Cluster-wide GPU telemetry beyond power. Emitted when the perfmon CSVs
     // include the corresponding sample columns; left undefined otherwise so
     // the chart layer can distinguish "no measurement" from a real zero.
-    avg_temp_c: m.avg_temp_c,
-    peak_temp_c: m.peak_temp_c,
-    avg_util_pct: m.avg_util_pct,
-    avg_mem_used_mb: m.avg_mem_used_mb,
+    avg_temp_c: measuredPowerValid ? m.avg_temp_c : undefined,
+    peak_temp_c: measuredPowerValid ? m.peak_temp_c : undefined,
+    avg_util_pct: measuredPowerValid ? m.avg_util_pct : undefined,
+    avg_mem_used_mb: measuredPowerValid ? m.avg_mem_used_mb : undefined,
     // Per-worker measured power. Surfaced on BenchmarkRow as a sibling of the
     // scalar `metrics` dict (see api.ts). Narrow defensively so a malformed
     // payload can't poison downstream consumers.

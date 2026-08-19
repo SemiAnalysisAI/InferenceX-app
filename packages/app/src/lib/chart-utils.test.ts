@@ -28,7 +28,7 @@ vi.mock('@/lib/constants', async (importOriginal) => {
   return {
     ...actual,
     getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
-    getGpuSpecs: vi.fn(() => ({ power: 700, costh: 2.8, costn: 1.4, costr: 0.7 })),
+    getGpuSpecs: vi.fn(() => ({ power: 700, tdp: 700, costh: 2.8, costn: 1.4, costr: 0.7 })),
   };
 });
 
@@ -849,6 +849,57 @@ describe('markRooflinePoints', () => {
     expect(mB.costh.roof).toBe(true);
     expect(mC.costh.roof).toBe(false);
   });
+
+  // Regression: the query-energy axes were registered in Y_AXIS_METRICS and had
+  // rooflines computed for them, but markRooflinePoints carried no branch, so
+  // every frontier point came back roof:false and the chart drew no roofline.
+  describe('query-energy axes', () => {
+    const chartDefQueryEnergy: ChartDefinition = {
+      ...chartDef,
+      y_measuredJPerSuccessfulQuery: 'measuredJPerSuccessfulQuery.y',
+      y_measuredJPerSuccessfulQuery_roofline: 'lower_right',
+      y_measuredWhPerSuccessfulQuery: 'measuredWhPerSuccessfulQuery.y',
+      y_measuredWhPerSuccessfulQuery_roofline: 'lower_right',
+    };
+
+    // lower_right (max x, min energy): A(x=1, 500 J) is the cheapest run and
+    // C(x=3, 900 J) is the fastest, so neither dominates the other and both sit
+    // on the front. B(x=2, 2400 J) is dominated by C on both axes.
+    const withEnergy = (x: number, joules: number, roof = false): InferenceData => ({
+      ...pt(x, 0, 'h100', { tpPerGpuY: 50 }),
+      measuredJPerSuccessfulQuery: { y: joules, roof },
+      measuredWhPerSuccessfulQuery: { y: joules / 3600, roof },
+    });
+
+    const group = { h100: [withEnergy(1, 500), withEnergy(2, 2400), withEnergy(3, 900)] };
+
+    it('marks the frontier points on both query-energy axes', () => {
+      const rooflines = computeAllRooflines(group, chartDefQueryEnergy);
+      const marked = markRooflinePoints(group, rooflines, chartDefQueryEnergy);
+
+      const a = marked.find((p) => p.x === 1)!;
+      const b = marked.find((p) => p.x === 2)!;
+      const c = marked.find((p) => p.x === 3)!;
+
+      expect(a.measuredJPerSuccessfulQuery!.roof).toBe(true);
+      expect(c.measuredJPerSuccessfulQuery!.roof).toBe(true);
+      expect(b.measuredJPerSuccessfulQuery!.roof).toBe(false);
+
+      expect(a.measuredWhPerSuccessfulQuery!.roof).toBe(true);
+      expect(c.measuredWhPerSuccessfulQuery!.roof).toBe(true);
+      expect(b.measuredWhPerSuccessfulQuery!.roof).toBe(false);
+    });
+
+    it('clears a stale roof flag on a dominated query-energy point', () => {
+      const dirty = { h100: [withEnergy(1, 500), withEnergy(2, 2400, true), withEnergy(3, 900)] };
+      const rooflines = computeAllRooflines(dirty, chartDefQueryEnergy);
+      const marked = markRooflinePoints(dirty, rooflines, chartDefQueryEnergy);
+
+      const b = marked.find((p) => p.x === 2)!;
+      expect(b.measuredJPerSuccessfulQuery!.roof).toBe(false);
+      expect(b.measuredWhPerSuccessfulQuery!.roof).toBe(false);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1331,6 +1382,29 @@ describe('createChartDataPoint measured power fields', () => {
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.measuredJPerOutputToken).toBeDefined();
     expect(point.measuredJPerOutputToken!.y).toBe(8.4);
+  });
+
+  it('derives J/query, Wh/query, and percent TDP from validated source fields', () => {
+    const e = entry({ avg_power_w: 560, joules_per_successful_query: 1800 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+
+    expect(point.measuredJPerSuccessfulQuery?.y).toBe(1800);
+    expect(point.measuredWhPerSuccessfulQuery?.y).toBe(0.5);
+    expect(point.measuredPowerPercentTdp?.y).toBe(80);
+  });
+
+  it('omits derived query and TDP axes when their inputs are absent', () => {
+    const point = createChartDataPoint(
+      '2025-01-01',
+      entry(),
+      'median_e2el',
+      'tput_per_gpu',
+      'h100',
+    );
+
+    expect(point.measuredJPerSuccessfulQuery).toBeUndefined();
+    expect(point.measuredWhPerSuccessfulQuery).toBeUndefined();
+    expect(point.measuredPowerPercentTdp).toBeUndefined();
   });
 
   it('omits both fields when neither is on the entry', () => {

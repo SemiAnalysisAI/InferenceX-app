@@ -191,6 +191,9 @@ export const Y_AXIS_METRICS = [
   'y_measuredJPerOutputToken',
   'y_measuredJPerTotalToken',
   'y_measuredJPerInputToken',
+  'y_measuredJPerSuccessfulQuery',
+  'y_measuredWhPerSuccessfulQuery',
+  'y_measuredPowerPercentTdp',
 ] as const;
 
 export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
@@ -451,26 +454,59 @@ export function createChartDataPoint(
         }
       : {}),
 
-    // Measured power / energy from runner's aggregate_power.py. Gated on the
-    // raw fields existing so points from runs predating the measurement land
-    // without these keys and the chart correctly filters them out.
+    ...buildMeasuredPowerChartFields(entry, specs.tdp),
+  };
+}
+
+type MeasuredPowerChartFields = Partial<
+  Pick<
+    InferenceData,
+    | 'measuredAvgPower'
+    | 'measuredPrefillAvgPower'
+    | 'measuredDecodeAvgPower'
+    | 'measuredJPerOutputToken'
+    | 'measuredJPerTotalToken'
+    | 'measuredJPerInputToken'
+    | 'measuredJPerSuccessfulQuery'
+    | 'measuredWhPerSuccessfulQuery'
+    | 'measuredPowerPercentTdp'
+  >
+>;
+
+const measuredMetric = (y: number): { y: number; roof: boolean } => ({ y, roof: false });
+
+/** Build the measured fields shared by scatter points and historical trends. */
+export function buildMeasuredPowerChartFields(
+  entry: AggDataEntry,
+  tdpWatts: number,
+): MeasuredPowerChartFields {
+  return {
     ...(typeof entry.avg_power_w === 'number'
-      ? { measuredAvgPower: { y: entry.avg_power_w, roof: false } }
+      ? { measuredAvgPower: measuredMetric(entry.avg_power_w) }
       : {}),
     ...(typeof entry.prefill_avg_power_w === 'number'
-      ? { measuredPrefillAvgPower: { y: entry.prefill_avg_power_w, roof: false } }
+      ? { measuredPrefillAvgPower: measuredMetric(entry.prefill_avg_power_w) }
       : {}),
     ...(typeof entry.decode_avg_power_w === 'number'
-      ? { measuredDecodeAvgPower: { y: entry.decode_avg_power_w, roof: false } }
+      ? { measuredDecodeAvgPower: measuredMetric(entry.decode_avg_power_w) }
       : {}),
     ...(typeof entry.joules_per_output_token === 'number'
-      ? { measuredJPerOutputToken: { y: entry.joules_per_output_token, roof: false } }
+      ? { measuredJPerOutputToken: measuredMetric(entry.joules_per_output_token) }
       : {}),
     ...(typeof entry.joules_per_total_token === 'number'
-      ? { measuredJPerTotalToken: { y: entry.joules_per_total_token, roof: false } }
+      ? { measuredJPerTotalToken: measuredMetric(entry.joules_per_total_token) }
       : {}),
     ...(typeof entry.joules_per_input_token === 'number'
-      ? { measuredJPerInputToken: { y: entry.joules_per_input_token, roof: false } }
+      ? { measuredJPerInputToken: measuredMetric(entry.joules_per_input_token) }
+      : {}),
+    ...(typeof entry.joules_per_successful_query === 'number'
+      ? {
+          measuredJPerSuccessfulQuery: measuredMetric(entry.joules_per_successful_query),
+          measuredWhPerSuccessfulQuery: measuredMetric(entry.joules_per_successful_query / 3600),
+        }
+      : {}),
+    ...(typeof entry.avg_power_w === 'number' && tdpWatts > 0
+      ? { measuredPowerPercentTdp: measuredMetric((entry.avg_power_w / tdpWatts) * 100) }
       : {}),
   };
 }
@@ -663,7 +699,9 @@ export const calculateRoofline = (
     | `measuredDecodeAvgPower.y`
     | `measuredJPerOutputToken.y`
     | `measuredJPerTotalToken.y`
-    | `measuredJPerInputToken.y`,
+    | `measuredJPerInputToken.y`
+    | `measuredJPerSuccessfulQuery.y`
+    | `measuredWhPerSuccessfulQuery.y`,
   rooflineDirection: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right',
 ): InferenceData[] => {
   // Exclude degenerate x <= 0 points (see isFrontierEligible) so they never
@@ -741,7 +779,9 @@ export function computeAllRooflines(
             | `measuredDecodeAvgPower.y`
             | `measuredJPerOutputToken.y`
             | `measuredJPerTotalToken.y`
-            | `measuredJPerInputToken.y`,
+            | `measuredJPerInputToken.y`
+            | `measuredJPerSuccessfulQuery.y`
+            | `measuredWhPerSuccessfulQuery.y`,
           rooflineDirection,
         );
       }
@@ -791,6 +831,8 @@ export function markRooflinePoints(
       if (newPoint.measuredJPerOutputToken) newPoint.measuredJPerOutputToken.roof = false;
       if (newPoint.measuredJPerTotalToken) newPoint.measuredJPerTotalToken.roof = false;
       if (newPoint.measuredJPerInputToken) newPoint.measuredJPerInputToken.roof = false;
+      if (newPoint.measuredJPerSuccessfulQuery) newPoint.measuredJPerSuccessfulQuery.roof = false;
+      if (newPoint.measuredWhPerSuccessfulQuery) newPoint.measuredWhPerSuccessfulQuery.roof = false;
 
       for (const chartDefYKey of Y_AXIS_METRICS) {
         const rooflinePoints = computedRooflines[hwKey]?.[chartDefYKey];
@@ -868,6 +910,16 @@ export function markRooflinePoints(
           newPoint.measuredJPerTotalToken.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_measuredJPerInputToken' && newPoint.measuredJPerInputToken) {
           newPoint.measuredJPerInputToken.roof = onCurrentRoofline;
+        } else if (
+          chartDefYKey === 'y_measuredJPerSuccessfulQuery' &&
+          newPoint.measuredJPerSuccessfulQuery
+        ) {
+          newPoint.measuredJPerSuccessfulQuery.roof = onCurrentRoofline;
+        } else if (
+          chartDefYKey === 'y_measuredWhPerSuccessfulQuery' &&
+          newPoint.measuredWhPerSuccessfulQuery
+        ) {
+          newPoint.measuredWhPerSuccessfulQuery.roof = onCurrentRoofline;
         }
       }
       finalProcessedData.push(newPoint);

@@ -142,6 +142,7 @@ export interface AggDataEntry {
   power_valid?: number;
   power_metric_schema_version?: number;
   avg_power_w?: number;
+  joules_per_successful_query?: number;
   joules_per_output_token?: number;
   joules_per_total_token?: number;
   // Multinode / disagg-only measured power. The aggregate_power.py runner
@@ -327,6 +328,9 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   measuredJPerOutputToken?: { y: number; roof: boolean };
   measuredJPerTotalToken?: { y: number; roof: boolean };
   measuredJPerInputToken?: { y: number; roof: boolean };
+  measuredJPerSuccessfulQuery?: { y: number; roof: boolean };
+  measuredWhPerSuccessfulQuery?: { y: number; roof: boolean };
+  measuredPowerPercentTdp?: { y: number; roof: boolean };
 }
 
 /** Why a chart-ready point was intentionally excluded from the visible plot. */
@@ -370,7 +374,10 @@ export type YAxisMetricKey =
   | 'measuredDecodeAvgPower'
   | 'measuredJPerOutputToken'
   | 'measuredJPerTotalToken'
-  | 'measuredJPerInputToken';
+  | 'measuredJPerInputToken'
+  | 'measuredJPerSuccessfulQuery'
+  | 'measuredWhPerSuccessfulQuery'
+  | 'measuredPowerPercentTdp';
 
 /**
  * Defines the configuration and labels for a specific chart.
@@ -500,6 +507,28 @@ export interface ChartDefinition {
   y_measuredJPerTotalToken_label?: string;
   y_measuredJPerTotalToken_title?: string;
   y_measuredJPerTotalToken_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_measuredJPerSuccessfulQuery?: string;
+  y_measuredJPerSuccessfulQuery_label?: string;
+  y_measuredJPerSuccessfulQuery_title?: string;
+  y_measuredJPerSuccessfulQuery_roofline?:
+    | 'upper_right'
+    | 'upper_left'
+    | 'lower_left'
+    | 'lower_right';
+  y_measuredWhPerSuccessfulQuery?: string;
+  y_measuredWhPerSuccessfulQuery_label?: string;
+  y_measuredWhPerSuccessfulQuery_title?: string;
+  y_measuredWhPerSuccessfulQuery_roofline?:
+    | 'upper_right'
+    | 'upper_left'
+    | 'lower_left'
+    | 'lower_right';
+  y_measuredPowerPercentTdp?: string;
+  y_measuredPowerPercentTdp_label?: string;
+  y_measuredPowerPercentTdp_title?: string;
+  // No `_roofline`: %TDP is a utilization gauge, not an efficiency frontier —
+  // there is no corner along which a config is "better", so the axis
+  // deliberately declares no Pareto direction.
   y_cost_limit?: number;
   y_latency_limit?: number;
 }
