@@ -128,6 +128,15 @@ describe('Header', () => {
       .should('have.text', '新');
   });
 
+  it('orders the nav with AgentX first', () => {
+    const expected = ['AgentX', 'Home', 'Overview', 'Dashboard', 'Comparisons', 'About'];
+    cy.get('[data-testid^="nav-link-"]').then(($links) => {
+      // Strip the NEW badge so the comparison is against the label alone.
+      const labels = [...$links].map((link) => (link.textContent ?? '').replace('NEW', '').trim());
+      expect(labels).to.deep.equal(expected);
+    });
+  });
+
   it('keeps footer destinations out of the primary nav', () => {
     cy.get('[data-testid="nav-link-supporters"]').should('not.exist');
     cy.get('[data-testid="nav-link-blog"]').should('not.exist');
