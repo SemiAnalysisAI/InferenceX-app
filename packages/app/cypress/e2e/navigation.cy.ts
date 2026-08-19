@@ -46,18 +46,24 @@ describe('First-load navigation', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-starred');
-        win.localStorage.removeItem('inferencex-star-modal-dismissed');
+        // Snoozed, not cleared: dismissing the launch modal below makes the
+        // star modal the next eligible landing nudge, and its corner card
+        // would sit over the footer links these specs click.
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         win.localStorage.removeItem('inferencex-agentic-results-modal-dismissed');
         win.localStorage.removeItem('inferencex-agentic-results-banner-dismissed');
       },
     });
 
-    // Banner (inline) and overlay modal coexist in independent slots.
+    // The launch modal is centered behind a backdrop, so it owns the first
+    // interaction — dismiss it before exercising the page underneath.
     cy.get('[data-testid="launch-modal"]').should('be.visible');
+    cy.get('[data-testid="launch-modal-dismiss"]').click();
+    cy.get('[data-testid="launch-modal"]').should('not.exist');
     cy.get('body').should('not.have.attr', 'data-scroll-locked');
   });
 
-  it('navigates to articles from the footer while the launch modal is visible', () => {
+  it('navigates to articles from the footer after the launch modal is dismissed', () => {
     cy.get('[data-testid="footer-link-articles"]').scrollIntoView().click();
     cy.location('pathname').should('eq', '/blog');
   });

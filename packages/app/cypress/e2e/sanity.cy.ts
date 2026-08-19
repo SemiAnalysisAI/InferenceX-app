@@ -63,6 +63,24 @@ describe('Page Load & Navigation', () => {
 // Toggle visibility, click behavior, and aria-label are covered by
 // cypress/component/mode-toggle.cy.tsx. Only the reload-persistence test
 // requires a full page load (true e2e concern).
+describe('Splash text', () => {
+  it('announces AgentX on the landing page in both light and dark mode', () => {
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('theme', 'light');
+      },
+    });
+    cy.get('html').should('not.have.class', 'dark');
+    cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
+
+    // Same splash after switching themes — it is no longer minecraft-only.
+    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('html').should('have.class', 'dark');
+    cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
+  });
+});
+
 describe('Theme Toggle', () => {
   it('theme persists across page reload (localStorage)', () => {
     cy.window().then((win) => {

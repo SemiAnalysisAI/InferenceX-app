@@ -302,6 +302,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
         '查看 Kimi K3、DeepSeek-V4-Pro、MiniMax-M3、Qwen3.5 397B 与 GLM-5.2 在支持 Chip 和推理服务栈上的 AgentX 结果。',
       testId: 'launch-modal',
       containerClassName: 'border-brand/40',
+      // Launch announcement — centered with a backdrop so it reads as the
+      // page's headline moment instead of a bottom-right corner card.
+      centered: true,
       badge: 'New',
       badgeZh: '最新',
       dismissLabel: 'Maybe Later',

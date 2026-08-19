@@ -57,7 +57,8 @@ describe('Landing nudges — modals', () => {
       .and('contain.text', 'Real-world agentic inference benchmark results are live')
       .and('contain.text', 'Kimi K3, DeepSeek-V4-Pro, MiniMax-M3, Qwen3.5 397B, and GLM-5.2')
       .and('contain.text', 'View results')
-      .and('match', 'div[role="dialog"][aria-modal="false"]');
+      // Centered launch modal: a real backdrop-backed dialog, not a corner card.
+      .and('match', 'div[role="dialog"][aria-modal="true"]');
     cy.get('[data-new-badge]')
       .should('have.length', 3)
       .then(($badges) => {
@@ -115,6 +116,23 @@ describe('Landing nudges — modals', () => {
       .and('contain.text', '真实场景智能体推理基准测试结果已上线')
       .and('contain.text', 'Kimi K3、DeepSeek-V4-Pro、MiniMax-M3、Qwen3.5 397B 与 GLM-5.2')
       .and('contain.text', '查看结果');
+  });
+
+  it('renders the launch modal centered in the viewport, over a backdrop', () => {
+    cy.visit('/', {
+      onBeforeLoad: clearAllNudgeStorage,
+    });
+    cy.get('[data-testid="launch-modal"]').should('be.visible');
+    cy.window().then((win) => {
+      const rect = win.document
+        .querySelector('[data-testid="launch-modal"]')!
+        .getBoundingClientRect();
+      // clientWidth, not innerWidth: a fixed overlay is laid out against the
+      // viewport minus the scrollbar, so innerWidth is half a scrollbar off.
+      const { clientWidth, clientHeight } = win.document.documentElement;
+      expect(Math.abs((rect.left + rect.right) / 2 - clientWidth / 2)).to.be.lessThan(2);
+      expect(Math.abs((rect.top + rect.bottom) / 2 - clientHeight / 2)).to.be.lessThan(2);
+    });
   });
 
   it('dismissing launch modal persists — not shown on reload', () => {
