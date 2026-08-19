@@ -27,10 +27,10 @@ describe('request chart data', () => {
         {
           cid: 'conversation-a',
           phase: 'profiling',
-          start: 1,
-          end: 2,
-          ttftMs: 3,
-          tpotMs: 4,
+          start: 1_000,
+          end: 2_000,
+          ttftMs: 3.123_456,
+          tpotMs: 4.654_321,
           isl: 5,
           osl: 6,
           cancelled: false,
@@ -38,8 +38,8 @@ describe('request chart data', () => {
         {
           cid: 'conversation-a',
           phase: 'profiling',
-          start: 7,
-          end: 8,
+          start: 7_000,
+          end: 8_000,
           ttftMs: null,
           tpotMs: null,
           isl: 9,
@@ -56,7 +56,7 @@ describe('request chart data', () => {
       phases: ['profiling'],
     });
     expect(encoded.requests).toEqual([
-      [0, 0, 1, 2, 3, 4, 5, 6, 0],
+      [0, 0, 1, 2, 3.123, 4.654, 5, 6, 0],
       [0, 0, 7, 8, null, null, 9, 10, 1],
     ]);
   });
@@ -71,7 +71,7 @@ describe('request chart data', () => {
           start_ns: 10,
           end_ns: 30,
           duration_s: 2,
-          requests: [['c', 'profiling', 1, 2, 3, 4, 5, 6, false]],
+          requests: [['c', 'profiling', 1_000, 2_000, 3, 4, 5, 6, false]],
         },
       ],
     ]);

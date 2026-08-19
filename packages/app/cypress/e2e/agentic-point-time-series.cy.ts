@@ -27,7 +27,7 @@ const requestChartPayload = (requests: ReturnType<typeof timelineRequest>[]) => 
   const cids = [...new Set(requests.map((request) => request.cid))];
   const phases = [...new Set(requests.map((request) => request.phase))];
   return {
-    version: 501,
+    version: 502,
     timelineVersion: 5,
     startNs: 0,
     endNs: 7_000_000_000,
@@ -37,8 +37,8 @@ const requestChartPayload = (requests: ReturnType<typeof timelineRequest>[]) => 
     requests: requests.map((request) => [
       cids.indexOf(request.cid),
       phases.indexOf(request.phase),
-      request.start,
-      request.end,
+      Math.round(request.start / 1_000),
+      Math.round(request.end / 1_000),
       request.ttftMs,
       request.tpotMs,
       request.isl,

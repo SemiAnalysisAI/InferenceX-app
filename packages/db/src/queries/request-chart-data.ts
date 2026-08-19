@@ -17,15 +17,15 @@ import {
 import type { DbClient } from '../connection.js';
 import { getRequestTimeline } from './request-timeline';
 
-const REQUEST_CHART_SHAPE_VERSION = 1;
+const REQUEST_CHART_SHAPE_VERSION = 2;
 export const REQUEST_CHART_DATA_VERSION =
   REQUEST_TIMELINE_VERSION * 100 + REQUEST_CHART_SHAPE_VERSION;
 
 export type RequestChartTuple = [
   cid: number,
   phase: number,
-  start: number,
-  end: number,
+  startUs: number,
+  endUs: number,
   ttftMs: number | null,
   tpotMs: number | null,
   isl: number | null,
@@ -78,6 +78,10 @@ function dictionaryIndex(value: string, values: string[], indices: Map<string, n
   return index;
 }
 
+const nanosecondsToMicroseconds = (value: number): number => Math.round(value / 1_000);
+const roundMilliseconds = (value: number | null): number | null =>
+  value === null ? null : Math.round(value * 1_000) / 1_000;
+
 export function encodeRequestChartData(
   timeline: Pick<RequestTimeline, 'version' | 'startNs' | 'endNs' | 'durationS'>,
   records: readonly ChartRecord[],
@@ -92,10 +96,10 @@ export function encodeRequestChartData(
     requests.push([
       dictionaryIndex(record.cid, cids, cidIndices),
       dictionaryIndex(record.phase, phases, phaseIndices),
-      record.start,
-      record.end,
-      record.ttftMs,
-      record.tpotMs,
+      nanosecondsToMicroseconds(record.start),
+      nanosecondsToMicroseconds(record.end),
+      roundMilliseconds(record.ttftMs),
+      roundMilliseconds(record.tpotMs),
       record.isl,
       record.osl,
       record.cancelled ? 1 : 0,

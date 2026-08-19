@@ -3,8 +3,8 @@ import { useByIdQuery } from './benchmark-id-query';
 type RequestChartTuple = [
   cid: number,
   phase: number,
-  start: number,
-  end: number,
+  startUs: number,
+  endUs: number,
   ttftMs: number | null,
   tpotMs: number | null,
   isl: number | null,
@@ -54,8 +54,8 @@ function decodeRequestChartData(wire: RequestChartDataWire): RequestChartData {
     requests: wire.requests.map((request) => ({
       cid: wire.cids[request[0]] ?? '',
       phase: wire.phases[request[1]] ?? '',
-      start: request[2],
-      end: request[3],
+      start: request[2] * 1_000,
+      end: request[3] * 1_000,
       ttftMs: request[4],
       tpotMs: request[5],
       isl: request[6],
