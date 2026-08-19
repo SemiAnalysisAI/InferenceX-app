@@ -1,216 +1,235 @@
 ---
-title: 'Agentic Benchmark 与 Agent Benchmark：AI 智能体评估指南'
-subtitle: '系统理解任务成功率、工具调用、可靠性、成本、延迟与生产推理性能等智能体基准测试指标'
-seoDescription: '什么是 Agentic Benchmark？本文说明 Agent Benchmark 如何衡量任务成功率、工具调用、可靠性、成本、延迟与推理服务性能。'
+title: '面向 LLM 推理的 Agentic Benchmark：指标与方法'
+subtitle: 'Agent Benchmark 如何回放长上下文、多轮工作负载，并测量延迟、吞吐量、cache 行为与推理服务成本'
+seoDescription: '面向 LLM 推理的 Agentic Benchmark 指南：了解 Agent Benchmark 如何测量延迟、吞吐量、prefix caching、并发与成本。'
 date: '2026-08-19'
 publishDate: '2026-08-19'
 tags:
   - benchmark
   - agents
   - agentic
-  - evaluation
   - inference
-  - reliability
+  - latency
+  - throughput
 ---
 
-**Agentic Benchmark（智能体基准测试）**也常被称为 **Agent Benchmark**，它测试的是 AI 系统通过多个步骤完成目标的能力。Agent 不再只回答一次 prompt，而是可能检查环境、调用工具、更新状态、从错误中恢复，并持续决定下一步行动。
+**面向 LLM 推理的 Agentic Benchmark** 衡量模型服务系统在 AI agent 流量下的表现。它不判断 agent 是否修复了 bug 或完成了工作流，而是测量承载每次模型调用的基础设施，包括延迟、吞吐量、cache 复用、并发能力与成本。
 
-不过，这一定义包含两类不同问题。多数 Agent Benchmark 关注 agent 最终是否完成任务；Agentic Inference Benchmark（智能体推理基准测试）则关注另一层：推理服务系统能否高效处理 agent 工作时产生的长上下文、重复 prefix、tool 等待与并行分支。完整的评估体系需要同时覆盖这两层。
+这一目标会改变 workload。传统推理基准测试可以发送 input 和 output 长度固定的独立 prompt；Agent Benchmark 则必须表示完整会话，其中上下文随轮次增长，请求共享长 prefix，tool 执行带来停顿，subagent 产生并行分支。后续请求通常要等前序请求完成后才能开始。
 
-本文将解释 Agent Benchmark 衡量什么、主流基准测试分别适合哪些场景、哪些指标真正重要，以及为什么模型、agent 框架、工具或服务条件不同的分数不能直接比较。
+AgentX 是 InferenceX 面向这类 workload 的开放基准测试。它把自愿提供的编码 agent trace 转换为保护隐私的请求形状，再通过 AIPerf 进行确定性回放，用相同场景比较完整的软硬件推理配置。
 
-## Agentic Benchmark 与 Agent Benchmark 有区别吗？
+<DashboardCTA href="/zh/inference?i_seq=agentic-traces">对比实时 AgentX 推理结果 →</DashboardCTA>
 
-在日常使用中，**Agentic Benchmark** 与 **Agent Benchmark** 通常可以互换，“AI Agent Benchmark”也是同一概念的常见写法。它们都指 agent 在交互式环境中经过多个动作完成任务的评估。
+## 什么是 Agentic Inference Benchmark？
 
-名称本身并不能说明测试内容。解读分数前，应该先确认基准测试真正关注哪一层：
+Agentic Inference Benchmark 是面向多轮 agent 流量的系统基准测试。被测系统包括 accelerator、服务器拓扑、推理引擎、模型 checkpoint、精度、并行策略、cache 配置与请求调度器。
 
-- **Agent 能力：**能否完成编码、浏览器操作、研究、桌面操作或客服任务？
-- **可靠性与规则遵循：**能否多次稳定成功，并在失败后恢复，同时遵守业务规则？
-- **效率：**一次成功任务消耗多少时间、费用、token 与 tool call？
-- **智能体推理：**模型服务栈能否以合理的延迟、吞吐量和成本承载真实多轮 agent 流量？
-- **安全性与鲁棒性：**能否抵御有害指令、prompt injection、越权操作或意外副作用？
+它回答以下问题：
 
-因此，两项测试即使都叫“Agent Benchmark”，也可能测量系统中完全不同的层次。
+- 一套部署能同时服务多少个 agent 会话？
+- 每个 agent 需要等待多久才能收到首 token？
+- 每个活跃 agent 接收 output token 的速度是多少？
+- 在目标延迟下，每颗 Chip 能提供多少 output 吞吐量？
+- 重复 prefix 会命中 HBM、host memory，还是触发重新计算？
+- 在可用的响应速度下，每百万 token 的成本是多少？
 
-## 什么是 Agentic Benchmark？
+“Benchmark”也常用于 agent 任务评估，因此必须说明测试范围。这两类测试回答不同问题：
 
-一项可复现的 Agentic Benchmark 通常包含五个组成部分：
+| 问题                        | 测试类型                    | 常见结果                             |
+| --------------------------- | --------------------------- | ------------------------------------ |
+| Agent 能否正确完成任务？    | Agent 任务评估              | 成功率、policy 合规率或评分器分数    |
+| 推理栈能否承载 agent 流量？ | Agentic Inference Benchmark | 延迟、吞吐量、cache 行为、容量与成本 |
 
-1. **任务：**Agent 必须完成的目标，例如修复代码仓库 issue，或按照公司规则修改一条业务记录。
-2. **环境：**Agent 可以观察和修改的代码仓库、浏览器、桌面、数据库、API sandbox 或其他状态。
-3. **工具：**向 agent 开放的操作，例如 shell 命令、浏览器控制、搜索、文件编辑与应用 API。
-4. **Agent 框架：**包裹模型的 prompt、规划循环、memory、上下文管理、重试逻辑与 tool adapter。
-5. **评分器：**用于判定成功的测试、数据库 assertion、精确答案、人工 rubric 或规则检查。
+AgentX 对应第二类。任务语义与完成质量需要单独评估。
 
-基准测试结果属于这一整套配置。如果同一个模型换用了不同的 scaffold、tool schema、上下文策略或重试预算，它就成为另一套 agent 系统。IBM Research 的 [Open Agent Leaderboard](https://huggingface.co/blog/ibm-research/open-agent-leaderboard) 因此比较“模型 + agent”的组合，而不是把模型名称当作完整系统。
+## 为什么固定序列推理基准测试无法代表 Agent 流量？
 
-## Agent Benchmark 与 LLM Benchmark 的区别
+固定序列测试仍然适合做受控比较。例如，8K input 和 1K output workload 能隔离常见请求形状，并让不同配置容易复现，但它无法表示持续运行的 agent 会话。
 
-传统 LLM Benchmark 通常把一个输入直接映射为一个待评分的输出。它可以测试知识、推理、代码生成或指令遵循，但模型不一定会在持久环境中采取行动。
+| Workload 特征  | 固定序列推理                    | Agentic 推理                       |
+| -------------- | ------------------------------- | ---------------------------------- |
+| 请求形状       | 固定 input 与 output 长度       | 每一轮长度都不同                   |
+| 到达模式       | 按固定速率或 batch 发送独立请求 | 前序请求完成后才触发后续依赖请求   |
+| Prefix 复用    | 可选或人工构造                  | 大型共享 prefix 随会话不断增长     |
+| Tool 时间      | 通常不存在                      | 模型调用之间存在不均匀停顿         |
+| 并行性         | 请求级并发                      | 主 agent 与 subagent 分支可能重叠  |
+| Cache 生命周期 | 短且规律                        | 长时间状态争用 HBM 与 offload 容量 |
+| 有效结论       | 一种请求分布下的性能            | 完整 agent 会话的容量与响应速度    |
 
-Agent Benchmark 则增加了反馈循环：
+这些差异可能改变系统排序。更大的 HBM 能让长时间存活的 KV cache 保持驻留；更有效的 prefix caching 可以避免重新处理数十万 prompt token；对独立 prompt 影响较小的 scheduler 与 router 开销，也可能随活跃会话的数量和长度增长。
 
-```text
-目标 -> 观察 -> 推理 -> 调用工具行动 -> 检查结果 -> 再次行动 -> 评估最终状态
-```
+## Agent Benchmark 是一张请求依赖图
 
-这个循环会暴露单次回答无法体现的失败模式。Agent 可能选错工具、错误使用正确工具、丢失状态、重复操作、违反规则、过早停止、耗尽预算，或者破坏本已正确的环境状态；它也可能从错误的中间步骤中恢复并最终完成任务。
-
-因此，Agent Benchmark 报告至少应该说明模型、agent 版本、工具、环境版本、prompt 或 policy、最大步数、采样设置与评分器，而不能只给出模型名称和一个百分比。
-
-## Agent Benchmark 的主要类型
-
-没有任何一项 Agent Benchmark 能代表所有生产场景。应该根据 agent 实际运行的环境选择测试。
-
-| 基准测试类型   | 核心问题                                     | 代表性项目                                                                                    | 常见评分方式                  |
-| -------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------- |
-| 软件工程       | Agent 能否诊断并修复真实代码仓库 issue？     | [SWE-bench](https://github.com/SWE-bench/SWE-bench)                                           | 对提交 patch 运行代码仓库测试 |
-| 工具与规则遵循 | Agent 能否在遵守行业规则的同时帮助用户？     | [τ-bench](https://taubench.com/)                                                              | 数据库状态、必要动作与 policy |
-| Web 交互       | Agent 能否在功能完整的网站中完成长流程任务？ | [WebArena](https://webarena.dev/)                                                             | 程序化检查答案与网站状态      |
-| 桌面交互       | 多模态 agent 能否操作真实计算机应用？        | [OSWorld](https://github.com/xlang-ai/OSWorld)                                                | 针对每项任务的执行结果检查    |
-| 通用助理       | Agent 能否跨工具与模态完成研究和推理？       | [GAIA](https://ai.meta.com/research/publications/gaia-a-benchmark-for-general-ai-assistants/) | 精确答案或结构化答案          |
-| 多环境评估     | Agent 行为能否泛化到多种交互任务？           | [AgentBench](https://arxiv.org/abs/2308.03688)                                                | 各环境专用的成功指标          |
-| 智能体推理     | 推理基础设施能否承载真实 agent 流量？        | [AgentX](/zh/agentx)                                                                          | 吞吐量、延迟、交互性与成本    |
-
-### 编码 Agent Benchmark
-
-[SWE-bench](https://github.com/SWE-bench/SWE-bench) 向系统提供真实 GitHub issue 与代码仓库，再通过测试评估生成的 patch。SWE-bench Verified 是由人工验证的 500 道题子集，旨在提高题目可解性与评分可靠性。它衡量的是特定 harness 下的 issue 解决能力，而不是所有软件工程工作的通用分数。
-
-比较编码 agent 结果时，应检查代码仓库访问方式、tool 集合、测试可见性、步骤与费用预算、重试策略，以及是否使用针对该基准测试调优的 prompt。通用 agent 与高度定制的参赛系统各自都可能提供有价值的结果，但两者并不一定适合直接排名。
-
-### 工具调用与规则遵循 Benchmark
-
-[τ-bench](https://taubench.com/) 把 agent 放在模拟用户与工具之间，覆盖零售、航空等业务领域。Agent 必须在遵守 policy 的同时达到正确的数据库结果。其 `pass^k` 指标要求多次独立试验全部成功，因此不会让平均成功率掩盖不稳定性。
-
-这对生产系统很重要。某个 agent 单次成功率为 80%，并不代表它连续四次都成功的概率也是 80%。假设每次试验相互独立，全部成功的概率只有 `0.8^4 = 40.96%`。
-
-### Web 与计算机操作 Benchmark
-
-[WebArena](https://webarena.dev/) 提供可自行部署、功能完整的网站，用于长流程浏览器任务，并以程序化方式检查最终网站状态。[OSWorld](https://github.com/xlang-ai/OSWorld) 则把交互扩展到操作系统环境中的真实计算机应用。这些测试能覆盖导航与有状态操作，但分数仍会受到观测格式、浏览器或桌面控制方式、屏幕分辨率、timeout 与恢复逻辑影响。
-
-### 通用助理 Benchmark
-
-[GAIA](https://ai.meta.com/research/publications/gaia-a-benchmark-for-general-ai-assistants/) 使用需要推理、Web 浏览、多模态理解与工具调用的现实问题。[AgentBench](https://arxiv.org/abs/2308.03688) 则覆盖八种交互环境。宽覆盖的评估套件有助于测试泛化能力，但总分可能掩盖不同领域间的巨大差异，因此还应查看每个环境的分项结果。
-
-## Agent Benchmark 应该报告哪些指标？
-
-任务成功率必不可少，但仅有成功率远远不够。完整报告至少应覆盖四组指标。
-
-### 1. 结果质量
-
-- **任务成功率：**最终状态满足评分器要求的任务占比。
-- **部分得分：**当全有或全无评分过于粗糙时，记录已满足哪些条件。
-- **规则遵循：**不仅检查结果，也检查 agent 是否遵守约束。
-- **副作用：**是否修改了本应保持不变的数据或状态。
-
-### 2. 可靠性
-
-- **重复试验成功率：**相同配置在多次运行中的稳定程度。
-- **`pass@k`：**`k` 次尝试中至少一次成功，适用于允许多次尝试的场景。
-- **`pass^k`：**`k` 次尝试全部成功，适用于产品要求稳定一致的场景。
-- **失败分类：**选错工具、参数错误、状态丢失、违反 policy、timeout、预算耗尽或评分失败。
-
-`pass@k` 与 `pass^k` 回答的是相反的产品问题：前者奖励“至少有一次成功”，后者惩罚不稳定性。任何基准测试若只写“pass”却不定义含义，都不足以支持严谨比较。
-
-### 3. 效率
-
-- 端到端任务时长与尾延迟
-- 每项任务使用的模型 token、tool call 与 agent step
-- 单次尝试成本与每次成功任务成本
-- 每美元成功率或质量与成本的 Pareto frontier
-
-失败运行也必须计入成本。某个 agent 在数百次工具调用后缓慢失败，运营成本可能高于能力略弱、但能快速失败并干净转交人工的系统。
-
-### 4. 推理服务性能
-
-- [首 token 延迟](/zh/glossary/time-to-first-token)（TTFT）
-- [交互性](/zh/glossary/interactivity)，即每个活跃 agent 接收 output token 的速度
-- 每颗 Chip 或每台服务器的总[吞吐量](/zh/glossary/throughput)
-- Prefix cache 与 KV cache 行为
-- 并发会话下的排队与尾延迟
-- 在明确延迟或交互性目标下的每 token 成本
-
-这些基础设施指标不能证明 agent 做出了正确决策，它们说明底层推理栈能否高效承载该 workload。
-
-## 为什么 Agentic Inference Benchmark 是独立的一层？
-
-任务完成类基准测试可以告诉你哪个 agent 修复了更多 issue，却无法说明一个推理部署能支持多少个长时间并发会话、重复 prefix 是否命中 cache，或者 subagent 扇出是否会导致尾延迟崩溃。
-
-Agent 流量与固定 prompt 基准测试有多项本质差异：
-
-- 上下文会随轮次增长，甚至达到数十万 token。
-- 后续请求通常复用此前的大部分 prefix。
-- Tool 执行会在模型调用之间插入不均匀停顿。
-- 主 agent 可以并行启动多个 subagent，随后等待它们汇合。
-- 下一个请求何时发出，取决于上一个请求何时完成。
+Agent 会话不是扁平的 prompt 列表。主 agent 轮次形成依赖链；某一轮可以启动一个或多个 subagent，主链随后可能等待这些分支完成；辅助调用也可以独立运行而不汇入主链。
 
 <Figure
   src="/images/agentx-methodology/replay-multi-subagent.png"
-  alt="Agentic Benchmark 回放图，包含主 agent 请求链、四条并行 subagent 分支、两个汇合点及一条独立辅助请求"
-  caption="智能体会话是一张依赖图，而不是彼此独立的 prompt 列表。AgentX 会保留主 agent 轮次、并行 subagent、汇合点与记录中的等待时间。"
+  alt="Agentic 推理基准测试回放图，包含主 agent 请求链、四条并行 subagent 分支、两个汇合点与一条独立辅助请求"
+  caption="AgentX 把会话表示为依赖图，保留主 agent 轮次、并行 subagent、汇合点、辅助调用与记录中的等待时间。"
 />
 
-真实的基础设施测试因此需要[闭环基准测试](/zh/glossary/closed-loop-benchmark)。每个模拟客户端只有在依赖请求完成后才继续推进；服务器越快，越早产生下一项工作。分支启动与汇合时，瞬时 HTTP 请求数也会不断变化。
+AgentX 通过[闭环模式](/zh/glossary/closed-loop-benchmark)回放这张图。每个客户端只有在依赖的前序工作完成后才发送下一个可执行请求。服务器越快，会话越早推进并产生后续工作。当 subagent 扇出时，瞬时 HTTP 请求数可以高于客户端 concurrency；分支完成后，请求数会再次下降。
 
-## AgentX Agentic Benchmark 衡量什么？
+因此，AgentX concurrency 表示**活跃 agent 客户端数量**，并不是固定 request batch。若多个客户端同时存在活跃 subagent，concurrency 50 的运行可能拥有超过 50 个 in-flight 请求。
 
-[AgentX](/zh/agentx) 是 InferenceX 的开放智能体推理基准测试。它把自愿提供的 Claude Code 会话 workload 形状转换为确定性的 AIPerf 回放。公开 trace 会移除 prompt、源代码、tool argument 与 tool result，同时保留请求长度、prefix 关系、时间信息和 subagent 拓扑。
+## AgentX 如何构建可复现 Workload？
 
-AgentX v1.0 包含 393 个公开会话。单请求 input token 中位数为 142,016，output token 中位数为 444，44% 的会话包含 subagent。固定 seed 控制采样与合成内容；cache primer 与 warmup 请求会在一小时 profiling 窗口开始前建立 prefix 状态。[完整 AgentX 方法论](/zh/agentx/methodology)记录了数据筛选、回放构建、speculative decoding 控制、DRAM 规则与复现限制。
+AgentX 通过四个阶段，把已记录的会话结构转换为不含原始内容的回放。
+
+### 1. 采集请求形状与时间
+
+自愿启用的 HTTP proxy 会记录请求到达与完成时间、input 和 output token 数、conversation ID 与 subagent ID。公开数据不包含 prompt、源代码、tool argument 或 tool result。
+
+### 2. 保留 Prefix，而不保留内容
+
+每段 input 会被转换为以 64-token block 为单位的会话内 hash 链。相同 block ID 会保留不同轮次间的 prefix 关系。回放前，AIPerf 使用确定性的合成编码与 tool-use token 替换这些 block。
+
+### 3. 重建依赖关系
+
+主 agent 请求形成线性链；subagent 请求形成带有 spawn 和 join 依赖的独立链；记录中的轮次间停顿会重现 tool 执行与等待其他工作的时间。回放保留客户端可见的顺序与重叠关系，但不会推断 provider 内部事件。
+
+### 4. 在不同系统上回放同一场景
+
+固定 seed 控制会话采样、回放起点与合成 payload。每套软硬件配置都接收相同场景定义，因此曲线差异来自推理系统，而不是人工编写的 prompt batch。
+
+AgentX v1.0 从自愿提供的 Claude Code trace 中筛选出 393 个公开会话。每个会话至少包含 20 个请求，并且同时运行的 subagent 不超过 10 个。
+
+| AgentX v1.0 特征           |    数值 |
+| -------------------------- | ------: |
+| 公开会话                   |     393 |
+| 单请求 input token 中位数  | 142,016 |
+| 单请求 output token 中位数 |     444 |
+| 包含 subagent 的会话       |     44% |
+| Full 数据集最大上下文      |      1M |
+| 限制上下文的数据集变体     |    256K |
+
+<Figure
+  src="/images/agentx-methodology/request-distributions.png"
+  alt="AgentX v1.0 的对数分布图，展示轮次间延迟、input sequence length 与 output sequence length"
+  caption="AgentX v1.0 请求分布。单请求 input token 中位数为 142,016，output token 中位数为 444。"
+/>
+
+Full 变体保留最高 1M token 的上下文。256K 变体会移除超过上限的请求，同时保留其余请求的时间关系与 subagent 重叠。[AgentX 方法论](/zh/agentx/methodology)公开了数据集规则、图表与来源链接。
+
+## 保证比较有效的 Benchmark 控制
+
+长时间运行的 agent workload 对初始状态、cache 内容、speculative decoding 与 host memory 十分敏感。AgentX 通过明确规则锁定这些变量。
+
+### Cache Warmup 与测量窗口
+
+固定 seed 会在每段会话 25% 至 75% 的位置选择起点。`max_tokens=1` 的 primer 会建立活跃主 agent 与 subagent 的 prefix，随后每条回放 lane 再完成 10 个 warmup 请求，之后才开始测量。
+
+对外结果只统计随后一小时的 profiling 窗口。每次循环回放都会加入唯一 cache-bust 标记，避免无关会话逐步形成共享 prefix。
+
+### 合成 Payload 与 Speculative Decoding
+
+合成 token 会保留长度和 prefix 结构，却无法自然复现 draft token acceptance。AgentX 因此针对每组模型、speculative 方法、draft length 与 thinking mode，使用 [SPEED-Bench](https://arxiv.org/abs/2604.09557) 编码类别测得的 acceptance length。该数值记录在带版本的 golden 文件中，并通过推理引擎控制项应用。
+
+这样可以把推理服务性能与合成文本偶然造成的 speculator acceptance 差异分开。
+
+### DRAM 与 KV Cache Offload
+
+Host memory 容量会影响长 prefix 应该重新加载还是重新计算。没有标准化 DRAM 配置的服务器上限为 3 TB；GB200 NVL72、GB300 NVL72 与 TPUv7 等标准系统可以使用实际装机容量。每种基准测试配置只能按 GPU 占比使用对应的 host memory。
+
+回放格式与依赖规则记录在 [AIPerf WEKA trace 指南](https://github.com/ai-dynamo/aiperf/blob/main/docs/tutorials/weka-trace.md)中。
+
+## Agentic Benchmark 应该测量哪些指标？
+
+单个数字无法描述 agent 服务。应该在完整 concurrency sweep 中同时报告吞吐量、延迟与交互性。
+
+| 指标                             | 说明                                                |
+| -------------------------------- | --------------------------------------------------- |
+| 每颗 Chip 的 output 吞吐量       | 每颗 accelerator 每秒完成的生成 token 数            |
+| P90 interactivity                | 根据 p90 inter-token latency 得到的单客户端生成速度 |
+| 首 token 延迟（TTFT）            | Agent 开始收到响应前的等待时间                      |
+| Inter-token latency（ITL）       | 相邻 streamed output token 之间的时间               |
+| Input 吞吐量                     | 每秒处理的 prompt token 数                          |
+| Cache 来源分布                   | Prompt token 来自 HBM、host memory 还是重新计算     |
+| Queue 与 in-flight request depth | 分支启动和汇合时的 scheduler 压力                   |
+| 每百万 token 成本                | 在明确延迟或交互性要求下的推理服务经济性            |
+
+百分位数不能省略。如果部分 agent 分支需要在长 prefill 后排队，较低的平均 TTFT 可能与很差的 p90 或 p99 同时出现。总 output 吞吐量上升时，单个客户端接收 token 的速度也可能下降。
+
+## 应该读取完整的吞吐量与交互性曲线
+
+AgentX 扫描不同的并发 agent 客户端数量，并绘制相应运行点。低并发通常有利于单客户端响应速度；提高并发可以改善 batching 与总吞吐量，直到排队、内存压力或其他瓶颈开始降低交互性。
 
 <Figure
   src="/images/agentx-methodology/pareto-b200-minimax-m3.png"
-  alt="MiniMax-M3 在 NVIDIA B200 上的 AgentX Benchmark Pareto 曲线，展示不同客户端并发下每颗 Chip 的 output 吞吐量与 p90 交互性"
-  caption="AgentX 结果是在多个并发 agent 客户端下得到的吞吐量与交互性曲线，而不是单个最大吞吐量分数。"
+  alt="MiniMax-M3 在 NVIDIA B200 上的 AgentX Pareto 曲线，展示不同客户端并发下每颗 Chip 的 output 吞吐量与 p90 交互性"
+  caption="每个点对应一个客户端 concurrency 设置。比较系统时应使用相同 p90 interactivity，而不是比较两个不匹配的峰值吞吐量点。"
 />
 
-AgentX 衡量的是**推理系统**，而不是模型能否解决原始编码任务。合成 payload 的目标是保留流量形状，而非语义内容。应把 AgentX 与任务质量 Benchmark 结合解读：前者说明服务栈如何承载 agent 流量，后者说明 agent 能否把工作做好。
+有效结果是 [Pareto frontier](/zh/glossary/pareto-frontier)，而不是唯一的最大吞吐量点。硬件 A 可能在低交互性下给出最高 tok/s/chip，硬件 B 却可能在交互式编码产品所需的响应速度下领先。
+
+闭环回放还意味着更快的配置能在相同 profiling 小时内推进到采样会话的更后位置，因此实际请求组合可能略有变化，低并发时尤其明显。结果应包含完整曲线，并使用足够并发降低采样噪声。
+
+## Agent 流量会考验推理栈的哪些部分？
+
+Agentic 推理会暴露固定 prompt batch 容易低估的瓶颈。
+
+- **KV-cache 容量：**长上下文与大量活跃会话会让大型 cache 驻留更久。
+- **Prefix-cache 正确性：**错误命中会产生错误状态，漏掉命中则会重复昂贵的 prefill。
+- **Offload 带宽：**从 host memory 移动长 prefix 可能比重新计算更快，但传输粒度与 descriptor 开销会影响结果。
+- **Scheduler 公平性：**并行 subagent 可以提高总吞吐量，同时让某条分支等待过久。
+- **Router 与 frontend CPU：**Prefix matching、过期项清理、序列化与 streamed response 处理都会随活跃会话状态增长。
+- **长上下文 kernel：**Attention、sparse attention、normalization 与 graph capture 路径可能随 sequence length 变化而表现不同。
+- **Speculative decoding：**Acceptance 控制与 scheduler 生命周期会同时影响吞吐量和交互性。
+
+[AgentX 优化追踪页](/zh/agentx/optimizations)记录了 vLLM、SGLang、TensorRT-LLM、ATOM、Dynamo 与 KV-cache 系统中由该 workload 暴露的具体改进。
+
+## 如何比较 AgentX 结果？
+
+比较双方应使用同一套场景约束：
+
+1. 对齐模型、checkpoint、精度与 thinking mode。
+2. 对齐 AgentX 数据集变体与上下文上限。
+3. 记录推理引擎、container image、并行策略与 speculative decoding 方法。
+4. 应用相同的 golden acceptance-length 规则。
+5. 对齐 DRAM 容量、KV-cache offload policy 与按比例分配内存的规则。
+6. 使用相同 seed、warmup 流程、profiling 时长与客户端 concurrency sweep。
+7. 当系统规模不同时，同时比较每颗 Chip 与整套系统结果。
+8. 在相同 p90 interactivity 或延迟目标下比较。
+9. 保留失败与不稳定配置，而不是只报告成功运行点。
+
+相同交互性下的比较通常比峰值吞吐量更有用。它直接回答部署问题：在用户需要的响应速度下，哪套系统每颗 Chip 或每美元能够服务更多 agent 工作？
+
+## 这项 Agent Benchmark 能回答什么，不能回答什么？
+
+AgentX 可以测量 trace 衍生 agent workload 下的推理容量、响应速度、cache 复用、内存压力、吞吐量与成本。它可以显示软件更新是否改善了相同硬件上的长上下文多轮服务，也可以比较不同硬件拓扑如何改变有效 frontier。
+
+AgentX 无法判断模型是否写出了正确代码、选择了正确工具、遵守了业务规则，或完成了原始任务。合成 payload 会有意移除这些语义。Agent 质量应使用任务评估，推理性能则使用 AgentX。两类分数描述不同的系统问题，不应混为一个总分。
 
 <DashboardCTA href="/zh/inference?i_seq=agentic-traces">
-  对比实时 AgentX Benchmark 结果 →
+  查看 AgentX 吞吐量与交互性 frontier →
 </DashboardCTA>
-
-## 如何评估一项 Agent Benchmark？
-
-接受排行榜结论前，可以按以下清单检查：
-
-1. **明确被测系统。**记录模型、agent harness、prompt、工具、memory 策略及所有组件版本。
-2. **让环境贴近产品。**编码分数无法预测航空客服规则遵循，浏览器分数也无法预测桌面操作。
-3. **检查评分器。**优先选择可执行结果或经过仔细审计的 rubric，并检查含糊、不可解、泄漏或容易走捷径的题目。
-4. **使用相同预算。**统一最大步骤、重试次数、上下文上限、工具、timeout 与费用上限。
-5. **运行重复试验。**随机性 agent 需要置信区间或多次运行可靠性，而不是单个 seed。
-6. **报告成本与延迟。**如果需要更多 token、尝试次数或时间，小幅质量提升可能没有经济价值。
-7. **区分质量与基础设施。**做容量规划时，将任务成功率与 Agentic Inference Benchmark 配合使用。
-8. **加入私有回归任务。**公开 Benchmark 是有价值的共同参照；生产决策还需要覆盖自身工作流与失败场景。
-
-最好的 Agent Benchmark 不一定是最热门的排行榜，而是任务、环境、工具、评分器与运行约束最接近实际生产决策的那一项评估。
 
 ## 常见问题
 
-### 什么是 Agentic Benchmark？
+### 什么是面向 LLM 推理的 Agentic Benchmark？
 
-Agentic Benchmark 会在交互环境中评估 AI agent 完成多步骤任务的表现。Agent 观察状态、调用工具、接收反馈，并持续行动直到完成任务或达到限制。具体分数可能衡量任务成功率、可靠性、规则遵循、效率、安全性或推理系统性能。
+它是一项系统基准测试，用于衡量推理栈如何服务多轮 agent 流量。测试会回放不断增长的上下文、共享 prefix、tool 等待与 subagent 分支，并报告延迟、吞吐量、交互性、cache 行为、容量与成本。
 
-### Agentic Benchmark 与 Agent Benchmark 是一回事吗？
+### Agentic Benchmark 与固定序列推理基准测试有何区别？
 
-通常是。“Agentic Benchmark”“Agent Benchmark”与“AI Agent Benchmark”经常互换使用。真正重要的不是措辞，而是评估目标：任务能力、重复运行可靠性、安全性、成本，还是基础设施性能。
+固定序列测试会发送 input 和 output 长度明确的独立请求。Agentic Benchmark 回放的是相互依赖的会话，其中请求长度、时间、prefix 复用与并行分支会持续变化，因此更接近真实 agent 产生的服务条件。
 
-### Agent Benchmark 与 LLM Benchmark 有什么区别？
+### AgentX Benchmark 测量什么？
 
-LLM Benchmark 可以只评分模型对一个输入给出的一次回答；Agent Benchmark 评估的是反馈循环，模型会观察环境、选择工具、改变状态并再次行动，因此结果取决于完整 agent 系统，而不只是基础模型。
+AgentX 使用从编码 agent trace 衍生的流量，测量完整推理配置。它扫描并发 agent 客户端数量，并报告每颗 Chip 的 output 吞吐量、p90 interactivity、TTFT、ITL、cache 行为与推理服务成本。
 
-### 应该选择哪项 Agent Benchmark？
+### AgentX 为什么使用闭环并发？
 
-应选择接近目标环境的测试。SWE-bench 适合代码仓库 issue 修复，τ-bench 适合工具与业务规则交互，WebArena 适合浏览器任务，OSWorld 适合计算机操作，GAIA 适合通用工具辅助问题，AgentX 则适合评估长上下文、多轮 agent 流量下的推理基础设施。产品特有工作流还需要私有回归任务。
+Agent 无法提前发出所有轮次，因为后续动作依赖前序结果。在闭环回放中，每个客户端会在依赖完成后发送下一个可执行请求，从而保留服务器速度与会话产生后续工作的时间关系。
 
-### AI Agent Benchmark 应该如何衡量可靠性？
+### Agent 推理最重要的指标有哪些？
 
-应该对相同任务运行多次独立试验并报告结果分布，而不是只展示最好的一次。还要定义指标是 `pass@k`（至少一次成功）还是 `pass^k`（每次试验都成功），并把 timeout、policy 失败与预算耗尽计入失败。
+应结合 output 吞吐量、p90 interactivity、TTFT、ITL、cache 来源分布、queue depth 与成本，并在相同延迟或交互性目标下比较完整 concurrency 曲线。单个最大吞吐量点无法描述交互式部署。
 
-### AgentX 会衡量 agent 或模型质量吗？
+### Agent Benchmark 会衡量模型或 Agent 质量吗？
 
-不会。AgentX 衡量推理系统如何承载从真实 agent trace 衍生的流量，包括长上下文、共享 prefix、tool 等待、subagent 分支、延迟、吞吐量与成本。模型和 agent 的任务质量需要单独评估。
+部分 Benchmark 会，但 AgentX 不会。AgentX 使用保留 workload 形状的合成 payload 来测量推理系统性能。任务正确性、工具选择与 policy 合规性需要单独的 agent 评估。
 
 <JsonLd>{`{
   "@context": "https://schema.org",
@@ -218,50 +237,50 @@ LLM Benchmark 可以只评分模型对一个输入给出的一次回答；Agent 
   "mainEntity": [
     {
       "@type": "Question",
-      "name": "什么是 Agentic Benchmark？",
+      "name": "什么是面向 LLM 推理的 Agentic Benchmark？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Agentic Benchmark 会在交互环境中评估 AI agent 完成多步骤任务的表现。Agent 观察状态、调用工具、接收反馈，并持续行动直到完成任务或达到限制。具体分数可能衡量任务成功率、可靠性、规则遵循、效率、安全性或推理系统性能。"
+        "text": "它是一项系统基准测试，用于衡量推理栈如何服务多轮 agent 流量。测试会回放不断增长的上下文、共享 prefix、tool 等待与 subagent 分支，并报告延迟、吞吐量、交互性、cache 行为、容量与成本。"
       }
     },
     {
       "@type": "Question",
-      "name": "Agentic Benchmark 与 Agent Benchmark 是一回事吗？",
+      "name": "Agentic Benchmark 与固定序列推理基准测试有何区别？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "通常是。Agentic Benchmark、Agent Benchmark 与 AI Agent Benchmark 经常互换使用。真正重要的不是措辞，而是评估目标：任务能力、重复运行可靠性、安全性、成本，还是基础设施性能。"
+        "text": "固定序列测试会发送 input 和 output 长度明确的独立请求。Agentic Benchmark 回放的是相互依赖的会话，其中请求长度、时间、prefix 复用与并行分支会持续变化。"
       }
     },
     {
       "@type": "Question",
-      "name": "Agent Benchmark 与 LLM Benchmark 有什么区别？",
+      "name": "AgentX Benchmark 测量什么？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "LLM Benchmark 可以只评分模型对一个输入给出的一次回答；Agent Benchmark 评估的是反馈循环，模型会观察环境、选择工具、改变状态并再次行动，因此结果取决于完整 agent 系统，而不只是基础模型。"
+        "text": "AgentX 使用从编码 agent trace 衍生的流量，测量完整推理配置。它扫描并发 agent 客户端数量，并报告每颗 Chip 的 output 吞吐量、p90 interactivity、TTFT、ITL、cache 行为与推理服务成本。"
       }
     },
     {
       "@type": "Question",
-      "name": "应该选择哪项 Agent Benchmark？",
+      "name": "AgentX 为什么使用闭环并发？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "应选择接近目标环境的测试。SWE-bench 适合代码仓库 issue 修复，tau-bench 适合工具与业务规则交互，WebArena 适合浏览器任务，OSWorld 适合计算机操作，GAIA 适合通用工具辅助问题，AgentX 则适合评估长上下文、多轮 agent 流量下的推理基础设施。"
+        "text": "Agent 无法提前发出所有轮次，因为后续动作依赖前序结果。在闭环回放中，每个客户端会在依赖完成后发送下一个可执行请求，从而保留服务器速度与会话产生后续工作的时间关系。"
       }
     },
     {
       "@type": "Question",
-      "name": "AI Agent Benchmark 应该如何衡量可靠性？",
+      "name": "Agent 推理最重要的指标有哪些？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "应该对相同任务运行多次独立试验并报告结果分布，而不是只展示最好的一次。还要定义指标是 pass@k（至少一次成功）还是 pass^k（每次试验都成功），并把 timeout、policy 失败与预算耗尽计入失败。"
+        "text": "应结合 output 吞吐量、p90 interactivity、TTFT、ITL、cache 来源分布、queue depth 与成本，并在相同延迟或交互性目标下比较完整 concurrency 曲线。"
       }
     },
     {
       "@type": "Question",
-      "name": "AgentX 会衡量 agent 或模型质量吗？",
+      "name": "Agent Benchmark 会衡量模型或 Agent 质量吗？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "不会。AgentX 衡量推理系统如何承载从真实 agent trace 衍生的流量，包括长上下文、共享 prefix、tool 等待、subagent 分支、延迟、吞吐量与成本。模型和 agent 的任务质量需要单独评估。"
+        "text": "部分 Benchmark 会，但 AgentX 不会。AgentX 使用保留 workload 形状的合成 payload 来测量推理系统性能。任务正确性、工具选择与 policy 合规性需要单独评估。"
       }
     }
   ]
