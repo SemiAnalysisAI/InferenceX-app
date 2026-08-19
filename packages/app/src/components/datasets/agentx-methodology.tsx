@@ -1,5 +1,7 @@
 import { Card } from '@/components/ui/card';
+
 import { AgentXMethodologyLink } from './agentx-methodology-link';
+import { AgentXOptimizationsCallout } from './agentx-optimizations-callout';
 
 type Locale = 'en' | 'zh';
 
@@ -193,6 +195,8 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
       </header>
 
       <div className="space-y-8 px-5 py-6 sm:px-6">
+        <AgentXOptimizationsCallout locale={locale} />
+
         <section aria-labelledby="agentx-process-title">
           <h2 id="agentx-process-title" className="mb-3 text-base font-semibold text-foreground">
             {t.processTitle}

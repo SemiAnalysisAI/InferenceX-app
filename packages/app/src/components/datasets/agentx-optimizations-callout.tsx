@@ -1,4 +1,3 @@
-import { Card } from '@/components/ui/card';
 import { getLocalizedFrameworks, getOptimizationsOverview } from '@/lib/agentx-optimizations-zh';
 import type { Locale } from '@/lib/i18n';
 
@@ -7,7 +6,8 @@ import { AgentXOptimizationsLink } from './agentx-optimizations-link';
 /**
  * Entry point from /agentx into the optimizations pages: the headline claim,
  * a button to the index, and one link per project so a reader who already
- * knows which engine they care about can go straight there.
+ * knows which engine they care about can go straight there. Rendered inside
+ * the AgentX methodology card, so it is a section rather than its own card.
  */
 export function AgentXOptimizationsCallout({ locale }: { locale: Locale }) {
   const overview = getOptimizationsOverview(locale);
@@ -15,12 +15,18 @@ export function AgentXOptimizationsCallout({ locale }: { locale: Locale }) {
   const prefix = locale === 'zh' ? '/zh' : '';
 
   return (
-    <Card className="overflow-hidden p-0" data-testid="agentx-optimizations-callout">
-      <div className="px-5 py-5 sm:px-6">
+    <section
+      aria-labelledby="agentx-optimizations-title"
+      data-testid="agentx-optimizations-callout"
+      className="rounded-lg border border-primary/30 bg-primary/5"
+    >
+      <div className="px-4 py-4 sm:px-5 sm:py-5">
         <p className="mb-2 font-mono text-[11px] font-medium tracking-[0.18em] text-primary uppercase">
           {overview.eyebrow}
         </p>
-        <h2 className="text-xl font-semibold text-foreground">{overview.title}</h2>
+        <h2 id="agentx-optimizations-title" className="text-lg font-semibold text-foreground">
+          {overview.title}
+        </h2>
         <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">{overview.lead}</p>
 
         <AgentXOptimizationsLink
@@ -50,6 +56,6 @@ export function AgentXOptimizationsCallout({ locale }: { locale: Locale }) {
           ))}
         </ul>
       </div>
-    </Card>
+    </section>
   );
 }
