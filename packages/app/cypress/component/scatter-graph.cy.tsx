@@ -1114,7 +1114,7 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('@setLocalOfficialOverride').should('not.have.been.called');
   });
 
-  it('renders the table columns without a Median Interactivity column', () => {
+  it('renders the table columns without the median interactivity or TTFT columns', () => {
     // Mirror the real interactivity chart: x IS interactivity, which is what
     // made the separate median column a duplicate.
     const chartDefinition = createMockChartDefinition({
@@ -1162,6 +1162,10 @@ describe('ChartDisplay engine comparison guard', () => {
       // quietly reintroduce the duplicate.
       expect(headers).to.not.include('Median Interactivity (tok/s)');
       expect(headers.filter((h) => h.toLowerCase().includes('interactivity'))).to.have.length(1);
+      // Median TTFT was dropped too; unlike interactivity it is not duplicated
+      // by the x-axis column, so nothing else in the table should carry it.
+      expect(headers).to.not.include('Median TTFT (ms)');
+      expect(headers.filter((h) => h.toLowerCase().includes('ttft'))).to.have.length(0);
     });
   });
 
