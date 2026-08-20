@@ -519,7 +519,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/server-logs.ts',
-    sourceSha256: '4ac684affbb4a2ecf1568419a72bac9752ccfe3e70c6c0e9cb50b45c09e41cce',
+    sourceSha256: '5322e69ebd758ff687636abf8f2fa13192e8d4658742ac4ced76e793516acd84',
     reviewArea: {
       en: 'Log filename discovery, selected-file reads, bounded chunk metadata, availability, and legacy-schema fallback.',
       zh: '日志文件名发现、指定文件读取、有界分块元数据、可用性以及旧版 schema 回退行为。',

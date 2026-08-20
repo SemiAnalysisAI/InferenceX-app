@@ -47,6 +47,18 @@ describe('pairServerLogArtifacts', () => {
     expect(pairs).toHaveLength(1);
     expect(pairs[0]?.serverLogs.name).toBe('multinode_server_logs_shared_pool_00');
   });
+
+  it('keeps only the newest exact benchmark/log pair across runner retries', () => {
+    const pairs = pairServerLogArtifacts([
+      artifact('server_logs_retry_pool_00', '2026-08-12T00:00:00Z'),
+      artifact('bmk_agentic_retry_pool_00', '2026-08-12T00:01:00Z'),
+      artifact('server_logs_retry_pool_01', '2026-08-12T01:00:00Z'),
+      artifact('bmk_agentic_retry_pool_01', '2026-08-12T01:01:00Z'),
+    ]);
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0]?.serverLogs.name).toBe('server_logs_retry_pool_01');
+    expect(pairs[0]?.benchmarks.name).toBe('bmk_agentic_retry_pool_01');
+  });
 });
 
 describe('resolveServerLogResultCandidates', () => {

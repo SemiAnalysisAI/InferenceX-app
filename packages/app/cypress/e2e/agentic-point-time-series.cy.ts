@@ -180,6 +180,63 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="detail-view-point"]').click();
   });
 
+  it('keeps loaded log text visible when a later chunk fails', () => {
+    cy.intercept(
+      { method: 'GET', pathname: '/api/v1/server-log-files' },
+      { body: ['results/server.log', 'results/benchmark.log'] },
+    );
+    cy.intercept({ method: 'GET', pathname: '/api/v1/server-log' }, (request) => {
+      const params = new URL(request.url).searchParams;
+      const fileName = params.get('file');
+      const offset = Number(params.get('offset') ?? 0);
+      if (fileName !== 'results/benchmark.log') {
+        request.reply({
+          body: {
+            id: 206885,
+            fileName,
+            serverLog: 'INFO initial file\n',
+            offset,
+            nextOffset: null,
+          },
+        });
+        return;
+      }
+      request.alias = 'retainedLogChunk';
+      if (offset === 0) {
+        request.reply({
+          body: {
+            id: 206885,
+            fileName: 'results/benchmark.log',
+            serverLog: 'INFO retained after failure\n',
+            offset: 0,
+            nextOffset: 28,
+          },
+        });
+      } else {
+        request.reply({ statusCode: 503, body: { error: 'temporary failure' } });
+      }
+    });
+
+    cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
+    cy.get('[data-testid="detail-view-logs"]').click();
+    cy.location('search').should('contain', 'view=logs');
+    cy.get('#agentic-log-file').click();
+    cy.contains('[role="option"]', 'results/benchmark.log').click();
+    cy.wait('@retainedLogChunk');
+    cy.get('[data-testid="server-log-content"]').should(
+      'contain.text',
+      'INFO retained after failure',
+    );
+    cy.get('[data-testid="load-more-server-log"]').click();
+    cy.contains('The next chunk could not be loaded', { timeout: 15_000 }).should('be.visible');
+    cy.get('[data-testid="server-log-content"]').should(
+      'contain.text',
+      'INFO retained after failure',
+    );
+    cy.get('[data-testid="detail-view-point"]').click();
+    cy.location('search').should('not.contain', 'view=logs');
+  });
+
   it('renders rolling P90 interactivity and TTFT by default using profiling requests only', () => {
     cy.get('[data-testid="interactivity-over-time-chart"]').within(() => {
       cy.contains('h2', 'Interactivity over time').should('be.visible');

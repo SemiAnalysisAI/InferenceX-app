@@ -105,13 +105,29 @@ export async function getServerLogChunk(
     const requestedFile = fileName ?? null;
     const rows = (await sql`
       with selected_log as (
-        select sl.file_name, sl.server_log as log_text, 0 as priority
+        select
+          sl.file_name,
+          substring(
+            sl.server_log
+            from ${offset + 1}::integer
+            for ${limit}::integer
+          ) as log_text,
+          substring(sl.server_log from ${offset + limit + 1}::integer for 1) <> '' as has_more,
+          0 as priority
         from benchmark_results br
         join server_logs sl on sl.id = br.server_log_id
         where br.id = ${benchmarkResultId}
           and (${requestedFile}::text is null or sl.file_name = ${requestedFile})
         union all
-        select slf.file_name, slf.log_text, 1 as priority
+        select
+          slf.file_name,
+          substring(
+            slf.log_text
+            from ${offset + 1}::integer
+            for ${limit}::integer
+          ) as log_text,
+          substring(slf.log_text from ${offset + limit + 1}::integer for 1) <> '' as has_more,
+          1 as priority
         from benchmark_results br
         join server_log_files slf on slf.server_log_id = br.server_log_id
         where br.id = ${benchmarkResultId}
@@ -120,43 +136,43 @@ export async function getServerLogChunk(
         order by priority
         limit 1
       )
-      select file_name, substring(
-        log_text
-        from ${offset + 1}::integer
-        for ${limit + 1}::integer
-      ) as log_text
+      select file_name, log_text, char_length(log_text) as char_count, has_more
       from selected_log
-    `) as { file_name: string; log_text: string }[];
+    `) as { file_name: string; log_text: string; char_count: number; has_more: boolean }[];
     const row = rows[0];
     if (!row) return null;
-    const serverLog = row.log_text.slice(0, limit);
     return {
       fileName: row.file_name,
-      serverLog,
+      serverLog: row.log_text,
       offset,
-      nextOffset: row.log_text.length > limit ? offset + serverLog.length : null,
+      nextOffset: row.has_more ? offset + Number(row.char_count) : null,
     };
   } catch (error) {
     if (!isPreLogFilesSchema(error)) throw error;
     if (fileName && fileName !== 'server.log') return null;
     const rows = (await sql`
-      select substring(
-        sl.server_log
-        from ${offset + 1}::integer
-        for ${limit + 1}::integer
-      ) as server_log
-      from benchmark_results br
-      join server_logs sl on sl.id = br.server_log_id
-      where br.id = ${benchmarkResultId}
-    `) as { server_log: string }[];
-    const raw = rows[0]?.server_log;
-    if (raw === undefined) return null;
-    const serverLog = raw.slice(0, limit);
+      with selected_log as (
+        select
+          substring(
+            sl.server_log
+            from ${offset + 1}::integer
+            for ${limit}::integer
+          ) as server_log,
+          substring(sl.server_log from ${offset + limit + 1}::integer for 1) <> '' as has_more
+        from benchmark_results br
+        join server_logs sl on sl.id = br.server_log_id
+        where br.id = ${benchmarkResultId}
+      )
+      select server_log, char_length(server_log) as char_count, has_more
+      from selected_log
+    `) as { server_log: string; char_count: number; has_more: boolean }[];
+    const row = rows[0];
+    if (!row) return null;
     return {
       fileName: 'server.log',
-      serverLog,
+      serverLog: row.server_log,
       offset,
-      nextOffset: raw.length > limit ? offset + serverLog.length : null,
+      nextOffset: row.has_more ? offset + Number(row.char_count) : null,
     };
   }
 }

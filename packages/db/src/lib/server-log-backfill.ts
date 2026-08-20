@@ -1,4 +1,4 @@
-import type { ArtifactMeta } from './github-artifacts.js';
+import { RUNNER_SUFFIX_RE, type ArtifactMeta } from './github-artifacts.js';
 import { serverLogArtifactSuffix } from '../etl/server-log-artifacts.js';
 
 export interface ServerLogArtifactPair {
@@ -45,7 +45,7 @@ export function pairServerLogArtifacts(
     const existing = byName.get(artifact.name);
     if (!existing || artifact.created_at > existing.created_at) byName.set(artifact.name, artifact);
   }
-  const pairs: ServerLogArtifactPair[] = [];
+  const pairsByLogicalBenchmark = new Map<string, ServerLogArtifactPair>();
 
   for (const serverLogs of byName.values()) {
     const suffix = serverLogArtifactSuffix(serverLogs.name);
@@ -53,8 +53,16 @@ export function pairServerLogArtifacts(
     // Require the exact runner suffix. Eval and benchmark jobs can share the
     // same logical config while uploading distinct server-log artifacts.
     const benchmarks = byName.get(`bmk_agentic_${suffix}`) ?? byName.get(`bmk_${suffix}`);
-    if (benchmarks) pairs.push({ serverLogs, benchmarks });
+    if (!benchmarks) continue;
+
+    const logicalName = benchmarks.name.replace(RUNNER_SUFFIX_RE, '');
+    const existing = pairsByLogicalBenchmark.get(logicalName);
+    if (!existing || benchmarks.created_at > existing.benchmarks.created_at) {
+      pairsByLogicalBenchmark.set(logicalName, { serverLogs, benchmarks });
+    }
   }
 
-  return pairs.toSorted((a, b) => a.serverLogs.name.localeCompare(b.serverLogs.name));
+  return [...pairsByLogicalBenchmark.values()].toSorted((a, b) =>
+    a.serverLogs.name.localeCompare(b.serverLogs.name),
+  );
 }

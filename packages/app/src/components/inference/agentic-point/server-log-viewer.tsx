@@ -1,7 +1,7 @@
 'use client';
 
 import { Check, ChevronDown, Copy, LoaderCircle, Terminal } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
   Select,
@@ -29,6 +29,7 @@ const STRINGS = {
     copied: 'Copied',
     loadMore: 'Load next 64 KiB',
     loadingMore: 'Loading…',
+    loadMoreError: 'The next chunk could not be loaded. The loaded text is still available.',
     loadedCharacters: 'characters loaded',
     endOfLog: 'End of stored log',
   },
@@ -43,6 +44,7 @@ const STRINGS = {
     copied: '已复制',
     loadMore: '继续加载 64 KiB',
     loadingMore: '正在加载……',
+    loadMoreError: '无法加载下一段内容，已加载的文本仍可查看。',
     loadedCharacters: '个字符已加载',
     endOfLog: '已到达日志末尾',
   },
@@ -58,15 +60,9 @@ export function ServerLogViewer({ id, enabled }: Props) {
   const t = STRINGS[locale];
   const filesQuery = useServerLogFiles(id, enabled);
   const files = filesQuery.data ?? [];
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (files.length === 0) {
-      setSelectedFile(null);
-      return;
-    }
-    setSelectedFile((current) => (current && files.includes(current) ? current : files[0]!));
-  }, [files]);
+  const [requestedFile, setRequestedFile] = useState<string | null>(null);
+  const selectedFile =
+    requestedFile && files.includes(requestedFile) ? requestedFile : (files[0] ?? null);
 
   const query = useServerLog(id, selectedFile, enabled && selectedFile !== null);
   const [copied, setCopied] = useState(false);
@@ -92,7 +88,7 @@ export function ServerLogViewer({ id, enabled }: Props) {
   };
 
   const selectFile = (fileName: string) => {
-    setSelectedFile(fileName);
+    setRequestedFile(fileName);
     setCopied(false);
     track('inference_agentic_log_file_selected', { id, fileName });
   };
@@ -107,14 +103,16 @@ export function ServerLogViewer({ id, enabled }: Props) {
     void query.fetchNextPage();
   };
 
-  if (filesQuery.isLoading || (selectedFile !== null && query.isLoading)) {
+  const hasLoadedLog = query.data?.pages[0] !== undefined && query.data.pages[0] !== null;
+
+  if (filesQuery.isLoading || (!hasLoadedLog && selectedFile !== null && query.isLoading)) {
     return (
       <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
         {t.loading}
       </div>
     );
   }
-  if (filesQuery.isError || query.isError) {
+  if (filesQuery.isError || (query.isError && !hasLoadedLog)) {
     return (
       <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
         {t.error}
@@ -188,24 +186,31 @@ export function ServerLogViewer({ id, enabled }: Props) {
         <span>
           {formatter.format(log.length)} {t.loadedCharacters}
         </span>
-        {query.hasNextPage ? (
-          <button
-            type="button"
-            onClick={loadMore}
-            disabled={query.isFetchingNextPage}
-            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 font-medium text-foreground transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-            data-testid="load-more-server-log"
-          >
-            {query.isFetchingNextPage ? (
-              <LoaderCircle className="size-3.5 animate-spin" />
-            ) : (
-              <ChevronDown className="size-3.5" />
-            )}
-            {query.isFetchingNextPage ? t.loadingMore : t.loadMore}
-          </button>
-        ) : (
-          <span>{t.endOfLog}</span>
-        )}
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          {query.isFetchNextPageError ? (
+            <span className="text-destructive" role="alert">
+              {t.loadMoreError}
+            </span>
+          ) : null}
+          {query.hasNextPage ? (
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={query.isFetchingNextPage}
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 font-medium text-foreground transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+              data-testid="load-more-server-log"
+            >
+              {query.isFetchingNextPage ? (
+                <LoaderCircle className="size-3.5 animate-spin" />
+              ) : (
+                <ChevronDown className="size-3.5" />
+              )}
+              {query.isFetchingNextPage ? t.loadingMore : t.loadMore}
+            </button>
+          ) : (
+            <span>{t.endOfLog}</span>
+          )}
+        </div>
       </footer>
     </section>
   );

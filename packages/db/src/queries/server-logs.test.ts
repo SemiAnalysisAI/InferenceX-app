@@ -14,7 +14,9 @@ function mockSql(rows: unknown[]) {
 
 describe('getServerLogChunk', () => {
   it('returns a bounded chunk and a continuation offset', async () => {
-    const { sql, call } = mockSql([{ file_name: 'results/server.log', log_text: 'abcd' }]);
+    const { sql, call } = mockSql([
+      { file_name: 'results/server.log', log_text: 'abc', char_count: 3, has_more: true },
+    ]);
 
     await expect(getServerLogChunk(sql, 42, 10, 3)).resolves.toEqual({
       fileName: 'results/server.log',
@@ -23,13 +25,16 @@ describe('getServerLogChunk', () => {
       nextOffset: 13,
     });
     expect(call).toHaveBeenCalledOnce();
-    expect(call.mock.calls[0]?.slice(1)).toEqual([42, null, null, 42, null, null, 11, 4]);
+    expect(call.mock.calls[0]?.slice(1)).toEqual(expect.arrayContaining([42, 11, 3, 14]));
     expect(call.mock.calls[0]?.[0].join('')).toContain('from ::integer');
     expect(call.mock.calls[0]?.[0].join('')).toContain('for ::integer');
+    expect(call.mock.calls[0]?.[0].join('')).not.toContain('sl.server_log as log_text');
   });
 
   it('marks an exact-size final chunk as complete', async () => {
-    const { sql } = mockSql([{ file_name: 'router.log', log_text: 'abc' }]);
+    const { sql } = mockSql([
+      { file_name: 'router.log', log_text: 'abc', char_count: 3, has_more: false },
+    ]);
     await expect(getServerLogChunk(sql, 42, 0, 3)).resolves.toEqual({
       fileName: 'router.log',
       serverLog: 'abc',
@@ -44,12 +49,24 @@ describe('getServerLogChunk', () => {
   });
 
   it('selects an additional file by its artifact-relative name', async () => {
-    const { sql, call } = mockSql([{ file_name: 'workers/decode.out', log_text: 'worker' }]);
+    const { sql, call } = mockSql([
+      { file_name: 'workers/decode.out', log_text: 'worker', char_count: 6, has_more: false },
+    ]);
     await expect(getServerLogChunk(sql, 42, 0, 64, 'workers/decode.out')).resolves.toMatchObject({
       fileName: 'workers/decode.out',
       serverLog: 'worker',
     });
     expect(call.mock.calls[0]?.slice(1)).toContain('workers/decode.out');
+  });
+
+  it('advances offsets in PostgreSQL characters instead of UTF-16 code units', async () => {
+    const { sql } = mockSql([
+      { file_name: 'unicode.log', log_text: 'a😀b', char_count: 3, has_more: true },
+    ]);
+    await expect(getServerLogChunk(sql, 42, 5, 3, 'unicode.log')).resolves.toMatchObject({
+      serverLog: 'a😀b',
+      nextOffset: 8,
+    });
   });
 });
 
