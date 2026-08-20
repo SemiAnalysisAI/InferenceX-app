@@ -260,7 +260,76 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('not.exist');
   });
 
-  it('rewrites one history entry when the overview request fails', () => {
+  it('keeps the last matrix and history entry when a popstate request fails', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+    // A client-derived reference switch proves hydration and the popstate
+    // listener are established without warming the tier payload under test.
+    cy.get('[data-testid="overview-reference-select"]').click();
+    cy.get('[data-overview-reference="b300"]').click();
+    cy.location('search').should('eq', '?ref=b300');
+    cy.intercept('GET', '**/api/v1/overview?tier=75', { statusCode: 500 }).as(
+      'overviewPopstateFailure',
+    );
+    cy.window().then((win) => {
+      (win as Window & { __overviewNavigationSentinel?: string }).__overviewNavigationSentinel =
+        'preserved';
+      win.History.prototype.pushState.call(
+        win.history,
+        win.history.state,
+        '',
+        '/overview?tier=75&ref=b300',
+      );
+      cy.wrap(win.history.length).as('overviewHistoryLength');
+    });
+
+    cy.go('back');
+    cy.location('search').should('eq', '?ref=b300');
+    cy.go('forward');
+    cy.wait('@overviewPopstateFailure');
+    cy.get('[data-testid="overview-navigation-error"]')
+      .should('have.attr', 'role', 'alert')
+      .and(
+        'have.text',
+        'Could not load the selected comparison. Showing the last successfully loaded data.',
+      );
+    cy.get('[data-testid="overview-tier-switcher"] [aria-current="page"]').should(
+      'have.text',
+      '50',
+    );
+    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('not.exist');
+    cy.location('search').should('eq', '?tier=75&ref=b300');
+    cy.get<number>('@overviewHistoryLength').then((expectedHistoryLength) => {
+      cy.window().then((after) => {
+        expect(after.history.length).to.equal(expectedHistoryLength);
+        expect(
+          (after as Window & { __overviewNavigationSentinel?: string })
+            .__overviewNavigationSentinel,
+        ).to.equal('preserved');
+      });
+    });
+  });
+
+  it('shows a localized empty state after a selector returns no models', () => {
+    cy.viewport(1280, 900);
+    cy.request('/api/v1/overview?tier=75').then(({ body }) => {
+      cy.intercept('GET', '**/api/v1/overview?tier=75', {
+        statusCode: 200,
+        body: { ...body, models: [] },
+      }).as('emptyOverview');
+      cy.visit('/zh/overview');
+
+      cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+      cy.wait('@emptyOverview');
+      cy.get('[data-testid="overview-empty-state"]')
+        .should('have.attr', 'role', 'status')
+        .and('have.text', '没有符合当前筛选条件的总览结果。');
+      cy.get('[data-testid="overview-desktop-matrix"]').should('not.exist');
+      cy.get('[data-testid="overview-mobile-list"]').should('not.exist');
+    });
+  });
+
+  it('keeps one history entry when the overview request fails', () => {
     cy.viewport(1280, 900);
     cy.visit('/inference');
     cy.visit('/overview');

@@ -71,6 +71,48 @@ afterEach(() => {
 });
 
 describe('getOverviewPageData engine scope forwarding', () => {
+  it('fails closed when history mode has no current snapshot', async () => {
+    const getCachedBenchmarks = vi.fn(() => Promise.resolve([]));
+    const getCachedBenchmarksAsOf = vi.fn();
+    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+    vi.doMock('@/lib/benchmark-data.server', () => ({
+      getCachedBenchmarks,
+      getCachedBenchmarksAsOf,
+    }));
+    vi.doMock('@/lib/test-fixtures', () => ({ loadFixture: vi.fn() }));
+
+    const { getOverviewPageData, OverviewHistoryUnavailableError } =
+      await import('./overview-data.server');
+
+    await expect(getOverviewPageData(50, 'community', '30d')).rejects.toBeInstanceOf(
+      OverviewHistoryUnavailableError,
+    );
+    expect(getCachedBenchmarksAsOf).not.toHaveBeenCalled();
+  });
+
+  it('keeps hardware mode valid when every platform is missing', async () => {
+    const getCachedBenchmarks = vi.fn(() => Promise.resolve([]));
+    const getCachedBenchmarksAsOf = vi.fn();
+    vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+    vi.doMock('@/lib/benchmark-data.server', () => ({
+      getCachedBenchmarks,
+      getCachedBenchmarksAsOf,
+    }));
+    vi.doMock('@/lib/test-fixtures', () => ({ loadFixture: vi.fn() }));
+
+    const { getOverviewPageData } = await import('./overview-data.server');
+    const page = await getOverviewPageData(50, 'community', 'hardware');
+
+    expect(page.comparisonMode).toBe('hardware');
+    expect(page.models.length).toBeGreaterThan(0);
+    expect(
+      page.models.every((model) =>
+        model.platforms.every((platform) => platform.costPerMtok === null),
+      ),
+    ).toBe(true);
+    expect(getCachedBenchmarksAsOf).not.toHaveBeenCalled();
+  });
+
   it('forwards the selected hardware reference through fixture mode', async () => {
     vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: true }));
     vi.doMock('@/lib/benchmark-data.server', () => ({ getCachedBenchmarks: vi.fn() }));

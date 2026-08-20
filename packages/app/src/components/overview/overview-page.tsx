@@ -25,6 +25,7 @@ import {
   OverviewNavigationProvider,
   useOverviewData,
   useOverviewNavigation,
+  useOverviewNavigationError,
   useOverviewReference,
 } from './overview-navigation';
 import {
@@ -81,6 +82,20 @@ function OverviewPendingStatus({ label }: { label: string }) {
   );
 }
 
+function OverviewNavigationErrorStatus({ label }: { label: string }) {
+  const hasError = useOverviewNavigationError();
+  if (!hasError) return null;
+  return (
+    <p
+      role="alert"
+      data-testid="overview-navigation-error"
+      className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-foreground"
+    >
+      {label}
+    </p>
+  );
+}
+
 function OverviewMatrixCard({ children }: { children: ReactNode }) {
   const { isPending } = useOverviewNavigation();
   return (
@@ -106,6 +121,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
   return (
     <section data-testid="overview-page" className="flex flex-col gap-4">
       <OverviewPendingStatus label={strings.loadingStatus} />
+      <OverviewNavigationErrorStatus label={strings.navigationError} />
       {/* Held in a stable child slot: swapping the header out for the surface
           would remount the surface and drop the browser out of fullscreen. The
           browser already stops painting it, so this only keeps the hidden
@@ -330,6 +346,23 @@ function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
       presenting={presenting}
     />
   );
+
+  if (data.models.length === 0) {
+    return (
+      <>
+        <OverviewControlRow locale={locale} />
+        <OverviewMatrixCard>
+          <p
+            role="status"
+            data-testid="overview-empty-state"
+            className="px-6 py-12 text-center text-sm text-muted-foreground"
+          >
+            {strings.emptyState}
+          </p>
+        </OverviewMatrixCard>
+      </>
+    );
+  }
 
   return (
     <>

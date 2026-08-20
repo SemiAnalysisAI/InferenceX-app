@@ -154,6 +154,9 @@ export const OVERVIEW_STRINGS = {
     } as Partial<Record<string, string>>,
     categoryBadgeTitle: 'Model is no longer actively benchmarked.',
     loadingStatus: 'Loading the selected comparison…',
+    navigationError:
+      'Could not load the selected comparison. Showing the last successfully loaded data.',
+    emptyState: 'No overview results match this selection.',
   },
   zh: {
     title: '智能体推理成本',
@@ -251,6 +254,8 @@ export const OVERVIEW_STRINGS = {
     } as Partial<Record<string, string>>,
     categoryBadgeTitle: '该模型已不再进行活跃基准测试。',
     loadingStatus: '正在加载所选对比…',
+    navigationError: '无法加载所选对比，当前显示的是上次成功加载的数据。',
+    emptyState: '没有符合当前筛选条件的总览结果。',
   },
 } as const;
 
