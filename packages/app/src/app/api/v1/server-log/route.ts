@@ -11,14 +11,21 @@ export const dynamic = 'force-dynamic';
 const getCachedServerLog = cachedQuery((id: number) => getServerLog(getDb(), id), 'server-log', {
   blobOnly: true,
 });
+const getCachedNamedServerLog = cachedQuery(
+  (id: number, fileName: string) => getServerLog(getDb(), id, fileName),
+  'server-log-file',
+  { blobOnly: true },
+);
 const getCachedServerLogChunk = cachedQuery(
-  (id: number, offset: number, limit: number) => getServerLogChunk(getDb(), id, offset, limit),
+  (id: number, offset: number, limit: number, fileName: string | null) =>
+    getServerLogChunk(getDb(), id, offset, limit, fileName ?? undefined),
   'server-log-chunk',
 );
 
 export const DEFAULT_SERVER_LOG_CHUNK_SIZE = 64 * 1024;
 export const MAX_SERVER_LOG_CHUNK_SIZE = 256 * 1024;
 const MAX_SERVER_LOG_OFFSET = 2_000_000_000;
+const MAX_SERVER_LOG_FILE_NAME_LENGTH = 1024;
 
 function parseIntegerParam(
   value: string | null,
@@ -40,6 +47,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const fileName = request.nextUrl.searchParams.get('file');
+    if (
+      fileName !== null &&
+      (fileName.length === 0 ||
+        fileName.length > MAX_SERVER_LOG_FILE_NAME_LENGTH ||
+        fileName.includes('\u0000'))
+    ) {
+      return NextResponse.json({ error: 'file is invalid' }, { status: 400 });
+    }
     const wantsChunk =
       request.nextUrl.searchParams.has('offset') || request.nextUrl.searchParams.has('limit');
     if (wantsChunk) {
@@ -64,20 +80,23 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      const chunk = await getCachedServerLogChunk(id, offset, limit);
+      const chunk = await getCachedServerLogChunk(id, offset, limit, fileName);
       if (chunk === null) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
       }
       return cachedJson({ id, ...chunk });
     }
 
-    const serverLog = await getCachedServerLog(id);
+    const serverLog =
+      fileName === null
+        ? await getCachedServerLog(id)
+        : await getCachedNamedServerLog(id, fileName);
 
     if (serverLog === null) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    return cachedJson({ id, serverLog });
+    return cachedJson(fileName === null ? { id, serverLog } : { id, fileName, serverLog });
   } catch (error) {
     console.error('Error fetching server log:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -28,6 +28,7 @@
     "db:backfill-full-response-interactivity": "bun --env-file=../../.env src/backfill-full-response-interactivity.ts",
     "db:backfill-request-timeline": "bun --env-file=../../.env src/backfill-request-timeline.ts",
     "db:backfill-runtime-metadata": "bun --env-file=../../.env src/backfill-runtime-metadata.ts",
+    "db:backfill-server-log-files": "bun --env-file=../../.env src/backfill-server-log-files.ts",
     "db:reset": "bun --env-file=../../.env src/reset-db.ts",
     "db:verify": "bun --env-file=../../.env src/verify-db.ts",
     "test:unit": "vitest run",

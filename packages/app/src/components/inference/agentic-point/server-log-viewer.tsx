@@ -1,8 +1,16 @@
 'use client';
 
 import { Check, ChevronDown, Copy, LoaderCircle, Terminal } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useServerLogFiles } from '@/hooks/api/use-server-log-files';
 import { SERVER_LOG_CHUNK_SIZE, useServerLog } from '@/hooks/api/use-server-log';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
@@ -11,14 +19,12 @@ import { readableLogText } from './log-text';
 
 const STRINGS = {
   en: {
-    title: 'Server log',
-    artifact: 'server.log',
-    description: 'Raw server output captured for this benchmark point.',
-    storageNote:
-      'The database currently stores the server.log artifact as one stream. Router and worker log files are not persisted separately yet.',
-    loading: 'Loading the first log chunk…',
-    error: 'The server log could not be loaded. Try again in a moment.',
-    missing: 'No server log is stored for this benchmark point.',
+    title: 'Log files',
+    description: 'Raw .log and .out files captured for this benchmark point.',
+    fileLabel: 'Log file',
+    loading: 'Loading log files…',
+    error: 'The log files could not be loaded. Try again in a moment.',
+    missing: 'No log files are stored for this benchmark point.',
     copy: 'Copy loaded logs',
     copied: 'Copied',
     loadMore: 'Load next 64 KiB',
@@ -27,14 +33,12 @@ const STRINGS = {
     endOfLog: 'End of stored log',
   },
   zh: {
-    title: '服务器日志',
-    artifact: 'server.log',
-    description: '该基准测试数据点采集的原始服务器输出。',
-    storageNote:
-      '数据库目前将 server.log 产物存储为单一日志流，尚未分别持久化 router 和 worker 日志文件。',
-    loading: '正在加载首个日志分块……',
-    error: '无法加载服务器日志，请稍后重试。',
-    missing: '该基准测试数据点没有已存储的服务器日志。',
+    title: '日志文件',
+    description: '该基准测试数据点采集的原始 .log 和 .out 文件。',
+    fileLabel: '日志文件',
+    loading: '正在加载日志文件……',
+    error: '无法加载日志文件，请稍后重试。',
+    missing: '该基准测试数据点没有已存储的日志文件。',
     copy: '复制已加载日志',
     copied: '已复制',
     loadMore: '继续加载 64 KiB',
@@ -52,14 +56,25 @@ interface Props {
 export function ServerLogViewer({ id, enabled }: Props) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const query = useServerLog(id, enabled);
+  const filesQuery = useServerLogFiles(id, enabled);
+  const files = filesQuery.data ?? [];
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (files.length === 0) {
+      setSelectedFile(null);
+      return;
+    }
+    setSelectedFile((current) => (current && files.includes(current) ? current : files[0]!));
+  }, [files]);
+
+  const query = useServerLog(id, selectedFile, enabled && selectedFile !== null);
   const [copied, setCopied] = useState(false);
   const rawLog = useMemo(
     () => query.data?.pages.map((page) => page?.serverLog ?? '').join('') ?? '',
     [query.data],
   );
   const log = useMemo(() => readableLogText(rawLog), [rawLog]);
-  const hasLog = query.data?.pages[0] !== null;
   const formatter = useMemo(
     () => new Intl.NumberFormat(locale === 'zh' ? 'zh-CN' : 'en-US'),
     [locale],
@@ -68,34 +83,45 @@ export function ServerLogViewer({ id, enabled }: Props) {
   const copyLoadedLog = async () => {
     await navigator.clipboard.writeText(log);
     setCopied(true);
-    track('inference_agentic_logs_copied', { id, loadedCharacters: log.length });
+    track('inference_agentic_logs_copied', {
+      id,
+      fileName: selectedFile,
+      loadedCharacters: log.length,
+    });
     window.setTimeout(() => setCopied(false), 1500);
+  };
+
+  const selectFile = (fileName: string) => {
+    setSelectedFile(fileName);
+    setCopied(false);
+    track('inference_agentic_log_file_selected', { id, fileName });
   };
 
   const loadMore = () => {
     track('inference_agentic_log_chunk_loaded', {
       id,
+      fileName: selectedFile,
       offset: query.data?.pages.at(-1)?.nextOffset ?? 0,
       chunkSize: SERVER_LOG_CHUNK_SIZE,
     });
     void query.fetchNextPage();
   };
 
-  if (query.isLoading) {
+  if (filesQuery.isLoading || (selectedFile !== null && query.isLoading)) {
     return (
       <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
         {t.loading}
       </div>
     );
   }
-  if (query.isError) {
+  if (filesQuery.isError || query.isError) {
     return (
       <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
         {t.error}
       </div>
     );
   }
-  if (!hasLog) {
+  if (files.length === 0 || selectedFile === null || query.data?.pages[0] === null) {
     return (
       <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
         {t.missing}
@@ -108,21 +134,36 @@ export function ServerLogViewer({ id, enabled }: Props) {
       className="overflow-hidden rounded-lg border border-border/60 bg-card/40"
       data-testid="agentic-server-log-viewer"
     >
-      <header className="flex flex-col gap-3 border-b border-border/60 bg-muted/20 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+      <header className="flex flex-col gap-3 border-b border-border/60 bg-muted/20 px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex gap-3">
           <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background text-muted-foreground">
             <Terminal className="size-4" aria-hidden="true" />
           </span>
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-semibold text-foreground">{t.title}</h2>
-              <code className="rounded border border-border/60 bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground">
-                {t.artifact}
-              </code>
-            </div>
+            <h2 className="font-semibold text-foreground">{t.title}</h2>
             <p className="mt-1 text-xs text-muted-foreground">{t.description}</p>
           </div>
         </div>
+        <div className="grid min-w-0 gap-1 sm:w-80">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="agentic-log-file">
+            {t.fileLabel}
+          </label>
+          <Select value={selectedFile} onValueChange={selectFile}>
+            <SelectTrigger id="agentic-log-file" className="w-full font-mono text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {files.map((fileName) => (
+                <SelectItem key={fileName} value={fileName} className="font-mono text-xs">
+                  {fileName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </header>
+
+      <div className="flex justify-end border-b border-border/60 bg-background/40 px-4 py-2">
         <button
           type="button"
           onClick={() => void copyLoadedLog()}
@@ -133,11 +174,7 @@ export function ServerLogViewer({ id, enabled }: Props) {
           {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
           {copied ? t.copied : t.copy}
         </button>
-      </header>
-
-      <p className="border-b border-border/60 bg-amber-500/5 px-4 py-2 text-xs text-muted-foreground">
-        {t.storageNote}
-      </p>
+      </div>
 
       <pre
         className="max-h-[70vh] min-h-[28rem] overflow-auto bg-zinc-950 p-4 font-mono text-xs leading-5 text-zinc-100 selection:bg-sky-400/30"

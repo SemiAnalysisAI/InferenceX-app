@@ -5,6 +5,7 @@ const STALE_TIME_MS = 5 * 60 * 1000;
 
 export interface ServerLogChunk {
   id: number;
+  fileName: string;
   serverLog: string;
   offset: number;
   nextOffset: number | null;
@@ -12,11 +13,13 @@ export interface ServerLogChunk {
 
 async function fetchServerLogChunk(
   id: number,
+  fileName: string,
   offset: number,
   signal?: AbortSignal,
 ): Promise<ServerLogChunk | null> {
   const params = new URLSearchParams({
     id: String(id),
+    file: fileName,
     offset: String(offset),
     limit: String(SERVER_LOG_CHUNK_SIZE),
   });
@@ -27,16 +30,16 @@ async function fetchServerLogChunk(
 }
 
 /** Incrementally fetch immutable server-log chunks for one benchmark point. */
-export function useServerLog(id: number | null, enabled = false) {
+export function useServerLog(id: number | null, fileName: string | null, enabled = false) {
   return useInfiniteQuery({
-    queryKey: ['server-log', id, 'chunks'] as const,
+    queryKey: ['server-log', id, fileName, 'chunks'] as const,
     queryFn: ({ pageParam, signal }) => {
-      if (!id) return Promise.resolve(null);
-      return fetchServerLogChunk(id, pageParam, signal);
+      if (!id || !fileName) return Promise.resolve(null);
+      return fetchServerLogChunk(id, fileName, pageParam, signal);
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage?.nextOffset ?? undefined,
-    enabled: enabled && Boolean(id),
+    enabled: enabled && Boolean(id) && Boolean(fileName),
     staleTime: STALE_TIME_MS,
   });
 }

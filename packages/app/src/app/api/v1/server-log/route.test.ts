@@ -76,25 +76,36 @@ describe('GET /api/v1/server-log', () => {
 
   it('returns a bounded chunk when offset or limit is provided', async () => {
     mockGetServerLogChunk.mockResolvedValueOnce({
+      fileName: 'results/router.log',
       serverLog: 'INFO ready\n',
       offset: 65536,
       nextOffset: 65547,
     });
 
-    const res = await GET(req('/api/v1/server-log?id=42&offset=65536&limit=1024'));
+    const res = await GET(
+      req('/api/v1/server-log?id=42&file=results%2Frouter.log&offset=65536&limit=1024'),
+    );
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
       id: 42,
+      fileName: 'results/router.log',
       serverLog: 'INFO ready\n',
       offset: 65536,
       nextOffset: 65547,
     });
-    expect(mockGetServerLogChunk).toHaveBeenCalledWith('mock-sql', 42, 65536, 1024);
+    expect(mockGetServerLogChunk).toHaveBeenCalledWith(
+      'mock-sql',
+      42,
+      65536,
+      1024,
+      'results/router.log',
+    );
     expect(mockGetServerLog).not.toHaveBeenCalled();
   });
 
   it('uses bounded defaults when only one chunk parameter is provided', async () => {
     mockGetServerLogChunk.mockResolvedValueOnce({
+      fileName: 'server.log',
       serverLog: 'start',
       offset: 0,
       nextOffset: null,
@@ -102,7 +113,7 @@ describe('GET /api/v1/server-log', () => {
 
     const res = await GET(req('/api/v1/server-log?id=42&offset=0'));
     expect(res.status).toBe(200);
-    expect(mockGetServerLogChunk).toHaveBeenCalledWith('mock-sql', 42, 0, 64 * 1024);
+    expect(mockGetServerLogChunk).toHaveBeenCalledWith('mock-sql', 42, 0, 64 * 1024, undefined);
   });
 
   it.each([
@@ -116,6 +127,23 @@ describe('GET /api/v1/server-log', () => {
     const res = await GET(req(`/api/v1/server-log?id=42&${query}`));
     expect(res.status).toBe(400);
     expect(mockGetServerLogChunk).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an empty filename', async () => {
+    const res = await GET(req('/api/v1/server-log?id=42&file='));
+    expect(res.status).toBe(400);
+    expect(mockGetServerLog).not.toHaveBeenCalled();
+  });
+
+  it('returns a complete named log for compatibility clients', async () => {
+    mockGetServerLog.mockResolvedValueOnce('router output');
+    const res = await GET(req('/api/v1/server-log?id=42&file=router.log'));
+    await expect(res.json()).resolves.toEqual({
+      id: 42,
+      fileName: 'router.log',
+      serverLog: 'router output',
+    });
+    expect(mockGetServerLog).toHaveBeenCalledWith('mock-sql', 42, 'router.log');
   });
 
   it('returns 404 when a requested chunk has no linked log', async () => {

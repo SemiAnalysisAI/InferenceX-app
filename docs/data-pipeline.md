@@ -151,6 +151,21 @@ AIPerf defines the `server_metrics_export.json` envelope, but labels such as wor
 
 Adapters are selected from the benchmark's canonical framework, and per-worker series are only emitted for disaggregated configs with a recognized adapter. Unknown orchestrators and non-disaggregated configs retain their aggregate-only series; roles are never guessed from ports or metric names. The frontend only consumes the canonical source identity and never interprets orchestrator-native labels.
 
+### Server-Log Artifact Bundles
+
+Server-log artifacts are stored as filename-keyed bundles rather than as a hard-coded list of
+router, worker, or benchmark roles. Ingest recursively retains every regular `.log` and `.out`
+file and preserves its artifact-relative path. This applies to both `server_logs_*` ZIPs and
+`multinode_server_logs_*` artifacts whose files are nested inside
+`multinode_server_logs.tar.gz`.
+
+The primary file remains in `server_logs.server_log` for compatibility and KV-cache metadata
+extraction; `server_log_files` holds the remaining files. `server_logs.file_name` records the
+primary file's original path, and `files_complete` distinguishes fully scanned bundles from
+legacy single-file rows. Run `bun run admin:db:backfill-server-log-files` to download retained
+GitHub artifacts and idempotently fill historical bundles. The backfill supports `--run <id>`,
+`--limit <n>`, and the standard `--yes` confirmation bypass.
+
 ### Agentic Dataset Provenance
 
 AIPerf exports public-dataset provenance in `metadata.dataset`, including the Hugging Face dataset ID. InferenceX preserves that object as `dataset` on each agentic aggregate benchmark row. During benchmark ingest, `ingest-ci-run.ts` derives the dashboard slug from `hf_dataset_name` (for example, `semianalysisai/cc-traces-weka-062126` becomes `cc-traces-weka-062126`) and upserts `run_datasets` for the workflow run.

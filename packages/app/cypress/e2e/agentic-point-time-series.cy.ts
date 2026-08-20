@@ -116,32 +116,51 @@ describe('Agentic point request metric time series', () => {
   });
 
   it('opens the stored server log and loads it incrementally', () => {
-    cy.intercept('GET', '/api/v1/server-log*', (request) => {
-      const offset = Number(new URL(request.url).searchParams.get('offset') ?? 0);
+    cy.intercept(
+      { method: 'GET', pathname: '/api/v1/server-log-files' },
+      {
+        body: ['results/server.log', 'results/benchmark.log', 'results/router.log'],
+      },
+    ).as('serverLogFiles');
+    cy.intercept({ method: 'GET', pathname: '/api/v1/server-log' }, (request) => {
+      const params = new URL(request.url).searchParams;
+      const offset = Number(params.get('offset') ?? 0);
+      const fileName = params.get('file') ?? 'results/server.log';
       request.reply({
         body:
-          offset === 0
+          fileName === 'results/router.log'
             ? {
                 id: 206885,
-                serverLog: '\u001B[32mINFO\u001B[0m server ready\n',
+                fileName,
+                serverLog: 'INFO router ready\n',
                 offset: 0,
-                nextOffset: 31,
-              }
-            : {
-                id: 206885,
-                serverLog: 'INFO benchmark complete\n',
-                offset,
                 nextOffset: null,
-              },
+              }
+            : offset === 0
+              ? {
+                  id: 206885,
+                  fileName,
+                  serverLog: '\u001B[32mINFO\u001B[0m server ready\n',
+                  offset: 0,
+                  nextOffset: 31,
+                }
+              : {
+                  id: 206885,
+                  fileName,
+                  serverLog: 'INFO benchmark complete\n',
+                  offset,
+                  nextOffset: null,
+                },
       });
     }).as('serverLogChunk');
     cy.get('[data-testid="detail-view-logs"]').click();
     cy.location('search').should('contain', 'view=logs');
+    cy.wait('@serverLogFiles');
     cy.wait('@serverLogChunk');
 
     cy.get('[data-testid="agentic-server-log-viewer"]')
-      .should('contain.text', 'Server log')
-      .and('contain.text', 'Router and worker log files are not persisted separately yet.');
+      .should('contain.text', 'Log files')
+      .and('contain.text', 'results/server.log');
     cy.get('[data-testid="server-log-content"]')
       .should('contain.text', 'INFO server ready')
       .and('not.contain.text', '\u001B[32m');
@@ -152,6 +171,11 @@ describe('Agentic point request metric time series', () => {
       .should('contain.text', 'INFO server ready')
       .and('contain.text', 'INFO benchmark complete');
     cy.contains('End of stored log').should('be.visible');
+
+    cy.get('#agentic-log-file').click();
+    cy.contains('[role="option"]', 'results/router.log').click();
+    cy.wait('@serverLogChunk');
+    cy.get('[data-testid="server-log-content"]').should('contain.text', 'INFO router ready');
 
     cy.get('[data-testid="detail-view-point"]').click();
   });
@@ -296,22 +320,32 @@ describe('Agentic point request metric time series', () => {
   it('renders the log viewer in Simplified Chinese', () => {
     cy.intercept('GET', '/api/v1/trace-server-metrics*', { body: null });
     cy.intercept('GET', '/api/v1/benchmark-siblings*', { body: benchmarkSiblings });
-    cy.intercept('GET', '/api/v1/server-log*', {
-      body: {
-        id: 206885,
-        serverLog: 'INFO server ready\n',
-        offset: 0,
-        nextOffset: null,
+    cy.intercept(
+      { method: 'GET', pathname: '/api/v1/server-log-files' },
+      {
+        body: ['results/server.log'],
       },
-    });
+    );
+    cy.intercept(
+      { method: 'GET', pathname: '/api/v1/server-log' },
+      {
+        body: {
+          id: 206885,
+          fileName: 'results/server.log',
+          serverLog: 'INFO server ready\n',
+          offset: 0,
+          nextOffset: null,
+        },
+      },
+    );
     cy.visit('/zh/inference/agentic/206885?view=logs', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="detail-view-logs"]')
       .should('have.attr', 'aria-selected', 'true')
       .and('have.text', '日志');
     cy.get('[data-testid="agentic-server-log-viewer"]')
-      .should('contain.text', '服务器日志')
-      .and('contain.text', '尚未分别持久化 router 和 worker 日志文件')
+      .should('contain.text', '日志文件')
+      .and('contain.text', 'results/server.log')
       .and('contain.text', '已到达日志末尾');
   });
 });

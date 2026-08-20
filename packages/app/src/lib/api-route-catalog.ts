@@ -308,12 +308,20 @@ export const apiRouteCatalog = [
     sourceSha256: '30659cb757b9fd23411757051b650cfb564016aa15c8b9fec48676b9591f01e9',
   },
   {
+    source: 'src/app/api/v1/server-log-files/route.ts',
+    path: '/api/v1/server-log-files',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-server-log-files',
+    sourceSha256: '367628818cb02273505c4826d35407e10c45ed4eced69b628da091cde79db0cf',
+  },
+  {
     source: 'src/app/api/v1/server-log/route.ts',
     path: '/api/v1/server-log',
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-server-log',
-    sourceSha256: 'dc86bff0ad197fd301e3a65acafcf397df58f59017c05a5746ba06a213b66456',
+    sourceSha256: '422643c2a33a139e95067c3945219af0c3cca7049f629e2054f0f9ab8419e6e0',
   },
   {
     source: 'src/app/api/v1/submissions/route.ts',
@@ -511,10 +519,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/server-logs.ts',
-    sourceSha256: '522f08bc876be312ac18ffb47512e6db24886e9960cbad201a94206f429a22aa',
+    sourceSha256: '4ac684affbb4a2ecf1568419a72bac9752ccfe3e70c6c0e9cb50b45c09e41cce',
     reviewArea: {
-      en: 'Server log lookup, bounded chunk metadata, availability map, and missing-record behavior.',
-      zh: '服务器日志查询、有界分块元数据、可用性映射和记录缺失行为。',
+      en: 'Log filename discovery, selected-file reads, bounded chunk metadata, availability, and legacy-schema fallback.',
+      zh: '日志文件名发现、指定文件读取、有界分块元数据、可用性以及旧版 schema 回退行为。',
     },
   },
   {
