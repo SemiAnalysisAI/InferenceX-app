@@ -1,11 +1,13 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useCallback, useRef } from 'react';
 
 import {
   type UrlStateKey,
   type UrlStateParams,
   readUrlParams,
+  refreshUrlParamsOnNavigation,
   writeUrlParams,
 } from '@/lib/url-state';
 
@@ -16,6 +18,19 @@ import {
  */
 export function useUrlState() {
   const initialParams = useRef<UrlStateParams | null>(null);
+
+  // The load-time snapshot in `url-state.ts` is captured once per document, so
+  // on a client-side navigation every provider below would initialise from the
+  // params of the page the user came FROM. Refresh during render — before the
+  // `useState` initialisers and mount effects of the providers underneath —
+  // and only once per navigation, so a component mounting later on the same
+  // path cannot re-import the URL over filter changes made since.
+  //
+  // `usePathname`, not `useSearchParams`: the latter forces every statically
+  // prerendered page that mounts a filter provider behind a Suspense boundary,
+  // which fails the build on /ai-chart.
+  const pathname = usePathname();
+  refreshUrlParamsOnNavigation(pathname ?? '');
 
   // read URL params only once (synchronous, before first render)
   if (initialParams.current === null) {

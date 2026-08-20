@@ -1,5 +1,7 @@
 import { updateRepoUrl } from '@/lib/utils';
+import { agenticDetailHref } from '@/lib/agentic-detail-link';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import type { Locale } from '@/lib/i18n';
 
 import type { InferenceData } from '@/components/inference/types';
 import { fmt, getPointLabel } from '@/components/inference/utils/tooltipUtils';
@@ -55,10 +57,11 @@ const num = (v: number | undefined | null): number | null =>
 export function pointDetailHref(
   d: InferenceData,
   isOverlay: boolean,
+  locale: Locale = 'en',
 ): { href: string | null; isExternal: boolean } {
   if (isOverlay) return { href: null, isExternal: false };
   if (d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)) {
-    return { href: `/inference/agentic/${d.id}`, isExternal: false };
+    return { href: agenticDetailHref(d.id, locale), isExternal: false };
   }
   if (d.run_url) return { href: updateRepoUrl(d.run_url), isExternal: true };
   return { href: null, isExternal: false };
@@ -72,10 +75,11 @@ export function pointDetailHref(
 export function buildLegendPointsRows(
   points: InferenceData[],
   isOverlay: boolean,
+  locale: Locale = 'en',
 ): LegendPointsTableRow[] {
   return points
     .map((d, i) => {
-      const { href, isExternal } = pointDetailHref(d, isOverlay);
+      const { href, isExternal } = pointDetailHref(d, isOverlay, locale);
       return {
         key: `${d.hwKey}|${d.precision}|${d.conc}|${getPointLabel(d)}|${d.offload_mode ?? ''}|${i}`,
         conc: d.conc,

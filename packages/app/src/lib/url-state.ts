@@ -219,6 +219,34 @@ export function refreshUrlParams(): UrlStateParams {
   return _initialParams;
 }
 
+/**
+ * Pathname of the last navigation whose params were pulled into the snapshot.
+ * Module-level (not a hook ref) so only the FIRST `useUrlState` consumer to
+ * render after a navigation does the work: a component that mounts later on
+ * the same path must not re-import the URL over filter changes the user has
+ * made since.
+ */
+let lastRefreshedPathname: string | null = null;
+
+/**
+ * Refresh the snapshot once per client-side navigation.
+ *
+ * Providers read their initial state through `getUrlParam` during render, so
+ * the snapshot has to be current BEFORE they initialise. `useUrlState` calls
+ * this while rendering, which puts it ahead of every provider below the
+ * component that called it first (React renders top-down), and ahead of the
+ * mount effects that read `i_gpus` and friends.
+ *
+ * Returns whether a refresh actually happened, which is what the unit tests
+ * assert on.
+ */
+export function refreshUrlParamsOnNavigation(pathname: string): boolean {
+  if (lastRefreshedPathname === pathname) return false;
+  lastRefreshedPathname = pathname;
+  refreshUrlParams();
+  return true;
+}
+
 /** Check whether the current URL has any share-link params. */
 export function hasAnyUrlParams(): boolean {
   if (typeof window === 'undefined') return false;
@@ -278,12 +306,15 @@ function flushPendingParams(): void {
  */
 const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/iu;
 
-export function buildShareUrl(): string {
+/**
+ * Current in-memory state for `tab`, plus any unofficial-run IDs in the address
+ * bar, as a `URLSearchParams`. Flushes pending writes first so the caller sees
+ * the newest filter change rather than the one before it.
+ */
+function collectTabParams(tab: string): URLSearchParams {
   flushPendingParams();
 
-  const pathTab = window.location.pathname.split('/').filter(Boolean)[0] || 'inference';
-  const prefixes = TAB_PARAM_PREFIXES[pathTab] ?? TAB_PARAM_PREFIXES.inference;
-
+  const prefixes = TAB_PARAM_PREFIXES[tab] ?? TAB_PARAM_PREFIXES.inference;
   const filtered = new URLSearchParams();
   for (const [key, value] of Object.entries(currentState)) {
     if (prefixes.some((p) => key.startsWith(p))) {
@@ -303,6 +334,83 @@ export function buildShareUrl(): string {
     }
   }
 
-  const search = filtered.toString();
+  return filtered;
+}
+
+export function buildShareUrl(): string {
+  const pathTab = window.location.pathname.split('/').filter(Boolean)[0] || 'inference';
+  const search = collectTabParams(pathTab).toString();
   return `${window.location.origin}/${pathTab}${search ? `?${search}` : ''}`;
+}
+
+/**
+ * Which tab's params matter for a pathname, ignoring the `/zh` prefix and any
+ * trailing segments. `/zh/inference/agentic/206863` and `/inference` both
+ * resolve to `inference`, so a detail page carries the chart's params.
+ */
+function tabForPathname(pathname: string): string {
+  const segments = pathname.split('/').filter(Boolean);
+  const first = segments[0] === 'zh' ? segments[1] : segments[0];
+  return first || 'inference';
+}
+
+/**
+ * The chart state this page would share, as a query string (no leading `?`).
+ * Empty when every value is at its default.
+ */
+export function currentChartSearch(): string {
+  if (typeof window === 'undefined') return '';
+  return collectTabParams(tabForPathname(window.location.pathname)).toString();
+}
+
+/**
+ * Write the chart state into the CURRENT history entry, so Back restores it.
+ *
+ * Filter changes only ever reach the in-memory `currentState` — the address bar
+ * is deliberately stripped clean after load — so the entry the browser returns
+ * to is a bare `/inference` that rebuilds from defaults. Detail-page links are
+ * plain `<a href>` (they must support open-in-new-tab), i.e. full-document
+ * navigations that also destroy this module, so the URL is the only channel
+ * that survives. Call this immediately before navigating away from a chart.
+ *
+ * `history.state` is passed straight through so the Next router's own entry
+ * bookkeeping is not clobbered.
+ */
+export function rememberChartStateInUrl(): string {
+  if (typeof window === 'undefined') return '';
+  const { pathname, hash, search: liveSearch } = window.location;
+  const chartParams = collectTabParams(tabForPathname(pathname));
+
+  // Start from whatever is already in the address bar so params this module
+  // does not own (campaign tags and the like) survive the rewrite, then layer
+  // the chart state on top. Both unofficial-run spellings are cleared first —
+  // `collectTabParams` re-emits the canonical plural form.
+  const merged = new URLSearchParams(liveSearch);
+  for (const key of URL_STATE_KEYS) merged.delete(key);
+  const unofficialKeys: string[] = [];
+  for (const key of merged.keys()) {
+    if (UNOFFICIAL_RUN_PARAM_RE.test(key)) unofficialKeys.push(key);
+  }
+  // Deleting inside the iteration above would skip entries.
+  for (const key of unofficialKeys) merged.delete(key);
+  for (const [key, value] of chartParams) merged.set(key, value);
+
+  const search = merged.toString();
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${pathname}${search ? `?${search}` : ''}${hash}`,
+  );
+  return chartParams.toString();
+}
+
+/**
+ * Append the current chart state to an outbound in-app href, so the page it
+ * opens can link back to the chart the user left. Used for the agentic
+ * point-detail links, which are full-document navigations.
+ */
+export function withChartState(href: string): string {
+  const search = currentChartSearch();
+  if (!search) return href;
+  return `${href}${href.includes('?') ? '&' : '?'}${search}`;
 }

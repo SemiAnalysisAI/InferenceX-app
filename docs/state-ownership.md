@@ -258,6 +258,43 @@ Note: `i_seq` and `i_prec` are written by `GlobalFilterProvider` (not InferenceP
 
 `useUrlStateSync` (used by InferenceProvider, EvaluationProvider, ReliabilityProvider) skips the first render via `isMountedRef` to avoid overwriting the just-snapshotted URL params. GlobalFilterProvider uses a manually-written equivalent (lines 288–308 in `GlobalFilterContext.tsx`).
 
+### Carrying state across a full-document navigation
+
+The two effects above combine into a trap: filter changes reach only the
+in-memory `currentState`, and the address bar is stripped clean, so **the URL of
+the `/inference` history entry describes nothing**. Any full-document navigation
+away from the chart therefore destroys the state entirely — the module is torn
+down, and Back returns to a bare `/inference` that rebuilds from defaults.
+
+The agentic point-detail links (`/inference/agentic/<id>`, rendered by
+`tooltipUtils.viewChartsButtonHTML` and `legend-points-table.pointDetailHref`)
+are exactly that: plain `<a href>`, deliberately, so browsers can offer
+open-in-new-tab. Three helpers in `url-state.ts` bridge the gap:
+
+| Helper                      | Used by                                                      | Why                                                                           |
+| --------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `rememberChartStateInUrl()` | the point-click handlers (Scatter / GPU graph, legend table) | `history.replaceState`s the chart state onto the entry Back will return to    |
+| `withChartState(href)`      | `agenticDetailHref()`                                        | appends it to the outbound link so the detail page can link back to that view |
+| `currentChartSearch()`      | both of the above                                            | resolves the tab through the `/zh` prefix, flushes pending writes, filters    |
+
+The detail page reads the state back through `withChartState` (its own URL was
+snapshotted into `currentState` at load, then stripped as usual), which is what
+makes its "Inference chart" link land on the chart the reader left rather than
+on defaults.
+
+### Re-hydration on client-side navigation
+
+`useUrlState` calls `refreshUrlParamsOnNavigation(pathname)` **during render**,
+guarded by a module-level last-pathname so it runs at most once per navigation.
+That ordering matters: providers read `getUrlParam` in `useState` initialisers
+and mount effects, both of which run before any parent's layout effect, so
+refreshing from an effect (as `GlobalFilterContext` does on its own account)
+is too late for anything below it. With the hook-level refresh, every provider
+— `InferenceProvider`'s `i_gpus` / `i_metric` / `i_active` included — sees the
+params of the page it actually landed on. The once-per-pathname guard is what
+keeps a late-mounting component from replaying a stale URL over filter changes
+the user has made since.
+
 ### Share URL construction
 
 `buildShareUrl()` flushes pending writes, reads `currentState`, and filters to only the param prefixes relevant to the current tab (defined in `TAB_PARAM_PREFIXES`). Inference share URLs include `g_` + `i_` params; evaluation includes `g_` + `e_`; reliability includes only `r_`.
