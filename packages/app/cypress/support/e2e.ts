@@ -9,6 +9,8 @@
  * own `onBeforeLoad`, which runs after this hook; specs that exercise the
  * launch modal call `keepLaunchModal()` instead — see below.
  */
+import 'cypress-axe';
+
 let suppressLaunchModal = true;
 let suppressTelemetryTutorial = true;
 
