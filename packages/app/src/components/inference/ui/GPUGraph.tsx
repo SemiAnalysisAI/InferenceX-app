@@ -9,7 +9,7 @@ import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getChartWatermark, Sequence } from '@/lib/data-mappings';
-import { generateGpuDateColors } from '@/lib/dynamic-colors';
+import { generateGpuDateColors, generateHighContrastGpuDateColors } from '@/lib/dynamic-colors';
 import { useLocale } from '@/lib/use-locale';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -193,9 +193,13 @@ const GPUGraph = React.memo(
       return ids;
     }, [gpuDatePairs]);
 
+    // High contrast keys off the GPU (not `date_gpu`) so each hardware config
+    // gets exactly one hue; the dates within a config are separated by the
+    // lightness ramp built below rather than by unrelated hues.
     const { resolveColor, getCssColor } = useThemeColors({
       highContrast,
       identifiers: graphIdentifiers,
+      hcKeys: gpuDatePairs.sortedGPUs,
     });
 
     // Dynamic GPU×date color map
@@ -206,25 +210,38 @@ const GPUGraph = React.memo(
       return generateGpuDateColors(sortedGPUs, dates.length, theme);
     }, [gpuDatePairs, resolvedTheme]);
 
+    // High-contrast GPU×date color map: one iwanthue hue per GPU, ramped across
+    // the compared dates so a config's runs stay recognisably the same color
+    // while still reading oldest → newest.
+    const hcGpuDateColorMap = useMemo(() => {
+      const { dates, sortedGPUs } = gpuDatePairs;
+      if (!highContrast || sortedGPUs.length === 0 || dates.length === 0) return {};
+      const theme = resolvedTheme === 'dark' || resolvedTheme === 'minecraft' ? 'dark' : 'light';
+      const baseColors: Record<string, string> = {};
+      for (const gpu of sortedGPUs) baseColors[gpu] = getCssColor(resolveColor(gpu));
+      return generateHighContrastGpuDateColors(baseColors, dates.length, theme);
+    }, [gpuDatePairs, highContrast, resolvedTheme, resolveColor, getCssColor]);
+
     const allGraphs = useMemo(() => {
       const { dates, sortedGPUs } = gpuDatePairs;
       const result: { date: string; color: string; hwKey: string; id: string }[] = [];
       sortedGPUs.forEach((gpu) => {
         dates.forEach((date, dateIndex) => {
           const id = `${date}_${gpu}`;
-          const dynamicColor = gpuDateColorMap[`${dateIndex}_${gpu}`];
+          const compositeKey = `${dateIndex}_${gpu}`;
+          const dynamicColor = gpuDateColorMap[compositeKey];
           result.push({
             date,
             hwKey: gpu,
             id,
             color: highContrast
-              ? getCssColor(resolveColor(id))
+              ? hcGpuDateColorMap[compositeKey] || getCssColor(resolveColor(gpu))
               : dynamicColor || 'var(--foreground)',
           });
         });
       });
       return result;
-    }, [gpuDatePairs, gpuDateColorMap, highContrast, resolveColor, getCssColor]);
+    }, [gpuDatePairs, gpuDateColorMap, hcGpuDateColorMap, highContrast, resolveColor, getCssColor]);
 
     const groupedData = useMemo(
       () =>
