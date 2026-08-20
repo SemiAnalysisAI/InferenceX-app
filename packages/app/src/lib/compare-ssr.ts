@@ -59,6 +59,26 @@ export const KNOWN_MODELS = new Set([
 export const KNOWN_SEQUENCES = new Set(['1k/1k', '1k/8k', '8k/1k', 'agentic-traces']);
 export const KNOWN_PRECISIONS = new Set(['fp4', 'fp4fp8', 'fp8', 'bf16', 'int4', 'nvfp4', 'mxfp4']);
 
+/**
+ * Three-sentence framing shown above the narrative when a compare page is
+ * rendering the agentic workload. The agentic scenario is a different kind of
+ * measurement from a fixed-sequence run, and a reader who arrived from a GPU
+ * query ("b200 vs b300") has no reason to know that yet — so say it once,
+ * here, and hand off to /agentx for the rest.
+ */
+export interface AgenticScenarioIntro {
+  paragraph: string;
+  linkLabel: string;
+  href: string;
+}
+
+export const AGENTIC_SCENARIO_INTRO: AgenticScenarioIntro = {
+  paragraph:
+    'AgentX replays real coding-agent sessions rather than fixed-length prompts, so context grows turn over turn and most of each request is served from cache instead of being recomputed. That turns the comparison into a systems question: KV transfer between nodes, prefix-aware routing, and cache capacity all move the curve alongside raw chip throughput. Fixed-sequence workloads stay the clean baseline for kernel and silicon performance, so the two scenarios answer different questions about the same hardware.',
+  linkLabel: 'Learn more about AgentX',
+  href: '/agentx',
+};
+
 export function pickString(value: string | string[] | undefined): string | undefined {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value[0];

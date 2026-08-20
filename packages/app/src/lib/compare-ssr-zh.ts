@@ -20,6 +20,7 @@ import {
   compareModelSeoName,
 } from '@/lib/compare-slug';
 import {
+  type AgenticScenarioIntro,
   bandFor,
   type CompareJsonLdVariant,
   computeCompareStat,
@@ -154,6 +155,14 @@ const FULL_SINGLE_TEMPLATES_ZH: ((args: {
 // ---------------------------------------------------------------------------
 // compareTableNarrativeZh
 // ---------------------------------------------------------------------------
+
+/** 1:1 port of `AGENTIC_SCENARIO_INTRO` — see the English original for why. */
+export const AGENTIC_SCENARIO_INTRO_ZH: AgenticScenarioIntro = {
+  paragraph:
+    'AgentX 回放真实的编码 agent 会话，而不是固定长度的 prompt，因此上下文随轮次不断增长，每个请求的大部分内容由 cache 提供而无需重新计算。这让对比变成一个系统问题：跨节点的 KV 传输、prefix 感知路由与 cache 容量，都会与芯片原始吞吐量一同影响曲线。固定序列负载仍然是衡量 kernel 与芯片性能的干净基线，因此两种场景回答的是关于同一硬件的不同问题。',
+  linkLabel: '进一步了解 AgentX',
+  href: '/zh/agentx',
+};
 
 export function compareTableNarrativeZh(
   variant: CompareJsonLdVariant,

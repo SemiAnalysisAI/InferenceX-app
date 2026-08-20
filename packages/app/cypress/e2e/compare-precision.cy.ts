@@ -38,12 +38,12 @@ describe('Compare precision index page', () => {
       .first()
       .should('contain.text', 'AgentX')
       .and('have.attr', 'href')
-      .and('match', /\?i_seq=agentic-traces$/u);
+      .and('match', /\/agentic$/u);
     cy.get('#deepseek-r1 a[data-scenario="8K→1K"]')
       .first()
       .should('contain.text', '8K→1K')
       .and('have.attr', 'href')
-      .and('match', /\?i_seq=8k%2F1k$/u);
+      .and('match', /\/8k-1k$/u);
   });
 
   it('ships the same AgentX-first hierarchy on the Simplified Chinese page', () => {
@@ -70,7 +70,7 @@ describe('Compare precision index page', () => {
     cy.get('#deepseek-v4 a[data-scenario="AgentX"]')
       .first()
       .should('have.attr', 'href')
-      .and('match', /^\/zh\/compare\/.+\?i_seq=agentic-traces$/u);
+      .and('match', /^\/zh\/compare\/.+\/agentic$/u);
   });
 
   it('renders the /compare-per-dollar index with precision and spec-decode CTA links', () => {

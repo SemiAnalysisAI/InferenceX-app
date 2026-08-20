@@ -9,6 +9,11 @@ import {
 } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
+import {
+  isAgenticSequence,
+  type ScenarioSegment,
+  sequenceForScenarioSegment,
+} from '@/lib/compare-scenario-route';
 import { languageAlternates } from '@/lib/i18n';
 import { pickPairDefaults } from '@/lib/compare-pair-defaults';
 import {
@@ -19,6 +24,7 @@ import {
 } from '@/lib/compare-slug';
 import { getGpuSpecs } from '@/lib/constants';
 import {
+  AGENTIC_SCENARIO_INTRO,
   buildBreadcrumbJsonLd,
   buildJsonLd,
   compareTableNarrative,
@@ -36,6 +42,22 @@ import ComparePerDollarPageClient from './page-client';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * `/compare-per-dollar/<slug>/<scenario>` renders this same page with the workload
+ * pinned by the path. The segment is threaded through rather than duplicated
+ * in a parallel route file so the body — redirects, JSON-LD, metadata, client
+ * props — is written once and cannot drift between the two URLs.
+ */
+export interface ScenarioOptions {
+  scenarioSegment?: ScenarioSegment;
+}
+
+function scenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): string {
+  return scenarioSegment
+    ? `/compare-per-dollar/${canonical}/${scenarioSegment}`
+    : `/compare-per-dollar/${canonical}`;
+}
+
 interface Props {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -43,11 +65,26 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+  return buildPerDollarMetadata(slug, {});
+}
+
+export function buildPerDollarMetadata(
+  slug: string,
+  { scenarioSegment }: ScenarioOptions,
+): Metadata {
   const parsed = parseCompareSlug(slug);
   if (!parsed) return {};
   const fullLabel = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
   const gpuLabel = compareDisplayLabel(parsed.a, parsed.b);
-  const url = `${SITE_URL}/compare-per-dollar/${canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b)}`;
+  const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
+  // The scenario segments are views of one comparison, so the bare slug URL
+  // stays the indexable representative and every segment canonicalizes to it.
+  // Without this, `/…/<slug>/<default-scenario>` and `/…/<slug>` would serve
+  // byte-identical pages, each claiming to be canonical.
+  const routePath = scenarioPath(canonical, scenarioSegment);
+  const canonicalPath = scenarioPath(canonical);
+  const url = `${SITE_URL}${routePath}`;
+  const canonicalUrl = `${SITE_URL}${canonicalPath}`;
   // Description leads with the searched GPU pair + model, then the trust
   // signals (verified/reproducible, what InferenceX is, named supporters)
   // before weaving the per-dollar SEO terms ("performance per dollar", "cost
@@ -57,10 +94,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${fullLabel} — Performance per Dollar`,
     description,
     alternates: {
-      canonical: url,
-      languages: languageAlternates(
-        `/compare-per-dollar/${canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b)}`,
-      ),
+      canonical: canonicalUrl,
+      languages: languageAlternates(canonicalPath),
     },
     openGraph: {
       title: `${fullLabel} — Performance per Dollar | ${SITE_NAME}`,
@@ -78,10 +113,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ComparePerDollarPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  return renderPerDollarPage(slug, await searchParams, {});
+}
+
+export async function renderPerDollarPage(
+  slug: string,
+  sp: Record<string, string | string[] | undefined>,
+  { scenarioSegment }: ScenarioOptions,
+) {
   const parsed = parseCompareSlug(slug);
   if (!parsed) notFound();
-
-  const sp = await searchParams;
 
   // Same one-hop 308 normalization as /compare/[slug] — bare-slug fallback,
   // alias model resolution, GPU alphabetical order — but redirect target lives
@@ -98,7 +139,9 @@ export default async function ComparePerDollarPage({ params, searchParams }: Pro
       })
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
-    permanentRedirect(`/compare-per-dollar/${canonical}${qs ? `?${qs}` : ''}`);
+    // Keep the scenario segment across the redirect — dropping it would send
+    // the reader to the pair's default workload instead.
+    permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
   const rows = await getCachedBenchmarks(parsed.model.dbKeys);
@@ -113,7 +156,11 @@ export default async function ComparePerDollarPage({ params, searchParams }: Pro
   const urlSeq = pickString(sp.i_seq);
   const urlPrec = pickString(sp.i_prec);
   const urlModel = pickString(sp.g_model);
-  const effectiveSequence = urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence;
+  // Path beats query beats the pair's default: a scenario segment is an
+  // explicit address for one workload, so it outranks a stale `?i_seq=`.
+  const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
+  const effectiveSequence =
+    pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence);
   const effectivePrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : pickedPrecision;
   const effectiveModel =
     urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
@@ -126,7 +173,8 @@ export default async function ComparePerDollarPage({ params, searchParams }: Pro
     effectivePrecision,
   );
 
-  const url = `${SITE_URL}/compare-per-dollar/${canonical}`;
+  const routePath = scenarioPath(canonical, scenarioSegment);
+  const url = `${SITE_URL}${routePath}`;
   const imageUrl = `${url}/performance-per-dollar.png`;
   const { oldest, newest } = dateRangeForPair(rows, parsed.a, parsed.b);
   const jsonLd = buildJsonLd(
@@ -183,6 +231,7 @@ export default async function ComparePerDollarPage({ params, searchParams }: Pro
         defaultPrecision={effectivePrecision}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         narrative={narrative}
+        agenticIntro={isAgenticSequence(effectiveSequence) ? AGENTIC_SCENARIO_INTRO : null}
         aLabel={aLabel}
         bLabel={bLabel}
         aVendor={aMeta?.vendor ?? ''}

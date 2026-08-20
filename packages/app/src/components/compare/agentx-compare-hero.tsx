@@ -1,6 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
+import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
 import { agentxDashboardHref, FEATURED_AGENTX_MODELS } from '@/lib/compare-agentx';
 
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
@@ -56,9 +57,15 @@ export function AgentXCompareHero({
             <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
               {t.eyebrow}
             </p>
-            <Heading className="mt-3 max-w-2xl text-[1.5rem]/[1.8rem] font-semibold tracking-tight text-foreground lg:text-[2.4rem]/[2.4rem]">
-              {t.title}
-            </Heading>
+            {/* `relative` anchors the splash, which positions itself absolutely
+                at the top right. Landing only: /compare is not the launch
+                surface, and the announcement belongs on the front page. */}
+            <div className="relative">
+              <Heading className="mt-3 max-w-2xl text-[1.5rem]/[1.8rem] font-semibold tracking-tight text-foreground lg:text-[2.4rem]/[2.4rem]">
+                {t.title}
+              </Heading>
+              {surface === 'landing' && <MinecraftSplash />}
+            </div>
             <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground lg:text-lg">
               {t.description}
             </p>

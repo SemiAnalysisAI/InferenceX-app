@@ -12,6 +12,7 @@ import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
 import { track } from '@/lib/analytics';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare-enum-coerce';
+import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
 
 interface SsrTableData {
   defaultTargets: number[];
@@ -61,6 +62,10 @@ interface ComparePageClientProps {
    *  but varies across pages in the catalog. Empty array when there's no
    *  comparable data. */
   narrative: string[];
+  /** Set only when the page is rendering the agentic workload. Explains what
+   *  AgentX measures before the head-to-head numbers, since a reader who
+   *  arrived from a GPU query has no reason to expect a replayed trace. */
+  agenticIntro?: AgenticScenarioIntro | null;
   aLabel: string;
   bLabel: string;
   aVendor: string;
@@ -81,6 +86,7 @@ export default function ComparePageClient({
   defaultPrecision,
   ssrTableData,
   narrative,
+  agenticIntro = null,
   aLabel,
   bLabel,
   aVendor,
@@ -140,6 +146,21 @@ export default function ComparePageClient({
                     {t.mainChartLinkText}
                   </Link>
                   .
+                </p>
+              )}
+              {agenticIntro && (
+                <p
+                  className="mt-3 max-w-3xl text-sm text-foreground/80"
+                  data-testid="compare-agentic-intro"
+                >
+                  {agenticIntro.paragraph}{' '}
+                  <Link
+                    href={agenticIntro.href}
+                    data-testid="compare-agentic-intro-link"
+                    className="font-medium text-brand underline underline-offset-4 hover:no-underline"
+                  >
+                    {agenticIntro.linkLabel} →
+                  </Link>
                 </p>
               )}
               {narrative.length > 0 && (

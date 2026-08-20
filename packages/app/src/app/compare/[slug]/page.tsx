@@ -5,6 +5,11 @@ import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 
 import { JsonLd } from '@/components/json-ld';
 import { comparisonScenarioForModel } from '@/lib/compare-agentx';
+import {
+  isAgenticSequence,
+  type ScenarioSegment,
+  sequenceForScenarioSegment,
+} from '@/lib/compare-scenario-route';
 import { languageAlternates } from '@/lib/i18n';
 import { pickPairDefaults } from '@/lib/compare-pair-defaults';
 import {
@@ -16,6 +21,7 @@ import {
   parseCompareSlug,
 } from '@/lib/compare-slug';
 import {
+  AGENTIC_SCENARIO_INTRO,
   buildBreadcrumbJsonLd,
   buildJsonLd,
   compareMetaDescription,
@@ -34,20 +40,48 @@ import ComparePageClient from './page-client';
 
 export const dynamic = 'force-dynamic';
 
+function comparePath(canonical: string, scenarioSegment?: ScenarioSegment): string {
+  return scenarioSegment ? `/compare/${canonical}/${scenarioSegment}` : `/compare/${canonical}`;
+}
+
 interface Props {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
+/**
+ * `/compare/<slug>/<scenario>` renders this same page with the workload
+ * pinned by the path. The segment is threaded through rather than handled in
+ * a parallel route file so the body — redirects, JSON-LD, metadata, the
+ * client props — is written once and cannot drift between the two URLs.
+ */
+export interface ScenarioOptions {
+  scenarioSegment?: ScenarioSegment;
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+  return buildCompareMetadata(slug, {});
+}
+
+export async function buildCompareMetadata(
+  slug: string,
+  { scenarioSegment }: ScenarioOptions,
+): Promise<Metadata> {
   const parsed = parseCompareSlug(slug);
   if (!parsed) return {};
   const fullLabel = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
   const gpuLabel = compareDisplayLabel(parsed.a, parsed.b);
   const modelSeoName = compareModelSeoName(parsed.model);
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
-  const url = `${SITE_URL}/compare/${canonical}`;
+  // The scenario segments are views of one comparison, so the bare slug URL
+  // stays the indexable representative and every segment canonicalizes to it.
+  // Without this, `/…/<slug>/<default-scenario>` and `/…/<slug>` would serve
+  // byte-identical pages, each claiming to be canonical.
+  const routePath = comparePath(canonical, scenarioSegment);
+  const canonicalPath = comparePath(canonical);
+  const url = `${SITE_URL}${routePath}`;
+  const canonicalUrl = `${SITE_URL}${canonicalPath}`;
 
   // Lead the SEO title with the GPU pair — that's the phrase people search
   // ("b200 vs b300") and must survive Google's ~60-char SERP truncation. The
@@ -72,8 +106,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: { absolute: title },
     description,
     alternates: {
-      canonical: url,
-      languages: languageAlternates(`/compare/${canonical}`),
+      canonical: canonicalUrl,
+      languages: languageAlternates(canonicalPath),
     },
     openGraph: {
       title: `${fullLabel} | ${SITE_NAME}`,
@@ -91,12 +125,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ComparePage({ params, searchParams }: Props) {
   const { slug } = await params;
+  return renderComparePage(slug, await searchParams, {});
+}
+
+export async function renderComparePage(
+  slug: string,
+  sp: Record<string, string | string[] | undefined>,
+  { scenarioSegment }: ScenarioOptions,
+) {
   const parsed = parseCompareSlug(slug);
   if (!parsed) notFound();
-
-  // Await searchParams once so we can both preserve them on redirect and read
-  // them for URL-param overrides further down.
-  const sp = await searchParams;
 
   // One-hop redirect to the fully canonical URL. Handles all three normalization
   // cases in a single 308:
@@ -124,7 +162,9 @@ export default async function ComparePage({ params, searchParams }: Props) {
     // all permanent decisions — using a permanent redirect lets search engines
     // consolidate link equity onto the canonical URL instead of keeping the
     // alias URL in the index alongside the canonical one.
-    permanentRedirect(`/compare/${canonical}${qs ? `?${qs}` : ''}`);
+    // Keep the scenario segment across the redirect — dropping it would send
+    // `/compare/h100-vs-h200/agentic` to the pair's default workload.
+    permanentRedirect(`${comparePath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
   const rows = await getCachedBenchmarks(parsed.model.dbKeys);
@@ -143,7 +183,11 @@ export default async function ComparePage({ params, searchParams }: Props) {
   const urlSeq = pickString(sp.i_seq);
   const urlPrec = pickString(sp.i_prec);
   const urlModel = pickString(sp.g_model);
-  const effectiveSequence = urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence;
+  // Path beats query beats the pair's default: a scenario segment is an
+  // explicit address for one workload, so it outranks a stale `?i_seq=`.
+  const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
+  const effectiveSequence =
+    pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence);
   const effectivePrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : pickedPrecision;
   // `?g_model=` is honored only if it matches a known model — but the slug's
   // model is the canonical default. Disregard URL param if user wants to
@@ -159,7 +203,7 @@ export default async function ComparePage({ params, searchParams }: Props) {
     effectivePrecision,
   );
 
-  const url = `${SITE_URL}/compare/${canonical}`;
+  const url = `${SITE_URL}${comparePath(canonical, scenarioSegment)}`;
   const { oldest, newest } = dateRangeForPair(rows, parsed.a, parsed.b);
   const jsonLd = buildJsonLd(
     'full',
@@ -209,6 +253,7 @@ export default async function ComparePage({ params, searchParams }: Props) {
         defaultPrecision={effectivePrecision}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         narrative={narrative}
+        agenticIntro={isAgenticSequence(effectiveSequence) ? AGENTIC_SCENARIO_INTRO : null}
         aLabel={aLabel}
         bLabel={bLabel}
         aVendor={aMeta?.vendor ?? ''}
