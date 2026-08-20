@@ -9,10 +9,18 @@ import { ShareButton } from '@/components/ui/share-button';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { useLocale } from '@/lib/use-locale';
 import type { Locale } from '@/lib/i18n';
+import { BIG_MAC_CALORIES, JOULES_PER_FOOD_CALORIE } from '@/lib/chart-utils';
 
 // Keep these metric-key groups in sync with chart-utils/chart configs when new source-backed
 // metrics are added; this helper owns which caption notes and caveats appear for each family.
-const POWER_SOURCE_METRICS = new Set(['y_tpPerMw', 'y_inputTputPerMw', 'y_outputTputPerMw']);
+const POWER_SOURCE_METRICS = new Set([
+  'y_tpPerMw',
+  'y_inputTputPerMw',
+  'y_outputTputPerMw',
+  'y_tokensPerCalorie',
+  'y_tokensPerBigMac',
+]);
+const FOOD_ENERGY_METRICS = new Set(['y_tokensPerCalorie', 'y_tokensPerBigMac']);
 const TOTAL_COST_METRICS = new Set([
   'y_costh',
   'y_costn',
@@ -212,6 +220,7 @@ export function MetricAssumptionNotes({
   const isTokensPerRmb = selectedYAxisMetric.includes('TokensPerRmb');
   const isTokensPerCurrency = isTokensPerDollar || isTokensPerRmb;
   const showJouleSource = selectedYAxisMetric.startsWith('y_j');
+  const showFoodEnergySource = FOOD_ENERGY_METRICS.has(selectedYAxisMetric);
 
   const costValues =
     showTotalCostSource || showOutputCostSource || showInputCostSource
@@ -234,6 +243,26 @@ export function MetricAssumptionNotes({
             SemiAnalysis Datacenter Industry Model
           </SourceLink>
         </>
+      )}
+      {showFoodEnergySource && (
+        <SourceLink
+          href="https://www.nist.gov/pml/special-publication-811/nist-guide-si-appendix-b-conversion-factors/nist-guide-si-appendix-b9"
+          sourceLabel={sourceLabel}
+        >
+          {locale === 'zh'
+            ? `1 食物卡路里 = ${JOULES_PER_FOOD_CALORIE.toLocaleString('en-US')} J`
+            : `1 food Calorie = ${JOULES_PER_FOOD_CALORIE.toLocaleString('en-US')} J`}
+        </SourceLink>
+      )}
+      {selectedYAxisMetric === 'y_tokensPerBigMac' && (
+        <SourceLink
+          href="https://www.mcdonalds.com/us/en-us/product/big-mac.html"
+          sourceLabel={sourceLabel}
+        >
+          {locale === 'zh'
+            ? `McDonald's 美国 Big Mac：${BIG_MAC_CALORIES} Cal`
+            : `McDonald's U.S. Big Mac: ${BIG_MAC_CALORIES} Cal`}
+        </SourceLink>
       )}
       {costValues && (
         <>

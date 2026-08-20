@@ -132,6 +132,11 @@ const METRIC_GROUPS: {
     metrics: ['y_tokensPerDollarH', 'y_tokensPerDollarN', 'y_tokensPerDollarR'],
   },
   {
+    label: 'Food Energy',
+    labelZh: '食物能量',
+    metrics: ['y_tokensPerCalorie', 'y_tokensPerBigMac'],
+  },
+  {
     label: 'Total Tokens per ¥1 CNY',
     labelZh: '每 1 元人民币可购买的总 token 数',
     metrics: ['y_tokensPerRmbH', 'y_tokensPerRmbN', 'y_tokensPerRmbR'],

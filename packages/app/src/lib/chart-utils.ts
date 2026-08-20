@@ -12,6 +12,21 @@ import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 import type { Locale } from '@/lib/i18n';
 
+/** One nutritional Calorie (kcal), expressed in Joules. */
+export const JOULES_PER_FOOD_CALORIE = 4_184;
+
+/** Calories in a U.S. Big Mac, per McDonald's nutrition listing (August 2026). */
+export const BIG_MAC_CALORIES = 580;
+
+/** Convert per-chip throughput and all-in provisioned power into tokens per food Calorie. */
+export function calculateTokensPerFoodCalorie(
+  tokensPerSecond: number,
+  powerKilowatts: number,
+): number {
+  if (!(tokensPerSecond > 0) || !(powerKilowatts > 0)) return 0;
+  return (tokensPerSecond * JOULES_PER_FOOD_CALORIE) / (powerKilowatts * 1_000);
+}
+
 // ---------------------------------------------------------------------------
 // High-contrast color generation (iwanthue — k-means in CIELab)
 // ---------------------------------------------------------------------------
@@ -171,6 +186,8 @@ export const Y_AXIS_METRICS = [
   'y_tpPerMw',
   'y_inputTputPerMw',
   'y_outputTputPerMw',
+  'y_tokensPerCalorie',
+  'y_tokensPerBigMac',
   'y_costh',
   'y_costn',
   'y_costr',
@@ -347,6 +364,7 @@ export function createChartDataPoint(
   const millionTokensPerHour = tokensPerHour / 1_000_000;
   const millionOutputTokensPerHour = outputTokensPerHour / 1_000_000;
   const millionInputTokensPerHour = inputTokensPerHour / 1_000_000;
+  const tokensPerCalorie = calculateTokensPerFoodCalorie(tputPerGpu, hardwarePower);
 
   return {
     // Spread all AggDataEntry fields (raw stats, metadata, etc.)
@@ -393,6 +411,8 @@ export function createChartDataPoint(
     ...(outputTputPerGpu ? { outputTputPerGpu: { y: outputTputPerGpu, roof: false } } : {}),
     ...(inputTputPerGpu ? { inputTputPerGpu: { y: inputTputPerGpu, roof: false } } : {}),
     tpPerMw: { y: (tputPerGpu * 1000) / hardwarePower, roof: false },
+    tokensPerCalorie: { y: tokensPerCalorie, roof: false },
+    tokensPerBigMac: { y: tokensPerCalorie * BIG_MAC_CALORIES, roof: false },
     ...(inputTputPerGpu
       ? {
           inputTputPerMw: {
@@ -779,6 +799,8 @@ export const calculateRoofline = (
     | `tpPerMw.y`
     | `inputTputPerMw.y`
     | `outputTputPerMw.y`
+    | `tokensPerCalorie.y`
+    | `tokensPerBigMac.y`
     | `costh.y`
     | `costn.y`
     | `costr.y`
@@ -877,6 +899,8 @@ export function computeAllRooflines(
             | `tpPerMw.y`
             | `inputTputPerMw.y`
             | `outputTputPerMw.y`
+            | `tokensPerCalorie.y`
+            | `tokensPerBigMac.y`
             | `costh.y`
             | `costn.y`
             | `costr.y`
@@ -937,6 +961,8 @@ export function markRooflinePoints(
       newPoint.tpPerMw.roof = false;
       if (newPoint.inputTputPerMw) newPoint.inputTputPerMw.roof = false;
       if (newPoint.outputTputPerMw) newPoint.outputTputPerMw.roof = false;
+      if (newPoint.tokensPerCalorie) newPoint.tokensPerCalorie.roof = false;
+      if (newPoint.tokensPerBigMac) newPoint.tokensPerBigMac.roof = false;
       newPoint.costh.roof = false;
       newPoint.costn.roof = false;
       newPoint.costr.roof = false;
@@ -1001,6 +1027,10 @@ export function markRooflinePoints(
           if (newPoint.inputTputPerMw) newPoint.inputTputPerMw.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_outputTputPerMw') {
           if (newPoint.outputTputPerMw) newPoint.outputTputPerMw.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_tokensPerCalorie') {
+          if (newPoint.tokensPerCalorie) newPoint.tokensPerCalorie.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_tokensPerBigMac') {
+          if (newPoint.tokensPerBigMac) newPoint.tokensPerBigMac.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_costh') {
           newPoint.costh.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_costn') {

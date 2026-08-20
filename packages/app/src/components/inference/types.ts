@@ -302,6 +302,8 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
   outputTputPerMw?: { y: number; roof: boolean };
+  tokensPerCalorie?: { y: number; roof: boolean };
+  tokensPerBigMac?: { y: number; roof: boolean };
   // Cost per million tokens.
   costh: { y: number; roof: boolean };
   costn: { y: number; roof: boolean };
@@ -377,6 +379,8 @@ export type YAxisMetricKey =
   | 'tpPerMw'
   | 'inputTputPerMw'
   | 'outputTputPerMw'
+  | 'tokensPerCalorie'
+  | 'tokensPerBigMac'
   | 'costh'
   | 'costn'
   | 'costr'
@@ -468,6 +472,14 @@ export interface ChartDefinition {
   y_outputTputPerMw_label?: string;
   y_outputTputPerMw_title?: string;
   y_outputTputPerMw_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_tokensPerCalorie?: string;
+  y_tokensPerCalorie_label?: string;
+  y_tokensPerCalorie_title?: string;
+  y_tokensPerCalorie_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_tokensPerBigMac?: string;
+  y_tokensPerBigMac_label?: string;
+  y_tokensPerBigMac_title?: string;
+  y_tokensPerBigMac_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
   y_costh?: string;
   y_costh_label?: string;
   y_costh_title?: string;
