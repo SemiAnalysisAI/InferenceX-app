@@ -96,7 +96,7 @@ describe('Inference ChartControls with GPUs selected', () => {
     cy.contains('Comparison Date Range').should('be.visible');
   });
 
-  it('flags the date range when nothing has been picked to compare against', () => {
+  it('leaves the optional date range unflagged for a selected current config', () => {
     mountWithProviders(<InferenceChartControls />, {
       inference: {
         selectedGPUs: ['h100'],
@@ -105,7 +105,9 @@ describe('Inference ChartControls with GPUs selected', () => {
       },
     });
 
-    cy.contains('button', 'Select date range').should('have.class', 'animate-pulse');
+    cy.contains('button', 'Select date range')
+      .should('not.have.class', 'animate-pulse')
+      .and('not.have.class', 'border-red-500');
   });
 
   it('leaves the date range unflagged when exact comparison entries are pinned', () => {
