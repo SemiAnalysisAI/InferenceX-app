@@ -430,6 +430,7 @@ const SCATTER_STRINGS = {
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
     overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
+    humanOutputSpeed: 'Human Output Speed',
   },
   zh: {
     logScale: '对数缩放',
@@ -445,8 +446,14 @@ const SCATTER_STRINGS = {
     overflowMixed: (count: number) => `${count} 个点已截断`,
     overflowCost: (count: number, limit: number) => `${count} 个点 > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${count} 个点 > ${limit}s TTFT`,
+    humanOutputSpeed: '人类输出速度',
   },
 } as const;
+
+const HUMAN_OUTPUT_REFERENCE_BY_METRIC: Readonly<Record<string, number>> = {
+  y_outputTokensPerCalorie: 700,
+  y_outputTokensPerBigMac: 406_000,
+};
 
 const ScatterGraph = React.memo(
   ({
@@ -1232,6 +1239,7 @@ const ScatterGraph = React.memo(
     ]);
 
     const isInputTputMetric = selectedYAxisMetric === 'y_inputTputPerGpu';
+    const humanOutputReference = HUMAN_OUTPUT_REFERENCE_BY_METRIC[selectedYAxisMetric] ?? null;
 
     const xScaleConfigRaw = useMemo(() => {
       const ext =
@@ -1261,11 +1269,18 @@ const ScatterGraph = React.memo(
     const xScaleConfig = useStableValue(xScaleConfigRaw, isSameScaleConfig);
 
     const yScaleConfigRaw = useMemo(() => {
-      const ext =
+      const dataExtent =
         yExtentOverride ??
         (visiblePoints.length > 0
           ? (d3.extent(visiblePoints, (d) => d.y) as [number, number])
           : ([0, 100] as [number, number]));
+      const ext: [number, number] =
+        humanOutputReference === null
+          ? dataExtent
+          : [
+              Math.min(dataExtent[0], humanOutputReference),
+              Math.max(dataExtent[1], humanOutputReference),
+            ];
       const range = ext[1] - ext[0];
       const useLog = !isInputTputMetric && logScale;
 
@@ -1283,7 +1298,14 @@ const ScatterGraph = React.memo(
         domain: [yMin, ext[1] * 1.05] as [number, number],
         nice: niceAxes,
       };
-    }, [visiblePoints, isInputTputMetric, logScale, niceAxes, yExtentOverride]);
+    }, [
+      visiblePoints,
+      isInputTputMetric,
+      logScale,
+      niceAxes,
+      yExtentOverride,
+      humanOutputReference,
+    ]);
     const yScaleConfig = useStableValue(yScaleConfigRaw, isSameScaleConfig);
 
     // --- Axis configs ---
@@ -2728,6 +2750,62 @@ const ScatterGraph = React.memo(
         },
       };
 
+      const drawHumanOutputReference = (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        ctx: RenderContext,
+        yScale: ContinuousScale,
+      ) => {
+        const layer = zoomGroup
+          .selectAll<SVGGElement, number>('.human-output-reference-layer')
+          .data(humanOutputReference === null ? [] : [humanOutputReference])
+          .join('g')
+          .attr('class', 'human-output-reference-layer')
+          .attr('data-testid', 'human-output-reference')
+          .attr('pointer-events', 'none')
+          .attr('aria-label', legendT.humanOutputSpeed);
+
+        if (humanOutputReference === null) return;
+
+        const y = yScale(humanOutputReference);
+        layer
+          .selectAll<SVGLineElement, number>('line')
+          .data([humanOutputReference])
+          .join('line')
+          .attr('x1', 0)
+          .attr('x2', ctx.width)
+          .attr('y1', y)
+          .attr('y2', y)
+          .attr('stroke', 'var(--foreground)')
+          .attr('stroke-width', 1.5)
+          .attr('stroke-dasharray', '6 5')
+          .attr('opacity', 0.7);
+        layer
+          .selectAll<SVGTextElement, number>('text')
+          .data([humanOutputReference])
+          .join('text')
+          .attr('x', ctx.width - 8)
+          .attr('y', y - 7)
+          .attr('text-anchor', 'end')
+          .attr('fill', 'var(--foreground)')
+          .attr('stroke', 'var(--background)')
+          .attr('stroke-width', 4)
+          .attr('stroke-linejoin', 'round')
+          .attr('paint-order', 'stroke')
+          .attr('font-size', 11.5)
+          .attr('font-weight', 600)
+          .text(legendT.humanOutputSpeed);
+
+        layer.lower();
+      };
+      const humanOutputReferenceLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'human-output-reference',
+        render: (zoomGroup, ctx) =>
+          drawHumanOutputReference(zoomGroup, ctx, ctx.yScale as ContinuousScale),
+        onZoom: (zoomGroup, ctx) =>
+          drawHumanOutputReference(zoomGroup, ctx, ctx.newYScale as ContinuousScale),
+      };
+
       // ── Intentional clipping: interpolated dashed Pareto continuation + arrow ──
       const drawOverflowContinuations = (
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -2929,7 +3007,11 @@ const ScatterGraph = React.memo(
           drawKnownIssues(ctx, ctx.newXScale as ContinuousScale, ctx.newYScale as ContinuousScale),
       };
 
-      const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
+      const result: LayerConfig<InferenceData>[] = [
+        humanOutputReferenceLayer,
+        rooflineLayer,
+        scatterLayer,
+      ];
       if (overlayLayer) result.push(overlayLayer);
       result.push(overflowContinuationLayer, speedOverlayLayer, knownIssueLayer);
       return result;
@@ -2965,6 +3047,7 @@ const ScatterGraph = React.memo(
       selectedYAxisMetric,
       chartDefinition,
       locale,
+      humanOutputReference,
     ]);
 
     // Layers handle for the decoration effect — lets it re-run individual
