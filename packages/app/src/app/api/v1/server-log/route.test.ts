@@ -116,6 +116,59 @@ describe('GET /api/v1/server-log', () => {
     expect(mockGetServerLogChunk).toHaveBeenCalledWith('mock-sql', 42, 0, 64 * 1024, undefined);
   });
 
+  it('streams the complete selected file as a download attachment', async () => {
+    mockGetServerLogChunk
+      .mockResolvedValueOnce({
+        fileName: 'nested/router log.out',
+        serverLog: 'INFO',
+        offset: 0,
+        nextOffset: 4,
+      })
+      .mockResolvedValueOnce({
+        fileName: 'nested/router log.out',
+        serverLog: ' ready\n',
+        offset: 4,
+        nextOffset: null,
+      });
+
+    const res = await GET(
+      req('/api/v1/server-log?id=42&file=nested%2Frouter%20log.out&download=1'),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('text/plain; charset=utf-8');
+    expect(res.headers.get('content-disposition')).toContain(
+      'attachment; filename="router log.out"',
+    );
+    await expect(res.text()).resolves.toBe('INFO ready\n');
+    expect(mockGetServerLogChunk).toHaveBeenNthCalledWith(
+      1,
+      'mock-sql',
+      42,
+      0,
+      256 * 1024,
+      'nested/router log.out',
+    );
+    expect(mockGetServerLogChunk).toHaveBeenNthCalledWith(
+      2,
+      'mock-sql',
+      42,
+      4,
+      256 * 1024,
+      'nested/router log.out',
+    );
+    expect(mockGetServerLog).not.toHaveBeenCalled();
+  });
+
+  it.each(['download=0', 'download=yes', 'download=1&offset=0', 'download=1&limit=1'])(
+    'returns 400 for invalid download parameters %s',
+    async (query) => {
+      const res = await GET(req(`/api/v1/server-log?id=42&${query}`));
+      expect(res.status).toBe(400);
+      expect(mockGetServerLogChunk).not.toHaveBeenCalled();
+    },
+  );
+
   it.each([
     'offset=-1',
     'offset=1.5',

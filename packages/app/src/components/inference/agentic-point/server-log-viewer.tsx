@@ -1,6 +1,15 @@
 'use client';
 
-import { Check, ChevronDown, Copy, LoaderCircle, Search, Terminal } from 'lucide-react';
+import {
+  ArrowDownToLine,
+  Check,
+  ChevronDown,
+  Copy,
+  Download,
+  LoaderCircle,
+  Search,
+  Terminal,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -10,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useServerLogFiles } from '@/hooks/api/use-server-log-files';
 import { useServerLogSearch } from '@/hooks/api/use-server-log-search';
@@ -34,11 +44,13 @@ const STRINGS = {
     matches: 'matches',
     firstMatches: 'Showing the first',
     character: 'character',
+    goToMatch: 'Go to in logs',
     loading: 'Loading log files…',
     error: 'The log files could not be loaded. Try again in a moment.',
     missing: 'No log files are stored for this benchmark point.',
     copy: 'Copy loaded logs',
     copied: 'Copied',
+    download: 'Download selected log',
     loadMore: 'Load next 64 KiB',
     loadingMore: 'Loading…',
     loadMoreError: 'The next chunk could not be loaded. The loaded text is still available.',
@@ -59,11 +71,13 @@ const STRINGS = {
     matches: '处匹配',
     firstMatches: '显示前',
     character: '字符',
+    goToMatch: '在日志中定位',
     loading: '正在加载日志文件……',
     error: '无法加载日志文件，请稍后重试。',
     missing: '该基准测试数据点没有已存储的日志文件。',
     copy: '复制已加载日志',
     copied: '已复制',
+    download: '下载当前日志',
     loadMore: '继续加载 64 KiB',
     loadingMore: '正在加载……',
     loadMoreError: '无法加载下一段内容，已加载的文本仍可查看。',
@@ -77,18 +91,38 @@ interface Props {
   enabled: boolean;
 }
 
+interface LogJumpTarget {
+  fileName: string;
+  offset: number;
+  match: string;
+  requestId: number;
+}
+
+interface LogSelection {
+  pointId: number;
+  fileName: string;
+  initialOffset: number;
+  jumpTarget: LogJumpTarget | null;
+}
+
+const SEARCH_JUMP_CONTEXT_SIZE = 16 * 1024;
+
 export function ServerLogViewer({ id, enabled }: Props) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const filesQuery = useServerLogFiles(id, enabled);
   const files = filesQuery.data ?? [];
-  const [requestedFile, setRequestedFile] = useState<string | null>(null);
+  const [selection, setSelection] = useState<LogSelection | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const activeSelection = selection?.pointId === id ? selection : null;
+  const requestedFile = activeSelection?.fileName ?? null;
+  const initialOffset = activeSelection?.initialOffset ?? 0;
+  const jumpTarget = activeSelection?.jumpTarget ?? null;
   const selectedFile =
     requestedFile && files.includes(requestedFile) ? requestedFile : (files[0] ?? null);
 
-  const query = useServerLog(id, selectedFile, enabled && selectedFile !== null);
+  const query = useServerLog(id, selectedFile, enabled && selectedFile !== null, initialOffset);
   const searchQuery = useServerLogSearch(id, searchTerm, enabled);
   const [copied, setCopied] = useState(false);
   const rawLog = useMemo(
@@ -101,8 +135,34 @@ export function ServerLogViewer({ id, enabled }: Props) {
     [locale],
   );
   const logViewportRef = useRef<HTMLPreElement>(null);
+  const jumpHighlightRef = useRef<HTMLElement>(null);
+  const jumpRequestIdRef = useRef(0);
+  const scrolledJumpRequestIdRef = useRef(0);
   const loadMoreTriggerRef = useRef<HTMLSpanElement>(null);
   const nextOffset = query.data?.pages.at(-1)?.nextOffset ?? 0;
+  const loadedOffset = query.data?.pages[0]?.offset ?? initialOffset;
+
+  const highlightedLog = useMemo(() => {
+    if (!jumpTarget || jumpTarget.fileName !== selectedFile) return null;
+    const relativeOffset = jumpTarget.offset - loadedOffset;
+    if (relativeOffset < 0 || relativeOffset + jumpTarget.match.length > rawLog.length) return null;
+    return {
+      before: readableLogText(rawLog.slice(0, relativeOffset)),
+      match: readableLogText(
+        rawLog.slice(relativeOffset, relativeOffset + jumpTarget.match.length),
+      ),
+      after: readableLogText(rawLog.slice(relativeOffset + jumpTarget.match.length)),
+    };
+  }, [jumpTarget, loadedOffset, rawLog, selectedFile]);
+
+  const downloadUrl = useMemo(() => {
+    if (!selectedFile) return '#';
+    return `/api/v1/server-log?${new URLSearchParams({
+      id: String(id),
+      file: selectedFile,
+      download: '1',
+    })}`;
+  }, [id, selectedFile]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setSearchTerm(searchInput.trim()), 300);
@@ -113,6 +173,20 @@ export function ServerLogViewer({ id, enabled }: Props) {
     if (!searchTerm) return;
     track('inference_agentic_logs_searched', { id, queryLength: searchTerm.length });
   }, [id, searchTerm]);
+
+  useEffect(() => {
+    if (
+      !highlightedLog ||
+      !jumpTarget ||
+      !jumpHighlightRef.current ||
+      scrolledJumpRequestIdRef.current === jumpTarget.requestId
+    ) {
+      return;
+    }
+    scrolledJumpRequestIdRef.current = jumpTarget.requestId;
+    jumpHighlightRef.current.scrollIntoView({ block: 'center' });
+    jumpHighlightRef.current.focus({ preventScroll: true });
+  }, [highlightedLog, jumpTarget]);
 
   const copyLoadedLog = async () => {
     await navigator.clipboard.writeText(log);
@@ -126,9 +200,27 @@ export function ServerLogViewer({ id, enabled }: Props) {
   };
 
   const selectFile = (fileName: string) => {
-    setRequestedFile(fileName);
+    setSelection({ pointId: id, fileName, initialOffset: 0, jumpTarget: null });
     setCopied(false);
     track('inference_agentic_log_file_selected', { id, fileName });
+  };
+
+  const goToSearchMatch = (result: Omit<LogJumpTarget, 'requestId'>) => {
+    const startOffset = Math.max(0, result.offset - SEARCH_JUMP_CONTEXT_SIZE);
+    jumpRequestIdRef.current += 1;
+    setSelection({
+      pointId: id,
+      fileName: result.fileName,
+      initialOffset: startOffset,
+      jumpTarget: { ...result, requestId: jumpRequestIdRef.current },
+    });
+    setCopied(false);
+    track('inference_agentic_log_search_match_opened', {
+      id,
+      fileName: result.fileName,
+      offset: result.offset,
+      queryLength: searchTerm.length,
+    });
   };
 
   const loadMore = useCallback(
@@ -300,6 +392,17 @@ export function ServerLogViewer({ id, enabled }: Props) {
                       </mark>
                       {readableLogText(result.after)}
                     </pre>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 justify-self-end px-2 text-[11px] text-amber-200 hover:bg-amber-300/10 hover:text-amber-100"
+                      onClick={() => goToSearchMatch(result)}
+                      data-testid="go-to-server-log-match"
+                    >
+                      <ArrowDownToLine className="size-3.5" />
+                      {t.goToMatch}
+                    </Button>
                   </article>
                 ))}
               </div>
@@ -308,17 +411,32 @@ export function ServerLogViewer({ id, enabled }: Props) {
         ) : null}
       </div>
 
-      <div className="flex justify-end border-b border-border/60 bg-background/40 px-4 py-2">
-        <button
+      <div className="flex flex-wrap justify-end gap-2 border-b border-border/60 bg-background/40 px-4 py-2">
+        <Button asChild variant="outline" size="sm" className="text-xs">
+          <a
+            href={downloadUrl}
+            download
+            onClick={() =>
+              track('inference_agentic_log_downloaded', { id, fileName: selectedFile })
+            }
+            data-testid="download-selected-server-log"
+          >
+            <Download className="size-3.5" />
+            {t.download}
+          </a>
+        </Button>
+        <Button
           type="button"
           onClick={() => void copyLoadedLog()}
           disabled={log.length === 0}
-          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+          variant="outline"
+          size="sm"
+          className="text-xs"
           data-testid="copy-loaded-server-log"
         >
           {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
           {copied ? t.copied : t.copy}
-        </button>
+        </Button>
       </div>
 
       <pre
@@ -327,7 +445,22 @@ export function ServerLogViewer({ id, enabled }: Props) {
         data-testid="server-log-content"
         tabIndex={0}
       >
-        {log}
+        {highlightedLog ? (
+          <>
+            {highlightedLog.before}
+            <mark
+              ref={jumpHighlightRef}
+              className="rounded-sm bg-amber-300 px-0.5 text-zinc-950 outline-none ring-2 ring-amber-300/30 ring-offset-2 ring-offset-zinc-950"
+              data-testid="server-log-jump-highlight"
+              tabIndex={-1}
+            >
+              {highlightedLog.match}
+            </mark>
+            {highlightedLog.after}
+          </>
+        ) : (
+          log
+        )}
         <span
           ref={loadMoreTriggerRef}
           className="block h-px w-full"

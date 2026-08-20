@@ -1941,8 +1941,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log',
     summary: text('Read a benchmark server log', '读取基准服务器日志'),
     description: text(
-      'Returns one stored .log/.out file for a benchmark result ID. Use file with a name from server-log-files. Add offset or limit for a bounded chunk; chunked reads are recommended because some files are hundreds of megabytes.',
-      '返回某个基准结果 ID 已存储的一个 .log/.out 文件。file 应使用 server-log-files 返回的文件名。可添加 offset 或 limit 读取有界分块；部分文件达到数百 MB，建议使用分块读取。',
+      'Returns one stored .log/.out file for a benchmark result ID. Use file with a name from server-log-files. Add offset or limit for a bounded chunk; add download=1 to stream the complete selected file as a text attachment.',
+      '返回某个基准结果 ID 已存储的一个 .log/.out 文件。file 应使用 server-log-files 返回的文件名。可添加 offset 或 limit 读取有界分块；添加 download=1 可将完整的当前文件作为文本附件流式下载。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -1987,6 +1987,16 @@ export const apiOperations: readonly ApiOperation[] = [
         { type: 'integer', minimum: 1, maximum: 262_144, default: 65_536 },
         65_536,
       ),
+      parameter(
+        'download',
+        'query',
+        false,
+        'integer',
+        'Set to 1 to stream the complete selected file as a text attachment. Cannot be combined with offset or limit.',
+        '设为 1 时，将完整的当前文件作为文本附件流式下载。不能与 offset 或 limit 同时使用。',
+        { type: 'integer', enum: [1] },
+        1,
+      ),
     ],
     responses: [
       success(
@@ -2026,7 +2036,7 @@ export const apiOperations: readonly ApiOperation[] = [
         'Internal server error',
       ),
     ],
-    responseShapeName: 'ServerLog | ServerLogChunk',
+    responseShapeName: 'ServerLog | ServerLogChunk | text/plain attachment',
     curlUrl: `${API_BASE_URL}/api/v1/server-log?id=421&file=results%2Frouter.log&offset=0&limit=65536`,
   },
   {

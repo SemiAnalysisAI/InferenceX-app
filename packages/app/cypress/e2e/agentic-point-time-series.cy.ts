@@ -119,6 +119,11 @@ describe('Agentic point request metric time series', () => {
     const longServerLogPath =
       'agentic/conc_1152/aiperf_artifacts/logs/aiperf/2026-08-20/server.log';
     const firstChunk = `INFO server ready\n${'trace line\n'.repeat(4_000)}`;
+    const searchMatchOffset = 70_027;
+    const searchJumpOffset = searchMatchOffset - 16 * 1024;
+    const routerJumpChunk = `${'context line\n'.repeat(1_260)}${'x'.repeat(
+      searchMatchOffset - searchJumpOffset - 'context line\n'.length * 1_260,
+    )}router ready for requests\n`;
     cy.intercept(
       { method: 'GET', pathname: '/api/v1/server-log-files' },
       {
@@ -129,14 +134,23 @@ describe('Agentic point request metric time series', () => {
       const params = new URL(request.url).searchParams;
       const offset = Number(params.get('offset') ?? 0);
       const fileName = params.get('file') ?? longServerLogPath;
+      if (fileName === longServerLogPath && offset === 0) {
+        request.alias = 'serverLogInitialChunk';
+      } else if (fileName === longServerLogPath && offset === 31) {
+        request.alias = 'serverLogNextChunk';
+      } else if (fileName === 'results/router.log' && offset === searchJumpOffset) {
+        request.alias = 'serverLogJumpChunk';
+      } else if (fileName === 'results/router.log' && offset === 0) {
+        request.alias = 'serverLogRouterStart';
+      }
       request.reply({
         body:
           fileName === 'results/router.log'
             ? {
                 id: 206885,
                 fileName,
-                serverLog: 'INFO router ready\n',
-                offset: 0,
+                serverLog: offset === searchJumpOffset ? routerJumpChunk : 'INFO router ready\n',
+                offset,
                 nextOffset: null,
               }
             : offset === 0
@@ -165,7 +179,7 @@ describe('Agentic point request metric time series', () => {
           matches: [
             {
               fileName: 'results/router.log',
-              offset: 27,
+              offset: searchMatchOffset,
               before: 'INFO ',
               match: 'router ready',
               after: ' for requests',
@@ -175,11 +189,29 @@ describe('Agentic point request metric time series', () => {
         },
       });
     }).as('serverLogSearch');
+    cy.intercept(
+      {
+        method: 'GET',
+        pathname: '/api/v1/server-log',
+        query: {
+          id: '206885',
+          file: longServerLogPath,
+          download: '1',
+        },
+      },
+      {
+        headers: {
+          'content-disposition': 'attachment; filename="server.log"',
+          'content-type': 'text/plain; charset=utf-8',
+        },
+        body: firstChunk,
+      },
+    ).as('serverLogDownload');
     cy.viewport(480, 900);
     cy.get('[data-testid="detail-view-logs"]').click();
     cy.location('search').should('contain', 'view=logs');
     cy.wait('@serverLogFiles');
-    cy.wait('@serverLogChunk');
+    cy.wait('@serverLogInitialChunk');
 
     cy.get('[data-testid="agentic-server-log-viewer"]')
       .should('contain.text', 'Log files')
@@ -201,11 +233,31 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="server-log-search-results"]')
       .should('contain.text', '1 match')
       .and('contain.text', 'results/router.log')
-      .and('contain.text', 'character 28')
+      .and('contain.text', 'character 70,028')
       .and('contain.text', 'INFO router ready for requests');
 
+    cy.get('[data-testid="go-to-server-log-match"]').click();
+    cy.wait('@serverLogJumpChunk').then(({ request }) => {
+      const params = new URL(request.url).searchParams;
+      expect(params.get('file')).to.equal('results/router.log');
+      expect(params.get('offset')).to.equal(String(searchJumpOffset));
+    });
+    cy.get('#agentic-log-file').should('contain.text', 'results/router.log');
+    cy.get('[data-testid="server-log-jump-highlight"]')
+      .should('be.visible')
+      .and('have.text', 'router ready');
+
+    cy.get('#agentic-log-file').click();
+    cy.contains('[role="option"]', longServerLogPath).click();
+    cy.get('[data-testid="server-log-content"]').should('contain.text', 'INFO server ready');
+    cy.get('[data-testid="download-selected-server-log"]')
+      .should('have.attr', 'href')
+      .and('include', 'download=1');
+    cy.get('[data-testid="download-selected-server-log"]').click();
+    cy.wait('@serverLogDownload');
+
     cy.get('[data-testid="server-log-content"]').scrollTo('bottom');
-    cy.wait('@serverLogChunk');
+    cy.wait('@serverLogNextChunk');
     cy.get('[data-testid="server-log-content"]')
       .should('contain.text', 'INFO server ready')
       .and('contain.text', 'INFO benchmark complete');
@@ -213,7 +265,7 @@ describe('Agentic point request metric time series', () => {
 
     cy.get('#agentic-log-file').click();
     cy.contains('[role="option"]', 'results/router.log').click();
-    cy.wait('@serverLogChunk');
+    cy.wait('@serverLogRouterStart');
     cy.get('[data-testid="server-log-content"]').should('contain.text', 'INFO router ready');
 
     cy.viewport(1280, 720);

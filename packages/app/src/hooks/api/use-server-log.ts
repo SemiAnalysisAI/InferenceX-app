@@ -30,14 +30,19 @@ async function fetchServerLogChunk(
 }
 
 /** Incrementally fetch immutable server-log chunks for one benchmark point. */
-export function useServerLog(id: number | null, fileName: string | null, enabled = false) {
+export function useServerLog(
+  id: number | null,
+  fileName: string | null,
+  enabled = false,
+  initialOffset = 0,
+) {
   return useInfiniteQuery({
-    queryKey: ['server-log', id, fileName, 'chunks'] as const,
+    queryKey: ['server-log', id, fileName, 'chunks', initialOffset] as const,
     queryFn: ({ pageParam, signal }) => {
       if (!id || !fileName) return Promise.resolve(null);
       return fetchServerLogChunk(id, fileName, pageParam, signal);
     },
-    initialPageParam: 0,
+    initialPageParam: initialOffset,
     getNextPageParam: (lastPage) => lastPage?.nextOffset ?? undefined,
     enabled: enabled && Boolean(id) && Boolean(fileName),
     staleTime: STALE_TIME_MS,
