@@ -3007,13 +3007,14 @@ const ScatterGraph = React.memo(
           drawKnownIssues(ctx, ctx.newXScale as ContinuousScale, ctx.newYScale as ContinuousScale),
       };
 
-      const result: LayerConfig<InferenceData>[] = [
-        humanOutputReferenceLayer,
-        rooflineLayer,
-        scatterLayer,
-      ];
+      const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
-      result.push(overflowContinuationLayer, speedOverlayLayer, knownIssueLayer);
+      result.push(
+        humanOutputReferenceLayer,
+        overflowContinuationLayer,
+        speedOverlayLayer,
+        knownIssueLayer,
+      );
       return result;
       // Interaction state (visibility, colors, precision shapes, known-issue
       // annotations) is deliberately NOT a dependency: layer closures read it
