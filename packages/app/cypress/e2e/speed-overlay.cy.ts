@@ -200,7 +200,7 @@ describe('Y-Axis Metric Search', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
     cy.get('[data-slot="select-content"]')
       .find('input[placeholder="Search..."]')
-      .type('total token cost');
+      .type('cost per million total tokens');
     cy.get('[data-slot="select-content"]')
       .find('[role="option"]')
       .contains('3 Year Rental')
