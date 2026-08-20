@@ -162,9 +162,12 @@ Legacy artifacts without provenance leave any existing mapping untouched. A work
 AIPerf can sample one dataset conversation into multiple trajectory lanes, and
 those replays may execute concurrently. The source `conversation_id` therefore
 identifies dataset provenance, not a unique execution lane. During trace-replay
-ingest, `computeRequestTimeline()` groups requests by `root_correlation_id`
-(falling back to `x_correlation_id`) and replaces the repeated UUID with a
-compact, deterministic numeric `ri` ranked by each lane's first dispatch.
+ingest, `computeRequestTimeline()` groups requests by `root_correlation_id`.
+For older exports without that field, it walks `parent_correlation_id` ancestry
+from each per-session `x_correlation_id`, so nested subagents resolve to the
+main session rather than becoming separate replay lanes. The extractor replaces
+the repeated root UUID with a compact, deterministic numeric `ri` ranked by each
+lane's first dispatch.
 
 The request-timeline frontend groups by `(conversation_id, ri)`, keeping all
 main-agent, subagent, warmup, and profiling requests from one replay together.

@@ -423,7 +423,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/etl/compute-request-timeline.ts',
-    sourceSha256: '0ad16e72ca43ea162a37897a8e499a2b97d2ff5fbe06db8294ba092311228ad6',
+    sourceSha256: '377d6f6cab10d6d7d59e7021d16e2ca872a2bfff6d28030966e1b36189d6bbc0',
     reviewArea: {
       en: 'Request timeline contract version, replay identity, source provenance, and event timing semantics.',
       zh: '请求时间线契约版本、重放标识、来源溯源和事件计时语义。',

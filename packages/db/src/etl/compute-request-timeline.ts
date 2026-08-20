@@ -72,6 +72,7 @@ export interface RequestTimeline {
 interface RawMetadata {
   conversation_id?: string;
   root_correlation_id?: string;
+  parent_correlation_id?: string;
   x_correlation_id?: string;
   turn_index?: number;
   source_trace_id?: string;
@@ -114,15 +115,45 @@ function readNum(v: unknown): number | undefined {
 }
 
 /**
+ * Correlation ancestry needed to reconstruct the root on older AIPerf exports
+ * that do not repeat `root_correlation_id` on subagent records.
+ */
+interface ReplayCorrelationMaps {
+  parentByCorrelation: Map<string, string>;
+  rootByCorrelation: Map<string, string>;
+}
+
+function correlationId(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function resolveCorrelationRoot(id: string, maps: ReplayCorrelationMaps): string {
+  const seen = new Set<string>();
+  let current = id;
+  while (!seen.has(current)) {
+    seen.add(current);
+    const explicitRoot = maps.rootByCorrelation.get(current);
+    if (explicitRoot !== undefined) return explicitRoot;
+    const parent = maps.parentByCorrelation.get(current);
+    if (parent === undefined) return current;
+    current = parent;
+  }
+  return id;
+}
+
+/**
  * AIPerf may sample the same source conversation into several concurrently
  * executing trajectory lanes. `conversation_id` intentionally stays the
- * source id, while the root correlation id identifies one replay of it across
- * every turn (and across warmup/profiling). Prefer the explicit root field and
- * retain the older x-correlation spelling as a compatibility fallback.
+ * source id, while the root correlation id identifies one replay across every
+ * turn and subagent. For older exports, walk `parent_correlation_id` links from
+ * the per-session `x_correlation_id` instead of treating each subagent session
+ * as an independent replay.
  */
-function replayKey(meta: RawMetadata): string | undefined {
-  const key = meta.root_correlation_id ?? meta.x_correlation_id;
-  return typeof key === 'string' && key.length > 0 ? key : undefined;
+function replayKey(meta: RawMetadata, maps: ReplayCorrelationMaps): string | undefined {
+  const explicitRoot = correlationId(meta.root_correlation_id);
+  if (explicitRoot !== undefined) return explicitRoot;
+  const session = correlationId(meta.x_correlation_id);
+  return session === undefined ? undefined : resolveCorrelationRoot(session, maps);
 }
 
 /**
@@ -172,7 +203,12 @@ export async function computeRequestTimeline(blob: Buffer | null): Promise<Reque
   let originNs = Number.POSITIVE_INFINITY;
   let endNs = 0;
   let recordCount = 0;
-  const replayFirstStart = new Map<string, number>();
+  const explicitRootFirstStart = new Map<string, number>();
+  const legacySessionFirstStart = new Map<string, number>();
+  const correlationMaps: ReplayCorrelationMaps = {
+    parentByCorrelation: new Map(),
+    rootByCorrelation: new Map(),
+  };
 
   try {
     for await (const line of gunzipLines(blob)) {
@@ -189,10 +225,22 @@ export async function computeRequestTimeline(blob: Buffer | null): Promise<Reque
       if (cStart < originNs) originNs = cStart;
       if (cEnd > endNs) endNs = cEnd;
 
-      const key = replayKey(meta);
+      const session = correlationId(meta.x_correlation_id);
+      const explicitRoot = correlationId(meta.root_correlation_id);
+      const parent = correlationId(meta.parent_correlation_id);
+      if (session !== undefined && explicitRoot !== undefined) {
+        correlationMaps.rootByCorrelation.set(session, explicitRoot);
+      }
+      if (session !== undefined && parent !== undefined) {
+        correlationMaps.parentByCorrelation.set(session, parent);
+      }
+
+      const firstStarts =
+        explicitRoot === undefined ? legacySessionFirstStart : explicitRootFirstStart;
+      const key = explicitRoot ?? session;
       if (key === undefined) continue;
-      const current = replayFirstStart.get(key);
-      if (current === undefined || cStart < current) replayFirstStart.set(key, cStart);
+      const current = firstStarts.get(key);
+      if (current === undefined || cStart < current) firstStarts.set(key, cStart);
     }
   } catch {
     return null;
@@ -204,6 +252,13 @@ export async function computeRequestTimeline(blob: Buffer | null): Promise<Reque
   // Assign compact deterministic replay ids. UUIDs would add substantial
   // repeated payload to large timelines, so rank distinct correlation ids by
   // their first dispatch and send only the numeric rank to the frontend.
+  const replayFirstStart = new Map(explicitRootFirstStart);
+  for (const [session, firstStart] of legacySessionFirstStart) {
+    const key = resolveCorrelationRoot(session, correlationMaps);
+    const current = replayFirstStart.get(key);
+    if (current === undefined || firstStart < current) replayFirstStart.set(key, firstStart);
+  }
+
   const replayIndex = new Map<string, number>();
   [...replayFirstStart.entries()]
     .sort(
@@ -232,7 +287,7 @@ export async function computeRequestTimeline(blob: Buffer | null): Promise<Reque
       const end = cEnd - originNs;
       requests.push({
         cid: m.conversation_id ?? 'unknown',
-        ri: replayIndex.get(replayKey(m) ?? ''),
+        ri: replayIndex.get(replayKey(m, correlationMaps) ?? ''),
         ti: typeof m.turn_index === 'number' ? m.turn_index : 0,
         srcTrace: typeof m.source_trace_id === 'string' ? m.source_trace_id : undefined,
         srcOuter: typeof m.source_outer_idx === 'number' ? m.source_outer_idx : undefined,

@@ -8,6 +8,7 @@ interface SyntheticRequest {
   cid: string;
   ti: number;
   rootCorrelation?: string;
+  parentCorrelation?: string;
   xCorrelation?: string;
   srcTrace?: string;
   srcOuter?: number;
@@ -34,6 +35,9 @@ function makeBlob(requests: SyntheticRequest[]) {
       metadata: {
         conversation_id: r.cid,
         ...(r.rootCorrelation === undefined ? {} : { root_correlation_id: r.rootCorrelation }),
+        ...(r.parentCorrelation === undefined
+          ? {}
+          : { parent_correlation_id: r.parentCorrelation }),
         ...(r.xCorrelation === undefined ? {} : { x_correlation_id: r.xCorrelation }),
         turn_index: r.ti,
         ...(r.srcTrace === undefined ? {} : { source_trace_id: r.srcTrace }),
@@ -221,6 +225,41 @@ describe('computeRequestTimeline', () => {
       { ti: 0, ri: 0 },
       { ti: 1, ri: 1 },
     ]);
+  });
+
+  it('walks parent correlation links for legacy subagent sessions', async () => {
+    const tl = await computeRequestTimeline(
+      makeBlob([
+        {
+          cid: 'conversation',
+          ti: 1,
+          xCorrelation: 'main-session',
+          credit: 0,
+          start: 10,
+          end: 100,
+        },
+        {
+          cid: 'conversation::sa:subagent-a',
+          ti: 1,
+          xCorrelation: 'child-session',
+          parentCorrelation: 'main-session',
+          credit: 20,
+          start: 30,
+          end: 80,
+        },
+        {
+          cid: 'conversation::sa:subagent-b',
+          ti: 1,
+          xCorrelation: 'grandchild-session',
+          parentCorrelation: 'child-session',
+          credit: 40,
+          start: 50,
+          end: 70,
+        },
+      ]),
+    );
+
+    expect(new Set(tl?.requests.map((record) => record.ri))).toEqual(new Set([0]));
   });
 
   it('leaves legacy records without correlation ids backward-compatible', async () => {
