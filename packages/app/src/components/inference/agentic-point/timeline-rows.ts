@@ -5,6 +5,7 @@
  */
 
 import type { RequestRecord } from '@/hooks/api/use-request-timeline';
+import type { Locale } from '@/lib/i18n';
 
 export type RowMode = 'conversation' | 'worker';
 
@@ -188,6 +189,17 @@ export function splitTimelineCid(cid: string): {
 }
 
 /**
+ * Top-level grouping identity for conversation mode. AIPerf can replay the
+ * same source conversation in several trajectory lanes at once, so the source
+ * id alone is not an execution lane. Legacy timelines have no `ri` and retain
+ * the historical conversation-only grouping.
+ */
+export function conversationReplayKey(request: RequestRecord): string {
+  const parent = splitTimelineCid(request.cid).parent;
+  return request.ri === undefined ? parent : `${parent}::replay-lane:${request.ri}`;
+}
+
+/**
  * Stable order/color index for the top-level row groups (conversations in
  * conversation mode, workers in worker mode), keyed by group id and computed
  * over the FULL (unfiltered) request set. Both the row ordering and the color
@@ -214,7 +226,7 @@ export function computeStableRowIndex(
   const inProfiling = new Set<string>();
   const inWarmup = new Set<string>();
   for (const r of requests) {
-    const key = mode === 'conversation' ? splitTimelineCid(r.cid).parent : r.wid;
+    const key = mode === 'conversation' ? conversationReplayKey(r) : r.wid;
     const cur = firstStart.get(key);
     if (cur === undefined || r.start < cur) firstStart.set(key, r.start);
     if (r.phase === 'profiling') inProfiling.add(key);
@@ -256,6 +268,7 @@ export function buildRequestTimelineRows(
   mode: RowMode,
   expandedSubagents: ReadonlySet<string>,
   stableRowIndex?: ReadonlyMap<string, number>,
+  locale: Locale = 'en',
 ): RequestTimelineRow[] {
   const index = stableRowIndex ?? computeStableRowIndex(requests, mode);
   const colorFor = (key: string) =>
@@ -298,7 +311,9 @@ export function buildRequestTimelineRows(
     aux: Map<string, RequestRecord[]>;
   }
   interface Tree {
+    groupKey: string;
     parentCid: string;
+    replayIndex?: number;
     parentReqs: RequestRecord[];
     // Aux lanes hanging directly off the main agent (`<cid>::aux:…`).
     parentAux: Map<string, RequestRecord[]>;
@@ -309,16 +324,19 @@ export function buildRequestTimelineRows(
   const trees = new Map<string, Tree>();
   for (const r of requests) {
     const { parent, subagentBase, stream, aux } = splitTimelineCid(r.cid);
-    let tree = trees.get(parent);
+    const groupKey = conversationReplayKey(r);
+    let tree = trees.get(groupKey);
     if (!tree) {
       tree = {
+        groupKey,
         parentCid: parent,
+        replayIndex: r.ri,
         parentReqs: [],
         parentAux: new Map(),
         subagents: new Map(),
         firstStart: Number.POSITIVE_INFINITY,
       };
-      trees.set(parent, tree);
+      trees.set(groupKey, tree);
     }
     if (subagentBase === null && aux !== null) {
       const list = tree.parentAux.get(aux);
@@ -346,17 +364,21 @@ export function buildRequestTimelineRows(
   }
 
   const sortedTrees = [...trees.values()].toSorted(
-    (a, b) => orderOf(a.parentCid) - orderOf(b.parentCid) || a.firstStart - b.firstStart,
+    (a, b) => orderOf(a.groupKey) - orderOf(b.groupKey) || a.firstStart - b.firstStart,
   );
   const rows: RequestTimelineRow[] = [];
   for (const tree of sortedTrees) {
-    const color = colorFor(tree.parentCid);
+    const color = colorFor(tree.groupKey);
     // Parent row (use a placeholder key if the parent itself wasn't replayed).
     tree.parentReqs.sort((a, b) => a.start - b.start);
-    const parentRowKey = tree.parentReqs.length > 0 ? tree.parentCid : `__parent_${tree.parentCid}`;
+    const parentRowKey = tree.parentReqs.length > 0 ? tree.groupKey : `__parent_${tree.groupKey}`;
+    const replayLabel =
+      tree.replayIndex === undefined
+        ? tree.parentCid
+        : `${tree.parentCid} · ${locale === 'zh' ? '重放' : 'replay'} ${tree.replayIndex + 1}`;
     rows.push({
       key: parentRowKey,
-      label: tree.parentCid,
+      label: replayLabel,
       color,
       requests: tree.parentReqs,
       depth: 0,
@@ -372,7 +394,7 @@ export function buildRequestTimelineRows(
     for (const [auxId, reqs] of parentAuxEntries) {
       reqs.sort((a, b) => a.start - b.start);
       rows.push({
-        key: `${tree.parentCid}::aux:${auxId}`,
+        key: `${tree.groupKey}::aux:${auxId}`,
         label: `aux ${auxId} · parallel`,
         color,
         requests: reqs,
@@ -397,7 +419,7 @@ export function buildRequestTimelineRows(
       return aStart - bStart;
     });
     for (const [saBase, lanes] of subagentEntries) {
-      const subagentKey = `${tree.parentCid}::sa:${saBase}`;
+      const subagentKey = `${tree.groupKey}::sa:${saBase}`;
       // Union of primary stream requests for collapsed-view bars. Aux lanes
       // stay separate so their overlap remains visible as parallel work.
       const allReqs: RequestRecord[] = [];

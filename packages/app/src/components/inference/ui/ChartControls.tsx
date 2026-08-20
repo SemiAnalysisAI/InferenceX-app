@@ -42,7 +42,7 @@ const STRINGS = {
   en: {
     yAxisMetric: 'Y-Axis Metric',
     yAxisMetricTooltip:
-      "The performance metric displayed on the chart's Y-axis. Options include throughput, cost per million tokens, tokens per $1, and custom user-defined values.",
+      "The performance metric displayed on the chart's Y-axis. Options include throughput, cost per million tokens, tokens per $1 USD or ¥1 CNY, and custom user-defined values.",
     xAxisMetric: 'X-Axis Metric',
     xAxisMetricTooltip:
       "The latency metric displayed on the chart's X-axis: P90 Time To First Token.",
@@ -546,7 +546,11 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
           )}
         </div>
 
-        {!hideGpuComparison && (
+        {/* Quick Filters slice by vendor, framework, deployment, and spec
+            decoding — dimensions the agentic scenario collapses into one
+            best-available curve per model, SKU, and engine, so the chips have
+            nothing meaningful to filter there. */}
+        {!hideGpuComparison && selectedSequence !== Sequence.AgenticTraces && (
           <div className="flex flex-col space-y-1.5" data-testid="quick-filters">
             <LabelWithTooltip
               htmlFor="quick-filters"

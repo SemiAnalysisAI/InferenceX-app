@@ -185,6 +185,10 @@
       "duration": 15093
     },
     {
+      "spec": "cypress/e2e/tokens-per-currency.cy.ts",
+      "duration": 651
+    },
+    {
       "spec": "cypress/e2e/ttft-x-axis-toggle.cy.ts",
       "duration": 3778
     },

@@ -91,6 +91,15 @@ const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>
   inputTokensPerDollarH: 'inputTputPerGpu',
   inputTokensPerDollarN: 'inputTputPerGpu',
   inputTokensPerDollarR: 'inputTputPerGpu',
+  tokensPerRmbH: 'tpPerGpu',
+  tokensPerRmbN: 'tpPerGpu',
+  tokensPerRmbR: 'tpPerGpu',
+  outputTokensPerRmbH: 'outputTputPerGpu',
+  outputTokensPerRmbN: 'outputTputPerGpu',
+  outputTokensPerRmbR: 'outputTputPerGpu',
+  inputTokensPerRmbH: 'inputTputPerGpu',
+  inputTokensPerRmbN: 'inputTputPerGpu',
+  inputTokensPerRmbR: 'inputTputPerGpu',
 };
 
 export function trendMetricDependencies(metricKey: YAxisMetricKey): DerivedMetricKey[] {

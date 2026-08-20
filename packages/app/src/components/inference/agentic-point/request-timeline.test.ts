@@ -172,6 +172,67 @@ describe('subagent timeline hierarchy', () => {
   });
 });
 
+describe('reused conversation replay lanes', () => {
+  it('renders overlapping replays of one source conversation on separate rows', () => {
+    const records = [
+      { ...request(0, 100), cid: 'reused-conversation', ti: 26, ri: 0 },
+      { ...request(110, 180), cid: 'reused-conversation', ti: 27, ri: 0 },
+      { ...request(50, 140), cid: 'reused-conversation', ti: 40, ri: 1 },
+      {
+        ...request(70, 120),
+        cid: 'reused-conversation::sa:subagent_001_abcd',
+        ti: 40,
+        ri: 1,
+      },
+    ];
+
+    const rows = buildRequestTimelineRows(records, 'conversation', new Set());
+    const parents = rows.filter((row) => row.kind === 'parent');
+    expect(parents.map((row) => row.label)).toEqual([
+      'reused-conversation · replay 1',
+      'reused-conversation · replay 2',
+    ]);
+    expect(parents.map((row) => row.requests.map((record) => record.ti))).toEqual([[26, 27], [40]]);
+    expect(rows.find((row) => row.kind === 'subagent')?.key).toContain('replay-lane:1');
+  });
+
+  it('localizes replay labels in the Chinese timeline', () => {
+    const rows = buildRequestTimelineRows(
+      [{ ...request(0, 10), cid: 'conversation', ri: 2 }],
+      'conversation',
+      new Set(),
+      undefined,
+      'zh',
+    );
+    expect(rows[0]?.label).toBe('conversation · 重放 3');
+  });
+
+  it('keeps a replay lane stable across warmup and profiling filters', () => {
+    const records = [
+      { ...request(0, 10), cid: 'conversation', ri: 0, phase: 'warmup' },
+      { ...request(100, 110), cid: 'conversation', ri: 0, phase: 'profiling' },
+      { ...request(50, 60), cid: 'conversation', ri: 1, phase: 'profiling' },
+    ];
+    const index = computeStableRowIndex(records, 'conversation');
+    const warmup = buildRequestTimelineRows(
+      records.filter((record) => record.phase === 'warmup'),
+      'conversation',
+      new Set(),
+      index,
+    );
+    const profiling = buildRequestTimelineRows(
+      records.filter((record) => record.phase === 'profiling'),
+      'conversation',
+      new Set(),
+      index,
+    );
+
+    expect(warmup[0]?.label).toBe('conversation · replay 1');
+    expect(profiling[0]?.label).toBe('conversation · replay 1');
+    expect(warmup[0]?.color).toBe(profiling[0]?.color);
+  });
+});
+
 describe('conversationHref', () => {
   it('builds a turn-carrying dataset link for a main-conversation request', () => {
     expect(

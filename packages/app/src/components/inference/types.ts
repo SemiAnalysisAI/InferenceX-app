@@ -298,6 +298,16 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   inputTokensPerDollarH?: { y: number; roof: boolean };
   inputTokensPerDollarN?: { y: number; roof: boolean };
   inputTokensPerDollarR?: { y: number; roof: boolean };
+  // Tokens purchasable per ¥1 — the $ metrics converted at USD_TO_CNY.
+  tokensPerRmbH?: { y: number; roof: boolean };
+  tokensPerRmbN?: { y: number; roof: boolean };
+  tokensPerRmbR?: { y: number; roof: boolean };
+  outputTokensPerRmbH?: { y: number; roof: boolean };
+  outputTokensPerRmbN?: { y: number; roof: boolean };
+  outputTokensPerRmbR?: { y: number; roof: boolean };
+  inputTokensPerRmbH?: { y: number; roof: boolean };
+  inputTokensPerRmbN?: { y: number; roof: boolean };
+  inputTokensPerRmbR?: { y: number; roof: boolean };
   tokensPerDollarUser?: { y: number; roof: boolean };
   powerUser?: { y: number; roof: boolean };
 
@@ -358,6 +368,7 @@ export interface ChartDefinition {
   x_label: string;
   y: keyof AggDataEntry;
   y_label?: string;
+
   y_cost_limit?: number;
   y_latency_limit?: number;
 }

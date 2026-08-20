@@ -41,6 +41,15 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_seq).toBe('');
   });
 
+  it('strips i_metric against the same default the dashboard opens on', async () => {
+    // A share link omits any value equal to PARAM_DEFAULTS. If this drifted
+    // from DEFAULT_Y_AXIS_METRIC, a link captured on the *other* metric would
+    // be written without `i_metric` and reopen on the dashboard default.
+    const { PARAM_DEFAULTS, DEFAULT_Y_AXIS_METRIC } = await import('@/lib/url-state');
+    expect(PARAM_DEFAULTS.i_metric).toBe(DEFAULT_Y_AXIS_METRIC);
+    expect(DEFAULT_Y_AXIS_METRIC).toBe('y_tokensPerDollarH');
+  });
+
   it('has expected default for r_range', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.r_range).toBe('last-3-months');
@@ -129,6 +138,65 @@ describe('readUrlParams', () => {
       '',
       '/zh/evaluation?eval=42#sample-detail',
     );
+  });
+});
+
+describe('refreshUrlParams', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  // A client-side navigation does not reload the module, so the load-time
+  // snapshot still describes the page the user came FROM. Every AgentX card on
+  // the landing page linked to `/inference?g_model=<model>` and opened the
+  // default model instead, because the snapshot from `/` had no g_model.
+  it('picks up params that arrived via a client-side navigation', async () => {
+    const { location } = setupWindow('', '/');
+    const { readUrlParams, refreshUrlParams } = await import('@/lib/url-state');
+    expect(readUrlParams().g_model).toBeUndefined();
+
+    location.search = '?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces';
+    location.pathname = '/inference';
+    const refreshed = refreshUrlParams();
+
+    expect(refreshed.g_model).toBe('Qwen-3.5-397B-A17B');
+    expect(refreshed.i_seq).toBe('agentic-traces');
+    // Same object the load-time readers already hold, so they see it too.
+    expect(readUrlParams().g_model).toBe('Qwen-3.5-397B-A17B');
+  });
+
+  it('keeps existing params when the new URL omits them', async () => {
+    const { location } = setupWindow('?g_model=Kimi-K3&i_seq=agentic-traces', '/inference');
+    const { refreshUrlParams } = await import('@/lib/url-state');
+
+    location.search = '?i_seq=8k/1k';
+    const refreshed = refreshUrlParams();
+
+    expect(refreshed.i_seq).toBe('8k/1k');
+    // Not cleared: the provider writes params back as the user filters, and a
+    // partial URL must not wipe state the user did not touch.
+    expect(refreshed.g_model).toBe('Kimi-K3');
+  });
+
+  it('ignores unknown params', async () => {
+    const { location } = setupWindow('', '/');
+    const { refreshUrlParams } = await import('@/lib/url-state');
+    location.search = '?g_model=GLM-5.2&not_a_real_key=x';
+    const refreshed = refreshUrlParams();
+    expect(refreshed.g_model).toBe('GLM-5.2');
+    expect(refreshed).not.toHaveProperty('not_a_real_key');
+  });
+
+  it('is a no-op without a window (SSR)', async () => {
+    vi.stubGlobal('window', undefined);
+    const { refreshUrlParams } = await import('@/lib/url-state');
+    expect(() => refreshUrlParams()).not.toThrow();
   });
 });
 

@@ -88,7 +88,7 @@ describe('MetricAssumptionNotes', () => {
       'SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model',
     );
     expect(getVisibleCaveatText()).toContain(
-      'calculate tokens per $1 per decode chip or per prefill chip',
+      'calculate tokens per $1 USD per decode chip or per prefill chip',
     );
   });
 
@@ -115,7 +115,7 @@ describe('MetricAssumptionNotes', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
 
     expect(getVisibleCaveatText()).toContain(
-      'calculate tokens per $1 per decode chip or per prefill chip',
+      'calculate tokens per $1 USD per decode chip or per prefill chip',
     );
   });
 
@@ -146,7 +146,7 @@ describe('MetricAssumptionNotes', () => {
       'SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model',
     );
     expect(getVisibleCaveatText()).not.toContain(
-      'calculate tokens per $1 per decode chip or per prefill chip',
+      'calculate tokens per $1 USD per decode chip or per prefill chip',
     );
   });
 

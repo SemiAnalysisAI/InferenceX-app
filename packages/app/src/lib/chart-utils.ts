@@ -4,7 +4,7 @@
  * They do NOT import Node.js-specific modules (fs, path) or build-time dependencies.
  */
 
-import { resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
+import { resolveFrameworkAlias, USD_TO_CNY } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 
 import type {
@@ -417,6 +417,52 @@ export function buildDerivedChartFields(
   }
   if (wants('inputTokensPerDollarR')) {
     fields.inputTokensPerDollarR = chartMetric(specs.costr ? inputTokensPerHour / specs.costr : 0);
+  }
+
+  if (wants('tokensPerRmbH')) {
+    fields.tokensPerRmbH = chartMetric(
+      specs.costh ? tokensPerHour / (specs.costh * USD_TO_CNY) : 0,
+    );
+  }
+  if (wants('tokensPerRmbN')) {
+    fields.tokensPerRmbN = chartMetric(
+      specs.costn ? tokensPerHour / (specs.costn * USD_TO_CNY) : 0,
+    );
+  }
+  if (wants('tokensPerRmbR')) {
+    fields.tokensPerRmbR = chartMetric(
+      specs.costr ? tokensPerHour / (specs.costr * USD_TO_CNY) : 0,
+    );
+  }
+  if (wants('outputTokensPerRmbH')) {
+    fields.outputTokensPerRmbH = chartMetric(
+      specs.costh ? outputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
+    );
+  }
+  if (wants('outputTokensPerRmbN')) {
+    fields.outputTokensPerRmbN = chartMetric(
+      specs.costn ? outputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
+    );
+  }
+  if (wants('outputTokensPerRmbR')) {
+    fields.outputTokensPerRmbR = chartMetric(
+      specs.costr ? outputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
+    );
+  }
+  if (wants('inputTokensPerRmbH')) {
+    fields.inputTokensPerRmbH = chartMetric(
+      specs.costh ? inputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
+    );
+  }
+  if (wants('inputTokensPerRmbN')) {
+    fields.inputTokensPerRmbN = chartMetric(
+      specs.costn ? inputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
+    );
+  }
+  if (wants('inputTokensPerRmbR')) {
+    fields.inputTokensPerRmbR = chartMetric(
+      specs.costr ? inputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
+    );
   }
 
   if (wants('jTotal')) {

@@ -12,7 +12,6 @@
  *
  * Only non-default values are written to keep URLs short.
  */
-import { DEFAULT_METRIC_CONFIG_KEY } from '@/components/inference/metric-registry';
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/dashboard-routes';
 
 // All known share-link parameter keys
@@ -81,6 +80,18 @@ export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
 export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
 
 /** Default values for each parameter. Params matching their default are omitted from share URLs. */
+/**
+ * Dashboard default y-axis: total tokens purchasable per $1 USD at owning
+ * hyperscaler TCO, so the dashboard leads with the economics rather than raw
+ * throughput. `?i_metric=` still wins, so existing shared links are unaffected.
+ *
+ * Lives here rather than in `InferenceContext` because `PARAM_DEFAULTS` below
+ * strips any value equal to the default from share links. If the two drifted,
+ * a link captured on the *other* metric would be written without `i_metric`
+ * and reopen on this one.
+ */
+export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarH';
+
 export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_model: 'DeepSeek-V4-Pro',
   g_rundate: '',
@@ -97,7 +108,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   // explicitly, so an explicit FP4 selection must survive (not be stripped as a
   // "default") or it would silently revert to the per-model auto default on reload.
   i_prec: '',
-  i_metric: DEFAULT_METRIC_CONFIG_KEY,
+  i_metric: DEFAULT_Y_AXIS_METRIC,
   i_pctl: 'p90',
   i_xmetric: 'p90_ttft',
   i_e2e_xmetric: 'p90_ttft',
@@ -173,6 +184,33 @@ if (typeof window !== 'undefined') {
 
 /** Returns the share-link params that were in the URL at page load. */
 export function readUrlParams(): UrlStateParams {
+  return _initialParams;
+}
+
+/**
+ * Re-read share-link params from the live URL, replacing the load-time
+ * snapshot.
+ *
+ * The snapshot above is captured once per page load, which is correct for a
+ * hard navigation but wrong for a client-side one: a soft transition to
+ * `/inference?g_model=…` does not remount the provider, so every reader kept
+ * seeing the params of the page the user came FROM (usually none). Callers
+ * must only invoke this on a real router navigation — self-writes go through
+ * `history.replaceState`, which deliberately does not, so re-reading after one
+ * of those would fight the user's own filter changes.
+ *
+ * Also mirrors into `currentState` so the next share-link write starts from
+ * what the URL actually asked for.
+ */
+export function refreshUrlParams(): UrlStateParams {
+  if (typeof window === 'undefined') return _initialParams;
+  const searchParams = new URLSearchParams(window.location.search);
+  for (const key of URL_STATE_KEYS) {
+    const value = searchParams.get(key);
+    if (value === null) continue;
+    _initialParams[key] = value;
+    currentState[key] = value;
+  }
   return _initialParams;
 }
 

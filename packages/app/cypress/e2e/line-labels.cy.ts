@@ -57,7 +57,7 @@ describe('Line Labels Toggle', () => {
     });
     cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
 
-    cy.get('[data-testid="scatter-graph"] svg').then(($svg) => {
+    cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]').then(($svg) => {
       const svg = $svg[0];
       const dots = svg.querySelectorAll('.dot-group');
       const labels = svg.querySelectorAll('g.line-label');
@@ -88,7 +88,7 @@ describe('Line Labels Toggle', () => {
 
     // The chart requires Shift for wheel zoom (so bare scroll doesn't hijack
     // the page). Dispatch a few shift+wheel events over the plot to zoom in.
-    cy.get('[data-testid="scatter-graph"] svg').then(($svg) => {
+    cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]').then(($svg) => {
       const svg = $svg[0];
       const r = svg.getBoundingClientRect();
       for (let i = 0; i < 3; i++) {
@@ -106,7 +106,7 @@ describe('Line Labels Toggle', () => {
     });
     cy.wait(300);
 
-    cy.get('[data-testid="scatter-graph"] svg').then(($svg) => {
+    cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]').then(($svg) => {
       const svg = $svg[0];
       const dots = svg.querySelectorAll('.dot-group');
       const labels = svg.querySelectorAll('g.line-label');

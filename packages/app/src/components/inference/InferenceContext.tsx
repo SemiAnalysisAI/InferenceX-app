@@ -53,10 +53,11 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
+import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
-import { MODEL_PREFIX_MAPPING, sequenceKind } from '@/lib/data-mappings';
+import { MODEL_PREFIX_MAPPING, Sequence, sequenceKind } from '@/lib/data-mappings';
 import {
   EngineComparisonConflictToast,
   type EngineComparisonConflictDetail,
@@ -201,7 +202,7 @@ export function InferenceProvider({
    * Initial y-axis metric key when the URL has no `?i_metric=` param. Used by
    * `/compare-per-dollar/[slug]` to default the chart to
    * `y_costh` (Cost per Million Total Tokens — Owning Hyperscaler) instead of
-   * the dashboard's default `y_tpPerGpu`. URL param still wins so existing
+   * the dashboard's default `y_tokensPerDollarH`. URL param still wins so existing
    * shared links are unaffected.
    */
   initialYAxisMetric?: string;
@@ -334,7 +335,7 @@ export function InferenceProvider({
     }
   }, [selectedGpuResolution]);
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
-    resolveMetricConfigKey(getUrlParam('i_metric'), initialYAxisMetric),
+    resolveMetricConfigKey(getUrlParam('i_metric'), initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC),
   );
   const [selectedXAxisMetric, setSelectedXAxisMetric] = useState<string | null>(
     () => getUrlParam('i_xmetric') || 'p90_ttft',
@@ -427,7 +428,13 @@ export function InferenceProvider({
   // The Historical Trends tab hides the quick-filter pills (hideGpuComparison), so
   // don't silently narrow its chart with selections carried in via share links or
   // the inference tab — there would be no pill to clear them.
-  const dataQuickFilters = activeTab === 'historical' ? EMPTY_QUICK_FILTERS : quickFilters;
+  // Quick Filters are hidden on the historical tab and in the agentic scenario.
+  // Hiding the pills is not enough: leftover `i_vendor` / `i_fw` / `i_disagg` /
+  // `i_spec` state would keep slicing the chart with no control left to clear
+  // it, so a share link could drop series the reader cannot get back.
+  const quickFiltersHidden =
+    activeTab === 'historical' || effectiveSequence === Sequence.AgenticTraces;
+  const dataQuickFilters = quickFiltersHidden ? EMPTY_QUICK_FILTERS : quickFilters;
   const { highContrast, setHighContrast, isLegendExpanded, setIsLegendExpanded } = useChartUIState({
     urlPrefix: 'i_',
   });

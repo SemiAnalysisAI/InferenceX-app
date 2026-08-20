@@ -2,7 +2,7 @@ import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 import type { AggDataEntry, InferenceData, RunInfo } from '@/components/inference/types';
-import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
+import { FRAMEWORK_LABELS, USD_TO_CNY } from '@semianalysisai/inferencex-constants';
 
 import { getGpuSpecs } from './constants';
 /**
@@ -201,7 +201,10 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
       item.costrOutput &&
       item.outputTokensPerDollarH &&
       item.outputTokensPerDollarN &&
-      item.outputTokensPerDollarR
+      item.outputTokensPerDollarR &&
+      item.outputTokensPerRmbH &&
+      item.outputTokensPerRmbN &&
+      item.outputTokensPerRmbR
     ) {
       return item;
     }
@@ -245,6 +248,18 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
       },
       outputTokensPerDollarR: item.outputTokensPerDollarR ?? {
         y: specs.costr > 0 ? outputTokensPerHour / specs.costr : 0,
+        roof: false,
+      },
+      outputTokensPerRmbH: item.outputTokensPerRmbH ?? {
+        y: specs.costh > 0 ? outputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
+        roof: false,
+      },
+      outputTokensPerRmbN: item.outputTokensPerRmbN ?? {
+        y: specs.costn > 0 ? outputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
+        roof: false,
+      },
+      outputTokensPerRmbR: item.outputTokensPerRmbR ?? {
+        y: specs.costr > 0 ? outputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
         roof: false,
       },
     };
@@ -384,7 +399,10 @@ export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
       item.costri &&
       item.inputTokensPerDollarH &&
       item.inputTokensPerDollarN &&
-      item.inputTokensPerDollarR
+      item.inputTokensPerDollarR &&
+      item.inputTokensPerRmbH &&
+      item.inputTokensPerRmbN &&
+      item.inputTokensPerRmbR
     ) {
       return item;
     }
@@ -425,6 +443,18 @@ export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
       },
       inputTokensPerDollarR: item.inputTokensPerDollarR ?? {
         y: specs.costr > 0 ? inputTokensPerHour / specs.costr : 0,
+        roof: false,
+      },
+      inputTokensPerRmbH: item.inputTokensPerRmbH ?? {
+        y: specs.costh > 0 ? inputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
+        roof: false,
+      },
+      inputTokensPerRmbN: item.inputTokensPerRmbN ?? {
+        y: specs.costn > 0 ? inputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
+        roof: false,
+      },
+      inputTokensPerRmbR: item.inputTokensPerRmbR ?? {
+        y: specs.costr > 0 ? inputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
         roof: false,
       },
     };
