@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { slugify } from '@/lib/blog';
 import type { Locale } from '@/lib/i18n';
 import { HeadingLink } from '@/components/blog/heading-link';
+import { ThemedFigureImage } from '@/components/blog/themed-figure-image';
 import { JsonLd } from '@/components/json-ld';
 
 function childrenToText(children: ReactNode): string {
@@ -144,26 +145,13 @@ export function createMdxComponents(
       return (
         <figure className="my-6 flex flex-col items-center">
           {hasThemedVariants ? (
-            <>
-              {lightSrc && (
-                <img
-                  src={lightSrc}
-                  alt={props.alt ?? ''}
-                  loading={loading}
-                  decoding="async"
-                  className="rounded-lg w-full md:w-3/4 block dark:hidden"
-                />
-              )}
-              {darkSrc && (
-                <img
-                  src={darkSrc}
-                  alt={props.alt ?? ''}
-                  loading={loading}
-                  decoding="async"
-                  className="rounded-lg w-full md:w-3/4 hidden dark:block"
-                />
-              )}
-            </>
+            <ThemedFigureImage
+              srcLight={lightSrc}
+              srcDark={darkSrc}
+              alt={props.alt ?? ''}
+              loading={loading}
+              className="rounded-lg w-full md:w-3/4"
+            />
           ) : (
             (lightSrc || darkSrc) && (
               <img
