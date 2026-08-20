@@ -1,32 +1,27 @@
 /**
  * Pure toggle state transition.
  *
- * - If all items are active and one is toggled, only that item remains active (solo).
- * - If only one item is active and it's toggled, all items become active (restore all).
- * - Otherwise, the item is simply added or removed from the active set.
+ * - Clicking an active item while others are active solos it.
+ * - Clicking the only active item restores all.
+ * - Clicking an inactive item adds it.
+ *
+ * Solo used to require EVERY item to be active, which quietly made it
+ * unreachable wherever something starts deselected. On the agentic view the
+ * engine guard switches SGLang off on load, so a fresh chart never had all
+ * items active and the first click on a legend entry removed it instead of
+ * isolating it. Individual removal has its own control — the X that appears on
+ * a legend row on hover — so the label click is free to always mean "show only
+ * this".
  *
  * Kept free of React so server-only modules (`exclusion.ts`, and through it the
  * overview data layer) can reuse it without pulling client hooks into a Server
  * Component graph.
  */
 export function computeToggle(prev: Set<string>, item: string, allItems: Set<string>): Set<string> {
-  const allAreActive = prev.size === allItems.size;
-  const isActive = prev.has(item);
-
-  if (isActive) {
-    if (allAreActive) {
-      // Solo: only keep the clicked item
-      return new Set([item]);
-    } else if (prev.size === 1) {
-      // Restore all: re-enable everything
-      return allItems;
-    }
-    // Remove the clicked item
-    const next = new Set(prev);
-    next.delete(item);
-    return next;
+  if (prev.has(item)) {
+    // Sole survivor -> restore everything, so a second click undoes the solo.
+    if (prev.size <= 1) return allItems;
+    return new Set([item]);
   }
-  // Add the clicked item
-  const next = new Set([...prev, item]);
-  return next;
+  return new Set([...prev, item]);
 }
