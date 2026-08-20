@@ -255,6 +255,12 @@ describe('OverviewNavigationProvider', () => {
     await act(async () => {
       window.dispatchEvent(new PopStateEvent('popstate'));
       await Promise.resolve();
+    });
+
+    expect(readProbe('pending')).toBe('pending');
+    expect(readProbe('error')).toBe('ok');
+
+    await act(async () => {
       settlers[1]?.resolve(Response.json(pageData(100)));
       await Promise.resolve();
     });

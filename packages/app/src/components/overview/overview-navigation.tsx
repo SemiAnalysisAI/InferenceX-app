@@ -137,6 +137,7 @@ export function OverviewNavigationProvider({
       const navigationId = ++navigationIdRef.current;
       pendingHrefRef.current = href;
       setPendingHref(href);
+      setNavigationError(false);
       if (updateHistory) {
         // Deliberately the pristine prototype method: `window.history.pushState`
         // is patched by Next to dispatch a router action, and that per-click

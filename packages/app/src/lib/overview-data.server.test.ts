@@ -71,7 +71,7 @@ afterEach(() => {
 });
 
 describe('getOverviewPageData engine scope forwarding', () => {
-  it('fails closed when history mode has no current snapshot', async () => {
+  it('returns a renderable empty history payload when no current snapshot exists', async () => {
     const getCachedBenchmarks = vi.fn(() => Promise.resolve([]));
     const getCachedBenchmarksAsOf = vi.fn();
     vi.doMock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
@@ -81,12 +81,23 @@ describe('getOverviewPageData engine scope forwarding', () => {
     }));
     vi.doMock('@/lib/test-fixtures', () => ({ loadFixture: vi.fn() }));
 
-    const { getOverviewPageData, OverviewHistoryUnavailableError } =
-      await import('./overview-data.server');
+    const { getOverviewPageData } = await import('./overview-data.server');
 
-    await expect(getOverviewPageData(50, 'community', '30d')).rejects.toBeInstanceOf(
-      OverviewHistoryUnavailableError,
-    );
+    await expect(
+      getOverviewPageData(75, 'all', '30d', 'b300', 'all', 'changed', 'priced'),
+    ).resolves.toEqual({
+      models: [],
+      tier: 75,
+      engineScope: 'all',
+      comparisonMode: '30d',
+      referenceHardware: 'b300',
+      modelScope: 'all',
+      rowScope: 'changed',
+      hardwareRowScope: 'priced',
+      unchangedRowCount: 0,
+      emptyRowCount: 0,
+      historicalWindow: null,
+    });
     expect(getCachedBenchmarksAsOf).not.toHaveBeenCalled();
   });
 

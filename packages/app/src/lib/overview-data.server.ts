@@ -30,13 +30,6 @@ import {
 } from '@/lib/overview-data';
 import { loadFixture } from '@/lib/test-fixtures';
 
-export class OverviewHistoryUnavailableError extends Error {
-  constructor(comparisonMode: OverviewComparisonMode) {
-    super(`Overview history is unavailable for ${comparisonMode}`);
-    this.name = 'OverviewHistoryUnavailableError';
-  }
-}
-
 async function loadRowsByModel(
   models: readonly Model[],
   loader: (keys: string[]) => Promise<BenchmarkRow[]>,
@@ -97,7 +90,19 @@ export async function getOverviewPageData(
       : currentRowsByModel;
   const snapshotDate = overviewSnapshotDate(snapshotRows, engineScope);
   if (snapshotDate === null) {
-    throw new OverviewHistoryUnavailableError(comparisonMode);
+    return {
+      models: [],
+      tier,
+      engineScope,
+      comparisonMode,
+      referenceHardware,
+      modelScope,
+      rowScope,
+      hardwareRowScope,
+      unchangedRowCount: 0,
+      emptyRowCount: 0,
+      historicalWindow: null,
+    };
   }
 
   const window = overviewHistoricalWindow(snapshotDate, comparisonMode);
