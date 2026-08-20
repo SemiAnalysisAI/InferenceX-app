@@ -17,14 +17,13 @@ import { track } from '@/lib/analytics';
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import {
+  resolveAvailableSelection,
   useChartUIState,
   useChartToggleSet,
-  useAutoInitializeToggleSet,
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useEvaluations } from '@/hooks/api/use-evaluations';
 import { useUrlState } from '@/hooks/useUrlState';
-import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
 import type { Model } from '@/lib/data-mappings';
 import type { EvalRow } from '@/lib/api';
 
@@ -38,6 +37,22 @@ import type { EvalChangelogEntry, EvaluationChartContextType, EvaluationChartDat
 /** @internal Exported for test provider wrapping only. */
 export const EvaluationContext = createContext<EvaluationChartContextType | undefined>(undefined);
 
+export function resolveEvaluationDate(
+  requestedDate: string,
+  availableDates: readonly string[],
+): string {
+  if (availableDates.length === 0) return requestedDate;
+  if (!requestedDate) return availableDates.at(-1)!;
+  if (availableDates.includes(requestedDate)) return requestedDate;
+
+  const target = new Date(requestedDate).getTime();
+  return availableDates.reduce((closest, date) => {
+    const closestDifference = Math.abs(new Date(closest).getTime() - target);
+    const difference = Math.abs(new Date(date).getTime() - target);
+    return difference < closestDifference ? date : closest;
+  }, availableDates[0]);
+}
+
 export function EvaluationProvider({ children }: { children: ReactNode }) {
   const {
     selectedModel,
@@ -50,30 +65,27 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     effectivePrecisions,
     setSelectedPrecisions,
     availablePrecisions: globalAvailablePrecisions,
+    availabilityError,
   } = useGlobalFilters();
   const { getUrlParam } = useUrlState();
-  const { data: rawRows, isLoading: loading, error: queryError } = useEvaluations();
+  const {
+    data: rawRows,
+    isLoading: loading,
+    isSuccess: evaluationsSettled,
+    error: queryError,
+  } = useEvaluations();
   const { unofficialEvalRows, localOfficialOverride } = useUnofficialRun();
 
-  const error = queryError ? queryError.message : null;
+  const error = availabilityError || (queryError ? queryError.message : null);
   const rawData: EvalRow[] = rawRows ?? [];
   const unofficialRawData: EvalRow[] = unofficialEvalRows ?? [];
 
-  const [selectedRunDate, setSelectedRunDate] = useState<string>(
-    () => getUrlParam('e_rundate') || globalRunDate || '',
-  );
+  const [dateIntent, setDateIntent] = useState(() => ({
+    date: getUrlParam('e_rundate') || '',
+    globalRevision: selectedRunDateRev,
+  }));
 
-  const handleSetSelectedRunDate = useCallback(
-    (date: string) => {
-      setSelectedRunDate(date);
-      if (inferenceAvailableDates.length === 0 || inferenceAvailableDates.includes(date)) {
-        setGlobalRunDate(date);
-      }
-    },
-    [inferenceAvailableDates, setGlobalRunDate],
-  );
-
-  const [selectedBenchmark, setSelectedBenchmark] = useState<string | undefined>(
+  const [requestedBenchmark, setRequestedBenchmark] = useState<string | undefined>(
     () => getUrlParam('e_bench') || undefined,
   );
 
@@ -92,11 +104,11 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   } = useChartToggleSet();
 
   // Pending legend-active selection restored from `e_active` URL param.
-  // Consumed once when hwTypesWithData first populates.
+  // Consumed once when hardware availability settles.
   const [pendingActiveHardware, setPendingActiveHardware] = useState<Set<string> | null>(() => {
-    const v = getUrlParam('e_active');
-    if (!v) return null;
-    const set = new Set(v.split(',').filter(Boolean));
+    const value = getUrlParam('e_active');
+    if (!value) return null;
+    const set = new Set(value.split(',').filter(Boolean));
     return set.size > 0 ? set : null;
   });
 
@@ -119,65 +131,29 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     return [...dates].toSorted();
   }, [rawData, selectedModel]);
 
-  const prevAvailableDatesRef = useRef<string[]>([]);
+  const selectedBenchmark =
+    requestedBenchmark && availableBenchmarks.includes(requestedBenchmark)
+      ? requestedBenchmark
+      : availableBenchmarks[0];
 
-  useEffect(() => {
-    if (availableBenchmarks.length > 0 && !selectedBenchmark) {
-      setSelectedBenchmark(availableBenchmarks[0]);
-    }
-    if (availableModels.length > 0 && !selectedModel) {
-      setSelectedModel(availableModels[0]);
-    }
-  }, [availableBenchmarks, availableModels, selectedBenchmark, setSelectedModel]);
+  const preferredRunDate =
+    selectedRunDateRev > dateIntent.globalRevision
+      ? globalRunDate
+      : dateIntent.date || globalRunDate;
+  const selectedRunDate = resolveEvaluationDate(preferredRunDate, availableDates);
 
-  useEffect(() => {
-    if (availableDates.length === 0) return;
-    const latestDate = availableDates.at(-1);
-    const prevAvailableDates = prevAvailableDatesRef.current;
-    const wasOnLatest =
-      prevAvailableDates.length > 0 && selectedRunDate === prevAvailableDates.at(-1);
-    if (!selectedRunDate || wasOnLatest || !availableDates.includes(selectedRunDate)) {
-      setSelectedRunDate(latestDate!);
-      // If no global date yet (evals loaded first), set it so inference syncs to us.
-      if (!globalRunDate) setGlobalRunDate(latestDate!);
-    }
-    prevAvailableDatesRef.current = availableDates;
-  }, [availableDates, selectedRunDate, setSelectedRunDate, globalRunDate, setGlobalRunDate]);
-
-  useEffect(() => {
-    if (!globalRunDate) return;
-    if (availableDates.length === 0) {
-      setSelectedRunDate(globalRunDate);
-      return;
-    }
-    if (availableDates.includes(globalRunDate)) {
-      setSelectedRunDate(globalRunDate);
-      return;
-    }
-    // Snap to the nearest valid date
-    const target = new Date(globalRunDate).getTime();
-    let closest = availableDates[0];
-    let minDiff = Math.abs(new Date(closest).getTime() - target);
-    for (const d of availableDates) {
-      const diff = Math.abs(new Date(d).getTime() - target);
-      if (diff < minDiff) {
-        minDiff = diff;
-        closest = d;
-      }
-    }
-    setSelectedRunDate(closest);
-  }, [globalRunDate, availableDates, selectedRunDateRev]);
-
-  const availableHardware = useMemo(() => {
-    const hwSet = new Set<string>();
-    rawData.forEach((item) => {
-      const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
-      if (hwKey !== 'unknown') hwSet.add(hwKey);
-    });
-    return [...hwSet].toSorted();
-  }, [rawData]);
-
-  useAutoInitializeToggleSet(availableHardware, enabledHardware, setEnabledHardware);
+  const handleSetSelectedRunDate = useCallback(
+    (date: string) => {
+      const updatesGlobal =
+        inferenceAvailableDates.length === 0 || inferenceAvailableDates.includes(date);
+      setDateIntent({
+        date,
+        globalRevision: selectedRunDateRev + (updatesGlobal ? 1 : 0),
+      });
+      if (updatesGlobal) setGlobalRunDate(date);
+    },
+    [inferenceAvailableDates, selectedRunDateRev, setGlobalRunDate],
+  );
 
   const availablePrecisions = useMemo(() => {
     const dbModelKeys = DISPLAY_MODEL_TO_DB[selectedModel];
@@ -256,16 +232,29 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     [unfilteredChartData],
   );
 
+  const hardwareScopeKey = `${selectedModel}|${selectedBenchmark ?? ''}|${selectedRunDate}|${effectivePrecisions.join(',')}`;
+  const lastHardwareScopeRef = useRef('');
   useEffect(() => {
-    if (hwTypesWithData.size === 0) return;
-    if (pendingActiveHardware) {
-      const restored = new Set([...pendingActiveHardware].filter((k) => hwTypesWithData.has(k)));
-      setEnabledHardware(restored.size > 0 ? restored : hwTypesWithData);
-      setPendingActiveHardware(null);
-      return;
-    }
-    setEnabledHardware(hwTypesWithData);
-  }, [selectedModel, hwTypesWithData]);
+    const scopeChanged = lastHardwareScopeRef.current !== hardwareScopeKey;
+    const resolution = resolveAvailableSelection({
+      active: enabledHardware,
+      available: hwTypesWithData,
+      pending: pendingActiveHardware,
+      scopeChanged,
+      settled: evaluationsSettled,
+    });
+    if (!evaluationsSettled) return;
+    lastHardwareScopeRef.current = hardwareScopeKey;
+    if (resolution.selection !== enabledHardware) setEnabledHardware(resolution.selection);
+    if (resolution.consumedPending) setPendingActiveHardware(null);
+  }, [
+    enabledHardware,
+    evaluationsSettled,
+    hardwareScopeKey,
+    hwTypesWithData,
+    pendingActiveHardware,
+    setEnabledHardware,
+  ]);
 
   const selectAllHwTypes = useCallback(
     () => selectAllHwRaw(hwTypesWithData),
@@ -346,7 +335,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       selectedBenchmark,
-      setSelectedBenchmark,
+      setSelectedBenchmark: setRequestedBenchmark,
       selectedModel,
       setSelectedModel: handleSetSelectedModel,
       selectedRunDate,

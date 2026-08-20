@@ -9,6 +9,7 @@ import { D3Chart, type D3ChartHandle, type LayerConfig } from '@/lib/d3-chart/D3
 import { renderErrorBars } from '@/lib/d3-chart/layers/error-bars';
 import { renderPoints, updatePointsOnZoom } from '@/lib/d3-chart/layers/points';
 import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
+import { attachOverlayXMarkerHandlers, xMarkerPath } from '@/lib/d3-chart/overlay-x-marker';
 import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
@@ -23,7 +24,10 @@ import {
 import { useLocale } from '@/lib/use-locale';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import {
+  useOverlayScopeReconciliation,
+  useUnofficialRun,
+} from '@/components/unofficial-run-provider';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';
@@ -33,9 +37,6 @@ const OVERLAY_X_SIZE = 6;
 const OVERLAY_X_HOVER_SIZE = 8;
 const OVERLAY_HIT_RADIUS = 10;
 const OVERLAY_ERROR_STROKE_WIDTH = 1.5;
-
-const getOverlayXPath = (size: number) =>
-  `M ${-size},${-size} L ${size},${size} M ${-size},${size} L ${size},${-size}`;
 
 const formatDateStr = (dateStr: string) => {
   const [year, month, day] = dateStr.split('-');
@@ -178,11 +179,9 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     unofficialRunInfo,
     unofficialRunInfos,
     activeOverlayHwTypes,
-    setActiveOverlayHwTypes,
     allOverlayHwTypes,
-    resetOverlayHwTypes,
     localOfficialOverride,
-    setLocalOfficialOverride,
+    setUnifiedOverlaySelection,
     runIndexByUrl,
   } = useUnofficialRun();
   const chartRef = useRef<D3ChartHandle>(null);
@@ -206,6 +205,39 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     },
     [runIndexByUrl, unofficialRunInfos, unofficialRunInfo],
   );
+  const evaluationOverlayScope = useMemo(
+    () => new Set(unofficialChartData.map((datum) => String(datum.hwKey))),
+    [unofficialChartData],
+  );
+  const evaluationScopeRegistration = useMemo(
+    () =>
+      isUnofficialRun
+        ? {
+            scopeKey: `evaluation|${selectedModel ?? ''}|${selectedBenchmark ?? ''}|${
+              selectedRunDate ?? ''
+            }|${unofficialRunInfos.map((run) => run.url).join(',')}`,
+            officialHwTypes: hwTypesWithData,
+            overlayHwTypes: evaluationOverlayScope,
+            bestOfficialHwTypes: hwTypesWithData,
+            bestOverlayHwTypes: evaluationOverlayScope,
+            bestPerSku: false,
+            ready: !loading || hwTypesWithData.size > 0,
+          }
+        : null,
+    [
+      isUnofficialRun,
+      selectedModel,
+      selectedBenchmark,
+      selectedRunDate,
+      unofficialRunInfos,
+      hwTypesWithData,
+      evaluationOverlayScope,
+      loading,
+      activeOverlayHwTypes,
+      localOfficialOverride,
+    ],
+  );
+  useOverlayScopeReconciliation(evaluationScopeRegistration);
 
   const effectiveOfficialHardware = localOfficialOverride ?? enabledHardware;
 
@@ -228,15 +260,13 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         if (key.startsWith('overlay:')) nextOverlay.add(key.slice(8));
         else nextOfficial.add(key);
       }
-      setLocalOfficialOverride(nextOfficial);
-      setActiveOverlayHwTypes(nextOverlay);
+      setUnifiedOverlaySelection(nextOfficial, nextOverlay);
     },
     [
       activeOverlayHwTypes,
       allUnifiedHwTypes,
       effectiveOfficialHardware,
-      setActiveOverlayHwTypes,
-      setLocalOfficialOverride,
+      setUnifiedOverlaySelection,
     ],
   );
 
@@ -728,7 +758,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
                 .attr('cursor', 'pointer');
               g.append('path')
                 .attr('class', 'unofficial-eval-x')
-                .attr('d', getOverlayXPath(OVERLAY_X_SIZE))
+                .attr('d', xMarkerPath(OVERLAY_X_SIZE))
                 .attr('fill', 'none')
                 .attr('stroke-width', 2.5)
                 .attr('stroke-linecap', 'round')
@@ -765,45 +795,32 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
               .text(d.score.toFixed(3));
           });
 
-          overlayPoints
-            .on('mouseenter', function (_event, d) {
-              if (chartRef.current?.isPinned()) return;
-              d3.select(this)
-                .select('.unofficial-eval-x')
-                .attr('d', getOverlayXPath(OVERLAY_X_HOVER_SIZE))
-                .attr('stroke-width', 3.5);
-              tooltip
-                .style('opacity', 1)
-                .style('display', 'block')
-                .style('pointer-events', 'none')
-                .html(generateEvaluationTooltipContent(d, false, branchForRow(d)));
-            })
-            .on('mousemove', (event) => {
-              if (chartRef.current?.isPinned()) return;
-              const [mx, my] = d3.pointer(event, container);
-              const pos = computeTooltipPosition(mx, my, tooltip, container);
-              tooltip.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
-            })
-            .on('mouseleave', function () {
-              if (chartRef.current?.isPinned()) return;
-              d3.select(this)
-                .select('.unofficial-eval-x')
-                .attr('d', getOverlayXPath(OVERLAY_X_SIZE))
-                .attr('stroke-width', 2.5);
-              tooltip.style('opacity', 0).style('display', 'none');
-            })
-            .on('click', (event, d) => {
-              event.stopPropagation();
-              const [mx, my] = d3.pointer(event, container);
-              tooltip
-                .html(generateEvaluationTooltipContent(d, true, branchForRow(d)))
-                .style('opacity', 1)
-                .style('display', 'block')
-                .style('pointer-events', 'auto');
-              const pos = computeTooltipPosition(mx, my, tooltip, container);
-              tooltip.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
-              chartRef.current?.pinTooltip(d, true);
-            });
+          attachOverlayXMarkerHandlers(overlayPoints, {
+            markerSelector: '.unofficial-eval-x',
+            normalPath: xMarkerPath(OVERLAY_X_SIZE),
+            hoverPath: xMarkerPath(OVERLAY_X_HOVER_SIZE),
+            tooltip,
+            handle: chartRef.current,
+            content: (datum, pinned) =>
+              generateEvaluationTooltipContent(datum, pinned, branchForRow(datum)),
+            position: (event) => {
+              const [mouseX, mouseY] = d3.pointer(event, container);
+              return computeTooltipPosition(mouseX, mouseY, tooltip, container);
+            },
+            rulers: {
+              show: (datum) => {
+                const currentX = d3.zoomTransform(svgNode).rescaleX(xScale);
+                const datumY = (yScale(datum.configLabel) || 0) + yScale.bandwidth() / 2;
+                group.select('.ruler-group').style('display', 'block');
+                group
+                  .select('.vertical-ruler')
+                  .attr('x1', currentX(datum.score))
+                  .attr('x2', currentX(datum.score));
+                group.select('.horizontal-ruler').attr('y1', datumY).attr('y2', datumY);
+              },
+              hide: () => group.select('.ruler-group').style('display', 'none'),
+            },
+          });
         },
         onZoom: (group, { newXScale, yScale: ys }) => {
           const xScale = newXScale as d3.ScaleLinear<number, number>;
@@ -958,8 +975,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
                     label: legendT.resetFilter,
                     onClick: () => {
                       selectAllHwTypes();
-                      setLocalOfficialOverride(null);
-                      resetOverlayHwTypes();
+                      setUnifiedOverlaySelection(hwTypesWithData, allOverlayHwTypes);
                       track('evaluation_filter_reset');
                     },
                   },

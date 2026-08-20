@@ -25,6 +25,7 @@ import { useAvailability } from '@/hooks/api/use-availability';
 import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import type { RunInfo } from '@/components/inference/types';
 import {
   Model,
   MODEL_OPTIONS,
@@ -37,7 +38,7 @@ import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/default-sequence';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
-
+import type { UrlStateParams } from '@/lib/url-state';
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
 
@@ -48,22 +49,6 @@ const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
 // act on an unresolved sequence gate on `sequenceResolved` instead.
 // (Declared after the import block so it never references `Sequence` above its import.)
 const APP_DEFAULT_SEQUENCE = Sequence.EightK_OneK;
-
-interface RunInfo {
-  runId: string;
-  runDate: string;
-  runUrl: string;
-  conclusion: string | null;
-  changelog?: {
-    entries: {
-      config_keys: string[];
-      description: string;
-      pr_link: string | null;
-      head_ref: string;
-      append_only?: boolean;
-    }[];
-  };
-}
 
 export interface GlobalFilterContextType {
   // Shared filter state
@@ -103,9 +88,11 @@ export interface GlobalFilterContextType {
 
   // Raw availability rows (shared with inference for GPU filtering)
   availabilityRows: AvailabilityRow[] | undefined;
+  /** True only after the database availability request succeeds. */
+  availabilitySettled: boolean;
+  availabilityError: string | null;
 
   // Workflow info
-  workflowInfo: { runInfoBySequence: Record<string, RunInfo> }[] | null;
   availableRuns: Record<string, RunInfo>;
   workflowLoading: boolean;
   workflowError: string | null;
@@ -114,7 +101,7 @@ export interface GlobalFilterContextType {
 /** @internal Exported for test provider wrapping only. */
 export const GlobalFilterContext = createContext<GlobalFilterContextType | undefined>(undefined);
 
-/** Transform API response into the shape the app expects. */
+/** Transform API response into the run map consumed by selectors and displays. */
 function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
   const runs: Record<string, RunInfo> = {};
   for (const run of data.runs) {
@@ -143,24 +130,59 @@ function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
   return runs;
 }
 
+export function resolveEffectiveRunDate(
+  requestedDate: string,
+  availableDates: readonly string[],
+  requestedExplicitly: boolean,
+): string {
+  if (availableDates.length === 0) return requestedDate;
+  if (requestedExplicitly && requestedDate && availableDates.includes(requestedDate)) {
+    return requestedDate;
+  }
+  return availableDates.at(-1)!;
+}
+
+export function resolveEffectiveRunId(
+  requestedRunId: string,
+  availableRuns: Readonly<Record<string, RunInfo>>,
+): string {
+  const runIds = Object.keys(availableRuns);
+  if (runIds.length === 0) return '';
+  if (requestedRunId && Object.hasOwn(availableRuns, requestedRunId)) return requestedRunId;
+  return runIds.reduce((latest, runId) => (runId > latest ? runId : latest), runIds[0]);
+}
+
+export function getRequestedRunUrlParams(
+  requestedRunDate: string,
+  requestedRunId: string,
+): Pick<UrlStateParams, 'g_rundate' | 'g_runid'> {
+  return {
+    g_rundate: requestedRunDate,
+    g_runid: requestedRunId,
+  };
+}
+
 export function GlobalFilterProvider({
   children,
   initialModel,
   initialSequence,
   initialPrecisions,
+  initialRunDate,
+  initialRunId,
 }: {
   children: ReactNode;
   /**
    * Initial values used when no URL params are present. Lets per-route entry
    * points (e.g. `/compare/[a]-vs-[b]`) seed sensible defaults derived from
-   * actual data — without these, every page falls back to FP4/8K-1K which
-   * has no data for older GPUs (Hopper, CDNA 3).
+   * actual data, without forcing a second provider during server rendering.
    */
   initialModel?: Model;
   initialSequence?: Sequence;
   initialPrecisions?: string[];
+  initialRunDate?: string;
+  initialRunId?: string;
 }) {
-  const { hasUrlParam, getUrlParam, setUrlParams } = useUrlState();
+  const { getUrlParam, setUrlParams } = useUrlState();
 
   // ── Core filter state ─────────────────────────────────────────────────────
   const [selectedModel, setSelectedModel] = useState<Model>(
@@ -217,10 +239,13 @@ export function GlobalFilterProvider({
   }, []);
 
   // ── Run date / run ID ─────────────────────────────────────────────────────
-  const [selectedRunDate, setSelectedRunDateBase] = useState<string>('');
+  const [requestedRunDate, setRequestedRunDate] = useState<string>(() => initialRunDate ?? '');
   const [selectedRunDateRev, setSelectedRunDateRev] = useState(0);
+  const requestedRunDateExplicitRef = useRef(
+    initialRunDate !== undefined || Boolean(getUrlParam('g_rundate')),
+  );
 
-  const [selectedRunId, setSelectedRunId] = useState<string>('');
+  const [requestedRunId, setRequestedRunId] = useState<string>(() => initialRunId ?? '');
 
   // Apply URL param overrides synchronously after the first commit. Runs only
   // on the client (useEffect on server is a no-op). Updates state before paint
@@ -257,13 +282,21 @@ export function GlobalFilterProvider({
         setPrecisionExplicit(true);
       }
     }
-    applyIfMatches('g_rundate', RUNDATE_RE, setSelectedRunDateBase);
-    applyIfMatches('g_runid', RUNID_RE, setSelectedRunId);
+    applyIfMatches('g_rundate', RUNDATE_RE, (date) => {
+      requestedRunDateExplicitRef.current = true;
+      setRequestedRunDate(date);
+    });
+    applyIfMatches('g_runid', RUNID_RE, setRequestedRunId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Availability data ─────────────────────────────────────────────────────
-  const { data: availabilityRows } = useAvailability();
+  const {
+    data: availabilityRows,
+    error: availabilityQueryError,
+    isSuccess: availabilitySettled,
+  } = useAvailability();
+  const availabilityError = availabilityQueryError ? availabilityQueryError.message : null;
   const { availableModelsAndSequences: unofficialAvailable } = useUnofficialRun();
 
   const dbModelKeys = useMemo<string[]>(
@@ -426,31 +459,17 @@ export function GlobalFilterProvider({
     return [...new Set(rows.map((r) => r.date))].toSorted();
   }, [availabilityRows, modelRows, effectiveSequence, effectivePrecisions]);
 
-  // When true, keep the user's date if available; otherwise always use latest
-  const userPickedDateRef = useRef(Boolean(getUrlParam('g_rundate')));
-
   const setSelectedRunDateManual = useCallback((date: string) => {
-    userPickedDateRef.current = true;
-    setSelectedRunDateBase(date);
-    setSelectedRunDateRev((v) => v + 1);
+    requestedRunDateExplicitRef.current = true;
+    setRequestedRunDate(date);
+    setSelectedRunDateRev((revision) => revision + 1);
   }, []);
 
-  const effectiveRunDate = useMemo(() => {
-    if (availableDates.length === 0) return selectedRunDate;
-    const latest = availableDates.at(-1)!;
-    if (userPickedDateRef.current && selectedRunDate && availableDates.includes(selectedRunDate)) {
-      return selectedRunDate;
-    }
-    return latest;
-  }, [availableDates, selectedRunDate]);
-
-  // Sync selectedRunDate state when effectiveRunDate changes
-  useEffect(() => {
-    if (availableDates.length > 0 && effectiveRunDate !== selectedRunDate) {
-      setSelectedRunDateBase(effectiveRunDate);
-      setSelectedRunDateRev((v) => v + 1);
-    }
-  }, [effectiveRunDate, availableDates]);
+  const effectiveRunDate = resolveEffectiveRunDate(
+    requestedRunDate,
+    availableDates,
+    requestedRunDateExplicitRef.current,
+  );
 
   // ── Workflow info ─────────────────────────────────────────────────────────
   const {
@@ -466,38 +485,14 @@ export function GlobalFilterProvider({
     [workflowData],
   );
 
-  const workflowInfo = useMemo(
-    () => (Object.keys(availableRuns).length > 0 ? [{ runInfoBySequence: availableRuns }] : null),
-    [availableRuns],
+  const effectiveRunId = useMemo(
+    () => resolveEffectiveRunId(requestedRunId, availableRuns),
+    [requestedRunId, availableRuns],
   );
 
-  // Auto-select latest run ID when availableRuns change
-  const urlInitRef = useRef({ runIdApplied: false });
-
-  useEffect(() => {
-    if (availableRuns && Object.keys(availableRuns).length > 0) {
-      if (!urlInitRef.current.runIdApplied && hasUrlParam('g_runid')) {
-        const urlRunId = getUrlParam('g_runid')!;
-        urlInitRef.current.runIdApplied = true;
-        if (Object.keys(availableRuns).includes(urlRunId)) {
-          setSelectedRunId(urlRunId);
-          return;
-        }
-      }
-      urlInitRef.current.runIdApplied = true;
-
-      if (
-        !selectedRunId ||
-        (selectedRunId && !Object.keys(availableRuns).includes(selectedRunId))
-      ) {
-        const runIds = Object.keys(availableRuns);
-        const maxRunId = runIds.reduce((max, id) => (id > max ? id : max), runIds[0]);
-        setSelectedRunId(maxRunId);
-      }
-    } else if (selectedRunId !== '') {
-      setSelectedRunId('');
-    }
-  }, [availableRuns, selectedRunId]);
+  const setSelectedRunId = useCallback((runId: string) => {
+    setRequestedRunId(runId);
+  }, []);
 
   // ── URL sync ──────────────────────────────────────────────────────────────
   const isMountedRef = useRef(false);
@@ -508,8 +503,7 @@ export function GlobalFilterProvider({
     }
     setUrlParams({
       g_model: selectedModel,
-      g_rundate: selectedRunDate,
-      g_runid: selectedRunId,
+      ...getRequestedRunUrlParams(requestedRunDate, requestedRunId),
       // Don't pin the sequence to the URL until it's resolved from real
       // availability — writing the pre-load placeholder (8k/1k) would clobber a
       // shared `?i_seq=agentic-traces` link before the model's availability
@@ -521,8 +515,8 @@ export function GlobalFilterProvider({
     });
   }, [
     selectedModel,
-    selectedRunDate,
-    selectedRunId,
+    requestedRunDate,
+    requestedRunId,
     effectiveSequence,
     sequenceResolved,
     effectivePrecisions,
@@ -544,7 +538,7 @@ export function GlobalFilterProvider({
       selectedRunDate: effectiveRunDate,
       setSelectedRunDate: setSelectedRunDateManual,
       selectedRunDateRev,
-      selectedRunId,
+      selectedRunId: effectiveRunId,
       setSelectedRunId,
       availableModels,
       availableSequences,
@@ -552,7 +546,8 @@ export function GlobalFilterProvider({
       availableDates,
       effectiveRunDate,
       availabilityRows,
-      workflowInfo,
+      availabilitySettled,
+      availabilityError,
       availableRuns,
       workflowLoading,
       workflowError,
@@ -567,13 +562,15 @@ export function GlobalFilterProvider({
       effectiveRunDate,
       setSelectedRunDateManual,
       selectedRunDateRev,
-      selectedRunId,
+      effectiveRunId,
+      setSelectedRunId,
       availableModels,
       availableSequences,
       availablePrecisions,
       availableDates,
       availabilityRows,
-      workflowInfo,
+      availabilitySettled,
+      availabilityError,
       availableRuns,
       workflowLoading,
       workflowError,

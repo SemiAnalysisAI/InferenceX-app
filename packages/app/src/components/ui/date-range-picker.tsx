@@ -1,7 +1,7 @@
 'use client';
 
 import { Calendar, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { track } from '@/lib/analytics';
 
@@ -26,6 +26,53 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { useLocale } from '@/lib/use-locale';
+
+const STRINGS = {
+  en: {
+    placeholder: 'Select date range',
+    unavailableDatesPrefix: 'These dates do not exist: ',
+    title: 'Select Date Range',
+    selected: 'Selected:',
+    startDate: 'Start date:',
+    chooseEndDate: 'Choose an end date',
+    chooseRange: 'Choose a start and end date to define your date range.',
+    checking: 'Checking available dates...',
+    noAvailableDates: 'No available dates',
+    noAvailableDatesDescription: 'Please change Model, ISL/OSL, or Chip to see available dates.',
+    oneDateAvailable: 'Only 1 date available',
+    oneDateDescription:
+      'Historical comparison requires at least 2 dates. Please change Model, ISL/OSL, or chip selection.',
+    viewAnyway: 'View anyway',
+    maxRange: 'Max Range',
+    last90Days: 'Last 90 Days',
+    last30Days: 'Last 30 Days',
+    cancel: 'Cancel',
+    applying: 'Applying...',
+    apply: 'Apply',
+  },
+  zh: {
+    placeholder: '选择日期范围',
+    unavailableDatesPrefix: '以下日期不存在：',
+    title: '选择日期范围',
+    selected: '已选择：',
+    startDate: '开始日期：',
+    chooseEndDate: '请选择结束日期',
+    chooseRange: '请选择开始和结束日期以定义日期范围。',
+    checking: '正在检查可用日期...',
+    noAvailableDates: '没有可用日期',
+    noAvailableDatesDescription: '请更改模型、ISL/OSL 或 Chip 以查看可用日期。',
+    oneDateAvailable: '仅有 1 个可用日期',
+    oneDateDescription: '历史对比至少需要 2 个日期。请更改模型、ISL/OSL 或 Chip 选择。',
+    viewAnyway: '仍然查看',
+    maxRange: '最大范围',
+    last90Days: '最近 90 天',
+    last30Days: '最近 30 天',
+    cancel: '取消',
+    applying: '正在应用...',
+    apply: '应用',
+  },
+} as const;
 
 export interface DateRange {
   startDate: string;
@@ -51,12 +98,15 @@ export function DateRangePicker({
   dateRange,
   onChange,
   className,
-  placeholder = 'Select date range',
+  placeholder,
   minDate,
   maxDate,
   availableDates,
   isCheckingAvailableDates,
 }: DateRangePickerProps) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const resolvedPlaceholder = placeholder ?? t.placeholder;
   const [open, setOpen] = useState(false);
   const [tempRange, setTempRange] = useState<DateRange>(dateRange);
   const [selectingStart, setSelectingStart] = useState(true);
@@ -67,18 +117,18 @@ export function DateRangePicker({
   // Get display text for the input
   const getDisplayText = () => {
     if (!dateRange.startDate && !dateRange.endDate) {
-      return placeholder;
+      return resolvedPlaceholder;
     }
     if (dateRange.startDate && dateRange.endDate) {
       if (dateRange.startDate === dateRange.endDate) {
-        return formatDisplayDate(dateRange.startDate);
+        return formatDisplayDate(dateRange.startDate, locale);
       }
-      return `${formatDisplayDate(dateRange.startDate)} - ${formatDisplayDate(dateRange.endDate)}`;
+      return `${formatDisplayDate(dateRange.startDate, locale)} - ${formatDisplayDate(dateRange.endDate, locale)}`;
     }
     if (dateRange.startDate) {
-      return `${formatDisplayDate(dateRange.startDate)} - ...`;
+      return `${formatDisplayDate(dateRange.startDate, locale)} - ...`;
     }
-    return placeholder;
+    return resolvedPlaceholder;
   };
 
   // Handle date selection in calendar
@@ -108,7 +158,7 @@ export function DateRangePicker({
         const dates = [tempRange.startDate, tempRange.endDate];
         const failedDates = dates.filter((date) => !availableDates.includes(date));
         if (failedDates.length > 0) {
-          setError(`These dates do not exist: ${failedDates.join(', ')}`);
+          setError(`${t.unavailableDatesPrefix}${failedDates.join(', ')}`);
           return;
         }
       }
@@ -125,19 +175,15 @@ export function DateRangePicker({
     setOpen(false);
   };
 
-  // Reset when opening
   const handleOpenChange = (isOpen: boolean) => {
     track(isOpen ? 'date_range_picker_opened' : 'date_range_picker_closed');
+    setError('');
     if (isOpen) {
       setTempRange(dateRange);
       setSelectingStart(!dateRange.startDate || Boolean(dateRange.endDate));
     }
     setOpen(isOpen);
   };
-
-  useEffect(() => {
-    setError('');
-  }, [open]);
 
   return (
     <div className="space-y-2">
@@ -157,26 +203,26 @@ export function DateRangePicker({
         </DialogTrigger>
         <DialogContent className="sm:max-w-[900px]">
           <DialogHeader>
-            <DialogTitle>Select Date Range</DialogTitle>
+            <DialogTitle>{t.title}</DialogTitle>
             <DialogDescription>
               {tempRange.startDate && tempRange.endDate ? (
                 <span>
-                  Selected:{' '}
+                  {t.selected}{' '}
                   <span className="font-semibold text-foreground">
-                    {formatDisplayDate(tempRange.startDate)} -{' '}
-                    {formatDisplayDate(tempRange.endDate)}
+                    {formatDisplayDate(tempRange.startDate, locale)} -{' '}
+                    {formatDisplayDate(tempRange.endDate, locale)}
                   </span>
                 </span>
               ) : tempRange.startDate ? (
                 <span>
-                  Start date:{' '}
+                  {t.startDate}{' '}
                   <span className="font-semibold text-foreground">
-                    {formatDisplayDate(tempRange.startDate)}
+                    {formatDisplayDate(tempRange.startDate, locale)}
                   </span>{' '}
-                  - Choose an end date
+                  - {t.chooseEndDate}
                 </span>
               ) : (
-                'Choose a start and end date to define your date range.'
+                t.chooseRange
               )}
             </DialogDescription>
           </DialogHeader>
@@ -196,7 +242,7 @@ export function DateRangePicker({
               <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="size-6 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">Checking available dates...</p>
+                  <p className="text-sm text-muted-foreground">{t.checking}</p>
                 </div>
               </div>
             )}
@@ -205,10 +251,8 @@ export function DateRangePicker({
               availableDates.length === 0 && (
                 <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
                   <div className="flex flex-col items-center gap-2 text-center px-4">
-                    <p className="text-sm font-medium text-foreground">No available dates</p>
-                    <p className="text-xs text-muted-foreground">
-                      Please change Model, ISL/OSL, or Chip to see available dates.
-                    </p>
+                    <p className="text-sm font-medium text-foreground">{t.noAvailableDates}</p>
+                    <p className="text-xs text-muted-foreground">{t.noAvailableDatesDescription}</p>
                   </div>
                 </div>
               )}
@@ -217,11 +261,8 @@ export function DateRangePicker({
               availableDates.length === 1 && (
                 <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
                   <div className="flex flex-col items-center gap-2 text-center px-4">
-                    <p className="text-sm font-medium text-foreground">Only 1 date available</p>
-                    <p className="text-xs text-muted-foreground">
-                      Historical comparison requires at least 2 dates. Please change Model, ISL/OSL,
-                      or chip selection.
-                    </p>
+                    <p className="text-sm font-medium text-foreground">{t.oneDateAvailable}</p>
+                    <p className="text-xs text-muted-foreground">{t.oneDateDescription}</p>
                     <Button
                       variant="outline"
                       size="sm"
@@ -233,7 +274,7 @@ export function DateRangePicker({
                         setOpen(false);
                       }}
                     >
-                      View anyway
+                      {t.viewAnyway}
                     </Button>
                   </div>
                 </div>
@@ -245,14 +286,16 @@ export function DateRangePicker({
               <div className="flex flex-wrap gap-1.5">
                 {[
                   {
-                    label: 'Max Range',
+                    label: t.maxRange,
+                    analyticsLabel: 'Max Range',
                     getRange: () => ({
                       startDate: availableDates[0],
                       endDate: availableDates.at(-1)!,
                     }),
                   },
                   {
-                    label: 'Last 90 Days',
+                    label: t.last90Days,
+                    analyticsLabel: 'Last 90 Days',
                     getRange: () => {
                       const cutoff = new Date();
                       cutoff.setDate(cutoff.getDate() - 90);
@@ -263,7 +306,8 @@ export function DateRangePicker({
                     },
                   },
                   {
-                    label: 'Last 30 Days',
+                    label: t.last30Days,
+                    analyticsLabel: 'Last 30 Days',
                     getRange: () => {
                       const cutoff = new Date();
                       cutoff.setDate(cutoff.getDate() - 30);
@@ -273,7 +317,7 @@ export function DateRangePicker({
                       return { startDate: filtered[0], endDate: filtered.at(-1)! };
                     },
                   },
-                ].map(({ label, getRange }) => {
+                ].map(({ label, analyticsLabel, getRange }) => {
                   const range = getRange();
                   if (!range) return null;
                   return (
@@ -282,7 +326,7 @@ export function DateRangePicker({
                       variant="outline"
                       onClick={() => {
                         setTempRange(range);
-                        track('date_range_picker_quick_select', { label });
+                        track('date_range_picker_quick_select', { label: analyticsLabel });
                       }}
                     >
                       {label}
@@ -296,7 +340,7 @@ export function DateRangePicker({
             <div className="flex gap-2">
               <DialogClose asChild>
                 <Button variant="outline" onClick={handleCancel}>
-                  Cancel
+                  {t.cancel}
                 </Button>
               </DialogClose>
               <Button
@@ -308,7 +352,7 @@ export function DateRangePicker({
                   (availableDates !== undefined && availableDates.length < 2)
                 }
               >
-                {isApplying ? 'Applying...' : 'Apply'}
+                {isApplying ? t.applying : t.apply}
               </Button>
             </div>
           </DialogFooter>

@@ -11,12 +11,8 @@ vi.mock('next/navigation', () => ({
 }));
 
 import { OverviewNavigationProvider } from './overview-navigation';
-import {
-  DesktopOverviewMatrix,
-  overviewFormatters,
-  OVERVIEW_STRINGS,
-  type OverviewStrings,
-} from './overview-scorecard';
+import { DesktopOverviewMatrix, overviewFormatters } from './overview-scorecard';
+import { OVERVIEW_STRINGS, type OverviewStrings } from './overview-strings';
 import {
   OverviewPresentationProvider,
   OverviewPresentationSurface,

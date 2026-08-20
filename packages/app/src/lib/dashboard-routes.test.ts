@@ -1,0 +1,54 @@
+import { existsSync } from 'node:fs';
+
+import { describe, expect, it } from 'vitest';
+
+import {
+  DASHBOARD_ROUTES,
+  dashboardRouteForPathname,
+  getDashboardRoute,
+  isDashboardRouteKey,
+} from './dashboard-routes';
+
+describe('dashboard route registry', () => {
+  it('has unique keys, navigation paths, and sitemap paths', () => {
+    expect(new Set(DASHBOARD_ROUTES.map((route) => route.key)).size).toBe(DASHBOARD_ROUTES.length);
+    expect(new Set(DASHBOARD_ROUTES.map((route) => route.path)).size).toBe(DASHBOARD_ROUTES.length);
+    expect(new Set(DASHBOARD_ROUTES.map((route) => route.canonicalPath)).size).toBe(
+      DASHBOARD_ROUTES.length,
+    );
+  });
+
+  it.each(DASHBOARD_ROUTES)('has English and Chinese page parity for "$key"', (route) => {
+    const englishPage = new URL(`../app/(dashboard)/${route.key}/page.tsx`, import.meta.url);
+    const chinesePage = new URL(`../app/zh/(dashboard)/${route.key}/page.tsx`, import.meta.url);
+
+    expect(existsSync(englishPage)).toBe(true);
+    expect(existsSync(chinesePage)).toBe(route.localeMirrored);
+  });
+
+  it('keeps reliability footer-only and indexable, and feedback out of the sitemap', () => {
+    expect(getDashboardRoute('reliability').navGroup).toBe('footer-only');
+    expect(getDashboardRoute('reliability').indexable).toBe(true);
+    expect(getDashboardRoute('feedback').indexable).toBe(false);
+  });
+
+  it('declares the standalone and self-seeded provider capabilities', () => {
+    expect(getDashboardRoute('collectivex').providers).toEqual({
+      globalFilters: false,
+      unofficialRuns: false,
+    });
+    expect(getDashboardRoute('calculator').providers).toEqual({
+      globalFilters: false,
+      unofficialRuns: true,
+    });
+  });
+
+  it('resolves English, Chinese, canonical, and dashboard child paths', () => {
+    expect(dashboardRouteForPathname('/evaluation')?.key).toBe('evaluation');
+    expect(dashboardRouteForPathname('/zh/evaluation')?.key).toBe('evaluation');
+    expect(dashboardRouteForPathname('/')?.key).toBe('inference');
+    expect(dashboardRouteForPathname('/zh/inference/agentic/42')?.key).toBe('inference');
+    expect(dashboardRouteForPathname('/compare/foo-vs-bar')).toBeUndefined();
+    expect(isDashboardRouteKey('not-a-tab')).toBe(false);
+  });
+});

@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
+import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ChevronDownIcon } from 'lucide-react';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
@@ -40,14 +39,7 @@ const STRINGS = {
 
 export default function EvaluationChartControls() {
   const t = STRINGS[useLocale()];
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const handleDropdownOpenChange = (dropdownKey: string) => (isOpen: boolean) => {
-    if (isOpen) {
-      setOpenDropdown(dropdownKey);
-      return;
-    }
-    setOpenDropdown((current) => (current === dropdownKey ? null : current));
-  };
+  const { openDropdown, handleDropdownOpenChange } = useOpenDropdown<string>();
 
   const {
     selectedBenchmark,

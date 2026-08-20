@@ -12,6 +12,8 @@
  *
  * Only non-default values are written to keep URLs short.
  */
+import { DEFAULT_METRIC_CONFIG_KEY } from '@/components/inference/metric-registry';
+import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/dashboard-routes';
 
 // All known share-link parameter keys
 const URL_STATE_KEYS = [
@@ -95,7 +97,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   // explicitly, so an explicit FP4 selection must survive (not be stripped as a
   // "default") or it would silently revert to the per-model auto default on reload.
   i_prec: '',
-  i_metric: 'y_tpPerGpu',
+  i_metric: DEFAULT_METRIC_CONFIG_KEY,
   i_pctl: 'p90',
   i_xmetric: 'p90_ttft',
   i_e2e_xmetric: 'p90_ttft',
@@ -139,16 +141,6 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   c_costcap: '',
 };
 
-/** Which param prefixes are relevant per tab. */
-const TAB_PARAM_PREFIXES: Record<string, string[]> = {
-  inference: ['g_', 'i_'],
-  evaluation: ['g_', 'e_'],
-  reliability: ['r_'],
-  // The calculator reuses the global model + inference sequence/precision
-  // params, plus its own c_ scope (fleet planner MW / cost cap).
-  calculator: ['g_', 'i_', 'c_'],
-};
-
 /** In-memory store of current param values (kept in sync via writeUrlParams). */
 const currentState: Record<string, string> = {};
 
@@ -171,7 +163,11 @@ if (typeof window !== 'undefined') {
       sp.delete(key);
     }
     const s = sp.toString();
-    window.history.replaceState(null, '', `${window.location.pathname}${s ? `?${s}` : ''}`);
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${s ? `?${s}` : ''}${window.location.hash}`,
+    );
   }, 0);
 }
 
@@ -242,8 +238,10 @@ const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/iu;
 export function buildShareUrl(): string {
   flushPendingParams();
 
-  const pathTab = window.location.pathname.split('/').filter(Boolean)[0] || 'inference';
-  const prefixes = TAB_PARAM_PREFIXES[pathTab] ?? TAB_PARAM_PREFIXES.inference;
+  const route = dashboardRouteForPathname(window.location.pathname);
+  // Compare and other chart routes share inference controls but deliberately
+  // stay outside the dashboard registry.
+  const prefixes = route?.shareParamScopes ?? getDashboardRoute('inference').shareParamScopes;
 
   const filtered = new URLSearchParams();
   for (const [key, value] of Object.entries(currentState)) {
@@ -265,5 +263,5 @@ export function buildShareUrl(): string {
   }
 
   const search = filtered.toString();
-  return `${window.location.origin}/${pathTab}${search ? `?${search}` : ''}`;
+  return `${window.location.origin}${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`;
 }

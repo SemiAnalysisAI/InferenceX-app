@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { NUDGE_REGISTRY, TELEMETRY_TUTORIAL_STORAGE_KEY } from './registry';
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('NUDGE_REGISTRY integrity', () => {
   it('has no duplicate IDs', () => {
@@ -93,6 +96,21 @@ describe('NUDGE_REGISTRY integrity', () => {
     // charts under test; a rename here has to be mirrored there.
     expect(tutorial?.storageKey).toBe(TELEMETRY_TUTORIAL_STORAGE_KEY);
     expect(TELEMETRY_TUTORIAL_STORAGE_KEY).toBe('inferencex-agentx-telemetry-tutorial-dismissed');
+  });
+
+  it('keeps internal action destinations in the active Chinese route tree', () => {
+    const location = { pathname: '/zh/inference', href: '' };
+    vi.stubGlobal('window', { location });
+
+    const reproducibility = NUDGE_REGISTRY.find((nudge) => nudge.id === 'reproducibility');
+    if (reproducibility?.type !== 'toast') throw new Error('Missing reproducibility toast');
+    reproducibility.content.action?.onClick();
+    expect(location.href).toBe('/zh/about#reproducibility');
+
+    const launch = NUDGE_REGISTRY.find((nudge) => nudge.id === 'agentic-results-launch-modal');
+    if (launch?.type !== 'modal') throw new Error('Missing launch modal');
+    launch.content.primaryAction?.onClick();
+    expect(location.href).toBe('/zh/inference?i_seq=agentic-traces');
   });
 
   it('preserves testId for every entry', () => {

@@ -4,6 +4,7 @@ import { GlobalFilterProvider } from '@/components/GlobalFilterContext';
 import { NudgeEngine } from '@/components/nudge-engine';
 import { TabNav } from '@/components/tab-nav';
 import { UnofficialRunProvider } from '@/components/unofficial-run-provider';
+import { dashboardRouteForPathname } from '@/lib/dashboard-routes';
 import { usePathname } from 'next/navigation';
 
 /**
@@ -21,26 +22,34 @@ function isAgenticDetailPath(pathname: string): boolean {
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const content = (
-    <main className="relative">
-      <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
-        <TabNav />
-        {children}
-      </div>
-    </main>
-  );
-  if (pathname === '/collectivex' || pathname === '/zh/collectivex') return content;
+  const agenticDetail = isAgenticDetailPath(pathname);
+  const providerCapabilities = agenticDetail
+    ? { globalFilters: false, unofficialRuns: false }
+    : (dashboardRouteForPathname(pathname)?.providers ?? {
+        globalFilters: true,
+        unofficialRuns: true,
+      });
+
+  let content = children;
+  if (providerCapabilities.globalFilters) {
+    content = <GlobalFilterProvider>{content}</GlobalFilterProvider>;
+  }
+  if (providerCapabilities.unofficialRuns) {
+    content = <UnofficialRunProvider>{content}</UnofficialRunProvider>;
+  }
+
+  const mountsDashboardProviders =
+    providerCapabilities.globalFilters || providerCapabilities.unofficialRuns;
+
   return (
     <>
-      {!isAgenticDetailPath(pathname) && <NudgeEngine scope="dashboard" />}
-      <UnofficialRunProvider>
-        <main className="relative">
-          <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
-            <TabNav />
-            <GlobalFilterProvider>{children}</GlobalFilterProvider>
-          </div>
-        </main>
-      </UnofficialRunProvider>
+      {mountsDashboardProviders && !agenticDetail && <NudgeEngine scope="dashboard" />}
+      <main className="relative">
+        <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
+          <TabNav />
+          {content}
+        </div>
+      </main>
     </>
   );
 }

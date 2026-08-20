@@ -14,6 +14,7 @@ import dynamic from 'next/dynamic';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
 import { FEEDBACK_SUBMITTED_EVENT } from '@/components/feedback-modal';
+import { isZhPathname, localePath } from '@/lib/i18n';
 import { LANDING_BANNER_STORAGE_KEY } from '@/lib/nudges/landing-banner';
 
 // Keep the ~210-line FeedbackForm out of the landing/dashboard initial JS.
@@ -44,17 +45,16 @@ function isOnInferenceTab(): boolean {
   return (segments[0] ?? 'inference') === 'inference';
 }
 
-/**
- * The telemetry tutorial lives at /agentx/telemetry and /zh/agentx/telemetry.
- * The nudge fires from a client callback rather than a server-rendered link,
- * so it resolves the locale from the pathname at click time.
- */
+/** Resolve an internal nudge destination in the locale active at click time. */
+function localizedNudgeHref(enPath: string): string {
+  if (typeof window === 'undefined') return enPath;
+  return localePath(enPath, isZhPathname(window.location.pathname) ? 'zh' : 'en');
+}
+
 export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
 
 function telemetryTutorialHref(): string {
-  if (typeof window === 'undefined') return '/agentx/telemetry';
-  const isZh = window.location.pathname.split('/').filter(Boolean)[0] === 'zh';
-  return isZh ? '/zh/agentx/telemetry' : '/agentx/telemetry';
+  return localizedNudgeHref('/agentx/telemetry');
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
         label: 'See how',
         labelZh: '了解详情',
         onClick: () => {
-          window.location.href = '/about#reproducibility';
+          window.location.href = localizedNudgeHref('/about#reproducibility');
         },
       },
       testId: 'reproducibility-nudge',
@@ -331,7 +331,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
         labelZh: '查看结果',
         icon: <ArrowRight className="size-4" />,
         onClick: () => {
-          window.location.href = '/inference?i_seq=agentic-traces';
+          window.location.href = localizedNudgeHref('/inference?i_seq=agentic-traces');
         },
       },
     },
@@ -408,7 +408,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = '/inference?i_seq=agentic-traces';
+        window.location.href = localizedNudgeHref('/inference?i_seq=agentic-traces');
       },
     },
     analytics: {

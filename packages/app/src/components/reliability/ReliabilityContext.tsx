@@ -7,13 +7,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
 import {
+  resolveAvailableSelection,
   useChartUIState,
   useChartToggleSet,
-  useAutoInitializeToggleSet,
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useReliability } from '@/hooks/api/use-reliability';
@@ -67,7 +68,12 @@ function aggregateByDateRange(rows: ReliabilityRow[]): DateRangeSuccessRateData 
 
 export function ReliabilityProvider({ children }: { children: ReactNode }) {
   const { getUrlParam } = useUrlState();
-  const { data: rawRows, isLoading: loading, error: queryError } = useReliability();
+  const {
+    data: rawRows,
+    isLoading: loading,
+    isSuccess: reliabilitySettled,
+    error: queryError,
+  } = useReliability();
 
   const error = queryError ? queryError.message : null;
 
@@ -110,8 +116,6 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     return rangeData ? Object.keys(rangeData) : [];
   }, [dateRangeSuccessRateData, dateRange]);
 
-  useAutoInitializeToggleSet(availableModels, enabledModels, setEnabledModels);
-
   const filteredReliabilityData = useMemo(() => {
     const selectedRangeData = dateRangeSuccessRateData[dateRange];
     if (!selectedRangeData) return [];
@@ -150,16 +154,28 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
   );
   const removeModel = useCallback((model: string) => removeModelRaw(model), [removeModelRaw]);
 
+  const lastModelScopeRef = useRef('');
   useEffect(() => {
-    if (modelsWithData.size === 0) return;
-    if (pendingActiveModels) {
-      const restored = new Set([...pendingActiveModels].filter((k) => modelsWithData.has(k)));
-      setEnabledModels(restored.size > 0 ? restored : modelsWithData);
-      setPendingActiveModels(null);
-      return;
-    }
-    setEnabledModels(modelsWithData);
-  }, [dateRange, modelsWithData]);
+    const scopeChanged = lastModelScopeRef.current !== dateRange;
+    const resolution = resolveAvailableSelection({
+      active: enabledModels,
+      available: modelsWithData,
+      pending: pendingActiveModels,
+      scopeChanged,
+      settled: reliabilitySettled,
+    });
+    if (!reliabilitySettled) return;
+    lastModelScopeRef.current = dateRange;
+    if (resolution.selection !== enabledModels) setEnabledModels(resolution.selection);
+    if (resolution.consumedPending) setPendingActiveModels(null);
+  }, [
+    dateRange,
+    enabledModels,
+    modelsWithData,
+    pendingActiveModels,
+    reliabilitySettled,
+    setEnabledModels,
+  ]);
 
   const selectAllModels = useCallback(
     () => selectAllModelsRaw(modelsWithData),

@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // helper to set up window mocks before module import
-function setupWindow(search = '', pathname = '/inference') {
+function setupWindow(search = '', pathname = '/inference', hash = '') {
   const location = {
     search,
     pathname,
+    hash,
     origin: 'https://example.com',
   };
   const history = { replaceState: vi.fn() };
@@ -116,6 +117,18 @@ describe('readUrlParams', () => {
     const params = readUrlParams();
     expect(params.g_model).toBe('test');
     expect(params).not.toHaveProperty('unknown_key');
+  });
+
+  it('preserves the locale path, unrelated params, and hash when cleaning initial state', async () => {
+    const { history } = setupWindow('?g_model=test&eval=42', '/zh/evaluation', '#sample-detail');
+    await import('@/lib/url-state');
+    await vi.runAllTimersAsync();
+
+    expect(history.replaceState).toHaveBeenCalledWith(
+      null,
+      '',
+      '/zh/evaluation?eval=42#sample-detail',
+    );
   });
 });
 
@@ -345,6 +358,30 @@ describe('buildShareUrl tab filtering', () => {
     const url = buildShareUrl();
     expect(url).toContain('g_model=x');
     expect(url).not.toContain('r_range');
+  });
+
+  it('preserves the exact locale, slug, scenario, and hash for non-dashboard chart routes', async () => {
+    setupWindow('', '/zh/compare/h100-vs-h200/8k-1k', '#interactive-results');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'x', i_seq: '8k/1k', r_range: 'last-7-days' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(buildShareUrl()).toBe(
+      'https://example.com/zh/compare/h100-vs-h200/8k-1k?g_model=x&i_seq=8k%2F1k#interactive-results',
+    );
+  });
+
+  it('uses the localized dashboard route to select its share scope', async () => {
+    setupWindow('', '/zh/evaluation', '#samples');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'x', e_bench: 'mmlu', i_seq: '8k/1k' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(buildShareUrl()).toBe(
+      'https://example.com/zh/evaluation?g_model=x&e_bench=mmlu#samples',
+    );
   });
 
   it('omits query string when no non-default params exist', async () => {
