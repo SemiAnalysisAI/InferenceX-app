@@ -134,7 +134,14 @@ const METRIC_GROUPS: {
   {
     label: 'Food Energy',
     labelZh: '食物能量',
-    metrics: ['y_tokensPerCalorie', 'y_tokensPerBigMac'],
+    metrics: [
+      'y_tokensPerCalorie',
+      'y_outputTokensPerCalorie',
+      'y_inputTokensPerCalorie',
+      'y_tokensPerBigMac',
+      'y_outputTokensPerBigMac',
+      'y_inputTokensPerBigMac',
+    ],
   },
   {
     label: 'Total Tokens per ¥1 CNY',

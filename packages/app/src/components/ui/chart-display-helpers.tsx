@@ -18,9 +18,20 @@ const POWER_SOURCE_METRICS = new Set([
   'y_inputTputPerMw',
   'y_outputTputPerMw',
   'y_tokensPerCalorie',
+  'y_outputTokensPerCalorie',
+  'y_inputTokensPerCalorie',
   'y_tokensPerBigMac',
+  'y_outputTokensPerBigMac',
+  'y_inputTokensPerBigMac',
 ]);
-const FOOD_ENERGY_METRICS = new Set(['y_tokensPerCalorie', 'y_tokensPerBigMac']);
+const FOOD_ENERGY_METRICS = new Set([
+  'y_tokensPerCalorie',
+  'y_outputTokensPerCalorie',
+  'y_inputTokensPerCalorie',
+  'y_tokensPerBigMac',
+  'y_outputTokensPerBigMac',
+  'y_inputTokensPerBigMac',
+]);
 const TOTAL_COST_METRICS = new Set([
   'y_costh',
   'y_costn',
@@ -254,7 +265,8 @@ export function MetricAssumptionNotes({
             : `1 food Calorie = ${JOULES_PER_FOOD_CALORIE.toLocaleString('en-US')} J`}
         </SourceLink>
       )}
-      {selectedYAxisMetric === 'y_tokensPerBigMac' && (
+      {selectedYAxisMetric.endsWith('TokensPerBigMac') ||
+      selectedYAxisMetric === 'y_tokensPerBigMac' ? (
         <SourceLink
           href="https://www.mcdonalds.com/us/en-us/product/big-mac.html"
           sourceLabel={sourceLabel}
@@ -263,7 +275,7 @@ export function MetricAssumptionNotes({
             ? `McDonald's 美国 Big Mac：${BIG_MAC_CALORIES} Cal`
             : `McDonald's U.S. Big Mac: ${BIG_MAC_CALORIES} Cal`}
         </SourceLink>
-      )}
+      ) : null}
       {costValues && (
         <>
           <MetricBadges label={costLabel} values={costValues} />

@@ -55,6 +55,8 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
   const millionOutTokPerHr = outTokPerHr / 1_000_000;
   const millionInTokPerHr = inTokPerHr / 1_000_000;
   const tokensPerCalorie = calculateTokensPerFoodCalorie(tput, power);
+  const outputTokensPerCalorie = calculateTokensPerFoodCalorie(outputTput, power);
+  const inputTokensPerCalorie = calculateTokensPerFoodCalorie(inputTput, power);
 
   // Build metric objects matching InferenceData shape. Measured-power keys are
   // only set when the runner-side aggregate_power.py emitted them — leaving the
@@ -74,6 +76,18 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
     tpPerMw: wrapMetric(power > 0 ? (tput * 1000) / power : 0),
     tokensPerCalorie: wrapMetric(tokensPerCalorie),
     tokensPerBigMac: wrapMetric(tokensPerCalorie * BIG_MAC_CALORIES),
+    ...(outputTput
+      ? {
+          outputTokensPerCalorie: wrapMetric(outputTokensPerCalorie),
+          outputTokensPerBigMac: wrapMetric(outputTokensPerCalorie * BIG_MAC_CALORIES),
+        }
+      : {}),
+    ...(inputTput
+      ? {
+          inputTokensPerCalorie: wrapMetric(inputTokensPerCalorie),
+          inputTokensPerBigMac: wrapMetric(inputTokensPerCalorie * BIG_MAC_CALORIES),
+        }
+      : {}),
     // Cost per million tokens (total / output / input).
     costh: wrapMetric(millionTokPerHr ? specs.costh / millionTokPerHr : 0),
     costn: wrapMetric(millionTokPerHr ? specs.costn / millionTokPerHr : 0),
@@ -148,7 +162,11 @@ const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> 
  */
 const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
   tokensPerCalorie: 'tpPerGpu',
+  outputTokensPerCalorie: 'outputTputPerGpu',
+  inputTokensPerCalorie: 'inputTputPerGpu',
   tokensPerBigMac: 'tpPerGpu',
+  outputTokensPerBigMac: 'outputTputPerGpu',
+  inputTokensPerBigMac: 'inputTputPerGpu',
   tokensPerDollarH: 'tpPerGpu',
   tokensPerDollarN: 'tpPerGpu',
   tokensPerDollarR: 'tpPerGpu',

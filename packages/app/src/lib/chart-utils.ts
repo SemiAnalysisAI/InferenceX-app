@@ -187,7 +187,11 @@ export const Y_AXIS_METRICS = [
   'y_inputTputPerMw',
   'y_outputTputPerMw',
   'y_tokensPerCalorie',
+  'y_outputTokensPerCalorie',
+  'y_inputTokensPerCalorie',
   'y_tokensPerBigMac',
+  'y_outputTokensPerBigMac',
+  'y_inputTokensPerBigMac',
   'y_costh',
   'y_costn',
   'y_costr',
@@ -365,6 +369,8 @@ export function createChartDataPoint(
   const millionOutputTokensPerHour = outputTokensPerHour / 1_000_000;
   const millionInputTokensPerHour = inputTokensPerHour / 1_000_000;
   const tokensPerCalorie = calculateTokensPerFoodCalorie(tputPerGpu, hardwarePower);
+  const outputTokensPerCalorie = calculateTokensPerFoodCalorie(outputTputPerGpu, hardwarePower);
+  const inputTokensPerCalorie = calculateTokensPerFoodCalorie(inputTputPerGpu, hardwarePower);
 
   return {
     // Spread all AggDataEntry fields (raw stats, metadata, etc.)
@@ -413,6 +419,24 @@ export function createChartDataPoint(
     tpPerMw: { y: (tputPerGpu * 1000) / hardwarePower, roof: false },
     tokensPerCalorie: { y: tokensPerCalorie, roof: false },
     tokensPerBigMac: { y: tokensPerCalorie * BIG_MAC_CALORIES, roof: false },
+    ...(outputTputPerGpu
+      ? {
+          outputTokensPerCalorie: { y: outputTokensPerCalorie, roof: false },
+          outputTokensPerBigMac: {
+            y: outputTokensPerCalorie * BIG_MAC_CALORIES,
+            roof: false,
+          },
+        }
+      : {}),
+    ...(inputTputPerGpu
+      ? {
+          inputTokensPerCalorie: { y: inputTokensPerCalorie, roof: false },
+          inputTokensPerBigMac: {
+            y: inputTokensPerCalorie * BIG_MAC_CALORIES,
+            roof: false,
+          },
+        }
+      : {}),
     ...(inputTputPerGpu
       ? {
           inputTputPerMw: {
@@ -800,7 +824,11 @@ export const calculateRoofline = (
     | `inputTputPerMw.y`
     | `outputTputPerMw.y`
     | `tokensPerCalorie.y`
+    | `outputTokensPerCalorie.y`
+    | `inputTokensPerCalorie.y`
     | `tokensPerBigMac.y`
+    | `outputTokensPerBigMac.y`
+    | `inputTokensPerBigMac.y`
     | `costh.y`
     | `costn.y`
     | `costr.y`
@@ -900,7 +928,11 @@ export function computeAllRooflines(
             | `inputTputPerMw.y`
             | `outputTputPerMw.y`
             | `tokensPerCalorie.y`
+            | `outputTokensPerCalorie.y`
+            | `inputTokensPerCalorie.y`
             | `tokensPerBigMac.y`
+            | `outputTokensPerBigMac.y`
+            | `inputTokensPerBigMac.y`
             | `costh.y`
             | `costn.y`
             | `costr.y`
@@ -962,7 +994,11 @@ export function markRooflinePoints(
       if (newPoint.inputTputPerMw) newPoint.inputTputPerMw.roof = false;
       if (newPoint.outputTputPerMw) newPoint.outputTputPerMw.roof = false;
       if (newPoint.tokensPerCalorie) newPoint.tokensPerCalorie.roof = false;
+      if (newPoint.outputTokensPerCalorie) newPoint.outputTokensPerCalorie.roof = false;
+      if (newPoint.inputTokensPerCalorie) newPoint.inputTokensPerCalorie.roof = false;
       if (newPoint.tokensPerBigMac) newPoint.tokensPerBigMac.roof = false;
+      if (newPoint.outputTokensPerBigMac) newPoint.outputTokensPerBigMac.roof = false;
+      if (newPoint.inputTokensPerBigMac) newPoint.inputTokensPerBigMac.roof = false;
       newPoint.costh.roof = false;
       newPoint.costn.roof = false;
       newPoint.costr.roof = false;
@@ -1029,8 +1065,24 @@ export function markRooflinePoints(
           if (newPoint.outputTputPerMw) newPoint.outputTputPerMw.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_tokensPerCalorie') {
           if (newPoint.tokensPerCalorie) newPoint.tokensPerCalorie.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_outputTokensPerCalorie') {
+          if (newPoint.outputTokensPerCalorie) {
+            newPoint.outputTokensPerCalorie.roof = onCurrentRoofline;
+          }
+        } else if (chartDefYKey === 'y_inputTokensPerCalorie') {
+          if (newPoint.inputTokensPerCalorie) {
+            newPoint.inputTokensPerCalorie.roof = onCurrentRoofline;
+          }
         } else if (chartDefYKey === 'y_tokensPerBigMac') {
           if (newPoint.tokensPerBigMac) newPoint.tokensPerBigMac.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_outputTokensPerBigMac') {
+          if (newPoint.outputTokensPerBigMac) {
+            newPoint.outputTokensPerBigMac.roof = onCurrentRoofline;
+          }
+        } else if (chartDefYKey === 'y_inputTokensPerBigMac') {
+          if (newPoint.inputTokensPerBigMac) {
+            newPoint.inputTokensPerBigMac.roof = onCurrentRoofline;
+          }
         } else if (chartDefYKey === 'y_costh') {
           newPoint.costh.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_costn') {

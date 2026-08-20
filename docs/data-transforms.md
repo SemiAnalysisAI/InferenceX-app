@@ -61,8 +61,9 @@ Returns `{ chartData: InferenceData[][], hardwareConfig: HardwareConfig }`.
 
 - `tpPerGpu`, `outputTputPerGpu`, `inputTputPerGpu` — raw throughput from the entry (tok/s/gpu).
 - `tpPerMw` — `(tputPerGpu * 1000) / hardwarePower` (GPU power in kW, result in tok/s/MW).
-- `tokensPerCalorie` / `tokensPerBigMac` — converts the same all-in provisioned power to
-  nutritional Calories (4,184 J), then scales the latter by 580 Cal per U.S. Big Mac.
+- Food-energy fields — total, input, and output token throughput converted from the same all-in
+  provisioned power to nutritional Calories (4,184 J), with matching Big Mac variants scaled by
+  580 Cal per U.S. Big Mac.
 - Cost-per-million fields — GPU hourly cost divided by tokens-per-hour (in millions): `costh` / `costn` / `costr` for hyperscaler / neocloud / 3-year-rental pricing respectively. Three token variants exist: combined (`costh`/`costn`/`costr`), output-only (`costhOutput`/`costnOutput`/`costrOutput`), and input-only (`costhi`/`costni`/`costri`).
 - Tokens-per-dollar fields — tokens-per-hour divided by the same hourly costs. They are separate Y-axis metrics rather than a display toggle: combined (`tokensPerDollarH`/`N`/`R`), output-only (`outputTokensPerDollarH`/`N`/`R`), and input-only (`inputTokensPerDollarH`/`N`/`R`). This keeps existing `i_metric=y_cost*` links and cost semantics unchanged.
 - Energy fields — `jTotal` / `jOutput` / `jInput`: `(hardwarePower * 1000) / tputPerGpu` (Joules per token, where power in kW is converted to W).

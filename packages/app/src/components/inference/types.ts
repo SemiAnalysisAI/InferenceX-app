@@ -303,7 +303,11 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   inputTputPerMw?: { y: number; roof: boolean };
   outputTputPerMw?: { y: number; roof: boolean };
   tokensPerCalorie?: { y: number; roof: boolean };
+  outputTokensPerCalorie?: { y: number; roof: boolean };
+  inputTokensPerCalorie?: { y: number; roof: boolean };
   tokensPerBigMac?: { y: number; roof: boolean };
+  outputTokensPerBigMac?: { y: number; roof: boolean };
+  inputTokensPerBigMac?: { y: number; roof: boolean };
   // Cost per million tokens.
   costh: { y: number; roof: boolean };
   costn: { y: number; roof: boolean };
@@ -380,7 +384,11 @@ export type YAxisMetricKey =
   | 'inputTputPerMw'
   | 'outputTputPerMw'
   | 'tokensPerCalorie'
+  | 'outputTokensPerCalorie'
+  | 'inputTokensPerCalorie'
   | 'tokensPerBigMac'
+  | 'outputTokensPerBigMac'
+  | 'inputTokensPerBigMac'
   | 'costh'
   | 'costn'
   | 'costr'
@@ -476,10 +484,32 @@ export interface ChartDefinition {
   y_tokensPerCalorie_label?: string;
   y_tokensPerCalorie_title?: string;
   y_tokensPerCalorie_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTokensPerCalorie?: string;
+  y_outputTokensPerCalorie_label?: string;
+  y_outputTokensPerCalorie_title?: string;
+  y_outputTokensPerCalorie_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerCalorie?: string;
+  y_inputTokensPerCalorie_label?: string;
+  y_inputTokensPerCalorie_title?: string;
+  y_inputTokensPerCalorie_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerCalorie_x?: string;
+  y_inputTokensPerCalorie_x_label?: string;
+  y_inputTokensPerCalorie_heading?: string;
   y_tokensPerBigMac?: string;
   y_tokensPerBigMac_label?: string;
   y_tokensPerBigMac_title?: string;
   y_tokensPerBigMac_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTokensPerBigMac?: string;
+  y_outputTokensPerBigMac_label?: string;
+  y_outputTokensPerBigMac_title?: string;
+  y_outputTokensPerBigMac_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerBigMac?: string;
+  y_inputTokensPerBigMac_label?: string;
+  y_inputTokensPerBigMac_title?: string;
+  y_inputTokensPerBigMac_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerBigMac_x?: string;
+  y_inputTokensPerBigMac_x_label?: string;
+  y_inputTokensPerBigMac_heading?: string;
   y_costh?: string;
   y_costh_label?: string;
   y_costh_title?: string;
