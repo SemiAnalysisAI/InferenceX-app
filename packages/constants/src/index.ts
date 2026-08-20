@@ -6,3 +6,4 @@ export * from './precision-keys';
 export * from './models';
 export * from './seo';
 export * from './tables';
+export * from './currency';

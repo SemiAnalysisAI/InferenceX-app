@@ -42,7 +42,7 @@ import { useUrlState } from '@/hooks/useUrlState';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
-import { MODEL_PREFIX_MAPPING, sequenceKind } from '@/lib/data-mappings';
+import { MODEL_PREFIX_MAPPING, Sequence, sequenceKind } from '@/lib/data-mappings';
 import {
   EngineComparisonConflictToast,
   type EngineComparisonConflictDetail,
@@ -79,6 +79,24 @@ import {
 
 /** @internal Exported for test provider wrapping only. */
 export const InferenceContext = createContext<InferenceChartContextType | undefined>(undefined);
+
+/**
+ * Dashboard default y-axis.
+ *
+ * Intended to be `y_tokensPerDollarH` (total tokens per $1 USD at owning
+ * hyperscaler TCO) so the dashboard leads with the economics. Held at
+ * throughput for now: with tokens-per-dollar on screen, `line-labels.cy.ts`
+ * ends with an empty chart — zero dot groups, zero labels, no console error,
+ * no recovery. It reproduces with `?i_metric=y_tokensPerDollarH` too, so it is
+ * not about which metric is *default*, and it needs that spec's shared page
+ * load across several tests: the same toggle sequence on a fresh page passes
+ * for every metric, tokens-per-dollar included.
+ *
+ * The metric itself is fine — all 39 y-axis metrics render points in
+ * `yaxis-metrics-render.cy.ts`. Flipping this constant is a one-line change
+ * once that interaction is fixed.
+ */
+export const DEFAULT_Y_AXIS_METRIC = 'y_tpPerGpu';
 
 export function InferenceProvider({
   children,
@@ -234,7 +252,7 @@ export function InferenceProvider({
     }
   }, [selectedGpuResolution, setUrlParam]);
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(
-    () => getUrlParam('i_metric') || initialYAxisMetric || 'y_tpPerGpu',
+    () => getUrlParam('i_metric') || initialYAxisMetric || DEFAULT_Y_AXIS_METRIC,
   );
   const [selectedXAxisMetric, setSelectedXAxisMetric] = useState<string | null>(
     () => getUrlParam('i_xmetric') || 'p90_ttft',
@@ -321,7 +339,13 @@ export function InferenceProvider({
   // The Historical Trends tab hides the quick-filter pills (hideGpuComparison), so
   // don't silently narrow its chart with selections carried in via share links or
   // the inference tab — there would be no pill to clear them.
-  const dataQuickFilters = activeTab === 'historical' ? EMPTY_QUICK_FILTERS : quickFilters;
+  // Quick Filters are hidden on the historical tab and in the agentic scenario.
+  // Hiding the pills is not enough: leftover `i_vendor` / `i_fw` / `i_disagg` /
+  // `i_spec` state would keep slicing the chart with no control left to clear
+  // it, so a share link could drop series the reader cannot get back.
+  const quickFiltersHidden =
+    activeTab === 'historical' || effectiveSequence === Sequence.AgenticTraces;
+  const dataQuickFilters = quickFiltersHidden ? EMPTY_QUICK_FILTERS : quickFilters;
   const { highContrast, setHighContrast, isLegendExpanded, setIsLegendExpanded } = useChartUIState({
     urlPrefix: 'i_',
   });

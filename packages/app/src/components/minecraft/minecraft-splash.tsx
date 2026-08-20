@@ -44,6 +44,9 @@ export const SPLASHES = [
  * minecraft-theme easter egg, while this is a launch callout that has to say
  * the same thing on every load.
  */
+/** Mirrors the `@media (min-width: 1024px)` rule that reveals `.splash-wrapper`. */
+const SPLASH_MIN_WIDTH = '(min-width: 1024px)';
+
 const ANNOUNCEMENT = {
   en: 'AgentX is here!!',
   zh: 'AgentX 来了！！',
@@ -58,11 +61,25 @@ export function MinecraftSplash() {
   const locale = useLocale();
   const [randomSplash, setRandomSplash] = useState('');
   const [isMinecraft, setIsMinecraft] = useState(false);
+  const [wideEnough, setWideEnough] = useState(false);
 
   // Picked client-side only: a server-rendered random pick would mismatch on
   // hydration. Minecraft mode is the only consumer, and it starts `false`.
   useEffect(() => {
     setRandomSplash(SPLASHES[Math.floor(Math.random() * SPLASHES.length)]);
+  }, []);
+
+  // `.splash-wrapper` is `display: none` below 1024px, but hiding it in CSS is
+  // not enough: the browser still fetches the Monocraft webfont the splash
+  // asks for, so a phone pays for a font it never paints. Gate the element out
+  // of the tree entirely below the same breakpoint the stylesheet uses.
+  // Starts `false` so the server render and the first client render agree.
+  useEffect(() => {
+    const query = window.matchMedia(SPLASH_MIN_WIDTH);
+    const sync = () => setWideEnough(query.matches);
+    sync();
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
   }, []);
 
   useEffect(() => {
@@ -76,7 +93,7 @@ export function MinecraftSplash() {
   }, []);
 
   const splash = isMinecraft ? randomSplash : ANNOUNCEMENT[locale];
-  if (!splash) return null;
+  if (!splash || !wideEnough) return null;
 
   return (
     <div className="splash-wrapper" data-testid="splash-text">

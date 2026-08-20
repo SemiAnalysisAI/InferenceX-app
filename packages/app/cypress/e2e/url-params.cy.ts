@@ -149,12 +149,12 @@ describe('URL Parameter Persistence', () => {
 
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
-        'Total Tokens per $1 (Owning - Hyperscaler)',
+        'Total Tokens per $1 USD (Owning - Hyperscaler)',
       );
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg text[transform="rotate(-90)"]')
-        .should('have.text', 'Total Tokens per $1 (tok/$)');
+        .should('have.text', 'Total Tokens per $1 USD (tok/$)');
     });
 
     it('selecting a Y-axis metric updates the displayed value', () => {

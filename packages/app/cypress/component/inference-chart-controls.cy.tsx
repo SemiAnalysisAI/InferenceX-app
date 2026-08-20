@@ -1,4 +1,5 @@
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
+import { Sequence } from '@/lib/data-mappings';
 import { mountWithProviders } from '../support/test-utils';
 
 describe('Inference ChartControls', () => {
@@ -22,6 +23,10 @@ describe('Inference ChartControls', () => {
     // Default mock: selectedPrecisions = [Precision.FP4] -> label "FP4"
     cy.get('[data-testid="precision-multiselect"]').should('be.visible');
     cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP4');
+  });
+
+  it('renders Quick Filters for a fixed-sequence scenario', () => {
+    cy.get('[data-testid="quick-filters"]').should('exist');
   });
 
   it('renders the Y-axis metric selector', () => {
@@ -97,13 +102,15 @@ describe('Inference ChartControls cost metrics', () => {
     cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').should(
       'exist',
     );
-    cy.contains('[role="option"]', 'Total Tokens per $1 (Owning - Hyperscaler)').should('exist');
+    cy.contains('[role="option"]', 'Total Tokens per $1 USD (Owning - Hyperscaler)').should(
+      'exist',
+    );
     cy.get('[data-testid="cost-display-selector"]').should('not.exist');
   });
 
   it('selects tokens per dollar through the Y-axis metric control', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click();
-    cy.contains('[role="option"]', 'Total Tokens per $1 (Owning - Hyperscaler)').click();
+    cy.contains('[role="option"]', 'Total Tokens per $1 USD (Owning - Hyperscaler)').click();
     cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarH');
   });
 });
@@ -155,5 +162,25 @@ describe('Inference ChartControls with hideGpuComparison', () => {
 
     cy.contains('Chip Config').should('not.exist');
     cy.get('[data-testid="gpu-multiselect"]').should('not.exist');
+  });
+
+  describe('agentic scenario', () => {
+    beforeEach(() => {
+      mountWithProviders(<InferenceChartControls />, {
+        inference: { selectedSequence: Sequence.AgenticTraces },
+        globalFilters: {
+          selectedSequence: Sequence.AgenticTraces,
+          effectiveSequence: Sequence.AgenticTraces,
+        },
+      });
+    });
+
+    it('drops Quick Filters, which have nothing to slice on one combined curve', () => {
+      // AgentX collapses vendor, framework, deployment, and spec decoding into
+      // a single best-available curve per model, SKU, and engine, so the pills
+      // would filter dimensions the chart no longer separates.
+      cy.get('#scenario-select').should('exist');
+      cy.get('[data-testid="quick-filters"]').should('not.exist');
+    });
   });
 });

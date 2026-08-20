@@ -4,7 +4,7 @@
  * They do NOT import Node.js-specific modules (fs, path) or build-time dependencies.
  */
 
-import { resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
+import { resolveFrameworkAlias, USD_TO_CNY } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 
 import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
@@ -189,6 +189,15 @@ export const Y_AXIS_METRICS = [
   'y_inputTokensPerDollarH',
   'y_inputTokensPerDollarN',
   'y_inputTokensPerDollarR',
+  'y_tokensPerRmbH',
+  'y_tokensPerRmbN',
+  'y_tokensPerRmbR',
+  'y_outputTokensPerRmbH',
+  'y_outputTokensPerRmbN',
+  'y_outputTokensPerRmbR',
+  'y_inputTokensPerRmbH',
+  'y_inputTokensPerRmbN',
+  'y_inputTokensPerRmbR',
   'y_jTotal',
   'y_jOutput',
   'y_jInput',
@@ -481,6 +490,44 @@ export function createChartDataPoint(
       roof: false,
     },
 
+    // Same quantities priced in ¥ at the pinned USD_TO_CNY rate.
+    tokensPerRmbH: {
+      y: specs.costh ? tokensPerHour / (specs.costh * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    tokensPerRmbN: {
+      y: specs.costn ? tokensPerHour / (specs.costn * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    tokensPerRmbR: {
+      y: specs.costr ? tokensPerHour / (specs.costr * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    outputTokensPerRmbH: {
+      y: specs.costh ? outputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    outputTokensPerRmbN: {
+      y: specs.costn ? outputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    outputTokensPerRmbR: {
+      y: specs.costr ? outputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    inputTokensPerRmbH: {
+      y: specs.costh ? inputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    inputTokensPerRmbN: {
+      y: specs.costn ? inputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    inputTokensPerRmbR: {
+      y: specs.costr ? inputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
+      roof: false,
+    },
+
     // All-in provisioned Joules per token: J/token = W/GPU / tok/s/gpu
     // hardwarePower is in kW, so multiply by 1000 to get watts
     jTotal: {
@@ -750,6 +797,15 @@ export const calculateRoofline = (
     | `inputTokensPerDollarH.y`
     | `inputTokensPerDollarN.y`
     | `inputTokensPerDollarR.y`
+    | `tokensPerRmbH.y`
+    | `tokensPerRmbN.y`
+    | `tokensPerRmbR.y`
+    | `outputTokensPerRmbH.y`
+    | `outputTokensPerRmbN.y`
+    | `outputTokensPerRmbR.y`
+    | `inputTokensPerRmbH.y`
+    | `inputTokensPerRmbN.y`
+    | `inputTokensPerRmbR.y`
     | `jTotal.y`
     | `jOutput.y`
     | `jInput.y`
