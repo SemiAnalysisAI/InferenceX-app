@@ -1050,7 +1050,7 @@ describe('ScatterGraph', () => {
 });
 
 describe('ChartDisplay engine comparison guard', () => {
-  it('includes cost-clipped official and unofficial points in table mode', () => {
+  it('includes explicitly clipped official and unofficial points in table mode', () => {
     const chartDefinition = createMockChartDefinition({
       chartType: 'interactivity',
       x: 'median_intvty',

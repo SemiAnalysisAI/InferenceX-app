@@ -1174,14 +1174,15 @@ describe('createChartDataPoint', () => {
     expect(point.outputTputPerMw).toBeUndefined();
   });
 
-  it('computes cost fields (costh, costn, costr) from hardware config and throughput', () => {
-    // tokensPerHour = (tput_per_gpu * 3600) / 1_000_000 = (1000 * 3600) / 1e6 = 3.6
-    // costh.y = hwConfig.costh / tokensPerHour = 2.8 / 3.6
+  it('keeps cost-per-million fields and adds total tokens-per-dollar fields', () => {
     const e = entry({ tput_per_gpu: 1000 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costh.y).toBeCloseTo(2.8 / 3.6, 5);
     expect(point.costn.y).toBeCloseTo(1.4 / 3.6, 5);
     expect(point.costr.y).toBeCloseTo(0.7 / 3.6, 5);
+    expect(point.tokensPerDollarH!.y).toBeCloseTo(3_600_000 / 2.8, 5);
+    expect(point.tokensPerDollarN!.y).toBeCloseTo(3_600_000 / 1.4, 5);
+    expect(point.tokensPerDollarR!.y).toBeCloseTo(3_600_000 / 0.7, 5);
   });
 
   it('sets cost fields to 0 when throughput is 0', () => {
@@ -1192,22 +1193,24 @@ describe('createChartDataPoint', () => {
     expect(point.costr.y).toBe(0);
   });
 
-  it('computes output cost fields when output_tput_per_gpu > 0', () => {
+  it('adds output tokens-per-dollar fields without replacing output cost fields', () => {
     const e = entry({ output_tput_per_gpu: 500 });
-    // outputTokensPerHour = (500 * 3600) / 1e6 = 1.8
+    // outputTokensPerHour = 500 * 3600 = 1,800,000
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costhOutput!.y).toBeCloseTo(2.8 / 1.8, 5);
-    expect(point.costnOutput!.y).toBeCloseTo(1.4 / 1.8, 5);
-    expect(point.costrOutput!.y).toBeCloseTo(0.7 / 1.8, 5);
+    expect(point.outputTokensPerDollarH!.y).toBeCloseTo(1_800_000 / 2.8, 5);
+    expect(point.outputTokensPerDollarN!.y).toBeCloseTo(1_800_000 / 1.4, 5);
+    expect(point.outputTokensPerDollarR!.y).toBeCloseTo(1_800_000 / 0.7, 5);
   });
 
-  it('computes input cost fields when input_tput_per_gpu > 0', () => {
+  it('adds input tokens-per-dollar fields without replacing input cost fields', () => {
     const e = entry({ input_tput_per_gpu: 200 });
-    // inputTokensPerHour = (200 * 3600) / 1e6 = 0.72
+    // inputTokensPerHour = 200 * 3600 = 720,000
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costhi.y).toBeCloseTo(2.8 / 0.72, 5);
-    expect(point.costni.y).toBeCloseTo(1.4 / 0.72, 5);
-    expect(point.costri.y).toBeCloseTo(0.7 / 0.72, 5);
+    expect(point.inputTokensPerDollarH!.y).toBeCloseTo(720_000 / 2.8, 5);
+    expect(point.inputTokensPerDollarN!.y).toBeCloseTo(720_000 / 1.4, 5);
+    expect(point.inputTokensPerDollarR!.y).toBeCloseTo(720_000 / 0.7, 5);
   });
 
   it('narrows dp_attention string "true" to boolean true', () => {
@@ -1625,7 +1628,7 @@ describe('createChartDataPoint output cost edge cases', () => {
     expect(point.costri.y).toBe(0);
   });
 
-  it('computes all 9 cost fields correctly for a point with all throughput types', () => {
+  it('computes all 9 added tokens-per-dollar fields for a point with all throughput types', () => {
     const e = entry({
       tput_per_gpu: 1000,
       output_tput_per_gpu: 500,
@@ -1633,20 +1636,20 @@ describe('createChartDataPoint output cost edge cases', () => {
     });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
 
-    // Total: tokensPerHour = (1000 * 3600) / 1e6 = 3.6
-    expect(point.costh.y).toBeCloseTo(2.8 / 3.6, 5);
-    expect(point.costn.y).toBeCloseTo(1.4 / 3.6, 5);
-    expect(point.costr.y).toBeCloseTo(0.7 / 3.6, 5);
+    // Total: tokensPerHour = 1000 * 3600 = 3,600,000
+    expect(point.tokensPerDollarH!.y).toBeCloseTo(3_600_000 / 2.8, 5);
+    expect(point.tokensPerDollarN!.y).toBeCloseTo(3_600_000 / 1.4, 5);
+    expect(point.tokensPerDollarR!.y).toBeCloseTo(3_600_000 / 0.7, 5);
 
-    // Output: outputTokensPerHour = (500 * 3600) / 1e6 = 1.8
-    expect(point.costhOutput!.y).toBeCloseTo(2.8 / 1.8, 5);
-    expect(point.costnOutput!.y).toBeCloseTo(1.4 / 1.8, 5);
-    expect(point.costrOutput!.y).toBeCloseTo(0.7 / 1.8, 5);
+    // Output: outputTokensPerHour = 500 * 3600 = 1,800,000
+    expect(point.outputTokensPerDollarH!.y).toBeCloseTo(1_800_000 / 2.8, 5);
+    expect(point.outputTokensPerDollarN!.y).toBeCloseTo(1_800_000 / 1.4, 5);
+    expect(point.outputTokensPerDollarR!.y).toBeCloseTo(1_800_000 / 0.7, 5);
 
-    // Input: inputTokensPerHour = (200 * 3600) / 1e6 = 0.72
-    expect(point.costhi.y).toBeCloseTo(2.8 / 0.72, 5);
-    expect(point.costni.y).toBeCloseTo(1.4 / 0.72, 5);
-    expect(point.costri.y).toBeCloseTo(0.7 / 0.72, 5);
+    // Input: inputTokensPerHour = 200 * 3600 = 720,000
+    expect(point.inputTokensPerDollarH!.y).toBeCloseTo(720_000 / 2.8, 5);
+    expect(point.inputTokensPerDollarN!.y).toBeCloseTo(720_000 / 1.4, 5);
+    expect(point.inputTokensPerDollarR!.y).toBeCloseTo(720_000 / 0.7, 5);
   });
 });
 
@@ -2400,7 +2403,7 @@ describe('metricTitle', () => {
     y: 'tput_per_gpu',
     y_tpPerGpu_title: 'Token Throughput per GPU',
     y_tpPerGpu_titleZh: '每 GPU token 吞吐量',
-    y_costh_title: 'Cost per Million Total Tokens (Owning - Hyperscaler)',
+    y_tokensPerDollarH_title: 'Total Tokens per $1 (Owning - Hyperscaler)',
   } as ChartDefinition;
 
   it('returns English title for locale en', () => {
@@ -2412,8 +2415,8 @@ describe('metricTitle', () => {
   });
 
   it('falls back to English when Zh field is missing', () => {
-    expect(metricTitle(chartDef, 'y_costh', 'zh')).toBe(
-      'Cost per Million Total Tokens (Owning - Hyperscaler)',
+    expect(metricTitle(chartDef, 'y_tokensPerDollarH', 'zh')).toBe(
+      'Total Tokens per $1 (Owning - Hyperscaler)',
     );
   });
 
@@ -2431,7 +2434,7 @@ describe('metricLabel', () => {
     y: 'tput_per_gpu',
     y_tpPerGpu_label: 'Token Throughput per GPU (tok/s/gpu)',
     y_tpPerGpu_labelZh: '每 GPU token 吞吐量（tok/s/gpu）',
-    y_costh_label: 'Cost per Million Total Tokens ($)',
+    y_tokensPerDollarH_label: 'Total Tokens per $1 (tok/$)',
   } as ChartDefinition;
 
   it('returns English label for locale en', () => {
@@ -2443,7 +2446,7 @@ describe('metricLabel', () => {
   });
 
   it('falls back to English when Zh field is missing', () => {
-    expect(metricLabel(chartDef, 'y_costh', 'zh')).toBe('Cost per Million Total Tokens ($)');
+    expect(metricLabel(chartDef, 'y_tokensPerDollarH', 'zh')).toBe('Total Tokens per $1 (tok/$)');
   });
 
   it('returns empty string for unknown metric', () => {

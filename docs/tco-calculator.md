@@ -141,6 +141,14 @@ at every interpolated point.
 compare interpolation models on a fixed snapshot, but they must not be presented
 as permanent impact figures for the changing live dataset.
 
+The `/inference` page also exposes tokens-per-dollar as separate Y-axis metrics;
+it does not replace the cost-per-million metrics. Historical trends for these
+purchasing-power metrics select Pareto knots from the matching total, output, or
+input throughput, spline that throughput, and apply the constant
+`3600 / $/GPU-hr` multiplier. Reusing the matching throughput frontier is
+essential: total-throughput knots are not necessarily the output- or
+input-throughput Pareto knots.
+
 ### The consistency guard
 
 `recoverReciprocalNumerator` returns the constant only if **every** usable point

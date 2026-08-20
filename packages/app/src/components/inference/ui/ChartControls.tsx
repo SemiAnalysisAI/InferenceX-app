@@ -36,7 +36,7 @@ const STRINGS = {
   en: {
     yAxisMetric: 'Y-Axis Metric',
     yAxisMetricTooltip:
-      "The performance metric displayed on the chart's Y-axis. Options include throughput (tokens/sec), cost per million tokens, and custom user-defined values.",
+      "The performance metric displayed on the chart's Y-axis. Options include throughput, cost per million tokens, tokens per $1, and custom user-defined values.",
     xAxisMetric: 'X-Axis Metric',
     xAxisMetricTooltip:
       "The latency metric displayed on the chart's X-axis: P90 Time To First Token.",
@@ -69,7 +69,7 @@ const STRINGS = {
   zh: {
     yAxisMetric: 'Y 轴指标',
     yAxisMetricTooltip:
-      '图表 Y 轴显示的性能指标。包括吞吐量（token/秒）、每百万 token 成本以及自定义用户值。',
+      '图表 Y 轴显示的性能指标，包括吞吐量、每百万 token 成本、每 1 美元可购买的 token 数以及自定义用户值。',
     xAxisMetric: 'X 轴指标',
     xAxisMetricTooltip: '图表 X 轴显示的延迟指标：P90 Time To First Token。',
     xAxisScale: 'X 轴刻度',
@@ -127,6 +127,21 @@ const METRIC_GROUPS: {
     ],
   },
   {
+    label: 'Total Tokens per $1',
+    labelZh: '每 1 美元可购买的总 token 数',
+    metrics: ['y_tokensPerDollarH', 'y_tokensPerDollarN', 'y_tokensPerDollarR'],
+  },
+  {
+    label: 'Output Tokens per $1',
+    labelZh: '每 1 美元可购买的输出 token 数',
+    metrics: ['y_outputTokensPerDollarH', 'y_outputTokensPerDollarN', 'y_outputTokensPerDollarR'],
+  },
+  {
+    label: 'Input Tokens per $1',
+    labelZh: '每 1 美元可购买的输入 token 数',
+    metrics: ['y_inputTokensPerDollarH', 'y_inputTokensPerDollarN', 'y_inputTokensPerDollarR'],
+  },
+  {
     label: 'Cost per Million Total Tokens',
     labelZh: '每百万总 token 成本',
     metrics: ['y_costh', 'y_costn', 'y_costr'],
@@ -161,7 +176,11 @@ const METRIC_GROUPS: {
       'y_measuredPowerPercentTdp',
     ],
   },
-  { label: 'Custom User Values', labelZh: '自定义值', metrics: ['y_costUser', 'y_powerUser'] },
+  {
+    label: 'Custom User Values',
+    labelZh: '自定义值',
+    metrics: ['y_tokensPerDollarUser', 'y_costUser', 'y_powerUser'],
+  },
 ];
 
 /** Map from metric key → human-readable title (e.g. "Token Throughput per GPU") */

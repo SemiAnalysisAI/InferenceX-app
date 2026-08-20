@@ -61,7 +61,8 @@ Returns `{ chartData: InferenceData[][], hardwareConfig: HardwareConfig }`.
 
 - `tpPerGpu`, `outputTputPerGpu`, `inputTputPerGpu` — raw throughput from the entry (tok/s/gpu).
 - `tpPerMw` — `(tputPerGpu * 1000) / hardwarePower` (GPU power in kW, result in tok/s/MW).
-- Cost fields — GPU hourly cost divided by tokens-per-hour (in millions): `costh` / `costn` / `costr` for hyperscaler / neocloud / 3-year-rental pricing respectively. Three token variants exist: combined (`costh`/`costn`/`costr`), output-only (`costhOutput`/`costnOutput`/`costrOutput`), input-only (`costhi`/`costni`/`costri`).
+- Cost-per-million fields — GPU hourly cost divided by tokens-per-hour (in millions): `costh` / `costn` / `costr` for hyperscaler / neocloud / 3-year-rental pricing respectively. Three token variants exist: combined (`costh`/`costn`/`costr`), output-only (`costhOutput`/`costnOutput`/`costrOutput`), and input-only (`costhi`/`costni`/`costri`).
+- Tokens-per-dollar fields — tokens-per-hour divided by the same hourly costs. They are separate Y-axis metrics rather than a display toggle: combined (`tokensPerDollarH`/`N`/`R`), output-only (`outputTokensPerDollarH`/`N`/`R`), and input-only (`inputTokensPerDollarH`/`N`/`R`). This keeps existing `i_metric=y_cost*` links and cost semantics unchanged.
 - Energy fields — `jTotal` / `jOutput` / `jInput`: `(hardwarePower * 1000) / tputPerGpu` (Joules per token, where power in kW is converted to W).
 
 **GPU specs lookup** — `createChartDataPoint` calls `getGpuSpecs(hwKey)` (`lib/constants.ts`) which splits on `[-_]` to extract the base GPU token (e.g. `"b200_trt_mtp"` → `"b200"`) and looks it up in `HW_REGISTRY`. `HW_REGISTRY` stores power (kW per GPU) and three cost tiers ($ per GPU-hour). Missing keys return zeroed specs, which produces `0` cost/energy values rather than crashing.
@@ -78,7 +79,7 @@ The hook runs a 5-step memoized pipeline:
 
 4. **Sort `hardwareConfig`** — the `HardwareConfig` object is sorted by `getModelSortIndex` and stabilized with a ref: if the sorted key string matches the previous render, the same object reference is returned. This prevents D3 Effect 2 (data bind) from firing when a sequence change returns the same GPU set.
 
-5. **Build renderable graphs** — `stableChartDefinitions` is computed in a separate `useMemo` that depends only on metric/axis selections (not on data). This decouples Y-axis changes from data changes so D3 Effect 3 (metric repositioning) does not fire alongside Effect 2 (data bind). Within this memo, the x-axis field is resolved per chart type, roofline directions are flipped when the x-axis polarity reverses (e.g. interactivity → TTFT), and Y-axis labels are looked up. The final `graphs` memo applies GPU filtering, cost-limit clamping, optional user-cost/user-power overrides, and remaps each point's `x`/`y` from the selected metric's `{ y, roof }` object.
+5. **Build renderable graphs** — `stableChartDefinitions` is computed in a separate `useMemo` that depends only on metric/axis selections (not on data). This decouples Y-axis changes from data changes so D3 Effect 3 (metric repositioning) does not fire alongside Effect 2 (data bind). Within this memo, the x-axis field is resolved per chart type, roofline directions are flipped when the x-axis polarity reverses (e.g. interactivity → TTFT), and Y-axis labels are looked up. The final `graphs` memo applies GPU filtering, cost-limit clipping, optional user-cost/user-power overrides, and remaps each point's `x`/`y` from the selected metric's `{ y, roof }` object.
 
 ---
 
@@ -124,4 +125,4 @@ Both charts share the same Y-axis options. The `y` field is the default `AggData
 
 **Input-metric x-axis override** — when the selected Y metric's title contains `"input"`, the interactivity chart switches its x-axis to `p99_ttft` (or the user-overridden x metric). This is detected in `stableChartDefinitions` via `metricTitle.toLowerCase().includes('input')`. The config encodes the default override fields: `y_inputTputPerGpu_x: "p99_ttft"` and `y_inputTputPerGpu_x_label`.
 
-**Limits** — both charts include `y_cost_limit: 5` (clamp cost-metric y-axis to $5/M tokens) and `y_latency_limit: 60` (filter x-axis outliers beyond 60s when TTFT is on x).
+**Limits** — both charts include `y_cost_limit: 5` (clip cost-per-million metrics above $5/M tokens) and `y_latency_limit: 60` (clip x-axis outliers beyond 60s when TTFT is on x). Tokens-per-dollar metrics are not cost-clipped; clipped cost points remain available to the dashed continuation layer.

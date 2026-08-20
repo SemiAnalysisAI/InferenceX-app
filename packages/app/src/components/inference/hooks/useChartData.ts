@@ -125,9 +125,9 @@ export function flipRooflineDirection(dir: RooflineDirection): RooflineDirection
  * Roofline corner for a trace-derived x-axis mode. Derived modes render on the
  * e2e chart definition, whose corners assume lower-x-is-better; when the
  * derived metric is higher-is-better (E2E Normalized Interactivity) the corner mirrors
- * horizontally. This keeps the y-metric's own good direction — throughput
- * lands on an upper corner, cost and joules on a lower one — where hardcoding
- * a single corner inverted the frontier for the cost metrics.
+ * horizontally. This keeps the y-metric's own good direction — throughput and
+ * tokens-per-dollar purchasing power land on an upper corner, while cost and
+ * joules land on a lower one.
  */
 export function derivedModeRoofline(
   configuredE2eCorner: RooflineDirection | undefined,
@@ -531,7 +531,10 @@ export function useChartData(
     if (chartData.length === 0) return [];
 
     let dataSource: InferenceData[][] = chartData;
-    if (selectedYAxisMetric === 'y_costUser' && userCosts) {
+    if (
+      (selectedYAxisMetric === 'y_costUser' || selectedYAxisMetric === 'y_tokensPerDollarUser') &&
+      userCosts
+    ) {
       dataSource = chartData.map((d) => calculateCostsForGpus(d, userCosts));
     }
     if (selectedYAxisMetric === 'y_powerUser' && userPowers) {

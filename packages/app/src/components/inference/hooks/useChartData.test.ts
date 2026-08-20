@@ -493,8 +493,7 @@ describe('derived higher-is-better x-axis rooflines', () => {
   // The E2E Normalized Interactivity mode renders on the e2e chart definition (lower-x-is-better)
   // but its x-axis is higher-is-better, like interactivity. ChartDisplay
   // therefore mirrors each configured e2e corner horizontally rather than
-  // hardcoding one corner — hardcoding `upper_left` inverted the frontier for
-  // cost and joules metrics, whose good direction is a LOWER corner.
+  // hardcoding one corner.
   it('mirroring the e2e corner reproduces the interactivity corner for every y-metric', () => {
     const defs = chartDefinitions as Record<string, unknown>[];
     const e2e = defs.find((d) => d.chartType === 'e2e')!;
@@ -512,12 +511,13 @@ describe('derived higher-is-better x-axis rooflines', () => {
     }
   });
 
-  it('covers the cost metrics Bugbot flagged, not just throughput', () => {
+  it('keeps purchasing power on an upper corner and cost/joules on lower corners', () => {
     const defs = chartDefinitions as Record<string, unknown>[];
     const e2e = defs.find((d) => d.chartType === 'e2e')!;
-    // Throughput wants an upper corner, cost a lower one — a single hardcoded
-    // corner cannot serve both.
     expect(derivedModeRoofline(e2e.y_tpPerGpu_roofline as 'upper_right', true)).toBe('upper_left');
+    expect(derivedModeRoofline(e2e.y_tokensPerDollarH_roofline as 'upper_right', true)).toBe(
+      'upper_left',
+    );
     expect(derivedModeRoofline(e2e.y_costh_roofline as 'lower_left', true)).toBe('lower_right');
     expect(derivedModeRoofline(e2e.y_jTotal_roofline as 'lower_left', true)).toBe('lower_right');
   });
@@ -525,6 +525,58 @@ describe('derived higher-is-better x-axis rooflines', () => {
   it('leaves the corner alone for a lower-is-better derived metric', () => {
     expect(derivedModeRoofline('upper_right', false)).toBe('upper_right');
     expect(derivedModeRoofline(undefined, true)).toBeUndefined();
+  });
+
+  it('defines every purchasing-power metric as a separate upper-is-better option', () => {
+    const defs = chartDefinitions as Record<string, unknown>[];
+    const interactivity = defs.find((d) => d.chartType === 'interactivity')!;
+    const e2e = defs.find((d) => d.chartType === 'e2e')!;
+    const metrics = [
+      'y_tokensPerDollarH',
+      'y_tokensPerDollarN',
+      'y_tokensPerDollarR',
+      'y_outputTokensPerDollarH',
+      'y_outputTokensPerDollarN',
+      'y_outputTokensPerDollarR',
+      'y_inputTokensPerDollarH',
+      'y_inputTokensPerDollarN',
+      'y_inputTokensPerDollarR',
+      'y_tokensPerDollarUser',
+    ];
+
+    for (const metric of metrics) {
+      expect(interactivity[`${metric}_title`]).toContain('per $1');
+      expect(interactivity[`${metric}_titleZh`]).toContain('每 1 美元');
+      expect(interactivity[`${metric}_roofline`]).toBe('upper_left');
+      expect(e2e[`${metric}_roofline`]).toBe('upper_right');
+    }
+    expect(interactivity.y_cost_limit).toBe(5);
+    expect(e2e.y_cost_limit).toBe(5);
+  });
+
+  it('preserves every existing cost-per-million metric as a separate lower-is-better option', () => {
+    const defs = chartDefinitions as Record<string, unknown>[];
+    const interactivity = defs.find((d) => d.chartType === 'interactivity')!;
+    const e2e = defs.find((d) => d.chartType === 'e2e')!;
+    const metrics = [
+      'y_costh',
+      'y_costn',
+      'y_costr',
+      'y_costhOutput',
+      'y_costnOutput',
+      'y_costrOutput',
+      'y_costhi',
+      'y_costni',
+      'y_costri',
+      'y_costUser',
+    ];
+
+    for (const metric of metrics) {
+      expect(interactivity[`${metric}_title`]).toContain('Cost per Million');
+      expect(interactivity[`${metric}_titleZh`]).toContain('每百万');
+      expect(interactivity[`${metric}_roofline`]).toBe('lower_right');
+      expect(e2e[`${metric}_roofline`]).toBe('lower_left');
+    }
   });
 });
 

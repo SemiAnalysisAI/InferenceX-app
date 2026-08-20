@@ -26,6 +26,7 @@ describe('Inference ChartControls', () => {
 
   it('renders the Y-axis metric selector', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
+    cy.get('[data-testid="cost-display-selector"]').should('not.exist');
   });
 
   it('Y-axis metric selector shows grouped options', () => {
@@ -81,6 +82,29 @@ describe('Inference ChartControls', () => {
     // The GPU Config label should be present (hideGpuComparison defaults to false)
     cy.contains('Chip Config').should('be.visible');
     cy.get('[data-testid="gpu-multiselect"]').should('be.visible');
+  });
+});
+
+describe('Inference ChartControls cost metrics', () => {
+  beforeEach(() => {
+    mountWithProviders(<InferenceChartControls />, {
+      inference: { selectedYAxisMetric: 'y_costh' },
+    });
+  });
+
+  it('shows cost per million and tokens per dollar as separate Y-axis options', () => {
+    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').should(
+      'exist',
+    );
+    cy.contains('[role="option"]', 'Total Tokens per $1 (Owning - Hyperscaler)').should('exist');
+    cy.get('[data-testid="cost-display-selector"]').should('not.exist');
+  });
+
+  it('selects tokens per dollar through the Y-axis metric control', () => {
+    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.contains('[role="option"]', 'Total Tokens per $1 (Owning - Hyperscaler)').click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarH');
   });
 });
 

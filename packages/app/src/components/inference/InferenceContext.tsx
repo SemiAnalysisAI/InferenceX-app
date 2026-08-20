@@ -55,7 +55,6 @@ import {
   type ExclusionConflictPolicy,
 } from '@/lib/exclusion';
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
-
 import {
   isAgenticOnlyXAxisMode,
   useChartData,
@@ -1193,7 +1192,9 @@ export function InferenceProvider({
   }, [allDateIds, setActiveDates]);
 
   useEffect(() => {
-    if (selectedYAxisMetric !== 'y_costUser') setUserCosts((prev) => (prev === null ? prev : null));
+    if (selectedYAxisMetric !== 'y_costUser' && selectedYAxisMetric !== 'y_tokensPerDollarUser') {
+      setUserCosts((prev) => (prev === null ? prev : null));
+    }
     if (selectedYAxisMetric !== 'y_powerUser')
       setUserPowers((prev) => (prev === null ? prev : null));
   }, [selectedModel, effectiveSequence, effectivePrecisions, selectedYAxisMetric]);

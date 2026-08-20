@@ -81,7 +81,7 @@ export function UnofficialChartDisplay() {
       const processedData =
         dataForChart.data.length > 0 && metricKey in dataForChart.data[0]
           ? dataForChart.data.map((d: InferenceData) => {
-              const yValue = (d[metricKey] as { y: number })?.y || d.y;
+              const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
               const roof = (d[metricKey] as { roof: boolean })?.roof ?? false;
 
               return {

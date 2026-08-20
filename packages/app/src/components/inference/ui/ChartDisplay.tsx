@@ -1007,7 +1007,8 @@ export default function ChartDisplay() {
         </Card>
       </section>
 
-      {selectedYAxisMetric === 'y_costUser' && (
+      {(selectedYAxisMetric === 'y_costUser' ||
+        selectedYAxisMetric === 'y_tokensPerDollarUser') && (
         <section>
           <CustomCosts loading={loading} />
         </section>
