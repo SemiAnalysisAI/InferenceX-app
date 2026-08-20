@@ -54,7 +54,7 @@ describe('getRequestTimeline', () => {
     await expect(getRequestTimeline(sql, 422991)).resolves.toEqual(timeline);
     expect(calls).toHaveLength(2);
     expect(calls[0]).toContain('pg_column_size');
-    expect(calls[1]).toContain('substring');
+    expect(calls[1]).toContain('substr(text');
     expect(calls[1]).not.toContain('profile_export_jsonl_gz as blob');
   });
 
