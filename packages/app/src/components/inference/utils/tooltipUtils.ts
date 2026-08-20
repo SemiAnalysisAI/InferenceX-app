@@ -38,6 +38,8 @@ export interface TooltipConfig {
    * call so we don't ship megabytes of profile JSONL just for this check).
    */
   hasTrace?: boolean;
+  /** Whether this official DB-backed point has a linked `server_logs` row. */
+  hasLog?: boolean;
   /** Page locale for tooltip metadata labels. Defaults to English. */
   locale?: Locale;
 }
@@ -230,19 +232,35 @@ const generateAgenticHTML = (d: InferenceData, locale: Locale): string => {
   return parts.join('');
 };
 
-/** "View charts" link — only visible when the tooltip is pinned and the
- *  point has stored trace data. Wired up by the scatter/GPU graph click handlers. */
-const viewChartsButtonHTML = (
-  isPinned: boolean,
-  hasTraceData: boolean,
-  pointId: number | undefined,
-): string => {
-  if (!isPinned || !hasTraceData || !isPersistedBenchmarkId(pointId)) return '';
-  return `<a data-action="view-charts" href="/inference/agentic/${pointId}" style="
-    display: block; margin-top: 8px; width: 100%; padding: 4px 8px; font-size: 11px; font-weight: 500;
+const ACTION_STRINGS = {
+  en: { charts: 'View charts', logs: 'View logs' },
+  zh: { charts: '查看图表', logs: '查看日志' },
+} as const;
+
+const pointDetailActionLink = (action: 'view-charts' | 'view-logs', href: string, label: string) =>
+  `<a data-action="${action}" href="${href}" style="
+    display: block; width: 100%; padding: 4px 8px; font-size: 11px; font-weight: 500;
     border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
     background: var(--accent); color: var(--accent-foreground); text-align: center; text-decoration: none;
-  ">View charts &rarr;</a>`;
+  ">${label} &rarr;</a>`;
+
+/** Point-detail links rendered only for persisted, pinned official points. */
+const viewActionsHTML = (
+  isPinned: boolean,
+  hasTraceData: boolean,
+  hasLogData: boolean,
+  pointId: number | undefined,
+  locale: Locale,
+): string => {
+  if (!isPinned || !isPersistedBenchmarkId(pointId) || (!hasTraceData && !hasLogData)) return '';
+  const prefix = locale === 'zh' ? '/zh' : '';
+  const baseHref = `${prefix}/inference/agentic/${pointId}`;
+  const t = ACTION_STRINGS[locale];
+  const actions = [
+    hasTraceData ? pointDetailActionLink('view-charts', baseHref, t.charts) : '',
+    hasLogData ? pointDetailActionLink('view-logs', `${baseHref}?view=logs`, t.logs) : '',
+  ].filter(Boolean);
+  return `<div style="display: grid; gap: 6px; margin-top: 8px;">${actions.join('')}</div>`;
 };
 
 const shortenSha = (image: string) =>
@@ -420,7 +438,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       ${generateCacheMetadataHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${runLinkHTML(runUrl)}
-      ${viewChartsButtonHTML(isPinned, Boolean(hasTrace), d.id)}
+      ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(config.hasLog), d.id, locale)}
     </div>
   `;
 };
@@ -491,6 +509,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
     hardwareConfig,
     runUrl,
     hasTrace,
+    hasLog,
   } = config;
   const locale = config.locale ?? 'en';
 
@@ -542,7 +561,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       ${generateCacheMetadataHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${runLinkHTML(runUrl)}
-      ${viewChartsButtonHTML(isPinned, Boolean(hasTrace), d.id)}
+      ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(hasLog), d.id, locale)}
     </div>
   `;
 };

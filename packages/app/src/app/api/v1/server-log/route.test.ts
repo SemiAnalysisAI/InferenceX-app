@@ -1,7 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const { mockGetServerLog, mockGetDb } = vi.hoisted(() => ({
+const { mockGetServerLog, mockGetServerLogChunk, mockGetDb } = vi.hoisted(() => ({
   mockGetServerLog: vi.fn(),
+  mockGetServerLogChunk: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
 }));
 
@@ -12,6 +13,7 @@ vi.mock('@semianalysisai/inferencex-db/connection', () => ({
 
 vi.mock('@semianalysisai/inferencex-db/queries/server-logs', () => ({
   getServerLog: mockGetServerLog,
+  getServerLogChunk: mockGetServerLogChunk,
 }));
 
 vi.mock('@/lib/api-cache', () => ({
@@ -70,6 +72,56 @@ describe('GET /api/v1/server-log', () => {
     const body = await res.json();
     expect(body).toEqual({ id: 42, serverLog: mockLog });
     expect(mockGetServerLog).toHaveBeenCalledWith('mock-sql', 42);
+  });
+
+  it('returns a bounded chunk when offset or limit is provided', async () => {
+    mockGetServerLogChunk.mockResolvedValueOnce({
+      serverLog: 'INFO ready\n',
+      offset: 65536,
+      nextOffset: 65547,
+    });
+
+    const res = await GET(req('/api/v1/server-log?id=42&offset=65536&limit=1024'));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      id: 42,
+      serverLog: 'INFO ready\n',
+      offset: 65536,
+      nextOffset: 65547,
+    });
+    expect(mockGetServerLogChunk).toHaveBeenCalledWith('mock-sql', 42, 65536, 1024);
+    expect(mockGetServerLog).not.toHaveBeenCalled();
+  });
+
+  it('uses bounded defaults when only one chunk parameter is provided', async () => {
+    mockGetServerLogChunk.mockResolvedValueOnce({
+      serverLog: 'start',
+      offset: 0,
+      nextOffset: null,
+    });
+
+    const res = await GET(req('/api/v1/server-log?id=42&offset=0'));
+    expect(res.status).toBe(200);
+    expect(mockGetServerLogChunk).toHaveBeenCalledWith('mock-sql', 42, 0, 64 * 1024);
+  });
+
+  it.each([
+    'offset=-1',
+    'offset=1.5',
+    'offset=2000000001',
+    'limit=0',
+    'limit=262145',
+    'limit=nope',
+  ])('returns 400 for invalid chunk parameter %s', async (query) => {
+    const res = await GET(req(`/api/v1/server-log?id=42&${query}`));
+    expect(res.status).toBe(400);
+    expect(mockGetServerLogChunk).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when a requested chunk has no linked log', async () => {
+    mockGetServerLogChunk.mockResolvedValueOnce(null);
+    const res = await GET(req('/api/v1/server-log?id=999&offset=0'));
+    expect(res.status).toBe(404);
   });
 
   it('returns 500 when query throws', async () => {

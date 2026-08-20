@@ -115,6 +115,47 @@ describe('Agentic point request metric time series', () => {
     cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
   });
 
+  it('opens the stored server log and loads it incrementally', () => {
+    cy.intercept('GET', '/api/v1/server-log*', (request) => {
+      const offset = Number(new URL(request.url).searchParams.get('offset') ?? 0);
+      request.reply({
+        body:
+          offset === 0
+            ? {
+                id: 206885,
+                serverLog: '\u001B[32mINFO\u001B[0m server ready\n',
+                offset: 0,
+                nextOffset: 31,
+              }
+            : {
+                id: 206885,
+                serverLog: 'INFO benchmark complete\n',
+                offset,
+                nextOffset: null,
+              },
+      });
+    }).as('serverLogChunk');
+    cy.get('[data-testid="detail-view-logs"]').click();
+    cy.location('search').should('contain', 'view=logs');
+    cy.wait('@serverLogChunk');
+
+    cy.get('[data-testid="agentic-server-log-viewer"]')
+      .should('contain.text', 'Server log')
+      .and('contain.text', 'Router and worker log files are not persisted separately yet.');
+    cy.get('[data-testid="server-log-content"]')
+      .should('contain.text', 'INFO server ready')
+      .and('not.contain.text', '\u001B[32m');
+
+    cy.get('[data-testid="load-more-server-log"]').click();
+    cy.wait('@serverLogChunk');
+    cy.get('[data-testid="server-log-content"]')
+      .should('contain.text', 'INFO server ready')
+      .and('contain.text', 'INFO benchmark complete');
+    cy.contains('End of stored log').should('be.visible');
+
+    cy.get('[data-testid="detail-view-point"]').click();
+  });
+
   it('renders rolling P90 interactivity and TTFT by default using profiling requests only', () => {
     cy.get('[data-testid="interactivity-over-time-chart"]').within(() => {
       cy.contains('h2', 'Interactivity over time').should('be.visible');
@@ -250,6 +291,28 @@ describe('Agentic point request metric time series', () => {
       cy.get('svg').should('contain.text', 'Cumulative average');
       cy.get('svg path[stroke="#ef4444"]').should('have.length', 1);
     });
+  });
+
+  it('renders the log viewer in Simplified Chinese', () => {
+    cy.intercept('GET', '/api/v1/trace-server-metrics*', { body: null });
+    cy.intercept('GET', '/api/v1/benchmark-siblings*', { body: benchmarkSiblings });
+    cy.intercept('GET', '/api/v1/server-log*', {
+      body: {
+        id: 206885,
+        serverLog: 'INFO server ready\n',
+        offset: 0,
+        nextOffset: null,
+      },
+    });
+    cy.visit('/zh/inference/agentic/206885?view=logs', { onBeforeLoad: unlockAgenticGate });
+
+    cy.get('[data-testid="detail-view-logs"]')
+      .should('have.attr', 'aria-selected', 'true')
+      .and('have.text', '日志');
+    cy.get('[data-testid="agentic-server-log-viewer"]')
+      .should('contain.text', '服务器日志')
+      .and('contain.text', '尚未分别持久化 router 和 worker 日志文件')
+      .and('contain.text', '已到达日志末尾');
   });
 });
 

@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import { useInference } from '@/components/inference/InferenceContext';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
+import { useLogAvailability } from '@/hooks/api/use-log-availability';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import {
@@ -1127,6 +1128,10 @@ const ScatterGraph = React.memo(
       return ids;
     }, [pointsData]);
     const { data: traceAvailability } = useTraceAvailability(agenticIds);
+    // Unofficial overlays intentionally do not participate: their temporary
+    // points have no benchmark_results id and their log artifacts are not
+    // persisted in this database.
+    const { data: logAvailability } = useLogAvailability(agenticIds);
 
     // --- Legend points table (per-series drill-down opened from the legend) ---
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
@@ -1480,6 +1485,7 @@ const ScatterGraph = React.memo(
             hardwareConfig,
             runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
             hasTrace: typeof d.id === 'number' ? traceAvailability?.[d.id] === true : false,
+            hasLog: typeof d.id === 'number' ? logAvailability?.[d.id] === true : false,
             locale,
           }),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
@@ -1512,6 +1518,17 @@ const ScatterGraph = React.memo(
               });
             });
           }
+          const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
+          if (logsBtn && typeof d.id === 'number') {
+            logsBtn.addEventListener('click', (btnEvent) => {
+              btnEvent.stopPropagation();
+              track('latency_view_logs_opened', {
+                id: d.id,
+                hwKey: String(d.hwKey),
+                conc: d.conc,
+              });
+            });
+          }
         },
         attachToLayer: 1, // scatter layer is index 1 (after rooflines at 0)
       }),
@@ -1525,6 +1542,7 @@ const ScatterGraph = React.memo(
         // tooltip content closure (the "View charts" button), so rebuild the
         // config when the presence fetch resolves.
         traceAvailability,
+        logAvailability,
         locale,
       ],
     );

@@ -46,6 +46,9 @@ vi.mock('@/components/unofficial-run-provider', () => ({
 vi.mock('@/hooks/api/use-trace-availability', () => ({
   useTraceAvailability: () => ({ data: undefined }),
 }));
+vi.mock('@/hooks/api/use-log-availability', () => ({
+  useLogAvailability: () => ({ data: undefined }),
+}));
 
 import ScatterGraph, { pointLabelText } from './ScatterGraph';
 

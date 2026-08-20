@@ -178,6 +178,36 @@ describe('generateTooltipContent', () => {
     expect(html).not.toContain('data-action="view-charts" target=');
   });
 
+  it('renders View logs only for pinned points with a stored server log', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ id: 7 }), isPinned: true, hasLog: true }),
+    );
+    expect(html).toContain('<a data-action="view-logs"');
+    expect(html).toContain('href="/inference/agentic/7?view=logs"');
+    expect(
+      generateTooltipContent(tooltipConfig({ data: pt({ id: 7 }), isPinned: false, hasLog: true })),
+    ).not.toContain('data-action="view-logs"');
+    expect(
+      generateTooltipContent(tooltipConfig({ data: pt({ id: 7 }), isPinned: true, hasLog: false })),
+    ).not.toContain('data-action="view-logs"');
+  });
+
+  it('localizes point-detail actions and their /zh routes', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({ id: 7 }),
+        isPinned: true,
+        hasTrace: true,
+        hasLog: true,
+        locale: 'zh',
+      }),
+    );
+    expect(html).toContain('查看图表');
+    expect(html).toContain('href="/zh/inference/agentic/7"');
+    expect(html).toContain('查看日志');
+    expect(html).toContain('href="/zh/inference/agentic/7?view=logs"');
+  });
+
   it('omits View charts when the point id is non-persisted (0 / NaN), even if pinned + hasTrace', () => {
     // Overlay agentic points arrive with id 0 / NaN — the button would otherwise
     // link to /inference/agentic/0, a doomed lookup.
@@ -190,6 +220,7 @@ describe('generateTooltipContent', () => {
         }),
       );
       expect(html).not.toContain('data-action="view-charts"');
+      expect(html).not.toContain('data-action="view-logs"');
     }
   });
 
