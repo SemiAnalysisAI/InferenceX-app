@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ArtifactMeta } from './github-artifacts.js';
-import { pairServerLogArtifacts } from './server-log-backfill.js';
+import { pairServerLogArtifacts, resolveServerLogResultCandidates } from './server-log-backfill.js';
 
 const artifact = (name: string, created_at = '2026-08-12T00:00:00Z'): ArtifactMeta => ({
   name,
@@ -46,5 +46,38 @@ describe('pairServerLogArtifacts', () => {
     ]);
     expect(pairs).toHaveLength(1);
     expect(pairs[0]?.serverLogs.name).toBe('multinode_server_logs_shared_pool_00');
+  });
+});
+
+describe('resolveServerLogResultCandidates', () => {
+  it('prefers exact offload-mode matches', () => {
+    expect(
+      resolveServerLogResultCandidates(
+        [
+          { id: 1, offloadMode: 'off' },
+          { id: 2, offloadMode: 'on' },
+        ],
+        'on',
+      ),
+    ).toEqual({ ids: [2], usedUniqueFallback: false });
+  });
+
+  it('accepts historical offload-label drift for one unique candidate', () => {
+    expect(resolveServerLogResultCandidates([{ id: 439874, offloadMode: 'on' }], 'off')).toEqual({
+      ids: [439874],
+      usedUniqueFallback: true,
+    });
+  });
+
+  it('rejects an ambiguous fallback', () => {
+    expect(
+      resolveServerLogResultCandidates(
+        [
+          { id: 1, offloadMode: 'on' },
+          { id: 2, offloadMode: 'auto' },
+        ],
+        'off',
+      ),
+    ).toEqual({ ids: [], usedUniqueFallback: false });
   });
 });

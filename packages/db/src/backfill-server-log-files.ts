@@ -25,7 +25,10 @@ import { createSkipTracker } from './etl/skip-tracker.js';
 import { downloadArtifact, listRunArtifacts } from './lib/github-artifacts.js';
 import { confirmProceed, parseLimitForceFlags, runBackfillMain } from './lib/backfill-runner.js';
 import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
-import { pairServerLogArtifacts } from './lib/server-log-backfill.js';
+import {
+  pairServerLogArtifacts,
+  resolveServerLogResultCandidates,
+} from './lib/server-log-backfill.js';
 
 const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const RETENTION_DAYS = 90;
@@ -79,8 +82,8 @@ async function findBenchmarkResultIds(
   const ids = new Set<number>();
   for (const row of rows) {
     const c = row.config;
-    const matches = await sql<{ id: number }[]>`
-      select br.id
+    const candidates = await sql<{ id: number; offload_mode: string }[]>`
+      select br.id, br.offload_mode
       from benchmark_results br
       join workflow_runs wr on wr.id = br.workflow_run_id
       join configs cfg on cfg.id = br.config_id
@@ -107,10 +110,22 @@ async function findBenchmarkResultIds(
         and br.isl is not distinct from ${row.isl}
         and br.osl is not distinct from ${row.osl}
         and br.conc = ${row.conc}
-        and br.offload_mode = ${row.offloadMode}
         and br.recipe_fingerprint is not distinct from ${row.recipeFingerprint}
     `;
-    for (const match of matches) ids.add(Number(match.id));
+    const resolution = resolveServerLogResultCandidates(
+      candidates.map((candidate) => ({
+        id: Number(candidate.id),
+        offloadMode: candidate.offload_mode,
+      })),
+      row.offloadMode,
+    );
+    if (resolution.usedUniqueFallback) {
+      console.warn(
+        `  [WARN] benchmark result ${resolution.ids[0]} uses a historical offload label; ` +
+          `matched uniquely without offload_mode`,
+      );
+    }
+    for (const id of resolution.ids) ids.add(id);
   }
   return [...ids];
 }
