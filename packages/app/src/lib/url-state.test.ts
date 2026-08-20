@@ -40,6 +40,15 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_seq).toBe('');
   });
 
+  it('strips i_metric against the same default the dashboard opens on', async () => {
+    // A share link omits any value equal to PARAM_DEFAULTS. If this drifted
+    // from DEFAULT_Y_AXIS_METRIC, a link captured on the *other* metric would
+    // be written without `i_metric` and reopen on the dashboard default.
+    const { PARAM_DEFAULTS, DEFAULT_Y_AXIS_METRIC } = await import('@/lib/url-state');
+    expect(PARAM_DEFAULTS.i_metric).toBe(DEFAULT_Y_AXIS_METRIC);
+    expect(DEFAULT_Y_AXIS_METRIC).toBe('y_tokensPerDollarH');
+  });
+
   it('has expected default for r_range', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.r_range).toBe('last-3-months');

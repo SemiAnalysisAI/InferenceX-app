@@ -39,6 +39,7 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
+import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
@@ -79,13 +80,6 @@ import {
 
 /** @internal Exported for test provider wrapping only. */
 export const InferenceContext = createContext<InferenceChartContextType | undefined>(undefined);
-
-/**
- * Dashboard default y-axis: total tokens purchasable per $1 USD at owning
- * hyperscaler TCO, so the dashboard leads with the economics rather than raw
- * throughput. `?i_metric=` still wins, so existing shared links are unaffected.
- */
-export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarH';
 
 export function InferenceProvider({
   children,

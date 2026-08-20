@@ -35,7 +35,7 @@ describe('Tokens per currency and agentic controls', () => {
     cy.visit('/inference');
     cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
     cy.get('[role="option"]')
-      .contains('Total Tokens per ¥1 (Owning - Hyperscaler)')
+      .contains('Total Tokens per ¥1 RMB (Owning - Hyperscaler)')
       .click({ force: true });
     cy.get('[data-testid="scatter-graph"]')
       .first()
