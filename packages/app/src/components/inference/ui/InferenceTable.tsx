@@ -88,20 +88,6 @@ export default function InferenceTable({
         sortValue: (row) => row.tput_per_gpu ?? 0,
         className: 'tabular-nums',
       },
-      {
-        header: 'Median TTFT (ms)',
-        align: 'right',
-        cell: (row) => fmt((row.median_ttft ?? 0) * 1000, 0),
-        sortValue: (row) => row.median_ttft ?? 0,
-        className: 'tabular-nums',
-      },
-      {
-        header: 'Median Interactivity (tok/s)',
-        align: 'right',
-        cell: (row) => fmt(row.median_intvty ?? 0, 1),
-        sortValue: (row) => row.median_intvty ?? 0,
-        className: 'tabular-nums',
-      },
     ],
     [yPath, yLabel, xLabel],
   );

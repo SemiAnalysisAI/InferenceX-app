@@ -625,6 +625,47 @@ describe('Overview page', () => {
       });
   });
 
+  it('keeps a benchmark result usable without comparison dates', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN)
+      .find(
+        '[data-testid="overview-pair-value"][data-hardware="mi355x"] [data-testid="overview-cost-evidence-link"]',
+      )
+      .then(($link) => {
+        const href = String($link.attr('href'));
+        expect(href).not.to.contain('i_dates=');
+        cy.visit(href);
+
+        cy.contains('Comparison Date Range').should('be.visible');
+        cy.contains('button', 'Select date range')
+          .should('not.have.class', 'animate-pulse')
+          .and('not.have.class', 'border-red-500');
+        cy.get('[data-testid="scatter-graph"]')
+          .should('be.visible')
+          .find('svg .dot-group')
+          .should('have.length.greaterThan', 0);
+        cy.contains('Select a date range or add a run to view chip comparison').should('not.exist');
+      });
+  });
+
+  it('does not require comparison dates when opening AgentX details', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+
+    desktopModel('Qwen-3.5-397B-A17B', AGENTX)
+      .contains('a', 'View details')
+      .then(($link) => {
+        const href = String($link.attr('href'));
+        expect(href).to.contain('i_seq=agentic-traces');
+        expect(href).not.to.contain('i_dates=');
+        cy.visit(href);
+
+        cy.contains('Comparison Date Range').should('not.exist');
+      });
+  });
+
   it('keeps the historical comparison complete and non-scrolling across desktop, tablet and phone', () => {
     for (const width of [320, 390, 768, 1024, 1279, 1280, 1440]) {
       cy.viewport(width, 900);

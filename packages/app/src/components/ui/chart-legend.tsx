@@ -133,7 +133,7 @@ export default function ChartLegend({
   const locale = useLocale();
   const t = STRINGS[locale];
   const isSidebar = variant === 'sidebar';
-  const [hasLongText, setHasLongText] = useState(false);
+  const hasLongText = legendItems.some((item) => item.label && item.label.length > 8);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -151,10 +151,6 @@ export default function ChartLegend({
   const effectiveRemove = onItemRemove && activeCount > 1 ? onItemRemove : undefined;
   const removeFor = (item: CommonLegendItemProps) =>
     item.isRemovable === false ? undefined : effectiveRemove;
-
-  useLayoutEffect(() => {
-    setHasLongText(legendItems.some((item) => item.label && item.label.length > 8));
-  }, [legendItems]);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;

@@ -2,6 +2,7 @@ import { Card } from '@/components/ui/card';
 
 import { AgentXMethodologyLink } from './agentx-methodology-link';
 import { AgentXOptimizationsCallout } from './agentx-optimizations-callout';
+import { AgentXTelemetryCallout } from './agentx-telemetry-callout';
 
 type Locale = 'en' | 'zh';
 
@@ -184,7 +185,7 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
         <h1 className="text-xl font-semibold text-foreground">{t.title}</h1>
         <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">{t.intro}</p>
         <AgentXMethodologyLink
-          href={locale === 'zh' ? '/zh/overview' : '/overview'}
+          href={locale === 'zh' ? '/zh/inference' : '/inference'}
           analyticsEvent="agentx_results_opened"
           analyticsTarget="methodology-header"
           data-testid="agentx-results-cta"
@@ -196,6 +197,8 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
 
       <div className="space-y-8 px-5 py-6 sm:px-6">
         <AgentXOptimizationsCallout locale={locale} />
+
+        <AgentXTelemetryCallout locale={locale} />
 
         <section aria-labelledby="agentx-process-title">
           <h2 id="agentx-process-title" className="mb-3 text-base font-semibold text-foreground">

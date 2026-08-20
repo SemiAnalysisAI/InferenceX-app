@@ -1,6 +1,7 @@
 import { ArrowRight, BarChart3, ShieldCheck, Sparkles } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
+import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { IntroSection } from '@/components/intro-section';
 import { LandingPageAnalytics, LandingTrackedLink } from '@/components/landing/landing-analytics';
 import { CuratedViewCard } from '@/components/landing/curated-view-card';
@@ -67,6 +68,13 @@ const STRINGS = {
   },
 } as const;
 
+/**
+ * Quick Comparisons is hidden for now. The card, its `quickComparisons*`
+ * strings, `CuratedViewCard`, and `FAVORITE_PRESETS` are all left in place —
+ * flip this to `true` to bring the section back.
+ */
+const SHOW_QUICK_COMPARISONS = false;
+
 export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
   const t = STRINGS[locale];
   // Internal links stay within the current language tree.
@@ -76,6 +84,12 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
       <LandingPageAnalytics />
       <NudgeEngine scope="landing" />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
+        {/* Same AgentX hero that leads /compare, above the quote carousel. The
+            landing page owns no h1 of its own, but keep this an h2 so the hero
+            stays a section within the page rather than retitling the whole
+            site. */}
+        <AgentXCompareHero locale={locale} headingLevel="h2" surface="landing" />
+
         <IntroSection locale={locale} />
 
         {/* Split: exploration entry points vs presets */}
@@ -167,19 +181,21 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
             </div>
           </Card>
 
-          {/* Right - Curated Presets */}
-          <Card>
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="size-5 shrink-0 text-brand" />
-              <h2 className="text-lg font-semibold">{t.quickComparisons}</h2>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">{t.quickComparisonsDesc}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {FAVORITE_PRESETS.filter((preset) => !preset.hidden).map((preset) => (
-                <CuratedViewCard key={preset.id} preset={preset} />
-              ))}
-            </div>
-          </Card>
+          {/* Right - Curated Presets (temporarily hidden, see SHOW_QUICK_COMPARISONS) */}
+          {SHOW_QUICK_COMPARISONS && (
+            <Card data-testid="landing-quick-comparisons">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="size-5 shrink-0 text-brand" />
+                <h2 className="text-lg font-semibold">{t.quickComparisons}</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">{t.quickComparisonsDesc}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {FAVORITE_PRESETS.filter((preset) => !preset.hidden).map((preset) => (
+                  <CuratedViewCard key={preset.id} preset={preset} />
+                ))}
+              </div>
+            </Card>
+          )}
         </section>
       </div>
     </main>

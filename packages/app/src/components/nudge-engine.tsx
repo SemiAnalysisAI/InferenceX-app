@@ -15,7 +15,7 @@ import {
 } from '@/lib/nudges/persistence';
 import { dismissesOnAction } from '@/lib/nudges/policy';
 import { NUDGE_REGISTRY } from '@/lib/nudges/registry';
-import type { NudgeDefinition, NudgeTrigger } from '@/lib/nudges/types';
+import type { NudgeDefinition, NudgeScope, NudgeTrigger } from '@/lib/nudges/types';
 import { LANDING_BANNER_DISMISSED_ATTRIBUTE } from '@/lib/nudges/landing-banner';
 import { BottomToast } from '@/components/ui/bottom-toast';
 import { Button } from '@/components/ui/button';
@@ -43,7 +43,7 @@ function isEligible(def: NudgeDefinition): boolean {
 // ---------------------------------------------------------------------------
 
 interface NudgeEngineProps {
-  scope: 'dashboard' | 'landing' | 'evaluation';
+  scope: NudgeScope;
 }
 
 /**

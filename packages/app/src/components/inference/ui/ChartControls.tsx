@@ -28,7 +28,6 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import type { ChartDefinition, DeploymentMode, SpecMode } from '@/components/inference/types';
-import { resolveComparisonEntries } from '@/components/inference/utils/comparisonEntry';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
@@ -263,7 +262,6 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     selectedGPUs,
     setSelectedGPUs,
     availableGPUs,
-    selectedDates,
     selectedDateRange,
     setSelectedDateRange,
     dateRangeAvailableDates,
@@ -638,14 +636,6 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                 placeholder={t.dateRangePlaceholder}
                 availableDates={dateRangeAvailableDates}
                 isCheckingAvailableDates={isCheckingAvailableDates}
-                className={
-                  // Note (wenyao): a pinned run (`date~rID`) can only reach the chart through
-                  // selectedDates, never through a range, so demanding a range here raises a
-                  // false alarm on comparisons that are already complete.
-                  resolveComparisonEntries(selectedDates, selectedDateRange).length === 0
-                    ? 'border-red-500 ring-4 ring-red-500/40 animate-pulse'
-                    : ''
-                }
               />
             </div>
           )}

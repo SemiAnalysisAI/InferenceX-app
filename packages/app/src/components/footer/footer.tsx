@@ -23,7 +23,8 @@ const STRINGS = {
     cookiePolicy: 'Cookie Policy',
     contribute: 'Contribute',
     benchmarks: 'Benchmarks',
-    frontend: 'Frontend',
+    agentxHarness: 'AgentX Harness',
+    visualization: 'Visualization',
     more: 'More',
     supporters: 'Supporters',
     agentx: 'AgentX',
@@ -51,7 +52,8 @@ const STRINGS = {
     cookiePolicy: 'Cookie 政策',
     contribute: '参与贡献',
     benchmarks: '基准测试仓库',
-    frontend: '前端仓库',
+    agentxHarness: 'AgentX 框架仓库',
+    visualization: '可视化仓库',
     more: '更多',
     supporters: '支持者',
     agentx: 'AgentX',
@@ -177,13 +179,22 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 {t.benchmarks}
               </a>
               <a
-                data-testid="footer-link-frontend"
+                data-testid="footer-link-agentx-harness"
+                href="https://github.com/SemiAnalysisAI/agentx-harness"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.agentxHarness}
+              </a>
+              <a
+                data-testid="footer-link-visualization"
                 href="https://github.com/SemiAnalysisAI/InferenceX-app"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                {t.frontend}
+                {t.visualization}
               </a>
             </div>
             <div data-testid="footer-links-more" className="flex flex-col gap-2.5">

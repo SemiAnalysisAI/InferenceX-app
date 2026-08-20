@@ -1,0 +1,134 @@
+---
+title: 'Agentic 工作负载简述'
+subtitle: '多轮会话、长上下文与近乎完全的 prefix 复用，让 agentic 推理成为一个系统问题，也改变了基准测试需要测量的内容'
+seoDescription: 'Agentic 工作负载的四个特征：多轮会话、长上下文、高 prefix 复用与突发式 subagent 扇出，以及为什么对其做基准测试是一个系统问题。'
+date: '2026-08-19'
+publishDate: '2026-08-19'
+tags:
+  - agentic
+  - agents
+  - agentx
+  - benchmark
+  - inference
+---
+
+概括来说，[agentic 工作负载](/zh/glossary/agentic-coding-workload)有四个特征：
+
+- **多轮。** 一次会话包含几十到几百次用户与助手交互，而 chatbot 场景通常只有寥寥数轮。
+- **长上下文。** system prompt、tool 定义，再加上轮次本身的数量，上下文会迅速累积。
+- **高 [prefix 复用](/zh/glossary/prefix-caching)。** 对话呈线性推进，第 _n-1_ 轮的输出会拼接进第 _n_ 轮的输入，因此大部分上下文可以直接由 [KV cache](/zh/glossary/kv-cache) 提供，而无需重新计算——具体比例取决于可用于存放 KV tensor 的存储容量。随着 _n_ 增大，命中 cache 的输入与未命中输入之比会趋近于 1。
+- **突发式 [subagent](/zh/glossary/subagent) 扇出。** 一轮可能同时启动多个短生命周期的 subagent，由此产生尖峰式的 KV cache 分配与淘汰模式。
+
+<Figure
+  src="/images/brief-overview-of-agentic-workloads/context-accumulation.png"
+  alt="四轮 agentic 会话的上下文累积示意图：每一轮的输入都包含上一轮的完整输入及其输出，其中共享部分被标记为来自上一轮的 cache"
+  caption="四轮 agentic 会话中的上下文累积。高亮部分均由 cache 提供，只有最新的输出与 tool 结果未命中 cache。"
+/>
+
+## Agentic 推理是一个系统问题
+
+考虑到上述特征，对这类工作负载做基准测试，与现有的固定序列长度基准测试有本质区别。
+
+由于 prefix 复用比例极高，KV tensor 必须在节点与 rank 之间高效传输，这正是 NIXL、MORI-IO 和 [Mooncake](/zh/agentx/optimizations/mooncake) 这类传输层要解决的问题。随后还需要把不同对话路由到其 prefix 所在的节点或 rank，以最大化 cache 命中率，llm-d、[Dynamo](/zh/agentx/optimizations/dynamo) 以及 vLLM 与 SGLang 的 router 承担的就是这项工作。长上下文对话会给 KV cache 的 HBM 容量带来压力，迫使 KV tensor 卸载到 DRAM、SSD 等更慢的存储层级，而这一过程同样需要高效实现——Mooncake Store、[LMCache](/zh/agentx/optimizations/lmcache)、vLLM 的 CPU offloading 与 SGLang HiCache 都在攻克这一层。
+
+与之相对的是固定序列长度的单轮工作负载：prefix 复用在其中并不相关，推理性能主要反映芯片与 kernel 的基础表现。这并不意味着 InferenceX 上大量的固定序列长度数据不重要。剥离 agentic 推理服务的复杂性之后，这些数据能清晰呈现底层推理优化的进展，也构成了解读 AgentX 结果时所依据的基线。
+
+## 构建真实的回放语料
+
+为了让 AgentX 的工作负载尽可能贴近真实场景，我们收集了 393 条 SemiAnalysis 内部的 Claude Code trace 用于回放。为在匿名化内容的同时保留原始的 prefix 复用模式，我们采用了与 [Qwen-Bailian](https://github.com/alibaba-edu/qwen-bailian-usagetraces-anon) 类似的方法——后者是最早公开的生产环境 trace 语料之一。随后我们使用 [AIPerf](https://github.com/ai-dynamo/aiperf) 按照原始的请求时间表，在不同并发客户端数量下重建这些 trace。
+
+重建 subagent 结构需要 Claude Code 本身做出改动。我们与 Anthropic 合作推动了两项功能落地，它们都为出站请求补充了 agent 实例身份信息，使并行分支能在 proxy 层被区分开：
+
+- [anthropics/claude-code #49207](https://github.com/anthropics/claude-code/issues/49207) —— 在 API 请求 header 中加入 agent 实例 ID（`x-claude-code-agent-id`）及其父级 ID（`x-claude-code-parent-agent-id`），让交错的 subagent 请求可被归因，而不是坍缩成单一的会话级流量。
+- [anthropics/claude-code #66761](https://github.com/anthropics/claude-code/issues/66761) —— 把同样的 header 扩展到由 `Workflow` tool 扇出产生的 subagent，此前这些请求只携带父级对话的 session ID。
+
+缺少这些 header，一个扇出 N 个并发 subagent 的会话就与 N 个互不相关的对话无法区分，塑造[回放图](/zh/glossary/trace-replay)的 spawn 与 join 依赖关系也就无从还原。
+
+完整的数据集规则、分布图与来源链接发布在 [AgentX 方法论](/zh/agentx/methodology)页面；该工作负载已经暴露出的具体引擎改进，则记录在 [AgentX 优化追踪页](/zh/agentx/optimizations)。
+
+## 致谢
+
+感谢 Anthropic 团队在 Claude Code 中落地 agent 身份标识 header，也感谢 Qwen-Bailian 与 AIPerf 背后的阿里巴巴与 NVIDIA 团队——AgentX 的回放流水线正建立在他们的工作之上。
+
+<DashboardCTA href="/zh/inference?i_seq=agentic-traces">对比实时 AgentX 推理结果 →</DashboardCTA>
+
+## 常见问题
+
+### 什么是 agentic 工作负载？
+
+Agentic 工作负载指由 AI agent 而非真人在对话框中输入所产生的推理流量。它的特征是几十到几百轮交互的多轮会话、由 system prompt 与 tool 定义堆叠出的长上下文、跨轮次极高的 prefix 复用，以及成批出现的短生命周期 subagent。
+
+### 为什么 prefix 复用对 agentic 推理如此关键？
+
+每一轮的输入都包含上一轮的输入加上其输出，因此绝大部分上下文此前已经处理过。只要该 prefix 的 KV tensor 仍然驻留，prefill 工作就可以跳过。随着会话增长，命中 cache 的输入与未命中输入之比会趋近于 1，于是 cache 容量与命中率主导了推理服务的成本。
+
+### 对 agentic 工作负载做基准测试，与固定序列长度基准测试有何不同？
+
+固定序列长度基准测试发送 input 与 output 长度固定的独立请求，prefix 复用不构成变量，结果主要反映芯片与 kernel 性能。Agentic 基准测试回放的是彼此依赖的会话，其中上下文不断增长、prefix 被共享、subagent 会扇出，因此 KV 传输、prefix 感知路由与 cache 分层卸载都成为被测量的对象。
+
+### 突发式 subagent 扇出会对 KV cache 造成什么影响？
+
+单轮可能一次性拉起多个 subagent，每个都要分配自己的 KV cache，短暂运行后结束，因此 cache 压力以尖峰而非稳态形式到来。面向均匀请求流调优的调度器与淘汰策略，在这种模式下的表现会明显不同。
+
+### AgentX 的回放语料是如何构建的？
+
+我们收集了 393 条 SemiAnalysis 内部的 Claude Code trace，采用与 Qwen-Bailian 类似的分块哈希方法完成匿名化，在不保留内容的前提下保留 prefix 关系。随后由 AIPerf 按原始请求时间表，在不同并发客户端数量下重建这些 trace。
+
+### 固定序列长度基准测试还有意义吗？
+
+有。固定序列长度结果剥离了 agentic 推理服务的复杂性，单独呈现底层芯片与 kernel 性能，因而是解读 AgentX 结果时所依据的基线。
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "什么是 agentic 工作负载？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Agentic 工作负载指由 AI agent 而非真人在对话框中输入所产生的推理流量。它的特征是几十到几百轮交互的多轮会话、由 system prompt 与 tool 定义堆叠出的长上下文、跨轮次极高的 prefix 复用，以及成批出现的短生命周期 subagent。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "为什么 prefix 复用对 agentic 推理如此关键？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "每一轮的输入都包含上一轮的输入加上其输出，因此绝大部分上下文此前已经处理过。只要该 prefix 的 KV tensor 仍然驻留，prefill 工作就可以跳过。随着会话增长，命中 cache 的输入与未命中输入之比会趋近于 1，于是 cache 容量与命中率主导了推理服务的成本。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "对 agentic 工作负载做基准测试，与固定序列长度基准测试有何不同？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "固定序列长度基准测试发送 input 与 output 长度固定的独立请求，prefix 复用不构成变量，结果主要反映芯片与 kernel 性能。Agentic 基准测试回放的是彼此依赖的会话，其中上下文不断增长、prefix 被共享、subagent 会扇出，因此 KV 传输、prefix 感知路由与 cache 分层卸载都成为被测量的对象。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "突发式 subagent 扇出会对 KV cache 造成什么影响？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "单轮可能一次性拉起多个 subagent，每个都要分配自己的 KV cache，短暂运行后结束，因此 cache 压力以尖峰而非稳态形式到来。面向均匀请求流调优的调度器与淘汰策略，在这种模式下的表现会明显不同。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "AgentX 的回放语料是如何构建的？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "我们收集了 393 条 SemiAnalysis 内部的 Claude Code trace，采用与 Qwen-Bailian 类似的分块哈希方法完成匿名化，在不保留内容的前提下保留 prefix 关系。随后由 AIPerf 按原始请求时间表，在不同并发客户端数量下重建这些 trace。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "固定序列长度基准测试还有意义吗？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "有。固定序列长度结果剥离了 agentic 推理服务的复杂性，单独呈现底层芯片与 kernel 性能，因而是解读 AgentX 结果时所依据的基线。"
+      }
+    }
+  ]
+}`}</JsonLd>

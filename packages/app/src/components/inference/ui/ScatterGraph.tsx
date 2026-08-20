@@ -398,16 +398,19 @@ const parseHwKeyToLabel = (hwKey: string, model?: string): { name: string; label
 };
 
 // Line-label text for a curve. When more than one precision is shown, each curve
-// is its own line, so append the precision (e.g. "B200 (vLLM) FP8") to keep the
-// FP4 and FP8 curves of the same hardware distinguishable.
+// is its own line, so place the precision between the GPU and engine (e.g.
+// "B200 FP8 (vLLM)") to keep the primary identifiers together.
 const lineLabelText = (
   hwKey: string,
   precision: string,
   includePrecision: boolean,
   model?: string,
 ): string => {
-  const base = parseHwKeyToLabel(hwKey, model).label;
-  return includePrecision ? `${base} ${getPrecisionLabel(precision as Precision)}` : base;
+  const config = getHardwareConfig(hwKey, model);
+  if (!includePrecision) return getDisplayLabel(config);
+  return [config.label, getPrecisionLabel(precision as Precision), config.suffix]
+    .filter(Boolean)
+    .join(' ');
 };
 
 const pointCountEn = (count: number) => `${count} ${count === 1 ? 'point' : 'points'}`;
@@ -681,6 +684,36 @@ const ScatterGraph = React.memo(
       },
       [setLocalOfficialOverride, setActiveOverlayHwTypes, mergeScopedOverlaySelection],
     );
+    useEffect(() => {
+      if (!overlayData || !bestPerSku || overlayScopeChanged) return;
+      const direction = chartDefinition[`${selectedYAxisMetric}_roofline` as keyof ChartDefinition];
+      if (
+        direction !== 'upper_right' &&
+        direction !== 'upper_left' &&
+        direction !== 'lower_left' &&
+        direction !== 'lower_right'
+      ) {
+        return;
+      }
+      const officialBest = bestSeriesPerSku(data, direction);
+      const overlayBest = bestSeriesPerSku(overlayData.data, direction);
+      const selection = new Set(officialBest.size > 0 ? officialBest : hwTypesWithData);
+      for (const key of overlayBest.size > 0 ? overlayBest : scopedOverlayHwTypes) {
+        selection.add(`overlay:${key}`);
+      }
+      if (!setsEqual(rawUnifiedSelection, selection)) commitUnifiedSelection(selection);
+    }, [
+      overlayData,
+      bestPerSku,
+      overlayScopeChanged,
+      chartDefinition,
+      selectedYAxisMetric,
+      data,
+      hwTypesWithData,
+      scopedOverlayHwTypes,
+      rawUnifiedSelection,
+      commitUnifiedSelection,
+    ]);
     const unifiedToggle = useCallback(
       (key: string, isOverlay: boolean) => {
         const prefixedKey = isOverlay ? `overlay:${key}` : key;
@@ -707,8 +740,15 @@ const ScatterGraph = React.memo(
 
     // When no overlay data, delegate to context's toggleHwType (preserves setActivePresetId)
     const handleToggleHwType = useCallback(
-      (key: string) => (overlayData ? unifiedToggle(key, false) : toggleHwType(key)),
-      [overlayData, unifiedToggle, toggleHwType],
+      (key: string) => {
+        if (!overlayData) {
+          toggleHwType(key);
+          return;
+        }
+        setBestPerSku(false, { applySelection: false });
+        unifiedToggle(key, false);
+      },
+      [overlayData, setBestPerSku, unifiedToggle, toggleHwType],
     );
 
     // Legend "X" (remove) — same overlay split as handleToggleHwType. With an
@@ -724,11 +764,12 @@ const ScatterGraph = React.memo(
           removeHwType(key);
           return;
         }
+        setBestPerSku(false, { applySelection: false });
         const next = new Set(resolvedUnifiedSelection);
         next.delete(key);
         commitUnifiedSelection(next);
       },
-      [overlayData, removeHwType, resolvedUnifiedSelection, commitUnifiedSelection],
+      [overlayData, setBestPerSku, removeHwType, resolvedUnifiedSelection, commitUnifiedSelection],
     );
 
     // --- Theme ---
@@ -1882,9 +1923,10 @@ const ScatterGraph = React.memo(
                 precision: string,
               ): string => {
                 const info = unofficialRunInfos[runIndex];
-                const base = info
-                  ? `✕ ${info.branch || `run ${info.id}`}`
-                  : parseHwKeyToLabel(hwKey, modelLabel).label;
+                if (!info) {
+                  return lineLabelText(hwKey, precision, multiPrecision, modelLabel);
+                }
+                const base = `✕ ${info.branch || `run ${info.id}`}`;
                 return multiPrecision
                   ? `${base} ${getPrecisionLabel(precision as Precision)}`
                   : base;
@@ -1937,12 +1979,12 @@ const ScatterGraph = React.memo(
               for (const [ovKey, group] of Object.entries(overlayRooflines)) {
                 if (!ir.activeOverlayHwTypes.has(group.hwKey)) continue;
                 const info = unofficialRunInfos[group.runIndex];
-                const branchOrHw = info
-                  ? `✕ ${info.branch || `run ${info.id}`}`
-                  : parseHwKeyToLabel(group.hwKey, modelLabel).label;
-                const labelText = multiPrecision
-                  ? `${branchOrHw} ${getPrecisionLabel((group.points[0]?.precision ?? '') as Precision)}`
-                  : branchOrHw;
+                const precision = group.points[0]?.precision ?? '';
+                const labelText = info
+                  ? multiPrecision
+                    ? `✕ ${info.branch || `run ${info.id}`} ${getPrecisionLabel(precision as Precision)}`
+                    : `✕ ${info.branch || `run ${info.id}`}`
+                  : lineLabelText(group.hwKey, precision, multiPrecision, modelLabel);
                 const labelKey = `overlay-${ovKey}`;
                 const pt = group.points.at(-1)!;
                 lineLabels.push({
@@ -2023,7 +2065,50 @@ const ScatterGraph = React.memo(
           // Two-pass text/bbox sizing — same batching rationale as the
           // parallelism labels above.
           llSel.each(function (d) {
-            d3.select(this).select<SVGTextElement>('.ll-text').text(d.label);
+            const text = d3.select(this).select<SVGTextElement>('.ll-text');
+            const config = getHardwareConfig(d.hw, modelLabel);
+            const hardwareLabel = getDisplayLabel(config);
+            const isHardwareLabel =
+              d.label === hardwareLabel || d.label.startsWith(`${config.label} `);
+            const remainingLabel = isHardwareLabel ? d.label.slice(config.label.length) : '';
+            const engineLabel = config.suffix ? ` ${config.suffix}` : '';
+            const precisionLabel =
+              engineLabel && remainingLabel.endsWith(engineLabel)
+                ? remainingLabel.slice(0, -engineLabel.length)
+                : remainingLabel;
+            const segments = isHardwareLabel
+              ? [
+                  { className: 'll-gpu', text: config.label, fill: 'white', weight: '700' },
+                  ...(precisionLabel
+                    ? [
+                        {
+                          className: 'll-precision',
+                          text: precisionLabel,
+                          fill: 'white',
+                          weight: '600',
+                        },
+                      ]
+                    : []),
+                  ...(config.suffix
+                    ? [
+                        {
+                          className: 'll-engine',
+                          text: engineLabel,
+                          fill: '#d1d5db',
+                          weight: '400',
+                        },
+                      ]
+                    : []),
+                ]
+              : [{ className: 'll-plain', text: d.label, fill: 'white', weight: '600' }];
+            text
+              .selectAll<SVGTSpanElement, (typeof segments)[number]>('tspan')
+              .data(segments, (segment) => segment.className)
+              .join('tspan')
+              .attr('class', (segment) => segment.className)
+              .attr('fill', (segment) => segment.fill)
+              .attr('font-weight', (segment) => segment.weight)
+              .text((segment) => segment.text);
           });
           const llMeasured: { node: SVGGElement; d: LineLabel; bbox: DOMRect }[] = [];
           llSel.each(function (d) {

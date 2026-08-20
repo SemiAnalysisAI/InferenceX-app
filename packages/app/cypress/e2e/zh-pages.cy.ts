@@ -8,7 +8,11 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="intro-section"]').should('contain.text', '智能体推理基准测试');
       cy.get('[data-testid="splash-text"]').should('have.text', 'AgentX 来了！！');
       cy.contains('h2', '探索 InferenceX').should('exist');
-      cy.contains('快速对比').should('exist');
+      // Quick Comparisons is hidden behind SHOW_QUICK_COMPARISONS in
+      // landing-page.tsx; the card and its Chinese strings still exist in the
+      // source, so assert it is not rendered rather than dropping the check.
+      cy.get('[data-testid="landing-quick-comparisons"]').should('not.exist');
+      cy.contains('快速对比').should('not.exist');
     });
 
     it('links to the Chinese overview and full dashboard', () => {
@@ -33,6 +37,18 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="nav-link-agentx"]')
         .should('contain.text', 'AgentX')
         .and('have.attr', 'href', '/zh/agentx');
+    });
+
+    it('renders the AgentX hero on the Chinese landing page', () => {
+      cy.get('[data-testid="compare-agentx-primary"]').within(() => {
+        cy.get('h2').should('have.text', '对比真实场景下的智能体推理性能');
+        cy.get('[data-testid="compare-agentx-overview-link"]')
+          .should('contain.text', '总览')
+          .and('have.attr', 'href', '/zh/overview');
+        cy.get('[data-testid="compare-agentx-methodology-link"]')
+          .should('contain.text', '方法论深度解析')
+          .and('have.attr', 'href', '/zh/agentx');
+      });
     });
 
     it('footer renders in Chinese with zh-internal links', () => {

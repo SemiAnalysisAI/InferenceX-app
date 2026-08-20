@@ -945,8 +945,12 @@ export function InferenceProvider({
   }, [graphs, hwTypesWithData, selectedXAxisMode, selectedYAxisMetric]);
 
   const setBestPerSkuAndApply = useCallback(
-    (enabled: boolean) => {
+    (enabled: boolean, options?: { applySelection?: boolean }) => {
       setBestPerSku(enabled);
+      // Overlay-mode legend edits own a temporary unified selection. They can
+      // disable the automatic mode without replacing the context selection
+      // that should be restored when the overlay is dismissed.
+      if (options?.applySelection === false) return;
       const target = enabled ? bestHwTypes : selectableHwTypes;
       setActiveHwTypes(resolveHwSelection(target).result);
       setActivePresetId(null);
@@ -1049,7 +1053,7 @@ export function InferenceProvider({
   const precisionsKey = effectivePrecisions.join(',');
   const hwResetKey = `${selectedModel}|${effectiveSequence}|${precisionsKey}|${
     isUnofficialRun ? 'preview' : 'official'
-  }|${selectedYAxisMetric}|${selectedXAxisMode}`;
+  }`;
   const lastHwResetKeyRef = useRef('');
 
   // Restore legend-active selection from URL on first availability of
@@ -1103,9 +1107,14 @@ export function InferenceProvider({
     if (pendingHwFilterRef.current) return;
     if (pendingActiveHwTypes) return;
     if (selectableHwTypes.size === 0) return;
-    if (lastHwResetKeyRef.current === hwResetKey) return;
-    lastHwResetKeyRef.current = hwResetKey;
+    const scopeChanged = lastHwResetKeyRef.current !== hwResetKey;
     const presetFilter = presetHwFilterRef.current;
+    // Metric changes must preserve manual legend subsets, but automatic
+    // selections still need to follow the newly selected axes. In particular,
+    // Best per SKU is metric-aware and would otherwise keep the previous
+    // metric's winners while its toggle remained enabled.
+    if (!scopeChanged && !bestPerSku && !presetFilter) return;
+    lastHwResetKeyRef.current = hwResetKey;
     if (presetFilter) {
       const filtered = new Set(
         [...selectableHwTypes].filter((k) => matchesPresetHwFilter(k, presetFilter, selectedModel)),

@@ -346,6 +346,9 @@ describe('ScatterGraph', () => {
       chartType: 'interactivity',
       y_tpPerGpu_roofline: 'upper_left',
     });
+    const runId = 32177976542;
+    const runBranch = 'qwen3.5-fp4-gb200-dynamo-sglang-agentic-mtp-pareto-refresh';
+    const runUrl = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId}`;
     const officialData = [
       createMockInferenceData({ hwKey: 'h100', x: 8, y: 240, precision: Precision.FP4 }),
       createMockInferenceData({ hwKey: 'h100', x: 16, y: 200, precision: Precision.FP4 }),
@@ -358,26 +361,26 @@ describe('ScatterGraph', () => {
           x: 8,
           y: 320,
           precision: Precision.FP4,
-          run_url: 'https://github.com/x/y/actions/runs/12345',
+          run_url: runUrl,
         }),
         createMockInferenceData({
           hwKey: 'b200_trt',
           x: 16,
           y: 280,
           precision: Precision.FP4,
-          run_url: 'https://github.com/x/y/actions/runs/12345',
+          run_url: runUrl,
         }),
         createMockInferenceData({
           hwKey: 'b200_trt',
           x: 32,
           y: 220,
           precision: Precision.FP4,
-          run_url: 'https://github.com/x/y/actions/runs/12345',
+          run_url: runUrl,
         }),
       ],
       hardwareConfig: hwConfig,
-      label: 'feature-branch',
-      runUrl: 'https://github.com/x/y/actions/runs/12345',
+      label: runBranch,
+      runUrl,
     };
 
     mountWithProviders(
@@ -403,15 +406,15 @@ describe('ScatterGraph', () => {
         unofficial: {
           activeOverlayHwTypes: new Set(['b200_trt']),
           allOverlayHwTypes: new Set(['b200_trt']),
-          runIndexByUrl: { 'https://github.com/x/y/actions/runs/12345': 0, '12345': 0 },
+          runIndexByUrl: { [runUrl]: 0, [String(runId)]: 0 },
           unofficialRunInfos: [
             {
-              id: 12345,
+              id: runId,
               name: 'CI run',
-              branch: 'feature-branch',
-              sha: 'abc123',
-              createdAt: '2026-05-01T00:00:00Z',
-              url: 'https://github.com/x/y/actions/runs/12345',
+              branch: runBranch,
+              sha: '7a4a06b',
+              createdAt: '2026-08-18T19:40:51Z',
+              url: runUrl,
               conclusion: 'success',
               status: 'completed',
               isNonMainBranch: true,
@@ -435,11 +438,104 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-overlay-labels svg .line-label')
       .filter('[data-line-key]:not([data-line-key^="overlay-"])')
       .should('have.length.greaterThan', 0);
-    // Overlay label text is the run's branch name (matching the overlay legend),
-    // not the hw label.
+    // The exact branch that crashed the production page remains visible in the
+    // overlay line label and legend after ScatterGraph's render-time updates.
     cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
       .find('text')
-      .should('contain.text', 'feature-branch');
+      .should('contain.text', runBranch);
+    cy.get(
+      '#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-gpu',
+    ).should('not.exist');
+    cy.get('#test-scatter-overlay-labels [data-testid="chart-legend"]').should(
+      'contain.text',
+      runBranch,
+    );
+  });
+
+  it('places precision between the GPU and engine in multi-precision labels', () => {
+    const runUrl = 'https://github.com/x/y/actions/runs/precision-order';
+    const chartDefinition = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const data = [Precision.FP4, Precision.FP8].flatMap((precision, precisionIndex) =>
+      [8, 16].map((x, index) =>
+        createMockInferenceData({
+          hwKey: 'b200_trt',
+          x,
+          y: 320 - precisionIndex * 20 - index * 40,
+          precision,
+        }),
+      ),
+    );
+    const overlayData = {
+      data: [Precision.FP4, Precision.FP8].flatMap((precision, precisionIndex) =>
+        [8, 16].map((x, index) =>
+          createMockInferenceData({
+            hwKey: 'h100_vllm',
+            x,
+            y: 260 - precisionIndex * 20 - index * 40,
+            precision,
+            run_url: runUrl,
+          }),
+        ),
+      ),
+      hardwareConfig: hwConfig,
+      label: '',
+      runUrl,
+    };
+
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-precision-order"
+          modelLabel="DeepSeek R1"
+          data={data}
+          xLabel="Concurrency"
+          yLabel="Throughput / Chip (tok/s)"
+          chartDefinition={chartDefinition}
+          overlayData={overlayData}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_trt']),
+          hwTypesWithData: new Set(['b200_trt']),
+          selectedPrecisions: [Precision.FP4, Precision.FP8],
+          showLineLabels: true,
+        },
+        unofficial: {
+          activeOverlayHwTypes: new Set(['h100_vllm']),
+          allOverlayHwTypes: new Set(['h100_vllm']),
+          runIndexByUrl: { [runUrl]: 0, 'precision-order': 0 },
+          // No run metadata: exercise the hardware-label fallback path.
+          unofficialRunInfos: [],
+        },
+      },
+    );
+
+    cy.get('#test-scatter-precision-order svg .line-label[data-hw-key="b200_trt"] .ll-text')
+      .should('have.length', 2)
+      .then(($labels) => {
+        expect($labels.toArray().map((label) => label.textContent)).to.have.members([
+          'B200 FP4 (TRTLLM)',
+          'B200 FP8 (TRTLLM)',
+        ]);
+        for (const label of $labels) {
+          expect(
+            [...label.querySelectorAll('tspan')].map((segment) => segment.className.baseVal),
+          ).to.deep.equal(['ll-gpu', 'll-precision', 'll-engine']);
+        }
+      });
+    cy.get('#test-scatter-precision-order svg .line-label[data-line-key^="overlay-"] .ll-text')
+      .should('have.length', 2)
+      .then(($labels) => {
+        expect($labels.toArray().map((label) => label.textContent)).to.have.members([
+          'H100 FP4 (vLLM)',
+          'H100 FP8 (vLLM)',
+        ]);
+      });
   });
 
   it('renders a line label for a singleton unofficial overlay series', () => {
@@ -585,6 +681,16 @@ describe('ScatterGraph', () => {
       .should('have.css', 'opacity', '1')
       .find('text')
       .should('have.text', 'B200 (TileRT, MTP)');
+    cy.get(
+      '#test-scatter-ingested-singleton-label svg .line-label[data-hw-key="b200_tilert_mtp"] .ll-gpu',
+    )
+      .should('have.text', 'B200')
+      .and('have.attr', 'font-weight', '700');
+    cy.get(
+      '#test-scatter-ingested-singleton-label svg .line-label[data-hw-key="b200_tilert_mtp"] .ll-engine',
+    )
+      .should('have.text', ' (TileRT, MTP)')
+      .and('have.attr', 'fill', '#d1d5db');
 
     cy.get('#scatter-line-labels').click();
     cy.get('#test-scatter-ingested-singleton-label svg .line-label').should('not.exist');
@@ -676,6 +782,12 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"]')
       .find('text')
       .should('contain.text', 'EAGLE');
+    cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"] .ll-gpu')
+      .should('have.text', 'B200')
+      .and('have.attr', 'font-weight', '700');
+    cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"] .ll-engine')
+      .should('contain.text', 'EAGLE')
+      .and('have.attr', 'fill', '#d1d5db');
     // No label should show the generic MTP token for M3.
     cy.get('#test-scatter-m3-eagle svg .line-label text').should('not.contain.text', 'MTP');
   });
@@ -1112,6 +1224,61 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('[data-testid="inference-results-table"] tbody').contains('vLLM').should('exist');
     cy.get('[data-testid="inference-results-table"] tbody').contains('SGLang').should('not.exist');
     cy.get('@setLocalOfficialOverride').should('not.have.been.called');
+  });
+
+  it('renders the table columns without the median interactivity or TTFT columns', () => {
+    // Mirror the real interactivity chart: x IS interactivity, which is what
+    // made the separate median column a duplicate.
+    const chartDefinition = createMockChartDefinition({
+      chartType: 'interactivity',
+      x: 'median_intvty',
+      x_label: 'Interactivity (tok/s/user)',
+    });
+    const row = createMockInferenceData({
+      hwKey: 'b200_sglang',
+      hw: 'Official SGLang',
+      model: Model.DeepSeek_V4_Pro,
+      precision: Precision.FP4,
+    });
+
+    mountWithProviders(<ChartDisplay />, {
+      inference: {
+        graphs: [
+          {
+            model: Model.DeepSeek_V4_Pro,
+            sequence: Sequence.AgenticTraces,
+            chartDefinition,
+            data: [row],
+          },
+        ],
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        selectedXAxisMode: 'interactivity',
+        activeHwTypes: new Set(['b200_sglang']),
+        hwTypesWithData: new Set(['b200_sglang']),
+      },
+      globalFilters: {
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        effectiveSequence: Sequence.AgenticTraces,
+      },
+      unofficial: {},
+    });
+
+    cy.get('[data-testid="inference-table-view-btn"]').click();
+    cy.get('[data-testid="inference-results-table"] thead th').then(($headers) => {
+      const headers = [...$headers].map((th) => (th.textContent ?? '').trim());
+      // Interactivity is already the x-axis column on the interactivity chart,
+      // so the median column duplicated it. Assert both that the column is gone
+      // and that exactly one interactivity column remains, so a rename cannot
+      // quietly reintroduce the duplicate.
+      expect(headers).to.not.include('Median Interactivity (tok/s)');
+      expect(headers.filter((h) => h.toLowerCase().includes('interactivity'))).to.have.length(1);
+      // Median TTFT was dropped too; unlike interactivity it is not duplicated
+      // by the x-axis column, so nothing else in the table should carry it.
+      expect(headers).to.not.include('Median TTFT (ms)');
+      expect(headers.filter((h) => h.toLowerCase().includes('ttft'))).to.have.length(0);
+    });
   });
 
   it('keeps same-hardware cross-engine AgentX STP rows out of table mode', () => {

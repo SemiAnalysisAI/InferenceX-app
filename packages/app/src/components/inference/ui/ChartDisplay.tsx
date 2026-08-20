@@ -90,7 +90,6 @@ const STRINGS = {
     updated: 'Updated:',
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
-    selectDateRange: 'Select a date range or add a run to view chip comparison',
     viewMode: 'View mode',
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
@@ -107,7 +106,6 @@ const STRINGS = {
     updated: '更新时间：',
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
-    selectDateRange: '请选择日期范围或添加运行以查看 Chip 对比',
     viewMode: '视图模式',
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
@@ -945,15 +943,6 @@ export default function ChartDisplay() {
                               ) ?? undefined
                             }
                           />
-                          {selectedGPUs.length > 0 &&
-                            (!selectedDateRange.startDate || !selectedDateRange.endDate) &&
-                            selectedDates.length === 0 && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg z-10">
-                                <p className="text-sm font-medium text-muted-foreground bg-background/90 border border-border rounded-md px-4 py-2 shadow-sm">
-                                  {t.selectDateRange}
-                                </p>
-                              </div>
-                            )}
                         </div>
                       );
                     })()}

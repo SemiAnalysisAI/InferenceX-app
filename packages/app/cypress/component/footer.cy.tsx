@@ -49,8 +49,13 @@ describe('Footer', () => {
     cy.get('[data-testid="footer-link-benchmarks"]')
       .should('have.attr', 'href')
       .and('include', 'github.com/SemiAnalysisAI/InferenceX');
-    cy.get('[data-testid="footer-link-frontend"]')
-      .should('have.attr', 'href')
+    cy.get('[data-testid="footer-link-agentx-harness"]')
+      .should('contain.text', 'AgentX Harness')
+      .and('have.attr', 'href')
+      .and('include', 'github.com/SemiAnalysisAI/agentx-harness');
+    cy.get('[data-testid="footer-link-visualization"]')
+      .should('contain.text', 'Visualization')
+      .and('have.attr', 'href')
       .and('include', 'github.com/SemiAnalysisAI/InferenceX-app');
   });
 
