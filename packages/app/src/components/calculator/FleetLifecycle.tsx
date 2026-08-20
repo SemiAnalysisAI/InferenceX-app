@@ -107,6 +107,8 @@ const STRINGS = {
     viewTable: 'Table',
     viewAria: 'View mode',
     captionTarget: (target: number) => `${target.toFixed(0)} tok/s/user`,
+    captionPrices: (input: string, output: string, cachedPct: string | null) =>
+      `$${input} in / $${output} out per M tok${cachedPct === null ? '' : `, cached ${cachedPct}%`}`,
     description:
       'A fixed fleet, from the day the model shipped. The chips never change; the software serving them does — so each rollout is a config that beat every config before it, climbing from what the fleet already served to its own numbers, and the gap to the cost line is the return on that work.',
     needMw:
@@ -212,6 +214,8 @@ const STRINGS = {
     viewTable: '表格',
     viewAria: '显示模式',
     captionTarget: (target: number) => `${target.toFixed(0)} tok/s/用户`,
+    captionPrices: (input: string, output: string, cachedPct: string | null) =>
+      `输入 $${input} / 输出 $${output} 每百万 token${cachedPct === null ? '' : `，缓存 ${cachedPct}%`}`,
     description:
       '固定集群自模型发布之日起的表现。Chip 从未更换，变化的是为其提供服务的软件——每一次推广都是一个优于此前所有配置的新配置，从集群当前已提供的水平爬升至其自身水平，而与成本线之间的差距即为这些工作带来的回报。',
     needMw: '请在上方「集群规模测算」中输入设施功率预算，以测算生命周期经济性。',
@@ -342,6 +346,20 @@ const DEFAULTS = {
 function formatPrice(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return '0';
   return value < 0.0001 ? value.toPrecision(3) : value.toFixed(4);
+}
+
+/**
+ * Same price, for reading rather than editing.
+ *
+ * The input fields are padded to four decimals so a seeded break-even figure
+ * lines up as you type into it; a caption is prose, and `$12.0000` there reads
+ * as spurious precision. Trailing zeros are dropped — `12`, `12.5`, `0.1234` —
+ * which keeps sub-cent prices intact, since a break-even figure on a large fleet
+ * routinely lands below a cent and rounding it to one would print `$0`.
+ */
+function formatCaptionPrice(value: number): string {
+  const fixed = formatPrice(value);
+  return fixed.includes('.') ? fixed.replace(/\.?0+$/u, '') : fixed;
 }
 
 function parseNonNegative(raw: string): number | null {
@@ -934,6 +952,30 @@ export default function FleetLifecycle({
   ]);
 
   /**
+   * The two token prices, for the caption. Revenue — and so every margin plotted
+   * here — is linear in these, and on the margin metrics they are *seeded* from
+   * break-even rather than typed, so a reader comparing two screenshots needs to
+   * see them next to the MW figure to know whether they are looking at the same
+   * scenario.
+   *
+   * Null until the seed lands: the fields start empty and a break-even effect
+   * fills them, and `$/M tok` with nothing in front of it is worse than silence.
+   * The cached tier is quoted only for agentic, which is the only sequence that
+   * measures a hit rate for it to apply to — and there it is load-bearing, since
+   * most input tokens bill at it rather than at the input price beside it.
+   */
+  const captionPrices = useMemo(() => {
+    const input = parseNonNegative(priceInput);
+    const output = parseNonNegative(outputPriceInput);
+    if (input === null || output === null) return null;
+    return t.captionPrices(
+      formatCaptionPrice(input),
+      formatCaptionPrice(output),
+      isAgentic ? String(Math.round(cacheReadRatio * 100)) : null,
+    );
+  }, [priceInput, outputPriceInput, isAgentic, cacheReadRatio, t]);
+
+  /**
    * The figure's own header, in the same shape the bar chart above uses: title,
    * then the provenance a reader needs to know what they are looking at. The
    * chart renders it as its caption; the table view renders it as a figcaption,
@@ -954,7 +996,8 @@ export default function FleetLifecycle({
       <p className="text-sm text-muted-foreground mb-2">
         {getModelLabel(selectedModel)} • {getSequenceLabel(selectedSequence, locale)} •{' '}
         {t.captionTarget(targetValue)}
-        {mw ? ` • ${mw} MW` : ''} • {t.source}SemiAnalysis
+        {mw ? ` • ${mw} MW` : ''}
+        {captionPrices === null ? '' : ` • ${captionPrices}`} • {t.source}SemiAnalysis
       </p>
     </>
   );

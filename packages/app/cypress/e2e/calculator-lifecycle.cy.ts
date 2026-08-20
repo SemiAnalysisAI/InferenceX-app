@@ -181,6 +181,57 @@ describe('Calculator — Fleet Lifecycle', () => {
       });
   });
 
+  it('quotes both token prices in the caption, and tracks the fields', () => {
+    // Every margin plotted is linear in these two, and on the margin metrics they
+    // are seeded from break-even rather than typed — so without them in the
+    // caption two screenshots of different scenarios are indistinguishable.
+    cy.get('[data-testid="calc-lifecycle-price-input"]').clear().type('12');
+    cy.get('[data-testid="calc-lifecycle-output-price-input"]').clear().type('48');
+    // A whole-dollar price reads as `$12`, not `$12.0000` — the fields pad for
+    // typing, the caption is prose. Cents survive; trailing zeros do not.
+    cy.get('[data-testid="calculator-lifecycle-figure"]').should('not.contain', '$12.0000');
+    cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
+      cy.contains('$12 in / $48 out per M tok').should('be.visible');
+      // Beside the MW figure, not instead of it.
+      cy.contains('MW').should('be.visible');
+    });
+
+    // It is the figure's caption, so it survives the tab switch with the rest.
+    showTable();
+    cy.get('[data-testid="calculator-lifecycle-figure"]').should(
+      'contain',
+      '$12 in / $48 out per M tok',
+    );
+    showChart();
+
+    cy.get('[data-testid="calc-lifecycle-price-input"]').clear().type('7.25');
+    cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
+      cy.contains('$7.25 in / $48 out per M tok').should('be.visible');
+    });
+
+    cy.get('[data-testid="calc-lifecycle-price-input"]').clear().type('7');
+    cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
+      cy.contains('$7 in / $48 out per M tok').should('be.visible');
+      cy.contains('$12 in').should('not.exist');
+    });
+
+    // `testIsolation: false`, so hand the prices back to break-even before
+    // leaving — later tests read the seeded values and a stale 7 makes them fail
+    // for a reason that has nothing to do with what they assert. The caption
+    // following the reset is the last thing worth checking anyway.
+    cy.get('[data-testid="calc-lifecycle-price-reset"]').click();
+    cy.get('[data-testid="calc-lifecycle-price-input"]')
+      .invoke('val')
+      .then((seeded) => {
+        // The field pads to four decimals; the caption drops trailing zeros, so
+        // the expectation has to apply the same trim rather than echo the field.
+        const trimmed = String(seeded).includes('.')
+          ? String(seeded).replace(/\.?0+$/u, '')
+          : String(seeded);
+        cy.get('[data-testid="calculator-lifecycle-figure"]').should('contain', `$${trimmed} in /`);
+      });
+  });
+
   it('puts the chart and the table on their own tabs, with a header on both', () => {
     // The header is the figure's own caption, so it survives the switch — a reader
     // on the table tab still sees what model, scenario and target they are reading.
@@ -731,6 +782,16 @@ describe('Calculator — Fleet Lifecycle with agentic traces', () => {
     );
   });
 
+  it('names the cached tier in the caption, since most input bills at it', () => {
+    // On agentic the input price beside it is not what most tokens actually cost:
+    // the measured hit rate is ~0.9 here, so quoting the input price alone would
+    // overstate what a reader thinks the fleet charges.
+    cy.get('[data-testid="calculator-lifecycle-figure"]').should('contain', ', cached 10%');
+    cy.get('[data-testid="calc-lifecycle-cache-input"]').clear().type('35');
+    cy.get('[data-testid="calculator-lifecycle-figure"]').should('contain', ', cached 35%');
+    cy.get('[data-testid="calc-lifecycle-cache-input"]').clear().type('10');
+  });
+
   it('raises the break-even price it seeds, because fewer tokens are billable', () => {
     cy.get('[data-testid="calc-lifecycle-cache-input"]').should('have.value', '10');
     // While the price is still auto-seeded, the discount does NOT move margin —
@@ -784,6 +845,9 @@ describe('Calculator — Fleet Lifecycle in Chinese', () => {
       .and('contain.text', '设施功率预算');
     cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
     cy.get('[data-testid="calculator-lifecycle-figure"]', { timeout: 30_000 }).should('be.visible');
+    // The caption's price line is translated too, units and all.
+    cy.get('[data-testid="calculator-lifecycle-figure"]').should('contain', '每百万 token');
+    cy.get('[data-testid="calculator-lifecycle-figure"]').should('contain', '输入 $');
     // The table headers this test checks are on the other tab now.
     showTable();
     cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
