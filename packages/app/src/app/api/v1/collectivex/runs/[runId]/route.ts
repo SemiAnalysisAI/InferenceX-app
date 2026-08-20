@@ -1,5 +1,3 @@
-import { timingSafeEqual } from 'crypto';
-
 import { type NextRequest, NextResponse } from 'next/server';
 
 import {
@@ -7,11 +5,7 @@ import {
   type CollectiveXRunSummary,
   parseCollectiveXVersion,
 } from '@semianalysisai/inferencex-db/collectivex/types';
-import {
-  FIXTURES_MODE,
-  getCollectiveXDb,
-  getCollectiveXWriteDb,
-} from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE, getCollectiveXWriteDb } from '@semianalysisai/inferencex-db/connection';
 import {
   collectiveXDatasetFromRow,
   deleteCollectiveXRun,
@@ -24,6 +18,7 @@ import {
   cachedJson,
   purgeCollectiveX,
 } from '@/lib/api-cache';
+import { bearerMatches } from '@/lib/bearer-auth';
 import { collectiveXSweepErrorStatus, ensureCollectiveXRun } from '@/lib/collectivex-lazy-ingest';
 import { loadFixture } from '@/lib/test-fixtures';
 
@@ -58,7 +53,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
   }
 
   try {
-    const row = await getCollectiveXRun(getCollectiveXDb(), version, runId);
+    // Ensure may have inserted or refreshed this run, so read from the same primary.
+    const row = await getCollectiveXRun(getCollectiveXWriteDb(), version, runId);
     if (row === null) {
       if (ensureError) {
         const status = collectiveXSweepErrorStatus(ensureError);
@@ -85,15 +81,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
     console.error('Error fetching CollectiveX run:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
-
-/** Constant-time Bearer check that tolerates multibyte header bytes. */
-function bearerMatches(header: string, secret: string): boolean {
-  const provided = Buffer.from(header);
-  const expected = Buffer.from(`Bearer ${secret}`);
-  // Compare BYTE lengths — a multibyte char can make the JS string lengths
-  // equal while the buffers differ, and timingSafeEqual throws on that.
-  return provided.length === expected.length && timingSafeEqual(provided, expected);
 }
 
 /**

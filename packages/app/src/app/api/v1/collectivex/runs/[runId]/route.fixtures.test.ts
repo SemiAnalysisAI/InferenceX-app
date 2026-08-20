@@ -12,7 +12,6 @@ const { mockLoadFixture } = vi.hoisted(() => ({
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
   FIXTURES_MODE: true,
-  getCollectiveXDb: vi.fn(),
   getCollectiveXWriteDb: vi.fn(),
 }));
 

@@ -6,6 +6,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { extractDemonstrations } from '@/lib/eval-sample-utils';
+import { parseEvalSampleWindow } from '@/lib/eval-sample-params';
 import {
   type EvalArtifactConfig,
   fetchAndParseSamples,
@@ -14,10 +15,6 @@ import {
 import { fetchGithubRunArtifacts, getGithubToken } from '@/lib/github-artifacts';
 
 export const dynamic = 'force-dynamic';
-
-const ALLOWED_FILTERS = new Set(['all', 'passed', 'failed']);
-const DEFAULT_LIMIT = 200;
-const MAX_LIMIT = 500;
 
 /**
  * GET /api/v1/eval-samples-live
@@ -42,10 +39,6 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const runId = params.get('run_id') ?? '';
   const task = params.get('task') ?? '';
-  const filterParam = params.get('filter') ?? 'all';
-  const offset = Math.max(0, Math.trunc(Number(params.get('offset') ?? '0')));
-  const requestedLimit = Math.trunc(Number(params.get('limit') ?? String(DEFAULT_LIMIT)));
-  const limit = Math.min(MAX_LIMIT, Math.max(1, requestedLimit || DEFAULT_LIMIT));
 
   if (!/^\d+$/u.test(runId)) {
     return NextResponse.json({ error: 'run_id must be a positive integer' }, { status: 400 });
@@ -53,13 +46,11 @@ export async function GET(request: NextRequest) {
   if (!task) {
     return NextResponse.json({ error: 'task is required' }, { status: 400 });
   }
-  if (!ALLOWED_FILTERS.has(filterParam)) {
-    return NextResponse.json(
-      { error: `filter must be one of: ${[...ALLOWED_FILTERS].join(', ')}` },
-      { status: 400 },
-    );
+  const window = parseEvalSampleWindow(params);
+  if ('error' in window) {
+    return NextResponse.json(window, { status: 400 });
   }
-  const filter = filterParam as 'all' | 'passed' | 'failed';
+  const { filter, offset, limit } = window;
 
   const config: EvalArtifactConfig = {
     model: params.get('model') ?? '',

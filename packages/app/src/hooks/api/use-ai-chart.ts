@@ -33,7 +33,7 @@ import {
 } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/metric-registry';
 
 // ---------------------------------------------------------------------------
 // Result types

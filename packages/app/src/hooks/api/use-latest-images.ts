@@ -5,6 +5,6 @@ import { fetchLatestImages } from '@/lib/api';
 export function useLatestImages() {
   return useQuery({
     queryKey: ['latest-images'],
-    queryFn: fetchLatestImages,
+    queryFn: ({ signal }) => fetchLatestImages(signal),
   });
 }

@@ -83,6 +83,13 @@ describe('benchmarkQueryOptions', () => {
     expect(calculator.queryKey).not.toEqual(otherSequence.queryKey);
   });
 
+  it('canonicalizes every no-date request to the materialized-view key', () => {
+    const omittedDate = benchmarkQueryOptions('m', 'latest');
+    const emptyDate = benchmarkQueryOptions('m', '');
+    expect(omittedDate.queryKey).toEqual(emptyDate.queryKey);
+    expect(emptyDate.queryKey[2]).toBe('');
+  });
+
   it('is enabled when model is non-empty', () => {
     const opts = benchmarkQueryOptions('DeepSeek-R1-0528', '2026-03-01');
     expect(opts.enabled).toBe(true);

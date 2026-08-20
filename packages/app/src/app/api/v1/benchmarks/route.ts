@@ -11,6 +11,7 @@ import {
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
+import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/public-api-errors';
 import { agenticWorkflowMetadataOnly } from '@/lib/agentic-workflow-metadata';
 import { loadFixture } from '@/lib/test-fixtures';
 
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
   const sequence = params.get('sequence') ?? '';
   const dbModelKeys = DISPLAY_MODEL_TO_DB[model];
   if (!dbModelKeys || dbModelKeys.length === 0) {
-    return NextResponse.json({ error: 'Unknown model' }, { status: 400 });
+    return publicApiError(PUBLIC_API_ERRORS.unknownModel, 400);
   }
   if (view === 'calculator' && !['1k/1k', '1k/8k', '8k/1k', 'agentic-traces'].includes(sequence)) {
     return NextResponse.json({ error: 'Unknown calculator sequence' }, { status: 400 });
@@ -75,6 +76,6 @@ export async function GET(request: NextRequest) {
     return cachedJson(agenticWorkflowMetadataOnly(rows));
   } catch (error) {
     console.error('Error fetching benchmarks:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return publicApiError(PUBLIC_API_ERRORS.internal, 500);
   }
 }

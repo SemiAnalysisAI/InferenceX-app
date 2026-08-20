@@ -14,18 +14,19 @@ export function benchmarkQueryOptions(
   exactRun?: boolean,
   view?: { type: 'calculator'; sequence: string },
 ) {
+  const canonicalDate = date === 'latest' ? '' : date;
   return {
     queryKey: [
       'benchmarks',
       model,
-      date,
+      canonicalDate,
       exact ? 'exact' : 'latest',
       runId ?? 'all',
       exactRun ? 'run' : 'asof',
       ...(view ? ([view.type, view.sequence] as const) : []),
     ] as const,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchBenchmarks(model, date, exact, signal, runId, exactRun, view),
+      fetchBenchmarks(model, canonicalDate, exact, signal, runId, exactRun, view),
     enabled: enabled && Boolean(model),
   };
 }
@@ -39,6 +40,6 @@ export function useBenchmarks(
   view?: { type: 'calculator'; sequence: string },
 ) {
   return useQuery(
-    benchmarkQueryOptions(model, date ?? 'latest', enabled, undefined, runId, exactRun, view),
+    benchmarkQueryOptions(model, date ?? '', enabled, undefined, runId, exactRun, view),
   );
 }

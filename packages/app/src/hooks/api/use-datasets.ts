@@ -1,42 +1,26 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 
 import type {
+  ConversationDetail,
+  ConversationList,
+  ConversationListItem,
   ConversationStructure,
+  DatasetDetail as RawDatasetDetail,
+  DatasetRecord,
+  DatasetSummary,
+  ListConversationsOpts,
   StructureNode,
-} from '@semianalysisai/inferencex-db/etl/weka-structure';
+} from '@semianalysisai/inferencex-db/queries/datasets';
 
-export type { ConversationStructure, StructureNode };
-
-export interface DatasetSummary {
-  blockSize?: number;
-  hashIdScope?: string | null;
-  totalIn?: number;
-  totalOut?: number;
-  totalCached?: number;
-  cachedPct?: number;
-  mainTurns?: number;
-  subagentGroups?: number;
-  subagentTurns?: number;
-  meanRequestsPerConversation?: number;
-  medianRequestsPerConversation?: number;
-  meanSubagentsPerTrace?: number;
-  medianSubagentsPerTrace?: number;
-  modelMix?: Record<string, number>;
-  [k: string]: unknown;
-}
-
-export interface DatasetRecord {
-  id: string;
-  slug: string;
-  label: string;
-  variant: string;
-  description: string | null;
-  hf_url: string | null;
-  license: string | null;
-  conversation_count: number;
-  summary: DatasetSummary;
-  ingested_at: string;
-}
+export type {
+  ConversationDetail,
+  ConversationList,
+  ConversationListItem,
+  ConversationStructure,
+  DatasetRecord,
+  DatasetSummary,
+  StructureNode,
+};
 
 export interface HistogramBin {
   x0: number;
@@ -75,37 +59,11 @@ export interface DatasetChartData {
   [k: string]: unknown;
 }
 
-export interface DatasetDetail extends DatasetRecord {
+export type DatasetDetail = RawDatasetDetail & {
   chart_data: DatasetChartData;
-}
+};
 
-export interface ConversationListItem {
-  conv_id: string;
-  models: string[];
-  num_turns: number;
-  num_subagent_groups: number;
-  total_in: number;
-  total_out: number;
-  total_cached: number;
-}
-
-export interface ConversationList {
-  total: number;
-  items: ConversationListItem[];
-}
-
-export interface ConversationDetail {
-  conv_id: string;
-  models: string[];
-  num_turns: number;
-  num_subagent_groups: number;
-  total_in: number;
-  total_out: number;
-  total_cached: number;
-  structure: ConversationStructure;
-}
-
-export type ConversationSort = 'tokens' | 'turns' | 'subagents' | 'id';
+export type ConversationSort = NonNullable<ListConversationsOpts['sort']>;
 
 // Dataset contents only change on (rare) re-ingest, so cache aggressively.
 const DAY = 24 * 60 * 60 * 1000;

@@ -54,19 +54,75 @@ interface CachedQueryOptions {
   tag?: string;
 }
 
-// Leave room for BLOB_CACHE_PREFIX and the `.json` suffix in the final Vercel
-// Blob pathname. Short keys keep their existing human-readable form (and warm
-// cache entries); large argument lists use a fixed-size digest instead.
+// Blob argument encoding is explicitly versioned. v1 used `args.join(':')`,
+// which was not injective for arrays, objects, null, and undefined. v2 keys
+// never read a v1 entry; the next ordinary prefix purge removes those orphaned
+// values along with every other cache generation.
+const BLOB_KEY_ENCODING_VERSION = 'v2';
 const MAX_INLINE_BLOB_KEY_BYTES = 512;
 
-function blobKeyForArgs(keyPrefix: string, args: unknown[]): string {
-  if (args.length === 0) return keyPrefix;
+function canonicalCacheValue(value: unknown, ancestors: Set<object>): unknown {
+  if (value === null) return ['null'];
+  if (value === undefined) return ['undefined'];
 
-  const inlineKey = `${keyPrefix}:${args.join(':')}`;
+  switch (typeof value) {
+    case 'string':
+    case 'boolean': {
+      return [typeof value, value];
+    }
+    case 'number': {
+      if (Number.isNaN(value)) return ['number', 'NaN'];
+      if (value === Number.POSITIVE_INFINITY) return ['number', 'Infinity'];
+      if (value === Number.NEGATIVE_INFINITY) return ['number', '-Infinity'];
+      if (Object.is(value, -0)) return ['number', '-0'];
+      return ['number', String(value)];
+    }
+    case 'bigint': {
+      return ['bigint', value.toString()];
+    }
+    case 'object': {
+      if (ancestors.has(value)) throw new TypeError('Blob cache arguments must not be cyclic');
+      if (
+        !Array.isArray(value) &&
+        Object.getPrototypeOf(value) !== Object.prototype &&
+        Object.getPrototypeOf(value) !== null
+      ) {
+        throw new TypeError('Blob cache arguments must contain only arrays and plain objects');
+      }
+      if (Object.getOwnPropertySymbols(value).length > 0) {
+        throw new TypeError('Blob cache arguments must not contain symbol keys');
+      }
+
+      ancestors.add(value);
+      let encoded: unknown;
+      if (Array.isArray(value)) {
+        encoded = ['array', value.map((item) => canonicalCacheValue(item, ancestors))];
+      } else {
+        // The prototype check above establishes the plain string-keyed object boundary.
+        const objectValue = value as Record<string, unknown>;
+        encoded = [
+          'object',
+          Object.keys(objectValue)
+            .toSorted()
+            .map((key) => [key, canonicalCacheValue(objectValue[key], ancestors)]),
+        ];
+      }
+      ancestors.delete(value);
+      return encoded;
+    }
+    default: {
+      throw new TypeError(`Unsupported Blob cache argument type: ${typeof value}`);
+    }
+  }
+}
+
+function blobKeyForArgs(keyPrefix: string, args: unknown[]): string {
+  const serialized = JSON.stringify(canonicalCacheValue(args, new Set()));
+  const inlineKey = `${keyPrefix}:${BLOB_KEY_ENCODING_VERSION}:${Buffer.from(serialized).toString('base64url')}`;
   if (Buffer.byteLength(inlineKey, 'utf8') <= MAX_INLINE_BLOB_KEY_BYTES) return inlineKey;
 
-  const digest = createHash('sha256').update(JSON.stringify(args)).digest('hex');
-  return `${keyPrefix}:sha256:${digest}`;
+  const digest = createHash('sha256').update(serialized).digest('hex');
+  return `${keyPrefix}:${BLOB_KEY_ENCODING_VERSION}:sha256:${digest}`;
 }
 
 /**

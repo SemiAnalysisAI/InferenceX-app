@@ -92,7 +92,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-availability',
-    sourceSha256: '12bc0fa8930792897ed8300bd3be1333826b51903c04c6fbdec335f13d80ca7a',
+    sourceSha256: 'f1c5845a59cefbe03f57f471a5bb63b194a8c0aa5dccc188febdc177003310f1',
   },
   {
     source: 'src/app/api/v1/benchmark-siblings/route.ts',
@@ -108,7 +108,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmarks',
-    sourceSha256: '49fea92d0bd2eacd3babb2a9e6091af0ebf2dbde4462e826274712449b1534a9',
+    sourceSha256: 'c6a5b78108b7e0d523b11590e1e34ef2e8c2d5457673eb41338d93d3d8f04909',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/route.ts',
@@ -116,7 +116,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmark-history',
-    sourceSha256: 'd4b3d2ad8ed6e35df70c6b651f71c9d86b6e1dad9c3eaf6eadc2a8591318d1fb',
+    sourceSha256: '7d4302fdc83e05237c77b6f6c375e0adbcad3fe911959005c54c8bd1c9bff85a',
   },
   {
     source: 'src/app/api/v1/collectivex/latest/route.ts',
@@ -124,7 +124,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-collectivex-latest',
-    sourceSha256: '41c67c25c62ae2bad5f2ef16faf7a3e5a5c4440a53e3701ae68cf0fdb0973f18',
+    sourceSha256: '4d50dc7bdce61936c135c7a480fa048b97658737121ad9ff1b964d3db4cfa7ef',
   },
   {
     source: 'src/app/api/v1/collectivex/runs/route.ts',
@@ -132,7 +132,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-collectivex-runs',
-    sourceSha256: 'bce17c290c75ddae3300125b4cefec684f58748cbd524dd4b6916e2728660f23',
+    sourceSha256: '60548a817e1d408e3ed3ee993b48bcecfd5b1ddffe6dc554228eb131c43b1228',
   },
   {
     source: 'src/app/api/v1/collectivex/runs/[runId]/route.ts',
@@ -140,7 +140,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-collectivex-run',
-    sourceSha256: 'dabbf260d406f774a880ea4c19c25271775755107ada6d036e2cf6b13f818cbb',
+    sourceSha256: '911688cb21861d86639c1c75e9081c263433a6ab4d41959fb9a0e723e507733e',
   },
   {
     source: 'src/app/api/v1/collectivex/runs/[runId]/route.ts',
@@ -151,7 +151,7 @@ export const apiRouteCatalog = [
       en: 'Authenticated CollectiveX administration mutation; deletion is not part of the public read API.',
       zh: '需要身份验证的 CollectiveX 管理写操作；删除不属于公开只读 API。',
     },
-    sourceSha256: 'dabbf260d406f774a880ea4c19c25271775755107ada6d036e2cf6b13f818cbb',
+    sourceSha256: '911688cb21861d86639c1c75e9081c263433a6ab4d41959fb9a0e723e507733e',
   },
   {
     source: 'src/app/api/v1/datasets/route.ts',
@@ -159,7 +159,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-datasets',
-    sourceSha256: '22eb9d7bb5f91d64a19d43723c4be73c239513073819ad5af83864a3b4858505',
+    sourceSha256: '2a779884ef1a44c9a14f7f4a2005495a9809aa91448c1401674fd9d99b32c65e',
   },
   {
     source: 'src/app/api/v1/datasets/[slug]/route.ts',
@@ -202,7 +202,7 @@ export const apiRouteCatalog = [
       en: 'UI-only evaluation sample reader backed by live workflow artifacts with an unstable artifact contract.',
       zh: '仅供界面读取由实时工作流制品支持的评测样本；该制品契约不稳定。',
     },
-    sourceSha256: '7790c89e48b71f0cb2a819f34ec649ce300982fa41bba20a2b996b6c9768b6c7',
+    sourceSha256: 'd5b8c36466c5882fa253e653997c7c4dd181489d754aca6fef1f98aaa103cf65',
   },
   {
     source: 'src/app/api/v1/eval-samples/route.ts',
@@ -213,7 +213,7 @@ export const apiRouteCatalog = [
       en: 'UI drill-down for evaluation samples; its pagination and sample payload remain page-owned.',
       zh: '用于界面下钻评测样本；其分页和样本载荷仍由页面内部使用。',
     },
-    sourceSha256: '0e05c3d98153a53e5025e6c9973ac6a0eef294ad8cb6ac8748b9a1478067b233',
+    sourceSha256: '865f41e25148e30e5de094af98773eebdfc67a395cac7e1a4b75e9b96b23bf85',
   },
   {
     source: 'src/app/api/v1/evaluations/route.ts',
@@ -221,7 +221,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-evaluations',
-    sourceSha256: '8eab5b9d1df62b64b89458943d6e2182b62713c22421a30f427044f664b76b04',
+    sourceSha256: '6fac9705f7d595b00525639d861dad2cb67dcc51fea5ef2e69da7c2d61630f35',
   },
   {
     source: 'src/app/api/v1/feedback/route.ts',
@@ -262,7 +262,7 @@ export const apiRouteCatalog = [
       en: 'Secret-protected cache invalidation mutation for operators; it is not a public application contract.',
       zh: '供运维人员使用的密钥保护缓存失效写操作；它不是公开应用契约。',
     },
-    sourceSha256: 'b081b54a5960e6da0987e9ccee777bfbc40c03d0206823472ee7d0f0e969e8d7',
+    sourceSha256: 'eadfc008403b3a5321f9b857897ed5c9fce2de29dee34279fb559cf1b763c247',
   },
   {
     source: 'src/app/api/v1/latest-images/route.ts',
@@ -270,7 +270,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-latest-images',
-    sourceSha256: '67e50209f2a1200b56e418c9edc29eba955e6c1273319f98a2deb8657b79e895',
+    sourceSha256: 'ae0d5535af9f5bf8d287c04f915067c0e470ec907efb2a848cb6c35660770d2d',
   },
   {
     source: 'src/app/api/v1/overview/route.ts',
@@ -289,7 +289,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-reliability',
-    sourceSha256: 'fe295d04ecf45bfcbd5d59518eb9a5b04a7f460a95053d79f7f904502d39d189',
+    sourceSha256: 'ce1c5db78b47548beb77a69797f10fb33853cde01cea5c44675c8ad3519bcf20',
   },
   {
     source: 'src/app/api/v1/request-timeline/route.ts',
@@ -305,7 +305,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-server-log',
-    sourceSha256: '0462679b059bb8e2c48507e147faa24389a76b04312f06dbf9ab3724352a1239',
+    sourceSha256: 'f81387385ce4e9a52948ee64ddb7b0caa8ef19a87bf50eaafc10e705a9358ab0',
   },
   {
     source: 'src/app/api/v1/submissions/route.ts',
@@ -353,9 +353,168 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-workflow-info',
-    sourceSha256: 'b7b0f215e9bf2c766ce2d4c9a13090504c1704a67f697af3a2fd1f318de1e6d6',
+    sourceSha256: '8849e70ef8a890370cb13a57ef7792e5f8522a93a4fdff7fa811a9a58f5cac32',
   },
 ] as const satisfies readonly ApiRouteCatalogEntry[];
+
+export type PublicApiCachePolicy = 'public-db-day' | 'framework-release-hour';
+
+export interface StablePublicApiContract {
+  readonly operationId: string;
+  readonly parameters: readonly string[];
+  readonly statuses: readonly `${number}`[];
+  readonly auth: 'none';
+  readonly cachePolicy: PublicApiCachePolicy;
+  readonly errorExamples: readonly string[];
+  readonly responseShapeName: string;
+}
+
+/**
+ * Reviewable behavioral contract for stable public reads. This intentionally
+ * records behavior rather than defining DTOs: raw query-row types remain
+ * canonical in the database package.
+ */
+export const stablePublicApiContracts = [
+  {
+    operationId: 'get-availability',
+    parameters: [],
+    statuses: ['200', '500'],
+    auth: 'none',
+    cachePolicy: 'public-db-day',
+    errorExamples: ['Internal server error'],
+    responseShapeName: 'AvailabilityRows',
+  },
+  {
+    operationId: 'list-benchmarks',
+    parameters: ['model', 'date', 'exact', 'runId', 'exactRun'],
+    statuses: ['200', '400', '500'],
+    auth: 'none',
+    cachePolicy: 'public-db-day',
+    errorExamples: ['Unknown model', 'Internal server error'],
+    responseShapeName: 'BenchmarkRows',
+  },
+  {
+    operationId: 'list-benchmark-history',
+    parameters: ['model', 'isl', 'osl', 'benchmarkType'],
+    statuses: ['200', '400', '500'],
+    auth: 'none',
+    cachePolicy: 'public-db-day',
+    errorExamples: ['model, isl, and osl are required', 'Internal server error'],
+    responseShapeName: 'BenchmarkRows',
+  },
+  {
+    operationId: 'get-workflow-info',
+    parameters: ['date', 'benchmarkType'],
+    statuses: ['200', '400', '500'],
+    auth: 'none',
+    cachePolicy: 'public-db-day',
+    errorExamples: ['Invalid date format (YYYY-MM-DD required)', 'Internal server error'],
+    responseShapeName: 'WorkflowInfo',
+  },
+  {
+    operationId: 'list-evaluations',
+    parameters: [],
+    statuses: ['200', '500'],
+    auth: 'none',
+    cachePolicy: 'public-db-day',
+    errorExamples: ['Internal server error'],
+    responseShapeName: 'EvaluationRows',
+  },
+  {
+    operationId: 'list-reliability',
+    parameters: [],
+    statuses: ['200', '500'],
+    auth: 'none',
+    cachePolicy: 'public-db-day',
+    errorExamples: ['Internal server error'],
+    responseShapeName: 'ReliabilityRows',
+  },
+  {
+    operationId: 'get-tco-feed',
+    parameters: [
+      'model',
+      'workloads',
+      'tiers',
+      'date',
+      'format',
+      'view',
+      'weights',
+      'workload_weights',
+      'alpha',
+    ],
+    statuses: ['200', '400', '500'],
+    auth: 'none',
+    cachePolicy: 'public-db-day',
+    errorExamples: [
+      'Invalid tiers: expected comma-separated positive numbers',
+      'Internal server error',
+    ],
+    responseShapeName: 'TcoFeed',
+  },
+  {
+    operationId: 'get-submissions',
+    parameters: [],
+    statuses: ['200', '500'],
+    auth: 'none',
+    cachePolicy: 'public-db-day',
+    errorExamples: ['Internal server error'],
+    responseShapeName: 'Submissions',
+  },
+  {
+    operationId: 'get-framework-releases',
+    parameters: [],
+    statuses: ['200', '500'],
+    auth: 'none',
+    cachePolicy: 'framework-release-hour',
+    errorExamples: ['Internal server error'],
+    responseShapeName: 'FrameworkReleases',
+  },
+  {
+    operationId: 'get-latest-images',
+    parameters: [],
+    statuses: ['200', '500'],
+    auth: 'none',
+    cachePolicy: 'public-db-day',
+    errorExamples: ['Internal server error'],
+    responseShapeName: 'LatestImageRows',
+  },
+  {
+    operationId: 'list-datasets',
+    parameters: [],
+    statuses: ['200', '500'],
+    auth: 'none',
+    cachePolicy: 'public-db-day',
+    errorExamples: ['Internal server error'],
+    responseShapeName: 'DatasetRecords',
+  },
+  {
+    operationId: 'get-dataset',
+    parameters: ['slug'],
+    statuses: ['200', '404', '500'],
+    auth: 'none',
+    cachePolicy: 'public-db-day',
+    errorExamples: ['Not found', 'Internal server error'],
+    responseShapeName: 'DatasetDetail',
+  },
+  {
+    operationId: 'list-dataset-conversations',
+    parameters: ['slug', 'search', 'limit', 'offset', 'sort'],
+    statuses: ['200', '400', '404', '500'],
+    auth: 'none',
+    cachePolicy: 'public-db-day',
+    errorExamples: ['search too long', 'Not found', 'Internal server error'],
+    responseShapeName: 'ConversationList',
+  },
+  {
+    operationId: 'get-dataset-conversation',
+    parameters: ['slug', 'convId'],
+    statuses: ['200', '404', '500'],
+    auth: 'none',
+    cachePolicy: 'public-db-day',
+    errorExamples: ['Not found', 'Internal server error'],
+    responseShapeName: 'ConversationDetail',
+  },
+] as const satisfies readonly StablePublicApiContract[];
 
 export interface ApiContractSourceDigest {
   /** Path relative to packages/app. */
@@ -371,8 +530,72 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/lib/api-cache.ts',
+    sourceSha256: '45582b8b5ffc6130a9e70600390eb84a897a555d20fbd3af05e75d355e98f163',
+    reviewArea: {
+      en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
+      zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
+    },
+  },
+  {
+    source: 'src/lib/blob-cache.ts',
+    sourceSha256: 'f15476f437c5ffea9d601d5ae1fa3dfafa77b1f53861ec02f0c359bf0f59c2ff',
+    reviewArea: {
+      en: 'Blob cache read, write, prefix migration, and purge behavior.',
+      zh: 'Blob 缓存读取、写入、前缀迁移和清除行为。',
+    },
+  },
+  {
+    source: 'src/lib/cached-read-route.ts',
+    sourceSha256: '3b2fdf31075919e08b34514b6434906f39d9d20bea996da7f59bf42cacf36715',
+    reviewArea: {
+      en: 'Shared parameterless cached-read fixture, response, and public-error behavior.',
+      zh: '共享无参数缓存读取的夹具、响应和公开错误行为。',
+    },
+  },
+  {
+    source: 'src/lib/bearer-auth.ts',
+    sourceSha256: 'f9bb8619b6b9c3017fa780a8956aa7584fdd54d89f86f8335c295077cab71f4d',
+    reviewArea: {
+      en: 'Byte-safe constant-time Bearer credential comparison used by administration routes.',
+      zh: '管理路由使用的字节安全恒定时间 Bearer 凭据比较。',
+    },
+  },
+  {
+    source: 'src/lib/public-api-errors.ts',
+    sourceSha256: '48301bb3567870921f5cae0e0a35240c9a687767b89f96141b36be41afbaa16a',
+    reviewArea: {
+      en: 'Canonical public JSON error strings shared by handlers and OpenAPI examples.',
+      zh: '处理程序与 OpenAPI 示例共享的规范公开 JSON 错误字符串。',
+    },
+  },
+  {
+    source: 'src/lib/eval-sample-params.ts',
+    sourceSha256: '60073c6a3dcd7b4e16d2024606a2c7f457c35d127d89afaf361d382e198e88b9',
+    reviewArea: {
+      en: 'Shared stored/live evaluation sample filter and pagination behavior.',
+      zh: '存储与实时评测样本共享的筛选和分页行为。',
+    },
+  },
+  {
+    source: 'src/lib/submissions-types.ts',
+    sourceSha256: '1665a6a65f061184458997069b3222c9243b993f12573d83b0d10e571046a4bc',
+    reviewArea: {
+      en: 'Submission response topology and canonical database row type exports.',
+      zh: '提交响应拓扑和规范数据库行类型导出。',
+    },
+  },
+  {
+    source: 'src/lib/benchmark-id.ts',
+    sourceSha256: '36f9adf8a92cf5830abc01d0a389aa21eca9f429f31a9231b5d77e108c985d35',
+    reviewArea: {
+      en: 'Client-side persisted benchmark identifier recognition.',
+      zh: '客户端持久化基准标识符识别。',
+    },
+  },
+  {
     source: 'src/app/api/v1/id-routes.ts',
-    sourceSha256: '65a8ebf97d500fd4164e068dc7d303d82e74e5ed84301dcd19ef8d386317b721',
+    sourceSha256: '7dde26440ea11d775aa0daca0a6a06671bfdd8cdcb75979ca56eff3c2b90f78c',
     reviewArea: {
       en: 'Shared positive-ID and ID-list validation, status codes, and error payloads for diagnostic reads.',
       zh: '诊断读取共享的正整数 ID 与 ID 列表校验、状态码和错误载荷。',
@@ -380,7 +603,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api.ts',
-    sourceSha256: '18323e38cb50d20fd535ecb2d87d89131180664721d2ffb95f9ec5843c9d55e4',
+    sourceSha256: '859d84c1af8b9a734e4575e5358aa6e6e399c79c48d4bfb6ec31e0d8ea8f7db6',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
@@ -447,7 +670,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '11e1bb637dc0d8c338fffebabcbe1864068d08b8b8b1dad1e1e17718eca851dd',
+    sourceSha256: '486e34d55275170c7e0544af24c151199752eb5628191d38606b1ecec289dfdf',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',
@@ -463,7 +686,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/datasets.ts',
-    sourceSha256: '05b0f990f8aeb1061fb0bfe7204f1c015fc55b0a541249188ffe740edf2a5af6',
+    sourceSha256: '34aba7d420ce651b6f04269a73466c3635d36a1a8c7eb63ae8e0f6b9e43b8685',
     reviewArea: {
       en: 'Dataset registry, detail, conversation index, pagination, and conversation structure responses.',
       zh: '数据集目录、详情、会话索引、分页和会话结构响应。',

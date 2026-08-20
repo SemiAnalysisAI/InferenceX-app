@@ -1,10 +1,9 @@
-import { type NextRequest, NextResponse } from 'next/server';
-
 import { getDb } from '@semianalysisai/inferencex-db/connection';
 
 import { getServerLog } from '@semianalysisai/inferencex-db/queries/server-logs';
 
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { cachedQuery } from '@/lib/api-cache';
+import { idQueryRoute } from '../id-routes';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,23 +11,10 @@ const getCachedServerLog = cachedQuery((id: number) => getServerLog(getDb(), id)
   blobOnly: true,
 });
 
-export async function GET(request: NextRequest) {
-  const id = Number(request.nextUrl.searchParams.get('id'));
-
-  if (!id || !Number.isFinite(id)) {
-    return NextResponse.json({ error: 'id is required (benchmark_result_id)' }, { status: 400 });
-  }
-
-  try {
+export const GET = idQueryRoute({
+  logLabel: 'server log',
+  fetch: async (id: number) => {
     const serverLog = await getCachedServerLog(id);
-
-    if (serverLog === null) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
-
-    return cachedJson({ id, serverLog });
-  } catch (error) {
-    console.error('Error fetching server log:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+    return serverLog === null ? null : { id, serverLog };
+  },
+});

@@ -8,12 +8,9 @@ import {
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
 import { extractDemonstrations } from '@/lib/eval-sample-utils';
+import { parseEvalSampleWindow } from '@/lib/eval-sample-params';
 
 export const dynamic = 'force-dynamic';
-
-const ALLOWED_FILTERS = new Set(['all', 'passed', 'failed']);
-const DEFAULT_LIMIT = 200;
-const MAX_LIMIT = 500;
 
 const getCachedEvalSamples = cachedQuery(
   (evalResultId: number, filter: 'all' | 'passed' | 'failed', offset: number, limit: number) =>
@@ -38,12 +35,8 @@ const getCachedEvalSampleOffset = cachedQuery(
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const evalResultId = Number(params.get('eval_result_id'));
-  const filterParam = params.get('filter') ?? 'all';
-  const offset = Math.max(0, Math.trunc(Number(params.get('offset') ?? '0')));
   const docIdParam = params.get('doc_id');
   const docId = docIdParam === null ? null : Math.trunc(Number(docIdParam));
-  const requestedLimit = Math.trunc(Number(params.get('limit') ?? String(DEFAULT_LIMIT)));
-  const limit = Math.min(MAX_LIMIT, Math.max(1, requestedLimit || DEFAULT_LIMIT));
 
   if (!evalResultId || !Number.isFinite(evalResultId) || evalResultId <= 0) {
     return NextResponse.json(
@@ -54,13 +47,11 @@ export async function GET(request: NextRequest) {
   if (docId !== null && (!Number.isFinite(docId) || docId < 0)) {
     return NextResponse.json({ error: 'doc_id must be a non-negative integer' }, { status: 400 });
   }
-  if (!ALLOWED_FILTERS.has(filterParam)) {
-    return NextResponse.json(
-      { error: `filter must be one of: ${[...ALLOWED_FILTERS].join(', ')}` },
-      { status: 400 },
-    );
+  const window = parseEvalSampleWindow(params);
+  if ('error' in window) {
+    return NextResponse.json(window, { status: 400 });
   }
-  const filter = filterParam as 'all' | 'passed' | 'failed';
+  const { filter, offset, limit } = window;
 
   try {
     const sampleOffset =
