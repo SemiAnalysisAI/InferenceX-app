@@ -323,6 +323,16 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   inputTokensPerDollarH?: { y: number; roof: boolean };
   inputTokensPerDollarN?: { y: number; roof: boolean };
   inputTokensPerDollarR?: { y: number; roof: boolean };
+  // Tokens purchasable per ¥1 — the $ metrics converted at USD_TO_CNY.
+  tokensPerRmbH?: { y: number; roof: boolean };
+  tokensPerRmbN?: { y: number; roof: boolean };
+  tokensPerRmbR?: { y: number; roof: boolean };
+  outputTokensPerRmbH?: { y: number; roof: boolean };
+  outputTokensPerRmbN?: { y: number; roof: boolean };
+  outputTokensPerRmbR?: { y: number; roof: boolean };
+  inputTokensPerRmbH?: { y: number; roof: boolean };
+  inputTokensPerRmbN?: { y: number; roof: boolean };
+  inputTokensPerRmbR?: { y: number; roof: boolean };
   tokensPerDollarUser?: { y: number; roof: boolean };
   powerUser?: { y: number; roof: boolean };
 
@@ -386,6 +396,15 @@ export type YAxisMetricKey =
   | 'inputTokensPerDollarH'
   | 'inputTokensPerDollarN'
   | 'inputTokensPerDollarR'
+  | 'tokensPerRmbH'
+  | 'tokensPerRmbN'
+  | 'tokensPerRmbR'
+  | 'outputTokensPerRmbH'
+  | 'outputTokensPerRmbN'
+  | 'outputTokensPerRmbR'
+  | 'inputTokensPerRmbH'
+  | 'inputTokensPerRmbN'
+  | 'inputTokensPerRmbR'
   | 'tokensPerDollarUser'
   | 'powerUser'
   | 'jTotal'
@@ -523,6 +542,42 @@ export interface ChartDefinition {
   y_inputTokensPerDollarR_label?: string;
   y_inputTokensPerDollarR_title?: string;
   y_inputTokensPerDollarR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_tokensPerRmbH?: string;
+  y_tokensPerRmbH_label?: string;
+  y_tokensPerRmbH_title?: string;
+  y_tokensPerRmbH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_tokensPerRmbN?: string;
+  y_tokensPerRmbN_label?: string;
+  y_tokensPerRmbN_title?: string;
+  y_tokensPerRmbN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_tokensPerRmbR?: string;
+  y_tokensPerRmbR_label?: string;
+  y_tokensPerRmbR_title?: string;
+  y_tokensPerRmbR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTokensPerRmbH?: string;
+  y_outputTokensPerRmbH_label?: string;
+  y_outputTokensPerRmbH_title?: string;
+  y_outputTokensPerRmbH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTokensPerRmbN?: string;
+  y_outputTokensPerRmbN_label?: string;
+  y_outputTokensPerRmbN_title?: string;
+  y_outputTokensPerRmbN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTokensPerRmbR?: string;
+  y_outputTokensPerRmbR_label?: string;
+  y_outputTokensPerRmbR_title?: string;
+  y_outputTokensPerRmbR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerRmbH?: string;
+  y_inputTokensPerRmbH_label?: string;
+  y_inputTokensPerRmbH_title?: string;
+  y_inputTokensPerRmbH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerRmbN?: string;
+  y_inputTokensPerRmbN_label?: string;
+  y_inputTokensPerRmbN_title?: string;
+  y_inputTokensPerRmbN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerRmbR?: string;
+  y_inputTokensPerRmbR_label?: string;
+  y_inputTokensPerRmbR_title?: string;
+  y_inputTokensPerRmbR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
   // All-in provisioned Joules per token
   y_jTotal?: string;
   y_jTotal_label?: string;

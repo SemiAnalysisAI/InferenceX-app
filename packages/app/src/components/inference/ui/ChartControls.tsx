@@ -36,7 +36,7 @@ const STRINGS = {
   en: {
     yAxisMetric: 'Y-Axis Metric',
     yAxisMetricTooltip:
-      "The performance metric displayed on the chart's Y-axis. Options include throughput, cost per million tokens, tokens per $1, and custom user-defined values.",
+      "The performance metric displayed on the chart's Y-axis. Options include throughput, cost per million tokens, tokens per $1 USD or ¥1 CNY, and custom user-defined values.",
     xAxisMetric: 'X-Axis Metric',
     xAxisMetricTooltip:
       "The latency metric displayed on the chart's X-axis: P90 Time To First Token.",
@@ -127,19 +127,34 @@ const METRIC_GROUPS: {
     ],
   },
   {
-    label: 'Total Tokens per $1',
+    label: 'Total Tokens per $1 USD',
     labelZh: '每 1 美元可购买的总 token 数',
     metrics: ['y_tokensPerDollarH', 'y_tokensPerDollarN', 'y_tokensPerDollarR'],
   },
   {
-    label: 'Output Tokens per $1',
+    label: 'Total Tokens per ¥1 CNY',
+    labelZh: '每 1 元人民币可购买的总 token 数',
+    metrics: ['y_tokensPerRmbH', 'y_tokensPerRmbN', 'y_tokensPerRmbR'],
+  },
+  {
+    label: 'Output Tokens per $1 USD',
     labelZh: '每 1 美元可购买的输出 token 数',
     metrics: ['y_outputTokensPerDollarH', 'y_outputTokensPerDollarN', 'y_outputTokensPerDollarR'],
   },
   {
-    label: 'Input Tokens per $1',
+    label: 'Output Tokens per ¥1 CNY',
+    labelZh: '每 1 元人民币可购买的输出 token 数',
+    metrics: ['y_outputTokensPerRmbH', 'y_outputTokensPerRmbN', 'y_outputTokensPerRmbR'],
+  },
+  {
+    label: 'Input Tokens per $1 USD',
     labelZh: '每 1 美元可购买的输入 token 数',
     metrics: ['y_inputTokensPerDollarH', 'y_inputTokensPerDollarN', 'y_inputTokensPerDollarR'],
+  },
+  {
+    label: 'Input Tokens per ¥1 CNY',
+    labelZh: '每 1 元人民币可购买的输入 token 数',
+    metrics: ['y_inputTokensPerRmbH', 'y_inputTokensPerRmbN', 'y_inputTokensPerRmbR'],
   },
   {
     label: 'Cost per Million Total Tokens',
@@ -641,7 +656,11 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
           )}
         </div>
 
-        {!hideGpuComparison && (
+        {/* Quick Filters slice by vendor, framework, deployment, and spec
+            decoding — dimensions the agentic scenario collapses into one
+            best-available curve per model, SKU, and engine, so the chips have
+            nothing meaningful to filter there. */}
+        {!hideGpuComparison && selectedSequence !== Sequence.AgenticTraces && (
           <div className="flex flex-col space-y-1.5" data-testid="quick-filters">
             <LabelWithTooltip
               htmlFor="quick-filters"

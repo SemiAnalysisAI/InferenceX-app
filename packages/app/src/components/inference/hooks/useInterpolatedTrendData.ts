@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { sequenceToIslOsl, USD_TO_CNY } from '@semianalysisai/inferencex-constants';
 
 import type { InferenceData, TrendDataPoint, YAxisMetricKey } from '@/components/inference/types';
 import {
@@ -86,6 +86,15 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
     inputTokensPerDollarH: wrapMetric(specs.costh ? inTokPerHr / specs.costh : 0),
     inputTokensPerDollarN: wrapMetric(specs.costn ? inTokPerHr / specs.costn : 0),
     inputTokensPerDollarR: wrapMetric(specs.costr ? inTokPerHr / specs.costr : 0),
+    tokensPerRmbH: wrapMetric(specs.costh ? tokPerHr / (specs.costh * USD_TO_CNY) : 0),
+    tokensPerRmbN: wrapMetric(specs.costn ? tokPerHr / (specs.costn * USD_TO_CNY) : 0),
+    tokensPerRmbR: wrapMetric(specs.costr ? tokPerHr / (specs.costr * USD_TO_CNY) : 0),
+    outputTokensPerRmbH: wrapMetric(specs.costh ? outTokPerHr / (specs.costh * USD_TO_CNY) : 0),
+    outputTokensPerRmbN: wrapMetric(specs.costn ? outTokPerHr / (specs.costn * USD_TO_CNY) : 0),
+    outputTokensPerRmbR: wrapMetric(specs.costr ? outTokPerHr / (specs.costr * USD_TO_CNY) : 0),
+    inputTokensPerRmbH: wrapMetric(specs.costh ? inTokPerHr / (specs.costh * USD_TO_CNY) : 0),
+    inputTokensPerRmbN: wrapMetric(specs.costn ? inTokPerHr / (specs.costn * USD_TO_CNY) : 0),
+    inputTokensPerRmbR: wrapMetric(specs.costr ? inTokPerHr / (specs.costr * USD_TO_CNY) : 0),
     // Energy: J/token = W / tok/s
     jTotal: wrapMetric(power > 0 && tput ? (power * 1000) / tput : 0),
     ...(outputTput ? { jOutput: wrapMetric(power > 0 ? (power * 1000) / outputTput : 0) } : {}),
@@ -139,6 +148,15 @@ const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>
   inputTokensPerDollarH: 'inputTputPerGpu',
   inputTokensPerDollarN: 'inputTputPerGpu',
   inputTokensPerDollarR: 'inputTputPerGpu',
+  tokensPerRmbH: 'tpPerGpu',
+  tokensPerRmbN: 'tpPerGpu',
+  tokensPerRmbR: 'tpPerGpu',
+  outputTokensPerRmbH: 'outputTputPerGpu',
+  outputTokensPerRmbN: 'outputTputPerGpu',
+  outputTokensPerRmbR: 'outputTputPerGpu',
+  inputTokensPerRmbH: 'inputTputPerGpu',
+  inputTokensPerRmbN: 'inputTputPerGpu',
+  inputTokensPerRmbR: 'inputTputPerGpu',
 };
 
 function recoverProportionalMultiplier(

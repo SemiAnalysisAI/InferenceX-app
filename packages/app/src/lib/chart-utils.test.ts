@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
+
+import { USD_TO_CNY } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 
 import type * as ConstantsModule from '@/lib/constants';
@@ -1183,6 +1185,17 @@ describe('createChartDataPoint', () => {
     expect(point.tokensPerDollarH!.y).toBeCloseTo(3_600_000 / 2.8, 5);
     expect(point.tokensPerDollarN!.y).toBeCloseTo(3_600_000 / 1.4, 5);
     expect(point.tokensPerDollarR!.y).toBeCloseTo(3_600_000 / 0.7, 5);
+  });
+
+  it('prices the same tokens in yuan at the pinned FX rate', () => {
+    const e = entry({ tput_per_gpu: 1000 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    // ¥ metrics are the $ metrics over USD_TO_CNY — the same tokens, priced in
+    // the other currency, so the two must stay in exact proportion.
+    expect(point.tokensPerRmbH!.y).toBeCloseTo(3_600_000 / (2.8 * USD_TO_CNY), 5);
+    expect(point.tokensPerRmbN!.y).toBeCloseTo(3_600_000 / (1.4 * USD_TO_CNY), 5);
+    expect(point.tokensPerRmbR!.y).toBeCloseTo(3_600_000 / (0.7 * USD_TO_CNY), 5);
+    expect(point.tokensPerRmbH!.y * USD_TO_CNY).toBeCloseTo(point.tokensPerDollarH!.y, 5);
   });
 
   it('sets cost fields to 0 when throughput is 0', () => {

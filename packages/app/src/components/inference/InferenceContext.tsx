@@ -80,6 +80,13 @@ import {
 /** @internal Exported for test provider wrapping only. */
 export const InferenceContext = createContext<InferenceChartContextType | undefined>(undefined);
 
+/**
+ * Dashboard default y-axis: total tokens purchasable per $1 USD at owning
+ * hyperscaler TCO. Leads with the economics rather than raw throughput —
+ * `?i_metric=` still wins, so existing shared links are unaffected.
+ */
+export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarH';
+
 export function InferenceProvider({
   children,
   activeTab,
@@ -234,7 +241,7 @@ export function InferenceProvider({
     }
   }, [selectedGpuResolution, setUrlParam]);
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(
-    () => getUrlParam('i_metric') || initialYAxisMetric || 'y_tpPerGpu',
+    () => getUrlParam('i_metric') || initialYAxisMetric || DEFAULT_Y_AXIS_METRIC,
   );
   const [selectedXAxisMetric, setSelectedXAxisMetric] = useState<string | null>(
     () => getUrlParam('i_xmetric') || 'p90_ttft',
