@@ -48,7 +48,7 @@ jobs:
   dump:
     name: Dump and compress
     needs: preflight
-    timeout-minutes: 180
+    timeout-minutes: 360
     runs-on: ubuntu-latest
     steps:
       - name: Dump, compress, and split database
