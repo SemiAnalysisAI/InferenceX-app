@@ -528,18 +528,15 @@ describe('valueAtMonth', () => {
 });
 
 describe('ramp sampling is anchored, not proportional', () => {
-  // The interactivity surface reads one lifecycle per (chip, interactivity slice)
-  // and then compares those slices against each other. A rung that no sweep
-  // measured at a given slice is dropped from that slice's timeline, so the
-  // *same* governing config can be followed by a different next rung — or by
-  // none — depending on the slice. That changes where the governing rollout's
-  // ramp ends.
+  // A rung that no sweep measured at the selected interactivity is dropped from
+  // the timeline, so the *same* governing config can be followed by a different
+  // next rung — or by none — depending on the target. That changes where the
+  // governing rollout's ramp ends.
   //
   // Nothing about the underlying curve changes: `levelWithin` is a function of
   // the rollout's own start, from, to and the user's rampMonths. Only the
-  // reconstruction can move, and it must not, or two slices disagree about a
-  // config they both ran and the surface rises along an axis the selection
-  // guarantees it falls along.
+  // reconstruction can move, and it must not, or the same config reconstructs
+  // differently depending on what else happened to be measured beside it.
   const ramped: LifecycleAssumptions = { ...assumptions, rampMonths: 3 };
 
   it('reconstructs a governing rollout identically whether or not it is cut short', () => {

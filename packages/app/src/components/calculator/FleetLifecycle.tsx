@@ -1,7 +1,6 @@
 'use client';
 
 import { BarChart3, Table2 } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -9,7 +8,6 @@ import { getModelReleaseDate } from '@semianalysisai/inferencex-constants';
 
 import type { HardwareConfig } from '@/components/inference/types';
 import { Card } from '@/components/ui/card';
-import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
@@ -50,7 +48,6 @@ import {
   type ThroughputStep,
 } from './lifecycle';
 import { getCostProviderLabel, getThroughputForType } from './ThroughputBarChart';
-import { useInteractivitySurface } from './useInteractivitySurface';
 import type { CalculatorMode, CostProvider, CostType, InterpolatedResult } from './types';
 import { useHistoricalBest } from './useHistoricalBest';
 
@@ -72,16 +69,6 @@ interface FleetLifecycleProps {
   /** Resolves a series colour from the calculator's theme palette. */
   colorResolver: (hwKey: string) => string;
 }
-
-/**
- * three.js is several hundred KB and only this one view needs it, so the surface
- * loads on first expand — the section is folded by default, and `CollapsibleSection`
- * unmounts a folded body, so a reader who never opens it never fetches it.
- */
-const FleetLifecycleSurface = dynamic(() => import('./FleetLifecycleSurface'), {
-  ssr: false,
-  loading: () => null,
-});
 
 type LifecycleView = 'chart' | 'table';
 
@@ -200,10 +187,6 @@ const STRINGS = {
     tipRunLink: 'Open run',
     chartInstructions:
       'Hover to read every chip at that date · Click to freeze the readout, click again to release · Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
-    surfaceTitle: 'Interactivity Surface',
-    surfaceToggle: 'Expand or fold this section',
-    surfaceDescription:
-      'The same fleets with interactivity as a third axis: what the fleet you would deploy for your target earns if users turn out to want faster or slower tokens. A fleet runs one config at a time, so the configs are fixed once at the slider interactivity — that slice is exactly the line above — and every other slice re-reads those same runs. Away from the slider this is therefore what your chosen fleet delivers, not the best config for that speed. Rotate it to read the shape. Screen-only: no export, and the Y axis, price, ramp, MTBI, recovery and horizon above all apply here unchanged.',
     assumptions: (tier: string, chips: string, release: string) =>
       `Anchored at the ${release} release. Fleet sized by facility power at ${chips}; cost = chips × ${tier} $/chip/hr, flat for the whole window. Revenue is priced on the selected token type and reduced by the availability haircut. Price, ramp, MTBI, recovery and horizon are your assumptions — the throughput steps are not.`,
     source: 'Source: ',
@@ -304,10 +287,6 @@ const STRINGS = {
     tipRunLink: '查看运行',
     chartInstructions:
       '悬停可读取该日期下所有 Chip 的数值 · 点击可冻结读数，再次点击解除 · Shift+滚轮 横向缩放 · 拖动平移 · 双击重置',
-    surfaceTitle: '交互性曲面',
-    surfaceToggle: '展开或折叠此板块',
-    surfaceDescription:
-      '同一批集群，以交互性作为第三个坐标轴：为你的目标交互性所部署的集群，在用户实际需要更快或更慢的 token 时会有怎样的表现。集群同一时刻只运行一套配置，因此配置在滑块所在的交互性上一次性确定——该切片即上方的曲线——其余切片只是把同一批运行结果按各自的交互性重新读取。因此在偏离滑块的位置，图中呈现的是你所选集群的表现，而非该速度下的最优配置。可旋转查看其形状。仅供屏幕查看：不支持导出；上方的 Y 轴、价格、爬坡期、平均无故障间隔、恢复时间与测算期在此同样适用。',
     assumptions: (tier: string, chips: string, release: string) =>
       `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = Chip 数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、爬坡期、平均无故障间隔、恢复时间与测算期为你的假设——吞吐量台阶不是。`,
     source: '来源：',
@@ -746,11 +725,6 @@ export default function FleetLifecycle({
     [rows],
   );
 
-  /**
-   * The 3D view is folded by default and its body unmounts when folded, so both the
-   * grid build and the three.js bundle are paid only by a reader who opens it.
-   */
-  const [surfaceOpen, setSurfaceOpen] = useState(false);
   const [view, setView] = useState<LifecycleView>('chart');
 
   const viewOptions = useMemo<SegmentedToggleOption<LifecycleView>[]>(
@@ -776,29 +750,6 @@ export default function FleetLifecycle({
     setView(value);
     track('calculator_lifecycle_view_changed', { view: value });
   }, []);
-  const surfaceGrid = useInteractivitySurface({
-    groups: historical.groups,
-    visibleHwKeys,
-    mode,
-    // The surface follows the 2D chart's y axis rather than carrying its own
-    // selector: two controls for one question is how the two views drift apart.
-    metric: yMetric,
-    costProvider,
-    costType,
-    cacheReadRatio,
-    mw,
-    anchorMs,
-    horizonMonths,
-    assumptions,
-    currentZ: targetValue,
-    labelFor: (baseGpu) => getLabel(baseGpu, hardwareConfig),
-    // Colour by the base GPU's latest config, matching the 2D lines: the palette is
-    // built over active hwKeys, so a bare base key would resolve to fallback grey.
-    colorFor: (baseGpu) =>
-      colorResolver(rows.find((r) => r.progression.baseGpu === baseGpu)?.colorKey ?? baseGpu),
-    enabled: surfaceOpen,
-  });
-
   const chartData = useMemo<LifecycleChartSeries[]>(
     () =>
       rows.map((r) => {
@@ -1329,32 +1280,6 @@ export default function FleetLifecycle({
                 }}
               />
             )}
-            <section data-testid="calculator-lifecycle-surface-section">
-              <CollapsibleSection
-                title={t.surfaceTitle}
-                toggleLabel={t.surfaceToggle}
-                testId="calculator-lifecycle-surface-collapse"
-                onToggle={(open) => {
-                  setSurfaceOpen(open);
-                  track('calculator_surface_toggled', { open });
-                }}
-                defaultOpen={false}
-              >
-                <div className="flex flex-col gap-2">
-                  <p className="text-muted-foreground text-sm">{t.surfaceDescription}</p>
-                  {surfaceGrid ? (
-                    <FleetLifecycleSurface grid={surfaceGrid} />
-                  ) : (
-                    <p
-                      className="text-muted-foreground text-sm"
-                      data-testid="calculator-lifecycle-surface-thin"
-                    >
-                      {t.noneMeasured}
-                    </p>
-                  )}
-                </div>
-              </CollapsibleSection>
-            </section>
           </figure>
         ) : (
           <p className="text-sm text-muted-foreground" data-testid="calculator-lifecycle-none">

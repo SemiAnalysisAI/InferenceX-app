@@ -352,12 +352,12 @@ export interface LifecycleSeries {
  * What a view plots. `margin` and `revenue` are rates in $/day; `cumulativeRevenue`
  * is the area under the revenue curve since the fleet's first config, in $.
  *
- * Lives here rather than in a chart component because both the 2D chart and the 3D
- * surface select on it, and the surface's grid builder is pure.
+ * Lives here rather than in a chart component because the selection is pure and
+ * the chart is not the only thing that reads it.
  *
  * Note the unit change: a caller that formats an axis or a tooltip must ask
  * `isCumulative` rather than assume $/day, and anything anchored to zero as
- * break-even (the 2D rule, the 3D plane) applies to `margin` alone.
+ * break-even (the dashed rule) applies to `margin` alone.
  */
 export type LifecycleMetric = 'margin' | 'marginPerMw' | 'revenue' | 'cumulativeRevenue';
 
@@ -367,8 +367,8 @@ export function isCumulative(metric: LifecycleMetric): boolean {
 }
 
 /**
- * True when zero on this metric means break-even, so a view may draw a rule (2D)
- * or a plane (3D) there. Per-MW margin is still revenue − cost, only rescaled by
+ * True when zero on this metric means break-even, so a view may draw a rule
+ * there. Per-MW margin is still revenue − cost, only rescaled by
  * a positive number, so its zero crossing is the same instant as `margin`'s.
  */
 export function isBreakEvenAnchored(metric: LifecycleMetric): boolean {
@@ -603,14 +603,12 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
       // window, so reading between samples with a straight line overestimates by
       // an amount that grows with the spacing. Dividing the window into
       // RAMP_SAMPLES pieces makes that spacing a function of `rampEnd` — and
-      // `rampEnd` depends on whether the *next* config is present. That is fine
-      // for one line, which is self-consistent, but the interactivity surface
-      // compares slices, and a rung unreadable at one slice is dropped there and
-      // kept at the next. Two slices would then reconstruct the identical
-      // governing config on different grids and disagree, which showed up as the
-      // surface rising along z where the selection guarantees it must fall.
-      // A cadence fixed by `rampMonths` — a user assumption, shared by every
-      // slice — puts the samples at the same months either way.
+      // `rampEnd` depends on whether the *next* config is present. One line is
+      // self-consistent either way, but two lifecycles built from the same runs
+      // at different interactivities would sample the identical governing config
+      // on different grids and disagree. A cadence fixed by `rampMonths` — a user
+      // assumption, independent of which configs happen to be readable — puts the
+      // samples at the same months regardless.
       const spacing = rampMonths / RAMP_SAMPLES;
       let s = 0;
       for (; rollout.start + spacing * s < rampEnd - EPSILON_MONTHS; s += 1) {

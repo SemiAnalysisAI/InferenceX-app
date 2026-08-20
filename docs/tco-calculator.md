@@ -511,186 +511,6 @@ The rule's group is `.lower()`ed on every draw. `renderLines` keeps its paths ac
 re-renders through a data join while this layer removes and re-appends, so without
 that the dashed rule climbs above the lines after the first repaint.
 
-### Interactivity Surface (the 3D view)
-
-A folded section under the 2D chart plots the same fleets with **interactivity as a
-third axis**: x = time, y = the 2D chart's selected metric in $/day, z = interactivity,
-one shaded surface per chip, rotatable (`FleetLifecycleSurface.tsx` + `surface/`, data
-in `interactivity-surface.ts`).
-
-It answers: **the fleet I would deploy for my target, what does it earn if users turn
-out to want faster or slower tokens than I planned for?**
-
-🔴 The rule that shapes everything: **a fleet runs one config at a time.** The rungs
-are chosen once, at the calculator's target, by exactly the 1D pipeline
-(`stepsAtInteractivity` at `currentZ`) — so the slice at the slider _is_ the 2D
-chart's line — and every other slice re-reads **those same sweeps** at its own
-interactivity. A date has one config across the whole z axis, because that is what a
-deployed fleet has.
-
-The tempting alternative is to re-derive the best-so-far staircase per slice. It draws
-something no operator can buy: at one instant, the fleet running config A for users who
-want 20 tok/s/user and config B for users who want 120 — two fleets. It also puts step
-changes along z wherever the winner flips, and those cliffs read as economics when they
-are really the boundary of where a sweep happens to have been run.
-
-Fixing the winner is only half of it, and the other half is easy to miss. A rung whose
-sweep was never measured at some slice cannot contribute there — and if that date's cell
-then falls back to the config it replaced, the timeline changes with z again and the
-same bug is back one level down. It shows up as a **rippling** surface. So a date whose
-config is unmeasured at a slice is a **hole**, never the previous config. (Rollouts need
-one extra guard: a ramp climbs from whatever the fleet was serving before, so if the
-previous config is unmeasured at that slice the ramp — and only the ramp — is unknown
-too. `contaminatedRungs` computes that, including chains through rollouts that were
-themselves still climbing.)
-
-That is what makes the surface monotone in z **under total-token pricing**, and
-monotonicity is the check worth running there: at a fixed date the value is one config's
-frontier read, or two blended by a ramp whose weights depend on the date alone, so it
-can only fall as users demand faster tokens. Measured over the shipped fixture at four
-targets with total-token pricing — ~33k live cells — the current code has **zero**
-violations; the fallback version had 79–132 per target, with jumps up to 440×. At
-input-token pricing the same grids legitimately contain rises (below), so monotonicity
-is a valid regression check for `costType: 'total'` only.
-
-The cost of the honest rule has to be stated in the UI, and is: **away from the target,
-the surface is not the best that chip could do.** A config picked for 35 tok/s/user may
-be beaten at 120 by one the fleet passed over. The caption says so. It also costs
-coverage — about 12% of cells on the fixture become holes — which is the right trade:
-those cells were previously showing a config the fleet had already replaced.
-
-**Which way does the surface tilt along z?** For total-token pricing, down — and that is
-a theorem, not a measurement: chip count is fixed by the power budget and price is one
-scalar, so revenue tracks tok/s/chip, and for total tokens that number is the Pareto
-frontier's own y axis, which `paretoFrontUpperLeft` constructs strictly decreasing in
-interactivity. The fixture agrees because it must: across the shipped fixture's 197
-sweeps (1k/1k, fp8 + fp4), tok/s/chip falls across the frontier's own range in all 160
-multi-point frontiers and is flat in the 37 single-point ones.
-
-The guarantee now covers every pricing, which it did not before. Revenue is
-`total × (share × inputPrice + (1 − share) × outputPrice)`, a positive multiple of the
-frontier's own axis whenever the token mix holds — and on a fixed sequence the mix _is_
-the sequence shape, constant to within 0.2% across all of production history. Measured
-on the shipped fixture: **0 rises in 27,837 cross-slice comparisons**, over 8k/1k and
-1k/1k, at ramp 0 and 3, priced alike, at 4× output, and at output-only.
-
-The caveat that used to sit here — 12 sweeps rising on input throughput, grids at input
-pricing carrying z-rises of up to ~4% per slice step — was an **artifact, not a
-finding**. See "The disaggregated token-split trap" below.
-
-**A running total cannot span a hole.** The rate metrics resume after a gap, correctly:
-a rate at a given date depends only on the config governing then. A running total does
-not — it contains every interval before it, and where a rung the fleet actually ran is
-missing from a slice's timeline, `computeLifecycle` integrates that window at the
-previous config's rate, which the staircase says was slower. On a 12-month window with
-one 3-month hole that understates the total by ≥ $1.72B, ≥ 7.7%, in every later cell,
-with nothing on screen to say so. So a cumulative row ends at its first gap, and a slice
-missing its _first_ rung shows nothing at all — otherwise the totals compared along z
-would cover different windows (9.88 months against 11.80 on the test fixture), which is
-not a comparison. Rates are deliberately left alone.
-
-Holding the config fixed is what lets that read cleanly, and is the strongest argument
-for the rule. With a per-slice winner the same fixture jumps 5,009 → 14,275 tok/s
-between the 15.1 and 18.5 tok/s/user slices — not because the economics turn, but
-because below 18.5 the 2.85×-better `b300_dynamo-trt_mtp@2026-01-28` was never swept and
-a weaker config inherits the slice. Fixing the rungs turns that artefact back into what
-it always was: a hole. The unit tests pin exactly this, and the previous implementation
-fails all three.
-
-Five decisions that are easy to get wrong, and why:
-
-- **Slices are never interpolated into one another.** A rung exists on a slice only
-  where its own sweep was measured, so blending adjacent slices would invent risers on
-  dates nothing was measured. Every slice is evaluated independently and sampled onto
-  one shared time grid; z is the axis you read across, not one you interpolate along.
-- **Holes are drawn as holes.** Reads outside a run's measured range are excluded, not
-  clamped, so coverage is banded: measured on the shipped fixture, the fraction of
-  sweeps covering a given interactivity peaks near 65% and falls to ~2% at both ends
-  of the axis, and 37 of 197 sweeps have single-point frontiers that can never
-  contribute. `buildSurfaceGeometry` indexes a quad only when all four corners carry a
-  value, so gaps terminate the mesh instead of bridging it — and the caption says so.
-- **One price for the whole surface.** Re-seeding break-even per slice would zero the
-  margin along every slice at once, flattening the crossing into a plane and
-  destroying the cross-slice comparison. The section's own price applies unchanged, so
-  the zero contour is a real answer: where this fleet, at the price you set, stops
-  losing money.
-- **The y axis is the 2D chart's selector, not a second control.** `SurfaceGrid` carries
-  its own `metric` — margin, revenue, or cumulative revenue — so a view cannot label an
-  axis with one quantity and draw another; the break-even plane is drawn only on a
-  margin grid, since on the other two nothing is subtracted and zero is the floor rather
-  than a threshold anything crosses. On a cumulative grid the surface rises along time
-  and still falls along z, which is the same finding the rate surfaces show, integrated:
-  faster tokens per user buy fewer tokens per chip, so the area under the curve shrinks
-  too. The unit tests pin the
-  relationship: the two grids differ by exactly the flat cost, in every live cell, and
-  their holes fall in identical places, because coverage is a property of the run
-  history and not of which rate is plotted.
-- **The frontier is prepared once and read many times.** `interpolateForGPU` bakes the
-  target into its last step and builds ten splines per call; twenty slices that way is
-  ~160k spline builds. `prepareFrontier` hoists the Pareto pass and the slope solves
-  out and narrows to the three metrics a fleet needs, which is ~2.4k solves plus cheap
-  Hermite evaluations. It **composes** `paretoFrontUpperLeft` / `monotoneSlopes` /
-  `hermiteInterpolate` and changes none of them, because AGENTS.md hard-syncs those
-  with a Python port.
-
-That last point duplicates the 1D module's selection rules, so
-`interactivity-surface.test.ts` pins the duplication: `stepsAtInteractivity` must agree
-with `bestSoFarProgression` + `mergeProgressionsByChip` at every target — which is also
-what makes the slider's slice identical to the 2D line, since the grid selects there —
-and
-`prepareFrontier` must agree with `interpolateForGPU` at every target inside a range.
-Both were mutation-checked — clamping instead of refusing to extrapolate fails five
-tests. Note the per-hwKey running-max gate is _not_ pinned and cannot be: the pooled
-merge runs its own running maximum and drops the same candidates, so removing that
-gate leaves every test green. It is an early filter, not the rule that makes a
-staircase.
-
-Rendering notes worth keeping:
-
-- **Rotation is three's own `OrbitControls`**, instantiated imperatively (not via R3F
-  `extend()` — it is not an `Object3D`, and imperative lets its `change` event drive
-  `invalidate()` for on-demand rendering). No new dependency: `three` and
-  `@react-three/fiber` were already here. Elevation is clamped short of horizontal so
-  the floor never flips overhead.
-- **Surfaces are opaque.** Transparency sorts per object by bounding-sphere distance,
-  and five surfaces spanning one volume have near-identical centres, so the order flips
-  mid-rotation and they pop in front of each other. Only two things are translucent:
-  the break-even plane (one quad, `depthWrite: false`) and dimmed non-focused chips
-  (one group, so the sort is trivial).
-- **The value axis fills the box; break-even is positioned, not assumed.** It is
-  tempting to offset the value range so that $0 lands on world y 0 — then the
-  break-even plane needs no offset and "above water" is a sign test on a coordinate.
-  That only fits when zero sits at the middle of the range: a margin range of
-  −$250k…+$50k, or a revenue grid whose floor _is_ zero, maps outside ±h/2 and the
-  surface draws **outside the frame it is inside**. So all three axes span the box the
-  same way and the plane sits at `yOf(0)`.
-- **The camera distance is fitted to the aspect ratio.** `fov` is the _vertical_ angle,
-  so a fixed camera position pads a tall panel with dead space and crops a narrow phone
-  viewport. `fitCameraDistance` fits the box's bounding **sphere** — bearing-independent,
-  so the framing does not breathe as the reader rotates — and the double-click reset
-  goes through the same function. A resize re-fits only while the camera is still where
-  the last fit put it, so a deliberate zoom survives one.
-- **Colour must go through a canvas probe.** `THREE.Color` cannot parse `oklch()` and
-  yields **black** silently — and this palette is oklch. `surface/surfaceColors.ts`
-  resolves every colour through a 2d context first.
-- **Labels are DOM, reprojected per frame**, not sprite textures: they inherit the
-  theme and the font stack, stay crisp at any zoom, and are assertable in tests. Which
-  edges carry them is recomputed from the camera azimuth each frame
-  (`pickAxisEdges`) — and the value axis deliberately avoids the corner where the time
-  and interactivity ticks converge, because three tick families at one corner are
-  unreadable.
-- **Isolating a chip is the most valuable control here**, more than the rotation:
-  height fields occlude each other from every angle, and under the vendor palette four
-  of the five chips are greens. Hence the chip row above the canvas.
-- **No export.** The PNG path clones the DOM and re-renders through html-to-image, and
-  `cloneNode` does not carry a canvas bitmap, so a WebGL view would export as an empty
-  rectangle. The 2D chart stays the exportable artefact.
-- **No WebGL → a named note.** The context is probed _before_ a `<Canvas>` is
-  constructed, so on a GPU-less runner nothing mounts and nothing hangs; a lost context
-  after a successful probe swaps to the same note. The section is also folded by
-  default, so three.js is not in the initial payload and the grid is not built for a
-  reader who never opens it.
-
 ### Known visual limitation: the palette is not colourblind-safe here
 
 An adversarial review ran the series colours through a CVD validator and the result
@@ -881,8 +701,8 @@ handed to a disagg config a comparable basis rejects; on **input**, 17 of 46 cha
 `mi355x_mooncake-atom@2026-06-12` won the output ranking at 25 and 30 tok/s/user on the
 raw basis; on a comparable one `mi355x_atom_mtp@2026-07-28` wins.
 
-So `getComparableTpPerMwForType` splits `tpPerMw` by the same share, and both the 2D
-selection (`useHistoricalBest`) and the 3D reader (`prepareFrontier`'s `rankOf`) use it.
+So `getComparableTpPerMwForType` splits `tpPerMw` by the same share, and the
+lifecycle selection (`useHistoricalBest`) uses it.
 For an aggregated config it is an exact identity — the rates already sum to the total, so
 `tpPerMw × share` _is_ `inputTpPerMw` — so only disaggregated rows move.
 
@@ -913,8 +733,8 @@ because a reader could reasonably expect more of it than it delivers:
   metric at zero rather than dividing by it.
 
 Because the rescale is by a positive constant, zero is still break-even — hence
-`isBreakEvenAnchored`, which is what the 2D chart's dashed rule and the 3D
-surface's plane test rather than comparing against `'margin'` directly.
+`isBreakEvenAnchored`, which is what the chart's dashed rule tests rather than
+comparing against `'margin'` directly.
 
 ### Agentic traces, and cached input tokens
 

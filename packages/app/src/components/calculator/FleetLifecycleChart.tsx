@@ -100,7 +100,7 @@ interface SliceReading {
   cumulative: number;
 }
 
-/** Which per-day rate the y axis plots. Defined in `lifecycle.ts`, which the 3D surface also selects on. */
+/** Which per-day rate the y axis plots. Defined in `lifecycle.ts`, which selects on it. */
 export type { LifecycleMetric } from './lifecycle';
 
 interface FleetLifecycleChartProps {
