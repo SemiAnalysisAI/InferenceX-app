@@ -61,13 +61,22 @@ describe('Calculator — Interactivity Surface', () => {
   });
 
   it('discloses the holes rather than presenting a solid surface', () => {
-    // Reads outside a run's measured interactivity range are excluded, so a surface
-    // legitimately has gaps. Saying so is load-bearing, not decoration.
-    surfaceSection().should('contain.text', 'Gaps are interactivity levels no run measured');
-    surfaceSection().should('contain.text', 'Slider interactivity');
-    // And the limitation of holding one config across the axis: away from the
-    // slider this is the chosen fleet, not the best config for that speed.
+    // The limitation of holding one config across the axis is prose in the intro,
+    // so it is there whether or not the canvas is: away from the slider this is
+    // the chosen fleet, not the best config for that speed.
     surfaceSection().should('contain.text', 'not the best config for that speed');
+    hasWebgl().then((webgl) => {
+      if (!webgl) {
+        // No context, no surface, so no holes to disclose — the fallback note
+        // stands in for the whole view, and is asserted above.
+        cy.get('[data-testid="calculator-lifecycle-surface-unavailable"]').should('be.visible');
+        return;
+      }
+      // Reads outside a run's measured interactivity range are excluded, so a
+      // surface legitimately has gaps. Saying so is load-bearing, not decoration.
+      surfaceSection().should('contain.text', 'Gaps are interactivity levels no run measured');
+      surfaceSection().should('contain.text', 'Slider interactivity');
+    });
   });
 
   it('isolates one chip, since overlapping surfaces occlude each other', () => {
