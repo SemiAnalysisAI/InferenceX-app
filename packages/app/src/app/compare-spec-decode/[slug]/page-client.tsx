@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card';
 import { track } from '@/lib/analytics';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare-enum-coerce';
 import { SPEC_METHODS_ACTIVE } from '@/lib/compare-variant-slug';
+import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
 
 interface SsrTableData {
   defaultTargets: number[];
@@ -64,6 +65,9 @@ interface CompareSpecDecodePageClientProps {
   defaultPrecision: string | null;
   ssrTableData: SsrTableData;
   narrative: string[];
+  /** Set only when the page is rendering the agentic workload. Explains
+   *  what AgentX measures before the head-to-head numbers. */
+  agenticIntro?: AgenticScenarioIntro | null;
   gpuLabel: string;
   precisionLabel: string;
   gpuArch: string;
@@ -84,6 +88,7 @@ export default function CompareSpecDecodePageClient({
   defaultPrecision,
   ssrTableData,
   narrative,
+  agenticIntro = null,
   gpuLabel,
   precisionLabel,
   gpuArch,
@@ -163,6 +168,21 @@ export default function CompareSpecDecodePageClient({
                   </p>
                 </div>
               </div>
+              {agenticIntro && (
+                <p
+                  className="mt-3 max-w-3xl text-sm text-foreground/80"
+                  data-testid="compare-agentic-intro"
+                >
+                  {agenticIntro.paragraph}{' '}
+                  <Link
+                    href={agenticIntro.href}
+                    data-testid="compare-agentic-intro-link"
+                    className="font-medium text-brand underline underline-offset-4 hover:no-underline"
+                  >
+                    {agenticIntro.linkLabel} →
+                  </Link>
+                </p>
+              )}
               {narrative.length > 0 && (
                 <div
                   className="mt-3 flex flex-col gap-2"

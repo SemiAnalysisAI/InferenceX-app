@@ -9,6 +9,12 @@ import {
 } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
+import { AGENTIC_SCENARIO_INTRO_ZH } from '@/lib/compare-ssr-zh';
+import {
+  isAgenticSequence,
+  type ScenarioSegment,
+  sequenceForScenarioSegment,
+} from '@/lib/compare-scenario-route';
 import { getCachedBenchmarks, KNOWN_SEQUENCES, pickString } from '@/lib/compare-ssr';
 import {
   canonicalSpecDecodeCompareSlug,
@@ -34,6 +40,30 @@ import CompareSpecDecodePageClient from '../../../compare-spec-decode/[slug]/pag
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * `/zh/compare-spec-decode/<slug>/<scenario>` renders this same page with the workload
+ * pinned by the path. The segment is threaded through rather than duplicated
+ * in a parallel route file so the body — redirects, JSON-LD, metadata, client
+ * props — is written once and cannot drift between the two URLs.
+ */
+export interface ScenarioOptions {
+  scenarioSegment?: ScenarioSegment;
+}
+
+/** English twin of `scenarioPath` — hreflang pairs are keyed off the
+ *  English route, so the segment has to survive the locale swap. */
+function enScenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): string {
+  return scenarioSegment
+    ? `/compare-spec-decode/${canonical}/${scenarioSegment}`
+    : `/compare-spec-decode/${canonical}`;
+}
+
+function scenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): string {
+  return scenarioSegment
+    ? `/zh/compare-spec-decode/${canonical}/${scenarioSegment}`
+    : `/zh/compare-spec-decode/${canonical}`;
+}
+
 interface Props {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -41,6 +71,13 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+  return buildSpecDecodeMetadataZh(slug, {});
+}
+
+export function buildSpecDecodeMetadataZh(
+  slug: string,
+  { scenarioSegment }: ScenarioOptions,
+): Metadata {
   const parsed = parseSpecDecodeCompareSlug(slug);
   if (!parsed) return {};
   const gpuMeta = HW_REGISTRY[parsed.gpu];
@@ -53,13 +90,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     parsed.precision,
     parsed.method,
   );
-  const url = `${SITE_URL}/zh/compare-spec-decode/${canonical}`;
+  // The scenario segments are views of one comparison, so the bare slug URL
+  // stays the indexable representative and every segment canonicalizes to it.
+  // Without this, `/…/<slug>/<default-scenario>` and `/…/<slug>` would serve
+  // byte-identical pages, each claiming to be canonical.
+  const routePath = scenarioPath(canonical, scenarioSegment);
+  const url = `${SITE_URL}${routePath}`;
   const description = `${parsed.model.label} 在 ${gpuLabel} ${precLabel} 上的 ${aLabel} vs Off 投机解码对比：来自 InferenceX（SemiAnalysis 推出的独立开源基准测试平台）的经验证、可复现结果。${SUPPORTERS_LINE_ZH}查看投机解码是否在各交互性水平下提升吞吐量和降低成本。`;
   const title = `${parsed.model.label} — ${gpuLabel} ${precLabel}: ${aLabel} vs Off — 投机解码对比`;
   return {
     title,
     description,
-    alternates: zhAlternates(`/compare-spec-decode/${canonical}`),
+    alternates: zhAlternates(enScenarioPath(canonical)),
     openGraph: {
       title: `${title} | ${SITE_NAME}`,
       description,
@@ -77,10 +119,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CompareSpecDecodePageZh({ params, searchParams }: Props) {
   const { slug } = await params;
+  return renderSpecDecodePageZh(slug, await searchParams, {});
+}
+
+export async function renderSpecDecodePageZh(
+  slug: string,
+  sp: Record<string, string | string[] | undefined>,
+  { scenarioSegment }: ScenarioOptions,
+) {
   const parsed = parseSpecDecodeCompareSlug(slug);
   if (!parsed) notFound();
-
-  const sp = await searchParams;
 
   const canonical = canonicalSpecDecodeCompareSlug(
     parsed.model.slug,
@@ -97,7 +145,9 @@ export default async function CompareSpecDecodePageZh({ params, searchParams }: 
       })
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
-    permanentRedirect(`/zh/compare-spec-decode/${canonical}${qs ? `?${qs}` : ''}`);
+    // Keep the scenario segment across the redirect — dropping it would send
+    // the reader to the pair's default workload instead.
+    permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
   const rows = await getCachedBenchmarks(parsed.model.dbKeys);
@@ -113,7 +163,9 @@ export default async function CompareSpecDecodePageZh({ params, searchParams }: 
   const defaults = pickVariantPairDefaults('spec-decode', rows, parsed.gpu, sideA, sideB);
 
   const urlSeq = pickString(sp.i_seq);
-  const effectiveSequence = urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : defaults.sequence;
+  const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
+  const effectiveSequence =
+    pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : defaults.sequence);
   const effectivePrecision = parsed.precision;
 
   const sideAFull: VariantCompareSide = {
@@ -137,7 +189,7 @@ export default async function CompareSpecDecodePageZh({ params, searchParams }: 
   const summaryB = summarizeVariantSide(rows, parsed.gpu, sideBFull);
   const { oldest, newest } = dateRangeForVariantPair(rows, parsed.gpu, sideAFull, sideBFull);
 
-  const url = `${SITE_URL}/zh/compare-spec-decode/${canonical}`;
+  const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
   // The PNG route exists only under the EN tree; zh JSON-LD references it there.
   const imageUrl = `${SITE_URL}/compare-spec-decode/${canonical}/spec-decode-comparison.png`;
 
@@ -184,6 +236,7 @@ export default async function CompareSpecDecodePageZh({ params, searchParams }: 
         defaultPrecision={effectivePrecision}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         narrative={narrative}
+        agenticIntro={isAgenticSequence(effectiveSequence) ? AGENTIC_SCENARIO_INTRO_ZH : null}
         gpuLabel={gpuLabel}
         precisionLabel={precLabel}
         gpuArch={gpuMeta?.arch ?? ''}
