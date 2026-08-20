@@ -37,14 +37,21 @@ describe('AgentX comparison links', () => {
       sequence: 'agentic-traces',
     });
     expect(comparisonPairHref('en', 'deepseek-v4-h100-vs-h200', deepSeekV4)).toBe(
-      '/compare/deepseek-v4-h100-vs-h200?i_seq=agentic-traces',
+      '/compare/deepseek-v4-h100-vs-h200/agentic',
     );
     expect(comparisonScenarioForModel(deepSeekR1)).toEqual({
       label: '8K→1K',
       sequence: '8k/1k',
     });
     expect(comparisonPairHref('zh', 'deepseek-r1-h100-vs-h200', deepSeekR1)).toBe(
-      '/zh/compare/deepseek-r1-h100-vs-h200?i_seq=8k%2F1k',
+      '/zh/compare/deepseek-r1-h100-vs-h200/8k-1k',
     );
+    // The per-dollar catalog links the same workloads under its own family.
+    expect(
+      comparisonPairHref('en', 'deepseek-v4-h100-vs-h200', deepSeekV4, 'compare-per-dollar'),
+    ).toBe('/compare-per-dollar/deepseek-v4-h100-vs-h200/agentic');
+    expect(
+      comparisonPairHref('zh', 'deepseek-r1-h100-vs-h200', deepSeekR1, 'compare-per-dollar'),
+    ).toBe('/zh/compare-per-dollar/deepseek-r1-h100-vs-h200/8k-1k');
   });
 });

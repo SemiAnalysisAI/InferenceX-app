@@ -1,3 +1,4 @@
+import { scenarioSegmentForSequence } from '@/lib/compare-scenario-route';
 import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
 
 const FEATURED_AGENTX_MODEL_SLUGS = [
@@ -39,12 +40,19 @@ export function comparisonScenarioForModel(model: CompareModelSlug): ComparisonS
     : { label: '8K→1K', sequence: '8k/1k' };
 }
 
+/**
+ * Catalog card link for a comparison pair, pointing at the workload the model
+ * actually has data for. The workload rides in the path (`/…/<slug>/agentic`)
+ * rather than `?i_seq=`, so a card links to a real, shareable address for that
+ * scenario instead of a query-string variant of the default view.
+ */
 export function comparisonPairHref(
   locale: 'en' | 'zh',
   slug: string,
   model: CompareModelSlug,
+  family: 'compare' | 'compare-per-dollar' = 'compare',
 ): string {
-  const path = locale === 'zh' ? `/zh/compare/${slug}` : `/compare/${slug}`;
-  const query = new URLSearchParams({ i_seq: comparisonScenarioForModel(model).sequence });
-  return `${path}?${query}`;
+  const path = locale === 'zh' ? `/zh/${family}/${slug}` : `/${family}/${slug}`;
+  const segment = scenarioSegmentForSequence(comparisonScenarioForModel(model).sequence);
+  return segment ? `${path}/${segment}` : path;
 }

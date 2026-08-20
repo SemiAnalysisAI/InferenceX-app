@@ -88,6 +88,27 @@ describe('Compare scenario routes', () => {
     }
   });
 
+  it('links catalog cards to scenario paths rather than query strings', () => {
+    for (const base of ['/compare', '/compare-per-dollar']) {
+      cy.visit(base);
+      cy.get('#deepseek-v4 a[data-scenario="AgentX"]')
+        .first()
+        .should('have.attr', 'href')
+        .and('match', new RegExp(`^${base}/.+/agentic$`, 'u'));
+      cy.get('#deepseek-r1 a[data-scenario="8K→1K"]')
+        .first()
+        .should('have.attr', 'href')
+        .and('match', new RegExp(`^${base}/.+/8k-1k$`, 'u'));
+    }
+  });
+
+  it('splits the per-dollar catalog by scenario the way /compare does', () => {
+    cy.visit('/compare-per-dollar');
+    cy.contains('Models with AgentX data open long-context').should('be.visible');
+    cy.get('a[data-scenario="AgentX"]').should('have.length.greaterThan', 0);
+    cy.get('a[data-scenario="8K→1K"]').should('have.length.greaterThan', 0);
+  });
+
   it('ships the Chinese explainer on the Chinese scenario route', () => {
     cy.visit(`/zh/compare/${AGENTX_SLUG}/agentic`);
 

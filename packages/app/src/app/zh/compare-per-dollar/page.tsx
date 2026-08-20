@@ -11,6 +11,7 @@ import {
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
 import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
 import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
 import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
@@ -102,6 +103,10 @@ export default async function ComparePerDollarIndexPageZh() {
             。性能按所属云服务商 TCO 归一化——每个页面展示每 token 成本图表及插值美元/百万 token
             对比表格，帮助您在任意目标交互性水平下选出更经济的 Chip。
           </p>
+          <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
+            具备 AgentX 数据的模型会打开长上下文、多轮 trace 回放结果；尚未纳入 AgentX
+            的模型则打开受控的 8K→1K 负载。每张卡片都会标明其对应场景。
+          </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               data-testid="compare-per-dollar-index-compare-link-zh"
@@ -140,6 +145,9 @@ export default async function ComparePerDollarIndexPageZh() {
       {modelsWithPairs.map((model) => {
         const pairs = comparablePairsByModel.get(model.slug) ?? [];
         const groups = groupPairsByVendorForModel(model, pairs);
+        // Same scenario split /compare uses: models with AgentX data open the
+        // agentic trace replay, the rest open the fixed 8K→1K workload.
+        const scenario = comparisonScenarioForModel(model);
         return (
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
@@ -163,10 +171,11 @@ export default async function ComparePerDollarIndexPageZh() {
                       return (
                         <ComparePairCardLink
                           key={slug}
-                          href={`/zh/compare-per-dollar/${slug}`}
+                          href={comparisonPairHref('zh', slug, model, 'compare-per-dollar')}
                           slug={slug}
                           label={label}
                           archLine={archLine}
+                          scenarioLabel={scenario.label}
                         />
                       );
                     })}
