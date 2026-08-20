@@ -95,7 +95,8 @@ const NOUN_ZH: Record<string, string> = {
   cost: '成本',
   'cost per million tokens': '每百万 token 成本',
   'token cost': 'token 成本',
-  'tokens per $1': '每 1 美元可购买的 token 数',
+  'tokens per $1 USD': '每 1 美元可购买的 token 数',
+  'tokens per ¥1 RMB': '每 1 元人民币可购买的 token 数',
   'purchasing power': '购买力',
   'input throughput': '输入吞吐量',
   'output throughput': '输出吞吐量',
@@ -246,7 +247,7 @@ export function MetricAssumptionNotes({
         visible={showCostCaveat}
         calculationNoun={
           isTokensPerRmb
-            ? 'tokens per ¥1 CNY'
+            ? 'tokens per ¥1 RMB'
             : isTokensPerDollar
               ? 'tokens per $1 USD'
               : 'cost per million tokens'
