@@ -7,6 +7,7 @@ const timelineRequest = (
   overrides: Record<string, unknown> = {},
 ) => ({
   cid: 'conversation-1',
+  ri: 0,
   ti: index,
   wid: 'worker-1',
   ad: 0,
@@ -73,7 +74,7 @@ describe('Agentic point request metric time series', () => {
     cy.intercept('GET', '/api/v1/benchmark-siblings*', { body: benchmarkSiblings });
     cy.intercept('GET', '/api/v1/request-timeline*', {
       body: {
-        version: 3,
+        version: 6,
         startNs: 0,
         endNs: 7_000_000_000,
         durationS: 7,
@@ -82,7 +83,7 @@ describe('Agentic point request metric time series', () => {
           timelineRequest(1, 200, 20),
           timelineRequest(2, 400, 25),
           timelineRequest(3, 800, 40),
-          timelineRequest(4, 1600, 80),
+          timelineRequest(4, 1600, 80, { ri: 1 }),
           timelineRequest(5, 3200, 160, { phase: 'warmup' }),
           timelineRequest(6, 6400, 320, { cancelled: true }),
           timelineRequest(7, 0, 0, {
@@ -228,6 +229,12 @@ describe('Agentic point request metric time series', () => {
     // coverage is now continuous across [0s, 7s]: idle 0ms (0.0%). A 1.00s value
     // here would mean the Gantt had regressed to label-based filtering.
     cy.get('[data-testid="timeline-total-idle-time"]').should('have.text', 'idle 0ms (0.0%)');
+    cy.get('[data-timeline-row-kind="parent"]')
+      .should('have.length', 2)
+      .then(($rows) => {
+        expect($rows.eq(0)).to.contain.text('conversation-1 · replay 1');
+        expect($rows.eq(1)).to.contain.text('conversation-1 · replay 2');
+      });
     cy.get('[data-timeline-row-kind="aux"]')
       .should('have.css', 'padding-left', '24px')
       .and('contain.text', 'aux 011 · parallel');

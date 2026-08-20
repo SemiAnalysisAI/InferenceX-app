@@ -157,6 +157,23 @@ AIPerf exports public-dataset provenance in `metadata.dataset`, including the Hu
 
 Legacy artifacts without provenance leave any existing mapping untouched. A workflow run can map to only one dataset; conflicting dataset IDs fail ingest rather than silently linking the run to an arbitrary dataset.
 
+### Agentic Replay-Lane Identity
+
+AIPerf can sample one dataset conversation into multiple trajectory lanes, and
+those replays may execute concurrently. The source `conversation_id` therefore
+identifies dataset provenance, not a unique execution lane. During trace-replay
+ingest, `computeRequestTimeline()` groups requests by `root_correlation_id`
+(falling back to `x_correlation_id`) and replaces the repeated UUID with a
+compact, deterministic numeric `ri` ranked by each lane's first dispatch.
+
+The request-timeline frontend groups by `(conversation_id, ri)`, keeping all
+main-agent, subagent, warmup, and profiling requests from one replay together.
+Legacy timelines without correlation metadata omit `ri` and retain the older
+conversation-only grouping. `REQUEST_TIMELINE_VERSION` invalidates derived
+JSONB when this extraction changes; `db:backfill-request-timeline` recomputes it
+from the raw gzipped `profile_export.jsonl` already stored in Neon, so no GitHub
+artifact refetch or schema migration is required.
+
 ### Agentic Full-Response Interactivity
 
 Agentic charts use full-response inter-token latency as their canonical ITL and

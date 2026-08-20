@@ -14,11 +14,13 @@
 import { gunzipSync } from 'node:zlib';
 
 /** Bump when the extraction algorithm changes — backfill recomputes anything older. */
-export const REQUEST_TIMELINE_VERSION = 5;
+export const REQUEST_TIMELINE_VERSION = 6;
 
 export interface RequestRecord {
   /** Conversation id (groups turns of one agent session). */
   cid: string;
+  /** Compact replay-lane id derived from AIPerf's stable correlation id. */
+  ri?: number;
   /** Zero-based turn index within the conversation. */
   ti: number;
   /** Source trace id from the original raw dataset, when distinct from replay cid. */
@@ -67,6 +69,8 @@ export interface RequestTimeline {
 
 interface RawMetadata {
   conversation_id?: string;
+  root_correlation_id?: string;
+  x_correlation_id?: string;
   turn_index?: number;
   source_trace_id?: string;
   source_outer_idx?: number;
@@ -105,6 +109,18 @@ function readNum(v: unknown): number | undefined {
     if (typeof inner === 'number' && Number.isFinite(inner)) return inner;
   }
   return undefined;
+}
+
+/**
+ * AIPerf may sample the same source conversation into several concurrently
+ * executing trajectory lanes. `conversation_id` intentionally stays the
+ * source id, while the root correlation id identifies one replay of it across
+ * every turn (and across warmup/profiling). Prefer the explicit root field and
+ * retain the older x-correlation spelling as a compatibility fallback.
+ */
+function replayKey(meta: RawMetadata): string | undefined {
+  const key = meta.root_correlation_id ?? meta.x_correlation_id;
+  return typeof key === 'string' && key.length > 0 ? key : undefined;
 }
 
 /**
@@ -164,6 +180,25 @@ export function computeRequestTimeline(blob: Buffer | null): RequestTimeline | n
   if (raw.length === 0) return null;
   if (!Number.isFinite(originNs)) originNs = 0;
 
+  // Assign compact deterministic replay ids. UUIDs would add substantial
+  // repeated payload to large timelines, so rank distinct correlation ids by
+  // their first dispatch and send only the numeric rank to the frontend.
+  const replayFirstStart = new Map<string, number>();
+  for (const { meta } of raw) {
+    const key = replayKey(meta);
+    if (key === undefined) continue;
+    const start = meta.credit_issued_ns ?? meta.request_start_ns ?? originNs;
+    const current = replayFirstStart.get(key);
+    if (current === undefined || start < current) replayFirstStart.set(key, start);
+  }
+  const replayIndex = new Map<string, number>();
+  [...replayFirstStart.entries()]
+    .sort(
+      ([aKey, aStart], [bKey, bStart]) =>
+        aStart - bStart || (aKey < bKey ? -1 : aKey > bKey ? 1 : 0),
+    )
+    .forEach(([key], index) => replayIndex.set(key, index));
+
   // Second pass: shift timestamps to be relative to originNs (smaller
   // numbers fit in JSON nicely and the frontend doesn't need bigint math).
   const requests: RequestRecord[] = [];
@@ -175,6 +210,7 @@ export function computeRequestTimeline(blob: Buffer | null): RequestTimeline | n
     const end = (m.request_end_ns ?? originNs) - originNs;
     requests.push({
       cid: m.conversation_id ?? 'unknown',
+      ri: replayIndex.get(replayKey(m) ?? ''),
       ti: typeof m.turn_index === 'number' ? m.turn_index : 0,
       srcTrace: typeof m.source_trace_id === 'string' ? m.source_trace_id : undefined,
       srcOuter: typeof m.source_outer_idx === 'number' ? m.source_outer_idx : undefined,

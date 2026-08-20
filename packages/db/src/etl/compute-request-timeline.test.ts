@@ -7,6 +7,8 @@ import { REQUEST_TIMELINE_VERSION, computeRequestTimeline } from './compute-requ
 interface SyntheticRequest {
   cid: string;
   ti: number;
+  rootCorrelation?: string;
+  xCorrelation?: string;
   srcTrace?: string;
   srcOuter?: number;
   srcInner?: number;
@@ -31,6 +33,8 @@ function makeBlob(requests: SyntheticRequest[]) {
     JSON.stringify({
       metadata: {
         conversation_id: r.cid,
+        ...(r.rootCorrelation === undefined ? {} : { root_correlation_id: r.rootCorrelation }),
+        ...(r.xCorrelation === undefined ? {} : { x_correlation_id: r.xCorrelation }),
         turn_index: r.ti,
         ...(r.srcTrace === undefined ? {} : { source_trace_id: r.srcTrace }),
         ...(r.srcOuter === undefined ? {} : { source_outer_idx: r.srcOuter }),
@@ -125,6 +129,105 @@ describe('computeRequestTimeline', () => {
     expect(r.wid).toBe('worker_abcd1234');
     expect(r.ad).toBe(2);
     expect(r.phase).toBe('profiling');
+  });
+
+  it('assigns separate replay ids when AIPerf concurrently reuses one conversation', () => {
+    const tl = computeRequestTimeline(
+      makeBlob([
+        {
+          cid: 'reused-conversation',
+          ti: 26,
+          rootCorrelation: 'root-a',
+          credit: 10,
+          start: 20,
+          end: 100,
+        },
+        {
+          cid: 'reused-conversation',
+          ti: 40,
+          rootCorrelation: 'root-b',
+          credit: 30,
+          start: 40,
+          end: 120,
+        },
+      ]),
+    );
+
+    expect(tl?.requests.map(({ cid, ri }) => ({ cid, ri }))).toEqual([
+      { cid: 'reused-conversation', ri: 0 },
+      { cid: 'reused-conversation', ri: 1 },
+    ]);
+  });
+
+  it('keeps every turn and subagent request in the same replay across phases', () => {
+    const tl = computeRequestTimeline(
+      makeBlob([
+        {
+          cid: 'conversation',
+          ti: 0,
+          rootCorrelation: 'root-a',
+          phase: 'warmup',
+          credit: 0,
+          start: 1,
+          end: 10,
+        },
+        {
+          cid: 'conversation',
+          ti: 1,
+          rootCorrelation: 'root-a',
+          phase: 'profiling',
+          credit: 20,
+          start: 21,
+          end: 30,
+        },
+        {
+          cid: 'conversation::sa:subagent_001_abcd',
+          ti: 1,
+          rootCorrelation: 'root-a',
+          phase: 'profiling',
+          credit: 22,
+          start: 23,
+          end: 29,
+        },
+      ]),
+    );
+
+    expect(new Set(tl?.requests.map((record) => record.ri))).toEqual(new Set([0]));
+  });
+
+  it('uses x_correlation_id as a fallback and ranks replay ids by first dispatch', () => {
+    const tl = computeRequestTimeline(
+      makeBlob([
+        {
+          cid: 'conversation',
+          ti: 1,
+          xCorrelation: 'later',
+          credit: 100,
+          start: 110,
+          end: 120,
+        },
+        {
+          cid: 'conversation',
+          ti: 0,
+          xCorrelation: 'earlier',
+          credit: 0,
+          start: 10,
+          end: 20,
+        },
+      ]),
+    );
+
+    expect(tl?.requests.map(({ ti, ri }) => ({ ti, ri }))).toEqual([
+      { ti: 0, ri: 0 },
+      { ti: 1, ri: 1 },
+    ]);
+  });
+
+  it('leaves legacy records without correlation ids backward-compatible', () => {
+    const tl = computeRequestTimeline(
+      makeBlob([{ cid: 'legacy', ti: 0, credit: 0, start: 10, end: 20 }]),
+    );
+    expect(tl?.requests[0]?.ri).toBeUndefined();
   });
 
   it('preserves raw source provenance fields when present', () => {

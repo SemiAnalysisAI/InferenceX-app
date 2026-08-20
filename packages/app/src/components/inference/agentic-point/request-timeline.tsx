@@ -47,6 +47,7 @@ import {
 export {
   buildRequestTimelineRows,
   computeStableRowIndex,
+  conversationReplayKey,
   conversationHref,
   datasetConvId,
   requestIdleStats,
@@ -185,7 +186,7 @@ export function RequestTimelineView({
     () => sliceTimelineByPhase(data, hasWarmup ? phaseFilter : 'profiling').requests,
     [data, phaseFilter, hasWarmup],
   );
-  // Stable order/color per conversation (or worker), computed over the FULL
+  // Stable order/color per replay lane (or worker), computed over the FULL
   // request set — NOT the phase-filtered subset — so a row keeps its position
   // and color when the user toggles between warmup and profiling.
   const stableRowIndex = useMemo(
@@ -193,8 +194,8 @@ export function RequestTimelineView({
     [data.requests, rowMode],
   );
   const rows = useMemo(
-    () => buildRequestTimelineRows(filtered, rowMode, expandedSubagents, stableRowIndex),
-    [filtered, rowMode, expandedSubagents, stableRowIndex],
+    () => buildRequestTimelineRows(filtered, rowMode, expandedSubagents, stableRowIndex, locale),
+    [filtered, rowMode, expandedSubagents, stableRowIndex, locale],
   );
   const idleStats = useMemo(() => requestIdleStats(filtered), [filtered]);
 
