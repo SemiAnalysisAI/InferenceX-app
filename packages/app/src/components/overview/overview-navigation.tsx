@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import {
   createContext,
   type MutableRefObject,
@@ -75,14 +74,16 @@ interface OverviewNavigationValue {
 }
 
 /**
- * Three contexts, not one. A selector click moves the pending href immediately
+ * Split contexts, not one. A selector click moves the pending href immediately
  * and the payload only when the request settles, so a single value would push
  * two full matrix renders per uncached selection. Splitting them means the
- * controls can re-render on their own while the matrix waits for real data.
+ * controls and failure notice can re-render on their own while the matrix waits
+ * for real data.
  */
 const OverviewDataContext = createContext<OverviewPageData | null>(null);
 const OverviewReferenceContext = createContext<OverviewReferenceHardware | null>(null);
 const OverviewComparisonContext = createContext<OverviewComparisonMode | null>(null);
+const OverviewNavigationErrorContext = createContext(false);
 const OverviewNavigationContext = createContext<OverviewNavigationValue | null>(null);
 
 export function OverviewNavigationProvider({
@@ -94,8 +95,8 @@ export function OverviewNavigationProvider({
   initialHref: string;
   children: ReactNode;
 }) {
-  const router = useRouter();
   const [data, setData] = useState(initialData);
+  const [navigationError, setNavigationError] = useState(false);
   const [pendingHref, setPendingHref] = useState(initialHref);
   const [committedHref, setCommittedHref] = useState(initialHref);
   const pendingHrefRef = useRef(initialHref);
@@ -136,6 +137,7 @@ export function OverviewNavigationProvider({
       const navigationId = ++navigationIdRef.current;
       pendingHrefRef.current = href;
       setPendingHref(href);
+      setNavigationError(false);
       if (updateHistory) {
         // Deliberately the pristine prototype method: `window.history.pushState`
         // is patched by Next to dispatch a router action, and that per-click
@@ -163,10 +165,11 @@ export function OverviewNavigationProvider({
             History.prototype.replaceState.call(window.history, window.history.state, '', href);
           }
           setData(nextData);
+          setNavigationError(false);
           // The pushState above is invisible to Next's router, so the app-wide
           // pageview tracker never fires here. Emit once per committed state —
           // in the success branch so Back/Forward is covered too, and so the
-          // failure path's `router.replace` is not double-counted.
+          // recoverable failure path never records a pageview.
           track('$pageview', { $current_url: new URL(href, window.location.origin).href });
         })
         .catch(() => {
@@ -183,19 +186,10 @@ export function OverviewNavigationProvider({
           );
           pendingHrefRef.current = rolledBack;
           setPendingHref(rolledBack);
-          if (updateHistory) {
-            // The entry pushed above already carries `href`, so `replace`
-            // rewrites it in place instead of stacking a duplicate the user
-            // has to press Back through twice. Rewinding to the committed
-            // href first would also strand the header language toggle, which
-            // only ever hears about search changes through the event above.
-            router.replace(href, { scroll: false });
-          } else {
-            window.location.reload();
-          }
+          setNavigationError(true);
         });
     },
-    [load, router],
+    [load],
   );
 
   useEffect(() => {
@@ -211,6 +205,7 @@ export function OverviewNavigationProvider({
     pendingHrefRef.current = href;
     setPendingHref(href);
     setData(initialData);
+    setNavigationError(false);
   }, [initialData, initialHref]);
 
   useEffect(() => {
@@ -301,9 +296,11 @@ export function OverviewNavigationProvider({
     <OverviewDataContext.Provider value={data}>
       <OverviewReferenceContext.Provider value={referenceHardware}>
         <OverviewComparisonContext.Provider value={comparisonMode}>
-          <OverviewNavigationContext.Provider value={value}>
-            {children}
-          </OverviewNavigationContext.Provider>
+          <OverviewNavigationErrorContext.Provider value={navigationError}>
+            <OverviewNavigationContext.Provider value={value}>
+              {children}
+            </OverviewNavigationContext.Provider>
+          </OverviewNavigationErrorContext.Provider>
         </OverviewComparisonContext.Provider>
       </OverviewReferenceContext.Provider>
     </OverviewDataContext.Provider>
@@ -314,6 +311,10 @@ export function useOverviewNavigation(): OverviewNavigationValue {
   const value = useContext(OverviewNavigationContext);
   if (value === null) throw new Error('Overview controls require OverviewNavigationProvider');
   return value;
+}
+
+export function useOverviewNavigationError(): boolean {
+  return useContext(OverviewNavigationErrorContext);
 }
 
 export function useOverviewData(): OverviewPageData {
