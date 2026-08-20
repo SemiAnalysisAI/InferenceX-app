@@ -24,13 +24,17 @@ Two rules keep that BFF honest, both enforced in `overview-navigation.tsx`:
 
 Because the selector commit uses `History.prototype.pushState` rather than Next's patched version, `useSearchParams()` and `usePathname()` stay at the load-time URL on `/overview`. Anything that needs the live URL there listens for `CLIENT_SEARCH_CHANGE_EVENT`; the provider emits its own `$pageview`. Do not add a `useSearchParams()` consumer to the overview tree.
 
-## Hash-Based Tab Routing (Not Next.js Routes)
+## Route-Based Dashboard Navigation
 
-Tabs use `window.location.hash` instead of Next.js file-based routing because:
+Every dashboard surface is a real Next.js route. The data-only registry in
+`packages/app/src/lib/dashboard-routes.ts` owns canonical paths, navigation groups,
+indexability, provider capabilities, locale mirroring, and share-parameter scopes.
+`TabNav` renders links from that registry, so browser back/forward uses ordinary
+navigation and a newly added route cannot silently disappear from the sitemap or
+Chinese route map.
 
-- The entire app is a single dashboard page. Separate routes would mean separate page loads, losing React state (zoom positions, filter selections, legend toggles).
-- Hash changes don't trigger Next.js navigation, so context providers stay mounted. This is critical — rebuilding D3 charts from scratch on tab switch would cause visible jank.
-- Browser back/forward still works (hashchange event listener updates tab state).
+Chart state survives navigation through the URL-state contract rather than a
+long-lived single-page tab tree. Each route mounts only the providers it consumes.
 
 ## URL State Persistence
 
@@ -38,23 +42,28 @@ Chart filter state (model, sequence, metric, precisions, date range, GPU selecti
 
 **Why debounced writes (150ms)?** Rapid filter changes (e.g., clicking multiple precision checkboxes) would spam `history.pushState`. Debouncing batches them into a single URL update.
 
-**Why snapshot-and-clear on load?** Initial params are read into React state, then stripped from the URL via `history.replaceState`. This prevents stale params from accumulating across navigation — the URL always reflects current state, written back by the debounced sync.
+**Why snapshot-and-clear on load?** Initial params are read into the URL-state snapshot, then stripped from the visible address bar with `history.replaceState` while preserving the pathname and hash. Route-owned entry points can also pass typed server seeds. Subsequent debounced writes update the in-memory share state.
 
-**Prefix convention**: `g_` (global), `i_` (inference), `e_` (evaluation), `r_` (reliability). Prevents namespace collisions and allows `buildShareUrl()` to include only tab-relevant params.
+**Prefix convention**: `g_` (global), `i_` (inference), `e_` (evaluation), `r_` (reliability), and `c_` (calculator). The canonical dashboard route registry declares which scopes belong in each share URL.
 
-## Provider Nesting Order
+## Provider Ownership
+
+`DashboardShell` reads provider capabilities from the route registry:
 
 ```
-QueryProvider → ThemeProvider → UnofficialRunProvider → GlobalStateProvider
-  → GlobalFilterProvider → InferenceProvider → EvaluationProvider → ReliabilityProvider
+QueryProvider → ThemeProvider → DashboardShell
+  filtered routes: UnofficialRunProvider → GlobalFilterProvider
+    inference / historical: InferenceProvider
+    evaluation: EvaluationProvider
+  calculator: UnofficialRunProvider → route-owned seeded GlobalFilterProvider
+  reliability: route-owned ReliabilityProvider
+  static / internal routes: no data providers
 ```
 
-This isn't arbitrary. Each provider depends on the one above it:
-
-- `GlobalFilterProvider` needs React Query (`useAvailability()`, `useWorkflowInfo()`)
-- `InferenceProvider` needs global model/date selection; gated by `activeTab` to skip heavy work on non-inference tabs
-- Evaluation and Reliability need the hardware config from Inference context
-- TCO Calculator and Historical Trends reuse InferenceContext state (sequence, precisions) without their own providers — local `useState` is sufficient since they don't share state with other tabs
+This keeps availability, workflow, and unofficial-run requests off pages that do not
+consume them. Compare routes sit outside `DashboardShell` and own their seeded
+`GlobalFilterProvider` / `InferenceProvider` pair. Agentic point-detail routes are also
+standalone because they fetch point-owned data rather than dashboard filters.
 
 ## Client-Side Caching (React Query — In-Memory Only)
 
@@ -79,7 +88,7 @@ API route responses are cached at two layers before hitting the CDN.
 
 `unstable_cache` entries are tagged `'db'`. Calling `revalidateTag('db', { expire: 0 })` evicts all local cache entries in one call. Blob storage has no built-in tag system, so `blobPurge()` walks the paginated blob list and deletes every object under the prefix.
 
-Both are called together by `purgeAll()`, which also writes a new `cache-version` timestamp to blob storage.
+`purgeAll()` calls both mechanisms and also invalidates the separate CollectiveX tag. Blob keys are versioned and encoded deterministically so structured arguments cannot collide.
 
 ### CDN Cache Headers
 
@@ -94,7 +103,7 @@ Vercel-Cache-Tag: db
 
 ### /api/v1/invalidate
 
-`POST /api/v1/invalidate` requires a `Bearer {INVALIDATE_SECRET}` header (compared with `timingSafeEqual` to prevent timing attacks). On success it calls `purgeAll()` — which clears blob storage, bumps the cache-version timestamp, and revalidates the `'db'` tag — then returns `{ invalidated: true, blobsDeleted: N }`. This endpoint is called by the CI ingest pipelines after benchmark runs and by the run-override pipeline after it applies and verifies merged override changes.
+`POST /api/v1/invalidate` requires a `Bearer {INVALIDATE_SECRET}` header, checked through the shared byte-safe constant-time bearer helper. On success it calls `purgeAll()`, which clears blob storage and revalidates the database and CollectiveX tags, then returns `{ invalidated: true, blobsDeleted: N }`. This endpoint is called by the CI ingest pipelines after benchmark runs and by the run-override pipeline after it applies and verifies merged override changes.
 
 ## React Query Configuration
 

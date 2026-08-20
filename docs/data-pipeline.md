@@ -2,24 +2,38 @@
 
 ## DB Schema Decisions
 
-### Why JSONB + Hot Columns (Hybrid)
+### Why Metrics Stay in JSONB
 
-Benchmark metrics are stored in a JSONB `metrics` column AND extracted into dedicated "hot" columns (`tput_per_gpu`, `median_intvty`, `median_ttft`, `median_e2el`, `p99_ttft`, `median_tpot`).
+Benchmark measurements live only in the `benchmark_results.metrics` JSONB column;
+there are no duplicated metric-specific columns on `benchmark_results` or
+`latest_benchmarks`.
 
-- **JSONB**: New metrics can be added by CI without schema migrations. Old data doesn't need backfilling — missing fields default to 0 at read time (`m.field ?? 0`).
-- **Hot columns**: The most-queried metrics need B-tree indexes for `DISTINCT ON` queries. JSONB extraction (`metrics->>'field'`) can't use these indexes efficiently.
-- **Trade-off**: ~6 duplicated values per row. Acceptable because benchmark_results is write-once/read-many, and the index speedup on daily queries is orders of magnitude.
+- **Schema flexibility**: CI can add metrics without a database migration, and
+  historical rows simply omit keys that their artifact did not produce.
+- **Read contract**: Raw benchmark endpoints pass the JSONB object through.
+  Specialized readers such as MCP select keys explicitly. A missing historical
+  metric remains absent until a presentation consumer applies its own fallback.
+- **Indexes**: The benchmark indexes cover relational selection dimensions such
+  as config, scenario, concurrency, sequence lengths, date, offload mode, and
+  recipe fingerprint. Metric ranking and extraction use JSONB expressions rather
+  than nonexistent "hot" columns.
 
 ### Why Denormalized Dates
 
 `benchmark_results.date`, `workflow_runs.date`, and the `availability` table all store denormalized date values (derived from `workflow_runs.created_at`). This avoids JOINs in the hottest queries:
 
-- `getLatestBenchmarks` uses `DISTINCT ON (config_id, conc, isl, osl) ORDER BY date DESC` — needs date on the same table as benchmark_results for the covering index.
+- `getLatestBenchmarks` orders candidate line snapshots by `date`, `run_started_at`,
+  and workflow-run ID before applying the append-only curve rules. Keeping `date`
+  on each benchmark row avoids another join in that base-table scan.
 - `availability` is a separate denormalized table because the date-picker query (`SELECT DISTINCT model, date`) needs to be fast without scanning benchmark_results.
 
 ### Why a Materialized View (latest_benchmarks)
 
-The `DISTINCT ON` query for "latest benchmark per config" is expensive on the full table (millions of rows). The materialized view pre-computes this, refreshed concurrently after each ingest. API routes use the view when no date filter is specified; date-filtered requests hit the base table.
+Computing the newest logical curve from the full result table is expensive. The
+materialized view pre-computes the newest successful snapshot for each config,
+scenario, sequence, offload mode, recipe fingerprint, and concurrency, including
+the same-image append-only history when applicable. API routes use the view when no
+date filter is specified; date-filtered requests hit the base table.
 
 `REFRESH CONCURRENTLY` allows reads during refresh (no downtime). The trade-off is a brief window where the view is stale after ingest — acceptable since data changes at most daily.
 
@@ -116,14 +130,21 @@ point across attempts; the log records the applied backfill ID. Changelog correc
 likewise applied to artifact metadata before `appendOnly`/`evalsOnly` run semantics are
 resolved and before the changelog is upserted.
 
-### Why Two Connection Types
+### Connection drivers and policy
 
-| Connection                      | Library     | Use Case                             | Why                                                                                                  |
-| ------------------------------- | ----------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `@neondatabase/serverless` HTTP | API routes  | Stateless, read-only, scales to zero | Serverless functions can't hold persistent connections; HTTP driver works over Vercel's edge network |
-| `postgres` TCP                  | ETL scripts | Bulk inserts, transactions, COPY     | HTTP driver has per-query overhead that's unacceptable for 10K+ row batches                          |
+| Connection                      | Library                  | Use case                             |
+| ------------------------------- | ------------------------ | ------------------------------------ |
+| `@neondatabase/serverless` HTTP | Application API reads    | Stateless serverless queries         |
+| `postgres` TCP                  | ETL, migrations, and MCP | Bulk work, transactions, and MCP SQL |
 
-The read replica (`DATABASE_READONLY_URL`) is used by API routes to isolate read traffic from write load. ETL uses the primary writer (`DATABASE_WRITE_URL`).
+`resolveDatabaseConnection` in `packages/db/src/connection.ts` is the single URL and TLS
+policy. Each caller selects its environment variable and driver deliberately. An explicit
+URL can override the environment value, `DATABASE_SSL` can override host detection, and
+loopback hosts disable TLS by default. Application reads may select Neon HTTP, while admin
+and MCP clients remain on postgres.js.
+
+Normal API reads use `DATABASE_READONLY_URL` so a replica can isolate read traffic from
+writes. ETL uses the primary writer in `DATABASE_WRITE_URL`.
 
 ### Why CHECK Constraints for Lowercase
 
@@ -135,7 +156,7 @@ All text keys (model, hardware, framework, precision) have `CHECK (field = lower
 
 Phase 1 (parallel 20): ZIP reading + JSON parsing + row mapping. IO-bound (network + disk), so high parallelism.
 
-Phase 2 (parallel 5): DB writes. Connection-limited (max 20 connections), and each write does config lookup + bulk insert. Lower parallelism prevents connection exhaustion.
+Phase 2 (parallel 10): DB writes. Connection-limited (max 20 connections), and each write does config lookup + bulk insert. Half-pool concurrency leaves capacity for metadata and summary queries while improving ingest throughput.
 
 ### Config Cache
 

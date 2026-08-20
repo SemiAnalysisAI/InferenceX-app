@@ -3,16 +3,18 @@
 ## Structure
 
 **Unit tests**: Vitest, colocated with source (`*.test.ts` next to `*.ts`). Config: `packages/app/vitest.config.ts`.
-**E2E tests**: Cypress, in `packages/app/cypress/e2e/`. Config: `packages/app/cypress.config.ts`.
+**Component tests**: Cypress, in `packages/app/cypress/component/`. Use these for isolated UI behavior with controlled providers, routes, and API intercepts.
+**Integration tests**: Cypress, in `packages/app/cypress/e2e/`. Use these for page routing, browser history, API fixture mode, and cross-component workflows. Config: `packages/app/cypress.config.ts`.
 
 ## Requirements (Mandatory)
 
 Enforced by `@pr-claude` — missing/low-quality tests are flagged 🔴 BLOCKING.
 
 1. New utility functions → colocated unit test
-2. New UI features → E2E test in `cypress/e2e/<feature>.cy.ts`
-3. Bug fixes → regression test reproducing the bug
-4. Run `bun run test:unit` and the local smoke suite, `bun run test:e2e`, before considering a task complete. The full E2E suite runs in CI and is available locally as `bun run test:e2e:full`.
+2. Component-local UI behavior → Cypress component test in `cypress/component/`
+3. Route, navigation, or cross-component behavior → Cypress integration test in `cypress/e2e/`
+4. Bug fixes → regression test at the narrowest layer that reproduces the bug
+5. Run `bun run test:unit` and the local smoke suite, `bun run test:e2e`, before considering a task complete. The full E2E suite runs in CI and is available locally as `bun run test:e2e:full`.
 
 ## Pre-commit Checklist
 
@@ -28,6 +30,24 @@ bun run test:e2e
 The local `bun run test:e2e` command is a curated smoke suite across the core page, chart, overlay, localization, and component paths. It is the default agent and developer check and is intended to stay under one minute once the app is running.
 
 The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as one component job plus four integration shards per browser, Chrome and Firefox. The CI workflow is the merge gate for the full E2E suite.
+
+`packages/app/timings.json` is the committed `cypress-split` baseline. Its unit guard requires one positive timing for every integration spec and rejects removed entries. Regenerate the baseline from an observed full integration run when specs are added, removed, or materially rebalanced.
+
+With an `E2E_FIXTURES=1` app server running on port 3000, run this from the repository root:
+
+```bash
+E2E_FIXTURES=1 \
+  SPLIT=1 \
+  SPLIT_INDEX1=1 \
+  SPLIT_FILE=timings.json \
+  SPLIT_OUTPUT_FILE=timings.json \
+  SPLIT_SUMMARY=false \
+  bun run --cwd packages/app test:e2e:integration
+```
+
+`SPLIT=1` intentionally runs every spec in one chunk so one process records the complete baseline. CI uses `SPLIT=4` only for parallel execution and writes each shard's timing output to a throwaway file.
+
+`E2E_FIXTURES=1` serves the committed API snapshots under `packages/app/cypress/fixtures/api/`. Refresh them with `bun run --cwd packages/app capture:fixtures`. The capture script updates `_manifest.json`, which records the fixture shape, byte length, checksum, source, and capture timestamp. The manifest guard rejects partial or hand-edited snapshots.
 
 ## Quality Standards
 

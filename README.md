@@ -21,6 +21,7 @@ Neon PostgreSQL → API routes (/api/v1/*) → React Query hooks → Context pro
 ```
 
 The frontend fetches data from API routes backed by a Neon PostgreSQL read replica. All presentation logic lives in the frontend — API routes return raw DB data.
+The MCP server exposes read-only benchmark tools through the same `db` and `constants` packages, without depending on frontend code.
 
 ### Monorepo Structure
 
@@ -28,7 +29,8 @@ The frontend fetches data from API routes backed by a Neon PostgreSQL read repli
 packages/
 ├── app/          # Next.js frontend
 ├── constants/    # Shared constants (GPU keys, model mappings)
-└── db/           # DB layer, ETL, migrations, queries, ingest scripts
+├── db/           # DB layer, ETL, migrations, queries, ingest scripts
+└── mcp/          # MCP server exposing read-only benchmark tools
 ```
 
 ## Prerequisites
@@ -108,6 +110,7 @@ Some of these may require additional setup or environment variables.
 | Script                         | Description                                    |
 | ------------------------------ | ---------------------------------------------- |
 | `bun run dev`                  | Start development server with Turbopack        |
+| `bun run mcp`                  | Start the InferenceX MCP server                |
 | `bun run build`                | Production build                               |
 | `bun run start`                | Start production server                        |
 | `bun run preview`              | Build then start production server locally     |

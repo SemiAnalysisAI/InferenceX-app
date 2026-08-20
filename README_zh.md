@@ -21,6 +21,7 @@ Neon PostgreSQL → API routes (/api/v1/*) → React Query hooks → Context pro
 ```
 
 前端从由 Neon PostgreSQL 只读副本支撑的 API 路由获取数据。所有展示逻辑都在前端 — API 路由只返回原始数据库数据。
+MCP server 通过相同的 `db` 与 `constants` package 提供只读基准测试工具，不依赖前端代码。
 
 ### Monorepo 结构
 
@@ -28,7 +29,8 @@ Neon PostgreSQL → API routes (/api/v1/*) → React Query hooks → Context pro
 packages/
 ├── app/          # Next.js 前端
 ├── constants/    # 共享常量（GPU key、模型映射）
-└── db/           # 数据库层、ETL、迁移、查询、数据摄取脚本
+├── db/           # 数据库层、ETL、迁移、查询、数据摄取脚本
+└── mcp/          # 提供只读基准测试工具的 MCP server
 ```
 
 ## 前置条件
@@ -108,6 +110,7 @@ bun run dev
 | 脚本                           | 说明                              |
 | ------------------------------ | --------------------------------- |
 | `bun run dev`                  | 启动开发服务器（Turbopack）       |
+| `bun run mcp`                  | 启动 InferenceX MCP server        |
 | `bun run build`                | 生产构建                          |
 | `bun run start`                | 启动生产服务器                    |
 | `bun run preview`              | 本地构建并启动生产服务器          |
