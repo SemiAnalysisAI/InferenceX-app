@@ -26,17 +26,7 @@ const timeline: RequestTimeline = {
 };
 
 describe('getRequestTimeline', () => {
-  it('returns the current precomputed timeline without selecting the raw profile blob', async () => {
-    const { sql, calls } = mockSql([
-      [{ trace_replay_id: 870, has_blob: true, request_timeline: timeline }],
-    ]);
-
-    await expect(getRequestTimeline(sql, 422991)).resolves.toEqual(timeline);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).not.toContain('profile_export_jsonl_gz as blob');
-  });
-
-  it('reads oversized current timelines in bounded JSON text chunks', async () => {
+  it('returns the current precomputed timeline from a bounded text read without selecting the raw profile blob', async () => {
     const encoded = JSON.stringify(timeline);
     const { sql, calls } = mockSql([
       [
@@ -44,10 +34,6 @@ describe('getRequestTimeline', () => {
           trace_replay_id: 870,
           has_blob: true,
           timeline_version: REQUEST_TIMELINE_VERSION,
-          // The serialized response is large even if TOAST compresses the
-          // repetitive JSONB value below the old pg_column_size threshold.
-          timeline_text_bytes: 20 * 1024 * 1024,
-          request_timeline: null,
         },
       ],
       [{ chunk: encoded, chunk_chars: encoded.length }],
@@ -55,8 +41,26 @@ describe('getRequestTimeline', () => {
 
     await expect(getRequestTimeline(sql, 422991)).resolves.toEqual(timeline);
     expect(calls).toHaveLength(2);
-    expect(calls[0]).toContain('octet_length');
+    expect(calls[1]).not.toContain('profile_export_jsonl_gz as blob');
+  });
+
+  it('never uses compressed JSONB storage size to decide whether to read bounded chunks', async () => {
+    const encoded = JSON.stringify(timeline);
+    const { sql, calls } = mockSql([
+      [
+        {
+          trace_replay_id: 870,
+          has_blob: true,
+          timeline_version: REQUEST_TIMELINE_VERSION,
+        },
+      ],
+      [{ chunk: encoded, chunk_chars: encoded.length }],
+    ]);
+
+    await expect(getRequestTimeline(sql, 422991)).resolves.toEqual(timeline);
+    expect(calls).toHaveLength(2);
     expect(calls[0]).not.toContain('pg_column_size');
+    expect(calls[0]).not.toContain('octet_length');
     expect(calls[1]).toContain('substr(text');
     expect(calls[1]).not.toContain('profile_export_jsonl_gz as blob');
   });

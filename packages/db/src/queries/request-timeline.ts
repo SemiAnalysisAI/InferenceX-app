@@ -2,9 +2,9 @@
  * Per-request timeline for the agentic detail page's Gantt view.
  *
  * Backed by `agentic_trace_replay.request_timeline` (pre-computed at
- * ingest time, see `etl/compute-request-timeline.ts`). Normal payloads use a
- * single SQL row read; oversized payloads are read as bounded text chunks so
- * Neon's 64 MiB encoded-response limit cannot reject the query. The slow path re-computes from
+ * ingest time, see `etl/compute-request-timeline.ts`). Current payloads are
+ * read as bounded text chunks so Neon's 64 MiB encoded-response limit cannot
+ * reject even highly compressible JSONB. The slow path re-computes from
  * `profile_export_jsonl_gz` and is only taken when the column is missing
  * or the stored `REQUEST_TIMELINE_VERSION` is stale.
  */
@@ -24,8 +24,6 @@ interface RawMetaRow {
   trace_replay_id: number;
   has_blob: boolean;
   timeline_version: number | null;
-  timeline_text_bytes: number | null;
-  request_timeline: RequestTimeline | null;
 }
 
 interface RawBlobRow {
@@ -37,11 +35,11 @@ interface RawTimelineChunkRow {
   chunk_chars: number;
 }
 
-// Measure the serialized JSON text, not pg_column_size(JSONB): TOAST can make
-// the on-disk value much smaller than Neon's encoded response. Keep ample
-// headroom under Neon's 64 MiB per-query response cap.
-const MAX_INLINE_TIMELINE_TEXT_BYTES = 16 * 1024 * 1024;
-const TIMELINE_TEXT_CHUNK_CHARS = 32 * 1024 * 1024;
+// JSONB can be far smaller on disk than its serialized response due to TOAST
+// compression, so every current timeline uses bounded chunks. Timeline fields
+// are compact identifiers/numbers; 16 MiB leaves ample room for JSON-string
+// escaping under Neon's 64 MiB per-query response cap.
+const TIMELINE_TEXT_CHUNK_CHARS = 16 * 1024 * 1024;
 const MAX_TIMELINE_TEXT_CHUNKS = 64;
 
 async function readChunkedRequestTimeline(
@@ -88,13 +86,7 @@ export async function getRequestTimeline(
     select
       atr.id as trace_replay_id,
       (atr.profile_export_jsonl_gz is not null) as has_blob,
-      (atr.request_timeline->>'version')::int as timeline_version,
-      octet_length(atr.request_timeline::text)::int as timeline_text_bytes,
-      case
-        when octet_length(atr.request_timeline::text) <= ${MAX_INLINE_TIMELINE_TEXT_BYTES}
-        then atr.request_timeline
-        else null
-      end as request_timeline
+      (atr.request_timeline->>'version')::int as timeline_version
     from benchmark_results br
     join agentic_trace_replay atr on atr.id = br.trace_replay_id
     where br.id = ${benchmarkResultId}
@@ -102,15 +94,11 @@ export async function getRequestTimeline(
   const row = rows[0];
   if (!row) return null;
 
-  // Fast paths: return normal pre-computed timelines inline; reconstruct
-  // oversized ones from bounded text queries so one Neon HTTP response never
-  // exceeds the platform's 64 MiB limit.
-  const storedVersion = row.timeline_version ?? row.request_timeline?.version;
-  if (Number(storedVersion) === REQUEST_TIMELINE_VERSION) {
-    if (row.request_timeline) return row.request_timeline;
-    if ((row.timeline_text_bytes ?? 0) > MAX_INLINE_TIMELINE_TEXT_BYTES) {
-      return readChunkedRequestTimeline(sql, row.trace_replay_id);
-    }
+  // Read every current pre-computed timeline through bounded text queries.
+  // Choosing from compressed storage size is unsafe: a small TOAST value can
+  // still serialize past Neon's per-query response limit.
+  if (Number(row.timeline_version) === REQUEST_TIMELINE_VERSION) {
+    return readChunkedRequestTimeline(sql, row.trace_replay_id);
   }
 
   if (!row.has_blob) return null;

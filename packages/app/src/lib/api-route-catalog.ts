@@ -495,7 +495,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/request-timeline.ts',
-    sourceSha256: '164ab05367e48a2c95104617e9b7503ae0aa90f70f4b07fd0a81c9172b03c770',
+    sourceSha256: 'e27e2c421d94d55f8178756d31e9791d4143d33e4086f767e4ea15132a7ad708',
     reviewArea: {
       en: 'Request timeline metadata, request event records, units, and nullable timings.',
       zh: '请求时间线元数据、请求事件记录、单位和可空计时字段。',

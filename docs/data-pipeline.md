@@ -184,9 +184,11 @@ peak memory for high-throughput traces whose decompressed profiles exceed
 400 MB, at the cost of a second sequential decompression pass during ingest or
 backfill. The backfill also downloads the stored gzip and uploads the derived
 JSONB in 4 MiB chunks, matching trace ingest and avoiding single-value transport
-limits for oversized runs. The request-timeline reader returns ordinary JSONB
-inline, but reconstructs unusually large current timelines from bounded text
-chunks so no individual Neon HTTP response crosses the 64 MiB platform limit.
+limits for oversized runs. The request-timeline reader checks only compact
+metadata inline, then reconstructs every current timeline from bounded text
+chunks. It deliberately does not choose by compressed JSONB storage size, so a
+highly compressible timeline cannot cross Neon's 64 MiB response limit or force
+the database to materialize the serialized size just to select a read path.
 
 ### Agentic Full-Response Interactivity
 
