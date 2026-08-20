@@ -195,13 +195,7 @@ function srgbToLinear(c: number): number {
 /** Parse `#rgb` / `#rrggbb` into OKLch `[L, C, H]`, or null when unparseable. */
 function hexToOklch(hex: string): [number, number, number] | null {
   const raw = hex.trim().replace('#', '');
-  const full =
-    raw.length === 3
-      ? raw
-          .split('')
-          .map((ch) => ch + ch)
-          .join('')
-      : raw;
+  const full = raw.length === 3 ? [...raw].map((ch) => ch + ch).join('') : raw;
   if (full.length !== 6 || !/^[0-9a-f]{6}$/iu.test(full)) return null;
 
   const r = srgbToLinear(Number.parseInt(full.slice(0, 2), 16) / 255);
