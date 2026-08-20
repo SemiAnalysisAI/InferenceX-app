@@ -61,7 +61,7 @@ export async function getRequestTimeline(
     from agentic_trace_replay
     where id = ${row.trace_replay_id}
   `) as unknown as RawBlobRow[];
-  const timeline = computeRequestTimeline(blobRows[0]?.blob ?? null);
+  const timeline = await computeRequestTimeline(blobRows[0]?.blob ?? null);
 
   // Self-heal the stored request_timeline so the next request (and the
   // trace-histograms route, which reads the same column) takes the fast path.

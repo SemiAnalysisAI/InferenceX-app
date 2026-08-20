@@ -3,15 +3,17 @@
  * Gantt view. Output lands in `agentic_trace_replay.request_timeline`
  * and is read directly by the timeline API route.
  *
- * Shape is a thin array — ~150 bytes per request × ~200 requests per
- * point ≈ 30 KB per row before JSONB compression. Trivial vs the raw
- * gzipped JSONL blob (~1-3 MB).
+ * Shape is a thin array — roughly 150 bytes per request before JSONB
+ * compression. The largest throughput runs contain hundreds of thousands of
+ * requests, so extraction must not materialize the decompressed JSONL.
  *
  * Versioned so the backfill script knows which rows are stale — bump
  * `REQUEST_TIMELINE_VERSION` whenever the extraction algorithm changes.
  */
 
-import { gunzipSync } from 'node:zlib';
+import { Readable } from 'node:stream';
+import { StringDecoder } from 'node:string_decoder';
+import { createGunzip } from 'node:zlib';
 
 /** Bump when the extraction algorithm changes — backfill recomputes anything older. */
 export const REQUEST_TIMELINE_VERSION = 6;
@@ -124,73 +126,84 @@ function replayKey(meta: RawMetadata): string | undefined {
 }
 
 /**
+ * Yield complete UTF-8 lines without retaining the decompressed profile.
+ * `Readable.from([blob])` is intentional: without the array wrapper Node may
+ * iterate the Buffer byte-by-byte instead of passing it as one chunk.
+ */
+async function* gunzipLines(blob: Buffer): AsyncGenerator<string> {
+  const decoder = new StringDecoder('utf8');
+  let carry = '';
+
+  for await (const chunk of Readable.from([blob]).pipe(createGunzip())) {
+    const text = carry + decoder.write(chunk as Buffer);
+    let lineStart = 0;
+    let newline = text.indexOf('\n');
+    while (newline !== -1) {
+      yield text.slice(lineStart, newline);
+      lineStart = newline + 1;
+      newline = text.indexOf('\n', lineStart);
+    }
+    carry = text.slice(lineStart);
+  }
+
+  carry += decoder.end();
+  if (carry.length > 0) yield carry;
+}
+
+function parseRawRecord(line: string): RawRecord | null {
+  if (!line) return null;
+  try {
+    return JSON.parse(line) as RawRecord;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Parse the gzipped `profile_export.jsonl` blob into a chart-ready
  * timeline. Returns null on a missing or malformed blob.
  */
-export function computeRequestTimeline(blob: Buffer | null): RequestTimeline | null {
+export async function computeRequestTimeline(blob: Buffer | null): Promise<RequestTimeline | null> {
   if (!blob) return null;
-  let text: string;
+
+  // First pass: find the timeline bounds and the first dispatch for each
+  // replay. This deliberately stores only one entry per replay, not one entry
+  // per request, so a 400+ MB decompressed profile stays memory-bounded.
+  let originNs = Number.POSITIVE_INFINITY;
+  let endNs = 0;
+  let recordCount = 0;
+  const replayFirstStart = new Map<string, number>();
+
   try {
-    text = gunzipSync(blob).toString('utf8');
+    for await (const line of gunzipLines(blob)) {
+      const rec = parseRawRecord(line);
+      if (!rec) continue;
+      const meta = rec.metadata ?? {};
+      // Use credit_issued_ns when available (the true start of the request's
+      // lifecycle), falling back to request_start_ns. Skip rows missing both.
+      const cStart = meta.credit_issued_ns ?? meta.request_start_ns;
+      const cEnd = meta.request_end_ns;
+      if (typeof cStart !== 'number' || typeof cEnd !== 'number') continue;
+
+      recordCount += 1;
+      if (cStart < originNs) originNs = cStart;
+      if (cEnd > endNs) endNs = cEnd;
+
+      const key = replayKey(meta);
+      if (key === undefined) continue;
+      const current = replayFirstStart.get(key);
+      if (current === undefined || cStart < current) replayFirstStart.set(key, cStart);
+    }
   } catch {
     return null;
   }
 
-  // First pass: parse + collect raw turns; find timeline origin.
-  const raw: {
-    meta: RawMetadata;
-    ttftMs: number | null;
-    tpotMs: number | null;
-    isl: number | null;
-    osl: number | null;
-  }[] = [];
-  let originNs = Number.POSITIVE_INFINITY;
-  let endNs = 0;
-
-  for (const line of text.split('\n')) {
-    if (!line) continue;
-    let rec: RawRecord;
-    try {
-      rec = JSON.parse(line) as RawRecord;
-    } catch {
-      continue;
-    }
-    const meta = rec.metadata ?? {};
-    // Use credit_issued_ns when available (the true start of the request's
-    // lifecycle), falling back to request_start_ns. Skip rows missing both.
-    const cStart = meta.credit_issued_ns ?? meta.request_start_ns;
-    const cEnd = meta.request_end_ns;
-    if (typeof cStart !== 'number' || typeof cEnd !== 'number') continue;
-
-    if (cStart < originNs) originNs = cStart;
-    if (cEnd > endNs) endNs = cEnd;
-
-    raw.push({
-      meta,
-      ttftMs: readNum(rec.metrics?.time_to_first_token) ?? null,
-      tpotMs:
-        readNum(rec.metrics?.time_per_output_token) ??
-        readNum(rec.metrics?.inter_token_latency) ??
-        null,
-      isl: readNum(rec.metrics?.input_sequence_length) ?? null,
-      osl: readNum(rec.metrics?.output_sequence_length) ?? null,
-    });
-  }
-
-  if (raw.length === 0) return null;
+  if (recordCount === 0) return null;
   if (!Number.isFinite(originNs)) originNs = 0;
 
   // Assign compact deterministic replay ids. UUIDs would add substantial
   // repeated payload to large timelines, so rank distinct correlation ids by
   // their first dispatch and send only the numeric rank to the frontend.
-  const replayFirstStart = new Map<string, number>();
-  for (const { meta } of raw) {
-    const key = replayKey(meta);
-    if (key === undefined) continue;
-    const start = meta.credit_issued_ns ?? meta.request_start_ns ?? originNs;
-    const current = replayFirstStart.get(key);
-    if (current === undefined || start < current) replayFirstStart.set(key, start);
-  }
   const replayIndex = new Map<string, number>();
   [...replayFirstStart.entries()]
     .sort(
@@ -199,36 +212,51 @@ export function computeRequestTimeline(blob: Buffer | null): RequestTimeline | n
     )
     .forEach(([key], index) => replayIndex.set(key, index));
 
-  // Second pass: shift timestamps to be relative to originNs (smaller
-  // numbers fit in JSON nicely and the frontend doesn't need bigint math).
+  // Second gzip pass: build only the final compact request objects. Re-reading
+  // costs some CPU but avoids simultaneously retaining the decompressed text,
+  // parsed source records, and output records — the previous peak-memory
+  // multiplier that made high-throughput backfills fail.
   const requests: RequestRecord[] = [];
-  for (const r of raw) {
-    const m = r.meta;
-    const credit = (m.credit_issued_ns ?? m.request_start_ns ?? originNs) - originNs;
-    const start = (m.request_start_ns ?? m.credit_issued_ns ?? originNs) - originNs;
-    const ack = typeof m.request_ack_ns === 'number' ? m.request_ack_ns - originNs : null;
-    const end = (m.request_end_ns ?? originNs) - originNs;
-    requests.push({
-      cid: m.conversation_id ?? 'unknown',
-      ri: replayIndex.get(replayKey(m) ?? ''),
-      ti: typeof m.turn_index === 'number' ? m.turn_index : 0,
-      srcTrace: typeof m.source_trace_id === 'string' ? m.source_trace_id : undefined,
-      srcOuter: typeof m.source_outer_idx === 'number' ? m.source_outer_idx : undefined,
-      srcInner: typeof m.source_inner_idx === 'number' ? m.source_inner_idx : undefined,
-      srcKind: typeof m.source_kind === 'string' ? m.source_kind : undefined,
-      wid: m.worker_id ?? 'unknown',
-      ad: typeof m.agent_depth === 'number' ? m.agent_depth : 0,
-      phase: m.benchmark_phase ?? 'unknown',
-      credit,
-      start,
-      ack,
-      end,
-      ttftMs: r.ttftMs,
-      tpotMs: r.tpotMs,
-      isl: r.isl,
-      osl: r.osl,
-      cancelled: m.was_cancelled === true,
-    });
+  try {
+    for await (const line of gunzipLines(blob)) {
+      const rec = parseRawRecord(line);
+      if (!rec) continue;
+      const m = rec.metadata ?? {};
+      const cStart = m.credit_issued_ns ?? m.request_start_ns;
+      const cEnd = m.request_end_ns;
+      if (typeof cStart !== 'number' || typeof cEnd !== 'number') continue;
+
+      const credit = cStart - originNs;
+      const start = (m.request_start_ns ?? m.credit_issued_ns ?? originNs) - originNs;
+      const ack = typeof m.request_ack_ns === 'number' ? m.request_ack_ns - originNs : null;
+      const end = cEnd - originNs;
+      requests.push({
+        cid: m.conversation_id ?? 'unknown',
+        ri: replayIndex.get(replayKey(m) ?? ''),
+        ti: typeof m.turn_index === 'number' ? m.turn_index : 0,
+        srcTrace: typeof m.source_trace_id === 'string' ? m.source_trace_id : undefined,
+        srcOuter: typeof m.source_outer_idx === 'number' ? m.source_outer_idx : undefined,
+        srcInner: typeof m.source_inner_idx === 'number' ? m.source_inner_idx : undefined,
+        srcKind: typeof m.source_kind === 'string' ? m.source_kind : undefined,
+        wid: m.worker_id ?? 'unknown',
+        ad: typeof m.agent_depth === 'number' ? m.agent_depth : 0,
+        phase: m.benchmark_phase ?? 'unknown',
+        credit,
+        start,
+        ack,
+        end,
+        ttftMs: readNum(rec.metrics?.time_to_first_token) ?? null,
+        tpotMs:
+          readNum(rec.metrics?.time_per_output_token) ??
+          readNum(rec.metrics?.inter_token_latency) ??
+          null,
+        isl: readNum(rec.metrics?.input_sequence_length) ?? null,
+        osl: readNum(rec.metrics?.output_sequence_length) ?? null,
+        cancelled: m.was_cancelled === true,
+      });
+    }
+  } catch {
+    return null;
   }
 
   // Stable order so backfill output is deterministic.

@@ -174,6 +174,15 @@ JSONB when this extraction changes; `db:backfill-request-timeline` recomputes it
 from the raw gzipped `profile_export.jsonl` already stored in Neon, so no GitHub
 artifact refetch or schema migration is required.
 
+Timeline extraction reads the gzip stream twice instead of materializing the
+entire JSONL. The first pass retains only timeline bounds and one first-dispatch
+timestamp per replay; the second emits compact request records. This bounds
+peak memory for high-throughput traces whose decompressed profiles exceed
+400 MB, at the cost of a second sequential decompression pass during ingest or
+backfill. The backfill also downloads the stored gzip and uploads the derived
+JSONB in 4 MiB chunks, matching trace ingest and avoiding single-value transport
+limits for oversized runs.
+
 ### Agentic Full-Response Interactivity
 
 Agentic charts use full-response inter-token latency as their canonical ITL and

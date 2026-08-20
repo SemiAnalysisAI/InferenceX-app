@@ -62,28 +62,28 @@ function makeBlob(requests: SyntheticRequest[]) {
 }
 
 describe('computeRequestTimeline', () => {
-  it('returns null when the blob is null', () => {
-    expect(computeRequestTimeline(null)).toBeNull();
+  it('returns null when the blob is null', async () => {
+    expect(await computeRequestTimeline(null)).toBeNull();
   });
 
-  it('returns null on a malformed (non-gzip) blob', () => {
-    expect(computeRequestTimeline(Buffer.from('not-gzip'))).toBeNull();
+  it('returns null on a malformed (non-gzip) blob', async () => {
+    expect(await computeRequestTimeline(Buffer.from('not-gzip'))).toBeNull();
   });
 
-  it('returns null when the blob has no parseable records', () => {
-    expect(computeRequestTimeline(gzipSync(Buffer.from('\n\n')))).toBeNull();
+  it('returns null when the blob has no parseable records', async () => {
+    expect(await computeRequestTimeline(gzipSync(Buffer.from('\n\n')))).toBeNull();
   });
 
-  it('returns the current REQUEST_TIMELINE_VERSION in the bundle', () => {
-    const tl = computeRequestTimeline(
+  it('returns the current REQUEST_TIMELINE_VERSION in the bundle', async () => {
+    const tl = await computeRequestTimeline(
       makeBlob([{ cid: 'a', ti: 0, credit: 1000, start: 2000, end: 3000 }]),
     );
     expect(tl?.version).toBe(REQUEST_TIMELINE_VERSION);
   });
 
-  it('shifts ns timestamps to be relative to the earliest credit_issued', () => {
+  it('shifts ns timestamps to be relative to the earliest credit_issued', async () => {
     // Two requests with absolute ns starting at 1_000_000_000.
-    const tl = computeRequestTimeline(
+    const tl = await computeRequestTimeline(
       makeBlob([
         { cid: 'a', ti: 0, credit: 1_000_000_000, start: 1_001_000_000, end: 1_010_000_000 },
         { cid: 'a', ti: 1, credit: 1_020_000_000, start: 1_021_000_000, end: 1_030_000_000 },
@@ -97,8 +97,8 @@ describe('computeRequestTimeline', () => {
     expect(tl?.requests[1]?.start).toBe(21_000_000);
   });
 
-  it('sorts requests by start time, regardless of input order', () => {
-    const tl = computeRequestTimeline(
+  it('sorts requests by start time, regardless of input order', async () => {
+    const tl = await computeRequestTimeline(
       makeBlob([
         { cid: 'a', ti: 0, credit: 30, start: 50, end: 60 },
         { cid: 'a', ti: 1, credit: 0, start: 10, end: 20 },
@@ -108,8 +108,8 @@ describe('computeRequestTimeline', () => {
     expect(tl?.requests.map((r) => r.start)).toEqual([10, 50, 90]);
   });
 
-  it('preserves conversation/worker grouping fields', () => {
-    const tl = computeRequestTimeline(
+  it('preserves conversation/worker grouping fields', async () => {
+    const tl = await computeRequestTimeline(
       makeBlob([
         {
           cid: 'conv-A',
@@ -131,8 +131,8 @@ describe('computeRequestTimeline', () => {
     expect(r.phase).toBe('profiling');
   });
 
-  it('assigns separate replay ids when AIPerf concurrently reuses one conversation', () => {
-    const tl = computeRequestTimeline(
+  it('assigns separate replay ids when AIPerf concurrently reuses one conversation', async () => {
+    const tl = await computeRequestTimeline(
       makeBlob([
         {
           cid: 'reused-conversation',
@@ -159,8 +159,8 @@ describe('computeRequestTimeline', () => {
     ]);
   });
 
-  it('keeps every turn and subagent request in the same replay across phases', () => {
-    const tl = computeRequestTimeline(
+  it('keeps every turn and subagent request in the same replay across phases', async () => {
+    const tl = await computeRequestTimeline(
       makeBlob([
         {
           cid: 'conversation',
@@ -195,8 +195,8 @@ describe('computeRequestTimeline', () => {
     expect(new Set(tl?.requests.map((record) => record.ri))).toEqual(new Set([0]));
   });
 
-  it('uses x_correlation_id as a fallback and ranks replay ids by first dispatch', () => {
-    const tl = computeRequestTimeline(
+  it('uses x_correlation_id as a fallback and ranks replay ids by first dispatch', async () => {
+    const tl = await computeRequestTimeline(
       makeBlob([
         {
           cid: 'conversation',
@@ -223,15 +223,15 @@ describe('computeRequestTimeline', () => {
     ]);
   });
 
-  it('leaves legacy records without correlation ids backward-compatible', () => {
-    const tl = computeRequestTimeline(
+  it('leaves legacy records without correlation ids backward-compatible', async () => {
+    const tl = await computeRequestTimeline(
       makeBlob([{ cid: 'legacy', ti: 0, credit: 0, start: 10, end: 20 }]),
     );
     expect(tl?.requests[0]?.ri).toBeUndefined();
   });
 
-  it('preserves raw source provenance fields when present', () => {
-    const tl = computeRequestTimeline(
+  it('preserves raw source provenance fields when present', async () => {
+    const tl = await computeRequestTimeline(
       makeBlob([
         {
           cid: 'trace::fa:003',
@@ -256,8 +256,8 @@ describe('computeRequestTimeline', () => {
     });
   });
 
-  it('preserves the cancelled flag and TTFT/TPOT/ISL/OSL metrics', () => {
-    const tl = computeRequestTimeline(
+  it('preserves the cancelled flag and TTFT/TPOT/ISL/OSL metrics', async () => {
+    const tl = await computeRequestTimeline(
       makeBlob([
         {
           cid: 'a',
@@ -281,8 +281,8 @@ describe('computeRequestTimeline', () => {
     expect(r.osl).toBe(256);
   });
 
-  it('accepts time_per_output_token as a TPOT alias', () => {
-    const tl = computeRequestTimeline(
+  it('accepts time_per_output_token as a TPOT alias', async () => {
+    const tl = await computeRequestTimeline(
       makeBlob([
         {
           cid: 'a',
@@ -298,7 +298,7 @@ describe('computeRequestTimeline', () => {
     expect(tl?.requests[0]?.tpotMs).toBeCloseTo(8.25, 6);
   });
 
-  it('skips records missing both credit_issued_ns and request_start_ns', () => {
+  it('skips records missing both credit_issued_ns and request_start_ns', async () => {
     // Build a record with only request_end_ns — the helper rejects it.
     const broken = gzipSync(
       Buffer.from(
@@ -308,6 +308,6 @@ describe('computeRequestTimeline', () => {
         }),
       ),
     );
-    expect(computeRequestTimeline(broken)).toBeNull();
+    expect(await computeRequestTimeline(broken)).toBeNull();
   });
 });
