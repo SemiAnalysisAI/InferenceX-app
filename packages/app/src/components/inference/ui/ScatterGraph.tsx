@@ -430,7 +430,7 @@ const SCATTER_STRINGS = {
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
     overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
-    humanOutputSpeed: 'Human Output Speed',
+    humanOutputSpeed: 'Assuming Average Human Output Speed of 3 tok/s',
   },
   zh: {
     logScale: '对数缩放',
@@ -446,7 +446,7 @@ const SCATTER_STRINGS = {
     overflowMixed: (count: number) => `${count} 个点已截断`,
     overflowCost: (count: number, limit: number) => `${count} 个点 > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${count} 个点 > ${limit}s TTFT`,
-    humanOutputSpeed: '人类输出速度',
+    humanOutputSpeed: '假设人类平均输出速度为 3 tok/s',
   },
 } as const;
 
