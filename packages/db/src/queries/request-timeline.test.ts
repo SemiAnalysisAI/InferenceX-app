@@ -44,7 +44,9 @@ describe('getRequestTimeline', () => {
           trace_replay_id: 870,
           has_blob: true,
           timeline_version: REQUEST_TIMELINE_VERSION,
-          timeline_storage_bytes: 20 * 1024 * 1024,
+          // The serialized response is large even if TOAST compresses the
+          // repetitive JSONB value below the old pg_column_size threshold.
+          timeline_text_bytes: 20 * 1024 * 1024,
           request_timeline: null,
         },
       ],
@@ -53,7 +55,8 @@ describe('getRequestTimeline', () => {
 
     await expect(getRequestTimeline(sql, 422991)).resolves.toEqual(timeline);
     expect(calls).toHaveLength(2);
-    expect(calls[0]).toContain('pg_column_size');
+    expect(calls[0]).toContain('octet_length');
+    expect(calls[0]).not.toContain('pg_column_size');
     expect(calls[1]).toContain('substr(text');
     expect(calls[1]).not.toContain('profile_export_jsonl_gz as blob');
   });

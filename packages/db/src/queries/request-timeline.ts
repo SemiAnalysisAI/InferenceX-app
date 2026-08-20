@@ -24,7 +24,7 @@ interface RawMetaRow {
   trace_replay_id: number;
   has_blob: boolean;
   timeline_version: number | null;
-  timeline_storage_bytes: number | null;
+  timeline_text_bytes: number | null;
   request_timeline: RequestTimeline | null;
 }
 
@@ -37,9 +37,10 @@ interface RawTimelineChunkRow {
   chunk_chars: number;
 }
 
-// JSONB storage is compressed and therefore smaller than its encoded Neon
-// response. Keep ample headroom under Neon's 64 MiB per-query response cap.
-const MAX_INLINE_TIMELINE_STORAGE_BYTES = 16 * 1024 * 1024;
+// Measure the serialized JSON text, not pg_column_size(JSONB): TOAST can make
+// the on-disk value much smaller than Neon's encoded response. Keep ample
+// headroom under Neon's 64 MiB per-query response cap.
+const MAX_INLINE_TIMELINE_TEXT_BYTES = 16 * 1024 * 1024;
 const TIMELINE_TEXT_CHUNK_CHARS = 32 * 1024 * 1024;
 const MAX_TIMELINE_TEXT_CHUNKS = 64;
 
@@ -88,9 +89,9 @@ export async function getRequestTimeline(
       atr.id as trace_replay_id,
       (atr.profile_export_jsonl_gz is not null) as has_blob,
       (atr.request_timeline->>'version')::int as timeline_version,
-      pg_column_size(atr.request_timeline)::int as timeline_storage_bytes,
+      octet_length(atr.request_timeline::text)::int as timeline_text_bytes,
       case
-        when pg_column_size(atr.request_timeline) <= ${MAX_INLINE_TIMELINE_STORAGE_BYTES}
+        when octet_length(atr.request_timeline::text) <= ${MAX_INLINE_TIMELINE_TEXT_BYTES}
         then atr.request_timeline
         else null
       end as request_timeline
@@ -107,7 +108,7 @@ export async function getRequestTimeline(
   const storedVersion = row.timeline_version ?? row.request_timeline?.version;
   if (Number(storedVersion) === REQUEST_TIMELINE_VERSION) {
     if (row.request_timeline) return row.request_timeline;
-    if ((row.timeline_storage_bytes ?? 0) > MAX_INLINE_TIMELINE_STORAGE_BYTES) {
+    if ((row.timeline_text_bytes ?? 0) > MAX_INLINE_TIMELINE_TEXT_BYTES) {
       return readChunkedRequestTimeline(sql, row.trace_replay_id);
     }
   }
