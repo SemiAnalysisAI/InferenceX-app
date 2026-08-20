@@ -192,6 +192,33 @@ export function readUrlParams(): UrlStateParams {
   return _initialParams;
 }
 
+/**
+ * Re-read share-link params from the live URL, replacing the load-time
+ * snapshot.
+ *
+ * The snapshot above is captured once per page load, which is correct for a
+ * hard navigation but wrong for a client-side one: a soft transition to
+ * `/inference?g_model=…` does not remount the provider, so every reader kept
+ * seeing the params of the page the user came FROM (usually none). Callers
+ * must only invoke this on a real router navigation — self-writes go through
+ * `history.replaceState`, which deliberately does not, so re-reading after one
+ * of those would fight the user's own filter changes.
+ *
+ * Also mirrors into `currentState` so the next share-link write starts from
+ * what the URL actually asked for.
+ */
+export function refreshUrlParams(): UrlStateParams {
+  if (typeof window === 'undefined') return _initialParams;
+  const searchParams = new URLSearchParams(window.location.search);
+  for (const key of URL_STATE_KEYS) {
+    const value = searchParams.get(key);
+    if (value === null) continue;
+    _initialParams[key] = value;
+    currentState[key] = value;
+  }
+  return _initialParams;
+}
+
 /** Check whether the current URL has any share-link params. */
 export function hasAnyUrlParams(): boolean {
   if (typeof window === 'undefined') return false;
