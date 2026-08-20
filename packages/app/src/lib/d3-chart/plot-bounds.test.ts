@@ -28,28 +28,46 @@ function stubBox(element: Element, left: number, top: number, width: number, hei
  * The skeleton `setupChart` builds: a root group translated by the margins,
  * and a clip rect sized to the plot area inside them.
  */
+const CLIP_ID = 'clip-scatter-graph';
+
 function renderChartSvg({
   box = { left: 100, top: 200, width: 800, height: 600 },
   transform = 'translate(60,24)' as string | null,
   clip = { width: 730, height: 516 } as { width: number; height: number } | null,
+  /** A same-SVG clipPath belonging to something else (overflow continuations). */
+  decoyClip = false,
 } = {}): Element {
   const svg = svgEl('svg');
   stubBox(svg, box.left, box.top, box.width, box.height);
 
+  const defs = svgEl('defs');
+  if (decoyClip) {
+    const other = svgEl('clipPath');
+    other.setAttribute('id', 'some-other-clip');
+    const otherRect = svgEl('rect');
+    otherRect.setAttribute('width', '1');
+    otherRect.setAttribute('height', '1');
+    other.append(otherRect);
+    defs.append(other);
+  }
   if (clip) {
-    const defs = svgEl('defs');
     const clipPath = svgEl('clipPath');
+    clipPath.setAttribute('id', CLIP_ID);
     const rect = svgEl('rect');
     rect.setAttribute('width', String(clip.width));
     rect.setAttribute('height', String(clip.height));
     clipPath.append(rect);
     defs.append(clipPath);
-    svg.append(defs);
   }
+  svg.append(defs);
 
   const root = svgEl('g');
   root.setAttribute('class', 'chart-root');
   if (transform !== null) root.setAttribute('transform', transform);
+  const zoomGroup = svgEl('g');
+  zoomGroup.setAttribute('class', 'zoom-group');
+  if (clip) zoomGroup.setAttribute('clip-path', `url(#${CLIP_ID})`);
+  root.append(zoomGroup);
   svg.append(root);
 
   document.body.append(svg);
@@ -89,10 +107,23 @@ describe('plotBounds', () => {
     expect(plotBounds(svg)?.left).toBe(160);
   });
 
+  it("resolves the chart's own clipPath, not whichever one comes first", () => {
+    // The overflow-continuation layer defines a clipPath per group, so
+    // "the first clipPath in the SVG" is not a safe assumption.
+    const svg = renderChartSvg({ decoyClip: true });
+    expect(plotBounds(svg)).toEqual({ left: 160, top: 224, right: 890, bottom: 740 });
+  });
+
   it('returns null when the chart clips nothing', () => {
-    // clipContent: false — the caller should fall back to the SVG box, since
-    // in that mode nothing is painted away.
+    // clipContent: false — no clip-path on the zoom group, so nothing is
+    // painted away and the caller should fall back to the SVG box.
     expect(plotBounds(renderChartSvg({ clip: null }))).toBeNull();
+  });
+
+  it('returns null when the referenced clipPath is missing', () => {
+    const svg = renderChartSvg();
+    svg.querySelector('clipPath')!.remove();
+    expect(plotBounds(svg)).toBeNull();
   });
 
   it('returns null before the skeleton has rendered', () => {

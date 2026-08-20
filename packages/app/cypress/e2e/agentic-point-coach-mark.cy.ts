@@ -12,6 +12,7 @@ import {
   keepAgenticCoachMark,
   unlockAgenticGate,
 } from '../support/e2e';
+import { plotBounds } from '@/lib/d3-chart/plot-bounds';
 import { OVERLAY_RUN_ID, interceptOverlayRun } from '../support/overlay-fixtures';
 
 // This spec owns coach-mark state, so it opts out of the global suppression in
@@ -118,6 +119,33 @@ describe('Agentic point coach mark', () => {
 
     cy.get('[data-testid="scatter-graph"]').scrollIntoView();
     cy.get(COACH_MARK).should('be.visible');
+  });
+
+  it('targets the clipped plot area, not the axis gutters', () => {
+    // `plotBounds` reconstructs the clip region from the live chart DOM. If the
+    // skeleton it reads ever changes shape it returns null and the resolver
+    // silently falls back to the SVG box — which includes the 60px axis
+    // gutters, where a zoomed point is invisible. Assert against the real DOM
+    // so that fallback cannot go unnoticed.
+    visitAgenticChart();
+    cy.get(COACH_MARK).should('be.visible');
+
+    cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]').then(($svg) => {
+      const svg = $svg[0];
+      const bounds = plotBounds(svg);
+      expect(bounds, 'clip region resolves against the real chart').to.not.eq(null);
+
+      const box = svg.getBoundingClientRect();
+      expect(bounds!.left, 'left gutter excluded').to.be.greaterThan(box.left);
+      expect(bounds!.bottom, 'bottom gutter excluded').to.be.lessThan(box.bottom);
+
+      cy.get('[data-testid="agentic-point-coach-mark-target"]').then(($ring) => {
+        const cx = Number($ring.attr('cx'));
+        const cy = Number($ring.attr('cy'));
+        expect(cx).to.be.within(bounds!.left, bounds!.right);
+        expect(cy).to.be.within(bounds!.top, bounds!.bottom);
+      });
+    });
   });
 
   it('keeps the card fully on screen', () => {

@@ -72,8 +72,10 @@ function appendChartSvg(chart: Element, spec: ChartSvgSpec): void {
   svg.dataset.testid = 'd3-chart-svg';
   stubBox(svg, spec.box.left, spec.box.top, spec.box.width, spec.box.height);
 
+  const clipId = 'clip-scatter-graph';
   const defs = document.createElementNS(SVG_NS, 'defs');
   const clipPath = document.createElementNS(SVG_NS, 'clipPath');
+  clipPath.setAttribute('id', clipId);
   const clipRect = document.createElementNS(SVG_NS, 'rect');
   clipRect.setAttribute('width', String(spec.clip.width));
   clipRect.setAttribute('height', String(spec.clip.height));
@@ -84,6 +86,10 @@ function appendChartSvg(chart: Element, spec: ChartSvgSpec): void {
   const root = document.createElementNS(SVG_NS, 'g');
   root.setAttribute('class', 'chart-root');
   root.setAttribute('transform', `translate(${spec.margin.left},${spec.margin.top})`);
+  const zoomGroup = document.createElementNS(SVG_NS, 'g');
+  zoomGroup.setAttribute('class', 'zoom-group');
+  zoomGroup.setAttribute('clip-path', `url(#${clipId})`);
+  root.append(zoomGroup);
   svg.append(root);
 
   chart.append(svg);

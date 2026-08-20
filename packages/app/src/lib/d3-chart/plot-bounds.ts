@@ -25,6 +25,8 @@ export interface PlotBounds {
 
 /** `translate(x,y)` as written by `setupChart` — also tolerates space separators. */
 const TRANSLATE = /translate\(\s*(?<x>-?[\d.]+)[\s,]+(?<y>-?[\d.]+)\s*\)/u;
+/** The `clip-path="url(#…)"` reference `setupChart` puts on the zoom group. */
+const CLIP_URL = /url\(\s*#(?<id>[^)\s]+)\s*\)/u;
 
 /**
  * @param svg the chart's `<svg>` element (`[data-testid="d3-chart-svg"]`).
@@ -35,8 +37,19 @@ const TRANSLATE = /translate\(\s*(?<x>-?[\d.]+)[\s,]+(?<y>-?[\d.]+)\s*\)/u;
  */
 export function plotBounds(svg: Element): PlotBounds | null {
   const root = svg.querySelector('.chart-root');
-  const clip = svg.querySelector('defs clipPath rect');
-  if (!root || !clip) return null;
+  const zoomGroup = svg.querySelector('.zoom-group');
+  if (!root || !zoomGroup) return null;
+
+  // Follow the zoom group's own reference rather than assuming the chart's is
+  // the only clipPath in the SVG — the overflow-continuation layer defines one
+  // per group, and future layers may too. No reference means `clipContent:
+  // false`, i.e. nothing is being clipped away.
+  const clipId = CLIP_URL.exec(zoomGroup.getAttribute('clip-path') ?? '')?.groups?.id;
+  if (!clipId) return null;
+  const clip = [...svg.querySelectorAll('clipPath')]
+    .find((candidate) => candidate.id === clipId)
+    ?.querySelector('rect');
+  if (!clip) return null;
 
   const translate = TRANSLATE.exec(root.getAttribute('transform') ?? '')?.groups;
   const width = Number(clip.getAttribute('width'));
