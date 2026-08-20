@@ -79,6 +79,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'yearly',
       priority: 0.4,
     }),
+    // The catalog index is indexable; the per-point detail pages it links to
+    // stay noindex, so only this page enters the sitemap.
+    ...localizedPair('/inference/agentic', {
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.7,
+    }),
     ...localizedPair('/compare', { lastModified: now, changeFrequency: 'daily', priority: 0.8 }),
     ...localizedPair('/compare-per-dollar', {
       lastModified: now,
