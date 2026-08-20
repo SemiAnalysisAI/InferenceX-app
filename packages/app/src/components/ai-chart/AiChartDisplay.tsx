@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, Eye, EyeOff, Sparkles } from 'lucide-react';
 
 import { track } from '@/lib/analytics';
@@ -66,9 +66,14 @@ export default function AiChartDisplay() {
   });
   const [prompt, setPrompt] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const [isMac, setIsMac] = useState(false);
   const { result, isLoading, error, generate, reset } = useAiChart();
   const locale = useLocale();
   const t = STRINGS[locale];
+
+  useEffect(() => {
+    setIsMac(navigator.userAgent.includes('Mac'));
+  }, []);
 
   const apiKey = apiKeys[provider];
 
@@ -157,7 +162,7 @@ export default function AiChartDisplay() {
             />
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground text-xs">
-                {navigator.userAgent.includes('Mac') ? '⌘' : 'Ctrl'}
+                {isMac ? '⌘' : 'Ctrl'}
                 {t.enterToGenerate}
               </span>
               <Button
