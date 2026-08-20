@@ -4,13 +4,16 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/client-navigation';
 import type { OverviewPageData } from '@/lib/overview-data';
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
-}));
+const routerStub = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+const trackStub = vi.hoisted(() => vi.fn());
 
-import { OverviewNavigationProvider } from './overview-navigation';
+vi.mock('next/navigation', () => ({ useRouter: () => routerStub }));
+vi.mock('@/lib/analytics', () => ({ track: trackStub }));
+
+import { OverviewNavigationProvider, useOverviewNavigation } from './overview-navigation';
 import {
   DesktopOverviewMatrix,
   overviewFormatters,
@@ -81,13 +84,17 @@ function stubFullscreenApi(enabled: boolean) {
   });
 }
 
-function render() {
+function render(initialHref = '/overview?compare=30d') {
   act(() => {
     root.render(
-      <OverviewNavigationProvider initialData={HISTORY_DATA} initialHref="/overview?compare=30d">
+      <OverviewNavigationProvider initialData={HISTORY_DATA} initialHref={initialHref}>
         <OverviewPresentationProvider locale="en">
           <OverviewPresentationSurface>
             <OverviewPresentToggle strings={strings} />
+            <NavigationProbe />
+            <div role="option" tabIndex={-1} data-testid="overview-select-option">
+              7 days
+            </div>
           </OverviewPresentationSurface>
         </OverviewPresentationProvider>
       </OverviewNavigationProvider>,
@@ -95,12 +102,37 @@ function render() {
   });
 }
 
+function NavigationProbe() {
+  const navigation = useOverviewNavigation();
+  return (
+    <>
+      <button
+        type="button"
+        data-testid="overview-server-selection"
+        onClick={() => navigation.push('/overview', ['compare'])}
+      >
+        Hardware
+      </button>
+      <output data-testid="overview-next-href">
+        {navigation.resolve('/overview?tier=75', ['tier'])}
+      </output>
+    </>
+  );
+}
+
 const surface = () =>
   container.querySelector<HTMLElement>('[data-testid="overview-presentation-surface"]');
 const toggle = () =>
   container.querySelector<HTMLButtonElement>('[data-testid="overview-present-toggle"]');
+const serverSelection = () =>
+  container.querySelector<HTMLButtonElement>('[data-testid="overview-server-selection"]');
+const selectOption = () =>
+  container.querySelector<HTMLElement>('[data-testid="overview-select-option"]');
 
 beforeEach(() => {
+  routerStub.push.mockClear();
+  routerStub.replace.mockClear();
+  trackStub.mockClear();
   window.history.replaceState({}, '', '/overview?compare=30d');
   container = document.createElement('div');
   document.body.append(container);
@@ -115,21 +147,29 @@ afterEach(() => {
 });
 
 describe('OverviewPresentationSurface', () => {
-  it('hands the surface to the Fullscreen API and mirrors the browser back', () => {
+  it('hands the surface to the Fullscreen API and mirrors presentation intent in the URL', () => {
     render();
     expect(toggle()?.textContent).toBe('Present');
     expect(surface()?.dataset.presenting).toBe('false');
 
     act(() => toggle()?.click());
     expect(requestFullscreen).toHaveBeenCalledTimes(1);
+    expect(window.location.search).toBe('?compare=30d&present=1');
     expect(fullscreenElement).toBe(surface());
     expect(surface()?.dataset.presenting).toBe('true');
     expect(toggle()?.textContent).toBe('Exit');
+    expect(trackStub).toHaveBeenLastCalledWith('overview_presentation_toggled', {
+      action: 'enter',
+    });
 
     act(() => toggle()?.click());
     expect(exitFullscreen).toHaveBeenCalledTimes(1);
+    expect(window.location.search).toBe('?compare=30d');
     expect(surface()?.dataset.presenting).toBe('false');
     expect(toggle()?.textContent).toBe('Present');
+    expect(trackStub).toHaveBeenLastCalledWith('overview_presentation_toggled', {
+      action: 'exit',
+    });
   });
 
   it('follows the browser out of fullscreen when Esc bypasses the button', () => {
@@ -142,6 +182,210 @@ describe('OverviewPresentationSurface', () => {
       document.dispatchEvent(new Event('fullscreenchange'));
     });
     expect(surface()?.dataset.presenting).toBe('false');
+    expect(window.location.search).toBe('?compare=30d');
+  });
+
+  it('reasserts presentation intent when Back or Forward lands on an older URL', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise(() => {
+            // Keep server navigation pending while checking client URL state.
+          }),
+      ),
+    );
+    window.history.replaceState({}, '', '/overview?tier=100&compare=30d');
+    render('/overview?tier=100&compare=30d');
+    act(() => toggle()?.click());
+
+    await act(async () => {
+      window.history.replaceState({}, '', '/overview?tier=75&compare=30d');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      await Promise.resolve();
+    });
+
+    expect(window.location.search).toBe('?tier=75&compare=30d&present=1');
+    expect(container.querySelector('[data-testid="overview-next-href"]')?.textContent).toBe(
+      '/overview?tier=75&compare=30d&present=1',
+    );
+    expect(surface()?.dataset.presenting).toBe('true');
+    expect(fullscreenElement).toBe(surface());
+    expect(fetch).toHaveBeenCalledWith('/api/v1/overview?tier=75&compare=30d', {
+      headers: { Accept: 'application/json' },
+    });
+  });
+
+  it('does not carry presentation intent onto a route left through browser history', () => {
+    render();
+    act(() => toggle()?.click());
+
+    act(() => {
+      window.history.replaceState({}, '', '/inference');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+
+    expect(window.location.pathname).toBe('/inference');
+    expect(window.location.search).toBe('');
+  });
+
+  it('preserves every other query parameter and the fragment while notifying persistent chrome', () => {
+    vi.stubGlobal('fetch', vi.fn());
+    window.history.replaceState({}, '', '/overview?tier=75&compare=30d&utm_source=deck#matrix');
+    const searchEvents: string[] = [];
+    const onSearchChange = (event: Event) => {
+      if (event instanceof CustomEvent && typeof event.detail === 'string') {
+        searchEvents.push(event.detail);
+      }
+    };
+    window.addEventListener(CLIENT_SEARCH_CHANGE_EVENT, onSearchChange);
+
+    render('/overview?tier=75&compare=30d');
+    act(() => toggle()?.click());
+
+    expect(window.location.pathname).toBe('/overview');
+    expect(window.location.search).toBe('?tier=75&compare=30d&present=1&utm_source=deck');
+    expect(window.location.hash).toBe('#matrix');
+    expect(searchEvents).toEqual(['?tier=75&compare=30d&present=1&utm_source=deck']);
+    expect(fetch).not.toHaveBeenCalled();
+
+    act(() => toggle()?.click());
+    expect(window.location.search).toBe('?tier=75&compare=30d&utm_source=deck');
+    expect(window.location.hash).toBe('#matrix');
+    expect(searchEvents).toEqual([
+      '?tier=75&compare=30d&present=1&utm_source=deck',
+      '?tier=75&compare=30d&utm_source=deck',
+    ]);
+    window.removeEventListener(CLIENT_SEARCH_CHANGE_EVENT, onSearchChange);
+  });
+
+  it('does not attempt native fullscreen from a shared presentation URL without a user gesture', () => {
+    window.history.replaceState({}, '', '/overview?compare=30d&present=1');
+    render('/overview?compare=30d');
+
+    expect(requestFullscreen).not.toHaveBeenCalled();
+    expect(surface()?.dataset.presenting).toBe('false');
+    expect(window.location.search).toBe('?compare=30d&present=1');
+
+    act(() => toggle()?.click());
+    expect(requestFullscreen).toHaveBeenCalledTimes(1);
+    expect(surface()?.dataset.presenting).toBe('true');
+  });
+
+  it('keeps presentation intent and fullscreen active while paging to another view', async () => {
+    const requested: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        requested.push(String(input));
+        return Promise.resolve(Response.json({ ...HISTORY_DATA, comparisonMode: 'hardware' }));
+      }),
+    );
+    render();
+
+    act(() => toggle()?.click());
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(requested).toHaveLength(1);
+    expect(requested[0]).not.toContain('present=1');
+    expect(window.location.search).toBe('?present=1');
+    expect(surface()?.dataset.presenting).toBe('true');
+    expect(fullscreenElement).toBe(surface());
+  });
+
+  it('does not page when an arrow key belongs to an interactive control', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => {})),
+    );
+    render();
+    act(() => toggle()?.click());
+
+    act(() =>
+      toggle()?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })),
+    );
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(window.location.search).toBe('?compare=30d&present=1');
+  });
+
+  it('does not page when a Radix Select option owns the arrow key', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => {})),
+    );
+    render();
+    act(() => toggle()?.click());
+
+    act(() =>
+      selectOption()?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
+      ),
+    );
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(window.location.search).toBe('?compare=30d&present=1');
+  });
+
+  it('keeps presentation intent when an older server selection fails', async () => {
+    let rejectRequest: ((error: Error) => void) | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((_resolve, reject) => {
+            rejectRequest = reject;
+          }),
+      ),
+    );
+    render();
+
+    act(() => serverSelection()?.click());
+    act(() => toggle()?.click());
+    expect(window.location.search).toBe('?present=1');
+
+    await act(async () => {
+      rejectRequest?.(new Error('network down'));
+      await Promise.resolve();
+    });
+
+    expect(window.location.search).toBe('?present=1');
+    expect(surface()?.dataset.presenting).toBe('true');
+    expect(container.querySelector('[data-testid="overview-next-href"]')?.textContent).toContain(
+      'present=1',
+    );
+  });
+
+  it('removes presentation intent if the browser refuses fullscreen', async () => {
+    requestFullscreen.mockRejectedValueOnce(new Error('denied'));
+    render();
+
+    await act(async () => {
+      toggle()?.click();
+      await Promise.resolve();
+    });
+
+    expect(window.location.search).toBe('?compare=30d');
+    expect(surface()?.dataset.presenting).toBe('false');
+  });
+
+  it('keeps presenting without an unhandled rejection if exiting fullscreen is refused', async () => {
+    render();
+    act(() => toggle()?.click());
+    exitFullscreen.mockRejectedValueOnce(new Error('denied'));
+
+    await act(async () => {
+      toggle()?.click();
+      await Promise.resolve();
+    });
+
+    expect(window.location.search).toBe('?compare=30d&present=1');
+    expect(surface()?.dataset.presenting).toBe('true');
+    expect(fullscreenElement).toBe(surface());
   });
 
   it('pages between the two views with the arrow keys, but only while presenting', () => {
@@ -169,9 +413,11 @@ describe('OverviewPresentationSurface', () => {
 
   it('stays out of the way on browsers that refuse fullscreen', () => {
     stubFullscreenApi(false);
+    window.history.replaceState({}, '', '/overview?compare=30d&present=1');
     render();
     expect(toggle()).toBeNull();
     expect(surface()).not.toBeNull();
+    expect(window.location.search).toBe('?compare=30d');
   });
 });
 
