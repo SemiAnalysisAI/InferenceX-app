@@ -160,6 +160,10 @@ describe('GPU comparison agentic point detail', () => {
 
     cy.get('[data-testid="gpu-multiselect"] [role="combobox"]').click({ force: true });
     cy.get('[role="option"]').first().click();
+    cy.contains('Comparison Date Range').should('be.visible');
+    cy.contains('button', 'Select date range')
+      .should('not.have.class', 'animate-pulse')
+      .and('not.have.class', 'border-red-500');
     cy.contains('button', 'Select date range').click();
     cy.get('body').then(($body) => {
       if ($body.text().includes('View anyway')) {
