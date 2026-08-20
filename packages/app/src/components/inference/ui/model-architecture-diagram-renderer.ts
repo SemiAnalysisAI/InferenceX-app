@@ -437,7 +437,7 @@ export function renderDiagram(
   let attnExpandedStartY = 0;
   let merge1Y = 0;
   let norm1Y = 0;
-  let _routerY = 0;
+  const _routerY = 0;
   let expertY = 0;
   let ffnY = 0;
   let ffnExpandedStartY = 0;
@@ -535,7 +535,6 @@ export function renderDiagram(
 
     if (isMoE) {
       // Router
-      _routerY = y;
       y += blockH + arrowH;
 
       // Expert grid

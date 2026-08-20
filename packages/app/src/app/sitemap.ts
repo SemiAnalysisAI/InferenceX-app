@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 import { listDatasets } from '@semianalysisai/inferencex-db/queries/datasets';
 
 import { AGENTX_OPTIMIZATION_SLUGS } from '@/lib/agentx-optimizations';
@@ -48,7 +48,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getAllComparableCompareSlugs(),
     getAllComparablePrecisionSlugs(),
     getAllComparableSpecDecodeSlugs(),
-    listDatasets(getDb()),
+    FIXTURES_MODE ? Promise.resolve([]) : listDatasets(getDb()),
   ]);
   const zhPosts = new Set(getAllPosts('zh').map((post) => post.slug));
 

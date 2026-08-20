@@ -1,11 +1,22 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
 import { zhPath } from '@/lib/i18n';
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({ getDb: () => ({}) }));
+const mocks = vi.hoisted(() => ({
+  fixturesMode: false,
+  getDb: vi.fn(() => ({})),
+  listDatasets: vi.fn(() => Promise.resolve([{ slug: 'agentx-fixture' }])),
+}));
+
+vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+  get FIXTURES_MODE() {
+    return mocks.fixturesMode;
+  },
+  getDb: mocks.getDb,
+}));
 vi.mock('@semianalysisai/inferencex-db/queries/datasets', () => ({
-  listDatasets: () => Promise.resolve([{ slug: 'agentx-fixture' }]),
+  listDatasets: mocks.listDatasets,
 }));
 vi.mock('@/lib/agentx-optimizations', () => ({ AGENTX_OPTIMIZATION_SLUGS: [] }));
 vi.mock('@/lib/blog', () => ({ getAllPosts: () => [] }));
@@ -21,6 +32,11 @@ vi.mock('@/lib/glossary', () => ({ getAllGlossaryEntries: () => [] }));
 import sitemap from './sitemap';
 
 describe('sitemap locale parity', () => {
+  beforeEach(() => {
+    mocks.fixturesMode = false;
+    vi.clearAllMocks();
+  });
+
   it('emits both locales for every indexable dashboard route and omits non-indexable routes', async () => {
     const entries = await sitemap();
     const urls = new Set(entries.map((entry) => entry.url));
@@ -40,5 +56,16 @@ describe('sitemap locale parity', () => {
     const urls = new Set(entries.map((entry) => entry.url));
     expect(urls.has(`${SITE_URL}/agentx/agentx-fixture`)).toBe(true);
     expect(urls.has(`${SITE_URL}/zh/agentx/agentx-fixture`)).toBe(true);
+  });
+
+  it('does not require a database connection in fixture mode', async () => {
+    mocks.fixturesMode = true;
+
+    const entries = await sitemap();
+    const urls = new Set(entries.map((entry) => entry.url));
+
+    expect(mocks.getDb).not.toHaveBeenCalled();
+    expect(mocks.listDatasets).not.toHaveBeenCalled();
+    expect(urls.has(`${SITE_URL}/agentx/agentx-fixture`)).toBe(false);
   });
 });
