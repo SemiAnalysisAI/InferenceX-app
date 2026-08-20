@@ -13,7 +13,19 @@ export interface RankAiHardwareOptions {
   distinctGpus: boolean;
 }
 
-export function readAiMetric(point: unknown, path: string): number | null {
+function isMeasuredTelemetryMetric(metric: string): boolean {
+  return metric.startsWith('y_measured');
+}
+
+export function isAiMetricValueValid(metric: string, value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    (value > 0 || (value === 0 && isMeasuredTelemetryMetric(metric)))
+  );
+}
+
+export function readAiMetric(point: unknown, path: string, metric: string): number | null {
   let value: unknown = point;
 
   for (const key of path.split('.')) {
@@ -21,7 +33,7 @@ export function readAiMetric(point: unknown, path: string): number | null {
     value = (value as Record<string, unknown>)[key];
   }
 
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  return isAiMetricValueValid(metric, value) ? value : null;
 }
 
 export function getAiMetricDirection(
@@ -34,6 +46,7 @@ export function getAiMetricDirection(
 
 export function buildAiLineData<T extends AiMetricPoint>(
   points: readonly T[],
+  metric: string,
   metricPath: string,
   visibleHardwareKeys: ReadonlySet<string>,
 ): Record<string, { x: number; y: number }[]> {
@@ -44,7 +57,10 @@ export function buildAiLineData<T extends AiMetricPoint>(
     if (!hwKey || !visibleHardwareKeys.has(hwKey)) continue;
 
     lines[hwKey] ??= [];
-    lines[hwKey].push({ x: point.x, y: readAiMetric(point, metricPath) ?? Number.NaN });
+    lines[hwKey].push({
+      x: point.x,
+      y: readAiMetric(point, metricPath, metric) ?? Number.NaN,
+    });
   }
 
   for (const [hwKey, line] of Object.entries(lines)) {
@@ -65,7 +81,7 @@ export function normalizeAiRadarRows(
   for (const values of rawRows.values()) {
     for (let index = 0; index < metrics.length; index++) {
       const value = values[index];
-      if (value === null || value === undefined || !Number.isFinite(value)) continue;
+      if (!isAiMetricValueValid(metrics[index], value)) continue;
       mins[index] = Math.min(mins[index], value);
       maxs[index] = Math.max(maxs[index], value);
     }
@@ -78,9 +94,7 @@ export function normalizeAiRadarRows(
       metrics.map((metric, index) => {
         const value = values[index];
         if (
-          value === null ||
-          value === undefined ||
-          !Number.isFinite(value) ||
+          !isAiMetricValueValid(metric, value) ||
           !Number.isFinite(mins[index]) ||
           maxs[index] === mins[index]
         ) {
@@ -109,7 +123,7 @@ export function rankAiHardwareKeys<T extends AiMetricPoint>(
     const hwKey = point.hwKey ?? '';
     if (!hwKey) continue;
 
-    const value = readAiMetric(point, options.metricPath);
+    const value = readAiMetric(point, options.metricPath, options.metric);
     if (value === null) continue;
 
     const existing = bestByHardware.get(hwKey);

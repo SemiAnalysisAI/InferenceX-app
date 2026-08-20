@@ -81,10 +81,10 @@ describe('AI chart metric semantics', () => {
     cy.visit('/ai-chart');
   });
 
-  it('uses the minimum cost when selecting the top configuration', () => {
+  it('excludes unavailable zero cost when selecting the top configuration', () => {
     cy.fixture<FixtureRow[]>('api/benchmarks.json').then((fixtureRows) => {
       const rows = [
-        fixtureRow(fixtureRows, 'b200', 40, 100),
+        fixtureRow(fixtureRows, 'b200', 40, 0),
         fixtureRow(fixtureRows, 'mi355x', 40, 10_000),
       ];
       interceptGeneration(

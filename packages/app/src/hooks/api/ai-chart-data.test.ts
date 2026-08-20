@@ -13,10 +13,27 @@ import {
 const chartDefinition = chartDefinitions[0] as Record<string, unknown>;
 
 describe('readAiMetric', () => {
-  it('distinguishes an absent nested metric from a measured zero', () => {
-    expect(readAiMetric({ measuredAvgPower: { y: 0 } }, 'measuredAvgPower.y')).toBe(0);
-    expect(readAiMetric({}, 'measuredAvgPower.y')).toBeNull();
-    expect(readAiMetric({ measuredAvgPower: { y: Number.NaN } }, 'measuredAvgPower.y')).toBeNull();
+  it('preserves an explicitly measured zero while rejecting a missing telemetry property', () => {
+    expect(
+      readAiMetric({ measuredAvgPower: { y: 0 } }, 'measuredAvgPower.y', 'y_measuredAvgPower'),
+    ).toBe(0);
+    expect(readAiMetric({}, 'measuredAvgPower.y', 'y_measuredAvgPower')).toBeNull();
+    expect(
+      readAiMetric(
+        { measuredAvgPower: { y: Number.NaN } },
+        'measuredAvgPower.y',
+        'y_measuredAvgPower',
+      ),
+    ).toBeNull();
+  });
+
+  it.each([
+    ['costh.y', 'y_costh'],
+    ['tpPerGpu.y', 'y_tpPerGpu'],
+    ['jTotal.y', 'y_jTotal'],
+  ])('rejects a synthetic zero sentinel for %s', (path, metric) => {
+    const [field] = path.split('.');
+    expect(readAiMetric({ [field]: { y: 0 } }, path, metric)).toBeNull();
   });
 });
 
@@ -46,7 +63,7 @@ describe('buildAiLineData', () => {
       { hwKey: 'b200_vllm', x: 30, metric: { y: 0 } },
     ];
 
-    const lines = buildAiLineData(points, 'metric.y', new Set(['b200_vllm']));
+    const lines = buildAiLineData(points, 'y_measuredAvgPower', 'metric.y', new Set(['b200_vllm']));
 
     expect(lines.b200_vllm).toHaveLength(3);
     expect(lines.b200_vllm?.map((point) => point.x)).toEqual([10, 20, 30]);
@@ -61,6 +78,7 @@ describe('buildAiLineData', () => {
         { hwKey: 'b200_vllm', x: 10 },
         { hwKey: 'b200_vllm', x: 20 },
       ],
+      'y_measuredAvgPower',
       'metric.y',
       new Set(['b200_vllm']),
     );
@@ -88,7 +106,7 @@ describe('normalizeAiRadarRows', () => {
     const normalized = normalizeAiRadarRows(
       new Map([
         ['missing', [null]],
-        ['zero', [0]],
+        ['low', [5]],
         ['positive', [10]],
       ]),
       ['y_tpPerGpu'],
@@ -96,8 +114,60 @@ describe('normalizeAiRadarRows', () => {
     );
 
     expect(normalized.get('missing')?.[0]).toBeNull();
-    expect(normalized.get('zero')?.[0]).toBe(0);
+    expect(normalized.get('low')?.[0]).toBe(0);
     expect(normalized.get('positive')?.[0]).toBe(1);
+  });
+
+  it('rejects synthetic zero sentinels while preserving measured zero telemetry', () => {
+    const unavailableCost = normalizeAiRadarRows(
+      new Map([
+        ['unavailable', [0]],
+        ['valid-low', [1]],
+        ['valid-high', [2]],
+      ]),
+      ['y_costh'],
+      chartDefinition,
+    );
+    const measuredPower = normalizeAiRadarRows(
+      new Map([
+        ['zero', [0]],
+        ['positive', [100]],
+      ]),
+      ['y_measuredAvgPower'],
+      chartDefinition,
+    );
+
+    expect(unavailableCost.get('unavailable')?.[0]).toBeNull();
+    expect(measuredPower.get('zero')?.[0]).toBe(1);
+  });
+});
+
+describe('synthetic metric availability', () => {
+  it('turns an unavailable cost into no bar value, a radar gap, and a line gap', () => {
+    const unavailable = { hwKey: 'b200_vllm', x: 20, costh: { y: 0 } };
+    const lines = buildAiLineData(
+      [
+        { hwKey: 'b200_vllm', x: 10, costh: { y: 2 } },
+        unavailable,
+        { hwKey: 'b200_vllm', x: 30, costh: { y: 1 } },
+      ],
+      'y_costh',
+      'costh.y',
+      new Set(['b200_vllm']),
+    );
+    const radar = normalizeAiRadarRows(
+      new Map([
+        ['unavailable', [0]],
+        ['valid-low', [1]],
+        ['valid-high', [2]],
+      ]),
+      ['y_costh'],
+      chartDefinition,
+    );
+
+    expect(readAiMetric(unavailable, 'costh.y', 'y_costh')).toBeNull();
+    expect(lines.b200_vllm?.[1]?.y).toBeNaN();
+    expect(radar.get('unavailable')?.[0]).toBeNull();
   });
 });
 
@@ -159,7 +229,7 @@ describe('rankAiHardwareKeys', () => {
     ).toEqual(['b200_sglang', 'mi355x_vllm']);
   });
 
-  it('excludes missing values while preserving a measured zero', () => {
+  it('excludes missing and synthetic zero values from lower-is-better ranking', () => {
     const points = [
       { hwKey: 'missing', x: 10 },
       { hwKey: 'zero', x: 10, costh: { y: 0 } },
@@ -171,6 +241,21 @@ describe('rankAiHardwareKeys', () => {
         ...baseOptions,
         metric: 'y_costh',
         metricPath: 'costh.y',
+      }),
+    ).toEqual(['positive']);
+  });
+
+  it('preserves measured zero telemetry in lower-is-better ranking', () => {
+    const points = [
+      { hwKey: 'zero', x: 10, measuredAvgPower: { y: 0 } },
+      { hwKey: 'positive', x: 10, measuredAvgPower: { y: 1 } },
+    ];
+
+    expect(
+      rankAiHardwareKeys(points, {
+        ...baseOptions,
+        metric: 'y_measuredAvgPower',
+        metricPath: 'measuredAvgPower.y',
       }),
     ).toEqual(['zero']);
   });

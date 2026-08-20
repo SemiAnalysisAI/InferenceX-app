@@ -126,7 +126,7 @@ function buildBenchmarkBarData(
       }
     }
 
-    const value = readAiMetric(closest, yFieldPath);
+    const value = readAiMetric(closest, yFieldPath, spec.yAxisMetric);
     if (value === null) continue;
 
     const config = getHardwareConfig(hwKey, closest.model);
@@ -274,7 +274,7 @@ function buildLineData(
 ): Record<string, { x: number; y: number }[]> {
   const chartDef = (chartDefinitions as any[])[0];
   const yFieldPath: string = chartDef[spec.yAxisMetric] ?? 'tpPerGpu.y';
-  return buildAiLineData(points, yFieldPath, new Set(Object.keys(colorMap)));
+  return buildAiLineData(points, spec.yAxisMetric, yFieldPath, new Set(Object.keys(colorMap)));
 }
 
 function buildRadarData(
@@ -302,7 +302,7 @@ function buildRadarData(
   for (const [hwKey, point] of groups) {
     const vals = metrics.map((m) => {
       const path: string = chartDef[m] ?? m;
-      return readAiMetric(point, path);
+      return readAiMetric(point, path, m);
     });
     rawMatrix.set(hwKey, vals);
   }
