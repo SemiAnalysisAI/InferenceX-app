@@ -142,6 +142,7 @@ export const NAV_LABELS_ZH: Record<string, string> = {
   '/': '首页',
   '/overview': '总览',
   '/inference': '仪表板',
+  '/inference/agentic': '遥测数据',
   '/compare': 'Chip 对比',
   '/agentx': 'AgentX',
   '/about': '关于',
