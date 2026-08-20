@@ -316,6 +316,14 @@ export const apiRouteCatalog = [
     sourceSha256: '367628818cb02273505c4826d35407e10c45ed4eced69b628da091cde79db0cf',
   },
   {
+    source: 'src/app/api/v1/server-log-search/route.ts',
+    path: '/api/v1/server-log-search',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'search-server-logs',
+    sourceSha256: '029a578cc8417a3ff34b6585fcc91c568e9973a2c00aab025a11cdbe9a847cb3',
+  },
+  {
     source: 'src/app/api/v1/server-log/route.ts',
     path: '/api/v1/server-log',
     method: 'GET',
@@ -519,10 +527,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/server-logs.ts',
-    sourceSha256: '5322e69ebd758ff687636abf8f2fa13192e8d4658742ac4ced76e793516acd84',
+    sourceSha256: '7a6f6b0b3c60e1713f73f6d543745931886654f060cf55d6dc4be9619a64b479',
     reviewArea: {
-      en: 'Log filename discovery, selected-file reads, bounded chunk metadata, availability, and legacy-schema fallback.',
-      zh: '日志文件名发现、指定文件读取、有界分块元数据、可用性以及旧版 schema 回退行为。',
+      en: 'Log filename discovery, selected-file reads, bounded chunk metadata, complete-file search, availability, and legacy-schema fallback.',
+      zh: '日志文件名发现、指定文件读取、有界分块元数据、完整文件搜索、可用性以及旧版 schema 回退行为。',
     },
   },
   {

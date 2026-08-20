@@ -116,16 +116,19 @@ describe('Agentic point request metric time series', () => {
   });
 
   it('opens the stored server log and loads it incrementally', () => {
+    const longServerLogPath =
+      'agentic/conc_1152/aiperf_artifacts/logs/aiperf/2026-08-20/server.log';
+    const firstChunk = `INFO server ready\n${'trace line\n'.repeat(4_000)}`;
     cy.intercept(
       { method: 'GET', pathname: '/api/v1/server-log-files' },
       {
-        body: ['results/server.log', 'results/benchmark.log', 'results/router.log'],
+        body: [longServerLogPath, 'results/benchmark.log', 'results/router.log'],
       },
     ).as('serverLogFiles');
     cy.intercept({ method: 'GET', pathname: '/api/v1/server-log' }, (request) => {
       const params = new URL(request.url).searchParams;
       const offset = Number(params.get('offset') ?? 0);
-      const fileName = params.get('file') ?? 'results/server.log';
+      const fileName = params.get('file') ?? longServerLogPath;
       request.reply({
         body:
           fileName === 'results/router.log'
@@ -140,7 +143,7 @@ describe('Agentic point request metric time series', () => {
               ? {
                   id: 206885,
                   fileName,
-                  serverLog: '\u001B[32mINFO\u001B[0m server ready\n',
+                  serverLog: `\u001B[32m${firstChunk}\u001B[0m`,
                   offset: 0,
                   nextOffset: 31,
                 }
@@ -153,6 +156,26 @@ describe('Agentic point request metric time series', () => {
                 },
       });
     }).as('serverLogChunk');
+    cy.intercept({ method: 'GET', pathname: '/api/v1/server-log-search' }, (request) => {
+      expect(new URL(request.url).searchParams.get('q')).to.equal('router ready');
+      request.reply({
+        body: {
+          id: 206885,
+          query: 'router ready',
+          matches: [
+            {
+              fileName: 'results/router.log',
+              offset: 27,
+              before: 'INFO ',
+              match: 'router ready',
+              after: ' for requests',
+            },
+          ],
+          truncated: false,
+        },
+      });
+    }).as('serverLogSearch');
+    cy.viewport(480, 900);
     cy.get('[data-testid="detail-view-logs"]').click();
     cy.location('search').should('contain', 'view=logs');
     cy.wait('@serverLogFiles');
@@ -160,12 +183,28 @@ describe('Agentic point request metric time series', () => {
 
     cy.get('[data-testid="agentic-server-log-viewer"]')
       .should('contain.text', 'Log files')
-      .and('contain.text', 'results/server.log');
+      .and('contain.text', longServerLogPath)
+      .then(($viewer) => {
+        cy.get('#agentic-log-file').then(($trigger) => {
+          const viewerBounds = $viewer[0].getBoundingClientRect();
+          const triggerBounds = $trigger[0].getBoundingClientRect();
+          expect(triggerBounds.left).to.be.at.least(viewerBounds.left);
+          expect(triggerBounds.right).to.be.at.most(viewerBounds.right);
+        });
+      });
     cy.get('[data-testid="server-log-content"]')
       .should('contain.text', 'INFO server ready')
       .and('not.contain.text', '\u001B[32m');
 
-    cy.get('[data-testid="load-more-server-log"]').click();
+    cy.get('[data-testid="server-log-search"]').type('router ready');
+    cy.wait('@serverLogSearch');
+    cy.get('[data-testid="server-log-search-results"]')
+      .should('contain.text', '1 match')
+      .and('contain.text', 'results/router.log')
+      .and('contain.text', 'character 28')
+      .and('contain.text', 'INFO router ready for requests');
+
+    cy.get('[data-testid="server-log-content"]').scrollTo('bottom');
     cy.wait('@serverLogChunk');
     cy.get('[data-testid="server-log-content"]')
       .should('contain.text', 'INFO server ready')
@@ -177,10 +216,12 @@ describe('Agentic point request metric time series', () => {
     cy.wait('@serverLogChunk');
     cy.get('[data-testid="server-log-content"]').should('contain.text', 'INFO router ready');
 
+    cy.viewport(1280, 720);
     cy.get('[data-testid="detail-view-point"]').click();
   });
 
   it('keeps loaded log text visible when a later chunk fails', () => {
+    const retainedLog = `INFO retained after failure\n${'trace line\n'.repeat(2_000)}`;
     cy.intercept(
       { method: 'GET', pathname: '/api/v1/server-log-files' },
       { body: ['results/server.log', 'results/benchmark.log'] },
@@ -207,7 +248,7 @@ describe('Agentic point request metric time series', () => {
           body: {
             id: 206885,
             fileName: 'results/benchmark.log',
-            serverLog: 'INFO retained after failure\n',
+            serverLog: retainedLog,
             offset: 0,
             nextOffset: 28,
           },
@@ -403,6 +444,7 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="agentic-server-log-viewer"]')
       .should('contain.text', '日志文件')
       .and('contain.text', 'results/server.log')
+      .and('contain.text', '搜索所有日志文件')
       .and('contain.text', '已到达日志末尾');
   });
 });

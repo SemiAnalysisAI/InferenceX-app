@@ -1,7 +1,7 @@
 'use client';
 
-import { Check, ChevronDown, Copy, LoaderCircle, Terminal } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Check, ChevronDown, Copy, LoaderCircle, Search, Terminal } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   Select,
@@ -10,7 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { useServerLogFiles } from '@/hooks/api/use-server-log-files';
+import { useServerLogSearch } from '@/hooks/api/use-server-log-search';
 import { SERVER_LOG_CHUNK_SIZE, useServerLog } from '@/hooks/api/use-server-log';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
@@ -22,6 +24,16 @@ const STRINGS = {
     title: 'Log files',
     description: 'Raw .log and .out files captured for this benchmark point.',
     fileLabel: 'Log file',
+    searchLabel: 'Search all log files',
+    searchPlaceholder: 'Search full log contents…',
+    searchHint: 'Searches every stored file, including content not loaded below.',
+    searching: 'Searching…',
+    searchError: 'The logs could not be searched. Try again in a moment.',
+    noMatches: 'No matches found.',
+    match: 'match',
+    matches: 'matches',
+    firstMatches: 'Showing the first',
+    character: 'character',
     loading: 'Loading log files…',
     error: 'The log files could not be loaded. Try again in a moment.',
     missing: 'No log files are stored for this benchmark point.',
@@ -37,6 +49,16 @@ const STRINGS = {
     title: '日志文件',
     description: '该基准测试数据点采集的原始 .log 和 .out 文件。',
     fileLabel: '日志文件',
+    searchLabel: '搜索所有日志文件',
+    searchPlaceholder: '搜索完整日志内容……',
+    searchHint: '搜索所有已存储文件，包括下方尚未加载的内容。',
+    searching: '正在搜索……',
+    searchError: '无法搜索日志，请稍后重试。',
+    noMatches: '未找到匹配内容。',
+    match: '处匹配',
+    matches: '处匹配',
+    firstMatches: '显示前',
+    character: '字符',
     loading: '正在加载日志文件……',
     error: '无法加载日志文件，请稍后重试。',
     missing: '该基准测试数据点没有已存储的日志文件。',
@@ -61,10 +83,13 @@ export function ServerLogViewer({ id, enabled }: Props) {
   const filesQuery = useServerLogFiles(id, enabled);
   const files = filesQuery.data ?? [];
   const [requestedFile, setRequestedFile] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const selectedFile =
     requestedFile && files.includes(requestedFile) ? requestedFile : (files[0] ?? null);
 
   const query = useServerLog(id, selectedFile, enabled && selectedFile !== null);
+  const searchQuery = useServerLogSearch(id, searchTerm, enabled);
   const [copied, setCopied] = useState(false);
   const rawLog = useMemo(
     () => query.data?.pages.map((page) => page?.serverLog ?? '').join('') ?? '',
@@ -75,6 +100,19 @@ export function ServerLogViewer({ id, enabled }: Props) {
     () => new Intl.NumberFormat(locale === 'zh' ? 'zh-CN' : 'en-US'),
     [locale],
   );
+  const logViewportRef = useRef<HTMLPreElement>(null);
+  const loadMoreTriggerRef = useRef<HTMLSpanElement>(null);
+  const nextOffset = query.data?.pages.at(-1)?.nextOffset ?? 0;
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setSearchTerm(searchInput.trim()), 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchInput]);
+
+  useEffect(() => {
+    if (!searchTerm) return;
+    track('inference_agentic_logs_searched', { id, queryLength: searchTerm.length });
+  }, [id, searchTerm]);
 
   const copyLoadedLog = async () => {
     await navigator.clipboard.writeText(log);
@@ -93,15 +131,42 @@ export function ServerLogViewer({ id, enabled }: Props) {
     track('inference_agentic_log_file_selected', { id, fileName });
   };
 
-  const loadMore = () => {
-    track('inference_agentic_log_chunk_loaded', {
-      id,
-      fileName: selectedFile,
-      offset: query.data?.pages.at(-1)?.nextOffset ?? 0,
-      chunkSize: SERVER_LOG_CHUNK_SIZE,
-    });
-    void query.fetchNextPage();
-  };
+  const loadMore = useCallback(
+    (trigger: 'button' | 'scroll') => {
+      track('inference_agentic_log_chunk_loaded', {
+        id,
+        fileName: selectedFile,
+        offset: nextOffset,
+        chunkSize: SERVER_LOG_CHUNK_SIZE,
+        trigger,
+      });
+      void query.fetchNextPage();
+    },
+    [id, nextOffset, query.fetchNextPage, selectedFile],
+  );
+
+  useEffect(() => {
+    const root = logViewportRef.current;
+    const target = loadMoreTriggerRef.current;
+    if (
+      !root ||
+      !target ||
+      !query.hasNextPage ||
+      query.isFetchingNextPage ||
+      query.isFetchNextPageError
+    ) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) loadMore('scroll');
+      },
+      { root, rootMargin: '0px 0px 160px 0px' },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [loadMore, query.hasNextPage, query.isFetchNextPageError, query.isFetchingNextPage]);
 
   const hasLoadedLog = query.data?.pages[0] !== undefined && query.data.pages[0] !== null;
 
@@ -132,27 +197,36 @@ export function ServerLogViewer({ id, enabled }: Props) {
       className="overflow-hidden rounded-lg border border-border/60 bg-card/40"
       data-testid="agentic-server-log-viewer"
     >
-      <header className="flex flex-col gap-3 border-b border-border/60 bg-muted/20 px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex gap-3">
+      <header className="grid min-w-0 gap-3 border-b border-border/60 bg-muted/20 px-4 py-3">
+        <div className="flex min-w-0 gap-3">
           <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background text-muted-foreground">
             <Terminal className="size-4" aria-hidden="true" />
           </span>
-          <div>
+          <div className="min-w-0">
             <h2 className="font-semibold text-foreground">{t.title}</h2>
             <p className="mt-1 text-xs text-muted-foreground">{t.description}</p>
           </div>
         </div>
-        <div className="grid min-w-0 gap-1 sm:w-80">
+        <div className="grid min-w-0 gap-1">
           <label className="text-xs font-medium text-muted-foreground" htmlFor="agentic-log-file">
             {t.fileLabel}
           </label>
           <Select value={selectedFile} onValueChange={selectFile}>
-            <SelectTrigger id="agentic-log-file" className="w-full font-mono text-xs">
+            <SelectTrigger
+              id="agentic-log-file"
+              className="w-full min-w-0 overflow-hidden font-mono text-xs *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:truncate"
+              title={selectedFile}
+            >
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-w-[calc(100vw-2rem)]">
               {files.map((fileName) => (
-                <SelectItem key={fileName} value={fileName} className="font-mono text-xs">
+                <SelectItem
+                  key={fileName}
+                  value={fileName}
+                  className="max-w-full font-mono text-xs whitespace-normal break-all"
+                  title={fileName}
+                >
                   {fileName}
                 </SelectItem>
               ))}
@@ -160,6 +234,79 @@ export function ServerLogViewer({ id, enabled }: Props) {
           </Select>
         </div>
       </header>
+
+      <div className="grid gap-2 border-b border-border/60 bg-background/20 px-4 py-3">
+        <label className="text-xs font-medium text-muted-foreground" htmlFor="agentic-log-search">
+          {t.searchLabel}
+        </label>
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            id="agentic-log-search"
+            type="search"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder={t.searchPlaceholder}
+            className="pr-9 pl-9 font-mono text-xs"
+            data-testid="server-log-search"
+          />
+          {searchQuery.isFetching ? (
+            <LoaderCircle
+              className="absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
+              aria-label={t.searching}
+            />
+          ) : null}
+        </div>
+        <p className="text-xs text-muted-foreground">{t.searchHint}</p>
+
+        {searchTerm && searchQuery.isError ? (
+          <p className="text-xs text-destructive" role="alert">
+            {t.searchError}
+          </p>
+        ) : null}
+        {searchTerm && searchQuery.data ? (
+          <div className="grid gap-2" data-testid="server-log-search-results">
+            <p className="text-xs font-medium text-muted-foreground" aria-live="polite">
+              {searchQuery.data.truncated ? `${t.firstMatches} ` : ''}
+              {formatter.format(searchQuery.data.matches.length)}{' '}
+              {searchQuery.data.matches.length === 1 ? t.match : t.matches}
+            </p>
+            {searchQuery.data.matches.length === 0 ? (
+              <p className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                {t.noMatches}
+              </p>
+            ) : (
+              <div className="max-h-72 divide-y divide-border/60 overflow-auto rounded-md border border-border/60 bg-zinc-950">
+                {searchQuery.data.matches.map((result) => (
+                  <article
+                    key={`${result.fileName}:${result.offset}`}
+                    className="grid gap-1 px-3 py-2"
+                  >
+                    <div className="flex min-w-0 items-center justify-between gap-3 font-mono text-[11px] text-zinc-400">
+                      <span className="min-w-0 truncate" title={result.fileName}>
+                        {result.fileName}
+                      </span>
+                      <span className="shrink-0">
+                        {t.character} {formatter.format(result.offset + 1)}
+                      </span>
+                    </div>
+                    <pre className="max-h-20 overflow-hidden font-mono text-xs leading-5 whitespace-pre-wrap break-all text-zinc-200">
+                      {readableLogText(result.before)}
+                      <mark className="rounded-sm bg-amber-300 px-0.5 text-zinc-950">
+                        {readableLogText(result.match)}
+                      </mark>
+                      {readableLogText(result.after)}
+                    </pre>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
 
       <div className="flex justify-end border-b border-border/60 bg-background/40 px-4 py-2">
         <button
@@ -175,11 +322,18 @@ export function ServerLogViewer({ id, enabled }: Props) {
       </div>
 
       <pre
+        ref={logViewportRef}
         className="max-h-[70vh] min-h-[28rem] overflow-auto bg-zinc-950 p-4 font-mono text-xs leading-5 text-zinc-100 selection:bg-sky-400/30"
         data-testid="server-log-content"
         tabIndex={0}
       >
         {log}
+        <span
+          ref={loadMoreTriggerRef}
+          className="block h-px w-full"
+          data-testid="server-log-load-more-trigger"
+          aria-hidden="true"
+        />
       </pre>
 
       <footer className="flex flex-col gap-2 border-t border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
@@ -195,7 +349,7 @@ export function ServerLogViewer({ id, enabled }: Props) {
           {query.hasNextPage ? (
             <button
               type="button"
-              onClick={loadMore}
+              onClick={() => loadMore('button')}
               disabled={query.isFetchingNextPage}
               className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 font-medium text-foreground transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
               data-testid="load-more-server-log"
