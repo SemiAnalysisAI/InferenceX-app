@@ -347,8 +347,8 @@ const COST_DELTA_SATURATION = 0.5;
 // Missing comparison evidence is neutral gray, never red/green: availability
 // is not a better/worse judgment.
 const COST_DELTA_CLASS = {
-  cheaper: 'text-emerald-700 dark:text-emerald-400',
-  pricier: 'text-red-700 dark:text-red-400',
+  cheaper: 'text-emerald-900 dark:text-emerald-200',
+  pricier: 'text-red-900 dark:text-red-200',
   even: 'text-muted-foreground',
   'no-baseline': 'text-muted-foreground',
 } as const;
@@ -663,7 +663,7 @@ function CellValue({
         )}
       </div>
       {member.precision === null ? null : (
-        <div className="min-w-0 text-[11px] leading-tight font-normal uppercase tracking-wider text-muted-foreground/70">
+        <div className="min-w-0 text-[11px] leading-tight font-normal uppercase tracking-wider text-muted-foreground">
           {config === null ? (
             member.precision.toUpperCase()
           ) : phoneRow && stackPrefix !== null && decodeLabel !== null ? (
@@ -1183,9 +1183,10 @@ export function OverviewComparisonSwitcher({
     href: overviewHref(locale, tier, engineScope, window, referenceHardware, modelScope),
   }));
   // The inactive-only classes live on the inactive branch, not here: Tailwind
-  // emits `border-transparent` after `border-secondary` at equal specificity,
-  // so sharing them left the active underline invisible in light mode. Same
-  // reason for the hover border — it would grey out the active underline.
+  // emits `border-transparent` after the active border at equal specificity,
+  // so sharing them left the active underline invisible in light mode. The
+  // darker light-theme blue also keeps this small active label above AA
+  // contrast on the page background; dark mode retains the brand primary.
   const optionClass =
     'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:min-w-[140px]';
   const inactiveOptionClass =
@@ -1201,7 +1202,7 @@ export function OverviewComparisonSwitcher({
           control="comparison"
           data-overview-comparison="hardware"
           aria-current="true"
-          className={`${optionClass} border-secondary text-secondary dark:border-primary dark:text-primary`}
+          className={`${optionClass} border-sky-800 text-sky-800 dark:border-primary dark:text-primary`}
         >
           <span className="inline-flex items-center gap-0.5">
             <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
@@ -1255,7 +1256,7 @@ export function OverviewComparisonSwitcher({
           control="comparison"
           data-overview-comparison={comparisonMode}
           aria-current="true"
-          className={`${optionClass} border-secondary text-secondary dark:border-primary dark:text-primary`}
+          className={`${optionClass} border-sky-800 text-sky-800 dark:border-primary dark:text-primary`}
         >
           <span className="inline-flex items-center gap-0.5">
             <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
