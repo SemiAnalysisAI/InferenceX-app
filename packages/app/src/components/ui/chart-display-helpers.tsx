@@ -3,10 +3,15 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import {
+  HW_REGISTRY,
+  TCO_SOURCE_TITLE,
+  TCO_SOURCE_URL,
+} from '@semianalysisai/inferencex-constants';
+
 import { Badge } from '@/components/ui/badge';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { ShareButton } from '@/components/ui/share-button';
-import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { useLocale } from '@/lib/use-locale';
 import type { Locale } from '@/lib/i18n';
 
@@ -238,8 +243,8 @@ export function MetricAssumptionNotes({
       {costValues && (
         <>
           <MetricBadges label={costLabel} values={costValues} />
-          <SourceLink href="https://semianalysis.com/ai-cloud-tco-model/" sourceLabel={sourceLabel}>
-            SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
+          <SourceLink href={TCO_SOURCE_URL} sourceLabel={sourceLabel}>
+            {TCO_SOURCE_TITLE}
           </SourceLink>
         </>
       )}

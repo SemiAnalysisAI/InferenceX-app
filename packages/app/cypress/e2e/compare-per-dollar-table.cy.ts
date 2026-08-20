@@ -1,3 +1,5 @@
+import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
+
 describe('Compare-per-dollar slug page — slimmed table + cross-link', () => {
   before(() => {
     cy.window().then((win) => {
@@ -57,6 +59,12 @@ describe('Compare-per-dollar slug page — slimmed table + cross-link', () => {
 
   it('uses "Performance per Dollar" framing in the page header', () => {
     cy.contains('Performance per Dollar').should('be.visible');
+  });
+
+  it('attributes pricing to the shared TCO source', () => {
+    cy.get('[data-testid="compare-per-dollar-pricing"]')
+      .contains('a', TCO_SOURCE_TITLE)
+      .should('have.attr', 'href', TCO_SOURCE_URL);
   });
 
   it('renders an indexable comparison PNG with descriptive alt text', () => {
