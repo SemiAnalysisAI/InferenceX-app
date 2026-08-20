@@ -2,6 +2,11 @@ import type { Metadata } from 'next';
 
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 import { ZH_OG_LOCALE, zhAlternates, zhPath } from '@/lib/i18n';
+import {
+  getDashboardRoute,
+  isDashboardRouteKey,
+  type DashboardRouteKey,
+} from '@/lib/dashboard-routes';
 
 export const LANDING_META_ZH = {
   title: '开源智能体推理基准测试',
@@ -9,28 +14,9 @@ export const LANDING_META_ZH = {
     '跨 Chip 与推理框架，对比 AgentX 长上下文多轮编码场景与固定序列 AI 推理。NVIDIA 与 AMD 的公开运行会在配置变更时更新。',
 };
 
-export const ZH_TAB_KEYS = [
-  'inference',
-  'evaluation',
-  'historical',
-  'calculator',
-  'reliability',
-  'gpu-specs',
-  'gpu-metrics',
-  'collectivex',
-  'submissions',
-  'ai-chart',
-  'current-inferencex-image',
-  'feedback',
-] as const;
+export const isZhTab = isDashboardRouteKey;
 
-export type ZhTabKey = (typeof ZH_TAB_KEYS)[number];
-
-export function isZhTab(tab: string): tab is ZhTabKey {
-  return (ZH_TAB_KEYS as readonly string[]).includes(tab);
-}
-
-export const TAB_META_ZH: Record<ZhTabKey, { title: string; description: string }> = {
+export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description: string }> = {
   inference: {
     title: '智能体推理基准测试',
     description:
@@ -93,7 +79,7 @@ export const TAB_META_ZH: Record<ZhTabKey, { title: string; description: string 
  * /zh tab page. The charts themselves render in English; this block gives
  * crawlers and readers genuine Chinese content describing the page.
  */
-export const TAB_INTRO_ZH: Record<ZhTabKey, string> = {
+export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
   inference:
     '本页面展示 InferenceX 的智能体推理与固定序列 AI 推理基准测试结果：跨 Chip、推理框架与模型对比吞吐量（token/s/Chip）、交互性（token/s/用户）、首 token 延迟（TTFT）等指标。智能体推理数据来自 AgentX；该场景对公开智能体编码轨迹衍生出的长上下文、多轮、含 subagent 工作负载进行回放。每个数据点都来自公开的 GitHub Actions 工作流，可复现、可审计。',
   evaluation:
@@ -121,24 +107,32 @@ export const TAB_INTRO_ZH: Record<ZhTabKey, string> = {
 };
 
 /** Chinese labels for the dashboard tab bar (TabNav) on /zh pages. */
-export const TAB_LABELS_ZH: Record<string, string> = {
-  overview: '总览',
+export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   inference: '推理性能',
   evaluation: '准确率评估',
   historical: '历史趋势',
   calculator: 'TCO 计算器',
   reliability: '可靠性',
   'gpu-specs': 'Chip 规格',
-  'gpu-metrics': 'Chip 功耗',
-  collectivex: 'CollectiveX 通信',
   submissions: '提交记录',
+  collectivex: 'CollectiveX 通信',
   'ai-chart': 'AI 图表',
+  'gpu-metrics': 'Chip 功耗',
   'current-inferencex-image': '镜像',
   feedback: '反馈',
 };
 
-/** Chinese labels for the site header nav on /zh pages, keyed by English href. */
-export const NAV_LABELS_ZH: Record<string, string> = {
+export type HeaderNavHref =
+  | '/'
+  | '/agentx'
+  | '/overview'
+  | '/inference'
+  | '/inference/agentic'
+  | '/compare'
+  | '/about';
+
+/** Chinese labels for the site header nav, keyed by its exact English href set. */
+export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
   '/': '首页',
   '/overview': '总览',
   '/inference': '仪表板',
@@ -151,10 +145,9 @@ export const NAV_LABELS_ZH: Record<string, string> = {
 const TITLE_SUFFIX = `${SITE_NAME} by ${AUTHOR_NAME}`;
 
 /** Generate Next.js Metadata for a /zh tab page (mirrors `tabMetadata`). */
-export function tabMetadataZh(tab: ZhTabKey): Metadata {
+export function tabMetadataZh(tab: DashboardRouteKey): Metadata {
   const meta = TAB_META_ZH[tab];
-  // The English inference tab canonicalizes to the site root; mirror that.
-  const enPath = tab === 'inference' ? '/' : `/${tab}`;
+  const enPath = getDashboardRoute(tab).canonicalPath;
   const url = `${SITE_URL}${zhPath(enPath)}`;
   return {
     title: meta.title,

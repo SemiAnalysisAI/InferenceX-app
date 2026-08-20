@@ -3,9 +3,12 @@
 import Link from 'next/link';
 import { useEffect, useMemo } from 'react';
 
-import type { GPUDataPoint, InterpolatedResult } from '@/components/calculator/types';
+import type { GPUDataPoint } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
-import { CompareInterpolatedTable } from '@/components/compare/compare-interpolated-table';
+import {
+  CompareTableRenderer,
+  type CompareTableData,
+} from '@/components/compare/compare-table-renderer';
 import { useGlobalFilters, GlobalFilterProvider } from '@/components/GlobalFilterContext';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
@@ -13,12 +16,6 @@ import { Card } from '@/components/ui/card';
 import { track } from '@/lib/analytics';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare-enum-coerce';
 import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
-
-interface SsrTableData {
-  defaultTargets: number[];
-  ssrRows: { target: number; a: InterpolatedResult | null; b: InterpolatedResult | null }[];
-  interactivityRange: { min: number; max: number };
-}
 
 /** Only show Cost + Concurrency in the interpolated table — the rest of the
  *  metric rows (Throughput, tok/s/MW) live on the sibling /compare page. */
@@ -32,7 +29,7 @@ const PER_DOLLAR_LABEL_OVERRIDES = {
 };
 
 /** y_costh = Cost per Million Total Tokens (Owning - Hyperscaler). Defined in
- *  packages/app/src/components/inference/inference-chart-config.json. */
+ *  packages/app/src/components/inference/metric-registry.ts. */
 const PER_DOLLAR_DEFAULT_Y_AXIS = 'y_costh';
 
 const STRINGS = {
@@ -73,7 +70,7 @@ interface ComparePerDollarPageClientProps {
   defaultModel: string;
   defaultSequence: string | null;
   defaultPrecision: string | null;
-  ssrTableData: SsrTableData;
+  ssrTableData: CompareTableData;
   /** One SSR-rendered prose paragraph per interpolated-table row (default
    *  interactivity target). Each paragraph picks a template variant
    *  deterministically from the slug so prose stays stable across renders
@@ -300,7 +297,7 @@ function CompareTableSection({
   b: string;
   aLabel: string;
   bLabel: string;
-  ssrTableData: SsrTableData;
+  ssrTableData: CompareTableData;
   emptyStateText: string;
 }) {
   const { effectiveSequence, effectivePrecisions, selectedRunDate, selectedModel } =
@@ -326,23 +323,15 @@ function CompareTableSection({
 
   const clientRange = hasData ? ranges.interactivity : ssrTableData.interactivityRange;
 
-  if (ssrTableData.defaultTargets.length === 0) {
-    return (
-      <div className="border border-border/50 rounded-md px-4 py-3 text-sm text-muted-foreground bg-muted/30">
-        {emptyStateText}
-      </div>
-    );
-  }
-
   return (
-    <CompareInterpolatedTable
+    <CompareTableRenderer
       aLabel={aLabel}
       bLabel={bLabel}
-      ssrRows={ssrTableData.ssrRows}
-      defaultTargets={ssrTableData.defaultTargets}
+      ssrTableData={ssrTableData}
       interactivityRange={clientRange}
       gpuDataPointsA={pointsA}
       gpuDataPointsB={pointsB}
+      emptyStateText={emptyStateText}
       visibleMetricLabels={PER_DOLLAR_TABLE_METRICS}
       metricLabelOverrides={PER_DOLLAR_LABEL_OVERRIDES}
     />

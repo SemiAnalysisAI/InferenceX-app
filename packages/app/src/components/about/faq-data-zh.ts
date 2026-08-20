@@ -1,41 +1,10 @@
-import {
-  GPU_KEYS,
-  GPU_VENDORS,
-  DB_MODEL_TO_DISPLAY,
-  PRECISION_KEYS,
-  GITHUB_OWNER,
-  GITHUB_REPO,
-  FRAMEWORK_LABELS,
-} from '@semianalysisai/inferencex-constants';
-import { CAROUSEL_ORGS, CAROUSEL_LABELS } from '@/components/quotes/quotes-data';
+import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
-import type { FaqItem } from './faq-data';
-
-/* ---------- Dynamic lists from constants ---------- */
-
-const gpusByVendor = [...GPU_KEYS].reduce<Record<string, string[]>>((acc, key) => {
-  const vendor = GPU_VENDORS[key] ?? 'Other';
-  (acc[vendor] ??= []).push(key.toUpperCase());
-  return acc;
-}, {});
-
-const modelNames = Object.values({
-  ...DB_MODEL_TO_DISPLAY,
-  'kimik2.6': 'Kimi-K2.6',
-  'kimik2.7-code': 'Kimi-K2.7-Code',
-  'minimaxm2.7': 'MiniMax-M2.7',
-  'glm5.1': 'GLM-5.1',
-});
-
-const frameworkNames = [...new Set(Object.values(FRAMEWORK_LABELS))].map((n) =>
-  n.replace(/[¹²³⁴⁵⁶⁷⁸⁹⁰]+$/u, ''),
-);
-
-const supporterOrgs = CAROUSEL_ORGS.map((org) => CAROUSEL_LABELS[org] ?? org);
+import { GENERATED_FAQ_DATA, type FaqItem } from '@/components/about/faq';
 
 /* ---------- FAQ content (Simplified Chinese) ---------- */
 
-export const FAQ_ITEMS_ZH: FaqItem[] = [
+export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
   {
     question: '什么是 InferenceX？',
     answer:
@@ -43,25 +12,25 @@ export const FAQ_ITEMS_ZH: FaqItem[] = [
   },
   {
     question: 'InferenceX 由谁开发？',
-    answer: `InferenceX 由独立半导体与 AI 研究机构 SemiAnalysis 构建，受到 ${supporterOrgs.join('、')} 的支持与信赖。基准测试代码、数据和仪表板均在 GitHub 上开源。`,
+    answer: `InferenceX 由独立半导体与 AI 研究机构 SemiAnalysis 构建，受到 ${GENERATED_FAQ_DATA.supporterOrgs.join('、')} 的支持与信赖。基准测试代码、数据和仪表板均在 GitHub 上开源。`,
   },
   {
     question: 'InferenceX 测试了哪些 Chip？',
     answer: '我们会在新加速器可用时持续添加。',
-    list: Object.entries(gpusByVendor).map(([vendor, gpus]) => `${vendor}: ${gpus.join(', ')}`),
+    list: GENERATED_FAQ_DATA.gpuGroups,
   },
   {
     question: '测试了哪些 AI 模型？',
     answer:
       '各模型会在其已有数据所覆盖的固定序列配置（1k/1k、1k/8k、8k/1k tokens）与多个并发级别下进行测试。具备对应数据的模型还包含 AgentX 长上下文多轮智能体编码运行。',
-    list: modelNames,
+    list: GENERATED_FAQ_DATA.modelNames,
   },
   {
     question: '测试了哪些推理框架和配置？',
     answer: '',
     list: [
-      `框架：${frameworkNames.join(', ')}`,
-      `精度：${[...PRECISION_KEYS].map((p) => p.toUpperCase()).join(', ')}`,
+      `框架：${GENERATED_FAQ_DATA.frameworkNames.join(', ')}`,
+      `精度：${GENERATED_FAQ_DATA.precisionNames.join(', ')}`,
       '运行时：CUDA、ROCm',
       '分离式推理（Disaggregated serving，独立的 prefill/decode Chip 池）',
       '多 token 预测（MTP）',

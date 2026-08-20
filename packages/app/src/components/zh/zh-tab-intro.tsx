@@ -1,12 +1,13 @@
 import { Card } from '@/components/ui/card';
-import { TAB_INTRO_ZH, TAB_META_ZH, type ZhTabKey } from '@/lib/tab-meta-zh';
+import type { DashboardRouteKey } from '@/lib/dashboard-routes';
+import { TAB_INTRO_ZH, TAB_META_ZH } from '@/lib/tab-meta-zh';
 
 /**
  * Server-rendered Chinese intro above the interactive dashboard on /zh tab
  * pages. The charts below render in English; this block gives crawlers and
  * readers genuine Chinese content describing what the page shows.
  */
-export function ZhTabIntro({ tab }: { tab: ZhTabKey }) {
+export function ZhTabIntro({ tab }: { tab: DashboardRouteKey }) {
   return (
     <Card data-testid="zh-tab-intro">
       <h1 className="text-xl lg:text-2xl font-bold tracking-tight">{TAB_META_ZH[tab].title}</h1>
