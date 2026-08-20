@@ -2,22 +2,18 @@ import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 import { describe, expect, it } from 'vitest';
 
 import { ZH_OG_LOCALE } from './i18n';
-import { OVERVIEW_HARDWARE, overviewHardwareLabel } from './overview-data';
 import { buildOverviewMetadata } from './overview-route.server';
 
-const CURATED_LABELS = OVERVIEW_HARDWARE.map((hardware) => overviewHardwareLabel(hardware));
-const NON_OVERVIEW_LABELS = ['h100', 'h200', 'mi300x', 'mi325x', 'rtx6000pro'].map((hardware) =>
-  overviewHardwareLabel(hardware),
-);
+const EXPECTED_DESCRIPTIONS = {
+  en: 'Compare hyperscaler cost per million total tokens across B200, MI355X, B300, GB200 NVL72, and GB300 NVL72 for the AgentX long-context, multi-turn coding scenario and fixed-sequence scenarios where data is available.',
+  zh: '在具备对应数据的模型上，分别按 AgentX 长上下文多轮编码场景与固定序列场景，对比 B200、MI355X、B300、GB200 NVL72 与 GB300 NVL72 的每百万总 token 超大规模云成本。',
+} as const;
 
 describe('buildOverviewMetadata', () => {
-  it.each(['en', 'zh'] as const)('names only the curated Overview platforms in %s', (locale) => {
+  it.each(['en', 'zh'] as const)('locks the curated Overview platform wording in %s', (locale) => {
     const metadata = buildOverviewMetadata(locale);
-    const description = metadata.description;
 
-    expect(typeof description).toBe('string');
-    for (const label of CURATED_LABELS) expect(description).toContain(label);
-    for (const label of NON_OVERVIEW_LABELS) expect(description).not.toContain(label);
+    expect(metadata.description).toBe(EXPECTED_DESCRIPTIONS[locale]);
   });
 
   it('preserves the English title, canonical URL, and OpenGraph identity', () => {

@@ -29,7 +29,7 @@ interface OverviewRouteProps extends OverviewRoutePageProps {
 
 function overviewPlatformList(locale: Locale): string {
   const labels = OVERVIEW_HARDWARE.map((hardware) => overviewHardwareLabel(hardware));
-  if (locale === 'zh') return labels.join('、');
+  if (locale === 'zh') return `${labels.slice(0, -1).join('、')} 与 ${labels.at(-1)}`;
   return `${labels.slice(0, -1).join(', ')}, and ${labels.at(-1)}`;
 }
 
