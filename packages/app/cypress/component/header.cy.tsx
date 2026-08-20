@@ -129,7 +129,15 @@ describe('Header', () => {
   });
 
   it('orders the nav with Home first and AgentX second', () => {
-    const expected = ['Home', 'AgentX', 'Overview', 'Dashboard', 'Comparisons', 'About'];
+    const expected = [
+      'Home',
+      'AgentX',
+      'Overview',
+      'Dashboard',
+      'Telemetry',
+      'Comparisons',
+      'About',
+    ];
     cy.get('[data-testid^="nav-link-"]').then(($links) => {
       // Strip the NEW badge so the comparison is against the label alone.
       const labels = [...$links].map((link) => (link.textContent ?? '').replace('NEW', '').trim());
