@@ -9,11 +9,18 @@ import {
   CompareTableRenderer,
   type CompareTableData,
 } from '@/components/compare/compare-table-renderer';
-import { useGlobalFilters, GlobalFilterProvider } from '@/components/GlobalFilterContext';
+import {
+  GlobalFilterProvider,
+  useGlobalFilterAvailability,
+  useGlobalFilterRun,
+  useGlobalFilterSelection,
+} from '@/components/GlobalFilterContext';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
 import { track } from '@/lib/analytics';
+import type { BenchmarkRow } from '@/lib/api';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare-enum-coerce';
 import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
 
@@ -71,6 +78,7 @@ interface ComparePerDollarPageClientProps {
   defaultSequence: string | null;
   defaultPrecision: string | null;
   ssrTableData: CompareTableData;
+  initialBenchmarkRows?: BenchmarkRow[];
   /** One SSR-rendered prose paragraph per interpolated-table row (default
    *  interactivity target). Each paragraph picks a template variant
    *  deterministically from the slug so prose stays stable across renders
@@ -106,6 +114,7 @@ export default function ComparePerDollarPageClient({
   defaultSequence,
   defaultPrecision,
   ssrTableData,
+  initialBenchmarkRows,
   narrative,
   agenticIntro = null,
   aLabel,
@@ -127,6 +136,14 @@ export default function ComparePerDollarPageClient({
   const initialModel = toModel(defaultModel);
   const initialSequence = toSequence(defaultSequence);
   const initialPrecisions = toPrecisions(defaultPrecision);
+  const benchmarkQueryScope = `compare-pair:${a}:${b}`;
+  const initialCalculatorRows = useMemo(
+    () =>
+      initialBenchmarkRows && defaultSequence
+        ? toCalculatorBenchmarkRows(initialBenchmarkRows, defaultSequence)
+        : undefined,
+    [defaultSequence, initialBenchmarkRows],
+  );
   const t = STRINGS[locale];
   const isZh = locale === 'zh';
 
@@ -141,6 +158,9 @@ export default function ComparePerDollarPageClient({
         initialActiveHwTypes={[a, b]}
         compareGpuPair={compareGpuPair}
         initialYAxisMetric={PER_DOLLAR_DEFAULT_Y_AXIS}
+        benchmarkQueryScope={benchmarkQueryScope}
+        initialBenchmarkModel={initialModel}
+        initialBenchmarkRows={initialBenchmarkRows}
       >
         <div className="flex flex-col gap-4">
           <Card className="flex w-full min-w-0 flex-col gap-3">
@@ -275,6 +295,9 @@ export default function ComparePerDollarPageClient({
               aLabel={aLabel}
               bLabel={bLabel}
               ssrTableData={ssrTableData}
+              initialModel={initialModel}
+              initialSequence={initialSequence}
+              initialCalculatorRows={initialCalculatorRows}
               emptyStateText={t.emptyState}
             />
           </Card>
@@ -291,6 +314,9 @@ function CompareTableSection({
   aLabel,
   bLabel,
   ssrTableData,
+  initialModel,
+  initialSequence,
+  initialCalculatorRows,
   emptyStateText,
 }: {
   a: string;
@@ -298,16 +324,36 @@ function CompareTableSection({
   aLabel: string;
   bLabel: string;
   ssrTableData: CompareTableData;
+  initialModel: ReturnType<typeof toModel>;
+  initialSequence: ReturnType<typeof toSequence>;
+  initialCalculatorRows?: BenchmarkRow[];
   emptyStateText: string;
 }) {
-  const { effectiveSequence, effectivePrecisions, selectedRunDate, selectedModel } =
-    useGlobalFilters();
+  const { effectiveSequence, effectivePrecisions, selectedModel, sequenceResolved } =
+    useGlobalFilterSelection();
+  const { availableDates } = useGlobalFilterAvailability();
+  const { selectedRunDate } = useGlobalFilterRun();
+  const latestAvailableDate = availableDates.at(-1) ?? '';
+  const calculatorRunDate =
+    selectedRunDate && selectedRunDate === latestAvailableDate ? '' : selectedRunDate;
+  const initialRows =
+    initialCalculatorRows &&
+    sequenceResolved &&
+    selectedModel === initialModel &&
+    effectiveSequence === initialSequence &&
+    calculatorRunDate === ''
+      ? initialCalculatorRows
+      : undefined;
 
   const { gpuDataByGroupKey, ranges, hasData } = useThroughputData(
     selectedModel,
     effectiveSequence,
     effectivePrecisions,
-    selectedRunDate,
+    calculatorRunDate,
+    undefined,
+    undefined,
+    initialRows,
+    sequenceResolved,
   );
 
   const { pointsA, pointsB } = useMemo(() => {

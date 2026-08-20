@@ -13,6 +13,7 @@ import {
 } from 'react';
 
 import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
+import type { BenchmarkRow } from '@/lib/api';
 import { track } from '@/lib/analytics';
 import {
   FAVORITE_PRESETS,
@@ -20,9 +21,21 @@ import {
   matchesPresetHwFilter,
 } from '@/components/favorites/favorite-presets';
 
-import { useGlobalFilters } from '@/components/GlobalFilterContext';
+import {
+  useGlobalFilterActions,
+  useGlobalFilterAvailability,
+  useGlobalFilterRun,
+  useGlobalFilterSelection,
+  useGlobalFilterWorkflow,
+} from '@/components/GlobalFilterContext';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import type { InferenceChartContextType, InferenceData } from '@/components/inference/types';
+import type {
+  InferenceActionsContextType,
+  InferenceData,
+  InferenceDataContextType,
+  InferenceDisplayContextType,
+  InferenceFiltersContextType,
+} from '@/components/inference/types';
 import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
 import { Button } from '@/components/ui/button';
 import {
@@ -78,8 +91,60 @@ import {
   type SpecMode,
 } from './utils/quickFilters';
 
-/** @internal Exported for test provider wrapping only. */
-export const InferenceContext = createContext<InferenceChartContextType | undefined>(undefined);
+const InferenceDataContext = createContext<InferenceDataContextType | undefined>(undefined);
+const InferenceFiltersContext = createContext<InferenceFiltersContextType | undefined>(undefined);
+const InferenceDisplayContext = createContext<InferenceDisplayContextType | undefined>(undefined);
+const InferenceActionsContext = createContext<InferenceActionsContextType | undefined>(undefined);
+
+function useStableInferenceActions(
+  actions: InferenceActionsContextType,
+): InferenceActionsContextType {
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
+
+  return useMemo(() => {
+    const stableActions = {} as InferenceActionsContextType;
+    const writableActions = stableActions as unknown as Record<
+      keyof InferenceActionsContextType,
+      (...args: never[]) => unknown
+    >;
+    for (const key of Object.keys(actions) as (keyof InferenceActionsContextType)[]) {
+      writableActions[key] = (...args: never[]) => {
+        const currentAction = actionsRef.current[key] as (...currentArgs: never[]) => unknown;
+        return currentAction(...args);
+      };
+    }
+    return stableActions;
+  }, []);
+}
+
+/** @internal Shared by the route provider and focused context-isolation tests. */
+export function InferenceContextsProvider({
+  children,
+  data,
+  filters,
+  display,
+  actions,
+}: {
+  children: ReactNode;
+  data: InferenceDataContextType;
+  filters: InferenceFiltersContextType;
+  display: InferenceDisplayContextType;
+  actions: InferenceActionsContextType;
+}) {
+  const stableActions = useStableInferenceActions(actions);
+  return (
+    <InferenceActionsContext.Provider value={stableActions}>
+      <InferenceDataContext.Provider value={data}>
+        <InferenceFiltersContext.Provider value={filters}>
+          <InferenceDisplayContext.Provider value={display}>
+            {children}
+          </InferenceDisplayContext.Provider>
+        </InferenceFiltersContext.Provider>
+      </InferenceDataContext.Provider>
+    </InferenceActionsContext.Provider>
+  );
+}
 
 export function resolveEffectiveXAxisMode(
   requestedMode: XAxisMode,
@@ -110,6 +175,9 @@ export function InferenceProvider({
   activeTab,
   initialActiveHwTypes,
   compareGpuPair,
+  benchmarkQueryScope,
+  initialBenchmarkModel,
+  initialBenchmarkRows,
   initialYAxisMetric,
 }: {
   children: ReactNode;
@@ -125,6 +193,10 @@ export function InferenceProvider({
    * registry GPU base keys so other hardware never appears on the legend or plots.
    */
   compareGpuPair?: readonly [string, string];
+  /** Isolates pair-filtered compare hydration from canonical dashboard queries. */
+  benchmarkQueryScope?: string;
+  initialBenchmarkModel?: string;
+  initialBenchmarkRows?: BenchmarkRow[];
   /**
    * Initial y-axis metric key when the URL has no `?i_metric=` param. Used by
    * `/compare-per-dollar/[slug]` to default the chart to
@@ -137,29 +209,26 @@ export function InferenceProvider({
   const isActive =
     activeTab === 'inference' || activeTab === 'historical' || activeTab === 'compare';
 
+  const { selectedModel, effectiveSequence, sequenceResolved, effectivePrecisions } =
+    useGlobalFilterSelection();
   const {
-    selectedModel,
     setSelectedModel,
-    effectiveSequence,
-    sequenceResolved,
     setSelectedSequence,
-    effectivePrecisions,
     setSelectedPrecisions,
-    selectedRunDate,
     setSelectedRunDate,
-    selectedRunId,
     setSelectedRunId,
+  } = useGlobalFilterActions();
+  const { selectedRunDate, selectedRunId, effectiveRunDate } = useGlobalFilterRun();
+  const {
     availableModels,
     availableSequences,
     availablePrecisions,
     availableDates,
-    effectiveRunDate,
     availabilityRows,
     availabilitySettled,
     availabilityError,
-    availableRuns,
-    workflowError,
-  } = useGlobalFilters();
+  } = useGlobalFilterAvailability();
+  const { availableRuns, workflowError } = useGlobalFilterWorkflow();
   const { isUnofficialRun } = useUnofficialRun();
 
   const { getUrlParam, setUrlParams } = useUrlState();
@@ -542,6 +611,8 @@ export function InferenceProvider({
     asOfRunId,
     dataQuickFilters,
     overviewHistoryPair,
+    benchmarkQueryScope,
+    selectedModel === initialBenchmarkModel ? initialBenchmarkRows : undefined,
   );
 
   // For GPU comparison date picker — use shared availability data from global filters
@@ -1431,11 +1502,11 @@ export function InferenceProvider({
   // filteredAvailableRuns / effectiveSelectedRunId are computed above the data
   // fetch (so the chart can query "as of" the selected run).
   //
-  // NOTE: We intentionally do NOT sync effectiveSelectedRunId back to
-  // GlobalFilterContext (setSelectedRunId). That would cause a full tree
-  // re-render on every precision change because filteredAvailableRuns
-  // depends on effectivePrecisions. Instead, InferenceContext exposes
-  // effectiveSelectedRunId directly (line ~499).
+  // NOTE: We intentionally do not sync effectiveSelectedRunId back through the
+  // global run action. filteredAvailableRuns depends on effectivePrecisions, so
+  // doing so would replace the user's global run intent with an inference-only
+  // fallback whenever the precision scope changes. The inference filter domain
+  // exposes effectiveSelectedRunId directly instead.
 
   const handleDateRangeDialogOk = () => {
     clearOverviewHistoryPair();
@@ -1444,162 +1515,176 @@ export function InferenceProvider({
     setShowDateRangeDialog(false);
   };
 
-  // ── Context value ─────────────────────────────────────────────────────────
+  // ── Domain context values ─────────────────────────────────────────────────
 
-  const value = useMemo(
+  const dataValue = useMemo<InferenceDataContextType>(
     () => ({
-      activeHwTypes,
       hwTypesWithData,
-      toggleHwType,
-      removeHwType,
-      selectAllHwTypes,
-      bestPerSku,
-      setBestPerSku: setBestPerSkuAndApply,
-      resolveComparisonSelection: resolveHwSelection,
-      toggleComparisonSelection,
       hardwareConfig,
       graphs,
-      selectedModel,
-      setSelectedModel: setSelectedModelAndClear,
-      selectedSequence: effectiveSequence,
-      setSelectedSequence: setSelectedSequenceAndClear,
-      selectedPrecisions: effectivePrecisions,
-      setSelectedPrecisions: setSelectedPrecisionsAndClear,
-      isLegendExpanded,
-      setIsLegendExpanded,
-      hideNonOptimal,
-      setHideNonOptimal,
-      showPointLabels,
-      setShowPointLabels,
-      highContrast,
-      setHighContrast,
-      logScale,
-      setLogScale,
-      selectedXAxisMetric,
-      setSelectedXAxisMetric,
-      selectedE2eXAxisMetric,
-      selectedXAxisMode,
-      setSelectedXAxisMode: handleSetXAxisMode,
-      scaleType,
-      setScaleType,
-      quickFilters,
-      availableQuickFilters,
-      setQuickFilterVendors,
-      setQuickFilterFrameworks,
-      setQuickFilterDeployment,
-      setQuickFilterSpec,
       loading,
       error,
-      selectedYAxisMetric,
-      setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
-      selectedPercentile,
-      setSelectedPercentile,
-      selectedGPUs,
-      setSelectedGPUs: setSelectedGPUsAndClear,
+      availableQuickFilters,
       availableGPUs,
-      selectedDates,
-      setSelectedDates: setSelectedDatesAndClear,
-      setSelectedDatesFromRunExpansion: setSelectedDates,
-      selectedDateRange,
-      setSelectedDateRange: setSelectedDateRangeAndClear,
-      activeDates,
-      setActiveDates,
-      toggleActiveDate,
-      removeActiveDate,
-      selectAllActiveDates,
-      selectedRunDate,
-      setSelectedRunDate,
-      userCosts,
-      setUserCosts,
       availableDates,
       dateRangeAvailableDates,
       isCheckingAvailableDates,
       availableRuns: filteredAvailableRuns,
-      selectedRunId: effectiveSelectedRunId,
-      setSelectedRunId,
       availablePrecisions,
       availableSequences,
       availableModels,
+    }),
+    [
+      hwTypesWithData,
+      hardwareConfig,
+      graphs,
+      loading,
+      error,
+      availableQuickFilters,
+      availableGPUs,
+      availableDates,
+      dateRangeAvailableDates,
+      isCheckingAvailableDates,
+      filteredAvailableRuns,
+      availablePrecisions,
+      availableSequences,
+      availableModels,
+    ],
+  );
+
+  const filtersValue = useMemo<InferenceFiltersContextType>(
+    () => ({
+      activeHwTypes,
+      bestPerSku,
+      selectedModel,
+      selectedSequence: effectiveSequence,
+      selectedPrecisions: effectivePrecisions,
+      quickFilters,
+      selectedGPUs,
+      selectedDates,
+      selectedDateRange,
+      activeDates,
+      userCosts,
+      selectedRunDate,
+      selectedRunId: effectiveSelectedRunId,
       userPowers,
-      setUserPowers,
-      useAdvancedLabels,
-      setUseAdvancedLabels,
-      showGradientLabels,
-      setShowGradientLabels,
-      showLineLabels,
-      setShowLineLabels,
-      showSpeedOverlay,
-      setShowSpeedOverlay,
-      showMinecraftOverlay,
-      setShowMinecraftOverlay,
-      setHwFilter: setPendingHwFilter,
       activePresetId,
-      setActivePresetId,
       presetGuardRef,
       compareGpuPair: compareGpuPair ?? null,
     }),
     [
       activeHwTypes,
-      hwTypesWithData,
-      toggleHwType,
-      removeHwType,
-      selectAllHwTypes,
       bestPerSku,
-      setBestPerSkuAndApply,
-      resolveHwSelection,
-      toggleComparisonSelection,
-
-      hardwareConfig,
-      graphs,
-      loading,
-      error,
       selectedModel,
       effectiveSequence,
       effectivePrecisions,
-      selectedYAxisMetric,
-      selectedXAxisMetric,
-      selectedE2eXAxisMetric,
-      selectedXAxisMode,
-      scaleType,
       quickFilters,
-      availableQuickFilters,
       selectedGPUs,
       selectedDates,
       selectedDateRange,
       activeDates,
-      toggleActiveDate,
-      removeActiveDate,
-      selectAllActiveDates,
-      selectedRunDate,
-      availableDates,
-      dateRangeAvailableDates,
-      isCheckingAvailableDates,
-      availableGPUs,
-      filteredAvailableRuns,
-      effectiveSelectedRunId,
-      availablePrecisions,
-      availableSequences,
-      availableModels,
-      hideNonOptimal,
-      showPointLabels,
-      highContrast,
-      logScale,
-      isLegendExpanded,
-      useAdvancedLabels,
-      showGradientLabels,
-      showLineLabels,
-      showSpeedOverlay,
-      showMinecraftOverlay,
       userCosts,
+      selectedRunDate,
+      effectiveSelectedRunId,
       userPowers,
       activePresetId,
       compareGpuPair,
     ],
   );
 
+  const displayValue = useMemo<InferenceDisplayContextType>(
+    () => ({
+      selectedYAxisMetric,
+      selectedPercentile,
+      selectedXAxisMetric,
+      selectedE2eXAxisMetric,
+      selectedXAxisMode,
+      scaleType,
+      isLegendExpanded,
+      hideNonOptimal,
+      showPointLabels,
+      highContrast,
+      logScale,
+      useAdvancedLabels,
+      showGradientLabels,
+      showLineLabels,
+      showSpeedOverlay,
+      showMinecraftOverlay,
+    }),
+    [
+      selectedYAxisMetric,
+      selectedPercentile,
+      selectedXAxisMetric,
+      selectedE2eXAxisMetric,
+      selectedXAxisMode,
+      scaleType,
+      isLegendExpanded,
+      hideNonOptimal,
+      showPointLabels,
+      highContrast,
+      logScale,
+      useAdvancedLabels,
+      showGradientLabels,
+      showLineLabels,
+      showSpeedOverlay,
+      showMinecraftOverlay,
+    ],
+  );
+
+  const actionsValue: InferenceActionsContextType = {
+    toggleActiveDate,
+    removeActiveDate,
+    selectAllActiveDates,
+    toggleHwType,
+    removeHwType,
+    selectAllHwTypes,
+    setBestPerSku: setBestPerSkuAndApply,
+    resolveComparisonSelection: resolveHwSelection,
+    toggleComparisonSelection,
+    setSelectedModel: setSelectedModelAndClear,
+    setSelectedSequence: setSelectedSequenceAndClear,
+    setSelectedPrecisions: setSelectedPrecisionsAndClear,
+    setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
+    setSelectedPercentile,
+    setSelectedXAxisMetric,
+    setSelectedXAxisMode: handleSetXAxisMode,
+    setScaleType,
+    setQuickFilterVendors,
+    setQuickFilterFrameworks,
+    setQuickFilterDeployment,
+    setQuickFilterSpec,
+    setIsLegendExpanded,
+    setHideNonOptimal,
+    setShowPointLabels,
+    setHighContrast,
+    setLogScale,
+    setUseAdvancedLabels,
+    setShowGradientLabels,
+    setShowLineLabels,
+    setShowSpeedOverlay,
+    setShowMinecraftOverlay,
+    setSelectedGPUs: setSelectedGPUsAndClear,
+    setSelectedDates: setSelectedDatesAndClear,
+    setSelectedDatesFromRunExpansion: setSelectedDates,
+    setSelectedDateRange: setSelectedDateRangeAndClear,
+    setUserCosts,
+    setSelectedRunDate,
+    setSelectedRunId,
+    setUserPowers,
+    setHwFilter: setPendingHwFilter,
+    setActivePresetId,
+  };
+
   return (
-    <InferenceContext.Provider value={value}>
-      {children}
+    <>
+      <InferenceContextsProvider
+        data={dataValue}
+        filters={filtersValue}
+        display={displayValue}
+        actions={actionsValue}
+      >
+        {children}
+      </InferenceContextsProvider>
       <EngineComparisonConflictToast
         detail={isUnofficialRun ? null : engineConflict}
         onDismiss={dismissEngineConflict}
@@ -1618,14 +1703,29 @@ export function InferenceProvider({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </InferenceContext.Provider>
+    </>
   );
 }
 
-export function useInference() {
-  const context = useContext(InferenceContext);
+function useRequiredInferenceContext<T>(context: T | undefined, hookName: string): T {
   if (context === undefined) {
-    throw new Error('useInference must be used within an InferenceProvider');
+    throw new Error(`${hookName} must be used within an InferenceProvider`);
   }
   return context;
+}
+
+export function useInferenceData() {
+  return useRequiredInferenceContext(useContext(InferenceDataContext), 'useInferenceData');
+}
+
+export function useInferenceFilters() {
+  return useRequiredInferenceContext(useContext(InferenceFiltersContext), 'useInferenceFilters');
+}
+
+export function useInferenceDisplay() {
+  return useRequiredInferenceContext(useContext(InferenceDisplayContext), 'useInferenceDisplay');
+}
+
+export function useInferenceActions() {
+  return useRequiredInferenceContext(useContext(InferenceActionsContext), 'useInferenceActions');
 }

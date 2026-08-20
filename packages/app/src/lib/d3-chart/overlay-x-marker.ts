@@ -1,4 +1,5 @@
 import * as d3 from 'd3';
+import { invalidateTooltipGeometry } from '@/lib/d3-chart/layers/scatter-points';
 
 export interface OverlayTooltipHandle<T> {
   isPinned: () => boolean;
@@ -52,6 +53,7 @@ export function attachOverlayXMarkerHandlers<T>(
         .style('display', 'block')
         .style('pointer-events', 'none')
         .html(options.content(data, false));
+      invalidateTooltipGeometry(options.tooltip.node());
       options.rulers?.show(data);
     })
     .on('mousemove', (event) => {
@@ -74,6 +76,7 @@ export function attachOverlayXMarkerHandlers<T>(
         .style('opacity', 1)
         .style('display', 'block')
         .style('pointer-events', 'auto');
+      invalidateTooltipGeometry(options.tooltip.node());
       positionTooltip(event);
       options.rulers?.show(data);
       options.handle?.pinTooltip(data, true);

@@ -9,11 +9,18 @@ import {
   CompareTableRenderer,
   type CompareTableData,
 } from '@/components/compare/compare-table-renderer';
-import { useGlobalFilters, GlobalFilterProvider } from '@/components/GlobalFilterContext';
+import {
+  GlobalFilterProvider,
+  useGlobalFilterAvailability,
+  useGlobalFilterRun,
+  useGlobalFilterSelection,
+} from '@/components/GlobalFilterContext';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
 import { track } from '@/lib/analytics';
+import type { BenchmarkRow } from '@/lib/api';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare-enum-coerce';
 import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
 
@@ -53,6 +60,7 @@ interface ComparePageClientProps {
   defaultSequence: string | null;
   defaultPrecision: string | null;
   ssrTableData: CompareTableData;
+  initialBenchmarkRows?: BenchmarkRow[];
   /** One SSR-rendered prose paragraph per interpolated-table row (default
    *  interactivity target). Each paragraph picks a template variant
    *  deterministically from the slug so prose stays stable across renders
@@ -82,6 +90,7 @@ export default function ComparePageClient({
   defaultSequence,
   defaultPrecision,
   ssrTableData,
+  initialBenchmarkRows,
   narrative,
   agenticIntro = null,
   aLabel,
@@ -99,6 +108,14 @@ export default function ComparePageClient({
   const compareGpuPair = useMemo(() => [a, b] as const, [a, b]);
   const initialModel = toModel(defaultModel);
   const initialSequence = toSequence(defaultSequence);
+  const benchmarkQueryScope = `compare-pair:${a}:${b}`;
+  const initialCalculatorRows = useMemo(
+    () =>
+      initialBenchmarkRows && defaultSequence
+        ? toCalculatorBenchmarkRows(initialBenchmarkRows, defaultSequence)
+        : undefined,
+    [defaultSequence, initialBenchmarkRows],
+  );
   const initialPrecisions = toPrecisions(defaultPrecision);
   const t = STRINGS[locale];
   const isZh = locale === 'zh';
@@ -113,6 +130,9 @@ export default function ComparePageClient({
         activeTab="compare"
         initialActiveHwTypes={[a, b]}
         compareGpuPair={compareGpuPair}
+        benchmarkQueryScope={benchmarkQueryScope}
+        initialBenchmarkModel={initialModel}
+        initialBenchmarkRows={initialBenchmarkRows}
       >
         <div className="flex flex-col gap-4">
           <Card className="flex flex-col gap-3">
@@ -195,6 +215,9 @@ export default function ComparePageClient({
               aLabel={aLabel}
               bLabel={bLabel}
               ssrTableData={ssrTableData}
+              initialModel={initialModel}
+              initialSequence={initialSequence}
+              initialCalculatorRows={initialCalculatorRows}
               emptyStateText={t.emptyState}
             />
           </Card>
@@ -211,6 +234,9 @@ function CompareTableSection({
   aLabel,
   bLabel,
   ssrTableData,
+  initialModel,
+  initialSequence,
+  initialCalculatorRows,
   emptyStateText,
 }: {
   a: string;
@@ -218,16 +244,36 @@ function CompareTableSection({
   aLabel: string;
   bLabel: string;
   ssrTableData: CompareTableData;
+  initialModel: ReturnType<typeof toModel>;
+  initialSequence: ReturnType<typeof toSequence>;
+  initialCalculatorRows?: BenchmarkRow[];
   emptyStateText: string;
 }) {
-  const { effectiveSequence, effectivePrecisions, selectedRunDate, selectedModel } =
-    useGlobalFilters();
+  const { effectiveSequence, effectivePrecisions, selectedModel, sequenceResolved } =
+    useGlobalFilterSelection();
+  const { availableDates } = useGlobalFilterAvailability();
+  const { selectedRunDate } = useGlobalFilterRun();
+  const latestAvailableDate = availableDates.at(-1) ?? '';
+  const calculatorRunDate =
+    selectedRunDate && selectedRunDate === latestAvailableDate ? '' : selectedRunDate;
+  const initialRows =
+    initialCalculatorRows &&
+    sequenceResolved &&
+    selectedModel === initialModel &&
+    effectiveSequence === initialSequence &&
+    calculatorRunDate === ''
+      ? initialCalculatorRows
+      : undefined;
 
   const { gpuDataByGroupKey, ranges, hasData } = useThroughputData(
     selectedModel,
     effectiveSequence,
     effectivePrecisions,
-    selectedRunDate,
+    calculatorRunDate,
+    undefined,
+    undefined,
+    initialRows,
+    sequenceResolved,
   );
 
   // Extract GPUDataPoint arrays for just the two GPUs in the pair.

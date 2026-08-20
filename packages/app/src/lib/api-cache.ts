@@ -164,6 +164,21 @@ export function cachedQuery<T, Args extends unknown[]>(
   return (...args: Args): Promise<T> => nextCached(...args);
 }
 
+/**
+ * Cache compact, derived server payloads in Next's tagged cache.
+ *
+ * This deliberately has no Blob fallback: callers use it only after reducing
+ * raw database rows to a page-owned payload that stays below Next's cache
+ * limit. Arguments are part of the unstable_cache key, so callers should pass
+ * only canonical, meaningful selector values.
+ */
+export function cachedDerivedData<T, Args extends unknown[]>(
+  fn: (...args: Args) => Promise<T>,
+  keyPrefix: string,
+): (...args: Args) => Promise<T> {
+  return cachedQuery(fn, `derived:${keyPrefix}`);
+}
+
 /** Purge both unstable_cache (via revalidateTag) and blob storage. */
 export async function purgeAll(): Promise<number> {
   const deleted = await blobPurge();

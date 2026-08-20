@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DASHBOARD_ROUTES,
   dashboardRouteForPathname,
+  dashboardShellCapabilitiesForPathname,
   getDashboardRoute,
   isDashboardRouteKey,
 } from './dashboard-routes';
@@ -42,6 +43,26 @@ describe('dashboard route registry', () => {
       unofficialRuns: true,
     });
   });
+
+  it.each(['/inference/agentic', '/zh/inference/agentic'])(
+    'keeps the agentic catalog standalone at %s',
+    (pathname) => {
+      expect(dashboardShellCapabilitiesForPathname(pathname)).toEqual({
+        providers: { globalFilters: false, unofficialRuns: false },
+        dashboardNudge: false,
+      });
+    },
+  );
+
+  it.each(['/inference/agentic/42', '/zh/inference/agentic/42'])(
+    'preserves standalone agentic detail behavior at %s',
+    (pathname) => {
+      expect(dashboardShellCapabilitiesForPathname(pathname)).toEqual({
+        providers: { globalFilters: false, unofficialRuns: false },
+        dashboardNudge: false,
+      });
+    },
+  );
 
   it('resolves English, Chinese, canonical, and dashboard child paths', () => {
     expect(dashboardRouteForPathname('/evaluation')?.key).toBe('evaluation');

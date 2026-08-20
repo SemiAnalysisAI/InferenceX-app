@@ -14,8 +14,12 @@ import {
 } from '@/components/ui/select';
 import { updateRepoUrl } from '@/lib/utils';
 
-import { useGlobalFilters } from '@/components/GlobalFilterContext';
-import { useInference } from '@/components/inference/InferenceContext';
+import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+import {
+  useInferenceActions,
+  useInferenceData,
+  useInferenceFilters,
+} from '@/components/inference/InferenceContext';
 import {
   formatChangelogDescription,
   formatConfigKeys,
@@ -48,17 +52,11 @@ function RunConclusionDot({ conclusion }: { conclusion: string | null }) {
 }
 
 export default function WorkflowInfoDisplay() {
-  const {
-    selectedRunDate,
-    setSelectedRunDate,
-    availableDates,
-    availableRuns,
-    selectedRunId,
-    setSelectedRunId,
-    isCheckingAvailableDates,
-  } = useInference();
+  const { selectedRunDate, selectedRunId } = useInferenceFilters();
+  const { availableDates, availableRuns, isCheckingAvailableDates } = useInferenceData();
+  const { setSelectedRunDate, setSelectedRunId } = useInferenceActions();
 
-  const { effectivePrecisions } = useGlobalFilters();
+  const { effectivePrecisions } = useGlobalFilterSelection();
 
   // Navigation functions for runs
   const runIds = Object.keys(availableRuns);

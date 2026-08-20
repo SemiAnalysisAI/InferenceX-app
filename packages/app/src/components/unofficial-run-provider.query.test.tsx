@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, createElement } from 'react';
+import { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/client-navigation';
 
-import { UnofficialRunProvider, useUnofficialRun } from './unofficial-run-provider';
+import {
+  UnofficialRunProvider,
+  useUnofficialRun,
+  type UnofficialRunContextType,
+} from './unofficial-run-provider';
 
 vi.mock('@/components/ui/unofficial-banner', () => ({ UnofficialBanner: () => null }));
 
@@ -35,13 +39,22 @@ function runInfo(id: number) {
 let latestRunIds: number[] = [];
 let dismissLatest: ((runId: string) => void) | null = null;
 let clearLatest: (() => void) | null = null;
+let latestContextValue: UnofficialRunContextType | null = null;
+let rerenderProvider: (() => void) | null = null;
 
 function Probe() {
   const value = useUnofficialRun();
+  latestContextValue = value;
   latestRunIds = value.unofficialRunInfos.map((run) => run.id);
   dismissLatest = value.dismissRun;
   clearLatest = value.clearUnofficialRun;
   return null;
+}
+
+function ProviderHarness() {
+  const [, setRevision] = useState(0);
+  rerenderProvider = () => setRevision((revision) => revision + 1);
+  return createElement(UnofficialRunProvider, null, createElement(Probe));
 }
 
 function installPendingFetch(): void {
@@ -63,13 +76,7 @@ function mountProvider(): Root {
   const container = document.createElement('div');
   const root = createRoot(container);
   act(() => {
-    root.render(
-      createElement(
-        QueryClientProvider,
-        { client },
-        createElement(UnofficialRunProvider, null, createElement(Probe)),
-      ),
-    );
+    root.render(createElement(QueryClientProvider, { client }, createElement(ProviderHarness)));
   });
   return root;
 }
@@ -82,16 +89,43 @@ async function flush(): Promise<void> {
   });
 }
 
+function hasRunIds(expected: number[]): boolean {
+  return (
+    latestRunIds.length === expected.length &&
+    expected.every((runId, index) => latestRunIds[index] === runId)
+  );
+}
+
+async function waitForRunIds(expected: number[]): Promise<void> {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    if (hasRunIds(expected)) return;
+    await flush();
+  }
+  expect(latestRunIds).toEqual(expected);
+}
+
 afterEach(() => {
   requests.length = 0;
   latestRunIds = [];
   clearLatest = null;
   dismissLatest = null;
+  latestContextValue = null;
+  rerenderProvider = null;
   window.history.replaceState({}, '', '/inference');
   vi.restoreAllMocks();
 });
 
 describe('UnofficialRunProvider query lifecycle', () => {
+  it('preserves the context value identity when provider fields are unchanged', () => {
+    const root = mountProvider();
+    const initialValue = latestContextValue;
+
+    act(() => rerenderProvider?.());
+
+    expect(latestContextValue).toBe(initialValue);
+    act(() => root.unmount());
+  });
+
   it('aborts the old key and ignores its response after a URL race', async () => {
     installPendingFetch();
     window.history.replaceState({}, '', '/inference?unofficialrun=1');
@@ -135,7 +169,7 @@ describe('UnofficialRunProvider query lifecycle', () => {
           evaluations: [],
         }),
     } as Response);
-    await flush();
+    await waitForRunIds([1, 2]);
 
     act(() => dismissLatest?.('1'));
     await flush();

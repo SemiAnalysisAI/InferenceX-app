@@ -6,7 +6,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
 import chartDefinitions from '@/components/inference/metric-registry';
-import { useInference } from '@/components/inference/InferenceContext';
+import {
+  useInferenceActions,
+  useInferenceData,
+  useInferenceDisplay,
+  useInferenceFilters,
+} from '@/components/inference/InferenceContext';
 import type {
   ChartDefinition,
   HardwareConfig,
@@ -191,33 +196,34 @@ const VIEW_MODE_OPTIONS: SegmentedToggleOption<InferenceViewMode>[] = [
 export default function ChartDisplay() {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const { graphs, loading, error, dateRangeAvailableDates } = useInferenceData();
   const {
-    graphs,
-    loading,
-    error,
-    selectedYAxisMetric,
-    selectedXAxisMetric,
-    selectedE2eXAxisMetric,
     selectedGPUs,
     selectedPrecisions,
     selectedDates,
-    setSelectedDates,
-    setSelectedDatesFromRunExpansion,
     selectedDateRange,
-    dateRangeAvailableDates,
     selectedModel,
     selectedSequence,
     selectedRunDate,
-    setIsLegendExpanded,
     activeHwTypes,
     bestPerSku,
     activeDates,
-    selectedPercentile,
     compareGpuPair,
-    selectedXAxisMode,
-    setSelectedXAxisMode,
     quickFilters,
-  } = useInference();
+  } = useInferenceFilters();
+  const {
+    selectedYAxisMetric,
+    selectedXAxisMetric,
+    selectedE2eXAxisMetric,
+    selectedPercentile,
+    selectedXAxisMode,
+  } = useInferenceDisplay();
+  const {
+    setSelectedDates,
+    setSelectedDatesFromRunExpansion,
+    setIsLegendExpanded,
+    setSelectedXAxisMode,
+  } = useInferenceActions();
   const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
   const workflowInfoBenchmarkType =

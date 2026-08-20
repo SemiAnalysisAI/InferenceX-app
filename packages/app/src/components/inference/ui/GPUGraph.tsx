@@ -5,7 +5,12 @@ import * as d3 from 'd3';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTheme } from 'next-themes';
 
-import { useInference } from '@/components/inference/InferenceContext';
+import {
+  useInferenceActions,
+  useInferenceData,
+  useInferenceDisplay,
+  useInferenceFilters,
+} from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getChartWatermark, Sequence } from '@/lib/data-mappings';
@@ -112,34 +117,38 @@ const GPUGraph = React.memo(
     caption,
     runNumbering: providedRunNumbering,
   }: ScatterGraphProps) => {
+    const { hardwareConfig } = useInferenceData();
     const {
-      hardwareConfig,
       selectedPrecisions,
-      selectedYAxisMetric,
       selectedGPUs,
       selectedDateRange,
       selectedDates,
       selectedSequence,
+      activeDates,
+    } = useInferenceFilters();
+    const {
+      selectedYAxisMetric,
+      hideNonOptimal,
+      showPointLabels,
+      logScale,
+      isLegendExpanded,
+      useAdvancedLabels,
+      highContrast,
+      showLineLabels,
+    } = useInferenceDisplay();
+    const {
       setSelectedDates,
       toggleActiveDate,
       removeActiveDate,
-      activeDates,
-      hideNonOptimal,
       setHideNonOptimal,
-      showPointLabels,
       setShowPointLabels,
-      logScale,
       setLogScale,
-      isLegendExpanded,
       setIsLegendExpanded,
-      useAdvancedLabels,
       setUseAdvancedLabels,
-      highContrast,
       setHighContrast,
       selectAllActiveDates,
-      showLineLabels,
       setShowLineLabels,
-    } = useInference();
+    } = useInferenceActions();
     const locale = useLocale();
     const legendT = GPU_STRINGS[locale];
     const { resolvedTheme } = useTheme();
@@ -311,6 +320,8 @@ const GPUGraph = React.memo(
       [filteredData],
     );
     const { data: traceAvailability } = useTraceAvailability(agenticIds);
+    const traceAvailabilityRef = useRef(traceAvailability);
+    traceAvailabilityRef.current = traceAvailability;
 
     // Warning annotations for visible series with known upstream issues —
     // same treatment the scatter view gets, applied to the date-comparison view.
@@ -385,9 +396,9 @@ const GPUGraph = React.memo(
           .join('|'),
       [filteredData],
     );
-    // Trace availability changes tooltip actions without changing the point set.
-    // Include it in the metric phase identity so D3 refreshes the point handlers
-    // after the async lookup resolves instead of retaining a hasTrace=false closure.
+    // Tooltip-only trace availability is deliberately excluded from chart
+    // identity; the long-lived D3 content callback reads its latest value via
+    // traceAvailabilityRef.
     const metricIdentity = useMemo(
       () =>
         [
@@ -395,25 +406,13 @@ const GPUGraph = React.memo(
           selectedYAxisMetric,
           `linear:${xExtent.join(',')}`,
           `${logScale ? 'log' : 'linear'}:${yDomain.join(',')}`,
-          ...agenticIds.map(
-            (id) => `trace:${id}:${traceAvailability?.[id] === true ? 'available' : 'unavailable'}`,
-          ),
           ...filteredData.map(
             (point) => `${point.date}:${scatterPointConfigId(point)}:${point.x}:${point.y}`,
           ),
         ]
           .toSorted()
           .join('|'),
-      [
-        selectedYAxisMetric,
-        useAdvancedLabels,
-        xExtent,
-        logScale,
-        yDomain,
-        filteredData,
-        agenticIds,
-        traceAvailability,
-      ],
+      [selectedYAxisMetric, useAdvancedLabels, xExtent, logScale, yDomain, filteredData],
     );
 
     // Color resolver for points/rooflines
@@ -678,7 +677,8 @@ const GPUGraph = React.memo(
               selectedYAxisMetric,
               hardwareConfig,
               runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-              hasTrace: typeof d.id === 'number' ? traceAvailability?.[d.id] === true : false,
+              hasTrace:
+                typeof d.id === 'number' ? traceAvailabilityRef.current?.[d.id] === true : false,
               locale,
             }),
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),

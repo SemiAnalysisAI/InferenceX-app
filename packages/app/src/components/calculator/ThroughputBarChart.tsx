@@ -2,7 +2,7 @@
 
 import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useLocale } from '@/lib/use-locale';
 
 import type { HardwareConfig } from '@/components/inference/types';
@@ -424,12 +424,15 @@ export default function ThroughputBarChart({
   // Color resolution: unofficial-run overlay bars take the run's palette color
   // (so they match the banner + legend swatch — see lib/overlay-run-style.ts);
   // official bars prefer the dynamic colorResolver, falling back to static config.
-  const resolveBarColor = (d: InterpolatedResult) =>
-    d.isOverlay
-      ? overlayRunColor(d.runIndex ?? 0)
-      : colorResolver
-        ? colorResolver(d.hwKey)
-        : getColor();
+  const resolveBarColor = useCallback(
+    (datum: InterpolatedResult) =>
+      datum.isOverlay
+        ? overlayRunColor(datum.runIndex ?? 0)
+        : colorResolver
+          ? colorResolver(datum.hwKey)
+          : getColor(),
+    [colorResolver],
+  );
 
   // Stable refs to avoid re-running the D3 effect
   const hoveredBarXRef = useRef(0);
@@ -474,6 +477,60 @@ export default function ThroughputBarChart({
     [sortedResults],
   );
 
+  const dataIdentity = useMemo(
+    () => JSON.stringify(sortedResults.map((datum) => datum.resultKey).toSorted()),
+    [sortedResults],
+  );
+  const metricIdentity = useMemo(
+    () =>
+      JSON.stringify({
+        bars: sortedResults.map((datum) =>
+          JSON.stringify([
+            datum.resultKey,
+            getMetricValue(datum, barMetric, costType),
+            getValueLabel(datum, barMetric, mode, costType),
+            getCostForType(datum, costType),
+            getThroughputForType(datum, costType),
+            getLabel(datum, hardwareConfig),
+          ]),
+        ),
+        barMetric,
+        costType,
+        mode,
+        maxBarValue,
+        yDomain,
+      }),
+    [barMetric, costType, hardwareConfig, maxBarValue, mode, sortedResults, yDomain],
+  );
+  const paletteIdentity = useMemo(
+    () =>
+      JSON.stringify(
+        sortedResults
+          .map((datum) => JSON.stringify([datum.resultKey, resolveBarColor(datum)]))
+          .toSorted(),
+      ),
+    [resolveBarColor, sortedResults],
+  );
+  const xScaleConfig = useMemo(
+    () => ({ type: 'linear' as const, domain: [0, maxBarValue] as [number, number] }),
+    [maxBarValue],
+  );
+  const yScaleConfig = useMemo(
+    () => ({ type: 'band' as const, domain: yDomain, padding: 0.3 }),
+    [yDomain],
+  );
+  const zoomConfig = useMemo(
+    () => ({
+      enabled: true,
+      axes: 'x' as const,
+      scaleExtent: [0.1, 1] as [number, number],
+      rescaleX: (xScale: ContinuousScale, transform: d3.ZoomTransform) =>
+        xScale.copy().domain([0, maxBarValue / transform.k]) as ContinuousScale,
+      customTransformStorage: (transform: d3.ZoomTransform) => d3.zoomIdentity.scale(transform.k),
+    }),
+    [maxBarValue],
+  );
+
   // ── Layers ──
 
   const layers = useMemo(() => {
@@ -495,6 +552,7 @@ export default function ThroughputBarChart({
     const labelLayer: CustomLayerConfig = {
       type: 'custom',
       key: 'bar-labels',
+      displayIdentity: paletteIdentity,
       render: (zoomGroup, ctx) => {
         const xScale = ctx.xScale as d3.ScaleLinear<number, number>;
         const yScale = ctx.yScale as d3.ScaleBand<string>;
@@ -539,6 +597,20 @@ export default function ThroughputBarChart({
         const barColor = (d: InterpolatedResult) => resolveBarColor(d);
         positionLabelPairs(zoomGroup, xScale, ctx.width, barMetric, costType, barColor);
       },
+      onDisplayUpdate: (zoomGroup, ctx) => {
+        const baseXScale = ctx.xScale as d3.ScaleLinear<number, number>;
+        const svgNode = ctx.layout.svg.node();
+        const transform = svgNode ? d3.zoomTransform(svgNode) : d3.zoomIdentity;
+        const currentXScale = baseXScale.copy().domain([0, maxBarValue / transform.k]);
+        positionLabelPairs(
+          zoomGroup,
+          currentXScale,
+          ctx.width,
+          barMetric,
+          costType,
+          resolveBarColor,
+        );
+      },
       onZoom: (zoomGroup, ctx) => {
         const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
         const barColor = (d: InterpolatedResult) => resolveBarColor(d);
@@ -547,46 +619,58 @@ export default function ThroughputBarChart({
     };
 
     return [barLayer, labelLayer];
-  }, [sortedResults, barMetric, costType, hardwareConfig, mode, colorResolver]);
+  }, [sortedResults, barMetric, costType, mode, maxBarValue, paletteIdentity, resolveBarColor]);
 
   // ── Tooltip ──
+  const tooltipStateRef = useRef({ hardwareConfig, mode, barMetric, costType, runUrl, locale });
+  tooltipStateRef.current = { hardwareConfig, mode, barMetric, costType, runUrl, locale };
 
   const tooltip = useMemo(
     () => ({
       rulerType: 'vertical' as const,
-      content: (d: InterpolatedResult, isPinned: boolean) =>
-        generateTooltipHTML(
-          d,
-          hardwareConfig,
-          mode,
-          barMetric,
-          costType,
-          runUrl,
+      content: (datum: InterpolatedResult, isPinned: boolean) => {
+        const state = tooltipStateRef.current;
+        return generateTooltipHTML(
+          datum,
+          state.hardwareConfig,
+          state.mode,
+          state.barMetric,
+          state.costType,
+          state.runUrl,
           isPinned,
-          OVERLAY_STRINGS[locale],
-        ),
+          OVERLAY_STRINGS[state.locale],
+        );
+      },
       getRulerX: () => hoveredBarXRef.current,
-      onHoverStart: (sel: d3.Selection<any, InterpolatedResult, any, any>) => {
-        hoveredBarXRef.current = parseFloat(sel.attr('width') || '0');
+      onHoverStart: (
+        selection: d3.Selection<SVGRectElement, InterpolatedResult, SVGGElement, unknown>,
+      ) => {
+        hoveredBarXRef.current = Number.parseFloat(selection.attr('width') || '0');
         const hasSelection = selectedBarsRef.current.size > 0;
         if (!hasSelection) {
-          sel.attr('opacity', 1).attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
+          selection
+            .attr('opacity', 1)
+            .attr('stroke', 'var(--foreground)')
+            .attr('stroke-width', 1.5);
         }
       },
-      onHoverEnd: (sel: d3.Selection<any, InterpolatedResult, any, any>, d: InterpolatedResult) => {
+      onHoverEnd: (
+        selection: d3.Selection<SVGRectElement, InterpolatedResult, SVGGElement, unknown>,
+        datum: InterpolatedResult,
+      ) => {
         const hasSelection = selectedBarsRef.current.size > 0;
-        const isSelected = selectedBarsRef.current.has(d.resultKey);
-        sel
+        const isSelected = selectedBarsRef.current.has(datum.resultKey);
+        selection
           .attr('opacity', hasSelection ? (isSelected ? 0.95 : 0.15) : 0.85)
           .attr('stroke', 'none');
       },
-      onPointClick: (d: InterpolatedResult) => {
-        onBarSelectRef.current(d.resultKey);
-        track('calculator_bar_selected', { gpu: d.hwKey, precision: d.precision });
+      onPointClick: (datum: InterpolatedResult) => {
+        onBarSelectRef.current(datum.resultKey);
+        track('calculator_bar_selected', { gpu: datum.hwKey, precision: datum.precision });
       },
       attachToLayer: 0,
     }),
-    [hardwareConfig, mode, barMetric, costType, runUrl, locale],
+    [],
   );
 
   // ── Y axis customize: map resultKey → display label, then split into two-line GPU labels ──
@@ -652,25 +736,21 @@ export default function ThroughputBarChart({
       ref={chartRef}
       chartId="calculator-chart"
       data={sortedResults}
+      dataIdentity={dataIdentity}
+      metricIdentity={metricIdentity}
+      displayIdentity={paletteIdentity}
       height={dynamicHeight}
       margin={dynamicMargin}
       watermark={getChartWatermark()}
       testId="calculator-bar-chart"
       grabCursor
       clipContent={false}
-      xScale={{ type: 'linear', domain: [0, maxBarValue] }}
-      yScale={{ type: 'band', domain: yDomain, padding: 0.3 }}
+      xScale={xScaleConfig}
+      yScale={yScaleConfig}
       xAxis={xAxisConfig}
       yAxis={yAxisConfig}
       layers={layers}
-      zoom={{
-        enabled: true,
-        axes: 'x',
-        scaleExtent: [0.1, 1],
-        rescaleX: (xScale, transform) =>
-          xScale.copy().domain([0, maxBarValue / transform.k]) as ContinuousScale,
-        customTransformStorage: (transform) => d3.zoomIdentity.scale(transform.k),
-      }}
+      zoom={zoomConfig}
       instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a bar to select"
       tooltip={tooltip}
       onRender={onRender}

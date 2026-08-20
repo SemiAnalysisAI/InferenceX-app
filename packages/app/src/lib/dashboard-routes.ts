@@ -6,6 +6,11 @@ export interface DashboardProviderCapabilities {
   readonly unofficialRuns: boolean;
 }
 
+export interface DashboardShellCapabilities {
+  readonly providers: DashboardProviderCapabilities;
+  readonly dashboardNudge: boolean;
+}
+
 interface DashboardRouteDefinition {
   readonly key: string;
   /** Route used for dashboard navigation. */
@@ -33,6 +38,25 @@ const STANDALONE_DASHBOARD_PROVIDERS = {
   globalFilters: false,
   unofficialRuns: false,
 } as const;
+
+interface DashboardShellCapabilityRoute extends DashboardShellCapabilities {
+  readonly path: `/${string}`;
+  readonly includeChildren: boolean;
+}
+
+/**
+ * Shell-only route overrides. These live beside the dashboard registry so
+ * provider and nudge decisions are data-driven rather than inferred in the
+ * React shell. Locale-prefixed paths are normalized by the resolver.
+ */
+export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
+  {
+    path: '/inference/agentic',
+    includeChildren: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    dashboardNudge: false,
+  },
+] as const satisfies readonly DashboardShellCapabilityRoute[];
 
 /**
  * Canonical, data-only registry for every dashboard route.
@@ -189,4 +213,35 @@ export function dashboardRouteForPathname(pathname: string): DashboardRoute | un
       enPath.startsWith(`${route.path}/`) ||
       enPath === route.canonicalPath,
   );
+}
+
+const DEFAULT_DASHBOARD_SHELL_CAPABILITIES: DashboardShellCapabilities = {
+  providers: FILTERED_DASHBOARD_PROVIDERS,
+  dashboardNudge: true,
+};
+
+/** Resolve providers and dashboard nudges for an English or Chinese pathname. */
+export function dashboardShellCapabilitiesForPathname(
+  pathname: string,
+): DashboardShellCapabilities {
+  const barePath = pathname.split(/[?#]/u, 1)[0] || '/';
+  const enPath = barePath === '/zh' ? '/' : barePath.replace(/^\/zh(?=\/)/u, '');
+  const capabilityRoute = DASHBOARD_SHELL_CAPABILITY_ROUTES.find(
+    (route) =>
+      enPath === route.path || (route.includeChildren && enPath.startsWith(`${route.path}/`)),
+  );
+  if (capabilityRoute) {
+    return {
+      providers: capabilityRoute.providers,
+      dashboardNudge: capabilityRoute.dashboardNudge,
+    };
+  }
+
+  const dashboardRoute = dashboardRouteForPathname(enPath);
+  if (!dashboardRoute) return DEFAULT_DASHBOARD_SHELL_CAPABILITIES;
+  return {
+    providers: dashboardRoute.providers,
+    dashboardNudge:
+      dashboardRoute.providers.globalFilters || dashboardRoute.providers.unofficialRuns,
+  };
 }

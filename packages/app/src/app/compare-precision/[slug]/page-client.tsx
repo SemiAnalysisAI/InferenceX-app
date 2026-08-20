@@ -9,7 +9,11 @@ import {
   CompareTableRenderer,
   type CompareTableData,
 } from '@/components/compare/compare-table-renderer';
-import { useGlobalFilters, GlobalFilterProvider } from '@/components/GlobalFilterContext';
+import {
+  GlobalFilterProvider,
+  useGlobalFilterRun,
+  useGlobalFilterSelection,
+} from '@/components/GlobalFilterContext';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
@@ -248,8 +252,8 @@ function CompareTableSection({
   ssrTableData: CompareTableData;
   emptyStateText: string;
 }) {
-  const { effectiveSequence, effectivePrecisions, selectedRunDate, selectedModel } =
-    useGlobalFilters();
+  const { effectiveSequence, effectivePrecisions, selectedModel } = useGlobalFilterSelection();
+  const { selectedRunDate } = useGlobalFilterRun();
 
   const { gpuDataByGroupKey, ranges, hasData } = useThroughputData(
     selectedModel,

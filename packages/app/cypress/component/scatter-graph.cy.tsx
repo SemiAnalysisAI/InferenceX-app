@@ -1,6 +1,6 @@
 import { useReducer, useState } from 'react';
-import { GlobalFilterContext } from '@/components/GlobalFilterContext';
-import { InferenceContext } from '@/components/inference/InferenceContext';
+import { GlobalFilterSelectionContext } from '@/components/GlobalFilterContext';
+import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import {
   overlaySelectionReducer,
   UnofficialRunContext,
@@ -12,8 +12,8 @@ import {
   createMockInferenceData,
   createMockChartDefinition,
   createMockHardwareConfig,
-  createMockGlobalFilterContext,
-  createMockInferenceContext,
+  createMockGlobalFilterContexts,
+  createMockInferenceContextValues,
   createMockUnofficialRunContext,
 } from '../support/mock-data';
 import { Model, Precision, Sequence } from '@/lib/data-mappings';
@@ -141,7 +141,7 @@ describe('ScatterGraph', () => {
         }),
       ),
     );
-    const baseInference = createMockInferenceContext();
+    const baseInference = createMockInferenceContextValues();
 
     function OfficialScopeHarness() {
       const [secondScope, setSecondScope] = useState(false);
@@ -158,7 +158,12 @@ describe('ScatterGraph', () => {
       };
 
       return (
-        <InferenceContext.Provider value={inference}>
+        <InferenceContextsProvider
+          data={inference}
+          filters={inference}
+          display={inference}
+          actions={inference}
+        >
           <button data-testid="change-official-scope" onClick={() => setSecondScope(true)}>
             Change official scope
           </button>
@@ -172,7 +177,7 @@ describe('ScatterGraph', () => {
               chartDefinition={chartDefinition}
             />
           </div>
-        </InferenceContext.Provider>
+        </InferenceContextsProvider>
       );
     }
 
@@ -207,7 +212,7 @@ describe('ScatterGraph', () => {
       chartType: 'interactivity',
       y_tpPerGpu_roofline: 'upper_left',
     });
-    const baseInference = createMockInferenceContext();
+    const baseInference = createMockInferenceContextValues();
     const baseUnofficial = createMockUnofficialRunContext();
 
     function DelayedOfficialScopeHarness() {
@@ -269,7 +274,12 @@ describe('ScatterGraph', () => {
 
       return (
         <UnofficialRunContext.Provider value={unofficial}>
-          <InferenceContext.Provider value={inference}>
+          <InferenceContextsProvider
+            data={inference}
+            filters={inference}
+            display={inference}
+            actions={inference}
+          >
             <button data-testid="change-delayed-chart-scope" onClick={() => setSecondScope(true)}>
               Change scope
             </button>
@@ -296,7 +306,7 @@ describe('ScatterGraph', () => {
                 overlayData={overlayData}
               />
             </div>
-          </InferenceContext.Provider>
+          </InferenceContextsProvider>
         </UnofficialRunContext.Provider>
       );
     }
@@ -649,21 +659,25 @@ describe('ScatterGraph', () => {
       createMockInferenceData({ hwKey: 'h100', x: 300, y: 190, precision: Precision.FP8 }),
       createMockInferenceData({ hwKey: 'h100', x: 340, y: 150, precision: Precision.FP8 }),
     ];
-    const baseInference = createMockInferenceContext();
+    const baseInference = createMockInferenceContextValues();
 
     function IngestedSingletonLabelHarness() {
       const [showLineLabels, setShowLineLabels] = useState(true);
+      const inference = {
+        ...baseInference,
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(['b200_tilert_mtp', 'h100']),
+        hwTypesWithData: new Set(['b200_tilert_mtp', 'h100']),
+        selectedPrecisions: [Precision.FP8],
+        showLineLabels,
+        setShowLineLabels,
+      };
       return (
-        <InferenceContext.Provider
-          value={{
-            ...baseInference,
-            hardwareConfig: hwConfig,
-            activeHwTypes: new Set(['b200_tilert_mtp', 'h100']),
-            hwTypesWithData: new Set(['b200_tilert_mtp', 'h100']),
-            selectedPrecisions: [Precision.FP8],
-            showLineLabels,
-            setShowLineLabels,
-          }}
+        <InferenceContextsProvider
+          data={inference}
+          filters={inference}
+          display={inference}
+          actions={inference}
         >
           <div style={{ width: 800, height: 600 }}>
             <ScatterGraph
@@ -675,7 +689,7 @@ describe('ScatterGraph', () => {
               chartDefinition={interactivityChartDef}
             />
           </div>
-        </InferenceContext.Provider>
+        </InferenceContextsProvider>
       );
     }
 
@@ -1161,8 +1175,8 @@ describe('ChartDisplay engine comparison guard', () => {
 
   it('keeps official table rows synchronized with legend state after a scope change', () => {
     const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
-    const baseInference = createMockInferenceContext();
-    const baseGlobalFilters = createMockGlobalFilterContext();
+    const baseInference = createMockInferenceContextValues();
+    const baseGlobalFilters = createMockGlobalFilterContexts().selection;
 
     function OfficialRowsScopeHarness() {
       const [secondScope, setSecondScope] = useState(false);
@@ -1199,8 +1213,13 @@ describe('ChartDisplay engine comparison guard', () => {
       };
 
       return (
-        <GlobalFilterContext.Provider value={globalFilters}>
-          <InferenceContext.Provider value={inference}>
+        <GlobalFilterSelectionContext.Provider value={globalFilters}>
+          <InferenceContextsProvider
+            data={inference}
+            filters={inference}
+            display={inference}
+            actions={inference}
+          >
             <button data-testid="change-official-table-scope" onClick={() => setSecondScope(true)}>
               Change scope
             </button>
@@ -1211,8 +1230,8 @@ describe('ChartDisplay engine comparison guard', () => {
               Select vLLM
             </button>
             <ChartDisplay />
-          </InferenceContext.Provider>
-        </GlobalFilterContext.Provider>
+          </InferenceContextsProvider>
+        </GlobalFilterSelectionContext.Provider>
       );
     }
 
@@ -1494,8 +1513,8 @@ describe('ChartDisplay engine comparison guard', () => {
       status: 'completed',
       isNonMainBranch: true,
     };
-    const baseInference = createMockInferenceContext();
-    const baseGlobalFilters = createMockGlobalFilterContext();
+    const baseInference = createMockInferenceContextValues();
+    const baseGlobalFilters = createMockGlobalFilterContexts().selection;
     const baseUnofficial = createMockUnofficialRunContext();
 
     function OverlayScopeHarness() {
@@ -1581,9 +1600,14 @@ describe('ChartDisplay engine comparison guard', () => {
       };
 
       return (
-        <GlobalFilterContext.Provider value={globalFilters}>
+        <GlobalFilterSelectionContext.Provider value={globalFilters}>
           <UnofficialRunContext.Provider value={unofficial}>
-            <InferenceContext.Provider value={inference}>
+            <InferenceContextsProvider
+              data={inference}
+              filters={inference}
+              display={inference}
+              actions={inference}
+            >
               <button data-testid="change-overlay-scope" onClick={() => setSecondScope(true)}>
                 Change scope
               </button>
@@ -1609,9 +1633,9 @@ describe('ChartDisplay engine comparison guard', () => {
                 Rerender
               </button>
               <ChartDisplay />
-            </InferenceContext.Provider>
+            </InferenceContextsProvider>
           </UnofficialRunContext.Provider>
-        </GlobalFilterContext.Provider>
+        </GlobalFilterSelectionContext.Provider>
       );
     }
 

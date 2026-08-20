@@ -31,7 +31,10 @@ vi.mock('@/components/ui/chart-legend', () => ({
   },
 }));
 vi.mock('@/components/inference/InferenceContext', () => ({
-  useInference: () => globalThis.__scatterInferenceState.current,
+  useInferenceActions: () => globalThis.__scatterInferenceState.current,
+  useInferenceData: () => globalThis.__scatterInferenceState.current,
+  useInferenceDisplay: () => globalThis.__scatterInferenceState.current,
+  useInferenceFilters: () => globalThis.__scatterInferenceState.current,
 }));
 vi.mock('@/components/unofficial-run-provider', () => ({
   useUnofficialRun: () => globalThis.__scatterOverlayState.current,

@@ -5,7 +5,12 @@ import * as d3 from 'd3';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
-import { useInference } from '@/components/inference/InferenceContext';
+import {
+  useInferenceActions,
+  useInferenceData,
+  useInferenceDisplay,
+  useInferenceFilters,
+} from '@/components/inference/InferenceContext';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import {
@@ -348,43 +353,49 @@ const ScatterGraph = React.memo(
     yExtentOverride,
   }: ScatterGraphProps) => {
     const {
+      hardwareConfig: contextHardwareConfig,
+      hwTypesWithData,
+      availableRuns,
+    } = useInferenceData();
+    const {
       activeHwTypes,
       bestPerSku,
-      setBestPerSku,
-      hardwareConfig: contextHardwareConfig,
-      toggleHwType,
-      removeHwType,
-      hwTypesWithData,
-      resolveComparisonSelection,
       selectedPrecisions,
-      selectedYAxisMetric,
-      availableRuns,
       selectedRunId,
-      hideNonOptimal,
-      setHideNonOptimal,
-      showPointLabels,
-      setShowPointLabels,
-      selectAllHwTypes,
-      highContrast,
-      setHighContrast,
-      logScale,
-      setLogScale,
-      scaleType,
-      isLegendExpanded,
-      setIsLegendExpanded,
-      useAdvancedLabels,
-      setUseAdvancedLabels,
-      showGradientLabels,
-      setShowGradientLabels,
-      showLineLabels,
-      setShowLineLabels,
-      showSpeedOverlay,
-      setShowSpeedOverlay,
-      showMinecraftOverlay,
-      setShowMinecraftOverlay,
       selectedSequence,
       quickFilters,
-    } = useInference();
+    } = useInferenceFilters();
+    const {
+      selectedYAxisMetric,
+      hideNonOptimal,
+      showPointLabels,
+      highContrast,
+      logScale,
+      scaleType,
+      isLegendExpanded,
+      useAdvancedLabels,
+      showGradientLabels,
+      showLineLabels,
+      showSpeedOverlay,
+      showMinecraftOverlay,
+    } = useInferenceDisplay();
+    const {
+      setBestPerSku,
+      toggleHwType,
+      removeHwType,
+      resolveComparisonSelection,
+      setHideNonOptimal,
+      setShowPointLabels,
+      selectAllHwTypes,
+      setHighContrast,
+      setLogScale,
+      setIsLegendExpanded,
+      setUseAdvancedLabels,
+      setShowGradientLabels,
+      setShowLineLabels,
+      setShowSpeedOverlay,
+      setShowMinecraftOverlay,
+    } = useInferenceActions();
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
     const costLimit = chartDefinition.y_cost_limit ?? 0;
@@ -1084,9 +1095,6 @@ const ScatterGraph = React.memo(
           selectedYAxisMetric,
           `${xScaleConfig.type}:${xScaleConfig.domain.join(',')}`,
           `${yScaleConfig.type}:${yScaleConfig.domain.join(',')}`,
-          ...agenticIds.map(
-            (id) => `trace:${id}:${traceAvailability?.[id] === true ? 'available' : 'unavailable'}`,
-          ),
           ...pointsData.map(
             (point) =>
               `${buildPointId(point)}:${point.date ?? ''}:${point.id ?? ''}:${point.run_url ?? ''}:${point.x}:${point.y}`,
@@ -1106,8 +1114,6 @@ const ScatterGraph = React.memo(
         pointsData,
         processedOverlayData,
         buildPointId,
-        agenticIds,
-        traceAvailability,
       ],
     );
 
@@ -1174,6 +1180,7 @@ const ScatterGraph = React.memo(
       getCssColor,
       resolveColor,
       knownIssueAnnotations,
+      traceAvailability,
     });
     interactionRef.current = {
       isPointVisible,
@@ -1184,6 +1191,7 @@ const ScatterGraph = React.memo(
       getCssColor,
       resolveColor,
       knownIssueAnnotations,
+      traceAvailability,
     };
 
     // Render context from the last D3 render — lets the decoration effect
@@ -1285,10 +1293,19 @@ const ScatterGraph = React.memo(
               d3.axisLeft(newYS).ticks(10).tickFormat(logTickFormat(newYS)) as any,
             );
           }
-          avoidPointLabelCollisions(ctx.layout.zoomGroup);
+          if (showPointLabels && !showGradientLabels) {
+            avoidPointLabelCollisions(ctx.layout.zoomGroup);
+          }
         },
       }),
-      [zoomResetEventName, eventPrefix, xScaleConfig._isLog, yScaleConfig.type],
+      [
+        zoomResetEventName,
+        eventPrefix,
+        xScaleConfig._isLog,
+        yScaleConfig.type,
+        showPointLabels,
+        showGradientLabels,
+      ],
     );
 
     // --- Tooltip config ---
@@ -1304,7 +1321,10 @@ const ScatterGraph = React.memo(
             selectedYAxisMetric,
             hardwareConfig,
             runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-            hasTrace: typeof d.id === 'number' ? traceAvailability?.[d.id] === true : false,
+            hasTrace:
+              typeof d.id === 'number'
+                ? interactionRef.current.traceAvailability?.[d.id] === true
+                : false,
             locale,
           }),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
@@ -1345,11 +1365,9 @@ const ScatterGraph = React.memo(
         yLabel,
         selectedYAxisMetric,
         hardwareConfig,
-        // selectedPrecisions is read via interactionRef.current in the hover
-        // handlers, so it isn't a dep. traceAvailability IS read directly in the
-        // tooltip content closure (the "View charts" button), so rebuild the
-        // config when the presence fetch resolves.
-        traceAvailability,
+        // selectedPrecisions and traceAvailability are read through
+        // interactionRef.current so long-lived D3 handlers always observe the
+        // latest state without turning tooltip-only data into chart identity.
         locale,
       ],
     );
@@ -2481,8 +2499,6 @@ const ScatterGraph = React.memo(
           renderOffloadHalo(d3.select(this), d, 'var(--foreground)');
         });
 
-        avoidPointLabelCollisions(zoomGroup);
-
         // Log tick formatting on initial render
         if (xScaleConfig._isLog) {
           const xScale = ctx.xScale as d3.ScaleLogarithmic<number, number>;
@@ -2634,6 +2650,10 @@ const ScatterGraph = React.memo(
         if (rooflineLayer?.type === 'custom' && rooflineLayer.render) {
           rooflineLayer.render(zoomGroup, decorationCtx);
         }
+      }
+
+      if (showPointLabels && !showGradientLabels) {
+        avoidPointLabelCollisions(zoomGroup);
       }
 
       // Known-issue annotations follow the visible series; their layer writes

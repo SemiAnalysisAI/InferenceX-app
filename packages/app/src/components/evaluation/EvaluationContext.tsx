@@ -14,7 +14,12 @@ import {
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
 
-import { useGlobalFilters } from '@/components/GlobalFilterContext';
+import {
+  useGlobalFilterActions,
+  useGlobalFilterAvailability,
+  useGlobalFilterRun,
+  useGlobalFilterSelection,
+} from '@/components/GlobalFilterContext';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import {
   resolveAvailableSelection,
@@ -54,19 +59,19 @@ export function resolveEvaluationDate(
 }
 
 export function EvaluationProvider({ children }: { children: ReactNode }) {
+  const { selectedModel, effectivePrecisions } = useGlobalFilterSelection();
   const {
-    selectedModel,
     setSelectedModel,
-    selectedRunDate: globalRunDate,
-    selectedRunDateRev,
     setSelectedRunDate: setGlobalRunDate,
+    setSelectedPrecisions,
+  } = useGlobalFilterActions();
+  const { selectedRunDate: globalRunDate, selectedRunDateRev } = useGlobalFilterRun();
+  const {
     availableModels,
     availableDates: inferenceAvailableDates,
-    effectivePrecisions,
-    setSelectedPrecisions,
     availablePrecisions: globalAvailablePrecisions,
     availabilityError,
-  } = useGlobalFilters();
+  } = useGlobalFilterAvailability();
   const { getUrlParam } = useUrlState();
   const {
     data: rawRows,

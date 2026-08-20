@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 import { useAgenticAggregates } from '@/hooks/api/use-agentic-aggregates';
@@ -11,7 +11,6 @@ import { useTraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
 import { useBenchmarkSiblings } from '@/hooks/api/use-benchmark-siblings';
 import { NudgeEngine } from '@/components/nudge-engine';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
 
@@ -40,6 +39,7 @@ import {
 } from './server-metric-cards';
 import { SiblingNav } from './sibling-nav';
 import type { ThroughputSeriesKey } from './time-series-math';
+import { useDetailView, type DetailView } from './use-detail-view';
 
 const STRINGS = {
   en: {
@@ -84,32 +84,6 @@ const STRINGS = {
 
 interface Props {
   id: number;
-}
-
-type DetailView = 'point' | 'timeline' | 'aggregates';
-
-const isDetailView = (value: string | null): value is DetailView =>
-  value === 'point' || value === 'timeline' || value === 'aggregates';
-
-/** URL-persisted detail view (`?view=`; per-point is the unadorned default). */
-function useDetailView(): [DetailView, (nextView: DetailView) => void] {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const requestedView = searchParams.get('view');
-  const view: DetailView = isDetailView(requestedView) ? requestedView : 'point';
-  const setView = useCallback(
-    (nextView: DetailView) => {
-      const nextParams = new URLSearchParams(searchParams.toString());
-      if (nextView === 'point') nextParams.delete('view');
-      else nextParams.set('view', nextView);
-      const query = nextParams.toString();
-      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-      track('inference_agentic_detail_view_changed', { view: nextView });
-    },
-    [pathname, router, searchParams],
-  );
-  return [view, setView];
 }
 
 export function AgenticPointDetail({ id }: Props) {

@@ -6,7 +6,12 @@ import { track } from '@/lib/analytics';
 import { useFeatureGate } from '@/lib/use-feature-gate';
 import { cn } from '@/lib/utils';
 
-import { useInference } from '@/components/inference/InferenceContext';
+import {
+  useInferenceActions,
+  useInferenceData,
+  useInferenceDisplay,
+  useInferenceFilters,
+} from '@/components/inference/InferenceContext';
 import {
   ModelSelector,
   ScenarioSelector,
@@ -146,37 +151,39 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
 
   const {
     selectedModel,
-    setSelectedModel,
     selectedSequence,
-    setSelectedSequence,
     selectedPrecisions,
-    setSelectedPrecisions,
-    selectedYAxisMetric,
-    setSelectedYAxisMetric,
-    selectedPercentile,
-    setSelectedPercentile,
-    graphs,
     selectedGPUs,
-    setSelectedGPUs,
-    availableGPUs,
     selectedDateRange,
-    setSelectedDateRange,
+    quickFilters,
+  } = useInferenceFilters();
+  const {
+    graphs,
+    availableGPUs,
     dateRangeAvailableDates,
     isCheckingAvailableDates,
     availablePrecisions,
     availableSequences,
     availableModels,
-    selectedXAxisMetric,
-    setSelectedXAxisMetric,
-    scaleType,
-    setScaleType,
-    quickFilters,
     availableQuickFilters,
+  } = useInferenceData();
+  const { selectedYAxisMetric, selectedPercentile, selectedXAxisMetric, scaleType } =
+    useInferenceDisplay();
+  const {
+    setSelectedModel,
+    setSelectedSequence,
+    setSelectedPrecisions,
+    setSelectedYAxisMetric,
+    setSelectedPercentile,
+    setSelectedGPUs,
+    setSelectedDateRange,
+    setSelectedXAxisMetric,
+    setScaleType,
     setQuickFilterVendors,
     setQuickFilterFrameworks,
     setQuickFilterDeployment,
     setQuickFilterSpec,
-  } = useInference();
+  } = useInferenceActions();
 
   // Y-axis options come from the canonical registry and need no API data.
   // Gated groups appear only after the feature gate unlocks.

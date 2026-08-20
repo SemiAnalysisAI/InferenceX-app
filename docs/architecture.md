@@ -80,7 +80,9 @@ API route responses are cached at two layers before hitting the CDN.
 | Local (unstable_cache) | Next.js in-process | ~2 MB default      | Small payloads (availability, workflow-info, etc.) |
 | Blob storage           | Vercel Blob        | No practical limit | Large payloads that exceed the 2 MB threshold      |
 
-`cachedQuery()` in `src/lib/api-cache.ts` wraps both tiers. Pass `{ blobOnly: true }` for payloads known to be large (e.g. `/api/v1/benchmarks`, which returns full benchmark rows for a model). The blob path is `{BLOB_CACHE_PREFIX}/{keyPrefix}:{args}.json`.
+`cachedQuery()` in `src/lib/api-cache.ts` wraps both tiers. Pass `{ blobOnly: true }` for payloads known to be large (e.g. `/api/v1/benchmarks`, which returns full benchmark rows for a model). Blob keys encode canonical typed arguments as `{keyPrefix}:v2:{base64url}`; keys that would exceed the pathname limit use `{keyPrefix}:v2:sha256:{digest}` instead. `blob-cache.ts` stores that key beneath `BLOB_CACHE_PREFIX` with a `.json` suffix.
+
+`cachedDerivedData()` is the tagged, `unstable_cache`-only wrapper for compact server payloads. Overview caches its fully assembled selector response. Compare caches one pair-filtered, full-shape hydration row set per model/GPU pair, then recomputes the inexpensive sequence/precision table transform per request; nesting a selector cache around the pair cache would bypass Next.js incremental caching. Raw public benchmark responses keep their existing Blob-backed contract.
 
 `blobSet()` is no-op if the key already exists, making concurrent lambda invocations race-safe — only the first writer wins, subsequent calls skip silently.
 

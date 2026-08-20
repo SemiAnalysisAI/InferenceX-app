@@ -2,7 +2,11 @@
 
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 
-import { useInference } from '@/components/inference/InferenceContext';
+import {
+  useInferenceActions,
+  useInferenceDisplay,
+  useInferenceFilters,
+} from '@/components/inference/InferenceContext';
 import {
   buildAppliedCustomGpuValues,
   buildDefaultCustomGpuValues,
@@ -152,14 +156,9 @@ const CustomGpuValuePanel = memo(
   ({ loading, kind }: { loading: boolean; kind: GpuValuePanelKind }) => {
     const locale = useLocale();
     const t = STRINGS[locale];
-    const {
-      selectedYAxisMetric,
-      selectedPrecisions,
-      selectedModel,
-      selectedSequence,
-      setUserCosts,
-      setUserPowers,
-    } = useInference();
+    const { selectedYAxisMetric } = useInferenceDisplay();
+    const { selectedPrecisions, selectedModel, selectedSequence } = useInferenceFilters();
+    const { setUserCosts, setUserPowers } = useInferenceActions();
 
     const config = PANEL_CONFIG[kind];
     const title = locale === 'zh' ? config.titleZh : config.title;

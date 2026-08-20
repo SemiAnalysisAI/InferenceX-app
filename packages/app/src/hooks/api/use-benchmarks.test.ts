@@ -83,6 +83,33 @@ describe('benchmarkQueryOptions', () => {
     expect(calculator.queryKey).not.toEqual(otherSequence.queryKey);
   });
 
+  it('seeds only the matching initial calculator query', () => {
+    const rows = [{ id: 1 }] as never[];
+    const initial = benchmarkQueryOptions(
+      'DeepSeek-R1-0528',
+      '',
+      true,
+      undefined,
+      undefined,
+      undefined,
+      { type: 'calculator', sequence: '1k/1k' },
+      rows,
+    );
+    const changed = benchmarkQueryOptions(
+      'DeepSeek-R1-0528',
+      '',
+      true,
+      undefined,
+      undefined,
+      undefined,
+      { type: 'calculator', sequence: '8k/1k' },
+    );
+
+    expect(initial.initialData).toBe(rows);
+    expect('initialData' in changed).toBe(false);
+    expect(initial.queryKey).not.toEqual(changed.queryKey);
+  });
+
   it('canonicalizes every no-date request to the materialized-view key', () => {
     const omittedDate = benchmarkQueryOptions('m', 'latest');
     const emptyDate = benchmarkQueryOptions('m', '');

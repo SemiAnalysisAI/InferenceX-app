@@ -2,7 +2,11 @@ import { useLayoutEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { getDomainAwareChartWatermark } from '@/lib/unofficial-domain';
 
-import { computeTooltipPosition } from '../layers/scatter-points';
+import {
+  computeTooltipPosition,
+  getTooltipContainerGeometry,
+  invalidateTooltipGeometry,
+} from '../layers/scatter-points';
 import { setupChartStructure } from '../chart-setup';
 import { renderAxes, renderGrid, type AnyScale } from '../chart-update';
 import type { ChartLayout, ContinuousScale } from '../types';
@@ -162,6 +166,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
   const layoutRef = useRef<ChartLayout | null>(null);
   const prevDataRef = useRef(data);
   const prevScalesRef = useRef({ xScaleConfig, yScaleConfig });
+  const prevYAxisConfigRef = useRef(yAxisConfig);
   const zoomFrameBatcherRef = useRef<ZoomFrameBatcher | null>(null);
   if (zoomFrameBatcherRef.current === null) {
     zoomFrameBatcherRef.current = createZoomFrameBatcher(
@@ -255,6 +260,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       yScaleConfig !== prevScalesRef.current.yScaleConfig;
     prevDataRef.current = data;
     prevScalesRef.current = { xScaleConfig, yScaleConfig };
+    prevYAxisConfigRef.current = yAxisConfig;
 
     {
       if (!svgRef.current || !tooltipRef.current) return;
@@ -410,12 +416,13 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
                 .style('display', 'block')
                 .style('pointer-events', 'none')
                 .html(tooltipConfig.content(d, false));
+              invalidateTooltipGeometry(tooltip.node());
 
               // Position tooltip near mouse
-              const rect = containerEl.getBoundingClientRect();
-              const cmx = event.clientX - rect.left;
-              const cmy = event.clientY - rect.top;
-              const pos = computeTooltipPosition(cmx, cmy, tooltip, containerEl);
+              const geometry = getTooltipContainerGeometry(containerEl);
+              const cmx = event.clientX - geometry.bounds.left;
+              const cmy = event.clientY - geometry.bounds.top;
+              const pos = computeTooltipPosition(cmx, cmy, tooltip, containerEl, 10, geometry);
               tooltip.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
 
               // Position rulers
@@ -452,11 +459,12 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
               if (!d) return;
 
               event.stopPropagation();
-              const rect = containerEl.getBoundingClientRect();
-              const cmx = event.clientX - rect.left;
-              const cmy = event.clientY - rect.top;
+              const geometry = getTooltipContainerGeometry(containerEl);
+              const cmx = event.clientX - geometry.bounds.left;
+              const cmy = event.clientY - geometry.bounds.top;
               tooltip.html(tooltipConfig.content(d, true));
-              const pos = computeTooltipPosition(cmx, cmy, tooltip, containerEl);
+              invalidateTooltipGeometry(tooltip.node());
+              const pos = computeTooltipPosition(cmx, cmy, tooltip, containerEl, 10, geometry);
               tooltip
                 .style('left', `${pos.left}px`)
                 .style('top', `${pos.top}px`)
@@ -584,14 +592,14 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
               }
 
               zoomFrameBatcherRef.current?.schedule(() => {
-                const xTickValues = resolveTickValues(
-                  zoomXAxisConfig?.tickValues,
-                  newXScale as AnyScale,
-                );
-                const yTickValues = resolveTickValues(
-                  zoomYAxisConfig?.tickValues,
-                  newYScale as AnyScale,
-                );
+                const updatesX = currentZoomAxes === 'x' || currentZoomAxes === 'both';
+                const updatesY = currentZoomAxes === 'y' || currentZoomAxes === 'both';
+                const xTickValues = updatesX
+                  ? resolveTickValues(zoomXAxisConfig?.tickValues, newXScale as AnyScale)
+                  : undefined;
+                const yTickValues = updatesY
+                  ? resolveTickValues(zoomYAxisConfig?.tickValues, newYScale as AnyScale)
+                  : undefined;
                 const zoomYAxisScale = newYScale as unknown as
                   | ContinuousScale
                   | d3.ScaleBand<string>;
@@ -602,9 +610,10 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
                   yTickCount: zoomYAxisConfig?.tickCount,
                   xTickValues,
                   yTickValues,
+                  axes: currentZoomAxes,
                 });
-                zoomXAxisConfig?.customize?.(zoomLayout.xAxisGroup);
-                zoomYAxisConfig?.customize?.(zoomLayout.yAxisGroup);
+                if (updatesX) zoomXAxisConfig?.customize?.(zoomLayout.xAxisGroup);
+                if (updatesY) zoomYAxisConfig?.customize?.(zoomLayout.yAxisGroup);
                 renderGrid(
                   zoomLayout,
                   newXScale as AnyScale,
@@ -613,6 +622,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
                   0,
                   xTickValues,
                   yTickValues,
+                  currentZoomAxes,
                 );
                 for (const layer of zoomLayers) {
                   updateLayerDecorationOnZoom(
@@ -716,6 +726,14 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     const layout = layoutRef.current;
     const { width, height } = layout;
     const renderGroup = clipContent ? layout.zoomGroup : layout.g;
+    if (isPinned()) {
+      dismissTooltip(true);
+      d3.select(tooltipRef.current)
+        .style('opacity', 0)
+        .style('display', 'none')
+        .style('pointer-events', 'none');
+      renderGroup.select('.ruler-group').style('display', 'none');
+    }
     const xScale = hasScales
       ? buildScale(xScaleConfig!, [0, width])
       : buildScale({ type: 'linear', domain: [0, 1] }, [0, width]);
@@ -740,8 +758,15 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     }
 
     if (hasScales) {
+      const yIsStatic =
+        zoomAxes === 'x' &&
+        prevScalesRef.current.yScaleConfig === yScaleConfig &&
+        prevYAxisConfigRef.current === yAxisConfig;
+      const updateAxes = yIsStatic ? 'x' : 'both';
       const xTickValues = resolveTickValues(xAxisConfig?.tickValues, currentXScale as AnyScale);
-      const yTickValues = resolveTickValues(yAxisConfig?.tickValues, currentYScale as AnyScale);
+      const yTickValues = yIsStatic
+        ? undefined
+        : resolveTickValues(yAxisConfig?.tickValues, currentYScale as AnyScale);
       const yAxisScale = currentYScale as unknown as ContinuousScale | d3.ScaleBand<string>;
       renderGrid(
         layout,
@@ -751,6 +776,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         0,
         xTickValues,
         yTickValues,
+        updateAxes,
       );
       renderAxes(layout, currentXScale as AnyScale, yAxisScale, {
         xTickFormat: xAxisConfig?.tickFormat,
@@ -759,9 +785,10 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         yTickCount: yAxisConfig?.tickCount,
         xTickValues,
         yTickValues,
+        axes: updateAxes,
       });
       xAxisConfig?.customize?.(layout.xAxisGroup);
-      yAxisConfig?.customize?.(layout.yAxisGroup);
+      if (!yIsStatic) yAxisConfig?.customize?.(layout.yAxisGroup);
     }
 
     const baseCtx: RenderContext = {
@@ -778,9 +805,9 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       xScale: currentXScale,
       yScale: currentYScale,
     };
-    for (const layer of layers) {
-      updateLayerForMetric(layer, renderGroup, currentXScale, currentYScale, layout, metricCtx);
-    }
+    const metricLayerSelections = layers.map((layer) =>
+      updateLayerForMetric(layer, renderGroup, currentXScale, currentYScale, layout, metricCtx),
+    );
     customLayerDisplayIdentitiesRef.current = customLayerDisplayIdentities(layers);
     lastDisplayIdentityRef.current = displayIdentity;
     renderGroup.selectAll('.dot-group').raise();
@@ -790,9 +817,9 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     if (tooltipConfig && !tooltipConfig.proximityHover) {
       const attachIdx =
         tooltipConfig.attachToLayer ??
-        layers.findIndex((layer) => layer.type === 'scatter' || layer.type === 'point');
-      const targetLayer = attachIdx >= 0 ? layers[attachIdx] : undefined;
-      if (targetLayer?.type === 'scatter') {
+        metricLayerSelections.findIndex((selection) => selection !== null);
+      const targetSelection = attachIdx >= 0 ? metricLayerSelections[attachIdx] : null;
+      if (targetSelection) {
         const rulers = createRulers(
           renderGroup,
           tooltipConfig.rulerType,
@@ -801,7 +828,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           'var(--foreground)',
         );
         attachHandlers(
-          renderGroup.selectAll('.dot-group'),
+          targetSelection,
           {
             rulerType: tooltipConfig.rulerType,
             generateTooltipContent: tooltipConfig.content,
@@ -824,6 +851,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
 
     renderContextRef.current = baseCtx;
     lastMetricIdentityRef.current = metricIdentity;
+    prevScalesRef.current = { xScaleConfig, yScaleConfig };
+    prevYAxisConfigRef.current = yAxisConfig;
     onRender?.(baseCtx);
   }, [
     dataIdentity,
@@ -846,6 +875,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     tooltipRef,
     createRulers,
     attachHandlers,
+    isPinned,
+    dismissTooltip,
   ]);
 
   // Phase 4: display-only invalidation. Charts can restyle existing marks

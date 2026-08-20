@@ -49,6 +49,8 @@ interface UnofficialRunResponse {
   evaluations: EvalRow[];
 }
 
+const EMPTY_UNOFFICIAL_RUN_INFOS: UnofficialRunInfo[] = [];
+
 const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/iu;
 function deleteUnofficialRunParams(searchParams: URLSearchParams): void {
   const keysToDelete: string[] = [];
@@ -377,7 +379,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
     refetchOnMount: 'always',
   });
 
-  const unofficialRunInfos = query.data?.runInfos ?? [];
+  const unofficialRunInfos = query.data?.runInfos ?? EMPTY_UNOFFICIAL_RUN_INFOS;
   const unofficialRunInfo = unofficialRunInfos[0] ?? null;
   const unofficialBenchmarkRows = query.data?.benchmarks ?? null;
   const unofficialEvalRows = query.data?.evaluations ?? null;
@@ -473,30 +475,52 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
   const loading = runIds.length > 0 && query.isFetching;
   const error = query.error instanceof Error ? query.error.message : null;
 
+  const contextValue = useMemo<UnofficialRunContextType>(
+    () => ({
+      isUnofficialRun: unofficialRunInfos.length > 0,
+      unofficialRunInfo,
+      unofficialRunInfos,
+      runIndexByUrl,
+      unofficialChartData,
+      unofficialBenchmarkRows,
+      unofficialEvalRows,
+      loading,
+      error,
+      clearUnofficialRun,
+      dismissRun,
+      availableModelsAndSequences,
+      getOverlayData,
+      activeOverlayHwTypes: selection.activeOverlayHwTypes,
+      allOverlayHwTypes,
+      localOfficialOverride: selection.localOfficialOverride,
+      reconcileOverlayScope,
+      setUnifiedOverlaySelection,
+      resetOverlaySelection,
+    }),
+    [
+      unofficialRunInfos,
+      unofficialRunInfo,
+      runIndexByUrl,
+      unofficialChartData,
+      unofficialBenchmarkRows,
+      unofficialEvalRows,
+      loading,
+      error,
+      clearUnofficialRun,
+      dismissRun,
+      availableModelsAndSequences,
+      getOverlayData,
+      selection.activeOverlayHwTypes,
+      allOverlayHwTypes,
+      selection.localOfficialOverride,
+      reconcileOverlayScope,
+      setUnifiedOverlaySelection,
+      resetOverlaySelection,
+    ],
+  );
+
   return (
-    <UnofficialRunContext.Provider
-      value={{
-        isUnofficialRun: unofficialRunInfos.length > 0,
-        unofficialRunInfo,
-        unofficialRunInfos,
-        runIndexByUrl,
-        unofficialChartData,
-        unofficialBenchmarkRows,
-        unofficialEvalRows,
-        loading,
-        error,
-        clearUnofficialRun,
-        dismissRun,
-        availableModelsAndSequences,
-        getOverlayData,
-        activeOverlayHwTypes: selection.activeOverlayHwTypes,
-        allOverlayHwTypes,
-        localOfficialOverride: selection.localOfficialOverride,
-        reconcileOverlayScope,
-        setUnifiedOverlaySelection,
-        resetOverlaySelection,
-      }}
-    >
+    <UnofficialRunContext.Provider value={contextValue}>
       {unofficialRunInfos.length > 0 && (
         <UnofficialBanner
           runs={unofficialRunInfos}

@@ -67,6 +67,7 @@ export type ConversationSort = NonNullable<ListConversationsOpts['sort']>;
 
 // Dataset contents only change on (rare) re-ingest, so cache aggressively.
 const DAY = 24 * 60 * 60 * 1000;
+const CONVERSATION_QUERY_GC_TIME = 5 * 60 * 1000;
 
 /** Shared fetch for the per-dataset endpoints: 404 → null, other errors throw. */
 async function fetchJsonOr404<T>(
@@ -138,6 +139,7 @@ export function useDatasetConversations({
     enabled: Boolean(slug),
     placeholderData: keepPreviousData,
     staleTime: DAY,
+    gcTime: CONVERSATION_QUERY_GC_TIME,
   });
 }
 

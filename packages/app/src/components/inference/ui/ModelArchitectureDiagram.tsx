@@ -28,10 +28,19 @@ interface ArchitectureContentProps {
   isExpanded: boolean;
 }
 
+interface DiagramRenderState {
+  width: number;
+  arch: ModelArchitecture;
+  isDark: boolean;
+  expandedBlocks: Set<string>;
+  onBlockClick: (blockId: string) => void;
+}
+
 function ArchitectureContent({ model, arch, isExpanded }: ArchitectureContentProps) {
   const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastRenderRef = useRef<DiagramRenderState | null>(null);
   const { resolvedTheme } = useTheme();
   const releaseDate = getModelReleaseDate(model);
 
@@ -51,36 +60,41 @@ function ArchitectureContent({ model, arch, isExpanded }: ArchitectureContentPro
     [model],
   );
 
-  useEffect(() => {
-    if (isExpanded && svgRef.current) {
-      renderDiagram(
-        svgRef.current,
-        arch,
-        resolvedTheme === 'dark' || resolvedTheme === 'minecraft',
-        expandedBlocks,
-        toggleBlock,
-      );
+  const renderIfChanged = useCallback(() => {
+    const svg = svgRef.current;
+    const container = containerRef.current;
+    if (!isExpanded || !svg || !container) return;
+
+    // Match the renderer's effective width so ResizeObserver notifications that
+    // cannot change the SVG (including its initial callback) stay no-ops.
+    const width = Math.min(container.clientWidth || 600, 640);
+    const isDark = resolvedTheme === 'dark' || resolvedTheme === 'minecraft';
+    const previous = lastRenderRef.current;
+    if (
+      previous?.width === width &&
+      previous.arch === arch &&
+      previous.isDark === isDark &&
+      previous.expandedBlocks === expandedBlocks &&
+      previous.onBlockClick === toggleBlock
+    ) {
+      return;
     }
+
+    renderDiagram(svg, arch, isDark, expandedBlocks, toggleBlock);
+    lastRenderRef.current = { width, arch, isDark, expandedBlocks, onBlockClick: toggleBlock };
   }, [isExpanded, arch, resolvedTheme, expandedBlocks, toggleBlock]);
 
   useEffect(() => {
-    if (!isExpanded || !containerRef.current) return;
+    if (!isExpanded || !containerRef.current) {
+      lastRenderRef.current = null;
+      return;
+    }
 
-    const observer = new ResizeObserver(() => {
-      if (svgRef.current) {
-        renderDiagram(
-          svgRef.current,
-          arch,
-          resolvedTheme === 'dark' || resolvedTheme === 'minecraft',
-          expandedBlocks,
-          toggleBlock,
-        );
-      }
-    });
-
+    renderIfChanged();
+    const observer = new ResizeObserver(renderIfChanged);
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [isExpanded, arch, resolvedTheme, expandedBlocks, toggleBlock]);
+  }, [isExpanded, renderIfChanged]);
 
   return (
     <div

@@ -2,7 +2,11 @@ import * as d3 from 'd3';
 
 import type { ChartLayout, ContinuousScale } from '../types';
 import { renderBars, updateBarsOnZoom } from '../layers/bars';
-import { renderHorizontalBars, updateHorizontalBarsOnZoom } from '../layers/horizontal-bars';
+import {
+  renderHorizontalBars,
+  updateHorizontalBarsForDisplay,
+  updateHorizontalBarsOnZoom,
+} from '../layers/horizontal-bars';
 import { renderPoints, updatePointsOnZoom } from '../layers/points';
 import { renderErrorBars, updateErrorBarsOnZoom } from '../layers/error-bars';
 import { renderLines, updateLinesOnZoom } from '../layers/lines';
@@ -240,10 +244,9 @@ export function updateLayerForMetric<T>(
   yScale: BuiltScale,
   layout: ChartLayout,
   ctx: RenderContext,
-): void {
+): d3.Selection<any, any, any, any> | null {
   if (layer.type !== 'scatter') {
-    renderLayer(layer, group, xScale, yScale, layout, ctx);
-    return;
+    return renderLayer(layer, group, xScale, yScale, layout, ctx);
   }
 
   const keyFor = (datum: (typeof layer.data)[number], index: number): string =>
@@ -285,6 +288,7 @@ export function updateLayerForMetric<T>(
     selection.selectAll('.point-label').remove();
   }
   updateScatterPointsOnZoom(group, xScale as ContinuousScale, yScale as ContinuousScale);
+  return selection;
 }
 
 /** Update scale-neutral decoration without rebuilding joins, scales, or paths. */
@@ -295,6 +299,10 @@ export function updateLayerForDisplay<T>(
 ): void {
   if (layer.type === 'scatter') {
     updateScatterPointsForDisplay(group, layer.config);
+    return;
+  }
+  if (layer.type === 'horizontalBar') {
+    updateHorizontalBarsForDisplay(group, layer.config);
     return;
   }
   if (layer.type === 'roofline') {

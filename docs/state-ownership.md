@@ -51,21 +51,26 @@ File: `packages/app/src/components/GlobalFilterContext.tsx`
 - `effectiveRunDate` resolves the requested date or latest valid date
 - `selectedRunId` resolves requested run intent against `availableRuns`
 
+`GlobalFilterProvider` owns the state, but it does not publish one response-shaped
+context value. Consumers subscribe through five independently memoized domains:
+
+- `useGlobalFilterSelection`: requested model, sequence, and precision state plus
+  their effective values and `sequenceResolved`
+- `useGlobalFilterActions`: stable setters for selection, run date, and run ID
+- `useGlobalFilterRun`: effective date and run ID selectors plus the manual date revision
+- `useGlobalFilterAvailability`: availability options, raw rows, settled state, and errors
+- `useGlobalFilterWorkflow`: the run map plus workflow loading and error state
+
+Workflow query updates therefore do not notify selection or action consumers. Selection
+updates do not notify workflow-only consumers. Components should subscribe only to the
+domains they read.
+
 Availability owns explicit settled and error states. Consumers must distinguish an
-unresolved request from a settled empty result; inference fetches are gated on
+unresolved request from a settled empty result. Inference fetches are gated on
 `sequenceResolved` and render `availabilityError` rather than an indefinite skeleton.
 
-**Derived availability** (memos over `availabilityRows`):
-
-- `availableModels`, `availableSequences`, `availablePrecisions`, `availableDates`
-- `availabilityRows`, `availabilitySettled`, `availabilityError`
-
-**Workflow / run info** (derived from `useWorkflowInfo(effectiveRunDate)`):
-
-- `availableRuns`, `workflowLoading`, `workflowError`
-
-There is no response-shaped `workflowInfo` adapter. `RunInfo` and `availableRuns` are
-the canonical run contract.
+There is no response-shaped workflow adapter. `RunInfo` and `availableRuns` are the
+canonical run contract.
 
 **Why here, not InferenceProvider**: Model, sequence, and precision are cross-tab. EvaluationContext consumes `selectedModel` and `availableModels` directly. If these lived in InferenceProvider, EvaluationProvider would need an indirect coupling or duplicate state.
 
@@ -75,54 +80,54 @@ the canonical run contract.
 
 File: `packages/app/src/components/inference/InferenceContext.tsx`
 
-Depends on: `GlobalFilterProvider` (reads all filter state and availability, including `availabilityRows`).
+Depends on `GlobalFilterProvider` through its narrow selection, run, availability,
+workflow, and action hooks.
 
-**GPU comparison state** (inference-only, URL-initialised):
+The provider owns inference-specific effects and URL synchronization, then exposes
+four independently memoized domains. Consumers must subscribe only to the domains
+they read.
 
-- `selectedGPUs` — hardware keys selected for GPU filter/comparison (`i_gpus`)
-- `selectedDates` — discrete comparison dates (`i_dates`)
-- `selectedDateRange` — `{startDate, endDate}` for range comparisons (`i_dstart`, `i_dend`)
-- `activeDates` — `Set<string>` toggle controlling visible comparison overlays (keyed by `${date}_${gpuKey}`)
+**`useInferenceData`**
 
-**Chart axis / display state**:
+Fetched and derived benchmark results:
 
-- `selectedYAxisMetric` and `selectedXAxisMetric`
-- requested x-axis mode plus derived `selectedXAxisMode`
-- derived `selectedE2eXAxisMetric`, resolved from scenario and percentile
-- `scaleType`, optimal/label/high-contrast/legend controls
-- `colorShuffleSeed` (ephemeral)
+- `graphs`, `hardwareConfig`, `loading`, and `error`
+- `hwTypesWithData`
+- GPU, date, precision, sequence, model, run, and quick-filter availability
 
-**Derived availability** (GPU-level, computed from `availabilityRows` inherited from GlobalFilterContext):
+**`useInferenceFilters`**
 
-- `availableGPUs` — hardware configs that have data for the current model + sequence + precisions AND have a known base GPU in `HW_REGISTRY`
-- `dateRangeAvailableDates` — dates available for the current filter combination, further narrowed by `selectedGPUs`
-- `hwTypesWithData` — `Set<string>` of GPU keys currently present in fetched chart data
+Workflow, filter, and date selection state:
 
-**Hardware toggle set**:
+- effective model, sequence, and precision selections read from global filter state
+- `selectedGPUs`, `selectedDates`, `selectedDateRange`, and `activeDates`
+- `activeHwTypes`, `bestPerSku`, and `quickFilters`
+- effective run selection, custom cost and power values, preset state, and compare scope
 
-- `activeHwTypes` — subset of `hwTypesWithData` that are visible (managed by `useChartDataFilter`)
+This domain owns inference-only selection state. GPU selections and comparison dates
+do not belong in global filter state because evaluation and reliability do not use
+them.
 
-**Tracked configs / presets**:
+**`useInferenceDisplay`**
 
-- `trackedConfigs` — up to 6 pinned data points for cross-chart comparison
-- `activePresetId`, `pendingHwFilter` — active favourite preset and its deferred GPU filter
+Axis and presentation state:
 
-**User overrides**:
+- selected x-axis and y-axis metrics, percentile, and effective x-axis mode
+- scale, optimal-point, label, contrast, legend, and overlay controls
 
-- `userCosts`, `userPowers` — per-GPU cost/power overrides for custom cost metric; reset when `selectedYAxisMetric` changes away from `y_costUser`/`y_powerUser`
+Display changes stay in this domain. A contrast or label toggle therefore does not
+notify filter-only or data-only consumers.
 
-**Run filtering** (inference-local, not written back to GlobalFilterContext):
+**`useInferenceActions`**
 
-- `filteredAvailableRuns` — `availableRuns` filtered to runs matching `selectedModel` + `effectivePrecisions`
-- `effectiveSelectedRunId` — validated run ID within `filteredAvailableRuns`; intentionally NOT synced back to GlobalFilterContext to avoid full-tree re-renders on precision change
+All inference commands and setters. The context value and every exposed action keep
+stable identities. The provider routes each stable action to the latest implementation,
+so new availability or chart data cannot invalidate action-only consumers.
 
-**Charts data** (from `useChartData`):
-
-- `graphs` — `RenderableGraph[]` used by all D3 charts
-- `hardwareConfig` — config map derived from benchmark rows
-- `loading`, `error`
-
-**Why not in GlobalFilterContext**: GPU selection and comparison dates are meaningless outside the inference/historical tabs. Putting them in the global context would pollute the interface for evaluation and reliability.
+Run filtering remains inference-local. `filteredAvailableRuns` narrows global run
+availability to the effective model and precisions. `effectiveSelectedRunId` is
+validated within that set but is not written back through the global run action, so a
+precision-specific fallback cannot replace the user's global run intent.
 
 ---
 
@@ -221,7 +226,7 @@ GlobalFilterProvider
                          AND precision ∈ effectivePrecisions
   → effectiveRunDate   = latest of availableDates (unless user explicitly picked a date)
 
-InferenceProvider (receives availabilityRows from GlobalFilterContext)
+InferenceProvider (receives availability rows from `useGlobalFilterAvailability`)
   → availableGPUs     = availabilityRows filtered to (model, effectiveSequence, effectivePrecisions)
                         → hwKey extracted via buildAvailabilityHwKey()
                         → filtered by isKnownGpu() (base GPU in HW_REGISTRY)
@@ -259,12 +264,12 @@ Source files: `packages/app/src/lib/url-state.ts`, `packages/app/src/hooks/useUr
 
 | Prefix | Scope                                                                               |
 | ------ | ----------------------------------------------------------------------------------- |
-| `g_`   | GlobalFilterContext — model, run date, run ID                                       |
-| `i_`   | InferenceProvider — sequence, precision, GPUs, dates, metrics, display toggles      |
+| `g_`   | Global filter run and selection contexts: model, run date, run ID                   |
+| `i_`   | Global selection plus InferenceProvider: sequence, precision, GPUs, metrics         |
 | `e_`   | EvaluationProvider — eval date (only when it differs from globalRunDate), benchmark |
 | `r_`   | ReliabilityProvider — date range, display toggles                                   |
 
-Note: `i_seq` and `i_prec` are written by `GlobalFilterProvider` (not InferenceProvider) because they live in GlobalFilterContext.
+Note: `i_seq` and `i_prec` are written by `GlobalFilterProvider` because selection state is owned by `useGlobalFilterSelection`, not InferenceProvider.
 
 ### Snapshot, external subscriptions, and writes
 

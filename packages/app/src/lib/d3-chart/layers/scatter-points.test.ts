@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
 import * as d3 from 'd3';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { ShapeKey } from '@/lib/chart-rendering';
 
-import { computeTooltipPosition, renderScatterPoints, syncPointShape } from './scatter-points';
+import {
+  computeTooltipPosition,
+  invalidateTooltipGeometry,
+  renderScatterPoints,
+  syncPointShape,
+} from './scatter-points';
 
 interface TestPoint {
   hwKey: string;
@@ -165,6 +170,78 @@ describe('syncPointShape', () => {
 });
 
 describe('computeTooltipPosition', () => {
+  it('caches same-frame geometry and invalidates it by frame and content lifecycle', () => {
+    let nextFrame: FrameRequestCallback | undefined;
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        nextFrame = callback;
+        return 1;
+      }),
+    );
+
+    const tooltipNode = document.createElement('div');
+    const tooltipBounds = vi.fn(() => ({
+      width: 100,
+      height: 80,
+      left: 0,
+      top: 0,
+      right: 100,
+      bottom: 80,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }));
+    Object.defineProperty(tooltipNode, 'getBoundingClientRect', { value: tooltipBounds });
+
+    const container = document.createElement('div');
+    const containerBounds = vi.fn(() => ({
+      width: 800,
+      height: 600,
+      left: 100,
+      top: 50,
+      right: 900,
+      bottom: 650,
+      x: 100,
+      y: 50,
+      toJSON: () => ({}),
+    }));
+    const clientWidthRead = vi.fn(() => 800);
+    const clientHeightRead = vi.fn(() => 600);
+    Object.defineProperties(container, {
+      clientWidth: { get: clientWidthRead },
+      clientHeight: { get: clientHeightRead },
+      getBoundingClientRect: { value: containerBounds },
+    });
+
+    const tooltip = d3.select(tooltipNode);
+    computeTooltipPosition(20, 30, tooltip, container);
+    tooltipNode.style.left = '120px';
+    computeTooltipPosition(25, 35, tooltip, container);
+
+    expect(containerBounds).toHaveBeenCalledTimes(1);
+    expect(clientWidthRead).toHaveBeenCalledTimes(1);
+    expect(clientHeightRead).toHaveBeenCalledTimes(1);
+    expect(tooltipBounds).toHaveBeenCalledTimes(1);
+
+    nextFrame!(0);
+    computeTooltipPosition(30, 40, tooltip, container);
+    expect(containerBounds).toHaveBeenCalledTimes(2);
+    expect(tooltipBounds).toHaveBeenCalledTimes(2);
+
+    tooltipNode.innerHTML = '<strong>updated content</strong>';
+    invalidateTooltipGeometry(tooltipNode);
+    computeTooltipPosition(35, 45, tooltip, container);
+    expect(containerBounds).toHaveBeenCalledTimes(2);
+    expect(tooltipBounds).toHaveBeenCalledTimes(3);
+
+    tooltipNode.style.width = '200px';
+    computeTooltipPosition(40, 50, tooltip, container);
+    expect(tooltipBounds).toHaveBeenCalledTimes(4);
+    nextFrame!(16);
+    vi.unstubAllGlobals();
+  });
+
   it('keeps a tall pinned tooltip inside the visible viewport', () => {
     const tooltipNode = document.createElement('div');
     document.body.append(tooltipNode);

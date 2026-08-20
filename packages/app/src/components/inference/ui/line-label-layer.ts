@@ -311,7 +311,15 @@ export function avoidPointLabelCollisions(
 
   zoomGroup.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
     const label = this.querySelector<SVGTextElement>('.point-label');
-    if (!label || this.style.opacity === '0') return;
+    if (
+      !label ||
+      label.style.display === 'none' ||
+      label.style.visibility === 'hidden' ||
+      label.style.opacity === '0' ||
+      this.style.opacity === '0'
+    ) {
+      return;
+    }
     const tspans = label.querySelectorAll<SVGTSpanElement>('tspan');
     if (tspans.length === 0) return;
     const transform = this.getAttribute('transform') ?? '';

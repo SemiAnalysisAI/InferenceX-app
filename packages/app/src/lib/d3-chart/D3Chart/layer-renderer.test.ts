@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as d3 from 'd3';
 
 import { setupChartStructure } from '../chart-setup';
@@ -66,6 +66,41 @@ describe('updateLayerForMetric', () => {
     const boundData = layout.zoomGroup.selectAll<SVGGElement, PointDatum>('.dot-group').data();
     expect(boundData.map((point) => point.y)).toEqual([8, 6]);
     expect(after[0].getAttribute('transform')).toBe(`translate(${xScale(2)},${yScale(8)})`);
+  });
+
+  it('returns a custom metric selection for fresh tooltip handler attachment', () => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const layout = setupChartStructure(svg, {
+      chartId: 'custom-metric-selection-test',
+      containerWidth: 400,
+      containerHeight: 300,
+      margin: { top: 10, right: 10, bottom: 20, left: 30 },
+      watermark: 'none',
+    });
+    const xScale = d3.scaleLinear().domain([0, 10]).range([0, layout.width]);
+    const yScale = d3.scaleLinear().domain([0, 10]).range([layout.height, 0]);
+    const ctx: RenderContext = {
+      layout,
+      tooltipElement: document.createElement('div'),
+      xScale,
+      yScale,
+      width: layout.width,
+      height: layout.height,
+    };
+    const data = [{ id: 'a', precision: 'fp8', x: 4, y: 6 }];
+    const layer = {
+      type: 'custom',
+      render: (group: typeof layout.zoomGroup) =>
+        group
+          .selectAll<SVGCircleElement, PointDatum>('.metric-point')
+          .data(data)
+          .join('circle')
+          .attr('class', 'metric-point'),
+    } satisfies LayerConfig<PointDatum>;
+
+    const selection = updateLayerForMetric(layer, layout.zoomGroup, xScale, yScale, layout, ctx);
+
+    expect(selection?.node()).toBe(layout.zoomGroup.select('.metric-point').node());
   });
 });
 
@@ -151,5 +186,100 @@ describe('updateLayerForDisplay', () => {
     expect(point.select('.point-label').attr('fill')).toBe('#eeeeee');
     expect(point.select('.point-label').style('display')).toBe('none');
     expect(roofline.attr('stroke')).toBe('#00ff00');
+  });
+
+  it('recolors horizontal bars without repeating their join or geometry writes', () => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const layout = setupChartStructure(svg, {
+      chartId: 'bar-display-phase-test',
+      containerWidth: 400,
+      containerHeight: 300,
+      margin: { top: 10, right: 10, bottom: 20, left: 30 },
+      watermark: 'none',
+    });
+    const xScale = d3.scaleLinear().domain([0, 100]).range([0, layout.width]);
+    const yScale = d3.scaleBand().domain(['a']).range([layout.height, 0]);
+    const ctx: RenderContext = {
+      layout,
+      tooltipElement: document.createElement('div'),
+      xScale,
+      yScale,
+      width: layout.width,
+      height: layout.height,
+    };
+    const data = [{ id: 'a', value: 42 }];
+    const initialLayer = {
+      type: 'horizontalBar',
+      data,
+      config: {
+        getY: (datum: (typeof data)[number]) => datum.id,
+        getX: (datum: (typeof data)[number]) => datum.value,
+        getColor: () => '#111111',
+        keyFn: (datum: (typeof data)[number]) => datum.id,
+      },
+    } satisfies LayerConfig<(typeof data)[number]>;
+
+    renderLayer(initialLayer, layout.zoomGroup, xScale, yScale, layout, ctx);
+    const bar = layout.zoomGroup.select<SVGRectElement>('.bar');
+    const barNode = bar.node();
+    const geometry = {
+      x: bar.attr('x'),
+      y: bar.attr('y'),
+      width: bar.attr('width'),
+      height: bar.attr('height'),
+    };
+
+    updateLayerForDisplay(
+      {
+        ...initialLayer,
+        config: { ...initialLayer.config, getColor: () => '#abcdef' },
+      },
+      layout.zoomGroup,
+      ctx,
+    );
+
+    expect(bar.node()).toBe(barNode);
+    expect(bar.attr('fill')).toBe('#abcdef');
+    expect({
+      x: bar.attr('x'),
+      y: bar.attr('y'),
+      width: bar.attr('width'),
+      height: bar.attr('height'),
+    }).toEqual(geometry);
+  });
+
+  it('runs only a custom layer display updater for display invalidation', () => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const layout = setupChartStructure(svg, {
+      chartId: 'custom-display-phase-test',
+      containerWidth: 400,
+      containerHeight: 300,
+      margin: { top: 10, right: 10, bottom: 20, left: 30 },
+      watermark: 'none',
+    });
+    const xScale = d3.scaleLinear().domain([0, 10]).range([0, layout.width]);
+    const yScale = d3.scaleLinear().domain([0, 10]).range([layout.height, 0]);
+    const ctx: RenderContext = {
+      layout,
+      tooltipElement: document.createElement('div'),
+      xScale,
+      yScale,
+      width: layout.width,
+      height: layout.height,
+    };
+    const render = vi.fn();
+    const onDisplayUpdate = vi.fn();
+    const customLayer = {
+      type: 'custom',
+      key: 'display-only',
+      displayIdentity: 'visible',
+      render,
+      onDisplayUpdate,
+    } satisfies LayerConfig<PointDatum>;
+
+    updateLayerForDisplay(customLayer, layout.zoomGroup, ctx);
+
+    expect(onDisplayUpdate).toHaveBeenCalledOnce();
+    expect(render).not.toHaveBeenCalled();
   });
 });

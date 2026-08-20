@@ -10,7 +10,14 @@ import { useCallback, useMemo, useState } from 'react';
 import CalculatorTable from '@/components/calculator/CalculatorTable';
 import FleetPlanner from '@/components/calculator/FleetPlanner';
 import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
-import { GlobalFilterProvider, useGlobalFilters } from '@/components/GlobalFilterContext';
+import {
+  GlobalFilterProvider,
+  useGlobalFilterActions,
+  useGlobalFilterAvailability,
+  useGlobalFilterRun,
+  useGlobalFilterSelection,
+  useGlobalFilterWorkflow,
+} from '@/components/GlobalFilterContext';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
@@ -305,19 +312,14 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const {
     selectedModel,
-    setSelectedModel,
-    selectedRunDate,
-    selectedRunId,
-    availableRuns,
     effectiveSequence: selectedSequence,
-    setSelectedSequence,
     effectivePrecisions: selectedPrecisions,
-    setSelectedPrecisions,
-    availablePrecisions,
-    availableSequences,
-    availableModels,
-    availabilityError,
-  } = useGlobalFilters();
+  } = useGlobalFilterSelection();
+  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
+  const { selectedRunDate, selectedRunId } = useGlobalFilterRun();
+  const { availablePrecisions, availableSequences, availableModels, availabilityError } =
+    useGlobalFilterAvailability();
+  const { availableRuns } = useGlobalFilterWorkflow();
   const mode = 'interactivity_to_throughput' as const;
   const [costProvider, setCostProvider] = useState<CostProvider>('costh');
   const [costType, setCostType] = useState<CostType>('total');

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 
@@ -97,7 +97,7 @@ describe('ScatterGraph toggle decoration', () => {
     unmount();
   });
 
-  it('refreshes point tooltip handlers when async trace availability resolves', () => {
+  it('reads current trace availability without changing metric identity', () => {
     const agenticPoint = {
       ...point('h100', 'fp8', 20, 200, 2),
       id: 42,
@@ -108,6 +108,8 @@ describe('ScatterGraph toggle decoration', () => {
       selectedSequence: 'agentic-traces',
     };
     const { container, rerender, unmount } = mountChart({ data: [agenticPoint] });
+    const buildsAfterMount = rebuildCount();
+    const originalDot = container.querySelector<SVGGElement>('.dot-group')!;
     const dot = container.querySelector<SVGGElement>('.dot-group')!;
 
     act(() =>
@@ -117,6 +119,8 @@ describe('ScatterGraph toggle decoration', () => {
 
     traceAvailabilityState.current = { 42: true };
     rerender();
+    expect(rebuildCount()).toBe(buildsAfterMount);
+    expect(container.querySelector<SVGGElement>('.dot-group')).toBe(originalDot);
     act(() =>
       dot.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 20, clientY: 20 })),
     );
@@ -124,6 +128,36 @@ describe('ScatterGraph toggle decoration', () => {
     expect(document.querySelector('[data-action="view-charts"]')?.getAttribute('href')).toBe(
       '/inference/agentic/42',
     );
+    unmount();
+  });
+
+  it('does not measure point-label collisions while point labels are hidden', () => {
+    inferenceState.current = {
+      ...baseInferenceState(),
+      showPointLabels: false,
+    };
+    let pointLabelMeasurements = 0;
+    vi.spyOn(
+      SVGElement.prototype as unknown as { getBBox: () => DOMRect },
+      'getBBox',
+    ).mockImplementation(function (this: SVGElement) {
+      if (this.classList.contains('point-label')) pointLabelMeasurements++;
+      return {
+        x: 0,
+        y: 0,
+        width: 48,
+        height: 12,
+        top: 0,
+        right: 48,
+        bottom: 12,
+        left: 0,
+        toJSON: () => ({}),
+      } as DOMRect;
+    });
+
+    const { unmount } = mountChart();
+
+    expect(pointLabelMeasurements).toBe(0);
     unmount();
   });
 

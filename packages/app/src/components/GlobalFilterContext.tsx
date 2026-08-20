@@ -50,65 +50,86 @@ const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
 // (Declared after the import block so it never references `Sequence` above its import.)
 const APP_DEFAULT_SEQUENCE = Sequence.EightK_OneK;
 
-export interface GlobalFilterContextType {
-  // Shared filter state
+export interface GlobalFilterSelectionContextType {
   selectedModel: Model;
-  setSelectedModel: (model: Model) => void;
   selectedSequence: Sequence;
-  setSelectedSequence: (sequence: Sequence) => void;
   selectedPrecisions: string[];
-  setSelectedPrecisions: (precisions: string[]) => void;
-
-  // Effective (validated) values
   effectiveSequence: Sequence;
   /**
    * Whether `effectiveSequence` reflects the selected model's real availability
-   * (DB or unofficial run) rather than the pre-load placeholder. False during
-   * the brief window before availability loads. Consumers that trigger data
-   * fetches or render sequence-dependent labels should gate on this so a
-   * fixed-seq-only model never fires an agentic fetch or flashes "Agentic
-   * Traces" before availability settles.
+   * rather than the pre-load placeholder.
    */
   sequenceResolved: boolean;
   effectivePrecisions: string[];
+}
 
-  // Run date & run ID
-  selectedRunDate: string;
+export interface GlobalFilterActionsContextType {
+  setSelectedModel: (model: Model) => void;
+  setSelectedSequence: (sequence: Sequence) => void;
+  setSelectedPrecisions: (precisions: string[]) => void;
   setSelectedRunDate: (date: string) => void;
+  setSelectedRunId: (id: string) => void;
+}
+
+export interface GlobalFilterRunContextType {
+  selectedRunDate: string;
   selectedRunDateRev: number;
   selectedRunId: string;
-  setSelectedRunId: (id: string) => void;
+  effectiveRunDate: string;
+}
 
-  // Derived availability
+export interface GlobalFilterAvailabilityContextType {
   availableModels: Model[];
   availableSequences: Sequence[];
   availablePrecisions: string[];
   availableDates: string[];
-  effectiveRunDate: string;
-
-  // Raw availability rows (shared with inference for GPU filtering)
   availabilityRows: AvailabilityRow[] | undefined;
   /** True only after the database availability request succeeds. */
   availabilitySettled: boolean;
   availabilityError: string | null;
+}
 
-  // Workflow info
+export interface GlobalFilterWorkflowContextType {
   availableRuns: Record<string, RunInfo>;
   workflowLoading: boolean;
   workflowError: string | null;
 }
 
-/** @internal Exported for test provider wrapping only. */
-export const GlobalFilterContext = createContext<GlobalFilterContextType | undefined>(undefined);
+/** @internal Exported for focused provider tests and Cypress provider wrapping. */
+export const GlobalFilterSelectionContext = createContext<
+  GlobalFilterSelectionContextType | undefined
+>(undefined);
+/** @internal Exported for focused provider tests and Cypress provider wrapping. */
+export const GlobalFilterActionsContext = createContext<GlobalFilterActionsContextType | undefined>(
+  undefined,
+);
+/** @internal Exported for focused provider tests and Cypress provider wrapping. */
+export const GlobalFilterRunContext = createContext<GlobalFilterRunContextType | undefined>(
+  undefined,
+);
+/** @internal Exported for focused provider tests and Cypress provider wrapping. */
+export const GlobalFilterAvailabilityContext = createContext<
+  GlobalFilterAvailabilityContextType | undefined
+>(undefined);
+/** @internal Exported for focused provider tests and Cypress provider wrapping. */
+export const GlobalFilterWorkflowContext = createContext<
+  GlobalFilterWorkflowContextType | undefined
+>(undefined);
 
 /** Transform API response into the run map consumed by selectors and displays. */
-function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
+export function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
+  const changelogsByRunId = new Map<string, (typeof data.changelogs)[number][]>();
+  for (const changelog of data.changelogs) {
+    const runId = String(changelog.workflow_run_id);
+    const indexed = changelogsByRunId.get(runId);
+    if (indexed) indexed.push(changelog);
+    else changelogsByRunId.set(runId, [changelog]);
+  }
+
   const runs: Record<string, RunInfo> = {};
   for (const run of data.runs) {
     const runId = String(run.github_run_id);
-    const runChangelogs = data.changelogs.filter(
-      (c) => String(c.workflow_run_id) === String(run.github_run_id),
-    );
+    const runChangelogs = changelogsByRunId.get(runId) ?? [];
     runs[runId] = {
       runId,
       runDate: run.created_at,
@@ -116,12 +137,12 @@ function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
       conclusion: run.conclusion,
       ...(runChangelogs.length > 0 && {
         changelog: {
-          entries: runChangelogs.map((c) => ({
-            config_keys: c.config_keys,
-            description: c.description,
-            pr_link: c.pr_link,
-            head_ref: c.head_ref,
-            append_only: c.append_only,
+          entries: runChangelogs.map((changelog) => ({
+            config_keys: changelog.config_keys,
+            description: changelog.description,
+            pr_link: changelog.pr_link,
+            head_ref: changelog.head_ref,
+            append_only: changelog.append_only,
           })),
         },
       }),
@@ -379,7 +400,7 @@ export function GlobalFilterProvider({
   // Synchronously validated sequence.
   //
   // `resolveEffectiveSequence` returns null while availability is still loading
-  // — we surface that as `sequenceResolved` so InferenceContext can gate the
+  // so InferenceProvider can gate the
   // benchmark fetch until the real sequence is known (no agentic fetch fires for
   // a fixed-seq-only model). For the non-null public `effectiveSequence` value
   // we retain the fixed-sequence placeholder until availability confirms the
@@ -524,33 +545,14 @@ export function GlobalFilterProvider({
     setUrlParams,
   ]);
 
-  const contextValue = useMemo<GlobalFilterContextType>(
+  const selectionValue = useMemo<GlobalFilterSelectionContextType>(
     () => ({
       selectedModel,
-      setSelectedModel,
       selectedSequence,
-      setSelectedSequence,
       selectedPrecisions,
-      setSelectedPrecisions,
       effectiveSequence,
       sequenceResolved,
       effectivePrecisions,
-      selectedRunDate: effectiveRunDate,
-      setSelectedRunDate: setSelectedRunDateManual,
-      selectedRunDateRev,
-      selectedRunId: effectiveRunId,
-      setSelectedRunId,
-      availableModels,
-      availableSequences,
-      availablePrecisions,
-      availableDates,
-      effectiveRunDate,
-      availabilityRows,
-      availabilitySettled,
-      availabilityError,
-      availableRuns,
-      workflowLoading,
-      workflowError,
     }),
     [
       selectedModel,
@@ -559,11 +561,38 @@ export function GlobalFilterProvider({
       effectiveSequence,
       sequenceResolved,
       effectivePrecisions,
-      effectiveRunDate,
-      setSelectedRunDateManual,
-      selectedRunDateRev,
-      effectiveRunId,
+    ],
+  );
+
+  const actionsValue = useMemo<GlobalFilterActionsContextType>(
+    () => ({
+      setSelectedModel,
+      setSelectedSequence,
+      setSelectedPrecisions,
+      setSelectedRunDate: setSelectedRunDateManual,
       setSelectedRunId,
+    }),
+    [
+      setSelectedModel,
+      setSelectedSequence,
+      setSelectedPrecisions,
+      setSelectedRunDateManual,
+      setSelectedRunId,
+    ],
+  );
+
+  const runValue = useMemo<GlobalFilterRunContextType>(
+    () => ({
+      selectedRunDate: effectiveRunDate,
+      selectedRunDateRev,
+      selectedRunId: effectiveRunId,
+      effectiveRunDate,
+    }),
+    [effectiveRunDate, selectedRunDateRev, effectiveRunId],
+  );
+
+  const availabilityValue = useMemo<GlobalFilterAvailabilityContextType>(
+    () => ({
       availableModels,
       availableSequences,
       availablePrecisions,
@@ -571,21 +600,74 @@ export function GlobalFilterProvider({
       availabilityRows,
       availabilitySettled,
       availabilityError,
-      availableRuns,
-      workflowLoading,
-      workflowError,
+    }),
+    [
+      availableModels,
+      availableSequences,
+      availablePrecisions,
+      availableDates,
+      availabilityRows,
+      availabilitySettled,
+      availabilityError,
     ],
   );
 
+  const workflowValue = useMemo<GlobalFilterWorkflowContextType>(
+    () => ({ availableRuns, workflowLoading, workflowError }),
+    [availableRuns, workflowLoading, workflowError],
+  );
+
   return (
-    <GlobalFilterContext.Provider value={contextValue}>{children}</GlobalFilterContext.Provider>
+    <GlobalFilterActionsContext.Provider value={actionsValue}>
+      <GlobalFilterSelectionContext.Provider value={selectionValue}>
+        <GlobalFilterRunContext.Provider value={runValue}>
+          <GlobalFilterAvailabilityContext.Provider value={availabilityValue}>
+            <GlobalFilterWorkflowContext.Provider value={workflowValue}>
+              {children}
+            </GlobalFilterWorkflowContext.Provider>
+          </GlobalFilterAvailabilityContext.Provider>
+        </GlobalFilterRunContext.Provider>
+      </GlobalFilterSelectionContext.Provider>
+    </GlobalFilterActionsContext.Provider>
   );
 }
 
-export function useGlobalFilters() {
-  const context = useContext(GlobalFilterContext);
+export function useGlobalFilterSelection() {
+  const context = useContext(GlobalFilterSelectionContext);
   if (context === undefined) {
-    throw new Error('useGlobalFilters must be used within a GlobalFilterProvider');
+    throw new Error('useGlobalFilterSelection must be used within a GlobalFilterProvider');
+  }
+  return context;
+}
+
+export function useGlobalFilterActions() {
+  const context = useContext(GlobalFilterActionsContext);
+  if (context === undefined) {
+    throw new Error('useGlobalFilterActions must be used within a GlobalFilterProvider');
+  }
+  return context;
+}
+
+export function useGlobalFilterRun() {
+  const context = useContext(GlobalFilterRunContext);
+  if (context === undefined) {
+    throw new Error('useGlobalFilterRun must be used within a GlobalFilterProvider');
+  }
+  return context;
+}
+
+export function useGlobalFilterAvailability() {
+  const context = useContext(GlobalFilterAvailabilityContext);
+  if (context === undefined) {
+    throw new Error('useGlobalFilterAvailability must be used within a GlobalFilterProvider');
+  }
+  return context;
+}
+
+export function useGlobalFilterWorkflow() {
+  const context = useContext(GlobalFilterWorkflowContext);
+  if (context === undefined) {
+    throw new Error('useGlobalFilterWorkflow must be used within a GlobalFilterProvider');
   }
   return context;
 }

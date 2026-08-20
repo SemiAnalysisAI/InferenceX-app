@@ -1,35 +1,39 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import { InferenceContext } from '@/components/inference/InferenceContext';
+import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import { EvaluationContext } from '@/components/evaluation/EvaluationContext';
 import { ReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import {
-  GlobalFilterContext,
-  type GlobalFilterContextType,
+  GlobalFilterActionsContext,
+  GlobalFilterAvailabilityContext,
+  GlobalFilterRunContext,
+  GlobalFilterSelectionContext,
+  GlobalFilterWorkflowContext,
 } from '@/components/GlobalFilterContext';
 import {
   UnofficialRunContext,
   type UnofficialRunContextType,
 } from '@/components/unofficial-run-provider';
 
-import type { InferenceChartContextType } from '@/components/inference/types';
 import type { EvaluationChartContextType } from '@/components/evaluation/types';
 import type { ReliabilityChartContextType } from '@/components/reliability/types';
 
 import {
-  createMockInferenceContext,
+  createMockInferenceContextValues,
   createMockEvaluationContext,
   createMockReliabilityContext,
-  createMockGlobalFilterContext,
+  createMockGlobalFilterContexts,
   createMockUnofficialRunContext,
+  type GlobalFilterContextOverrides,
+  type MockInferenceContextValues,
 } from './mock-data';
 
 export interface ProviderOverrides {
-  inference?: Partial<InferenceChartContextType>;
+  inference?: Partial<MockInferenceContextValues>;
   evaluation?: Partial<EvaluationChartContextType>;
   reliability?: Partial<ReliabilityChartContextType>;
-  globalFilters?: Partial<GlobalFilterContextType>;
+  globalFilters?: GlobalFilterContextOverrides;
   unofficial?: Partial<UnofficialRunContextType>;
 }
 
@@ -53,8 +57,12 @@ export function mountWithProviders(
   let tree = component;
 
   if (overrides.inference !== undefined) {
-    const value = createMockInferenceContext(overrides.inference);
-    tree = <InferenceContext.Provider value={value}>{tree}</InferenceContext.Provider>;
+    const value = createMockInferenceContextValues(overrides.inference);
+    tree = (
+      <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+        {tree}
+      </InferenceContextsProvider>
+    );
   }
 
   if (overrides.evaluation !== undefined) {
@@ -68,8 +76,20 @@ export function mountWithProviders(
   }
 
   if (overrides.globalFilters !== undefined) {
-    const value = createMockGlobalFilterContext(overrides.globalFilters);
-    tree = <GlobalFilterContext.Provider value={value}>{tree}</GlobalFilterContext.Provider>;
+    const values = createMockGlobalFilterContexts(overrides.globalFilters);
+    tree = (
+      <GlobalFilterActionsContext.Provider value={values.actions}>
+        <GlobalFilterSelectionContext.Provider value={values.selection}>
+          <GlobalFilterRunContext.Provider value={values.run}>
+            <GlobalFilterAvailabilityContext.Provider value={values.availability}>
+              <GlobalFilterWorkflowContext.Provider value={values.workflow}>
+                {tree}
+              </GlobalFilterWorkflowContext.Provider>
+            </GlobalFilterAvailabilityContext.Provider>
+          </GlobalFilterRunContext.Provider>
+        </GlobalFilterSelectionContext.Provider>
+      </GlobalFilterActionsContext.Provider>
+    );
   }
 
   if (overrides.unofficial !== undefined) {

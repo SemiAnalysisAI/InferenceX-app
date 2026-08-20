@@ -2,8 +2,11 @@ import type {
   AggDataEntry,
   ChartDefinition,
   HardwareConfig,
-  InferenceChartContextType,
+  InferenceActionsContextType,
   InferenceData,
+  InferenceDataContextType,
+  InferenceDisplayContextType,
+  InferenceFiltersContextType,
 } from '@/components/inference/types';
 import type {
   EvaluationChartContextType,
@@ -13,7 +16,13 @@ import type {
   ModelSuccessRateData,
   ReliabilityChartContextType,
 } from '@/components/reliability/types';
-import type { GlobalFilterContextType } from '@/components/GlobalFilterContext';
+import type {
+  GlobalFilterActionsContextType,
+  GlobalFilterAvailabilityContextType,
+  GlobalFilterRunContextType,
+  GlobalFilterSelectionContextType,
+  GlobalFilterWorkflowContextType,
+} from '@/components/GlobalFilterContext';
 import type { UnofficialRunContextType } from '@/components/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { Model, Sequence, Precision } from '@/lib/data-mappings';
@@ -153,12 +162,17 @@ export function createMockInferenceData(overrides?: Partial<InferenceData>): Inf
 }
 
 // ---------------------------------------------------------------------------
-// Inference context
+// Inference domain contexts
 // ---------------------------------------------------------------------------
 
-export function createMockInferenceContext(
-  overrides?: Partial<InferenceChartContextType>,
-): InferenceChartContextType {
+export type MockInferenceContextValues = InferenceDataContextType &
+  InferenceFiltersContextType &
+  InferenceDisplayContextType &
+  InferenceActionsContextType;
+
+export function createMockInferenceContextValues(
+  overrides?: Partial<MockInferenceContextValues>,
+): MockInferenceContextValues {
   const hwConfig = createMockHardwareConfig();
   return {
     activeHwTypes: new Set(['h100', 'b200', 'b200_trt', 'mi300x', 'h200']),
@@ -412,14 +426,29 @@ export function createMockReliabilityContext(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Global filter context
+// Global filter contexts
 // ---------------------------------------------------------------------------
 
-export function createMockGlobalFilterContext(
-  overrides?: Partial<GlobalFilterContextType>,
-): GlobalFilterContextType {
-  return {
+export type GlobalFilterContextOverrides = Partial<
+  GlobalFilterSelectionContextType &
+    GlobalFilterActionsContextType &
+    GlobalFilterRunContextType &
+    GlobalFilterAvailabilityContextType &
+    GlobalFilterWorkflowContextType
+>;
+
+export interface MockGlobalFilterContexts {
+  selection: GlobalFilterSelectionContextType;
+  actions: GlobalFilterActionsContextType;
+  run: GlobalFilterRunContextType;
+  availability: GlobalFilterAvailabilityContextType;
+  workflow: GlobalFilterWorkflowContextType;
+}
+
+export function createMockGlobalFilterContexts(
+  overrides: GlobalFilterContextOverrides = {},
+): MockGlobalFilterContexts {
+  const values = {
     selectedModel: Model.DeepSeek_R1,
     setSelectedModel: namedStub('setSelectedModel_global'),
     selectedSequence: Sequence.EightK_OneK,
@@ -427,8 +456,6 @@ export function createMockGlobalFilterContext(
     selectedPrecisions: [Precision.FP4],
     setSelectedPrecisions: namedStub('setSelectedPrecisions_global'),
     effectiveSequence: Sequence.EightK_OneK,
-    // Mocks represent a settled state: availability is known and the sequence is
-    // resolved. Tests exercising the pre-availability window override this.
     sequenceResolved: true,
     effectivePrecisions: [Precision.FP4],
     selectedRunDate: '2025-03-01',
@@ -448,6 +475,44 @@ export function createMockGlobalFilterContext(
     workflowLoading: false,
     workflowError: null,
     ...overrides,
+  };
+
+  return {
+    selection: {
+      selectedModel: values.selectedModel,
+      selectedSequence: values.selectedSequence,
+      selectedPrecisions: values.selectedPrecisions,
+      effectiveSequence: values.effectiveSequence,
+      sequenceResolved: values.sequenceResolved,
+      effectivePrecisions: values.effectivePrecisions,
+    },
+    actions: {
+      setSelectedModel: values.setSelectedModel,
+      setSelectedSequence: values.setSelectedSequence,
+      setSelectedPrecisions: values.setSelectedPrecisions,
+      setSelectedRunDate: values.setSelectedRunDate,
+      setSelectedRunId: values.setSelectedRunId,
+    },
+    run: {
+      selectedRunDate: values.selectedRunDate,
+      selectedRunDateRev: values.selectedRunDateRev,
+      selectedRunId: values.selectedRunId,
+      effectiveRunDate: values.effectiveRunDate,
+    },
+    availability: {
+      availableModels: values.availableModels,
+      availableSequences: values.availableSequences,
+      availablePrecisions: values.availablePrecisions,
+      availableDates: values.availableDates,
+      availabilityRows: values.availabilityRows,
+      availabilitySettled: values.availabilitySettled,
+      availabilityError: values.availabilityError,
+    },
+    workflow: {
+      availableRuns: values.availableRuns,
+      workflowLoading: values.workflowLoading,
+      workflowError: values.workflowError,
+    },
   };
 }
 

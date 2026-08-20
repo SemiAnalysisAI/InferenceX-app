@@ -204,6 +204,101 @@ export function updateScatterPointsForDisplay<
     .style('opacity', config.hideLabels ? 0 : 1);
 }
 
+export interface TooltipContainerGeometry {
+  bounds: DOMRect;
+  width: number;
+  height: number;
+}
+
+interface TooltipGeometry {
+  width: number;
+  height: number;
+  sizeStyle: string;
+  className: string | null;
+}
+
+let containerGeometryCache = new WeakMap<HTMLElement, TooltipContainerGeometry>();
+let tooltipGeometryCache = new WeakMap<HTMLDivElement, TooltipGeometry>();
+let geometryResetPending = false;
+
+function scheduleGeometryReset(): void {
+  if (geometryResetPending) return;
+  geometryResetPending = true;
+  const reset = () => {
+    containerGeometryCache = new WeakMap();
+    tooltipGeometryCache = new WeakMap();
+    geometryResetPending = false;
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(reset);
+  else setTimeout(reset, 0);
+}
+
+/**
+ * Invalidate dimensions after synchronously replacing tooltip content.
+ * Style/class changes are detected from their non-layout attributes; callers
+ * use this helper when content and positioning happen in one event.
+ */
+export function invalidateTooltipGeometry(tooltip: HTMLDivElement | null): void {
+  if (tooltip) tooltipGeometryCache.delete(tooltip);
+}
+
+function tooltipSizeStyleSignature(tooltip: HTMLDivElement): string {
+  const { style } = tooltip;
+  return [
+    style.width,
+    style.height,
+    style.minWidth,
+    style.minHeight,
+    style.maxWidth,
+    style.maxHeight,
+    style.padding,
+    style.borderWidth,
+    style.boxSizing,
+    style.font,
+    style.fontSize,
+    style.fontWeight,
+    style.lineHeight,
+    style.letterSpacing,
+    style.whiteSpace,
+  ].join('|');
+}
+
+function getTooltipGeometry(tooltip: HTMLDivElement): TooltipGeometry {
+  const sizeStyle = tooltipSizeStyleSignature(tooltip);
+  const className = tooltip.getAttribute('class');
+  const cached = tooltipGeometryCache.get(tooltip);
+  if (cached && cached.sizeStyle === sizeStyle && cached.className === className) return cached;
+  const bounds = tooltip.getBoundingClientRect();
+  const geometry = {
+    width: bounds.width || tooltip.offsetWidth,
+    height: bounds.height || tooltip.offsetHeight,
+    sizeStyle,
+    className,
+  };
+  tooltipGeometryCache.set(tooltip, geometry);
+  scheduleGeometryReset();
+  return geometry;
+}
+
+/**
+ * Return container geometry shared by every tooltip position calculation in
+ * the current animation frame. Pointer events can fire more often than paint;
+ * coalescing these layout reads avoids measuring the same chart repeatedly.
+ */
+export function getTooltipContainerGeometry(container: HTMLElement): TooltipContainerGeometry {
+  const cached = containerGeometryCache.get(container);
+  if (cached) return cached;
+
+  const geometry = {
+    bounds: container.getBoundingClientRect(),
+    width: container.clientWidth,
+    height: container.clientHeight,
+  };
+  containerGeometryCache.set(container, geometry);
+  scheduleGeometryReset();
+  return geometry;
+}
+
 /**
  * Compute tooltip left/top **in viewport coordinates** so the tooltip can be
  * rendered via portal with `position: fixed`. Callers still pass cursor coords
@@ -228,19 +323,25 @@ export function computeTooltipPosition(
     | d3.Selection<HTMLDivElement, unknown, null, undefined>,
   container: HTMLElement,
   offset = 10,
+  containerGeometry?: TooltipContainerGeometry,
 ): { left: number; top: number } {
   const node = tooltip.node();
   if (!node) return { left: mx + offset, top: my + offset };
 
-  // Ensure tooltip is measurable
-  node.style.display = 'block';
+  // Ensure the tooltip is measurable. Moving from hidden to shown changes its
+  // size lifecycle, so discard any dimensions measured before that style write.
+  if (node.style.display !== 'block') {
+    node.style.display = 'block';
+    invalidateTooltipGeometry(node);
+  }
 
-  // Force reflow so we get real dimensions
-  const tw = node.getBoundingClientRect().width || node.offsetWidth;
-  const th = node.getBoundingClientRect().height || node.offsetHeight;
-  const rect = container.getBoundingClientRect();
-  const cw = container.clientWidth;
-  const ch = container.clientHeight;
+  const tooltipGeometry = getTooltipGeometry(node);
+  const tw = tooltipGeometry.width;
+  const th = tooltipGeometry.height;
+  const geometry = containerGeometry ?? getTooltipContainerGeometry(container);
+  const rect = geometry.bounds;
+  const cw = geometry.width;
+  const ch = geometry.height;
   const EDGE_PAD = 4;
 
   // Prefer right of cursor; flip to left if no room.

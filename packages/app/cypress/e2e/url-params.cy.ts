@@ -352,8 +352,8 @@ describe('URL Parameter Persistence', () => {
     });
 
     it('historical trends tab shares the inference high-contrast default (off)', () => {
-      // Historical reads highContrast from the same InferenceContext as the
-      // scatter chart, so it inherits the default-off behavior.
+      // Historical reads highContrast from the shared inference display domain,
+      // so it inherits the default-off behavior.
       visitWithDismissedModal('/historical');
       cy.get('[data-testid="historical-trends-display"]').should('exist');
       cy.get('#historical-high-contrast').first().should('have.attr', 'data-state', 'unchecked');

@@ -4,7 +4,12 @@ import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import React, { useCallback, useMemo, useState } from 'react';
 
-import { useInference } from '@/components/inference/InferenceContext';
+import {
+  useInferenceActions,
+  useInferenceData,
+  useInferenceDisplay,
+  useInferenceFilters,
+} from '@/components/inference/InferenceContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
@@ -67,28 +72,18 @@ const STRINGS = {
 
 export default function HistoricalTrendsDisplay() {
   const t = STRINGS[useLocale()];
+  const { graphs, loading, hardwareConfig, hwTypesWithData, availableDates } = useInferenceData();
+  const { selectedModel, selectedSequence, selectedPrecisions, activeHwTypes, selectedRunDate } =
+    useInferenceFilters();
+  const { selectedYAxisMetric, logScale, isLegendExpanded, highContrast } = useInferenceDisplay();
   const {
-    graphs,
-    loading,
-    selectedModel,
-    selectedSequence,
-    selectedPrecisions,
-    selectedYAxisMetric,
-    hardwareConfig,
-    activeHwTypes,
-    hwTypesWithData,
     toggleHwType,
     removeHwType,
     selectAllHwTypes,
-    availableDates,
-    logScale,
     setLogScale,
-    isLegendExpanded,
     setIsLegendExpanded,
-    selectedRunDate,
-    highContrast,
     setHighContrast,
-  } = useInference();
+  } = useInferenceActions();
 
   // Check if interactivity chart data exists
   const hasInteractivityChart = graphs.some((g) => g.chartDefinition.chartType === 'interactivity');

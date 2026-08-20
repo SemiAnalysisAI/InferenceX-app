@@ -14,7 +14,7 @@ import {
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
-import { useInference } from '@/components/inference/InferenceContext';
+import { useInferenceDisplay, useInferenceFilters } from '@/components/inference/InferenceContext';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import type { ChartDefinition } from '@/components/inference/types';
 import { Button } from '@/components/ui/button';
@@ -108,8 +108,10 @@ export default function ReplayPanel({
   yLabel,
   xLabel,
 }: ReplayPanelProps) {
-  const inference = useInference();
-  const { selectedModel, selectedSequence, activeHwTypes } = inference;
+  const { selectedModel, selectedSequence, selectedPrecisions, activeHwTypes } =
+    useInferenceFilters();
+  const { selectedE2eXAxisMetric, selectedXAxisMetric, selectedYAxisMetric } =
+    useInferenceDisplay();
 
   const { isl = 0, osl = 0 } = sequenceToIslOsl(selectedSequence) ?? {};
   const history = useBenchmarkHistory(
@@ -120,26 +122,18 @@ export default function ReplayPanel({
   );
 
   const effectiveX =
-    chartDefinition.chartType === 'e2e'
-      ? inference.selectedE2eXAxisMetric
-      : inference.selectedXAxisMetric;
+    chartDefinition.chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
 
   const timeline = useMemo(() => {
     if (!history.data) return null;
     return buildReplayTimeline(
       history.data,
       chartDefinition,
-      inference.selectedYAxisMetric,
+      selectedYAxisMetric,
       effectiveX ?? null,
-      inference.selectedPrecisions,
+      selectedPrecisions,
     );
-  }, [
-    history.data,
-    chartDefinition,
-    inference.selectedYAxisMetric,
-    effectiveX,
-    inference.selectedPrecisions,
-  ]);
+  }, [history.data, chartDefinition, selectedYAxisMetric, effectiveX, selectedPrecisions]);
 
   // Fixed axes for the whole run: take the extent across every step (not just
   // the current frame) for the active hardware, so the axes stay put and the

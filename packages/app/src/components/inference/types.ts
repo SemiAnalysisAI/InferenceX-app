@@ -539,139 +539,117 @@ export interface QuickFilters {
  */
 export type AvailableQuickFilters = QuickFilters;
 
-/**
- * Defines the shape of the context object provided by `InferenceChartContext`.
- * @interface InferenceChartContextType
- * @property {Set<string>} activeHwTypes - A set of currently active hardware types for filtering.
- * @property {Set<string>} hwTypesWithData - A set of all hardware types present in the current dataset.
- * @property {(hw: string) => void} toggleHwType - Function to toggle the active state of a hardware type.
- * @property {HardwareConfig} hardwareConfig - The hardware configuration map.
- * @property {RenderableGraph[]} graphs - An array of graphs ready for rendering.
- * @property {string} selectedModel - The currently selected model.
- * @property {(model: string) => void} setSelectedModel - Function to set the selected model.
- * @property {string} selectedSequence - The currently selected sequence.
- * @property {(sequence: string) => void} setSelectedSequence - Function to set the selected sequence.
- * @property {string} selectedPrecision - The currently selected precision.
- * @property {(precision: string) => void} setSelectedPrecision - Function to set the selected precision.
- * @property {boolean} loading - Indicates if data is currently being loaded.
- * @property {string | null} error - Any error message encountered during data loading, or null if no error.
- */
-export interface InferenceChartContextType {
+/** Fetched and derived benchmark data shared by inference consumers. */
+export interface InferenceDataContextType {
+  hwTypesWithData: Set<string>;
+  hardwareConfig: HardwareConfig;
+  graphs: RenderableGraph[];
+  loading: boolean;
+  error: string | null;
+  availableQuickFilters: AvailableQuickFilters;
+  availableGPUs: { value: string; label: string }[];
+  availableDates: string[];
+  dateRangeAvailableDates: string[];
+  isCheckingAvailableDates: boolean;
+  availableRuns: Record<string, RunInfo>;
+  availablePrecisions: string[];
+  availableSequences: Sequence[];
+  availableModels: string[];
+}
+
+/** Inference-only workflow, filter, and date selection state. */
+export interface InferenceFiltersContextType {
   activeHwTypes: Set<string>;
+  bestPerSku: boolean;
+  selectedModel: Model;
+  selectedSequence: Sequence;
+  selectedPrecisions: string[];
+  quickFilters: QuickFilters;
+  selectedGPUs: string[];
+  selectedDates: string[];
+  selectedDateRange: { startDate: string; endDate: string };
+  activeDates: Set<string>;
+  userCosts: Record<string, number | undefined> | null;
+  selectedRunDate: string;
+  selectedRunId: string;
+  userPowers: Record<string, number | undefined> | null;
+  activePresetId: string | null;
+  presetGuardRef: React.RefObject<boolean>;
+  compareGpuPair: readonly [string, string] | null;
+}
+
+/** Axis choices and visual presentation state. */
+export interface InferenceDisplayContextType {
+  selectedYAxisMetric: string;
+  selectedPercentile: string;
+  selectedXAxisMetric: string | null;
+  selectedE2eXAxisMetric: string | null;
+  selectedXAxisMode: 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity';
+  scaleType: 'auto' | 'linear' | 'log';
+  isLegendExpanded: boolean;
+  hideNonOptimal: boolean;
+  showPointLabels: boolean;
+  highContrast: boolean;
+  logScale: boolean;
+  useAdvancedLabels: boolean;
+  showGradientLabels: boolean;
+  showLineLabels: boolean;
+  showSpeedOverlay: boolean;
+  showMinecraftOverlay: boolean;
+}
+
+/** Stable commands that mutate inference state. */
+export interface InferenceActionsContextType {
   toggleActiveDate: (date: string) => void;
   removeActiveDate: (date: string) => void;
   selectAllActiveDates: () => void;
-  activeDates: Set<string>;
-  hwTypesWithData: Set<string>;
   toggleHwType: (hw: string) => void;
   removeHwType: (hw: string) => void;
   selectAllHwTypes: () => void;
-  /** Whether clean dashboard loads automatically keep the best configuration per physical SKU. */
-  bestPerSku: boolean;
   setBestPerSku: (enabled: boolean, options?: { applySelection?: boolean }) => void;
-  /** Resolve automatic official + `overlay:` hardware selections under the active scope rule. */
   resolveComparisonSelection: (
     proposed: Set<string>,
     prev?: Set<string>,
   ) => { result: Set<string>; keptGroup: string | null; droppedGroups: string[] };
-  /** Apply one official/overlay toggle; returns null when a cross-engine add is blocked. */
   toggleComparisonSelection: (
     prev: Set<string>,
     item: string,
     allItems: Set<string>,
   ) => Set<string> | null;
-  hardwareConfig: HardwareConfig;
-  graphs: RenderableGraph[];
-  selectedModel: Model;
   setSelectedModel: (model: Model) => void;
-  selectedSequence: Sequence;
   setSelectedSequence: (sequence: Sequence) => void;
-  selectedPrecisions: string[];
   setSelectedPrecisions: (precisions: string[]) => void;
-  loading: boolean;
-  error: string | null;
-  selectedYAxisMetric: string;
   setSelectedYAxisMetric: (metric: string) => void;
-  /** Latency percentile for the x-axis under agentic scenarios (median/p90/p99/p99.9). */
-  selectedPercentile: string;
-  setSelectedPercentile: (p: string) => void;
-  selectedXAxisMetric: string | null;
+  setSelectedPercentile: (percentile: string) => void;
   setSelectedXAxisMetric: (metric: string | null) => void;
-  selectedE2eXAxisMetric: string | null;
-  /**
-   * Which chart variant the user wants to see — the inference card shows one chart
-   * at a time, picked by the big buttons above the chart.
-   * - 'ttft'          → e2e chartType with x-axis forced to p90_ttft
-   * - 'e2e'           → e2e chartType with the chart-config default x-axis (median_e2el / p90_e2el)
-   * - 'interactivity' → interactivity chartType (x = median_intvty / p90_intvty)
-   * - 'e2e-normalized-interactivity'      → agentic-only; x = slow-tail per-request OSL / E2E latency
-   *                     in tok/s/user (live-computed from trace blobs)
-   */
-  selectedXAxisMode: 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity';
   setSelectedXAxisMode: (
     mode: 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity',
   ) => void;
-  scaleType: 'auto' | 'linear' | 'log';
   setScaleType: (type: 'auto' | 'linear' | 'log') => void;
-  /** Coarse vendor / framework / deployment / mtp-stp filters applied to the chart point set. */
-  quickFilters: QuickFilters;
-  /** Quick-filter values that have data for the current model (drives pill enable/disable). */
-  availableQuickFilters: AvailableQuickFilters;
   setQuickFilterVendors: (vendors: string[]) => void;
   setQuickFilterFrameworks: (frameworks: string[]) => void;
   setQuickFilterDeployment: (modes: DeploymentMode[]) => void;
   setQuickFilterSpec: (modes: SpecMode[]) => void;
-  setIsLegendExpanded: (metric: boolean) => void;
-  isLegendExpanded: boolean;
-  hideNonOptimal: boolean;
+  setIsLegendExpanded: (expanded: boolean) => void;
   setHideNonOptimal: (hide: boolean) => void;
-  showPointLabels: boolean;
   setShowPointLabels: (show: boolean) => void;
-  highContrast: boolean;
   setHighContrast: (highContrast: boolean) => void;
-  logScale: boolean;
   setLogScale: (logScale: boolean) => void;
-  useAdvancedLabels: boolean;
   setUseAdvancedLabels: (useAdvancedLabels: boolean) => void;
-  showGradientLabels: boolean;
   setShowGradientLabels: (showGradientLabels: boolean) => void;
-  showLineLabels: boolean;
   setShowLineLabels: (showLineLabels: boolean) => void;
-  showSpeedOverlay: boolean;
   setShowSpeedOverlay: (showSpeedOverlay: boolean) => void;
-  showMinecraftOverlay: boolean;
   setShowMinecraftOverlay: (showMinecraftOverlay: boolean) => void;
-  selectedGPUs: string[];
   setSelectedGPUs: (gpus: string[]) => void;
-  availableGPUs: { value: string; label: string }[];
-  selectedDates: string[];
-  /** Accepts a value or a state-updater fn (for safe rapid successive adds). */
   setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void;
-  /** Internal date-to-run normalization; preserves an Overview exact-pair scope. */
   setSelectedDatesFromRunExpansion: (dates: string[] | ((prev: string[]) => string[])) => void;
-  selectedDateRange: { startDate: string; endDate: string };
   setSelectedDateRange: (dateRange: { startDate: string; endDate: string }) => void;
-  userCosts: Record<string, number | undefined> | null;
   setUserCosts: (userCosts: Record<string, number | undefined> | null) => void;
-  selectedRunDate: string;
   setSelectedRunDate: (date: string) => void;
-  availableDates: string[];
-  dateRangeAvailableDates: string[];
-  isCheckingAvailableDates: boolean;
-  availableRuns: Record<string, RunInfo>;
-  selectedRunId: string;
   setSelectedRunId: (runId: string) => void;
-  availablePrecisions: string[];
-  availableSequences: Sequence[];
-  availableModels: string[];
-  userPowers: Record<string, number | undefined> | null;
   setUserPowers: (userPowers: Record<string, number | undefined> | null) => void;
   setHwFilter: (filter: string[] | null) => void;
-  activePresetId: string | null;
   setActivePresetId: (id: string | null) => void;
-  presetGuardRef: React.RefObject<boolean>;
-  /** Compare pages only: slug GPU pair used to filter benchmark series. */
-  compareGpuPair: readonly [string, string] | null;
 }
 export interface CalculateUserCostsRequest {
   model: string;

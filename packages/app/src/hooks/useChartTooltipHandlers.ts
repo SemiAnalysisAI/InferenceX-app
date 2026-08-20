@@ -1,6 +1,10 @@
 import * as d3 from 'd3';
 import { useCallback } from 'react';
-import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
+import {
+  computeTooltipPosition,
+  getTooltipContainerGeometry,
+  invalidateTooltipGeometry,
+} from '@/lib/d3-chart/layers/scatter-points';
 import { useStickyTooltip } from './useStickyTooltip';
 
 export type RulerType = 'vertical' | 'horizontal' | 'crosshair' | 'none';
@@ -257,6 +261,7 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
             .style('display', 'block')
             .style('pointer-events', 'none')
             .html(config.generateTooltipContent(d, false));
+          invalidateTooltipGeometry(tooltipElement.node());
 
           // Position rulers
           const { curX: currentXScale, curY: currentYScale } = getZoomedScales();
@@ -277,10 +282,17 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         .on('mousemove', (event) => {
           if (isPinned()) return;
 
-          const rect = containerElement.getBoundingClientRect();
-          const mx = event.clientX - rect.left;
-          const my = event.clientY - rect.top;
-          const pos = computeTooltipPosition(mx, my, tooltipElement, containerElement);
+          const geometry = getTooltipContainerGeometry(containerElement);
+          const mx = event.clientX - geometry.bounds.left;
+          const my = event.clientY - geometry.bounds.top;
+          const pos = computeTooltipPosition(
+            mx,
+            my,
+            tooltipElement,
+            containerElement,
+            10,
+            geometry,
+          );
           tooltipElement.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
         })
         .on('mouseleave', function (_event, d) {
@@ -301,11 +313,19 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
           event.stopPropagation();
 
           // Set content first so dimensions are available for position calc
-          const rect = containerElement.getBoundingClientRect();
-          const mx = event.clientX - rect.left;
-          const my = event.clientY - rect.top;
+          const geometry = getTooltipContainerGeometry(containerElement);
+          const mx = event.clientX - geometry.bounds.left;
+          const my = event.clientY - geometry.bounds.top;
           tooltipElement.html(config.generateTooltipContent(d, true));
-          const pos = computeTooltipPosition(mx, my, tooltipElement, containerElement);
+          invalidateTooltipGeometry(tooltipElement.node());
+          const pos = computeTooltipPosition(
+            mx,
+            my,
+            tooltipElement,
+            containerElement,
+            10,
+            geometry,
+          );
           tooltipElement
             .style('left', `${pos.left}px`)
             .style('top', `${pos.top}px`)

@@ -18,6 +18,7 @@ import {
   resolveComparisonEntries,
 } from '@/components/inference/utils/comparisonEntry';
 import { useBenchmarks, benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
+import type { BenchmarkRow } from '@/lib/api';
 import {
   GPU_ALIAS_TO_CANONICAL,
   getModelSortIndex,
@@ -42,9 +43,8 @@ import {
 } from '@/components/inference/utils/quickFilters';
 
 /**
- * Chart x-axis variant selected by the mode buttons above the plot. This is
- * the single definition — InferenceContext (URL/state) and ChartDisplay
- * (buttons) import it from here.
+ * Chart x-axis variant selected by the mode buttons above the plot. The
+ * inference provider and ChartDisplay import this single definition.
  */
 export type XAxisMode = 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity';
 
@@ -244,6 +244,8 @@ export function useChartData(
     currentConfigKey: string;
     baselineConfigKey: string;
   },
+  benchmarkQueryScope?: string,
+  initialBenchmarkRows?: BenchmarkRow[],
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
@@ -269,7 +271,16 @@ export function useChartData(
     data: baseRows,
     isLoading: baseLoading,
     error: baseError,
-  } = useBenchmarks(selectedModel, queryDate, enabled, asOfRunId);
+  } = useBenchmarks(
+    selectedModel,
+    queryDate,
+    enabled,
+    asOfRunId,
+    undefined,
+    undefined,
+    !asOfRunId && queryDate === '' ? initialBenchmarkRows : undefined,
+    benchmarkQueryScope,
+  );
   const {
     data: runRows,
     isLoading: runLoading,
