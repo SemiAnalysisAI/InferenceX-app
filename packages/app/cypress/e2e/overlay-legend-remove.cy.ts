@@ -92,9 +92,30 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
     // Inactive row: the hover affordance flips to the "+" restore indicator
     // (explicit "clicking the name brings it back"), and the Hide X is gone.
     cy.get('[data-testid="chart-legend"] [title^="Show B300"]').should('exist');
+    cy.get('[data-testid="scatter-best-per-sku"]').should('have.attr', 'data-state', 'unchecked');
     cy.get(
       '[data-testid="chart-legend"] [role="button"][aria-label^="Hide"][aria-label*="B300"]',
     ).should('not.exist');
+  });
+
+  it('keeps the official SKU hidden when chart metrics change', () => {
+    cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+    cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').click({
+      force: true,
+    });
+
+    cy.get('[data-testid="chart-legend"] [title^="Show B300"]').should('exist');
+    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
+      expect(countVisible($dots), 'visible official points after Y-axis change').to.eq(0);
+    });
+
+    cy.get('[data-testid="x-axis-mode-ttft"]').click().should('have.attr', 'data-state', 'active');
+    cy.get('[data-testid="chart-legend"] [title^="Show B300"]').should('exist');
+    cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(($pts) => {
+      expect(countVisible($pts), 'visible overlay points after metric changes').to.be.greaterThan(
+        0,
+      );
+    });
   });
 
   it('re-activating the SKU from the legend restores the official points', () => {

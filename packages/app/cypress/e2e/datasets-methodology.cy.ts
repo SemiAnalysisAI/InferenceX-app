@@ -30,7 +30,7 @@ describe('AgentX dataset methodology', () => {
         .and('have.attr', 'href', '/agentx/methodology');
       cy.get('[data-testid="agentx-results-cta"]')
         .should('contain.text', 'View AgentX Performance Results')
-        .and('have.attr', 'href', '/overview');
+        .and('have.attr', 'href', '/inference');
     });
   });
 
@@ -48,7 +48,7 @@ describe('AgentX dataset methodology', () => {
         .and('have.attr', 'href', '/zh/agentx/methodology');
       cy.get('[data-testid="agentx-results-cta"]')
         .should('contain.text', '查看 AgentX 性能结果')
-        .and('have.attr', 'href', '/zh/overview');
+        .and('have.attr', 'href', '/zh/inference');
     });
   });
 

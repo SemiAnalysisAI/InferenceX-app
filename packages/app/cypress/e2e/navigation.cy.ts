@@ -111,6 +111,39 @@ describe('First-load navigation', () => {
     cy.location('pathname').should('eq', '/inference');
   });
 
+  it('leads the landing page with the AgentX hero and its three CTAs', () => {
+    cy.get('[data-testid="compare-agentx-primary"]').within(() => {
+      // The hero owns /compare's h1; on the landing page it is a section heading.
+      cy.get('h2').should('have.text', 'Compare Realistic Agentic Inference Perf');
+      cy.get('h1').should('not.exist');
+      cy.get('[data-testid="compare-agentx-overview-link"]')
+        .should('contain.text', 'Overview')
+        .and('have.attr', 'href', '/overview');
+      cy.get('[data-testid="compare-agentx-dashboard-link"]')
+        .should('contain.text', 'Full dashboard')
+        .and('have.attr', 'href', '/inference?g_model=Kimi-K3&i_seq=agentic-traces&i_optimal=1');
+      cy.get('[data-testid="compare-agentx-methodology-link"]')
+        .should('contain.text', 'Methodology Deep Dive')
+        .and('have.attr', 'href', '/agentx');
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
+      // Editorial order, not alphabetical — see FEATURED_AGENTX_MODEL_SLUGS.
+      cy.get('[data-testid^="compare-agentx-model-"]').then(($rows) => {
+        const slugs = [...$rows].map((row) =>
+          (row.dataset.testid ?? '').replace('compare-agentx-model-', ''),
+        );
+        expect(slugs).to.deep.equal([
+          'kimi-k3',
+          'deepseek-v4',
+          'glm-5-2',
+          'minimax-m3',
+          'qwen-3-5',
+        ]);
+      });
+    });
+    cy.get('[data-testid="compare-agentx-overview-link"]').click();
+    cy.location('pathname').should('eq', '/overview');
+  });
+
   it('navigates to submissions from the landing CTA', () => {
     cy.get('[data-testid="landing-submissions-link"]').click();
     cy.location('pathname').should('eq', '/submissions');

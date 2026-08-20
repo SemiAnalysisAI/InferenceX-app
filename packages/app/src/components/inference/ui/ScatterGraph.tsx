@@ -684,6 +684,36 @@ const ScatterGraph = React.memo(
       },
       [setLocalOfficialOverride, setActiveOverlayHwTypes, mergeScopedOverlaySelection],
     );
+    useEffect(() => {
+      if (!overlayData || !bestPerSku || overlayScopeChanged) return;
+      const direction = chartDefinition[`${selectedYAxisMetric}_roofline` as keyof ChartDefinition];
+      if (
+        direction !== 'upper_right' &&
+        direction !== 'upper_left' &&
+        direction !== 'lower_left' &&
+        direction !== 'lower_right'
+      ) {
+        return;
+      }
+      const officialBest = bestSeriesPerSku(data, direction);
+      const overlayBest = bestSeriesPerSku(overlayData.data, direction);
+      const selection = new Set(officialBest.size > 0 ? officialBest : hwTypesWithData);
+      for (const key of overlayBest.size > 0 ? overlayBest : scopedOverlayHwTypes) {
+        selection.add(`overlay:${key}`);
+      }
+      if (!setsEqual(rawUnifiedSelection, selection)) commitUnifiedSelection(selection);
+    }, [
+      overlayData,
+      bestPerSku,
+      overlayScopeChanged,
+      chartDefinition,
+      selectedYAxisMetric,
+      data,
+      hwTypesWithData,
+      scopedOverlayHwTypes,
+      rawUnifiedSelection,
+      commitUnifiedSelection,
+    ]);
     const unifiedToggle = useCallback(
       (key: string, isOverlay: boolean) => {
         const prefixedKey = isOverlay ? `overlay:${key}` : key;
@@ -710,8 +740,15 @@ const ScatterGraph = React.memo(
 
     // When no overlay data, delegate to context's toggleHwType (preserves setActivePresetId)
     const handleToggleHwType = useCallback(
-      (key: string) => (overlayData ? unifiedToggle(key, false) : toggleHwType(key)),
-      [overlayData, unifiedToggle, toggleHwType],
+      (key: string) => {
+        if (!overlayData) {
+          toggleHwType(key);
+          return;
+        }
+        setBestPerSku(false, { applySelection: false });
+        unifiedToggle(key, false);
+      },
+      [overlayData, setBestPerSku, unifiedToggle, toggleHwType],
     );
 
     // Legend "X" (remove) — same overlay split as handleToggleHwType. With an
@@ -727,11 +764,12 @@ const ScatterGraph = React.memo(
           removeHwType(key);
           return;
         }
+        setBestPerSku(false, { applySelection: false });
         const next = new Set(resolvedUnifiedSelection);
         next.delete(key);
         commitUnifiedSelection(next);
       },
-      [overlayData, removeHwType, resolvedUnifiedSelection, commitUnifiedSelection],
+      [overlayData, setBestPerSku, removeHwType, resolvedUnifiedSelection, commitUnifiedSelection],
     );
 
     // --- Theme ---
