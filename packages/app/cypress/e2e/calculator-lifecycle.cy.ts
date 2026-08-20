@@ -42,12 +42,24 @@ const resetToChart = () =>
   });
 
 /**
- * Nth cell of the first lifecycle table row. Switches to the table tab first: the
- * section opens on the chart, and these assertions are about the numbers.
+ * A named cell of the first lifecycle table row. Switches to the table tab first:
+ * the section opens on the chart, and these assertions are about the numbers.
+ *
+ * Resolved by header text rather than by position on purpose — these were once
+ * bare indices, and inserting a column silently re-pointed nine assertions at
+ * their neighbours, each of which then failed on a value that was correct.
  */
-const firstRowCell = (index: number) => {
+const firstRowCell = (header: string) => {
   showTable();
-  return cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').first().find('td').eq(index);
+  return cy.get('[data-testid="calculator-lifecycle-table"] thead th').then(($ths) => {
+    const index = $ths.toArray().findIndex((th) => (th.textContent ?? '').includes(header));
+    expect(index, `a column headed "${header}"`).to.be.greaterThan(-1);
+    return cy
+      .get('[data-testid="calculator-lifecycle-table"] tbody tr')
+      .first()
+      .find('td')
+      .eq(index);
+  });
 };
 
 /** The time-axis tick labels, as one string — changes when the x domain moves. */
@@ -140,9 +152,13 @@ describe('Calculator — Fleet Lifecycle', () => {
     cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
   });
 
-  it('entering a MW budget in the fleet planner drives the lifecycle table', () => {
-    // One budget, one `c_mw` param, both sections.
-    cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
+  it('entering a MW budget in this section drives the lifecycle table', () => {
+    // The input lives here now: it used to sit in a separate Fleet Projection
+    // section, which is what made the empty state above have to point at another
+    // part of the page.
+    cy.get('[data-testid="calculator-lifecycle-section"]')
+      .find('[data-testid="calc-fleet-mw-input"]')
+      .type('10');
     // The figure opens on the chart; the table is the other tab.
     cy.get('[data-testid="calculator-lifecycle-figure"]', { timeout: 30_000 }).should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
@@ -153,6 +169,10 @@ describe('Calculator — Fleet Lifecycle', () => {
       cy.contains('th', 'First Run').should('exist');
       cy.contains('th', 'Latest Best').should('exist');
       cy.contains('th', 'Improvements').should('exist');
+      // Absorbed from the old Fleet Projection table: the physical sizing the
+      // economics rest on, on the same row as the economics.
+      cy.contains('th', 'Chips').should('exist');
+      cy.contains('th', 'Concurrent Users now').should('exist');
       cy.contains('th', 'Margin $/day').should('exist');
       cy.contains('th', 'Payback').should('exist');
       cy.contains('th', 'Cumulative Margin').should('exist');
@@ -271,10 +291,10 @@ describe('Calculator — Fleet Lifecycle', () => {
   it('every row is traceable to the dated run it came from', () => {
     // The caption's run date no longer describes these numbers, so each row
     // carries its own date and links its run.
-    firstRowCell(2)
+    firstRowCell('First Run')
       .invoke('text')
       .should('match', /\d{4}-\d{2}-\d{2}/u);
-    firstRowCell(3)
+    firstRowCell('Latest Best')
       .invoke('text')
       .should('match', /\d{4}-\d{2}-\d{2}/u);
   });
@@ -296,8 +316,8 @@ describe('Calculator — Fleet Lifecycle', () => {
     cy.get('[data-testid="calc-lifecycle-price-input"]').clear();
     cy.get('[data-testid="calc-lifecycle-price-input"]').type('50');
     // Margin $/day column: positive, so no leading minus.
-    firstRowCell(9).invoke('text').should('match', /^\$/u);
-    firstRowCell(10)
+    firstRowCell('Margin $/day').invoke('text').should('match', /^\$/u);
+    firstRowCell('Payback')
       .invoke('text')
       .should('match', /\d+(?:\.\d+)? mo/u);
   });
@@ -314,11 +334,11 @@ describe('Calculator — Fleet Lifecycle', () => {
     // not respond to this at all.
     cy.get('[data-testid="calc-lifecycle-price-input"]').clear().type('10');
     cy.get('[data-testid="calc-lifecycle-output-price-input"]').clear().type('10');
-    firstRowCell(9)
+    firstRowCell('Margin $/day')
       .invoke('text')
       .then((before) => {
         cy.get('[data-testid="calc-lifecycle-output-price-input"]').clear().type('500');
-        firstRowCell(9)
+        firstRowCell('Margin $/day')
           .invoke('text')
           .should((after) => {
             expect(money(after)).to.be.greaterThan(money(before));
@@ -564,17 +584,17 @@ describe('Calculator — Fleet Lifecycle', () => {
     // of the physics rather than of one fixture's profitability.
     cy.get('[data-testid="calc-lifecycle-horizon-input"]').clear();
     cy.get('[data-testid="calc-lifecycle-horizon-input"]').type('24');
-    firstRowCell(9)
+    firstRowCell('Margin $/day')
       .invoke('text')
       .then((perDay) => {
         const sign = Math.sign(money(perDay));
         expect(sign, 'a non-zero daily margin to accumulate').to.not.equal(0);
-        firstRowCell(11)
+        firstRowCell('Cumulative Margin')
           .invoke('text')
           .then((short) => {
             cy.get('[data-testid="calc-lifecycle-horizon-input"]').clear();
             cy.get('[data-testid="calc-lifecycle-horizon-input"]').type('96');
-            firstRowCell(11)
+            firstRowCell('Cumulative Margin')
               .invoke('text')
               .should((long) => {
                 const delta = (money(long) - money(short)) * sign;
@@ -595,7 +615,7 @@ describe('Calculator — Fleet Lifecycle', () => {
       expect(Math.max(...improvements)).to.be.greaterThan(0);
     });
     // Gain over the opening config is reported as a multiple.
-    firstRowCell(5)
+    firstRowCell('Gain')
       .invoke('text')
       .should('match', /^\d+(?:\.\d+)?×$/u);
   });
@@ -608,13 +628,13 @@ describe('Calculator — Fleet Lifecycle', () => {
       // Rollouts are sampled into curves, so the line cannot be a bare staircase.
       expect(curved).to.be.greaterThan(20);
       // A longer ramp reaches each config's numbers later, so it earns less.
-      firstRowCell(11)
+      firstRowCell('Cumulative Margin')
         .invoke('text')
         .then((short) => {
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').type('18');
           // "Earns less" is the claim, so assert less — not merely different.
-          firstRowCell(11)
+          firstRowCell('Cumulative Margin')
             .invoke('text')
             .should((long) => expect(money(long)).to.be.lessThan(money(short)));
           // Ramp 0 means configs take effect instantly — a pure staircase, which
@@ -630,12 +650,12 @@ describe('Calculator — Fleet Lifecycle', () => {
   it('a shorter MTBI lowers availability', () => {
     cy.get('[data-testid="calc-lifecycle-mtbi-input"]').clear();
     cy.get('[data-testid="calc-lifecycle-mtbi-input"]').type('60');
-    firstRowCell(12)
+    firstRowCell('Availability')
       .invoke('text')
       .then((high) => {
         cy.get('[data-testid="calc-lifecycle-mtbi-input"]').clear();
         cy.get('[data-testid="calc-lifecycle-mtbi-input"]').type('2');
-        firstRowCell(12)
+        firstRowCell('Availability')
           .invoke('text')
           .should((low) => {
             expect(Number.parseFloat(low)).to.be.lessThan(Number.parseFloat(high));
@@ -664,7 +684,7 @@ describe('Calculator — Fleet Lifecycle', () => {
       expect(new Set(chips).size).to.equal(chips.length);
     });
     // And each row names the config it ended up on, since that changes along the line.
-    firstRowCell(1).invoke('text').should('not.be.empty');
+    firstRowCell('Config Now').invoke('text').should('not.be.empty');
   });
 
   it('follows legend visibility', () => {
@@ -705,10 +725,32 @@ describe('Calculator — Fleet Lifecycle', () => {
     cy.get('[data-testid="calculator-lifecycle-unmeasured"]').should('contain.text', 'measured');
   });
 
-  it('clearing the MW budget restores the empty state', () => {
+  it('names the budget, not the slider, when a budget is too small to size a fleet', () => {
+    // The two ways to have nothing to plot need different fixes, so they must not
+    // share a message: this one is the budget, and blaming the interactivity
+    // slider would send the reader to the wrong control.
+    //
+    // The previous test leaves the target at the top of the range, where nothing
+    // is measured — which is the *other* cause, and would make `noneMeasured`
+    // the correct answer. So put the target back in a measured range first, or
+    // this asserts nothing about the budget at all.
+    cy.get('[data-testid="calculator-controls"] input[type="number"]').clear();
+    cy.get('[data-testid="calculator-controls"] input[type="number"]').type('35{enter}');
+    cy.get('[data-testid="calculator-lifecycle-figure"]', { timeout: 30_000 }).should('be.visible');
+
+    cy.get('[data-testid="calc-fleet-mw-input"]').clear();
+    cy.get('[data-testid="calc-fleet-mw-input"]').type('0.0001');
+    cy.get('[data-testid="calculator-lifecycle-none"]')
+      .should('be.visible')
+      .and('contain.text', 'too small to power a single chip');
+  });
+
+  it('clearing the MW budget restores the empty state, and the input survives it', () => {
     cy.get('[data-testid="calc-fleet-mw-input"]').clear();
     cy.get('[data-testid="calculator-lifecycle-empty"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
+    // The one control that must never vanish with the body it gates.
+    cy.get('[data-testid="calc-fleet-mw-input"]').should('be.visible');
   });
 });
 
@@ -816,11 +858,11 @@ describe('Calculator — Fleet Lifecycle with agentic traces', () => {
     // lands where a reader would expect it — on the margin.
     cy.get('[data-testid="calc-lifecycle-cache-input"]').clear().type('100');
     cy.get('[data-testid="calc-lifecycle-price-input"]').clear().type('500');
-    firstRowCell(9)
+    firstRowCell('Margin $/day')
       .invoke('text')
       .then((full) => {
         cy.get('[data-testid="calc-lifecycle-cache-input"]').clear().type('10');
-        firstRowCell(9)
+        firstRowCell('Margin $/day')
           .invoke('text')
           .should((discounted) => {
             expect(money(discounted)).to.be.lessThan(money(full));

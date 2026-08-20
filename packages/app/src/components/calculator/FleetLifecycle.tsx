@@ -65,7 +65,14 @@ interface FleetLifecycleProps {
   selectedPrecisions: string[];
   selectedPercentile?: Percentile;
   /** Facility power budget in MW, shared with the fleet planner. */
-  mw: number | null;
+  /**
+   * The facility power budget, raw. Owned by the parent because the URL seed and
+   * the fleet-sizing basis are shared, but the *input* lives here: this section
+   * is the only thing that consumes it, and a control in one section feeding a
+   * table in another is what the old Fleet Projection split got wrong.
+   */
+  mwInput: string;
+  onMwInputChange: (raw: string) => void;
   /** Resolves a series colour from the calculator's theme palette. */
   colorResolver: (hwKey: string) => string;
 }
@@ -98,8 +105,15 @@ const STRINGS = {
       `$${input} in / $${output} out per M tok${cachedPct === null ? '' : `, cached ${cachedPct}%`}`,
     description:
       'A fixed fleet, from the day the model shipped. The chips never change; the software serving them does — so each rollout is a config that beat every config before it, climbing from what the fleet already served to its own numbers, and the gap to the cost line is the return on that work.',
-    needMw:
-      'Enter a facility power budget in the Fleet Projection section above to project lifecycle economics.',
+    tooSmall:
+      'This power budget is too small to power a single chip of the shown hardware — try a larger value.',
+    mwLabel: 'Facility Power (MW)',
+    mwTooltip:
+      'Total facility power budget in megawatts. Chip count uses all-in power per chip (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model — not bare TDP.',
+    mwPlaceholder: 'e.g. 10',
+    colChips: 'Chips',
+    colUsers: 'Concurrent Users now',
+    needMw: 'Enter a facility power budget to project lifecycle economics.',
     noReleaseDate:
       'No release date is on file for this model, so the timeline is anchored to its first benchmark run instead.',
     loading: 'Loading run history…',
@@ -201,7 +215,14 @@ const STRINGS = {
       `输入 $${input} / 输出 $${output} 每百万 token${cachedPct === null ? '' : `，缓存 ${cachedPct}%`}`,
     description:
       '固定集群自模型发布之日起的表现。Chip 从未更换，变化的是为其提供服务的软件——每一次推广都是一个优于此前所有配置的新配置，从集群当前已提供的水平爬升至其自身水平，而与成本线之间的差距即为这些工作带来的回报。',
-    needMw: '请在上方「集群规模测算」中输入设施功率预算，以测算生命周期经济性。',
+    tooSmall: '该功率预算不足以为所示任一 Chip 供电——请尝试更大的数值。',
+    mwLabel: '设施功率 (MW)',
+    mwTooltip:
+      '设施总功率预算（兆瓦）。Chip 数量按每 Chip 全含功率（主机、网络、散热）计算，数据来自 SemiAnalysis Datacenter Industry Model，而非裸 TDP。',
+    mwPlaceholder: '如 10',
+    colChips: 'Chip 数',
+    colUsers: '当前并发用户数',
+    needMw: '输入设施功率预算，以测算生命周期经济性。',
     noReleaseDate: '该模型暂无发布日期记录，时间轴改以其首次基准测试运行为起点。',
     loading: '正在加载运行历史……',
     errorPrefix: '无法加载运行历史：',
@@ -410,6 +431,10 @@ interface LifecycleRow {
   /** A real hwKey to resolve the series colour from. */
   colorKey: string;
   tpPerMw: number;
+  /** Chips the power budget provisions — flat across the whole lifecycle. */
+  gpus: number;
+  /** Streams the fleet serves at the target interactivity on its latest config. */
+  concurrentUsersNow: number;
   disagg: boolean;
   series: LifecycleSeries;
 }
@@ -425,11 +450,17 @@ export default function FleetLifecycle({
   selectedSequence,
   selectedPrecisions,
   selectedPercentile,
-  mw,
+  mwInput,
+  onMwInputChange,
   colorResolver,
 }: FleetLifecycleProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  /** A zero or blank budget sizes no fleet, so it is treated as unset. */
+  const mw = useMemo(() => {
+    const parsed = parseNonNegative(mwInput);
+    return parsed !== null && parsed > 0 ? parsed : null;
+  }, [mwInput]);
 
   const historical = useHistoricalBest({
     model: selectedModel,
@@ -579,6 +610,11 @@ export default function FleetLifecycle({
       const specs = getGpuSpecs(progression.baseGpu);
       const steps: ThroughputStep[] = [];
       let costPerHour: number | null = null;
+      // Chip count is mw / all-in power, so it is the same at every rung. Users
+      // is not: the fleet streams more of them as throughput improves, so it is
+      // the *latest* rung's figure, matching the `tok/s/MW now` column.
+      let gpus: number | null = null;
+      let concurrentUsersNow: number | null = null;
       // Power the fleet actually occupies, not the budget: chip counts are whole,
       // so the last fraction of a chip's worth of the budget is never provisioned.
       let provisionedMw: number | null = null;
@@ -602,6 +638,8 @@ export default function FleetLifecycle({
         if (!stats) continue;
         costPerHour ??= stats.costPerHour;
         provisionedMw ??= (stats.gpus * specs.power) / 1000;
+        gpus ??= stats.gpus;
+        concurrentUsersNow = stats.concurrentUsers;
         steps.push({
           month: (Date.parse(`${step.date}T00:00:00Z`) - anchorMs) / MS_PER_MONTH,
           // Always the total-token rate, never the cost-type one: the fleet sells
@@ -617,11 +655,17 @@ export default function FleetLifecycle({
         });
       }
 
-      if (steps.length === 0 || costPerHour === null || provisionedMw === null) {
+      if (
+        steps.length === 0 ||
+        costPerHour === null ||
+        provisionedMw === null ||
+        gpus === null ||
+        concurrentUsersNow === null
+      ) {
         absent.push(progression.baseGpu);
         return [];
       }
-      return [{ progression, steps, costPerHour, provisionedMw }];
+      return [{ progression, steps, costPerHour, provisionedMw, gpus, concurrentUsersNow }];
     });
     return { fleets: sized, unplottable: absent };
   }, [mw, anchorMs, visibleProgressions, costProvider, costType, targetValue, cacheReadRatio]);
@@ -682,34 +726,38 @@ export default function FleetLifecycle({
 
   const rows = useMemo<LifecycleRow[]>(
     () =>
-      fleets.flatMap(({ progression, steps, costPerHour, provisionedMw }) => {
-        const series = computeLifecycle({
-          steps,
-          costPerHour,
-          provisionedMw,
-          horizonMonths,
-          assumptions,
-        });
-        if (!series) return [];
-        const latest = progression.steps.at(-1)!;
-        const latestHwKey = latest.result.hwKey ?? progression.baseGpu;
-        return [
-          {
-            progression,
-            // The chip, not the config: the config is what changes along the line.
-            label: getLabel(progression.baseGpu, hardwareConfig),
-            configNow: configSuffix(latestHwKey, progression.baseGpu, hardwareConfig),
-            // The palette is built over the *active* hwKeys, so a bare base key
-            // resolves to the fallback grey. Colour the line by the config it is
-            // running now, which is both a real key and the legend entry a reader
-            // would look for.
-            colorKey: latestHwKey,
-            tpPerMw: latest.rankValue,
-            disagg: progression.disagg,
-            series,
-          },
-        ];
-      }),
+      fleets.flatMap(
+        ({ progression, steps, costPerHour, provisionedMw, gpus, concurrentUsersNow }) => {
+          const series = computeLifecycle({
+            steps,
+            costPerHour,
+            provisionedMw,
+            horizonMonths,
+            assumptions,
+          });
+          if (!series) return [];
+          const latest = progression.steps.at(-1)!;
+          const latestHwKey = latest.result.hwKey ?? progression.baseGpu;
+          return [
+            {
+              progression,
+              // The chip, not the config: the config is what changes along the line.
+              label: getLabel(progression.baseGpu, hardwareConfig),
+              configNow: configSuffix(latestHwKey, progression.baseGpu, hardwareConfig),
+              // The palette is built over the *active* hwKeys, so a bare base key
+              // resolves to the fallback grey. Colour the line by the config it is
+              // running now, which is both a real key and the legend entry a reader
+              // would look for.
+              colorKey: latestHwKey,
+              tpPerMw: latest.rankValue,
+              gpus,
+              concurrentUsersNow,
+              disagg: progression.disagg,
+              series,
+            },
+          ];
+        },
+      ),
     [fleets, horizonMonths, assumptions, hardwareConfig],
   );
 
@@ -1001,10 +1049,28 @@ export default function FleetLifecycle({
         className: 'tabular-nums',
       },
       {
+        // The physical sizing the whole projection rests on. It used to live in a
+        // separate Fleet Projection section, which meant the budget that produced
+        // it and the economics that consume it were three sections apart.
+        header: t.colChips,
+        align: 'right',
+        cell: (r) => formatCompact(r.gpus, 0),
+        sortValue: (r) => r.gpus,
+        className: 'tabular-nums',
+      },
+      {
         header: t.colTpPerMw(tokenTypeLabel),
         align: 'right',
         cell: (r) => formatCompact(r.tpPerMw),
         sortValue: (r) => r.tpPerMw,
+        className: 'tabular-nums',
+      },
+      {
+        // Streams, not tokens: the same fleet throughput read as demand served.
+        header: t.colUsers,
+        align: 'right',
+        cell: (r) => formatCompact(r.concurrentUsersNow, 0),
+        sortValue: (r) => r.concurrentUsersNow,
         className: 'tabular-nums',
       },
       {
@@ -1282,8 +1348,12 @@ export default function FleetLifecycle({
             )}
           </figure>
         ) : (
+          /* Nothing to plot has two causes, and blaming the wrong one sends the
+             reader to the wrong control: chips were selected but none could be
+             sized (the budget), versus nothing measured at this speed (the
+             slider). `unplottable` distinguishes them. */
           <p className="text-sm text-muted-foreground" data-testid="calculator-lifecycle-none">
-            {t.noneMeasured}
+            {unplottable.length > 0 ? t.tooSmall : t.noneMeasured}
           </p>
         )}
 
@@ -1384,6 +1454,24 @@ export default function FleetLifecycle({
             <div>
               <h2 className="text-lg font-semibold mb-2">{t.title}</h2>
               <p className="text-muted-foreground text-sm">{t.description}</p>
+            </div>
+            {/* Outside `body()` on purpose: every other control is only meaningful
+                once a fleet exists, but this is the one that brings it into being,
+                so it has to render in the empty state too. */}
+            <div className="flex flex-col space-y-1.5">
+              <LabelWithTooltip htmlFor="calc-fleet-mw" label={t.mwLabel} tooltip={t.mwTooltip} />
+              <Input
+                id="calc-fleet-mw"
+                data-testid="calc-fleet-mw-input"
+                type="number"
+                min={0}
+                step="any"
+                placeholder={t.mwPlaceholder}
+                value={mwInput}
+                onChange={(e) => onMwInputChange(e.target.value)}
+                onBlur={() => track('calculator_fleet_mw_set', { mw: mwInput })}
+                className="w-32 h-9"
+              />
             </div>
             {body()}
           </div>

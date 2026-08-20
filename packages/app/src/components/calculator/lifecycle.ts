@@ -143,8 +143,8 @@ export interface ThroughputStep {
    *
    * Deliberately not named `fleetTokPerSec` like {@link FleetStats}: that one is
    * the physical rate the racks deliver, and the two diverge whenever a workload
-   * serves input tokens from cache. The Fleet Projection section reports the
-   * physical rate; revenue here is charged on these two.
+   * serves input tokens from cache. `FleetStats.fleetTokPerSec` is the physical
+   * rate; revenue here is charged on these two.
    */
   billableInputTokPerSec: number;
   /** Fleet output tokens once this config lands, tok/s. Never cached. */

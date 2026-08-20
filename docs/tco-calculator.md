@@ -65,9 +65,9 @@ Click-to-compare uses `resultKey` (not hwKey) because multi-precision mode produ
 
 ## Folding sections away (`CollapsibleSection`)
 
-The page is long — chart, fleet projection, cost target, lifecycle — and most readers
-want one of them at a time. The chart section, Fleet Projection and Interactivity
-Within a Cost Target each carry a chevron toggle (`components/ui/collapsible-section.tsx`).
+The page is long — chart, cost target, lifecycle — and most readers want one of them
+at a time. The chart section and Interactivity Within a Cost Target each carry a
+chevron toggle (`components/ui/collapsible-section.tsx`).
 
 Two decisions in that component:
 
@@ -190,6 +190,43 @@ output tokens and then apply it to total throughput; the existing
 Everything above answers "which chip is cheapest at this interactivity, right
 now?". This section answers "what has a fleet of it earned and cost since the
 model shipped?" — and the answer is measured, not assumed.
+
+### Why it absorbed Fleet Projection, and why the cost target moved instead
+
+The page used to carry three fleet sections: **Fleet Projection** (a MW budget →
+chips, fleet tok/s, concurrent users, $/hr, $/mo), **Interactivity Within a Cost
+Target**, and this one. Two of those three are now one.
+
+Fleet Projection was folded in here because it was half of this section already.
+Its MW input was this section's _primary_ input — the empty state read "enter a
+facility power budget in the Fleet Projection section above", which is a control
+in one section gating a table in another. Its `Fleet $/hr` and `$/mo` are this
+section's `Cost $/day` in other units, and its `Fleet tok/s` is `tok/s/MW now`
+times the budget. What it had that this did not was the physical sizing: **chip
+count** and **concurrent users**. Those are now columns, so the budget, the sizing
+it produces and the economics that rest on it read across one row.
+
+Two consequences worth knowing:
+
+- **The MW input renders outside `body()`.** Every other control here only means
+  something once a fleet exists, but this is the control that brings one into
+  being, so it must be present in the empty state — otherwise the section
+  deadlocks on its own precondition.
+- **"Nothing to plot" needed splitting.** Fleet Projection had a dedicated message
+  for a budget too small to power one chip. Falling back to this section's
+  `noneMeasured` would have blamed the interactivity slider for a budget problem
+  and sent the reader to the wrong control, so an unsizeable budget (`unplottable`
+  non-empty with no rows) says so in its own words.
+
+The cost target was **not** folded in, because it is not a slice of this section at
+any point on the axis: it is the _inverse_ of the target-interactivity slider. The
+slider fixes a speed and the cost falls out; the cost target fixes a cost ceiling
+and the speed falls out. Nothing on a lifecycle answers "how fast can I go under
+$0.50/M tok". So it moved rather than merged — out of the fleet-economics stack and
+up to sit directly beneath the slider it inverts (`CostTargetPanel.tsx`), which is
+also why it is deliberately independent of the slider's current value: it reads the
+unfiltered frontier, so a chip that interpolates to nothing at the present target
+still gets an answer.
 
 ### Why it reads the full run history
 
@@ -868,7 +905,7 @@ exclusion in its own note rather than leaving a silent gap.
 
 ### What is still not apples-to-apples, and why it was left alone
 
-The bar chart, the cost matrix and Fleet Projection's throughput column still show
+The bar chart and the cost matrix still show
 `input_tput_per_gpu` / `output_tput_per_gpu` on their reported per-prefill / per-decode
 basis, and their `$/M tok` with them. On the Input and Output token types a disaggregated
 config therefore reads **faster per chip and cheaper per token than it is** — a median 2×,

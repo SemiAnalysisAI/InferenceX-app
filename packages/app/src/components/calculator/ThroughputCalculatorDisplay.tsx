@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import CalculatorTable from '@/components/calculator/CalculatorTable';
 import FleetLifecycle from '@/components/calculator/FleetLifecycle';
-import FleetPlanner from '@/components/calculator/FleetPlanner';
+import CostTargetPanel from '@/components/calculator/CostTargetPanel';
 import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
 import { GlobalFilterProvider, useGlobalFilters } from '@/components/GlobalFilterContext';
 import { Badge } from '@/components/ui/badge';
@@ -303,8 +303,8 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const [barMetric, setBarMetric] = useState<BarMetric>('throughput');
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
   const [visibleHwKeys, setVisibleHwKeys] = useState<Set<string>>(new Set());
-  // Owned here, not in FleetPlanner, because the lifecycle section sizes its
-  // fleets from the same budget and the same `c_mw` param.
+  // Owned here rather than inside the lifecycle section so the `c_mw` URL seed is
+  // read once, at the level that also hands the budget to the cost-target panel.
   const [mwInput, setMwInput] = useState<string>(() => readUrlParams().c_mw ?? '');
   const [selectedBars, setSelectedBars] = useState<Set<string>>(new Set());
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
@@ -1108,6 +1108,19 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         </Card>
       </section>
 
+      {/* The inverse of the target-interactivity slider directly above: fix a cost
+          ceiling, read off the fastest speed that stays under it. */}
+      {!loading && hasData && (
+        <CostTargetPanel
+          gpuDataByGroupKey={gpuDataByGroupKey}
+          hardwareConfig={hardwareConfig}
+          costProvider={costProvider}
+          costType={costType}
+          visibleHwKeys={visibleHwKeys}
+          mw={mw}
+        />
+      )}
+
       {/* Chart / Table */}
       <section data-testid="calculator-chart-section">
         <CollapsibleSection
@@ -1380,21 +1393,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         </section>
       )}
 
-      {/* Fleet planner: MW-budget projection + cost-target inverse lookup */}
-      {!loading && hasData && (
-        <FleetPlanner
-          results={results}
-          gpuDataByGroupKey={gpuDataByGroupKey}
-          hardwareConfig={hardwareConfig}
-          costProvider={costProvider}
-          costType={costType}
-          targetValue={targetValue}
-          visibleHwKeys={visibleHwKeys}
-          mwInput={mwInput}
-          onMwInputChange={handleMwInputChange}
-        />
-      )}
-
       {/* Fleet lifecycle: all-time-best config projected over a fleet's life.
           Official results only — see the overlay note in the section. */}
       {!loading && hasData && (
@@ -1409,7 +1407,8 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           selectedSequence={selectedSequence}
           selectedPrecisions={selectedPrecisions}
           selectedPercentile={selectedPercentile}
-          mw={mw}
+          mwInput={mwInput}
+          onMwInputChange={handleMwInputChange}
           colorResolver={resolveColor}
         />
       )}
