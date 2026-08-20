@@ -266,8 +266,23 @@ export function OverviewNavigationProvider({
 
   const replaceClientState = useCallback(
     (targetHref: string, keys: readonly OverviewClientOnlySearchKey[]) => {
-      const pending = mergeOverviewControlHref(pendingHrefRef.current, targetHref, keys);
-      const committed = mergeOverviewControlHref(committedHrefRef.current, targetHref, keys);
+      // A child effect can request client-only cleanup before this provider's
+      // mount effect adopts the loaded URL. Rebase both snapshots on the live
+      // address first so campaign params and the fragment survive that race,
+      // while server-owned keys still come from their pending/committed state.
+      const actualHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const pendingBase = mergeOverviewControlHref(
+        actualHref,
+        pendingHrefRef.current,
+        OVERVIEW_SERVER_SEARCH_KEYS,
+      );
+      const committedBase = mergeOverviewControlHref(
+        actualHref,
+        committedHrefRef.current,
+        OVERVIEW_SERVER_SEARCH_KEYS,
+      );
+      const pending = mergeOverviewControlHref(pendingBase, targetHref, keys);
+      const committed = mergeOverviewControlHref(committedBase, targetHref, keys);
       pendingHrefRef.current = pending;
       committedHrefRef.current = committed;
       setPendingHref(pending);

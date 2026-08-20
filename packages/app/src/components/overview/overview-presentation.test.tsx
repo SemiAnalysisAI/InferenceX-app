@@ -413,11 +413,12 @@ describe('OverviewPresentationSurface', () => {
 
   it('stays out of the way on browsers that refuse fullscreen', () => {
     stubFullscreenApi(false);
-    window.history.replaceState({}, '', '/overview?compare=30d&present=1');
-    render();
+    window.history.replaceState({}, '', '/overview?compare=30d&present=1&utm_source=deck#matrix');
+    render('/overview?compare=30d');
     expect(toggle()).toBeNull();
     expect(surface()).not.toBeNull();
-    expect(window.location.search).toBe('?compare=30d');
+    expect(window.location.search).toBe('?compare=30d&utm_source=deck');
+    expect(window.location.hash).toBe('#matrix');
   });
 });
 
