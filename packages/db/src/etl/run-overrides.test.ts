@@ -99,6 +99,52 @@ describe('audited run backfills', () => {
     expect(() => validateRunBackfills([], [first, second])).toThrow(/duplicate.*selector/u);
   });
 
+  it('allows a pending production config ID for a pre-ingest upstream config', () => {
+    expect(() =>
+      validateRunBackfills([], [examplePointBackfill({ productionConfigId: null })]),
+    ).not.toThrow();
+  });
+
+  it('audits all ten DeepSeek-V4 TRT native-offload points from run 32171407952', () => {
+    const backfills = BENCHMARK_POINT_BACKFILLS.filter(
+      (backfill) => backfill.githubRunId === 32171407952 && backfill.runAttempt === 4,
+    );
+
+    expect(
+      backfills.map((backfill) => [
+        backfill.conc,
+        backfill.config.prefillTp,
+        backfill.config.prefillNumWorkers,
+        backfill.config.decodeTp,
+        backfill.config.decodeNumWorkers,
+      ]),
+    ).toEqual([
+      [4, 4, 1, 8, 4],
+      [12, 4, 1, 4, 6],
+      [24, 4, 1, 4, 6],
+      [206, 8, 1, 32, 1],
+      [388, 8, 1, 32, 1],
+      [736, 8, 2, 32, 1],
+      [1152, 8, 3, 16, 1],
+      [1389, 8, 4, 32, 1],
+      [1978, 8, 5, 16, 1],
+      [2626, 8, 5, 16, 1],
+    ]);
+    for (const backfill of backfills) {
+      expect(backfill.offloadMode).toBe('off');
+      expect(backfill.recipeFingerprint).toMatch(/^[a-f0-9]{64}$/u);
+      expect(backfill.set).toEqual({
+        offloadMode: 'on',
+        metricsRemove: ['allocated_cpu_dram_gb'],
+        metricsMerge: {
+          kv_offloading: 'dram',
+          kv_offload_backend: 'native',
+          kv_offload_backend_version: '1.3.0rc24',
+        },
+      });
+    }
+  });
+
   it('applies point corrections during ingest and synchronizes offload metadata', () => {
     const backfill = examplePointBackfill();
     const registry = BENCHMARK_POINT_BACKFILLS as BenchmarkPointBackfill[];

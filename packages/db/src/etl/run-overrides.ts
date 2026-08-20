@@ -270,8 +270,11 @@ export type JsonValue =
 export interface BenchmarkPointBackfill extends AuditedBackfill {
   githubRunId: number;
   runAttempt: number;
-  /** Production ID retained for audit logs only. Never use it to match another DB branch. */
-  productionConfigId: number;
+  /**
+   * Production ID retained for audit logs only. Never use it to match another DB branch.
+   * Null is allowed when a backfill must be staged before its upstream config is ingested.
+   */
+  productionConfigId: number | null;
   /** Stable configuration dimensions shared by production, staging, and rebuilt databases. */
   config: ConfigParams;
   benchmarkType: string;
@@ -347,6 +350,14 @@ const QWEN35_GB300_DYNAMO_TRT = {
   hardware: 'gb300',
   framework: 'dynamo-trt',
   model: 'qwen3.5',
+  precision: 'fp4',
+  specMethod: 'mtp',
+} as const;
+
+const DSV4_GB300_DYNAMO_TRT = {
+  hardware: 'gb300',
+  framework: 'dynamo-trt',
+  model: 'dsv4',
   precision: 'fp4',
   specMethod: 'mtp',
 } as const;
@@ -530,6 +541,138 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
     },
   })),
 
+  // Every TensorRT-LLM recipe in source run 32171407952 configures a 180 GiB
+  // native host KV cache on each prefill worker (and zero on decode). The
+  // master matrix declared NIXL transfer but omitted the offload annotation,
+  // so all ten artifacts incorrectly reported the points as non-offloaded.
+  ...(
+    [
+      [
+        1523,
+        4,
+        '730b70547e2cb7ec08ee97afd4c6f857430daecccbac385c9f00849dd2aacea3',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
+          { tp: 8, ep: 8, dpAttn: false, numWorkers: 4 },
+        ),
+      ],
+      [
+        null,
+        12,
+        'b12030690f36afb51f68ea3a92e768847c57bf70ad83108c12c9593349ab93bf',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
+          { tp: 4, ep: 4, dpAttn: false, numWorkers: 6 },
+        ),
+      ],
+      [
+        null,
+        24,
+        '7ecf8cc7a0c6ccef7975aef667072253d16ff62307c69bfa599c15ce990e665c',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
+          { tp: 4, ep: 4, dpAttn: false, numWorkers: 6 },
+        ),
+      ],
+      [
+        null,
+        206,
+        '189b47caf0b91f70c45f2e613f2a7c80bfa238f7aa2b74c814b1cdf6b4c481ec',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 1 },
+          { tp: 32, ep: 32, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        null,
+        388,
+        'bb8cc47a64da74d67c88c75ca5820e499292f14c50dbe78ee1935dbf5b74d1be',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 1 },
+          { tp: 32, ep: 32, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        null,
+        736,
+        '53e12d9e2d1e6f4e8889860c1047560cc542f9f82f696830266fe2929bbc3a3a',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 2 },
+          { tp: 32, ep: 32, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        null,
+        1152,
+        '4a95abd7469c665e18fa33d40f1460ceb212000a6074c080bbca7690ffb4b61f',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 3 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        null,
+        1389,
+        'f6ac9caf11d6f6459cec79182f4ab602bf30adc84353c8a2439e436915263f7c',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 4 },
+          { tp: 32, ep: 32, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        null,
+        1978,
+        '56aebdc93d0edb450a884f0ee747409fdbd73950805386ec4d22e294719b87b1',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 5 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        null,
+        2626,
+        'f8777377b0d9ee0051a9d9750b59a7574cf0a1043f2a046f678d81c16113b888',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 5 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+    ] as const
+  ).map(([productionConfigId, conc, recipeFingerprint, config]) => ({
+    id: `run-32171407952-conc-${conc}-native-offload`,
+    reason:
+      'The TensorRT-LLM runtime recipe configured a native host KV cache, but the artifact reported this AgentX point as non-offloaded.',
+    githubRunId: 32171407952,
+    runAttempt: 4,
+    productionConfigId,
+    config,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc,
+    offloadMode: 'off',
+    recipeFingerprint,
+    set: {
+      offloadMode: 'on' as const,
+      metricsRemove: ['allocated_cpu_dram_gb'],
+      metricsMerge: {
+        kv_offloading: 'dram',
+        kv_offload_backend: 'native',
+        kv_offload_backend_version: '1.3.0rc24',
+      },
+    },
+  })),
+
   // The four disaggregated recipes in run 31965016666 attach
   // MooncakeStoreConnector to NIXL through MultiConnector and allocate a
   // 140 GB Mooncake segment per node. The three aggregate points in the same
@@ -639,7 +782,8 @@ function backfillPointIdentity(
 function backfillProductionPointIdentity(
   backfill: BenchmarkPointBackfill,
   offloadMode: string = backfill.offloadMode,
-): string {
+): string | null {
+  if (backfill.productionConfigId === null) return null;
   return pointIdentity({
     githubRunId: backfill.githubRunId,
     runAttempt: backfill.runAttempt,
@@ -740,7 +884,9 @@ export function validateRunBackfills(
   }
 
   for (const backfill of points) {
-    validatePositiveInteger(backfill.productionConfigId, 'productionConfigId', backfill.id);
+    if (backfill.productionConfigId !== null) {
+      validatePositiveInteger(backfill.productionConfigId, 'productionConfigId', backfill.id);
+    }
     validateBackfillConfig(backfill.config, backfill.id);
     validatePositiveInteger(backfill.conc, 'conc', backfill.id);
     if (backfill.benchmarkType.length === 0 || backfill.offloadMode.length === 0) {
@@ -785,9 +931,14 @@ export function validateRunBackfills(
     if (
       PURGED_BENCHMARK_POINTS.some((purged) => {
         const purgedIdentity = pointIdentity(purged);
+        const sourceProductionIdentity = backfillProductionPointIdentity(backfill);
+        const desiredProductionIdentity = backfillProductionPointIdentity(
+          backfill,
+          desiredOffloadMode,
+        );
         return (
-          purgedIdentity === backfillProductionPointIdentity(backfill) ||
-          purgedIdentity === backfillProductionPointIdentity(backfill, desiredOffloadMode)
+          (sourceProductionIdentity !== null && purgedIdentity === sourceProductionIdentity) ||
+          (desiredProductionIdentity !== null && purgedIdentity === desiredProductionIdentity)
         );
       })
     ) {

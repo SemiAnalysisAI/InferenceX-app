@@ -255,9 +255,10 @@ function benchmarkPointBackfillIsApplied(
 }
 
 function benchmarkPointDescription(backfill: BenchmarkPointBackfill): string {
+  const productionId = backfill.productionConfigId ?? 'pending upstream ingest';
   return (
     `run ${backfill.githubRunId} attempt ${backfill.runAttempt}, ` +
-    `config ${configCacheKey(backfill.config)} (production id ${backfill.productionConfigId}), ` +
+    `config ${configCacheKey(backfill.config)} (production id ${productionId}), ` +
     `${backfill.benchmarkType}, isl ${backfill.isl}, osl ${backfill.osl}, ` +
     `conc ${backfill.conc}, offload ${backfill.offloadMode}, ` +
     `recipe ${backfill.recipeFingerprint ?? 'legacy'}`
