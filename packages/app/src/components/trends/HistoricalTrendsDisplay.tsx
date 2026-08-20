@@ -85,7 +85,7 @@ export default function HistoricalTrendsDisplay() {
     setLogScale,
     isLegendExpanded,
     setIsLegendExpanded,
-    workflowInfo,
+    selectedRunDate,
     highContrast,
     setHighContrast,
   } = useInference();
@@ -326,10 +326,10 @@ export default function HistoricalTrendsDisplay() {
                         .map((prec: string) => getPrecisionLabel(prec as Precision))
                         .join(', ')}{' '}
                       • {getSequenceLabel(selectedSequence as Sequence)} • {t.source}
-                      {workflowInfo && workflowInfo.length > 0 && workflowInfo[0]?.run_date && (
+                      {selectedRunDate && (
                         <>
                           {' '}
-                          • {t.updated} {workflowInfo[0].run_date.split(',')[0]}
+                          • {t.updated} {selectedRunDate}
                         </>
                       )}
                     </p>

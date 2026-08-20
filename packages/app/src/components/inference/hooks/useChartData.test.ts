@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/metric-registry';
 import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
 
 import type { InferenceData } from '@/components/inference/types';

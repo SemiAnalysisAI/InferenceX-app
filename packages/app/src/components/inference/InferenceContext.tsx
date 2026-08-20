@@ -23,6 +23,7 @@ import {
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import type { InferenceChartContextType, InferenceData } from '@/components/inference/types';
+import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -80,6 +81,30 @@ import {
 /** @internal Exported for test provider wrapping only. */
 export const InferenceContext = createContext<InferenceChartContextType | undefined>(undefined);
 
+export function resolveEffectiveXAxisMode(
+  requestedMode: XAxisMode,
+  sequence: Parameters<typeof sequenceKind>[0],
+  sequenceResolved: boolean,
+): XAxisMode {
+  if (!sequenceResolved) return requestedMode;
+  return sequenceKind(sequence) === 'fixed-seq' && isAgenticOnlyXAxisMode(requestedMode)
+    ? 'interactivity'
+    : requestedMode;
+}
+
+export function resolveE2eXAxisMetric(
+  requestedMetric: string | null,
+  mode: XAxisMode,
+  sequence: Parameters<typeof sequenceKind>[0],
+  percentile: string,
+): string | null {
+  if (mode === 'ttft') {
+    return sequenceKind(sequence) === 'agentic' ? `${percentile}_ttft` : 'median_ttft';
+  }
+  if (mode === 'e2e') return null;
+  return requestedMetric;
+}
+
 export function InferenceProvider({
   children,
   activeTab,
@@ -130,13 +155,14 @@ export function InferenceProvider({
     availableDates,
     effectiveRunDate,
     availabilityRows,
-    workflowInfo,
+    availabilitySettled,
+    availabilityError,
     availableRuns,
     workflowError,
   } = useGlobalFilters();
   const { isUnofficialRun } = useUnofficialRun();
 
-  const { getUrlParam, setUrlParam, setUrlParams } = useUrlState();
+  const { getUrlParam, setUrlParams } = useUrlState();
 
   const [overviewHistoryPair, setOverviewHistoryPair] = useState(() => {
     const currentConfigKey = getUrlParam('i_overview_current');
@@ -220,10 +246,15 @@ export function InferenceProvider({
     };
   }, [selectedGpuState, sequenceResolved, exclusion, exclusionPolicy, defaultExclusionGroup]);
   const selectedGPUs = selectedGpuResolution?.selection ?? selectedGpuState;
+  const notifiedGpuResolutionRef = useRef('');
   useEffect(() => {
-    if (!selectedGpuResolution) return;
-    setSelectedGpuState(selectedGpuResolution.selection);
-    setUrlParam('i_gpus', selectedGpuResolution.selection.join(','));
+    if (!selectedGpuResolution) {
+      notifiedGpuResolutionRef.current = '';
+      return;
+    }
+    const resolutionKey = `${selectedGpuResolution.selection.join(',')}|${selectedGpuResolution.dropped.join(',')}|${selectedGpuResolution.partial.join(',')}`;
+    if (resolutionKey === notifiedGpuResolutionRef.current) return;
+    notifiedGpuResolutionRef.current = resolutionKey;
     if (selectedGpuResolution.dropped.length > 0 || selectedGpuResolution.partial.length > 0) {
       setEngineConflict({
         kind: 'resolved',
@@ -232,14 +263,14 @@ export function InferenceProvider({
         partial: selectedGpuResolution.partial,
       });
     }
-  }, [selectedGpuResolution, setUrlParam]);
-  const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(
-    () => getUrlParam('i_metric') || initialYAxisMetric || 'y_tpPerGpu',
+  }, [selectedGpuResolution]);
+  const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
+    resolveMetricConfigKey(getUrlParam('i_metric'), initialYAxisMetric),
   );
   const [selectedXAxisMetric, setSelectedXAxisMetric] = useState<string | null>(
     () => getUrlParam('i_xmetric') || 'p90_ttft',
   );
-  const [selectedE2eXAxisMetric, setSelectedE2eXAxisMetric] = useState<string | null>(
+  const [requestedE2eXAxisMetric] = useState<string | null>(
     () => getUrlParam('i_e2e_xmetric') || 'p90_ttft',
   );
   // Selected chart variant. Initialize from URL only — SSR cannot read URL, so
@@ -251,30 +282,36 @@ export function InferenceProvider({
   // value (if any) in a post-mount effect — keeps server + client first render
   // identical and avoids "didn't match" hydration warnings when the URL holds
   // a non-default mode.
-  const [selectedXAxisMode, setSelectedXAxisMode] = useState<XAxisMode>('interactivity');
+  const [requestedXAxisMode, setRequestedXAxisMode] = useState<XAxisMode>('interactivity');
   const xAxisModeFromUrlRef = useRef(false);
   useEffect(() => {
     if (xAxisModeFromUrlRef.current) return;
-    const v = getUrlParam('i_xmode');
-    if (v && (X_AXIS_MODES as readonly string[]).includes(v)) {
+    const value = getUrlParam('i_xmode');
+    if (value && (X_AXIS_MODES as readonly string[]).includes(value)) {
       xAxisModeFromUrlRef.current = true;
-      setSelectedXAxisMode(v as XAxisMode);
+      setRequestedXAxisMode(value as XAxisMode);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // Wrap the setter so a button click also aligns selectedE2eXAxisMetric — the
-  // existing useChartData pipeline keys off that flag for the e2e chart's x-axis.
+  const selectedXAxisMode = resolveEffectiveXAxisMode(
+    requestedXAxisMode,
+    effectiveSequence,
+    sequenceResolved,
+  );
   const handleSetXAxisMode = useCallback((mode: XAxisMode) => {
     xAxisModeFromUrlRef.current = true;
-    setSelectedXAxisMode(mode);
-    // The e2e chart's x-axis metric is reconciled in a separate effect below,
-    // because it depends on sequence kind (fixed-seq has no p90_* metrics) and
-    // the agentic percentile, both of which can change independently.
+    setRequestedXAxisMode(mode);
   }, []);
   // Latency percentile applied to the chart x-axis for agentic scenarios.
   // Values: 'p90' | 'p99'. Non-agentic charts ignore.
   const [selectedPercentile, setSelectedPercentile] = useState<string>(
     () => getUrlParam('i_pctl') || 'p90',
+  );
+  const selectedE2eXAxisMetric = resolveE2eXAxisMetric(
+    requestedE2eXAxisMetric,
+    selectedXAxisMode,
+    effectiveSequence,
+    selectedPercentile,
   );
   const [scaleType, setScaleType] = useState<'auto' | 'linear' | 'log'>(
     () => (getUrlParam('i_scale') as 'auto' | 'linear' | 'log') || 'auto',
@@ -391,12 +428,11 @@ export function InferenceProvider({
   );
 
   const filteredAvailableRuns = useMemo(
-    () => filterRunsByModel(availableRuns, modelPrefixes, [...effectivePrecisions]),
+    () => filterRunsByModel(availableRuns, modelPrefixes, [...effectivePrecisions]) ?? {},
     [availableRuns, modelPrefixes, effectivePrecisions],
   );
 
   const effectiveSelectedRunId = useMemo(() => {
-    if (!filteredAvailableRuns) return selectedRunId;
     const filteredRunIds = Object.keys(filteredAvailableRuns);
     if (filteredRunIds.length === 0 || filteredRunIds.includes(selectedRunId)) return selectedRunId;
     return filteredRunIds.reduce((max, id) => (id > max ? id : max), filteredRunIds[0]);
@@ -405,7 +441,7 @@ export function InferenceProvider({
   // The latest run for this model on the selected date. GitHub run ids increase
   // monotonically with time, so the lexicographically-greatest id is the newest run.
   const latestRunIdForModel = useMemo(() => {
-    const ids = filteredAvailableRuns ? Object.keys(filteredAvailableRuns) : [];
+    const ids = Object.keys(filteredAvailableRuns);
     return ids.length > 0 ? ids.reduce((max, id) => (id > max ? id : max), ids[0]) : '';
   }, [filteredAvailableRuns]);
 
@@ -583,62 +619,6 @@ export function InferenceProvider({
     setShowLineLabels(labelState.showLineLabels);
   }, [labelScenarioKind, sequenceResolved, getUrlParam]);
 
-  // Reconcile the x-axis mode with the scenario kind:
-  //  - On mount with no `i_xmode` URL param: snap to the kind's natural default
-  //    (E2E Normalized Interactivity for agentic — the "north star" e2e-interactivity view —
-  //    and interactivity for fixed-sequence scenarios). The state was initialized
-  //    to a SSR-stable constant so server and client render the same DOM; this
-  //    effect fixes it up after hydration.
-  //  - When the user later switches sequence kinds: snap to the new kind's
-  //    natural default (the prior selection was for a different kind, so it
-  //    doesn't carry over).
-  const lastSeqKindRef = useRef<ReturnType<typeof sequenceKind> | null>(null);
-  useEffect(() => {
-    // Wait for availability to resolve the sequence. Before it does,
-    // `effectiveSequence` is a fixed-seq placeholder; recording that kind here
-    // would make the later switch to agentic look like a user-driven kind
-    // change and clobber a URL-restored `i_xmode` with the kind's default.
-    if (!sequenceResolved) return;
-    const kind = sequenceKind(effectiveSequence);
-    const isInitialMount = lastSeqKindRef.current === null;
-    const isAgenticOnlyMode = isAgenticOnlyXAxisMode(selectedXAxisMode);
-    if (!isInitialMount && lastSeqKindRef.current === kind) {
-      if (kind === 'fixed-seq' && isAgenticOnlyMode) {
-        handleSetXAxisMode('interactivity');
-      }
-      return;
-    }
-    lastSeqKindRef.current = kind;
-    if (
-      isInitialMount &&
-      xAxisModeFromUrlRef.current &&
-      !(kind === 'fixed-seq' && isAgenticOnlyMode)
-    ) {
-      // URL-restored agentic-only mode on a fixed-seq sequence makes no sense
-      // — fall through to the default snap below.
-      return;
-    }
-    handleSetXAxisMode('interactivity');
-  }, [sequenceResolved, effectiveSequence, selectedXAxisMode, handleSetXAxisMode]);
-
-  // Reconcile selectedE2eXAxisMetric whenever the mode, sequence kind, or
-  // agentic percentile changes. For fixed-seq the JSONB only carries
-  // median_* / p99_* (no p90_*), so the TTFT button there has to point at
-  // median_ttft — otherwise the chart goes blank. For agentic, we point at
-  // the user's chosen percentile so the dropdown actually drives the axis.
-  useEffect(() => {
-    const isAgentic = sequenceKind(effectiveSequence) === 'agentic';
-    if (selectedXAxisMode === 'ttft') {
-      setSelectedE2eXAxisMetric(isAgentic ? `${selectedPercentile}_ttft` : 'median_ttft');
-    } else if (selectedXAxisMode === 'e2e') {
-      // null = use the chart-config natural x (median_e2el), which useChartData
-      // rewrites to <pctl>_e2el for agentic via withPercentile().
-      setSelectedE2eXAxisMetric(null);
-    }
-    // 'interactivity' mode renders the interactivity chart, which keys off
-    // selectedXAxisMetric (not the e2e one), so nothing to do here.
-  }, [selectedXAxisMode, effectiveSequence, selectedPercentile]);
-
   // Ref guard: when true, filter changes don't clear the active preset.
   // FavoritePresetsDropdown sets this while applying a preset so its own
   // programmatic setter calls don't accidentally deactivate it.
@@ -762,7 +742,7 @@ export function InferenceProvider({
   );
 
   const loading = chartDataLoading;
-  const error = workflowError || chartDataError;
+  const error = availabilityError || workflowError || chartDataError;
 
   // ── Toggle sets ───────────────────────────────────────────────────────────
 
@@ -1156,13 +1136,14 @@ export function InferenceProvider({
     resolveHwSelection,
   ]);
 
-  // Remove selected GPUs that no longer have data for current filters
+  // Remove selected GPUs only after successful availability has settled. An
+  // empty successful scope is different from the transient empty loading state.
   useEffect(() => {
-    if (selectedGPUs.length === 0 || availableGPUs.length === 0) return;
-    const validKeys = new Set(availableGPUs.map((g) => g.value));
-    const valid = selectedGPUs.filter((g) => validKeys.has(g));
+    if (!availabilitySettled || !sequenceResolved || selectedGPUs.length === 0) return;
+    const validKeys = new Set(availableGPUs.map((gpu) => gpu.value));
+    const valid = selectedGPUs.filter((gpu) => validKeys.has(gpu));
     if (valid.length !== selectedGPUs.length) setSelectedGpuState(valid);
-  }, [availableGPUs]);
+  }, [availabilitySettled, sequenceResolved, availableGPUs, selectedGPUs]);
 
   useEffect(() => {
     if (!gpuUrlHydrated) return;
@@ -1497,7 +1478,6 @@ export function InferenceProvider({
       selectedXAxisMetric,
       setSelectedXAxisMetric,
       selectedE2eXAxisMetric,
-      setSelectedE2eXAxisMetric,
       selectedXAxisMode,
       setSelectedXAxisMode: handleSetXAxisMode,
       scaleType,
@@ -1510,7 +1490,6 @@ export function InferenceProvider({
       setQuickFilterSpec,
       loading,
       error,
-      workflowInfo,
       selectedYAxisMetric,
       setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
       selectedPercentile,
@@ -1574,7 +1553,6 @@ export function InferenceProvider({
       graphs,
       loading,
       error,
-      workflowInfo,
       selectedModel,
       effectiveSequence,
       effectivePrecisions,

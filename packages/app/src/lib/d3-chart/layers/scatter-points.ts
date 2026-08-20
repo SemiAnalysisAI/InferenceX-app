@@ -6,7 +6,6 @@ import {
   getShapeConfig,
   getShapeKeyForPrecision,
   applyNormalState,
-  applyHoverState,
 } from '@/lib/chart-rendering';
 
 import type { ContinuousScale } from '../types';
@@ -107,35 +106,6 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
   // Visible shape is created (or swapped, if selectedPrecisions changed) in the
   // merged update pass below.
 
-  // Label (enter only). Multi-line labels are passed as `\n`-separated strings;
-  // we anchor the entire stack via the FIRST tspan's `dy` so getBBox() doesn't
-  // pick up the text element's own (unused) y=0 origin. The first tspan is
-  // raised so the LAST line baseline lands ~8px above the point; subsequent
-  // tspans cascade down by 1.1em.
-  if (!config.hideLabels && config.getLabelText && config.foreground) {
-    const labelGetter = config.getLabelText;
-    entered.each(function (d) {
-      const lines = labelGetter(d).split('\n');
-      const text = d3
-        .select(this)
-        .append('text')
-        .attr('class', 'point-label')
-        .attr('text-anchor', 'middle')
-        .attr('fill', config.foreground!)
-        .attr('font-size', '10px')
-        .attr('font-weight', '700')
-        .attr('pointer-events', 'none');
-      const firstDy = -(0.8 + (lines.length - 1) * 1.1);
-      lines.forEach((line, i) => {
-        text
-          .append('tspan')
-          .attr('x', 0)
-          .attr('dy', i === 0 ? `${firstDy}em` : '1.1em')
-          .text(line);
-      });
-    });
-  }
-
   // Exit: remove stale points
   selection.exit().remove();
 
@@ -166,10 +136,9 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
     syncPointShape(g, shapeKey, config.getColor(d));
   });
 
-  // Update labels: use data join so labels are created/removed properly on toggle.
-  // Anchor the stack via the first tspan (NOT the text dy — that doesn't shift the
-  // bbox cleanly when there are tspan children).
-  if (!config.hideLabels && config.getLabelText && config.foreground) {
+  // Labels stay joined across display toggles. The display phase changes only
+  // visibility, while data and metric phases may update their text.
+  if (config.getLabelText && config.foreground) {
     const labelGetter = config.getLabelText;
     points.each(function (d) {
       const lines = labelGetter(d).split('\n');
@@ -193,6 +162,10 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
         .attr('dy', (_l, i) => (i === 0 ? `${firstDy}em` : '1.1em'))
         .text((l) => l);
     });
+    points
+      .selectAll('.point-label')
+      .style('display', config.hideLabels ? 'none' : '')
+      .style('opacity', config.hideLabels ? 0 : 1);
   } else {
     points.selectAll('.point-label').remove();
   }
@@ -201,105 +174,34 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
 }
 
 /**
- * Attach scatter point tooltip handlers (hover, click, pin).
- * Works for both ScatterGraph and GPUGraph.
+ * Restyle existing scatter marks without rejoining data or rewriting positions.
+ * Used by the display phase for palette, visibility, and label toggles.
  */
-export function attachScatterTooltipHandlers<
-  T extends { precision: string; x: number; y: number; hwKey?: string | number },
+export function updateScatterPointsForDisplay<
+  T extends { precision: string; x: number; y: number },
 >(
-  points: d3.Selection<SVGGElement, T, SVGGElement, unknown>,
-  config: {
-    xScale: ContinuousScale;
-    yScale: ContinuousScale;
-    svgRef: React.RefObject<SVGSVGElement | null> | React.RefObject<SVGSVGElement>;
-    tooltip: d3.Selection<HTMLDivElement | null, unknown, null, undefined>;
-    container: HTMLElement;
-    rulerGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
-    verticalRuler?: d3.Selection<SVGLineElement, unknown, null, undefined>;
-    horizontalRuler?: d3.Selection<SVGLineElement, unknown, null, undefined>;
-    isPinned: () => boolean;
-    pinTooltip: (point: T, isOverlay: boolean) => void;
-    generateTooltipContent: (d: T, pinned: boolean) => string;
-    trackEvent?: (hw: string, x: number, y: number) => void;
-    /** Called after a point is clicked and tooltip is pinned. Use to attach handlers to tooltip buttons. */
-    onPointClick?: (
-      d: T,
-      tooltip: d3.Selection<HTMLDivElement | null, unknown, null, undefined>,
-    ) => void;
-    /** Ref to current scales — when provided, avoids stale-closure bugs after scale recalculation */
-    scalesRef?: React.RefObject<{ xScale: ContinuousScale; yScale: ContinuousScale } | null>;
-    /** Selected precisions, in selection order; controls hover shape key. */
-    selectedPrecisions?: readonly string[];
-  },
+  zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+  config: ScatterPointConfig<T>,
 ): void {
-  const {
-    xScale,
-    yScale,
-    svgRef,
-    tooltip,
-    container,
-    rulerGroup,
-    verticalRuler,
-    horizontalRuler,
-    isPinned,
-    pinTooltip,
-    generateTooltipContent,
-    trackEvent,
-    onPointClick,
-    scalesRef,
-    selectedPrecisions,
-  } = config;
-
+  const points = zoomGroup.selectAll<SVGGElement, T>('.dot-group');
+  points.each(function (d) {
+    const point = d3.select(this);
+    if (config.getOpacity) point.style('opacity', config.getOpacity(d));
+    if (config.getPointerEvents) point.style('pointer-events', config.getPointerEvents(d));
+    const shapeKey = config.getShapeKey
+      ? config.getShapeKey(d)
+      : resolveShapeKey(d.precision, config.selectedPrecisions);
+    syncPointShape(
+      point as unknown as d3.Selection<SVGGElement, unknown, null, undefined>,
+      shapeKey,
+      config.getColor(d),
+    );
+  });
   points
-    .on('mouseenter', function (_event, d) {
-      if (isPinned()) return;
-      applyHoverState(
-        d3.select(this).select('.visible-shape') as any,
-        resolveShapeKey(d.precision, selectedPrecisions),
-      );
-      tooltip.style('opacity', 1).style('display', 'block').style('pointer-events', 'none');
-      const curXScale = scalesRef?.current?.xScale ?? xScale;
-      const curYScale = scalesRef?.current?.yScale ?? yScale;
-      const ct = d3.zoomTransform(svgRef.current!);
-      rulerGroup.style('display', 'block');
-      verticalRuler
-        ?.attr('x1', ct.rescaleX(curXScale)(d.x))
-        .attr('x2', ct.rescaleX(curXScale)(d.x));
-      horizontalRuler
-        ?.attr('y1', ct.rescaleY(curYScale)(d.y))
-        .attr('y2', ct.rescaleY(curYScale)(d.y));
-      tooltip.html(generateTooltipContent(d, false));
-    })
-    .on('mousemove', (event) => {
-      if (isPinned()) return;
-      const [mx, my] = d3.pointer(event, container);
-      const pos = computeTooltipPosition(mx, my, tooltip, container);
-      tooltip.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
-    })
-    .on('mouseleave', function (_event, d) {
-      if (isPinned()) return;
-      applyNormalState(
-        d3.select(this).select('.visible-shape') as any,
-        resolveShapeKey(d.precision, selectedPrecisions),
-      );
-      tooltip.style('opacity', 0).style('display', 'none');
-      rulerGroup.style('display', 'none');
-    })
-    .on('click', (event, d) => {
-      event.stopPropagation();
-      const [mx, my] = d3.pointer(event, container);
-      tooltip.html(generateTooltipContent(d, true));
-      const pos = computeTooltipPosition(mx, my, tooltip, container);
-      tooltip
-        .style('left', `${pos.left}px`)
-        .style('top', `${pos.top}px`)
-        .style('opacity', 1)
-        .style('display', 'block')
-        .style('pointer-events', 'auto');
-      pinTooltip(d, false);
-      onPointClick?.(d, tooltip);
-      trackEvent?.(String(d.hwKey), d.x, d.y);
-    });
+    .selectAll('.point-label')
+    .attr('fill', config.foreground ?? null)
+    .style('display', config.hideLabels ? 'none' : '')
+    .style('opacity', config.hideLabels ? 0 : 1);
 }
 
 /**

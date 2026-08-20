@@ -8,8 +8,14 @@ import { renderAxes, renderGrid, type AnyScale } from '../chart-update';
 import type { ChartLayout, ContinuousScale } from '../types';
 
 import { buildScale, isBandScale, type BuiltScale } from './scale-builders';
-import { renderLayer, updateLayerOnZoom } from './layer-renderer';
-import type { AxisConfig, D3ChartProps, RenderContext, ZoomContext } from './types';
+import {
+  renderLayer,
+  updateLayerDecorationOnZoom,
+  updateLayerForDisplay,
+  updateLayerForMetric,
+  updateLayerPositionOnZoom,
+} from './layer-renderer';
+import type { AxisConfig, D3ChartProps, LayerConfig, RenderContext, ZoomContext } from './types';
 
 interface RendererDeps {
   svgRef: React.RefObject<SVGSVGElement | null>;
@@ -59,10 +65,61 @@ function resolveTickValues(
   if (!tickValues) return undefined;
   return typeof tickValues === 'function' ? tickValues(scale) : tickValues;
 }
+export interface ZoomFrameBatcher {
+  schedule: (work: () => void) => void;
+  cancel: () => void;
+}
+
+/** Coalesces expensive zoom work and always runs the latest submitted closure. */
+export function createZoomFrameBatcher(
+  requestFrame: (callback: FrameRequestCallback) => number,
+  cancelFrame: (id: number) => void,
+): ZoomFrameBatcher {
+  let frameId: number | null = null;
+  let latestWork: (() => void) | null = null;
+
+  return {
+    schedule(work) {
+      latestWork = work;
+      if (frameId !== null) return;
+      frameId = requestFrame(() => {
+        frameId = null;
+        const finalWork = latestWork;
+        latestWork = null;
+        finalWork?.();
+      });
+    },
+    cancel() {
+      if (frameId !== null) cancelFrame(frameId);
+      frameId = null;
+      latestWork = null;
+    },
+  };
+}
+
+function customLayerDisplayIdentities<T>(layers: LayerConfig<T>[]): Map<string, string> {
+  const identities = new Map<string, string>();
+  layers.forEach((layer, index) => {
+    if (layer.type === 'custom' && layer.displayIdentity !== undefined) {
+      identities.set(layer.key ?? `custom:${index}`, layer.displayIdentity);
+    }
+  });
+  return identities;
+}
+
+function customLayerDisplayPlanIdentity<T>(layers: LayerConfig<T>[]): string {
+  return layers
+    .map((layer, index) =>
+      layer.type === 'custom' && layer.displayIdentity !== undefined
+        ? `${layer.key ?? `custom:${index}`}:${layer.displayIdentity}`
+        : '',
+    )
+    .join('|');
+}
 
 /**
- * Core render effect for D3Chart. Builds scales, renders structure/axes/grid/layers,
- * wires up tooltip and zoom handlers.
+ * Coordinates structure, stable-identity data joins, metric updates, display
+ * invalidation, tooltip wiring, and zoom work for D3Chart.
  */
 export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps): void {
   const {
@@ -71,6 +128,9 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     margin = { top: 24, right: 10, bottom: 40, left: 60 },
     watermark = 'logo',
     clipContent = true,
+    dataIdentity,
+    metricIdentity,
+    displayIdentity,
     xScale: xScaleConfig,
     yScale: yScaleConfig,
     xAxis: xAxisConfig,
@@ -80,6 +140,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     tooltip: tooltipConfig,
     transitionDuration,
     onRender,
+    onDisplayUpdate,
   } = props;
 
   const {
@@ -101,17 +162,89 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
   const layoutRef = useRef<ChartLayout | null>(null);
   const prevDataRef = useRef(data);
   const prevScalesRef = useRef({ xScaleConfig, yScaleConfig });
+  const zoomFrameBatcherRef = useRef<ZoomFrameBatcher | null>(null);
+  if (zoomFrameBatcherRef.current === null) {
+    zoomFrameBatcherRef.current = createZoomFrameBatcher(
+      (callback) => requestAnimationFrame(callback),
+      (id) => cancelAnimationFrame(id),
+    );
+  }
+  const renderContextRef = useRef<RenderContext | null>(null);
+  const joinedIdentityRef = useRef<string | null>(null);
+  const lastMetricIdentityRef = useRef<string | undefined>(undefined);
+  const lastDisplayIdentityRef = useRef<string | undefined>(undefined);
+  const customLayerDisplayIdentitiesRef = useRef<Map<string, string>>(new Map());
+  const layersRef = useRef(layers);
+  const axesRef = useRef({ xAxisConfig, yAxisConfig });
+  const zoomConfigRef = useRef(zoomConfig);
+  layersRef.current = layers;
+  axesRef.current = { xAxisConfig, yAxisConfig };
+  zoomConfigRef.current = zoomConfig;
+  const displayCallbackRef = useRef(onDisplayUpdate);
+  displayCallbackRef.current = onDisplayUpdate;
+  const customDisplayPlanIdentity = customLayerDisplayPlanIdentity(layers);
+  const hasScales =
+    xScaleConfig !== null &&
+    xScaleConfig !== undefined &&
+    yScaleConfig !== null &&
+    yScaleConfig !== undefined;
+  const hasRenderableData = data.length > 0 || layers.some((layer) => layer.type === 'custom');
+  const dataJoinIdentity = dataIdentity ?? data;
+  const dataPhaseXScale = dataIdentity ? null : xScaleConfig;
+  const dataPhaseYScale = dataIdentity ? null : yScaleConfig;
+  const dataPhaseLayers = dataIdentity ? null : layers;
+  const dataPhaseTooltip = dataIdentity ? null : tooltipConfig;
 
-  // useLayoutEffect ensures D3 renders synchronously before browser paint,
-  // preventing a frame where dots and lines are out of sync during y-axis metric changes.
+  // Phase 1: SVG structure. Metric changes may refresh labels here, but never
+  // touch joined marks.
   useLayoutEffect(() => {
-    if (!svgRef.current || !tooltipRef.current || dimensions.width === 0) return;
-    if (data.length === 0 && layers.every((layer) => layer.type !== 'custom')) {
+    if (!svgRef.current || dimensions.width === 0) return;
+    if (!hasRenderableData) {
       d3.select(svgRef.current).selectAll('*').remove();
       scalesRef.current = null;
       layoutRef.current = null;
+      renderContextRef.current = null;
       dismissTooltip(true);
-      prevDataRef.current = data;
+      return;
+    }
+
+    layoutRef.current = setupChartStructure(svgRef.current, {
+      chartId,
+      containerWidth: dimensions.width,
+      containerHeight: dimensions.height,
+      margin,
+      watermark: getDomainAwareChartWatermark(watermark, window.location.hostname),
+      xLabel: xAxisConfig?.label,
+      yLabel: yAxisConfig?.label,
+      clipContent,
+      hideAxes: !hasScales,
+    });
+  }, [
+    chartId,
+    dimensions.width,
+    dimensions.height,
+    margin.top,
+    margin.right,
+    margin.bottom,
+    margin.left,
+    watermark,
+    xAxisConfig?.label,
+    yAxisConfig?.label,
+    clipContent,
+    hasScales,
+    hasRenderableData,
+  ]);
+
+  // Phase 2: full data join. With a supplied identity this runs only when the
+  // point set changes, not when coordinates or display state change.
+  useLayoutEffect(() => {
+    if (
+      !svgRef.current ||
+      !tooltipRef.current ||
+      dimensions.width === 0 ||
+      !hasRenderableData ||
+      !layoutRef.current
+    ) {
       return;
     }
 
@@ -144,25 +277,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         }
       }
 
-      // ── Structure setup ──
-      const hasScales =
-        xScaleConfig !== null &&
-        xScaleConfig !== undefined &&
-        yScaleConfig !== null &&
-        yScaleConfig !== undefined;
-      const layout = setupChartStructure(svgRef.current, {
-        chartId,
-        containerWidth: dimensions.width,
-        containerHeight: dimensions.height,
-        margin,
-        watermark: getDomainAwareChartWatermark(watermark, window.location.hostname),
-        xLabel: xAxisConfig?.label,
-        yLabel: yAxisConfig?.label,
-        clipContent,
-        hideAxes: !hasScales,
-      });
-      layoutRef.current = layout;
-
+      const layout = layoutRef.current;
+      if (!layout) return;
       const { width, height, zoomGroup, g } = layout;
       const renderGroup = clipContent ? zoomGroup : g;
       const tooltip = d3.select(tooltipRef.current);
@@ -217,6 +333,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         height,
         transitionDuration,
       };
+      renderContextRef.current = ctx;
 
       // ── Render layers ──
       const layerSelections: (d3.Selection<any, any, any, any> | null)[] = [];
@@ -224,6 +341,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         const sel = renderLayer(layer, renderGroup, xScale, yScale, layout, ctx);
         layerSelections.push(sel);
       }
+      customLayerDisplayIdentitiesRef.current = customLayerDisplayIdentities(layers);
+      lastDisplayIdentityRef.current = displayIdentity;
 
       // Ensure points render above lines/rooflines on re-renders
       // (D3 enter appends new elements at the end, so new lines can end up after existing dots)
@@ -406,90 +525,109 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
             customTransformStorage: zoomConfig.customTransformStorage,
             onZoom: (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
               const transform = event.transform;
+              const currentScales = scalesRef.current;
+              const currentLayout = layoutRef.current;
+              const currentCtx = renderContextRef.current;
+              if (!currentScales || !currentLayout || !currentCtx) return;
+              const { xScale: zoomXScale, yScale: zoomYScale } = currentScales;
+              const zoomLayout = currentLayout;
+              const zoomLayers = layersRef.current;
+              const { xAxisConfig: zoomXAxisConfig, yAxisConfig: zoomYAxisConfig } =
+                axesRef.current;
+              const currentZoomConfig = zoomConfigRef.current;
+              const currentZoomAxes = currentZoomConfig?.axes ?? 'both';
+              const zoomRenderGroup = clipContent ? zoomLayout.zoomGroup : zoomLayout.g;
+              const zoomBaseContext = currentCtx;
 
-              // Dismiss tooltip on zoom
               if (isPinned()) {
                 dismissTooltip(true);
                 tooltip
                   .style('opacity', 0)
                   .style('display', 'none')
                   .style('pointer-events', 'none');
-                renderGroup.select('.ruler-group').style('display', 'none');
+                zoomRenderGroup.select('.ruler-group').style('display', 'none');
               }
 
-              // Compute new scales
-              let newXScale: BuiltScale = xScale;
-              let newYScale: BuiltScale = yScale;
-
-              if (zoomAxes === 'x' || zoomAxes === 'both') {
-                if (zoomConfig.rescaleX && !isBandScale(xScale)) {
-                  newXScale = zoomConfig.rescaleX(xScale as ContinuousScale, transform);
-                } else if (!isBandScale(xScale)) {
-                  newXScale = transform.rescaleX(xScale as any);
+              let newXScale: BuiltScale = zoomXScale;
+              let newYScale: BuiltScale = zoomYScale;
+              if (currentZoomAxes === 'x' || currentZoomAxes === 'both') {
+                if (currentZoomConfig?.rescaleX && !isBandScale(zoomXScale)) {
+                  newXScale = currentZoomConfig.rescaleX(zoomXScale as ContinuousScale, transform);
+                } else if (!isBandScale(zoomXScale)) {
+                  newXScale = transform.rescaleX(zoomXScale as ContinuousScale);
                 }
               }
-              if (zoomAxes === 'y' || zoomAxes === 'both') {
-                if (zoomConfig.rescaleY && !isBandScale(yScale)) {
-                  newYScale = zoomConfig.rescaleY(yScale as ContinuousScale, transform);
-                } else if (!isBandScale(yScale)) {
-                  newYScale = transform.rescaleY(yScale as any);
+              if (currentZoomAxes === 'y' || currentZoomAxes === 'both') {
+                if (currentZoomConfig?.rescaleY && !isBandScale(zoomYScale)) {
+                  newYScale = currentZoomConfig.rescaleY(zoomYScale as ContinuousScale, transform);
+                } else if (!isBandScale(zoomYScale)) {
+                  newYScale = transform.rescaleY(zoomYScale as ContinuousScale);
                 }
               }
 
-              // Update axes + grid
-              const xTickValues = resolveTickValues(xAxisConfig?.tickValues, newXScale as AnyScale);
-              const yTickValues = resolveTickValues(yAxisConfig?.tickValues, newYScale as AnyScale);
-              renderAxes(layout, newXScale as AnyScale, newYScale as any, {
-                xTickFormat: xAxisConfig?.tickFormat,
-                yTickFormat: yAxisConfig?.tickFormat,
-                xTickCount: xAxisConfig?.tickCount,
-                yTickCount: yAxisConfig?.tickCount,
-                xTickValues,
-                yTickValues,
-              });
-              if (xAxisConfig?.customize) {
-                xAxisConfig.customize(layout.xAxisGroup);
-              }
-              if (yAxisConfig?.customize) {
-                yAxisConfig.customize(layout.yAxisGroup);
-              }
-              renderGrid(
-                layout,
-                newXScale as AnyScale,
-                newYScale as any,
-                yAxisConfig?.tickCount ?? 5,
-                0,
-                xTickValues,
-                yTickValues,
-              );
-
-              // Update layers
-              const zoomCtx: ZoomContext = {
-                ...ctx,
+              const zoomContext: ZoomContext = {
+                ...zoomBaseContext,
                 newXScale,
                 newYScale,
                 transform,
               };
 
-              for (const layer of layers) {
-                updateLayerOnZoom(
+              for (const layer of zoomLayers) {
+                updateLayerPositionOnZoom(
                   layer,
-                  renderGroup,
-                  xScale,
-                  yScale,
+                  zoomRenderGroup,
+                  zoomXScale,
                   newXScale,
                   newYScale,
-                  layout,
-                  zoomCtx,
+                  zoomLayout,
                 );
               }
 
-              // Keep line labels above the points after the per-layer zoom
-              // updates re-touch the DOM (mirrors the full-render raise above).
-              renderGroup.selectAll('.line-label').raise();
-
-              // User callback
-              zoomConfig.onZoom?.(event, zoomCtx);
+              zoomFrameBatcherRef.current?.schedule(() => {
+                const xTickValues = resolveTickValues(
+                  zoomXAxisConfig?.tickValues,
+                  newXScale as AnyScale,
+                );
+                const yTickValues = resolveTickValues(
+                  zoomYAxisConfig?.tickValues,
+                  newYScale as AnyScale,
+                );
+                const zoomYAxisScale = newYScale as unknown as
+                  | ContinuousScale
+                  | d3.ScaleBand<string>;
+                renderAxes(zoomLayout, newXScale as AnyScale, zoomYAxisScale, {
+                  xTickFormat: zoomXAxisConfig?.tickFormat,
+                  yTickFormat: zoomYAxisConfig?.tickFormat,
+                  xTickCount: zoomXAxisConfig?.tickCount,
+                  yTickCount: zoomYAxisConfig?.tickCount,
+                  xTickValues,
+                  yTickValues,
+                });
+                zoomXAxisConfig?.customize?.(zoomLayout.xAxisGroup);
+                zoomYAxisConfig?.customize?.(zoomLayout.yAxisGroup);
+                renderGrid(
+                  zoomLayout,
+                  newXScale as AnyScale,
+                  zoomYAxisScale,
+                  zoomYAxisConfig?.tickCount ?? 5,
+                  0,
+                  xTickValues,
+                  yTickValues,
+                );
+                for (const layer of zoomLayers) {
+                  updateLayerDecorationOnZoom(
+                    layer,
+                    zoomRenderGroup,
+                    zoomXScale,
+                    newXScale,
+                    newYScale,
+                    zoomLayout,
+                    zoomContext,
+                  );
+                }
+                zoomRenderGroup.selectAll('.line-label').raise();
+                currentZoomConfig?.onZoom?.(event, zoomContext);
+              });
             },
           },
         );
@@ -532,21 +670,205 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         });
       }
 
-      // ── User onRender callback ──
+      renderContextRef.current = ctx;
+      joinedIdentityRef.current = dataIdentity ?? null;
+      lastMetricIdentityRef.current = metricIdentity;
       onRender?.(ctx);
     }
+    return () => {
+      zoomFrameBatcherRef.current?.cancel();
+    };
     // We intentionally list specific deps rather than the entire props object.
   }, [
-    data,
-    dimensions,
+    dataJoinIdentity,
+    dimensions.width,
+    dimensions.height,
     chartId,
-    xScaleConfig,
-    yScaleConfig,
-    layers,
+    dataPhaseXScale,
+    dataPhaseYScale,
+    dataPhaseLayers,
     zoomConfig?.enabled,
-    tooltipConfig,
+    dataPhaseTooltip,
     transitionDuration,
     setupZoom,
     watermark,
+    clipContent,
+    hasRenderableData,
   ]);
+
+  // Phase 3: coordinate and scale updates. Bound scatter data is mutated by
+  // stable key, so metric-only changes skip enter/update/exit joins.
+  useLayoutEffect(() => {
+    if (
+      !dataIdentity ||
+      metricIdentity === undefined ||
+      joinedIdentityRef.current !== dataIdentity ||
+      lastMetricIdentityRef.current === metricIdentity ||
+      !svgRef.current ||
+      !tooltipRef.current ||
+      !layoutRef.current
+    ) {
+      return;
+    }
+
+    zoomFrameBatcherRef.current?.cancel();
+
+    const layout = layoutRef.current;
+    const { width, height } = layout;
+    const renderGroup = clipContent ? layout.zoomGroup : layout.g;
+    const xScale = hasScales
+      ? buildScale(xScaleConfig!, [0, width])
+      : buildScale({ type: 'linear', domain: [0, 1] }, [0, width]);
+    const yScale = hasScales
+      ? buildScale(yScaleConfig!, [height, 0])
+      : buildScale({ type: 'linear', domain: [0, 1] }, [height, 0]);
+    scalesRef.current = { xScale, yScale };
+
+    const transform = d3.zoomTransform(svgRef.current);
+    const zoomAxes = zoomConfig?.axes ?? 'both';
+    let currentXScale = xScale;
+    let currentYScale = yScale;
+    if ((zoomAxes === 'x' || zoomAxes === 'both') && !isBandScale(xScale)) {
+      currentXScale = zoomConfig?.rescaleX
+        ? zoomConfig.rescaleX(xScale as ContinuousScale, transform)
+        : transform.rescaleX(xScale as ContinuousScale);
+    }
+    if ((zoomAxes === 'y' || zoomAxes === 'both') && !isBandScale(yScale)) {
+      currentYScale = zoomConfig?.rescaleY
+        ? zoomConfig.rescaleY(yScale as ContinuousScale, transform)
+        : transform.rescaleY(yScale as ContinuousScale);
+    }
+
+    if (hasScales) {
+      const xTickValues = resolveTickValues(xAxisConfig?.tickValues, currentXScale as AnyScale);
+      const yTickValues = resolveTickValues(yAxisConfig?.tickValues, currentYScale as AnyScale);
+      const yAxisScale = currentYScale as unknown as ContinuousScale | d3.ScaleBand<string>;
+      renderGrid(
+        layout,
+        currentXScale as AnyScale,
+        yAxisScale,
+        yAxisConfig?.tickCount ?? 5,
+        0,
+        xTickValues,
+        yTickValues,
+      );
+      renderAxes(layout, currentXScale as AnyScale, yAxisScale, {
+        xTickFormat: xAxisConfig?.tickFormat,
+        yTickFormat: yAxisConfig?.tickFormat,
+        xTickCount: xAxisConfig?.tickCount,
+        yTickCount: yAxisConfig?.tickCount,
+        xTickValues,
+        yTickValues,
+      });
+      xAxisConfig?.customize?.(layout.xAxisGroup);
+      yAxisConfig?.customize?.(layout.yAxisGroup);
+    }
+
+    const baseCtx: RenderContext = {
+      layout,
+      tooltipElement: tooltipRef.current,
+      xScale,
+      yScale,
+      width,
+      height,
+      transitionDuration,
+    };
+    const metricCtx: RenderContext = {
+      ...baseCtx,
+      xScale: currentXScale,
+      yScale: currentYScale,
+    };
+    for (const layer of layers) {
+      updateLayerForMetric(layer, renderGroup, currentXScale, currentYScale, layout, metricCtx);
+    }
+    customLayerDisplayIdentitiesRef.current = customLayerDisplayIdentities(layers);
+    lastDisplayIdentityRef.current = displayIdentity;
+    renderGroup.selectAll('.dot-group').raise();
+    renderGroup.selectAll('.point').raise();
+    renderGroup.selectAll('.line-label').raise();
+
+    if (tooltipConfig && !tooltipConfig.proximityHover) {
+      const attachIdx =
+        tooltipConfig.attachToLayer ??
+        layers.findIndex((layer) => layer.type === 'scatter' || layer.type === 'point');
+      const targetLayer = attachIdx >= 0 ? layers[attachIdx] : undefined;
+      if (targetLayer?.type === 'scatter') {
+        const rulers = createRulers(
+          renderGroup,
+          tooltipConfig.rulerType,
+          width,
+          height,
+          'var(--foreground)',
+        );
+        attachHandlers(
+          renderGroup.selectAll('.dot-group'),
+          {
+            rulerType: tooltipConfig.rulerType,
+            generateTooltipContent: tooltipConfig.content,
+            getRulerX: tooltipConfig.getRulerX,
+            getRulerY: tooltipConfig.getRulerY,
+            onHoverStart: tooltipConfig.onHoverStart,
+            onHoverEnd: tooltipConfig.onHoverEnd,
+            onPointClick: tooltipConfig.onPointClick,
+          },
+          svgRef.current.parentElement as HTMLDivElement,
+          d3.select(tooltipRef.current),
+          rulers,
+          currentXScale,
+          currentYScale,
+          svgRef,
+          zoomConfig?.axes,
+        );
+      }
+    }
+
+    renderContextRef.current = baseCtx;
+    lastMetricIdentityRef.current = metricIdentity;
+    onRender?.(baseCtx);
+  }, [
+    dataIdentity,
+    metricIdentity,
+    dimensions.width,
+    dimensions.height,
+    xScaleConfig,
+    yScaleConfig,
+    xAxisConfig,
+    yAxisConfig,
+    layers,
+    zoomConfig,
+    tooltipConfig,
+    transitionDuration,
+    onRender,
+    hasScales,
+    clipContent,
+    scalesRef,
+    svgRef,
+    tooltipRef,
+    createRulers,
+    attachHandlers,
+  ]);
+
+  // Phase 4: display-only invalidation. Charts can restyle existing marks
+  // without rebuilding structure, joins, scales, or paths.
+  useLayoutEffect(() => {
+    const ctx = renderContextRef.current;
+    if (!ctx) return;
+    const renderGroup = clipContent ? ctx.layout.zoomGroup : ctx.layout.g;
+    const previousCustomIdentities = customLayerDisplayIdentitiesRef.current;
+    const nextCustomIdentities = customLayerDisplayIdentities(layersRef.current);
+    const displayChanged = lastDisplayIdentityRef.current !== displayIdentity;
+    layersRef.current.forEach((layer, index) => {
+      if (layer.type === 'custom') {
+        if (layer.displayIdentity === undefined) return;
+        const key = layer.key ?? `custom:${index}`;
+        if (previousCustomIdentities.get(key) === layer.displayIdentity) return;
+      } else if (!displayChanged) {
+        return;
+      }
+      updateLayerForDisplay(layer, renderGroup, ctx);
+    });
+    customLayerDisplayIdentitiesRef.current = nextCustomIdentities;
+    lastDisplayIdentityRef.current = displayIdentity;
+    if (displayChanged) displayCallbackRef.current?.(ctx);
+  }, [displayIdentity, customDisplayPlanIdentity]);
 }

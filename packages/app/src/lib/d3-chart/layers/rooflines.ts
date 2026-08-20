@@ -72,6 +72,23 @@ export function renderRooflines<T extends { x: number; y: number }>(
   });
 }
 
+/** Restyle existing rooflines without rejoining entries or rewriting path geometry. */
+export function updateRooflinesForDisplay(
+  zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+  config: RooflineConfig,
+): void {
+  const { getColor, getOpacity, strokeWidth = 2, strokeDasharray } = config;
+  zoomGroup
+    .selectAll<SVGPathElement, RooflineEntry<{ x: number; y: number }>>('.roofline-path')
+    .attr('stroke', (d) => getColor(d.key))
+    .attr('stroke-width', strokeWidth)
+    .attr('stroke-dasharray', strokeDasharray ?? null)
+    .each(function (d) {
+      const opacity = getOpacity?.(d.key);
+      if (opacity !== undefined) d3.select(this).style('opacity', opacity);
+    });
+}
+
 /** Update roofline paths on zoom with new scales. */
 export function updateRooflinesOnZoom<T extends { x: number; y: number }>(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,

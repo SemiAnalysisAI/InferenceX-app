@@ -2,7 +2,15 @@
 
 import { Pause, Play, RotateCcw, Video } from 'lucide-react';
 import { flushSync } from 'react-dom';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type SetStateAction,
+} from 'react';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
@@ -24,7 +32,12 @@ import { track } from '@/lib/analytics';
 import { Sequence } from '@/lib/data-mappings';
 import { cn } from '@/lib/utils';
 
-import { buildReplayTimeline, computeFullRunDomain } from './buildReplayTimeline';
+import {
+  buildReplayTimeline,
+  computeFullRunDomain,
+  type ReplayTimeline,
+  type StepDomain,
+} from './buildReplayTimeline';
 import type { Mp4ExportError, Mp4ExportStage } from './exportMp4';
 import { buildFrameData, dateAtFraction, shouldCommitFraction, spanMs } from './replayFrameData';
 import { useReducedMotion } from './useReducedMotion';
@@ -50,6 +63,36 @@ interface ReplayPanelProps {
 
 const SPEED_OPTIONS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const REPLAY_BODY_MIN_HEIGHT = 480;
+
+interface ReplayPlaybackState {
+  timeline: ReplayTimeline | null;
+  fraction: number;
+  playing: boolean;
+}
+
+type ReplayPlaybackAction =
+  | { type: 'resetTimeline'; timeline: ReplayTimeline | null }
+  | { type: 'setFraction'; value: SetStateAction<number> }
+  | { type: 'setPlaying'; value: SetStateAction<boolean> };
+
+function replayPlaybackReducer(
+  state: ReplayPlaybackState,
+  action: ReplayPlaybackAction,
+): ReplayPlaybackState {
+  if (action.type === 'resetTimeline') {
+    return { timeline: action.timeline, fraction: 0, playing: false };
+  }
+  if (action.type === 'setFraction') {
+    return {
+      ...state,
+      fraction: typeof action.value === 'function' ? action.value(state.fraction) : action.value,
+    };
+  }
+  return {
+    ...state,
+    playing: typeof action.value === 'function' ? action.value(state.playing) : action.value,
+  };
+}
 
 /**
  * Replay panel that drives the actual `<ScatterGraph>` with interpolated frame
@@ -107,6 +150,37 @@ export default function ReplayPanel({
     [timeline, activeHwTypes],
   );
 
+  return (
+    <ReplayPanelContent
+      parentChartId={parentChartId}
+      chartDefinition={chartDefinition}
+      yLabel={yLabel}
+      xLabel={xLabel}
+      timeline={timeline}
+      fixedExtent={fixedExtent}
+      selectedModel={selectedModel}
+      isLoading={history.isLoading}
+    />
+  );
+}
+
+interface ReplayPanelContentProps extends ReplayPanelProps {
+  timeline: ReplayTimeline | null;
+  fixedExtent: StepDomain | null;
+  selectedModel: string;
+  isLoading: boolean;
+}
+
+function ReplayPanelContent({
+  parentChartId,
+  chartDefinition,
+  yLabel,
+  xLabel,
+  timeline,
+  fixedExtent,
+  selectedModel,
+  isLoading,
+}: ReplayPanelContentProps) {
   // Track the SVG's position inside our relative wrapper so the date overlay
   // can anchor its bottom-right to the chart plot's top-right (the wrapper
   // also contains the legend, so we can't anchor to the wrapper edge).
@@ -175,8 +249,24 @@ export default function ReplayPanel({
 
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const [fraction, setFraction] = useState(0);
-  const [playing, setPlaying] = useState(false);
+  const [playback, dispatchPlayback] = useReducer(replayPlaybackReducer, {
+    timeline,
+    fraction: 0,
+    playing: false,
+  });
+  let { fraction, playing } = playback;
+  const timelineChanged = playback.timeline !== timeline;
+  if (timelineChanged) {
+    fraction = 0;
+    playing = false;
+    dispatchPlayback({ type: 'resetTimeline', timeline });
+  }
+  const setFraction = useCallback((value: SetStateAction<number>) => {
+    dispatchPlayback({ type: 'setFraction', value });
+  }, []);
+  const setPlaying = useCallback((value: SetStateAction<boolean>) => {
+    dispatchPlayback({ type: 'setPlaying', value });
+  }, []);
   const [speed, setSpeed] = useState(1);
   // Fixed axes (default) freeze the coordinate space to the whole run so the
   // frontier visibly expands over time; turning this off lets the axes refit to
@@ -212,7 +302,8 @@ export default function ReplayPanel({
   // so the predicate compares like-with-like — comparing against the
   // React-committed value lags by a frame and would no-op a backward scrub
   // that crosses a quantum boundary.
-  const fractionRef = useRef(0);
+  const fractionRef = useRef(fraction);
+  if (timelineChanged) fractionRef.current = 0;
   const commitFraction = useCallback((next: number, opts?: { force?: boolean }) => {
     const clamped = next < 0 ? 0 : Math.min(1, next);
     const prev = fractionRef.current;
@@ -273,12 +364,6 @@ export default function ReplayPanel({
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [playing, timeline, prefersReducedMotion]);
-
-  useEffect(() => {
-    fractionRef.current = 0;
-    setFraction(0);
-    setPlaying(false);
-  }, [timeline]);
 
   const frameData = useMemo(
     () => (timeline ? buildFrameData(timeline, fraction) : []),
@@ -464,7 +549,7 @@ export default function ReplayPanel({
     }
   }, [chartDefinition.chartType, parentChartId, selectedModel, timeline, hasWebCodecs]);
 
-  if (history.isLoading || !timeline) {
+  if (isLoading || !timeline) {
     return (
       <div
         className="p-4 sm:p-6 flex flex-col"

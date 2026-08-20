@@ -1,7 +1,11 @@
 import type React from 'react';
+import type { WorkerPower } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 import type { HardwareEntry } from '@/lib/constants';
 import type { Model, Sequence } from '@/lib/data-mappings';
+import type { MetricKey } from './metric-registry';
+
+export type { WorkerPower };
 
 /**
  * Role of a single worker process in a multinode / disaggregated deployment.
@@ -16,36 +20,6 @@ import type { Model, Sequence } from '@/lib/data-mappings';
  * cast at the point of use.
  */
 export type WorkerRole = 'prefill' | 'decode' | 'agg' | 'frontend';
-
-/**
- * Per-worker measured power entry emitted by the runner's aggregate_power.py
- * for multinode and disaggregated runs. The chart layer can use these to
- * surface a stacked breakdown of where energy is spent across worker types.
- *
- * `hosts` lists the node hostnames whose perfmon CSVs were rolled up into
- * this worker entry (a single-node worker has one host; a multinode decode
- * worker spanning 4 nodes has four). Optional because pre-multinode versions
- * of aggregate_power.py didn't emit it.
- *
- * `avg_temp_c`, `peak_temp_c`, `avg_util_pct`, `avg_mem_used_mb` mirror the
- * cluster-wide telemetry scalars and are only present when the perfmon CSVs
- * include the corresponding sample columns. Each is optional so callers can
- * distinguish "field absent from this run" from "field present and equal to 0".
- */
-export interface WorkerPower {
-  // `string` rather than `WorkerRole` so the type lines up with what we get
-  // from the JSONB column without an unsafe cast at every boundary. Chart
-  // code can still narrow on the literal values it understands.
-  role: string;
-  worker_idx: number;
-  hosts?: string[];
-  num_gpus: number;
-  avg_power_w: number;
-  avg_temp_c?: number;
-  peak_temp_c?: number;
-  avg_util_pct?: number;
-  avg_mem_used_mb?: number;
-}
 
 /**
  * Represents an aggregated data entry, typically from a raw data source.
@@ -269,6 +243,7 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   // Chart-specific derived fields
   x: number;
   y: number;
+  roof?: boolean;
   hidden?: boolean;
   /**
    * Whether this point sits on the canonical
@@ -360,46 +335,7 @@ export interface ClippedInferenceData {
 /**
  * Keys of InferenceData that have the roofline metric structure ({y, roof}).
  */
-export type YAxisMetricKey =
-  | 'tpPerGpu'
-  | 'outputTputPerGpu'
-  | 'inputTputPerGpu'
-  | 'tpPerMw'
-  | 'inputTputPerMw'
-  | 'outputTputPerMw'
-  | 'costh'
-  | 'costn'
-  | 'costr'
-  | 'costhOutput'
-  | 'costnOutput'
-  | 'costrOutput'
-  | 'costhi'
-  | 'costni'
-  | 'costri'
-  | 'costUser'
-  | 'tokensPerDollarH'
-  | 'tokensPerDollarN'
-  | 'tokensPerDollarR'
-  | 'outputTokensPerDollarH'
-  | 'outputTokensPerDollarN'
-  | 'outputTokensPerDollarR'
-  | 'inputTokensPerDollarH'
-  | 'inputTokensPerDollarN'
-  | 'inputTokensPerDollarR'
-  | 'tokensPerDollarUser'
-  | 'powerUser'
-  | 'jTotal'
-  | 'jOutput'
-  | 'jInput'
-  | 'measuredAvgPower'
-  | 'measuredPrefillAvgPower'
-  | 'measuredDecodeAvgPower'
-  | 'measuredJPerOutputToken'
-  | 'measuredJPerTotalToken'
-  | 'measuredJPerInputToken'
-  | 'measuredJPerSuccessfulQuery'
-  | 'measuredWhPerSuccessfulQuery'
-  | 'measuredPowerPercentTdp';
+export type YAxisMetricKey = MetricKey;
 
 /**
  * Defines the configuration and labels for a specific chart.
@@ -422,171 +358,6 @@ export interface ChartDefinition {
   x_label: string;
   y: keyof AggDataEntry;
   y_label?: string;
-  y_tpPerGpu?: string;
-  y_tpPerGpu_label?: string;
-  y_tpPerGpu_title?: string;
-  y_tpPerGpu_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_outputTputPerGpu?: string;
-  y_outputTputPerGpu_label?: string;
-  y_outputTputPerGpu_title?: string;
-  y_outputTputPerGpu_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_inputTputPerGpu?: string;
-  y_inputTputPerGpu_label?: string;
-  y_inputTputPerGpu_title?: string;
-  y_inputTputPerGpu_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_inputTputPerGpu_x?: string;
-  y_inputTputPerGpu_x_label?: string;
-  y_inputTputPerGpu_heading?: string;
-  y_tpPerMw?: string;
-  y_tpPerMw_label?: string;
-  y_tpPerMw_title?: string;
-  y_tpPerMw_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_inputTputPerMw?: string;
-  y_inputTputPerMw_label?: string;
-  y_inputTputPerMw_title?: string;
-  y_inputTputPerMw_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_outputTputPerMw?: string;
-  y_outputTputPerMw_label?: string;
-  y_outputTputPerMw_title?: string;
-  y_outputTputPerMw_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_costh?: string;
-  y_costh_label?: string;
-  y_costh_title?: string;
-  y_costh_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_costn?: string;
-  y_costn_label?: string;
-  y_costn_title?: string;
-  y_costn_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_costr?: string;
-  y_costr_label?: string;
-  y_costr_title?: string;
-  y_costr_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  // Cost per million output tokens
-  y_costhOutput?: string;
-  y_costhOutput_label?: string;
-  y_costhOutput_title?: string;
-  y_costhOutput_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_costnOutput?: string;
-  y_costnOutput_label?: string;
-  y_costnOutput_title?: string;
-  y_costnOutput_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_costrOutput?: string;
-  y_costrOutput_label?: string;
-  y_costrOutput_title?: string;
-  y_costrOutput_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  // Cost per million input tokens
-  y_costhi?: string;
-  y_costhi_label?: string;
-  y_costhi_title?: string;
-  y_costhi_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_costni?: string;
-  y_costni_label?: string;
-  y_costni_title?: string;
-  y_costni_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_costri?: string;
-  y_costri_label?: string;
-  y_costri_title?: string;
-  y_costri_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_tokensPerDollarH?: string;
-  y_tokensPerDollarH_label?: string;
-  y_tokensPerDollarH_title?: string;
-  y_tokensPerDollarH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_tokensPerDollarN?: string;
-  y_tokensPerDollarN_label?: string;
-  y_tokensPerDollarN_title?: string;
-  y_tokensPerDollarN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_tokensPerDollarR?: string;
-  y_tokensPerDollarR_label?: string;
-  y_tokensPerDollarR_title?: string;
-  y_tokensPerDollarR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_outputTokensPerDollarH?: string;
-  y_outputTokensPerDollarH_label?: string;
-  y_outputTokensPerDollarH_title?: string;
-  y_outputTokensPerDollarH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_outputTokensPerDollarN?: string;
-  y_outputTokensPerDollarN_label?: string;
-  y_outputTokensPerDollarN_title?: string;
-  y_outputTokensPerDollarN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_outputTokensPerDollarR?: string;
-  y_outputTokensPerDollarR_label?: string;
-  y_outputTokensPerDollarR_title?: string;
-  y_outputTokensPerDollarR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_inputTokensPerDollarH?: string;
-  y_inputTokensPerDollarH_label?: string;
-  y_inputTokensPerDollarH_title?: string;
-  y_inputTokensPerDollarH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_inputTokensPerDollarN?: string;
-  y_inputTokensPerDollarN_label?: string;
-  y_inputTokensPerDollarN_title?: string;
-  y_inputTokensPerDollarN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_inputTokensPerDollarR?: string;
-  y_inputTokensPerDollarR_label?: string;
-  y_inputTokensPerDollarR_title?: string;
-  y_inputTokensPerDollarR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  // All-in provisioned Joules per token
-  y_jTotal?: string;
-  y_jTotal_label?: string;
-  y_jTotal_title?: string;
-  y_jTotal_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_jOutput?: string;
-  y_jOutput_label?: string;
-  y_jOutput_title?: string;
-  y_jOutput_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_jInput?: string;
-  y_jInput_label?: string;
-  y_jInput_title?: string;
-  y_jInput_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  // Measured power / energy from runner GPU telemetry
-  y_measuredAvgPower?: string;
-  y_measuredAvgPower_label?: string;
-  y_measuredAvgPower_title?: string;
-  // Not explicitly set in the config — ScatterGraph falls back to lower_right
-  // (matches "lower power at the same interactivity is more efficient").
-  // The field stays in the type for parity with the other y_* metrics and
-  // so a future config can override the default.
-  y_measuredAvgPower_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_measuredPrefillAvgPower?: string;
-  y_measuredPrefillAvgPower_label?: string;
-  y_measuredPrefillAvgPower_title?: string;
-  y_measuredPrefillAvgPower_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_measuredDecodeAvgPower?: string;
-  y_measuredDecodeAvgPower_label?: string;
-  y_measuredDecodeAvgPower_title?: string;
-  y_measuredDecodeAvgPower_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_measuredJPerOutputToken?: string;
-  y_measuredJPerOutputToken_label?: string;
-  y_measuredJPerOutputToken_title?: string;
-  y_measuredJPerOutputToken_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_measuredJPerInputToken?: string;
-  y_measuredJPerInputToken_label?: string;
-  y_measuredJPerInputToken_title?: string;
-  y_measuredJPerInputToken_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_measuredJPerTotalToken?: string;
-  y_measuredJPerTotalToken_label?: string;
-  y_measuredJPerTotalToken_title?: string;
-  y_measuredJPerTotalToken_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_measuredJPerSuccessfulQuery?: string;
-  y_measuredJPerSuccessfulQuery_label?: string;
-  y_measuredJPerSuccessfulQuery_title?: string;
-  y_measuredJPerSuccessfulQuery_roofline?:
-    | 'upper_right'
-    | 'upper_left'
-    | 'lower_left'
-    | 'lower_right';
-  y_measuredWhPerSuccessfulQuery?: string;
-  y_measuredWhPerSuccessfulQuery_label?: string;
-  y_measuredWhPerSuccessfulQuery_title?: string;
-  y_measuredWhPerSuccessfulQuery_roofline?:
-    | 'upper_right'
-    | 'upper_left'
-    | 'lower_left'
-    | 'lower_right';
-  y_measuredPowerPercentTdp?: string;
-  y_measuredPowerPercentTdp_label?: string;
-  y_measuredPowerPercentTdp_title?: string;
-  // No `_roofline`: %TDP is a utilization gauge, not an efficiency frontier —
-  // there is no corner along which a config is "better", so the axis
-  // deliberately declares no Pareto direction.
   y_cost_limit?: number;
   y_latency_limit?: number;
 }
@@ -729,52 +500,6 @@ export interface LegendItemProps {
 }
 
 /**
- * Props for the WorkflowInfoDisplay component.
- * @interface WorkflowInfoDisplayProps
- * @property {string} [runId] - The ID of the workflow run.
- * @property {string} [runUrl] - The URL to the workflow run details.
- * @property {string} [runDate] - The date of the workflow run.
- * @property {string} [runTimezone] - The timezone of the workflow run date.
- */
-export interface WorkflowInfoDisplayProps {
-  runId?: string;
-  runUrl?: string;
-  runDate?: string;
-  runTimezone?: string;
-}
-
-/**
- * Represents the configuration of models, sequences, and precisions.
- * @interface ModelConfig
- * @property {object} [modelName: string] - An object where keys are model names.
- * @property {object} [modelName: string].[sequence: string] - An object where keys are sequence names.
- * @property {string[]} [modelName: string].[sequence: string] - An array of available precisions for the given model and sequence.
- */
-export type ModelConfig = Record<string, Record<string, string[]>>;
-
-/**
- * Represents information about a workflow run.
- * @interface WorkflowInfo
- * @property {string} runInfoBySequence - Object mapping sequence types to their run information.
- * @property {string} run_date - The date when the workflow was run.
- * @property {ModelConfig} modelConfig - Configuration details for models, sequences, and precisions.
- */
-export interface WorkflowInfo {
-  runInfoBySequence: Record<
-    string,
-    {
-      runId: string;
-      runDate: string;
-      runUrl: string;
-      changelog?: ChangelogMetadata;
-    }
-  >;
-  run_date: string;
-  modelConfig: ModelConfig;
-  gpus: HardwareConfig;
-}
-
-/**
  * Represents information about a single workflow run by sequence.
  * @interface RunInfo
  * @property {string} runId - The unique identifier for the workflow run.
@@ -830,7 +555,6 @@ export type AvailableQuickFilters = QuickFilters;
  * @property {(precision: string) => void} setSelectedPrecision - Function to set the selected precision.
  * @property {boolean} loading - Indicates if data is currently being loaded.
  * @property {string | null} error - Any error message encountered during data loading, or null if no error.
- * @property {WorkflowInfo | null} workflowInfo - Information about the workflow run, or null if not yet loaded.
  */
 export interface InferenceChartContextType {
   activeHwTypes: Set<string>;
@@ -866,7 +590,6 @@ export interface InferenceChartContextType {
   setSelectedPrecisions: (precisions: string[]) => void;
   loading: boolean;
   error: string | null;
-  workflowInfo: any;
   selectedYAxisMetric: string;
   setSelectedYAxisMetric: (metric: string) => void;
   /** Latency percentile for the x-axis under agentic scenarios (median/p90/p99/p99.9). */
@@ -875,7 +598,6 @@ export interface InferenceChartContextType {
   selectedXAxisMetric: string | null;
   setSelectedXAxisMetric: (metric: string | null) => void;
   selectedE2eXAxisMetric: string | null;
-  setSelectedE2eXAxisMetric: (metric: string | null) => void;
   /**
    * Which chart variant the user wants to see — the inference card shows one chart
    * at a time, picked by the big buttons above the chart.
@@ -936,7 +658,7 @@ export interface InferenceChartContextType {
   availableDates: string[];
   dateRangeAvailableDates: string[];
   isCheckingAvailableDates: boolean;
-  availableRuns: Record<string, RunInfo> | null;
+  availableRuns: Record<string, RunInfo>;
   selectedRunId: string;
   setSelectedRunId: (runId: string) => void;
   availablePrecisions: string[];

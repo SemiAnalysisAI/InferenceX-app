@@ -6,9 +6,11 @@
  * variables don't survive html-to-image.
  */
 
-import type * as d3 from 'd3';
+import * as d3 from 'd3';
 
 import type { KnownConfigIssue } from '@/lib/known-issues';
+import type { CustomLayerConfig, RenderContext } from '@/lib/d3-chart/D3Chart/types';
+import type { ContinuousScale } from '@/lib/d3-chart/types';
 
 export interface KnownIssueAnnotation {
   issue: KnownConfigIssue;
@@ -36,6 +38,57 @@ export interface AnnotationRenderOptions {
    */
   rightInset?: number;
   onLinkClick?: (annotation: KnownIssueAnnotation) => void;
+}
+
+export type KnownIssueLayerOptions = Omit<
+  AnnotationRenderOptions,
+  'width' | 'height' | 'xScale' | 'yScale' | 'rightInset'
+>;
+
+/** Build the shared render/zoom lifecycle for chart-level known-issue callouts. */
+export function createKnownIssueLayer(
+  resolveOptions: () => KnownIssueLayerOptions,
+  displayIdentity?: string,
+): CustomLayerConfig {
+  const draw = (ctx: RenderContext, xScale: ContinuousScale, yScale: ContinuousScale): void => {
+    const options = resolveOptions();
+    renderKnownIssueAnnotations(ctx.layout.g, ctx.layout.defs, {
+      ...options,
+      width: ctx.width,
+      height: ctx.height,
+      xScale,
+      yScale,
+      rightInset:
+        options.annotations.length === 0
+          ? 0
+          : measureLegendRightInset(
+              options.chartId,
+              ctx.layout.svg.node(),
+              ctx.layout.margin.left,
+              ctx.width,
+            ),
+    });
+  };
+
+  return {
+    type: 'custom',
+    key: 'known-issues',
+    displayIdentity,
+    render: (_zoomGroup, ctx) =>
+      draw(ctx, ctx.xScale as ContinuousScale, ctx.yScale as ContinuousScale),
+    onDisplayUpdate: (_zoomGroup, ctx) => {
+      const svg = ctx.layout.svg.node();
+      if (!svg) return;
+      const transform = d3.zoomTransform(svg);
+      draw(
+        ctx,
+        transform.rescaleX(ctx.xScale as ContinuousScale),
+        transform.rescaleY(ctx.yScale as ContinuousScale),
+      );
+    },
+    onZoom: (_zoomGroup, ctx) =>
+      draw(ctx, ctx.newXScale as ContinuousScale, ctx.newYScale as ContinuousScale),
+  };
 }
 
 const BOX_TOP = 8;

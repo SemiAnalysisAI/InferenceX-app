@@ -178,6 +178,19 @@ describe('generateTooltipContent', () => {
     expect(html).not.toContain('data-action="view-charts" target=');
   });
 
+  it('renders the chart destination and label in the Chinese route tree', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({ id: 1 }),
+        isPinned: true,
+        hasTrace: true,
+        locale: 'zh',
+      }),
+    );
+    expect(html).toContain('href="/zh/inference/agentic/1"');
+    expect(html).toContain('>查看图表 &rarr;</a>');
+  });
+
   it('omits View charts when the point id is non-persisted (0 / NaN), even if pinned + hasTrace', () => {
     // Overlay agentic points arrive with id 0 / NaN — the button would otherwise
     // link to /inference/agentic/0, a doomed lookup.

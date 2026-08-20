@@ -125,18 +125,16 @@ describe('Inference Replay', () => {
         .first()
         .invoke('attr', 'd')
         .then((beforeD) => {
-          // Toggle the log-scale setting in the underlying inference context —
-          // the replay panel shares state with the parent chart, so the chart
-          // re-renders without us touching the replay UI.
-          cy.window().then((win) => {
-            const url = new URL(win.location.href);
-            const cur = url.searchParams.get('i_log') === '1';
-            url.searchParams.set('i_log', cur ? '0' : '1');
-            win.history.replaceState(null, '', url.toString());
-            // Dispatch a popstate so InferenceContext picks up the change.
-            win.dispatchEvent(new win.PopStateEvent('popstate'));
+          // Toggle the control on the parent chart rather than mutating the address
+          // bar. Dashboard URL state is intentionally snapshotted on load, so a
+          // synthetic popstate is not a supported control update.
+          cy.get('[data-testid="scatter-log-scale"]').then(($toggles) => {
+            const parentToggle = [...$toggles].find(
+              (toggle) => !toggle.closest('[data-testid^="replay-panel-chart-"]'),
+            );
+            if (!parentToggle) throw new Error('Parent chart log-scale toggle is missing');
+            cy.wrap(parentToggle).click({ force: true });
           });
-          cy.wait(400);
           cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path')
             .first()
             .invoke('attr', 'd')

@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/metric-registry';
 import { useInference } from '@/components/inference/InferenceContext';
 import type {
   ChartDefinition,
@@ -38,7 +38,10 @@ import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
 import { getDisplayLabel } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import {
+  useOverlayScopeReconciliation,
+  useUnofficialRun,
+} from '@/components/unofficial-run-provider';
 import {
   type Model,
   type Precision,
@@ -112,7 +115,7 @@ const STRINGS = {
   },
 } as const;
 
-// Translate the "vs. …" chart-heading suffix from inference-chart-config.json
+// Translate the "vs. …" chart-heading suffix from the metric registry
 // into Chinese. useChartData rewrites the heading with the selected percentile
 // for agentic sequences (e.g. "vs. P90 Interactivity"), so this matches the
 // pattern instead of a fixed string; unknown headings pass through unchanged.
@@ -192,7 +195,6 @@ export default function ChartDisplay() {
     graphs,
     loading,
     error,
-    workflowInfo,
     selectedYAxisMetric,
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
@@ -326,9 +328,7 @@ export default function ChartDisplay() {
     getOverlayData,
     isUnofficialRun,
     activeOverlayHwTypes,
-    setActiveOverlayHwTypes,
     localOfficialOverride,
-    setLocalOfficialOverride,
   } = useUnofficialRun();
 
   // Compute overlay data for each chart type — must match useChartData processing
@@ -494,54 +494,39 @@ export default function ChartDisplay() {
   const overlayRowsScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(
     ',',
   )}|${unofficialRunInfos.map((run) => run.url).join(',')}`;
-  const [appliedOverlayRowsScopeKey, setAppliedOverlayRowsScopeKey] = useState(overlayRowsScopeKey);
-  const overlayRowsScopeChanged =
-    isUnofficialRun && appliedOverlayRowsScopeKey !== overlayRowsScopeKey;
-  const selectedOfficialHwTypes = overlayRowsScopeChanged
-    ? officialScope
-    : isUnofficialRun
-      ? (localOfficialOverride ?? activeHwTypes)
-      : activeHwTypes;
-  // Preview tables follow the same policy as ScatterGraph: preserve every
-  // active engine family instead of applying the production comparison guard.
-  const scopedActiveOverlayHwTypes = useMemo(() => {
-    const activeScopedOverlayKeys = new Set(
-      [...activeOverlayHwTypes].filter((key) => overlayScope.has(key)),
-    );
-    return overlayRowsScopeChanged ? scopedBestSelections.overlay : activeScopedOverlayKeys;
-  }, [activeOverlayHwTypes, overlayScope, overlayRowsScopeChanged, scopedBestSelections.overlay]);
-  useEffect(() => {
-    const merged = new Set(activeOverlayHwTypes);
-    overlayScope.forEach((key) => merged.delete(key));
-    scopedActiveOverlayHwTypes.forEach((key) => merged.add(key));
-    let selectionChanged = merged.size !== activeOverlayHwTypes.size;
-    if (!selectionChanged) {
-      for (const key of merged) {
-        if (!activeOverlayHwTypes.has(key)) {
-          selectionChanged = true;
-          break;
-        }
-      }
-    }
-    if (selectionChanged) setActiveOverlayHwTypes(merged);
-    // A scope change can render once before its official graphs arrive. Do not
-    // persist that transient empty set as an intentional legend selection.
-    if (overlayRowsScopeChanged && (!loading || officialScope.size > 0)) {
-      setLocalOfficialOverride(scopedBestSelections.official);
-      setAppliedOverlayRowsScopeKey(overlayRowsScopeKey);
-    }
-  }, [
-    overlayRowsScopeChanged,
-    overlayRowsScopeKey,
-    activeOverlayHwTypes,
-    loading,
-    officialScope,
-    scopedBestSelections.official,
-    overlayScope,
-    scopedActiveOverlayHwTypes,
-    setActiveOverlayHwTypes,
-    setLocalOfficialOverride,
-  ]);
+  const selectedOfficialHwTypes = isUnofficialRun
+    ? (localOfficialOverride ?? activeHwTypes)
+    : activeHwTypes;
+  const scopedActiveOverlayHwTypes = useMemo(
+    () => new Set([...activeOverlayHwTypes].filter((key) => overlayScope.has(key))),
+    [activeOverlayHwTypes, overlayScope],
+  );
+  const overlayScopeRegistration = useMemo(
+    () =>
+      isUnofficialRun
+        ? {
+            scopeKey: overlayRowsScopeKey,
+            officialHwTypes: officialScope,
+            overlayHwTypes: overlayScope,
+            bestOfficialHwTypes: scopedBestSelections.official,
+            bestOverlayHwTypes: scopedBestSelections.overlay,
+            bestPerSku,
+            ready: !loading || officialScope.size > 0,
+          }
+        : null,
+    [
+      isUnofficialRun,
+      overlayRowsScopeKey,
+      officialScope,
+      overlayScope,
+      scopedBestSelections,
+      bestPerSku,
+      loading,
+      activeOverlayHwTypes,
+      localOfficialOverride,
+    ],
+  );
+  useOverlayScopeReconciliation(overlayScopeRegistration);
 
   const visibleComparisonRows = useCallback(
     (officialRows: InferenceData[], overlay: OverlayData | null | undefined) => {
@@ -977,7 +962,7 @@ export default function ChartDisplay() {
             </div>
             <ChartControls />
             <ModelArchitectureDiagram model={selectedModel} />
-            {selectedGPUs.length === 0 && <WorkflowInfoDisplay workflowInfo={workflowInfo} />}
+            {selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
             {selectedGPUs.length > 0 && (
               <ComparisonChangelog
                 changelogs={changelogs}

@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 
-import { interpolateMetricAtInteractivity } from './useInterpolatedTrendData';
+import {
+  interpolateMetricAtInteractivity,
+  trendMetricDependencies,
+} from './useInterpolatedTrendData';
 
 // ─── Factory ───
 
@@ -311,5 +314,19 @@ describe('interpolateMetricAtInteractivity', () => {
     const result = interpolateMetricAtInteractivity(points, 100, 'tpPerGpu');
     expect(result).not.toBeNull();
     expect(result!).toBeCloseTo(200, 0);
+  });
+});
+
+describe('trendMetricDependencies', () => {
+  it('selects only the metric and matching throughput needed by reciprocal formulas', () => {
+    expect(trendMetricDependencies('costhOutput')).toEqual([
+      'tpPerGpu',
+      'costhOutput',
+      'outputTputPerGpu',
+    ]);
+  });
+
+  it('does not route custom user metrics through benchmark-derived history fields', () => {
+    expect(trendMetricDependencies('costUser')).toEqual(['tpPerGpu']);
   });
 });

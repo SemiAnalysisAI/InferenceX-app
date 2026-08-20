@@ -1,5 +1,3 @@
-import type { InferenceData } from '@/components/inference/types';
-
 /**
  * Find the point on a polyline whose x is closest to a target data-space x.
  *
@@ -11,7 +9,7 @@ import type { InferenceData } from '@/components/inference/types';
  *
  * `pts` is assumed non-empty (callers guard with `pts.length >= 2`).
  */
-export const pointNearestX = (pts: InferenceData[], targetX: number): InferenceData => {
+export const pointNearestX = <T extends { x: number }>(pts: readonly T[], targetX: number): T => {
   let best = pts[0];
   let bestDist = Math.abs(pts[0].x - targetX);
   for (let i = 1; i < pts.length; i++) {

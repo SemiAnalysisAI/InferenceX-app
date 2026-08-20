@@ -3,7 +3,7 @@ import { useMemo, useRef } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { rowToSequence } from '@semianalysisai/inferencex-constants';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/metric-registry';
 import type {
   AggDataEntry,
   ChartDefinition,
@@ -31,6 +31,7 @@ import {
 } from '@/lib/benchmark-run-selection';
 import { Sequence, type Model } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
+import { remapInferencePoint } from '@/lib/chart-utils';
 import { overviewServingSeriesKey, type OverviewServingSeriesRow } from '@/lib/overview-data';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import {
@@ -561,22 +562,7 @@ export function useChartData(
         const mappedData = hasMetric
           ? filteredData
               .filter((d) => metricKey in d)
-              .map((d: InferenceData) => {
-                const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
-                const roof = (d[metricKey] as { roof: boolean })?.roof ?? false;
-                // xAxisField is `keyof AggDataEntry`; InferenceData embeds those
-                // fields via `Partial<Omit<AggDataEntry, ...>>`, so a typed
-                // accessor catches a future field rename (silent fallthrough to
-                // d.x would otherwise mask the regression).
-                const xCandidate = (d as Partial<AggDataEntry>)[xAxisField];
-                const xValue = typeof xCandidate === 'number' ? xCandidate : d.x;
-                return {
-                  ...d,
-                  x: xValue,
-                  y: yValue,
-                  roof,
-                };
-              })
+              .map((d) => remapInferencePoint(d, metricKey, xAxisField))
           : [];
 
         const isAgentic = selectedSequence === Sequence.AgenticTraces;

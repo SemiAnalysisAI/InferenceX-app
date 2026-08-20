@@ -4,14 +4,19 @@
 
 import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/metric-registry';
 import type {
   AggDataEntry,
   ChartDefinition,
   HardwareConfig,
   InferenceData,
 } from '@/components/inference/types';
-import { createChartDataPoint, getHardwareKey } from '@/lib/chart-utils';
+import {
+  buildDerivedChartFields,
+  createChartDataPoint,
+  getHardwareKey,
+  type DerivedChartFields,
+} from '@/lib/chart-utils';
 import { getHardwareConfig } from '@/lib/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import type { BenchmarkRow } from '@/lib/api';
@@ -285,6 +290,7 @@ interface PreparedEntry {
   entry: AggDataEntry;
   hwKey: string;
   date: string;
+  derivedFields: DerivedChartFields;
 }
 
 /**
@@ -381,7 +387,12 @@ export function transformBenchmarkRows(
       if (hwConfig) gpuConfig[hwKey] = { ...hwConfig, name: hwKey };
     }
 
-    prepared[i] = { entry, hwKey, date: row.date };
+    prepared[i] = {
+      entry,
+      hwKey,
+      date: row.date,
+      derivedFields: buildDerivedChartFields(entry, hwKey),
+    };
   }
 
   // Phase 2: Build chart data per chart definition (reusing prepared entries)
@@ -389,13 +400,14 @@ export function transformBenchmarkRows(
     const xKey = withPercentile(chartDef.x, percentile);
     const groupedByHw: Record<string, InferenceData[]> = {};
 
-    for (const { entry, hwKey, date } of prepared) {
+    for (const { entry, hwKey, date, derivedFields } of prepared) {
       const dataPoint = createChartDataPoint(
         date,
         entry,
         xKey as keyof AggDataEntry,
         chartDef.y as keyof AggDataEntry,
         hwKey,
+        derivedFields,
       );
 
       if (!groupedByHw[hwKey]) groupedByHw[hwKey] = [];
