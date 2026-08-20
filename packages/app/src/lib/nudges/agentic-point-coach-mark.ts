@@ -8,6 +8,8 @@
  * visitors never find it.
  */
 
+import { plotBounds } from '@/lib/d3-chart/plot-bounds';
+
 import { isAnchorOnScreen, isAnchorWithin, viewportSize } from './anchor';
 
 export const AGENTIC_COACH_MARK_STORAGE_KEY = 'inferencex-agentic-point-coach-mark-dismissed';
@@ -86,8 +88,13 @@ export function resolveAgenticPointAnchor(): Element | null {
   // Zooming pushes points outside the plot, where a clip path hides them —
   // but they keep a perfectly ordinary bounding box, so the viewport check
   // alone would happily point at one the user cannot see.
-  const plot =
-    chart.querySelector('[data-testid="d3-chart-svg"]')?.getBoundingClientRect() ?? chartRect;
+  //
+  // This has to be the clip region, NOT the SVG's own box: the box includes
+  // the 60px axis gutters, so a zoomed point parked over the y-axis labels is
+  // painted away yet still inside the SVG. `plotBounds` returns null only when
+  // the chart clips nothing, in which case the SVG box is the honest answer.
+  const svg = chart.querySelector('[data-testid="d3-chart-svg"]');
+  const plot = (svg && plotBounds(svg)) ?? svg?.getBoundingClientRect() ?? chartRect;
 
   for (const element of document.querySelectorAll<SVGGElement>(AGENTIC_POINT_SELECTOR)) {
     if (!isRendered(element)) continue;

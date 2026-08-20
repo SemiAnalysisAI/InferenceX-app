@@ -50,24 +50,55 @@ function stubBox(element: Element, left: number, top: number, width: number, hei
     }) as DOMRect;
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+interface ChartSvgSpec {
+  /** The `<svg>` box — includes the axis gutters, so bigger than the plot. */
+  box: { left: number; top: number; width: number; height: number };
+  /** `.chart-root` translate, i.e. the left/top chart margins. */
+  margin: { left: number; top: number };
+  /** The clipPath rect `setupChart` sizes to the plot area. */
+  clip: { width: number; height: number };
+}
+
+/**
+ * The chart SVG skeleton `setupChart` builds: a root group translated by the
+ * margins plus a clip rect covering the plot area only. Built for real (rather
+ * than stubbing a single box) because the gap between the SVG box and the clip
+ * region is exactly what the clipping tests are about.
+ */
+function appendChartSvg(chart: Element, spec: ChartSvgSpec): void {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.dataset.testid = 'd3-chart-svg';
+  stubBox(svg, spec.box.left, spec.box.top, spec.box.width, spec.box.height);
+
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  const clipPath = document.createElementNS(SVG_NS, 'clipPath');
+  const clipRect = document.createElementNS(SVG_NS, 'rect');
+  clipRect.setAttribute('width', String(spec.clip.width));
+  clipRect.setAttribute('height', String(spec.clip.height));
+  clipPath.append(clipRect);
+  defs.append(clipPath);
+  svg.append(defs);
+
+  const root = document.createElementNS(SVG_NS, 'g');
+  root.setAttribute('class', 'chart-root');
+  root.setAttribute('transform', `translate(${spec.margin.left},${spec.margin.top})`);
+  svg.append(root);
+
+  chart.append(svg);
+}
+
 /**
  * Build a 1000x600 chart container with the given points and return them in
- * order. When `plot` is set, an inner `d3-chart-svg` with that box stands in
- * for the clipped plot area.
+ * order. When `svgSpec` is set, a real chart SVG skeleton is added so the
+ * resolver can work out the clip region.
  */
-function renderChart(
-  points: PointSpec[],
-  plot?: { left: number; top: number; width: number; height: number },
-): Element[] {
+function renderChart(points: PointSpec[], svgSpec?: ChartSvgSpec): Element[] {
   document.body.innerHTML = '<div data-testid="scatter-graph"></div>';
   const chart = document.querySelector('[data-testid="scatter-graph"]')!;
   stubBox(chart, 0, 0, 1000, 600);
-  if (plot) {
-    const svg = document.createElement('div');
-    svg.dataset.testid = 'd3-chart-svg';
-    chart.append(svg);
-    stubBox(svg, plot.left, plot.top, plot.width, plot.height);
-  }
+  if (svgSpec) appendChartSvg(chart, svgSpec);
 
   return points.map((spec) => {
     const element = document.createElement('div');
@@ -192,27 +223,60 @@ describe('resolveAgenticPointAnchor', () => {
     expect(resolveAgenticPointAnchor()).toBe(group);
   });
 
+  // The scatter's real geometry: a 900x520 SVG with 60px left / 24px top
+  // margins, clipped to the 830x436 plot inside them. The left 60px and the
+  // bottom 60px of the SVG are axis gutters — inside the SVG box, outside the
+  // clip.
+  const CHART_SVG = {
+    box: { left: 40, top: 40, width: 900, height: 520 },
+    margin: { left: 60, top: 24 },
+    clip: { width: 830, height: 436 },
+  };
+
   it('ignores points that zooming has pushed outside the clipped plot area', () => {
     // Outside the plot the chart's clip path hides a point, but its bounding
-    // box stays perfectly ordinary — only the plot bounds rule it out.
-    renderChart([{ left: 900, top: 60 }], { left: 100, top: 100, width: 600, height: 400 });
+    // box stays perfectly ordinary — only the clip region rules it out.
+    renderChart([{ left: 960, top: 300 }], CHART_SVG);
+    expect(resolveAgenticPointAnchor()).toBeNull();
+  });
+
+  it.each([
+    ['left gutter, over the y-axis labels', { left: 70, top: 300 }],
+    ['bottom gutter, under the x-axis labels', { left: 500, top: 505 }],
+  ])('ignores a zoomed point parked in the %s', (_label, spec) => {
+    // Regression: this used to be checked against the SVG's own box, which
+    // includes the 60px axis margins — so a point sitting over the axis labels
+    // was painted away by the clip path yet still accepted, aiming the pointer
+    // at something invisible.
+    renderChart([spec], CHART_SVG);
+    const svgBox = document.querySelector('[data-testid="d3-chart-svg"]')!.getBoundingClientRect();
+    // Guard the guard: the point really is inside the SVG, so this is not
+    // vacuously passing because it fell off the element altogether.
+    expect(spec.left).toBeGreaterThan(svgBox.left);
+    expect(spec.left).toBeLessThan(svgBox.right);
+    expect(spec.top).toBeGreaterThan(svgBox.top);
+    expect(spec.top).toBeLessThan(svgBox.bottom);
+
     expect(resolveAgenticPointAnchor()).toBeNull();
   });
 
   it('still anchors to points that remain inside the plot area', () => {
     const [inside] = renderChart(
       [
-        { left: 380, top: 280 },
-        { left: 950, top: 60 },
+        { left: 400, top: 300 },
+        { left: 960, top: 300 },
       ],
-      {
-        left: 100,
-        top: 100,
-        width: 600,
-        height: 400,
-      },
+      CHART_SVG,
     );
     expect(resolveAgenticPointAnchor()).toBe(inside);
+  });
+
+  it('falls back to the SVG box when the chart clips nothing', () => {
+    // clipContent: false leaves no clipPath, so nothing is painted away and
+    // the SVG box is the honest visibility test — not a reason to reject every
+    // point.
+    const [only] = renderChart([{ left: 70, top: 300 }]);
+    expect(resolveAgenticPointAnchor()).toBe(only);
   });
 
   it('bails out cheaply while the whole chart is below the fold', () => {

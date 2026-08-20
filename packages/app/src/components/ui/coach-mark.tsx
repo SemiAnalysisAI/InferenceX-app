@@ -135,22 +135,32 @@ export function CoachMark({
     };
   }, [resolve, repositionEvents]);
 
+  /**
+   * Whether the callout is actually on screen. The card stays mounted while
+   * hidden — it has to be in the DOM to be measured, and it re-appears when
+   * its point comes back — so every input handler below is gated on this.
+   * Dismissal is permanent: reacting to a keypress or a click while nothing
+   * is visible would burn the first-visit tip the user never saw.
+   */
+  const visible = placement !== null;
+
   // ── Escape to dismiss ────────────────────────────────────────────────────
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
   useEffect(() => {
+    if (!visible) return;
     const handler = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onDismissRef.current();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [visible]);
 
   // ── Clicking the thing the tip is about counts as taking the action ──────
   const onActionRef = useRef(onAction);
   onActionRef.current = onAction;
   useEffect(() => {
-    if (!actionSelector) return;
+    if (!actionSelector || !visible) return;
     const handler = (event: MouseEvent) => {
       const target = event.target as Element | null;
       if (target?.closest?.(actionSelector)) onActionRef.current?.();
@@ -158,11 +168,10 @@ export function CoachMark({
     // Capture phase: d3's own point handler calls stopPropagation().
     document.addEventListener('click', handler, true);
     return () => document.removeEventListener('click', handler, true);
-  }, [actionSelector]);
+  }, [actionSelector, visible]);
 
   const handleDismiss = useCallback(() => onDismissRef.current(), []);
 
-  const visible = placement !== null;
   const titleId = testId ? `${testId}-title` : undefined;
   const descriptionId = testId ? `${testId}-description` : undefined;
 
