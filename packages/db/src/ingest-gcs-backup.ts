@@ -41,6 +41,7 @@ import {
   validateRunBackfills,
 } from './etl/run-overrides';
 import { createSkipTracker, type Skips } from './etl/skip-tracker';
+import { printIngestSummaryFooter } from './etl/ingest-summary';
 import { GPU_KEYS, parseIslOsl } from './etl/normalizers';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices, type GithubRunInfo } from './etl/workflow-run';
@@ -61,7 +62,7 @@ import {
   hasAppendOnlyFlag,
   hasEvalsOnlyFlag,
 } from './etl/changelog-ingest';
-import { readZipJson, readZipJsonMap, readZipText, readZipTextsMatching } from './etl/zip-reader';
+import { readZipJson, readZipJsonAndText, readZipJsonMap, readZipText } from './etl/zip-reader';
 
 const GCS_DIR = path.join(import.meta.dirname, '..', '..', '..', 'gcs');
 const CONCURRENCY = 20;
@@ -351,12 +352,16 @@ async function mapWorkflowDir(
   const evalRows: WorkflowMapResult['evalRows'] = [];
   for (const zipFile of evalZips) {
     const zipPath = path.join(artifactsPath, zipFile);
-    const files = readZipJsonMap(zipPath);
-    if (!files) {
+    const contents = readZipJsonAndText(
+      zipPath,
+      (name) => name.startsWith('samples_') && name.endsWith('.jsonl'),
+    );
+    if (!contents) {
       local.skips.badZip++;
       warnings.push(`  [WARN] ${dateDir}/${zipFile}: bad/empty zip — skipped`);
       continue;
     }
+    const { jsonFiles: files, textFiles: sampleTexts } = contents;
     const meta = files.get('meta_env.json') as Record<string, any> | undefined;
     const resultsEntry = [...files.entries()].find(
       ([k]) => k.startsWith('results_') && k.endsWith('.json'),
@@ -388,12 +393,6 @@ async function mapWorkflowDir(
       continue;
     }
 
-    // lm-eval names sample files `samples_<task>_<timestamp>.jsonl`. Pull
-    // them all and key by lowercased task to match `EvalParams.task`.
-    const sampleTexts = readZipTextsMatching(
-      zipPath,
-      (n) => n.startsWith('samples_') && n.endsWith('.jsonl'),
-    );
     const samplesByTask = new Map<string, string>();
     for (const [name, text] of sampleTexts) {
       const m = name.match(/^samples_(?<task>.+?)_[^_]+\.jsonl$/u);
@@ -410,12 +409,13 @@ async function mapWorkflowDir(
 
   // ── Map compiled eval ZIPs ────────────────────────────────────────────────
   for (const zipFile of evalAggZips) {
-    const files = readZipJsonMap(path.join(artifactsPath, zipFile));
-    if (!files) {
+    const contents = readZipJsonAndText(path.join(artifactsPath, zipFile));
+    if (!contents) {
       local.skips.badZip++;
       warnings.push(`  [WARN] ${dateDir}/${zipFile}: bad/empty zip — skipped`);
       continue;
     }
+    const files = contents.jsonFiles;
     const agg = files.get('agg_eval_all.json');
     if (!Array.isArray(agg)) {
       local.skips.badZip++;
@@ -747,9 +747,10 @@ async function main(): Promise<void> {
 
     for (const { params, samplesText } of result.evalRows) {
       try {
+        const configId = await getOrCreateConfig(params.config);
         const { outcome, id: evalResultId } = await ingestEvalRow(
           sql,
-          getOrCreateConfig,
+          configId,
           params,
           workflowRunId,
           result.dateDir,
@@ -906,42 +907,17 @@ async function main(): Promise<void> {
   console.log(`  Eval results:      ${totalEvals} new`);
   console.log(`  Eval samples:      ${totalEvalSamples} new`);
   console.log(`  Changelog entries: ${totalChangelogs} written`);
-  console.log(`\n  DB totals:`);
-  console.log(`    configs           ${configCount.n}`);
-  console.log(`    benchmark_results ${resultCount.n}`);
-  console.log(`    run_stats         ${statsCount.n}`);
-  console.log(`    eval_results      ${evalCount.n}`);
-  console.log(`    eval_samples      ${sampleCount.n}`);
-  console.log(`    changelog_entries ${changelogCount.n}`);
-
-  const { skips, unmappedModels, unmappedHws } = tracker;
-  const totalSkips =
-    skips.badZip + skips.unmappedModel + skips.unmappedHw + skips.noIslOsl + skips.dbError;
-  if (totalSkips > 0) {
-    console.log(`\n  Skipped: ${totalSkips} rows`);
-    const skipLines: [string, number][] = [
-      ['no isl/osl (old format)', skips.noIslOsl],
-      ['unmapped model', skips.unmappedModel],
-      ['unmapped hw', skips.unmappedHw],
-      ['bad/empty zip', skips.badZip],
-      ['DB errors', skips.dbError],
-    ].filter(([, n]) => (n as number) > 0) as [string, number][];
-    const pad = Math.max(...skipLines.map(([label]) => label.length));
-    for (const [label, n] of skipLines) {
-      console.log(`    ${label.padEnd(pad)}: ${n}`);
-    }
-  }
-
-  if (unmappedModels.size > 0) {
-    console.log(`\n  Unmapped model values (add to MODEL_TO_KEY to ingest):`);
-    [...unmappedModels].slice(0, 20).forEach((v) => console.log(`    ${v}`));
-    if (unmappedModels.size > 20) console.log(`    ... and ${unmappedModels.size - 20} more`);
-  }
-
-  if (unmappedHws.size > 0) {
-    console.log(`\n  Unmapped hw values (add to hwToGpuKey to ingest):`);
-    [...unmappedHws].slice(0, 20).forEach((v) => console.log(`    ${v}`));
-  }
+  printIngestSummaryFooter(
+    {
+      configs: configCount.n,
+      benchmarkResults: resultCount.n,
+      runStats: statsCount.n,
+      evalResults: evalCount.n,
+      evalSamples: sampleCount.n,
+      changelogEntries: changelogCount.n,
+    },
+    tracker,
+  );
 
   console.log('\n=== db:ingest:gcs complete ===');
   console.log('  Invalidate API cache: bun run admin:cache:invalidate');

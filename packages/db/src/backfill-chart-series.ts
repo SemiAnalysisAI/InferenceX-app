@@ -26,11 +26,10 @@ import { hasNoSslFlag } from './cli-utils.js';
 import { CHART_SERIES_VERSION, computeChartSeries } from './etl/compute-chart-series.js';
 import { createAdminSql } from './etl/db-utils.js';
 import {
-  confirmProceed,
   jsonbParam,
   parseLimitForceFlags,
   runBackfillMain,
-  runPerIdBackfill,
+  runCandidateIdBackfill,
 } from './lib/backfill-runner.js';
 
 const flags = parseLimitForceFlags();
@@ -47,40 +46,34 @@ async function main(): Promise<void> {
   console.log(`  force = ${flags.force}`);
   console.log(`  limit = ${flags.limit ?? 'none'}`);
 
-  // Only rows that actually have a server_metrics blob can produce a
-  // chart_series. Rows without the blob legitimately keep `chart_series`
-  // null and the API serves them via the slow path (which also returns
-  // null because there's no blob to parse — so the page falls into the
-  // "no stored trace_replay blob" branch).
-  const candidates = flags.force
-    ? await sql<{ id: number }[]>`
-        select id
-        from agentic_trace_replay
-        where server_metrics_json_gz is not null
-        order by id
-        ${flags.limit ? sql`limit ${flags.limit}` : sql``}
-      `
-    : await sql<{ id: number }[]>`
-        select id
-        from agentic_trace_replay
-        where server_metrics_json_gz is not null
-          and (
-            chart_series is null
-            or coalesce((chart_series->>'version')::int, -1) <> ${CHART_SERIES_VERSION}
-          )
-        order by id
-        ${flags.limit ? sql`limit ${flags.limit}` : sql``}
-      `;
-
-  if (candidates.length === 0) {
-    console.log('\n  Nothing to do — all rows up to date.');
-    return;
-  }
-
-  if (!(await confirmProceed(`${candidates.length} candidate row(s).`))) return;
-
-  await runPerIdBackfill(
-    candidates.map((c) => c.id),
+  await runCandidateIdBackfill(
+    async () => {
+      // Only rows that actually have a server_metrics blob can produce a
+      // chart_series. Rows without the blob legitimately keep `chart_series`
+      // null and the API serves them via the slow path (which also returns
+      // null because there's no blob to parse — so the page falls into the
+      // "no stored trace_replay blob" branch).
+      const candidates = flags.force
+        ? await sql<{ id: number }[]>`
+            select id
+            from agentic_trace_replay
+            where server_metrics_json_gz is not null
+            order by id
+            ${flags.limit ? sql`limit ${flags.limit}` : sql``}
+          `
+        : await sql<{ id: number }[]>`
+            select id
+            from agentic_trace_replay
+            where server_metrics_json_gz is not null
+              and (
+                chart_series is null
+                or coalesce((chart_series->>'version')::int, -1) <> ${CHART_SERIES_VERSION}
+              )
+            order by id
+            ${flags.limit ? sql`limit ${flags.limit}` : sql``}
+          `;
+      return candidates.map((candidate) => candidate.id);
+    },
     async (id) => {
       const [row] = await sql<
         {

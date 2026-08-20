@@ -20,11 +20,10 @@ import {
 } from './etl/compute-request-timeline.js';
 import { createAdminSql } from './etl/db-utils.js';
 import {
-  confirmProceed,
   jsonbParam,
   parseLimitForceFlags,
   runBackfillMain,
-  runPerIdBackfill,
+  runCandidateIdBackfill,
 } from './lib/backfill-runner.js';
 
 const flags = parseLimitForceFlags();
@@ -41,38 +40,32 @@ async function main(): Promise<void> {
   console.log(`  force = ${flags.force}`);
   console.log(`  limit = ${flags.limit ?? 'none'}`);
 
-  // Only rows with a profile_export blob can produce a timeline. Rows
-  // without the blob keep `request_timeline` null and the API serves them
-  // as "no timeline data".
-  const candidates = flags.force
-    ? await sql<{ id: number }[]>`
-        select id
-        from agentic_trace_replay
-        where profile_export_jsonl_gz is not null
-        order by id
-        ${flags.limit ? sql`limit ${flags.limit}` : sql``}
-      `
-    : await sql<{ id: number }[]>`
-        select id
-        from agentic_trace_replay
-        where profile_export_jsonl_gz is not null
-          and (
-            request_timeline is null
-            or coalesce((request_timeline->>'version')::int, -1) <> ${REQUEST_TIMELINE_VERSION}
-          )
-        order by id
-        ${flags.limit ? sql`limit ${flags.limit}` : sql``}
-      `;
-
-  if (candidates.length === 0) {
-    console.log('\n  Nothing to do — all rows up to date.');
-    return;
-  }
-
-  if (!(await confirmProceed(`${candidates.length} candidate row(s).`))) return;
-
-  await runPerIdBackfill(
-    candidates.map((c) => c.id),
+  await runCandidateIdBackfill(
+    async () => {
+      // Only rows with a profile_export blob can produce a timeline. Rows
+      // without the blob keep `request_timeline` null and the API serves them
+      // as "no timeline data".
+      const candidates = flags.force
+        ? await sql<{ id: number }[]>`
+            select id
+            from agentic_trace_replay
+            where profile_export_jsonl_gz is not null
+            order by id
+            ${flags.limit ? sql`limit ${flags.limit}` : sql``}
+          `
+        : await sql<{ id: number }[]>`
+            select id
+            from agentic_trace_replay
+            where profile_export_jsonl_gz is not null
+              and (
+                request_timeline is null
+                or coalesce((request_timeline->>'version')::int, -1) <> ${REQUEST_TIMELINE_VERSION}
+              )
+            order by id
+            ${flags.limit ? sql`limit ${flags.limit}` : sql``}
+          `;
+      return candidates.map((candidate) => candidate.id);
+    },
     async (id) => {
       const [row] = await sql<{ profile_export_jsonl_gz: Buffer | null }[]>`
         select profile_export_jsonl_gz

@@ -30,11 +30,10 @@ import {
 } from './etl/compute-aggregate-stats.js';
 import { createAdminSql } from './etl/db-utils.js';
 import {
-  confirmProceed,
   jsonbParam,
   parseLimitForceFlags,
   runBackfillMain,
-  runPerIdBackfill,
+  runCandidateIdBackfill,
 } from './lib/backfill-runner.js';
 
 const flags = parseLimitForceFlags();
@@ -51,34 +50,28 @@ async function main(): Promise<void> {
   console.log(`  force = ${flags.force}`);
   console.log(`  limit = ${flags.limit ?? 'none'}`);
 
-  // Find candidates: rows missing stats, or whose stored version is stale.
-  // Using >>'version'::int comparison would error on null; coalesce to -1 so
-  // null-stats rows always count as stale.
-  const candidates = flags.force
-    ? await sql<{ id: number }[]>`
-        select id
-        from agentic_trace_replay
-        order by id
-        ${flags.limit ? sql`limit ${flags.limit}` : sql``}
-      `
-    : await sql<{ id: number }[]>`
-        select id
-        from agentic_trace_replay
-        where aggregate_stats is null
-           or coalesce((aggregate_stats->>'version')::int, -1) <> ${STATS_VERSION}
-        order by id
-        ${flags.limit ? sql`limit ${flags.limit}` : sql``}
-      `;
-
-  if (candidates.length === 0) {
-    console.log('\n  Nothing to do — all rows up to date.');
-    return;
-  }
-
-  if (!(await confirmProceed(`${candidates.length} candidate row(s).`))) return;
-
-  await runPerIdBackfill(
-    candidates.map((c) => c.id),
+  await runCandidateIdBackfill(
+    async () => {
+      // Find candidates: rows missing stats, or whose stored version is stale.
+      // Using >>'version'::int comparison would error on null; coalesce to -1 so
+      // null-stats rows always count as stale.
+      const candidates = flags.force
+        ? await sql<{ id: number }[]>`
+            select id
+            from agentic_trace_replay
+            order by id
+            ${flags.limit ? sql`limit ${flags.limit}` : sql``}
+          `
+        : await sql<{ id: number }[]>`
+            select id
+            from agentic_trace_replay
+            where aggregate_stats is null
+               or coalesce((aggregate_stats->>'version')::int, -1) <> ${STATS_VERSION}
+            order by id
+            ${flags.limit ? sql`limit ${flags.limit}` : sql``}
+          `;
+      return candidates.map((candidate) => candidate.id);
+    },
     async (id) => {
       // Fetch one row at a time — the json_gz blob is the heavy field.
       const [row] = await sql<

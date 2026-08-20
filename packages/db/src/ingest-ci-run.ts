@@ -45,6 +45,7 @@ import {
   validateRunBackfills,
 } from './etl/run-overrides';
 import { createSkipTracker } from './etl/skip-tracker';
+import { printIngestSummaryFooter } from './etl/ingest-summary';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices } from './etl/workflow-run';
 import {
@@ -804,13 +805,8 @@ async function main(): Promise<void> {
       if (!mapped) continue;
 
       try {
-        const { outcome } = await ingestEvalRow(
-          sql,
-          getOrCreateConfig,
-          mapped,
-          workflowRunId,
-          date,
-        );
+        const configId = await getOrCreateConfig(mapped.config);
+        const { outcome } = await ingestEvalRow(sql, configId, mapped, workflowRunId, date);
         if (outcome === 'new') totalEvals++;
       } catch (error: any) {
         tracker.recordDbError('eval row', error);
@@ -870,9 +866,10 @@ async function main(): Promise<void> {
 
     for (const params of evalParamsList) {
       try {
+        const configId = await getOrCreateConfig(params.config);
         const { id: evalResultId } = await ingestEvalRow(
           sql,
-          getOrCreateConfig,
+          configId,
           params,
           workflowRunId,
           date,
@@ -935,53 +932,20 @@ async function main(): Promise<void> {
   console.log(`  Eval results:      ${totalEvals} new`);
   console.log(`  Eval samples:      ${totalSamples} new across ${totalSampleFiles} file(s)`);
   console.log(`  Changelog entries: ${totalChangelogs} written`);
-  console.log(`\n  DB totals:`);
-  console.log(`    configs           ${configCount.n}`);
-  console.log(`    benchmark_results ${resultCount.n}`);
-  console.log(`    run_stats         ${statsCount.n}`);
-  console.log(`    eval_results      ${evalCount.n}`);
-  console.log(`    eval_samples      ${sampleCount.n}`);
-  console.log(`    changelog_entries ${changelogCount.n}`);
+  printIngestSummaryFooter(
+    {
+      configs: configCount.n,
+      benchmarkResults: resultCount.n,
+      runStats: statsCount.n,
+      evalResults: evalCount.n,
+      evalSamples: sampleCount.n,
+      changelogEntries: changelogCount.n,
+    },
+    tracker,
+    { includeFailedRuns: true, includeUnmappedPrecisions: true },
+  );
 
-  const { skips, unmappedModels, unmappedHws, unmappedPrecisions } = tracker;
-  const totalSkips =
-    skips.badZip +
-    skips.unmappedModel +
-    skips.unmappedHw +
-    skips.noIslOsl +
-    skips.failedRun +
-    skips.dbError;
-  if (totalSkips > 0) {
-    console.log(`\n  Skipped: ${totalSkips} rows`);
-    const skipLines: [string, number][] = [
-      ['no isl/osl (old format)', skips.noIslOsl],
-      ['failed run (0 successful)', skips.failedRun],
-      ['unmapped model', skips.unmappedModel],
-      ['unmapped hw', skips.unmappedHw],
-      ['bad/empty zip', skips.badZip],
-      ['DB errors', skips.dbError],
-    ].filter(([, n]) => (n as number) > 0) as [string, number][];
-    const pad = Math.max(...skipLines.map(([label]) => label.length));
-    for (const [label, n] of skipLines) {
-      console.log(`    ${label.padEnd(pad)}: ${n}`);
-    }
-  }
-
-  if (unmappedModels.size > 0) {
-    console.log(`\n  Unmapped model values (add to MODEL_TO_KEY to ingest):`);
-    [...unmappedModels].slice(0, 20).forEach((v) => console.log(`    ${v}`));
-    if (unmappedModels.size > 20) console.log(`    ... and ${unmappedModels.size - 20} more`);
-  }
-
-  if (unmappedHws.size > 0) {
-    console.log(`\n  Unmapped hw values (add to hwToGpuKey to ingest):`);
-    [...unmappedHws].slice(0, 20).forEach((v) => console.log(`    ${v}`));
-  }
-
-  if (unmappedPrecisions.size > 0) {
-    console.log(`\n  Unmapped precision values (add to PRECISION_KEYS to ingest):`);
-    [...unmappedPrecisions].forEach((v) => console.log(`    ${v}`));
-  }
+  const { unmappedModels, unmappedHws, unmappedPrecisions } = tracker;
 
   // Write unmapped entities to file so CI workflow can send Slack notifications
   const unmappedOutPath = process.env.UNMAPPED_ENTITIES_OUTPUT;

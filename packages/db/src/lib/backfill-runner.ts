@@ -79,6 +79,27 @@ export async function runPerIdBackfill(
 }
 
 /**
+ * Load candidate ids, handle the standard empty/confirmation gates, then
+ * process the ids serially. The callbacks deliberately stop at orchestration:
+ * each script still owns its candidate, fetch, and update SQL. Returns true
+ * only when the candidates passed the confirmation gate and were processed.
+ */
+export async function runCandidateIdBackfill(
+  loadCandidateIds: () => Promise<readonly number[]>,
+  processRow: (id: number) => Promise<'ok' | 'skipped'>,
+  formatCandidates: (count: number) => string = (count) => `${count} candidate row(s).`,
+): Promise<boolean> {
+  const ids = await loadCandidateIds();
+  if (ids.length === 0) {
+    console.log('\n  Nothing to do — all rows up to date.');
+    return false;
+  }
+  if (!(await confirmProceed(formatCandidates(ids.length)))) return false;
+  await runPerIdBackfill(ids, processRow);
+  return true;
+}
+
+/**
  * jsonb parameter for a freshly computed value. `structuredClone` strips
  * class instances/prototypes so postgres.js serializes plain data only —
  * matches what the inline ingest path stores.
