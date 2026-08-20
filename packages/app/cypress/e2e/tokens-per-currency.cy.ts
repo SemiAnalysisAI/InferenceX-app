@@ -11,10 +11,8 @@ describe('Tokens per currency and agentic controls', () => {
     });
   });
 
-  it('renders total tokens per $1 USD from a URL metric', () => {
-    // The dashboard default is still throughput — see DEFAULT_Y_AXIS_METRIC in
-    // InferenceContext for why the flip is held back.
-    cy.visit('/inference?i_metric=y_tokensPerDollarH');
+  it('defaults the y-axis to total tokens per $1 USD', () => {
+    cy.visit('/inference');
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
       'Total Tokens per $1 USD (Owning - Hyperscaler)',
@@ -23,6 +21,14 @@ describe('Tokens per currency and agentic controls', () => {
       .first()
       .find('svg .dot-group')
       .should('have.length.greaterThan', 0);
+  });
+
+  it('still honors an explicit ?i_metric=, so shared links are unaffected', () => {
+    cy.visit('/inference?i_metric=y_tpPerGpu');
+    cy.get('[data-testid="yaxis-metric-selector"]').should(
+      'contain.text',
+      'Token Throughput per Chip',
+    );
   });
 
   it('offers the same quantities priced in yuan', () => {
