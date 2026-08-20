@@ -7,17 +7,11 @@ import chartDefinitions from '@/components/inference/inference-chart-config.json
 import type {
   AggDataEntry,
   ChartDefinition,
-  CostDisplayMode,
   HardwareConfig,
   InferenceData,
   RenderableGraph,
   YAxisMetricKey,
 } from '@/components/inference/types';
-import {
-  applyCostDisplayToChartDefinition,
-  displayTokenCostValue,
-  isTokenCostMetric,
-} from '@/components/inference/cost-display';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
 import {
   parseComparisonEntry,
@@ -132,8 +126,8 @@ export function flipRooflineDirection(dir: RooflineDirection): RooflineDirection
  * e2e chart definition, whose corners assume lower-x-is-better; when the
  * derived metric is higher-is-better (E2E Normalized Interactivity) the corner mirrors
  * horizontally. This keeps the y-metric's own good direction — throughput and
- * tokens-per-dollar purchasing power land on an upper corner, while joules
- * land on a lower one.
+ * tokens-per-dollar purchasing power land on an upper corner, while cost and
+ * joules land on a lower one.
  */
 export function derivedModeRoofline(
   configuredE2eCorner: RooflineDirection | undefined,
@@ -211,7 +205,6 @@ export function useChartData(
   selectedSequence: Sequence,
   selectedPrecisions: string[],
   selectedYAxisMetric: string,
-  costDisplayMode: CostDisplayMode,
   selectedXAxisMetric: string | null,
   selectedE2eXAxisMetric: string | null,
   selectedGPUs: string[],
@@ -432,12 +425,7 @@ export function useChartData(
   // which would cause Effect 3 (metric reposition) to fire redundantly after Effect 2.
   const stableChartDefinitions = useMemo(
     () =>
-      (chartDefinitions as ChartDefinition[]).map((baseChartDef) => {
-        const chartDef = applyCostDisplayToChartDefinition(
-          baseChartDef,
-          selectedYAxisMetric,
-          costDisplayMode,
-        );
+      (chartDefinitions as ChartDefinition[]).map((chartDef) => {
         const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
 
         // Resolve which data field the x-axis plots — shared with the overlay
@@ -531,7 +519,6 @@ export function useChartData(
       }),
     [
       selectedYAxisMetric,
-      costDisplayMode,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedPercentile,
@@ -544,7 +531,10 @@ export function useChartData(
     if (chartData.length === 0) return [];
 
     let dataSource: InferenceData[][] = chartData;
-    if (selectedYAxisMetric === 'y_costUser' && userCosts) {
+    if (
+      (selectedYAxisMetric === 'y_costUser' || selectedYAxisMetric === 'y_tokensPerDollarUser') &&
+      userCosts
+    ) {
       dataSource = chartData.map((d) => calculateCostsForGpus(d, userCosts));
     }
     if (selectedYAxisMetric === 'y_powerUser' && userPowers) {
@@ -572,10 +562,7 @@ export function useChartData(
           ? filteredData
               .filter((d) => metricKey in d)
               .map((d: InferenceData) => {
-                const storedYValue = (d[metricKey] as { y: number })?.y ?? d.y;
-                const yValue = isTokenCostMetric(selectedYAxisMetric)
-                  ? displayTokenCostValue(storedYValue, costDisplayMode)
-                  : storedYValue;
+                const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
                 const roof = (d[metricKey] as { roof: boolean })?.roof ?? false;
                 // xAxisField is `keyof AggDataEntry`; InferenceData embeds those
                 // fields via `Partial<Omit<AggDataEntry, ...>>`, so a typed
@@ -585,12 +572,6 @@ export function useChartData(
                 const xValue = typeof xCandidate === 'number' ? xCandidate : d.x;
                 return {
                   ...d,
-                  ...(isTokenCostMetric(selectedYAxisMetric) && {
-                    [metricKey]: {
-                      ...(d[metricKey] as { y: number; roof?: boolean }),
-                      y: yValue,
-                    },
-                  }),
                   x: xValue,
                   y: yValue,
                   roof,
@@ -622,7 +603,6 @@ export function useChartData(
     selectedModel,
     selectedSequence,
     selectedYAxisMetric,
-    costDisplayMode,
     selectedGPUs,
     userCosts,
     userPowers,

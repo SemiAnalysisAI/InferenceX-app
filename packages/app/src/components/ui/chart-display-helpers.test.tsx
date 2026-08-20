@@ -81,7 +81,7 @@ describe('MetricAssumptionNotes', () => {
   });
 
   it('renders TCO notes, source attribution, and the purchasing-power caveat', () => {
-    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_costhOutput" />);
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_outputTokensPerDollarH" />);
 
     expect(getVisibleText()).toContain('TCO $/chip/hr:');
     expect(getVisibleText()).toContain(
@@ -92,13 +92,8 @@ describe('MetricAssumptionNotes', () => {
     );
   });
 
-  it('describes the reciprocal cost view when cost per million is selected', () => {
-    renderUi(
-      <MetricAssumptionNotes
-        selectedYAxisMetric="y_costhOutput"
-        costDisplayMode="cost-per-million"
-      />,
-    );
+  it('describes the existing cost-per-million metric', () => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_costhOutput" />);
 
     expect(getVisibleCaveatText()).toContain(
       'calculate cost per million tokens per decode chip or per prefill chip',
@@ -106,35 +101,54 @@ describe('MetricAssumptionNotes', () => {
     expect(getVisibleCaveatText()).toContain('token cost comparison');
   });
 
-  // The prefill/decode split only skews per-token-type purchasing power; the
+  // The prefill/decode split only skews per-token-type metrics; the
   // total-token metric divides by the whole chip count, exactly as an aggregated
   // config does, so it must not carry the caveat.
+  it.each([
+    'y_outputTokensPerDollarH',
+    'y_outputTokensPerDollarN',
+    'y_outputTokensPerDollarR',
+    'y_inputTokensPerDollarH',
+    'y_inputTokensPerDollarN',
+    'y_inputTokensPerDollarR',
+  ])('shows the purchasing-power caveat for per-token-type metric %s', (metric) => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
+
+    expect(getVisibleCaveatText()).toContain(
+      'calculate tokens per $1 per decode chip or per prefill chip',
+    );
+  });
+
   it.each(['y_costhOutput', 'y_costnOutput', 'y_costrOutput', 'y_costhi', 'y_costni', 'y_costri'])(
-    'shows the purchasing-power caveat for per-token-type metric %s',
+    'shows the token-cost caveat for per-token-type metric %s',
     (metric) => {
       renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
 
       expect(getVisibleCaveatText()).toContain(
-        'calculate tokens per $1 per decode chip or per prefill chip',
+        'calculate cost per million tokens per decode chip or per prefill chip',
       );
     },
   );
 
-  it.each(['y_costh', 'y_costn', 'y_costr'])(
-    'hides the purchasing-power caveat for total-token metric %s',
-    (metric) => {
-      renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
+  it.each([
+    'y_costh',
+    'y_costn',
+    'y_costr',
+    'y_tokensPerDollarH',
+    'y_tokensPerDollarN',
+    'y_tokensPerDollarR',
+  ])('hides the purchasing-power caveat for total-token metric %s', (metric) => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
 
-      // The TCO badges and source attribution still explain the hourly-price input.
-      expect(getVisibleText()).toContain('TCO $/chip/hr:');
-      expect(getVisibleText()).toContain(
-        'SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model',
-      );
-      expect(getVisibleCaveatText()).not.toContain(
-        'calculate tokens per $1 per decode chip or per prefill chip',
-      );
-    },
-  );
+    // The TCO badges and source attribution still explain the hourly-price input.
+    expect(getVisibleText()).toContain('TCO $/chip/hr:');
+    expect(getVisibleText()).toContain(
+      'SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model',
+    );
+    expect(getVisibleCaveatText()).not.toContain(
+      'calculate tokens per $1 per decode chip or per prefill chip',
+    );
+  });
 
   it('renders metric-specific throughput caveats and preserves Joules wording semantics', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_inputTputPerGpu" />);

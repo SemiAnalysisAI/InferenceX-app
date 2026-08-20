@@ -85,26 +85,26 @@ describe('Inference ChartControls', () => {
   });
 });
 
-describe('Inference ChartControls with a token-cost metric', () => {
+describe('Inference ChartControls cost metrics', () => {
   beforeEach(() => {
     mountWithProviders(<InferenceChartControls />, {
       inference: { selectedYAxisMetric: 'y_costh' },
     });
   });
 
-  it('shows unit-neutral cost metric names and defaults to tokens per dollar', () => {
+  it('shows cost per million and tokens per dollar as separate Y-axis options', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click();
-    cy.contains('[role="option"]', 'Total Token Cost (Owning - Hyperscaler)').should('exist');
-    cy.get('[data-testid="cost-display-selector"]')
-      .should('be.visible')
-      .and('contain.text', 'Tokens per $1');
+    cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').should(
+      'exist',
+    );
+    cy.contains('[role="option"]', 'Total Tokens per $1 (Owning - Hyperscaler)').should('exist');
+    cy.get('[data-testid="cost-display-selector"]').should('not.exist');
   });
 
-  it('selects cost per million tokens independently of the Y-axis metric', () => {
-    cy.get('[data-testid="cost-display-selector"]').click();
-    cy.contains('[role="option"]', 'Cost per Million Tokens').click();
-    cy.get('@setCostDisplayMode').should('have.been.calledWith', 'cost-per-million');
-    cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
+  it('selects tokens per dollar through the Y-axis metric control', () => {
+    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.contains('[role="option"]', 'Total Tokens per $1 (Owning - Hyperscaler)').click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarH');
   });
 });
 

@@ -70,7 +70,7 @@ export function formatNumber(tickItem: number) {
 }
 
 /**
- * Calculate how many tokens $1 buys for each GPU using the user-provided hourly cost.
+ * Calculate both cost-per-million and tokens-per-dollar values from a user-provided hourly cost.
  * GPUs with prefixes (TRT, MTP) will inherit values from their base parent
  */
 export function calculateCostsForGpus(
@@ -88,14 +88,20 @@ export function calculateCostsForGpus(
     }
     if (userCostPerHour !== undefined) {
       const tputPerGpu = item.tpPerGpu.y;
+      const millionTokensPerHour = (tputPerGpu * 3600) / 1_000_000;
+      const costPerMillion = millionTokensPerHour > 0 ? userCostPerHour / millionTokensPerHour : 0;
       const tokensPerDollar = userCostPerHour > 0 ? (tputPerGpu * 3600) / userCostPerHour : 0;
+      const costRounded = parseFloat(costPerMillion.toFixed(3));
       const tokensRounded = parseFloat(tokensPerDollar.toFixed(3));
 
-      // Preserve the legacy costUser key for existing shared URLs.
       return {
         ...item,
-        y: tokensRounded, // Update the main y value for chart rendering
+        y: costRounded,
         costUser: {
+          y: costRounded,
+          roof: false,
+        },
+        tokensPerDollarUser: {
           y: tokensRounded,
           roof: false, // Always false for user-calculated values
         },
@@ -182,17 +188,21 @@ export function getDisplayLabel(config: { label: string; suffix?: string }): str
 }
 
 /**
- * Computes missing output purchasing-power fields for historical data points.
+ * Computes missing output cost and tokens-per-dollar fields for historical data points.
  * This handles backwards compatibility with historical data that doesn't have these fields.
- *
- * The calculation is: outputTokensPerHour / costPerHour.
  *
  * If outputTputPerGpu is not available, falls back to using the total throughput ratio.
  */
 export function computeOutputCostFields(data: InferenceData[]): InferenceData[] {
   return data.map((item) => {
-    // If output cost fields already exist, return as-is
-    if (item.costhOutput && item.costnOutput && item.costrOutput) {
+    if (
+      item.costhOutput &&
+      item.costnOutput &&
+      item.costrOutput &&
+      item.outputTokensPerDollarH &&
+      item.outputTokensPerDollarN &&
+      item.outputTokensPerDollarR
+    ) {
       return item;
     }
 
@@ -203,10 +213,13 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
     // For sequence pairs like 1k/8k (ISL/OSL), output tokens dominate, typically ~87.5% of total
     const outputTputPerGpu = item.outputTputPerGpu?.y ?? item.tpPerGpu.y * 0.875;
     const outputTokensPerHour = outputTputPerGpu * 3600;
-
-    const costhOutput = specs.costh > 0 ? outputTokensPerHour / specs.costh : 0;
-    const costnOutput = specs.costn > 0 ? outputTokensPerHour / specs.costn : 0;
-    const costrOutput = specs.costr > 0 ? outputTokensPerHour / specs.costr : 0;
+    const millionOutputTokensPerHour = outputTokensPerHour / 1_000_000;
+    const costhOutput =
+      millionOutputTokensPerHour > 0 ? specs.costh / millionOutputTokensPerHour : 0;
+    const costnOutput =
+      millionOutputTokensPerHour > 0 ? specs.costn / millionOutputTokensPerHour : 0;
+    const costrOutput =
+      millionOutputTokensPerHour > 0 ? specs.costr / millionOutputTokensPerHour : 0;
 
     return {
       ...item,
@@ -222,15 +235,25 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
         y: parseFloat(costrOutput.toFixed(3)),
         roof: false,
       },
+      outputTokensPerDollarH: item.outputTokensPerDollarH ?? {
+        y: specs.costh > 0 ? outputTokensPerHour / specs.costh : 0,
+        roof: false,
+      },
+      outputTokensPerDollarN: item.outputTokensPerDollarN ?? {
+        y: specs.costn > 0 ? outputTokensPerHour / specs.costn : 0,
+        roof: false,
+      },
+      outputTokensPerDollarR: item.outputTokensPerDollarR ?? {
+        y: specs.costr > 0 ? outputTokensPerHour / specs.costr : 0,
+        roof: false,
+      },
     };
   });
 }
 
 /**
- * Computes missing input purchasing-power fields at runtime.
+ * Computes missing input cost and tokens-per-dollar fields at runtime.
  * This handles backwards compatibility with historical data that doesn't have these fields.
- *
- * The calculation is: inputTokensPerHour / costPerHour.
  *
  * If inputTputPerGpu is not available, falls back to using a portion of total throughput.
  */
@@ -355,8 +378,14 @@ export function computeEnergyFields(data: InferenceData[]): InferenceData[] {
 
 export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
   return data.map((item) => {
-    // If input cost fields already exist, return as-is
-    if (item.costhi && item.costni && item.costri) {
+    if (
+      item.costhi &&
+      item.costni &&
+      item.costri &&
+      item.inputTokensPerDollarH &&
+      item.inputTokensPerDollarN &&
+      item.inputTokensPerDollarR
+    ) {
       return item;
     }
 
@@ -367,10 +396,10 @@ export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
     // For sequence pairs like 1k/8k (ISL/OSL), input tokens are typically ~12.5% of total
     const inputTputPerGpu = item.inputTputPerGpu?.y ?? item.tpPerGpu.y * 0.125;
     const inputTokensPerHour = inputTputPerGpu * 3600;
-
-    const costhi = specs.costh > 0 ? inputTokensPerHour / specs.costh : 0;
-    const costni = specs.costn > 0 ? inputTokensPerHour / specs.costn : 0;
-    const costri = specs.costr > 0 ? inputTokensPerHour / specs.costr : 0;
+    const millionInputTokensPerHour = inputTokensPerHour / 1_000_000;
+    const costhi = millionInputTokensPerHour > 0 ? specs.costh / millionInputTokensPerHour : 0;
+    const costni = millionInputTokensPerHour > 0 ? specs.costn / millionInputTokensPerHour : 0;
+    const costri = millionInputTokensPerHour > 0 ? specs.costr / millionInputTokensPerHour : 0;
 
     return {
       ...item,
@@ -384,6 +413,18 @@ export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
       },
       costri: item.costri ?? {
         y: parseFloat(costri.toFixed(3)),
+        roof: false,
+      },
+      inputTokensPerDollarH: item.inputTokensPerDollarH ?? {
+        y: specs.costh > 0 ? inputTokensPerHour / specs.costh : 0,
+        roof: false,
+      },
+      inputTokensPerDollarN: item.inputTokensPerDollarN ?? {
+        y: specs.costn > 0 ? inputTokensPerHour / specs.costn : 0,
+        roof: false,
+      },
+      inputTokensPerDollarR: item.inputTokensPerDollarR ?? {
+        y: specs.costr > 0 ? inputTokensPerHour / specs.costr : 0,
         roof: false,
       },
     };

@@ -1,7 +1,7 @@
 const selectCustomCostMetric = () => {
   cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
   cy.get('[role="option"]')
-    .contains('Total Token Cost (Custom User Values)')
+    .contains('Cost per Million Total Tokens (Custom User Values)')
     .click({ force: true });
 };
 

@@ -180,6 +180,15 @@ export const Y_AXIS_METRICS = [
   'y_costhi',
   'y_costni',
   'y_costri',
+  'y_tokensPerDollarH',
+  'y_tokensPerDollarN',
+  'y_tokensPerDollarR',
+  'y_outputTokensPerDollarH',
+  'y_outputTokensPerDollarN',
+  'y_outputTokensPerDollarR',
+  'y_inputTokensPerDollarH',
+  'y_inputTokensPerDollarN',
+  'y_inputTokensPerDollarR',
   'y_jTotal',
   'y_jOutput',
   'y_jInput',
@@ -326,6 +335,9 @@ export function createChartDataPoint(
   const tokensPerHour = tputPerGpu * 3600;
   const outputTokensPerHour = outputTputPerGpu * 3600;
   const inputTokensPerHour = inputTputPerGpu * 3600;
+  const millionTokensPerHour = tokensPerHour / 1_000_000;
+  const millionOutputTokensPerHour = outputTokensPerHour / 1_000_000;
+  const millionInputTokensPerHour = inputTokensPerHour / 1_000_000;
 
   return {
     // Spread all AggDataEntry fields (raw stats, metadata, etc.)
@@ -389,45 +401,82 @@ export function createChartDataPoint(
         }
       : {}),
 
-    // Purchasing-power fields (combined throughput). The legacy `cost*` keys
-    // stay stable so existing `i_metric=y_costh` share links keep working.
+    // Cost per million tokens (combined throughput).
     costh: {
-      y: specs.costh ? tokensPerHour / specs.costh : 0,
+      y: hardwarePower && millionTokensPerHour ? specs.costh / millionTokensPerHour : 0,
       roof: false,
     },
     costn: {
-      y: specs.costn ? tokensPerHour / specs.costn : 0,
+      y: hardwarePower && millionTokensPerHour ? specs.costn / millionTokensPerHour : 0,
       roof: false,
     },
     costr: {
-      y: specs.costr ? tokensPerHour / specs.costr : 0,
+      y: hardwarePower && millionTokensPerHour ? specs.costr / millionTokensPerHour : 0,
       roof: false,
     },
 
-    // Output tokens purchasable per dollar
+    // Cost per million output tokens.
     costhOutput: {
-      y: specs.costh ? outputTokensPerHour / specs.costh : 0,
+      y: hardwarePower && millionOutputTokensPerHour ? specs.costh / millionOutputTokensPerHour : 0,
       roof: false,
     },
     costnOutput: {
-      y: specs.costn ? outputTokensPerHour / specs.costn : 0,
+      y: hardwarePower && millionOutputTokensPerHour ? specs.costn / millionOutputTokensPerHour : 0,
       roof: false,
     },
     costrOutput: {
-      y: specs.costr ? outputTokensPerHour / specs.costr : 0,
+      y: hardwarePower && millionOutputTokensPerHour ? specs.costr / millionOutputTokensPerHour : 0,
       roof: false,
     },
 
-    // Input tokens purchasable per dollar
+    // Cost per million input tokens.
     costhi: {
-      y: specs.costh ? inputTokensPerHour / specs.costh : 0,
+      y: hardwarePower && millionInputTokensPerHour ? specs.costh / millionInputTokensPerHour : 0,
       roof: false,
     },
     costni: {
-      y: specs.costn ? inputTokensPerHour / specs.costn : 0,
+      y: hardwarePower && millionInputTokensPerHour ? specs.costn / millionInputTokensPerHour : 0,
       roof: false,
     },
     costri: {
+      y: hardwarePower && millionInputTokensPerHour ? specs.costr / millionInputTokensPerHour : 0,
+      roof: false,
+    },
+
+    // Tokens purchasable per $1 (total / output / input).
+    tokensPerDollarH: {
+      y: specs.costh ? tokensPerHour / specs.costh : 0,
+      roof: false,
+    },
+    tokensPerDollarN: {
+      y: specs.costn ? tokensPerHour / specs.costn : 0,
+      roof: false,
+    },
+    tokensPerDollarR: {
+      y: specs.costr ? tokensPerHour / specs.costr : 0,
+      roof: false,
+    },
+    outputTokensPerDollarH: {
+      y: specs.costh ? outputTokensPerHour / specs.costh : 0,
+      roof: false,
+    },
+    outputTokensPerDollarN: {
+      y: specs.costn ? outputTokensPerHour / specs.costn : 0,
+      roof: false,
+    },
+    outputTokensPerDollarR: {
+      y: specs.costr ? outputTokensPerHour / specs.costr : 0,
+      roof: false,
+    },
+    inputTokensPerDollarH: {
+      y: specs.costh ? inputTokensPerHour / specs.costh : 0,
+      roof: false,
+    },
+    inputTokensPerDollarN: {
+      y: specs.costn ? inputTokensPerHour / specs.costn : 0,
+      roof: false,
+    },
+    inputTokensPerDollarR: {
       y: specs.costr ? inputTokensPerHour / specs.costr : 0,
       roof: false,
     },
@@ -692,6 +741,15 @@ export const calculateRoofline = (
     | `costhi.y`
     | `costni.y`
     | `costri.y`
+    | `tokensPerDollarH.y`
+    | `tokensPerDollarN.y`
+    | `tokensPerDollarR.y`
+    | `outputTokensPerDollarH.y`
+    | `outputTokensPerDollarN.y`
+    | `outputTokensPerDollarR.y`
+    | `inputTokensPerDollarH.y`
+    | `inputTokensPerDollarN.y`
+    | `inputTokensPerDollarR.y`
     | `jTotal.y`
     | `jOutput.y`
     | `jInput.y`
@@ -772,6 +830,15 @@ export function computeAllRooflines(
             | `costhi.y`
             | `costni.y`
             | `costri.y`
+            | `tokensPerDollarH.y`
+            | `tokensPerDollarN.y`
+            | `tokensPerDollarR.y`
+            | `outputTokensPerDollarH.y`
+            | `outputTokensPerDollarN.y`
+            | `outputTokensPerDollarR.y`
+            | `inputTokensPerDollarH.y`
+            | `inputTokensPerDollarN.y`
+            | `inputTokensPerDollarR.y`
             | `jTotal.y`
             | `jOutput.y`
             | `jInput.y`
@@ -823,6 +890,15 @@ export function markRooflinePoints(
       newPoint.costhi.roof = false;
       newPoint.costni.roof = false;
       newPoint.costri.roof = false;
+      if (newPoint.tokensPerDollarH) newPoint.tokensPerDollarH.roof = false;
+      if (newPoint.tokensPerDollarN) newPoint.tokensPerDollarN.roof = false;
+      if (newPoint.tokensPerDollarR) newPoint.tokensPerDollarR.roof = false;
+      if (newPoint.outputTokensPerDollarH) newPoint.outputTokensPerDollarH.roof = false;
+      if (newPoint.outputTokensPerDollarN) newPoint.outputTokensPerDollarN.roof = false;
+      if (newPoint.outputTokensPerDollarR) newPoint.outputTokensPerDollarR.roof = false;
+      if (newPoint.inputTokensPerDollarH) newPoint.inputTokensPerDollarH.roof = false;
+      if (newPoint.inputTokensPerDollarN) newPoint.inputTokensPerDollarN.roof = false;
+      if (newPoint.inputTokensPerDollarR) newPoint.inputTokensPerDollarR.roof = false;
       if (newPoint.jTotal) newPoint.jTotal.roof = false;
       if (newPoint.jOutput) newPoint.jOutput.roof = false;
       if (newPoint.jInput) newPoint.jInput.roof = false;
@@ -887,6 +963,36 @@ export function markRooflinePoints(
           newPoint.costni.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_costri') {
           newPoint.costri.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_tokensPerDollarH') {
+          if (newPoint.tokensPerDollarH) newPoint.tokensPerDollarH.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_tokensPerDollarN') {
+          if (newPoint.tokensPerDollarN) newPoint.tokensPerDollarN.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_tokensPerDollarR') {
+          if (newPoint.tokensPerDollarR) newPoint.tokensPerDollarR.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_outputTokensPerDollarH') {
+          if (newPoint.outputTokensPerDollarH) {
+            newPoint.outputTokensPerDollarH.roof = onCurrentRoofline;
+          }
+        } else if (chartDefYKey === 'y_outputTokensPerDollarN') {
+          if (newPoint.outputTokensPerDollarN) {
+            newPoint.outputTokensPerDollarN.roof = onCurrentRoofline;
+          }
+        } else if (chartDefYKey === 'y_outputTokensPerDollarR') {
+          if (newPoint.outputTokensPerDollarR) {
+            newPoint.outputTokensPerDollarR.roof = onCurrentRoofline;
+          }
+        } else if (chartDefYKey === 'y_inputTokensPerDollarH') {
+          if (newPoint.inputTokensPerDollarH) {
+            newPoint.inputTokensPerDollarH.roof = onCurrentRoofline;
+          }
+        } else if (chartDefYKey === 'y_inputTokensPerDollarN') {
+          if (newPoint.inputTokensPerDollarN) {
+            newPoint.inputTokensPerDollarN.roof = onCurrentRoofline;
+          }
+        } else if (chartDefYKey === 'y_inputTokensPerDollarR') {
+          if (newPoint.inputTokensPerDollarR) {
+            newPoint.inputTokensPerDollarR.roof = onCurrentRoofline;
+          }
         } else if (chartDefYKey === 'y_jTotal' && newPoint.jTotal) {
           newPoint.jTotal.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_jOutput' && newPoint.jOutput) {

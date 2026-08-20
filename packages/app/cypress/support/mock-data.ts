@@ -198,8 +198,6 @@ export function createMockInferenceContext(
     workflowInfo: null,
     selectedYAxisMetric: 'y_tpPerGpu',
     setSelectedYAxisMetric: namedStub('setSelectedYAxisMetric'),
-    costDisplayMode: 'tokens-per-dollar',
-    setCostDisplayMode: namedStub('setCostDisplayMode'),
     selectedPercentile: 'p90',
     setSelectedPercentile: namedStub('setSelectedPercentile'),
     selectedXAxisMetric: null,

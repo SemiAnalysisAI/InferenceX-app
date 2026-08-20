@@ -4,7 +4,7 @@ Non-obvious failure modes discovered during development. Each entry explains wha
 
 ## Token Type Consistency
 
-**Bug pattern**: Chart title says "Output Tokens per $1" but values use total-token throughput.
+**Bug pattern**: Chart title says "Output Tokens per $1" or "Cost per Million Output Tokens" but values use total-token throughput.
 
 When a UI has a Token Type selector (Total/Input/Output), **every** downstream value must use the selected type: chart title, bar values, table values, tooltips, sorting, comparison text, axis labels. The common mistake is updating the title and sorting but forgetting the tooltip or comparison banner.
 
@@ -40,9 +40,9 @@ D3 event handlers capture variables from their creation scope. If a handler refe
 
 ## Disaggregated Config Metrics
 
-**Bug pattern**: Tokens per $1 is 2x too low for disaggregated setups.
+**Bug pattern**: Tokens per $1 is 2x too low—or cost per token is 2x too high—for disaggregated setups.
 
-Disaggregated configs (MoRI SGLang, Dynamo TRT) have separate prefill and decode GPU counts. Purchasing power and throughput metrics must be calculated per decode/prefill GPU, not per total GPU count. The disclaimer in ChartDisplay.tsx explains this to users.
+Disaggregated configs (MoRI SGLang, Dynamo TRT) have separate prefill and decode GPU counts. Cost, purchasing-power, and throughput metrics must be calculated per decode/prefill GPU, not per total GPU count. The disclaimer in ChartDisplay.tsx explains this to users.
 
 When adding metrics that involve per-GPU calculations, check if the config is disaggregated (`d.disagg === true`) and use the appropriate GPU count.
 

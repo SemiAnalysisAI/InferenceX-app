@@ -51,15 +51,13 @@ describe('URL Parameter Persistence', () => {
 
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
-        'Total Token Cost (Owning - Hyperscaler)',
+        'Cost per Million Total Tokens (Owning - Hyperscaler)',
       );
-
-      cy.get('[data-testid="cost-display-selector"]').should('contain.text', 'Tokens per $1');
 
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg text[transform="rotate(-90)"]')
-        .should('have.text', 'Total Tokens per $1 (tok/$)');
+        .should('have.text', 'Cost per Million Total Tokens ($)');
     });
 
     it('changing Y-axis metric via dropdown updates SVG axis label', () => {
@@ -71,27 +69,27 @@ describe('URL Parameter Persistence', () => {
         .should('contain.text', 'Throughput');
 
       cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-      cy.contains('[role="option"]', 'Total Token Cost (Owning - Hyperscaler)').click({
+      cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').click({
         force: true,
       });
 
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg text[transform="rotate(-90)"]')
-        .should('have.text', 'Total Tokens per $1 (tok/$)');
+        .should('have.text', 'Cost per Million Total Tokens ($)');
     });
 
-    it('cost display URL param and dropdown switch to cost per million tokens', () => {
-      visitWithDismissedModal('/inference?i_metric=y_costh&i_cost_display=cost-per-million');
+    it('tokens-per-dollar URL metric is independent from cost per million', () => {
+      visitWithDismissedModal('/inference?i_metric=y_tokensPerDollarH');
 
-      cy.get('[data-testid="cost-display-selector"]').should(
+      cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
-        'Cost per Million Tokens',
+        'Total Tokens per $1 (Owning - Hyperscaler)',
       );
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg text[transform="rotate(-90)"]')
-        .should('have.text', 'Cost per Million Total Tokens ($/M tok)');
+        .should('have.text', 'Total Tokens per $1 (tok/$)');
     });
 
     it('selecting a Y-axis metric updates the displayed value', () => {

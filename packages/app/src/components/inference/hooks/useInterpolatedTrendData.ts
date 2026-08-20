@@ -2,13 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
-import type {
-  CostDisplayMode,
-  InferenceData,
-  TrendDataPoint,
-  YAxisMetricKey,
-} from '@/components/inference/types';
-import { displayTokenCostValue, isTokenCostMetric } from '@/components/inference/cost-display';
+import type { InferenceData, TrendDataPoint, YAxisMetricKey } from '@/components/inference/types';
 import {
   hermiteInterpolate,
   monotoneSlopes,
@@ -52,6 +46,9 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
   const tokPerHr = tput * 3600;
   const outTokPerHr = outputTput * 3600;
   const inTokPerHr = inputTput * 3600;
+  const millionTokPerHr = tokPerHr / 1_000_000;
+  const millionOutTokPerHr = outTokPerHr / 1_000_000;
+  const millionInTokPerHr = inTokPerHr / 1_000_000;
 
   // Build metric objects matching InferenceData shape. Measured-power keys are
   // only set when the runner-side aggregate_power.py emitted them — leaving the
@@ -69,17 +66,26 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
     outputTputPerGpu: wrapMetric(outputTput),
     inputTputPerGpu: wrapMetric(inputTput),
     tpPerMw: wrapMetric(power > 0 ? (tput * 1000) / power : 0),
-    // Tokens purchasable per $1 (total / output / input). Legacy field names
-    // remain stable for saved metric URLs and historical-series identifiers.
-    costh: wrapMetric(specs.costh ? tokPerHr / specs.costh : 0),
-    costn: wrapMetric(specs.costn ? tokPerHr / specs.costn : 0),
-    costr: wrapMetric(specs.costr ? tokPerHr / specs.costr : 0),
-    costhOutput: wrapMetric(specs.costh ? outTokPerHr / specs.costh : 0),
-    costnOutput: wrapMetric(specs.costn ? outTokPerHr / specs.costn : 0),
-    costrOutput: wrapMetric(specs.costr ? outTokPerHr / specs.costr : 0),
-    costhi: wrapMetric(specs.costh ? inTokPerHr / specs.costh : 0),
-    costni: wrapMetric(specs.costn ? inTokPerHr / specs.costn : 0),
-    costri: wrapMetric(specs.costr ? inTokPerHr / specs.costr : 0),
+    // Cost per million tokens (total / output / input).
+    costh: wrapMetric(millionTokPerHr ? specs.costh / millionTokPerHr : 0),
+    costn: wrapMetric(millionTokPerHr ? specs.costn / millionTokPerHr : 0),
+    costr: wrapMetric(millionTokPerHr ? specs.costr / millionTokPerHr : 0),
+    costhOutput: wrapMetric(millionOutTokPerHr ? specs.costh / millionOutTokPerHr : 0),
+    costnOutput: wrapMetric(millionOutTokPerHr ? specs.costn / millionOutTokPerHr : 0),
+    costrOutput: wrapMetric(millionOutTokPerHr ? specs.costr / millionOutTokPerHr : 0),
+    costhi: wrapMetric(millionInTokPerHr ? specs.costh / millionInTokPerHr : 0),
+    costni: wrapMetric(millionInTokPerHr ? specs.costn / millionInTokPerHr : 0),
+    costri: wrapMetric(millionInTokPerHr ? specs.costr / millionInTokPerHr : 0),
+    // Tokens purchasable per $1 (total / output / input).
+    tokensPerDollarH: wrapMetric(specs.costh ? tokPerHr / specs.costh : 0),
+    tokensPerDollarN: wrapMetric(specs.costn ? tokPerHr / specs.costn : 0),
+    tokensPerDollarR: wrapMetric(specs.costr ? tokPerHr / specs.costr : 0),
+    outputTokensPerDollarH: wrapMetric(specs.costh ? outTokPerHr / specs.costh : 0),
+    outputTokensPerDollarN: wrapMetric(specs.costn ? outTokPerHr / specs.costn : 0),
+    outputTokensPerDollarR: wrapMetric(specs.costr ? outTokPerHr / specs.costr : 0),
+    inputTokensPerDollarH: wrapMetric(specs.costh ? inTokPerHr / specs.costh : 0),
+    inputTokensPerDollarN: wrapMetric(specs.costn ? inTokPerHr / specs.costn : 0),
+    inputTokensPerDollarR: wrapMetric(specs.costr ? inTokPerHr / specs.costr : 0),
     // Energy: J/token = W / tok/s
     jTotal: wrapMetric(power > 0 && tput ? (power * 1000) / tput : 0),
     ...(outputTput ? { jOutput: wrapMetric(power > 0 ? (power * 1000) / outputTput : 0) } : {}),
@@ -101,6 +107,16 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
  * splining them directly remains correct.
  */
 const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
+  // $/M tok = $/GPU-hr x 1e6 / (tok/s x 3600)
+  costh: 'tpPerGpu',
+  costn: 'tpPerGpu',
+  costr: 'tpPerGpu',
+  costhOutput: 'outputTputPerGpu',
+  costnOutput: 'outputTputPerGpu',
+  costrOutput: 'outputTputPerGpu',
+  costhi: 'inputTputPerGpu',
+  costni: 'inputTputPerGpu',
+  costri: 'inputTputPerGpu',
   // J/token = W / (tok/s)
   jTotal: 'tpPerGpu',
   jOutput: 'outputTputPerGpu',
@@ -114,15 +130,15 @@ const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> 
  * from the corresponding tokens-per-dollar chart.
  */
 const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
-  costh: 'tpPerGpu',
-  costn: 'tpPerGpu',
-  costr: 'tpPerGpu',
-  costhOutput: 'outputTputPerGpu',
-  costnOutput: 'outputTputPerGpu',
-  costrOutput: 'outputTputPerGpu',
-  costhi: 'inputTputPerGpu',
-  costni: 'inputTputPerGpu',
-  costri: 'inputTputPerGpu',
+  tokensPerDollarH: 'tpPerGpu',
+  tokensPerDollarN: 'tpPerGpu',
+  tokensPerDollarR: 'tpPerGpu',
+  outputTokensPerDollarH: 'outputTputPerGpu',
+  outputTokensPerDollarN: 'outputTputPerGpu',
+  outputTokensPerDollarR: 'outputTputPerGpu',
+  inputTokensPerDollarH: 'inputTputPerGpu',
+  inputTokensPerDollarN: 'inputTputPerGpu',
+  inputTokensPerDollarR: 'inputTputPerGpu',
 };
 
 function recoverProportionalMultiplier(
@@ -218,8 +234,8 @@ export function interpolateMetricAtInteractivity(
     }
   }
 
-  // Energy per token is `constant / throughput`. Spline that throughput and
-  // re-derive rather than splining the metric, preserving the identity.
+  // Cost and energy per token are `constant / throughput`. Spline that
+  // throughput and re-derive rather than splining the metric, preserving the identity.
   const throughputKey = RECIPROCAL_OF_THROUGHPUT[metricKey];
   if (throughputKey) {
     const tputYs: number[] = [];
@@ -259,7 +275,6 @@ interface UseInterpolatedTrendDataParams {
   selectedSequence: Sequence;
   selectedPrecisions: string[];
   selectedYAxisMetric: string;
-  costDisplayMode: CostDisplayMode;
   targetInteractivity: number;
   availableDates: string[];
   enabled: boolean;
@@ -284,7 +299,6 @@ export function useInterpolatedTrendData({
   selectedSequence,
   selectedPrecisions,
   selectedYAxisMetric,
-  costDisplayMode,
   targetInteractivity,
   enabled,
 }: UseInterpolatedTrendDataParams): UseInterpolatedTrendDataResult {
@@ -344,14 +358,10 @@ export function useInterpolatedTrendData({
           metricKey,
         );
         if (interpolated === null) continue;
-        const displayValue = isTokenCostMetric(selectedYAxisMetric)
-          ? displayTokenCostValue(interpolated, costDisplayMode)
-          : interpolated;
-
         if (!resultMap.has(groupKey)) resultMap.set(groupKey, new Map());
         resultMap.get(groupKey)!.set(date, {
           date,
-          value: displayValue,
+          value: interpolated,
           x: targetInteractivity,
         });
       }
@@ -387,7 +397,7 @@ export function useInterpolatedTrendData({
     }
 
     return { trendLines: lines, hwKeysWithData: keysWithData };
-  }, [dateGroupedData, targetInteractivity, selectedYAxisMetric, costDisplayMode]);
+  }, [dateGroupedData, targetInteractivity, selectedYAxisMetric]);
 
   // Artificial progress that ramps up while the API call is in flight
   const [progress, setProgress] = useState(0);

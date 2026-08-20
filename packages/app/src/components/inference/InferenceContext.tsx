@@ -22,11 +22,7 @@ import {
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import type {
-  CostDisplayMode,
-  InferenceChartContextType,
-  InferenceData,
-} from '@/components/inference/types';
+import type { InferenceChartContextType, InferenceData } from '@/components/inference/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -59,8 +55,6 @@ import {
   type ExclusionConflictPolicy,
 } from '@/lib/exclusion';
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
-import { parseCostDisplayMode } from './cost-display';
-
 import {
   isAgenticOnlyXAxisMode,
   useChartData,
@@ -109,7 +103,7 @@ export function InferenceProvider({
   /**
    * Initial y-axis metric key when the URL has no `?i_metric=` param. Used by
    * `/compare-per-dollar/[slug]` to default the chart to
-   * `y_costh` (Total Tokens per $1 — Owning Hyperscaler) instead of
+   * `y_costh` (Cost per Million Total Tokens — Owning Hyperscaler) instead of
    * the dashboard's default `y_tpPerGpu`. URL param still wins so existing
    * shared links are unaffected.
    */
@@ -241,9 +235,6 @@ export function InferenceProvider({
   }, [selectedGpuResolution, setUrlParam]);
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(
     () => getUrlParam('i_metric') || initialYAxisMetric || 'y_tpPerGpu',
-  );
-  const [costDisplayMode, setCostDisplayMode] = useState<CostDisplayMode>(() =>
-    parseCostDisplayMode(getUrlParam('i_cost_display')),
   );
   const [selectedXAxisMetric, setSelectedXAxisMetric] = useState<string | null>(
     () => getUrlParam('i_xmetric') || 'p90_ttft',
@@ -492,7 +483,6 @@ export function InferenceProvider({
     effectiveSequence,
     effectivePrecisions,
     selectedYAxisMetric,
-    costDisplayMode,
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
     selectedGPUs,
@@ -1193,7 +1183,9 @@ export function InferenceProvider({
   }, [allDateIds, setActiveDates]);
 
   useEffect(() => {
-    if (selectedYAxisMetric !== 'y_costUser') setUserCosts((prev) => (prev === null ? prev : null));
+    if (selectedYAxisMetric !== 'y_costUser' && selectedYAxisMetric !== 'y_tokensPerDollarUser') {
+      setUserCosts((prev) => (prev === null ? prev : null));
+    }
     if (selectedYAxisMetric !== 'y_powerUser')
       setUserPowers((prev) => (prev === null ? prev : null));
   }, [selectedModel, effectiveSequence, effectivePrecisions, selectedYAxisMetric]);
@@ -1294,7 +1286,6 @@ export function InferenceProvider({
   useUrlStateSync(
     {
       i_metric: selectedYAxisMetric,
-      i_cost_display: costDisplayMode,
       i_pctl: selectedPercentile,
       i_gpus: selectedGPUs.join(','),
       i_dates: selectedDates.join(','),
@@ -1323,7 +1314,6 @@ export function InferenceProvider({
     },
     [
       selectedYAxisMetric,
-      costDisplayMode,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedXAxisMode,
@@ -1514,8 +1504,6 @@ export function InferenceProvider({
       workflowInfo,
       selectedYAxisMetric,
       setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
-      costDisplayMode,
-      setCostDisplayMode,
       selectedPercentile,
       setSelectedPercentile,
       selectedGPUs,
@@ -1582,7 +1570,6 @@ export function InferenceProvider({
       effectiveSequence,
       effectivePrecisions,
       selectedYAxisMetric,
-      costDisplayMode,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedXAxisMode,

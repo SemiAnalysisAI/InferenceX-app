@@ -74,7 +74,6 @@ export default function HistoricalTrendsDisplay() {
     selectedSequence,
     selectedPrecisions,
     selectedYAxisMetric,
-    costDisplayMode,
     hardwareConfig,
     activeHwTypes,
     hwTypesWithData,
@@ -152,7 +151,6 @@ export default function HistoricalTrendsDisplay() {
     selectedSequence: selectedSequence as Sequence,
     selectedPrecisions,
     selectedYAxisMetric,
-    costDisplayMode,
     targetInteractivity,
     availableDates,
     enabled: hasInteractivityChart,
@@ -337,7 +335,6 @@ export default function HistoricalTrendsDisplay() {
                     </p>
                     <MetricAssumptionNotes
                       selectedYAxisMetric={selectedYAxisMetric}
-                      costDisplayMode={costDisplayMode}
                       includeAllPowerThroughputMetrics={false}
                       includePowerThroughputCaveat={false}
                     />

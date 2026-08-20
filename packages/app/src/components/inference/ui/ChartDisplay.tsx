@@ -196,7 +196,6 @@ export default function ChartDisplay() {
     error,
     workflowInfo,
     selectedYAxisMetric,
-    costDisplayMode,
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
     selectedGPUs,
@@ -376,7 +375,6 @@ export default function ChartDisplay() {
         {
           isAgentic,
           selectedPercentile,
-          costDisplayMode,
         },
       );
 
@@ -423,7 +421,6 @@ export default function ChartDisplay() {
     selectedModel,
     selectedSequence,
     selectedYAxisMetric,
-    costDisplayMode,
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
     selectedPercentile,
@@ -866,10 +863,7 @@ export default function ChartDisplay() {
                               </>
                             )}
                           </p>
-                          <MetricAssumptionNotes
-                            selectedYAxisMetric={selectedYAxisMetric}
-                            costDisplayMode={costDisplayMode}
-                          />
+                          <MetricAssumptionNotes selectedYAxisMetric={selectedYAxisMetric} />
                           {isUnofficialRun &&
                             selectedXAxisMode === 'e2e-normalized-interactivity' && (
                               <p className="mb-2 text-xs text-muted-foreground">
@@ -1024,7 +1018,8 @@ export default function ChartDisplay() {
         </Card>
       </section>
 
-      {selectedYAxisMetric === 'y_costUser' && (
+      {(selectedYAxisMetric === 'y_costUser' ||
+        selectedYAxisMetric === 'y_tokensPerDollarUser') && (
         <section>
           <CustomCosts loading={loading} />
         </section>

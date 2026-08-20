@@ -302,7 +302,7 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
   outputTputPerMw?: { y: number; roof: boolean };
-  // Tokens purchasable per $1. Legacy cost* keys preserve shared URL compatibility.
+  // Cost per million tokens.
   costh: { y: number; roof: boolean };
   costn: { y: number; roof: boolean };
   costr: { y: number; roof: boolean };
@@ -313,6 +313,17 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   costni: { y: number; roof: boolean };
   costri: { y: number; roof: boolean };
   costUser?: { y: number; roof: boolean };
+  // Tokens purchasable per $1.
+  tokensPerDollarH?: { y: number; roof: boolean };
+  tokensPerDollarN?: { y: number; roof: boolean };
+  tokensPerDollarR?: { y: number; roof: boolean };
+  outputTokensPerDollarH?: { y: number; roof: boolean };
+  outputTokensPerDollarN?: { y: number; roof: boolean };
+  outputTokensPerDollarR?: { y: number; roof: boolean };
+  inputTokensPerDollarH?: { y: number; roof: boolean };
+  inputTokensPerDollarN?: { y: number; roof: boolean };
+  inputTokensPerDollarR?: { y: number; roof: boolean };
+  tokensPerDollarUser?: { y: number; roof: boolean };
   powerUser?: { y: number; roof: boolean };
 
   // All-in provisioned Joules per token
@@ -366,6 +377,16 @@ export type YAxisMetricKey =
   | 'costni'
   | 'costri'
   | 'costUser'
+  | 'tokensPerDollarH'
+  | 'tokensPerDollarN'
+  | 'tokensPerDollarR'
+  | 'outputTokensPerDollarH'
+  | 'outputTokensPerDollarN'
+  | 'outputTokensPerDollarR'
+  | 'inputTokensPerDollarH'
+  | 'inputTokensPerDollarN'
+  | 'inputTokensPerDollarR'
+  | 'tokensPerDollarUser'
   | 'powerUser'
   | 'jTotal'
   | 'jOutput'
@@ -392,7 +413,6 @@ export type YAxisMetricKey =
  * @property {'up' | 'down'} roofline - Specifies the direction of the roofline calculation (e.g., "up" for higher is better, "down" for lower is better).
  */
 export type InferenceChartType = 'e2e' | 'interactivity';
-export type CostDisplayMode = 'tokens-per-dollar' | 'cost-per-million';
 
 export interface ChartDefinition {
   [key: string]: string | number | undefined;
@@ -441,7 +461,7 @@ export interface ChartDefinition {
   y_costr_label?: string;
   y_costr_title?: string;
   y_costr_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  // Output tokens purchasable per $1 (legacy cost* keys preserve shared URLs)
+  // Cost per million output tokens
   y_costhOutput?: string;
   y_costhOutput_label?: string;
   y_costhOutput_title?: string;
@@ -454,7 +474,7 @@ export interface ChartDefinition {
   y_costrOutput_label?: string;
   y_costrOutput_title?: string;
   y_costrOutput_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  // Input tokens purchasable per $1 (legacy cost* keys preserve shared URLs)
+  // Cost per million input tokens
   y_costhi?: string;
   y_costhi_label?: string;
   y_costhi_title?: string;
@@ -467,6 +487,42 @@ export interface ChartDefinition {
   y_costri_label?: string;
   y_costri_title?: string;
   y_costri_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_tokensPerDollarH?: string;
+  y_tokensPerDollarH_label?: string;
+  y_tokensPerDollarH_title?: string;
+  y_tokensPerDollarH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_tokensPerDollarN?: string;
+  y_tokensPerDollarN_label?: string;
+  y_tokensPerDollarN_title?: string;
+  y_tokensPerDollarN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_tokensPerDollarR?: string;
+  y_tokensPerDollarR_label?: string;
+  y_tokensPerDollarR_title?: string;
+  y_tokensPerDollarR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTokensPerDollarH?: string;
+  y_outputTokensPerDollarH_label?: string;
+  y_outputTokensPerDollarH_title?: string;
+  y_outputTokensPerDollarH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTokensPerDollarN?: string;
+  y_outputTokensPerDollarN_label?: string;
+  y_outputTokensPerDollarN_title?: string;
+  y_outputTokensPerDollarN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTokensPerDollarR?: string;
+  y_outputTokensPerDollarR_label?: string;
+  y_outputTokensPerDollarR_title?: string;
+  y_outputTokensPerDollarR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerDollarH?: string;
+  y_inputTokensPerDollarH_label?: string;
+  y_inputTokensPerDollarH_title?: string;
+  y_inputTokensPerDollarH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerDollarN?: string;
+  y_inputTokensPerDollarN_label?: string;
+  y_inputTokensPerDollarN_title?: string;
+  y_inputTokensPerDollarN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerDollarR?: string;
+  y_inputTokensPerDollarR_label?: string;
+  y_inputTokensPerDollarR_title?: string;
+  y_inputTokensPerDollarR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
   // All-in provisioned Joules per token
   y_jTotal?: string;
   y_jTotal_label?: string;
@@ -813,8 +869,6 @@ export interface InferenceChartContextType {
   workflowInfo: any;
   selectedYAxisMetric: string;
   setSelectedYAxisMetric: (metric: string) => void;
-  costDisplayMode: CostDisplayMode;
-  setCostDisplayMode: (mode: CostDisplayMode) => void;
   /** Latency percentile for the x-axis under agentic scenarios (median/p90/p99/p99.9). */
   selectedPercentile: string;
   setSelectedPercentile: (p: string) => void;

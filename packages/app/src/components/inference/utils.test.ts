@@ -310,18 +310,16 @@ describe('processOverlayChartData', () => {
 
   it('keeps all unofficial-run tokens-per-dollar points without the former cost clamp', () => {
     const data = [
-      pt({ costh: { y: 500_000, roof: false }, median_intvty: 10 } as any),
-      pt({ costh: { y: 2_000_000, roof: false }, median_intvty: 20 } as any),
+      pt({ tokensPerDollarH: { y: 500_000, roof: false }, median_intvty: 10 } as any),
+      pt({ tokensPerDollarH: { y: 2_000_000, roof: false }, median_intvty: 20 } as any),
     ];
-    const result = processOverlayChartData(data, 'interactivity', 'y_costh', null);
+    const result = processOverlayChartData(data, 'interactivity', 'y_tokensPerDollarH', null);
     expect(result.map((point) => point.y)).toEqual([500_000, 2_000_000]);
   });
 
-  it('renders unofficial-run cost per million as the reciprocal of tokens per dollar', () => {
-    const data = [pt({ costh: { y: 2_000_000, roof: false }, median_intvty: 20 } as any)];
-    const result = processOverlayChartData(data, 'interactivity', 'y_costh', null, {
-      costDisplayMode: 'cost-per-million',
-    });
+  it('keeps the existing unofficial-run cost-per-million metric independent', () => {
+    const data = [pt({ costh: { y: 0.5, roof: false }, median_intvty: 20 } as any)];
+    const result = processOverlayChartData(data, 'interactivity', 'y_costh', null);
 
     expect(result).toHaveLength(1);
     expect(result[0].y).toBe(0.5);
@@ -330,12 +328,12 @@ describe('processOverlayChartData', () => {
 
   it('does not classify unofficial-run purchasing-power points as cost overflows', () => {
     const visible = pt({
-      costh: { y: 500_000, roof: false },
+      tokensPerDollarH: { y: 500_000, roof: false },
       median_intvty: 10,
       run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
     } as any);
     const highValue = pt({
-      costh: { y: 2_000_000, roof: false },
+      tokensPerDollarH: { y: 2_000_000, roof: false },
       median_intvty: 20,
       run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
     } as any);
@@ -343,7 +341,7 @@ describe('processOverlayChartData', () => {
     const result = processOverlayChartDataWithClipping(
       [visible, highValue],
       'interactivity',
-      'y_costh',
+      'y_tokensPerDollarH',
       null,
     );
 

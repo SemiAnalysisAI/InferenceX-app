@@ -45,11 +45,6 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.r_range).toBe('last-3-months');
   });
 
-  it('defaults inference token-cost display to tokens per dollar', async () => {
-    const { PARAM_DEFAULTS } = await import('@/lib/url-state');
-    expect(PARAM_DEFAULTS.i_cost_display).toBe('tokens-per-dollar');
-  });
-
   it('has empty string defaults for optional params', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.g_rundate).toBe('');

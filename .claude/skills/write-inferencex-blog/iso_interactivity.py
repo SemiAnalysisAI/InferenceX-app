@@ -24,11 +24,11 @@ a per-chip constant divided by a throughput, so they are NOT splined independent
 Two independent splines need not preserve `metric * throughput = constant` between
 measured knots. Pass `reciprocal_of='throughput'` (or the matching output/input
 throughput key) to spline that throughput and re-derive the metric. The live
-inference charts display tokens/$ instead; that purchasing-power metric is directly
-proportional to throughput. Pass `proportional_to='throughput'` (or the matching
-output/input throughput key) so it uses the same Pareto knots and spline as that
-throughput before applying the recovered multiplier. See docs/tco-calculator.md
-for a reproducible measurement.
+inference charts also expose tokens/$ as a separate metric; that purchasing-power
+metric is directly proportional to throughput. Pass `proportional_to='throughput'`
+(or the matching output/input throughput key) so it uses the same Pareto knots and
+spline as that throughput before applying the recovered multiplier. See
+docs/tco-calculator.md for a reproducible measurement.
 
 Usage as a module:
     from iso_interactivity import interpolate_metric, pareto_front_upper_left

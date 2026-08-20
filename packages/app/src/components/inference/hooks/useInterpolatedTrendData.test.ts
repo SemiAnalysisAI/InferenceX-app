@@ -90,20 +90,20 @@ describe('interpolateMetricAtInteractivity', () => {
       makePoint({
         x: 20,
         tpPerGpu: { y: 800, roof: false },
-        costh: { y: 800_000, roof: false },
+        tokensPerDollarH: { y: 800_000, roof: false },
       }),
       makePoint({
         x: 40,
         tpPerGpu: { y: 600, roof: false },
-        costh: { y: 600_000, roof: false },
+        tokensPerDollarH: { y: 600_000, roof: false },
       }),
       makePoint({
         x: 60,
         tpPerGpu: { y: 400, roof: false },
-        costh: { y: 400_000, roof: false },
+        tokensPerDollarH: { y: 400_000, roof: false },
       }),
     ];
-    const result = interpolateMetricAtInteractivity(points, 30, 'costh');
+    const result = interpolateMetricAtInteractivity(points, 30, 'tokensPerDollarH');
     expect(result).toBeCloseTo(700_000, 0);
   });
 
@@ -113,25 +113,28 @@ describe('interpolateMetricAtInteractivity', () => {
         x: 20,
         tpPerGpu: { y: 1000, roof: false },
         outputTputPerGpu: { y: 100, roof: false },
-        costhOutput: { y: 100_000, roof: false },
+        outputTokensPerDollarH: { y: 100_000, roof: false },
       }),
       makePoint({
         x: 40,
         tpPerGpu: { y: 800, roof: false },
         outputTputPerGpu: { y: 700, roof: false },
-        costhOutput: { y: 700_000, roof: false },
+        outputTokensPerDollarH: { y: 700_000, roof: false },
       }),
       makePoint({
         x: 60,
         tpPerGpu: { y: 900, roof: false },
         outputTputPerGpu: { y: 500, roof: false },
-        costhOutput: { y: 500_000, roof: false },
+        outputTokensPerDollarH: { y: 500_000, roof: false },
       }),
     ];
 
     // The total-throughput frontier drops x=40, while the output-throughput
     // frontier keeps x=40 and drops x=20. The midpoint must follow the latter.
-    expect(interpolateMetricAtInteractivity(points, 50, 'costhOutput')).toBeCloseTo(581_250, 0);
+    expect(interpolateMetricAtInteractivity(points, 50, 'outputTokensPerDollarH')).toBeCloseTo(
+      581_250,
+      0,
+    );
   });
 
   it('uses the matching input-throughput Pareto knots for input tokens per dollar', () => {
@@ -140,23 +143,26 @@ describe('interpolateMetricAtInteractivity', () => {
         x: 20,
         tpPerGpu: { y: 1000, roof: false },
         inputTputPerGpu: { y: 100, roof: false },
-        costhi: { y: 200_000, roof: false },
+        inputTokensPerDollarH: { y: 200_000, roof: false },
       }),
       makePoint({
         x: 40,
         tpPerGpu: { y: 800, roof: false },
         inputTputPerGpu: { y: 700, roof: false },
-        costhi: { y: 1_400_000, roof: false },
+        inputTokensPerDollarH: { y: 1_400_000, roof: false },
       }),
       makePoint({
         x: 60,
         tpPerGpu: { y: 900, roof: false },
         inputTputPerGpu: { y: 500, roof: false },
-        costhi: { y: 1_000_000, roof: false },
+        inputTokensPerDollarH: { y: 1_000_000, roof: false },
       }),
     ];
 
-    expect(interpolateMetricAtInteractivity(points, 50, 'costhi')).toBeCloseTo(1_162_500, 0);
+    expect(interpolateMetricAtInteractivity(points, 50, 'inputTokensPerDollarH')).toBeCloseTo(
+      1_162_500,
+      0,
+    );
   });
 
   it('filters dominated points via Pareto front', () => {

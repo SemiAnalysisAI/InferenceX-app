@@ -30,7 +30,7 @@ const PER_DOLLAR_LABEL_OVERRIDES = {
   'Cost ($/M tok)': 'Dollar per Million Tokens',
 };
 
-/** y_costh = Total Tokens per $1 (Owning - Hyperscaler). Defined in
+/** y_costh = Cost per Million Total Tokens (Owning - Hyperscaler). Defined in
  *  packages/app/src/components/inference/inference-chart-config.json. */
 const PER_DOLLAR_DEFAULT_Y_AXIS = 'y_costh';
 

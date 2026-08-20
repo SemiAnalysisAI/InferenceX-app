@@ -137,23 +137,25 @@ describe('updateRepoUrl', () => {
 });
 
 // ===========================================================================
-// calculateCostsForGpus (legacy name; values are tokens purchasable per $1)
+// calculateCostsForGpus (produces both cost-per-million and tokens-per-dollar)
 // costh=2.8, costn=1.4, costr=0.7 (from mock, but this fn uses userCosts arg)
 // ===========================================================================
 describe('calculateCostsForGpus', () => {
   it('computes purchasing power: tpPerGpu=1000, userCost=$5/hr → 720,000 tok/$', () => {
     const data = [pt({ hwKey: 'h100' as any, tpPerGpu: { y: 1000, roof: false } })];
     const result = calculateCostsForGpus(data, { h100: 5 });
-    expect(result[0].costUser?.y).toBe(720_000);
-    expect(result[0].y).toBe(720_000);
+    expect(result[0].costUser?.y).toBe(1.389);
+    expect(result[0].tokensPerDollarUser?.y).toBe(720_000);
+    expect(result[0].y).toBe(1.389);
     expect(result[0].costUser?.roof).toBe(false);
   });
 
   it('computes purchasing power: tpPerGpu=1000, userCost=$3/hr → 1,200,000 tok/$', () => {
     const data = [pt({ hwKey: 'h100' as any, tpPerGpu: { y: 1000, roof: false } })];
     const result = calculateCostsForGpus(data, { h100: 3 });
-    expect(result[0].costUser?.y).toBe(1_200_000);
-    expect(result[0].y).toBe(1_200_000);
+    expect(result[0].costUser?.y).toBe(0.833);
+    expect(result[0].tokensPerDollarUser?.y).toBe(1_200_000);
+    expect(result[0].y).toBe(0.833);
   });
 
   it('returns item unchanged when no user cost is provided for that GPU', () => {
@@ -166,7 +168,8 @@ describe('calculateCostsForGpus', () => {
   it('inherits cost from base GPU key for prefixed hardware (e.g. h100_trt → h100)', () => {
     const data = [pt({ hwKey: 'h100_trt' as any, tpPerGpu: { y: 1000, roof: false } })];
     const result = calculateCostsForGpus(data, { h100: 5 });
-    expect(result[0].costUser?.y).toBe(720_000);
+    expect(result[0].costUser?.y).toBe(1.389);
+    expect(result[0].tokensPerDollarUser?.y).toBe(720_000);
   });
 
   it('processes multiple items independently', () => {
@@ -175,14 +178,17 @@ describe('calculateCostsForGpus', () => {
       pt({ hwKey: 'a100' as any, tpPerGpu: { y: 2000, roof: false } }),
     ];
     const result = calculateCostsForGpus(data, { h100: 5, a100: 5 });
-    expect(result[0].costUser?.y).toBe(720_000);
-    expect(result[1].costUser?.y).toBe(1_440_000);
+    expect(result[0].costUser?.y).toBe(1.389);
+    expect(result[1].costUser?.y).toBe(0.694);
+    expect(result[0].tokensPerDollarUser?.y).toBe(720_000);
+    expect(result[1].tokensPerDollarUser?.y).toBe(1_440_000);
   });
 
   it('returns zero purchasing power for a zero hourly cost', () => {
     const data = [pt({ hwKey: 'h100' as any, tpPerGpu: { y: 1000, roof: false } })];
     const result = calculateCostsForGpus(data, { h100: 0 });
     expect(result[0].costUser?.y).toBe(0);
+    expect(result[0].tokensPerDollarUser?.y).toBe(0);
   });
 });
 
@@ -240,14 +246,15 @@ describe('computeOutputCostFields', () => {
     expect(result[0].costrOutput?.y).toBe(99);
   });
 
-  it('computes output tokens per dollar from outputTputPerGpu', () => {
+  it('computes both output cost and output tokens per dollar', () => {
     const item = pt({
       outputTputPerGpu: { y: 1000, roof: false },
     });
     const result = computeOutputCostFields([item]);
-    expect(result[0].costhOutput?.y).toBe(1_285_714.286);
-    expect(result[0].costnOutput?.y).toBe(2_571_428.571);
-    expect(result[0].costrOutput?.y).toBe(5_142_857.143);
+    expect(result[0].costhOutput?.y).toBe(0.778);
+    expect(result[0].costnOutput?.y).toBe(0.389);
+    expect(result[0].costrOutput?.y).toBe(0.194);
+    expect(result[0].outputTokensPerDollarH?.y).toBeCloseTo(1_285_714.286, 3);
     expect(result[0].costhOutput?.roof).toBe(false);
   });
 
@@ -255,9 +262,10 @@ describe('computeOutputCostFields', () => {
     // fallback tput = 1000 * 0.875 = 875
     const item = pt({ tpPerGpu: { y: 1000, roof: false } });
     const result = computeOutputCostFields([item]);
-    expect(result[0].costhOutput?.y).toBe(1_125_000);
-    expect(result[0].costnOutput?.y).toBe(2_250_000);
-    expect(result[0].costrOutput?.y).toBe(4_500_000);
+    expect(result[0].costhOutput?.y).toBe(0.889);
+    expect(result[0].costnOutput?.y).toBe(0.444);
+    expect(result[0].costrOutput?.y).toBe(0.222);
+    expect(result[0].outputTokensPerDollarH?.y).toBeCloseTo(1_125_000, 3);
   });
 
   it('does not overwrite an existing costhOutput field (partial override)', () => {
@@ -269,7 +277,7 @@ describe('computeOutputCostFields', () => {
     // costhOutput already existed → kept as 42
     expect(result[0].costhOutput?.y).toBe(42);
     // costnOutput was absent → computed
-    expect(result[0].costnOutput?.y).toBe(2_250_000);
+    expect(result[0].costnOutput?.y).toBe(0.444);
   });
 
   it('returns an empty array for empty input', () => {
@@ -296,7 +304,7 @@ describe('computeInputCostFields', () => {
     expect(result[0].costri?.y).toBe(99);
   });
 
-  it('computes input tokens per dollar from inputTputPerGpu', () => {
+  it('computes both input cost and input tokens per dollar', () => {
     const item = pt({
       costhi: undefined as any,
       costni: undefined as any,
@@ -304,9 +312,10 @@ describe('computeInputCostFields', () => {
       inputTputPerGpu: { y: 200, roof: false },
     });
     const result = computeInputCostFields([item]);
-    expect(result[0].costhi?.y).toBe(257_142.857);
-    expect(result[0].costni?.y).toBe(514_285.714);
-    expect(result[0].costri?.y).toBe(1_028_571.429);
+    expect(result[0].costhi?.y).toBe(3.889);
+    expect(result[0].costni?.y).toBe(1.944);
+    expect(result[0].costri?.y).toBe(0.972);
+    expect(result[0].inputTokensPerDollarH?.y).toBeCloseTo(257_142.857, 3);
     expect(result[0].costhi?.roof).toBe(false);
   });
 
@@ -319,9 +328,10 @@ describe('computeInputCostFields', () => {
       tpPerGpu: { y: 1000, roof: false },
     });
     const result = computeInputCostFields([item]);
-    expect(result[0].costhi?.y).toBe(160_714.286);
-    expect(result[0].costni?.y).toBe(321_428.571);
-    expect(result[0].costri?.y).toBe(642_857.143);
+    expect(result[0].costhi?.y).toBe(6.222);
+    expect(result[0].costni?.y).toBe(3.111);
+    expect(result[0].costri?.y).toBe(1.556);
+    expect(result[0].inputTokensPerDollarH?.y).toBeCloseTo(160_714.286, 3);
   });
 
   it('does not overwrite an existing costhi field (partial override)', () => {
@@ -334,7 +344,7 @@ describe('computeInputCostFields', () => {
     // costhi already existed → kept as 77
     expect(result[0].costhi?.y).toBe(77);
     // costni was absent → computed (fallback: tpPerGpu=1000)
-    expect(result[0].costni?.y).toBe(321_428.571);
+    expect(result[0].costni?.y).toBe(3.111);
   });
 
   it('returns an empty array for empty input', () => {

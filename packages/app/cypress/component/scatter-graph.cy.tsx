@@ -944,8 +944,8 @@ describe('ChartDisplay engine comparison guard', () => {
       x: 'median_intvty',
       x_label: 'Interactivity (tok/s/user)',
       y_costhOutput: 'costhOutput.y',
-      y_costhOutput_label: 'Output Tokens per $1 (tok/$)',
-      y_costhOutput_roofline: 'upper_left',
+      y_costhOutput_label: 'Cost per Million Output Tokens ($)',
+      y_costhOutput_roofline: 'lower_right',
       y_cost_limit: 5,
     });
     const officialVisible = createMockInferenceData({

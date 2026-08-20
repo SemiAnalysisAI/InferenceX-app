@@ -8,15 +8,35 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { ShareButton } from '@/components/ui/share-button';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { useLocale } from '@/lib/use-locale';
-import type { CostDisplayMode } from '@/components/inference/types';
 import type { Locale } from '@/lib/i18n';
 
 // Keep these metric-key groups in sync with chart-utils/chart configs when new source-backed
 // metrics are added; this helper owns which caption notes and caveats appear for each family.
 const POWER_SOURCE_METRICS = new Set(['y_tpPerMw', 'y_inputTputPerMw', 'y_outputTputPerMw']);
-const TOTAL_COST_METRICS = new Set(['y_costh', 'y_costn', 'y_costr']);
-const OUTPUT_COST_METRICS = new Set(['y_costhOutput', 'y_costnOutput', 'y_costrOutput']);
-const INPUT_COST_METRICS = new Set(['y_costhi', 'y_costni', 'y_costri']);
+const TOTAL_COST_METRICS = new Set([
+  'y_costh',
+  'y_costn',
+  'y_costr',
+  'y_tokensPerDollarH',
+  'y_tokensPerDollarN',
+  'y_tokensPerDollarR',
+]);
+const OUTPUT_COST_METRICS = new Set([
+  'y_costhOutput',
+  'y_costnOutput',
+  'y_costrOutput',
+  'y_outputTokensPerDollarH',
+  'y_outputTokensPerDollarN',
+  'y_outputTokensPerDollarR',
+]);
+const INPUT_COST_METRICS = new Set([
+  'y_costhi',
+  'y_costni',
+  'y_costri',
+  'y_inputTokensPerDollarH',
+  'y_inputTokensPerDollarN',
+  'y_inputTokensPerDollarR',
+]);
 const POWER_VALUES = Object.fromEntries(
   Object.entries(HW_REGISTRY).map(([base, specs]) => [base, `${specs.power}kW`]),
 );
@@ -64,6 +84,8 @@ function SourceLink({
 
 const NOUN_ZH: Record<string, string> = {
   cost: '成本',
+  'cost per million tokens': '每百万 token 成本',
+  'token cost': 'token 成本',
   'tokens per $1': '每 1 美元可购买的 token 数',
   'purchasing power': '购买力',
   'input throughput': '输入吞吐量',
@@ -122,11 +144,17 @@ function getCostValues(selectedYAxisMetric: string) {
       base,
       selectedYAxisMetric === 'y_costh' ||
       selectedYAxisMetric === 'y_costhOutput' ||
-      selectedYAxisMetric === 'y_costhi'
+      selectedYAxisMetric === 'y_costhi' ||
+      selectedYAxisMetric === 'y_tokensPerDollarH' ||
+      selectedYAxisMetric === 'y_outputTokensPerDollarH' ||
+      selectedYAxisMetric === 'y_inputTokensPerDollarH'
         ? specs.costh
         : selectedYAxisMetric === 'y_costn' ||
             selectedYAxisMetric === 'y_costnOutput' ||
-            selectedYAxisMetric === 'y_costni'
+            selectedYAxisMetric === 'y_costni' ||
+            selectedYAxisMetric === 'y_tokensPerDollarN' ||
+            selectedYAxisMetric === 'y_outputTokensPerDollarN' ||
+            selectedYAxisMetric === 'y_inputTokensPerDollarN'
           ? specs.costn
           : specs.costr,
     ]),
@@ -139,12 +167,10 @@ export function ChartShareActions() {
 
 export function MetricAssumptionNotes({
   selectedYAxisMetric,
-  costDisplayMode = 'tokens-per-dollar',
   includeAllPowerThroughputMetrics = true,
   includePowerThroughputCaveat = true,
 }: {
   selectedYAxisMetric: string;
-  costDisplayMode?: CostDisplayMode;
   // Historical trends only annotates y_tpPerMw and intentionally omits per-MW caveats to preserve
   // the tab's existing caption contract while sharing the same helper as inference.
   includeAllPowerThroughputMetrics?: boolean;
@@ -159,13 +185,14 @@ export function MetricAssumptionNotes({
   const showInputCostSource = INPUT_COST_METRICS.has(selectedYAxisMetric);
   const showInputThroughputCaveat = selectedYAxisMetric === 'y_inputTputPerGpu';
   const showOutputThroughputCaveat = selectedYAxisMetric === 'y_outputTputPerGpu';
-  // Per-token-type purchasing power only. A disagg config's prefill and decode chips are
-  // counted separately, so input/output purchasing power is attributed to
-  // one side of the split and can't be lined up against an aggregated config.
+  // Per-token-type cost and purchasing power only. A disagg config's prefill and decode
+  // chips are counted separately, so input/output economics are attributed to one side
+  // of the split and can't be lined up against an aggregated config.
   // The total-token metric uses the whole chip count, which is the same
   // denominator an aggregated config uses, so it needs no caveat — the same
   // split the throughput caveats above already make (input/output, not total).
   const showCostCaveat = showOutputCostSource || showInputCostSource;
+  const isTokensPerDollar = selectedYAxisMetric.includes('TokensPerDollar');
   const showJouleSource = selectedYAxisMetric.startsWith('y_j');
 
   const costValues =
@@ -200,10 +227,8 @@ export function MetricAssumptionNotes({
       )}
       <DisaggCaveat
         visible={showCostCaveat}
-        calculationNoun={
-          costDisplayMode === 'tokens-per-dollar' ? 'tokens per $1' : 'cost per million tokens'
-        }
-        comparisonNoun={costDisplayMode === 'tokens-per-dollar' ? 'purchasing power' : 'token cost'}
+        calculationNoun={isTokensPerDollar ? 'tokens per $1' : 'cost per million tokens'}
+        comparisonNoun={isTokensPerDollar ? 'purchasing power' : 'token cost'}
         locale={locale}
       />
       <DisaggCaveat
