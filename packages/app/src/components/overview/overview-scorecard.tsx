@@ -2,6 +2,8 @@
 
 import { type ComponentPropsWithoutRef, useEffect, useRef } from 'react';
 
+import { TCO_SOURCE_TITLE } from '@semianalysisai/inferencex-constants';
+
 import {
   OVERVIEW_DEFAULT_HISTORY_WINDOW,
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
@@ -50,7 +52,7 @@ export const OVERVIEW_STRINGS = {
     // The unit is dropped from the visible line but kept for screen readers.
     scopeAria: 'Hyperscaler cost per one million total tokens. Lower is better.',
     sourcePrefix: 'Source: InferenceX & ',
-    sourceLinkText: 'SemiAnalysis Market July 2026 AI Cloud TCO Model',
+    sourceLinkText: TCO_SOURCE_TITLE,
     tierNavLabel: 'SLO',
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
@@ -161,7 +163,7 @@ export const OVERVIEW_STRINGS = {
     scopeDirection: '↓ 越低越好',
     scopeAria: '超大规模云（hyperscaler）每百万总 token 成本，越低越好。',
     sourcePrefix: '来源：InferenceX 与 ',
-    sourceLinkText: 'SemiAnalysis Market July 2026 AI Cloud TCO Model',
+    sourceLinkText: TCO_SOURCE_TITLE,
     tierNavLabel: 'SLO',
     tierUnit: 'tok/s/用户',
     engineScopeNavLabel: '引擎范围',

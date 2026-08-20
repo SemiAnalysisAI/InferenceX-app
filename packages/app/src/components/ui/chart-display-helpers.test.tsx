@@ -3,6 +3,8 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
+
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 
 let container: HTMLDivElement;
@@ -84,9 +86,8 @@ describe('MetricAssumptionNotes', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_outputTokensPerDollarH" />);
 
     expect(getVisibleText()).toContain('TCO $/chip/hr:');
-    expect(getVisibleText()).toContain(
-      'SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model',
-    );
+    expect(getVisibleText()).toContain(TCO_SOURCE_TITLE);
+    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).not.toBeNull();
     expect(getVisibleCaveatText()).toContain(
       'calculate tokens per $1 USD per decode chip or per prefill chip',
     );
@@ -142,9 +143,8 @@ describe('MetricAssumptionNotes', () => {
 
     // The TCO badges and source attribution still explain the hourly-price input.
     expect(getVisibleText()).toContain('TCO $/chip/hr:');
-    expect(getVisibleText()).toContain(
-      'SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model',
-    );
+    expect(getVisibleText()).toContain(TCO_SOURCE_TITLE);
+    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).not.toBeNull();
     expect(getVisibleCaveatText()).not.toContain(
       'calculate tokens per $1 USD per decode chip or per prefill chip',
     );

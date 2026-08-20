@@ -1,3 +1,5 @@
+import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
+
 // Order mirrors DEFAULT_MODELS (MODEL_CONFIG insertion order), which fixes the
 // matrix row order.
 const MODEL_LABELS = [
@@ -29,10 +31,8 @@ const AGENTX_SHORT = 'AgentX';
 
 const PAGE_TITLE = 'Agentic Inference Costs';
 const PAGE_TITLE_ZH = '智能体推理成本';
-const SOURCE_NOTE = 'Source: InferenceX & SemiAnalysis Market July 2026 AI Cloud TCO Model';
-const SOURCE_LINK_TEXT = 'SemiAnalysis Market July 2026 AI Cloud TCO Model';
-const SOURCE_NOTE_ZH = '来源：InferenceX 与 SemiAnalysis Market July 2026 AI Cloud TCO Model';
-const SOURCE_HREF = 'https://semianalysis.com/ai-cloud-tco-model/';
+const SOURCE_NOTE = `Source: InferenceX & ${TCO_SOURCE_TITLE}`;
+const SOURCE_NOTE_ZH = `来源：InferenceX 与 ${TCO_SOURCE_TITLE}`;
 const SCOPE_METRIC = 'Hyperscaler cost';
 const SCOPE_DIRECTION = '↓ Lower is better';
 const SCOPE_LINE = `${SCOPE_METRIC} · ${SCOPE_DIRECTION} · ${SOURCE_NOTE}`;
@@ -947,8 +947,8 @@ describe('Overview page', () => {
       .and('not.contain.text', '8K→1K');
     // The TCO model behind every $/GPU/hr is cited under the metric.
     cy.get('[data-testid="overview-source-link"]')
-      .should('have.text', SOURCE_LINK_TEXT)
-      .and('have.attr', 'href', SOURCE_HREF)
+      .should('have.text', TCO_SOURCE_TITLE)
+      .and('have.attr', 'href', TCO_SOURCE_URL)
       .and('have.attr', 'target', '_blank')
       .and('have.attr', 'rel', 'noopener noreferrer');
     // Opening off-site is signalled by the shared external-link glyph.
@@ -1489,8 +1489,8 @@ describe('Overview page', () => {
     );
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);
     cy.get('[data-testid="overview-source-link"]')
-      .should('have.text', SOURCE_LINK_TEXT)
-      .and('have.attr', 'href', SOURCE_HREF);
+      .should('have.text', TCO_SOURCE_TITLE)
+      .and('have.attr', 'href', TCO_SOURCE_URL);
     cy.get('body').should('not.contain.text', '一眼对比');
     cy.contains('— = 无结果。∞ = 缺少 B200 基线。').should('exist');
     cy.get('[data-testid="overview-methodology"]').children('p').should('have.length', 2);

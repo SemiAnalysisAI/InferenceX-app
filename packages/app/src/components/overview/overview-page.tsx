@@ -2,6 +2,8 @@
 
 import type { ReactNode } from 'react';
 
+import { TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
+
 import { Card } from '@/components/ui/card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { OVERVIEW_HISTORY_WINDOW_DAYS, type OverviewPageData } from '@/lib/overview-data';
@@ -34,9 +36,6 @@ import {
   useOverviewPresentation,
 } from './overview-presentation';
 import { useWideViewport } from './use-wide-viewport';
-
-/** The SemiAnalysis AI Cloud TCO model behind `HW_REGISTRY.costh`. */
-const OVERVIEW_SOURCE_HREF = 'https://semianalysis.com/ai-cloud-tco-model/';
 
 interface OverviewPageProps {
   data: OverviewPageData;
@@ -149,7 +148,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
                   {strings.sourcePrefix}
                   <a
                     data-testid="overview-source-link"
-                    href={OVERVIEW_SOURCE_HREF}
+                    href={TCO_SOURCE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="group rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"

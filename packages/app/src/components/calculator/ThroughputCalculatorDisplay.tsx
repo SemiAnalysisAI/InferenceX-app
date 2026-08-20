@@ -7,6 +7,12 @@ import { useFeatureGate } from '@/lib/use-feature-gate';
 import { useLocale } from '@/lib/use-locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import {
+  HW_REGISTRY,
+  TCO_SOURCE_TITLE,
+  TCO_SOURCE_URL,
+} from '@semianalysisai/inferencex-constants';
+
 import CalculatorTable from '@/components/calculator/CalculatorTable';
 import FleetPlanner from '@/components/calculator/FleetPlanner';
 import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
@@ -42,7 +48,6 @@ import {
   getPrecisionLabel,
   getSequenceLabel,
 } from '@/lib/data-mappings';
-import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
@@ -1192,9 +1197,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                               <Link
                                 target="_blank"
                                 className="underline hover:text-foreground"
-                                href="https://semianalysis.com/ai-cloud-tco-model/"
+                                href={TCO_SOURCE_URL}
                               >
-                                SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
+                                {TCO_SOURCE_TITLE}
                                 <ExternalLinkIcon />
                               </Link>
                             </small>
