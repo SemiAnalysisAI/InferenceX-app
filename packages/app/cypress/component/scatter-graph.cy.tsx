@@ -443,10 +443,99 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
       .find('text')
       .should('contain.text', runBranch);
+    cy.get(
+      '#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-gpu',
+    ).should('not.exist');
     cy.get('#test-scatter-overlay-labels [data-testid="chart-legend"]').should(
       'contain.text',
       runBranch,
     );
+  });
+
+  it('places precision between the GPU and engine in multi-precision labels', () => {
+    const runUrl = 'https://github.com/x/y/actions/runs/precision-order';
+    const chartDefinition = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const data = [Precision.FP4, Precision.FP8].flatMap((precision, precisionIndex) =>
+      [8, 16].map((x, index) =>
+        createMockInferenceData({
+          hwKey: 'b200_trt',
+          x,
+          y: 320 - precisionIndex * 20 - index * 40,
+          precision,
+        }),
+      ),
+    );
+    const overlayData = {
+      data: [Precision.FP4, Precision.FP8].flatMap((precision, precisionIndex) =>
+        [8, 16].map((x, index) =>
+          createMockInferenceData({
+            hwKey: 'h100_vllm',
+            x,
+            y: 260 - precisionIndex * 20 - index * 40,
+            precision,
+            run_url: runUrl,
+          }),
+        ),
+      ),
+      hardwareConfig: hwConfig,
+      label: '',
+      runUrl,
+    };
+
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-precision-order"
+          modelLabel="DeepSeek R1"
+          data={data}
+          xLabel="Concurrency"
+          yLabel="Throughput / Chip (tok/s)"
+          chartDefinition={chartDefinition}
+          overlayData={overlayData}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_trt']),
+          hwTypesWithData: new Set(['b200_trt']),
+          selectedPrecisions: [Precision.FP4, Precision.FP8],
+          showLineLabels: true,
+        },
+        unofficial: {
+          activeOverlayHwTypes: new Set(['h100_vllm']),
+          allOverlayHwTypes: new Set(['h100_vllm']),
+          runIndexByUrl: { [runUrl]: 0, 'precision-order': 0 },
+          // No run metadata: exercise the hardware-label fallback path.
+          unofficialRunInfos: [],
+        },
+      },
+    );
+
+    cy.get('#test-scatter-precision-order svg .line-label[data-hw-key="b200_trt"] .ll-text')
+      .should('have.length', 2)
+      .then(($labels) => {
+        expect($labels.toArray().map((label) => label.textContent)).to.have.members([
+          'B200 FP4 (TRTLLM)',
+          'B200 FP8 (TRTLLM)',
+        ]);
+        for (const label of $labels) {
+          expect(
+            [...label.querySelectorAll('tspan')].map((segment) => segment.className.baseVal),
+          ).to.deep.equal(['ll-gpu', 'll-precision', 'll-engine']);
+        }
+      });
+    cy.get('#test-scatter-precision-order svg .line-label[data-line-key^="overlay-"] .ll-text')
+      .should('have.length', 2)
+      .then(($labels) => {
+        expect($labels.toArray().map((label) => label.textContent)).to.have.members([
+          'H100 FP4 (vLLM)',
+          'H100 FP8 (vLLM)',
+        ]);
+      });
   });
 
   it('renders a line label for a singleton unofficial overlay series', () => {
@@ -592,6 +681,16 @@ describe('ScatterGraph', () => {
       .should('have.css', 'opacity', '1')
       .find('text')
       .should('have.text', 'B200 (TileRT, MTP)');
+    cy.get(
+      '#test-scatter-ingested-singleton-label svg .line-label[data-hw-key="b200_tilert_mtp"] .ll-gpu',
+    )
+      .should('have.text', 'B200')
+      .and('have.attr', 'font-weight', '700');
+    cy.get(
+      '#test-scatter-ingested-singleton-label svg .line-label[data-hw-key="b200_tilert_mtp"] .ll-engine',
+    )
+      .should('have.text', ' (TileRT, MTP)')
+      .and('have.attr', 'fill', '#d1d5db');
 
     cy.get('#scatter-line-labels').click();
     cy.get('#test-scatter-ingested-singleton-label svg .line-label').should('not.exist');
@@ -683,6 +782,12 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"]')
       .find('text')
       .should('contain.text', 'EAGLE');
+    cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"] .ll-gpu')
+      .should('have.text', 'B200')
+      .and('have.attr', 'font-weight', '700');
+    cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"] .ll-engine')
+      .should('contain.text', 'EAGLE')
+      .and('have.attr', 'fill', '#d1d5db');
     // No label should show the generic MTP token for M3.
     cy.get('#test-scatter-m3-eagle svg .line-label text').should('not.contain.text', 'MTP');
   });
