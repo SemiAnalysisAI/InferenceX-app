@@ -79,6 +79,18 @@ export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
 export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
 
 /** Default values for each parameter. Params matching their default are omitted from share URLs. */
+/**
+ * Dashboard default y-axis: total tokens purchasable per $1 USD at owning
+ * hyperscaler TCO, so the dashboard leads with the economics rather than raw
+ * throughput. `?i_metric=` still wins, so existing shared links are unaffected.
+ *
+ * Lives here rather than in `InferenceContext` because `PARAM_DEFAULTS` below
+ * strips any value equal to the default from share links. If the two drifted,
+ * a link captured on the *other* metric would be written without `i_metric`
+ * and reopen on this one.
+ */
+export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarH';
+
 export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_model: 'DeepSeek-V4-Pro',
   g_rundate: '',
@@ -95,7 +107,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   // explicitly, so an explicit FP4 selection must survive (not be stripped as a
   // "default") or it would silently revert to the per-model auto default on reload.
   i_prec: '',
-  i_metric: 'y_tpPerGpu',
+  i_metric: DEFAULT_Y_AXIS_METRIC,
   i_pctl: 'p90',
   i_xmetric: 'p90_ttft',
   i_e2e_xmetric: 'p90_ttft',

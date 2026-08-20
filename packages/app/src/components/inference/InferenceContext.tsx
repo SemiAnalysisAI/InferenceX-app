@@ -39,6 +39,7 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
+import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
@@ -79,24 +80,6 @@ import {
 
 /** @internal Exported for test provider wrapping only. */
 export const InferenceContext = createContext<InferenceChartContextType | undefined>(undefined);
-
-/**
- * Dashboard default y-axis.
- *
- * Intended to be `y_tokensPerDollarH` (total tokens per $1 USD at owning
- * hyperscaler TCO) so the dashboard leads with the economics. Held at
- * throughput for now: with tokens-per-dollar on screen, `line-labels.cy.ts`
- * ends with an empty chart — zero dot groups, zero labels, no console error,
- * no recovery. It reproduces with `?i_metric=y_tokensPerDollarH` too, so it is
- * not about which metric is *default*, and it needs that spec's shared page
- * load across several tests: the same toggle sequence on a fresh page passes
- * for every metric, tokens-per-dollar included.
- *
- * The metric itself is fine — all 39 y-axis metrics render points in
- * `yaxis-metrics-render.cy.ts`. Flipping this constant is a one-line change
- * once that interaction is fixed.
- */
-export const DEFAULT_Y_AXIS_METRIC = 'y_tpPerGpu';
 
 export function InferenceProvider({
   children,
