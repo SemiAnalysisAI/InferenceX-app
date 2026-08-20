@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-20T08:25:30.857Z",
+  "fixtures": {
+    "agentic-catalog": {
+      "bytes": 10027,
+      "capturedAt": null,
+      "sha256": "b4d7da73dbb839a8c9444af4bf90cdcd2e25c53970214937ecc122c86c13ae58",
+      "source": null,
+      "topLevel": "array"
+    },
+    "availability": {
+      "bytes": 147942,
+      "capturedAt": null,
+      "sha256": "ffcf2ed4d741a592c50a4720d288acff176202b737942edb048ac46f0a9409ba",
+      "source": null,
+      "topLevel": "array"
+    },
+    "benchmarks-history": {
+      "bytes": 1859995,
+      "capturedAt": null,
+      "sha256": "9e7efc17d018d25acd13095ac0c33ed3c20aaf0d86c225792c0a73bde8e12d15",
+      "source": null,
+      "topLevel": "array"
+    },
+    "benchmarks": {
+      "bytes": 775884,
+      "capturedAt": null,
+      "sha256": "f46823a76cb63248705329f327e1494df02b4dfa4df0898b7ee084c75c20bd52",
+      "source": null,
+      "topLevel": "array"
+    },
+    "collectivex-latest": {
+      "bytes": 63278,
+      "capturedAt": "2026-08-20T08:25:30.857Z",
+      "sha256": "66dd9287f7b5c1d33fa2dc76f69622b25dc42d89fcd62644b01c8edd7d6290b3",
+      "source": "synthetic://collectivex",
+      "topLevel": "object"
+    },
+    "collectivex-run-159": {
+      "bytes": 20374,
+      "capturedAt": "2026-08-20T08:25:30.857Z",
+      "sha256": "54e33df39b51158ed3fb0956dd70e10e2c3540845dd62ab7c64fabad175d2259",
+      "source": "synthetic://collectivex",
+      "topLevel": "object"
+    },
+    "collectivex-runs": {
+      "bytes": 687,
+      "capturedAt": "2026-08-20T08:25:30.857Z",
+      "sha256": "9f3d47af2543fc56b0afec7b0c577ba08fcfc2d6c91b07d98163e721e50146c8",
+      "source": "synthetic://collectivex",
+      "topLevel": "object"
+    },
+    "evaluations": {
+      "bytes": 474940,
+      "capturedAt": null,
+      "sha256": "edd2740ddbf1104c763114018fa081e96c39d5edfa3f2e2424a7ce4b724a06c9",
+      "source": null,
+      "topLevel": "array"
+    },
+    "overview-history-rows": {
+      "bytes": 5002,
+      "capturedAt": null,
+      "sha256": "73caa715550d07044dcad6f14dd6661fb28a203883470ad47f272df1eb3c4c82",
+      "source": null,
+      "topLevel": "object"
+    },
+    "overview-rows": {
+      "bytes": 22152,
+      "capturedAt": null,
+      "sha256": "ccdc4c23fc6b5ab6f664e19db2ec31efe2b34318976baec06e9219987e240922",
+      "source": null,
+      "topLevel": "object"
+    },
+    "reliability": {
+      "bytes": 530238,
+      "capturedAt": null,
+      "sha256": "cf36cdc2446c75bd191a22f027823bce6ec1380937b5387f274a773dbc19ee66",
+      "source": null,
+      "topLevel": "array"
+    },
+    "submissions": {
+      "bytes": 130122,
+      "capturedAt": null,
+      "sha256": "cd3d37a878b708eab504b0a6bca6d2af408101d88bee47503f0a656d6c60f1f9",
+      "source": null,
+      "topLevel": "object"
+    },
+    "workflow-info": {
+      "bytes": 4941,
+      "capturedAt": null,
+      "sha256": "f28d2220e5246ad70113e38e49394bc7a0bfe9afba8cedf08b90e39042e53357",
+      "source": null,
+      "topLevel": "object"
+    }
+  }
+}
