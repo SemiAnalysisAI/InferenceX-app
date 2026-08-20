@@ -128,6 +128,65 @@ describe('readUrlParams', () => {
   });
 });
 
+describe('refreshUrlParams', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  // A client-side navigation does not reload the module, so the load-time
+  // snapshot still describes the page the user came FROM. Every AgentX card on
+  // the landing page linked to `/inference?g_model=<model>` and opened the
+  // default model instead, because the snapshot from `/` had no g_model.
+  it('picks up params that arrived via a client-side navigation', async () => {
+    const { location } = setupWindow('', '/');
+    const { readUrlParams, refreshUrlParams } = await import('@/lib/url-state');
+    expect(readUrlParams().g_model).toBeUndefined();
+
+    location.search = '?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces';
+    location.pathname = '/inference';
+    const refreshed = refreshUrlParams();
+
+    expect(refreshed.g_model).toBe('Qwen-3.5-397B-A17B');
+    expect(refreshed.i_seq).toBe('agentic-traces');
+    // Same object the load-time readers already hold, so they see it too.
+    expect(readUrlParams().g_model).toBe('Qwen-3.5-397B-A17B');
+  });
+
+  it('keeps existing params when the new URL omits them', async () => {
+    const { location } = setupWindow('?g_model=Kimi-K3&i_seq=agentic-traces', '/inference');
+    const { refreshUrlParams } = await import('@/lib/url-state');
+
+    location.search = '?i_seq=8k/1k';
+    const refreshed = refreshUrlParams();
+
+    expect(refreshed.i_seq).toBe('8k/1k');
+    // Not cleared: the provider writes params back as the user filters, and a
+    // partial URL must not wipe state the user did not touch.
+    expect(refreshed.g_model).toBe('Kimi-K3');
+  });
+
+  it('ignores unknown params', async () => {
+    const { location } = setupWindow('', '/');
+    const { refreshUrlParams } = await import('@/lib/url-state');
+    location.search = '?g_model=GLM-5.2&not_a_real_key=x';
+    const refreshed = refreshUrlParams();
+    expect(refreshed.g_model).toBe('GLM-5.2');
+    expect(refreshed).not.toHaveProperty('not_a_real_key');
+  });
+
+  it('is a no-op without a window (SSR)', async () => {
+    vi.stubGlobal('window', undefined);
+    const { refreshUrlParams } = await import('@/lib/url-state');
+    expect(() => refreshUrlParams()).not.toThrow();
+  });
+});
+
 describe('hasAnyUrlParams', () => {
   beforeEach(() => {
     vi.useFakeTimers();
