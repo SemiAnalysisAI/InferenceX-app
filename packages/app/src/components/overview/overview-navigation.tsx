@@ -31,13 +31,19 @@ import {
   mergeOverviewControlHref,
   OVERVIEW_CLIENT_ONLY_KEYS,
   OVERVIEW_SEARCH_ORDER,
+  type OverviewClientOnlySearchKey,
   overviewHref,
   type OverviewSearchKey,
 } from '@/lib/overview-links';
 
+const OVERVIEW_SERVER_SEARCH_KEYS = OVERVIEW_SEARCH_ORDER.filter(
+  (key): key is Exclude<OverviewSearchKey, OverviewClientOnlySearchKey> =>
+    !OVERVIEW_CLIENT_ONLY_KEYS.includes(key as OverviewClientOnlySearchKey),
+);
+
 /**
  * Cache and request identity. The payload depends only on the server-resolved
- * params, minus `ref`, which the client derives. Equivalent URLs — explicit
+ * params, minus `ref` and `present`, which the client derives. Equivalent URLs — explicit
  * defaults, reordered params, campaign tags, a fragment — collapse to one key,
  * so a `ref` change is a guaranteed hit and the CDN sees one entry per data
  * state instead of one per link anyone has ever shared.
@@ -69,6 +75,7 @@ interface OverviewNavigationValue {
    *  that replaces it can take the focus its predecessor lost on unmount. */
   focusIntent: MutableRefObject<OverviewNavControl | null>;
   prefetch: (targetHref: string, keys: readonly OverviewSearchKey[]) => void;
+  replaceClientState: (targetHref: string, keys: readonly OverviewClientOnlySearchKey[]) => void;
   resolve: (targetHref: string, keys: readonly OverviewSearchKey[]) => string;
   push: (targetHref: string, keys: readonly OverviewSearchKey[]) => void;
 }
@@ -159,10 +166,25 @@ export function OverviewNavigationProvider({
       void load(href)
         .then((nextData) => {
           if (navigationId !== navigationIdRef.current) return;
-          committedHrefRef.current = href;
-          setCommittedHref(href);
+          // A client-only control can change while this data request is in
+          // flight. Commit the loaded server state without rolling that newer
+          // local state back out of the address bar or navigation context.
+          const settledHref = mergeOverviewControlHref(
+            href,
+            pendingHrefRef.current,
+            OVERVIEW_CLIENT_ONLY_KEYS,
+          );
+          committedHrefRef.current = settledHref;
+          pendingHrefRef.current = settledHref;
+          setCommittedHref(settledHref);
+          setPendingHref(settledHref);
           if (updateHistory) {
-            History.prototype.replaceState.call(window.history, window.history.state, '', href);
+            History.prototype.replaceState.call(
+              window.history,
+              window.history.state,
+              '',
+              settledHref,
+            );
           }
           setData(nextData);
           setNavigationError(false);
@@ -170,7 +192,9 @@ export function OverviewNavigationProvider({
           // pageview tracker never fires here. Emit once per committed state —
           // in the success branch so Back/Forward is covered too, and so the
           // recoverable failure path never records a pageview.
-          track('$pageview', { $current_url: new URL(href, window.location.origin).href });
+          track('$pageview', {
+            $current_url: new URL(settledHref, window.location.origin).href,
+          });
         })
         .catch(() => {
           if (navigationId !== navigationIdRef.current) return;
@@ -179,9 +203,10 @@ export function OverviewNavigationProvider({
           // request was in flight needs no payload of its own, and the address
           // bar keeps it either way, so dropping it here would repaint against
           // a column the URL still claims.
+          const clientState = pendingHrefRef.current;
           const rolledBack = mergeOverviewControlHref(
             committedHrefRef.current,
-            href,
+            clientState,
             OVERVIEW_CLIENT_ONLY_KEYS,
           );
           pendingHrefRef.current = rolledBack;
@@ -198,7 +223,7 @@ export function OverviewNavigationProvider({
     // (utm_*, gclid, a fragment) are adopted from the address bar, so a stale
     // location can never key the cache to the wrong payload.
     const actual = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    const href = mergeOverviewControlHref(actual, initialHref, OVERVIEW_SEARCH_ORDER);
+    const href = mergeOverviewControlHref(actual, initialHref, OVERVIEW_SERVER_SEARCH_KEYS);
     dataCacheRef.current.set(overviewDataKey(href), initialData);
     committedHrefRef.current = href;
     setCommittedHref(href);
@@ -237,6 +262,39 @@ export function OverviewNavigationProvider({
     (targetHref: string, keys: readonly OverviewSearchKey[]) =>
       mergeOverviewControlHref(pendingHref, targetHref, keys),
     [pendingHref],
+  );
+
+  const replaceClientState = useCallback(
+    (targetHref: string, keys: readonly OverviewClientOnlySearchKey[]) => {
+      // A child effect can request client-only cleanup before this provider's
+      // mount effect adopts the loaded URL. Rebase both snapshots on the live
+      // address first so campaign params and the fragment survive that race,
+      // while server-owned keys still come from their pending/committed state.
+      const actualHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const pendingBase = mergeOverviewControlHref(
+        actualHref,
+        pendingHrefRef.current,
+        OVERVIEW_SERVER_SEARCH_KEYS,
+      );
+      const committedBase = mergeOverviewControlHref(
+        actualHref,
+        committedHrefRef.current,
+        OVERVIEW_SERVER_SEARCH_KEYS,
+      );
+      const pending = mergeOverviewControlHref(pendingBase, targetHref, keys);
+      const committed = mergeOverviewControlHref(committedBase, targetHref, keys);
+      pendingHrefRef.current = pending;
+      committedHrefRef.current = committed;
+      setPendingHref(pending);
+      setCommittedHref(committed);
+
+      const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (pending !== currentHref) {
+        History.prototype.replaceState.call(window.history, window.history.state, '', pending);
+        notifyClientSearchChange(pending);
+      }
+    },
+    [],
   );
 
   /** The URL already shows the new selection while the matrix still shows the
@@ -280,6 +338,7 @@ export function OverviewNavigationProvider({
       isPending,
       focusIntent: focusIntentRef,
       resolve,
+      replaceClientState,
       prefetch: (targetHref, keys) => {
         const href = mergeOverviewControlHref(pendingHrefRef.current, targetHref, keys);
         void load(href).catch(() => undefined);
@@ -289,7 +348,7 @@ export function OverviewNavigationProvider({
         commit(href, true);
       },
     }),
-    [commit, isPending, load, resolve],
+    [commit, isPending, load, replaceClientState, resolve],
   );
 
   return (

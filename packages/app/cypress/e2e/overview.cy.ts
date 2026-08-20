@@ -63,6 +63,37 @@ function expectNoHorizontalScroller(testId: string) {
   });
 }
 
+function stubFullscreenApi(win: Window) {
+  let fullscreenElement: Element | null = null;
+  const document = win.document;
+  const EventConstructor = document.defaultView?.Event ?? Event;
+  const ElementConstructor = document.defaultView?.Element ?? Element;
+  Object.defineProperty(document, 'fullscreenEnabled', {
+    configurable: true,
+    value: true,
+  });
+  Object.defineProperty(document, 'fullscreenElement', {
+    configurable: true,
+    get: () => fullscreenElement,
+  });
+  Object.defineProperty(document, 'exitFullscreen', {
+    configurable: true,
+    value: () => {
+      fullscreenElement = null;
+      document.dispatchEvent(new EventConstructor('fullscreenchange'));
+      return Promise.resolve();
+    },
+  });
+  Object.defineProperty(ElementConstructor.prototype, 'requestFullscreen', {
+    configurable: true,
+    value() {
+      fullscreenElement = document.querySelector('[data-testid="overview-presentation-surface"]');
+      document.dispatchEvent(new EventConstructor('fullscreenchange'));
+      return Promise.resolve();
+    },
+  });
+}
+
 /**
  * The row header shows the acronym so the 22%-wide model column stays one line,
  * and keeps the full scenario name for assistive tech and the hover title. Both
@@ -369,6 +400,10 @@ describe('Overview page', () => {
 
     cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').click();
     cy.location('search').should('eq', '?tier=100');
+    cy.get('[data-testid="overview-tier-switcher"] [aria-current="page"]').should(
+      'have.text',
+      '100',
+    );
     cy.then(() => {
       expect(jsonRequests, 'the click reuses the warmed response').to.equal(1);
     });
@@ -557,6 +592,98 @@ describe('Overview page', () => {
       });
     cy.contains('当前成本及其相对 30–60 天前最近一次有效平台结果的变化。').should('exist');
     cy.contains('缺少有效 30 天对比的平台仅显示当前成本。').should('exist');
+  });
+
+  it('keeps client-only presentation intent across selectors without forcing fullscreen on load', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview?tier=75&present=1&utm_source=deck#matrix', {
+      onBeforeLoad: stubFullscreenApi,
+    });
+
+    cy.get('[data-testid="overview-presentation-surface"]').should(
+      'have.attr',
+      'data-presenting',
+      'false',
+    );
+    cy.get('[data-testid="language-toggle"]').should(
+      'have.attr',
+      'href',
+      '/zh/overview?tier=75&present=1&utm_source=deck',
+    );
+
+    cy.get('[data-testid="overview-present-toggle"]').click();
+    cy.get('[data-testid="overview-presentation-surface"]').should(
+      'have.attr',
+      'data-presenting',
+      'true',
+    );
+    cy.location('search').should('eq', '?tier=75&present=1&utm_source=deck');
+    cy.location('hash').should('eq', '#matrix');
+
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').click();
+    cy.location('search').should('eq', '?tier=100&present=1&utm_source=deck');
+    cy.get('[data-testid="overview-presentation-surface"]').should(
+      'have.attr',
+      'data-presenting',
+      'true',
+    );
+
+    cy.get('[data-overview-comparison="30d"]').click();
+    cy.location('search').should('eq', '?tier=100&compare=30d&present=1&utm_source=deck');
+    cy.get('[data-testid="overview-presentation-surface"]').should(
+      'have.attr',
+      'data-presenting',
+      'true',
+    );
+
+    cy.get('[data-testid="overview-present-toggle"]').click();
+    cy.get('[data-testid="overview-presentation-surface"]').should(
+      'have.attr',
+      'data-presenting',
+      'false',
+    );
+    cy.location('search').should('eq', '?tier=100&compare=30d&utm_source=deck');
+    cy.location('hash').should('eq', '#matrix');
+    cy.get('[data-testid="language-toggle"]').should(
+      'have.attr',
+      'href',
+      '/zh/overview?tier=100&compare=30d&utm_source=deck',
+    );
+  });
+
+  it('reasserts presentation intent when browser history changes during fullscreen', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview?tier=75', { onBeforeLoad: stubFullscreenApi });
+
+    // A selector push creates a real same-document history entry.
+    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').click();
+    cy.location('search').should('eq', '?tier=100');
+    cy.get('[data-testid="overview-present-toggle"]').click();
+    cy.location('search').should('eq', '?tier=100&present=1');
+
+    cy.window().then((win) => win.history.back());
+    cy.location('search').should('eq', '?tier=75&present=1');
+    cy.get('[data-testid="overview-presentation-surface"]').should(
+      'have.attr',
+      'data-presenting',
+      'true',
+    );
+  });
+
+  it('leaves comparison paging to a focused presentation select option', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview?compare=30d', { onBeforeLoad: stubFullscreenApi });
+    cy.get('[data-testid="overview-present-toggle"]').click();
+
+    cy.get('[data-testid="overview-history-window-select"]').click();
+    cy.get('[role="option"]').first().focus().trigger('keydown', {
+      key: 'ArrowRight',
+      code: 'ArrowRight',
+      bubbles: true,
+    });
+
+    cy.location('search').should('eq', '?compare=30d&present=1');
+    cy.get('[data-overview-comparison="30d"]').should('have.attr', 'aria-current', 'true');
   });
 
   it('switches the history window through the embedded selector', () => {
