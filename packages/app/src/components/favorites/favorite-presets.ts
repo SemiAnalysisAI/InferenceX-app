@@ -149,7 +149,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     titleZh: 'Kimi K3 — 首发基准测试',
     description:
       'First benchmarks of Kimi K3 across every available chip. New configurations appear here as they come online.',
-    descriptionZh: '涵盖所有可用 Chip 的 Kimi K3 首批基准测试结果。新配置上线后将在此同步更新。',
+    descriptionZh: '涵盖所有可用芯片的 Kimi K3 首批基准测试结果。新配置上线后将在此同步更新。',
     tags: ['Kimi', 'K3', 'New'],
     category: 'comparison',
     wide: true,
@@ -170,7 +170,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     titleZh: 'MiniMax M3 — 首发基准测试',
     description:
       'First benchmarks of MiniMax M3 across every available chip. New configurations appear here as they come online.',
-    descriptionZh: '涵盖所有可用 Chip 的 MiniMax M3 首批基准测试结果。新配置上线后将在此同步更新。',
+    descriptionZh: '涵盖所有可用芯片的 MiniMax M3 首批基准测试结果。新配置上线后将在此同步更新。',
     tags: ['MiniMax', 'M3', 'New'],
     category: 'comparison',
     wide: true,
@@ -248,7 +248,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     description:
       'Blackwell B200 vs Hopper H200 Dynamo TRTLLM throughput per chip on DeepSeek R1 (8k/1k) at FP8.',
     descriptionZh:
-      'Blackwell B200 vs Hopper H200 Dynamo TRTLLM 每 Chip 吞吐量对比，基于 DeepSeek R1 (8k/1k)，FP8 精度。',
+      'Blackwell B200 vs Hopper H200 Dynamo TRTLLM 每芯片吞吐量对比，基于 DeepSeek R1 (8k/1k)，FP8 精度。',
     tags: ['DeepSeek', 'B200', 'H200', 'Dynamo', 'FP8'],
     category: 'comparison',
     config: {

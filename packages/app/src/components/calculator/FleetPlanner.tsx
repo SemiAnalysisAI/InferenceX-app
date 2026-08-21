@@ -45,7 +45,7 @@ const STRINGS = {
     mwTooltip:
       'Total facility power budget in megawatts. Chip count uses all-in power per chip (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model — not bare TDP.',
     mwPlaceholder: 'e.g. 10',
-    colGpu: 'Chip',
+    colGpu: '芯片',
     colGpus: 'Chips',
     colFleetTput: (tokenType: string) => `Fleet ${tokenType}tok/s`,
     colUsers: 'Concurrent Users',
@@ -80,23 +80,23 @@ const STRINGS = {
   zh: {
     fleetTitle: '集群规模测算',
     fleetDescription:
-      '按设施功率规划部署：在给定兆瓦预算内可容纳多少 Chip，以及在上方目标交互性下的服务能力。',
+      '按设施功率规划部署：在给定兆瓦预算内可容纳多少芯片，以及在上方目标交互性下的服务能力。',
     mwLabel: '设施功率 (MW)',
     mwTooltip:
-      '设施总功率预算（兆瓦）。Chip 数量按每 Chip 全含功率（主机、网络、散热）计算，数据来自 SemiAnalysis Datacenter Industry Model，而非裸 TDP。',
+      '设施总功率预算（兆瓦）。芯片数量按每芯片全含功率（主机、网络、散热）计算，数据来自 SemiAnalysis Datacenter Industry Model，而非裸 TDP。',
     mwPlaceholder: '如 10',
     colGpu: 'Chip',
-    colGpus: 'Chip 数',
+    colGpus: '芯片数',
     colFleetTput: (tokenType: string) => `集群${tokenType} tok/s`,
     colUsers: '并发用户数',
     colCostHr: '集群 $/hr',
     colCostMo: '集群 $/mo',
     fleetEmpty: '输入设施功率预算以测算集群容量与成本。',
-    fleetTooSmall: '该功率预算不足以为所示任一 Chip 供电——请尝试更大的数值。',
-    fleetNoGpus: '当前无可见 Chip 可测算——请在图表图例中启用硬件。',
+    fleetTooSmall: '该功率预算不足以为所示任一芯片供电——请尝试更大的数值。',
+    fleetNoGpus: '当前无可见芯片可测算——请在图表图例中启用硬件。',
     costCapTitle: '成本上限下的交互性',
     costCapDescription:
-      '设定每百万 token 的成本上限，查看每款 Chip 在不超支前提下可提供的最高交互性。',
+      '设定每百万 token 的成本上限，查看每款芯片在不超支前提下可提供的最高交互性。',
     costCapLabel: '成本上限 ($/M tok)',
     costCapTooltip:
       '每百万 token 的最高可接受成本（按所选定价层级和 token 类型）。结果为插值成本不超过该上限的最高交互性。',
@@ -104,13 +104,13 @@ const STRINGS = {
     colMaxInteractivity: '最高交互性 (tok/s/user)',
     colTputAtIv: '吞吐量 (tok/s/chip)',
     notReachable: '无法达到',
-    costCapEmpty: '输入成本上限以查看每款 Chip 可提供的交互性。',
-    costCapNoGpus: '当前无可见 Chip 可评估——请在图表图例中启用硬件。',
+    costCapEmpty: '输入成本上限以查看每款芯片可提供的交互性。',
+    costCapNoGpus: '当前无可见芯片可评估——请在图表图例中启用硬件。',
     note: '注意：',
     disaggFleet:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 Chip 或预填充 Chip 报告吞吐量，而非按 Chip 总数——这类配置的集群规模与成本和聚合配置并非同类比较。',
+      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码芯片或预填充芯片报告吞吐量，而非按芯片总数——这类配置的集群规模与成本和聚合配置并非同类比较。',
     assumptions: (tier: string) =>
-      `假设该操作点下 100% 利用率及自有数据中心经济模型：集群成本 = Chip 数 × ${tier} $/chip/hr，每月按 730 小时计。设施功率为每 Chip 全含功率（主机、网络、散热），非裸 TDP。`,
+      `假设该操作点下 100% 利用率及自有数据中心经济模型：集群成本 = 芯片数 × ${tier} $/chip/hr，每月按 730 小时计。设施功率为每芯片全含功率（主机、网络、散热），非裸 TDP。`,
     source: '来源：',
     tokenTypeTotal: '总',
     tokenTypeInput: '输入',

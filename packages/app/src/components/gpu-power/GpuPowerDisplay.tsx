@@ -70,7 +70,7 @@ const STRINGS = {
   zh: {
     heading: 'PowerX',
     descPre: '输入 GitHub Actions 运行 ID，可视化',
-    descPost: '产物中 Chip 指标的时间变化趋势。',
+    descPost: '产物中芯片指标的时间变化趋势。',
     relockButton: '重新锁定功能入口',
     runIdLabel: '运行 ID',
     runIdPlaceholder: '例如 22806827144',
@@ -91,7 +91,7 @@ const STRINGS = {
     metricCorrelation: '指标相关性',
     resetFilter: '重置筛选',
     downsample: '降采样',
-    perGpuStats: '每 Chip 统计信息',
+    perGpuStats: '每芯片统计信息',
     rows: '行',
   },
 } as const;

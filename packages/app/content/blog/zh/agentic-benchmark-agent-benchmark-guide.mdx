@@ -30,7 +30,7 @@ Agentic Inference Benchmark 是面向多轮 agent 流量的系统基准测试。
 - 一套部署能同时服务多少个 agent 会话？
 - 每个 agent 需要等待多久才能收到首 token？
 - 每个活跃 agent 接收 output token 的速度是多少？
-- 在目标延迟下，每颗 Chip 能提供多少 output 吞吐量？
+- 在目标延迟下，每颗芯片能提供多少 output 吞吐量？
 - 重复 prefix 会命中 HBM、host memory，还是触发重新计算？
 - 在可用的响应速度下，每百万 token 的成本是多少？
 
@@ -140,7 +140,7 @@ Host memory 容量会影响长 prefix 应该重新加载还是重新计算。没
 
 | 指标                             | 说明                                                |
 | -------------------------------- | --------------------------------------------------- |
-| 每颗 Chip 的 output 吞吐量       | 每颗 accelerator 每秒完成的生成 token 数            |
+| 每颗芯片的 output 吞吐量         | 每颗 accelerator 每秒完成的生成 token 数            |
 | P90 interactivity                | 根据 p90 inter-token latency 得到的单客户端生成速度 |
 | 首 token 延迟（TTFT）            | Agent 开始收到响应前的等待时间                      |
 | Inter-token latency（ITL）       | 相邻 streamed output token 之间的时间               |
@@ -157,7 +157,7 @@ AgentX 扫描不同的并发 agent 客户端数量，并绘制相应运行点。
 
 <Figure
   src="/images/agentx-methodology/pareto-b200-minimax-m3.png"
-  alt="MiniMax-M3 在 NVIDIA B200 上的 AgentX Pareto 曲线，展示不同客户端并发下每颗 Chip 的 output 吞吐量与 p90 交互性"
+  alt="MiniMax-M3 在 NVIDIA B200 上的 AgentX Pareto 曲线，展示不同客户端并发下每颗芯片的 output 吞吐量与 p90 交互性"
   caption="每个点对应一个客户端 concurrency 设置。比较系统时应使用相同 p90 interactivity，而不是比较两个不匹配的峰值吞吐量点。"
 />
 
@@ -189,11 +189,11 @@ Agentic 推理会暴露固定 prompt batch 容易低估的瓶颈。
 4. 应用相同的 golden acceptance-length 规则。
 5. 对齐 DRAM 容量、KV-cache offload policy 与按比例分配内存的规则。
 6. 使用相同 seed、warmup 流程、profiling 时长与客户端 concurrency sweep。
-7. 当系统规模不同时，同时比较每颗 Chip 与整套系统结果。
+7. 当系统规模不同时，同时比较每颗芯片与整套系统结果。
 8. 在相同 p90 interactivity 或延迟目标下比较。
 9. 保留失败与不稳定配置，而不是只报告成功运行点。
 
-相同交互性下的比较通常比峰值吞吐量更有用。它直接回答部署问题：在用户需要的响应速度下，哪套系统每颗 Chip 或每美元能够服务更多 agent 工作？
+相同交互性下的比较通常比峰值吞吐量更有用。它直接回答部署问题：在用户需要的响应速度下，哪套系统每颗芯片或每美元能够服务更多 agent 工作？
 
 ## 这项 Agent Benchmark 能回答什么，不能回答什么？
 
@@ -217,7 +217,7 @@ AgentX 无法判断模型是否写出了正确代码、选择了正确工具、�
 
 ### AgentX Benchmark 测量什么？
 
-AgentX 使用从编码 agent trace 衍生的流量，测量完整推理配置。它扫描并发 agent 客户端数量，并报告每颗 Chip 的 output 吞吐量、p90 interactivity、TTFT、ITL、cache 行为与推理服务成本。
+AgentX 使用从编码 agent trace 衍生的流量，测量完整推理配置。它扫描并发 agent 客户端数量，并报告每颗芯片的 output 吞吐量、p90 interactivity、TTFT、ITL、cache 行为与推理服务成本。
 
 ### AgentX 为什么使用闭环并发？
 
@@ -256,7 +256,7 @@ Agent 无法提前发出所有轮次，因为后续动作依赖前序结果。�
       "name": "AgentX Benchmark 测量什么？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "AgentX 使用从编码 agent trace 衍生的流量，测量完整推理配置。它扫描并发 agent 客户端数量，并报告每颗 Chip 的 output 吞吐量、p90 interactivity、TTFT、ITL、cache 行为与推理服务成本。"
+        "text": "AgentX 使用从编码 agent trace 衍生的流量，测量完整推理配置。它扫描并发 agent 客户端数量，并报告每颗芯片的 output 吞吐量、p90 interactivity、TTFT、ITL、cache 行为与推理服务成本。"
       }
     },
     {

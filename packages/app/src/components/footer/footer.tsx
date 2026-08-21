@@ -58,7 +58,7 @@ const STRINGS = {
     supporters: '支持者',
     agentx: 'AgentX',
     articles: '文章',
-    gpuReliability: 'Chip 可靠性',
+    gpuReliability: '芯片可靠性',
     apiReference: 'API 参考文档',
     perfPerDollar: '每美元性能',
     glossary: 'AI 推理术语表',

@@ -124,10 +124,10 @@ function DisaggCaveat({
   const content =
     locale === 'zh' ? (
       <>
-        <strong>注意：</strong>分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 Chip 或预填充
-        Chip 计算
+        <strong>注意：</strong>分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码芯片或预填充
+        芯片计算
         {NOUN_ZH[calculationNoun] ?? calculationNoun}
-        ，而非按 Chip 总数计算。因此，与聚合配置进行
+        ，而非按芯片总数计算。因此，与聚合配置进行
         {NOUN_ZH[comparisonNoun] ?? comparisonNoun}
         的直接对比并不完全等价。
       </>
@@ -223,8 +223,8 @@ export function MetricAssumptionNotes({
       ? getCostValues(selectedYAxisMetric)
       : null;
 
-  const powerLabel = locale === 'zh' ? '全包功耗/Chip：' : 'All in Power/Chip:';
-  const costLabel = locale === 'zh' ? 'TCO $/chip/小时：' : 'TCO $/chip/hr:';
+  const powerLabel = locale === 'zh' ? '全含功率/芯片：' : 'All in Power/Chip:';
+  const costLabel = locale === 'zh' ? 'TCO $/chip/hr：' : 'TCO $/chip/hr:';
   const sourceLabel = locale === 'zh' ? '来源：' : 'Source:';
 
   return (

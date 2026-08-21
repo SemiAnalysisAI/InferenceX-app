@@ -45,7 +45,7 @@ const STRINGS = {
     tooltipIslOsl: 'Input Sequence Length / Output Sequence Length in tokens.',
     labelSpecDecode: 'Spec Decode',
     tooltipSpecDecode: 'Speculative decoding method. MTP = Multi-Token Prediction.',
-    labelGpuSku: 'Chip SKU',
+    labelGpuSku: '芯片型号',
     tooltipGpuSku: 'Filter by Chip model (e.g. H200, MI300X, B200).',
     labelNodeType: 'Node Type',
     tooltipNodeType:
@@ -60,7 +60,7 @@ const STRINGS = {
     allFrameworks: 'All frameworks',
     thModel: 'Model',
     thPrecision: 'Precision',
-    thGpuSku: 'Chip SKU',
+    thGpuSku: '芯片型号',
     thSpecDecode: 'Spec Decode',
     thCurrentTag: 'Current InferenceX Image Tag',
     thActualLatest: 'Actual Latest Tag',
@@ -68,7 +68,7 @@ const STRINGS = {
   },
   zh: {
     title: 'InferenceX 当前镜像',
-    description: '各模型与 Chip 配置的 Docker 镜像标签。',
+    description: '各模型与芯片配置的 Docker 镜像标签。',
     loading: '加载中……',
     error: '无法加载镜像数据。',
     noMatch: '没有符合当前筛选条件的镜像数据。',
@@ -81,7 +81,7 @@ const STRINGS = {
     labelSpecDecode: '投机解码',
     tooltipSpecDecode: '投机解码方式。MTP = 多 Token 预测。',
     labelGpuSku: 'Chip SKU',
-    tooltipGpuSku: '按 Chip 型号筛选（如 H200、MI300X、B200）。',
+    tooltipGpuSku: '按芯片型号筛选（如 H200、MI300X、B200）。',
     labelNodeType: '节点类型',
     tooltipNodeType:
       '单节点 = 非分离式服务。分离式 = 使用独立预填充/解码池，包括 Dynamo、Mori 和 llm-d。',
