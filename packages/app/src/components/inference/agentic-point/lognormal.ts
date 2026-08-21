@@ -34,6 +34,24 @@ export function positiveValues(values: readonly number[]): number[] {
 }
 
 /**
+ * Smallest and largest of a non-empty sample set.
+ *
+ * Deliberately a loop rather than `Math.min(...values)`: a high-concurrency
+ * agentic point carries well over 100k requests, and spreading an array that
+ * long into a variadic call exceeds the JS argument limit and throws
+ * `RangeError: Maximum call stack size exceeded`.
+ */
+function extent(values: readonly number[]): [min: number, max: number] {
+  let min = values[0]!;
+  let max = values[0]!;
+  for (const value of values) {
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+  return [min, max];
+}
+
+/**
  * Histogram with bins of equal width in ln(x). `bins` is clamped to at least 1.
  * When every sample is the same value the range is widened by a factor of two
  * either side so the single spike still has somewhere to sit.
@@ -43,8 +61,9 @@ export function logHistogram(values: readonly number[], bins: number): LogHistog
   if (positive.length === 0) return null;
 
   const nBins = Math.max(1, Math.floor(bins));
-  let lnMin = Math.log(Math.min(...positive));
-  let lnMax = Math.log(Math.max(...positive));
+  const [min, max] = extent(positive);
+  let lnMin = Math.log(min);
+  let lnMax = Math.log(max);
   if (!(lnMax > lnMin)) {
     lnMin -= Math.LN2;
     lnMax += Math.LN2;

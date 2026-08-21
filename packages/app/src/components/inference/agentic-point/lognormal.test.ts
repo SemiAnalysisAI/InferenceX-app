@@ -36,6 +36,18 @@ describe('logHistogram', () => {
     expect(logHistogram([], 10)).toBeNull();
     expect(logHistogram([0, -4], 10)).toBeNull();
   });
+
+  it('bins a sample set larger than the JS argument limit', () => {
+    // A c=1536 agentic point carries ~151k requests. Passing that many
+    // arguments to Math.min/Math.max throws RangeError, so the min/max scan
+    // has to stay a loop.
+    const values = Array.from({ length: 200_000 }, (_, i) => 1 + (i % 4096));
+    const histogram = logHistogram(values, 40);
+    expect(histogram).not.toBeNull();
+    expect(histogram!.counts.reduce((a, b) => a + b, 0)).toBe(200_000);
+    expect(Math.exp(histogram!.lnMin)).toBeCloseTo(1, 6);
+    expect(Math.exp(histogram!.lnMax)).toBeCloseTo(4096, 6);
+  });
 });
 
 describe('logTicks', () => {
