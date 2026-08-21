@@ -66,6 +66,7 @@ import {
   OffloadHaloLegendKey,
 } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
+import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 
 const FixedSequenceLogDialog = dynamic(() =>
   import('@/components/inference/log-viewer/fixed-sequence-log-dialog').then(
@@ -95,6 +96,7 @@ const GPU_STRINGS = {
     parallelismLabels: 'Parallelism Labels',
     lineLabels: 'Line Labels',
     resetFilter: 'Reset filter',
+    quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
   },
   zh: {
     logScale: '对数缩放',
@@ -104,6 +106,7 @@ const GPU_STRINGS = {
     parallelismLabels: '并行配置标签',
     lineLabels: '曲线标签',
     resetFilter: '重置筛选',
+    quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
   },
 } as const;
 
@@ -145,11 +148,18 @@ const GPUGraph = React.memo(
       selectAllActiveDates,
       showLineLabels,
       setShowLineLabels,
+      quickFilters,
     } = useInference();
     const locale = useLocale();
     const legendT = GPU_STRINGS[locale];
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
+    const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
+    const quickFilterCount =
+      quickFilters.vendors.length +
+      quickFilters.frameworks.length +
+      quickFilters.deployment.length +
+      (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
     const hasOffloadHalo = useMemo(() => data.some((point) => point.offload_mode === 'on'), [data]);
 
     // Shared date+GPU pairs. `dates` holds comparison-series entries (plain dates
@@ -1088,6 +1098,14 @@ const GPUGraph = React.memo(
                   track('gpu_timeseries_reset_filter');
                 },
               },
+              {
+                id: 'gpu-quick-filters',
+                label: legendT.quickFilters(quickFilterCount),
+                onClick: () => {
+                  setQuickFiltersOpen(true);
+                  track('inference_quick_filters_dialog_opened', { source: 'timeline_legend' });
+                },
+              },
             ]}
             precisionIndicators={selectedPrecisions}
             keyIndicators={
@@ -1106,6 +1124,7 @@ const GPUGraph = React.memo(
                     }}
                   />
                 )}
+                <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
               </>
             }
           />

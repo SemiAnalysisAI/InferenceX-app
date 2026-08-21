@@ -1,7 +1,7 @@
 /**
  * The dashboard now opens on tokens purchasable per $1 USD, and the same
  * quantities are also available priced in yuan. Fixed-sequence Quick Filters
- * remain available through their collapsed disclosure.
+ * remain available from the chart legend.
  */
 describe('Tokens per currency and agentic controls', () => {
   beforeEach(() => {
@@ -44,10 +44,8 @@ describe('Tokens per currency and agentic controls', () => {
 
   it('keeps Quick Filters for a fixed-sequence scenario', () => {
     cy.visit('/inference?i_seq=8k%2F1k');
-    cy.get('[data-testid="quick-filters-trigger"]')
-      .should('have.attr', 'aria-expanded', 'false')
-      .click()
-      .should('have.attr', 'aria-expanded', 'true');
+    cy.get('[data-testid="scatter-quick-filters"]').click();
+    cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
     cy.get('[data-testid="quick-filter-spec-mtp"]').should('exist');
   });
 });

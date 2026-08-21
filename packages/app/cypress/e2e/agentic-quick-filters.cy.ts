@@ -104,18 +104,16 @@ function visitAgenticQuickFilters() {
 }
 
 describe('Agentic Quick Filters', () => {
-  it('starts collapsed, omits spec decoding, and filters the rendered agentic points', () => {
+  it('opens from the legend, omits spec decoding, and filters the rendered agentic points', () => {
     visitAgenticQuickFilters();
 
     // A stale speculative-decoding URL selection is ignored for agentic data.
     cy.get('.dot-group[data-hw-key^="b200"]').should('exist');
     cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
+    cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
+    cy.get('[data-testid="scatter-quick-filters"]').should('contain.text', 'Quick Filters').click();
+    cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
     cy.get('[data-testid="quick-filters-selected-count"]').should('not.exist');
-
-    cy.get('[data-testid="quick-filters-trigger"]')
-      .should('have.attr', 'aria-expanded', 'false')
-      .click()
-      .should('have.attr', 'aria-expanded', 'true');
 
     cy.get('[data-testid^="quick-filter-spec-"]').should('not.exist');
     cy.contains('Spec Decoding').should('not.exist');
