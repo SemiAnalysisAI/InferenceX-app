@@ -205,6 +205,37 @@ function avoidLabelCollisions(
   }
 }
 
+/** A drawn label box, as centre point + half-width, for overlap tests. */
+interface PlacedBox {
+  x: number;
+  y: number;
+  halfW: number;
+}
+
+/**
+ * Centre + half-width of every visible parallelism pill inside the zoom group.
+ *
+ * Line labels are placed greedily against a list of boxes they must not sit on
+ * top of. The pills are drawn first, so seeding that list from the DOM is what
+ * keeps a run name off a "TP8 / PP2" chip.
+ */
+function parallelismLabelBoxes(root: SVGGElement | null): PlacedBox[] {
+  const boxes: PlacedBox[] = [];
+  if (!root) return boxes;
+  for (const node of root.querySelectorAll<SVGGElement>('.parallelism-label')) {
+    // Hidden pills stay in the DOM but must not push labels around.
+    if (node.style.opacity === '0') continue;
+    const m = /translate\((?<tx>[^,]+),(?<ty>[^)]+)\)/u.exec(node.getAttribute('transform') ?? '');
+    if (!m?.groups) continue;
+    const x = Number(m.groups.tx);
+    const y = Number(m.groups.ty);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const width = Number(node.querySelector('.pl-bg')?.getAttribute('width') ?? 0);
+    boxes.push({ x, y, halfW: (Number.isFinite(width) ? width : 0) / 2 });
+  }
+  return boxes;
+}
+
 // X-shape path for overlay (unofficial) data points
 const X_SIZE = 5;
 const X_HOVER_SIZE = 7;
@@ -1860,11 +1891,23 @@ const ScatterGraph = React.memo(
             const LABEL_W = 120; // approximate label width for overlap check
 
             if (isInteractivity) {
-              // Greedy placement: try top-left → midpoint → right-side → hide
-              const placed: { x: number; y: number }[] = [];
-
-              const collides = (cx: number, cy: number) =>
-                placed.some((p) => Math.abs(p.y - cy) < LABEL_H && Math.abs(p.x - cx) < LABEL_W);
+              // Greedy placement: try top-left → midpoint → right-side → hide,
+              // seeded with the parallelism pills already drawn above.
+              const placed = parallelismLabelBoxes(zoomGroup.node());
+              const HALF_W = LABEL_W / 2;
+              // Labels draw at (anchor.x + 8, anchor.y - 14). Comparing drawn centres
+              // rather than raw anchors lets a narrow pill count as narrow, while
+              // label-vs-label spacing stays exactly LABEL_W as before.
+              const centreOf = (cx: number, cy: number) => ({ x: cx + 8 + HALF_W, y: cy - 14 });
+              const collides = (cx: number, cy: number) => {
+                const c = centreOf(cx, cy);
+                return placed.some(
+                  (p) => Math.abs(p.y - c.y) < LABEL_H && Math.abs(p.x - c.x) < p.halfW + HALF_W,
+                );
+              };
+              const remember = (cx: number, cy: number) => {
+                placed.push({ ...centreOf(cx, cy), halfW: HALF_W });
+              };
 
               // Deduplicate by group key — one label per curve. With a single
               // precision that's one per hw; with multiple it's one per (hw,
@@ -1915,7 +1958,7 @@ const ScatterGraph = React.memo(
                   const pt = pointNearestX(pts, anchorX);
                   const px = xScale(pt.x);
                   const py = yScale(pt.y);
-                  placed.push({ x: px, y: py });
+                  remember(px, py);
                   // Stay visible across frames — positional stability is the goal
                   // during animation, so we don't hide on transient collisions.
                   lineLabels.push({ key, hw, label, color, x: px, y: py, visible: true });
@@ -1926,7 +1969,7 @@ const ScatterGraph = React.memo(
                   const py = yScale(pt.y);
                   if (!collides(px, py)) {
                     lineLabels.push({ key, hw, label, color, x: px, y: py, visible: true });
-                    placed.push({ x: px, y: py });
+                    remember(px, py);
                     return;
                   }
                 }
@@ -1943,7 +1986,7 @@ const ScatterGraph = React.memo(
                   y: py,
                   visible: keepVisibleOnCollision,
                 });
-                if (keepVisibleOnCollision) placed.push({ x: px, y: py });
+                if (keepVisibleOnCollision) remember(px, py);
               };
 
               // Sort entries by highest y-value first (top of chart) for priority
@@ -2319,9 +2362,21 @@ const ScatterGraph = React.memo(
                 // Re-run greedy placement with zoomed scales (static chart). Overlay
                 // rooflines share the same `placed` array so they stay non-
                 // overlapping with the official labels post-zoom.
-                const placed: { x: number; y: number }[] = [];
-                const collides = (cx: number, cy: number) =>
-                  placed.some((p) => Math.abs(p.y - cy) < LABEL_H && Math.abs(p.x - cx) < LABEL_W);
+                const placed = parallelismLabelBoxes(zoomGroup.node());
+                const HALF_W = LABEL_W / 2;
+                // Labels draw at (anchor.x + 8, anchor.y - 14). Comparing drawn centres
+                // rather than raw anchors lets a narrow pill count as narrow, while
+                // label-vs-label spacing stays exactly LABEL_W as before.
+                const centreOf = (cx: number, cy: number) => ({ x: cx + 8 + HALF_W, y: cy - 14 });
+                const collides = (cx: number, cy: number) => {
+                  const c = centreOf(cx, cy);
+                  return placed.some(
+                    (p) => Math.abs(p.y - c.y) < LABEL_H && Math.abs(p.x - c.x) < p.halfW + HALF_W,
+                  );
+                };
+                const remember = (cx: number, cy: number) => {
+                  placed.push({ ...centreOf(cx, cy), halfW: HALF_W });
+                };
                 const greedyPlace = (
                   key: string,
                   pts: InferenceData[],
@@ -2338,7 +2393,7 @@ const ScatterGraph = React.memo(
                     const py = newYScale(pt.y);
                     if (!collides(px, py)) {
                       zoomResults.set(key, { x: px, y: py, vis: true });
-                      placed.push({ x: px, y: py });
+                      remember(px, py);
                       return;
                     }
                   }
@@ -2349,7 +2404,7 @@ const ScatterGraph = React.memo(
                     y: py,
                     vis: keepVisibleOnCollision,
                   });
-                  if (keepVisibleOnCollision) placed.push({ x: px, y: py });
+                  if (keepVisibleOnCollision) remember(px, py);
                 };
                 for (const [key, pts] of visibleEntries) greedyPlace(key, pts, pts.length === 1);
                 for (const [ovKey, group] of overlayVisible)
