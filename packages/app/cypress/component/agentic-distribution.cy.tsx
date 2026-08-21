@@ -35,19 +35,16 @@ function mountDistribution(values: number[], pathname = '/inference/agentic/9625
 }
 
 describe('Agentic ISL/OSL distribution', () => {
-  it('bins on a log axis and overlays the fitted lognormal', () => {
+  it('bins on a log axis without a fitted overlay', () => {
     const values = lognormalSample(1500, 7.3, 0.9);
     mountDistribution(values);
 
     cy.contains('1,500 requests').should('be.visible');
     cy.contains('log scale').should('be.visible');
-    // The curve is identified by a legend chip, not a stats readout.
-    cy.contains('lognormal fit').should('be.visible');
+    // Bars only — no fitted overlay or stats readout.
+    cy.contains('lognormal fit').should('not.exist');
     cy.contains('μ=').should('not.exist');
-    cy.contains('σ=').should('not.exist');
-
-    // One fitted curve, drawn as a path rather than bars.
-    cy.get(`path[stroke="${FIT_STROKE}"]`).should('have.length', 1);
+    cy.get(`path[stroke="${FIT_STROKE}"]`).should('not.exist');
     cy.get('rect[opacity="0.55"]').should('have.length.greaterThan', 10);
 
     // Percentile guides remain, one per percentile.
@@ -75,12 +72,9 @@ describe('Agentic ISL/OSL distribution', () => {
     cy.contains('3 requests with 0 tokens excluded from the log axis').should('be.visible');
   });
 
-  it('still draws the histogram when the data cannot be fitted', () => {
-    // Zero variance in log space — a lognormal curve would be degenerate.
+  it('still draws the histogram when every request is the same length', () => {
     mountDistribution(Array.from({ length: 50 }, () => 512));
     cy.contains('50 requests').should('be.visible');
-    cy.contains('lognormal fit').should('not.exist');
-    cy.get(`path[stroke="${FIT_STROKE}"]`).should('not.exist');
     cy.get('rect[opacity="0.55"]').should('have.length.greaterThan', 0);
   });
 
@@ -94,7 +88,6 @@ describe('Agentic ISL/OSL distribution', () => {
     mountDistribution(lognormalSample(600, 7, 0.8), '/zh/inference/agentic/96255');
     cy.contains('600 个请求').should('be.visible');
     cy.contains('对数刻度').should('be.visible');
-    cy.contains('对数正态拟合').should('be.visible');
     cy.contains('数值（tokens，对数刻度）').should('be.visible');
     cy.contains('requests').should('not.exist');
   });

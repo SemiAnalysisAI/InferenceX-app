@@ -6,20 +6,10 @@ import { useLocale } from '@/lib/use-locale';
 
 import { ChartHover, type HoverItem } from './chart-hover';
 import { CHART_PAD, ChartEmpty, PERCENTILE_COLORS, fmtCount } from './chart-shared';
-import {
-  fitLognormal,
-  logHistogram,
-  logTicks,
-  lognormalCdf,
-  lognormalCurve,
-  positiveValues,
-} from './lognormal';
+import { logHistogram, logTicks, positiveValues } from './lognormal';
 import { quantile } from './time-series-math';
 
 const PAD = CHART_PAD;
-
-/** Fitted-curve stroke. Distinct from every percentile guide color below. */
-const FIT_COLOR = '#a855f7';
 
 const GUIDES = [
   { label: 'p50', q: 0.5, color: PERCENTILE_COLORS.p50 },
@@ -33,13 +23,11 @@ const STRINGS = {
     requests: 'requests',
     range: 'range',
     logScale: 'log scale',
-    lognormalFit: 'lognormal fit',
     excluded: (n: string, unit: string) =>
       `${n} requests with 0 ${unit} excluded from the log axis`,
     bin: 'Bin',
     count: 'Count',
     cumulative: 'Cumulative',
-    expected: 'Fit expects',
     valueAxis: (unit: string) => `value (${unit}, log scale)`,
     countAxis: 'count',
   },
@@ -47,12 +35,10 @@ const STRINGS = {
     requests: '个请求',
     range: '范围',
     logScale: '对数刻度',
-    lognormalFit: '对数正态拟合',
     excluded: (n: string, unit: string) => `${n} 个请求为 0 ${unit}，已从对数轴中排除`,
     bin: '区间',
     count: '数量',
     cumulative: '累计',
-    expected: '拟合预期',
     valueAxis: (unit: string) => `数值（${unit}，对数刻度）`,
     countAxis: '数量',
   },
@@ -60,14 +46,13 @@ const STRINGS = {
 
 /**
  * Bar histogram of per-request sequence lengths with vertical p50/p75/p90/p95
- * guide lines and a fitted lognormal overlay. Designed for the detail-page
- * card — fills its container width via `viewBox` + 100% width.
+ * guide lines. Designed for the detail-page card — fills its container width
+ * via `viewBox` + 100% width.
  *
  * Bins are uniform in ln(value), not in value: ISL/OSL span orders of magnitude,
  * so linear bins pile nearly every request into the leftmost few and stretch a
- * near-empty tail across the rest of the axis. On a log axis the same data
- * reads as a bell, and the fitted lognormal (drawn from the MLE of ln(value))
- * is overlaid so the reader can see how closely the trace really follows one.
+ * near-empty tail across the rest of the axis. On a log axis the same roughly
+ * lognormal data reads as an ordinary bell instead.
  *
  * Hover shows the bin range + count + cumulative percentile.
  */
@@ -92,12 +77,9 @@ export function Distribution({
     const nBins = Math.min(50, Math.max(15, Math.ceil(Math.sqrt(positive.length))));
     const histogram = logHistogram(positive, nBins);
     if (!histogram) return null;
-    const fit = fitLognormal(positive);
     return {
       sorted: positive.toSorted((a, b) => a - b),
       histogram,
-      fit,
-      curve: fit ? lognormalCurve(fit, histogram) : null,
       // Zero-token requests are real but unplottable on a log axis; they are
       // reported under the chart rather than silently folded into bin one.
       excluded: values.length - positive.length,
@@ -109,15 +91,13 @@ export function Distribution({
   if (!computed) {
     return <ChartEmpty height={H} />;
   }
-  const { sorted, histogram, fit, curve, excluded, innerW, innerH } = computed;
+  const { sorted, histogram, excluded, innerW, innerH } = computed;
   const { counts, edges, lnMin, lnMax } = histogram;
   const min = edges[0]!;
   const max = edges.at(-1)!;
   const nBins = counts.length;
 
-  const barMax = Math.max(...counts, 1);
-  const curveMax = curve ? Math.max(...curve.map((point) => point.count)) : 0;
-  const yMax = Math.max(barMax, curveMax);
+  const yMax = Math.max(...counts, 1);
 
   const lnSpan = lnMax - lnMin;
   const xScale = (v: number) =>
@@ -143,27 +123,11 @@ export function Distribution({
       { color: 'currentColor', label: t.count, value: count.toLocaleString() },
       { color: 'currentColor', label: t.cumulative, value: `${cumPct.toFixed(1)}%` },
     ];
-    if (fit) {
-      // Expected count under the fit for this same bin, so the reader can
-      // compare bar against curve numerically and not just by eye.
-      const expected =
-        fit.n * (lognormalCdf(binHi, fit.mu, fit.sigma) - lognormalCdf(binLo, fit.mu, fit.sigma));
-      items.push({
-        color: FIT_COLOR,
-        label: t.expected,
-        value: Math.round(expected).toLocaleString(),
-      });
-    }
     return { items };
   };
 
   const xTickVals = logTicks(min, max);
   const yTickVals = Array.from({ length: 5 }, (_, i) => (yMax * i) / 4);
-  const curvePath = curve
-    ? curve
-        .map((point, i) => `${i === 0 ? 'M' : 'L'}${xScale(point.value)},${yScale(point.count)}`)
-        .join(' ')
-    : null;
 
   return (
     <div className="w-full">
@@ -216,18 +180,6 @@ export function Distribution({
             />
           );
         })}
-
-        {/* Fitted lognormal */}
-        {curvePath && (
-          <path
-            d={curvePath}
-            fill="none"
-            stroke={FIT_COLOR}
-            strokeWidth={2.5}
-            strokeLinejoin="round"
-            opacity={0.95}
-          />
-        )}
 
         {/* Percentile guide lines */}
         {GUIDES.map(({ q, color }) => {
@@ -295,36 +247,25 @@ export function Distribution({
           {t.countAxis}
         </text>
 
-        {/* Legend chips: dashed for the percentile guides, solid for the fit. */}
+        {/* Percentile legend chips */}
         {(() => {
-          const chips = [
-            ...GUIDES.map(({ label: ql, q, color }) => ({
-              key: ql,
-              label: `${ql} ${fmt(quantile(sorted, q))}`,
-              color,
-              dashed: true,
-            })),
-            ...(fit
-              ? [{ key: 'fit', label: t.lognormalFit, color: FIT_COLOR, dashed: false }]
-              : []),
-          ];
           const chipY = H - 8;
-          const chipW = innerW / chips.length;
-          return chips.map((chip, i) => {
+          const chipW = innerW / GUIDES.length;
+          return GUIDES.map(({ label: ql, q, color }, i) => {
             const x = PAD.left + i * chipW;
             return (
-              <g key={chip.key}>
+              <g key={ql}>
                 <line
                   x1={x + 2}
                   x2={x + 14}
                   y1={chipY - 4}
                   y2={chipY - 4}
-                  stroke={chip.color}
+                  stroke={color}
                   strokeWidth={2}
-                  strokeDasharray={chip.dashed ? '5 3' : undefined}
+                  strokeDasharray="5 3"
                 />
                 <text x={x + 18} y={chipY} fontSize={11} fill="currentColor" opacity={0.9}>
-                  {chip.label}
+                  {ql} {fmt(quantile(sorted, q))}
                 </text>
               </g>
             );

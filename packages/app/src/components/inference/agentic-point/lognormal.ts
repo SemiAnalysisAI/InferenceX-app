@@ -1,27 +1,15 @@
 /**
- * Lognormal fitting and log-spaced binning for the ISL/OSL distribution charts.
+ * Log-spaced binning for the ISL/OSL distribution charts.
  *
  * Per-request sequence lengths span orders of magnitude (a few hundred tokens
  * to tens of thousands), so a linear histogram collapses almost every request
  * into the leftmost bins and leaves a long, unreadable tail. Binning uniformly
- * in ln(x) instead spreads the mass out, and a lognormal — normal in ln(x) —
- * then reads as an ordinary bell curve that can be compared against the bars.
+ * in ln(x) instead spreads the mass out, and the roughly lognormal shape then
+ * reads as an ordinary bell.
  *
  * Every function here takes and returns plain numbers so the chart component
  * stays presentational and this math is unit-testable on its own.
  */
-
-/** A lognormal fitted to sample data. */
-export interface LognormalFit {
-  /** Mean of ln(x) — the location parameter. */
-  mu: number;
-  /** Standard deviation of ln(x) — the shape parameter. */
-  sigma: number;
-  /** exp(mu): the fitted median, in the original units. */
-  median: number;
-  /** Number of positive samples the fit used. */
-  n: number;
-}
 
 /** Uniform-in-ln bins over a positive range. */
 export interface LogHistogram {
@@ -37,73 +25,12 @@ export interface LogHistogram {
 }
 
 /**
- * Abramowitz & Stegun 7.1.26 — max absolute error 1.5e-7, which is far below
- * anything visible in a chart.
- */
-function erf(x: number): number {
-  const sign = x < 0 ? -1 : 1;
-  const z = Math.abs(x);
-  const t = 1 / (1 + 0.3275911 * z);
-  const poly =
-    t *
-    (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
-  return sign * (1 - poly * Math.exp(-z * z));
-}
-
-/** Standard normal CDF. */
-export function normalCdf(z: number): number {
-  return 0.5 * (1 + erf(z / Math.SQRT2));
-}
-
-/** Standard normal PDF. */
-export function normalPdf(z: number): number {
-  return Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI);
-}
-
-/** Density of the fitted lognormal at `x`, in the original units. */
-export function lognormalPdf(x: number, mu: number, sigma: number): number {
-  if (x <= 0 || sigma <= 0) return 0;
-  return normalPdf((Math.log(x) - mu) / sigma) / (x * sigma);
-}
-
-/** P(X <= x) for the fitted lognormal. */
-export function lognormalCdf(x: number, mu: number, sigma: number): number {
-  if (x <= 0) return 0;
-  if (sigma <= 0) return Math.log(x) >= mu ? 1 : 0;
-  return normalCdf((Math.log(x) - mu) / sigma);
-}
-
-/**
  * Only strictly positive samples can be logged. A request that produced zero
  * tokens is real data, so callers report how many were set aside rather than
  * silently folding them into the first bin.
  */
 export function positiveValues(values: readonly number[]): number[] {
   return values.filter((v) => Number.isFinite(v) && v > 0);
-}
-
-/**
- * Maximum-likelihood lognormal fit: the MLE is just the mean and (population)
- * standard deviation of ln(x), so no iteration is needed.
- *
- * Returns `null` when fewer than two positive samples are available, or when
- * every sample is identical — sigma would be zero and the curve degenerate.
- */
-export function fitLognormal(values: readonly number[]): LognormalFit | null {
-  const positive = positiveValues(values);
-  const n = positive.length;
-  if (n < 2) return null;
-
-  const logs = positive.map((v) => Math.log(v));
-  const mu = logs.reduce((sum, v) => sum + v, 0) / n;
-  const variance = logs.reduce((sum, v) => sum + (v - mu) ** 2, 0) / n;
-  const sigma = Math.sqrt(variance);
-  // Summing identical logs still leaves a residual variance around 1e-32, so
-  // requiring merely `sigma > 0` would admit a spike of zero width. Compare
-  // against the scale of mu instead, which is what "no spread" really means.
-  if (!Number.isFinite(mu) || !(sigma > 1e-9 * Math.max(1, Math.abs(mu)))) return null;
-
-  return { mu, sigma, median: Math.exp(mu), n };
 }
 
 /**
@@ -132,28 +59,6 @@ export function logHistogram(values: readonly number[], bins: number): LogHistog
 
   const edges = Array.from({ length: nBins + 1 }, (_, i) => Math.exp(lnMin + i * lnStep));
   return { edges, counts, lnStep, lnMin, lnMax };
-}
-
-/**
- * The fitted curve sampled for drawing, in the same units as the bar heights.
- *
- * Because bins are uniform in ln(x), the expected count in a bin of width
- * `lnStep` is `n * lnStep * normalPdf(ln x)`, so the curve can be evaluated
- * directly in ln space and lines up with the bars without further scaling.
- */
-export function lognormalCurve(
-  fit: LognormalFit,
-  histogram: LogHistogram,
-  samples = 120,
-): { value: number; count: number }[] {
-  const points: { value: number; count: number }[] = [];
-  const steps = Math.max(2, Math.floor(samples));
-  for (let i = 0; i < steps; i++) {
-    const lnValue = histogram.lnMin + ((histogram.lnMax - histogram.lnMin) * i) / (steps - 1);
-    const density = normalPdf((lnValue - fit.mu) / fit.sigma) / fit.sigma;
-    points.push({ value: Math.exp(lnValue), count: fit.n * histogram.lnStep * density });
-  }
-  return points;
 }
 
 /**
