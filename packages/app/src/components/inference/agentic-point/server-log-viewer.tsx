@@ -27,7 +27,7 @@ import { SERVER_LOG_CHUNK_SIZE, useServerLog } from '@/hooks/api/use-server-log'
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 
-import { readableLogText } from './log-text';
+import { isNearLogBottom, readableLogText, utf16IndexAtCodePointOffset } from './log-text';
 
 const STRINGS = {
   en: {
@@ -139,7 +139,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
   const jumpHighlightRef = useRef<HTMLElement>(null);
   const jumpRequestIdRef = useRef(0);
   const scrolledJumpRequestIdRef = useRef(0);
-  const loadMoreTriggerRef = useRef<HTMLSpanElement>(null);
+  const suppressScrollLoadUntilRef = useRef(0);
   const nextOffset = query.data?.pages.at(-1)?.nextOffset ?? 0;
   const loadedOffset = query.data?.pages[0]?.offset ?? initialOffset;
   const analyticsPrefix =
@@ -148,13 +148,15 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
   const highlightedLog = useMemo(() => {
     if (!jumpTarget || jumpTarget.fileName !== selectedFile) return null;
     const relativeOffset = jumpTarget.offset - loadedOffset;
-    if (relativeOffset < 0 || relativeOffset + jumpTarget.match.length > rawLog.length) return null;
+    if (relativeOffset < 0) return null;
+    const matchCodePointLength = [...jumpTarget.match].length;
+    const matchStart = utf16IndexAtCodePointOffset(rawLog, relativeOffset);
+    const matchEnd = utf16IndexAtCodePointOffset(rawLog, relativeOffset + matchCodePointLength);
+    if (matchStart === null || matchEnd === null) return null;
     return {
-      before: readableLogText(rawLog.slice(0, relativeOffset)),
-      match: readableLogText(
-        rawLog.slice(relativeOffset, relativeOffset + jumpTarget.match.length),
-      ),
-      after: readableLogText(rawLog.slice(relativeOffset + jumpTarget.match.length)),
+      before: readableLogText(rawLog.slice(0, matchStart)),
+      match: readableLogText(rawLog.slice(matchStart, matchEnd)),
+      after: readableLogText(rawLog.slice(matchEnd)),
     };
   }, [jumpTarget, loadedOffset, rawLog, selectedFile]);
 
@@ -187,6 +189,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
       return;
     }
     scrolledJumpRequestIdRef.current = jumpTarget.requestId;
+    suppressScrollLoadUntilRef.current = Date.now() + 500;
     jumpHighlightRef.current.scrollIntoView({ block: 'center' });
     jumpHighlightRef.current.focus({ preventScroll: true });
   }, [highlightedLog, jumpTarget]);
@@ -203,6 +206,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
   };
 
   const selectFile = (fileName: string) => {
+    suppressScrollLoadUntilRef.current = 0;
     setSelection({ pointId: id, fileName, initialOffset: 0, jumpTarget: null });
     setCopied(false);
     track(`${analyticsPrefix}_log_file_selected`, { id, fileName });
@@ -240,28 +244,22 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
     [analyticsPrefix, id, nextOffset, query.fetchNextPage, selectedFile],
   );
 
-  useEffect(() => {
-    const root = logViewportRef.current;
-    const target = loadMoreTriggerRef.current;
-    if (
-      !root ||
-      !target ||
-      !query.hasNextPage ||
-      query.isFetchingNextPage ||
-      query.isFetchNextPageError
-    ) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) loadMore('scroll');
-      },
-      { root, rootMargin: '0px 0px 160px 0px' },
-    );
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [loadMore, query.hasNextPage, query.isFetchNextPageError, query.isFetchingNextPage]);
+  const handleLogScroll = useCallback(
+    (event: React.UIEvent<HTMLPreElement>) => {
+      const viewport = event.currentTarget;
+      if (
+        Date.now() < suppressScrollLoadUntilRef.current ||
+        !isNearLogBottom(viewport) ||
+        !query.hasNextPage ||
+        query.isFetchingNextPage ||
+        query.isFetchNextPageError
+      ) {
+        return;
+      }
+      loadMore('scroll');
+    },
+    [loadMore, query.hasNextPage, query.isFetchNextPageError, query.isFetchingNextPage],
+  );
 
   const hasLoadedLog = query.data?.pages[0] !== undefined && query.data.pages[0] !== null;
 
@@ -447,6 +445,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
         ref={logViewportRef}
         className="max-h-[70vh] min-h-[28rem] overflow-auto bg-zinc-950 p-4 font-mono text-xs leading-5 text-zinc-100 selection:bg-sky-400/30"
         data-testid="server-log-content"
+        onScroll={handleLogScroll}
         tabIndex={0}
       >
         {highlightedLog ? (
@@ -465,12 +464,6 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
         ) : (
           log
         )}
-        <span
-          ref={loadMoreTriggerRef}
-          className="block h-px w-full"
-          data-testid="server-log-load-more-trigger"
-          aria-hidden="true"
-        />
       </pre>
 
       <footer className="flex flex-col gap-2 border-t border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
