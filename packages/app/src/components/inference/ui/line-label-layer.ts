@@ -47,6 +47,73 @@ export function firstNonCollidingRect(
   return null;
 }
 
+/** A drawn pill box, as centre point + half-width, for overlap tests. */
+export interface PlacedBox {
+  x: number;
+  y: number;
+  halfW: number;
+}
+
+/**
+ * Centre + half-width of every visible parallelism pill inside `root`.
+ *
+ * Line labels are placed greedily against a list of boxes they must not sit on
+ * top of. The pills are drawn before the label layers run, so seeding that
+ * list from the DOM is what keeps a run name off a "TP8 / PP2" chip.
+ */
+export function parallelismLabelBoxes(root: SVGGElement | null): PlacedBox[] {
+  const boxes: PlacedBox[] = [];
+  if (!root) return boxes;
+  for (const node of root.querySelectorAll<SVGGElement>('.parallelism-label')) {
+    // Hidden pills stay in the DOM but must not push labels around.
+    if (node.style.opacity === '0') continue;
+    const match = /translate\((?<tx>[^,]+),(?<ty>[^)]+)\)/u.exec(
+      node.getAttribute('transform') ?? '',
+    );
+    if (!match?.groups) continue;
+    const x = Number(match.groups.tx);
+    const y = Number(match.groups.ty);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const width = Number(node.querySelector('.pl-bg')?.getAttribute('width') ?? 0);
+    boxes.push({ x, y, halfW: (Number.isFinite(width) ? width : 0) / 2 });
+  }
+  return boxes;
+}
+
+/**
+ * Bounding boxes of the pills drawn over the plot: run-name labels
+ * (`.line-label`) and parallelism labels (`.parallelism-label`).
+ *
+ * Both are positioned by the roofline layer, which always runs before point
+ * label collision avoidance, so reading the DOM gives their final placement
+ * for the current frame. The group carries a `translate(...)` and the
+ * `.ll-bg`/`.pl-bg` rect carries an offset sized to its text; summing the two
+ * puts the box in the same space as a point label's centre.
+ */
+function pillObstacles(
+  zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+): RectBounds[] {
+  const boxes: RectBounds[] = [];
+  zoomGroup.selectAll<SVGGElement, unknown>('.line-label, .parallelism-label').each(function () {
+    // A hidden pill is still in the DOM but covers nothing.
+    if (this.style.opacity === '0') return;
+    const match = /translate\((?<tx>[^,]+),(?<ty>[^)]+)\)/u.exec(
+      this.getAttribute('transform') ?? '',
+    );
+    const background = this.querySelector<SVGRectElement>('.ll-bg, .pl-bg');
+    if (!match?.groups || !background) return;
+    const tx = Number(match.groups.tx);
+    const ty = Number(match.groups.ty);
+    const x = Number(background.getAttribute('x'));
+    const y = Number(background.getAttribute('y'));
+    const width = Number(background.getAttribute('width'));
+    const height = Number(background.getAttribute('height'));
+    if (![tx, ty, x, y, width, height].every((value) => Number.isFinite(value))) return;
+    boxes.push({ left: tx + x, top: ty + y, right: tx + x + width, bottom: ty + y + height });
+  });
+  return boxes;
+}
+
 function lineCandidates<TPoint extends CartesianPoint>(points: readonly TPoint[]): TPoint[] {
   return [
     points[Math.min(1, points.length - 1)],
@@ -65,19 +132,23 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
     collisionHeight?: number;
     anchors?: Map<string, number>;
     pinAnchors?: boolean;
+    /** Pill boxes already on the plot that labels must not cover. */
+    obstacles?: readonly PlacedBox[];
   },
 ): LineLabelPlacement[] {
   const collisionHeight = options.collisionHeight ?? 18;
-  const placed: { x: number; y: number }[] = [];
+  const placed: PlacedBox[] = [...(options.obstacles ?? [])];
   const result: LineLabelPlacement[] = [];
   const sorted = [...series].toSorted(
     (a, b) => yScale(a.points[0]?.y ?? 0) - yScale(b.points[0]?.y ?? 0),
   );
 
+  const labelHalfWidth = options.collisionWidth / 2;
   const collides = (x: number, y: number) =>
     placed.some(
       (other) =>
-        Math.abs(other.y - y) < collisionHeight && Math.abs(other.x - x) < options.collisionWidth,
+        Math.abs(other.y - y) < collisionHeight &&
+        Math.abs(other.x - x) < other.halfW + labelHalfWidth,
     );
 
   for (const entry of sorted) {
@@ -94,7 +165,7 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
       const point = pointNearestX(entry.points, anchorX);
       const x = xScale(point.x);
       const y = yScale(point.y);
-      placed.push({ x, y });
+      placed.push({ x, y, halfW: labelHalfWidth });
       result.push({
         key: entry.key,
         seriesId: entry.seriesId,
@@ -111,7 +182,7 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
     if (candidate) {
       const x = xScale(candidate.x);
       const y = yScale(candidate.y);
-      placed.push({ x, y });
+      placed.push({ x, y, halfW: labelHalfWidth });
       result.push({
         key: entry.key,
         seriesId: entry.seriesId,
@@ -128,7 +199,7 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
     const x = xScale(fallback.x);
     const y = yScale(fallback.y);
     const visible = entry.keepVisibleOnCollision === true;
-    if (visible) placed.push({ x, y });
+    if (visible) placed.push({ x, y, halfW: labelHalfWidth });
     result.push({
       key: entry.key,
       seriesId: entry.seriesId,
@@ -344,7 +415,11 @@ export function avoidPointLabelCollisions(
     width: label.element.getBBox().width,
   }));
   labels.sort((a, b) => a.centerX - b.centerX);
-  const placed: RectBounds[] = [];
+  // Seed with the run-name and parallelism pills so a point label that would
+  // sit underneath one is pushed to its next candidate slot (or hidden) rather
+  // than being drawn through it. Point-label-vs-point-label behaviour below is
+  // unchanged; the pills simply occupy space before the first label is placed.
+  const placed: RectBounds[] = pillObstacles(zoomGroup);
 
   for (const label of labels) {
     const blockHeight = (label.lineCount - 1) * lineHeight + ascent + descent;

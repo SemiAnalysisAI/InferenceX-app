@@ -17,6 +17,10 @@
       "duration": 1961
     },
     {
+      "spec": "cypress/e2e/agentic-quick-filters.cy.ts",
+      "duration": 1000
+    },
+    {
       "spec": "cypress/e2e/agentx-optimizations.cy.ts",
       "duration": 775
     },
@@ -191,6 +195,10 @@
     {
       "spec": "cypress/e2e/reliability-chart.cy.ts",
       "duration": 1504
+    },
+    {
+      "spec": "cypress/e2e/resident-sequence-lengths.cy.ts",
+      "duration": 1000
     },
     {
       "spec": "cypress/e2e/sanity.cy.ts",

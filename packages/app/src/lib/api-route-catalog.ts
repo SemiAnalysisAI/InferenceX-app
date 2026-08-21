@@ -84,7 +84,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-agentic-aggregates',
-    sourceSha256: '6a99fc156b02b86c5c26ca5ba6b05a280e064dd6123aaba528f124ff0f13c577',
+    sourceSha256: '7dab9929039926b2697d5db71c143eb39f94e795a0d83bb0348db8869f279a5f',
   },
   {
     source: 'src/app/api/v1/availability/route.ts',
@@ -300,12 +300,34 @@ export const apiRouteCatalog = [
     sourceSha256: 'ce1c5db78b47548beb77a69797f10fb33853cde01cea5c44675c8ad3519bcf20',
   },
   {
+    source: 'src/app/api/v1/request-chart-data/route.ts',
+    path: '/api/v1/request-chart-data',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic point-detail BFF with a compact dictionary-encoded request projection coupled to the chart implementation.',
+      zh: '智能体数据点详情页专用 BFF；其字典编码的精简请求投影与图表实现紧密耦合。',
+    },
+    sourceSha256: '44f5a6830358417eb1402c948051fe13dd05bee392c0de7b1511654d94bb7c43',
+  },
+  {
     source: 'src/app/api/v1/request-timeline/route.ts',
     path: '/api/v1/request-timeline',
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-request-timeline',
     sourceSha256: '30659cb757b9fd23411757051b650cfb564016aa15c8b9fec48676b9591f01e9',
+  },
+  {
+    source: 'src/app/api/v1/resident-sequence-lengths/route.ts',
+    path: '/api/v1/resident-sequence-lengths',
+    method: 'GET',
+    classification: 'ui-artifact-read',
+    exclusionReason: {
+      en: 'UI-only mergeable sequence-length sketches for the resident inference-chart point set.',
+      zh: '仅供界面合并当前推理图表数据点的序列长度 sketch。',
+    },
+    sourceSha256: '7a66a7116be3bf63a8c7fc1a54cc7eaf97405858e633daa0802cc2ae7cdbb37e',
   },
   {
     source: 'src/app/api/v1/server-log-files/route.ts',
@@ -364,12 +386,23 @@ export const apiRouteCatalog = [
     sourceSha256: '1157a59930b754787872b0d543167c917477be27e63a6fab0cc487ffab5d4825',
   },
   {
+    source: 'src/app/api/v1/trace-server-metric-source/route.ts',
+    path: '/api/v1/trace-server-metric-source',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic point-detail BFF that lazily returns the full time-series arrays for one UI-selected metric source.',
+      zh: '智能体数据点详情页专用 BFF；按界面选择按需返回单个指标来源的完整时间序列。',
+    },
+    sourceSha256: '6bf3444510f1451dff1c76414a257faec0c657d8a01ae821035a9e80addccd2c',
+  },
+  {
     source: 'src/app/api/v1/trace-server-metrics/route.ts',
     path: '/api/v1/trace-server-metrics',
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-trace-server-metrics',
-    sourceSha256: 'b1bb5b859a28ec18abd0b4ddebf5e505974a08b7ed9693e5bab118f4533f3ce6',
+    sourceSha256: '365b428f2c32e5461cfe13966292eccecfb285e9bf348617383dda821619251f',
   },
   {
     source: 'src/app/api/v1/workflow-info/route.ts',
@@ -678,7 +711,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/agentic-aggregates.ts',
-    sourceSha256: 'b0f4be6c39fe440df99db687b4b6deeed58897bf20325770631680f6e41aa304',
+    sourceSha256: 'fae8d19971730132cb30cd781f677562bfc6328b1f4e35a8268a8391ad187c18',
     reviewArea: {
       en: 'Agentic aggregate percentile keys, nullability, and ID-keyed response shape.',
       zh: '智能体汇总百分位字段、可空性和按 ID 索引的响应结构。',
@@ -774,7 +807,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-histograms.ts',
-    sourceSha256: '43d11e53abc4f9ba723c987424823a03fc8f5dde51cf11653ab8c0bf3a634f55',
+    sourceSha256: 'ec3b7358046ca2acdaaa56d8ecde2829ba8fe4f4b2b31c3795838ac85f59ca89',
     reviewArea: {
       en: 'Trace histogram input/output token arrays and ID-keyed response shape.',
       zh: '跟踪直方图输入/输出 token 数组和按 ID 索引的响应结构。',
@@ -782,7 +815,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-server-metrics.ts',
-    sourceSha256: '06b5a9b92b90a5e695ab6c1dfb4b4d1240180f8d306ff4523ea8cc4269b0ddf3',
+    sourceSha256: 'da987d22521dc63da34dcacf3caaad6adb21aa6e5e7a65d1a4fa495a71e9f1f0',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',
       zh: '跟踪服务器指标元数据、时间序列分组、来源标签和单位。',

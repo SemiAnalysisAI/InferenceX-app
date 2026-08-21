@@ -67,7 +67,17 @@ describe('getRequestTimeline', () => {
 
   it('does not fetch a blob when neither a current timeline nor a blob exists', async () => {
     const { sql, calls } = mockSql([
-      [{ trace_replay_id: 870, has_blob: false, request_timeline: null }],
+      [
+        {
+          trace_replay_id: 870,
+          has_blob: false,
+          timeline_version: null,
+          start_ns: null,
+          end_ns: null,
+          duration_s: null,
+          request_count: null,
+        },
+      ],
     ]);
 
     await expect(getRequestTimeline(sql, 422991)).resolves.toBeNull();
@@ -95,11 +105,16 @@ describe('getRequestTimeline', () => {
         }),
       ),
     );
-    const stale = { ...timeline, version: REQUEST_TIMELINE_VERSION - 1 };
-    const { sql, calls } = mockSql([
-      [{ trace_replay_id: 870, has_blob: true, request_timeline: stale }],
-      [{ blob }],
-    ]);
+    const staleHeader = {
+      trace_replay_id: 870,
+      has_blob: true,
+      timeline_version: REQUEST_TIMELINE_VERSION - 1,
+      start_ns: 100,
+      end_ns: 200,
+      duration_s: 0.0000001,
+      request_count: 0,
+    };
+    const { sql, calls } = mockSql([[staleHeader], [{ blob }]]);
 
     const result = await getRequestTimeline(sql, 422991);
 
@@ -113,11 +128,16 @@ describe('getRequestTimeline', () => {
   });
 
   it('does not write back when the blob is missing (never persists a null timeline)', async () => {
-    const stale = { ...timeline, version: REQUEST_TIMELINE_VERSION - 1 };
-    const { sql, calls } = mockSql([
-      [{ trace_replay_id: 870, has_blob: true, request_timeline: stale }],
-      [{ blob: null }],
-    ]);
+    const staleHeader = {
+      trace_replay_id: 870,
+      has_blob: true,
+      timeline_version: REQUEST_TIMELINE_VERSION - 1,
+      start_ns: 100,
+      end_ns: 200,
+      duration_s: 0.0000001,
+      request_count: 0,
+    };
+    const { sql, calls } = mockSql([[staleHeader], [{ blob: null }]]);
 
     await expect(getRequestTimeline(sql, 422991)).resolves.toBeNull();
     // meta read + blob read only — no write-back for a null recompute.

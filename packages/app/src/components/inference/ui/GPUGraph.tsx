@@ -15,6 +15,7 @@ import {
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
+import { Button } from '@/components/ui/button';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getChartWatermark, Sequence } from '@/lib/data-mappings';
 import { generateGpuDateColors, generateHighContrastGpuDateColors } from '@/lib/dynamic-colors';
@@ -68,13 +69,15 @@ import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import {
-  placeEndpointLineLabels,
+  parallelismLabelBoxes,
   placeLineLabels,
+  placeEndpointLineLabels,
   renderLineLabels,
   updateRenderedLineLabels,
   type LineLabelSeries,
 } from '@/components/inference/ui/line-label-layer';
 import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
+import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 
 const FixedSequenceLogDialog = dynamic(() =>
   import('@/components/inference/log-viewer/fixed-sequence-log-dialog').then(
@@ -104,6 +107,7 @@ const GPU_STRINGS = {
     parallelismLabels: 'Parallelism Labels',
     lineLabels: 'Line Labels',
     resetFilter: 'Reset filter',
+    quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
   },
   zh: {
     logScale: '对数缩放',
@@ -113,6 +117,7 @@ const GPU_STRINGS = {
     parallelismLabels: '并行配置标签',
     lineLabels: '曲线标签',
     resetFilter: '重置筛选',
+    quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
   },
 } as const;
 
@@ -134,6 +139,7 @@ const GPUGraph = React.memo(
       selectedDateRange,
       selectedDates,
       selectedSequence,
+      quickFilters,
       activeDates,
     } = useInferenceFilters();
     const {
@@ -158,11 +164,32 @@ const GPUGraph = React.memo(
       setHighContrast,
       selectAllActiveDates,
       setShowLineLabels,
+      setQuickFilterVendors,
+      setQuickFilterFrameworks,
+      setQuickFilterDeployment,
+      setQuickFilterSpec,
     } = useInferenceActions();
     const locale = useLocale();
     const legendT = GPU_STRINGS[locale];
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
+    const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
+    const quickFilterCount =
+      quickFilters.vendors.length +
+      quickFilters.frameworks.length +
+      quickFilters.deployment.length +
+      (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
+    const clearQuickFilters = useCallback(() => {
+      setQuickFilterVendors([]);
+      setQuickFilterFrameworks([]);
+      setQuickFilterDeployment([]);
+      setQuickFilterSpec([]);
+    }, [
+      setQuickFilterVendors,
+      setQuickFilterFrameworks,
+      setQuickFilterDeployment,
+      setQuickFilterSpec,
+    ]);
     const hasOffloadHalo = useMemo(() => data.some((point) => point.offload_mode === 'on'), [data]);
 
     // Shared date+GPU pairs. `dates` holds comparison-series entries (plain dates
@@ -508,11 +535,18 @@ const GPUGraph = React.memo(
           points,
         }));
       };
-      const placeLabels = (xScale: ContinuousScale, yScale: ContinuousScale) => {
+      const placeLabels = (
+        xScale: ContinuousScale,
+        yScale: ContinuousScale,
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+      ) => {
         if (!showLineLabels) return [];
         const series = buildSeries();
         return chartDefinition.chartType === 'interactivity'
-          ? placeLineLabels(series, xScale, yScale, { collisionWidth: 160 })
+          ? placeLineLabels(series, xScale, yScale, {
+              collisionWidth: 160,
+              obstacles: parallelismLabelBoxes(zoomGroup.node()),
+            })
           : placeEndpointLineLabels(series, xScale, yScale);
       };
 
@@ -523,7 +557,7 @@ const GPUGraph = React.memo(
         render: (zoomGroup, ctx) => {
           renderLineLabels(
             zoomGroup,
-            placeLabels(ctx.xScale as ContinuousScale, ctx.yScale as ContinuousScale),
+            placeLabels(ctx.xScale as ContinuousScale, ctx.yScale as ContinuousScale, zoomGroup),
             {
               seriesAttribute: 'data-graph-id',
               opacity: showLineLabels ? 0.95 : 0,
@@ -537,6 +571,7 @@ const GPUGraph = React.memo(
             placeLabels(
               transform.rescaleX(ctx.xScale as ContinuousScale),
               transform.rescaleY(ctx.yScale as ContinuousScale),
+              zoomGroup,
             ),
             {
               seriesAttribute: 'data-graph-id',
@@ -548,7 +583,11 @@ const GPUGraph = React.memo(
         onZoom: (zoomGroup, ctx) => {
           updateRenderedLineLabels(
             zoomGroup,
-            placeLabels(ctx.newXScale as ContinuousScale, ctx.newYScale as ContinuousScale),
+            placeLabels(
+              ctx.newXScale as ContinuousScale,
+              ctx.newYScale as ContinuousScale,
+              zoomGroup,
+            ),
             { opacity: showLineLabels ? 0.95 : 0 },
           );
         },
@@ -624,8 +663,22 @@ const GPUGraph = React.memo(
               <p className="text-xs">
                 Please change the model, sequence, precision, date range or chip selection.
               </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-4"
+                data-testid="gpu-empty-quick-filters"
+                onClick={() => {
+                  setQuickFiltersOpen(true);
+                  track('inference_quick_filters_dialog_opened', { source: 'timeline_empty' });
+                }}
+              >
+                {legendT.quickFilters(quickFilterCount)}
+              </Button>
             </div>
           </div>
+          <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
         </div>
       );
     }
@@ -911,7 +964,16 @@ const GPUGraph = React.memo(
                 label: legendT.resetFilter,
                 onClick: () => {
                   selectAllActiveDates();
+                  clearQuickFilters();
                   track('gpu_timeseries_reset_filter');
+                },
+              },
+              {
+                id: 'gpu-quick-filters',
+                label: legendT.quickFilters(quickFilterCount),
+                onClick: () => {
+                  setQuickFiltersOpen(true);
+                  track('inference_quick_filters_dialog_opened', { source: 'timeline_legend' });
                 },
               },
             ]}
@@ -932,6 +994,7 @@ const GPUGraph = React.memo(
                     }}
                   />
                 )}
+                <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
               </>
             }
           />

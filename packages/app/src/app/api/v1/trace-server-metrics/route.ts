@@ -12,6 +12,15 @@ import { idQueryRoute } from '../id-routes';
 
 export const dynamic = 'force-dynamic';
 
+// The slow path re-parses `server_metrics_json_gz`, which reaches 448 MB
+// compressed (several GB of JSON) on the largest agentic points and takes
+// minutes to stream. That only happens for rows whose stored `chart_series`
+// predates the current version — i.e. after a version bump, until
+// `db:backfill-chart-series` drains them — but the platform default would
+// cut those requests off mid-parse and the blob cache only populates on
+// success, so every visitor would re-pay. Ask for the maximum instead.
+export const maxDuration = 300;
+
 // Key derived from TRACE_SERVER_METRICS_VERSION (governs chart_series plus
 // the separately queried point-metadata payload).
 // The blob cache is write-once with no post-backfill purge, so the

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { useFeatureGate } from '@/lib/use-feature-gate';
-import { cn } from '@/lib/utils';
 
 import {
   useInferenceActions,
@@ -30,10 +29,7 @@ import {
 } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { Button } from '@/components/ui/button';
 import { METRIC_CONTROL_GROUPS, METRIC_REGISTRY } from '@/components/inference/metric-registry';
-import type { DeploymentMode, SpecMode } from '@/components/inference/types';
-import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
@@ -60,17 +56,6 @@ const STRINGS = {
     comparisonDateRangeTooltip:
       'Select the start and end dates for the historical comparison. The chart will show performance data for the selected chip configs across this time range.',
     dateRangePlaceholder: 'Select date range',
-    quickFilters: 'Quick Filters',
-    quickFiltersTooltip:
-      'Narrow the chart by chip vendor, serving framework, deployment mode (single-node, multi-node aggregate, or disaggregated), and speculative decoding. Selecting none in a group shows all.',
-    filterVendor: 'Vendor',
-    filterFramework: 'Framework',
-    filterDeployment: 'Deployment',
-    singleNode: 'Single-node',
-    multiNode: 'Multi-node',
-    disaggregated: 'Disaggregated',
-    filterSpecDecoding: 'Spec Decoding',
-    noData: 'No data for the current selection',
   },
   zh: {
     yAxisMetric: 'Y 轴指标',
@@ -92,17 +77,6 @@ const STRINGS = {
     comparisonDateRangeTooltip:
       '选择历史对比的起止日期。图表将展示所选 Chip 配置在此时间范围内的性能数据。',
     dateRangePlaceholder: '选择日期范围',
-    quickFilters: '快捷筛选',
-    quickFiltersTooltip:
-      '按 Chip 厂商、推理框架、部署模式（单节点、多节点聚合或分离式）和投机解码筛选图表。某组不选则显示全部。',
-    filterVendor: '厂商',
-    filterFramework: '框架',
-    filterDeployment: '部署模式',
-    singleNode: '单节点',
-    multiNode: '多节点聚合',
-    disaggregated: '分离式',
-    filterSpecDecoding: '投机解码',
-    noData: '当前选择无可用数据',
   },
 } as const;
 
@@ -115,22 +89,6 @@ const METRIC_TITLE_MAP = new Map(
 const METRIC_TITLE_ZH_MAP = new Map(
   Object.entries(METRIC_REGISTRY).map(([key, metric]) => [`y_${key}`, metric.titleZh]),
 );
-
-/** Quick-filter pill groups: vendor, deployment mode, spec-decoding method. */
-const QUICK_FILTER_VENDORS: { value: string; label: string }[] = [
-  { value: 'NVIDIA', label: 'NVIDIA' },
-  { value: 'AMD', label: 'AMD' },
-];
-const QUICK_FILTER_DEPLOYMENT: DeploymentMode[] = ['single-node', 'multi-node', 'disagg'];
-const QUICK_FILTER_SPEC: { value: SpecMode; label: string }[] = [
-  { value: 'mtp', label: 'MTP' },
-  { value: 'stp', label: 'STP' },
-];
-
-/** Toggle a value in/out of a quick-filter selection array. */
-function toggleValue<T extends string>(current: T[], value: T): T[] {
-  return current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
-}
 
 interface ChartControlsProps {
   /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
@@ -149,14 +107,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
 
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown<string>();
 
-  const {
-    selectedModel,
-    selectedSequence,
-    selectedPrecisions,
-    selectedGPUs,
-    selectedDateRange,
-    quickFilters,
-  } = useInferenceFilters();
+  const { selectedModel, selectedSequence, selectedPrecisions, selectedGPUs, selectedDateRange } =
+    useInferenceFilters();
   const {
     graphs,
     availableGPUs,
@@ -165,7 +117,6 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     availablePrecisions,
     availableSequences,
     availableModels,
-    availableQuickFilters,
   } = useInferenceData();
   const { selectedYAxisMetric, selectedPercentile, selectedXAxisMetric, scaleType } =
     useInferenceDisplay();
@@ -179,10 +130,6 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     setSelectedDateRange,
     setSelectedXAxisMetric,
     setScaleType,
-    setQuickFilterVendors,
-    setQuickFilterFrameworks,
-    setQuickFilterDeployment,
-    setQuickFilterSpec,
   } = useInferenceActions();
 
   // Y-axis options come from the canonical registry and need no API data.
@@ -287,28 +234,6 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     });
   };
 
-  const handleQuickFilterToggle = (
-    category: 'vendor' | 'framework' | 'deployment' | 'spec',
-    value: string,
-  ) => {
-    const wasActive =
-      category === 'vendor'
-        ? quickFilters.vendors.includes(value)
-        : category === 'framework'
-          ? quickFilters.frameworks.includes(value)
-          : category === 'deployment'
-            ? quickFilters.deployment.includes(value as DeploymentMode)
-            : quickFilters.spec.includes(value as SpecMode);
-    if (category === 'vendor') setQuickFilterVendors(toggleValue(quickFilters.vendors, value));
-    else if (category === 'framework')
-      setQuickFilterFrameworks(toggleValue(quickFilters.frameworks, value));
-    else if (category === 'deployment')
-      setQuickFilterDeployment(toggleValue(quickFilters.deployment, value as DeploymentMode));
-    else setQuickFilterSpec(toggleValue(quickFilters.spec, value as SpecMode));
-    // `active` is the state *after* this toggle.
-    track('inference_quick_filter_toggled', { category, value, active: !wasActive });
-  };
-
   const isInputMetric = (() => {
     const chartDef = graphs[0]?.chartDefinition;
     if (!chartDef) return false;
@@ -324,70 +249,6 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
       endDate: range.endDate,
     });
   };
-
-  // Quick-filter pill groups. Each option carries an `available` flag (has data
-  // for the current model); the render disables unavailable options unless they
-  // are currently selected, so a selection can always be toggled back off. The
-  // Framework group is data-driven — only families present (or selected) are
-  // offered, so it's omitted entirely when none resolve (e.g. while data loads).
-  const fwSelected = quickFilters.frameworks;
-  const frameworkOptions = FRAMEWORK_FAMILIES.filter(
-    (f) => availableQuickFilters.frameworks.includes(f.key) || fwSelected.includes(f.key),
-  ).map((f) => ({
-    value: f.key,
-    label: f.label,
-    available: availableQuickFilters.frameworks.includes(f.key),
-  }));
-  const quickFilterGroups: {
-    key: 'vendor' | 'framework' | 'deployment' | 'spec';
-    label: string;
-    options: readonly { value: string; label: string; available: boolean }[];
-    selected: readonly string[];
-  }[] = [
-    {
-      key: 'vendor',
-      label: t.filterVendor,
-      options: QUICK_FILTER_VENDORS.map((o) => ({
-        ...o,
-        available: availableQuickFilters.vendors.includes(o.value),
-      })),
-      selected: quickFilters.vendors,
-    },
-    ...(frameworkOptions.length > 0
-      ? [
-          {
-            key: 'framework' as const,
-            label: t.filterFramework,
-            options: frameworkOptions,
-            selected: quickFilters.frameworks,
-          },
-        ]
-      : []),
-    {
-      key: 'deployment',
-      label: t.filterDeployment,
-      options: QUICK_FILTER_DEPLOYMENT.map((value) => ({
-        value,
-        label:
-          value === 'single-node'
-            ? t.singleNode
-            : value === 'multi-node'
-              ? t.multiNode
-              : t.disaggregated,
-        available: availableQuickFilters.deployment.includes(value),
-      })),
-      selected: quickFilters.deployment,
-    },
-    {
-      key: 'spec',
-      label: t.filterSpecDecoding,
-      options: QUICK_FILTER_SPEC.map((o) => ({
-        ...o,
-        available: availableQuickFilters.spec.includes(o.value),
-      })),
-      selected: quickFilters.spec,
-    },
-  ];
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -545,56 +406,6 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             </div>
           )}
         </div>
-
-        {/* Quick Filters slice by vendor, framework, deployment, and spec
-            decoding — dimensions the agentic scenario collapses into one
-            best-available curve per model, SKU, and engine, so the chips have
-            nothing meaningful to filter there. */}
-        {!hideGpuComparison && selectedSequence !== Sequence.AgenticTraces && (
-          <div className="flex flex-col space-y-1.5" data-testid="quick-filters">
-            <LabelWithTooltip
-              htmlFor="quick-filters"
-              label={t.quickFilters}
-              tooltip={t.quickFiltersTooltip}
-            />
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              {quickFilterGroups.map((group) => (
-                <div key={group.key} className="flex items-center gap-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">{group.label}:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {group.options.map((option) => {
-                      const active = (group.selected as readonly string[]).includes(option.value);
-                      // Disable options with no data, but keep a selected one
-                      // clickable so it can always be toggled back off.
-                      const disabled = !option.available && !active;
-                      return (
-                        <Button
-                          key={option.value}
-                          type="button"
-                          size="sm"
-                          variant={active ? 'default' : 'outline'}
-                          aria-pressed={active}
-                          disabled={disabled}
-                          title={disabled ? t.noData : undefined}
-                          // Active pills use the brand color (blue in light, amber in dark)
-                          // rather than the amber primary fill.
-                          className={cn(
-                            'h-7 rounded-full px-3 text-xs',
-                            active && 'bg-brand hover:bg-brand/90',
-                          )}
-                          data-testid={`quick-filter-${group.key}-${option.value}`}
-                          onClick={() => handleQuickFilterToggle(group.key, option.value)}
-                        >
-                          {option.label}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </TooltipProvider>
   );

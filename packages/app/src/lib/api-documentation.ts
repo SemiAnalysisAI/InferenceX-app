@@ -492,7 +492,9 @@ const percentileSchema = objectSchema({
   p50: numberSchema,
   p75: numberSchema,
   p90: numberSchema,
+  p95: numberSchema,
   p99: numberSchema,
+  n: integerSchema,
 });
 const nullablePercentileSchema: ApiSchema = { oneOf: [percentileSchema, { type: 'null' }] };
 const idListSchema: ApiSchema = { type: 'string', pattern: '^\\d+(,\\d+)*$' };
@@ -1705,7 +1707,15 @@ export const apiOperations: readonly ApiOperation[] = [
         {
           '421': {
             id: 421,
-            isl: { mean: 18320, p50: 16440, p75: 20110, p90: 24880, p99: 31900 },
+            isl: {
+              mean: 18320,
+              p50: 16440,
+              p75: 20110,
+              p90: 24880,
+              p95: 27940,
+              p99: 31900,
+              n: 512,
+            },
             osl: null,
             kvCacheUtil: null,
             prefixCacheHitRate: null,
@@ -2388,8 +2398,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/trace-server-metrics',
     summary: text('Read trace server metrics', '读取跟踪服务器指标'),
     description: text(
-      'Returns point metadata and chart-ready time series for cache usage, queue depth, prefill and decode throughput, prompt-token sources, and metric sources.',
-      '返回点元数据，以及缓存使用率、队列深度、预填充和解码吞吐、提示 token 来源与指标来源的图表时间序列。',
+      'Returns point metadata and chart-ready aggregate time series for cache usage, queue depth, prefill and decode throughput, and prompt-token sources. metricSources contains source descriptors; source-specific arrays are loaded by the point-detail UI only when selected.',
+      '返回点元数据，以及缓存使用率、队列深度、预填充和解码吞吐、提示 token 来源的图表聚合时间序列。metricSources 仅包含来源描述信息；详情页只会在用户选中某个来源时加载其专属数组。',
     ),
     audience: 'public',
     stability: 'beta',

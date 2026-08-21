@@ -29,6 +29,7 @@ describe('percentilesOf', () => {
     // For 100 sorted values, p75 = sorted[0.75 * 99] = sorted[74.25] interp.
     expect(p!.p75).toBeCloseTo(75.25, 6);
     expect(p!.p90).toBeCloseTo(90.1, 6);
+    expect(p!.p95).toBeCloseTo(95.05, 6);
     expect(p!.p99).toBeCloseTo(99.01, 6);
   });
 
@@ -47,6 +48,14 @@ describe('extractIslOsl', () => {
         metrics: {
           input_sequence_length: { value: 100, unit: 'tokens' },
           output_sequence_length: { value: 50, unit: 'tokens' },
+        },
+      }),
+      // cancelled profiling record — it did not complete and must be ignored
+      JSON.stringify({
+        metadata: { benchmark_phase: 'profiling', was_cancelled: true },
+        metrics: {
+          input_sequence_length: { value: 7777, unit: 'tokens' },
+          output_sequence_length: { value: 7777, unit: 'tokens' },
         },
       }),
       JSON.stringify({

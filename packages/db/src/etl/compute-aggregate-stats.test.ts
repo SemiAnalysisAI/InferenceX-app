@@ -5,17 +5,21 @@ import { describe, expect, it } from 'vitest';
 import {
   STATS_VERSION,
   computeAggregateStats,
+  computeProfileAggregateStatsFromCompressedChunks,
   mergeProfileStatsUpgrade,
 } from './compute-aggregate-stats.js';
 
 /** Build a minimal `profile_export.jsonl` from a few synthetic requests. */
-function makeProfileBlob(requests: { isl: number; osl: number; rl?: number; ttft?: number }[]) {
+function makeProfileBlob(
+  requests: { isl: number; osl: number; rl?: number; ttft?: number; cancelled?: boolean }[],
+) {
   const lines = requests.map((r, i) =>
     JSON.stringify({
       metadata: {
         benchmark_phase: 'profiling',
         conversation_id: `conv-${i}`,
         turn_index: 0,
+        was_cancelled: r.cancelled,
       },
       metrics: {
         input_sequence_length: { value: r.isl, unit: 'tokens' },
@@ -81,6 +85,8 @@ describe('computeAggregateStats', () => {
     expect(stats.isl?.mean).toBeCloseTo(200, 6);
     expect(stats.osl?.n).toBe(3);
     expect(stats.osl?.mean).toBeCloseTo(75, 6);
+    expect(stats.sequenceLengths.isl?.n).toBe(3);
+    expect(stats.sequenceLengths.osl?.n).toBe(3);
 
     // Server-side metrics still null when there's no server blob.
     expect(stats.kvCacheUtil).toBeNull();
@@ -91,6 +97,38 @@ describe('computeAggregateStats', () => {
     expect(stats.e2elPerOsl?.p50).toBeCloseTo(2 / 75, 6);
     // p90 of 3 values (linear interpolation): pos=1.8 → 0.02667 + 0.8×(0.03-0.02667)
     expect(stats.e2elPerOsl?.p90).toBeCloseTo(2 / 75 + 0.8 * (0.03 - 2 / 75), 6);
+  });
+
+  it('excludes cancelled requests from every streamed profile distribution', async () => {
+    const stats = await computeAggregateStats({
+      profileBlob: makeProfileBlob([
+        { isl: 100, osl: 50, rl: 1000 },
+        { isl: 1_000_000, osl: 1_000_000, rl: 1_000_000, cancelled: true },
+      ]),
+      serverBlob: null,
+    });
+
+    expect(stats.isl?.n).toBe(1);
+    expect(stats.isl?.p50).toBe(100);
+    expect(stats.osl?.n).toBe(1);
+    expect(stats.e2elPerOsl?.n).toBe(1);
+    expect(stats.sequenceLengths.isl?.n).toBe(1);
+    expect(stats.sequenceLengths.osl?.n).toBe(1);
+  });
+
+  it('accepts a gzip profile split across arbitrarily small compressed chunks', async () => {
+    const blob = makeProfileBlob([
+      { isl: 100, osl: 50, rl: 1000 },
+      { isl: 200, osl: 100, rl: 2000 },
+    ]);
+    const chunks = Array.from({ length: Math.ceil(blob.length / 7) }, (_, index) =>
+      blob.subarray(index * 7, Math.min(blob.length, (index + 1) * 7)),
+    );
+
+    const stats = await computeProfileAggregateStatsFromCompressedChunks(chunks);
+    expect(stats.isl?.n).toBe(2);
+    expect(stats.osl?.n).toBe(2);
+    expect(stats.e2elPerOsl?.n).toBe(2);
   });
 
   it('computes KV util + prefix hit rate from the server blob alone', async () => {
@@ -148,7 +186,15 @@ describe('mergeProfileStatsUpgrade', () => {
       version: STATS_VERSION - 1,
       isl: null,
       osl: null,
-      kvCacheUtil: { mean: 0.4, p50: 0.4, p75: 0.5, p90: 0.6, p99: 0.7, n: 3 },
+      kvCacheUtil: {
+        mean: 0.4,
+        p50: 0.4,
+        p75: 0.5,
+        p90: 0.6,
+        p95: 0.65,
+        p99: 0.7,
+        n: 3,
+      },
       prefixCacheHitRate: null,
       normalizedSessionTimeS: 999,
       p90PrefillTpsPerUser: 999,

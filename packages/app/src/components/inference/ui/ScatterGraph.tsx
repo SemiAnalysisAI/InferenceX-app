@@ -20,10 +20,11 @@ import { useLogAvailability } from '@/hooks/api/use-log-availability';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import {
   avoidPointLabelCollisions,
-  placeEndpointLineLabels,
+  parallelismLabelBoxes,
   placeLineLabels,
-  renderLineLabels,
+  placeEndpointLineLabels,
   updateRenderedLineLabels,
+  renderLineLabels,
   type LineLabelPlacement,
   type LineLabelSeries,
 } from '@/components/inference/ui/line-label-layer';
@@ -32,6 +33,7 @@ import {
   labelOpacityForHover,
 } from '@/components/inference/ui/line-label-visibility';
 import ChartLegend from '@/components/ui/chart-legend';
+import { Button } from '@/components/ui/button';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import {
@@ -91,6 +93,7 @@ import {
   generateOverlayTooltipContent,
   generateTooltipContent,
 } from '@/components/inference/utils/tooltipUtils';
+import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 import {
   scatterPointConfigId,
   scatterPointJoinId,
@@ -329,6 +332,7 @@ const SCATTER_STRINGS = {
     gradientLabels: 'Gradient Labels',
     lineLabels: 'Line Labels',
     resetFilter: 'Reset filter',
+    quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
     overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
@@ -344,6 +348,7 @@ const SCATTER_STRINGS = {
     gradientLabels: '渐变标签',
     lineLabels: '曲线标签',
     resetFilter: '重置筛选',
+    quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
     overflowMixed: (count: number) => `${count} 个点已截断`,
     overflowCost: (count: number, limit: number) => `${count} 个点 > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${count} 个点 > ${limit}s TTFT`,
@@ -412,6 +417,10 @@ const ScatterGraph = React.memo(
       setShowLineLabels,
       setShowSpeedOverlay,
       setShowMinecraftOverlay,
+      setQuickFilterVendors,
+      setQuickFilterFrameworks,
+      setQuickFilterDeployment,
+      setQuickFilterSpec,
     } = useInferenceActions();
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
@@ -949,6 +958,23 @@ const ScatterGraph = React.memo(
 
     // --- Legend points table (per-series drill-down opened from the legend) ---
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
+    const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
+    const quickFilterCount =
+      quickFilters.vendors.length +
+      quickFilters.frameworks.length +
+      quickFilters.deployment.length +
+      (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
+    const clearQuickFilters = useCallback(() => {
+      setQuickFilterVendors([]);
+      setQuickFilterFrameworks([]);
+      setQuickFilterDeployment([]);
+      setQuickFilterSpec([]);
+    }, [
+      setQuickFilterVendors,
+      setQuickFilterFrameworks,
+      setQuickFilterDeployment,
+      setQuickFilterSpec,
+    ]);
 
     const pointsTable = useMemo(() => {
       if (!pointsTableTarget) return null;
@@ -1721,6 +1747,7 @@ const ScatterGraph = React.memo(
                     collisionWidth: 120,
                     anchors: lineLabelAnchorRef.current,
                     pinAnchors: pinLineLabels,
+                    obstacles: parallelismLabelBoxes(ctx.layout.zoomGroup.node()),
                   })
                 : placeEndpointLineLabels(labelSeries, xScale, yScale, {
                     nudge: !pinLineLabels,
@@ -1959,6 +1986,7 @@ const ScatterGraph = React.memo(
                     collisionWidth: 120,
                     anchors: lineLabelAnchorRef.current,
                     pinAnchors: pinLineLabels,
+                    obstacles: parallelismLabelBoxes(zoomGroup.node()),
                   })
                 : placeEndpointLineLabels(labelSeries, newXScale, newYScale, {
                     nudge: !pinLineLabels,
@@ -2809,8 +2837,22 @@ const ScatterGraph = React.memo(
               <p className="text-xs">
                 Please change the model, sequence, precision, date range or chip selection.
               </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-4"
+                data-testid="scatter-empty-quick-filters"
+                onClick={() => {
+                  setQuickFiltersOpen(true);
+                  track('inference_quick_filters_dialog_opened', { source: 'scatter_empty' });
+                }}
+              >
+                {legendT.quickFilters(quickFilterCount)}
+              </Button>
             </div>
           </div>
+          <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
         </div>
       );
     }
@@ -3106,21 +3148,31 @@ const ScatterGraph = React.memo(
               onAdvancedExpandedChange={(expanded) => {
                 track('latency_advanced_controls_toggled', { expanded });
               }}
-              actions={
-                effectiveOfficialHwTypes.size < hwTypesWithData.size ||
-                activeOverlayHwTypes.size < scopedOverlayHwTypes.size
+              actions={[
+                ...(effectiveOfficialHwTypes.size < hwTypesWithData.size ||
+                activeOverlayHwTypes.size < scopedOverlayHwTypes.size ||
+                quickFilterCount > 0
                   ? [
                       {
                         id: 'scatter-reset-filter',
                         label: legendT.resetFilter,
                         onClick: () => {
                           resetUnifiedSelection();
+                          clearQuickFilters();
                           track('latency_legend_filter_reset');
                         },
                       },
                     ]
-                  : []
-              }
+                  : []),
+                {
+                  id: 'scatter-quick-filters',
+                  label: legendT.quickFilters(quickFilterCount),
+                  onClick: () => {
+                    setQuickFiltersOpen(true);
+                    track('inference_quick_filters_dialog_opened', { source: 'scatter_legend' });
+                  },
+                },
+              ]}
               precisionIndicators={selectedPrecisions}
               keyIndicators={
                 hasOffloadHalo || selectedSequence === Sequence.AgenticTraces ? (
@@ -3134,6 +3186,7 @@ const ScatterGraph = React.memo(
             />
           }
         />
+        <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
         {pointsTable && (
           <LegendPointsDialog
             open

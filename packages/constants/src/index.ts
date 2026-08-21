@@ -8,3 +8,4 @@ export * from './seo';
 export * from './tables';
 export * from './currency';
 export * from './tco';
+export * from './token-length-sketch';

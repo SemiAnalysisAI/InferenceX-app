@@ -29,9 +29,11 @@ import {
   extractIslOsl,
   fetchAggregateStatsRows,
   percentilesOf,
+  sequenceLengthSketches,
   STATS_VERSION,
   writeBackTraceReplayJsonb,
   type MetricPercentiles,
+  type SequenceLengthSketches,
 } from './agentic-shared';
 
 // STATS_VERSION, the profile extractor `extractIslOsl`, and the percentile
@@ -41,8 +43,10 @@ import {
 export {
   extractIslOsl,
   percentilesOf,
+  sequenceLengthSketches,
   STATS_VERSION,
   type MetricPercentiles,
+  type SequenceLengthSketches,
 } from './agentic-shared';
 
 export interface AgenticAggregate {
@@ -329,6 +333,7 @@ export async function getAgenticAggregates(
               kvCacheUtil: null,
               prefixCacheHitRate: null,
               e2elPerOsl: derived.e2el_per_osl,
+              sequenceLengths: sequenceLengthSketches(isl, osl),
             },
           });
         } catch {
@@ -414,6 +419,7 @@ interface FullAggregateStats {
   kvCacheUtil: MetricPercentiles | null;
   prefixCacheHitRate: MetricPercentiles | null;
   e2elPerOsl: MetricPercentiles | null;
+  sequenceLengths: SequenceLengthSketches;
 }
 
 function blankAggregate(id: number): AgenticAggregate {

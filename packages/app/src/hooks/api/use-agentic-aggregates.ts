@@ -5,6 +5,7 @@ export interface MetricPercentiles {
   p50: number;
   p75: number;
   p90: number;
+  p95: number;
   p99: number;
   n: number;
 }
@@ -22,7 +23,7 @@ export type AgenticAggregateMap = Record<number, AgenticAggregate>;
 const fetchAgenticAggregates = bulkIdsFetcher<AgenticAggregate>('agentic-aggregates');
 
 /**
- * Fetch per-id aggregate stats (mean/p50/p75/p90/p99) for ISL, OSL, KV
+ * Fetch per-id aggregate stats (mean/p50/p75/p90/p95/p99) for ISL, OSL, KV
  * cache utilization, and prefix cache hit rate. Used by the "Aggregates
  * across configs" view on the agentic detail page.
  */
