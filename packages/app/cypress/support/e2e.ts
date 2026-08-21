@@ -13,6 +13,7 @@ import 'cypress-axe';
 
 let suppressLaunchModal = true;
 let suppressTelemetryTutorial = true;
+let suppressAgenticCoachMark = true;
 
 /**
  * Opt the whole spec out of the launch-modal suppression.
@@ -40,6 +41,18 @@ export function keepTelemetryTutorial(): void {
   suppressTelemetryTutorial = false;
 }
 
+/**
+ * Opt the whole spec out of the agentic point coach-mark suppression, for the
+ * same reason as `keepLaunchModal` — the key is re-seeded on `cy.reload()`, so
+ * a per-visit `onBeforeLoad` clear cannot own its state.
+ *
+ * The callout is anchored to a point inside `[data-testid="scatter-graph"]`,
+ * so on the agentic view it sits over the plot area that other specs click.
+ */
+export function keepAgenticCoachMark(): void {
+  suppressAgenticCoachMark = false;
+}
+
 Cypress.on('window:before:load', (win) => {
   try {
     win.localStorage.setItem('inferencex-feedback-modal-snoozed', String(Date.now()));
@@ -48,6 +61,9 @@ Cypress.on('window:before:load', (win) => {
     }
     if (suppressTelemetryTutorial) {
       win.localStorage.setItem('inferencex-agentx-telemetry-tutorial-dismissed', '1');
+    }
+    if (suppressAgenticCoachMark) {
+      win.localStorage.setItem('inferencex-agentic-point-coach-mark-dismissed', '1');
     }
   } catch {
     // localStorage unavailable — fine, the test will just see the modal.

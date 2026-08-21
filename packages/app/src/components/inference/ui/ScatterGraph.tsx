@@ -5,6 +5,7 @@ import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import { SCATTER_RENDERED_EVENT } from '@/lib/nudges/agentic-point-coach-mark';
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import { useInference } from '@/components/inference/InferenceContext';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
@@ -2392,6 +2393,9 @@ const ScatterGraph = React.memo(
           dataAttrs: {
             'hw-key': (d) => String(d.hwKey),
             precision: (d) => d.precision,
+            // Lets the agentic coach mark pick an anchor out of the DOM
+            // without knowing anything about React state.
+            'benchmark-type': (d) => d.benchmark_type ?? '',
           },
           getShapeKey: (d) =>
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
@@ -2996,6 +3000,11 @@ const ScatterGraph = React.memo(
 
         avoidLabelCollisions(zoomGroup);
 
+        // Tell the nudge engine the chart has painted, so an anchored coach
+        // mark can (re)try resolving a point to point at. Cheap: one event per
+        // full render, not per zoom frame.
+        window.dispatchEvent(new CustomEvent(SCATTER_RENDERED_EVENT));
+
         // Log tick formatting on initial render
         if (xScaleConfig._isLog) {
           const xScale = ctx.xScale as d3.ScaleLogarithmic<number, number>;
@@ -3061,6 +3070,13 @@ const ScatterGraph = React.memo(
         // A precision toggle may replace and append the visible SVG shape.
         // Keep the offload halo above that shape after the swap.
         sel.selectAll('.offload-halo').raise();
+        // Whether this point's pinned tooltip will offer "View charts". Written
+        // here rather than in the layer's dataAttrs because availability
+        // resolves after the chart renders, and a rebuild would drop the zoom.
+        sel.attr(
+          'data-has-trace',
+          typeof d.id === 'number' && traceAvailability?.[d.id] === true ? 'true' : null,
+        );
       });
 
       // Overlay X markers: Optimal Only visibility (mirrors the official dot
@@ -3167,6 +3183,8 @@ const ScatterGraph = React.memo(
       showGradientLabels,
       showLineLabels,
       gradientColorByPoint,
+      // Re-stamps `data-has-trace` once the presence lookup resolves.
+      traceAvailability,
     ]);
 
     // D3 custom layers are keyed additions, so removing the overlay layer from
