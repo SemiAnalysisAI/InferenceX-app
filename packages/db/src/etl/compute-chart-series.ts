@@ -8,7 +8,7 @@
  * `CHART_SERIES_VERSION` whenever the extraction algorithm changes.
  */
 
-import { gunzipJsonWithinLimit, streamCollectKeys } from './gzip-json-stream';
+import { collectMetricPhases } from './gzip-json-stream';
 import {
   selectServerMetricsAdapter,
   type MetricSource,
@@ -266,31 +266,17 @@ function mergePhaseMetrics(profiling: MetricsMap, warmup: MetricsMap): MetricsMa
 }
 
 /**
- * Stream-parse fallback: collect the chart's metric subtrees from both phase
- * blocks and merge (see v11) when the full JSON exceeds the in-memory
- * fast-path ceiling.
- */
-async function streamCollectMetrics(buffer: Buffer): Promise<MetricsMap> {
-  const [profiling, warmup] = await Promise.all([
-    streamCollectKeys<RawMetric>(buffer, 'metrics', CHART_METRIC_KEYS),
-    streamCollectKeys<RawMetric>(buffer, 'warmup_metrics', CHART_METRIC_KEYS),
-  ]);
-  return mergePhaseMetrics(profiling, warmup);
-}
-
-/**
  * Parse the gzipped server_metrics blob into the metric map. Small blobs use
- * the synchronous fast path; oversized blobs use the streaming parser. Merges
- * the warmup block into the profiling one (v11) so the series span both phases.
+ * the synchronous fast path; oversized blobs use one streaming parser pass
+ * that collects both phase blocks. Merges the warmup block into the profiling
+ * one (v11) so the series span both phases.
  */
 async function parseMetrics(buffer: Buffer): Promise<MetricsMap> {
-  const json = gunzipJsonWithinLimit(buffer);
-  if (json === null) return await streamCollectMetrics(buffer);
-  const obj = JSON.parse(json) as {
-    metrics?: MetricsMap;
-    warmup_metrics?: MetricsMap;
-  };
-  return mergePhaseMetrics(obj.metrics ?? {}, obj.warmup_metrics ?? {});
+  const { metrics, warmupMetrics } = await collectMetricPhases<RawMetric>(
+    buffer,
+    CHART_METRIC_KEYS,
+  );
+  return mergePhaseMetrics(metrics, warmupMetrics);
 }
 
 /**
