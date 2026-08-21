@@ -1,5 +1,6 @@
 import { formatNumber, getDisplayLabel } from '@/lib/utils';
 import { specMethodDisplayLabel } from '@/lib/compare-variant-slug';
+import { agenticDetailHref } from '@/lib/agentic-detail-link';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
@@ -257,8 +258,10 @@ const viewActionsHTML = (
   const showCharts = isAgentic && hasTraceData;
   if (!isPinned || !isPersistedBenchmarkId(pointId) || (!showCharts && !hasLogData)) return '';
   const prefix = locale === 'zh' ? '/zh' : '';
-  const agenticHref = `${prefix}/inference/agentic/${pointId}`;
-  const logHref = isAgentic ? `${agenticHref}?view=logs` : `${prefix}/inference/logs/${pointId}`;
+  const agenticHref = agenticDetailHref(pointId, locale);
+  const logHref = isAgentic
+    ? `${agenticHref}${agenticHref.includes('?') ? '&' : '?'}view=logs`
+    : `${prefix}/inference/logs/${pointId}`;
   const t = ACTION_STRINGS[locale];
   const actions = [
     showCharts ? pointDetailActionLink('view-charts', agenticHref, t.charts) : '',

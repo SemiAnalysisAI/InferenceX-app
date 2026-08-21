@@ -89,6 +89,9 @@ export function setupChartStructure(
 
     let zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
     if (clipContent) {
+      // `plot-bounds.ts` reconstructs this rect in viewport coordinates (from
+      // the .chart-root translate plus these dimensions) so callers can tell
+      // whether a point is actually visible. Keep the two in step.
       defs
         .append('clipPath')
         .attr('id', `clip-${config.chartId}`)

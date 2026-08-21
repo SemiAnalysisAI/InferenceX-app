@@ -97,7 +97,7 @@ describe('computeTraceDerivedPayloads', () => {
     const [aggregateStats, chartSeries, requestTimeline] = await Promise.all([
       computeAggregateStats({ profileBlob, serverBlob }),
       computeChartSeries(serverBlob, context),
-      Promise.resolve(computeRequestTimeline(profileBlob)),
+      computeRequestTimeline(profileBlob),
     ]);
     const optimized = await computeTraceDerivedPayloads(profileBlob, serverBlob, context);
 
@@ -137,6 +137,6 @@ describe('computeTraceDerivedPayloads', () => {
       await computeAggregateStats({ profileBlob, serverBlob: malformedServer }),
     );
     expect(optimized.chartSeries).toBeNull();
-    expect(optimized.requestTimeline).toEqual(computeRequestTimeline(profileBlob));
+    expect(optimized.requestTimeline).toEqual(await computeRequestTimeline(profileBlob));
   });
 });

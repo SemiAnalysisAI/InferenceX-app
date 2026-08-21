@@ -2,6 +2,8 @@
 
 import type { ReactNode } from 'react';
 
+import { TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
+
 import { Card } from '@/components/ui/card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { OVERVIEW_HISTORY_WINDOW_DAYS, type OverviewPageData } from '@/lib/overview-data';
@@ -25,6 +27,7 @@ import {
   OverviewNavigationProvider,
   useOverviewData,
   useOverviewNavigation,
+  useOverviewNavigationError,
   useOverviewReference,
 } from './overview-navigation';
 import {
@@ -34,9 +37,6 @@ import {
   useOverviewPresentation,
 } from './overview-presentation';
 import { useWideViewport } from './use-wide-viewport';
-
-/** The SemiAnalysis AI Cloud TCO model behind `HW_REGISTRY.costh`. */
-const OVERVIEW_SOURCE_HREF = 'https://semianalysis.com/ai-cloud-tco-model/';
 
 interface OverviewPageProps {
   data: OverviewPageData;
@@ -81,6 +81,20 @@ function OverviewPendingStatus({ label }: { label: string }) {
   );
 }
 
+function OverviewNavigationErrorStatus({ label }: { label: string }) {
+  const hasError = useOverviewNavigationError();
+  if (!hasError) return null;
+  return (
+    <p
+      role="alert"
+      data-testid="overview-navigation-error"
+      className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-foreground"
+    >
+      {label}
+    </p>
+  );
+}
+
 function OverviewMatrixCard({ children }: { children: ReactNode }) {
   const { isPending } = useOverviewNavigation();
   return (
@@ -106,6 +120,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
   return (
     <section data-testid="overview-page" className="flex flex-col gap-4">
       <OverviewPendingStatus label={strings.loadingStatus} />
+      <OverviewNavigationErrorStatus label={strings.navigationError} />
       {/* Held in a stable child slot: swapping the header out for the surface
           would remount the surface and drop the browser out of fullscreen. The
           browser already stops painting it, so this only keeps the hidden
@@ -149,7 +164,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
                   {strings.sourcePrefix}
                   <a
                     data-testid="overview-source-link"
-                    href={OVERVIEW_SOURCE_HREF}
+                    href={TCO_SOURCE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="group rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
@@ -330,6 +345,23 @@ function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
       presenting={presenting}
     />
   );
+
+  if (data.models.length === 0) {
+    return (
+      <>
+        <OverviewControlRow locale={locale} />
+        <OverviewMatrixCard>
+          <p
+            role="status"
+            data-testid="overview-empty-state"
+            className="px-6 py-12 text-center text-sm text-muted-foreground"
+          >
+            {strings.emptyState}
+          </p>
+        </OverviewMatrixCard>
+      </>
+    );
+  }
 
   return (
     <>

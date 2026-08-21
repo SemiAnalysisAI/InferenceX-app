@@ -447,10 +447,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/etl/compute-request-timeline.ts',
-    sourceSha256: '7cf9d1ab318ca9c21d9200ca4347437ce9f7bb3159bedb29a169cdf6ba46baae',
+    sourceSha256: '377d6f6cab10d6d7d59e7021d16e2ca872a2bfff6d28030966e1b36189d6bbc0',
     reviewArea: {
-      en: 'Request timeline contract version and event timing field semantics.',
-      zh: '请求时间线契约版本和事件计时字段语义。',
+      en: 'Request timeline contract version, replay identity, source provenance, and event timing semantics.',
+      zh: '请求时间线契约版本、重放标识、来源溯源和事件计时语义。',
     },
   },
   {
@@ -519,7 +519,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/request-timeline.ts',
-    sourceSha256: '5373c839e1290d5ce1fde420041028325418597e0c911b212368f2f839756fa2',
+    sourceSha256: 'e27e2c421d94d55f8178756d31e9791d4143d33e4086f767e4ea15132a7ad708',
     reviewArea: {
       en: 'Request timeline metadata, request event records, units, and nullable timings.',
       zh: '请求时间线元数据、请求事件记录、单位和可空计时字段。',

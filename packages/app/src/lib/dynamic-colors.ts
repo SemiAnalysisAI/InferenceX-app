@@ -166,3 +166,105 @@ export function generateGpuDateColors(
 
   return result;
 }
+
+// ---------------------------------------------------------------------------
+// High-contrast GPU × date gradient
+// ---------------------------------------------------------------------------
+
+/**
+ * Total OKLch lightness span swept across the compared dates in high-contrast
+ * mode. Wide on purpose: the whole point of the gradient is that consecutive
+ * dates read apart at a glance, so a subtle ramp would defeat it.
+ */
+const HC_DATE_L_SPAN = 0.36;
+
+/**
+ * Absolute lightness bounds for the ramp so neither end of the gradient washes
+ * out against the page background (dark themes need a higher floor).
+ */
+const HC_DATE_L_BOUNDS = {
+  light: { min: 0.34, max: 0.86 },
+  dark: { min: 0.44, max: 0.95 },
+} as const;
+
+/** sRGB channel (0–1) → linear-light. */
+function srgbToLinear(c: number): number {
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+/** Parse `#rgb` / `#rrggbb` into OKLch `[L, C, H]`, or null when unparseable. */
+function hexToOklch(hex: string): [number, number, number] | null {
+  const raw = hex.trim().replace('#', '');
+  const full = raw.length === 3 ? [...raw].map((ch) => ch + ch).join('') : raw;
+  if (full.length !== 6 || !/^[0-9a-f]{6}$/iu.test(full)) return null;
+
+  const r = srgbToLinear(Number.parseInt(full.slice(0, 2), 16) / 255);
+  const g = srgbToLinear(Number.parseInt(full.slice(2, 4), 16) / 255);
+  const b = srgbToLinear(Number.parseInt(full.slice(4, 6), 16) / 255);
+
+  // Linear sRGB → OKLab (Björn Ottosson's matrices).
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+
+  const okL = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s;
+  const okA = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+  const okB = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+
+  const chroma = Math.hypot(okA, okB);
+  const hue = ((Math.atan2(okB, okA) * 180) / Math.PI + 360) % 360;
+  return [okL, chroma, hue];
+}
+
+/**
+ * Spread one high-contrast base color per GPU across the compared dates.
+ *
+ * High contrast previously handed every `date × GPU` series its own iwanthue
+ * hue, which severed the visual link between a hardware config's own runs. Here
+ * the hue/chroma stay pinned to the GPU (so a config keeps one identity) and
+ * only lightness ramps — oldest lightest → newest darkest, matching the
+ * non-high-contrast ramp in {@link generateGpuDateColors}.
+ *
+ * @param baseColors - hwKey → high-contrast base color (hex from iwanthue).
+ * @param dateCount  - Number of dates being compared.
+ * @param theme      - 'light' or 'dark'.
+ * @returns Map of `${date-index}_${hwKey}` → `oklch(L C H)` string. GPUs whose
+ *          base color can't be parsed keep that base color at every date index.
+ */
+export function generateHighContrastGpuDateColors(
+  baseColors: Record<string, string>,
+  dateCount: number,
+  theme: 'light' | 'dark',
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  if (dateCount <= 0) return result;
+
+  const { min: lMin, max: lMax } = HC_DATE_L_BOUNDS[theme];
+
+  for (const [hwKey, base] of Object.entries(baseColors)) {
+    const oklch = hexToOklch(base);
+    if (!oklch) {
+      for (let di = 0; di < dateCount; di++) result[`${di}_${hwKey}`] = base;
+      continue;
+    }
+    const [baseL, chroma, hue] = oklch;
+
+    // Center the ramp on the base lightness, then slide (not squash) it back
+    // inside the theme bounds so the full span survives near the extremes.
+    const span = Math.min(HC_DATE_L_SPAN, lMax - lMin);
+    let top = Math.min(lMax, baseL + span / 2);
+    let bottom = top - span;
+    if (bottom < lMin) {
+      bottom = lMin;
+      top = bottom + span;
+    }
+
+    for (let di = 0; di < dateCount; di++) {
+      const lightness = dateCount <= 1 ? baseL : top - (di / (dateCount - 1)) * span;
+      result[`${di}_${hwKey}`] =
+        `oklch(${lightness.toFixed(3)} ${chroma.toFixed(3)} ${hue.toFixed(1)})`;
+    }
+  }
+
+  return result;
+}

@@ -48,8 +48,8 @@ jobs:
   dump:
     name: Dump and compress
     needs: preflight
-    timeout-minutes: 180
-    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    runs-on: blacksmith-32vcpu-ubuntu-2404
     steps:
       - name: Dump, compress, and split database
         env:

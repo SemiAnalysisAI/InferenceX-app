@@ -49,6 +49,16 @@ describe('pointDetailHref', () => {
     });
   });
 
+  it('keeps a Chinese reader on /zh', () => {
+    // The bare path used to hand /zh readers to the English detail page, and
+    // every link out of that page kept them in English.
+    const d = pt({ benchmark_type: 'agentic_traces', id: 206863 });
+    expect(pointDetailHref(d, false, 'zh')).toEqual({
+      href: '/zh/inference/agentic/206863',
+      isExternal: false,
+    });
+  });
+
   it('fixed-seq point links to its GitHub Actions run (repo URL rewritten)', () => {
     const d = pt({
       benchmark_type: 'single_turn',
@@ -117,6 +127,15 @@ describe('buildLegendPointsRows', () => {
       href: '/inference/agentic/1',
       isExternal: false,
     });
+  });
+
+  it('threads the locale through to each row href', () => {
+    const rows = buildLegendPointsRows(
+      [pt({ benchmark_type: 'agentic_traces', id: 1 })],
+      false,
+      'zh',
+    );
+    expect(rows[0].href).toBe('/zh/inference/agentic/1');
   });
 
   it('default-sorts by concurrency ascending', () => {

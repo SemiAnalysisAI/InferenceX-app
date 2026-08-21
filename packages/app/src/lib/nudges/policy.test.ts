@@ -31,6 +31,12 @@ describe('dismissesOnAction', () => {
     expect(dismissesOnAction(makeNudge('modal'))).toBe(true);
   });
 
+  it('returns true for coach-mark by default', () => {
+    // Performing the interaction the coach mark teaches is the whole point —
+    // it must not keep pointing at the chart afterwards.
+    expect(dismissesOnAction(makeNudge('coach-mark'))).toBe(true);
+  });
+
   it('returns false for banner by default', () => {
     expect(dismissesOnAction(makeNudge('banner'))).toBe(false);
   });
@@ -41,6 +47,10 @@ describe('dismissesOnAction', () => {
 
   it('respects explicit dismissOnAction: false on a modal', () => {
     expect(dismissesOnAction(makeNudge('modal', false))).toBe(false);
+  });
+
+  it('respects explicit dismissOnAction: false on a coach-mark', () => {
+    expect(dismissesOnAction(makeNudge('coach-mark', false))).toBe(false);
   });
 
   it('respects explicit dismissOnAction: true on a banner', () => {

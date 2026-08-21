@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // helper to set up window mocks before module import
-function setupWindow(search = '', pathname = '/inference') {
+function setupWindow(search = '', pathname = '/inference', hash = '') {
   const location = {
     search,
     pathname,
+    hash,
     origin: 'https://example.com',
   };
-  const history = { replaceState: vi.fn() };
+  const history = { replaceState: vi.fn(), state: { __NA: 1 } };
 
   vi.stubGlobal('window', { location, history });
   return { location, history };
@@ -38,6 +39,15 @@ describe('PARAM_DEFAULTS', () => {
     // matches the default, so it's always persisted.
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_seq).toBe('');
+  });
+
+  it('strips i_metric against the same default the dashboard opens on', async () => {
+    // A share link omits any value equal to PARAM_DEFAULTS. If this drifted
+    // from DEFAULT_Y_AXIS_METRIC, a link captured on the *other* metric would
+    // be written without `i_metric` and reopen on the dashboard default.
+    const { PARAM_DEFAULTS, DEFAULT_Y_AXIS_METRIC } = await import('@/lib/url-state');
+    expect(PARAM_DEFAULTS.i_metric).toBe(DEFAULT_Y_AXIS_METRIC);
+    expect(DEFAULT_Y_AXIS_METRIC).toBe('y_tokensPerDollarH');
   });
 
   it('has expected default for r_range', async () => {
@@ -116,6 +126,65 @@ describe('readUrlParams', () => {
     const params = readUrlParams();
     expect(params.g_model).toBe('test');
     expect(params).not.toHaveProperty('unknown_key');
+  });
+});
+
+describe('refreshUrlParams', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  // A client-side navigation does not reload the module, so the load-time
+  // snapshot still describes the page the user came FROM. Every AgentX card on
+  // the landing page linked to `/inference?g_model=<model>` and opened the
+  // default model instead, because the snapshot from `/` had no g_model.
+  it('picks up params that arrived via a client-side navigation', async () => {
+    const { location } = setupWindow('', '/');
+    const { readUrlParams, refreshUrlParams } = await import('@/lib/url-state');
+    expect(readUrlParams().g_model).toBeUndefined();
+
+    location.search = '?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces';
+    location.pathname = '/inference';
+    const refreshed = refreshUrlParams();
+
+    expect(refreshed.g_model).toBe('Qwen-3.5-397B-A17B');
+    expect(refreshed.i_seq).toBe('agentic-traces');
+    // Same object the load-time readers already hold, so they see it too.
+    expect(readUrlParams().g_model).toBe('Qwen-3.5-397B-A17B');
+  });
+
+  it('keeps existing params when the new URL omits them', async () => {
+    const { location } = setupWindow('?g_model=Kimi-K3&i_seq=agentic-traces', '/inference');
+    const { refreshUrlParams } = await import('@/lib/url-state');
+
+    location.search = '?i_seq=8k/1k';
+    const refreshed = refreshUrlParams();
+
+    expect(refreshed.i_seq).toBe('8k/1k');
+    // Not cleared: the provider writes params back as the user filters, and a
+    // partial URL must not wipe state the user did not touch.
+    expect(refreshed.g_model).toBe('Kimi-K3');
+  });
+
+  it('ignores unknown params', async () => {
+    const { location } = setupWindow('', '/');
+    const { refreshUrlParams } = await import('@/lib/url-state');
+    location.search = '?g_model=GLM-5.2&not_a_real_key=x';
+    const refreshed = refreshUrlParams();
+    expect(refreshed.g_model).toBe('GLM-5.2');
+    expect(refreshed).not.toHaveProperty('not_a_real_key');
+  });
+
+  it('is a no-op without a window (SSR)', async () => {
+    vi.stubGlobal('window', undefined);
+    const { refreshUrlParams } = await import('@/lib/url-state');
+    expect(() => refreshUrlParams()).not.toThrow();
   });
 });
 
@@ -458,5 +527,263 @@ describe('buildShareUrl unofficialrun handling', () => {
 
     const url = buildShareUrl();
     expect(url).not.toContain('unofficialrun');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Carrying chart state across a full-document navigation.
+//
+// Filter changes only ever reach the in-memory store — the address bar is
+// stripped clean after load — so the history entry behind a detail-page link
+// was a bare `/inference` that rebuilt from defaults on Back.
+// ---------------------------------------------------------------------------
+
+describe('currentChartSearch', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('returns the inference params a share link would carry', async () => {
+    setupWindow('', '/inference');
+    const { currentChartSearch, writeUrlParams } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'Kimi-K3', i_active: 'gb200_dynamo-vllm', i_seq: 'agentic-traces' });
+    // Reads through the debounce rather than around it: the click that
+    // navigates away can land inside the 150ms window.
+    const search = currentChartSearch();
+
+    expect(new URLSearchParams(search).get('g_model')).toBe('Kimi-K3');
+    expect(new URLSearchParams(search).get('i_active')).toBe('gb200_dynamo-vllm');
+    expect(new URLSearchParams(search).get('i_seq')).toBe('agentic-traces');
+  });
+
+  it('resolves the tab through the /zh prefix and any trailing segments', async () => {
+    setupWindow('', '/zh/inference/agentic/440106');
+    const { currentChartSearch, writeUrlParams } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'Kimi-K3', r_range: 'all-time' });
+    const params = new URLSearchParams(currentChartSearch());
+
+    // `inference` prefixes, not the reliability tab's — a detail page carries
+    // the chart it was opened from.
+    expect(params.get('g_model')).toBe('Kimi-K3');
+    expect(params.has('r_range')).toBe(false);
+  });
+
+  it('is empty when every value is at its default', async () => {
+    setupWindow('', '/inference');
+    const { currentChartSearch, writeUrlParams } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'DeepSeek-V4-Pro', r_range: 'last-3-months' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(currentChartSearch()).toBe('');
+  });
+
+  it('is a no-op without a window (SSR)', async () => {
+    vi.stubGlobal('window', undefined);
+    const { currentChartSearch } = await import('@/lib/url-state');
+    expect(currentChartSearch()).toBe('');
+  });
+});
+
+describe('rememberChartStateInUrl', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('writes the chart state into the current history entry', async () => {
+    const { history } = setupWindow('', '/inference');
+    const { rememberChartStateInUrl, writeUrlParams } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'Kimi-K3', i_active: 'gb200_dynamo-vllm' });
+    rememberChartStateInUrl();
+
+    expect(history.replaceState).toHaveBeenCalledTimes(1);
+    const [state] = history.replaceState.mock.calls[0] as [unknown, string, string];
+    const url = (history.replaceState.mock.calls[0] as [unknown, string, string])[2];
+    // Next patches replaceState and keeps its routing bookkeeping in `state`;
+    // dropping it would strand the router on the entry we just rewrote.
+    expect(state).toEqual({ __NA: 1 });
+    expect(url.startsWith('/inference?')).toBe(true);
+    const params = new URLSearchParams(url.slice(url.indexOf('?')));
+    expect(params.get('g_model')).toBe('Kimi-K3');
+    expect(params.get('i_active')).toBe('gb200_dynamo-vllm');
+  });
+
+  it('keeps the pathname and hash intact', async () => {
+    const { history } = setupWindow('', '/zh/inference', '#chart');
+    const { rememberChartStateInUrl, writeUrlParams } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'Kimi-K3' });
+    rememberChartStateInUrl();
+
+    const url = (history.replaceState.mock.calls[0] as [unknown, string, string])[2];
+    expect(url).toBe('/zh/inference?g_model=Kimi-K3#chart');
+  });
+
+  it('leaves a default-only chart on a bare path rather than an empty query', async () => {
+    const { history } = setupWindow('', '/inference');
+    const { rememberChartStateInUrl } = await import('@/lib/url-state');
+
+    expect(rememberChartStateInUrl()).toBe('');
+    const url = (history.replaceState.mock.calls[0] as [unknown, string, string])[2];
+    expect(url).toBe('/inference');
+  });
+
+  it('carries an unofficial run overlay across the navigation', async () => {
+    const { history } = setupWindow('?unofficialruns=987654321', '/inference');
+    const { rememberChartStateInUrl, writeUrlParams } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'Kimi-K3' });
+    rememberChartStateInUrl();
+
+    const url = (history.replaceState.mock.calls[0] as [unknown, string, string])[2];
+    expect(new URLSearchParams(url.slice(url.indexOf('?'))).get('unofficialruns')).toBe(
+      '987654321',
+    );
+  });
+
+  it('is a no-op without a window (SSR)', async () => {
+    vi.stubGlobal('window', undefined);
+    const { rememberChartStateInUrl } = await import('@/lib/url-state');
+    expect(() => rememberChartStateInUrl()).not.toThrow();
+    expect(rememberChartStateInUrl()).toBe('');
+  });
+});
+
+describe('withChartState', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('appends the chart state to an in-app href', async () => {
+    setupWindow('', '/inference');
+    const { withChartState, writeUrlParams } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'Kimi-K3', i_active: 'gb200_dynamo-vllm' });
+    const href = withChartState('/inference/agentic/440106');
+
+    expect(href.startsWith('/inference/agentic/440106?')).toBe(true);
+    expect(new URLSearchParams(href.slice(href.indexOf('?'))).get('g_model')).toBe('Kimi-K3');
+  });
+
+  it('merges into an href that already has a query', async () => {
+    setupWindow('', '/inference');
+    const { withChartState, writeUrlParams } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'Kimi-K3' });
+    const href = withChartState('/inference?view=timeline');
+
+    expect(href).toBe('/inference?view=timeline&g_model=Kimi-K3');
+  });
+
+  it('returns the href untouched when there is no state to carry', async () => {
+    setupWindow('', '/inference');
+    const { withChartState } = await import('@/lib/url-state');
+
+    expect(withChartState('/inference/agentic/440106')).toBe('/inference/agentic/440106');
+  });
+
+  it('returns the href untouched without a window (SSR)', async () => {
+    vi.stubGlobal('window', undefined);
+    const { withChartState } = await import('@/lib/url-state');
+    expect(withChartState('/inference')).toBe('/inference');
+  });
+});
+
+describe('refreshUrlParamsOnNavigation', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('pulls the new URL in once per navigation', async () => {
+    const { location } = setupWindow('', '/');
+    const { readUrlParams, refreshUrlParamsOnNavigation } = await import('@/lib/url-state');
+
+    // First call on a fresh document still refreshes — the load-time snapshot
+    // and the live URL agree, so it is a no-op in effect.
+    expect(refreshUrlParamsOnNavigation('/')).toBe(true);
+
+    location.search = '?g_model=Kimi-K3&i_active=gb200_dynamo-vllm';
+    location.pathname = '/inference';
+    expect(refreshUrlParamsOnNavigation('/inference')).toBe(true);
+    expect(readUrlParams().g_model).toBe('Kimi-K3');
+    expect(readUrlParams().i_active).toBe('gb200_dynamo-vllm');
+  });
+
+  it('does not re-import the URL for a component mounting later on the same path', async () => {
+    const { location } = setupWindow('?g_model=Kimi-K3', '/inference');
+    const { readUrlParams, refreshUrlParamsOnNavigation } = await import('@/lib/url-state');
+
+    expect(refreshUrlParamsOnNavigation('/inference')).toBe(true);
+    expect(readUrlParams().g_model).toBe('Kimi-K3');
+
+    // The user picks another model. Writes go to the in-memory store, never the
+    // address bar, so the stale URL must not be replayed over the new choice
+    // when some unrelated component mounts.
+    location.search = '?g_model=Kimi-K3';
+    expect(refreshUrlParamsOnNavigation('/inference')).toBe(false);
+  });
+});
+
+describe('rememberChartStateInUrl — params this module does not own', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps unrelated query params on the entry it rewrites', async () => {
+    const { history } = setupWindow('?utm_source=twitter', '/inference');
+    const { rememberChartStateInUrl, writeUrlParams } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'Kimi-K3' });
+    rememberChartStateInUrl();
+
+    const url = (history.replaceState.mock.calls[0] as [unknown, string, string])[2];
+    const params = new URLSearchParams(url.slice(url.indexOf('?')));
+    expect(params.get('utm_source')).toBe('twitter');
+    expect(params.get('g_model')).toBe('Kimi-K3');
+  });
+
+  it('collapses the singular unofficialrun spelling onto the canonical plural', async () => {
+    const { history } = setupWindow('?unofficialrun=987654321', '/inference');
+    const { rememberChartStateInUrl } = await import('@/lib/url-state');
+
+    rememberChartStateInUrl();
+
+    const url = (history.replaceState.mock.calls[0] as [unknown, string, string])[2];
+    const params = new URLSearchParams(url.slice(url.indexOf('?')));
+    expect(params.get('unofficialruns')).toBe('987654321');
+    expect(params.has('unofficialrun')).toBe(false);
   });
 });

@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 
+import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
+
 import { track } from '@/lib/analytics';
 import type { HardwareConfig } from '@/components/inference/types';
 import { Card } from '@/components/ui/card';
@@ -394,12 +396,8 @@ export default function FleetPlanner({
             <ExternalLinkIcon />
           </Link>
           {' & '}
-          <Link
-            target="_blank"
-            className="underline hover:text-foreground"
-            href="https://semianalysis.com/ai-cloud-tco-model/"
-          >
-            SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
+          <Link target="_blank" className="underline hover:text-foreground" href={TCO_SOURCE_URL}>
+            {TCO_SOURCE_TITLE}
             <ExternalLinkIcon />
           </Link>
         </small>

@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useMemo } from 'react';
 
+import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
+
 import type { GPUDataPoint, InterpolatedResult } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
 import { CompareInterpolatedTable } from '@/components/compare/compare-interpolated-table';
@@ -228,13 +230,13 @@ export default function ComparePerDollarPageClient({
                   {bCostPerGpuHr > 0 ? `$${bCostPerGpuHr.toFixed(2)}/chip/hr` : '—'}.{' '}
                   {t.pricingSource}{' '}
                   <a
-                    href="https://semianalysis.com/ai-cloud-tco-model/"
+                    href={TCO_SOURCE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="underline hover:text-primary"
                     onClick={() => track('compare_per_dollar_tco_source_clicked', { slug })}
                   >
-                    SemiAnalysis Market July 2026 Pricing Surveys &amp; AI Cloud TCO Model
+                    {TCO_SOURCE_TITLE}
                   </a>
                   .
                 </p>

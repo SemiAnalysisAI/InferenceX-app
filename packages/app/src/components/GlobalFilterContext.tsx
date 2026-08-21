@@ -1,5 +1,7 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
+
 import {
   type ReactNode,
   createContext,
@@ -24,6 +26,7 @@ function isEnumValue<T extends Record<string, string>>(e: T, v: string): v is T[
 import { useAvailability } from '@/hooks/api/use-availability';
 import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
+import { refreshUrlParams } from '@/lib/url-state';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import {
   Model,
@@ -227,7 +230,23 @@ export function GlobalFilterProvider({
   // so users with shareable URLs (?i_seq=…&g_model=…) see their values without
   // flicker, and SSR/client hydration agree because initial state came from
   // props/defaults on both sides.
+  // Soft navigations do not remount this provider, and `useUrlState` caches the
+  // URL in a ref at first render — so without this, landing on
+  // `/inference?g_model=Qwen-3.5-397B-A17B` via a <Link> kept whatever model
+  // the previous page had (the default, DeepSeek). Every AgentX card on the
+  // landing page pointed at the right URL and still opened the wrong model.
+  // `usePathname` rather than `useSearchParams`: the latter forces every
+  // statically-prerendered page that mounts this provider behind a Suspense
+  // boundary, which fails the build on /ai-chart. Pathname changes on the
+  // navigations that matter here — the AgentX cards and every share link live
+  // on a different route from /inference.
+  const pathname = usePathname();
+
   useIsomorphicLayoutEffect(() => {
+    // Pull the live URL into the shared snapshot first: `getUrlParam` below and
+    // the auto-switch guard further down both read from it, and on a soft
+    // navigation it still holds the previous page's params.
+    refreshUrlParams();
     const applyIfEnum = <T extends Record<string, string>>(
       key: 'g_model' | 'i_seq',
       enumType: T,
@@ -259,8 +278,14 @@ export function GlobalFilterProvider({
     }
     applyIfMatches('g_rundate', RUNDATE_RE, setSelectedRunDateBase);
     applyIfMatches('g_runid', RUNID_RE, setSelectedRunId);
+    // Re-runs on client-side navigation as well as on mount. Keyed on the
+    // pathname, which the Next router owns: the provider's own share-link
+    // writes go through `history.replaceState` and never change it, so this
+    // cannot fight a user changing filters in place. A param-only navigation
+    // within /inference is therefore not picked up — no in-app link does that
+    // today, and covering it would mean the Suspense bailout above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pathname]);
 
   // ── Availability data ─────────────────────────────────────────────────────
   const { data: availabilityRows } = useAvailability();
