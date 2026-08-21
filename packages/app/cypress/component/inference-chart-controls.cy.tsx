@@ -25,8 +25,14 @@ describe('Inference ChartControls', () => {
     cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP4');
   });
 
-  it('renders Quick Filters for a fixed-sequence scenario', () => {
-    cy.get('[data-testid="quick-filters"]').should('exist');
+  it('keeps Quick Filters collapsed until the reader expands them', () => {
+    cy.get('[data-testid="quick-filters-trigger"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('[data-testid="quick-filter-spec-mtp"]').should('not.exist');
+
+    cy.get('[data-testid="quick-filters-trigger"]').click();
+
+    cy.get('[data-testid="quick-filters-trigger"]').should('have.attr', 'aria-expanded', 'true');
+    cy.get('[data-testid="quick-filter-spec-mtp"]').should('exist');
   });
 
   it('renders the Y-axis metric selector', () => {
@@ -162,25 +168,38 @@ describe('Inference ChartControls with hideGpuComparison', () => {
 
     cy.contains('Chip Config').should('not.exist');
     cy.get('[data-testid="gpu-multiselect"]').should('not.exist');
+    cy.get('[data-testid="quick-filters"]').should('not.exist');
+  });
+});
+
+describe('Inference ChartControls in the agentic scenario', () => {
+  beforeEach(() => {
+    mountWithProviders(<InferenceChartControls />, {
+      inference: {
+        selectedSequence: Sequence.AgenticTraces,
+        availableQuickFilters: {
+          vendors: ['NVIDIA', 'AMD'],
+          frameworks: ['vllm', 'sglang'],
+          deployment: ['single-node', 'multi-node', 'disagg'],
+          spec: ['mtp', 'stp'],
+        },
+      },
+      globalFilters: {
+        selectedSequence: Sequence.AgenticTraces,
+        effectiveSequence: Sequence.AgenticTraces,
+      },
+    });
   });
 
-  describe('agentic scenario', () => {
-    beforeEach(() => {
-      mountWithProviders(<InferenceChartControls />, {
-        inference: { selectedSequence: Sequence.AgenticTraces },
-        globalFilters: {
-          selectedSequence: Sequence.AgenticTraces,
-          effectiveSequence: Sequence.AgenticTraces,
-        },
-      });
-    });
+  it('offers vendor, framework, and deployment filters but not spec decoding', () => {
+    cy.get('[data-testid="quick-filters-trigger"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('[data-testid="quick-filters-trigger"]').click();
 
-    it('drops Quick Filters, which have nothing to slice on one combined curve', () => {
-      // AgentX collapses vendor, framework, deployment, and spec decoding into
-      // a single best-available curve per model, SKU, and engine, so the pills
-      // would filter dimensions the chart no longer separates.
-      cy.get('#scenario-select').should('exist');
-      cy.get('[data-testid="quick-filters"]').should('not.exist');
-    });
+    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]').click();
+    cy.get('@setQuickFilterVendors').should('have.been.calledWith', ['NVIDIA']);
+    cy.get('[data-testid="quick-filter-framework-vllm"]').should('exist');
+    cy.get('[data-testid="quick-filter-deployment-disagg"]').should('exist');
+    cy.get('[data-testid^="quick-filter-spec-"]').should('not.exist');
+    cy.contains('Spec Decoding').should('not.exist');
   });
 });

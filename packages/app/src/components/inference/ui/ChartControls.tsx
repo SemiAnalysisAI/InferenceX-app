@@ -26,6 +26,12 @@ import {
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import type { ChartDefinition, DeploymentMode, SpecMode } from '@/components/inference/types';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
@@ -57,6 +63,9 @@ const STRINGS = {
     quickFilters: 'Quick Filters',
     quickFiltersTooltip:
       'Narrow the chart by chip vendor, serving framework, deployment mode (single-node, multi-node aggregate, or disaggregated), and speculative decoding. Selecting none in a group shows all.',
+    quickFiltersAgenticTooltip:
+      'Narrow the chart by chip vendor, serving framework, and deployment mode. Selecting none in a group shows all.',
+    filtersSelected: 'selected',
     filterVendor: 'Vendor',
     filterFramework: 'Framework',
     filterDeployment: 'Deployment',
@@ -89,6 +98,8 @@ const STRINGS = {
     quickFilters: '快捷筛选',
     quickFiltersTooltip:
       '按 Chip 厂商、推理框架、部署模式（单节点、多节点聚合或分离式）和投机解码筛选图表。某组不选则显示全部。',
+    quickFiltersAgenticTooltip: '按 Chip 厂商、推理框架和部署模式筛选图表。某组不选则显示全部。',
+    filtersSelected: '项已选',
     filterVendor: '厂商',
     filterFramework: '框架',
     filterDeployment: '部署模式',
@@ -499,6 +510,14 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
       selected: quickFilters.spec,
     },
   ];
+  const isAgentic = selectedSequence === Sequence.AgenticTraces;
+  const visibleQuickFilterGroups = isAgentic
+    ? quickFilterGroups.filter((group) => group.key !== 'spec')
+    : quickFilterGroups;
+  const selectedQuickFilterCount = visibleQuickFilterGroups.reduce(
+    (count, group) => count + group.selected.length,
+    0,
+  );
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -656,54 +675,75 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
           )}
         </div>
 
-        {/* Quick Filters slice by vendor, framework, deployment, and spec
-            decoding — dimensions the agentic scenario collapses into one
-            best-available curve per model, SKU, and engine, so the chips have
-            nothing meaningful to filter there. */}
-        {!hideGpuComparison && selectedSequence !== Sequence.AgenticTraces && (
-          <div className="flex flex-col space-y-1.5" data-testid="quick-filters">
-            <LabelWithTooltip
-              htmlFor="quick-filters"
-              label={t.quickFilters}
-              tooltip={t.quickFiltersTooltip}
-            />
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              {quickFilterGroups.map((group) => (
-                <div key={group.key} className="flex items-center gap-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">{group.label}:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {group.options.map((option) => {
-                      const active = (group.selected as readonly string[]).includes(option.value);
-                      // Disable options with no data, but keep a selected one
-                      // clickable so it can always be toggled back off.
-                      const disabled = !option.available && !active;
-                      return (
-                        <Button
-                          key={option.value}
-                          type="button"
-                          size="sm"
-                          variant={active ? 'default' : 'outline'}
-                          aria-pressed={active}
-                          disabled={disabled}
-                          title={disabled ? t.noData : undefined}
-                          // Active pills use the brand color (blue in light, amber in dark)
-                          // rather than the amber primary fill.
-                          className={cn(
-                            'h-7 rounded-full px-3 text-xs',
-                            active && 'bg-brand hover:bg-brand/90',
-                          )}
-                          data-testid={`quick-filter-${group.key}-${option.value}`}
-                          onClick={() => handleQuickFilterToggle(group.key, option.value)}
-                        >
-                          {option.label}
-                        </Button>
-                      );
-                    })}
-                  </div>
+        {!hideGpuComparison && (
+          <Accordion type="single" collapsible data-testid="quick-filters">
+            <AccordionItem value="quick-filters" className="overflow-hidden">
+              <AccordionTrigger
+                className="items-center px-3 py-2.5 text-sm hover:no-underline"
+                data-testid="quick-filters-trigger"
+                onClick={() => track('inference_quick_filters_disclosure_toggled')}
+              >
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="flex items-center gap-2">
+                    <span>{t.quickFilters}</span>
+                    {selectedQuickFilterCount > 0 && (
+                      <span
+                        className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand"
+                        data-testid="quick-filters-selected-count"
+                      >
+                        {selectedQuickFilterCount} {t.filtersSelected}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {isAgentic ? t.quickFiltersAgenticTooltip : t.quickFiltersTooltip}
+                  </span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="border-t pt-4">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                  {visibleQuickFilterGroups.map((group) => (
+                    <div key={group.key} className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {group.label}:
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {group.options.map((option) => {
+                          const active = (group.selected as readonly string[]).includes(
+                            option.value,
+                          );
+                          // Disable options with no data, but keep a selected one
+                          // clickable so it can always be toggled back off.
+                          const disabled = !option.available && !active;
+                          return (
+                            <Button
+                              key={option.value}
+                              type="button"
+                              size="sm"
+                              variant={active ? 'default' : 'outline'}
+                              aria-pressed={active}
+                              disabled={disabled}
+                              title={disabled ? t.noData : undefined}
+                              // Active pills use the brand color (blue in light, amber in dark)
+                              // rather than the amber primary fill.
+                              className={cn(
+                                'h-7 rounded-full px-3 text-xs',
+                                active && 'bg-brand hover:bg-brand/90',
+                              )}
+                              data-testid={`quick-filter-${group.key}-${option.value}`}
+                              onClick={() => handleQuickFilterToggle(group.key, option.value)}
+                            >
+                              {option.label}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         )}
       </div>
     </TooltipProvider>

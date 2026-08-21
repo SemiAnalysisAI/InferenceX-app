@@ -59,6 +59,10 @@ describe('Inference Chart', () => {
 
   it('renders quick filters and toggles a vendor pill', () => {
     cy.get('[data-testid="quick-filters"]').should('exist');
+    cy.get('[data-testid="quick-filters-trigger"]')
+      .should('have.attr', 'aria-expanded', 'false')
+      .click()
+      .should('have.attr', 'aria-expanded', 'true');
     cy.get('[data-testid="quick-filter-deployment-single-node"]').should('contain', 'Single-node');
     cy.get('[data-testid="quick-filter-deployment-multi-node"]').should('contain', 'Multi-node');
     cy.get('[data-testid="quick-filter-deployment-disagg"]').should('contain', 'Disaggregated');
