@@ -45,7 +45,7 @@ const STRINGS = {
     mwTooltip:
       'Total facility power budget in megawatts. Chip count uses all-in power per chip (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model — not bare TDP.',
     mwPlaceholder: 'e.g. 10',
-    colGpu: '芯片',
+    colGpu: 'Chip',
     colGpus: 'Chips',
     colFleetTput: (tokenType: string) => `Fleet ${tokenType}tok/s`,
     colUsers: 'Concurrent Users',
@@ -85,7 +85,7 @@ const STRINGS = {
     mwTooltip:
       '设施总功率预算（兆瓦）。芯片数量按每芯片全含功率（主机、网络、散热）计算，数据来自 SemiAnalysis Datacenter Industry Model，而非裸 TDP。',
     mwPlaceholder: '如 10',
-    colGpu: 'Chip',
+    colGpu: '芯片',
     colGpus: '芯片数',
     colFleetTput: (tokenType: string) => `集群${tokenType} tok/s`,
     colUsers: '并发用户数',

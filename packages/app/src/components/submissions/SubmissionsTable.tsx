@@ -33,7 +33,7 @@ import {
 const STRINGS = {
   en: {
     searchPlaceholder: 'Search configs...',
-    colGpu: '芯片',
+    colGpu: 'Chip',
     colModel: 'Model',
     colPrecision: 'Precision',
     colSpecMethod: 'Spec Method',
@@ -91,7 +91,7 @@ const STRINGS = {
   },
   zh: {
     searchPlaceholder: '搜索配置...',
-    colGpu: 'Chip',
+    colGpu: '芯片',
     colModel: '模型',
     colPrecision: '精度',
     colSpecMethod: '推测解码',
