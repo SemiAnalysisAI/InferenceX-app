@@ -459,6 +459,7 @@ const ScatterGraph = React.memo(
     chartDefinition,
     caption,
     showAllHardwareTypes = false,
+    hardwareColorKeyMap,
     syncBestPerSkuSelection = true,
     hardwareConfigOverride,
     overlayData,
@@ -792,12 +793,20 @@ const ScatterGraph = React.memo(
     // e.g. deselecting B300 would recolor B200 from red to blue). Keying off the
     // stable full set fixes each hw's color so toggling only hides/shows lines.
     const stableHcKeys = useMemo(() => [...hwTypesWithData], [hwTypesWithData]);
-    const { resolveColor, getCssColor } = useThemeColors({
+    const { resolveColor: resolveThemeColor, getCssColor } = useThemeColors({
       highContrast,
       identifiers: activeHwKeys,
       activeKeys: activeOfficialKeys,
       hcKeys: stableHcKeys,
     });
+    const resolveColor = useCallback(
+      (identifier: string, hardwareKey?: string) =>
+        resolveThemeColor(
+          hardwareColorKeyMap?.get(identifier) ?? identifier,
+          hardwareKey ? (hardwareColorKeyMap?.get(hardwareKey) ?? hardwareKey) : undefined,
+        ),
+      [resolveThemeColor, hardwareColorKeyMap],
+    );
 
     // --- Changelog ---
     const changelog = availableRuns ? availableRuns[selectedRunId]?.changelog || null : null;

@@ -43,6 +43,12 @@ describe('Inference replay — Best per SKU', () => {
     setBestReplayScrubber(0);
     bestReplayHardwareKeys().then((startKeys) => {
       expect(startKeys.length, 'at least one SKU winner at the first date').to.be.greaterThan(0);
+      cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path').each(($path) => {
+        expect(
+          $path.attr('stroke'),
+          `${$path.data('hw-key')} reuses its current parent SKU color`,
+        ).not.to.equal('var(--muted-foreground)');
+      });
       setBestReplayScrubber(1000);
       bestReplayHardwareKeys().then((endKeys) => {
         expect(endKeys.length, 'at least one SKU winner at the last date').to.be.greaterThan(0);

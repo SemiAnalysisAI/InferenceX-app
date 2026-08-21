@@ -1,5 +1,5 @@
 import type { InferenceData, OverlayData } from '@/components/inference/types';
-import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
+import { baseSku, bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import type { ParetoDirection } from '@/lib/chart-utils';
 
 import type { ReplayTimeline } from './buildReplayTimeline';
@@ -86,6 +86,29 @@ export function computeReplayDomain(
     points.push(...buildFrameData(timeline, index / denominator, options));
   }
   return replayPointsDomain(points);
+}
+
+/**
+ * Alias every historical hwKey to the current parent-chart winner for the same
+ * physical SKU. The replay can change configs without changing the SKU color.
+ */
+export function buildReplayColorKeyMap(
+  timeline: ReplayTimeline,
+  currentHwTypes: ReadonlySet<string>,
+): ReadonlyMap<string, string> {
+  const currentWinnerBySku = new Map<string, string>();
+  for (const config of timeline.configs) {
+    if (currentHwTypes.has(config.hwKey)) {
+      currentWinnerBySku.set(baseSku(config.template), config.hwKey);
+    }
+  }
+
+  const colorKeyByHwType = new Map<string, string>();
+  for (const config of timeline.configs) {
+    const currentWinner = currentWinnerBySku.get(baseSku(config.template));
+    if (currentWinner) colorKeyByHwType.set(config.hwKey, currentWinner);
+  }
+  return colorKeyByHwType;
 }
 
 /**

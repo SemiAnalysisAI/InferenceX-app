@@ -654,6 +654,12 @@ export interface ScatterGraphProps {
    */
   showAllHardwareTypes?: boolean;
   /**
+   * Optional display-color alias for official hardware series. Replay maps a
+   * historical Best per SKU winner to the current parent winner for the same
+   * physical SKU so the SKU keeps one stable color while its config changes.
+   */
+  hardwareColorKeyMap?: ReadonlyMap<string, string>;
+  /**
    * Whether this chart should reconcile Best per SKU selections back into the
    * shared inference context. Replay disables this because its winner set is
    * intentionally recomputed for every historical frame; committing a past

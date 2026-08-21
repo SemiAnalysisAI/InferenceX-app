@@ -31,6 +31,7 @@ import { buildReplayTimeline } from './buildReplayTimeline';
 import type { Mp4ExportError, Mp4ExportStage } from './exportMp4';
 import {
   buildFrameData,
+  buildReplayColorKeyMap,
   buildReplayOverlayData,
   computeReplayDomain,
   dateAtFraction,
@@ -132,6 +133,11 @@ export default function ReplayPanel({
       : undefined;
   }, [chartDefinition, selectedYAxisMetric]);
   const dynamicBestPerSku = bestPerSku && rooflineDirection !== undefined;
+  const replayColorKeyMap = useMemo(
+    () =>
+      timeline && dynamicBestPerSku ? buildReplayColorKeyMap(timeline, activeHwTypes) : undefined,
+    [timeline, dynamicBestPerSku, activeHwTypes],
+  );
 
   const replayPointMatchesFilters = useCallback(
     (point: InferenceData) => matchesQuickFilters(point, quickFilters),
@@ -619,6 +625,7 @@ export default function ReplayPanel({
           yLabel={yLabel}
           chartDefinition={chartDefinition}
           showAllHardwareTypes={dynamicBestPerSku}
+          hardwareColorKeyMap={replayColorKeyMap}
           syncBestPerSkuSelection={false}
           overlayData={replayOverlayData}
           transitionDuration={0}

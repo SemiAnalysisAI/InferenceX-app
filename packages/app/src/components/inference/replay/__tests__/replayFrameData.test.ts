@@ -6,6 +6,7 @@ import type { ReplayTimeline } from '../buildReplayTimeline';
 import {
   FRACTION_COMMIT_QUANTUM,
   buildFrameData,
+  buildReplayColorKeyMap,
   buildReplayOverlayData,
   computeReplayDomain,
   dateAtFraction,
@@ -329,6 +330,13 @@ describe('buildFrameData', () => {
       x: [10, 20],
       y: [50, 110],
     });
+    expect(buildReplayColorKeyMap(changing, new Set(['b200_engine_b', 'h100_engine_a']))).toEqual(
+      new Map([
+        ['b200_engine_a', 'b200_engine_b'],
+        ['b200_engine_b', 'b200_engine_b'],
+        ['h100_engine_a', 'h100_engine_a'],
+      ]),
+    );
   });
 });
 
