@@ -43,11 +43,18 @@ vi.mock('@/components/unofficial-run-provider', () => ({
 // ScatterGraph calls useTraceAvailability (a useQuery) for the agentic "View
 // charts" tooltip button. Stub it so these decoration tests don't need a
 // QueryClientProvider — trace presence is irrelevant to the toggle path.
+const availabilityState = vi.hoisted(() => ({ traceIds: [] as number[], logIds: [] as number[] }));
 vi.mock('@/hooks/api/use-trace-availability', () => ({
-  useTraceAvailability: () => ({ data: undefined }),
+  useTraceAvailability: (ids: number[]) => {
+    availabilityState.traceIds = ids;
+    return { data: undefined };
+  },
 }));
 vi.mock('@/hooks/api/use-log-availability', () => ({
-  useLogAvailability: () => ({ data: undefined }),
+  useLogAvailability: (ids: number[]) => {
+    availabilityState.logIds = ids;
+    return { data: undefined };
+  },
 }));
 
 import ScatterGraph, { pointLabelText } from './ScatterGraph';
@@ -226,6 +233,8 @@ beforeEach(() => {
   inferenceState.current = baseInferenceState();
   overlayState.current = baseOverlayState();
   legendState.current = null;
+  availabilityState.traceIds = [];
+  availabilityState.logIds = [];
   vi.mocked(setupChartStructure).mockClear();
 });
 
@@ -241,6 +250,24 @@ describe('ScatterGraph toggle decoration', () => {
     expect(dotGroups(container)).toHaveLength(POINTS.length);
     expect(container.querySelectorAll('.roofline-path').length).toBeGreaterThan(0);
     expect(rebuildCount()).toBeGreaterThan(0);
+    unmount();
+  });
+
+  it('checks log availability for fixed-sequence and agentic official points', () => {
+    const fixed = {
+      ...point('h100', 'fp8', 10, 100, 1),
+      id: 96255,
+      benchmark_type: 'single_turn',
+    } as InferenceData;
+    const agentic = {
+      ...point('h100', 'fp8', 20, 200, 2),
+      id: 206885,
+      benchmark_type: 'agentic_traces',
+    } as InferenceData;
+    const { unmount } = mountChart({ data: [fixed, agentic] });
+
+    expect(availabilityState.logIds).toEqual([96255, 206885]);
+    expect(availabilityState.traceIds).toEqual([206885]);
     unmount();
   });
 

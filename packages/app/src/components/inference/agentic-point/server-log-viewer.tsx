@@ -89,6 +89,7 @@ const STRINGS = {
 interface Props {
   id: number;
   enabled: boolean;
+  analyticsContext?: 'agentic' | 'fixed-sequence';
 }
 
 interface LogJumpTarget {
@@ -107,7 +108,7 @@ interface LogSelection {
 
 const SEARCH_JUMP_CONTEXT_SIZE = 16 * 1024;
 
-export function ServerLogViewer({ id, enabled }: Props) {
+export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: Props) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const filesQuery = useServerLogFiles(id, enabled);
@@ -141,6 +142,8 @@ export function ServerLogViewer({ id, enabled }: Props) {
   const loadMoreTriggerRef = useRef<HTMLSpanElement>(null);
   const nextOffset = query.data?.pages.at(-1)?.nextOffset ?? 0;
   const loadedOffset = query.data?.pages[0]?.offset ?? initialOffset;
+  const analyticsPrefix =
+    analyticsContext === 'agentic' ? 'inference_agentic' : 'inference_fixed_seq';
 
   const highlightedLog = useMemo(() => {
     if (!jumpTarget || jumpTarget.fileName !== selectedFile) return null;
@@ -171,8 +174,8 @@ export function ServerLogViewer({ id, enabled }: Props) {
 
   useEffect(() => {
     if (!searchTerm) return;
-    track('inference_agentic_logs_searched', { id, queryLength: searchTerm.length });
-  }, [id, searchTerm]);
+    track(`${analyticsPrefix}_logs_searched`, { id, queryLength: searchTerm.length });
+  }, [analyticsPrefix, id, searchTerm]);
 
   useEffect(() => {
     if (
@@ -191,7 +194,7 @@ export function ServerLogViewer({ id, enabled }: Props) {
   const copyLoadedLog = async () => {
     await navigator.clipboard.writeText(log);
     setCopied(true);
-    track('inference_agentic_logs_copied', {
+    track(`${analyticsPrefix}_logs_copied`, {
       id,
       fileName: selectedFile,
       loadedCharacters: log.length,
@@ -202,7 +205,7 @@ export function ServerLogViewer({ id, enabled }: Props) {
   const selectFile = (fileName: string) => {
     setSelection({ pointId: id, fileName, initialOffset: 0, jumpTarget: null });
     setCopied(false);
-    track('inference_agentic_log_file_selected', { id, fileName });
+    track(`${analyticsPrefix}_log_file_selected`, { id, fileName });
   };
 
   const goToSearchMatch = (result: Omit<LogJumpTarget, 'requestId'>) => {
@@ -215,7 +218,7 @@ export function ServerLogViewer({ id, enabled }: Props) {
       jumpTarget: { ...result, requestId: jumpRequestIdRef.current },
     });
     setCopied(false);
-    track('inference_agentic_log_search_match_opened', {
+    track(`${analyticsPrefix}_log_search_match_opened`, {
       id,
       fileName: result.fileName,
       offset: result.offset,
@@ -225,7 +228,7 @@ export function ServerLogViewer({ id, enabled }: Props) {
 
   const loadMore = useCallback(
     (trigger: 'button' | 'scroll') => {
-      track('inference_agentic_log_chunk_loaded', {
+      track(`${analyticsPrefix}_log_chunk_loaded`, {
         id,
         fileName: selectedFile,
         offset: nextOffset,
@@ -234,7 +237,7 @@ export function ServerLogViewer({ id, enabled }: Props) {
       });
       void query.fetchNextPage();
     },
-    [id, nextOffset, query.fetchNextPage, selectedFile],
+    [analyticsPrefix, id, nextOffset, query.fetchNextPage, selectedFile],
   );
 
   useEffect(() => {
@@ -288,6 +291,7 @@ export function ServerLogViewer({ id, enabled }: Props) {
     <section
       className="overflow-hidden rounded-lg border border-border/60 bg-card/40"
       data-testid="agentic-server-log-viewer"
+      data-log-context={analyticsContext}
     >
       <header className="grid min-w-0 gap-3 border-b border-border/60 bg-muted/20 px-4 py-3">
         <div className="flex min-w-0 gap-3">
@@ -417,7 +421,7 @@ export function ServerLogViewer({ id, enabled }: Props) {
             href={downloadUrl}
             download
             onClick={() =>
-              track('inference_agentic_log_downloaded', { id, fileName: selectedFile })
+              track(`${analyticsPrefix}_log_downloaded`, { id, fileName: selectedFile })
             }
             data-testid="download-selected-server-log"
           >

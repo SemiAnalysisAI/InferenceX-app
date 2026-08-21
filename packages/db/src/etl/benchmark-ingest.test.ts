@@ -1,7 +1,15 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Sql } from './db-utils';
-import { benchmarkPointIngestKey, insertServerLogFiles } from './benchmark-ingest';
+import {
+  benchmarkPointIngestKey,
+  insertServerLogFilePaths,
+  insertServerLogFiles,
+} from './benchmark-ingest';
 
 const point = (recipeFingerprint: string | null) => ({
   configId: 7,
@@ -76,5 +84,31 @@ describe('insertServerLogFiles', () => {
       2,
     );
     expect(calls.some((call) => call.text.includes('files_complete = true'))).toBe(true);
+  });
+
+  it('reads archived file paths lazily and removes null bytes', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-log-ingest-test-'));
+    const serverPath = path.join(root, 'server.log');
+    const routerPath = path.join(root, 'router.log');
+    fs.writeFileSync(serverPath, 'server\u0000');
+    fs.writeFileSync(routerPath, 'router\u0000');
+    try {
+      const { sql, calls } = fakeTransactionSql(null);
+      await insertServerLogFilePaths(
+        sql,
+        [42],
+        [
+          { fileName: 'router.log', path: routerPath },
+          { fileName: 'server.log', path: serverPath },
+        ],
+      );
+
+      const primaryInsert = calls.find((call) => call.text.includes('insert into server_logs'));
+      expect(primaryInsert?.values).toEqual(['server', 'server.log']);
+      const childInsert = calls.find((call) => call.text.includes('insert into server_log_files'));
+      expect(childInsert?.values).toEqual([99, 'router.log', 'router']);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });

@@ -59,6 +59,16 @@ describe('pairServerLogArtifacts', () => {
     expect(pairs[0]?.serverLogs.name).toBe('server_logs_retry_pool_01');
     expect(pairs[0]?.benchmarks.name).toBe('bmk_agentic_retry_pool_01');
   });
+
+  it('uses artifact ids to break equal GCS upload timestamps', () => {
+    const pairs = pairServerLogArtifacts([
+      { ...artifact('server_logs_retry_pool_00'), id: 100 },
+      { ...artifact('server_logs_retry_pool_00'), id: 200 },
+      { ...artifact('bmk_retry_pool_00'), id: 300 },
+    ]);
+
+    expect(pairs[0]?.serverLogs.id).toBe(200);
+  });
 });
 
 describe('resolveServerLogResultCandidates', () => {

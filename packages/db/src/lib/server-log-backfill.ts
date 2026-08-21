@@ -16,6 +16,13 @@ export interface ServerLogResultResolution {
   usedUniqueFallback: boolean;
 }
 
+function isNewerArtifact(candidate: ArtifactMeta, existing: ArtifactMeta): boolean {
+  return (
+    candidate.created_at > existing.created_at ||
+    (candidate.created_at === existing.created_at && (candidate.id ?? 0) > (existing.id ?? 0))
+  );
+}
+
 /**
  * Prefer the persisted point whose offload mode matches the current mapper.
  * Historical mapper changes left a small number of otherwise-identical points
@@ -43,7 +50,7 @@ export function pairServerLogArtifacts(
   const byName = new Map<string, ArtifactMeta>();
   for (const artifact of artifacts) {
     const existing = byName.get(artifact.name);
-    if (!existing || artifact.created_at > existing.created_at) byName.set(artifact.name, artifact);
+    if (!existing || isNewerArtifact(artifact, existing)) byName.set(artifact.name, artifact);
   }
   const pairsByLogicalBenchmark = new Map<string, ServerLogArtifactPair>();
 
@@ -57,7 +64,7 @@ export function pairServerLogArtifacts(
 
     const logicalName = benchmarks.name.replace(RUNNER_SUFFIX_RE, '');
     const existing = pairsByLogicalBenchmark.get(logicalName);
-    if (!existing || benchmarks.created_at > existing.benchmarks.created_at) {
+    if (!existing || isNewerArtifact(benchmarks, existing.benchmarks)) {
       pairsByLogicalBenchmark.set(logicalName, { serverLogs, benchmarks });
     }
   }

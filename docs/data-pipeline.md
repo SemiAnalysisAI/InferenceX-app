@@ -162,9 +162,13 @@ file and preserves its artifact-relative path. This applies to both `server_logs
 The primary file remains in `server_logs.server_log` for compatibility and KV-cache metadata
 extraction; `server_log_files` holds the remaining files. `server_logs.file_name` records the
 primary file's original path, and `files_complete` distinguishes fully scanned bundles from
-legacy single-file rows. Run `bun run admin:db:backfill-server-log-files` to download retained
-GitHub artifacts and idempotently fill historical bundles. The backfill supports `--run <id>`,
-`--limit <n>`, and the standard `--yes` confirmation bypass.
+legacy single-file rows. Run `bun run admin:db:backfill-server-log-files` to use the public GCS
+artifact backup first and fall back to retained GitHub artifacts for recent runs. Pass `--all`
+for complete DB history, `--source gcs` to exercise only the backup path, and `--dry-run` to
+inventory pair counts and compressed download size without writing. `--run <id>`, `--limit <n>`,
+and `--yes` remain available for targeted, idempotent recovery. Bundles already marked
+`files_complete` are skipped after their small benchmark artifact is mapped, avoiding repeated
+large log downloads.
 
 Full-bundle search stays inside PostgreSQL: each file is scanned through overlapping 16 MiB
 character slices, and the API returns at most 50 match contexts rather than transferring the

@@ -2,9 +2,12 @@
  * Bulk DB insert functions for `benchmark_results` and `run_stats`.
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+
 import type postgres from 'postgres';
 import type { BenchmarkParams } from './benchmark-mapper';
-import { primaryServerLogFile, type ServerLogFile } from './server-log-artifacts';
+import { cleanLogText, type ServerLogFile, type ServerLogFilePath } from './server-log-artifacts';
 import { kvCachePoolTokensFromServerLog } from './server-log-metrics';
 
 type Sql = ReturnType<typeof postgres>;
@@ -117,21 +120,37 @@ export async function bulkIngestBenchmarkRows(
  * to the given benchmark result IDs. Existing bundles receive only missing
  * filenames, making both normal ingest and the historical backfill idempotent.
  */
-export async function insertServerLogFiles(
+interface DeferredServerLogFile {
+  fileName: string;
+  readText: () => string;
+}
+
+function primaryDeferredServerLogFile(
+  files: readonly DeferredServerLogFile[],
+): DeferredServerLogFile | null {
+  return (
+    files.find((file) => path.posix.basename(file.fileName).toLowerCase() === 'server.log') ??
+    files[0] ??
+    null
+  );
+}
+
+async function insertDeferredServerLogFiles(
   sql: Sql,
   benchmarkResultIds: number[],
-  files: readonly ServerLogFile[],
+  files: readonly DeferredServerLogFile[],
 ): Promise<void> {
   if (benchmarkResultIds.length === 0 || files.length === 0) return;
 
   const deduped = [...new Map(files.map((file) => [file.fileName, file])).values()];
-  const primary = primaryServerLogFile(deduped);
+  const primary = primaryDeferredServerLogFile(deduped);
   if (!primary) return;
   const additional = deduped.filter((file) => file.fileName !== primary.fileName);
+  const primaryText = primary.readText();
   const serverLog =
     primary.fileName.toLowerCase().endsWith('/server.log') ||
     primary.fileName.toLowerCase() === 'server.log'
-      ? primary.logText
+      ? primaryText
       : null;
   const kvCachePoolTokens = serverLog ? kvCachePoolTokensFromServerLog(serverLog) : null;
 
@@ -149,7 +168,7 @@ export async function insertServerLogFiles(
     if (unlinked.length > 0) {
       const [{ id: logId }] = await tx<{ id: number }[]>`
         insert into server_logs (server_log, file_name, files_complete)
-        values (${primary.logText}, ${primary.fileName}, true)
+        values (${primaryText}, ${primary.fileName}, true)
         returning id
       `;
       bundleIds.add(Number(logId));
@@ -173,9 +192,10 @@ export async function insertServerLogFiles(
         where id = ${logId}
       `;
       for (const file of additional) {
+        const logText = file.readText();
         await tx`
           insert into server_log_files (server_log_id, file_name, log_text)
-          values (${logId}, ${file.fileName}, ${file.logText})
+          values (${logId}, ${file.fileName}, ${logText})
           on conflict (server_log_id, file_name) do nothing
         `;
       }
@@ -196,6 +216,34 @@ export async function insertServerLogFiles(
       `;
     }
   });
+}
+
+export async function insertServerLogFiles(
+  sql: Sql,
+  benchmarkResultIds: number[],
+  files: readonly ServerLogFile[],
+): Promise<void> {
+  await insertDeferredServerLogFiles(
+    sql,
+    benchmarkResultIds,
+    files.map((file) => ({ fileName: file.fileName, readText: () => file.logText })),
+  );
+}
+
+/** Read archived log files one at a time so multinode bundles stay memory-bounded. */
+export async function insertServerLogFilePaths(
+  sql: Sql,
+  benchmarkResultIds: number[],
+  files: readonly ServerLogFilePath[],
+): Promise<void> {
+  await insertDeferredServerLogFiles(
+    sql,
+    benchmarkResultIds,
+    files.map((file) => ({
+      fileName: file.fileName,
+      readText: () => cleanLogText(fs.readFileSync(file.path, 'utf8')),
+    })),
+  );
 }
 
 /** Compatibility wrapper for callers/tests that still provide one legacy stream. */

@@ -250,15 +250,19 @@ const viewActionsHTML = (
   hasTraceData: boolean,
   hasLogData: boolean,
   pointId: number | undefined,
+  benchmarkType: string | undefined,
   locale: Locale,
 ): string => {
-  if (!isPinned || !isPersistedBenchmarkId(pointId) || (!hasTraceData && !hasLogData)) return '';
+  const isAgentic = benchmarkType === 'agentic_traces';
+  const showCharts = isAgentic && hasTraceData;
+  if (!isPinned || !isPersistedBenchmarkId(pointId) || (!showCharts && !hasLogData)) return '';
   const prefix = locale === 'zh' ? '/zh' : '';
-  const baseHref = `${prefix}/inference/agentic/${pointId}`;
+  const agenticHref = `${prefix}/inference/agentic/${pointId}`;
+  const logHref = isAgentic ? `${agenticHref}?view=logs` : `${prefix}/inference/logs/${pointId}`;
   const t = ACTION_STRINGS[locale];
   const actions = [
-    hasTraceData ? pointDetailActionLink('view-charts', baseHref, t.charts) : '',
-    hasLogData ? pointDetailActionLink('view-logs', `${baseHref}?view=logs`, t.logs) : '',
+    showCharts ? pointDetailActionLink('view-charts', agenticHref, t.charts) : '',
+    hasLogData ? pointDetailActionLink('view-logs', logHref, t.logs) : '',
   ].filter(Boolean);
   return `<div style="display: grid; gap: 6px; margin-top: 8px;">${actions.join('')}</div>`;
 };
@@ -438,7 +442,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       ${generateCacheMetadataHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${runLinkHTML(runUrl)}
-      ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(config.hasLog), d.id, locale)}
+      ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(config.hasLog), d.id, d.benchmark_type, locale)}
     </div>
   `;
 };
@@ -561,7 +565,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       ${generateCacheMetadataHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${runLinkHTML(runUrl)}
-      ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(hasLog), d.id, locale)}
+      ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(hasLog), d.id, d.benchmark_type, locale)}
     </div>
   `;
 };
