@@ -9,6 +9,7 @@
  * Usage:
  *   bun run --cwd packages/db db:backfill-server-log-files
  *   bun run --cwd packages/db db:backfill-server-log-files --run 31415828111 --yes
+ *   bun run --cwd packages/db db:backfill-server-log-files --all --from-run 26606969606 --yes
  *   bun run --cwd packages/db db:backfill-server-log-files --all --source gcs --dry-run
  *   bun run --cwd packages/db db:backfill-server-log-files --all --source auto --yes
  */
@@ -30,6 +31,7 @@ import {
   type GcsArtifactMeta,
 } from './lib/gcs-artifacts.js';
 import { confirmProceed, parseLimitForceFlags, runBackfillMain } from './lib/backfill-runner.js';
+import { retryArtifactOperation } from './lib/artifact-retry.js';
 import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
 import {
   pairServerLogArtifacts,
@@ -61,6 +63,16 @@ function parseRunFilter(): number | null {
   const raw = process.argv[index + 1];
   if (!raw || !/^\d+$/u.test(raw) || Number(raw) <= 0) {
     throw new Error('--run requires a positive GitHub Actions run ID');
+  }
+  return Number(raw);
+}
+
+function parseFromRunFilter(): number | null {
+  const index = process.argv.indexOf('--from-run');
+  if (index === -1) return null;
+  const raw = process.argv[index + 1];
+  if (!raw || !/^\d+$/u.test(raw) || Number(raw) <= 0) {
+    throw new Error('--from-run requires a positive GitHub Actions run ID');
   }
   return Number(raw);
 }
@@ -187,6 +199,10 @@ function isWithinGithubRetention(date: string, now = new Date()): boolean {
 async function main(): Promise<void> {
   console.log('=== backfill-server-log-files ===');
   const runFilter = parseRunFilter();
+  const fromRunFilter = parseFromRunFilter();
+  if (runFilter !== null && fromRunFilter !== null) {
+    throw new Error('--run and --from-run cannot be combined');
+  }
   const flags = parseBackfillFlags();
   const { limit } = parseLimitForceFlags();
   const runs = await sql<CandidateRun[]>`
@@ -194,6 +210,7 @@ async function main(): Promise<void> {
     from workflow_runs wr
     join benchmark_results br on br.workflow_run_id = wr.id
     where (${runFilter}::bigint is null or wr.github_run_id = ${runFilter})
+      and (${fromRunFilter}::bigint is null or wr.github_run_id >= ${fromRunFilter})
       and (
         ${runFilter}::bigint is not null
         or ${flags.all}
@@ -264,9 +281,11 @@ async function main(): Promise<void> {
         flags.source !== 'gcs' &&
         (flags.source === 'github' || isWithinGithubRetention(run.date))
       ) {
-        pairs = pairServerLogArtifacts(
-          listRunArtifacts(repository, String(runId)).filter((artifact) => !artifact.expired),
+        const artifacts = await retryArtifactOperation(
+          `listing GitHub artifacts for run ${runId}`,
+          () => listRunArtifacts(repository, String(runId)),
         );
+        pairs = pairServerLogArtifacts(artifacts.filter((artifact) => !artifact.expired));
         if (pairs.length > 0) {
           source = 'github';
           githubRuns++;
@@ -286,8 +305,12 @@ async function main(): Promise<void> {
         try {
           benchmarkDir =
             source === 'gcs'
-              ? downloadGcsArtifact(pair.benchmarks as GcsArtifactMeta, tempDir)
-              : downloadArtifact(pair.benchmarks, tempDir);
+              ? await retryArtifactOperation(`downloading ${pair.benchmarks.name}`, () =>
+                  downloadGcsArtifact(pair.benchmarks as GcsArtifactMeta, tempDir),
+                )
+              : await retryArtifactOperation(`downloading ${pair.benchmarks.name}`, () =>
+                  downloadArtifact(pair.benchmarks, tempDir),
+                );
           const mappedRows = readMappedRows(benchmarkDir);
           const resultIds = await findBenchmarkResultIds(run, mappedRows);
           if (resultIds.length === 0) {
@@ -301,8 +324,12 @@ async function main(): Promise<void> {
           }
           serverLogDir =
             source === 'gcs'
-              ? downloadGcsArtifact(pair.serverLogs as GcsArtifactMeta, tempDir)
-              : downloadArtifact(pair.serverLogs, tempDir);
+              ? await retryArtifactOperation(`downloading ${pair.serverLogs.name}`, () =>
+                  downloadGcsArtifact(pair.serverLogs as GcsArtifactMeta, tempDir),
+                )
+              : await retryArtifactOperation(`downloading ${pair.serverLogs.name}`, () =>
+                  downloadArtifact(pair.serverLogs, tempDir),
+                );
           const root = serverLogArtifactRoot(serverLogDir, pair.serverLogs.name);
           const logFiles = root ? listServerLogFilePaths(root) : [];
           if (logFiles.length === 0) {
