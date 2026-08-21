@@ -63,8 +63,6 @@ interface ReplayPanelProps {
 
 const STANDARD_SPEED_OPTIONS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const BEST_PER_SKU_SPEED_OPTIONS: readonly number[] = [...STANDARD_SPEED_OPTIONS, 3, 4, 5];
-const BEST_PER_SKU_TRANSITION_MS = 240;
-const BEST_PER_SKU_MIN_TRANSITION_MS = 60;
 const REPLAY_BODY_MIN_HEIGHT = 480;
 
 /**
@@ -274,13 +272,6 @@ export default function ReplayPanel({
 
   const prefersReducedMotion = useReducedMotion();
   const speedOptions = dynamicBestPerSku ? BEST_PER_SKU_SPEED_OPTIONS : STANDARD_SPEED_OPTIONS;
-  const replayTransitionDuration =
-    dynamicBestPerSku && !prefersReducedMotion
-      ? Math.max(
-          BEST_PER_SKU_MIN_TRANSITION_MS,
-          Math.round(BEST_PER_SKU_TRANSITION_MS / Math.max(1, speed)),
-        )
-      : 0;
 
   // The extended speeds belong to Best per SKU replay. If that mode is
   // disabled while the panel is open, return to the regular replay ceiling.
@@ -386,9 +377,17 @@ export default function ReplayPanel({
             pointFilter: replayPointMatchesFilters,
             bestPerSku: dynamicBestPerSku,
             direction: rooflineDirection,
+            animateBestPerSku: dynamicBestPerSku && !prefersReducedMotion,
           })
         : [],
-    [timeline, fraction, replayPointMatchesFilters, dynamicBestPerSku, rooflineDirection],
+    [
+      timeline,
+      fraction,
+      replayPointMatchesFilters,
+      dynamicBestPerSku,
+      rooflineDirection,
+      prefersReducedMotion,
+    ],
   );
 
   const currentDate = useMemo(
@@ -646,7 +645,7 @@ export default function ReplayPanel({
           hardwareSeriesKeyMap={replayColorKeyMap}
           syncBestPerSkuSelection={false}
           overlayData={replayOverlayData}
-          transitionDuration={replayTransitionDuration}
+          transitionDuration={0}
           niceAxes={false}
           pinLineLabels
           xExtentOverride={fixedAxes ? fixedExtent?.x : undefined}

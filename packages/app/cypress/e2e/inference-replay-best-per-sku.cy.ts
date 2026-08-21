@@ -17,12 +17,8 @@ const bestReplayHardwareKeys = (): Cypress.Chainable<InferenceData['hwKey'][]> =
       .toSorted(),
   );
 
-type AnimatedRoofline = SVGPathElement & {
-  __transition?: Record<string, { name?: string }>;
-};
-
 describe('Inference replay — Best per SKU', () => {
-  it('animates changing winners and offers Best-per-SKU-only speeds through 5×', () => {
+  it('keeps changing winner geometry continuous and offers Best-per-SKU-only speeds through 5×', () => {
     cy.intercept('GET', '/api/v1/availability', { fixture: 'api/availability.json' });
     cy.intercept('GET', '**/api/v1/benchmarks?*', { fixture: 'api/benchmarks.json' });
     cy.intercept('GET', '**/api/v1/benchmarks/history*', {
@@ -63,7 +59,7 @@ describe('Inference replay — Best per SKU', () => {
       expect(startKeys.length, 'at least one SKU winner at the first date').to.be.greaterThan(0);
       cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path').then(($startPaths) => {
         const startPaths = [...$startPaths].map((node) => ({
-          node: node as unknown as AnimatedRoofline,
+          node: node as unknown as SVGPathElement,
           hwKey: node.dataset.hwKey,
           seriesKey: node.dataset.seriesKey,
           d: node.getAttribute('d'),
@@ -77,7 +73,7 @@ describe('Inference replay — Best per SKU', () => {
 
         setBestReplayScrubber(1000);
         cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path').then(($endPaths) => {
-          const endPaths = [...$endPaths] as unknown as AnimatedRoofline[];
+          const endPaths = [...$endPaths] as unknown as SVGPathElement[];
           const moved = startPaths.find((start) => {
             const reused = endPaths.find((end) => end === start.node);
             return reused && reused.dataset.hwKey !== start.hwKey;
@@ -88,16 +84,10 @@ describe('Inference replay — Best per SKU', () => {
           ).not.to.equal(undefined);
           const movedNode = moved!.node;
           expect(movedNode.dataset.seriesKey).to.equal(moved!.seriesKey);
-          expect(
-            Object.values(movedNode.__transition ?? {}).some(
-              (transition) => transition.name === 'data-update',
-            ),
-            'the reused roofline has an active D3 movement transition',
-          ).to.equal(true);
           cy.wrap(movedNode).should(() => {
             expect(
               movedNode.getAttribute('d'),
-              'the roofline animates away from its old geometry',
+              'the stable roofline receives the deterministic MP4-frame geometry',
             ).not.to.equal(moved!.d);
           });
         });

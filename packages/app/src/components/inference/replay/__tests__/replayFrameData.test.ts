@@ -5,6 +5,7 @@ import type { InferenceData, OverlayData } from '@/components/inference/types';
 import type { ReplayTimeline } from '../buildReplayTimeline';
 import {
   FRACTION_COMMIT_QUANTUM,
+  bestPerSkuMorphWindowFraction,
   buildFrameData,
   buildReplayColorKeyMap,
   buildReplayOverlayData,
@@ -112,6 +113,14 @@ describe('spanMs', () => {
 
   it('respects a minimum of 4500ms once the floor kicks in', () => {
     expect(spanMs(5)).toBe(4500);
+  });
+});
+
+describe('bestPerSkuMorphWindowFraction', () => {
+  it('allocates about 240ms of the MP4 timeline without overlapping adjacent dates', () => {
+    expect(bestPerSkuMorphWindowFraction(2)).toBeCloseTo(240 / 4500);
+    expect(bestPerSkuMorphWindowFraction(100)).toBeCloseTo(0.45 / 99);
+    expect(bestPerSkuMorphWindowFraction(1)).toBe(0);
   });
 });
 
@@ -336,6 +345,60 @@ describe('buildFrameData', () => {
         ['b200_engine_b', 'b200_engine_b'],
         ['h100_engine_a', 'h100_engine_a'],
       ]),
+    );
+
+    // Regression: MP4 export captures deterministic replay fractions and does
+    // not wait for wall-clock D3 transitions. A frame shortly after the winner
+    // changes must therefore contain intermediate line geometry itself.
+    let switchFraction = 0;
+    for (let step = 1; step <= 1000; step++) {
+      const candidate = step / 1000;
+      const keys = new Set(
+        buildFrameData(changing, candidate, {
+          bestPerSku: true,
+          direction: 'upper_left',
+        }).map((point) => point.hwKey),
+      );
+      if (keys.has('b200_engine_b')) {
+        switchFraction = candidate;
+        break;
+      }
+    }
+    expect(switchFraction).toBeGreaterThan(0);
+
+    const morphFraction = switchFraction + bestPerSkuMorphWindowFraction(2) / 2;
+    const snapped = buildFrameData(changing, morphFraction, {
+      bestPerSku: true,
+      direction: 'upper_left',
+    });
+    const animated = buildFrameData(changing, morphFraction, {
+      bestPerSku: true,
+      direction: 'upper_left',
+      animateBestPerSku: true,
+    });
+    const snappedB200 = snapped
+      .filter((point) => point.hwKey === 'b200_engine_b')
+      .toSorted((a, b) => a.x - b.x);
+    const animatedB200 = animated
+      .filter((point) => point.hwKey === 'b200_engine_b')
+      .toSorted((a, b) => a.x - b.x);
+    expect(animatedB200).toHaveLength(snappedB200.length);
+    expect(animatedB200[0].y).not.toBeCloseTo(snappedB200[0].y);
+    expect(new Set(animated.map((point) => point.hwKey))).toEqual(
+      new Set(['b200_engine_b', 'h100_engine_a']),
+    );
+
+    const settledFraction = switchFraction + bestPerSkuMorphWindowFraction(2) * 1.1;
+    const settled = buildFrameData(changing, settledFraction, {
+      bestPerSku: true,
+      direction: 'upper_left',
+      animateBestPerSku: true,
+    });
+    expect(settled).toEqual(
+      buildFrameData(changing, settledFraction, {
+        bestPerSku: true,
+        direction: 'upper_left',
+      }),
     );
   });
 });

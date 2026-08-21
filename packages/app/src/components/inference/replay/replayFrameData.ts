@@ -9,6 +9,12 @@ export interface ReplayFrameOptions {
   pointFilter?: (point: InferenceData) => boolean;
   bestPerSku?: boolean;
   direction?: ParetoDirection;
+  /**
+   * Morph a newly winning config from the outgoing config's geometry. This is
+   * driven by replay fraction rather than wall-clock time so MP4 capture sees
+   * the same animation as the live preview.
+   */
+  animateBestPerSku?: boolean;
 }
 
 export interface ReplayOverlayOptions extends ReplayFrameOptions {
@@ -17,17 +23,10 @@ export interface ReplayOverlayOptions extends ReplayFrameOptions {
   activeHwTypes: ReadonlySet<string>;
 }
 
-/**
- * Build the visible rows for one replay frame.
- *
- * Best per SKU is deliberately evaluated after interpolation. A serving
- * engine that wins today is not necessarily the engine that won on an older
- * benchmark date, so replay must not reuse the live chart's active hwKey set.
- */
-export function buildFrameData(
+function buildEligibleFrame(
   timeline: ReplayTimeline,
   fraction: number,
-  options: ReplayFrameOptions = {},
+  pointFilter?: ReplayFrameOptions['pointFilter'],
 ): InferenceData[] {
   const idxFloat = stepFloatAtFraction(fraction, timeline.dates.length);
   // A replay frame is a single point in time, so every point gets the
@@ -42,10 +41,162 @@ export function buildFrameData(
     if (!r.visible) continue;
     out.push({ ...c.template, x: r.x, y: r.y, date: frameDate });
   }
-  const eligible = options.pointFilter ? out.filter(options.pointFilter) : out;
+  return pointFilter ? out.filter(pointFilter) : out;
+}
+
+const winnerBySku = (
+  points: InferenceData[],
+  direction: ParetoDirection,
+): { selected: Set<string>; bySku: Map<string, string> } => {
+  const selected = bestSeriesPerSku(points, direction);
+  const bySku = new Map<string, string>();
+  for (const point of points) {
+    const hwKey = String(point.hwKey);
+    if (selected.has(hwKey)) bySku.set(baseSku(point), hwKey);
+  }
+  return { selected, bySku };
+};
+
+const pointsByHwKey = (points: readonly InferenceData[]): Map<string, InferenceData[]> => {
+  const grouped = new Map<string, InferenceData[]>();
+  for (const point of points) {
+    const key = String(point.hwKey);
+    const rows = grouped.get(key) ?? [];
+    rows.push(point);
+    grouped.set(key, rows);
+  }
+  return grouped;
+};
+
+const sampleSeries = (
+  points: readonly InferenceData[],
+  fraction: number,
+): { x: number; y: number } => {
+  const sorted = points.toSorted((a, b) => a.x - b.x);
+  if (sorted.length === 1) return sorted[0];
+  const position = Math.max(0, Math.min(1, fraction)) * (sorted.length - 1);
+  const low = Math.floor(position);
+  const high = Math.min(sorted.length - 1, low + 1);
+  const mix = position - low;
+  return {
+    x: sorted[low].x + (sorted[high].x - sorted[low].x) * mix,
+    y: sorted[low].y + (sorted[high].y - sorted[low].y) * mix,
+  };
+};
+
+const morphSeries = (
+  outgoing: readonly InferenceData[],
+  incoming: readonly InferenceData[],
+  progress: number,
+): InferenceData[] => {
+  const sortedIncoming = incoming.toSorted((a, b) => a.x - b.x);
+  return sortedIncoming.map((point, index) => {
+    const rank = sortedIncoming.length <= 1 ? 0.5 : index / (sortedIncoming.length - 1);
+    const from = sampleSeries(outgoing, rank);
+    return {
+      ...point,
+      x: from.x + (point.x - from.x) * progress,
+      y: from.y + (point.y - from.y) * progress,
+    };
+  });
+};
+
+const BEST_PER_SKU_MORPH_MS = 240;
+
+/** Fraction of the exported timeline used to morph one winner into the next. */
+export function bestPerSkuMorphWindowFraction(numDates: number): number {
+  if (numDates <= 1) return 0;
+  // Keep the animation close to 240ms in the deterministic MP4 timeline, but
+  // never let it overlap more than 45% of one observed-date segment.
+  return Math.min(BEST_PER_SKU_MORPH_MS / spanMs(numDates), 0.45 / (numDates - 1));
+}
+
+function findWinnerSwitchFraction(
+  timeline: ReplayTimeline,
+  sku: string,
+  incomingHwKey: string,
+  startFraction: number,
+  endFraction: number,
+  direction: ParetoDirection,
+  pointFilter?: ReplayFrameOptions['pointFilter'],
+): number {
+  let low = startFraction;
+  let high = endFraction;
+  // Eight bisections place a 240ms morph boundary within ~1ms in the longest
+  // 30s export, without precomputing every SKU's complete winner history.
+  for (let iteration = 0; iteration < 8; iteration++) {
+    const mid = (low + high) / 2;
+    const eligible = buildEligibleFrame(timeline, mid, pointFilter);
+    const winner = winnerBySku(eligible, direction).bySku.get(sku);
+    if (winner === incomingHwKey) high = mid;
+    else low = mid;
+  }
+  return high;
+}
+
+/**
+ * Build the visible rows for one replay frame.
+ *
+ * Best per SKU is deliberately evaluated after interpolation. A serving
+ * engine that wins today is not necessarily the engine that won on an older
+ * benchmark date, so replay must not reuse the live chart's active hwKey set.
+ * Winner morphs are derived from `fraction`, not a live D3 timer, so every
+ * intermediate position is present in the frames encoded into the MP4.
+ */
+export function buildFrameData(
+  timeline: ReplayTimeline,
+  fraction: number,
+  options: ReplayFrameOptions = {},
+): InferenceData[] {
+  const eligible = buildEligibleFrame(timeline, fraction, options.pointFilter);
   if (!options.bestPerSku || !options.direction) return eligible;
-  const winners = bestSeriesPerSku(eligible, options.direction);
-  return winners.size > 0 ? eligible.filter((point) => winners.has(String(point.hwKey))) : eligible;
+
+  const current = winnerBySku(eligible, options.direction);
+  if (current.selected.size === 0) return eligible;
+  if (!options.animateBestPerSku) {
+    return eligible.filter((point) => current.selected.has(String(point.hwKey)));
+  }
+
+  const windowFraction = bestPerSkuMorphWindowFraction(timeline.dates.length);
+  const previousFraction = Math.max(0, fraction - windowFraction);
+  if (windowFraction === 0 || previousFraction === fraction) {
+    return eligible.filter((point) => current.selected.has(String(point.hwKey)));
+  }
+
+  const previousEligible = buildEligibleFrame(timeline, previousFraction, options.pointFilter);
+  const previous = winnerBySku(previousEligible, options.direction);
+  const currentPoints = pointsByHwKey(eligible);
+  const previousPoints = pointsByHwKey(previousEligible);
+  const output: InferenceData[] = [];
+
+  for (const [sku, incomingHwKey] of current.bySku) {
+    const incoming = currentPoints.get(incomingHwKey) ?? [];
+    const outgoingHwKey = previous.bySku.get(sku);
+    if (!outgoingHwKey || outgoingHwKey === incomingHwKey) {
+      output.push(...incoming);
+      continue;
+    }
+
+    const outgoing = currentPoints.get(outgoingHwKey) ?? previousPoints.get(outgoingHwKey) ?? [];
+    if (outgoing.length === 0 || incoming.length === 0) {
+      output.push(...incoming);
+      continue;
+    }
+
+    const switchFraction = findWinnerSwitchFraction(
+      timeline,
+      sku,
+      incomingHwKey,
+      previousFraction,
+      fraction,
+      options.direction,
+      options.pointFilter,
+    );
+    const progress = Math.max(0, Math.min(1, (fraction - switchFraction) / windowFraction));
+    output.push(...morphSeries(outgoing, incoming, progress));
+  }
+
+  return output;
 }
 
 const safeDomain = (lo: number, hi: number): [number, number] => {

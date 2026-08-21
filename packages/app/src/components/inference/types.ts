@@ -662,7 +662,8 @@ export interface ScatterGraphProps {
   /**
    * Optional stable identity alias for official rooflines. Best per SKU replay
    * maps every historical winner for one physical SKU to the same identity so
-   * D3 can morph the existing line when the winning config changes.
+   * deterministic frame geometry updates the existing line when the winning
+   * config changes.
    */
   hardwareSeriesKeyMap?: ReadonlyMap<string, string>;
   /**
@@ -684,8 +685,8 @@ export interface ScatterGraphProps {
   overlayData?: OverlayData;
   /**
    * D3 transition duration in ms used when data or scales change. Defaults to
-   * the regular interactive value (750). Regular replay passes 0; Best per SKU
-   * replay uses a short speed-aware duration to animate winner-line movement.
+   * the regular interactive value (750). Replay passes 0 because its motion is
+   * encoded directly into deterministic frame data for MP4 parity.
    */
   transitionDuration?: number;
   /**
