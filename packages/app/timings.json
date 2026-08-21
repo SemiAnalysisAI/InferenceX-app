@@ -198,7 +198,7 @@
     },
     {
       "spec": "cypress/e2e/url-params.cy.ts",
-      "duration": 5884
+      "duration": 7000
     },
     {
       "spec": "cypress/e2e/yaxis-metrics-render.cy.ts",

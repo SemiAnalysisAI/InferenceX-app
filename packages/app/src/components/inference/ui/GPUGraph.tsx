@@ -746,7 +746,10 @@ const GPUGraph = React.memo(
         onRender={(ctx: RenderContext) => {
           // Apply log tick format on initial render (needs the built scale)
           if (logScale) {
-            const yScale = ctx.yScale as d3.ScaleLogarithmic<number, number>;
+            const yScale = (ctx.renderedYScale ?? ctx.yScale) as d3.ScaleLogarithmic<
+              number,
+              number
+            >;
             ctx.layout.yAxisGroup.call(
               d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)) as any,
             );

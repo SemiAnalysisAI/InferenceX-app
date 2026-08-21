@@ -436,13 +436,13 @@ export function resolveMetricConfigKey(
   metricConfigKey: string | null | undefined,
   fallback?: string,
 ): MetricConfigKey {
-  if (metricConfigKey === 'y') return DEFAULT_METRIC_CONFIG_KEY;
+  if (metricConfigKey === 'y') return 'y_tpPerGpu';
   if (metricConfigKey?.startsWith('y_')) {
     const metricKey = metricConfigKey.slice(2);
     if (isMetricKey(metricKey)) return metricConfigKey as MetricConfigKey;
   }
 
-  if (fallback === 'y') return DEFAULT_METRIC_CONFIG_KEY;
+  if (fallback === 'y') return 'y_tpPerGpu';
   if (fallback?.startsWith('y_')) {
     const fallbackMetricKey = fallback.slice(2);
     if (isMetricKey(fallbackMetricKey)) return fallback as MetricConfigKey;

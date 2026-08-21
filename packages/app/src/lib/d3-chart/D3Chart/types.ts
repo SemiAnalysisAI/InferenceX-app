@@ -209,6 +209,9 @@ export interface RenderContext {
   tooltipElement: HTMLDivElement;
   xScale: AnyScale | d3.ScaleTime<number, number>;
   yScale: AnyScale | d3.ScaleTime<number, number>;
+  /** Scales currently rendered after applying the active zoom transform. */
+  renderedXScale?: AnyScale | d3.ScaleTime<number, number>;
+  renderedYScale?: AnyScale | d3.ScaleTime<number, number>;
   width: number;
   height: number;
   /** Transition duration in ms for animated scale/domain changes. */

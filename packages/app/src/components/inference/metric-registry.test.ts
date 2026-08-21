@@ -41,7 +41,12 @@ describe('metric registry', () => {
 
 describe('metric compatibility', () => {
   it('maps the legacy base y field to canonical throughput', () => {
-    expect(resolveMetricConfigKey('y')).toBe(DEFAULT_METRIC_CONFIG_KEY);
+    expect(resolveMetricConfigKey('y')).toBe('y_tpPerGpu');
+  });
+
+  it('keeps the legacy fallback independent from the dashboard default', () => {
+    expect(resolveMetricConfigKey(undefined, 'y')).toBe('y_tpPerGpu');
+    expect(DEFAULT_METRIC_CONFIG_KEY).not.toBe('y_tpPerGpu');
   });
 
   it('falls back safely for unknown persisted metric values', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// helper to set up window mocks before module import
+// Dynamic imports are intentional: each test resets the module-scope URL snapshot after stubbing window.
 function setupWindow(search = '', pathname = '/inference', hash = '') {
   const location = {
     search,
@@ -319,6 +319,27 @@ describe('writeUrlParams + buildShareUrl', () => {
     // don't advance timers, buildShareUrl should flush synchronously
     const url = buildShareUrl();
     expect(url).toContain('g_model=immediate');
+  });
+
+  it('flushes pending writes synchronously for a remounted provider', async () => {
+    setupWindow('', '/inference');
+    const { readUrlParams, writeUrlParams } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'Kimi-K3', i_seq: 'agentic-traces' });
+
+    expect(readUrlParams()).toMatchObject({
+      g_model: 'Kimi-K3',
+      i_seq: 'agentic-traces',
+    });
+  });
+
+  it('does not restore an initial param after the user resets it to default', async () => {
+    setupWindow('?g_model=Kimi-K3', '/inference');
+    const { readUrlParams, writeUrlParams } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
+
+    expect(readUrlParams().g_model).toBeUndefined();
   });
 });
 

@@ -101,6 +101,18 @@ export function createZoomFrameBatcher(
   };
 }
 
+export function metricRenderCallbackContext(
+  baseContext: RenderContext,
+  renderedXScale: RenderContext['xScale'],
+  renderedYScale: RenderContext['yScale'],
+): RenderContext {
+  return {
+    ...baseContext,
+    renderedXScale,
+    renderedYScale,
+  };
+}
+
 function customLayerDisplayIdentities<T>(layers: LayerConfig<T>[]): Map<string, string> {
   const identities = new Map<string, string>();
   layers.forEach((layer, index) => {
@@ -335,6 +347,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         tooltipElement: tooltipRef.current,
         xScale,
         yScale,
+        renderedXScale: xScale,
+        renderedYScale: yScale,
         width,
         height,
         transitionDuration,
@@ -796,6 +810,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       tooltipElement: tooltipRef.current,
       xScale,
       yScale,
+      renderedXScale: xScale,
+      renderedYScale: yScale,
       width,
       height,
       transitionDuration,
@@ -804,7 +820,10 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       ...baseCtx,
       xScale: currentXScale,
       yScale: currentYScale,
+      renderedXScale: currentXScale,
+      renderedYScale: currentYScale,
     };
+    const callbackCtx = metricRenderCallbackContext(baseCtx, currentXScale, currentYScale);
     const metricLayerSelections = layers.map((layer) =>
       updateLayerForMetric(layer, renderGroup, currentXScale, currentYScale, layout, metricCtx),
     );
@@ -841,8 +860,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           svgRef.current.parentElement as HTMLDivElement,
           d3.select(tooltipRef.current),
           rulers,
-          currentXScale,
-          currentYScale,
+          xScale,
+          yScale,
           svgRef,
           zoomConfig?.axes,
         );
@@ -853,7 +872,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     lastMetricIdentityRef.current = metricIdentity;
     prevScalesRef.current = { xScaleConfig, yScaleConfig };
     prevYAxisConfigRef.current = yAxisConfig;
-    onRender?.(baseCtx);
+    onRender?.(callbackCtx);
   }, [
     dataIdentity,
     metricIdentity,

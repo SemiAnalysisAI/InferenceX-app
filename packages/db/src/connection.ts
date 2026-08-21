@@ -22,11 +22,7 @@ export type DbClient = (
  */
 export const FIXTURES_MODE = process.env.E2E_FIXTURES === '1';
 
-const LOOPBACK_HOSTS: Record<string, true> = {
-  localhost: true,
-  '127.0.0.1': true,
-  '::1': true,
-};
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
 export type DatabaseDriver = 'neon' | 'postgres';
 export type DatabaseSsl = false | 'require';
@@ -68,7 +64,7 @@ function resolveSsl(hostname: string | null, input?: string | boolean): Database
   const normalized = typeof input === 'string' ? input.toLowerCase() : input;
   if (normalized === false || normalized === 'false') return false;
   if (normalized === true || normalized === 'true' || normalized === 'require') return 'require';
-  return hostname && LOOPBACK_HOSTS[hostname] ? false : 'require';
+  return hostname && LOOPBACK_HOSTS.has(hostname) ? false : 'require';
 }
 
 /**

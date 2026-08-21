@@ -2501,13 +2501,13 @@ const ScatterGraph = React.memo(
 
         // Log tick formatting on initial render
         if (xScaleConfig._isLog) {
-          const xScale = ctx.xScale as d3.ScaleLogarithmic<number, number>;
+          const xScale = (ctx.renderedXScale ?? ctx.xScale) as d3.ScaleLogarithmic<number, number>;
           ctx.layout.xAxisGroup.call(
             d3.axisBottom(xScale).ticks(10).tickFormat(logTickFormat(xScale)) as any,
           );
         }
         if (yScaleConfig.type === 'log') {
-          const yScale = ctx.yScale as d3.ScaleLogarithmic<number, number>;
+          const yScale = (ctx.renderedYScale ?? ctx.yScale) as d3.ScaleLogarithmic<number, number>;
           ctx.layout.yAxisGroup.call(
             d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)) as any,
           );

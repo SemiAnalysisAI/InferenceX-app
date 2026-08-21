@@ -182,8 +182,9 @@ if (typeof window !== 'undefined') {
   }, 0);
 }
 
-/** Returns the share-link params that were in the URL at page load. */
+/** Returns the current share-link state, flushing pending writes for provider remounts. */
 export function readUrlParams(): UrlStateParams {
+  flushPendingParams();
   return _initialParams;
 }
 
@@ -252,8 +253,10 @@ function flushPendingParams(): void {
 
     if (value === undefined || value === defaultValue) {
       delete currentState[urlKey];
+      delete _initialParams[urlKey];
     } else {
       currentState[urlKey] = value;
+      _initialParams[urlKey] = value;
     }
   }
 

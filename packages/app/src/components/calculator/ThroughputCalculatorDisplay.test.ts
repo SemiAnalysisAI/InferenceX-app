@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   resolveCalculatorBarSelection,
   resolveCalculatorTarget,
+  resolveCalculatorTargetInputValue,
   resolveCalculatorVisibility,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
 
@@ -44,6 +45,11 @@ describe('calculator effective state selectors', () => {
     expect(resolveCalculatorTarget(35, false, { min: 50, max: 100 })).toBe(35);
     expect(resolveCalculatorTarget(35, true, { min: 50, max: 100 })).toBe(50);
     expect(resolveCalculatorTarget(120, true, { min: 50, max: 100 })).toBe(100);
+  });
+
+  it('shows the effective clamp when idle while preserving the active editing buffer', () => {
+    expect(resolveCalculatorTargetInputValue('100', 80, false)).toBe('80');
+    expect(resolveCalculatorTargetInputValue('100', 80, true)).toBe('100');
   });
 
   it('clears stale bar selections when results change and prunes missing IDs', () => {

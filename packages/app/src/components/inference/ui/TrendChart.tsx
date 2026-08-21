@@ -173,9 +173,9 @@ const TrendChart = React.memo(
 
     // Apply logTickFormat to the y-axis after render (needs the built scale)
     const applyLogTickFormat = useCallback(
-      (ctx: Pick<RenderContext, 'layout' | 'yScale'>) => {
+      (ctx: Pick<RenderContext, 'layout' | 'yScale' | 'renderedYScale'>) => {
         if (!logScale) return;
-        const scale = ctx.yScale as d3.ScaleLogarithmic<number, number>;
+        const scale = (ctx.renderedYScale ?? ctx.yScale) as d3.ScaleLogarithmic<number, number>;
         const fmt = logTickFormat(scale);
         ctx.layout.yAxisGroup.call(d3.axisLeft(scale).ticks(8).tickFormat(fmt));
       },

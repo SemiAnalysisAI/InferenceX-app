@@ -110,6 +110,21 @@ describe('URL Parameter Persistence', () => {
     });
   });
 
+  describe('Provider remount state', () => {
+    it('preserves filters across a standalone dashboard route', () => {
+      visitWithDismissedModal('/inference');
+      cy.get('[data-testid="model-selector"]').click();
+      cy.contains('[role="option"]', 'Qwen3.5 397B').click();
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
+      // Navigate immediately to cover pending writes inside the debounce window.
+      cy.get('[data-testid="tab-trigger-gpu-specs"]').click();
+      cy.url().should('include', '/gpu-specs');
+      cy.get('[data-testid="tab-trigger-inference"]').click();
+
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
+    });
+  });
+
   describe('Inference Y-axis metric', () => {
     it('i_metric URL param pre-selects the metric and updates SVG axis label', () => {
       visitWithDismissedModal('/inference?i_metric=y_costh');
@@ -159,6 +174,15 @@ describe('URL Parameter Persistence', () => {
         .should('have.text', 'Total Tokens per $1 USD (tok/$)');
     });
 
+    it('keeps the legacy i_metric=y alias on raw throughput', () => {
+      visitWithDismissedModal('/inference?i_metric=y');
+
+      cy.get('[data-testid="yaxis-metric-selector"]').should(
+        'contain.text',
+        'Token Throughput per Chip',
+      );
+    });
+
     it('selecting a Y-axis metric updates the displayed value', () => {
       visitWithDismissedModal('/inference');
       cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
@@ -200,6 +224,61 @@ describe('URL Parameter Persistence', () => {
         .first()
         .find('svg text[transform="rotate(-90)"]')
         .should('contain.text', 'Token Throughput per All in Utility MW');
+    });
+
+    it('keeps tooltip rulers aligned after a zoomed metric switch', () => {
+      visitWithDismissedModal('/inference?i_metric=y_tpPerGpu');
+      cy.get('#scatter-log-scale').first().click();
+
+      cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]')
+        .first()
+        .then(($svg) => {
+          const svg = $svg[0] as unknown as SVGSVGElement & { __zoom?: { k: number } };
+          const bounds = svg.getBoundingClientRect();
+          for (let i = 0; i < 2; i += 1) {
+            svg.dispatchEvent(
+              new WheelEvent('wheel', {
+                deltaY: -240,
+                clientX: bounds.x + bounds.width / 2,
+                clientY: bounds.y + bounds.height / 2,
+                shiftKey: true,
+                bubbles: true,
+                cancelable: true,
+              }),
+            );
+          }
+          expect(svg.__zoom?.k, 'active zoom scale').to.be.greaterThan(1);
+        });
+
+      cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+      cy.contains('[role="option"]', 'Input Token Throughput per Chip').click({ force: true });
+      cy.get('[data-testid="yaxis-metric-selector"]').should(
+        'contain.text',
+        'Input Token Throughput per Chip',
+      );
+
+      cy.get('[data-testid="scatter-graph"]')
+        .first()
+        .within(() => {
+          cy.get<SVGGElement>('.dot-group')
+            .first()
+            .then(($point) => {
+              const match = $point
+                .attr('transform')
+                ?.match(/translate\((?<x>[^,]+),(?<y>[^)]+)\)/u);
+              expect(match, 'point transform').not.to.equal(null);
+              const pointX = Number(match?.groups?.x);
+              const pointY = Number(match?.groups?.y);
+
+              cy.wrap($point).trigger('mouseenter', { force: true });
+              cy.get('.vertical-ruler')
+                .invoke('attr', 'x1')
+                .then((x) => expect(Number(x)).to.be.closeTo(pointX, 1));
+              cy.get('.horizontal-ruler')
+                .invoke('attr', 'y1')
+                .then((y) => expect(Number(y)).to.be.closeTo(pointY, 1));
+            });
+        });
     });
   });
 

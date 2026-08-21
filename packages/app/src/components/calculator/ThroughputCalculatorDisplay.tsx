@@ -75,10 +75,14 @@ import type {
 } from './types';
 import { useThroughputData } from './useThroughputData';
 
-const COST_PROVIDER_OPTIONS: { value: CostProvider; label: string }[] = [
-  { value: 'costh', label: 'Hyperscaler' },
-  { value: 'costn', label: 'Neocloud' },
-  { value: 'costr', label: '3yr Rental' },
+const COST_PROVIDER_OPTIONS: {
+  value: CostProvider;
+  label: string;
+  labelZh: string;
+}[] = [
+  { value: 'costh', label: 'Hyperscaler', labelZh: '超大规模云服务商' },
+  { value: 'costn', label: 'Neocloud', labelZh: 'Neocloud' },
+  { value: 'costr', label: '3yr Rental', labelZh: '3 年租赁' },
 ];
 
 const COST_TYPE_OPTIONS: { value: CostType; label: string }[] = [
@@ -120,6 +124,14 @@ export function resolveCalculatorTarget(
 ): number {
   if (!hasData) return requestedTarget;
   return Math.max(range.min, Math.min(range.max, requestedTarget));
+}
+
+export function resolveCalculatorTargetInputValue(
+  editingValue: string,
+  effectiveTarget: number,
+  isEditing: boolean,
+): string {
+  return isEditing ? editingValue : String(effectiveTarget);
 }
 
 export function resolveCalculatorBarSelection(
@@ -325,6 +337,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const [costType, setCostType] = useState<CostType>('total');
   const [requestedTargetValue, setRequestedTargetValue] = useState<number>(35);
   const [inputValue, setInputValue] = useState<string>('35');
+  const [isTargetInputFocused, setIsTargetInputFocused] = useState(false);
   const [barMetric, setBarMetric] = useState<BarMetric>('throughput');
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
@@ -526,6 +539,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     }
   }, []);
 
+  const handleInputFocus = useCallback(() => {
+    setInputValue(String(targetValue));
+    setIsTargetInputFocused(true);
+  }, [targetValue]);
+
   const handleInputBlur = useCallback(() => {
     const parsed = parseFloat(inputValue);
     if (isNaN(parsed) || parsed < 0) {
@@ -536,6 +554,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
       setRequestedTargetValue(clamped);
       setInputValue(String(clamped));
     }
+    setIsTargetInputFocused(false);
     track('calculator_target_set', { mode, value: targetValue });
   }, [inputValue, targetValue, mode, ranges.interactivity]);
 
@@ -886,9 +905,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   />
                   <div id="calc-cost" data-testid="calc-cost-selector">
                     <MultiSelect
-                      options={COST_PROVIDER_OPTIONS.map((c) => ({
-                        value: c.value,
-                        label: c.label,
+                      options={COST_PROVIDER_OPTIONS.map((provider) => ({
+                        value: provider.value,
+                        label: locale === 'zh' ? provider.labelZh : provider.label,
                       }))}
                       value={[costProvider]}
                       onChange={(values) => {
@@ -1042,7 +1061,12 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                     </div>
                     <Input
                       type="number"
-                      value={inputValue}
+                      value={resolveCalculatorTargetInputValue(
+                        inputValue,
+                        targetValue,
+                        isTargetInputFocused,
+                      )}
+                      onFocus={handleInputFocus}
                       onChange={handleInputChange}
                       onBlur={handleInputBlur}
                       className="w-24 h-9"

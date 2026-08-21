@@ -72,6 +72,17 @@ describe('resolveDatabaseConnection', () => {
     }
   });
 
+  it('requires TLS for remote hostnames inherited from Object.prototype', () => {
+    for (const hostname of ['constructor', 'toString', '__proto__']) {
+      expect(
+        resolveDatabaseConnection({
+          envVar: 'UNUSED',
+          url: `postgres://user:pass@${hostname}/app`,
+        }).ssl,
+      ).toBe('require');
+    }
+  });
+
   it('lets explicit TLS inputs override hostname defaults', () => {
     expect(
       resolveDatabaseConnection({
