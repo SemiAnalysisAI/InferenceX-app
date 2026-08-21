@@ -11,7 +11,7 @@
  * stays presentational and this math is unit-testable on its own.
  */
 
-/** A lognormal fitted to sample data, plus how well it actually fits. */
+/** A lognormal fitted to sample data. */
 export interface LognormalFit {
   /** Mean of ln(x) — the location parameter. */
   mu: number;
@@ -21,13 +21,6 @@ export interface LognormalFit {
   median: number;
   /** Number of positive samples the fit used. */
   n: number;
-  /**
-   * Kolmogorov–Smirnov statistic: the largest gap between the empirical CDF and
-   * the fitted one, in [0, 1]. Small means the lognormal describes the data
-   * well; it is reported rather than turned into a pass/fail because these are
-   * measured traces, not a hypothesis test.
-   */
-  ks: number;
 }
 
 /** Uniform-in-ln bins over a positive range. */
@@ -45,7 +38,7 @@ export interface LogHistogram {
 
 /**
  * Abramowitz & Stegun 7.1.26 — max absolute error 1.5e-7, which is far below
- * anything visible in a chart or meaningful in a KS statistic.
+ * anything visible in a chart.
  */
 function erf(x: number): number {
   const sign = x < 0 ? -1 : 1;
@@ -110,16 +103,7 @@ export function fitLognormal(values: readonly number[]): LognormalFit | null {
   // against the scale of mu instead, which is what "no spread" really means.
   if (!Number.isFinite(mu) || !(sigma > 1e-9 * Math.max(1, Math.abs(mu)))) return null;
 
-  // KS statistic against the fit. Both the step below and the step above each
-  // sample are checked, which is what makes this the true supremum gap.
-  const sortedLogs = logs.toSorted((a, b) => a - b);
-  let ks = 0;
-  for (const [i, logValue] of sortedLogs.entries()) {
-    const fitted = normalCdf((logValue - mu) / sigma);
-    ks = Math.max(ks, Math.abs((i + 1) / n - fitted), Math.abs(fitted - i / n));
-  }
-
-  return { mu, sigma, median: Math.exp(mu), n, ks };
+  return { mu, sigma, median: Math.exp(mu), n };
 }
 
 /**

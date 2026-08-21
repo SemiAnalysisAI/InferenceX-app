@@ -34,8 +34,6 @@ const STRINGS = {
     range: 'range',
     logScale: 'log scale',
     lognormalFit: 'lognormal fit',
-    median: 'median',
-    ks: 'KS',
     excluded: (n: string, unit: string) =>
       `${n} requests with 0 ${unit} excluded from the log axis`,
     bin: 'Bin',
@@ -50,8 +48,6 @@ const STRINGS = {
     range: '范围',
     logScale: '对数刻度',
     lognormalFit: '对数正态拟合',
-    median: '中位数',
-    ks: 'KS',
     excluded: (n: string, unit: string) => `${n} 个请求为 0 ${unit}，已从对数轴中排除`,
     bin: '区间',
     count: '数量',
@@ -71,8 +67,7 @@ const STRINGS = {
  * so linear bins pile nearly every request into the leftmost few and stretch a
  * near-empty tail across the rest of the axis. On a log axis the same data
  * reads as a bell, and the fitted lognormal (drawn from the MLE of ln(value))
- * shows how closely it really follows one — the KS gap quantifies that rather
- * than asserting it.
+ * is overlaid so the reader can see how closely the trace really follows one.
  *
  * Hover shows the bin range + count + cumulative percentile.
  */
@@ -176,12 +171,6 @@ export function Distribution({
         {sorted.length.toLocaleString()} {t.requests} · {t.range} {fmt(min)}–{fmt(max)} {unit} ·{' '}
         {t.logScale}
       </div>
-      {fit && (
-        <div className="mb-2 text-xs text-muted-foreground">
-          <span style={{ color: FIT_COLOR }}>{t.lognormalFit}</span> · μ={fit.mu.toFixed(2)} σ=
-          {fit.sigma.toFixed(2)} · {t.median} {fmt(fit.median)} {unit} · {t.ks} {fit.ks.toFixed(3)}
-        </div>
-      )}
       <ChartHover pad={PAD} width={W} height={H} resolve={resolve}>
         {/* y-axis gridlines + labels */}
         {yTickVals.map((v, i) => {
@@ -306,26 +295,36 @@ export function Distribution({
           {t.countAxis}
         </text>
 
-        {/* Percentile legend chips */}
+        {/* Legend chips: dashed for the percentile guides, solid for the fit. */}
         {(() => {
+          const chips = [
+            ...GUIDES.map(({ label: ql, q, color }) => ({
+              key: ql,
+              label: `${ql} ${fmt(quantile(sorted, q))}`,
+              color,
+              dashed: true,
+            })),
+            ...(fit
+              ? [{ key: 'fit', label: t.lognormalFit, color: FIT_COLOR, dashed: false }]
+              : []),
+          ];
           const chipY = H - 8;
-          const chipW = innerW / GUIDES.length;
-          return GUIDES.map(({ label: ql, q, color }, i) => {
-            const v = quantile(sorted, q);
+          const chipW = innerW / chips.length;
+          return chips.map((chip, i) => {
             const x = PAD.left + i * chipW;
             return (
-              <g key={ql}>
+              <g key={chip.key}>
                 <line
                   x1={x + 2}
                   x2={x + 14}
                   y1={chipY - 4}
                   y2={chipY - 4}
-                  stroke={color}
+                  stroke={chip.color}
                   strokeWidth={2}
-                  strokeDasharray="5 3"
+                  strokeDasharray={chip.dashed ? '5 3' : undefined}
                 />
                 <text x={x + 18} y={chipY} fontSize={11} fill="currentColor" opacity={0.9}>
-                  {ql} {fmt(v)}
+                  {chip.label}
                 </text>
               </g>
             );

@@ -41,14 +41,10 @@ describe('Agentic ISL/OSL distribution', () => {
 
     cy.contains('1,500 requests').should('be.visible');
     cy.contains('log scale').should('be.visible');
+    // The curve is identified by a legend chip, not a stats readout.
     cy.contains('lognormal fit').should('be.visible');
-
-    // Parameters are reported next to the interpretable median. Recovery
-    // accuracy itself is pinned in lognormal.test.ts, not re-asserted here.
-    cy.contains(/μ=\d+\.\d\d/).should('be.visible');
-    cy.contains(/σ=\d+\.\d\d/).should('be.visible');
-    cy.contains(/median [\d,]+ tokens/).should('be.visible');
-    cy.contains(/KS \d\.\d\d\d/).should('be.visible');
+    cy.contains('μ=').should('not.exist');
+    cy.contains('σ=').should('not.exist');
 
     // One fitted curve, drawn as a path rather than bars.
     cy.get(`path[stroke="${FIT_STROKE}"]`).should('have.length', 1);
@@ -99,7 +95,6 @@ describe('Agentic ISL/OSL distribution', () => {
     cy.contains('600 个请求').should('be.visible');
     cy.contains('对数刻度').should('be.visible');
     cy.contains('对数正态拟合').should('be.visible');
-    cy.contains('中位数').should('be.visible');
     cy.contains('数值（tokens，对数刻度）').should('be.visible');
     cy.contains('requests').should('not.exist');
   });

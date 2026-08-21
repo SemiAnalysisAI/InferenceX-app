@@ -67,19 +67,20 @@ describe('fitLognormal', () => {
     expect(fit!.sigma).toBeCloseTo(0.9, 1);
     expect(fit!.median).toBeCloseTo(Math.exp(fit!.mu), 6);
     expect(fit!.n).toBe(4000);
-    // A genuinely lognormal sample should track the fit closely.
-    expect(fit!.ks).toBeLessThan(0.05);
   });
 
-  it('reports a large KS gap when the data is not lognormal', () => {
-    // Two far-apart spikes: no single lognormal can follow this shape.
+  it('stays finite on data no lognormal describes well', () => {
+    // Two far-apart spikes: the fit is meaningless but must not blow up, since
+    // the chart still draws a curve from whatever comes back.
     const bimodal = [
       ...Array.from({ length: 500 }, () => 10),
       ...Array.from({ length: 500 }, () => 100_000),
     ];
     const fit = fitLognormal(bimodal);
     expect(fit).not.toBeNull();
-    expect(fit!.ks).toBeGreaterThan(0.3);
+    expect(Number.isFinite(fit!.mu)).toBe(true);
+    // Sigma has to span both modes rather than collapse onto one.
+    expect(fit!.sigma).toBeGreaterThan(4);
   });
 
   it('ignores non-positive samples rather than producing NaN', () => {
