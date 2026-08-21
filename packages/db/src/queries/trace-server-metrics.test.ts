@@ -2,7 +2,11 @@ import { gzipSync } from 'node:zlib';
 
 import { describe, expect, it } from 'vitest';
 
-import { CHART_SERIES_VERSION, type ChartSeries } from '../etl/compute-chart-series';
+import {
+  CHART_SERIES_VERSION,
+  type ChartSeries,
+  type MetricSourceSeries,
+} from '../etl/compute-chart-series';
 import type { DbClient } from '../connection.js';
 
 import { getTraceServerMetrics, getTraceServerMetricSource } from './trace-server-metrics';
@@ -185,7 +189,11 @@ describe('getTraceServerMetricSource', () => {
 // the ETL, so it needs no CHART_SERIES_VERSION bump or backfill.
 
 /** One metric source (worker) owning `ranks` engines, each at a flat value. */
-function workerSource(role: string, workerId: string, ranks: number[]) {
+function workerSource(
+  role: MetricSourceSeries['source']['role'],
+  workerId: string,
+  ranks: number[],
+): MetricSourceSeries {
   return {
     source: {
       id: `dynamo|${role}|${workerId}`,
@@ -258,6 +266,26 @@ describe('getTraceServerMetrics all-endpoints KV overlay', () => {
       perRank,
     );
     expect(result?.kvCacheUsageByEngine).toEqual(perRank);
+  });
+
+  it('keeps a single-pool worker when sibling workers own multiple ranks', async () => {
+    const decode = workerSource('decode', 'wdec-cccc', []);
+    decode.kvCacheUsage = [
+      { t: 0, value: 0.4 },
+      { t: 1, value: 0.5 },
+    ];
+    const result = await run([
+      workerSource('prefill', 'wpre-aaaa', [0.1, 0.3]),
+      workerSource('prefill', 'wpre-bbbb', [0.5, 0.7]),
+      decode,
+    ]);
+
+    expect(result?.kvCacheUsageByEngine.map((e) => e.engineLabel)).toEqual([
+      'prefill aaaa',
+      'prefill bbbb',
+      'decode',
+    ]);
+    expect(result?.kvCacheUsageByEngine[2]?.points).toEqual(decode.kvCacheUsage);
   });
 
   it('still trims metricSources to descriptors', async () => {

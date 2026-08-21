@@ -236,7 +236,18 @@ function collapseKvByWorker(
 ): { engineLabel: string; points: TimeSeriesPoint[] }[] | null {
   if (sources.length < 2) return null;
   const entries = sources
-    .map((entry) => ({ source: entry.source, engines: entry.kvCacheUsageByEngine ?? [] }))
+    .map((entry) => ({
+      source: entry.source,
+      // Single-pool workers intentionally omit the per-engine array because
+      // it would duplicate their aggregate line. Preserve that worker when a
+      // sibling with multiple ranks makes the all-endpoints collapse useful.
+      engines:
+        entry.kvCacheUsageByEngine?.length > 0
+          ? entry.kvCacheUsageByEngine
+          : entry.kvCacheUsage.length > 0
+            ? [{ points: entry.kvCacheUsage }]
+            : [],
+    }))
     .filter((entry) => entry.engines.length > 0);
   if (entries.length < 2) return null;
   // Already one engine per worker — nothing to average, so leave the stored
