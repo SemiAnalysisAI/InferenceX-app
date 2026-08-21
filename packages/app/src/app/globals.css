@@ -61,6 +61,21 @@
   -webkit-text-fill-color: transparent;
 }
 
+/* Benchmark log viewer gutter. Line numbers come from a CSS counter rather than
+   DOM text so they stay out of the element's text content and out of anything
+   the reader copies from the pane. */
+.log-lines {
+  counter-reset: log-line;
+}
+
+.log-lines > .log-gutter {
+  counter-increment: log-line;
+}
+
+.log-lines > .log-gutter::before {
+  content: counter(log-line);
+}
+
 /* Shiki dual-theme: light by default, dark when .dark class is active */
 .shiki,
 .shiki span {

@@ -6,10 +6,10 @@ import { useClientSearchParams } from '@/hooks/useClientSearch';
 import { track } from '@/lib/analytics';
 import { replaceClientSearch } from '@/lib/client-navigation';
 
-export type DetailView = 'point' | 'timeline' | 'aggregates';
+export type DetailView = 'point' | 'timeline' | 'aggregates' | 'logs';
 
 const isDetailView = (value: string | null): value is DetailView =>
-  value === 'point' || value === 'timeline' || value === 'aggregates';
+  value === 'point' || value === 'timeline' || value === 'aggregates' || value === 'logs';
 
 /** URL-persisted detail view (`?view=`; per-point is the unadorned default). */
 export function useDetailView(): [DetailView, (nextView: DetailView) => void] {

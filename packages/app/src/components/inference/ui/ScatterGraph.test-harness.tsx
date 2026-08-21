@@ -15,13 +15,18 @@ declare global {
   var __scatterInferenceState: { current: Record<string, unknown> };
   var __scatterOverlayState: { current: Record<string, unknown> };
   var __scatterTraceAvailabilityState: { current: Record<number, boolean> | undefined };
+  var __scatterLogAvailabilityState: { current: Record<number, boolean> | undefined };
 }
-
+const availabilityIdsGlobal = vi.hoisted(() => ({
+  traceIds: [] as number[],
+  logIds: [] as number[],
+}));
 vi.hoisted(() => {
   globalThis.__scatterLegendState = { current: null };
   globalThis.__scatterInferenceState = { current: {} };
   globalThis.__scatterOverlayState = { current: {} };
   globalThis.__scatterTraceAvailabilityState = { current: undefined };
+  globalThis.__scatterLogAvailabilityState = { current: undefined };
 });
 
 vi.mock('@/components/ui/chart-legend', () => ({
@@ -42,10 +47,21 @@ vi.mock('@/components/unofficial-run-provider', () => ({
 
 export const legendState = globalThis.__scatterLegendState;
 export const inferenceState = globalThis.__scatterInferenceState;
+export const logAvailabilityState = globalThis.__scatterLogAvailabilityState;
 export const overlayState = globalThis.__scatterOverlayState;
 export const traceAvailabilityState = globalThis.__scatterTraceAvailabilityState;
+export const availabilityState = availabilityIdsGlobal;
 vi.mock('@/hooks/api/use-trace-availability', () => ({
-  useTraceAvailability: () => ({ data: globalThis.__scatterTraceAvailabilityState.current }),
+  useTraceAvailability: (ids: number[]) => {
+    availabilityIdsGlobal.traceIds = ids ?? [];
+    return { data: globalThis.__scatterTraceAvailabilityState.current, isPending: false };
+  },
+}));
+vi.mock('@/hooks/api/use-log-availability', () => ({
+  useLogAvailability: (ids: number[]) => {
+    availabilityIdsGlobal.logIds = ids ?? [];
+    return { data: globalThis.__scatterLogAvailabilityState.current, isPending: false };
+  },
 }));
 
 import ScatterGraph from './ScatterGraph';
@@ -211,6 +227,9 @@ beforeEach(() => {
   overlayState.current = baseOverlayState();
   legendState.current = null;
   traceAvailabilityState.current = undefined;
+  logAvailabilityState.current = undefined;
+  availabilityState.traceIds = [];
+  availabilityState.logIds = [];
   vi.mocked(setupChartStructure).mockClear();
 });
 

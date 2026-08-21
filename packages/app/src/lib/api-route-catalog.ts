@@ -273,6 +273,14 @@ export const apiRouteCatalog = [
     sourceSha256: 'ae0d5535af9f5bf8d287c04f915067c0e470ec907efb2a848cb6c35660770d2d',
   },
   {
+    source: 'src/app/api/v1/log-availability/route.ts',
+    path: '/api/v1/log-availability',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-log-availability',
+    sourceSha256: '1dab7aee9d6adf3304807823dba7463f8ccc4575afb4506e93f390b042ff2ac9',
+  },
+  {
     source: 'src/app/api/v1/overview/route.ts',
     path: '/api/v1/overview',
     method: 'GET',
@@ -300,12 +308,28 @@ export const apiRouteCatalog = [
     sourceSha256: '30659cb757b9fd23411757051b650cfb564016aa15c8b9fec48676b9591f01e9',
   },
   {
+    source: 'src/app/api/v1/server-log-files/route.ts',
+    path: '/api/v1/server-log-files',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-server-log-files',
+    sourceSha256: '367628818cb02273505c4826d35407e10c45ed4eced69b628da091cde79db0cf',
+  },
+  {
+    source: 'src/app/api/v1/server-log-search/route.ts',
+    path: '/api/v1/server-log-search',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'search-server-logs',
+    sourceSha256: '029a578cc8417a3ff34b6585fcc91c568e9973a2c00aab025a11cdbe9a847cb3',
+  },
+  {
     source: 'src/app/api/v1/server-log/route.ts',
     path: '/api/v1/server-log',
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-server-log',
-    sourceSha256: 'f81387385ce4e9a52948ee64ddb7b0caa8ef19a87bf50eaafc10e705a9358ab0',
+    sourceSha256: '13e61c279840bcc176bb75be1959cc417b711bcb329aaf278681416c078a9b69',
   },
   {
     source: 'src/app/api/v1/submissions/route.ts',
@@ -726,10 +750,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/server-logs.ts',
-    sourceSha256: '44a4a55283fe4952e07df4034abf6a211d055225aee510ef3e6a945c72b63b55',
+    sourceSha256: '7a6f6b0b3c60e1713f73f6d543745931886654f060cf55d6dc4be9619a64b479',
     reviewArea: {
-      en: 'Server log lookup result fields and missing-record behavior.',
-      zh: '服务器日志查询结果字段和记录缺失行为。',
+      en: 'Log filename discovery, selected-file reads, bounded chunk metadata, complete-file search, availability, and legacy-schema fallback.',
+      zh: '日志文件名发现、指定文件读取、有界分块元数据、完整文件搜索、可用性以及旧版 schema 回退行为。',
     },
   },
   {

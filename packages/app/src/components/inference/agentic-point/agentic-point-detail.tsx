@@ -29,6 +29,7 @@ import {
 import { PointSummary } from './point-summary';
 import { RequestMetricOverTime, SequenceMetricCard } from './request-metric-cards';
 import { RequestTimelineView } from './request-timeline';
+import { ServerLogViewer } from './server-log-viewer';
 import {
   CumulativeUniqueInputTokensCard,
   InflightUniqueTokensCard,
@@ -56,6 +57,8 @@ const STRINGS = {
     perPoint: 'Per-point',
     requestTimeline: 'Request timeline',
     aggregatesAcrossConfigs: 'Aggregates across configs',
+    logs: 'Logs',
+    detailView: 'Detail view',
     warmupWord: 'warmup',
     warmupNotePrefix: 'Showing the ',
     warmupNoteBody:
@@ -75,6 +78,8 @@ const STRINGS = {
     perPoint: '单点',
     requestTimeline: '请求时间线',
     aggregatesAcrossConfigs: '跨配置聚合',
+    logs: '日志',
+    detailView: '详情视图',
     warmupWord: 'warmup',
     warmupNotePrefix: '当前显示 ',
     warmupNoteBody:
@@ -112,6 +117,7 @@ export function AgenticPointDetail({ id }: Props) {
       { value: 'point', label: t.perPoint, testId: 'detail-view-point' },
       { value: 'timeline', label: t.requestTimeline, testId: 'detail-view-timeline' },
       { value: 'aggregates', label: t.aggregatesAcrossConfigs, testId: 'detail-view-aggregates' },
+      { value: 'logs', label: t.logs, testId: 'detail-view-logs' },
     ],
     [t],
   );
@@ -238,25 +244,26 @@ export function AgenticPointDetail({ id }: Props) {
         <div className="text-sm text-muted-foreground">{t.loadingPoint}</div>
       ) : null}
 
-      {metricsQuery.isError && (
+      {view !== 'logs' && metricsQuery.isError && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
           Failed to load trace data for benchmark point #{id}.
         </div>
       )}
-      {metricsQuery.data === null && !metricsQuery.isLoading && (
+      {view !== 'logs' && metricsQuery.data === null && !metricsQuery.isLoading && (
         <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
           No stored trace_replay blob for benchmark point #{id}. This point predates the aiperf
           time-series capture, or its source artifacts have expired on GitHub.
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex min-w-0 items-center justify-between gap-3">
         <SegmentedToggle
           value={view}
           options={viewOptions}
           onValueChange={setView}
-          ariaLabel="Detail view"
+          ariaLabel={t.detailView}
           testId="detail-view-toggle"
+          className="max-w-full overflow-x-auto"
           buttonClassName="px-3 py-1.5 text-sm"
         />
         {view === 'aggregates' && (
@@ -284,7 +291,9 @@ export function AgenticPointDetail({ id }: Props) {
         />
       )}
 
-      {view === 'aggregates' ? (
+      {view === 'logs' ? (
+        <ServerLogViewer id={id} enabled />
+      ) : view === 'aggregates' ? (
         <AggregatesGrid
           siblings={siblingsData?.siblings ?? []}
           aggregates={aggregatesQuery.data}

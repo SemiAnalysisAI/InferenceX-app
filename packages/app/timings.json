@@ -109,6 +109,10 @@
       "duration": 2496
     },
     {
+      "spec": "cypress/e2e/fixed-sequence-logs.cy.ts",
+      "duration": 1000
+    },
+    {
       "spec": "cypress/e2e/gpu-compare-agentic-detail.cy.ts",
       "duration": 1104
     },

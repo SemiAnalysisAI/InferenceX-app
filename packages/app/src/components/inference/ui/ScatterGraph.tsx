@@ -4,6 +4,7 @@ import { track } from '@/lib/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
+import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { SCATTER_RENDERED_EVENT } from '@/lib/nudges/agentic-point-coach-mark';
@@ -15,6 +16,7 @@ import {
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
+import { useLogAvailability } from '@/hooks/api/use-log-availability';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import {
   avoidPointLabelCollisions,
@@ -118,6 +120,14 @@ import {
   buildFrontierContinuations,
   fitContinuationLabelBaseline,
 } from '@/components/inference/utils/overflowContinuations';
+
+const FixedSequenceLogDialog = dynamic(
+  () =>
+    import('@/components/inference/log-viewer/fixed-sequence-log-dialog').then(
+      (module) => module.FixedSequenceLogDialog,
+    ),
+  { ssr: false },
+);
 
 const formatChangelogDescription = (desc: string | string[]): React.JSX.Element => {
   if (typeof desc === 'string') {
@@ -928,6 +938,15 @@ const ScatterGraph = React.memo(
     const { data: traceAvailability, isPending: isTraceAvailabilityPending } =
       useTraceAvailability(agenticIds);
 
+    // Log availability applies to every persisted official point, including
+    // fixed-sequence runs.
+    const persistedPointIds = useMemo(
+      () => pointsData.flatMap((point) => (isPersistedBenchmarkId(point.id) ? [point.id] : [])),
+      [pointsData],
+    );
+    const { data: persistedLogAvailability } = useLogAvailability(persistedPointIds);
+    const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
+
     // --- Legend points table (per-series drill-down opened from the legend) ---
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
 
@@ -1190,6 +1209,7 @@ const ScatterGraph = React.memo(
       resolveColor,
       knownIssueAnnotations,
       traceAvailability,
+      logAvailability: persistedLogAvailability,
     });
     interactionRef.current = {
       isPointVisible,
@@ -1201,6 +1221,7 @@ const ScatterGraph = React.memo(
       resolveColor,
       knownIssueAnnotations,
       traceAvailability,
+      logAvailability: persistedLogAvailability,
     };
 
     // Render context from the last D3 render — lets the decoration effect
@@ -1330,8 +1351,12 @@ const ScatterGraph = React.memo(
             selectedYAxisMetric,
             hardwareConfig,
             runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-            hasTrace: isPersistedBenchmarkId(d.id)
-              ? interactionRef.current.traceAvailability?.[d.id] === true
+            hasTrace:
+              d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
+                ? (interactionRef.current.traceAvailability?.[d.id] ?? false)
+                : false,
+            hasLog: isPersistedBenchmarkId(d.id)
+              ? (interactionRef.current.logAvailability?.[d.id] ?? false)
               : false,
             locale,
           }),
@@ -1366,6 +1391,23 @@ const ScatterGraph = React.memo(
                 id: d.id,
                 hwKey: String(d.hwKey),
                 conc: d.conc,
+              });
+            });
+          }
+          const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
+          if (logsBtn && typeof d.id === 'number') {
+            logsBtn.addEventListener('click', (btnEvent) => {
+              btnEvent.stopPropagation();
+              if (d.benchmark_type !== 'agentic_traces') {
+                btnEvent.preventDefault();
+                setFixedLogPointId(d.id!);
+                chartRef.current?.dismissTooltip();
+              }
+              track('latency_view_logs_opened', {
+                id: d.id,
+                hwKey: String(d.hwKey),
+                conc: d.conc,
+                benchmarkType: d.benchmark_type ?? 'single_turn',
               });
             });
           }
@@ -3110,6 +3152,14 @@ const ScatterGraph = React.memo(
                 href: row.href ?? '',
               })
             }
+          />
+        )}
+        {fixedLogPointId === null ? null : (
+          <FixedSequenceLogDialog
+            pointId={fixedLogPointId}
+            onOpenChange={(open) => {
+              if (!open) setFixedLogPointId(null);
+            }}
           />
         )}
       </>

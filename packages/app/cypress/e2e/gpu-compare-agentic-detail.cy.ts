@@ -117,6 +117,14 @@ describe('GPU comparison agentic point detail', () => {
       );
       request.reply({ body: result });
     });
+    cy.intercept('GET', '/api/v1/log-availability*', (request) => {
+      const ids = new URL(request.url).searchParams.get('ids')?.split(',') ?? [];
+      request.reply({
+        body: Object.fromEntries(
+          ids.filter((id) => agenticIds.has(Number(id))).map((id) => [id, true]),
+        ),
+      });
+    }).as('gpuLogAvailability');
     // The agentic default x-axis mode (E2E Normalized Interactivity) fetches derived metrics on
     // mount; without values every point drops out of the (remapped) data set.
     interceptDerivedAgenticMetrics();
@@ -146,6 +154,7 @@ describe('GPU comparison agentic point detail', () => {
 
     cy.get('[data-testid="gpu-graph"]').first().should('be.visible');
     cy.wait('@gpuTraceAvailability');
+    cy.wait('@gpuLogAvailability');
     cy.wait(100);
     cy.get('[data-testid="gpu-graph"]')
       .first()
@@ -180,6 +189,17 @@ describe('GPU comparison agentic point detail', () => {
         // non-default values are carried, so `g_model` (DeepSeek-V4-Pro IS the
         // default) is absent while the scenario and GPU selection are not.
         const params = new URLSearchParams(href.slice(href.indexOf('?')));
+        expect(params.get('i_seq')).to.equal('agentic-traces');
+        expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
+      });
+    cy.get('[data-chart-tooltip]:visible [data-action="view-logs"]')
+      .should('be.visible')
+      .then(($link) => {
+        expect($link).to.match('a');
+        const href = $link.attr('href') ?? '';
+        expect(href).to.match(/^\/inference\/agentic\/\d+\?/u);
+        const params = new URLSearchParams(href.slice(href.indexOf('?')));
+        expect(params.get('view')).to.equal('logs');
         expect(params.get('i_seq')).to.equal('agentic-traces');
         expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
       });

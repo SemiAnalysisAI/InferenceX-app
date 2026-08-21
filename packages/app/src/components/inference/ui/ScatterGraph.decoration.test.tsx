@@ -13,6 +13,7 @@ import {
   point,
   rebuildCount,
   traceAvailabilityState,
+  availabilityState,
 } from './ScatterGraph.test-harness';
 import { pointLabelText } from './point-label';
 
@@ -50,6 +51,24 @@ describe('ScatterGraph toggle decoration', () => {
     expect(dotGroups(container)).toHaveLength(POINTS.length);
     expect(container.querySelectorAll('.roofline-path').length).toBeGreaterThan(0);
     expect(rebuildCount()).toBeGreaterThan(0);
+    unmount();
+  });
+
+  it('checks log availability for fixed-sequence and agentic official points', () => {
+    const fixed = {
+      ...point('h100', 'fp8', 10, 100, 1),
+      id: 96255,
+      benchmark_type: 'single_turn',
+    } as InferenceData;
+    const agentic = {
+      ...point('h100', 'fp8', 20, 200, 2),
+      id: 206885,
+      benchmark_type: 'agentic_traces',
+    } as InferenceData;
+    const { unmount } = mountChart({ data: [fixed, agentic] });
+
+    expect(availabilityState.logIds).toEqual([96255, 206885]);
+    expect(availabilityState.traceIds).toEqual([206885]);
     unmount();
   });
 

@@ -35,6 +35,7 @@ import {
   fetchRunAttempt,
   listRunArtifacts,
 } from './lib/github-artifacts';
+import { pairServerLogArtifacts } from './lib/server-log-backfill';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import {
   applyBenchmarkPointBackfill,
@@ -57,7 +58,7 @@ import {
   bulkIngestBenchmarkRows,
   bulkIngestRunStats,
   bulkUpsertAvailability,
-  insertServerLog,
+  insertServerLogFiles,
 } from './etl/benchmark-ingest';
 import { findUnlinkedTraceReplayIds, persistPreparedTraceReplay } from './etl/trace-replay-ingest';
 import {
@@ -66,6 +67,7 @@ import {
 } from './etl/trace-replay-worker-pool';
 import { AsyncSemaphore } from './etl/async-semaphore';
 import { discoverTraceReplayArtifacts } from './etl/trace-artifact-discovery';
+import { discoverServerLogArtifacts, readServerLogArtifact } from './etl/server-log-artifacts';
 import { datasetSlugFromBenchmarkRow } from './etl/dataset-provenance';
 import { mapAggEvalRow, mapEvalRow } from './etl/eval-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
@@ -146,7 +148,29 @@ if (isDownloadMode) {
   // most recent per logical name (see RUNNER_SUFFIX_RE in github-artifacts)
   // so a failed attempt's empty metrics can't overwrite the good one via
   // ON CONFLICT DO UPDATE.
-  const byLogical = dedupeArtifactsByLogicalName(listRunArtifacts(REPO, runIdStr));
+  const artifacts = listRunArtifacts(REPO, runIdStr);
+  const byLogical = dedupeArtifactsByLogicalName(artifacts);
+  // Server-log artifacts from eval and benchmark jobs can share a logical
+  // config but differ by runner suffix. Keep the exact server-log sibling for
+  // each selected bmk artifact instead of letting latest-created eval logs win.
+  for (const [key, artifact] of byLogical) {
+    if (
+      artifact.name.startsWith('server_logs_') ||
+      artifact.name.startsWith('multinode_server_logs_')
+    ) {
+      byLogical.delete(key);
+    }
+  }
+  const selectedBenchmarkNames = new Set(
+    [...byLogical.values()]
+      .filter((artifact) => artifact.name.startsWith('bmk_'))
+      .map((artifact) => artifact.name),
+  );
+  for (const pair of pairServerLogArtifacts(artifacts)) {
+    if (selectedBenchmarkNames.has(pair.benchmarks.name)) {
+      byLogical.set(`server-log:${pair.serverLogs.name}`, pair.serverLogs);
+    }
+  }
 
   for (const artifact of byLogical.values()) {
     console.log(`  ${artifact.name}`);
@@ -424,23 +448,9 @@ async function main(): Promise<void> {
           .filter((d) => fs.statSync(d).isDirectory())
       : [];
 
-    const serverLogPaths = new Map<string, string>();
-    if (fs.existsSync(artifactsDir)) {
-      for (const d of fs.readdirSync(artifactsDir)) {
-        if (!d.startsWith('server_logs_')) continue;
-        // feat-agentx-v1.0 harness nests the log under `results/server.log`;
-        // older runs keep it at the artifact root. Check both.
-        const logPath = [
-          path.join(artifactsDir, d, 'server.log'),
-          path.join(artifactsDir, d, 'results', 'server.log'),
-        ].find((p) => fs.existsSync(p));
-        if (!logPath) continue;
-        const configKey = d.replace(/^server_logs_/u, '');
-        serverLogPaths.set(configKey, logPath);
-      }
-    }
-    if (serverLogPaths.size > 0) {
-      console.log(`  Found ${serverLogPaths.size} server log artifact(s)`);
+    const serverLogArtifacts = discoverServerLogArtifacts(artifactsDir);
+    if (serverLogArtifacts.size > 0) {
+      console.log(`  Found ${serverLogArtifacts.size} server log artifact(s)`);
     }
 
     // Sibling aiperf artifacts: each `bmk_agentic_<suffix>` is paired with an
@@ -587,20 +597,24 @@ async function main(): Promise<void> {
             // prefix), so fall back to the fully-stripped suffix — otherwise
             // agentic rows never get their server log (and KV-pool size) linked.
             const configKey = parentDir.replace(/^bmk_/u, '');
-            const logPath =
-              serverLogPaths.get(configKey) ??
-              serverLogPaths.get(stripBmkAndAgenticPrefix(parentDir));
-            if (logPath) {
+            const logArtifact =
+              serverLogArtifacts.get(configKey) ??
+              serverLogArtifacts.get(stripBmkAndAgenticPrefix(parentDir));
+            if (logArtifact) {
               try {
                 const serverLogStart = Date.now();
-                console.log(
-                  `    server_log ${path.basename(logPath)} (${formatBytes(fileSize(logPath))})`,
+                const logFiles = readServerLogArtifact(logArtifact);
+                const totalBytes = logFiles.reduce(
+                  (bytes, logFile) => bytes + Buffer.byteLength(logFile.logText, 'utf8'),
+                  0,
                 );
-                const serverLog = fs.readFileSync(logPath, 'utf8').replaceAll('\u0000', '');
-                await insertServerLog(sql, insertedIds, serverLog);
-                console.log(`    server_log linked (${elapsed(serverLogStart)})`);
+                console.log(
+                  `    server_logs ${logFiles.length} .log/.out file(s) (${formatBytes(totalBytes)})`,
+                );
+                await insertServerLogFiles(sql, insertedIds, logFiles);
+                console.log(`    server_logs linked (${elapsed(serverLogStart)})`);
               } catch (error: any) {
-                tracker.recordDbError(`server_log for ${configKey}`, error);
+                tracker.recordDbError(`server_logs for ${configKey}`, error);
               }
             }
           }
