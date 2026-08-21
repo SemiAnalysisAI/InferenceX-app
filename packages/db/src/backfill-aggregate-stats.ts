@@ -24,6 +24,7 @@
 import { hasNoSslFlag } from './cli-utils.js';
 import {
   computeAggregateStats,
+  computeProfileAggregateStatsFromCompressedChunks,
   mergeProfileStatsUpgrade,
   STATS_VERSION,
   type AggregateStats,
@@ -39,11 +40,30 @@ import {
 
 const flags = parseLimitForceFlags();
 
+// Neon's HTTP response and JS drivers should not receive a 100+ MB bytea as
+// one value. Slice oversized TOAST values into independent bounded reads and
+// feed the compressed bytes directly into the streaming gzip parser.
+const MAX_INLINE_PROFILE_BYTES = 64 * 1024 * 1024;
+const PROFILE_CHUNK_BYTES = 8 * 1024 * 1024;
+
 const sql = createAdminSql({
   noSsl: hasNoSslFlag(),
   max: 1,
   onnotice: () => {},
 });
+
+async function* readProfileChunks(id: number, totalBytes: number): AsyncGenerator<Buffer> {
+  for (let offset = 0; offset < totalBytes; offset += PROFILE_CHUNK_BYTES) {
+    const length = Math.min(PROFILE_CHUNK_BYTES, totalBytes - offset);
+    const [row] = await sql<{ chunk: Buffer }[]>`
+      select substring(profile_export_jsonl_gz from ${offset + 1} for ${length}) as chunk
+      from agentic_trace_replay
+      where id = ${id}
+    `;
+    if (!row?.chunk) throw new Error(`profile blob chunk missing at byte ${offset}`);
+    yield row.chunk;
+  }
+}
 
 async function main(): Promise<void> {
   console.log('=== backfill-aggregate-stats ===');
@@ -82,9 +102,20 @@ async function main(): Promise<void> {
     async (id) => {
       // Fetch one row at a time — the json_gz blob is the heavy field.
       const [row] = await sql<
-        { profile_export_jsonl_gz: Buffer | null; aggregate_stats: AggregateStats | null }[]
+        {
+          profile_export_jsonl_gz: Buffer | null;
+          profile_blob_bytes: number;
+          aggregate_stats: AggregateStats | null;
+        }[]
       >`
-        select profile_export_jsonl_gz, aggregate_stats
+        select
+          case
+            when pg_column_size(profile_export_jsonl_gz) <= ${MAX_INLINE_PROFILE_BYTES}
+              then profile_export_jsonl_gz
+            else null
+          end as profile_export_jsonl_gz,
+          coalesce(pg_column_size(profile_export_jsonl_gz), 0)::bigint as profile_blob_bytes,
+          aggregate_stats
         from agentic_trace_replay
         where id = ${id}
       `;
@@ -93,16 +124,22 @@ async function main(): Promise<void> {
         return 'skipped';
       }
 
+      const profileStats =
+        Number(row.profile_blob_bytes) > MAX_INLINE_PROFILE_BYTES
+          ? await computeProfileAggregateStatsFromCompressedChunks(
+              readProfileChunks(id, Number(row.profile_blob_bytes)),
+            )
+          : await computeAggregateStats({
+              profileBlob: row.profile_export_jsonl_gz,
+              serverBlob: null,
+            });
+
       let stats: AggregateStats;
       // v3 onwards → current is a profile-only change (the server-derived
       // fields haven't changed since v3), so skip re-reading the huge server
       // blob and carry its KV/prefix distributions forward.
       const storedVersion = row.aggregate_stats?.version;
       if (storedVersion !== undefined && storedVersion >= 3 && storedVersion < STATS_VERSION) {
-        const profileStats = await computeAggregateStats({
-          profileBlob: row.profile_export_jsonl_gz,
-          serverBlob: null,
-        });
         stats = mergeProfileStatsUpgrade(row.aggregate_stats!, profileStats);
       } else {
         const [serverRow] = await sql<{ server_metrics_json_gz: Buffer | null }[]>`
@@ -110,10 +147,11 @@ async function main(): Promise<void> {
           from agentic_trace_replay
           where id = ${id}
         `;
-        stats = await computeAggregateStats({
-          profileBlob: row.profile_export_jsonl_gz,
+        const serverStats = await computeAggregateStats({
+          profileBlob: null,
           serverBlob: serverRow?.server_metrics_json_gz ?? null,
         });
+        stats = mergeProfileStatsUpgrade(serverStats, profileStats);
       }
 
       await sql`
