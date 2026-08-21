@@ -35,6 +35,7 @@ import {
   buildReplayOverlayData,
   computeReplayDomain,
   dateAtFraction,
+  replayExportDurationSec,
   replayPointsDomain,
   shouldCommitFraction,
   spanMs,
@@ -63,6 +64,7 @@ interface ReplayPanelProps {
 
 const STANDARD_SPEED_OPTIONS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const BEST_PER_SKU_SPEED_OPTIONS: readonly number[] = [...STANDARD_SPEED_OPTIONS, 3, 4, 5];
+const MP4_EXPORT_FPS = 30;
 const REPLAY_BODY_MIN_HEIGHT = 480;
 
 /**
@@ -502,23 +504,25 @@ export default function ReplayPanel({
       const mod = await import('./exportMp4');
       const { exportReplayMp4 } = mod;
       guard = mod.isMp4ExportError;
-      // Export duration is deterministic from timeline length, NOT playback speed
-      // — the MP4 is an artifact of the dataset, not a recording of the current
-      // UI session. Capped at 60s.
-      const durationSec = Math.max(2, Math.min(60, spanMs(timeline.dates.length) / 1000));
+      // Best per SKU explicitly offers faster playback, so its MP4 uses that
+      // speed too. Regular replay preserves the existing canonical duration.
+      const exportSpeed = dynamicBestPerSku ? speed : 1;
+      const durationSec = replayExportDurationSec(timeline.dates.length, exportSpeed);
       const root = panelRef.current;
       if (!root) throw new Error('Replay panel element is not mounted.');
       await exportReplayMp4({
         captureRoot: root,
         fileName: `InferenceX_${selectedModel}_${chartDefinition.chartType}_replay`,
+        fps: MP4_EXPORT_FPS,
         durationSec,
         signal: ac.signal,
         renderFrame: async (t) => {
-          // flushSync forces React to commit synchronously; two RAFs let the
-          // browser paint before the capture step reads back the DOM.
+          // flushSync commits React synchronously. One animation frame lets
+          // ScatterGraph's D3 effects update the SVG before capture without
+          // imposing two display-refresh waits on every encoded frame.
           flushSync(() => commitFraction(t, { force: true }));
           await new Promise<void>((resolve) => {
-            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+            requestAnimationFrame(() => resolve());
           });
         },
         onStage: (s) => {
@@ -526,7 +530,7 @@ export default function ReplayPanel({
         },
         onProgress: (p) => {
           lastProgressAt = performance.now();
-          frameCount = Math.round(p * durationSec * 30);
+          frameCount = Math.round(p * durationSec * MP4_EXPORT_FPS);
           setExportProgress(p);
         },
       });
@@ -580,7 +584,16 @@ export default function ReplayPanel({
       setExportProgress(null);
       abortRef.current = null;
     }
-  }, [chartDefinition.chartType, parentChartId, selectedModel, timeline, hasWebCodecs]);
+  }, [
+    chartDefinition.chartType,
+    parentChartId,
+    selectedModel,
+    timeline,
+    hasWebCodecs,
+    dynamicBestPerSku,
+    speed,
+    commitFraction,
+  ]);
 
   if (history.isLoading || !timeline) {
     return (

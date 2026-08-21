@@ -11,6 +11,7 @@ import {
   buildReplayOverlayData,
   computeReplayDomain,
   dateAtFraction,
+  replayExportDurationSec,
   shouldCommitFraction,
   spanMs,
   stepFloatAtFraction,
@@ -113,6 +114,21 @@ describe('spanMs', () => {
 
   it('respects a minimum of 4500ms once the floor kicks in', () => {
     expect(spanMs(5)).toBe(4500);
+  });
+});
+
+describe('replayExportDurationSec', () => {
+  it('reduces frame-producing duration at faster playback speeds', () => {
+    expect(replayExportDurationSec(95, 1)).toBe(30);
+    expect(replayExportDurationSec(95, 3)).toBe(10);
+    expect(replayExportDurationSec(95, 5)).toBe(6);
+    expect(replayExportDurationSec(5, 5)).toBe(0.9);
+  });
+
+  it('caps slow exports and ignores invalid playback speeds', () => {
+    expect(replayExportDurationSec(95, 0.25)).toBe(60);
+    expect(replayExportDurationSec(95, 0)).toBe(30);
+    expect(replayExportDurationSec(95, Number.NaN)).toBe(30);
   });
 });
 

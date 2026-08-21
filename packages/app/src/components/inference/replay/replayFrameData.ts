@@ -304,6 +304,17 @@ export function spanMs(numDates: number): number {
   return Math.min(30_000, Math.max(4500, numDates * 800));
 }
 
+/**
+ * MP4 duration for a replay speed. Faster Best-per-SKU playback emits fewer
+ * 30 FPS frames, while the 60s ceiling prevents slow playback from creating
+ * an unexpectedly large browser-side export.
+ */
+export function replayExportDurationSec(numDates: number, playbackSpeed = 1): number {
+  const safeSpeed = Number.isFinite(playbackSpeed) && playbackSpeed > 0 ? playbackSpeed : 1;
+  const baseDurationSec = Math.max(2, spanMs(numDates) / 1000);
+  return Math.min(60, baseDurationSec / safeSpeed);
+}
+
 // Scrubber-resolution quantum (1/1000) used to throttle React commits while
 // the rAF loop advances continuously through the underlying ref.
 export const FRACTION_COMMIT_QUANTUM = 1000;

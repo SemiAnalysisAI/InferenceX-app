@@ -127,6 +127,12 @@ transition duration stays at zero for replay. Best-per-SKU MP4 mode keeps this
 explicitly requested animation active even when the ambient reduced-motion
 preference is set; regular replay continues to honor that preference.
 
+Best-per-SKU export also applies the selected replay speed to the MP4 duration
+while retaining 30 FPS, so 3×–5× produces proportionally fewer frames instead
+of spending time encoding a canonical 1× video. Regular replay keeps its
+existing duration. Each export frame uses one paint boundary after the
+synchronous React commit before the chart DOM is cloned and rasterized.
+
 ## Batched Label Measurement
 
 Label loops that size a background rect to its text (`.ll-bg`/`.pl-bg`, point-label collision avoidance) must not interleave `getBBox()` with DOM writes — each read after a write forces a synchronous layout, turning N labels into N reflows. The pattern is two passes over the selection: write every label's text first, then measure every bbox (one forced layout for the whole batch), then write the rects. Same rule for `measureLegendRightInset`: it reads `getBoundingClientRect`, so it's skipped entirely when there are no known-issue annotations to place — it would otherwise run on every zoom frame.
