@@ -368,7 +368,7 @@ describe('tooltip parallelism — zh locale', () => {
   it('localizes the old-data parallelism strategy line', () => {
     const html = generateTooltipContent(tooltipConfig({ data: pt({ tp: 4 }), locale: 'zh' }));
     expect(html).toContain('并行策略');
-    expect(html).toContain('4 个 Chip');
+    expect(html).toContain('4 个芯片');
   });
 
   it('localizes the multinode disagg role headers', () => {
@@ -385,9 +385,9 @@ describe('tooltip parallelism — zh locale', () => {
         locale: 'zh',
       }),
     );
-    expect(html).toContain('预填充:');
-    expect(html).toContain('解码:');
-    expect(html).toContain('16 个 Chip');
+    expect(html).toContain('预填充：');
+    expect(html).toContain('解码：');
+    expect(html).toContain('16 个芯片');
   });
 });
 

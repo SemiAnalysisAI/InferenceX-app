@@ -93,7 +93,7 @@ export function buildPerDollarMetadataZh(
   // byte-identical pages, each claiming to be canonical.
   const routePath = scenarioPath(canonical, scenarioSegment);
   const url = `${SITE_URL}${routePath}`;
-  const description = `${gpuLabel} 在 ${parsed.model.label} 上的每美元性能：来自 InferenceX（SemiAnalysis 推出的独立开源基准测试平台）的经验证、可复现的每百万 token 成本结果，基于云服务商 TCO 归一化。${SUPPORTERS_LINE_ZH}查看哪款 Chip 在各交互性水平下更经济。`;
+  const description = `${gpuLabel} 在 ${parsed.model.label} 上的每美元性能：来自 InferenceX（SemiAnalysis 推出的独立开源基准测试平台）的经验证、可复现的每百万 token 成本结果，基于云服务商 TCO 归一化。${SUPPORTERS_LINE_ZH}查看哪款芯片在各交互性水平下更经济。`;
   return {
     title: `${fullLabel} — 每美元性能`,
     description,

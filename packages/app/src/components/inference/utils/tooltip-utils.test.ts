@@ -371,7 +371,7 @@ describe('generateTooltipContent', () => {
     );
 
     expect(enabled).toContain('<strong>Offload Type:</strong> Enabled (legacy data)');
-    expect(disabledZh).toContain('<strong>卸载类型:</strong> 已禁用（旧版数据）');
+    expect(disabledZh).toContain('<strong>卸载类型：</strong> 已禁用（旧版数据）');
   });
 
   it('does not treat the fixed-sequence offload default as legacy metadata', () => {
@@ -458,9 +458,9 @@ describe('generateTooltipContent', () => {
         }),
       }),
     );
-    expect(html).toContain('<strong>卸载类型:</strong> DRAM');
-    expect(html).toContain('<strong>KV 卸载引擎:</strong> LMCache');
-    expect(html).toContain('<strong>路由器:</strong> vLLM Router 0.1.14');
+    expect(html).toContain('<strong>卸载类型：</strong> DRAM');
+    expect(html).toContain('<strong>KV 卸载引擎：</strong> LMCache');
+    expect(html).toContain('<strong>路由器：</strong> vLLM Router 0.1.14');
   });
 
   it('omits the offload type row when the canonical tier is none', () => {
@@ -585,7 +585,7 @@ describe('generateOverlayTooltipContent', () => {
     );
 
     expect(mtp).toContain('<strong>Speculative Decoding:</strong> MTP');
-    expect(standardZh).toContain('<strong>投机解码:</strong> 关闭');
+    expect(standardZh).toContain('<strong>投机解码：</strong> 关闭');
   });
 
   it('labels Kimi-K3 speculative decoding "DSpark" rather than the generic MTP', () => {

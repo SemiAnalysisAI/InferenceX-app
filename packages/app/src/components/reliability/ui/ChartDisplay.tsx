@@ -23,9 +23,9 @@ const STRINGS = {
     captionSource: 'Source: SemiAnalysis InferenceX™',
   },
   zh: {
-    heading: 'Chip 可靠性',
-    description: '各 Chip 型号推理运行的成功率百分比，展示硬件在一段时间内的推理运行可靠性。',
-    captionHeading: '各 Chip 型号成功率',
+    heading: '芯片可靠性',
+    description: '各芯片型号推理运行的成功率百分比，展示硬件在一段时间内的推理运行可靠性。',
+    captionHeading: '各芯片型号成功率',
     captionSource: '数据来源：SemiAnalysis InferenceX™',
   },
 } as const;

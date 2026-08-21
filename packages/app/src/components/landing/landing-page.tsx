@@ -43,7 +43,7 @@ const STRINGS = {
   zh: {
     exploreInferenceX: '探索 InferenceX',
     exploreInferenceXLead:
-      '先查看活跃模型与关键平台的精简成本总览，或打开完整仪表板，探索所有模型、Chip、框架与指标。AgentX 是我们的长上下文多轮编码场景。',
+      '先查看活跃模型与关键平台的精简成本总览，或打开完整仪表板，探索所有模型、芯片、框架与指标。AgentX 是我们的长上下文多轮编码场景。',
     fullDashboard: '完整仪表板',
     platformCoverage:
       '跨 DeepSeekv4 Pro、Qwen、Kimi、GLM、MiniMax、gpt-oss、Llama 等模型，对比 NVIDIA GB300 NVL72、GB200 NVL72、B300、B200、H200、H100、AMD MI355X、MI325X、MI300X，以及即将上线的 VR200 NVL72、AMD MI455X UALoE72、TPUv7 Ironwood 等硬件。',
@@ -52,7 +52,7 @@ const STRINGS = {
     reproP1:
       '仪表板上的每个数据点都由公开的 GitHub Actions 工作流运行产生。配置方案（recipe）保存在公开仓库中，运行在真实目标硬件上执行，完整日志与产物公开可查。点击图表上的任意数据点即可跳转到生成它的那次运行。一切都可复现、可审计、开源。',
     reproStat: '平均每周新增 1,000+ 条基准测试数据点。',
-    reproStatTail: '第一时间浏览每个新上线的模型、Chip、框架与配置。',
+    reproStatTail: '第一时间浏览每个新上线的模型、芯片、框架与配置。',
     actionsRunsTitle: '公开的 Actions 运行',
     actionsRunsDesc: '每次基准测试都在 GitHub Actions 上执行，运行过程中即可实时查看完整日志。',
     openRecipesTitle: '开放的配置方案',
@@ -64,7 +64,7 @@ const STRINGS = {
     viewRuns: '在 GitHub Actions 上查看基准测试运行',
     howItWorks: '工作原理',
     quickComparisons: '快速对比',
-    quickComparisonsDesc: '一键进入最热门的 Chip 推理基准测试对比，精选视图开箱即用。',
+    quickComparisonsDesc: '一键进入最热门的芯片推理基准测试对比，精选视图开箱即用。',
   },
 } as const;
 
