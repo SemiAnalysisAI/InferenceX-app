@@ -101,14 +101,14 @@ const morphSeries = (
   });
 };
 
-const BEST_PER_SKU_MORPH_MS = 240;
+const BEST_PER_SKU_MORPH_MS = 480;
 
 /** Fraction of the exported timeline used to morph one winner into the next. */
 export function bestPerSkuMorphWindowFraction(numDates: number): number {
   if (numDates <= 1) return 0;
-  // Keep the animation close to 240ms in the deterministic MP4 timeline, but
-  // never let it overlap more than 45% of one observed-date segment.
-  return Math.min(BEST_PER_SKU_MORPH_MS / spanMs(numDates), 0.45 / (numDates - 1));
+  // Keep the animation close to 480ms in the deterministic MP4 timeline, but
+  // leave a gap before the next observed date even in long, capped replays.
+  return Math.min(BEST_PER_SKU_MORPH_MS / spanMs(numDates), 0.8 / (numDates - 1));
 }
 
 function findWinnerSwitchFraction(
@@ -122,7 +122,7 @@ function findWinnerSwitchFraction(
 ): number {
   let low = startFraction;
   let high = endFraction;
-  // Eight bisections place a 240ms morph boundary within ~1ms in the longest
+  // Eight bisections place a 480ms morph boundary within ~2ms in the longest
   // 30s export, without precomputing every SKU's complete winner history.
   for (let iteration = 0; iteration < 8; iteration++) {
     const mid = (low + high) / 2;

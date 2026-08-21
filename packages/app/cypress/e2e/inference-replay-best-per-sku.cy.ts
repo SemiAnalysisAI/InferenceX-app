@@ -33,7 +33,7 @@ describe('Inference replay — Best per SKU', () => {
         win.matchMedia = (query: string) => {
           if (query !== '(prefers-reduced-motion: reduce)') return nativeMatchMedia(query);
           return {
-            matches: false,
+            matches: true,
             media: query,
             onchange: null,
             addListener: () => {},
@@ -53,6 +53,26 @@ describe('Inference replay — Best per SKU', () => {
       });
     cy.get('[data-testid="export-mp4-button"]').first().click();
     cy.get('[data-testid="replay-scrubber"]', { timeout: 15_000 }).should('exist');
+
+    // Regression: the runtime that exposed the bug reports reduced motion.
+    // Best-per-SKU MP4 mode is an explicit animation request, so it must use
+    // continuous fractions instead of the reduced-motion 1.2s slideshow.
+    cy.window().then((win) => {
+      expect(win.matchMedia('(prefers-reduced-motion: reduce)').matches).to.equal(true);
+    });
+    cy.get('[data-testid="replay-reset"]').click();
+    cy.get('[data-testid="replay-play-pause"]').click();
+    cy.wait(300);
+    cy.get('[data-testid="replay-scrubber"]')
+      .invoke('val')
+      .then((value) => {
+        expect(
+          Number(value),
+          'continuous Best-per-SKU animation advances before 1.2s',
+        ).to.be.greaterThan(0);
+      });
+    cy.get('[data-testid="replay-play-pause"]').click();
+    cy.get('[data-testid="replay-reset"]').click();
 
     setBestReplayScrubber(0);
     bestReplayHardwareKeys().then((startKeys) => {

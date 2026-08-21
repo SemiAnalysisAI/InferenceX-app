@@ -315,7 +315,7 @@ export default function ReplayPanel({
     if (!playing || !timeline) return;
     // Reduced motion: advance one observed step per ~1.2s without per-frame
     // interpolation, so users get a slideshow rather than continuous motion.
-    if (prefersReducedMotion) {
+    if (prefersReducedMotion && !dynamicBestPerSku) {
       const stepMs = 1200 / Math.max(0.1, speedRef.current);
       const n = timeline.dates.length;
       const intervalId = window.setInterval(() => {
@@ -362,7 +362,7 @@ export default function ReplayPanel({
       if (rafId !== 0) cancelAnimationFrame(rafId);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [playing, timeline, prefersReducedMotion]);
+  }, [playing, timeline, prefersReducedMotion, dynamicBestPerSku]);
 
   useEffect(() => {
     fractionRef.current = 0;
@@ -377,17 +377,10 @@ export default function ReplayPanel({
             pointFilter: replayPointMatchesFilters,
             bestPerSku: dynamicBestPerSku,
             direction: rooflineDirection,
-            animateBestPerSku: dynamicBestPerSku && !prefersReducedMotion,
+            animateBestPerSku: dynamicBestPerSku,
           })
         : [],
-    [
-      timeline,
-      fraction,
-      replayPointMatchesFilters,
-      dynamicBestPerSku,
-      rooflineDirection,
-      prefersReducedMotion,
-    ],
+    [timeline, fraction, replayPointMatchesFilters, dynamicBestPerSku, rooflineDirection],
   );
 
   const currentDate = useMemo(

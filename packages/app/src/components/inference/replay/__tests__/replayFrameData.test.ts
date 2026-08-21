@@ -117,9 +117,9 @@ describe('spanMs', () => {
 });
 
 describe('bestPerSkuMorphWindowFraction', () => {
-  it('allocates about 240ms of the MP4 timeline without overlapping adjacent dates', () => {
-    expect(bestPerSkuMorphWindowFraction(2)).toBeCloseTo(240 / 4500);
-    expect(bestPerSkuMorphWindowFraction(100)).toBeCloseTo(0.45 / 99);
+  it('allocates about 480ms of the MP4 timeline without overlapping adjacent dates', () => {
+    expect(bestPerSkuMorphWindowFraction(2)).toBeCloseTo(480 / 4500);
+    expect(bestPerSkuMorphWindowFraction(100)).toBeCloseTo(0.8 / 99);
     expect(bestPerSkuMorphWindowFraction(1)).toBe(0);
   });
 });

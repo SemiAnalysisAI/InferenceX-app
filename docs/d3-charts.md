@@ -120,10 +120,12 @@ MP4 export captures a sequence of cloned DOM frames. A wall-clock D3 transition
 can look correct in the live preview yet disappear from the video because the
 export loop advances the replay fraction and captures before that timer has
 meaningfully progressed. Best-per-SKU winner changes therefore encode their
-morph directly in replay frame data: a short fraction window resamples the
+morph directly in replay frame data: a visible fraction window resamples the
 outgoing roofline and interpolates it into the incoming config. The preview and
 the encoder consume the same intermediate geometry, while the shared D3
-transition duration stays at zero for replay.
+transition duration stays at zero for replay. Best-per-SKU MP4 mode keeps this
+explicitly requested animation active even when the ambient reduced-motion
+preference is set; regular replay continues to honor that preference.
 
 ## Batched Label Measurement
 
