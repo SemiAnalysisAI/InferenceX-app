@@ -116,10 +116,13 @@ type ChartSeriesSummary = Omit<ChartSeries, 'metricSources'> & {
   metricSources: MetricSourceDescriptor[];
 };
 
+type KvMetricSource = Pick<MetricSourceSeries, 'source' | 'kvCacheUsage' | 'kvCacheUsageByEngine'>;
+
 interface RawMetaRow extends PointMeta {
   trace_replay_id: number | null;
   has_blob: boolean;
-  chart_series: ChartSeries | null;
+  chart_series: Omit<ChartSeries, 'metricSources'> | null;
+  metric_sources: KvMetricSource[];
   /** Derived at server-log ingest from "GPU KV cache size: N tokens" lines. */
   kv_cache_pool_tokens: string | null;
 }
@@ -232,7 +235,7 @@ function meanOfEngines(engines: readonly { points: TimeSeriesPoint[] }[]): TimeS
  * skew is the signal.
  */
 function collapseKvByWorker(
-  sources: readonly MetricSourceSeries[],
+  sources: readonly KvMetricSource[],
 ): { engineLabel: string; points: TimeSeriesPoint[] }[] | null {
   if (sources.length < 2) return null;
   const entries = sources
@@ -276,8 +279,10 @@ function collapseKvByWorker(
   });
 }
 
-function summarizeSeries(series: ChartSeries): ChartSeriesSummary {
-  const sources = series.metricSources ?? [];
+function summarizeSeries(
+  series: Omit<ChartSeries, 'metricSources'>,
+  sources: readonly KvMetricSource[],
+): ChartSeriesSummary {
   return {
     ...series,
     kvCacheUsageByEngine: collapseKvByWorker(sources) ?? series.kvCacheUsageByEngine ?? [],
@@ -293,7 +298,23 @@ export async function getTraceServerMetrics(
     select
       br.trace_replay_id,
       (atr.server_metrics_json_gz is not null) as has_blob,
-      atr.chart_series,
+      case
+        when atr.chart_series is null then null
+        else atr.chart_series - 'metricSources'
+      end as chart_series,
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'source', metric_source->'source',
+          'kvCacheUsage', coalesce(metric_source->'kvCacheUsage', '[]'::jsonb),
+          'kvCacheUsageByEngine', coalesce(
+            metric_source->'kvCacheUsageByEngine',
+            '[]'::jsonb
+          )
+        ))
+        from jsonb_array_elements(
+          coalesce(atr.chart_series->'metricSources', '[]'::jsonb)
+        ) as metric_source
+      ), '[]'::jsonb) as metric_sources,
       br.id, c.hardware, c.framework, c.model, c.precision, c.spec_method,
       c.disagg, c.is_multinode,
       br.conc, br.offload_mode, br.isl, br.osl, br.benchmark_type,
@@ -323,7 +344,7 @@ export async function getTraceServerMetrics(
 
   // Fast path: pre-computed chart_series at the current version.
   if (row.chart_series && Number(row.chart_series.version) === CHART_SERIES_VERSION) {
-    const summary = summarizeSeries(row.chart_series);
+    const summary = summarizeSeries(row.chart_series, row.metric_sources);
     return merge(meta, summary, kvCachePoolTokens, summary.metricSources);
   }
 
@@ -353,7 +374,7 @@ export async function getTraceServerMetrics(
   // (no-ops on a read-only replica). trace_replay_id is non-null on this path.
   writeBackTraceReplayJsonb(sql, 'chart_series', row.trace_replay_id, series);
 
-  const summary = summarizeSeries(series);
+  const summary = summarizeSeries(series, series.metricSources);
   return merge(meta, summary, kvCachePoolTokens, summary.metricSources);
 }
 

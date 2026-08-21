@@ -19,6 +19,8 @@
  *   bun run --cwd packages/db db:backfill-chart-series
  *     [--limit N]   only process the first N candidate rows
  *     [--force]     recompute every row, even if version already matches
+ *     [--shard-count N] split work across N independent processes
+ *     [--shard-index N] zero-based shard handled by this process
  *     [--yes]       skip the confirmation prompt
  */
 
@@ -46,6 +48,7 @@ async function main(): Promise<void> {
   console.log(`  CHART_SERIES_VERSION = ${CHART_SERIES_VERSION}`);
   console.log(`  force = ${flags.force}`);
   console.log(`  limit = ${flags.limit ?? 'none'}`);
+  console.log(`  shard = ${flags.shardIndex + 1}/${flags.shardCount}`);
 
   // Only rows that actually have a server_metrics blob can produce a
   // chart_series. Rows without the blob legitimately keep `chart_series`
@@ -57,18 +60,24 @@ async function main(): Promise<void> {
         select id
         from agentic_trace_replay
         where server_metrics_json_gz is not null
-        order by id
+          and mod(id, ${flags.shardCount}) = ${flags.shardIndex}
+        -- Restore the newest, most actively viewed runs first. The backfill is
+        -- idempotent, so an interrupted pass resumes with only stale rows.
+        order by id desc
         ${flags.limit ? sql`limit ${flags.limit}` : sql``}
       `
     : await sql<{ id: number }[]>`
         select id
         from agentic_trace_replay
         where server_metrics_json_gz is not null
+          and mod(id, ${flags.shardCount}) = ${flags.shardIndex}
           and (
             chart_series is null
             or coalesce((chart_series->>'version')::int, -1) <> ${CHART_SERIES_VERSION}
           )
-        order by id
+        -- Restore the newest, most actively viewed runs first. The backfill is
+        -- idempotent, so an interrupted pass resumes with only stale rows.
+        order by id desc
         ${flags.limit ? sql`limit ${flags.limit}` : sql``}
       `;
 

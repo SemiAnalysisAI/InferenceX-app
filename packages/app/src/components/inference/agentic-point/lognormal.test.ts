@@ -36,6 +36,17 @@ describe('logHistogram', () => {
     expect(logHistogram([], 10)).toBeNull();
     expect(logHistogram([0, -4], 10)).toBeNull();
   });
+
+  it('handles request counts above the JavaScript variadic argument limit', () => {
+    const values = Array.from({ length: 200_000 }, (_, index) => (index % 4096) + 1);
+
+    const histogram = logHistogram(values, 32);
+
+    expect(histogram).not.toBeNull();
+    expect(histogram!.counts.reduce((sum, count) => sum + count, 0)).toBe(values.length);
+    expect(histogram!.edges[0]).toBeCloseTo(1, 10);
+    expect(histogram!.edges.at(-1)).toBeCloseTo(4096, 6);
+  });
 });
 
 describe('logTicks', () => {

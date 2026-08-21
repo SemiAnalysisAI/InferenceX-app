@@ -592,7 +592,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-server-metrics.ts',
-    sourceSha256: '7702f580ee488ff691f0e1182b58c1f54e2e3a58678f79b3edbdbb18e505be88',
+    sourceSha256: 'da987d22521dc63da34dcacf3caaad6adb21aa6e5e7a65d1a4fa495a71e9f1f0',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',
       zh: '跟踪服务器指标元数据、时间序列分组、来源标签和单位。',
