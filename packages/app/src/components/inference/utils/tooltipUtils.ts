@@ -1,5 +1,6 @@
 import { formatNumber, getDisplayLabel } from '@/lib/utils';
 import { specMethodDisplayLabel } from '@/lib/compare-variant-slug';
+import { agenticDetailHref } from '@/lib/agentic-detail-link';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
@@ -236,9 +237,10 @@ const viewChartsButtonHTML = (
   isPinned: boolean,
   hasTraceData: boolean,
   pointId: number | undefined,
+  locale: Locale,
 ): string => {
   if (!isPinned || !hasTraceData || !isPersistedBenchmarkId(pointId)) return '';
-  return `<a data-action="view-charts" href="/inference/agentic/${pointId}" style="
+  return `<a data-action="view-charts" href="${agenticDetailHref(pointId, locale)}" style="
     display: block; margin-top: 8px; width: 100%; padding: 4px 8px; font-size: 11px; font-weight: 500;
     border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
     background: var(--accent); color: var(--accent-foreground); text-align: center; text-decoration: none;
@@ -420,7 +422,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       ${generateCacheMetadataHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${runLinkHTML(runUrl)}
-      ${viewChartsButtonHTML(isPinned, Boolean(hasTrace), d.id)}
+      ${viewChartsButtonHTML(isPinned, Boolean(hasTrace), d.id, locale)}
     </div>
   `;
 };
@@ -542,7 +544,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       ${generateCacheMetadataHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${runLinkHTML(runUrl)}
-      ${viewChartsButtonHTML(isPinned, Boolean(hasTrace), d.id)}
+      ${viewChartsButtonHTML(isPinned, Boolean(hasTrace), d.id, locale)}
     </div>
   `;
 };

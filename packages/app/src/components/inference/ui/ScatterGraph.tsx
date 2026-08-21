@@ -1,6 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
@@ -1149,7 +1150,7 @@ const ScatterGraph = React.memo(
           title: hwConfig ? getDisplayLabel(hwConfig) : hwKey,
           color: resolveColor(hwKey),
           isOverlay: false,
-          rows: buildLegendPointsRows(pts, false),
+          rows: buildLegendPointsRows(pts, false, locale),
         };
       }
       const { runIndex, runId, branch } = pointsTableTarget;
@@ -1166,7 +1167,7 @@ const ScatterGraph = React.memo(
         title: `✕ ${branch}`,
         color: overlayRunColor(runIndex),
         isOverlay: true,
-        rows: buildLegendPointsRows(pts, true),
+        rows: buildLegendPointsRows(pts, true, locale),
       };
     }, [
       pointsTableTarget,
@@ -1180,6 +1181,7 @@ const ScatterGraph = React.memo(
       processedOverlayData,
       runIndexByUrl,
       activeOverlayHwTypes,
+      locale,
     ]);
 
     // Gradient label data
@@ -1505,6 +1507,10 @@ const ScatterGraph = React.memo(
           if (viewBtn && typeof d.id === 'number') {
             viewBtn.addEventListener('click', (btnEvent) => {
               btnEvent.stopPropagation();
+              // Full-document navigation: stamp the chart state onto THIS
+              // history entry first, or Back returns to a bare /inference that
+              // rebuilds from defaults.
+              rememberChartStateInUrl();
               track('latency_view_charts_opened', {
                 id: d.id,
                 hwKey: String(d.hwKey),

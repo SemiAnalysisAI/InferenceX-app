@@ -1,6 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTheme } from 'next-themes';
@@ -893,6 +894,10 @@ const GPUGraph = React.memo(
             if (!viewBtn || typeof d.id !== 'number') return;
             viewBtn.addEventListener('click', (event) => {
               event.stopPropagation();
+              // Full-document navigation: stamp the chart state onto THIS
+              // history entry first, or Back returns to a bare /inference that
+              // rebuilds from defaults.
+              rememberChartStateInUrl();
               track('gpu_timeseries_view_charts_opened', {
                 id: d.id,
                 hwKey: String(d.hwKey),
