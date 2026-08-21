@@ -233,7 +233,9 @@ function LineChart({
   const flatPoints = useMemo<LinePoint[]>(
     () =>
       Object.entries(lineData).flatMap(([hwKey, pts]) =>
-        pts.map((p) => ({ hwKey, precision: 'fp8', x: p.x, y: p.y })),
+        pts
+          .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+          .map((p) => ({ hwKey, precision: 'fp8', x: p.x, y: p.y })),
       ),
     [lineData],
   );
@@ -267,6 +269,7 @@ function LineChart({
       config: {
         getColor: (key) => colorMap[key] ?? '#888',
         strokeWidth: 2.5,
+        isDefined: ({ x, y }) => Number.isFinite(x) && Number.isFinite(y),
       },
     };
     const scatterLayer: ScatterLayerConfig<LinePoint> = {

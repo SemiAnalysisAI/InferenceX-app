@@ -12,6 +12,7 @@ import {
   buildOverviewHistoryDashboardHref,
   detailHref,
   mergeOverviewControlHref,
+  OVERVIEW_CLIENT_ONLY_KEYS,
   overviewEngineScopeHref,
   overviewHref,
   overviewTierHref,
@@ -270,6 +271,24 @@ describe('overviewHref', () => {
 });
 
 describe('overview switch links', () => {
+  it('treats presentation intent as client-only navigation state', () => {
+    expect(OVERVIEW_CLIENT_ONLY_KEYS).toContain('present');
+  });
+
+  it('merges presentation intent canonically without dropping query state or fragments', () => {
+    expect(
+      mergeOverviewControlHref('/overview?tier=75&utm_source=deck#matrix', '/overview?present=1', [
+        'present',
+      ]),
+    ).toBe('/overview?tier=75&present=1&utm_source=deck#matrix');
+
+    expect(
+      mergeOverviewControlHref('/overview?tier=75&present=1&utm_source=deck#matrix', '/overview', [
+        'present',
+      ]),
+    ).toBe('/overview?tier=75&utm_source=deck#matrix');
+  });
+
   it('merges rapid control changes into the latest pending overview URL', () => {
     const tierHref = mergeOverviewControlHref('/overview', '/overview?tier=75', ['tier']);
     const engineHref = mergeOverviewControlHref(tierHref, '/overview?engine=all', ['engine']);

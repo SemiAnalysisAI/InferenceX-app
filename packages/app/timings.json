@@ -17,6 +17,10 @@
       "duration": 14767
     },
     {
+      "spec": "cypress/e2e/ai-chart.cy.ts",
+      "duration": 3000
+    },
+    {
       "spec": "cypress/e2e/api-documentation.cy.ts",
       "duration": 310
     },
@@ -155,6 +159,10 @@
     {
       "spec": "cypress/e2e/overlay-optimal-only.cy.ts",
       "duration": 482
+    },
+    {
+      "spec": "cypress/e2e/overview-a11y.cy.ts",
+      "duration": 2000
     },
     {
       "spec": "cypress/e2e/overview.cy.ts",

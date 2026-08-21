@@ -1,3 +1,5 @@
+import { TCO_SOURCE_TITLE } from '@semianalysisai/inferencex-constants';
+
 export type OverviewLocale = 'en' | 'zh';
 
 export const OVERVIEW_STRINGS = {
@@ -10,7 +12,7 @@ export const OVERVIEW_STRINGS = {
     // The unit is dropped from the visible line but kept for screen readers.
     scopeAria: 'Hyperscaler cost per one million total tokens. Lower is better.',
     sourcePrefix: 'Source: InferenceX & ',
-    sourceLinkText: 'SemiAnalysis Market July 2026 AI Cloud TCO Model',
+    sourceLinkText: TCO_SOURCE_TITLE,
     tierNavLabel: 'SLO',
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
@@ -114,6 +116,9 @@ export const OVERVIEW_STRINGS = {
     } as Partial<Record<string, string>>,
     categoryBadgeTitle: 'Model is no longer actively benchmarked.',
     loadingStatus: 'Loading the selected comparison…',
+    navigationError:
+      'Could not load the selected comparison. Showing the last successfully loaded data.',
+    emptyState: 'No overview results match this selection.',
   },
   zh: {
     title: '智能体推理成本',
@@ -121,7 +126,7 @@ export const OVERVIEW_STRINGS = {
     scopeDirection: '↓ 越低越好',
     scopeAria: '超大规模云（hyperscaler）每百万总 token 成本，越低越好。',
     sourcePrefix: '来源：InferenceX 与 ',
-    sourceLinkText: 'SemiAnalysis Market July 2026 AI Cloud TCO Model',
+    sourceLinkText: TCO_SOURCE_TITLE,
     tierNavLabel: 'SLO',
     tierUnit: 'tok/s/用户',
     engineScopeNavLabel: '引擎范围',
@@ -211,6 +216,8 @@ export const OVERVIEW_STRINGS = {
     } as Partial<Record<string, string>>,
     categoryBadgeTitle: '该模型已不再进行活跃基准测试。',
     loadingStatus: '正在加载所选对比…',
+    navigationError: '无法加载所选对比，当前显示的是上次成功加载的数据。',
+    emptyState: '没有符合当前筛选条件的总览结果。',
   },
 } as const;
 

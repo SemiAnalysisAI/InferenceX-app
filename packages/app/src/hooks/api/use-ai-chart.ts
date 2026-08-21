@@ -26,12 +26,15 @@ import {
   dedupeAgenticHistoryRuns,
   dedupeRowsToLatestPerConfig,
 } from '@/lib/benchmark-run-selection';
-import {
-  getNestedYValue,
-  normalizeEvalHardwareKey,
-  generateHighContrastColors,
-} from '@/lib/chart-utils';
+import { normalizeEvalHardwareKey, generateHighContrastColors } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+
+import {
+  buildAiLineData,
+  normalizeAiRadarRows,
+  rankAiHardwareKeys,
+  readAiMetric,
+} from './ai-chart-data';
 
 import chartDefinitions from '@/components/inference/metric-registry';
 
@@ -123,8 +126,8 @@ function buildBenchmarkBarData(
       }
     }
 
-    const value = getNestedYValue(closest, yFieldPath);
-    if (value <= 0) continue;
+    const value = readAiMetric(closest, yFieldPath, spec.yAxisMetric);
+    if (value === null) continue;
 
     const config = getHardwareConfig(hwKey, closest.model);
     bars.push({
@@ -271,19 +274,7 @@ function buildLineData(
 ): Record<string, { x: number; y: number }[]> {
   const chartDef = (chartDefinitions as any[])[0];
   const yFieldPath: string = chartDef[spec.yAxisMetric] ?? 'tpPerGpu.y';
-
-  const lines: Record<string, { x: number; y: number }[]> = {};
-  for (const p of points) {
-    const hwKey = p.hwKey ?? '';
-    if (!hwKey || !colorMap[hwKey]) continue;
-    if (!lines[hwKey]) lines[hwKey] = [];
-    lines[hwKey].push({ x: p.x, y: getNestedYValue(p, yFieldPath) });
-  }
-  // Sort each line by x
-  for (const pts of Object.values(lines)) {
-    pts.sort((a, b) => a.x - b.x);
-  }
-  return lines;
+  return buildAiLineData(points, spec.yAxisMetric, yFieldPath, new Set(Object.keys(colorMap)));
 }
 
 function buildRadarData(
@@ -307,51 +298,25 @@ function buildRadarData(
   }
 
   // Extract raw values per metric per GPU
-  const rawMatrix = new Map<string, number[]>();
+  const rawMatrix = new Map<string, (number | null)[]>();
   for (const [hwKey, point] of groups) {
     const vals = metrics.map((m) => {
       const path: string = chartDef[m] ?? m;
-      return getNestedYValue(point, path);
+      return readAiMetric(point, path, m);
     });
     rawMatrix.set(hwKey, vals);
   }
-
-  // Find min/max per metric for normalization
-  const mins = metrics.map(() => Infinity);
-  const maxs = metrics.map(() => -Infinity);
-  for (const vals of rawMatrix.values()) {
-    for (let i = 0; i < vals.length; i++) {
-      if (vals[i] > 0) {
-        mins[i] = Math.min(mins[i], vals[i]);
-        maxs[i] = Math.max(maxs[i], vals[i]);
-      }
-    }
-  }
-
-  // For cost/energy metrics, invert normalization (lower is better)
-  const invertMetric = new Set([
-    'y_costh',
-    'y_costn',
-    'y_costr',
-    'y_jTotal',
-    'y_jOutput',
-    'y_jInput',
-  ]);
+  const normalizedMatrix = normalizeAiRadarRows(rawMatrix, metrics, chartDef);
 
   const items: AiRadarItem[] = [];
   for (const [hwKey, rawVals] of rawMatrix) {
     const config = getHardwareConfig(hwKey, groups.get(hwKey)?.model);
-    const normalized = rawVals.map((v, i) => {
-      if (v <= 0 || !isFinite(mins[i]) || maxs[i] === mins[i]) return null;
-      const norm = (v - mins[i]) / (maxs[i] - mins[i]);
-      return invertMetric.has(metrics[i]) ? 1 - norm : norm;
-    });
     items.push({
       hwKey,
       label: config ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}` : hwKey,
       color: colorMap[hwKey] ?? '#888',
-      values: normalized,
-      rawValues: rawVals.map((v) => (v > 0 ? v : null)),
+      values: normalizedMatrix.get(hwKey) ?? metrics.map(() => null),
+      rawValues: rawVals,
     });
   }
 
@@ -459,43 +424,19 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
     });
   }
 
-  // topN: rank configs by peak metric value and keep only the best N
+  // topN: rank configs by their best value in the metric's canonical direction.
   if (spec.topN) {
     const chartDef = (chartDefinitions as any[])[0];
     const yFieldPath: string = chartDef[spec.yAxisMetric] ?? 'tpPerGpu.y';
-    const peakByHw = new Map<string, number>();
-    for (const p of points) {
-      const hw = p.hwKey ?? '';
-      if (!hw) continue;
-      const val = getNestedYValue(p, yFieldPath);
-      peakByHw.set(hw, Math.max(peakByHw.get(hw) ?? 0, val));
-    }
-
-    let topHwKeys: Set<string>;
-    if (spec.topNDistinctGpus === false) {
-      // Rank individual configs regardless of GPU family
-      topHwKeys = new Set(
-        [...peakByHw.entries()]
-          .toSorted(([, a], [, b]) => b - a)
-          .slice(0, spec.topN)
-          .map(([k]) => k),
-      );
-    } else {
-      // Group by base GPU, pick the best config per GPU, then take top N GPUs
-      const bestPerGpu = new Map<string, { hwKey: string; peak: number }>();
-      for (const [hwKey, peak] of peakByHw) {
-        const base = hwKey.split('_')[0];
-        const existing = bestPerGpu.get(base);
-        if (!existing || peak > existing.peak) {
-          bestPerGpu.set(base, { hwKey, peak });
-        }
-      }
-      const topBases = [...bestPerGpu.entries()]
-        .toSorted(([, a], [, b]) => b.peak - a.peak)
-        .slice(0, spec.topN);
-      // Include only the single best config per winning GPU
-      topHwKeys = new Set(topBases.map(([, v]) => v.hwKey));
-    }
+    const topHwKeys = new Set(
+      rankAiHardwareKeys(points, {
+        metric: spec.yAxisMetric,
+        metricPath: yFieldPath,
+        chartDefinition: chartDef,
+        topN: spec.topN,
+        distinctGpus: spec.topNDistinctGpus !== false,
+      }),
+    );
     points = points.filter((p) => topHwKeys.has(p.hwKey ?? ''));
   }
 

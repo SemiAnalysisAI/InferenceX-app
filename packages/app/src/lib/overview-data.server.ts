@@ -91,16 +91,19 @@ async function buildOverviewPageData(
       : currentRowsByModel;
   const snapshotDate = overviewSnapshotDate(snapshotRows, engineScope);
   if (snapshotDate === null) {
-    return scopeRows({
-      ...assembleOverviewPageData(
-        currentRowsByModel,
-        tier,
-        engineScope,
-        referenceHardware,
-        modelScope,
-      ),
+    return {
+      models: [],
+      tier,
+      engineScope,
       comparisonMode,
-    });
+      referenceHardware,
+      modelScope,
+      rowScope,
+      hardwareRowScope,
+      unchangedRowCount: 0,
+      emptyRowCount: 0,
+      historicalWindow: null,
+    };
   }
 
   const window = overviewHistoricalWindow(snapshotDate, comparisonMode);

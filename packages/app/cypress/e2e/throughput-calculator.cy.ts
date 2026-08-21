@@ -1,3 +1,5 @@
+import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
+
 import {
   availability as agenticAvailability,
   b300Rows as agenticB300Rows,
@@ -217,6 +219,9 @@ describe('TCO Calculator', () => {
     it('shows TCO badges when cost metric is selected', () => {
       cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'TCO $/chip/hr');
       cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', '$');
+      cy.get('[data-testid="calculator-chart-section"]')
+        .contains('a', TCO_SOURCE_TITLE)
+        .should('have.attr', 'href', TCO_SOURCE_URL);
     });
 
     it('displays chart title that updates when metric changes', () => {
@@ -742,6 +747,9 @@ describe('TCO Calculator', () => {
         'contain.text',
         'SemiAnalysis Datacenter Industry Model',
       );
+      cy.get('[data-testid="calculator-fleet-section"]')
+        .contains('a', TCO_SOURCE_TITLE)
+        .should('have.attr', 'href', TCO_SOURCE_URL);
     });
 
     it('entering a generous cost target renders reachable interactivity per GPU', () => {
