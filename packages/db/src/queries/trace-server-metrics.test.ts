@@ -37,6 +37,7 @@ function metaRow(overrides: Record<string, unknown> = {}) {
     trace_replay_id: 7,
     has_blob: true,
     chart_series: currentSeries(),
+    metric_sources: [],
     hardware: 'gb200',
     framework: 'dynamo-vllm',
     model: 'deepseek-r1-0528',
@@ -101,6 +102,8 @@ describe('getTraceServerMetrics', () => {
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]).not.toContain('server_metrics_json_gz as blob');
+    expect(calls[0]).toContain("atr.chart_series - 'metricSources'");
+    expect(calls[0]).toContain("metric_source->'kvCacheUsageByEngine'");
     expect(calls[0]).toContain("br.metrics ->> 'kv_offload_backend'");
   });
 
@@ -228,9 +231,8 @@ describe('getTraceServerMetrics all-endpoints KV overlay', () => {
     const series = {
       ...currentSeries(),
       kvCacheUsageByEngine: fallback,
-      metricSources,
     } as unknown as ChartSeries;
-    const { sql } = mockSql([[metaRow({ chart_series: series })]]);
+    const { sql } = mockSql([[metaRow({ chart_series: series, metric_sources: metricSources })]]);
     return getTraceServerMetrics(sql, 42);
   }
 

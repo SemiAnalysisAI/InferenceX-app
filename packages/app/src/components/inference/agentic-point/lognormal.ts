@@ -43,8 +43,18 @@ export function logHistogram(values: readonly number[], bins: number): LogHistog
   if (positive.length === 0) return null;
 
   const nBins = Math.max(1, Math.floor(bins));
-  let lnMin = Math.log(Math.min(...positive));
-  let lnMax = Math.log(Math.max(...positive));
+  // Do not spread this array into Math.min/Math.max. Large agentic runs have
+  // hundreds of thousands of requests, which exceeds JavaScript engines'
+  // variadic argument limit and crashes the entire point page.
+  let min = positive[0]!;
+  let max = min;
+  for (let i = 1; i < positive.length; i++) {
+    const value = positive[i]!;
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+  let lnMin = Math.log(min);
+  let lnMax = Math.log(max);
   if (!(lnMax > lnMin)) {
     lnMin -= Math.LN2;
     lnMax += Math.LN2;

@@ -57,7 +57,9 @@ async function main(): Promise<void> {
         select id
         from agentic_trace_replay
         where server_metrics_json_gz is not null
-        order by id
+        -- Restore the newest, most actively viewed runs first. The backfill is
+        -- idempotent, so an interrupted pass resumes with only stale rows.
+        order by id desc
         ${flags.limit ? sql`limit ${flags.limit}` : sql``}
       `
     : await sql<{ id: number }[]>`
@@ -68,7 +70,9 @@ async function main(): Promise<void> {
             chart_series is null
             or coalesce((chart_series->>'version')::int, -1) <> ${CHART_SERIES_VERSION}
           )
-        order by id
+        -- Restore the newest, most actively viewed runs first. The backfill is
+        -- idempotent, so an interrupted pass resumes with only stale rows.
+        order by id desc
         ${flags.limit ? sql`limit ${flags.limit}` : sql``}
       `;
 
