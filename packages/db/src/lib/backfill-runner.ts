@@ -12,12 +12,16 @@ import type { Sql } from '../etl/db-utils.js';
 export interface LimitForceFlags {
   limit: number | null;
   force: boolean;
+  shardCount: number;
+  shardIndex: number;
 }
 
 /** Parse the standard `--limit N` / `--force` backfill flags from argv. */
 export function parseLimitForceFlags(): LimitForceFlags {
   let limit: number | null = null;
   let force = false;
+  let shardCount = 1;
+  let shardIndex = 0;
   for (let i = 2; i < process.argv.length; i++) {
     const arg = process.argv[i]!;
     if (arg === '--force') force = true;
@@ -28,9 +32,29 @@ export function parseLimitForceFlags(): LimitForceFlags {
         process.exit(1);
       }
       limit = Number(next);
+    } else if (arg === '--shard-count') {
+      const next = process.argv[++i];
+      const parsed = Number(next);
+      if (!next || !Number.isInteger(parsed) || parsed < 1) {
+        console.error('--shard-count requires a positive integer');
+        process.exit(1);
+      }
+      shardCount = parsed;
+    } else if (arg === '--shard-index') {
+      const next = process.argv[++i];
+      const parsed = Number(next);
+      if (!next || !Number.isInteger(parsed) || parsed < 0) {
+        console.error('--shard-index requires a non-negative integer');
+        process.exit(1);
+      }
+      shardIndex = parsed;
     }
   }
-  return { limit, force };
+  if (shardIndex >= shardCount) {
+    console.error('--shard-index must be less than --shard-count');
+    process.exit(1);
+  }
+  return { limit, force, shardCount, shardIndex };
 }
 
 /**

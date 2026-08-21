@@ -10,12 +10,33 @@ describe('parseLimitForceFlags', () => {
 
   it('defaults to no limit and force off', () => {
     process.argv = ['node', 'script.ts'];
-    expect(parseLimitForceFlags()).toEqual({ limit: null, force: false });
+    expect(parseLimitForceFlags()).toEqual({
+      limit: null,
+      force: false,
+      shardCount: 1,
+      shardIndex: 0,
+    });
   });
 
-  it('parses --limit N and --force', () => {
-    process.argv = ['node', 'script.ts', '--limit', '25', '--force', '--yes'];
-    expect(parseLimitForceFlags()).toEqual({ limit: 25, force: true });
+  it('parses --limit N, --force, and process-shard flags', () => {
+    process.argv = [
+      'node',
+      'script.ts',
+      '--limit',
+      '25',
+      '--force',
+      '--shard-count',
+      '4',
+      '--shard-index',
+      '2',
+      '--yes',
+    ];
+    expect(parseLimitForceFlags()).toEqual({
+      limit: 25,
+      force: true,
+      shardCount: 4,
+      shardIndex: 2,
+    });
   });
 });
 
