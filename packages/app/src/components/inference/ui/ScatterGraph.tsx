@@ -459,6 +459,7 @@ const ScatterGraph = React.memo(
     chartDefinition,
     caption,
     showAllHardwareTypes = false,
+    syncBestPerSkuSelection = true,
     hardwareConfigOverride,
     overlayData,
     transitionDuration = 750,
@@ -685,7 +686,7 @@ const ScatterGraph = React.memo(
       [setLocalOfficialOverride, setActiveOverlayHwTypes, mergeScopedOverlaySelection],
     );
     useEffect(() => {
-      if (!overlayData || !bestPerSku || overlayScopeChanged) return;
+      if (!syncBestPerSkuSelection || !overlayData || !bestPerSku || overlayScopeChanged) return;
       const direction = chartDefinition[`${selectedYAxisMetric}_roofline` as keyof ChartDefinition];
       if (
         direction !== 'upper_right' &&
@@ -704,6 +705,7 @@ const ScatterGraph = React.memo(
       if (!setsEqual(rawUnifiedSelection, selection)) commitUnifiedSelection(selection);
     }, [
       overlayData,
+      syncBestPerSkuSelection,
       bestPerSku,
       overlayScopeChanged,
       chartDefinition,
@@ -3372,7 +3374,7 @@ const ScatterGraph = React.memo(
                   checked: bestPerSku,
                   onCheckedChange: (checked: boolean) => {
                     setBestPerSku(checked);
-                    if (overlayData) {
+                    if (overlayData && syncBestPerSkuSelection) {
                       if (checked) {
                         const direction =
                           chartDefinition[

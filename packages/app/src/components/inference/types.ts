@@ -654,6 +654,13 @@ export interface ScatterGraphProps {
    */
   showAllHardwareTypes?: boolean;
   /**
+   * Whether this chart should reconcile Best per SKU selections back into the
+   * shared inference context. Replay disables this because its winner set is
+   * intentionally recomputed for every historical frame; committing a past
+   * frame's winners would incorrectly change the live parent chart.
+   */
+  syncBestPerSkuSelection?: boolean;
+  /**
    * Optional hardware configuration override. When provided, this is used instead of the context's
    * hardwareConfig. Used for unofficial run visualization where hardware types may differ.
    */
