@@ -41,6 +41,8 @@ export interface BenchmarkRow {
   /** KV-cache offload mode. Defaults to 'off' for fixed-sequence rows. */
   offload_mode: string;
   image: string | null;
+  /** Producer-generated complete-recipe identity; null/absent on legacy rows. */
+  recipe_fingerprint?: string | null;
   metrics: Record<string, number>;
   /**
    * Per-worker measured power for multinode / disagg runs. The runner emits
@@ -52,7 +54,14 @@ export interface BenchmarkRow {
    */
   workers?: WorkerPower[];
   date: string;
+  /** Internal workflow identity used to keep merged agentic curves within one run. */
+  workflow_run_id?: number;
+  run_started_at?: string | null;
   run_url: string | null;
+  /** Logical curve snapshot; producer date/run fields above retain point provenance. */
+  curve_date?: string;
+  curve_workflow_run_id?: number;
+  curve_run_started_at?: string | null;
 }
 
 export interface WorkflowRunRow {
@@ -73,6 +82,7 @@ export interface ChangelogRow {
   config_keys: string[];
   description: string;
   pr_link: string | null;
+  append_only?: boolean;
 }
 
 export interface DateConfigRow {
@@ -160,12 +170,17 @@ export function fetchBenchmarks(
   runId?: string,
   /** When true with a runId, fetch exactly that run's results (GPU comparison). */
   exactRun?: boolean,
+  view?: { type: 'calculator'; sequence: string },
 ) {
   const params = new URLSearchParams({ model });
   if (date) params.set('date', date);
   if (exact) params.set('exact', 'true');
   if (runId) params.set('runId', runId);
   if (exactRun) params.set('exactRun', 'true');
+  if (view) {
+    params.set('view', view.type);
+    params.set('sequence', view.sequence);
+  }
   return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks?${params}`, signal);
 }
 
@@ -174,16 +189,25 @@ export function fetchBenchmarkHistory(
   isl: number,
   osl: number,
   signal?: AbortSignal,
+  benchmarkType?: 'agentic_traces',
 ) {
-  const params = new URLSearchParams({ model, isl: String(isl), osl: String(osl) });
+  const params = new URLSearchParams({
+    model,
+    isl: String(isl),
+    osl: String(osl),
+  });
+  if (benchmarkType) params.set('benchmarkType', benchmarkType);
   return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks/history?${params}`, signal);
 }
 
-export function fetchWorkflowInfo(date: string, signal?: AbortSignal) {
-  return fetchJson<WorkflowInfoResponse>(
-    `/api/v1/workflow-info?date=${encodeURIComponent(date)}`,
-    signal,
-  );
+export function fetchWorkflowInfo(
+  date: string,
+  signal?: AbortSignal,
+  benchmarkType?: 'agentic_traces',
+) {
+  const params = new URLSearchParams({ date });
+  if (benchmarkType) params.set('benchmarkType', benchmarkType);
+  return fetchJson<WorkflowInfoResponse>(`/api/v1/workflow-info?${params}`, signal);
 }
 
 export interface AvailabilityRow {

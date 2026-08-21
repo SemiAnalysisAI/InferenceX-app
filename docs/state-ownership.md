@@ -39,7 +39,9 @@ File: `packages/app/src/components/GlobalFilterContext.tsx`
 
 **Effective (auto-corrected) values** (derived, not settable directly):
 
-- `effectiveSequence` — `selectedSequence` if valid for current model, else first available
+- `effectiveSequence` — the Agentic scenario while the user has made no explicit choice and the
+  model has corresponding availability, otherwise `selectedSequence` if valid for the current
+  model, else 8K/1K, else first available
 - `effectivePrecisions` — subset of `selectedPrecisions` that are available; falls back to `[availablePrecisions[0]]`
 - `effectiveRunDate` — latest available date unless user explicitly picked one
 
@@ -190,7 +192,9 @@ GlobalFilterProvider
   → selectedModel     (user pick)
   → modelRows         = availabilityRows filtered to selectedModel (internal memo)
   → availableSequences = unique sequences in modelRows
-  → effectiveSequence  = selectedSequence if in availableSequences, else availableSequences[0]
+  → effectiveSequence  = Agentic (if unchosen and in availableSequences),
+                         else selectedSequence if in availableSequences,
+                         else 8k/1k if available, else availableSequences[0]
   → availablePrecisions = unique precisions in modelRows where sequence = effectiveSequence
   → effectivePrecisions = selectedPrecisions ∩ availablePrecisions; falls back to [availablePrecisions[0]]
   → availableDates     = unique dates in modelRows where sequence = effectiveSequence
@@ -253,6 +257,43 @@ Note: `i_seq` and `i_prec` are written by `GlobalFilterProvider` (not InferenceP
 `writeUrlParams(params)` merges incoming params into `pendingParams` and sets a 150 ms debounce timer. On flush, params matching their default in `PARAM_DEFAULTS` are deleted from `currentState`; non-defaults are stored. This keeps share URLs short.
 
 `useUrlStateSync` (used by InferenceProvider, EvaluationProvider, ReliabilityProvider) skips the first render via `isMountedRef` to avoid overwriting the just-snapshotted URL params. GlobalFilterProvider uses a manually-written equivalent (lines 288–308 in `GlobalFilterContext.tsx`).
+
+### Carrying state across a full-document navigation
+
+The two effects above combine into a trap: filter changes reach only the
+in-memory `currentState`, and the address bar is stripped clean, so **the URL of
+the `/inference` history entry describes nothing**. Any full-document navigation
+away from the chart therefore destroys the state entirely — the module is torn
+down, and Back returns to a bare `/inference` that rebuilds from defaults.
+
+The agentic point-detail links (`/inference/agentic/<id>`, rendered by
+`tooltipUtils.viewChartsButtonHTML` and `legend-points-table.pointDetailHref`)
+are exactly that: plain `<a href>`, deliberately, so browsers can offer
+open-in-new-tab. Three helpers in `url-state.ts` bridge the gap:
+
+| Helper                      | Used by                                                      | Why                                                                           |
+| --------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `rememberChartStateInUrl()` | the point-click handlers (Scatter / GPU graph, legend table) | `history.replaceState`s the chart state onto the entry Back will return to    |
+| `withChartState(href)`      | `agenticDetailHref()`                                        | appends it to the outbound link so the detail page can link back to that view |
+| `currentChartSearch()`      | both of the above                                            | resolves the tab through the `/zh` prefix, flushes pending writes, filters    |
+
+The detail page reads the state back through `withChartState` (its own URL was
+snapshotted into `currentState` at load, then stripped as usual), which is what
+makes its "Inference chart" link land on the chart the reader left rather than
+on defaults.
+
+### Re-hydration on client-side navigation
+
+`useUrlState` calls `refreshUrlParamsOnNavigation(pathname)` **during render**,
+guarded by a module-level last-pathname so it runs at most once per navigation.
+That ordering matters: providers read `getUrlParam` in `useState` initialisers
+and mount effects, both of which run before any parent's layout effect, so
+refreshing from an effect (as `GlobalFilterContext` does on its own account)
+is too late for anything below it. With the hook-level refresh, every provider
+— `InferenceProvider`'s `i_gpus` / `i_metric` / `i_active` included — sees the
+params of the page it actually landed on. The once-per-pathname guard is what
+keeps a late-mounting component from replaying a stale URL over filter changes
+the user has made since.
 
 ### Share URL construction
 

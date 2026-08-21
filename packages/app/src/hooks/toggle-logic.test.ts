@@ -42,17 +42,29 @@ describe('computeToggle', () => {
     });
   });
 
+  // Clicking an active entry always isolates it, even from a partial
+  // selection. Solo used to require EVERY item to be active, which made it
+  // unreachable wherever something starts deselected — on the agentic chart
+  // the engine guard switches SGLang off on load, so the first legend click
+  // removed the entry instead of isolating it. Removing one entry has its own
+  // control (the X on a legend row).
   describe('when some (but not all/one) items are active', () => {
-    it('removes an active item', () => {
+    it('solos the clicked active item', () => {
       const prev = new Set(['a', 'b']);
       const result = computeToggle(prev, 'a', ALL);
+      expect(result).toEqual(new Set(['a']));
+    });
+
+    it('solos the other active item', () => {
+      const prev = new Set(['a', 'b']);
+      const result = computeToggle(prev, 'b', ALL);
       expect(result).toEqual(new Set(['b']));
     });
 
-    it('removes the other active item', () => {
+    it('does not mutate the input set', () => {
       const prev = new Set(['a', 'b']);
-      const result = computeToggle(prev, 'b', ALL);
-      expect(result).toEqual(new Set(['a']));
+      computeToggle(prev, 'a', ALL);
+      expect(prev).toEqual(new Set(['a', 'b']));
     });
   });
 
@@ -113,14 +125,14 @@ describe('computeToggle', () => {
       expect(step2).toEqual(ALL);
     });
 
-    it('full cycle: all → solo → add → remove → single → restore', () => {
+    it('full cycle: all → solo → add → re-solo → restore', () => {
       const s1 = computeToggle(new Set(['a', 'b', 'c']), 'a', ALL); // solo a
       expect(s1).toEqual(new Set(['a']));
       const s2 = computeToggle(s1, 'b', ALL); // add b
       expect(s2).toEqual(new Set(['a', 'b']));
-      const s3 = computeToggle(s2, 'a', ALL); // remove a
-      expect(s3).toEqual(new Set(['b']));
-      const s4 = computeToggle(s3, 'b', ALL); // restore all (only b active)
+      const s3 = computeToggle(s2, 'a', ALL); // clicking a active entry re-solos
+      expect(s3).toEqual(new Set(['a']));
+      const s4 = computeToggle(s3, 'a', ALL); // restore all (only a active)
       expect(s4).toEqual(ALL);
     });
   });

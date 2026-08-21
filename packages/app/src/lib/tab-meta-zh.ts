@@ -4,9 +4,9 @@ import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 import { ZH_OG_LOCALE, zhAlternates, zhPath } from '@/lib/i18n';
 
 export const LANDING_META_ZH = {
-  title: '开源 AI 推理基准测试',
+  title: '开源智能体推理基准测试',
   description:
-    '跨 Chip 与推理框架对比 AI 推理性能。基于 NVIDIA GB200、B200、AMD MI355X 等硬件的真实基准测试。免费、开源、持续更新。',
+    '跨 Chip 与推理框架，对比 AgentX 长上下文多轮编码场景与固定序列 AI 推理。NVIDIA 与 AMD 的公开运行会在配置变更时更新。',
 };
 
 export const ZH_TAB_KEYS = [
@@ -32,9 +32,9 @@ export function isZhTab(tab: string): tab is ZhTabKey {
 
 export const TAB_META_ZH: Record<ZhTabKey, { title: string; description: string }> = {
   inference: {
-    title: 'AI 推理基准测试',
+    title: '智能体推理基准测试',
     description:
-      '跨 Chip 与云服务商对比 AI 推理延迟、吞吐量与首 token 延迟（TTFT）。基于 NVIDIA GB200、H100、AMD MI355X 等硬件的真实基准测试。',
+      '跨 Chip 与推理框架，对比智能体推理和固定序列 AI 推理的延迟、吞吐量、成本与首 token 延迟（TTFT）。AgentX 提供长上下文多轮编码工作负载。',
   },
   evaluation: {
     title: 'LLM 评估结果',
@@ -95,7 +95,7 @@ export const TAB_META_ZH: Record<ZhTabKey, { title: string; description: string 
  */
 export const TAB_INTRO_ZH: Record<ZhTabKey, string> = {
   inference:
-    '本页面展示 InferenceX 的 AI 推理基准测试结果：跨 Chip、推理框架与模型对比吞吐量（token/s/Chip）、交互性（token/s/用户）、首 token 延迟（TTFT）等指标。每个数据点都来自公开的 GitHub Actions 工作流，可复现、可审计。',
+    '本页面展示 InferenceX 的智能体推理与固定序列 AI 推理基准测试结果：跨 Chip、推理框架与模型对比吞吐量（token/s/Chip）、交互性（token/s/用户）、首 token 延迟（TTFT）等指标。智能体推理数据来自 AgentX；该场景对公开智能体编码轨迹衍生出的长上下文、多轮、含 subagent 工作负载进行回放。每个数据点都来自公开的 GitHub Actions 工作流，可复现、可审计。',
   evaluation:
     '本页面展示 LLM 评估（evaluation）结果：使用标准化评估集对比各模型与部署配置的准确率，验证推理优化不会损害模型质量。',
   historical:
@@ -142,7 +142,9 @@ export const NAV_LABELS_ZH: Record<string, string> = {
   '/': '首页',
   '/overview': '总览',
   '/inference': '仪表板',
+  '/inference/agentic': '遥测数据',
   '/compare': 'Chip 对比',
+  '/agentx': 'AgentX',
   '/about': '关于',
 };
 

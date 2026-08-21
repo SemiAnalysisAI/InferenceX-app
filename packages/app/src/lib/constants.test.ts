@@ -224,6 +224,7 @@ describe('getHardwareConfig', () => {
 describe('getGpuSpecs', () => {
   it('returns specs for a base GPU key', () => {
     const specs = getGpuSpecs('h100');
+    expect(specs.tdp).toBe(700);
     expect(specs.power).toBe(1.37);
     expect(specs.costh).toBe(1.17);
     expect(specs.costn).toBe(1.55);
@@ -244,6 +245,7 @@ describe('getGpuSpecs', () => {
   it('returns zero specs for unknown GPU', () => {
     const specs = getGpuSpecs('nonexistent');
     expect(specs.power).toBe(0);
+    expect(specs.tdp).toBe(0);
     expect(specs.costh).toBe(0);
     expect(specs.costn).toBe(0);
     expect(specs.costr).toBe(0);
@@ -253,6 +255,7 @@ describe('getGpuSpecs', () => {
     for (const [base, entry] of Object.entries(HW_REGISTRY)) {
       const result = getGpuSpecs(base);
       expect(result.power).toBe(entry.power);
+      expect(result.tdp).toBe(entry.tdp);
       expect(result.costh).toBe(entry.costh);
     }
   });

@@ -26,70 +26,43 @@ const timeline: RequestTimeline = {
 };
 
 describe('getRequestTimeline', () => {
-  it('returns the current precomputed timeline without selecting the raw profile blob', async () => {
-    // Header first, then the requests are pulled in slices — the header query
-    // must never select the timeline document itself.
+  it('returns the current precomputed timeline from a bounded text read without selecting the raw profile blob', async () => {
+    const encoded = JSON.stringify(timeline);
     const { sql, calls } = mockSql([
       [
         {
           trace_replay_id: 870,
           has_blob: true,
           timeline_version: REQUEST_TIMELINE_VERSION,
-          start_ns: 100,
-          end_ns: 200,
-          duration_s: 0.0000001,
-          request_count: 0,
         },
       ],
+      [{ chunk: encoded, chunk_chars: encoded.length }],
     ]);
 
     await expect(getRequestTimeline(sql, 422991)).resolves.toEqual(timeline);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).not.toContain('profile_export_jsonl_gz as blob');
-    expect(calls[0]).not.toMatch(/atr\.request_timeline\s*$/m);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).not.toContain('profile_export_jsonl_gz as blob');
   });
 
-  it('pages a long timeline instead of selecting the whole document', async () => {
-    // 3 requests over a chunk size of 2 would be two round trips; the mock
-    // stands in for that paging so we assert the slicing contract, not the size.
-    const record = {
-      cid: 'c',
-      ti: 0,
-      wid: 'w',
-      ad: 0,
-      phase: 'profiling',
-      credit: 0,
-      start: 1,
-      ack: 2,
-      end: 3,
-      ttftMs: 1,
-      tpotMs: 2,
-      isl: 10,
-      osl: 20,
-      cancelled: false,
-    };
+  it('never uses compressed JSONB storage size to decide whether to read bounded chunks', async () => {
+    const encoded = JSON.stringify(timeline);
     const { sql, calls } = mockSql([
       [
         {
           trace_replay_id: 870,
           has_blob: true,
           timeline_version: REQUEST_TIMELINE_VERSION,
-          start_ns: 100,
-          end_ns: 200,
-          duration_s: 0.0000001,
-          request_count: 2,
         },
       ],
-      [{ requests: [record, { ...record, ti: 1 }] }],
+      [{ chunk: encoded, chunk_chars: encoded.length }],
     ]);
 
-    const result = await getRequestTimeline(sql, 422991);
-    expect(result?.requests).toHaveLength(2);
-    expect(result?.startNs).toBe(100);
-    // One header read plus one slice read, and the slice is bounded.
+    await expect(getRequestTimeline(sql, 422991)).resolves.toEqual(timeline);
     expect(calls).toHaveLength(2);
-    expect(calls[1]).toContain('jsonb_array_elements');
-    expect(calls[1]).toContain('with ordinality');
+    expect(calls[0]).not.toContain('pg_column_size');
+    expect(calls[0]).not.toContain('octet_length');
+    expect(calls[1]).toContain('substr(text');
+    expect(calls[1]).not.toContain('profile_export_jsonl_gz as blob');
   });
 
   it('does not fetch a blob when neither a current timeline nor a blob exists', async () => {

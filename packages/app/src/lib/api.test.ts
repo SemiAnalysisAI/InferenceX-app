@@ -75,6 +75,26 @@ describe('fetchBenchmarks', () => {
     );
   });
 
+  it('requests the compact calculator view for one sequence', async () => {
+    mockOk([]);
+    await fetchBenchmarks(
+      'DeepSeek-R1-0528',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        type: 'calculator',
+        sequence: 'agentic-traces',
+      },
+    );
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/benchmarks?model=DeepSeek-R1-0528&view=calculator&sequence=agentic-traces',
+      expect.objectContaining({}),
+    );
+  });
+
   it('returns parsed JSON on success', async () => {
     const data = [{ hardware: 'h200', metrics: {} }];
     mockOk(data);

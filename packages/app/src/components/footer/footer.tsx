@@ -23,11 +23,13 @@ const STRINGS = {
     cookiePolicy: 'Cookie Policy',
     contribute: 'Contribute',
     benchmarks: 'Benchmarks',
-    frontend: 'Frontend',
+    agentxHarness: 'AgentX Harness',
+    visualization: 'Visualization',
     more: 'More',
     supporters: 'Supporters',
-    datasets: 'Datasets',
+    agentx: 'AgentX',
     articles: 'Articles',
+    apiReference: 'API Reference',
     gpuReliability: 'Chip Reliability',
     perfPerDollar: 'Performance per Dollar',
     glossary: 'AI Inference Glossary',
@@ -50,12 +52,14 @@ const STRINGS = {
     cookiePolicy: 'Cookie 政策',
     contribute: '参与贡献',
     benchmarks: '基准测试仓库',
-    frontend: '前端仓库',
+    agentxHarness: 'AgentX 框架仓库',
+    visualization: '可视化仓库',
     more: '更多',
     supporters: '支持者',
-    datasets: '数据集',
+    agentx: 'AgentX',
     articles: '文章',
     gpuReliability: 'Chip 可靠性',
+    apiReference: 'API 参考文档',
     perfPerDollar: '每美元性能',
     glossary: 'AI 推理术语表',
     languageLink: 'English',
@@ -175,13 +179,22 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 {t.benchmarks}
               </a>
               <a
-                data-testid="footer-link-frontend"
+                data-testid="footer-link-agentx-harness"
+                href="https://github.com/SemiAnalysisAI/agentx-harness"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.agentxHarness}
+              </a>
+              <a
+                data-testid="footer-link-visualization"
                 href="https://github.com/SemiAnalysisAI/InferenceX-app"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                {t.frontend}
+                {t.visualization}
               </a>
             </div>
             <div data-testid="footer-links-more" className="flex flex-col gap-2.5">
@@ -195,12 +208,12 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 {t.supporters}
               </Link>
               <Link
-                data-testid="footer-link-datasets"
-                href={`${prefix}/datasets`}
-                onClick={() => track('footer_datasets_clicked')}
+                data-testid="footer-link-agentx"
+                href={`${prefix}/agentx`}
+                onClick={() => track('footer_agentx_clicked')}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                {t.datasets}
+                {t.agentx}
               </Link>
               <Link
                 data-testid="footer-link-articles"
@@ -209,6 +222,14 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 {t.articles}
+              </Link>
+              <Link
+                data-testid="footer-link-api"
+                href={`${prefix}/api`}
+                onClick={() => track('footer_api_clicked')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.apiReference}
               </Link>
               <Link
                 data-testid="footer-link-reliability"

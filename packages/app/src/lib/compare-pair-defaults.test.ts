@@ -112,4 +112,72 @@ describe('pickPairDefaults', () => {
       precision: 'fp8',
     });
   });
+
+  it('recognizes AgentX rows without fixed input or output lengths', () => {
+    const rows: BenchmarkRow[] = [
+      makeRow({
+        hardware: 'h100',
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        precision: 'fp8',
+      }),
+      makeRow({
+        hardware: 'gb200',
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        precision: 'fp8',
+      }),
+    ];
+
+    expect(pickPairDefaults(rows, 'h100', 'gb200')).toEqual({
+      sequence: 'agentic-traces',
+      precision: 'fp8',
+    });
+  });
+
+  it('honors an available preferred scenario before overlap ranking', () => {
+    const rows: BenchmarkRow[] = [
+      makeRow({ hardware: 'h100', conc: 32 }),
+      makeRow({ hardware: 'h100', conc: 64 }),
+      makeRow({ hardware: 'gb200', conc: 32 }),
+      makeRow({ hardware: 'gb200', conc: 64 }),
+      makeRow({
+        hardware: 'h100',
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        conc: 8,
+      }),
+      makeRow({
+        hardware: 'gb200',
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        conc: 8,
+      }),
+    ];
+
+    expect(pickPairDefaults(rows, 'h100', 'gb200', 'agentic-traces')).toEqual({
+      sequence: 'agentic-traces',
+      precision: 'fp8',
+    });
+    expect(pickPairDefaults(rows, 'h100', 'gb200', '8k/1k')).toEqual({
+      sequence: '8k/1k',
+      precision: 'fp8',
+    });
+  });
+
+  it('falls back to the best available scenario when the preference has no rows', () => {
+    const rows: BenchmarkRow[] = [
+      makeRow({ hardware: 'h100', conc: 64 }),
+      makeRow({ hardware: 'gb200', conc: 64 }),
+    ];
+
+    expect(pickPairDefaults(rows, 'h100', 'gb200', 'agentic-traces')).toEqual({
+      sequence: '8k/1k',
+      precision: 'fp8',
+    });
+  });
 });

@@ -84,6 +84,8 @@ export interface AggDataEntry {
   rawMetricKeys?: string[];
   /** Stable per-point id from benchmark_results — for trace_replay lookups. */
   id?: number;
+  /** Stable identity for recipe variants that share topology and concurrency. */
+  recipe_fingerprint?: string;
   hw: string;
   mtp?: string;
   hwKey: string;
@@ -137,7 +139,10 @@ export interface AggDataEntry {
   'p99.9_e2el': number;
   // Measured GPU telemetry (emitted by runner's aggregate_power.py).
   // Optional because historical runs predate the fields.
+  power_valid?: number;
+  power_metric_schema_version?: number;
   avg_power_w?: number;
+  joules_per_successful_query?: number;
   joules_per_output_token?: number;
   joules_per_total_token?: number;
   // Multinode / disagg-only measured power. The aggregate_power.py runner
@@ -145,13 +150,13 @@ export interface AggDataEntry {
   // and decode workers (single-node disagg or multinode disagg). Single-node
   // aggregated configs leave these undefined.
   // - prefill_avg_power_w / decode_avg_power_w: mean per-GPU draw (W) within each role
-  // - joules_per_input_token: prefill_energy / total_input_tokens (prefill GPUs only)
-  // The disagg decode-only J/output is carried by joules_per_output_token above
-  // (the runner overrides it to decode_energy / total_output_tokens on disagg) —
-  // there is no separate _decode field.
+  // Unprefixed joules fields are whole-deployment metrics in schema version 2.
+  // Explicit prefill/decode keys retain role-local energy breakdowns.
   prefill_avg_power_w?: number;
   decode_avg_power_w?: number;
   joules_per_input_token?: number;
+  prefill_joules_per_input_token?: number;
+  decode_joules_per_output_token?: number;
   // Cluster-wide GPU telemetry beyond power (temperature, utilization, memory).
   // Emitted by aggregate_power.py when the perfmon CSVs include the matching
   // sample columns. Optional because older runs (and runs without the relevant
@@ -189,6 +194,14 @@ export interface AggDataEntry {
   decode_ep?: number;
   /** Decode-side pipeline parallelism — see {@link AggDataEntry.pp}. */
   decode_pp?: number;
+  /** Prefill worker's decode-context parallel width, when emitted by the runtime. */
+  prefill_dcp_size?: number;
+  /** Decode worker's decode-context parallel width, when emitted by the runtime. */
+  decode_dcp_size?: number;
+  /** Prefill worker's prefill-context parallel width, when emitted by the runtime. */
+  prefill_pcp_size?: number;
+  /** Decode worker's prefill-context parallel width, when emitted by the runtime. */
+  decode_pcp_size?: number;
   decode_dp_attention?: boolean | string;
   decode_num_workers?: number;
   image?: string;
@@ -289,6 +302,7 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
   outputTputPerMw?: { y: number; roof: boolean };
+  // Cost per million tokens.
   costh: { y: number; roof: boolean };
   costn: { y: number; roof: boolean };
   costr: { y: number; roof: boolean };
@@ -299,6 +313,27 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   costni: { y: number; roof: boolean };
   costri: { y: number; roof: boolean };
   costUser?: { y: number; roof: boolean };
+  // Tokens purchasable per $1.
+  tokensPerDollarH?: { y: number; roof: boolean };
+  tokensPerDollarN?: { y: number; roof: boolean };
+  tokensPerDollarR?: { y: number; roof: boolean };
+  outputTokensPerDollarH?: { y: number; roof: boolean };
+  outputTokensPerDollarN?: { y: number; roof: boolean };
+  outputTokensPerDollarR?: { y: number; roof: boolean };
+  inputTokensPerDollarH?: { y: number; roof: boolean };
+  inputTokensPerDollarN?: { y: number; roof: boolean };
+  inputTokensPerDollarR?: { y: number; roof: boolean };
+  // Tokens purchasable per ¥1 — the $ metrics converted at USD_TO_CNY.
+  tokensPerRmbH?: { y: number; roof: boolean };
+  tokensPerRmbN?: { y: number; roof: boolean };
+  tokensPerRmbR?: { y: number; roof: boolean };
+  outputTokensPerRmbH?: { y: number; roof: boolean };
+  outputTokensPerRmbN?: { y: number; roof: boolean };
+  outputTokensPerRmbR?: { y: number; roof: boolean };
+  inputTokensPerRmbH?: { y: number; roof: boolean };
+  inputTokensPerRmbN?: { y: number; roof: boolean };
+  inputTokensPerRmbR?: { y: number; roof: boolean };
+  tokensPerDollarUser?: { y: number; roof: boolean };
   powerUser?: { y: number; roof: boolean };
 
   // All-in provisioned Joules per token
@@ -315,6 +350,9 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   measuredJPerOutputToken?: { y: number; roof: boolean };
   measuredJPerTotalToken?: { y: number; roof: boolean };
   measuredJPerInputToken?: { y: number; roof: boolean };
+  measuredJPerSuccessfulQuery?: { y: number; roof: boolean };
+  measuredWhPerSuccessfulQuery?: { y: number; roof: boolean };
+  measuredPowerPercentTdp?: { y: number; roof: boolean };
 }
 
 /** Why a chart-ready point was intentionally excluded from the visible plot. */
@@ -349,6 +387,25 @@ export type YAxisMetricKey =
   | 'costni'
   | 'costri'
   | 'costUser'
+  | 'tokensPerDollarH'
+  | 'tokensPerDollarN'
+  | 'tokensPerDollarR'
+  | 'outputTokensPerDollarH'
+  | 'outputTokensPerDollarN'
+  | 'outputTokensPerDollarR'
+  | 'inputTokensPerDollarH'
+  | 'inputTokensPerDollarN'
+  | 'inputTokensPerDollarR'
+  | 'tokensPerRmbH'
+  | 'tokensPerRmbN'
+  | 'tokensPerRmbR'
+  | 'outputTokensPerRmbH'
+  | 'outputTokensPerRmbN'
+  | 'outputTokensPerRmbR'
+  | 'inputTokensPerRmbH'
+  | 'inputTokensPerRmbN'
+  | 'inputTokensPerRmbR'
+  | 'tokensPerDollarUser'
   | 'powerUser'
   | 'jTotal'
   | 'jOutput'
@@ -358,7 +415,10 @@ export type YAxisMetricKey =
   | 'measuredDecodeAvgPower'
   | 'measuredJPerOutputToken'
   | 'measuredJPerTotalToken'
-  | 'measuredJPerInputToken';
+  | 'measuredJPerInputToken'
+  | 'measuredJPerSuccessfulQuery'
+  | 'measuredWhPerSuccessfulQuery'
+  | 'measuredPowerPercentTdp';
 
 /**
  * Defines the configuration and labels for a specific chart.
@@ -446,6 +506,78 @@ export interface ChartDefinition {
   y_costri_label?: string;
   y_costri_title?: string;
   y_costri_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_tokensPerDollarH?: string;
+  y_tokensPerDollarH_label?: string;
+  y_tokensPerDollarH_title?: string;
+  y_tokensPerDollarH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_tokensPerDollarN?: string;
+  y_tokensPerDollarN_label?: string;
+  y_tokensPerDollarN_title?: string;
+  y_tokensPerDollarN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_tokensPerDollarR?: string;
+  y_tokensPerDollarR_label?: string;
+  y_tokensPerDollarR_title?: string;
+  y_tokensPerDollarR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTokensPerDollarH?: string;
+  y_outputTokensPerDollarH_label?: string;
+  y_outputTokensPerDollarH_title?: string;
+  y_outputTokensPerDollarH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTokensPerDollarN?: string;
+  y_outputTokensPerDollarN_label?: string;
+  y_outputTokensPerDollarN_title?: string;
+  y_outputTokensPerDollarN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTokensPerDollarR?: string;
+  y_outputTokensPerDollarR_label?: string;
+  y_outputTokensPerDollarR_title?: string;
+  y_outputTokensPerDollarR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerDollarH?: string;
+  y_inputTokensPerDollarH_label?: string;
+  y_inputTokensPerDollarH_title?: string;
+  y_inputTokensPerDollarH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerDollarN?: string;
+  y_inputTokensPerDollarN_label?: string;
+  y_inputTokensPerDollarN_title?: string;
+  y_inputTokensPerDollarN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerDollarR?: string;
+  y_inputTokensPerDollarR_label?: string;
+  y_inputTokensPerDollarR_title?: string;
+  y_inputTokensPerDollarR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_tokensPerRmbH?: string;
+  y_tokensPerRmbH_label?: string;
+  y_tokensPerRmbH_title?: string;
+  y_tokensPerRmbH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_tokensPerRmbN?: string;
+  y_tokensPerRmbN_label?: string;
+  y_tokensPerRmbN_title?: string;
+  y_tokensPerRmbN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_tokensPerRmbR?: string;
+  y_tokensPerRmbR_label?: string;
+  y_tokensPerRmbR_title?: string;
+  y_tokensPerRmbR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTokensPerRmbH?: string;
+  y_outputTokensPerRmbH_label?: string;
+  y_outputTokensPerRmbH_title?: string;
+  y_outputTokensPerRmbH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTokensPerRmbN?: string;
+  y_outputTokensPerRmbN_label?: string;
+  y_outputTokensPerRmbN_title?: string;
+  y_outputTokensPerRmbN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTokensPerRmbR?: string;
+  y_outputTokensPerRmbR_label?: string;
+  y_outputTokensPerRmbR_title?: string;
+  y_outputTokensPerRmbR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerRmbH?: string;
+  y_inputTokensPerRmbH_label?: string;
+  y_inputTokensPerRmbH_title?: string;
+  y_inputTokensPerRmbH_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerRmbN?: string;
+  y_inputTokensPerRmbN_label?: string;
+  y_inputTokensPerRmbN_title?: string;
+  y_inputTokensPerRmbN_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTokensPerRmbR?: string;
+  y_inputTokensPerRmbR_label?: string;
+  y_inputTokensPerRmbR_title?: string;
+  y_inputTokensPerRmbR_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
   // All-in provisioned Joules per token
   y_jTotal?: string;
   y_jTotal_label?: string;
@@ -488,6 +620,28 @@ export interface ChartDefinition {
   y_measuredJPerTotalToken_label?: string;
   y_measuredJPerTotalToken_title?: string;
   y_measuredJPerTotalToken_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_measuredJPerSuccessfulQuery?: string;
+  y_measuredJPerSuccessfulQuery_label?: string;
+  y_measuredJPerSuccessfulQuery_title?: string;
+  y_measuredJPerSuccessfulQuery_roofline?:
+    | 'upper_right'
+    | 'upper_left'
+    | 'lower_left'
+    | 'lower_right';
+  y_measuredWhPerSuccessfulQuery?: string;
+  y_measuredWhPerSuccessfulQuery_label?: string;
+  y_measuredWhPerSuccessfulQuery_title?: string;
+  y_measuredWhPerSuccessfulQuery_roofline?:
+    | 'upper_right'
+    | 'upper_left'
+    | 'lower_left'
+    | 'lower_right';
+  y_measuredPowerPercentTdp?: string;
+  y_measuredPowerPercentTdp_label?: string;
+  y_measuredPowerPercentTdp_title?: string;
+  // No `_roofline`: %TDP is a utilization gauge, not an efficiency frontier —
+  // there is no corner along which a config is "better", so the axis
+  // deliberately declares no Pareto direction.
   y_cost_limit?: number;
   y_latency_limit?: number;
 }
@@ -743,6 +897,9 @@ export interface InferenceChartContextType {
   toggleHwType: (hw: string) => void;
   removeHwType: (hw: string) => void;
   selectAllHwTypes: () => void;
+  /** Whether clean dashboard loads automatically keep the best configuration per physical SKU. */
+  bestPerSku: boolean;
+  setBestPerSku: (enabled: boolean, options?: { applySelection?: boolean }) => void;
   /** Resolve automatic official + `overlay:` hardware selections under the active scope rule. */
   resolveComparisonSelection: (
     proposed: Set<string>,
@@ -902,5 +1059,6 @@ export interface ChangelogMetadata {
     pr_link: string | null;
     head_ref?: string;
     evals_only?: boolean;
+    append_only?: boolean;
   }[];
 }

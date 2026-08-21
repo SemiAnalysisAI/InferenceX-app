@@ -3,6 +3,8 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
+
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 
 let container: HTMLDivElement;
@@ -80,45 +82,73 @@ describe('MetricAssumptionNotes', () => {
     );
   });
 
-  it('renders TCO notes, source attribution, and the cost disaggregation caveat', () => {
-    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_costhOutput" />);
+  it('renders TCO notes, source attribution, and the purchasing-power caveat', () => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_outputTokensPerDollarH" />);
 
     expect(getVisibleText()).toContain('TCO $/chip/hr:');
-    expect(getVisibleText()).toContain(
-      'SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model',
+    expect(getVisibleText()).toContain(TCO_SOURCE_TITLE);
+    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).not.toBeNull();
+    expect(getVisibleCaveatText()).toContain(
+      'calculate tokens per $1 USD per decode chip or per prefill chip',
     );
-    expect(getVisibleCaveatText()).toContain('calculate cost per decode chip or per prefill chip');
   });
 
-  // The prefill/decode split only skews the per-token-type costs; the
-  // total-token cost divides by the whole chip count, exactly as an aggregated
+  it('describes the existing cost-per-million metric', () => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_costhOutput" />);
+
+    expect(getVisibleCaveatText()).toContain(
+      'calculate cost per million tokens per decode chip or per prefill chip',
+    );
+    expect(getVisibleCaveatText()).toContain('token cost comparison');
+  });
+
+  // The prefill/decode split only skews per-token-type metrics; the
+  // total-token metric divides by the whole chip count, exactly as an aggregated
   // config does, so it must not carry the caveat.
+  it.each([
+    'y_outputTokensPerDollarH',
+    'y_outputTokensPerDollarN',
+    'y_outputTokensPerDollarR',
+    'y_inputTokensPerDollarH',
+    'y_inputTokensPerDollarN',
+    'y_inputTokensPerDollarR',
+  ])('shows the purchasing-power caveat for per-token-type metric %s', (metric) => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
+
+    expect(getVisibleCaveatText()).toContain(
+      'calculate tokens per $1 USD per decode chip or per prefill chip',
+    );
+  });
+
   it.each(['y_costhOutput', 'y_costnOutput', 'y_costrOutput', 'y_costhi', 'y_costni', 'y_costri'])(
-    'shows the cost disaggregation caveat for per-token-type cost metric %s',
+    'shows the token-cost caveat for per-token-type metric %s',
     (metric) => {
       renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
 
       expect(getVisibleCaveatText()).toContain(
-        'calculate cost per decode chip or per prefill chip',
+        'calculate cost per million tokens per decode chip or per prefill chip',
       );
     },
   );
 
-  it.each(['y_costh', 'y_costn', 'y_costr'])(
-    'hides the cost disaggregation caveat for total-token cost metric %s',
-    (metric) => {
-      renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
+  it.each([
+    'y_costh',
+    'y_costn',
+    'y_costr',
+    'y_tokensPerDollarH',
+    'y_tokensPerDollarN',
+    'y_tokensPerDollarR',
+  ])('hides the purchasing-power caveat for total-token metric %s', (metric) => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
 
-      // The TCO badges and source attribution still belong on a cost chart.
-      expect(getVisibleText()).toContain('TCO $/chip/hr:');
-      expect(getVisibleText()).toContain(
-        'SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model',
-      );
-      expect(getVisibleCaveatText()).not.toContain(
-        'calculate cost per decode chip or per prefill chip',
-      );
-    },
-  );
+    // The TCO badges and source attribution still explain the hourly-price input.
+    expect(getVisibleText()).toContain('TCO $/chip/hr:');
+    expect(getVisibleText()).toContain(TCO_SOURCE_TITLE);
+    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).not.toBeNull();
+    expect(getVisibleCaveatText()).not.toContain(
+      'calculate tokens per $1 USD per decode chip or per prefill chip',
+    );
+  });
 
   it('renders metric-specific throughput caveats and preserves Joules wording semantics', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_inputTputPerGpu" />);

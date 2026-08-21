@@ -87,7 +87,7 @@ describe('Dataset distribution percentiles', () => {
     cy.intercept('GET', '/api/v1/datasets/test-dataset/conversations*', {
       body: { total: 0, items: [] },
     });
-    cy.visit('/datasets/test-dataset', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/agentx/test-dataset', { onBeforeLoad: unlockAgenticGate });
   });
 
   it('shows P50/P75/P90/P95 for ISL, OSL, and uncached input', () => {

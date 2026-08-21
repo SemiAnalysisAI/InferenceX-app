@@ -127,6 +127,108 @@ describe('mapBenchmarkRow', () => {
       expect(result!.metrics).not.toHaveProperty('ep');
     });
 
+    it.each([
+      {
+        name: 'boolean verdict and junk-suffixed schema',
+        input: { power_valid: true, power_metric_schema_version: '2garbage' },
+        expectedVerdict: 0,
+        expectedSchema: undefined,
+      },
+      {
+        name: 'garbage verdict and valid numeric schema',
+        input: { power_valid: 'garbage', power_metric_schema_version: 2 },
+        expectedVerdict: 0,
+        expectedSchema: 2,
+      },
+      {
+        name: 'canonical numeric strings',
+        input: { power_valid: '1', power_metric_schema_version: '2' },
+        expectedVerdict: 1,
+        expectedSchema: 2,
+      },
+      {
+        name: 'explicit invalid verdict',
+        input: { power_valid: 0, power_metric_schema_version: 2 },
+        expectedVerdict: 0,
+        expectedSchema: 2,
+      },
+      {
+        name: 'legacy row without power contract fields',
+        input: {},
+        expectedVerdict: undefined,
+        expectedSchema: undefined,
+      },
+    ])(
+      'normalizes power contract discriminators: $name',
+      ({ input, expectedVerdict, expectedSchema }) => {
+        const tracker = createSkipTracker();
+        const result = mapBenchmarkRow(makeV1Row(input), tracker);
+
+        if (expectedVerdict === undefined) {
+          expect(result!.metrics).not.toHaveProperty('power_valid');
+        } else {
+          expect(result!.metrics.power_valid).toBe(expectedVerdict);
+        }
+        if (expectedSchema === undefined) {
+          expect(result!.metrics).not.toHaveProperty('power_metric_schema_version');
+        } else {
+          expect(result!.metrics.power_metric_schema_version).toBe(expectedSchema);
+        }
+      },
+    );
+
+    it.each([true, false, null, 0.5, 2, Number.NaN, Number.POSITIVE_INFINITY])(
+      'fails closed for explicitly malformed power_valid=%j',
+      (powerValid) => {
+        const tracker = createSkipTracker();
+        const result = mapBenchmarkRow(makeV1Row({ power_valid: powerValid }), tracker);
+
+        expect(result!.metrics.power_valid).toBe(0);
+      },
+    );
+
+    it.each([
+      null,
+      true,
+      false,
+      0,
+      -1,
+      1.5,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.MAX_SAFE_INTEGER + 1,
+      '0',
+      '-1',
+      '02',
+      '2.0',
+      ' 2',
+      '2 ',
+      '2garbage',
+      '1e2',
+      String(Number.MAX_SAFE_INTEGER + 1),
+    ])('omits malformed power_metric_schema_version=%j', (schemaVersion) => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV1Row({ power_metric_schema_version: schemaVersion }),
+        tracker,
+      );
+
+      expect(result!.metrics).not.toHaveProperty('power_metric_schema_version');
+    });
+
+    it.each([1, 2, Number.MAX_SAFE_INTEGER, '1', '2', String(Number.MAX_SAFE_INTEGER)])(
+      'accepts safe positive integer power_metric_schema_version=%j',
+      (schemaVersion) => {
+        const tracker = createSkipTracker();
+        const result = mapBenchmarkRow(
+          makeV1Row({ power_metric_schema_version: schemaVersion }),
+          tracker,
+        );
+
+        expect(result!.metrics.power_metric_schema_version).toBe(Number(schemaVersion));
+      },
+    );
+
     it('preserves the KV transfer engine for fixed-sequence multinode rows', () => {
       const tracker = createSkipTracker();
       const result = mapBenchmarkRow(
@@ -412,6 +514,28 @@ describe('mapBenchmarkRow', () => {
       const result = mapBenchmarkRow(makeV1Row(), tracker);
 
       expect(result!.image).toBeNull();
+    });
+  });
+
+  describe('recipe fingerprint', () => {
+    it('preserves the producer fingerprint outside metrics', () => {
+      const result = mapBenchmarkRow(
+        makeV1Row({
+          recipe_fingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        }),
+        createSkipTracker(),
+      );
+
+      expect(result!.recipeFingerprint).toBe(
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      );
+      expect(result!.metrics).not.toHaveProperty('recipe_fingerprint');
+    });
+
+    it('uses null for legacy artifacts without a fingerprint', () => {
+      const result = mapBenchmarkRow(makeV1Row(), createSkipTracker());
+
+      expect(result!.recipeFingerprint).toBeNull();
     });
   });
 

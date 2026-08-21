@@ -58,8 +58,8 @@ describe('Landing page performance', () => {
 
     cy.visit('/', {
       onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-kimi-k3-modal-dismissed');
-        win.localStorage.removeItem('inferencex-kimi-k3-banner-dismissed');
+        win.localStorage.removeItem('inferencex-agentic-results-modal-dismissed');
+        win.localStorage.removeItem('inferencex-agentic-results-banner-dismissed');
         observeLayoutShifts(win);
       },
     });
@@ -77,7 +77,7 @@ describe('Landing page performance', () => {
     cy.viewport(412, 823);
     cy.visit('/', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-kimi-k3-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-agentic-results-banner-dismissed', '1');
         observeLayoutShifts(win);
       },
     });

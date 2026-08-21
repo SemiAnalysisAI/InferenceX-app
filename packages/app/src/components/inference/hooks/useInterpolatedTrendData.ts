@@ -1,24 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { sequenceToIslOsl, USD_TO_CNY } from '@semianalysisai/inferencex-constants';
 
 import type { InferenceData, TrendDataPoint, YAxisMetricKey } from '@/components/inference/types';
 import {
   hermiteInterpolate,
   monotoneSlopes,
   paretoFrontUpperLeft,
+  recoverReciprocalNumerator,
+  reciprocalMetricAt,
 } from '@/components/calculator/useThroughputData';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
-import { getHardwareKey } from '@/lib/chart-utils';
+import { buildMeasuredPowerChartFields, getHardwareKey } from '@/lib/chart-utils';
 import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
-import type { Model, Sequence } from '@/lib/data-mappings';
+import { benchmarkCurveDate, dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
+import { Sequence, type Model } from '@/lib/data-mappings';
 
 // Trend points never sit on a roofline — they're synthetic per-(date, config)
 // aggregates, not the per-load Pareto-frontier points the chart marks. Hardcode
 // roof:false so the field shape lines up with InferenceData without a cast.
-const wrapMetric = (n: number): { y: number; roof: boolean } => ({ y: n, roof: false });
+const wrapMetric = (n: number): { y: number; roof: boolean } => ({
+  y: n,
+  roof: false,
+});
 
 /**
  * Build a lightweight InferenceData-compatible point from a raw BenchmarkRow.
@@ -37,9 +43,12 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
   const specs = getGpuSpecs(hwKey);
   const power = specs.power;
 
-  const tokPerHr = (tput * 3600) / 1_000_000;
-  const outTokPerHr = (outputTput * 3600) / 1_000_000;
-  const inTokPerHr = (inputTput * 3600) / 1_000_000;
+  const tokPerHr = tput * 3600;
+  const outTokPerHr = outputTput * 3600;
+  const inTokPerHr = inputTput * 3600;
+  const millionTokPerHr = tokPerHr / 1_000_000;
+  const millionOutTokPerHr = outTokPerHr / 1_000_000;
+  const millionInTokPerHr = inTokPerHr / 1_000_000;
 
   // Build metric objects matching InferenceData shape. Measured-power keys are
   // only set when the runner-side aggregate_power.py emitted them — leaving the
@@ -52,50 +61,131 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
     precision: row.precision,
     tp: row.decode_tp,
     conc: row.conc,
-    date: row.date,
+    date: benchmarkCurveDate(row),
     tpPerGpu: wrapMetric(tput),
     outputTputPerGpu: wrapMetric(outputTput),
     inputTputPerGpu: wrapMetric(inputTput),
     tpPerMw: wrapMetric(power > 0 ? (tput * 1000) / power : 0),
-    // Cost per million tokens (total / output / input)
-    costh: wrapMetric(tokPerHr ? specs.costh / tokPerHr : 0),
-    costn: wrapMetric(tokPerHr ? specs.costn / tokPerHr : 0),
-    costr: wrapMetric(tokPerHr ? specs.costr / tokPerHr : 0),
-    costhOutput: wrapMetric(outTokPerHr ? specs.costh / outTokPerHr : 0),
-    costnOutput: wrapMetric(outTokPerHr ? specs.costn / outTokPerHr : 0),
-    costrOutput: wrapMetric(outTokPerHr ? specs.costr / outTokPerHr : 0),
-    costhi: wrapMetric(inTokPerHr ? specs.costh / inTokPerHr : 0),
-    costni: wrapMetric(inTokPerHr ? specs.costn / inTokPerHr : 0),
-    costri: wrapMetric(inTokPerHr ? specs.costr / inTokPerHr : 0),
+    // Cost per million tokens (total / output / input).
+    costh: wrapMetric(millionTokPerHr ? specs.costh / millionTokPerHr : 0),
+    costn: wrapMetric(millionTokPerHr ? specs.costn / millionTokPerHr : 0),
+    costr: wrapMetric(millionTokPerHr ? specs.costr / millionTokPerHr : 0),
+    costhOutput: wrapMetric(millionOutTokPerHr ? specs.costh / millionOutTokPerHr : 0),
+    costnOutput: wrapMetric(millionOutTokPerHr ? specs.costn / millionOutTokPerHr : 0),
+    costrOutput: wrapMetric(millionOutTokPerHr ? specs.costr / millionOutTokPerHr : 0),
+    costhi: wrapMetric(millionInTokPerHr ? specs.costh / millionInTokPerHr : 0),
+    costni: wrapMetric(millionInTokPerHr ? specs.costn / millionInTokPerHr : 0),
+    costri: wrapMetric(millionInTokPerHr ? specs.costr / millionInTokPerHr : 0),
+    // Tokens purchasable per $1 (total / output / input).
+    tokensPerDollarH: wrapMetric(specs.costh ? tokPerHr / specs.costh : 0),
+    tokensPerDollarN: wrapMetric(specs.costn ? tokPerHr / specs.costn : 0),
+    tokensPerDollarR: wrapMetric(specs.costr ? tokPerHr / specs.costr : 0),
+    outputTokensPerDollarH: wrapMetric(specs.costh ? outTokPerHr / specs.costh : 0),
+    outputTokensPerDollarN: wrapMetric(specs.costn ? outTokPerHr / specs.costn : 0),
+    outputTokensPerDollarR: wrapMetric(specs.costr ? outTokPerHr / specs.costr : 0),
+    inputTokensPerDollarH: wrapMetric(specs.costh ? inTokPerHr / specs.costh : 0),
+    inputTokensPerDollarN: wrapMetric(specs.costn ? inTokPerHr / specs.costn : 0),
+    inputTokensPerDollarR: wrapMetric(specs.costr ? inTokPerHr / specs.costr : 0),
+    tokensPerRmbH: wrapMetric(specs.costh ? tokPerHr / (specs.costh * USD_TO_CNY) : 0),
+    tokensPerRmbN: wrapMetric(specs.costn ? tokPerHr / (specs.costn * USD_TO_CNY) : 0),
+    tokensPerRmbR: wrapMetric(specs.costr ? tokPerHr / (specs.costr * USD_TO_CNY) : 0),
+    outputTokensPerRmbH: wrapMetric(specs.costh ? outTokPerHr / (specs.costh * USD_TO_CNY) : 0),
+    outputTokensPerRmbN: wrapMetric(specs.costn ? outTokPerHr / (specs.costn * USD_TO_CNY) : 0),
+    outputTokensPerRmbR: wrapMetric(specs.costr ? outTokPerHr / (specs.costr * USD_TO_CNY) : 0),
+    inputTokensPerRmbH: wrapMetric(specs.costh ? inTokPerHr / (specs.costh * USD_TO_CNY) : 0),
+    inputTokensPerRmbN: wrapMetric(specs.costn ? inTokPerHr / (specs.costn * USD_TO_CNY) : 0),
+    inputTokensPerRmbR: wrapMetric(specs.costr ? inTokPerHr / (specs.costr * USD_TO_CNY) : 0),
     // Energy: J/token = W / tok/s
     jTotal: wrapMetric(power > 0 && tput ? (power * 1000) / tput : 0),
     ...(outputTput ? { jOutput: wrapMetric(power > 0 ? (power * 1000) / outputTput : 0) } : {}),
     ...(inputTput ? { jInput: wrapMetric(power > 0 ? (power * 1000) / inputTput : 0) } : {}),
-    ...(typeof entry.avg_power_w === 'number'
-      ? { measuredAvgPower: { y: entry.avg_power_w, roof: false } }
-      : {}),
-    ...(typeof entry.joules_per_output_token === 'number'
-      ? { measuredJPerOutputToken: { y: entry.joules_per_output_token, roof: false } }
-      : {}),
-    ...(typeof entry.joules_per_total_token === 'number'
-      ? { measuredJPerTotalToken: { y: entry.joules_per_total_token, roof: false } }
-      : {}),
-    ...(typeof entry.prefill_avg_power_w === 'number'
-      ? { measuredPrefillAvgPower: { y: entry.prefill_avg_power_w, roof: false } }
-      : {}),
-    ...(typeof entry.decode_avg_power_w === 'number'
-      ? { measuredDecodeAvgPower: { y: entry.decode_avg_power_w, roof: false } }
-      : {}),
-    ...(typeof entry.joules_per_input_token === 'number'
-      ? { measuredJPerInputToken: { y: entry.joules_per_input_token, roof: false } }
-      : {}),
+    ...buildMeasuredPowerChartFields(entry, specs.tdp),
   };
   return point;
 }
 
 /**
+ * Metrics defined as a per-chip constant divided by a throughput, mapped to the
+ * throughput metric they divide. These are interpolated by splining that
+ * throughput and re-deriving, never by splining the metric independently, so
+ * the interpolated pair preserves `metric x throughput = constant`. See
+ * `recoverReciprocalNumerator` and docs/tco-calculator.md.
+ *
+ * The `measured*` energy keys are deliberately absent: their numerator is
+ * measured per point rather than a constant, so the identity does not hold and
+ * splining them directly remains correct.
+ */
+const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
+  // $/M tok = $/GPU-hr x 1e6 / (tok/s x 3600)
+  costh: 'tpPerGpu',
+  costn: 'tpPerGpu',
+  costr: 'tpPerGpu',
+  costhOutput: 'outputTputPerGpu',
+  costnOutput: 'outputTputPerGpu',
+  costrOutput: 'outputTputPerGpu',
+  costhi: 'inputTputPerGpu',
+  costni: 'inputTputPerGpu',
+  costri: 'inputTputPerGpu',
+  // J/token = W / (tok/s)
+  jTotal: 'tpPerGpu',
+  jOutput: 'outputTputPerGpu',
+  jInput: 'inputTputPerGpu',
+};
+
+/**
+ * Purchasing-power metrics mapped to the throughput they scale. Their Pareto
+ * knots must come from this throughput too: choosing the total-throughput
+ * frontier for output/input tokens can select a different serving envelope
+ * from the corresponding tokens-per-dollar chart.
+ */
+const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
+  tokensPerDollarH: 'tpPerGpu',
+  tokensPerDollarN: 'tpPerGpu',
+  tokensPerDollarR: 'tpPerGpu',
+  outputTokensPerDollarH: 'outputTputPerGpu',
+  outputTokensPerDollarN: 'outputTputPerGpu',
+  outputTokensPerDollarR: 'outputTputPerGpu',
+  inputTokensPerDollarH: 'inputTputPerGpu',
+  inputTokensPerDollarN: 'inputTputPerGpu',
+  inputTokensPerDollarR: 'inputTputPerGpu',
+  tokensPerRmbH: 'tpPerGpu',
+  tokensPerRmbN: 'tpPerGpu',
+  tokensPerRmbR: 'tpPerGpu',
+  outputTokensPerRmbH: 'outputTputPerGpu',
+  outputTokensPerRmbN: 'outputTputPerGpu',
+  outputTokensPerRmbR: 'outputTputPerGpu',
+  inputTokensPerRmbH: 'inputTputPerGpu',
+  inputTokensPerRmbN: 'inputTputPerGpu',
+  inputTokensPerRmbR: 'inputTputPerGpu',
+};
+
+function recoverProportionalMultiplier(
+  values: readonly number[],
+  throughputs: readonly number[],
+): number | null {
+  const RELATIVE_TOLERANCE = 1e-3;
+  let multiplier: number | null = null;
+
+  for (let i = 0; i < values.length; i += 1) {
+    const value = values[i];
+    const throughput = throughputs[i];
+    if (value === undefined || throughput === undefined) continue;
+    if (!(value > 0) || !(throughput > 0)) continue;
+
+    const candidate = value / throughput;
+    if (multiplier === null) {
+      multiplier = candidate;
+    } else if (Math.abs(candidate - multiplier) > Math.abs(multiplier) * RELATIVE_TOLERANCE) {
+      return null;
+    }
+  }
+
+  return multiplier;
+}
+
+/**
  * Interpolate a selected metric at a target interactivity for a set of InferenceData points
- * from a single GPU. Uses Pareto front (throughput-based frontier) + monotone cubic Hermite spline.
+ * from a single GPU. Uses a throughput-based Pareto front + monotone cubic Hermite spline.
  *
  * Exported for unit testing.
  */
@@ -106,11 +196,19 @@ export function interpolateMetricAtInteractivity(
 ): number | null {
   if (points.length === 0) return null;
 
-  // Build Pareto front on interactivity(x) vs throughput(y)
+  // Tokens/$ uses the corresponding total/output/input throughput frontier so
+  // its knots exactly match the throughput/interactivity serving envelope.
+  const proportionalThroughputKey = PROPORTIONAL_TO_THROUGHPUT[metricKey];
+  const frontierThroughputKey = proportionalThroughputKey ?? 'tpPerGpu';
+  for (const point of points) {
+    if (extractMetric(point, frontierThroughputKey) === null) return null;
+  }
+
+  // Build Pareto front on interactivity(x) vs the applicable throughput(y).
   const frontier = paretoFrontUpperLeft<InferenceData>(
     points,
     (p) => p.x,
-    (p) => p.tpPerGpu.y,
+    (p) => extractMetric(p, frontierThroughputKey)!,
   );
   if (frontier.length === 0) return null;
 
@@ -139,6 +237,39 @@ export function interpolateMetricAtInteractivity(
     const v = extractMetric(p, metricKey);
     if (v === null) return null;
     metricYs.push(v);
+  }
+
+  // Tokens/$ is `throughput * 3600 / hourlyCost`. Spline the matching
+  // throughput and apply that constant multiplier so the purchasing-power
+  // curve cannot drift from its throughput/interactivity Pareto curve.
+  if (proportionalThroughputKey) {
+    const tputYs = sorted.map((p) => extractMetric(p, proportionalThroughputKey)!);
+    const multiplier = recoverProportionalMultiplier(metricYs, tputYs);
+    if (multiplier !== null) {
+      const tputSlopes = monotoneSlopes(xs, tputYs);
+      const tput = hermiteInterpolate(xs, tputYs, tputSlopes, targetInteractivity);
+      return Math.max(0, tput) * multiplier;
+    }
+  }
+
+  // Cost and energy per token are `constant / throughput`. Spline that
+  // throughput and re-derive rather than splining the metric, preserving the identity.
+  const throughputKey = RECIPROCAL_OF_THROUGHPUT[metricKey];
+  if (throughputKey) {
+    const tputYs: number[] = [];
+    for (const p of sorted) {
+      const v = extractMetric(p, throughputKey);
+      if (v === null) return null;
+      tputYs.push(v);
+    }
+    const numerator = recoverReciprocalNumerator(metricYs, tputYs);
+    // null means these points do not obey the identity — fall through and spline
+    // the metric directly rather than rewrite it from one point's ratio.
+    if (numerator !== null) {
+      const tputSlopes = monotoneSlopes(xs, tputYs);
+      const tput = hermiteInterpolate(xs, tputYs, tputSlopes, targetInteractivity);
+      return reciprocalMetricAt(numerator, Math.max(0, tput));
+    }
   }
 
   // Monotone cubic Hermite spline interpolation
@@ -195,6 +326,7 @@ export function useInterpolatedTrendData({
     enabled ? selectedModel : '',
     seqIslOsl?.isl ?? 0,
     seqIslOsl?.osl ?? 0,
+    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
   );
 
   // Build lightweight InferenceData points grouped by date and hwKey.
@@ -204,16 +336,17 @@ export function useInterpolatedTrendData({
 
     const result = new Map<string, Map<string, InferenceData[]>>();
 
-    for (const row of allRows) {
+    for (const row of dedupeAgenticHistoryRuns(allRows)) {
       if (!selectedPrecisions.includes(row.precision)) continue;
 
       const point = rowToLightweightPoint(row);
       if (!point) continue;
 
-      let dateMap = result.get(row.date);
+      const curveDate = benchmarkCurveDate(row);
+      let dateMap = result.get(curveDate);
       if (!dateMap) {
         dateMap = new Map();
-        result.set(row.date, dateMap);
+        result.set(curveDate, dateMap);
       }
 
       const hwKey = point.hwKey as string;
@@ -243,7 +376,6 @@ export function useInterpolatedTrendData({
           metricKey,
         );
         if (interpolated === null) continue;
-
         if (!resultMap.has(groupKey)) resultMap.set(groupKey, new Map());
         resultMap.get(groupKey)!.set(date, {
           date,
@@ -266,7 +398,12 @@ export function useInterpolatedTrendData({
         // Extend line to today if the last point is before today
         const last = points.at(-1)!;
         if (last.date < today) {
-          points.push({ date: today, value: last.value, x: last.x, synthetic: true });
+          points.push({
+            date: today,
+            value: last.value,
+            x: last.x,
+            synthetic: true,
+          });
         }
         lines.set(groupKey, points);
         // Return base hwKey for legend filtering
@@ -300,7 +437,12 @@ export function useInterpolatedTrendData({
   }, [isLoading]);
 
   if (!enabled) {
-    return { trendLines: new Map(), hwKeysWithData: [], loading: false, progress: 0 };
+    return {
+      trendLines: new Map(),
+      hwKeysWithData: [],
+      loading: false,
+      progress: 0,
+    };
   }
 
   return { trendLines, hwKeysWithData, loading: isLoading, progress };

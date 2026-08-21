@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 
 import { ModeToggle } from '@/components/ui/mode-toggle';
+import { NewBadge } from '@/components/ui/new-badge';
 import { MinecraftToggles } from '@/components/minecraft/minecraft-toggles';
 import { CLIENT_SEARCH_CHANGE_EVENT, navigateInApp } from '@/lib/client-navigation';
 import { hasZhSibling, isZhPathname, switchLocalePath, ZH_PREFIX, zhPath } from '@/lib/i18n';
@@ -14,6 +15,9 @@ import { NAV_LABELS_ZH } from '@/lib/tab-meta-zh';
 import { cn } from '@/lib/utils';
 
 import { GitHubStars } from './GithubStars';
+
+/** The Telemetry nav entry, carved out of the Dashboard tab prefix match. */
+const TELEMETRY_PATH = '/inference/agentic';
 
 /** Dashboard tab paths that should highlight the "Dashboard" nav link. */
 const DASHBOARD_TABS = [
@@ -29,8 +33,28 @@ const DASHBOARD_TABS = [
   '/current-inferencex-image',
 ];
 
-const NAV_LINKS = [
+interface NavLink {
+  href: string;
+  label: string;
+  testId: string;
+  event: string;
+  badge?: {
+    en: string;
+    zh: string;
+  };
+}
+
+const NAV_LINKS: readonly NavLink[] = [
   { href: '/', label: 'Home', testId: 'nav-link-home', event: 'header_home_clicked' },
+  // AgentX sits directly after Home: it is the flagship benchmark, and the
+  // surface every entry below it ultimately explains.
+  {
+    href: '/agentx',
+    label: 'AgentX',
+    testId: 'nav-link-agentx',
+    event: 'header_agentx_clicked',
+    badge: { en: 'NEW', zh: '新' },
+  },
   {
     href: '/overview',
     label: 'Overview',
@@ -42,6 +66,12 @@ const NAV_LINKS = [
     label: 'Dashboard',
     testId: 'nav-link-dashboard',
     event: 'header_dashboard_clicked',
+  },
+  {
+    href: '/inference/agentic',
+    label: 'Telemetry',
+    testId: 'nav-link-telemetry',
+    event: 'header_telemetry_clicked',
   },
   {
     href: '/compare',
@@ -61,11 +91,29 @@ function isActive(pathname: string, href: string): boolean {
       : pathname.slice(ZH_PREFIX.length)
     : pathname;
   if (href === '/') return enPathname === '/';
-  if (href === '/inference') return DASHBOARD_TABS.some((tab) => enPathname.startsWith(tab));
+  // `/inference/agentic` is its own nav entry, so exclude it here — a bare
+  // `startsWith('/inference')` would light up Dashboard and Telemetry at once.
+  if (href === '/inference') {
+    return (
+      !enPathname.startsWith(TELEMETRY_PATH) &&
+      DASHBOARD_TABS.some((tab) => enPathname.startsWith(tab))
+    );
+  }
   // Exact match or a child path under `<href>/...`. The bare `startsWith` would
   // light up `/compare` when the user is on `/compare-per-dollar/...` since the
   // latter starts with the literal string `/compare`.
   return enPathname === href || enPathname.startsWith(`${href}/`);
+}
+
+/**
+ * Whether the link lands on the page already on screen. Deliberately not
+ * `isActive`, which also lights up for every sibling dashboard tab and for
+ * child routes — those are real destinations, so treating their clicks as
+ * no-ops would strand the user (Dashboard from `/evaluation`, Comparisons
+ * from `/compare/<slug>`).
+ */
+function isCurrentPage(pathname: string, displayHref: string): boolean {
+  return pathname === displayHref;
 }
 
 /** EN ↔ 中文 switcher; maps the current page to its sibling in the other language. */
@@ -101,7 +149,10 @@ function LanguageToggle({
   return (
     <Link
       href={target + search}
-      prefetch={false}
+      // Only /overview rewrites this href per interaction, which would
+      // re-prefetch its force-dynamic sibling on every selector commit.
+      // Everywhere else the href is stable, so let Next prefetch it.
+      prefetch={isActive(pathname, '/overview') ? false : undefined}
       data-testid="language-toggle"
       hrefLang={isZh ? 'en' : 'zh-CN'}
       className="inline-flex items-center min-h-11 px-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
@@ -128,9 +179,14 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
     ? NAV_LINKS.map((link) => ({
         ...link,
         label: NAV_LABELS_ZH[link.href] ?? link.label,
+        badgeLabel: link.badge?.zh,
         displayHref: hasZhSibling(link.href) ? zhPath(link.href) : link.href,
       }))
-    : NAV_LINKS.map((link) => ({ ...link, displayHref: link.href }));
+    : NAV_LINKS.map((link) => ({
+        ...link,
+        badgeLabel: link.badge?.en,
+        displayHref: link.href,
+      }));
 
   // Close menu on route change
   useEffect(() => {
@@ -188,27 +244,38 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-1">
-            {navLinks.map(({ href, displayHref, label, testId, event }) => (
+          <nav className="hidden items-center gap-1 xl:flex">
+            {navLinks.map(({ href, displayHref, label, badgeLabel, testId, event }) => (
               <Link
                 key={href}
                 data-testid={testId}
                 href={displayHref}
                 prefetch={isActive(pathname, href) ? false : undefined}
                 className={cn(
-                  'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
                   isActive(pathname, href)
                     ? 'text-brand bg-brand/10'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted',
                 )}
                 onClick={(e) => {
                   track(event);
+                  // Re-entering the current page would refetch the route and
+                  // discard whatever selector state the URL already carries.
+                  if (isCurrentPage(pathname, displayHref)) {
+                    e.preventDefault();
+                    return;
+                  }
                   if (href === '/overview' || href === '/inference') {
                     navigateInApp(e, router, displayHref);
                   }
                 }}
               >
-                {label}
+                <span>{label}</span>
+                {badgeLabel && (
+                  <NewBadge data-nav-badge="agentx" data-new-badge="agentx-nav">
+                    {badgeLabel}
+                  </NewBadge>
+                )}
               </Link>
             ))}
           </nav>
@@ -227,7 +294,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             <ModeToggle />
 
             {/* Mobile hamburger */}
-            <div ref={menuRef} className="relative lg:hidden">
+            <div ref={menuRef} className="relative xl:hidden">
               <button
                 type="button"
                 data-testid="mobile-menu-toggle"
@@ -256,7 +323,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                   data-testid="mobile-menu"
                   className="absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-40"
                 >
-                  {navLinks.map(({ href, displayHref, label, event }) => (
+                  {navLinks.map(({ href, displayHref, label, badgeLabel, event }) => (
                     <Link
                       key={href}
                       href={displayHref}
@@ -269,12 +336,25 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                       )}
                       onClick={(e) => {
                         track(event);
+                        if (isCurrentPage(pathname, displayHref)) {
+                          e.preventDefault();
+                          return;
+                        }
                         if (href === '/overview' || href === '/inference') {
                           navigateInApp(e, router, displayHref);
                         }
                       }}
                     >
-                      {label}
+                      <span>{label}</span>
+                      {badgeLabel && (
+                        <NewBadge
+                          data-nav-badge="agentx"
+                          data-new-badge="agentx-nav"
+                          className="ml-1.5"
+                        >
+                          {badgeLabel}
+                        </NewBadge>
+                      )}
                     </Link>
                   ))}
                   <span className="flex items-center gap-2 px-3 sm:hidden">

@@ -1,6 +1,5 @@
 import { resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants';
 
-import { restrictAgenticPointsToE2eFrontier } from './agentic-frontier';
 import type { BenchmarkRow } from './api';
 import { rowToAggDataEntry } from './benchmark-transform';
 import { buildAvailabilityHwKey } from './chart-utils';
@@ -17,6 +16,11 @@ import {
 } from './data-mappings';
 import { frameworkFamily } from './framework-family';
 import {
+  benchmarkCurveDate,
+  benchmarkCurveRunStartedAt,
+  benchmarkCurveWorkflowRunId,
+} from './benchmark-run-selection';
+import {
   computeTierReads,
   singleTurnInteractivity,
   type TcoTierBoundary,
@@ -32,10 +36,34 @@ export const OVERVIEW_HARDWARE = ['b200', 'mi355x', 'b300', 'gb200', 'gb300'] as
 export type OverviewReferenceHardware = (typeof OVERVIEW_HARDWARE)[number];
 export const OVERVIEW_DEFAULT_REFERENCE_HARDWARE: OverviewReferenceHardware = 'b200';
 export type OverviewEngineScope = 'all' | 'community';
-export type OverviewComparisonMode = 'hardware' | 'history';
+export const OVERVIEW_HISTORY_WINDOWS = ['7d', '30d', '60d', '90d'] as const;
+export type OverviewHistoryWindowKey = (typeof OVERVIEW_HISTORY_WINDOWS)[number];
+export const OVERVIEW_DEFAULT_HISTORY_WINDOW: OverviewHistoryWindowKey = '30d';
+export const OVERVIEW_HISTORY_WINDOW_DAYS: Record<OverviewHistoryWindowKey, number> = {
+  '7d': 7,
+  '30d': 30,
+  '60d': 60,
+  '90d': 90,
+};
+/** A history mode IS its window key, so `?compare=<key>` alone determines the
+ *  payload and every href/caching path threads the window with no extra param. */
+export type OverviewComparisonMode = 'hardware' | OverviewHistoryWindowKey;
 export const OVERVIEW_DEFAULT_COMPARISON_MODE: OverviewComparisonMode = 'hardware';
 export type OverviewModelScope = 'default' | 'all';
 export const OVERVIEW_DEFAULT_MODEL_SCOPE: OverviewModelScope = 'default';
+/** History mode only: `changed` narrows the matrix to rows that moved in the
+ *  window. It is opt-in — the default shows every row, because an unchanged row
+ *  still carries current cost the reader came to audit. Ignored in hardware
+ *  mode, where every row carries a comparison. */
+export type OverviewRowScope = 'changed' | 'all';
+export const OVERVIEW_DEFAULT_ROW_SCOPE: OverviewRowScope = 'all';
+/** Hardware mode only: `priced` drops rows that quote no platform at all, which
+ *  carry neither a cost nor a comparison and exist purely to say "not measured".
+ *  Deliberately not "rows without a delta against the reference": that would
+ *  delete rows pricing three chips just because the reference happens to miss
+ *  this scenario, and the count would swing with the chosen reference. */
+export type OverviewHardwareRowScope = 'priced' | 'all';
+export const OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE: OverviewHardwareRowScope = 'all';
 export type OverviewScenario = 'single_turn_8k1k' | 'agentx';
 /** Row order within a model: the single-turn workload first, AgentX below it. */
 export const OVERVIEW_SCENARIOS = ['single_turn_8k1k', 'agentx'] as const;
@@ -61,7 +89,10 @@ export function resolveOverviewComparisonMode(
   raw: string | readonly string[] | undefined,
 ): OverviewComparisonMode {
   const candidate = Array.isArray(raw) ? raw[0] : raw;
-  return candidate === '30d' ? 'history' : OVERVIEW_DEFAULT_COMPARISON_MODE;
+  return (
+    OVERVIEW_HISTORY_WINDOWS.find((window) => window === candidate) ??
+    OVERVIEW_DEFAULT_COMPARISON_MODE
+  );
 }
 
 export function resolveOverviewModelScope(
@@ -69,6 +100,20 @@ export function resolveOverviewModelScope(
 ): OverviewModelScope {
   const candidate = Array.isArray(raw) ? raw[0] : raw;
   return candidate === 'all' ? 'all' : OVERVIEW_DEFAULT_MODEL_SCOPE;
+}
+
+export function resolveOverviewRowScope(
+  raw: string | readonly string[] | undefined,
+): OverviewRowScope {
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  return candidate === 'changed' ? 'changed' : OVERVIEW_DEFAULT_ROW_SCOPE;
+}
+
+export function resolveOverviewHardwareRowScope(
+  raw: string | readonly string[] | undefined,
+): OverviewHardwareRowScope {
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  return candidate === 'priced' ? 'priced' : OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE;
 }
 
 // Note (wenyao): row order is a contract — defaults, then maintenance, then
@@ -119,6 +164,11 @@ export interface OverviewConfigResult {
   latestDate: string;
 }
 
+/** What actually reaches the client. `tierValues` is the interpolation input —
+ *  the server reads it to produce a tier's value and nothing renders it, so it
+ *  is stripped before serialization rather than shipped and ignored. */
+export type OverviewConfigView = Omit<OverviewConfigResult, 'tierValues'>;
+
 export interface OverviewTierRead {
   tier: number;
   value: number | null;
@@ -126,7 +176,7 @@ export interface OverviewTierRead {
   estimated: boolean;
   evidenceDate: { from: string; to: string } | null;
   evidenceTopologies: string[];
-  config: OverviewConfigResult | null;
+  config: OverviewConfigView | null;
 }
 
 /** Why a platform shows `∞`. `cannot_reach_at_tier` = every
@@ -146,7 +196,7 @@ export interface OverviewHistoricalComparison {
   costDeltaPct: number | null;
   baselineDate: string | null;
   /** Exact serving envelope that produced the historical value. */
-  baselineConfig: OverviewConfigResult | null;
+  baselineConfig: OverviewConfigView | null;
 }
 
 export interface OverviewPlatformResult {
@@ -179,10 +229,20 @@ export interface OverviewPageData {
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
   modelScope: OverviewModelScope;
+  rowScope: OverviewRowScope;
+  hardwareRowScope: OverviewHardwareRowScope;
+  /** Rows with no 30-day change, counted over the full matrix regardless of the
+   *  active scope, so the toggle can name the same number in both directions.
+   *  Zero outside history mode and whenever filtering would change nothing. */
+  unchangedRowCount: number;
+  /** Rows quoting no platform at all, counted the same way for hardware mode.
+   *  Zero outside hardware mode and whenever filtering would change nothing. */
+  emptyRowCount: number;
   historicalWindow: OverviewHistoricalWindow | null;
 }
 
 export interface OverviewHistoricalWindow {
+  key: OverviewHistoryWindowKey;
   snapshotDate: string;
   targetDate: string;
   earliestDate: string;
@@ -221,16 +281,24 @@ export function overviewSnapshotDate(
           scenarios.includes(scenario)
         );
       })
-      .map((row) => row.date);
+      .map(benchmarkCurveDate);
   });
   return dates.length === 0 ? null : (dates.toSorted().at(-1) ?? null);
 }
 
-export function overviewHistoricalWindow(snapshotDate: string): OverviewHistoricalWindow {
+/** Baseline band is one window-width wide ([snapshot−2w, snapshot−w]): wide
+ *  enough that a benchmark cadence sparser than the window still finds a
+ *  baseline, without ever reaching into results newer than the window. */
+export function overviewHistoricalWindow(
+  snapshotDate: string,
+  key: OverviewHistoryWindowKey = OVERVIEW_DEFAULT_HISTORY_WINDOW,
+): OverviewHistoricalWindow {
+  const days = OVERVIEW_HISTORY_WINDOW_DAYS[key];
   return {
+    key,
     snapshotDate,
-    targetDate: subtractUtcDays(snapshotDate, 30),
-    earliestDate: subtractUtcDays(snapshotDate, 60),
+    targetDate: subtractUtcDays(snapshotDate, days),
+    earliestDate: subtractUtcDays(snapshotDate, days * 2),
   };
 }
 
@@ -325,15 +393,16 @@ function overviewScenarioRows(
 export type OverviewServingSeriesRow = Pick<
   BenchmarkRow,
   'model' | 'hardware' | 'framework' | 'spec_method' | 'precision' | 'disagg' | 'is_multinode'
-> & { offload_mode?: string | null };
+> & { offload_mode?: string | null; benchmark_type?: string };
 
 /** Stable identity for one Overview serving envelope across topology points. */
 export function overviewServingSeriesKey(row: OverviewServingSeriesRow): string {
+  const specMethod = row.benchmark_type === 'agentic_traces' ? '' : row.spec_method;
   return JSON.stringify([
     row.model,
     row.hardware,
     row.framework,
-    row.spec_method,
+    specMethod,
     row.precision,
     row.disagg,
     row.is_multinode,
@@ -359,10 +428,27 @@ function buildConfigs(
   const configs: OverviewConfigResult[] = [];
   for (const [key, configRows] of rowsByConfig) {
     const latestDate = configRows.reduce(
-      (latest, row) => (row.date > latest ? row.date : latest),
-      configRows[0].date,
+      (latest, row) => (benchmarkCurveDate(row) > latest ? benchmarkCurveDate(row) : latest),
+      benchmarkCurveDate(configRows[0]),
     );
-    const latestRows = configRows.filter((row) => row.date === latestDate);
+    let latestRows = configRows.filter((row) => benchmarkCurveDate(row) === latestDate);
+    if (
+      scenario === 'agentx' &&
+      latestRows.some((row) => benchmarkCurveWorkflowRunId(row) !== undefined)
+    ) {
+      const winningRow = latestRows.reduce((winner, row) => {
+        const startedAt = benchmarkCurveRunStartedAt(row) ?? '';
+        const winnerStartedAt = benchmarkCurveRunStartedAt(winner) ?? '';
+        if (startedAt !== winnerStartedAt) return startedAt > winnerStartedAt ? row : winner;
+        return (benchmarkCurveWorkflowRunId(row) ?? Number.NEGATIVE_INFINITY) >
+          (benchmarkCurveWorkflowRunId(winner) ?? Number.NEGATIVE_INFINITY)
+          ? row
+          : winner;
+      });
+      latestRows = latestRows.filter(
+        (row) => benchmarkCurveWorkflowRunId(row) === benchmarkCurveWorkflowRunId(winningRow),
+      );
+    }
     const config = buildConfigResult(model, scenario, latestRows[0].precision, key, latestRows);
     if (config) configs.push(config);
   }
@@ -383,7 +469,7 @@ function readConfigAtTier(config: OverviewConfigResult, tier: number): OverviewT
 }
 
 interface ConfigTierRead extends OverviewTierRead {
-  config: OverviewConfigResult;
+  config: OverviewConfigView;
 }
 
 /** In-range reads only: a clamped or unreachable read remains a coverage gap. */
@@ -427,10 +513,16 @@ function nonComparableAsMissing(
   if (read === undefined) return nullTierRead(tier);
   return isInRangeTierRead(read)
     ? read
-    : { ...read, value: null, estimated: false, evidenceDate: null, evidenceTopologies: [] };
+    : {
+        ...read,
+        value: null,
+        estimated: false,
+        evidenceDate: null,
+        evidenceTopologies: [],
+      };
 }
 
-function configPriorityIndex(config: OverviewConfigResult): number {
+function configPriorityIndex(config: OverviewConfigView): number {
   return OVERVIEW_SLICE_PRIORITY.findIndex(
     ({ speculative, precision }) =>
       speculative === isSpeculativeDecode(config.specMethod) && precision === config.precision,
@@ -444,7 +536,10 @@ function selectPlatformRead(
 ): OverviewTierRead {
   const reads = configs
     .filter((config) => config.hardware === hardware)
-    .map((config): ConfigTierRead => ({ ...readConfigAtTier(config, tier), config }));
+    .map((config): ConfigTierRead => {
+      const { tierValues: _tierValues, ...view } = config;
+      return { ...readConfigAtTier(config, tier), config: view };
+    });
 
   for (const priority of OVERVIEW_SLICE_PRIORITY) {
     const exact = reads
@@ -590,12 +685,12 @@ function buildAgenticTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
         interactivity,
         e2eLatency,
         throughput: totalThroughput,
-        date: row.date,
+        date: benchmarkCurveDate(row),
         evidenceLabel: topologyEvidence(row),
       },
     ];
   });
-  return computeTierReads(restrictAgenticPointsToE2eFrontier(points), OVERVIEW_TIERS);
+  return computeTierReads(points, OVERVIEW_TIERS);
 }
 
 /** Single-turn 8K/1K: frontier points at the chart's stored interactivity,
@@ -611,7 +706,7 @@ function buildSingleTurnTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] 
       {
         interactivity,
         throughput: totalTput * deployedGpuFactor(row),
-        date: row.date,
+        date: benchmarkCurveDate(row),
         evidenceLabel: topologyEvidence(row),
       },
     ];
@@ -630,7 +725,17 @@ function buildConfigResult(
   if (feed.length === 0) return null;
 
   const first = rows[0];
-  const { hardware, framework, spec_method: specMethod, disagg, is_multinode: isMultinode } = first;
+  const { hardware, framework, disagg, is_multinode: isMultinode } = first;
+  const specMethods = [...new Set(rows.map((row) => row.spec_method))];
+  const specMethod = specMethods.length === 1 ? specMethods[0] : 'mixed';
+  const specLabel =
+    specMethod === 'mixed'
+      ? specMethods
+          .map((method) =>
+            method === 'none' || method === '' ? 'STP' : resolveFrameworkPartLabel(model, method),
+          )
+          .join(' + ')
+      : resolveFrameworkPartLabel(model, specMethod);
   const sourceRunUrls = [
     ...new Set(rows.flatMap((row) => (row.run_url === null ? [] : [row.run_url]))),
   ].toSorted();
@@ -638,11 +743,17 @@ function buildConfigResult(
     key,
     dbModel: first.model,
     hardware,
-    hwKey: buildAvailabilityHwKey(hardware, framework, specMethod, disagg),
+    hwKey: buildAvailabilityHwKey(
+      hardware,
+      framework,
+      specMethod,
+      disagg,
+      scenario === 'agentx' ? 'agentic_traces' : 'single_turn',
+    ),
     framework,
     frameworkLabel: resolveFrameworkPartLabel(model, framework),
     specMethod,
-    specLabel: resolveFrameworkPartLabel(model, specMethod),
+    specLabel,
     disagg,
     isMultinode,
     precision,
@@ -711,8 +822,88 @@ export function assembleOverviewPageData(
     comparisonMode: OVERVIEW_DEFAULT_COMPARISON_MODE,
     referenceHardware,
     modelScope,
+    rowScope: 'all',
+    hardwareRowScope: 'all',
+    unchangedRowCount: 0,
+    emptyRowCount: 0,
     historicalWindow: null,
   };
+}
+
+/** A row earns its place in the 30-day matrix when at least one platform has a
+ *  baseline to compare against. `comparable` is the only status carrying a
+ *  `costDeltaPct`, so it is the same predicate the cells render from. */
+export function overviewRowHasHistoricalChange(model: OverviewModelSummary): boolean {
+  return model.platforms.some((platform) => platform.historicalComparison?.status === 'comparable');
+}
+
+/**
+ * Counts the rows that did not move, and narrows the matrix to the ones that
+ * did when the reader opted in.
+ *
+ * Hardware mode passes straight through. So does a window in which nothing is
+ * comparable — filtering to nothing tells the reader less than the unfiltered
+ * matrix, and the empty state is indistinguishable from a data outage.
+ *
+ * Note: an unchanged row is not an empty row. It routinely carries current
+ * costs that exist nowhere else on the page — on the live site Kimi K3's only
+ * row has no 30-day baseline yet still prices three platforms. That is why
+ * narrowing is opt-in rather than the default.
+ */
+export function applyOverviewRowScope(
+  data: OverviewPageData,
+  rowScope: OverviewRowScope,
+): OverviewPageData {
+  // Hardware mode filters on its own terms, but the reader's answer here is
+  // still carried so a tab switch can restore it. Only the count is zeroed:
+  // there is no control to label while this mode is off screen.
+  if (data.comparisonMode === 'hardware') {
+    return { ...data, rowScope, unchangedRowCount: 0 };
+  }
+
+  const changed = data.models.filter(overviewRowHasHistoricalChange);
+  const unchangedRowCount = data.models.length - changed.length;
+  if (changed.length === 0 || unchangedRowCount === 0) {
+    return { ...data, rowScope: 'all', unchangedRowCount: 0 };
+  }
+
+  return rowScope === 'changed'
+    ? { ...data, models: changed, rowScope: 'changed', unchangedRowCount }
+    : { ...data, rowScope: 'all', unchangedRowCount };
+}
+
+/** A row earns its place in the hardware matrix as soon as one platform quotes
+ *  a cost. One price is still a fact about the row; zero prices is a row of
+ *  dashes saying only that nothing was measured. */
+export function overviewRowHasAnyCost(model: OverviewModelSummary): boolean {
+  return model.platforms.some((platform) => platform.costPerMtok !== null);
+}
+
+/**
+ * The hardware-mode counterpart of {@link applyOverviewRowScope}: counts the
+ * rows that price nothing, and drops them when the reader opts in.
+ *
+ * History mode passes straight through, as does a matrix where every row is
+ * empty — filtering to nothing would read as an outage rather than a filter.
+ */
+export function applyOverviewHardwareRowScope(
+  data: OverviewPageData,
+  hardwareRowScope: OverviewHardwareRowScope,
+): OverviewPageData {
+  // Carried rather than cleared, for the same reason as the history scope.
+  if (data.comparisonMode !== 'hardware') {
+    return { ...data, hardwareRowScope, emptyRowCount: 0 };
+  }
+
+  const priced = data.models.filter(overviewRowHasAnyCost);
+  const emptyRowCount = data.models.length - priced.length;
+  if (priced.length === 0 || emptyRowCount === 0) {
+    return { ...data, hardwareRowScope: 'all', emptyRowCount: 0 };
+  }
+
+  return hardwareRowScope === 'priced'
+    ? { ...data, models: priced, hardwareRowScope: 'priced', emptyRowCount }
+    : { ...data, hardwareRowScope: 'all', emptyRowCount };
 }
 
 function overviewPlatformKey(
@@ -753,7 +944,7 @@ export function assembleOverviewHistoricalPageData(
 
   return {
     ...current,
-    comparisonMode: 'history',
+    comparisonMode: window.key,
     historicalWindow: window,
     models: current.models.map((model) => ({
       ...model,

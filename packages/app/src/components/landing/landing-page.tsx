@@ -1,6 +1,7 @@
 import { ArrowRight, BarChart3, ShieldCheck, Sparkles } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
+import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { IntroSection } from '@/components/intro-section';
 import { LandingPageAnalytics, LandingTrackedLink } from '@/components/landing/landing-analytics';
 import { CuratedViewCard } from '@/components/landing/curated-view-card';
@@ -13,7 +14,7 @@ const STRINGS = {
   en: {
     exploreInferenceX: 'Explore InferenceX',
     exploreInferenceXLead:
-      'Start with a concise cost overview across active models and key platforms, or open the full dashboard for every model, chip, framework, and metric.',
+      'Start with a concise cost overview across active models and key platforms, or open the full dashboard for every model, chip, framework, and metric. AgentX is our long-context, multi-turn coding scenario.',
     fullDashboard: 'Full Dashboard',
     platformCoverage:
       'Compare NVIDIA GB300 NVL72, GB200 NVL72, B300, B200, H200, H100, AMD MI355X, MI325X, MI300X and soon VR200 NVL72, AMD MI455X UALoE72, TPUv7 Ironwood, etc across DeepSeekv4 Pro, Qwen, Kimi, GLM, MiniMax, gpt-oss, Llama and other models.',
@@ -42,7 +43,7 @@ const STRINGS = {
   zh: {
     exploreInferenceX: '探索 InferenceX',
     exploreInferenceXLead:
-      '先查看活跃模型与关键平台的精简成本总览，或打开完整仪表板，探索所有模型、Chip、框架与指标。',
+      '先查看活跃模型与关键平台的精简成本总览，或打开完整仪表板，探索所有模型、Chip、框架与指标。AgentX 是我们的长上下文多轮编码场景。',
     fullDashboard: '完整仪表板',
     platformCoverage:
       '跨 DeepSeekv4 Pro、Qwen、Kimi、GLM、MiniMax、gpt-oss、Llama 等模型，对比 NVIDIA GB300 NVL72、GB200 NVL72、B300、B200、H200、H100、AMD MI355X、MI325X、MI300X，以及即将上线的 VR200 NVL72、AMD MI455X UALoE72、TPUv7 Ironwood 等硬件。',
@@ -67,6 +68,13 @@ const STRINGS = {
   },
 } as const;
 
+/**
+ * Quick Comparisons is hidden for now. The card, its `quickComparisons*`
+ * strings, `CuratedViewCard`, and `FAVORITE_PRESETS` are all left in place —
+ * flip this to `true` to bring the section back.
+ */
+const SHOW_QUICK_COMPARISONS = false;
+
 export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
   const t = STRINGS[locale];
   // Internal links stay within the current language tree.
@@ -76,6 +84,12 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
       <LandingPageAnalytics />
       <NudgeEngine scope="landing" />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
+        {/* Same AgentX hero that leads /compare, above the quote carousel. The
+            landing page owns no h1 of its own, but keep this an h2 so the hero
+            stays a section within the page rather than retitling the whole
+            site. */}
+        <AgentXCompareHero locale={locale} headingLevel="h2" surface="landing" />
+
         <IntroSection locale={locale} />
 
         {/* Split: exploration entry points vs presets */}
@@ -167,19 +181,21 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
             </div>
           </Card>
 
-          {/* Right - Curated Presets */}
-          <Card>
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="size-5 shrink-0 text-brand" />
-              <h2 className="text-lg font-semibold">{t.quickComparisons}</h2>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">{t.quickComparisonsDesc}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {FAVORITE_PRESETS.filter((preset) => !preset.hidden).map((preset) => (
-                <CuratedViewCard key={preset.id} preset={preset} />
-              ))}
-            </div>
-          </Card>
+          {/* Right - Curated Presets (temporarily hidden, see SHOW_QUICK_COMPARISONS) */}
+          {SHOW_QUICK_COMPARISONS && (
+            <Card data-testid="landing-quick-comparisons">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="size-5 shrink-0 text-brand" />
+                <h2 className="text-lg font-semibold">{t.quickComparisons}</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">{t.quickComparisonsDesc}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {FAVORITE_PRESETS.filter((preset) => !preset.hidden).map((preset) => (
+                  <CuratedViewCard key={preset.id} preset={preset} />
+                ))}
+              </div>
+            </Card>
+          )}
         </section>
       </div>
     </main>

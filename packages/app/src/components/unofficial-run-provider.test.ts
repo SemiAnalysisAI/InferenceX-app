@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
 import { Model, Sequence } from '@/lib/data-mappings';
+import { normalizeArtifactRows } from '@/app/api/unofficial-run/route';
 
 import { buildChartData, parseAvailableModelsAndSequences } from './unofficial-run-provider';
 
@@ -39,6 +40,31 @@ function stubRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
     metrics: { tput_per_gpu: 100, mean_ttft: 0.5, mean_tpot: 0.01, mean_e2el: 1, mean_intvty: 50 },
     date: '2026-03-01',
     run_url: null,
+    ...overrides,
+  };
+}
+
+function rawPowerArtifact(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    infmax_model_prefix: 'dsr1',
+    hw: 'h200-nv',
+    framework: 'sglang',
+    precision: 'fp8',
+    isl: 1024,
+    osl: 1024,
+    conc: 128,
+    disagg: true,
+    prefill_tp: 8,
+    prefill_ep: 1,
+    prefill_num_workers: 1,
+    decode_tp: 8,
+    decode_ep: 1,
+    decode_num_workers: 1,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    median_e2el: 1.4,
+    median_intvty: 48,
+    tput_per_gpu: 100.5,
     ...overrides,
   };
 }
@@ -274,5 +300,66 @@ describe('buildChartData', () => {
       sequence: Sequence.EightK_OneK,
       precisions: ['fp8'],
     });
+  });
+});
+
+describe('schema-v2 measured-power overlay data flow', () => {
+  it('normalizes an overlay artifact and exposes J/query, Wh/query, and percent TDP', () => {
+    const rows = normalizeArtifactRows(
+      [
+        rawPowerArtifact({
+          power_valid: '1',
+          power_metric_schema_version: '2',
+          avg_power_w: 560,
+          joules_per_successful_query: 1800,
+        }),
+      ],
+      '2026-08-12',
+    );
+    const point = buildChartData(rows)['DeepSeek-R1-0528_1k/1k'].interactivity.data[0];
+
+    expect(rows[0].metrics.power_valid).toBe(1);
+    expect(rows[0].metrics.power_metric_schema_version).toBe(2);
+    expect(point.measuredJPerSuccessfulQuery?.y).toBe(1800);
+    expect(point.measuredWhPerSuccessfulQuery?.y).toBe(0.5);
+    expect(point.measuredPowerPercentTdp?.y).toBe(80);
+  });
+
+  it.each([
+    {
+      name: 'malformed boolean verdict and junk schema',
+      contract: { power_valid: true, power_metric_schema_version: '2garbage' },
+    },
+    {
+      name: 'malformed string verdict',
+      contract: { power_valid: 'garbage', power_metric_schema_version: 2 },
+    },
+    {
+      name: 'explicit invalid verdict',
+      contract: { power_valid: 0, power_metric_schema_version: 2 },
+    },
+  ])('withholds measured values for $name', ({ contract }) => {
+    const rows = normalizeArtifactRows(
+      [
+        rawPowerArtifact({
+          ...contract,
+          avg_power_w: 560,
+          joules_per_successful_query: 1800,
+          avg_temp_c: 68.4,
+          workers: [{ role: 'agg', worker_idx: 0, num_gpus: 8, avg_power_w: 560 }],
+        }),
+      ],
+      '2026-08-12',
+    );
+    const point = buildChartData(rows)['DeepSeek-R1-0528_1k/1k'].interactivity.data[0];
+
+    expect(rows[0].metrics.power_valid).toBe(0);
+    expect(point.avg_power_w).toBeUndefined();
+    expect(point.joules_per_successful_query).toBeUndefined();
+    expect(point.avg_temp_c).toBeUndefined();
+    expect(point.workers).toBeUndefined();
+    expect(point.measuredJPerSuccessfulQuery).toBeUndefined();
+    expect(point.measuredWhPerSuccessfulQuery).toBeUndefined();
+    expect(point.measuredPowerPercentTdp).toBeUndefined();
   });
 });

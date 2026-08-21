@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Profiler, useState } from 'react';
 
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
@@ -81,6 +81,41 @@ describe('ChartLegend (sidebar variant)', () => {
     cy.get('.sidebar-legend label').should('have.length', 4);
   });
 
+  it('derives long unofficial labels without a nested update', () => {
+    const branch = 'qwen3.5-fp4-gb200-dynamo-sglang-agentic-mtp-pareto-refresh';
+    const onRender = cy.spy().as('legendRender');
+
+    cy.mount(
+      <Profiler id="long-unofficial-run-legend" onRender={onRender}>
+        <ChartLegend
+          legendItems={[
+            {
+              ...MOCK_ITEMS[0],
+              name: 'unofficial-run-32177976542',
+              label: `✕ ${branch}`,
+            },
+          ]}
+          isLegendExpanded={true}
+          onExpandedChange={() => {}}
+          variant="sidebar"
+        />
+      </Profiler>,
+    );
+
+    cy.get('[data-testid="chart-legend"]').should('contain.text', branch);
+    cy.get('@legendRender').should((renderSpy) => {
+      // Cypress loses the Sinon spy type when resolving an alias.
+      const profilerSpy = renderSpy as unknown as {
+        getCalls: () => { args: unknown[] }[];
+      };
+      const calls = profilerSpy.getCalls();
+      expect(
+        calls.map(({ args }) => args[1]),
+        'React render phases',
+      ).not.to.include('nested-update');
+    });
+  });
+
   it('legend items have colored dots', () => {
     cy.get('.sidebar-legend label').first().find('span').first().should('exist');
   });
@@ -141,8 +176,8 @@ describe('ChartLegend (sidebar variant)', () => {
 
     cy.get('[data-testid="offload-halo-key"]')
       .should('be.visible')
-      .and('contain.text', 'Dashed halo:')
       .and('contain.text', 'KV offload ON')
+      .and('not.contain.text', 'Dashed halo:')
       .and('not.have.class', 'no-export');
     cy.get('[data-testid="offload-halo-key"] circle[stroke-dasharray="3 2"]').should('exist');
     cy.get('[data-testid="chart-legend"]').then(($legend) => {
@@ -232,7 +267,7 @@ function LegendWithPointsTable() {
             if (!open) setOpenSeries(null);
           }}
           title={isOverlay ? '✕ my-branch' : 'B300 (vLLM)'}
-          subtitle="DeepSeek V4 Pro · Agentic Traces"
+          subtitle="DeepSeek V4 Pro · Agentic"
           accentColor={isOverlay ? '#dc2626' : '#2b83ba'}
           rows={buildLegendPointsRows(isOverlay ? OVERLAY_POINTS : OFFICIAL_POINTS, isOverlay)}
           isOverlay={isOverlay}
@@ -258,7 +293,7 @@ describe('ChartLegend points-table icon + dialog', () => {
     cy.get('[data-testid="legend-points-dialog"]').should('contain.text', 'B300 (vLLM)');
     cy.get('[data-testid="legend-points-dialog"]').should(
       'contain.text',
-      'DeepSeek V4 Pro · Agentic Traces',
+      'DeepSeek V4 Pro · Agentic',
     );
     // Two rows, conc ascending, linked to the agentic detail pages
     cy.get('[data-testid="legend-points-row"]').should('have.length', 2);

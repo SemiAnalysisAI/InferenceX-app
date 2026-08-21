@@ -20,6 +20,10 @@ describe('Unofficial-run watermark', () => {
           benchmarks: benchmarks.map((row: Record<string, unknown>) => ({
             ...row,
             is_multinode: true,
+            prefill_tp: 8,
+            prefill_ep: 1,
+            decode_tp: 8,
+            decode_ep: 1,
             metrics: {
               ...(row.metrics as Record<string, unknown> | undefined),
               kv_offloading: 'dram',
@@ -27,6 +31,8 @@ describe('Unofficial-run watermark', () => {
               kv_p2p_transfer: 'nixl',
               router_name: 'sglang-router',
               router_version: '0.3.2',
+              dcp_size: 8,
+              pcp_size: 4,
               server_gpu_cache_hit_rate: 0.875,
             },
             run_url: runUrl,
@@ -79,8 +85,16 @@ describe('Unofficial-run watermark', () => {
         expect(tooltip).to.contain.text('KV Offload Engine: HiCache');
         expect(tooltip).to.contain.text('KV Transfer Engine: NIXL');
         expect(tooltip).to.contain.text('Router: SGLang Router 0.3.2');
+        expect(tooltip).to.contain.text('Decode Context Parallelism (DCP): 8');
+        expect(tooltip).to.contain.text('Prefill Context Parallelism (PCP): 4');
         expect(tooltip).to.contain.text('Chip Cache Hit Rate: 87.5%');
       });
+
+    cy.get('#scatter-parallelism-labels').click();
+    cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt')
+      .first()
+      .find('.overlay-label')
+      .should('contain.text', 'TP8/DCP8/PCP4');
 
     cy.get('[data-testid="scatter-graph"]').first().scrollIntoView();
     cy.screenshot('unofficial-watermark', { capture: 'viewport' });

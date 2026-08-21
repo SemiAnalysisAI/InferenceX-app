@@ -7,7 +7,9 @@
     "nursery": "deny"
   },
   "rules": {
-    "capitalized-comments": "off",
+    "eslint/capitalized-comments": "off",
+    "eslint/one-var": "off",
+    "one-var": "off",
     "curly": "off",
     "func-names": "off",
     "func-style": "off",
@@ -38,6 +40,7 @@
     "unicorn/filename-case": "off",
     "unicorn/max-nested-calls": "off",
     "unicorn/no-array-callback-reference": "off",
+    "unicorn/no-array-sort": "off",
     "unicorn/no-nested-ternary": "off",
     "unicorn/no-null": "off",
     "unicorn/no-useless-undefined": "off",

@@ -1,15 +1,27 @@
+'use client';
+
+import { type ComponentPropsWithoutRef, useEffect, useRef } from 'react';
+
+import { TCO_SOURCE_TITLE } from '@semianalysisai/inferencex-constants';
+
 import {
+  OVERVIEW_DEFAULT_HISTORY_WINDOW,
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  OVERVIEW_DEFAULT_ROW_SCOPE,
   OVERVIEW_HARDWARE,
+  OVERVIEW_HISTORY_WINDOW_DAYS,
+  OVERVIEW_HISTORY_WINDOWS,
   OVERVIEW_TIERS,
   overviewHardwareLabel,
   type OverviewComparisonMode,
   type OverviewEngineScope,
+  type OverviewHardwareRowScope,
   type OverviewHistoricalComparison,
   type OverviewModelScope,
   type OverviewModelSummary,
   type OverviewPlatformResult,
   type OverviewReferenceHardware,
+  type OverviewRowScope,
   type OverviewTier,
 } from '@/lib/overview-data';
 import {
@@ -23,14 +35,16 @@ import {
 
 import { OverviewDetailLink } from './overview-detail-link';
 import { OverviewHistoryDetailLink } from './overview-history-detail-link';
+import { OverviewHistoryWindowSelect } from './overview-history-window-select';
 import { OverviewNavLink } from './overview-nav-link';
+import { type OverviewNavControl, useOverviewNavigation } from './overview-navigation';
 import { OverviewReferenceSelect } from './overview-reference-select';
 
 export type OverviewLocale = 'en' | 'zh';
 
 export const OVERVIEW_STRINGS = {
   en: {
-    title: 'Inference Cost per Million Tokens',
+    title: 'Agentic Inference Costs',
     // The active tier is not repeated here — the SLO selector below already
     // states it.
     scopeMetric: 'Hyperscaler cost',
@@ -38,7 +52,7 @@ export const OVERVIEW_STRINGS = {
     // The unit is dropped from the visible line but kept for screen readers.
     scopeAria: 'Hyperscaler cost per one million total tokens. Lower is better.',
     sourcePrefix: 'Source: InferenceX & ',
-    sourceLinkText: 'SemiAnalysis Market July 2026 AI Cloud TCO Model',
+    sourceLinkText: TCO_SOURCE_TITLE,
     tierNavLabel: 'SLO',
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
@@ -48,18 +62,32 @@ export const OVERVIEW_STRINGS = {
     },
     comparisonNavLabel: 'Compare',
     comparisonOptions: {
-      history: '30-day change',
+      history: 'Change over time',
     },
+    historyWindowOptions: {
+      '7d': '1 week ago',
+      '30d': '1 month ago',
+      '60d': '2 months ago',
+      '90d': '3 months ago',
+    } as Record<string, string>,
+    historyWindowSelectAria: 'Comparison window',
     hardwareComparisonLabel: (reference: string) => `vs ${reference}`,
     referenceSelectorAria: 'Reference hardware',
     caption:
       'Cost per million total tokens from each platform’s best observed serving envelope for the scenario shown with each model.',
-    historyCaption:
-      'Current cost and change versus the latest validated platform result 30–60 days earlier.',
+    historyCaption: (days: number) =>
+      `Current cost and change versus the latest validated platform result ${days}–${days * 2} days earlier.`,
     modelHeader: 'Model · Scenario',
     scenarioLabels: {
       single_turn_8k1k: '8K/1K',
       agentx: 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)',
+    },
+    // Rendered in the row header; the full label above stays the accessible
+    // name and the hover title, so nothing is lost by not wrapping it to three
+    // lines in a 22%-wide column.
+    scenarioLabelsShort: {
+      single_turn_8k1k: '8K/1K',
+      agentx: 'AgentX',
     },
     detailLink: 'View details',
     detailAria: (modelLabel: string, scenarioLabel: string) =>
@@ -92,24 +120,53 @@ export const OVERVIEW_STRINGS = {
       `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than this platform’s ${baselineDate} result`,
     historicalEvenAria: (baselineDate: string) =>
       `About the same cost as this platform’s ${baselineDate} result`,
-    historyCellStateLegend: 'Platforms without a valid 30-day comparison show current cost only.',
+    historyCellStateLegend: (days: number) =>
+      `Platforms without a valid ${days}-day comparison show current cost only.`,
     referenceHeader: 'Reference',
     modelScopeNavLabel: 'Inactive models',
     modelScopeShow: 'Show deprecated & maintenance-mode models',
     modelScopeHide: 'Hide deprecated & maintenance-mode models',
+    rowScopeNavLabel: (days: number) => `Rows without a ${days}-day change`,
+    rowScopeShow: (count: number, days: number) =>
+      `Show ${count} ${count === 1 ? 'row' : 'rows'} with no ${days}-day change`,
+    rowScopeHide: (count: number, days: number) =>
+      `Hide ${count} ${count === 1 ? 'row' : 'rows'} with no ${days}-day change`,
+    hardwareRowScopeNavLabel: 'Rows with no result',
+    hardwareRowScopeShow: (count: number) =>
+      `Show ${count} ${count === 1 ? 'row' : 'rows'} with no result on any platform`,
+    hardwareRowScopeHide: (count: number) =>
+      `Hide ${count} ${count === 1 ? 'row' : 'rows'} with no result on any platform`,
+    // Short forms of the sentences above, for the presentation toolbar. They
+    // carry the same verb, so they flip with the scope the same way; the
+    // sentence with the count stays on the accessible name.
+    rowScopeChipHide: 'Hide unchanged',
+    rowScopeChipShow: 'Show all rows',
+    hardwareRowScopeChipHide: 'Hide blanks',
+    hardwareRowScopeChipShow: 'Show all rows',
+    modelScopeChipShow: 'Show inactive',
+    modelScopeChipHide: 'Hide inactive',
+    presentEnter: 'Present',
+    presentExit: 'Exit',
+    presentEnterAria: 'Show the matrix full screen',
+    presentExitAria: 'Leave full screen',
+    presentShortcutHint: 'Arrow keys switch views · Esc exits',
     categoryBadges: {
       maintenance: 'Maintenance',
       deprecated: 'Deprecated',
     } as Partial<Record<string, string>>,
     categoryBadgeTitle: 'Model is no longer actively benchmarked.',
+    loadingStatus: 'Loading the selected comparison…',
+    navigationError:
+      'Could not load the selected comparison. Showing the last successfully loaded data.',
+    emptyState: 'No overview results match this selection.',
   },
   zh: {
-    title: '推理每百万 token 成本',
+    title: '智能体推理成本',
     scopeMetric: '超大规模云（hyperscaler）成本',
     scopeDirection: '↓ 越低越好',
     scopeAria: '超大规模云（hyperscaler）每百万总 token 成本，越低越好。',
     sourcePrefix: '来源：InferenceX 与 ',
-    sourceLinkText: 'SemiAnalysis Market July 2026 AI Cloud TCO Model',
+    sourceLinkText: TCO_SOURCE_TITLE,
     tierNavLabel: 'SLO',
     tierUnit: 'tok/s/用户',
     engineScopeNavLabel: '引擎范围',
@@ -119,16 +176,28 @@ export const OVERVIEW_STRINGS = {
     },
     comparisonNavLabel: '对比方式',
     comparisonOptions: {
-      history: '30 天变化',
+      history: '历史变化',
     },
+    historyWindowOptions: {
+      '7d': '1 周前',
+      '30d': '1 个月前',
+      '60d': '2 个月前',
+      '90d': '3 个月前',
+    } as Record<string, string>,
+    historyWindowSelectAria: '对比时间窗口',
     hardwareComparisonLabel: (reference: string) => `对比 ${reference}`,
     referenceSelectorAria: '基准硬件',
     caption: '按各模型标注的场景，基于各平台最佳观测服务包络线计算每百万总 token 成本。',
-    historyCaption: '当前成本及其相对 30–60 天前最近一次有效平台结果的变化。',
+    historyCaption: (days: number) =>
+      `当前成本及其相对 ${days}–${days * 2} 天前最近一次有效平台结果的变化。`,
     modelHeader: '模型 · 场景',
     scenarioLabels: {
       single_turn_8k1k: '8K/1K',
       agentx: '长上下文多轮真实智能体场景（AgentX）',
+    },
+    scenarioLabelsShort: {
+      single_turn_8k1k: '8K/1K',
+      agentx: 'AgentX',
     },
     detailLink: '查看详情',
     detailAria: (modelLabel: string, scenarioLabel: string) =>
@@ -159,16 +228,36 @@ export const OVERVIEW_STRINGS = {
     historicalDeltaAria: (pct: string, cheaper: boolean, baselineDate: string) =>
       `比该平台 ${baselineDate} 的结果${cheaper ? '便宜' : '昂贵'} ${pct}`,
     historicalEvenAria: (baselineDate: string) => `与该平台 ${baselineDate} 的结果成本基本持平`,
-    historyCellStateLegend: '缺少有效 30 天对比的平台仅显示当前成本。',
+    historyCellStateLegend: (days: number) => `缺少有效 ${days} 天对比的平台仅显示当前成本。`,
     referenceHeader: '基准',
     modelScopeNavLabel: '非活跃模型',
     modelScopeShow: '显示已弃用与维护模式模型',
     modelScopeHide: '隐藏已弃用与维护模式模型',
+    rowScopeNavLabel: (days: number) => `${days} 天内无变化的行`,
+    rowScopeShow: (count: number, days: number) => `显示 ${count} 行 ${days} 天内无变化的数据`,
+    rowScopeHide: (count: number, days: number) => `隐藏 ${count} 行 ${days} 天内无变化的数据`,
+    hardwareRowScopeNavLabel: '无结果的行',
+    hardwareRowScopeShow: (count: number) => `显示 ${count} 行所有平台均无结果的数据`,
+    hardwareRowScopeHide: (count: number) => `隐藏 ${count} 行所有平台均无结果的数据`,
+    rowScopeChipHide: '隐藏无变化',
+    rowScopeChipShow: '显示全部行',
+    hardwareRowScopeChipHide: '隐藏空行',
+    hardwareRowScopeChipShow: '显示全部行',
+    modelScopeChipShow: '显示停用模型',
+    modelScopeChipHide: '隐藏停用模型',
+    presentEnter: '演示',
+    presentExit: '退出',
+    presentEnterAria: '全屏展示矩阵',
+    presentExitAria: '退出全屏',
+    presentShortcutHint: '方向键切换视图 · Esc 退出',
     categoryBadges: {
       maintenance: '维护模式',
       deprecated: '已弃用',
     } as Partial<Record<string, string>>,
     categoryBadgeTitle: '该模型已不再进行活跃基准测试。',
+    loadingStatus: '正在加载所选对比…',
+    navigationError: '无法加载所选对比，当前显示的是上次成功加载的数据。',
+    emptyState: '没有符合当前筛选条件的总览结果。',
   },
 } as const;
 
@@ -181,7 +270,7 @@ interface Formatters {
   shortDate: (date: string) => string;
 }
 
-export function overviewFormatters(locale: OverviewLocale): Formatters {
+function buildOverviewFormatters(locale: OverviewLocale): Formatters {
   const tag = locale === 'zh' ? 'zh-CN' : 'en-US';
   const shortDateFormat = new Intl.DateTimeFormat(tag, {
     month: 'short',
@@ -207,6 +296,19 @@ export function overviewFormatters(locale: OverviewLocale): Formatters {
   };
 }
 
+/** Built once per locale. Constructing ICU formatters is not free and the page
+ *  body calls this on every render; the inputs are two fixed locales. */
+const FORMATTER_CACHE = new Map<OverviewLocale, Formatters>();
+
+export function overviewFormatters(locale: OverviewLocale): Formatters {
+  let cached = FORMATTER_CACHE.get(locale);
+  if (cached === undefined) {
+    cached = buildOverviewFormatters(locale);
+    FORMATTER_CACHE.set(locale, cached);
+  }
+  return cached;
+}
+
 function formatEvidenceDate(
   formatters: Formatters,
   evidenceDate: { from: string; to: string },
@@ -225,18 +327,23 @@ function missingReasonCopy(platform: OverviewPlatformResult, strings: OverviewSt
 const RAW_SOURCE_LINK_CLASS =
   'inline-flex min-h-11 items-center rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50';
 
-/** No result for this GPU. The reason survives as hover/focus/SR text only. */
+/** No result for this GPU. The reason reads as visible text, mirroring the
+ *  stack line on a populated cell — a `title` tooltip reaches neither keyboard
+ *  nor touch users, and this is the only per-cell string with no other surface. */
 function CellMissing({ hardware, reason }: { hardware: string; reason: string }) {
   return (
-    <span
+    <div
       data-testid="overview-pair-missing"
       data-hardware={hardware}
-      title={reason}
-      className="inline-flex items-baseline gap-1 text-muted-foreground"
+      className="min-w-0 space-y-0.5 text-sm text-muted-foreground"
     >
-      <span aria-hidden="true">{'—'}</span>
-      <span className="sr-only">{reason}</span>
-    </span>
+      <span>{'—'}</span>
+      {reason === '' ? null : (
+        <div className="min-w-0 text-[11px] leading-tight font-normal text-muted-foreground/70">
+          {reason}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -247,8 +354,8 @@ const COST_DELTA_SATURATION = 0.5;
 // Missing comparison evidence is neutral gray, never red/green: availability
 // is not a better/worse judgment.
 const COST_DELTA_CLASS = {
-  cheaper: 'text-emerald-700 dark:text-emerald-400',
-  pricier: 'text-red-700 dark:text-red-400',
+  cheaper: 'text-emerald-900 dark:text-emerald-200',
+  pricier: 'text-red-900 dark:text-red-200',
   even: 'text-muted-foreground',
   'no-baseline': 'text-muted-foreground',
 } as const;
@@ -270,13 +377,18 @@ interface DisplayedComparison {
   baselineDate: string | null;
 }
 
+/** `referenceCost` is the reference column's cost for this row, or null when it
+ *  has no priced read. The ratio is recomputed here rather than read from
+ *  `costVsReferencePct` because the payload may have been cached for a
+ *  different reference — `ref` never reaches the server on a client commit. */
 function displayedComparison(
   platform: OverviewPlatformResult,
   comparisonMode: OverviewComparisonMode,
   referenceHardware: OverviewReferenceHardware,
+  referenceCost: number | null,
 ): DisplayedComparison | null {
   if (platform.costPerMtok === null) return null;
-  if (comparisonMode === 'history') {
+  if (comparisonMode !== 'hardware') {
     const comparison = platform.historicalComparison;
     return comparison?.status === 'comparable' && comparison.costDeltaPct !== null
       ? {
@@ -287,9 +399,13 @@ function displayedComparison(
       : null;
   }
   if (platform.hardware === referenceHardware) return null;
+  const pct =
+    referenceCost === null || platform.costPerMtok === null
+      ? null
+      : platform.costPerMtok / referenceCost - 1;
   return {
-    status: platform.costVsReferencePct === null ? 'no_baseline' : 'comparable',
-    pct: platform.costVsReferencePct,
+    status: pct === null ? 'no_baseline' : 'comparable',
+    pct,
     baselineDate: null,
   };
 }
@@ -353,8 +469,14 @@ export function costDeltaCellStyle(
   platform: OverviewPlatformResult,
   comparisonMode: OverviewComparisonMode = 'hardware',
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  referenceCost: number | null = null,
 ): { backgroundColor: string } | undefined {
-  const comparison = displayedComparison(platform, comparisonMode, referenceHardware);
+  const comparison = displayedComparison(
+    platform,
+    comparisonMode,
+    referenceHardware,
+    referenceCost,
+  );
   if (comparison === null) return undefined;
   const { pct } = comparison;
   const polarity = comparisonPolarity(comparison);
@@ -397,7 +519,7 @@ function CostDeltaBadge({
       data-testid="overview-cost-delta"
       data-hardware={hardware}
       data-cost-polarity={polarity}
-      data-history-status={comparisonMode === 'history' ? status : undefined}
+      data-history-status={comparisonMode === 'hardware' ? undefined : status}
       title={aria}
       // The cell behind it carries the shade, so the badge itself stays
       // untinted — two washes of the same hue would double up.
@@ -419,6 +541,7 @@ function CellValue({
   strings,
   comparisonMode,
   referenceHardware,
+  referenceCost,
   referenceLabel,
   phoneRow = false,
 }: {
@@ -429,6 +552,7 @@ function CellValue({
   strings: OverviewStrings;
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
+  referenceCost: number | null;
   referenceLabel: string;
   phoneRow?: boolean;
 }) {
@@ -481,9 +605,9 @@ function CellValue({
       ? null
       : strings.rawDashboardAria(evidenceDateLabel, model.modelLabel, stack);
   const costText = formattedValue;
-  const comparison = displayedComparison(member, comparisonMode, referenceHardware);
+  const comparison = displayedComparison(member, comparisonMode, referenceHardware, referenceCost);
   const historicalConfig =
-    comparisonMode === 'history' && member.historicalComparison?.status === 'comparable'
+    comparisonMode !== 'hardware' && member.historicalComparison?.status === 'comparable'
       ? member.historicalComparison.baselineConfig
       : null;
   return (
@@ -546,7 +670,7 @@ function CellValue({
         )}
       </div>
       {member.precision === null ? null : (
-        <div className="min-w-0 text-[11px] leading-tight font-normal uppercase tracking-wider text-muted-foreground/70">
+        <div className="min-w-0 text-[11px] leading-tight font-normal uppercase tracking-wider text-muted-foreground">
           {config === null ? (
             member.precision.toUpperCase()
           ) : phoneRow && stackPrefix !== null && decodeLabel !== null ? (
@@ -581,6 +705,7 @@ function PlatformCell(props: {
   strings: OverviewStrings;
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
+  referenceCost: number | null;
   referenceLabel: string;
   phoneRow?: boolean;
 }) {
@@ -594,6 +719,7 @@ function PlatformCell(props: {
         strings={props.strings}
         comparisonMode={props.comparisonMode}
         referenceHardware={props.referenceHardware}
+        referenceCost={props.referenceCost}
         referenceLabel={props.referenceLabel}
         phoneRow={props.phoneRow}
       />
@@ -603,6 +729,8 @@ function PlatformCell(props: {
 
 function ModelName({ model, strings }: { model: OverviewModelSummary; strings: OverviewStrings }) {
   const badge = strings.categoryBadges[model.category];
+  const label = strings.scenarioLabels[model.scenario];
+  const shortLabel = strings.scenarioLabelsShort[model.scenario];
   return (
     <div>
       <h2 className="text-sm font-semibold leading-snug">
@@ -615,14 +743,28 @@ function ModelName({ model, strings }: { model: OverviewModelSummary; strings: O
             className="ml-1.5 inline-block rounded-sm border border-border/60 px-1 py-px align-middle text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
           >
             {badge}
+            {/* `title` reaches a hovering mouse and nothing else, so a screen
+                reader announced this badge as a bare label with no reason
+                attached. `normal-case` because the badge's `uppercase` inherits
+                and browsers expose the transformed string to the accessibility
+                tree, which turns the sentence into shouted, mis-parsed words. */}
+            <span className="sr-only normal-case">{strings.categoryBadgeTitle}</span>
           </span>
         )}
       </h2>
       <p
         data-testid="overview-model-scenario"
+        title={label}
         className="mt-0.5 text-[11px] font-normal leading-tight text-muted-foreground"
       >
-        {strings.scenarioLabels[model.scenario]}
+        {shortLabel === label ? (
+          label
+        ) : (
+          <>
+            <span className="sr-only">{label}</span>
+            <span aria-hidden="true">{shortLabel}</span>
+          </>
+        )}
       </p>
     </div>
   );
@@ -644,14 +786,21 @@ export function DesktopOverviewMatrix({
   strings,
   comparisonMode,
   referenceHardware,
-}: SurfaceProps) {
+  presenting = false,
+}: SurfaceProps & { presenting?: boolean }) {
   const platforms = models[0]?.platforms ?? [];
   const referenceLabel = overviewHardwareLabel(referenceHardware);
   return (
-    <div className="hidden xl:block">
+    // The `xl` gate asks whether the viewport can hold the matrix, which stops
+    // being the question once presenting: the deck lays out at a fixed width and
+    // is scaled by `zoom`, so on a projector narrower than 1280px this would
+    // hide the matrix on a slide whose phone list has already been dropped.
+    <div className={presenting ? 'block' : 'hidden xl:block'}>
       <table data-testid="overview-desktop-matrix" className="w-full border-collapse text-sm">
         <caption className="sr-only">
-          {comparisonMode === 'history' ? strings.historyCaption : strings.caption}
+          {comparisonMode === 'hardware'
+            ? strings.caption
+            : strings.historyCaption(OVERVIEW_HISTORY_WINDOW_DAYS[comparisonMode])}
         </caption>
         <colgroup>
           <col className="w-[22%]" />
@@ -682,52 +831,65 @@ export function DesktopOverviewMatrix({
           </tr>
         </thead>
         <tbody>
-          {models.map((model) => (
-            <tr
-              key={`${model.model}-${model.scenario}`}
-              data-testid="overview-desktop-model"
-              data-model={model.model}
-              data-scenario={model.scenario}
-              className="border-b border-border/50 align-top last:border-b-0"
-            >
-              <th scope="row" className="px-4 py-4 text-left align-top font-normal lg:px-6">
-                <ModelName model={model} strings={strings} />
-                {/* The link lives with the model it drills into, so the matrix
+          {models.map((model) => {
+            // One lookup per row, not one per cell. Every row carries all five
+            // platforms, so this misses only when the reference has no read.
+            const referenceCost =
+              model.platforms.find((platform) => platform.hardware === referenceHardware)
+                ?.costPerMtok ?? null;
+            return (
+              <tr
+                key={`${model.model}-${model.scenario}`}
+                data-testid="overview-desktop-model"
+                data-model={model.model}
+                data-scenario={model.scenario}
+                className="border-b border-border/50 align-top last:border-b-0"
+              >
+                <th scope="row" className="px-4 py-2.5 text-left align-top font-normal lg:px-6">
+                  <ModelName model={model} strings={strings} />
+                  {/* The link lives with the model it drills into, so the matrix
                     spends no column on a header that is the same every row. */}
-                {comparisonMode === 'history' ? null : (
-                  <OverviewDetailLink
-                    href={detailHref(locale, model)}
-                    model={model.model}
-                    ariaLabel={strings.detailAria(
-                      model.modelLabel,
-                      strings.scenarioLabels[model.scenario],
+                  {comparisonMode === 'hardware' && (
+                    <OverviewDetailLink
+                      href={detailHref(locale, model)}
+                      model={model.model}
+                      ariaLabel={strings.detailAria(
+                        model.modelLabel,
+                        strings.scenarioLabels[model.scenario],
+                      )}
+                      className="mt-1 text-xs"
+                    >
+                      {strings.detailLink}
+                    </OverviewDetailLink>
+                  )}
+                </th>
+                {model.platforms.map((platform) => (
+                  <td
+                    key={platform.hardware}
+                    style={costDeltaCellStyle(
+                      platform,
+                      comparisonMode,
+                      referenceHardware,
+                      referenceCost,
                     )}
-                    className="mt-1 text-xs"
+                    className={`px-3 py-2.5 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/30' : ''}`}
                   >
-                    {strings.detailLink}
-                  </OverviewDetailLink>
-                )}
-              </th>
-              {model.platforms.map((platform) => (
-                <td
-                  key={platform.hardware}
-                  style={costDeltaCellStyle(platform, comparisonMode, referenceHardware)}
-                  className={`px-3 py-4 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/30' : ''}`}
-                >
-                  <PlatformCell
-                    locale={locale}
-                    model={model}
-                    platform={platform}
-                    formatters={formatters}
-                    strings={strings}
-                    comparisonMode={comparisonMode}
-                    referenceHardware={referenceHardware}
-                    referenceLabel={referenceLabel}
-                  />
-                </td>
-              ))}
-            </tr>
-          ))}
+                    <PlatformCell
+                      locale={locale}
+                      model={model}
+                      platform={platform}
+                      formatters={formatters}
+                      strings={strings}
+                      comparisonMode={comparisonMode}
+                      referenceHardware={referenceHardware}
+                      referenceCost={referenceCost}
+                      referenceLabel={referenceLabel}
+                    />
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -745,61 +907,103 @@ export function MobileOverviewList({
   const referenceLabel = overviewHardwareLabel(referenceHardware);
   return (
     <ul data-testid="overview-mobile-list" className="divide-y divide-border/50 xl:hidden">
-      {models.map((model) => (
-        <li key={`${model.model}-${model.scenario}`}>
-          <article
-            data-testid="overview-mobile-model"
-            data-model={model.model}
-            data-scenario={model.scenario}
-            className="space-y-2 px-4 py-3.5"
-          >
-            <ModelName model={model} strings={strings} />
-            <div className="grid grid-cols-1">
-              {model.platforms.map((platform) => (
-                <div
-                  key={platform.hardware}
-                  data-testid="overview-mobile-platform-row"
-                  data-hardware={platform.hardware}
-                  style={costDeltaCellStyle(platform, comparisonMode, referenceHardware)}
-                  className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-1.5 last:border-b-0"
-                >
-                  <span
-                    data-testid="overview-mobile-hardware"
-                    className="pt-0.5 text-xs font-medium text-muted-foreground"
+      {models.map((model) => {
+        const referenceCost =
+          model.platforms.find((platform) => platform.hardware === referenceHardware)
+            ?.costPerMtok ?? null;
+        return (
+          <li key={`${model.model}-${model.scenario}`}>
+            <article
+              data-testid="overview-mobile-model"
+              data-model={model.model}
+              data-scenario={model.scenario}
+              className="space-y-2 px-4 py-3.5"
+            >
+              <ModelName model={model} strings={strings} />
+              <div className="grid grid-cols-1">
+                {model.platforms.map((platform) => (
+                  <div
+                    key={platform.hardware}
+                    data-testid="overview-mobile-platform-row"
+                    data-hardware={platform.hardware}
+                    style={costDeltaCellStyle(
+                      platform,
+                      comparisonMode,
+                      referenceHardware,
+                      referenceCost,
+                    )}
+                    className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-1.5 last:border-b-0"
                   >
-                    {platform.hardwareLabel}
-                  </span>
-                  <PlatformCell
-                    locale={locale}
-                    model={model}
-                    platform={platform}
-                    formatters={formatters}
-                    strings={strings}
-                    comparisonMode={comparisonMode}
-                    referenceHardware={referenceHardware}
-                    referenceLabel={referenceLabel}
-                    phoneRow
-                  />
-                </div>
-              ))}
-            </div>
-            {comparisonMode === 'history' ? null : (
-              <OverviewDetailLink
-                href={detailHref(locale, model)}
-                model={model.model}
-                ariaLabel={strings.detailAria(
-                  model.modelLabel,
-                  strings.scenarioLabels[model.scenario],
-                )}
-                className="min-h-11 w-full justify-between"
-              >
-                {strings.detailLink}
-              </OverviewDetailLink>
-            )}
-          </article>
-        </li>
-      ))}
+                    <span
+                      data-testid="overview-mobile-hardware"
+                      className="pt-0.5 text-xs font-medium text-muted-foreground"
+                    >
+                      {platform.hardwareLabel}
+                    </span>
+                    <PlatformCell
+                      locale={locale}
+                      model={model}
+                      platform={platform}
+                      formatters={formatters}
+                      strings={strings}
+                      comparisonMode={comparisonMode}
+                      referenceHardware={referenceHardware}
+                      referenceCost={referenceCost}
+                      referenceLabel={referenceLabel}
+                      phoneRow
+                    />
+                  </div>
+                ))}
+              </div>
+              {comparisonMode === 'hardware' && (
+                <OverviewDetailLink
+                  href={detailHref(locale, model)}
+                  model={model.model}
+                  ariaLabel={strings.detailAria(
+                    model.modelLabel,
+                    strings.scenarioLabels[model.scenario],
+                  )}
+                  className="min-h-11 w-full justify-between"
+                >
+                  {strings.detailLink}
+                </OverviewDetailLink>
+              )}
+            </article>
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+/**
+ * The active option of a switcher. It replaces the anchor the user activated,
+ * which destroys the focused node and drops focus to <body>; when the click
+ * came from the keyboard, this takes that focus back.
+ *
+ * `tabIndex={-1}` keeps a non-interactive span out of the tab order while still
+ * allowing programmatic focus.
+ */
+function ActiveSwitcherOption({
+  control,
+  children,
+  ...props
+}: ComponentPropsWithoutRef<'span'> & { control: OverviewNavControl }) {
+  const { focusIntent } = useOverviewNavigation();
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (focusIntent.current !== control) return;
+    focusIntent.current = null;
+    ref.current?.focus({ preventScroll: true });
+    // Mount-only by construction: `control` is a literal per call site and
+    // `focusIntent` is a stable ref, so this runs exactly on the commit that
+    // swapped the anchor out. Dropping the deps would consume the intent one
+    // render early and leave focus on <body>.
+  }, [control, focusIntent]);
+  return (
+    <span {...props} ref={ref} tabIndex={-1}>
+      {children}
+    </span>
   );
 }
 
@@ -811,6 +1015,8 @@ export function OverviewTierSwitcher({
   comparisonMode,
   referenceHardware,
   modelScope,
+  rowScope,
+  hardwareRowScope,
   locale,
   strings,
 }: {
@@ -819,10 +1025,13 @@ export function OverviewTierSwitcher({
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
   modelScope: OverviewModelScope;
+  rowScope: OverviewRowScope;
+  hardwareRowScope: OverviewHardwareRowScope;
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
-  const optionClass = 'inline-flex min-h-11 items-center px-3 tabular-nums';
+  const optionClass =
+    'inline-flex min-h-11 items-center px-3 tabular-nums focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring';
   return (
     <nav
       data-testid="overview-tier-switcher"
@@ -833,13 +1042,14 @@ export function OverviewTierSwitcher({
       <div className="flex divide-x divide-border/60 overflow-hidden rounded-md border border-border/60">
         {OVERVIEW_TIERS.map((option) =>
           option === tier ? (
-            <span
+            <ActiveSwitcherOption
               key={option}
+              control="tier"
               aria-current="page"
-              className={`${optionClass} bg-foreground font-semibold text-background`}
+              className={`${optionClass} bg-muted font-semibold text-foreground`}
             >
               {option}
-            </span>
+            </ActiveSwitcherOption>
           ) : (
             <OverviewNavLink
               key={option}
@@ -850,10 +1060,12 @@ export function OverviewTierSwitcher({
                 comparisonMode,
                 referenceHardware,
                 modelScope,
+                rowScope,
+                hardwareRowScope,
               )}
               analytics={{ control: 'tier', value: String(option) }}
               searchKeys={['tier']}
-              className={`${optionClass} text-muted-foreground transition-colors hover:bg-muted hover:text-foreground`}
+              className={`${optionClass} text-muted-foreground transition-colors hover:text-foreground`}
             >
               {option}
             </OverviewNavLink>
@@ -872,6 +1084,8 @@ export function OverviewEngineScopeSwitcher({
   comparisonMode,
   referenceHardware,
   modelScope,
+  rowScope,
+  hardwareRowScope,
   locale,
   strings,
 }: {
@@ -880,12 +1094,14 @@ export function OverviewEngineScopeSwitcher({
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
   modelScope: OverviewModelScope;
+  rowScope: OverviewRowScope;
+  hardwareRowScope: OverviewHardwareRowScope;
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
   const options: OverviewEngineScope[] = ['community', 'all'];
   const optionClass =
-    'inline-flex min-h-11 w-full items-center rounded-md border border-border/60 px-3 py-1.5 text-left leading-snug sm:w-auto';
+    'inline-flex min-h-11 w-full items-center rounded-md border border-border/60 px-3 py-1.5 text-left leading-snug focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:w-auto';
   return (
     <nav
       data-testid="overview-engine-scope-switcher"
@@ -896,14 +1112,15 @@ export function OverviewEngineScopeSwitcher({
       <div className="flex w-full min-w-0 flex-col gap-1 sm:w-auto sm:flex-row">
         {options.map((option) =>
           option === engineScope ? (
-            <span
+            <ActiveSwitcherOption
               key={option}
+              control="engine"
               data-overview-engine-scope={option}
               aria-current="true"
-              className={`${optionClass} bg-foreground font-semibold text-background`}
+              className={`${optionClass} bg-muted font-semibold text-foreground`}
             >
               {strings.engineScopeOptions[option]}
-            </span>
+            </ActiveSwitcherOption>
           ) : (
             <OverviewNavLink
               key={option}
@@ -915,10 +1132,12 @@ export function OverviewEngineScopeSwitcher({
                 comparisonMode,
                 referenceHardware,
                 modelScope,
+                rowScope,
+                hardwareRowScope,
               )}
               analytics={{ control: 'engine', value: option }}
               searchKeys={['engine']}
-              className={`${optionClass} text-muted-foreground transition-colors hover:bg-muted hover:text-foreground`}
+              className={`${optionClass} text-muted-foreground transition-colors hover:text-foreground`}
             >
               {strings.engineScopeOptions[option]}
             </OverviewNavLink>
@@ -935,6 +1154,8 @@ export function OverviewComparisonSwitcher({
   tier,
   referenceHardware,
   modelScope,
+  rowScope,
+  hardwareRowScope,
   locale,
   strings,
 }: {
@@ -943,63 +1164,146 @@ export function OverviewComparisonSwitcher({
   tier: OverviewTier;
   referenceHardware: OverviewReferenceHardware;
   modelScope: OverviewModelScope;
+  rowScope: OverviewRowScope;
+  hardwareRowScope: OverviewHardwareRowScope;
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
-  const options: OverviewComparisonMode[] = ['hardware', 'history'];
   const referenceLabel = overviewHardwareLabel(referenceHardware);
   const referenceOptions = OVERVIEW_HARDWARE.map((hardware) => ({
     value: hardware,
     label: overviewHardwareLabel(hardware),
-    href: overviewHref(locale, tier, engineScope, 'hardware', hardware, modelScope),
+    href: overviewHref(
+      locale,
+      tier,
+      engineScope,
+      'hardware',
+      hardware,
+      modelScope,
+      rowScope,
+      hardwareRowScope,
+    ),
   }));
+  const windowOptions = OVERVIEW_HISTORY_WINDOWS.map((window) => ({
+    value: window,
+    label: strings.historyWindowOptions[window],
+    href: overviewHref(locale, tier, engineScope, window, referenceHardware, modelScope),
+  }));
+  // The inactive-only classes live on the inactive branch, not here: Tailwind
+  // emits `border-transparent` after the active border at equal specificity,
+  // so sharing them left the active underline invisible in light mode. The
+  // darker light-theme blue also keeps this small active label above AA
+  // contrast on the page background; dark mode retains the brand primary.
   const optionClass =
-    'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 border-transparent px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors duration-200 hover:border-muted-foreground/30 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:min-w-[140px]';
+    'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:min-w-[140px]';
+  const inactiveOptionClass =
+    'border-transparent text-muted-foreground hover:border-muted-foreground/30';
   return (
     <nav
       data-testid="overview-comparison-switcher"
       aria-label={strings.comparisonNavLabel}
       className="flex flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
     >
-      {options.map((option) => {
-        const label =
-          option === 'hardware'
-            ? strings.hardwareComparisonLabel(referenceLabel)
-            : strings.comparisonOptions.history;
-        return option === comparisonMode ? (
-          <span
-            key={option}
-            data-overview-comparison={option}
-            aria-current="true"
-            className={`${optionClass} border-secondary text-secondary dark:border-primary dark:text-primary`}
-          >
-            {option === 'hardware' ? (
-              <span className="inline-flex items-center gap-0.5">
-                <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
-                <OverviewReferenceSelect
-                  ariaLabel={strings.referenceSelectorAria}
-                  options={referenceOptions}
-                  value={referenceHardware}
-                />
-              </span>
-            ) : (
-              label
-            )}
+      {comparisonMode === 'hardware' ? (
+        <ActiveSwitcherOption
+          control="comparison"
+          data-overview-comparison="hardware"
+          aria-current="true"
+          className={`${optionClass} border-sky-800 text-sky-800 dark:border-primary dark:text-primary`}
+        >
+          <span className="inline-flex items-center gap-0.5">
+            <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
+            <OverviewReferenceSelect
+              ariaLabel={strings.referenceSelectorAria}
+              options={referenceOptions}
+            />
           </span>
-        ) : (
-          <OverviewNavLink
-            key={option}
-            data-overview-comparison={option}
-            href={overviewHref(locale, tier, engineScope, option, referenceHardware, modelScope)}
-            analytics={{ control: 'comparison', value: option }}
-            searchKeys={['compare']}
-            className={optionClass}
-          >
-            {label}
-          </OverviewNavLink>
-        );
-      })}
+        </ActiveSwitcherOption>
+      ) : (
+        <OverviewNavLink
+          data-overview-comparison="hardware"
+          href={overviewHref(
+            locale,
+            tier,
+            engineScope,
+            'hardware',
+            referenceHardware,
+            modelScope,
+            rowScope,
+            hardwareRowScope,
+          )}
+          analytics={{ control: 'comparison', value: 'hardware' }}
+          searchKeys={['compare']}
+          className={`${optionClass} ${inactiveOptionClass}`}
+        >
+          {strings.hardwareComparisonLabel(referenceLabel)}
+        </OverviewNavLink>
+      )}
+      {comparisonMode === 'hardware' ? (
+        <OverviewNavLink
+          data-overview-comparison={OVERVIEW_DEFAULT_HISTORY_WINDOW}
+          href={overviewHref(
+            locale,
+            tier,
+            engineScope,
+            OVERVIEW_DEFAULT_HISTORY_WINDOW,
+            referenceHardware,
+            modelScope,
+            rowScope,
+            hardwareRowScope,
+          )}
+          analytics={{ control: 'comparison', value: OVERVIEW_DEFAULT_HISTORY_WINDOW }}
+          searchKeys={['compare']}
+          className={`${optionClass} ${inactiveOptionClass}`}
+        >
+          {strings.comparisonOptions.history}
+        </OverviewNavLink>
+      ) : (
+        <ActiveSwitcherOption
+          control="comparison"
+          data-overview-comparison={comparisonMode}
+          aria-current="true"
+          className={`${optionClass} border-sky-800 text-sky-800 dark:border-primary dark:text-primary`}
+        >
+          <span className="inline-flex items-center gap-0.5">
+            <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
+            <OverviewHistoryWindowSelect
+              ariaLabel={strings.historyWindowSelectAria}
+              value={comparisonMode}
+              options={windowOptions}
+            />
+          </span>
+        </ActiveSwitcherOption>
+      )}
     </nav>
+  );
+}
+
+/**
+ * Where a scope toggle is drawn. `section` is the chip in the footer bar
+ * beneath the matrix; `toolbar` is the same chip riding the deck toolbar while
+ * presenting, where the count badge would be noise at projection size.
+ */
+type OverviewScopeToggleVariant = 'section' | 'toolbar';
+
+/**
+ * Matches Exit, so the right end of the deck toolbar reads as one row of
+ * actions. Deliberately not filled-when-engaged: these labels name the click
+ * rather than the state, and a filled "Show all rows" contradicts itself.
+ */
+const SCOPE_CHIP_CLASS =
+  'inline-flex min-h-11 items-center whitespace-nowrap rounded-md border border-border/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground';
+
+/** The count the chip's short label elides; the full sentence stays on the
+ *  accessible name, so the badge is presentation only. */
+function ScopeChipCount({ count }: { count: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] leading-none tabular-nums"
+    >
+      {count}
+    </span>
   );
 }
 
@@ -1009,33 +1313,201 @@ export function OverviewModelScopeToggle({
   engineScope,
   comparisonMode,
   referenceHardware,
+  rowScope,
+  hardwareRowScope,
   locale,
   strings,
+  variant = 'section',
 }: {
   modelScope: OverviewModelScope;
   tier: OverviewTier;
   engineScope: OverviewEngineScope;
   comparisonMode: OverviewComparisonMode;
   referenceHardware: OverviewReferenceHardware;
+  rowScope: OverviewRowScope;
+  hardwareRowScope: OverviewHardwareRowScope;
   locale: OverviewLocale;
   strings: OverviewStrings;
+  variant?: OverviewScopeToggleVariant;
 }) {
   const target: OverviewModelScope = modelScope === 'all' ? 'default' : 'all';
+  // Inactive models rarely post a 30-day change, so revealing them under the
+  // changed-only scope would filter them straight back out and read as a dead
+  // link. Asking for more models asks for more rows.
+  const targetRowScope: OverviewRowScope = target === 'all' ? 'all' : rowScope;
+  // Same trap in hardware mode, and a deeper one: an inactive model is the most
+  // likely to have no result on any platform, which is exactly what the
+  // priced-only scope removes.
+  const targetHardwareRowScope: OverviewHardwareRowScope =
+    target === 'all' ? 'all' : hardwareRowScope;
+  const sentence = modelScope === 'all' ? strings.modelScopeHide : strings.modelScopeShow;
+  const link = (
+    <OverviewNavLink
+      data-overview-model-scope={target}
+      href={overviewHref(
+        locale,
+        tier,
+        engineScope,
+        comparisonMode,
+        referenceHardware,
+        target,
+        targetRowScope,
+        targetHardwareRowScope,
+      )}
+      analytics={{ control: 'models', value: target }}
+      searchKeys={['models', 'rows', 'hwrows']}
+      aria-label={sentence}
+      title={sentence}
+      className={SCOPE_CHIP_CLASS}
+    >
+      {modelScope === 'all' ? strings.modelScopeChipHide : strings.modelScopeChipShow}
+    </OverviewNavLink>
+  );
+  if (variant === 'toolbar') return link;
   return (
     <nav
       data-testid="overview-model-scope-toggle"
       aria-label={strings.modelScopeNavLabel}
-      className="border-t border-border/50 px-4 text-xs lg:px-6"
+      className="text-xs"
     >
-      <OverviewNavLink
-        data-overview-model-scope={target}
-        href={overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware, target)}
-        analytics={{ control: 'models', value: target }}
-        searchKeys={['models']}
-        className="inline-flex min-h-11 items-center text-muted-foreground underline decoration-dotted underline-offset-4 transition-colors hover:text-foreground hover:decoration-solid"
-      >
-        {modelScope === 'all' ? strings.modelScopeHide : strings.modelScopeShow}
-      </OverviewNavLink>
+      {link}
+    </nav>
+  );
+}
+
+/**
+ * Opt-in narrowing to the rows that moved in the window, and the way back.
+ * Rendered only when the two scopes would differ, so a fully-comparable window
+ * shows no dead control.
+ */
+export function OverviewRowScopeToggle({
+  rowScope,
+  unchangedRowCount,
+  windowDays,
+  tier,
+  engineScope,
+  referenceHardware,
+  modelScope,
+  locale,
+  strings,
+  variant = 'section',
+}: {
+  rowScope: OverviewRowScope;
+  /** Days of the active history window; the copy must name the window the
+   *  filter actually reads. */
+  windowDays: number;
+  unchangedRowCount: number;
+  tier: OverviewTier;
+  engineScope: OverviewEngineScope;
+  referenceHardware: OverviewReferenceHardware;
+  modelScope: OverviewModelScope;
+  locale: OverviewLocale;
+  strings: OverviewStrings;
+  variant?: OverviewScopeToggleVariant;
+}) {
+  if (unchangedRowCount === 0) return null;
+  const target: OverviewRowScope = rowScope === 'all' ? 'changed' : 'all';
+  const sentence =
+    rowScope === 'all'
+      ? strings.rowScopeHide(unchangedRowCount, windowDays)
+      : strings.rowScopeShow(unchangedRowCount, windowDays);
+  const link = (
+    <OverviewNavLink
+      data-overview-row-scope={target}
+      href={overviewHref(
+        locale,
+        tier,
+        engineScope,
+        OVERVIEW_DEFAULT_HISTORY_WINDOW,
+        referenceHardware,
+        modelScope,
+        target,
+      )}
+      analytics={{ control: 'rows', value: target }}
+      searchKeys={['rows']}
+      aria-label={sentence}
+      title={sentence}
+      className={SCOPE_CHIP_CLASS}
+    >
+      {rowScope === 'all' ? strings.rowScopeChipHide : strings.rowScopeChipShow}
+      {variant === 'section' ? <ScopeChipCount count={unchangedRowCount} /> : null}
+    </OverviewNavLink>
+  );
+  if (variant === 'toolbar') return link;
+  return (
+    <nav
+      data-testid="overview-row-scope-toggle"
+      aria-label={strings.rowScopeNavLabel(windowDays)}
+      className="text-xs"
+    >
+      {link}
+    </nav>
+  );
+}
+
+/** The hardware-mode sibling of {@link OverviewRowScopeToggle}. Kept separate
+ *  rather than parameterised: the two filters answer different questions, name
+ *  different counts, and each mode remembers its own answer. */
+export function OverviewHardwareRowScopeToggle({
+  hardwareRowScope,
+  emptyRowCount,
+  tier,
+  engineScope,
+  referenceHardware,
+  modelScope,
+  locale,
+  strings,
+  variant = 'section',
+}: {
+  hardwareRowScope: OverviewHardwareRowScope;
+  emptyRowCount: number;
+  tier: OverviewTier;
+  engineScope: OverviewEngineScope;
+  referenceHardware: OverviewReferenceHardware;
+  modelScope: OverviewModelScope;
+  locale: OverviewLocale;
+  strings: OverviewStrings;
+  variant?: OverviewScopeToggleVariant;
+}) {
+  if (emptyRowCount === 0) return null;
+  const target: OverviewHardwareRowScope = hardwareRowScope === 'all' ? 'priced' : 'all';
+  const sentence =
+    hardwareRowScope === 'all'
+      ? strings.hardwareRowScopeHide(emptyRowCount)
+      : strings.hardwareRowScopeShow(emptyRowCount);
+  const link = (
+    <OverviewNavLink
+      data-overview-hardware-row-scope={target}
+      href={overviewHref(
+        locale,
+        tier,
+        engineScope,
+        'hardware',
+        referenceHardware,
+        modelScope,
+        OVERVIEW_DEFAULT_ROW_SCOPE,
+        target,
+      )}
+      analytics={{ control: 'hwrows', value: target }}
+      searchKeys={['hwrows']}
+      aria-label={sentence}
+      title={sentence}
+      className={SCOPE_CHIP_CLASS}
+    >
+      {hardwareRowScope === 'all'
+        ? strings.hardwareRowScopeChipHide
+        : strings.hardwareRowScopeChipShow}
+      {variant === 'section' ? <ScopeChipCount count={emptyRowCount} /> : null}
+    </OverviewNavLink>
+  );
+  if (variant === 'toolbar') return link;
+  return (
+    <nav
+      data-testid="overview-hardware-row-scope-toggle"
+      aria-label={strings.hardwareRowScopeNavLabel}
+      className="text-xs"
+    >
+      {link}
     </nav>
   );
 }
@@ -1053,13 +1525,15 @@ export function OverviewMethodology({
   return (
     <div
       data-testid="overview-methodology"
-      className="space-y-1 border-t border-border/50 px-4 py-3 text-xs leading-snug text-muted-foreground lg:px-6"
+      className="space-y-1 text-xs leading-snug text-muted-foreground"
     >
-      {comparisonMode === 'history' ? <p>{strings.historyCaption}</p> : null}
+      {comparisonMode === 'hardware' ? null : (
+        <p>{strings.historyCaption(OVERVIEW_HISTORY_WINDOW_DAYS[comparisonMode])}</p>
+      )}
       <p>
-        {comparisonMode === 'history'
-          ? strings.historyCellStateLegend
-          : strings.cellStateLegend(referenceLabel)}
+        {comparisonMode === 'hardware'
+          ? strings.cellStateLegend(referenceLabel)
+          : strings.historyCellStateLegend(OVERVIEW_HISTORY_WINDOW_DAYS[comparisonMode])}
       </p>
       <p>{strings.methodologyNote}</p>
     </div>

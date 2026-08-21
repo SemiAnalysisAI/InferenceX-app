@@ -1,6 +1,7 @@
 export const GLOSSARY_CATEGORIES = [
   'Benchmark metrics',
   'Serving',
+  'Agentic inference',
   'Parallelism',
   'Hardware',
   'Numerical precision',
@@ -45,6 +46,9 @@ const B200_KIMI = 'b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar';
 const SGLANG_056 = 'sglang-0-5-6-b200-deepseek-r1-fp4-up-to-1-8x';
 const VR_RUBIN = 'vera-rubin-nvl72-vs-gb200-nvl72-inference';
 const KIMI_K3 = 'kimi-k3-the-manos-the-mythos-the';
+const TILERT = 'ultra-high-interactivity-on-nvidia';
+const AGENT_BENCHMARK = 'agentic-benchmark-agent-benchmark-guide';
+const AGENTIC_WORKLOADS = 'brief-overview-of-agentic-workloads';
 
 const entries = [
   {
@@ -64,6 +68,126 @@ const entries = [
       'InferenceX benchmarks complete serving recipes because peak chip specifications alone cannot describe serving performance. Each curve captures a model, engine, numerical precision, parallelism strategy, chip system, sequence length, and concurrency sweep.',
     relatedTerms: ['inference-engine', 'prefill', 'decode', 'throughput', 'interactivity'],
     articleSlugs: [INFERENCEMAX, INFERENCEX_V2],
+  },
+  {
+    slug: 'agentic-inference',
+    term: 'Agentic inference',
+    aliases: ['AI agent inference', 'agent inference'],
+    category: 'Agentic inference',
+    plainEnglish:
+      'Agentic inference serves an AI system that works through a task over many model requests, often using tools and delegating work along the way.',
+    definition:
+      'Agentic inference is model serving for agents that maintain state across multiple turns, call tools, reuse growing context, and may run subagents in parallel.',
+    explanation:
+      'A single agent session can alternate between model requests, tool execution, and waiting periods. Later requests often include much of the earlier conversation, so prefix caching and KV-cache capacity affect both speed and cost. Parallel subagents add branches with their own request timing and context growth.',
+    significance:
+      'Fixed input and output lengths miss several pressures created by agents. Long shared prefixes change cache behavior, tool delays make traffic bursty, and concurrent branches compete for serving capacity. Hardware and software can rank differently under this request pattern.',
+    benchmarkContext:
+      'InferenceX uses AgentX to measure agentic inference. Read AgentX results alongside fixed-sequence scenarios because they answer different capacity questions. AgentX reports the behavior of a closed-loop session replay instead of treating every request as an independent batch item.',
+    relatedTerms: ['agentx', 'agentic-coding-workload', 'subagent', 'prefix-caching', 'kv-cache'],
+    articleSlugs: [AGENTIC_WORKLOADS, AGENT_BENCHMARK, TILERT, VR_RUBIN, INFERENCEX_V2],
+  },
+  {
+    slug: 'agentx',
+    term: 'AgentX',
+    aliases: ['AgentX benchmark', 'AgentX scenario'],
+    category: 'Agentic inference',
+    plainEnglish:
+      'AgentX is the InferenceX workload for testing how inference systems serve complete long-context, multi-turn coding-agent sessions.',
+    definition:
+      'AgentX is InferenceX’s agentic inference benchmark scenario, built from workload shapes derived from opt-in coding-agent traces after original content is removed.',
+    explanation:
+      'AgentX reconstructs session structure with deterministic synthetic tokens. Its replay keeps request lengths, turn timing, shared-prefix growth, tool pauses, and main-agent or subagent dependencies while excluding original prompts, generated code, and tool payloads. The serving stack receives the traffic pattern without receiving the source conversation.',
+    significance:
+      'Long contexts pressure KV-cache capacity, repeated prefixes reward effective cache reuse, and branch timing tests request scheduling. These effects are small or absent in short, independent requests. The resulting curve describes the complete serving system under agent traffic.',
+    benchmarkContext:
+      'The Agentic scenario appears by default for models with matching AgentX data. Compare its throughput, latency, and interactivity only with other AgentX runs at compatible settings. Use fixed-sequence scenarios when the target workload is a conventional request stream.',
+    relatedTerms: [
+      'agentic-inference',
+      'agentic-coding-workload',
+      'trace-replay',
+      'closed-loop-benchmark',
+      'subagent',
+    ],
+    articleSlugs: [AGENTIC_WORKLOADS, AGENT_BENCHMARK, TILERT, VR_RUBIN],
+  },
+  {
+    slug: 'agentic-coding-workload',
+    term: 'Agentic coding workload',
+    aliases: ['coding-agent workload', 'software-engineering agent workload'],
+    category: 'Agentic inference',
+    plainEnglish:
+      'This is the request pattern created when a coding agent reads a repository, edits code, runs tools, and revisits the model until the task is done.',
+    definition:
+      'An agentic coding workload is a multi-turn inference workload produced by a software agent that combines model generation with repository inspection, tool calls, code changes, and delegated subtasks.',
+    explanation:
+      'Request sizes grow as the agent accumulates instructions, files, tool results, and earlier responses. Many turns reuse a large common prefix. Tool execution inserts uneven delays, while subagents can create overlapping request branches. These properties produce a different traffic shape from fixed-length prompt benchmarks.',
+    significance:
+      'Coding agents can keep a serving system busy for minutes or hours through a chain of dependent calls. Cache policy, scheduler fairness, memory capacity, and tail latency all affect task progress. Peak decode throughput alone cannot describe that behavior.',
+    benchmarkContext:
+      'AgentX represents this workload with trace-derived request shapes and deterministic synthetic content. It measures inference-system performance. Model coding quality requires a separate evaluation, so quality scores and AgentX serving results answer separate questions.',
+    relatedTerms: ['agentic-inference', 'agentx', 'subagent', 'prefix-caching', 'trace-replay'],
+    articleSlugs: [AGENTIC_WORKLOADS, AGENT_BENCHMARK, TILERT, VR_RUBIN, INFERENCEX_V2],
+  },
+  {
+    slug: 'trace-replay',
+    term: 'Trace replay',
+    aliases: ['workload replay', 'session replay'],
+    category: 'Agentic inference',
+    plainEnglish:
+      'Trace replay recreates the timing and shape of recorded sessions so a benchmark sends requests like the original workload.',
+    definition:
+      'Trace replay is a benchmarking method that converts recorded request relationships, lengths, and timing into a repeatable workload for a system under test.',
+    explanation:
+      'A replay can preserve a directed graph of main-agent turns, parallel subagent branches, and auxiliary requests. Deterministic synthetic tokens replace private content while retaining token counts and prefix relationships. Recorded gaps between turns reproduce the periods when an agent was using tools or waiting on dependencies.',
+    significance:
+      'The method captures traffic features that a list of independent prompts cannot express. It also makes repeated hardware and software comparisons possible from the same session shapes. AgentX removes source-conversation content before publishing replay data.',
+    benchmarkContext:
+      'AgentX replays trace-derived sessions through AIPerf. A fixed seed selects sessions, starting points, and synthetic content. Reported results cover the profiling window after cache warmup, which keeps run-to-run comparisons focused on steady-state serving behavior.',
+    relatedTerms: ['agentx', 'closed-loop-benchmark', 'subagent', 'concurrency', 'kv-cache'],
+    articleSlugs: [AGENTIC_WORKLOADS, AGENT_BENCHMARK, TILERT, VR_RUBIN],
+  },
+  {
+    slug: 'closed-loop-benchmark',
+    term: 'Closed-loop benchmark',
+    aliases: ['closed-loop load test', 'closed-loop workload'],
+    category: 'Agentic inference',
+    plainEnglish:
+      'In a closed-loop benchmark, each simulated user waits for one step to finish before sending the next step in that session.',
+    definition:
+      'A closed-loop benchmark generates new work from each client in response to completion of its previous dependent request, subject to the workload’s recorded delays and branch structure.',
+    explanation:
+      'Concurrency is the number of active clients or sessions; the simultaneous request count changes over time. Faster systems complete turns sooner and therefore issue more requests during the same profiling period. The exact request mix can vary slightly because progress through each sampled session depends on completion time.',
+    significance:
+      'This load model resembles interactive agents, where the next action depends on the previous result. Throughput and latency remain coupled: a faster response advances the session and creates later work sooner. Low-concurrency runs can show more sampling variation than large pooled runs.',
+    benchmarkContext:
+      'AgentX uses closed-loop concurrency. Its concurrency value is the number of agent clients; request batch size changes as the sessions advance. Read throughput, time to first token, and interactivity together.',
+    relatedTerms: ['agentx', 'trace-replay', 'concurrency', 'throughput', 'latency'],
+    articleSlugs: [AGENT_BENCHMARK, TILERT, INFERENCEX_V2],
+  },
+  {
+    slug: 'subagent',
+    term: 'Subagent',
+    aliases: ['child agent', 'delegated agent'],
+    category: 'Agentic inference',
+    plainEnglish:
+      'A subagent is an additional agent started by a main agent to handle a smaller piece of the same task, sometimes at the same time as other work.',
+    definition:
+      'A subagent is a delegated agent execution with its own conversation state and model requests, connected to a parent session through task and dependency relationships.',
+    explanation:
+      'The main agent can launch one or more subagents and later consume their results. Their requests may overlap with the parent or with each other, creating branches in the session graph. Each branch can grow a separate context while sharing some initial instructions or repository state.',
+    significance:
+      'Subagents make agent traffic less sequential. A serving stack may receive bursts of long-context requests from one user task, and scheduler decisions affect how quickly branches finish. Aggregate throughput can rise while an individual branch waits longer for service.',
+    benchmarkContext:
+      'AgentX preserves subagent branches from the trace-derived workload and replays their dependencies. Delegation quality is outside its scope. The benchmark measures how the inference system serves the resulting parallel requests, shared prefixes, and completion timing.',
+    relatedTerms: [
+      'agentic-inference',
+      'agentic-coding-workload',
+      'agentx',
+      'trace-replay',
+      'concurrency',
+    ],
+    articleSlugs: [AGENTIC_WORKLOADS, TILERT, VR_RUBIN],
   },
   {
     slug: 'inference-engine',
@@ -119,7 +243,7 @@ const entries = [
       'InferenceX plots tokens per second per user against throughput or cost. Iso-interactivity tables interpolate each system’s Pareto frontier at the same token rate so the comparison holds user experience constant.',
     measurement: { label: 'Typical unit', value: 'tokens/second/user (tok/s/user)' },
     relatedTerms: ['time-per-output-token', 'throughput', 'iso-interactivity', 'latency'],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, MI355X_KIMI],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, MI355X_KIMI, TILERT],
   },
   {
     slug: 'latency',
@@ -176,7 +300,7 @@ const entries = [
       'InferenceX often presents the reciprocal measure, tok/s/user, because higher is visually better. Recipe tables may include TPOT directly, especially when comparing scheduler or kernel changes at matched concurrency.',
     measurement: { label: 'Relationship', value: 'interactivity ≈ 1000 / TPOT(ms)' },
     relatedTerms: ['interactivity', 'time-to-first-token', 'decode', 'concurrency'],
-    articleSlugs: [INFERENCEX_V2, SGLANG_056, MI355X_GLM5],
+    articleSlugs: [INFERENCEX_V2, SGLANG_056, MI355X_GLM5, TILERT],
   },
   {
     slug: 'concurrency',
@@ -398,7 +522,7 @@ const entries = [
     benchmarkContext:
       'InferenceX decode performance appears as tok/s/user and aggregate tok/s/chip across concurrency. Output sequence length, batch shape, precision, and parallelism must match for a fair comparison.',
     relatedTerms: ['prefill', 'time-per-output-token', 'kv-cache', 'speculative-decoding'],
-    articleSlugs: [INFERENCEX_V2, GB300_DSV4, SGLANG_056],
+    articleSlugs: [INFERENCEX_V2, GB300_DSV4, SGLANG_056, TILERT],
   },
   {
     slug: 'kv-cache',
@@ -440,7 +564,7 @@ const entries = [
     benchmarkContext:
       'InferenceX generally disables prefix caching on random datasets to isolate full prompt processing from cache policy. Treat benchmark cost as a no-hit baseline unless the recipe says otherwise.',
     relatedTerms: ['kv-cache', 'prefill', 'time-to-first-token', 'nvidia-dynamo'],
-    articleSlugs: [INFERENCEX_V2, GB200_KIMI, KIMI_K3],
+    articleSlugs: [AGENTIC_WORKLOADS, INFERENCEX_V2, GB200_KIMI, KIMI_K3],
   },
   {
     slug: 'disaggregated-inference',
@@ -459,7 +583,7 @@ const entries = [
     benchmarkContext:
       'A disagg label identifies the serving layout, not its performance. Judge it from the prefill and decode world sizes, TP/EP layout, framework, network domain, and the interactivity range where its frontier leads.',
     relatedTerms: ['prefill', 'decode', 'kv-cache', 'nvidia-dynamo', 'wide-expert-parallelism'],
-    articleSlugs: [INFERENCEX_V2, GB200_R1, GB300_DSV4, GB200_KIMI],
+    articleSlugs: [INFERENCEX_V2, GB200_R1, GB300_DSV4, GB200_KIMI, TILERT],
   },
   {
     slug: 'speculative-decoding',
@@ -874,7 +998,7 @@ const entries = [
     benchmarkContext:
       'InferenceX recipes pin container images and therefore a concrete CUDA stack. Historical comparisons can isolate the effect of an engine image bump on otherwise identical hardware and configuration.',
     relatedTerms: ['inference-engine', 'nvfp4', 'nvlink', 'rocm', 'tensorrt-llm'],
-    articleSlugs: [SGLANG_056, B200_GLM5, INFERENCEX_V2],
+    articleSlugs: [SGLANG_056, B200_GLM5, INFERENCEX_V2, TILERT],
   },
   {
     slug: 'rocm',
@@ -909,7 +1033,7 @@ const entries = [
     benchmarkContext:
       'InferenceX treats vLLM as one engine option and pins the exact image in each recipe. Engine name alone does not set a fixed performance level, so comparisons must match model, precision, workload, and topology.',
     relatedTerms: ['inference-engine', 'nvidia-dynamo', 'kv-cache', 'sglang', 'rocm'],
-    articleSlugs: [MI355X_KIMI, GB200_KIMI, B200_MINIMAX, B200_KIMI, KIMI_K3],
+    articleSlugs: [MI355X_KIMI, GB200_KIMI, B200_MINIMAX, B200_KIMI, KIMI_K3, TILERT],
   },
   {
     slug: 'sglang',

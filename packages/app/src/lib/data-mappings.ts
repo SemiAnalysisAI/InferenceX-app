@@ -59,12 +59,22 @@ interface ModelConfig {
  * be active together because their acceptance-rate forcing implementations
  * differ. ATOM and SGLang share the upstream ROCm MTP path, so they form one
  * comparability group; vLLM is its own group.
+ *
+ * Scoped to `hardware` for the same reason the STP rule below is: the guard
+ * exists to stop two engines being read off one SKU's curve, not to stop a
+ * chart holding two SKUs. B200 vLLM MTP next to B300 SGLang MTP compares
+ * hardware, which is the point of the chart. Where only one engine has a run
+ * for a SKU there is nothing to confuse, so that SKU is free to show it.
+ *
+ * ATOM is its own family and is deliberately NOT grouped with SGLang, so it
+ * stays comparable with everything — including both vLLM and SGLang on the
+ * SKUs where it runs.
  */
 const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
   {
     suffix: '_mtp',
     stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
-    groupAliases: { atom: 'sglang' },
+    scope: 'hardware',
   },
 ];
 
@@ -72,31 +82,42 @@ const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
  * STP exclusion: unsuffixed standard-token configs for the same hardware SKU
  * can't mix engine families, because each engine tunes its serving path
  * differently. Different hardware may use different engines on one graph.
+ * `dynamo-`/`mori-`/`llmd-`/`mooncake-` are routers, not engines, so
+ * `dynamo-sglang` is SGLang and is guarded as such.
  *
- * Which families this covers is per-scenario: AgentX applies it to every engine
- * family while the agentic benchmark is new, whereas 8K/1K narrows it (and its
- * MTP sibling) to vLLM and SGLang via `exclusionFamilies` below.
+ * ATOM is its own family and is not aliased to SGLang — it stays comparable
+ * with everything.
  */
 const STP_ENGINE_EXCLUSION: ExclusionSpec[] = [
   {
     suffix: null,
     stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
-    groupAliases: { atom: 'sglang' },
     scope: 'hardware',
   },
 ];
 
 /**
- * Engine families guarded on the 8K/1K chart. vLLM and SGLang tune their runs
- * against engine-specific serving paths, so their numbers aren't directly
- * comparable on one graph — for standard-token and MTP configs alike.
+ * Engine families guarded on the 8K/1K and Agentic Traces charts. vLLM and
+ * SGLang tune their runs against engine-specific serving paths, so their
+ * numbers aren't directly comparable on one SKU — for standard-token and MTP
+ * configs alike. The resulting matrix, per SKU:
  *
- * Every other engine is comparable with everything here: TRTLLM, ATOM, and
- * Mooncake ATOMesh stay freely selectable next to either engine and next to
- * each other. Because the list is matched before `groupAliases`, ATOM escapes
- * even though the MTP rule folds it into SGLang's comparability group.
+ *   vLLM ↔ SGLang           blocked  (standard-token and MTP)
+ *   TRTLLM ↔ vLLM           allowed
+ *   TRTLLM ↔ SGLang         allowed
+ *   TRTLLM ↔ ATOM           allowed
+ *   ATOM ↔ vLLM or SGLang   allowed
+ *
+ * Every engine outside this list is comparable with everything: TRTLLM, ATOM,
+ * and Mooncake ATOMesh stay freely selectable next to either guarded engine and
+ * next to each other. Because the list is matched before `groupAliases`, ATOM
+ * escapes even though the MTP rule folds it into SGLang's comparability group.
+ *
+ * Both scenarios share the list. AgentX guarded every engine family while the
+ * agentic benchmark was new; that blocked TRTLLM against vLLM, SGLang, and ATOM
+ * on the same SKU, which the pairs above now allow.
  */
-const EIGHTK_ONEK_EXCLUSION_FAMILIES = ['vllm', 'sglang'] as const;
+const GUARDED_ENGINE_FAMILIES = ['vllm', 'sglang'] as const;
 
 // Total parameter counts appended to each label so users can compare model
 // scale at a glance in the dropdown. For Llama and gpt-oss the count is
@@ -142,7 +163,9 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     category: 'maintenance',
   },
   [Model.GLM_5]: { label: 'GLM5/5.1 744B', prefix: 'glm5', category: 'deprecated' },
-  [Model.GLM_5_2]: { label: 'GLM5.2', prefix: 'glm5.2', category: 'default' },
+  // GLM-5.2 and GLM-5.3 share the same architecture and inference profile, so
+  // the selector presents both releases over the existing GLM-5.2 data bucket.
+  [Model.GLM_5_2]: { label: 'GLM5.2/GLM5.3', prefix: 'glm5.2', category: 'default' },
   [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
   [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'deprecated' },
   [Model.MiniMax_M2_5]: {
@@ -302,17 +325,18 @@ const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
     exclusion: STP_ENGINE_EXCLUSION,
     exclusionPolicy: 'keep-sticky',
     defaultExclusionGroup: 'vllm',
-    exclusionFamilies: EIGHTK_ONEK_EXCLUSION_FAMILIES,
+    exclusionFamilies: GUARDED_ENGINE_FAMILIES,
   },
   [Sequence.AgenticTraces]: {
-    label: 'Agentic Traces',
-    labelZh: '智能体轨迹',
+    label: 'Agentic',
+    labelZh: '智能体',
     compact: 'agentic',
     category: 'default',
     kind: 'agentic',
     exclusion: STP_ENGINE_EXCLUSION,
     exclusionPolicy: 'keep-sticky',
     defaultExclusionGroup: 'vllm',
+    exclusionFamilies: GUARDED_ENGINE_FAMILIES,
   },
 };
 

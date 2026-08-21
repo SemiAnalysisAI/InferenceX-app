@@ -9,6 +9,11 @@ import {
 } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
+import {
+  isAgenticSequence,
+  type ScenarioSegment,
+  sequenceForScenarioSegment,
+} from '@/lib/compare-scenario-route';
 import { pickPairDefaults } from '@/lib/compare-pair-defaults';
 import {
   canonicalCompareSlug,
@@ -28,6 +33,7 @@ import {
   summarize,
 } from '@/lib/compare-ssr';
 import {
+  AGENTIC_SCENARIO_INTRO_ZH,
   buildBreadcrumbJsonLdZh,
   buildJsonLdZh,
   compareTableNarrativeZh,
@@ -38,6 +44,30 @@ import ComparePerDollarPageClient from '../../../compare-per-dollar/[slug]/page-
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * `/zh/compare-per-dollar/<slug>/<scenario>` renders this same page with the workload
+ * pinned by the path. The segment is threaded through rather than duplicated
+ * in a parallel route file so the body — redirects, JSON-LD, metadata, client
+ * props — is written once and cannot drift between the two URLs.
+ */
+export interface ScenarioOptions {
+  scenarioSegment?: ScenarioSegment;
+}
+
+/** English twin of `scenarioPath` — hreflang pairs are keyed off the
+ *  English route, so the segment has to survive the locale swap. */
+function enScenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): string {
+  return scenarioSegment
+    ? `/compare-per-dollar/${canonical}/${scenarioSegment}`
+    : `/compare-per-dollar/${canonical}`;
+}
+
+function scenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): string {
+  return scenarioSegment
+    ? `/zh/compare-per-dollar/${canonical}/${scenarioSegment}`
+    : `/zh/compare-per-dollar/${canonical}`;
+}
+
 interface Props {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -45,17 +75,29 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+  return buildPerDollarMetadataZh(slug, {});
+}
+
+export function buildPerDollarMetadataZh(
+  slug: string,
+  { scenarioSegment }: ScenarioOptions,
+): Metadata {
   const parsed = parseCompareSlug(slug);
   if (!parsed) return {};
   const fullLabel = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
   const gpuLabel = compareDisplayLabel(parsed.a, parsed.b);
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
-  const url = `${SITE_URL}/zh/compare-per-dollar/${canonical}`;
+  // The scenario segments are views of one comparison, so the bare slug URL
+  // stays the indexable representative and every segment canonicalizes to it.
+  // Without this, `/…/<slug>/<default-scenario>` and `/…/<slug>` would serve
+  // byte-identical pages, each claiming to be canonical.
+  const routePath = scenarioPath(canonical, scenarioSegment);
+  const url = `${SITE_URL}${routePath}`;
   const description = `${gpuLabel} 在 ${parsed.model.label} 上的每美元性能：来自 InferenceX（SemiAnalysis 推出的独立开源基准测试平台）的经验证、可复现的每百万 token 成本结果，基于云服务商 TCO 归一化。${SUPPORTERS_LINE_ZH}查看哪款 Chip 在各交互性水平下更经济。`;
   return {
     title: `${fullLabel} — 每美元性能`,
     description,
-    alternates: zhAlternates(`/compare-per-dollar/${canonical}`),
+    alternates: zhAlternates(enScenarioPath(canonical)),
     openGraph: {
       title: `${fullLabel} — 每美元性能 | ${SITE_NAME}`,
       description,
@@ -73,10 +115,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ComparePerDollarPageZh({ params, searchParams }: Props) {
   const { slug } = await params;
+  return renderPerDollarPageZh(slug, await searchParams, {});
+}
+
+export async function renderPerDollarPageZh(
+  slug: string,
+  sp: Record<string, string | string[] | undefined>,
+  { scenarioSegment }: ScenarioOptions,
+) {
   const parsed = parseCompareSlug(slug);
   if (!parsed) notFound();
-
-  const sp = await searchParams;
 
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
   if (canonical !== slug.toLowerCase()) {
@@ -88,7 +136,9 @@ export default async function ComparePerDollarPageZh({ params, searchParams }: P
       })
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
-    permanentRedirect(`/zh/compare-per-dollar/${canonical}${qs ? `?${qs}` : ''}`);
+    // Keep the scenario segment across the redirect — dropping it would send
+    // the reader to the pair's default workload instead.
+    permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
   const rows = await getCachedBenchmarks(parsed.model.dbKeys);
@@ -103,7 +153,11 @@ export default async function ComparePerDollarPageZh({ params, searchParams }: P
   const urlSeq = pickString(sp.i_seq);
   const urlPrec = pickString(sp.i_prec);
   const urlModel = pickString(sp.g_model);
-  const effectiveSequence = urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence;
+  // Path beats query beats the pair's default: a scenario segment is an
+  // explicit address for one workload, so it outranks a stale `?i_seq=`.
+  const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
+  const effectiveSequence =
+    pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence);
   const effectivePrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : pickedPrecision;
   const effectiveModel =
     urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
@@ -116,7 +170,7 @@ export default async function ComparePerDollarPageZh({ params, searchParams }: P
     effectivePrecision,
   );
 
-  const url = `${SITE_URL}/zh/compare-per-dollar/${canonical}`;
+  const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
   // The PNG route exists only under the EN tree; zh JSON-LD references it there.
   const imageUrl = `${SITE_URL}/compare-per-dollar/${canonical}/performance-per-dollar.png`;
   const { oldest, newest } = dateRangeForPair(rows, parsed.a, parsed.b);
@@ -170,6 +224,7 @@ export default async function ComparePerDollarPageZh({ params, searchParams }: P
         defaultPrecision={effectivePrecision}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         narrative={narrative}
+        agenticIntro={isAgenticSequence(effectiveSequence) ? AGENTIC_SCENARIO_INTRO_ZH : null}
         aLabel={aLabel}
         bLabel={bLabel}
         aVendor={aMeta?.vendor ?? ''}

@@ -3,19 +3,54 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import {
+  HW_REGISTRY,
+  TCO_SOURCE_TITLE,
+  TCO_SOURCE_URL,
+} from '@semianalysisai/inferencex-constants';
+
 import { Badge } from '@/components/ui/badge';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { ShareButton } from '@/components/ui/share-button';
-import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { useLocale } from '@/lib/use-locale';
 import type { Locale } from '@/lib/i18n';
 
 // Keep these metric-key groups in sync with chart-utils/chart configs when new source-backed
 // metrics are added; this helper owns which caption notes and caveats appear for each family.
 const POWER_SOURCE_METRICS = new Set(['y_tpPerMw', 'y_inputTputPerMw', 'y_outputTputPerMw']);
-const TOTAL_COST_METRICS = new Set(['y_costh', 'y_costn', 'y_costr']);
-const OUTPUT_COST_METRICS = new Set(['y_costhOutput', 'y_costnOutput', 'y_costrOutput']);
-const INPUT_COST_METRICS = new Set(['y_costhi', 'y_costni', 'y_costri']);
+const TOTAL_COST_METRICS = new Set([
+  'y_costh',
+  'y_costn',
+  'y_costr',
+  'y_tokensPerDollarH',
+  'y_tokensPerDollarN',
+  'y_tokensPerDollarR',
+  'y_tokensPerRmbH',
+  'y_tokensPerRmbN',
+  'y_tokensPerRmbR',
+]);
+const OUTPUT_COST_METRICS = new Set([
+  'y_costhOutput',
+  'y_costnOutput',
+  'y_costrOutput',
+  'y_outputTokensPerDollarH',
+  'y_outputTokensPerDollarN',
+  'y_outputTokensPerDollarR',
+  'y_outputTokensPerRmbH',
+  'y_outputTokensPerRmbN',
+  'y_outputTokensPerRmbR',
+]);
+const INPUT_COST_METRICS = new Set([
+  'y_costhi',
+  'y_costni',
+  'y_costri',
+  'y_inputTokensPerDollarH',
+  'y_inputTokensPerDollarN',
+  'y_inputTokensPerDollarR',
+  'y_inputTokensPerRmbH',
+  'y_inputTokensPerRmbN',
+  'y_inputTokensPerRmbR',
+]);
 const POWER_VALUES = Object.fromEntries(
   Object.entries(HW_REGISTRY).map(([base, specs]) => [base, `${specs.power}kW`]),
 );
@@ -63,6 +98,11 @@ function SourceLink({
 
 const NOUN_ZH: Record<string, string> = {
   cost: '成本',
+  'cost per million tokens': '每百万 token 成本',
+  'token cost': 'token 成本',
+  'tokens per $1 USD': '每 1 美元可购买的 token 数',
+  'tokens per ¥1 RMB': '每 1 元人民币可购买的 token 数',
+  'purchasing power': '购买力',
   'input throughput': '输入吞吐量',
   'output throughput': '输出吞吐量',
   power: '功耗',
@@ -119,11 +159,23 @@ function getCostValues(selectedYAxisMetric: string) {
       base,
       selectedYAxisMetric === 'y_costh' ||
       selectedYAxisMetric === 'y_costhOutput' ||
-      selectedYAxisMetric === 'y_costhi'
+      selectedYAxisMetric === 'y_costhi' ||
+      selectedYAxisMetric === 'y_tokensPerRmbH' ||
+      selectedYAxisMetric === 'y_outputTokensPerRmbH' ||
+      selectedYAxisMetric === 'y_inputTokensPerRmbH' ||
+      selectedYAxisMetric === 'y_tokensPerDollarH' ||
+      selectedYAxisMetric === 'y_outputTokensPerDollarH' ||
+      selectedYAxisMetric === 'y_inputTokensPerDollarH'
         ? specs.costh
         : selectedYAxisMetric === 'y_costn' ||
             selectedYAxisMetric === 'y_costnOutput' ||
-            selectedYAxisMetric === 'y_costni'
+            selectedYAxisMetric === 'y_costni' ||
+            selectedYAxisMetric === 'y_tokensPerRmbN' ||
+            selectedYAxisMetric === 'y_outputTokensPerRmbN' ||
+            selectedYAxisMetric === 'y_inputTokensPerRmbN' ||
+            selectedYAxisMetric === 'y_tokensPerDollarN' ||
+            selectedYAxisMetric === 'y_outputTokensPerDollarN' ||
+            selectedYAxisMetric === 'y_inputTokensPerDollarN'
           ? specs.costn
           : specs.costr,
     ]),
@@ -154,13 +206,16 @@ export function MetricAssumptionNotes({
   const showInputCostSource = INPUT_COST_METRICS.has(selectedYAxisMetric);
   const showInputThroughputCaveat = selectedYAxisMetric === 'y_inputTputPerGpu';
   const showOutputThroughputCaveat = selectedYAxisMetric === 'y_outputTputPerGpu';
-  // Per-token-type cost only. A disagg config's prefill and decode chips are
-  // counted separately, so the input- and output-token costs are attributed to
-  // one side of the split and can't be lined up against an aggregated config.
-  // The total-token cost divides by the whole chip count, which is the same
+  // Per-token-type cost and purchasing power only. A disagg config's prefill and decode
+  // chips are counted separately, so input/output economics are attributed to one side
+  // of the split and can't be lined up against an aggregated config.
+  // The total-token metric uses the whole chip count, which is the same
   // denominator an aggregated config uses, so it needs no caveat — the same
   // split the throughput caveats above already make (input/output, not total).
   const showCostCaveat = showOutputCostSource || showInputCostSource;
+  const isTokensPerDollar = selectedYAxisMetric.includes('TokensPerDollar');
+  const isTokensPerRmb = selectedYAxisMetric.includes('TokensPerRmb');
+  const isTokensPerCurrency = isTokensPerDollar || isTokensPerRmb;
   const showJouleSource = selectedYAxisMetric.startsWith('y_j');
 
   const costValues =
@@ -188,12 +243,23 @@ export function MetricAssumptionNotes({
       {costValues && (
         <>
           <MetricBadges label={costLabel} values={costValues} />
-          <SourceLink href="https://semianalysis.com/ai-cloud-tco-model/" sourceLabel={sourceLabel}>
-            SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
+          <SourceLink href={TCO_SOURCE_URL} sourceLabel={sourceLabel}>
+            {TCO_SOURCE_TITLE}
           </SourceLink>
         </>
       )}
-      <DisaggCaveat visible={showCostCaveat} calculationNoun="cost" locale={locale} />
+      <DisaggCaveat
+        visible={showCostCaveat}
+        calculationNoun={
+          isTokensPerRmb
+            ? 'tokens per ¥1 RMB'
+            : isTokensPerDollar
+              ? 'tokens per $1 USD'
+              : 'cost per million tokens'
+        }
+        comparisonNoun={isTokensPerCurrency ? 'purchasing power' : 'token cost'}
+        locale={locale}
+      />
       <DisaggCaveat
         visible={showInputThroughputCaveat}
         calculationNoun="input throughput"

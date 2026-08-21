@@ -99,6 +99,25 @@ describe('getPointLabel', () => {
     expect(getPointLabel(pt({ tp: 4, ep: 1 }))).toBe('TP4');
   });
 
+  it('includes DCP and PCP in the point label when non-default', () => {
+    expect(
+      getPointLabel(
+        pt({
+          tp: 8,
+          decode_tp: 8,
+          ep: 1,
+          prefill_dcp_size: 8,
+          decode_dcp_size: 8,
+          prefill_pcp_size: 1,
+          decode_pcp_size: 1,
+        }),
+      ),
+    ).toBe('TP8/DCP8');
+    expect(
+      getPointLabel(pt({ tp: 8, decode_tp: 8, ep: 1, decode_dcp_size: 8, prefill_pcp_size: 4 })),
+    ).toBe('TP8/DCP8/PCP4');
+  });
+
   it('returns "DPATP4" when ep is 1 and dp_attention is true', () => {
     expect(getPointLabel(pt({ tp: 4, ep: 1, dp_attention: true }))).toBe('DPATP4');
   });
@@ -152,11 +171,74 @@ describe('getPointLabel', () => {
 describe('generateTooltipContent', () => {
   it('renders View charts as a same-tab anchor so browsers offer open-in-new-tab', () => {
     const html = generateTooltipContent(
-      tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: true }),
+      tooltipConfig({
+        data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+        isPinned: true,
+        hasTrace: true,
+      }),
     );
     expect(html).toContain('<a data-action="view-charts"');
     expect(html).toContain('href="/inference/agentic/1"');
     expect(html).not.toContain('data-action="view-charts" target=');
+  });
+
+  it('renders View logs only for pinned points with a stored server log', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
+        isPinned: true,
+        hasLog: true,
+      }),
+    );
+    expect(html).toContain('<a data-action="view-logs"');
+    expect(html).toContain('href="/inference/agentic/7?view=logs"');
+    expect(
+      generateTooltipContent(
+        tooltipConfig({
+          data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
+          isPinned: false,
+          hasLog: true,
+        }),
+      ),
+    ).not.toContain('data-action="view-logs"');
+    expect(
+      generateTooltipContent(
+        tooltipConfig({
+          data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
+          isPinned: true,
+          hasLog: false,
+        }),
+      ),
+    ).not.toContain('data-action="view-logs"');
+  });
+
+  it('routes fixed-sequence log actions to the fixed benchmark log viewer', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({ id: 96255, benchmark_type: 'single_turn' }),
+        isPinned: true,
+        hasLog: true,
+      }),
+    );
+    expect(html).toContain('<a data-action="view-logs"');
+    expect(html).toContain('href="/inference/logs/96255"');
+    expect(html).not.toContain('/inference/agentic/96255');
+  });
+
+  it('localizes point-detail actions and their /zh routes', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
+        isPinned: true,
+        hasTrace: true,
+        hasLog: true,
+        locale: 'zh',
+      }),
+    );
+    expect(html).toContain('查看图表');
+    expect(html).toContain('href="/zh/inference/agentic/7"');
+    expect(html).toContain('查看日志');
+    expect(html).toContain('href="/zh/inference/agentic/7?view=logs"');
   });
 
   it('omits View charts when the point id is non-persisted (0 / NaN), even if pinned + hasTrace', () => {
@@ -164,9 +246,14 @@ describe('generateTooltipContent', () => {
     // link to /inference/agentic/0, a doomed lookup.
     for (const badId of [0, Number.NaN]) {
       const html = generateTooltipContent(
-        tooltipConfig({ data: pt({ id: badId }), isPinned: true, hasTrace: true }),
+        tooltipConfig({
+          data: pt({ id: badId, benchmark_type: 'agentic_traces' }),
+          isPinned: true,
+          hasTrace: true,
+        }),
       );
       expect(html).not.toContain('data-action="view-charts"');
+      expect(html).not.toContain('data-action="view-logs"');
     }
   });
 
@@ -473,6 +560,49 @@ describe('generateOverlayTooltipContent', () => {
     expect(html).toContain('<strong>CPU Cache Hit Rate:</strong> 42.0%');
   });
 
+  it('shows DCP and PCP for unofficial-run points', () => {
+    const html = generateOverlayTooltipContent(
+      overlayConfig({
+        data: pt({ ep: 1, decode_dcp_size: 8, prefill_pcp_size: 4 }),
+      }),
+    );
+
+    expect(html).toContain('<strong>Decode Context Parallelism (DCP):</strong> 8');
+    expect(html).toContain('<strong>Prefill Context Parallelism (PCP):</strong> 4');
+  });
+
+  it('shows point-level speculative decoding for mixed agentic overlays', () => {
+    const mtp = generateOverlayTooltipContent(
+      overlayConfig({
+        data: pt({ benchmark_type: 'agentic_traces', spec_decoding: 'mtp' }),
+      }),
+    );
+    const standardZh = generateOverlayTooltipContent(
+      overlayConfig({
+        data: pt({ benchmark_type: 'agentic_traces', spec_decoding: 'none' }),
+        locale: 'zh',
+      }),
+    );
+
+    expect(mtp).toContain('<strong>Speculative Decoding:</strong> MTP');
+    expect(standardZh).toContain('<strong>投机解码:</strong> 关闭');
+  });
+
+  it('labels Kimi-K3 speculative decoding "DSpark" rather than the generic MTP', () => {
+    const html = generateOverlayTooltipContent(
+      overlayConfig({
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          model: 'Kimi-K3',
+          spec_decoding: 'mtp',
+        }),
+      }),
+    );
+
+    expect(html).toContain('<strong>Speculative Decoding:</strong> DSpark');
+    expect(html).not.toContain('<strong>Speculative Decoding:</strong> MTP');
+  });
+
   it('hides stale CPU cache hits for unofficial overlays without offload', () => {
     const html = generateOverlayTooltipContent(
       overlayConfig({
@@ -539,6 +669,17 @@ describe('generateGPUGraphTooltipContent', () => {
     expect(html).toContain('BF16');
   });
 
+  it('shows DCP and PCP in comparison point tooltips', () => {
+    const html = generateGPUGraphTooltipContent(
+      tooltipConfig({
+        data: pt({ ep: 1, decode_dcp_size: 8, prefill_pcp_size: 4 }),
+      }),
+    );
+
+    expect(html).toContain('<strong>Decode Context Parallelism (DCP):</strong> 8');
+    expect(html).toContain('<strong>Prefill Context Parallelism (PCP):</strong> 4');
+  });
+
   it('splits image and SHA onto separate lines', () => {
     const html = generateGPUGraphTooltipContent(
       tooltipConfig({ data: pt({ image: 'vllm-v0.6.0 abc123' }) }),
@@ -549,22 +690,38 @@ describe('generateGPUGraphTooltipContent', () => {
   it('shows View charts only for pinned points with stored trace data', () => {
     expect(
       generateGPUGraphTooltipContent(
-        tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: true }),
+        tooltipConfig({
+          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+          isPinned: true,
+          hasTrace: true,
+        }),
       ),
     ).toContain('data-action="view-charts"');
     expect(
       generateGPUGraphTooltipContent(
-        tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: true }),
+        tooltipConfig({
+          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+          isPinned: true,
+          hasTrace: true,
+        }),
       ),
     ).toContain('href="/inference/agentic/1"');
     expect(
       generateGPUGraphTooltipContent(
-        tooltipConfig({ data: pt({ id: 1 }), isPinned: false, hasTrace: true }),
+        tooltipConfig({
+          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+          isPinned: false,
+          hasTrace: true,
+        }),
       ),
     ).not.toContain('data-action="view-charts"');
     expect(
       generateGPUGraphTooltipContent(
-        tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: false }),
+        tooltipConfig({
+          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+          isPinned: true,
+          hasTrace: false,
+        }),
       ),
     ).not.toContain('data-action="view-charts"');
   });

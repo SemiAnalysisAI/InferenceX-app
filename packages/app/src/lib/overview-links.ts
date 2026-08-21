@@ -1,27 +1,49 @@
 import { runIdFromRunUrl } from './known-issues';
 import {
   OVERVIEW_DEFAULT_COMPARISON_MODE,
+  OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
   OVERVIEW_DEFAULT_MODEL_SCOPE,
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  OVERVIEW_DEFAULT_ROW_SCOPE,
   OVERVIEW_PRIMARY_TIER,
   type OverviewComparisonMode,
-  type OverviewConfigResult,
+  type OverviewConfigView,
   type OverviewEngineScope,
+  type OverviewHardwareRowScope,
   type OverviewModelScope,
   type OverviewModelSummary,
   type OverviewReferenceHardware,
+  type OverviewRowScope,
   type OverviewTier,
 } from './overview-data';
 
-export type OverviewSearchKey = 'tier' | 'engine' | 'ref' | 'compare' | 'models';
+export type OverviewSearchKey =
+  | 'tier'
+  | 'engine'
+  | 'ref'
+  | 'compare'
+  | 'models'
+  | 'rows'
+  | 'hwrows'
+  | 'present';
 
-const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
+export const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
   'tier',
   'engine',
   'ref',
   'compare',
   'models',
+  'rows',
+  'hwrows',
+  'present',
 ];
+
+/** Params the client resolves without asking the server. `ref` only picks which
+ *  column the percentages are measured against, and `present` only records the
+ *  requested layout. Neither changes the Overview payload or its cache key. */
+export const OVERVIEW_CLIENT_ONLY_KEYS = ['ref', 'present'] as const;
+
+export type OverviewClientOnlySearchKey = (typeof OVERVIEW_CLIENT_ONLY_KEYS)[number];
 
 /** Apply one control's destination to the latest pending overview URL.
  * This prevents a second, fast selection from rebuilding from stale server
@@ -52,7 +74,10 @@ export function mergeOverviewControlHref(
   }
 
   const search = ordered.toString();
-  return `${current.pathname}${search === '' ? '' : `?${search}`}${target.hash}`;
+  // A control href never carries a fragment, so an absent one means "keep the
+  // one already on the page" rather than "clear it".
+  const hash = target.hash === '' ? current.hash : target.hash;
+  return `${current.pathname}${search === '' ? '' : `?${search}`}${hash}`;
 }
 import type { UrlStateParams } from './url-state';
 
@@ -70,7 +95,8 @@ function inferenceRoute(locale: 'en' | 'zh'): string {
  * (mirrors `pointSpecMode` in quickFilters.ts, minus its hwKey suffix check —
  * overview `specMethod` comes straight from `spec_method`).
  */
-function dashboardSpecMode(specMethod: string): 'mtp' | 'stp' {
+function dashboardSpecMode(specMethod: string): 'mtp' | 'stp' | undefined {
+  if (specMethod === 'mixed') return undefined;
   return specMethod === 'none' || specMethod === '' ? 'stp' : 'mtp';
 }
 
@@ -80,7 +106,7 @@ function dashboardSpecMode(specMethod: string): 'mtp' | 'stp' {
  * helpers below read this one predicate, so the `g_runid` pin and the source-run
  * link can never disagree about whether a single run backs the configuration.
  */
-function soleSourceRun(config: OverviewConfigResult): { url: string; id: string } | null {
+function soleSourceRun(config: OverviewConfigView): { url: string; id: string } | null {
   if (config.sourceRunUrls.length !== 1) return null;
   const url = config.sourceRunUrls[0];
   const id = runIdFromRunUrl(url);
@@ -100,7 +126,7 @@ function soleSourceRun(config: OverviewConfigResult): { url: string; id: string 
 export function buildOverviewDashboardHref(
   locale: 'en' | 'zh',
   model: OverviewModelSummary,
-  config: OverviewConfigResult,
+  config: OverviewConfigView,
 ): string {
   const params: UrlStateParams = {
     g_model: model.model,
@@ -135,8 +161,8 @@ function uniqueValues(values: readonly string[]): string {
 export function buildOverviewHistoryDashboardHref(
   locale: 'en' | 'zh',
   model: OverviewModelSummary,
-  current: OverviewConfigResult,
-  baseline: OverviewConfigResult,
+  current: OverviewConfigView,
+  baseline: OverviewConfigView,
 ): string {
   const currentRun = soleSourceRun(current);
   const baselineRun = soleSourceRun(baseline);
@@ -188,6 +214,8 @@ export function overviewHref(
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+  rowScope: OverviewRowScope = OVERVIEW_DEFAULT_ROW_SCOPE,
+  hardwareRowScope: OverviewHardwareRowScope = OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
 ): string {
   const base = locale === 'zh' ? '/zh/overview' : '/overview';
   const query = new URLSearchParams();
@@ -196,8 +224,19 @@ export function overviewHref(
   if (referenceHardware !== OVERVIEW_DEFAULT_REFERENCE_HARDWARE) {
     query.set('ref', referenceHardware);
   }
-  if (comparisonMode === 'history') query.set('compare', '30d');
+  if (comparisonMode !== 'hardware') query.set('compare', comparisonMode);
   if (modelScope !== OVERVIEW_DEFAULT_MODEL_SCOPE) query.set('models', modelScope);
+  // Each mode filters rows on its own terms and carries its own key. Both are
+  // written whenever they are set, including the one whose mode is off screen:
+  // that dormant key is the only record of the other tab's answer, and a URL
+  // rebuilt from page data — on first load, on refresh, or from a shared link —
+  // has nothing else to restore it from.
+  if (rowScope !== OVERVIEW_DEFAULT_ROW_SCOPE) query.set('rows', rowScope);
+  if (hardwareRowScope !== OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE) {
+    query.set('hwrows', hardwareRowScope);
+  }
+  // `rows=changed` and `hwrows=priced` are the only values ever emitted; `all`
+  // is the default and stays out of the URL so the canonical link is unchanged.
   const search = query.toString();
   return search === '' ? base : `${base}?${search}`;
 }
@@ -210,8 +249,19 @@ export function overviewTierHref(
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+  rowScope: OverviewRowScope = OVERVIEW_DEFAULT_ROW_SCOPE,
+  hardwareRowScope: OverviewHardwareRowScope = OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
 ): string {
-  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware, modelScope);
+  return overviewHref(
+    locale,
+    tier,
+    engineScope,
+    comparisonMode,
+    referenceHardware,
+    modelScope,
+    rowScope,
+    hardwareRowScope,
+  );
 }
 
 /** Engine-scope switch preserving the active service tier. */
@@ -222,6 +272,17 @@ export function overviewEngineScopeHref(
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+  rowScope: OverviewRowScope = OVERVIEW_DEFAULT_ROW_SCOPE,
+  hardwareRowScope: OverviewHardwareRowScope = OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
 ): string {
-  return overviewHref(locale, tier, engineScope, comparisonMode, referenceHardware, modelScope);
+  return overviewHref(
+    locale,
+    tier,
+    engineScope,
+    comparisonMode,
+    referenceHardware,
+    modelScope,
+    rowScope,
+    hardwareRowScope,
+  );
 }

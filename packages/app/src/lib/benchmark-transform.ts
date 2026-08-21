@@ -17,6 +17,14 @@ import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import type { BenchmarkRow } from '@/lib/api';
 
 /**
+ * Producer schema version whose unprefixed `joules_per_*` fields are documented
+ * as whole-deployment energy. Mirrors `POWER_METRIC_SCHEMA_VERSION` in the
+ * runner's `utils/aggregate_power.py`; bump both together when the semantics of
+ * those fields change again.
+ */
+const WHOLE_DEPLOYMENT_ENERGY_SCHEMA_VERSION = 2;
+
+/**
  * Agentic trace-replay runs (`benchmark_type === 'agentic_traces'`) emit ttft/ttlt/itl
  * but not the intvty/e2el/tpot keys the chart pipeline expects. Bridge them here:
  *   e2el   ≡ ttlt   (time-to-last-token == end-to-end latency)
@@ -95,6 +103,16 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   const aggregateDpAttention = aggregateUsesPrefill
     ? row.prefill_dp_attention
     : row.decode_dp_attention;
+  // An explicit invalid verdict is authoritative. Legacy rows without the
+  // verdict remain eligible so historical single-node measurements do not
+  // disappear. Unversioned disaggregated joules are withheld because their
+  // unprefixed fields changed from role-local to whole-deployment semantics.
+  const measuredPowerValid = m.power_valid !== 0;
+  // Match the version exactly rather than `>= 2`: an open bound would silently
+  // admit a future schema whose semantics changed again, which is the exact
+  // failure that made versioning necessary in the first place.
+  const hasWholeDeploymentEnergySemantics =
+    !row.disagg || m.power_metric_schema_version === WHOLE_DEPLOYMENT_ENERGY_SCHEMA_VERSION;
   // Prefer the dedicated column (added in migration 004); fall back to the
   // legacy stash inside `metrics` for any rows ingested before that column
   // existed.
@@ -115,6 +133,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   return {
     rawMetricKeys: Object.keys(m),
     id: isPersistedBenchmarkId(numericId) ? numericId : undefined,
+    recipe_fingerprint: row.recipe_fingerprint ?? undefined,
     hw: row.hardware,
     framework: row.framework,
     model: DB_MODEL_TO_DISPLAY[row.model] ?? row.model,
@@ -168,26 +187,46 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     // Measured GPU telemetry (runner's aggregate_power.py). Left undefined for
     // rows predating the field so downstream chart code can distinguish
     // "no measurement" from "0 W" via createChartDataPoint's typeof guard.
-    avg_power_w: m.avg_power_w,
-    joules_per_output_token: m.joules_per_output_token,
-    joules_per_total_token: m.joules_per_total_token,
-    // Multinode / disagg-only role splits — same undefined-for-legacy pattern.
-    // (disagg's decode-only J/output is carried by joules_per_output_token above,
-    // which the runner overrides to the per-stage value — no separate _decode key.)
-    prefill_avg_power_w: m.prefill_avg_power_w,
-    decode_avg_power_w: m.decode_avg_power_w,
-    joules_per_input_token: m.joules_per_input_token,
+    power_valid: m.power_valid,
+    power_metric_schema_version: m.power_metric_schema_version,
+    avg_power_w: measuredPowerValid ? m.avg_power_w : undefined,
+    joules_per_successful_query:
+      measuredPowerValid && hasWholeDeploymentEnergySemantics
+        ? m.joules_per_successful_query
+        : undefined,
+    joules_per_output_token:
+      measuredPowerValid && hasWholeDeploymentEnergySemantics
+        ? m.joules_per_output_token
+        : undefined,
+    joules_per_total_token:
+      measuredPowerValid && hasWholeDeploymentEnergySemantics
+        ? m.joules_per_total_token
+        : undefined,
+    // Role power remains unambiguous across schema versions. Version 2 also
+    // publishes explicit role energy alongside whole-deployment joules.
+    prefill_avg_power_w: measuredPowerValid ? m.prefill_avg_power_w : undefined,
+    decode_avg_power_w: measuredPowerValid ? m.decode_avg_power_w : undefined,
+    joules_per_input_token:
+      measuredPowerValid && hasWholeDeploymentEnergySemantics
+        ? m.joules_per_input_token
+        : undefined,
+    prefill_joules_per_input_token: measuredPowerValid
+      ? m.prefill_joules_per_input_token
+      : undefined,
+    decode_joules_per_output_token: measuredPowerValid
+      ? m.decode_joules_per_output_token
+      : undefined,
     // Cluster-wide GPU telemetry beyond power. Emitted when the perfmon CSVs
     // include the corresponding sample columns; left undefined otherwise so
     // the chart layer can distinguish "no measurement" from a real zero.
-    avg_temp_c: m.avg_temp_c,
-    peak_temp_c: m.peak_temp_c,
-    avg_util_pct: m.avg_util_pct,
-    avg_mem_used_mb: m.avg_mem_used_mb,
+    avg_temp_c: measuredPowerValid ? m.avg_temp_c : undefined,
+    peak_temp_c: measuredPowerValid ? m.peak_temp_c : undefined,
+    avg_util_pct: measuredPowerValid ? m.avg_util_pct : undefined,
+    avg_mem_used_mb: measuredPowerValid ? m.avg_mem_used_mb : undefined,
     // Per-worker measured power. Surfaced on BenchmarkRow as a sibling of the
     // scalar `metrics` dict (see api.ts). Narrow defensively so a malformed
     // payload can't poison downstream consumers.
-    workers: Array.isArray(row.workers) ? row.workers : undefined,
+    workers: measuredPowerValid && Array.isArray(row.workers) ? row.workers : undefined,
     disagg: row.disagg,
     num_prefill_gpu: row.num_prefill_gpu,
     num_decode_gpu: row.num_decode_gpu,
@@ -208,6 +247,14 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     decode_tp: row.disagg ? row.decode_tp : aggregateTp,
     decode_ep: row.disagg ? row.decode_ep : aggregateEp,
     decode_pp: row.disagg ? m.decode_pp : aggregatePp,
+    // Context-parallel widths are emitted by the runtime into metrics JSONB.
+    // Preserve both role-shaped values even for aggregate deployments: the
+    // tooltip collapses the transport-only role names for aggregate serving,
+    // while disaggregated serving displays the values per role.
+    prefill_dcp_size: m.prefill_dcp_size ?? m.dcp_size,
+    decode_dcp_size: m.decode_dcp_size ?? m.dcp_size,
+    prefill_pcp_size: m.prefill_pcp_size ?? m.pcp_size,
+    decode_pcp_size: m.decode_pcp_size ?? m.pcp_size,
     decode_dp_attention: row.disagg ? row.decode_dp_attention : aggregateDpAttention,
     decode_num_workers: row.decode_num_workers,
     image: row.image ?? undefined,
@@ -249,14 +296,32 @@ export function withPercentile(key: string, percentile: string): string {
   return key.replace(/^(?:mean|median|p75|p90|p95|p99|p99\.9)_/u, `${percentile}_`);
 }
 
-// Replacement granularity for single-run scoping: the changelog config_key
-// tuple (model-precision-hardware-framework) plus benchmark_type AND offload_mode.
-// benchmark_type keeps an agentic-only run from hiding the same config's
-// fixed-seq carry-forward; offload_mode keeps a run that produced only one
-// offload variant (e.g. offload=on) from claiming — and thereby suppressing —
-// the other variant's (offload=off) base rows, which are a distinct series.
+// Replacement granularity for single-run scoping is an exact generated topology.
+// An append-only run may touch one TP/EP search-space row while the displayed
+// curve also contains sibling topologies from the preceding snapshot.
 const runScopeKey = (r: BenchmarkRow): string =>
-  `${r.model}|${r.precision}|${r.hardware}|${r.framework}|${r.benchmark_type}|${r.offload_mode ?? 'off'}`;
+  JSON.stringify([
+    r.model,
+    r.precision,
+    r.hardware,
+    r.framework,
+    r.spec_method,
+    r.disagg,
+    r.is_multinode,
+    r.prefill_tp,
+    r.prefill_ep,
+    r.prefill_dp_attention,
+    r.prefill_num_workers,
+    r.decode_tp,
+    r.decode_ep,
+    r.decode_dp_attention,
+    r.decode_num_workers,
+    r.benchmark_type,
+    r.isl,
+    r.osl,
+    r.offload_mode ?? 'off',
+    r.recipe_fingerprint ?? null,
+  ]);
 
 /**
  * Merge run-scoped benchmark rows with the normal latest-per-config rows.
@@ -269,8 +334,8 @@ const runScopeKey = (r: BenchmarkRow): string =>
  * e.g. selecting one of two same-day vLLM runs made the day's SGLang curve
  * vanish because it lived in a different workflow run.
  *
- * Run rows win for every (model, precision, hardware, framework,
- * benchmark_type) group they cover; base rows fill in the rest.
+ * Run rows win for every exact generated topology they cover; base rows fill
+ * in sibling topologies and unrelated series.
  */
 export function mergeRunScopedRows(
   runRows: BenchmarkRow[],

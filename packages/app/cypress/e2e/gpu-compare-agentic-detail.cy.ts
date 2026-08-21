@@ -147,6 +147,14 @@ describe('GPU comparison agentic point detail', () => {
       );
       request.reply({ body: result });
     });
+    cy.intercept('GET', '/api/v1/log-availability*', (request) => {
+      const ids = new URL(request.url).searchParams.get('ids')?.split(',') ?? [];
+      request.reply({
+        body: Object.fromEntries(
+          ids.filter((id) => agenticIds.has(Number(id))).map((id) => [id, true]),
+        ),
+      });
+    }).as('gpuLogAvailability');
     // The agentic default x-axis mode (E2E Normalized Interactivity) fetches derived metrics on
     // mount; without values every point drops out of the (remapped) data set.
     interceptDerivedAgenticMetrics();
@@ -160,6 +168,10 @@ describe('GPU comparison agentic point detail', () => {
 
     cy.get('[data-testid="gpu-multiselect"] [role="combobox"]').click({ force: true });
     cy.get('[role="option"]').first().click();
+    cy.contains('Comparison Date Range').should('be.visible');
+    cy.contains('button', 'Select date range')
+      .should('not.have.class', 'animate-pulse')
+      .and('not.have.class', 'border-red-500');
     cy.contains('button', 'Select date range').click();
     cy.get('body').then(($body) => {
       if ($body.text().includes('View anyway')) {
@@ -172,6 +184,7 @@ describe('GPU comparison agentic point detail', () => {
 
     cy.get('[data-testid="gpu-graph"]').first().should('be.visible');
     cy.wait('@gpuTraceAvailability');
+    cy.wait('@gpuLogAvailability');
     cy.wait(100);
     cy.get('[data-testid="gpu-graph"]')
       .first()
@@ -199,7 +212,26 @@ describe('GPU comparison agentic point detail', () => {
       .then(($link) => {
         expect($link).to.match('a');
         expect($link).not.to.have.attr('target');
-        expect($link.attr('href')).to.match(/^\/inference\/agentic\/\d+$/u);
+        const href = $link.attr('href') ?? '';
+        expect(href).to.match(/^\/inference\/agentic\/\d+\?/u);
+        // The chart state rides along so the detail page can link back to the
+        // view the reader left — see agentic-detail-back-nav.cy.ts. Only
+        // non-default values are carried, so `g_model` (DeepSeek-V4-Pro IS the
+        // default) is absent while the scenario and GPU selection are not.
+        const params = new URLSearchParams(href.slice(href.indexOf('?')));
+        expect(params.get('i_seq')).to.equal('agentic-traces');
+        expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
+      });
+    cy.get('[data-chart-tooltip]:visible [data-action="view-logs"]')
+      .should('be.visible')
+      .then(($link) => {
+        expect($link).to.match('a');
+        const href = $link.attr('href') ?? '';
+        expect(href).to.match(/^\/inference\/agentic\/\d+\?/u);
+        const params = new URLSearchParams(href.slice(href.indexOf('?')));
+        expect(params.get('view')).to.equal('logs');
+        expect(params.get('i_seq')).to.equal('agentic-traces');
+        expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
       });
     cy.location('pathname').should('eq', '/inference');
   });

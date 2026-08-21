@@ -13,9 +13,15 @@ import {
   Precision,
 } from './data-mappings';
 import {
+  applyOverviewHardwareRowScope,
+  applyOverviewRowScope,
   assembleOverviewHistoricalPageData,
   assembleOverviewPageData,
   buildOverviewModelSummary,
+  OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
+  OVERVIEW_DEFAULT_ROW_SCOPE,
+  overviewRowHasAnyCost,
+  overviewRowHasHistoricalChange,
   overviewCostPerMtok,
   overviewHistoricalWindow,
   overviewScenarioForModel,
@@ -23,8 +29,10 @@ import {
   overviewTierEvidenceDate,
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
+  resolveOverviewHardwareRowScope,
   resolveOverviewModelScope,
   resolveOverviewReferenceHardware,
+  resolveOverviewRowScope,
   resolveOverviewTier,
   type OverviewModelSummary,
   type OverviewPageData,
@@ -156,8 +164,11 @@ describe('overview engine scope and scenario selection', () => {
   it.each([
     [undefined, 'hardware'],
     ['hardware', 'hardware'],
-    ['30d', 'history'],
-    [['30d'], 'history'],
+    ['7d', '7d'],
+    ['30d', '30d'],
+    ['60d', '60d'],
+    ['90d', '90d'],
+    [['30d'], '30d'],
     ['unknown', 'hardware'],
   ] as const)('resolves comparison mode %j to %s', (raw, expected) => {
     expect(resolveOverviewComparisonMode(raw)).toBe(expected);
@@ -365,6 +376,25 @@ describe('overview engine scope and scenario selection', () => {
 
     expect(page.engineScope).toBe('community');
     expect(page).not.toHaveProperty('datasetThroughDate');
+  });
+
+  it('keeps the tier interpolation input off the wire', () => {
+    const page = assembleOverviewPageData(
+      {
+        [Model.Qwen3_5]: [
+          row({ framework: 'dynamo-vllm', date: '2026-07-20' }),
+          row({ framework: 'atom', date: '2026-07-21' }),
+        ],
+      },
+      50,
+    );
+
+    // The reads that back the matrix must exist, or the assertion below passes
+    // vacuously on an empty payload.
+    expect(page.models.some((model) => model.platforms.some((p) => p.read.config !== null))).toBe(
+      true,
+    );
+    expect(JSON.stringify(page)).not.toContain('tierValues');
   });
 
   it('ranks same-bucket configs by total throughput even when output ranking disagrees', () => {
@@ -674,11 +704,28 @@ describe('overview engine scope and scenario selection', () => {
 describe('overview historical window', () => {
   it('anchors the target and floor to the latest database evidence date', () => {
     expect(overviewHistoricalWindow('2026-08-03')).toEqual({
+      key: '30d',
       snapshotDate: '2026-08-03',
       targetDate: '2026-07-04',
       earliestDate: '2026-06-04',
     });
   });
+
+  it.each([
+    ['7d', '2026-07-27', '2026-07-20'],
+    ['60d', '2026-06-04', '2026-04-05'],
+    ['90d', '2026-05-05', '2026-02-04'],
+  ] as const)(
+    'sizes the %s window to its day count with a window-wide floor',
+    (key, target, earliest) => {
+      expect(overviewHistoricalWindow('2026-08-03', key)).toEqual({
+        key,
+        snapshotDate: '2026-08-03',
+        targetDate: target,
+        earliestDate: earliest,
+      });
+    },
+  );
 
   it('returns the latest date across model buckets', () => {
     expect(
@@ -748,6 +795,7 @@ describe('overview historical window', () => {
 
 describe('assembleOverviewHistoricalPageData', () => {
   const window = {
+    key: '30d',
     snapshotDate: '2026-08-03',
     targetDate: '2026-07-04',
     earliestDate: '2026-06-04',
@@ -801,7 +849,7 @@ describe('assembleOverviewHistoricalPageData', () => {
     );
     const platform = platformFor(page, Model.Qwen3_5, 'single_turn_8k1k', 'mi355x');
 
-    expect(page.comparisonMode).toBe('history');
+    expect(page.comparisonMode).toBe('30d');
     expect(page.historicalWindow).toEqual(window);
     expect(platform?.historicalComparison?.status).toBe('comparable');
     expect(platform?.historicalComparison?.costDeltaPct).toBeCloseTo(-0.2, 9);
@@ -1100,17 +1148,47 @@ describe('overview platform selection', () => {
     );
   });
 
-  it('restricts AgentX points to the E2E frontier on total throughput', () => {
-    // The slower-E2E point wins on output tokens but loses on total tokens, so
-    // the total-token frontier drops it and the tier read becomes unreachable.
+  it('builds one AgentX frontier from mixed standard and MTP points', () => {
+    const summary = buildOverviewModelSummary(Model.GLM_5_2, [
+      agenticRow(40, 30, 12600, 1200, {
+        hardware: 'b200',
+        conc: 8,
+        spec_method: 'none',
+      }),
+      agenticRow(50, 25, 10800, 850, {
+        hardware: 'b200',
+        conc: 12,
+        spec_method: 'mtp',
+      }),
+      agenticRow(60, 20, 9000, 800, {
+        hardware: 'b200',
+        conc: 16,
+        spec_method: 'none',
+      }),
+    ]);
+
+    const config = summary.platforms.find(({ hardware }) => hardware === 'b200')?.read.config;
+    expect(config).toMatchObject({
+      specMethod: 'mixed',
+      specLabel: 'STP + MTP',
+      hwKey: 'b200_sglang',
+    });
+  });
+
+  it('reads AgentX tiers from every measured point, not just the E2E frontier', () => {
+    // The second point is dominated on total tokens (8100 < 9000) and slower on
+    // E2E (25 > 20). Until #736 the E2E frontier dropped it, leaving only the
+    // interactivity-40 point, which cannot reach the tier-50 read — so the tier
+    // came back null. That gating was removed deliberately, so the point now
+    // stands and the read lands on it exactly.
     const summary = buildOverviewModelSummary(Model.GLM_5_2, [
       agenticRow(40, 20, 9000, 500, { hardware: 'b200', conc: 8 }),
       agenticRow(50, 25, 8100, 900, { hardware: 'b200', conc: 12 }),
     ]);
 
     const b200 = summary.platforms.find(({ hardware }) => hardware === 'b200')!;
-    expect(b200.read.value).toBeNull();
-    expect(b200.missingReason).toBe('cannot_reach_at_tier');
+    expect(b200.read.value).toBe(8100);
+    expect(b200.missingReason).toBeNull();
   });
 
   it('reports scenario-level missing coverage when AgentX rows lack usable P90 metrics', () => {
@@ -1447,5 +1525,185 @@ describe('overview model scope', () => {
       ...DEPRECATED_MODELS,
     ]);
     expect(page.modelScope).toBe('all');
+  });
+});
+
+describe('overview row scope', () => {
+  const window = {
+    key: '30d',
+    snapshotDate: '2026-08-03',
+    targetDate: '2026-07-04',
+    earliestDate: '2026-06-04',
+  } as const;
+  // Only Qwen3.5 posts rows, so exactly one summary can be comparable and every
+  // other default row is dead weight in the 30-day matrix.
+  const currentRows = {
+    [Model.Qwen3_5]: frontier([12000, 10000, 8000, 6000], {
+      hardware: 'mi355x',
+      framework: 'sglang',
+      date: '2026-08-01',
+      precision: Precision.FP4,
+    }),
+  };
+  const baselineRows = {
+    [Model.Qwen3_5]: frontier([9600, 8000, 6400, 4800], {
+      hardware: 'mi355x',
+      framework: 'sglang',
+      date: '2026-06-20',
+      precision: Precision.FP4,
+    }),
+  };
+
+  function historyPage() {
+    return assembleOverviewHistoricalPageData(currentRows, baselineRows, window, 50, 'community');
+  }
+
+  it("resolves 'changed' as opt-in and defaults everything else to all rows", () => {
+    expect(resolveOverviewRowScope('changed')).toBe('changed');
+    expect(resolveOverviewRowScope(['changed', 'all'])).toBe('changed');
+    expect(resolveOverviewRowScope('all')).toBe('all');
+    expect(resolveOverviewRowScope('moved')).toBe('all');
+    expect(resolveOverviewRowScope('')).toBe('all');
+    expect(resolveOverviewRowScope(undefined)).toBe('all');
+  });
+
+  it('shows every row by default, so no current cost is hidden without asking', () => {
+    const page = historyPage();
+    const scoped = applyOverviewRowScope(page, OVERVIEW_DEFAULT_ROW_SCOPE);
+
+    expect(OVERVIEW_DEFAULT_ROW_SCOPE).toBe('all');
+    expect(scoped.rowScope).toBe('all');
+    expect(scoped.models).toHaveLength(page.models.length);
+    expect(scoped.unchangedRowCount).toBe(page.models.length - 1);
+  });
+
+  it("keeps only rows with a comparable platform under opt-in scope 'changed'", () => {
+    const page = historyPage();
+    const scoped = applyOverviewRowScope(page, 'changed');
+
+    expect(scoped.rowScope).toBe('changed');
+    expect(scoped.models).toHaveLength(1);
+    expect(scoped.models[0]?.model).toBe(Model.Qwen3_5);
+    expect(scoped.unchangedRowCount).toBe(page.models.length - 1);
+    expect(
+      scoped.models[0]?.platforms.some((p) => p.historicalComparison?.status === 'comparable'),
+    ).toBe(true);
+  });
+
+  it('never drops a row that still prices a platform without a 30-day baseline', () => {
+    const page = historyPage();
+    const dropped = page.models.filter((m) => !overviewRowHasHistoricalChange(m));
+    const stillPriced = dropped.filter((m) => m.platforms.some((p) => p.costPerMtok !== null));
+
+    // The default must keep them; only the opt-in scope may remove them.
+    expect(applyOverviewRowScope(page, 'all').models).toEqual(expect.arrayContaining(stillPriced));
+    for (const summary of stillPriced) {
+      expect(applyOverviewRowScope(page, 'changed').models).not.toContain(summary);
+    }
+  });
+
+  it('filters nothing in hardware mode but still carries the reader’s answer', () => {
+    const page = assembleOverviewPageData(currentRows, 50, 'community');
+    const scoped = applyOverviewRowScope(page, 'changed');
+
+    expect(scoped.models).toHaveLength(page.models.length);
+    // Carried, not cleared: the page rebuilds its own URL from this data, so
+    // clearing it here is what dropped the 30-day filter on a tab switch back.
+    expect(scoped.rowScope).toBe('changed');
+    expect(scoped.unchangedRowCount).toBe(0);
+  });
+
+  it('falls back to the full matrix when no row moved, rather than rendering nothing', () => {
+    const page = assembleOverviewHistoricalPageData({}, {}, window, 50, 'community');
+    const scoped = applyOverviewRowScope(page, 'changed');
+
+    expect(scoped.models).toHaveLength(page.models.length);
+    expect(scoped.rowScope).toBe('all');
+    expect(scoped.unchangedRowCount).toBe(0);
+  });
+});
+
+describe('overview hardware row scope', () => {
+  const window = {
+    key: '30d',
+    snapshotDate: '2026-08-03',
+    targetDate: '2026-07-04',
+    earliestDate: '2026-06-04',
+  } as const;
+  // Only Qwen3.5 posts rows, and only on MI355X. That makes it the row the
+  // filter has to reason about carefully: it prices a platform while the
+  // default B200 reference prices nothing, so it has a cost but no delta.
+  const currentRows = {
+    [Model.Qwen3_5]: frontier([12000, 10000, 8000, 6000], {
+      hardware: 'mi355x',
+      framework: 'sglang',
+      date: '2026-08-01',
+      precision: Precision.FP4,
+    }),
+  };
+
+  function hardwarePage() {
+    return assembleOverviewPageData(currentRows, 50, 'community');
+  }
+
+  it("resolves 'priced' as opt-in and defaults everything else to all rows", () => {
+    expect(resolveOverviewHardwareRowScope('priced')).toBe('priced');
+    expect(resolveOverviewHardwareRowScope(['priced', 'all'])).toBe('priced');
+    expect(resolveOverviewHardwareRowScope('all')).toBe('all');
+    expect(resolveOverviewHardwareRowScope('empty')).toBe('all');
+    expect(resolveOverviewHardwareRowScope('')).toBe('all');
+    expect(resolveOverviewHardwareRowScope(undefined)).toBe('all');
+  });
+
+  it('shows every row by default, so no current cost is hidden without asking', () => {
+    const page = hardwarePage();
+    const scoped = applyOverviewHardwareRowScope(page, OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE);
+
+    expect(OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE).toBe('all');
+    expect(scoped.hardwareRowScope).toBe('all');
+    expect(scoped.models).toHaveLength(page.models.length);
+    expect(scoped.emptyRowCount).toBe(page.models.filter((m) => !overviewRowHasAnyCost(m)).length);
+  });
+
+  it("keeps only rows pricing a platform under opt-in scope 'priced'", () => {
+    const page = hardwarePage();
+    const priced = page.models.filter(overviewRowHasAnyCost);
+    const scoped = applyOverviewHardwareRowScope(page, 'priced');
+
+    expect(priced.length).toBeGreaterThan(0);
+    expect(priced.length).toBeLessThan(page.models.length);
+    expect(scoped.hardwareRowScope).toBe('priced');
+    expect(scoped.models).toEqual(priced);
+    expect(scoped.emptyRowCount).toBe(page.models.length - priced.length);
+  });
+
+  it('keeps a row priced only on a platform the reference never reached', () => {
+    // The tempting predicate — "has a delta against the reference" — would drop
+    // this row, deleting a cost that appears nowhere else, and would hide a
+    // different set of rows for every reference the reader picks.
+    const scoped = applyOverviewHardwareRowScope(hardwarePage(), 'priced');
+    const kept = scoped.models.filter((m) => m.model === Model.Qwen3_5);
+
+    expect(kept.length).toBeGreaterThan(0);
+    expect(kept.some((m) => m.platforms.some((p) => p.costPerMtok !== null))).toBe(true);
+    expect(kept.every((m) => m.platforms.every((p) => p.costVsReferencePct === null))).toBe(true);
+  });
+
+  it('filters nothing in history mode but still carries the reader’s answer', () => {
+    const page = assembleOverviewHistoricalPageData(currentRows, {}, window, 50, 'community');
+    const scoped = applyOverviewHardwareRowScope(page, 'priced');
+
+    expect(scoped.models).toHaveLength(page.models.length);
+    expect(scoped.hardwareRowScope).toBe('priced');
+    expect(scoped.emptyRowCount).toBe(0);
+  });
+
+  it('falls back to the full matrix when no row prices anything', () => {
+    const page = assembleOverviewPageData({}, 50, 'community');
+    const scoped = applyOverviewHardwareRowScope(page, 'priced');
+
+    expect(scoped.models).toHaveLength(page.models.length);
+    expect(scoped.hardwareRowScope).toBe('all');
+    expect(scoped.emptyRowCount).toBe(0);
   });
 });

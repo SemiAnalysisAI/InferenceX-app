@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 import { useAgenticAggregates } from '@/hooks/api/use-agentic-aggregates';
@@ -14,10 +14,12 @@ import {
   useTraceServerMetricSource,
 } from '@/hooks/api/use-trace-server-metrics';
 import { useBenchmarkSiblings } from '@/hooks/api/use-benchmark-siblings';
+import { NudgeEngine } from '@/components/nudge-engine';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
+import { withChartState } from '@/lib/url-state';
 
 import { AggregatesGrid } from './aggregates-grid';
 import { MetricSourceToolbar } from './metric-source-toolbar';
@@ -31,6 +33,7 @@ import {
 } from './phase-slice';
 import { PointSummary } from './point-summary';
 import { RequestMetricOverTime, SequenceMetricCard } from './request-metric-cards';
+import { ServerLogViewer } from './server-log-viewer';
 import {
   CumulativeUniqueInputTokensCard,
   InflightUniqueTokensCard,
@@ -57,6 +60,8 @@ const STRINGS = {
     perPoint: 'Per-point',
     requestTimeline: 'Request timeline',
     aggregatesAcrossConfigs: 'Aggregates across configs',
+    logs: 'Logs',
+    detailView: 'Detail view',
     warmupWord: 'warmup',
     warmupNotePrefix: 'Showing the ',
     warmupNoteBody:
@@ -77,6 +82,8 @@ const STRINGS = {
     perPoint: '单点',
     requestTimeline: '请求时间线',
     aggregatesAcrossConfigs: '跨配置聚合',
+    logs: '日志',
+    detailView: '详情视图',
     warmupWord: 'warmup',
     warmupNotePrefix: '当前显示 ',
     warmupNoteBody:
@@ -95,10 +102,10 @@ interface Props {
   id: number;
 }
 
-type DetailView = 'point' | 'timeline' | 'aggregates';
+type DetailView = 'point' | 'timeline' | 'aggregates' | 'logs';
 
 const isDetailView = (value: string | null): value is DetailView =>
-  value === 'point' || value === 'timeline' || value === 'aggregates';
+  value === 'point' || value === 'timeline' || value === 'aggregates' || value === 'logs';
 
 /** URL-persisted detail view (`?view=`; per-point is the unadorned default). */
 function useDetailView(): [DetailView, (nextView: DetailView) => void] {
@@ -127,12 +134,25 @@ export function AgenticPointDetail({ id }: Props) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const isZh = isZhPathname(pathname);
-  const inferenceHref = isZh ? `${ZH_PREFIX}/inference` : '/inference';
+  const inferenceBaseHref = isZh ? `${ZH_PREFIX}/inference` : '/inference';
+  // Carry the chart state the reader arrived with back to the chart. The link
+  // used to be a bare path, so it could only ever land on the default model
+  // with the default legend, no matter what the reader was looking at.
+  //
+  // Resolved after mount, not during render: `withChartState` reads the
+  // in-memory param store (seeded from this page's own URL at load), which
+  // does not exist on the server — computing it during render would make the
+  // server and client markup disagree.
+  const [inferenceHref, setInferenceHref] = useState(inferenceBaseHref);
+  useEffect(() => {
+    setInferenceHref(withChartState(inferenceBaseHref));
+  }, [inferenceBaseHref]);
   const viewOptions: SegmentedToggleOption<DetailView>[] = useMemo(
     () => [
       { value: 'point', label: t.perPoint, testId: 'detail-view-point' },
       { value: 'timeline', label: t.requestTimeline, testId: 'detail-view-timeline' },
       { value: 'aggregates', label: t.aggregatesAcrossConfigs, testId: 'detail-view-aggregates' },
+      { value: 'logs', label: t.logs, testId: 'detail-view-logs' },
     ],
     [t],
   );
@@ -231,16 +251,27 @@ export function AgenticPointDetail({ id }: Props) {
 
   return (
     <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4 py-6">
+      {/* Points readers at /agentx/telemetry, which explains every chart below.
+          Non-centered, so the card never covers the charts it describes. */}
+      <NudgeEngine scope="agentic-detail" />
+
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => {
+            track('inference_agentic_detail_back_clicked', { id });
+            router.back();
+          }}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" /> {t.back}
         </button>
         <span className="text-sm text-muted-foreground">·</span>
-        <Link href={inferenceHref} className="text-sm text-muted-foreground hover:text-foreground">
+        <Link
+          href={inferenceHref}
+          onClick={() => track('inference_agentic_detail_chart_link_clicked', { id })}
+          className="text-sm text-muted-foreground hover:text-foreground"
+        >
           {t.inferenceChart}
         </Link>
       </div>
@@ -257,25 +288,26 @@ export function AgenticPointDetail({ id }: Props) {
         <div className="text-sm text-muted-foreground">{t.loadingPoint}</div>
       ) : null}
 
-      {metricsQuery.isError && (
+      {view !== 'logs' && metricsQuery.isError && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
           Failed to load trace data for benchmark point #{id}.
         </div>
       )}
-      {metricsQuery.data === null && !metricsQuery.isLoading && (
+      {view !== 'logs' && metricsQuery.data === null && !metricsQuery.isLoading && (
         <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
           No stored trace_replay blob for benchmark point #{id}. This point predates the aiperf
           time-series capture, or its source artifacts have expired on GitHub.
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex min-w-0 items-center justify-between gap-3">
         <SegmentedToggle
           value={view}
           options={viewOptions}
           onValueChange={setView}
-          ariaLabel="Detail view"
+          ariaLabel={t.detailView}
           testId="detail-view-toggle"
+          className="max-w-full overflow-x-auto"
           buttonClassName="px-3 py-1.5 text-sm"
         />
         {view === 'aggregates' && (
@@ -303,7 +335,9 @@ export function AgenticPointDetail({ id }: Props) {
         />
       )}
 
-      {view === 'aggregates' ? (
+      {view === 'logs' ? (
+        <ServerLogViewer id={id} enabled />
+      ) : view === 'aggregates' ? (
         <AggregatesGrid
           siblings={siblingsData?.siblings ?? []}
           aggregates={aggregatesQuery.data}

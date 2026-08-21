@@ -131,26 +131,32 @@ export const METRIC_KEYS = new Set([
   // server_metrics.kv_cache.gpu_usage_pct in v3)
   'gpu_kv_cache_usage_pct',
   // measured power / energy (emitted by runner's aggregate_power.py)
+  // power_valid: numeric 1/0 publication verdict; explicit 0 withholds power
+  // power_metric_schema_version: version 2 defines every unprefixed
+  //                              joules_per_* field as whole-deployment energy
   // avg_power_w:             mean per-GPU draw (W) during the load window
+  // joules_per_successful_query: whole-deployment energy / successful requests
   // joules_per_output_token: energy / total_output_tokens. CLUSTER-WIDE on
-  //                          single-node / non-disagg (total_system_energy);
-  //                          PER-STAGE decode_energy on disagg (decode GPUs only),
-  //                          symmetric with joules_per_input_token below.
+  //                          schema-version-2 rows, including disaggregated runs.
   // joules_per_total_token:  total_system_energy / (total_input + total_output)
   //                          — cluster-wide; workload-shape-fair view that
   //                          doesn't treat prompt as free.
+  'power_valid',
+  'power_metric_schema_version',
   'avg_power_w',
+  'joules_per_successful_query',
   'joules_per_output_token',
   'joules_per_total_token',
   // multinode / disagg role splits (emitted only when the deployment has
   // distinct prefill / decode workers)
   // prefill_avg_power_w / decode_avg_power_w:  mean per-GPU draw within each role
-  // joules_per_input_token:  prefill_energy / total_input_tokens (prefill GPUs only).
-  //   The disagg output counterpart is joules_per_output_token above (decode GPUs
-  //   only) — there is no separate _decode key.
+  // Explicit role-local energy remains separate from the version-2 unprefixed
+  // whole-deployment fields.
   'prefill_avg_power_w',
   'decode_avg_power_w',
   'joules_per_input_token',
+  'prefill_joules_per_input_token',
+  'decode_joules_per_output_token',
   // cluster-wide GPU telemetry beyond power (emitted by aggregate_power.py when
   // the perfmon CSVs include temperature, utilization, or memory samples).
   // avg_temp_c:        mean per-GPU temperature (Celsius) during load window
@@ -171,6 +177,10 @@ export const METRIC_KEYS = new Set([
   // (rowToAggDataEntry in benchmark-transform.ts).
   'prefill_pp',
   'decode_pp',
+  // Aggregate artifacts emit one context-parallel width, while disaggregated
+  // artifacts may emit a separate value for each role.
+  'dcp_size',
+  'pcp_size',
   'prefill_dcp_size',
   'decode_dcp_size',
   'prefill_pcp_size',

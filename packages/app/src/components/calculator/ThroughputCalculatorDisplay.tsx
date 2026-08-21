@@ -3,8 +3,15 @@
 import { track } from '@/lib/analytics';
 import Link from 'next/link';
 import { BarChart3, Table2 } from 'lucide-react';
+import { useFeatureGate } from '@/lib/use-feature-gate';
 import { useLocale } from '@/lib/use-locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import {
+  HW_REGISTRY,
+  TCO_SOURCE_TITLE,
+  TCO_SOURCE_URL,
+} from '@semianalysisai/inferencex-constants';
 
 import CalculatorTable from '@/components/calculator/CalculatorTable';
 import FleetPlanner from '@/components/calculator/FleetPlanner';
@@ -41,7 +48,6 @@ import {
   getPrecisionLabel,
   getSequenceLabel,
 } from '@/lib/data-mappings';
-import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
@@ -125,7 +131,7 @@ const STRINGS = {
       'The interactivity operating point used for interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency at different interactivity levels.',
     targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
-      `The ${percentile} interactivity operating point used for agentic trace interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency.`,
+      `The ${percentile} interactivity operating point used for agentic workload interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency.`,
     metricThroughput: 'Throughput',
     metricCost: 'Cost',
     viewChart: 'Chart',
@@ -177,7 +183,7 @@ const STRINGS = {
       '用于插值的交互性操作点。调整滑块以比较不同交互性级别下 Chip 的吞吐量、成本和能效。',
     targetAgenticLabel: (percentile: string) => `目标 ${percentile} 交互性 (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
-      `用于智能体轨迹插值的 ${percentile} 交互性操作点。调整滑块以比较 Chip 的吞吐量、成本和能效。`,
+      `用于智能体工作负载插值的 ${percentile} 交互性操作点。调整滑块以比较 Chip 的吞吐量、成本和能效。`,
     metricThroughput: '吞吐量',
     metricCost: '成本',
     viewChart: '图表',
@@ -354,6 +360,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   );
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
+  // AgentX publishes on P90, so the percentile control is an insider affordance
+  // rather than a normal filter: it stays behind the ↑↑↓↓ feature gate, matching
+  // the inference chart, and the calculator defaults to P90 without it.
+  const featureGateUnlocked = useFeatureGate();
   const percentileLabel = selectedPercentile.toUpperCase();
 
   /**
@@ -866,7 +876,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   onOpenChange={handleDropdownOpenChange('sequence')}
                   availableSequences={availableSequences}
                 />
-                {isAgenticSequence && (
+                {isAgenticSequence && featureGateUnlocked && (
                   <PercentileSelector
                     id="calc-percentile"
                     data-testid="calc-percentile-selector"
@@ -980,15 +990,35 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
               {/* Target value slider + input */}
               {!loading && hasAnyData && (
                 <div className="space-y-2">
-                  <LabelWithTooltip
-                    htmlFor="calc-target"
-                    label={
-                      isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
-                    }
-                    tooltip={
-                      isAgenticSequence ? t.targetAgenticTooltip(percentileLabel) : t.targetTooltip
-                    }
-                  />
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <LabelWithTooltip
+                      htmlFor="calc-target"
+                      label={
+                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                      }
+                      tooltip={
+                        isAgenticSequence
+                          ? t.targetAgenticTooltip(percentileLabel)
+                          : t.targetTooltip
+                      }
+                    />
+                    <div
+                      className="flex items-center gap-2"
+                      data-testid="calculator-hide-over-limit-control"
+                    >
+                      <LabelWithTooltip
+                        htmlFor="calc-hide-over-limit"
+                        label={t.hideSkuAboveConfigLimitLabel}
+                        tooltip={t.hideSkuAboveConfigLimitHelp}
+                      />
+                      <Switch
+                        id="calc-hide-over-limit"
+                        checked={hideSkuAboveConfigLimit}
+                        onCheckedChange={handleHideSkuAboveLimitChange}
+                        className="shrink-0"
+                      />
+                    </div>
+                  </div>
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
                       <input
@@ -1033,19 +1063,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                       onBlur={handleInputBlur}
                       className="w-24 h-9"
                       min={0}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-3 pt-1">
-                    <LabelWithTooltip
-                      htmlFor="calc-hide-over-limit"
-                      label={t.hideSkuAboveConfigLimitLabel}
-                      tooltip={t.hideSkuAboveConfigLimitHelp}
-                    />
-                    <Switch
-                      id="calc-hide-over-limit"
-                      checked={hideSkuAboveConfigLimit}
-                      onCheckedChange={handleHideSkuAboveLimitChange}
-                      className="shrink-0"
                     />
                   </div>
                 </div>
@@ -1180,9 +1197,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                               <Link
                                 target="_blank"
                                 className="underline hover:text-foreground"
-                                href="https://semianalysis.com/ai-cloud-tco-model/"
+                                href={TCO_SOURCE_URL}
                               >
-                                SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
+                                {TCO_SOURCE_TITLE}
                                 <ExternalLinkIcon />
                               </Link>
                             </small>

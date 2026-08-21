@@ -24,6 +24,11 @@ import {
   hardwareKeyMatchesAnyBase,
 } from '@/lib/constants';
 import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmark-transform';
+import {
+  benchmarkCurveDate,
+  dedupeAgenticHistoryRuns,
+  dedupeRowsToLatestPerConfig as dedupeLatestBenchmarkSeries,
+} from '@/lib/benchmark-run-selection';
 import { Sequence, type Model } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
 import { overviewServingSeriesKey, type OverviewServingSeriesRow } from '@/lib/overview-data';
@@ -120,9 +125,9 @@ export function flipRooflineDirection(dir: RooflineDirection): RooflineDirection
  * Roofline corner for a trace-derived x-axis mode. Derived modes render on the
  * e2e chart definition, whose corners assume lower-x-is-better; when the
  * derived metric is higher-is-better (E2E Normalized Interactivity) the corner mirrors
- * horizontally. This keeps the y-metric's own good direction — throughput
- * lands on an upper corner, cost and joules on a lower one — where hardcoding
- * a single corner inverted the frontier for the cost metrics.
+ * horizontally. This keeps the y-metric's own good direction — throughput and
+ * tokens-per-dollar purchasing power land on an upper corner, while cost and
+ * joules land on a lower one.
  */
 export function derivedModeRoofline(
   configuredE2eCorner: RooflineDirection | undefined,
@@ -159,32 +164,40 @@ interface DedupeRow {
   disagg: boolean;
   precision: string;
   offload_mode?: string | null;
+  benchmark_type?: string;
   date: string;
+  workflow_run_id?: number;
+  run_started_at?: string | null;
 }
 
 // offload_mode normalized `?? 'off'` to match the SQL layer's getBenchmarksForRun
 // lineKey — agentic offload=on and offload=off are distinct series.
-const dedupeSeriesKey = (r: DedupeRow): string =>
-  `${r.hardware}|${r.framework}|${r.spec_method}|${r.disagg}|${r.precision}|${r.offload_mode ?? 'off'}`;
-
 /**
- * For each series — (hardware, framework, spec_method, disagg, precision,
- * offload_mode) — keep only the rows from that series' most recent date. When
- * parallelism settings change between runs, old config_ids create stale points
- * under the same legend line; dropping all-but-latest removes them.
- *
- * Without `offload_mode` in the key, an offload=on sweep ingested on a LATER date
- * than the offload=off sweep would win the shared group and silently drop the
- * (earlier-dated) offload=off variant — a data-loss regression.
+ * Keep only the newest workflow run for each chart series. Agentic series omit
+ * point-level spec decoding from their curve identity; fixed-sequence series do not.
  */
 export function dedupeRowsToLatestPerConfig<T extends DedupeRow>(rows: T[]): T[] {
-  const maxDatePerGroup = new Map<string, string>();
-  for (const r of rows) {
-    const k = dedupeSeriesKey(r);
-    const cur = maxDatePerGroup.get(k);
-    if (!cur || r.date > cur) maxDatePerGroup.set(k, r.date);
+  return dedupeLatestBenchmarkSeries(rows);
+}
+
+/**
+ * Coarse filters that apply to every y-axis metric: the explicit GPU picks, the
+ * vendor / deployment / spec quick-filter pills, and the two-GPU compare scope.
+ * Deliberately excludes the y-metric coverage filter, so the result is the set
+ * of configs the user could have selected regardless of which axis is drawn.
+ */
+export function applyScopeFilters(
+  points: InferenceData[],
+  selectedGPUs: string[],
+  quickFilters: QuickFilters,
+  compareGpuPair?: readonly [string, string] | null,
+): InferenceData[] {
+  let scoped = filterByGPU(points, selectedGPUs, GPU_ALIAS_TO_CANONICAL);
+  scoped = applyQuickFilters(scoped, quickFilters);
+  if (compareGpuPair) {
+    scoped = scoped.filter((d) => hardwareKeyMatchesAnyBase(String(d.hwKey), compareGpuPair));
   }
-  return rows.filter((r) => r.date === maxDatePerGroup.get(dedupeSeriesKey(r)));
+  return scoped;
 }
 
 export function useChartData(
@@ -329,16 +342,25 @@ export function useChartData(
     // an offload=on sweep can't hide a differently-dated offload=off series.
     const deduped = dedupeRowsToLatestPerConfig(seqFiltered);
 
-    const mainRows = deduped.map((r) =>
-      selectedRunDate ? { ...r, date: selectedRunDate, actualDate: r.date } : r,
-    );
+    const mainRows = deduped.map((r) => ({
+      ...r,
+      date: selectedRunDate ?? benchmarkCurveDate(r),
+      actualDate: r.date,
+    }));
     if (comparisonDates.length === 0) return mainRows;
-    const extraRows = comparisonQueries.flatMap((q, i) =>
-      filterOverviewHistoryRows(
+    const extraRows = comparisonQueries.flatMap((q, i) => {
+      const filtered = filterOverviewHistoryRows(
         (q.data ?? []).filter(seqFilter),
         overviewHistoryPair?.baselineConfigKey,
-      ).map((r) => ({ ...r, date: comparisonDates[i], actualDate: r.date })),
-    );
+      );
+      const selected =
+        selectedSequence === Sequence.AgenticTraces ? dedupeAgenticHistoryRuns(filtered) : filtered;
+      return selected.map((r) => ({
+        ...r,
+        date: comparisonDates[i],
+        actualDate: r.date,
+      }));
+    });
     return [...mainRows, ...extraRows];
   }, [
     allRows,
@@ -353,7 +375,10 @@ export function useChartData(
   // Transform filtered rows into chart data
   const { chartData, hardwareConfig: rawHardwareConfig } = useMemo(() => {
     if (rows.length === 0)
-      return { chartData: [] as InferenceData[][], hardwareConfig: {} as HardwareConfig };
+      return {
+        chartData: [] as InferenceData[][],
+        hardwareConfig: {} as HardwareConfig,
+      };
     return transformBenchmarkRows(rows, selectedPercentile);
   }, [rows, selectedPercentile]);
 
@@ -506,7 +531,10 @@ export function useChartData(
     if (chartData.length === 0) return [];
 
     let dataSource: InferenceData[][] = chartData;
-    if (selectedYAxisMetric === 'y_costUser' && userCosts) {
+    if (
+      (selectedYAxisMetric === 'y_costUser' || selectedYAxisMetric === 'y_tokensPerDollarUser') &&
+      userCosts
+    ) {
       dataSource = chartData.map((d) => calculateCostsForGpus(d, userCosts));
     }
     if (selectedYAxisMetric === 'y_powerUser' && userPowers) {
@@ -515,20 +543,15 @@ export function useChartData(
 
     const result = stableChartDefinitions.map(
       ({ chartDefinition, metricKey, xAxisField }, index) => {
-        let filteredData = dataSource[index] || [];
-
-        // Filter by selected GPUs if any
-        filteredData = filterByGPU(filteredData, selectedGPUs, GPU_ALIAS_TO_CANONICAL);
-
-        // Quick filters (vendor / deployment / mtp-stp) — coarse pre-filter that
-        // also prunes the legend and rooflines since they derive from this set.
-        filteredData = applyQuickFilters(filteredData, quickFilters);
-
-        if (compareGpuPair) {
-          filteredData = filteredData.filter((d) =>
-            hardwareKeyMatchesAnyBase(String(d.hwKey), compareGpuPair),
-          );
-        }
+        // Quick filters (vendor / deployment / mtp-stp) are part of this coarse
+        // pre-filter, which also prunes the legend and rooflines since they
+        // derive from this set.
+        const filteredData = applyScopeFilters(
+          dataSource[index] || [],
+          selectedGPUs,
+          quickFilters,
+          compareGpuPair,
+        );
 
         // Filter to points that have the selected metric, then remap x/y.
         // Intentional cost/TTFT outliers are partitioned only after this step
@@ -589,5 +612,24 @@ export function useChartData(
     quickFilters,
   ]);
 
-  return { graphs, loading, error, hardwareConfig, availableQuickFilters };
+  // Points that pass every scope filter but NOT the y-metric coverage filter.
+  // The legend's active set must be reconciled against these, never against
+  // `graphs`: reconcileActiveSet intersects the user's selection with the set
+  // it is handed and never re-widens, so reconciling against metric-filtered
+  // data permanently deletes every config without telemetry for the selected
+  // axis (the Measured Energy axes) the moment that axis is picked. Both chart
+  // definitions are built from the same rows, so index 0 carries every hw key.
+  const selectionPoints = useMemo(
+    () => applyScopeFilters(chartData[0] ?? [], selectedGPUs, quickFilters, compareGpuPair),
+    [chartData, selectedGPUs, quickFilters, compareGpuPair],
+  );
+
+  return {
+    graphs,
+    selectionPoints,
+    loading,
+    error,
+    hardwareConfig,
+    availableQuickFilters,
+  };
 }

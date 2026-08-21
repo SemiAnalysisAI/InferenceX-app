@@ -1,7 +1,10 @@
+import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
+
 import {
   availability as agenticAvailability,
   b300Rows as agenticB300Rows,
 } from '../support/overlay-fixtures';
+import { unlockAgenticGate } from '../support/e2e';
 
 describe('TCO Calculator', () => {
   // ---------------------------------------------------------------------------
@@ -150,6 +153,19 @@ describe('TCO Calculator', () => {
       });
     });
 
+    it('places the config-range toggle beside its label above the slider', () => {
+      cy.get('[data-testid="calculator-hide-over-limit-control"]').then(($control) => {
+        const label = $control.children().first()[0].getBoundingClientRect();
+        const toggle = $control.find('button[role="switch"]')[0].getBoundingClientRect();
+        const slider = $control
+          .closest('[data-testid="calculator-controls"]')
+          .find('input[type="range"]')[0]
+          .getBoundingClientRect();
+        expect(toggle.left - label.right).to.be.lessThan(12);
+        expect(toggle.bottom).to.be.lessThan(slider.top);
+      });
+    });
+
     it('does not show badges when throughput metric is selected', () => {
       cy.get('[data-testid="calculator-cost-badges"]').should('not.exist');
     });
@@ -203,6 +219,9 @@ describe('TCO Calculator', () => {
     it('shows TCO badges when cost metric is selected', () => {
       cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'TCO $/chip/hr');
       cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', '$');
+      cy.get('[data-testid="calculator-chart-section"]')
+        .contains('a', TCO_SOURCE_TITLE)
+        .should('have.attr', 'href', TCO_SOURCE_URL);
     });
 
     it('displays chart title that updates when metric changes', () => {
@@ -601,13 +620,16 @@ describe('TCO Calculator', () => {
       cy.visit('/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          // The percentile control sits behind the ↑↑↓↓ gate; unlock it so the
+          // specs below can still exercise switching to P75.
+          unlockAgenticGate(win);
         },
       });
       cy.wait('@agenticBenchmarks');
     });
 
     it('renders throughput and cost calculations from null-ISL/OSL agentic rows', () => {
-      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic Traces');
+      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic');
       cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
       cy.get('[data-testid="calculator-no-data"]').should('not.exist');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
@@ -650,6 +672,29 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
         .should('contain.text', 'P75 Interactivity');
+    });
+
+    // AgentX publishes on P90, so the percentile control is insider-only. With
+    // the gate locked it must not render at all, and the calculator must still
+    // compute on P90.
+    it('hides the percentile selector behind the feature gate and defaults to P90', () => {
+      cy.visit('/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          win.localStorage.removeItem('inferencex-feature-gate');
+        },
+      });
+      cy.wait('@agenticBenchmarks');
+
+      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic');
+      cy.get('[data-testid="calc-percentile-selector"]').should('not.exist');
+      cy.get('[data-testid="calculator-chart-section"] h2')
+        .first()
+        .should('contain.text', 'P90 Interactivity');
+      cy.get('[data-testid="calculator-controls"]').should(
+        'contain.text',
+        'Target P90 Interactivity',
+      );
     });
   });
 
@@ -702,6 +747,9 @@ describe('TCO Calculator', () => {
         'contain.text',
         'SemiAnalysis Datacenter Industry Model',
       );
+      cy.get('[data-testid="calculator-fleet-section"]')
+        .contains('a', TCO_SOURCE_TITLE)
+        .should('have.attr', 'href', TCO_SOURCE_URL);
     });
 
     it('entering a generous cost target renders reachable interactivity per GPU', () => {

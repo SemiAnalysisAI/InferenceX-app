@@ -394,7 +394,7 @@ export default function HistoricalTrendsDisplay() {
                       },
                     ]}
                     actions={
-                      activeHwTypes.size < hwTypesWithData.size
+                      [...hwTypesWithData].some((key) => !activeHwTypes.has(key))
                         ? [
                             {
                               id: 'historical-reset-filter',

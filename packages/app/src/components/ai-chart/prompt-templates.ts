@@ -71,7 +71,7 @@ Pick the chart type that best matches the user's intent. Be flexible — interpr
 - **bar** — Horizontal bar chart. Compares one metric across GPU configs at a fixed interactivity point. Best for rankings, comparisons, "which is best". DEFAULT.
 - **scatter** — XY scatter plot (x=interactivity, y=metric). Shows all data points. Good for trade-off analysis, pareto frontiers.
 - **line** — Connected lines (x=interactivity, y=metric), one line per GPU config. Good for seeing how performance changes with load, comparing curves.
-- **radar** — Spider/radar chart. Compares GPUs across MULTIPLE metrics simultaneously on normalized axes. Set radarMetrics to choose which metrics are axes (pick 3-6 that are relevant). Cost/energy metrics are auto-inverted (lower=better=further out).
+- **radar** — Spider/radar chart. Compares GPUs across MULTIPLE metrics simultaneously on normalized axes. Set radarMetrics to choose which metrics are axes (pick 3-6 that are relevant). Metric direction comes from the dashboard definition, so lower-is-better metrics render better values farther out.
 
 ## Filtering
 
@@ -82,12 +82,12 @@ Pick the chart type that best matches the user's intent. Be flexible — interpr
 
 ## Sorting & Sampling
 
-- **sortOrder** ("registry"): Sort order for bar charts. "desc" = highest value first, "asc" = lowest first, "registry" = default GPU registry order. Use "desc" when user asks for "best" or "rank by".
+- **sortOrder** ("registry"): Sort order for bar charts. "desc" = highest value first, "asc" = lowest first, "registry" = default GPU registry order. When the user asks for "best" or "rank by", use "asc" for lower-is-better metrics such as cost/energy/power and "desc" for higher-is-better metrics such as throughput.
 - **targetInteractivity** (40): The interactivity level (tok/s/user) to sample at for bar charts. Adjust if user specifies a concurrency level.
 
 ## Top-N
 
-- **topN** (null): "top 3 GPUs" → topN: 3. Ranks ALL configs by peak metric value after data loads. Don't guess — let data decide.
+- **topN** (null): "top 3 GPUs" → topN: 3. Ranks ALL configs by their best observed value in the metric's dashboard-defined direction after data loads (minimum for lower-is-better; maximum for higher-is-better). Don't guess — let data decide.
 - **topNDistinctGpus** (true): When true, topN picks the best config from each unique GPU family (so "top 2 GPUs" = 2 different GPU types). Set false when user says "top N configs" or "top N combos" (may return same GPU with different frameworks).
 
 ## Multi-Chart

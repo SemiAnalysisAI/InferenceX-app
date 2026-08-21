@@ -22,9 +22,10 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
     // Use distinct hardware so the engine-comparison exclusion policy does
     // not resolve the official and unofficial rows as one competing family.
     interceptOverlayRun({ overlayHardware: 'h100' });
-    // The agentic default mode is E2E Normalized Interactivity (which suppresses overlays and
-    // fetches derived metrics) — stub the fetch, then switch to Interactivity
-    // where the overlay renders.
+    // Agentic charts default to Interactivity, where the overlay renders. The
+    // derived-metrics fetch now happens only under E2E Normalized Interactivity,
+    // so the stub below is a guard against a stray request rather than a
+    // dependency of this suite.
     interceptDerivedAgenticMetrics();
     cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90`, {
       onBeforeLoad(win) {
@@ -33,12 +34,26 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
       },
     });
     cy.wait('@unofficialRun');
-    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
+    // Every x-axis metric is a top-level tab on agentic charts, and Interactivity
+    // is the default — clicked anyway so the suite does not depend on that.
+    cy.get('[data-testid="x-axis-mode-interactivity"]')
+      .click()
+      .should('have.attr', 'data-state', 'active');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'have.length',
       REAL_CONFIGS.length,
     );
+  });
+
+  // Cypress clears intercepts between tests, so the derived-metrics stub is
+  // re-registered per test rather than once in `before`. Until #736 the
+  // agentic default was E2E Normalized Interactivity, so the fetch happened
+  // during `before` while the stub was still alive and React Query held the
+  // result for the rest of the spec. The default no longer fetches, so any
+  // later switch into that mode issues a fresh request.
+  beforeEach(() => {
+    interceptDerivedAgenticMetrics();
   });
 
   it('shows official points and an official legend entry initially', () => {
@@ -67,17 +82,40 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
     cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
       expect(countVisible($dots), 'visible official points after remove').to.eq(0);
     });
-    // The overlay series is untouched. Optimal Only still hides its trace-less
-    // points because unofficial rows cannot join the canonical frontier.
+    // The overlay series is untouched — hiding an official SKU must not disturb
+    // it. All five overlay points stay visible under Optimal Only: they are
+    // non-dominated on the interactivity axes, and since #736 lacking persisted
+    // traces no longer excludes them from the frontier.
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(($pts) => {
-      expect(countVisible($pts), 'visible overlay X markers').to.eq(0);
+      expect(countVisible($pts), 'visible overlay X markers').to.eq(REAL_CONFIGS.length);
     });
     // Inactive row: the hover affordance flips to the "+" restore indicator
     // (explicit "clicking the name brings it back"), and the Hide X is gone.
     cy.get('[data-testid="chart-legend"] [title^="Show B300"]').should('exist');
+    cy.get('[data-testid="scatter-best-per-sku"]').should('have.attr', 'data-state', 'unchecked');
     cy.get(
       '[data-testid="chart-legend"] [role="button"][aria-label^="Hide"][aria-label*="B300"]',
     ).should('not.exist');
+  });
+
+  it('keeps the official SKU hidden when chart metrics change', () => {
+    cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+    cy.contains('[role="option"]', 'Cost per Million Total Tokens (Owning - Hyperscaler)').click({
+      force: true,
+    });
+
+    cy.get('[data-testid="chart-legend"] [title^="Show B300"]').should('exist');
+    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
+      expect(countVisible($dots), 'visible official points after Y-axis change').to.eq(0);
+    });
+
+    cy.get('[data-testid="x-axis-mode-ttft"]').click().should('have.attr', 'data-state', 'active');
+    cy.get('[data-testid="chart-legend"] [title^="Show B300"]').should('exist');
+    cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(($pts) => {
+      expect(countVisible($pts), 'visible overlay points after metric changes').to.be.greaterThan(
+        0,
+      );
+    });
   });
 
   it('re-activating the SKU from the legend restores the official points', () => {

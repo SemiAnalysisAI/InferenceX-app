@@ -4,7 +4,7 @@
  * They do NOT import Node.js-specific modules (fs, path) or build-time dependencies.
  */
 
-import { resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
+import { resolveFrameworkAlias, USD_TO_CNY } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 
 import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
@@ -180,6 +180,24 @@ export const Y_AXIS_METRICS = [
   'y_costhi',
   'y_costni',
   'y_costri',
+  'y_tokensPerDollarH',
+  'y_tokensPerDollarN',
+  'y_tokensPerDollarR',
+  'y_outputTokensPerDollarH',
+  'y_outputTokensPerDollarN',
+  'y_outputTokensPerDollarR',
+  'y_inputTokensPerDollarH',
+  'y_inputTokensPerDollarN',
+  'y_inputTokensPerDollarR',
+  'y_tokensPerRmbH',
+  'y_tokensPerRmbN',
+  'y_tokensPerRmbR',
+  'y_outputTokensPerRmbH',
+  'y_outputTokensPerRmbN',
+  'y_outputTokensPerRmbR',
+  'y_inputTokensPerRmbH',
+  'y_inputTokensPerRmbN',
+  'y_inputTokensPerRmbR',
   'y_jTotal',
   'y_jOutput',
   'y_jInput',
@@ -191,12 +209,20 @@ export const Y_AXIS_METRICS = [
   'y_measuredJPerOutputToken',
   'y_measuredJPerTotalToken',
   'y_measuredJPerInputToken',
+  'y_measuredJPerSuccessfulQuery',
+  'y_measuredWhPerSuccessfulQuery',
+  'y_measuredPowerPercentTdp',
 ] as const;
 
 export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
 
 /**
- * Determines the correct hardware key based on the hardware name and MTP status.
+ * Determines the chart-series hardware key.
+ *
+ * Fixed-sequence curves keep speculative decoding in their identity. Agentic
+ * curves deliberately do not: one production curve may choose a speculative
+ * method for some load points and standard decoding for others. The point
+ * still carries `spec_decoding` for filters, tooltips, and point-level keys.
  */
 export const getHardwareKey = (entry: AggDataEntry): string => {
   let normalizedHwName = entry.hw.split('-')[0];
@@ -215,10 +241,12 @@ export const getHardwareKey = (entry: AggDataEntry): string => {
       normalizedHwName = candidateDirect;
     }
   }
-  if (entry.mtp === 'on' || entry['spec_decoding'] === 'mtp') {
-    normalizedHwName = `${normalizedHwName}_mtp`;
-  } else if (entry['spec_decoding'] && entry['spec_decoding'] !== 'none') {
-    normalizedHwName = `${normalizedHwName}_${entry['spec_decoding']}`;
+  if (entry.benchmark_type !== 'agentic_traces') {
+    if (entry.mtp === 'on' || entry['spec_decoding'] === 'mtp') {
+      normalizedHwName = `${normalizedHwName}_mtp`;
+    } else if (entry['spec_decoding'] && entry['spec_decoding'] !== 'none') {
+      normalizedHwName = `${normalizedHwName}_${entry['spec_decoding']}`;
+    }
   }
   return normalizedHwName;
 };
@@ -270,6 +298,7 @@ export function buildAvailabilityHwKey(
   framework?: string,
   specMethod?: string,
   disagg?: boolean,
+  benchmarkType?: string,
 ): string {
   let hwKey = hardware.split('-')[0];
   const fw = framework ? resolveFrameworkAlias(framework) : undefined;
@@ -285,8 +314,10 @@ export function buildAvailabilityHwKey(
       hwKey = candidateDirect;
     }
   }
-  if (specMethod === 'mtp') hwKey = `${hwKey}_mtp`;
-  else if (specMethod && specMethod !== 'none') hwKey = `${hwKey}_${specMethod}`;
+  if (benchmarkType !== 'agentic_traces') {
+    if (specMethod === 'mtp') hwKey = `${hwKey}_mtp`;
+    else if (specMethod && specMethod !== 'none') hwKey = `${hwKey}_${specMethod}`;
+  }
   return hwKey;
 }
 
@@ -310,9 +341,12 @@ export function createChartDataPoint(
   const outputTputPerGpu = entry.output_tput_per_gpu ?? 0;
   const inputTputPerGpu = entry.input_tput_per_gpu ?? 0;
 
-  const tokensPerHour = (tputPerGpu * 3600) / 1000000;
-  const outputTokensPerHour = (outputTputPerGpu * 3600) / 1000000;
-  const inputTokensPerHour = (inputTputPerGpu * 3600) / 1000000;
+  const tokensPerHour = tputPerGpu * 3600;
+  const outputTokensPerHour = outputTputPerGpu * 3600;
+  const inputTokensPerHour = inputTputPerGpu * 3600;
+  const millionTokensPerHour = tokensPerHour / 1_000_000;
+  const millionOutputTokensPerHour = outputTokensPerHour / 1_000_000;
+  const millionInputTokensPerHour = inputTokensPerHour / 1_000_000;
 
   return {
     // Spread all AggDataEntry fields (raw stats, metadata, etc.)
@@ -376,45 +410,121 @@ export function createChartDataPoint(
         }
       : {}),
 
-    // Cost fields (combined throughput)
+    // Cost per million tokens (combined throughput).
     costh: {
-      y: hardwarePower && tokensPerHour ? specs.costh / tokensPerHour : 0,
+      y: hardwarePower && millionTokensPerHour ? specs.costh / millionTokensPerHour : 0,
       roof: false,
     },
     costn: {
-      y: hardwarePower && tokensPerHour ? specs.costn / tokensPerHour : 0,
+      y: hardwarePower && millionTokensPerHour ? specs.costn / millionTokensPerHour : 0,
       roof: false,
     },
     costr: {
-      y: hardwarePower && tokensPerHour ? specs.costr / tokensPerHour : 0,
+      y: hardwarePower && millionTokensPerHour ? specs.costr / millionTokensPerHour : 0,
       roof: false,
     },
 
-    // Cost per million output tokens
+    // Cost per million output tokens.
     costhOutput: {
-      y: hardwarePower && outputTokensPerHour ? specs.costh / outputTokensPerHour : 0,
+      y: hardwarePower && millionOutputTokensPerHour ? specs.costh / millionOutputTokensPerHour : 0,
       roof: false,
     },
     costnOutput: {
-      y: hardwarePower && outputTokensPerHour ? specs.costn / outputTokensPerHour : 0,
+      y: hardwarePower && millionOutputTokensPerHour ? specs.costn / millionOutputTokensPerHour : 0,
       roof: false,
     },
     costrOutput: {
-      y: hardwarePower && outputTokensPerHour ? specs.costr / outputTokensPerHour : 0,
+      y: hardwarePower && millionOutputTokensPerHour ? specs.costr / millionOutputTokensPerHour : 0,
       roof: false,
     },
 
-    // Cost per million input tokens
+    // Cost per million input tokens.
     costhi: {
-      y: hardwarePower && inputTokensPerHour ? specs.costh / inputTokensPerHour : 0,
+      y: hardwarePower && millionInputTokensPerHour ? specs.costh / millionInputTokensPerHour : 0,
       roof: false,
     },
     costni: {
-      y: hardwarePower && inputTokensPerHour ? specs.costn / inputTokensPerHour : 0,
+      y: hardwarePower && millionInputTokensPerHour ? specs.costn / millionInputTokensPerHour : 0,
       roof: false,
     },
     costri: {
-      y: hardwarePower && inputTokensPerHour ? specs.costr / inputTokensPerHour : 0,
+      y: hardwarePower && millionInputTokensPerHour ? specs.costr / millionInputTokensPerHour : 0,
+      roof: false,
+    },
+
+    // Tokens purchasable per $1 (total / output / input).
+    tokensPerDollarH: {
+      y: specs.costh ? tokensPerHour / specs.costh : 0,
+      roof: false,
+    },
+    tokensPerDollarN: {
+      y: specs.costn ? tokensPerHour / specs.costn : 0,
+      roof: false,
+    },
+    tokensPerDollarR: {
+      y: specs.costr ? tokensPerHour / specs.costr : 0,
+      roof: false,
+    },
+    outputTokensPerDollarH: {
+      y: specs.costh ? outputTokensPerHour / specs.costh : 0,
+      roof: false,
+    },
+    outputTokensPerDollarN: {
+      y: specs.costn ? outputTokensPerHour / specs.costn : 0,
+      roof: false,
+    },
+    outputTokensPerDollarR: {
+      y: specs.costr ? outputTokensPerHour / specs.costr : 0,
+      roof: false,
+    },
+    inputTokensPerDollarH: {
+      y: specs.costh ? inputTokensPerHour / specs.costh : 0,
+      roof: false,
+    },
+    inputTokensPerDollarN: {
+      y: specs.costn ? inputTokensPerHour / specs.costn : 0,
+      roof: false,
+    },
+    inputTokensPerDollarR: {
+      y: specs.costr ? inputTokensPerHour / specs.costr : 0,
+      roof: false,
+    },
+
+    // Same quantities priced in ¥ at the pinned USD_TO_CNY rate.
+    tokensPerRmbH: {
+      y: specs.costh ? tokensPerHour / (specs.costh * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    tokensPerRmbN: {
+      y: specs.costn ? tokensPerHour / (specs.costn * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    tokensPerRmbR: {
+      y: specs.costr ? tokensPerHour / (specs.costr * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    outputTokensPerRmbH: {
+      y: specs.costh ? outputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    outputTokensPerRmbN: {
+      y: specs.costn ? outputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    outputTokensPerRmbR: {
+      y: specs.costr ? outputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    inputTokensPerRmbH: {
+      y: specs.costh ? inputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    inputTokensPerRmbN: {
+      y: specs.costn ? inputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
+      roof: false,
+    },
+    inputTokensPerRmbR: {
+      y: specs.costr ? inputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
       roof: false,
     },
 
@@ -441,26 +551,59 @@ export function createChartDataPoint(
         }
       : {}),
 
-    // Measured power / energy from runner's aggregate_power.py. Gated on the
-    // raw fields existing so points from runs predating the measurement land
-    // without these keys and the chart correctly filters them out.
+    ...buildMeasuredPowerChartFields(entry, specs.tdp),
+  };
+}
+
+type MeasuredPowerChartFields = Partial<
+  Pick<
+    InferenceData,
+    | 'measuredAvgPower'
+    | 'measuredPrefillAvgPower'
+    | 'measuredDecodeAvgPower'
+    | 'measuredJPerOutputToken'
+    | 'measuredJPerTotalToken'
+    | 'measuredJPerInputToken'
+    | 'measuredJPerSuccessfulQuery'
+    | 'measuredWhPerSuccessfulQuery'
+    | 'measuredPowerPercentTdp'
+  >
+>;
+
+const measuredMetric = (y: number): { y: number; roof: boolean } => ({ y, roof: false });
+
+/** Build the measured fields shared by scatter points and historical trends. */
+export function buildMeasuredPowerChartFields(
+  entry: AggDataEntry,
+  tdpWatts: number,
+): MeasuredPowerChartFields {
+  return {
     ...(typeof entry.avg_power_w === 'number'
-      ? { measuredAvgPower: { y: entry.avg_power_w, roof: false } }
+      ? { measuredAvgPower: measuredMetric(entry.avg_power_w) }
       : {}),
     ...(typeof entry.prefill_avg_power_w === 'number'
-      ? { measuredPrefillAvgPower: { y: entry.prefill_avg_power_w, roof: false } }
+      ? { measuredPrefillAvgPower: measuredMetric(entry.prefill_avg_power_w) }
       : {}),
     ...(typeof entry.decode_avg_power_w === 'number'
-      ? { measuredDecodeAvgPower: { y: entry.decode_avg_power_w, roof: false } }
+      ? { measuredDecodeAvgPower: measuredMetric(entry.decode_avg_power_w) }
       : {}),
     ...(typeof entry.joules_per_output_token === 'number'
-      ? { measuredJPerOutputToken: { y: entry.joules_per_output_token, roof: false } }
+      ? { measuredJPerOutputToken: measuredMetric(entry.joules_per_output_token) }
       : {}),
     ...(typeof entry.joules_per_total_token === 'number'
-      ? { measuredJPerTotalToken: { y: entry.joules_per_total_token, roof: false } }
+      ? { measuredJPerTotalToken: measuredMetric(entry.joules_per_total_token) }
       : {}),
     ...(typeof entry.joules_per_input_token === 'number'
-      ? { measuredJPerInputToken: { y: entry.joules_per_input_token, roof: false } }
+      ? { measuredJPerInputToken: measuredMetric(entry.joules_per_input_token) }
+      : {}),
+    ...(typeof entry.joules_per_successful_query === 'number'
+      ? {
+          measuredJPerSuccessfulQuery: measuredMetric(entry.joules_per_successful_query),
+          measuredWhPerSuccessfulQuery: measuredMetric(entry.joules_per_successful_query / 3600),
+        }
+      : {}),
+    ...(typeof entry.avg_power_w === 'number' && tdpWatts > 0
+      ? { measuredPowerPercentTdp: measuredMetric((entry.avg_power_w / tdpWatts) * 100) }
       : {}),
   };
 }
@@ -645,6 +788,24 @@ export const calculateRoofline = (
     | `costhi.y`
     | `costni.y`
     | `costri.y`
+    | `tokensPerDollarH.y`
+    | `tokensPerDollarN.y`
+    | `tokensPerDollarR.y`
+    | `outputTokensPerDollarH.y`
+    | `outputTokensPerDollarN.y`
+    | `outputTokensPerDollarR.y`
+    | `inputTokensPerDollarH.y`
+    | `inputTokensPerDollarN.y`
+    | `inputTokensPerDollarR.y`
+    | `tokensPerRmbH.y`
+    | `tokensPerRmbN.y`
+    | `tokensPerRmbR.y`
+    | `outputTokensPerRmbH.y`
+    | `outputTokensPerRmbN.y`
+    | `outputTokensPerRmbR.y`
+    | `inputTokensPerRmbH.y`
+    | `inputTokensPerRmbN.y`
+    | `inputTokensPerRmbR.y`
     | `jTotal.y`
     | `jOutput.y`
     | `jInput.y`
@@ -653,7 +814,9 @@ export const calculateRoofline = (
     | `measuredDecodeAvgPower.y`
     | `measuredJPerOutputToken.y`
     | `measuredJPerTotalToken.y`
-    | `measuredJPerInputToken.y`,
+    | `measuredJPerInputToken.y`
+    | `measuredJPerSuccessfulQuery.y`
+    | `measuredWhPerSuccessfulQuery.y`,
   rooflineDirection: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right',
 ): InferenceData[] => {
   // Exclude degenerate x <= 0 points (see isFrontierEligible) so they never
@@ -723,6 +886,15 @@ export function computeAllRooflines(
             | `costhi.y`
             | `costni.y`
             | `costri.y`
+            | `tokensPerDollarH.y`
+            | `tokensPerDollarN.y`
+            | `tokensPerDollarR.y`
+            | `outputTokensPerDollarH.y`
+            | `outputTokensPerDollarN.y`
+            | `outputTokensPerDollarR.y`
+            | `inputTokensPerDollarH.y`
+            | `inputTokensPerDollarN.y`
+            | `inputTokensPerDollarR.y`
             | `jTotal.y`
             | `jOutput.y`
             | `jInput.y`
@@ -731,7 +903,9 @@ export function computeAllRooflines(
             | `measuredDecodeAvgPower.y`
             | `measuredJPerOutputToken.y`
             | `measuredJPerTotalToken.y`
-            | `measuredJPerInputToken.y`,
+            | `measuredJPerInputToken.y`
+            | `measuredJPerSuccessfulQuery.y`
+            | `measuredWhPerSuccessfulQuery.y`,
           rooflineDirection,
         );
       }
@@ -772,6 +946,15 @@ export function markRooflinePoints(
       newPoint.costhi.roof = false;
       newPoint.costni.roof = false;
       newPoint.costri.roof = false;
+      if (newPoint.tokensPerDollarH) newPoint.tokensPerDollarH.roof = false;
+      if (newPoint.tokensPerDollarN) newPoint.tokensPerDollarN.roof = false;
+      if (newPoint.tokensPerDollarR) newPoint.tokensPerDollarR.roof = false;
+      if (newPoint.outputTokensPerDollarH) newPoint.outputTokensPerDollarH.roof = false;
+      if (newPoint.outputTokensPerDollarN) newPoint.outputTokensPerDollarN.roof = false;
+      if (newPoint.outputTokensPerDollarR) newPoint.outputTokensPerDollarR.roof = false;
+      if (newPoint.inputTokensPerDollarH) newPoint.inputTokensPerDollarH.roof = false;
+      if (newPoint.inputTokensPerDollarN) newPoint.inputTokensPerDollarN.roof = false;
+      if (newPoint.inputTokensPerDollarR) newPoint.inputTokensPerDollarR.roof = false;
       if (newPoint.jTotal) newPoint.jTotal.roof = false;
       if (newPoint.jOutput) newPoint.jOutput.roof = false;
       if (newPoint.jInput) newPoint.jInput.roof = false;
@@ -781,6 +964,8 @@ export function markRooflinePoints(
       if (newPoint.measuredJPerOutputToken) newPoint.measuredJPerOutputToken.roof = false;
       if (newPoint.measuredJPerTotalToken) newPoint.measuredJPerTotalToken.roof = false;
       if (newPoint.measuredJPerInputToken) newPoint.measuredJPerInputToken.roof = false;
+      if (newPoint.measuredJPerSuccessfulQuery) newPoint.measuredJPerSuccessfulQuery.roof = false;
+      if (newPoint.measuredWhPerSuccessfulQuery) newPoint.measuredWhPerSuccessfulQuery.roof = false;
 
       for (const chartDefYKey of Y_AXIS_METRICS) {
         const rooflinePoints = computedRooflines[hwKey]?.[chartDefYKey];
@@ -834,6 +1019,36 @@ export function markRooflinePoints(
           newPoint.costni.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_costri') {
           newPoint.costri.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_tokensPerDollarH') {
+          if (newPoint.tokensPerDollarH) newPoint.tokensPerDollarH.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_tokensPerDollarN') {
+          if (newPoint.tokensPerDollarN) newPoint.tokensPerDollarN.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_tokensPerDollarR') {
+          if (newPoint.tokensPerDollarR) newPoint.tokensPerDollarR.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_outputTokensPerDollarH') {
+          if (newPoint.outputTokensPerDollarH) {
+            newPoint.outputTokensPerDollarH.roof = onCurrentRoofline;
+          }
+        } else if (chartDefYKey === 'y_outputTokensPerDollarN') {
+          if (newPoint.outputTokensPerDollarN) {
+            newPoint.outputTokensPerDollarN.roof = onCurrentRoofline;
+          }
+        } else if (chartDefYKey === 'y_outputTokensPerDollarR') {
+          if (newPoint.outputTokensPerDollarR) {
+            newPoint.outputTokensPerDollarR.roof = onCurrentRoofline;
+          }
+        } else if (chartDefYKey === 'y_inputTokensPerDollarH') {
+          if (newPoint.inputTokensPerDollarH) {
+            newPoint.inputTokensPerDollarH.roof = onCurrentRoofline;
+          }
+        } else if (chartDefYKey === 'y_inputTokensPerDollarN') {
+          if (newPoint.inputTokensPerDollarN) {
+            newPoint.inputTokensPerDollarN.roof = onCurrentRoofline;
+          }
+        } else if (chartDefYKey === 'y_inputTokensPerDollarR') {
+          if (newPoint.inputTokensPerDollarR) {
+            newPoint.inputTokensPerDollarR.roof = onCurrentRoofline;
+          }
         } else if (chartDefYKey === 'y_jTotal' && newPoint.jTotal) {
           newPoint.jTotal.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_jOutput' && newPoint.jOutput) {
@@ -858,6 +1073,16 @@ export function markRooflinePoints(
           newPoint.measuredJPerTotalToken.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_measuredJPerInputToken' && newPoint.measuredJPerInputToken) {
           newPoint.measuredJPerInputToken.roof = onCurrentRoofline;
+        } else if (
+          chartDefYKey === 'y_measuredJPerSuccessfulQuery' &&
+          newPoint.measuredJPerSuccessfulQuery
+        ) {
+          newPoint.measuredJPerSuccessfulQuery.roof = onCurrentRoofline;
+        } else if (
+          chartDefYKey === 'y_measuredWhPerSuccessfulQuery' &&
+          newPoint.measuredWhPerSuccessfulQuery
+        ) {
+          newPoint.measuredWhPerSuccessfulQuery.roof = onCurrentRoofline;
         }
       }
       finalProcessedData.push(newPoint);

@@ -54,19 +54,19 @@ const DOMAIN_OVERVIEW = `InferenceX benchmark database — ML inference performa
 
 ## Tables
 - **configs** — Serving configs: (hardware, framework, model, precision, spec_method, disagg) + parallelism (TP/EP/DP per prefill/decode).
-- **benchmark_results** — Perf metrics per config/concurrency/sequence-length/date. \`metrics\` JSONB holds all numbers.
+- **benchmark_results** — Perf metrics per config/recipe/concurrency/sequence-length/date. \`metrics\` JSONB holds all numbers.
 - **availability** — Denormalized date×config availability.
 - **eval_results** — Eval accuracy (e.g. gsm8k). Joined to configs via config_id.
 - **workflow_runs** — GitHub Actions run metadata.
 - **run_stats** — Per-hardware reliability (n_success/total).
 
 ## Key Views
-- **latest_benchmarks** (materialized) — Latest successful benchmark per (config, conc, isl, osl). Use this for current data.
+- **latest_benchmarks** (materialized) — Latest successful benchmark per (config, benchmark_type, isl, osl, offload_mode, recipe_fingerprint, conc). Use this for current data.
 
 ## Column Names
 - **configs**: id, hardware, framework, model, precision, spec_method, disagg, is_multinode, prefill_tp, prefill_ep, prefill_dp_attention, prefill_num_workers, decode_tp, decode_ep, decode_dp_attention, decode_num_workers, num_prefill_gpu, num_decode_gpu
-- **benchmark_results**: id, workflow_run_id (FK), config_id (FK), benchmark_type, date, isl, osl, conc, image, metrics (JSONB), error, server_log_id (FK)
-- **latest_benchmarks** (materialized view): config_id, date, isl, osl, conc, image, metrics (JSONB) — latest per (config, conc, isl, osl) where error IS NULL
+- **benchmark_results**: id, workflow_run_id (FK), config_id (FK), benchmark_type, date, isl, osl, conc, image, recipe_fingerprint, metrics (JSONB), error, server_log_id (FK)
+- **latest_benchmarks** (materialized view): config_id, benchmark_type, date, isl, osl, conc, offload_mode, image, recipe_fingerprint, metrics (JSONB) — latest per (config, benchmark_type, isl, osl, offload_mode, recipe_fingerprint, conc) where error IS NULL
 - **latest_workflow_runs** (view): id, github_run_id, run_attempt, name, status, conclusion, head_sha, head_branch, html_url, created_at, run_started_at, date
 - **workflow_runs**: id, github_run_id, run_attempt, name, status, conclusion, head_sha, head_branch, html_url, created_at, run_started_at, date
 - **eval_results**: id, workflow_run_id (FK), config_id (FK), task, date, isl, osl, conc, lm_eval_version, metrics (JSONB)

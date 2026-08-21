@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
+
+import { USD_TO_CNY } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 
 import type * as ConstantsModule from '@/lib/constants';
@@ -28,7 +30,7 @@ vi.mock('@/lib/constants', async (importOriginal) => {
   return {
     ...actual,
     getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
-    getGpuSpecs: vi.fn(() => ({ power: 700, costh: 2.8, costn: 1.4, costr: 0.7 })),
+    getGpuSpecs: vi.fn(() => ({ power: 700, tdp: 700, costh: 2.8, costn: 1.4, costr: 0.7 })),
   };
 });
 
@@ -254,6 +256,15 @@ describe('buildAvailabilityHwKey', () => {
 
   it('handles undefined framework with mtp spec method', () => {
     expect(buildAvailabilityHwKey('h200', undefined, 'mtp')).toBe('h200_mtp');
+  });
+
+  it('omits speculative decoding from agentic availability series keys', () => {
+    expect(buildAvailabilityHwKey('h200', 'sglang', 'mtp', false, 'agentic_traces')).toBe(
+      'h200_sglang',
+    );
+    expect(buildAvailabilityHwKey('h200', 'sglang', 'eagle', false, 'agentic_traces')).toBe(
+      'h200_sglang',
+    );
   });
 
   it('handles undefined framework and spec method', () => {
@@ -840,6 +851,57 @@ describe('markRooflinePoints', () => {
     expect(mB.costh.roof).toBe(true);
     expect(mC.costh.roof).toBe(false);
   });
+
+  // Regression: the query-energy axes were registered in Y_AXIS_METRICS and had
+  // rooflines computed for them, but markRooflinePoints carried no branch, so
+  // every frontier point came back roof:false and the chart drew no roofline.
+  describe('query-energy axes', () => {
+    const chartDefQueryEnergy: ChartDefinition = {
+      ...chartDef,
+      y_measuredJPerSuccessfulQuery: 'measuredJPerSuccessfulQuery.y',
+      y_measuredJPerSuccessfulQuery_roofline: 'lower_right',
+      y_measuredWhPerSuccessfulQuery: 'measuredWhPerSuccessfulQuery.y',
+      y_measuredWhPerSuccessfulQuery_roofline: 'lower_right',
+    };
+
+    // lower_right (max x, min energy): A(x=1, 500 J) is the cheapest run and
+    // C(x=3, 900 J) is the fastest, so neither dominates the other and both sit
+    // on the front. B(x=2, 2400 J) is dominated by C on both axes.
+    const withEnergy = (x: number, joules: number, roof = false): InferenceData => ({
+      ...pt(x, 0, 'h100', { tpPerGpuY: 50 }),
+      measuredJPerSuccessfulQuery: { y: joules, roof },
+      measuredWhPerSuccessfulQuery: { y: joules / 3600, roof },
+    });
+
+    const group = { h100: [withEnergy(1, 500), withEnergy(2, 2400), withEnergy(3, 900)] };
+
+    it('marks the frontier points on both query-energy axes', () => {
+      const rooflines = computeAllRooflines(group, chartDefQueryEnergy);
+      const marked = markRooflinePoints(group, rooflines, chartDefQueryEnergy);
+
+      const a = marked.find((p) => p.x === 1)!;
+      const b = marked.find((p) => p.x === 2)!;
+      const c = marked.find((p) => p.x === 3)!;
+
+      expect(a.measuredJPerSuccessfulQuery!.roof).toBe(true);
+      expect(c.measuredJPerSuccessfulQuery!.roof).toBe(true);
+      expect(b.measuredJPerSuccessfulQuery!.roof).toBe(false);
+
+      expect(a.measuredWhPerSuccessfulQuery!.roof).toBe(true);
+      expect(c.measuredWhPerSuccessfulQuery!.roof).toBe(true);
+      expect(b.measuredWhPerSuccessfulQuery!.roof).toBe(false);
+    });
+
+    it('clears a stale roof flag on a dominated query-energy point', () => {
+      const dirty = { h100: [withEnergy(1, 500), withEnergy(2, 2400, true), withEnergy(3, 900)] };
+      const rooflines = computeAllRooflines(dirty, chartDefQueryEnergy);
+      const marked = markRooflinePoints(dirty, rooflines, chartDefQueryEnergy);
+
+      const b = marked.find((p) => p.x === 2)!;
+      expect(b.measuredJPerSuccessfulQuery!.roof).toBe(false);
+      expect(b.measuredWhPerSuccessfulQuery!.roof).toBe(false);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -919,6 +981,13 @@ describe('getHardwareKey', () => {
     expect(getHardwareKey(entry({ hw: 'h100-sxm', framework: '', spec_decoding: 'mtp' }))).toBe(
       'h100_mtp',
     );
+  });
+
+  it('omits speculative decoding from agentic series identity', () => {
+    const base = { hw: 'h100-sxm', framework: 'vllm', benchmark_type: 'agentic_traces' };
+    expect(getHardwareKey(entry({ ...base, spec_decoding: 'none' }))).toBe('h100_vllm');
+    expect(getHardwareKey(entry({ ...base, spec_decoding: 'mtp' }))).toBe('h100_vllm');
+    expect(getHardwareKey(entry({ ...base, spec_decoding: 'eagle' }))).toBe('h100_vllm');
   });
 
   it('appends spec_decoding suffix when not "none" and not "mtp"', () => {
@@ -1107,14 +1176,26 @@ describe('createChartDataPoint', () => {
     expect(point.outputTputPerMw).toBeUndefined();
   });
 
-  it('computes cost fields (costh, costn, costr) from hardware config and throughput', () => {
-    // tokensPerHour = (tput_per_gpu * 3600) / 1_000_000 = (1000 * 3600) / 1e6 = 3.6
-    // costh.y = hwConfig.costh / tokensPerHour = 2.8 / 3.6
+  it('keeps cost-per-million fields and adds total tokens-per-dollar fields', () => {
     const e = entry({ tput_per_gpu: 1000 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costh.y).toBeCloseTo(2.8 / 3.6, 5);
     expect(point.costn.y).toBeCloseTo(1.4 / 3.6, 5);
     expect(point.costr.y).toBeCloseTo(0.7 / 3.6, 5);
+    expect(point.tokensPerDollarH!.y).toBeCloseTo(3_600_000 / 2.8, 5);
+    expect(point.tokensPerDollarN!.y).toBeCloseTo(3_600_000 / 1.4, 5);
+    expect(point.tokensPerDollarR!.y).toBeCloseTo(3_600_000 / 0.7, 5);
+  });
+
+  it('prices the same tokens in yuan at the pinned FX rate', () => {
+    const e = entry({ tput_per_gpu: 1000 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    // ¥ metrics are the $ metrics over USD_TO_CNY — the same tokens, priced in
+    // the other currency, so the two must stay in exact proportion.
+    expect(point.tokensPerRmbH!.y).toBeCloseTo(3_600_000 / (2.8 * USD_TO_CNY), 5);
+    expect(point.tokensPerRmbN!.y).toBeCloseTo(3_600_000 / (1.4 * USD_TO_CNY), 5);
+    expect(point.tokensPerRmbR!.y).toBeCloseTo(3_600_000 / (0.7 * USD_TO_CNY), 5);
+    expect(point.tokensPerRmbH!.y * USD_TO_CNY).toBeCloseTo(point.tokensPerDollarH!.y, 5);
   });
 
   it('sets cost fields to 0 when throughput is 0', () => {
@@ -1125,22 +1206,24 @@ describe('createChartDataPoint', () => {
     expect(point.costr.y).toBe(0);
   });
 
-  it('computes output cost fields when output_tput_per_gpu > 0', () => {
+  it('adds output tokens-per-dollar fields without replacing output cost fields', () => {
     const e = entry({ output_tput_per_gpu: 500 });
-    // outputTokensPerHour = (500 * 3600) / 1e6 = 1.8
+    // outputTokensPerHour = 500 * 3600 = 1,800,000
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costhOutput!.y).toBeCloseTo(2.8 / 1.8, 5);
-    expect(point.costnOutput!.y).toBeCloseTo(1.4 / 1.8, 5);
-    expect(point.costrOutput!.y).toBeCloseTo(0.7 / 1.8, 5);
+    expect(point.outputTokensPerDollarH!.y).toBeCloseTo(1_800_000 / 2.8, 5);
+    expect(point.outputTokensPerDollarN!.y).toBeCloseTo(1_800_000 / 1.4, 5);
+    expect(point.outputTokensPerDollarR!.y).toBeCloseTo(1_800_000 / 0.7, 5);
   });
 
-  it('computes input cost fields when input_tput_per_gpu > 0', () => {
+  it('adds input tokens-per-dollar fields without replacing input cost fields', () => {
     const e = entry({ input_tput_per_gpu: 200 });
-    // inputTokensPerHour = (200 * 3600) / 1e6 = 0.72
+    // inputTokensPerHour = 200 * 3600 = 720,000
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costhi.y).toBeCloseTo(2.8 / 0.72, 5);
-    expect(point.costni.y).toBeCloseTo(1.4 / 0.72, 5);
-    expect(point.costri.y).toBeCloseTo(0.7 / 0.72, 5);
+    expect(point.inputTokensPerDollarH!.y).toBeCloseTo(720_000 / 2.8, 5);
+    expect(point.inputTokensPerDollarN!.y).toBeCloseTo(720_000 / 1.4, 5);
+    expect(point.inputTokensPerDollarR!.y).toBeCloseTo(720_000 / 0.7, 5);
   });
 
   it('narrows dp_attention string "true" to boolean true', () => {
@@ -1315,6 +1398,29 @@ describe('createChartDataPoint measured power fields', () => {
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.measuredJPerOutputToken).toBeDefined();
     expect(point.measuredJPerOutputToken!.y).toBe(8.4);
+  });
+
+  it('derives J/query, Wh/query, and percent TDP from validated source fields', () => {
+    const e = entry({ avg_power_w: 560, joules_per_successful_query: 1800 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+
+    expect(point.measuredJPerSuccessfulQuery?.y).toBe(1800);
+    expect(point.measuredWhPerSuccessfulQuery?.y).toBe(0.5);
+    expect(point.measuredPowerPercentTdp?.y).toBe(80);
+  });
+
+  it('omits derived query and TDP axes when their inputs are absent', () => {
+    const point = createChartDataPoint(
+      '2025-01-01',
+      entry(),
+      'median_e2el',
+      'tput_per_gpu',
+      'h100',
+    );
+
+    expect(point.measuredJPerSuccessfulQuery).toBeUndefined();
+    expect(point.measuredWhPerSuccessfulQuery).toBeUndefined();
+    expect(point.measuredPowerPercentTdp).toBeUndefined();
   });
 
   it('omits both fields when neither is on the entry', () => {
@@ -1535,7 +1641,7 @@ describe('createChartDataPoint output cost edge cases', () => {
     expect(point.costri.y).toBe(0);
   });
 
-  it('computes all 9 cost fields correctly for a point with all throughput types', () => {
+  it('computes all 9 added tokens-per-dollar fields for a point with all throughput types', () => {
     const e = entry({
       tput_per_gpu: 1000,
       output_tput_per_gpu: 500,
@@ -1543,20 +1649,20 @@ describe('createChartDataPoint output cost edge cases', () => {
     });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
 
-    // Total: tokensPerHour = (1000 * 3600) / 1e6 = 3.6
-    expect(point.costh.y).toBeCloseTo(2.8 / 3.6, 5);
-    expect(point.costn.y).toBeCloseTo(1.4 / 3.6, 5);
-    expect(point.costr.y).toBeCloseTo(0.7 / 3.6, 5);
+    // Total: tokensPerHour = 1000 * 3600 = 3,600,000
+    expect(point.tokensPerDollarH!.y).toBeCloseTo(3_600_000 / 2.8, 5);
+    expect(point.tokensPerDollarN!.y).toBeCloseTo(3_600_000 / 1.4, 5);
+    expect(point.tokensPerDollarR!.y).toBeCloseTo(3_600_000 / 0.7, 5);
 
-    // Output: outputTokensPerHour = (500 * 3600) / 1e6 = 1.8
-    expect(point.costhOutput!.y).toBeCloseTo(2.8 / 1.8, 5);
-    expect(point.costnOutput!.y).toBeCloseTo(1.4 / 1.8, 5);
-    expect(point.costrOutput!.y).toBeCloseTo(0.7 / 1.8, 5);
+    // Output: outputTokensPerHour = 500 * 3600 = 1,800,000
+    expect(point.outputTokensPerDollarH!.y).toBeCloseTo(1_800_000 / 2.8, 5);
+    expect(point.outputTokensPerDollarN!.y).toBeCloseTo(1_800_000 / 1.4, 5);
+    expect(point.outputTokensPerDollarR!.y).toBeCloseTo(1_800_000 / 0.7, 5);
 
-    // Input: inputTokensPerHour = (200 * 3600) / 1e6 = 0.72
-    expect(point.costhi.y).toBeCloseTo(2.8 / 0.72, 5);
-    expect(point.costni.y).toBeCloseTo(1.4 / 0.72, 5);
-    expect(point.costri.y).toBeCloseTo(0.7 / 0.72, 5);
+    // Input: inputTokensPerHour = 200 * 3600 = 720,000
+    expect(point.inputTokensPerDollarH!.y).toBeCloseTo(720_000 / 2.8, 5);
+    expect(point.inputTokensPerDollarN!.y).toBeCloseTo(720_000 / 1.4, 5);
+    expect(point.inputTokensPerDollarR!.y).toBeCloseTo(720_000 / 0.7, 5);
   });
 });
 
@@ -2310,7 +2416,7 @@ describe('metricTitle', () => {
     y: 'tput_per_gpu',
     y_tpPerGpu_title: 'Token Throughput per GPU',
     y_tpPerGpu_titleZh: '每 GPU token 吞吐量',
-    y_costh_title: 'Cost per Million Total Tokens (Owning - Hyperscaler)',
+    y_tokensPerDollarH_title: 'Total Tokens per $1 (Owning - Hyperscaler)',
   } as ChartDefinition;
 
   it('returns English title for locale en', () => {
@@ -2322,8 +2428,8 @@ describe('metricTitle', () => {
   });
 
   it('falls back to English when Zh field is missing', () => {
-    expect(metricTitle(chartDef, 'y_costh', 'zh')).toBe(
-      'Cost per Million Total Tokens (Owning - Hyperscaler)',
+    expect(metricTitle(chartDef, 'y_tokensPerDollarH', 'zh')).toBe(
+      'Total Tokens per $1 (Owning - Hyperscaler)',
     );
   });
 
@@ -2341,7 +2447,7 @@ describe('metricLabel', () => {
     y: 'tput_per_gpu',
     y_tpPerGpu_label: 'Token Throughput per GPU (tok/s/gpu)',
     y_tpPerGpu_labelZh: '每 GPU token 吞吐量（tok/s/gpu）',
-    y_costh_label: 'Cost per Million Total Tokens ($)',
+    y_tokensPerDollarH_label: 'Total Tokens per $1 (tok/$)',
   } as ChartDefinition;
 
   it('returns English label for locale en', () => {
@@ -2353,7 +2459,7 @@ describe('metricLabel', () => {
   });
 
   it('falls back to English when Zh field is missing', () => {
-    expect(metricLabel(chartDef, 'y_costh', 'zh')).toBe('Cost per Million Total Tokens ($)');
+    expect(metricLabel(chartDef, 'y_tokensPerDollarH', 'zh')).toBe('Total Tokens per $1 (tok/$)');
   });
 
   it('returns empty string for unknown metric', () => {

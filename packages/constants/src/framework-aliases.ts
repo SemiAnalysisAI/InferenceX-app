@@ -55,12 +55,13 @@ export const FRAMEWORK_LABELS: Record<string, string> = {
  * Per-model display overrides for hwKey suffix parts (framework / spec_method
  * tokens), keyed by frontend display model name → token → label.
  *
- * M3's speculative-decoding runs are ingested under the generic `mtp` token but
- * actually use EAGLE, so for MiniMax-M3 the suffix reads "EAGLE" while every
- * other model keeps the generic "MTP" label.
+ * Some models are ingested under the generic `mtp` token but ship a
+ * differently-named method: M3 uses EAGLE, and K3 uses DSpark. Those models get
+ * their own label while every other model keeps the generic "MTP" label.
  */
 export const MODEL_SPEC_METHOD_LABELS: Record<string, Record<string, string>> = {
   'MiniMax-M3': { mtp: 'M3 EAGLE' },
+  'Kimi-K3': { mtp: 'DSpark' },
 };
 
 /**

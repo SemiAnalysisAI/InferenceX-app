@@ -59,6 +59,24 @@ export interface NudgeRenderContext {
   dismiss: () => void;
 }
 
+export interface NudgeAnchor {
+  /**
+   * Resolve the element the coach mark should point at, in the live DOM.
+   * Return `null` when nothing suitable is on screen (chart still loading,
+   * every candidate filtered out, scrolled out of view) — the engine hides
+   * the callout rather than stranding an arrow.
+   */
+  resolve: () => Element | null;
+  /**
+   * Clicking an element matching this selector counts as taking the nudge's
+   * action: the user found the affordance, so record engagement and stop
+   * showing it.
+   */
+  actionSelector?: string;
+  /** Extra window events that should trigger a reposition (beyond scroll/resize). */
+  repositionEvents?: readonly string[];
+}
+
 export interface NudgeContent {
   icon: ComponentType<{ className?: string }>;
   iconClassName?: string;
@@ -90,12 +108,23 @@ export interface NudgeContent {
   badge?: string;
   badgeZh?: string;
 
+  // -- Coach-mark-specific (ignored by toasts/modals/banners) --
+
+  /**
+   * Which on-screen element the callout points at. Required for `coach-mark`;
+   * without it the engine has nothing to anchor to and skips the nudge.
+   */
+  anchor?: NudgeAnchor;
+
   // -- Banner-specific (ignored by toasts/modals) --
 
   /** href for the banner link (the whole banner is clickable). */
   href?: string;
   /** Called when the banner link is clicked (for analytics). */
   onLinkClick?: () => void;
+  /** Short action label shown at the end of the banner link. */
+  linkLabel?: string;
+  linkLabelZh?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +143,14 @@ export interface NudgeAnalyticsOverrides {
 // NudgeDefinition — a single registry entry
 // ---------------------------------------------------------------------------
 
-export type NudgeType = 'toast' | 'modal' | 'banner';
+export type NudgeType = 'toast' | 'modal' | 'banner' | 'coach-mark';
+
+/**
+ * Which NudgeEngine instance owns a nudge. One engine mounts per scope, so a
+ * new scope needs a matching `<NudgeEngine scope="…" />` on the surface it
+ * names — `agentic-detail` mounts on /inference/agentic/[id].
+ */
+export type NudgeScope = 'dashboard' | 'landing' | 'evaluation' | 'agentic-detail';
 
 export interface NudgeDefinition {
   id: string;
@@ -127,7 +163,7 @@ export interface NudgeDefinition {
   /** Higher priority wins when multiple nudges are eligible simultaneously. */
   priority: number;
   /** Which NudgeEngine instance manages this nudge. */
-  scope: 'dashboard' | 'landing' | 'evaluation';
+  scope: NudgeScope;
   /**
    * Render an immediate banner in the server response so hydration cannot
    * insert it above existing content and cause a layout shift.

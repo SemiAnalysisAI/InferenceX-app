@@ -11,11 +11,13 @@ describe('resolveLabelState', () => {
     });
   });
 
-  it('uses parallelism labels instead of line labels for agentic scenarios', () => {
+  it('turns on parallelism labels for agentic scenarios, and keeps line labels', () => {
+    // Line labels name the curve, point labels name the point — the agentic
+    // view wants both, so it differs from fixed-seq only in the point labels.
     expect(resolveLabelState('agentic', {})).toEqual({
       showPointLabels: true,
       useAdvancedLabels: true,
-      showLineLabels: false,
+      showLineLabels: true,
     });
   });
 
@@ -48,12 +50,12 @@ describe('serializeLabelState', () => {
       serializeLabelState('agentic', {
         showPointLabels: false,
         useAdvancedLabels: false,
-        showLineLabels: true,
+        showLineLabels: false,
       }),
     ).toEqual({
       i_label: '0',
       i_advlabel: '0',
-      i_linelabel: '1',
+      i_linelabel: '0',
     });
   });
 

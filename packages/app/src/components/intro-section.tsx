@@ -1,7 +1,6 @@
 import { Quote } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
-import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
 import { QuoteCarousel } from '@/components/quote-carousel';
 import { QUOTES, CAROUSEL_ORGS, CAROUSEL_LABELS } from '@/components/quotes/quotes-data';
 import type { Locale } from '@/lib/i18n';
@@ -14,8 +13,8 @@ const CAROUSEL_OVERRIDES = {
 };
 
 const HEADING = {
-  en: 'Open Source Continuous Inference Benchmark Trusted by GigaWatt Token Factories',
-  zh: '受吉瓦级 token 工厂信赖的开源持续推理基准测试',
+  en: 'Open-Source Continuous Agentic Inference Benchmark Trusted by GigaWatt Token Factories',
+  zh: '受吉瓦级 token 工厂信赖的开源持续智能体推理基准测试',
 } as const;
 
 export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
@@ -27,10 +26,12 @@ export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
   return (
     <section>
       <Card data-testid="intro-section">
-        <div className="relative flex items-start gap-2 mb-4">
+        {/* The splash moved to the AgentX hero, which now opens the landing
+            page — two copies of the same announcement one scroll apart read
+            as a duplicate rather than a callout. */}
+        <div className="flex items-start gap-2 mb-4">
           <Quote className="size-5 shrink-0 mt-1 text-brand" />
           <h2 className="text-lg font-semibold">{HEADING[locale]}</h2>
-          <MinecraftSplash />
         </div>
         <div>
           <QuoteCarousel

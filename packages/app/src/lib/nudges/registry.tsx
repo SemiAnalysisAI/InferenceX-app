@@ -1,6 +1,8 @@
 import {
   ArrowRight,
+  BookOpen,
   Download,
+  MousePointerClick,
   MessageSquareText,
   Palette,
   ShieldCheck,
@@ -13,6 +15,12 @@ import dynamic from 'next/dynamic';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
 import { FEEDBACK_SUBMITTED_EVENT } from '@/components/feedback-modal';
+import {
+  AGENTIC_COACH_MARK_STORAGE_KEY,
+  AGENTIC_POINT_ACTION_SELECTOR,
+  SCATTER_RENDERED_EVENT,
+  resolveAgenticPointAnchor,
+} from '@/lib/nudges/agentic-point-coach-mark';
 import { LANDING_BANNER_STORAGE_KEY } from '@/lib/nudges/landing-banner';
 
 // Keep the ~210-line FeedbackForm out of the landing/dashboard initial JS.
@@ -41,6 +49,19 @@ function isOnInferenceTab(): boolean {
   const segments = window.location.pathname.split('/').filter(Boolean);
   if (segments[0] === 'zh') segments.shift();
   return (segments[0] ?? 'inference') === 'inference';
+}
+
+/**
+ * The telemetry tutorial lives at /agentx/telemetry and /zh/agentx/telemetry.
+ * The nudge fires from a client callback rather than a server-rendered link,
+ * so it resolves the locale from the pathname at click time.
+ */
+export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
+
+function telemetryTutorialHref(): string {
+  if (typeof window === 'undefined') return '/agentx/telemetry';
+  const isZh = window.location.pathname.split('/').filter(Boolean)[0] === 'zh';
+  return isZh ? '/zh/agentx/telemetry' : '/agentx/telemetry';
 }
 
 // ---------------------------------------------------------------------------
@@ -247,6 +268,53 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   },
 
   // -------------------------------------------------------------------------
+  // Agentic chart coach mark
+  // -------------------------------------------------------------------------
+  {
+    id: 'agentic-point-detail',
+    type: 'coach-mark',
+    // Three ways in, all retried until an anchor exists (see `isEligible`'s
+    // `requireAnchor`): a short timer for a chart that is already painted,
+    // every subsequent chart render for the usual async-data case, and scroll
+    // — on a laptop viewport the chart starts below the fold, so the first two
+    // fire while there is still nothing on screen to point at. The resolver
+    // rejects an off-screen chart with a single rect read, keeping the scroll
+    // path cheap, and the engine drops these listeners once the tip is up.
+    trigger: [
+      { type: 'timer', delayMs: 1200 },
+      { type: 'event', event: SCATTER_RENDERED_EVENT, delayMs: 700 },
+      { type: 'dom-event', event: 'scroll' },
+    ],
+    dismissal: { type: 'permanent' },
+    storageKey: AGENTIC_COACH_MARK_STORAGE_KEY,
+    // Highest dashboard priority: it is the only nudge tied to a specific
+    // element, so it should claim its slot the moment that element exists.
+    // (It has its own slot, so this only orders it against future coach marks.)
+    priority: 45,
+    scope: 'dashboard',
+    content: {
+      icon: MousePointerClick,
+      iconClassName: 'text-brand',
+      title: 'Every point has a story',
+      titleZh: '每个数据点背后都有细节',
+      description:
+        'Click any point to view server metrics and logs — cache hit rates, queue depth, and the full request timeline for that run.',
+      descriptionZh:
+        '点击任意数据点即可查看服务端指标与日志——cache 命中率、队列深度，以及该次运行的完整请求时间线。',
+      testId: 'agentic-point-coach-mark',
+      anchor: {
+        resolve: resolveAgenticPointAnchor,
+        actionSelector: AGENTIC_POINT_ACTION_SELECTOR,
+      },
+    },
+    analytics: {
+      shown: 'inference_agentic_point_coach_mark_shown',
+      dismissed: 'inference_agentic_point_coach_mark_dismissed',
+      action: 'inference_agentic_point_coach_mark_point_clicked',
+    },
+  },
+
+  // -------------------------------------------------------------------------
   // Dashboard modals
   // -------------------------------------------------------------------------
   {
@@ -284,41 +352,47 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // Landing modals
   // -------------------------------------------------------------------------
   {
-    id: 'kimi-k3-launch-modal',
+    id: 'agentic-results-launch-modal',
     type: 'modal',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
-    storageKey: 'inferencex-kimi-k3-modal-dismissed',
+    storageKey: 'inferencex-agentic-results-modal-dismissed',
     priority: 50,
     scope: 'landing',
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'Kimi K3 is live',
-      titleZh: 'Kimi K3 已上线',
+      title: 'Real-world agentic inference benchmark results are live',
+      titleZh: '真实场景智能体推理基准测试结果已上线',
       description:
-        'Day-zero benchmarks for Kimi K3 are now available across the latest NVIDIA and AMD chips. Results are experimental — see how the new model performs across hardware.',
+        'Compare AgentX results for Kimi K3, DeepSeek-V4-Pro-0813, MiniMax-M3, Qwen3.5 397B, and GLM-5.3 across supported chips and serving stacks.',
       descriptionZh:
-        'Kimi K3 的首日基准测试数据现已覆盖最新的 NVIDIA 和 AMD Chip。结果为实验性数据——来看看新模型在不同硬件上的表现。',
+        '查看 Kimi K3、DeepSeek-V4-Pro-0813、MiniMax-M3、Qwen3.5 397B 与 GLM-5.3 在支持 Chip 和推理服务栈上的 AgentX 结果。',
+      // Both buckets carry two releases on one architecture (GLM-5.2/5.3, the
+      // V4-Pro April preview and the 0813 GA); name the newer one, as the
+      // model selector does for GLM.
       testId: 'launch-modal',
       containerClassName: 'border-brand/40',
+      // Launch announcement — centered with a backdrop so it reads as the
+      // page's headline moment instead of a bottom-right corner card.
+      centered: true,
       badge: 'New',
       badgeZh: '最新',
       dismissLabel: 'Maybe Later',
       dismissLabelZh: '稍后再看',
       primaryAction: {
-        label: 'Explore',
-        labelZh: '开始探索',
+        label: 'View results',
+        labelZh: '查看结果',
         icon: <ArrowRight className="size-4" />,
         onClick: () => {
-          window.location.href = '/inference?preset=kimi-k3-launch';
+          window.location.href = '/inference?i_seq=agentic-traces';
         },
       },
     },
     analytics: {
-      shown: 'kimi_k3_modal_shown',
-      dismissed: 'kimi_k3_modal_dismissed',
-      action: 'kimi_k3_modal_explored',
+      shown: 'agentic_results_modal_shown',
+      dismissed: 'agentic_results_modal_dismissed',
+      action: 'agentic_results_modal_viewed',
     },
   },
   {
@@ -365,7 +439,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // Landing banner
   // -------------------------------------------------------------------------
   {
-    id: 'kimi-k3-launch-banner',
+    id: 'agentic-results-launch-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -376,23 +450,70 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'Kimi K3 benchmarks are live',
-      titleZh: 'Kimi K3 基准测试已上线',
-      description: 'First inference numbers across NVIDIA and AMD chips, click to explore.',
-      descriptionZh: 'NVIDIA 和 AMD Chip 的首批推理数据，点击探索。',
+      title: 'Agentic benchmark results are live',
+      titleZh: '智能体基准测试结果已上线',
+      description:
+        "AgentX is the World's First Fully Open Source Realistic 1Mil+ Long Context, Multi Turn Benchmark",
+      descriptionZh: 'AgentX 是全球首个完全开源、贴近真实场景的百万级 (1M+) 长上下文多轮基准测试',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: '/inference?preset=kimi-k3-launch',
+      href: '/inference?i_seq=agentic-traces',
+      linkLabel: 'View results',
+      linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = '/inference?preset=kimi-k3-launch';
+        window.location.href = '/inference?i_seq=agentic-traces';
       },
     },
     analytics: {
-      shown: 'launch_banner_shown',
-      dismissed: 'launch_banner_dismissed',
-      action: 'launch_banner_clicked',
-      properties: { banner_id: 'kimi-k3-launch', preset_id: 'kimi-k3-launch' },
+      shown: 'agentic_results_banner_shown',
+      dismissed: 'agentic_results_banner_dismissed',
+      action: 'agentic_results_banner_clicked',
+      properties: { banner_id: 'agentic-results-launch', scenario: 'agentic-traces' },
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // Agentic point-detail modal
+  // -------------------------------------------------------------------------
+  {
+    id: 'agentx-telemetry-tutorial',
+    type: 'modal',
+    // The detail page is chart-dense and its data arrives asynchronously;
+    // waiting lets the charts paint before the card slides in.
+    trigger: { type: 'timer', delayMs: 2500 },
+    dismissal: { type: 'permanent' },
+    storageKey: TELEMETRY_TUTORIAL_STORAGE_KEY,
+    priority: 40,
+    scope: 'agentic-detail',
+    content: {
+      icon: BookOpen,
+      iconClassName: 'text-brand',
+      title: 'New to these charts?',
+      titleZh: '第一次看这些图表？',
+      description:
+        'The telemetry tutorial explains every chart on this page — the sequence-length distributions, the cache and queue series, the request timeline, and the per-conversation flamegraph.',
+      descriptionZh:
+        '遥测数据教程会讲解本页的每一张图表——序列长度分布、cache 与队列相关曲线、请求时间线，以及单会话火焰图。',
+      testId: 'telemetry-tutorial-modal',
+      // Deliberately NOT centered: a backdrop here would cover the charts the
+      // tutorial is describing. A bottom-right card leaves the page usable.
+      containerClassName: 'border-brand/40',
+      dismissLabel: 'Not now',
+      dismissLabelZh: '暂不需要',
+      primaryAction: {
+        label: 'Read the tutorial',
+        labelZh: '阅读教程',
+        icon: <ArrowRight className="size-4" />,
+        onClick: () => {
+          window.location.href = telemetryTutorialHref();
+        },
+      },
+    },
+    analytics: {
+      shown: 'agentx_telemetry_modal_shown',
+      dismissed: 'agentx_telemetry_modal_dismissed',
+      action: 'agentx_telemetry_modal_opened',
     },
   },
 ];

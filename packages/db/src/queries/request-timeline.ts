@@ -2,8 +2,9 @@
  * Per-request timeline for the agentic detail page's Gantt view.
  *
  * Backed by `agentic_trace_replay.request_timeline` (pre-computed at
- * ingest time, see `etl/compute-request-timeline.ts`). The fast path is
- * a single SQL row read; the slow path re-computes from
+ * ingest time, see `etl/compute-request-timeline.ts`). Current payloads are
+ * read as bounded text chunks so Neon's 64 MiB encoded-response limit cannot
+ * reject even highly compressible JSONB. The slow path re-computes from
  * `profile_export_jsonl_gz` and is only taken when the column is missing
  * or the stored `REQUEST_TIMELINE_VERSION` is stale.
  */
@@ -19,49 +20,73 @@ import { writeBackTraceReplayJsonb } from './agentic-shared';
 
 export type { RequestTimeline, RequestRecord } from '../etl/compute-request-timeline';
 
-type RequestRecordRow = RequestTimeline['requests'][number];
-
 interface RawMetaRow {
   trace_replay_id: number;
   has_blob: boolean;
   timeline_version: number | null;
-  start_ns: number | null;
-  end_ns: number | null;
-  duration_s: number | null;
-  request_count: number | null;
 }
-
-/**
- * Requests fetched per round trip on the fast path.
- *
- * The stored timeline is one JSONB document, so selecting it whole put its
- * entire JSON text in a single Neon HTTP response — 61 MB for a 151k-request
- * point, past the driver's 64 MiB cap. That failed the route with
- * `507 response is too large` and emptied the ISL/OSL distribution and Gantt
- * charts on the longest runs. Records average ~400 bytes, so 20k per slice
- * keeps each response near 8 MB with room for wider records.
- */
-const REQUESTS_PER_CHUNK = 20_000;
 
 interface RawBlobRow {
   blob: Buffer | null;
+}
+
+interface RawTimelineChunkRow {
+  chunk: string | null;
+  chunk_chars: number;
+}
+
+// JSONB can be far smaller on disk than its serialized response due to TOAST
+// compression, so every current timeline uses bounded chunks. Timeline fields
+// are compact identifiers/numbers; 16 MiB leaves ample room for JSON-string
+// escaping under Neon's 64 MiB per-query response cap.
+const TIMELINE_TEXT_CHUNK_CHARS = 16 * 1024 * 1024;
+const MAX_TIMELINE_TEXT_CHUNKS = 64;
+
+async function readChunkedRequestTimeline(
+  sql: DbClient,
+  traceReplayId: number,
+): Promise<RequestTimeline | null> {
+  const pieces: string[] = [];
+  for (let part = 0; part < MAX_TIMELINE_TEXT_CHUNKS; part += 1) {
+    const offset = part * TIMELINE_TEXT_CHUNK_CHARS;
+    const chunkRows = (await sql`
+      with payload as materialized (
+        select request_timeline::text as text
+        from agentic_trace_replay
+        where id = ${traceReplayId}
+      ),
+      piece as materialized (
+        select substr(text, ${offset + 1}::int, ${TIMELINE_TEXT_CHUNK_CHARS}::int) as chunk
+        from payload
+      )
+      select
+        chunk,
+        char_length(chunk)::int as chunk_chars
+      from piece
+    `) as unknown as RawTimelineChunkRow[];
+    const row = chunkRows[0];
+    if (!row || row.chunk === null) return null;
+    pieces.push(row.chunk);
+    if (row.chunk_chars < TIMELINE_TEXT_CHUNK_CHARS) {
+      try {
+        return JSON.parse(pieces.join('')) as RequestTimeline;
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
 }
 
 export async function getRequestTimeline(
   sql: DbClient,
   benchmarkResultId: number,
 ): Promise<RequestTimeline | null> {
-  // Read only the header here — never `atr.request_timeline` itself, or a long
-  // run's document alone blows the HTTP response cap (see REQUESTS_PER_CHUNK).
   const rows = (await sql`
     select
       atr.id as trace_replay_id,
       (atr.profile_export_jsonl_gz is not null) as has_blob,
-      (atr.request_timeline->>'version')::int as timeline_version,
-      (atr.request_timeline->>'startNs')::double precision as start_ns,
-      (atr.request_timeline->>'endNs')::double precision as end_ns,
-      (atr.request_timeline->>'durationS')::double precision as duration_s,
-      jsonb_array_length(atr.request_timeline->'requests') as request_count
+      (atr.request_timeline->>'version')::int as timeline_version
     from benchmark_results br
     join agentic_trace_replay atr on atr.id = br.trace_replay_id
     where br.id = ${benchmarkResultId}
@@ -69,44 +94,11 @@ export async function getRequestTimeline(
   const row = rows[0];
   if (!row) return null;
 
-  // Fast path: pre-computed timeline at the current version, pulled a slice at
-  // a time so the response size scales with the chunk rather than the run.
-  if (row.timeline_version !== null && Number(row.timeline_version) === REQUEST_TIMELINE_VERSION) {
-    const total = Number(row.request_count ?? 0);
-    // Every slice re-expands the whole array before discarding what falls
-    // outside its window, so each costs the same regardless of offset
-    // (measured: 0.72s / 0.74s / 0.62s at offsets 0 / 60k / 140k on a 151k
-    // point). They do not depend on each other, so issue them together and
-    // pay one slice's latency instead of the sum — 8 sequential slices were
-    // ~5.6s of the 12.8s that point took to serve.
-    const offsets: number[] = [];
-    for (let offset = 0; offset < total; offset += REQUESTS_PER_CHUNK) offsets.push(offset);
-    const slices = await Promise.all(
-      offsets.map(async (offset) => {
-        const chunk = (await sql`
-          select coalesce(jsonb_agg(r order by ord), '[]'::jsonb) as requests
-          from (
-            select r, ord
-            from agentic_trace_replay atr,
-                 jsonb_array_elements(atr.request_timeline->'requests') with ordinality x(r, ord)
-            where atr.id = ${row.trace_replay_id}
-              and ord > ${offset}
-              and ord <= ${offset + REQUESTS_PER_CHUNK}
-          ) slice
-        `) as unknown as { requests: RequestRecordRow[] }[];
-        return chunk[0]?.requests ?? [];
-      }),
-    );
-    // Offsets are ascending and each slice is ordered, so concatenating in
-    // offset order preserves the original request order.
-    const requests: RequestRecordRow[] = slices.flat();
-    return {
-      version: Number(row.timeline_version),
-      startNs: Number(row.start_ns ?? 0),
-      endNs: Number(row.end_ns ?? 0),
-      durationS: Number(row.duration_s ?? 0),
-      requests,
-    } as RequestTimeline;
+  // Read every current pre-computed timeline through bounded text queries.
+  // Choosing from compressed storage size is unsafe: a small TOAST value can
+  // still serialize past Neon's per-query response limit.
+  if (Number(row.timeline_version) === REQUEST_TIMELINE_VERSION) {
+    return readChunkedRequestTimeline(sql, row.trace_replay_id);
   }
 
   if (!row.has_blob) return null;
@@ -120,7 +112,7 @@ export async function getRequestTimeline(
     from agentic_trace_replay
     where id = ${row.trace_replay_id}
   `) as unknown as RawBlobRow[];
-  const timeline = computeRequestTimeline(blobRows[0]?.blob ?? null);
+  const timeline = await computeRequestTimeline(blobRows[0]?.blob ?? null);
 
   // Self-heal the stored request_timeline so the next request (and the
   // trace-histograms route, which reads the same column) takes the fast path.

@@ -20,9 +20,10 @@ import {
   maxInteractivityAtCost,
   monotoneSlopes,
   paretoFrontUpperLeft,
+  reciprocalMetricAt,
+  recoverReciprocalNumerator,
   sign,
 } from './interpolation';
-import { restrictAgenticPointsToE2eFrontier } from '@/lib/agentic-frontier';
 import type { CostProvider, GPUDataPoint, InterpolatedResult } from './types';
 
 // Re-export pure functions so existing imports from this module keep working.
@@ -33,6 +34,8 @@ export {
   maxInteractivityAtCost,
   monotoneSlopes,
   paretoFrontUpperLeft,
+  reciprocalMetricAt,
+  recoverReciprocalNumerator,
   sign,
 };
 
@@ -150,18 +153,6 @@ export function buildGpuGroups<M extends GroupMeta>(
     });
   }
 
-  if (sequence === Sequence.AgenticTraces) {
-    for (const groupKey of Object.keys(grouped)) {
-      const restricted = restrictAgenticPointsToE2eFrontier(grouped[groupKey]);
-      if (restricted.length === 0) {
-        delete grouped[groupKey];
-        delete groupMeta[groupKey];
-      } else {
-        grouped[groupKey] = restricted;
-      }
-    }
-  }
-
   return { grouped, groupMeta, hwConfigMap };
 }
 
@@ -190,7 +181,10 @@ export function useThroughputData(
     data: allRows,
     isLoading: queryLoading,
     error: queryError,
-  } = useBenchmarks(selectedModel, selectedRunDate);
+  } = useBenchmarks(selectedModel, selectedRunDate, true, undefined, undefined, {
+    type: 'calculator',
+    sequence: selectedSequence,
+  });
 
   const loading = queryLoading || !allRows;
   const error = queryError ? queryError.message : null;

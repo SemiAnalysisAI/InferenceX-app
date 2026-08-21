@@ -191,7 +191,11 @@ export function processOverlayChartDataWithClipping(
     .map((d: InferenceData) => {
       const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
       const xValue = (d as any)[xAxisField] ?? d.x;
-      return { ...d, x: xValue, y: yValue };
+      return {
+        ...d,
+        x: xValue,
+        y: yValue,
+      };
     });
 
   // The normalized metric is derived from persisted request traces, which an

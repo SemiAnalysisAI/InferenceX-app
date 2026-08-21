@@ -36,7 +36,7 @@ const STRINGS = {
   en: {
     yAxisMetric: 'Y-Axis Metric',
     yAxisMetricTooltip:
-      "The performance metric displayed on the chart's Y-axis. Options include throughput (tokens/sec), cost per million tokens, and custom user-defined values.",
+      "The performance metric displayed on the chart's Y-axis. Options include throughput, cost per million tokens, tokens per $1 USD or ¥1 CNY, and custom user-defined values.",
     xAxisMetric: 'X-Axis Metric',
     xAxisMetricTooltip:
       "The latency metric displayed on the chart's X-axis: P90 Time To First Token.",
@@ -69,7 +69,7 @@ const STRINGS = {
   zh: {
     yAxisMetric: 'Y 轴指标',
     yAxisMetricTooltip:
-      '图表 Y 轴显示的性能指标。包括吞吐量（token/秒）、每百万 token 成本以及自定义用户值。',
+      '图表 Y 轴显示的性能指标，包括吞吐量、每百万 token 成本、每 1 美元可购买的 token 数以及自定义用户值。',
     xAxisMetric: 'X 轴指标',
     xAxisMetricTooltip: '图表 X 轴显示的延迟指标：P90 Time To First Token。',
     xAxisScale: 'X 轴刻度',
@@ -127,6 +127,36 @@ const METRIC_GROUPS: {
     ],
   },
   {
+    label: 'Total Tokens per $1 USD',
+    labelZh: '每 1 美元可购买的总 token 数',
+    metrics: ['y_tokensPerDollarH', 'y_tokensPerDollarN', 'y_tokensPerDollarR'],
+  },
+  {
+    label: 'Total Tokens per ¥1 CNY',
+    labelZh: '每 1 元人民币可购买的总 token 数',
+    metrics: ['y_tokensPerRmbH', 'y_tokensPerRmbN', 'y_tokensPerRmbR'],
+  },
+  {
+    label: 'Output Tokens per $1 USD',
+    labelZh: '每 1 美元可购买的输出 token 数',
+    metrics: ['y_outputTokensPerDollarH', 'y_outputTokensPerDollarN', 'y_outputTokensPerDollarR'],
+  },
+  {
+    label: 'Output Tokens per ¥1 CNY',
+    labelZh: '每 1 元人民币可购买的输出 token 数',
+    metrics: ['y_outputTokensPerRmbH', 'y_outputTokensPerRmbN', 'y_outputTokensPerRmbR'],
+  },
+  {
+    label: 'Input Tokens per $1 USD',
+    labelZh: '每 1 美元可购买的输入 token 数',
+    metrics: ['y_inputTokensPerDollarH', 'y_inputTokensPerDollarN', 'y_inputTokensPerDollarR'],
+  },
+  {
+    label: 'Input Tokens per ¥1 CNY',
+    labelZh: '每 1 元人民币可购买的输入 token 数',
+    metrics: ['y_inputTokensPerRmbH', 'y_inputTokensPerRmbN', 'y_inputTokensPerRmbR'],
+  },
+  {
     label: 'Cost per Million Total Tokens',
     labelZh: '每百万总 token 成本',
     metrics: ['y_costh', 'y_costn', 'y_costr'],
@@ -156,10 +186,16 @@ const METRIC_GROUPS: {
       'y_measuredJPerInputToken',
       'y_measuredJPerOutputToken',
       'y_measuredJPerTotalToken',
+      'y_measuredJPerSuccessfulQuery',
+      'y_measuredWhPerSuccessfulQuery',
+      'y_measuredPowerPercentTdp',
     ],
-    gated: true,
   },
-  { label: 'Custom User Values', labelZh: '自定义值', metrics: ['y_costUser', 'y_powerUser'] },
+  {
+    label: 'Custom User Values',
+    labelZh: '自定义值',
+    metrics: ['y_tokensPerDollarUser', 'y_costUser', 'y_powerUser'],
+  },
 ];
 
 /** Map from metric key → human-readable title (e.g. "Token Throughput per GPU") */
@@ -484,7 +520,10 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             availableSequences={availableSequences}
             data-testid="scenario-selector"
           />
-          {mounted && selectedSequence === Sequence.AgenticTraces && (
+          {/* AgentX publishes on P90, so the percentile control is an insider
+              affordance rather than a normal chart filter: it stays behind the
+              ↑↑↓↓ feature gate and the chart defaults to P90 without it. */}
+          {mounted && selectedSequence === Sequence.AgenticTraces && featureGateUnlocked && (
             <PercentileSelector
               value={selectedPercentile}
               onChange={(p: Percentile) => setSelectedPercentile(p)}
@@ -612,18 +651,16 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                 placeholder={t.dateRangePlaceholder}
                 availableDates={dateRangeAvailableDates}
                 isCheckingAvailableDates={isCheckingAvailableDates}
-                className={
-                  selectedGPUs.length > 0 &&
-                  (!selectedDateRange.startDate || !selectedDateRange.endDate)
-                    ? 'border-red-500 ring-4 ring-red-500/40 animate-pulse'
-                    : ''
-                }
               />
             </div>
           )}
         </div>
 
-        {!hideGpuComparison && (
+        {/* Quick Filters slice by vendor, framework, deployment, and spec
+            decoding — dimensions the agentic scenario collapses into one
+            best-available curve per model, SKU, and engine, so the chips have
+            nothing meaningful to filter there. */}
+        {!hideGpuComparison && selectedSequence !== Sequence.AgenticTraces && (
           <div className="flex flex-col space-y-1.5" data-testid="quick-filters">
             <LabelWithTooltip
               htmlFor="quick-filters"

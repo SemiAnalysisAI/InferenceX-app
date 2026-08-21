@@ -7,6 +7,7 @@ const timelineRequest = (
   overrides: Record<string, unknown> = {},
 ) => ({
   cid: 'conversation-1',
+  ri: 0,
   ti: index,
   wid: 'worker-1',
   ad: 0,
@@ -27,8 +28,8 @@ const requestChartPayload = (requests: ReturnType<typeof timelineRequest>[]) => 
   const cids = [...new Set(requests.map((request) => request.cid))];
   const phases = [...new Set(requests.map((request) => request.phase))];
   return {
-    version: 502,
-    timelineVersion: 5,
+    version: 602,
+    timelineVersion: 6,
     startNs: 0,
     endNs: 7_000_000_000,
     durationS: 7,
@@ -48,6 +49,49 @@ const requestChartPayload = (requests: ReturnType<typeof timelineRequest>[]) => 
   };
 };
 
+const benchmarkSiblings = {
+  sku: {
+    hardware: 'b300',
+    framework: 'vllm',
+    model: 'kimik3',
+    precision: 'fp4',
+    spec_method: 'mtp',
+    benchmark_type: 'agentic_traces',
+    github_run_id: 31893747354,
+    date: '2026-08-15',
+    dataset_slug: null,
+  },
+  siblings: [
+    {
+      id: 206885,
+      conc: 8,
+      offload_mode: 'off',
+      decode_tp: 8,
+      decode_ep: 1,
+      decode_pp: 1,
+      decode_dcp_size: 8,
+      decode_pcp_size: 1,
+      decode_dp_attention: false,
+      decode_num_workers: 0,
+      prefill_tp: 8,
+      prefill_ep: 1,
+      prefill_pp: 1,
+      prefill_dcp_size: 8,
+      prefill_pcp_size: 1,
+      prefill_dp_attention: false,
+      prefill_num_workers: 0,
+      num_prefill_gpu: 8,
+      num_decode_gpu: 8,
+      disagg: false,
+      is_multinode: false,
+      tput_per_gpu: 1.2,
+      total_requests: 395,
+      is_current: true,
+      has_trace: true,
+    },
+  ],
+};
+
 describe('Agentic point request metric time series', () => {
   beforeEach(() => {
     const requests = [
@@ -55,7 +99,7 @@ describe('Agentic point request metric time series', () => {
       timelineRequest(1, 200, 20),
       timelineRequest(2, 400, 25),
       timelineRequest(3, 800, 40),
-      timelineRequest(4, 1600, 80),
+      timelineRequest(4, 1600, 80, { ri: 1 }),
       timelineRequest(5, 3200, 160, { phase: 'warmup' }),
       timelineRequest(6, 6400, 320, { cancelled: true }),
       timelineRequest(7, 0, 0, {
@@ -81,13 +125,13 @@ describe('Agentic point request metric time series', () => {
     ];
     cy.intercept('GET', '/api/v1/trace-histograms*', { body: {} });
     cy.intercept('GET', '/api/v1/trace-server-metrics*', { body: null });
-    cy.intercept('GET', '/api/v1/benchmark-siblings*', { statusCode: 404 });
+    cy.intercept('GET', '/api/v1/benchmark-siblings*', { body: benchmarkSiblings });
     cy.intercept('GET', '/api/v1/request-chart-data*', {
       body: requestChartPayload(requests),
     });
     cy.intercept('GET', '/api/v1/request-timeline*', {
       body: {
-        version: 3,
+        version: 6,
         startNs: 0,
         endNs: 7_000_000_000,
         durationS: 7,
@@ -95,6 +139,225 @@ describe('Agentic point request metric time series', () => {
       },
     });
     cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+  });
+
+  it('uses the shared topology label for the active agentic point', () => {
+    cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
+  });
+
+  it('opens the stored server log and loads it incrementally', () => {
+    const longServerLogPath =
+      'agentic/conc_1152/aiperf_artifacts/logs/aiperf/2026-08-20/server.log';
+    const firstChunk = `INFO server ready\n${'trace line\n'.repeat(4_000)}`;
+    const searchMatchOffset = 70_027;
+    const searchJumpOffset = searchMatchOffset - 16 * 1024;
+    const routerJumpChunk = `${'context line\n'.repeat(1_260)}${'x'.repeat(
+      searchMatchOffset - searchJumpOffset - 'context line\n'.length * 1_260,
+    )}router ready for requests\n`;
+    cy.intercept(
+      { method: 'GET', pathname: '/api/v1/server-log-files' },
+      {
+        body: [longServerLogPath, 'results/benchmark.log', 'results/router.log'],
+      },
+    ).as('serverLogFiles');
+    cy.intercept({ method: 'GET', pathname: '/api/v1/server-log' }, (request) => {
+      const params = new URL(request.url).searchParams;
+      const offset = Number(params.get('offset') ?? 0);
+      const fileName = params.get('file') ?? longServerLogPath;
+      if (fileName === longServerLogPath && offset === 0) {
+        request.alias = 'serverLogInitialChunk';
+      } else if (fileName === longServerLogPath && offset === 31) {
+        request.alias = 'serverLogNextChunk';
+      } else if (fileName === 'results/router.log' && offset === searchJumpOffset) {
+        request.alias = 'serverLogJumpChunk';
+      } else if (fileName === 'results/router.log' && offset === 0) {
+        request.alias = 'serverLogRouterStart';
+      }
+      request.reply({
+        body:
+          fileName === 'results/router.log'
+            ? {
+                id: 206885,
+                fileName,
+                serverLog: offset === searchJumpOffset ? routerJumpChunk : 'INFO router ready\n',
+                offset,
+                nextOffset: null,
+              }
+            : offset === 0
+              ? {
+                  id: 206885,
+                  fileName,
+                  serverLog: `\u001B[32m${firstChunk}\u001B[0m`,
+                  offset: 0,
+                  nextOffset: 31,
+                }
+              : {
+                  id: 206885,
+                  fileName,
+                  serverLog: 'INFO benchmark complete\n',
+                  offset,
+                  nextOffset: null,
+                },
+      });
+    }).as('serverLogChunk');
+    cy.intercept({ method: 'GET', pathname: '/api/v1/server-log-search' }, (request) => {
+      expect(new URL(request.url).searchParams.get('q')).to.equal('router ready');
+      request.reply({
+        body: {
+          id: 206885,
+          query: 'router ready',
+          matches: [
+            {
+              fileName: 'results/router.log',
+              offset: searchMatchOffset,
+              before: 'INFO ',
+              match: 'router ready',
+              after: ' for requests',
+            },
+          ],
+          truncated: false,
+        },
+      });
+    }).as('serverLogSearch');
+    cy.intercept(
+      {
+        method: 'GET',
+        pathname: '/api/v1/server-log',
+        query: {
+          id: '206885',
+          file: longServerLogPath,
+          download: '1',
+        },
+      },
+      {
+        headers: {
+          'content-disposition': 'attachment; filename="server.log"',
+          'content-type': 'text/plain; charset=utf-8',
+        },
+        body: firstChunk,
+      },
+    ).as('serverLogDownload');
+    cy.viewport(480, 900);
+    cy.get('[data-testid="detail-view-logs"]').click();
+    cy.location('search').should('contain', 'view=logs');
+    cy.wait('@serverLogFiles');
+    cy.wait('@serverLogInitialChunk');
+
+    cy.get('[data-testid="agentic-server-log-viewer"]')
+      .should('contain.text', 'Log files')
+      .and('contain.text', longServerLogPath)
+      .then(($viewer) => {
+        cy.get('#agentic-log-file').then(($trigger) => {
+          const viewerBounds = $viewer[0].getBoundingClientRect();
+          const triggerBounds = $trigger[0].getBoundingClientRect();
+          expect(triggerBounds.left).to.be.at.least(viewerBounds.left);
+          expect(triggerBounds.right).to.be.at.most(viewerBounds.right);
+        });
+      });
+    cy.get('[data-testid="server-log-content"]')
+      .should('contain.text', 'INFO server ready')
+      .and('not.contain.text', '\u001B[32m');
+
+    cy.get('[data-testid="server-log-search"]').type('router ready');
+    cy.wait('@serverLogSearch');
+    cy.get('[data-testid="server-log-search-results"]')
+      .should('contain.text', '1 match')
+      .and('contain.text', 'results/router.log')
+      .and('contain.text', 'character 70,028')
+      .and('contain.text', 'INFO router ready for requests');
+
+    cy.get('[data-testid="go-to-server-log-match"]').click();
+    cy.wait('@serverLogJumpChunk').then(({ request }) => {
+      const params = new URL(request.url).searchParams;
+      expect(params.get('file')).to.equal('results/router.log');
+      expect(params.get('offset')).to.equal(String(searchJumpOffset));
+    });
+    cy.get('#agentic-log-file').should('contain.text', 'results/router.log');
+    cy.get('[data-testid="server-log-jump-highlight"]')
+      .should('be.visible')
+      .and('have.text', 'router ready');
+
+    cy.get('#agentic-log-file').click();
+    cy.contains('[role="option"]', longServerLogPath).click();
+    cy.get('[data-testid="server-log-content"]').should('contain.text', 'INFO server ready');
+    cy.get('[data-testid="download-selected-server-log"]')
+      .should('have.attr', 'href')
+      .and('include', 'download=1');
+    cy.get('[data-testid="download-selected-server-log"]').click();
+    cy.wait('@serverLogDownload');
+
+    cy.get('[data-testid="server-log-content"]').scrollTo('bottom');
+    cy.wait('@serverLogNextChunk');
+    cy.get('[data-testid="server-log-content"]')
+      .should('contain.text', 'INFO server ready')
+      .and('contain.text', 'INFO benchmark complete');
+    cy.contains('End of stored log').should('be.visible');
+
+    cy.get('#agentic-log-file').click();
+    cy.contains('[role="option"]', 'results/router.log').click();
+    cy.wait('@serverLogRouterStart');
+    cy.get('[data-testid="server-log-content"]').should('contain.text', 'INFO router ready');
+
+    cy.viewport(1280, 720);
+    cy.get('[data-testid="detail-view-point"]').click();
+  });
+
+  it('keeps loaded log text visible when a later chunk fails', () => {
+    const retainedLog = `INFO retained after failure\n${'trace line\n'.repeat(2_000)}`;
+    cy.intercept(
+      { method: 'GET', pathname: '/api/v1/server-log-files' },
+      { body: ['results/server.log', 'results/benchmark.log'] },
+    );
+    cy.intercept({ method: 'GET', pathname: '/api/v1/server-log' }, (request) => {
+      const params = new URL(request.url).searchParams;
+      const fileName = params.get('file');
+      const offset = Number(params.get('offset') ?? 0);
+      if (fileName !== 'results/benchmark.log') {
+        request.reply({
+          body: {
+            id: 206885,
+            fileName,
+            serverLog: 'INFO initial file\n',
+            offset,
+            nextOffset: null,
+          },
+        });
+        return;
+      }
+      request.alias = 'retainedLogChunk';
+      if (offset === 0) {
+        request.reply({
+          body: {
+            id: 206885,
+            fileName: 'results/benchmark.log',
+            serverLog: retainedLog,
+            offset: 0,
+            nextOffset: 28,
+          },
+        });
+      } else {
+        request.reply({ statusCode: 503, body: { error: 'temporary failure' } });
+      }
+    });
+
+    cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
+    cy.get('[data-testid="detail-view-logs"]').click();
+    cy.location('search').should('contain', 'view=logs');
+    cy.get('#agentic-log-file').click();
+    cy.contains('[role="option"]', 'results/benchmark.log').click();
+    cy.wait('@retainedLogChunk');
+    cy.get('[data-testid="server-log-content"]').should(
+      'contain.text',
+      'INFO retained after failure',
+    );
+    cy.get('[data-testid="load-more-server-log"]').click();
+    cy.contains('The next chunk could not be loaded', { timeout: 15_000 }).should('be.visible');
+    cy.get('[data-testid="server-log-content"]').should(
+      'contain.text',
+      'INFO retained after failure',
+    );
+    cy.get('[data-testid="detail-view-point"]').click();
+    cy.location('search').should('not.contain', 'view=logs');
   });
 
   it('renders rolling P90 interactivity and TTFT by default using profiling requests only', () => {
@@ -210,6 +473,12 @@ describe('Agentic point request metric time series', () => {
     // coverage is now continuous across [0s, 7s]: idle 0ms (0.0%). A 1.00s value
     // here would mean the Gantt had regressed to label-based filtering.
     cy.get('[data-testid="timeline-total-idle-time"]').should('have.text', 'idle 0ms (0.0%)');
+    cy.get('[data-timeline-row-kind="parent"]')
+      .should('have.length', 2)
+      .then(($rows) => {
+        expect($rows.eq(0)).to.contain.text('conversation-1 · replay 1');
+        expect($rows.eq(1)).to.contain.text('conversation-1 · replay 2');
+      });
     cy.get('[data-timeline-row-kind="aux"]')
       .should('have.css', 'padding-left', '24px')
       .and('contain.text', 'aux 011 · parallel');
@@ -219,7 +488,7 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="detail-view-timeline"]').click();
     cy.get('[data-testid="timeline-total-idle-time"]').should('be.visible');
     cy.window().then((win) => {
-      win.history.pushState({}, '', '/datasets/test-dataset/conversations/conversation-1');
+      win.history.pushState({}, '', '/agentx/test-dataset/conversations/conversation-1');
     });
     cy.go('back');
     cy.location('pathname').should('eq', '/inference/agentic/206885');
@@ -234,6 +503,39 @@ describe('Agentic point request metric time series', () => {
       cy.get('svg').should('contain.text', 'Cumulative average');
       cy.get('svg path[stroke="#ef4444"]').should('have.length', 1);
     });
+  });
+
+  it('renders the log viewer in Simplified Chinese', () => {
+    cy.intercept('GET', '/api/v1/trace-server-metrics*', { body: null });
+    cy.intercept('GET', '/api/v1/benchmark-siblings*', { body: benchmarkSiblings });
+    cy.intercept(
+      { method: 'GET', pathname: '/api/v1/server-log-files' },
+      {
+        body: ['results/server.log'],
+      },
+    );
+    cy.intercept(
+      { method: 'GET', pathname: '/api/v1/server-log' },
+      {
+        body: {
+          id: 206885,
+          fileName: 'results/server.log',
+          serverLog: 'INFO server ready\n',
+          offset: 0,
+          nextOffset: null,
+        },
+      },
+    );
+    cy.visit('/zh/inference/agentic/206885?view=logs', { onBeforeLoad: unlockAgenticGate });
+
+    cy.get('[data-testid="detail-view-logs"]')
+      .should('have.attr', 'aria-selected', 'true')
+      .and('have.text', '日志');
+    cy.get('[data-testid="agentic-server-log-viewer"]')
+      .should('contain.text', '日志文件')
+      .and('contain.text', 'results/server.log')
+      .and('contain.text', '搜索所有日志文件')
+      .and('contain.text', '已到达日志末尾');
   });
 });
 

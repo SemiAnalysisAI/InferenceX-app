@@ -35,9 +35,10 @@ function readCapturedCsv(): Cypress.Chainable<string> {
 describe('Inference CSV export with an unofficial-run overlay', () => {
   before(() => {
     interceptOverlayRun();
-    // The agentic default mode is E2E Normalized Interactivity (which suppresses overlays and
-    // fetches derived metrics) — stub the fetch, then switch to the
-    // Interactivity mode this suite's overlay assertions rely on.
+    // Agentic charts default to Interactivity, where the overlay renders. The
+    // derived-metrics fetch now happens only under E2E Normalized Interactivity,
+    // so the stub below is a guard against a stray request rather than a
+    // dependency of this suite.
     interceptDerivedAgenticMetrics();
     cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90`, {
       onBeforeLoad(win) {
@@ -47,12 +48,11 @@ describe('Inference CSV export with an unofficial-run overlay', () => {
       },
     });
     cy.wait('@unofficialRun');
-    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
-    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
-      'have.attr',
-      'aria-selected',
-      'true',
-    );
+    // Every x-axis metric is a top-level tab on agentic charts, and Interactivity
+    // is the default — clicked anyway so the suite does not depend on that.
+    cy.get('[data-testid="x-axis-mode-interactivity"]')
+      .click()
+      .should('have.attr', 'data-state', 'active');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should('exist');
   });
 

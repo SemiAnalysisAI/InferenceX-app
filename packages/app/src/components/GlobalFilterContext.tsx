@@ -1,5 +1,7 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
+
 import {
   type ReactNode,
   createContext,
@@ -24,6 +26,7 @@ function isEnumValue<T extends Record<string, string>>(e: T, v: string): v is T[
 import { useAvailability } from '@/hooks/api/use-availability';
 import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
+import { refreshUrlParams } from '@/lib/url-state';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import {
   Model,
@@ -42,13 +45,12 @@ const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
 
 // Placeholder for the public (non-null) `effectiveSequence` during the window
-// before availability has loaded. It must be a fixed-seq scenario — never
-// AgenticTraces — so the scenario selector doesn't flash "Agentic Traces" for a
-// fixed-seq-only model while the chart shows its loading skeleton. `8k/1k` is
-// the app default scenario. Consumers that must not act on an unresolved
-// sequence gate on `sequenceResolved` instead.
+// before availability has loaded. It stays on the fixed-sequence app default
+// until availability confirms whether the selected model has AgentX data, so a
+// fixed-seq-only model never flashes an agentic label. Consumers that must not
+// act on an unresolved sequence gate on `sequenceResolved` instead.
 // (Declared after the import block so it never references `Sequence` above its import.)
-const PRE_AVAILABILITY_SEQUENCE = Sequence.EightK_OneK;
+const APP_DEFAULT_SEQUENCE = Sequence.EightK_OneK;
 
 interface RunInfo {
   runId: string;
@@ -61,6 +63,7 @@ interface RunInfo {
       description: string;
       pr_link: string | null;
       head_ref: string;
+      append_only?: boolean;
     }[];
   };
 }
@@ -134,6 +137,7 @@ function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
             description: c.description,
             pr_link: c.pr_link,
             head_ref: c.head_ref,
+            append_only: c.append_only,
           })),
         },
       }),
@@ -166,14 +170,35 @@ export function GlobalFilterProvider({
     () => initialModel ?? Model.DeepSeek_V4_Pro,
   );
 
-  const [selectedSequence, setSelectedSequence] = useState<Sequence>(() => {
+  const [selectedSequence, setSelectedSequenceRaw] = useState<Sequence>(() => {
     if (initialSequence) return initialSequence;
     const urlSeq = getUrlParam('i_seq');
     if (urlSeq && Object.values(Sequence).includes(urlSeq as Sequence)) return urlSeq as Sequence;
-    // Default to the 8K/1K fixed-seq scenario; the effectiveSequence fallback
-    // below handles models that lack it (e.g. agentic-only models).
+    // Default to the 8K/1K fixed-seq scenario; the effectiveSequence resolution
+    // below prefers the Agentic scenario when availability confirms the model
+    // has corresponding data, and handles models that lack 8K/1K entirely.
     return Sequence.EightK_OneK;
   });
+  // Whether the scenario was chosen explicitly (seeded `initialSequence` prop,
+  // URL `i_seq`, or a manual pick). Until then the availability-driven AgentX
+  // default applies —
+  // without this flag the initial `8k/1k` state is indistinguishable from a
+  // deliberate 8K/1K selection, and the Agentic scenario could never win.
+  //
+  // Deliberately NOT seeded from `i_seq` here: this flag feeds the scenario
+  // label rendered during the pre-availability window, and `getUrlParam` sees
+  // the query string on the client but not on the server. Reading it in the
+  // initializer would render a different label on each side and fail
+  // hydration. The layout effect below applies `i_seq` (flag included) after
+  // the first commit and before paint, which is how every other URL param
+  // lands.
+  const [sequenceExplicit, setSequenceExplicit] = useState<boolean>(
+    () => initialSequence !== undefined,
+  );
+  const setSelectedSequence = useCallback((sequence: Sequence) => {
+    setSelectedSequenceRaw(sequence);
+    setSequenceExplicit(true);
+  }, []);
 
   const initialValidPrecisions = useMemo(
     () =>
@@ -205,7 +230,23 @@ export function GlobalFilterProvider({
   // so users with shareable URLs (?i_seq=…&g_model=…) see their values without
   // flicker, and SSR/client hydration agree because initial state came from
   // props/defaults on both sides.
+  // Soft navigations do not remount this provider, and `useUrlState` caches the
+  // URL in a ref at first render — so without this, landing on
+  // `/inference?g_model=Qwen-3.5-397B-A17B` via a <Link> kept whatever model
+  // the previous page had (the default, DeepSeek). Every AgentX card on the
+  // landing page pointed at the right URL and still opened the wrong model.
+  // `usePathname` rather than `useSearchParams`: the latter forces every
+  // statically-prerendered page that mounts this provider behind a Suspense
+  // boundary, which fails the build on /ai-chart. Pathname changes on the
+  // navigations that matter here — the AgentX cards and every share link live
+  // on a different route from /inference.
+  const pathname = usePathname();
+
   useIsomorphicLayoutEffect(() => {
+    // Pull the live URL into the shared snapshot first: `getUrlParam` below and
+    // the auto-switch guard further down both read from it, and on a soft
+    // navigation it still holds the previous page's params.
+    refreshUrlParams();
     const applyIfEnum = <T extends Record<string, string>>(
       key: 'g_model' | 'i_seq',
       enumType: T,
@@ -237,8 +278,14 @@ export function GlobalFilterProvider({
     }
     applyIfMatches('g_rundate', RUNDATE_RE, setSelectedRunDateBase);
     applyIfMatches('g_runid', RUNID_RE, setSelectedRunId);
+    // Re-runs on client-side navigation as well as on mount. Keyed on the
+    // pathname, which the Next router owns: the provider's own share-link
+    // writes go through `history.replaceState` and never change it, so this
+    // cannot fight a user changing filters in place. A param-only navigation
+    // within /inference is therefore not picked up — no in-app link does that
+    // today, and covering it would mean the Suspense bailout above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pathname]);
 
   // ── Availability data ─────────────────────────────────────────────────────
   const { data: availabilityRows } = useAvailability();
@@ -327,20 +374,21 @@ export function GlobalFilterProvider({
   // — we surface that as `sequenceResolved` so InferenceContext can gate the
   // benchmark fetch until the real sequence is known (no agentic fetch fires for
   // a fixed-seq-only model). For the non-null public `effectiveSequence` value
-  // we substitute a fixed-seq scenario (never AgenticTraces) during that window
-  // so the scenario selector never flashes "Agentic Traces"; the chart shows its
-  // normal loading skeleton until `sequenceResolved` flips true.
+  // we retain the fixed-sequence placeholder until availability confirms the
+  // AgentX scenario exists; the chart shows its normal loading skeleton until
+  // `sequenceResolved` flips true.
   const resolvedSequence = useMemo(
     () =>
       resolveEffectiveSequence({
         selectedSequence,
         availableSequences,
         availabilityLoaded,
+        sequenceExplicit,
       }),
-    [selectedSequence, availableSequences, availabilityLoaded],
+    [selectedSequence, availableSequences, availabilityLoaded, sequenceExplicit],
   );
   const sequenceResolved = resolvedSequence !== null;
-  const effectiveSequence = resolvedSequence ?? PRE_AVAILABILITY_SEQUENCE;
+  const effectiveSequence = resolvedSequence ?? APP_DEFAULT_SEQUENCE;
 
   // Precisions available for the selected model + sequence (DB ∪ unofficial run)
   const availablePrecisions = useMemo(() => {

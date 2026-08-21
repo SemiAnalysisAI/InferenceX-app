@@ -48,8 +48,8 @@ jobs:
   dump:
     name: Dump and compress
     needs: preflight
-    timeout-minutes: 180
-    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    runs-on: blacksmith-32vcpu-ubuntu-2404
     steps:
       - name: Dump, compress, and split database
         env:
@@ -86,7 +86,7 @@ jobs:
           cat SHA256SUMS
 
       - name: Upload dump parts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: db-dump-parts
           path: |
@@ -105,7 +105,7 @@ jobs:
       contents: write # Create the database dump release
     steps:
       - name: Download dump parts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: db-dump-parts
 

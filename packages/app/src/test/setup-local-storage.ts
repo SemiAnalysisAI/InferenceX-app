@@ -38,3 +38,24 @@ Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
   value: new MemoryStorage(),
 });
+
+// jsdom ships no `matchMedia`. Components that gate rendering on a breakpoint
+// need it to exist; default to "matches" so a component under test behaves as
+// it does on a desktop viewport unless a test overrides the stub.
+if (globalThis.window !== undefined && !globalThis.window.matchMedia) {
+  Object.defineProperty(globalThis.window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: (query: string): MediaQueryList =>
+      ({
+        matches: true,
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList,
+  });
+}

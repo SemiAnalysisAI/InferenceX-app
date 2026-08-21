@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useMemo } from 'react';
 
+import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
+
 import type { GPUDataPoint, InterpolatedResult } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
 import { CompareInterpolatedTable } from '@/components/compare/compare-interpolated-table';
@@ -12,6 +14,7 @@ import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
 import { track } from '@/lib/analytics';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare-enum-coerce';
+import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
 
 interface SsrTableData {
   defaultTargets: number[];
@@ -79,6 +82,9 @@ interface ComparePerDollarPageClientProps {
    *  but varies across pages in the catalog. Empty array when there's no
    *  comparable data. */
   narrative: string[];
+  /** Set only when the page is rendering the agentic workload. Explains
+   *  what AgentX measures before the head-to-head numbers. */
+  agenticIntro?: AgenticScenarioIntro | null;
   aLabel: string;
   bLabel: string;
   aVendor: string;
@@ -106,6 +112,7 @@ export default function ComparePerDollarPageClient({
   defaultPrecision,
   ssrTableData,
   narrative,
+  agenticIntro = null,
   aLabel,
   bLabel,
   aVendor,
@@ -175,6 +182,21 @@ export default function ComparePerDollarPageClient({
                   .
                 </p>
               )}
+              {agenticIntro && (
+                <p
+                  className="mt-3 max-w-3xl text-sm text-foreground/80"
+                  data-testid="compare-agentic-intro"
+                >
+                  {agenticIntro.paragraph}{' '}
+                  <Link
+                    href={agenticIntro.href}
+                    data-testid="compare-agentic-intro-link"
+                    className="font-medium text-brand underline underline-offset-4 hover:no-underline"
+                  >
+                    {agenticIntro.linkLabel} →
+                  </Link>
+                </p>
+              )}
               {narrative.length > 0 && (
                 <div
                   className="mt-3 flex flex-col gap-2"
@@ -208,13 +230,13 @@ export default function ComparePerDollarPageClient({
                   {bCostPerGpuHr > 0 ? `$${bCostPerGpuHr.toFixed(2)}/chip/hr` : '—'}.{' '}
                   {t.pricingSource}{' '}
                   <a
-                    href="https://semianalysis.com/ai-cloud-tco-model/"
+                    href={TCO_SOURCE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="underline hover:text-primary"
                     onClick={() => track('compare_per_dollar_tco_source_clicked', { slug })}
                   >
-                    SemiAnalysis Market July 2026 Pricing Surveys &amp; AI Cloud TCO Model
+                    {TCO_SOURCE_TITLE}
                   </a>
                   .
                 </p>

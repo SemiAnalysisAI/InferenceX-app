@@ -56,7 +56,7 @@ export async function computeTraceDerivedPayloads(
   options: TraceDerivedComputeOptions = {},
 ): Promise<TraceDerivedPayloads> {
   const profileStatsPromise = computeAggregateStats({ profileBlob, serverBlob: null });
-  const requestTimeline = computeRequestTimeline(profileBlob);
+  const requestTimelinePromise = computeRequestTimeline(profileBlob);
 
   const phases = serverBlob
     ? await collectMetricPhases<RawMetric>(
@@ -65,7 +65,11 @@ export async function computeTraceDerivedPayloads(
         options.maxInMemoryBytes,
       ).catch(() => null)
     : null;
-  let aggregateStats = await profileStatsPromise;
+  const [initialAggregateStats, requestTimeline] = await Promise.all([
+    profileStatsPromise,
+    requestTimelinePromise,
+  ]);
+  let aggregateStats = initialAggregateStats;
   let chartSeries: ChartSeries | null = null;
 
   if (phases) {

@@ -2,14 +2,69 @@
  * Global e2e setup. Loaded before every `cy.visit` via `supportFile` in
  * `cypress.config.ts`.
  *
- * Snoozes the feedback-modal nudge so it doesn't render its centered modal
- * + backdrop on top of the UI under test. Specs that want to exercise the
+ * Suppresses the two centered modals (feedback-modal on the dashboard, the
+ * agentic-results launch modal on the landing page) so their backdrops don't
+ * sit on top of the UI under test. Specs that want to exercise the
  * feedback-modal flow can clear `inferencex-feedback-modal-snoozed` in their
- * own `onBeforeLoad`.
+ * own `onBeforeLoad`, which runs after this hook; specs that exercise the
+ * launch modal call `keepLaunchModal()` instead — see below.
  */
+import 'cypress-axe';
+
+let suppressLaunchModal = true;
+let suppressTelemetryTutorial = true;
+let suppressAgenticCoachMark = true;
+
+/**
+ * Opt the whole spec out of the launch-modal suppression.
+ *
+ * Clearing the key in a visit's `onBeforeLoad` is not enough: this hook also
+ * fires on `cy.reload()`, which takes no `onBeforeLoad`, so the key would be
+ * re-seeded behind the test and a "still dismissed after reload" assertion
+ * would pass even if dismissal never persisted anything. Call this at the top
+ * of any spec that owns launch-modal state.
+ */
+export function keepLaunchModal(): void {
+  suppressLaunchModal = false;
+}
+
+/**
+ * Opt the whole spec out of the telemetry-tutorial suppression, for the same
+ * reason as `keepLaunchModal` — the card is seeded on `cy.reload()` too, so a
+ * per-visit `onBeforeLoad` clear cannot own its state.
+ *
+ * The card is a bottom-right modal on /inference/agentic/[id]. It has no
+ * backdrop, but it sits over the last chart in the grid, so agentic specs
+ * suppress it by default.
+ */
+export function keepTelemetryTutorial(): void {
+  suppressTelemetryTutorial = false;
+}
+
+/**
+ * Opt the whole spec out of the agentic point coach-mark suppression, for the
+ * same reason as `keepLaunchModal` — the key is re-seeded on `cy.reload()`, so
+ * a per-visit `onBeforeLoad` clear cannot own its state.
+ *
+ * The callout is anchored to a point inside `[data-testid="scatter-graph"]`,
+ * so on the agentic view it sits over the plot area that other specs click.
+ */
+export function keepAgenticCoachMark(): void {
+  suppressAgenticCoachMark = false;
+}
+
 Cypress.on('window:before:load', (win) => {
   try {
     win.localStorage.setItem('inferencex-feedback-modal-snoozed', String(Date.now()));
+    if (suppressLaunchModal) {
+      win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
+    }
+    if (suppressTelemetryTutorial) {
+      win.localStorage.setItem('inferencex-agentx-telemetry-tutorial-dismissed', '1');
+    }
+    if (suppressAgenticCoachMark) {
+      win.localStorage.setItem('inferencex-agentic-point-coach-mark-dismissed', '1');
+    }
   } catch {
     // localStorage unavailable — fine, the test will just see the modal.
   }
@@ -19,14 +74,14 @@ Cypress.on('window:before:load', (win) => {
  * Seed the shared feature-gate flag (the same localStorage key the ↑↑↓↓ konami
  * unlock writes — see use-feature-gate.ts).
  *
- * The agentic surfaces (the "Agentic Traces" scenario, /datasets,
- * /inference/agentic/[id], and the Datasets nav link) are now PUBLIC by default
+ * The agentic surfaces (the "Agentic" scenario, /agentx,
+ * /inference/agentic/[id], and the AgentX nav link) are now PUBLIC by default
  * — they no longer sit behind this gate — so agentic specs no longer need it.
  * The helper is retained as a harmless no-op for those specs (and still unlocks
  * the remaining hidden features: the "Hidden" tab dropdown and Measured Energy).
  *
  * Call from a spec's `cy.visit(..., { onBeforeLoad })`:
- *   cy.visit('/datasets/x', { onBeforeLoad: unlockAgenticGate });
+ *   cy.visit('/agentx/x', { onBeforeLoad: unlockAgenticGate });
  * or compose inside an existing hook: `unlockAgenticGate(win)`.
  */
 export function unlockAgenticGate(win: Window): void {

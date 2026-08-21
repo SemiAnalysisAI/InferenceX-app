@@ -49,8 +49,13 @@ describe('Footer', () => {
     cy.get('[data-testid="footer-link-benchmarks"]')
       .should('have.attr', 'href')
       .and('include', 'github.com/SemiAnalysisAI/InferenceX');
-    cy.get('[data-testid="footer-link-frontend"]')
-      .should('have.attr', 'href')
+    cy.get('[data-testid="footer-link-agentx-harness"]')
+      .should('contain.text', 'AgentX Harness')
+      .and('have.attr', 'href')
+      .and('include', 'github.com/SemiAnalysisAI/agentx-harness');
+    cy.get('[data-testid="footer-link-visualization"]')
+      .should('contain.text', 'Visualization')
+      .and('have.attr', 'href')
       .and('include', 'github.com/SemiAnalysisAI/InferenceX-app');
   });
 
@@ -58,9 +63,9 @@ describe('Footer', () => {
     cy.get('[data-testid="footer-link-supporters"]')
       .should('contain.text', 'Supporters')
       .and('have.attr', 'href', '/quotes');
-    cy.get('[data-testid="footer-link-datasets"]')
-      .should('contain.text', 'Datasets')
-      .and('have.attr', 'href', '/datasets');
+    cy.get('[data-testid="footer-link-agentx"]')
+      .should('contain.text', 'AgentX')
+      .and('have.attr', 'href', '/agentx');
     cy.get('[data-testid="footer-link-articles"]')
       .should('contain.text', 'Articles')
       .and('have.attr', 'href', '/blog');

@@ -13,6 +13,7 @@ import { enAlternates } from '@/lib/i18n';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
 import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
 import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
 import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
@@ -108,6 +109,11 @@ export default async function ComparePerDollarIndexPage() {
             each page renders the cost-per-token chart and an interpolated dollars-per-million
             comparison table so you can pick the cheaper SKU at any target interactivity level.
           </p>
+          <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
+            Models with AgentX data open long-context, multi-turn trace replay results. Models not
+            yet covered by AgentX open the controlled 8K→1K workload. Each card identifies its
+            scenario.
+          </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               data-testid="compare-per-dollar-index-compare-link"
@@ -146,6 +152,9 @@ export default async function ComparePerDollarIndexPage() {
       {modelsWithPairs.map((model) => {
         const pairs = comparablePairsByModel.get(model.slug) ?? [];
         const groups = groupPairsByVendorForModel(model, pairs);
+        // Same scenario split /compare uses: models with AgentX data open the
+        // agentic trace replay, the rest open the fixed 8K→1K workload.
+        const scenario = comparisonScenarioForModel(model);
         return (
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
@@ -170,10 +179,11 @@ export default async function ComparePerDollarIndexPage() {
                       return (
                         <ComparePairCardLink
                           key={slug}
-                          href={`/compare-per-dollar/${slug}`}
+                          href={comparisonPairHref('en', slug, model, 'compare-per-dollar')}
                           slug={slug}
                           label={label}
                           archLine={archLine}
+                          scenarioLabel={scenario.label}
                         />
                       );
                     })}

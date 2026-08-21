@@ -9,6 +9,12 @@ import {
 } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
+import { AGENTIC_SCENARIO_INTRO_ZH } from '@/lib/compare-ssr-zh';
+import {
+  isAgenticSequence,
+  type ScenarioSegment,
+  sequenceForScenarioSegment,
+} from '@/lib/compare-scenario-route';
 import { getCachedBenchmarks, KNOWN_SEQUENCES, pickString } from '@/lib/compare-ssr';
 import {
   canonicalPrecisionCompareSlug,
@@ -32,6 +38,30 @@ import ComparePrecisionPageClient from '../../../compare-precision/[slug]/page-c
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * `/zh/compare-precision/<slug>/<scenario>` renders this same page with the workload
+ * pinned by the path. The segment is threaded through rather than duplicated
+ * in a parallel route file so the body — redirects, JSON-LD, metadata, client
+ * props — is written once and cannot drift between the two URLs.
+ */
+export interface ScenarioOptions {
+  scenarioSegment?: ScenarioSegment;
+}
+
+/** English twin of `scenarioPath` — hreflang pairs are keyed off the
+ *  English route, so the segment has to survive the locale swap. */
+function enScenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): string {
+  return scenarioSegment
+    ? `/compare-precision/${canonical}/${scenarioSegment}`
+    : `/compare-precision/${canonical}`;
+}
+
+function scenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): string {
+  return scenarioSegment
+    ? `/zh/compare-precision/${canonical}/${scenarioSegment}`
+    : `/zh/compare-precision/${canonical}`;
+}
+
 interface Props {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -39,6 +69,13 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+  return buildPrecisionMetadataZh(slug, {});
+}
+
+export function buildPrecisionMetadataZh(
+  slug: string,
+  { scenarioSegment }: ScenarioOptions,
+): Metadata {
   const parsed = parsePrecisionCompareSlug(slug);
   if (!parsed) return {};
   const gpuMeta = HW_REGISTRY[parsed.gpu];
@@ -51,12 +88,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     parsed.precA,
     parsed.precB,
   );
-  const url = `${SITE_URL}/zh/compare-precision/${canonical}`;
+  // The scenario segments are views of one comparison, so the bare slug URL
+  // stays the indexable representative and every segment canonicalizes to it.
+  // Without this, `/…/<slug>/<default-scenario>` and `/…/<slug>` would serve
+  // byte-identical pages, each claiming to be canonical.
+  const routePath = scenarioPath(canonical, scenarioSegment);
+  const url = `${SITE_URL}${routePath}`;
   const description = `${gpuLabel} 上 ${aLabel} 与 ${bLabel} 精度对比（${parsed.model.label}）：来自 InferenceX（SemiAnalysis 推出的独立开源基准测试平台）的经验证、可复现的结果。${SUPPORTERS_LINE_ZH}查看哪种量化精度在各交互性水平下吞吐量和成本更优。`;
   return {
     title: `${parsed.model.label} — ${gpuLabel} ${aLabel} vs ${bLabel} — 精度对比`,
     description,
-    alternates: zhAlternates(`/compare-precision/${canonical}`),
+    alternates: zhAlternates(enScenarioPath(canonical)),
     openGraph: {
       title: `${parsed.model.label} — ${gpuLabel} ${aLabel} vs ${bLabel} — 精度对比 | ${SITE_NAME}`,
       description,
@@ -74,10 +116,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ComparePrecisionPageZh({ params, searchParams }: Props) {
   const { slug } = await params;
+  return renderPrecisionPageZh(slug, await searchParams, {});
+}
+
+export async function renderPrecisionPageZh(
+  slug: string,
+  sp: Record<string, string | string[] | undefined>,
+  { scenarioSegment }: ScenarioOptions,
+) {
   const parsed = parsePrecisionCompareSlug(slug);
   if (!parsed) notFound();
-
-  const sp = await searchParams;
 
   const canonical = canonicalPrecisionCompareSlug(
     parsed.model.slug,
@@ -94,7 +142,9 @@ export default async function ComparePrecisionPageZh({ params, searchParams }: P
       })
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
-    permanentRedirect(`/zh/compare-precision/${canonical}${qs ? `?${qs}` : ''}`);
+    // Keep the scenario segment across the redirect — dropping it would send
+    // the reader to the pair's default workload instead.
+    permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
   const rows = await getCachedBenchmarks(parsed.model.dbKeys);
@@ -110,7 +160,11 @@ export default async function ComparePrecisionPageZh({ params, searchParams }: P
   );
 
   const urlSeq = pickString(sp.i_seq);
-  const effectiveSequence = urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence;
+  // Path beats query beats the pair's default: a scenario segment is an
+  // explicit address for one workload, so it outranks a stale `?i_seq=`.
+  const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
+  const effectiveSequence =
+    pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence);
 
   const { defaultTargets, ssrRows, interactivityRange } = computeVariantCompareTableData(
     rows,
@@ -128,7 +182,7 @@ export default async function ComparePrecisionPageZh({ params, searchParams }: P
   const aLabel = precisionDisplayLabel(parsed.precA);
   const bLabel = precisionDisplayLabel(parsed.precB);
 
-  const url = `${SITE_URL}/zh/compare-precision/${canonical}`;
+  const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
   // The PNG route exists only under the EN tree; zh JSON-LD references it there.
   const imageUrl = `${SITE_URL}/compare-precision/${canonical}/precision-comparison.png`;
   const { oldest, newest } = dateRangeForVariantPair(rows, parsed.gpu, sideA, sideB);
@@ -172,6 +226,7 @@ export default async function ComparePrecisionPageZh({ params, searchParams }: P
         precB={parsed.precB}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         narrative={narrative}
+        agenticIntro={isAgenticSequence(effectiveSequence) ? AGENTIC_SCENARIO_INTRO_ZH : null}
         gpuLabel={gpuLabel}
         gpuVendor={gpuMeta?.vendor ?? ''}
         gpuArch={gpuMeta?.arch ?? ''}

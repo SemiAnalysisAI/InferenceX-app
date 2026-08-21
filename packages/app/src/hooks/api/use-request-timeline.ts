@@ -3,6 +3,8 @@ import { useByIdQuery } from './benchmark-id-query';
 export interface RequestRecord {
   /** Conversation id (groups turns of one agent session). */
   cid: string;
+  /** Compact replay-lane id; separates concurrent reuses of one conversation. */
+  ri?: number;
   /** Zero-based turn index within the conversation. */
   ti: number;
   /** Source trace id from the original raw dataset, when provided by AIPerf. */

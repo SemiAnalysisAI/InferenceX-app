@@ -20,14 +20,34 @@ import {
 } from '@/components/ui/input-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 import { HW_REGISTRY, type HwEntry } from '@semianalysisai/inferencex-constants';
 type GpuValuePanelKind = 'costs' | 'powers';
+
+const STRINGS = {
+  en: {
+    reset: 'Reset',
+    resetToDefaults: 'Reset to defaults',
+    calculate: 'Calculate',
+    invalidNumber: 'Must be a valid number',
+    nonNegative: 'Must be a non-negative number',
+  },
+  zh: {
+    reset: '重置',
+    resetToDefaults: '恢复默认值',
+    calculate: '计算',
+    invalidNumber: '请输入有效数字',
+    nonNegative: '请输入非负数',
+  },
+} as const;
 
 const PANEL_CONFIG: Record<
   GpuValuePanelKind,
   {
     title: string;
+    titleZh: string;
     description: string;
+    descriptionZh: string;
     sectionTestId: string;
     calculateTestId: string;
     inputIdPrefix: string;
@@ -38,8 +58,11 @@ const PANEL_CONFIG: Record<
 > = {
   costs: {
     title: 'Custom Chip Costs',
+    titleZh: '自定义 Chip 成本',
     description:
-      'Enter your own TCO (Total Cost of Ownership) values for each chip in $/chip/hr. These values will be used to calculate custom cost metrics.',
+      'Enter your own TCO (Total Cost of Ownership) values for each chip in $/chip/hr. These values determine the selected token cost metric.',
+    descriptionZh:
+      '输入每个 Chip 的自定义 TCO（总拥有成本），单位为 $/chip/hr。这些值用于计算所选 token 成本指标。',
     sectionTestId: 'custom-costs-section',
     calculateTestId: 'custom-costs-calculate',
     inputIdPrefix: 'cost-input',
@@ -49,8 +72,11 @@ const PANEL_CONFIG: Record<
   },
   powers: {
     title: 'Custom Chip Powers',
+    titleZh: '自定义 Chip 功耗',
     description:
       'Enter your own Token Throughput per All in Utility MW (tok/s/MW) values for each chip. These values will be used to calculate custom power metrics.',
+    descriptionZh:
+      '输入每个 Chip 的自定义全电源配置兆瓦 token 吞吐量（tok/s/MW）。这些值用于计算自定义功耗指标。',
     sectionTestId: 'custom-powers-section',
     calculateTestId: 'custom-powers-calculate',
     // Preserve legacy input IDs so existing Cypress selectors keep passing.
@@ -124,6 +150,8 @@ function renderSkeleton(title: string, description: string) {
 
 const CustomGpuValuePanel = memo(
   ({ loading, kind }: { loading: boolean; kind: GpuValuePanelKind }) => {
+    const locale = useLocale();
+    const t = STRINGS[locale];
     const {
       selectedYAxisMetric,
       selectedPrecisions,
@@ -134,6 +162,8 @@ const CustomGpuValuePanel = memo(
     } = useInference();
 
     const config = PANEL_CONFIG[kind];
+    const title = locale === 'zh' ? config.titleZh : config.title;
+    const description = locale === 'zh' ? config.descriptionZh : config.description;
     const applyValues = kind === 'costs' ? setUserCosts : setUserPowers;
 
     const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
@@ -186,18 +216,27 @@ const CustomGpuValuePanel = memo(
       }
     }, [defaultValues, selectedModel, selectedPrecisions, selectedSequence, selectedYAxisMetric]);
 
-    const handleInputChange = useCallback((gpuKey: string, value: string) => {
-      const validationError = validateCustomGpuValueInput(value);
+    const handleInputChange = useCallback(
+      (gpuKey: string, value: string) => {
+        const validationError = validateCustomGpuValueInput(value);
+        const localizedError =
+          locale === 'zh' && validationError === STRINGS.en.invalidNumber
+            ? t.invalidNumber
+            : locale === 'zh' && validationError === STRINGS.en.nonNegative
+              ? t.nonNegative
+              : validationError;
 
-      setInputErrors((prev) => ({
-        ...prev,
-        [gpuKey]: validationError,
-      }));
-      setLastCalculatedValues((prev) => ({
-        ...prev,
-        [gpuKey]: value,
-      }));
-    }, []);
+        setInputErrors((prev) => ({
+          ...prev,
+          [gpuKey]: localizedError,
+        }));
+        setLastCalculatedValues((prev) => ({
+          ...prev,
+          [gpuKey]: value,
+        }));
+      },
+      [locale, t.invalidNumber, t.nonNegative],
+    );
 
     const handleReset = useCallback(() => {
       track(config.resetEvent, {
@@ -226,13 +265,13 @@ const CustomGpuValuePanel = memo(
     }, [applyValues, config, inputErrors, lastCalculatedValues, selectedYAxisMetric, stableGpus]);
 
     if (loading || stableGpus.length === 0) {
-      return renderSkeleton(config.title, config.description);
+      return renderSkeleton(title, description);
     }
 
     return (
       <Card data-testid={config.sectionTestId}>
-        <h2 className="text-lg font-semibold mb-2">{config.title}</h2>
-        <p className="text-muted-foreground text-sm mb-4">{config.description}</p>
+        <h2 className="text-lg font-semibold mb-2">{title}</h2>
+        <p className="text-muted-foreground text-sm mb-4">{description}</p>
 
         <div className="flex flex-col gap-4">
           <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -254,13 +293,13 @@ const CustomGpuValuePanel = memo(
             <Button
               onClick={handleReset}
               variant="ghost"
-              aria-label="Reset to defaults"
-              title="Reset to defaults"
+              aria-label={t.resetToDefaults}
+              title={t.resetToDefaults}
             >
-              Reset
+              {t.reset}
             </Button>
             <Button data-testid={config.calculateTestId} onClick={handleRecalculate}>
-              Calculate
+              {t.calculate}
             </Button>
           </div>
         </div>

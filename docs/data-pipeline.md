@@ -31,16 +31,40 @@ Every INSERT uses `ON CONFLICT DO UPDATE` or `DO NOTHING`. This means:
 - **Partial failures recover**: If ingest crashes mid-batch, re-running picks up where it left off.
 - **No cleanup needed**: No "delete old data first" step that could leave the DB empty on failure.
 
-The unique constraints match natural keys (e.g., `(workflow_run_id, config_id, isl, osl, conc)` for benchmarks), not surrogate keys.
+The unique constraints match natural keys (for benchmarks, workflow/config/scenario,
+concurrency, offload mode, and the nullable recipe fingerprint), not surrogate keys.
+
+### Append-Only Curve Extensions
+
+Normal workflow runs are complete line snapshots: the latest run for a line replaces
+the prior run as a unit, so partial re-sweeps cannot silently stitch points from
+different recipes. A changelog containing only `append-only: true` entries marks the
+one narrow exception. The latest-curve queries then walk backward through consecutive
+append-only runs and include the nearest full snapshot, selecting the newest producer
+for each recipe and concurrency. The producer stamps every new point with a deterministic
+`recipe_fingerprint`, so variants that share the app's normalized topology and concurrency
+remain separate. Historical rows have a null fingerprint and retain their legacy identity.
+
+The chain continues only while the image is identical. Each returned benchmark row
+keeps its original workflow-run ID and run URL, so extending a curve does not erase
+point provenance; `curve_date` and `curve_workflow_run_id` carry the separate logical
+snapshot identity used by charts and history. InferenceX CI separately verifies that
+the generated matrix is strictly additive: existing recipes and points are immutable,
+while newly added concurrency points or complete recipe variants may run as deltas.
+All appended points must retain the target curve's image, and benchmark-affecting code
+changes must be isolated to the new points.
 
 ### Audited Point Purges
 
 `packages/db/src/etl/run-overrides.ts` is the durable audit record for exceptional
 data removal. Use `PURGED_BENCHMARK_POINTS` when a valid workflow run contains a
 specific invalid result, such as a server hang. Each record names `githubRunId`,
-`runAttempt`, `configId`, `benchmarkType`, `isl`, `osl`, `conc`, and `offloadMode`,
-with a dated reason comment. The full identity is required because one run can
-contain multiple serving configurations at the same sequence lengths and concurrency.
+`runAttempt`, `configId`, `benchmarkType`, `isl`, `osl`, `conc`, `offloadMode`, and
+the optional nullable `recipeFingerprint`, with a dated reason comment. A fingerprint
+targets exactly that recipe; omitting it or setting it to null targets only legacy rows
+whose stored fingerprint is null. The full identity is required because one run can
+contain multiple serving configurations and recipes at the same sequence lengths and
+concurrency.
 
 `bun run db:apply-overrides` previews every matching row and requires confirmation
 before deleting it in a transaction. It also removes unreferenced server logs and
@@ -53,6 +77,44 @@ metadata, it matches the same run and full point identity across attempts. This
 conservative fallback prevents a failed GitHub lookup from restoring a suppressed
 point. It can only suppress an identical point from another attempt while that
 attempt remains unknown.
+
+### Audited Run Backfills
+
+Exceptional metadata corrections use the same reviewed, automatically enforced ledger
+as purges. Add a `CHANGELOG_BACKFILLS` or `BENCHMARK_POINT_BACKFILLS` entry in
+`packages/db/src/etl/run-overrides.ts`; never add a one-off production SQL statement.
+Every entry has a stable kebab-case `id`, a human-readable `reason`, an exact run attempt,
+and the target table's complete natural-key selector. The source-control history records
+who approved the correction and why, while the stable ID appears in ingest and apply logs.
+
+Changelog backfills select `(githubRunId, runAttempt, baseRef, headRef)` and can patch
+`configKeys`, `description`, `prLink`, or `appendOnly`. An `appendOnly` correction updates
+both `changelog_entries.append_only` and `workflow_runs.append_only` atomically because
+the materialized benchmark view reads the run-level value.
+
+Benchmark point backfills use the same complete point selector as audited point purges:
+`githubRunId`, `runAttempt`, `configId`, `benchmarkType`, `isl`, `osl`, `conc`,
+`offloadMode`, and nullable `recipeFingerprint`. Their `set` block supports a shallow
+`metricsMerge`, top-level `metricsRemove`, and `offloadMode`. Setting `offloadMode`
+updates both the first-class column and `metrics.offload_mode`; for example, a missed CPU
+KV offload annotation can set `offloadMode: 'on'` and merge `kv_offloading` plus backend
+metadata in one correction. Unrelated metrics remain unchanged.
+
+Run `bun run admin:db:apply-overrides` to preview the exact rows, reasons, and patches;
+the command requires confirmation unless passed `--yes`. It fails before writing when a
+target is missing, when a point's desired identity already exists, or when registry
+validation finds an overlap or duplicate. Writes are verified against the declared state
+and `latest_benchmarks` is refreshed afterward. Merges to `master` run the same command in
+CI, followed by database verification, cache invalidation, and cache warmup.
+
+Point corrections are additionally applied before each CI or GCS benchmark insert. This
+prevents a later idempotent re-ingest from restoring the artifact's original value. The
+ingest tracks source and desired identities across the run and fails on a collision instead
+of silently collapsing two distinct artifact points. When GCS cannot recover an attempt
+number, it follows the purge path's conservative fallback and matches the exact run and
+point across attempts; the log records the applied backfill ID. Changelog corrections are
+likewise applied to artifact metadata before `appendOnly`/`evalsOnly` run semantics are
+resolved and before the changelog is upserted.
 
 ### Why Two Connection Types
 
@@ -125,11 +187,68 @@ also unioned back into the window rather than dropped. Only after that volume-we
 aggregation is the semantic `[0, 1]` bound applied as a guard against residual counter timing
 skew. Older rows without the component rate series retain the stored-ratio fallback.
 
+### Server-Log Artifact Bundles
+
+Server-log artifacts are stored as filename-keyed bundles rather than as a hard-coded list of
+router, worker, or benchmark roles. Ingest recursively retains every regular `.log` and `.out`
+file and preserves its artifact-relative path. This applies to both `server_logs_*` ZIPs and
+`multinode_server_logs_*` artifacts whose files are nested inside
+`multinode_server_logs.tar.gz`.
+
+The primary file remains in `server_logs.server_log` for compatibility and KV-cache metadata
+extraction; `server_log_files` holds the remaining files. `server_logs.file_name` records the
+primary file's original path, and `files_complete` distinguishes fully scanned bundles from
+legacy single-file rows. Run `bun run admin:db:backfill-server-log-files` to use the public GCS
+artifact backup first and fall back to retained GitHub artifacts for recent runs. Pass `--all`
+for complete DB history, `--source gcs` to exercise only the backup path, and `--dry-run` to
+inventory pair counts and compressed download size without writing. `--run <id>`, `--limit <n>`,
+and `--yes` remain available for targeted, idempotent recovery. Bundles already marked
+`files_complete` are skipped after their small benchmark artifact is mapped, avoiding repeated
+large log downloads.
+
+Full-bundle search stays inside PostgreSQL: each file is scanned through overlapping 16 MiB
+character slices, and the API returns at most 50 match contexts rather than transferring the
+complete file. The overlap preserves literal matches that cross a slice boundary. Files are
+processed sequentially so a multinode bundle cannot materialize every large log in one query.
+
 ### Agentic Dataset Provenance
 
 AIPerf exports public-dataset provenance in `metadata.dataset`, including the Hugging Face dataset ID. InferenceX preserves that object as `dataset` on each agentic aggregate benchmark row. During benchmark ingest, `ingest-ci-run.ts` derives the dashboard slug from `hf_dataset_name` (for example, `semianalysisai/cc-traces-weka-062126` becomes `cc-traces-weka-062126`) and upserts `run_datasets` for the workflow run.
 
 Legacy artifacts without provenance leave any existing mapping untouched. A workflow run can map to only one dataset; conflicting dataset IDs fail ingest rather than silently linking the run to an arbitrary dataset.
+
+### Agentic Replay-Lane Identity
+
+AIPerf can sample one dataset conversation into multiple trajectory lanes, and
+those replays may execute concurrently. The source `conversation_id` therefore
+identifies dataset provenance, not a unique execution lane. During trace-replay
+ingest, `computeRequestTimeline()` groups requests by `root_correlation_id`.
+For older exports without that field, it walks `parent_correlation_id` ancestry
+from each per-session `x_correlation_id`, so nested subagents resolve to the
+main session rather than becoming separate replay lanes. The extractor replaces
+the repeated root UUID with a compact, deterministic numeric `ri` ranked by each
+lane's first dispatch.
+
+The request-timeline frontend groups by `(conversation_id, ri)`, keeping all
+main-agent, subagent, warmup, and profiling requests from one replay together.
+Legacy timelines without correlation metadata omit `ri` and retain the older
+conversation-only grouping. `REQUEST_TIMELINE_VERSION` invalidates derived
+JSONB when this extraction changes; `db:backfill-request-timeline` recomputes it
+from the raw gzipped `profile_export.jsonl` already stored in Neon, so no GitHub
+artifact refetch or schema migration is required.
+
+Timeline extraction reads the gzip stream twice instead of materializing the
+entire JSONL. The first pass retains only timeline bounds and one first-dispatch
+timestamp per replay; the second emits compact request records. This bounds
+peak memory for high-throughput traces whose decompressed profiles exceed
+400 MB, at the cost of a second sequential decompression pass during ingest or
+backfill. The backfill also downloads the stored gzip and uploads the derived
+JSONB in 4 MiB chunks, matching trace ingest and avoiding single-value transport
+limits for oversized runs. The request-timeline reader checks only compact
+metadata inline, then reconstructs every current timeline from bounded text
+chunks. It deliberately does not choose by compressed JSONB storage size, so a
+highly compressible timeline cannot cross Neon's 64 MiB response limit or force
+the database to materialize the serialized size just to select a read path.
 
 ### Agentic Full-Response Interactivity
 

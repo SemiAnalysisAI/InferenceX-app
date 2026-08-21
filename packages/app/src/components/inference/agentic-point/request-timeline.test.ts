@@ -167,8 +167,69 @@ describe('subagent timeline hierarchy', () => {
 
   it('deep-links a main-agent aux request to the parent conversation without sa', () => {
     expect(conversationHref('slug', { ...request(0, 10), cid: 'abc123::aux:red:002', ti: 3 })).toBe(
-      '/datasets/slug/conversations/abc123?turn=3',
+      '/agentx/slug/conversations/abc123?turn=3',
     );
+  });
+});
+
+describe('reused conversation replay lanes', () => {
+  it('renders overlapping replays of one source conversation on separate rows', () => {
+    const records = [
+      { ...request(0, 100), cid: 'reused-conversation', ti: 26, ri: 0 },
+      { ...request(110, 180), cid: 'reused-conversation', ti: 27, ri: 0 },
+      { ...request(50, 140), cid: 'reused-conversation', ti: 40, ri: 1 },
+      {
+        ...request(70, 120),
+        cid: 'reused-conversation::sa:subagent_001_abcd',
+        ti: 40,
+        ri: 1,
+      },
+    ];
+
+    const rows = buildRequestTimelineRows(records, 'conversation', new Set());
+    const parents = rows.filter((row) => row.kind === 'parent');
+    expect(parents.map((row) => row.label)).toEqual([
+      'reused-conversation · replay 1',
+      'reused-conversation · replay 2',
+    ]);
+    expect(parents.map((row) => row.requests.map((record) => record.ti))).toEqual([[26, 27], [40]]);
+    expect(rows.find((row) => row.kind === 'subagent')?.key).toContain('replay-lane:1');
+  });
+
+  it('localizes replay labels in the Chinese timeline', () => {
+    const rows = buildRequestTimelineRows(
+      [{ ...request(0, 10), cid: 'conversation', ri: 2 }],
+      'conversation',
+      new Set(),
+      undefined,
+      'zh',
+    );
+    expect(rows[0]?.label).toBe('conversation · 重放 3');
+  });
+
+  it('keeps a replay lane stable across warmup and profiling filters', () => {
+    const records = [
+      { ...request(0, 10), cid: 'conversation', ri: 0, phase: 'warmup' },
+      { ...request(100, 110), cid: 'conversation', ri: 0, phase: 'profiling' },
+      { ...request(50, 60), cid: 'conversation', ri: 1, phase: 'profiling' },
+    ];
+    const index = computeStableRowIndex(records, 'conversation');
+    const warmup = buildRequestTimelineRows(
+      records.filter((record) => record.phase === 'warmup'),
+      'conversation',
+      new Set(),
+      index,
+    );
+    const profiling = buildRequestTimelineRows(
+      records.filter((record) => record.phase === 'profiling'),
+      'conversation',
+      new Set(),
+      index,
+    );
+
+    expect(warmup[0]?.label).toBe('conversation · replay 1');
+    expect(profiling[0]?.label).toBe('conversation · replay 1');
+    expect(warmup[0]?.color).toBe(profiling[0]?.color);
   });
 });
 
@@ -176,7 +237,7 @@ describe('conversationHref', () => {
   it('builds a turn-carrying dataset link for a main-conversation request', () => {
     expect(
       conversationHref('cc-traces-weka-062126', { ...request(0, 10), cid: 'abc123', ti: 4 }),
-    ).toBe('/datasets/cc-traces-weka-062126/conversations/abc123?turn=4');
+    ).toBe('/agentx/cc-traces-weka-062126/conversations/abc123?turn=4');
   });
 
   it('carries the subagent id and strips the ::sa suffix from the conv id', () => {
@@ -186,7 +247,7 @@ describe('conversationHref', () => {
         cid: 'abc123::sa:subagent_001_bf1c5c16:s2',
         ti: 7,
       }),
-    ).toBe('/datasets/slug/conversations/abc123?turn=7&sa=subagent_001_bf1c5c16');
+    ).toBe('/agentx/slug/conversations/abc123?turn=7&sa=subagent_001_bf1c5c16');
   });
 
   it('uses raw source provenance for flattened-agent dataset links', () => {
@@ -199,7 +260,7 @@ describe('conversationHref', () => {
         srcOuter: 204,
         srcKind: 'weka_flat',
       }),
-    ).toBe('/datasets/slug/conversations/02bc0afb13f7a2d9efa86c28511261d85c0e?turn=3&raw=204');
+    ).toBe('/agentx/slug/conversations/02bc0afb13f7a2d9efa86c28511261d85c0e?turn=3&raw=204');
   });
 
   it('uses raw nested source provenance for subagent child links', () => {
@@ -214,7 +275,7 @@ describe('conversationHref', () => {
         srcKind: 'weka_subagent',
       }),
     ).toBe(
-      '/datasets/slug/conversations/117ebe75819d050f308a0a81647893abd02d?turn=16&raw=39&inner=16',
+      '/agentx/slug/conversations/117ebe75819d050f308a0a81647893abd02d?turn=16&raw=39&inner=16',
     );
   });
 });

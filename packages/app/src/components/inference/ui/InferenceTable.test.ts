@@ -18,6 +18,9 @@ const CHART_DEF = {
   y_costh: 'costh.y',
   y_costh_label: 'Cost per Million Total Tokens ($)',
   y_costh_roofline: 'lower_right',
+  y_tokensPerDollarH: 'tokensPerDollarH.y',
+  y_tokensPerDollarH_label: 'Total Tokens per $1 (tok/$)',
+  y_tokensPerDollarH_roofline: 'upper_left',
 } as unknown as ChartDefinition;
 
 function makePoint(overrides: Partial<InferenceData>): InferenceData {
@@ -37,6 +40,7 @@ function makePoint(overrides: Partial<InferenceData>): InferenceData {
     costhi: { y: 0.2, roof: false },
     costni: { y: 0.15, roof: false },
     costri: { y: 0.1, roof: false },
+    tokensPerDollarH: { y: 2_000_000, roof: false },
     ...overrides,
   } as InferenceData;
 }
@@ -59,21 +63,21 @@ describe('InferenceTable sorting logic', () => {
     expect(getNestedYValue(sorted[2], yPath)).toBe(100);
   });
 
-  it('sorts by Y value ascending for lower_right roofline (cost)', () => {
+  it('sorts tokens-per-dollar purchasing power descending', () => {
     const points = [
-      makePoint({ costh: { y: 0.8, roof: false } }),
-      makePoint({ costh: { y: 0.2, roof: true } }),
-      makePoint({ costh: { y: 0.5, roof: false } }),
+      makePoint({ tokensPerDollarH: { y: 800_000, roof: false } }),
+      makePoint({ tokensPerDollarH: { y: 200_000, roof: false } }),
+      makePoint({ tokensPerDollarH: { y: 1_500_000, roof: true } }),
     ];
 
-    const yPath = CHART_DEF.y_costh as string;
+    const yPath = CHART_DEF.y_tokensPerDollarH as string;
     const sorted = [...points].toSorted(
-      (a, b) => getNestedYValue(a, yPath) - getNestedYValue(b, yPath),
+      (a, b) => getNestedYValue(b, yPath) - getNestedYValue(a, yPath),
     );
 
-    expect(getNestedYValue(sorted[0], yPath)).toBe(0.2);
-    expect(getNestedYValue(sorted[1], yPath)).toBe(0.5);
-    expect(getNestedYValue(sorted[2], yPath)).toBe(0.8);
+    expect(getNestedYValue(sorted[0], yPath)).toBe(1_500_000);
+    expect(getNestedYValue(sorted[1], yPath)).toBe(800_000);
+    expect(getNestedYValue(sorted[2], yPath)).toBe(200_000);
   });
 });
 
@@ -83,9 +87,14 @@ describe('getNestedYValue', () => {
     expect(getNestedYValue(point, 'tpPerGpu.y')).toBe(42);
   });
 
-  it('resolves nested cost metric path (costh.y)', () => {
+  it('resolves the existing cost-per-million path (costh.y)', () => {
     const point = makePoint({ costh: { y: 1.23, roof: false } });
     expect(getNestedYValue(point, 'costh.y')).toBe(1.23);
+  });
+
+  it('resolves the separate tokens-per-dollar path', () => {
+    const point = makePoint({ tokensPerDollarH: { y: 1_500_000, roof: false } });
+    expect(getNestedYValue(point, 'tokensPerDollarH.y')).toBe(1_500_000);
   });
 
   it('returns 0 for missing paths', () => {

@@ -39,6 +39,8 @@ const NON_METRIC_KEYS = new Set([
   'osl',
   'conc',
   'image',
+  'recipe_fingerprint',
+  'recipe-fingerprint',
   'disagg',
   'is_multinode',
   'spec_decoding',
@@ -130,6 +132,8 @@ export interface BenchmarkParams {
   /** 'on' | 'off' — KV cache offload to CPU. Defaults to 'off'. */
   offloadMode: string;
   image: string | null;
+  /** Stable producer-generated identity for the complete recipe, excluding concurrency. */
+  recipeFingerprint: string | null;
   metrics: Record<string, number>;
   /**
    * Per-worker measured-power breakdown emitted by the runner's
@@ -243,6 +247,7 @@ export function mapBenchmarkRow(
   // Dynamo artifacts that incorrectly emitted disagg=false.
   const disagg = frameworkDisagg || parallelism.decodeNumWorkers > 0;
   let metrics = captureNumericMetrics(row);
+  normalizePowerContractMetrics(row, metrics);
   if (isAgentic) metrics = preferFullResponseMetrics(metrics);
   if (!disagg) {
     const usePrefill =
@@ -332,6 +337,11 @@ export function mapBenchmarkRow(
 
   // Artifact names encode '/' as '#' to avoid path separators; restore the URI.
   const image = row.image ? String(row.image).replaceAll('#', '/') : null;
+  const rawRecipeFingerprint = row.recipe_fingerprint ?? row['recipe-fingerprint'];
+  const recipeFingerprint =
+    typeof rawRecipeFingerprint === 'string' && rawRecipeFingerprint.trim().length > 0
+      ? rawRecipeFingerprint.trim()
+      : null;
 
   // Per-worker measured-power breakdown. The runner emits this as an array
   // of objects sibling to the scalar metrics; we surface it on a dedicated
@@ -357,6 +367,7 @@ export function mapBenchmarkRow(
     conc,
     offloadMode: offloadModeRaw,
     image,
+    recipeFingerprint,
     metrics,
     workers,
   };
@@ -440,6 +451,42 @@ function captureNumericMetrics(row: Record<string, any>): Record<string, number>
     }
   }
   return metrics;
+}
+
+/**
+ * Re-parse the power publication contract after generic metric capture. These
+ * two fields are semantic discriminators, so loose numeric coercion must never
+ * turn malformed producer output into an affirmative verdict or schema.
+ */
+function normalizePowerContractMetrics(
+  row: Record<string, any>,
+  metrics: Record<string, number>,
+): void {
+  if (Object.hasOwn(row, 'power_valid')) {
+    const verdict = row.power_valid;
+    metrics.power_valid = verdict === 1 || verdict === '1' ? 1 : 0;
+  } else {
+    delete metrics.power_valid;
+  }
+
+  if (!Object.hasOwn(row, 'power_metric_schema_version')) {
+    delete metrics.power_metric_schema_version;
+    return;
+  }
+
+  const rawVersion = row.power_metric_schema_version;
+  const version =
+    typeof rawVersion === 'number'
+      ? rawVersion
+      : // Canonical decimal form: no sign, whitespace, decimal point, or zero padding.
+        typeof rawVersion === 'string' && /^[1-9]\d*$/u.test(rawVersion)
+        ? Number(rawVersion)
+        : undefined;
+  if (typeof version === 'number' && Number.isSafeInteger(version) && version > 0) {
+    metrics.power_metric_schema_version = version;
+  } else {
+    delete metrics.power_metric_schema_version;
+  }
 }
 
 /**

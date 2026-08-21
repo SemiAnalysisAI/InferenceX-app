@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { rememberChartStateInUrl } from '@/lib/url-state';
 import { cn } from '@/lib/utils';
 
 import {
@@ -24,7 +25,7 @@ export interface LegendPointsDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Series label, e.g. "B300 (vLLM)". */
   title: string;
-  /** Context line, e.g. "DeepSeek V4 Pro · Agentic Traces". */
+  /** Context line, e.g. "DeepSeek V4 Pro · Agentic". */
   subtitle: string;
   /** Legend swatch color for this series (overlayRunColor for overlay runs). */
   accentColor: string;
@@ -181,7 +182,13 @@ export default function LegendPointsDialog({
                   key={row.key}
                   href={row.href}
                   {...(row.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                  onClick={() => onRowClick?.(row)}
+                  onClick={() => {
+                    // In-app detail links are full-document navigations, so the
+                    // chart state has to be written into this history entry
+                    // before we leave or Back lands on a default chart.
+                    if (!row.isExternal) rememberChartStateInUrl();
+                    onRowClick?.(row);
+                  }}
                   className="col-span-full grid grid-cols-subgrid items-center rounded-sm hover:bg-accent whitespace-nowrap"
                 >
                   {renderCells(row)}

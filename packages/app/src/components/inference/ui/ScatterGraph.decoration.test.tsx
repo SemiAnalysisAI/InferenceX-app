@@ -22,7 +22,13 @@ vi.mock('@/lib/d3-chart/chart-setup', { spy: true });
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'dark' }) }));
 // The legend is React-rendered (covered elsewhere) — keep the tree light.
-vi.mock('@/components/ui/chart-legend', () => ({ default: () => null }));
+const legendState = vi.hoisted(() => ({ current: null as Record<string, any> | null }));
+vi.mock('@/components/ui/chart-legend', () => ({
+  default: (props: Record<string, any>) => {
+    legendState.current = props;
+    return props.keyIndicators ?? null;
+  },
+}));
 
 const inferenceState = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
 vi.mock('@/components/inference/InferenceContext', () => ({
@@ -37,11 +43,21 @@ vi.mock('@/components/unofficial-run-provider', () => ({
 // ScatterGraph calls useTraceAvailability (a useQuery) for the agentic "View
 // charts" tooltip button. Stub it so these decoration tests don't need a
 // QueryClientProvider — trace presence is irrelevant to the toggle path.
+const availabilityState = vi.hoisted(() => ({ traceIds: [] as number[], logIds: [] as number[] }));
 vi.mock('@/hooks/api/use-trace-availability', () => ({
-  useTraceAvailability: () => ({ data: undefined }),
+  useTraceAvailability: (ids: number[]) => {
+    availabilityState.traceIds = ids;
+    return { data: undefined };
+  },
+}));
+vi.mock('@/hooks/api/use-log-availability', () => ({
+  useLogAvailability: (ids: number[]) => {
+    availabilityState.logIds = ids;
+    return { data: undefined };
+  },
 }));
 
-import ScatterGraph from './ScatterGraph';
+import ScatterGraph, { pointLabelText } from './ScatterGraph';
 
 // ── Environment stubs ────────────────────────────────────────────────────────
 class MockResizeObserver {
@@ -72,6 +88,28 @@ const HARDWARE_CONFIG = {
 const CHART_DEFINITION = { chartType: 'interactivity' } as unknown as ChartDefinition;
 
 const noop = () => {};
+
+describe('pointLabelText', () => {
+  it('keeps decode mode out of mixed agentic point labels', () => {
+    const standard = point('h100', 'fp8', 1, 1, 8);
+    standard.benchmark_type = 'agentic_traces';
+    standard.spec_decoding = 'none';
+    const mtp = { ...standard, spec_decoding: 'mtp' };
+    const eagle = { ...standard, spec_decoding: 'eagle' };
+
+    expect(pointLabelText(standard, false)).toBe('8\nC=16');
+    expect(pointLabelText(mtp, false)).toBe('8\nC=16');
+    expect(pointLabelText(eagle, false)).toBe('8\nC=16');
+  });
+
+  it('keeps fixed-sequence labels unchanged', () => {
+    const fixed = point('h100', 'fp8', 1, 1, 8);
+    fixed.benchmark_type = 'single_turn';
+    fixed.spec_decoding = 'mtp';
+
+    expect(pointLabelText(fixed, false)).toBe('8\nC=16');
+  });
+});
 
 function baseInferenceState() {
   return {
@@ -194,6 +232,9 @@ beforeEach(() => {
   } as DOMRect);
   inferenceState.current = baseInferenceState();
   overlayState.current = baseOverlayState();
+  legendState.current = null;
+  availabilityState.traceIds = [];
+  availabilityState.logIds = [];
   vi.mocked(setupChartStructure).mockClear();
 });
 
@@ -209,6 +250,68 @@ describe('ScatterGraph toggle decoration', () => {
     expect(dotGroups(container)).toHaveLength(POINTS.length);
     expect(container.querySelectorAll('.roofline-path').length).toBeGreaterThan(0);
     expect(rebuildCount()).toBeGreaterThan(0);
+    unmount();
+  });
+
+  it('checks log availability for fixed-sequence and agentic official points', () => {
+    const fixed = {
+      ...point('h100', 'fp8', 10, 100, 1),
+      id: 96255,
+      benchmark_type: 'single_turn',
+    } as InferenceData;
+    const agentic = {
+      ...point('h100', 'fp8', 20, 200, 2),
+      id: 206885,
+      benchmark_type: 'agentic_traces',
+    } as InferenceData;
+    const { unmount } = mountChart({ data: [fixed, agentic] });
+
+    expect(availabilityState.logIds).toEqual([96255, 206885]);
+    expect(availabilityState.traceIds).toEqual([206885]);
+    unmount();
+  });
+
+  it('keeps speculative decoding out of point decorations and shows only KV offload', () => {
+    const standard = {
+      ...point('h100', 'fp8', 1, 1, 1),
+      benchmark_type: 'agentic_traces',
+      spec_decoding: 'none',
+      offload_mode: 'off',
+    } as InferenceData;
+    const mtp = {
+      ...point('h100', 'fp8', 20, 200, 2),
+      benchmark_type: 'agentic_traces',
+      spec_decoding: 'mtp',
+      offload_mode: 'off',
+    } as InferenceData;
+    const mtpWithOffload = {
+      ...point('h100', 'fp8', 40, 400, 4),
+      benchmark_type: 'agentic_traces',
+      spec_decoding: 'mtp',
+      offload_mode: 'on',
+    } as InferenceData;
+    const fixedMtp = {
+      ...point('h100', 'fp8', 100, 1000, 8),
+      benchmark_type: 'single_turn',
+      spec_decoding: 'mtp',
+      offload_mode: 'off',
+    } as InferenceData;
+
+    inferenceState.current = {
+      ...baseInferenceState(),
+      selectedSequence: 'agentic-traces',
+    };
+    const { container, unmount } = mountChart({
+      data: [standard, mtp, mtpWithOffload, fixedMtp],
+    });
+    const groups = dotGroups(container);
+
+    expect(container.querySelector('.spec-decode-marker')).toBeNull();
+    expect(groups[1].querySelector('.offload-halo')).toBeNull();
+    expect(groups[2].querySelector('.offload-halo')).not.toBeNull();
+    expect(container.querySelector('[data-testid="spec-decode-marker-key"]')).toBeNull();
+    expect(container.querySelector('[data-testid="offload-halo-key"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="agentic-optimization-note"]')).not.toBeNull();
     unmount();
   });
 
@@ -371,6 +474,191 @@ describe('ScatterGraph toggle decoration', () => {
 
     expect(container.querySelectorAll('.unofficial-overlay-pt')).toHaveLength(2);
     expect(rebuildCount()).toBe(buildsAfterMount);
+    unmount();
+  });
+
+  it('refreshes official and overlay winners while Best per SKU is enabled', () => {
+    const setLocalOfficialOverride = vi.fn();
+    const setActiveOverlayHwTypes = vi.fn();
+    const officialPoints = [
+      point('h100_vllm', 'fp8', 10, 10, 1),
+      point('h100_vllm', 'fp8', 20, 10, 2),
+      point('h100_trt', 'fp8', 10, 20, 1),
+      point('h100_trt', 'fp8', 20, 20, 2),
+    ];
+    const runUrl = 'https://github.com/o/r/actions/runs/123';
+    const overlayPoints = [
+      point('b200_vllm', 'fp8', 10, 5, 1),
+      point('b200_vllm', 'fp8', 20, 5, 2),
+      point('b200_trt', 'fp8', 10, 15, 1),
+      point('b200_trt', 'fp8', 20, 15, 2),
+    ].map((entry) => ({ ...entry, run_url: runUrl }));
+
+    inferenceState.current = {
+      ...baseInferenceState(),
+      activeHwTypes: new Set(['h100_vllm']),
+      hwTypesWithData: new Set(['h100_vllm', 'h100_trt']),
+      bestPerSku: true,
+      setBestPerSku: noop,
+      selectedYAxisMetric: 'y',
+    };
+    overlayState.current = {
+      ...baseOverlayState(),
+      isUnofficialRun: true,
+      activeOverlayHwTypes: new Set(['b200_vllm']),
+      allOverlayHwTypes: new Set(['b200_vllm', 'b200_trt']),
+      localOfficialOverride: new Set(['h100_vllm']),
+      setLocalOfficialOverride,
+      setActiveOverlayHwTypes,
+      runIndexByUrl: { [runUrl]: 0 },
+      unofficialRunInfos: [{ id: '123', branch: 'test-branch', url: runUrl }],
+    };
+
+    const { unmount } = mountChart({
+      data: officialPoints,
+      chartDefinition: {
+        chartType: 'interactivity',
+        y_roofline: 'upper_right',
+      } as unknown as ChartDefinition,
+      overlayData: {
+        data: overlayPoints,
+        hardwareConfig: HARDWARE_CONFIG,
+      } as unknown as Parameters<typeof ScatterGraph>[0]['overlayData'],
+    });
+
+    expect(setLocalOfficialOverride).toHaveBeenCalledWith(new Set(['h100_trt']));
+    expect(setActiveOverlayHwTypes).toHaveBeenCalledWith(new Set(['b200_trt']));
+    unmount();
+  });
+
+  it('falls back to the full official and overlay scopes when no best series is scoreable', () => {
+    const setLocalOfficialOverride = vi.fn();
+    const setActiveOverlayHwTypes = vi.fn();
+    const officialPoints = [
+      point('h100_vllm', 'fp8', 0, 10, 1),
+      point('h100_trt', 'fp8', 0, 20, 1),
+    ];
+    const runUrl = 'https://github.com/o/r/actions/runs/123';
+    const overlayPoints = [
+      point('b200_vllm', 'fp8', 0, 5, 1),
+      point('b200_trt', 'fp8', 0, 15, 1),
+    ].map((entry) => ({ ...entry, run_url: runUrl }));
+
+    inferenceState.current = {
+      ...baseInferenceState(),
+      activeHwTypes: new Set(['h100_vllm']),
+      hwTypesWithData: new Set(['h100_vllm', 'h100_trt']),
+      bestPerSku: true,
+      setBestPerSku: noop,
+      selectedYAxisMetric: 'y',
+    };
+    overlayState.current = {
+      ...baseOverlayState(),
+      isUnofficialRun: true,
+      activeOverlayHwTypes: new Set(['b200_vllm']),
+      allOverlayHwTypes: new Set(['b200_vllm', 'b200_trt']),
+      localOfficialOverride: new Set(['h100_vllm']),
+      setLocalOfficialOverride,
+      setActiveOverlayHwTypes,
+      runIndexByUrl: { [runUrl]: 0 },
+      unofficialRunInfos: [{ id: '123', branch: 'test-branch', url: runUrl }],
+    };
+
+    const { unmount } = mountChart({
+      data: officialPoints,
+      chartDefinition: {
+        chartType: 'interactivity',
+        y_roofline: 'upper_right',
+      } as unknown as ChartDefinition,
+      overlayData: {
+        data: overlayPoints,
+        hardwareConfig: HARDWARE_CONFIG,
+      } as unknown as Parameters<typeof ScatterGraph>[0]['overlayData'],
+    });
+
+    expect(setLocalOfficialOverride).toHaveBeenCalledWith(new Set(['h100_vllm', 'h100_trt']));
+    expect(setActiveOverlayHwTypes).toHaveBeenCalledWith(new Set(['b200_vllm', 'b200_trt']));
+    unmount();
+  });
+
+  it('disables Best per SKU for overlay edits without applying a context selection', () => {
+    const setBestPerSku = vi.fn();
+    const runUrl = 'https://github.com/o/r/actions/runs/123';
+    const overlayPoints = [
+      { ...point('h100', 'fp8', 30, 300, 2), run_url: runUrl },
+      { ...point('h100', 'fp8', 35, 350, 4), run_url: runUrl },
+    ];
+    inferenceState.current = {
+      ...baseInferenceState(),
+      bestPerSku: true,
+      setBestPerSku,
+    };
+    overlayState.current = {
+      ...baseOverlayState(),
+      isUnofficialRun: true,
+      activeOverlayHwTypes: new Set(['h100']),
+      allOverlayHwTypes: new Set(['h100']),
+      runIndexByUrl: { [runUrl]: 0 },
+      unofficialRunInfos: [{ id: '123', branch: 'test-branch', url: runUrl }],
+    };
+
+    const { unmount } = mountChart({
+      overlayData: {
+        data: overlayPoints,
+        hardwareConfig: HARDWARE_CONFIG,
+      } as unknown as Parameters<typeof ScatterGraph>[0]['overlayData'],
+    });
+    const officialItem = legendState.current!.legendItems.find(
+      (item: { hw: string }) => item.hw === 'h100',
+    );
+
+    act(() => officialItem.onClick());
+    expect(setBestPerSku).toHaveBeenLastCalledWith(false, { applySelection: false });
+
+    act(() => legendState.current!.onItemRemove('h100'));
+    expect(setBestPerSku).toHaveBeenLastCalledWith(false, { applySelection: false });
+    unmount();
+  });
+
+  it('keeps speculative decoding out of unofficial-run point decorations', () => {
+    const runUrl = 'https://github.com/o/r/actions/runs/123';
+    const overlayPoints = [
+      {
+        ...point('h100', 'fp8', 30, 300, 2),
+        benchmark_type: 'agentic_traces',
+        spec_decoding: 'mtp',
+        offload_mode: 'on',
+        run_url: runUrl,
+      } as InferenceData,
+      {
+        ...point('h100', 'fp8', 35, 350, 4),
+        benchmark_type: 'agentic_traces',
+        spec_decoding: 'none',
+        offload_mode: 'off',
+        run_url: runUrl,
+      } as InferenceData,
+    ];
+    overlayState.current = {
+      ...baseOverlayState(),
+      isUnofficialRun: true,
+      activeOverlayHwTypes: new Set(['h100']),
+      allOverlayHwTypes: new Set(['h100']),
+      runIndexByUrl: { [runUrl]: 0 },
+      unofficialRunInfos: [{ id: '123', branch: 'test-branch', url: runUrl }],
+    };
+
+    const { container, unmount } = mountChart({
+      overlayData: {
+        data: overlayPoints,
+        hardwareConfig: HARDWARE_CONFIG,
+      } as unknown as Parameters<typeof ScatterGraph>[0]['overlayData'],
+    });
+    const groups = [...container.querySelectorAll<SVGGElement>('.unofficial-overlay-pt')];
+
+    expect(groups[0].querySelector('.spec-decode-marker')).toBeNull();
+    expect(groups[0].querySelector('.offload-halo')).not.toBeNull();
+    expect(groups[1].querySelector('.spec-decode-marker')).toBeNull();
+    expect(groups[1].querySelector('.offload-halo')).toBeNull();
     unmount();
   });
 

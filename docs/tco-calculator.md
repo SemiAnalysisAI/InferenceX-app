@@ -102,7 +102,7 @@ The reset's early-out guards on the **merged** list, not the official one. An em
 - **Clamped values.** `interpolateForGPU` clamps the target into each series' measured range and always returns a value, so a bar can be showing its nearest edge point rather than an interpolation. This is pre-existing across GPUs with different ranges, but widening the slider to cover overlay operating points makes it reachable for every official bar at once — which would turn a side-by-side overlay delta into a real-vs-clamped comparison. Results carry a `clamped` flag and the tooltip says so. (Narrowing the slider back is not the fix: it only moves the clamping onto the overlay bars, and an overlay-only model loses its bounds entirely.)
 - **Escaping.** The tooltip is a hand-built HTML string injected with `.html()`, and branch names and run URLs come from the GitHub API for whatever run id the user pasted. Everything untrusted goes through `escapeHtml` (`lib/utils`). The y-axis tick labels render the same branch but go through d3 `.text()`, and the legend entry is React — both already safe.
 
-The calculator supports both fixed-sequence and Agentic Traces scenarios through
+The calculator supports both fixed-sequence and Agentic scenarios through
 the shared `rowToSequence` classifier. Agentic rows carry null `isl`/`osl`, so
 filtering them by numeric sequence lengths would silently drop every point.
 
@@ -121,3 +121,44 @@ Agentic interactivity follows the same definition as the main inference chart:
 `b300Rows` in `cypress/support/overlay-fixtures.ts` covers the agentic calculator
 path; `singleTurnRows` remains the fixture for fixed-sequence visibility and
 sequence-switching behavior.
+
+## Reciprocal Metrics Are Derived, Not Splined
+
+`$/M tok` and `J/token` are a per-chip constant divided by a throughput
+(`$/GPU-hr x 1e6 / (tok/s x 3600)`, `W / (tok/s)`). `interpolateForGPU`,
+`maxInteractivityAtCost` and `interpolateMetricAtInteractivity` therefore spline
+the **throughput** those metrics divide and re-derive the metric, rather than
+splining the metric itself.
+
+Independently splining the reciprocal metric and throughput creates two curves
+that need not satisfy `metric x throughput = constant` between measured knots.
+The direction and size of the difference depend on frontier density and can
+change as benchmark runs land. Re-deriving the metric preserves its definition
+at every interpolated point.
+
+`/inference` plots these metrics only at measured points (`lib/chart-utils.ts`,
+`roof: false`), where both methods agree exactly. Leave-one-out measurements can
+compare interpolation models on a fixed snapshot, but they must not be presented
+as permanent impact figures for the changing live dataset.
+
+The `/inference` page also exposes tokens-per-dollar as separate Y-axis metrics;
+it does not replace the cost-per-million metrics. Historical trends for these
+purchasing-power metrics select Pareto knots from the matching total, output, or
+input throughput, spline that throughput, and apply the constant
+`3600 / $/GPU-hr` multiplier. Reusing the matching throughput frontier is
+essential: total-throughput knots are not necessarily the output- or
+input-throughput Pareto knots.
+
+### The consistency guard
+
+`recoverReciprocalNumerator` returns the constant only if **every** usable point
+agrees on it within 0.1% (`1e-3` relative). That guard is what licenses the
+rewrite. The `measured*` energy keys have a numerator measured per point rather
+than a constant, so they are excluded from `RECIPROCAL_OF_THROUGHPUT` and still
+splined directly. When the guard fails, all three call sites fall back to
+splining.
+
+The rate is recovered across **all three token types at once** (`recoverCostRate`).
+Checking one family alone and falling back to another would recover a rate from
+output tokens and then apply it to total throughput; the existing
+`maxInteractivityAtCost` tests caught exactly that mistake.

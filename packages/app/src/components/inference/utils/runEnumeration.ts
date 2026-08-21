@@ -10,9 +10,9 @@
  * changelog entry, and that newest run is exactly the one the plain-date "latest"
  * view shows — so enumerating from changelog entries alone would silently drop it.
  *
- * Runs are scoped to the selected GPUs using the canonical {@link getHardwareKey}
- * so MTP and disagg variants (separate hw keys) are kept distinct, exactly as the
- * chart keys them.
+ * Runs are scoped to the selected GPUs using the canonical {@link getHardwareKey}.
+ * Fixed-sequence MTP variants stay distinct; agentic MTP and non-MTP points map
+ * to the same series, exactly as the chart keys them.
  */
 
 import type { AggDataEntry } from '@/components/inference/types';
@@ -37,15 +37,18 @@ export interface RunScope {
   selectedGPUs: string[];
   /** Selected DB precisions, e.g. ['fp8']. */
   selectedPrecisions: string[];
+  /** Scenario currently rendered by the chart. */
+  benchmarkType: 'single_turn' | 'agentic_traces';
 }
 
 /** The hw key a runConfig maps to, built the same way the chart builds series keys. */
-function runConfigHwKey(rc: RunConfigRow): string {
+function runConfigHwKey(rc: RunConfigRow, benchmarkType: 'single_turn' | 'agentic_traces'): string {
   return getHardwareKey({
     hw: rc.hardware,
     framework: rc.framework,
     disagg: rc.disagg,
     spec_decoding: rc.spec_method,
+    benchmark_type: benchmarkType,
   } as unknown as AggDataEntry);
 }
 
@@ -55,7 +58,7 @@ function runConfigHwKey(rc: RunConfigRow): string {
  * assigns read in the order the runs actually happened.
  */
 export function dataRunsForDate(runConfigs: RunConfigRow[], scope: RunScope): DataRun[] {
-  const { modelDbKeys, selectedGPUs, selectedPrecisions } = scope;
+  const { modelDbKeys, selectedGPUs, selectedPrecisions, benchmarkType } = scope;
   const precSet = new Set(selectedPrecisions);
   const gpuSet = new Set(selectedGPUs);
   const byRun = new Map<string, DataRun>();
@@ -63,7 +66,7 @@ export function dataRunsForDate(runConfigs: RunConfigRow[], scope: RunScope): Da
   for (const rc of runConfigs) {
     if (!modelDbKeys.includes(rc.model)) continue;
     if (!precSet.has(rc.precision)) continue;
-    if (!gpuSet.has(runConfigHwKey(rc))) continue;
+    if (!gpuSet.has(runConfigHwKey(rc, benchmarkType))) continue;
 
     const id = String(rc.github_run_id);
     if (!byRun.has(id)) {

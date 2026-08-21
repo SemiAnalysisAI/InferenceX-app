@@ -89,6 +89,23 @@ describe('GET /api/v1/workflow-info', () => {
     expect(mockGetRunConfigsByDate).toHaveBeenCalledWith('mock-sql', '2026-03-01');
   });
 
+  it('scopes run coverage only when agentic is explicitly requested', async () => {
+    mockGetWorkflowRunsByDate.mockResolvedValueOnce([]);
+    mockGetChangelogByDate.mockResolvedValueOnce([]);
+    mockGetDateConfigs.mockResolvedValueOnce([]);
+    mockGetRunConfigsByDate.mockResolvedValueOnce([]);
+
+    const res = await GET(
+      req('/api/v1/workflow-info?date=2026-03-01&benchmarkType=agentic_traces'),
+    );
+    expect(res.status).toBe(200);
+    expect(mockGetRunConfigsByDate).toHaveBeenCalledWith(
+      'mock-sql',
+      '2026-03-01',
+      'agentic_traces',
+    );
+  });
+
   it('accepts empty date param (returns all)', async () => {
     mockGetWorkflowRunsByDate.mockResolvedValueOnce([]);
     mockGetChangelogByDate.mockResolvedValueOnce([]);

@@ -12,7 +12,8 @@
  *   eval_results_all_*     → compiled eval aggregate (agg_eval_all.json, flat rows)
  *   eval_*                 → single eval result (meta_env.json + results_*.json)
  *   changelog-metadata_*   → changelog entries (base_ref, head_ref, entries[])
- *   server_logs_*          → server log text (server.log inside ZIP)
+ *   server_logs_*          → every recursively nested .log/.out file
+ *   multinode_server_logs_* → same, including files inside multinode_server_logs.tar.gz
  *
  * All inserts are idempotent (ON CONFLICT DO UPDATE/NOTHING), so re-running is safe.
  *
@@ -32,7 +33,14 @@ import path from 'path';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
-import { isBenchmarkPointPurged, PURGED_RUNS } from './etl/run-overrides';
+import {
+  applyBenchmarkPointBackfill,
+  applyChangelogBackfills,
+  isBenchmarkPointPurged,
+  PURGED_RUNS,
+  recordBackfilledPointIdentity,
+  validateRunBackfills,
+} from './etl/run-overrides';
 import { createSkipTracker, type Skips } from './etl/skip-tracker';
 import { GPU_KEYS, parseIslOsl } from './etl/normalizers';
 import { createConfigCache } from './etl/config-cache';
@@ -42,7 +50,7 @@ import {
   bulkIngestBenchmarkRows,
   bulkIngestRunStats,
   bulkUpsertAvailability,
-  insertServerLog,
+  insertServerLogFiles,
 } from './etl/benchmark-ingest';
 import { mapEvalRow, mapAggEvalRow, type EvalParams } from './etl/eval-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
@@ -51,9 +59,11 @@ import { bulkIngestEvalSamples } from './etl/eval-samples-ingest';
 import {
   parseChangelogEntries,
   ingestChangelogEntries,
+  hasAppendOnlyFlag,
   hasEvalsOnlyFlag,
 } from './etl/changelog-ingest';
-import { readZipJson, readZipJsonMap, readZipText, readZipTextsMatching } from './etl/zip-reader';
+import { readZipJson, readZipJsonMap, readZipTextsMatching } from './etl/zip-reader';
+import { readServerLogArtifactZip, serverLogArtifactSuffix } from './etl/server-log-artifacts';
 
 const GCS_DIR = path.join(import.meta.dirname, '..', '..', '..', 'gcs');
 const CONCURRENCY = 20;
@@ -79,7 +89,11 @@ interface WorkflowMapResult {
   createdAt: string;
   ghInfo: GithubRunInfo | null;
   /** Per-ZIP benchmark rows, ready for configId lookup + bulk insert in phase 2. */
-  bmkZips: { zipFile: string; rows: BenchmarkParams[]; serverLogPath?: string }[];
+  bmkZips: {
+    zipFile: string;
+    rows: BenchmarkParams[];
+    serverLogArtifact?: { zipPath: string; artifactName: string };
+  }[];
   statsRows: { hardware: string; nSuccess: number; total: number }[];
   /**
    * Each eval row carries the matching `samples_<task>_*.jsonl` text when the
@@ -115,15 +129,17 @@ interface WriteResult {
 
 /**
  * Run `fn` over `items` with at most `concurrency` tasks in-flight at once.
- * Result order matches input order. Per-item errors are caught and returned as
- * `null` (with a logged message) so one bad task doesn't abort the whole run.
+ * Result order matches input order. Per-item errors are logged and returned as
+ * `null`, unless failOnError requests a terminal error after in-flight work ends.
  */
 async function pMap<T, R>(
   items: T[],
   fn: (item: T) => Promise<R | null>,
   concurrency: number,
+  failOnError = false,
 ): Promise<(R | null)[]> {
   const results: (R | null)[] = Array.from({ length: items.length }, () => null);
+  const errors: Error[] = [];
   let next = 0;
   async function worker() {
     while (next < items.length) {
@@ -132,10 +148,14 @@ async function pMap<T, R>(
         results[i] = await fn(items[i]);
       } catch (error: any) {
         console.error(`  [ERROR] mapping task ${i} failed: ${error.message}`);
+        errors.push(error instanceof Error ? error : new Error(String(error)));
       }
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  if (failOnError && errors.length > 0) {
+    throw new Error(`${errors.length} restore task(s) failed; first error: ${errors[0].message}`);
+  }
   return results;
 }
 
@@ -207,7 +227,9 @@ async function mapWorkflowDir(
     (f) => f.startsWith('eval_') && !f.startsWith('eval_results_all_'),
   );
   const changelogZips = zipFiles.filter((f) => f.startsWith('changelog-metadata_'));
-  const serverLogZips = zipFiles.filter((f) => f.startsWith('server_logs_'));
+  const serverLogZips = zipFiles.filter(
+    (f) => f.startsWith('server_logs_') || f.startsWith('multinode_server_logs_'),
+  );
 
   if (
     bmkZipFiles.length +
@@ -235,11 +257,16 @@ async function mapWorkflowDir(
   const warnings: string[] = [];
 
   // ── Index server log ZIPs (deferred read — too large for memory) ─────────
-  // Map configKey → zip file path. Actual text is read lazily in phase 2.
-  const serverLogPaths = new Map<string, string>();
+  // Map configKey → ZIP metadata. .log/.out files are extracted lazily in phase 2.
+  const serverLogArtifacts = new Map<string, { zipPath: string; artifactName: string }>();
   for (const zipFile of serverLogZips) {
-    const configKey = zipFile.replace(/^server_logs_/u, '').replace(/_\d+_\d+\.zip$/u, '');
-    serverLogPaths.set(configKey, path.join(artifactsPath, zipFile));
+    const artifactName = zipFile.replace(/_\d+_\d+\.zip$/u, '');
+    const configKey = serverLogArtifactSuffix(artifactName);
+    if (!configKey) continue;
+    serverLogArtifacts.set(configKey, {
+      zipPath: path.join(artifactsPath, zipFile),
+      artifactName,
+    });
   }
 
   // ── Map benchmark ZIPs ────────────────────────────────────────────────────
@@ -300,12 +327,14 @@ async function mapWorkflowDir(
     }
     if (rows.length > 0) {
       // Match server log by config key (bmk_ files only — results_ compiled zips have no matching logs)
-      let serverLogPath: string | undefined;
+      let serverLogArtifact: { zipPath: string; artifactName: string } | undefined;
       if (zipFile.startsWith('bmk_')) {
         const bmkConfigKey = zipFile.replace(/^bmk_/u, '').replace(/_\d+_\d+\.zip$/u, '');
-        serverLogPath = serverLogPaths.get(bmkConfigKey);
+        serverLogArtifact =
+          serverLogArtifacts.get(bmkConfigKey) ??
+          serverLogArtifacts.get(bmkConfigKey.replace(/^agentic_/u, ''));
       }
-      bmkZips.push({ zipFile, rows, serverLogPath });
+      bmkZips.push({ zipFile, rows, serverLogArtifact });
     }
   }
 
@@ -321,7 +350,11 @@ async function mapWorkflowDir(
     for (const [hwKey, stats] of Object.entries(data as Record<string, any>)) {
       if (!GPU_KEYS.has(hwKey)) continue;
       if (typeof stats?.n_success !== 'number' || typeof stats?.total !== 'number') continue;
-      statsRows.push({ hardware: hwKey, nSuccess: stats.n_success, total: stats.total });
+      statsRows.push({
+        hardware: hwKey,
+        nSuccess: stats.n_success,
+        total: stats.total,
+      });
     }
   }
 
@@ -379,7 +412,10 @@ async function mapWorkflowDir(
     }
 
     for (const params of mapped) {
-      evalRows.push({ params, samplesText: samplesByTask.get(params.task) ?? null });
+      evalRows.push({
+        params,
+        samplesText: samplesByTask.get(params.task) ?? null,
+      });
     }
   }
 
@@ -416,8 +452,17 @@ async function mapWorkflowDir(
   }
 
   // ── Parse changelog ZIPs ──────────────────────────────────────────────────
+  const newestChangelogZip = [...changelogZips]
+    .toSorted((a, b) => {
+      const idA = a.match(/_(?<artifactId>\d+)\.zip$/u)?.[1];
+      const idB = b.match(/_(?<artifactId>\d+)\.zip$/u)?.[1];
+      const tsA = idA ? (artifactCreatedAt.get(Number(idA)) ?? '') : '';
+      const tsB = idB ? (artifactCreatedAt.get(Number(idB)) ?? '') : '';
+      return tsA.localeCompare(tsB) || Number(idA ?? 0) - Number(idB ?? 0);
+    })
+    .at(-1);
   const changelogs: WorkflowMapResult['changelogs'] = [];
-  for (const zipFile of changelogZips) {
+  for (const zipFile of newestChangelogZip ? [newestChangelogZip] : []) {
     const data = readZipJson(path.join(artifactsPath, zipFile)) as Record<string, any> | null;
     if (!data || typeof data !== 'object') {
       local.skips.badZip++;
@@ -431,7 +476,11 @@ async function mapWorkflowDir(
     if (entries.length > 0) changelogs.push({ baseRef, headRef, entries });
   }
 
-  const evalsOnly = hasEvalsOnlyFlag(changelogs);
+  const correctedChangelogs = applyChangelogBackfills(githubRunId, ghInfo?.runAttempt, changelogs);
+  for (const backfillId of correctedChangelogs.backfillIds) {
+    warnings.push(`  [${dateDir}] applied changelog backfill ${backfillId}`);
+  }
+  const evalsOnly = hasEvalsOnlyFlag(correctedChangelogs.changelogs);
   if (evalsOnly) {
     console.log(
       `  [${dateDir}] evals-only run ${githubRunId} — skipping ${bmkZips.length} benchmark ZIP(s) and ${statsRows.length} stats row(s)`,
@@ -450,7 +499,7 @@ async function mapWorkflowDir(
     bmkZips: evalsOnly ? [] : bmkZips,
     statsRows: evalsOnly ? [] : statsRows,
     evalRows,
-    changelogs,
+    changelogs: correctedChangelogs.changelogs,
     evalsOnly,
     localSkips: {
       badZip: local.skips.badZip,
@@ -470,6 +519,7 @@ async function mapWorkflowDir(
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  validateRunBackfills();
   console.log('=== db:ingest:gcs ===');
   console.log(
     'This will ingest all GCS backup ZIP artifacts into the database.\n' +
@@ -577,37 +627,57 @@ async function main(): Promise<void> {
       headBranch: result.headBranch,
       headSha: result.headSha,
       createdAt: result.createdAt,
+      appendOnly: hasAppendOnlyFlag(result.changelogs),
       ghInfo: result.ghInfo,
     });
     if (workflowRunId === null) return wr;
 
     const allInserted: (BenchmarkParams & { configId: number })[] = [];
-    for (const { zipFile, rows, serverLogPath } of result.bmkZips) {
+    const seenPointIdentities = new Map<string, string>();
+    for (const { zipFile, rows, serverLogArtifact } of result.bmkZips) {
       const toInsert: (BenchmarkParams & { configId: number })[] = [];
       for (const row of rows) {
+        let configId: number;
         try {
-          const configId = await getOrCreateConfig(row.config);
-          if (
-            isBenchmarkPointPurged(result.githubRunId, result.ghInfo?.runAttempt, {
-              configId,
-              benchmarkType: row.benchmarkType,
-              isl: row.isl,
-              osl: row.osl,
-              conc: row.conc,
-              offloadMode: row.offloadMode,
-            })
-          ) {
-            console.log(
-              `  [${result.dateDir}] skipped purged benchmark point: config ${configId}, ` +
-                `${row.benchmarkType}, isl ${row.isl}, osl ${row.osl}, conc ${row.conc}, ` +
-                `offload ${row.offloadMode}`,
-            );
-            continue;
-          }
-          toInsert.push({ ...row, configId });
+          configId = await getOrCreateConfig(row.config);
         } catch (error: any) {
           tracker.recordDbError(`config for ${zipFile}`, error);
+          continue;
         }
+        if (
+          isBenchmarkPointPurged(result.githubRunId, result.ghInfo?.runAttempt, {
+            configId,
+            benchmarkType: row.benchmarkType,
+            isl: row.isl,
+            osl: row.osl,
+            conc: row.conc,
+            offloadMode: row.offloadMode,
+            recipeFingerprint: row.recipeFingerprint,
+          })
+        ) {
+          console.log(
+            `  [${result.dateDir}] skipped purged benchmark point: config ${configId}, ` +
+              `${row.benchmarkType}, isl ${row.isl}, osl ${row.osl}, conc ${row.conc}, ` +
+              `offload ${row.offloadMode}, recipe ${row.recipeFingerprint ?? 'legacy'}`,
+          );
+          continue;
+        }
+        const applied = applyBenchmarkPointBackfill(result.githubRunId, result.ghInfo?.runAttempt, {
+          ...row,
+          configId,
+        });
+        recordBackfilledPointIdentity(
+          seenPointIdentities,
+          applied.sourceIdentity,
+          applied.desiredIdentity,
+        );
+        if (applied.backfillId) {
+          console.log(
+            `  [${result.dateDir}] applied benchmark point backfill ` +
+              `${applied.backfillId}: config ${configId}, conc ${row.conc}`,
+          );
+        }
+        toInsert.push(applied.point);
       }
       if (toInsert.length > 0) {
         try {
@@ -623,14 +693,13 @@ async function main(): Promise<void> {
           // Only track as inserted after successful bulk insert
           allInserted.push(...toInsert);
 
-          // Attach server log (read lazily — too large to hold all in memory during phase 1)
-          if (serverLogPath && insertedIds.length > 0) {
-            const serverLog = readZipText(serverLogPath, 'server.log');
-            if (serverLog) {
-              // Strip null bytes — some logs contain 0x00 which PostgreSQL text columns reject
-              const clean = serverLog.replaceAll('\u0000', '');
-              await insertServerLog(sql, insertedIds, clean);
-            }
+          // Attach every .log/.out file (read lazily to bound phase-1 memory).
+          if (serverLogArtifact && insertedIds.length > 0) {
+            const logFiles = readServerLogArtifactZip(
+              serverLogArtifact.zipPath,
+              serverLogArtifact.artifactName,
+            );
+            await insertServerLogFiles(sql, insertedIds, logFiles);
           }
         } catch (error: any) {
           tracker.recordDbError(zipFile, error);
@@ -740,6 +809,7 @@ async function main(): Promise<void> {
       return out;
     },
     DB_CONCURRENCY,
+    true,
   );
 
   // Accumulate totals per date, then print one line per date in sorted order.

@@ -15,10 +15,12 @@ import {
 } from '@/lib/nudges/persistence';
 import { dismissesOnAction } from '@/lib/nudges/policy';
 import { NUDGE_REGISTRY } from '@/lib/nudges/registry';
-import type { NudgeDefinition, NudgeTrigger } from '@/lib/nudges/types';
+import type { NudgeDefinition, NudgeScope, NudgeTrigger } from '@/lib/nudges/types';
 import { LANDING_BANNER_DISMISSED_ATTRIBUTE } from '@/lib/nudges/landing-banner';
 import { BottomToast } from '@/components/ui/bottom-toast';
+import { CoachMark } from '@/components/ui/coach-mark';
 import { Button } from '@/components/ui/button';
+import { NewBadge } from '@/components/ui/new-badge';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -29,7 +31,17 @@ function trackNudgeEvent(def: NudgeDefinition, event: 'shown' | 'dismissed' | 'a
   track(name, def.analytics?.properties);
 }
 
-function isEligible(def: NudgeDefinition): boolean {
+/**
+ * `requireAnchor` separates the two questions the engine asks.
+ *
+ * Trigger *setup* asks "could this nudge ever fire?" and must not consult the
+ * anchor: a coach mark's anchor only exists once the chart has painted, and
+ * skipping setup at mount would mean its triggers are never wired up at all.
+ * Showing asks "can it fire right now?" — there a missing anchor is
+ * disqualifying, and the show is simply retried on the next trigger.
+ */
+function isEligible(def: NudgeDefinition, { requireAnchor = true } = {}): boolean {
+  if (requireAnchor && def.type === 'coach-mark' && !def.content.anchor?.resolve()) return false;
   if (!isWithinSchedule(def.schedule)) return false;
   if (def.permanentSuppressKey && isPermanentlySuppressed(def.permanentSuppressKey)) return false;
   if (isDismissed(def.storageKey, def.dismissal)) return false;
@@ -42,16 +54,18 @@ function isEligible(def: NudgeDefinition): boolean {
 // ---------------------------------------------------------------------------
 
 interface NudgeEngineProps {
-  scope: 'dashboard' | 'landing' | 'evaluation';
+  scope: NudgeScope;
 }
 
 /**
- * Two independent slots:
+ * Three independent slots:
  *  - **banner** — inline content (one at a time)
  *  - **overlay** — toasts and modals (one at a time)
+ *  - **coach mark** — a callout anchored to a live element (one at a time)
  *
- * A banner and an overlay can be visible simultaneously because they
- * occupy different visual layers.
+ * All three can be visible simultaneously because they occupy different
+ * visual layers: a banner sits in the document flow, an overlay in the
+ * bottom-right corner, and a coach mark next to the element it explains.
  */
 export function NudgeEngine({ scope }: NudgeEngineProps) {
   const scopeNudges = useMemo(() => NUDGE_REGISTRY.filter((n) => n.scope === scope), [scope]);
@@ -68,8 +82,10 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     return initialBanner?.id ?? null;
   });
   const [activeOverlayId, setActiveOverlayId] = useState<string | null>(null);
+  const [activeCoachMarkId, setActiveCoachMarkId] = useState<string | null>(null);
   const bannerShownRef = useRef(false);
   const overlayShownRef = useRef(false);
+  const coachMarkShownRef = useRef(false);
 
   const triggerCountsRef = useRef<Record<string, number>>({});
   const eventDetailRef = useRef<Record<string, unknown> | null>(null);
@@ -77,6 +93,9 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
 
   const activeBanner = activeBannerId ? scopeNudges.find((n) => n.id === activeBannerId) : null;
   const activeOverlay = activeOverlayId ? scopeNudges.find((n) => n.id === activeOverlayId) : null;
+  const activeCoachMark = activeCoachMarkId
+    ? scopeNudges.find((n) => n.id === activeCoachMarkId)
+    : null;
 
   const showNudge = useCallback((def: NudgeDefinition) => {
     if (sessionDismissedRef.current.has(def.id)) return;
@@ -86,6 +105,10 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
       if (bannerShownRef.current) return;
       bannerShownRef.current = true;
       setActiveBannerId(def.id);
+    } else if (def.type === 'coach-mark') {
+      if (coachMarkShownRef.current) return;
+      coachMarkShownRef.current = true;
+      setActiveCoachMarkId(def.id);
     } else {
       if (overlayShownRef.current) return;
       overlayShownRef.current = true;
@@ -115,6 +138,31 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     setActiveOverlayId(null);
     overlayShownRef.current = false;
   }, [activeOverlay]);
+
+  const dismissCoachMark = useCallback(() => {
+    if (!activeCoachMark) return;
+    trackNudgeEvent(activeCoachMark, 'dismissed');
+    markDismissed(activeCoachMark.storageKey, activeCoachMark.dismissal);
+    sessionDismissedRef.current.add(activeCoachMark.id);
+    setActiveCoachMarkId(null);
+    coachMarkShownRef.current = false;
+  }, [activeCoachMark]);
+
+  /**
+   * The user performed the interaction the coach mark was teaching (clicked a
+   * point). That is engagement, not rejection — record it as an action and,
+   * per `dismissesOnAction`, stop showing the tip.
+   */
+  const handleCoachMarkAction = useCallback(() => {
+    if (!activeCoachMark) return;
+    trackNudgeEvent(activeCoachMark, 'action');
+    activeCoachMark.content.action?.onClick(eventDetailRef.current ?? undefined);
+    if (!dismissesOnAction(activeCoachMark)) return;
+    markDismissed(activeCoachMark.storageKey, activeCoachMark.dismissal);
+    sessionDismissedRef.current.add(activeCoachMark.id);
+    setActiveCoachMarkId(null);
+    coachMarkShownRef.current = false;
+  }, [activeCoachMark]);
 
   const handleBannerAction = useCallback(() => {
     if (!activeBanner) return;
@@ -166,7 +214,11 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     const sorted = [...scopeNudges].toSorted((a, b) => b.priority - a.priority);
 
     for (const def of sorted) {
-      if (!isEligible(def)) continue;
+      // Already occupying its slot — re-arming would keep re-running the
+      // (potentially expensive) eligibility check for no benefit.
+      if (def.id === activeBannerId || def.id === activeOverlayId) continue;
+      if (def.id === activeCoachMarkId) continue;
+      if (!isEligible(def, { requireAnchor: false })) continue;
       if (sessionDismissedRef.current.has(def.id)) continue;
 
       const triggers = Array.isArray(def.trigger) ? def.trigger : [def.trigger];
@@ -181,7 +233,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
       for (const fn of cleanups) fn();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeBannerId, activeOverlayId, scope]);
+  }, [activeBannerId, activeOverlayId, activeCoachMarkId, scope]);
 
   // -------------------------------------------------------------------------
   // Permanent suppress event listener
@@ -197,6 +249,9 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
         if (def.type === 'banner' && activeBannerId === def.id) {
           setActiveBannerId(null);
           bannerShownRef.current = false;
+        } else if (def.type === 'coach-mark' && activeCoachMarkId === def.id) {
+          setActiveCoachMarkId(null);
+          coachMarkShownRef.current = false;
         } else if (activeOverlayId === def.id) {
           setActiveOverlayId(null);
           overlayShownRef.current = false;
@@ -223,7 +278,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
         window.removeEventListener(event, handler);
       }
     };
-  }, [activeBannerId, activeOverlayId, scopeNudges]);
+  }, [activeBannerId, activeOverlayId, activeCoachMarkId, scopeNudges]);
 
   // -------------------------------------------------------------------------
   // Render — banner and overlay can coexist
@@ -250,6 +305,13 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
           def={activeOverlay}
           onDismiss={dismissOverlay}
           onAction={handleOverlayAction}
+        />
+      )}
+      {activeCoachMark?.content.anchor && (
+        <CoachMarkRenderer
+          def={activeCoachMark}
+          onDismiss={dismissCoachMark}
+          onAction={handleCoachMarkAction}
         />
       )}
     </>
@@ -433,9 +495,9 @@ function ModalRenderer({
               <Icon className={`size-5 ${content.iconClassName ?? ''}`} />
               {localized(locale, content.title, content.titleZh)}
               {content.badge && (
-                <span className="ml-1 inline-flex items-center rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm">
+                <NewBadge data-new-badge="launch-modal" className="ml-1">
                   {localized(locale, content.badge, content.badgeZh)}
-                </span>
+                </NewBadge>
               )}
             </h2>
             <p id={`${idPrefix}-description`} className="text-sm text-muted-foreground">
@@ -487,6 +549,34 @@ function ModalRenderer({
   return dialog;
 }
 
+function CoachMarkRenderer({
+  def,
+  onDismiss,
+  onAction,
+}: {
+  def: NudgeDefinition;
+  onDismiss: () => void;
+  onAction: () => void;
+}) {
+  const locale = useLocale();
+  const { content } = def;
+  const Icon = content.icon;
+  // Guarded by the caller — `isEligible` also refuses anchorless coach marks.
+  const anchor = content.anchor!;
+
+  return (
+    <CoachMark
+      anchor={anchor}
+      icon={<Icon className={content.iconClassName} />}
+      title={localized(locale, content.title, content.titleZh)}
+      description={localized(locale, content.description, content.descriptionZh)}
+      onDismiss={onDismiss}
+      onAction={onAction}
+      testId={content.testId}
+    />
+  );
+}
+
 function BannerRenderer({
   def,
   onDismiss,
@@ -535,9 +625,9 @@ function BannerRenderer({
                 {localized(locale, content.title, content.titleZh)}
               </span>
               {content.badge && (
-                <span className="ml-2 inline-flex items-center gap-1.5 align-middle rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm">
+                <NewBadge data-new-badge="launch-banner" className="ml-2 align-middle">
                   {localized(locale, content.badge, content.badgeZh)}
-                </span>
+                </NewBadge>
               )}
             </p>
             <p className="text-xs text-muted-foreground leading-snug truncate">
@@ -545,7 +635,7 @@ function BannerRenderer({
             </p>
           </div>
           <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-brand shrink-0 group-hover:translate-x-0.5 transition-transform duration-200">
-            {rs.explore}
+            {localized(locale, content.linkLabel ?? rs.explore, content.linkLabelZh)}
             <ArrowRight className="size-3.5" />
           </span>
         </div>

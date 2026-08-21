@@ -39,7 +39,7 @@ export const FAQ_ITEMS_ZH: FaqItem[] = [
   {
     question: '什么是 InferenceX？',
     answer:
-      'InferenceX（原名 InferenceMAX）是一个开源、厂商中立的基准测试（benchmark）平台，持续衡量各类 Chip 和软件栈的 AI 推理性能。每当配置发生变化时，基准测试会重新运行，确保结果始终跟随模型和框架的演进保持最新。',
+      'InferenceX（原名 InferenceMAX）持续衡量各类 Chip 和软件栈的智能体推理与固定序列推理性能。AgentX 是其长上下文多轮编码场景。配置发生变化时，基准测试会重新运行。',
   },
   {
     question: 'InferenceX 由谁开发？',
@@ -52,7 +52,8 @@ export const FAQ_ITEMS_ZH: FaqItem[] = [
   },
   {
     question: '测试了哪些 AI 模型？',
-    answer: '每个模型均在多种序列长度配置（1k/1k、1k/8k、8k/1k tokens）和并发级别下进行测试。',
+    answer:
+      '各模型会在其已有数据所覆盖的固定序列配置（1k/1k、1k/8k、8k/1k tokens）与多个并发级别下进行测试。具备对应数据的模型还包含 AgentX 长上下文多轮智能体编码运行。',
     list: modelNames,
   },
   {
@@ -76,6 +77,7 @@ export const FAQ_ITEMS_ZH: FaqItem[] = [
       '每 Chip 输入和输出吞吐量',
       '每兆瓦 token 吞吐量（tok/s/MW）',
       'P99 首 token 延迟（TTFT）',
+      'AgentX 场景的端到端延迟、token 间延迟（ITL）、输出吞吐量、prefix cache 行为以及会话与 subagent 执行情况',
       '每百万 token 成本（总计、输入、输出）——涵盖超大规模云、NeoCoud 和裸机租赁定价',
       '每 token 能耗（焦耳，总计、输入、输出）',
       '用户自定义成本和功耗计算',
@@ -97,7 +99,7 @@ export const FAQ_ITEMS_ZH: FaqItem[] = [
   {
     question: 'InferenceX 与其他 AI 基准测试有何不同？',
     answer:
-      '大多数 AI 基准测试是静态的、单时间点测量，参与者提交的是专为基准测试定制的镜像，无法反映真实的线上推理性能。InferenceX 在真实硬件上持续运行，采用完全可复现的配置。所有测试脚本均提交至代码仓库，基准测试日志在 GitHub Actions 上公开可见，结果端到端可审计。',
+      'InferenceX 在真实硬件上运行固定序列工作负载与 AgentX 长上下文多轮编码场景。测试配方保存在代码仓库中，每项结果均链接至对应的 GitHub Actions 运行。',
   },
   {
     question: '结果如何实现可复现？',
