@@ -84,7 +84,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-agentic-aggregates',
-    sourceSha256: '6a99fc156b02b86c5c26ca5ba6b05a280e064dd6123aaba528f124ff0f13c577',
+    sourceSha256: '7dab9929039926b2697d5db71c143eb39f94e795a0d83bb0348db8869f279a5f',
   },
   {
     source: 'src/app/api/v1/availability/route.ts',
@@ -319,6 +319,17 @@ export const apiRouteCatalog = [
     sourceSha256: '30659cb757b9fd23411757051b650cfb564016aa15c8b9fec48676b9591f01e9',
   },
   {
+    source: 'src/app/api/v1/resident-sequence-lengths/route.ts',
+    path: '/api/v1/resident-sequence-lengths',
+    method: 'GET',
+    classification: 'ui-artifact-read',
+    exclusionReason: {
+      en: 'UI-only mergeable sequence-length sketches for the resident inference-chart point set.',
+      zh: '仅供界面合并当前推理图表数据点的序列长度 sketch。',
+    },
+    sourceSha256: '7a66a7116be3bf63a8c7fc1a54cc7eaf97405858e633daa0802cc2ae7cdbb37e',
+  },
+  {
     source: 'src/app/api/v1/server-log-files/route.ts',
     path: '/api/v1/server-log-files',
     method: 'GET',
@@ -477,7 +488,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/agentic-aggregates.ts',
-    sourceSha256: 'b0f4be6c39fe440df99db687b4b6deeed58897bf20325770631680f6e41aa304',
+    sourceSha256: 'fae8d19971730132cb30cd781f677562bfc6328b1f4e35a8268a8391ad187c18',
     reviewArea: {
       en: 'Agentic aggregate percentile keys, nullability, and ID-keyed response shape.',
       zh: '智能体汇总百分位字段、可空性和按 ID 索引的响应结构。',

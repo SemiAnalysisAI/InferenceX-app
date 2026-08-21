@@ -473,7 +473,9 @@ const percentileSchema = objectSchema({
   p50: numberSchema,
   p75: numberSchema,
   p90: numberSchema,
+  p95: numberSchema,
   p99: numberSchema,
+  n: integerSchema,
 });
 const nullablePercentileSchema: ApiSchema = { oneOf: [percentileSchema, { type: 'null' }] };
 const idListSchema: ApiSchema = { type: 'string', pattern: '^\\d+(,\\d+)*$' };
@@ -1670,7 +1672,15 @@ export const apiOperations: readonly ApiOperation[] = [
         {
           '421': {
             id: 421,
-            isl: { mean: 18320, p50: 16440, p75: 20110, p90: 24880, p99: 31900 },
+            isl: {
+              mean: 18320,
+              p50: 16440,
+              p75: 20110,
+              p90: 24880,
+              p95: 27940,
+              p99: 31900,
+              n: 512,
+            },
             osl: null,
             kvCacheUtil: null,
             prefixCacheHitRate: null,

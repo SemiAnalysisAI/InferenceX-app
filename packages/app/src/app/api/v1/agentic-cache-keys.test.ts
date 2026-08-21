@@ -36,6 +36,7 @@ import { CACHE_KEY_PREFIX as requestChartDataKey } from './request-chart-data/ro
 import { CACHE_KEY_PREFIX as traceServerMetricSourceKey } from './trace-server-metric-source/route';
 import { CACHE_KEY_PREFIX as traceServerMetricsKey } from './trace-server-metrics/route';
 import { CACHE_KEY_PREFIX as traceHistogramsKey } from './trace-histograms/route';
+import { CACHE_KEY_PREFIX as residentSequenceLengthsKey } from './resident-sequence-lengths/route';
 
 describe('agentic blob-cache keys are version-derived', () => {
   it('agentic-aggregates key embeds STATS_VERSION', () => {
@@ -62,6 +63,10 @@ describe('agentic blob-cache keys are version-derived', () => {
     expect(traceHistogramsKey).toBe(`trace-histograms-v${REQUEST_TIMELINE_VERSION}`);
   });
 
+  it('resident-sequence-lengths key embeds STATS_VERSION', () => {
+    expect(residentSequenceLengthsKey).toBe(`resident-sequence-lengths-v${STATS_VERSION}`);
+  });
+
   it('every key actually contains a version segment (no unversioned literals)', () => {
     for (const key of [
       agenticAggregatesKey,
@@ -70,6 +75,7 @@ describe('agentic blob-cache keys are version-derived', () => {
       traceServerMetricsKey,
       traceServerMetricSourceKey,
       traceHistogramsKey,
+      residentSequenceLengthsKey,
     ]) {
       expect(key).toMatch(/-v\d+$/u);
     }

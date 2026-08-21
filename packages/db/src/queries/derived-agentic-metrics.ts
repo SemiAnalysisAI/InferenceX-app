@@ -29,9 +29,11 @@ import {
   fetchAggregateStatsRows,
   percentilesOf,
   readNum,
+  sequenceLengthSketches,
   STATS_VERSION,
   writeBackTraceReplayJsonb,
   type MetricPercentiles,
+  type SequenceLengthSketches,
 } from './agentic-shared';
 
 export interface DerivedAgenticMetric {
@@ -62,6 +64,7 @@ interface StoredAggregateStats {
   kvCacheUtil: MetricPercentiles | null;
   prefixCacheHitRate: MetricPercentiles | null;
   e2elPerOsl: MetricPercentiles | null;
+  sequenceLengths: SequenceLengthSketches;
 }
 
 /**
@@ -233,6 +236,7 @@ export async function getDerivedAgenticMetrics(
           kvCacheUtil: prior?.kvCacheUtil ?? null,
           prefixCacheHitRate: prior?.prefixCacheHitRate ?? null,
           e2elPerOsl: e2el_per_osl,
+          sequenceLengths: sequenceLengthSketches(isl, osl),
         };
         writeBackTraceReplayJsonb(sql, 'aggregate_stats', Number(row.trace_replay_id), merged);
       }
