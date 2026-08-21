@@ -112,6 +112,42 @@ const FixedSequenceLogDialog = dynamic(() =>
   ),
 );
 
+/**
+ * Bounding boxes of the pills drawn over the plot: the run-name labels
+ * (`.line-label`) and the parallelism labels (`.parallelism-label`).
+ *
+ * Both are positioned by the roofline layer, which always runs before the two
+ * places that call {@link avoidLabelCollisions} — layers render before the
+ * `onRender` callback, and the per-layer zoom updates run before
+ * `zoomConfig.onZoom` — so reading the DOM here gives their final placement
+ * for the current frame.
+ *
+ * Coordinates: the group carries a `translate(...)`, and the `.ll-bg` /
+ * `.pl-bg` rect carries an offset sized to its text. Summing the two puts the
+ * box in the same space as a point label's `cx`/`cy`.
+ */
+function pillObstacles(
+  zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+): { left: number; right: number; top: number; bottom: number }[] {
+  const boxes: { left: number; right: number; top: number; bottom: number }[] = [];
+  zoomGroup.selectAll<SVGGElement, unknown>('.line-label, .parallelism-label').each(function () {
+    // A hidden pill is still in the DOM but covers nothing.
+    if (this.style.opacity === '0') return;
+    const m = /translate\((?<tx>[^,]+),(?<ty>[^)]+)\)/u.exec(this.getAttribute('transform') ?? '');
+    const bg = this.querySelector<SVGRectElement>('.ll-bg, .pl-bg');
+    if (!m?.groups || !bg) return;
+    const tx = Number(m.groups.tx);
+    const ty = Number(m.groups.ty);
+    const x = Number(bg.getAttribute('x'));
+    const y = Number(bg.getAttribute('y'));
+    const w = Number(bg.getAttribute('width'));
+    const h = Number(bg.getAttribute('height'));
+    if (![tx, ty, x, y, w, h].every((v) => Number.isFinite(v))) return;
+    boxes.push({ left: tx + x, top: ty + y, right: tx + x + w, bottom: ty + y + h });
+  });
+  return boxes;
+}
+
 // Greedy label-collision avoidance.
 // Each candidate is the y-position of the FIRST baseline (relative to point
 // center) which we apply via the first tspan's `dy` — later tspans cascade
@@ -166,7 +202,11 @@ function avoidLabelCollisions(
   const labels: LabelInfo[] = pending.map((lab) => ({ ...lab, w: lab.el.getBBox().width }));
 
   labels.sort((a, b) => a.cx - b.cx);
-  const placed: { left: number; right: number; top: number; bottom: number }[] = [];
+  // Seed with the run-name and parallelism pills so a point label that would
+  // sit underneath one is pushed to its next candidate slot (or hidden) rather
+  // than being drawn through it. Point-label-vs-point-label behaviour below is
+  // unchanged; the pills simply occupy space before the first label is placed.
+  const placed = pillObstacles(zoomGroup);
   const pad = 2;
 
   for (const lab of labels) {
