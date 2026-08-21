@@ -21,8 +21,8 @@ describe('resident sequence-length subtitle', () => {
       expect(ids.length).to.be.greaterThan(1);
       request.reply({
         body: {
-          isl: buildTokenLengthSketch(Array.from({ length: ids.length * 2 }, () => 8_192)),
-          osl: buildTokenLengthSketch(Array.from({ length: ids.length * 2 }, () => 1_024)),
+          isl: buildTokenLengthSketch(Array.from({ length: 12_345 }, () => 8_192)),
+          osl: buildTokenLengthSketch(Array.from({ length: 12_345 }, () => 1_024)),
           coveredPoints: ids.length,
           requestedPoints: ids.length,
         },
@@ -33,7 +33,7 @@ describe('resident sequence-length subtitle', () => {
     cy.wait('@residentSequenceLengths');
     cy.get('[data-testid="resident-sequence-lengths"]')
       .should('be.visible')
-      .and('contain.text', 'Completed requests across all resident points')
+      .and('contain.text', 'Completed requests across all resident points (n=12,345)')
       .and('contain.text', 'ISL p50 8.2k')
       .and('contain.text', 'p95 8.2k')
       .and('contain.text', 'OSL p50 1k');

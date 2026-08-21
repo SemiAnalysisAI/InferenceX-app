@@ -91,7 +91,8 @@ const STRINGS = {
     updated: 'Updated:',
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
-    completedSequenceLengths: 'Completed requests across all resident points',
+    completedSequenceLengths: (count: string) =>
+      `Completed requests across all resident points (n=${count})`,
     viewMode: 'View mode',
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
@@ -108,7 +109,7 @@ const STRINGS = {
     updated: '更新时间：',
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
-    completedSequenceLengths: '当前所有数据点的已完成请求',
+    completedSequenceLengths: (count: string) => `当前所有数据点的已完成请求（n=${count}）`,
     viewMode: '视图模式',
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
@@ -906,8 +907,12 @@ export default function ChartDisplay() {
                               className="mb-2 text-xs text-muted-foreground"
                               data-testid="resident-sequence-lengths"
                             >
-                              {t.completedSequenceLengths} · ISL p50{' '}
-                              {formatTokenLength(residentSequenceLengths.isl.p50)} · p75{' '}
+                              {t.completedSequenceLengths(
+                                residentSequenceLengths.isl.n.toLocaleString(
+                                  locale === 'zh' ? 'zh-CN' : 'en-US',
+                                ),
+                              )}{' '}
+                              · ISL p50 {formatTokenLength(residentSequenceLengths.isl.p50)} · p75{' '}
                               {formatTokenLength(residentSequenceLengths.isl.p75)} · p90{' '}
                               {formatTokenLength(residentSequenceLengths.isl.p90)} · p95{' '}
                               {formatTokenLength(residentSequenceLengths.isl.p95)} · p99{' '}
