@@ -22,11 +22,12 @@ export async function retryArtifactOperation<T>(
   const warn = options.warn ?? console.warn;
   let lastError: unknown;
 
-  for (let attempt = 0; attempt <= delaysMs.length; attempt++) {
+  for (let attempt = 0; attempt < delaysMs.length + 1; attempt++) {
     try {
       return await operation();
     } catch (error) {
       lastError = error;
+      if (attempt >= delaysMs.length) break;
       const delayMs = delaysMs[attempt];
       if (delayMs === undefined) break;
       warn(`  [WARN] ${label} failed (attempt ${attempt + 1}); retrying in ${delayMs / 1_000}s`);
