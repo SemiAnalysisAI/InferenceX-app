@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 /**
@@ -43,7 +44,18 @@ export function useBulkIdsQuery<T>(
 }
 
 /** Single-payload query for one benchmark_results id; 404 resolves to null. */
-export function useByIdQuery<T>(endpoint: string, id: number | null, enabled: boolean) {
+export function useByIdQuery<T, TSelected = T>(
+  endpoint: string,
+  id: number | null,
+  enabled: boolean,
+  select?: (data: T) => TSelected,
+) {
+  const selectNullable = useCallback(
+    (data: T | null): TSelected | null =>
+      data === null ? null : (select?.(data) ?? (data as unknown as TSelected)),
+    [select],
+  );
+
   return useQuery({
     queryKey: [endpoint, id] as const,
     queryFn: async ({ signal }): Promise<T | null> => {
@@ -55,5 +67,9 @@ export function useByIdQuery<T>(endpoint: string, id: number | null, enabled: bo
     },
     enabled,
     staleTime: STALE_TIME_MS,
+    // TanStack Query re-runs select when its function identity changes. Keep
+    // this wrapper stable so decoding a large compact payload happens only
+    // when the cached wire data or the caller's selector actually changes.
+    select: selectNullable,
   });
 }

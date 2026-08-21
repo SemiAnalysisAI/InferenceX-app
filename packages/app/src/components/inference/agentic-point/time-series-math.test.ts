@@ -14,6 +14,8 @@ import {
   interpAt,
   maxTimeSeriesValue,
   rollingAverage,
+  rollingRatioFromComponents,
+  rollingRatioOfSums,
   rollingRequestMetric,
   timeRollingAverage,
   toggleThroughputSeries,
@@ -135,6 +137,15 @@ describe('rollingRequestMetric', () => {
       { t: 2, value: 0.2 },
     ]);
   });
+
+  it('computes exact cumulative percentiles for a large reverse-ordered latency set', () => {
+    const requests = Array.from({ length: 25_000 }, (_, index) =>
+      request(index + 1, 25_000 - index, 10),
+    );
+    const result = rollingRequestMetric(requests, 'ttft', 'p90');
+    expect(result.cumulative).toHaveLength(requests.length);
+    expect(result.cumulative.at(-1)?.value).toBeCloseTo(22.5001, 4);
+  });
 });
 
 describe('timeRollingAverage', () => {
@@ -177,6 +188,16 @@ describe('timeRollingAverage', () => {
     const data = [{ t: 0, value: 1 }];
     expect(timeRollingAverage(data, 0)).toBe(data);
   });
+
+  it('handles a six-figure event series without rescanning each prefix', () => {
+    const data = Array.from({ length: 100_000 }, (_, index) => ({
+      t: index / 10,
+      value: 7,
+    }));
+    const result = timeRollingAverage(data, 30);
+    expect(result).toHaveLength(data.length);
+    expect(result.at(-1)?.value).toBeCloseTo(7, 9);
+  });
 });
 
 describe('rollingAverage', () => {
@@ -188,6 +209,127 @@ describe('rollingAverage', () => {
   it('passes through window sizes of 1 or less', () => {
     const data = [{ t: 0, value: 5 }];
     expect(rollingAverage(data, 1)).toBe(data);
+  });
+});
+
+describe('rollingRatioOfSums', () => {
+  it('weights cache-hit ratios by token volume instead of averaging interval ratios', () => {
+    const result = rollingRatioOfSums(
+      [
+        { t: 0, value: 0 },
+        { t: 1, value: 100 },
+        { t: 2, value: 0 },
+      ],
+      [
+        { t: 0, value: 100 },
+        { t: 1, value: 0 },
+        { t: 2, value: 100 },
+      ],
+      3,
+    );
+
+    // The middle interval has a zero denominator and would yield an infinite
+    // pointwise ratio. Across the shared window it is 100 / 200 = 50%.
+    expect(result[1]).toEqual({ t: 1, value: 0.5 });
+    expect(result.every((point) => point.value <= 1)).toBe(true);
+  });
+
+  it('treats a missing numerator tick as zero and bounds residual timing skew', () => {
+    const result = rollingRatioOfSums(
+      [
+        { t: 1, value: 50 },
+        { t: 3, value: 110 },
+      ],
+      [
+        { t: 0, value: 100 },
+        { t: 1, value: 100 },
+        { t: 2, value: 100 },
+        { t: 3, value: 100 },
+      ],
+      1,
+    );
+
+    expect(result).toEqual([
+      { t: 0, value: 0 },
+      { t: 1, value: 0.5 },
+      { t: 2, value: 0 },
+      { t: 3, value: 1 },
+    ]);
+  });
+
+  it('handles six-figure series in linear time', () => {
+    const denominator = Array.from({ length: 100_000 }, (_, t) => ({ t, value: 100 }));
+    const numerator = denominator.map(({ t }) => ({ t, value: 80 }));
+    const result = rollingRatioOfSums(numerator, denominator, 50);
+
+    expect(result).toHaveLength(denominator.length);
+    expect(result.at(-1)?.value).toBeCloseTo(0.8, 12);
+  });
+});
+
+describe('rollingRatioFromComponents', () => {
+  it('preserves the stored query denominator when hits exceed prompt throughput', () => {
+    const result = rollingRatioFromComponents(
+      [
+        { t: 0, value: 0.5 },
+        { t: 1, value: 0.5 },
+      ],
+      [
+        { t: 0, value: 200 },
+        { t: 1, value: 200 },
+      ],
+      [
+        { t: 0, value: 100 },
+        { t: 1, value: 100 },
+      ],
+      2,
+    );
+
+    // The original query rate is 200 / 0.5 = 400. Using prompt throughput
+    // as the denominator would incorrectly clamp both intervals to 100%.
+    expect(result.map((point) => point.value)).toEqual([0.5, 0.5]);
+  });
+
+  it('uses prompt throughput only to weight a zero-hit interval', () => {
+    const result = rollingRatioFromComponents(
+      [
+        { t: 0, value: 0 },
+        { t: 1, value: 0.5 },
+      ],
+      [
+        { t: 0, value: 0 },
+        { t: 1, value: 50 },
+      ],
+      [
+        { t: 0, value: 100 },
+        { t: 1, value: 100 },
+      ],
+      2,
+    );
+
+    expect(result).toEqual([
+      { t: 0, value: 0.25 },
+      { t: 1, value: 0.5 },
+    ]);
+  });
+
+  it('retains hit-only ticks omitted from the stored ratio timeline', () => {
+    const result = rollingRatioFromComponents(
+      [{ t: 1, value: 0 }],
+      [
+        { t: 0, value: 100 },
+        { t: 1, value: 0 },
+      ],
+      [{ t: 1, value: 100 }],
+      3,
+    );
+
+    // t=0 has hits but no queries, while the matching query delta lands at
+    // t=1. The centered window must retain both halves: 100 / 100 = 100%.
+    expect(result).toEqual([
+      { t: 0, value: 1 },
+      { t: 1, value: 1 },
+    ]);
   });
 });
 

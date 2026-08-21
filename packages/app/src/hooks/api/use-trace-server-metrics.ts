@@ -1,3 +1,5 @@
+import { useQuery } from '@tanstack/react-query';
+
 import { useByIdQuery } from './benchmark-id-query';
 
 export interface TimeSeriesPoint {
@@ -63,6 +65,10 @@ export interface MetricSourceSeries {
   kvCacheUsageByEngine: { engineLabel: string; points: TimeSeriesPoint[] }[];
 }
 
+export interface MetricSourceDescriptor {
+  source: MetricSource;
+}
+
 export interface TraceServerMetrics {
   meta: PointMeta;
   startNs: number;
@@ -90,7 +96,7 @@ export interface TraceServerMetrics {
    */
   kvCachePoolTokens: number | null;
   /** Orchestrator-normalized metrics grouped by endpoint/worker. */
-  metricSources: MetricSourceSeries[];
+  metricSources: MetricSourceDescriptor[];
 }
 
 /**
@@ -100,4 +106,21 @@ export interface TraceServerMetrics {
  */
 export function useTraceServerMetrics(id: number | null, enabled = false) {
   return useByIdQuery<TraceServerMetrics>('trace-server-metrics', id, enabled && Boolean(id));
+}
+
+/** Fetch one endpoint/worker's full arrays only after it is selected. */
+export function useTraceServerMetricSource(id: number | null, source: string, enabled = false) {
+  return useQuery({
+    queryKey: ['trace-server-metric-source', id, source] as const,
+    queryFn: async ({ signal }): Promise<MetricSourceSeries | null> => {
+      if (!id || !source || source === 'all') return null;
+      const params = new URLSearchParams({ id: String(id), source });
+      const response = await fetch(`/api/v1/trace-server-metric-source?${params}`, { signal });
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`trace-server-metric-source ${response.status}`);
+      return (await response.json()) as MetricSourceSeries;
+    },
+    enabled: enabled && Boolean(id) && source !== 'all',
+    staleTime: 5 * 60 * 1000,
+  });
 }

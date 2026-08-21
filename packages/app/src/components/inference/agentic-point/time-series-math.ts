@@ -5,7 +5,7 @@
  * here is unit-testable in isolation (see time-series-math.test.ts).
  */
 
-import type { RequestRecord } from '@/hooks/api/use-request-timeline';
+import type { RequestChartRecord } from '@/hooks/api/use-request-chart-data';
 import type { TimeSeriesPoint } from '@/hooks/api/use-trace-server-metrics';
 
 /** One drawable line in a TimeSeriesChart. */
@@ -96,7 +96,7 @@ export function interpAt(data: TimeSeriesPoint[], t: number): number | null {
  * P90 interactivity = 1 / P90 TPOT (a conservative tail-latency view).
  */
 export function rollingRequestMetric(
-  requests: readonly RequestRecord[],
+  requests: readonly RequestChartRecord[],
   metric: RequestMetric,
   percentile: RequestPercentile,
   windowSize = 50,
@@ -132,17 +132,44 @@ export function rollingRequestMetric(
     const latencyMs = quantile(sorted, q);
     return { t, value: metric === 'interactivity' ? 1000 / latencyMs : latencyMs / 1000 };
   });
-  const prefixLatencies: number[] = [];
-  const cumulative = samples.map(({ t, latencyMs }) => {
-    let lo = 0;
-    let hi = prefixLatencies.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (prefixLatencies[mid]! <= latencyMs) lo = mid + 1;
-      else hi = mid;
+
+  // Exact expanding percentiles without inserting into a growing sorted array
+  // (which is O(n²) from repeated `splice` shifts on six-figure request sets).
+  // Coordinate-compress all observed values, then track prefix counts in a
+  // Fenwick tree so insertion and kth-value lookup are both O(log n).
+  const latencyValues = [...new Set(samples.map(({ latencyMs }) => latencyMs))].toSorted(
+    (a, b) => a - b,
+  );
+  const latencyIndex = new Map(latencyValues.map((value, index) => [value, index + 1]));
+  const counts = new Uint32Array(latencyValues.length + 1);
+  const addLatency = (index: number) => {
+    for (let cursor = index; cursor < counts.length; cursor += cursor & -cursor) {
+      counts[cursor]! += 1;
     }
-    prefixLatencies.splice(lo, 0, latencyMs);
-    const cumulativeLatencyMs = quantile(prefixLatencies, q);
+  };
+  const kthLatency = (zeroBasedRank: number): number => {
+    let index = 0;
+    let target = zeroBasedRank + 1;
+    let step = 1;
+    while (step * 2 < counts.length) step *= 2;
+    for (; step > 0; step >>= 1) {
+      const next = index + step;
+      if (next < counts.length && counts[next]! < target) {
+        index = next;
+        target -= counts[next]!;
+      }
+    }
+    return latencyValues[index]!;
+  };
+  const cumulative = samples.map(({ t, latencyMs }, index) => {
+    addLatency(latencyIndex.get(latencyMs)!);
+    const count = index + 1;
+    const position = (count - 1) * q;
+    const lowRank = Math.floor(position);
+    const highRank = Math.ceil(position);
+    const low = kthLatency(lowRank);
+    const high = kthLatency(highRank);
+    const cumulativeLatencyMs = low + (high - low) * (position - lowRank);
     return {
       t,
       value: metric === 'interactivity' ? 1000 / cumulativeLatencyMs : cumulativeLatencyMs / 1000,
@@ -162,23 +189,27 @@ export function rollingRequestMetric(
  */
 export function timeRollingAverage(data: TimeSeriesPoint[], windowS: number): TimeSeriesPoint[] {
   if (data.length === 0 || windowS <= 0) return data;
+  // Prefix integral of the input step function. `areaAt[i]` is the integral
+  // from t=0 through data[i].t, with the first value extended back to zero.
+  // A moving left cursor then evaluates every trailing window in O(n) total.
+  const areaAt = new Float64Array(data.length);
+  areaAt[0] = data[0]!.value * data[0]!.t;
+  for (let index = 1; index < data.length; index += 1) {
+    const previous = data[index - 1]!;
+    const current = data[index]!;
+    areaAt[index] = areaAt[index - 1]! + previous.value * (current.t - previous.t);
+  }
   const out: TimeSeriesPoint[] = Array.from({ length: data.length });
+  let left = 0;
   for (let i = 0; i < data.length; i++) {
     const tEnd = data[i]!.t;
     const tStart = Math.max(0, tEnd - windowS);
-    // Find the first sample j whose t is >= tStart; the step value at
-    // tStart is data[j-1].value if j > 0, else data[0].value.
-    let j = 0;
-    while (j < data.length && data[j]!.t < tStart) j++;
-    let prevT = tStart;
-    let prevV = j > 0 ? data[j - 1]!.value : data[0]!.value;
-    let area = 0;
-    for (; j <= i; j++) {
-      const curT = data[j]!.t;
-      area += prevV * (curT - prevT);
-      prevT = curT;
-      prevV = data[j]!.value;
-    }
+    while (left + 1 <= i && data[left + 1]!.t <= tStart) left += 1;
+    const areaAtStart =
+      tStart <= data[0]!.t
+        ? data[0]!.value * tStart
+        : areaAt[left]! + data[left]!.value * (tStart - data[left]!.t);
+    const area = areaAt[i]! - areaAtStart;
     const dur = tEnd - tStart;
     out[i] = { t: tEnd, value: dur > 0 ? area / dur : data[i]!.value };
   }
@@ -202,6 +233,158 @@ export function rollingAverage(data: TimeSeriesPoint[], windowSize: number): Tim
     out[i] = { t: data[i]!.t, value: n > 0 ? sum / n : 0 };
   }
   return out;
+}
+
+/**
+ * Centered, volume-weighted ratio over matching rate series.
+ *
+ * Counter families that describe one logical fraction can publish their
+ * deltas in adjacent scrape buckets. Averaging the pointwise ratios gives a
+ * tiny-denominator bucket the same weight as a million-token bucket and can
+ * therefore produce impossible percentages. Sum the rates over the window
+ * first, then divide. The semantic upper bound is applied only after that
+ * aggregation as a guard against residual counter timing skew.
+ *
+ * The denominator owns the timeline. Missing numerator samples contribute
+ * zero, which is the correct interpretation for a no-hit interval.
+ */
+export function rollingRatioOfSums(
+  numerator: TimeSeriesPoint[],
+  denominator: TimeSeriesPoint[],
+  windowSize: number,
+  upperBound = 1,
+): TimeSeriesPoint[] {
+  if (denominator.length === 0 || windowSize <= 0) return [];
+
+  const numeratorByT = new Map<number, number>();
+  for (const point of numerator) {
+    if (!Number.isFinite(point.t) || !Number.isFinite(point.value)) continue;
+    numeratorByT.set(point.t, (numeratorByT.get(point.t) ?? 0) + Math.max(0, point.value));
+  }
+
+  // The ETL emits sorted canonical-grid series. Coalesce defensively so a
+  // duplicate denominator timestamp cannot receive the numerator twice.
+  const rows: { t: number; numerator: number; denominator: number }[] = [];
+  for (const point of denominator) {
+    if (!Number.isFinite(point.t) || !Number.isFinite(point.value)) continue;
+    const previous = rows.at(-1);
+    if (previous?.t === point.t) {
+      previous.denominator += Math.max(0, point.value);
+      continue;
+    }
+    rows.push({
+      t: point.t,
+      numerator: numeratorByT.get(point.t) ?? 0,
+      denominator: Math.max(0, point.value),
+    });
+  }
+  if (rows.length === 0) return [];
+
+  const numeratorPrefix = new Float64Array(rows.length + 1);
+  const denominatorPrefix = new Float64Array(rows.length + 1);
+  for (let i = 0; i < rows.length; i++) {
+    numeratorPrefix[i + 1] = numeratorPrefix[i]! + rows[i]!.numerator;
+    denominatorPrefix[i + 1] = denominatorPrefix[i]! + rows[i]!.denominator;
+  }
+
+  const leftSpan = Math.floor((windowSize - 1) / 2);
+  const rightSpan = windowSize - leftSpan - 1;
+  const boundedUpper = Number.isFinite(upperBound) ? Math.max(0, upperBound) : Infinity;
+  const out: TimeSeriesPoint[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const start = Math.max(0, i - leftSpan);
+    const end = Math.min(rows.length, i + rightSpan + 1);
+    const denominatorSum = denominatorPrefix[end]! - denominatorPrefix[start]!;
+    if (denominatorSum <= 0) continue;
+    const numeratorSum = numeratorPrefix[end]! - numeratorPrefix[start]!;
+    out.push({
+      t: rows[i]!.t,
+      value: Math.min(boundedUpper, Math.max(0, numeratorSum / denominatorSum)),
+    });
+  }
+  return out;
+}
+
+/**
+ * Volume-weight a stored ratio without substituting a different denominator.
+ *
+ * `ratio = numerator / denominator`, so a positive interval lets us recover
+ * the original denominator exactly as `numerator / ratio`. This matters for
+ * vLLM, where prefix-cache queries are not interchangeable with prompt-token
+ * throughput. A zero-hit interval cannot be inverted; only there do we use
+ * the supplied denominator proxy to retain its zero-valued weight.
+ */
+export function rollingRatioFromComponents(
+  ratio: TimeSeriesPoint[],
+  numerator: TimeSeriesPoint[],
+  zeroRatioDenominator: TimeSeriesPoint[],
+  windowSize: number,
+  upperBound = 1,
+): TimeSeriesPoint[] {
+  const ratioByT = new Map<number, number>();
+  for (const point of ratio) {
+    if (!Number.isFinite(point.t) || !Number.isFinite(point.value) || point.value < 0) continue;
+    ratioByT.set(point.t, point.value);
+  }
+  const numeratorByT = new Map<number, number>();
+  for (const point of numerator) {
+    if (!Number.isFinite(point.t) || !Number.isFinite(point.value)) continue;
+    numeratorByT.set(point.t, (numeratorByT.get(point.t) ?? 0) + Math.max(0, point.value));
+  }
+  const fallbackByT = new Map(
+    zeroRatioDenominator.map((point) => [point.t, Math.max(0, point.value)]),
+  );
+  const recoveredNumerator: TimeSeriesPoint[] = [];
+  const recoveredDenominator: TimeSeriesPoint[] = [];
+
+  // The stored ratio omits `queries=0` ticks, but a lagging hit counter can
+  // still publish a positive numerator there. Walk the sorted union so those
+  // hits participate in the same centered window as their adjacent queries.
+  const timeline: number[] = [];
+  let ratioIndex = 0;
+  let numeratorIndex = 0;
+  while (ratioIndex < ratio.length || numeratorIndex < numerator.length) {
+    while (ratioIndex < ratio.length && !Number.isFinite(ratio[ratioIndex]!.t)) ratioIndex++;
+    while (numeratorIndex < numerator.length && !Number.isFinite(numerator[numeratorIndex]!.t)) {
+      numeratorIndex++;
+    }
+    const ratioT = ratio[ratioIndex]?.t ?? Infinity;
+    const numeratorT = numerator[numeratorIndex]?.t ?? Infinity;
+    const t = Math.min(ratioT, numeratorT);
+    if (!Number.isFinite(t)) break;
+    if (timeline.at(-1) !== t) timeline.push(t);
+    while (ratio[ratioIndex]?.t === t) ratioIndex++;
+    while (numerator[numeratorIndex]?.t === t) numeratorIndex++;
+  }
+
+  for (const t of timeline) {
+    const pointRatio = ratioByT.get(t);
+    const observedNumerator = numeratorByT.get(t) ?? 0;
+    // No stored ratio means the ETL saw no positive query denominator. Keep
+    // a zero denominator entry so a hit-only tick is not silently dropped.
+    if (pointRatio === undefined) {
+      if (observedNumerator > 0) {
+        recoveredNumerator.push({ t, value: observedNumerator });
+        recoveredDenominator.push({ t, value: 0 });
+      }
+      continue;
+    }
+
+    const fallbackDenominator = fallbackByT.get(t) ?? 0;
+    const denominator =
+      pointRatio > 0 && observedNumerator > 0
+        ? observedNumerator / pointRatio
+        : fallbackDenominator;
+    if (!Number.isFinite(denominator) || denominator <= 0) continue;
+
+    recoveredDenominator.push({ t, value: denominator });
+    recoveredNumerator.push({
+      t,
+      value: observedNumerator > 0 ? observedNumerator : pointRatio * denominator,
+    });
+  }
+
+  return rollingRatioOfSums(recoveredNumerator, recoveredDenominator, windowSize, upperBound);
 }
 
 /**
@@ -262,7 +445,9 @@ export function cumulativeTimeAverage(data: TimeSeriesPoint[]): TimeSeriesPoint[
  * Cumulative count of successfully completed (non-cancelled) requests by end
  * time. Phase is the caller's concern — pass a phase-scoped timeline.
  */
-export function cumulativeCompletedRequests(requests: readonly RequestRecord[]): TimeSeriesPoint[] {
+export function cumulativeCompletedRequests(
+  requests: readonly RequestChartRecord[],
+): TimeSeriesPoint[] {
   const completionTimes = requests
     .filter((request) => !request.cancelled)
     .map((request) => request.end / 1e9)
@@ -277,7 +462,7 @@ export function cumulativeCompletedRequests(requests: readonly RequestRecord[]):
  * OSL uses the request's final observed length across its whole lifetime.
  */
 export function averageSequenceLengthInFlight(
-  requests: readonly RequestRecord[],
+  requests: readonly RequestChartRecord[],
   metric: 'isl' | 'osl',
 ): TimeSeriesPoint[] {
   const events = new Map<number, { tokenDelta: number; countDelta: number }>();

@@ -2,10 +2,14 @@ import { gzipSync } from 'node:zlib';
 
 import { describe, expect, it } from 'vitest';
 
-import { CHART_SERIES_VERSION, type ChartSeries } from '../etl/compute-chart-series';
+import {
+  CHART_SERIES_VERSION,
+  type ChartSeries,
+  type MetricSourceSeries,
+} from '../etl/compute-chart-series';
 import type { DbClient } from '../connection.js';
 
-import { getTraceServerMetrics } from './trace-server-metrics';
+import { getTraceServerMetrics, getTraceServerMetricSource } from './trace-server-metrics';
 
 function currentSeries(): ChartSeries {
   return {
@@ -131,5 +135,165 @@ describe('getTraceServerMetrics', () => {
 
     await expect(getTraceServerMetrics(sql, 42)).resolves.toBeNull();
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe('getTraceServerMetricSource', () => {
+  it('returns only the selected source from a current precomputed series', async () => {
+    const metricSource = {
+      source: {
+        id: 'decode-0',
+        adapter: 'vllm',
+        role: 'decode' as const,
+        endpointUrl: null,
+        nativeRole: null,
+        workerId: 'worker-0',
+        dpRank: null,
+        engine: null,
+      },
+      kvCacheUsage: [],
+      prefixCacheHitRate: [],
+      queueDepth: [],
+      promptTokensBySource: {},
+      promptTps: [{ t: 0, value: 10 }],
+      generationTps: [{ t: 0, value: 20 }],
+      prefixCacheHitsTps: [],
+      hostKvCacheUsage: [],
+      kvCacheUsageByEngine: [],
+    };
+    const { sql, calls } = mockSql([
+      [
+        {
+          trace_replay_id: 7,
+          has_blob: true,
+          chart_series_version: CHART_SERIES_VERSION,
+          framework: 'dynamo-vllm',
+          disagg: true,
+          metric_source: metricSource,
+        },
+      ],
+    ]);
+
+    await expect(getTraceServerMetricSource(sql, 42, 'decode-0')).resolves.toEqual(metricSource);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("metric_source->'source'->>'id'");
+    expect(calls[0]).not.toContain('server_metrics_json_gz as blob');
+  });
+});
+
+// ── All-endpoints KV overlay collapses per worker ───────────────────────
+//
+// `chart_series.kvCacheUsageByEngine` is per DP rank. On a PD-disaggregated
+// run that is unreadable (6 prefill workers x DP4 + decode = 28 lines), so the
+// read layer averages each worker's ranks into one line. Derived here, not in
+// the ETL, so it needs no CHART_SERIES_VERSION bump or backfill.
+
+/** One metric source (worker) owning `ranks` engines, each at a flat value. */
+function workerSource(
+  role: MetricSourceSeries['source']['role'],
+  workerId: string,
+  ranks: number[],
+): MetricSourceSeries {
+  return {
+    source: {
+      id: `dynamo|${role}|${workerId}`,
+      adapter: 'dynamo',
+      role,
+      endpointUrl: `http://10.0.0.1:7500/metrics`,
+      nativeRole: role,
+      workerId,
+      dpRank: null,
+      engine: null,
+    },
+    kvCacheUsage: [],
+    prefixCacheHitRate: [],
+    queueDepth: [],
+    promptTokensBySource: {},
+    promptTps: [],
+    generationTps: [],
+    prefixCacheHitsTps: [],
+    hostKvCacheUsage: [],
+    kvCacheUsageByEngine: ranks.map((value, i) => ({
+      engineLabel: `${role} ${i}`,
+      points: [
+        { t: 0, value },
+        { t: 1, value },
+      ],
+    })),
+  };
+}
+
+describe('getTraceServerMetrics all-endpoints KV overlay', () => {
+  function run(metricSources: unknown[], fallback: unknown[] = []) {
+    const series = {
+      ...currentSeries(),
+      kvCacheUsageByEngine: fallback,
+      metricSources,
+    } as unknown as ChartSeries;
+    const { sql } = mockSql([[metaRow({ chart_series: series })]]);
+    return getTraceServerMetrics(sql, 42);
+  }
+
+  it("averages each worker's ranks into one line", async () => {
+    const result = await run([
+      workerSource('prefill', 'wpre-aaaa', [0.1, 0.3]),
+      workerSource('prefill', 'wpre-bbbb', [0.5, 0.7]),
+      workerSource('decode', 'wdec-cccc', [0.3, 0.5]),
+    ]);
+    expect(result?.kvCacheUsageByEngine.map((e) => e.engineLabel)).toEqual([
+      'prefill aaaa',
+      'prefill bbbb',
+      'decode',
+    ]);
+    expect(result?.kvCacheUsageByEngine.map((e) => e.points[0]!.value)).toEqual([0.2, 0.6, 0.4]);
+  });
+
+  it('keeps the stored per-rank overlay for a single-worker run', async () => {
+    // A plain DP deployment has no per-source data; rank skew is the signal
+    // there, so the stored per-rank lines must survive untouched.
+    const perRank = [
+      { engineLabel: '0', points: [{ t: 0, value: 0.1 }] },
+      { engineLabel: '1', points: [{ t: 0, value: 0.9 }] },
+    ];
+    const result = await run([], perRank);
+    expect(result?.kvCacheUsageByEngine).toEqual(perRank);
+  });
+
+  it('leaves workers that already own one engine each alone', async () => {
+    const perRank = [{ engineLabel: 'prefill 0', points: [{ t: 0, value: 0.2 }] }];
+    const result = await run(
+      [workerSource('prefill', 'wpre-aaaa', [0.2]), workerSource('decode', 'wdec-cccc', [0.4])],
+      perRank,
+    );
+    expect(result?.kvCacheUsageByEngine).toEqual(perRank);
+  });
+
+  it('keeps a single-pool worker when sibling workers own multiple ranks', async () => {
+    const decode = workerSource('decode', 'wdec-cccc', []);
+    decode.kvCacheUsage = [
+      { t: 0, value: 0.4 },
+      { t: 1, value: 0.5 },
+    ];
+    const result = await run([
+      workerSource('prefill', 'wpre-aaaa', [0.1, 0.3]),
+      workerSource('prefill', 'wpre-bbbb', [0.5, 0.7]),
+      decode,
+    ]);
+
+    expect(result?.kvCacheUsageByEngine.map((e) => e.engineLabel)).toEqual([
+      'prefill aaaa',
+      'prefill bbbb',
+      'decode',
+    ]);
+    expect(result?.kvCacheUsageByEngine[2]?.points).toEqual(decode.kvCacheUsage);
+  });
+
+  it('still trims metricSources to descriptors', async () => {
+    const result = await run([
+      workerSource('prefill', 'wpre-aaaa', [0.1, 0.3]),
+      workerSource('decode', 'wdec-cccc', [0.3, 0.5]),
+    ]);
+    expect(result?.metricSources).toHaveLength(2);
+    expect(Object.keys(result!.metricSources[0]!)).toEqual(['source']);
   });
 });

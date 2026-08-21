@@ -1,7 +1,9 @@
 'use client';
 
-import type { RequestTimeline } from '@/hooks/api/use-request-timeline';
-import type { MetricSourceSeries, QueueDepthPoint } from '@/hooks/api/use-trace-server-metrics';
+import { useMemo } from 'react';
+
+import type { RequestChartData } from '@/hooks/api/use-request-chart-data';
+import type { MetricSourceDescriptor, QueueDepthPoint } from '@/hooks/api/use-trace-server-metrics';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics';
 
@@ -18,6 +20,7 @@ import {
   buildThroughputChartSeries,
   inflightUniqueTokens,
   rollingAverage,
+  rollingRatioFromComponents,
   timeRollingAverage,
   toggleThroughputSeries,
   type ThroughputSeriesKey,
@@ -62,6 +65,15 @@ const DP_RANK_PALETTE = [
   '#eab308',
 ];
 
+/**
+ * Bare DP ranks read as "DP 3"; disaggregated runs get role- or worker-
+ * qualified labels from the ETL ("decode", "prefill 0", "0 (a01a)") that
+ * already name themselves, so those pass through untouched.
+ */
+function engineSeriesName(engineLabel: string): string {
+  return /^\d+$/u.test(engineLabel) ? `DP ${engineLabel}` : engineLabel;
+}
+
 export function KvCacheUtilizationCard({ sliced }: { sliced: SlicedServerSeries }) {
   return (
     <ExpandableChart
@@ -77,21 +89,29 @@ export function KvCacheUtilizationCard({ sliced }: { sliced: SlicedServerSeries 
         // than one, draw one line per rank in distinct colors so
         // load skew is visible at a glance; cluster-average sits on
         // top in white so it stands out.
-        const perEngine = serverSeries.kvCacheUsageByEngine ?? [];
-        const hasPerEngine = perEngine.length > 1;
+        const allEngines = serverSeries.kvCacheUsageByEngine ?? [];
+        // Decide off the point's own engine count, not the phase-sliced one:
+        // this also drives the average line's name, color and stroke, so
+        // keying it to the slice would make the chart change identity when
+        // you switch between the Warmup and Profiling tabs.
+        const hasPerEngine = allEngines.length > 1;
+        // Colors come from the unsliced position so a rank keeps its color
+        // across phases; engines with no points in this phase are dropped
+        // afterwards so they don't take a legend slot with no line.
+        const perEngine = allEngines
+          .map((e, i) => ({
+            name: engineSeriesName(e.engineLabel),
+            data: rollingAverage(e.points, 50),
+            color: DP_RANK_PALETTE[i % DP_RANK_PALETTE.length]!,
+            // Thin + translucent so the Avg line on top reads as
+            // the headline number, not just one more series.
+            strokeWidth: 1,
+            strokeOpacity: 0.5,
+          }))
+          .filter((s) => s.data.length > 0);
         // Render order matters: per-engine first → average drawn on top.
         const series = [
-          ...(hasPerEngine
-            ? perEngine.map((e, i) => ({
-                name: `DP ${e.engineLabel}`,
-                data: rollingAverage(e.points, 50),
-                color: DP_RANK_PALETTE[i % DP_RANK_PALETTE.length]!,
-                // Thin + translucent so the Avg line on top reads as
-                // the headline number, not just one more series.
-                strokeWidth: 1,
-                strokeOpacity: 0.5,
-              }))
-            : []),
+          ...(hasPerEngine ? perEngine : []),
           {
             name: hasHost
               ? 'Chip HBM (avg n=50)'
@@ -143,11 +163,15 @@ export function RequestActivityCard({
   onViewChange,
 }: {
   sliced: SlicedServerSeries;
-  phaseTimeline: RequestTimeline | null;
+  phaseTimeline: RequestChartData | null;
   timelineLoading: boolean;
   view: RequestActivityView;
   onViewChange: (view: RequestActivityView) => void;
 }) {
+  const completedRequests = useMemo(
+    () => (phaseTimeline ? cumulativeCompletedRequests(phaseTimeline.requests) : null),
+    [phaseTimeline],
+  );
   return (
     <ExpandableChart
       title={view === 'queue' ? 'Request queue depth' : 'Cumulative completed requests'}
@@ -176,7 +200,7 @@ export function RequestActivityCard({
               series={[
                 {
                   name: 'Completed requests',
-                  data: cumulativeCompletedRequests(phaseTimeline.requests),
+                  data: completedRequests ?? [],
                   color: '#3b82f6',
                   strokeWidth: 2.5,
                 },
@@ -240,20 +264,32 @@ export function RequestActivityCard({
 }
 
 export function PrefixCacheHitRateCard({ sliced }: { sliced: SlicedServerSeries }) {
+  const hitRateData = useMemo(() => {
+    if (!sliced) return [];
+    const serverSeries = sliced.series;
+    const weighted = rollingRatioFromComponents(
+      serverSeries.prefixCacheHitRate,
+      serverSeries.prefixCacheHitsTps,
+      serverSeries.prefillTps,
+      50,
+    );
+    // Older stored rows may not have the component rate series. Preserve
+    // their existing chart rather than turning it into an empty state.
+    return weighted.length > 0 ? weighted : rollingAverage(serverSeries.prefixCacheHitRate, 50);
+  }, [sliced]);
+
   return (
     <ExpandableChart
       title="Prefix cache hit rate per interval"
       render={(expanded) => {
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
         if (!sliced) return <ChartSkeleton />;
-        const serverSeries = sliced.series;
         return (
           <TimeSeriesChart
             series={[
               {
                 name: 'Chip (HBM, avg n=50)',
-                data: rollingAverage(serverSeries.prefixCacheHitRate, 50),
-                rawData: serverSeries.prefixCacheHitRate,
+                data: hitRateData,
                 color: '#a855f7',
                 strokeWidth: 2,
               },
@@ -277,7 +313,7 @@ export function ThroughputCard({
   onSelectedChange,
 }: {
   sliced: SlicedServerSeries;
-  selectedSource: MetricSourceSeries | undefined;
+  selectedSource: MetricSourceDescriptor | undefined;
   selected: ReadonlySet<ThroughputSeriesKey>;
   onSelectedChange: (next: ReadonlySet<ThroughputSeriesKey>) => void;
 }) {
@@ -418,11 +454,20 @@ export function InflightUniqueTokensCard({
   timelineLoading,
   kvCachePoolTokens,
 }: {
-  phaseTimeline: RequestTimeline | null;
+  phaseTimeline: RequestChartData | null;
   timelineLoading: boolean;
   /** KV-cache pool size in tokens (vLLM only) — drawn as a constant ceiling. */
   kvCachePoolTokens: number | null;
 }) {
+  const inflightSeries = useMemo(() => {
+    if (!phaseTimeline) return null;
+    const raw = inflightUniqueTokens(phaseTimeline.requests);
+    return {
+      raw,
+      smoothed: timeRollingAverage(raw, 30),
+      cumulative: cumulativeTimeAverage(raw),
+    };
+  }, [phaseTimeline]);
   return (
     <ExpandableChart
       title="Unique input tokens in flight"
@@ -439,8 +484,8 @@ export function InflightUniqueTokensCard({
         // independent (cross-conv prefix sharing adds <1pp in
         // practice). Smooth with a 30s time-weighted rolling average
         // so brief turn-handoff dips don't dominate the chart.
-        const raw = inflightUniqueTokens(phaseTimeline.requests);
-        const smoothed = timeRollingAverage(raw, 30);
+        const raw = inflightSeries?.raw ?? [];
+        const smoothed = inflightSeries?.smoothed ?? [];
         // KV-cache pool size (vLLM only) drawn as a constant ceiling so
         // you can see how close the working set gets to eviction
         // pressure. Phase-independent — it's a static config value.
@@ -457,7 +502,7 @@ export function InflightUniqueTokensCard({
               },
               {
                 name: 'Cumulative average',
-                data: cumulativeTimeAverage(raw),
+                data: inflightSeries?.cumulative ?? [],
                 color: '#ef4444',
                 strokeWidth: 3,
               },

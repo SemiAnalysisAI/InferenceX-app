@@ -300,6 +300,17 @@ export const apiRouteCatalog = [
     sourceSha256: 'fe295d04ecf45bfcbd5d59518eb9a5b04a7f460a95053d79f7f904502d39d189',
   },
   {
+    source: 'src/app/api/v1/request-chart-data/route.ts',
+    path: '/api/v1/request-chart-data',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic point-detail BFF with a compact dictionary-encoded request projection coupled to the chart implementation.',
+      zh: '智能体数据点详情页专用 BFF；其字典编码的精简请求投影与图表实现紧密耦合。',
+    },
+    sourceSha256: '44f5a6830358417eb1402c948051fe13dd05bee392c0de7b1511654d94bb7c43',
+  },
+  {
     source: 'src/app/api/v1/request-timeline/route.ts',
     path: '/api/v1/request-timeline',
     method: 'GET',
@@ -364,12 +375,23 @@ export const apiRouteCatalog = [
     sourceSha256: '1157a59930b754787872b0d543167c917477be27e63a6fab0cc487ffab5d4825',
   },
   {
+    source: 'src/app/api/v1/trace-server-metric-source/route.ts',
+    path: '/api/v1/trace-server-metric-source',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic point-detail BFF that lazily returns the full time-series arrays for one UI-selected metric source.',
+      zh: '智能体数据点详情页专用 BFF；按界面选择按需返回单个指标来源的完整时间序列。',
+    },
+    sourceSha256: '6bf3444510f1451dff1c76414a257faec0c657d8a01ae821035a9e80addccd2c',
+  },
+  {
     source: 'src/app/api/v1/trace-server-metrics/route.ts',
     path: '/api/v1/trace-server-metrics',
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-trace-server-metrics',
-    sourceSha256: 'b1bb5b859a28ec18abd0b4ddebf5e505974a08b7ed9693e5bab118f4533f3ce6',
+    sourceSha256: '365b428f2c32e5461cfe13966292eccecfb285e9bf348617383dda821619251f',
   },
   {
     source: 'src/app/api/v1/workflow-info/route.ts',
@@ -551,7 +573,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-histograms.ts',
-    sourceSha256: '43d11e53abc4f9ba723c987424823a03fc8f5dde51cf11653ab8c0bf3a634f55',
+    sourceSha256: 'ec3b7358046ca2acdaaa56d8ecde2829ba8fe4f4b2b31c3795838ac85f59ca89',
     reviewArea: {
       en: 'Trace histogram input/output token arrays and ID-keyed response shape.',
       zh: '跟踪直方图输入/输出 token 数组和按 ID 索引的响应结构。',
@@ -559,7 +581,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-server-metrics.ts',
-    sourceSha256: '06b5a9b92b90a5e695ab6c1dfb4b4d1240180f8d306ff4523ea8cc4269b0ddf3',
+    sourceSha256: '7702f580ee488ff691f0e1182b58c1f54e2e3a58678f79b3edbdbb18e505be88',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',
       zh: '跟踪服务器指标元数据、时间序列分组、来源标签和单位。',

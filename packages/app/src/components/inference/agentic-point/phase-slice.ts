@@ -15,6 +15,7 @@
  * off by the origin gap. This rebasing lives in `phaseBoundarySec` only.
  */
 
+import type { RequestChartData, RequestChartRecord } from '@/hooks/api/use-request-chart-data';
 import type { RequestRecord, RequestTimeline } from '@/hooks/api/use-request-timeline';
 import type {
   QueueDepthPoint,
@@ -42,7 +43,9 @@ export interface ServerSeriesLike {
 }
 
 /** True when the timeline contains at least one non-profiling (warmup) request. */
-export function timelineHasWarmup(timeline: RequestTimeline | null | undefined): boolean {
+type RequestPhaseData = Pick<RequestChartData, 'startNs' | 'durationS' | 'requests'>;
+
+export function timelineHasWarmup(timeline: RequestPhaseData | null | undefined): boolean {
   return Boolean(timeline?.requests.some((r) => r.phase !== 'profiling'));
 }
 
@@ -52,7 +55,7 @@ export function timelineHasWarmup(timeline: RequestTimeline | null | undefined):
  * Returns null unless BOTH a warmup and a profiling request exist (nothing to
  * split otherwise).
  */
-export function phaseBoundaryNs(timeline: RequestTimeline | null | undefined): number | null {
+export function phaseBoundaryNs(timeline: RequestPhaseData | null | undefined): number | null {
   if (!timeline) return null;
   let hasWarmup = false;
   let minProfilingStart: number | null = null;
@@ -77,7 +80,7 @@ export function phaseBoundaryNs(timeline: RequestTimeline | null | undefined): n
  */
 export function phaseBoundarySec(
   serverMetrics: Pick<TraceServerMetrics, 'startNs'> | null | undefined,
-  timeline: RequestTimeline | null | undefined,
+  timeline: RequestPhaseData | null | undefined,
 ): number | null {
   if (!serverMetrics) return null;
   const boundaryNs = phaseBoundaryNs(timeline);
@@ -185,4 +188,25 @@ export function sliceTimelineByPhase(
   const durationS =
     phase === 'warmup' ? boundaryOff / 1e9 : Math.max(1, timeline.durationS - boundaryOff / 1e9);
   return { ...timeline, startNs: timeline.startNs + shift, requests, durationS };
+}
+
+/** Compact-data counterpart to `sliceTimelineByPhase` for summary charts. */
+export function sliceRequestChartDataByPhase(
+  data: RequestChartData,
+  phase: StagePhase,
+): RequestChartData {
+  const boundaryNs = phaseBoundaryNs(data);
+  if (boundaryNs === null) return data;
+  const boundaryOff = boundaryNs - data.startNs;
+  const inPhase = (request: RequestChartRecord) =>
+    phase === 'warmup' ? request.start < boundaryOff : request.start >= boundaryOff;
+  const shift = phase === 'profiling' ? boundaryOff : 0;
+  const requests = data.requests.filter(inPhase).map((request) => ({
+    ...request,
+    start: request.start - shift,
+    end: request.end - shift,
+  }));
+  const durationS =
+    phase === 'warmup' ? boundaryOff / 1e9 : Math.max(1, data.durationS - boundaryOff / 1e9);
+  return { ...data, startNs: data.startNs + shift, requests, durationS };
 }
