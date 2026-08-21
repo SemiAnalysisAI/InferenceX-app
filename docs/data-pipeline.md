@@ -151,6 +151,30 @@ AIPerf defines the `server_metrics_export.json` envelope, but labels such as wor
 
 Adapters are selected from the benchmark's canonical framework, and per-worker series are only emitted for disaggregated configs with a recognized adapter. Unknown orchestrators and non-disaggregated configs retain their aggregate-only series; roles are never guessed from ports or metric names. The frontend only consumes the canonical source identity and never interprets orchestrator-native labels.
 
+### Server-Log Artifact Bundles
+
+Server-log artifacts are stored as filename-keyed bundles rather than as a hard-coded list of
+router, worker, or benchmark roles. Ingest recursively retains every regular `.log` and `.out`
+file and preserves its artifact-relative path. This applies to both `server_logs_*` ZIPs and
+`multinode_server_logs_*` artifacts whose files are nested inside
+`multinode_server_logs.tar.gz`.
+
+The primary file remains in `server_logs.server_log` for compatibility and KV-cache metadata
+extraction; `server_log_files` holds the remaining files. `server_logs.file_name` records the
+primary file's original path, and `files_complete` distinguishes fully scanned bundles from
+legacy single-file rows. Run `bun run admin:db:backfill-server-log-files` to use the public GCS
+artifact backup first and fall back to retained GitHub artifacts for recent runs. Pass `--all`
+for complete DB history, `--source gcs` to exercise only the backup path, and `--dry-run` to
+inventory pair counts and compressed download size without writing. `--run <id>`, `--limit <n>`,
+and `--yes` remain available for targeted, idempotent recovery. Bundles already marked
+`files_complete` are skipped after their small benchmark artifact is mapped, avoiding repeated
+large log downloads.
+
+Full-bundle search stays inside PostgreSQL: each file is scanned through overlapping 16 MiB
+character slices, and the API returns at most 50 match contexts rather than transferring the
+complete file. The overlap preserves literal matches that cross a slice boundary. Files are
+processed sequentially so a multinode bundle cannot materialize every large log in one query.
+
 ### Agentic Dataset Provenance
 
 AIPerf exports public-dataset provenance in `metadata.dataset`, including the Hugging Face dataset ID. InferenceX preserves that object as `dataset` on each agentic aggregate benchmark row. During benchmark ingest, `ingest-ci-run.ts` derives the dashboard slug from `hf_dataset_name` (for example, `semianalysisai/cc-traces-weka-062126` becomes `cc-traces-weka-062126`) and upserts `run_datasets` for the workflow run.

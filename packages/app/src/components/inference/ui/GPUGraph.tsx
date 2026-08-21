@@ -3,7 +3,8 @@
 import { track } from '@/lib/analytics';
 import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import dynamic from 'next/dynamic';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 
 import { useInference } from '@/components/inference/InferenceContext';
@@ -15,6 +16,7 @@ import { useLocale } from '@/lib/use-locale';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
+import { useLogAvailability } from '@/hooks/api/use-log-availability';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -64,6 +66,12 @@ import {
   OffloadHaloLegendKey,
 } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
+
+const FixedSequenceLogDialog = dynamic(() =>
+  import('@/components/inference/log-viewer/fixed-sequence-log-dialog').then(
+    (module) => module.FixedSequenceLogDialog,
+  ),
+);
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 
@@ -316,6 +324,15 @@ const GPUGraph = React.memo(
       [filteredData],
     );
     const { data: traceAvailability } = useTraceAvailability(agenticIds);
+    // Logs apply to every persisted fixed-sequence or agentic point. Unofficial
+    // overlays are absent from this comparison view and would not have stored
+    // benchmark ids/log rows in any case.
+    const persistedPointIds = useMemo(
+      () => filteredData.flatMap((point) => (typeof point.id === 'number' ? [point.id] : [])),
+      [filteredData],
+    );
+    const { data: logAvailability } = useLogAvailability(persistedPointIds);
+    const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
 
     // Warning annotations for visible series with known upstream issues —
     // same treatment the scatter view gets, applied to the date-comparison view.
@@ -867,6 +884,7 @@ const GPUGraph = React.memo(
               hardwareConfig,
               runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
               hasTrace: typeof d.id === 'number' ? traceAvailability?.[d.id] === true : false,
+              hasLog: typeof d.id === 'number' ? logAvailability?.[d.id] === true : false,
               locale,
             }),
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),
@@ -891,19 +909,37 @@ const GPUGraph = React.memo(
             const tooltipEl = chartRef.current?.getTooltipElement();
             if (!tooltipEl) return;
             const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
-            if (!viewBtn || typeof d.id !== 'number') return;
-            viewBtn.addEventListener('click', (event) => {
-              event.stopPropagation();
-              // Full-document navigation: stamp the chart state onto THIS
-              // history entry first, or Back returns to a bare /inference that
-              // rebuilds from defaults.
-              rememberChartStateInUrl();
-              track('gpu_timeseries_view_charts_opened', {
-                id: d.id,
-                hwKey: String(d.hwKey),
-                conc: d.conc,
+            if (viewBtn && typeof d.id === 'number') {
+              viewBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                // Full-document navigation: stamp the chart state onto THIS
+                // history entry first, or Back returns to a bare /inference that
+                // rebuilds from defaults.
+                rememberChartStateInUrl();
+                track('gpu_timeseries_view_charts_opened', {
+                  id: d.id,
+                  hwKey: String(d.hwKey),
+                  conc: d.conc,
+                });
               });
-            });
+            }
+            const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
+            if (logsBtn && typeof d.id === 'number') {
+              logsBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                if (d.benchmark_type !== 'agentic_traces') {
+                  event.preventDefault();
+                  setFixedLogPointId(d.id!);
+                  chartRef.current?.dismissTooltip();
+                }
+                track('gpu_timeseries_view_logs_opened', {
+                  id: d.id,
+                  hwKey: String(d.hwKey),
+                  conc: d.conc,
+                  benchmarkType: d.benchmark_type ?? 'single_turn',
+                });
+              });
+            }
             // Pinning updates D3Chart's React state. GPU comparison rebuilds
             // several inline layer configs on that render, whose cleanup can
             // briefly hide the otherwise-pinned portal tooltip. Restore its
@@ -1055,12 +1091,22 @@ const GPUGraph = React.memo(
             ]}
             precisionIndicators={selectedPrecisions}
             keyIndicators={
-              hasOffloadHalo || selectedSequence === Sequence.AgenticTraces ? (
-                <>
-                  {hasOffloadHalo && <OffloadHaloLegendKey />}
-                  {selectedSequence === Sequence.AgenticTraces && <AgenticOptimizationNote />}
-                </>
-              ) : undefined
+              <>
+                {hasOffloadHalo || selectedSequence === Sequence.AgenticTraces ? (
+                  <>
+                    {hasOffloadHalo && <OffloadHaloLegendKey />}
+                    {selectedSequence === Sequence.AgenticTraces && <AgenticOptimizationNote />}
+                  </>
+                ) : null}
+                {fixedLogPointId === null ? null : (
+                  <FixedSequenceLogDialog
+                    pointId={fixedLogPointId}
+                    onOpenChange={(open) => {
+                      if (!open) setFixedLogPointId(null);
+                    }}
+                  />
+                )}
+              </>
             }
           />
         }

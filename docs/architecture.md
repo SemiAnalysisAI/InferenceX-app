@@ -14,6 +14,7 @@ Some routes serve a purpose that raw DB rows cannot satisfy:
 
 - CollectiveX assembles stored sweep documents through its shared reader.
 - `tco-feed` performs server-side frontier interpolation for spreadsheet consumers that cannot run the TypeScript transforms.
+- `server-log-search` searches immutable log bundles in bounded database slices and returns only contextual matches. Returning raw rows would require transferring complete files that can exceed 100 MB before the browser could search them.
 - `/api/v1/overview` is a page-owned backend-for-frontend (BFF). It returns the compact `OverviewPageData` shape used by the initial server render, allowing selector changes to update the matrix without downloading every model's raw benchmark history or triggering a React Server Component (RSC) round trip. It is not a reusable public data API.
 - `/api/v1/benchmarks?view=calculator&sequence=...` is a page-owned compact view. It returns only the selected calculator scenario and the metric keys needed for interpolation, while the default endpoint preserves the raw-row contract. This reduces transfer and browser parsing without narrowing the reusable inference response.
 

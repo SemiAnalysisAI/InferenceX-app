@@ -2,8 +2,12 @@
  * Bulk DB insert functions for `benchmark_results` and `run_stats`.
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+
 import type postgres from 'postgres';
 import type { BenchmarkParams } from './benchmark-mapper';
+import { cleanLogText, type ServerLogFile, type ServerLogFilePath } from './server-log-artifacts';
 import { kvCachePoolTokensFromServerLog } from './server-log-metrics';
 
 type Sql = ReturnType<typeof postgres>;
@@ -112,42 +116,145 @@ export async function bulkIngestBenchmarkRows(
 }
 
 /**
- * Insert a server log once and link it to the given benchmark result IDs.
- * Idempotent: skips rows that already have a server_log_id set.
+ * Store every .log/.out file from one server-log artifact and link the bundle
+ * to the given benchmark result IDs. Existing bundles receive only missing
+ * filenames, making both normal ingest and the historical backfill idempotent.
  */
+interface DeferredServerLogFile {
+  fileName: string;
+  readText: () => string;
+}
+
+function primaryDeferredServerLogFile(
+  files: readonly DeferredServerLogFile[],
+): DeferredServerLogFile | null {
+  return (
+    files.find((file) => path.posix.basename(file.fileName).toLowerCase() === 'server.log') ??
+    files[0] ??
+    null
+  );
+}
+
+async function insertDeferredServerLogFiles(
+  sql: Sql,
+  benchmarkResultIds: number[],
+  files: readonly DeferredServerLogFile[],
+): Promise<void> {
+  if (benchmarkResultIds.length === 0 || files.length === 0) return;
+
+  const deduped = [...new Map(files.map((file) => [file.fileName, file])).values()];
+  const primary = primaryDeferredServerLogFile(deduped);
+  if (!primary) return;
+  const additional = deduped.filter((file) => file.fileName !== primary.fileName);
+  const primaryText = primary.readText();
+  const serverLog =
+    primary.fileName.toLowerCase().endsWith('/server.log') ||
+    primary.fileName.toLowerCase() === 'server.log'
+      ? primaryText
+      : null;
+  const kvCachePoolTokens = serverLog ? kvCachePoolTokensFromServerLog(serverLog) : null;
+
+  await sql.begin(async (tx) => {
+    const rows = await tx<{ id: number; server_log_id: number | null }[]>`
+      select id, server_log_id from benchmark_results
+      where id = any(${tx.array(benchmarkResultIds)}::bigint[])
+      for update
+    `;
+    const unlinked = rows.filter((row) => row.server_log_id === null);
+    const bundleIds = new Set(
+      rows.flatMap((row) => (row.server_log_id === null ? [] : [Number(row.server_log_id)])),
+    );
+
+    if (unlinked.length > 0) {
+      const [{ id: logId }] = await tx<{ id: number }[]>`
+        insert into server_logs (server_log, file_name, files_complete)
+        values (${primaryText}, ${primary.fileName}, true)
+        returning id
+      `;
+      bundleIds.add(Number(logId));
+      await tx`
+        update benchmark_results
+        set server_log_id = ${logId}
+        where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
+      `;
+    }
+
+    for (const logId of bundleIds) {
+      // Legacy rows used the synthetic name server.log. Backfill upgrades that
+      // label to the artifact-relative path without rewriting the large text.
+      await tx`
+        update server_logs
+        set file_name = case
+              when file_name = 'server.log' then ${primary.fileName}
+              else file_name
+            end,
+            files_complete = true
+        where id = ${logId}
+      `;
+      for (const file of additional) {
+        const logText = file.readText();
+        await tx`
+          insert into server_log_files (server_log_id, file_name, log_text)
+          values (${logId}, ${file.fileName}, ${logText})
+          on conflict (server_log_id, file_name) do nothing
+        `;
+      }
+    }
+
+    // Derive the KV-cache pool size (tokens) from the authoritative server.log
+    // when the artifact includes one. Multinode bundles without server.log are
+    // still stored in full; they simply cannot contribute this derived metric.
+    if (kvCachePoolTokens !== null) {
+      await tx`
+        update benchmark_results
+        set metrics = jsonb_set(
+          metrics,
+          '{kv_cache_pool_tokens}',
+          to_jsonb(${kvCachePoolTokens}::bigint)
+        )
+        where id = any(${tx.array(rows.map((row) => row.id))}::bigint[])
+      `;
+    }
+  });
+}
+
+export async function insertServerLogFiles(
+  sql: Sql,
+  benchmarkResultIds: number[],
+  files: readonly ServerLogFile[],
+): Promise<void> {
+  await insertDeferredServerLogFiles(
+    sql,
+    benchmarkResultIds,
+    files.map((file) => ({ fileName: file.fileName, readText: () => file.logText })),
+  );
+}
+
+/** Read archived log files one at a time so multinode bundles stay memory-bounded. */
+export async function insertServerLogFilePaths(
+  sql: Sql,
+  benchmarkResultIds: number[],
+  files: readonly ServerLogFilePath[],
+): Promise<void> {
+  await insertDeferredServerLogFiles(
+    sql,
+    benchmarkResultIds,
+    files.map((file) => ({
+      fileName: file.fileName,
+      readText: () => cleanLogText(fs.readFileSync(file.path, 'utf8')),
+    })),
+  );
+}
+
+/** Compatibility wrapper for callers/tests that still provide one legacy stream. */
 export async function insertServerLog(
   sql: Sql,
   benchmarkResultIds: number[],
   serverLog: string,
 ): Promise<void> {
-  if (benchmarkResultIds.length === 0) return;
-
-  // Only link rows that don't already have a server log
-  const unlinked = await sql<{ id: number }[]>`
-    select id from benchmark_results
-    where id = any(${sql.array(benchmarkResultIds)}::bigint[])
-      and server_log_id is null
-  `;
-  if (unlinked.length === 0) return;
-
-  const [{ id: logId }] = await sql<{ id: number }[]>`
-    insert into server_logs (server_log) values (${serverLog})
-    returning id
-  `;
-  // Derive the KV-cache pool size (tokens) from the log's authoritative
-  // "GPU KV cache size: N tokens" line(s) and stash it on the result's metrics
-  // JSON, mirroring how trace-replay-ingest derives cache-hit rates. The
-  // scraped vllm:cache_config_info metric can't reconstruct this for MLA models.
-  const kvCachePoolTokens = kvCachePoolTokensFromServerLog(serverLog);
-  await sql`
-    update benchmark_results
-    set server_log_id = ${logId}${
-      kvCachePoolTokens === null
-        ? sql``
-        : sql`, metrics = jsonb_set(metrics, '{kv_cache_pool_tokens}', to_jsonb(${kvCachePoolTokens}::bigint))`
-    }
-    where id = any(${sql.array(unlinked.map((r) => r.id))}::bigint[])
-  `;
+  await insertServerLogFiles(sql, benchmarkResultIds, [
+    { fileName: 'server.log', logText: serverLog },
+  ]);
 }
 
 /**

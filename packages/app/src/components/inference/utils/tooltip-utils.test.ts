@@ -171,18 +171,74 @@ describe('getPointLabel', () => {
 describe('generateTooltipContent', () => {
   it('renders View charts as a same-tab anchor so browsers offer open-in-new-tab', () => {
     const html = generateTooltipContent(
-      tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: true }),
+      tooltipConfig({
+        data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+        isPinned: true,
+        hasTrace: true,
+      }),
     );
     expect(html).toContain('<a data-action="view-charts"');
     expect(html).toContain('href="/inference/agentic/1"');
     expect(html).not.toContain('data-action="view-charts" target=');
   });
 
-  it('points View charts at the /zh detail page for a Chinese reader', () => {
+  it('renders View logs only for pinned points with a stored server log', () => {
     const html = generateTooltipContent(
-      tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: true, locale: 'zh' }),
+      tooltipConfig({
+        data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
+        isPinned: true,
+        hasLog: true,
+      }),
     );
-    expect(html).toContain('href="/zh/inference/agentic/1"');
+    expect(html).toContain('<a data-action="view-logs"');
+    expect(html).toContain('href="/inference/agentic/7?view=logs"');
+    expect(
+      generateTooltipContent(
+        tooltipConfig({
+          data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
+          isPinned: false,
+          hasLog: true,
+        }),
+      ),
+    ).not.toContain('data-action="view-logs"');
+    expect(
+      generateTooltipContent(
+        tooltipConfig({
+          data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
+          isPinned: true,
+          hasLog: false,
+        }),
+      ),
+    ).not.toContain('data-action="view-logs"');
+  });
+
+  it('routes fixed-sequence log actions to the fixed benchmark log viewer', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({ id: 96255, benchmark_type: 'single_turn' }),
+        isPinned: true,
+        hasLog: true,
+      }),
+    );
+    expect(html).toContain('<a data-action="view-logs"');
+    expect(html).toContain('href="/inference/logs/96255"');
+    expect(html).not.toContain('/inference/agentic/96255');
+  });
+
+  it('localizes point-detail actions and their /zh routes', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
+        isPinned: true,
+        hasTrace: true,
+        hasLog: true,
+        locale: 'zh',
+      }),
+    );
+    expect(html).toContain('查看图表');
+    expect(html).toContain('href="/zh/inference/agentic/7"');
+    expect(html).toContain('查看日志');
+    expect(html).toContain('href="/zh/inference/agentic/7?view=logs"');
   });
 
   it('omits View charts when the point id is non-persisted (0 / NaN), even if pinned + hasTrace', () => {
@@ -191,12 +247,13 @@ describe('generateTooltipContent', () => {
     for (const badId of [0, Number.NaN]) {
       const html = generateTooltipContent(
         tooltipConfig({
-          data: pt({ id: badId }),
+          data: pt({ id: badId, benchmark_type: 'agentic_traces' }),
           isPinned: true,
           hasTrace: true,
         }),
       );
       expect(html).not.toContain('data-action="view-charts"');
+      expect(html).not.toContain('data-action="view-logs"');
     }
   });
 
@@ -633,22 +690,38 @@ describe('generateGPUGraphTooltipContent', () => {
   it('shows View charts only for pinned points with stored trace data', () => {
     expect(
       generateGPUGraphTooltipContent(
-        tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: true }),
+        tooltipConfig({
+          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+          isPinned: true,
+          hasTrace: true,
+        }),
       ),
     ).toContain('data-action="view-charts"');
     expect(
       generateGPUGraphTooltipContent(
-        tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: true }),
+        tooltipConfig({
+          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+          isPinned: true,
+          hasTrace: true,
+        }),
       ),
     ).toContain('href="/inference/agentic/1"');
     expect(
       generateGPUGraphTooltipContent(
-        tooltipConfig({ data: pt({ id: 1 }), isPinned: false, hasTrace: true }),
+        tooltipConfig({
+          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+          isPinned: false,
+          hasTrace: true,
+        }),
       ),
     ).not.toContain('data-action="view-charts"');
     expect(
       generateGPUGraphTooltipContent(
-        tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: false }),
+        tooltipConfig({
+          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+          isPinned: true,
+          hasTrace: false,
+        }),
       ),
     ).not.toContain('data-action="view-charts"');
   });

@@ -3,12 +3,14 @@
 import { track } from '@/lib/analytics';
 import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
+import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { SCATTER_RENDERED_EVENT } from '@/lib/nudges/agentic-point-coach-mark';
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import { useInference } from '@/components/inference/InferenceContext';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
+import { useLogAvailability } from '@/hooks/api/use-log-availability';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import {
@@ -101,6 +103,12 @@ import {
   buildFrontierContinuations,
   fitContinuationLabelBaseline,
 } from '@/components/inference/utils/overflowContinuations';
+
+const FixedSequenceLogDialog = dynamic(() =>
+  import('@/components/inference/log-viewer/fixed-sequence-log-dialog').then(
+    (module) => module.FixedSequenceLogDialog,
+  ),
+);
 
 // Greedy label-collision avoidance.
 // Each candidate is the y-position of the FIRST baseline (relative to point
@@ -1129,6 +1137,16 @@ const ScatterGraph = React.memo(
       return ids;
     }, [pointsData]);
     const { data: traceAvailability } = useTraceAvailability(agenticIds);
+    // Logs apply to every persisted official point, including fixed-sequence
+    // runs. Unofficial overlays intentionally do not participate: their
+    // temporary points have no benchmark_results id and their artifacts are
+    // not persisted in this database.
+    const persistedPointIds = useMemo(
+      () => pointsData.flatMap((point) => (typeof point.id === 'number' ? [point.id] : [])),
+      [pointsData],
+    );
+    const { data: logAvailability } = useLogAvailability(persistedPointIds);
+    const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
 
     // --- Legend points table (per-series drill-down opened from the legend) ---
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
@@ -1483,6 +1501,7 @@ const ScatterGraph = React.memo(
             hardwareConfig,
             runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
             hasTrace: typeof d.id === 'number' ? traceAvailability?.[d.id] === true : false,
+            hasLog: typeof d.id === 'number' ? logAvailability?.[d.id] === true : false,
             locale,
           }),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
@@ -1519,6 +1538,23 @@ const ScatterGraph = React.memo(
               });
             });
           }
+          const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
+          if (logsBtn && typeof d.id === 'number') {
+            logsBtn.addEventListener('click', (btnEvent) => {
+              btnEvent.stopPropagation();
+              if (d.benchmark_type !== 'agentic_traces') {
+                btnEvent.preventDefault();
+                setFixedLogPointId(d.id!);
+                chartRef.current?.dismissTooltip();
+              }
+              track('latency_view_logs_opened', {
+                id: d.id,
+                hwKey: String(d.hwKey),
+                conc: d.conc,
+                benchmarkType: d.benchmark_type ?? 'single_turn',
+              });
+            });
+          }
         },
         attachToLayer: 1, // scatter layer is index 1 (after rooflines at 0)
       }),
@@ -1532,6 +1568,7 @@ const ScatterGraph = React.memo(
         // tooltip content closure (the "View charts" button), so rebuild the
         // config when the presence fetch resolves.
         traceAvailability,
+        logAvailability,
         locale,
       ],
     );
@@ -3583,6 +3620,14 @@ const ScatterGraph = React.memo(
                 href: row.href ?? '',
               })
             }
+          />
+        )}
+        {fixedLogPointId === null ? null : (
+          <FixedSequenceLogDialog
+            pointId={fixedLogPointId}
+            onOpenChange={(open) => {
+              if (!open) setFixedLogPointId(null);
+            }}
           />
         )}
       </>

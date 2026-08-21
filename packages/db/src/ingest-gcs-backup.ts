@@ -12,7 +12,8 @@
  *   eval_results_all_*     → compiled eval aggregate (agg_eval_all.json, flat rows)
  *   eval_*                 → single eval result (meta_env.json + results_*.json)
  *   changelog-metadata_*   → changelog entries (base_ref, head_ref, entries[])
- *   server_logs_*          → server log text (server.log inside ZIP)
+ *   server_logs_*          → every recursively nested .log/.out file
+ *   multinode_server_logs_* → same, including files inside multinode_server_logs.tar.gz
  *
  * All inserts are idempotent (ON CONFLICT DO UPDATE/NOTHING), so re-running is safe.
  *
@@ -49,7 +50,7 @@ import {
   bulkIngestBenchmarkRows,
   bulkIngestRunStats,
   bulkUpsertAvailability,
-  insertServerLog,
+  insertServerLogFiles,
 } from './etl/benchmark-ingest';
 import { mapEvalRow, mapAggEvalRow, type EvalParams } from './etl/eval-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
@@ -61,7 +62,8 @@ import {
   hasAppendOnlyFlag,
   hasEvalsOnlyFlag,
 } from './etl/changelog-ingest';
-import { readZipJson, readZipJsonMap, readZipText, readZipTextsMatching } from './etl/zip-reader';
+import { readZipJson, readZipJsonMap, readZipTextsMatching } from './etl/zip-reader';
+import { readServerLogArtifactZip, serverLogArtifactSuffix } from './etl/server-log-artifacts';
 
 const GCS_DIR = path.join(import.meta.dirname, '..', '..', '..', 'gcs');
 const CONCURRENCY = 20;
@@ -90,7 +92,7 @@ interface WorkflowMapResult {
   bmkZips: {
     zipFile: string;
     rows: BenchmarkParams[];
-    serverLogPath?: string;
+    serverLogArtifact?: { zipPath: string; artifactName: string };
   }[];
   statsRows: { hardware: string; nSuccess: number; total: number }[];
   /**
@@ -225,7 +227,9 @@ async function mapWorkflowDir(
     (f) => f.startsWith('eval_') && !f.startsWith('eval_results_all_'),
   );
   const changelogZips = zipFiles.filter((f) => f.startsWith('changelog-metadata_'));
-  const serverLogZips = zipFiles.filter((f) => f.startsWith('server_logs_'));
+  const serverLogZips = zipFiles.filter(
+    (f) => f.startsWith('server_logs_') || f.startsWith('multinode_server_logs_'),
+  );
 
   if (
     bmkZipFiles.length +
@@ -253,11 +257,16 @@ async function mapWorkflowDir(
   const warnings: string[] = [];
 
   // ── Index server log ZIPs (deferred read — too large for memory) ─────────
-  // Map configKey → zip file path. Actual text is read lazily in phase 2.
-  const serverLogPaths = new Map<string, string>();
+  // Map configKey → ZIP metadata. .log/.out files are extracted lazily in phase 2.
+  const serverLogArtifacts = new Map<string, { zipPath: string; artifactName: string }>();
   for (const zipFile of serverLogZips) {
-    const configKey = zipFile.replace(/^server_logs_/u, '').replace(/_\d+_\d+\.zip$/u, '');
-    serverLogPaths.set(configKey, path.join(artifactsPath, zipFile));
+    const artifactName = zipFile.replace(/_\d+_\d+\.zip$/u, '');
+    const configKey = serverLogArtifactSuffix(artifactName);
+    if (!configKey) continue;
+    serverLogArtifacts.set(configKey, {
+      zipPath: path.join(artifactsPath, zipFile),
+      artifactName,
+    });
   }
 
   // ── Map benchmark ZIPs ────────────────────────────────────────────────────
@@ -318,12 +327,14 @@ async function mapWorkflowDir(
     }
     if (rows.length > 0) {
       // Match server log by config key (bmk_ files only — results_ compiled zips have no matching logs)
-      let serverLogPath: string | undefined;
+      let serverLogArtifact: { zipPath: string; artifactName: string } | undefined;
       if (zipFile.startsWith('bmk_')) {
         const bmkConfigKey = zipFile.replace(/^bmk_/u, '').replace(/_\d+_\d+\.zip$/u, '');
-        serverLogPath = serverLogPaths.get(bmkConfigKey);
+        serverLogArtifact =
+          serverLogArtifacts.get(bmkConfigKey) ??
+          serverLogArtifacts.get(bmkConfigKey.replace(/^agentic_/u, ''));
       }
-      bmkZips.push({ zipFile, rows, serverLogPath });
+      bmkZips.push({ zipFile, rows, serverLogArtifact });
     }
   }
 
@@ -623,7 +634,7 @@ async function main(): Promise<void> {
 
     const allInserted: (BenchmarkParams & { configId: number })[] = [];
     const seenPointIdentities = new Map<string, string>();
-    for (const { zipFile, rows, serverLogPath } of result.bmkZips) {
+    for (const { zipFile, rows, serverLogArtifact } of result.bmkZips) {
       const toInsert: (BenchmarkParams & { configId: number })[] = [];
       for (const row of rows) {
         let configId: number;
@@ -682,14 +693,13 @@ async function main(): Promise<void> {
           // Only track as inserted after successful bulk insert
           allInserted.push(...toInsert);
 
-          // Attach server log (read lazily — too large to hold all in memory during phase 1)
-          if (serverLogPath && insertedIds.length > 0) {
-            const serverLog = readZipText(serverLogPath, 'server.log');
-            if (serverLog) {
-              // Strip null bytes — some logs contain 0x00 which PostgreSQL text columns reject
-              const clean = serverLog.replaceAll('\u0000', '');
-              await insertServerLog(sql, insertedIds, clean);
-            }
+          // Attach every .log/.out file (read lazily to bound phase-1 memory).
+          if (serverLogArtifact && insertedIds.length > 0) {
+            const logFiles = readServerLogArtifactZip(
+              serverLogArtifact.zipPath,
+              serverLogArtifact.artifactName,
+            );
+            await insertServerLogFiles(sql, insertedIds, logFiles);
           }
         } catch (error: any) {
           tracker.recordDbError(zipFile, error);
