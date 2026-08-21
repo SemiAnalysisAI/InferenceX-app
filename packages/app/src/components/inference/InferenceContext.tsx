@@ -822,7 +822,11 @@ export function InferenceProvider({
     [setSelectedDateRange, clearScopedSelectionOnChange],
   );
 
-  const loading = chartDataLoading;
+  // A failed availability lookup leaves `sequenceResolved` false forever, so
+  // the gated benchmark query never produces rows and `chartDataLoading` would
+  // pin the chart on its first-load skeleton. Availability errors are terminal:
+  // drop the loading flag so ChartDisplay surfaces the error instead.
+  const loading = availabilityError ? false : chartDataLoading;
   const error = availabilityError || workflowError || chartDataError;
 
   // ── Toggle sets ───────────────────────────────────────────────────────────
