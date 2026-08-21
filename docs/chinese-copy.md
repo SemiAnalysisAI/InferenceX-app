@@ -118,17 +118,13 @@ surface and reason in the PR or add a reviewed example here.
 4. The Chinese-speaking maintainer manually reads every changed sentence and makes the final
    editorial decision before merge. Attributed quotations receive an explicit attribution-and-
    voice check.
-5. The skill may become a blocking guard only after independent holdout evaluation meets the
-   documented thresholds. Manual Chinese review remains required after promotion.
 
-6. 作者为每段改动的中文提供英文原文、核心意思和实际页面上下文。
-7. Claude 加载 `review-zh-copy`，分别检查语义准确度和中文自然度，并给出完整改写，
+5. 作者为每段改动的中文提供英文原文、核心意思和实际页面上下文。
+6. Claude 加载 `review-zh-copy`，分别检查语义准确度和中文自然度，并给出完整改写，
    而不是只替换孤立词语。
-8. skill 处于 advisory 阶段时，其 finding 只是人工审核的输入，不作为合并阻断条件。
-9. 合并前，由中文维护者逐句人工审阅并作出最终编辑决定；署名引用还要单独核对署名、
+7. skill 的 finding 只是人工审核的输入，不作为合并阻断条件。
+8. 合并前，由中文维护者逐句人工审阅并作出最终编辑决定；署名引用还要单独核对署名、
    观点和说话者语气。
-10. 只有独立 holdout 评估达到文档规定的门槛后，skill 才能升级为 blocking guard；
-    升级后仍然需要人工中文审核。
 
 ## Pull request checklist / PR 审核清单
 
@@ -158,11 +154,10 @@ It must not decide fluency, sentence structure, register, or contextual pronoun 
 确定性 CI 只适合检查与上下文无关的规则，例如标点、受保护标识符、字典完整性，以及确实
 只有一种正确写法的术语。流畅度、句法、语域和第二人称选择不得交给机械规则判定。
 
-The `review-zh-copy` skill is an advisory reviewer for the judgment layer. Its suggestions do not
-become blocking until independently held-out cases show acceptable semantic preservation,
-rewrite quality, finding precision, and false-positive rates. Outputs from #819 are historical
-material, not automatic ground truth.
+The `review-zh-copy` skill assists the judgment layer and stays advisory; the Chinese maintainer
+makes the final decision. Separately verified mechanical cases from #819 may enter deterministic
+CI fixtures in #820, but editorial rewrites are never automatic ground truth.
 
-`review-zh-copy` skill 用于辅助判断性审核。在独立 holdout 案例证明其语义保留、改写质量、
-问题识别准确率和误报率达到要求之前，它的建议不作为 blocking finding。#819 的输出只是
-历史材料，不得自动视为标准答案。
+`review-zh-copy` skill 用于辅助判断性审核，并保持建议模式；最终决定由中文维护者作出。
+#819 中经过单独验证的机械案例可以进入 #820 的确定性 CI fixtures，但编辑性改写不得自动
+视为标准答案。
