@@ -257,7 +257,20 @@ export interface ChangelogBackfill extends AuditedBackfill {
  * Audited corrections to changelog rows already produced by workflow artifacts.
  * Selectors use the table's complete durable identity. `set` is a partial patch.
  */
-export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [];
+export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [
+  {
+    id: 'run-32242794988-restore-append-only',
+    reason:
+      'PR #2676 produced an append-only delta sweep, but conflict resolution removed the marker before its artifacts were reused for merge ingestion.',
+    githubRunId: 32242794988,
+    runAttempt: 3,
+    baseRef: '43996b8dc1b3fa53989abb0c86491a7d3e3b4472',
+    headRef: 'de871da96f061b097fef318489462a958240917a',
+    set: {
+      appendOnly: true,
+    },
+  },
+];
 
 export type JsonValue =
   | boolean
