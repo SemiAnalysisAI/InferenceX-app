@@ -61,7 +61,10 @@ interface ReplayPanelProps {
   overlayData?: OverlayData;
 }
 
-const SPEED_OPTIONS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+const STANDARD_SPEED_OPTIONS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+const BEST_PER_SKU_SPEED_OPTIONS: readonly number[] = [...STANDARD_SPEED_OPTIONS, 3, 4, 5];
+const BEST_PER_SKU_TRANSITION_MS = 240;
+const BEST_PER_SKU_MIN_TRANSITION_MS = 60;
 const REPLAY_BODY_MIN_HEIGHT = 480;
 
 /**
@@ -270,6 +273,20 @@ export default function ReplayPanel({
   const abortRef = useRef<AbortController | null>(null);
 
   const prefersReducedMotion = useReducedMotion();
+  const speedOptions = dynamicBestPerSku ? BEST_PER_SKU_SPEED_OPTIONS : STANDARD_SPEED_OPTIONS;
+  const replayTransitionDuration =
+    dynamicBestPerSku && !prefersReducedMotion
+      ? Math.max(
+          BEST_PER_SKU_MIN_TRANSITION_MS,
+          Math.round(BEST_PER_SKU_TRANSITION_MS / Math.max(1, speed)),
+        )
+      : 0;
+
+  // The extended speeds belong to Best per SKU replay. If that mode is
+  // disabled while the panel is open, return to the regular replay ceiling.
+  useEffect(() => {
+    if (!dynamicBestPerSku && speed > 2) setSpeed(2);
+  }, [dynamicBestPerSku, speed]);
 
   // Pre-flight feature detection so the Export button is disabled with a clear
   // reason on browsers that lack WebCodecs (Firefox today, older Safari).
@@ -626,9 +643,10 @@ export default function ReplayPanel({
           chartDefinition={chartDefinition}
           showAllHardwareTypes={dynamicBestPerSku}
           hardwareColorKeyMap={replayColorKeyMap}
+          hardwareSeriesKeyMap={replayColorKeyMap}
           syncBestPerSkuSelection={false}
           overlayData={replayOverlayData}
-          transitionDuration={0}
+          transitionDuration={replayTransitionDuration}
           niceAxes={false}
           pinLineLabels
           xExtentOverride={fixedAxes ? fixedExtent?.x : undefined}
@@ -694,7 +712,7 @@ export default function ReplayPanel({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {SPEED_OPTIONS.map((v) => (
+            {speedOptions.map((v) => (
               <SelectItem key={v} value={String(v)} data-testid={`replay-speed-${v}x`}>
                 {v}×
               </SelectItem>

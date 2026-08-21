@@ -460,6 +460,7 @@ const ScatterGraph = React.memo(
     caption,
     showAllHardwareTypes = false,
     hardwareColorKeyMap,
+    hardwareSeriesKeyMap,
     syncBestPerSkuSelection = true,
     hardwareConfigOverride,
     overlayData,
@@ -1576,6 +1577,7 @@ const ScatterGraph = React.memo(
           // Build roofline entries with gradient or solid stroke
           interface Entry {
             key: string;
+            joinKey: string;
             hw: string;
             precision: string;
             points: InferenceData[];
@@ -1632,6 +1634,9 @@ const ScatterGraph = React.memo(
 
               entries.push({
                 key: entryKey,
+                joinKey: singleDate
+                  ? `${hardwareSeriesKeyMap?.get(hw) ?? hw}_${precision}`
+                  : `${hardwareSeriesKeyMap?.get(hw) ?? hw}_${precision}__${date}`,
                 hw,
                 precision,
                 points: datePoints,
@@ -1654,11 +1659,12 @@ const ScatterGraph = React.memo(
             .selectAll<SVGPathElement, Entry>('.roofline-path')
             .data(
               entries.filter((entry) => entry.points.length > 1),
-              (d) => d.key,
+              (d) => d.joinKey,
             )
             .join('path')
             .attr('class', (d) => `roofline-path roofline-${d.key}`)
             .attr('data-hw-key', (d) => d.hw)
+            .attr('data-series-key', (d) => d.joinKey)
             .attr('data-precision', (d) => d.precision)
             .attr('fill', 'none')
             .attr('stroke', (d) => d.stroke)
@@ -2976,6 +2982,7 @@ const ScatterGraph = React.memo(
       selectedYAxisMetric,
       chartDefinition,
       locale,
+      hardwareSeriesKeyMap,
     ]);
 
     // Layers handle for the decoration effect — lets it re-run individual
