@@ -18,7 +18,9 @@ import {
   extractIslOsl,
   extractServerMetricSamples,
   percentilesOf,
+  sequenceLengthSketches,
   type MetricPercentiles,
+  type SequenceLengthSketches,
 } from '../queries/agentic-aggregates';
 
 export { STATS_VERSION };
@@ -35,6 +37,8 @@ export interface AggregateStats {
    * (tok/s/user): pXX E2E Normalized Interactivity = 1 / pXX(E2EL/OSL).
    */
   e2elPerOsl: MetricPercentiles | null;
+  /** Bounded mergeable distributions used by the chart-level subtitle. */
+  sequenceLengths: SequenceLengthSketches;
 }
 
 /**
@@ -128,6 +132,7 @@ export async function computeAggregateStats(args: {
   let islPct: MetricPercentiles | null = null;
   let oslPct: MetricPercentiles | null = null;
   let e2elPerOsl: MetricPercentiles | null = null;
+  let sequenceLengths: SequenceLengthSketches = { isl: null, osl: null };
 
   if (args.profileBlob) {
     try {
@@ -135,6 +140,7 @@ export async function computeAggregateStats(args: {
       const { isl, osl } = extractIslOsl(jsonl);
       islPct = percentilesOf(isl);
       oslPct = percentilesOf(osl);
+      sequenceLengths = sequenceLengthSketches(isl, osl);
       e2elPerOsl = computeDerivedFromBlob(jsonl).e2el_per_osl;
     } catch {
       // ignore malformed blob — leave nulls
@@ -167,5 +173,6 @@ export async function computeAggregateStats(args: {
     kvCacheUtil: kvPct,
     prefixCacheHitRate: prefixPct,
     e2elPerOsl,
+    sequenceLengths,
   };
 }

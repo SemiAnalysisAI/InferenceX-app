@@ -19,6 +19,7 @@ function toAggPoint(
     values.p50 = pct.p50;
     values.p75 = pct.p75;
     values.p90 = pct.p90;
+    values.p95 = pct.p95;
     values.p99 = pct.p99;
   }
   return { id: sibling.id, label: sibling.label, values };

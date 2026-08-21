@@ -81,6 +81,8 @@ describe('computeAggregateStats', () => {
     expect(stats.isl?.mean).toBeCloseTo(200, 6);
     expect(stats.osl?.n).toBe(3);
     expect(stats.osl?.mean).toBeCloseTo(75, 6);
+    expect(stats.sequenceLengths.isl?.n).toBe(3);
+    expect(stats.sequenceLengths.osl?.n).toBe(3);
 
     // Server-side metrics still null when there's no server blob.
     expect(stats.kvCacheUtil).toBeNull();
@@ -148,7 +150,15 @@ describe('mergeProfileStatsUpgrade', () => {
       version: STATS_VERSION - 1,
       isl: null,
       osl: null,
-      kvCacheUtil: { mean: 0.4, p50: 0.4, p75: 0.5, p90: 0.6, p99: 0.7, n: 3 },
+      kvCacheUtil: {
+        mean: 0.4,
+        p50: 0.4,
+        p75: 0.5,
+        p90: 0.6,
+        p95: 0.65,
+        p99: 0.7,
+        n: 3,
+      },
       prefixCacheHitRate: null,
       normalizedSessionTimeS: 999,
       p90PrefillTpsPerUser: 999,

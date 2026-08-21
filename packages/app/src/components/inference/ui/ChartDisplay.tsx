@@ -59,6 +59,7 @@ import {
   useDerivedAgenticMetrics,
   type DerivedAgenticMetric,
 } from '@/hooks/api/use-derived-agentic-metrics';
+import { useResidentSequenceLengths } from '@/hooks/api/use-resident-sequence-lengths';
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useLocale } from '@/lib/use-locale';
@@ -90,6 +91,7 @@ const STRINGS = {
     updated: 'Updated:',
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
+    completedSequenceLengths: 'Completed requests across all resident points',
     viewMode: 'View mode',
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
@@ -106,6 +108,7 @@ const STRINGS = {
     updated: '更新时间：',
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
+    completedSequenceLengths: '当前所有数据点的已完成请求',
     viewMode: '视图模式',
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
@@ -180,6 +183,14 @@ const VIEW_MODE_OPTIONS: SegmentedToggleOption<InferenceViewMode>[] = [
     testId: 'inference-table-view-btn',
   },
 ];
+
+export function formatTokenLength(value: number): string {
+  const rounded = Math.round(value);
+  if (rounded < 1_000) return String(rounded);
+  if (rounded < 10_000) return `${(rounded / 1_000).toFixed(1).replace(/\.0$/u, '')}k`;
+  if (rounded < 1_000_000) return `${Math.round(rounded / 1_000)}k`;
+  return `${(rounded / 1_000_000).toFixed(2).replace(/\.0+$/u, '')}m`;
+}
 
 /**
  * Renders the inference chart cards, captions, and overlay controls for the current filtered
@@ -609,6 +620,35 @@ export default function ChartDisplay() {
   }, [effectiveGraphs, selectedXAxisMode]);
 
   const isAgenticSequence = sequenceKind(selectedSequence) === 'agentic';
+  const residentPointIds = useMemo(() => {
+    if (!isAgenticSequence) return [] as number[];
+    const ids = new Set<number>();
+    for (const graph of visibleGraphs) {
+      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      for (const point of points) {
+        if (
+          selectedPrecisions.includes(point.precision) &&
+          point.benchmark_type === 'agentic_traces' &&
+          isPersistedBenchmarkId(point.id)
+        ) {
+          ids.add(point.id);
+        }
+      }
+    }
+    return [...ids];
+  }, [isAgenticSequence, selectedPrecisions, visibleGraphs]);
+  // Unofficial-run artifacts are transformed in memory and do not have
+  // persisted aggregate_stats sketches. Suppress the subtitle in overlay mode
+  // rather than presenting official-only values as if they covered the overlay.
+  const residentSequenceLengthsQuery = useResidentSequenceLengths(
+    residentPointIds,
+    isAgenticSequence && !isUnofficialRun,
+  );
+  const residentSequenceLengths =
+    residentSequenceLengthsQuery.data?.coveredPoints ===
+    residentSequenceLengthsQuery.data?.requestedPoints
+      ? residentSequenceLengthsQuery.data
+      : null;
   const useDerivedXAxis = isAgenticSequence && isAgenticOnlyXAxisMode(selectedXAxisMode);
   const derivedTargetIds = useMemo(() => {
     if (!useDerivedXAxis) return [] as number[];
@@ -861,6 +901,24 @@ export default function ChartDisplay() {
                               </>
                             )}
                           </p>
+                          {residentSequenceLengths && (
+                            <p
+                              className="mb-2 text-xs text-muted-foreground"
+                              data-testid="resident-sequence-lengths"
+                            >
+                              {t.completedSequenceLengths} · ISL p50{' '}
+                              {formatTokenLength(residentSequenceLengths.isl.p50)} · p75{' '}
+                              {formatTokenLength(residentSequenceLengths.isl.p75)} · p90{' '}
+                              {formatTokenLength(residentSequenceLengths.isl.p90)} · p95{' '}
+                              {formatTokenLength(residentSequenceLengths.isl.p95)} · p99{' '}
+                              {formatTokenLength(residentSequenceLengths.isl.p99)} | OSL p50{' '}
+                              {formatTokenLength(residentSequenceLengths.osl.p50)} · p75{' '}
+                              {formatTokenLength(residentSequenceLengths.osl.p75)} · p90{' '}
+                              {formatTokenLength(residentSequenceLengths.osl.p90)} · p95{' '}
+                              {formatTokenLength(residentSequenceLengths.osl.p95)} · p99{' '}
+                              {formatTokenLength(residentSequenceLengths.osl.p99)}
+                            </p>
+                          )}
                           <MetricAssumptionNotes selectedYAxisMetric={selectedYAxisMetric} />
                           {isUnofficialRun &&
                             selectedXAxisMode === 'e2e-normalized-interactivity' && (
