@@ -7,6 +7,7 @@ import {
   FIXTURE_MANIFEST_FILENAME,
   FIXTURE_MANIFEST_SCHEMA_VERSION,
   type FixtureManifest,
+  assertFixtureContent,
   assertFixtureMatchesManifest,
 } from '@/lib/test-fixture-manifest';
 
@@ -36,5 +37,15 @@ describe('Cypress API fixture manifest', () => {
         assertFixtureMatchesManifest(name, body, value, manifest.fixtures[name]),
       ).not.toThrow();
     }
+  });
+
+  it('rejects benchmark history that cannot exercise replay', () => {
+    expect(() => assertFixtureContent('benchmarks-history', [])).toThrow(/two replayable dates/u);
+    expect(() => assertFixtureContent('benchmarks-history', [{ date: '2026-08-20' }])).toThrow(
+      /two replayable dates/u,
+    );
+    expect(() =>
+      assertFixtureContent('benchmarks-history', [{ date: '2026-08-20' }, { date: '2026-08-21' }]),
+    ).not.toThrow();
   });
 });

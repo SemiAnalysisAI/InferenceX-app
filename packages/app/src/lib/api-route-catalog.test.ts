@@ -359,6 +359,7 @@ describe('published API documentation invariants', () => {
       kv_measured_cases: { type: 'integer' },
     });
     expect(latestSchema?.properties?.kv).toMatchObject({ type: 'array' });
+    expect(latestSchema?.required).not.toContain('kv');
 
     const runs = apiOperations.find((operation) => operation.id === 'list-collectivex-runs');
     const runSummary = runs?.responses.find((response) => response.status === '200')?.schema

@@ -26,7 +26,7 @@ function isEnumValue<T extends Record<string, string>>(e: T, v: string): v is T[
 import { useAvailability } from '@/hooks/api/use-availability';
 import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
-import { refreshUrlParams, type UrlStateParams } from '@/lib/url-state';
+import { hasExplicitUrlParam, refreshUrlParams, type UrlStateParams } from '@/lib/url-state';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import type { RunInfo } from '@/components/inference/types';
 import {
@@ -265,7 +265,7 @@ export function GlobalFilterProvider({
   const [requestedRunDate, setRequestedRunDate] = useState<string>(() => initialRunDate ?? '');
   const [selectedRunDateRev, setSelectedRunDateRev] = useState(0);
   const requestedRunDateExplicitRef = useRef(
-    initialRunDate !== undefined || Boolean(getUrlParam('g_rundate')),
+    initialRunDate !== undefined || hasExplicitUrlParam('g_rundate'),
   );
 
   const [requestedRunId, setRequestedRunId] = useState<string>(() => initialRunId ?? '');
@@ -372,19 +372,15 @@ export function GlobalFilterProvider({
   // leaves the user staring at a chart with no overlay points — they'd have
   // to know to open the dropdown and pick the run's model themselves.
   //
-  // Precedence on first load: the `if (urlModel)` early-bail in
-  // `computeAutoSwitchDecision` is the primary guard for explicit `g_model`
-  // intent. The dedupe ref is a secondary guard for the narrow window after
-  // an auto-switch fires but before the URL-sync effect (below) writes
-  // `g_model` back to the URL — once that runs, `urlModel` is set on every
-  // subsequent render and the ref check is effectively redundant. The ref
-  // still matters across navigations between unofficial runs because it is
-  // reset whenever the overlay set goes empty.
+  // Explicit URL intent is tracked separately from the mutable state mirrored
+  // for provider remounts. Automatic model changes serialize like any other
+  // filter, but must not become an explicit `g_model` that blocks the next
+  // unofficial-run auto-switch.
   const lastAutoSwitchKeyRef = useRef<string>('');
   useEffect(() => {
     const decision = computeAutoSwitchDecision(
       unofficialAvailable,
-      getUrlParam('g_model'),
+      hasExplicitUrlParam('g_model') ? getUrlParam('g_model') : undefined,
       selectedModel,
       lastAutoSwitchKeyRef.current,
     );

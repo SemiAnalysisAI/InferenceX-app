@@ -499,7 +499,9 @@ export default function ChartDisplay() {
   ]);
   const overlayRowsScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(
     ',',
-  )}|${unofficialRunInfos.map((run) => run.url).join(',')}`;
+  )}|${unofficialRunInfos.map((run) => run.url).join(',')}|official:${[...officialScope]
+    .toSorted()
+    .join(',')}|overlay:${[...overlayScope].toSorted().join(',')}`;
   const selectedOfficialHwTypes = isUnofficialRun
     ? (localOfficialOverride ?? activeHwTypes)
     : activeHwTypes;

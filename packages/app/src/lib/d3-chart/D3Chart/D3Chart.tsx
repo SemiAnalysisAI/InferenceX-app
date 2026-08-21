@@ -136,6 +136,7 @@ function D3ChartInner<T>(
       isPinned,
       pinTooltip,
       dismissTooltip,
+      hideTooltipElements,
       createRulers,
       attachHandlers,
     },

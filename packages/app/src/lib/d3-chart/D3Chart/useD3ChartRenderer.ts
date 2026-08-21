@@ -38,6 +38,10 @@ interface RendererDeps {
   isPinned: () => boolean;
   pinTooltip: (data: any, isOverlay?: boolean) => void;
   dismissTooltip: (clearPinnedPoint?: boolean) => void;
+  hideTooltipElements: (
+    tooltipRef: React.RefObject<HTMLDivElement | null>,
+    svgRef: React.RefObject<SVGSVGElement | null>,
+  ) => void;
   createRulers: (
     group: d3.Selection<SVGGElement, unknown, null, undefined>,
     rulerType: 'vertical' | 'horizontal' | 'crosshair' | 'none',
@@ -71,6 +75,7 @@ function resolveTickValues(
 }
 export interface ZoomFrameBatcher {
   schedule: (work: () => void) => void;
+  flush: () => void;
   cancel: () => void;
 }
 
@@ -93,6 +98,13 @@ export function createZoomFrameBatcher(
         finalWork?.();
       });
     },
+    flush() {
+      if (frameId !== null) cancelFrame(frameId);
+      frameId = null;
+      const finalWork = latestWork;
+      latestWork = null;
+      finalWork?.();
+    },
     cancel() {
       if (frameId !== null) cancelFrame(frameId);
       frameId = null;
@@ -101,6 +113,48 @@ export function createZoomFrameBatcher(
   };
 }
 
+interface TransitionGeometry {
+  transforms: Map<SVGGElement, string>;
+  paths: Map<SVGPathElement, string>;
+}
+
+function captureTransitionGeometry(
+  group: d3.Selection<SVGGElement, unknown, any, any>,
+): TransitionGeometry {
+  const transforms = new Map<SVGGElement, string>();
+  const paths = new Map<SVGPathElement, string>();
+  group.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
+    transforms.set(this, this.getAttribute('transform') || '');
+  });
+  group.selectAll<SVGPathElement, unknown>('.roofline-path').each(function () {
+    paths.set(this, this.getAttribute('d') || '');
+  });
+  return { transforms, paths };
+}
+
+function animateTransitionGeometry(
+  group: d3.Selection<SVGGElement, unknown, any, any>,
+  previous: TransitionGeometry | null,
+  durationMs: number | undefined = 0,
+): void {
+  if (!previous || durationMs <= 0) return;
+  group.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
+    const oldPosition = previous.transforms.get(this);
+    const newPosition = this.getAttribute('transform');
+    if (oldPosition !== undefined && newPosition && oldPosition !== newPosition) {
+      this.setAttribute('transform', oldPosition);
+      d3.select(this).transition('data-update').duration(durationMs).attr('transform', newPosition);
+    }
+  });
+  group.selectAll<SVGPathElement, unknown>('.roofline-path').each(function () {
+    const oldPath = previous.paths.get(this);
+    const newPath = this.getAttribute('d');
+    if (oldPath !== undefined && newPath && oldPath !== newPath) {
+      this.setAttribute('d', oldPath);
+      d3.select(this).transition('data-update').duration(durationMs).attr('d', newPath);
+    }
+  });
+}
 export function metricRenderCallbackContext(
   baseContext: RenderContext,
   renderedXScale: RenderContext['xScale'],
@@ -169,6 +223,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     isPinned,
     pinTooltip,
     dismissTooltip,
+    hideTooltipElements,
     createRulers,
     attachHandlers,
   } = deps;
@@ -281,19 +336,11 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       zoomTransformRef.current = d3.zoomTransform(svgRef.current);
 
       // ── Save old positions for animated transitions ──
-      const oldTransforms = new Map<SVGGElement, string>();
-      const oldPaths = new Map<SVGPathElement, string>();
-      if (transitionDuration && (dataChanged || scalesChanged)) {
-        const existingGroup = d3.select(svgRef.current).select('.zoom-group');
-        if (!existingGroup.empty()) {
-          existingGroup.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
-            oldTransforms.set(this, this.getAttribute('transform') || '');
-          });
-          existingGroup.selectAll<SVGPathElement, unknown>('.roofline-path').each(function () {
-            oldPaths.set(this, this.getAttribute('d') || '');
-          });
-        }
-      }
+      const existingGroup = d3.select(svgRef.current).select<SVGGElement>('.zoom-group');
+      const previousGeometry =
+        transitionDuration && (dataChanged || scalesChanged) && !existingGroup.empty()
+          ? captureTransitionGeometry(existingGroup)
+          : null;
 
       const layout = layoutRef.current;
       if (!layout) return;
@@ -563,11 +610,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
 
               if (isPinned()) {
                 dismissTooltip(true);
-                tooltip
-                  .style('opacity', 0)
-                  .style('display', 'none')
-                  .style('pointer-events', 'none');
-                zoomRenderGroup.select('.ruler-group').style('display', 'none');
+                hideTooltipElements(tooltipRef, svgRef);
               }
 
               let newXScale: BuiltScale = zoomXScale;
@@ -668,31 +711,13 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           renderGroup.select('.ruler-group').style('display', 'none');
         }
       }
+      // A restored non-identity transform emits synchronously above, but its
+      // expensive path work is normally rAF-batched. Flush that replay before
+      // capturing transition targets or a running transition can overwrite
+      // zoomed paths with their base-scale `d` values.
+      zoomFrameBatcherRef.current?.flush();
 
-      // ── Animate from old positions to new positions ──
-      if (transitionDuration && (oldTransforms.size > 0 || oldPaths.size > 0)) {
-        // Scatter points: restore old position, then transition to current
-        renderGroup.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
-          const oldPos = oldTransforms.get(this);
-          const newPos = this.getAttribute('transform');
-          if (oldPos !== undefined && newPos && oldPos !== newPos) {
-            this.setAttribute('transform', oldPos);
-            d3.select(this)
-              .transition('data-update')
-              .duration(transitionDuration)
-              .attr('transform', newPos);
-          }
-        });
-        // Roofline paths: restore old path, then transition to current
-        renderGroup.selectAll<SVGPathElement, unknown>('.roofline-path').each(function () {
-          const oldD = oldPaths.get(this);
-          const newD = this.getAttribute('d');
-          if (oldD !== undefined && newD && oldD !== newD) {
-            this.setAttribute('d', oldD);
-            d3.select(this).transition('data-update').duration(transitionDuration).attr('d', newD);
-          }
-        });
-      }
+      animateTransitionGeometry(renderGroup, previousGeometry, transitionDuration);
 
       renderContextRef.current = ctx;
       joinedIdentityRef.current = dataIdentity ?? null;
@@ -718,6 +743,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     watermark,
     clipContent,
     hasRenderableData,
+    hideTooltipElements,
   ]);
 
   // Phase 3: coordinate and scale updates. Bound scatter data is mutated by
@@ -742,11 +768,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     const renderGroup = clipContent ? layout.zoomGroup : layout.g;
     if (isPinned()) {
       dismissTooltip(true);
-      d3.select(tooltipRef.current)
-        .style('opacity', 0)
-        .style('display', 'none')
-        .style('pointer-events', 'none');
-      renderGroup.select('.ruler-group').style('display', 'none');
+      hideTooltipElements(tooltipRef, svgRef);
     }
     const xScale = hasScales
       ? buildScale(xScaleConfig!, [0, width])
@@ -824,9 +846,12 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       renderedYScale: currentYScale,
     };
     const callbackCtx = metricRenderCallbackContext(baseCtx, currentXScale, currentYScale);
+    const previousGeometry =
+      (transitionDuration ?? 0) > 0 ? captureTransitionGeometry(renderGroup) : null;
     const metricLayerSelections = layers.map((layer) =>
       updateLayerForMetric(layer, renderGroup, currentXScale, currentYScale, layout, metricCtx),
     );
+    animateTransitionGeometry(renderGroup, previousGeometry, transitionDuration);
     customLayerDisplayIdentitiesRef.current = customLayerDisplayIdentities(layers);
     lastDisplayIdentityRef.current = displayIdentity;
     renderGroup.selectAll('.dot-group').raise();
@@ -883,6 +908,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     xAxisConfig,
     yAxisConfig,
     layers,
+    hideTooltipElements,
     zoomConfig,
     tooltipConfig,
     transitionDuration,

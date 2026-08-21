@@ -5,6 +5,14 @@
       "duration": 446
     },
     {
+      "spec": "cypress/e2e/agentic-detail-back-nav.cy.ts",
+      "duration": 2000
+    },
+    {
+      "spec": "cypress/e2e/agentic-point-coach-mark.cy.ts",
+      "duration": 8000
+    },
+    {
       "spec": "cypress/e2e/agentic-point-time-series.cy.ts",
       "duration": 1961
     },

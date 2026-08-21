@@ -33,6 +33,13 @@ export function rowToLightweightPoint(
 ): InferenceData | null {
   const entry = rowToAggDataEntry(row);
   const hwKey = getHardwareKey(entry);
+  // Historical rows predating explicit output-throughput telemetry used total
+  // throughput as output throughput. Preserve that production fallback for
+  // output cost, purchasing-power, and energy trend metrics.
+  const derivedEntry =
+    row.metrics.output_tput_per_gpu === null || row.metrics.output_tput_per_gpu === undefined
+      ? { ...entry, output_tput_per_gpu: entry.tput_per_gpu }
+      : entry;
   if (!isKnownGpu(hwKey)) return null;
 
   return {
@@ -43,7 +50,7 @@ export function rowToLightweightPoint(
     tp: row.decode_tp,
     conc: row.conc,
     date: benchmarkCurveDate(row),
-    ...buildDerivedChartFields(entry, hwKey, requestedMetrics),
+    ...buildDerivedChartFields(derivedEntry, hwKey, requestedMetrics),
   } as InferenceData;
 }
 

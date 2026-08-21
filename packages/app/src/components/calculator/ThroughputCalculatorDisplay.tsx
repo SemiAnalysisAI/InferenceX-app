@@ -334,7 +334,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   } = useGlobalFilterSelection();
   const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
   const { selectedRunDate, selectedRunId } = useGlobalFilterRun();
-  const { availablePrecisions, availableSequences, availableModels, availabilityError } =
+  const { availablePrecisions, availableSequences, availableModels } =
     useGlobalFilterAvailability();
   const { availableRuns } = useGlobalFilterWorkflow();
   const mode = 'interactivity_to_throughput' as const;
@@ -404,7 +404,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     overlayInput,
     selectedPercentile,
   );
-  const error = availabilityError || throughputError;
+  const error = throughputError;
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
   // AgentX publishes on P90, so the percentile control is an insider affordance

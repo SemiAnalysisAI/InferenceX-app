@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
+import { useLocale } from '@/lib/use-locale';
 
 import { collectiveXTopologyLabel } from './data';
 import type { CollectiveXCoverage, CollectiveXDataset, CollectiveXTerminalStatus } from './types';
@@ -28,6 +29,88 @@ const STATUS_CLASS: Record<CollectiveXTerminalStatus, string> = {
   diagnostic: 'border-amber-600/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
   pending: 'border-zinc-500/40 bg-zinc-500/5 text-muted-foreground',
 };
+const STRINGS = {
+  en: {
+    title: 'Matrix case inventory',
+    headers: {
+      run: 'Run',
+      case: 'Case',
+      backend: 'Backend',
+      phase: 'Phase',
+      mode: 'Mode',
+      precision: 'Precision',
+      topology: 'Topology',
+      disposition: 'Disposition',
+      pointStatus: 'Point status',
+    },
+    statuses: {
+      measured: 'measured',
+      unsupported: 'unsupported',
+      failed: 'failed',
+      invalid: 'invalid',
+      diagnostic: 'diagnostic',
+      pending: 'pending',
+    },
+    phases: { decode: 'decode', prefill: 'prefill' },
+    modes: { normal: 'normal', 'low-latency': 'low-latency' },
+    dispositions: { runnable: 'runnable', unsupported: 'unsupported' },
+    outcomes: {
+      success: 'success',
+      unsupported: 'unsupported',
+      failed: 'failed',
+      invalid: 'invalid',
+      diagnostic: 'diagnostic',
+      pending: 'pending',
+    },
+    summary: {
+      runs: 'runs',
+      cases: 'cases',
+      measured: 'measured',
+      unsupported: 'unsupported',
+      terminalPoints: 'terminal points',
+    },
+  },
+  zh: {
+    title: '矩阵测试用例清单',
+    headers: {
+      run: '运行',
+      case: '测试用例',
+      backend: '后端',
+      phase: '阶段',
+      mode: '模式',
+      precision: '精度',
+      topology: '拓扑',
+      disposition: '处置结果',
+      pointStatus: '数据点状态',
+    },
+    statuses: {
+      measured: '已测量',
+      unsupported: '不支持',
+      failed: '失败',
+      invalid: '无效',
+      diagnostic: '诊断',
+      pending: '待处理',
+    },
+    phases: { decode: '解码', prefill: '预填充' },
+    modes: { normal: '常规', 'low-latency': '低延迟' },
+    dispositions: { runnable: '可运行', unsupported: '不支持' },
+    outcomes: {
+      success: '成功',
+      unsupported: '不支持',
+      failed: '失败',
+      invalid: '无效',
+      diagnostic: '诊断',
+      pending: '待处理',
+    },
+    summary: {
+      runs: '次运行',
+      cases: '个测试用例',
+      measured: '已测量',
+      unsupported: '不支持',
+      terminalPoints: '个终态数据点',
+    },
+  },
+} as const;
 
 function terminalCounts(item: CollectiveXCoverage): Record<CollectiveXTerminalStatus, number> {
   const counts = Object.fromEntries(TERMINAL_ORDER.map((status) => [status, 0])) as Record<
@@ -38,7 +121,13 @@ function terminalCounts(item: CollectiveXCoverage): Record<CollectiveXTerminalSt
   return counts;
 }
 
-function TerminalBadges({ item }: { item: CollectiveXCoverage }) {
+function TerminalBadges({
+  item,
+  labels,
+}: {
+  item: CollectiveXCoverage;
+  labels: Record<CollectiveXTerminalStatus, string>;
+}) {
   const counts = terminalCounts(item);
   const reasons = [...new Set(item.points.flatMap((point) => point.reason ?? []))];
   return (
@@ -46,7 +135,7 @@ function TerminalBadges({ item }: { item: CollectiveXCoverage }) {
       <div className="flex flex-wrap gap-1">
         {TERMINAL_ORDER.filter((status) => counts[status] > 0).map((status) => (
           <Badge key={status} variant="outline" className={STATUS_CLASS[status]}>
-            {status} {counts[status]}
+            {labels[status]} {counts[status]}
           </Badge>
         ))}
       </div>
@@ -58,6 +147,8 @@ function TerminalBadges({ item }: { item: CollectiveXCoverage }) {
 }
 
 export function CollectiveXInventory({ datasets }: { datasets: CollectiveXDataset[] }) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const rows = useMemo<CollectiveXRunCoverage[]>(
     () =>
       datasets.flatMap((dataset) =>
@@ -68,13 +159,13 @@ export function CollectiveXInventory({ datasets }: { datasets: CollectiveXDatase
   const columns = useMemo<DataTableColumn<CollectiveXRunCoverage>[]>(
     () => [
       {
-        header: 'Run',
+        header: t.headers.run,
         cell: (row) => <span className="font-mono text-xs">#{row.run_id}</span>,
         sortValue: (row) => Number(row.run_id),
         className: 'whitespace-nowrap',
       },
       {
-        header: 'Case',
+        header: t.headers.case,
         cell: (row) => (
           <div className="min-w-56">
             <p className="font-medium">{row.label}</p>
@@ -85,7 +176,7 @@ export function CollectiveXInventory({ datasets }: { datasets: CollectiveXDatase
       },
       { header: 'SKU', cell: (row) => row.sku.toUpperCase(), sortValue: (row) => row.sku },
       {
-        header: 'Backend',
+        header: t.headers.backend,
         cell: (row) => row.backend,
         sortValue: (row) => row.backend,
         className: 'whitespace-nowrap',
@@ -96,32 +187,32 @@ export function CollectiveXInventory({ datasets }: { datasets: CollectiveXDatase
         sortValue: (row) => row.topology.ep_size,
       },
       {
-        header: 'Phase',
-        cell: (row) => row.phase,
+        header: t.headers.phase,
+        cell: (row) => t.phases[row.phase],
         sortValue: (row) => row.phase,
       },
       {
-        header: 'Mode',
-        cell: (row) => row.mode,
+        header: t.headers.mode,
+        cell: (row) => t.modes[row.mode],
         sortValue: (row) => row.mode,
       },
       {
-        header: 'Precision',
+        header: t.headers.precision,
         cell: (row) => row.precision,
         sortValue: (row) => row.precision,
       },
       {
-        header: 'Topology',
+        header: t.headers.topology,
         cell: (row) => collectiveXTopologyLabel(row.topology),
         sortValue: (row) => collectiveXTopologyLabel(row.topology),
         className: 'whitespace-nowrap',
       },
       {
-        header: 'Disposition',
+        header: t.headers.disposition,
         cell: (row) => (
           <div className="min-w-48">
             <p>
-              {row.disposition} · {row.outcome}
+              {t.dispositions[row.disposition]} · {t.outcomes[row.outcome]}
             </p>
             {(row.detail || row.reason) && (
               <p className="text-xs text-muted-foreground">{row.detail ?? row.reason}</p>
@@ -132,13 +223,13 @@ export function CollectiveXInventory({ datasets }: { datasets: CollectiveXDatase
           `${row.disposition} ${row.outcome} ${row.reason ?? ''} ${row.detail ?? ''}`,
       },
       {
-        header: 'Point status',
-        cell: (row) => <TerminalBadges item={row} />,
+        header: t.headers.pointStatus,
+        cell: (row) => <TerminalBadges item={row} labels={t.statuses} />,
         sortValue: (row) =>
           `${TERMINAL_ORDER.map((status) => `${status}:${terminalCounts(row)[status]}`).join(' ')} ${row.points.map((point) => point.reason ?? '').join(' ')}`,
       },
     ],
-    [],
+    [t],
   );
   const points = rows.flatMap((item) => item.points);
   const measured = points.filter((point) => point.terminal_status === 'measured').length;
@@ -152,11 +243,12 @@ export function CollectiveXInventory({ datasets }: { datasets: CollectiveXDatase
 
   return (
     <Card data-testid="collectivex-inventory" className="min-w-0 w-full max-w-full overflow-hidden">
-      <h2 className="text-lg font-semibold">Matrix case inventory</h2>
+      <h2 className="text-lg font-semibold">{t.title}</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        {datasets.length} runs · {rows.length} cases · {measuredCases} measured · {unsupportedCases}{' '}
-        unsupported · {terminalPoints}/{requestedPoints} terminal points · {measured} measured ·{' '}
-        {unsupported} unsupported
+        {datasets.length} {t.summary.runs} · {rows.length} {t.summary.cases} · {measuredCases}{' '}
+        {t.summary.measured} · {unsupportedCases} {t.summary.unsupported} · {terminalPoints}/
+        {requestedPoints} {t.summary.terminalPoints} · {measured} {t.summary.measured} ·{' '}
+        {unsupported} {t.summary.unsupported}
       </p>
       <DataTable
         data={rows}

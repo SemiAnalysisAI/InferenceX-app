@@ -26,6 +26,7 @@ import {
   FIXTURE_MANIFEST_SCHEMA_VERSION,
   type FixtureManifest,
   type FixtureManifestEntry,
+  assertFixtureContent,
   fixtureSha256,
   fixtureTopLevel,
 } from '../src/lib/test-fixture-manifest';
@@ -167,6 +168,7 @@ async function writeFixtureManifest(updatedNames: Set<string>, source: string): 
     const name = filename.slice(0, -'.json'.length);
     const body = await readFile(resolve(fixturesDir, filename), 'utf8');
     const value = JSON.parse(body) as unknown;
+    assertFixtureContent(name, value);
     const oldEntry = previous?.fixtures[name];
     const wasUpdated = updatedNames.has(name);
     fixtures[name] = {

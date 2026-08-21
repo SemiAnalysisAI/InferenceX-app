@@ -9,7 +9,11 @@ import { D3Chart, type D3ChartHandle, type LayerConfig } from '@/lib/d3-chart/D3
 import { renderErrorBars } from '@/lib/d3-chart/layers/error-bars';
 import { renderPoints, updatePointsOnZoom } from '@/lib/d3-chart/layers/points';
 import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
-import { attachOverlayXMarkerHandlers, xMarkerPath } from '@/lib/d3-chart/overlay-x-marker';
+import {
+  attachOverlayXMarkerHandlers,
+  overlayMarkerPosition,
+  xMarkerPath,
+} from '@/lib/d3-chart/overlay-x-marker';
 import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
@@ -1011,15 +1015,14 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
               return computeTooltipPosition(mouseX, mouseY, tooltip, container);
             },
             rulers: {
-              show: (datum) => {
-                const currentX = d3.zoomTransform(svgNode).rescaleX(xScale);
-                const datumY = (yScale(datum.configLabel) || 0) + yScale.bandwidth() / 2;
+              show: (datum, marker) => {
+                const position = overlayMarkerPosition(marker) ?? {
+                  x: xScale(datum.score),
+                  y: (yScale(datum.configLabel) || 0) + yScale.bandwidth() / 2,
+                };
                 group.select('.ruler-group').style('display', 'block');
-                group
-                  .select('.vertical-ruler')
-                  .attr('x1', currentX(datum.score))
-                  .attr('x2', currentX(datum.score));
-                group.select('.horizontal-ruler').attr('y1', datumY).attr('y2', datumY);
+                group.select('.vertical-ruler').attr('x1', position.x).attr('x2', position.x);
+                group.select('.horizontal-ruler').attr('y1', position.y).attr('y2', position.y);
               },
               hide: () => group.select('.ruler-group').style('display', 'none'),
             },

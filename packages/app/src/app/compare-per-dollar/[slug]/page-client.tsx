@@ -30,12 +30,15 @@ import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
  *  metric rows (Throughput, tok/s/MW) live on the sibling /compare page. */
 const PER_DOLLAR_TABLE_METRICS = ['Cost ($/M tok)', 'Concurrency'];
 
-/** Rename "Cost ($/M tok)" to the full-English "Dollar per Million Tokens"
- *  in the per-dollar table so the cell reads in line with the page's
- *  "Performance per Dollar" framing and surfaces the SEO term verbatim. */
+/** Localized display labels keyed by the table's stable English metric key. */
 const PER_DOLLAR_LABEL_OVERRIDES = {
-  'Cost ($/M tok)': 'Dollar per Million Tokens',
-};
+  en: {
+    'Cost ($/M tok)': 'Dollar per Million Tokens',
+  },
+  zh: {
+    'Cost ($/M tok)': '每百万 token 美元成本',
+  },
+} as const;
 
 /** y_costh = Cost per Million Total Tokens (Owning - Hyperscaler). Defined in
  *  packages/app/src/components/inference/metric-registry.ts. */
@@ -301,6 +304,7 @@ export default function ComparePerDollarPageClient({
               initialSequence={initialSequence}
               initialCalculatorRows={initialCalculatorRows}
               emptyStateText={t.emptyState}
+              isZh={isZh}
             />
           </Card>
           <InferenceChartDisplay />
@@ -320,6 +324,7 @@ function CompareTableSection({
   initialSequence,
   initialCalculatorRows,
   emptyStateText,
+  isZh,
 }: {
   a: string;
   b: string;
@@ -330,6 +335,7 @@ function CompareTableSection({
   initialSequence: ReturnType<typeof toSequence>;
   initialCalculatorRows?: BenchmarkRow[];
   emptyStateText: string;
+  isZh: boolean;
 }) {
   const { effectiveSequence, effectivePrecisions, selectedModel, sequenceResolved } =
     useGlobalFilterSelection();
@@ -380,8 +386,8 @@ function CompareTableSection({
       gpuDataPointsA={pointsA}
       gpuDataPointsB={pointsB}
       emptyStateText={emptyStateText}
+      metricLabelOverrides={PER_DOLLAR_LABEL_OVERRIDES[isZh ? 'zh' : 'en']}
       visibleMetricLabels={PER_DOLLAR_TABLE_METRICS}
-      metricLabelOverrides={PER_DOLLAR_LABEL_OVERRIDES}
     />
   );
 }

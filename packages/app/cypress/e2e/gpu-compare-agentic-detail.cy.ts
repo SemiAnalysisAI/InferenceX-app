@@ -173,7 +173,15 @@ describe('GPU comparison agentic point detail', () => {
       .then(($link) => {
         expect($link).to.match('a');
         expect($link).not.to.have.attr('target');
-        expect($link.attr('href')).to.match(/^\/inference\/agentic\/\d+$/u);
+        const href = $link.attr('href') ?? '';
+        expect(href).to.match(/^\/inference\/agentic\/\d+\?/u);
+        // The chart state rides along so the detail page can link back to the
+        // view the reader left — see agentic-detail-back-nav.cy.ts. Only
+        // non-default values are carried, so `g_model` (DeepSeek-V4-Pro IS the
+        // default) is absent while the scenario and GPU selection are not.
+        const params = new URLSearchParams(href.slice(href.indexOf('?')));
+        expect(params.get('i_seq')).to.equal('agentic-traces');
+        expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
       });
     cy.location('pathname').should('eq', '/inference');
   });

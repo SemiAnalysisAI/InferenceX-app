@@ -1,7 +1,8 @@
 import { formatNumber, getDisplayLabel } from '@/lib/utils';
 import { specMethodDisplayLabel } from '@/lib/compare-variant-slug';
+import { agenticDetailHref } from '@/lib/agentic-detail-link';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import { localePath, type Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
@@ -239,7 +240,7 @@ const viewChartsButtonHTML = (
   locale: Locale,
 ): string => {
   if (!isPinned || !hasTraceData || !isPersistedBenchmarkId(pointId)) return '';
-  const href = localePath(`/inference/agentic/${pointId}`, locale);
+  const href = agenticDetailHref(pointId, locale);
   const label = locale === 'zh' ? '查看图表' : 'View charts';
   return `<a data-action="view-charts" href="${href}" style="
     display: block; margin-top: 8px; width: 100%; padding: 4px 8px; font-size: 11px; font-weight: 500;

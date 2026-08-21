@@ -1,9 +1,12 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import { SCATTER_RENDERED_EVENT } from '@/lib/nudges/agentic-point-coach-mark';
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import {
   useInferenceActions,
@@ -49,7 +52,11 @@ import type {
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { computeTooltipPosition, syncPointShape } from '@/lib/d3-chart/layers/scatter-points';
-import { attachOverlayXMarkerHandlers, xMarkerPath } from '@/lib/d3-chart/overlay-x-marker';
+import {
+  attachOverlayXMarkerHandlers,
+  overlayMarkerPosition,
+  xMarkerPath,
+} from '@/lib/d3-chart/overlay-x-marker';
 import { useStableValue } from '@/hooks/useStableValue';
 import {
   overlayRooflineDasharray,
@@ -914,11 +921,12 @@ const ScatterGraph = React.memo(
     const agenticIds = useMemo(() => {
       const ids: number[] = [];
       for (const p of pointsData) {
-        if (p.benchmark_type === 'agentic_traces' && typeof p.id === 'number') ids.push(p.id);
+        if (p.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(p.id)) ids.push(p.id);
       }
       return ids;
     }, [pointsData]);
-    const { data: traceAvailability } = useTraceAvailability(agenticIds);
+    const { data: traceAvailability, isPending: isTraceAvailabilityPending } =
+      useTraceAvailability(agenticIds);
 
     // --- Legend points table (per-series drill-down opened from the legend) ---
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
@@ -941,7 +949,7 @@ const ScatterGraph = React.memo(
           title: hwConfig ? getDisplayLabel(hwConfig) : hwKey,
           color: resolveColor(hwKey),
           isOverlay: false,
-          rows: buildLegendPointsRows(pts, false),
+          rows: buildLegendPointsRows(pts, false, locale),
         };
       }
       const { runIndex, runId, branch } = pointsTableTarget;
@@ -958,7 +966,7 @@ const ScatterGraph = React.memo(
         title: `✕ ${branch}`,
         color: overlayRunColor(runIndex),
         isOverlay: true,
-        rows: buildLegendPointsRows(pts, true),
+        rows: buildLegendPointsRows(pts, true, locale),
       };
     }, [
       pointsTableTarget,
@@ -972,6 +980,7 @@ const ScatterGraph = React.memo(
       processedOverlayData,
       runIndexByUrl,
       activeOverlayHwTypes,
+      locale,
     ]);
 
     // Gradient label data
@@ -1321,10 +1330,9 @@ const ScatterGraph = React.memo(
             selectedYAxisMetric,
             hardwareConfig,
             runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-            hasTrace:
-              typeof d.id === 'number'
-                ? interactionRef.current.traceAvailability?.[d.id] === true
-                : false,
+            hasTrace: isPersistedBenchmarkId(d.id)
+              ? interactionRef.current.traceAvailability?.[d.id] === true
+              : false,
             locale,
           }),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
@@ -1347,9 +1355,13 @@ const ScatterGraph = React.memo(
           // ── Summary-page actions ──────────────────────────────────────────
           // ── "View charts" real link (supports browser open-in-new-tab) ───
           const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
-          if (viewBtn && typeof d.id === 'number') {
+          if (viewBtn && isPersistedBenchmarkId(d.id)) {
             viewBtn.addEventListener('click', (btnEvent) => {
               btnEvent.stopPropagation();
+              // Full-document navigation: stamp the chart state onto THIS
+              // history entry first, or Back returns to a bare /inference that
+              // rebuilds from defaults.
+              rememberChartStateInUrl();
               track('latency_view_charts_opened', {
                 id: d.id,
                 hwKey: String(d.hwKey),
@@ -1937,6 +1949,9 @@ const ScatterGraph = React.memo(
           dataAttrs: {
             'hw-key': (d) => String(d.hwKey),
             precision: (d) => d.precision,
+            // Lets the agentic coach mark pick an anchor out of the DOM
+            // without knowing anything about React state.
+            'benchmark-type': (d) => d.benchmark_type ?? '',
           },
           getShapeKey: (d) =>
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
@@ -2084,19 +2099,14 @@ const ScatterGraph = React.memo(
               const svgNode = ctx.layout.svg.node()!;
               const container = svgNode.parentElement as HTMLDivElement;
               const tooltip = d3.select(ctx.tooltipElement);
-              const showRulers = (point: InferenceData) => {
-                const transform = d3.zoomTransform(svgNode);
-                const currentX = transform.rescaleX(xScale);
-                const currentY = transform.rescaleY(yScale);
+              const showRulers = (point: InferenceData, marker: SVGGElement) => {
+                const position = overlayMarkerPosition(marker) ?? {
+                  x: xScale(point.x),
+                  y: yScale(point.y),
+                };
                 zoomGroup.select('.ruler-group').style('display', 'block');
-                zoomGroup
-                  .select('.vertical-ruler')
-                  .attr('x1', currentX(point.x))
-                  .attr('x2', currentX(point.x));
-                zoomGroup
-                  .select('.horizontal-ruler')
-                  .attr('y1', currentY(point.y))
-                  .attr('y2', currentY(point.y));
+                zoomGroup.select('.vertical-ruler').attr('x1', position.x).attr('x2', position.x);
+                zoomGroup.select('.horizontal-ruler').attr('y1', position.y).attr('y2', position.y);
               };
               attachOverlayXMarkerHandlers(overlayPoints, {
                 markerSelector: '.overlay-x',
@@ -2499,6 +2509,12 @@ const ScatterGraph = React.memo(
           renderOffloadHalo(d3.select(this), d, 'var(--foreground)');
         });
 
+        avoidPointLabelCollisions(zoomGroup);
+
+        // Tell the nudge engine the chart has painted, so an anchored coach
+        // mark can retry resolving a point to point at. This fires once per
+        // full render, never per zoom frame.
+        window.dispatchEvent(new CustomEvent(SCATTER_RENDERED_EVENT));
         // Log tick formatting on initial render
         if (xScaleConfig._isLog) {
           const xScale = (ctx.renderedXScale ?? ctx.xScale) as d3.ScaleLogarithmic<number, number>;
@@ -2564,6 +2580,20 @@ const ScatterGraph = React.memo(
         // A precision toggle may replace and append the visible SVG shape.
         // Keep the offload halo above that shape after the swap.
         sel.selectAll('.offload-halo').raise();
+        // Whether this point's pinned tooltip will offer "View charts". Written
+        // here rather than in the layer's dataAttrs because availability
+        // resolves after the chart renders, and a rebuild would drop the zoom.
+        const pointId = isPersistedBenchmarkId(d.id) ? d.id : null;
+        const persistedAgenticPoint = d.benchmark_type === 'agentic_traces' && pointId !== null;
+        sel
+          .attr(
+            'data-has-trace',
+            pointId !== null && traceAvailability?.[pointId] === true ? 'true' : null,
+          )
+          .attr(
+            'data-trace-availability',
+            persistedAgenticPoint ? (isTraceAvailabilityPending ? 'pending' : 'resolved') : null,
+          );
       });
 
       // Overlay X markers: Optimal Only visibility (mirrors the official dot
@@ -2676,6 +2706,9 @@ const ScatterGraph = React.memo(
       showGradientLabels,
       showLineLabels,
       gradientColorByPoint,
+      // Re-stamps `data-has-trace` once the presence lookup resolves.
+      traceAvailability,
+      isTraceAvailabilityPending,
     ]);
 
     // D3 custom layers are keyed additions, so removing the overlay layer from
@@ -2751,7 +2784,7 @@ const ScatterGraph = React.memo(
           data={pointsData}
           dataIdentity={dataIdentity}
           metricIdentity={metricIdentity}
-          displayIdentity={`${showPointLabels}:${showGradientLabels}`}
+          displayIdentity={`${showPointLabels}:${showGradientLabels}:${selectedPrecisions.join(',')}`}
           margin={CHART_MARGIN}
           watermark={getChartWatermark(isUnofficialRun)}
           testId="scatter-graph"

@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 
+import type { BenchmarkRow } from '@/lib/api';
+
 import {
   interpolateMetricAtInteractivity,
+  rowToLightweightPoint,
   trendMetricDependencies,
 } from './useInterpolatedTrendData';
 
@@ -29,6 +32,56 @@ function makePoint(overrides: Partial<InferenceData> = {}): InferenceData {
     ...overrides,
   } as InferenceData;
 }
+
+function makeBenchmarkRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
+  return {
+    id: 1,
+    hardware: 'h200',
+    framework: 'trt',
+    model: 'dsr1',
+    precision: 'fp8',
+    spec_method: 'none',
+    disagg: false,
+    is_multinode: false,
+    prefill_tp: 8,
+    prefill_ep: 1,
+    prefill_dp_attention: false,
+    prefill_num_workers: 0,
+    decode_tp: 8,
+    decode_ep: 1,
+    decode_dp_attention: false,
+    decode_num_workers: 0,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    benchmark_type: 'single_turn',
+    offload_mode: 'off',
+    isl: 1024,
+    osl: 1024,
+    conc: 64,
+    image: 'test',
+    metrics: {
+      tput_per_gpu: 400,
+      median_intvty: 20,
+    },
+    date: '2026-03-01',
+    run_url: null,
+    ...overrides,
+  };
+}
+
+describe('rowToLightweightPoint', () => {
+  it('preserves legacy output-throughput trends when the explicit field is absent', () => {
+    const point = rowToLightweightPoint(makeBenchmarkRow(), [
+      'outputTputPerGpu',
+      'costhOutput',
+      'outputTokensPerDollarH',
+    ]);
+
+    expect(point?.outputTputPerGpu?.y).toBe(400);
+    expect(point?.costhOutput?.y).toBeGreaterThan(0);
+    expect(point?.outputTokensPerDollarH?.y).toBeGreaterThan(0);
+  });
+});
 
 // ─── Tests ───
 

@@ -45,6 +45,28 @@ describe('createZoomFrameBatcher', () => {
     expect(cancelled).not.toHaveBeenCalled();
     expect(later).toHaveBeenCalledTimes(1);
   });
+
+  it('flushes the latest pending work synchronously and cancels its frame', () => {
+    const frames: FrameRequestCallback[] = [];
+    const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    const cancelFrame = vi.fn();
+    const batcher = createZoomFrameBatcher(requestFrame, cancelFrame);
+    const first = vi.fn();
+    const final = vi.fn();
+
+    batcher.schedule(first);
+    batcher.schedule(final);
+    batcher.flush();
+
+    expect(cancelFrame).toHaveBeenCalledWith(1);
+    expect(first).not.toHaveBeenCalled();
+    expect(final).toHaveBeenCalledTimes(1);
+    frames[0](16);
+    expect(final).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('metricRenderCallbackContext', () => {

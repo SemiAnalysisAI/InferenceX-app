@@ -56,6 +56,12 @@ export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     dashboardNudge: false,
   },
+  {
+    path: '/collectivex',
+    includeChildren: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    dashboardNudge: false,
+  },
 ] as const satisfies readonly DashboardShellCapabilityRoute[];
 
 /**
@@ -241,7 +247,9 @@ export function dashboardShellCapabilitiesForPathname(
   if (!dashboardRoute) return DEFAULT_DASHBOARD_SHELL_CAPABILITIES;
   return {
     providers: dashboardRoute.providers,
-    dashboardNudge:
-      dashboardRoute.providers.globalFilters || dashboardRoute.providers.unofficialRuns,
+    // Provider ownership and nudge ownership are independent. Production
+    // mounted dashboard nudges on standalone tabs too; only explicit shell
+    // overrides suppress them.
+    dashboardNudge: true,
   };
 }

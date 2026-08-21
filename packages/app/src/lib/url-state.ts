@@ -158,12 +158,14 @@ const currentState: Record<string, string> = {};
 // On module load: snapshot share-link params from the URL.
 // Cleanup is deferred so it runs after Next.js hydration finishes.
 const _initialParams: UrlStateParams = {};
+const explicitUrlParams: UrlStateParams = {};
 if (typeof window !== 'undefined') {
   const searchParams = new URLSearchParams(window.location.search);
   for (const key of URL_STATE_KEYS) {
     const value = searchParams.get(key);
     if (value !== null) {
       _initialParams[key] = value;
+      explicitUrlParams[key] = value;
       currentState[key] = value;
     }
   }
@@ -205,14 +207,50 @@ export function readUrlParams(): UrlStateParams {
  */
 export function refreshUrlParams(): UrlStateParams {
   if (typeof window === 'undefined') return _initialParams;
+  flushPendingParams();
   const searchParams = new URLSearchParams(window.location.search);
   for (const key of URL_STATE_KEYS) {
+    delete explicitUrlParams[key];
     const value = searchParams.get(key);
     if (value === null) continue;
+    explicitUrlParams[key] = value;
     _initialParams[key] = value;
     currentState[key] = value;
   }
   return _initialParams;
+}
+
+/**
+ * Pathname of the last navigation whose params were pulled into the snapshot.
+ * Module-level (not a hook ref) so only the FIRST `useUrlState` consumer to
+ * render after a navigation does the work: a component that mounts later on
+ * the same path must not re-import the URL over filter changes the user has
+ * made since.
+ */
+let lastRefreshedPathname: string | null = null;
+
+/**
+ * Refresh the snapshot once per client-side navigation.
+ *
+ * Providers read their initial state through `getUrlParam` during render, so
+ * the snapshot has to be current BEFORE they initialise. `useUrlState` calls
+ * this while rendering, which puts it ahead of every provider below the
+ * component that called it first (React renders top-down), and ahead of the
+ * mount effects that read `i_gpus` and friends.
+ *
+ * Returns whether a refresh actually happened, which is what the unit tests
+ * assert on.
+ */
+export function refreshUrlParamsOnNavigation(pathname: string): boolean {
+  if (lastRefreshedPathname === pathname) return false;
+  lastRefreshedPathname = pathname;
+  refreshUrlParams();
+  return true;
+}
+
+/** Whether the current navigation explicitly supplied a share-link parameter. */
+export function hasExplicitUrlParam(key: UrlStateKey): boolean {
+  return explicitUrlParams[key] !== undefined;
 }
 
 /** Check whether the current URL has any share-link params. */
@@ -276,14 +314,18 @@ function flushPendingParams(): void {
  */
 const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/iu;
 
-export function buildShareUrl(): string {
+/**
+ * Current in-memory state for the active route, plus any unofficial-run IDs
+ * in the address bar, as a `URLSearchParams`. Flushes pending writes first so
+ * the caller sees the newest filter change rather than the one before it.
+ */
+function collectTabParams(): URLSearchParams {
   flushPendingParams();
 
   const route = dashboardRouteForPathname(window.location.pathname);
   // Compare and other chart routes share inference controls but deliberately
   // stay outside the dashboard registry.
   const prefixes = route?.shareParamScopes ?? getDashboardRoute('inference').shareParamScopes;
-
   const filtered = new URLSearchParams();
   for (const [key, value] of Object.entries(currentState)) {
     if (prefixes.some((p) => key.startsWith(p))) {
@@ -303,6 +345,71 @@ export function buildShareUrl(): string {
     }
   }
 
-  const search = filtered.toString();
+  return filtered;
+}
+
+export function buildShareUrl(): string {
+  const search = collectTabParams().toString();
   return `${window.location.origin}${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`;
+}
+
+/**
+ * The chart state this page would share, as a query string (no leading `?`).
+ * Empty when every value is at its default.
+ */
+export function currentChartSearch(): string {
+  if (typeof window === 'undefined') return '';
+  return collectTabParams().toString();
+}
+
+/**
+ * Write the chart state into the CURRENT history entry, so Back restores it.
+ *
+ * Filter changes only ever reach the in-memory `currentState` — the address bar
+ * is deliberately stripped clean after load — so the entry the browser returns
+ * to is a bare `/inference` that rebuilds from defaults. Detail-page links are
+ * plain `<a href>` (they must support open-in-new-tab), i.e. full-document
+ * navigations that also destroy this module, so the URL is the only channel
+ * that survives. Call this immediately before navigating away from a chart.
+ *
+ * `history.state` is passed straight through so the Next router's own entry
+ * bookkeeping is not clobbered.
+ */
+export function rememberChartStateInUrl(): string {
+  if (typeof window === 'undefined') return '';
+  const { pathname, hash, search: liveSearch } = window.location;
+  const chartParams = collectTabParams();
+
+  // Start from whatever is already in the address bar so params this module
+  // does not own (campaign tags and the like) survive the rewrite, then layer
+  // the chart state on top. Both unofficial-run spellings are cleared first —
+  // `collectTabParams` re-emits the canonical plural form.
+  const merged = new URLSearchParams(liveSearch);
+  for (const key of URL_STATE_KEYS) merged.delete(key);
+  const unofficialKeys: string[] = [];
+  for (const key of merged.keys()) {
+    if (UNOFFICIAL_RUN_PARAM_RE.test(key)) unofficialKeys.push(key);
+  }
+  // Deleting inside the iteration above would skip entries.
+  for (const key of unofficialKeys) merged.delete(key);
+  for (const [key, value] of chartParams) merged.set(key, value);
+
+  const search = merged.toString();
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${pathname}${search ? `?${search}` : ''}${hash}`,
+  );
+  return chartParams.toString();
+}
+
+/**
+ * Append the current chart state to an outbound in-app href, so the page it
+ * opens can link back to the chart the user left. Used for the agentic
+ * point-detail links, which are full-document navigations.
+ */
+export function withChartState(href: string): string {
+  const search = currentChartSearch();
+  if (!search) return href;
+  return `${href}${href.includes('?') ? '&' : '?'}${search}`;
 }

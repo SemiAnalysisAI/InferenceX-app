@@ -81,6 +81,15 @@ describe('Compare-per-dollar slug page — slimmed table + cross-link', () => {
   });
 });
 
+describe('Chinese compare-per-dollar table', () => {
+  it('localizes the per-dollar metric label', () => {
+    cy.visit('/zh/compare-per-dollar/deepseek-r1-gb200-vs-h100');
+    cy.get('[data-testid="compare-interpolated-table"] tbody')
+      .should('contain.text', '每百万 token 美元成本')
+      .and('not.contain.text', 'Dollar per Million Tokens');
+  });
+});
+
 describe('Compare slug page — cross-link to per-dollar view', () => {
   before(() => {
     cy.window().then((win) => {

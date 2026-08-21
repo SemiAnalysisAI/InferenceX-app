@@ -1525,7 +1525,7 @@ describe('ChartDisplay engine comparison guard', () => {
         activeOverlayHwTypes: new Set(['h100_sglang']),
         availableOverlayHwTypes: new Set(['h100_sglang', 'h200_sglang', 'b200_vllm']),
         localOfficialOverride: null,
-        scopeKey: `${Model.DeepSeek_V4_Pro}|${Sequence.AgenticTraces}|${Precision.FP4}|${runInfo.url}`,
+        scopeKey: `${Model.DeepSeek_V4_Pro}|${Sequence.AgenticTraces}|${Precision.FP4}|${runInfo.url}|official:b200_sglang|overlay:h100_sglang,h200_sglang`,
         scopeOverlayHwTypes: new Set(['h100_sglang', 'h200_sglang']),
         scopeReady: true,
         bestSelectionKey: '',

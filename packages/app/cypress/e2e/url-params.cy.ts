@@ -123,6 +123,22 @@ describe('URL Parameter Persistence', () => {
 
       cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
     });
+
+    it('preserves the newest pending model across a retained-provider tab switch', () => {
+      visitWithDismissedModal('/inference');
+      cy.get('[data-testid="model-selector"]').click();
+      cy.contains('[role="option"]', 'MiniMax M3 428B').click();
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'MiniMax M3 428B');
+      cy.wait(200);
+
+      cy.get('[data-testid="model-selector"]').click();
+      cy.contains('[role="option"]', 'Qwen3.5 397B').click();
+      cy.get('[data-testid="tab-trigger-evaluation"]').click();
+      cy.location('pathname').should('eq', '/evaluation');
+      cy.get('[data-testid="tab-trigger-inference"]').click();
+      cy.location('pathname').should('eq', '/inference');
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
+    });
   });
 
   describe('Inference Y-axis metric', () => {

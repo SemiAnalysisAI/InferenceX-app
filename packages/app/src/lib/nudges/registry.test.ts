@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  AGENTIC_COACH_MARK_STORAGE_KEY,
+  AGENTIC_POINT_ACTION_SELECTOR,
+} from './agentic-point-coach-mark';
+import { dismissesOnAction } from './policy';
 import { NUDGE_REGISTRY, TELEMETRY_TUTORIAL_STORAGE_KEY } from './registry';
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -18,7 +23,7 @@ describe('NUDGE_REGISTRY integrity', () => {
 
   it('every entry has a valid type', () => {
     for (const nudge of NUDGE_REGISTRY) {
-      expect(['toast', 'modal', 'banner']).toContain(nudge.type);
+      expect(['toast', 'modal', 'banner', 'coach-mark']).toContain(nudge.type);
     }
   });
 
@@ -65,6 +70,7 @@ describe('NUDGE_REGISTRY integrity', () => {
   it('contains the expected set of migrated nudges', () => {
     const ids = NUDGE_REGISTRY.map((n) => n.id).toSorted();
     expect(ids).toEqual([
+      'agentic-point-detail',
       'agentic-results-launch-banner',
       'agentic-results-launch-modal',
       'agentx-telemetry-tutorial',
@@ -111,6 +117,31 @@ describe('NUDGE_REGISTRY integrity', () => {
     if (launch?.type !== 'modal') throw new Error('Missing launch modal');
     launch.content.primaryAction?.onClick();
     expect(location.href).toBe('/zh/inference?i_seq=agentic-traces');
+  });
+
+  it('gives every coach mark an anchor to point at', () => {
+    for (const nudge of NUDGE_REGISTRY.filter((n) => n.type === 'coach-mark')) {
+      expect(typeof nudge.content.anchor?.resolve).toBe('function');
+    }
+  });
+
+  it('anchors the agentic coach mark to the inference chart, dismissed for good on a point click', () => {
+    const coachMark = NUDGE_REGISTRY.find((n) => n.id === 'agentic-point-detail');
+
+    expect(coachMark?.type).toBe('coach-mark');
+    expect(coachMark?.scope).toBe('dashboard');
+    expect(coachMark?.dismissal.type).toBe('permanent');
+    expect(coachMark?.storageKey).toBe(AGENTIC_COACH_MARK_STORAGE_KEY);
+    expect(dismissesOnAction(coachMark!)).toBe(true);
+    expect(coachMark?.content.anchor?.actionSelector).toBe(AGENTIC_POINT_ACTION_SELECTOR);
+    expect(AGENTIC_COACH_MARK_STORAGE_KEY).toBe('inferencex-agentic-point-coach-mark-dismissed');
+  });
+
+  it('ships a Chinese translation for every user-visible nudge string', () => {
+    for (const nudge of NUDGE_REGISTRY) {
+      expect(nudge.content.titleZh, `${nudge.id} title`).toBeTruthy();
+      expect(nudge.content.descriptionZh, `${nudge.id} description`).toBeTruthy();
+    }
   });
 
   it('preserves testId for every entry', () => {

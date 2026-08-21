@@ -47,7 +47,7 @@ E2E_FIXTURES=1 \
 
 `SPLIT=1` intentionally runs every spec in one chunk so one process records the complete baseline. CI uses `SPLIT=4` only for parallel execution and writes each shard's timing output to a throwaway file.
 
-`E2E_FIXTURES=1` serves the committed API snapshots under `packages/app/cypress/fixtures/api/`. Refresh them with `bun run --cwd packages/app capture:fixtures`. The capture script updates `_manifest.json`, which records the fixture shape, byte length, checksum, source, and capture timestamp. The manifest guard rejects partial or hand-edited snapshots.
+`E2E_FIXTURES=1` serves the committed API snapshots under `packages/app/cypress/fixtures/api/`. Refresh them with `bun run --cwd packages/app capture:fixtures`. The capture script updates `_manifest.json`, which records the fixture shape, byte length, checksum, source, and capture timestamp. The manifest guard rejects partial or hand-edited snapshots; benchmark history must also contain at least two dates so replay tests cannot silently skip their substantive path.
 
 ### Route bundle budgets
 

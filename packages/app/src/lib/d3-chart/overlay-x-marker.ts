@@ -7,7 +7,7 @@ export interface OverlayTooltipHandle<T> {
 }
 
 export interface OverlayRulerLifecycle<T> {
-  show: (data: T) => void;
+  show: (data: T, marker: SVGGElement) => void;
   hide: () => void;
 }
 
@@ -28,6 +28,15 @@ export interface OverlayXMarkerOptions<T> {
 export function xMarkerPath(size: number, armScale = 1): string {
   const arm = size * armScale;
   return `M ${-arm} ${-arm} L ${arm} ${arm} M ${-arm} ${arm} L ${arm} ${-arm}`;
+}
+
+/** Current rendered translation of an overlay marker group. */
+export function overlayMarkerPosition(marker: Element): { x: number; y: number } | null {
+  const transform = marker.getAttribute('transform') ?? '';
+  const match = transform.match(/translate\((?<x>[^, ]+)[, ]+(?<y>[^) ]+)\)/u);
+  const x = Number(match?.groups?.x);
+  const y = Number(match?.groups?.y);
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
 
 export function attachOverlayXMarkerHandlers<T>(
@@ -54,7 +63,7 @@ export function attachOverlayXMarkerHandlers<T>(
         .style('pointer-events', 'none')
         .html(options.content(data, false));
       invalidateTooltipGeometry(options.tooltip.node());
-      options.rulers?.show(data);
+      options.rulers?.show(data, this);
     })
     .on('mousemove', (event) => {
       if (options.handle?.isPinned()) return;
@@ -69,7 +78,7 @@ export function attachOverlayXMarkerHandlers<T>(
       options.tooltip.style('opacity', 0).style('display', 'none');
       options.rulers?.hide();
     })
-    .on('click', (event, data) => {
+    .on('click', function (event, data) {
       event.stopPropagation();
       options.tooltip
         .html(options.content(data, true))
@@ -78,7 +87,7 @@ export function attachOverlayXMarkerHandlers<T>(
         .style('pointer-events', 'auto');
       invalidateTooltipGeometry(options.tooltip.node());
       positionTooltip(event);
-      options.rulers?.show(data);
+      options.rulers?.show(data, this);
       options.handle?.pinTooltip(data, true);
       options.onClick?.(data);
     });

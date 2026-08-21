@@ -1,6 +1,8 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTheme } from 'next-themes';
@@ -330,7 +332,7 @@ const GPUGraph = React.memo(
     const agenticIds = useMemo(
       () =>
         filteredData.flatMap((point) =>
-          point.benchmark_type === 'agentic_traces' && typeof point.id === 'number'
+          point.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(point.id)
             ? [point.id]
             : [],
         ),
@@ -615,7 +617,7 @@ const GPUGraph = React.memo(
         chartId={chartId}
         dataIdentity={dataIdentity}
         metricIdentity={metricIdentity}
-        displayIdentity={`${showPointLabels}:${paletteIdentity}`}
+        displayIdentity={`${showPointLabels}:${paletteIdentity}:${selectedPrecisions.join(',')}`}
         data={filteredData}
         margin={CHART_MARGIN}
         watermark={getChartWatermark()}
@@ -662,6 +664,7 @@ const GPUGraph = React.memo(
               },
               selectedPrecisions,
             },
+            keyFn: (point) => `${point.date}:${scatterPointConfigId(point)}`,
           },
           lineLabelLayer,
           knownIssueLayer,
@@ -694,8 +697,9 @@ const GPUGraph = React.memo(
               selectedYAxisMetric,
               hardwareConfig,
               runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-              hasTrace:
-                typeof d.id === 'number' ? traceAvailabilityRef.current?.[d.id] === true : false,
+              hasTrace: isPersistedBenchmarkId(d.id)
+                ? traceAvailabilityRef.current?.[d.id] === true
+                : false,
               locale,
             }),
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),
@@ -720,9 +724,13 @@ const GPUGraph = React.memo(
             const tooltipEl = chartRef.current?.getTooltipElement();
             if (!tooltipEl) return;
             const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
-            if (!viewBtn || typeof d.id !== 'number') return;
+            if (!viewBtn || !isPersistedBenchmarkId(d.id)) return;
             viewBtn.addEventListener('click', (event) => {
               event.stopPropagation();
+              // Full-document navigation: stamp the chart state onto THIS
+              // history entry first, or Back returns to a bare /inference that
+              // rebuilds from defaults.
+              rememberChartStateInUrl();
               track('gpu_timeseries_view_charts_opened', {
                 id: d.id,
                 hwKey: String(d.hwKey),

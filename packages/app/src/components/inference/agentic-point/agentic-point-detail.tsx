@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 import { useAgenticAggregates } from '@/hooks/api/use-agentic-aggregates';
@@ -11,8 +11,10 @@ import { useTraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
 import { useBenchmarkSiblings } from '@/hooks/api/use-benchmark-siblings';
 import { NudgeEngine } from '@/components/nudge-engine';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
+import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
+import { withChartState } from '@/lib/url-state';
 
 import { AggregatesGrid } from './aggregates-grid';
 import { MetricSourceToolbar } from './metric-source-toolbar';
@@ -92,7 +94,19 @@ export function AgenticPointDetail({ id }: Props) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const isZh = isZhPathname(pathname);
-  const inferenceHref = isZh ? `${ZH_PREFIX}/inference` : '/inference';
+  const inferenceBaseHref = isZh ? `${ZH_PREFIX}/inference` : '/inference';
+  // Carry the chart state the reader arrived with back to the chart. The link
+  // used to be a bare path, so it could only ever land on the default model
+  // with the default legend, no matter what the reader was looking at.
+  //
+  // Resolved after mount, not during render: `withChartState` reads the
+  // in-memory param store (seeded from this page's own URL at load), which
+  // does not exist on the server — computing it during render would make the
+  // server and client markup disagree.
+  const [inferenceHref, setInferenceHref] = useState(inferenceBaseHref);
+  useEffect(() => {
+    setInferenceHref(withChartState(inferenceBaseHref));
+  }, [inferenceBaseHref]);
   const viewOptions: SegmentedToggleOption<DetailView>[] = useMemo(
     () => [
       { value: 'point', label: t.perPoint, testId: 'detail-view-point' },
@@ -194,13 +208,20 @@ export function AgenticPointDetail({ id }: Props) {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => {
+            track('inference_agentic_detail_back_clicked', { id });
+            router.back();
+          }}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" /> {t.back}
         </button>
         <span className="text-sm text-muted-foreground">·</span>
-        <Link href={inferenceHref} className="text-sm text-muted-foreground hover:text-foreground">
+        <Link
+          href={inferenceHref}
+          onClick={() => track('inference_agentic_detail_chart_link_clicked', { id })}
+          className="text-sm text-muted-foreground hover:text-foreground"
+        >
           {t.inferenceChart}
         </Link>
       </div>

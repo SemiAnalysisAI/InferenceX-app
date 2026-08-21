@@ -64,6 +64,23 @@ describe('dashboard route registry', () => {
     },
   );
 
+  it.each(['/collectivex', '/zh/collectivex'])(
+    'keeps the CollectiveX route free of dashboard providers and nudges at %s',
+    (pathname) => {
+      expect(dashboardShellCapabilitiesForPathname(pathname)).toEqual({
+        providers: { globalFilters: false, unofficialRuns: false },
+        dashboardNudge: false,
+      });
+    },
+  );
+
+  it.each(['/reliability', '/gpu-specs', '/submissions', '/feedback'])(
+    'keeps dashboard nudges active on provider-free route %s',
+    (pathname) => {
+      expect(dashboardShellCapabilitiesForPathname(pathname).dashboardNudge).toBe(true);
+    },
+  );
+
   it('resolves English, Chinese, canonical, and dashboard child paths', () => {
     expect(dashboardRouteForPathname('/evaluation')?.key).toBe('evaluation');
     expect(dashboardRouteForPathname('/zh/evaluation')?.key).toBe('evaluation');

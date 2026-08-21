@@ -462,7 +462,7 @@ const collectiveXDatasetSchema = objectSchema(
     series: arraySchema(anyObjectSchema),
     kv: arraySchema(anyObjectSchema),
   },
-  ['version', 'run', 'coverage', 'series', 'kv'],
+  ['version', 'run', 'coverage', 'series'],
 );
 const collectiveRunSummarySchema = objectSchemaWithOptional(
   {
