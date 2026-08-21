@@ -223,4 +223,26 @@ describe('applyQuickFilters', () => {
       [overlay],
     );
   });
+
+  it('filters agentic unofficial overlays by the options exposed in the UI', () => {
+    const official = point({
+      id: 42,
+      benchmark_type: 'agentic_traces',
+      hwKey: 'b200_vllm_mtp',
+      framework: 'vllm',
+      spec_decoding: 'mtp',
+    });
+    const overlay = point({
+      id: undefined,
+      benchmark_type: 'agentic_traces',
+      run_url: 'https://github.com/example/actions/runs/2',
+      hwKey: 'mi300x_sglang_mtp',
+      framework: 'sglang',
+      spec_decoding: 'mtp',
+    });
+
+    expect(
+      applyQuickFilters([official, overlay], filters({ vendors: ['AMD'], frameworks: ['sglang'] })),
+    ).toEqual([overlay]);
+  });
 });

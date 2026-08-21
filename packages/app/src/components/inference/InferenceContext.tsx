@@ -319,16 +319,19 @@ export function InferenceProvider({
     }),
     [quickFilterVendors, quickFilterFrameworks, quickFilterDeployment, quickFilterSpec],
   );
-  // The Historical Trends tab hides the quick-filter pills (hideGpuComparison), so
-  // don't silently narrow its chart with selections carried in via share links or
-  // the inference tab — there would be no pill to clear them.
-  // Quick Filters are hidden on the historical tab and in the agentic scenario.
-  // Hiding the pills is not enough: leftover `i_vendor` / `i_fw` / `i_disagg` /
-  // `i_spec` state would keep slicing the chart with no control left to clear
-  // it, so a share link could drop series the reader cannot get back.
-  const quickFiltersHidden =
-    activeTab === 'historical' || effectiveSequence === Sequence.AgenticTraces;
-  const dataQuickFilters = quickFiltersHidden ? EMPTY_QUICK_FILTERS : quickFilters;
+  // Historical Trends hides Quick Filters, so never apply invisible selections there.
+  // Agentic charts expose vendor, framework, and deployment filters, but speculative
+  // decoding is intentionally not an agentic option. Ignore stale `i_spec` state from
+  // an older shared URL without discarding it when the reader returns to fixed-seq.
+  const dataQuickFilters = useMemo(
+    () =>
+      activeTab === 'historical'
+        ? EMPTY_QUICK_FILTERS
+        : effectiveSequence === Sequence.AgenticTraces
+          ? { ...quickFilters, spec: [] }
+          : quickFilters,
+    [activeTab, effectiveSequence, quickFilters],
+  );
   const { highContrast, setHighContrast, isLegendExpanded, setIsLegendExpanded } = useChartUIState({
     urlPrefix: 'i_',
   });

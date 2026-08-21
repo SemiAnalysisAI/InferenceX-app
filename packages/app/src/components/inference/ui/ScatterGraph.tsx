@@ -18,6 +18,7 @@ import {
   labelOpacityForHover,
 } from '@/components/inference/ui/line-label-visibility';
 import ChartLegend from '@/components/ui/chart-legend';
+import { Button } from '@/components/ui/button';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import {
@@ -75,6 +76,7 @@ import {
 } from '@/components/inference/utils/tooltipUtils';
 import { scatterPointConfigId } from '@/components/inference/utils/point-identity';
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
+import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 import {
   OFFLOAD_HALO_DASHARRAY,
   OFFLOAD_HALO_RADIUS,
@@ -437,6 +439,7 @@ const SCATTER_STRINGS = {
     gradientLabels: 'Gradient Labels',
     lineLabels: 'Line Labels',
     resetFilter: 'Reset filter',
+    quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
     overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
@@ -452,6 +455,7 @@ const SCATTER_STRINGS = {
     gradientLabels: '渐变标签',
     lineLabels: '曲线标签',
     resetFilter: '重置筛选',
+    quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
     overflowMixed: (count: number) => `${count} 个点已截断`,
     overflowCost: (count: number, limit: number) => `${count} 个点 > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${count} 个点 > ${limit}s TTFT`,
@@ -515,6 +519,10 @@ const ScatterGraph = React.memo(
       selectedSequence,
       selectedModel,
       quickFilters,
+      setQuickFilterVendors,
+      setQuickFilterFrameworks,
+      setQuickFilterDeployment,
+      setQuickFilterSpec,
       loading,
     } = useInference();
     const locale = useLocale();
@@ -1150,6 +1158,23 @@ const ScatterGraph = React.memo(
 
     // --- Legend points table (per-series drill-down opened from the legend) ---
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
+    const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
+    const quickFilterCount =
+      quickFilters.vendors.length +
+      quickFilters.frameworks.length +
+      quickFilters.deployment.length +
+      (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
+    const clearQuickFilters = useCallback(() => {
+      setQuickFilterVendors([]);
+      setQuickFilterFrameworks([]);
+      setQuickFilterDeployment([]);
+      setQuickFilterSpec([]);
+    }, [
+      setQuickFilterVendors,
+      setQuickFilterFrameworks,
+      setQuickFilterDeployment,
+      setQuickFilterSpec,
+    ]);
 
     const pointsTable = useMemo(() => {
       if (!pointsTableTarget) return null;
@@ -3280,8 +3305,22 @@ const ScatterGraph = React.memo(
               <p className="text-xs">
                 Please change the model, sequence, precision, date range or chip selection.
               </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-4"
+                data-testid="scatter-empty-quick-filters"
+                onClick={() => {
+                  setQuickFiltersOpen(true);
+                  track('inference_quick_filters_dialog_opened', { source: 'scatter_empty' });
+                }}
+              >
+                {legendT.quickFilters(quickFilterCount)}
+              </Button>
             </div>
           </div>
+          <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
         </div>
       );
     }
@@ -3574,21 +3613,31 @@ const ScatterGraph = React.memo(
               onAdvancedExpandedChange={(expanded) => {
                 track('latency_advanced_controls_toggled', { expanded });
               }}
-              actions={
-                effectiveOfficialHwTypes.size < hwTypesWithData.size ||
-                activeOverlayHwTypes.size < scopedOverlayHwTypes.size
+              actions={[
+                ...(effectiveOfficialHwTypes.size < hwTypesWithData.size ||
+                activeOverlayHwTypes.size < scopedOverlayHwTypes.size ||
+                quickFilterCount > 0
                   ? [
                       {
                         id: 'scatter-reset-filter',
                         label: legendT.resetFilter,
                         onClick: () => {
                           resetUnifiedSelection();
+                          clearQuickFilters();
                           track('latency_legend_filter_reset');
                         },
                       },
                     ]
-                  : []
-              }
+                  : []),
+                {
+                  id: 'scatter-quick-filters',
+                  label: legendT.quickFilters(quickFilterCount),
+                  onClick: () => {
+                    setQuickFiltersOpen(true);
+                    track('inference_quick_filters_dialog_opened', { source: 'scatter_legend' });
+                  },
+                },
+              ]}
               precisionIndicators={selectedPrecisions}
               keyIndicators={
                 hasOffloadHalo || selectedSequence === Sequence.AgenticTraces ? (
@@ -3602,6 +3651,7 @@ const ScatterGraph = React.memo(
             />
           }
         />
+        <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
         {pointsTable && (
           <LegendPointsDialog
             open
