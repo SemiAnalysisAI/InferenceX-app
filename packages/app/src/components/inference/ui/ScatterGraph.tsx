@@ -18,6 +18,7 @@ import {
   labelOpacityForHover,
 } from '@/components/inference/ui/line-label-visibility';
 import ChartLegend from '@/components/ui/chart-legend';
+import { Button } from '@/components/ui/button';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import {
@@ -518,6 +519,10 @@ const ScatterGraph = React.memo(
       selectedSequence,
       selectedModel,
       quickFilters,
+      setQuickFilterVendors,
+      setQuickFilterFrameworks,
+      setQuickFilterDeployment,
+      setQuickFilterSpec,
       loading,
     } = useInference();
     const locale = useLocale();
@@ -1159,6 +1164,17 @@ const ScatterGraph = React.memo(
       quickFilters.frameworks.length +
       quickFilters.deployment.length +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
+    const clearQuickFilters = useCallback(() => {
+      setQuickFilterVendors([]);
+      setQuickFilterFrameworks([]);
+      setQuickFilterDeployment([]);
+      setQuickFilterSpec([]);
+    }, [
+      setQuickFilterVendors,
+      setQuickFilterFrameworks,
+      setQuickFilterDeployment,
+      setQuickFilterSpec,
+    ]);
 
     const pointsTable = useMemo(() => {
       if (!pointsTableTarget) return null;
@@ -3289,8 +3305,22 @@ const ScatterGraph = React.memo(
               <p className="text-xs">
                 Please change the model, sequence, precision, date range or chip selection.
               </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-4"
+                data-testid="scatter-empty-quick-filters"
+                onClick={() => {
+                  setQuickFiltersOpen(true);
+                  track('inference_quick_filters_dialog_opened', { source: 'scatter_empty' });
+                }}
+              >
+                {legendT.quickFilters(quickFilterCount)}
+              </Button>
             </div>
           </div>
+          <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
         </div>
       );
     }
@@ -3585,13 +3615,15 @@ const ScatterGraph = React.memo(
               }}
               actions={[
                 ...(effectiveOfficialHwTypes.size < hwTypesWithData.size ||
-                activeOverlayHwTypes.size < scopedOverlayHwTypes.size
+                activeOverlayHwTypes.size < scopedOverlayHwTypes.size ||
+                quickFilterCount > 0
                   ? [
                       {
                         id: 'scatter-reset-filter',
                         label: legendT.resetFilter,
                         onClick: () => {
                           resetUnifiedSelection();
+                          clearQuickFilters();
                           track('latency_legend_filter_reset');
                         },
                       },

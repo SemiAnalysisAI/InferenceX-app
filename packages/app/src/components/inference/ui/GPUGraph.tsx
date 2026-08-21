@@ -9,6 +9,7 @@ import { useTheme } from 'next-themes';
 
 import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
+import { Button } from '@/components/ui/button';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getChartWatermark, Sequence } from '@/lib/data-mappings';
 import { generateGpuDateColors, generateHighContrastGpuDateColors } from '@/lib/dynamic-colors';
@@ -149,6 +150,10 @@ const GPUGraph = React.memo(
       showLineLabels,
       setShowLineLabels,
       quickFilters,
+      setQuickFilterVendors,
+      setQuickFilterFrameworks,
+      setQuickFilterDeployment,
+      setQuickFilterSpec,
     } = useInference();
     const locale = useLocale();
     const legendT = GPU_STRINGS[locale];
@@ -160,6 +165,17 @@ const GPUGraph = React.memo(
       quickFilters.frameworks.length +
       quickFilters.deployment.length +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
+    const clearQuickFilters = useCallback(() => {
+      setQuickFilterVendors([]);
+      setQuickFilterFrameworks([]);
+      setQuickFilterDeployment([]);
+      setQuickFilterSpec([]);
+    }, [
+      setQuickFilterVendors,
+      setQuickFilterFrameworks,
+      setQuickFilterDeployment,
+      setQuickFilterSpec,
+    ]);
     const hasOffloadHalo = useMemo(() => data.some((point) => point.offload_mode === 'on'), [data]);
 
     // Shared date+GPU pairs. `dates` holds comparison-series entries (plain dates
@@ -805,8 +821,22 @@ const GPUGraph = React.memo(
               <p className="text-xs">
                 Please change the model, sequence, precision, date range or chip selection.
               </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-4"
+                data-testid="gpu-empty-quick-filters"
+                onClick={() => {
+                  setQuickFiltersOpen(true);
+                  track('inference_quick_filters_dialog_opened', { source: 'timeline_empty' });
+                }}
+              >
+                {legendT.quickFilters(quickFilterCount)}
+              </Button>
             </div>
           </div>
+          <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
         </div>
       );
     }
@@ -1095,6 +1125,7 @@ const GPUGraph = React.memo(
                 label: legendT.resetFilter,
                 onClick: () => {
                   selectAllActiveDates();
+                  clearQuickFilters();
                   track('gpu_timeseries_reset_filter');
                 },
               },
