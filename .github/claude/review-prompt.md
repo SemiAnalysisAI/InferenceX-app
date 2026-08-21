@@ -97,7 +97,7 @@ The `/zh` side is hand-authored. **If the complete diff touches any user-visible
 
 Read `docs/chinese-copy.md` completely. Review the full UI element or paragraph together with its English source, intended meaning, surface, and rendered context. Evaluate semantic fidelity and natural Chinese as independent gates; fluent Chinese that changes the source is still wrong.
 
-**Comment as a suggestion, not a block while the skill says `Operating mode: advisory`.** The Chinese maintainer makes the final wording decision. The existing repository rules remain blocking: newly added user-visible English without Chinese, and an English page changed without its `/zh` sibling.
+**Chinese-copy findings are always non-blocking while the skill says `Operating mode: advisory`.** Do not label them `🔴 BLOCKING`, submit a request-changes review for them, or otherwise hold another contributor's merge. If a Chinese-copy issue is serious enough that it would normally warrant blocking, label it `Needs Chinese maintainer confirmation`, mention `@edwingao28`, and ask for review. It remains a suggestion; the Chinese maintainer decides whether any follow-up is needed.
 
 Worth a suggestion:
 

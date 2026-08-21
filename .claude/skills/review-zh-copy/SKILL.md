@@ -7,12 +7,14 @@ description: Review user-visible Simplified Chinese changes in InferenceX for se
 
 ## Operating mode: advisory
 
-Report editorial findings as suggestions, not merge blockers. Missing Chinese for newly added
-user-visible English and unsynchronized English/Chinese sibling pages remain blocking under the
-repository rules; this skill's judgment about wording does not.
+Every finding produced by this skill is non-blocking. Do not label a Chinese-copy finding
+`BLOCKING`, submit a request-changes review for it, or otherwise hold another contributor's merge.
+If an issue is serious enough that it would normally warrant blocking, label it
+`Needs Chinese maintainer confirmation`, mention `@edwingao28`, and ask for review. It remains a
+suggestion while the Chinese maintainer decides whether any follow-up is needed.
 
 The Chinese maintainer makes the final wording decision and manually reviews every changed
-Chinese passage before merge.
+Chinese passage.
 
 ## Editorial source of truth
 

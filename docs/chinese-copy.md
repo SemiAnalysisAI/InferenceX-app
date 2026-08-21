@@ -114,17 +114,21 @@ surface and reason in the PR or add a reviewed example here.
    changed Chinese passage.
 2. Claude loads `review-zh-copy`, evaluates semantic fidelity and natural Chinese separately,
    and reports complete suggested replacements rather than isolated word swaps.
-3. While the skill is advisory, its findings are review input rather than merge blockers.
+3. The skill's findings never block another contributor's merge. Claude must not label a
+   Chinese-copy finding `BLOCKING` or submit a request-changes review for it. If an issue is serious
+   enough that it would normally warrant blocking, Claude labels it
+   `Needs Chinese maintainer confirmation`, mentions `@edwingao28`, and asks for review.
 4. The Chinese-speaking maintainer manually reads every changed sentence and makes the final
-   editorial decision before merge. Attributed quotations receive an explicit attribution-and-
-   voice check.
+   editorial decision. Attributed quotations receive an explicit attribution-and-voice check.
 
 5. 作者为每段改动的中文提供英文原文、核心意思和实际页面上下文。
 6. Claude 加载 `review-zh-copy`，分别检查语义准确度和中文自然度，并给出完整改写，
    而不是只替换孤立词语。
-7. skill 的 finding 只是人工审核的输入，不作为合并阻断条件。
-8. 合并前，由中文维护者逐句人工审阅并作出最终编辑决定；署名引用还要单独核对署名、
-   观点和说话者语气。
+7. skill 的 finding 不阻断其他贡献者合并。Claude 不得把中文文案 finding 标为
+   `BLOCKING`，也不得因此提交 request-changes review。如果某项问题严重到通常需要阻断，
+   则标为 `Needs Chinese maintainer confirmation`，并 `@edwingao28` 请中文维护者审核。
+8. 中文维护者逐句人工审阅并作出最终编辑决定；署名引用还要单独核对署名、观点和说话者
+   语气。
 
 ## Pull request checklist / PR 审核清单
 
@@ -154,10 +158,12 @@ It must not decide fluency, sentence structure, register, or contextual pronoun 
 确定性 CI 只适合检查与上下文无关的规则，例如标点、受保护标识符、字典完整性，以及确实
 只有一种正确写法的术语。流畅度、句法、语域和第二人称选择不得交给机械规则判定。
 
-The `review-zh-copy` skill assists the judgment layer and stays advisory; the Chinese maintainer
-makes the final decision. Separately verified mechanical cases from #819 may enter deterministic
-CI fixtures in #820, but editorial rewrites are never automatic ground truth.
+The `review-zh-copy` skill assists the judgment layer and stays non-blocking. Serious findings
+mention `@edwingao28` for review instead of holding another contributor's merge, and the Chinese
+maintainer makes the final wording decision. Separately verified mechanical cases from #819 may
+enter deterministic CI fixtures in #820, but editorial rewrites are never automatic ground truth.
 
-`review-zh-copy` skill 用于辅助判断性审核，并保持建议模式；最终决定由中文维护者作出。
-#819 中经过单独验证的机械案例可以进入 #820 的确定性 CI fixtures，但编辑性改写不得自动
-视为标准答案。
+`review-zh-copy` skill 用于辅助判断性审核，并保持非阻断模式。严重 finding 应
+`@edwingao28` 请中文维护者审核，而不是阻止其他贡献者合并；最终文案决定由中文维护者
+作出。#819 中经过单独验证的机械案例可以进入 #820 的确定性 CI fixtures，但编辑性改写
+不得自动视为标准答案。
