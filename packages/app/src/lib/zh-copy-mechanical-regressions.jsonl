@@ -1,0 +1,9 @@
+{"rule": "chip-untranslated", "kind": "regression", "before": "- 在目标延迟下，每颗 Chip 能提供多少 output 吞吐量？", "after": "- 在目标延迟下，每颗芯片能提供多少 output 吞吐量？", "note": "blog prose, content/blog/zh/agentic-benchmark-agent-benchmark-guide.mdx"}
+{"rule": "chip-untranslated", "kind": "regression", "before": "'分离式配置按解码 Chip 或预填充 Chip 报告吞吐量，而非按 Chip 总数。'", "after": "'分离式配置按解码芯片或预填充芯片报告吞吐量，而非按芯片总数。'", "note": "disagg caveat banner; three occurrences on one line"}
+{"rule": "chip-untranslated", "kind": "exemption", "text": "`${i.aLabel} 吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本 …`", "note": "unit — AGENTS.md rule 6 keeps units in English"}
+{"rule": "chip-untranslated", "kind": "exemption", "text": "'吞吐量（token/s/chip）'", "note": "expanded spelling of the same unit also stays English"}
+{"rule": "chip-untranslated", "kind": "exemption", "text": "'$/M = TCO（$/chip-hour）× 1,000,000 /（3600 × tok/s/chip）'", "note": "unit inside a formula"}
+{"rule": "chip-untranslated", "kind": "exemption", "text": "const powerLabel = locale === 'zh' ? '全含功率/芯片：' : 'All in Power/Chip:';", "note": "the English sibling on a bilingual ternary must not be rewritten — this exact line was broken once by a line-level scan, which is why segmentation is per string literal"}
+{"rule": "hardcoded-english-label", "kind": "regression", "before": "`<div><strong>Concurrency:</strong> ${d.concurrency}</div>`", "after": "`<div><strong>${t.concurrency}：</strong> ${d.concurrency}</div>`", "note": "chart tooltip shipped 16 of these; a /zh reader saw them beside 投机解码：关闭"}
+{"rule": "hardcoded-english-label", "kind": "exemption", "text": "`<div><strong>TP:</strong> ${d.tp}</div>`", "note": "acronym — stays English"}
+{"rule": "hardcoded-english-label", "kind": "exemption", "text": "`<div><strong>tok/s/MW:</strong> ${d.perMw}</div>`", "note": "unit — stays English"}
