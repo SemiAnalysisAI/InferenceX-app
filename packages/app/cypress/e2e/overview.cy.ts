@@ -25,7 +25,7 @@ const SINGLE_TURN = 'single_turn_8k1k';
 const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
-const AGENTX_LABEL_ZH = '长上下文多轮真实智能体场景（AgentX）';
+const AGENTX_LABEL_ZH = '长上下文、多轮交互的真实智能体场景（AgentX）';
 /** Shared by both locales: the scenario is named after its acronym. */
 const AGENTX_SHORT = 'AgentX';
 
@@ -36,7 +36,7 @@ const SOURCE_NOTE_ZH = `来源：InferenceX 与 ${TCO_SOURCE_TITLE}`;
 const SCOPE_METRIC = 'Hyperscaler cost';
 const SCOPE_DIRECTION = '↓ Lower is better';
 const SCOPE_LINE = `${SCOPE_METRIC} · ${SCOPE_DIRECTION} · ${SOURCE_NOTE}`;
-const SCOPE_METRIC_ZH = '超大规模云（hyperscaler）成本';
+const SCOPE_METRIC_ZH = '超大规模云厂商成本';
 const SCOPE_DIRECTION_ZH = '↓ 越低越好';
 const SCOPE_LINE_ZH = `${SCOPE_METRIC_ZH} · ${SCOPE_DIRECTION_ZH} · ${SOURCE_NOTE_ZH}`;
 
@@ -484,7 +484,7 @@ describe('Overview page', () => {
     desktopModel('gpt-oss-120b')
       .find('[data-testid="overview-model-category-badge"]')
       .should('contain.text', '已弃用')
-      .and('contain.text', '该模型已不再进行活跃基准测试。');
+      .and('contain.text', '目前已不再对该模型进行持续基准测试。');
   });
 
   it('uses a selectable hardware reference and preserves it across overview controls', () => {
@@ -590,8 +590,17 @@ describe('Overview page', () => {
           .should('have.attr', 'aria-current', 'true')
           .and('have.text', '对比 1 个月前');
       });
-    cy.contains('当前成本及其相对 30–60 天前最近一次有效平台结果的变化。').should('exist');
-    cy.contains('缺少有效 30 天对比的平台仅显示当前成本。').should('exist');
+    // The prose is editorial; the stable contract is that both history notes
+    // render the selected window while the caption also renders its upper bound.
+    cy.get('[data-testid="overview-methodology"] p')
+      .eq(0)
+      .should('be.visible')
+      .and('contain.text', '30')
+      .should('contain.text', '60');
+    cy.get('[data-testid="overview-methodology"] p')
+      .eq(1)
+      .should('be.visible')
+      .and('contain.text', '30');
   });
 
   it('keeps client-only presentation intent across selectors without forcing fullscreen on load', () => {
@@ -1680,9 +1689,9 @@ describe('Overview page', () => {
       .should('have.attr', 'href', '/zh/overview')
       .and('contain.text', '总览');
     cy.contains('h1', PAGE_TITLE_ZH).should('exist');
-    cy.contains('按各模型标注的场景，基于各平台最佳观测服务包络线计算每百万总 token 成本').should(
-      'exist',
-    );
+    cy.contains(
+      '根据各模型标注的测试场景，采用各平台实测的最优服务包络线，计算每百万总 token 成本',
+    ).should('exist');
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);
     cy.get('[data-testid="overview-source-link"]')
       .should('have.text', TCO_SOURCE_TITLE)
@@ -1704,11 +1713,11 @@ describe('Overview page', () => {
       )
       .as('estimatedB200')
       .invoke('attr', 'title')
-      .should('include', '根据已验证的基准运行结果估算。')
+      .should('include', '根据已验证的基准测试结果估算。')
       .and('include', '原始数据仪表板：DeepSeek V4 Pro 1.6T · B200 · SGLang · FP4 · MTP');
     cy.get('@estimatedB200')
       .invoke('attr', 'aria-label')
-      .should('include', '约 $0.059。根据已验证的基准运行结果估算。');
+      .should('include', '约 $0.059。根据已验证的基准测试结果估算。');
     cy.get('@estimatedB200').should('have.text', '$0.059');
     cy.get('@estimatedB200')
       .should('have.attr', 'href')
@@ -1753,7 +1762,7 @@ describe('Overview page', () => {
         '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
       ).should('have.text', '$0.064');
     });
-    cy.contains('若某款芯片不支持 FP4 推测解码，则采用次优的可用配置。').should('exist');
+    cy.contains('如果某款芯片没有可用的 FP4 投机解码配置，则改用次优配置。').should('exist');
 
     cy.visit('/zh/overview?tier=100');
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);

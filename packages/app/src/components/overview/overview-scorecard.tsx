@@ -162,13 +162,13 @@ export const OVERVIEW_STRINGS = {
   },
   zh: {
     title: '智能体推理成本',
-    scopeMetric: '超大规模云（hyperscaler）成本',
+    scopeMetric: '超大规模云厂商成本',
     scopeDirection: '↓ 越低越好',
-    scopeAria: '超大规模云（hyperscaler）每百万总 token 成本，越低越好。',
+    scopeAria: '每百万总 token 的超大规模云厂商（hyperscaler）成本，越低越好。',
     sourcePrefix: '来源：InferenceX 与 ',
     sourceLinkText: TCO_SOURCE_TITLE,
     tierNavLabel: 'SLO',
-    tierUnit: 'tok/s/用户',
+    tierUnit: 'tok/s/user',
     engineScopeNavLabel: '引擎范围',
     engineScopeOptions: {
       all: '所有平台',
@@ -187,13 +187,13 @@ export const OVERVIEW_STRINGS = {
     historyWindowSelectAria: '对比时间窗口',
     hardwareComparisonLabel: (reference: string) => `对比 ${reference}`,
     referenceSelectorAria: '基准硬件',
-    caption: '按各模型标注的场景，基于各平台最佳观测服务包络线计算每百万总 token 成本。',
+    caption: '根据各模型标注的测试场景，采用各平台实测的最优服务包络线，计算每百万总 token 成本。',
     historyCaption: (days: number) =>
-      `当前成本及其相对 ${days}–${days * 2} 天前最近一次有效平台结果的变化。`,
+      `当前成本，以及相较于 ${days}–${days * 2} 天前该平台最近一次有效结果的变化。`,
     modelHeader: '模型 · 场景',
     scenarioLabels: {
       single_turn_8k1k: '8K/1K',
-      agentx: '长上下文多轮真实智能体场景（AgentX）',
+      agentx: '长上下文、多轮交互的真实智能体场景（AgentX）',
     },
     scenarioLabelsShort: {
       single_turn_8k1k: '8K/1K',
@@ -209,8 +209,8 @@ export const OVERVIEW_STRINGS = {
       `打开 ${evidenceDate} 原始数据仪表板：${modelLabel} · ${stack}`,
     estimatedTooltip: (topologies: readonly string[]) =>
       topologies.length === 0
-        ? '根据已验证的基准运行结果估算。'
-        : `根据已验证的 ${topologies.join(' 与 ')} 运行结果估算。`,
+        ? '根据已验证的基准测试结果估算。'
+        : `根据已验证的 ${topologies.join(' 与 ')} 测试结果估算。`,
     estimatedAria: (value: string, explanation: string) => `约 ${value}。${explanation}`,
     cellStateLegend: (reference: string) => `— = 无结果。∞ = 缺少 ${reference} 基线。`,
     missingReasons: (tier: number): Record<string, string> => ({
@@ -220,13 +220,13 @@ export const OVERVIEW_STRINGS = {
       no_exact_at_tier: `无精确 @${tier} 结果`,
     }),
     standardDecodeLabel: 'STP',
-    methodologyNote: '若某款芯片不支持 FP4 推测解码，则采用次优的可用配置。',
+    methodologyNote: '如果某款芯片没有可用的 FP4 投机解码配置，则改用次优配置。',
     costDeltaAria: (pct: string, cheaper: boolean, reference: string) =>
-      `比 ${reference} ${cheaper ? '便宜' : '昂贵'} ${pct}`,
+      `成本比 ${reference} ${cheaper ? '低' : '高'} ${pct}`,
     costDeltaEvenAria: (reference: string) => `与 ${reference} 成本基本持平`,
     noBaselineAria: (reference: string) => `缺少可比较的 ${reference} 基线`,
     historicalDeltaAria: (pct: string, cheaper: boolean, baselineDate: string) =>
-      `比该平台 ${baselineDate} 的结果${cheaper ? '便宜' : '昂贵'} ${pct}`,
+      `成本比该平台 ${baselineDate} 的结果${cheaper ? '低' : '高'} ${pct}`,
     historicalEvenAria: (baselineDate: string) => `与该平台 ${baselineDate} 的结果成本基本持平`,
     historyCellStateLegend: (days: number) => `缺少有效 ${days} 天对比的平台仅显示当前成本。`,
     referenceHeader: '基准',
@@ -234,11 +234,11 @@ export const OVERVIEW_STRINGS = {
     modelScopeShow: '显示已弃用与维护模式模型',
     modelScopeHide: '隐藏已弃用与维护模式模型',
     rowScopeNavLabel: (days: number) => `${days} 天内无变化的行`,
-    rowScopeShow: (count: number, days: number) => `显示 ${count} 行 ${days} 天内无变化的数据`,
-    rowScopeHide: (count: number, days: number) => `隐藏 ${count} 行 ${days} 天内无变化的数据`,
+    rowScopeShow: (count: number, days: number) => `显示过去 ${days} 天无变化的 ${count} 行数据`,
+    rowScopeHide: (count: number, days: number) => `隐藏过去 ${days} 天无变化的 ${count} 行数据`,
     hardwareRowScopeNavLabel: '无结果的行',
-    hardwareRowScopeShow: (count: number) => `显示 ${count} 行所有平台均无结果的数据`,
-    hardwareRowScopeHide: (count: number) => `隐藏 ${count} 行所有平台均无结果的数据`,
+    hardwareRowScopeShow: (count: number) => `显示所有平台均无结果的 ${count} 行数据`,
+    hardwareRowScopeHide: (count: number) => `隐藏所有平台均无结果的 ${count} 行数据`,
     rowScopeChipHide: '隐藏无变化',
     rowScopeChipShow: '显示全部行',
     hardwareRowScopeChipHide: '隐藏空行',
@@ -254,7 +254,7 @@ export const OVERVIEW_STRINGS = {
       maintenance: '维护模式',
       deprecated: '已弃用',
     } as Partial<Record<string, string>>,
-    categoryBadgeTitle: '该模型已不再进行活跃基准测试。',
+    categoryBadgeTitle: '目前已不再对该模型进行持续基准测试。',
     loadingStatus: '正在加载所选对比…',
     navigationError: '无法加载所选对比，当前显示的是上次成功加载的数据。',
     emptyState: '没有符合当前筛选条件的总览结果。',
