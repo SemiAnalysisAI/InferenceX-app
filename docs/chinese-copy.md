@@ -121,13 +121,15 @@ surface and reason in the PR or add a reviewed example here.
 4. The Chinese-speaking maintainer manually reads every changed sentence and makes the final
    editorial decision. Attributed quotations receive an explicit attribution-and-voice check.
 
-5. 作者为每段改动的中文提供英文原文、核心意思和实际页面上下文。
-6. Claude 加载 `review-zh-copy`，分别检查语义准确度和中文自然度，并给出完整改写，
+中文步骤：
+
+1. 作者为每段改动的中文提供英文原文、核心意思和实际页面上下文。
+2. Claude 加载 `review-zh-copy`，分别检查语义准确度和中文自然度，并给出完整改写，
    而不是只替换孤立词语。
-7. skill 的 finding 不阻断其他贡献者合并。Claude 不得把中文文案 finding 标为
+3. skill 的 finding 不阻断其他贡献者合并。Claude 不得把中文文案 finding 标为
    `BLOCKING`，也不得因此提交 request-changes review。如果某项问题严重到通常需要阻断，
    则标为 `Needs Chinese maintainer confirmation`，并 `@edwingao28` 请中文维护者审核。
-8. 中文维护者逐句人工审阅并作出最终编辑决定；署名引用还要单独核对署名、观点和说话者
+4. 中文维护者逐句人工审阅并作出最终编辑决定；署名引用还要单独核对署名、观点和说话者
    语气。
 
 ## Pull request checklist / PR 审核清单

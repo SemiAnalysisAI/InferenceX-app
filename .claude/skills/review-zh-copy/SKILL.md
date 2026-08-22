@@ -1,6 +1,6 @@
 ---
 name: review-zh-copy
-description: Review user-visible Simplified Chinese changes in InferenceX for semantic fidelity and natural technical Chinese. Use for PRs or diffs that touch Chinese anywhere, including refactors and files whose names do not contain zh.
+description: Use when reviewing PRs or diffs that add or modify user-visible Simplified Chinese in InferenceX, including refactors and files whose names do not contain zh.
 ---
 
 # Review Simplified Chinese copy
