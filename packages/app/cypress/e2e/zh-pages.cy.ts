@@ -62,6 +62,9 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="footer-link-agentx"]')
         .should('contain.text', 'AgentX')
         .and('have.attr', 'href', '/zh/agentx');
+      cy.get('[data-testid="footer-link-about"]')
+        .should('have.text', '关于 SemiAnalysis')
+        .and('have.attr', 'href', 'https://semianalysis.com/about/');
       cy.get('[data-testid="footer-link-articles"]')
         .should('contain.text', '文章')
         .and('have.attr', 'href', '/zh/blog');

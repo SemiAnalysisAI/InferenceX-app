@@ -45,7 +45,7 @@ const STRINGS = {
     semianalysis: 'SemiAnalysis',
     mainSite: 'SemiAnalysis 官网',
     newsletter: '订阅通讯',
-    about: '关于 InferenceX',
+    about: '关于 SemiAnalysis',
     legal: '法律信息',
     landAcknowledgement: '原住民传统领地声明',
     privacyPolicy: '隐私政策',
