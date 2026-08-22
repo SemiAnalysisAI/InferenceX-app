@@ -709,6 +709,26 @@ export interface ScatterGraphProps {
    */
   showAllHardwareTypes?: boolean;
   /**
+   * Optional display-color alias for official hardware series. Replay maps a
+   * historical Best per SKU winner to the current parent winner for the same
+   * physical SKU so the SKU keeps one stable color while its config changes.
+   */
+  hardwareColorKeyMap?: ReadonlyMap<string, string>;
+  /**
+   * Optional stable identity alias for official rooflines. Best per SKU replay
+   * maps every historical winner for one physical SKU to the same identity so
+   * deterministic frame geometry updates the existing line when the winning
+   * config changes.
+   */
+  hardwareSeriesKeyMap?: ReadonlyMap<string, string>;
+  /**
+   * Whether this chart should reconcile Best per SKU selections back into the
+   * shared inference context. Replay disables this because its winner set is
+   * intentionally recomputed for every historical frame; committing a past
+   * frame's winners would incorrectly change the live parent chart.
+   */
+  syncBestPerSkuSelection?: boolean;
+  /**
    * Optional hardware configuration override. When provided, this is used instead of the context's
    * hardwareConfig. Used for unofficial run visualization where hardware types may differ.
    */
@@ -720,8 +740,8 @@ export interface ScatterGraphProps {
   overlayData?: OverlayData;
   /**
    * D3 transition duration in ms used when data or scales change. Defaults to
-   * the regular interactive value (750). The replay panel passes 0 so frames
-   * snap to interpolated positions instead of fighting a 750ms tween.
+   * the regular interactive value (750). Replay passes 0 because its motion is
+   * encoded directly into deterministic frame data for MP4 parity.
    */
   transitionDuration?: number;
   /**

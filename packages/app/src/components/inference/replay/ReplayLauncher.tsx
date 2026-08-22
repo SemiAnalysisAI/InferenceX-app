@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { forwardRef, useImperativeHandle, useState } from 'react';
 
-import type { ChartDefinition } from '@/components/inference/types';
+import type { ChartDefinition, OverlayData } from '@/components/inference/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -21,6 +21,7 @@ interface ReplayLauncherProps {
   chartDefinition: ChartDefinition;
   yLabel: string;
   xLabel: string;
+  overlayData?: OverlayData;
 }
 
 export interface ReplayLauncherHandle {
@@ -33,7 +34,7 @@ export interface ReplayLauncherHandle {
  * keeping mp4-muxer and html-to-image out of the main inference bundle.
  */
 const ReplayLauncher = forwardRef<ReplayLauncherHandle, ReplayLauncherProps>(
-  ({ parentChartId, chartDefinition, yLabel, xLabel }, ref) => {
+  ({ parentChartId, chartDefinition, yLabel, xLabel, overlayData }, ref) => {
     const [open, setOpen] = useState(false);
     useImperativeHandle(ref, () => ({ open: () => setOpen(true) }), []);
     return (
@@ -49,6 +50,7 @@ const ReplayLauncher = forwardRef<ReplayLauncherHandle, ReplayLauncherProps>(
               chartDefinition={chartDefinition}
               yLabel={yLabel}
               xLabel={xLabel}
+              overlayData={overlayData}
             />
           )}
         </DialogContent>

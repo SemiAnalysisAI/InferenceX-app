@@ -1018,6 +1018,13 @@ export default function ChartDisplay() {
                         chartDefinition={graph.chartDefinition}
                         yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                         xLabel={graph.chartDefinition.x_label}
+                        overlayData={
+                          selectUnofficialOverlayForMode(
+                            selectedXAxisMode,
+                            graph.chartDefinition.chartType,
+                            overlayDataByChartType,
+                          ) ?? undefined
+                        }
                       />
                     )}
                   </Card>

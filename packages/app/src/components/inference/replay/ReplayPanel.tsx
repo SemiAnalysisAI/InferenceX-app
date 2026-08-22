@@ -8,7 +8,9 @@ import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
 import { useInference } from '@/components/inference/InferenceContext';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
-import type { ChartDefinition } from '@/components/inference/types';
+import type { ChartDefinition, InferenceData, OverlayData } from '@/components/inference/types';
+import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
+import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -21,12 +23,23 @@ import {
 } from '@/components/ui/select';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { track } from '@/lib/analytics';
+import type { ParetoDirection } from '@/lib/chart-utils';
 import { Sequence } from '@/lib/data-mappings';
 import { cn } from '@/lib/utils';
 
-import { buildReplayTimeline, computeFullRunDomain } from './buildReplayTimeline';
+import { buildReplayTimeline } from './buildReplayTimeline';
 import type { Mp4ExportError, Mp4ExportStage } from './exportMp4';
-import { buildFrameData, dateAtFraction, shouldCommitFraction, spanMs } from './replayFrameData';
+import {
+  buildFrameData,
+  buildReplayColorKeyMap,
+  buildReplayOverlayData,
+  computeReplayDomain,
+  dateAtFraction,
+  replayExportDurationSec,
+  replayPointsDomain,
+  shouldCommitFraction,
+  spanMs,
+} from './replayFrameData';
 import { useReducedMotion } from './useReducedMotion';
 
 type Mp4ExportGuard = (value: unknown) => value is Mp4ExportError;
@@ -46,9 +59,12 @@ interface ReplayPanelProps {
   chartDefinition: ChartDefinition;
   yLabel: string;
   xLabel: string;
+  overlayData?: OverlayData;
 }
 
-const SPEED_OPTIONS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+const STANDARD_SPEED_OPTIONS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+const BEST_PER_SKU_SPEED_OPTIONS: readonly number[] = [...STANDARD_SPEED_OPTIONS, 3, 4, 5];
+const MP4_EXPORT_FPS = 30;
 const REPLAY_BODY_MIN_HEIGHT = 480;
 
 /**
@@ -64,9 +80,19 @@ export default function ReplayPanel({
   chartDefinition,
   yLabel,
   xLabel,
+  overlayData,
 }: ReplayPanelProps) {
   const inference = useInference();
-  const { selectedModel, selectedSequence, activeHwTypes } = inference;
+  const {
+    selectedModel,
+    selectedSequence,
+    activeHwTypes,
+    bestPerSku,
+    quickFilters,
+    selectedPrecisions,
+    selectedYAxisMetric,
+  } = inference;
+  const { activeOverlayHwTypes } = useUnofficialRun();
 
   const { isl = 0, osl = 0 } = sequenceToIslOsl(selectedSequence) ?? {};
   const history = useBenchmarkHistory(
@@ -98,14 +124,73 @@ export default function ReplayPanel({
     inference.selectedPrecisions,
   ]);
 
-  // Fixed axes for the whole run: take the extent across every step (not just
-  // the current frame) for the active hardware, so the axes stay put and the
-  // frontier visibly expands toward them over time instead of the chart
-  // refitting each frame. Recomputed when the legend's hw filter changes.
-  const fixedExtent = useMemo(
-    () => (timeline ? computeFullRunDomain(timeline, (hw) => activeHwTypes.has(hw)) : null),
-    [timeline, activeHwTypes],
+  const rooflineDirection = useMemo(() => {
+    const value = chartDefinition[`${selectedYAxisMetric}_roofline` as keyof ChartDefinition] as
+      | ParetoDirection
+      | undefined;
+    return value === 'upper_right' ||
+      value === 'upper_left' ||
+      value === 'lower_left' ||
+      value === 'lower_right'
+      ? value
+      : undefined;
+  }, [chartDefinition, selectedYAxisMetric]);
+  const dynamicBestPerSku = bestPerSku && rooflineDirection !== undefined;
+  const replayColorKeyMap = useMemo(
+    () =>
+      timeline && dynamicBestPerSku ? buildReplayColorKeyMap(timeline, activeHwTypes) : undefined,
+    [timeline, dynamicBestPerSku, activeHwTypes],
   );
+
+  const replayPointMatchesFilters = useCallback(
+    (point: InferenceData) => matchesQuickFilters(point, quickFilters),
+    [quickFilters],
+  );
+
+  // Fixed axes span only rows that can appear in this replay. In Best per SKU
+  // mode the winner is recomputed at every observed date, so historical winner
+  // changes are included instead of freezing the latest chart's hwKey set.
+  const fixedExtent = useMemo(() => {
+    if (!timeline) return null;
+    const official = computeReplayDomain(timeline, {
+      pointFilter: (point) =>
+        replayPointMatchesFilters(point) &&
+        (dynamicBestPerSku || activeHwTypes.has(String(point.hwKey))),
+      bestPerSku: dynamicBestPerSku,
+      direction: rooflineDirection,
+    });
+
+    if (!overlayData) return official;
+    const overlayPoints = buildReplayOverlayData(overlayData, {
+      currentDate: '\uFFFF',
+      selectedPrecisions,
+      activeHwTypes: activeOverlayHwTypes,
+      pointFilter: replayPointMatchesFilters,
+      bestPerSku: dynamicBestPerSku,
+      direction: rooflineDirection,
+    }).data;
+    if (overlayPoints.length === 0) return official;
+    const overlay = replayPointsDomain(overlayPoints);
+    return {
+      x: [Math.min(official.x[0], overlay.x[0]), Math.max(official.x[1], overlay.x[1])] as [
+        number,
+        number,
+      ],
+      y: [Math.min(official.y[0], overlay.y[0]), Math.max(official.y[1], overlay.y[1])] as [
+        number,
+        number,
+      ],
+    };
+  }, [
+    timeline,
+    replayPointMatchesFilters,
+    dynamicBestPerSku,
+    activeHwTypes,
+    rooflineDirection,
+    overlayData,
+    selectedPrecisions,
+    activeOverlayHwTypes,
+  ]);
 
   // Track the SVG's position inside our relative wrapper so the date overlay
   // can anchor its bottom-right to the chart plot's top-right (the wrapper
@@ -188,6 +273,13 @@ export default function ReplayPanel({
   const abortRef = useRef<AbortController | null>(null);
 
   const prefersReducedMotion = useReducedMotion();
+  const speedOptions = dynamicBestPerSku ? BEST_PER_SKU_SPEED_OPTIONS : STANDARD_SPEED_OPTIONS;
+
+  // The extended speeds belong to Best per SKU replay. If that mode is
+  // disabled while the panel is open, return to the regular replay ceiling.
+  useEffect(() => {
+    if (!dynamicBestPerSku && speed > 2) setSpeed(2);
+  }, [dynamicBestPerSku, speed]);
 
   // Pre-flight feature detection so the Export button is disabled with a clear
   // reason on browsers that lack WebCodecs (Firefox today, older Safari).
@@ -225,7 +317,7 @@ export default function ReplayPanel({
     if (!playing || !timeline) return;
     // Reduced motion: advance one observed step per ~1.2s without per-frame
     // interpolation, so users get a slideshow rather than continuous motion.
-    if (prefersReducedMotion) {
+    if (prefersReducedMotion && !dynamicBestPerSku) {
       const stepMs = 1200 / Math.max(0.1, speedRef.current);
       const n = timeline.dates.length;
       const intervalId = window.setInterval(() => {
@@ -272,7 +364,7 @@ export default function ReplayPanel({
       if (rafId !== 0) cancelAnimationFrame(rafId);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [playing, timeline, prefersReducedMotion]);
+  }, [playing, timeline, prefersReducedMotion, dynamicBestPerSku]);
 
   useEffect(() => {
     fractionRef.current = 0;
@@ -281,14 +373,42 @@ export default function ReplayPanel({
   }, [timeline]);
 
   const frameData = useMemo(
-    () => (timeline ? buildFrameData(timeline, fraction) : []),
-    [timeline, fraction],
+    () =>
+      timeline
+        ? buildFrameData(timeline, fraction, {
+            pointFilter: replayPointMatchesFilters,
+            bestPerSku: dynamicBestPerSku,
+            direction: rooflineDirection,
+            animateBestPerSku: dynamicBestPerSku,
+          })
+        : [],
+    [timeline, fraction, replayPointMatchesFilters, dynamicBestPerSku, rooflineDirection],
   );
 
   const currentDate = useMemo(
     () => (timeline ? dateAtFraction(timeline, fraction) : ''),
     [timeline, fraction],
   );
+
+  const replayOverlayData = useMemo(() => {
+    if (!overlayData) return undefined;
+    return buildReplayOverlayData(overlayData, {
+      currentDate,
+      selectedPrecisions,
+      activeHwTypes: activeOverlayHwTypes,
+      pointFilter: replayPointMatchesFilters,
+      bestPerSku: dynamicBestPerSku,
+      direction: rooflineDirection,
+    });
+  }, [
+    overlayData,
+    currentDate,
+    selectedPrecisions,
+    replayPointMatchesFilters,
+    activeOverlayHwTypes,
+    dynamicBestPerSku,
+    rooflineDirection,
+  ]);
 
   const handlePlayPause = useCallback(() => {
     if (playing) {
@@ -384,23 +504,25 @@ export default function ReplayPanel({
       const mod = await import('./exportMp4');
       const { exportReplayMp4 } = mod;
       guard = mod.isMp4ExportError;
-      // Export duration is deterministic from timeline length, NOT playback speed
-      // — the MP4 is an artifact of the dataset, not a recording of the current
-      // UI session. Capped at 60s.
-      const durationSec = Math.max(2, Math.min(60, spanMs(timeline.dates.length) / 1000));
+      // Best per SKU explicitly offers faster playback, so its MP4 uses that
+      // speed too. Regular replay preserves the existing canonical duration.
+      const exportSpeed = dynamicBestPerSku ? speed : 1;
+      const durationSec = replayExportDurationSec(timeline.dates.length, exportSpeed);
       const root = panelRef.current;
       if (!root) throw new Error('Replay panel element is not mounted.');
       await exportReplayMp4({
         captureRoot: root,
         fileName: `InferenceX_${selectedModel}_${chartDefinition.chartType}_replay`,
+        fps: MP4_EXPORT_FPS,
         durationSec,
         signal: ac.signal,
         renderFrame: async (t) => {
-          // flushSync forces React to commit synchronously; two RAFs let the
-          // browser paint before the capture step reads back the DOM.
+          // flushSync commits React synchronously. One animation frame lets
+          // ScatterGraph's D3 effects update the SVG before capture without
+          // imposing two display-refresh waits on every encoded frame.
           flushSync(() => commitFraction(t, { force: true }));
           await new Promise<void>((resolve) => {
-            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+            requestAnimationFrame(() => resolve());
           });
         },
         onStage: (s) => {
@@ -408,7 +530,7 @@ export default function ReplayPanel({
         },
         onProgress: (p) => {
           lastProgressAt = performance.now();
-          frameCount = Math.round(p * durationSec * 30);
+          frameCount = Math.round(p * durationSec * MP4_EXPORT_FPS);
           setExportProgress(p);
         },
       });
@@ -462,7 +584,16 @@ export default function ReplayPanel({
       setExportProgress(null);
       abortRef.current = null;
     }
-  }, [chartDefinition.chartType, parentChartId, selectedModel, timeline, hasWebCodecs]);
+  }, [
+    chartDefinition.chartType,
+    parentChartId,
+    selectedModel,
+    timeline,
+    hasWebCodecs,
+    dynamicBestPerSku,
+    speed,
+    commitFraction,
+  ]);
 
   if (history.isLoading || !timeline) {
     return (
@@ -515,6 +646,11 @@ export default function ReplayPanel({
           xLabel={xLabel}
           yLabel={yLabel}
           chartDefinition={chartDefinition}
+          showAllHardwareTypes={dynamicBestPerSku}
+          hardwareColorKeyMap={replayColorKeyMap}
+          hardwareSeriesKeyMap={replayColorKeyMap}
+          syncBestPerSkuSelection={false}
+          overlayData={replayOverlayData}
           transitionDuration={0}
           niceAxes={false}
           pinLineLabels
@@ -581,7 +717,7 @@ export default function ReplayPanel({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {SPEED_OPTIONS.map((v) => (
+            {speedOptions.map((v) => (
               <SelectItem key={v} value={String(v)} data-testid={`replay-speed-${v}x`}>
                 {v}×
               </SelectItem>

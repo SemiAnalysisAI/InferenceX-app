@@ -544,6 +544,9 @@ const ScatterGraph = React.memo(
     chartDefinition,
     caption,
     showAllHardwareTypes = false,
+    hardwareColorKeyMap,
+    hardwareSeriesKeyMap,
+    syncBestPerSkuSelection = true,
     hardwareConfigOverride,
     overlayData,
     transitionDuration = 750,
@@ -774,7 +777,7 @@ const ScatterGraph = React.memo(
       [setLocalOfficialOverride, setActiveOverlayHwTypes, mergeScopedOverlaySelection],
     );
     useEffect(() => {
-      if (!overlayData || !bestPerSku || overlayScopeChanged) return;
+      if (!syncBestPerSkuSelection || !overlayData || !bestPerSku || overlayScopeChanged) return;
       const direction = chartDefinition[`${selectedYAxisMetric}_roofline` as keyof ChartDefinition];
       if (
         direction !== 'upper_right' &&
@@ -793,6 +796,7 @@ const ScatterGraph = React.memo(
       if (!setsEqual(rawUnifiedSelection, selection)) commitUnifiedSelection(selection);
     }, [
       overlayData,
+      syncBestPerSkuSelection,
       bestPerSku,
       overlayScopeChanged,
       chartDefinition,
@@ -879,12 +883,20 @@ const ScatterGraph = React.memo(
     // e.g. deselecting B300 would recolor B200 from red to blue). Keying off the
     // stable full set fixes each hw's color so toggling only hides/shows lines.
     const stableHcKeys = useMemo(() => [...hwTypesWithData], [hwTypesWithData]);
-    const { resolveColor, getCssColor } = useThemeColors({
+    const { resolveColor: resolveThemeColor, getCssColor } = useThemeColors({
       highContrast,
       identifiers: activeHwKeys,
       activeKeys: activeOfficialKeys,
       hcKeys: stableHcKeys,
     });
+    const resolveColor = useCallback(
+      (identifier: string, hardwareKey?: string) =>
+        resolveThemeColor(
+          hardwareColorKeyMap?.get(identifier) ?? identifier,
+          hardwareKey ? (hardwareColorKeyMap?.get(hardwareKey) ?? hardwareKey) : undefined,
+        ),
+      [resolveThemeColor, hardwareColorKeyMap],
+    );
 
     // --- Changelog ---
     const changelog = availableRuns ? availableRuns[selectedRunId]?.changelog || null : null;
@@ -1705,6 +1717,7 @@ const ScatterGraph = React.memo(
           // Build roofline entries with gradient or solid stroke
           interface Entry {
             key: string;
+            joinKey: string;
             hw: string;
             precision: string;
             points: InferenceData[];
@@ -1761,6 +1774,9 @@ const ScatterGraph = React.memo(
 
               entries.push({
                 key: entryKey,
+                joinKey: singleDate
+                  ? `${hardwareSeriesKeyMap?.get(hw) ?? hw}_${precision}`
+                  : `${hardwareSeriesKeyMap?.get(hw) ?? hw}_${precision}__${date}`,
                 hw,
                 precision,
                 points: datePoints,
@@ -1783,11 +1799,12 @@ const ScatterGraph = React.memo(
             .selectAll<SVGPathElement, Entry>('.roofline-path')
             .data(
               entries.filter((entry) => entry.points.length > 1),
-              (d) => d.key,
+              (d) => d.joinKey,
             )
             .join('path')
             .attr('class', (d) => `roofline-path roofline-${d.key}`)
             .attr('data-hw-key', (d) => d.hw)
+            .attr('data-series-key', (d) => d.joinKey)
             .attr('data-precision', (d) => d.precision)
             .attr('fill', 'none')
             .attr('stroke', (d) => d.stroke)
@@ -3132,6 +3149,7 @@ const ScatterGraph = React.memo(
       selectedYAxisMetric,
       chartDefinition,
       locale,
+      hardwareSeriesKeyMap,
     ]);
 
     // Layers handle for the decoration effect — lets it re-run individual
@@ -3567,7 +3585,7 @@ const ScatterGraph = React.memo(
                   checked: bestPerSku,
                   onCheckedChange: (checked: boolean) => {
                     setBestPerSku(checked);
-                    if (overlayData) {
+                    if (overlayData && syncBestPerSkuSelection) {
                       if (checked) {
                         const direction =
                           chartDefinition[

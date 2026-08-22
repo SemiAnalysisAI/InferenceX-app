@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import type { InferenceData } from '@/components/inference/types';
+import type { InferenceData, OverlayData } from '@/components/inference/types';
 
 import type { ReplayTimeline } from '../buildReplayTimeline';
 import {
   FRACTION_COMMIT_QUANTUM,
+  bestPerSkuMorphWindowFraction,
   buildFrameData,
+  buildReplayColorKeyMap,
+  buildReplayOverlayData,
+  computeReplayDomain,
   dateAtFraction,
+  replayExportDurationSec,
   shouldCommitFraction,
   spanMs,
   stepFloatAtFraction,
@@ -109,6 +114,29 @@ describe('spanMs', () => {
 
   it('respects a minimum of 4500ms once the floor kicks in', () => {
     expect(spanMs(5)).toBe(4500);
+  });
+});
+
+describe('replayExportDurationSec', () => {
+  it('reduces frame-producing duration at faster playback speeds', () => {
+    expect(replayExportDurationSec(95, 1)).toBe(30);
+    expect(replayExportDurationSec(95, 3)).toBe(10);
+    expect(replayExportDurationSec(95, 5)).toBe(6);
+    expect(replayExportDurationSec(5, 5)).toBe(0.9);
+  });
+
+  it('caps slow exports and ignores invalid playback speeds', () => {
+    expect(replayExportDurationSec(95, 0.25)).toBe(60);
+    expect(replayExportDurationSec(95, 0)).toBe(30);
+    expect(replayExportDurationSec(95, Number.NaN)).toBe(30);
+  });
+});
+
+describe('bestPerSkuMorphWindowFraction', () => {
+  it('allocates about 480ms of the MP4 timeline without overlapping adjacent dates', () => {
+    expect(bestPerSkuMorphWindowFraction(2)).toBeCloseTo(480 / 4500);
+    expect(bestPerSkuMorphWindowFraction(100)).toBeCloseTo(0.8 / 99);
+    expect(bestPerSkuMorphWindowFraction(1)).toBe(0);
   });
 });
 
@@ -269,5 +297,171 @@ describe('buildFrameData', () => {
       domain: { x: [0, 1], y: [0, 1] },
     };
     expect(buildFrameData(empty, 0.5)).toEqual([]);
+  });
+
+  it('recomputes Best per SKU for each frame and keeps a winner for every SKU', () => {
+    const series = (
+      configId: string,
+      hw: string,
+      hwKey: string,
+      x: number,
+      startY: number,
+      endY: number,
+    ) => ({
+      configId,
+      hwKey,
+      precision: 'fp8',
+      template: {
+        ...baseTemplate,
+        hw,
+        hwKey,
+        x,
+        y: startY,
+      } as InferenceData,
+      stepValues: [
+        { visible: true as const, x, y: startY },
+        { visible: true as const, x, y: endY },
+      ],
+    });
+    const changing: ReplayTimeline = {
+      dates: ['2025-09-01', '2025-09-02'],
+      configs: [
+        series('b200-a-1', 'B200-8', 'b200_engine_a', 10, 100, 50),
+        series('b200-a-2', 'B200-8', 'b200_engine_a', 20, 80, 40),
+        series('b200-b-1', 'B200-8', 'b200_engine_b', 10, 90, 110),
+        series('b200-b-2', 'B200-8', 'b200_engine_b', 20, 60, 90),
+        series('h100-a-1', 'H100-8', 'h100_engine_a', 10, 60, 65),
+        series('h100-a-2', 'H100-8', 'h100_engine_a', 20, 50, 55),
+      ],
+      domain: { x: [10, 20], y: [40, 110] },
+    };
+
+    const start = buildFrameData(changing, 0, {
+      bestPerSku: true,
+      direction: 'upper_left',
+    });
+    const end = buildFrameData(changing, 1, {
+      bestPerSku: true,
+      direction: 'upper_left',
+    });
+
+    expect(new Set(start.map((point) => point.hwKey))).toEqual(
+      new Set(['b200_engine_a', 'h100_engine_a']),
+    );
+    expect(new Set(end.map((point) => point.hwKey))).toEqual(
+      new Set(['b200_engine_b', 'h100_engine_a']),
+    );
+    expect(computeReplayDomain(changing, { bestPerSku: true, direction: 'upper_left' })).toEqual({
+      x: [10, 20],
+      y: [50, 110],
+    });
+    expect(buildReplayColorKeyMap(changing, new Set(['b200_engine_b', 'h100_engine_a']))).toEqual(
+      new Map([
+        ['b200_engine_a', 'b200_engine_b'],
+        ['b200_engine_b', 'b200_engine_b'],
+        ['h100_engine_a', 'h100_engine_a'],
+      ]),
+    );
+
+    // Regression: MP4 export captures deterministic replay fractions and does
+    // not wait for wall-clock D3 transitions. A frame shortly after the winner
+    // changes must therefore contain intermediate line geometry itself.
+    let switchFraction = 0;
+    for (let step = 1; step <= 1000; step++) {
+      const candidate = step / 1000;
+      const keys = new Set(
+        buildFrameData(changing, candidate, {
+          bestPerSku: true,
+          direction: 'upper_left',
+        }).map((point) => point.hwKey),
+      );
+      if (keys.has('b200_engine_b')) {
+        switchFraction = candidate;
+        break;
+      }
+    }
+    expect(switchFraction).toBeGreaterThan(0);
+
+    const morphFraction = switchFraction + bestPerSkuMorphWindowFraction(2) / 2;
+    const snapped = buildFrameData(changing, morphFraction, {
+      bestPerSku: true,
+      direction: 'upper_left',
+    });
+    const animated = buildFrameData(changing, morphFraction, {
+      bestPerSku: true,
+      direction: 'upper_left',
+      animateBestPerSku: true,
+    });
+    const snappedB200 = snapped
+      .filter((point) => point.hwKey === 'b200_engine_b')
+      .toSorted((a, b) => a.x - b.x);
+    const animatedB200 = animated
+      .filter((point) => point.hwKey === 'b200_engine_b')
+      .toSorted((a, b) => a.x - b.x);
+    expect(animatedB200).toHaveLength(snappedB200.length);
+    expect(animatedB200[0].y).not.toBeCloseTo(snappedB200[0].y);
+    expect(new Set(animated.map((point) => point.hwKey))).toEqual(
+      new Set(['b200_engine_b', 'h100_engine_a']),
+    );
+
+    const settledFraction = switchFraction + bestPerSkuMorphWindowFraction(2) * 1.1;
+    const settled = buildFrameData(changing, settledFraction, {
+      bestPerSku: true,
+      direction: 'upper_left',
+      animateBestPerSku: true,
+    });
+    expect(settled).toEqual(
+      buildFrameData(changing, settledFraction, {
+        bestPerSku: true,
+        direction: 'upper_left',
+      }),
+    );
+  });
+});
+
+describe('buildReplayOverlayData', () => {
+  const overlayPoint = (hw: string, hwKey: string, x: number, y: number): InferenceData =>
+    ({
+      ...baseTemplate,
+      hw,
+      hwKey,
+      x,
+      y,
+      date: '2025-09-02',
+      run_url: 'https://github.com/example/actions/runs/123',
+    }) as InferenceData;
+  const overlay = {
+    label: 'preview',
+    hardwareConfig: {},
+    data: [
+      overlayPoint('B200-8', 'b200_vllm', 10, 80),
+      overlayPoint('B200-8', 'b200_vllm', 20, 60),
+      overlayPoint('B200-8', 'b200_sglang', 10, 100),
+      overlayPoint('B200-8', 'b200_sglang', 20, 90),
+      overlayPoint('H100-8', 'h100_vllm', 10, 50),
+      overlayPoint('MI355X-8', 'mi355x_hidden', 10, 120),
+    ],
+  } as OverlayData;
+
+  it('date-gates overlays and preserves the best active series for every visible SKU', () => {
+    const beforeRun = buildReplayOverlayData(overlay, {
+      currentDate: '2025-09-01',
+      selectedPrecisions: ['fp8'],
+      activeHwTypes: new Set(['b200_vllm', 'b200_sglang', 'h100_vllm']),
+      bestPerSku: true,
+      direction: 'upper_left',
+    });
+    expect(beforeRun.data).toEqual([]);
+
+    const atRun = buildReplayOverlayData(overlay, {
+      currentDate: '2025-09-02',
+      selectedPrecisions: ['fp8'],
+      activeHwTypes: new Set(['b200_vllm', 'b200_sglang', 'h100_vllm']),
+      bestPerSku: true,
+      direction: 'upper_left',
+    });
+    expect(new Set(atRun.data.map((point) => point.hwKey))).toEqual(
+      new Set(['b200_sglang', 'h100_vllm']),
+    );
   });
 });
