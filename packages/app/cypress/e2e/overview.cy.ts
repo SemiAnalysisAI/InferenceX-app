@@ -526,6 +526,28 @@ describe('Overview page', () => {
     cy.get('[data-overview-comparison="hardware"]').should('contain.text', '对比 B300');
   });
 
+  it('sends one RSC request when a slow language switch preserves overview state', () => {
+    let zhOverviewRscRequests = 0;
+
+    cy.intercept('GET', '/zh/overview*', (request) => {
+      if (request.query._rsc === undefined && request.headers.rsc !== '1') return;
+
+      zhOverviewRscRequests += 1;
+      request.continue((response) => {
+        response.setDelay(600);
+      });
+    });
+
+    cy.visit('/overview?tier=100&ref=b300');
+    cy.get('[data-testid="language-toggle"]')
+      .should('have.attr', 'href', '/zh/overview?tier=100&ref=b300')
+      .click();
+
+    cy.location('pathname').should('eq', '/zh/overview');
+    cy.location('search').should('eq', '?tier=100&ref=b300');
+    cy.then(() => expect(zhOverviewRscRequests).to.equal(1));
+  });
+
   it('uses rack SKU labels when GB200 or GB300 is the comparison reference', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview?ref=gb200');
