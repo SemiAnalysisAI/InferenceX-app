@@ -36,6 +36,27 @@ const strings = {
   presentShortcutHint: 'Arrow keys switch views · Esc exits',
 } as unknown as OverviewStrings;
 
+describe('OVERVIEW_STRINGS.zh', () => {
+  it('preserves protected identifiers, units, and dynamic values', () => {
+    const zh = OVERVIEW_STRINGS.zh;
+
+    expect(zh.tierUnit).toBe('tok/s/user');
+    expect(zh.scopeAria).toContain('hyperscaler');
+    expect(zh.caption).toContain('token');
+    expect(zh.scenarioLabels.agentx).toContain('AgentX');
+    expect(zh.methodologyNote).toContain('FP4');
+    expect(zh.historyCaption(7)).toContain('7–14');
+    expect(zh.costDeltaAria('20%', true, 'B200')).toEqual(
+      expect.stringMatching(/B200.*20%|20%.*B200/),
+    );
+    expect(zh.historicalDeltaAria('20%', true, '2026年8月1日')).toEqual(
+      expect.stringMatching(/2026年8月1日.*20%|20%.*2026年8月1日/),
+    );
+    expect(zh.rowScopeShow(3, 7)).toEqual(expect.stringMatching(/3.*7|7.*3/));
+    expect(zh.hardwareRowScopeShow(3)).toContain('3');
+  });
+});
+
 const HISTORY_DATA: OverviewPageData = {
   models: [],
   tier: 50,

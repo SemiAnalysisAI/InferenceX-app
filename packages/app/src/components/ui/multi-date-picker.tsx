@@ -51,7 +51,7 @@ const STRINGS = {
     unavailableDatesPrefix: '以下日期不存在：',
     title: '选择对比日期',
     descriptionPrefix: '最多选择 ',
-    descriptionSuffix: ' 个日期，以对比 Chip 性能随时间的变化。',
+    descriptionSuffix: ' 个日期，以对比芯片性能随时间的变化。',
     selectedDates: '已选日期：',
     clearAll: '全部清除',
     removeDatePrefix: '移除 ',
