@@ -127,24 +127,26 @@ const sourceFiles: string[] = SCAN_ROOTS.filter((root) => fs.existsSync(root)).f
  * sibling as context. JSON-LD is dropped: structured data is JSON, so its quotes
  * and colons are syntax and "fixing" them breaks the schema.org payload.
  */
+function chineseLinesFromSource(relative: string, source: string): Line[] {
+  const isProse = path.extname(relative) === '.mdx';
+  let inJsonLd = false;
+  return source.split('\n').flatMap((raw, index) => {
+    if (isProse) {
+      const trimmed = raw.trim();
+      if (trimmed.startsWith('<JsonLd') || trimmed.startsWith('{{')) inJsonLd = true;
+      const skip = inJsonLd;
+      if (inJsonLd && (trimmed.endsWith('/>') || trimmed.endsWith('</JsonLd>') || trimmed === '}}'))
+        inJsonLd = false;
+      if (skip) return [];
+    }
+    return segment(raw, isProse).map((text) => ({ file: relative, line: index + 1, text }));
+  });
+}
+
 const chineseLines: Line[] = sourceFiles.flatMap((file) => {
   const relative = path.relative(APP_DIR, file);
   if (relative === SELF) return [];
-  const isProse = path.extname(file) === '.mdx';
-  let inJsonLd = false;
-  return fs
-    .readFileSync(file, 'utf8')
-    .split('\n')
-    .flatMap((raw, index) => {
-      if (isProse) {
-        const trimmed = raw.trim();
-        if (trimmed.startsWith('<JsonLd') || trimmed.startsWith('{{')) inJsonLd = true;
-        const skip = inJsonLd;
-        if (inJsonLd && (trimmed.endsWith('/>') || trimmed === '}}')) inJsonLd = false;
-        if (skip) return [];
-      }
-      return segment(raw, isProse).map((text) => ({ file: relative, line: index + 1, text }));
-    });
+  return chineseLinesFromSource(relative, fs.readFileSync(file, 'utf8'));
 });
 
 function report(violations: Violation[]): string {
@@ -227,6 +229,24 @@ describe('zh copy — every rule still catches what it was written for', () => {
 });
 
 describe('zh copy — coverage', () => {
+  it('resumes scanning Chinese prose after an MDX JsonLd block', () => {
+    const lines = chineseLinesFromSource(
+      'content/blog/zh/example.mdx',
+      [
+        'JSON-LD 之前的中文。',
+        '<JsonLd>{`{',
+        '  "description": "结构化数据中的 Chip 不应扫描"',
+        '}`}</JsonLd>',
+        'JSON-LD 之后的中文 Chip 应继续扫描。',
+      ].join('\n'),
+    );
+
+    expect(lines.map(({ line, text }) => ({ line, text }))).toEqual([
+      { line: 1, text: 'JSON-LD 之前的中文。' },
+      { line: 5, text: 'JSON-LD 之后的中文 Chip 应继续扫描。' },
+    ]);
+  });
+
   it('scans a plausible amount of Chinese copy', () => {
     // A refactor that guts the /zh tree should fail loudly rather than let every
     // rule above pass vacuously.
