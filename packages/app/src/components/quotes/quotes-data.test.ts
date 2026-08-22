@@ -42,3 +42,15 @@ describe('quote carousel membership', () => {
     }
   });
 });
+
+describe('Chinese quote attribution', () => {
+  it('provides a Chinese role for every quote with an English role', () => {
+    for (const quote of QUOTES) {
+      if (!quote.title) continue;
+      expect(
+        Reflect.get(quote, 'titleZh'),
+        `${quote.name} has an English role but no Chinese role`,
+      ).toBeTruthy();
+    }
+  });
+});

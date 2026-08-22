@@ -14,14 +14,18 @@ const CAROUSEL_OVERRIDES = {
 
 const HEADING = {
   en: 'Open-Source Continuous Agentic Inference Benchmark Trusted by GigaWatt Token Factories',
-  zh: '受吉瓦级 token 工厂信赖的开源持续智能体推理基准测试',
+  zh: 'InferenceX 提供持续更新的开源智能体推理基准测试，已获得吉瓦级 token 工厂运营方的信赖。',
 } as const;
 
 export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
   const isZh = locale === 'zh';
   // Quotes fall back to the English original until a translation lands.
   const quotes = isZh
-    ? carouselQuotes.map((q) => ({ ...q, text: q.textZh ?? q.text }))
+    ? carouselQuotes.map((q) => ({
+        ...q,
+        text: q.textZh ?? q.text,
+        title: q.titleZh ?? q.title,
+      }))
     : carouselQuotes;
   return (
     <section>
@@ -38,7 +42,7 @@ export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
             quotes={quotes}
             overrides={CAROUSEL_OVERRIDES}
             moreHref={isZh ? '/zh/quotes' : '/quotes'}
-            moreLabel={isZh ? '查看更多支持者 →' : undefined}
+            moreLabel={isZh ? '查看业界评价 →' : undefined}
           />
         </div>
       </Card>

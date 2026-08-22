@@ -76,6 +76,6 @@ describe('API documentation', () => {
       .and('have.attr', 'hreflang', 'en');
     cy.get('[data-testid="footer-link-api"]')
       .should('have.attr', 'href', '/zh/api')
-      .and('have.text', 'API 参考文档');
+      .and('have.text', 'API 文档');
   });
 });

@@ -6,7 +6,7 @@ import { ZH_OG_LOCALE, zhAlternates, zhPath } from '@/lib/i18n';
 export const LANDING_META_ZH = {
   title: '开源智能体推理基准测试',
   description:
-    '跨芯片与推理框架，对比 AgentX 长上下文多轮编码场景与固定序列 AI 推理。NVIDIA 与 AMD 的公开运行会在配置变更时更新。',
+    '比较不同芯片和推理框架在 AgentX 与固定序列场景下的推理性能。AgentX 是 InferenceX 面向长上下文、多轮编码的测试场景；NVIDIA 和 AMD 的公开运行结果会随配置变化更新。',
 };
 
 export const ZH_TAB_KEYS = [
@@ -143,7 +143,7 @@ export const NAV_LABELS_ZH: Record<string, string> = {
   '/overview': '总览',
   '/inference': '仪表板',
   '/inference/agentic': '遥测数据',
-  '/compare': '芯片对比',
+  '/compare': '性能对比',
   '/agentx': 'AgentX',
   '/about': '关于',
 };
