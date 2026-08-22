@@ -165,7 +165,7 @@ const STRINGS = {
     yAxis: {
       latency: '延迟',
       'tokens-per-second': '所选延迟分位点的 token 速率',
-      'payload-rate': '所选延迟分位点的载荷带宽（每 Chip）',
+      'payload-rate': '所选延迟分位点的载荷带宽（每芯片）',
     },
     mode: { normal: '常规', 'low-latency': '低延迟' },
     fabricScope: { all: '全部', 'scale-up': '域内', 'scale-out': '跨域' },
@@ -270,7 +270,7 @@ const STRINGS = {
     isolatedNote: '分项之和为派生值，不用于计算吞吐量。',
     payloadNote: '逻辑载荷速率按所选延迟分位点派生，不代表物理链路带宽。',
     payloadBandwidthNote:
-      '载荷带宽为完整逻辑载荷（含 FP8 缩放字节）÷ 延迟（每 Chip），是基于逻辑字节的派生速率，不代表物理链路带宽。工具提示中的 β/α 为延迟对字节在整个梯度上的最小二乘拟合（β = 每 Chip 带宽项，α = 固定开销）。',
+      '载荷带宽为完整逻辑载荷（含 FP8 缩放字节）÷ 延迟（每芯片），是基于逻辑字节的派生速率，不代表物理链路带宽。工具提示中的 β/α 为延迟对字节在整个梯度上的最小二乘拟合（β = 每芯片带宽项，α = 固定开销）。',
     provenance: '发布数据溯源',
     runLabel: 'Run',
     attemptLabel: 'Attempt',

@@ -224,7 +224,7 @@ const STRINGS = {
   zh: {
     title: 'TCO 计算器',
     description:
-      '设定目标交互性（tokens/sec/user），比较所有 Chip 的吞吐量和成本。数值基于真实基准测试数据插值计算。',
+      '设定目标交互性（tokens/sec/user），比较所有芯片的吞吐量和成本。数值基于真实基准测试数据插值计算。',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
       '用于计算每百万 token 成本的定价层级。Hyperscaler（如 AWS/GCP）、Neocloud（如 CoreWeave）或 3 年租赁。',
@@ -237,10 +237,10 @@ const STRINGS = {
       '图表中显示的比较指标。吞吐量（tok/s/chip）、能效（tok/s/MW）或每百万 token 成本。',
     targetLabel: '目标交互性 (tok/s/user)',
     targetTooltip:
-      '用于插值的交互性操作点。调整滑块以比较不同交互性级别下 Chip 的吞吐量、成本和能效。',
+      '用于插值的交互性操作点。调整滑块以比较不同交互性级别下芯片的吞吐量、成本和能效。',
     targetAgenticLabel: (percentile: string) => `目标 ${percentile} 交互性 (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
-      `用于智能体工作负载插值的 ${percentile} 交互性操作点。调整滑块以比较 Chip 的吞吐量、成本和能效。`,
+      `用于智能体工作负载插值的 ${percentile} 交互性操作点。调整滑块以比较芯片的吞吐量、成本和能效。`,
     metricThroughput: '吞吐量',
     metricCost: '成本',
     viewChart: '图表',
@@ -254,15 +254,15 @@ const STRINGS = {
     totalTokens: '总 Token',
     inputTokens: '输入 Token',
     outputTokens: '输出 Token',
-    allInPower: '全含功率/Chip：',
+    allInPower: '全含功率/芯片：',
     tcoPerHr: 'TCO $/chip/hr：',
     source: '来源：',
     updated: ' • 更新于：',
     note: '注意：',
     disaggCost:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 Chip 或预填充 Chip 计算成本，而非按 Chip 总数。因此与聚合配置的直接成本对比并非同类比较。',
+      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码芯片或预填充芯片计算成本，而非按芯片总数。因此与聚合配置的直接成本对比并非同类比较。',
     disaggThroughput:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 Chip 或预填充 Chip 计算吞吐量，而非按 Chip 总数。因此与聚合配置的直接吞吐量对比并非同类比较。',
+      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码芯片或预填充芯片计算吞吐量，而非按芯片总数。因此与聚合配置的直接吞吐量对比并非同类比较。',
     compMetricThroughput: '吞吐量',
     compMetricCost: '成本效率',
     compMetricPower: 'tok/s/MW',
@@ -301,7 +301,7 @@ function getChartTitleZh(
     }
     default: {
       return mode === 'interactivity_to_throughput'
-        ? `${targetLabel}下每 Chip ${tokenTypeLabel} token 吞吐量`
+        ? `${targetLabel}下每芯片 ${tokenTypeLabel} token 吞吐量`
         : `${targetLabel}下的交互性`;
     }
   }

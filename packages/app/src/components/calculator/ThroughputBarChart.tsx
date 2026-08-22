@@ -37,15 +37,29 @@ import type {
 const OVERLAY_STRINGS = {
   en: {
     unofficialRun: 'UNOFFICIAL RUN',
-    branch: 'Branch',
+    branch: 'Branch:',
+    dismiss: 'Click elsewhere to dismiss',
     viewRun: 'View workflow run',
     clamped: 'Outside measured range — showing nearest data point',
+    parallelism: 'Parallelism:',
+    cost: 'Cost:',
+    concurrency: 'Concurrency:',
+    precision: 'Precision:',
+    disaggregated: 'Disaggregated:',
+    yes: 'Yes',
   },
   zh: {
     unofficialRun: '非官方运行',
-    branch: '分支',
+    branch: '分支：',
+    dismiss: '点击其他区域关闭',
     viewRun: '查看工作流运行',
     clamped: '超出实测范围——显示最接近的数据点',
+    parallelism: '并行策略：',
+    cost: '成本：',
+    concurrency: '并发数：',
+    precision: '精度：',
+    disaggregated: '分离式：',
+    yes: '是',
   },
 } as const;
 
@@ -290,7 +304,7 @@ export function generateTooltipHTML(
 
   let parallelismHtml: string;
   if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
-    parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Parallelism:</strong> ${dpAttn ? 'DEP' : 'TEP'}${tp}</div>`;
+    parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.parallelism}</strong> ${dpAttn ? 'DEP' : 'TEP'}${tp}</div>`;
   } else if (ep !== null && ep !== undefined && ep > 1) {
     parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP:</strong> ${tp}, <strong>EP:</strong> ${ep}${dpAttn ? ', <strong>DPA:</strong> True' : ''}</div>`;
   } else {
@@ -320,7 +334,7 @@ export function generateTooltipHTML(
 
   const overlayBranchHtml =
     d.isOverlay && d.runLabel
-      ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.branch}:</strong> ${escapeHtml(d.runLabel)}</div>`
+      ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.branch}</strong> ${escapeHtml(d.runLabel)}</div>`
       : '';
   const overlayHeaderHtml = d.isOverlay
     ? `<div style="color: var(--destructive, #ef4444); font-size: 11px; font-weight: 600; margin-bottom: 4px;">${overlayStrings.unofficialRun}</div>${overlayBranchHtml}`
@@ -328,7 +342,7 @@ export function generateTooltipHTML(
 
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 320px; pointer-events: auto; user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${overlayStrings.dismiss}</div>` : ''}
       ${overlayHeaderHtml}
       <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">
         ${label}
@@ -338,17 +352,17 @@ export function generateTooltipHTML(
         <strong>${metricName}:</strong> ${metricDisplay}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>Cost:</strong> $${costValue.toFixed(3)}${costLabel}
+        <strong>${overlayStrings.cost}</strong> $${costValue.toFixed(3)}${costLabel}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>tok/s/MW:</strong> ${getTpPerMwForType(d, costType).toFixed(0)}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>Concurrency:</strong> ~${d.concurrency}
+        <strong>${overlayStrings.concurrency}</strong> ~${d.concurrency}
       </div>
-      ${precision ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Precision:</strong> ${escapeHtml(precision.toUpperCase())}</div>` : ''}
+      ${precision ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.precision}</strong> ${escapeHtml(precision.toUpperCase())}</div>` : ''}
       ${parallelismHtml}
-      ${disagg ? '<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Disaggregated:</strong> Yes</div>' : ''}
+      ${disagg ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.disaggregated}</strong> ${overlayStrings.yes}</div>` : ''}
       ${runLinkHtml}
     </div>
   `;

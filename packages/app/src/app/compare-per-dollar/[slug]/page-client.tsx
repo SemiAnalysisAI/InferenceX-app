@@ -64,10 +64,10 @@ const STRINGS = {
     fullComparisonLinkText: '查看完整延迟与吞吐量对比 →',
     caveatSeqFallback: '序列',
     caveatPrecFallback: '精度',
-    pricingLabel: 'Chip 定价（所属云服务商）：',
+    pricingLabel: '芯片定价（所属云服务商）：',
     pricingSource: '来源：',
     emptyState:
-      '当前默认模型在此 Chip 组合上没有可用的插值每 token 成本数据。请使用下方图表控件选择一个两款 Chip 均有基准测试数据的模型和精度。',
+      '当前默认模型在此芯片组合上没有可用的插值每 token 成本数据。请使用下方图表控件选择一个两款芯片均有基准测试数据的模型和精度。',
   },
 } as const;
 

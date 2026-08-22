@@ -45,8 +45,8 @@ const STRINGS = {
   },
   zh: {
     title: '快捷筛选',
-    description: '按 Chip 厂商、推理框架、部署模式和投机解码筛选图表。某组不选则显示全部。',
-    agenticDescription: '按 Chip 厂商、推理框架和部署模式筛选图表。某组不选则显示全部。',
+    description: '按芯片厂商、推理框架、部署模式和投机解码筛选图表。某组不选则显示全部。',
+    agenticDescription: '按芯片厂商、推理框架和部署模式筛选图表。某组不选则显示全部。',
     selected: '项已选',
     vendor: '厂商',
     framework: '框架',

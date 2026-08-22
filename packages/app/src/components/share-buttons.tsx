@@ -15,7 +15,7 @@ const STRINGS = {
   },
   zh: {
     shareText:
-      '探索 InferenceX：开源测试智能体推理与固定序列 AI 推理，并提供来自公开 Chip 运行的 AgentX 结果。',
+      '探索 InferenceX：开源测试智能体推理与固定序列 AI 推理，并提供来自公开芯片运行的 AgentX 结果。',
     twitter: '分享到 X（推特）',
     linkedin: '分享到 LinkedIn',
   },

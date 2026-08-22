@@ -342,7 +342,7 @@ describe('compareMetaDescriptionZh — structural 1:1 port', () => {
     expect(zh).toContain('B300');
     expect(zh).toContain('34%');
     expect(zh).toContain('12%');
-    expect(zh).toContain('每 Chip 吞吐量');
+    expect(zh).toContain('每芯片吞吐量');
     expect(zh).toContain('每 token 成本');
     expect(zh.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
   });

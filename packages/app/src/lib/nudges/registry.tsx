@@ -367,7 +367,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       description:
         'Compare AgentX results for Kimi K3, DeepSeek-V4-Pro-0813, MiniMax-M3, Qwen3.5 397B, and GLM-5.3 across supported chips and serving stacks.',
       descriptionZh:
-        '查看 Kimi K3、DeepSeek-V4-Pro-0813、MiniMax-M3、Qwen3.5 397B 与 GLM-5.3 在支持 Chip 和推理服务栈上的 AgentX 结果。',
+        '查看 Kimi K3、DeepSeek-V4-Pro-0813、MiniMax-M3、Qwen3.5 397B 与 GLM-5.3 在支持芯片和推理服务栈上的 AgentX 结果。',
       // Both buckets carry two releases on one architecture (GLM-5.2/5.3, the
       // V4-Pro April preview and the 0813 GA); name the newer one, as the
       // model selector does for GLM.
@@ -413,7 +413,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       description:
         'Star InferenceX on GitHub to get notified when we publish new benchmark data. We update chip performance comparisons regularly — starring is the easiest way to stay in the loop and help the project grow.',
       descriptionZh:
-        '在 GitHub 上为 InferenceX 加星，以便在我们发布新基准测试数据时收到通知。我们定期更新 Chip 性能对比——加星是保持关注并帮助项目成长的最简单方式。',
+        '在 GitHub 上为 InferenceX 加星，以便在我们发布新基准测试数据时收到通知。我们定期更新芯片性能对比——加星是保持关注并帮助项目成长的最简单方式。',
       testId: 'github-star-modal',
       dismissLabel: 'Maybe Later',
       dismissLabelZh: '稍后再看',

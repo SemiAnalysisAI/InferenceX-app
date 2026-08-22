@@ -35,13 +35,13 @@ const STRINGS = {
       'No interpolated comparison data available for the default model. Use the chart controls below to select a model with benchmark data for both chips.',
   },
   zh: {
-    eyebrowSuffix: 'Chip 对比',
+    eyebrowSuffix: '芯片对比',
     mainChartLinkText: '主推理图表',
     perDollarLinkText: '查看每美元性能对比 →',
     caveatSeqFallback: '序列',
     caveatPrecFallback: '精度',
     emptyState:
-      '当前默认模型没有可用的插值对比数据。请使用下方图表控件选择一个两款 Chip 均有基准测试数据的模型。',
+      '当前默认模型没有可用的插值对比数据。请使用下方图表控件选择一个两款芯片均有基准测试数据的模型。',
   },
 } as const;
 

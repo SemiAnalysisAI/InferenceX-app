@@ -69,13 +69,13 @@ const STRINGS = {
     scaleAuto: '自动',
     scaleLinear: '线性',
     scaleLog: '对数',
-    gpuConfig: 'Chip 配置',
+    gpuConfig: '芯片配置',
     gpuConfigTooltip:
-      '最多选择 4 个 Chip 配置以对比其历史性能趋势。可用于追踪软件更新对特定硬件的影响。',
-    gpuConfigPlaceholder: '选择 Chip 配置进行对比',
+      '最多选择 4 个芯片配置以对比其历史性能趋势。可用于追踪软件更新对特定硬件的影响。',
+    gpuConfigPlaceholder: '选择芯片配置进行对比',
     comparisonDateRange: '对比日期范围',
     comparisonDateRangeTooltip:
-      '选择历史对比的起止日期。图表将展示所选 Chip 配置在此时间范围内的性能数据。',
+      '选择历史对比的起止日期。图表将展示所选芯片配置在此时间范围内的性能数据。',
     dateRangePlaceholder: '选择日期范围',
   },
 } as const;
