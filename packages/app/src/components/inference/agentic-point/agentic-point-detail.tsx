@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 import { useAgenticAggregates } from '@/hooks/api/use-agentic-aggregates';
@@ -46,6 +46,7 @@ import {
 } from './server-metric-cards';
 import { SiblingNav } from './sibling-nav';
 import type { ThroughputSeriesKey } from './time-series-math';
+import { useDetailView, type DetailView } from './use-detail-view';
 
 const STRINGS = {
   en: {
@@ -100,32 +101,6 @@ const RequestTimelineView = dynamic(() =>
 
 interface Props {
   id: number;
-}
-
-type DetailView = 'point' | 'timeline' | 'aggregates' | 'logs';
-
-const isDetailView = (value: string | null): value is DetailView =>
-  value === 'point' || value === 'timeline' || value === 'aggregates' || value === 'logs';
-
-/** URL-persisted detail view (`?view=`; per-point is the unadorned default). */
-function useDetailView(): [DetailView, (nextView: DetailView) => void] {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const requestedView = searchParams.get('view');
-  const view: DetailView = isDetailView(requestedView) ? requestedView : 'point';
-  const setView = useCallback(
-    (nextView: DetailView) => {
-      const nextParams = new URLSearchParams(searchParams.toString());
-      if (nextView === 'point') nextParams.delete('view');
-      else nextParams.set('view', nextView);
-      const query = nextParams.toString();
-      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-      track('inference_agentic_detail_view_changed', { view: nextView });
-    },
-    [pathname, router, searchParams],
-  );
-  return [view, setView];
 }
 
 export function AgenticPointDetail({ id }: Props) {

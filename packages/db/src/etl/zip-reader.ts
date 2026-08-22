@@ -28,27 +28,45 @@ export function readZipText(zipPath: string, name: string): string | null {
   }
 }
 
+export interface ZipJsonAndText {
+  jsonFiles: Map<string, unknown>;
+  textFiles: Map<string, string>;
+}
+
 /**
- * Read all text files in a ZIP whose basenames match `predicate`, keyed by basename.
- * Returns an empty map on ZIP-level errors. Used to pull all `samples_*.jsonl`
- * entries from an eval ZIP in a single pass.
+ * Traverse a ZIP once, parsing every JSON entry and reading only selected text entries.
+ * Returns null on ZIP-level errors; individual JSON parse errors yield null values and
+ * individual text read errors omit that entry.
  */
-export function readZipTextsMatching(
+export function readZipJsonAndText(
   zipPath: string,
-  predicate: (name: string) => boolean,
-): Map<string, string> {
-  const out = new Map<string, string>();
+  selectText?: (name: string) => boolean,
+): ZipJsonAndText | null {
   try {
     const zip = new AdmZip(zipPath);
+    const jsonFiles = new Map<string, unknown>();
+    const textFiles = new Map<string, string>();
+
     for (const entry of zip.getEntries()) {
       if (entry.isDirectory) continue;
-      if (!predicate(entry.name)) continue;
-      try {
-        out.set(entry.name, entry.getData().toString('utf8'));
-      } catch {}
+
+      if (entry.name.endsWith('.json')) {
+        try {
+          jsonFiles.set(entry.name, JSON.parse(entry.getData().toString('utf8')));
+        } catch {
+          jsonFiles.set(entry.name, null);
+        }
+      } else if (selectText?.(entry.name)) {
+        try {
+          textFiles.set(entry.name, entry.getData().toString('utf8'));
+        } catch {}
+      }
     }
-  } catch {}
-  return out;
+
+    return { jsonFiles, textFiles };
+  } catch {
+    return null;
+  }
 }
 
 /**

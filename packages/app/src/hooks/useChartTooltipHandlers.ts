@@ -1,8 +1,13 @@
 import * as d3 from 'd3';
 import { useCallback } from 'react';
-import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
+import {
+  computeTooltipPosition,
+  getTooltipContainerGeometry,
+  invalidateTooltipGeometry,
+} from '@/lib/d3-chart/layers/scatter-points';
 import { useStickyTooltip } from './useStickyTooltip';
 
+import { overlayMarkerPosition } from '@/lib/d3-chart/overlay-x-marker';
 export type RulerType = 'vertical' | 'horizontal' | 'crosshair' | 'none';
 
 export interface ChartTooltipConfig<TData> {
@@ -257,30 +262,42 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
             .style('display', 'block')
             .style('pointer-events', 'none')
             .html(config.generateTooltipContent(d, false));
+          invalidateTooltipGeometry(tooltipElement.node());
 
-          // Position rulers
+          // Position rulers. During a data transition the bound scales already
+          // describe the destination while the marker is still interpolating.
+          // Prefer the live translated marker position so rulers pass through
+          // what is actually painted.
+          const markerPosition = this instanceof Element ? overlayMarkerPosition(this) : null;
           const { curX: currentXScale, curY: currentYScale } = getZoomedScales();
 
           if (verticalRuler || horizontalRuler) {
             rulerGroup.style('display', 'block');
           }
           if (verticalRuler && config.getRulerX) {
-            const x = config.getRulerX(d, currentXScale);
+            const x = markerPosition?.x ?? config.getRulerX(d, currentXScale);
             verticalRuler.attr('x1', x).attr('x2', x);
           }
 
           if (horizontalRuler && currentYScale && config.getRulerY) {
-            const y = config.getRulerY(d, currentYScale);
+            const y = markerPosition?.y ?? config.getRulerY(d, currentYScale);
             horizontalRuler.attr('y1', y).attr('y2', y);
           }
         })
         .on('mousemove', (event) => {
           if (isPinned()) return;
 
-          const rect = containerElement.getBoundingClientRect();
-          const mx = event.clientX - rect.left;
-          const my = event.clientY - rect.top;
-          const pos = computeTooltipPosition(mx, my, tooltipElement, containerElement);
+          const geometry = getTooltipContainerGeometry(containerElement);
+          const mx = event.clientX - geometry.bounds.left;
+          const my = event.clientY - geometry.bounds.top;
+          const pos = computeTooltipPosition(
+            mx,
+            my,
+            tooltipElement,
+            containerElement,
+            10,
+            geometry,
+          );
           tooltipElement.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
         })
         .on('mouseleave', function (_event, d) {
@@ -297,15 +314,23 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
           tooltipElement.style('opacity', 0).style('display', 'none');
           rulerGroup.style('display', 'none');
         })
-        .on('click', (event, d) => {
+        .on('click', function (event, d) {
           event.stopPropagation();
 
           // Set content first so dimensions are available for position calc
-          const rect = containerElement.getBoundingClientRect();
-          const mx = event.clientX - rect.left;
-          const my = event.clientY - rect.top;
+          const geometry = getTooltipContainerGeometry(containerElement);
+          const mx = event.clientX - geometry.bounds.left;
+          const my = event.clientY - geometry.bounds.top;
           tooltipElement.html(config.generateTooltipContent(d, true));
-          const pos = computeTooltipPosition(mx, my, tooltipElement, containerElement);
+          invalidateTooltipGeometry(tooltipElement.node());
+          const pos = computeTooltipPosition(
+            mx,
+            my,
+            tooltipElement,
+            containerElement,
+            10,
+            geometry,
+          );
           tooltipElement
             .style('left', `${pos.left}px`)
             .style('top', `${pos.top}px`)
@@ -313,27 +338,22 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
             .style('display', 'block')
             .style('pointer-events', 'auto');
 
-          // Position rulers at the clicked point
+          const markerPosition = this instanceof Element ? overlayMarkerPosition(this) : null;
           const { curX: currentXScale, curY: currentYScale } = getZoomedScales();
           if (verticalRuler || horizontalRuler) {
             rulerGroup.style('display', 'block');
           }
           if (verticalRuler && config.getRulerX) {
-            const x = config.getRulerX(d, currentXScale);
+            const x = markerPosition?.x ?? config.getRulerX(d, currentXScale);
             verticalRuler.attr('x1', x).attr('x2', x);
           }
           if (horizontalRuler && currentYScale && config.getRulerY) {
-            const y = config.getRulerY(d, currentYScale);
+            const y = markerPosition?.y ?? config.getRulerY(d, currentYScale);
             horizontalRuler.attr('y1', y).attr('y2', y);
           }
 
-          // Pin the tooltip
           pinTooltip(d);
-
-          // Call optional analytics tracking
-          if (config.onPointClick) {
-            config.onPointClick(d);
-          }
+          config.onPointClick?.(d);
         });
     },
     [isPinned, pinTooltip],

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { DASHBOARD_ROUTES } from './dashboard-routes';
 
 import { isValidTab, TAB_META } from './tab-meta';
 import {
@@ -10,7 +11,6 @@ import {
   TAB_LABELS_ZH,
   TAB_META_ZH,
   tabMetadataZh,
-  ZH_TAB_KEYS,
 } from './tab-meta-zh';
 
 const HAN_REGEX = /\p{Script=Han}/u;
@@ -28,18 +28,20 @@ describe('Chinese agentic inference positioning', () => {
   });
 });
 
-describe('ZH_TAB_KEYS', () => {
-  it.each(ZH_TAB_KEYS)('mirrors a valid English tab "%s"', (tab) => {
-    expect(isValidTab(tab)).toBe(true);
-    expect(TAB_META[tab]).toBeDefined();
+describe('mirrored dashboard routes', () => {
+  const mirroredRoutes = DASHBOARD_ROUTES.filter((route) => route.localeMirrored);
+
+  it.each(mirroredRoutes)('mirrors a valid English tab "$key"', ({ key }) => {
+    expect(isValidTab(key)).toBe(true);
+    expect(TAB_META[key]).toBeDefined();
   });
 
-  it.each(ZH_TAB_KEYS)('has complete Chinese meta, intro, and label for "%s"', (tab) => {
+  it.each(mirroredRoutes)('has complete Chinese content for "$key"', ({ key }) => {
     // Actual Chinese text, not an English placeholder that slipped through.
-    expect(TAB_META_ZH[tab].title).toMatch(HAN_REGEX);
-    expect(TAB_META_ZH[tab].description).toMatch(HAN_REGEX);
-    expect(TAB_INTRO_ZH[tab]).toMatch(HAN_REGEX);
-    expect(TAB_LABELS_ZH[tab]).toMatch(HAN_REGEX);
+    expect(TAB_META_ZH[key].title).toMatch(HAN_REGEX);
+    expect(TAB_META_ZH[key].description).toMatch(HAN_REGEX);
+    expect(TAB_INTRO_ZH[key]).toMatch(HAN_REGEX);
+    expect(TAB_LABELS_ZH[key]).toMatch(HAN_REGEX);
   });
 });
 

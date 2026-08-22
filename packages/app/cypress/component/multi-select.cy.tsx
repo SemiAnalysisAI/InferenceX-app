@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
 
@@ -15,11 +16,13 @@ function MultiSelectWrapper({
   maxSelections,
   minSelections,
   searchable = true,
+  useDefaults = false,
 }: {
   initial?: string[];
   maxSelections?: number;
   minSelections?: number;
   searchable?: boolean;
+  useDefaults?: boolean;
 }) {
   const [value, setValue] = useState<string[]>(initial);
   return (
@@ -27,7 +30,7 @@ function MultiSelectWrapper({
       options={OPTIONS}
       value={value}
       onChange={setValue}
-      placeholder="Select Chips..."
+      placeholder={useDefaults ? undefined : 'Select Chips...'}
       maxSelections={maxSelections}
       minSelections={minSelections}
       searchable={searchable}
@@ -113,6 +116,23 @@ describe('MultiSelect', () => {
     cy.get('[aria-label="Clear all selections"]').click();
     // Placeholder should return
     cy.contains('Select Chips...').should('be.visible');
+  });
+
+  it('localizes visible and accessible defaults on Chinese routes', () => {
+    cy.mount(
+      <PathnameContext.Provider value="/zh/inference">
+        <MultiSelectWrapper initial={['h100-sxm']} maxSelections={2} useDefaults />
+      </PathnameContext.Provider>,
+    );
+
+    cy.get('[aria-label="移除 NVIDIA H100 SXM"]').should('exist');
+    cy.get('[aria-label="清除所有选择"]').should('exist');
+    cy.get('[data-slot="select-trigger"]').click();
+    cy.get('input[placeholder="搜索..."]')
+      .should('have.attr', 'aria-label', '搜索选项')
+      .type('不存在');
+    cy.contains('没有结果').should('be.visible');
+    cy.contains('1 / 2 项已选择').should('be.visible');
   });
 
   it('click outside closes dropdown', () => {

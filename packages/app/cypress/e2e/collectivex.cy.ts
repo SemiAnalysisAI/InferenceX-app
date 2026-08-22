@@ -342,6 +342,19 @@ describe('CollectiveX neutral run view', () => {
       .should('contain.text', 'H200-DGXC')
       .and('contain.text', 'B300');
   });
+
+  it('localizes the matrix inventory on the Chinese route', () => {
+    cy.visit('/zh/collectivex');
+    cy.wait('@runs');
+    cy.wait('@run');
+
+    cy.get('[data-testid="collectivex-inventory"]')
+      .should('contain.text', '矩阵测试用例清单')
+      .and('contain.text', '数据点状态')
+      .and('contain.text', '解码')
+      .and('contain.text', '常规')
+      .and('contain.text', '成功');
+  });
 });
 
 describe('CollectiveX run deletion', () => {

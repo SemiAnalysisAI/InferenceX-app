@@ -1,7 +1,7 @@
 'use client';
 
 import { Calendar, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { track } from '@/lib/analytics';
 
@@ -25,7 +25,41 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
+
+const STRINGS = {
+  en: {
+    placeholder: 'Select dates',
+    comparisonSeparator: ' vs ',
+    selectedSuffix: ' dates selected',
+    unavailableDatesPrefix: 'These dates do not exist: ',
+    title: 'Select Comparison Dates',
+    descriptionPrefix: 'Choose up to ',
+    descriptionSuffix: ' dates to compare chip performance over time.',
+    selectedDates: 'Selected Dates:',
+    clearAll: 'Clear All',
+    removeDatePrefix: 'Remove ',
+    cancel: 'Cancel',
+    applying: 'Applying...',
+    apply: 'Apply',
+  },
+  zh: {
+    placeholder: '选择日期',
+    comparisonSeparator: ' 对比 ',
+    selectedSuffix: ' 个日期已选择',
+    unavailableDatesPrefix: '以下日期不存在：',
+    title: '选择对比日期',
+    descriptionPrefix: '最多选择 ',
+    descriptionSuffix: ' 个日期，以对比芯片性能随时间的变化。',
+    selectedDates: '已选日期：',
+    clearAll: '全部清除',
+    removeDatePrefix: '移除 ',
+    cancel: '取消',
+    applying: '正在应用...',
+    apply: '应用',
+  },
+} as const;
 export interface MultiDatePickerProps {
   dates: string[];
   onChange: (dates: string[]) => void;
@@ -48,9 +82,12 @@ export function MultiDatePicker({
   minDate,
   maxDate,
   className,
-  placeholder = 'Select dates',
+  placeholder,
   availableDates,
 }: MultiDatePickerProps) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const resolvedPlaceholder = placeholder ?? t.placeholder;
   const [open, setOpen] = useState(false);
   const [tempDates, setTempDates] = useState<string[]>(dates);
   const [isApplying, _setIsApplying] = useState(false);
@@ -59,15 +96,15 @@ export function MultiDatePicker({
   // Get display text for the input
   const getDisplayText = () => {
     if (dates.length === 0) {
-      return placeholder;
+      return resolvedPlaceholder;
     }
     if (dates.length === 1) {
-      return formatDisplayDate(dates[0]);
+      return formatDisplayDate(dates[0], locale);
     }
     if (dates.length === 2) {
-      return `${formatDisplayDate(dates[0])} vs ${formatDisplayDate(dates[1])}`;
+      return `${formatDisplayDate(dates[0], locale)}${t.comparisonSeparator}${formatDisplayDate(dates[1], locale)}`;
     }
-    return `${dates.length} dates selected`;
+    return `${dates.length}${t.selectedSuffix}`;
   };
 
   // Handle date selection in calendar
@@ -94,7 +131,7 @@ export function MultiDatePicker({
     if (availableDates) {
       const failedDates = tempDates.filter((date) => !availableDates.includes(date));
       if (failedDates.length > 0) {
-        setError(`These dates do not exist: ${failedDates.join(', ')}`);
+        setError(`${t.unavailableDatesPrefix}${failedDates.join(', ')}`);
         return;
       }
     }
@@ -110,18 +147,14 @@ export function MultiDatePicker({
     setOpen(false);
   };
 
-  // Reset when opening
   const handleOpenChange = (isOpen: boolean) => {
     track(isOpen ? 'multi_date_picker_opened' : 'multi_date_picker_closed');
+    setError('');
     if (isOpen) {
       setTempDates(dates);
     }
     setOpen(isOpen);
   };
-
-  useEffect(() => {
-    setError('');
-  }, [open]);
 
   return (
     <div className="space-y-2">
@@ -141,9 +174,11 @@ export function MultiDatePicker({
         </DialogTrigger>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Select Comparison Dates</DialogTitle>
+            <DialogTitle>{t.title}</DialogTitle>
             <DialogDescription>
-              Choose up to {maxDates} dates to compare chip performance over time.
+              {t.descriptionPrefix}
+              {maxDates}
+              {t.descriptionSuffix}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -158,7 +193,7 @@ export function MultiDatePicker({
             {tempDates.length > 0 && maxDates > 1 && (
               <div className="mt-4 p-3 bg-muted/30 rounded-md">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium">Selected Dates:</p>
+                  <p className="text-sm font-medium">{t.selectedDates}</p>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -168,7 +203,7 @@ export function MultiDatePicker({
                     }}
                     className="h-6 px-2 text-xs"
                   >
-                    Clear All
+                    {t.clearAll}
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -177,7 +212,7 @@ export function MultiDatePicker({
                       key={index}
                       className="px-2 py-1 bg-primary text-primary-foreground rounded-md text-xs flex items-center gap-1 group"
                     >
-                      {formatDisplayDate(dateStr)}
+                      {formatDisplayDate(dateStr, locale)}
                       <button
                         type="button"
                         onClick={(e) => {
@@ -185,7 +220,7 @@ export function MultiDatePicker({
                           handleRemoveTempDate(dateStr);
                         }}
                         className="ml-1 hover:bg-primary-foreground/20 rounded-sm p-0.5 transition-colors"
-                        aria-label={`Remove ${formatDisplayDate(dateStr)}`}
+                        aria-label={`${t.removeDatePrefix}${formatDisplayDate(dateStr, locale)}`}
                       >
                         <X className="size-3" />
                       </button>
@@ -199,11 +234,11 @@ export function MultiDatePicker({
           <DialogFooter>
             <DialogClose asChild>
               <Button variant="outline" onClick={handleCancel}>
-                Cancel
+                {t.cancel}
               </Button>
             </DialogClose>
             <Button onClick={handleApply} disabled={isApplying}>
-              {isApplying ? 'Applying...' : 'Apply'}
+              {isApplying ? t.applying : t.apply}
             </Button>
           </DialogFooter>
         </DialogContent>

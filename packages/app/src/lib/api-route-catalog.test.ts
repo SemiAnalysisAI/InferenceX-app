@@ -15,6 +15,7 @@ import {
 import {
   apiContractSourceDigests,
   apiRouteCatalog,
+  stablePublicApiContracts,
   type ApiRouteHttpMethod,
   type BilingualReviewText,
 } from './api-route-catalog';
@@ -243,6 +244,38 @@ describe('API route catalog', () => {
       );
     }
   });
+
+  it('keeps stable public parameters, statuses, errors, auth, cache policy, and schemas explicit', () => {
+    const stableOperations = apiOperations.filter((operation) => operation.stability === 'stable');
+    expect(stablePublicApiContracts.map((contract) => contract.operationId).toSorted()).toEqual(
+      stableOperations.map((operation) => operation.id).toSorted(),
+    );
+
+    for (const contract of stablePublicApiContracts) {
+      const operation = stableOperations.find((candidate) => candidate.id === contract.operationId);
+      expect(
+        operation,
+        `${contract.operationId} contract metadata has no stable operation`,
+      ).toBeDefined();
+      expect(operation?.parameters.map((parameter) => parameter.name)).toEqual(contract.parameters);
+      expect(operation?.responses.map((response) => response.status)).toEqual(contract.statuses);
+      expect(operation?.responseShapeName).toBe(contract.responseShapeName);
+      const documentedErrors = operation?.responses
+        .filter((response) => response.status !== '200')
+        .map((response) => {
+          const example = response.example;
+          return example &&
+            typeof example === 'object' &&
+            'error' in example &&
+            typeof example.error === 'string'
+            ? example.error
+            : undefined;
+        });
+      expect(documentedErrors).toEqual(contract.errorExamples);
+      expect(contract.auth).toBe('none');
+      expect(['public-db-day', 'framework-release-hour']).toContain(contract.cachePolicy);
+    }
+  });
 });
 
 describe('published API documentation invariants', () => {
@@ -305,6 +338,60 @@ describe('published API documentation invariants', () => {
           }
         }
       }
+    }
+  });
+
+  it('documents optional submission topology and CollectiveX KV fields', () => {
+    const submissions = apiOperations.find((operation) => operation.id === 'get-submissions');
+    const submissionSummary = submissions?.responses.find((response) => response.status === '200')
+      ?.schema.properties?.summary?.items?.properties;
+    expect(submissionSummary).toMatchObject({
+      prefill_tp: { type: 'integer' },
+      prefill_ep: { type: 'integer' },
+      decode_tp: { type: 'integer' },
+      decode_ep: { type: 'integer' },
+    });
+
+    const latest = apiOperations.find((operation) => operation.id === 'get-collectivex-latest');
+    const latestSchema = latest?.responses.find((response) => response.status === '200')?.schema;
+    expect(latestSchema?.properties?.run?.properties).toMatchObject({
+      kv_requested_cases: { type: 'integer' },
+      kv_measured_cases: { type: 'integer' },
+    });
+    expect(latestSchema?.properties?.kv).toMatchObject({ type: 'array' });
+    expect(latestSchema?.required).not.toContain('kv');
+
+    const runs = apiOperations.find((operation) => operation.id === 'list-collectivex-runs');
+    const runSummary = runs?.responses.find((response) => response.status === '200')?.schema
+      .properties?.runs?.items?.properties;
+    expect(runSummary?.kv_cases).toMatchObject({ type: 'object' });
+  });
+
+  it('uses canonical shared-route error examples', () => {
+    const bulkIds = [
+      'get-agentic-aggregates',
+      'get-derived-agentic-metrics',
+      'get-trace-availability',
+      'get-trace-histograms',
+    ];
+    const singleId = [
+      'get-benchmark-siblings',
+      'get-request-timeline',
+      'get-server-log',
+      'get-trace-server-metrics',
+    ];
+
+    for (const operationId of bulkIds) {
+      const operation = apiOperations.find((candidate) => candidate.id === operationId);
+      expect(operation?.responses.find((response) => response.status === '400')?.example).toEqual({
+        error: 'ids query param is required',
+      });
+    }
+    for (const operationId of singleId) {
+      const operation = apiOperations.find((candidate) => candidate.id === operationId);
+      expect(operation?.responses.find((response) => response.status === '400')?.example).toEqual({
+        error: 'id is required (benchmark_result_id)',
+      });
     }
   });
 

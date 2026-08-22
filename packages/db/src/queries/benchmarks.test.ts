@@ -2,38 +2,73 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { getAllBenchmarksForHistory, getBenchmarksForRun, getLatestBenchmarks } from './benchmarks';
 
+interface CapturedQuery {
+  text: string;
+  values: unknown[];
+}
+
 function captureSql() {
-  let query = '';
-  const sql = vi.fn((strings: TemplateStringsArray) => {
-    const text = strings.join('?').replaceAll(/\s+/gu, ' ');
-    if (text.includes('SELECT') || text.includes('WITH RECURSIVE')) query = text;
+  let query: CapturedQuery = { text: '', values: [] };
+  const sql = vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
+    query = {
+      text: strings.join('?').replaceAll(/\s+/gu, ' ').trim(),
+      values,
+    };
     return Promise.resolve([]);
   });
   return {
     sql: sql as unknown as Parameters<typeof getBenchmarksForRun>[0],
     query: () => query,
+    calls: () => sql.mock.calls.length,
   };
 }
 
 describe('append-only benchmark snapshots', () => {
-  it('walks same-image visual-series runs and preserves producer provenance', async () => {
+  it('seeds a run snapshot from only the requested run, then walks older runs', async () => {
     const captured = captureSql();
 
     await getBenchmarksForRun(captured.sql, 'dsv4', 123456);
+    expect(captured.calls()).toBe(1);
 
-    const query = captured.query();
-    expect(query).toContain('WITH RECURSIVE run_lines AS');
-    expect(query).toContain('WHERE current.append_only');
-    expect(query).toContain('current.images_complete');
-    expect(query).toContain('older.image = current.root_image');
-    expect(query).toContain('older.line_spec_method = current.line_spec_method');
-    expect(query).toContain('benchmark_type, isl, osl, offload_mode ORDER BY date DESC');
-    expect(query).toContain('point_c.id = br.config_id');
-    expect(query).toContain('br.recipe_fingerprint, br.conc, cr.run_rank');
-    expect(query).toContain('br.recipe_fingerprint,');
-    expect(query).toContain('br.workflow_run_id, wr.run_started_at::text');
-    expect(query).toContain('br.snapshot_date::text AS curve_date');
-    expect(query).toContain('snapshot_wr.id = br.snapshot_workflow_run_id');
+    const { text, values } = captured.query();
+    expect(text).toContain('WITH RECURSIVE run_lines AS');
+    expect(text).toContain('FROM ranked_runs WHERE github_run_id = ? UNION ALL');
+    expect(text).not.toContain('seed_runs AS');
+    expect(text).not.toContain('r.date <=');
+    expect(text).toContain('WHERE current.append_only');
+    expect(text).toContain('older.image = current.root_image');
+    expect(text).toContain('older.line_spec_method = current.line_spec_method');
+    expect(text).toContain('point_c.id = br.config_id');
+    expect(text).toContain('br.recipe_fingerprint, br.conc, cr.run_rank');
+    expect(text).toContain('br.workflow_run_id, wr.run_started_at::text');
+    expect(text).toContain('br.snapshot_date::text AS curve_date');
+    expect(text).toContain('snapshot_wr.id = br.snapshot_workflow_run_id');
+    expect(values).toEqual([['dsv4'], 123456]);
+  });
+
+  it('chooses latest seeds under both the date and as-of-run cutoffs', async () => {
+    const captured = captureSql();
+
+    await getLatestBenchmarks(captured.sql, 'dsv4', '2026-08-01', false, '456789');
+
+    const { text, values } = captured.query();
+    expect(text).toContain('seed_runs AS ( SELECT DISTINCT ON');
+    expect(text).toContain('FROM ranked_runs r WHERE r.date <= ?::date');
+    expect(text).toContain('lwr.github_run_id = ?');
+    expect(text).toContain('FROM seed_runs UNION ALL');
+    expect(text).not.toContain('WHERE run_rank = 1');
+    expect(values).toEqual([['dsv4'], '2026-08-01', 456789]);
+  });
+
+  it('keeps exact-date seeds independent from the main-chart run cutoff', async () => {
+    const captured = captureSql();
+
+    await getLatestBenchmarks(captured.sql, 'dsv4', '2026-08-01', true, '456789');
+
+    const { text, values } = captured.query();
+    expect(text).toContain('FROM ranked_runs r WHERE r.date = ?::date');
+    expect(text).not.toContain('lwr.github_run_id = ?');
+    expect(values).toEqual([['dsv4'], '2026-08-01']);
   });
 
   it('stamps latest materialized-view rows with a separate logical identity', async () => {
@@ -41,24 +76,40 @@ describe('append-only benchmark snapshots', () => {
 
     await getLatestBenchmarks(captured.sql, 'dsv4');
 
-    const query = captured.query();
-    expect(query).toContain('FROM latest_benchmarks lb');
-    expect(query).toContain('lb.date::text, lb.workflow_run_id');
-    expect(query).toContain('lb.snapshot_date::text AS curve_date');
-    expect(query).toContain('lb.recipe_fingerprint,');
-    expect(query).toContain('snapshot_wr.id = lb.snapshot_workflow_run_id');
+    const { text } = captured.query();
+    expect(text).toContain('FROM latest_benchmarks lb');
+    expect(text).toContain('lb.date::text, lb.workflow_run_id');
+    expect(text).toContain('lb.snapshot_date::text AS curve_date');
+    expect(text).toContain('lb.recipe_fingerprint,');
+    expect(text).toContain('snapshot_wr.id = lb.snapshot_workflow_run_id');
   });
 
-  it('builds every historical run as its own logical snapshot', async () => {
+  it('seeds every filtered sequence run as a distinct historical snapshot', async () => {
     const captured = captureSql();
 
     await getAllBenchmarksForHistory(captured.sql, 'dsv4', 8192, 1024);
 
-    const query = captured.query();
-    expect(query).toContain('FROM ranked_runs UNION ALL');
-    expect(query).toContain('cr.snapshot_workflow_run_id, br.config_id');
-    expect(query).toContain('br.recipe_fingerprint, br.conc, cr.run_rank');
-    expect(query).toContain('br.snapshot_date::text AS curve_date');
-    expect(query).toContain('ORDER BY br.snapshot_date, c.id, br.conc');
+    const { text, values } = captured.query();
+    expect(text).toContain('AND br.isl = ? AND br.osl = ? AND br.error IS NULL');
+    expect(text).toContain('FROM ranked_runs UNION ALL');
+    expect(text).not.toContain('WHERE github_run_id = ?');
+    expect(text).not.toContain('seed_runs AS');
+    expect(text).toContain('cr.snapshot_workflow_run_id, br.config_id');
+    expect(text).toContain('br.recipe_fingerprint, br.conc, cr.run_rank');
+    expect(text).toContain("br.metrics - '{std_ttft,std_tpot");
+    expect(text).toContain('ORDER BY br.snapshot_date, c.id, br.conc');
+    expect(values).toEqual([['dsv4'], 8192, 1024]);
+  });
+
+  it('filters agentic history by scenario without imposing sequence lengths', async () => {
+    const captured = captureSql();
+
+    await getAllBenchmarksForHistory(captured.sql, 'dsv4', null, null, 'agentic_traces');
+
+    const { text, values } = captured.query();
+    expect(text).toContain("AND br.benchmark_type = 'agentic_traces' AND br.error IS NULL");
+    expect(text).not.toContain('AND br.isl = ?');
+    expect(text).toContain('FROM ranked_runs UNION ALL');
+    expect(values).toEqual([['dsv4']]);
   });
 });

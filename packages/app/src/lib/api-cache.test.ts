@@ -98,7 +98,7 @@ describe('cachedQuery', () => {
 
       const result = await wrapped();
       expect(result).toEqual({ answer: 42 });
-      expect(mockBlobGet).toHaveBeenCalledWith('blob-key');
+      expect(mockBlobGet).toHaveBeenCalledWith(expect.stringMatching(/^blob-key:v2:/u));
       expect(fn).not.toHaveBeenCalled();
       expect(mockBlobSet).not.toHaveBeenCalled();
     });
@@ -112,7 +112,9 @@ describe('cachedQuery', () => {
       const result = await wrapped();
       expect(result).toEqual({ big: 'payload' });
       expect(fn).toHaveBeenCalled();
-      expect(mockBlobSet).toHaveBeenCalledWith('miss-key', { big: 'payload' });
+      expect(mockBlobSet).toHaveBeenCalledWith(expect.stringMatching(/^miss-key:v2:/u), {
+        big: 'payload',
+      });
     });
 
     it('builds blob key from prefix and args', async () => {
@@ -122,8 +124,9 @@ describe('cachedQuery', () => {
       const wrapped = cachedQuery(fn, 'bench', { blobOnly: true });
 
       await wrapped('llama', '2025-01-01');
-      expect(mockBlobGet).toHaveBeenCalledWith('bench:llama:2025-01-01');
-      expect(mockBlobSet).toHaveBeenCalledWith('bench:llama:2025-01-01', ['llama', '2025-01-01']);
+      const key = mockBlobGet.mock.calls[0]![0];
+      expect(key).toMatch(/^bench:v2:[A-Za-z0-9_-]+$/u);
+      expect(mockBlobSet).toHaveBeenCalledWith(key, ['llama', '2025-01-01']);
     });
 
     it('hashes oversized argument lists into a bounded deterministic key', async () => {
@@ -139,9 +142,48 @@ describe('cachedQuery', () => {
       const firstKey = mockBlobGet.mock.calls[0]![0];
       const secondKey = mockBlobGet.mock.calls[1]![0];
       expect(firstKey).toBe(secondKey);
-      expect(firstKey).toMatch(/^derived-agentic-metrics-v7:sha256:[a-f0-9]{64}$/u);
+      expect(firstKey).toMatch(/^derived-agentic-metrics-v7:v2:sha256:[a-f0-9]{64}$/u);
       expect(firstKey.length).toBeLessThan(128);
       expect(mockBlobSet).toHaveBeenCalledWith(firstKey, 200);
+    });
+
+    it('cannot collide arrays, objects, null, and undefined that stringify similarly', async () => {
+      mockBlobGet.mockResolvedValue(null);
+      mockBlobSet.mockResolvedValue(undefined);
+      const wrapped = cachedQuery((value: unknown) => Promise.resolve(value), 'structured', {
+        blobOnly: true,
+      });
+
+      await wrapped(['a:b']);
+      await wrapped(['a', 'b']);
+      await wrapped({ value: null });
+      await wrapped({ value: undefined });
+
+      expect(new Set(mockBlobGet.mock.calls.map(([key]) => key)).size).toBe(4);
+    });
+
+    it('serializes object properties deterministically', async () => {
+      mockBlobGet.mockResolvedValue(null);
+      mockBlobSet.mockResolvedValue(undefined);
+      const wrapped = cachedQuery((value: unknown) => Promise.resolve(value), 'structured', {
+        blobOnly: true,
+      });
+
+      await wrapped({ b: 2, a: 1 });
+      await wrapped({ a: 1, b: 2 });
+
+      expect(mockBlobGet.mock.calls[0]![0]).toBe(mockBlobGet.mock.calls[1]![0]);
+    });
+
+    it('rejects non-plain structured arguments instead of assigning a colliding key', async () => {
+      const wrapped = cachedQuery((value: unknown) => Promise.resolve(value), 'structured', {
+        blobOnly: true,
+      });
+
+      await expect(wrapped(new Date('2026-08-20T00:00:00Z'))).rejects.toThrow(
+        'Blob cache arguments must contain only arrays and plain objects',
+      );
+      expect(mockBlobGet).not.toHaveBeenCalled();
     });
 
     it('serves a successful query result when the blob write fails', async () => {
@@ -159,13 +201,13 @@ describe('cachedQuery', () => {
       warn.mockRestore();
     });
 
-    it('uses bare prefix when no args are passed', async () => {
+    it('versions keys even when no arguments are passed', async () => {
       mockBlobGet.mockResolvedValue('cached');
       const fn = vi.fn(() => Promise.resolve('fresh'));
       const wrapped = cachedQuery(fn, 'no-args', { blobOnly: true });
 
       await wrapped();
-      expect(mockBlobGet).toHaveBeenCalledWith('no-args');
+      expect(mockBlobGet).toHaveBeenCalledWith(expect.stringMatching(/^no-args:v2:/u));
     });
 
     it('does not use unstable_cache in blobOnly mode', () => {

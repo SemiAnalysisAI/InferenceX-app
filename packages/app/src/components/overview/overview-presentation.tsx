@@ -21,7 +21,7 @@ import {
   useOverviewNavigation,
   useOverviewReference,
 } from './overview-navigation';
-import type { OverviewLocale, OverviewStrings } from './overview-scorecard';
+import type { OverviewLocale, OverviewStrings } from './overview-strings';
 
 /**
  * Width the matrix is laid out at while presenting, before `zoom` magnifies it.

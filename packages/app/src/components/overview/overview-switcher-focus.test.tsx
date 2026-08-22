@@ -13,7 +13,8 @@ vi.mock('next/navigation', () => ({
 }));
 
 import { OverviewNavigationProvider, useOverviewData } from './overview-navigation';
-import { OVERVIEW_STRINGS, OverviewTierSwitcher } from './overview-scorecard';
+import { OverviewTierSwitcher } from './overview-scorecard';
+import { OVERVIEW_STRINGS } from './overview-strings';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;

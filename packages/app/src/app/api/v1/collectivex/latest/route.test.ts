@@ -2,15 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeCollectiveXDataset } from '@semianalysisai/inferencex-db/collectivex/test-fixture';
 
-const { mockGetLatest, mockFromRow, mockGetDb, mockEnsureLatest } = vi.hoisted(() => ({
+const { mockGetLatest, mockFromRow, mockGetWriteDb, mockEnsureLatest } = vi.hoisted(() => ({
   mockGetLatest: vi.fn(),
   mockFromRow: vi.fn(),
-  mockGetDb: vi.fn(() => 'mock-sql'),
+  mockGetWriteDb: vi.fn(() => 'mock-write-sql'),
   mockEnsureLatest: vi.fn(),
 }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  getCollectiveXDb: mockGetDb,
+  getCollectiveXWriteDb: mockGetWriteDb,
   FIXTURES_MODE: false,
 }));
 
@@ -73,7 +73,7 @@ describe('GET /api/v1/collectivex/latest', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(dataset);
     expect(mockEnsureLatest).toHaveBeenCalledWith(1);
-    expect(mockGetLatest).toHaveBeenCalledWith('mock-sql', 1);
+    expect(mockGetLatest).toHaveBeenCalledWith('mock-write-sql', 1);
   });
 
   it('serves the stored run when GitHub discovery fails', async () => {

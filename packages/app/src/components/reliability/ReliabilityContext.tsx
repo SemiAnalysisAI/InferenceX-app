@@ -7,13 +7,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
 import {
+  resolveAvailableSelection,
   useChartUIState,
   useChartToggleSet,
-  useAutoInitializeToggleSet,
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useReliability } from '@/hooks/api/use-reliability';
@@ -30,31 +31,36 @@ import type {
 /** @internal Exported for test provider wrapping only. */
 export const ReliabilityContext = createContext<ReliabilityChartContextType | undefined>(undefined);
 
-/** Aggregate raw reliability rows into date-range buckets. */
-function aggregateByDateRange(rows: ReliabilityRow[]): DateRangeSuccessRateData {
-  const now = new Date();
-  const cutoffs: Record<string, Date | null> = {
-    'last-3-days': new Date(now.getTime() - 3 * 86400000),
-    'last-7-days': new Date(now.getTime() - 7 * 86400000),
-    'last-month': new Date(now.getTime() - 30 * 86400000),
-    'last-3-months': new Date(now.getTime() - 90 * 86400000),
-    'all-time': null,
-  };
+/** @internal Aggregate raw reliability rows into date-range buckets. */
+export function aggregateByDateRange(rows: ReliabilityRow[]): DateRangeSuccessRateData {
+  const now = Date.now();
+  const ranges = [
+    ['last-3-days', now - 3 * 86400000],
+    ['last-7-days', now - 7 * 86400000],
+    ['last-month', now - 30 * 86400000],
+    ['last-3-months', now - 90 * 86400000],
+    ['all-time', null],
+  ] as const;
+  const aggregates = Object.fromEntries(
+    ranges.map(([range]) => [range, {} as Record<string, { n_success: number; total: number }>]),
+  ) as Record<(typeof ranges)[number][0], Record<string, { n_success: number; total: number }>>;
+
+  for (const row of rows) {
+    const rowTime = new Date(row.date).getTime();
+    for (const [range, cutoff] of ranges) {
+      if (cutoff !== null && rowTime < cutoff) continue;
+      const stats = (aggregates[range][row.hardware] ??= { n_success: 0, total: 0 });
+      stats.n_success += row.n_success;
+      stats.total += row.total;
+    }
+  }
 
   const result: DateRangeSuccessRateData = {};
-
-  for (const [range, cutoff] of Object.entries(cutoffs)) {
-    const agg: Record<string, { n_success: number; total: number }> = {};
-    for (const row of rows) {
-      if (cutoff && new Date(row.date) < cutoff) continue;
-      if (!agg[row.hardware]) agg[row.hardware] = { n_success: 0, total: 0 };
-      agg[row.hardware].n_success += row.n_success;
-      agg[row.hardware].total += row.total;
-    }
+  for (const [range] of ranges) {
     result[range] = {};
-    for (const [hw, stats] of Object.entries(agg)) {
+    for (const [hardware, stats] of Object.entries(aggregates[range])) {
       if (stats.total === 0) continue;
-      result[range][hw] = {
+      result[range][hardware] = {
         rate: Math.round((stats.n_success / stats.total) * 10000) / 100,
         total: stats.total,
         n_success: stats.n_success,
@@ -67,7 +73,12 @@ function aggregateByDateRange(rows: ReliabilityRow[]): DateRangeSuccessRateData 
 
 export function ReliabilityProvider({ children }: { children: ReactNode }) {
   const { getUrlParam } = useUrlState();
-  const { data: rawRows, isLoading: loading, error: queryError } = useReliability();
+  const {
+    data: rawRows,
+    isLoading: loading,
+    isSuccess: reliabilitySettled,
+    error: queryError,
+  } = useReliability();
 
   const error = queryError ? queryError.message : null;
 
@@ -110,8 +121,6 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     return rangeData ? Object.keys(rangeData) : [];
   }, [dateRangeSuccessRateData, dateRange]);
 
-  useAutoInitializeToggleSet(availableModels, enabledModels, setEnabledModels);
-
   const filteredReliabilityData = useMemo(() => {
     const selectedRangeData = dateRangeSuccessRateData[dateRange];
     if (!selectedRangeData) return [];
@@ -150,16 +159,28 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
   );
   const removeModel = useCallback((model: string) => removeModelRaw(model), [removeModelRaw]);
 
+  const lastModelScopeRef = useRef('');
   useEffect(() => {
-    if (modelsWithData.size === 0) return;
-    if (pendingActiveModels) {
-      const restored = new Set([...pendingActiveModels].filter((k) => modelsWithData.has(k)));
-      setEnabledModels(restored.size > 0 ? restored : modelsWithData);
-      setPendingActiveModels(null);
-      return;
-    }
-    setEnabledModels(modelsWithData);
-  }, [dateRange, modelsWithData]);
+    const scopeChanged = lastModelScopeRef.current !== dateRange;
+    const resolution = resolveAvailableSelection({
+      active: enabledModels,
+      available: modelsWithData,
+      pending: pendingActiveModels,
+      scopeChanged,
+      settled: reliabilitySettled,
+    });
+    if (!reliabilitySettled) return;
+    lastModelScopeRef.current = dateRange;
+    if (resolution.selection !== enabledModels) setEnabledModels(resolution.selection);
+    if (resolution.consumedPending) setPendingActiveModels(null);
+  }, [
+    dateRange,
+    enabledModels,
+    modelsWithData,
+    pendingActiveModels,
+    reliabilitySettled,
+    setEnabledModels,
+  ]);
 
   const selectAllModels = useCallback(
     () => selectAllModelsRaw(modelsWithData),

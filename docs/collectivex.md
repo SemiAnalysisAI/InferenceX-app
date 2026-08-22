@@ -44,6 +44,11 @@ Key invariants:
   `ON CONFLICT (run_id) DO NOTHING`; concurrent first-viewers can't double-ingest or
   expose a partial run. A GitHub re-run (newer `run_attempt`) is replaced through a
   `FOR UPDATE`-guarded refresh statement.
+- **Reads after lazy persistence use the primary**: discovery state checks, writes, and
+  each route's post-discovery query use `DATABASE_COLLECTIVEX_WRITE_URL`. This guarantees
+  that a newly inserted or refreshed run is visible in the same request even when
+  `DATABASE_COLLECTIVEX_READONLY_URL` points at a lagging replica. Ordinary read-only
+  consumers can still use the read URL.
 - **Deletion tombstones** (`cx_runs.deleted_at`, documents freed): discovery must never
   resurrect a deleted run. Re-ingesting via the CLI
   (`bun run admin:db:ingest:collectivex <run-url-or-id>`) clears the tombstone — that CLI is
@@ -65,11 +70,12 @@ Key invariants:
   `s-maxage` (freshness bound for lazy discovery). Run deletion and
   `POST /api/v1/invalidate?scope=collectivex` purge only that tag; the main dashboard's
   blob cache is untouched by CollectiveX operations.
-- **Env**: `DATABASE_COLLECTIVEX_READONLY_URL` (must be the same primary as the write URL
-  — the routes read their own writes), `DATABASE_COLLECTIVEX_WRITE_URL` (direct/unpooled;
-  also used by migrations via `bun run admin:db:migrate:collectivex`),
-  `COLLECTIVEX_ADMIN_SECRET` (delete route Bearer token — deliberately not
-  INVALIDATE_SECRET, since it is remembered in browser localStorage), and `GITHUB_TOKEN`.
+- **Env**: `DATABASE_COLLECTIVEX_READONLY_URL` is the ordinary read-only connection and
+  may point at a replica. `DATABASE_COLLECTIVEX_WRITE_URL` is the primary used by lazy
+  persistence, its consistent reads, deletion, and migrations via
+  `bun run admin:db:migrate:collectivex`. `COLLECTIVEX_ADMIN_SECRET` is the delete route
+  Bearer token (deliberately not `INVALIDATE_SECRET`, since it is remembered in browser
+  localStorage), and `GITHUB_TOKEN` authorizes artifact reads.
 
 ## Multi-run explorer
 

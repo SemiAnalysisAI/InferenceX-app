@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OverviewPageData } from '@/lib/overview-data';
 
 import { OverviewPageContent } from './overview-page';
-import type { OverviewLocale } from './overview-scorecard';
+import type { OverviewLocale } from './overview-strings';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;

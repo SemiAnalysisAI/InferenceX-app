@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// helper to set up window mocks before module import
+// Dynamic imports are intentional: each test resets the module-scope URL snapshot after stubbing window.
 function setupWindow(search = '', pathname = '/inference', hash = '') {
   const location = {
     search,
@@ -127,6 +127,18 @@ describe('readUrlParams', () => {
     expect(params.g_model).toBe('test');
     expect(params).not.toHaveProperty('unknown_key');
   });
+
+  it('preserves the locale path, unrelated params, and hash when cleaning initial state', async () => {
+    const { history } = setupWindow('?g_model=test&eval=42', '/zh/evaluation', '#sample-detail');
+    await import('@/lib/url-state');
+    await vi.runAllTimersAsync();
+
+    expect(history.replaceState).toHaveBeenCalledWith(
+      null,
+      '',
+      '/zh/evaluation?eval=42#sample-detail',
+    );
+  });
 });
 
 describe('refreshUrlParams', () => {
@@ -170,6 +182,35 @@ describe('refreshUrlParams', () => {
     // Not cleared: the provider writes params back as the user filters, and a
     // partial URL must not wipe state the user did not touch.
     expect(refreshed.g_model).toBe('Kimi-K3');
+  });
+
+  it('flushes a pending filter before a retained provider refreshes on navigation', async () => {
+    const { location } = setupWindow('?g_model=Kimi-K3', '/inference');
+    const { readUrlParams, refreshUrlParams, writeUrlParams } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'Qwen-3.5-397B-A17B' });
+    location.search = '';
+    location.pathname = '/evaluation';
+    refreshUrlParams();
+
+    expect(readUrlParams().g_model).toBe('Qwen-3.5-397B-A17B');
+  });
+
+  it('tracks explicit navigation intent separately from serialized state', async () => {
+    const { location } = setupWindow('', '/inference');
+    const { hasExplicitUrlParam, refreshUrlParams, writeUrlParams } =
+      await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'Kimi-K3' });
+    expect(hasExplicitUrlParam('g_model')).toBe(false);
+
+    location.search = '?g_model=GLM-5.2';
+    refreshUrlParams();
+    expect(hasExplicitUrlParam('g_model')).toBe(true);
+
+    location.search = '';
+    refreshUrlParams();
+    expect(hasExplicitUrlParam('g_model')).toBe(false);
   });
 
   it('ignores unknown params', async () => {
@@ -308,6 +349,27 @@ describe('writeUrlParams + buildShareUrl', () => {
     const url = buildShareUrl();
     expect(url).toContain('g_model=immediate');
   });
+
+  it('flushes pending writes synchronously for a remounted provider', async () => {
+    setupWindow('', '/inference');
+    const { readUrlParams, writeUrlParams } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'Kimi-K3', i_seq: 'agentic-traces' });
+
+    expect(readUrlParams()).toMatchObject({
+      g_model: 'Kimi-K3',
+      i_seq: 'agentic-traces',
+    });
+  });
+
+  it('does not restore an initial param after the user resets it to default', async () => {
+    setupWindow('?g_model=Kimi-K3', '/inference');
+    const { readUrlParams, writeUrlParams } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
+
+    expect(readUrlParams().g_model).toBeUndefined();
+  });
 });
 
 describe('SSR safety', () => {
@@ -414,6 +476,30 @@ describe('buildShareUrl tab filtering', () => {
     const url = buildShareUrl();
     expect(url).toContain('g_model=x');
     expect(url).not.toContain('r_range');
+  });
+
+  it('preserves the exact locale, slug, scenario, and hash for non-dashboard chart routes', async () => {
+    setupWindow('', '/zh/compare/h100-vs-h200/8k-1k', '#interactive-results');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'x', i_seq: '8k/1k', r_range: 'last-7-days' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(buildShareUrl()).toBe(
+      'https://example.com/zh/compare/h100-vs-h200/8k-1k?g_model=x&i_seq=8k%2F1k#interactive-results',
+    );
+  });
+
+  it('uses the localized dashboard route to select its share scope', async () => {
+    setupWindow('', '/zh/evaluation', '#samples');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+
+    writeUrlParams({ g_model: 'x', e_bench: 'mmlu', i_seq: '8k/1k' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(buildShareUrl()).toBe(
+      'https://example.com/zh/evaluation?g_model=x&e_bench=mmlu#samples',
+    );
   });
 
   it('omits query string when no non-default params exist', async () => {

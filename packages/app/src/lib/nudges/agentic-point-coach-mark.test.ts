@@ -29,6 +29,7 @@ interface PointSpec {
   top: number;
   benchmarkType?: string;
   hasTrace?: boolean;
+  traceAvailability?: 'pending' | 'resolved';
   hidden?: boolean;
   overlay?: boolean;
   /** Add the marker child the real chart renders inside every `.dot-group`. */
@@ -113,6 +114,9 @@ function renderChart(points: PointSpec[], svgSpec?: ChartSvgSpec): Element[] {
       element.dataset.benchmarkType = spec.benchmarkType ?? 'agentic_traces';
     }
     if (spec.hasTrace) element.dataset.hasTrace = 'true';
+    if (spec.traceAvailability) {
+      element.dataset.traceAvailability = spec.traceAvailability;
+    }
     if (spec.hidden) element.style.opacity = '0';
     if (spec.withShape) {
       const shape = document.createElement('div');
@@ -197,6 +201,30 @@ describe('resolveAgenticPointAnchor', () => {
   it('falls back to any agentic point while the trace lookup is still pending', () => {
     const [only] = renderChart([{ left: 480, top: 280 }]);
     expect(resolveAgenticPointAnchor()).toBe(only);
+  });
+
+  it('does not point at a dead-end point after trace availability resolves empty', () => {
+    renderChart([{ left: 480, top: 280, traceAvailability: 'resolved' }]);
+    expect(resolveAgenticPointAnchor()).toBeNull();
+  });
+
+  it('scopes point geometry to each visible scatter chart', () => {
+    renderChart([]);
+    const firstChart = document.querySelector<HTMLElement>('[data-testid="scatter-graph"]')!;
+    stubBox(firstChart, 0, 1200, 1000, 600);
+
+    const secondChart = document.createElement('div');
+    secondChart.dataset.testid = 'scatter-graph';
+    stubBox(secondChart, 0, 0, 1000, 600);
+    const point = document.createElement('div');
+    point.className = 'dot-group';
+    point.dataset.benchmarkType = 'agentic_traces';
+    point.dataset.hasTrace = 'true';
+    stubRect(point, 480, 280);
+    secondChart.append(point);
+    document.body.append(secondChart);
+
+    expect(resolveAgenticPointAnchor()).toBe(point);
   });
 
   it('skips points hidden by a legend or precision filter', () => {

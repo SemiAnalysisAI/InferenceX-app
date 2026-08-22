@@ -10,7 +10,6 @@ import {
   sequenceForScenarioSegment,
 } from '@/lib/compare-scenario-route';
 import { comparisonScenarioForModel } from '@/lib/compare-agentx';
-import { pickPairDefaults } from '@/lib/compare-pair-defaults';
 import {
   canonicalCompareSlug,
   compareDisplayLabel,
@@ -18,16 +17,11 @@ import {
   compareModelSeoName,
   parseCompareSlug,
 } from '@/lib/compare-slug';
+import { KNOWN_MODELS, KNOWN_PRECISIONS, KNOWN_SEQUENCES, pickString } from '@/lib/compare-ssr';
 import {
-  computeCompareTableData,
-  dateRangeForPair,
-  getCachedBenchmarks,
-  KNOWN_MODELS,
-  KNOWN_PRECISIONS,
-  KNOWN_SEQUENCES,
-  pickString,
-  summarize,
-} from '@/lib/compare-ssr';
+  getComparePageDerivedData,
+  initialCompareBenchmarkRows,
+} from '@/lib/compare-page-data.server';
 import {
   AGENTIC_SCENARIO_INTRO_ZH,
   buildBreadcrumbJsonLdZh,
@@ -96,14 +90,14 @@ export async function buildCompareMetadataZh(
 
   // Stat-led Chinese meta description from the interpolated head-to-head numbers
   // at the slug's default operating point (falls back to boilerplate when thin).
-  const rows = await getCachedBenchmarks(parsed.model.dbKeys);
-  const { sequence, precision } = pickPairDefaults(
-    rows,
+  const { ssrRows } = await getComparePageDerivedData(
+    parsed.model.dbKeys,
     parsed.a,
     parsed.b,
+    null,
+    null,
     comparisonScenarioForModel(parsed.model).sequence,
   );
-  const { ssrRows } = computeCompareTableData(rows, parsed.a, parsed.b, sequence, precision);
   const description = compareMetaDescriptionZh(parsed.model, parsed.a, parsed.b, ssrRows);
 
   return {
@@ -153,38 +147,39 @@ export async function renderComparePageZh(
     permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
-  const rows = await getCachedBenchmarks(parsed.model.dbKeys);
-  const summaryA = summarize(rows, parsed.a);
-  const summaryB = summarize(rows, parsed.b);
-  const { sequence: pickedSequence, precision: pickedPrecision } = pickPairDefaults(
-    rows,
-    parsed.a,
-    parsed.b,
-    comparisonScenarioForModel(parsed.model).sequence,
-  );
+  const fallbackSequence = comparisonScenarioForModel(parsed.model).sequence;
 
   const urlSeq = pickString(sp.i_seq);
   const urlPrec = pickString(sp.i_prec);
   const urlModel = pickString(sp.g_model);
+  const effectiveModel =
+    urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
   // Path beats query beats the pair's default: a scenario segment is an
   // explicit address for one workload, so it outranks a stale `?i_seq=`.
   const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
-  const effectiveSequence =
-    pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence);
-  const effectivePrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : pickedPrecision;
-  const effectiveModel =
-    urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
-
-  const { defaultTargets, ssrRows, interactivityRange } = computeCompareTableData(
-    rows,
+  const requestedSequence = pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : null);
+  const requestedPrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : null;
+  const {
+    sequence: effectiveSequence,
+    precision: effectivePrecision,
+    summaryA,
+    summaryB,
+    defaultTargets,
+    ssrRows,
+    interactivityRange,
+    oldest,
+    newest,
+    initialPairBenchmarkRows,
+  } = await getComparePageDerivedData(
+    parsed.model.dbKeys,
     parsed.a,
     parsed.b,
-    effectiveSequence,
-    effectivePrecision,
+    requestedSequence,
+    requestedPrecision,
+    fallbackSequence,
   );
 
   const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
-  const { oldest, newest } = dateRangeForPair(rows, parsed.a, parsed.b);
   const jsonLd = buildJsonLdZh(
     'full',
     parsed.model,
@@ -231,6 +226,11 @@ export async function renderComparePageZh(
         defaultModel={effectiveModel}
         defaultSequence={effectiveSequence}
         defaultPrecision={effectivePrecision}
+        initialBenchmarkRows={initialCompareBenchmarkRows(
+          parsed.model.displayName,
+          effectiveModel,
+          initialPairBenchmarkRows,
+        )}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         narrative={narrative}
         agenticIntro={isAgenticSequence(effectiveSequence) ? AGENTIC_SCENARIO_INTRO_ZH : null}

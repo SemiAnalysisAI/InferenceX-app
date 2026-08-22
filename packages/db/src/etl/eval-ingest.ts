@@ -3,19 +3,26 @@
  */
 
 import type postgres from 'postgres';
-import type { ConfigParams } from './config-cache';
-import type { EvalParams } from './eval-mapper';
 
 type Sql = ReturnType<typeof postgres>;
 
+export interface EvalPersistenceInput {
+  task: string;
+  isl: number | null;
+  osl: number | null;
+  conc: number | null;
+  lmEvalVersion: string | null;
+  metrics: Record<string, number>;
+}
+
 /**
- * Resolve the config id and insert a single `eval_results` row.
+ * Insert a single `eval_results` row for an already resolved config id.
  * On conflict `(workflow_run_id, config_id, task, isl, osl, conc)` the metrics
  * are overwritten with the latest values.
  *
  * @param sql - Active `postgres` connection.
- * @param getOrCreateConfig - Config cache lookup/upsert function from `createConfigCache`.
- * @param p - Mapped eval parameters to insert.
+ * @param configId - Resolved `configs.id` for this result.
+ * @param p - Eval fields persisted on `eval_results`.
  * @param workflowRunId - DB id of the parent `workflow_runs` row.
  * @param date - ISO date string (`YYYY-MM-DD`) for the `date` column.
  * @returns Outcome (`'new'` or `'dup'`) and the inserted/updated row's `id`,
@@ -23,12 +30,11 @@ type Sql = ReturnType<typeof postgres>;
  */
 export async function ingestEvalRow(
   sql: Sql,
-  getOrCreateConfig: (p: ConfigParams) => Promise<number>,
-  p: EvalParams,
+  configId: number,
+  p: EvalPersistenceInput,
   workflowRunId: number,
   date: string,
 ): Promise<{ outcome: 'new' | 'dup'; id: number }> {
-  const configId = await getOrCreateConfig(p.config);
   const [row] = await sql<{ inserted: boolean; id: number }[]>`
     insert into eval_results (
       workflow_run_id, config_id, task, date,

@@ -28,6 +28,60 @@ export function reconcileActiveSet<T>(
   return filtered;
 }
 
+export interface AvailableSelectionInput<T> {
+  active: Set<T>;
+  available: Set<T>;
+  pending?: Set<T> | null;
+  /** A user-visible scope changed (model, date range, benchmark, etc.). */
+  scopeChanged: boolean;
+  /** False while an empty available set may still be a loading transition. */
+  settled: boolean;
+}
+
+export interface AvailableSelectionResult<T> {
+  selection: Set<T>;
+  consumedPending: boolean;
+}
+
+/**
+ * Shared policy for legend selections backed by asynchronously available data.
+ *
+ * Pending URL intent wins once data settles. A real scope transition starts
+ * fully enabled, while updates inside the same scope only prune stale keys.
+ * An explicitly empty selection is preserved inside a scope rather than being
+ * mistaken for an uninitialized set.
+ */
+export function resolveAvailableSelection<T>({
+  active,
+  available,
+  pending,
+  scopeChanged,
+  settled,
+}: AvailableSelectionInput<T>): AvailableSelectionResult<T> {
+  if (!settled) return { selection: active, consumedPending: false };
+  if (available.size === 0) {
+    return {
+      selection: active.size === 0 ? active : new Set(),
+      consumedPending: pending !== null && pending !== undefined,
+    };
+  }
+
+  if (pending) {
+    const restored = new Set([...pending].filter((item) => available.has(item)));
+    return {
+      selection: restored.size > 0 ? restored : available,
+      consumedPending: true,
+    };
+  }
+
+  if (scopeChanged) return { selection: available, consumedPending: false };
+  if (active.size === 0) return { selection: active, consumedPending: false };
+  return {
+    selection: reconcileActiveSet(active, available, false),
+    consumedPending: false,
+  };
+}
+
 /**
  * Common chart context state and logic shared across all chart types.
  * Extracts duplicated patterns from InferenceChartContext, ReliabilityChartContext,
@@ -114,22 +168,6 @@ export function useChartToggleSet<T extends string = string>() {
     selectAll,
     remove,
   };
-}
-
-/**
- * Automatically initializes a togglable set when available items change.
- * Prevents unnecessary reinitialization when the set is already populated.
- */
-export function useAutoInitializeToggleSet<T>(
-  availableItems: T[],
-  activeSet: Set<T>,
-  setActiveSet: (set: Set<T>) => void,
-) {
-  useEffect(() => {
-    if (availableItems.length > 0 && activeSet.size === 0) {
-      setActiveSet(new Set(availableItems));
-    }
-  }, [availableItems, activeSet.size, setActiveSet]);
 }
 
 /**

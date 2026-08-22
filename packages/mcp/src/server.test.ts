@@ -27,8 +27,11 @@ const { mockState, mockDb } = vi.hoisted(() => {
 });
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  FIXTURES_MODE: false,
-  postgresOptionsForUrl: () => ({ max: 5, ssl: false }),
+  resolveDatabaseConnection: () => ({
+    url: 'postgres://test@localhost/test',
+    driver: 'postgres',
+    ssl: false,
+  }),
 }));
 
 vi.mock('postgres', () => ({

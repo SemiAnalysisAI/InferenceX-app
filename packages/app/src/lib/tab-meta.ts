@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
-import { hasZhSibling, languageAlternates } from '@/lib/i18n';
+import {
+  getDashboardRoute,
+  isDashboardRouteKey,
+  type DashboardRouteKey,
+} from '@/lib/dashboard-routes';
+import { languageAlternates } from '@/lib/i18n';
 
 export const LANDING_META = {
   title: 'Open-Source Agentic Inference Benchmark',
@@ -9,24 +14,7 @@ export const LANDING_META = {
     "Compare AgentX, InferenceX's long-context, multi-turn coding scenario, with fixed-sequence AI inference across chips and frameworks. Public NVIDIA and AMD runs update when configurations change.",
 };
 
-export const VALID_TABS = [
-  'inference',
-  'evaluation',
-  'historical',
-  'calculator',
-  'reliability',
-  'gpu-specs',
-  'collectivex',
-  'ai-chart',
-  'gpu-metrics',
-  'submissions',
-  'current-inferencex-image',
-  'feedback',
-] as const;
-
-export type TabKey = (typeof VALID_TABS)[number];
-
-export const TAB_META: Record<TabKey, { title: string; description: string }> = {
+export const TAB_META: Record<DashboardRouteKey, { title: string; description: string }> = {
   inference: {
     title: 'Agentic Inference Benchmarks',
     description:
@@ -90,27 +78,26 @@ export const TAB_META: Record<TabKey, { title: string; description: string }> = 
 
 const TITLE_SUFFIX = `${SITE_NAME} by ${AUTHOR_NAME}`;
 
-export function isValidTab(value: string): value is TabKey {
-  return (VALID_TABS as readonly string[]).includes(value);
-}
+export const isValidTab = isDashboardRouteKey;
 
 export function getTabTitle(tab: string): string {
-  const meta = TAB_META[tab as TabKey];
+  const meta = isDashboardRouteKey(tab) ? TAB_META[tab] : undefined;
   return meta ? `${meta.title} | ${TITLE_SUFFIX}` : TITLE_SUFFIX;
 }
 
 /** Generate Next.js Metadata for a tab page. */
-export function tabMetadata(tab: TabKey): Metadata {
+export function tabMetadata(tab: DashboardRouteKey): Metadata {
   const meta = TAB_META[tab];
-  const enPath = tab === 'inference' ? '/' : `/${tab}`;
-  const url = tab === 'inference' ? SITE_URL : `${SITE_URL}/${tab}`;
+  const route = getDashboardRoute(tab);
+  const enPath = route.canonicalPath;
+  const url = enPath === '/' ? SITE_URL : `${SITE_URL}${enPath}`;
   return {
     title: meta.title,
     description: meta.description,
     alternates: {
       canonical: url,
       // hreflang to the Chinese sibling page, for tabs mirrored under /zh.
-      ...(hasZhSibling(enPath) && { languages: languageAlternates(enPath) }),
+      ...(route.localeMirrored && { languages: languageAlternates(enPath) }),
     },
     openGraph: {
       title: `${meta.title} | InferenceX`,

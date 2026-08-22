@@ -12,6 +12,7 @@
  *
  * Only non-default values are written to keep URLs short.
  */
+import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/dashboard-routes';
 
 // All known share-link parameter keys
 const URL_STATE_KEYS = [
@@ -151,28 +152,20 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   c_costcap: '',
 };
 
-/** Which param prefixes are relevant per tab. */
-const TAB_PARAM_PREFIXES: Record<string, string[]> = {
-  inference: ['g_', 'i_'],
-  evaluation: ['g_', 'e_'],
-  reliability: ['r_'],
-  // The calculator reuses the global model + inference sequence/precision
-  // params, plus its own c_ scope (fleet planner MW / cost cap).
-  calculator: ['g_', 'i_', 'c_'],
-};
-
 /** In-memory store of current param values (kept in sync via writeUrlParams). */
 const currentState: Record<string, string> = {};
 
 // On module load: snapshot share-link params from the URL.
 // Cleanup is deferred so it runs after Next.js hydration finishes.
 const _initialParams: UrlStateParams = {};
+const explicitUrlParams: UrlStateParams = {};
 if (typeof window !== 'undefined') {
   const searchParams = new URLSearchParams(window.location.search);
   for (const key of URL_STATE_KEYS) {
     const value = searchParams.get(key);
     if (value !== null) {
       _initialParams[key] = value;
+      explicitUrlParams[key] = value;
       currentState[key] = value;
     }
   }
@@ -183,12 +176,17 @@ if (typeof window !== 'undefined') {
       sp.delete(key);
     }
     const s = sp.toString();
-    window.history.replaceState(null, '', `${window.location.pathname}${s ? `?${s}` : ''}`);
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${s ? `?${s}` : ''}${window.location.hash}`,
+    );
   }, 0);
 }
 
-/** Returns the share-link params that were in the URL at page load. */
+/** Returns the current share-link state, flushing pending writes for provider remounts. */
 export function readUrlParams(): UrlStateParams {
+  flushPendingParams();
   return _initialParams;
 }
 
@@ -209,10 +207,13 @@ export function readUrlParams(): UrlStateParams {
  */
 export function refreshUrlParams(): UrlStateParams {
   if (typeof window === 'undefined') return _initialParams;
+  flushPendingParams();
   const searchParams = new URLSearchParams(window.location.search);
   for (const key of URL_STATE_KEYS) {
+    delete explicitUrlParams[key];
     const value = searchParams.get(key);
     if (value === null) continue;
+    explicitUrlParams[key] = value;
     _initialParams[key] = value;
     currentState[key] = value;
   }
@@ -245,6 +246,11 @@ export function refreshUrlParamsOnNavigation(pathname: string): boolean {
   lastRefreshedPathname = pathname;
   refreshUrlParams();
   return true;
+}
+
+/** Whether the current navigation explicitly supplied a share-link parameter. */
+export function hasExplicitUrlParam(key: UrlStateKey): boolean {
+  return explicitUrlParams[key] !== undefined;
 }
 
 /** Check whether the current URL has any share-link params. */
@@ -285,8 +291,10 @@ function flushPendingParams(): void {
 
     if (value === undefined || value === defaultValue) {
       delete currentState[urlKey];
+      delete _initialParams[urlKey];
     } else {
       currentState[urlKey] = value;
+      _initialParams[urlKey] = value;
     }
   }
 
@@ -307,14 +315,17 @@ function flushPendingParams(): void {
 const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/iu;
 
 /**
- * Current in-memory state for `tab`, plus any unofficial-run IDs in the address
- * bar, as a `URLSearchParams`. Flushes pending writes first so the caller sees
- * the newest filter change rather than the one before it.
+ * Current in-memory state for the active route, plus any unofficial-run IDs
+ * in the address bar, as a `URLSearchParams`. Flushes pending writes first so
+ * the caller sees the newest filter change rather than the one before it.
  */
-function collectTabParams(tab: string): URLSearchParams {
+function collectTabParams(): URLSearchParams {
   flushPendingParams();
 
-  const prefixes = TAB_PARAM_PREFIXES[tab] ?? TAB_PARAM_PREFIXES.inference;
+  const route = dashboardRouteForPathname(window.location.pathname);
+  // Compare and other chart routes share inference controls but deliberately
+  // stay outside the dashboard registry.
+  const prefixes = route?.shareParamScopes ?? getDashboardRoute('inference').shareParamScopes;
   const filtered = new URLSearchParams();
   for (const [key, value] of Object.entries(currentState)) {
     if (prefixes.some((p) => key.startsWith(p))) {
@@ -338,20 +349,8 @@ function collectTabParams(tab: string): URLSearchParams {
 }
 
 export function buildShareUrl(): string {
-  const pathTab = window.location.pathname.split('/').filter(Boolean)[0] || 'inference';
-  const search = collectTabParams(pathTab).toString();
-  return `${window.location.origin}/${pathTab}${search ? `?${search}` : ''}`;
-}
-
-/**
- * Which tab's params matter for a pathname, ignoring the `/zh` prefix and any
- * trailing segments. `/zh/inference/agentic/206863` and `/inference` both
- * resolve to `inference`, so a detail page carries the chart's params.
- */
-function tabForPathname(pathname: string): string {
-  const segments = pathname.split('/').filter(Boolean);
-  const first = segments[0] === 'zh' ? segments[1] : segments[0];
-  return first || 'inference';
+  const search = collectTabParams().toString();
+  return `${window.location.origin}${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`;
 }
 
 /**
@@ -360,7 +359,7 @@ function tabForPathname(pathname: string): string {
  */
 export function currentChartSearch(): string {
   if (typeof window === 'undefined') return '';
-  return collectTabParams(tabForPathname(window.location.pathname)).toString();
+  return collectTabParams().toString();
 }
 
 /**
@@ -379,7 +378,7 @@ export function currentChartSearch(): string {
 export function rememberChartStateInUrl(): string {
   if (typeof window === 'undefined') return '';
   const { pathname, hash, search: liveSearch } = window.location;
-  const chartParams = collectTabParams(tabForPathname(pathname));
+  const chartParams = collectTabParams();
 
   // Start from whatever is already in the address bar so params this module
   // does not own (campaign tags and the like) survive the rewrite, then layer

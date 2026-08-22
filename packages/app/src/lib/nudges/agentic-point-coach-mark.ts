@@ -65,60 +65,63 @@ function isRendered(element: Element): boolean {
 export function resolveAgenticPointAnchor(): Element | null {
   if (typeof document === 'undefined') return null;
 
-  const chart = document.querySelector('[data-testid="scatter-graph"]');
-  if (!chart) return null;
-
   const viewport = viewportSize();
-  const chartRect = chart.getBoundingClientRect();
-  // Cheap bail-out. This runs on every scroll event (the chart usually starts
-  // below the fold), and the full scan is a layout read per point — so reject
-  // an off-screen chart with one rect read instead of a hundred.
-  if (
-    chartRect.bottom <= 0 ||
-    chartRect.top >= viewport.height ||
-    chartRect.right <= 0 ||
-    chartRect.left >= viewport.width
-  ) {
-    return null;
-  }
+  const eligible: {
+    element: SVGGElement;
+    hasTrace: boolean;
+    traceAvailability: string | undefined;
+    distance: number;
+  }[] = [];
 
-  const eligible: { element: SVGGElement; hasTrace: boolean; distance: number }[] = [];
-  const chartCx = chartRect.left + chartRect.width / 2;
-  const chartCy = chartRect.top + chartRect.height / 2;
-  // Zooming pushes points outside the plot, where a clip path hides them —
-  // but they keep a perfectly ordinary bounding box, so the viewport check
-  // alone would happily point at one the user cannot see.
-  //
-  // This has to be the clip region, NOT the SVG's own box: the box includes
-  // the 60px axis gutters, so a zoomed point parked over the y-axis labels is
-  // painted away yet still inside the SVG. `plotBounds` returns null only when
-  // the chart clips nothing, in which case the SVG box is the honest answer.
-  const svg = chart.querySelector('[data-testid="d3-chart-svg"]');
-  const plot = (svg && plotBounds(svg)) ?? svg?.getBoundingClientRect() ?? chartRect;
+  for (const chart of document.querySelectorAll<HTMLElement>('[data-testid="scatter-graph"]')) {
+    const chartRect = chart.getBoundingClientRect();
+    // Cheap bail-out. This runs on every scroll event, and the full scan is a
+    // layout read per point, so reject each off-screen chart first.
+    if (
+      chartRect.bottom <= 0 ||
+      chartRect.top >= viewport.height ||
+      chartRect.right <= 0 ||
+      chartRect.left >= viewport.width
+    ) {
+      continue;
+    }
 
-  for (const element of document.querySelectorAll<SVGGElement>(AGENTIC_POINT_SELECTOR)) {
-    if (!isRendered(element)) continue;
-    const rect = element.getBoundingClientRect();
-    if (!isAnchorOnScreen(rect, viewport)) continue;
-    if (!isAnchorWithin(rect, plot)) continue;
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    eligible.push({
-      element,
-      hasTrace: element.dataset.hasTrace === 'true',
-      distance: (cx - chartCx) ** 2 + (cy - chartCy) ** 2,
-    });
+    const chartCx = chartRect.left + chartRect.width / 2;
+    const chartCy = chartRect.top + chartRect.height / 2;
+    // Zoomed points retain ordinary bounding boxes outside the clip region.
+    // Check against the plot rather than the SVG box, which includes gutters.
+    const svg = chart.querySelector('[data-testid="d3-chart-svg"]');
+    const plot = (svg && plotBounds(svg)) ?? svg?.getBoundingClientRect() ?? chartRect;
+
+    for (const element of chart.querySelectorAll<SVGGElement>(
+      '.dot-group[data-benchmark-type="agentic_traces"]',
+    )) {
+      if (!isRendered(element)) continue;
+      const rect = element.getBoundingClientRect();
+      if (!isAnchorOnScreen(rect, viewport)) continue;
+      if (!isAnchorWithin(rect, plot)) continue;
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      eligible.push({
+        element,
+        hasTrace: element.dataset.hasTrace === 'true',
+        traceAvailability: element.dataset.traceAvailability,
+        distance: (cx - chartCx) ** 2 + (cy - chartCy) ** 2,
+      });
+    }
   }
 
   if (eligible.length === 0) return null;
 
-  const withTrace = eligible.filter((c) => c.hasTrace);
-  const pool = withTrace.length > 0 ? withTrace : eligible;
-  const chosen = pool.reduce((best, c) => (c.distance < best.distance ? c : best)).element;
+  const withTrace = eligible.filter((candidate) => candidate.hasTrace);
+  const pending = eligible.filter((candidate) => candidate.traceAvailability !== 'resolved');
+  const pool = withTrace.length > 0 ? withTrace : pending;
+  if (pool.length === 0) return null;
+  const chosen = pool.reduce((best, candidate) =>
+    candidate.distance < best.distance ? candidate : best,
+  ).element;
 
   // Point at the marker, not at the group: a `.dot-group` also contains the
-  // hit area and (when labels are on) the C=/DEP text above the dot, so its
-  // bounding box centre can sit well off the dot itself. Eligibility is still
-  // decided on the group, which is what carries opacity and pointer-events.
+  // hit area and point label, so its bounding box centre can sit off the dot.
   return chosen.querySelector('.visible-shape') ?? chosen;
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/metric-registry';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { sortRowsByYMetric } from '@/components/inference/ui/inference-table-sort';
 import {

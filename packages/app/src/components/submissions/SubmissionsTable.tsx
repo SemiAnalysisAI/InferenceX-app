@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronDown, ChevronRight, GitCompare, Info } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import {
   DB_MODEL_TO_DISPLAY,
@@ -237,6 +237,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
 
   const handleSort = useCallback(
     (key: SortKey) => {
+      setVisibleCount(ROW_PAGE_SIZE);
       if (sortKey === key) {
         setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
       } else {
@@ -273,11 +274,10 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
     });
   }, [filtered, sortKey, sortDir]);
 
-  // Reset visible count when the filtered/sorted view changes so the user
-  // always lands at the top of the new result set instead of mid-list.
-  useEffect(() => {
+  const handleSearchChange = (nextSearch: string) => {
+    setSearch(nextSearch);
     setVisibleCount(ROW_PAGE_SIZE);
-  }, [search, sortKey, sortDir]);
+  };
 
   const visibleRows = useMemo(() => sorted.slice(0, visibleCount), [sorted, visibleCount]);
   const hiddenCount = Math.max(0, sorted.length - visibleRows.length);
@@ -306,7 +306,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
       <input
         type="text"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={(e) => handleSearchChange(e.target.value)}
         onBlur={() => {
           if (search.trim()) track('submissions_table_searched', { query: search.trim() });
         }}

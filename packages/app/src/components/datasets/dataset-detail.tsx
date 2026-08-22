@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
@@ -23,6 +23,7 @@ import { compact, formatPct, formatShare, perConversation } from './format';
 import { Stat } from './stat';
 
 const PAGE = 50;
+const SEARCH_DEBOUNCE_MS = 250;
 
 const STRINGS = {
   en: {
@@ -113,9 +114,12 @@ const STRINGS = {
 
 export function DatasetDetail({ slug }: { slug: string }) {
   const { data: dataset, isLoading, isError } = useDataset(slug);
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<ConversationSort>('tokens');
-  const [page, setPage] = useState(0);
+  const [searchInput, setSearchInput] = useState('');
+  const [{ search, sort, page }, setConversationQuery] = useState({
+    search: '',
+    sort: 'tokens' as ConversationSort,
+    page: 0,
+  });
   const locale = useLocale();
   const t = STRINGS[locale];
   const prefix = locale === 'zh' ? '/zh' : '';
@@ -127,13 +131,28 @@ export function DatasetDetail({ slug }: { slug: string }) {
     { value: 'id', label: t.sortId },
   ];
 
-  const { data: convs, isFetching } = useDatasetConversations({
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setConversationQuery((current) => {
+        if (current.search === searchInput && current.page === 0) return current;
+        return { ...current, search: searchInput, page: 0 };
+      });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  const {
+    data: convs,
+    isFetching,
+    isPlaceholderData,
+  } = useDatasetConversations({
     slug,
     search,
     sort,
     limit: PAGE,
     offset: page * PAGE,
   });
+  const paginationPending = searchInput !== search || isFetching || isPlaceholderData;
 
   if (isLoading) {
     return <div className="py-12 text-center text-sm text-muted-foreground">{t.loading}</div>;
@@ -281,19 +300,19 @@ export function DatasetDetail({ slug }: { slug: string }) {
           <div className="flex items-center gap-2">
             <input
               type="text"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(0);
-              }}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder={t.searchPlaceholder}
               className="h-8 w-40 rounded-md border border-border/40 bg-background px-2 text-xs outline-none focus:border-primary"
             />
             <Select
               value={sort}
               onValueChange={(v) => {
-                setSort(v as ConversationSort);
-                setPage(0);
+                setConversationQuery((current) => ({
+                  ...current,
+                  sort: v as ConversationSort,
+                  page: 0,
+                }));
                 track('datasets_conversations_sorted', { mode: v });
               }}
             >
@@ -370,11 +389,11 @@ export function DatasetDetail({ slug }: { slug: string }) {
           <div className="flex items-center justify-center gap-3 text-xs">
             <button
               type="button"
-              disabled={page === 0}
+              disabled={paginationPending || page === 0}
               onClick={() => {
                 const next = Math.max(0, page - 1);
                 track('datasets_conversations_page_changed', { direction: 'prev', page: next });
-                setPage(next);
+                setConversationQuery((current) => ({ ...current, page: next }));
               }}
               className="rounded-md border border-border/40 px-2 py-1 hover:bg-accent disabled:opacity-30"
             >
@@ -383,11 +402,11 @@ export function DatasetDetail({ slug }: { slug: string }) {
             <span className="text-muted-foreground">{t.pageOf(page + 1, pageCount)}</span>
             <button
               type="button"
-              disabled={page >= pageCount - 1}
+              disabled={paginationPending || page >= pageCount - 1}
               onClick={() => {
                 const next = Math.min(pageCount - 1, page + 1);
                 track('datasets_conversations_page_changed', { direction: 'next', page: next });
-                setPage(next);
+                setConversationQuery((current) => ({ ...current, page: next }));
               }}
               className="rounded-md border border-border/40 px-2 py-1 hover:bg-accent disabled:opacity-30"
             >

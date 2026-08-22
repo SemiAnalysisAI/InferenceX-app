@@ -6,16 +6,29 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import type postgres from 'postgres';
-import type { BenchmarkParams } from './benchmark-mapper';
 import { cleanLogText, type ServerLogFile, type ServerLogFilePath } from './server-log-artifacts';
+import type { BenchmarkType, WorkerPower } from './benchmark-mapper';
 import { kvCachePoolTokensFromServerLog } from './server-log-metrics';
 
 type Sql = ReturnType<typeof postgres>;
 
+export interface BenchmarkPersistenceInput {
+  configId: number;
+  benchmarkType: BenchmarkType;
+  isl: number | null;
+  osl: number | null;
+  conc: number;
+  offloadMode: string;
+  image: string | null;
+  recipeFingerprint: string | null;
+  metrics: Record<string, number>;
+  workers?: WorkerPower[];
+}
+
 type BenchmarkPointIdentity = Pick<
-  BenchmarkParams,
-  'benchmarkType' | 'isl' | 'osl' | 'conc' | 'offloadMode' | 'recipeFingerprint'
-> & { configId: number };
+  BenchmarkPersistenceInput,
+  'configId' | 'benchmarkType' | 'isl' | 'osl' | 'conc' | 'offloadMode' | 'recipeFingerprint'
+>;
 
 /** Stable in-batch identity matching benchmark_results_unique. */
 export function benchmarkPointIngestKey(row: BenchmarkPointIdentity): string {
@@ -38,14 +51,14 @@ export function benchmarkPointIngestKey(row: BenchmarkPointIdentity): string {
  * would update the same row twice in a single query.
  *
  * @param sql - Active `postgres` connection.
- * @param rows - Mapped benchmark rows with their resolved `configId`.
+ * @param rows - Benchmark persistence fields with their resolved `configId`.
  * @param workflowRunId - DB id of the parent `workflow_runs` row.
  * @param date - ISO date string (`YYYY-MM-DD`) for the `date` column.
  * @returns Counts of newly inserted rows and rows that hit the conflict path.
  */
 export async function bulkIngestBenchmarkRows(
   sql: Sql,
-  rows: (BenchmarkParams & { configId: number })[],
+  rows: BenchmarkPersistenceInput[],
   workflowRunId: number,
   date: string,
 ): Promise<{ newCount: number; dupCount: number; insertedIds: number[] }> {
@@ -54,7 +67,7 @@ export async function bulkIngestBenchmarkRows(
   // Postgres rejects ON CONFLICT DO UPDATE if the same conflict key appears
   // more than once in a single batch. Deduplicate within the batch, keeping
   // the last occurrence for each unique recipe/config/scenario/concurrency point.
-  const seen = new Map<string, BenchmarkParams & { configId: number }>();
+  const seen = new Map<string, BenchmarkPersistenceInput>();
   for (const r of rows) {
     seen.set(benchmarkPointIngestKey(r), r);
   }

@@ -4,8 +4,9 @@
  * For Pareto front calculations, see @/lib/chart-utils
  */
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/metric-registry';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
+import { remapInferencePoint } from '@/lib/chart-utils';
 
 import type { ChartDefinition, ClippedInferenceData, InferenceData, YAxisMetricKey } from './types';
 
@@ -188,15 +189,7 @@ export function processOverlayChartDataWithClipping(
 
   const processedData = data
     .filter((d) => metricKey in d)
-    .map((d: InferenceData) => {
-      const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
-      const xValue = (d as any)[xAxisField] ?? d.x;
-      return {
-        ...d,
-        x: xValue,
-        y: yValue,
-      };
-    });
+    .map((d) => remapInferencePoint(d, metricKey, xAxisField));
 
   // The normalized metric is derived from persisted request traces, which an
   // unofficial overlay does not have. An all-false canonical stamp prevents a

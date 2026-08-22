@@ -20,9 +20,8 @@ import {
   OverviewRowScopeToggle,
   OverviewTierSwitcher,
   overviewFormatters,
-  OVERVIEW_STRINGS,
-  type OverviewLocale,
 } from './overview-scorecard';
+import { OVERVIEW_STRINGS, type OverviewLocale } from './overview-strings';
 import {
   OverviewNavigationProvider,
   useOverviewData,

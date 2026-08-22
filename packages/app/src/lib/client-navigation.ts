@@ -16,6 +16,18 @@ export function notifyClientSearchChange(href: string): void {
 }
 
 /**
+ * Replace only the current document's query string without involving the App
+ * Router. Next patches `window.history.replaceState`; calling the pristine
+ * prototype method avoids an RSC navigation for client-owned URL state.
+ */
+export function replaceClientSearch(searchParams: URLSearchParams): void {
+  const search = searchParams.toString();
+  const href = `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`;
+  History.prototype.replaceState.call(window.history, window.history.state, '', href);
+  notifyClientSearchChange(href);
+}
+
+/**
  * The first dashboard transition can request the route without committing the
  * URL change. Repeating the same app-router push after the route payload has
  * been requested preserves same-document navigation and avoids a music restart.

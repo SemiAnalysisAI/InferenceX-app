@@ -63,8 +63,13 @@ function centreOf(element: Element) {
 beforeEach(() => {
   cy.clearAllLocalStorage();
   cy.clearAllSessionStorage();
+  cy.intercept('GET', '/api/v1/trace-availability?ids=*', (request) => {
+    const ids = new URL(request.url).searchParams.get('ids')?.split(',').filter(Boolean) ?? [];
+    request.reply({
+      body: Object.fromEntries(ids.map((id) => [id, true])),
+    });
+  });
 });
-
 describe('Agentic point coach mark', () => {
   it('points at a real, visible agentic point on the first visit', () => {
     visitAgenticChart();

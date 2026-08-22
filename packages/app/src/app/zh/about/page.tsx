@@ -4,23 +4,12 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { FAQ_ITEMS_ZH } from '@/components/about/faq-data-zh';
 import { AgentXFaq } from '@/components/about/agentx-faq';
+import { buildFaqJsonLd, FaqList } from '@/components/about/faq';
 import { JsonLd } from '@/components/json-ld';
 import { zhAlternates, ZH_OG_LOCALE, ZH_LANG_TAG } from '@/lib/i18n';
 import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const faqJsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'FAQPage',
-  inLanguage: ZH_LANG_TAG,
-  mainEntity: FAQ_ITEMS_ZH.map((item) => ({
-    '@type': 'Question',
-    name: item.question,
-    acceptedAnswer: {
-      '@type': 'Answer',
-      text: [item.answer, item.link?.text, ...(item.list ?? [])].filter(Boolean).join(' '),
-    },
-  })),
-};
+const faqJsonLd = buildFaqJsonLd(FAQ_ITEMS_ZH, ZH_LANG_TAG);
 
 const ABOUT_DESCRIPTION =
   'InferenceX 对比各类加速器与服务栈的智能体推理和固定序列 AI 推理性能。AgentX 是其长上下文多轮编码场景。';
@@ -66,16 +55,18 @@ export default function AboutPageZh() {
               NeoCloud。了解更多详情请阅读我们的文章：{' '}
               <Link
                 href="/blog/inferencemax-open-source-inference-benchmarking"
+                hrefLang="en"
                 className="text-brand hover:underline font-medium"
               >
-                InferenceX v1
+                InferenceX v1（英文文章）
               </Link>
               、{' '}
               <Link
                 href="/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper"
+                hrefLang="en"
                 className="text-brand hover:underline font-medium"
               >
-                InferenceX v2
+                InferenceX v2（英文文章）
               </Link>
               。
             </p>
@@ -173,45 +164,7 @@ export default function AboutPageZh() {
           </Card>
         </section>
 
-        <section>
-          <Card>
-            <h2 className="text-lg font-semibold mb-4">常见问题</h2>
-            <dl className="divide-y divide-border">
-              {FAQ_ITEMS_ZH.map((item) => (
-                <div key={item.question} className="py-4 first:pt-0 last:pb-0">
-                  <dt className="font-medium mb-1">{item.question}</dt>
-                  <dd className="text-muted-foreground text-sm">
-                    {item.answer && (
-                      <p>
-                        {item.answer}
-                        {item.link && (
-                          <>
-                            {' '}
-                            <a
-                              href={item.link.href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-brand hover:underline font-medium"
-                            >
-                              {item.link.text}
-                            </a>
-                          </>
-                        )}
-                      </p>
-                    )}
-                    {item.list && (
-                      <ul className="mt-1.5 ml-8 list-disc space-y-0.5">
-                        {item.list.map((li) => (
-                          <li key={li}>{li}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </Card>
-        </section>
+        <FaqList title="常见问题" items={FAQ_ITEMS_ZH} />
       </div>
     </main>
   );

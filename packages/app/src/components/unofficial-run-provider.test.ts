@@ -4,7 +4,13 @@ import type { BenchmarkRow } from '@/lib/api';
 import { Model, Sequence } from '@/lib/data-mappings';
 import { normalizeArtifactRows } from '@/app/api/unofficial-run/route';
 
-import { buildChartData, parseAvailableModelsAndSequences } from './unofficial-run-provider';
+import {
+  buildChartData,
+  overlaySelectionReducer,
+  parseAvailableModelsAndSequences,
+  parseUnofficialRunIds,
+  type OverlaySelectionState,
+} from './unofficial-run-provider';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -361,5 +367,98 @@ describe('schema-v2 measured-power overlay data flow', () => {
     expect(point.measuredJPerSuccessfulQuery).toBeUndefined();
     expect(point.measuredWhPerSuccessfulQuery).toBeUndefined();
     expect(point.measuredPowerPercentTdp).toBeUndefined();
+  });
+});
+
+const initialSelection = (): OverlaySelectionState => ({
+  availabilityKey: '1,2',
+  activeOverlayHwTypes: new Set(['b200', 'h100']),
+  availableOverlayHwTypes: new Set(['b200', 'h100']),
+  localOfficialOverride: null,
+  scopeKey: null,
+  scopeOverlayHwTypes: new Set(),
+  scopeReady: false,
+  bestSelectionKey: '',
+  bestPerSku: false,
+});
+
+describe('unofficial URL and overlay selection state', () => {
+  it('canonicalizes whitespace, leading zeroes, and duplicate run IDs', () => {
+    expect(parseUnofficialRunIds('?UnofficialRuns=0022,%2011,22')).toEqual(['22', '11']);
+  });
+
+  it('seeds a mixed official/overlay scope only when official readiness is known', () => {
+    const pending = overlaySelectionReducer(initialSelection(), {
+      type: 'scope',
+      input: {
+        scopeKey: 'model|sequence|1,2',
+        officialHwTypes: new Set(['h200']),
+        overlayHwTypes: new Set(['b200']),
+        bestOfficialHwTypes: new Set(['h200']),
+        bestOverlayHwTypes: new Set(['b200']),
+        bestPerSku: false,
+        ready: false,
+      },
+    });
+    expect(pending.localOfficialOverride).toBeNull();
+    expect(pending.activeOverlayHwTypes).toEqual(new Set(['b200', 'h100']));
+
+    const ready = overlaySelectionReducer(pending, {
+      type: 'scope',
+      input: {
+        scopeKey: 'model|sequence|1,2',
+        officialHwTypes: new Set(['h200']),
+        overlayHwTypes: new Set(['b200']),
+        bestOfficialHwTypes: new Set(['h200']),
+        bestOverlayHwTypes: new Set(['b200']),
+        bestPerSku: false,
+        ready: true,
+      },
+    });
+    expect(ready.localOfficialOverride).toEqual(new Set(['h200']));
+  });
+
+  it('reconciles best-per-SKU in the reducer and restores the full scope when disabled', () => {
+    const scope = {
+      scopeKey: 'model|sequence|1,2',
+      officialHwTypes: new Set(['h100', 'h200']),
+      overlayHwTypes: new Set(['b100', 'b200']),
+      bestOfficialHwTypes: new Set(['h200']),
+      bestOverlayHwTypes: new Set(['b200']),
+      bestPerSku: true,
+      ready: true,
+    };
+    const best = overlaySelectionReducer(initialSelection(), { type: 'scope', input: scope });
+    expect(best.localOfficialOverride).toEqual(new Set(['h200']));
+    expect(best.activeOverlayHwTypes).toEqual(new Set(['h100', 'b200']));
+
+    const restored = overlaySelectionReducer(best, {
+      type: 'scope',
+      input: { ...scope, bestPerSku: false },
+    });
+    expect(restored.localOfficialOverride).toEqual(new Set(['h100', 'h200']));
+    expect(restored.activeOverlayHwTypes).toEqual(new Set(['h100', 'b100', 'b200']));
+  });
+
+  it('resets dismissed-run selection exactly once when the canonical query key changes', () => {
+    const selected = overlaySelectionReducer(initialSelection(), {
+      type: 'selection',
+      official: new Set(['h200']),
+      overlay: new Set(['b200']),
+    });
+    const dismissed = overlaySelectionReducer(selected, {
+      type: 'availability',
+      key: '1',
+      allOverlayHwTypes: new Set(['b100']),
+    });
+    expect(dismissed.activeOverlayHwTypes).toEqual(new Set(['b100']));
+    expect(dismissed.localOfficialOverride).toBeNull();
+    expect(
+      overlaySelectionReducer(dismissed, {
+        type: 'availability',
+        key: '1',
+        allOverlayHwTypes: new Set(['b100']),
+      }),
+    ).toBe(dismissed);
   });
 });

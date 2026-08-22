@@ -601,6 +601,21 @@ describe('TCO Calculator', () => {
   // DeepSeek V4 agentic trace calculations
   // ---------------------------------------------------------------------------
 
+  describe('availability failure degradation', () => {
+    it('keeps usable benchmark results visible when availability metadata fails', () => {
+      cy.intercept('GET', '/api/v1/availability*', {
+        statusCode: 503,
+        body: { error: 'temporarily unavailable' },
+      }).as('availabilityFailure');
+
+      cy.visit('/calculator');
+      cy.wait('@availabilityFailure');
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
+      cy.get('[data-testid="calculator-controls"]').should('be.visible');
+      cy.contains('Error loading calculator data').should('not.exist');
+    });
+  });
+
   describe('DeepSeek V4 agentic calculations', () => {
     beforeEach(() => {
       const b300Rows = agenticB300Rows(null);

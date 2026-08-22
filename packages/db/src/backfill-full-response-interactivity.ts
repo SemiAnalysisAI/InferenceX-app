@@ -16,11 +16,10 @@ import { hasNoSslFlag } from './cli-utils.js';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
 import { fullResponseMetricsFromGzip } from './etl/full-response-interactivity.js';
 import {
-  confirmProceed,
   jsonbParam,
   parseLimitForceFlags,
   runBackfillMain,
-  runPerIdBackfill,
+  runCandidateIdBackfill,
 } from './lib/backfill-runner.js';
 
 const flags = parseLimitForceFlags();
@@ -31,35 +30,30 @@ async function main(): Promise<void> {
   console.log(`  force = ${flags.force}`);
   console.log(`  limit = ${flags.limit ?? 'none'}`);
 
-  const candidates = flags.force
-    ? await sql<{ id: number }[]>`
-        select br.id
-        from benchmark_results br
-        join agentic_trace_replay atr on atr.id = br.trace_replay_id
-        where br.benchmark_type = 'agentic_traces'
-          and atr.profile_export_jsonl_gz is not null
-        order by br.id
-        ${flags.limit ? sql`limit ${flags.limit}` : sql``}
-      `
-    : await sql<{ id: number }[]>`
-        select br.id
-        from benchmark_results br
-        join agentic_trace_replay atr on atr.id = br.trace_replay_id
-        where br.benchmark_type = 'agentic_traces'
-          and atr.profile_export_jsonl_gz is not null
-          and not (br.metrics ? 'median_full_response_itl')
-        order by br.id
-        ${flags.limit ? sql`limit ${flags.limit}` : sql``}
-      `;
-
-  if (candidates.length === 0) {
-    console.log('\n  Nothing to do — all rows up to date.');
-    return;
-  }
-  if (!(await confirmProceed(`${candidates.length} candidate benchmark row(s).`))) return;
-
-  await runPerIdBackfill(
-    candidates.map((candidate) => candidate.id),
+  const processedCandidates = await runCandidateIdBackfill(
+    async () => {
+      const candidates = flags.force
+        ? await sql<{ id: number }[]>`
+            select br.id
+            from benchmark_results br
+            join agentic_trace_replay atr on atr.id = br.trace_replay_id
+            where br.benchmark_type = 'agentic_traces'
+              and atr.profile_export_jsonl_gz is not null
+            order by br.id
+            ${flags.limit ? sql`limit ${flags.limit}` : sql``}
+          `
+        : await sql<{ id: number }[]>`
+            select br.id
+            from benchmark_results br
+            join agentic_trace_replay atr on atr.id = br.trace_replay_id
+            where br.benchmark_type = 'agentic_traces'
+              and atr.profile_export_jsonl_gz is not null
+              and not (br.metrics ? 'median_full_response_itl')
+            order by br.id
+            ${flags.limit ? sql`limit ${flags.limit}` : sql``}
+          `;
+      return candidates.map((candidate) => candidate.id);
+    },
     async (id) => {
       const [row] = await sql<{ profile_export_jsonl_gz: Buffer | null }[]>`
         select atr.profile_export_jsonl_gz
@@ -85,9 +79,10 @@ async function main(): Promise<void> {
       `;
       return 'ok';
     },
+    (count) => `${count} candidate benchmark row(s).`,
   );
 
-  if (process.exitCode !== 1) await refreshLatestBenchmarks(sql);
+  if (processedCandidates && process.exitCode !== 1) await refreshLatestBenchmarks(sql);
 }
 
 runBackfillMain('backfill-full-response-interactivity', sql, main);

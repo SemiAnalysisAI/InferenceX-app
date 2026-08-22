@@ -14,9 +14,12 @@ import {
 } from '@/components/ui/select';
 import { updateRepoUrl } from '@/lib/utils';
 
-import { useGlobalFilters } from '@/components/GlobalFilterContext';
-import { useInference } from '@/components/inference/InferenceContext';
-import type { WorkflowInfo } from '@/components/inference/types';
+import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+import {
+  useInferenceActions,
+  useInferenceData,
+  useInferenceFilters,
+} from '@/components/inference/InferenceContext';
 import {
   formatChangelogDescription,
   formatConfigKeys,
@@ -48,25 +51,15 @@ function RunConclusionDot({ conclusion }: { conclusion: string | null }) {
   );
 }
 
-export default function WorkflowInfoDisplay({
-  workflowInfo,
-}: {
-  workflowInfo: WorkflowInfo[] | null;
-}) {
-  const {
-    selectedRunDate,
-    setSelectedRunDate,
-    availableDates,
-    availableRuns,
-    selectedRunId,
-    setSelectedRunId,
-    isCheckingAvailableDates,
-  } = useInference();
+export default function WorkflowInfoDisplay() {
+  const { selectedRunDate, selectedRunId } = useInferenceFilters();
+  const { availableDates, availableRuns, isCheckingAvailableDates } = useInferenceData();
+  const { setSelectedRunDate, setSelectedRunId } = useInferenceActions();
 
-  const { effectivePrecisions } = useGlobalFilters();
+  const { effectivePrecisions } = useGlobalFilterSelection();
 
   // Navigation functions for runs
-  const runIds = availableRuns ? Object.keys(availableRuns) : [];
+  const runIds = Object.keys(availableRuns);
   const currentRunIndex = runIds.indexOf(selectedRunId);
 
   const canGoPreviousRun = () => currentRunIndex > 0;
@@ -90,7 +83,7 @@ export default function WorkflowInfoDisplay({
     }
   };
 
-  if (!workflowInfo || workflowInfo.length === 0 || !workflowInfo[0]) {
+  if (runIds.length === 0) {
     return (
       <div className="flex flex-col lg:flex-row gap-2 text-muted-foreground">
         <DatePicker
@@ -104,7 +97,7 @@ export default function WorkflowInfoDisplay({
   }
 
   const changelog = (() => {
-    const raw = availableRuns ? availableRuns[selectedRunId]?.changelog || null : null;
+    const raw = availableRuns[selectedRunId]?.changelog || null;
     if (!raw) return null;
     // Filter config_keys by selected precisions, drop entries with no matching keys
     const filtered = raw.entries
@@ -121,17 +114,13 @@ export default function WorkflowInfoDisplay({
 
   return (
     <div className="flex flex-wrap gap-2 lg:gap-4 text-muted-foreground">
-      {/* <div className="flex items-center gap-2">
-        <CalendarRange size={16} />
-        <strong>Run Date:</strong> {workflowInfo[0].run_date} UTC
-      </div> */}
       <DatePicker
         date={selectedRunDate}
         onChange={(date) => setSelectedRunDate(date)}
         availableDates={availableDates}
         isCheckingAvailableDates={isCheckingAvailableDates}
       />
-      {availableRuns ? (
+      {runIds.length > 0 ? (
         <div className="flex items-center gap-0.5">
           <Button
             variant="ghost"

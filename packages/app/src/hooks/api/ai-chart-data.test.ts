@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/metric-registry';
 
 import {
   buildAiLineData,

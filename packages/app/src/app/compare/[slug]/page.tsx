@@ -11,7 +11,6 @@ import {
   sequenceForScenarioSegment,
 } from '@/lib/compare-scenario-route';
 import { languageAlternates } from '@/lib/i18n';
-import { pickPairDefaults } from '@/lib/compare-pair-defaults';
 import {
   canonicalCompareSlug,
   compareDisplayLabel,
@@ -26,15 +25,15 @@ import {
   buildJsonLd,
   compareMetaDescription,
   compareTableNarrative,
-  computeCompareTableData,
-  dateRangeForPair,
-  getCachedBenchmarks,
   KNOWN_MODELS,
   KNOWN_PRECISIONS,
   KNOWN_SEQUENCES,
   pickString,
-  summarize,
 } from '@/lib/compare-ssr';
+import {
+  getComparePageDerivedData,
+  initialCompareBenchmarkRows,
+} from '@/lib/compare-page-data.server';
 
 import ComparePageClient from './page-client';
 
@@ -89,17 +88,17 @@ export async function buildCompareMetadata(
   // template so the query isn't pushed off the end.
   const title = `${compareSeoTitle(gpuLabel, modelSeoName)} | ${SITE_NAME}`;
 
-  // Stat-led meta description built from the interpolated head-to-head numbers
-  // at the slug's default operating point (falls back to boilerplate for
-  // sparse-data pairs). Fetch is blob-cached and shared with the page render.
-  const rows = await getCachedBenchmarks(parsed.model.dbKeys);
-  const { sequence, precision } = pickPairDefaults(
-    rows,
+  // Stat-led meta description from the default interpolated head-to-head
+  // numbers. The compact derived payload is shared with the page render and
+  // invalidated with the database cache tag.
+  const { ssrRows } = await getComparePageDerivedData(
+    parsed.model.dbKeys,
     parsed.a,
     parsed.b,
+    null,
+    null,
     comparisonScenarioForModel(parsed.model).sequence,
   );
-  const { ssrRows } = computeCompareTableData(rows, parsed.a, parsed.b, sequence, precision);
   const description = compareMetaDescription(parsed.model, parsed.a, parsed.b, ssrRows);
 
   return {
@@ -167,44 +166,41 @@ export async function renderComparePage(
     permanentRedirect(`${comparePath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
-  const rows = await getCachedBenchmarks(parsed.model.dbKeys);
-  const summaryA = summarize(rows, parsed.a);
-  const summaryB = summarize(rows, parsed.b);
-  const { sequence: pickedSequence, precision: pickedPrecision } = pickPairDefaults(
-    rows,
-    parsed.a,
-    parsed.b,
-    comparisonScenarioForModel(parsed.model).sequence,
-  );
-
+  const fallbackSequence = comparisonScenarioForModel(parsed.model).sequence;
   // URL params win over slug-derived defaults; this baking-into-SSR avoids the
   // hydration flash where the client upgrades seeded defaults to URL values.
   // `sp` was already awaited above for the redirect-query-preservation path.
   const urlSeq = pickString(sp.i_seq);
   const urlPrec = pickString(sp.i_prec);
   const urlModel = pickString(sp.g_model);
+  const effectiveModel =
+    urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
   // Path beats query beats the pair's default: a scenario segment is an
   // explicit address for one workload, so it outranks a stale `?i_seq=`.
   const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
-  const effectiveSequence =
-    pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence);
-  const effectivePrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : pickedPrecision;
-  // `?g_model=` is honored only if it matches a known model — but the slug's
-  // model is the canonical default. Disregard URL param if user wants to
-  // explicitly override (rare).
-  const effectiveModel =
-    urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
-
-  const { defaultTargets, ssrRows, interactivityRange } = computeCompareTableData(
-    rows,
+  const requestedSequence = pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : null);
+  const requestedPrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : null;
+  const {
+    sequence: effectiveSequence,
+    precision: effectivePrecision,
+    summaryA,
+    summaryB,
+    defaultTargets,
+    ssrRows,
+    interactivityRange,
+    oldest,
+    newest,
+    initialPairBenchmarkRows,
+  } = await getComparePageDerivedData(
+    parsed.model.dbKeys,
     parsed.a,
     parsed.b,
-    effectiveSequence,
-    effectivePrecision,
+    requestedSequence,
+    requestedPrecision,
+    fallbackSequence,
   );
 
   const url = `${SITE_URL}${comparePath(canonical, scenarioSegment)}`;
-  const { oldest, newest } = dateRangeForPair(rows, parsed.a, parsed.b);
   const jsonLd = buildJsonLd(
     'full',
     parsed.model,
@@ -251,6 +247,11 @@ export async function renderComparePage(
         defaultModel={effectiveModel}
         defaultSequence={effectiveSequence}
         defaultPrecision={effectivePrecision}
+        initialBenchmarkRows={initialCompareBenchmarkRows(
+          parsed.model.displayName,
+          effectiveModel,
+          initialPairBenchmarkRows,
+        )}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         narrative={narrative}
         agenticIntro={isAgenticSequence(effectiveSequence) ? AGENTIC_SCENARIO_INTRO : null}

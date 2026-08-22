@@ -14,7 +14,7 @@
  */
 import { withPercentile } from '@/lib/benchmark-transform';
 
-import type { ChartDefinition } from '../types';
+import type { AggDataEntry, ChartDefinition } from '../types';
 
 /** Which rung of the branch ladder chose the x field (drives label choice). */
 export type XAxisBranch =
@@ -25,10 +25,9 @@ export type XAxisBranch =
 
 export interface ResolvedXAxis {
   /** The data field the x-axis plots (percentile-adjusted for agentic). */
-  xAxisField: string;
-  /** The chart's natural latency metric, percentile-adjusted — the "no
-   * override" baseline the flip check compares against. */
-  naturalX: string;
+  xAxisField: keyof AggDataEntry;
+  /** The chart's natural latency metric, percentile-adjusted. */
+  naturalX: keyof AggDataEntry;
   isInputMetric: boolean;
   isTtftOverride: boolean;
   branch: XAxisBranch;
@@ -60,7 +59,10 @@ export function resolveXAxisField(
   opts: { isAgentic: boolean; percentile: string },
 ): ResolvedXAxis {
   const { isAgentic, percentile } = opts;
-  const naturalX = withPercentile(chartDef.x, isAgentic ? percentile : 'median');
+  const naturalX = withPercentile(
+    chartDef.x,
+    isAgentic ? percentile : 'median',
+  ) as keyof AggDataEntry;
 
   const metricTitle =
     (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
@@ -69,22 +71,22 @@ export function resolveXAxisField(
   // percentile (median/p75/p90/p99) depending on sequence kind.
   const isTtftOverride = typeof effectiveXMetric === 'string' && effectiveXMetric.endsWith('_ttft');
 
-  let xAxisField: string = naturalX;
+  let xAxisField: keyof AggDataEntry = naturalX;
   let branch: XAxisBranch = 'natural';
   if (effectiveXMetric && chartDef.chartType === 'interactivity' && isInputMetric && !isAgentic) {
-    xAxisField = effectiveXMetric;
+    xAxisField = effectiveXMetric as keyof AggDataEntry;
     branch = 'user-input-override';
   } else if (chartDef.chartType === 'interactivity' && isInputMetric) {
     const xOverrideKey = `${selectedYAxisMetric}_x` as keyof ChartDefinition;
-    xAxisField = (chartDef[xOverrideKey] as string) || chartDef.x;
+    xAxisField = ((chartDef[xOverrideKey] as string) || chartDef.x) as keyof AggDataEntry;
     branch = 'config-input-override';
   } else if (chartDef.chartType === 'e2e' && isTtftOverride) {
-    xAxisField = effectiveXMetric!;
+    xAxisField = effectiveXMetric as keyof AggDataEntry;
     branch = 'e2e-ttft-override';
   }
 
   if (isAgentic) {
-    xAxisField = withPercentile(xAxisField, percentile);
+    xAxisField = withPercentile(xAxisField, percentile) as keyof AggDataEntry;
   }
 
   return { xAxisField, naturalX, isInputMetric, isTtftOverride, branch };

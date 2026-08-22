@@ -5,6 +5,32 @@ import * as React from 'react';
 
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
+import { useLocale } from '@/lib/use-locale';
+
+const STRINGS = {
+  en: {
+    placeholder: 'Select items...',
+    searchPlaceholder: 'Search...',
+    searchAriaLabel: 'Search options',
+    noResultsLabel: 'No results',
+    clearSearchLabel: 'Clear search',
+    selectedSuffix: ' selected',
+    minimumPrefix: 'Minimum: ',
+    removePrefix: 'Remove ',
+    clearAllSelections: 'Clear all selections',
+  },
+  zh: {
+    placeholder: '选择项目...',
+    searchPlaceholder: '搜索...',
+    searchAriaLabel: '搜索选项',
+    noResultsLabel: '没有结果',
+    clearSearchLabel: '清除搜索',
+    selectedSuffix: ' 项已选择',
+    minimumPrefix: '最少：',
+    removePrefix: '移除 ',
+    clearAllSelections: '清除所有选择',
+  },
+} as const;
 
 interface MultiSelectOption {
   value: string;
@@ -39,6 +65,7 @@ interface MultiSelectProps {
   plainSelectedText?: boolean;
   showSelectionSummary?: boolean;
   searchPlaceholder?: string;
+  searchAriaLabel?: string;
   noResultsLabel?: string;
   clearSearchLabel?: string;
   selectedSuffix?: string;
@@ -54,7 +81,7 @@ function MultiSelect({
   triggerTestId,
   open,
   onOpenChange,
-  placeholder = 'Select items...',
+  placeholder,
   size = 'default',
   className,
   disabled = false,
@@ -64,12 +91,21 @@ function MultiSelect({
   searchable = true,
   plainSelectedText = false,
   showSelectionSummary = true,
-  searchPlaceholder = 'Search...',
-  noResultsLabel = 'No results',
-  clearSearchLabel = 'Clear search',
-  selectedSuffix = ' selected',
-  minimumPrefix = 'Minimum: ',
+  searchPlaceholder,
+  searchAriaLabel,
+  noResultsLabel,
+  clearSearchLabel,
+  selectedSuffix,
+  minimumPrefix,
 }: MultiSelectProps) {
+  const t = STRINGS[useLocale()];
+  const resolvedPlaceholder = placeholder ?? t.placeholder;
+  const resolvedSearchPlaceholder = searchPlaceholder ?? t.searchPlaceholder;
+  const resolvedSearchAriaLabel = searchAriaLabel ?? t.searchAriaLabel;
+  const resolvedNoResultsLabel = noResultsLabel ?? t.noResultsLabel;
+  const resolvedClearSearchLabel = clearSearchLabel ?? t.clearSearchLabel;
+  const resolvedSelectedSuffix = selectedSuffix ?? t.selectedSuffix;
+  const resolvedMinimumPrefix = minimumPrefix ?? t.minimumPrefix;
   const [internalIsOpen, setInternalIsOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const listboxId = React.useId();
@@ -85,18 +121,23 @@ function MultiSelect({
   const isOpen = isControlledOpen ? open : internalIsOpen;
   const setIsOpen = React.useCallback(
     (nextOpen: boolean) => {
+      if (!nextOpen && isOpen) {
+        if (searchUsedRef.current) {
+          track('multi_select_searched', { query: searchStateRef.current });
+          searchUsedRef.current = false;
+        }
+        setSearch('');
+      }
       if (!isControlledOpen) {
         setInternalIsOpen(nextOpen);
       }
       onOpenChange?.(nextOpen);
     },
-    [isControlledOpen, onOpenChange],
+    [isControlledOpen, isOpen, onOpenChange],
   );
 
   const isMaxReached = maxSelections !== undefined && value.length >= maxSelections;
   const isMinReached = minSelections !== undefined && value.length <= minSelections;
-
-  const prevIsOpenRef = React.useRef(isOpen);
 
   React.useEffect(() => {
     const handlePointerDownOutside = (event: PointerEvent) => {
@@ -134,20 +175,7 @@ function MultiSelect({
       document.removeEventListener('focusin', handleFocusOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen]);
-
-  React.useEffect(() => {
-    const wasOpen = prevIsOpenRef.current;
-    prevIsOpenRef.current = isOpen;
-
-    if (wasOpen && !isOpen) {
-      if (searchUsedRef.current) {
-        track('multi_select_searched', { query: searchStateRef.current });
-        searchUsedRef.current = false;
-      }
-      setSearch('');
-    }
-  }, [isOpen]);
+  }, [isOpen, setIsOpen]);
 
   const flatOptions = React.useMemo(() => {
     if (sections?.length) {
@@ -294,7 +322,7 @@ function MultiSelect({
                       'hover:bg-primary/20 rounded-sm cursor-pointer transition-colors',
                       (disabled || isMinReached) && 'hidden',
                     )}
-                    aria-label={`Remove ${label}`}
+                    aria-label={`${t.removePrefix}${label}`}
                     aria-disabled={disabled || isMinReached}
                   >
                     <XIcon className="size-4 text-foreground" />
@@ -303,7 +331,7 @@ function MultiSelect({
               ))
             )
           ) : (
-            <span className="text-muted-foreground">{placeholder}</span>
+            <span className="text-muted-foreground">{resolvedPlaceholder}</span>
           )}
         </div>
         {value.length > 0 && showClearAll && (
@@ -322,7 +350,7 @@ function MultiSelect({
               (disabled || (minSelections !== undefined && minSelections > 0)) &&
                 'cursor-not-allowed opacity-50 pointer-events-none',
             )}
-            aria-label="Clear all selections"
+            aria-label={t.clearAllSelections}
             aria-disabled={disabled || (minSelections !== undefined && minSelections > 0)}
           >
             <XIcon className="size-4" />
@@ -358,7 +386,8 @@ function MultiSelect({
                     setSearch(e.target.value);
                     if (e.target.value) searchUsedRef.current = true;
                   }}
-                  placeholder={searchPlaceholder}
+                  placeholder={resolvedSearchPlaceholder}
+                  aria-label={resolvedSearchAriaLabel}
                   className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
                 />
                 {search && (
@@ -369,7 +398,7 @@ function MultiSelect({
                       searchRef.current?.focus();
                     }}
                     className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label={clearSearchLabel}
+                    aria-label={resolvedClearSearchLabel}
                   >
                     <XIcon className="size-3.5" />
                   </button>
@@ -381,10 +410,10 @@ function MultiSelect({
                 <div className="text-muted-foreground px-2 py-1.5 text-xs border-b mb-1">
                   {value.length}
                   {maxSelections !== undefined && ` / ${maxSelections}`}
-                  {selectedSuffix}
+                  {resolvedSelectedSuffix}
                   {minSelections !== undefined && minSelections > 0 && (
                     <span className="block text-xs mt-0.5">
-                      {minimumPrefix}
+                      {resolvedMinimumPrefix}
                       {minSelections}
                     </span>
                   )}
@@ -392,7 +421,7 @@ function MultiSelect({
               )}
             {filteredOptions.length === 0 && (
               <div className="text-muted-foreground px-2 py-1.5 text-sm text-center">
-                {noResultsLabel}
+                {resolvedNoResultsLabel}
               </div>
             )}
             {filteredSections

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   AGENTIC_COACH_MARK_STORAGE_KEY,
@@ -6,6 +6,9 @@ import {
 } from './agentic-point-coach-mark';
 import { dismissesOnAction } from './policy';
 import { NUDGE_REGISTRY, TELEMETRY_TUTORIAL_STORAGE_KEY } from './registry';
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('NUDGE_REGISTRY integrity', () => {
   it('has no duplicate IDs', () => {
@@ -101,9 +104,23 @@ describe('NUDGE_REGISTRY integrity', () => {
     expect(TELEMETRY_TUTORIAL_STORAGE_KEY).toBe('inferencex-agentx-telemetry-tutorial-dismissed');
   });
 
+  it('keeps internal action destinations in the active Chinese route tree', () => {
+    const location = { pathname: '/zh/inference', href: '' };
+    vi.stubGlobal('window', { location });
+
+    const reproducibility = NUDGE_REGISTRY.find((nudge) => nudge.id === 'reproducibility');
+    if (reproducibility?.type !== 'toast') throw new Error('Missing reproducibility toast');
+    reproducibility.content.action?.onClick();
+    expect(location.href).toBe('/zh/about#reproducibility');
+
+    const launch = NUDGE_REGISTRY.find((nudge) => nudge.id === 'agentic-results-launch-modal');
+    if (launch?.type !== 'modal') throw new Error('Missing launch modal');
+    launch.content.primaryAction?.onClick();
+    expect(location.href).toBe('/zh/inference?i_seq=agentic-traces');
+  });
+
   it('gives every coach mark an anchor to point at', () => {
     for (const nudge of NUDGE_REGISTRY.filter((n) => n.type === 'coach-mark')) {
-      // Without one the engine has nothing to position against and skips it.
       expect(typeof nudge.content.anchor?.resolve).toBe('function');
     }
   });
@@ -112,17 +129,11 @@ describe('NUDGE_REGISTRY integrity', () => {
     const coachMark = NUDGE_REGISTRY.find((n) => n.id === 'agentic-point-detail');
 
     expect(coachMark?.type).toBe('coach-mark');
-    // Lives on the dashboard engine, which `DashboardShell` deliberately does
-    // not mount on /inference/agentic/[id] — the page the tip points at.
     expect(coachMark?.scope).toBe('dashboard');
-    // First visit only.
     expect(coachMark?.dismissal.type).toBe('permanent');
     expect(coachMark?.storageKey).toBe(AGENTIC_COACH_MARK_STORAGE_KEY);
-    // Clicking a point is engagement, so it persists the dismissal too.
     expect(dismissesOnAction(coachMark!)).toBe(true);
     expect(coachMark?.content.anchor?.actionSelector).toBe(AGENTIC_POINT_ACTION_SELECTOR);
-    // cypress/support/e2e.ts seeds this key so the callout can't sit over the
-    // chart under test; a rename here has to be mirrored there.
     expect(AGENTIC_COACH_MARK_STORAGE_KEY).toBe('inferencex-agentic-point-coach-mark-dismissed');
   });
 

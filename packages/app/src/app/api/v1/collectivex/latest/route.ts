@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { parseCollectiveXVersion } from '@semianalysisai/inferencex-db/collectivex/types';
-import { FIXTURES_MODE, getCollectiveXDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE, getCollectiveXWriteDb } from '@semianalysisai/inferencex-db/connection';
 import {
   collectiveXDatasetFromRow,
   getLatestCollectiveXRun,
@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const row = await getLatestCollectiveXRun(getCollectiveXDb(), version);
+    // Discovery may have persisted a run, so read from the same primary.
+    const row = await getLatestCollectiveXRun(getCollectiveXWriteDb(), version);
     if (row !== null) {
       if (ensureError)
         console.error('CollectiveX discovery failed; serving stored run:', ensureError);

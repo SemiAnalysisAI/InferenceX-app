@@ -1,13 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { compileMDX } from 'next-mdx-remote/rsc';
-import rehypeShikiFromHighlighter from '@shikijs/rehype/core';
-import rehypeKatex from 'rehype-katex';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import { createHighlighterCore } from 'shiki/core';
-import { createOnigurumaEngine } from 'shiki/engine/oniguruma';
 
 import 'katex/dist/katex.min.css';
 
@@ -15,7 +8,6 @@ import { BlogBackLink } from '@/components/blog/blog-back-link';
 import { BlogPostNav } from '@/components/blog/blog-post-nav';
 import { BlogToc } from '@/components/blog/blog-toc';
 import { HashScroll } from '@/components/blog/hash-scroll';
-import { createMdxComponents } from '@/components/blog/mdx-components';
 import { ReadingProgressBar } from '@/components/blog/reading-progress-bar';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { Card } from '@/components/ui/card';
@@ -29,6 +21,7 @@ import {
   extractHeadings,
   getPostBySlug,
 } from '@/lib/blog';
+import { compileBlogMdx } from '@/lib/blog-mdx';
 import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 import {
   AUTHOR_HANDLE,
@@ -81,33 +74,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-let highlighterPromise: ReturnType<typeof createHighlighterCore> | null = null;
-
-function getHighlighter() {
-  if (!highlighterPromise) {
-    highlighterPromise = createHighlighterCore({
-      themes: [import('shiki/themes/github-dark.mjs'), import('shiki/themes/github-light.mjs')],
-      langs: [
-        import('shiki/langs/typescript.mjs'),
-        import('shiki/langs/javascript.mjs'),
-        import('shiki/langs/python.mjs'),
-        import('shiki/langs/bash.mjs'),
-        import('shiki/langs/json.mjs'),
-        import('shiki/langs/yaml.mjs'),
-        import('shiki/langs/css.mjs'),
-        import('shiki/langs/html.mjs'),
-        import('shiki/langs/tsx.mjs'),
-        import('shiki/langs/jsx.mjs'),
-        import('shiki/langs/sql.mjs'),
-        import('shiki/langs/go.mjs'),
-        import('shiki/langs/rust.mjs'),
-      ],
-      engine: createOnigurumaEngine(import('shiki/wasm')),
-    });
-  }
-  return highlighterPromise;
-}
-
 export default async function ZhBlogPostPage({ params }: Props) {
   const { slug } = await params;
   const result = getPostBySlug(slug, 'zh');
@@ -116,32 +82,7 @@ export default async function ZhBlogPostPage({ params }: Props) {
   const { meta, raw } = result;
   const adjacent = getAdjacentPosts(slug, 'zh');
   const headings = extractHeadings(raw);
-  const highlighter = await getHighlighter();
-
-  const { content } = await compileMDX({
-    source: raw,
-    components: createMdxComponents('zh'),
-    options: {
-      mdxOptions: {
-        // `singleDollarTextMath: false` keeps prices like $1.95/GPU/hr from being parsed
-        // as inline math; math must be delimited with `$$`.
-        remarkPlugins: [remarkGfm, [remarkMath, { singleDollarTextMath: false }]],
-        rehypePlugins: [
-          // `strict: false` keeps a single malformed expression from failing the whole build;
-          // KaTeX renders it inline in red instead.
-          [rehypeKatex, { strict: false }],
-          [
-            rehypeShikiFromHighlighter,
-            highlighter,
-            {
-              themes: { dark: 'github-dark', light: 'github-light' },
-              defaultColor: false,
-            },
-          ],
-        ],
-      },
-    },
-  });
+  const { content } = await compileBlogMdx(raw, 'zh');
 
   const jsonLd = buildBlogPostingJsonLd(meta, raw, 'zh');
   const breadcrumbJsonLd = buildBlogBreadcrumbJsonLdZh(slug, meta.title);

@@ -5,6 +5,7 @@ import { getDb } from '@semianalysisai/inferencex-db/connection';
 import { getServerLog, getServerLogChunk } from '@semianalysisai/inferencex-db/queries/server-logs';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/public-api-errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
   const id = Number(request.nextUrl.searchParams.get('id'));
 
   if (!id || !Number.isFinite(id)) {
-    return NextResponse.json({ error: 'id is required (benchmark_result_id)' }, { status: 400 });
+    return publicApiError(PUBLIC_API_ERRORS.idRequired, 400);
   }
 
   try {
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
     if (download === '1') {
       const firstChunk = await getCachedServerLogChunk(id, 0, MAX_SERVER_LOG_CHUNK_SIZE, fileName);
       if (firstChunk === null) {
-        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
       }
       const encoder = new TextEncoder();
       let nextOffset = firstChunk.nextOffset;
@@ -155,7 +156,7 @@ export async function GET(request: NextRequest) {
 
       const chunk = await getCachedServerLogChunk(id, offset, limit, fileName);
       if (chunk === null) {
-        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
       }
       return cachedJson({ id, ...chunk });
     }
@@ -166,12 +167,12 @@ export async function GET(request: NextRequest) {
         : await getCachedNamedServerLog(id, fileName);
 
     if (serverLog === null) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
     }
 
     return cachedJson(fileName === null ? { id, serverLog } : { id, fileName, serverLog });
   } catch (error) {
     console.error('Error fetching server log:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return publicApiError(PUBLIC_API_ERRORS.internal, 500);
   }
 }

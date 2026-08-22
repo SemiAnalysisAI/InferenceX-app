@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { parseCollectiveXVersion } from '@semianalysisai/inferencex-db/collectivex/types';
-import { FIXTURES_MODE, getCollectiveXDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE, getCollectiveXWriteDb } from '@semianalysisai/inferencex-db/connection';
 import { listCollectiveXRuns } from '@semianalysisai/inferencex-db/queries/collectivex';
 
 import { COLLECTIVEX_CACHE_CONTROL, cachedJson, collectiveXCacheTag } from '@/lib/api-cache';
@@ -35,7 +35,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const runs = await listCollectiveXRuns(getCollectiveXDb(), version);
+    // Backfill may have persisted runs, so read from the same primary.
+    const runs = await listCollectiveXRuns(getCollectiveXWriteDb(), version);
     if (runs.length === 0 && ensureError) {
       console.error('CollectiveX run backfill failed with no stored fallback:', ensureError);
       const status = collectiveXSweepErrorStatus(ensureError) ?? 502;

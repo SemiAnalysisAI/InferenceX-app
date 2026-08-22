@@ -3,32 +3,35 @@
  */
 
 import postgres, { type Options } from 'postgres';
+import { resolveDatabaseConnection } from '../connection.js';
 
 export type Sql = ReturnType<typeof postgres>;
 
 /**
- * Create a postgres client for admin scripts.
+ * Create a postgres.js client for admin scripts.
  * Reads DATABASE_WRITE_URL by default, or DATABASE_READONLY_URL with `readonly: true`.
- * Pass `envVar` to target another database (e.g. DATABASE_COLLECTIVEX_WRITE_URL).
- * Pass `noSsl: true` to disable TLS for local Postgres.
+ * Pass `envVar` or `url` to target a different database. `noSsl` explicitly
+ * disables TLS, while the shared resolver handles environment and host defaults.
  */
 export function createAdminSql(
   opts: Omit<Options<Record<string, postgres.PostgresType>>, 'ssl'> & {
     readonly?: boolean;
     noSsl?: boolean;
     envVar?: string;
+    url?: string;
   } = {},
 ): Sql {
-  const { readonly, noSsl, envVar: envVarOverride, ...pgOpts } = opts;
+  const { readonly, noSsl, envVar: envVarOverride, url, ...pgOpts } = opts;
   const envVar = envVarOverride ?? (readonly ? 'DATABASE_READONLY_URL' : 'DATABASE_WRITE_URL');
-  const url = process.env[envVar];
-  if (!url) {
-    console.error(`${envVar} is required`);
-    process.exit(1);
-  }
-  return postgres(url, {
+  const connection = resolveDatabaseConnection({
+    envVar,
+    url,
+    driver: 'postgres',
+    ssl: noSsl ? false : process.env.DATABASE_SSL,
+  });
+  return postgres(connection.url, {
     ...pgOpts,
-    ssl: noSsl ? false : 'require',
+    ssl: connection.ssl,
   });
 }
 

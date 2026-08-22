@@ -31,7 +31,7 @@ import {
   selectShardArtifacts,
 } from '@semianalysisai/inferencex-db/collectivex/artifact-selection';
 import type { CollectiveXVersion } from '@semianalysisai/inferencex-db/collectivex/types';
-import { getCollectiveXDb, getCollectiveXWriteDb } from '@semianalysisai/inferencex-db/connection';
+import { getCollectiveXWriteDb } from '@semianalysisai/inferencex-db/connection';
 import {
   getCollectiveXRunStates,
   insertCollectiveXRun,
@@ -492,7 +492,7 @@ async function considerCandidate(
   version: CollectiveXVersion,
   token: string,
 ): Promise<CandidateResult> {
-  const states = await getCollectiveXRunStates(getCollectiveXDb(), [String(run.id)]);
+  const states = await getCollectiveXRunStates(getCollectiveXWriteDb(), [String(run.id)]);
   const known = states[String(run.id)];
   if (known) {
     if (known.version !== version || known.state !== 'live') return 'skip';
@@ -576,7 +576,7 @@ export function ensureCollectiveXRun(version: CollectiveXVersion, runId: string)
     if (!Number.isSafeInteger(numericId) || numericId <= 0) {
       throw new CollectiveXSweepError('not-found', 'invalid run id');
     }
-    const states = await getCollectiveXRunStates(getCollectiveXDb(), [runId]);
+    const states = await getCollectiveXRunStates(getCollectiveXWriteDb(), [runId]);
     const known = states[runId];
     if (known && (known.state !== 'live' || known.version !== version)) {
       // Tombstoned or cross-version rows both read as absent to the caller.

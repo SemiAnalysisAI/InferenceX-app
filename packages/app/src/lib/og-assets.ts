@@ -1,11 +1,13 @@
-// OG image shared assets — tile grid, logo loader, and color constants.
-// compare/compare-per-dollar/blog still carry their own copies (follow-up to migrate).
+// Shared OG tile grid, logo, font loaders, and color tokens.
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export const BLUE = '#0B86D1';
 export const BG = '#131416';
 export const PANEL_BG = '#0F1214';
+export const TEXT = '#EAEBEC';
+export const MUTED = '#9BA0A6';
+export const TITLE = '#FFFFFF';
 
 export const TILE_GRID: ({ file: string; rotate?: number } | null)[] = [
   { file: 'teal-chevron.png', rotate: 180 },
@@ -53,4 +55,38 @@ export function getTiles(): Promise<({ src: string; rotate?: number } | null)[]>
     });
   }
   return tilesPromise;
+}
+
+export interface OgFontAsset {
+  name: string;
+  data: ArrayBuffer;
+  weight: 400 | 800;
+  style: 'normal';
+}
+
+let cjkFontsPromise: Promise<OgFontAsset[]> | undefined;
+export function getCjkFonts(): Promise<OgFontAsset[]> {
+  if (!cjkFontsPromise) {
+    cjkFontsPromise = Promise.all([
+      readFile(new URL('compare-og-fonts/NotoSansCJKsc-Compare-Regular.otf', import.meta.url)),
+      readFile(new URL('compare-og-fonts/NotoSansCJKsc-Compare-Bold.otf', import.meta.url)),
+    ]).then(([regular, bold]) => [
+      {
+        name: 'Noto Sans SC',
+        data: regular.buffer.slice(
+          regular.byteOffset,
+          regular.byteOffset + regular.byteLength,
+        ) as ArrayBuffer,
+        weight: 400,
+        style: 'normal',
+      },
+      {
+        name: 'Noto Sans SC',
+        data: bold.buffer.slice(bold.byteOffset, bold.byteOffset + bold.byteLength) as ArrayBuffer,
+        weight: 800,
+        style: 'normal',
+      },
+    ]);
+  }
+  return cjkFontsPromise;
 }

@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('next/cache', () => ({
+  revalidateTag: vi.fn(),
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
+}));
 import type { BenchmarkRow } from './api';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 

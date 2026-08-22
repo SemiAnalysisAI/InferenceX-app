@@ -71,4 +71,13 @@ describe('Inference Chart', () => {
       .click()
       .should('have.attr', 'aria-pressed', 'false');
   });
+
+  it('surfaces the error instead of an endless skeleton when availability fails', () => {
+    cy.intercept('GET', '/api/v1/availability*', { statusCode: 500, body: {} }).as(
+      'availabilityFailure',
+    );
+    cy.visit('/inference');
+    cy.wait('@availabilityFailure');
+    cy.contains('h2', 'Something went wrong!', { timeout: 10000 }).should('be.visible');
+  });
 });

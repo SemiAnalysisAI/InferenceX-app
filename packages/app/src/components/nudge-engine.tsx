@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
-import type { Locale } from '@/lib/i18n';
+import { localePath, type Locale } from '@/lib/i18n';
 import {
   isDismissed,
   isPermanentlySuppressed,
@@ -40,12 +40,15 @@ function trackNudgeEvent(def: NudgeDefinition, event: 'shown' | 'dismissed' | 'a
  * Showing asks "can it fire right now?" — there a missing anchor is
  * disqualifying, and the show is simply retried on the next trigger.
  */
-function isEligible(def: NudgeDefinition, { requireAnchor = true } = {}): boolean {
+function isEligible(
+  def: NudgeDefinition,
+  { requireAnchor = true, requireConditions = true } = {},
+): boolean {
   if (requireAnchor && def.type === 'coach-mark' && !def.content.anchor?.resolve()) return false;
   if (!isWithinSchedule(def.schedule)) return false;
   if (def.permanentSuppressKey && isPermanentlySuppressed(def.permanentSuppressKey)) return false;
   if (isDismissed(def.storageKey, def.dismissal)) return false;
-  if (def.conditions?.some((c) => !c.check())) return false;
+  if (requireConditions && def.conditions?.some((condition) => !condition.check())) return false;
   return true;
 }
 
@@ -218,14 +221,31 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
       // (potentially expensive) eligibility check for no benefit.
       if (def.id === activeBannerId || def.id === activeOverlayId) continue;
       if (def.id === activeCoachMarkId) continue;
-      if (!isEligible(def, { requireAnchor: false })) continue;
+      // Conditions are evaluated when a trigger fires. Wiring triggers only
+      // while a condition is already true strands route-dependent nudges when
+      // the persistent dashboard shell moves between tabs.
+      if (!isEligible(def, { requireAnchor: false, requireConditions: false })) continue;
       if (sessionDismissedRef.current.has(def.id)) continue;
 
       const triggers = Array.isArray(def.trigger) ? def.trigger : [def.trigger];
+      const triggerEvents = new Set(
+        triggers.flatMap((trigger) => (trigger.type === 'event' ? [trigger.event] : [])),
+      );
 
       for (const trigger of triggers) {
         const cleanup = setupTrigger(trigger, def, showNudge, triggerCountsRef, eventDetailRef);
         if (cleanup) cleanups.push(cleanup);
+      }
+
+      // A condition may need re-evaluation on an event that is not itself a
+      // display trigger. Avoid a duplicate listener when the trigger already
+      // owns the same event and its configured threshold/delay.
+      for (const condition of def.conditions ?? []) {
+        const event = condition.listenEvent;
+        if (!event || triggerEvents.has(event)) continue;
+        const handler = () => showNudge(def);
+        window.addEventListener(event, handler);
+        cleanups.push(() => window.removeEventListener(event, handler));
       }
     }
 
@@ -590,6 +610,9 @@ function BannerRenderer({
   const rs = RENDERER_STRINGS[locale];
   const { content } = def;
   const Icon = content.icon;
+  const href = content.href?.startsWith('/')
+    ? localePath(content.href, locale)
+    : (content.href ?? '#');
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
@@ -609,7 +632,7 @@ function BannerRenderer({
       data-initial-banner={def.renderOnInitialLoad ? '' : undefined}
     >
       <a
-        href={content.href ?? '#'}
+        href={href}
         onClick={handleClick}
         className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-brand/40 bg-gradient-to-r from-brand/10 via-brand/5 to-transparent px-4 py-3 transition-all duration-200 hover:border-brand/70 hover:shadow-lg hover:shadow-brand/10"
         data-testid={content.testId}

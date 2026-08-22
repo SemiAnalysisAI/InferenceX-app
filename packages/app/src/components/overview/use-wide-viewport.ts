@@ -1,21 +1,33 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 const QUERY = '(min-width: 80rem)';
 
+const NOOP = () => {};
+
+function subscribe(onStoreChange: () => void): () => void {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return NOOP;
+  const mediaQuery = window.matchMedia(QUERY);
+  mediaQuery.addEventListener('change', onStoreChange);
+  return () => mediaQuery.removeEventListener('change', onStoreChange);
+}
+
+function getSnapshot(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia(QUERY).matches
+  );
+}
+
+function getServerSnapshot(): null {
+  return null;
+}
+
 /**
- * Tri-state on purpose: `null` until the first effect runs, so the server and
- * the hydrating client render both surfaces exactly as the CSS-only version
- * did. Only after hydration is the off-screen one dropped from the tree.
+ * Tri-state on purpose: the server snapshot is `null`, so server rendering and
+ * hydration keep both responsive surfaces mounted. The client snapshot takes
+ * over immediately after hydration and subscribes to viewport changes.
  */
 export function useWideViewport(): boolean | null {
-  const [wide, setWide] = useState<boolean | null>(null);
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-    const mq = window.matchMedia(QUERY);
-    setWide(mq.matches);
-    const onChange = (e: MediaQueryListEvent) => setWide(e.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-  return wide;
+  return useSyncExternalStore<boolean | null>(subscribe, getSnapshot, getServerSnapshot);
 }

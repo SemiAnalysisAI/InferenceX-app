@@ -3,6 +3,7 @@ import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
 import type { BenchmarkRow } from '@/lib/api';
 import { benchmarkCurveDate } from '@/lib/benchmark-run-selection';
+import { cachedDerivedData } from '@/lib/api-cache';
 import { getCachedBenchmarks, getCachedBenchmarksAsOf } from '@/lib/benchmark-data.server';
 import type { Model } from '@/lib/data-mappings';
 import {
@@ -44,7 +45,7 @@ async function loadRowsByModel(
   return Object.fromEntries(entries);
 }
 
-export async function getOverviewPageData(
+async function buildOverviewPageData(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
@@ -130,5 +131,28 @@ export async function getOverviewPageData(
       referenceHardware,
       modelScope,
     ),
+  );
+}
+
+const getCachedOverviewPageData = cachedDerivedData(buildOverviewPageData, 'overview-page-v1');
+
+export function getOverviewPageData(
+  tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
+  engineScope: OverviewEngineScope = 'community',
+  comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+  rowScope: OverviewRowScope = OVERVIEW_DEFAULT_ROW_SCOPE,
+  hardwareRowScope: OverviewHardwareRowScope = OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
+): Promise<OverviewPageData> {
+  const loader = FIXTURES_MODE ? buildOverviewPageData : getCachedOverviewPageData;
+  return loader(
+    tier,
+    engineScope,
+    comparisonMode,
+    referenceHardware,
+    modelScope,
+    rowScope,
+    hardwareRowScope,
   );
 }

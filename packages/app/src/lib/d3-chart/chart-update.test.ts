@@ -300,6 +300,29 @@ describe('renderAxes', () => {
       expect(ticks1).toBeGreaterThan(0);
       expect(ticks2).toBeGreaterThan(0);
     });
+
+    it('leaves the Y-axis subtree untouched during an X-only update', () => {
+      const layout = makeLayout();
+      const xScale = d3.scaleLinear().domain([0, 10]).range([0, layout.width]);
+      const yScale = d3
+        .scaleBand()
+        .domain(['Alpha', 'Beta'])
+        .range([layout.height, 0])
+        .padding(0.1);
+
+      renderAxes(layout, xScale, yScale, {});
+      layout.yAxisGroup.select('.tick text').append('tspan').attr('data-static-label', 'true');
+      const yRoot = layout.yAxisGroup.node();
+      const yFirstChild = yRoot?.firstChild;
+      const yMarkup = yRoot?.innerHTML;
+
+      xScale.domain([2, 6]);
+      renderAxes(layout, xScale, yScale.domain(['Changed']), { axes: 'x' });
+
+      expect(layout.yAxisGroup.node()).toBe(yRoot);
+      expect(layout.yAxisGroup.node()?.firstChild).toBe(yFirstChild);
+      expect(layout.yAxisGroup.node()?.innerHTML).toBe(yMarkup);
+    });
   });
 });
 
@@ -518,6 +541,25 @@ describe('renderGrid', () => {
 
       expect(layout.gridGroup.selectAll('.grid-v').size()).toBe(1);
       expect(layout.gridGroup.selectAll('.grid-h').size()).toBe(1);
+    });
+
+    it('leaves the horizontal grid subtree untouched during an X-only update', () => {
+      const layout = makeLayout();
+      const xScale = d3.scaleLinear().domain([0, 100]).range([0, layout.width]);
+      const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
+
+      renderGrid(layout, xScale, yScale);
+      const horizontalGrid = layout.gridGroup.select<SVGGElement>('.grid-h').node();
+      const firstLine = horizontalGrid?.firstChild;
+      const markup = horizontalGrid?.innerHTML;
+
+      xScale.domain([25, 50]);
+      yScale.domain([500, 1000]);
+      renderGrid(layout, xScale, yScale, 5, 0, undefined, undefined, 'x');
+
+      expect(layout.gridGroup.select('.grid-h').node()).toBe(horizontalGrid);
+      expect(horizontalGrid?.firstChild).toBe(firstLine);
+      expect(horizontalGrid?.innerHTML).toBe(markup);
     });
 
     it('updates line positions when scale domain changes', () => {

@@ -1,56 +1,10 @@
-import {
-  GPU_KEYS,
-  GPU_VENDORS,
-  DB_MODEL_TO_DISPLAY,
-  PRECISION_KEYS,
-  GITHUB_OWNER,
-  GITHUB_REPO,
-  FRAMEWORK_LABELS,
-} from '@semianalysisai/inferencex-constants';
-import { CAROUSEL_ORGS, CAROUSEL_LABELS } from '@/components/quotes/quotes-data';
+import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
-export interface FaqLink {
-  text: string;
-  href: string;
-}
-
-export interface FaqItem {
-  question: string;
-  /** Intro text shown before any list. */
-  answer: string;
-  /** Optional link rendered inline after the answer text. */
-  link?: FaqLink;
-  /** Optional bullet list rendered below the answer text. */
-  list?: string[];
-}
-
-/* ---------- Dynamic lists from constants ---------- */
-
-const gpusByVendor = [...GPU_KEYS].reduce<Record<string, string[]>>((acc, key) => {
-  const vendor = GPU_VENDORS[key] ?? 'Other';
-  (acc[vendor] ??= []).push(key.toUpperCase());
-  return acc;
-}, {});
-// /about lists each DB bucket as its own bullet, so point releases that
-// elsewhere collapse under one display name (see DB_MODEL_TO_DISPLAY) are
-// expanded back out here.
-const modelNames = Object.values({
-  ...DB_MODEL_TO_DISPLAY,
-  'kimik2.6': 'Kimi-K2.6',
-  'kimik2.7-code': 'Kimi-K2.7-Code',
-  'minimaxm2.7': 'MiniMax-M2.7',
-  'glm5.1': 'GLM-5.1',
-});
-
-const frameworkNames = [...new Set(Object.values(FRAMEWORK_LABELS))].map((n) =>
-  n.replace(/[¹²³⁴⁵⁶⁷⁸⁹⁰]+$/u, ''),
-);
-
-const supporterOrgs = CAROUSEL_ORGS.map((org) => CAROUSEL_LABELS[org] ?? org);
+import { GENERATED_FAQ_DATA, type FaqItem } from '@/components/about/faq';
 
 /* ---------- FAQ content ---------- */
 
-export const FAQ_ITEMS: FaqItem[] = [
+export const FAQ_ITEMS: readonly FaqItem[] = [
   {
     question: 'What is InferenceX?',
     answer:
@@ -58,25 +12,25 @@ export const FAQ_ITEMS: FaqItem[] = [
   },
   {
     question: 'Who is behind InferenceX?',
-    answer: `InferenceX is built by SemiAnalysis, an independent semiconductor and AI research firm. It is supported and trusted by ${supporterOrgs.join(', ')}. The benchmark code, data, and dashboard are all open-source on GitHub.`,
+    answer: `InferenceX is built by SemiAnalysis, an independent semiconductor and AI research firm. It is supported and trusted by ${GENERATED_FAQ_DATA.supporterOrgs.join(', ')}. The benchmark code, data, and dashboard are all open-source on GitHub.`,
   },
   {
     question: 'Which chips does InferenceX benchmark?',
     answer: 'New accelerators are added as they become available.',
-    list: Object.entries(gpusByVendor).map(([vendor, gpus]) => `${vendor}: ${gpus.join(', ')}`),
+    list: GENERATED_FAQ_DATA.gpuGroups,
   },
   {
     question: 'Which AI models are tested?',
     answer:
       'Models are tested across the fixed-sequence configurations available for them (1k/1k, 1k/8k, and 8k/1k tokens) and multiple concurrency levels. Supported models with corresponding data also include AgentX long-context, multi-turn agentic coding runs.',
-    list: modelNames,
+    list: GENERATED_FAQ_DATA.modelNames,
   },
   {
     question: 'Which inference frameworks and configurations are tested?',
     answer: '',
     list: [
-      `Frameworks: ${frameworkNames.join(', ')}`,
-      `Precisions: ${[...PRECISION_KEYS].map((p) => p.toUpperCase()).join(', ')}`,
+      `Frameworks: ${GENERATED_FAQ_DATA.frameworkNames.join(', ')}`,
+      `Precisions: ${GENERATED_FAQ_DATA.precisionNames.join(', ')}`,
       'Runtimes: CUDA, ROCm',
       'Disaggregated serving (separate prefill/decode chip pools)',
       'Multi-token prediction (MTP)',

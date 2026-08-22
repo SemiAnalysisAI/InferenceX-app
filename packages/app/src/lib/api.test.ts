@@ -9,6 +9,8 @@ import {
   fetchCollectiveXRunList,
   fetchReliability,
   fetchEvaluations,
+  fetchFrameworkReleases,
+  fetchLatestImages,
 } from './api';
 import { buildRunSummary } from '@semianalysisai/inferencex-db/collectivex/reader';
 import { makeCollectiveXDataset } from '@/components/collectivex/test-fixture';
@@ -115,6 +117,36 @@ describe('fetchWorkflowInfo', () => {
     expect(mockFetch).toHaveBeenCalledWith(
       '/api/v1/workflow-info?date=2026-03-01',
       expect.objectContaining({}),
+    );
+  });
+
+  it('serializes the Agentic Traces workflow cache dimension', async () => {
+    mockOk({ runs: [], changelogs: [], configs: [], runConfigs: [] });
+    await fetchWorkflowInfo('2026-03-01', undefined, 'agentic_traces');
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/workflow-info?date=2026-03-01&benchmarkType=agentic_traces',
+      expect.objectContaining({}),
+    );
+  });
+});
+
+describe('simple read abort signals', () => {
+  it('forwards AbortSignal for latest images and framework releases', async () => {
+    const controller = new AbortController();
+    mockOk([]);
+    await fetchLatestImages(controller.signal);
+    mockOk({});
+    await fetchFrameworkReleases(controller.signal);
+
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/latest-images',
+      expect.objectContaining({ signal: controller.signal }),
+    );
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/framework-releases',
+      expect.objectContaining({ signal: controller.signal }),
     );
   });
 });

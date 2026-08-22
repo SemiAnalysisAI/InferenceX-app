@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { cachedJson } from '@/lib/api-cache';
+import { PUBLIC_API_ERRORS, publicApiError, tooManyIdsError } from '@/lib/public-api-errors';
 
 /**
  * Shared GET-handler factories for the agentic benchmark routes, which all
@@ -22,7 +23,7 @@ import { cachedJson } from '@/lib/api-cache';
 export function parseIdsParam(request: NextRequest, maxIds: number): number[] | NextResponse {
   const raw = request.nextUrl.searchParams.get('ids');
   if (!raw) {
-    return NextResponse.json({ error: 'ids query param is required' }, { status: 400 });
+    return publicApiError(PUBLIC_API_ERRORS.idsRequired, 400);
   }
 
   const ids = [
@@ -34,10 +35,10 @@ export function parseIdsParam(request: NextRequest, maxIds: number): number[] | 
     ),
   ];
   if (ids.length === 0) {
-    return NextResponse.json({ error: 'no valid ids provided' }, { status: 400 });
+    return publicApiError(PUBLIC_API_ERRORS.noValidIds, 400);
   }
   if (ids.length > maxIds) {
-    return NextResponse.json({ error: `too many ids (max ${maxIds})` }, { status: 400 });
+    return publicApiError(tooManyIdsError(maxIds), 400);
   }
   return ids.toSorted((a, b) => a - b);
 }
@@ -57,7 +58,7 @@ export function idsQueryRoute<T>(options: {
       return cachedJson(await fetch(ids));
     } catch (error) {
       console.error(`Error fetching ${logLabel}:`, error);
-      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      return publicApiError(PUBLIC_API_ERRORS.internal, 500);
     }
   };
 }
@@ -71,15 +72,15 @@ export function idQueryRoute<T>(options: {
   return async (request: NextRequest) => {
     const id = Number(request.nextUrl.searchParams.get('id'));
     if (!id || !Number.isFinite(id)) {
-      return NextResponse.json({ error: 'id is required (benchmark_result_id)' }, { status: 400 });
+      return publicApiError(PUBLIC_API_ERRORS.idRequired, 400);
     }
     try {
       const data = await fetch(id);
-      if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      if (!data) return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
       return cachedJson(data);
     } catch (error) {
       console.error(`Error fetching ${logLabel}:`, error);
-      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      return publicApiError(PUBLIC_API_ERRORS.internal, 500);
     }
   };
 }

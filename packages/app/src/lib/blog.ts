@@ -50,10 +50,25 @@ export function slugify(raw: string): string {
 }
 
 const CJK_CHAR_REGEX = /\p{Script=Han}/gu;
+const WORD_TOKEN_REGEX = /[\p{L}\p{N}]/u;
+
+function countContentUnits(content: string): { cjkChars: number; words: number } {
+  const cjkChars = content.match(CJK_CHAR_REGEX)?.length ?? 0;
+  const nonCjkContent = content.replaceAll(CJK_CHAR_REGEX, ' ').trim();
+  const words = nonCjkContent
+    ? nonCjkContent.split(/\s+/u).filter((token) => WORD_TOKEN_REGEX.test(token)).length
+    : 0;
+  return { cjkChars, words };
+}
+
+/** Counts whitespace-delimited words and each Han character as one word. */
+export function getWordCount(content: string): number {
+  const { cjkChars, words } = countContentUnits(content);
+  return words + cjkChars;
+}
 
 export function getReadingTime(content: string): number {
-  const cjkChars = content.match(CJK_CHAR_REGEX)?.length ?? 0;
-  const words = content.replaceAll(CJK_CHAR_REGEX, ' ').trim().split(/\s+/u).filter(Boolean).length;
+  const { cjkChars, words } = countContentUnits(content);
   return Math.max(1, Math.ceil(words / WORDS_PER_MINUTE + cjkChars / CJK_CHARS_PER_MINUTE));
 }
 
@@ -260,7 +275,7 @@ export function buildBlogPostingJsonLd(meta: BlogPostMeta, raw: string, locale: 
     url,
     mainEntityOfPage: { '@type': 'WebPage', '@id': url },
     inLanguage: locale === 'zh' ? ZH_LANG_TAG : 'en-US',
-    wordCount: raw.trim().split(/\s+/u).length,
+    wordCount: getWordCount(raw),
     timeRequired: `PT${meta.readingTime}M`,
   };
 }

@@ -178,6 +178,88 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
     [chartData],
   );
 
+  const dataIdentity = useMemo(
+    () =>
+      JSON.stringify(
+        sortedChartData.map((datum) => JSON.stringify([datum.model, datum.modelLabel])).toSorted(),
+      ),
+    [sortedChartData],
+  );
+  const metricIdentity = useMemo(
+    () =>
+      JSON.stringify(
+        sortedChartData
+          .map((datum) =>
+            JSON.stringify([
+              datum.model,
+              datum.modelLabel,
+              datum.successRate,
+              datum.n_success,
+              datum.total,
+            ]),
+          )
+          .toSorted(),
+      ),
+    [sortedChartData],
+  );
+  const paletteIdentity = useMemo(
+    () =>
+      JSON.stringify(
+        sortedChartData
+          .map((datum) => JSON.stringify([datum.model, getCssColor(resolveColor(datum.model))]))
+          .toSorted(),
+      ),
+    [getCssColor, resolveColor, sortedChartData],
+  );
+  // Reverse so first in sort order appears at top (band scale range is [height, 0]).
+  const yDomain = useMemo(
+    () => [...sortedChartData].toReversed().map((datum) => datum.modelLabel),
+    [sortedChartData],
+  );
+  const xScaleConfig = useMemo(
+    () => ({ type: 'linear' as const, domain: [0, 100] as [number, number] }),
+    [],
+  );
+  const yScaleConfig = useMemo(
+    () => ({ type: 'band' as const, domain: yDomain, padding: 0.15 }),
+    [yDomain],
+  );
+  const zoomConfig = useMemo(
+    () => ({
+      enabled: true,
+      axes: 'x' as const,
+      scaleExtent: [0.1, 1] as [number, number],
+      rescaleX: (xScale: ContinuousScale, transform: d3.ZoomTransform) =>
+        xScale.copy().domain([0, 100 / transform.k]) as ContinuousScale,
+      customTransformStorage: (transform: d3.ZoomTransform) => d3.zoomIdentity.scale(transform.k),
+    }),
+    [],
+  );
+  const tooltipConfig = useMemo(
+    () => ({
+      rulerType: 'vertical' as const,
+      content: (datum: ChartItem, isPinned: boolean) =>
+        generateReliabilityTooltipContent(datum, isPinned, locale),
+      getRulerX: () => hoveredBarXRef.current,
+      getRulerY: (
+        datum: ChartItem,
+        scale: d3.ScaleLinear<number, number> | d3.ScaleLogarithmic<number, number>,
+      ) => {
+        const bandScale = scale as unknown as d3.ScaleBand<string>;
+        return (bandScale(datum.modelLabel) ?? 0) + bandScale.bandwidth() / 2;
+      },
+      onHoverStart: (selection: d3.Selection<SVGRectElement, ChartItem, SVGGElement, unknown>) => {
+        hoveredBarXRef.current = Number.parseFloat(selection.attr('width') || '0');
+        selection.attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
+      },
+      onHoverEnd: (selection: d3.Selection<SVGRectElement, ChartItem, SVGGElement, unknown>) => {
+        selection.attr('stroke', 'none');
+      },
+      attachToLayer: 0,
+    }),
+    [locale],
+  );
+
   const dynamicHeight = useMemo(() => {
     const barCount = sortedChartData.length || 1;
     return Math.max(600, barCount * 45 + 80);
@@ -187,6 +269,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
     (): LayerConfig<ChartItem>[] => [
       {
         type: 'horizontalBar',
+        key: 'bars',
         data: sortedChartData,
         config: {
           getY: (d) => d.modelLabel,
@@ -200,6 +283,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
       {
         type: 'custom',
         key: 'bar-labels',
+        displayIdentity: paletteIdentity,
         render: (group, ctx) => {
           const yScale = ctx.yScale as d3.ScaleBand<string>;
 
@@ -233,19 +317,22 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
             getCssColor(resolveColor(d.model)),
           );
         },
+        onDisplayUpdate: (group, ctx) => {
+          const baseXScale = ctx.xScale as d3.ScaleLinear<number, number>;
+          const svgNode = ctx.layout.svg.node();
+          const transform = svgNode ? d3.zoomTransform(svgNode) : d3.zoomIdentity;
+          const currentXScale = baseXScale.copy().domain([0, 100 / transform.k]);
+          positionLabelPairs(group, currentXScale, (datum) =>
+            getCssColor(resolveColor(datum.model)),
+          );
+        },
         onZoom: (group, ctx) => {
           const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
           positionLabelPairs(group, newXScale, (d) => getCssColor(resolveColor(d.model)));
         },
       },
     ],
-    [sortedChartData, getCssColor, resolveColor],
-  );
-
-  // Reverse so first in sort order appears at top (band scale range is [height, 0])
-  const yDomain = useMemo(
-    () => [...sortedChartData].toReversed().map((d) => d.modelLabel),
-    [sortedChartData],
+    [sortedChartData, getCssColor, paletteIdentity, resolveColor],
   );
 
   const yAxisConfig = useMemo(() => ({ customize: twoRowYAxisLabels() }), []);
@@ -281,6 +368,9 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
       <D3Chart<ChartItem>
         chartId="reliability-chart"
         data={sortedChartData}
+        dataIdentity={dataIdentity}
+        metricIdentity={metricIdentity}
+        displayIdentity={paletteIdentity}
         height={dynamicHeight}
         margin={chartMargin}
         watermark="logo"
@@ -289,36 +379,13 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
         caption={caption}
         noDataOverlay={emptyOverlay}
         instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Hover for details"
-        xScale={{ type: 'linear', domain: [0, 100] }}
-        yScale={{ type: 'band', domain: yDomain, padding: 0.15 }}
+        xScale={xScaleConfig}
+        yScale={yScaleConfig}
         xAxis={xAxisConfig}
         yAxis={yAxisConfig}
         layers={layers}
-        zoom={{
-          enabled: true,
-          axes: 'x',
-          scaleExtent: [0.1, 1],
-          rescaleX: (xScale, transform) =>
-            xScale.copy().domain([0, 100 / transform.k]) as ContinuousScale,
-          customTransformStorage: (transform) => d3.zoomIdentity.scale(transform.k),
-        }}
-        tooltip={{
-          rulerType: 'vertical',
-          content: (d, isPinned) => generateReliabilityTooltipContent(d, isPinned, locale),
-          getRulerX: () => hoveredBarXRef.current,
-          getRulerY: (d, ys) => {
-            const bandScale = ys as unknown as d3.ScaleBand<string>;
-            return (bandScale(d.modelLabel) ?? 0) + bandScale.bandwidth() / 2;
-          },
-          onHoverStart: (sel) => {
-            hoveredBarXRef.current = parseFloat(sel.attr('width') || '0');
-            sel.attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
-          },
-          onHoverEnd: (sel) => {
-            sel.attr('stroke', 'none');
-          },
-          attachToLayer: 0,
-        }}
+        zoom={zoomConfig}
+        tooltip={tooltipConfig}
         legendElement={
           <ChartLegend
             variant="sidebar"

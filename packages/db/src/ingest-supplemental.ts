@@ -22,7 +22,11 @@ import {
   normalizeSpecMethod,
   parseBool,
 } from './etl/normalizers';
-import { bulkIngestBenchmarkRows, bulkUpsertAvailability } from './etl/benchmark-ingest';
+import {
+  bulkIngestBenchmarkRows,
+  bulkUpsertAvailability,
+  type BenchmarkPersistenceInput,
+} from './etl/benchmark-ingest';
 import { ingestEvalRow } from './etl/eval-ingest';
 
 const sql = createAdminSql({
@@ -125,9 +129,8 @@ async function ingestSupplementalEvals(
 
       const { outcome } = await ingestEvalRow(
         sql,
-        () => Promise.resolve(configId),
+        configId,
         {
-          config: {} as any,
           task: entry.task,
           isl: 1024,
           osl: 8192,
@@ -217,17 +220,7 @@ async function ingestSupplementalBmk(
       conclusion: 'success',
     }))!;
 
-    const rows: {
-      configId: number;
-      benchmarkType: 'single_turn' | 'agentic_traces';
-      offloadMode: string;
-      isl: number | null;
-      osl: number | null;
-      conc: number;
-      image: string | null;
-      recipeFingerprint: string | null;
-      metrics: Record<string, number>;
-    }[] = [];
+    const rows: BenchmarkPersistenceInput[] = [];
 
     for (const entry of entries) {
       const modelKey = resolveModelKey({ model: entry.model, infmax_model_prefix: undefined });
@@ -285,12 +278,7 @@ async function ingestSupplementalBmk(
       });
     }
 
-    const { newCount, dupCount } = await bulkIngestBenchmarkRows(
-      sql,
-      rows.map((r) => ({ ...r, config: {} as any })),
-      workflowRunId,
-      date,
-    );
+    const { newCount, dupCount } = await bulkIngestBenchmarkRows(sql, rows, workflowRunId, date);
     totalNew += newCount;
     totalDup += dupCount;
 

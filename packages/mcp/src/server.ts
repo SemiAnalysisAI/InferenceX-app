@@ -6,12 +6,16 @@ import {
   PRECISION_KEYS,
   SPEC_METHOD_KEYS,
 } from '@semianalysisai/inferencex-constants';
-import { postgresOptionsForUrl } from '@semianalysisai/inferencex-db/connection';
+import { resolveDatabaseConnection } from '@semianalysisai/inferencex-db/connection';
 import postgres from 'postgres';
 import { z } from 'zod';
 
-const url = process.env.DATABASE_READONLY_URL!;
-const db = postgres(url, postgresOptionsForUrl(url));
+const connection = resolveDatabaseConnection({
+  envVar: 'DATABASE_READONLY_URL',
+  driver: 'postgres',
+  ssl: process.env.DATABASE_SSL,
+});
+const db = postgres(connection.url, { max: 5, ssl: connection.ssl });
 const MAX_ROWS = 5_000;
 
 const roundMetric = (v: unknown) => (typeof v === 'number' ? Math.round(v * 10000) / 10000 : v);
@@ -44,36 +48,44 @@ const modelMapping = Object.entries(DB_MODEL_TO_DISPLAY)
  */
 const SERVER_INSTRUCTIONS = `InferenceX: ML inference benchmark database. Query GPU performance across hardware and frameworks.
 Models: ${modelMapping}.
-Key tool: get_latest_benchmarks — filters by hardware, model, framework, precision, spec_method, disagg, num_gpu, isl, osl, conc. Returns config details (incl. num_prefill_gpu, num_decode_gpu) and metrics JSONB with keys: median_ttft, p99_ttft, median_tpot, p99_tpot, tput_per_gpu, output_tput_per_gpu, median_itl, median_e2el (all in seconds; throughput in tok/s/GPU).
+Key tool: get_latest_benchmarks filters by hardware, model, framework, precision, spec_method, disagg, num_gpu, isl, osl, and conc. It returns config details (including num_prefill_gpu and num_decode_gpu) plus selected metric keys. Pass metrics=["all"] for the complete metrics JSONB object. Common keys include median_ttft, p99_ttft, median_tpot, p99_tpot, tput_per_gpu, output_tput_per_gpu, median_itl, and median_e2el.
 For aggregations or custom queries use query_sql against the latest_benchmarks view joined to configs.`;
 
 /**
  * Full overview returned by get_overview tool — no length constraint.
  */
-const DOMAIN_OVERVIEW = `InferenceX benchmark database — ML inference performance data across GPU hardware and serving frameworks.
+const DOMAIN_OVERVIEW = `InferenceX benchmark database. It contains ML inference performance data across GPU hardware and serving frameworks.
 
 ## Tables
-- **configs** — Serving configs: (hardware, framework, model, precision, spec_method, disagg) + parallelism (TP/EP/DP per prefill/decode).
-- **benchmark_results** — Perf metrics per config/recipe/concurrency/sequence-length/date. \`metrics\` JSONB holds all numbers.
-- **availability** — Denormalized date×config availability.
-- **eval_results** — Eval accuracy (e.g. gsm8k). Joined to configs via config_id.
-- **workflow_runs** — GitHub Actions run metadata.
-- **run_stats** — Per-hardware reliability (n_success/total).
+- **configs** stores serving identity and prefill/decode topology.
+- **benchmark_results** stores one scenario point per workflow, config, recipe, sequence, offload mode, and concurrency. Measurements stay in \`metrics\` JSONB. Per-worker power data stays in \`workers\` JSONB.
+- **workflow_runs**, **changelog_entries**, and **run_stats** store GitHub run metadata, reviewed changelog metadata, and hardware reliability counts.
+- **availability** is the denormalized model/config/scenario/date index used by selectors.
+- **eval_results** and **eval_samples** store aggregate and per-prompt evaluation results.
+- **agentic_trace_replay** stores compressed trace exports and precomputed aggregate, chart, and request-timeline JSONB.
+- **datasets**, **dataset_conversations**, and **run_datasets** store agentic dataset metadata, conversation structures, and workflow-to-dataset links.
+- **server_logs** stores benchmark server logs. **user_feedback** stores encrypted feedback fields.
 
 ## Key Views
-- **latest_benchmarks** (materialized) — Latest successful benchmark per (config, benchmark_type, isl, osl, offload_mode, recipe_fingerprint, conc). Use this for current data.
+- **latest_workflow_runs** keeps the highest attempt for each GitHub run.
+- **latest_benchmarks** is a materialized view of the newest successful logical curve for each config, benchmark type, sequence, offload mode, recipe fingerprint, and concurrency. It can carry points from same-image append-only history. Producer identity remains in \`workflow_run_id\`; logical snapshot identity is in \`snapshot_workflow_run_id\`.
 
 ## Column Names
 - **configs**: id, hardware, framework, model, precision, spec_method, disagg, is_multinode, prefill_tp, prefill_ep, prefill_dp_attention, prefill_num_workers, decode_tp, decode_ep, decode_dp_attention, decode_num_workers, num_prefill_gpu, num_decode_gpu
-- **benchmark_results**: id, workflow_run_id (FK), config_id (FK), benchmark_type, date, isl, osl, conc, image, recipe_fingerprint, metrics (JSONB), error, server_log_id (FK)
-- **latest_benchmarks** (materialized view): config_id, benchmark_type, date, isl, osl, conc, offload_mode, image, recipe_fingerprint, metrics (JSONB) — latest per (config, benchmark_type, isl, osl, offload_mode, recipe_fingerprint, conc) where error IS NULL
-- **latest_workflow_runs** (view): id, github_run_id, run_attempt, name, status, conclusion, head_sha, head_branch, html_url, created_at, run_started_at, date
-- **workflow_runs**: id, github_run_id, run_attempt, name, status, conclusion, head_sha, head_branch, html_url, created_at, run_started_at, date
-- **eval_results**: id, workflow_run_id (FK), config_id (FK), task, date, isl, osl, conc, lm_eval_version, metrics (JSONB)
+- **benchmark_results**: id, workflow_run_id (FK), config_id (FK), benchmark_type, date, isl, osl, conc, image, metrics (JSONB), error, server_log_id (FK), workers (JSONB), offload_mode, trace_replay_id (FK), recipe_fingerprint
+- **latest_benchmarks**: all benchmark_results columns plus snapshot_date and snapshot_workflow_run_id
+- **workflow_runs** and **latest_workflow_runs**: id, github_run_id, run_attempt, name, status, conclusion, head_sha, head_branch, html_url, created_at, run_started_at, date, append_only
+- **changelog_entries**: id, workflow_run_id (FK), date, base_ref, head_ref, config_keys (text[]), description, pr_link, append_only
 - **run_stats**: id, workflow_run_id (FK), date, hardware, n_success, total
-- **availability**: model, isl, osl, precision, hardware, framework, spec_method, disagg, date (PK is all columns)
-- **changelog_entries**: id, workflow_run_id (FK), date, base_ref, head_ref, config_keys (text[]), description, pr_link
-- **server_logs**: id, server_log (text)
+- **availability**: model, isl, osl, precision, hardware, framework, spec_method, disagg, date, benchmark_type (unique natural key, NULLS NOT DISTINCT)
+- **eval_results**: id, workflow_run_id (FK), config_id (FK), task, date, isl, osl, conc, lm_eval_version, metrics (JSONB)
+- **eval_samples**: id, eval_result_id (FK), doc_id, prompt, target, response, passed, score, metrics (JSONB), data (JSONB)
+- **agentic_trace_replay**: id, profile_export_jsonl_gz, profile_export_uncompressed_size, server_metrics_csv, server_metrics_csv_size, created_at, server_metrics_json_gz, server_metrics_json_uncompressed_size, aggregate_stats (JSONB), chart_series (JSONB), request_timeline (JSONB)
+- **datasets**: id, slug, label, variant, description, hf_url, license, conversation_count, summary (JSONB), chart_data (JSONB), dataset_version, ingested_at
+- **dataset_conversations**: id, dataset_id (FK), conv_id, models (text[]), num_turns, num_subagent_groups, total_in, total_out, total_cached, structure (JSONB)
+- **run_datasets**: workflow_run_id (FK), dataset_slug, created_at
+- **server_logs**: id, server_log
+- **user_feedback**: id, created_at, doing_well_ciphertext, doing_poorly_ciphertext, want_to_see_ciphertext, user_agent_ciphertext, page_path_ciphertext
 
 ## Enum Values
 - **hardware**: ${HW_ENUM.join(', ')}
@@ -82,13 +94,13 @@ const DOMAIN_OVERVIEW = `InferenceX benchmark database — ML inference performa
 - **precision**: ${PREC_ENUM.join(', ')}
 - **spec_method**: ${SPEC_ENUM.join(', ')}
 
-## Metrics JSONB Keys (seconds; throughput in tok/s/GPU)
-- **Throughput**: tput_per_gpu, output_tput_per_gpu, input_tput_per_gpu
-- **TTFT**: median_ttft, mean_ttft, p99_ttft, std_ttft
-- **TPOT**: median_tpot, mean_tpot, p99_tpot, std_tpot
-- **ITL**: median_itl, mean_itl, p99_itl, std_itl
-- **E2EL**: median_e2el, mean_e2el, p99_e2el, std_e2el
-- **Interactivity**: median_intvty, mean_intvty, p99_intvty, std_intvty
+## Metrics JSONB
+Metrics are artifact-dependent and remain in JSONB. There are no metric-specific columns on benchmark_results or latest_benchmarks.
+- **Throughput**: tput_per_gpu, output_tput_per_gpu, input_tput_per_gpu (tokens/s/GPU); total_tput_tps, output_tput_tps, input_tput_tps (tokens/s)
+- **Latency distributions in seconds**: *_ttft, *_tpot, *_itl, *_e2el, and *_full_response_itl. Available prefixes can include median, mean, std, p75, p90, p95, p99, and p99.9.
+- **Interactivity in tokens/s/user**: *_intvty and *_full_response_intvty
+- **Agentic scalars** can include duration_seconds, *_qps, token-count distributions, cache-hit rates, KV-cache usage, and total request/token counters.
+- Some agentic rows also retain categorical metadata such as offload_mode and cache backend in metrics. Do not assume every JSONB value is numeric or every row contains every key.
 
 ## Common SQL
 \`\`\`sql
@@ -196,7 +208,7 @@ export function createServer(): McpServer {
     {
       title: 'Get Latest Benchmarks',
       description:
-        'Get latest benchmark results with config details and metrics JSONB. This is the primary query tool — use it before falling back to query_sql. All filters are optional; combine any subset. Use sort_by with limit to get top-N results by a metric.',
+        'Get latest benchmark results with config details and selected metric keys. This is the primary query tool to use before query_sql. All filters are optional and can be combined. Pass metrics=["all"] for the complete metrics JSONB object. Use sort_by with limit for top-N results.',
       inputSchema: {
         hardware: z.enum(HW_ENUM).optional().describe('GPU type'),
         model: z.enum(MODEL_ENUM).optional().describe('Model key'),

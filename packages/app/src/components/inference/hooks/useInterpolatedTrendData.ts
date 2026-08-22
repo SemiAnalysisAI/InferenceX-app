@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { sequenceToIslOsl, USD_TO_CNY } from '@semianalysisai/inferencex-constants';
+import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
 import type { InferenceData, TrendDataPoint, YAxisMetricKey } from '@/components/inference/types';
+import {
+  isBenchmarkMetricKey,
+  resolveMetricConfigKey,
+} from '@/components/inference/metric-registry';
 import {
   hermiteInterpolate,
   monotoneSlopes,
@@ -11,97 +15,43 @@ import {
   reciprocalMetricAt,
 } from '@/components/calculator/useThroughputData';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
-import { buildMeasuredPowerChartFields, getHardwareKey } from '@/lib/chart-utils';
-import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
+import { buildDerivedChartFields, getHardwareKey, type DerivedMetricKey } from '@/lib/chart-utils';
+import { isKnownGpu } from '@/lib/constants';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
 import { benchmarkCurveDate, dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
 import { Sequence, type Model } from '@/lib/data-mappings';
 
-// Trend points never sit on a roofline — they're synthetic per-(date, config)
-// aggregates, not the per-load Pareto-frontier points the chart marks. Hardcode
-// roof:false so the field shape lines up with InferenceData without a cast.
-const wrapMetric = (n: number): { y: number; roof: boolean } => ({
-  y: n,
-  roof: false,
-});
-
 /**
  * Build a lightweight InferenceData-compatible point from a raw BenchmarkRow.
- * Skips the expensive transformBenchmarkRows pipeline (rooflines, cost derivations)
- * since the trend interpolation only needs x (interactivity), tpPerGpu, and metric values.
+ * This deliberately skips full chart transformation and derives only the
+ * selected trend metric plus its frontier/interpolation dependencies.
  */
-function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
+export function rowToLightweightPoint(
+  row: BenchmarkRow,
+  requestedMetrics: readonly DerivedMetricKey[],
+): InferenceData | null {
   const entry = rowToAggDataEntry(row);
   const hwKey = getHardwareKey(entry);
+  // Historical rows predating explicit output-throughput telemetry used total
+  // throughput as output throughput. Preserve that production fallback for
+  // output cost, purchasing-power, and energy trend metrics.
+  const derivedEntry =
+    row.metrics.output_tput_per_gpu === null || row.metrics.output_tput_per_gpu === undefined
+      ? { ...entry, output_tput_per_gpu: entry.tput_per_gpu }
+      : entry;
   if (!isKnownGpu(hwKey)) return null;
 
-  const m = row.metrics;
-  const tput = m.tput_per_gpu ?? 0;
-  const outputTput = m.output_tput_per_gpu ?? tput;
-  const inputTput = m.input_tput_per_gpu ?? 0;
-  const specs = getGpuSpecs(hwKey);
-  const power = specs.power;
-
-  const tokPerHr = tput * 3600;
-  const outTokPerHr = outputTput * 3600;
-  const inTokPerHr = inputTput * 3600;
-  const millionTokPerHr = tokPerHr / 1_000_000;
-  const millionOutTokPerHr = outTokPerHr / 1_000_000;
-  const millionInTokPerHr = inTokPerHr / 1_000_000;
-
-  // Build metric objects matching InferenceData shape. Measured-power keys are
-  // only set when the runner-side aggregate_power.py emitted them — leaving the
-  // field undefined lets extractMetric return null and the trend show a real
-  // gap instead of a flat-zero line.
-  const point: InferenceData = {
-    x: m.median_intvty ?? 0,
-    y: tput,
+  return {
+    x: row.metrics.median_intvty ?? 0,
+    y: row.metrics.tput_per_gpu ?? 0,
     hwKey,
     precision: row.precision,
     tp: row.decode_tp,
     conc: row.conc,
     date: benchmarkCurveDate(row),
-    tpPerGpu: wrapMetric(tput),
-    outputTputPerGpu: wrapMetric(outputTput),
-    inputTputPerGpu: wrapMetric(inputTput),
-    tpPerMw: wrapMetric(power > 0 ? (tput * 1000) / power : 0),
-    // Cost per million tokens (total / output / input).
-    costh: wrapMetric(millionTokPerHr ? specs.costh / millionTokPerHr : 0),
-    costn: wrapMetric(millionTokPerHr ? specs.costn / millionTokPerHr : 0),
-    costr: wrapMetric(millionTokPerHr ? specs.costr / millionTokPerHr : 0),
-    costhOutput: wrapMetric(millionOutTokPerHr ? specs.costh / millionOutTokPerHr : 0),
-    costnOutput: wrapMetric(millionOutTokPerHr ? specs.costn / millionOutTokPerHr : 0),
-    costrOutput: wrapMetric(millionOutTokPerHr ? specs.costr / millionOutTokPerHr : 0),
-    costhi: wrapMetric(millionInTokPerHr ? specs.costh / millionInTokPerHr : 0),
-    costni: wrapMetric(millionInTokPerHr ? specs.costn / millionInTokPerHr : 0),
-    costri: wrapMetric(millionInTokPerHr ? specs.costr / millionInTokPerHr : 0),
-    // Tokens purchasable per $1 (total / output / input).
-    tokensPerDollarH: wrapMetric(specs.costh ? tokPerHr / specs.costh : 0),
-    tokensPerDollarN: wrapMetric(specs.costn ? tokPerHr / specs.costn : 0),
-    tokensPerDollarR: wrapMetric(specs.costr ? tokPerHr / specs.costr : 0),
-    outputTokensPerDollarH: wrapMetric(specs.costh ? outTokPerHr / specs.costh : 0),
-    outputTokensPerDollarN: wrapMetric(specs.costn ? outTokPerHr / specs.costn : 0),
-    outputTokensPerDollarR: wrapMetric(specs.costr ? outTokPerHr / specs.costr : 0),
-    inputTokensPerDollarH: wrapMetric(specs.costh ? inTokPerHr / specs.costh : 0),
-    inputTokensPerDollarN: wrapMetric(specs.costn ? inTokPerHr / specs.costn : 0),
-    inputTokensPerDollarR: wrapMetric(specs.costr ? inTokPerHr / specs.costr : 0),
-    tokensPerRmbH: wrapMetric(specs.costh ? tokPerHr / (specs.costh * USD_TO_CNY) : 0),
-    tokensPerRmbN: wrapMetric(specs.costn ? tokPerHr / (specs.costn * USD_TO_CNY) : 0),
-    tokensPerRmbR: wrapMetric(specs.costr ? tokPerHr / (specs.costr * USD_TO_CNY) : 0),
-    outputTokensPerRmbH: wrapMetric(specs.costh ? outTokPerHr / (specs.costh * USD_TO_CNY) : 0),
-    outputTokensPerRmbN: wrapMetric(specs.costn ? outTokPerHr / (specs.costn * USD_TO_CNY) : 0),
-    outputTokensPerRmbR: wrapMetric(specs.costr ? outTokPerHr / (specs.costr * USD_TO_CNY) : 0),
-    inputTokensPerRmbH: wrapMetric(specs.costh ? inTokPerHr / (specs.costh * USD_TO_CNY) : 0),
-    inputTokensPerRmbN: wrapMetric(specs.costn ? inTokPerHr / (specs.costn * USD_TO_CNY) : 0),
-    inputTokensPerRmbR: wrapMetric(specs.costr ? inTokPerHr / (specs.costr * USD_TO_CNY) : 0),
-    // Energy: J/token = W / tok/s
-    jTotal: wrapMetric(power > 0 && tput ? (power * 1000) / tput : 0),
-    ...(outputTput ? { jOutput: wrapMetric(power > 0 ? (power * 1000) / outputTput : 0) } : {}),
-    ...(inputTput ? { jInput: wrapMetric(power > 0 ? (power * 1000) / inputTput : 0) } : {}),
-    ...buildMeasuredPowerChartFields(entry, specs.tdp),
-  };
-  return point;
+    ...buildDerivedChartFields(derivedEntry, hwKey, requestedMetrics),
+  } as InferenceData;
 }
 
 /**
@@ -158,6 +108,16 @@ const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>
   inputTokensPerRmbN: 'inputTputPerGpu',
   inputTokensPerRmbR: 'inputTputPerGpu',
 };
+
+export function trendMetricDependencies(metricKey: YAxisMetricKey): DerivedMetricKey[] {
+  const dependencies = new Set<DerivedMetricKey>(['tpPerGpu']);
+  if (!isBenchmarkMetricKey(metricKey)) return [...dependencies];
+  dependencies.add(metricKey);
+  const throughputKey =
+    RECIPROCAL_OF_THROUGHPUT[metricKey] ?? PROPORTIONAL_TO_THROUGHPUT[metricKey];
+  if (throughputKey && isBenchmarkMetricKey(throughputKey)) dependencies.add(throughputKey);
+  return [...dependencies];
+}
 
 function recoverProportionalMultiplier(
   values: readonly number[],
@@ -328,6 +288,8 @@ export function useInterpolatedTrendData({
     seqIslOsl?.osl ?? 0,
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
   );
+  const trendMetricKey = resolveMetricConfigKey(selectedYAxisMetric).slice(2) as YAxisMetricKey;
+  const requestedMetrics = useMemo(() => trendMetricDependencies(trendMetricKey), [trendMetricKey]);
 
   // Build lightweight InferenceData points grouped by date and hwKey.
   // Skips the full transformBenchmarkRows pipeline (~100x faster for ~100 dates).
@@ -339,7 +301,7 @@ export function useInterpolatedTrendData({
     for (const row of dedupeAgenticHistoryRuns(allRows)) {
       if (!selectedPrecisions.includes(row.precision)) continue;
 
-      const point = rowToLightweightPoint(row);
+      const point = rowToLightweightPoint(row, requestedMetrics);
       if (!point) continue;
 
       const curveDate = benchmarkCurveDate(row);
@@ -361,12 +323,12 @@ export function useInterpolatedTrendData({
     }
 
     return result;
-  }, [allRows, selectedPrecisions]);
+  }, [allRows, selectedPrecisions, requestedMetrics]);
 
   // Interpolation memo — instant when slider moves or metric changes
   const { trendLines, hwKeysWithData } = useMemo(() => {
     const resultMap = new Map<string, Map<string, TrendDataPoint>>();
-    const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
+    const metricKey = trendMetricKey;
 
     for (const [date, byGroupKey] of dateGroupedData) {
       for (const [groupKey, points] of byGroupKey) {
@@ -415,7 +377,7 @@ export function useInterpolatedTrendData({
     }
 
     return { trendLines: lines, hwKeysWithData: keysWithData };
-  }, [dateGroupedData, targetInteractivity, selectedYAxisMetric]);
+  }, [dateGroupedData, targetInteractivity, trendMetricKey]);
 
   // Artificial progress that ramps up while the API call is in flight
   const [progress, setProgress] = useState(0);

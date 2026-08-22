@@ -8,8 +8,10 @@ import type { EvaluationChartData } from '@/components/evaluation/types';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { track } from '@/lib/analytics';
+import { notifyClientSearchChange } from '@/lib/client-navigation';
 import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';
 import { useLocale } from '@/lib/use-locale';
+import { useClientSearchParams } from '@/hooks/useClientSearch';
 
 const STRINGS = {
   en: {
@@ -58,14 +60,23 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
   const sorted = useMemo(() => [...data].toSorted((a, b) => b.score - a.score), [data]);
   const hasDisaggConfigs = useMemo(() => data.some((d) => d.disagg), [data]);
   const [drawerRow, setDrawerRow] = useState<EvaluationChartData | null>(null);
-  const [sharedTarget, setSharedTarget] = useState<{
-    evalResultId: number;
-    docId?: number;
-  } | null>(null);
+  const searchParams = useClientSearchParams();
+  const sharedTarget = useMemo(() => {
+    const evalParam = searchParams.get('eval');
+    if (evalParam === null) return null;
+    const evalResultId = Number(evalParam);
+    if (!Number.isInteger(evalResultId) || evalResultId <= 0) return null;
+
+    const sampleParam = searchParams.get('sample');
+    const docId = sampleParam === null ? undefined : Number(sampleParam);
+    return {
+      evalResultId,
+      ...(docId !== undefined && Number.isInteger(docId) && docId >= 0 ? { docId } : {}),
+    };
+  }, [searchParams]);
   const trackedSharedEvalId = useRef<number | null>(null);
 
   const openDrawer = (row: EvaluationChartData) => {
-    setSharedTarget(null);
     setDrawerRow(row);
     // Notify the first-visit nudge to dismiss itself once the user has
     // discovered the affordance on their own.
@@ -79,29 +90,13 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
     });
   };
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const evalParam = params.get('eval');
-    if (evalParam === null) return;
-
-    const evalResultId = Number(evalParam);
-    if (!Number.isInteger(evalResultId) || evalResultId <= 0) return;
-
-    const sampleParam = params.get('sample');
-    const docId = sampleParam === null ? undefined : Number(sampleParam);
-    setSharedTarget({
-      evalResultId,
-      ...(docId !== undefined && Number.isInteger(docId) && docId >= 0 ? { docId } : {}),
-    });
-  }, []);
-
   const closeDrawer = () => {
     setDrawerRow(null);
-    setSharedTarget(null);
     const url = new URL(window.location.href);
     url.searchParams.delete('eval');
     url.searchParams.delete('sample');
     window.history.replaceState(window.history.state, '', url);
+    notifyClientSearchChange(url.href);
   };
 
   const sharedRow = sharedTarget

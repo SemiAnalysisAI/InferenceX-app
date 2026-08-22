@@ -1,11 +1,15 @@
 'use client';
 
 import { ListFilter } from 'lucide-react';
-
-import { useInference } from '@/components/inference/InferenceContext';
+import { Button } from '@/components/ui/button';
 import type { DeploymentMode, SpecMode } from '@/components/inference/types';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
-import { Button } from '@/components/ui/button';
+
+import {
+  useInferenceActions,
+  useInferenceData,
+  useInferenceFilters,
+} from '@/components/inference/InferenceContext';
 import {
   Dialog,
   DialogClose,
@@ -81,14 +85,13 @@ export function QuickFiltersDialog({
   const locale = useLocale();
   const t = STRINGS[locale];
   const {
-    selectedSequence,
-    quickFilters,
-    availableQuickFilters,
     setQuickFilterVendors,
     setQuickFilterFrameworks,
     setQuickFilterDeployment,
     setQuickFilterSpec,
-  } = useInference();
+  } = useInferenceActions();
+  const { selectedSequence, quickFilters } = useInferenceFilters();
+  const { availableQuickFilters } = useInferenceData();
   const isAgentic = selectedSequence === Sequence.AgenticTraces;
 
   const frameworkOptions = FRAMEWORK_FAMILIES.filter(
