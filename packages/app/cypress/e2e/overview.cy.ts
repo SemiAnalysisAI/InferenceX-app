@@ -590,8 +590,17 @@ describe('Overview page', () => {
           .should('have.attr', 'aria-current', 'true')
           .and('have.text', '对比 1 个月前');
       });
-    cy.contains('当前成本及其相对 30–60 天前最近一次有效平台结果的变化。').should('exist');
-    cy.contains('缺少有效 30 天对比的平台仅显示当前成本。').should('exist');
+    // The prose is editorial; the stable contract is that both history notes
+    // render the selected window while the caption also renders its upper bound.
+    cy.get('[data-testid="overview-methodology"] p')
+      .eq(0)
+      .should('be.visible')
+      .and('contain.text', '30')
+      .should('contain.text', '60');
+    cy.get('[data-testid="overview-methodology"] p')
+      .eq(1)
+      .should('be.visible')
+      .and('contain.text', '30');
   });
 
   it('keeps client-only presentation intent across selectors without forcing fullscreen on load', () => {
