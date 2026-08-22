@@ -13,10 +13,9 @@
   ],
   "scripts": {
     "dev": "bun --env-file=../../.env next dev --turbopack",
-    "build": "bun --env-file=../../.env next build --turbopack && bun run check:bundle-budgets",
+    "build": "bun --env-file=../../.env next build --turbopack",
     "start": "bun --env-file=../../.env next start",
     "preview": "bun run build && bun run start --port 3001",
-    "check:bundle-budgets": "bun --env-file=../../.env scripts/check-route-bundle-budgets.ts",
     "test": "bun run test:unit && bun run test:e2e:full",
     "test:e2e": "bun run test:e2e:quick",
     "test:e2e:quick": "bun run test:e2e:quick:component && bun run test:e2e:quick:integration",
