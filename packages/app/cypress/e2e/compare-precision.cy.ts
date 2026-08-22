@@ -49,7 +49,7 @@ describe('Compare precision index page', () => {
   it('ships the same AgentX-first hierarchy on the Simplified Chinese page', () => {
     cy.visit('/zh/compare');
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-      cy.get('h1').should('have.text', '对比真实场景下的智能体推理性能');
+      cy.get('h1').should('have.text', '真实智能体工作负载下的推理性能对比');
       cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
       cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should(
         'have.attr',
@@ -60,10 +60,10 @@ describe('Compare precision index page', () => {
         .should('contain.text', '总览')
         .and('have.attr', 'href', '/zh/overview');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
-        .should('contain.text', '完整仪表板')
+        .should('contain.text', '查看完整仪表板')
         .and('have.attr', 'href', '/zh/inference?g_model=Kimi-K3&i_seq=agentic-traces&i_optimal=1');
       cy.get('[data-testid="compare-agentx-methodology-link"]')
-        .should('contain.text', '方法论深度解析')
+        .should('contain.text', '测试方法')
         .and('have.attr', 'href', '/zh/agentx');
     });
     cy.get('[data-testid="compare-model-catalog"]').should('contain.text', 'AgentX 与 8K→1K 结果');
