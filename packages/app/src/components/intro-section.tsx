@@ -21,7 +21,11 @@ export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
   const isZh = locale === 'zh';
   // Quotes fall back to the English original until a translation lands.
   const quotes = isZh
-    ? carouselQuotes.map((q) => ({ ...q, text: q.textZh ?? q.text }))
+    ? carouselQuotes.map((q) => ({
+        ...q,
+        text: q.textZh ?? q.text,
+        title: q.titleZh ?? q.title,
+      }))
     : carouselQuotes;
   return (
     <section>
