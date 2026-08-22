@@ -86,7 +86,7 @@ export interface GlobalFilterAvailabilityContextType {
   availablePrecisions: string[];
   availableDates: string[];
   availabilityRows: AvailabilityRow[] | undefined;
-  /** True only after the database availability request succeeds. */
+  /** True once the database availability request has either succeeded or failed. */
   availabilitySettled: boolean;
   availabilityError: string | null;
 }
@@ -339,8 +339,9 @@ export function GlobalFilterProvider({
   const {
     data: availabilityRows,
     error: availabilityQueryError,
-    isSuccess: availabilitySettled,
+    isPending: availabilityPending,
   } = useAvailability();
+  const availabilitySettled = !availabilityPending;
   const availabilityError = availabilityQueryError ? availabilityQueryError.message : null;
   const { availableModelsAndSequences: unofficialAvailable } = useUnofficialRun();
 
