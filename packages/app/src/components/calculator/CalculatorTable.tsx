@@ -50,7 +50,7 @@ const STRINGS = {
     costPrefix: '成本 (',
     costSuffix: ')',
     concurrency: '并发数',
-    footer: '数值基于真实 InferenceMAX 基准测试数据插值计算。仅显示在测量范围内有数据的 Chip。',
+    footer: '数值基于真实 InferenceMAX 基准测试数据插值计算。仅显示在测量范围内有数据的芯片。',
   },
 } as const;
 

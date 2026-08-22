@@ -53,7 +53,7 @@ const STRINGS = {
     heading: '历史趋势',
     description: '在固定交互性操作点下，各性能指标随时间的插值变化。',
     targetLabel: '目标交互性 (tok/s/user)',
-    targetTooltip: '用于插值的交互性操作点。移动滑块可查看各 Chip 在不同交互性水平下的性能变化。',
+    targetTooltip: '用于插值的交互性操作点。移动滑块可查看各芯片在不同交互性水平下的性能变化。',
     captionTitle: (yTitle: string, target: number) =>
       `${yTitle} 随时间变化（交互性 ${target} tok/s/user）`,
     source: '来源：SemiAnalysis InferenceX™',

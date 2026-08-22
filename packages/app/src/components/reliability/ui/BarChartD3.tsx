@@ -14,6 +14,7 @@ import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-marg
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import type { ModelSuccessRateData } from '@/components/reliability/types';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { type Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 import ChartLegend from '@/components/ui/chart-legend';
 
@@ -21,15 +22,35 @@ type ChartItem = ModelSuccessRateData & { modelLabel: string };
 
 const BASE_MARGIN = { top: 24, right: 24, bottom: 40 };
 
-const generateReliabilityTooltipContent = (data: ChartItem, isPinned: boolean): string => {
+const TOOLTIP_STRINGS = {
+  en: {
+    dismiss: 'Click elsewhere to dismiss',
+    successRate: 'Success Rate:',
+    successful: 'Successful:',
+    totalRuns: 'Total Runs:',
+  },
+  zh: {
+    dismiss: '点击其他区域关闭',
+    successRate: '成功率：',
+    successful: '成功次数：',
+    totalRuns: '总运行次数：',
+  },
+} as const;
+
+const generateReliabilityTooltipContent = (
+  data: ChartItem,
+  isPinned: boolean,
+  locale: Locale = 'en',
+): string => {
+  const t = TOOLTIP_STRINGS[locale];
   const modelLabel = getHardwareConfig(data.model).label;
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
       <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${modelLabel}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Success Rate:</strong> ${data.successRate.toFixed(2)}%</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Successful:</strong> ${data.n_success}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px;"><strong>Total Runs:</strong> ${data.total}</div>
+      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${t.successRate}</strong> ${data.successRate.toFixed(2)}%</div>
+      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${t.successful}</strong> ${data.n_success}</div>
+      <div style="color: var(--muted-foreground); font-size: 11px;"><strong>${t.totalRuns}</strong> ${data.total}</div>
     </div>
   `;
 };
@@ -283,7 +304,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
         }}
         tooltip={{
           rulerType: 'vertical',
-          content: generateReliabilityTooltipContent,
+          content: (d, isPinned) => generateReliabilityTooltipContent(d, isPinned, locale),
           getRulerX: () => hoveredBarXRef.current,
           getRulerY: (d, ys) => {
             const bandScale = ys as unknown as d3.ScaleBand<string>;

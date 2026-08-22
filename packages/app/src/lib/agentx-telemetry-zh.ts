@@ -60,7 +60,7 @@ const GUIDE_ZH = {
         '我们仍然会暴露每个点的底层配置与来源信息。点击一个数据点会弹出 tooltip，其中详细列出产生该点的具体配置、运行元数据、指向公开可查的 CI 来源链接，以及 AgentX 特有的统计数据。从那里点击 “View charts” 链接，即可打开完整的单点详情页。',
       ],
       figure: {
-        alt: 'AgentX Pareto 曲线，横轴为 P90 interactivity、纵轴为单 chip token 吞吐量，图上固定显示一个 tooltip，列出所选点的镜像、interactivity、吞吐量、chip 数量、并行方式、精度、cache 命中率、speculative decoding 与 token 数量，并附带 GitHub Actions 运行链接和 View charts 按钮。',
+        alt: 'AgentX Pareto 曲线，横轴为 P90 interactivity、纵轴为单芯片 token 吞吐量，图上固定显示一个 tooltip，列出所选点的镜像、interactivity、吞吐量、芯片数量、并行方式、精度、cache 命中率、speculative decoding 与 token 数量，并附带 GitHub Actions 运行链接和 View charts 按钮。',
         caption:
           '数据点 tooltip。曲线上的每项结论都可追溯：容器镜像、并行方式、精度、cache 命中率、所用 speculator，以及产生这些数字的 CI 运行链接。',
       },
@@ -91,7 +91,7 @@ const GUIDE_ZH = {
     'kv-offload': {
       heading: '如何解读启用 KV cache offload 的点',
       paragraphs: [
-        '使用了 KV cache offload 的点，在主图上会额外套一圈虚线圆环，用于区分开启了 KV offload 的数据点。选中这类点后，详情页会显示 offload 类型、KV offload 引擎、chip cache 命中率和 CPU cache 命中率。',
+        '使用了 KV cache offload 的点，在主图上会额外套一圈虚线圆环，用于区分开启了 KV offload 的数据点。选中这类点后，详情页会显示 offload 类型、KV offload 引擎、芯片 cache 命中率和 CPU cache 命中率。',
         '这样一来，无需为每种 offload 配置单独画一条曲线，也能看清 KV offload 在最佳曲线中的贡献——这与“把优化合并到同一条曲线”是同一个思路，只是应用在了效果最容易被忽略的那项优化上。',
       ],
     },

@@ -38,7 +38,7 @@ const STRINGS = {
     transferEngine: 'KV 传输引擎',
     router: '路由器',
     concurrency: '并发数',
-    gpuCacheHit: 'Chip Cache 命中率',
+    gpuCacheHit: '芯片 Cache 命中率',
     cpuCacheHit: 'CPU Cache 命中率',
     enabledLegacy: '已启用（旧版数据）',
     disabledLegacy: '已禁用（旧版数据）',

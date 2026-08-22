@@ -64,7 +64,7 @@ const STRINGS = {
     viewRuns: '查看 GitHub Actions 运行记录',
     howItWorks: '了解复现流程',
     quickComparisons: '快速对比',
-    quickComparisonsDesc: '一键进入最热门的 Chip 推理基准测试对比，精选视图开箱即用。',
+    quickComparisonsDesc: '一键进入最热门的芯片推理基准测试对比，精选视图开箱即用。',
   },
 } as const;
 

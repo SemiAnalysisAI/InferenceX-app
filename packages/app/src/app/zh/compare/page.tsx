@@ -113,7 +113,7 @@ export default async function CompareIndexPageZh() {
               href="/zh/compare-per-dollar"
               className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
             >
-              Chip 每美元性能对比
+              芯片每美元性能对比
               <span aria-hidden="true" className="text-lg lg:text-xl">
                 →
               </span>
@@ -152,7 +152,7 @@ export default async function CompareIndexPageZh() {
               <div>
                 <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {pairs.length} 组 Chip 对比具有 {model.label} 的基准测试数据。
+                  {pairs.length} 组芯片对比具有 {model.label} 的基准测试数据。
                 </p>
               </div>
               {groups.map((group) => (
