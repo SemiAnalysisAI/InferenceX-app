@@ -16,7 +16,6 @@
     "dev": "bun run --cwd packages/app dev",
     "mcp": "bun run --cwd packages/mcp mcp",
     "build": "bun run --cwd packages/app build",
-    "check:bundle-budgets": "bun run --cwd packages/app check:bundle-budgets",
     "start": "bun run --cwd packages/app start",
     "preview": "bun run --cwd packages/app preview",
     "typecheck": "tsc --noEmit",

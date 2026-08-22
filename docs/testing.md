@@ -49,14 +49,6 @@ E2E_FIXTURES=1 \
 
 `E2E_FIXTURES=1` serves the committed API snapshots under `packages/app/cypress/fixtures/api/`. Refresh them with `bun run --cwd packages/app capture:fixtures`. The capture script updates `_manifest.json`, which records the fixture shape, byte length, checksum, source, and capture timestamp. The manifest guard rejects partial or hand-edited snapshots; benchmark history must also contain at least two dates so replay tests cannot silently skip their substantive path.
 
-### Route bundle budgets
-
-Production builds emit deterministic per-route first-load JavaScript sizes in `.next/diagnostics/route-bundle-stats.json`. `bun run build` runs `bun run check:bundle-budgets` after Next.js finishes, and the guard checks the measured landing, dashboard, AgentX, blog-detail, and comparison route families in both locales.
-
-Each budget records the measured byte baseline plus 2% headroom. The guard rejects both oversized routes and missing route entries, so deleting or renaming a route cannot silently remove it from performance coverage. The colocated Vitest contract runs in the normal unit workflow and verifies those failure modes without relying on wall-clock timing.
-
-After an intentional bundle change, inspect the generated route diagnostics, account for the size change, and update the relevant baselines in `src/lib/route-bundle-budgets.ts`. Do not raise a family-wide ceiling to hide one route's regression.
-
 Server-cache performance regressions must assert source-reader call counts for repeated identical inputs. Do not use elapsed-time thresholds: CI scheduling and cold-start variance make wall-clock assertions nondeterministic.
 
 ## Quality Standards
