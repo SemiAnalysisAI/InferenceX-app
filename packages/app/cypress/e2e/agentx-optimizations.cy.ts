@@ -23,7 +23,7 @@ const FRAMEWORK_NAMES: Record<(typeof FRAMEWORK_SLUGS)[number], string> = {
 };
 
 const ROUTE_VIEWPORTS = [
-  { width: 1280, height: 800 },
+  { width: 1440, height: 900 },
   { width: 390, height: 844 },
 ] as const;
 
@@ -116,7 +116,7 @@ describe('AgentX optimizations', () => {
       });
   });
 
-  it('renders the index and every project at desktop and 390px in both locales', () => {
+  it('renders the index and every project at 1440px and 390px in both locales', () => {
     for (const viewport of ROUTE_VIEWPORTS) {
       for (const locale of ['', '/zh']) {
         cy.viewport(viewport.width, viewport.height);

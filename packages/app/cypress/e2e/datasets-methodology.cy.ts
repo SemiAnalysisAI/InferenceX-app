@@ -22,7 +22,7 @@ const DATASET = {
 };
 
 const ROUTE_VIEWPORTS = [
-  { width: 1280, height: 800 },
+  { width: 1440, height: 900 },
   { width: 375, height: 812 },
 ] as const;
 
@@ -162,7 +162,7 @@ describe('AgentX dataset methodology', () => {
     cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/agentx/methodology');
   });
 
-  it('renders the landing and methodology click path at desktop and 375px in both locales', () => {
+  it('renders the landing and methodology click path at 1440px and 375px in both locales', () => {
     for (const viewport of ROUTE_VIEWPORTS) {
       for (const locale of ['', '/zh']) {
         cy.viewport(viewport.width, viewport.height);

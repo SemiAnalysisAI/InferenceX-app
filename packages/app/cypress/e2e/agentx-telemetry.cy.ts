@@ -22,7 +22,7 @@ const FIGURE_KEYS = [
 ];
 
 const ROUTE_VIEWPORTS = [
-  { width: 1280, height: 800 },
+  { width: 1440, height: 900 },
   { width: 375, height: 812 },
 ] as const;
 
@@ -125,7 +125,7 @@ describe('AgentX telemetry tutorial — entry point on /agentx', () => {
 });
 
 describe('AgentX telemetry tutorial — responsive locale routes', () => {
-  it('renders the full telemetry surface at desktop and 375px in both locales', () => {
+  it('renders the full telemetry surface at 1440px and 375px in both locales', () => {
     for (const viewport of ROUTE_VIEWPORTS) {
       for (const locale of ['', '/zh']) {
         cy.viewport(viewport.width, viewport.height);
