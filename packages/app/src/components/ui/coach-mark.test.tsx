@@ -236,4 +236,16 @@ describe('CoachMark anchor reuse', () => {
       '706',
     );
   });
+
+  it('stays hidden when a resolved anchor fails validation', () => {
+    const point = addPoint();
+
+    renderCoachMark({
+      resolve: () => point,
+      getRect: () => null,
+      actionSelector: ACTION_SELECTOR,
+    });
+
+    expect(isVisible()).toBe(false);
+  });
 });

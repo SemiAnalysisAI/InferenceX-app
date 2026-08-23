@@ -92,7 +92,7 @@ export function CoachMark({
       let rect = element && getRect ? getRect(element) : null;
       if (!element || !rect) {
         element = resolve();
-        rect = element ? (getRect?.(element) ?? element.getBoundingClientRect()) : null;
+        rect = element ? (getRect ? getRect(element) : element.getBoundingClientRect()) : null;
       }
       anchorRef.current = element && rect ? element : null;
 
