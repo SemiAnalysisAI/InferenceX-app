@@ -1267,6 +1267,8 @@ const ScatterGraph = React.memo(
     labelDisplayRef.current = { showPointLabels, showGradientLabels, showLineLabels };
     const pointLabelsVisible = showPointLabels && !showGradientLabels;
     const lastPointLabelsVisibleRef = useRef(pointLabelsVisible);
+    const lastShowLineLabelsRef = useRef(showLineLabels);
+    const lastShowGradientLabelsRef = useRef(showGradientLabels);
 
     const getDisplaySelection = useCallback(() => {
       const svg = chartRef.current?.getSvgElement?.();
@@ -2751,20 +2753,41 @@ const ScatterGraph = React.memo(
       });
     }, [getDisplaySelection, dataIdentity, traceAvailability, isTraceAvailabilityPending]);
 
-    // Point-label controls own only label visibility and collision placement.
-    // Overlay label visibility remains owned by the overlay custom layer's
-    // matching selective display callback.
+    // Label-mode controls own point-label visibility and collision placement.
+    // Line and gradient labels are collision obstacles whose custom layer
+    // renders once through D3's display phase. Replaying that layer before the
+    // point-label collision pass preserves its stable placement behavior
+    // without restyling unrelated point marks. Overlay label visibility remains
+    // owned by the overlay custom layer's matching selective display callback.
     useLayoutEffect(() => {
-      if (lastPointLabelsVisibleRef.current === pointLabelsVisible) return;
+      const visibilityChanged = lastPointLabelsVisibleRef.current !== pointLabelsVisible;
+      const lineLabelsChanged = lastShowLineLabelsRef.current !== showLineLabels;
+      const gradientLabelsChanged = lastShowGradientLabelsRef.current !== showGradientLabels;
+      if (!visibilityChanged && !lineLabelsChanged && !gradientLabelsChanged) return;
       lastPointLabelsVisibleRef.current = pointLabelsVisible;
+      lastShowLineLabelsRef.current = showLineLabels;
+      lastShowGradientLabelsRef.current = showGradientLabels;
       const display = getDisplaySelection();
       if (!display) return;
-      display.zoomGroup
-        .selectAll<SVGTextElement, unknown>('.dot-group .point-label')
-        .style('display', pointLabelsVisible ? '' : 'none')
-        .style('opacity', pointLabelsVisible ? 1 : 0);
-      if (pointLabelsVisible) avoidPointLabelCollisions(display.zoomGroup);
-    }, [getDisplaySelection, pointLabelsVisible]);
+      const { svg, ctx, zoomGroup } = display;
+      if (visibilityChanged) {
+        zoomGroup
+          .selectAll<SVGTextElement, unknown>('.dot-group .point-label')
+          .style('display', pointLabelsVisible ? '' : 'none')
+          .style('opacity', pointLabelsVisible ? 1 : 0);
+      }
+      if ((lineLabelsChanged || gradientLabelsChanged) && (showLineLabels || showGradientLabels)) {
+        const entranceInFlight = zoomGroup
+          .selectAll<SVGPathElement, unknown>('.roofline-path')
+          .nodes()
+          .some((node) => hasNamedTransition(node, 'data-update'));
+        const rooflineLayer = layersRef.current.find((layer) => layer.key === 'rooflines');
+        if (!entranceInFlight && rooflineLayer?.type === 'custom' && rooflineLayer.render) {
+          rooflineLayer.render(zoomGroup, currentZoomRenderContext(svg, ctx));
+        }
+      }
+      if (pointLabelsVisible) avoidPointLabelCollisions(zoomGroup);
+    }, [getDisplaySelection, pointLabelsVisible, showGradientLabels, showLineLabels]);
 
     // Visibility and palette changes can alter label collision placement and
     // line-label colors. Label mode changes are handled by each custom layer's

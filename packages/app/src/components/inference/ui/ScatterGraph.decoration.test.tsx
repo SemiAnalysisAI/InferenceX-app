@@ -207,6 +207,33 @@ describe('ScatterGraph toggle decoration', () => {
     unmount();
   });
 
+  it('rechecks point-label collisions when line-label obstacles change', () => {
+    inferenceState.current = {
+      ...baseInferenceState(),
+      showPointLabels: true,
+      showLineLabels: false,
+    };
+    const getBBox = vi.spyOn(
+      SVGElement.prototype as unknown as { getBBox: () => DOMRect },
+      'getBBox',
+    );
+    const { rerender, unmount } = mountChart();
+    getBBox.mockClear();
+
+    inferenceState.current = {
+      ...inferenceState.current,
+      showLineLabels: true,
+    };
+    rerender();
+
+    expect(
+      getBBox.mock.contexts.some(
+        (element) => element instanceof SVGElement && element.classList.contains('point-label'),
+      ),
+    ).toBe(true);
+    unmount();
+  });
+
   it('hides a toggled-off hw via opacity without rebuilding the chart', () => {
     const { container, rerender, unmount } = mountChart();
     const buildsAfterMount = rebuildCount();
