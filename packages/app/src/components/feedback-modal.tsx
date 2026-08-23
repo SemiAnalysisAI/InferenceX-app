@@ -22,6 +22,9 @@ export interface FeedbackFormProps {
   onDismiss: () => void;
   /** Test/embedded-surface override. Production defaults to the current route locale. */
   locale?: Locale;
+  /** Engine-owned IDs referenced by the containing dialog. */
+  titleId?: string;
+  descriptionId?: string;
 }
 
 const STRINGS = {
@@ -63,7 +66,12 @@ const STRINGS = {
   },
 } as const;
 
-export function FeedbackForm({ onDismiss, locale: localeOverride }: FeedbackFormProps) {
+export function FeedbackForm({
+  onDismiss,
+  locale: localeOverride,
+  titleId: titleIdOverride,
+  descriptionId: descriptionIdOverride,
+}: FeedbackFormProps) {
   const [doingWell, setDoingWell] = useState('');
   const [doingPoorly, setDoingPoorly] = useState('');
   const [wantToSee, setWantToSee] = useState('');
@@ -74,8 +82,10 @@ export function FeedbackForm({ onDismiss, locale: localeOverride }: FeedbackForm
   const routeLocale = useLocale();
   const locale = localeOverride ?? routeLocale;
   const t = STRINGS[locale];
-  const titleId = useId();
-  const descId = useId();
+  const generatedTitleId = useId();
+  const generatedDescriptionId = useId();
+  const titleId = titleIdOverride ?? generatedTitleId;
+  const descriptionId = descriptionIdOverride ?? generatedDescriptionId;
 
   const handleSubmit = useCallback(async () => {
     if (status === 'submitting') return;
@@ -149,7 +159,7 @@ export function FeedbackForm({ onDismiss, locale: localeOverride }: FeedbackForm
         <h2 id={titleId} className="text-lg font-semibold">
           {t.successTitle}
         </h2>
-        <p id={descId} className="text-sm text-muted-foreground">
+        <p id={descriptionId} className="text-sm text-muted-foreground">
           {t.successBody}
         </p>
       </div>
@@ -163,7 +173,7 @@ export function FeedbackForm({ onDismiss, locale: localeOverride }: FeedbackForm
           <MessageSquareText className="size-5 text-brand" />
           {t.title}
         </h2>
-        <p id={descId} className="text-sm text-muted-foreground">
+        <p id={descriptionId} className="text-sm text-muted-foreground">
           {t.description}
         </p>
       </div>

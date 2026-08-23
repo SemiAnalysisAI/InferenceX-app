@@ -225,6 +225,31 @@ describe('Historical Trends — Chinese route', () => {
     cy.contains('historical-database-internal-detail').should('not.exist');
   });
 
+  it('shows a distinct secondary-history error and recovers through the tracked retry', () => {
+    cy.fixture('api/benchmarks-history.json').then((historyRows) => {
+      let attempts = 0;
+      cy.intercept('GET', '**/api/v1/benchmarks/history?*', (request) => {
+        attempts += 1;
+        request.reply(
+          attempts <= 2
+            ? { statusCode: 500, body: { error: 'secondary-history-internal-detail' } }
+            : { body: historyRows },
+        );
+      }).as('secondaryHistory');
+
+      cy.reload();
+      cy.wait('@secondaryHistory');
+      cy.wait('@secondaryHistory');
+      cy.get('[data-testid="historical-trend-error"]')
+        .should('contain.text', '历史趋势数据加载失败。')
+        .and('not.contain.text', '历史基准测试数据加载失败。')
+        .and('not.contain.text', 'secondary-history-internal-detail');
+      cy.contains('button', '重试加载趋势数据').click();
+      cy.wait('@secondaryHistory');
+      cy.get('[data-testid="historical-trend-figure"]').should('be.visible');
+    });
+  });
+
   for (const width of [375, 390]) {
     it(`keeps the target controls and chart reachable at ${width}px`, () => {
       cy.viewport(width, 844);

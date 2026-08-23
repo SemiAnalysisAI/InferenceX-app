@@ -176,15 +176,28 @@ describe('Reliability Chart — Chinese route and settled states', () => {
     cy.contains('正在加载可靠性数据……').should('not.exist');
   });
 
-  it('shows a safe Chinese error instead of a raw API response', () => {
-    cy.intercept('GET', '**/api/v1/reliability', {
-      statusCode: 500,
-      body: { error: 'database-internal-detail' },
-    }).as('failedReliability');
+  it('shows a safe Chinese error and recovers through the tracked retry control', () => {
+    let attempts = 0;
+    cy.fixture('api/reliability.json').then((fixture) => {
+      cy.intercept('GET', '**/api/v1/reliability', (req) => {
+        attempts += 1;
+        req.reply(
+          attempts <= 2
+            ? { statusCode: 500, body: { error: 'database-internal-detail' } }
+            : { statusCode: 200, body: fixture },
+        );
+      }).as('retryReliability');
+    });
     cy.visit('/zh/reliability');
-    cy.wait('@failedReliability');
-    cy.contains('可靠性数据加载失败。').should('be.visible');
+    cy.wait('@retryReliability');
+    cy.wait('@retryReliability');
+    cy.get('[data-testid="reliability-error"]')
+      .should('be.visible')
+      .and('contain.text', '可靠性数据加载失败。');
     cy.contains('database-internal-detail').should('not.exist');
+    cy.contains('[data-testid="reliability-error"] button', '重试').click();
+    cy.wait('@retryReliability');
+    cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
   });
 
   for (const width of [375, 390]) {

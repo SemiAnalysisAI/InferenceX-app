@@ -79,6 +79,7 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     isLoading: loading,
     isSuccess: reliabilitySettled,
     error: queryError,
+    refetch,
   } = useReliability();
 
   const error = queryError ? queryError.message : null;
@@ -219,6 +220,7 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     () => ({
       loading,
       error,
+      refetch,
       dateRangeSuccessRateData,
       filteredReliabilityData,
       chartData,
@@ -240,6 +242,7 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     [
       loading,
       error,
+      refetch,
       dateRangeSuccessRateData,
       filteredReliabilityData,
       chartData,

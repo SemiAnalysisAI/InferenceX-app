@@ -46,6 +46,28 @@ describe('FeedbackForm', () => {
     cy.get('@onDismiss').should('have.been.calledOnce');
   });
 
+  it('keeps engine-provided English accessible labels valid after success', () => {
+    cy.intercept('POST', '/api/v1/feedback', { statusCode: 204 }).as('postAccessibleEn');
+    cy.mount(
+      <FeedbackForm
+        onDismiss={cy.stub()}
+        titleId="feedback-modal-title"
+        descriptionId="feedback-modal-description"
+      />,
+    );
+
+    cy.get('#feedback-modal-title').should('have.text', 'Help us improve InferenceX');
+    cy.get('#feedback-modal-description').should(
+      'have.text',
+      "We'd love to hear what's working and what isn't.",
+    );
+    cy.get('[data-testid="feedback-doing-well"]').type('Clear charts');
+    cy.get('[data-testid="feedback-modal-submit"]').click();
+    cy.wait('@postAccessibleEn');
+    cy.get('#feedback-modal-title').should('have.text', 'Thanks for your feedback!');
+    cy.get('#feedback-modal-description').should('have.text', 'We read every response.');
+  });
+
   it('surfaces a 429 as a user-readable error', () => {
     cy.intercept('POST', '/api/v1/feedback', { statusCode: 429 }).as('post');
     cy.mount(<FeedbackForm onDismiss={cy.stub()} />);
@@ -69,6 +91,29 @@ describe('FeedbackForm', () => {
     cy.get('[data-testid="feedback-modal-submit"]').click();
     cy.wait('@postZh');
     cy.contains('感谢您的反馈！').should('be.visible');
+  });
+
+  it('keeps engine-provided Chinese accessible labels valid after success', () => {
+    cy.intercept('POST', '/api/v1/feedback', { statusCode: 204 }).as('postAccessibleZh');
+    cy.mount(
+      <FeedbackForm
+        locale="zh"
+        onDismiss={cy.stub()}
+        titleId="feedback-modal-title"
+        descriptionId="feedback-modal-description"
+      />,
+    );
+
+    cy.get('#feedback-modal-title').should('have.text', '帮助我们改进 InferenceX');
+    cy.get('#feedback-modal-description').should(
+      'have.text',
+      '欢迎告诉我们哪些体验不错，以及哪些地方需要改进。',
+    );
+    cy.get('[data-testid="feedback-doing-well"]').type('图表很清晰');
+    cy.get('[data-testid="feedback-modal-submit"]').click();
+    cy.wait('@postAccessibleZh');
+    cy.get('#feedback-modal-title').should('have.text', '感谢您的反馈！');
+    cy.get('#feedback-modal-description').should('have.text', '我们会认真阅读每一条反馈。');
   });
 
   it('localizes rate-limit and server errors on Chinese routes', () => {

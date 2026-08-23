@@ -283,8 +283,16 @@ describe('Chinese (/zh) pages', () => {
 
     cy.get('[data-testid="feedback-modal"]')
       .should('be.visible')
+      .and('have.attr', 'role', 'dialog')
+      .and('have.attr', 'aria-labelledby', 'feedback-modal-title')
+      .and('have.attr', 'aria-describedby', 'feedback-modal-description')
       .and('contain.text', '帮助我们改进 InferenceX')
       .and('contain.text', '您的反馈会加密保存');
+    cy.get('#feedback-modal-title').should('have.text', '帮助我们改进 InferenceX');
+    cy.get('#feedback-modal-description').should(
+      'have.text',
+      '欢迎告诉我们哪些体验不错，以及哪些地方需要改进。',
+    );
     cy.get('[data-testid="feedback-modal-dismiss"]').click();
     cy.get('[data-testid="feedback-modal"]').should('not.exist');
   });

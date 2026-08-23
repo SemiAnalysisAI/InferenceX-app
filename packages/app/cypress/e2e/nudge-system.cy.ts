@@ -21,12 +21,33 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
     'inferencex-gradient-nudge-shown',
     'inferencex-eval-samples-nudge-dismissed',
     'inferencex-filter-hint-nudge-dismissed',
+    'inferencex-feedback-modal-snoozed',
+    'inferencex-feedback-modal-submitted',
   ];
   for (const key of keys) {
     win.localStorage.removeItem(key);
     win.sessionStorage.removeItem(key);
   }
 }
+
+describe('Dashboard feedback modal accessibility', () => {
+  it('has a valid English accessible name and description', () => {
+    cy.visit('/inference', {
+      onBeforeLoad: clearAllNudgeStorage,
+    });
+
+    cy.get('[data-testid="feedback-modal"]')
+      .should('be.visible')
+      .and('have.attr', 'role', 'dialog')
+      .and('have.attr', 'aria-labelledby', 'feedback-modal-title')
+      .and('have.attr', 'aria-describedby', 'feedback-modal-description');
+    cy.get('#feedback-modal-title').should('have.text', 'Help us improve InferenceX');
+    cy.get('#feedback-modal-description').should(
+      'have.text',
+      "We'd love to hear what's working and what isn't.",
+    );
+  });
+});
 
 // `cypress.config.ts` runs with `testIsolation: false` — the browser context
 // (incl. localStorage / sessionStorage) survives across tests in this spec.

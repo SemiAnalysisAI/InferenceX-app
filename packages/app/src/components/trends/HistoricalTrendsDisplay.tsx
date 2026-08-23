@@ -63,6 +63,8 @@ const STRINGS = {
     noData: 'No interactivity chart data available for the selected model and sequence.',
     loadError: 'Historical benchmark data could not be loaded.',
     retry: 'Reload page',
+    trendLoadError: 'Historical trend data could not be loaded.',
+    trendRetry: 'Retry loading trend data',
   },
   zh: {
     heading: '历史趋势',
@@ -79,6 +81,8 @@ const STRINGS = {
     noData: '所选模型和序列无可用的交互性图表数据。',
     loadError: '历史基准测试数据加载失败。',
     retry: '重新加载页面',
+    trendLoadError: '历史趋势数据加载失败。',
+    trendRetry: '重试加载趋势数据',
   },
 };
 
@@ -154,7 +158,12 @@ export default function HistoricalTrendsDisplay() {
   }, [interactivityInput, targetInteractivity, interactivityRange]);
 
   // Interpolated trend data
-  const { trendLines, loading: trendLoading } = useInterpolatedTrendData({
+  const {
+    trendLines,
+    loading: trendLoading,
+    error: trendError,
+    refetch: refetchTrendData,
+  } = useInterpolatedTrendData({
     selectedModel: selectedModel as Model,
     selectedSequence: selectedSequence as Sequence,
     selectedPrecisions,
@@ -245,6 +254,31 @@ export default function HistoricalTrendsDisplay() {
               }}
             >
               {t.retry}
+            </Button>
+          </div>
+        </Card>
+      </section>
+    );
+  }
+
+  if (trendError) {
+    return (
+      <section data-testid="historical-trends-display">
+        <Card data-testid="historical-trend-error">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
+              <p className="text-destructive text-sm">{t.trendLoadError}</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                track('historical_trend_retry_clicked');
+                void refetchTrendData();
+              }}
+            >
+              {t.trendRetry}
             </Button>
           </div>
         </Card>

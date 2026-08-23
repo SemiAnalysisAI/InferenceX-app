@@ -48,14 +48,19 @@ function lineColor(key: string): string {
 const LINE_KEYS = ['nvidia', 'amd', 'total'] as const;
 type LineKey = (typeof LINE_KEYS)[number];
 
-function generateTooltipContent(d: ChartPoint, isPinned: boolean, locale: Locale): string {
-  const t = SUBMISSIONS_STRINGS[locale];
-  const numberLocale = locale === 'zh' ? 'zh-CN' : 'en-US';
-  const dateStr = new Date(d.date).toLocaleDateString(numberLocale, {
+export function formatSubmissionTooltipDate(date: number, locale: Locale): string {
+  return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-  });
+    timeZone: 'UTC',
+  }).format(new Date(date));
+}
+
+function generateTooltipContent(d: ChartPoint, isPinned: boolean, locale: Locale): string {
+  const t = SUBMISSIONS_STRINGS[locale];
+  const numberLocale = locale === 'zh' ? 'zh-CN' : 'en-US';
+  const dateStr = formatSubmissionTooltipDate(d.date, locale);
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); min-width: 160px; user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
