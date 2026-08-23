@@ -305,7 +305,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
               {documentation.schemaNotes.map((schema) => (
                 <div
                   key={schema.id}
-                  className="border-b border-border/50 p-4 last:border-b-0 md:border-r md:even:border-r-0"
+                  className="min-w-0 border-b border-border/50 p-4 last:border-b-0 md:border-r md:even:border-r-0"
                 >
                   <dt className="font-mono text-sm font-semibold">{schema.title}</dt>
                   <dd className="mt-2">

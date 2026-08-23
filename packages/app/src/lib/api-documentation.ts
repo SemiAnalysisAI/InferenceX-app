@@ -506,7 +506,7 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
     title: text('Core benchmark data', '核心基准数据'),
     description: text(
       'Benchmark results, availability, workflow provenance, evaluations, and reliability.',
-      '基准结果、可用配置、工作流来源、评测与可靠性数据。',
+      '基准结果、可用配置、工作流来源、评估与可靠性数据。',
     ),
   },
   {
@@ -552,7 +552,7 @@ export const apiOperations: readonly ApiOperation[] = [
     summary: text('List available benchmark configurations', '列出可用的基准配置'),
     description: text(
       'Returns model, sequence, precision, hardware, framework, speculative method, benchmark type, and date combinations that have benchmark data.',
-      '返回已有基准数据的模型、序列、精度、硬件、框架、推测方法、基准类型和日期组合。',
+      '返回已有基准数据的模型、序列、精度、硬件、框架、投机解码方式、基准类型和日期组合。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -829,16 +829,16 @@ export const apiOperations: readonly ApiOperation[] = [
     group: 'core',
     method: 'GET',
     path: '/api/v1/evaluations',
-    summary: text('List evaluation aggregates', '列出评测汇总'),
+    summary: text('List evaluation aggregates', '列出评估汇总'),
     description: text(
       'Returns latest-attempt evaluation results with configuration, task, provenance, and metric values.',
-      '返回最新尝试的评测结果，包含配置、任务、来源和指标值。',
+      '返回最新尝试的评估结果，包含配置、任务、来源和指标值。',
     ),
     audience: 'public',
     stability: 'stable',
     parameters: [],
     responses: [
-      success('Evaluation result rows.', '评测结果行。', evaluationsSchema, [
+      success('Evaluation result rows.', '评估结果行。', evaluationsSchema, [
         {
           id: 72,
           config_id: 11,
@@ -870,7 +870,7 @@ export const apiOperations: readonly ApiOperation[] = [
       errorResponse(
         '500',
         'The evaluation query failed.',
-        '评测查询失败。',
+        '评估查询失败。',
         'Internal server error',
       ),
     ],

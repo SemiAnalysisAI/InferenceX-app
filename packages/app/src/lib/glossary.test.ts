@@ -123,6 +123,7 @@ describe('Chinese glossary content', () => {
     expect(getZhGlossaryEntry('trace-replay')?.term).toBe('轨迹回放');
     expect(getZhGlossaryEntry('closed-loop-benchmark')?.term).toBe('闭环基准测试');
     expect(getZhGlossaryEntry('subagent')?.term).toBe('子智能体');
+    expect(getZhGlossaryEntry('speculative-decoding')?.term).toBe('投机解码');
     expect(getZhGlossaryEntry('multi-token-prediction')?.term).toBe('多 token 预测');
     expect(getZhGlossaryEntry('not-a-real-term')).toBeUndefined();
 
@@ -133,6 +134,12 @@ describe('Chinese glossary content', () => {
         next: sorted[index + 1] ?? null,
       });
     }
+  });
+
+  it('preserves the source scope in audited Chinese definitions', () => {
+    expect(getZhGlossaryEntry('ai-inference')?.explanation).not.toContain('相差数倍');
+    expect(getZhGlossaryEntry('cost-per-million-tokens')?.significance).toContain('低吞吐量');
+    expect(getZhGlossaryEntry('sglang')?.benchmarkContext).toContain('回归或提升');
   });
 });
 

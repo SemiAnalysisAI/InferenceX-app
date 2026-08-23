@@ -53,7 +53,7 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
       '每兆瓦 token 吞吐量（tok/s/MW）',
       'P99 首 token 延迟（TTFT）',
       'AgentX 场景的端到端延迟、token 间延迟（ITL）、输出吞吐量、prefix cache 行为以及会话与 subagent 执行情况',
-      '每百万 token 成本（总计、输入、输出）——涵盖超大规模云、NeoCoud 和裸机租赁定价',
+      '每百万 token 成本（总计、输入、输出）——涵盖超大规模云、NeoCloud 和裸机租赁定价',
       '每 token 能耗（焦耳，总计、输入、输出）',
       '用户自定义成本和功耗计算',
     ],

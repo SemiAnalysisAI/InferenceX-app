@@ -2,6 +2,7 @@ const SITE_URL = 'https://inferencex.semianalysis.com';
 
 describe('API documentation', () => {
   it('exposes the localized reference and its OpenAPI contract', () => {
+    cy.viewport(1440, 900);
     cy.visit('/api');
 
     cy.get('[data-testid="api-reference"]')
@@ -78,4 +79,26 @@ describe('API documentation', () => {
       .should('have.attr', 'href', '/zh/api')
       .and('have.text', 'API 文档');
   });
+
+  for (const [path, width] of [
+    ['/api', 375],
+    ['/zh/api', 390],
+  ] as const) {
+    it(`keeps wide API data reachable without page overflow at ${path} on ${width}px`, () => {
+      cy.viewport(width, 844);
+      cy.visit(path);
+      cy.get('[data-testid="api-endpoint-list-benchmarks"] summary').click();
+      cy.get('[data-testid="api-endpoint-list-benchmarks"] .overflow-x-auto')
+        .first()
+        .should('be.visible')
+        .then(($scroller) => {
+          expect($scroller[0].scrollWidth).to.be.greaterThan($scroller[0].clientWidth);
+        });
+      cy.document().then((document) => {
+        expect(document.documentElement.scrollWidth).to.be.at.most(
+          document.documentElement.clientWidth,
+        );
+      });
+    });
+  }
 });

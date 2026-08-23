@@ -36,7 +36,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'AI 推理是使用已经训练好的模型处理新输入并生成输出的过程；对大语言模型而言，通常就是处理提示词并生成 token。',
     explanation:
-      '训练阶段会更新模型权重，推理阶段则使用这些权重。生产系统还需要推理引擎负责调度请求、管理内存、合并批次，并在一个或多个加速器上执行内核。相同模型在不同软硬件栈上的表现可能相差数倍。',
+      '训练阶段会更新模型权重，推理阶段则使用这些权重。生产系统还需要推理引擎负责调度请求、管理内存、合并批次，并在一个或多个加速器上执行内核。周边软硬件栈不同，性能也会随之变化。',
     significance:
       '推理既是模型问题，也是系统问题。用户体验取决于延迟和交互性，运营成本则取决于吞吐量、利用率、功耗与硬件成本；只优化其中一个维度，往往会牺牲另一个维度。',
     benchmarkContext:
@@ -221,7 +221,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '批处理就像让多名乘客坐同一辆巴士：芯片一次处理多个请求，让每趟计算完成更多有效工作。',
     definition: '批处理将多个请求的工作组合起来，使加速器能够一起处理它们的 token。',
     explanation:
-      '大型矩阵运算比大量微小运算更能发挥芯片效率。现代推理引擎采用连续批处理，请求到达和结束时动态加入或退出，无需等待固定批次全部完成。',
+      '大型矩阵运算比大量微小运算更能发挥芯片效率。现代推理引擎采用连续批处理，请求到达和结束时动态加入或退出，无需等待固定批次全部完成。由此形成的批次形状会在预填充和解码过程中不断变化。',
     significance:
       '批处理是吞吐量与延迟核心权衡的来源。更大的有效批次能摊薄权重读取和内核启动开销，但通常会增加每位用户的 token 间隔。',
     benchmarkContext:
@@ -274,7 +274,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       'InferenceX 根据每小时总体拥有成本和实测 token 吞吐量计算该指标。它可能按总 token 报告，也可能区分输入和输出 token，因此比较前必须确认分母。',
     significance:
-      '该指标把系统性能转化为服务经济性，但仍受工作负载、交互性、利用率、缓存命中和成本假设影响；离线低交互点不能直接与实时端点比较。',
+      '该指标把系统性能转化为服务经济性，但仍受工作负载、交互性、利用率、缓存命中和成本假设影响；低吞吐量的离线运行点与高交互性实时端点属于不同的运行区间，不能直接比较。',
     benchmarkContext:
       '成本曲线使用与吞吐曲线相同的并发扫描。在等交互性下，更低的 $/M 表示以更少建模成本提供相同流式体验。',
     measurement: {
@@ -339,7 +339,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '每个新 token 都依赖此前 token，因此时间维度无法完全并行。模型会反复读取权重与该序列的 KV 缓存，使解码对内存带宽、批处理和通信尤其敏感。',
     significance:
-      '解码决定流式交互性，也常主导长输出成本。推测解码、MTP、量化和宽专家并行都试图减少每个有效 token 的工作量或耗时。',
+      '解码决定流式交互性，也常主导长输出成本。投机解码、MTP、量化和宽专家并行都试图减少每个有效 token 的工作量或耗时。',
     benchmarkContext:
       'InferenceX 用 tok/s/user 与总 tok/s/chip 展示不同并发下的解码性能。公平比较必须匹配输出长度、批形状、精度和并行策略。',
   },
@@ -382,12 +382,12 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       'InferenceX 中的 disagg 不是万能开关。应查看预填充/解码 world size、TP/EP 布局、框架、网络域，以及分离前沿真正领先的交互性区间。',
   },
   'speculative-decoding': {
-    term: '推测解码',
+    term: '投机解码',
     aliases: ['speculative decoding', '草稿与验证解码'],
     plainEnglish:
-      '推测解码让一个便宜的助手先起草多个 token，再由完整模型一次性审核，省去部分逐个生成步骤。',
+      '投机解码让一个便宜的助手先起草多个 token，再由完整模型一次性审核，省去部分逐个生成步骤。',
     definition:
-      '推测解码先以低成本提出多个未来 token，再由目标模型批量验证，从而减少昂贵的串行解码步数。',
+      '投机解码先以低成本提出多个未来 token，再由目标模型批量验证，从而减少昂贵的串行解码步数。',
     explanation:
       '草稿模型或内置预测头生成候选，目标模型在一次批量验证中评估这些候选并接受有效前缀；严格实现时不会改变目标分布。',
     significance:
@@ -400,7 +400,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     aliases: ['multi-token prediction', '多 token 预测头'],
     plainEnglish: 'MTP 让模型一次猜测多个后续 token 并一起验证，从而减少缓慢的逐 token 步骤。',
     definition:
-      '多 token 预测（MTP）使用与主模型共同训练的辅助预测头，提出多个未来 token 供推测验证。',
+      '多 token 预测（MTP）使用与主模型共同训练的辅助预测头，提出多个未来 token 供投机验证。',
     explanation:
       'MTP 不需要独立草稿模型，候选来自目标模型自身表示，因此分布更一致、部署也更简单；但它要求检查点包含兼容 MTP 模块，且推理引擎支持验证路径。',
     significance:
@@ -410,12 +410,12 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   eagle: {
     term: 'EAGLE',
-    aliases: ['EAGLE 推测解码', 'EAGLE-3'],
+    aliases: ['EAGLE 投机解码', 'EAGLE-3'],
     plainEnglish: 'EAGLE 是一种为主模型起草多个可能后续 token 的方法，可让答案流式输出得更快。',
     definition:
-      'EAGLE 是一组推测解码方法：利用与目标语言模型相关的特征预测草稿序列，再由目标模型验证。',
+      'EAGLE 是一组投机解码方法：利用与目标语言模型相关的特征预测草稿序列，再由目标模型验证。',
     explanation:
-      '推理框架通常通过推测步数、草稿 token 数和候选宽度等参数暴露 EAGLE。模型检查点、草稿组件与引擎实现必须匹配。',
+      '推理框架通常通过投机步数、草稿 token 数和候选宽度等参数暴露 EAGLE。模型检查点、草稿组件与引擎实现必须匹配。',
     significance:
       'EAGLE 能提高每个目标模型步接受的 token 数，但结果依赖工作负载；接受行为、草稿开销、模型架构和批大小共同决定端到端收益。',
     benchmarkContext:
@@ -690,11 +690,11 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       'SGLang 是用于快速服务语言模型的开源软件，提供面向复杂 AI 工作负载的调度和优化功能。',
     definition: 'SGLang 是面向高性能 LLM 与多模态推理的开源服务引擎和语言模型编程系统。',
     explanation:
-      '服务运行时包含连续批处理、前缀感知调度、分布式并行、推测解码，以及面向 NVIDIA/AMD 芯片的多种注意力和 MoE 内核后端。',
+      '服务运行时包含连续批处理、前缀感知调度、分布式并行、投机解码，以及面向 NVIDIA/AMD 芯片的多种注意力和 MoE 内核后端。',
     significance:
       'SGLang 快速迭代的版本和模型专用内核可在硬件不变时显著改变吞吐量；低并发受调度开销影响，其他区间则由注意力、MoE 与通信内核主导。',
     benchmarkContext:
-      'InferenceX 持续重跑固定版本的 SGLang 方案。跨版本曲线会保留改动对完整性能区间的影响。',
+      'InferenceX 持续重跑版本固定的 SGLang 方案。对比不同版本的曲线，可以看出改动如何影响完整运行区间，并发现单个峰值点掩盖的回归或提升。',
   },
   'tensorrt-llm': {
     term: 'TensorRT-LLM',

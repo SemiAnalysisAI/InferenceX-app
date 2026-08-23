@@ -59,19 +59,17 @@ export default function AboutPageZh() {
               实验室的容量规划策略团队，以及多家数十亿美元级
               NeoCloud。了解更多详情请阅读我们的文章：{' '}
               <Link
-                href="/blog/inferencemax-open-source-inference-benchmarking"
-                hrefLang="en"
+                href="/zh/blog/inferencemax-open-source-inference-benchmarking"
                 className="text-brand hover:underline font-medium"
               >
-                InferenceX v1（英文文章）
+                InferenceX v1
               </Link>
               、{' '}
               <Link
-                href="/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper"
-                hrefLang="en"
+                href="/zh/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper"
                 className="text-brand hover:underline font-medium"
               >
-                InferenceX v2（英文文章）
+                InferenceX v2
               </Link>
               。
             </p>

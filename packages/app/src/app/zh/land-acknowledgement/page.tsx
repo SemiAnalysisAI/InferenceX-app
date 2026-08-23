@@ -7,40 +7,41 @@ import { SITE_URL } from '@semianalysisai/inferencex-constants';
 const REGIONAL_ACKNOWLEDGEMENTS_ZH = [
   {
     region: 'San Jose',
-    peoples: 'Muwekma Ohlone 部落',
+    peoples: 'Muwekma Ohlone Tribe',
     acknowledgement:
-      '我们位于 San Jose 地区的基准测试基础设施运行在旧金山湾区 Muwekma Ohlone 部落未被让渡的祖传家园之上。',
+      '我们位于 San Jose 地区的基准测试基础设施，建在旧金山湾区 Muwekma Ohlone Tribe 尚未割让的祖居地上。',
   },
   {
     region: 'Los Angeles',
-    peoples: 'Tongva、Tataviam、Serrano、Kizh 和 Chumash 族群',
+    peoples: 'Tongva、Tataviam、Serrano、Kizh 和 Chumash 原住民族',
     acknowledgement:
-      '我们位于 Los Angeles 地区的基准测试基础设施运行在 Tongva、Tataviam、Serrano、Kizh 和 Chumash 族群最初居住并至今仍在守护的土地之上。',
+      '我们位于 Los Angeles 地区的基准测试基础设施，建在 Tongva、Tataviam、Serrano、Kizh 和 Chumash 原住民族最早居住、至今仍在生活并守护的土地上。',
   },
   {
     region: 'Chicago',
-    peoples: '三火议会、Illinois 联盟、Miami、Ho-Chunk、Menominee、Fox 和 Sac 族群',
+    peoples:
+      'Council of the Three Fires、Illinois Confederacy、Miami、Ho-Chunk、Menominee、Fox 和 Sac 原住民族',
     acknowledgement:
-      '我们位于 Chicago 地区的基准测试基础设施运行在由三火议会（Ojibwe、Odawa 和 Potawatomi 部落）、Illinois 联盟以及包括 Miami、Ho-Chunk、Menominee、Fox 和 Sac 在内的众多原住民族群守护的土地之上。',
+      '我们位于 Chicago 地区的基准测试基础设施，建在 Council of the Three Fires（Ojibwe、Odawa 和 Potawatomi Nations）、Illinois Confederacy 以及 Miami、Ho-Chunk、Menominee、Fox 和 Sac 等其他原住民族世代守护的土地上。',
   },
 ];
 
+const LAND_ACKNOWLEDGEMENT_DESCRIPTION =
+  'InferenceX 就 San Jose、Los Angeles 和 Chicago 美国基准测试集群所在的原住民族与传统领地所作的声明。';
+
 export const metadata: Metadata = {
-  title: '土地致谢',
-  description:
-    '对与 InferenceX 美国基准测试集群（San Jose、Los Angeles 和 Chicago）所在土地相关的原住民族群和家园的致谢。',
+  title: '原住民传统领地声明',
+  description: LAND_ACKNOWLEDGEMENT_DESCRIPTION,
   alternates: zhAlternates('/land-acknowledgement'),
   openGraph: {
-    title: '土地致谢 | InferenceX',
-    description:
-      '对与 InferenceX 美国基准测试集群（San Jose、Los Angeles 和 Chicago）所在土地相关的原住民族群和家园的致谢。',
+    title: '原住民传统领地声明 | InferenceX',
+    description: LAND_ACKNOWLEDGEMENT_DESCRIPTION,
     url: `${SITE_URL}/zh/land-acknowledgement`,
     locale: ZH_OG_LOCALE,
   },
   twitter: {
-    title: '土地致谢 | InferenceX',
-    description:
-      '对与 InferenceX 美国基准测试集群（San Jose、Los Angeles 和 Chicago）所在土地相关的原住民族群和家园的致谢。',
+    title: '原住民传统领地声明 | InferenceX',
+    description: LAND_ACKNOWLEDGEMENT_DESCRIPTION,
   },
 };
 
@@ -51,22 +52,21 @@ export default function LandAcknowledgementPageZh() {
         <Card className="gap-10">
           <header className="max-w-3xl">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.32em] text-brand">
-              土地致谢
+              原住民传统领地声明
             </p>
             <h1 className="text-4xl font-semibold tracking-heading text-foreground md:text-5xl">
-              我们致敬与我们美国基础设施所在土地相关的原住民家园。
+              我们承认并尊重美国基础设施所在地的原住民传统领地。
             </h1>
             <p className="mt-4 text-sm leading-6 text-muted-foreground md:text-base">
-              InferenceX 基准测试集群为多个地区提供服务。本页聚焦于我们在美国的 San Jose、Los
-              Angeles 和 Chicago
-              站点，并向世代守护这些土地、至今仍在延续这一使命的原住民族群致以敬意。
+              InferenceX 基准测试集群服务多个地区。本页聚焦 San Jose、Los Angeles 和 Chicago
+              三个美国站点，向世代守护这些土地并延续至今的原住民族致意。
             </p>
           </header>
 
           <section
             data-testid="land-acknowledgement-regions"
             className="grid gap-4 lg:grid-cols-3"
-            aria-label="各地区土地致谢"
+            aria-label="各地区原住民传统领地声明"
           >
             {REGIONAL_ACKNOWLEDGEMENTS_ZH.map((entry) => (
               <article
@@ -90,7 +90,7 @@ export default function LandAcknowledgementPageZh() {
           </section>
 
           <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-            致谢只是一个起点。我们怀着对原住民主权、历史和持续存在的社区的尊重分享这份声明，如果措辞需要改进，欢迎指正。
+            承认这些传统领地只是起点。我们怀着对原住民族主权、历史及延续至今的社群的尊重作出本声明；如有措辞需要改进，欢迎指正。
           </p>
         </Card>
       </div>

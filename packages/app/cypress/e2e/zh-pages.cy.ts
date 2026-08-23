@@ -122,6 +122,106 @@ describe('Chinese (/zh) pages', () => {
     });
   });
 
+  describe('About pages', () => {
+    it('keeps English article links on the English click path', () => {
+      cy.viewport(1440, 900);
+      cy.visit('/about');
+
+      cy.get('link[rel="alternate"][hreflang="zh-CN"]').should('exist');
+      cy.contains('a', 'InferenceX v1')
+        .should('have.attr', 'href', '/blog/inferencemax-open-source-inference-benchmarking')
+        .click();
+      cy.location('pathname').should('eq', '/blog/inferencemax-open-source-inference-benchmarking');
+    });
+
+    it('keeps both Chinese article links inside /zh and preserves the FAQ structure', () => {
+      cy.viewport(390, 844);
+      cy.visit('/zh/about');
+
+      cy.get('link[rel="alternate"][hreflang="en"]').should('exist');
+      cy.contains('NeoCloud').should('exist');
+      cy.contains('dt', '什么是 InferenceX？').should('exist');
+      cy.contains('a', 'InferenceX v1')
+        .should('have.attr', 'href', '/zh/blog/inferencemax-open-source-inference-benchmarking')
+        .and('not.have.attr', 'hreflang', 'en');
+      cy.contains('a', 'InferenceX v2')
+        .should('have.attr', 'href', '/zh/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper')
+        .and('not.have.attr', 'hreflang', 'en')
+        .click();
+      cy.location('pathname').should(
+        'eq',
+        '/zh/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper',
+      );
+    });
+  });
+
+  describe('Glossary pages', () => {
+    it('supports search, category filtering, empty recovery, and a Chinese term click path', () => {
+      cy.viewport(1440, 900);
+      cy.visit('/zh/glossary');
+
+      cy.get('link[rel="alternate"][hreflang="en"]').should('exist');
+      cy.get('input[placeholder="搜索 MTP、延迟、FP4…"]').as('search').type('MTP');
+      cy.get('a[href="/zh/glossary/multi-token-prediction"]').should('be.visible');
+      cy.get('@search').clear().type('不存在的术语-xyz');
+      cy.contains('h2', '未找到相关术语').should('be.visible');
+      cy.contains('button', '显示全部术语').click();
+      cy.get('@search').should('have.value', '');
+
+      cy.contains('button', '智能体推理').click().should('have.attr', 'aria-pressed', 'true');
+      cy.get('a[href="/zh/glossary/agentx"]').click();
+      cy.location('pathname').should('eq', '/zh/glossary/agentx');
+      cy.contains('a', 'AI 推理术语表').click();
+      cy.location('pathname').should('eq', '/zh/glossary');
+    });
+
+    for (const width of [375, 390]) {
+      it(`keeps the Chinese glossary inside the ${width}px viewport`, () => {
+        cy.viewport(width, 844);
+        cy.visit('/zh/glossary');
+        cy.document().then((document) => {
+          expect(document.documentElement.scrollWidth).to.be.at.most(
+            document.documentElement.clientWidth,
+          );
+        });
+        cy.get('input[placeholder="搜索 MTP、延迟、FP4…"]').should('be.visible');
+        cy.contains('button', '智能体推理').should('be.visible');
+      });
+    }
+  });
+
+  describe('Land acknowledgement pages', () => {
+    it('renders the English source and its Chinese hreflang at 1440px', () => {
+      cy.viewport(1440, 900);
+      cy.visit('/land-acknowledgement');
+      cy.contains('h1', 'Indigenous homelands').should('be.visible');
+      cy.get('link[rel="alternate"][hreflang="zh-CN"]').should('exist');
+    });
+
+    it('uses the approved Chinese page term and keeps every nation visible on mobile', () => {
+      cy.viewport(375, 812);
+      cy.visit('/zh/land-acknowledgement');
+
+      cy.get('[data-testid="land-acknowledgement-page"]').should(
+        'contain.text',
+        '原住民传统领地声明',
+      );
+      cy.title().should('contain', '原住民传统领地声明');
+      cy.get('[data-testid="land-acknowledgement-san-jose"]').should(
+        'contain.text',
+        'Muwekma Ohlone',
+      );
+      cy.get('[data-testid="land-acknowledgement-los-angeles"]').should('contain.text', 'Tongva');
+      cy.get('[data-testid="land-acknowledgement-chicago"]').should('contain.text', 'Potawatomi');
+      cy.get('link[rel="alternate"][hreflang="en"]').should('exist');
+      cy.document().then((document) => {
+        expect(document.documentElement.scrollWidth).to.be.at.most(
+          document.documentElement.clientWidth,
+        );
+      });
+    });
+  });
+
   describe('zh blog post page', () => {
     before(() => {
       cy.visit('/zh/blog/inferencemax-open-source-inference-benchmarking');
