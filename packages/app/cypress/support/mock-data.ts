@@ -343,6 +343,7 @@ export function createMockEvaluationContext(
 ): EvaluationChartContextType {
   return {
     loading: false,
+    isEvaluationDataSettled: true,
     error: null,
     isError: false,
     isAvailabilityError: false,

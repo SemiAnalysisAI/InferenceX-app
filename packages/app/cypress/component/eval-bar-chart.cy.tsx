@@ -6,7 +6,12 @@ import { Model, Precision } from '@/lib/data-mappings';
 describe('EvalBarChartD3', () => {
   it('shows skeleton during loading with no data', () => {
     mountWithProviders(<EvalBarChartD3 />, {
-      evaluation: { loading: true, chartData: [], error: null },
+      evaluation: {
+        loading: true,
+        isEvaluationDataSettled: false,
+        chartData: [],
+        error: null,
+      },
       unofficial: {},
     });
     // Skeleton elements are rendered (Skeleton component uses data-slot="skeleton")

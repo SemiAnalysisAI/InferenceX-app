@@ -55,6 +55,7 @@ export interface EvalChangelogEntry {
  */
 export interface EvaluationChartContextType {
   loading: boolean;
+  isEvaluationDataSettled: boolean;
   error: string | null;
   isError: boolean;
   isAvailabilityError: boolean;

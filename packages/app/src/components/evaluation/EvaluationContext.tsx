@@ -93,11 +93,12 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   const {
     data: rawRows,
     isLoading: loading,
-    isSuccess: evaluationsSettled,
+    isSuccess: evaluationsSucceeded,
     isError: evaluationsError,
     error: queryError,
     refetch: refetchEvaluations,
   } = useEvaluations();
+  const isEvaluationDataSettled = evaluationsSucceeded || evaluationsError;
   const { unofficialEvalRows, localOfficialOverride } = useUnofficialRun();
 
   const error = availabilityError || (queryError ? queryError.message : null);
@@ -275,15 +276,15 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       available: hwTypesWithData,
       pending: pendingActiveHardware,
       scopeChanged,
-      settled: evaluationsSettled,
+      settled: evaluationsSucceeded,
     });
-    if (!evaluationsSettled) return;
+    if (!evaluationsSucceeded) return;
     lastHardwareScopeRef.current = hardwareScopeKey;
     if (resolution.selection !== enabledHardware) setEnabledHardware(resolution.selection);
     if (resolution.consumedPending) setPendingActiveHardware(null);
   }, [
     enabledHardware,
-    evaluationsSettled,
+    evaluationsSucceeded,
     hardwareScopeKey,
     hwTypesWithData,
     pendingActiveHardware,
@@ -367,6 +368,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   const value: EvaluationChartContextType = useMemo(
     () => ({
       loading,
+      isEvaluationDataSettled,
       error,
       isError: availabilityIsError || evaluationsError,
       isAvailabilityError: availabilityIsError,
@@ -404,6 +406,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     }),
     [
       loading,
+      isEvaluationDataSettled,
       error,
       availabilityIsError,
       evaluationsError,

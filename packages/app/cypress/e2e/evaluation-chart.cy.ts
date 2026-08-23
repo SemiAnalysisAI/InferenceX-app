@@ -331,6 +331,7 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
   it('renders a successful empty response without offering an error retry', () => {
     cy.intercept('GET', '/api/v1/evaluations', { statusCode: 200, body: [] });
     cy.visit('/zh/evaluation');
+    cy.contains('当前筛选条件下没有可用数据。').should('be.visible');
     cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();
     cy.contains(/该模型暂无评估数据|所选模型与基准测试组合暂无评估数据/u).should('be.visible');
     cy.get('[data-testid="evaluation-query-error"]').should('not.exist');

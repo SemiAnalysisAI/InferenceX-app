@@ -3,7 +3,11 @@ import * as d3 from 'd3';
 import { describe, expect, it } from 'vitest';
 
 import type { EvaluationChartData } from '../types';
-import { evaluationChartBlockingState, sizeScoreLabelBackgrounds } from './BarChartD3';
+import {
+  evaluationChartBlockingState,
+  evaluationChartIsInitializing,
+  sizeScoreLabelBackgrounds,
+} from './BarChartD3';
 import * as barChartModule from './BarChartD3';
 
 function makeDatum(configLabel: string, score: number): EvaluationChartData {
@@ -130,5 +134,22 @@ describe('evaluation chart blocking state', () => {
         isEvaluationDataError: true,
       }),
     ).toBe('data-error');
+  });
+});
+
+describe('evaluation chart initialization state', () => {
+  it('stops showing the loading skeleton after a successful empty response settles', () => {
+    expect(
+      evaluationChartIsInitializing({
+        loading: true,
+        isEvaluationDataSettled: false,
+      }),
+    ).toBe(true);
+    expect(
+      evaluationChartIsInitializing({
+        loading: false,
+        isEvaluationDataSettled: true,
+      }),
+    ).toBe(false);
   });
 });
