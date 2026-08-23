@@ -54,6 +54,7 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
     back: 'Back',
     inferenceChart: 'Inference chart',
     loadingSku: 'Loading SKU navigator…',
+    siblingError: 'Failed to load the SKU navigator.',
     loadingPoint: 'Loading point metadata…',
     configsInSku: 'configs in SKU',
     requests: 'requests',
@@ -86,6 +87,7 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
     back: '返回',
     inferenceChart: '推理图表',
     loadingSku: '加载 SKU 导航器……',
+    siblingError: 'SKU 导航数据加载失败。',
     loadingPoint: '加载数据点元信息……',
     configsInSku: '个配置',
     requests: '个请求',
@@ -273,7 +275,14 @@ export function AgenticPointDetail({ id }: Props) {
         </Link>
       </div>
 
-      {siblingsData ? (
+      {siblingsQuery.isError ? (
+        <RetryableQueryError
+          message={t.siblingError}
+          analyticsEvent="inference_agentic_siblings_retry_clicked"
+          onRetry={siblingsQuery.refetch}
+          testId="agentic-siblings-query-error"
+        />
+      ) : siblingsData ? (
         <SiblingNav sku={siblingsData.sku} siblings={siblingsData.siblings} />
       ) : siblingsQuery.isLoading ? (
         <div className="text-sm text-muted-foreground">{t.loadingSku}</div>
@@ -286,9 +295,12 @@ export function AgenticPointDetail({ id }: Props) {
       ) : null}
 
       {view !== 'logs' && metricsQuery.isError && (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-          {withId(t.traceFailure)}
-        </div>
+        <RetryableQueryError
+          message={withId(t.traceFailure)}
+          analyticsEvent="inference_agentic_trace_retry_clicked"
+          onRetry={metricsQuery.refetch}
+          testId="agentic-trace-query-error"
+        />
       )}
       {view !== 'logs' && metricsQuery.data === null && !metricsQuery.isLoading && (
         <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
@@ -393,9 +405,12 @@ export function AgenticPointDetail({ id }: Props) {
             </p>
           )}
           {metricSourceQuery.isError && (
-            <p className="rounded-md border-l-2 border-destructive/60 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              {t.metricSourceError}
-            </p>
+            <RetryableQueryError
+              message={t.metricSourceError}
+              analyticsEvent="inference_agentic_metric_source_retry_clicked"
+              onRetry={metricSourceQuery.refetch}
+              testId="agentic-metric-source-query-error"
+            />
           )}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {!requestChartQuery.isError && (

@@ -18,6 +18,7 @@ describe('inference detail metadata', () => {
       'zh-CN': expect.stringContaining('/zh/inference/logs/206885'),
     });
     expect(zh.alternates?.languages).toEqual(en.alternates?.languages);
+    expect(zh.openGraph).toMatchObject({ locale: 'zh_CN' });
   });
 
   it('keeps Agentic details noindex and declares the Chinese Open Graph locale', async () => {

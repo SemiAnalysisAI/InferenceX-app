@@ -58,6 +58,21 @@ export function resolveEvaluationDate(
   }, availableDates[0]);
 }
 
+export function retryFailedEvaluationQueries({
+  availabilityFailed,
+  evaluationsFailed,
+  refetchAvailability,
+  refetchEvaluations,
+}: {
+  availabilityFailed: boolean;
+  evaluationsFailed: boolean;
+  refetchAvailability: () => unknown;
+  refetchEvaluations: () => unknown;
+}): void {
+  if (availabilityFailed) void refetchAvailability();
+  if (evaluationsFailed) void refetchEvaluations();
+}
+
 export function EvaluationProvider({ children }: { children: ReactNode }) {
   const { selectedModel, effectivePrecisions } = useGlobalFilterSelection();
   const {
@@ -71,6 +86,8 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     availableDates: inferenceAvailableDates,
     availablePrecisions: globalAvailablePrecisions,
     availabilityError,
+    availabilityIsError,
+    retryAvailability,
   } = useGlobalFilterAvailability();
   const { getUrlParam } = useUrlState();
   const {
@@ -84,9 +101,16 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   const { unofficialEvalRows, localOfficialOverride } = useUnofficialRun();
 
   const error = availabilityError || (queryError ? queryError.message : null);
-  const retry = useCallback(() => {
-    void refetchEvaluations();
-  }, [refetchEvaluations]);
+  const retry = useCallback(
+    () =>
+      retryFailedEvaluationQueries({
+        availabilityFailed: availabilityIsError,
+        evaluationsFailed: evaluationsError,
+        refetchAvailability: retryAvailability,
+        refetchEvaluations,
+      }),
+    [availabilityIsError, evaluationsError, retryAvailability, refetchEvaluations],
+  );
   const rawData: EvalRow[] = rawRows ?? [];
   const unofficialRawData: EvalRow[] = unofficialEvalRows ?? [];
 
@@ -344,7 +368,9 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     () => ({
       loading,
       error,
-      isError: evaluationsError,
+      isError: availabilityIsError || evaluationsError,
+      isAvailabilityError: availabilityIsError,
+      isEvaluationDataError: evaluationsError,
       retry,
       selectedBenchmark,
       setSelectedBenchmark: setRequestedBenchmark,
@@ -379,6 +405,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     [
       loading,
       error,
+      availabilityIsError,
       evaluationsError,
       retry,
       selectedBenchmark,

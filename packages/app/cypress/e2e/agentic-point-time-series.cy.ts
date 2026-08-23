@@ -309,6 +309,7 @@ describe('Agentic point request metric time series', () => {
 
   it('keeps loaded log text visible when a later chunk fails', () => {
     const retainedLog = `INFO retained after failure\n${'trace line\n'.repeat(2_000)}`;
+    let failedChunkAttempts = 0;
     cy.intercept(
       { method: 'GET', pathname: '/api/v1/server-log-files' },
       { body: ['results/server.log', 'results/benchmark.log'] },
@@ -341,6 +342,8 @@ describe('Agentic point request metric time series', () => {
           },
         });
       } else {
+        failedChunkAttempts += 1;
+        if (failedChunkAttempts === 2) request.alias = 'failedLogChunkSettled';
         request.reply({ statusCode: 503, body: { error: 'temporary failure' } });
       }
     });
@@ -356,7 +359,8 @@ describe('Agentic point request metric time series', () => {
       'INFO retained after failure',
     );
     cy.get('[data-testid="load-more-server-log"]').click();
-    cy.contains('The next chunk could not be loaded', { timeout: 15_000 }).should('be.visible');
+    cy.wait('@failedLogChunkSettled');
+    cy.contains('The next chunk could not be loaded').should('be.visible');
     cy.get('[data-testid="server-log-content"]').should(
       'contain.text',
       'INFO retained after failure',
@@ -543,6 +547,69 @@ describe('Agentic point request metric time series', () => {
       .and('contain.text', '已到达日志末尾');
   });
 
+  it('retries the failed log-file inventory, initial content, and search queries independently', () => {
+    let fileAttempts = 0;
+    let contentAttempts = 0;
+    let searchAttempts = 0;
+    cy.intercept({ method: 'GET', pathname: '/api/v1/server-log-files' }, (request) => {
+      fileAttempts += 1;
+      request.reply(
+        fileAttempts <= 2
+          ? { statusCode: 500, body: {} }
+          : { statusCode: 200, body: ['results/server.log'] },
+      );
+    });
+    cy.intercept({ method: 'GET', pathname: '/api/v1/server-log' }, (request) => {
+      contentAttempts += 1;
+      request.reply(
+        contentAttempts <= 2
+          ? { statusCode: 500, body: {} }
+          : {
+              statusCode: 200,
+              body: {
+                id: 206885,
+                fileName: 'results/server.log',
+                serverLog: 'INFO recovered log\n',
+                offset: 0,
+                nextOffset: null,
+              },
+            },
+      );
+    });
+    cy.intercept({ method: 'GET', pathname: '/api/v1/server-log-search' }, (request) => {
+      searchAttempts += 1;
+      request.reply(
+        searchAttempts <= 2
+          ? { statusCode: 500, body: {} }
+          : {
+              statusCode: 200,
+              body: { id: 206885, query: 'recovered', matches: [], truncated: false },
+            },
+      );
+    });
+    cy.visit('/zh/inference/agentic/206885?view=logs', { onBeforeLoad: unlockAgenticGate });
+
+    cy.get('[data-testid="server-log-files-query-error"]')
+      .should('contain.text', '无法加载日志文件，请稍后重试。')
+      .and('contain.text', '重试');
+    cy.get('[data-testid="server-log-files-query-error"]').contains('重试').click();
+    cy.then(() => expect(fileAttempts).to.equal(3));
+
+    cy.get('[data-testid="server-log-content-query-error"]')
+      .should('contain.text', '无法加载日志文件，请稍后重试。')
+      .and('contain.text', '重试');
+    cy.get('[data-testid="server-log-content-query-error"]').contains('重试').click();
+    cy.get('[data-testid="server-log-content"]').should('contain.text', 'INFO recovered log');
+    cy.then(() => expect(contentAttempts).to.equal(3));
+
+    cy.get('[data-testid="server-log-search"]').type('recovered');
+    cy.get('[data-testid="server-log-search-query-error"]').should('contain.text', '重试');
+    cy.get('[data-testid="server-log-search-query-error"]').contains('重试').click();
+    cy.get('[data-testid="server-log-search-query-error"]').should('not.exist');
+    cy.get('[data-testid="server-log-search-results"]').should('contain.text', '0 处匹配');
+    cy.then(() => expect(searchAttempts).to.equal(3));
+  });
+
   it('renders the complete Chinese detail, mobile, metadata, and timeline click path', () => {
     cy.viewport(390, 900);
     cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
@@ -687,6 +754,40 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="agentic-timeline-query-error"]').contains('重试').click();
     cy.get('[data-testid="request-timeline-svg"]').should('be.visible');
     cy.then(() => expect(timelineAttempts).to.equal(3));
+  });
+
+  it('retries trace metadata and the missing SKU navigator with their own queries', () => {
+    let traceAttempts = 0;
+    let siblingAttempts = 0;
+    cy.intercept('GET', '/api/v1/trace-server-metrics*', (request) => {
+      traceAttempts += 1;
+      request.reply(
+        traceAttempts <= 2 ? { statusCode: 500, body: {} } : { statusCode: 200, body: null },
+      );
+    });
+    cy.intercept('GET', '/api/v1/benchmark-siblings*', (request) => {
+      siblingAttempts += 1;
+      request.reply(
+        siblingAttempts <= 2
+          ? { statusCode: 500, body: {} }
+          : { statusCode: 200, body: benchmarkSiblings },
+      );
+    });
+    cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+
+    cy.get('[data-testid="agentic-trace-query-error"]')
+      .should('contain.text', '无法加载基准测试数据点 #206885 的 trace 数据。')
+      .and('contain.text', '重试');
+    cy.get('[data-testid="agentic-trace-query-error"]').contains('重试').click();
+    cy.get('[data-testid="agentic-trace-query-error"]').should('not.exist');
+    cy.then(() => expect(traceAttempts).to.equal(3));
+
+    cy.get('[data-testid="agentic-siblings-query-error"]')
+      .should('contain.text', 'SKU 导航数据加载失败。')
+      .and('contain.text', '重试');
+    cy.get('[data-testid="agentic-siblings-query-error"]').contains('重试').click();
+    cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
+    cy.then(() => expect(siblingAttempts).to.equal(3));
   });
 });
 
@@ -883,6 +984,38 @@ describe('Agentic point orchestrator metric sources', () => {
     cy.get('[data-testid="throughput-series-decode"]').click();
     cy.get('[data-testid="throughput-series-input"]').should('be.disabled');
     cy.get('[data-testid="throughput-series-decode"]').should('have.attr', 'aria-pressed', 'false');
+  });
+
+  it('retries only the selected server-metrics source query', () => {
+    const decodeSource = {
+      id: 'dynamo|decode|decode-a.internal.test:7516|decode-a|0|0',
+      adapter: 'dynamo',
+      role: 'decode' as const,
+      endpointUrl: 'decode-a.internal.test:7516',
+      nativeRole: 'backend',
+      workerId: 'decode-a',
+      dpRank: '0',
+      engine: '0',
+    };
+    const recovered = sourceSeries(decodeSource, 300, 400);
+    let attempts = 0;
+    cy.intercept('GET', '/api/v1/trace-server-metric-source*', (request) => {
+      attempts += 1;
+      request.reply(
+        attempts <= 2 ? { statusCode: 500, body: {} } : { statusCode: 200, body: recovered },
+      );
+    });
+    cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.get('[data-testid="metric-source-select"]').click();
+    cy.contains('[role="option"]', '解码 · decode-a').click();
+
+    cy.get('[data-testid="agentic-metric-source-query-error"]')
+      .should('contain.text', '无法加载所选服务器指标来源。')
+      .and('contain.text', '重试');
+    cy.get('[data-testid="agentic-metric-source-query-error"]').contains('重试').click();
+    cy.get('[data-testid="agentic-metric-source-query-error"]').should('not.exist');
+    cy.contains('h2', '吞吐量 · 解码 · decode-a').should('be.visible');
+    cy.then(() => expect(attempts).to.equal(3));
   });
 });
 

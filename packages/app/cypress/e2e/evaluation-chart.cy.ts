@@ -296,6 +296,33 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
     });
   });
 
+  it('keeps evaluation results visible while retrying failed availability metadata', () => {
+    cy.fixture('api/availability.json').then((availability) => {
+      cy.fixture('api/evaluations.json').then((evaluations) => {
+        let availabilityAttempts = 0;
+        cy.intercept('GET', '/api/v1/availability*', (request) => {
+          availabilityAttempts += 1;
+          request.reply(
+            availabilityAttempts <= 2
+              ? { statusCode: 500, body: {} }
+              : { statusCode: 200, body: availability },
+          );
+        });
+        cy.intercept('GET', '/api/v1/evaluations', { statusCode: 200, body: evaluations });
+        cy.visit('/zh/evaluation');
+
+        cy.get('[data-testid="evaluation-query-error"]')
+          .should('contain.text', '筛选项可用性数据加载失败。')
+          .and('contain.text', '重试');
+        cy.get('[data-testid="evaluation-results-table"]').should('be.visible');
+        cy.get('[data-testid="evaluation-query-error"]').contains('重试').click();
+        cy.get('[data-testid="evaluation-query-error"]').should('not.exist');
+        cy.get('[data-testid="evaluation-results-table"]').should('be.visible');
+        cy.then(() => expect(availabilityAttempts).to.equal(3));
+      });
+    });
+  });
+
   it('renders a successful empty response without offering an error retry', () => {
     cy.intercept('GET', '/api/v1/evaluations', { statusCode: 200, body: [] });
     cy.visit('/zh/evaluation');

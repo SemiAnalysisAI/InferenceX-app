@@ -47,6 +47,8 @@ export const EVALUATION_DISPLAY_STRINGS = {
     sourceOfficial: 'Source: SemiAnalysis InferenceX™',
     updated: 'Updated:',
     queryError: 'Failed to load evaluation data.',
+    availabilityError: 'Failed to load filter availability data.',
+    combinedError: 'Failed to load evaluation and filter availability data.',
   },
   zh: {
     chartView: '图表',
@@ -59,6 +61,8 @@ export const EVALUATION_DISPLAY_STRINGS = {
     sourceOfficial: '来源：SemiAnalysis InferenceX™',
     updated: '更新时间：',
     queryError: '评估数据加载失败。',
+    availabilityError: '筛选项可用性数据加载失败。',
+    combinedError: '评估数据与筛选项可用性数据均加载失败。',
   },
 };
 
@@ -75,6 +79,8 @@ export default function EvaluationChartDisplay() {
     unofficialChartData,
     selectedPrecisions,
     isError,
+    isAvailabilityError,
+    isEvaluationDataError,
     retry,
   } = useEvaluation();
   const { isUnofficialRun } = useUnofficialRun();
@@ -168,21 +174,31 @@ export default function EvaluationChartDisplay() {
           />
         }
       >
-        {isError ? (
-          <RetryableQueryError
-            message={t.queryError}
-            analyticsEvent="evaluation_data_retry_clicked"
-            onRetry={retry}
-            testId="evaluation-query-error"
-          />
-        ) : viewMode === 'table' ? (
-          <>
-            {caption}
-            <EvaluationTable data={tableData} />
-          </>
-        ) : (
-          <EvalBarChartD3 caption={caption} />
-        )}
+        <>
+          {isError && (
+            <RetryableQueryError
+              message={
+                isAvailabilityError && isEvaluationDataError
+                  ? t.combinedError
+                  : isEvaluationDataError
+                    ? t.queryError
+                    : t.availabilityError
+              }
+              analyticsEvent="evaluation_data_retry_clicked"
+              onRetry={retry}
+              testId="evaluation-query-error"
+            />
+          )}
+          {!isEvaluationDataError &&
+            (viewMode === 'table' ? (
+              <>
+                {caption}
+                <EvaluationTable data={tableData} />
+              </>
+            ) : (
+              <EvalBarChartD3 caption={caption} />
+            ))}
+        </>
       </ChartSection>
     </div>
   );

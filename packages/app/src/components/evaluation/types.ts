@@ -57,6 +57,8 @@ export interface EvaluationChartContextType {
   loading: boolean;
   error: string | null;
   isError: boolean;
+  isAvailabilityError: boolean;
+  isEvaluationDataError: boolean;
   retry: () => void;
   selectedBenchmark: string | undefined;
   setSelectedBenchmark: (benchmark: string) => void;

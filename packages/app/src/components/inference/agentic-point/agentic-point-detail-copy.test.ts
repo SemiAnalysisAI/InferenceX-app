@@ -12,6 +12,7 @@ describe('agentic point detail copy', () => {
     const zh = AGENTIC_POINT_DETAIL_STRINGS.zh as Record<string, unknown>;
     expect(en).toMatchObject({
       traceFailure: 'Failed to load trace data for benchmark point #{id}.',
+      siblingError: 'Failed to load the SKU navigator.',
       missingTrace:
         'No stored trace_replay blob for benchmark point #{id}. This point predates the aiperf time-series capture, or its source artifacts have expired on GitHub.',
       loadingAggregates: 'loading…',
@@ -25,6 +26,7 @@ describe('agentic point detail copy', () => {
     expect(Object.keys(zh)).toEqual(Object.keys(en));
     for (const key of [
       'traceFailure',
+      'siblingError',
       'missingTrace',
       'loadingAggregates',
       'loadingTimeline',

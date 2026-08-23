@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { BenchmarkLogDetail } from '@/components/inference/log-viewer/benchmark-log-detail';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import { zhAlternates } from '@/lib/i18n';
+import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n';
 
 export async function generateMetadata({
   params,
@@ -14,6 +14,7 @@ export async function generateMetadata({
   return {
     title: '基准测试日志 | InferenceX',
     alternates: zhAlternates(`/inference/logs/${id}`),
+    openGraph: { locale: ZH_OG_LOCALE },
     robots: { index: false },
   };
 }

@@ -22,5 +22,9 @@ describe('evaluation locale copy', () => {
   it('distinguishes a failed evaluation query from an empty result', () => {
     expect(EVALUATION_DISPLAY_STRINGS.en.queryError).toBe('Failed to load evaluation data.');
     expect(EVALUATION_DISPLAY_STRINGS.zh.queryError).toBe('评估数据加载失败。');
+    expect(EVALUATION_DISPLAY_STRINGS.en.availabilityError).toBe(
+      'Failed to load filter availability data.',
+    );
+    expect(EVALUATION_DISPLAY_STRINGS.zh.availabilityError).toBe('筛选项可用性数据加载失败。');
   });
 });
