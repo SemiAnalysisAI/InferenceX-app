@@ -29,7 +29,7 @@ const STRINGS = {
   zh: {
     dateRangeLabel: '时间范围',
     dateRangeTooltip:
-      '计算芯片可靠性指标的时间窗口。更长的范围可提供更稳定的统计数据，但可能无法反映近期的硬件性能变化。',
+      '该时间范围用于计算芯片可靠性。范围越长，统计结果通常越稳定，但可能弱化近期变化。',
     dateRangePlaceholder: '选择时间范围',
     last3Days: '最近 3 天',
     last7Days: '最近 7 天',

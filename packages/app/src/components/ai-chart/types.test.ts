@@ -13,3 +13,9 @@ describe('validateSpec measured power axes', () => {
     expect(spec.yAxisMetric).toBe(yAxisMetric);
   });
 });
+
+describe('validateSpec locale fallbacks', () => {
+  it('uses a Chinese fallback title for incomplete Chinese chart specs', () => {
+    expect(validateSpec({}, 'zh').title).toBe('AI 生成的图表');
+  });
+});

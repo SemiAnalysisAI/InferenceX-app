@@ -48,11 +48,31 @@ const STRINGS = {
     xAriaLabel: 'CollectiveX KV X axis',
     pageAriaLabel: 'CollectiveX KV page size',
     opAriaLabel: 'CollectiveX KV direction',
+    summary: (cases: number, measured: number) => `${cases} cases · ${measured} measured · `,
+    headers: {
+      run: 'Run',
+      backend: 'Backend',
+      fabric: 'Fabric',
+      workload: 'Workload',
+      precision: 'Precision',
+      outcome: 'Outcome',
+      handoff: 'Handoff ms',
+    },
+    outcomes: {
+      success: 'success',
+      unsupported: 'unsupported',
+      failed: 'failed',
+      invalid: 'invalid',
+      diagnostic: 'diagnostic',
+      pending: 'pending',
+    },
+    batch: 'Batch',
+    caption: (op: string, page: string, suffix: string) => `${op} · page ${page} · ${suffix}`,
   },
   zh: {
     heading: 'KV 缓存传输',
     description:
-      '预填充到解码的 KV 交接（2 节点 x 1 GPU，按 vLLM 为 DeepSeek-V4-Pro 分配的缓存布局）。' +
+      '预填充到解码的 KV 缓存交接（2 节点 × 1 GPU，采用 vLLM 为 DeepSeek-V4-Pro 分配的缓存布局）。' +
       '分页行按随机块表以逐层描述符列表搬运每个请求；bulk 为单描述符线速上限。' +
       'GB/s 为最大 ISL 处按突发聚合的 pull 带宽；b1/bmax 表示每次突发提交的请求数。',
     batchCaption: '取最大实测 ISL',
@@ -69,6 +89,26 @@ const STRINGS = {
     xAriaLabel: 'CollectiveX KV X 轴',
     pageAriaLabel: 'CollectiveX KV 页大小',
     opAriaLabel: 'CollectiveX KV 传输方向',
+    summary: (cases: number, measured: number) => `${cases} 个用例 · 已测 ${measured} 个 · `,
+    headers: {
+      run: '运行',
+      backend: '后端',
+      fabric: '互联方式',
+      workload: '工作负载',
+      precision: '精度',
+      outcome: '结果',
+      handoff: '交接延迟（ms）',
+    },
+    outcomes: {
+      success: '成功',
+      unsupported: '不支持',
+      failed: '失败',
+      invalid: '无效',
+      diagnostic: '诊断',
+      pending: '待处理',
+    },
+    batch: '批量请求数',
+    caption: (op: string, page: string, suffix: string) => `${op} · 每页 ${page} token · ${suffix}`,
   },
 } as const;
 
@@ -193,27 +233,35 @@ export function CollectiveXKvSection({
   const columns = useMemo<DataTableColumn<CollectiveXKvRunCase>[]>(
     () => [
       {
-        header: 'Run',
+        header: strings.headers.run,
         cell: (row) => <span className="font-mono text-xs">#{row.run_id}</span>,
         sortValue: (row) => Number(row.run_id),
         className: 'whitespace-nowrap',
       },
       { header: 'SKU', cell: (row) => collectiveXSkuLabel(row.sku), sortValue: (row) => row.sku },
       {
-        header: 'Backend',
+        header: strings.headers.backend,
         cell: (row) => row.backend,
         sortValue: (row) => row.backend,
         className: 'whitespace-nowrap',
       },
-      { header: 'Fabric', cell: (row) => row.fabric, sortValue: (row) => row.fabric },
-      { header: 'Workload', cell: (row) => row.workload, sortValue: (row) => row.workload },
-      { header: 'Precision', cell: (row) => row.precision, sortValue: (row) => row.precision },
+      { header: strings.headers.fabric, cell: (row) => row.fabric, sortValue: (row) => row.fabric },
       {
-        header: 'Outcome',
+        header: strings.headers.workload,
+        cell: (row) => row.workload,
+        sortValue: (row) => row.workload,
+      },
+      {
+        header: strings.headers.precision,
+        cell: (row) => row.precision,
+        sortValue: (row) => row.precision,
+      },
+      {
+        header: strings.headers.outcome,
         cell: (row) => (
           <div className="min-w-28">
             <Badge variant="outline" className={OUTCOME_CLASS[row.outcome]}>
-              {row.outcome}
+              {strings.outcomes[row.outcome]}
             </Badge>
             {(row.detail || row.reason) && (
               <p className="mt-1 text-xs text-muted-foreground">{row.detail ?? row.reason}</p>
@@ -251,7 +299,7 @@ export function CollectiveXKvSection({
         className: 'text-right tabular-nums',
       },
       {
-        header: 'Handoff ms',
+        header: strings.headers.handoff,
         cell: (row) => {
           const cell = cellsOf(row).p64b1;
           return cell ? cell.latency_ms.p50.toFixed(1) : '-';
@@ -260,7 +308,7 @@ export function CollectiveXKvSection({
         className: 'text-right tabular-nums',
       },
     ],
-    [],
+    [strings],
   );
 
   if (rows.length === 0) return null;
@@ -275,7 +323,8 @@ export function CollectiveXKvSection({
     <Card data-testid="collectivex-kv-table" className="min-w-0 w-full max-w-full overflow-hidden">
       <h2 className="text-lg font-semibold">{strings.heading}</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        {rows.length} cases · {measured} measured · {strings.description}
+        {strings.summary(rows.length, measured)}
+        {strings.description}
       </p>
       {measuredCases.length > 0 && (
         <>
@@ -309,7 +358,7 @@ export function CollectiveXKvSection({
                 ariaLabel={strings.xAriaLabel}
                 testId="collectivex-kv-xaxis-toggle"
                 options={[
-                  { value: 'batch', label: 'Batch' },
+                  { value: 'batch', label: strings.batch },
                   { value: 'isl', label: 'ISL' },
                   { value: 'frontier', label: strings.frontierOption },
                 ]}
@@ -319,7 +368,10 @@ export function CollectiveXKvSection({
               <Label className="text-xs text-muted-foreground">{strings.pageControl}</Label>
               <SegmentedToggle
                 value={pageTokens}
-                onValueChange={setPageTokens}
+                onValueChange={(value) => {
+                  setPageTokens(value);
+                  track('collectivex_kv_page_size_changed', { page_tokens: value });
+                }}
                 ariaLabel={strings.pageAriaLabel}
                 testId="collectivex-kv-page-toggle"
                 options={[
@@ -352,7 +404,7 @@ export function CollectiveXKvSection({
                 selection={{ op, pageTokens: Number(pageTokens) }}
                 caption={
                   <p className="text-sm text-muted-foreground">
-                    {op} · page {pageTokens} · {strings.frontierCaption}
+                    {strings.caption(op, pageTokens, strings.frontierCaption)}
                   </p>
                 }
                 legendElement={
@@ -361,7 +413,10 @@ export function CollectiveXKvSection({
                     legendItems={legendItems}
                     disableActiveSort
                     isLegendExpanded={legendExpanded}
-                    onExpandedChange={setLegendExpanded}
+                    onExpandedChange={(expanded) => {
+                      setLegendExpanded(expanded);
+                      track('collectivex_kv_legend_expanded', { expanded });
+                    }}
                   />
                 }
               />
@@ -374,8 +429,11 @@ export function CollectiveXKvSection({
                 selection={selection}
                 caption={
                   <p className="text-sm text-muted-foreground">
-                    {op} · page {pageTokens} ·{' '}
-                    {xAxis === 'batch' ? strings.batchCaption : strings.islCaption}
+                    {strings.caption(
+                      op,
+                      pageTokens,
+                      xAxis === 'batch' ? strings.batchCaption : strings.islCaption,
+                    )}
                   </p>
                 }
                 legendElement={
@@ -384,7 +442,10 @@ export function CollectiveXKvSection({
                     legendItems={legendItems}
                     disableActiveSort
                     isLegendExpanded={legendExpanded}
-                    onExpandedChange={setLegendExpanded}
+                    onExpandedChange={(expanded) => {
+                      setLegendExpanded(expanded);
+                      track('collectivex_kv_legend_expanded', { expanded });
+                    }}
                   />
                 }
               />

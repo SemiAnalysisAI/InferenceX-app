@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import chartDefinitions from '@/components/inference/metric-registry';
+import { Y_AXIS_METRICS } from '@/lib/chart-utils';
 
 import {
   buildAiLineData,
+  getAiRadarMetricLabel,
   getAiMetricDirection,
   normalizeAiRadarRows,
   rankAiHardwareKeys,
@@ -11,6 +13,19 @@ import {
 } from './ai-chart-data';
 
 const chartDefinition = chartDefinitions[0] as Record<string, unknown>;
+
+describe('getAiRadarMetricLabel', () => {
+  it('resolves a valid non-default radar metric through the Chinese metric registry', () => {
+    expect(getAiRadarMetricLabel('y_measuredAvgPower', chartDefinitions[0], 'zh')).toBe(
+      '每芯片实测平均功耗（W）',
+    );
+  });
+
+  it.each(Y_AXIS_METRICS)('never returns a blank axis label for allowed metric %s', (metric) => {
+    expect(getAiRadarMetricLabel(metric, chartDefinitions[0], 'en')).not.toBe('');
+    expect(getAiRadarMetricLabel(metric, chartDefinitions[0], 'zh')).not.toBe('');
+  });
+});
 
 describe('readAiMetric', () => {
   it('preserves an explicitly measured zero while rejecting a missing telemetry property', () => {

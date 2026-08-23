@@ -418,6 +418,45 @@ describe('CollectiveX neutral run view', () => {
       .and('contain.text', 'EP')
       .and('contain.text', 'KV');
   });
+
+  it('localizes the complete chart and run-table click path on the Chinese route', () => {
+    cy.viewport(1440, 900);
+    cy.visit('/zh/collectivex');
+    cy.wait('@runs');
+    cy.wait('@run');
+
+    cy.get('[data-testid="collectivex-run-conclusion"]')
+      .should('contain.text', `#${runId}`)
+      .and('contain.text', '成功');
+    cy.get('[data-testid="collectivex-runs"]')
+      .should('contain.text', '运行记录')
+      .and('contain.text', '终态数据点');
+    cy.get('[data-testid="collectivex-main-chart"]')
+      .should('contain.text', '往返（实测）')
+      .and('contain.text', '解码')
+      .and('contain.text', '延迟（µs）');
+
+    cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain.text', '点击其他区域关闭')
+      .and('contain.text', '往返')
+      .and('contain.text', '延迟 p50 / p90 / p95 / p99');
+  });
+
+  for (const width of [375, 390]) {
+    it(`keeps the Chinese explorer and runs table reachable at ${width}px`, () => {
+      cy.viewport(width, 844);
+      cy.visit('/zh/collectivex');
+      cy.wait('@runs');
+      cy.wait('@run');
+
+      cy.get('[data-testid="collectivex-main-chart"] svg').should('exist');
+      cy.get('[data-testid="collectivex-runs-table"]').scrollTo('right').should('be.visible');
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
+      });
+    });
+  }
 });
 
 describe('CollectiveX run deletion', () => {
@@ -545,7 +584,8 @@ describe('CollectiveX availability states', () => {
     cy.wait('@missing');
     cy.get('[data-testid="collectivex-error"]')
       .should('be.visible')
-      .and('contain.text', 'API error: 404');
+      .and('contain.text', 'The CollectiveX dataset failed to load.')
+      .and('not.contain.text', 'API error: 404');
     cy.get('[data-testid="collectivex-error-version-select"]').should('contain.text', 'V1');
   });
 
@@ -558,7 +598,21 @@ describe('CollectiveX availability states', () => {
     cy.wait('@down');
     cy.get('[data-testid="collectivex-error"]')
       .should('be.visible')
-      .and('contain.text', 'API error: 503');
+      .and('contain.text', 'The CollectiveX dataset failed to load.')
+      .and('not.contain.text', 'API error: 503');
+  });
+
+  it('shows a safe localized error on the Chinese route', () => {
+    cy.intercept('GET', '/api/v1/collectivex/runs?*', {
+      statusCode: 503,
+      body: { error: 'collectivex-internal-storage-detail' },
+    }).as('zhDown');
+    cy.visit('/zh/collectivex');
+    cy.wait('@zhDown');
+    cy.get('[data-testid="collectivex-error"]')
+      .should('contain.text', 'CollectiveX 运行暂不可用')
+      .and('contain.text', 'CollectiveX 数据集加载失败。')
+      .and('not.contain.text', 'collectivex-internal-storage-detail');
   });
 
   it('renders the loading state while the run resolves', () => {

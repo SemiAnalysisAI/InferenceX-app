@@ -38,24 +38,30 @@ const STRINGS = {
     openRun: (id: string) => `Open GitHub Actions run #${id}`,
     deleteRun: (id: string) => `Delete run #${id}`,
     empty: 'No runs match this benchmark version.',
+    conclusion: { success: 'success', failure: 'failure' },
+    epSuite: (measured: number, requested: number) => `EP: ${measured}/${requested} measured`,
+    kvSuite: (measured: number, requested: number) =>
+      `KV transfer: ${measured}/${requested} measured`,
   },
-  // English placeholders per the repository's temporary language override.
   zh: {
-    shown: 'Shown',
-    run: 'Run',
-    result: 'Result',
+    shown: '显示',
+    run: '运行',
+    result: '结果',
     suites: '测试套件',
-    cases: 'Measured cases',
-    points: 'Terminal points',
+    cases: '实测用例',
+    points: '终态数据点',
     skus: 'SKUs',
-    published: 'Published (UTC)',
-    actions: 'Actions',
-    pending: 'pending',
-    showRun: (id: string) => `Show run #${id}`,
-    lineStyle: (id: string) => `Line style for run #${id}`,
-    openRun: (id: string) => `Open GitHub Actions run #${id}`,
-    deleteRun: (id: string) => `Delete run #${id}`,
-    empty: 'No runs match this benchmark version.',
+    published: '发布时间（UTC）',
+    actions: '操作',
+    pending: '待处理',
+    showRun: (id: string) => `显示运行 #${id}`,
+    lineStyle: (id: string) => `运行 #${id} 的线型`,
+    openRun: (id: string) => `打开 GitHub Actions 运行 #${id}`,
+    deleteRun: (id: string) => `删除运行 #${id}`,
+    empty: '该基准测试版本下暂无运行记录。',
+    conclusion: { success: '成功', failure: '失败' },
+    epSuite: (measured: number, requested: number) => `EP：已测量 ${measured}/${requested}`,
+    kvSuite: (measured: number, requested: number) => `KV 传输：已测量 ${measured}/${requested}`,
   },
 } as const;
 
@@ -205,14 +211,16 @@ export function CollectiveXRunsTable({
                       CONCLUSION_CLASSES[conclusion] ?? CONCLUSION_FALLBACK_CLASS,
                     )}
                   >
-                    {conclusion}
+                    {conclusion === 'success' || conclusion === 'failure'
+                      ? t.conclusion[conclusion]
+                      : conclusion}
                   </span>
                 </td>
                 <td className="px-3 py-1.5">
                   <div className="flex gap-1">
                     {epRequested > 0 && (
                       <span
-                        title={`EP: ${epMeasured}/${epRequested} measured`}
+                        title={t.epSuite(epMeasured, epRequested)}
                         data-testid={`collectivex-run-suite-ep-${run.run_id}`}
                         className={cn(
                           'inline-flex rounded-md border px-2 py-0.5 text-2xs font-medium',
@@ -224,7 +232,7 @@ export function CollectiveXRunsTable({
                     )}
                     {kvRequested > 0 && (
                       <span
-                        title={`KV transfer: ${kvMeasured}/${kvRequested} measured`}
+                        title={t.kvSuite(kvMeasured, kvRequested)}
                         data-testid={`collectivex-run-suite-kv-${run.run_id}`}
                         className={cn(
                           'inline-flex rounded-md border px-2 py-0.5 text-2xs font-medium',

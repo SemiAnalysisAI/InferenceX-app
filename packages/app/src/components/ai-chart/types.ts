@@ -1,5 +1,6 @@
 import { Model, Sequence, Precision } from '@/lib/data-mappings';
 import { Y_AXIS_METRICS } from '@/lib/chart-utils';
+import type { Locale } from '@/lib/i18n';
 import { HW_REGISTRY, FRAMEWORK_KEYS } from '@semianalysisai/inferencex-constants';
 
 export type AiProvider = 'openai' | 'anthropic' | 'xai' | 'google';
@@ -80,7 +81,7 @@ const VALID_Y_METRICS = new Set<string>([...Y_AXIS_METRICS, 'eval_score', 'relia
 const VALID_SORT_ORDERS = new Set<string>(['desc', 'asc', 'registry']);
 
 /** Validate and clamp an LLM-generated spec to known values. Throws on unrecoverable input. */
-export function validateSpec(raw: Record<string, unknown>): AiChartSpec {
+export function validateSpec(raw: Record<string, unknown>, locale: Locale = 'en'): AiChartSpec {
   const chartType = VALID_CHART_TYPES.has(raw.chartType as string)
     ? (raw.chartType as AiChartType)
     : 'bar';
@@ -149,7 +150,12 @@ export function validateSpec(raw: Record<string, unknown>): AiChartSpec {
         ? Math.round(raw.topN)
         : undefined,
     topNDistinctGpus: raw.topNDistinctGpus !== false,
-    title: typeof raw.title === 'string' ? raw.title.slice(0, 200) : 'AI Generated Chart',
+    title:
+      typeof raw.title === 'string'
+        ? raw.title.slice(0, 200)
+        : locale === 'zh'
+          ? 'AI 生成的图表'
+          : 'AI Generated Chart',
     description: typeof raw.description === 'string' ? raw.description.slice(0, 500) : '',
   };
 }

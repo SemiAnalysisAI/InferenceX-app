@@ -169,3 +169,124 @@ describe('AI chart metric semantics', () => {
     });
   });
 });
+
+describe('AI chart Chinese workflow', () => {
+  it('requests Chinese presentation copy and renders the returned chart and summary', () => {
+    cy.viewport(1440, 900);
+    cy.fixture<FixtureRow[]>('api/benchmarks.json').then((fixtureRows) => {
+      const rows = [
+        fixtureRow(fixtureRows, 'b200', 40, 12_000),
+        fixtureRow(fixtureRows, 'mi355x', 40, 10_000),
+      ];
+      const spec = benchmarkSpec({
+        title: '每芯片吞吐量对比',
+        description: '在目标交互性下对比两种芯片。',
+        yAxisLabel: '每芯片吞吐量',
+      });
+
+      cy.intercept('GET', '**/api/v1/benchmarks?*', rows).as('zhBenchmarks');
+      cy.intercept('POST', 'https://api.openai.com/v1/chat/completions', (request) => {
+        const systemPrompt = request.body.messages?.[0]?.content ?? '';
+        if (systemPrompt.includes('chart generation assistant')) {
+          expect(systemPrompt).to.contain('natural Simplified Chinese');
+          request.reply({ choices: [{ message: { content: JSON.stringify(spec) } }] });
+          return;
+        }
+
+        expect(systemPrompt).to.contain('用自然、准确的简体中文回答');
+        request.reply({ choices: [{ message: { content: 'B200 在该配置下吞吐量更高。' } }] });
+      }).as('zhOpenAi');
+
+      cy.visit('/zh/ai-chart');
+      cy.get('input[placeholder="OpenAI API Key"]').type('test-api-key', { log: false });
+      cy.get('textarea[placeholder="描述您想查看的图表……"]').type(
+        '对比 B200 和 MI355X 的每芯片吞吐量',
+      );
+      cy.contains('button', '生成图表').click();
+
+      cy.wait('@zhBenchmarks');
+      cy.get('#ai-chart-bar-export')
+        .should('contain.text', '每芯片吞吐量对比')
+        .and('contain.text', '在目标交互性下对比两种芯片。')
+        .and('contain.text', '每芯片吞吐量');
+      cy.get('[role="img"][aria-label="AI 生成的条形图"]').should('be.visible');
+      cy.contains('[data-slot="card-title"]', 'AI 总结').should('be.visible');
+      cy.contains('B200 在该配置下吞吐量更高。').should('be.visible');
+    });
+  });
+
+  it('shows a localized empty state for one unmatched chart in a multi-chart result', () => {
+    cy.fixture<FixtureRow[]>('api/benchmarks.json').then((fixtureRows) => {
+      const rows = [fixtureRow(fixtureRows, 'b200', 40, 12_000)];
+      const specs = [
+        benchmarkSpec({
+          title: 'B200 吞吐量',
+          description: '实测配置。',
+          hardwareKeys: ['b200'],
+          yAxisLabel: '每芯片吞吐量',
+        }),
+        benchmarkSpec({
+          title: 'H100 吞吐量',
+          description: '当前数据集中没有匹配项。',
+          hardwareKeys: ['h100'],
+          yAxisLabel: '每芯片吞吐量',
+        }),
+      ];
+
+      cy.intercept('GET', '**/api/v1/benchmarks?*', rows).as('multiChartBenchmarks');
+      cy.intercept('POST', 'https://api.openai.com/v1/chat/completions', (request) => {
+        const systemPrompt = request.body.messages?.[0]?.content ?? '';
+        request.reply({
+          choices: [
+            {
+              message: {
+                content: systemPrompt.includes('chart generation assistant')
+                  ? JSON.stringify(specs)
+                  : '已对比可用数据。',
+              },
+            },
+          ],
+        });
+      });
+
+      cy.visit('/zh/ai-chart');
+      cy.get('input[placeholder="OpenAI API Key"]').type('test-api-key', { log: false });
+      cy.get('textarea').type('生成两张吞吐量图表');
+      cy.contains('button', '生成图表').click();
+
+      cy.wait('@multiChartBenchmarks');
+      cy.contains('H100 吞吐量')
+        .closest('[data-slot="card"]')
+        .should('contain.text', '没有数据符合这项图表配置。');
+    });
+  });
+
+  it('does not expose a provider error body or API key on the Chinese route', () => {
+    cy.intercept('POST', 'https://api.openai.com/v1/chat/completions', {
+      statusCode: 401,
+      body: { error: { message: 'provider-internal-error sk-sensitive-example-key' } },
+    }).as('failedProvider');
+    cy.visit('/zh/ai-chart');
+    cy.get('input[placeholder="OpenAI API Key"]').type('sk-sensitive-example-key', { log: false });
+    cy.get('textarea').type('对比吞吐量');
+    cy.contains('button', '生成图表').click();
+    cy.wait('@failedProvider');
+
+    cy.contains('图表请求失败。请检查 API 密钥和服务商设置后重试。').should('be.visible');
+    cy.contains('provider-internal-error').should('not.exist');
+    cy.get('[data-testid="ai-chart-error"]').should('not.contain.text', 'sk-sensitive-example-key');
+  });
+
+  for (const width of [375, 390]) {
+    it(`keeps Chinese provider controls and examples within ${width}px`, () => {
+      cy.viewport(width, 844);
+      cy.visit('/zh/ai-chart');
+      cy.get('input[placeholder="OpenAI API Key"]').should('be.visible');
+      cy.get('textarea[placeholder="描述您想查看的图表……"]').should('be.visible');
+      cy.contains('示例提示').should('be.visible');
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
+      });
+    });
+  }
+});

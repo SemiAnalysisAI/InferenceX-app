@@ -60,6 +60,7 @@ function positionLabelPairs(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   xScale: d3.ScaleLinear<number, number>,
   getBarColor: (d: ChartItem) => string,
+  locale: Locale,
 ) {
   const valueLabels = group.selectAll<SVGTextElement, ChartItem>('.value-label');
   const overlayLabels = group.selectAll<SVGTextElement, ChartItem>('.overlay-label');
@@ -73,7 +74,10 @@ function positionLabelPairs(
   });
   overlayLabels.each((d) => {
     const prev = maxWidths.get(d.modelLabel) ?? 0;
-    const w = measureTextWidth(`${d.n_success}/${d.total} runs`, '500 10px sans-serif');
+    const w = measureTextWidth(
+      locale === 'zh' ? `${d.n_success}/${d.total} 次运行` : `${d.n_success}/${d.total} runs`,
+      '500 10px sans-serif',
+    );
     maxWidths.set(d.modelLabel, Math.max(prev, w));
   });
 
@@ -99,16 +103,30 @@ const RELIABILITY_STRINGS = {
   en: {
     highContrast: 'High Contrast',
     resetFilter: 'Reset filter',
+    xAxis: 'Success Rate (%)',
+    loading: 'Loading reliability data…',
+    loadError: 'Failed to load reliability data.',
+    noData: 'No reliability data available for this date range.',
+    instructions:
+      'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Hover for details',
+    runCount: (success: number, total: number) => `${success}/${total} runs`,
   },
   zh: {
     highContrast: '高对比度',
     resetFilter: '重置筛选',
+    xAxis: '成功率（%）',
+    loading: '正在加载可靠性数据……',
+    loadError: '可靠性数据加载失败。',
+    noData: '所选时间范围内暂无可靠性数据。',
+    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 悬停查看详情',
+    runCount: (success: number, total: number) => `${success}/${total} 次运行`,
   },
 } as const;
 
 export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode }) {
   const hoveredBarXRef = useRef(0);
   const {
+    loading,
     error,
     chartData,
     highContrast,
@@ -311,10 +329,13 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
             .attr('font-size', '10px')
             .attr('font-weight', '500')
             .style('pointer-events', 'none')
-            .text((d) => `${d.n_success}/${d.total} runs`);
+            .text((d) => legendT.runCount(d.n_success, d.total));
 
-          positionLabelPairs(group, ctx.xScale as d3.ScaleLinear<number, number>, (d) =>
-            getCssColor(resolveColor(d.model)),
+          positionLabelPairs(
+            group,
+            ctx.xScale as d3.ScaleLinear<number, number>,
+            (d) => getCssColor(resolveColor(d.model)),
+            locale,
           );
         },
         onDisplayUpdate: (group, ctx) => {
@@ -322,17 +343,20 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
           const svgNode = ctx.layout.svg.node();
           const transform = svgNode ? d3.zoomTransform(svgNode) : d3.zoomIdentity;
           const currentXScale = baseXScale.copy().domain([0, 100 / transform.k]);
-          positionLabelPairs(group, currentXScale, (datum) =>
-            getCssColor(resolveColor(datum.model)),
+          positionLabelPairs(
+            group,
+            currentXScale,
+            (datum) => getCssColor(resolveColor(datum.model)),
+            locale,
           );
         },
         onZoom: (group, ctx) => {
           const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
-          positionLabelPairs(group, newXScale, (d) => getCssColor(resolveColor(d.model)));
+          positionLabelPairs(group, newXScale, (d) => getCssColor(resolveColor(d.model)), locale);
         },
       },
     ],
-    [sortedChartData, getCssColor, paletteIdentity, resolveColor],
+    [sortedChartData, getCssColor, legendT, locale, paletteIdentity, resolveColor],
   );
 
   const yAxisConfig = useMemo(() => ({ customize: twoRowYAxisLabels() }), []);
@@ -344,21 +368,19 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
 
   const xAxisConfig = useMemo(
     () => ({
-      label: 'Success Rate (%)',
+      label: legendT.xAxis,
       tickFormat: (d: d3.AxisDomain) => `${d}%`,
       tickCount: 5,
     }),
-    [],
+    [legendT.xAxis],
   );
 
-  const isEmpty = error || chartData.length === 0;
+  const isEmpty = loading || error || chartData.length === 0;
 
   const emptyOverlay = isEmpty ? (
     <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg z-10">
       <p className="text-sm font-medium text-muted-foreground bg-background/90 border border-border rounded-md px-4 py-2 shadow-sm">
-        {error
-          ? 'Failed to load reliability data.'
-          : 'No reliability data available for this date range.'}
+        {loading ? legendT.loading : error ? legendT.loadError : legendT.noData}
       </p>
     </div>
   ) : null;
@@ -378,7 +400,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
         clipContent={false}
         caption={caption}
         noDataOverlay={emptyOverlay}
-        instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Hover for details"
+        instructions={legendT.instructions}
         xScale={xScaleConfig}
         yScale={yScaleConfig}
         xAxis={xAxisConfig}

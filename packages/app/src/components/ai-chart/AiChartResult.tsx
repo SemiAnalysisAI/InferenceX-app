@@ -20,6 +20,7 @@ import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { getHardwareConfig } from '@/lib/constants';
 import DOMPurify from 'dompurify';
+import { useLocale } from '@/lib/use-locale';
 
 import type { AiChartBarPoint, AiChartSpec } from './types';
 import type { AiSingleChartResult, AiRadarItem } from '@/hooks/api/use-ai-chart';
@@ -37,11 +38,44 @@ interface AiChartResultProps {
   summary: string | null;
 }
 
+const STRINGS = {
+  en: {
+    interactivityAxis: 'Interactivity (tok/s/user)',
+    interactivity: 'Interactivity',
+    instructions:
+      'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    summary: 'AI Summary',
+    noData: 'No data matched this chart specification.',
+    chartAria: {
+      bar: 'AI-generated bar chart',
+      scatter: 'AI-generated scatter chart',
+      line: 'AI-generated line chart',
+      radar: 'AI-generated radar chart',
+    },
+  },
+  zh: {
+    interactivityAxis: '交互性（tok/s/user）',
+    interactivity: '交互性',
+    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    summary: 'AI 总结',
+    noData: '没有数据符合这项图表配置。',
+    chartAria: {
+      bar: 'AI 生成的条形图',
+      scatter: 'AI 生成的散点图',
+      line: 'AI 生成的折线图',
+      radar: 'AI 生成的雷达图',
+    },
+  },
+} as const;
+
 // ---------------------------------------------------------------------------
 // Bar Chart (horizontal)
 // ---------------------------------------------------------------------------
 
 function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const numberLocale = locale === 'zh' ? 'zh-CN' : undefined;
   const labels = useMemo(() => data.map((d) => d.label), [data]);
 
   const yScale = useMemo<ScaleConfig>(
@@ -95,27 +129,29 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
             <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${d.label}</span>
           </div>
           <div style="color: var(--muted-foreground); font-size: 11px;">
-            <strong>${spec.yAxisLabel}:</strong> ${d.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            <strong>${spec.yAxisLabel}:</strong> ${d.value.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
           </div>
         </div>`),
     }),
-    [spec.yAxisLabel],
+    [numberLocale, spec.yAxisLabel],
   );
 
   return (
-    <D3Chart
-      chartId="ai-chart-bar"
-      data={data}
-      height={Math.max(300, data.length * 40 + margin.top + margin.bottom)}
-      margin={margin}
-      xScale={xScale}
-      yScale={yScale}
-      xAxis={xAxis}
-      yAxis={yAxis}
-      layers={layers}
-      tooltip={tooltip}
-      watermark="logo"
-    />
+    <div role="img" aria-label={t.chartAria.bar}>
+      <D3Chart
+        chartId="ai-chart-bar"
+        data={data}
+        height={Math.max(300, data.length * 40 + margin.top + margin.bottom)}
+        margin={margin}
+        xScale={xScale}
+        yScale={yScale}
+        xAxis={xAxis}
+        yAxis={yAxis}
+        layers={layers}
+        tooltip={tooltip}
+        watermark="logo"
+      />
+    </div>
   );
 }
 
@@ -132,6 +168,9 @@ function ScatterChart({
   spec: AiChartSpec;
   colorMap: Record<string, string>;
 }) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const numberLocale = locale === 'zh' ? 'zh-CN' : undefined;
   const xExtent = useMemo(() => {
     const xs = data.map((d) => d.x);
     return [Math.min(...xs) * 0.9, Math.max(...xs) * 1.1] as [number, number];
@@ -151,7 +190,7 @@ function ScatterChart({
     [yExtent],
   );
 
-  const xAxis = useMemo<AxisConfig>(() => ({ label: 'Interactivity (tok/s/user)' }), []);
+  const xAxis = useMemo<AxisConfig>(() => ({ label: t.interactivityAxis }), [t.interactivityAxis]);
   const yAxis = useMemo<AxisConfig>(() => ({ label: spec.yAxisLabel }), [spec.yAxisLabel]);
 
   const layers = useMemo(() => {
@@ -175,38 +214,40 @@ function ScatterChart({
             <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${hwKey}</span>
           </div>
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 2px;">
-            <strong>Interactivity:</strong> ${d.x.toFixed(1)} tok/s/user
+            <strong>${t.interactivity}:</strong> ${d.x.toFixed(1)} tok/s/user
           </div>
           <div style="color: var(--muted-foreground); font-size: 11px;">
-            <strong>${spec.yAxisLabel}:</strong> ${d.y.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            <strong>${spec.yAxisLabel}:</strong> ${d.y.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
           </div>
         </div>`);
       },
     }),
-    [colorMap, spec.yAxisLabel],
+    [colorMap, numberLocale, spec.yAxisLabel, t.interactivity],
   );
 
   return (
-    <D3Chart
-      chartId="ai-chart-scatter"
-      data={data}
-      height={500}
-      xScale={xScale}
-      yScale={yScale}
-      xAxis={xAxis}
-      yAxis={yAxis}
-      layers={layers}
-      tooltip={tooltip}
-      watermark="logo"
-      grabCursor
-      instructions="Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip"
-      zoom={{
-        enabled: true,
-        axes: 'both',
-        scaleExtent: [0.7, 20],
-        resetEventName: 'ai_chart_zoom_reset_ai-chart-scatter',
-      }}
-    />
+    <div role="img" aria-label={t.chartAria.scatter}>
+      <D3Chart
+        chartId="ai-chart-scatter"
+        data={data}
+        height={500}
+        xScale={xScale}
+        yScale={yScale}
+        xAxis={xAxis}
+        yAxis={yAxis}
+        layers={layers}
+        tooltip={tooltip}
+        watermark="logo"
+        grabCursor
+        instructions={t.instructions}
+        zoom={{
+          enabled: true,
+          axes: 'both',
+          scaleExtent: [0.7, 20],
+          resetEventName: 'ai_chart_zoom_reset_ai-chart-scatter',
+        }}
+      />
+    </div>
   );
 }
 
@@ -230,6 +271,9 @@ function LineChart({
   spec: AiChartSpec;
   colorMap: Record<string, string>;
 }) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const numberLocale = locale === 'zh' ? 'zh-CN' : undefined;
   const flatPoints = useMemo<LinePoint[]>(
     () =>
       Object.entries(lineData).flatMap(([hwKey, pts]) =>
@@ -259,7 +303,7 @@ function LineChart({
     [yExtent],
   );
 
-  const xAxis = useMemo<AxisConfig>(() => ({ label: 'Interactivity (tok/s/user)' }), []);
+  const xAxis = useMemo<AxisConfig>(() => ({ label: t.interactivityAxis }), [t.interactivityAxis]);
   const yAxis = useMemo<AxisConfig>(() => ({ label: spec.yAxisLabel }), [spec.yAxisLabel]);
 
   const layers = useMemo(() => {
@@ -298,10 +342,10 @@ function LineChart({
             <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${label}</span>
           </div>
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 2px;">
-            <strong>Interactivity:</strong> ${d.x.toFixed(1)} tok/s/user
+            <strong>${t.interactivity}:</strong> ${d.x.toFixed(1)} tok/s/user
           </div>
           <div style="color: var(--muted-foreground); font-size: 11px;">
-            <strong>${spec.yAxisLabel}:</strong> ${d.y.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            <strong>${spec.yAxisLabel}:</strong> ${d.y.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
           </div>
         </div>`);
       },
@@ -309,30 +353,32 @@ function LineChart({
       getRulerY: (d, yS) => (yS as any)(d.y),
       attachToLayer: 1,
     }),
-    [colorMap, spec.yAxisLabel],
+    [colorMap, numberLocale, spec.yAxisLabel, t.interactivity],
   );
 
   return (
-    <D3Chart
-      chartId="ai-chart-line"
-      data={flatPoints}
-      height={500}
-      xScale={xScale}
-      yScale={yScale}
-      xAxis={xAxis}
-      yAxis={yAxis}
-      layers={layers}
-      tooltip={tooltip}
-      watermark="logo"
-      grabCursor
-      instructions="Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip"
-      zoom={{
-        enabled: true,
-        axes: 'both',
-        scaleExtent: [0.7, 20],
-        resetEventName: 'ai_chart_zoom_reset_ai-chart-line',
-      }}
-    />
+    <div role="img" aria-label={t.chartAria.line}>
+      <D3Chart
+        chartId="ai-chart-line"
+        data={flatPoints}
+        height={500}
+        xScale={xScale}
+        yScale={yScale}
+        xAxis={xAxis}
+        yAxis={yAxis}
+        layers={layers}
+        tooltip={tooltip}
+        watermark="logo"
+        grabCursor
+        instructions={t.instructions}
+        zoom={{
+          enabled: true,
+          axes: 'both',
+          scaleExtent: [0.7, 20],
+          resetEventName: 'ai_chart_zoom_reset_ai-chart-line',
+        }}
+      />
+    </div>
   );
 }
 
@@ -347,6 +393,9 @@ function RadarChart({
   data: AiRadarItem[];
   axes: { label: string; unit?: string }[];
 }) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const numberLocale = locale === 'zh' ? 'zh-CN' : undefined;
   const layers = useMemo(() => {
     const radarLayer: RadarLayerConfig<AiRadarItem> = {
       type: 'radar',
@@ -374,7 +423,7 @@ function RadarChart({
             const raw = d.rawValues[i];
             return raw === null
               ? ''
-              : `<div><strong>${axis.label}:</strong> ${raw.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>`;
+              : `<div><strong>${axis.label}:</strong> ${raw.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}</div>`;
           })
           .filter(Boolean)
           .join('');
@@ -387,23 +436,25 @@ function RadarChart({
         </div>`);
       },
     }),
-    [axes],
+    [axes, numberLocale],
   );
 
   // Radar ignores scales/axes — it draws its own grid. Provide dummy scales.
   const dummyScale = useMemo<ScaleConfig>(() => ({ type: 'linear', domain: [0, 1] }), []);
 
   return (
-    <D3Chart
-      chartId="ai-chart-radar"
-      data={data}
-      height={500}
-      xScale={dummyScale}
-      yScale={dummyScale}
-      layers={layers}
-      tooltip={tooltip}
-      watermark="logo"
-    />
+    <div role="img" aria-label={t.chartAria.radar}>
+      <D3Chart
+        chartId="ai-chart-radar"
+        data={data}
+        height={500}
+        xScale={dummyScale}
+        yScale={dummyScale}
+        layers={layers}
+        tooltip={tooltip}
+        watermark="logo"
+      />
+    </div>
   );
 }
 
@@ -442,11 +493,18 @@ function buildLegendItems(colorMap: Record<string, string>): { label: string; co
 // ---------------------------------------------------------------------------
 
 export default function AiChartResult({ charts, summary }: AiChartResultProps) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
   return (
     <div className="flex flex-col gap-4">
       {charts.map((chart, i) => {
         const chartId = `ai-chart-${chart.spec.chartType}`;
         const hasZoom = chart.spec.chartType === 'scatter' || chart.spec.chartType === 'line';
+        const hasData =
+          chart.barData.length > 0 ||
+          chart.scatterData.length > 0 ||
+          Object.keys(chart.lineData).length > 0 ||
+          chart.radarData.length > 0;
         return (
           <figure key={i} className="relative rounded-lg">
             <ChartButtons chartId={chartId} analyticsPrefix="ai_chart" hideZoomReset={!hasZoom} />
@@ -456,6 +514,9 @@ export default function AiChartResult({ charts, summary }: AiChartResultProps) {
                 <CardDescription>{chart.spec.description}</CardDescription>
               </CardHeader>
               <CardContent>
+                {!hasData && (
+                  <p className="py-16 text-center text-sm text-muted-foreground">{t.noData}</p>
+                )}
                 {chart.spec.chartType === 'bar' && chart.barData.length > 0 && (
                   <BarChart data={chart.barData} spec={chart.spec} />
                 )}
@@ -496,7 +557,7 @@ export default function AiChartResult({ charts, summary }: AiChartResultProps) {
       {summary && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">AI Summary</CardTitle>
+            <CardTitle className="text-sm">{t.summary}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground text-sm">{summary}</p>
