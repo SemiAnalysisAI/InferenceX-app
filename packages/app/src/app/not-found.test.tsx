@@ -27,6 +27,7 @@ describe('localized not-found surfaces', () => {
     expect(html).toContain('404 - 页面不存在');
     expect(html).toContain('找不到该页面。');
     expect(html).toContain('href="/zh"');
+    expect(html).toContain('inline-flex min-h-11 items-center justify-center');
     expect(html).toContain('返回首页');
   });
 

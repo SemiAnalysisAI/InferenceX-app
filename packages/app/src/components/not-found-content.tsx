@@ -28,7 +28,7 @@ export function NotFoundContent({ locale }: { locale: Locale }) {
       <p className="mb-8 text-lg">{t.description}</p>
       <Link
         href={href}
-        className="min-h-11 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
+        className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
         onClick={() => track('not_found_home_clicked', { locale })}
       >
         {t.home}

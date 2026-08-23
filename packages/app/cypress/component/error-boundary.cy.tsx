@@ -74,7 +74,15 @@ describe('Not-found recovery analytics', () => {
     registerAnalyticsClient({ capture });
 
     cy.mount(<NotFoundContent locale="zh" />);
-    cy.contains('a', '返回首页').invoke('removeAttr', 'href').click();
+    cy.contains('a', '返回首页')
+      .should('have.class', 'inline-flex')
+      .and('have.class', 'items-center')
+      .and('have.class', 'justify-center')
+      .then(($link) => {
+        expect($link[0].getBoundingClientRect().height).to.be.at.least(44);
+      })
+      .invoke('removeAttr', 'href')
+      .click();
 
     cy.get('@capture').should('have.been.calledWith', 'not_found_home_clicked', { locale: 'zh' });
   });
