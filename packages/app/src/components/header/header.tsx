@@ -107,21 +107,31 @@ function isCurrentPage(pathname: string, displayHref: string): boolean {
 }
 
 /** EN ↔ 中文 switcher; maps the current page to its sibling in the other language. */
-function LanguageToggle({ pathname }: { pathname: string }) {
+function LanguageToggle({
+  pathname,
+  router,
+}: {
+  pathname: string;
+  router: ReturnType<typeof useRouter>;
+}) {
   const isZh = isZhPathname(pathname);
   const target = switchLocalePath(pathname);
   const search = useClientSearch();
+  const isOverview = isActive(pathname, '/overview');
   return (
     <Link
       href={target + search}
       // Only /overview rewrites this href per interaction, which would
       // re-prefetch its force-dynamic sibling on every selector commit.
       // Everywhere else the href is stable, so let Next prefetch it.
-      prefetch={isActive(pathname, '/overview') ? false : undefined}
+      prefetch={isOverview ? false : undefined}
       data-testid="language-toggle"
       hrefLang={isZh ? 'en' : 'zh-CN'}
       className="inline-flex items-center min-h-11 px-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
-      onClick={() => track('header_language_toggled', { to: isZh ? 'en' : 'zh' })}
+      onClick={(event) => {
+        track('header_language_toggled', { to: isZh ? 'en' : 'zh' });
+        if (!isOverview) navigateInApp(event, router, target + search);
+      }}
     >
       {isZh ? 'EN' : '中文'}
     </Link>
@@ -247,7 +257,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             <span className="hidden sm:flex">
               <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" starCount={starCount} />
             </span>
-            <LanguageToggle pathname={pathname} />
+            <LanguageToggle pathname={pathname} router={router} />
             {/* Below `sm` these move into the mobile menu — they are what push
                 a 320px header past its bounds in minecraft mode. */}
             <span className="hidden items-center gap-2 sm:flex">

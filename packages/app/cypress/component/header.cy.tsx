@@ -70,6 +70,20 @@ describe('Header', () => {
     cy.wrap(mockRouter.push).should('have.been.calledTwice');
   });
 
+  it('retains resilient locale navigation outside Overview', () => {
+    cy.clock();
+    mountHeader('/inference');
+    cy.get('[data-testid="language-toggle"]')
+      .invoke('attr', 'href')
+      .then((href) => {
+        expect(href).to.include('/zh/inference');
+        cy.get('[data-testid="language-toggle"]').click();
+        cy.wrap(mockRouter.push).should('have.been.calledOnceWith', href);
+        cy.tick(250);
+        cy.wrap(mockRouter.push).should('have.been.calledTwice');
+      });
+  });
+
   it('makes a click on the tab already showing a no-op', () => {
     mountHeader('/overview');
     cy.get('[data-testid="nav-link-overview"]').click();
