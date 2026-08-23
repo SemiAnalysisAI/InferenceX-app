@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { AgenticPointDetail } from '@/components/inference/agentic-point/agentic-point-detail';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import { zhAlternates } from '@/lib/i18n';
+import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n';
 
 export async function generateMetadata({
   params,
@@ -15,6 +15,7 @@ export async function generateMetadata({
     title: 'Agentic trace 详情 | InferenceX',
     description: `查看 Agentic 基准测试数据点 #${id} 的请求时间线、服务器指标、聚合数据与日志。`,
     alternates: zhAlternates(`/inference/agentic/${id}`),
+    openGraph: { locale: ZH_OG_LOCALE },
     robots: { index: false },
   };
 }

@@ -5,7 +5,7 @@
  */
 
 import type { RequestRecord } from '@/hooks/api/use-request-timeline';
-import type { Locale } from '@/lib/i18n';
+import { localePath, type Locale } from '@/lib/i18n';
 
 export type RowMode = 'conversation' | 'worker';
 
@@ -41,7 +41,11 @@ export function subagentIdOf(cid: string): string | null {
  * real `href` on the request bar so the browser's native "open in new tab"
  * (right-click, ⌘/Ctrl-click, middle-click) works.
  */
-export function conversationHref(datasetSlug: string, req: RequestRecord): string {
+export function conversationHref(
+  datasetSlug: string,
+  req: RequestRecord,
+  locale: Locale = 'en',
+): string {
   const convId = req.srcTrace ?? datasetConvId(req.cid);
   const params = new URLSearchParams({ turn: String(req.ti) });
   if (typeof req.srcOuter === 'number' && Number.isInteger(req.srcOuter) && req.srcOuter >= 0) {
@@ -52,7 +56,10 @@ export function conversationHref(datasetSlug: string, req: RequestRecord): strin
   }
   const sa = subagentIdOf(req.cid);
   if (sa && !params.has('inner')) params.set('sa', sa);
-  return `/agentx/${datasetSlug}/conversations/${encodeURIComponent(convId)}?${params.toString()}`;
+  return localePath(
+    `/agentx/${datasetSlug}/conversations/${encodeURIComponent(convId)}?${params.toString()}`,
+    locale,
+  );
 }
 
 /** Human label for where a request came from (raw trace index or replay turn). */

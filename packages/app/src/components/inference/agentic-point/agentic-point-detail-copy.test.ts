@@ -18,6 +18,9 @@ describe('agentic point detail copy', () => {
       loadingTimeline: 'Loading request timeline…',
       missingTimeline:
         "No per-request timeline for benchmark point #{id} — the profile_export.jsonl artifact isn't stored for this row.",
+      aggregatesError: 'Failed to load aggregate data across configurations.',
+      timelineError: 'Failed to load the request timeline.',
+      requestChartsError: 'Failed to load request chart data.',
     });
     expect(Object.keys(zh)).toEqual(Object.keys(en));
     for (const key of [
@@ -26,6 +29,9 @@ describe('agentic point detail copy', () => {
       'loadingAggregates',
       'loadingTimeline',
       'missingTimeline',
+      'aggregatesError',
+      'timelineError',
+      'requestChartsError',
     ]) {
       expect(zh[key]).not.toBe(en[key]);
     }

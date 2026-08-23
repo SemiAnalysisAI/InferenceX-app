@@ -344,6 +344,8 @@ export function createMockEvaluationContext(
   return {
     loading: false,
     error: null,
+    isError: false,
+    retry: namedStub('retryEvaluations'),
     selectedBenchmark: 'mmlu',
     setSelectedBenchmark: namedStub('setSelectedBenchmark'),
     selectedModel: Model.DeepSeek_R1,

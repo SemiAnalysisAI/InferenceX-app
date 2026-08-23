@@ -12,6 +12,7 @@ import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ChartSection } from '@/components/ui/chart-section';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { exportToCsv } from '@/lib/csv-export';
@@ -33,7 +34,7 @@ export function evaluationCaptionDate(date: string, locale: Locale): string {
   });
 }
 
-const STRINGS = {
+export const EVALUATION_DISPLAY_STRINGS = {
   en: {
     chartView: 'Chart',
     tableView: 'Table',
@@ -45,6 +46,7 @@ const STRINGS = {
     sourceUnofficial: 'Source: UNOFFICIAL',
     sourceOfficial: 'Source: SemiAnalysis InferenceX™',
     updated: 'Updated:',
+    queryError: 'Failed to load evaluation data.',
   },
   zh: {
     chartView: '图表',
@@ -56,12 +58,13 @@ const STRINGS = {
     sourceUnofficial: '来源：非官方',
     sourceOfficial: '来源：SemiAnalysis InferenceX™',
     updated: '更新时间：',
+    queryError: '评估数据加载失败。',
   },
 };
 
 export default function EvaluationChartDisplay() {
   const locale = useLocale();
-  const t = STRINGS[locale];
+  const t = EVALUATION_DISPLAY_STRINGS[locale];
   const CHART_ID = 'evaluation-chart';
   const {
     selectedModel,
@@ -71,6 +74,8 @@ export default function EvaluationChartDisplay() {
     chartData,
     unofficialChartData,
     selectedPrecisions,
+    isError,
+    retry,
   } = useEvaluation();
   const { isUnofficialRun } = useUnofficialRun();
   // In unofficial-run mode the bar chart already shows both, but the table only
@@ -163,7 +168,14 @@ export default function EvaluationChartDisplay() {
           />
         }
       >
-        {viewMode === 'table' ? (
+        {isError ? (
+          <RetryableQueryError
+            message={t.queryError}
+            analyticsEvent="evaluation_data_retry_clicked"
+            onRetry={retry}
+            testId="evaluation-query-error"
+          />
+        ) : viewMode === 'table' ? (
           <>
             {caption}
             <EvaluationTable data={tableData} />

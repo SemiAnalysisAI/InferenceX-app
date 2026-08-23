@@ -33,6 +33,7 @@ import { Sequence } from '@/lib/data-mappings';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/lib/use-locale';
 import type { Locale } from '@/lib/i18n';
+import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 
 import {
   buildReplayTimeline,
@@ -69,7 +70,6 @@ const REPLAY_STRINGS = {
     heading: 'Replay over time',
     loading: 'Loading benchmark history…',
     loadError: 'Failed to load benchmark history.',
-    retry: 'Retry',
     insufficient:
       'Not enough history yet to replay this chart — at least two distinct benchmark dates are required.',
     dates: (count: number) => `${count} dates`,
@@ -99,7 +99,6 @@ const REPLAY_STRINGS = {
     heading: '按时间回放',
     loading: '正在加载基准测试历史……',
     loadError: '基准测试历史加载失败。',
-    retry: '重试',
     insufficient: '历史数据不足，暂时无法回放该图表——至少需要两个不同的基准测试日期。',
     dates: (count: number) => `${count} 个日期`,
     configs: (count: number) => `${count} 个配置`,
@@ -634,18 +633,13 @@ function ReplayPanelContent({
         style={{ minHeight: REPLAY_BODY_MIN_HEIGHT + 140 }}
       >
         <h3 className="text-base font-semibold">{t.heading}</h3>
-        <div className="flex flex-1 flex-col items-center justify-center gap-3">
-          <p className="text-sm text-destructive">{t.loadError}</p>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              track('inference_replay_history_retry_clicked');
-              onRetry();
-            }}
-          >
-            {t.retry}
-          </Button>
+        <div className="flex flex-1 items-center justify-center">
+          <RetryableQueryError
+            message={t.loadError}
+            analyticsEvent="inference_replay_history_retry_clicked"
+            onRetry={onRetry}
+            testId="replay-history-query-error"
+          />
         </div>
       </div>
     );

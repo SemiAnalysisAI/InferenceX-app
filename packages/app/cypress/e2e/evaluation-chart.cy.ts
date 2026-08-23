@@ -276,11 +276,31 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
     });
   });
 
-  it('renders a localized evaluation fetch error', () => {
-    cy.intercept('GET', '/api/v1/evaluations', { statusCode: 500, body: {} });
+  it('distinguishes a fetch error from empty data and retries the failed query', () => {
+    cy.fixture('api/evaluations.json').then((evaluations) => {
+      let attempts = 0;
+      cy.intercept('GET', '/api/v1/evaluations', (request) => {
+        attempts += 1;
+        request.reply(
+          attempts <= 2 ? { statusCode: 500, body: {} } : { statusCode: 200, body: evaluations },
+        );
+      });
+      cy.visit('/zh/evaluation');
+      cy.get('[data-testid="evaluation-query-error"]')
+        .should('contain.text', '评估数据加载失败。')
+        .and('contain.text', '重试');
+      cy.get('[data-testid="evaluation-query-error"]').contains('重试').click();
+      cy.get('[data-testid="evaluation-query-error"]').should('not.exist');
+      cy.get('[data-testid="evaluation-results-table"]').should('be.visible');
+      cy.then(() => expect(attempts).to.equal(3));
+    });
+  });
+
+  it('renders a successful empty response without offering an error retry', () => {
+    cy.intercept('GET', '/api/v1/evaluations', { statusCode: 200, body: [] });
     cy.visit('/zh/evaluation');
     cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();
-    cy.contains('评估数据加载失败。').should('be.visible');
-    cy.contains('Failed to load eval data.').should('not.exist');
+    cy.contains(/该模型暂无评估数据|所选模型与基准测试组合暂无评估数据/u).should('be.visible');
+    cy.get('[data-testid="evaluation-query-error"]').should('not.exist');
   });
 });

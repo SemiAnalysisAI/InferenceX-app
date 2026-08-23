@@ -3,11 +3,20 @@ import { notFound } from 'next/navigation';
 
 import { BenchmarkLogDetail } from '@/components/inference/log-viewer/benchmark-log-detail';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { enAlternates } from '@/lib/i18n';
 
-export const metadata: Metadata = {
-  title: 'Benchmark logs | InferenceX',
-  robots: { index: false },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  return {
+    title: 'Benchmark logs | InferenceX',
+    alternates: enAlternates(`/inference/logs/${id}`),
+    robots: { index: false },
+  };
+}
 
 export default async function BenchmarkLogPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

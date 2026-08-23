@@ -22,14 +22,25 @@ const setReplayScrubber = (v: number) =>
 // detected. The run can grow in x, y, or both between frames, so asserting on
 // the y-axis alone would falsely fail when only x expands.
 const replayAxisExtent = () =>
-  cy.get('[data-testid="replay-panel-chart-0"] svg').then(($svg) => {
-    const svg = $svg[0];
-    const lastTick = (sel: string) => {
-      const els = [...svg.querySelectorAll(sel)];
-      return els.length > 0 ? (els.at(-1)!.textContent ?? '').trim() : '';
-    };
-    return `${lastTick('g.x-axis text')}|${lastTick('g.y-axis text')}`;
+  cy.get('[data-testid="replay-panel-chart-0"] svg').then(($svg) => replayAxisExtentFrom($svg[0]));
+
+const replayAxisExtentFrom = (svg: Element) => {
+  const lastTick = (selector: string) => {
+    const elements = [...svg.querySelectorAll(selector)];
+    return elements.length > 0 ? (elements.at(-1)!.textContent ?? '').trim() : '';
+  };
+  return `${lastTick('g.x-axis text')}|${lastTick('g.y-axis text')}`;
+};
+
+const visitChineseReplay = () => {
+  cy.viewport(390, 900);
+  cy.visit('/zh/inference?g_model=DeepSeek-R1-0528', {
+    onBeforeLoad(win) {
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    },
   });
+  openReplayDialog();
+};
 
 describe('Inference Replay', () => {
   before(() => {
@@ -66,7 +77,7 @@ describe('Inference Replay', () => {
 
   it('exposes scrubber + play/pause + speed controls when history is available', () => {
     // Wait for history to resolve into either the controls UI or the empty-state message.
-    cy.get('[data-testid="replay-panel-chart-0"]', { timeout: 15_000 }).should(($panel) => {
+    cy.get('[data-testid="replay-panel-chart-0"]').should(($panel) => {
       const hasControls = $panel.find('[data-testid="replay-play-pause"]').length > 0;
       const hasEmpty = /Not enough history/u.test($panel.text());
       expect(hasControls || hasEmpty).to.equal(true);
@@ -102,13 +113,13 @@ describe('Inference Replay', () => {
             .invoke('text')
             .then((startDate) => {
               cy.get('[data-testid="replay-play-pause"]').click();
-              cy.wait(800);
-              cy.get('[data-testid="replay-play-pause"]').click();
               cy.get('[data-testid="replay-scrubber"]')
-                .invoke('val')
-                .should((endVal) => {
-                  expect(Number(endVal)).to.be.greaterThan(Number(startVal));
-                });
+                .should(($scrubber) => {
+                  expect(Number(($scrubber[0] as HTMLInputElement).value)).to.be.greaterThan(
+                    Number(startVal),
+                  );
+                })
+                .then(() => cy.get('[data-testid="replay-play-pause"]').click());
               cy.get('[data-testid="replay-date-overlay"]')
                 .invoke('text')
                 .should((endDate) => {
@@ -169,7 +180,7 @@ describe('Inference Replay', () => {
           if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
         });
       });
-      cy.get('[data-testid="replay-panel-chart-0"] svg g.line-label', { timeout: 6000 }).should(
+      cy.get('[data-testid="replay-panel-chart-0"] svg g.line-label').should(
         'have.length.greaterThan',
         0,
       );
@@ -200,30 +211,31 @@ describe('Inference Replay', () => {
       // independent of which axis the frontier grows along).
       cy.get('[data-testid="replay-fixed-axes"]').should('have.attr', 'data-state', 'checked');
       setReplayScrubber(0);
-      cy.wait(300);
+      cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
       replayAxisExtent().then((fixedAtStart) => {
         setReplayScrubber(1_000_000); // clamps to the scrubber max → last frame
-        cy.wait(300);
-        replayAxisExtent().then((fixedAtEnd) => {
-          expect(fixedAtEnd, 'fixed axes are identical at the first and last frame').to.equal(
-            fixedAtStart,
-          );
+        cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
+        cy.get('[data-testid="replay-panel-chart-0"] svg').should(($svg) => {
+          expect(
+            replayAxisExtentFrom($svg[0]),
+            'fixed axes are identical at the first and last frame',
+          ).to.equal(fixedAtStart);
+        });
 
-          // Turn fixed axes off → the first frame refits to just that frame's
-          // (smaller) frontier, so the extent differs from the whole-run box in
-          // at least one axis (compared as an x|y pair, not y alone).
-          cy.get('[data-testid="replay-fixed-axes"]').click();
-          setReplayScrubber(0);
-          cy.wait(300);
-          replayAxisExtent().then((dynamicAtStart) => {
+        // Turn fixed axes off → the first frame refits to just that frame's
+        // (smaller) frontier, so the extent differs from the whole-run box in
+        // at least one axis (compared as an x|y pair, not y alone).
+        cy.get('[data-testid="replay-fixed-axes"]').click();
+        setReplayScrubber(0);
+        cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
+        cy.get('[data-testid="replay-panel-chart-0"] svg')
+          .should(($svg) => {
             expect(
-              dynamicAtStart,
+              replayAxisExtentFrom($svg[0]),
               'per-frame axes at the first frame differ from the whole-run fixed extent',
             ).not.to.equal(fixedAtStart);
-          });
-          // Restore the default.
-          cy.get('[data-testid="replay-fixed-axes"]').click();
-        });
+          })
+          .then(() => cy.get('[data-testid="replay-fixed-axes"]').click());
       });
     });
   });
@@ -240,26 +252,83 @@ describe('Inference Replay', () => {
 });
 
 describe('Inference Replay — Simplified Chinese', () => {
-  it('localizes the replay dialog, controls, and accessible names', () => {
-    cy.viewport(390, 900);
-    cy.visit('/zh/inference', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
+  it('waits for fixture history and exercises every localized replay control', () => {
+    cy.fixture('api/benchmarks-history.json').then((history) => {
+      cy.intercept('GET', '/api/v1/benchmarks/history*', { body: history }).as('zhReplayHistory');
+      visitChineseReplay();
+      cy.wait('@zhReplayHistory');
+
+      cy.get('[data-testid="replay-panel-chart-0"]')
+        .should('contain.text', '按时间回放')
+        .and('not.contain.text', '正在加载基准测试历史');
+      cy.get('[data-testid="replay-play-pause"]')
+        .should('have.attr', 'aria-label', '播放回放')
+        .and('contain.text', '播放');
+      cy.get('[data-testid="replay-reset"]').should('have.attr', 'aria-label', '重置到起点');
+      cy.get('[data-testid="replay-scrubber"]').should('have.attr', 'aria-label', '回放时间线');
+      cy.get('[data-testid="replay-fixed-axes"]').should('have.attr', 'data-state', 'checked');
+
+      cy.get('[data-testid="replay-scrubber"]')
+        .invoke('val')
+        .then((startValue) => {
+          cy.get('[data-testid="replay-play-pause"]').click();
+          cy.get('[data-testid="replay-scrubber"]').should(($scrubber) => {
+            expect(Number(($scrubber[0] as HTMLInputElement).value)).to.be.greaterThan(
+              Number(startValue),
+            );
+          });
+          cy.get('[data-testid="replay-play-pause"]')
+            .should('have.attr', 'aria-label', '暂停回放')
+            .click();
+        });
+
+      cy.get('[data-testid="replay-reset"]').click();
+      cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
+      setReplayScrubber(1000);
+      cy.get('[data-testid="replay-scrubber"]')
+        .should('have.value', '1000')
+        .and('have.attr', 'aria-valuetext')
+        .and('match', /年/u);
+
+      cy.get('[data-testid="replay-fixed-axes"]')
+        .click()
+        .should('have.attr', 'data-state', 'unchecked')
+        .click()
+        .should('have.attr', 'data-state', 'checked');
     });
-    cy.get('[data-testid="chart-figure"]').first().find('[data-testid="export-button"]').click();
-    cy.get('[data-testid="export-mp4-button"]').first().click();
-    cy.get('[data-testid="replay-panel-chart-0"]')
-      .should('contain.text', '按时间回放')
-      .then(($panel) => {
-        if ($panel.find('[data-testid="replay-play-pause"]').length === 0) {
-          expect($panel.text()).to.match(/正在加载基准测试历史|历史数据不足/u);
-          return;
-        }
-        cy.get('[data-testid="replay-play-pause"]').should('have.attr', 'aria-label', '播放回放');
-        cy.get('[data-testid="replay-reset"]').should('have.attr', 'aria-label', '重置到起点');
-        cy.get('[data-testid="replay-scrubber"]').should('have.attr', 'aria-label', '回放时间线');
-        cy.contains('固定坐标轴').should('be.visible');
+  });
+
+  it('shows an error, retries after analytics, and then renders controls', () => {
+    cy.fixture('api/benchmarks-history.json').then((history) => {
+      let attempts = 0;
+      cy.intercept('GET', '/api/v1/benchmarks/history*', (request) => {
+        attempts += 1;
+        request.reply(
+          attempts <= 2 ? { statusCode: 500, body: {} } : { statusCode: 200, body: history },
+        );
       });
+      visitChineseReplay();
+      cy.get('[data-testid="replay-history-query-error"]')
+        .should('contain.text', '基准测试历史加载失败。')
+        .and('contain.text', '重试');
+      cy.get('[data-testid="replay-history-query-error"]').contains('重试').click();
+      cy.get('[data-testid="replay-history-query-error"]').should('not.exist');
+      cy.get('[data-testid="replay-play-pause"]').should('be.visible');
+      cy.then(() => expect(attempts).to.equal(3));
+    });
+  });
+
+  it('renders the insufficient-history state only after a successful response', () => {
+    cy.fixture<unknown[]>('api/benchmarks-history.json').then((history) => {
+      const firstDate = (history[0] as { date: string }).date;
+      const oneDate = history.filter((row) => (row as { date: string }).date === firstDate);
+      cy.intercept('GET', '/api/v1/benchmarks/history*', { statusCode: 200, body: oneDate });
+      visitChineseReplay();
+      cy.contains('历史数据不足，暂时无法回放该图表——至少需要两个不同的基准测试日期。').should(
+        'be.visible',
+      );
+      cy.get('[data-testid="replay-play-pause"]').should('not.exist');
+      cy.get('[data-testid="replay-history-query-error"]').should('not.exist');
+    });
   });
 });

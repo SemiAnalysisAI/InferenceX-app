@@ -56,6 +56,8 @@ export interface EvalChangelogEntry {
 export interface EvaluationChartContextType {
   loading: boolean;
   error: string | null;
+  isError: boolean;
+  retry: () => void;
   selectedBenchmark: string | undefined;
   setSelectedBenchmark: (benchmark: string) => void;
   selectedModel: string | undefined;

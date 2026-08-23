@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { evaluationCaptionDate } from './ChartDisplay';
+import { EVALUATION_DISPLAY_STRINGS, evaluationCaptionDate } from './ChartDisplay';
 import { EVALUATION_TABLE_STRINGS } from './EvaluationTable';
 
 describe('evaluation locale copy', () => {
@@ -17,5 +17,10 @@ describe('evaluation locale copy', () => {
       max: '最高',
     });
     expect(EVALUATION_TABLE_STRINGS.zh.unofficialTitle).not.toContain('/');
+  });
+
+  it('distinguishes a failed evaluation query from an empty result', () => {
+    expect(EVALUATION_DISPLAY_STRINGS.en.queryError).toBe('Failed to load evaluation data.');
+    expect(EVALUATION_DISPLAY_STRINGS.zh.queryError).toBe('评估数据加载失败。');
   });
 });

@@ -77,11 +77,16 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     data: rawRows,
     isLoading: loading,
     isSuccess: evaluationsSettled,
+    isError: evaluationsError,
     error: queryError,
+    refetch: refetchEvaluations,
   } = useEvaluations();
   const { unofficialEvalRows, localOfficialOverride } = useUnofficialRun();
 
   const error = availabilityError || (queryError ? queryError.message : null);
+  const retry = useCallback(() => {
+    void refetchEvaluations();
+  }, [refetchEvaluations]);
   const rawData: EvalRow[] = rawRows ?? [];
   const unofficialRawData: EvalRow[] = unofficialEvalRows ?? [];
 
@@ -339,6 +344,8 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     () => ({
       loading,
       error,
+      isError: evaluationsError,
+      retry,
       selectedBenchmark,
       setSelectedBenchmark: setRequestedBenchmark,
       selectedModel,
@@ -372,6 +379,8 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     [
       loading,
       error,
+      evaluationsError,
+      retry,
       selectedBenchmark,
       selectedModel,
       handleSetSelectedModel,

@@ -59,7 +59,7 @@ const benchmarkSiblings = {
     benchmark_type: 'agentic_traces',
     github_run_id: 31893747354,
     date: '2026-08-15',
-    dataset_slug: null,
+    dataset_slug: 'fixture-dataset',
   },
   siblings: [
     {
@@ -601,6 +601,92 @@ describe('Agentic point request metric time series', () => {
     cy.document().then((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
+    cy.get('a[href^="/zh/agentx/fixture-dataset/conversations/conversation-1"]')
+      .first()
+      .should('have.attr', 'href')
+      .and('include', 'turn=0');
+    cy.get('a[href^="/zh/agentx/fixture-dataset/conversations/conversation-1"]').first().click();
+    cy.location('pathname').should(
+      'equal',
+      '/zh/agentx/fixture-dataset/conversations/conversation-1',
+    );
+  });
+
+  it('keeps request-chart, aggregate, and timeline failures distinct and retryable', () => {
+    const retryRequests = [timelineRequest(0, 100, 10)];
+    let requestChartAttempts = 0;
+    let aggregateAttempts = 0;
+    let timelineAttempts = 0;
+
+    cy.intercept('GET', '/api/v1/request-chart-data*', (request) => {
+      requestChartAttempts += 1;
+      request.reply(
+        requestChartAttempts <= 2
+          ? { statusCode: 500, body: {} }
+          : { statusCode: 200, body: requestChartPayload(retryRequests) },
+      );
+    });
+    cy.intercept('GET', '/api/v1/agentic-aggregates*', (request) => {
+      aggregateAttempts += 1;
+      const values = { mean: 10, p50: 10, p75: 10, p90: 10, p95: 10, p99: 10, n: 1 };
+      request.reply(
+        aggregateAttempts <= 2
+          ? { statusCode: 500, body: {} }
+          : {
+              statusCode: 200,
+              body: {
+                206885: {
+                  id: 206885,
+                  isl: values,
+                  osl: values,
+                  kvCacheUtil: null,
+                  prefixCacheHitRate: null,
+                },
+              },
+            },
+      );
+    });
+    cy.intercept('GET', '/api/v1/request-timeline*', (request) => {
+      timelineAttempts += 1;
+      request.reply(
+        timelineAttempts <= 2
+          ? { statusCode: 500, body: {} }
+          : {
+              statusCode: 200,
+              body: {
+                version: 6,
+                startNs: 0,
+                endNs: 1_000_000_000,
+                durationS: 1,
+                requests: retryRequests,
+              },
+            },
+      );
+    });
+
+    cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.get('[data-testid="agentic-request-charts-query-error"]')
+      .should('contain.text', '请求图表数据加载失败。')
+      .and('contain.text', '重试');
+    cy.get('[data-testid="agentic-request-charts-query-error"]').contains('重试').click();
+    cy.contains('h2', '输入序列长度分布').should('be.visible');
+    cy.then(() => expect(requestChartAttempts).to.equal(3));
+
+    cy.get('[data-testid="detail-view-aggregates"]').click();
+    cy.get('[data-testid="agentic-aggregates-query-error"]')
+      .should('contain.text', '跨配置聚合数据加载失败。')
+      .and('contain.text', '重试');
+    cy.get('[data-testid="agentic-aggregates-query-error"]').contains('重试').click();
+    cy.contains('h2', '各配置的 ISL 分布').should('be.visible');
+    cy.then(() => expect(aggregateAttempts).to.equal(3));
+
+    cy.get('[data-testid="detail-view-timeline"]').click();
+    cy.get('[data-testid="agentic-timeline-query-error"]')
+      .should('contain.text', '请求时间线加载失败。')
+      .and('contain.text', '重试');
+    cy.get('[data-testid="agentic-timeline-query-error"]').contains('重试').click();
+    cy.get('[data-testid="request-timeline-svg"]').should('be.visible');
+    cy.then(() => expect(timelineAttempts).to.equal(3));
   });
 });
 

@@ -61,6 +61,22 @@ export type { RequestIdleStats, RequestTimelineRow } from './timeline-rows';
 export { parseTimelineViewSnapshot } from './timeline-view-snapshot';
 export type { TimelineViewSnapshot } from './timeline-view-snapshot';
 
+export function shouldHandleTimelineBarClick({
+  altKey = false,
+  button,
+  ctrlKey = false,
+  metaKey = false,
+  shiftKey = false,
+}: {
+  altKey?: boolean;
+  button: number;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  shiftKey?: boolean;
+}): boolean {
+  return button === 0 && !altKey && !ctrlKey && !metaKey && !shiftKey;
+}
+
 /**
  * Gantt-style request timeline for one agentic benchmark point.
  *
@@ -198,8 +214,7 @@ export function RequestTimelineView({
       }
       track('agentic_timeline_to_dataset', { slug: datasetSlug });
       // Stay within the Chinese tree when this timeline renders under /zh.
-      const href = conversationHref(datasetSlug, req);
-      router.push(locale === 'zh' ? `/zh${href}` : href);
+      router.push(conversationHref(datasetSlug, req, locale));
     },
     [datasetSlug, router, pointId, locale],
   );
@@ -452,7 +467,7 @@ export function RequestTimelineView({
   const handleBarLeave = useCallback(() => setTooltip(null), []);
   const handleBarClick = useCallback(
     (e: React.MouseEvent, req: RequestRecord) => {
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+      if (!shouldHandleTimelineBarClick(e)) return;
       e.preventDefault();
       openConversation(req);
     },
@@ -654,6 +669,7 @@ export function RequestTimelineView({
                   vStart={vStart}
                   vEnd={vEnd}
                   datasetSlug={datasetSlug}
+                  locale={locale}
                   onBarHover={handleBarHover}
                   onBarLeave={handleBarLeave}
                   onBarClick={handleBarClick}
