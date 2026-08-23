@@ -117,19 +117,20 @@ function LanguageToggle({
   const isZh = isZhPathname(pathname);
   const target = switchLocalePath(pathname);
   const search = useClientSearch();
+  const isOverview = isActive(pathname, '/overview');
   return (
     <Link
       href={target + search}
       // Only /overview rewrites this href per interaction, which would
       // re-prefetch its force-dynamic sibling on every selector commit.
       // Everywhere else the href is stable, so let Next prefetch it.
-      prefetch={isActive(pathname, '/overview') ? false : undefined}
+      prefetch={isOverview ? false : undefined}
       data-testid="language-toggle"
       hrefLang={isZh ? 'en' : 'zh-CN'}
       className="inline-flex items-center min-h-11 px-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
       onClick={(event) => {
         track('header_language_toggled', { to: isZh ? 'en' : 'zh' });
-        navigateInApp(event, router, target + search);
+        if (!isOverview) navigateInApp(event, router, target + search);
       }}
     >
       {isZh ? 'EN' : '中文'}
