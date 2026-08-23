@@ -420,6 +420,13 @@ function withoutSpans(source: string, spans: readonly TextSpan[]): string {
   return pieces.join('');
 }
 
+function slashStartsJsRegex(source: string, index: number, lastSignificant: string): boolean {
+  if (!lastSignificant || /[({[=,:;!?&|+\-*%^~<>]/u.test(lastSignificant)) return true;
+  return /(?:^|[^\w$])(?:await|case|delete|in|instanceof|of|return|throw|typeof|void|yield)\s*$/u.test(
+    source.slice(0, index),
+  );
+}
+
 function mdxTagSpans(source: string): TextSpan[] {
   const spans: TextSpan[] = [];
   for (let start = 0; start < source.length; start += 1) {
@@ -427,8 +434,25 @@ function mdxTagSpans(source: string): TextSpan[] {
     let quote = '';
     let escaped = false;
     let braceDepth = 0;
+    let blockComment = false;
+    let lineComment = false;
+    let regex = false;
+    let regexCharacterClass = false;
+    let lastSignificant = '<';
     for (let index = start + 1; index < source.length; index += 1) {
       const character = source[index];
+      const next = source[index + 1] ?? '';
+      if (lineComment) {
+        if (character === '\n' || character === '\r') lineComment = false;
+        continue;
+      }
+      if (blockComment) {
+        if (character === '*' && next === '/') {
+          blockComment = false;
+          index += 1;
+        }
+        continue;
+      }
       if (escaped) {
         escaped = false;
         continue;
@@ -438,7 +462,38 @@ function mdxTagSpans(source: string): TextSpan[] {
         continue;
       }
       if (quote) {
-        if (character === quote) quote = '';
+        if (character === quote) {
+          quote = '';
+          lastSignificant = character;
+        }
+        continue;
+      }
+      if (regex) {
+        if (character === '[') regexCharacterClass = true;
+        else if (character === ']') regexCharacterClass = false;
+        else if (character === '/' && !regexCharacterClass) {
+          regex = false;
+          lastSignificant = character;
+        }
+        continue;
+      }
+      if (braceDepth > 0 && character === '/' && next === '/') {
+        lineComment = true;
+        index += 1;
+        continue;
+      }
+      if (braceDepth > 0 && character === '/' && next === '*') {
+        blockComment = true;
+        index += 1;
+        continue;
+      }
+      if (
+        braceDepth > 0 &&
+        character === '/' &&
+        slashStartsJsRegex(source, index, lastSignificant)
+      ) {
+        regex = true;
+        regexCharacterClass = false;
         continue;
       }
       if (character === '"' || character === "'" || character === '`') {
@@ -447,17 +502,21 @@ function mdxTagSpans(source: string): TextSpan[] {
       }
       if (character === '{') {
         braceDepth += 1;
+        lastSignificant = character;
         continue;
       }
       if (character === '}' && braceDepth > 0) {
         braceDepth -= 1;
+        lastSignificant = character;
         continue;
       }
-      if (character !== '>' || braceDepth > 0) continue;
-      const end = index + 1;
-      spans.push({ start, end, text: source.slice(start, end) });
-      start = index;
-      break;
+      if (character === '>' && braceDepth === 0) {
+        const end = index + 1;
+        spans.push({ start, end, text: source.slice(start, end) });
+        start = index;
+        break;
+      }
+      if (!/\s/u.test(character)) lastSignificant = character;
     }
   }
   return spans;
@@ -585,9 +644,9 @@ function normalizeProtectedToken(value: string): string {
     .replace(/^tokens?(?=\/s)/u, 'tok')
     .replace(/^tokens?(?=\/sec)/u, 'tok')
     .replace('/sec', '/s')
-    .replace('/GPU', '/gpu')
     .replace(/GPU[/-](?:hr|hour)/u, 'gpu/hr')
     .replace(/chip[/-](?:hr|hour)/u, 'chip/hr')
+    .replace('/GPU', '/gpu')
     .replace(/M\s+tokens?$/u, 'M tok');
 }
 
@@ -600,7 +659,7 @@ function protectedTokens(raw: string): string[] {
     normalizeProtectedToken(match[0]),
   );
   const structuredGpuHours = jsonLdBlocks(raw).flatMap((block) =>
-    [...block.json.matchAll(/\b(?:GPU|chip)-hour\b/gu)].map((match) =>
+    [...block.json.matchAll(/\b(?:GPU|chip)[/-](?:hr|hour)\b/gu)].map((match) =>
       normalizeProtectedToken(match[0]),
     ),
   );

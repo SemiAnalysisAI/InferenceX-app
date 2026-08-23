@@ -35,12 +35,53 @@
     },
     {
       "rule": "protected-token",
+      "file": "b200-glm5-nvfp4-vs-h200-fp8-3-6x-perf-per-dollar.mdx",
+      "en": "",
+      "zh": "gpu/hr",
+      "pairSha256": "ea2ce6bcd6a363ae254cc2a50210894bf16aa3056d1a80d094dfe1b17fa2edc7",
+      "reason": "The baseline Chinese JSON-LD uses compact GPU/hr where the English source spells out per GPU per hour; the Blog rewrite branch owns the structured-data correction.",
+      "removeWhen": "Delete this row when one extra Chinese GPU/hr occurrence is removed from JSON-LD."
+    },
+    {
+      "rule": "protected-token",
+      "file": "b200-glm5-nvfp4-vs-h200-fp8-3-6x-perf-per-dollar.mdx",
+      "en": "",
+      "zh": "gpu/hr",
+      "reason": "The baseline Chinese JSON-LD has a second compact GPU/hr occurrence where the English source spells out the unit; the Blog rewrite branch owns the correction.",
+      "removeWhen": "Delete this row when the second extra Chinese GPU/hr occurrence is removed from JSON-LD."
+    },
+    {
+      "rule": "protected-token",
       "file": "b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar.mdx",
       "en": "",
       "zh": "tok/s/user",
       "pairSha256": "b350e97a4d3c851dd8f514caccf6643ee74c0f3a0c08f318b840806a5e1a4434",
       "reason": "The baseline Chinese article has one additional protected unit occurrence owned by the Blog rewrite branch.",
       "removeWhen": "Delete this row when the extra Chinese tok/s/user occurrence is removed."
+    },
+    {
+      "rule": "protected-token",
+      "file": "b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar.mdx",
+      "en": "",
+      "zh": "gpu/hr",
+      "reason": "The baseline Chinese JSON-LD uses compact GPU/hr where the English source spells out per GPU per hour; the Blog rewrite branch owns the structured-data correction.",
+      "removeWhen": "Delete this row when one extra Chinese GPU/hr occurrence is removed from JSON-LD."
+    },
+    {
+      "rule": "protected-token",
+      "file": "b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar.mdx",
+      "en": "",
+      "zh": "gpu/hr",
+      "reason": "The baseline Chinese JSON-LD has a second compact GPU/hr occurrence where the English source spells out the unit; the Blog rewrite branch owns the correction.",
+      "removeWhen": "Delete this row when the second extra Chinese GPU/hr occurrence is removed from JSON-LD."
+    },
+    {
+      "rule": "protected-token",
+      "file": "b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar.mdx",
+      "en": "",
+      "zh": "gpu/hr",
+      "reason": "The baseline Chinese JSON-LD has a third compact GPU/hr occurrence where the English source spells out the unit; the Blog rewrite branch owns the correction.",
+      "removeWhen": "Delete this row when the third extra Chinese GPU/hr occurrence is removed from JSON-LD."
     },
     {
       "rule": "protected-token",
@@ -76,14 +117,6 @@
       "pairSha256": "40f24e77ac9b75578c3c29d4ff9d8e354452daeb6ceab753be5b31a7e01a18a7",
       "reason": "The paired baseline articles differ by one tok/s/gpu and two GB occurrences; the Blog rewrite branch owns that content correction.",
       "removeWhen": "Delete this row when the tok/s/gpu and one extra GB mismatch is removed."
-    },
-    {
-      "rule": "protected-token",
-      "file": "gb300-nvl72-vs-gb200-nvl72-dsv4-pro-vllm-fp4.mdx",
-      "en": "gpu/hr",
-      "zh": "",
-      "reason": "The baseline Chinese JSON-LD renders GPU-hour as natural prose; the Blog rewrite branch owns the structured-data correction.",
-      "removeWhen": "Delete this row when the missing Chinese GPU-hour occurrence is restored in JSON-LD."
     },
     {
       "rule": "protected-token",

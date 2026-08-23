@@ -310,12 +310,14 @@ $$
     });
 
     it('protects static template-literal link props without treating them as inline code', () => {
-      const enMdx = '<DashboardCTA enabled={score > 0} href={`/blog/next`}>Open</DashboardCTA>';
-      const zhMdx = '<DashboardCTA enabled={score > 0} href={`/zh/blog/next`}>打开</DashboardCTA>';
-      expect(compareBlogPair('template-prop.mdx', enMdx, zhMdx, [])).toEqual([]);
-      expect(
-        compareBlogPair('template-prop.mdx', enMdx, zhMdx.replace('/next', '/wrong'), []),
-      ).toContainEqual(expect.objectContaining({ rule: 'link-target' }));
+      for (const expression of ['score > 0', 'score /* } */ > 0', '/}/.test(score) && score > 0']) {
+        const enMdx = `<DashboardCTA enabled={${expression}} href={\`/blog/next\`}>Open</DashboardCTA>`;
+        const zhMdx = `<DashboardCTA enabled={${expression}} href={\`/zh/blog/next\`}>打开</DashboardCTA>`;
+        expect(compareBlogPair('template-prop.mdx', enMdx, zhMdx, [])).toEqual([]);
+        expect(
+          compareBlogPair('template-prop.mdx', enMdx, zhMdx.replace('/next', '/wrong'), []),
+        ).toContainEqual(expect.objectContaining({ rule: 'link-target' }));
+      }
     });
 
     it('parses nested, angle, and reference Markdown destinations completely', () => {
@@ -393,6 +395,29 @@ $$
           expect.objectContaining({ rule: 'protected-token' }),
         );
       }
+    });
+
+    it('protects slash and hyphen GPU-hour forms inside translatable JSON-LD prose', () => {
+      const enMdx = '<JsonLd>{`{"text":"Cost per GPU/hr and chip-hour"}`}</JsonLd>';
+      const zhMdx = '<JsonLd>{`{"text":"成本按 GPU-hour 和 chip/hr 计"}`}</JsonLd>';
+      expect(compareBlogPair('json-units.mdx', enMdx, zhMdx, [])).toEqual([]);
+      for (const mutated of [
+        zhMdx.replace('GPU-hour', 'GPU/day'),
+        zhMdx.replace('chip/hr', 'chip/day'),
+      ]) {
+        expect(compareBlogPair('json-units.mdx', enMdx, mutated, [])).toContainEqual(
+          expect.objectContaining({ rule: 'protected-token' }),
+        );
+      }
+    });
+
+    it('normalizes GPU-hour cost-rate forms before normalizing the GPU casing', () => {
+      const enMdx = 'TCO is $/GPU-hour.';
+      const zhMdx = 'TCO 为 $/GPU/hr。';
+      expect(compareBlogPair('cost-unit.mdx', enMdx, zhMdx, [])).toEqual([]);
+      expect(
+        compareBlogPair('cost-unit.mdx', enMdx, zhMdx.replace('GPU/hr', 'GPU/day'), []),
+      ).toContainEqual(expect.objectContaining({ rule: 'protected-token' }));
     });
 
     it('accepts only an exact protected-token baseline exception', () => {
