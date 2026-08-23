@@ -180,6 +180,33 @@ describe('ScatterGraph toggle decoration', () => {
     unmount();
   });
 
+  it('keeps point-label visibility synchronized while the chart is empty', () => {
+    const chartProps = { data: [] as InferenceData[] };
+    inferenceState.current = {
+      ...baseInferenceState(),
+      showPointLabels: false,
+    };
+    const { container, rerender, unmount } = mountChart(chartProps);
+
+    inferenceState.current = {
+      ...inferenceState.current,
+      showPointLabels: true,
+    };
+    rerender();
+    chartProps.data = POINTS;
+    rerender();
+    const label = container.querySelector<SVGTextElement>('.point-label');
+    expect(label?.style.display).toBe('');
+
+    inferenceState.current = {
+      ...inferenceState.current,
+      showPointLabels: false,
+    };
+    rerender();
+    expect(label?.style.display).toBe('none');
+    unmount();
+  });
+
   it('hides a toggled-off hw via opacity without rebuilding the chart', () => {
     const { container, rerender, unmount } = mountChart();
     const buildsAfterMount = rebuildCount();
