@@ -9,6 +9,7 @@ import { Model } from '@/lib/data-mappings';
 const mocks = vi.hoisted(() => ({
   renderDiagram: vi.fn(),
   theme: { resolved: 'light' },
+  pathname: { value: '/inference' },
 }));
 
 vi.mock('./model-architecture-diagram-renderer', () => ({
@@ -23,6 +24,7 @@ vi.mock('next/link', () => ({
   ),
 }));
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
+vi.mock('next/navigation', () => ({ usePathname: () => mocks.pathname.value }));
 
 import ModelArchitectureDiagram from './ModelArchitectureDiagram';
 
@@ -85,6 +87,7 @@ beforeEach(() => {
   observedWidth = 500;
   mocks.theme.resolved = 'light';
   mocks.renderDiagram.mockReset();
+  mocks.pathname.value = '/inference';
   ResizeObserverStub.instances = [];
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   clientWidthSpy = vi
@@ -103,6 +106,30 @@ afterEach(() => {
 });
 
 describe('ModelArchitectureDiagram rendering', () => {
+  it('preserves the exact English release sentence spacing', () => {
+    render();
+    expand();
+
+    expect(container.textContent).toContain('Released by DeepSeek on');
+    expect(container.textContent).not.toContain('DeepSeekon');
+  });
+
+  it('localizes the complete architecture chrome and keeps technical feature data intact', () => {
+    mocks.pathname.value = '/zh/inference';
+    render();
+
+    const toggle = container.querySelector('[data-testid="model-architecture-toggle"]');
+    expect(toggle?.textContent).toContain('模型架构');
+    expect(toggle?.textContent).toContain('MoE');
+
+    expand();
+    expect(container.textContent).toContain('特性：');
+    expect(container.textContent).toContain('发布方 DeepSeek，发布于');
+    expect(container.textContent).not.toContain('DeepSeek ，');
+    expect(container.textContent).not.toContain('Features:');
+    expect(container.textContent).not.toContain('Released by');
+  });
+
   it('renders once on initial expansion and ignores the observer callback for the same width', () => {
     render();
     expand();

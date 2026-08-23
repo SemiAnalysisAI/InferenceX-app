@@ -94,6 +94,7 @@ const benchmarkSiblings = {
 
 describe('Agentic point request metric time series', () => {
   beforeEach(() => {
+    cy.viewport(1440, 900);
     const requests = [
       timelineRequest(0, 100, 10),
       timelineRequest(1, 200, 20),
@@ -540,6 +541,66 @@ describe('Agentic point request metric time series', () => {
       .and('contain.text', 'results/server.log')
       .and('contain.text', '搜索所有日志文件')
       .and('contain.text', '已到达日志末尾');
+  });
+
+  it('renders the complete Chinese detail, mobile, metadata, and timeline click path', () => {
+    cy.viewport(390, 900);
+    cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+
+    cy.get('link[rel="alternate"][hreflang="en"]')
+      .should('have.attr', 'href')
+      .and('include', '/inference/agentic/206885');
+    cy.get('link[rel="alternate"][hreflang="zh-CN"]')
+      .should('have.attr', 'href')
+      .and('include', '/zh/inference/agentic/206885');
+    cy.contains('本次运行共 1 个数据点').should('be.visible');
+    cy.get('[data-testid="sibling-sort-select"]').should('have.attr', 'aria-label', '数据点排序');
+    cy.contains('h2', '输入序列长度分布').should('be.visible');
+    cy.contains(/个请求 · 范围 .* token · 对数刻度/u).should('be.visible');
+    cy.contains('h2', '请求队列深度').should('be.visible');
+
+    cy.get('[data-testid="detail-view-timeline"]').click();
+    cy.get('[data-testid="timeline-total-idle-time"]').should('contain.text', '空闲');
+    cy.get('[data-testid="request-timeline-svg"]')
+      .should('have.attr', 'role', 'img')
+      .and('have.attr', 'aria-label', '请求执行时间线');
+    cy.contains('Shift+滚轮缩放 · 拖动平移 · 双击重置').should('be.visible');
+    cy.get('[data-testid="request-timeline-scroll"]')
+      .scrollTo('right')
+      .should(($scroller) => {
+        expect($scroller[0].scrollLeft).to.be.greaterThan(0);
+      });
+    cy.get('[data-testid="request-timeline-svg"] g > rect').then(($rects) => {
+      const viewport = $rects[0].ownerDocument.documentElement;
+      const visibleRect = [...$rects].find((element) => {
+        const bounds = element.getBoundingClientRect();
+        const centerX = (bounds.left + bounds.right) / 2;
+        const centerY = (bounds.top + bounds.bottom) / 2;
+        return (
+          bounds.width > 0 &&
+          bounds.height > 0 &&
+          bounds.left >= 0 &&
+          bounds.right <= viewport.clientWidth &&
+          bounds.top >= 0 &&
+          bounds.bottom <= viewport.clientHeight &&
+          element.ownerDocument.elementFromPoint(centerX, centerY) === element
+        );
+      });
+      expect(Boolean(visibleRect), 'visible request timeline bar').to.equal(true);
+      cy.wrap(visibleRect!).trigger('mousemove', 'center', { scrollBehavior: false });
+    });
+    cy.get('[data-testid="request-timeline-tooltip"]')
+      .should('contain.text', '总时长')
+      .and('contain.text', '排队等待')
+      .and('have.css', 'position', 'fixed')
+      .then(($tooltip) => {
+        const bounds = $tooltip[0].getBoundingClientRect();
+        expect(bounds.width).to.be.greaterThan(0);
+        expect(bounds.height).to.be.greaterThan(0);
+      });
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
   });
 });
 

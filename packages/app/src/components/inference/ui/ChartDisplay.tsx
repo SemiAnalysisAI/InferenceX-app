@@ -837,6 +837,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                 <figure data-testid="chart-figure" className="relative rounded-lg">
                   <ChartButtons
                     chartId={`chart-${graphIndex}`}
+                    mobileVisible
                     analyticsPrefix={
                       isTimelineMode
                         ? 'gpu_timeseries'
@@ -1210,7 +1211,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         }}
       >
         <TabsList
-          aria-label="Chart x-axis metric"
+          aria-label={locale === 'zh' ? '图表横轴指标' : 'Chart x-axis metric'}
           data-testid="x-axis-mode-buttons"
           className="flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
         >

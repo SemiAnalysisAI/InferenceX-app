@@ -3,6 +3,7 @@ import { interceptOverlayRun, OVERLAY_RUN_ID } from '../support/overlay-fixtures
 
 describe('Inference Chart', () => {
   before(() => {
+    cy.viewport(1440, 900);
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
@@ -200,6 +201,70 @@ describe('Inference Chart', () => {
     );
     cy.visit('/inference');
     cy.wait('@availabilityFailure');
-    cy.contains('h2', 'Something went wrong!', { timeout: 10000 }).should('be.visible');
+    cy.contains('h2', 'Something went wrong!').should('be.visible');
+  });
+});
+
+describe('Inference Chart — Simplified Chinese mobile path', () => {
+  beforeEach(() => {
+    cy.viewport(375, 900);
+    cy.visit('/zh/inference?g_model=DeepSeek-R1-0528', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="inference-chart-display"]').should('be.visible');
+  });
+
+  it('keeps chart controls reachable and localizes the complete table click path', () => {
+    cy.contains('h2', '推理性能').should('be.visible');
+    cy.get('[data-testid="x-axis-mode-buttons"]').should('have.attr', 'aria-label', '图表横轴指标');
+    cy.get('[data-testid="share-button"]')
+      .should('be.visible')
+      .and('have.attr', 'title', '分享当前视图');
+    cy.get('[data-testid="inference-view-toggle-0"]').should('be.visible').contains('表格').click();
+    cy.get('[data-testid="inference-results-table"]')
+      .should('contain.text', '芯片')
+      .and('contain.text', '精度')
+      .and('contain.text', '并发数');
+    cy.get('[data-testid="export-button"]')
+      .should('be.visible')
+      .and('have.attr', 'aria-label', '下载图表');
+    cy.document().then((doc) => {
+      const viewportWidth = doc.documentElement.clientWidth;
+      const overflow = [...doc.querySelectorAll<HTMLElement>('body *')]
+        .map((element) => ({
+          element,
+          bounds: element.getBoundingClientRect(),
+        }))
+        .filter(({ bounds }) => bounds.right > viewportWidth + 0.5)
+        .map(
+          ({ element, bounds }) =>
+            `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}${
+              element.className && typeof element.className === 'string'
+                ? `.${element.className.split(/\s+/u).filter(Boolean).join('.')}`
+                : ''
+            }=${bounds.left.toFixed(1)}..${bounds.right.toFixed(1)} text=${JSON.stringify(
+              element.textContent?.trim().slice(0, 24),
+            )} parent=${element.parentElement?.getAttribute('class')}`,
+        )
+        .slice(0, 10);
+      expect(
+        doc.documentElement.scrollWidth,
+        `overflowing elements: ${overflow.join(', ')}`,
+      ).to.be.at.most(viewportWidth);
+    });
+  });
+
+  it('localizes architecture and changelog overlays without changing technical model data', () => {
+    cy.viewport(1440, 900);
+    cy.get('[data-testid="model-architecture-toggle"]')
+      .should('contain.text', '模型架构')
+      .and('contain.text', 'MoE')
+      .click();
+    cy.contains('特性：').should('be.visible');
+    cy.contains('发布方 DeepSeek').should('be.visible');
+    cy.contains('button', '变更日志').should('be.visible').click();
+    cy.contains('说明').should('be.visible');
   });
 });

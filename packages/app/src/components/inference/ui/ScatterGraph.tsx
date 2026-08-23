@@ -373,6 +373,12 @@ const SCATTER_STRINGS = {
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
     overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
+    noData: 'No data available',
+    noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
+    unofficialTitle: (branch: string) => `UNOFFICIAL: ${branch}`,
+    unofficialRun: 'UNOFFICIAL RUN',
+    branch: 'Branch',
+    viewWorkflow: 'View workflow run',
   },
   zh: {
     logScale: '对数缩放',
@@ -393,6 +399,12 @@ const SCATTER_STRINGS = {
     overflowMixed: (count: number) => `${count} 个点已截断`,
     overflowCost: (count: number, limit: number) => `${count} 个点 > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${count} 个点 > ${limit}s TTFT`,
+    noData: '暂无数据',
+    noDataHint: '请调整模型、序列长度、精度、日期范围或芯片选项。',
+    unofficialTitle: (branch: string) => `非官方：${branch}`,
+    unofficialRun: '非官方运行',
+    branch: '分支',
+    viewWorkflow: '查看工作流运行记录',
   },
 } as const;
 
@@ -3337,10 +3349,8 @@ const ScatterGraph = React.memo(
                   d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                 />
               </svg>
-              <h3 className="text-sm font-medium mb-1">No data available</h3>
-              <p className="text-xs">
-                Please change the model, sequence, precision, date range or chip selection.
-              </p>
+              <h3 className="text-sm font-medium mb-1">{legendT.noData}</h3>
+              <p className="text-xs">{legendT.noDataHint}</p>
               <Button
                 type="button"
                 size="sm"
@@ -3397,10 +3407,8 @@ const ScatterGraph = React.memo(
                 style={{ zIndex: 100 }}
               >
                 <div className="text-muted-foreground text-center bg-background/80 px-4 py-2 rounded-md">
-                  <p className="text-sm font-medium">No data available</p>
-                  <p className="text-xs mt-1">
-                    Please change the model, sequence, precision, date range or chip selection.
-                  </p>
+                  <p className="text-sm font-medium">{legendT.noData}</p>
+                  <p className="text-xs mt-1">{legendT.noDataHint}</p>
                 </div>
               </div>
             ) : undefined
@@ -3429,7 +3437,7 @@ const ScatterGraph = React.memo(
                           name: `✕ unofficial-run-${info.id}`,
                           label: `✕ ${branch}`,
                           color: overlayRunColor(idx),
-                          title: `UNOFFICIAL: ${branch}`,
+                          title: legendT.unofficialTitle(branch),
                           isHighlighted: true,
                           hw: `overlay-run-${info.id}`,
                           isActive: true,
@@ -3448,8 +3456,12 @@ const ScatterGraph = React.memo(
                           },
                           tooltip: (
                             <div className="font-normal text-xs">
-                              <div className="text-red-500 font-semibold">UNOFFICIAL RUN</div>
-                              <div>Branch: {branch}</div>
+                              <div className="text-red-500 font-semibold">
+                                {legendT.unofficialRun}
+                              </div>
+                              <div>
+                                {legendT.branch}: {branch}
+                              </div>
                               {info.url && (
                                 <a
                                   href={info.url}
@@ -3457,7 +3469,7 @@ const ScatterGraph = React.memo(
                                   rel="noopener noreferrer"
                                   className="underline"
                                 >
-                                  View workflow run
+                                  {legendT.viewWorkflow}
                                 </a>
                               )}
                             </div>

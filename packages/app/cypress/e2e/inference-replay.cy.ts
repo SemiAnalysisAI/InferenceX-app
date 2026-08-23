@@ -238,3 +238,28 @@ describe('Inference Replay', () => {
     });
   });
 });
+
+describe('Inference Replay — Simplified Chinese', () => {
+  it('localizes the replay dialog, controls, and accessible names', () => {
+    cy.viewport(390, 900);
+    cy.visit('/zh/inference', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="chart-figure"]').first().find('[data-testid="export-button"]').click();
+    cy.get('[data-testid="export-mp4-button"]').first().click();
+    cy.get('[data-testid="replay-panel-chart-0"]')
+      .should('contain.text', '按时间回放')
+      .then(($panel) => {
+        if ($panel.find('[data-testid="replay-play-pause"]').length === 0) {
+          expect($panel.text()).to.match(/正在加载基准测试历史|历史数据不足/u);
+          return;
+        }
+        cy.get('[data-testid="replay-play-pause"]').should('have.attr', 'aria-label', '播放回放');
+        cy.get('[data-testid="replay-reset"]').should('have.attr', 'aria-label', '重置到起点');
+        cy.get('[data-testid="replay-scrubber"]').should('have.attr', 'aria-label', '回放时间线');
+        cy.contains('固定坐标轴').should('be.visible');
+      });
+  });
+});

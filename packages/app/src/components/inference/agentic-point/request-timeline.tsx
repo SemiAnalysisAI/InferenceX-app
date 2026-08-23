@@ -7,6 +7,7 @@ import { type RequestRecord, type RequestTimeline } from '@/hooks/api/use-reques
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
+import type { Locale } from '@/lib/i18n';
 
 import { sliceTimelineByPhase } from './phase-slice';
 import { TimelineBars } from './timeline-bars';
@@ -82,16 +83,61 @@ const ROW_MODE_OPTIONS: Record<'en' | 'zh', SegmentedToggleOption<RowMode>[]> = 
   ],
 };
 
-const PHASE_OPTIONS: Record<'en' | 'zh', SegmentedToggleOption<PhaseFilter>[]> = {
-  en: [
-    { value: 'profiling', label: 'Profiling', testId: 'timeline-phase-profiling' },
-    { value: 'warmup', label: 'Warmup', testId: 'timeline-phase-warmup' },
-  ],
-  zh: [
-    { value: 'profiling', label: '性能剖析', testId: 'timeline-phase-profiling' },
-    { value: 'warmup', label: 'warmup', testId: 'timeline-phase-warmup' },
-  ],
+export function timelinePhaseLabels(locale: Locale): { profiling: string; warmup: string } {
+  return locale === 'zh'
+    ? { profiling: 'profiling', warmup: 'warmup' }
+    : { profiling: 'Profiling', warmup: 'Warmup' };
+}
+
+const phaseOptions = (locale: Locale): SegmentedToggleOption<PhaseFilter>[] => {
+  const labels = timelinePhaseLabels(locale);
+  return [
+    { value: 'profiling', label: labels.profiling, testId: 'timeline-phase-profiling' },
+    { value: 'warmup', label: labels.warmup, testId: 'timeline-phase-warmup' },
+  ];
 };
+
+const TIMELINE_STRINGS = {
+  en: {
+    empty: 'No requests in the current filter.',
+    rowMode: 'Row mode',
+    phaseFilter: 'Phase filter',
+    requests: (n: number) => `${n} request${n === 1 ? '' : 's'}`,
+    conversations: (n: number) => `${n} conversations`,
+    workers: (n: number) => `${n} workers`,
+    span: 'span',
+    idle: 'idle',
+    idleTitle:
+      'Time between the first request start and final request end with no requests in flight',
+    resetZoom: 'reset zoom',
+    conversation: 'Conversation',
+    worker: 'worker',
+    collapse: 'Collapse streams',
+    expand: 'Expand streams',
+    aux: 'aux',
+    chartAria: 'Request execution timeline',
+    hint: 'shift+scroll to zoom · drag to pan · double-click to reset',
+  },
+  zh: {
+    empty: '当前筛选条件下没有请求。',
+    rowMode: '时间线行模式',
+    phaseFilter: '阶段筛选',
+    requests: (n: number) => `${n} 个请求`,
+    conversations: (n: number) => `${n} 个对话`,
+    workers: (n: number) => `${n} 个 worker`,
+    span: '跨度',
+    idle: '空闲',
+    idleTitle: '从第一个请求开始到最后一个请求结束之间，没有在途请求的总时长',
+    resetZoom: '重置缩放',
+    conversation: '对话',
+    worker: 'worker',
+    collapse: '折叠请求流',
+    expand: '展开请求流',
+    aux: '辅助流',
+    chartAria: '请求执行时间线',
+    hint: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
+  },
+} as const;
 
 const PLOT_WIDTH = CHART_WIDTH - PADDING_RIGHT;
 
@@ -108,6 +154,7 @@ export function RequestTimelineView({
 }) {
   const router = useRouter();
   const locale = useLocale();
+  const t = TIMELINE_STRINGS[locale];
   const [rowMode, setRowMode] = useState<RowMode>('conversation');
   const [phaseFilter, setPhaseFilter] = useState<PhaseFilter>('profiling');
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
@@ -415,7 +462,7 @@ export function RequestTimelineView({
   if (rows.length === 0) {
     return (
       <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-        No requests in the current filter.
+        {t.empty}
       </div>
     );
   }
@@ -429,30 +476,33 @@ export function RequestTimelineView({
         <SegmentedToggle
           value={rowMode}
           options={ROW_MODE_OPTIONS[locale]}
-          onValueChange={setRowMode}
-          ariaLabel="Row mode"
+          onValueChange={(mode) => {
+            setRowMode(mode);
+            track('inference_agentic_timeline_row_mode_changed', { mode });
+          }}
+          ariaLabel={t.rowMode}
           testId="timeline-row-mode"
           buttonClassName="px-2.5 py-1 text-xs"
         />
         {hasWarmup && (
           <SegmentedToggle
             value={phaseFilter}
-            options={PHASE_OPTIONS[locale]}
-            onValueChange={setPhaseFilter}
-            ariaLabel="Phase filter"
+            options={phaseOptions(locale)}
+            onValueChange={(phase) => {
+              setPhaseFilter(phase);
+              track('inference_agentic_timeline_phase_changed', { phase });
+            }}
+            ariaLabel={t.phaseFilter}
             testId="timeline-phase-filter"
             buttonClassName="px-2.5 py-1 text-xs"
           />
         )}
         <span className="ml-auto text-xs text-muted-foreground">
-          {totalRequests} request{totalRequests === 1 ? '' : 's'} · {rows.length}{' '}
-          {rowMode === 'conversation' ? 'conversations' : 'workers'} · span{' '}
-          {formatDuration((dataEnd - dataStart) / 1e6)} ·{' '}
-          <span
-            data-testid="timeline-total-idle-time"
-            title="Time between the first request start and final request end with no requests in flight"
-          >
-            idle {formatDuration(idleStats.idleNs / 1e6)}
+          {t.requests(totalRequests)} ·{' '}
+          {rowMode === 'conversation' ? t.conversations(rows.length) : t.workers(rows.length)} ·{' '}
+          {t.span} {formatDuration((dataEnd - dataStart) / 1e6)} ·{' '}
+          <span data-testid="timeline-total-idle-time" title={t.idleTitle}>
+            {t.idle} {formatDuration(idleStats.idleNs / 1e6)}
             {idleStats.spanNs > 0
               ? ` (${((idleStats.idleNs / idleStats.spanNs) * 100).toFixed(1)}%)`
               : ''}
@@ -460,8 +510,15 @@ export function RequestTimelineView({
           {isZoomed && (
             <>
               {' · '}
-              <button type="button" onClick={resetZoom} className="text-foreground hover:underline">
-                reset zoom
+              <button
+                type="button"
+                onClick={() => {
+                  resetZoom();
+                  track('inference_agentic_timeline_zoom_reset', { source: 'summary' });
+                }}
+                className="text-foreground hover:underline"
+              >
+                {t.resetZoom}
               </button>
             </>
           )}
@@ -483,17 +540,19 @@ export function RequestTimelineView({
         >
           <div className="flex w-max">
             {/* Label column — pinned left (sticky) so it stays put during
-                horizontal scroll, while scrolling vertically with the rows. */}
+                horizontal scroll, while scrolling vertically with the rows.
+                Narrow viewports reserve less than half the screen for labels so
+                the request bars remain reachable beside the sticky column. */}
             <div
               className="sticky left-0 z-10 flex-shrink-0 border-r border-border/60 bg-card"
-              style={{ width: LABEL_WIDTH, height: svgHeight }}
+              style={{ width: `min(${LABEL_WIDTH}px, 48vw)`, height: svgHeight }}
             >
               <div
                 className="sticky top-0 z-20 border-b border-border/60 bg-card flex items-end px-2 pb-1"
                 style={{ height: HEADER_HEIGHT }}
               >
                 <span className="text-[9px] font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-                  {rowMode === 'conversation' ? 'Conversation' : 'Worker'}
+                  {rowMode === 'conversation' ? t.conversation : t.worker}
                 </span>
               </div>
               {visibleRows.map((row, visibleIndex) => {
@@ -519,10 +578,15 @@ export function RequestTimelineView({
                     {isExpandable ? (
                       <button
                         type="button"
-                        onClick={() => toggleSubagent(row.key)}
+                        onClick={() => {
+                          toggleSubagent(row.key);
+                          track('inference_agentic_timeline_streams_toggled', {
+                            expanded: !isExpanded,
+                          });
+                        }}
                         className="size-3.5 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0"
-                        aria-label={isExpanded ? 'Collapse streams' : 'Expand streams'}
-                        title={isExpanded ? 'Collapse streams' : 'Expand streams'}
+                        aria-label={isExpanded ? t.collapse : t.expand}
+                        title={isExpanded ? t.collapse : t.expand}
                       >
                         <span className="text-3xs leading-none">{isExpanded ? '▾' : '▸'}</span>
                       </button>
@@ -548,7 +612,9 @@ export function RequestTimelineView({
                         <span className="text-muted-foreground ml-1">×{row.streamCount}</span>
                       )}
                       {isSubagentRow && (row.auxCount ?? 0) > 0 && (
-                        <span className="text-muted-foreground ml-1">+{row.auxCount} aux</span>
+                        <span className="text-muted-foreground ml-1">
+                          +{row.auxCount} {t.aux}
+                        </span>
                       )}
                     </span>
                     <span className="text-[9px] font-mono text-muted-foreground ml-auto shrink-0">
@@ -566,6 +632,8 @@ export function RequestTimelineView({
               <svg
                 ref={zoomSvgRef}
                 data-testid="request-timeline-svg"
+                role="img"
+                aria-label={t.chartAria}
                 width={CHART_WIDTH}
                 height={viewportHeight}
                 className="sticky top-0 block bg-card"
@@ -614,9 +682,7 @@ export function RequestTimelineView({
 
       {/* Footer — interaction hint only. */}
       <div className="flex items-center px-1 text-2xs text-muted-foreground">
-        <span className="ml-auto opacity-70">
-          shift+scroll to zoom · drag to pan · double-click to reset
-        </span>
+        <span className="ml-auto opacity-70">{t.hint}</span>
       </div>
 
       {/* Cursor stats popover: count of in-flight / waiting at the cursor's

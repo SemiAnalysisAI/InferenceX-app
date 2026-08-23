@@ -1,5 +1,6 @@
 describe('Evaluation Chart', () => {
   before(() => {
+    cy.viewport(1440, 900);
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
@@ -42,6 +43,7 @@ describe('Evaluation Chart', () => {
 
 describe('Evaluation Chart — Content & Interactions', () => {
   before(() => {
+    cy.viewport(1440, 900);
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
@@ -240,5 +242,45 @@ describe('Evaluation sample sharing', () => {
     cy.get('[role="dialog"]').should('be.visible');
     cy.get('[aria-expanded="true"]').should('exist');
     cy.get('[data-testid^="eval-sample-share-"]').scrollIntoView().should('be.visible');
+  });
+});
+
+describe('Evaluation Chart — Simplified Chinese mobile path', () => {
+  beforeEach(() => {
+    cy.viewport(390, 900);
+    cy.visit('/zh/evaluation', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');
+  });
+
+  it('keeps table/chart actions reachable and localizes table labels and dates', () => {
+    cy.contains('h2', '准确率评估').should('be.visible');
+    cy.get('[data-testid="share-button"]')
+      .should('be.visible')
+      .and('have.attr', 'title', '分享当前视图');
+    cy.get('[data-testid="evaluation-view-toggle"]').should('be.visible');
+    cy.get('[data-testid="evaluation-results-table"]')
+      .should('contain.text', '芯片')
+      .and('contain.text', '精度')
+      .and('contain.text', '日期')
+      .and('contain.text', '年');
+    cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();
+    cy.get('[data-testid="export-button"]')
+      .should('be.visible')
+      .and('have.attr', 'aria-label', '下载图表');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
+
+  it('renders a localized evaluation fetch error', () => {
+    cy.intercept('GET', '/api/v1/evaluations', { statusCode: 500, body: {} });
+    cy.visit('/zh/evaluation');
+    cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();
+    cy.contains('评估数据加载失败。').should('be.visible');
+    cy.contains('Failed to load eval data.').should('not.exist');
   });
 });

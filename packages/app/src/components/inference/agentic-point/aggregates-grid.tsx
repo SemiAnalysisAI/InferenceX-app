@@ -7,6 +7,7 @@ import { AggregateChart, type AggregatePoint, type PercentileKey } from './aggre
 import { CHART_SIZES } from './chart-shared';
 import { ExpandableChart } from './expandable-chart';
 import { chipLabel } from './sibling-nav';
+import { useLocale } from '@/lib/use-locale';
 
 /** Bundle per-percentile values for one sibling into the shape AggregateChart wants. */
 function toAggPoint(
@@ -35,17 +36,37 @@ export function AggregatesGrid({
   aggregates: AgenticAggregateMap | undefined;
   isLoading: boolean;
 }) {
+  const locale = useLocale();
+  const t =
+    locale === 'zh'
+      ? {
+          missing: '尚未加载同一 SKU 下的数据点。请先打开任一数据点。',
+          loading: (count: number) => `正在解析 trace 数据，并汇总 ${count} 个配置……`,
+          isl: '各配置的 ISL 分布',
+          osl: '各配置的 OSL 分布',
+          kv: '各配置的 KV cache 利用率',
+          prefix: '各配置的 Prefix cache 命中率',
+        }
+      : {
+          missing: 'SKU sibling list not loaded yet — open a point to populate.',
+          loading: (count: number) =>
+            `Computing aggregates across ${count} configs… (parsing trace blobs)`,
+          isl: 'ISL distribution (across configs)',
+          osl: 'OSL distribution (across configs)',
+          kv: 'KV cache utilization (across configs)',
+          prefix: 'Prefix cache hit rate (across configs)',
+        };
   if (siblings.length === 0) {
     return (
       <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-        SKU sibling list not loaded yet — open a point to populate.
+        {t.missing}
       </div>
     );
   }
   if (isLoading && !aggregates) {
     return (
       <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-        Computing aggregates across {siblings.length} configs… (parsing trace blobs)
+        {t.loading(siblings.length)}
       </div>
     );
   }
@@ -57,27 +78,27 @@ export function AggregatesGrid({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <ExpandableChart
-        title="ISL distribution (across configs)"
+        title={t.isl}
         render={(expanded) => (
           <AggregateChart
             points={islPoints}
-            unit="tokens"
+            unit={locale === 'zh' ? 'token' : 'tokens'}
             {...(expanded ? CHART_SIZES.expanded : CHART_SIZES.inline)}
           />
         )}
       />
       <ExpandableChart
-        title="OSL distribution (across configs)"
+        title={t.osl}
         render={(expanded) => (
           <AggregateChart
             points={oslPoints}
-            unit="tokens"
+            unit={locale === 'zh' ? 'token' : 'tokens'}
             {...(expanded ? CHART_SIZES.expanded : CHART_SIZES.inline)}
           />
         )}
       />
       <ExpandableChart
-        title="KV cache utilization (across configs)"
+        title={t.kv}
         render={(expanded) => (
           <AggregateChart
             points={kvPoints}
@@ -89,7 +110,7 @@ export function AggregatesGrid({
         )}
       />
       <ExpandableChart
-        title="Prefix cache hit rate (across configs)"
+        title={t.prefix}
         render={(expanded) => (
           <AggregateChart
             points={prefixPoints}

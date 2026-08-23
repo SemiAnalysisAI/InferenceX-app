@@ -5,6 +5,8 @@ import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
+import type { Locale } from '@/lib/i18n';
+import { useLocale } from '@/lib/use-locale';
 
 import { getModelReleaseDate } from '@semianalysisai/inferencex-constants';
 
@@ -33,6 +35,7 @@ interface ArchitectureContentProps {
   model: Model;
   arch: ModelArchitecture;
   isExpanded: boolean;
+  locale: Locale;
 }
 
 interface DiagramRenderState {
@@ -43,7 +46,33 @@ interface DiagramRenderState {
   onBlockClick: (blockId: string) => void;
 }
 
-function ArchitectureContent({ model, arch, isExpanded }: ArchitectureContentProps) {
+const ARCHITECTURE_STRINGS = {
+  en: {
+    heading: 'Model Architecture',
+    features: 'Features:',
+    source: 'Source',
+    releasedBy: 'Released by',
+    releasedOn: ' on',
+    hybrid:
+      'are two KV sources, not two separate attentions: each query attends in a single softmax to the union of sliding-window + selected compressed keys, with a learnable per-head attention sink.',
+    mhc: (count: number) =>
+      `replace each residual with ${count} parallel streams combined by learned, Sinkhorn-normalized weights — read (${count}→1), output, and a ${count}×${count} stream mix — shown as the mHC ×${count} nodes.`,
+  },
+  zh: {
+    heading: '模型架构',
+    features: '特性：',
+    source: '来源',
+    releasedBy: '发布方',
+    releasedOn: '，发布于',
+    hybrid:
+      '是两路 KV 来源，而非两套独立注意力：每个 query 都通过一次 softmax 同时关注滑动窗口与筛选后的压缩 key，并为每个 attention head 使用可学习的 attention sink。',
+    mhc: (count: number) =>
+      `将每条残差连接替换为 ${count} 路并行流，并通过学习得到的 Sinkhorn 归一化权重组合：包括读取 (${count}→1)、输出以及 ${count}×${count} 的流混合；图中标为 mHC ×${count} 节点。`,
+  },
+} as const;
+
+function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureContentProps) {
+  const t = ARCHITECTURE_STRINGS[locale];
   const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -128,11 +157,9 @@ function ArchitectureContent({ model, arch, isExpanded }: ArchitectureContentPro
               className="mt-2 text-2xs leading-snug text-muted-foreground"
               data-testid="hybrid-attention-note"
             >
-              <span className="font-medium text-foreground">Local</span> and{' '}
-              <span className="font-medium text-foreground">Compressed</span> are two KV sources,
-              not two separate attentions: each query attends in a{' '}
-              <span className="font-medium text-foreground">single softmax</span> to the union of
-              sliding-window + selected compressed keys, with a learnable per-head attention sink.
+              <span className="font-medium text-foreground">Local</span>{' '}
+              {locale === 'zh' ? '与' : 'and'}{' '}
+              <span className="font-medium text-foreground">Compressed</span> {t.hybrid}
             </p>
           )}
         {(arch.hyperConnections ?? 0) > 1 &&
@@ -143,16 +170,13 @@ function ArchitectureContent({ model, arch, isExpanded }: ArchitectureContentPro
               <span className="font-medium text-foreground">
                 Hyper-Connections (mHC ×{arch.hyperConnections})
               </span>{' '}
-              replace each residual with {arch.hyperConnections} parallel streams combined by
-              learned, Sinkhorn-normalized weights — read ({arch.hyperConnections}→1), output, and a{' '}
-              {arch.hyperConnections}×{arch.hyperConnections} stream mix — shown as the mHC ×
-              {arch.hyperConnections} nodes.
+              {t.mhc(arch.hyperConnections ?? 0)}
             </p>
           )}
         {arch.features && arch.features.length > 0 && (
           <div className="mt-3 pt-3 border-t border-border/50">
             <div className="flex flex-wrap gap-1.5 items-center">
-              <span className="text-xs text-muted-foreground mr-1">Features:</span>
+              <span className="text-xs text-muted-foreground mr-1">{t.features}</span>
               {arch.features.map((feature) => (
                 <Badge key={feature} variant="secondary" className="text-xs py-0">
                   {feature}
@@ -168,7 +192,7 @@ function ArchitectureContent({ model, arch, isExpanded }: ArchitectureContentPro
                     track('model_architecture_source_clicked', { url: arch.sourceUrl! })
                   }
                 >
-                  Source <ExternalLink className="size-3" />
+                  {t.source} <ExternalLink className="size-3" />
                 </Link>
               )}
             </div>
@@ -176,8 +200,9 @@ function ArchitectureContent({ model, arch, isExpanded }: ArchitectureContentPro
         )}
         {arch.developer && releaseDate && (
           <p className="text-xs text-muted-foreground mt-2">
-            Released by {arch.developer} on{' '}
-            {new Date(releaseDate).toLocaleDateString('en-US', {
+            {t.releasedBy} {arch.developer}
+            {t.releasedOn}{' '}
+            {new Date(releaseDate).toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', {
               year: 'numeric',
               month: 'short',
               day: 'numeric',
@@ -196,6 +221,8 @@ export default function ModelArchitectureDiagram({
 }: ModelArchitectureDiagramProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const arch = getModelArchitecture(model);
+  const locale = useLocale();
+  const t = ARCHITECTURE_STRINGS[locale];
 
   if (!arch) return null;
 
@@ -252,7 +279,7 @@ export default function ModelArchitectureDiagram({
             <line x1="3" y1="9" x2="21" y2="9" />
             <line x1="9" y1="9" x2="9" y2="21" />
           </svg>
-          <span className="text-sm font-medium">Model Architecture</span>
+          <span className="text-sm font-medium">{t.heading}</span>
           <Badge variant="outline" className="text-xs py-0">
             {arch.architectureType === 'moe' ? 'MoE' : 'Dense'}
           </Badge>
@@ -269,7 +296,13 @@ export default function ModelArchitectureDiagram({
           <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
         )}
       </button>
-      <ArchitectureContent key={model} model={model} arch={arch} isExpanded={isExpanded} />
+      <ArchitectureContent
+        key={model}
+        model={model}
+        arch={arch}
+        isExpanded={isExpanded}
+        locale={locale}
+      />
     </div>
   );
 }

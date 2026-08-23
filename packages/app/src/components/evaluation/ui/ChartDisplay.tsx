@@ -16,11 +16,22 @@ import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { exportToCsv } from '@/lib/csv-export';
 import { evaluationChartToCsv } from '@/lib/csv-export-helpers';
+import type { Locale } from '@/lib/i18n';
 
 import EvaluationChartControls from './ChartControls';
-import EvalBarChartD3 from './BarChartD3';
+import EvalBarChartD3, { formatEvaluationDate } from './BarChartD3';
 
 type EvalViewMode = 'chart' | 'table';
+
+export function evaluationCaptionDate(date: string, locale: Locale): string {
+  if (locale === 'zh') return formatEvaluationDate(date, locale);
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: 'UTC',
+  });
+}
 
 const STRINGS = {
   en: {
@@ -49,7 +60,8 @@ const STRINGS = {
 };
 
 export default function EvaluationChartDisplay() {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const CHART_ID = 'evaluation-chart';
   const {
     selectedModel,
@@ -108,13 +120,7 @@ export default function EvaluationChartDisplay() {
         {selectedRunDate && (
           <>
             {' '}
-            • {t.updated}{' '}
-            {new Date(`${selectedRunDate}T00:00:00Z`).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              timeZone: 'UTC',
-            })}
+            • {t.updated} {evaluationCaptionDate(selectedRunDate, locale)}
           </>
         )}
       </p>
@@ -141,6 +147,7 @@ export default function EvaluationChartDisplay() {
 
       <ChartSection
         chartId={CHART_ID}
+        mobileActions
         analyticsPrefix="evaluation"
         setIsLegendExpanded={setIsLegendExpanded}
         onExportCsv={handleExportCsv}
