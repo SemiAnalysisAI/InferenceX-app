@@ -554,4 +554,13 @@ describe('GPU Specs Chinese route', () => {
       .invoke('attr', 'href')
       .should('include', '/zh/gpu-specs');
   });
+
+  it('keeps the localized table contained at 390px', () => {
+    cy.viewport(390, 844);
+    cy.get('[data-testid="gpu-specs-view-toggle"]').should('have.attr', 'aria-label', '显示模式');
+    cy.get('table').parents('.overflow-x-auto').first().should('have.css', 'overflow-x', 'auto');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
 });

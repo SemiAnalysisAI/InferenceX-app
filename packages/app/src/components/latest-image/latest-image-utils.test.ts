@@ -7,6 +7,7 @@ import {
   baseFramework,
   daysSince,
   getActualLatestTag,
+  getCurrentImageNodeTypeTooltip,
   isOutdated,
 } from './latest-image-utils';
 
@@ -151,5 +152,16 @@ describe('getActualLatestTag', () => {
 
   it('returns null when the base release is missing from the releases map', () => {
     expect(getActualLatestTag('vllm', { sglang: 'v0.5.12' })).toBeNull();
+  });
+});
+
+describe('getCurrentImageNodeTypeTooltip', () => {
+  it('preserves the English Mori spelling while using MoRI in Chinese', () => {
+    expect(getCurrentImageNodeTypeTooltip('en')).toBe(
+      'Single node = non-disaggregated serving. Disaggregated = separate prefill/decode pools, including Dynamo, Mori, and llm-d.',
+    );
+    expect(getCurrentImageNodeTypeTooltip('zh')).toBe(
+      '单节点指非分离式推理；分离式配置使用独立的 prefill/decode 池，包括 Dynamo、MoRI 和 llm-d。',
+    );
   });
 });

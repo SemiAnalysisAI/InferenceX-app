@@ -239,4 +239,19 @@ describe('PowerX Chinese route', () => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
   });
+
+  it('keeps localized chart controls contained at 375px', () => {
+    cy.viewport(375, 812);
+    cy.intercept('GET', '**/api/gpu-metrics?runId=12345', gpuMetricsResponse).as('gpuMetrics');
+    cy.visit('/zh/gpu-metrics?gm_runId=12345', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-feature-gate', '1');
+      },
+    });
+    cy.wait('@gpuMetrics');
+    cy.get('[data-testid="gpu-metrics-metric-select"]').should('contain.text', '功耗 (W)');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
 });

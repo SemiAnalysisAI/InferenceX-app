@@ -883,6 +883,17 @@ describe('TCO Calculator Chinese route', () => {
     });
   });
 
+  it('keeps the localized chart contained at 375px', () => {
+    cy.viewport(375, 812);
+    cy.get('[data-testid="calculator-bar-chart"] svg .x-axis-label-calc').should(
+      'contain.text',
+      '每芯片总吞吐量 (tok/s/chip)',
+    );
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
+
   it('emits bidirectional hreflang metadata', () => {
     cy.get('link[rel="alternate"][hreflang="en"]')
       .invoke('attr', 'href')

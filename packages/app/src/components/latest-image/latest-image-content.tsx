@@ -28,6 +28,7 @@ import {
   baseFramework,
   daysSince,
   getActualLatestTag,
+  getCurrentImageNodeTypeTooltip,
   isOutdated,
 } from './latest-image-utils';
 
@@ -51,8 +52,6 @@ const STRINGS = {
     labelGpuSku: 'Chip SKU',
     tooltipGpuSku: 'Filter by Chip model (e.g. H200, MI300X, B200).',
     labelNodeType: 'Node Type',
-    tooltipNodeType:
-      'Single node = non-disaggregated serving. Disaggregated = separate prefill/decode pools, including Dynamo, MoRI, and llm-d.',
     labelFramework: 'Framework',
     tooltipFramework:
       'Filter by inference engine (sglang, vllm, TensorRT, atom). Disaggregated framework variants collapse into their base engine. Empty = all frameworks.',
@@ -92,8 +91,6 @@ const STRINGS = {
     labelGpuSku: '芯片型号',
     tooltipGpuSku: '按芯片型号筛选（如 H200、MI300X、B200）。',
     labelNodeType: '节点类型',
-    tooltipNodeType:
-      '单节点指非分离式推理；分离式配置使用独立的 prefill/decode 池，包括 Dynamo、MoRI 和 llm-d。',
     labelFramework: '框架',
     tooltipFramework:
       '按推理引擎筛选（sglang、vllm、TensorRT、atom）。分离式框架变体归入基础引擎；不选择框架时显示全部框架。',
@@ -401,7 +398,7 @@ export function CurrentImageContent() {
               <LabelWithTooltip
                 htmlFor="image-node-type-select"
                 label={t.labelNodeType}
-                tooltip={t.tooltipNodeType}
+                tooltip={getCurrentImageNodeTypeTooltip(locale)}
               />
               <Select
                 value={selectedNodeType}

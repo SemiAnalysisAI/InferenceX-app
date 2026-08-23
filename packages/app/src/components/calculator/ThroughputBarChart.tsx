@@ -31,10 +31,7 @@ import type {
   InterpolatedResult,
 } from './types';
 
-/**
- * Overlay-only tooltip strings. The rest of the tooltip is English-only today;
- * these are new user-visible strings, so they ship with a Chinese version.
- */
+/** Locale-specific tooltip strings; technical identifiers and units remain unchanged. */
 const OVERLAY_STRINGS = {
   en: {
     unofficialRun: 'UNOFFICIAL RUN',
