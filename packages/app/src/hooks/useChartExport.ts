@@ -185,6 +185,13 @@ export function getExportCaptureDimensions(element: HTMLElement): {
   };
 }
 
+/** Keep the plot responsive without stretching small UI icons in the clone. */
+export function normalizeChartSvgWidthsForExport(root: HTMLElement): void {
+  for (const svg of root.querySelectorAll<SVGElement>('svg[data-testid="d3-chart-svg"]')) {
+    svg.style.width = '100%';
+  }
+}
+
 /** Add a subtle watermark bar at the bottom of the exported image */
 function addWatermark(dataUrl: string, bgColor: string): Promise<string> {
   return new Promise((resolve) => {
@@ -303,7 +310,7 @@ export function useChartExport({
         | undefined;
 
       // Layout: force side-by-side flex row for export
-      applyStyles(exportElement, { width: 'max-content', overflow: 'visible', padding: '16px' });
+      applyStyles(exportElement, { width: 'fit-content', overflow: 'visible', padding: '16px' });
 
       const flexContainer = clone.querySelector(':scope > .flex') as HTMLElement | null;
       applyStyles(flexContainer, {
@@ -328,7 +335,7 @@ export function useChartExport({
       // Force legend into inline flow
       if (legendContainer) {
         legendContainer.style.cssText +=
-          '; position: relative !important; right: auto !important; top: auto !important; left: auto !important; bottom: auto !important; width: auto !important; min-width: fit-content !important; z-index: auto !important; overflow: visible !important; padding: 8px !important;';
+          '; position: relative !important; right: auto !important; top: auto !important; left: auto !important; bottom: auto !important; width: auto !important; min-width: fit-content !important; height: auto !important; min-height: 0 !important; max-height: none !important; z-index: auto !important; overflow: visible !important; padding: 8px !important;';
 
         const scrollContainer = legendContainer.querySelector(
           'ul, [class*="overflow"]',
@@ -424,9 +431,7 @@ export function useChartExport({
       for (const span of clone.querySelectorAll('span')) {
         span.style.fontSize = '14px';
       }
-      for (const svg of clone.querySelectorAll('svg')) {
-        svg.style.width = '100%';
-      }
+      normalizeChartSvgWidthsForExport(clone);
 
       // Wait for fonts before capture
       try {
