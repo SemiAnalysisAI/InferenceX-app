@@ -14,12 +14,16 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { formatScaleOutTopology, getTopologyConfig, type GpuSpec } from '@/lib/gpu-specs';
+import {
+  formatScaleOutTopology,
+  getScaleOutExpandAriaLabel,
+  getTopologyConfig,
+  type GpuSpec,
+} from '@/lib/gpu-specs';
 import { useLocale } from '@/lib/use-locale';
 
 const STRINGS = {
   en: {
-    expand: 'Expand',
     expandHint: 'Click to expand',
     previous: 'Previous Chip',
     next: 'Next Chip',
@@ -36,7 +40,6 @@ const STRINGS = {
     leaf: 'Leaf',
   },
   zh: {
-    expand: '展开',
     expandHint: '点击展开',
     previous: '上一款芯片',
     next: '下一款芯片',
@@ -149,7 +152,7 @@ export const TopologyDiagram = forwardRef<
           setOpen(true);
           track('gpu_specs_topology_expanded', { gpu: spec.name });
         }}
-        aria-label={`${t.expand} ${spec.name} ${t.diagram}`}
+        aria-label={getScaleOutExpandAriaLabel(spec.name, locale)}
       >
         <TopologyD3 spec={spec} config={compactConfig} compact locale={locale} />
         <p className="text-[10px] text-muted-foreground mt-1 text-center">{t.expandHint}</p>

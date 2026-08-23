@@ -59,6 +59,10 @@ export function formatScaleOutTopology(value: string, locale: 'en' | 'zh'): stri
   return match?.groups ? `${match.groups.rails}-rail 优化拓扑` : value;
 }
 
+export function getScaleOutExpandAriaLabel(gpuName: string, locale: 'en' | 'zh'): string {
+  return locale === 'zh' ? `展开 ${gpuName} 横向扩展拓扑图` : `Expand ${gpuName} topology diagram`;
+}
+
 export function formatScaleUpTopology(value: string, locale: 'en' | 'zh'): string {
   if (locale === 'en') return value;
   if (value === 'Full Mesh') return '全互连';

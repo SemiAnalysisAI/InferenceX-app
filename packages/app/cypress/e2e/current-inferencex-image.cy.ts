@@ -7,7 +7,8 @@ function visitCurrentImage() {
 }
 
 describe('Current InferenceX Image localized routes', () => {
-  const today = new Date().toISOString().slice(0, 10);
+  const fixedNow = Date.parse('2026-08-23T12:00:00Z');
+  const today = '2026-08-23';
   const imageRows = [
     {
       model: 'dsr1',
@@ -36,6 +37,7 @@ describe('Current InferenceX Image localized routes', () => {
   ];
 
   beforeEach(() => {
+    cy.clock(fixedNow, ['Date']);
     cy.viewport(390, 844);
   });
 

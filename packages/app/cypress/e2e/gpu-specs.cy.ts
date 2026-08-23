@@ -98,6 +98,17 @@ describe('GPU Specs Tab', () => {
       });
   });
 
+  it('preserves the English expand button label and identifies the scale-out SVG', () => {
+    cy.get('[data-testid="topology-h200-sxm"] button').should(
+      'have.attr',
+      'aria-label',
+      'Expand H200 SXM topology diagram',
+    );
+    cy.get('[data-testid="topology-h200-sxm"] svg')
+      .should('have.attr', 'aria-label')
+      .and('contain', 'H200 SXM 8-rail optimized scale-out topology diagram');
+  });
+
   it('B200 topology shows multiple pods', () => {
     cy.get('[data-testid="topology-b200-sxm"] svg')
       .should('exist')
@@ -492,8 +503,13 @@ describe('GPU Specs Chinese route', () => {
   it('localizes view accessibility, topology values, SVG labels, and dialogs', () => {
     cy.get('[data-testid="gpu-specs-view-toggle"]').should('have.attr', 'aria-label', '显示模式');
     cy.get('table').contains('button', '8-rail 优化拓扑').should('exist');
-    cy.get('[data-testid="topology-h200-sxm"] svg').should('contain.text', '芯片 0');
-    cy.get('[data-testid="topology-h200-sxm"] button').click({ force: true });
+    cy.get('[data-testid="topology-h200-sxm"] svg')
+      .should('contain.text', '芯片 0')
+      .and('have.attr', 'aria-label')
+      .and('contain', 'H200 SXM 8-rail 优化拓扑 横向扩展拓扑图');
+    cy.get('[data-testid="topology-h200-sxm"] button')
+      .should('have.attr', 'aria-label', '展开 H200 SXM 横向扩展拓扑图')
+      .click({ force: true });
     cy.get('[role="dialog"]')
       .should('contain.text', 'H200 SXM 横向扩展拓扑')
       .and('contain.text', 'Leaf 交换机：');
