@@ -447,8 +447,8 @@ export interface ScatterGraphProps {
   overlayData?: OverlayData;
   /**
    * D3 transition duration in ms used when data or scales change. Defaults to
-   * the regular interactive value (750). The replay panel passes 0 so frames
-   * snap to interpolated positions instead of fighting a 750ms tween.
+   * the regular 300ms interactive value. The replay panel passes 0 so frames
+   * snap to interpolated positions instead of fighting an in-flight tween.
    */
   transitionDuration?: number;
   /**
