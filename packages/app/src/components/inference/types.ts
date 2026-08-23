@@ -380,6 +380,7 @@ export interface ChartDefinition {
   heading: string;
   x: keyof AggDataEntry;
   x_label: string;
+  x_labelZh: string;
   y: keyof AggDataEntry;
   y_label?: string;
 

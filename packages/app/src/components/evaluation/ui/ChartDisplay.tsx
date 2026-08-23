@@ -13,6 +13,7 @@ import { ChartSection } from '@/components/ui/chart-section';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { exportToCsv } from '@/lib/csv-export';
@@ -49,6 +50,7 @@ export const EVALUATION_DISPLAY_STRINGS = {
     queryError: 'Failed to load evaluation data.',
     availabilityError: 'Failed to load filter availability data.',
     combinedError: 'Failed to load evaluation and filter availability data.',
+    tableLoading: 'Loading evaluation data…',
   },
   zh: {
     chartView: '图表',
@@ -63,8 +65,20 @@ export const EVALUATION_DISPLAY_STRINGS = {
     queryError: '评估数据加载失败。',
     availabilityError: '筛选项可用性数据加载失败。',
     combinedError: '评估数据与筛选项可用性数据均加载失败。',
+    tableLoading: '正在加载评估数据……',
   },
 };
+
+export function evaluationTableDisplayState({
+  isEvaluationDataSettled,
+  isEvaluationDataError,
+}: {
+  isEvaluationDataSettled: boolean;
+  isEvaluationDataError: boolean;
+}): 'loading' | 'ready' | 'error' {
+  if (isEvaluationDataError) return 'error';
+  return isEvaluationDataSettled ? 'ready' : 'loading';
+}
 
 export default function EvaluationChartDisplay() {
   const locale = useLocale();
@@ -81,6 +95,7 @@ export default function EvaluationChartDisplay() {
     isError,
     isAvailabilityError,
     isEvaluationDataError,
+    isEvaluationDataSettled,
     retry,
   } = useEvaluation();
   const { isUnofficialRun } = useUnofficialRun();
@@ -93,6 +108,10 @@ export default function EvaluationChartDisplay() {
   );
 
   const [viewMode, setViewMode] = useState<EvalViewMode>('table');
+  const tableDisplayState = evaluationTableDisplayState({
+    isEvaluationDataSettled,
+    isEvaluationDataError,
+  });
   const handleViewModeChange = (value: EvalViewMode) => {
     setViewMode(value);
     track('evaluation_view_changed', { view: value });
@@ -191,10 +210,23 @@ export default function EvaluationChartDisplay() {
           )}
           {!isEvaluationDataError &&
             (viewMode === 'table' ? (
-              <>
-                {caption}
-                <EvaluationTable data={tableData} />
-              </>
+              tableDisplayState === 'loading' ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  data-testid="evaluation-table-loading"
+                  className="space-y-3 py-3"
+                >
+                  <p className="text-sm text-muted-foreground">{t.tableLoading}</p>
+                  <Skeleton className="h-8 w-1/3" />
+                  <Skeleton className="h-64 w-full" />
+                </div>
+              ) : (
+                <>
+                  {caption}
+                  <EvaluationTable data={tableData} />
+                </>
+              )
             ) : (
               <EvalBarChartD3 caption={caption} />
             ))}

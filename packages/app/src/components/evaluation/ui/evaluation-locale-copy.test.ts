@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { EVALUATION_DISPLAY_STRINGS, evaluationCaptionDate } from './ChartDisplay';
+import {
+  EVALUATION_DISPLAY_STRINGS,
+  evaluationCaptionDate,
+  evaluationTableDisplayState,
+} from './ChartDisplay';
 import { EVALUATION_TABLE_STRINGS } from './EvaluationTable';
 
 describe('evaluation locale copy', () => {
@@ -26,5 +30,26 @@ describe('evaluation locale copy', () => {
       'Failed to load filter availability data.',
     );
     expect(EVALUATION_DISPLAY_STRINGS.zh.availabilityError).toBe('筛选项可用性数据加载失败。');
+  });
+
+  it('keeps table mode loading until the evaluations query settles', () => {
+    expect(
+      evaluationTableDisplayState({
+        isEvaluationDataSettled: false,
+        isEvaluationDataError: false,
+      }),
+    ).toBe('loading');
+    expect(
+      evaluationTableDisplayState({
+        isEvaluationDataSettled: true,
+        isEvaluationDataError: false,
+      }),
+    ).toBe('ready');
+    expect(
+      evaluationTableDisplayState({
+        isEvaluationDataSettled: true,
+        isEvaluationDataError: true,
+      }),
+    ).toBe('error');
   });
 });

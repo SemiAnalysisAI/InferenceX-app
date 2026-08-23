@@ -42,6 +42,7 @@ interface DiagramRenderState {
   width: number;
   arch: ModelArchitecture;
   isDark: boolean;
+  locale: Locale;
   expandedBlocks: Set<string>;
   onBlockClick: (blockId: string) => void;
 }
@@ -110,15 +111,23 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
       previous?.width === width &&
       previous.arch === arch &&
       previous.isDark === isDark &&
+      previous.locale === locale &&
       previous.expandedBlocks === expandedBlocks &&
       previous.onBlockClick === toggleBlock
     ) {
       return;
     }
 
-    renderDiagram(svg, arch, isDark, expandedBlocks, toggleBlock);
-    lastRenderRef.current = { width, arch, isDark, expandedBlocks, onBlockClick: toggleBlock };
-  }, [isExpanded, arch, resolvedTheme, expandedBlocks, toggleBlock]);
+    renderDiagram(svg, arch, isDark, expandedBlocks, toggleBlock, locale);
+    lastRenderRef.current = {
+      width,
+      arch,
+      isDark,
+      locale,
+      expandedBlocks,
+      onBlockClick: toggleBlock,
+    };
+  }, [isExpanded, arch, resolvedTheme, locale, expandedBlocks, toggleBlock]);
 
   useEffect(() => {
     if (!isExpanded || !containerRef.current) {

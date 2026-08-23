@@ -19,6 +19,7 @@ import {
   paretoFrontUpperLeft,
   metricTitle,
   metricLabel,
+  xAxisLabel,
 } from '@/lib/chart-utils';
 
 // mock constants so createChartDataPoint (also in this module) doesn't call
@@ -1650,6 +1651,7 @@ describe('metricTitle', () => {
     heading: 'vs. Interactivity',
     x: 'median_intvty',
     x_label: 'Interactivity (tok/s/user)',
+    x_labelZh: '交互性 (tok/s/user)',
     y: 'tput_per_gpu',
     y_tpPerGpu_title: 'Token Throughput per GPU',
     y_tpPerGpu_titleZh: '每 GPU token 吞吐量',
@@ -1681,6 +1683,7 @@ describe('metricLabel', () => {
     heading: 'vs. Interactivity',
     x: 'median_intvty',
     x_label: 'Interactivity (tok/s/user)',
+    x_labelZh: '交互性 (tok/s/user)',
     y: 'tput_per_gpu',
     y_tpPerGpu_label: 'Token Throughput per GPU (tok/s/gpu)',
     y_tpPerGpu_labelZh: '每 GPU token 吞吐量（tok/s/gpu）',
@@ -1701,5 +1704,17 @@ describe('metricLabel', () => {
 
   it('returns empty string for unknown metric', () => {
     expect(metricLabel(chartDef, 'y_unknown', 'en')).toBe('');
+  });
+});
+
+describe('xAxisLabel', () => {
+  it('preserves exact English and resolves the Chinese sibling for every consumer', () => {
+    const chartDef = {
+      x_label: 'End-to-end Latency (s)',
+      x_labelZh: '端到端延迟 (s)',
+    } as ChartDefinition;
+
+    expect(xAxisLabel(chartDef, 'en')).toBe('End-to-end Latency (s)');
+    expect(xAxisLabel(chartDef, 'zh')).toBe('端到端延迟 (s)');
   });
 });

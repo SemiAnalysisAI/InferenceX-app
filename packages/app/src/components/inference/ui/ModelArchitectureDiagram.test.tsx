@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Model } from '@/lib/data-mappings';
+import { getModelArchitecture } from '@/lib/model-architectures';
 
 const mocks = vi.hoisted(() => ({
   renderDiagram: vi.fn(),
@@ -27,6 +28,10 @@ vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 vi.mock('next/navigation', () => ({ usePathname: () => mocks.pathname.value }));
 
 import ModelArchitectureDiagram from './ModelArchitectureDiagram';
+
+interface ArchitectureRendererModule {
+  renderDiagram: (...args: unknown[]) => void;
+}
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -167,5 +172,49 @@ describe('ModelArchitectureDiagram rendering', () => {
 
     render(Model.GptOss);
     expect(mocks.renderDiagram).toHaveBeenCalledTimes(4);
+  });
+
+  it('passes locale to the renderer and includes it in the render cache key', () => {
+    render();
+    expand();
+    expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('en');
+
+    mocks.pathname.value = '/zh/inference';
+    render();
+    expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
+    expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('zh');
+  });
+
+  it('renders objective English and Chinese SVG labels', async () => {
+    const renderer = await vi.importActual<ArchitectureRendererModule>(
+      './model-architecture-diagram-renderer',
+    );
+    const renderActual = renderer.renderDiagram;
+    const arch = getModelArchitecture(Model.DeepSeek_R1);
+    expect(arch).toBeDefined();
+
+    const wrapper = document.createElement('div');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    wrapper.append(svg);
+    document.body.append(wrapper);
+
+    renderActual(svg, arch!, false, new Set(), vi.fn(), 'en');
+    expect(svg.textContent).toContain('Token Embedding');
+    expect(svg.textContent).toContain('Dense Transformer Block');
+    expect(svg.textContent).toContain('Output Head (LM Head)');
+    expect(svg.textContent).toContain('Type');
+    expect(svg.textContent).toContain('Layers');
+    expect(svg.textContent).toContain('Context');
+
+    renderActual(svg, arch!, false, new Set(), vi.fn(), 'zh');
+    expect(svg.textContent).toContain('Token 嵌入');
+    expect(svg.textContent).toContain('稠密 Transformer 块');
+    expect(svg.textContent).toContain('输出头（LM Head）');
+    expect(svg.textContent).toContain('类型');
+    expect(svg.textContent).toContain('层数');
+    expect(svg.textContent).toContain('上下文');
+    expect(svg.textContent).not.toContain('Token Embedding');
+
+    wrapper.remove();
   });
 });

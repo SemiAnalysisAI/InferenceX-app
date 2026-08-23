@@ -23,6 +23,9 @@ export function RetryableQueryError({
   return (
     <div
       data-testid={testId}
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
       className="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
     >
       <span>{message}</span>

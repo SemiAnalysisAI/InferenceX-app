@@ -13,6 +13,7 @@ export interface MetricDefinition {
   x?: string;
   source?: 'custom';
   xLabel?: string;
+  xLabelZh?: string;
   heading?: string;
 }
 
@@ -34,6 +35,7 @@ export const METRIC_REGISTRY = {
     polarity: 'higher',
     x: 'p90_ttft',
     xLabel: 'P90 Time To First Token (s)',
+    xLabelZh: 'P90 首 token 延迟 (s)',
     heading: 'vs. P90 Time To First Token',
   },
   outputTputPerGpu: {
@@ -588,6 +590,7 @@ function buildChartDefinition(chartType: 'interactivity' | 'e2e'): ChartDefiniti
     x: chartType === 'interactivity' ? 'median_intvty' : 'median_e2el',
     x_label:
       chartType === 'interactivity' ? 'Interactivity (tok/s/user)' : 'End-to-end Latency (s)',
+    x_labelZh: chartType === 'interactivity' ? '交互性 (tok/s/user)' : '端到端延迟 (s)',
     y: 'tput_per_gpu',
     y_cost_limit: 5,
     y_latency_limit: 60,
@@ -608,6 +611,7 @@ function buildChartDefinition(chartType: 'interactivity' | 'e2e'): ChartDefiniti
     }
     if ('x' in metric) definition[`${configKey}_x`] = metric.x;
     if ('xLabel' in metric) definition[`${configKey}_x_label`] = metric.xLabel;
+    if ('xLabelZh' in metric) definition[`${configKey}_x_labelZh`] = metric.xLabelZh;
     if ('heading' in metric && chartType === 'interactivity') {
       definition[`${configKey}_heading`] = metric.heading;
     }

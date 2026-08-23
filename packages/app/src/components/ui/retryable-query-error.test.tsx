@@ -51,6 +51,10 @@ describe('RetryableQueryError', () => {
     );
 
     expect(container.textContent).toContain('评估数据加载失败。');
+    const alert = container.querySelector('[data-testid="evaluation-query-error"]');
+    expect(alert?.getAttribute('role')).toBe('alert');
+    expect(alert?.getAttribute('aria-live')).toBe('assertive');
+    expect(alert?.getAttribute('aria-atomic')).toBe('true');
     const button = container.querySelector('button');
     expect(button?.textContent).toBe('重试');
     act(() => button?.click());

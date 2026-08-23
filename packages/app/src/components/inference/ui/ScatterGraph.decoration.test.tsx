@@ -54,6 +54,33 @@ describe('pointLabelText', () => {
 });
 
 describe('ScatterGraph toggle decoration', () => {
+  it('localizes the advanced decorative overlay labels without changing English', () => {
+    const english = mountChart();
+    const englishSwitches = globalThis.__scatterLegendState.current?.switches as
+      | { id: string; label: string }[]
+      | undefined;
+    expect(englishSwitches?.find((item) => item.id === 'scatter-speed-overlay')?.label).toBe(
+      'Bus / Race Car',
+    );
+    expect(englishSwitches?.find((item) => item.id === 'scatter-minecraft-overlay')?.label).toBe(
+      'Donkey / Elytra',
+    );
+    english.unmount();
+
+    globalThis.__scatterPathnameState.value = '/zh/inference';
+    const chinese = mountChart();
+    const chineseSwitches = globalThis.__scatterLegendState.current?.switches as
+      | { id: string; label: string }[]
+      | undefined;
+    expect(chineseSwitches?.find((item) => item.id === 'scatter-speed-overlay')?.label).toBe(
+      '公交车 / 赛车',
+    );
+    expect(chineseSwitches?.find((item) => item.id === 'scatter-minecraft-overlay')?.label).toBe(
+      '驴 / 鞘翅',
+    );
+    chinese.unmount();
+  });
+
   it('renders all points and rooflines after mount', () => {
     const { container, unmount } = mountChart();
 

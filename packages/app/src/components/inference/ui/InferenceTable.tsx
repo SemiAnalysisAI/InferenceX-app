@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { getHardwareConfig } from '@/lib/constants';
-import { getNestedYValue, metricLabel } from '@/lib/chart-utils';
+import { getNestedYValue, metricLabel, xAxisLabel } from '@/lib/chart-utils';
 import { sortRowsByYMetric } from '@/components/inference/ui/inference-table-sort';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { getDisplayLabel } from '@/lib/utils';
@@ -40,10 +40,7 @@ export function inferenceTableHeaderLabels(
     tensorParallelism: 'TP',
     concurrency: locale === 'zh' ? '并发数' : 'Conc',
     yMetric: metricLabel(chartDefinition, selectedYAxisMetric, locale),
-    xMetric:
-      locale === 'zh'
-        ? ((chartDefinition.x_labelZh as string | undefined) ?? chartDefinition.x_label)
-        : chartDefinition.x_label,
+    xMetric: xAxisLabel(chartDefinition, locale),
     throughput: locale === 'zh' ? '单芯片吞吐量 (tok/s)' : 'Throughput/Chip (tok/s)',
   };
 }
