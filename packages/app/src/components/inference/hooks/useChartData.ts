@@ -570,6 +570,7 @@ export function useChartData(
             ...rooflineOverrides,
             ...revenueLabels,
             heading: chartHeading,
+            x_scale_field: xAxisField,
             x_label: xAxisLabel,
             x_labelZh: xAxisLabelZh,
             y_label: dynamicYLabel === null ? undefined : String(dynamicYLabel),

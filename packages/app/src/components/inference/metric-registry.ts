@@ -588,6 +588,7 @@ function buildChartDefinition(chartType: 'interactivity' | 'e2e'): ChartDefiniti
     chartType,
     heading: chartType === 'interactivity' ? 'vs. Interactivity' : 'vs. End-to-end Latency',
     x: chartType === 'interactivity' ? 'median_intvty' : 'median_e2el',
+    x_scale_field: chartType === 'interactivity' ? 'median_intvty' : 'median_e2el',
     x_label:
       chartType === 'interactivity' ? 'Interactivity (tok/s/user)' : 'End-to-end Latency (s)',
     x_labelZh: chartType === 'interactivity' ? '交互性 (tok/s/user)' : '端到端延迟 (s)',

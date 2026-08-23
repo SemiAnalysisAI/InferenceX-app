@@ -1207,13 +1207,14 @@ const ScatterGraph = React.memo(
           ? (d3.extent(visiblePoints, (d) => d.x) as [number, number])
           : ([0, 100] as [number, number]));
 
-      // `chartDefinition.x` is the resolved data field shared by the live chart
-      // and Replay. Unlike `xLabel`, its identity is stable across locales.
+      // `x_scale_field` comes from useChartData and follows remapped `data[].x`
+      // through both the live chart and Replay. Unlike `xLabel`, it is stable
+      // across locales and distinct from the registry's natural `x` field.
       const useLog =
         resolveScatterXAxisScale({
           extent: ext,
           selectedYAxisMetric,
-          xAxisField: chartDefinition.x,
+          xAxisField: chartDefinition.x_scale_field,
           scaleType,
         }) === 'log';
 
@@ -1227,7 +1228,7 @@ const ScatterGraph = React.memo(
     }, [
       visiblePoints,
       selectedYAxisMetric,
-      chartDefinition.x,
+      chartDefinition.x_scale_field,
       scaleType,
       niceAxes,
       xExtentOverride,

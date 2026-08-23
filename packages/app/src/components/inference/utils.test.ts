@@ -57,6 +57,7 @@ function chartDef(overrides: Partial<ChartDefinition> = {}): ChartDefinition {
     x_label: 'Latency',
     y: 'tput_per_gpu',
     ...overrides,
+    x_scale_field: overrides.x_scale_field ?? String(overrides.x ?? 'median_e2el'),
     x_labelZh: overrides.x_labelZh ?? '延迟',
   };
 }

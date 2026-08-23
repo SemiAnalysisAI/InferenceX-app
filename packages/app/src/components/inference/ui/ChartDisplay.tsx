@@ -172,6 +172,7 @@ const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string; labelZh: string }[
 
 /** Presentation and data plumbing for trace-derived agentic x-axis modes. */
 interface DerivedXModeSpec {
+  xField: (percentile: string) => string;
   xLabel: (percentileLabel: string) => string;
   xLabelZh?: (percentileLabel: string) => string;
   heading: (percentileLabel: string) => string;
@@ -182,6 +183,7 @@ interface DerivedXModeSpec {
 
 const DERIVED_X_MODE_SPECS: Partial<Record<XAxisMode, DerivedXModeSpec>> = {
   'e2e-normalized-interactivity': {
+    xField: (percentile) => `${percentile}_e2e_norm_intvty`,
     xLabel: (pctl) => `${pctl} E2E Normalized Interactivity (tok/s/user)`,
     xLabelZh: (pctl) => `${pctl} 端到端归一化交互性 (tok/s/user)`,
     heading: (pctl) => `vs. ${pctl} E2E Normalized Interactivity`,
@@ -741,6 +743,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
 
       const chartDefinition = {
         ...graph.chartDefinition,
+        x_scale_field: derivedSpec.xField(selectedPercentile),
         x_label: derivedSpec.xLabel(selectedPercentile.toUpperCase()),
         x_labelZh: (derivedSpec.xLabelZh ?? derivedSpec.xLabel)(selectedPercentile.toUpperCase()),
         y_latency_limit: undefined,
