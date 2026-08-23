@@ -813,7 +813,7 @@ export default function ChartDisplay() {
                       );
                     }}
                   />
-                  <Card>
+                  <Card data-coach-mark-root="">
                     {(() => {
                       const chartCaption = (
                         <>
