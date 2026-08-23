@@ -97,7 +97,7 @@ The `/zh` side is hand-authored. **If the complete diff touches any user-visible
 
 Read `docs/chinese-copy.md` completely. Review the full UI element or paragraph together with its English source, intended meaning, surface, and rendered context. Evaluate semantic fidelity and natural Chinese as independent gates; fluent Chinese that changes the source is still wrong.
 
-**Chinese-copy findings are always non-blocking while the skill says `Operating mode: advisory`.** Do not label them `🔴 BLOCKING`, submit a request-changes review for them, or otherwise hold another contributor's merge. If a Chinese-copy issue is serious enough that it would normally warrant blocking, label it `Needs Chinese maintainer confirmation`, mention `@edwingao28`, and ask for review. It remains a suggestion; the Chinese maintainer decides whether any follow-up is needed.
+**Chinese-copy findings are always non-blocking while the skill says `Operating mode: advisory`.** Do not label them `🔴 BLOCKING`, submit a request-changes review for them, or otherwise hold another contributor's merge. Do not mention `@edwingao28` for a clean review, routine coverage, or an ordinary wording or naturalness suggestion. Mention `@edwingao28` only for a high-confidence semantic or factual error, changed attribution or speaker voice, or high-impact ambiguity that cannot be resolved from the source and context. Label that finding `Needs Chinese maintainer confirmation` and ask for review. It remains a suggestion; the Chinese maintainer decides whether any follow-up is needed.
 
 Worth a suggestion:
 
@@ -109,7 +109,7 @@ Not worth a comment:
 
 - Wording you would have phrased differently when the existing rendering is accurate and natural.
 - Long Chinese sentences per se. Length is not evidence of translationese.
-- English technical terms whose Chinese equivalent is not what practitioners actually write. Decide from real Chinese ML infrastructure usage, not from capitalization.
+- Established English technical terms and phrases that Chinese ML infrastructure engineers normally use in English. Keep them English in first-party UI and technical prose; decide from real industry usage and the surface, not from a closed list or capitalization. `warmup`, `seed`, and `offload` are examples, not the whole category. Chinese-first explanations may be appropriate for a broader audience, and attributed quotations preserve the speaker's wording.
 - `您` solely because it appears. Controls normally omit the pronoun, but a respectful CTA may use it intentionally.
 - Awkward Chinese the diff did not touch. Mention it separately from the review.
 

@@ -371,7 +371,7 @@ describe('generateTooltipContent', () => {
     );
 
     expect(enabled).toContain('<strong>Offload Type:</strong> Enabled (legacy data)');
-    expect(disabledZh).toContain('<strong>卸载类型：</strong> 已禁用（旧版数据）');
+    expect(disabledZh).toContain('<strong>offload 类型：</strong> 已禁用（旧版数据）');
   });
 
   it('does not treat the fixed-sequence offload default as legacy metadata', () => {
@@ -458,8 +458,8 @@ describe('generateTooltipContent', () => {
         }),
       }),
     );
-    expect(html).toContain('<strong>卸载类型：</strong> DRAM');
-    expect(html).toContain('<strong>KV 卸载引擎：</strong> LMCache');
+    expect(html).toContain('<strong>offload 类型：</strong> DRAM');
+    expect(html).toContain('<strong>KV offload 引擎：</strong> LMCache');
     expect(html).toContain('<strong>路由器：</strong> vLLM Router 0.1.14');
   });
 
@@ -470,7 +470,7 @@ describe('generateTooltipContent', () => {
     );
 
     expect(en).not.toContain('Offload Type');
-    expect(zh).not.toContain('卸载类型');
+    expect(zh).not.toContain('offload 类型');
   });
 
   it('falls back to hwKey when hardware config entry is missing', () => {

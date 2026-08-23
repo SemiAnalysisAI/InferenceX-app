@@ -6,7 +6,7 @@ import { getTelemetryGuide } from '@/lib/agentx-telemetry-zh';
 import { zhAlternates, ZH_LANG_TAG, ZH_OG_LOCALE } from '@/lib/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const TITLE = '深入解读智能体负载：详细遥测数据';
+const TITLE = '通过详细遥测数据解析智能体负载';
 const DESCRIPTION =
   '如何解读 AgentX 单个数据点背后的遥测数据：单点图表、请求时间线、KV offload 标记，以及单会话火焰图。';
 

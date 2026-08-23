@@ -7,19 +7,19 @@ import { zhAlternates, ZH_LANG_TAG, ZH_OG_LOCALE } from '@/lib/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const DESCRIPTION =
-  'AgentX 回放从自愿提供的 Claude Code 会话衍生出的工作负载形态。本页提供方法论、分布及逐对话火焰图。';
+  'AgentX 根据参与者自愿提供的 Claude Code 会话构建回放工作负载。可查看测试方法、数据分布和单会话火焰图。';
 
 export const metadata: Metadata = {
-  title: 'AgentX 方法论与数据集',
+  title: 'AgentX 测试方法与数据集',
   description: DESCRIPTION,
   alternates: zhAlternates('/agentx'),
   openGraph: {
-    title: 'AgentX 方法论与数据集 | InferenceX',
+    title: 'AgentX 测试方法与数据集 | InferenceX',
     description: DESCRIPTION,
     url: `${SITE_URL}/zh/agentx`,
     locale: ZH_OG_LOCALE,
   },
-  twitter: { title: 'AgentX 方法论与数据集 | InferenceX', description: DESCRIPTION },
+  twitter: { title: 'AgentX 测试方法与数据集 | InferenceX', description: DESCRIPTION },
 };
 
 const jsonLd = {

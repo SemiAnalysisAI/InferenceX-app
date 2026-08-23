@@ -9,9 +9,12 @@ description: Use when reviewing PRs or diffs that add or modify user-visible Sim
 
 Every finding produced by this skill is non-blocking. Do not label a Chinese-copy finding
 `BLOCKING`, submit a request-changes review for it, or otherwise hold another contributor's merge.
-If an issue is serious enough that it would normally warrant blocking, label it
-`Needs Chinese maintainer confirmation`, mention `@edwingao28`, and ask for review. It remains a
-suggestion while the Chinese maintainer decides whether any follow-up is needed.
+Do not mention `@edwingao28` for a clean review, routine coverage, or an ordinary wording or
+naturalness suggestion. Report an ordinary finding without a CC. Mention `@edwingao28` only for a
+high-confidence semantic or factual error, changed attribution or speaker voice, or high-impact
+ambiguity that cannot be resolved from the source and context. Label that finding
+`Needs Chinese maintainer confirmation` and ask for review. It remains a suggestion while the
+Chinese maintainer decides whether any follow-up is needed.
 
 The Chinese maintainer makes the final wording decision and manually reviews every changed
 Chinese passage.
@@ -83,6 +86,11 @@ Do not use fixed substitutions for contextual questions. In particular:
 - sentence length alone is not evidence of translationese;
 - technical English is not wrong merely because a Chinese equivalent exists;
 - one concept may need different wording in a UI action, prose, a unit, or an attributed quote;
+- established English technical terms and phrases that Chinese ML infrastructure engineers
+  normally use in English should remain English in first-party UI and technical prose; judge this
+  from real industry usage and the surface, not from a closed list. `warmup`, `seed`, and `offload`
+  are examples, not the whole category. Chinese-first explanations such as `预热（warmup）` remain
+  valid for a broader audience, and attributed quotations preserve the speaker's wording;
 - `您` is normally omitted in controls and tooltips but may be intentional in a respectful CTA;
 - #819 and other bulk-rewrite outputs are not automatic editorial ground truth; only their
   separately verified mechanical cases may seed deterministic CI fixtures.

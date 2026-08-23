@@ -107,6 +107,14 @@ const RULES: Rule[] = [
         })
         .map((match) => match[0]),
   },
+  {
+    id: 'duplicated-technical-loanword',
+    corpus: 'chinese',
+    fix: '保留技术借词，删除紧随其后的重复中文翻译',
+    find: matcher(
+      /\b(?:warmup(?:\s+预热|\s*[（(]\s*预热\s*[）)])|seed(?:\s+随机种子|\s*[（(]\s*随机种子\s*[）)])|offload(?:\s+卸载|\s*[（(]\s*卸载\s*[）)]))/giu,
+    ),
+  },
 ];
 
 function walk(directory: string): string[] {
