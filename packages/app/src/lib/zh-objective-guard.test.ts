@@ -1,3 +1,8 @@
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -11,6 +16,53 @@ import {
   type BlogGuardException,
   type DictionaryGuardException,
 } from './zh-objective-guard';
+
+const CHINESE_ONLY_SCRIPT = path.resolve(
+  import.meta.dirname,
+  '..',
+  '..',
+  'scripts',
+  'check-zh-chinese-only.ts',
+);
+
+function fixtureGit(directory: string, ...args: string[]): string {
+  return execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim();
+}
+
+function fixtureCommit(directory: string, message: string): string {
+  fixtureGit(directory, 'add', '.');
+  fixtureGit(directory, 'commit', '--no-verify', '-m', `test: ${message}`);
+  return fixtureGit(directory, 'rev-parse', 'HEAD');
+}
+
+function runChineseOnlyGuard(directory: string, base: string, head: string): string {
+  return execFileSync('bun', ['run', '--cwd', 'packages/app', 'guard:zh-copy:chinese-only'], {
+    cwd: directory,
+    encoding: 'utf8',
+    env: { ...process.env, ZH_GUARD_BASE_SHA: base, ZH_GUARD_HEAD_SHA: head },
+  });
+}
+
+function fixtureRepository(): string {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-objective-guard-'));
+  fixtureGit(directory, 'init', '-q');
+  fixtureGit(directory, 'config', 'user.name', 'Guard Test');
+  fixtureGit(directory, 'config', 'user.email', 'guard@example.com');
+  fs.mkdirSync(path.join(directory, 'packages/app/src'), { recursive: true });
+  fs.writeFileSync(
+    path.join(directory, 'packages/app/package.json'),
+    `${JSON.stringify(
+      {
+        scripts: {
+          'guard:zh-copy:chinese-only': `bun ${JSON.stringify(CHINESE_ONLY_SCRIPT)} --chinese-only`,
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  return directory;
+}
 
 describe('objective Chinese guard mutations', () => {
   describe('route siblings', () => {
@@ -64,7 +116,27 @@ describe('objective Chinese guard mutations', () => {
     it('rejects removal of an entire locale dictionary', () => {
       expect(
         findDictionaryParityViolations('copy.ts', `const COPY = { en: { title: 'Title' } };`),
-      ).toEqual([expect.objectContaining({ rule: 'dictionary-locale-count' })]);
+      ).toEqual([expect.objectContaining({ rule: 'dictionary-locale-pair' })]);
+    });
+
+    it('pairs each containing object independently without file-global cancellation', () => {
+      const source = `
+        const FIRST = { "en"   : { title: 'Title' } };
+        const SECOND = { 'zh' : { title: '标题' } };
+      `;
+      expect(findDictionaryParityViolations('copy.ts', source)).toEqual([
+        expect.objectContaining({ rule: 'dictionary-locale-pair' }),
+        expect.objectContaining({ rule: 'dictionary-locale-pair' }),
+      ]);
+    });
+
+    it('accepts whitespace and quoted locale keys when both siblings exist', () => {
+      expect(
+        findDictionaryParityViolations(
+          'copy.ts',
+          `const COPY = { "en"   : { title: 'Title' }, 'zh' : { title: '标题' } };`,
+        ),
+      ).toEqual([]);
     });
 
     it('accepts computed and spread-backed dictionaries it cannot prove structurally', () => {
@@ -177,6 +249,84 @@ $$
       expect(compareBlogPair('post.mdx', en, zh, [])).toEqual([]);
     });
 
+    it('protects MDX component href and src props while allowing /zh localization', () => {
+      const enMdx = [
+        '<DashboardCTA href="/blog/next">Open</DashboardCTA>',
+        '<ResourceCard src="https://example.com/reference">Read</ResourceCard>',
+      ].join('\n');
+      const zhMdx = enMdx
+        .replace('/blog/next', '/zh/blog/next')
+        .replace('>Open<', '>打开<')
+        .replace('>Read<', '>阅读<');
+      expect(compareBlogPair('props.mdx', enMdx, zhMdx, [])).toEqual([]);
+      expect(
+        compareBlogPair(
+          'props.mdx',
+          enMdx,
+          zhMdx.replace('https://example.com/reference', 'https://example.com/other'),
+          [],
+        ),
+      ).toContainEqual(expect.objectContaining({ rule: 'link-target' }));
+    });
+
+    it('protects legal tilde fences and inline code with arbitrary backtick delimiters', () => {
+      const enMdx = ['~~~bash', 'echo exact', '~~~', '', 'Use `` `literal` exact value ``.'].join(
+        '\n',
+      );
+      expect(compareBlogPair('delimiters.mdx', enMdx, enMdx, [])).toEqual([]);
+      expect(
+        compareBlogPair('delimiters.mdx', enMdx, enMdx.replace('echo exact', 'echo changed'), []),
+      ).toContainEqual(expect.objectContaining({ rule: 'fenced-code' }));
+      expect(
+        compareBlogPair('delimiters.mdx', enMdx, enMdx.replace('exact value', 'changed value'), []),
+      ).toContainEqual(expect.objectContaining({ rule: 'inline-code' }));
+    });
+
+    it('compares normalized protected tokens bidirectionally with multiplicity', () => {
+      const enMdx =
+        'Peak is 100 TFLOP/s at 2 GPU/hr. PUBLIC_MODEL_ID PUBLIC_MODEL_ID uses --safe-flag.';
+      const zhMdx =
+        '峰值为 100 TFLOP/s，成本按 2 GPU/hour 计。PUBLIC_MODEL_ID PUBLIC_MODEL_ID 使用 --safe-flag。';
+      expect(compareBlogPair('tokens.mdx', enMdx, zhMdx, [])).toEqual([]);
+      expect(
+        compareBlogPair(
+          'tokens.mdx',
+          enMdx,
+          zhMdx.replace('PUBLIC_MODEL_ID PUBLIC_MODEL_ID', 'PUBLIC_MODEL_ID'),
+          [],
+        ),
+      ).toContainEqual(expect.objectContaining({ rule: 'protected-token' }));
+      expect(compareBlogPair('tokens.mdx', enMdx, `${zhMdx} EXTRA_MODEL_ID`, [])).toContainEqual(
+        expect.objectContaining({ rule: 'protected-token' }),
+      );
+      expect(
+        compareBlogPair('tokens.mdx', enMdx, zhMdx.replace('TFLOP/s', 'PFLOP/s'), []),
+      ).toContainEqual(expect.objectContaining({ rule: 'protected-token' }));
+      expect(compareBlogPair('tokens.mdx', enMdx, `${zhMdx} --additional-flag`, [])).toContainEqual(
+        expect.objectContaining({ rule: 'protected-token' }),
+      );
+    });
+
+    it('accepts only an exact protected-token baseline exception', () => {
+      const enMdx = 'Capacity is 2 GPU/hr plus 1 GPU/hr.';
+      const zhMdx = '容量按 2 GPU/hour 计。';
+      const exception: BlogGuardException = {
+        rule: 'protected-token',
+        file: 'tokens.mdx',
+        en: 'gpu/hr',
+        zh: '',
+        reason: 'Temporary exact baseline mismatch.',
+        removeWhen: 'Delete when the missing unit occurrence is restored.',
+      };
+      expect(compareBlogPair('tokens.mdx', enMdx, zhMdx, [])).toContainEqual(
+        expect.objectContaining({ rule: 'protected-token' }),
+      );
+      expect(compareBlogPair('tokens.mdx', enMdx, zhMdx, [exception])).toEqual([]);
+      expect(compareBlogPair('tokens.mdx', enMdx, `${zhMdx} EXTRA_ID`, [exception])).toContainEqual(
+        expect.objectContaining({ rule: 'protected-token' }),
+      );
+    });
+
     it('rejects missing and orphan Blog siblings in both directions', () => {
       expect(findBlogPairViolations(['one.mdx'], ['one.mdx'])).toEqual([]);
       expect(findBlogPairViolations(['one.mdx', 'two.mdx'], ['one.mdx', 'orphan.mdx'])).toEqual([
@@ -243,5 +393,98 @@ $$
         ),
       ).toEqual([]);
     });
+
+    it('keeps acronym and unit hardcoded-label exemptions', () => {
+      expect(
+        findMechanicalCopyViolations(
+          'copy.tsx',
+          `const COPY = { zh: {} }; return <div><strong>TP:</strong><strong>tok/s/MW:</strong></div>;`,
+        ),
+      ).toEqual([]);
+    });
+
+    it('scans JSX literals and visible prose independently', () => {
+      const source = `const label = '属性正常。'; export const View = () => <p>可见文案 。</p>;`;
+      expect(findMechanicalCopyViolations('copy.tsx', source)).toContainEqual(
+        expect.objectContaining({ rule: 'malformed-chinese-punctuation' }),
+      );
+    });
+
+    it('scans MDX attributes and visible prose independently', () => {
+      const source = `<Callout title="属性正常。">可见文案 。</Callout>`;
+      expect(findMechanicalCopyViolations('copy.mdx', source)).toContainEqual(
+        expect.objectContaining({ rule: 'malformed-chinese-punctuation' }),
+      );
+    });
+  });
+});
+
+describe('Chinese-only CLI integration', () => {
+  it('uses the repo-root app pathspec and detects one changed English byte', () => {
+    const directory = fixtureRepository();
+    try {
+      const file = path.join(directory, 'packages/app/src/copy.ts');
+      fs.writeFileSync(
+        file,
+        `export const COPY = { en: { title: 'Exact' }, zh: { title: '旧' } };\n`,
+      );
+      const base = fixtureCommit(directory, 'base');
+      fs.writeFileSync(
+        file,
+        `export const COPY = { en: { title: 'Exact' }, zh: { title: '新' } };\n`,
+      );
+      const zhHead = fixtureCommit(directory, 'zh');
+      expect(runChineseOnlyGuard(directory, base, zhHead)).toContain(
+        'passed for 1 changed app file(s)',
+      );
+
+      fs.writeFileSync(
+        file,
+        `export const COPY = { en: { title: 'exact' }, zh: { title: '新' } };\n`,
+      );
+      const enHead = fixtureCommit(directory, 'en');
+      expect(() => runChineseOnlyGuard(directory, base, enHead)).toThrow(/copy\.ts/u);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('maps rename sources from the base path to the head path', () => {
+    const directory = fixtureRepository();
+    try {
+      const original = path.join(directory, 'packages/app/src/original.ts');
+      const renamed = path.join(directory, 'packages/app/src/renamed.ts');
+      fs.writeFileSync(
+        original,
+        [
+          `export const COPY = {`,
+          `  en: { title: 'Exact', description: 'Stable English description' },`,
+          `  zh: { title: '旧', description: '稳定中文说明' },`,
+          `};`,
+          '',
+        ].join('\n'),
+      );
+      const base = fixtureCommit(directory, 'base');
+      fs.renameSync(original, renamed);
+      const renamedHead = fixtureCommit(directory, 'rename');
+      expect(runChineseOnlyGuard(directory, base, renamedHead)).toContain(
+        'passed for 1 changed app file(s)',
+      );
+
+      fs.writeFileSync(
+        renamed,
+        [
+          `export const COPY = {`,
+          `  en: { title: 'Changed', description: 'Stable English description' },`,
+          `  zh: { title: '旧', description: '稳定中文说明' },`,
+          `};`,
+          '',
+        ].join('\n'),
+      );
+      const changedHead = fixtureCommit(directory, 'change');
+      expect(() => runChineseOnlyGuard(directory, base, changedHead)).toThrow(/renamed\.ts/u);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

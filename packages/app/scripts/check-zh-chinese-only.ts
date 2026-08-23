@@ -31,6 +31,7 @@ function git(args: readonly string[]): string {
 }
 
 function sourceAt(revision: string, file: string): string {
+  if (!file) return '';
   try {
     return execFileSync('git', ['show', `${revision}:${file}`], {
       encoding: 'utf8',
@@ -41,25 +42,55 @@ function sourceAt(revision: string, file: string): string {
   }
 }
 
-function changedFiles(base: string, head: string): string[] {
-  return git([
-    'diff',
-    '--name-only',
-    '--diff-filter=ACMRD',
-    `${base}...${head}`,
-    '--',
-    'packages/app',
-  ])
-    .split('\n')
-    .filter(Boolean);
+interface ChangedFile {
+  readonly baseFile: string;
+  readonly headFile: string;
+}
+
+function changedFiles(base: string, head: string): ChangedFile[] {
+  const raw = execFileSync(
+    'git',
+    [
+      'diff',
+      '--name-status',
+      '-z',
+      '--find-renames',
+      '--diff-filter=ACMRD',
+      `${base}...${head}`,
+      '--',
+      ':(top)packages/app',
+    ],
+    { encoding: 'utf8' },
+  );
+  const fields = raw.split('\0');
+  if (fields.at(-1) === '') fields.pop();
+  const changed: ChangedFile[] = [];
+  for (let index = 0; index < fields.length;) {
+    const status = fields[index++];
+    if (status.startsWith('R') || status.startsWith('C')) {
+      changed.push({ baseFile: fields[index++], headFile: fields[index++] });
+      continue;
+    }
+    const file = fields[index++];
+    changed.push({
+      baseFile: status === 'A' ? '' : file,
+      headFile: status === 'D' ? '' : file,
+    });
+  }
+  return changed;
 }
 
 const options = parseOptions(process.argv.slice(2));
 const mergeBase = git(['merge-base', options.base, options.head]);
 const files = changedFiles(mergeBase, options.head);
-const violations = files.flatMap((file) =>
-  compareEnglishSurfaces(file, sourceAt(mergeBase, file), sourceAt(options.head, file)),
-);
+const violations = files.flatMap(({ baseFile, headFile }) => {
+  const baseSource = sourceAt(mergeBase, baseFile);
+  const headSource = sourceAt(options.head, headFile);
+  const preferredFile = headFile || baseFile;
+  const preferred = compareEnglishSurfaces(preferredFile, baseSource, headSource);
+  if (preferred.length > 0 || baseFile === headFile || !baseFile) return preferred;
+  return compareEnglishSurfaces(baseFile, baseSource, headSource);
+});
 
 if (violations.length > 0) {
   console.error(

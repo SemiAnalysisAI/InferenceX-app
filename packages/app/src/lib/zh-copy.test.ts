@@ -15,6 +15,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  countLocaleDictionaryObjects,
   dictionaryViolationFingerprint,
   findDictionaryParityViolations,
   findMechanicalCopyViolations,
@@ -289,13 +290,17 @@ describe('zh copy — coverage', () => {
 describe('zh copy — generic bilingual dictionary parity', () => {
   const dictionaryFiles = sourceFiles.filter((file) => {
     const relative = path.relative(APP_DIR, file);
-    if (!/\.tsx?$/u.test(relative) || relative.includes('.test.')) return false;
-    const source = fs.readFileSync(file, 'utf8');
-    return /\b(?:en|zh):\s*\{/u.test(source);
+    return /\.tsx?$/u.test(relative) && !relative.includes('.test.');
   });
 
   it('discovers bilingual dictionaries non-vacuously', () => {
-    expect(dictionaryFiles.length).toBeGreaterThan(20);
+    const count = dictionaryFiles.reduce(
+      (total, file) =>
+        total +
+        countLocaleDictionaryObjects(path.relative(APP_DIR, file), fs.readFileSync(file, 'utf8')),
+      0,
+    );
+    expect(count).toBeGreaterThan(20);
   });
 
   it('keeps every explicit en/zh object key shape aligned', () => {

@@ -13,7 +13,7 @@ export interface GuardViolation {
 }
 
 export interface BlogGuardException {
-  readonly rule: 'inline-code';
+  readonly rule: 'inline-code' | 'protected-token';
   readonly file: string;
   readonly en: string;
   readonly zh: string;
@@ -155,40 +155,41 @@ export function findDictionaryParityViolations(
 ): GuardViolation[] {
   const sourceFile = parseSource(file, source);
   const violations: GuardViolation[] = [];
-  let enObjectCount = 0;
-  let zhObjectCount = 0;
   const visit = (node: ts.Node): void => {
     if (ts.isObjectLiteralExpression(node)) {
       const en = propertyInitializer(node, 'en');
       const zh = propertyInitializer(node, 'zh');
-      if (en && ts.isObjectLiteralExpression(en)) enObjectCount += 1;
-      if (zh && ts.isObjectLiteralExpression(zh)) zhObjectCount += 1;
-      if (en && zh && ts.isObjectLiteralExpression(en) && ts.isObjectLiteralExpression(zh)) {
-        const enPaths = structuralPaths(en);
-        const zhPaths = structuralPaths(zh);
-        const missingFromEn = [...zhPaths].filter((key) => !enPaths.has(key)).sort();
-        const missingFromZh = [...enPaths].filter((key) => !zhPaths.has(key)).sort();
-        if (missingFromEn.length > 0 || missingFromZh.length > 0) {
-          const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+      const enObject = en && ts.isObjectLiteralExpression(en) ? en : null;
+      const zhObject = zh && ts.isObjectLiteralExpression(zh) ? zh : null;
+      if (enObject || zhObject) {
+        const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+        if (!enObject || !zhObject) {
           violations.push({
-            rule: 'dictionary-key-parity',
+            rule: 'dictionary-locale-pair',
             file: `${file}:${line}`,
-            missingFromEn,
-            missingFromZh,
+            detail: enObject
+              ? '`en` object has no `zh` object sibling'
+              : '`zh` object has no `en` object sibling',
           });
+        } else {
+          const enPaths = structuralPaths(enObject);
+          const zhPaths = structuralPaths(zhObject);
+          const missingFromEn = [...zhPaths].filter((key) => !enPaths.has(key)).sort();
+          const missingFromZh = [...enPaths].filter((key) => !zhPaths.has(key)).sort();
+          if (missingFromEn.length > 0 || missingFromZh.length > 0) {
+            violations.push({
+              rule: 'dictionary-key-parity',
+              file: `${file}:${line}`,
+              missingFromEn,
+              missingFromZh,
+            });
+          }
         }
       }
     }
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
-  if (enObjectCount !== zhObjectCount) {
-    violations.push({
-      rule: 'dictionary-locale-count',
-      file,
-      detail: `${enObjectCount} en object(s), ${zhObjectCount} zh object(s)`,
-    });
-  }
   return violations.filter(
     (violation) =>
       !exceptions.some(
@@ -197,6 +198,24 @@ export function findDictionaryParityViolations(
           dictionaryViolationFingerprint(violation) === exception.mismatchSha256,
       ),
   );
+}
+
+/** Count object literals that contain at least one statically declared locale object. */
+export function countLocaleDictionaryObjects(file: string, source: string): number {
+  const sourceFile = parseSource(file, source);
+  let count = 0;
+  const visit = (node: ts.Node): void => {
+    if (ts.isObjectLiteralExpression(node)) {
+      const en = propertyInitializer(node, 'en');
+      const zh = propertyInitializer(node, 'zh');
+      if ((en && ts.isObjectLiteralExpression(en)) || (zh && ts.isObjectLiteralExpression(zh))) {
+        count += 1;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return count;
 }
 
 function englishSubtrees(file: string, source: string): string[] {
@@ -257,8 +276,54 @@ function multisetsEqual(left: readonly string[], right: readonly string[]): bool
   return a.size === b.size && [...a].every(([key, count]) => b.get(key) === count);
 }
 
+function multisetRemainder(left: readonly string[], right: readonly string[]): string[] {
+  const remaining = multiset(right);
+  return left.filter((value) => {
+    const count = remaining.get(value) ?? 0;
+    if (count === 0) return true;
+    remaining.set(value, count - 1);
+    return false;
+  });
+}
+
+interface TextSpan {
+  readonly start: number;
+  readonly end: number;
+  readonly text: string;
+}
+
+function fencedCodeSpans(raw: string): TextSpan[] {
+  const lines = [...raw.matchAll(/[^\n]*(?:\n|$)/gu)].filter((match) => match[0] !== '');
+  const spans: TextSpan[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const openingText = line[0].replace(/\r?\n$/u, '');
+    const opening = /^ {0,3}(?<fence>`{3,}|~{3,})(?<info>.*)$/u.exec(openingText);
+    if (!opening?.groups) continue;
+    const fence = opening.groups.fence;
+    if (fence.startsWith('`') && opening.groups.info.includes('`')) continue;
+    const closing = new RegExp(
+      `^ {0,3}${fence[0] === '`' ? '`' : '~'}{${fence.length},}[ \\t]*\\r?$`,
+      'u',
+    );
+    let endIndex = lines.length - 1;
+    for (let candidate = index + 1; candidate < lines.length; candidate += 1) {
+      if (closing.test(lines[candidate][0].replace(/\n$/u, ''))) {
+        endIndex = candidate;
+        break;
+      }
+    }
+    const start = line.index ?? 0;
+    const endingLine = lines[endIndex];
+    const end = (endingLine.index ?? 0) + endingLine[0].length;
+    spans.push({ start, end, text: raw.slice(start, end) });
+    index = endIndex;
+  }
+  return spans;
+}
+
 function fencedCode(raw: string): string[] {
-  return [...raw.matchAll(/^```[^\n]*\n[\s\S]*?^```\s*$/gmu)].map((match) => match[0]);
+  return fencedCodeSpans(raw).map((span) => span.text);
 }
 
 function mathBlocks(raw: string): string[] {
@@ -266,15 +331,60 @@ function mathBlocks(raw: string): string[] {
 }
 
 function withoutProtectedBlocks(raw: string): string {
-  return raw
-    .replaceAll(/^```[^\n]*\n[\s\S]*?^```\s*$/gmu, '')
-    .replaceAll(/<JsonLd>\{`[\s\S]*?`\}<\/JsonLd>/gu, '');
+  let cursor = 0;
+  const pieces: string[] = [];
+  for (const span of fencedCodeSpans(raw)) {
+    pieces.push(raw.slice(cursor, span.start), '\n');
+    cursor = span.end;
+  }
+  pieces.push(raw.slice(cursor));
+  return pieces.join('').replaceAll(/<JsonLd>\{`[\s\S]*?`\}<\/JsonLd>/gu, '');
+}
+
+function inlineCodeSpans(source: string): TextSpan[] {
+  const found: TextSpan[] = [];
+  for (let index = 0; index < source.length;) {
+    if (source[index] !== '`') {
+      index += 1;
+      continue;
+    }
+    let delimiterLength = 1;
+    while (source[index + delimiterLength] === '`') delimiterLength += 1;
+    const delimiter = '`'.repeat(delimiterLength);
+    let closing = source.indexOf(delimiter, index + delimiterLength);
+    while (
+      closing !== -1 &&
+      (source[closing - 1] === '`' || source[closing + delimiterLength] === '`')
+    ) {
+      closing = source.indexOf(delimiter, closing + delimiterLength);
+    }
+    if (closing === -1) {
+      index += delimiterLength;
+      continue;
+    }
+    found.push({
+      start: index,
+      end: closing + delimiterLength,
+      text: source.slice(index + delimiterLength, closing),
+    });
+    index = closing + delimiterLength;
+  }
+  return found;
+}
+
+function withoutSpans(source: string, spans: readonly TextSpan[]): string {
+  let cursor = 0;
+  const pieces: string[] = [];
+  for (const span of spans) {
+    pieces.push(source.slice(cursor, span.start), ' ');
+    cursor = span.end;
+  }
+  pieces.push(source.slice(cursor));
+  return pieces.join('');
 }
 
 function inlineCode(raw: string): string[] {
-  return [...withoutProtectedBlocks(raw).matchAll(/(?<!`)`(?<code>[^`\n]+)`(?!`)/gu)].map(
-    (match) => match.groups?.code ?? '',
-  );
+  return inlineCodeSpans(withoutProtectedBlocks(raw)).map((span) => span.text);
 }
 
 function figureSources(raw: string): string[] {
@@ -300,9 +410,22 @@ function normalizeLocalizedLink(target: string): string {
 }
 
 function linkTargets(raw: string): string[] {
-  return [...raw.matchAll(/\]\((?<target>[^)\s]+)(?:\s+"[^"]*")?\)/gu)].map((match) =>
-    normalizeLocalizedLink(match.groups?.target ?? ''),
+  const markdown = [...raw.matchAll(/\]\((?<target>[^)\s]+)(?:\s+"[^"]*")?\)/gu)].map(
+    (match) => match.groups?.target ?? '',
   );
+  const props = [
+    ...raw.matchAll(
+      /\b(?:href|src)\s*=\s*(?:"(?<double>[^"]+)"|'(?<single>[^']+)'|\{\s*"(?<expressionDouble>[^"]+)"\s*\}|\{\s*'(?<expressionSingle>[^']+)'\s*\})/gu,
+    ),
+  ].map(
+    (match) =>
+      match.groups?.double ??
+      match.groups?.single ??
+      match.groups?.expressionDouble ??
+      match.groups?.expressionSingle ??
+      '',
+  );
+  return [...markdown, ...props].map(normalizeLocalizedLink);
 }
 
 function jsonLdValues(raw: string): unknown[] {
@@ -322,11 +445,17 @@ function invalidJsonLd(value: unknown): boolean {
 }
 
 function protectedTokens(raw: string): string[] {
-  const prose = withoutProtectedBlocks(raw);
+  const withoutBlocks = withoutProtectedBlocks(raw);
+  const prose = withoutSpans(withoutBlocks, inlineCodeSpans(withoutBlocks));
   const pattern =
-    /--[a-z0-9][\w.-]*(?:=[^\s,，。;；)）`]+)?|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:tokens?\/s(?:\/(?:user|gpu|GPU|chip))?|GB\/s|TB\/s|GB|TB|ms|µs|ns|kW|MW)\b|\$\/(?:M\s+tok|chip-hour)/gu;
+    /--[a-z0-9](?:[\w.-]*[a-z0-9])?(?:=[^\s,，。;；)）`]+)?|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:tokens?|tok)\/s(?:\/(?:user|gpu|GPU|chip))?\b|\b[KMGTPE]?FLOP\/s\b|\b(?:GPU|chip)\/(?:hr|hour)\b|\b(?:GB\/s|TB\/s|GB|TB|ms|µs|ns|kW|MW)\b|\$\/(?:M\s+(?:tok|tokens?)|(?:GPU|chip)[/-](?:hr|hour))/gu;
   return [...prose.matchAll(pattern)].map((match) =>
-    match[0].replace(/^tokens?(?=\/s)/u, 'tok').replace('/GPU', '/gpu'),
+    match[0]
+      .replace(/^tokens?(?=\/s)/u, 'tok')
+      .replace('/GPU', '/gpu')
+      .replace(/GPU\/(?:hr|hour)/u, 'gpu/hr')
+      .replace(/chip[/-](?:hr|hour)/u, 'chip/hr')
+      .replace(/M\s+tokens?$/u, 'M tok'),
   );
 }
 
@@ -375,6 +504,24 @@ function addDifference(
   }
 }
 
+function applyBlogExceptions(
+  rule: BlogGuardException['rule'],
+  file: string,
+  enValues: string[],
+  zhValues: string[],
+  exceptions: readonly BlogGuardException[],
+): void {
+  for (const exception of exceptions.filter((item) => item.file === file && item.rule === rule)) {
+    const enIndex = exception.en === '' ? -1 : enValues.indexOf(exception.en);
+    const zhIndex = exception.zh === '' ? -1 : zhValues.indexOf(exception.zh);
+    const enMatched = exception.en === '' || enIndex !== -1;
+    const zhMatched = exception.zh === '' || zhIndex !== -1;
+    if (!enMatched || !zhMatched) continue;
+    if (enIndex !== -1) enValues.splice(enIndex, 1);
+    if (zhIndex !== -1) zhValues.splice(zhIndex, 1);
+  }
+}
+
 /** Compare objective, non-editorial invariants in one English/Chinese MDX pair. */
 export function compareBlogPair(
   file: string,
@@ -389,18 +536,17 @@ export function compareBlogPair(
 
   const enInline = inlineCode(en);
   const zhInline = inlineCode(zh);
-  for (const exception of exceptions.filter((item) => item.file === file)) {
-    const enIndex = enInline.indexOf(exception.en);
-    const zhIndex = zhInline.indexOf(exception.zh);
-    if (enIndex !== -1 && zhIndex !== -1) {
-      enInline.splice(enIndex, 1);
-      zhInline.splice(zhIndex, 1);
-    }
-  }
+  applyBlogExceptions('inline-code', file, enInline, zhInline, exceptions);
   if (!multisetsEqual(enInline, zhInline)) violations.push({ rule: 'inline-code', file });
-  const zhProtected = new Set(protectedTokens(zh));
-  if (![...new Set(protectedTokens(en))].every((token) => zhProtected.has(token))) {
-    violations.push({ rule: 'protected-token', file });
+  const enProtected = protectedTokens(en);
+  const zhProtected = protectedTokens(zh);
+  applyBlogExceptions('protected-token', file, enProtected, zhProtected, exceptions);
+  if (!multisetsEqual(enProtected, zhProtected)) {
+    violations.push({
+      rule: 'protected-token',
+      file,
+      detail: `missingFromZh=${JSON.stringify(multisetRemainder(enProtected, zhProtected))} missingFromEn=${JSON.stringify(multisetRemainder(zhProtected, enProtected))}`,
+    });
   }
   if (!multisetsEqual(linkTargets(en), linkTargets(zh))) {
     violations.push({ rule: 'link-target', file });
@@ -422,17 +568,45 @@ export function compareBlogPair(
   return violations;
 }
 
-function chineseSegments(source: string): string[] {
-  if (!HAN.test(source)) return [];
+function mdxChineseSegments(source: string): string[] {
   const literals = (source.match(STRING_LITERAL) ?? []).filter((text) => HAN.test(text));
-  return literals.length > 0 ? literals : [source];
+  const visible = source
+    .replaceAll(STRING_LITERAL, 'X')
+    .replaceAll(/<[^>]*>/gsu, '')
+    .split('\n')
+    .filter((text) => HAN.test(text));
+  return [...literals, ...visible];
+}
+
+function chineseSegments(file: string, source: string): string[] {
+  if (!HAN.test(source)) return [];
+  if (file.endsWith('.mdx')) return mdxChineseSegments(source);
+
+  const sourceFile = parseSource(file, source);
+  const segments: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isStringLiteral(node) ||
+      ts.isNoSubstitutionTemplateLiteral(node) ||
+      ts.isJsxText(node) ||
+      node.kind === ts.SyntaxKind.TemplateHead ||
+      node.kind === ts.SyntaxKind.TemplateMiddle ||
+      node.kind === ts.SyntaxKind.TemplateTail
+    ) {
+      const text = node.getText(sourceFile);
+      if (HAN.test(text)) segments.push(text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return segments.length > 0 ? segments : [source];
 }
 
 /** High-confidence copy checks only; no fluency, clause-order, register, or pronoun heuristics. */
 export function findMechanicalCopyViolations(file: string, source: string): GuardViolation[] {
   const violations: GuardViolation[] = [];
   const scanSource = file.endsWith('.mdx') ? withoutProtectedBlocks(source) : source;
-  for (const text of chineseSegments(scanSource)) {
+  for (const text of chineseSegments(file, scanSource)) {
     const withoutUnits = text.replaceAll(CHIP_UNIT, '');
     if (/\b[Cc]hip\b/gu.test(withoutUnits)) {
       violations.push({ rule: 'chip-untranslated', file });
@@ -445,10 +619,14 @@ export function findMechanicalCopyViolations(file: string, source: string): Guar
       violations.push({ rule: 'duplicated-technical-loanword', file });
     }
     if (/\s+[，。！？；：]|(?:,，|，,|\.。|。\.)/u.test(text)) {
-      violations.push({ rule: 'malformed-chinese-punctuation', file });
+      violations.push({
+        rule: 'malformed-chinese-punctuation',
+        file,
+        detail: text.replaceAll(/\s+/gu, ' ').trim().slice(0, 160),
+      });
     }
   }
-  if (/\bzh:\s*\{/u.test(source)) {
+  if (countLocaleDictionaryObjects(file, source) > 0) {
     const labels = [...source.matchAll(/<strong>(?<label>[A-Za-z][^<${}]{2,45}):<\/strong>/gu)]
       .map((match) => match.groups?.label ?? '')
       .filter((label) => !label.includes('/') && !/^[A-Z0-9]+$/u.test(label));
