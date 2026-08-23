@@ -36,9 +36,9 @@ interface FrameworkTranslation {
 }
 
 const OVERVIEW_ZH = {
-  eyebrow: 'AgentX 行业影响',
+  eyebrow: 'AgentX 的行业影响',
   title: '面向智能体负载的优化',
-  lead: 'AgentX 上线头几个月最有价值的产出并不是开源数据集，而是 AgentX 合作伙伴以 AgentX 为北极星，为真实智能体负载提交的 50 多个上游 PR。',
+  lead: 'AgentX 推出后的最初几个月，最有价值的成果并非开源数据集，而是合作伙伴围绕真实智能体负载提交的 50 多个上游 PR。AgentX 为这些优化提供了统一的衡量基准。',
   intro: [
     'AgentX 回放的是真实智能体流量，因此它衡量的远不止 prefill 与 decode 内核本身，而是端到端的完整链路：KV cache 生命周期、混合注意力（hybrid attention）cache 正确性、CPU KV offload、传输进度、路由亲和性、增量 tokenization、请求序列化以及调度器记账。这些开销每一项都是生产环境智能体部署已经在付的成本，而单轮 8k/1k 场景一项也测不出来。',
     'SemiAnalysis 与 AMD 软件团队多年协作、推动其软件开发方式现代化，下面的许多工作正是这一协作的成果，它们让 AMD 开源栈在智能体负载上更接近一流水平。',

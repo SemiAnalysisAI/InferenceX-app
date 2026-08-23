@@ -27,7 +27,7 @@ interface SectionTranslation {
 
 const GUIDE_ZH = {
   eyebrow: 'AgentX 教程',
-  title: '深入解读智能体负载：详细遥测数据',
+  title: '通过详细遥测数据解析智能体负载',
   lead: 'AgentX 上的一个数据点，背后是数千个请求，跨越不断增长的对话、subagent、warmup 阶段、cache 状态，以及动态变化的在途负载。本文介绍如何把这个点展开来看。',
   intro: [
     'AgentX 需要的不只是新的基准测试框架和数据集。我们还花了一些时间重构 InferenceX 的可视化，让智能体测试结果更容易探索和理解。Pareto 曲线上的单个点会掩盖大量有价值的信息，因此 AgentX 图表上的每个点现在都是进入其背后完整运行数据的入口。',

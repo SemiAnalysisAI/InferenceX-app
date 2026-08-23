@@ -86,9 +86,11 @@ Do not use fixed substitutions for contextual questions. In particular:
 - sentence length alone is not evidence of translationese;
 - technical English is not wrong merely because a Chinese equivalent exists;
 - one concept may need different wording in a UI action, prose, a unit, or an attributed quote;
-- first-party ML infrastructure UI and technical prose normally keep `warmup`, `seed`, and
-  `offload` in English; Chinese-first explanations such as `预热（warmup）` remain valid for a
-  broader audience, and attributed quotations preserve the speaker's wording;
+- established English technical terms and phrases that Chinese ML infrastructure engineers
+  normally use in English should remain English in first-party UI and technical prose; judge this
+  from real industry usage and the surface, not from a closed list. `warmup`, `seed`, and `offload`
+  are examples, not the whole category. Chinese-first explanations such as `预热（warmup）` remain
+  valid for a broader audience, and attributed quotations preserve the speaker's wording;
 - `您` is normally omitted in controls and tooltips but may be intentional in a respectful CTA;
 - #819 and other bulk-rewrite outputs are not automatic editorial ground truth; only their
   separately verified mechanical cases may seed deterministic CI fixtures.

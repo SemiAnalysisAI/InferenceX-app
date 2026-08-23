@@ -20,15 +20,17 @@ restrained, and easy to read without consulting the English source.
 - Prefer ordinary technical Chinese over slogans, literal metaphors, and stacked nouns.
 - Preserve facts, qualifications, modality, numbers, units, product names, and attribution.
 - Do not add confidence, causality, or endorsement that is absent from the English source.
-- Keep English only when Chinese practitioners normally keep it: product and model names,
-  hardware SKUs, framework names, flags, identifiers, and units.
+- Keep English when Chinese practitioners normally do: product and model names, hardware SKUs,
+  framework names, flags, identifiers, units, and established English technical terms or phrases.
+  Decide from real industry usage and the surface, not from a closed list.
 
 - 先说用户动作、结果或核心判断，不照搬英文的前置修饰链。
 - 使用工程师日常采用的技术中文，避免口号、直译隐喻和名词堆叠。
 - 保留事实、限定条件、语气强弱、数字、单位、产品名和署名。
 - 英文原文没有表达的确定性、因果关系或背书，不得自行添加。
-- 只有中文技术社区通常保留英文时才不翻译，例如产品与模型名称、硬件 SKU、框架名、
-  flag、标识符和单位。
+- 中文技术社区通常直接使用的英文应保留，包括产品与模型名称、硬件 SKU、框架名、flag、
+  标识符、单位，以及行业中已习惯使用英文的技术术语和短语。应结合真实行业用法和界面场景
+  判断，不能依赖封闭词表。
 
 ## Register by surface / 不同界面的语域
 
@@ -83,8 +85,16 @@ first gate; an accurate but translation-shaped sentence fails the second. Both m
 The table records defaults, not blind substitutions. When an exception is needed, document the
 surface and reason in the PR or add a reviewed example here.
 
+Established English technical terms and phrases that Chinese ML infrastructure engineers normally
+use in English should not be translated merely to increase Chinese-language coverage. This is an
+open, context-dependent category: `warmup`, `seed`, and `offload` are examples, not its boundaries.
+
 下表记录默认写法，不是全局替换表。需要例外时，应在 PR 中说明使用场景与理由，或将经过
 审核的案例补充到本文。
+
+中文 ML 基础设施工程师在行业实践中通常直接使用的英文技术术语和短语，不应为了提高中文
+占比而强行翻译。这是一个需要结合上下文判断的开放类别；`warmup`、`seed`、`offload` 只是
+示例，并非完整清单。
 
 | English                | Preferred rendering | Context and exceptions                                                                                                                                                                                                                                                                                                                              |
 | ---------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

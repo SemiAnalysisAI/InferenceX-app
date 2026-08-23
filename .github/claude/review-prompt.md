@@ -109,8 +109,7 @@ Not worth a comment:
 
 - Wording you would have phrased differently when the existing rendering is accurate and natural.
 - Long Chinese sentences per se. Length is not evidence of translationese.
-- English technical terms whose Chinese equivalent is not what practitioners actually write. Decide from real Chinese ML infrastructure usage, not from capitalization.
-- `warmup`, `seed`, or `offload` in first-party ML infrastructure UI and technical prose. These normally stay English; Chinese-first explanations may be appropriate for a broader audience, and attributed quotations preserve the speaker's wording.
+- Established English technical terms and phrases that Chinese ML infrastructure engineers normally use in English. Keep them English in first-party UI and technical prose; decide from real industry usage and the surface, not from a closed list or capitalization. `warmup`, `seed`, and `offload` are examples, not the whole category. Chinese-first explanations may be appropriate for a broader audience, and attributed quotations preserve the speaker's wording.
 - `您` solely because it appears. Controls normally omit the pronoun, but a respectful CTA may use it intentionally.
 - Awkward Chinese the diff did not touch. Mention it separately from the review.
 
