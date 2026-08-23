@@ -145,7 +145,10 @@ function inputTokenShare(row: BenchmarkRow, inputTput: number, outputTput: numbe
   if (typeof prompt === 'number' && typeof generated === 'number' && prompt + generated > 0) {
     return prompt / (prompt + generated);
   }
-  return sum > 0 ? inputTput / sum : null;
+  // The remaining rates are known to be on incompatible denominators. Treat
+  // the mix as unknown rather than turning a per-prefill/per-decode ratio into
+  // a fleet-wide token share and billing input volume the fleet did not serve.
+  return null;
 }
 
 /**

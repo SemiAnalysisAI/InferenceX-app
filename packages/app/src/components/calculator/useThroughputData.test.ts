@@ -1316,6 +1316,35 @@ describe('buildGpuGroups', () => {
       );
       expect(Object.values(grouped)[0][0].inputTokenShare).toBeCloseTo(0.9, 9);
     });
+
+    it('leaves the share unknown when disaggregated rates have no trustworthy mix', () => {
+      const { grouped } = buildGpuGroups(
+        [
+          makeRow({
+            disagg: true,
+            benchmark_type: 'agentic_traces',
+            isl: null,
+            osl: null,
+            metrics: {
+              p90_itl: 1 / 50,
+              tput_per_gpu: 300,
+              input_tput_per_gpu: 400,
+              output_tput_per_gpu: 100,
+            },
+          }),
+        ],
+        {
+          sequence: Sequence.AgenticTraces,
+          precisions: ['fp4'],
+          classify: singlePrecisionClassify,
+        },
+      );
+
+      // 400 / (400 + 100) is a ratio of per-pool rates, not a fleet-wide
+      // token share. Leaving it absent makes lifecycle revenue charge no input
+      // tokens instead of inventing an 80% input mix.
+      expect(Object.values(grouped)[0][0].inputTokenShare).toBeUndefined();
+    });
   });
 
   it('drops rows whose isl/osl do not match the selected sequence', () => {
