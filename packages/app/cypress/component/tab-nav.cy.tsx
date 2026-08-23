@@ -160,4 +160,37 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     mountTabNav({ pathname: '/inference' });
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.have.class', 'border-secondary');
   });
+
+  it('renders gated navigation entirely in Chinese on a /zh route', () => {
+    cy.viewport(1440, 900);
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+    mountTabNav({ pathname: '/zh/ai-chart' });
+
+    cy.get('[data-testid="tab-trigger-hidden"]')
+      .should('contain.text', '隐藏')
+      .and('have.class', 'border-secondary')
+      .click();
+    cy.get('[data-testid="tab-trigger-ai-chart"]')
+      .should('contain.text', 'AI 图表')
+      .and('have.attr', 'href', '/zh/ai-chart');
+    cy.get('[data-testid="tab-trigger-feedback"]')
+      .should('contain.text', '反馈')
+      .and('have.attr', 'href', '/zh/feedback');
+  });
+
+  it('keeps the gated group reachable and localized at 375px', () => {
+    cy.viewport(375, 812);
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+    mountTabNav({ pathname: '/zh/inference' });
+
+    cy.contains('label', '选择图表').should('be.visible');
+    cy.get('[data-testid="mobile-chart-select"]').click();
+    cy.contains('[role="group"]', '隐藏').within(() => {
+      cy.contains('[role="option"]', 'AI 图表').should('be.visible');
+      cy.contains('[role="option"]', '反馈').should('be.visible');
+    });
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
 });

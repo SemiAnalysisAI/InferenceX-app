@@ -135,7 +135,7 @@ export default async function ZhBlogPostPage({ params }: Props) {
             </header>
             {headings.length > 0 && (
               <div className="mt-4">
-                <BlogToc headings={headings} label="本页目录" />
+                <BlogToc headings={headings} locale="zh" />
               </div>
             )}
             <div className="mt-6 pt-6 border-t border-border/40">

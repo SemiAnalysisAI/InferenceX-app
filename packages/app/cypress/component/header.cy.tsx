@@ -131,6 +131,25 @@ describe('Header', () => {
       .should('have.text', '新');
   });
 
+  it('localizes the mobile navigation accessible name without changing English', () => {
+    cy.viewport(390, 844);
+    cy.get('[data-testid="mobile-menu-toggle"]').should(
+      'have.attr',
+      'aria-label',
+      'Navigation menu',
+    );
+
+    mountHeader('/zh/inference');
+    cy.get('[data-testid="mobile-menu-toggle"]')
+      .should('have.attr', 'aria-label', '导航菜单')
+      .click()
+      .should('have.attr', 'aria-expanded', 'true');
+    cy.get('[data-testid="mobile-menu"]').within(() => {
+      cy.contains('a', '总览').should('have.attr', 'href', '/zh/overview');
+      cy.contains('a', '仪表板').should('have.attr', 'href', '/zh/inference');
+    });
+  });
+
   it('orders the nav with Home first and AgentX second', () => {
     const expected = [
       'Home',

@@ -136,6 +136,42 @@ describe('Chinese (/zh) pages', () => {
     it('links to the English original', () => {
       cy.get('a[href="/blog/inferencemax-open-source-inference-benchmarking"]').should('exist');
     });
+
+    it('localizes the table of contents and heading-link controls at mobile widths', () => {
+      cy.viewport(390, 844);
+      cy.get('details[aria-label="本页目录"]')
+        .should('be.visible')
+        .find('summary')
+        .should('contain.text', '点击展开')
+        .and('not.contain.text', 'click to expand');
+      cy.get('article.prose a[aria-label="复制本节链接"]')
+        .first()
+        .should('have.attr', 'href')
+        .and('match', /^#/u);
+      cy.get('article.prose a[aria-label="Copy link to section"]').should('not.exist');
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
+    });
+  });
+
+  describe('localized not-found pages', () => {
+    it('returns a noindex Chinese 404 for unknown /zh paths', () => {
+      const path = '/zh/this-route-does-not-exist';
+      cy.request({ url: path, failOnStatusCode: false }).its('status').should('eq', 404);
+      cy.visit(path, { failOnStatusCode: false });
+
+      cy.contains('h1', '404 - 页面不存在').should('be.visible');
+      cy.contains('找不到该页面。').should('be.visible');
+      cy.get('a[href="/zh"]').should('have.text', '返回首页');
+      cy.get('meta[name="robots"]').should('have.attr', 'content').and('include', 'noindex');
+      cy.get('link[rel="canonical"]').should('not.exist');
+      cy.get('link[rel="alternate"][hreflang]').should('not.exist');
+      cy.viewport(375, 812);
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
+    });
   });
 
   describe('zh blog post with math', () => {

@@ -105,7 +105,7 @@ export function createMdxComponents(
       return (
         <h2 id={id} className="group" {...props}>
           {props.children}
-          <HeadingLink id={id} />
+          <HeadingLink id={id} locale={locale} />
         </h2>
       );
     },
@@ -114,7 +114,7 @@ export function createMdxComponents(
       return (
         <h2 id={id} className="group" {...props}>
           {props.children}
-          <HeadingLink id={id} />
+          <HeadingLink id={id} locale={locale} />
         </h2>
       );
     },
@@ -123,7 +123,7 @@ export function createMdxComponents(
       return (
         <h3 id={id} className="group" {...props}>
           {props.children}
-          <HeadingLink id={id} />
+          <HeadingLink id={id} locale={locale} />
         </h3>
       );
     },

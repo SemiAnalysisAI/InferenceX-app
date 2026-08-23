@@ -272,7 +272,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 onClick={toggleMenu}
                 className="flex items-center justify-center size-11 rounded-md transition-colors hover:bg-muted cursor-pointer"
                 aria-expanded={mobileMenuOpen}
-                aria-label="Navigation menu"
+                aria-label={isZh ? '导航菜单' : 'Navigation menu'}
               >
                 <svg
                   width="20"
