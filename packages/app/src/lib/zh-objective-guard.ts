@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 
-import { tokenizer } from 'acorn';
+import { Parser } from 'acorn';
+import jsx from 'acorn-jsx';
 import ts from 'typescript';
 
 export interface GuardViolation {
@@ -38,6 +39,7 @@ export interface DictionaryGuardException {
 const HAN = /\p{Script=Han}/u;
 const STRING_LITERAL = /'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/gsu;
 const CHIP_UNIT = /(?:tok|tokens?)\/s\/chip|\$\/chip[/-](?:hr|hour)|[A-Za-z]Chip\b|\bChip[A-Z]/giu;
+const MDX_EXPRESSION_PARSER = Parser.extend(jsx());
 
 function normalizedFile(file: string): string {
   return file.split(path.sep).join('/');
@@ -422,7 +424,9 @@ function withoutSpans(source: string, spans: readonly TextSpan[]): string {
 }
 
 function mdxExpressionClosingBrace(source: string, openingBrace: number): number | null {
-  const tokens = tokenizer(source.slice(openingBrace + 1), { ecmaVersion: 'latest' });
+  const tokens = MDX_EXPRESSION_PARSER.tokenizer(source.slice(openingBrace + 1), {
+    ecmaVersion: 'latest',
+  });
   let nestedBraceDepth = 0;
   try {
     for (;;) {

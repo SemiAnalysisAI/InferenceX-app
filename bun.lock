@@ -78,6 +78,7 @@
         "@types/three": "^0.185.4",
         "@vitest/coverage-v8": "^4.1.11",
         "acorn": "^8.16.0",
+        "acorn-jsx": "^5.3.2",
         "axe-core": "^4.13.0",
         "cypress": "15.21.1",
         "cypress-axe": "^1.7.0",

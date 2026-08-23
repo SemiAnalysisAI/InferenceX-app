@@ -318,6 +318,11 @@ $$
         '[.../}/.exec(score)].length > 0',
         String.raw`/[}\]]/.test(score) && score > 0`,
         ['`outer $', '{`inner }`}`.length > 0'].join(''),
+        '<span>ok</span>',
+        '() => <span>ok</span>',
+        '<>ok</>',
+        '<span>{score > 0 ? "yes" : "no"}</span>',
+        'items.map((item) => <span>{item}</span>)',
       ]) {
         const enMdx = `<DashboardCTA enabled={${expression}} href={\`/blog/next\`}>Open</DashboardCTA>`;
         const zhMdx = `<DashboardCTA enabled={${expression}} href={\`/zh/blog/next\`}>打开</DashboardCTA>`;

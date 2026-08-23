@@ -215,10 +215,11 @@ an accepted exception mutation.
   reference definitions, and static string/template-literal props are all covered. Chinese
   internal links may add `/zh` (including `/blog` → `/zh/blog`),
   same-page heading fragments may be localized, and link order may change when paragraphs are
-  reorganized. JSX attribute expressions are tokenized as JavaScript, so division, regular-expression
-  literals, comments, nested template interpolation, comparisons, and arrow operators before a static
-  link prop do not truncate the tag. Protected-token counts are bidirectional: deleting or adding a
-  flag, identifier, or unit occurrence fails. Protected forms include throughput, FLOP,
+  reorganized. JSX attribute expressions use a JSX-aware JavaScript tokenizer, so division,
+  regular-expression literals, comments, nested template interpolation, nested JSX or fragments,
+  comparisons, and arrow operators before a static link prop do not truncate the tag. Protected-token
+  counts are bidirectional: deleting or adding a flag, identifier, or unit occurrence fails. Protected
+  forms include throughput, FLOP,
   bit-bandwidth, power-per-GPU, slash or hyphen GPU/chip-hour forms, and numeric cost-rate units used
   by the real corpus. JSON-LD wrappers may contain legal whitespace and newlines, including in fenced
   examples without leaking into prose scans. Their prose values may be translated; keys, types,
@@ -258,9 +259,10 @@ an accepted exception mutation.
   尖括号 destination、reference definition，以及静态字符串或 template literal 属性都在
   检查范围内。中文站内链接可以添加 `/zh`
   （包括 `/blog` → `/zh/blog`）；页内标题锚点可以随中文标题本地化；段落重组时链接顺序可以
-  变化。JSX 属性表达式会按 JavaScript token 解析，因此静态链接属性前的除法、正则表达式
-  literal、注释、嵌套 template interpolation、比较和箭头运算符都不会截断标签。受保护 token
-  会双向核对出现次数，增删任何 flag、identifier 或单位都会失败；
+  变化。JSX 属性表达式会使用支持 JSX 的 JavaScript tokenizer，因此静态链接属性前的除法、
+  正则表达式 literal、注释、嵌套 template interpolation、嵌套 JSX 或 fragment、比较和箭头
+  运算符都不会截断标签。受保护 token 会双向核对出现次数，增删任何 flag、identifier 或单位
+  都会失败；
   实际语料中的吞吐量、FLOP、bit 带宽、每 GPU 功耗、斜杠或连字符形式的 GPU/chip-hour，
   以及数值成本率等单位都会覆盖。JSON-LD wrapper 可以包含合法空白与换行；即使它位于 fenced
   示例中，也不会泄漏到正文扫描。JSON-LD 中的说明性文案可以翻译，但 key、type、数组结构，
