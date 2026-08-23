@@ -53,12 +53,37 @@
     },
     {
       "rule": "protected-token",
+      "file": "gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt.mdx",
+      "en": "gpu/hr",
+      "zh": "",
+      "pairSha256": "2f48e280295501b888d7bfb1b6bbef741f0827855a18dc0a3dd225059ee6d4f0",
+      "reason": "The baseline Chinese JSON-LD renders one GPU-hour occurrence as natural prose; the Blog rewrite branch owns the structured-data correction.",
+      "removeWhen": "Delete this row when one missing Chinese GPU-hour occurrence is restored in JSON-LD."
+    },
+    {
+      "rule": "protected-token",
+      "file": "gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt.mdx",
+      "en": "gpu/hr",
+      "zh": "",
+      "reason": "The baseline Chinese JSON-LD renders a second GPU-hour occurrence as natural prose; the Blog rewrite branch owns the structured-data correction.",
+      "removeWhen": "Delete this row when the second missing Chinese GPU-hour occurrence is restored in JSON-LD."
+    },
+    {
+      "rule": "protected-token",
       "file": "gb300-nvl72-vs-gb200-nvl72-dsv4-pro-vllm-fp4.mdx",
       "en": "tok/s/gpu",
       "zh": "GB",
       "pairSha256": "40f24e77ac9b75578c3c29d4ff9d8e354452daeb6ceab753be5b31a7e01a18a7",
       "reason": "The paired baseline articles differ by one tok/s/gpu and two GB occurrences; the Blog rewrite branch owns that content correction.",
       "removeWhen": "Delete this row when the tok/s/gpu and one extra GB mismatch is removed."
+    },
+    {
+      "rule": "protected-token",
+      "file": "gb300-nvl72-vs-gb200-nvl72-dsv4-pro-vllm-fp4.mdx",
+      "en": "gpu/hr",
+      "zh": "",
+      "reason": "The baseline Chinese JSON-LD renders GPU-hour as natural prose; the Blog rewrite branch owns the structured-data correction.",
+      "removeWhen": "Delete this row when the missing Chinese GPU-hour occurrence is restored in JSON-LD."
     },
     {
       "rule": "protected-token",
@@ -175,6 +200,30 @@
       "zh": "",
       "reason": "The baseline Chinese article is missing two further MW occurrences owned by the Blog rewrite branch.",
       "removeWhen": "Delete this row when the final missing Chinese MW occurrence is restored."
+    },
+    {
+      "rule": "protected-token",
+      "file": "vera-rubin-nvl72-vs-gb200-nvl72-inference.mdx",
+      "en": "gpu/hr",
+      "zh": "",
+      "reason": "The baseline Chinese JSON-LD renders one GPU-hour occurrence as natural prose; the Blog rewrite branch owns the structured-data correction.",
+      "removeWhen": "Delete this row when one missing Chinese GPU-hour occurrence is restored in JSON-LD."
+    },
+    {
+      "rule": "protected-token",
+      "file": "vera-rubin-nvl72-vs-gb200-nvl72-inference.mdx",
+      "en": "gpu/hr",
+      "zh": "",
+      "reason": "The baseline Chinese JSON-LD renders a second GPU-hour occurrence as natural prose; the Blog rewrite branch owns the structured-data correction.",
+      "removeWhen": "Delete this row when the second missing Chinese GPU-hour occurrence is restored in JSON-LD."
+    },
+    {
+      "rule": "protected-token",
+      "file": "vera-rubin-nvl72-vs-gb200-nvl72-inference.mdx",
+      "en": "gpu/hr",
+      "zh": "",
+      "reason": "The baseline Chinese JSON-LD renders a third GPU-hour occurrence as natural prose; the Blog rewrite branch owns the structured-data correction.",
+      "removeWhen": "Delete this row when the third missing Chinese GPU-hour occurrence is restored in JSON-LD."
     }
   ],
   "dictionaries": [

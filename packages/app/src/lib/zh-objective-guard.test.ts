@@ -310,8 +310,8 @@ $$
     });
 
     it('protects static template-literal link props without treating them as inline code', () => {
-      const enMdx = '<DashboardCTA href={`/blog/next`}>Open</DashboardCTA>';
-      const zhMdx = '<DashboardCTA href={`/zh/blog/next`}>打开</DashboardCTA>';
+      const enMdx = '<DashboardCTA enabled={score > 0} href={`/blog/next`}>Open</DashboardCTA>';
+      const zhMdx = '<DashboardCTA enabled={score > 0} href={`/zh/blog/next`}>打开</DashboardCTA>';
       expect(compareBlogPair('template-prop.mdx', enMdx, zhMdx, [])).toEqual([]);
       expect(
         compareBlogPair('template-prop.mdx', enMdx, zhMdx.replace('/next', '/wrong'), []),
@@ -377,14 +377,17 @@ $$
     });
 
     it('protects real throughput, bandwidth, power, and numeric cost-rate forms', () => {
-      const enMdx = 'Rate: 8 tok/sec/user, 400 Gbit/s, 2 kW/GPU, and $1.35/M.';
-      const zhMdx = '速率：8 tok/s/user、400 Gbit/s、2 kW/gpu，成本为 $1.35/M。';
+      const enMdx =
+        'Rate: 8 tok/sec/user, 400 Gbit/s, 2 kW/GPU, $1.35/M, 3 GPU-hour, and 4 chip-hour.';
+      const zhMdx = '速率：8 tok/s/user、400 Gbit/s、2 kW/gpu、$1.35/M、3 GPU/hr 和 4 chip/hr。';
       expect(compareBlogPair('real-units.mdx', enMdx, zhMdx, [])).toEqual([]);
       for (const mutated of [
         zhMdx.replace('tok/s/user', 'tok/s/gpu'),
         zhMdx.replace('Gbit/s', 'GB/s'),
         zhMdx.replace('kW/gpu', 'MW/gpu'),
         zhMdx.replace('$1.35/M', '$1.53/M'),
+        zhMdx.replace('GPU/hr', 'GPU/day'),
+        zhMdx.replace('chip/hr', 'chip/day'),
       ]) {
         expect(compareBlogPair('real-units.mdx', enMdx, mutated, [])).toContainEqual(
           expect.objectContaining({ rule: 'protected-token' }),
@@ -540,6 +543,16 @@ $$
       expect(findMechanicalCopyViolations('copy.mdx', source)).toContainEqual(
         expect.objectContaining({ rule: 'malformed-chinese-punctuation' }),
       );
+    });
+
+    it('keeps nested JSON-LD examples inside fenced code out of mechanical prose scans', () => {
+      const source = [
+        '```mdx',
+        '<JsonLd>{`{"name":"示例"}`}</JsonLd>',
+        '后续中文 Chip',
+        '```',
+      ].join('\n');
+      expect(findMechanicalCopyViolations('copy.mdx', source)).toEqual([]);
     });
   });
 });

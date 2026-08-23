@@ -215,11 +215,15 @@ an accepted exception mutation.
   reference definitions, and static string/template-literal props are all covered. Chinese
   internal links may add `/zh` (including `/blog` → `/zh/blog`),
   same-page heading fragments may be localized, and link order may change when paragraphs are
-  reorganized. Protected-token counts are bidirectional: deleting or adding a flag, identifier,
-  or unit occurrence fails. Protected forms include throughput, FLOP, bit-bandwidth, power-per-GPU,
-  GPU-hour, and numeric cost-rate units used by the real corpus. JSON-LD wrappers may contain legal
-  whitespace and newlines. Their prose values may be translated; keys, types, array shape, and the
-  exact object/array paths of URLs, numbers, booleans, dates, flags, and identifiers remain protected.
+  reorganized. JSX expressions are brace- and string-aware, so comparison or arrow operators before
+  a static link prop do not truncate the tag. Protected-token counts are bidirectional: deleting or
+  adding a flag, identifier, or unit occurrence fails. Protected forms include throughput, FLOP,
+  bit-bandwidth, power-per-GPU, slash or hyphen GPU/chip-hour forms, and numeric cost-rate units used
+  by the real corpus. JSON-LD wrappers may contain legal whitespace and newlines, including in fenced
+  examples without leaking into prose scans. Their prose values may be translated; keys, types,
+  array shape, and the exact object/array paths of URLs, numbers, booleans, dates, flags, and
+  identifiers remain protected. GPU/chip-hour occurrence counts remain protected even when they
+  appear inside otherwise translatable JSON-LD prose.
 - Every containing object with an explicit `en` or `zh` object literal must carry the other locale,
   and the two objects must have the same statically declared nested key shape. Identifier and
   quoted locale keys are treated alike. Computed keys and spread contents cannot be proven locally
@@ -253,10 +257,13 @@ an accepted exception mutation.
   尖括号 destination、reference definition，以及静态字符串或 template literal 属性都在
   检查范围内。中文站内链接可以添加 `/zh`
   （包括 `/blog` → `/zh/blog`）；页内标题锚点可以随中文标题本地化；段落重组时链接顺序可以
-  变化。受保护 token 会双向核对出现次数，增删任何 flag、identifier 或单位都会失败；实际
-  语料中的吞吐量、FLOP、bit 带宽、每 GPU 功耗、GPU-hour 和数值成本率等单位都会覆盖。
-  JSON-LD wrapper 可以包含合法空白与换行，其中的说明性文案可以翻译，但 key、type、数组
-  结构，以及 URL、数字、boolean、日期、flag 和 identifier 所在的对象/数组路径必须保持不变。
+  变化。JSX 表达式会按大括号和字符串边界解析，因此静态链接属性前的比较或箭头运算符不会
+  截断标签。受保护 token 会双向核对出现次数，增删任何 flag、identifier 或单位都会失败；
+  实际语料中的吞吐量、FLOP、bit 带宽、每 GPU 功耗、斜杠或连字符形式的 GPU/chip-hour，
+  以及数值成本率等单位都会覆盖。JSON-LD wrapper 可以包含合法空白与换行；即使它位于 fenced
+  示例中，也不会泄漏到正文扫描。JSON-LD 中的说明性文案可以翻译，但 key、type、数组结构，
+  以及 URL、数字、boolean、日期、flag 和 identifier 所在的对象/数组路径必须保持不变；即使
+  GPU/chip-hour 出现在其他内容可翻译的 JSON-LD 文案中，其出现次数仍受保护。
 - 只要一个 containing object 中显式声明了 `en` 或 `zh` object literal，就必须同时声明另一
   个 locale，且两者的静态嵌套 key 结构一致；identifier key 与带引号的 locale key 采用相同
   规则。computed key 和 spread 的内容无法在本地可靠推断，不纳入该结构检查；同一对象中的

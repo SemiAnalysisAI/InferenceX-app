@@ -366,6 +366,11 @@ function withoutProtectedBlocks(raw: string): string {
     (left, right) => left.start - right.start,
   );
   for (const span of spans) {
+    if (span.end <= cursor) continue;
+    if (span.start < cursor) {
+      cursor = span.end;
+      continue;
+    }
     pieces.push(raw.slice(cursor, span.start), '\n');
     cursor = span.end;
   }
@@ -421,6 +426,7 @@ function mdxTagSpans(source: string): TextSpan[] {
     if (source[start] !== '<' || !/[!/A-Za-z]/u.test(source[start + 1] ?? '')) continue;
     let quote = '';
     let escaped = false;
+    let braceDepth = 0;
     for (let index = start + 1; index < source.length; index += 1) {
       const character = source[index];
       if (escaped) {
@@ -439,7 +445,15 @@ function mdxTagSpans(source: string): TextSpan[] {
         quote = character;
         continue;
       }
-      if (character !== '>') continue;
+      if (character === '{') {
+        braceDepth += 1;
+        continue;
+      }
+      if (character === '}' && braceDepth > 0) {
+        braceDepth -= 1;
+        continue;
+      }
+      if (character !== '>' || braceDepth > 0) continue;
       const end = index + 1;
       spans.push({ start, end, text: source.slice(start, end) });
       start = index;
@@ -566,21 +580,31 @@ function invalidJsonLd(value: unknown): boolean {
   return Boolean(value && typeof value === 'object' && '__invalidJsonLd' in value);
 }
 
+function normalizeProtectedToken(value: string): string {
+  return value
+    .replace(/^tokens?(?=\/s)/u, 'tok')
+    .replace(/^tokens?(?=\/sec)/u, 'tok')
+    .replace('/sec', '/s')
+    .replace('/GPU', '/gpu')
+    .replace(/GPU[/-](?:hr|hour)/u, 'gpu/hr')
+    .replace(/chip[/-](?:hr|hour)/u, 'chip/hr')
+    .replace(/M\s+tokens?$/u, 'M tok');
+}
+
 function protectedTokens(raw: string): string[] {
   const withoutBlocks = withoutProtectedBlocks(raw);
   const prose = withoutSpans(withoutBlocks, inlineCodeSpans(withoutBlocks));
   const pattern =
-    /--[a-z0-9](?:[\w.-]*[a-z0-9])?(?:=[^\s,，。;；)）`]+)?|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:tokens?|tok)\/(?:s|sec)(?:\/(?:user|gpu|GPU|chip))?\b|\b[KMGTPE]?FLOP\/s\b|\b[KMGT]?bit\/s\b|\b(?:kW|MW)\/(?:gpu|GPU)\b|\b(?:GPU|chip)\/(?:hr|hour)\b|\b(?:GB\/s|TB\/s|GB|TB|ms|µs|ns|kW|MW)\b|\$\d+(?:\.\d+)?\/M\b|\$\/(?:M\s+(?:tok|tokens?)|(?:GPU|chip)[/-](?:hr|hour))/gu;
-  return [...prose.matchAll(pattern)].map((match) =>
-    match[0]
-      .replace(/^tokens?(?=\/s)/u, 'tok')
-      .replace(/^tokens?(?=\/sec)/u, 'tok')
-      .replace('/sec', '/s')
-      .replace('/GPU', '/gpu')
-      .replace(/GPU\/(?:hr|hour)/u, 'gpu/hr')
-      .replace(/chip[/-](?:hr|hour)/u, 'chip/hr')
-      .replace(/M\s+tokens?$/u, 'M tok'),
+    /--[a-z0-9](?:[\w.-]*[a-z0-9])?(?:=[^\s,，。;；)）`]+)?|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:tokens?|tok)\/(?:s|sec)(?:\/(?:user|gpu|GPU|chip))?\b|\b[KMGTPE]?FLOP\/s\b|\b[KMGT]?bit\/s\b|\b(?:kW|MW)\/(?:gpu|GPU)\b|\b(?:GPU|chip)[/-](?:hr|hour)\b|\b(?:GB\/s|TB\/s|GB|TB|ms|µs|ns|kW|MW)\b|\$\d+(?:\.\d+)?\/M\b|\$\/(?:M\s+(?:tok|tokens?)|(?:GPU|chip)[/-](?:hr|hour))/gu;
+  const proseTokens = [...prose.matchAll(pattern)].map((match) =>
+    normalizeProtectedToken(match[0]),
   );
+  const structuredGpuHours = jsonLdBlocks(raw).flatMap((block) =>
+    [...block.json.matchAll(/\b(?:GPU|chip)-hour\b/gu)].map((match) =>
+      normalizeProtectedToken(match[0]),
+    ),
+  );
+  return [...proseTokens, ...structuredGpuHours];
 }
 
 function jsonShape(value: unknown): unknown {
