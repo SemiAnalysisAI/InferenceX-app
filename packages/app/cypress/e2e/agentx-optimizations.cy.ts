@@ -144,5 +144,15 @@ describe('AgentX optimizations', () => {
         .should('have.attr', 'href')
         .and('match', /^https:\/\/github\.com\/sgl-project\/sglang\/pull\/\d+$/u);
     });
+    cy.get('link[rel="alternate"][hreflang="en"]').should(
+      'have.attr',
+      'href',
+      'https://inferencex.semianalysis.com/agentx/optimizations/sglang',
+    );
+    cy.get('link[rel="alternate"][hreflang="zh-CN"]').should(
+      'have.attr',
+      'href',
+      'https://inferencex.semianalysis.com/zh/agentx/optimizations/sglang',
+    );
   });
 });

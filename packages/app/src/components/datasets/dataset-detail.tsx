@@ -19,7 +19,7 @@ import {
 } from '@/hooks/api/use-datasets';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
-import { compact, formatPct, formatShare, perConversation } from './format';
+import { compact, formatPct, formatShare, localeNumber, perConversation } from './format';
 import { Stat } from './stat';
 
 const PAGE = 50;
@@ -52,6 +52,8 @@ const STRINGS = {
     subagentOslSub: 'Inner subagent requests only',
     cachedFraction: 'Cached fraction per turn',
     searchPlaceholder: 'Search by ID…',
+    searchAria: 'Search conversations',
+    sortAria: 'Sort conversations',
     sortTokens: 'Total input ↓',
     sortTurns: 'Turns ↓',
     sortSubagents: 'Subagent groups ↓',
@@ -64,6 +66,8 @@ const STRINGS = {
     thCached: 'Cached',
     modelSuffix: (n: number) => `${n} model${n === 1 ? '' : 's'}`,
     noMatch: 'No conversations match.',
+    loadingConversations: 'Loading conversations…',
+    conversationsError: 'Failed to load conversations.',
     prev: '← Prev',
     next: 'Next →',
     pageOf: (p: number, total: number) => `Page ${p} of ${total}`,
@@ -94,6 +98,8 @@ const STRINGS = {
     subagentOslSub: '仅内部 subagent 请求',
     cachedFraction: '每轮缓存比例',
     searchPlaceholder: '按 ID 搜索…',
+    searchAria: '搜索对话',
+    sortAria: '对话排序',
     sortTokens: '总输入 ↓',
     sortTurns: '轮次 ↓',
     sortSubagents: 'Subagent 组 ↓',
@@ -106,6 +112,8 @@ const STRINGS = {
     thCached: '缓存',
     modelSuffix: (n: number) => `${n} 个模型`,
     noMatch: '没有匹配的对话。',
+    loadingConversations: '正在加载对话…',
+    conversationsError: '对话加载失败。',
     prev: '← 上一页',
     next: '下一页 →',
     pageOf: (p: number, total: number) => `第 ${p} 页，共 ${total} 页`,
@@ -145,6 +153,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
     data: convs,
     isFetching,
     isPlaceholderData,
+    isError: conversationsError,
   } = useDatasetConversations({
     slug,
     search,
@@ -219,12 +228,21 @@ export function DatasetDetail({ slug }: { slug: string }) {
       {/* summary stats */}
       <Card className="p-4">
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
-          <Stat label={t.conversations} value={dataset.conversation_count.toLocaleString()} />
-          <Stat label={t.medianReqConvo} value={perConversation(s.medianRequestsPerConversation)} />
-          <Stat label={t.meanReqConvo} value={perConversation(s.meanRequestsPerConversation)} />
+          <Stat label={t.conversations} value={localeNumber(dataset.conversation_count, locale)} />
+          <Stat
+            label={t.medianReqConvo}
+            value={perConversation(s.medianRequestsPerConversation, locale)}
+          />
+          <Stat
+            label={t.meanReqConvo}
+            value={perConversation(s.meanRequestsPerConversation, locale)}
+          />
           <Stat label={t.mainTurns} value={compact(s.mainTurns ?? 0)} />
-          <Stat label={t.medianSubagents} value={perConversation(s.medianSubagentsPerTrace)} />
-          <Stat label={t.meanSubagents} value={perConversation(s.meanSubagentsPerTrace)} />
+          <Stat
+            label={t.medianSubagents}
+            value={perConversation(s.medianSubagentsPerTrace, locale)}
+          />
+          <Stat label={t.meanSubagents} value={perConversation(s.meanSubagentsPerTrace, locale)} />
           <Stat label={t.cachedInput} value={formatPct(s.cachedPct)} />
           <Stat label={t.totalTokens} value={compact((s.totalIn ?? 0) + (s.totalOut ?? 0))} />
         </dl>
@@ -304,13 +322,14 @@ export function DatasetDetail({ slug }: { slug: string }) {
             {t.conversations}{' '}
             <span className="text-sm font-normal text-muted-foreground">({total})</span>
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <input
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder={t.searchPlaceholder}
-              className="h-8 w-40 rounded-md border border-border/40 bg-background px-2 text-xs outline-none focus:border-primary"
+              aria-label={t.searchAria}
+              className="h-8 w-full rounded-md border border-border/40 bg-background px-2 text-xs outline-none focus:border-primary sm:w-40"
             />
             <Select
               value={sort}
@@ -323,7 +342,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
                 track('datasets_conversations_sorted', { mode: v });
               }}
             >
-              <SelectTrigger className="h-8 w-[12rem] text-xs" aria-label="Sort conversations">
+              <SelectTrigger className="h-8 w-full text-xs sm:w-[12rem]" aria-label={t.sortAria}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -338,58 +357,74 @@ export function DatasetDetail({ slug }: { slug: string }) {
         </div>
 
         <Card className="overflow-hidden p-0">
-          <table className="w-full text-sm">
-            <thead className="border-b border-border/40 bg-muted/30 text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium">{t.thConversation}</th>
-                <th className="px-3 py-2 text-right font-medium">{t.thTurns}</th>
-                <th className="px-3 py-2 text-right font-medium">{t.thSubagents}</th>
-                <th className="px-3 py-2 text-right font-medium">{t.thInput}</th>
-                <th className="px-3 py-2 text-right font-medium">{t.thOutput}</th>
-                <th className="px-3 py-2 text-right font-medium">{t.thCached}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(convs?.items ?? []).map((c) => {
-                const cachedPct = formatShare(c.total_cached, c.total_in);
-                return (
-                  <tr
-                    key={c.conv_id}
-                    className="border-b border-border/20 last:border-0 hover:bg-accent/40"
-                  >
-                    <td className="px-3 py-2">
-                      <Link
-                        href={`${prefix}/agentx/${slug}/conversations/${encodeURIComponent(c.conv_id)}`}
-                        onClick={() => track('datasets_conversation_clicked', { slug })}
-                        className="font-mono text-xs text-primary hover:underline"
-                      >
-                        {c.conv_id.slice(0, 20)}…
-                      </Link>
-                      {c.models.length > 0 && (
-                        <span className="ml-2 text-[11px] text-muted-foreground">
-                          {t.modelSuffix(c.models.length)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">{c.num_turns}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{c.num_subagent_groups}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{compact(c.total_in)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{compact(c.total_out)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                      {cachedPct}
+          <div className="overflow-x-auto" data-testid="dataset-conversations-table-scroll">
+            <table className="w-full min-w-[40rem] text-sm">
+              <thead className="border-b border-border/40 bg-muted/30 text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium">{t.thConversation}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t.thTurns}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t.thSubagents}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t.thInput}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t.thOutput}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t.thCached}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(convs?.items ?? []).map((c) => {
+                  const cachedPct = formatShare(c.total_cached, c.total_in);
+                  return (
+                    <tr
+                      key={c.conv_id}
+                      className="border-b border-border/20 last:border-0 hover:bg-accent/40"
+                    >
+                      <td className="px-3 py-2">
+                        <Link
+                          href={`${prefix}/agentx/${slug}/conversations/${encodeURIComponent(c.conv_id)}`}
+                          onClick={() => track('datasets_conversation_clicked', { slug })}
+                          className="font-mono text-xs text-primary hover:underline"
+                        >
+                          {c.conv_id.slice(0, 20)}…
+                        </Link>
+                        {c.models.length > 0 && (
+                          <span className="ml-2 text-[11px] text-muted-foreground">
+                            {t.modelSuffix(c.models.length)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">{c.num_turns}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{c.num_subagent_groups}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{compact(c.total_in)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{compact(c.total_out)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                        {cachedPct}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {isFetching && !convs && (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-8 text-center text-xs text-muted-foreground">
+                      {t.loadingConversations}
                     </td>
                   </tr>
-                );
-              })}
-              {!isFetching && (convs?.items.length ?? 0) === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-xs text-muted-foreground">
-                    {t.noMatch}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+                {conversationsError && !convs && (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-8 text-center text-xs text-destructive">
+                      {t.conversationsError}
+                    </td>
+                  </tr>
+                )}
+                {!isFetching && !conversationsError && (convs?.items.length ?? 0) === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-8 text-center text-xs text-muted-foreground">
+                      {t.noMatch}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </Card>
 
         {pageCount > 1 && (

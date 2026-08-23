@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { ChartHover, type HoverItem } from '@/components/inference/agentic-point/chart-hover';
 import type { Distribution } from '@/hooks/api/use-datasets';
 import { useLocale } from '@/lib/use-locale';
-import { compact } from './format';
+import { compact, localeNumber } from './format';
 
 const STRINGS = {
   en: {
@@ -14,12 +14,16 @@ const STRINGS = {
     logScale: 'log scale',
     range: 'Range',
     count: 'Count',
+    max: 'max',
+    units: { tokens: 'tokens', turns: 'turns' },
   },
   zh: {
     noData: '暂无数据',
     logScale: '对数刻度',
     range: '范围',
     count: '数量',
+    max: '最大值',
+    units: { tokens: 'token', turns: '轮次' },
   },
 } as const;
 
@@ -46,6 +50,7 @@ export function DistributionCard({
 }: DistributionCardProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const localizedUnit = unit === 'tokens' || unit === 'turns' ? t.units[unit] : unit;
 
   const computed = useMemo(() => {
     const bins = distribution?.bins ?? [];
@@ -103,9 +108,9 @@ export function DistributionCard({
       {
         color: 'currentColor',
         label: t.range,
-        value: `${formatValue(b.x0)}–${formatValue(b.x1)} ${unit}`,
+        value: `${formatValue(b.x0)}–${formatValue(b.x1)} ${localizedUnit}`,
       },
-      { color: 'currentColor', label: t.count, value: b.count.toLocaleString() },
+      { color: 'currentColor', label: t.count, value: localeNumber(b.count, locale) },
     ];
     return { items };
   };
@@ -123,11 +128,11 @@ export function DistributionCard({
       {subtitle && <div className="mb-1 text-xs text-muted-foreground">{subtitle}</div>}
       {stats && (
         <div className="mb-2 text-xs text-muted-foreground">
-          n={stats.count.toLocaleString()} · p50 {formatValue(stats.median)}
+          n={localeNumber(stats.count, locale)} · p50 {formatValue(stats.median)}
           {typeof stats.p75 === 'number' && <> · p75 {formatValue(stats.p75)}</>} · p90{' '}
           {formatValue(stats.p90)}
-          {typeof stats.p95 === 'number' && <> · p95 {formatValue(stats.p95)}</>} · max{' '}
-          {formatValue(stats.max)} {unit}
+          {typeof stats.p95 === 'number' && <> · p95 {formatValue(stats.p95)}</>} · {t.max}{' '}
+          {formatValue(stats.max)} {localizedUnit}
         </div>
       )}
       <div className="w-full text-muted-foreground">
@@ -194,6 +199,7 @@ export function DistributionCard({
             );
           })}
           <text
+            data-testid="distribution-unit"
             x={W / 2}
             y={H - 16}
             fontSize={11}
@@ -201,7 +207,7 @@ export function DistributionCard({
             opacity={0.55}
             textAnchor="middle"
           >
-            {unit}
+            {localizedUnit}
           </text>
 
           {/* guide legend */}

@@ -1,7 +1,7 @@
 import { unlockAgenticGate } from '../support/e2e';
 
 describe('Dataset conversation flamegraph timing', () => {
-  before(() => {
+  beforeEach(() => {
     cy.intercept('GET', '/api/v1/datasets/test-dataset/conversations/conversation-1', {
       body: {
         conv_id: 'conversation-1',
@@ -127,5 +127,53 @@ describe('Dataset conversation flamegraph timing', () => {
     cy.get('[data-testid="flamegraph-overlap-g-1-c-2"]')
       .should('have.length', 1)
       .and('have.attr', 'data-overlap-group', 'subagent-1-2');
+  });
+
+  it('localizes generated flamegraph labels on the Chinese conversation route', () => {
+    cy.visit('/zh/agentx/test-dataset/conversations/conversation-1', {
+      onBeforeLoad: unlockAgenticGate,
+    });
+
+    cy.get('[data-rowkey="t-0"]').should('contain.text', '第 1 轮');
+    cy.get('[data-testid="flamegraph-bar-g-1"]').trigger('mousemove', {
+      clientX: 600,
+      clientY: 400,
+    });
+    cy.get('[data-testid="flamegraph-tooltip"]').should('contain.text', '3 轮');
+    cy.contains('button', 'Explore').click();
+    cy.get('[data-rowkey="g-1-c-0"]').should('contain.text', '子轮次 1');
+  });
+
+  it('publishes bidirectional hreflang metadata for noindex conversation pages', () => {
+    cy.visit('/zh/agentx/test-dataset/conversations/conversation-1', {
+      onBeforeLoad: unlockAgenticGate,
+    });
+
+    cy.get('link[rel="alternate"][hreflang="en"]').should(
+      'have.attr',
+      'href',
+      'https://inferencex.semianalysis.com/agentx/test-dataset/conversations/conversation-1',
+    );
+    cy.get('link[rel="alternate"][hreflang="zh-CN"]').should(
+      'have.attr',
+      'href',
+      'https://inferencex.semianalysis.com/zh/agentx/test-dataset/conversations/conversation-1',
+    );
+  });
+
+  it('keeps the flamegraph reachable through internal scrolling at 375px', () => {
+    cy.viewport(375, 812);
+    cy.visit('/zh/agentx/test-dataset/conversations/conversation-1', {
+      onBeforeLoad: unlockAgenticGate,
+    });
+
+    cy.get('[data-testid="flamegraph-scroll"]').should(($scroll) => {
+      const element = $scroll[0];
+      expect(getComputedStyle(element).overflowX).to.eq('auto');
+      expect(element.scrollWidth).to.be.greaterThan(element.clientWidth);
+    });
+    cy.window().then((win) => {
+      expect(win.document.documentElement.scrollWidth).to.be.at.most(win.innerWidth);
+    });
   });
 });

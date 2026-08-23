@@ -1,3 +1,14 @@
+import type { Locale } from '@/lib/i18n';
+
+function localeTag(locale: Locale): 'en-US' | 'zh-CN' {
+  return locale === 'zh' ? 'zh-CN' : 'en-US';
+}
+
+/** Format an unabridged application-owned count in the active page locale. */
+export function localeNumber(n: number, locale: Locale): string {
+  return n.toLocaleString(localeTag(locale));
+}
+
 /**
  * Compact number formatter for dataset token/count displays:
  * 1234 → "1.2k", 1_200_000 → "1.2M", 3.2e9 → "3.2B", 0.82 → "0.82".
@@ -12,9 +23,9 @@ export function compact(n: number): string {
 }
 
 /** Format a per-conversation count without hiding a meaningful fractional mean. */
-export function perConversation(n: number | undefined): string {
+export function perConversation(n: number | undefined, locale: Locale = 'en'): string {
   if (typeof n !== 'number' || !Number.isFinite(n)) return '—';
-  return n.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  return n.toLocaleString(localeTag(locale), { maximumFractionDigits: 1 });
 }
 
 /** Format a 0–1 fraction as a whole percent ("42%"), em dash when absent. */

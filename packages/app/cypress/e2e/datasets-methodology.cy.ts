@@ -134,7 +134,7 @@ describe('AgentX dataset methodology', () => {
     cy.visit('/zh/agentx/methodology', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="agentx-methodology-article"]').within(() => {
-      cy.get('h1').should('have.text', 'AgentX 方法论');
+      cy.get('h1').should('have.text', 'AgentX 测试方法');
       cy.contains('2026 年 6 月 21 日构建').should('be.visible');
       cy.contains('有向无环图（DAG）').should('be.visible');
       cy.contains('上限为 3 TB').should('be.visible');

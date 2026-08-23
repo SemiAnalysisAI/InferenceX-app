@@ -81,6 +81,16 @@ describe('AgentX telemetry tutorial — Chinese page', () => {
       'href',
       '/zh/inference?i_seq=agentic-traces',
     );
+    cy.get('link[rel="alternate"][hreflang="en"]').should(
+      'have.attr',
+      'href',
+      'https://inferencex.semianalysis.com/agentx/telemetry',
+    );
+    cy.get('link[rel="alternate"][hreflang="zh-CN"]').should(
+      'have.attr',
+      'href',
+      'https://inferencex.semianalysis.com/zh/agentx/telemetry',
+    );
   });
 });
 

@@ -34,7 +34,7 @@ const LAYOUT_DATASET = {
 };
 
 describe('Dataset distribution percentiles', () => {
-  before(() => {
+  beforeEach(() => {
     cy.intercept('GET', '/api/v1/datasets/test-dataset', {
       body: {
         id: 'test-dataset',
@@ -94,6 +94,13 @@ describe('Dataset distribution percentiles', () => {
             p95: 400,
             max: 500,
           }),
+          turnsPerConversation: distribution({
+            median: 12,
+            p75: 20,
+            p90: 30,
+            p95: 40,
+            max: 50,
+          }),
         },
         ingested_at: '2026-06-23T00:00:00Z',
       },
@@ -145,6 +152,32 @@ describe('Dataset distribution percentiles', () => {
         for (const percentile of percentiles) cy.contains(percentile).should('be.visible');
       });
     }
+  });
+
+  it('localizes Chinese distribution units, statistics, and conversation controls', () => {
+    cy.visit('/zh/agentx/test-dataset', { onBeforeLoad: unlockAgenticGate });
+
+    cy.get('input[aria-label="搜索对话"]').should('have.attr', 'placeholder', '按 ID 搜索…');
+    cy.get('button[aria-label="对话排序"]').should('exist');
+    cy.contains('[data-slot="card"]', '每对话轮次数').within(() => {
+      cy.contains('最大值 50 轮次').should('be.visible');
+      cy.contains('max').should('not.exist');
+      cy.get('[data-testid="distribution-unit"]').should('have.text', '轮次');
+    });
+  });
+
+  it('keeps the conversation table reachable through internal scrolling on mobile', () => {
+    cy.viewport(390, 844);
+    cy.visit('/zh/agentx/test-dataset', { onBeforeLoad: unlockAgenticGate });
+
+    cy.get('[data-testid="dataset-conversations-table-scroll"]').should(($scroll) => {
+      const element = $scroll[0];
+      expect(getComputedStyle(element).overflowX).to.eq('auto');
+      expect(element.scrollWidth).to.be.greaterThan(element.clientWidth);
+    });
+    cy.window().then((win) => {
+      expect(win.document.documentElement.scrollWidth).to.be.at.most(win.innerWidth);
+    });
   });
 });
 
