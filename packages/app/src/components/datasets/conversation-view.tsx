@@ -13,7 +13,9 @@ import { Stat } from './stat';
 const STRINGS = {
   en: {
     loading: 'Loading conversation…',
+    loadError: 'Failed to load conversation.',
     notFound: 'Conversation not found.',
+    retry: 'Retry',
     backToDataset: 'Back to AgentX dataset',
     breadcrumbDatasets: 'AgentX',
     breadcrumbConversation: 'conversation',
@@ -29,7 +31,9 @@ const STRINGS = {
   },
   zh: {
     loading: '正在加载对话…',
+    loadError: '对话加载失败。',
     notFound: '未找到对话。',
+    retry: '重试',
     backToDataset: '返回 AgentX 数据集',
     breadcrumbDatasets: 'AgentX',
     breadcrumbConversation: '对话',
@@ -46,7 +50,7 @@ const STRINGS = {
 } as const;
 
 export function ConversationView({ slug, convId }: { slug: string; convId: string }) {
-  const { data, isLoading, isError } = useDatasetConversation(slug, convId);
+  const { data, isLoading, isError, refetch } = useDatasetConversation(slug, convId);
   const locale = useLocale();
   const t = STRINGS[locale];
   const prefix = locale === 'zh' ? '/zh' : '';
@@ -65,9 +69,31 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
   if (isLoading) {
     return <div className="py-12 text-center text-sm text-muted-foreground">{t.loading}</div>;
   }
-  if (isError || !data) {
+  if (isError) {
     return (
-      <div className="py-12 text-center text-sm text-destructive">
+      <div
+        className="flex flex-wrap items-center justify-center gap-2 py-12 text-center text-sm text-destructive"
+        role="alert"
+        data-testid="conversation-view-error"
+        data-locale={locale}
+      >
+        <span>{t.loadError}</span>
+        <button type="button" className="text-primary underline" onClick={() => void refetch()}>
+          {t.retry}
+        </button>
+        <Link href={`${prefix}/agentx/${slug}`} className="text-primary underline">
+          {t.backToDataset}
+        </Link>
+      </div>
+    );
+  }
+  if (!data) {
+    return (
+      <div
+        className="py-12 text-center text-sm text-destructive"
+        data-testid="conversation-view-not-found"
+        data-locale={locale}
+      >
         {t.notFound}{' '}
         <Link href={`${prefix}/agentx/${slug}`} className="text-primary underline">
           {t.backToDataset}

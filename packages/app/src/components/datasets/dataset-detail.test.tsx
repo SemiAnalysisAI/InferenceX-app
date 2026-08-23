@@ -13,6 +13,26 @@ const { conversationQueries, testState } = vi.hoisted(() => ({
   }[],
   testState: {
     locale: 'en' as 'en' | 'zh',
+    dataset: {
+      data: {
+        slug: 'trace',
+        label: 'Trace dataset',
+        variant: 'test',
+        conversation_count: 100,
+        summary: {},
+        chart_data: {},
+      } as {
+        slug: string;
+        label: string;
+        variant: string;
+        conversation_count: number;
+        summary: Record<string, never>;
+        chart_data: Record<string, never>;
+      } | null,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    },
     conversations: {
       data: { total: 100, items: [] } as { total: number; items: never[] } | undefined,
       isFetching: false,
@@ -44,18 +64,7 @@ vi.mock('@/components/datasets/distribution-card', () => ({ DistributionCard: ()
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 vi.mock('@/lib/use-locale', () => ({ useLocale: () => testState.locale }));
 vi.mock('@/hooks/api/use-datasets', () => ({
-  useDataset: () => ({
-    data: {
-      slug: 'trace',
-      label: 'Trace dataset',
-      variant: 'test',
-      conversation_count: 100,
-      summary: {},
-      chart_data: {},
-    },
-    isLoading: false,
-    isError: false,
-  }),
+  useDataset: () => testState.dataset,
   useDatasetConversations: (args: (typeof conversationQueries)[number]) => {
     conversationQueries.push({ ...args });
     return testState.conversations;
@@ -72,6 +81,19 @@ function changeInput(input: HTMLInputElement, value: string): void {
 afterEach(() => {
   conversationQueries.length = 0;
   testState.locale = 'en';
+  testState.dataset = {
+    data: {
+      slug: 'trace',
+      label: 'Trace dataset',
+      variant: 'test',
+      conversation_count: 100,
+      summary: {},
+      chart_data: {},
+    },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  };
   testState.conversations = {
     data: { total: 100, items: [] },
     isFetching: false,
@@ -83,6 +105,47 @@ afterEach(() => {
 });
 
 describe('DatasetDetail conversation search', () => {
+  it('distinguishes a localized request failure from a genuine not-found response', () => {
+    testState.locale = 'zh';
+    testState.dataset.isError = true;
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    act(() => root.render(createElement(DatasetDetail, { slug: 'trace' })));
+
+    expect(
+      container.querySelector<HTMLElement>('[data-testid="dataset-detail-error"]')?.dataset.locale,
+    ).toBe('zh');
+    expect(container.querySelector('[data-testid="dataset-detail-not-found"]')).toBeNull();
+    expect(container.querySelector('a')?.getAttribute('href')).toBe('/zh/agentx');
+    const retry = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === '重试',
+    );
+    expect(retry).toBeDefined();
+    act(() => retry?.click());
+    expect(testState.dataset.refetch).toHaveBeenCalledOnce();
+
+    act(() => root.unmount());
+  });
+
+  it('keeps a successful null dataset response as the localized not-found state', () => {
+    testState.locale = 'zh';
+    testState.dataset.data = null;
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    act(() => root.render(createElement(DatasetDetail, { slug: 'missing' })));
+
+    expect(
+      container.querySelector<HTMLElement>('[data-testid="dataset-detail-not-found"]')?.dataset
+        .locale,
+    ).toBe('zh');
+    expect(container.querySelector('[data-testid="dataset-detail-error"]')).toBeNull();
+    expect([...container.querySelectorAll('button')]).toHaveLength(0);
+
+    act(() => root.unmount());
+  });
+
   it('keeps typing immediate and commits only the settled search with page zero', () => {
     vi.useFakeTimers();
     const container = document.createElement('div');

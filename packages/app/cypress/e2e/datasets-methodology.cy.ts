@@ -21,6 +21,20 @@ const DATASET = {
   ingested_at: '2026-06-21T00:00:00Z',
 };
 
+const ROUTE_VIEWPORTS = [
+  { width: 1280, height: 800 },
+  { width: 375, height: 812 },
+] as const;
+
+function expectNoPageOverflow(): void {
+  cy.window().should((win) => {
+    expect(win.document.body.scrollWidth, 'body scroll width').to.be.at.most(win.innerWidth);
+    expect(win.document.documentElement.scrollWidth, 'document scroll width').to.be.at.most(
+      win.innerWidth,
+    );
+  });
+}
+
 describe('AgentX dataset methodology', () => {
   beforeEach(() => {
     cy.intercept('GET', '/api/v1/datasets', { statusCode: 200, body: [DATASET] });
@@ -146,6 +160,34 @@ describe('AgentX dataset methodology', () => {
     });
 
     cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/agentx/methodology');
+  });
+
+  it('renders the landing and methodology click path at desktop and 375px in both locales', () => {
+    for (const viewport of ROUTE_VIEWPORTS) {
+      for (const locale of ['', '/zh']) {
+        cy.viewport(viewport.width, viewport.height);
+        cy.visit(`${locale}/agentx`, { onBeforeLoad: unlockAgenticGate });
+        cy.get('[data-testid="agentx-methodology"]').should('be.visible');
+        cy.get('[data-testid="agentx-methodology-cta"]').should(
+          'have.attr',
+          'href',
+          `${locale}/agentx/methodology`,
+        );
+        cy.get('[data-testid="agentx-telemetry-callout"]').should('exist');
+        cy.get('[data-testid="agentx-optimizations-callout"]').should('exist');
+        expectNoPageOverflow();
+
+        cy.visit(`${locale}/agentx/methodology`, { onBeforeLoad: unlockAgenticGate });
+        cy.get('[data-testid="agentx-methodology-article"]').should('be.visible');
+        cy.get('figure[data-testid^="agentx-methodology-figure-"]').should('have.length', 21);
+        cy.get('[data-testid="language-toggle"]').should(
+          'have.attr',
+          'href',
+          locale === '/zh' ? '/agentx/methodology' : '/zh/agentx/methodology',
+        );
+        expectNoPageOverflow();
+      }
+    }
   });
 
   it('permanently redirects legacy dataset routes without dropping path or query', () => {

@@ -99,7 +99,7 @@ export function DistributionCard({
       ]
     : [];
 
-  const tickIdxs = [0, Math.floor(n / 3), Math.floor((2 * n) / 3), n - 1];
+  const tickIdxs = [...new Set([0, Math.floor(n / 3), Math.floor((2 * n) / 3), n - 1])];
 
   const resolve = (fraction: number) => {
     const i = Math.min(n - 1, Math.max(0, Math.floor(fraction * n)));
@@ -136,7 +136,19 @@ export function DistributionCard({
         </div>
       )}
       <div className="w-full text-muted-foreground">
-        <ChartHover pad={PAD} width={W} height={H} resolve={resolve}>
+        <ChartHover
+          pad={PAD}
+          width={W}
+          height={H}
+          resolve={resolve}
+          ariaLabel={title}
+          keyboardSteps={n}
+          formatAriaValueText={
+            locale === 'zh'
+              ? (items) => items.map((item) => `${item.label}：${item.value}`).join('；')
+              : undefined
+          }
+        >
           {/* bars */}
           {bins.map((b, i) => {
             const h = (b.count / maxCount) * innerH;

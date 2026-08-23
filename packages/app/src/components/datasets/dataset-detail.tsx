@@ -28,7 +28,9 @@ const SEARCH_DEBOUNCE_MS = 250;
 const STRINGS = {
   en: {
     loading: 'Loading dataset…',
+    loadError: 'Failed to load dataset.',
     notFound: 'Dataset not found.',
+    retry: 'Retry',
     backToDatasets: 'Back to AgentX',
     breadcrumbDatasets: '← AgentX',
     viewOnHf: 'View on HuggingFace ↗',
@@ -74,7 +76,9 @@ const STRINGS = {
   },
   zh: {
     loading: '正在加载数据集…',
+    loadError: '数据集加载失败。',
     notFound: '未找到数据集。',
+    retry: '重试',
     backToDatasets: '返回 AgentX',
     breadcrumbDatasets: '← AgentX',
     viewOnHf: '在 HuggingFace 查看 ↗',
@@ -121,7 +125,7 @@ const STRINGS = {
 } as const;
 
 export function DatasetDetail({ slug }: { slug: string }) {
-  const { data: dataset, isLoading, isError } = useDataset(slug);
+  const { data: dataset, isLoading, isError, refetch } = useDataset(slug);
   const [searchInput, setSearchInput] = useState('');
   const [{ search, sort, page }, setConversationQuery] = useState({
     search: '',
@@ -173,9 +177,31 @@ export function DatasetDetail({ slug }: { slug: string }) {
       </div>
     );
   }
-  if (isError || !dataset) {
+  if (isError) {
     return (
-      <div className="min-h-svh py-12 text-center text-sm text-destructive">
+      <div
+        className="flex min-h-svh flex-wrap items-center justify-center gap-2 py-12 text-center text-sm text-destructive"
+        role="alert"
+        data-testid="dataset-detail-error"
+        data-locale={locale}
+      >
+        <span>{t.loadError}</span>
+        <button type="button" className="text-primary underline" onClick={() => void refetch()}>
+          {t.retry}
+        </button>
+        <Link href={`${prefix}/agentx`} className="text-primary underline">
+          {t.backToDatasets}
+        </Link>
+      </div>
+    );
+  }
+  if (!dataset) {
+    return (
+      <div
+        className="min-h-svh py-12 text-center text-sm text-destructive"
+        data-testid="dataset-detail-not-found"
+        data-locale={locale}
+      >
         {t.notFound}{' '}
         <Link href={`${prefix}/agentx`} className="text-primary underline">
           {t.backToDatasets}

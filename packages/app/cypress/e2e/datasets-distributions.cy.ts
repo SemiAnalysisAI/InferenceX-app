@@ -163,6 +163,12 @@ describe('Dataset distribution percentiles', () => {
       cy.contains('最大值 50 轮次').should('be.visible');
       cy.contains('max').should('not.exist');
       cy.get('[data-testid="distribution-unit"]').should('have.text', '轮次');
+      cy.get('rect[role="slider"]')
+        .should('have.attr', 'aria-label', '每对话轮次数')
+        .focus()
+        .should('have.attr', 'aria-valuetext')
+        .and('include', '范围：0–10 轮次');
+      cy.get('[role="tooltip"]').should('be.visible').and('contain.text', '数量5');
     });
   });
 
@@ -204,4 +210,42 @@ describe('Dataset detail loading stability', () => {
       cy.contains('h1', 'Layout dataset').should('be.visible');
     });
   }
+
+  it('renders a localized request error separately from 404 and retries at 390px', () => {
+    let attempts = 0;
+    cy.intercept('GET', '/api/v1/datasets/layout-dataset', (request) => {
+      attempts += 1;
+      request.reply(
+        attempts <= 2 ? { statusCode: 503, body: {} } : { statusCode: 200, body: LAYOUT_DATASET },
+      );
+    });
+    cy.intercept('GET', '/api/v1/datasets/layout-dataset/conversations*', {
+      body: { total: 0, items: [] },
+    });
+
+    cy.viewport(390, 844);
+    cy.visit('/zh/agentx/layout-dataset', { onBeforeLoad: unlockAgenticGate });
+    cy.get('[data-testid="dataset-detail-error"]', { timeout: 10_000 })
+      .should('have.attr', 'data-locale', 'zh')
+      .and('have.attr', 'role', 'alert');
+    cy.get('[data-testid="dataset-detail-not-found"]').should('not.exist');
+    cy.get('[data-testid="dataset-detail-error"] a').should('have.attr', 'href', '/zh/agentx');
+    cy.contains('[data-testid="dataset-detail-error"] button', '重试').click();
+    cy.contains('h1', 'Layout dataset').should('be.visible');
+    cy.window().then((win) => {
+      expect(win.document.documentElement.scrollWidth).to.be.at.most(win.innerWidth);
+    });
+  });
+
+  it('reserves the not-found state for a successful 404 response', () => {
+    cy.intercept('GET', '/api/v1/datasets/missing-dataset', { statusCode: 404 });
+    cy.intercept('GET', '/api/v1/datasets/missing-dataset/conversations*', { statusCode: 404 });
+
+    cy.viewport(1280, 800);
+    cy.visit('/agentx/missing-dataset', { onBeforeLoad: unlockAgenticGate });
+    cy.get('[data-testid="dataset-detail-not-found"]')
+      .should('have.attr', 'data-locale', 'en')
+      .and('be.visible');
+    cy.get('[data-testid="dataset-detail-error"]').should('not.exist');
+  });
 });
