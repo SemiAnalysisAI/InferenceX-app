@@ -9,20 +9,20 @@ const REGIONAL_ACKNOWLEDGEMENTS_ZH = [
     region: 'San Jose',
     peoples: 'Muwekma Ohlone Tribe',
     acknowledgement:
-      '我们位于 San Jose 地区的基准测试基础设施，建在旧金山湾区 Muwekma Ohlone Tribe 尚未割让的祖居地上。',
+      '我们位于 San Jose 地区的基准测试基础设施运行于旧金山湾区 Muwekma Ohlone Tribe 尚未割让的祖居地上。',
   },
   {
     region: 'Los Angeles',
     peoples: 'Tongva、Tataviam、Serrano、Kizh 和 Chumash 原住民族',
     acknowledgement:
-      '我们位于 Los Angeles 地区的基准测试基础设施，建在 Tongva、Tataviam、Serrano、Kizh 和 Chumash 原住民族最早居住、至今仍在生活并守护的土地上。',
+      '我们位于 Los Angeles 地区的基准测试基础设施运行于 Tongva、Tataviam、Serrano、Kizh 和 Chumash 原住民族最早居住、至今仍在生活并守护的土地上。',
   },
   {
     region: 'Chicago',
     peoples:
       'Council of the Three Fires、Illinois Confederacy、Miami、Ho-Chunk、Menominee、Fox 和 Sac 原住民族',
     acknowledgement:
-      '我们位于 Chicago 地区的基准测试基础设施，建在 Council of the Three Fires（Ojibwe、Odawa 和 Potawatomi Nations）、Illinois Confederacy 以及 Miami、Ho-Chunk、Menominee、Fox 和 Sac 等其他原住民族世代守护的土地上。',
+      '我们位于 Chicago 地区的基准测试基础设施运行于 Council of the Three Fires（Ojibwe、Odawa 和 Potawatomi Nations）、Illinois Confederacy 以及 Miami、Ho-Chunk、Menominee、Fox 和 Sac 等其他原住民族世代守护的土地上。',
   },
 ];
 
