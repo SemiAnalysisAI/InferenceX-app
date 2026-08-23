@@ -754,27 +754,30 @@ sequence the input/output split changes the **level** and the break-even price, 
 cannot reorder chips, because the mix is the same for all of them. On agentic traces the
 mix is measured per config, so there it can.
 
-### Margin per megawatt
+### Margin and revenue per megawatt
 
-A fourth y-axis metric, `marginPerMw` (`c_ly=marginPerMw`), plotting the same
-`revenue − TCO` in `$/MW/day`. Two things about it are worth being explicit,
-because a reader could reasonably expect more of it than it delivers:
+Two y-axis metrics normalize the daily rates by provisioned power:
+`marginPerMw` (`c_ly=marginPerMw`) plots `revenue − TCO` in `$/MW/day`, while
+`revenuePerMw` (`c_ly=revenuePerMw`) plots revenue before TCO in the same unit.
+Two things about them are worth being explicit, because a reader could reasonably
+expect more than they deliver:
 
-- **It re-ranks almost nothing.** Every chip in this section is sized to the same
-  power budget, so per-MW margin is `margin` divided by very nearly the same
-  number for every series. The only spread comes from how completely each chip's
-  power density fills the budget. What the metric buys is a figure that does not
-  move when the budget does — the unit a power-constrained plan is written in —
+- **They re-rank almost nothing.** Every chip in this section is sized to the same
+  power budget, so each per-MW rate is its unnormalized rate divided by very nearly
+  the same number for every series. The only spread comes from how completely each
+  chip's power density fills the budget. What the metrics buy is a figure that does
+  not move when the budget does — the unit a power-constrained plan is written in —
   not a new ordering.
 - **The denominator is provisioned power, not the budget.** `chips × kW/chip ÷ 1000`,
   because chip counts are whole and the remainder of the budget is stranded. Using
   the typed budget would credit each chip with power it never provisioned. An
   unusable figure (no registered power, a budget too small for one chip) leaves the
-  metric at zero rather than dividing by it.
+  metrics at zero rather than dividing by it.
 
-Because the rescale is by a positive constant, zero is still break-even — hence
-`isBreakEvenAnchored`, which is what the chart's dashed rule tests rather than
-comparing against `'margin'` directly.
+Because the rescale is by a positive constant, zero on `marginPerMw` is still
+break-even. That is why `isBreakEvenAnchored` includes it and the chart retains
+the dashed rule. `revenuePerMw`, like unnormalized revenue, does not draw the
+rule: zero revenue is not break-even for a fleet with non-zero cost.
 
 ### Agentic traces, and cached input tokens
 
@@ -958,8 +961,9 @@ changed.
 
 `c_price`, `c_life` (horizon), `c_ramp`, `c_cache` (cached-input price, % — agentic
 only), `c_mtbi`, `c_rec`, `c_ly` (y-axis metric —
-`margin` | `marginPerMw` | `revenue` | `cumulativeRevenue`, parsed against that allowlist so a stale
-or hand-edited link falls back to `margin` rather than seeding an unknown metric).
+`margin` | `marginPerMw` | `revenue` | `revenuePerMw` | `cumulativeRevenue`, parsed
+against that allowlist so a stale or hand-edited link falls back to `margin` rather
+than seeding an unknown metric).
 The first two default to
 `''` in `PARAM_DEFAULTS` because their real defaults are derived, not constant — see
 the comment there. The MW budget is

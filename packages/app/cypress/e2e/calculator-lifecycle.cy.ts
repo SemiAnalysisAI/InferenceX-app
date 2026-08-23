@@ -775,7 +775,7 @@ describe('Calculator — Fleet Lifecycle', () => {
   });
 });
 
-describe('Calculator — legacy lifecycle share links', () => {
+describe('Calculator — self-contained lifecycle regressions', () => {
   before(() => {
     const rows = agenticB300Rows(null);
     cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability });
@@ -803,6 +803,27 @@ describe('Calculator — legacy lifecycle share links', () => {
       .should((output) => {
         expect(Number(output)).to.equal(28);
       });
+  });
+
+  it('plots revenue per MW as a real normalized y-axis metric', () => {
+    cy.get('[data-testid="calc-lifecycle-metric-revenue"]').click();
+    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .y-axis')
+      .invoke('text')
+      .then((revenuePerDay) => {
+        cy.get('[data-testid="calc-lifecycle-metric-revenue-per-mw"]').click();
+        chartText().should('contain', 'Revenue ($/MW/day)');
+        cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should(
+          'not.exist',
+        );
+        cy.get('[data-testid="calculator-lifecycle-chart-svg"] .y-axis')
+          .invoke('text')
+          .should((revenuePerMw) => {
+            expect(revenuePerMw, 'Revenue/MW is not Revenue/day relabelled').to.not.equal(
+              revenuePerDay,
+            );
+          });
+      });
+    cy.get('[data-testid="calc-lifecycle-metric-margin"]').click();
   });
 
   it('exports the physical fleet sizing alongside its economics', () => {
@@ -961,6 +982,7 @@ describe('Calculator — Fleet Lifecycle in Chinese', () => {
     cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('contain.text', 'Token 价格')
+      .and('contain.text', '每 MW 收入')
       .and('contain.text', '当前配置')
       .and('contain.text', '首次运行')
       .and('contain.text', '累计利润')

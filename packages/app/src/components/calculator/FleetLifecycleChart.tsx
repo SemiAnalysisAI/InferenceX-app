@@ -100,7 +100,7 @@ interface SliceReading {
   cumulative: number;
 }
 
-/** Which per-day rate the y axis plots. Defined in `lifecycle.ts`, which selects on it. */
+/** Which lifecycle quantity the y axis plots. Defined in `lifecycle.ts`, which selects on it. */
 export type { LifecycleMetric } from './lifecycle';
 
 interface FleetLifecycleChartProps {
@@ -113,7 +113,9 @@ interface FleetLifecycleChartProps {
     date: string;
     config: string;
     marginPerDay: string;
+    marginPerMw: string;
     revenuePerDay: string;
+    revenuePerMw: string;
     cumulativeRevenue: string;
     costPerDay: string;
     /** Names the running total column, which is cumulative *margin* whatever the y axis plots. */
@@ -548,9 +550,13 @@ const FleetLifecycleChart = React.memo(
           const valueHeader =
             metric === 'revenue'
               ? labels.revenuePerDay
-              : metric === 'cumulativeRevenue'
-                ? labels.cumulativeRevenue
-                : labels.marginPerDay;
+              : metric === 'revenuePerMw'
+                ? labels.revenuePerMw
+                : metric === 'cumulativeRevenue'
+                  ? labels.cumulativeRevenue
+                  : metric === 'marginPerMw'
+                    ? labels.marginPerMw
+                    : labels.marginPerDay;
           const rows = readings
             .map(
               (r) =>

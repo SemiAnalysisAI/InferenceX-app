@@ -104,9 +104,9 @@ const STRINGS = {
     captionPrices: (input: string, output: string, cachedPct: string | null) =>
       `$${input} in / $${output} out per M tok${cachedPct === null ? '' : `, cached ${cachedPct}%`}`,
     description:
-      'A fixed fleet, from the day the model shipped. The chips never change; the software serving them does — so each rollout is a config that beat every config before it, climbing from what the fleet already served to its own numbers, and the gap to the cost line is the return on that work.',
+      'A fixed fleet, from the day the model shipped. The chips never change. The software serving them does, so each rollout is a config that beat every config before it, climbing from what the fleet already served to its own numbers. The gap to the cost line is the return on that work.',
     tooSmall:
-      'This power budget is too small to power a single chip of the shown hardware — try a larger value.',
+      'This power budget is too small to power a single chip of the shown hardware. Try a larger value.',
     mwLabel: 'Facility Power (MW)',
     mwTooltip:
       'Total facility power budget in megawatts. Chip count uses all-in power per chip (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model — not bare TDP.',
@@ -119,7 +119,7 @@ const STRINGS = {
     loading: 'Loading run history…',
     errorPrefix: 'Could not load run history: ',
     noneMeasured:
-      'No chip was measured at this interactivity on any run date. Move the target interactivity slider into a measured range — the ranges each chip has been measured over are listed below.',
+      'No chip was measured at this interactivity on any run date. Move the target interactivity slider into a measured range. The ranges each chip has been measured over are listed below.',
     priceLabel: 'Token Price — input, output ($/M tok)',
     priceInputLabel: 'Input token price, $ per million',
     outputPriceInputLabel: 'Output token price, $ per million',
@@ -141,7 +141,7 @@ const STRINGS = {
     cacheTooltip:
       'What a cached input token sells for, as a percentage of the price above. Agentic traces reuse enormous prefixes — a median 133 input tokens per output token, of which a median 92% are served from cache on these runs — and providers bill a cache read at a fraction of a fresh token, so charging full price for all of them overstates margin by close to an order of magnitude. The cached fraction is measured per config, not assumed; only the percentage is yours. Set it to 100 to bill every token the same. Fixed sequences record no cache hits at all, which is why this input only appears for agentic traces.',
     singleRung:
-      'Every chip here has been measured on a single run date, so each line is one config held flat — the staircase this section exists to show needs several dates per config, and agentic trace history does not go back far enough yet. The levels are measured; the absence of steps is a gap in the history, not a finding about the hardware.',
+      'Every chip here has been measured on a single run date, so each line is one config held flat. The staircase this section exists to show needs several dates per config, and agentic trace history does not go back far enough yet. The levels are measured; the absence of steps is a gap in the history, not a finding about the hardware.',
     colChip: 'Chip',
     colConfigNow: 'Config Now',
     colFirst: 'First Run',
@@ -170,30 +170,34 @@ const STRINGS = {
       return `nearest ${below.toFixed(1)} below and ${above.toFixed(1)} above, tok/s/user (${dateLabel})`;
     },
     unplottable: (chips: string) =>
-      `No fleet could be sized for ${chips} at this power budget — the chip has no registered power figure, or its measured throughput sizes to nothing. Listed rather than dropped so the chart is never quietly missing a chip.`,
+      `No fleet could be sized for ${chips} at this power budget. The chip has no registered power figure, or its measured throughput sizes to nothing. Listed rather than dropped so the chart is never quietly missing a chip.`,
     note: 'Note:',
     disagg:
-      ' A step can be won by a disaggregated configuration, and the handover is a like-for-like comparison: total tok/s/chip is reported per chip overall for both kinds, and prefill and decode chips are the same silicon, so neither the sizing nor the cost line moves at the switch. Where this section needs an input- or output-token figure — to rank a step, or to price the two streams apart — it derives one from that total and the run’s measured token mix, rather than reading the per-chip input and output rates directly. Those two are reported per prefill and per decode chip on a disaggregated run, which is why the throughput charts elsewhere caveat them as not apples-to-apples; deriving instead keeps every comparison here on one denominator. What the fleet does change is its shape — the winning config’s prefill:decode ratio is assumed to apply across the whole fleet from the moment that config rolls out, which in practice is a redeployment the ramp window stands in for rather than a measurement. The config named on each step says which kind won it.',
+      ' A step can be won by a disaggregated configuration, and the handover is a like-for-like comparison: total tok/s/chip is reported per chip overall for both kinds, and prefill and decode chips are the same silicon, so neither the sizing nor the cost line moves at the switch. Where this section needs an input- or output-token figure, to rank a step or to price the two streams apart, it derives one from that total and the run’s measured token mix rather than reading the per-chip input and output rates directly. Those two are reported per prefill and per decode chip on a disaggregated run, which is why the throughput charts elsewhere caveat them as not apples-to-apples; deriving instead keeps every comparison here on one denominator. What the fleet does change is its shape. The winning config’s prefill:decode ratio is assumed to apply across the whole fleet from the moment that config rolls out. In practice, this is a redeployment that the ramp window stands in for, not a measurement. The config named on each step says which kind won it.',
     hybrid:
-      " One line per chip, not per software config: at any moment it follows whichever framework, precision and speculative-decoding combination was ahead, so the config serving the fleet changes along the line and each step names the one that took over. Legend entries still filter configs, which removes them from candidacy. Each step is a measured run date whose interpolated throughput at the target beat every earlier date; a sweep that failed to beat the incumbent is not a step, because the fleet kept serving the config it already had. A config does not take effect the instant a sweep finds it, so each one rolls out over the ramp window, climbing from what the fleet already served to its own numbers. Power and $/chip/hr are today's values from the TCO model, and cost is flat throughout because no config moves either term — it is the same silicon either way. Reads outside a run's measured interactivity range are excluded rather than clamped.",
+      " One line per chip, not per software config: at any moment it follows whichever framework, precision and speculative-decoding combination was ahead, so the config serving the fleet changes along the line and each step names the one that took over. Legend entries still filter configs, which removes them from candidacy. Each step is a measured run date whose interpolated throughput at the target beat every earlier date; a sweep that failed to beat the incumbent is not a step, because the fleet kept serving the config it already had. A config does not take effect the instant a sweep finds it, so each one rolls out over the ramp window, climbing from what the fleet already served to its own numbers. Power and $/chip/hr are today's values from the TCO model, and cost is flat throughout because no config moves either term. It is the same silicon either way. Reads outside a run's measured interactivity range are excluded rather than clamped.",
     overlayExempt:
-      ' Unofficial runs loaded via a run link are not shown here — the run-history API serves ingested official results only.',
+      ' Unofficial runs loaded via a run link are not shown here because the run-history API serves ingested official results only.',
     metricLabel: 'Y Axis',
     metricTooltip:
-      'What to plot. Margin is the per-day revenue minus the flat fleet cost, so the break-even rule shows which side of it a fleet is on. Revenue is the same rate with the cost term dropped, which makes rollouts easier to compare across chips of very different cost — but a chip being higher no longer means it is more profitable. Cumulative Revenue is the running total taken in since launch, not a rate; it compounds that caveat, because the largest area under a revenue curve may still never have covered its cost.',
+      'What to plot. Margin is the per-day revenue minus the flat fleet cost, so the break-even rule shows which side of it a fleet is on. Margin/MW and Revenue/MW divide their daily rates by provisioned power. Revenue drops the cost term, which makes rollouts easier to compare across chips of very different cost, but a chip being higher no longer means it is more profitable. Cumulative Revenue is the running total taken in since launch, not a rate; it compounds that caveat, because the largest area under a revenue curve may still never have covered its cost.',
     metricMargin: 'Margin',
     metricMarginPerMw: 'Margin/MW',
     metricRevenue: 'Revenue',
+    metricRevenuePerMw: 'Revenue/MW',
     metricCumulativeRevenue: 'Cum. Revenue',
     chartY: 'Margin ($/day)',
     chartYMarginPerMw: 'Margin ($/MW/day)',
     chartYRevenue: 'Revenue ($/day)',
+    chartYRevenuePerMw: 'Revenue ($/MW/day)',
     chartYCumulativeRevenue: 'Cumulative Revenue ($)',
     chartBreakEven: 'break-even',
     tipDate: 'Measured',
     tipConfig: 'Config',
     tipMargin: 'Margin/day',
+    tipMarginPerMw: 'Margin/MW/day',
     tipRevenue: 'Revenue/day',
+    tipRevenuePerMw: 'Revenue/MW/day',
     tipCumulativeRevenue: 'Cumulative revenue',
     tipCost: 'Cost/day',
     tipCumulative: 'Cumulative margin',
@@ -202,7 +206,7 @@ const STRINGS = {
     chartInstructions:
       'Hover to read every chip at that date · Click to freeze the readout, click again to release · Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     assumptions: (tier: string, chips: string, release: string) =>
-      `Anchored at the ${release} release. Fleet sized by facility power at ${chips}; cost = chips × ${tier} $/chip/hr, flat for the whole window. Revenue is priced on the selected token type and reduced by the availability haircut. Price, ramp, MTBI, recovery and horizon are your assumptions — the throughput steps are not.`,
+      `Anchored at the ${release} release. Fleet sized by facility power at ${chips}; cost = chips × ${tier} $/chip/hr, flat for the whole window. Revenue is priced on the selected token type and reduced by the availability haircut. Price, ramp, MTBI, recovery and horizon are your assumptions. The throughput steps are not.`,
     source: 'Source: ',
   },
   zh: {
@@ -214,8 +218,8 @@ const STRINGS = {
     captionPrices: (input: string, output: string, cachedPct: string | null) =>
       `输入 $${input} / 输出 $${output} 每百万 token${cachedPct === null ? '' : `，缓存 ${cachedPct}%`}`,
     description:
-      '固定集群自模型发布之日起的表现。Chip 从未更换，变化的是为其提供服务的软件——每一次推广都是一个优于此前所有配置的新配置，从集群当前已提供的水平爬升至其自身水平，而与成本线之间的差距即为这些工作带来的回报。',
-    tooSmall: '该功率预算不足以为所示任一 Chip 供电——请尝试更大的数值。',
+      '固定集群自模型发布之日起的表现。Chip 始终不变，变化的是为其提供服务的软件。每次推广采用的配置都优于此前所有配置，并从集群当前服务水平逐步爬升至新配置水平。曲线与成本线之间的差距，就是这些优化工作的回报。',
+    tooSmall: '该功率预算不足以为所示任一 Chip 供电。请尝试更大的数值。',
     mwLabel: '设施功率 (MW)',
     mwTooltip:
       '设施总功率预算（兆瓦）。Chip 数量按每 Chip 全含功率（主机、网络、散热）计算，数据来自 SemiAnalysis Datacenter Industry Model，而非裸 TDP。',
@@ -227,7 +231,7 @@ const STRINGS = {
     loading: '正在加载运行历史……',
     errorPrefix: '无法加载运行历史：',
     noneMeasured:
-      '在任何运行日期下都没有 Chip 在该交互性下被实测过。请将目标交互性滑块移入已实测区间——各 Chip 的实测区间见下方列表。',
+      '在任何运行日期下都没有 Chip 在该交互性下被实测过。请将目标交互性滑块移入已实测区间。各 Chip 的实测区间见下方列表。',
     priceLabel: 'Token 价格 — 输入、输出 ($/M tok)',
     priceInputLabel: '输入 token 价格，$/百万',
     outputPriceInputLabel: '输出 token 价格，$/百万',
@@ -248,7 +252,7 @@ const STRINGS = {
     cacheTooltip:
       '一个缓存输入 token 的售价，以上方价格的百分比表示。Agentic traces 会复用极长的前缀——中位数为每个输出 token 对应 133 个输入 token，其中中位数 92% 在本批运行中由缓存提供——而服务商对缓存读取仅按新鲜 token 价格的一小部分计费，因此若对全部 token 按满价计费，将使利润被高估近一个数量级。缓存占比按各配置实测得出，并非假设；仅该百分比属于您的假设。设为 100 表示所有 token 同价。固定序列完全没有缓存命中记录，因此该输入项仅在 Agentic Traces 下出现。',
     singleRung:
-      '此处每款 Chip 都只有单一运行日期的实测数据，因此每条线都是一个配置的水平延伸——本模块所要呈现的阶梯需要同一配置在多个日期上的数据，而 agentic traces 的历史尚不够长。图中的水平值是实测的；缺少台阶反映的是历史数据的空缺，而非关于硬件的结论。',
+      '此处每款 Chip 都只有单一运行日期的实测数据，因此每条线都是一个配置的水平延伸。本模块所要呈现的阶梯需要同一配置在多个日期上的数据，而 agentic traces 的历史尚不够长。图中的水平值是实测的；缺少台阶反映的是历史数据的空缺，而非关于硬件的结论。',
     colChip: 'Chip',
     colConfigNow: '当前配置',
     colFirst: '首次运行',
@@ -277,30 +281,34 @@ const STRINGS = {
       return `最近实测为下方 ${below.toFixed(1)}、上方 ${above.toFixed(1)} tok/s/user（${dateLabel}）`;
     },
     unplottable: (chips: string) =>
-      `在该功率预算下无法为 ${chips} 组建集群——该 Chip 缺少已登记的功耗数据，或其实测吞吐无法组成任何规模。此处列出而非直接剔除，以免图表静默遗漏 Chip。`,
+      `在该功率预算下无法为 ${chips} 组建集群。该 Chip 缺少已登记的功耗数据，或其实测吞吐无法组成任何规模。此处列出而非直接剔除，以免图表静默遗漏 Chip。`,
     note: '注意：',
     disagg:
-      '台阶可以由解耦配置取得，且该次交接是同类比较：两种部署方式的总 tok/s/chip 均按 Chip 总数报告，且预填充与解码使用的是同一种硅片，因此切换时集群规模与成本线均不发生变化。当本模块需要输入或输出 token 的单独数值时（用于台阶排序，或将两类 token 分别计价），它由该总量与该次运行实测的 token 构成比推导得出，而非直接读取每芯片的输入/输出速率——在解耦部署下这两个速率分别按预填充芯片与解码芯片计算，这也正是别处吞吐图表标注其不可直接比较的原因；改为推导可使本模块的所有比较统一在同一分母上。真正改变的是集群的形态——自该配置开始推广起，其预填充:解码比例被假定应用于整个集群，这在实际中是一次重新部署，由爬坡期窗口代为体现，而非实测值。每一级台阶标注的配置即说明其类型。',
+      '台阶可以由解耦配置取得，且该次交接是同类比较：两种部署方式的总 tok/s/chip 均按 Chip 总数报告，且预填充与解码使用的是同一种硅片，因此切换时集群规模与成本线均不发生变化。当本模块需要输入或输出 token 的单独数值时（用于台阶排序，或将两类 token 分别计价），它由该总量与该次运行实测的 token 构成比推导得出，而非直接读取每芯片的输入/输出速率。在解耦部署下，这两个速率分别按预填充芯片与解码芯片计算，这也正是别处吞吐图表标注其不可直接比较的原因；改为推导可使本模块的所有比较统一在同一分母上。真正改变的是集群形态。自该配置开始推广起，其预填充:解码比例被假定应用于整个集群。实际部署中，这相当于一次重新部署，由爬坡期窗口代为体现，并非实测值。每一级台阶标注的配置即说明其类型。',
     hybrid:
-      '每个 Chip 一条曲线，而非每个软件配置一条：曲线在任一时刻都跟随当时领先的框架、精度与投机解码组合，因此服务集群的配置会沿曲线变化，每一级台阶都标注接管的配置。图例项仍可筛选配置，被隐藏的配置将不参与竞争。每一级台阶都是一个实测运行日期，其在目标交互性下的插值吞吐量优于此前所有日期；未能超越现有配置的扫描不构成台阶，因为集群仍在运行原有配置。配置不会在扫描发现的瞬间生效，因此每个配置都会在推广期内从集群当前已提供的水平爬升至其自身水平。功率与 $/chip/hr 为 TCO 模型的当前值，成本在整个期间保持水平，因为任何配置都不会改变这两项——两种情况下都是同一款芯片。超出某次运行实测交互性区间的结果会被排除而非钳制。',
+      '每个 Chip 一条曲线，而非每个软件配置一条：曲线在任一时刻都跟随当时领先的框架、精度与投机解码组合，因此服务集群的配置会沿曲线变化，每一级台阶都标注接管的配置。图例项仍可筛选配置，被隐藏的配置将不参与竞争。每一级台阶都是一个实测运行日期，其在目标交互性下的插值吞吐量优于此前所有日期；未能超越现有配置的扫描不构成台阶，因为集群仍在运行原有配置。配置不会在扫描发现的瞬间生效，因此每个配置都会在推广期内从集群当前已提供的水平爬升至其自身水平。功率与 $/chip/hr 为 TCO 模型的当前值，成本在整个期间保持水平，因为任何配置都不会改变这两项。两种情况下都是同一款芯片。超出某次运行实测交互性区间的结果会被排除而非钳制。',
     overlayExempt:
-      '通过运行链接加载的非官方运行不会显示在此——运行历史 API 仅提供已入库的官方结果。',
+      '通过运行链接加载的非官方运行不会显示在此，因为运行历史 API 仅提供已入库的官方结果。',
     metricLabel: 'Y 轴',
     metricTooltip:
-      '选择绘制的内容。利润为日均收入减去水平的集群成本，因此保本线可显示集群位于其哪一侧。收入为同一日均指标去掉成本项，便于在成本差异很大的 Chip 之间比较推广曲线——但此时位置更高并不代表更赚钱。累计收入是自上线以来的累计总额，而非日均指标；它进一步放大了上述注意事项——收入曲线下面积最大的 Chip 仍可能从未收回成本。',
+      '选择绘制的内容。利润为日均收入减去固定的集群成本，因此保本线可显示集群位于其哪一侧。每 MW 利润和每 MW 收入分别将对应的日均指标除以已配置功率。收入不扣除成本，便于在成本差异很大的 Chip 之间比较推广曲线，但此时位置更高并不代表更赚钱。累计收入是自上线以来的累计总额，而非日均指标；它会进一步放大上述注意事项，因为收入曲线下面积最大的 Chip 仍可能从未收回成本。',
     metricMargin: '利润',
     metricMarginPerMw: '每 MW 利润',
     metricRevenue: '收入',
+    metricRevenuePerMw: '每 MW 收入',
     metricCumulativeRevenue: '累计收入',
     chartY: '利润 ($/天)',
     chartYMarginPerMw: '每 MW 利润 ($/MW/天)',
     chartYRevenue: '收入 ($/天)',
+    chartYRevenuePerMw: '每 MW 收入 ($/MW/天)',
     chartYCumulativeRevenue: '累计收入 ($)',
     chartBreakEven: '保本线',
     tipDate: '实测于',
     tipConfig: '配置',
     tipMargin: '每日利润',
+    tipMarginPerMw: '每 MW 每日利润',
     tipRevenue: '每日收入',
+    tipRevenuePerMw: '每 MW 每日收入',
     tipCumulativeRevenue: '累计收入',
     tipCost: '每日成本',
     tipCumulative: '累计利润',
@@ -309,7 +317,7 @@ const STRINGS = {
     chartInstructions:
       '悬停可读取该日期下所有 Chip 的数值 · 点击可冻结读数，再次点击解除 · Shift+滚轮 横向缩放 · 拖动平移 · 双击重置',
     assumptions: (tier: string, chips: string, release: string) =>
-      `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = Chip 数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、爬坡期、平均无故障间隔、恢复时间与测算期为你的假设——吞吐量台阶不是。`,
+      `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = Chip 数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、爬坡期、平均无故障间隔、恢复时间与测算期为你的假设。吞吐量台阶不是假设。`,
     source: '来源：',
   },
 } as const;
@@ -535,7 +543,10 @@ export default function FleetLifecycle({
     const seeded = readUrlParams().c_ly;
     // Allowlisted rather than cast: the param is user-editable, and an unknown
     // value must fall back to the default instead of reaching `metricValue`.
-    return seeded === 'revenue' || seeded === 'cumulativeRevenue' || seeded === 'marginPerMw'
+    return seeded === 'revenue' ||
+      seeded === 'revenuePerMw' ||
+      seeded === 'cumulativeRevenue' ||
+      seeded === 'marginPerMw'
       ? seeded
       : 'margin';
   });
@@ -1293,6 +1304,11 @@ export default function FleetLifecycle({
                   testId: 'calc-lifecycle-metric-revenue',
                 },
                 {
+                  value: 'revenuePerMw',
+                  label: t.metricRevenuePerMw,
+                  testId: 'calc-lifecycle-metric-revenue-per-mw',
+                },
+                {
                   value: 'cumulativeRevenue',
                   label: t.metricCumulativeRevenue,
                   testId: 'calc-lifecycle-metric-cumulative-revenue',
@@ -1360,11 +1376,13 @@ export default function FleetLifecycle({
                 yLabel={
                   yMetric === 'revenue'
                     ? t.chartYRevenue
-                    : yMetric === 'cumulativeRevenue'
-                      ? t.chartYCumulativeRevenue
-                      : yMetric === 'marginPerMw'
-                        ? t.chartYMarginPerMw
-                        : t.chartY
+                    : yMetric === 'revenuePerMw'
+                      ? t.chartYRevenuePerMw
+                      : yMetric === 'cumulativeRevenue'
+                        ? t.chartYCumulativeRevenue
+                        : yMetric === 'marginPerMw'
+                          ? t.chartYMarginPerMw
+                          : t.chartY
                 }
                 caption={caption}
                 breakEvenLabel={t.chartBreakEven}
@@ -1373,7 +1391,9 @@ export default function FleetLifecycle({
                   date: t.tipDate,
                   config: t.tipConfig,
                   marginPerDay: t.tipMargin,
+                  marginPerMw: t.tipMarginPerMw,
                   revenuePerDay: t.tipRevenue,
+                  revenuePerMw: t.tipRevenuePerMw,
                   cumulativeRevenue: t.tipCumulativeRevenue,
                   costPerDay: t.tipCost,
                   cumulative: t.tipCumulative,
@@ -1402,7 +1422,7 @@ export default function FleetLifecycle({
             <ul className="mt-1 list-disc pl-5">
               {visibleUnmeasured.map((u) => (
                 <li key={u.hwKey}>
-                  {getLabel(u.hwKey, hardwareConfig)} —{' '}
+                  {getLabel(u.hwKey, hardwareConfig)}:{' '}
                   {t.unmeasuredRange(u.nearestBelow, u.nearestAbove, u.datesConsidered)}
                 </li>
               ))}

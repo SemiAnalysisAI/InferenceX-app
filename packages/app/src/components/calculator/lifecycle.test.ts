@@ -484,6 +484,7 @@ const point = (month: number, margin: number): LifecyclePoint => ({
   revenue: margin + 100,
   cost: 100,
   margin,
+  revenuePerMw: (margin + 100) / PROVISIONED_MW,
   marginPerMw: margin / PROVISIONED_MW,
   cumulative: margin * 10,
   cumulativeRevenue: (margin + 100) * 10,
@@ -751,7 +752,7 @@ describe('effectiveTokPerSec', () => {
   });
 });
 
-describe('margin per megawatt', () => {
+describe('per-megawatt lifecycle metrics', () => {
   const costPerHour = 10_000;
   const steps: ThroughputStep[] = [
     { month: 0, billableInputTokPerSec: 400_000, outputTokPerSec: 0 },
@@ -765,9 +766,10 @@ describe('margin per megawatt', () => {
     assumptions,
   };
 
-  it('is the daily margin divided by the power actually provisioned', () => {
+  it('divides daily revenue and margin by the power actually provisioned', () => {
     const series = computeLifecycle(base)!;
     for (const p of series.points) {
+      expect(p.revenuePerMw).toBeCloseTo(p.revenue / PROVISIONED_MW, 9);
       expect(p.marginPerMw).toBeCloseTo(p.margin / PROVISIONED_MW, 9);
     }
   });
@@ -790,6 +792,7 @@ describe('margin per megawatt', () => {
     }
     expect(isBreakEvenAnchored('marginPerMw')).toBe(true);
     expect(isBreakEvenAnchored('revenue')).toBe(false);
+    expect(isBreakEvenAnchored('revenuePerMw')).toBe(false);
     expect(isBreakEvenAnchored('cumulativeRevenue')).toBe(false);
   });
 
@@ -797,6 +800,8 @@ describe('margin per megawatt', () => {
     for (const provisionedMw of [0, -1, Number.NaN]) {
       const series = computeLifecycle({ ...base, provisionedMw })!;
       for (const p of series.points) {
+        expect(Number.isFinite(p.revenuePerMw)).toBe(true);
+        expect(p.revenuePerMw).toBe(0);
         expect(Number.isFinite(p.marginPerMw)).toBe(true);
         expect(p.marginPerMw).toBe(0);
       }
@@ -806,6 +811,7 @@ describe('margin per megawatt', () => {
   it('is selected by metricValue', () => {
     const series = computeLifecycle(base)!;
     const p = series.points.at(-1)!;
+    expect(metricValue(p, 'revenuePerMw')).toBe(p.revenuePerMw);
     expect(metricValue(p, 'marginPerMw')).toBe(p.marginPerMw);
     expect(metricValue(p, 'margin')).toBe(p.margin);
   });

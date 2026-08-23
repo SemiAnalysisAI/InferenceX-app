@@ -249,8 +249,8 @@ export interface LifecycleInputs {
    * paying for capacity in. Dividing by the nominal budget would credit each
    * chip with power it never provisioned.
    *
-   * Only used to express the per-MW metric. Zero or negative leaves that metric
-   * at zero rather than dividing by it.
+   * Only used to express the per-MW metrics. Zero or negative leaves those
+   * metrics at zero rather than dividing by it.
    */
   provisionedMw: number;
   /** End of the modelled window, months since the anchor. */
@@ -267,6 +267,8 @@ export interface LifecyclePoint {
   cost: number;
   /** revenue − cost, $/day. */
   margin: number;
+  /** Revenue per megawatt provisioned, $/MW/day. */
+  revenuePerMw: number;
   /**
    * The same margin per megawatt provisioned, $/MW/day.
    *
@@ -349,17 +351,23 @@ export interface LifecycleSeries {
 }
 
 /**
- * What a view plots. `margin` and `revenue` are rates in $/day; `cumulativeRevenue`
- * is the area under the revenue curve since the fleet's first config, in $.
+ * What a view plots. `margin` and `revenue` are rates in $/day; their `PerMw`
+ * variants divide the same rate by provisioned power. `cumulativeRevenue` is the
+ * area under the revenue curve since the fleet's first config, in $.
  *
  * Lives here rather than in a chart component because the selection is pure and
  * the chart is not the only thing that reads it.
  *
  * Note the unit change: a caller that formats an axis or a tooltip must ask
  * `isCumulative` rather than assume $/day, and anything anchored to zero as
- * break-even (the dashed rule) applies to `margin` alone.
+ * break-even (the dashed rule) applies to margin metrics alone.
  */
-export type LifecycleMetric = 'margin' | 'marginPerMw' | 'revenue' | 'cumulativeRevenue';
+export type LifecycleMetric =
+  | 'margin'
+  | 'marginPerMw'
+  | 'revenue'
+  | 'revenuePerMw'
+  | 'cumulativeRevenue';
 
 /** True when the metric is a running total in $ rather than a rate in $/day. */
 export function isCumulative(metric: LifecycleMetric): boolean {
@@ -378,6 +386,7 @@ export function isBreakEvenAnchored(metric: LifecycleMetric): boolean {
 /** The quantity a metric names, for reading off a sampled point. */
 export function metricValue(point: LifecyclePoint, metric: LifecycleMetric): number {
   if (metric === 'revenue') return point.revenue;
+  if (metric === 'revenuePerMw') return point.revenuePerMw;
   if (metric === 'cumulativeRevenue') return point.cumulativeRevenue;
   if (metric === 'marginPerMw') return point.marginPerMw;
   return point.margin;
@@ -682,6 +691,7 @@ export function computeLifecycle(inputs: LifecycleInputs): LifecycleSeries | nul
       revenue,
       cost,
       margin: revenue - cost,
+      revenuePerMw: revenue * perMw,
       marginPerMw: (revenue - cost) * perMw,
       cumulative,
       cumulativeRevenue,
