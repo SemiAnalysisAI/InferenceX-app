@@ -118,8 +118,8 @@ export interface TransitionGeometry {
   paths: Map<SVGPathElement, string>;
 }
 
-const TRANSITION_POINT_SELECTOR = '.dot-group, .unofficial-overlay-pt';
-const TRANSITION_ROOFLINE_SELECTOR = '.roofline-path, .overlay-roofline-path';
+const TRANSITION_POINT_SELECTOR = '.dot-group';
+const TRANSITION_ROOFLINE_SELECTOR = '.roofline-path';
 type GeometryVisibility = (element: SVGElement) => boolean;
 
 function isGeometryVisible(element: SVGElement): boolean {

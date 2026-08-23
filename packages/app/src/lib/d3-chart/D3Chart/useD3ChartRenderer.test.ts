@@ -120,7 +120,7 @@ describe('metricRenderCallbackContext', () => {
 });
 
 describe('coordinate transitions', () => {
-  it('animates visible official and overlay geometry for 300ms while hidden marks snap', () => {
+  it('animates visible official geometry for 300ms while hidden and overlay marks snap', () => {
     const svg = d3.select(document.body).append('svg');
     const group = svg.append('g') as unknown as d3.Selection<SVGGElement, unknown, any, any>;
     const point = (className: string, opacity?: number) => {
@@ -146,8 +146,8 @@ describe('coordinate transitions', () => {
     const hiddenOverlayRoofline = roofline('overlay-roofline-path', 0);
     const previous = captureTransitionGeometry(group);
 
-    expect(previous.transforms.size).toBe(2);
-    expect(previous.paths.size).toBe(2);
+    expect(previous.transforms.size).toBe(1);
+    expect(previous.paths.size).toBe(1);
 
     for (const element of [
       visibleOfficialPoint,
@@ -169,18 +169,18 @@ describe('coordinate transitions', () => {
     animateTransitionGeometry(group, previous, 300);
 
     expect(visibleOfficialPoint.getAttribute('transform')).toBe('translate(0,0)');
-    expect(visibleOverlayPoint.getAttribute('transform')).toBe('translate(0,0)');
+    expect(visibleOverlayPoint.getAttribute('transform')).toBe('translate(100,100)');
     expect(hiddenOfficialPoint.getAttribute('transform')).toBe('translate(100,100)');
     expect(hiddenOverlayPoint.getAttribute('transform')).toBe('translate(100,100)');
     expect(visibleOfficialRoofline.getAttribute('d')).toBe('M0,0L1,1');
-    expect(visibleOverlayRoofline.getAttribute('d')).toBe('M0,0L1,1');
+    expect(visibleOverlayRoofline.getAttribute('d')).toBe('M100,100L200,200');
     expect(hiddenOfficialRoofline.getAttribute('d')).toBe('M100,100L200,200');
     expect(hiddenOverlayRoofline.getAttribute('d')).toBe('M100,100L200,200');
 
     expect(transitionDuration(visibleOfficialPoint)).toBe(300);
-    expect(transitionDuration(visibleOverlayPoint)).toBe(300);
+    expect(transitionDuration(visibleOverlayPoint)).toBeUndefined();
     expect(transitionDuration(visibleOfficialRoofline)).toBe(300);
-    expect(transitionDuration(visibleOverlayRoofline)).toBe(300);
+    expect(transitionDuration(visibleOverlayRoofline)).toBeUndefined();
     expect(transitionDuration(hiddenOfficialPoint)).toBeUndefined();
     expect(transitionDuration(hiddenOverlayPoint)).toBeUndefined();
     expect(transitionDuration(hiddenOfficialRoofline)).toBeUndefined();
