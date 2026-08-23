@@ -71,7 +71,7 @@ describe('AgentX telemetry tutorial — Chinese page', () => {
   it('renders translated copy and keeps the same section anchors', () => {
     cy.visit('/zh/agentx/telemetry');
     cy.get('[data-testid="agentx-telemetry-article"]').should('be.visible');
-    cy.contains('h1', '深入解读智能体负载：详细遥测数据').should('be.visible');
+    cy.contains('h1', '通过详细遥测数据解析智能体负载').should('be.visible');
     // Anchors are language-neutral so a deep link survives the locale switch.
     for (const id of SECTION_IDS) {
       cy.get(`[data-testid="agentx-telemetry-section-${id}"]`).should('exist');

@@ -9,9 +9,11 @@ import { track } from '@/lib/analytics';
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { NewBadge } from '@/components/ui/new-badge';
 import { MinecraftToggles } from '@/components/minecraft/minecraft-toggles';
-import { CLIENT_SEARCH_CHANGE_EVENT, navigateInApp } from '@/lib/client-navigation';
+import { navigateInApp } from '@/lib/client-navigation';
+import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
+import { useClientSearch } from '@/hooks/useClientSearch';
 import { hasZhSibling, isZhPathname, switchLocalePath, ZH_PREFIX, zhPath } from '@/lib/i18n';
-import { NAV_LABELS_ZH } from '@/lib/tab-meta-zh';
+import { NAV_LABELS_ZH, type HeaderNavHref } from '@/lib/tab-meta-zh';
 import { cn } from '@/lib/utils';
 
 import { GitHubStars } from './GithubStars';
@@ -19,22 +21,10 @@ import { GitHubStars } from './GithubStars';
 /** The Telemetry nav entry, carved out of the Dashboard tab prefix match. */
 const TELEMETRY_PATH = '/inference/agentic';
 
-/** Dashboard tab paths that should highlight the "Dashboard" nav link. */
-const DASHBOARD_TABS = [
-  '/inference',
-  '/evaluation',
-  '/historical',
-  '/calculator',
-  '/reliability',
-  '/gpu-specs',
-  '/gpu-metrics',
-  '/collectivex',
-  '/submissions',
-  '/current-inferencex-image',
-];
+const DASHBOARD_TABS = DASHBOARD_ROUTES.map((route) => route.path);
 
 interface NavLink {
-  href: string;
+  href: HeaderNavHref;
   label: string;
   testId: string;
   event: string;
@@ -126,39 +116,21 @@ function LanguageToggle({
 }) {
   const isZh = isZhPathname(pathname);
   const target = switchLocalePath(pathname);
-  // The root layout is reused for search-only App Router transitions, so keep
-  // this persistent link synchronized with both browser history and the app's
-  // explicit soft-navigation signal.
-  const [search, setSearch] = useState('');
-  useEffect(() => {
-    const sync = (event: Event) => {
-      setSearch(
-        event instanceof CustomEvent && typeof event.detail === 'string'
-          ? event.detail
-          : window.location.search,
-      );
-    };
-    sync(new Event('initial'));
-    window.addEventListener('popstate', sync);
-    window.addEventListener(CLIENT_SEARCH_CHANGE_EVENT, sync);
-    return () => {
-      window.removeEventListener('popstate', sync);
-      window.removeEventListener(CLIENT_SEARCH_CHANGE_EVENT, sync);
-    };
-  }, [pathname]);
+  const search = useClientSearch();
+  const isOverview = isActive(pathname, '/overview');
   return (
     <Link
       href={target + search}
       // Only /overview rewrites this href per interaction, which would
       // re-prefetch its force-dynamic sibling on every selector commit.
       // Everywhere else the href is stable, so let Next prefetch it.
-      prefetch={isActive(pathname, '/overview') ? false : undefined}
+      prefetch={isOverview ? false : undefined}
       data-testid="language-toggle"
       hrefLang={isZh ? 'en' : 'zh-CN'}
       className="inline-flex items-center min-h-11 px-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
       onClick={(event) => {
         track('header_language_toggled', { to: isZh ? 'en' : 'zh' });
-        navigateInApp(event, router, target + search);
+        if (!isOverview) navigateInApp(event, router, target + search);
       }}
     >
       {isZh ? 'EN' : '中文'}

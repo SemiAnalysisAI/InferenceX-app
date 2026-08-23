@@ -1,33 +1,39 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 import { useAgenticAggregates } from '@/hooks/api/use-agentic-aggregates';
+import { useRequestChartData } from '@/hooks/api/use-request-chart-data';
 import { useRequestTimeline } from '@/hooks/api/use-request-timeline';
-import { useTraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
+import {
+  useTraceServerMetrics,
+  useTraceServerMetricSource,
+} from '@/hooks/api/use-trace-server-metrics';
 import { useBenchmarkSiblings } from '@/hooks/api/use-benchmark-siblings';
 import { NudgeEngine } from '@/components/nudge-engine';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
+import { withChartState } from '@/lib/url-state';
 
 import { AggregatesGrid } from './aggregates-grid';
 import { MetricSourceToolbar } from './metric-source-toolbar';
 import {
   phaseBoundarySec,
+  sliceRequestChartDataByPhase,
   sliceServerSeriesByPhase,
-  sliceTimelineByPhase,
   timelineHasWarmup,
   type ServerSeriesLike,
   type StagePhase,
 } from './phase-slice';
 import { PointSummary } from './point-summary';
 import { RequestMetricOverTime, SequenceMetricCard } from './request-metric-cards';
-import { RequestTimelineView } from './request-timeline';
+import { ServerLogViewer } from './server-log-viewer';
 import {
   CumulativeUniqueInputTokensCard,
   InflightUniqueTokensCard,
@@ -40,8 +46,9 @@ import {
 } from './server-metric-cards';
 import { SiblingNav } from './sibling-nav';
 import type { ThroughputSeriesKey } from './time-series-math';
+import { useDetailView, type DetailView } from './use-detail-view';
 
-const STRINGS = {
+export const AGENTIC_POINT_DETAIL_STRINGS = {
   en: {
     back: 'Back',
     inferenceChart: 'Inference chart',
@@ -54,12 +61,15 @@ const STRINGS = {
     perPoint: 'Per-point',
     requestTimeline: 'Request timeline',
     aggregatesAcrossConfigs: 'Aggregates across configs',
+    logs: 'Logs',
+    detailView: 'Detail view',
     warmupWord: 'warmup',
     warmupNotePrefix: 'Showing the ',
     warmupNoteBody:
       ' phase — a cache-warming pass whose outputs are capped at 1 token. Warmup OSL ≈ 1, and interactivity/decode are blank (single-token outputs have no inter-token latency).',
     warmupNoServerData:
       ' Warmup server-side metrics aren’t available for this point, so the server charts below are empty — the request-level charts above still reflect warmup.',
+    metricSourceError: 'The selected server-metrics source could not be loaded.',
   },
   zh: {
     back: '返回',
@@ -73,57 +83,51 @@ const STRINGS = {
     perPoint: '单点',
     requestTimeline: '请求时间线',
     aggregatesAcrossConfigs: '跨配置聚合',
+    logs: '日志',
+    detailView: '详情视图',
     warmupWord: 'warmup',
     warmupNotePrefix: '当前显示 ',
     warmupNoteBody:
-      ' 预热阶段——该阶段用于缓存预热，输出被限制为 1 个 token。预热阶段 OSL ≈ 1，交互性/解码指标为空（单 token 输出没有 token 间延迟）。',
+      ' 阶段——该阶段用于建立 cache 状态，输出被限制为 1 个 token。warmup 阶段 OSL ≈ 1，交互性/解码指标为空（单 token 输出没有 token 间延迟）。',
     warmupNoServerData:
-      ' 该数据点没有预热阶段的服务器端指标，因此下方服务器图表为空——上方请求级图表仍反映预热阶段数据。',
+      ' 该数据点没有 warmup 阶段的服务器端指标，因此下方服务器图表为空——上方请求级图表仍反映 warmup 阶段数据。',
+    metricSourceError: '无法加载所选服务器指标来源。',
   },
 } as const;
 
+const RequestTimelineView = dynamic(() =>
+  import('./request-timeline').then((module_) => module_.RequestTimelineView),
+);
+
 interface Props {
   id: number;
-}
-
-type DetailView = 'point' | 'timeline' | 'aggregates';
-
-const isDetailView = (value: string | null): value is DetailView =>
-  value === 'point' || value === 'timeline' || value === 'aggregates';
-
-/** URL-persisted detail view (`?view=`; per-point is the unadorned default). */
-function useDetailView(): [DetailView, (nextView: DetailView) => void] {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const requestedView = searchParams.get('view');
-  const view: DetailView = isDetailView(requestedView) ? requestedView : 'point';
-  const setView = useCallback(
-    (nextView: DetailView) => {
-      const nextParams = new URLSearchParams(searchParams.toString());
-      if (nextView === 'point') nextParams.delete('view');
-      else nextParams.set('view', nextView);
-      const query = nextParams.toString();
-      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-      track('inference_agentic_detail_view_changed', { view: nextView });
-    },
-    [pathname, router, searchParams],
-  );
-  return [view, setView];
 }
 
 export function AgenticPointDetail({ id }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
-  const t = STRINGS[locale];
+  const t = AGENTIC_POINT_DETAIL_STRINGS[locale];
   const isZh = isZhPathname(pathname);
-  const inferenceHref = isZh ? `${ZH_PREFIX}/inference` : '/inference';
+  const inferenceBaseHref = isZh ? `${ZH_PREFIX}/inference` : '/inference';
+  // Carry the chart state the reader arrived with back to the chart. The link
+  // used to be a bare path, so it could only ever land on the default model
+  // with the default legend, no matter what the reader was looking at.
+  //
+  // Resolved after mount, not during render: `withChartState` reads the
+  // in-memory param store (seeded from this page's own URL at load), which
+  // does not exist on the server — computing it during render would make the
+  // server and client markup disagree.
+  const [inferenceHref, setInferenceHref] = useState(inferenceBaseHref);
+  useEffect(() => {
+    setInferenceHref(withChartState(inferenceBaseHref));
+  }, [inferenceBaseHref]);
   const viewOptions: SegmentedToggleOption<DetailView>[] = useMemo(
     () => [
       { value: 'point', label: t.perPoint, testId: 'detail-view-point' },
       { value: 'timeline', label: t.requestTimeline, testId: 'detail-view-timeline' },
       { value: 'aggregates', label: t.aggregatesAcrossConfigs, testId: 'detail-view-aggregates' },
+      { value: 'logs', label: t.logs, testId: 'detail-view-logs' },
     ],
     [t],
   );
@@ -144,33 +148,42 @@ export function AgenticPointDetail({ id }: Props) {
   // shows how the metric varies across the SKU.
   const siblingIds = siblingsData?.siblings.map((s) => s.id) ?? [];
   const aggregatesQuery = useAgenticAggregates(siblingIds, view === 'aggregates');
-  // Per-request timeline used by the timeline view AND every per-point
-  // request-derived chart (ISL/OSL, latency-over-time, in-flight), so fetch
-  // whenever we're on either view.
-  const timelineQuery = useRequestTimeline(id, view === 'timeline' || view === 'point');
-  const timeline = timelineQuery.data;
+  // The default charts use a compact nine-field request projection. The much
+  // larger source-rich Gantt payload is fetched only after opening Timeline.
+  const requestChartQuery = useRequestChartData(id, view === 'point');
+  const requestChartData = requestChartQuery.data;
+  const timelineQuery = useRequestTimeline(id, view === 'timeline');
 
   // Warmup vs profiling stage. Only meaningful when the point actually has a
   // warmup phase (older runs are profiling-only) — when absent the toggle is
   // hidden and everything falls back to the full (profiling) run.
   const [phase, setPhase] = useState<StagePhase>('profiling');
-  const hasWarmup = useMemo(() => timelineHasWarmup(timeline), [timeline]);
+  const hasWarmup = useMemo(() => timelineHasWarmup(requestChartData), [requestChartData]);
   const effectivePhase: StagePhase = hasWarmup ? phase : 'profiling';
 
   // Server-metric boundary on the chart's own t-axis (rebased through absolute
   // ns — see phase-slice header for the origin-gap invariant). Request charts
   // get a phase-scoped timeline (filtered + rebased) so they share a 0-based
   // axis with the server charts for the selected phase.
-  const boundarySec = useMemo(() => phaseBoundarySec(metrics, timeline), [metrics, timeline]);
-  const phaseTimeline = useMemo(
-    () => (timeline ? sliceTimelineByPhase(timeline, effectivePhase) : null),
-    [timeline, effectivePhase],
+  const boundarySec = useMemo(
+    () => phaseBoundarySec(metrics, requestChartData),
+    [metrics, requestChartData],
+  );
+  const phaseRequestData = useMemo(
+    () =>
+      requestChartData ? sliceRequestChartDataByPhase(requestChartData, effectivePhase) : null,
+    [requestChartData, effectivePhase],
   );
 
   const metricSources = metrics?.metricSources ?? [];
   const selectedMetricSource = metricSources.find(({ source }) => source.id === metricSourceId);
+  const metricSourceQuery = useTraceServerMetricSource(
+    id,
+    metricSourceId,
+    view === 'point' && metricSourceId !== 'all',
+  );
   const baseServerSeries: ServerSeriesLike | undefined = useMemo(() => {
-    const src = metrics?.metricSources?.find((m) => m.source.id === metricSourceId);
+    const src = metricSourceQuery.data;
     if (src) {
       return {
         kvCacheUsage: src.kvCacheUsage,
@@ -184,8 +197,8 @@ export function AgenticPointDetail({ id }: Props) {
         kvCacheUsageByEngine: src.kvCacheUsageByEngine,
       };
     }
-    return metrics ?? undefined;
-  }, [metrics, metricSourceId]);
+    return metricSourceId === 'all' ? (metrics ?? undefined) : undefined;
+  }, [metrics, metricSourceId, metricSourceQuery.data]);
   // Phase-sliced server series (+ matching durationS) consumed by every server
   // chart. Null only when there are no server metrics at all.
   const sliced = useMemo(
@@ -220,13 +233,20 @@ export function AgenticPointDetail({ id }: Props) {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => {
+            track('inference_agentic_detail_back_clicked', { id });
+            router.back();
+          }}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" /> {t.back}
         </button>
         <span className="text-sm text-muted-foreground">·</span>
-        <Link href={inferenceHref} className="text-sm text-muted-foreground hover:text-foreground">
+        <Link
+          href={inferenceHref}
+          onClick={() => track('inference_agentic_detail_chart_link_clicked', { id })}
+          className="text-sm text-muted-foreground hover:text-foreground"
+        >
           {t.inferenceChart}
         </Link>
       </div>
@@ -243,25 +263,26 @@ export function AgenticPointDetail({ id }: Props) {
         <div className="text-sm text-muted-foreground">{t.loadingPoint}</div>
       ) : null}
 
-      {metricsQuery.isError && (
+      {view !== 'logs' && metricsQuery.isError && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
           Failed to load trace data for benchmark point #{id}.
         </div>
       )}
-      {metricsQuery.data === null && !metricsQuery.isLoading && (
+      {view !== 'logs' && metricsQuery.data === null && !metricsQuery.isLoading && (
         <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
           No stored trace_replay blob for benchmark point #{id}. This point predates the aiperf
           time-series capture, or its source artifacts have expired on GitHub.
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex min-w-0 items-center justify-between gap-3">
         <SegmentedToggle
           value={view}
           options={viewOptions}
           onValueChange={setView}
-          ariaLabel="Detail view"
+          ariaLabel={t.detailView}
           testId="detail-view-toggle"
+          className="max-w-full overflow-x-auto"
           buttonClassName="px-3 py-1.5 text-sm"
         />
         {view === 'aggregates' && (
@@ -289,7 +310,9 @@ export function AgenticPointDetail({ id }: Props) {
         />
       )}
 
-      {view === 'aggregates' ? (
+      {view === 'logs' ? (
+        <ServerLogViewer id={id} enabled />
+      ) : view === 'aggregates' ? (
         <AggregatesGrid
           siblings={siblingsData?.siblings ?? []}
           aggregates={aggregatesQuery.data}
@@ -325,30 +348,35 @@ export function AgenticPointDetail({ id }: Props) {
               {!slicedHasServerData && t.warmupNoServerData}
             </p>
           )}
+          {metricSourceQuery.isError && (
+            <p className="rounded-md border-l-2 border-destructive/60 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {t.metricSourceError}
+            </p>
+          )}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <SequenceMetricCard
               metric="isl"
-              timeline={phaseTimeline}
-              timelineLoading={timelineQuery.isLoading}
+              timeline={phaseRequestData}
+              timelineLoading={requestChartQuery.isLoading}
             />
             <SequenceMetricCard
               metric="osl"
-              timeline={phaseTimeline}
-              timelineLoading={timelineQuery.isLoading}
+              timeline={phaseRequestData}
+              timelineLoading={requestChartQuery.isLoading}
             />
 
             <RequestMetricOverTime
               title={t.interactivityOverTime}
               metric="interactivity"
-              timeline={phaseTimeline}
-              isLoading={timelineQuery.isLoading}
+              timeline={phaseRequestData}
+              isLoading={requestChartQuery.isLoading}
             />
 
             <RequestMetricOverTime
               title={t.ttftOverTime}
               metric="ttft"
-              timeline={phaseTimeline}
-              isLoading={timelineQuery.isLoading}
+              timeline={phaseRequestData}
+              isLoading={requestChartQuery.isLoading}
               latencySelector
             />
 
@@ -356,8 +384,8 @@ export function AgenticPointDetail({ id }: Props) {
 
             <RequestActivityCard
               sliced={sliced}
-              phaseTimeline={phaseTimeline}
-              timelineLoading={timelineQuery.isLoading}
+              phaseTimeline={phaseRequestData}
+              timelineLoading={requestChartQuery.isLoading}
               view={requestActivityView}
               onViewChange={setRequestActivityView}
             />
@@ -376,8 +404,8 @@ export function AgenticPointDetail({ id }: Props) {
             <CumulativeUniqueInputTokensCard sliced={sliced} />
 
             <InflightUniqueTokensCard
-              phaseTimeline={phaseTimeline}
-              timelineLoading={timelineQuery.isLoading}
+              phaseTimeline={phaseRequestData}
+              timelineLoading={requestChartQuery.isLoading}
               kvCachePoolTokens={metrics?.kvCachePoolTokens ?? null}
             />
           </div>

@@ -5,7 +5,7 @@
   "description": "InferenceX - Inference performance benchmarking and visualization",
   "repository": {
     "type": "git",
-    "url": "https://github.com/SemiAnalysisAI/inferencemax-app"
+    "url": "https://github.com/SemiAnalysisAI/InferenceX-app"
   },
   "sideEffects": [
     "**/*.css",
@@ -20,7 +20,7 @@
     "test:e2e": "bun run test:e2e:quick",
     "test:e2e:quick": "bun run test:e2e:quick:component && bun run test:e2e:quick:integration",
     "test:e2e:quick:component": "cypress run --component --spec cypress/component/chart-buttons.cy.tsx,cypress/component/scatter-graph.cy.tsx",
-    "test:e2e:quick:integration": "cypress run --spec cypress/e2e/sanity.cy.ts,cypress/e2e/inference-chart.cy.ts,cypress/e2e/evaluation-chart.cy.ts,cypress/e2e/reliability-chart.cy.ts,cypress/e2e/zh-pages.cy.ts,cypress/e2e/csv-export-overlay.cy.ts,cypress/e2e/overlay-optimal-only.cy.ts",
+    "test:e2e:quick:integration": "cypress run --spec cypress/e2e/sanity.cy.ts,cypress/e2e/inference-chart.cy.ts,cypress/e2e/evaluation-chart.cy.ts,cypress/e2e/reliability-chart.cy.ts,cypress/e2e/zh-pages.cy.ts,cypress/e2e/csv-export-overlay.cy.ts,cypress/e2e/overlay-optimal-only.cy.ts,cypress/e2e/resident-sequence-lengths.cy.ts,cypress/e2e/overview-a11y.cy.ts",
     "test:e2e:full": "cypress run --component && cypress run",
     "test:e2e:component": "cypress run --component",
     "test:e2e:integration": "cypress run",
@@ -37,7 +37,6 @@
     "@jpinsonneau/html-to-image": "^1.11.13",
     "@noble/ciphers": "^2.3.0",
     "@posthog/nextjs-config": "^1.9.69",
-    "@radix-ui/react-accordion": "^1.2.20",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-label": "^2.1.15",
     "@radix-ui/react-popover": "^1.1.23",
@@ -89,7 +88,9 @@
     "@types/react-dom": "19.2.3",
     "@types/three": "^0.185.4",
     "@vitest/coverage-v8": "^4.1.10",
+    "axe-core": "^4.13.0",
     "cypress": "15.19.0",
+    "cypress-axe": "^1.7.0",
     "cypress-split": "^1.25.0",
     "esbuild": "^0.28.2",
     "fake-indexeddb": "^6.2.5",

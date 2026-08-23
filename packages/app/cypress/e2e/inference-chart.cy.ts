@@ -58,7 +58,9 @@ describe('Inference Chart', () => {
   });
 
   it('renders quick filters and toggles a vendor pill', () => {
-    cy.get('[data-testid="quick-filters"]').should('exist');
+    cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
+    cy.get('[data-testid="scatter-quick-filters"]').click();
+    cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
     cy.get('[data-testid="quick-filter-deployment-single-node"]').should('contain', 'Single-node');
     cy.get('[data-testid="quick-filter-deployment-multi-node"]').should('contain', 'Multi-node');
     cy.get('[data-testid="quick-filter-deployment-disagg"]').should('contain', 'Disaggregated');
@@ -68,5 +70,14 @@ describe('Inference Chart', () => {
       .should('have.attr', 'aria-pressed', 'true')
       .click()
       .should('have.attr', 'aria-pressed', 'false');
+  });
+
+  it('surfaces the error instead of an endless skeleton when availability fails', () => {
+    cy.intercept('GET', '/api/v1/availability*', { statusCode: 500, body: {} }).as(
+      'availabilityFailure',
+    );
+    cy.visit('/inference');
+    cy.wait('@availabilityFailure');
+    cy.contains('h2', 'Something went wrong!', { timeout: 10000 }).should('be.visible');
   });
 });

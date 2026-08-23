@@ -1,12 +1,8 @@
 import { useQueries } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import {
-  fetchWorkflowInfo,
-  type ChangelogRow,
-  type RunConfigRow,
-  type WorkflowInfoResponse,
-} from '@/lib/api';
+import { type ChangelogRow, type RunConfigRow, type WorkflowInfoResponse } from '@/lib/api';
+import { workflowInfoQueryOptions } from '@/hooks/api/use-workflow-info';
 
 export interface ComparisonChangelogEntry {
   config_keys: string[];
@@ -64,12 +60,7 @@ export function useComparisonChangelogs(
   ]);
 
   const queries = useQueries({
-    queries: datesToQuery.map((date) => ({
-      queryKey: benchmarkType ? ['workflow-info', date, benchmarkType] : ['workflow-info', date],
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchWorkflowInfo(date, signal, benchmarkType),
-      enabled: hasGPUs,
-    })),
+    queries: datesToQuery.map((date) => workflowInfoQueryOptions(date, benchmarkType, hasGPUs)),
   });
 
   const changelogs = useMemo(() => {

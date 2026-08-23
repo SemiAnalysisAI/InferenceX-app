@@ -1,4 +1,5 @@
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
 
 /**
  * Minimal locale plumbing for the Simplified Chinese (/zh) page tree.
@@ -24,6 +25,11 @@ export function zhPath(enPath: string): string {
   return enPath === '/' ? ZH_PREFIX : `${ZH_PREFIX}${enPath}`;
 }
 
+/** Map an English internal path to the requested locale tree. */
+export function localePath(enPath: string, locale: Locale): string {
+  return locale === 'zh' ? zhPath(enPath) : enPath;
+}
+
 export function isZhPathname(pathname: string): boolean {
   return pathname === ZH_PREFIX || pathname.startsWith(`${ZH_PREFIX}/`);
 }
@@ -38,19 +44,9 @@ export const ZH_MIRRORED_ROUTES: readonly { path: string; exact?: boolean }[] = 
   { path: '/', exact: true },
   { path: '/overview', exact: true },
   { path: '/api', exact: true },
-  { path: '/inference', exact: true },
-  { path: '/inference/agentic' },
-  { path: '/evaluation', exact: true },
-  { path: '/historical', exact: true },
-  { path: '/calculator', exact: true },
-  { path: '/reliability', exact: true },
-  { path: '/gpu-specs', exact: true },
-  { path: '/gpu-metrics', exact: true },
-  { path: '/collectivex', exact: true },
-  { path: '/submissions', exact: true },
-  { path: '/ai-chart', exact: true },
-  { path: '/current-inferencex-image', exact: true },
-  { path: '/feedback', exact: true },
+  ...DASHBOARD_ROUTES.filter((route) => route.localeMirrored).map((route) => ({
+    path: route.path,
+  })),
   { path: '/about', exact: true },
   { path: '/quotes', exact: true },
   { path: '/land-acknowledgement', exact: true },

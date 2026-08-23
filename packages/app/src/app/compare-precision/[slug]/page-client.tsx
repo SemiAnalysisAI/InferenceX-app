@@ -3,22 +3,23 @@
 import Link from 'next/link';
 import { useEffect, useMemo } from 'react';
 
-import type { GPUDataPoint, InterpolatedResult } from '@/components/calculator/types';
+import type { GPUDataPoint } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
-import { CompareInterpolatedTable } from '@/components/compare/compare-interpolated-table';
-import { useGlobalFilters, GlobalFilterProvider } from '@/components/GlobalFilterContext';
+import {
+  CompareTableRenderer,
+  type CompareTableData,
+} from '@/components/compare/compare-table-renderer';
+import {
+  GlobalFilterProvider,
+  useGlobalFilterRun,
+  useGlobalFilterSelection,
+} from '@/components/GlobalFilterContext';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
 import { track } from '@/lib/analytics';
 import { toModel, toSequence } from '@/lib/compare-enum-coerce';
 import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
-
-interface SsrTableData {
-  defaultTargets: number[];
-  ssrRows: { target: number; a: InterpolatedResult | null; b: InterpolatedResult | null }[];
-  interactivityRange: { min: number; max: number };
-}
 
 const STRINGS = {
   en: {
@@ -51,7 +52,7 @@ interface ComparePrecisionPageClientProps {
   defaultSequence: string | null;
   precA: string;
   precB: string;
-  ssrTableData: SsrTableData;
+  ssrTableData: CompareTableData;
   narrative: string[];
   /** Set only when the page is rendering the agentic workload. Explains
    *  what AgentX measures before the head-to-head numbers. */
@@ -248,11 +249,11 @@ function CompareTableSection({
   precB: string;
   aLabel: string;
   bLabel: string;
-  ssrTableData: SsrTableData;
+  ssrTableData: CompareTableData;
   emptyStateText: string;
 }) {
-  const { effectiveSequence, effectivePrecisions, selectedRunDate, selectedModel } =
-    useGlobalFilters();
+  const { effectiveSequence, effectivePrecisions, selectedModel } = useGlobalFilterSelection();
+  const { selectedRunDate } = useGlobalFilterRun();
 
   const { gpuDataByGroupKey, ranges, hasData } = useThroughputData(
     selectedModel,
@@ -280,23 +281,15 @@ function CompareTableSection({
 
   const clientRange = hasData ? ranges.interactivity : ssrTableData.interactivityRange;
 
-  if (ssrTableData.defaultTargets.length === 0) {
-    return (
-      <div className="border border-border/50 rounded-md px-4 py-3 text-sm text-muted-foreground bg-muted/30">
-        {emptyStateText}
-      </div>
-    );
-  }
-
   return (
-    <CompareInterpolatedTable
+    <CompareTableRenderer
       aLabel={aLabel}
       bLabel={bLabel}
-      ssrRows={ssrTableData.ssrRows}
-      defaultTargets={ssrTableData.defaultTargets}
+      ssrTableData={ssrTableData}
       interactivityRange={clientRange}
       gpuDataPointsA={pointsA}
       gpuDataPointsB={pointsB}
+      emptyStateText={emptyStateText}
     />
   );
 }

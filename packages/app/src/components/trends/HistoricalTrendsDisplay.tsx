@@ -4,7 +4,12 @@ import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import React, { useCallback, useMemo, useState } from 'react';
 
-import { useInference } from '@/components/inference/InferenceContext';
+import {
+  useInferenceActions,
+  useInferenceData,
+  useInferenceDisplay,
+  useInferenceFilters,
+} from '@/components/inference/InferenceContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
@@ -53,7 +58,7 @@ const STRINGS = {
     heading: '历史趋势',
     description: '在固定交互性操作点下，各性能指标随时间的插值变化。',
     targetLabel: '目标交互性 (tok/s/user)',
-    targetTooltip: '用于插值的交互性操作点。移动滑块可查看各 Chip 在不同交互性水平下的性能变化。',
+    targetTooltip: '用于插值的交互性操作点。移动滑块可查看各芯片在不同交互性水平下的性能变化。',
     captionTitle: (yTitle: string, target: number) =>
       `${yTitle} 随时间变化（交互性 ${target} tok/s/user）`,
     source: '来源：SemiAnalysis InferenceX™',
@@ -67,28 +72,18 @@ const STRINGS = {
 
 export default function HistoricalTrendsDisplay() {
   const t = STRINGS[useLocale()];
+  const { graphs, loading, hardwareConfig, hwTypesWithData, availableDates } = useInferenceData();
+  const { selectedModel, selectedSequence, selectedPrecisions, activeHwTypes, selectedRunDate } =
+    useInferenceFilters();
+  const { selectedYAxisMetric, logScale, isLegendExpanded, highContrast } = useInferenceDisplay();
   const {
-    graphs,
-    loading,
-    selectedModel,
-    selectedSequence,
-    selectedPrecisions,
-    selectedYAxisMetric,
-    hardwareConfig,
-    activeHwTypes,
-    hwTypesWithData,
     toggleHwType,
     removeHwType,
     selectAllHwTypes,
-    availableDates,
-    logScale,
     setLogScale,
-    isLegendExpanded,
     setIsLegendExpanded,
-    workflowInfo,
-    highContrast,
     setHighContrast,
-  } = useInference();
+  } = useInferenceActions();
 
   // Check if interactivity chart data exists
   const hasInteractivityChart = graphs.some((g) => g.chartDefinition.chartType === 'interactivity');
@@ -326,10 +321,10 @@ export default function HistoricalTrendsDisplay() {
                         .map((prec: string) => getPrecisionLabel(prec as Precision))
                         .join(', ')}{' '}
                       • {getSequenceLabel(selectedSequence as Sequence)} • {t.source}
-                      {workflowInfo && workflowInfo.length > 0 && workflowInfo[0]?.run_date && (
+                      {selectedRunDate && (
                         <>
                           {' '}
-                          • {t.updated} {workflowInfo[0].run_date.split(',')[0]}
+                          • {t.updated} {selectedRunDate}
                         </>
                       )}
                     </p>

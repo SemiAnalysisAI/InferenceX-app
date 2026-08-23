@@ -8,6 +8,7 @@ import { getChartWatermark } from '@/lib/data-mappings';
 import {
   D3Chart,
   type D3ChartHandle,
+  type LayerConfig,
   type RenderContext,
   type ScaleConfig,
 } from '@/lib/d3-chart/D3Chart';
@@ -83,6 +84,8 @@ const STEP_MATCH_SLICES = 4;
 interface HoverSlice {
   /** Timestamp, ms. */
   x: number;
+  /** Present only on measured-step scatter markers. */
+  seriesKey?: string;
 }
 
 /** A measured config change, placed on the time axis. */
@@ -432,7 +435,7 @@ const FleetLifecycleChart = React.memo(
       [drawSeriesLabels],
     );
 
-    const layers = useMemo(
+    const layers = useMemo<LayerConfig<HoverSlice>[]>(
       () => [
         {
           type: 'custom' as const,
@@ -459,7 +462,8 @@ const FleetLifecycleChart = React.memo(
           key: 'lifecycle-steps',
           data: markers,
           config: {
-            getColor: (d: StepMarker) => bySafeKey.get(d.seriesKey)?.color ?? '#888',
+            getColor: (d: HoverSlice & { precision: string; y: number }) =>
+              bySafeKey.get(d.seriesKey ?? '')?.color ?? '#888',
           },
         },
         {

@@ -1,10 +1,11 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
 import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
 import { BarChart3, Check, Link as LinkIcon, Lock, Loader2, ScatterChart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -22,17 +23,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+import { localePath } from '@/lib/i18n';
 import { relockFeatureGate } from '@/lib/use-feature-gate';
 import { useLocale } from '@/lib/use-locale';
+import { useClientSearchParams } from '@/hooks/useClientSearch';
 
 import GpuCorrelationChart from './GpuCorrelationChart';
 import GpuMetricsChart from './GpuPowerChart';
 import GpuStatsTable from './GpuStatsTable';
 import {
   type GpuMetricKey,
-  type GpuMetricsArtifact,
   type GpuPowerApiResponse,
-  type GpuPowerRunInfo,
   ALL_METRIC_OPTIONS,
   getAvailableMetrics,
 } from './types';
@@ -70,7 +71,7 @@ const STRINGS = {
   zh: {
     heading: 'PowerX',
     descPre: '输入 GitHub Actions 运行 ID，可视化',
-    descPost: '产物中 Chip 指标的时间变化趋势。',
+    descPost: '产物中芯片指标的时间变化趋势。',
     relockButton: '重新锁定功能入口',
     runIdLabel: '运行 ID',
     runIdPlaceholder: '例如 22806827144',
@@ -91,7 +92,7 @@ const STRINGS = {
     metricCorrelation: '指标相关性',
     resetFilter: '重置筛选',
     downsample: '降采样',
-    perGpuStats: '每 Chip 统计信息',
+    perGpuStats: '每芯片统计信息',
     rows: '行',
   },
 } as const;
@@ -112,147 +113,167 @@ const GPU_METRICS_VIEW_OPTIONS: SegmentedToggleOption<GpuMetricsView>[] = [
     title: 'Correlation scatter',
   },
 ];
+async function fetchGpuPowerRun(runId: string, signal: AbortSignal): Promise<GpuPowerApiResponse> {
+  const response = await fetch(`/api/gpu-metrics?runId=${encodeURIComponent(runId)}`, {
+    cache: 'no-store',
+    signal,
+  });
+  const result = (await response.json()) as GpuPowerApiResponse | { error: string };
+  if (!response.ok) {
+    throw new Error('error' in result ? result.error : 'Failed to fetch chip metrics');
+  }
+  return result as GpuPowerApiResponse;
+}
 
 export default function GpuMetricsDisplay() {
   const router = useRouter();
-  const t = STRINGS[useLocale()];
-  const [runIdInput, setRunIdInput] = useState('22806827144');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [artifacts, setArtifacts] = useState<GpuMetricsArtifact[]>([]);
-  const [selectedArtifact, setSelectedArtifact] = useState<string>('');
-  const [selectedMetric, setSelectedMetric] = useState<GpuMetricKey>('power');
-  const [runInfo, setRunInfo] = useState<GpuPowerRunInfo | null>(null);
-  const [visibleGpus, setVisibleGpus] = useState<Set<number>>(new Set());
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const searchParams = useClientSearchParams();
+  const searchKey = searchParams.toString();
+  const urlRunId = searchParams.get('gm_runId')?.trim() || null;
+  const [runIdDraft, setRunIdDraft] = useState<{ searchKey: string; value: string } | null>(null);
+  const runIdInput =
+    runIdDraft?.searchKey === searchKey ? runIdDraft.value : (urlRunId ?? '22806827144');
+  const [submittedRun, setSubmittedRun] = useState<{
+    searchKey: string;
+    runId: string;
+  } | null>(null);
+  const requestedRunId = submittedRun?.searchKey === searchKey ? submittedRun.runId : urlRunId;
+  const query = useQuery({
+    queryKey: ['gpu-power-run', requestedRunId] as const,
+    queryFn: ({ signal }) => fetchGpuPowerRun(requestedRunId!, signal),
+    enabled: Boolean(requestedRunId),
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+    refetchOnMount: 'always',
+  });
+  const artifacts = query.data?.artifacts ?? [];
+  const runInfo = query.data?.runInfo ?? null;
+  const loading = Boolean(requestedRunId) && query.isFetching;
+  const error = query.error instanceof Error ? query.error.message : null;
+
+  const [selection, setSelection] = useState<{
+    searchKey: string;
+    runId: string;
+    artifact?: string;
+    metric?: GpuMetricKey;
+  } | null>(null);
+  const selectionApplies = selection?.searchKey === searchKey && selection.runId === requestedRunId;
+  const selectedArtifactCandidate = selectionApplies
+    ? selection.artifact
+    : (searchParams.get('gm_artifact') ?? undefined);
+  const selectedArtifact =
+    selectedArtifactCandidate &&
+    artifacts.some((artifact) => artifact.name === selectedArtifactCandidate)
+      ? selectedArtifactCandidate
+      : (artifacts[0]?.name ?? '');
+  const currentData = useMemo(
+    () => artifacts.find((artifact) => artifact.name === selectedArtifact)?.data ?? [],
+    [artifacts, selectedArtifact],
+  );
+  const availableMetrics = useMemo(() => getAvailableMetrics(currentData), [currentData]);
+  const urlMetric = searchParams.get('gm_metric');
+  const selectedMetricCandidate = selectionApplies ? selection.metric : urlMetric;
+  const selectedMetric =
+    selectedMetricCandidate &&
+    ALL_METRIC_OPTIONS.some((metric) => metric.key === selectedMetricCandidate) &&
+    availableMetrics.some((metric) => metric.key === selectedMetricCandidate)
+      ? (selectedMetricCandidate as GpuMetricKey)
+      : 'power';
+
+  const [gpuSelection, setGpuSelection] = useState<{
+    scopeKey: string;
+    values: Set<number>;
+  } | null>(null);
+  const allGpuIndices = useMemo(
+    () => [...new Set(currentData.map((datum) => datum.index))].toSorted((a, b) => a - b),
+    [currentData],
+  );
+  const gpuScopeKey = `${requestedRunId ?? ''}|${selectedArtifact}`;
+  const visibleGpus = useMemo(
+    () =>
+      gpuSelection?.scopeKey === gpuScopeKey
+        ? new Set(gpuSelection.values)
+        : new Set(allGpuIndices),
+    [gpuSelection, gpuScopeKey, allGpuIndices],
+  );
+
   const [copied, setCopied] = useState(false);
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [downsample, setDownsample] = useState(true);
-  // View toggle + correlation
   const [chartView, setChartView] = useState<GpuMetricsView>('chart');
   const [corrXMetric, setCorrXMetric] = useState<GpuMetricKey>('power');
   const [corrYMetric, setCorrYMetric] = useState<GpuMetricKey>('temperature');
-  // URL state
-  const pendingUrlState = useRef<{ artifact?: string; metric?: string } | null>(null);
-
-  const loadRun = useCallback(
-    async (runId: string, urlDefaults?: { artifact?: string; metric?: string }) => {
-      track('gpu_metrics_load_run', { runId });
-      setLoading(true);
-      setError(null);
-      if (urlDefaults) {
-        pendingUrlState.current = urlDefaults;
-      }
-      try {
-        const response = await fetch(`/api/gpu-metrics?runId=${encodeURIComponent(runId)}`);
-        const result: GpuPowerApiResponse | { error: string } = await response.json();
-        if (!response.ok) {
-          throw new Error('error' in result ? result.error : 'Failed to fetch chip metrics');
-        }
-        const apiResult = result as GpuPowerApiResponse;
-        setArtifacts(apiResult.artifacts);
-        setRunInfo(apiResult.runInfo);
-
-        const pending = pendingUrlState.current;
-        const targetArtifact =
-          pending?.artifact && apiResult.artifacts.some((a) => a.name === pending.artifact)
-            ? pending.artifact
-            : (apiResult.artifacts[0]?.name ?? '');
-        setSelectedArtifact(targetArtifact);
-
-        if (pending?.metric && ALL_METRIC_OPTIONS.some((m) => m.key === pending.metric)) {
-          setSelectedMetric(pending.metric as GpuMetricKey);
-        }
-        pendingUrlState.current = null;
-
-        const targetData = apiResult.artifacts.find((a) => a.name === targetArtifact)?.data ?? [];
-        const gpuIndices = new Set(targetData.map((d) => d.index));
-        setVisibleGpus(gpuIndices);
-      } catch (caughtError) {
-        setError(caughtError instanceof Error ? caughtError.message : 'Unknown error');
-        setArtifacts([]);
-        setRunInfo(null);
-        setSelectedArtifact('');
-        pendingUrlState.current = null;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
 
   const handleLoad = useCallback(() => {
-    const trimmed = runIdInput.trim();
-    if (!trimmed) return;
-    loadRun(trimmed);
-  }, [runIdInput, loadRun]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlRunId = params.get('gm_runId');
-    if (!urlRunId) return;
-    setRunIdInput(urlRunId);
-    loadRun(urlRunId, {
-      artifact: params.get('gm_artifact') ?? undefined,
-      metric: params.get('gm_metric') ?? undefined,
-    });
-  }, [loadRun]);
+    const runId = runIdInput.trim();
+    if (!runId) return;
+    track('gpu_metrics_load_run', { runId });
+    if (runId === requestedRunId) {
+      void query.refetch();
+      return;
+    }
+    setSubmittedRun({ searchKey, runId });
+  }, [runIdInput, requestedRunId, query, searchKey]);
 
   const handleArtifactChange = useCallback(
     (name: string) => {
       track('gpu_metrics_artifact_selected', { artifact: name });
-      setSelectedArtifact(name);
-      const artifact = artifacts.find((a) => a.name === name);
-      if (artifact) {
-        setVisibleGpus(new Set(artifact.data.map((d) => d.index)));
-        // Reset metric if current selection isn't available in new artifact
-        const available = getAvailableMetrics(artifact.data);
-        setSelectedMetric((prev) => (available.some((m) => m.key === prev) ? prev : 'power'));
-      }
+      const artifact = artifacts.find((candidate) => candidate.name === name);
+      const metrics = getAvailableMetrics(artifact?.data ?? []);
+      setSelection({
+        searchKey,
+        runId: requestedRunId ?? '',
+        artifact: name,
+        metric: metrics.some((metric) => metric.key === selectedMetric) ? selectedMetric : 'power',
+      });
     },
-    [artifacts],
+    [artifacts, requestedRunId, searchKey, selectedMetric],
   );
 
-  const handleMetricChange = useCallback((value: string) => {
-    track('gpu_metrics_metric_changed', { metric: value });
-    setSelectedMetric(value as GpuMetricKey);
-  }, []);
-
-  const currentData = useMemo(
-    () => artifacts.find((a) => a.name === selectedArtifact)?.data ?? [],
-    [artifacts, selectedArtifact],
+  const handleMetricChange = useCallback(
+    (value: string) => {
+      track('gpu_metrics_metric_changed', { metric: value });
+      setSelection({
+        searchKey,
+        runId: requestedRunId ?? '',
+        artifact: selectedArtifact,
+        metric: value as GpuMetricKey,
+      });
+    },
+    [requestedRunId, searchKey, selectedArtifact],
   );
 
-  const availableMetrics = useMemo(() => getAvailableMetrics(currentData), [currentData]);
+  const toggleGpu = useCallback(
+    (gpuIndex: number) => {
+      track('gpu_metrics_gpu_toggled', { gpuIndex });
+      const next = new Set(visibleGpus);
+      if (next.has(gpuIndex)) next.delete(gpuIndex);
+      else next.add(gpuIndex);
+      setGpuSelection({ scopeKey: gpuScopeKey, values: next });
+    },
+    [gpuScopeKey, visibleGpus],
+  );
 
-  const toggleGpu = useCallback((gpuIndex: number) => {
-    track('gpu_metrics_gpu_toggled', { gpuIndex });
-    setVisibleGpus((prev) => {
-      const next = new Set(prev);
-      if (next.has(gpuIndex)) {
-        next.delete(gpuIndex);
-      } else {
-        next.add(gpuIndex);
-      }
-      return next;
-    });
-  }, []);
-
-  const removeGpu = useCallback((hw: string) => {
-    setVisibleGpus((prev) => {
-      const next = new Set(prev);
+  const removeGpu = useCallback(
+    (hw: string) => {
+      const next = new Set(visibleGpus);
       next.delete(Number(hw));
-      return next;
-    });
-  }, []);
+      setGpuSelection({ scopeKey: gpuScopeKey, values: next });
+    },
+    [gpuScopeKey, visibleGpus],
+  );
 
   const handleShare = useCallback(async () => {
     const params = new URLSearchParams();
-    params.set('gm_runId', runIdInput.trim());
+    params.set('gm_runId', requestedRunId ?? runIdInput.trim());
     if (selectedArtifact) params.set('gm_artifact', selectedArtifact);
     if (selectedMetric !== 'power') params.set('gm_metric', selectedMetric);
     const url = `${window.location.origin}${window.location.pathname}?${params.toString()}#gpu-metrics`;
     track('gpu_metrics_share_link_copied', {
-      runId: runIdInput.trim(),
+      runId: requestedRunId ?? runIdInput.trim(),
       artifact: selectedArtifact,
       metric: selectedMetric,
     });
@@ -269,21 +290,15 @@ export default function GpuMetricsDisplay() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     window.dispatchEvent(new CustomEvent('inferencex:action'));
-  }, [runIdInput, selectedArtifact, selectedMetric]);
+  }, [requestedRunId, runIdInput, selectedArtifact, selectedMetric]);
 
-  const metricConfig = ALL_METRIC_OPTIONS.find((m) => m.key === selectedMetric)!;
-
-  const allGpuIndices = useMemo(
-    () => [...new Set(currentData.map((d) => d.index))].toSorted((a, b) => a - b),
-    [currentData],
-  );
-
+  const metricConfig = ALL_METRIC_OPTIONS.find((metric) => metric.key === selectedMetric)!;
   const allGpusSelected =
-    allGpuIndices.length > 0 && allGpuIndices.every((i) => visibleGpus.has(i));
+    allGpuIndices.length > 0 && allGpuIndices.every((index) => visibleGpus.has(index));
   const selectAllGpus = useCallback(() => {
-    setVisibleGpus(new Set(allGpuIndices));
+    setGpuSelection({ scopeKey: gpuScopeKey, values: new Set(allGpuIndices) });
     track('gpu_metrics_gpu_reset_filter');
-  }, [allGpuIndices]);
+  }, [allGpuIndices, gpuScopeKey]);
 
   const handleChartViewChange = useCallback((value: GpuMetricsView) => {
     setChartView(value);
@@ -311,7 +326,7 @@ export default function GpuMetricsDisplay() {
                 onClick={() => {
                   relockFeatureGate();
                   track('powerx_relocked');
-                  router.push('/inference');
+                  router.push(localePath('/inference', locale));
                 }}
                 title="Re-lock feature gate"
               >
@@ -329,7 +344,7 @@ export default function GpuMetricsDisplay() {
                 data-testid="gpu-metrics-run-input"
                 placeholder={t.runIdPlaceholder}
                 value={runIdInput}
-                onChange={(e) => setRunIdInput(e.target.value)}
+                onChange={(event) => setRunIdDraft({ searchKey, value: event.target.value })}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleLoad();
                 }}

@@ -11,6 +11,8 @@ import {
   useState,
 } from 'react';
 
+import { track } from '@/lib/analytics';
+import { notifyClientSearchChange } from '@/lib/client-navigation';
 import { OVERVIEW_DEFAULT_HISTORY_WINDOW, type OverviewComparisonMode } from '@/lib/overview-data';
 import { overviewHref } from '@/lib/overview-links';
 
@@ -19,7 +21,7 @@ import {
   useOverviewNavigation,
   useOverviewReference,
 } from './overview-navigation';
-import type { OverviewLocale, OverviewStrings } from './overview-scorecard';
+import type { OverviewLocale, OverviewStrings } from './overview-strings';
 
 /**
  * Width the matrix is laid out at while presenting, before `zoom` magnifies it.
@@ -83,29 +85,85 @@ export function OverviewPresentationProvider({
   // Same reason the matrix reads it here: the reference follows the URL, so a
   // payload still cached from another reference must not rewrite it.
   const referenceHardware = useOverviewReference();
-  const { push } = useOverviewNavigation();
+  const { push, replaceClientState } = useOverviewNavigation();
   const surfaceRef = useRef<HTMLDivElement>(null);
   const scalerRef = useRef<HTMLDivElement>(null);
   const [presenting, setPresenting] = useState(false);
   const [supported, setSupported] = useState(false);
 
-  useEffect(() => setSupported(document.fullscreenEnabled), []);
+  const setPresentationIntent = useCallback(
+    (enabled: boolean) => {
+      const target = new URL(
+        `${window.location.pathname}${window.location.search}${window.location.hash}`,
+        window.location.origin,
+      );
+      if (enabled) target.searchParams.set('present', '1');
+      else target.searchParams.delete('present');
+      replaceClientState(`${target.pathname}${target.search}${target.hash}`, ['present']);
+    },
+    [replaceClientState],
+  );
 
   useEffect(() => {
-    const syncPresenting = () =>
-      setPresenting(
-        surfaceRef.current !== null && document.fullscreenElement === surfaceRef.current,
-      );
+    setSupported(document.fullscreenEnabled);
+    if (!document.fullscreenEnabled) setPresentationIntent(false);
+  }, [setPresentationIntent]);
+
+  useEffect(() => {
+    const syncPresenting = () => {
+      const nextPresenting =
+        surfaceRef.current !== null && document.fullscreenElement === surfaceRef.current;
+      setPresenting(nextPresenting);
+      if (!nextPresenting) setPresentationIntent(false);
+    };
     document.addEventListener('fullscreenchange', syncPresenting);
     return () => document.removeEventListener('fullscreenchange', syncPresenting);
+  }, [setPresentationIntent]);
+
+  useEffect(() => {
+    const preserveIntentWhileFullscreen = () => {
+      const onOverview =
+        window.location.pathname === '/overview' || window.location.pathname === '/zh/overview';
+      if (
+        onOverview &&
+        surfaceRef.current !== null &&
+        document.fullscreenElement === surfaceRef.current
+      ) {
+        const target = new URL(
+          `${window.location.pathname}${window.location.search}${window.location.hash}`,
+          window.location.origin,
+        );
+        target.searchParams.set('present', '1');
+        const href = `${target.pathname}${target.search}${target.hash}`;
+        History.prototype.replaceState.call(window.history, window.history.state, '', href);
+        notifyClientSearchChange(href);
+      }
+    };
+    // Capture runs before the navigation provider reads the new location, so
+    // a Back/Forward entry that predates presentation cannot make its client
+    // state disagree with the still-active browser fullscreen surface.
+    window.addEventListener('popstate', preserveIntentWhileFullscreen, true);
+    return () => window.removeEventListener('popstate', preserveIntentWhileFullscreen, true);
   }, []);
 
   const toggle = useCallback(() => {
     const surface = surfaceRef.current;
     if (surface === null) return;
-    if (document.fullscreenElement === surface) void document.exitFullscreen();
-    else void surface.requestFullscreen().catch(() => setPresenting(false));
-  }, []);
+    if (document.fullscreenElement === surface) {
+      track('overview_presentation_toggled', { action: 'exit' });
+      void document.exitFullscreen().catch(() => {
+        setPresenting(true);
+        setPresentationIntent(true);
+      });
+    } else {
+      track('overview_presentation_toggled', { action: 'enter' });
+      setPresentationIntent(true);
+      void surface.requestFullscreen().catch(() => {
+        setPresenting(false);
+        setPresentationIntent(false);
+      });
+    }
+  }, [setPresentationIntent]);
 
   // Magnify rather than restyle: one `zoom` scales type, padding and rules
   // together, so the projected matrix cannot drift from the page's own layout.
@@ -143,6 +201,15 @@ export function OverviewPresentationProvider({
       // Key repeat would oscillate between the two views and spam fetches;
       // one page per physical press.
       if (event.repeat) return;
+      const eventTarget = event.target;
+      if (
+        eventTarget instanceof Element &&
+        eventTarget.closest(
+          'a, button, input, select, textarea, [contenteditable="true"], [role="button"], [role="combobox"], [role="listbox"], [role="option"], [role="menuitem"]',
+        ) !== null
+      ) {
+        return;
+      }
       // Two views, so either arrow means "the other one" — the audience reads
       // it as paging through slides.
       const target: OverviewComparisonMode =

@@ -15,6 +15,11 @@
 
 import type { DbClient } from '../connection.js';
 
+import {
+  buildTokenLengthSketch,
+  type TokenLengthSketch,
+} from '@semianalysisai/inferencex-constants';
+
 /**
  * Bump when the aggregate-stats computation algorithm changes — the backfill
  * script recomputes any row whose stored `aggregate_stats.version` is older,
@@ -39,11 +44,15 @@ import type { DbClient } from '../connection.js';
  * v7: add `e2elPerOsl` — percentiles of per-request E2E latency divided by
  * OSL (seconds per output token), the inverse of the "E2E Normalized Interactivity" x-axis
  * metric.
+ *
+ * v8: add p95 and bounded mergeable ISL/OSL sketches. The dashboard merges
+ * the sketches for all resident chart points instead of loading request-level
+ * timelines or attempting to combine per-point percentiles.
  */
-export const STATS_VERSION = 7;
+export const STATS_VERSION = 8;
 
 interface ProfileRecord {
-  metadata?: { benchmark_phase?: string };
+  metadata?: { benchmark_phase?: string; was_cancelled?: boolean };
   metrics?: {
     input_sequence_length?: { value?: number } | number;
     output_sequence_length?: { value?: number } | number;
@@ -63,6 +72,7 @@ export function extractIslOsl(jsonl: string): { isl: number[]; osl: number[] } {
       continue;
     }
     if (rec.metadata?.benchmark_phase && rec.metadata.benchmark_phase !== 'profiling') continue;
+    if (rec.metadata?.was_cancelled === true) continue;
     const m = rec.metrics ?? {};
     const i = readNum(m.input_sequence_length);
     const o = readNum(m.output_sequence_length);
@@ -77,6 +87,7 @@ export interface MetricPercentiles {
   p50: number;
   p75: number;
   p90: number;
+  p95: number;
   p99: number;
   /** Sample count used to compute the percentiles. */
   n: number;
@@ -110,8 +121,24 @@ export function percentilesOf(samples: number[]): MetricPercentiles | null {
     p50: quantile(sorted, 0.5),
     p75: quantile(sorted, 0.75),
     p90: quantile(sorted, 0.9),
+    p95: quantile(sorted, 0.95),
     p99: quantile(sorted, 0.99),
     n: sorted.length,
+  };
+}
+
+export interface SequenceLengthSketches {
+  isl: TokenLengthSketch | null;
+  osl: TokenLengthSketch | null;
+}
+
+export function sequenceLengthSketches(
+  isl: readonly number[],
+  osl: readonly number[],
+): SequenceLengthSketches {
+  return {
+    isl: buildTokenLengthSketch(isl),
+    osl: buildTokenLengthSketch(osl),
   };
 }
 

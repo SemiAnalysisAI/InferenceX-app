@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 import { MultiDatePicker } from '@/components/ui/multi-date-picker';
 
@@ -17,9 +18,11 @@ const AVAILABLE_DATES = [
 function MultiDatePickerWrapper({
   initialDates = [],
   maxDates = 3,
+  useDefaults = false,
 }: {
   initialDates?: string[];
   maxDates?: number;
+  useDefaults?: boolean;
 }) {
   const [dates, setDates] = useState<string[]>(initialDates);
   return (
@@ -30,7 +33,7 @@ function MultiDatePickerWrapper({
       availableDates={AVAILABLE_DATES}
       minDate={AVAILABLE_DATES[0]}
       maxDate={AVAILABLE_DATES.at(-1)}
-      placeholder="Select dates"
+      placeholder={useDefaults ? undefined : 'Select dates'}
     />
   );
 }
@@ -124,5 +127,21 @@ describe('MultiDatePicker', () => {
     cy.contains('Clear All').click();
     // Selected Dates section should disappear (no pills)
     cy.contains('Selected Dates:').should('not.exist');
+  });
+
+  it('localizes comparison, selection, and action copy on Chinese routes', () => {
+    cy.mount(
+      <PathnameContext.Provider value="/zh/inference">
+        <MultiDatePickerWrapper initialDates={['2025-11-05', '2025-11-10']} useDefaults />
+      </PathnameContext.Provider>,
+    );
+    cy.contains('2025年11月5日 对比 2025年11月10日').click();
+    cy.contains('选择对比日期').should('be.visible');
+    cy.contains('已选日期：').should('be.visible');
+    cy.contains('button', '全部清除').should('be.visible');
+    cy.contains('button', '取消').should('be.visible');
+    cy.contains('button', '应用').should('be.visible');
+    cy.get('[aria-label="移除 2025年11月5日"]').should('exist');
+    cy.get('[role="dialog"]').should('not.contain.text', 'Clear All');
   });
 });

@@ -76,23 +76,23 @@ const STRINGS = {
     toggleSection: '展开或折叠此板块',
     costCapTitle: '成本上限下的交互性',
     costCapDescription:
-      '设定每百万 token 的成本上限，查看每款 Chip 在不超支前提下可提供的最高交互性。',
+      '设定每百万 token 的成本上限，查看每款芯片在不超支前提下可提供的最高交互性。',
     costCapLabel: '成本上限 ($/M tok)',
     costCapTooltip:
       '每百万 token 的最高可接受成本（按所选定价层级和 token 类型）。结果为插值成本不超过该上限的最高交互性。',
     costCapPlaceholder: '如 0.50',
-    colGpu: 'Chip',
+    colGpu: '芯片',
     colMaxInteractivity: '最高交互性 (tok/s/user)',
     colTputAtIv: '吞吐量 (tok/s/chip)',
     colUsers: '并发用户数',
     notReachable: '无法达到',
-    costCapEmpty: '输入成本上限，以查看每款 Chip 可服务的交互性。',
-    costCapNoGpus: '当前无可见 Chip 可评估——请在图表图例中启用硬件。',
+    costCapEmpty: '输入成本上限，以查看每款芯片可服务的交互性。',
+    costCapNoGpus: '当前无可见芯片可评估。请在图表图例中启用硬件。',
     note: '注：',
     disaggFleet:
-      ' 解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充 Chip 与解码 Chip 报告，而非按 Chip 总数，因此在「输入」与「输出」token 类型下，成本上限所允许的交互性沿用了上述按池计的口径。在「总计」口径下，两种部署方式均按 Chip 总数计。',
+      ' 解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数，因此在「输入」与「输出」token 类型下，成本上限所允许的交互性沿用了上述按池计的口径。在「总计」口径下，两种部署方式均按芯片总数计。',
     assumptions: (tier: string) =>
-      `假设结果操作点下 100% 利用率，并采用 ${tier} 层级的自有数据中心经济模型。如显示并发用户数，则已改按 Chip 总数计。`,
+      `假设结果操作点下 100% 利用率，并采用 ${tier} 层级的自有数据中心经济模型。如显示并发用户数，则已改按芯片总数计。`,
     source: '来源：',
   },
 } as const;

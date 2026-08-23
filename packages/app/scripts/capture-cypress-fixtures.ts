@@ -11,7 +11,7 @@
  *   bun run --cwd packages/app capture:fixtures -- --collectivex-only         (synthetic multi-run data)
  */
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { buildRunSummary } from '@semianalysisai/inferencex-db/collectivex/reader';
@@ -20,6 +20,16 @@ import {
   makeCollectiveXDataset,
   makeRawShard,
 } from '@semianalysisai/inferencex-db/collectivex/test-fixture';
+import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
+import {
+  FIXTURE_MANIFEST_FILENAME,
+  FIXTURE_MANIFEST_SCHEMA_VERSION,
+  type FixtureManifest,
+  type FixtureManifestEntry,
+  assertFixtureContent,
+  fixtureSha256,
+  fixtureTopLevel,
+} from '../src/lib/test-fixture-manifest';
 
 const cliArgs = process.argv.filter((argument) => argument !== '--').slice(2);
 const collectiveXOnly = cliArgs.includes('--collectivex-only');
@@ -139,6 +149,44 @@ async function writeFixture(name: string, data: unknown): Promise<number> {
   await writeFile(resolve(fixturesDir, `${name}.json`), body);
   return body.length;
 }
+async function writeFixtureManifest(updatedNames: Set<string>, source: string): Promise<void> {
+  const manifestPath = resolve(fixturesDir, FIXTURE_MANIFEST_FILENAME);
+  let previous: FixtureManifest | null = null;
+  try {
+    previous = JSON.parse(await readFile(manifestPath, 'utf8')) as FixtureManifest;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+
+  const capturedAt = new Date().toISOString();
+  const directoryEntries = await readdir(fixturesDir);
+  const fixtureFiles = directoryEntries
+    .filter((name) => name.endsWith('.json') && name !== FIXTURE_MANIFEST_FILENAME)
+    .toSorted();
+  const fixtures: Record<string, FixtureManifestEntry> = {};
+  for (const filename of fixtureFiles) {
+    const name = filename.slice(0, -'.json'.length);
+    const body = await readFile(resolve(fixturesDir, filename), 'utf8');
+    const value = JSON.parse(body) as unknown;
+    assertFixtureContent(name, value);
+    const oldEntry = previous?.fixtures[name];
+    const wasUpdated = updatedNames.has(name);
+    fixtures[name] = {
+      bytes: Buffer.byteLength(body),
+      capturedAt: wasUpdated ? capturedAt : (oldEntry?.capturedAt ?? null),
+      sha256: fixtureSha256(body),
+      source: wasUpdated ? source : (oldEntry?.source ?? null),
+      topLevel: fixtureTopLevel(value),
+    };
+  }
+
+  const manifest: FixtureManifest = {
+    schemaVersion: FIXTURE_MANIFEST_SCHEMA_VERSION,
+    generatedAt: capturedAt,
+    fixtures,
+  };
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+}
 
 async function writeCollectiveXFixtures(): Promise<[string, number][]> {
   const latest = makeCollectiveXDataset();
@@ -182,7 +230,9 @@ async function main() {
   await mkdir(fixturesDir, { recursive: true });
   if (collectiveXOnly) {
     console.log('Generating synthetic CollectiveX fixtures');
-    printSizes(await writeCollectiveXFixtures());
+    const sizes = await writeCollectiveXFixtures();
+    await writeFixtureManifest(new Set(sizes.map(([name]) => name)), 'synthetic://collectivex');
+    printSizes(sizes);
     return;
   }
 
@@ -200,14 +250,6 @@ async function main() {
   // Latest-snapshot: already deduped to one row per config, no date filter.
   // ~20 conc levels per (hw, fw, prec, isl, osl) — sample down to keep the
   // scatter visually populated without writing every concurrency point.
-  interface BenchmarkRow {
-    conc: number;
-    hardware: string;
-    framework: string;
-    precision: string;
-    isl: number;
-    osl: number;
-  }
   const benchmarks = await fetchJson<BenchmarkRow[]>(
     `/api/v1/benchmarks?model=${encodeURIComponent(BENCHMARK_MODEL)}`,
   );
@@ -309,6 +351,12 @@ async function main() {
     ...collectiveXSizes,
   ];
 
+  const collectiveXNames = new Set(collectiveXSizes.map(([name]) => name));
+  await writeFixtureManifest(
+    new Set(sizes.map(([name]) => name).filter((name) => !collectiveXNames.has(name))),
+    baseUrl,
+  );
+  await writeFixtureManifest(collectiveXNames, 'synthetic://collectivex');
   printSizes(sizes);
 }
 

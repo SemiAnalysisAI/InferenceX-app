@@ -1,17 +1,21 @@
 # D3 Chart Design Rationale
 
-## Why 4 Effects in ScatterGraph
+## Four Invalidation Phases
 
-A single useEffect for all D3 operations takes ~500ms (React reconciliation ~200ms + full SVG rebuild ~300ms). Splitting into 4 effects makes the most common interaction — switching Y-axis metric — take ~100ms instead:
+One effect for every D3 operation takes roughly 500ms (React reconciliation ~200ms plus a full SVG update ~300ms). `D3Chart` separates structure, stable-identity data joins, metric coordinates, and display decoration. The most common interaction, switching the Y-axis metric, then takes roughly 100ms:
 
 | Effect            | Trigger                | Cost   | What it does                                    |
 | ----------------- | ---------------------- | ------ | ----------------------------------------------- |
 | 1. Structure      | Mount, resize, theme   | ~5ms   | SVG skeleton, axes groups, defs, clip paths     |
 | 2. Data render    | Data shape changes     | ~500ms | Full D3 join, bindpoints, rooflines, zoom setup |
 | 3. Metric update  | Metric/scale selection | ~100ms | Reposition points in-place, rebuild rooflines   |
-| 4. Display toggle | Legend/label toggles   | <20ms  | Opacity transitions only                        |
+| 4. Display toggle | Legend/label toggles   | <20ms  | Restyle marks or redraw changed decorations     |
 
-**The key insight**: Effect 2 depends on `dataIdentity` (a stable string hash of point keys), NOT on the `data` array reference. When users switch metrics, data points get new y-values (new array reference), but `dataIdentity` stays the same because the set of points hasn't changed. So Effect 2 skips entirely, and only Effect 3 runs.
+**The key insight**: The data phase depends on `dataIdentity`, a stable string built from point join keys, rather than the `data` array reference. Metric changes produce new `x`/`y` values and a new array, but the set of points stays the same. The metric phase mutates bound coordinates by key and skips enter/update/exit joins.
+
+Custom layers that own scale-neutral decorations declare a `displayIdentity` and an `onDisplayUpdate` callback. The renderer snapshots each identity after the data and metric phases, then reruns only the custom layers whose identities changed. This removes stale labels and decorative overlays without rebuilding joins, scales, or unrelated paths. Callbacks receive the current zoomed scales so toggles do not jump decorations back to the unzoomed frame.
+
+`ScatterGraph` further partitions Effect 4 because its controls have disjoint mutation scopes. Mark visibility, palette/shape, trace metadata, point-label visibility/collision, line-label placement, and known-issue annotations each have a dedicated layout effect. It deliberately omits the generic scatter `displayIdentity`: point-label toggles update only `.point-label` nodes, while the unofficial overlay layer's own display callback updates only `.overlay-label` nodes. Recombining these passes causes label toggles to restamp thousands of unchanged shape, visibility, and trace attributes.
 
 ## In-Place Y-Value Mutation
 
@@ -67,7 +71,7 @@ Different metrics need different "optimal" directions:
 | lower_right | High x, low y  | Cost/energy chart: high interactivity (x), low $/M tok or J/token (y) |
 | lower_left  | Low x, low y   | (not currently used)                                                  |
 
-The direction is declared per-metric in `inference-chart-config.json`, not computed. This makes the roofline direction a data concern, not a rendering concern.
+The metric registry declares whether higher or lower values are preferable. Chart definitions derive the concrete corner from that polarity and the chart's x-axis direction, which keeps the choice in data rather than rendering code.
 
 ## Gradient Roofline Labels
 
@@ -113,6 +117,11 @@ D3 bar charts measure actual Y-axis label widths using a temporary SVG `<text>` 
 ## One Animation System per Property
 
 Opacity animates via inline CSS `transition: opacity 150ms ease` (set on dots, rooflines, and labels in the render path); d3 `.transition()` is reserved for attributes CSS can't animate — the `data-update` entrance transitions on dot `transform` and roofline `d`. Never point both systems at the same property: a d3 transition re-writes the style every animation frame, and each write restarts the CSS transition, emitting `transitionrun`/`transitioncancel` per node per frame (a legend hover across a full chart used to produce tens of thousands of events per session, all of it also observed by PostHog's session-replay MutationObserver). Handlers like legend hover therefore write opacity **once** and let CSS do the animation.
+
+Official coordinate transitions use one 300ms D3 tween for visible points and rooflines. Hidden
+official marks snap directly to their final geometry and are excluded from the transition snapshot,
+avoiding frame-by-frame writes for data the user cannot see. Unofficial overlays retain their
+existing snap behavior. Replay passes a zero duration and remains frame-driven.
 
 ## Batched Label Measurement
 

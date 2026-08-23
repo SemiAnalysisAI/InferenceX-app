@@ -1,69 +1,38 @@
-import {
-  GPU_KEYS,
-  GPU_VENDORS,
-  DB_MODEL_TO_DISPLAY,
-  PRECISION_KEYS,
-  GITHUB_OWNER,
-  GITHUB_REPO,
-  FRAMEWORK_LABELS,
-} from '@semianalysisai/inferencex-constants';
-import { CAROUSEL_ORGS, CAROUSEL_LABELS } from '@/components/quotes/quotes-data';
+import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
-import type { FaqItem } from './faq-data';
-
-/* ---------- Dynamic lists from constants ---------- */
-
-const gpusByVendor = [...GPU_KEYS].reduce<Record<string, string[]>>((acc, key) => {
-  const vendor = GPU_VENDORS[key] ?? 'Other';
-  (acc[vendor] ??= []).push(key.toUpperCase());
-  return acc;
-}, {});
-
-const modelNames = Object.values({
-  ...DB_MODEL_TO_DISPLAY,
-  'kimik2.6': 'Kimi-K2.6',
-  'kimik2.7-code': 'Kimi-K2.7-Code',
-  'minimaxm2.7': 'MiniMax-M2.7',
-  'glm5.1': 'GLM-5.1',
-});
-
-const frameworkNames = [...new Set(Object.values(FRAMEWORK_LABELS))].map((n) =>
-  n.replace(/[¹²³⁴⁵⁶⁷⁸⁹⁰]+$/u, ''),
-);
-
-const supporterOrgs = CAROUSEL_ORGS.map((org) => CAROUSEL_LABELS[org] ?? org);
+import { GENERATED_FAQ_DATA, type FaqItem } from '@/components/about/faq';
 
 /* ---------- FAQ content (Simplified Chinese) ---------- */
 
-export const FAQ_ITEMS_ZH: FaqItem[] = [
+export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
   {
     question: '什么是 InferenceX？',
     answer:
-      'InferenceX（原名 InferenceMAX）持续衡量各类 Chip 和软件栈的智能体推理与固定序列推理性能。AgentX 是其长上下文多轮编码场景。配置发生变化时，基准测试会重新运行。',
+      'InferenceX（原名 InferenceMAX）持续衡量各类芯片和软件栈的智能体推理与固定序列推理性能。AgentX 是其长上下文多轮编码场景。配置发生变化时，基准测试会重新运行。',
   },
   {
     question: 'InferenceX 由谁开发？',
-    answer: `InferenceX 由独立半导体与 AI 研究机构 SemiAnalysis 构建，受到 ${supporterOrgs.join('、')} 的支持与信赖。基准测试代码、数据和仪表板均在 GitHub 上开源。`,
+    answer: `InferenceX 由独立半导体与 AI 研究机构 SemiAnalysis 构建，受到 ${GENERATED_FAQ_DATA.supporterOrgs.join('、')} 的支持与信赖。基准测试代码、数据和仪表板均在 GitHub 上开源。`,
   },
   {
-    question: 'InferenceX 测试了哪些 Chip？',
+    question: 'InferenceX 测试了哪些芯片？',
     answer: '我们会在新加速器可用时持续添加。',
-    list: Object.entries(gpusByVendor).map(([vendor, gpus]) => `${vendor}: ${gpus.join(', ')}`),
+    list: GENERATED_FAQ_DATA.gpuGroups,
   },
   {
     question: '测试了哪些 AI 模型？',
     answer:
       '各模型会在其已有数据所覆盖的固定序列配置（1k/1k、1k/8k、8k/1k tokens）与多个并发级别下进行测试。具备对应数据的模型还包含 AgentX 长上下文多轮智能体编码运行。',
-    list: modelNames,
+    list: GENERATED_FAQ_DATA.modelNames,
   },
   {
     question: '测试了哪些推理框架和配置？',
     answer: '',
     list: [
-      `框架：${frameworkNames.join(', ')}`,
-      `精度：${[...PRECISION_KEYS].map((p) => p.toUpperCase()).join(', ')}`,
+      `框架：${GENERATED_FAQ_DATA.frameworkNames.join(', ')}`,
+      `精度：${GENERATED_FAQ_DATA.precisionNames.join(', ')}`,
       '运行时：CUDA、ROCm',
-      '分离式推理（Disaggregated serving，独立的 prefill/decode Chip 池）',
+      '分离式推理（Disaggregated serving，独立的 prefill/decode 芯片池）',
       '多 token 预测（MTP）',
       '面向 MoE 模型的宽专家并行（Wide Expert Parallelism）',
     ],
@@ -73,8 +42,8 @@ export const FAQ_ITEMS_ZH: FaqItem[] = [
     answer: '',
     list: [
       '交互性（tok/s/user）',
-      '每 Chip token 吞吐量（tok/s/chip）',
-      '每 Chip 输入和输出吞吐量',
+      '每芯片 token 吞吐量（tok/s/chip）',
+      '每芯片输入和输出吞吐量',
       '每兆瓦 token 吞吐量（tok/s/MW）',
       'P99 首 token 延迟（TTFT）',
       'AgentX 场景的端到端延迟、token 间延迟（ITL）、输出吞吐量、prefix cache 行为以及会话与 subagent 执行情况',
@@ -104,12 +73,12 @@ export const FAQ_ITEMS_ZH: FaqItem[] = [
   {
     question: '结果如何实现可复现？',
     answer:
-      '仪表板上的每一个数据点均由公开的 GitHub Actions 工作流运行产生。测试配方（模型、框架、精度、并行度、序列长度、并发数）已提交至仓库，在目标硬件上实际执行，产物（日志、指标、Chip 追踪数据）上传至运行页面。用户可从任何图表的 tooltip 直接点击链接，跳转到生成该数据点的 GitHub Actions 运行。',
+      '仪表板上的每一个数据点均由公开的 GitHub Actions 工作流运行产生。测试配方（模型、框架、精度、并行度、序列长度、并发数）已提交至仓库，在目标硬件上实际执行，产物（日志、指标、芯片追踪数据）上传至运行页面。用户可从任何图表的 tooltip 直接点击链接，跳转到生成该数据点的 GitHub Actions 运行。',
   },
   {
     question: '在哪里可以查看原始基准测试日志？',
     answer:
-      '在图表上点击任意数据点即可打开 tooltip。其中的"GitHub Actions Run"链接将直接跳转到生成该数据点的工作流运行。在那里您可以查看完整的任务日志、框架和驱动版本、命令行参数，以及下载原始产物（包括请求延迟、token 计数和 Chip 功耗遥测数据）。',
+      '在图表上点击任意数据点即可打开 tooltip。其中的"GitHub Actions Run"链接将直接跳转到生成该数据点的工作流运行。在那里您可以查看完整的任务日志、框架和驱动版本、命令行参数，以及下载原始产物（包括请求延迟、token 计数和芯片功耗遥测数据）。',
   },
   {
     question: '我可以自己重新运行基准测试吗？',
@@ -124,6 +93,6 @@ export const FAQ_ITEMS_ZH: FaqItem[] = [
   {
     question: '我可以使用 InferenceX 的数据进行自己的分析吗？',
     answer:
-      '可以。所有数据均可自由获取。仪表板支持按 Chip、模型、框架和日期范围筛选，您也可以直接从任何图表导出原始 CSV 数据。',
+      '可以。所有数据均可自由获取。仪表板支持按芯片、模型、框架和日期范围筛选，您也可以直接从任何图表导出原始 CSV 数据。',
   },
 ];

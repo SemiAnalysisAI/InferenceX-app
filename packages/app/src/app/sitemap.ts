@@ -1,6 +1,9 @@
 import type { MetadataRoute } from 'next';
+import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { listDatasets } from '@semianalysisai/inferencex-db/queries/datasets';
 
 import { AGENTX_OPTIMIZATION_SLUGS } from '@/lib/agentx-optimizations';
+import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
 import { getAllPosts } from '@/lib/blog';
 import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import { canonicalCompareSlug } from '@/lib/compare-slug';
@@ -15,16 +18,6 @@ import {
 import { getAllGlossaryEntries } from '@/lib/glossary';
 import { languageAlternates, zhPath } from '@/lib/i18n';
 import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
-
-const TABS = [
-  'evaluation',
-  'historical',
-  'calculator',
-  'reliability',
-  'gpu-specs',
-  'gpu-metrics',
-  'collectivex',
-] as const;
 
 type SitemapEntry = MetadataRoute.Sitemap[number];
 
@@ -51,27 +44,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date().toISOString();
   // Only emit (model, pair) URLs that have benchmark data on both sides —
   // avoids polluting the sitemap with empty pages that hurt crawl budget.
-  const [compareSlugs, precisionSlugs, specDecodeSlugs] = await Promise.all([
+  const [compareSlugs, precisionSlugs, specDecodeSlugs, datasets] = await Promise.all([
     getAllComparableCompareSlugs(),
     getAllComparablePrecisionSlugs(),
     getAllComparableSpecDecodeSlugs(),
+    FIXTURES_MODE ? Promise.resolve([]) : listDatasets(getDb()),
   ]);
   const zhPosts = new Set(getAllPosts('zh').map((post) => post.slug));
 
   return [
-    ...localizedPair('/', { lastModified: now, changeFrequency: 'daily', priority: 1 }),
+    ...DASHBOARD_ROUTES.filter((route) => route.indexable).flatMap((route) =>
+      localizedPair(route.canonicalPath, {
+        lastModified: now,
+        changeFrequency: 'daily' as const,
+        priority: route.canonicalPath === '/' ? 1 : 0.9,
+      }),
+    ),
     ...localizedPair('/overview', {
       lastModified: now,
       changeFrequency: 'daily',
       priority: 0.9,
     }),
-    ...TABS.flatMap((tab) =>
-      localizedPair(`/${tab}`, {
-        lastModified: now,
-        changeFrequency: 'daily' as const,
-        priority: 0.9,
-      }),
-    ),
     ...localizedPair('/quotes', { lastModified: now, changeFrequency: 'monthly', priority: 0.6 }),
     ...localizedPair('/about', { lastModified: now, changeFrequency: 'monthly', priority: 0.6 }),
     ...localizedPair('/land-acknowledgement', {
@@ -103,6 +96,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     }),
     ...localizedPair('/agentx', { lastModified: now, changeFrequency: 'weekly', priority: 0.6 }),
+    ...datasets.flatMap((dataset) =>
+      localizedPair(`/agentx/${dataset.slug}`, {
+        lastModified: now,
+        changeFrequency: 'monthly' as const,
+        priority: 0.5,
+      }),
+    ),
     ...localizedPair('/agentx/methodology', {
       lastModified: now,
       changeFrequency: 'monthly',

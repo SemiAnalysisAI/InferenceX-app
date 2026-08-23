@@ -3,22 +3,26 @@
  * Gantt view. Output lands in `agentic_trace_replay.request_timeline`
  * and is read directly by the timeline API route.
  *
- * Shape is a thin array — ~150 bytes per request × ~200 requests per
- * point ≈ 30 KB per row before JSONB compression. Trivial vs the raw
- * gzipped JSONL blob (~1-3 MB).
+ * Shape is a thin array — roughly 150 bytes per request before JSONB
+ * compression. The largest throughput runs contain hundreds of thousands of
+ * requests, so extraction must not materialize the decompressed JSONL.
  *
  * Versioned so the backfill script knows which rows are stale — bump
  * `REQUEST_TIMELINE_VERSION` whenever the extraction algorithm changes.
  */
 
-import { gunzipSync } from 'node:zlib';
+import { Readable } from 'node:stream';
+import { StringDecoder } from 'node:string_decoder';
+import { createGunzip } from 'node:zlib';
 
 /** Bump when the extraction algorithm changes — backfill recomputes anything older. */
-export const REQUEST_TIMELINE_VERSION = 5;
+export const REQUEST_TIMELINE_VERSION = 6;
 
 export interface RequestRecord {
   /** Conversation id (groups turns of one agent session). */
   cid: string;
+  /** Compact replay-lane id derived from AIPerf's stable correlation id. */
+  ri?: number;
   /** Zero-based turn index within the conversation. */
   ti: number;
   /** Source trace id from the original raw dataset, when distinct from replay cid. */
@@ -67,6 +71,9 @@ export interface RequestTimeline {
 
 interface RawMetadata {
   conversation_id?: string;
+  root_correlation_id?: string;
+  parent_correlation_id?: string;
+  x_correlation_id?: string;
   turn_index?: number;
   source_trace_id?: string;
   source_outer_idx?: number;
@@ -108,91 +115,203 @@ function readNum(v: unknown): number | undefined {
 }
 
 /**
+ * Correlation ancestry needed to reconstruct the root on older AIPerf exports
+ * that do not repeat `root_correlation_id` on subagent records.
+ */
+interface ReplayCorrelationMaps {
+  parentByCorrelation: Map<string, string>;
+  rootByCorrelation: Map<string, string>;
+}
+
+function correlationId(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function resolveCorrelationRoot(id: string, maps: ReplayCorrelationMaps): string {
+  const seen = new Set<string>();
+  let current = id;
+  while (!seen.has(current)) {
+    seen.add(current);
+    const explicitRoot = maps.rootByCorrelation.get(current);
+    if (explicitRoot !== undefined) return explicitRoot;
+    const parent = maps.parentByCorrelation.get(current);
+    if (parent === undefined) return current;
+    current = parent;
+  }
+  return id;
+}
+
+/**
+ * AIPerf may sample the same source conversation into several concurrently
+ * executing trajectory lanes. `conversation_id` intentionally stays the
+ * source id, while the root correlation id identifies one replay across every
+ * turn and subagent. For older exports, walk `parent_correlation_id` links from
+ * the per-session `x_correlation_id` instead of treating each subagent session
+ * as an independent replay.
+ */
+function replayKey(meta: RawMetadata, maps: ReplayCorrelationMaps): string | undefined {
+  const explicitRoot = correlationId(meta.root_correlation_id);
+  if (explicitRoot !== undefined) return explicitRoot;
+  const session = correlationId(meta.x_correlation_id);
+  return session === undefined ? undefined : resolveCorrelationRoot(session, maps);
+}
+
+/**
+ * Yield complete UTF-8 lines without retaining the decompressed profile.
+ * `Readable.from([blob])` is intentional: without the array wrapper Node may
+ * iterate the Buffer byte-by-byte instead of passing it as one chunk.
+ */
+async function* gunzipLines(blob: Buffer): AsyncGenerator<string> {
+  const decoder = new StringDecoder('utf8');
+  let carry = '';
+
+  for await (const chunk of Readable.from([blob]).pipe(createGunzip())) {
+    const text = carry + decoder.write(chunk as Buffer);
+    let lineStart = 0;
+    let newline = text.indexOf('\n');
+    while (newline !== -1) {
+      yield text.slice(lineStart, newline);
+      lineStart = newline + 1;
+      newline = text.indexOf('\n', lineStart);
+    }
+    carry = text.slice(lineStart);
+  }
+
+  carry += decoder.end();
+  if (carry.length > 0) yield carry;
+}
+
+function parseRawRecord(line: string): RawRecord | null {
+  if (!line) return null;
+  try {
+    return JSON.parse(line) as RawRecord;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Parse the gzipped `profile_export.jsonl` blob into a chart-ready
  * timeline. Returns null on a missing or malformed blob.
  */
-export function computeRequestTimeline(blob: Buffer | null): RequestTimeline | null {
+export async function computeRequestTimeline(blob: Buffer | null): Promise<RequestTimeline | null> {
   if (!blob) return null;
-  let text: string;
+
+  // First pass: find the timeline bounds and the first dispatch for each
+  // replay. This deliberately stores only one entry per replay, not one entry
+  // per request, so a 400+ MB decompressed profile stays memory-bounded.
+  let originNs = Number.POSITIVE_INFINITY;
+  let endNs = 0;
+  let recordCount = 0;
+  const explicitRootFirstStart = new Map<string, number>();
+  const legacySessionFirstStart = new Map<string, number>();
+  const correlationMaps: ReplayCorrelationMaps = {
+    parentByCorrelation: new Map(),
+    rootByCorrelation: new Map(),
+  };
+
   try {
-    text = gunzipSync(blob).toString('utf8');
+    for await (const line of gunzipLines(blob)) {
+      const rec = parseRawRecord(line);
+      if (!rec) continue;
+      const meta = rec.metadata ?? {};
+      // Use credit_issued_ns when available (the true start of the request's
+      // lifecycle), falling back to request_start_ns. Skip rows missing both.
+      const cStart = meta.credit_issued_ns ?? meta.request_start_ns;
+      const cEnd = meta.request_end_ns;
+      if (typeof cStart !== 'number' || typeof cEnd !== 'number') continue;
+
+      recordCount += 1;
+      if (cStart < originNs) originNs = cStart;
+      if (cEnd > endNs) endNs = cEnd;
+
+      const session = correlationId(meta.x_correlation_id);
+      const explicitRoot = correlationId(meta.root_correlation_id);
+      const parent = correlationId(meta.parent_correlation_id);
+      if (session !== undefined && explicitRoot !== undefined) {
+        correlationMaps.rootByCorrelation.set(session, explicitRoot);
+      }
+      if (session !== undefined && parent !== undefined) {
+        correlationMaps.parentByCorrelation.set(session, parent);
+      }
+
+      const firstStarts =
+        explicitRoot === undefined ? legacySessionFirstStart : explicitRootFirstStart;
+      const key = explicitRoot ?? session;
+      if (key === undefined) continue;
+      const current = firstStarts.get(key);
+      if (current === undefined || cStart < current) firstStarts.set(key, cStart);
+    }
   } catch {
     return null;
   }
 
-  // First pass: parse + collect raw turns; find timeline origin.
-  const raw: {
-    meta: RawMetadata;
-    ttftMs: number | null;
-    tpotMs: number | null;
-    isl: number | null;
-    osl: number | null;
-  }[] = [];
-  let originNs = Number.POSITIVE_INFINITY;
-  let endNs = 0;
-
-  for (const line of text.split('\n')) {
-    if (!line) continue;
-    let rec: RawRecord;
-    try {
-      rec = JSON.parse(line) as RawRecord;
-    } catch {
-      continue;
-    }
-    const meta = rec.metadata ?? {};
-    // Use credit_issued_ns when available (the true start of the request's
-    // lifecycle), falling back to request_start_ns. Skip rows missing both.
-    const cStart = meta.credit_issued_ns ?? meta.request_start_ns;
-    const cEnd = meta.request_end_ns;
-    if (typeof cStart !== 'number' || typeof cEnd !== 'number') continue;
-
-    if (cStart < originNs) originNs = cStart;
-    if (cEnd > endNs) endNs = cEnd;
-
-    raw.push({
-      meta,
-      ttftMs: readNum(rec.metrics?.time_to_first_token) ?? null,
-      tpotMs:
-        readNum(rec.metrics?.time_per_output_token) ??
-        readNum(rec.metrics?.inter_token_latency) ??
-        null,
-      isl: readNum(rec.metrics?.input_sequence_length) ?? null,
-      osl: readNum(rec.metrics?.output_sequence_length) ?? null,
-    });
-  }
-
-  if (raw.length === 0) return null;
+  if (recordCount === 0) return null;
   if (!Number.isFinite(originNs)) originNs = 0;
 
-  // Second pass: shift timestamps to be relative to originNs (smaller
-  // numbers fit in JSON nicely and the frontend doesn't need bigint math).
+  // Assign compact deterministic replay ids. UUIDs would add substantial
+  // repeated payload to large timelines, so rank distinct correlation ids by
+  // their first dispatch and send only the numeric rank to the frontend.
+  const replayFirstStart = new Map(explicitRootFirstStart);
+  for (const [session, firstStart] of legacySessionFirstStart) {
+    const key = resolveCorrelationRoot(session, correlationMaps);
+    const current = replayFirstStart.get(key);
+    if (current === undefined || firstStart < current) replayFirstStart.set(key, firstStart);
+  }
+
+  const replayIndex = new Map<string, number>();
+  [...replayFirstStart.entries()]
+    .sort(
+      ([aKey, aStart], [bKey, bStart]) =>
+        aStart - bStart || (aKey < bKey ? -1 : aKey > bKey ? 1 : 0),
+    )
+    .forEach(([key], index) => replayIndex.set(key, index));
+
+  // Second gzip pass: build only the final compact request objects. Re-reading
+  // costs some CPU but avoids simultaneously retaining the decompressed text,
+  // parsed source records, and output records — the previous peak-memory
+  // multiplier that made high-throughput backfills fail.
   const requests: RequestRecord[] = [];
-  for (const r of raw) {
-    const m = r.meta;
-    const credit = (m.credit_issued_ns ?? m.request_start_ns ?? originNs) - originNs;
-    const start = (m.request_start_ns ?? m.credit_issued_ns ?? originNs) - originNs;
-    const ack = typeof m.request_ack_ns === 'number' ? m.request_ack_ns - originNs : null;
-    const end = (m.request_end_ns ?? originNs) - originNs;
-    requests.push({
-      cid: m.conversation_id ?? 'unknown',
-      ti: typeof m.turn_index === 'number' ? m.turn_index : 0,
-      srcTrace: typeof m.source_trace_id === 'string' ? m.source_trace_id : undefined,
-      srcOuter: typeof m.source_outer_idx === 'number' ? m.source_outer_idx : undefined,
-      srcInner: typeof m.source_inner_idx === 'number' ? m.source_inner_idx : undefined,
-      srcKind: typeof m.source_kind === 'string' ? m.source_kind : undefined,
-      wid: m.worker_id ?? 'unknown',
-      ad: typeof m.agent_depth === 'number' ? m.agent_depth : 0,
-      phase: m.benchmark_phase ?? 'unknown',
-      credit,
-      start,
-      ack,
-      end,
-      ttftMs: r.ttftMs,
-      tpotMs: r.tpotMs,
-      isl: r.isl,
-      osl: r.osl,
-      cancelled: m.was_cancelled === true,
-    });
+  try {
+    for await (const line of gunzipLines(blob)) {
+      const rec = parseRawRecord(line);
+      if (!rec) continue;
+      const m = rec.metadata ?? {};
+      const cStart = m.credit_issued_ns ?? m.request_start_ns;
+      const cEnd = m.request_end_ns;
+      if (typeof cStart !== 'number' || typeof cEnd !== 'number') continue;
+
+      const credit = cStart - originNs;
+      const start = (m.request_start_ns ?? m.credit_issued_ns ?? originNs) - originNs;
+      const ack = typeof m.request_ack_ns === 'number' ? m.request_ack_ns - originNs : null;
+      const end = cEnd - originNs;
+      requests.push({
+        cid: m.conversation_id ?? 'unknown',
+        ri: replayIndex.get(replayKey(m, correlationMaps) ?? ''),
+        ti: typeof m.turn_index === 'number' ? m.turn_index : 0,
+        srcTrace: typeof m.source_trace_id === 'string' ? m.source_trace_id : undefined,
+        srcOuter: typeof m.source_outer_idx === 'number' ? m.source_outer_idx : undefined,
+        srcInner: typeof m.source_inner_idx === 'number' ? m.source_inner_idx : undefined,
+        srcKind: typeof m.source_kind === 'string' ? m.source_kind : undefined,
+        wid: m.worker_id ?? 'unknown',
+        ad: typeof m.agent_depth === 'number' ? m.agent_depth : 0,
+        phase: m.benchmark_phase ?? 'unknown',
+        credit,
+        start,
+        ack,
+        end,
+        ttftMs: readNum(rec.metrics?.time_to_first_token) ?? null,
+        tpotMs:
+          readNum(rec.metrics?.time_per_output_token) ??
+          readNum(rec.metrics?.inter_token_latency) ??
+          null,
+        isl: readNum(rec.metrics?.input_sequence_length) ?? null,
+        osl: readNum(rec.metrics?.output_sequence_length) ?? null,
+        cancelled: m.was_cancelled === true,
+      });
+    }
+  } catch {
+    return null;
   }
 
   // Stable order so backfill output is deterministic.

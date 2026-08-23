@@ -4,7 +4,7 @@
  *
  * Regression: with an overlay active, the chart reads official visibility from
  * `localOfficialOverride` (the unified overlay-mode selection), but the legend
- * X routed straight to InferenceContext's `removeHwType`, which mutates
+ * X routed straight to the inference action domain's `removeHwType`, which mutates
  * `activeHwTypes` — a set the chart ignores in overlay mode. The click
  * appeared to do nothing. The legend toggle already had the overlay-aware
  * split (`unifiedToggle`); the X now shares it (`handleRemoveHwType`).

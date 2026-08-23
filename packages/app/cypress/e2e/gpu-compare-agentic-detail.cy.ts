@@ -1,4 +1,5 @@
 import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
+import { agenticMetrics } from '../support/agentic-fixtures';
 
 // ---------------------------------------------------------------------------
 // Spec-scoped fixture helpers
@@ -50,37 +51,6 @@ const agenticAvailability = [
     date: AGENTIC_DATE,
   })),
 ];
-
-// Minimal per-metric percentile ladder matching what the chart expects for
-// agentic rows (median/p75/p90/p95/p99 + std for each family).
-const percentileLadder = (prefix: string, base: number): Record<string, number> => ({
-  [`median_${prefix}`]: base,
-  [`p75_${prefix}`]: base * 1.2,
-  [`p90_${prefix}`]: base * 1.5,
-  [`p95_${prefix}`]: base * 1.7,
-  [`p99_${prefix}`]: base * 2.2,
-  [`std_${prefix}`]: base * 0.3,
-});
-
-const agenticMetrics = (conc: number): Record<string, number> => {
-  const scale = conc / 16;
-  const itl = 0.011 * scale;
-  return {
-    ...percentileLadder('ttft', 0.4 * scale),
-    ...percentileLadder('tpot', 0.012 * scale),
-    ...percentileLadder('itl', itl),
-    ...percentileLadder('e2el', 8 * scale),
-    median_intvty: 1 / itl,
-    p75_intvty: 1 / (itl * 1.2),
-    p90_intvty: 1 / (itl * 1.5),
-    p99_intvty: 1 / (itl * 2.2),
-    std_intvty: (1 / itl) * 0.1,
-    tput_per_gpu: 950 / Math.sqrt(scale),
-    output_tput_per_gpu: 210,
-    input_tput_per_gpu: 740,
-    total_tput_tps: 7600 * conc * 0.05,
-  };
-};
 
 // IDs must be unique numbers — the GPU graph uses them as D3 data keys and
 // trace-availability is keyed on them.
@@ -147,6 +117,14 @@ describe('GPU comparison agentic point detail', () => {
       );
       request.reply({ body: result });
     });
+    cy.intercept('GET', '/api/v1/log-availability*', (request) => {
+      const ids = new URL(request.url).searchParams.get('ids')?.split(',') ?? [];
+      request.reply({
+        body: Object.fromEntries(
+          ids.filter((id) => agenticIds.has(Number(id))).map((id) => [id, true]),
+        ),
+      });
+    }).as('gpuLogAvailability');
     // The agentic default x-axis mode (E2E Normalized Interactivity) fetches derived metrics on
     // mount; without values every point drops out of the (remapped) data set.
     interceptDerivedAgenticMetrics();
@@ -176,6 +154,7 @@ describe('GPU comparison agentic point detail', () => {
 
     cy.get('[data-testid="gpu-graph"]').first().should('be.visible');
     cy.wait('@gpuTraceAvailability');
+    cy.wait('@gpuLogAvailability');
     cy.wait(100);
     cy.get('[data-testid="gpu-graph"]')
       .first()
@@ -203,7 +182,26 @@ describe('GPU comparison agentic point detail', () => {
       .then(($link) => {
         expect($link).to.match('a');
         expect($link).not.to.have.attr('target');
-        expect($link.attr('href')).to.match(/^\/inference\/agentic\/\d+$/u);
+        const href = $link.attr('href') ?? '';
+        expect(href).to.match(/^\/inference\/agentic\/\d+\?/u);
+        // The chart state rides along so the detail page can link back to the
+        // view the reader left — see agentic-detail-back-nav.cy.ts. Only
+        // non-default values are carried, so `g_model` (DeepSeek-V4-Pro IS the
+        // default) is absent while the scenario and GPU selection are not.
+        const params = new URLSearchParams(href.slice(href.indexOf('?')));
+        expect(params.get('i_seq')).to.equal('agentic-traces');
+        expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
+      });
+    cy.get('[data-chart-tooltip]:visible [data-action="view-logs"]')
+      .should('be.visible')
+      .then(($link) => {
+        expect($link).to.match('a');
+        const href = $link.attr('href') ?? '';
+        expect(href).to.match(/^\/inference\/agentic\/\d+\?/u);
+        const params = new URLSearchParams(href.slice(href.indexOf('?')));
+        expect(params.get('view')).to.equal('logs');
+        expect(params.get('i_seq')).to.equal('agentic-traces');
+        expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
       });
     cy.location('pathname').should('eq', '/inference');
   });

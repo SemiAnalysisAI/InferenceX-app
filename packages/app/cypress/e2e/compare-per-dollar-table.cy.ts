@@ -1,3 +1,5 @@
+import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
+
 describe('Compare-per-dollar slug page — slimmed table + cross-link', () => {
   before(() => {
     cy.window().then((win) => {
@@ -59,6 +61,12 @@ describe('Compare-per-dollar slug page — slimmed table + cross-link', () => {
     cy.contains('Performance per Dollar').should('be.visible');
   });
 
+  it('attributes pricing to the shared TCO source', () => {
+    cy.get('[data-testid="compare-per-dollar-pricing"]')
+      .contains('a', TCO_SOURCE_TITLE)
+      .should('have.attr', 'href', TCO_SOURCE_URL);
+  });
+
   it('renders an indexable comparison PNG with descriptive alt text', () => {
     cy.get('[data-testid="compare-per-dollar-indexed-image"] img')
       .should('be.visible')
@@ -70,6 +78,15 @@ describe('Compare-per-dollar slug page — slimmed table + cross-link', () => {
     cy.get('[data-testid="compare-per-dollar-indexed-image"] img')
       .should('have.attr', 'alt')
       .and('contain', 'cost per million tokens at matched interactivity levels');
+  });
+});
+
+describe('Chinese compare-per-dollar table', () => {
+  it('localizes the per-dollar metric label', () => {
+    cy.visit('/zh/compare-per-dollar/deepseek-r1-gb200-vs-h100');
+    cy.get('[data-testid="compare-interpolated-table"] tbody')
+      .should('contain.text', '每百万 token 美元成本')
+      .and('not.contain.text', 'Dollar per Million Tokens');
   });
 });
 

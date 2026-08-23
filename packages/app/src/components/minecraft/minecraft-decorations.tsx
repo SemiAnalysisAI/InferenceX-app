@@ -123,7 +123,7 @@ export function MinecraftDecorations() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const audio = new Audio('/decorative/minecraft/ender-dragon.mp3');
-    audio.volume = 0.5;
+    audio.volume = 0.25;
     const timeout = window.setTimeout(() => {
       audio.play().catch(() => {
         /* browser blocked autoplay — no prior user gesture */

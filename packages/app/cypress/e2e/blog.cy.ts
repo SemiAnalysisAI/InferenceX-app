@@ -28,6 +28,9 @@ describe('Blog', () => {
 
   describe('Blog post page', () => {
     before(() => {
+      cy.intercept('GET', 'https://substack-post-media.s3.amazonaws.com/**', {
+        statusCode: 204,
+      });
       cy.visit('/blog/inferencemax-open-source-inference-benchmarking');
     });
 

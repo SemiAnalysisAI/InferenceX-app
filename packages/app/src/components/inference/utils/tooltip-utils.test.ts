@@ -171,11 +171,74 @@ describe('getPointLabel', () => {
 describe('generateTooltipContent', () => {
   it('renders View charts as a same-tab anchor so browsers offer open-in-new-tab', () => {
     const html = generateTooltipContent(
-      tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: true }),
+      tooltipConfig({
+        data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+        isPinned: true,
+        hasTrace: true,
+      }),
     );
     expect(html).toContain('<a data-action="view-charts"');
     expect(html).toContain('href="/inference/agentic/1"');
     expect(html).not.toContain('data-action="view-charts" target=');
+  });
+
+  it('renders View logs only for pinned points with a stored server log', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
+        isPinned: true,
+        hasLog: true,
+      }),
+    );
+    expect(html).toContain('<a data-action="view-logs"');
+    expect(html).toContain('href="/inference/agentic/7?view=logs"');
+    expect(
+      generateTooltipContent(
+        tooltipConfig({
+          data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
+          isPinned: false,
+          hasLog: true,
+        }),
+      ),
+    ).not.toContain('data-action="view-logs"');
+    expect(
+      generateTooltipContent(
+        tooltipConfig({
+          data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
+          isPinned: true,
+          hasLog: false,
+        }),
+      ),
+    ).not.toContain('data-action="view-logs"');
+  });
+
+  it('routes fixed-sequence log actions to the fixed benchmark log viewer', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({ id: 96255, benchmark_type: 'single_turn' }),
+        isPinned: true,
+        hasLog: true,
+      }),
+    );
+    expect(html).toContain('<a data-action="view-logs"');
+    expect(html).toContain('href="/inference/logs/96255"');
+    expect(html).not.toContain('/inference/agentic/96255');
+  });
+
+  it('localizes point-detail actions and their /zh routes', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
+        isPinned: true,
+        hasTrace: true,
+        hasLog: true,
+        locale: 'zh',
+      }),
+    );
+    expect(html).toContain('查看图表');
+    expect(html).toContain('href="/zh/inference/agentic/7"');
+    expect(html).toContain('查看日志');
+    expect(html).toContain('href="/zh/inference/agentic/7?view=logs"');
   });
 
   it('omits View charts when the point id is non-persisted (0 / NaN), even if pinned + hasTrace', () => {
@@ -184,12 +247,13 @@ describe('generateTooltipContent', () => {
     for (const badId of [0, Number.NaN]) {
       const html = generateTooltipContent(
         tooltipConfig({
-          data: pt({ id: badId }),
+          data: pt({ id: badId, benchmark_type: 'agentic_traces' }),
           isPinned: true,
           hasTrace: true,
         }),
       );
       expect(html).not.toContain('data-action="view-charts"');
+      expect(html).not.toContain('data-action="view-logs"');
     }
   });
 
@@ -307,7 +371,7 @@ describe('generateTooltipContent', () => {
     );
 
     expect(enabled).toContain('<strong>Offload Type:</strong> Enabled (legacy data)');
-    expect(disabledZh).toContain('<strong>卸载类型:</strong> 已禁用（旧版数据）');
+    expect(disabledZh).toContain('<strong>offload 类型：</strong> 已禁用（旧版数据）');
   });
 
   it('does not treat the fixed-sequence offload default as legacy metadata', () => {
@@ -394,9 +458,9 @@ describe('generateTooltipContent', () => {
         }),
       }),
     );
-    expect(html).toContain('<strong>卸载类型:</strong> DRAM');
-    expect(html).toContain('<strong>KV 卸载引擎:</strong> LMCache');
-    expect(html).toContain('<strong>路由器:</strong> vLLM Router 0.1.14');
+    expect(html).toContain('<strong>offload 类型：</strong> DRAM');
+    expect(html).toContain('<strong>KV offload 引擎：</strong> LMCache');
+    expect(html).toContain('<strong>路由器：</strong> vLLM Router 0.1.14');
   });
 
   it('omits the offload type row when the canonical tier is none', () => {
@@ -406,7 +470,7 @@ describe('generateTooltipContent', () => {
     );
 
     expect(en).not.toContain('Offload Type');
-    expect(zh).not.toContain('卸载类型');
+    expect(zh).not.toContain('offload 类型');
   });
 
   it('falls back to hwKey when hardware config entry is missing', () => {
@@ -521,7 +585,7 @@ describe('generateOverlayTooltipContent', () => {
     );
 
     expect(mtp).toContain('<strong>Speculative Decoding:</strong> MTP');
-    expect(standardZh).toContain('<strong>投机解码:</strong> 关闭');
+    expect(standardZh).toContain('<strong>投机解码：</strong> 关闭');
   });
 
   it('labels Kimi-K3 speculative decoding "DSpark" rather than the generic MTP', () => {
@@ -626,22 +690,38 @@ describe('generateGPUGraphTooltipContent', () => {
   it('shows View charts only for pinned points with stored trace data', () => {
     expect(
       generateGPUGraphTooltipContent(
-        tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: true }),
+        tooltipConfig({
+          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+          isPinned: true,
+          hasTrace: true,
+        }),
       ),
     ).toContain('data-action="view-charts"');
     expect(
       generateGPUGraphTooltipContent(
-        tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: true }),
+        tooltipConfig({
+          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+          isPinned: true,
+          hasTrace: true,
+        }),
       ),
     ).toContain('href="/inference/agentic/1"');
     expect(
       generateGPUGraphTooltipContent(
-        tooltipConfig({ data: pt({ id: 1 }), isPinned: false, hasTrace: true }),
+        tooltipConfig({
+          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+          isPinned: false,
+          hasTrace: true,
+        }),
       ),
     ).not.toContain('data-action="view-charts"');
     expect(
       generateGPUGraphTooltipContent(
-        tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: false }),
+        tooltipConfig({
+          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+          isPinned: true,
+          hasTrace: false,
+        }),
       ),
     ).not.toContain('data-action="view-charts"');
   });

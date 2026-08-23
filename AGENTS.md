@@ -4,7 +4,9 @@ For detailed subsystem docs, see [docs/index.md](./docs/index.md).
 
 > **PR and GitHub-issue titles & descriptions must be bilingual — include a Simplified Chinese version in addition to English.** Title format: `<English title> / <中文标题>` (keep bracket prefixes at the front untranslated). In the PR/issue body, follow the English content with a `## 中文说明` section mirroring the summary; don't translate code blocks, logs, or stack traces — summarize around them. **Commit messages must include a Chinese translation too**: keep the subject line in English (conventional-commit style) and include the Chinese translation of the subject and key points in the commit body (e.g. a trailing `中文：<translation>` paragraph); squash-merge commits inherit the bilingual PR title, which satisfies the subject requirement automatically.
 
-> **Translation quality bar:** write natural technical Chinese, not word-for-word machine translation (style reference: [`vllm-project/vllm-ascend` `README.zh.md`](https://github.com/vllm-project/vllm-ascend/blob/main/README.zh.md)). Preserve product names, hardware SKUs, framework/library names (Next.js, React Query, D3.js, Tailwind ...), flags, and code identifiers in English. Use parenthetical English clarification for acronyms on first use. Preferred terms: benchmark 基准测试, dashboard 仪表板, chart 图表, config 配置, throughput 吞吐量, latency 延迟, single-node/multi-node 单节点/多节点, evaluation 评估, artifact 产物.
+> **Translation quality bar:** write natural technical Chinese, not word-for-word machine translation (style reference: [`vllm-project/vllm-ascend` `README.zh.md`](https://github.com/vllm-project/vllm-ascend/blob/main/README.zh.md)). Preserve product names, hardware SKUs, framework/library names (Next.js, React Query, D3.js, Tailwind ...), flags, and code identifiers in English. Use parenthetical English clarification for acronyms on first use. Preferred terms: benchmark 基准测试, dashboard 仪表板, chart 图表, config 配置, throughput 吞吐量, latency 延迟, single-node/multi-node 单节点/多节点, evaluation 评估, artifact 产物. In first-party ML infrastructure UI and technical prose, keep established English technical terms and phrases that Chinese engineers normally use in English; decide from real industry usage and the surface, not from a closed list. `warmup`, `seed`, and `offload` are examples, not the whole category. Follow `docs/chinese-copy.md` for explanatory and quotation exceptions.
+
+> **Chinese editorial decisions are context-aware.** Follow [docs/chinese-copy.md](./docs/chinese-copy.md) for audience, surface-specific register, terminology exceptions, the two independent fidelity/naturalness gates, the Claude-plus-manual-review workflow, and the PR checklist. Do not turn a preferred wording or pronoun choice into a global mechanical rule unless it is correct in every supported context.
 
 > **The website itself is bilingual too — every indexable page must ship a Simplified Chinese sibling under `/zh`.** See [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces) below; a new page, tab, or blog post without its `/zh` version is 🔴 BLOCKING on PR review.
 
@@ -27,6 +29,7 @@ InferenceX App — Next.js 16 dashboard for ML inference benchmark data. DB-back
 ```bash
 bun install               # Install dependencies
 bun run dev                # Dev server with Turbopack (http://localhost:3000)
+bun run mcp                # MCP server exposing read-only benchmark tools
 bun run build              # Production build
 bun run typecheck          # TypeScript type checking (all packages)
 bun run lint               # Lint with oxlint
@@ -52,7 +55,8 @@ packages/
 │       ├── hooks/api/    # React Query hooks (use-benchmarks, use-availability, etc.)
 │       └── lib/          # Utilities, constants, d3-chart/, chart-utils, blog, data-mappings
 ├── constants/            # Shared constants (GPU keys, model mappings, SEO)
-└── db/                   # DB layer, ETL, migrations, queries, ingest scripts
+├── db/                   # DB layer, ETL, migrations, queries, ingest scripts
+└── mcp/                  # MCP server exposing read-only benchmark tools
 ```
 
 **Path alias**: `@/*` → `packages/app/src/`
@@ -150,7 +154,7 @@ All interactive elements should have `track()` from `@/lib/analytics` (autocaptu
 
 ## Tab Structure
 
-Order: `inference` → `evaluation` → `historical` → `calculator` → `reliability` → `gpu-specs` (defined in `page-content.tsx` `VALID_TABS`). Tab value = URL hash.
+Dashboard route keys, paths, primary/feature-gated/footer-only navigation, indexability, provider capabilities, `/zh` mirroring, and share-parameter scopes are defined once in `packages/app/src/lib/dashboard-routes.ts`. `TabNav`, `DashboardShell`, metadata, i18n, share URLs, and the sitemap derive from that registry; do not add a second route array.
 
 ## Unofficial Run Support — Mandatory for Inference / Evaluation Features
 
@@ -172,14 +176,18 @@ The site ships a hand-authored Simplified Chinese sibling for every indexable pa
 
 **Every new indexable page, dashboard tab, or blog post MUST ship its Chinese version in the same PR:**
 
-1. **New page** → create `packages/app/src/app/zh/<route>/page.tsx` with fully translated content and metadata. Metadata: `alternates: zhAlternates('<en-path>')` plus `openGraph.locale: ZH_OG_LOCALE`. Switch the English page's `alternates` to `enAlternates('<en-path>')` so both sides carry bidirectional hreflang. Register the route in `ZH_MIRRORED_ROUTES` (`src/lib/i18n.ts`) so the header nav and EN↔中文 toggle link to it, and add it to the sitemap via `localizedPair()` in `src/app/sitemap.ts`.
-2. **New dashboard tab** → add the tab to `ZH_TAB_KEYS`, `TAB_META_ZH`, `TAB_INTRO_ZH`, and `TAB_LABELS_ZH` in `src/lib/tab-meta-zh.ts`, then create `src/app/zh/(dashboard)/<tab>/page.tsx` mirroring the English page with `tabMetadataZh('<tab>')` and a `<ZhTabIntro tab="<tab>" />` block above the chart; the chart's own UI strings must follow rule 5. `tab-meta-zh.test.ts` enforces dictionary completeness.
+1. **New page** → create `packages/app/src/app/zh/<route>/page.tsx` with fully translated content and metadata. Metadata: `alternates: zhAlternates('<en-path>')` plus `openGraph.locale: ZH_OG_LOCALE`. Switch the English page's `alternates` to `enAlternates('<en-path>')` so both sides carry bidirectional hreflang. Register non-dashboard routes in `ZH_MIRRORED_ROUTES` (`src/lib/i18n.ts`) so the header nav and EN↔中文 toggle link to them, and add them to the sitemap via `localizedPair()`.
+2. **New dashboard tab** → add one entry to `src/lib/dashboard-routes.ts`, then add exact entries to `TAB_META_ZH`, `TAB_INTRO_ZH`, and `TAB_LABELS_ZH` in `src/lib/tab-meta-zh.ts`. Create `src/app/zh/(dashboard)/<tab>/page.tsx` mirroring the English page with `tabMetadataZh('<tab>')` and a `<ZhTabIntro tab="<tab>" />` block above the chart; the registry automatically supplies `/zh` route matching and indexable sitemap entries. The chart's own UI strings must follow rule 5. Registry and metadata tests enforce route parity and dictionary completeness.
 3. **New blog post** → the translation `packages/app/content/blog/zh/<same-filename>.mdx` is REQUIRED in the same PR. Translate frontmatter `title`/`subtitle` and the body; keep `date`, `publishDate`, `modifiedDate`, `tags`, and the filename/slug identical (English and Chinese posts pair by filename; visibility gating always follows the English post's `publishDate`). Rewrite internal `/blog/<slug>` links to `/zh/blog/<slug>`; never alter numbers, code blocks, or `<Figure>`/`<JsonLd>` structure. The `/zh/blog` listing, hreflang, and sitemap pick the file up automatically.
-4. **Editing an existing English page or post** → update its Chinese sibling in the same PR. Content drift between languages is a 🔴 BLOCKING review issue.
+4. **Editing an existing English page or post** → update its Chinese sibling in the same PR. Omitting the required Chinese sibling update is a 🔴 BLOCKING review issue. Fidelity or wording issues inside an updated Chinese sibling follow the advisory workflow below; serious findings require Chinese maintainer confirmation.
 5. **ALL user-visible UI strings MUST have a Chinese equivalent** — no carve-outs for "chart internals" or "option labels". This includes: headers/footers, card titles/descriptions, control and filter labels, buttons, toggles (Log Scale, Optimal Only, …), nudges, dropdown OPTION display names (Y-axis metric names, token types, scale modes), searchable-select placeholders ("Search…"), table column headers and action buttons ("Prompts"), modal/drawer chrome, legend footnotes, and empty/loading/error messages. Mechanism: client components call `useLocale()` (`src/lib/use-locale.ts`) and read from a component-local `STRINGS = { en, zh }` dict; server components take an optional `locale` prop passed from the /zh page; registry-defined display names (e.g. `Y_AXIS_METRICS`, legend toggle configs) carry a `labelZh` field resolved through a locale-aware label helper at render time. The `en` values must keep the exact original strings so English pages stay byte-identical.
-6. **What stays English** (only these): brand/product names, hardware SKUs, model/framework/precision names, units (tok/s/user, GB/s, $/M tok), code identifiers and flags — per the translation quality bar — plus DB-stored _content_ (benchmark rows, dataset conversation text, run logs), which is data, not UI.
+6. **What stays English**: brand/product names, hardware SKUs, model/framework/precision names, units (tok/s/user, GB/s, $/M tok), code identifiers and flags — per the translation quality bar — plus established English technical terms and phrases that Chinese ML infrastructure engineers normally use in English, as documented contextually in `docs/chinese-copy.md` (`warmup`, `seed`, and `offload` are non-exhaustive examples), and DB-stored _content_ (benchmark rows, dataset conversation text, run logs), which is data, not UI.
 7. **Compare slug narrative sync**: the per-slug compare pages are mirrored at `/zh/compare/[slug]` and `/zh/compare-per-dollar/[slug]`; their Chinese prose templates live in `src/lib/compare-ssr-zh.ts`, a 1:1 port of the English templates in `compare-ssr.ts`. The variant compare pages (`/zh/compare-precision/[slug]` and `/zh/compare-spec-decode/[slug]`) have their Chinese templates in `src/lib/compare-variant-ssr-zh.ts`, porting `compare-variant-ssr.ts`. Any PR that changes the English narrative templates MUST update the zh port in the same commit.
-8. **Every route gets a /zh sibling — including hidden/feature-gated ones** (`/datasets`, `/ai-chart`, `/current-inferencex-image`, `/feedback`, agentic detail pages). Noindex routes keep their noindex on both sides. The only exceptions: `feed.xml`/`llms.txt` (single-language machine feeds) and per-post OG images (Chinese posts reuse the English post's OG image — the OG renderer's font has no CJK glyphs).
+8. **Every route gets a /zh sibling, including hidden or feature-gated ones** (`/agentx`, `/ai-chart`, `/current-inferencex-image`, `/feedback`, agentic detail pages). Noindex routes keep their noindex on both sides. The only exceptions are `feed.xml` and `llms.txt` (single-language machine feeds) plus per-post OG images. Chinese posts reuse the English post's OG image because the renderer font has no CJK glyphs.
+
+> **Claude reviews every changed user-visible Chinese string, but the Chinese maintainer makes the final decision.** Load `review-zh-copy` before opening or reviewing any PR that touches user-visible Chinese text, including refactors whose filenames do not contain `zh`. The skill evaluates semantic fidelity and natural Chinese as separate gates and follows [docs/chinese-copy.md](./docs/chinese-copy.md). Its findings never block another contributor's merge. Do not mention `@edwingao28` for a clean review, routine coverage, or an ordinary wording or naturalness suggestion. Mention `@edwingao28` only for a high-confidence semantic or factual error, changed attribution or speaker voice, or unresolved high-impact ambiguity, and ask for confirmation. The Chinese maintainer makes the final editorial decision.
+
+> **Chinese copy has a narrow mechanical CI guard.** `packages/app/src/lib/zh-copy.test.ts` checks objective regressions: the standalone English common noun `Chip` in Chinese text (with explicit identifier and unit exemptions), prose-like English `<strong>` labels that bypass an available `zh:` dictionary, and redundant English-first double translations such as `warmup 预热`. It does not globally ban `预热`, `随机种子`, or `卸载`, and deliberately does **not** enforce pronouns, preferred contextual terminology, punctuation style, sentence structure, fluency, tone, or register; those require page context and human review. Every mechanical rule must use the same matcher for the source scan and a hand-checked case in `packages/app/src/lib/zh-copy-mechanical-regressions.jsonl`, including an exemption case whenever the rule has one.
 
 ## Chart Interpolation — TS and Python Helpers MUST Stay in Sync
 
@@ -248,13 +256,12 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 
 ### Add/modify a metric
 
-1. Register in `src/lib/chart-utils.ts`: `Y_AXIS_METRICS`, `calculateRoofline`, `computeAllRooflines`, `markRooflinePoints`
-2. Add TS types: optional field in `InferenceData`, add to `YAxisMetricKey`, add `ChartDefinition` fields
-3. Add chart config: `src/components/inference/inference-chart-config.json`
-4. Add Y-axis dropdown: `ChartControls.tsx`
-5. Add subtitle/disclaimer in `ChartDisplay.tsx` if metric depends on assumed constants
-6. Add disagg caveat banner in `ChartDisplay.tsx` for per-GPU or per-MW metrics (animated amber `border-l-2` banner pattern)
-7. Expose in UI state: `InferenceContext.tsx`
+1. Register the field, bilingual labels/titles, polarity, and custom-source metadata in `src/components/inference/metric-registry.ts` (`METRIC_REGISTRY`).
+2. Add or reuse the derived field in `buildDerivedChartFields` (`src/lib/chart-utils.ts`) and the corresponding optional `InferenceData` field. Historical trends request the same selective builder; do not duplicate formulas.
+3. Add the metric to `METRIC_CONTROL_GROUPS` when it belongs in a selector group. Chart definitions and metric key types derive from the registry.
+4. Add subtitle/disclaimer copy in `ChartDisplay.tsx` if the metric depends on assumed constants.
+5. Add the disaggregated-config caveat banner for per-GPU or per-MW metrics.
+6. Verify both official rows and `?unofficialrun=` overlays, including clipping, CSV/table behavior where applicable, zoom, labels, and Chinese UI.
 
 ### Add a new blog post
 
@@ -282,11 +289,12 @@ See [Blog](./docs/blog.md) for content format, available MDX components, and des
 
 ### Adding a new tab
 
-1. `page-content.tsx`: Add to `VALID_TABS`, add `TabsTrigger` (desktop), `SelectItem` (mobile), `TabsContent`
-2. Create a per-section context provider (see `InferenceContext.tsx`, `EvaluationContext.tsx` for patterns)
-3. Use `ChartLegend` with `variant="sidebar"`, sorted by `HW_REGISTRY` sort order, default expanded
-4. Analytics: all interactive elements use `track()` with `{tabname}_` prefix
-5. Create the Chinese sibling: extend `src/lib/tab-meta-zh.ts` dictionaries and add `src/app/zh/(dashboard)/<tab>/page.tsx` (see [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces))
+1. Add the canonical route entry to `packages/app/src/lib/dashboard-routes.ts`, including navigation group, indexability, provider capabilities, locale mirroring, and share scopes.
+2. Add explicit English metadata in `src/lib/tab-meta.ts` and Chinese metadata, intro, and label entries in `src/lib/tab-meta-zh.ts`.
+3. Create the English and Chinese App Router pages. `dashboard-routes.test.ts` enforces structural parity.
+4. Add the tab content and any section-specific provider only when the route actually needs one; declare dashboard-wide provider needs in the registry.
+5. Use `ChartLegend` with `variant="sidebar"`, sorted by `HW_REGISTRY` sort order, default expanded.
+6. Track interactive actions with the `{tabname}_` analytics prefix.
 
 ### Bumping dependencies
 
@@ -303,7 +311,7 @@ Workflow for a periodic dep bump. Branch: `chore/bump-deps-YYYY-MM-DD`. Commit e
 Detailed design rationale (the "why" and "how", not the "what") lives in [docs/](./docs/index.md):
 
 - **[Index](./docs/index.md)** — index of all docs **MUST ALWAYS READ IN CASE OF RELEVANT INFORMATION**
-- **[Architecture](./docs/architecture.md)** — Client-first design, hash routing, caching, color system
+- **[Architecture](./docs/architecture.md)** — Client-first design, route navigation, URL state, caching, color system
 - **[D3 Charts](./docs/d3-charts.md)** — 4-effect architecture, zoom refs, tooltip lifecycle
 - **[Data Pipeline](./docs/data-pipeline.md)** — DB schema reasoning, ETL design, spline interpolation
 - **[Pitfalls](./docs/pitfalls.md)** — Token type bugs, schema evolution, stale closures, zoom loss

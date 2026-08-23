@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { reconcileActiveSet } from '@/hooks/useChartContext';
+import { reconcileActiveSet, resolveAvailableSelection } from '@/hooks/useChartContext';
 
 describe('reconcileActiveSet', () => {
   it('initializes with all available items when no previous selection', () => {
@@ -45,5 +45,63 @@ describe('reconcileActiveSet', () => {
     expect(pruned).toEqual(new Set(['b200_sglang']));
 
     expect(reconcileActiveSet(pruned, full, true)).toBe(pruned);
+  });
+});
+
+describe('resolveAvailableSelection', () => {
+  it('waits through transient empty data without consuming URL intent', () => {
+    const active = new Set(['h100']);
+    const result = resolveAvailableSelection({
+      active,
+      available: new Set(),
+      pending: new Set(['b200']),
+      scopeChanged: true,
+      settled: false,
+    });
+    expect(result).toEqual({ selection: active, consumedPending: false });
+  });
+
+  it('restores the valid part of pending URL intent once data settles', () => {
+    const result = resolveAvailableSelection({
+      active: new Set(),
+      available: new Set(['h100', 'b200']),
+      pending: new Set(['b200', 'removed']),
+      scopeChanged: true,
+      settled: true,
+    });
+    expect(result.selection).toEqual(new Set(['b200']));
+    expect(result.consumedPending).toBe(true);
+  });
+
+  it('defaults a new scope to all available items', () => {
+    const available = new Set(['h100', 'b200']);
+    const result = resolveAvailableSelection({
+      active: new Set(['old']),
+      available,
+      scopeChanged: true,
+      settled: true,
+    });
+    expect(result.selection).toBe(available);
+  });
+
+  it('preserves a deliberate empty selection inside the same scope', () => {
+    const active = new Set<string>();
+    const result = resolveAvailableSelection({
+      active,
+      available: new Set(['h100', 'b200']),
+      scopeChanged: false,
+      settled: true,
+    });
+    expect(result.selection).toBe(active);
+  });
+
+  it('clears stale items for a settled empty scope', () => {
+    const result = resolveAvailableSelection({
+      active: new Set(['h100']),
+      available: new Set(),
+      scopeChanged: false,
+      settled: true,
+    });
+    expect(result.selection).toEqual(new Set());
   });
 });

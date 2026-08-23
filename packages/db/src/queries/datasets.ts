@@ -9,6 +9,7 @@
 
 import type { DbClient } from '../connection.js';
 import type { ConversationStructure } from '../etl/weka-structure.js';
+export type { ConversationStructure, StructureNode } from '../etl/weka-structure.js';
 
 export interface DatasetSummary {
   blockSize?: number;

@@ -83,8 +83,13 @@ export function D3ChartWrapper({
       <div className="flex flex-col lg:flex-row w-full">
         <div ref={setContainerRef} className="relative flex-1 min-w-0">
           <div className="relative">
+            {/* Stable hook for tests. `[data-testid="scatter-graph"] svg` also
+                matches every Lucide icon inside the card — dozens of them —
+                so picking "the first svg" silently grabs an icon whenever the
+                selected metric renders one above the chart. */}
             <svg
               ref={svgRef}
+              data-testid="d3-chart-svg"
               width="100%"
               height={dimensions.height}
               style={{ cursor: grabCursor ? 'grab' : undefined }}

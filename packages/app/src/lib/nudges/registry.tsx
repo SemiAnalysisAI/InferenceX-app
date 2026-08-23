@@ -2,6 +2,7 @@ import {
   ArrowRight,
   BookOpen,
   Download,
+  MousePointerClick,
   MessageSquareText,
   Palette,
   ShieldCheck,
@@ -14,6 +15,15 @@ import dynamic from 'next/dynamic';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
 import { FEEDBACK_SUBMITTED_EVENT } from '@/components/feedback-modal';
+import { isZhPathname, localePath } from '@/lib/i18n';
+import {
+  AGENTIC_COACH_MARK_STORAGE_KEY,
+  AGENTIC_POINT_ACTION_SELECTOR,
+  SCATTER_RENDERED_EVENT,
+  getAgenticPointAnchorMutationRoot,
+  getAgenticPointAnchorRect,
+  resolveAgenticPointAnchor,
+} from '@/lib/nudges/agentic-point-coach-mark';
 import { LANDING_BANNER_STORAGE_KEY } from '@/lib/nudges/landing-banner';
 
 // Keep the ~210-line FeedbackForm out of the landing/dashboard initial JS.
@@ -44,17 +54,16 @@ function isOnInferenceTab(): boolean {
   return (segments[0] ?? 'inference') === 'inference';
 }
 
-/**
- * The telemetry tutorial lives at /agentx/telemetry and /zh/agentx/telemetry.
- * The nudge fires from a client callback rather than a server-rendered link,
- * so it resolves the locale from the pathname at click time.
- */
+/** Resolve an internal nudge destination in the locale active at click time. */
+function localizedNudgeHref(enPath: string): string {
+  if (typeof window === 'undefined') return enPath;
+  return localePath(enPath, isZhPathname(window.location.pathname) ? 'zh' : 'en');
+}
+
 export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
 
 function telemetryTutorialHref(): string {
-  if (typeof window === 'undefined') return '/agentx/telemetry';
-  const isZh = window.location.pathname.split('/').filter(Boolean)[0] === 'zh';
-  return isZh ? '/zh/agentx/telemetry' : '/agentx/telemetry';
+  return localizedNudgeHref('/agentx/telemetry');
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +95,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
         label: 'See how',
         labelZh: '了解详情',
         onClick: () => {
-          window.location.href = '/about#reproducibility';
+          window.location.href = localizedNudgeHref('/about#reproducibility');
         },
       },
       testId: 'reproducibility-nudge',
@@ -261,6 +270,55 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   },
 
   // -------------------------------------------------------------------------
+  // Agentic chart coach mark
+  // -------------------------------------------------------------------------
+  {
+    id: 'agentic-point-detail',
+    type: 'coach-mark',
+    // Three ways in, all retried until an anchor exists (see `isEligible`'s
+    // `requireAnchor`): a short timer for a chart that is already painted,
+    // every subsequent chart render for the usual async-data case, and scroll
+    // — on a laptop viewport the chart starts below the fold, so the first two
+    // fire while there is still nothing on screen to point at. The resolver
+    // rejects an off-screen chart with a single rect read, keeping the scroll
+    // path cheap, and the engine drops these listeners once the tip is up.
+    trigger: [
+      { type: 'timer', delayMs: 1200 },
+      { type: 'event', event: SCATTER_RENDERED_EVENT, delayMs: 700 },
+      { type: 'dom-event', event: 'scroll' },
+    ],
+    dismissal: { type: 'permanent' },
+    storageKey: AGENTIC_COACH_MARK_STORAGE_KEY,
+    // Highest dashboard priority: it is the only nudge tied to a specific
+    // element, so it should claim its slot the moment that element exists.
+    // (It has its own slot, so this only orders it against future coach marks.)
+    priority: 45,
+    scope: 'dashboard',
+    content: {
+      icon: MousePointerClick,
+      iconClassName: 'text-brand',
+      title: 'Every point has a story',
+      titleZh: '每个数据点背后都有细节',
+      description:
+        'Click any point to view server metrics and logs — cache hit rates, queue depth, and the full request timeline for that run.',
+      descriptionZh:
+        '点击任意数据点即可查看服务端指标与日志——cache 命中率、队列深度，以及该次运行的完整请求时间线。',
+      testId: 'agentic-point-coach-mark',
+      anchor: {
+        resolve: resolveAgenticPointAnchor,
+        getRect: getAgenticPointAnchorRect,
+        getMutationRoot: getAgenticPointAnchorMutationRoot,
+        actionSelector: AGENTIC_POINT_ACTION_SELECTOR,
+      },
+    },
+    analytics: {
+      shown: 'inference_agentic_point_coach_mark_shown',
+      dismissed: 'inference_agentic_point_coach_mark_dismissed',
+      action: 'inference_agentic_point_coach_mark_point_clicked',
+    },
+  },
+
+  // -------------------------------------------------------------------------
   // Dashboard modals
   // -------------------------------------------------------------------------
   {
@@ -313,7 +371,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       description:
         'Compare AgentX results for Kimi K3, DeepSeek-V4-Pro-0813, MiniMax-M3, Qwen3.5 397B, and GLM-5.3 across supported chips and serving stacks.',
       descriptionZh:
-        '查看 Kimi K3、DeepSeek-V4-Pro-0813、MiniMax-M3、Qwen3.5 397B 与 GLM-5.3 在支持 Chip 和推理服务栈上的 AgentX 结果。',
+        '查看 Kimi K3、DeepSeek-V4-Pro-0813、MiniMax-M3、Qwen3.5 397B 与 GLM-5.3 在支持芯片和推理服务栈上的 AgentX 结果。',
       // Both buckets carry two releases on one architecture (GLM-5.2/5.3, the
       // V4-Pro April preview and the 0813 GA); name the newer one, as the
       // model selector does for GLM.
@@ -331,7 +389,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
         labelZh: '查看结果',
         icon: <ArrowRight className="size-4" />,
         onClick: () => {
-          window.location.href = '/inference?i_seq=agentic-traces';
+          window.location.href = localizedNudgeHref('/inference?i_seq=agentic-traces');
         },
       },
     },
@@ -359,7 +417,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       description:
         'Star InferenceX on GitHub to get notified when we publish new benchmark data. We update chip performance comparisons regularly — starring is the easiest way to stay in the loop and help the project grow.',
       descriptionZh:
-        '在 GitHub 上为 InferenceX 加星，以便在我们发布新基准测试数据时收到通知。我们定期更新 Chip 性能对比——加星是保持关注并帮助项目成长的最简单方式。',
+        '在 GitHub 上为 InferenceX 加星，以便在我们发布新基准测试数据时收到通知。我们定期更新芯片性能对比——加星是保持关注并帮助项目成长的最简单方式。',
       testId: 'github-star-modal',
       dismissLabel: 'Maybe Later',
       dismissLabelZh: '稍后再看',
@@ -408,7 +466,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = '/inference?i_seq=agentic-traces';
+        window.location.href = localizedNudgeHref('/inference?i_seq=agentic-traces');
       },
     },
     analytics: {

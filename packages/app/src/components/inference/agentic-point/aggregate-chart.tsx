@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { ChartHover, type HoverItem } from './chart-hover';
 import { ChartEmpty, PERCENTILE_COLORS } from './chart-shared';
 
-export type PercentileKey = 'mean' | 'p50' | 'p75' | 'p90' | 'p99';
+export type PercentileKey = 'mean' | 'p50' | 'p75' | 'p90' | 'p95' | 'p99';
 
 interface PercentileLine {
   key: PercentileKey;
@@ -19,6 +19,7 @@ const PERCENTILE_LINES: PercentileLine[] = [
   { key: 'p50', label: 'P50', color: PERCENTILE_COLORS.p50 },
   { key: 'p75', label: 'P75', color: PERCENTILE_COLORS.p75 },
   { key: 'p90', label: 'P90', color: PERCENTILE_COLORS.p90 },
+  { key: 'p95', label: 'P95', color: PERCENTILE_COLORS.p95 },
   { key: 'p99', label: 'P99', color: PERCENTILE_COLORS.p99 },
 ];
 
@@ -37,7 +38,7 @@ export interface AggregatePoint {
 
 /**
  * Multi-line chart: one x-position per sibling config, one line per
- * percentile (mean/p50/p75/p90/p99). Designed for the "Aggregates across
+ * percentile (mean/p50/p75/p90/p95/p99). Designed for the "Aggregates across
  * configs" view on the agentic detail page.
  */
 export function AggregateChart({

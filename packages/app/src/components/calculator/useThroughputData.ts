@@ -262,16 +262,34 @@ export function useThroughputData(
   selectedRunDate: string,
   overlay?: OverlayInput,
   selectedPercentile: Percentile = Percentile.P90,
+  initialRows?: BenchmarkRow[],
+  enabled = true,
 ) {
+  const initialCacheScope = useMemo(
+    () =>
+      initialRows
+        ? `compare-initial:${[...new Set(initialRows.map((row) => row.hardware))].toSorted().join(',')}`
+        : undefined,
+    [initialRows],
+  );
   // Reuse the same API + React Query cache as the inference charts
   const {
     data: allRows,
     isLoading: queryLoading,
     error: queryError,
-  } = useBenchmarks(selectedModel, selectedRunDate, true, undefined, undefined, {
-    type: 'calculator',
-    sequence: selectedSequence,
-  });
+  } = useBenchmarks(
+    selectedModel,
+    selectedRunDate,
+    enabled,
+    undefined,
+    undefined,
+    {
+      type: 'calculator',
+      sequence: selectedSequence,
+      ...(initialCacheScope ? { cacheScope: initialCacheScope } : {}),
+    },
+    initialRows,
+  );
 
   const loading = queryLoading || !allRows;
   const error = queryError ? queryError.message : null;

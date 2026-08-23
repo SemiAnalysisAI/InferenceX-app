@@ -107,8 +107,8 @@ describe('PointSummary', () => {
     );
     localeState.pathname = '/inference/agentic/206885';
 
-    expect(html).toContain('卸载类型');
-    expect(html).toContain('KV 卸载引擎');
+    expect(html).toContain('offload 类型');
+    expect(html).toContain('KV offload 引擎');
     expect(html).toContain('HiCache');
     expect(html).toContain('路由器');
     expect(html).toContain('SGLang Router 0.3.2');

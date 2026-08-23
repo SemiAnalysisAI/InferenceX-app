@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 import {
   ModelSelector,
@@ -107,6 +108,22 @@ describe('Chart Selectors', () => {
       cy.contains('Updated at a lower priority because these models are irrelevant.').should(
         'be.visible',
       );
+    });
+
+    it('localizes model category labels and reasons on Chinese routes', () => {
+      cy.mount(
+        <PathnameContext.Provider value="/zh/inference">
+          <ModelSelectorHarness />
+        </PathnameContext.Provider>,
+      );
+      cy.get('[data-testid="model-selector"]').click();
+      cy.contains('维护模式').should('be.visible');
+      cy.contains('已弃用').should('be.visible');
+      cy.contains('Maintenance Mode').should('not.exist');
+      cy.get('[data-testid="selector-category-maintenance-mode-info"]').trigger('pointermove', {
+        pointerType: 'mouse',
+      });
+      cy.contains('这些模型的相关性较低，因此以较低优先级更新。').should('be.visible');
     });
   });
 

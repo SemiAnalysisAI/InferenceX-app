@@ -9,60 +9,12 @@ import {
   type CollectiveXRunSummary,
   type CollectiveXVersion,
 } from '@/components/collectivex/types';
-import type { WorkerPower } from '@/components/inference/types';
+import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
+import type { EvalRow } from '@semianalysisai/inferencex-db/queries/evaluations';
 
 import type { SubmissionsResponse } from './submissions-types';
 
-export interface BenchmarkRow {
-  /** Stable per-point id from benchmark_results; used for agentic detail lookups. */
-  id: number;
-  hardware: string;
-  framework: string;
-  model: string;
-  precision: string;
-  spec_method: string;
-  disagg: boolean;
-  is_multinode: boolean;
-  prefill_tp: number;
-  prefill_ep: number;
-  prefill_dp_attention: boolean;
-  prefill_num_workers: number;
-  decode_tp: number;
-  decode_ep: number;
-  decode_dp_attention: boolean;
-  decode_num_workers: number;
-  num_prefill_gpu: number;
-  num_decode_gpu: number;
-  benchmark_type: string;
-  // Null for agentic_traces rows; numeric for single_turn fixed-seq rows.
-  isl: number | null;
-  osl: number | null;
-  conc: number;
-  /** KV-cache offload mode. Defaults to 'off' for fixed-sequence rows. */
-  offload_mode: string;
-  image: string | null;
-  /** Producer-generated complete-recipe identity; null/absent on legacy rows. */
-  recipe_fingerprint?: string | null;
-  metrics: Record<string, number>;
-  /**
-   * Per-worker measured power for multinode / disagg runs. The runner emits
-   * this as a JSONB sibling of the scalar metrics; the API layer surfaces it
-   * as a separate field here so the scalar `metrics` index signature can stay
-   * `Record<string, number>` and existing `m.x ?? 0` call sites keep narrowing
-   * cleanly. Undefined for single-node runs and any run predating
-   * aggregate_power.py.
-   */
-  workers?: WorkerPower[];
-  date: string;
-  /** Internal workflow identity used to keep merged agentic curves within one run. */
-  workflow_run_id?: number;
-  run_started_at?: string | null;
-  run_url: string | null;
-  /** Logical curve snapshot; producer date/run fields above retain point provenance. */
-  curve_date?: string;
-  curve_workflow_run_id?: number;
-  curve_run_started_at?: string | null;
-}
+export type { BenchmarkRow, EvalRow };
 
 export interface WorkflowRunRow {
   github_run_id: number;
@@ -126,34 +78,6 @@ export interface ReliabilityRow {
   date: string;
   n_success: number;
   total: number;
-}
-
-export interface EvalRow {
-  id: number;
-  config_id: number;
-  hardware: string;
-  framework: string;
-  model: string;
-  precision: string;
-  spec_method: string;
-  disagg: boolean;
-  is_multinode: boolean;
-  prefill_tp: number;
-  prefill_ep: number;
-  prefill_dp_attention: boolean;
-  prefill_num_workers: number;
-  decode_tp: number;
-  decode_ep: number;
-  decode_dp_attention: boolean;
-  decode_num_workers: number;
-  num_prefill_gpu: number;
-  num_decode_gpu: number;
-  task: string;
-  date: string;
-  conc: number | null;
-  metrics: Record<string, number>;
-  timestamp: string;
-  run_url: string | null;
 }
 
 async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
@@ -408,12 +332,12 @@ export interface LatestImageRow {
   date: string;
 }
 
-export function fetchLatestImages() {
-  return fetchJson<LatestImageRow[]>('/api/v1/latest-images');
+export function fetchLatestImages(signal?: AbortSignal) {
+  return fetchJson<LatestImageRow[]>('/api/v1/latest-images', signal);
 }
 
 export type FrameworkReleases = Record<string, string | null>;
 
-export function fetchFrameworkReleases() {
-  return fetchJson<FrameworkReleases>('/api/v1/framework-releases');
+export function fetchFrameworkReleases(signal?: AbortSignal) {
+  return fetchJson<FrameworkReleases>('/api/v1/framework-releases', signal);
 }

@@ -2,7 +2,7 @@
 
 import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useLocale } from '@/lib/use-locale';
 
 import type { HardwareConfig } from '@/components/inference/types';
@@ -37,15 +37,29 @@ import type {
 const OVERLAY_STRINGS = {
   en: {
     unofficialRun: 'UNOFFICIAL RUN',
-    branch: 'Branch',
+    branch: 'Branch:',
+    dismiss: 'Click elsewhere to dismiss',
     viewRun: 'View workflow run',
     clamped: 'Outside measured range — showing nearest data point',
+    parallelism: 'Parallelism:',
+    cost: 'Cost:',
+    concurrency: 'Concurrency:',
+    precision: 'Precision:',
+    disaggregated: 'Disaggregated:',
+    yes: 'Yes',
   },
   zh: {
     unofficialRun: '非官方运行',
-    branch: '分支',
+    branch: '分支：',
+    dismiss: '点击其他区域关闭',
     viewRun: '查看工作流运行',
     clamped: '超出实测范围——显示最接近的数据点',
+    parallelism: '并行策略：',
+    cost: '成本：',
+    concurrency: '并发数：',
+    precision: '精度：',
+    disaggregated: '分离式：',
+    yes: '是',
   },
 } as const;
 
@@ -321,7 +335,7 @@ export function generateTooltipHTML(
 
   let parallelismHtml: string;
   if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
-    parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Parallelism:</strong> ${dpAttn ? 'DEP' : 'TEP'}${tp}</div>`;
+    parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.parallelism}</strong> ${dpAttn ? 'DEP' : 'TEP'}${tp}</div>`;
   } else if (ep !== null && ep !== undefined && ep > 1) {
     parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP:</strong> ${tp}, <strong>EP:</strong> ${ep}${dpAttn ? ', <strong>DPA:</strong> True' : ''}</div>`;
   } else {
@@ -351,7 +365,7 @@ export function generateTooltipHTML(
 
   const overlayBranchHtml =
     d.isOverlay && d.runLabel
-      ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.branch}:</strong> ${escapeHtml(d.runLabel)}</div>`
+      ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.branch}</strong> ${escapeHtml(d.runLabel)}</div>`
       : '';
   const overlayHeaderHtml = d.isOverlay
     ? `<div style="color: var(--destructive, #ef4444); font-size: 11px; font-weight: 600; margin-bottom: 4px;">${overlayStrings.unofficialRun}</div>${overlayBranchHtml}`
@@ -359,7 +373,7 @@ export function generateTooltipHTML(
 
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 320px; pointer-events: auto; user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${overlayStrings.dismiss}</div>` : ''}
       ${overlayHeaderHtml}
       <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">
         ${label}
@@ -369,17 +383,17 @@ export function generateTooltipHTML(
         <strong>${metricName}:</strong> ${metricDisplay}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>Cost:</strong> $${costValue.toFixed(3)}${costLabel}
+        <strong>${overlayStrings.cost}</strong> $${costValue.toFixed(3)}${costLabel}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>tok/s/MW:</strong> ${getTpPerMwForType(d, costType).toFixed(0)}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>Concurrency:</strong> ~${d.concurrency}
+        <strong>${overlayStrings.concurrency}</strong> ~${d.concurrency}
       </div>
-      ${precision ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Precision:</strong> ${escapeHtml(precision.toUpperCase())}</div>` : ''}
+      ${precision ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.precision}</strong> ${escapeHtml(precision.toUpperCase())}</div>` : ''}
       ${parallelismHtml}
-      ${disagg ? '<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Disaggregated:</strong> Yes</div>' : ''}
+      ${disagg ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.disaggregated}</strong> ${overlayStrings.yes}</div>` : ''}
       ${runLinkHtml}
     </div>
   `;
@@ -455,12 +469,15 @@ export default function ThroughputBarChart({
   // Color resolution: unofficial-run overlay bars take the run's palette color
   // (so they match the banner + legend swatch — see lib/overlay-run-style.ts);
   // official bars prefer the dynamic colorResolver, falling back to static config.
-  const resolveBarColor = (d: InterpolatedResult) =>
-    d.isOverlay
-      ? overlayRunColor(d.runIndex ?? 0)
-      : colorResolver
-        ? colorResolver(d.hwKey)
-        : getColor();
+  const resolveBarColor = useCallback(
+    (datum: InterpolatedResult) =>
+      datum.isOverlay
+        ? overlayRunColor(datum.runIndex ?? 0)
+        : colorResolver
+          ? colorResolver(datum.hwKey)
+          : getColor(),
+    [colorResolver],
+  );
 
   // Stable refs to avoid re-running the D3 effect
   const hoveredBarXRef = useRef(0);
@@ -505,6 +522,60 @@ export default function ThroughputBarChart({
     [sortedResults],
   );
 
+  const dataIdentity = useMemo(
+    () => JSON.stringify(sortedResults.map((datum) => datum.resultKey).toSorted()),
+    [sortedResults],
+  );
+  const metricIdentity = useMemo(
+    () =>
+      JSON.stringify({
+        bars: sortedResults.map((datum) =>
+          JSON.stringify([
+            datum.resultKey,
+            getMetricValue(datum, barMetric, costType),
+            getValueLabel(datum, barMetric, mode, costType),
+            getCostForType(datum, costType),
+            getThroughputForType(datum, costType),
+            getLabel(datum, hardwareConfig),
+          ]),
+        ),
+        barMetric,
+        costType,
+        mode,
+        maxBarValue,
+        yDomain,
+      }),
+    [barMetric, costType, hardwareConfig, maxBarValue, mode, sortedResults, yDomain],
+  );
+  const paletteIdentity = useMemo(
+    () =>
+      JSON.stringify(
+        sortedResults
+          .map((datum) => JSON.stringify([datum.resultKey, resolveBarColor(datum)]))
+          .toSorted(),
+      ),
+    [resolveBarColor, sortedResults],
+  );
+  const xScaleConfig = useMemo(
+    () => ({ type: 'linear' as const, domain: [0, maxBarValue] as [number, number] }),
+    [maxBarValue],
+  );
+  const yScaleConfig = useMemo(
+    () => ({ type: 'band' as const, domain: yDomain, padding: 0.3 }),
+    [yDomain],
+  );
+  const zoomConfig = useMemo(
+    () => ({
+      enabled: true,
+      axes: 'x' as const,
+      scaleExtent: [0.1, 1] as [number, number],
+      rescaleX: (xScale: ContinuousScale, transform: d3.ZoomTransform) =>
+        xScale.copy().domain([0, maxBarValue / transform.k]) as ContinuousScale,
+      customTransformStorage: (transform: d3.ZoomTransform) => d3.zoomIdentity.scale(transform.k),
+    }),
+    [maxBarValue],
+  );
+
   // ── Layers ──
 
   const layers = useMemo(() => {
@@ -526,6 +597,7 @@ export default function ThroughputBarChart({
     const labelLayer: CustomLayerConfig = {
       type: 'custom',
       key: 'bar-labels',
+      displayIdentity: paletteIdentity,
       render: (zoomGroup, ctx) => {
         const xScale = ctx.xScale as d3.ScaleLinear<number, number>;
         const yScale = ctx.yScale as d3.ScaleBand<string>;
@@ -570,6 +642,20 @@ export default function ThroughputBarChart({
         const barColor = (d: InterpolatedResult) => resolveBarColor(d);
         positionLabelPairs(zoomGroup, xScale, ctx.width, barMetric, costType, barColor);
       },
+      onDisplayUpdate: (zoomGroup, ctx) => {
+        const baseXScale = ctx.xScale as d3.ScaleLinear<number, number>;
+        const svgNode = ctx.layout.svg.node();
+        const transform = svgNode ? d3.zoomTransform(svgNode) : d3.zoomIdentity;
+        const currentXScale = baseXScale.copy().domain([0, maxBarValue / transform.k]);
+        positionLabelPairs(
+          zoomGroup,
+          currentXScale,
+          ctx.width,
+          barMetric,
+          costType,
+          resolveBarColor,
+        );
+      },
       onZoom: (zoomGroup, ctx) => {
         const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
         const barColor = (d: InterpolatedResult) => resolveBarColor(d);
@@ -578,46 +664,58 @@ export default function ThroughputBarChart({
     };
 
     return [barLayer, labelLayer];
-  }, [sortedResults, barMetric, costType, hardwareConfig, mode, colorResolver]);
+  }, [sortedResults, barMetric, costType, mode, maxBarValue, paletteIdentity, resolveBarColor]);
 
   // ── Tooltip ──
+  const tooltipStateRef = useRef({ hardwareConfig, mode, barMetric, costType, runUrl, locale });
+  tooltipStateRef.current = { hardwareConfig, mode, barMetric, costType, runUrl, locale };
 
   const tooltip = useMemo(
     () => ({
       rulerType: 'vertical' as const,
-      content: (d: InterpolatedResult, isPinned: boolean) =>
-        generateTooltipHTML(
-          d,
-          hardwareConfig,
-          mode,
-          barMetric,
-          costType,
-          runUrl,
+      content: (datum: InterpolatedResult, isPinned: boolean) => {
+        const state = tooltipStateRef.current;
+        return generateTooltipHTML(
+          datum,
+          state.hardwareConfig,
+          state.mode,
+          state.barMetric,
+          state.costType,
+          state.runUrl,
           isPinned,
-          OVERLAY_STRINGS[locale],
-        ),
+          OVERLAY_STRINGS[state.locale],
+        );
+      },
       getRulerX: () => hoveredBarXRef.current,
-      onHoverStart: (sel: d3.Selection<any, InterpolatedResult, any, any>) => {
-        hoveredBarXRef.current = parseFloat(sel.attr('width') || '0');
+      onHoverStart: (
+        selection: d3.Selection<SVGRectElement, InterpolatedResult, SVGGElement, unknown>,
+      ) => {
+        hoveredBarXRef.current = Number.parseFloat(selection.attr('width') || '0');
         const hasSelection = selectedBarsRef.current.size > 0;
         if (!hasSelection) {
-          sel.attr('opacity', 1).attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
+          selection
+            .attr('opacity', 1)
+            .attr('stroke', 'var(--foreground)')
+            .attr('stroke-width', 1.5);
         }
       },
-      onHoverEnd: (sel: d3.Selection<any, InterpolatedResult, any, any>, d: InterpolatedResult) => {
+      onHoverEnd: (
+        selection: d3.Selection<SVGRectElement, InterpolatedResult, SVGGElement, unknown>,
+        datum: InterpolatedResult,
+      ) => {
         const hasSelection = selectedBarsRef.current.size > 0;
-        const isSelected = selectedBarsRef.current.has(d.resultKey);
-        sel
+        const isSelected = selectedBarsRef.current.has(datum.resultKey);
+        selection
           .attr('opacity', hasSelection ? (isSelected ? 0.95 : 0.15) : 0.85)
           .attr('stroke', 'none');
       },
-      onPointClick: (d: InterpolatedResult) => {
-        onBarSelectRef.current(d.resultKey);
-        track('calculator_bar_selected', { gpu: d.hwKey, precision: d.precision });
+      onPointClick: (datum: InterpolatedResult) => {
+        onBarSelectRef.current(datum.resultKey);
+        track('calculator_bar_selected', { gpu: datum.hwKey, precision: datum.precision });
       },
       attachToLayer: 0,
     }),
-    [hardwareConfig, mode, barMetric, costType, runUrl, locale],
+    [],
   );
 
   // ── Y axis customize: map resultKey → display label, then split into two-line GPU labels ──
@@ -683,25 +781,21 @@ export default function ThroughputBarChart({
       ref={chartRef}
       chartId="calculator-chart"
       data={sortedResults}
+      dataIdentity={dataIdentity}
+      metricIdentity={metricIdentity}
+      displayIdentity={paletteIdentity}
       height={dynamicHeight}
       margin={dynamicMargin}
       watermark={getChartWatermark()}
       testId="calculator-bar-chart"
       grabCursor
       clipContent={false}
-      xScale={{ type: 'linear', domain: [0, maxBarValue] }}
-      yScale={{ type: 'band', domain: yDomain, padding: 0.3 }}
+      xScale={xScaleConfig}
+      yScale={yScaleConfig}
       xAxis={xAxisConfig}
       yAxis={yAxisConfig}
       layers={layers}
-      zoom={{
-        enabled: true,
-        axes: 'x',
-        scaleExtent: [0.1, 1],
-        rescaleX: (xScale, transform) =>
-          xScale.copy().domain([0, maxBarValue / transform.k]) as ContinuousScale,
-        customTransformStorage: (transform) => d3.zoomIdentity.scale(transform.k),
-      }}
+      zoom={zoomConfig}
       instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a bar to select"
       tooltip={tooltip}
       onRender={onRender}

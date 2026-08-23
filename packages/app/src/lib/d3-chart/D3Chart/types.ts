@@ -101,6 +101,12 @@ export interface CustomLayerConfig extends LayerBase {
         ctx: RenderContext,
       ) => d3.Selection<any, any, any, any> | void)
     | null;
+  /** Scale-neutral state for this layer; changes automatically invalidate phase 4. */
+  displayIdentity?: string;
+  /** Cheap decoration update run when this layer's display identity changes. */
+  onDisplayUpdate?:
+    | ((zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) => void)
+    | null;
   onZoom?:
     | ((zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: ZoomContext) => void)
     | null;
@@ -114,8 +120,8 @@ export type LayerConfig<T = any> =
   | LineLayerConfig
   | RooflineLayerConfig
   | BarLabelLayerConfig<T>
-  | ScatterLayerConfig<any>
-  | RadarLayerConfig<any>
+  | ScatterLayerConfig<T & { precision: string; x: number; y: number }>
+  | RadarLayerConfig<T>
   | CustomLayerConfig;
 
 // ---------------------------------------------------------------------------
@@ -203,6 +209,9 @@ export interface RenderContext {
   tooltipElement: HTMLDivElement;
   xScale: AnyScale | d3.ScaleTime<number, number>;
   yScale: AnyScale | d3.ScaleTime<number, number>;
+  /** Scales currently rendered after applying the active zoom transform. */
+  renderedXScale?: AnyScale | d3.ScaleTime<number, number>;
+  renderedYScale?: AnyScale | d3.ScaleTime<number, number>;
   width: number;
   height: number;
   /** Transition duration in ms for animated scale/domain changes. */
@@ -255,6 +264,15 @@ export interface D3ChartProps<T = any> {
   instructions?: string;
   /** When false, chart structure uses the root `g` group instead of clip-pathed zoomGroup. */
   clipContent?: boolean;
+  /**
+   * Stable identity for the set of rendered points. When supplied, coordinate
+   * changes update bound data in place instead of repeating the full join.
+   */
+  dataIdentity?: string;
+  /** Coordinate/scale invalidation key for in-place metric updates. */
+  metricIdentity?: string;
+  /** Display-only invalidation key for built-in layers and `onDisplayUpdate`. */
+  displayIdentity?: string;
 
   xScale?: ScaleConfig;
   yScale?: ScaleConfig;
@@ -273,4 +291,6 @@ export interface D3ChartProps<T = any> {
 
   /** Called after all layers render. Useful for one-off DOM manipulations. */
   onRender?: (ctx: RenderContext) => void;
+  /** Runs only for display invalidation, after structure/data/metric phases. */
+  onDisplayUpdate?: (ctx: RenderContext) => void;
 }

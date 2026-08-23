@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 import { DatePicker } from '@/components/ui/date-picker';
 
@@ -16,9 +17,11 @@ const AVAILABLE_DATES = [
 function DatePickerWrapper({
   initialDate,
   availableDates = AVAILABLE_DATES,
+  useDefaults = false,
 }: {
   initialDate?: string;
   availableDates?: string[];
+  useDefaults?: boolean;
 }) {
   const [date, setDate] = useState<string | undefined>(initialDate);
   return (
@@ -28,7 +31,7 @@ function DatePickerWrapper({
       availableDates={availableDates}
       minDate={availableDates[0]}
       maxDate={availableDates.at(-1)}
-      placeholder="Select date"
+      placeholder={useDefaults ? undefined : 'Select date'}
     />
   );
 }
@@ -117,5 +120,24 @@ describe('DatePicker', () => {
     cy.contains('Cancel').click();
     // Original date should still be shown
     cy.contains('Nov 15, 2025').should('be.visible');
+  });
+
+  it('localizes the complete dialog chrome on Chinese routes', () => {
+    cy.mount(
+      <PathnameContext.Provider value="/zh/inference">
+        <DatePickerWrapper initialDate="2025-11-15" useDefaults />
+      </PathnameContext.Provider>,
+    );
+    cy.contains('运行日期：').click();
+    cy.contains('选择运行日期').should('be.visible');
+    cy.contains('选择运行日期以查看该次运行的性能数据。').should('be.visible');
+    cy.contains('button', '前往最新日期').should('be.visible');
+    cy.contains('button', '取消').should('be.visible');
+    cy.contains('button', '应用').should('be.visible');
+    cy.get('h3.font-semibold').should('contain', '2025年11月');
+    cy.get('[role="dialog"]')
+      .should('contain.text', '关闭')
+      .and('not.contain.text', 'Cancel')
+      .and('not.contain.text', 'Close');
   });
 });

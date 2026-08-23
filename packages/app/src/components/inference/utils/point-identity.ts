@@ -23,3 +23,15 @@ export function scatterPointConfigId(point: InferenceData): string {
   key += agenticSpecDecodingKeySuffix(point);
   return key;
 }
+
+/**
+ * Stable D3 join key for an official scatter point.
+ *
+ * Date only participates when a chart is simultaneously rendering multiple
+ * date series. This preserves the long-lived identity of current-run points
+ * while preventing otherwise-identical comparison points from sharing a key.
+ */
+export function scatterPointJoinId(point: InferenceData, distinguishDates: boolean): string {
+  const configId = scatterPointConfigId(point);
+  return distinguishDates && point.date ? `${configId}|date-${point.date}` : configId;
+}

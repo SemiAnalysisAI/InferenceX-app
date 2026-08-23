@@ -14,6 +14,8 @@ export interface CalculatorUrlSeed {
   sequence?: Sequence;
   precisions?: string[];
   percentile?: Percentile;
+  runDate?: string;
+  runId?: string;
 }
 
 function pickString(value: string | string[] | undefined): string | undefined {
@@ -55,6 +57,16 @@ export function resolveCalculatorUrlSeed(
   const percentileParam = pickString(sp.i_pctl);
   if (percentileParam && (PERCENTILE_OPTIONS as readonly string[]).includes(percentileParam)) {
     seed.percentile = percentileParam as Percentile;
+  }
+
+  const runDateParam = pickString(sp.g_rundate);
+  if (runDateParam && /^\d{4}-\d{2}-\d{2}$/u.test(runDateParam)) {
+    seed.runDate = runDateParam;
+  }
+
+  const runIdParam = pickString(sp.g_runid);
+  if (runIdParam && /^[A-Za-z0-9_-]{1,64}$/u.test(runIdParam)) {
+    seed.runId = runIdParam;
   }
 
   return seed;

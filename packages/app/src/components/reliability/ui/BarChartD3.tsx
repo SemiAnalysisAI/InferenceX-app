@@ -14,6 +14,7 @@ import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-marg
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import type { ModelSuccessRateData } from '@/components/reliability/types';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { type Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 import ChartLegend from '@/components/ui/chart-legend';
 
@@ -21,15 +22,35 @@ type ChartItem = ModelSuccessRateData & { modelLabel: string };
 
 const BASE_MARGIN = { top: 24, right: 24, bottom: 40 };
 
-const generateReliabilityTooltipContent = (data: ChartItem, isPinned: boolean): string => {
+const TOOLTIP_STRINGS = {
+  en: {
+    dismiss: 'Click elsewhere to dismiss',
+    successRate: 'Success Rate:',
+    successful: 'Successful:',
+    totalRuns: 'Total Runs:',
+  },
+  zh: {
+    dismiss: '点击其他区域关闭',
+    successRate: '成功率：',
+    successful: '成功次数：',
+    totalRuns: '总运行次数：',
+  },
+} as const;
+
+const generateReliabilityTooltipContent = (
+  data: ChartItem,
+  isPinned: boolean,
+  locale: Locale = 'en',
+): string => {
+  const t = TOOLTIP_STRINGS[locale];
   const modelLabel = getHardwareConfig(data.model).label;
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
       <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${modelLabel}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Success Rate:</strong> ${data.successRate.toFixed(2)}%</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Successful:</strong> ${data.n_success}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px;"><strong>Total Runs:</strong> ${data.total}</div>
+      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${t.successRate}</strong> ${data.successRate.toFixed(2)}%</div>
+      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${t.successful}</strong> ${data.n_success}</div>
+      <div style="color: var(--muted-foreground); font-size: 11px;"><strong>${t.totalRuns}</strong> ${data.total}</div>
     </div>
   `;
 };
@@ -157,6 +178,88 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
     [chartData],
   );
 
+  const dataIdentity = useMemo(
+    () =>
+      JSON.stringify(
+        sortedChartData.map((datum) => JSON.stringify([datum.model, datum.modelLabel])).toSorted(),
+      ),
+    [sortedChartData],
+  );
+  const metricIdentity = useMemo(
+    () =>
+      JSON.stringify(
+        sortedChartData
+          .map((datum) =>
+            JSON.stringify([
+              datum.model,
+              datum.modelLabel,
+              datum.successRate,
+              datum.n_success,
+              datum.total,
+            ]),
+          )
+          .toSorted(),
+      ),
+    [sortedChartData],
+  );
+  const paletteIdentity = useMemo(
+    () =>
+      JSON.stringify(
+        sortedChartData
+          .map((datum) => JSON.stringify([datum.model, getCssColor(resolveColor(datum.model))]))
+          .toSorted(),
+      ),
+    [getCssColor, resolveColor, sortedChartData],
+  );
+  // Reverse so first in sort order appears at top (band scale range is [height, 0]).
+  const yDomain = useMemo(
+    () => [...sortedChartData].toReversed().map((datum) => datum.modelLabel),
+    [sortedChartData],
+  );
+  const xScaleConfig = useMemo(
+    () => ({ type: 'linear' as const, domain: [0, 100] as [number, number] }),
+    [],
+  );
+  const yScaleConfig = useMemo(
+    () => ({ type: 'band' as const, domain: yDomain, padding: 0.15 }),
+    [yDomain],
+  );
+  const zoomConfig = useMemo(
+    () => ({
+      enabled: true,
+      axes: 'x' as const,
+      scaleExtent: [0.1, 1] as [number, number],
+      rescaleX: (xScale: ContinuousScale, transform: d3.ZoomTransform) =>
+        xScale.copy().domain([0, 100 / transform.k]) as ContinuousScale,
+      customTransformStorage: (transform: d3.ZoomTransform) => d3.zoomIdentity.scale(transform.k),
+    }),
+    [],
+  );
+  const tooltipConfig = useMemo(
+    () => ({
+      rulerType: 'vertical' as const,
+      content: (datum: ChartItem, isPinned: boolean) =>
+        generateReliabilityTooltipContent(datum, isPinned, locale),
+      getRulerX: () => hoveredBarXRef.current,
+      getRulerY: (
+        datum: ChartItem,
+        scale: d3.ScaleLinear<number, number> | d3.ScaleLogarithmic<number, number>,
+      ) => {
+        const bandScale = scale as unknown as d3.ScaleBand<string>;
+        return (bandScale(datum.modelLabel) ?? 0) + bandScale.bandwidth() / 2;
+      },
+      onHoverStart: (selection: d3.Selection<SVGRectElement, ChartItem, SVGGElement, unknown>) => {
+        hoveredBarXRef.current = Number.parseFloat(selection.attr('width') || '0');
+        selection.attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
+      },
+      onHoverEnd: (selection: d3.Selection<SVGRectElement, ChartItem, SVGGElement, unknown>) => {
+        selection.attr('stroke', 'none');
+      },
+      attachToLayer: 0,
+    }),
+    [locale],
+  );
+
   const dynamicHeight = useMemo(() => {
     const barCount = sortedChartData.length || 1;
     return Math.max(600, barCount * 45 + 80);
@@ -166,6 +269,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
     (): LayerConfig<ChartItem>[] => [
       {
         type: 'horizontalBar',
+        key: 'bars',
         data: sortedChartData,
         config: {
           getY: (d) => d.modelLabel,
@@ -179,6 +283,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
       {
         type: 'custom',
         key: 'bar-labels',
+        displayIdentity: paletteIdentity,
         render: (group, ctx) => {
           const yScale = ctx.yScale as d3.ScaleBand<string>;
 
@@ -212,19 +317,22 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
             getCssColor(resolveColor(d.model)),
           );
         },
+        onDisplayUpdate: (group, ctx) => {
+          const baseXScale = ctx.xScale as d3.ScaleLinear<number, number>;
+          const svgNode = ctx.layout.svg.node();
+          const transform = svgNode ? d3.zoomTransform(svgNode) : d3.zoomIdentity;
+          const currentXScale = baseXScale.copy().domain([0, 100 / transform.k]);
+          positionLabelPairs(group, currentXScale, (datum) =>
+            getCssColor(resolveColor(datum.model)),
+          );
+        },
         onZoom: (group, ctx) => {
           const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
           positionLabelPairs(group, newXScale, (d) => getCssColor(resolveColor(d.model)));
         },
       },
     ],
-    [sortedChartData, getCssColor, resolveColor],
-  );
-
-  // Reverse so first in sort order appears at top (band scale range is [height, 0])
-  const yDomain = useMemo(
-    () => [...sortedChartData].toReversed().map((d) => d.modelLabel),
-    [sortedChartData],
+    [sortedChartData, getCssColor, paletteIdentity, resolveColor],
   );
 
   const yAxisConfig = useMemo(() => ({ customize: twoRowYAxisLabels() }), []);
@@ -260,6 +368,9 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
       <D3Chart<ChartItem>
         chartId="reliability-chart"
         data={sortedChartData}
+        dataIdentity={dataIdentity}
+        metricIdentity={metricIdentity}
+        displayIdentity={paletteIdentity}
         height={dynamicHeight}
         margin={chartMargin}
         watermark="logo"
@@ -268,36 +379,13 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
         caption={caption}
         noDataOverlay={emptyOverlay}
         instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Hover for details"
-        xScale={{ type: 'linear', domain: [0, 100] }}
-        yScale={{ type: 'band', domain: yDomain, padding: 0.15 }}
+        xScale={xScaleConfig}
+        yScale={yScaleConfig}
         xAxis={xAxisConfig}
         yAxis={yAxisConfig}
         layers={layers}
-        zoom={{
-          enabled: true,
-          axes: 'x',
-          scaleExtent: [0.1, 1],
-          rescaleX: (xScale, transform) =>
-            xScale.copy().domain([0, 100 / transform.k]) as ContinuousScale,
-          customTransformStorage: (transform) => d3.zoomIdentity.scale(transform.k),
-        }}
-        tooltip={{
-          rulerType: 'vertical',
-          content: generateReliabilityTooltipContent,
-          getRulerX: () => hoveredBarXRef.current,
-          getRulerY: (d, ys) => {
-            const bandScale = ys as unknown as d3.ScaleBand<string>;
-            return (bandScale(d.modelLabel) ?? 0) + bandScale.bandwidth() / 2;
-          },
-          onHoverStart: (sel) => {
-            hoveredBarXRef.current = parseFloat(sel.attr('width') || '0');
-            sel.attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
-          },
-          onHoverEnd: (sel) => {
-            sel.attr('stroke', 'none');
-          },
-          attachToLayer: 0,
-        }}
+        zoom={zoomConfig}
+        tooltip={tooltipConfig}
         legendElement={
           <ChartLegend
             variant="sidebar"

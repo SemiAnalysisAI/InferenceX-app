@@ -53,11 +53,15 @@ Badges change based on metric because showing power badges when the metric is "C
 - **Cost metric**: TCO $/GPU/hr badges (assumed hourly rates per GPU, sourced from SemiAnalysis AI Cloud TCO Model)
 - **tok/s/MW metric**: Power/GPU badges (assumed power draw per GPU, sourced from SemiAnalysis Datacenter Industry Model)
 
-## Why No Separate Context Provider
+## Provider and State Ownership
 
-The calculator reuses `GlobalStateContext` (model, run date) and `InferenceChartContext` (sequence, precisions). Calculator-specific state (cost provider, token type, bar metric, target interactivity, selected bars) is local `useState`.
+The calculator route parses its URL seed on the server and mounts the sole
+`GlobalFilterProvider` for calculator model, sequence, precision, date, and run state.
+`DashboardShell` deliberately does not mount a second global provider on this route.
 
-Adding another context provider to the nesting hierarchy would increase re-render surface for unrelated tabs. Since calculator state doesn't need to be shared, local state is simpler and more performant.
+Calculator-specific visibility, target/input, metric, and selected-bar transitions are
+owned by one local reducer. Derived ranges and valid selections are computed from current
+data rather than copied back through reconciliation effects.
 
 ## Bar Selection & Comparison
 

@@ -1,4 +1,5 @@
 import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
+import { agenticMetrics } from '../support/agentic-fixtures';
 
 // This spec exercises the agentic x-axis modes, which only exist when the
 // selected model resolves to the Agentic scenario. The default e2e
@@ -11,36 +12,6 @@ import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2
 // where availability opens the agentic scenario on its own.
 const DEFAULT_MODEL_DB_KEY = 'dsv4'; // DeepSeek-V4-Pro is the default model
 const AGENTIC_DATE = '2026-06-12';
-
-// Percentile ladder for one metric family (median/p75/p90/p95/p99/std).
-const percentileLadder = (prefix: string, base: number): Record<string, number> => ({
-  [`median_${prefix}`]: base,
-  [`p75_${prefix}`]: base * 1.2,
-  [`p90_${prefix}`]: base * 1.5,
-  [`p95_${prefix}`]: base * 1.7,
-  [`p99_${prefix}`]: base * 2.2,
-  [`std_${prefix}`]: base * 0.3,
-});
-
-const agenticMetrics = (conc: number): Record<string, number> => {
-  const scale = conc / 16;
-  const itl = 0.011 * scale;
-  return {
-    ...percentileLadder('ttft', 0.4 * scale),
-    ...percentileLadder('tpot', 0.012 * scale),
-    ...percentileLadder('itl', itl),
-    ...percentileLadder('e2el', 8 * scale),
-    median_intvty: 1 / itl,
-    p75_intvty: 1 / (itl * 1.2),
-    p90_intvty: 1 / (itl * 1.5),
-    p99_intvty: 1 / (itl * 2.2),
-    std_intvty: (1 / itl) * 0.1,
-    tput_per_gpu: 950 / Math.sqrt(scale),
-    output_tput_per_gpu: 210,
-    input_tput_per_gpu: 740,
-    total_tput_tps: 7600 * conc * 0.05,
-  };
-};
 
 const agenticGpus = [
   { hardware: 'b200', framework: 'vllm', disagg: false },
@@ -256,10 +227,13 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     );
   });
 
-  it('defaults to parallelism labels without line labels for the agentic view', () => {
+  it('defaults to parallelism, point, and line labels for the agentic view', () => {
+    // Line labels name the curve and point labels name the point, so the
+    // agentic view turns on both — it differs from fixed-seq only in the
+    // parallelism and point labels.
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
   });
 
   it('honors explicit label URL overrides for the agentic view', () => {
@@ -267,7 +241,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     // Fresh page load → fresh React Query cache → the default E2E Normalized Interactivity
     // mode refetches derived metrics.
     interceptDerivedAgenticMetrics();
-    cy.visit('/inference?i_seq=agentic-traces&i_label=0&i_advlabel=0&i_linelabel=1', {
+    cy.visit('/inference?i_seq=agentic-traces&i_label=0&i_advlabel=0&i_linelabel=0', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -276,7 +250,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
   });
 
   it('switches the x-axis to TTFT and updates the heading', () => {

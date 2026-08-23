@@ -1,15 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useReducer, type Dispatch, type SetStateAction } from 'react';
 
 import { Button } from '@/components/ui/button';
+import type { Locale } from '@/lib/i18n';
+import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
 
-const DISPLAY_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-});
+const DISPLAY_DATE_FORMATTERS: Record<Locale, Intl.DateTimeFormat> = {
+  en: new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }),
+  zh: new Intl.DateTimeFormat('zh-CN', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }),
+};
 
 export interface CalendarDateBounds {
   minAllowedDate: Date;
@@ -40,6 +49,31 @@ export interface CalendarMonthPanelProps {
 
 type CalendarMonthResetDep = string | number | boolean | null | undefined;
 
+interface CalendarMonthState {
+  resetKey: string;
+  currentMonth: Date;
+}
+
+type CalendarMonthAction =
+  | { type: 'reset'; resetKey: string; currentMonth: Date }
+  | { type: 'set'; currentMonth: SetStateAction<Date> };
+
+function calendarMonthReducer(
+  state: CalendarMonthState,
+  action: CalendarMonthAction,
+): CalendarMonthState {
+  if (action.type === 'reset') {
+    return { resetKey: action.resetKey, currentMonth: action.currentMonth };
+  }
+  return {
+    ...state,
+    currentMonth:
+      typeof action.currentMonth === 'function'
+        ? action.currentMonth(state.currentMonth)
+        : action.currentMonth,
+  };
+}
+
 export function parseCalendarDate(dateStr: string): Date {
   if (dateStr.includes('-') && !dateStr.includes(',')) {
     const [year, month, day] = dateStr.split('-');
@@ -58,8 +92,8 @@ export function formatCalendarDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function formatDisplayDate(dateStr: string): string {
-  return DISPLAY_DATE_FORMATTER.format(parseCalendarDate(dateStr));
+export function formatDisplayDate(dateStr: string, locale: Locale = 'en'): string {
+  return DISPLAY_DATE_FORMATTERS[locale].format(parseCalendarDate(dateStr));
 }
 
 export function getLatestSelectableDate(availableDates?: string[], maxDate?: string): string {
@@ -158,18 +192,28 @@ export function useCalendarMonth(
   maxAllowedDate: Date,
   deps: readonly CalendarMonthResetDep[],
 ) {
-  const resetMonthKey = formatCalendarDate(
-    getInitialCalendarMonth(selectedDate, availableDates, maxAllowedDate),
-  );
-  const availableDatesKey = availableDates?.join(',') ?? '';
-  const maxAllowedDateKey = formatCalendarDate(maxAllowedDate);
-  const selectionResetKey = deps.map((dep) => String(dep ?? '')).join('\u001F');
-  const [currentMonth, setCurrentMonth] = useState(() => parseCalendarDate(resetMonthKey));
+  const initialMonth = getInitialCalendarMonth(selectedDate, availableDates, maxAllowedDate);
+  const resetMonthKey = formatCalendarDate(initialMonth);
+  const resetKey = [
+    availableDates?.join(',') ?? '',
+    formatCalendarDate(maxAllowedDate),
+    resetMonthKey,
+    deps.map((dep) => String(dep ?? '')).join('\u001F'),
+  ].join('\u001E');
+  const [state, dispatch] = useReducer(calendarMonthReducer, {
+    resetKey,
+    currentMonth: initialMonth,
+  });
 
-  useEffect(() => {
-    setCurrentMonth(parseCalendarDate(resetMonthKey));
-  }, [availableDatesKey, maxAllowedDateKey, resetMonthKey, selectionResetKey]);
+  let currentMonth = state.currentMonth;
+  if (state.resetKey !== resetKey) {
+    currentMonth = initialMonth;
+    dispatch({ type: 'reset', resetKey, currentMonth });
+  }
 
+  const setCurrentMonth: Dispatch<SetStateAction<Date>> = (nextMonth) => {
+    dispatch({ type: 'set', currentMonth: nextMonth });
+  };
   return [currentMonth, setCurrentMonth] as const;
 }
 
@@ -228,8 +272,18 @@ export function CalendarMonthPanel({
   onDateClick,
   onDateHover,
 }: CalendarMonthPanelProps) {
-  const monthName = month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const locale = useLocale();
+  const monthName = month.toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', {
+    month: 'long',
+    year: 'numeric',
+  });
+  const weekdays =
+    locale === 'zh'
+      ? ['日', '一', '二', '三', '四', '五', '六']
+      : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
   const days = getCalendarMonthDays(month);
+  const previousMonthLabel = locale === 'zh' ? '上个月' : 'Previous month';
+  const nextMonthLabel = locale === 'zh' ? '下个月' : 'Next month';
 
   return (
     <div className="space-y-4">
@@ -241,6 +295,7 @@ export function CalendarMonthPanel({
             onClick={onPreviousMonth}
             disabled={isDisabled || !canGoPrevious}
             className={cn(!canGoPrevious && 'opacity-30')}
+            aria-label={previousMonthLabel}
           >
             ‹
           </Button>
@@ -255,6 +310,7 @@ export function CalendarMonthPanel({
             onClick={onNextMonth}
             disabled={isDisabled || !canGoNext}
             className={cn(!canGoNext && 'opacity-30')}
+            aria-label={nextMonthLabel}
           >
             ›
           </Button>
@@ -264,7 +320,7 @@ export function CalendarMonthPanel({
       </div>
 
       <div className="grid grid-cols-7 gap-2">
-        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((weekday) => (
+        {weekdays.map((weekday) => (
           <div key={weekday} className="text-center text-xs font-medium text-muted-foreground py-2">
             {weekday}
           </div>

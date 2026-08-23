@@ -91,6 +91,30 @@ PostHog autocapture tracks all interactions automatically. Named `track()` calls
 
 **Important**: Only flag NEW or MODIFIED interactive elements in the PR diff. Do NOT flag existing code that was not changed in this PR.
 
+## 💡 NON-BLOCKING: Simplified Chinese copy quality
+
+The `/zh` side is hand-authored. **If the complete diff touches any user-visible Chinese string, load `.claude/skills/review-zh-copy/SKILL.md` and follow it.** Search the whole diff rather than relying on `zh` in a filename: Chinese also lives in component-local dictionaries, locale ternaries, metadata, option registries, tooltips, states, and feature-gated UI.
+
+Read `docs/chinese-copy.md` completely. Review the full UI element or paragraph together with its English source, intended meaning, surface, and rendered context. Evaluate semantic fidelity and natural Chinese as independent gates; fluent Chinese that changes the source is still wrong.
+
+**Chinese-copy findings are always non-blocking while the skill says `Operating mode: advisory`.** Do not label them `🔴 BLOCKING`, submit a request-changes review for them, or otherwise hold another contributor's merge. Do not mention `@edwingao28` for a clean review, routine coverage, or an ordinary wording or naturalness suggestion. Mention `@edwingao28` only for a high-confidence semantic or factual error, changed attribution or speaker voice, or high-impact ambiguity that cannot be resolved from the source and context. Label that finding `Needs Chinese maintainer confirmation` and ask for review. It remains a suggestion; the Chinese maintainer decides whether any follow-up is needed.
+
+Worth a suggestion:
+
+- Chinese that follows English clause order or modifier chains closely enough to sound translated.
+- A rendering that changes or loses the source meaning — fluent Chinese can still be a mistranslation, and that is the more expensive error.
+- Register wrong for the surface: marketing voice in a UI label, invented internet slang, or an attributed quote rewritten into a voice its speaker would not use.
+
+Not worth a comment:
+
+- Wording you would have phrased differently when the existing rendering is accurate and natural.
+- Long Chinese sentences per se. Length is not evidence of translationese.
+- Established English technical terms and phrases that Chinese ML infrastructure engineers normally use in English. Keep them English in first-party UI and technical prose; decide from real industry usage and the surface, not from a closed list or capitalization. `warmup`, `seed`, and `offload` are examples, not the whole category. Chinese-first explanations may be appropriate for a broader audience, and attributed quotations preserve the speaker's wording.
+- `您` solely because it appears. Controls normally omit the pronoun, but a respectful CTA may use it intentionally.
+- Awkward Chinese the diff did not touch. Mention it separately from the review.
+
+For each finding, quote the English source, state its intended meaning and failed gate, and give a complete replacement. Never comment "this reads awkwardly" on its own. End with the changed Chinese surfaces covered and any context that could not be rendered or verified.
+
 ## 🔴 BLOCKING: Test coverage enforcement
 
 When reviewing a PR diff, check if new code was added WITHOUT corresponding tests:

@@ -1,19 +1,29 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import dynamic from 'next/dynamic';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 
-import { useInference } from '@/components/inference/InferenceContext';
+import {
+  useInferenceActions,
+  useInferenceData,
+  useInferenceDisplay,
+  useInferenceFilters,
+} from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
+import { Button } from '@/components/ui/button';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getChartWatermark, Sequence } from '@/lib/data-mappings';
-import { generateGpuDateColors } from '@/lib/dynamic-colors';
+import { generateGpuDateColors, generateHighContrastGpuDateColors } from '@/lib/dynamic-colors';
 import { useLocale } from '@/lib/use-locale';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
+import { useLogAvailability } from '@/hooks/api/use-log-availability';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -50,19 +60,30 @@ import {
   generateGPUGraphTooltipContent,
   getPointLabel,
 } from '@/components/inference/utils/tooltipUtils';
+import { scatterPointConfigId } from '@/components/inference/utils/point-identity';
 import {
   type KnownIssueAnnotation,
-  measureLegendRightInset,
-  renderKnownIssueAnnotations,
+  createKnownIssueLayer,
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
+import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
+import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import {
-  OFFLOAD_HALO_DASHARRAY,
-  OFFLOAD_HALO_RADIUS,
-  OFFLOAD_HALO_STROKE_WIDTH,
-  OffloadHaloLegendKey,
-} from '@/components/inference/ui/OffloadHaloLegendKey';
+  parallelismLabelBoxes,
+  placeLineLabels,
+  placeEndpointLineLabels,
+  renderLineLabels,
+  updateRenderedLineLabels,
+  type LineLabelSeries,
+} from '@/components/inference/ui/line-label-layer';
 import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
+import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
+
+const FixedSequenceLogDialog = dynamic(() =>
+  import('@/components/inference/log-viewer/fixed-sequence-log-dialog').then(
+    (module) => module.FixedSequenceLogDialog,
+  ),
+);
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 
@@ -86,6 +107,7 @@ const GPU_STRINGS = {
     parallelismLabels: 'Parallelism Labels',
     lineLabels: 'Line Labels',
     resetFilter: 'Reset filter',
+    quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
   },
   zh: {
     logScale: '对数缩放',
@@ -95,6 +117,7 @@ const GPU_STRINGS = {
     parallelismLabels: '并行配置标签',
     lineLabels: '曲线标签',
     resetFilter: '重置筛选',
+    quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
   },
 } as const;
 
@@ -109,38 +132,64 @@ const GPUGraph = React.memo(
     caption,
     runNumbering: providedRunNumbering,
   }: ScatterGraphProps) => {
+    const { hardwareConfig } = useInferenceData();
     const {
-      hardwareConfig,
       selectedPrecisions,
-      selectedYAxisMetric,
       selectedGPUs,
       selectedDateRange,
       selectedDates,
       selectedSequence,
+      quickFilters,
+      activeDates,
+    } = useInferenceFilters();
+    const {
+      selectedYAxisMetric,
+      hideNonOptimal,
+      showPointLabels,
+      logScale,
+      isLegendExpanded,
+      useAdvancedLabels,
+      highContrast,
+      showLineLabels,
+    } = useInferenceDisplay();
+    const {
       setSelectedDates,
       toggleActiveDate,
       removeActiveDate,
-      activeDates,
-      hideNonOptimal,
       setHideNonOptimal,
-      showPointLabels,
       setShowPointLabels,
-      logScale,
       setLogScale,
-      isLegendExpanded,
       setIsLegendExpanded,
-      useAdvancedLabels,
       setUseAdvancedLabels,
-      highContrast,
       setHighContrast,
       selectAllActiveDates,
-      showLineLabels,
       setShowLineLabels,
-    } = useInference();
+      setQuickFilterVendors,
+      setQuickFilterFrameworks,
+      setQuickFilterDeployment,
+      setQuickFilterSpec,
+    } = useInferenceActions();
     const locale = useLocale();
     const legendT = GPU_STRINGS[locale];
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
+    const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
+    const quickFilterCount =
+      quickFilters.vendors.length +
+      quickFilters.frameworks.length +
+      quickFilters.deployment.length +
+      (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
+    const clearQuickFilters = useCallback(() => {
+      setQuickFilterVendors([]);
+      setQuickFilterFrameworks([]);
+      setQuickFilterDeployment([]);
+      setQuickFilterSpec([]);
+    }, [
+      setQuickFilterVendors,
+      setQuickFilterFrameworks,
+      setQuickFilterDeployment,
+      setQuickFilterSpec,
+    ]);
     const hasOffloadHalo = useMemo(() => data.some((point) => point.offload_mode === 'on'), [data]);
 
     // Shared date+GPU pairs. `dates` holds comparison-series entries (plain dates
@@ -193,9 +242,13 @@ const GPUGraph = React.memo(
       return ids;
     }, [gpuDatePairs]);
 
+    // High contrast keys off the GPU (not `date_gpu`) so each hardware config
+    // gets exactly one hue; the dates within a config are separated by the
+    // lightness ramp built below rather than by unrelated hues.
     const { resolveColor, getCssColor } = useThemeColors({
       highContrast,
       identifiers: graphIdentifiers,
+      hcKeys: gpuDatePairs.sortedGPUs,
     });
 
     // Dynamic GPU×date color map
@@ -206,25 +259,48 @@ const GPUGraph = React.memo(
       return generateGpuDateColors(sortedGPUs, dates.length, theme);
     }, [gpuDatePairs, resolvedTheme]);
 
+    // High-contrast GPU×date color map: one iwanthue hue per GPU, ramped across
+    // the compared dates so a config's runs stay recognisably the same color
+    // while still reading oldest → newest.
+    const hcGpuDateColorMap = useMemo(() => {
+      const { dates, sortedGPUs } = gpuDatePairs;
+      if (!highContrast || sortedGPUs.length === 0 || dates.length === 0) return {};
+      const theme = resolvedTheme === 'dark' || resolvedTheme === 'minecraft' ? 'dark' : 'light';
+      const baseColors: Record<string, string> = {};
+      for (const gpu of sortedGPUs) baseColors[gpu] = getCssColor(resolveColor(gpu));
+      return generateHighContrastGpuDateColors(baseColors, dates.length, theme);
+    }, [gpuDatePairs, highContrast, resolvedTheme, resolveColor, getCssColor]);
+
     const allGraphs = useMemo(() => {
       const { dates, sortedGPUs } = gpuDatePairs;
       const result: { date: string; color: string; hwKey: string; id: string }[] = [];
       sortedGPUs.forEach((gpu) => {
         dates.forEach((date, dateIndex) => {
           const id = `${date}_${gpu}`;
-          const dynamicColor = gpuDateColorMap[`${dateIndex}_${gpu}`];
+          const compositeKey = `${dateIndex}_${gpu}`;
+          const dynamicColor = gpuDateColorMap[compositeKey];
           result.push({
             date,
             hwKey: gpu,
             id,
             color: highContrast
-              ? getCssColor(resolveColor(id))
+              ? hcGpuDateColorMap[compositeKey] || getCssColor(resolveColor(gpu))
               : dynamicColor || 'var(--foreground)',
           });
         });
       });
       return result;
-    }, [gpuDatePairs, gpuDateColorMap, highContrast, resolveColor, getCssColor]);
+    }, [gpuDatePairs, gpuDateColorMap, hcGpuDateColorMap, highContrast, resolveColor, getCssColor]);
+
+    const paletteIdentity = useMemo(
+      () =>
+        [
+          resolvedTheme ?? 'system',
+          highContrast ? 'high-contrast' : 'standard',
+          ...allGraphs.map(({ id, color }) => `${id}:${color}`),
+        ].join('|'),
+      [resolvedTheme, highContrast, allGraphs],
+    );
 
     const groupedData = useMemo(
       () =>
@@ -291,13 +367,26 @@ const GPUGraph = React.memo(
     const agenticIds = useMemo(
       () =>
         filteredData.flatMap((point) =>
-          point.benchmark_type === 'agentic_traces' && typeof point.id === 'number'
+          point.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(point.id)
             ? [point.id]
             : [],
         ),
       [filteredData],
     );
     const { data: traceAvailability } = useTraceAvailability(agenticIds);
+    const traceAvailabilityRef = useRef(traceAvailability);
+    traceAvailabilityRef.current = traceAvailability;
+
+    // Log availability applies to every persisted official point in the
+    // comparison, including fixed-sequence runs.
+    const persistedPointIds = useMemo(
+      () => filteredData.flatMap((point) => (isPersistedBenchmarkId(point.id) ? [point.id] : [])),
+      [filteredData],
+    );
+    const { data: logAvailability } = useLogAvailability(persistedPointIds);
+    const logAvailabilityRef = useRef(logAvailability);
+    logAvailabilityRef.current = logAvailability;
+    const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
 
     // Warning annotations for visible series with known upstream issues —
     // same treatment the scatter view gets, applied to the date-comparison view.
@@ -322,47 +411,25 @@ const GPUGraph = React.memo(
       [modelLabel, filteredData, allGraphs, activeDates, resolveColor, getCssColor],
     );
 
-    const drawKnownIssues = (
-      ctx: RenderContext,
-      xScale: ContinuousScale,
-      yScale: ContinuousScale,
-    ) => {
-      renderKnownIssueAnnotations(ctx.layout.g, ctx.layout.defs, {
-        chartId,
-        width: ctx.width,
-        height: ctx.height,
-        xScale,
-        yScale,
-        annotations: knownIssueAnnotations,
-        // Only measure the legend overlap when there are boxes to place —
-        // this runs on every zoom frame, and the measurement forces layout.
-        rightInset:
-          knownIssueAnnotations.length === 0
-            ? 0
-            : measureLegendRightInset(
-                chartId,
-                ctx.layout.svg.node(),
-                ctx.layout.margin.left,
-                ctx.width,
-              ),
-        background: getCssColor('--background'),
-        foreground: getCssColor('--foreground'),
-        mutedForeground: getCssColor('--muted-foreground'),
-        onLinkClick: (a) =>
-          track('inference_known_issue_clicked', {
-            hwKey: a.issue.hwKey,
-            issue: a.issue.issueRef,
+    const knownIssueLayer = useMemo(
+      () =>
+        createKnownIssueLayer(
+          () => ({
+            chartId,
+            annotations: knownIssueAnnotations,
+            background: getCssColor('--background'),
+            foreground: getCssColor('--foreground'),
+            mutedForeground: getCssColor('--muted-foreground'),
+            onLinkClick: (annotation) =>
+              track('inference_known_issue_clicked', {
+                hwKey: annotation.issue.hwKey,
+                issue: annotation.issue.issueRef,
+              }),
           }),
-      });
-    };
-    const knownIssueLayer: CustomLayerConfig = {
-      type: 'custom',
-      key: 'known-issues',
-      render: (_zoomGroup, ctx) =>
-        drawKnownIssues(ctx, ctx.xScale as ContinuousScale, ctx.yScale as ContinuousScale),
-      onZoom: (_zoomGroup, ctx) =>
-        drawKnownIssues(ctx, ctx.newXScale as ContinuousScale, ctx.newYScale as ContinuousScale),
-    };
+          paletteIdentity,
+        ),
+      [chartId, knownIssueAnnotations, getCssColor, paletteIdentity],
+    );
 
     // Compute scale domains
     const xExtent = useMemo(() => {
@@ -385,6 +452,33 @@ const GPUGraph = React.memo(
       }
       return [yMin, yExtent[1] * 1.05] as [number, number];
     }, [filteredData, logScale]);
+
+    const dataIdentity = useMemo(
+      () =>
+        filteredData
+          .map((point) => `${point.date}:${scatterPointConfigId(point)}`)
+          .toSorted()
+          .join('|'),
+      [filteredData],
+    );
+    // Tooltip-only trace availability is deliberately excluded from chart
+    // identity; the long-lived D3 content callback reads its latest value via
+    // traceAvailabilityRef.
+    const metricIdentity = useMemo(
+      () =>
+        [
+          useAdvancedLabels ? 'advanced-labels' : 'basic-labels',
+          selectedYAxisMetric,
+          `linear:${xExtent.join(',')}`,
+          `${logScale ? 'log' : 'linear'}:${yDomain.join(',')}`,
+          ...filteredData.map(
+            (point) => `${point.date}:${scatterPointConfigId(point)}:${point.x}:${point.y}`,
+          ),
+        ]
+          .toSorted()
+          .join('|'),
+      [selectedYAxisMetric, useAdvancedLabels, xExtent, logScale, yDomain, filteredData],
+    );
 
     // Color resolver for points/rooflines
     const getColor = useMemo(
@@ -419,285 +513,94 @@ const GPUGraph = React.memo(
     // same combo dedupe down to the longest roofline so the label rides the
     // line that has the most placement options. Labels track the active filter
     // (`activeDates`) so removing a series via the legend hides its label too.
-    const lineLabelLayer: CustomLayerConfig = useMemo(
-      () => ({
+    const lineLabelLayer: CustomLayerConfig = useMemo(() => {
+      const buildSeries = (): LineLabelSeries<InferenceData>[] => {
+        const bestByGraph = new Map<
+          string,
+          { key: string; graphId: string; points: InferenceData[] }
+        >();
+        for (const [key, points] of Object.entries(rooflines)) {
+          if (points.length < 2 || !isRooflineVisible(key)) continue;
+          const graphId = key.slice(0, key.lastIndexOf('_'));
+          const previous = bestByGraph.get(graphId);
+          if (!previous || points.length > previous.points.length) {
+            bestByGraph.set(graphId, { key, graphId, points });
+          }
+        }
+        return [...bestByGraph.values()].map(({ key, graphId, points }) => ({
+          key,
+          seriesId: graphId,
+          label: labelTextFor(points, runNumbering),
+          color: getRooflineColor(key),
+          points,
+        }));
+      };
+      const placeLabels = (
+        xScale: ContinuousScale,
+        yScale: ContinuousScale,
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+      ) => {
+        if (!showLineLabels) return [];
+        const series = buildSeries();
+        return chartDefinition.chartType === 'interactivity'
+          ? placeLineLabels(series, xScale, yScale, {
+              collisionWidth: 160,
+              obstacles: parallelismLabelBoxes(zoomGroup.node()),
+            })
+          : placeEndpointLineLabels(series, xScale, yScale);
+      };
+
+      return {
         type: 'custom',
         key: 'line-labels',
+        displayIdentity: `${showLineLabels ? 'visible' : 'hidden'}:${paletteIdentity}`,
         render: (zoomGroup, ctx) => {
-          // Always run the data-join so toggling the switch off cleans the DOM.
-          interface LineLabel {
-            key: string;
-            graphId: string;
-            label: string;
-            color: string;
-            x: number;
-            y: number;
-            visible: boolean;
-          }
-
-          if (!showLineLabels) {
-            zoomGroup.selectAll('.line-label').remove();
-            return;
-          }
-
-          const xScale = ctx.xScale as ContinuousScale;
-          const yScale = ctx.yScale as ContinuousScale;
-          const isInteractivity = chartDefinition.chartType === 'interactivity';
-          const LABEL_H = 18;
-          const LABEL_W = 160;
-
-          // Pick longest roofline per (date, hwKey) so we get one label per series.
-          const bestByGraph = new Map<string, { key: string; pts: InferenceData[] }>();
-          for (const [key, pts] of Object.entries(rooflines)) {
-            if (pts.length < 2) continue;
-            const graphId = key.slice(0, key.lastIndexOf('_'));
-            if (!isRooflineVisible(key)) continue;
-            const prev = bestByGraph.get(graphId);
-            if (!prev || pts.length > prev.pts.length) bestByGraph.set(graphId, { key, pts });
-          }
-
-          const lineLabels: LineLabel[] = [];
-
-          if (isInteractivity) {
-            // Greedy placement: try start → midpoint → 2/3-along → endpoint.
-            const placed: { x: number; y: number }[] = [];
-            const collides = (cx: number, cy: number) =>
-              placed.some((p) => Math.abs(p.y - cy) < LABEL_H && Math.abs(p.x - cx) < LABEL_W);
-
-            const sorted = [...bestByGraph.entries()].toSorted(
-              ([, a], [, b]) => yScale(a.pts[0].y) - yScale(b.pts[0].y),
-            );
-            for (const [graphId, { key, pts }] of sorted) {
-              const candidates = [
-                pts[Math.min(1, pts.length - 1)],
-                pts[Math.floor(pts.length / 2)],
-                pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
-                pts.at(-1)!,
-              ];
-              const labelText = labelTextFor(pts, runNumbering);
-              let placedLabel = false;
-              for (const pt of candidates) {
-                const px = xScale(pt.x);
-                const py = yScale(pt.y);
-                if (!collides(px, py)) {
-                  lineLabels.push({
-                    key,
-                    graphId,
-                    label: labelText,
-                    color: getRooflineColor(key),
-                    x: px,
-                    y: py,
-                    visible: true,
-                  });
-                  placed.push({ x: px, y: py });
-                  placedLabel = true;
-                  break;
-                }
-              }
-              if (!placedLabel) {
-                const pt = pts[0];
-                lineLabels.push({
-                  key,
-                  graphId,
-                  label: labelText,
-                  color: getRooflineColor(key),
-                  x: xScale(pt.x),
-                  y: yScale(pt.y),
-                  visible: false,
-                });
-              }
-            }
-          } else {
-            // TTFT / E2EL: endpoint labels with vertical nudge to avoid overlap.
-            for (const [graphId, { key, pts }] of bestByGraph.entries()) {
-              const pt = pts.at(-1)!;
-              lineLabels.push({
-                key,
-                graphId,
-                label: labelTextFor(pts, runNumbering),
-                color: getRooflineColor(key),
-                x: xScale(pt.x),
-                y: yScale(pt.y),
-                visible: true,
-              });
-            }
-            if (lineLabels.length > 1) {
-              const yRange = yScale.range();
-              const top = Math.min(yRange[0], yRange[1]) + LABEL_H;
-              const bottom = Math.max(yRange[0], yRange[1]) - LABEL_H;
-              lineLabels.sort((a, b) => a.y - b.y);
-              for (let pass = 0; pass < 5; pass++) {
-                for (let i = 1; i < lineLabels.length; i++) {
-                  const overlap = lineLabels[i - 1].y + LABEL_H - lineLabels[i].y;
-                  if (overlap > 0) {
-                    const half = overlap / 2;
-                    lineLabels[i - 1].y -= half;
-                    lineLabels[i].y += half;
-                  }
-                }
-                for (const l of lineLabels) {
-                  l.y = Math.max(top, Math.min(bottom, l.y));
-                }
-              }
-            }
-          }
-
-          const llSel = zoomGroup
-            .selectAll<SVGGElement, LineLabel>('.line-label')
-            .data(lineLabels, (d) => d.key)
-            .join(
-              (enter) => {
-                const g = enter
-                  .append('g')
-                  .attr('class', 'line-label')
-                  .style('pointer-events', 'none');
-                g.append('rect').attr('class', 'll-bg').attr('rx', 4).attr('ry', 4);
-                g.append('text')
-                  .attr('class', 'll-text')
-                  .attr('text-anchor', 'start')
-                  .attr('dominant-baseline', 'central')
-                  .attr('fill', 'white')
-                  .attr('font-size', '10px')
-                  .attr('font-weight', '600');
-                return g;
-              },
-              (update) => update,
-              (exit) => exit.remove(),
-            )
-            .attr('data-line-key', (d) => d.key)
-            .attr('data-graph-id', (d) => d.graphId)
-            .attr('transform', (d) => `translate(${d.x + 8},${d.y - 14})`)
-            .style('opacity', (d) => (d.visible ? 0.95 : 0));
-
-          // Size each label's background to its text in two passes — write all
-          // texts, then measure all bboxes — so the batch forces one layout
-          // instead of one per label (mirrors ScatterGraph's label loops).
-          llSel.each(function (d) {
-            d3.select(this).select<SVGTextElement>('.ll-text').text(d.label);
-          });
-          const llMeasured: { node: SVGGElement; d: LineLabel; bbox: DOMRect }[] = [];
-          llSel.each(function (d) {
-            const text = this.querySelector<SVGTextElement>('.ll-text');
-            if (text) llMeasured.push({ node: this, d, bbox: text.getBBox() });
-          });
-          for (const { node, d, bbox } of llMeasured) {
-            const px = 5;
-            const py = 3;
-            d3.select(node)
-              .select('.ll-bg')
-              .attr('x', bbox.x - px)
-              .attr('y', bbox.y - py)
-              .attr('width', bbox.width + px * 2)
-              .attr('height', bbox.height + py * 2)
-              .attr('fill', d.color);
-          }
+          renderLineLabels(
+            zoomGroup,
+            placeLabels(ctx.xScale as ContinuousScale, ctx.yScale as ContinuousScale, zoomGroup),
+            {
+              seriesAttribute: 'data-graph-id',
+              opacity: showLineLabels ? 0.95 : 0,
+            },
+          );
+        },
+        onDisplayUpdate: (zoomGroup, ctx) => {
+          const transform = d3.zoomTransform(ctx.layout.svg.node()!);
+          renderLineLabels(
+            zoomGroup,
+            placeLabels(
+              transform.rescaleX(ctx.xScale as ContinuousScale),
+              transform.rescaleY(ctx.yScale as ContinuousScale),
+              zoomGroup,
+            ),
+            {
+              seriesAttribute: 'data-graph-id',
+              opacity: showLineLabels ? 0.95 : 0,
+            },
+          );
+          zoomGroup.selectAll('.line-label').raise();
         },
         onZoom: (zoomGroup, ctx) => {
-          if (!showLineLabels) return;
-          const newXScale = ctx.newXScale as ContinuousScale;
-          const newYScale = ctx.newYScale as ContinuousScale;
-
-          // Mirror the placement algorithm with the zoomed scales so labels
-          // stay anchored to their rooflines without jumping on zoom.
-          const isInteractivity = chartDefinition.chartType === 'interactivity';
-          const LABEL_H = 18;
-          const LABEL_W = 160;
-
-          const bestByGraph = new Map<string, { key: string; pts: InferenceData[] }>();
-          for (const [key, pts] of Object.entries(rooflines)) {
-            if (pts.length < 2 || !isRooflineVisible(key)) continue;
-            const graphId = key.slice(0, key.lastIndexOf('_'));
-            const prev = bestByGraph.get(graphId);
-            if (!prev || pts.length > prev.pts.length) bestByGraph.set(graphId, { key, pts });
-          }
-
-          const zoomResults = new Map<string, { x: number; y: number; vis: boolean }>();
-          if (isInteractivity) {
-            const placed: { x: number; y: number }[] = [];
-            const collides = (cx: number, cy: number) =>
-              placed.some((p) => Math.abs(p.y - cy) < LABEL_H && Math.abs(p.x - cx) < LABEL_W);
-            const sorted = [...bestByGraph.entries()].toSorted(
-              ([, a], [, b]) => newYScale(a.pts[0].y) - newYScale(b.pts[0].y),
-            );
-            for (const [, { key, pts }] of sorted) {
-              const candidates = [
-                pts[Math.min(1, pts.length - 1)],
-                pts[Math.floor(pts.length / 2)],
-                pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
-                pts.at(-1)!,
-              ];
-              let found = false;
-              for (const pt of candidates) {
-                const px = newXScale(pt.x);
-                const py = newYScale(pt.y);
-                if (!collides(px, py)) {
-                  zoomResults.set(key, { x: px, y: py, vis: true });
-                  placed.push({ x: px, y: py });
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) {
-                zoomResults.set(key, {
-                  x: newXScale(pts[0].x),
-                  y: newYScale(pts[0].y),
-                  vis: false,
-                });
-              }
-            }
-          } else {
-            interface ZL {
-              key: string;
-              x: number;
-              y: number;
-            }
-            const zls: ZL[] = [];
-            for (const [, { key, pts }] of bestByGraph.entries()) {
-              const pt = pts.at(-1)!;
-              zls.push({ key, x: newXScale(pt.x), y: newYScale(pt.y) });
-            }
-            if (zls.length > 1) {
-              const yRange = newYScale.range();
-              const top = Math.min(yRange[0], yRange[1]) + LABEL_H;
-              const bottom = Math.max(yRange[0], yRange[1]) - LABEL_H;
-              zls.sort((a, b) => a.y - b.y);
-              for (let pass = 0; pass < 5; pass++) {
-                for (let i = 1; i < zls.length; i++) {
-                  const overlap = zls[i - 1].y + LABEL_H - zls[i].y;
-                  if (overlap > 0) {
-                    const half = overlap / 2;
-                    zls[i - 1].y -= half;
-                    zls[i].y += half;
-                  }
-                }
-                for (const z of zls) z.y = Math.max(top, Math.min(bottom, z.y));
-              }
-            }
-            for (const z of zls) zoomResults.set(z.key, { x: z.x, y: z.y, vis: true });
-          }
-
-          zoomGroup.selectAll<SVGGElement, unknown>('.line-label').each(function () {
-            const el = d3.select(this);
-            const k = el.attr('data-line-key');
-            const zl = zoomResults.get(k);
-            if (zl) {
-              el.attr('transform', `translate(${zl.x + 8},${zl.y - 14})`);
-              el.style('opacity', zl.vis ? 0.95 : 0);
-            } else {
-              el.style('opacity', 0);
-            }
-          });
+          updateRenderedLineLabels(
+            zoomGroup,
+            placeLabels(
+              ctx.newXScale as ContinuousScale,
+              ctx.newYScale as ContinuousScale,
+              zoomGroup,
+            ),
+            { opacity: showLineLabels ? 0.95 : 0 },
+          );
         },
-      }),
-      [
-        showLineLabels,
-        rooflines,
-        isRooflineVisible,
-        getRooflineColor,
-        chartDefinition.chartType,
-        runNumbering,
-      ],
-    );
+      };
+    }, [
+      showLineLabels,
+      rooflines,
+      isRooflineVisible,
+      getRooflineColor,
+      chartDefinition.chartType,
+      runNumbering,
+      paletteIdentity,
+    ]);
 
     // Dismiss tooltip when pinned point's combo is hidden
     useEffect(() => {
@@ -760,8 +663,22 @@ const GPUGraph = React.memo(
               <p className="text-xs">
                 Please change the model, sequence, precision, date range or chip selection.
               </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-4"
+                data-testid="gpu-empty-quick-filters"
+                onClick={() => {
+                  setQuickFiltersOpen(true);
+                  track('inference_quick_filters_dialog_opened', { source: 'timeline_empty' });
+                }}
+              >
+                {legendT.quickFilters(quickFilterCount)}
+              </Button>
             </div>
           </div>
+          <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
         </div>
       );
     }
@@ -770,6 +687,9 @@ const GPUGraph = React.memo(
       <D3Chart<InferenceData>
         ref={chartRef}
         chartId={chartId}
+        dataIdentity={dataIdentity}
+        metricIdentity={metricIdentity}
+        displayIdentity={`${showPointLabels}:${paletteIdentity}:${selectedPrecisions.join(',')}`}
         data={filteredData}
         margin={CHART_MARGIN}
         watermark={getChartWatermark()}
@@ -816,6 +736,7 @@ const GPUGraph = React.memo(
               },
               selectedPrecisions,
             },
+            keyFn: (point) => `${point.date}:${scatterPointConfigId(point)}`,
           },
           lineLabelLayer,
           knownIssueLayer,
@@ -848,7 +769,12 @@ const GPUGraph = React.memo(
               selectedYAxisMetric,
               hardwareConfig,
               runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-              hasTrace: typeof d.id === 'number' ? traceAvailability?.[d.id] === true : false,
+              hasTrace: isPersistedBenchmarkId(d.id)
+                ? traceAvailabilityRef.current?.[d.id] === true
+                : false,
+              hasLog: isPersistedBenchmarkId(d.id)
+                ? logAvailabilityRef.current?.[d.id] === true
+                : false,
               locale,
             }),
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),
@@ -873,15 +799,37 @@ const GPUGraph = React.memo(
             const tooltipEl = chartRef.current?.getTooltipElement();
             if (!tooltipEl) return;
             const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
-            if (!viewBtn || typeof d.id !== 'number') return;
-            viewBtn.addEventListener('click', (event) => {
-              event.stopPropagation();
-              track('gpu_timeseries_view_charts_opened', {
-                id: d.id,
-                hwKey: String(d.hwKey),
-                conc: d.conc,
+            if (viewBtn && isPersistedBenchmarkId(d.id)) {
+              viewBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                // Full-document navigation: stamp the chart state onto THIS
+                // history entry first, or Back returns to a bare /inference
+                // that rebuilds from defaults.
+                rememberChartStateInUrl();
+                track('gpu_timeseries_view_charts_opened', {
+                  id: d.id,
+                  hwKey: String(d.hwKey),
+                  conc: d.conc,
+                });
               });
-            });
+            }
+            const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
+            if (logsBtn && typeof d.id === 'number') {
+              logsBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                if (d.benchmark_type !== 'agentic_traces') {
+                  event.preventDefault();
+                  setFixedLogPointId(d.id!);
+                  chartRef.current?.dismissTooltip();
+                }
+                track('gpu_timeseries_view_logs_opened', {
+                  id: d.id,
+                  hwKey: String(d.hwKey),
+                  conc: d.conc,
+                  benchmarkType: d.benchmark_type ?? 'single_turn',
+                });
+              });
+            }
             // Pinning updates D3Chart's React state. GPU comparison rebuilds
             // several inline layer configs on that render, whose cleanup can
             // briefly hide the otherwise-pinned portal tooltip. Restore its
@@ -899,7 +847,10 @@ const GPUGraph = React.memo(
         onRender={(ctx: RenderContext) => {
           // Apply log tick format on initial render (needs the built scale)
           if (logScale) {
-            const yScale = ctx.yScale as d3.ScaleLogarithmic<number, number>;
+            const yScale = (ctx.renderedYScale ?? ctx.yScale) as d3.ScaleLogarithmic<
+              number,
+              number
+            >;
             ctx.layout.yAxisGroup.call(
               d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)) as any,
             );
@@ -913,26 +864,12 @@ const GPUGraph = React.memo(
             .selectAll('.dot-group, .roofline-path')
             .style('transition', 'opacity 150ms ease');
 
-          // Offload halo: dashed ring on every point that used KV offload
-          // (mirrors ScatterGraph so compare mode shows the same CPU-offload
-          // indicator). The ring is a child of the dot-group, so it travels
-          // with the point on zoom/pan without a separate onZoom pass.
+          // The halo stays inside the point group, so normal zoom transforms
+          // carry it without a separate update pass.
           ctx.layout.zoomGroup
             .selectAll<SVGGElement, InferenceData>('.dot-group')
-            .each(function (d) {
-              const showHalo = d.offload_mode === 'on';
-              d3.select(this)
-                .selectAll<SVGCircleElement, boolean>('.offload-halo')
-                .data(showHalo ? [true] : [])
-                .join('circle')
-                .attr('class', 'offload-halo')
-                .attr('r', OFFLOAD_HALO_RADIUS)
-                .attr('fill', 'none')
-                .attr('stroke', 'var(--foreground)')
-                .attr('stroke-width', OFFLOAD_HALO_STROKE_WIDTH)
-                .attr('stroke-dasharray', OFFLOAD_HALO_DASHARRAY)
-                .attr('opacity', 0.9)
-                .attr('pointer-events', 'none');
+            .each(function (point) {
+              renderOffloadHalo(d3.select(this), point, 'var(--foreground)');
             });
         }}
         legendElement={
@@ -1027,18 +964,38 @@ const GPUGraph = React.memo(
                 label: legendT.resetFilter,
                 onClick: () => {
                   selectAllActiveDates();
+                  clearQuickFilters();
                   track('gpu_timeseries_reset_filter');
+                },
+              },
+              {
+                id: 'gpu-quick-filters',
+                label: legendT.quickFilters(quickFilterCount),
+                onClick: () => {
+                  setQuickFiltersOpen(true);
+                  track('inference_quick_filters_dialog_opened', { source: 'timeline_legend' });
                 },
               },
             ]}
             precisionIndicators={selectedPrecisions}
             keyIndicators={
-              hasOffloadHalo || selectedSequence === Sequence.AgenticTraces ? (
-                <>
-                  {hasOffloadHalo && <OffloadHaloLegendKey />}
-                  {selectedSequence === Sequence.AgenticTraces && <AgenticOptimizationNote />}
-                </>
-              ) : undefined
+              <>
+                {hasOffloadHalo || selectedSequence === Sequence.AgenticTraces ? (
+                  <>
+                    {hasOffloadHalo && <OffloadHaloLegendKey />}
+                    {selectedSequence === Sequence.AgenticTraces && <AgenticOptimizationNote />}
+                  </>
+                ) : null}
+                {fixedLogPointId === null ? null : (
+                  <FixedSequenceLogDialog
+                    pointId={fixedLogPointId}
+                    onOpenChange={(open) => {
+                      if (!open) setFixedLogPointId(null);
+                    }}
+                  />
+                )}
+                <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
+              </>
             }
           />
         }

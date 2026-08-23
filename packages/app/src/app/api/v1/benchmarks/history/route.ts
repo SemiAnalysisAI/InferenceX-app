@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
@@ -7,6 +7,7 @@ import { getAllBenchmarksForHistory } from '@semianalysisai/inferencex-db/querie
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
+import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/public-api-errors';
 import { loadFixture } from '@/lib/test-fixtures';
 import { agenticWorkflowMetadataOnly } from '@/lib/agentic-workflow-metadata';
 
@@ -64,10 +65,10 @@ export async function GET(request: NextRequest) {
   const calculatorView = request.nextUrl.searchParams.get('view') === 'calculator';
 
   if (!model) {
-    return NextResponse.json({ error: 'model, isl, and osl are required' }, { status: 400 });
+    return publicApiError(PUBLIC_API_ERRORS.benchmarkHistoryParameters, 400);
   }
   if (!isAgentic && (!isl || !osl)) {
-    return NextResponse.json({ error: 'model, isl, and osl are required' }, { status: 400 });
+    return publicApiError(PUBLIC_API_ERRORS.benchmarkHistoryParameters, 400);
   }
   if (FIXTURES_MODE) {
     const fixture = loadFixture('benchmarks-history');
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
   try {
     const modelKeys = DISPLAY_MODEL_TO_DB[model];
     if (!modelKeys || modelKeys.length === 0) {
-      return NextResponse.json({ error: 'Unknown model' }, { status: 400 });
+      return publicApiError(PUBLIC_API_ERRORS.unknownModel, 400);
     }
     const rows = isAgentic
       ? await getCachedAgenticBenchmarkHistory(modelKeys)
@@ -89,6 +90,6 @@ export async function GET(request: NextRequest) {
     return cachedJson(calculatorView ? applyCalculatorView(trimmed, isl, osl) : trimmed);
   } catch (error) {
     console.error('Error fetching benchmark history:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return publicApiError(PUBLIC_API_ERRORS.internal, 500);
   }
 }

@@ -56,17 +56,24 @@ const dynamoAdapter: ServerMetricsAdapter = {
             : 'unknown';
     const endpointUrl = series.endpoint_url ?? labels['dynamo_endpoint'] ?? null;
     const workerId = labels['worker_id'] ?? null;
-    const dpRank = labels['dp_rank'] ?? null;
-    const engine = labels['engine'] ?? labels['engine_idx'] ?? null;
     return {
-      id: stableId('dynamo', [role, endpointUrl, workerId, dpRank, engine]),
+      // A source is one WORKER, not one engine inside it. `dp_rank` (sglang)
+      // and `engine` (vllm) both name engines *within* a worker, so keying on
+      // them split every worker into 4-5 identical-looking entries: a 6p1d run
+      // listed 35 endpoints for 7 workers. The endpoint is only identity when
+      // the worker is anonymous — otherwise one worker reachable on two URLs
+      // would split again.
+      id: stableId('dynamo', [role, workerId ?? endpointUrl]),
       adapter: 'dynamo',
       role,
       endpointUrl,
       nativeRole,
       workerId,
-      dpRank,
-      engine,
+      // Null at worker granularity: this source spans every rank/engine the
+      // worker owns, so naming one of them would be arbitrary. The per-engine
+      // breakdown lives in the source's own `kvCacheUsageByEngine`.
+      dpRank: null,
+      engine: null,
     };
   },
 };
@@ -81,14 +88,14 @@ const genericAdapter: ServerMetricsAdapter = {
     const dpRank = labels['dp_rank'] ?? null;
     const engine = labels['engine'] ?? labels['engine_idx'] ?? null;
     return {
-      id: stableId('generic', [endpointUrl, workerId, dpRank, engine]),
+      id: stableId('generic', [workerId ?? endpointUrl]),
       adapter: 'generic',
       role: endpointUrl || workerId || dpRank || engine ? 'unknown' : 'combined',
       endpointUrl,
       nativeRole: null,
       workerId,
-      dpRank,
-      engine,
+      dpRank: null,
+      engine: null,
     };
   },
 };

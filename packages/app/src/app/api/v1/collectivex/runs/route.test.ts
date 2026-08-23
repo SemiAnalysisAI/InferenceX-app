@@ -3,15 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildRunSummary } from '@semianalysisai/inferencex-db/collectivex/reader';
 import { makeCollectiveXDataset } from '@semianalysisai/inferencex-db/collectivex/test-fixture';
 
-const { mockList, mockGetDb, mockEnsureList, mockCachedJson } = vi.hoisted(() => ({
+const { mockList, mockGetWriteDb, mockEnsureList, mockCachedJson } = vi.hoisted(() => ({
   mockList: vi.fn(),
-  mockGetDb: vi.fn(() => 'mock-sql'),
+  mockGetWriteDb: vi.fn(() => 'mock-write-sql'),
   mockEnsureList: vi.fn(),
   mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
 }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  getCollectiveXDb: mockGetDb,
+  getCollectiveXWriteDb: mockGetWriteDb,
   FIXTURES_MODE: false,
 }));
 
@@ -76,7 +76,7 @@ describe('GET /api/v1/collectivex/runs', () => {
       discovery_complete: true,
     });
     expect(mockEnsureList).toHaveBeenCalledWith(1);
-    expect(mockList).toHaveBeenCalledWith('mock-sql', 1);
+    expect(mockList).toHaveBeenCalledWith('mock-write-sql', 1);
   });
 
   it('marks the list incomplete when another bounded discovery pass is needed', async () => {

@@ -4,22 +4,12 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { FAQ_ITEMS } from '@/components/about/faq-data';
 import { AgentXFaq } from '@/components/about/agentx-faq';
+import { buildFaqJsonLd, FaqList } from '@/components/about/faq';
 import { JsonLd } from '@/components/json-ld';
 import { enAlternates } from '@/lib/i18n';
 import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const faqJsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'FAQPage',
-  mainEntity: FAQ_ITEMS.map((item) => ({
-    '@type': 'Question',
-    name: item.question,
-    acceptedAnswer: {
-      '@type': 'Answer',
-      text: [item.answer, item.link?.text, ...(item.list ?? [])].filter(Boolean).join(' '),
-    },
-  })),
-};
+const faqJsonLd = buildFaqJsonLd(FAQ_ITEMS);
 
 const ABOUT_DESCRIPTION =
   'InferenceX benchmarks agentic and fixed-sequence AI inference across accelerators and serving stacks. AgentX is its long-context, multi-turn coding scenario.';
@@ -176,45 +166,7 @@ export default function AboutPage() {
           </Card>
         </section>
 
-        <section>
-          <Card>
-            <h2 className="text-lg font-semibold mb-4">Frequently Asked Questions</h2>
-            <dl className="divide-y divide-border">
-              {FAQ_ITEMS.map((item) => (
-                <div key={item.question} className="py-4 first:pt-0 last:pb-0">
-                  <dt className="font-medium mb-1">{item.question}</dt>
-                  <dd className="text-muted-foreground text-sm">
-                    {item.answer && (
-                      <p>
-                        {item.answer}
-                        {item.link && (
-                          <>
-                            {' '}
-                            <a
-                              href={item.link.href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-brand hover:underline font-medium"
-                            >
-                              {item.link.text}
-                            </a>
-                          </>
-                        )}
-                      </p>
-                    )}
-                    {item.list && (
-                      <ul className="mt-1.5 ml-8 list-disc space-y-0.5">
-                        {item.list.map((li) => (
-                          <li key={li}>{li}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </Card>
-        </section>
+        <FaqList title="Frequently Asked Questions" items={FAQ_ITEMS} />
       </div>
     </main>
   );

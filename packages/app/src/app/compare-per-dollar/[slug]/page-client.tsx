@@ -3,36 +3,45 @@
 import Link from 'next/link';
 import { useEffect, useMemo } from 'react';
 
-import type { GPUDataPoint, InterpolatedResult } from '@/components/calculator/types';
+import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
+
+import type { GPUDataPoint } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
-import { CompareInterpolatedTable } from '@/components/compare/compare-interpolated-table';
-import { useGlobalFilters, GlobalFilterProvider } from '@/components/GlobalFilterContext';
+import {
+  CompareTableRenderer,
+  type CompareTableData,
+} from '@/components/compare/compare-table-renderer';
+import {
+  GlobalFilterProvider,
+  useGlobalFilterAvailability,
+  useGlobalFilterRun,
+  useGlobalFilterSelection,
+} from '@/components/GlobalFilterContext';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
 import { track } from '@/lib/analytics';
+import type { BenchmarkRow } from '@/lib/api';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare-enum-coerce';
 import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
-
-interface SsrTableData {
-  defaultTargets: number[];
-  ssrRows: { target: number; a: InterpolatedResult | null; b: InterpolatedResult | null }[];
-  interactivityRange: { min: number; max: number };
-}
 
 /** Only show Cost + Concurrency in the interpolated table — the rest of the
  *  metric rows (Throughput, tok/s/MW) live on the sibling /compare page. */
 const PER_DOLLAR_TABLE_METRICS = ['Cost ($/M tok)', 'Concurrency'];
 
-/** Rename "Cost ($/M tok)" to the full-English "Dollar per Million Tokens"
- *  in the per-dollar table so the cell reads in line with the page's
- *  "Performance per Dollar" framing and surfaces the SEO term verbatim. */
+/** Localized display labels keyed by the table's stable English metric key. */
 const PER_DOLLAR_LABEL_OVERRIDES = {
-  'Cost ($/M tok)': 'Dollar per Million Tokens',
-};
+  en: {
+    'Cost ($/M tok)': 'Dollar per Million Tokens',
+  },
+  zh: {
+    'Cost ($/M tok)': '每百万 token 美元成本',
+  },
+} as const;
 
 /** y_costh = Cost per Million Total Tokens (Owning - Hyperscaler). Defined in
- *  packages/app/src/components/inference/inference-chart-config.json. */
+ *  packages/app/src/components/inference/metric-registry.ts. */
 const PER_DOLLAR_DEFAULT_Y_AXIS = 'y_costh';
 
 const STRINGS = {
@@ -55,10 +64,10 @@ const STRINGS = {
     fullComparisonLinkText: '查看完整延迟与吞吐量对比 →',
     caveatSeqFallback: '序列',
     caveatPrecFallback: '精度',
-    pricingLabel: 'Chip 定价（所属云服务商）：',
+    pricingLabel: '芯片定价（所属云服务商）：',
     pricingSource: '来源：',
     emptyState:
-      '当前默认模型在此 Chip 组合上没有可用的插值每 token 成本数据。请使用下方图表控件选择一个两款 Chip 均有基准测试数据的模型和精度。',
+      '当前默认模型在此芯片组合上没有可用的插值每 token 成本数据。请使用下方图表控件选择一个两款芯片均有基准测试数据的模型和精度。',
   },
 } as const;
 
@@ -73,7 +82,8 @@ interface ComparePerDollarPageClientProps {
   defaultModel: string;
   defaultSequence: string | null;
   defaultPrecision: string | null;
-  ssrTableData: SsrTableData;
+  ssrTableData: CompareTableData;
+  initialBenchmarkRows?: BenchmarkRow[];
   /** One SSR-rendered prose paragraph per interpolated-table row (default
    *  interactivity target). Each paragraph picks a template variant
    *  deterministically from the slug so prose stays stable across renders
@@ -109,6 +119,7 @@ export default function ComparePerDollarPageClient({
   defaultSequence,
   defaultPrecision,
   ssrTableData,
+  initialBenchmarkRows,
   narrative,
   agenticIntro = null,
   aLabel,
@@ -130,6 +141,14 @@ export default function ComparePerDollarPageClient({
   const initialModel = toModel(defaultModel);
   const initialSequence = toSequence(defaultSequence);
   const initialPrecisions = toPrecisions(defaultPrecision);
+  const benchmarkQueryScope = `compare-pair:${a}:${b}`;
+  const initialCalculatorRows = useMemo(
+    () =>
+      initialBenchmarkRows && defaultSequence
+        ? toCalculatorBenchmarkRows(initialBenchmarkRows, defaultSequence)
+        : undefined,
+    [defaultSequence, initialBenchmarkRows],
+  );
   const t = STRINGS[locale];
   const isZh = locale === 'zh';
 
@@ -144,6 +163,9 @@ export default function ComparePerDollarPageClient({
         initialActiveHwTypes={[a, b]}
         compareGpuPair={compareGpuPair}
         initialYAxisMetric={PER_DOLLAR_DEFAULT_Y_AXIS}
+        benchmarkQueryScope={benchmarkQueryScope}
+        initialBenchmarkModel={initialModel}
+        initialBenchmarkRows={initialBenchmarkRows}
       >
         <div className="flex flex-col gap-4">
           <Card className="flex w-full min-w-0 flex-col gap-3">
@@ -228,13 +250,13 @@ export default function ComparePerDollarPageClient({
                   {bCostPerGpuHr > 0 ? `$${bCostPerGpuHr.toFixed(2)}/chip/hr` : '—'}.{' '}
                   {t.pricingSource}{' '}
                   <a
-                    href="https://semianalysis.com/ai-cloud-tco-model/"
+                    href={TCO_SOURCE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="underline hover:text-primary"
                     onClick={() => track('compare_per_dollar_tco_source_clicked', { slug })}
                   >
-                    SemiAnalysis Market July 2026 Pricing Surveys &amp; AI Cloud TCO Model
+                    {TCO_SOURCE_TITLE}
                   </a>
                   .
                 </p>
@@ -278,7 +300,11 @@ export default function ComparePerDollarPageClient({
               aLabel={aLabel}
               bLabel={bLabel}
               ssrTableData={ssrTableData}
+              initialModel={initialModel}
+              initialSequence={initialSequence}
+              initialCalculatorRows={initialCalculatorRows}
               emptyStateText={t.emptyState}
+              isZh={isZh}
             />
           </Card>
           <InferenceChartDisplay />
@@ -294,23 +320,48 @@ function CompareTableSection({
   aLabel,
   bLabel,
   ssrTableData,
+  initialModel,
+  initialSequence,
+  initialCalculatorRows,
   emptyStateText,
+  isZh,
 }: {
   a: string;
   b: string;
   aLabel: string;
   bLabel: string;
-  ssrTableData: SsrTableData;
+  ssrTableData: CompareTableData;
+  initialModel: ReturnType<typeof toModel>;
+  initialSequence: ReturnType<typeof toSequence>;
+  initialCalculatorRows?: BenchmarkRow[];
   emptyStateText: string;
+  isZh: boolean;
 }) {
-  const { effectiveSequence, effectivePrecisions, selectedRunDate, selectedModel } =
-    useGlobalFilters();
+  const { effectiveSequence, effectivePrecisions, selectedModel, sequenceResolved } =
+    useGlobalFilterSelection();
+  const { availableDates } = useGlobalFilterAvailability();
+  const { selectedRunDate } = useGlobalFilterRun();
+  const latestAvailableDate = availableDates.at(-1) ?? '';
+  const calculatorRunDate =
+    selectedRunDate && selectedRunDate === latestAvailableDate ? '' : selectedRunDate;
+  const initialRows =
+    initialCalculatorRows &&
+    sequenceResolved &&
+    selectedModel === initialModel &&
+    effectiveSequence === initialSequence &&
+    calculatorRunDate === ''
+      ? initialCalculatorRows
+      : undefined;
 
   const { gpuDataByGroupKey, ranges, hasData } = useThroughputData(
     selectedModel,
     effectiveSequence,
     effectivePrecisions,
-    selectedRunDate,
+    calculatorRunDate,
+    undefined,
+    undefined,
+    initialRows,
+    sequenceResolved,
   );
 
   const { pointsA, pointsB } = useMemo(() => {
@@ -326,25 +377,17 @@ function CompareTableSection({
 
   const clientRange = hasData ? ranges.interactivity : ssrTableData.interactivityRange;
 
-  if (ssrTableData.defaultTargets.length === 0) {
-    return (
-      <div className="border border-border/50 rounded-md px-4 py-3 text-sm text-muted-foreground bg-muted/30">
-        {emptyStateText}
-      </div>
-    );
-  }
-
   return (
-    <CompareInterpolatedTable
+    <CompareTableRenderer
       aLabel={aLabel}
       bLabel={bLabel}
-      ssrRows={ssrTableData.ssrRows}
-      defaultTargets={ssrTableData.defaultTargets}
+      ssrTableData={ssrTableData}
       interactivityRange={clientRange}
       gpuDataPointsA={pointsA}
       gpuDataPointsB={pointsB}
+      emptyStateText={emptyStateText}
+      metricLabelOverrides={PER_DOLLAR_LABEL_OVERRIDES[isZh ? 'zh' : 'en']}
       visibleMetricLabels={PER_DOLLAR_TABLE_METRICS}
-      metricLabelOverrides={PER_DOLLAR_LABEL_OVERRIDES}
     />
   );
 }

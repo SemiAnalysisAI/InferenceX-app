@@ -2,7 +2,11 @@
 
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 
-import { useInference } from '@/components/inference/InferenceContext';
+import {
+  useInferenceActions,
+  useInferenceDisplay,
+  useInferenceFilters,
+} from '@/components/inference/InferenceContext';
 import {
   buildAppliedCustomGpuValues,
   buildDefaultCustomGpuValues,
@@ -58,11 +62,11 @@ const PANEL_CONFIG: Record<
 > = {
   costs: {
     title: 'Custom Chip Costs',
-    titleZh: '自定义 Chip 成本',
+    titleZh: '自定义芯片成本',
     description:
       'Enter your own TCO (Total Cost of Ownership) values for each chip in $/chip/hr. These values determine the selected token cost metric.',
     descriptionZh:
-      '输入每个 Chip 的自定义 TCO（总拥有成本），单位为 $/chip/hr。这些值用于计算所选 token 成本指标。',
+      '输入每个芯片的自定义 TCO（总拥有成本），单位为 $/chip/hr。这些值用于计算所选 token 成本指标。',
     sectionTestId: 'custom-costs-section',
     calculateTestId: 'custom-costs-calculate',
     inputIdPrefix: 'cost-input',
@@ -72,11 +76,11 @@ const PANEL_CONFIG: Record<
   },
   powers: {
     title: 'Custom Chip Powers',
-    titleZh: '自定义 Chip 功耗',
+    titleZh: '自定义芯片功耗',
     description:
       'Enter your own Token Throughput per All in Utility MW (tok/s/MW) values for each chip. These values will be used to calculate custom power metrics.',
     descriptionZh:
-      '输入每个 Chip 的自定义全电源配置兆瓦 token 吞吐量（tok/s/MW）。这些值用于计算自定义功耗指标。',
+      '输入每个芯片的自定义全电源配置兆瓦 token 吞吐量（tok/s/MW）。这些值用于计算自定义功耗指标。',
     sectionTestId: 'custom-powers-section',
     calculateTestId: 'custom-powers-calculate',
     // Preserve legacy input IDs so existing Cypress selectors keep passing.
@@ -152,14 +156,9 @@ const CustomGpuValuePanel = memo(
   ({ loading, kind }: { loading: boolean; kind: GpuValuePanelKind }) => {
     const locale = useLocale();
     const t = STRINGS[locale];
-    const {
-      selectedYAxisMetric,
-      selectedPrecisions,
-      selectedModel,
-      selectedSequence,
-      setUserCosts,
-      setUserPowers,
-    } = useInference();
+    const { selectedYAxisMetric } = useInferenceDisplay();
+    const { selectedPrecisions, selectedModel, selectedSequence } = useInferenceFilters();
+    const { setUserCosts, setUserPowers } = useInferenceActions();
 
     const config = PANEL_CONFIG[kind];
     const title = locale === 'zh' ? config.titleZh : config.title;

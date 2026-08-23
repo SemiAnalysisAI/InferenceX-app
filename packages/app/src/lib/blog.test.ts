@@ -15,6 +15,7 @@ import {
   getAllPosts,
   getPostBySlug,
   getReadingTime,
+  getWordCount,
   hasZhTranslation,
   slugify,
   smartTruncate,
@@ -160,6 +161,16 @@ describe('slugify', () => {
     expect(slugify('性能 分析')).toBe('性能-分析');
     expect(slugify('GB200 性能对比')).toBe('gb200-性能对比');
     expect(slugify('（结论）')).toBe('结论');
+  });
+});
+
+describe('getWordCount', () => {
+  it('counts whitespace-delimited English words', () => {
+    expect(getWordCount('one two three four five')).toBe(5);
+  });
+
+  it('counts no-whitespace Han text by character and ignores punctuation', () => {
+    expect(getWordCount('这是中文正文。')).toBe(6);
   });
 });
 
@@ -686,11 +697,15 @@ describe('buildBlogPostingJsonLd', () => {
   });
 
   it('uses the zh language tag and /zh canonical URL for the Chinese page', () => {
-    const jsonLd = buildBlogPostingJsonLd(SAMPLE_META, 'a b c', 'zh') as Record<string, any>;
+    const jsonLd = buildBlogPostingJsonLd(SAMPLE_META, '这是中文正文。', 'zh') as Record<
+      string,
+      any
+    >;
     expect(jsonLd.inLanguage).toBe('zh-CN');
     expect(jsonLd.url).toBe(`${SITE_URL}/zh/blog/gb200-vs-mi355x`);
     expect(jsonLd.mainEntityOfPage['@id']).toBe(`${SITE_URL}/zh/blog/gb200-vs-mi355x`);
     expect(jsonLd.image).toBe(`${SITE_URL}/zh/blog/gb200-vs-mi355x/opengraph-image`);
+    expect(jsonLd.wordCount).toBe(6);
   });
 });
 

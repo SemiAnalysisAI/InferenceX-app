@@ -4,18 +4,7 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 import { TabNav } from '@/components/tab-nav';
 import { UnofficialRunContext } from '@/components/unofficial-run-provider';
 import { createMockUnofficialRunContext } from '../support/mock-data';
-
-function createMockRouter() {
-  return {
-    push: cy.stub(),
-    replace: cy.stub(),
-    refresh: cy.stub(),
-    back: cy.stub(),
-    forward: cy.stub(),
-    prefetch: cy.stub().resolves(),
-    bfcacheId: '',
-  };
-}
+import { createMockRouter } from '../support/mock-router';
 
 /**
  * Mount TabNav with the provided URL search string written into the window

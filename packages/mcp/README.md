@@ -8,6 +8,10 @@ Local MCP (Model Context Protocol) server for querying the InferenceX benchmark 
 bun run mcp
 ```
 
+The server requires `DATABASE_READONLY_URL` and deliberately uses the postgres.js TCP
+driver. URL and TLS handling come from the shared database resolver. `DATABASE_SSL=false`
+overrides TLS for any host; loopback hosts disable TLS by default.
+
 Or add to Claude Code:
 
 ```bash

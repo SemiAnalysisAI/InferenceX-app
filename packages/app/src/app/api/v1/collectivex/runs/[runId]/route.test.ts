@@ -2,19 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeCollectiveXDataset } from '@semianalysisai/inferencex-db/collectivex/test-fixture';
 
-const { mockGetRun, mockDelete, mockFromRow, mockGetDb, mockGetWriteDb, mockPurge, mockEnsureRun } =
+const { mockGetRun, mockDelete, mockFromRow, mockGetWriteDb, mockPurge, mockEnsureRun } =
   vi.hoisted(() => ({
     mockGetRun: vi.fn(),
     mockDelete: vi.fn(),
     mockFromRow: vi.fn(),
-    mockGetDb: vi.fn(() => 'mock-sql'),
     mockGetWriteDb: vi.fn(() => 'mock-write-sql'),
     mockPurge: vi.fn(() => Promise.resolve(0)),
     mockEnsureRun: vi.fn(),
   }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  getCollectiveXDb: mockGetDb,
   getCollectiveXWriteDb: mockGetWriteDb,
   FIXTURES_MODE: false,
 }));
@@ -99,7 +97,7 @@ describe('GET /api/v1/collectivex/runs/[runId]', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(dataset);
     expect(mockEnsureRun).toHaveBeenCalledWith(1, runId);
-    expect(mockGetRun).toHaveBeenCalledWith('mock-sql', 1, runId);
+    expect(mockGetRun).toHaveBeenCalledWith('mock-write-sql', 1, runId);
   });
 
   it.each([

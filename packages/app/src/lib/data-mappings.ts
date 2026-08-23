@@ -63,13 +63,17 @@ interface ModelConfig {
  * Scoped to `hardware` for the same reason the STP rule below is: the guard
  * exists to stop two engines being read off one SKU's curve, not to stop a
  * chart holding two SKUs. B200 vLLM MTP next to B300 SGLang MTP compares
- * hardware, which is the point of the chart.
+ * hardware, which is the point of the chart. Where only one engine has a run
+ * for a SKU there is nothing to confuse, so that SKU is free to show it.
+ *
+ * ATOM is its own family and is deliberately NOT grouped with SGLang, so it
+ * stays comparable with everything — including both vLLM and SGLang on the
+ * SKUs where it runs.
  */
 const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
   {
     suffix: '_mtp',
     stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
-    groupAliases: { atom: 'sglang' },
     scope: 'hardware',
   },
 ];
@@ -78,12 +82,16 @@ const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
  * STP exclusion: unsuffixed standard-token configs for the same hardware SKU
  * can't mix engine families, because each engine tunes its serving path
  * differently. Different hardware may use different engines on one graph.
+ * `dynamo-`/`mori-`/`llmd-`/`mooncake-` are routers, not engines, so
+ * `dynamo-sglang` is SGLang and is guarded as such.
+ *
+ * ATOM is its own family and is not aliased to SGLang — it stays comparable
+ * with everything.
  */
 const STP_ENGINE_EXCLUSION: ExclusionSpec[] = [
   {
     suffix: null,
     stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
-    groupAliases: { atom: 'sglang' },
     scope: 'hardware',
   },
 ];
@@ -157,7 +165,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
   [Model.GLM_5]: { label: 'GLM5/5.1 744B', prefix: 'glm5', category: 'deprecated' },
   // GLM-5.2 and GLM-5.3 share the same architecture and inference profile, so
   // the selector presents both releases over the existing GLM-5.2 data bucket.
-  [Model.GLM_5_2]: { label: 'GLM5.2/GLM5.3', prefix: 'glm5.2', category: 'default' },
+  [Model.GLM_5_2]: { label: 'GLM5.2/GLM5.3 744B', prefix: 'glm5.2', category: 'default' },
   [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
   [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'deprecated' },
   [Model.MiniMax_M2_5]: {

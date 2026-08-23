@@ -56,6 +56,27 @@ describe('resolveCalculatorUrlSeed', () => {
     });
   });
 
+  it('includes valid run date and run ID for the single server-seeded provider', () => {
+    expect(
+      resolveCalculatorUrlSeed({
+        g_rundate: '2026-08-20',
+        g_runid: 'run_123',
+      }),
+    ).toEqual({
+      runDate: '2026-08-20',
+      runId: 'run_123',
+    });
+  });
+
+  it('ignores invalid run date and run ID seeds', () => {
+    expect(
+      resolveCalculatorUrlSeed({
+        g_rundate: '08/20/2026',
+        g_runid: 'contains spaces',
+      }),
+    ).toEqual({});
+  });
+
   it('picks the first value when a param is repeated as an array', () => {
     expect(resolveCalculatorUrlSeed({ g_model: ['DeepSeek-V4-Pro', 'GLM-5'] })).toEqual({
       model: Model.DeepSeek_V4_Pro,

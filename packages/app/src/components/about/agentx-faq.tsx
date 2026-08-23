@@ -199,8 +199,8 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
           '保留原始轮次间延迟；仅将整个系统的全局空闲时间限制在 10 秒以内。',
           'first_turn_prefix cache busting 为每次回放的会话加入唯一首轮标记，避免虚假的跨会话 cache hit，同时保留会话内部的 cache 复用。',
           '有效测试至少运行 900 秒，默认运行 1,800 秒。',
-          '正式测量前通过 warmup 预热深层前缀。',
-          '每次运行都有随机种子，并记录在产物中。',
+          '正式测量前通过 warmup 建立深层 prefix。',
+          '每次运行都会使用 seed，并将其记录在产物中。',
         ],
       },
       {
@@ -233,7 +233,7 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
       {
         title: '为什么第一次运行可能很久？',
         paragraphs: [
-          '发送流量前，AIPerf 会下载语料，并将其重建为完成 token 化且带有 cache 结构的会话树。结果会存入 memory-mapped 磁盘 cache。只要语料、tokenizer、重建配置、条目数量和随机种子相同，后续测试通常可以在数秒内恢复准备好的数据集。',
+          '发送流量前，AIPerf 会下载语料，并将其重建为完成 token 化且带有 cache 结构的会话树。结果会存入 memory-mapped 磁盘 cache。只要语料、tokenizer、重建配置、条目数量和 seed 相同，后续测试通常可以在数秒内恢复准备好的数据集。',
           '冷启动时应同时提高两个配置超时。随后依次执行数据集配置、warmup、定时 profiling 和 drain/export。Benchmark duration 仅覆盖 profiling，因此总耗时会更长。',
         ],
         code: `export AIPERF_DATASET_CONFIGURATION_TIMEOUT=1800
@@ -243,7 +243,7 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
         title: '可以先跑一个短 smoke test 吗？',
         paragraphs: [
           '有效测试不能短于 900 秒。低成本有效检查可以降低 concurrency，但仍需保留 900 秒下限。--num-dataset-entries 能减少重建工作量，但会改变工作负载，不应将这种结果用于正式比较或提交。',
-          '如需在几分钟内检查连通性，可配合短 duration 使用 --unsafe-override，并接受 invalid 标记。保留完整语料并固定随机种子，可让后续有效测试复用重建后的数据集 cache。',
+          '如需在几分钟内检查连通性，可配合短 duration 使用 --unsafe-override，并接受 invalid 标记。保留完整语料并固定 seed，可让后续有效测试复用重建后的数据集 cache。',
         ],
       },
       {
@@ -282,7 +282,7 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
         title: '实用原则',
         bullets: [
           '让语料与服务器上下文窗口匹配；约 256K 的服务器优先使用 _256k 语料。',
-          '正式比较使用带日期的固定语料和固定随机种子。',
+          '正式比较使用带日期的固定语料和固定 seed。',
           '保持 cache busting 开启；关闭后，循环使用轨迹会夸大 cache-hit 结果。',
           '保留记录的时序；压缩单条轨迹的延迟会改变 cache TTL 行为和会话重叠程度。',
           '在判断结果受服务器限制前，先监控客户端 CPU 和连接池等待时间。',

@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { parseLimitForceFlags, runPerIdBackfill } from './backfill-runner.js';
+import {
+  parseLimitForceFlags,
+  runCandidateIdBackfill,
+  runPerIdBackfill,
+} from './backfill-runner.js';
 
 describe('parseLimitForceFlags', () => {
   const originalArgv = process.argv;
@@ -10,12 +14,33 @@ describe('parseLimitForceFlags', () => {
 
   it('defaults to no limit and force off', () => {
     process.argv = ['node', 'script.ts'];
-    expect(parseLimitForceFlags()).toEqual({ limit: null, force: false });
+    expect(parseLimitForceFlags()).toEqual({
+      limit: null,
+      force: false,
+      shardCount: 1,
+      shardIndex: 0,
+    });
   });
 
-  it('parses --limit N and --force', () => {
-    process.argv = ['node', 'script.ts', '--limit', '25', '--force', '--yes'];
-    expect(parseLimitForceFlags()).toEqual({ limit: 25, force: true });
+  it('parses --limit N, --force, and process-shard flags', () => {
+    process.argv = [
+      'node',
+      'script.ts',
+      '--limit',
+      '25',
+      '--force',
+      '--shard-count',
+      '4',
+      '--shard-index',
+      '2',
+      '--yes',
+    ];
+    expect(parseLimitForceFlags()).toEqual({
+      limit: 25,
+      force: true,
+      shardCount: 4,
+      shardIndex: 2,
+    });
   });
 });
 
@@ -51,5 +76,47 @@ describe('runPerIdBackfill', () => {
     const logged = vi.mocked(console.log).mock.calls.map((c) => String(c[0]));
     expect(logged.at(-1)).toContain('=== backfill complete: 1 ok, 1 failed');
     expect(vi.mocked(console.error).mock.calls[0]?.[0]).toContain('✗ id=1: boom');
+  });
+});
+
+describe('runCandidateIdBackfill', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    process.argv = ['node', 'script.ts', '--yes'];
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.restoreAllMocks();
+    process.exitCode = undefined;
+  });
+
+  it('stops after candidate loading when there is nothing to do', async () => {
+    const processRow = vi.fn<(_: number) => Promise<'ok'>>(() => Promise.resolve('ok'));
+
+    const processed = await runCandidateIdBackfill(() => Promise.resolve([]), processRow);
+
+    expect(processRow).not.toHaveBeenCalled();
+    expect(processed).toBe(false);
+    expect(vi.mocked(console.log).mock.calls[0]?.[0]).toContain('Nothing to do');
+  });
+
+  it('confirms and serially processes loaded candidate ids', async () => {
+    const seen: number[] = [];
+
+    const processed = await runCandidateIdBackfill(
+      () => Promise.resolve([4, 9]),
+      (id) => {
+        seen.push(id);
+        return Promise.resolve('ok');
+      },
+      (count) => `${count} custom candidates.`,
+    );
+
+    expect(seen).toEqual([4, 9]);
+    expect(processed).toBe(true);
+    expect(vi.mocked(console.log).mock.calls[0]?.[0]).toContain('2 custom candidates');
   });
 });

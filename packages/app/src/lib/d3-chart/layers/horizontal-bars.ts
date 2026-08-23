@@ -46,3 +46,15 @@ export function updateHorizontalBarsOnZoom<T>(
 ): void {
   group.selectAll<SVGRectElement, T>('.bar').attr('width', (d) => Math.max(0, xScale(getX(d))));
 }
+
+/** Restyle existing bars without repeating their data join or geometry writes. */
+export function updateHorizontalBarsForDisplay<T>(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  config: HorizontalBarConfig<T>,
+): void {
+  group
+    .selectAll<SVGRectElement, T>('.bar')
+    .attr('fill', (d) => config.getColor(d))
+    .attr('stroke', config.stroke ?? 'none')
+    .attr('stroke-width', config.strokeWidth ?? 0);
+}

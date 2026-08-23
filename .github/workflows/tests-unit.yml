@@ -10,10 +10,12 @@ on:
       - 'packages/app/**'
       - 'packages/constants/**'
       - 'packages/db/**'
+      - 'packages/mcp/**'
       - 'bunfig.toml'
       - 'bun.lock'
       - 'scripts/run-workspace-script.ts'
       - 'tsconfig.json'
+      - 'tsconfig.base.json'
 
 permissions: {}
 

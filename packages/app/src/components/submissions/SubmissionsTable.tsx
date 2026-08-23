@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronDown, ChevronRight, GitCompare, Info } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import {
   DB_MODEL_TO_DISPLAY,
@@ -91,7 +91,7 @@ const STRINGS = {
   },
   zh: {
     searchPlaceholder: '搜索配置...',
-    colGpu: 'Chip',
+    colGpu: '芯片',
     colModel: '模型',
     colPrecision: '精度',
     colSpecMethod: '推测解码',
@@ -103,25 +103,25 @@ const STRINGS = {
     noData: '暂无提交数据。',
     vsPrev: '对比',
     vendorLabel: '厂商：',
-    vendorTip: 'Chip 制造商',
+    vendorTip: '芯片制造商',
     specMethodLabel: '推测解码方法：',
     specMethodTip: '推测解码方法（如 MTP、Eagle）',
     disaggLabel: '分离式部署：',
-    disaggTip: 'Prefill 和 Decode 在不同 Chip 池上运行',
+    disaggTip: 'Prefill 和 Decode 在不同芯片池上运行',
     multinodeLabel: '多节点：',
     multinodeTip: '配置跨多个物理节点',
-    totalGpusLabel: '总 Chip 数：',
-    totalGpusTip: '物理 Chip 总数。分离式部署时，Prefill 和 Decode 使用不同的 Chip 池',
-    prefillGpusLabel: 'Prefill Chip 数：',
-    prefillGpusTip: '用于 Prefill（提示处理）阶段的 Chip',
-    decodeGpusLabel: 'Decode Chip 数：',
-    decodeGpusTip: '用于 Decode（Token 生成）阶段的 Chip',
+    totalGpusLabel: '总芯片数：',
+    totalGpusTip: '物理芯片总数。分离式部署时，Prefill 和 Decode 使用不同的芯片池',
+    prefillGpusLabel: 'Prefill 芯片数：',
+    prefillGpusTip: '用于 Prefill（提示处理）阶段的芯片',
+    decodeGpusLabel: 'Decode 芯片数：',
+    decodeGpusTip: '用于 Decode（Token 生成）阶段的芯片',
     prefillTpEpLabel: 'Prefill TP/EP：',
     prefillTpEpTip: 'Prefill 的张量并行 / 专家并行',
     decodeTpEpLabel: 'Decode TP/EP：',
     decodeTpEpTip: 'Decode 的张量并行 / 专家并行',
-    aggregateGpusLabel: '聚合推理 Chip 数：',
-    aggregateGpusTip: '单个聚合推理引擎使用的 Chip 数',
+    aggregateGpusLabel: '聚合推理芯片数：',
+    aggregateGpusTip: '单个聚合推理引擎使用的芯片数',
     aggregateTpEpLabel: '聚合推理 TP/EP：',
     aggregateTpEpTip: '聚合推理引擎的张量并行 / 专家并行',
     sequencesLabel: '序列组合：',
@@ -237,6 +237,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
 
   const handleSort = useCallback(
     (key: SortKey) => {
+      setVisibleCount(ROW_PAGE_SIZE);
       if (sortKey === key) {
         setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
       } else {
@@ -273,11 +274,10 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
     });
   }, [filtered, sortKey, sortDir]);
 
-  // Reset visible count when the filtered/sorted view changes so the user
-  // always lands at the top of the new result set instead of mid-list.
-  useEffect(() => {
+  const handleSearchChange = (nextSearch: string) => {
+    setSearch(nextSearch);
     setVisibleCount(ROW_PAGE_SIZE);
-  }, [search, sortKey, sortDir]);
+  };
 
   const visibleRows = useMemo(() => sorted.slice(0, visibleCount), [sorted, visibleCount]);
   const hiddenCount = Math.max(0, sorted.length - visibleRows.length);
@@ -306,7 +306,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
       <input
         type="text"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={(e) => handleSearchChange(e.target.value)}
         onBlur={() => {
           if (search.trim()) track('submissions_table_searched', { query: search.trim() });
         }}

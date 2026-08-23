@@ -3,6 +3,7 @@ import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared
 
 import { DatasetList } from '@/components/datasets/dataset-list';
 import type { DatasetRecord } from '@/hooks/api/use-datasets';
+import { createMockRouter } from '../support/mock-router';
 
 const datasets: DatasetRecord[] = [
   {
@@ -42,18 +43,6 @@ const datasets: DatasetRecord[] = [
     ingested_at: '2026-06-19T00:00:00Z',
   },
 ];
-
-function createMockRouter() {
-  return {
-    push: cy.stub(),
-    replace: cy.stub(),
-    refresh: cy.stub(),
-    back: cy.stub(),
-    forward: cy.stub(),
-    prefetch: cy.stub().resolves(),
-    bfcacheId: '',
-  };
-}
 
 function mountList() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

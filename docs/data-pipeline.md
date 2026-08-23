@@ -2,24 +2,38 @@
 
 ## DB Schema Decisions
 
-### Why JSONB + Hot Columns (Hybrid)
+### Why Metrics Stay in JSONB
 
-Benchmark metrics are stored in a JSONB `metrics` column AND extracted into dedicated "hot" columns (`tput_per_gpu`, `median_intvty`, `median_ttft`, `median_e2el`, `p99_ttft`, `median_tpot`).
+Benchmark measurements live only in the `benchmark_results.metrics` JSONB column;
+there are no duplicated metric-specific columns on `benchmark_results` or
+`latest_benchmarks`.
 
-- **JSONB**: New metrics can be added by CI without schema migrations. Old data doesn't need backfilling — missing fields default to 0 at read time (`m.field ?? 0`).
-- **Hot columns**: The most-queried metrics need B-tree indexes for `DISTINCT ON` queries. JSONB extraction (`metrics->>'field'`) can't use these indexes efficiently.
-- **Trade-off**: ~6 duplicated values per row. Acceptable because benchmark_results is write-once/read-many, and the index speedup on daily queries is orders of magnitude.
+- **Schema flexibility**: CI can add metrics without a database migration, and
+  historical rows simply omit keys that their artifact did not produce.
+- **Read contract**: Raw benchmark endpoints pass the JSONB object through.
+  Specialized readers such as MCP select keys explicitly. A missing historical
+  metric remains absent until a presentation consumer applies its own fallback.
+- **Indexes**: The benchmark indexes cover relational selection dimensions such
+  as config, scenario, concurrency, sequence lengths, date, offload mode, and
+  recipe fingerprint. Metric ranking and extraction use JSONB expressions rather
+  than nonexistent "hot" columns.
 
 ### Why Denormalized Dates
 
 `benchmark_results.date`, `workflow_runs.date`, and the `availability` table all store denormalized date values (derived from `workflow_runs.created_at`). This avoids JOINs in the hottest queries:
 
-- `getLatestBenchmarks` uses `DISTINCT ON (config_id, conc, isl, osl) ORDER BY date DESC` — needs date on the same table as benchmark_results for the covering index.
+- `getLatestBenchmarks` orders candidate line snapshots by `date`, `run_started_at`,
+  and workflow-run ID before applying the append-only curve rules. Keeping `date`
+  on each benchmark row avoids another join in that base-table scan.
 - `availability` is a separate denormalized table because the date-picker query (`SELECT DISTINCT model, date`) needs to be fast without scanning benchmark_results.
 
 ### Why a Materialized View (latest_benchmarks)
 
-The `DISTINCT ON` query for "latest benchmark per config" is expensive on the full table (millions of rows). The materialized view pre-computes this, refreshed concurrently after each ingest. API routes use the view when no date filter is specified; date-filtered requests hit the base table.
+Computing the newest logical curve from the full result table is expensive. The
+materialized view pre-computes the newest successful snapshot for each config,
+scenario, sequence, offload mode, recipe fingerprint, and concurrency, including
+the same-image append-only history when applicable. API routes use the view when no
+date filter is specified; date-filtered requests hit the base table.
 
 `REFRESH CONCURRENTLY` allows reads during refresh (no downtime). The trade-off is a brief window where the view is stale after ingest — acceptable since data changes at most daily.
 
@@ -116,14 +130,21 @@ point across attempts; the log records the applied backfill ID. Changelog correc
 likewise applied to artifact metadata before `appendOnly`/`evalsOnly` run semantics are
 resolved and before the changelog is upserted.
 
-### Why Two Connection Types
+### Connection drivers and policy
 
-| Connection                      | Library     | Use Case                             | Why                                                                                                  |
-| ------------------------------- | ----------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `@neondatabase/serverless` HTTP | API routes  | Stateless, read-only, scales to zero | Serverless functions can't hold persistent connections; HTTP driver works over Vercel's edge network |
-| `postgres` TCP                  | ETL scripts | Bulk inserts, transactions, COPY     | HTTP driver has per-query overhead that's unacceptable for 10K+ row batches                          |
+| Connection                      | Library                  | Use case                             |
+| ------------------------------- | ------------------------ | ------------------------------------ |
+| `@neondatabase/serverless` HTTP | Application API reads    | Stateless serverless queries         |
+| `postgres` TCP                  | ETL, migrations, and MCP | Bulk work, transactions, and MCP SQL |
 
-The read replica (`DATABASE_READONLY_URL`) is used by API routes to isolate read traffic from write load. ETL uses the primary writer (`DATABASE_WRITE_URL`).
+`resolveDatabaseConnection` in `packages/db/src/connection.ts` is the single URL and TLS
+policy. Each caller selects its environment variable and driver deliberately. An explicit
+URL can override the environment value, `DATABASE_SSL` can override host detection, and
+loopback hosts disable TLS by default. Application reads may select Neon HTTP, while admin
+and MCP clients remain on postgres.js.
+
+Normal API reads use `DATABASE_READONLY_URL` so a replica can isolate read traffic from
+writes. ETL uses the primary writer in `DATABASE_WRITE_URL`.
 
 ### Why CHECK Constraints for Lowercase
 
@@ -135,7 +156,7 @@ All text keys (model, hardware, framework, precision) have `CHECK (field = lower
 
 Phase 1 (parallel 20): ZIP reading + JSON parsing + row mapping. IO-bound (network + disk), so high parallelism.
 
-Phase 2 (parallel 5): DB writes. Connection-limited (max 20 connections), and each write does config lookup + bulk insert. Lower parallelism prevents connection exhaustion.
+Phase 2 (parallel 10): DB writes. Connection-limited (max 20 connections), and each write does config lookup + bulk insert. Half-pool concurrency leaves capacity for metadata and summary queries while improving ingest throughput.
 
 ### Config Cache
 
@@ -151,11 +172,104 @@ AIPerf defines the `server_metrics_export.json` envelope, but labels such as wor
 
 Adapters are selected from the benchmark's canonical framework, and per-worker series are only emitted for disaggregated configs with a recognized adapter. Unknown orchestrators and non-disaggregated configs retain their aggregate-only series; roles are never guessed from ports or metric names. The frontend only consumes the canonical source identity and never interprets orchestrator-native labels.
 
+### Logical Engines vs Raw Series
+
+A raw series in the blob is one `(scrape endpoint × phase block × label set)` tuple, which is **not** the same as one engine. The KV-cache chart needs one entry per _logical engine_ — one KV pool — so `compute-chart-series.ts` groups series by their Prometheus label set (`seriesIdentityKey`) rather than emitting one entry per raw series. Three kinds of duplication collapse there:
+
+- **Phase blocks.** The warmup and profiling blocks each carry their own series for the same engine, so keying by scrape instant unions them into one continuous line. The two blocks' first/last bounds can look overlapping — the profiling series often emits a single boundary sample and then gaps until warmup ends — but they never share a scrape instant, so the union neither drops nor double-counts a sample.
+- **Mirrored API-server frontends.** vLLM run with several API servers exposes the _same_ engine set on every `/metrics` endpoint, a few hundred ms apart. Identity ignores `endpoint_url` (Prometheus treats the label set as the series), and the endpoint covering the most wall-clock wins — merging the mirrors instead would interleave near-duplicate samples and halve the effective span of the frontend's fixed-width rolling average. Endpoints are only fused when their values actually agree; same-label endpoints whose readings diverge are independent replicas behind a router, and are kept as separate engines so none is silently discarded.
+- **Intra-engine shard ranks.** `tp_rank` / `pp_rank` / `ep_rank` / `moe_ep_rank` shard one pool and all report the same utilization, so they are excluded from the identity and averaged. `engine` / `engine_idx` / `dp_rank` are _not_ excluded — those do name distinct pools.
+
+The cluster average is then a mean across those logical engines on the union of their scrape instants, with each engine holding its last sample until its next one and contributing only inside its own observed window (and only while that sample is fresher than 5× the engine's own median scrape gap, so a reporting hole drops the engine out of the mean rather than pinning it to a stale reading). Grouping on an exact `start_ns` instead would average whichever engines happened to share that nanosecond — on a disaggregated run that alternates between "prefill only" and "decode only" and reads as a full-scale sawtooth.
+
+Engines are ordered by role, then numeric rank, then worker — never by the composed display string, which would sort `"decode 10"` before `"decode 2"` and scramble DP ranks. The role is only shown when engines actually differ in role, so an aggregated deployment reads `DP 0…DP 3` rather than `decode 0…decode 3`.
+
+### Summed Series and the Canonical Grid
+
+The same "components aren't scraped in lockstep" problem hits the **summed** series — prefill/decode/prefix-hit rates, queue depth, host KV usage, and the prompt-token source breakdown — but it cannot be solved the same way. A mean is scale-free, so `averageAcrossEngines` can evaluate on the union of scrape instants; a sum is not. `cumulativeUniqueInputTokens` turns these rates into token totals with `sum += value` and `rollingAverage` is a sample-count mean, so both only stay correct at **one point per scrape bucket**.
+
+Summing on an exact `start_ns` emitted one point per component per tick, each holding that component's share alone. Downstream that reads as a comb: the rolling average mixed the real samples with the other components' structural gaps and drew roughly 1/N of the cluster total. Two shapes produced it in the corpus — a disaggregated run puts every worker on its own `/metrics` endpoint and its own sub-second offset (~7× low on the 7-worker rows), and even a single-endpoint SGLang run splits its token counters into `is_streaming="true"`/`"false"` series ~16 ms apart, where the `"false"` half is an all-zero run for a fully streaming benchmark (2.2× low).
+
+Every summed series is therefore evaluated by `sumOntoGrid` on one canonical grid at the blob's native scrape cadence (`canonicalTickNs`, the median gap of the best-sampled series), with each component holding its last sample between its own scrapes and contributing only inside its observed window. The lattice is anchored at `t=0` and shared by every metric, so the pairs that get divided or added downstream (hits/queries, used/total, running+waiting) land on identical `t` values — anchoring each metric at its own first sample instead silently emptied the prefix-cache-hit-rate chart, because `sglang:cached_tokens` starts ~0.18 s off the grid `sglang:prompt_tokens` starts on.
+
+Mirrored endpoints are collapsed here too, on a **relative** tolerance rather than the gauge path's absolute one — a throughput mean is O(10⁵), so an absolute threshold would never fire and every mirror would be counted twice. This is a correction as well as a de-duplication: the two-API-server vLLM rows were double-counting their queue depth and token totals exactly 2× before v14.
+
+Nothing groups on an exact `start_ns` any more; `aggregateByStart` was removed in v14.
+
+The detail page does not average the resulting per-tick cache-hit ratios. Cache-hit and
+prompt-token counters can publish logically related deltas in adjacent scrape buckets, so a
+quiet denominator bucket can make a pointwise ratio exceed 100% even though the run-wide totals
+are valid. The displayed line is instead a centered 50-sample ratio of sums —
+`Σ(cache-hit rate) / Σ(cache-query rate)` — computed in O(n) with prefix sums. The query-rate
+denominator is recovered from the stored pointwise ratio and hit rate, preserving vLLM's
+`prefix_cache_queries` semantics; prompt-token rate is only a proxy weight for zero-hit intervals
+where `hits / ratio` cannot be inverted. Hit-counter ticks with no stored ratio (zero queries) are
+also unioned back into the window rather than dropped. Only after that volume-weighted
+aggregation is the semantic `[0, 1]` bound applied as a guard against residual counter timing
+skew. Older rows without the component rate series retain the stored-ratio fallback.
+
+### Server-Log Artifact Bundles
+
+Server-log artifacts are stored as filename-keyed bundles rather than as a hard-coded list of
+router, worker, or benchmark roles. Ingest recursively retains every regular `.log` and `.out`
+file and preserves its artifact-relative path. This applies to both `server_logs_*` ZIPs and
+`multinode_server_logs_*` artifacts whose files are nested inside
+`multinode_server_logs.tar.gz`.
+
+The primary file remains in `server_logs.server_log` for compatibility and KV-cache metadata
+extraction; `server_log_files` holds the remaining files. `server_logs.file_name` records the
+primary file's original path, and `files_complete` distinguishes fully scanned bundles from
+legacy single-file rows. Run `bun run admin:db:backfill-server-log-files` to use the public GCS
+artifact backup first and fall back to retained GitHub artifacts for recent runs. Pass `--all`
+for complete DB history, `--source gcs` to exercise only the backup path, and `--dry-run` to
+inventory pair counts and compressed download size without writing. `--run <id>`, `--limit <n>`,
+and `--yes` remain available for targeted, idempotent recovery. Bundles already marked
+`files_complete` are skipped after their small benchmark artifact is mapped, avoiding repeated
+large log downloads.
+
+Full-bundle search stays inside PostgreSQL: each file is scanned through overlapping 16 MiB
+character slices, and the API returns at most 50 match contexts rather than transferring the
+complete file. The overlap preserves literal matches that cross a slice boundary. Files are
+processed sequentially so a multinode bundle cannot materialize every large log in one query.
+
 ### Agentic Dataset Provenance
 
 AIPerf exports public-dataset provenance in `metadata.dataset`, including the Hugging Face dataset ID. InferenceX preserves that object as `dataset` on each agentic aggregate benchmark row. During benchmark ingest, `ingest-ci-run.ts` derives the dashboard slug from `hf_dataset_name` (for example, `semianalysisai/cc-traces-weka-062126` becomes `cc-traces-weka-062126`) and upserts `run_datasets` for the workflow run.
 
 Legacy artifacts without provenance leave any existing mapping untouched. A workflow run can map to only one dataset; conflicting dataset IDs fail ingest rather than silently linking the run to an arbitrary dataset.
+
+### Agentic Replay-Lane Identity
+
+AIPerf can sample one dataset conversation into multiple trajectory lanes, and
+those replays may execute concurrently. The source `conversation_id` therefore
+identifies dataset provenance, not a unique execution lane. During trace-replay
+ingest, `computeRequestTimeline()` groups requests by `root_correlation_id`.
+For older exports without that field, it walks `parent_correlation_id` ancestry
+from each per-session `x_correlation_id`, so nested subagents resolve to the
+main session rather than becoming separate replay lanes. The extractor replaces
+the repeated root UUID with a compact, deterministic numeric `ri` ranked by each
+lane's first dispatch.
+
+The request-timeline frontend groups by `(conversation_id, ri)`, keeping all
+main-agent, subagent, warmup, and profiling requests from one replay together.
+Legacy timelines without correlation metadata omit `ri` and retain the older
+conversation-only grouping. `REQUEST_TIMELINE_VERSION` invalidates derived
+JSONB when this extraction changes; `db:backfill-request-timeline` recomputes it
+from the raw gzipped `profile_export.jsonl` already stored in Neon, so no GitHub
+artifact refetch or schema migration is required.
+
+Timeline extraction reads the gzip stream twice instead of materializing the
+entire JSONL. The first pass retains only timeline bounds and one first-dispatch
+timestamp per replay; the second emits compact request records. This bounds
+peak memory for high-throughput traces whose decompressed profiles exceed
+400 MB, at the cost of a second sequential decompression pass during ingest or
+backfill. The backfill also downloads the stored gzip and uploads the derived
+JSONB in 4 MiB chunks, matching trace ingest and avoiding single-value transport
+limits for oversized runs. The request-timeline reader checks only compact
+metadata inline, then reconstructs every current timeline from bounded text
+chunks. It deliberately does not choose by compressed JSONB storage size, so a
+highly compressible timeline cannot cross Neon's 64 MiB response limit or force
+the database to materialize the serialized size just to select a read path.
 
 ### Agentic Full-Response Interactivity
 
@@ -170,6 +284,24 @@ reconstructs each request's decode interval from the retained lifecycle duration
 minus TTFT, then divides by `output_sequence_length - 1`. The same helper powers
 the one-time `db:backfill-full-response-interactivity` data migration, keeping
 historical rows and newly ingested rows on one definition.
+
+### Agentic Point-Detail Payloads
+
+The point-detail page deliberately splits its immutable trace data by use case.
+The default charts fetch `request-chart-data`, a dictionary-encoded tuple
+projection containing only conversation, phase, request timing, latency, and
+sequence-length fields. The source-rich `request-timeline` document is fetched
+only after the user opens the Timeline view. Likewise, `trace-server-metrics`
+returns the aggregate series plus source descriptors; a selected endpoint's
+full arrays come from `trace-server-metric-source` on demand.
+
+This split is a scale invariant, not only a transport optimization. A high-
+throughput point can contain more than 150,000 requests and several copies of
+each server series. Reusing either full document for the default view multiplies
+JSON parsing, React Query memory, and cache-transfer cost by data the visible
+charts do not consume. The Timeline view also virtualizes rows, so the number of
+SVG bar/link nodes is bounded by the scroll viewport rather than total request
+count.
 
 ## Frontend Transform Pipeline
 

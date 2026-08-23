@@ -14,7 +14,6 @@ import {
   type ScenarioSegment,
   sequenceForScenarioSegment,
 } from '@/lib/compare-scenario-route';
-import { pickPairDefaults } from '@/lib/compare-pair-defaults';
 import {
   canonicalCompareSlug,
   compareDisplayLabel,
@@ -22,16 +21,11 @@ import {
   parseCompareSlug,
 } from '@/lib/compare-slug';
 import { getGpuSpecs } from '@/lib/constants';
+import { KNOWN_MODELS, KNOWN_PRECISIONS, KNOWN_SEQUENCES, pickString } from '@/lib/compare-ssr';
 import {
-  computeCompareTableData,
-  dateRangeForPair,
-  getCachedBenchmarks,
-  KNOWN_MODELS,
-  KNOWN_PRECISIONS,
-  KNOWN_SEQUENCES,
-  pickString,
-  summarize,
-} from '@/lib/compare-ssr';
+  getComparePageDerivedData,
+  initialCompareBenchmarkRows,
+} from '@/lib/compare-page-data.server';
 import {
   AGENTIC_SCENARIO_INTRO_ZH,
   buildBreadcrumbJsonLdZh,
@@ -93,7 +87,7 @@ export function buildPerDollarMetadataZh(
   // byte-identical pages, each claiming to be canonical.
   const routePath = scenarioPath(canonical, scenarioSegment);
   const url = `${SITE_URL}${routePath}`;
-  const description = `${gpuLabel} 在 ${parsed.model.label} 上的每美元性能：来自 InferenceX（SemiAnalysis 推出的独立开源基准测试平台）的经验证、可复现的每百万 token 成本结果，基于云服务商 TCO 归一化。${SUPPORTERS_LINE_ZH}查看哪款 Chip 在各交互性水平下更经济。`;
+  const description = `${gpuLabel} 在 ${parsed.model.label} 上的每美元性能：来自 InferenceX（SemiAnalysis 推出的独立开源基准测试平台）的经验证、可复现的每百万 token 成本结果，基于云服务商 TCO 归一化。${SUPPORTERS_LINE_ZH}查看哪款芯片在各交互性水平下更经济。`;
   return {
     title: `${fullLabel} — 每美元性能`,
     description,
@@ -141,39 +135,41 @@ export async function renderPerDollarPageZh(
     permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
-  const rows = await getCachedBenchmarks(parsed.model.dbKeys);
-  const summaryA = summarize(rows, parsed.a);
-  const summaryB = summarize(rows, parsed.b);
-  const { sequence: pickedSequence, precision: pickedPrecision } = pickPairDefaults(
-    rows,
-    parsed.a,
-    parsed.b,
-  );
+  const fallbackSequence = null;
 
   const urlSeq = pickString(sp.i_seq);
   const urlPrec = pickString(sp.i_prec);
   const urlModel = pickString(sp.g_model);
+  const effectiveModel =
+    urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
   // Path beats query beats the pair's default: a scenario segment is an
   // explicit address for one workload, so it outranks a stale `?i_seq=`.
   const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
-  const effectiveSequence =
-    pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence);
-  const effectivePrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : pickedPrecision;
-  const effectiveModel =
-    urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
-
-  const { defaultTargets, ssrRows, interactivityRange } = computeCompareTableData(
-    rows,
+  const requestedSequence = pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : null);
+  const requestedPrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : null;
+  const {
+    sequence: effectiveSequence,
+    precision: effectivePrecision,
+    summaryA,
+    summaryB,
+    defaultTargets,
+    ssrRows,
+    interactivityRange,
+    oldest,
+    newest,
+    initialPairBenchmarkRows,
+  } = await getComparePageDerivedData(
+    parsed.model.dbKeys,
     parsed.a,
     parsed.b,
-    effectiveSequence,
-    effectivePrecision,
+    requestedSequence,
+    requestedPrecision,
+    fallbackSequence,
   );
 
   const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
   // The PNG route exists only under the EN tree; zh JSON-LD references it there.
   const imageUrl = `${SITE_URL}/compare-per-dollar/${canonical}/performance-per-dollar.png`;
-  const { oldest, newest } = dateRangeForPair(rows, parsed.a, parsed.b);
   const jsonLd = buildJsonLdZh(
     'per-dollar',
     parsed.model,
@@ -223,6 +219,11 @@ export async function renderPerDollarPageZh(
         defaultSequence={effectiveSequence}
         defaultPrecision={effectivePrecision}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
+        initialBenchmarkRows={initialCompareBenchmarkRows(
+          parsed.model.displayName,
+          effectiveModel,
+          initialPairBenchmarkRows,
+        )}
         narrative={narrative}
         agenticIntro={isAgenticSequence(effectiveSequence) ? AGENTIC_SCENARIO_INTRO_ZH : null}
         aLabel={aLabel}

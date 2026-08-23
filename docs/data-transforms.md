@@ -21,7 +21,7 @@ RenderableGraph[]  (consumed by ScatterGraph)
 
 **`AggDataEntry`** (`components/inference/types.ts`) — flattened, fully-typed working representation. All metric keys are promoted to top-level fields with `?? 0` defaults. The display model name is resolved here. `hwKey` starts as an empty string and is filled in by `transformBenchmarkRows` after calling `getHardwareKey`. The `actualDate` field holds the real DB date when the `date` field has been overridden to a user-selected comparison date.
 
-**`InferenceData`** (`components/inference/types.ts`) — chart-ready scatter point. Extends `Partial<AggDataEntry>` and adds: chart coordinates (`x`, `y`), all derived metrics as `{ y: number; roof: boolean }` objects, and narrowed boolean types for the `dp_attention`/`disagg` family. The `roof` flag is always `false` at creation and set to `true` by `markRooflinePoints` during the render phase.
+**`InferenceData`** (`components/inference/types.ts`) is a chart-ready scatter point. It extends `Partial<AggDataEntry>` with chart coordinates (`x`, `y`), derived metric objects shaped as `{ y: number; roof: boolean }`, and narrowed boolean types for the `dp_attention`/`disagg` family. Derived metric objects start with `roof: false`; current frontier membership is computed separately from the selected metric and chart direction.
 
 **`RenderableGraph`** — final output of `useChartData`. Bundles `model`, `sequence`, `chartDefinition`, and `InferenceData[]` for a single scatter chart panel.
 
@@ -44,20 +44,20 @@ RenderableGraph[]  (consumed by ScatterGraph)
 1. Converts every row to `AggDataEntry` once (via `rowToAggDataEntry`).
 2. Calls `getHardwareKey(entry)` and writes the result back into `entry.hwKey`.
 3. Calls `getHardwareConfig(hwKey)` with a per-call cache to build the `HardwareConfig` map (hardware display metadata — label, color, GPU title).
-4. For each `ChartDefinition` in `inference-chart-config.json`, calls `createChartDataPoint` with that definition's `x`/`y` field keys to produce one `InferenceData` array per chart. The same `AggDataEntry` objects are reused across chart definitions — they are not re-created.
+4. Builds canonical derived fields once per prepared entry, then calls `createChartDataPoint` for each chart definition with that definition's `x`/`y` keys and the shared fields. The same `AggDataEntry` and derived objects are reused across both charts.
 
 Returns `{ chartData: InferenceData[][], hardwareConfig: HardwareConfig }`.
 
 ### Step 2: AggDataEntry to InferenceData (`lib/chart-utils.ts`)
 
-**`createChartDataPoint(date, entry, xKey, yKey, hwKey)`** — spreads `entry` first, then overrides with derived fields:
+**`createChartDataPoint(date, entry, xKey, yKey, hwKey, derivedFields?)`** spreads `entry` first, then overrides chart coordinates and metadata. The full transform passes precomputed derived fields; direct callers may omit them.
 
 - `x` / `y`: read directly from `entry[xKey]` and `entry[yKey]` (set per chart definition).
 - `tp`: for disaggregated configs, set to `num_prefill_gpu + num_decode_gpu` instead of `decode_tp`.
 - Boolean narrowing: `dp_attention`, `prefill_dp_attention`, `decode_dp_attention`, and `is_multinode` are coerced from `boolean | string` to `boolean | undefined`.
 - Disagg fields: `num_prefill_gpu` / `num_decode_gpu` are only set when `entry.disagg` is true; otherwise they are dropped.
 
-**Derived metric fields** — each uses `{ y: number; roof: boolean }` so the chart layer can switch between them without re-fetching data:
+**`buildDerivedChartFields(entry, hwKey, requestedMetrics?)`** is the sole owner of inference and historical trend formulas. The full transform requests every benchmark-backed field. History requests only the selected metric and its interpolation dependencies, so it stays lightweight. Each emitted value uses `{ y: number; roof: boolean }`.
 
 - `tpPerGpu`, `outputTputPerGpu`, `inputTputPerGpu` — raw throughput from the entry (tok/s/gpu).
 - `tpPerMw` — `(tputPerGpu * 1000) / hardwarePower` (GPU power in kW, result in tok/s/MW).
@@ -65,7 +65,7 @@ Returns `{ chartData: InferenceData[][], hardwareConfig: HardwareConfig }`.
 - Tokens-per-dollar fields — tokens-per-hour divided by the same hourly costs. They are separate Y-axis metrics rather than a display toggle: combined (`tokensPerDollarH`/`N`/`R`), output-only (`outputTokensPerDollarH`/`N`/`R`), and input-only (`inputTokensPerDollarH`/`N`/`R`). This keeps existing `i_metric=y_cost*` links and cost semantics unchanged.
 - Energy fields — `jTotal` / `jOutput` / `jInput`: `(hardwarePower * 1000) / tputPerGpu` (Joules per token, where power in kW is converted to W).
 
-**GPU specs lookup** — `createChartDataPoint` calls `getGpuSpecs(hwKey)` (`lib/constants.ts`) which splits on `[-_]` to extract the base GPU token (e.g. `"b200_trt_mtp"` → `"b200"`) and looks it up in `HW_REGISTRY`. `HW_REGISTRY` stores power (kW per GPU) and three cost tiers ($ per GPU-hour). Missing keys return zeroed specs, which produces `0` cost/energy values rather than crashing.
+**GPU specs lookup** happens inside `buildDerivedChartFields`. `getGpuSpecs(hwKey)` (`lib/constants.ts`) splits on `[-_]` to extract the base GPU token (for example, `"b200_trt_mtp"` becomes `"b200"`) and looks it up in `HW_REGISTRY`. Missing keys return zeroed specs, producing `0` cost/energy values rather than crashing.
 
 ### Step 3: Filtering, memoization, and rendering (`hooks/useChartData.ts`)
 
@@ -107,7 +107,7 @@ The resulting key's base GPU must exist in `HW_REGISTRY`. Display fields (label,
 
 ## Chart Configuration
 
-`inference-chart-config.json` defines exactly two `ChartDefinition` objects:
+`metric-registry.ts` owns metric fields, English and Chinese labels, titles, polarity, and control ordering. It derives exactly two `ChartDefinition` objects:
 
 | `chartType`     | Default x-axis  | x meaning                                                      |
 | --------------- | --------------- | -------------------------------------------------------------- |
@@ -116,13 +116,13 @@ The resulting key's base GPU must exist in `HW_REGISTRY`. Display fields (label,
 
 Both charts share the same Y-axis options. The `y` field is the default `AggDataEntry` key used for raw Y values; each `y_{metric}` field overrides this with a dotted path into the `InferenceData` derived fields (e.g. `"tpPerGpu.y"`).
 
-**Per-metric Y-axis schema** — for each metric key (e.g. `y_costh`), the config carries:
+**Per-metric Y-axis schema** is owned once in `METRIC_REGISTRY`:
 
-- `y_{metric}`: dotted path for the value (e.g. `"costh.y"`).
-- `y_{metric}_label`: Y-axis label string.
-- `y_{metric}_title`: dropdown/UI title string.
-- `y_{metric}_roofline`: Pareto direction (`upper_left`, `upper_right`, `lower_left`, `lower_right`). Roofline direction differs between chart types for the same metric because the x-axis polarity differs (interactivity: higher-is-better; E2EL: lower-is-better).
+- `field`: dotted path for the value (for example, `"costh.y"`).
+- `label` / `labelZh`: bilingual Y-axis labels.
+- `title` / `titleZh`: bilingual dropdown and chart titles.
+- `polarity`: whether higher or lower values are preferable. The derived chart definitions combine this with x-axis polarity to produce the concrete Pareto corner.
 
-**Input-metric x-axis override** — when the selected Y metric's title contains `"input"`, the interactivity chart switches its x-axis to `p99_ttft` (or the user-overridden x metric). This is detected in `stableChartDefinitions` via `metricTitle.toLowerCase().includes('input')`. The config encodes the default override fields: `y_inputTputPerGpu_x: "p99_ttft"` and `y_inputTputPerGpu_x_label`.
+**Input-metric x-axis override** switches the interactivity chart to TTFT when the selected Y metric is input-related. `inputTputPerGpu` declares `p90_ttft` and its label in the registry; a user-selected TTFT metric may override it.
 
 **Limits** — both charts include `y_cost_limit: 5` (clip cost-per-million metrics above $5/M tokens) and `y_latency_limit: 60` (clip x-axis outliers beyond 60s when TTFT is on x). Tokens-per-dollar metrics are not cost-clipped; clipped cost points remain available to the dashed continuation layer.

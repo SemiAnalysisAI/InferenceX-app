@@ -5,8 +5,13 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
-import { useInference } from '@/components/inference/InferenceContext';
+import chartDefinitions from '@/components/inference/metric-registry';
+import {
+  useInferenceActions,
+  useInferenceData,
+  useInferenceDisplay,
+  useInferenceFilters,
+} from '@/components/inference/InferenceContext';
 import type {
   ChartDefinition,
   HardwareConfig,
@@ -38,7 +43,10 @@ import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
 import { getDisplayLabel } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import {
+  useOverlayScopeReconciliation,
+  useUnofficialRun,
+} from '@/components/unofficial-run-provider';
 import {
   type Model,
   type Precision,
@@ -59,6 +67,7 @@ import {
   useDerivedAgenticMetrics,
   type DerivedAgenticMetric,
 } from '@/hooks/api/use-derived-agentic-metrics';
+import { useResidentSequenceLengths } from '@/hooks/api/use-resident-sequence-lengths';
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useLocale } from '@/lib/use-locale';
@@ -90,6 +99,8 @@ const STRINGS = {
     updated: 'Updated:',
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
+    completedSequenceLengths: (count: string) =>
+      `Completed requests across all resident points (n=${count})`,
     viewMode: 'View mode',
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
@@ -106,13 +117,14 @@ const STRINGS = {
     updated: '更新时间：',
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
+    completedSequenceLengths: (count: string) => `当前所有数据点的已完成请求（n=${count}）`,
     viewMode: '视图模式',
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
   },
 } as const;
 
-// Translate the "vs. …" chart-heading suffix from inference-chart-config.json
+// Translate the "vs. …" chart-heading suffix from the metric registry
 // into Chinese. useChartData rewrites the heading with the selected percentile
 // for agentic sequences (e.g. "vs. P90 Interactivity"), so this matches the
 // pattern instead of a fixed string; unknown headings pass through unchanged.
@@ -181,6 +193,14 @@ const VIEW_MODE_OPTIONS: SegmentedToggleOption<InferenceViewMode>[] = [
   },
 ];
 
+export function formatTokenLength(value: number): string {
+  const rounded = Math.round(value);
+  if (rounded < 1_000) return String(rounded);
+  if (rounded < 10_000) return `${(rounded / 1_000).toFixed(1).replace(/\.0$/u, '')}k`;
+  if (rounded < 1_000_000) return `${Math.round(rounded / 1_000)}k`;
+  return `${(rounded / 1_000_000).toFixed(2).replace(/\.0+$/u, '')}m`;
+}
+
 /**
  * Renders the inference chart cards, captions, and overlay controls for the current filtered
  * benchmark data.
@@ -188,34 +208,34 @@ const VIEW_MODE_OPTIONS: SegmentedToggleOption<InferenceViewMode>[] = [
 export default function ChartDisplay() {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const { graphs, loading, error, dateRangeAvailableDates } = useInferenceData();
   const {
-    graphs,
-    loading,
-    error,
-    workflowInfo,
-    selectedYAxisMetric,
-    selectedXAxisMetric,
-    selectedE2eXAxisMetric,
     selectedGPUs,
     selectedPrecisions,
     selectedDates,
-    setSelectedDates,
-    setSelectedDatesFromRunExpansion,
     selectedDateRange,
-    dateRangeAvailableDates,
     selectedModel,
     selectedSequence,
     selectedRunDate,
-    setIsLegendExpanded,
     activeHwTypes,
     bestPerSku,
     activeDates,
-    selectedPercentile,
     compareGpuPair,
-    selectedXAxisMode,
-    setSelectedXAxisMode,
     quickFilters,
-  } = useInference();
+  } = useInferenceFilters();
+  const {
+    selectedYAxisMetric,
+    selectedXAxisMetric,
+    selectedE2eXAxisMetric,
+    selectedPercentile,
+    selectedXAxisMode,
+  } = useInferenceDisplay();
+  const {
+    setSelectedDates,
+    setSelectedDatesFromRunExpansion,
+    setIsLegendExpanded,
+    setSelectedXAxisMode,
+  } = useInferenceActions();
   const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
   const workflowInfoBenchmarkType =
@@ -326,9 +346,7 @@ export default function ChartDisplay() {
     getOverlayData,
     isUnofficialRun,
     activeOverlayHwTypes,
-    setActiveOverlayHwTypes,
     localOfficialOverride,
-    setLocalOfficialOverride,
   } = useUnofficialRun();
 
   // Compute overlay data for each chart type — must match useChartData processing
@@ -493,55 +511,42 @@ export default function ChartDisplay() {
   ]);
   const overlayRowsScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(
     ',',
-  )}|${unofficialRunInfos.map((run) => run.url).join(',')}`;
-  const [appliedOverlayRowsScopeKey, setAppliedOverlayRowsScopeKey] = useState(overlayRowsScopeKey);
-  const overlayRowsScopeChanged =
-    isUnofficialRun && appliedOverlayRowsScopeKey !== overlayRowsScopeKey;
-  const selectedOfficialHwTypes = overlayRowsScopeChanged
-    ? officialScope
-    : isUnofficialRun
-      ? (localOfficialOverride ?? activeHwTypes)
-      : activeHwTypes;
-  // Preview tables follow the same policy as ScatterGraph: preserve every
-  // active engine family instead of applying the production comparison guard.
-  const scopedActiveOverlayHwTypes = useMemo(() => {
-    const activeScopedOverlayKeys = new Set(
-      [...activeOverlayHwTypes].filter((key) => overlayScope.has(key)),
-    );
-    return overlayRowsScopeChanged ? scopedBestSelections.overlay : activeScopedOverlayKeys;
-  }, [activeOverlayHwTypes, overlayScope, overlayRowsScopeChanged, scopedBestSelections.overlay]);
-  useEffect(() => {
-    const merged = new Set(activeOverlayHwTypes);
-    overlayScope.forEach((key) => merged.delete(key));
-    scopedActiveOverlayHwTypes.forEach((key) => merged.add(key));
-    let selectionChanged = merged.size !== activeOverlayHwTypes.size;
-    if (!selectionChanged) {
-      for (const key of merged) {
-        if (!activeOverlayHwTypes.has(key)) {
-          selectionChanged = true;
-          break;
-        }
-      }
-    }
-    if (selectionChanged) setActiveOverlayHwTypes(merged);
-    // A scope change can render once before its official graphs arrive. Do not
-    // persist that transient empty set as an intentional legend selection.
-    if (overlayRowsScopeChanged && (!loading || officialScope.size > 0)) {
-      setLocalOfficialOverride(scopedBestSelections.official);
-      setAppliedOverlayRowsScopeKey(overlayRowsScopeKey);
-    }
-  }, [
-    overlayRowsScopeChanged,
-    overlayRowsScopeKey,
-    activeOverlayHwTypes,
-    loading,
-    officialScope,
-    scopedBestSelections.official,
-    overlayScope,
-    scopedActiveOverlayHwTypes,
-    setActiveOverlayHwTypes,
-    setLocalOfficialOverride,
-  ]);
+  )}|${unofficialRunInfos.map((run) => run.url).join(',')}|official:${[...officialScope]
+    .toSorted()
+    .join(',')}|overlay:${[...overlayScope].toSorted().join(',')}`;
+  const selectedOfficialHwTypes = isUnofficialRun
+    ? (localOfficialOverride ?? activeHwTypes)
+    : activeHwTypes;
+  const scopedActiveOverlayHwTypes = useMemo(
+    () => new Set([...activeOverlayHwTypes].filter((key) => overlayScope.has(key))),
+    [activeOverlayHwTypes, overlayScope],
+  );
+  const overlayScopeRegistration = useMemo(
+    () =>
+      isUnofficialRun
+        ? {
+            scopeKey: overlayRowsScopeKey,
+            officialHwTypes: officialScope,
+            overlayHwTypes: overlayScope,
+            bestOfficialHwTypes: scopedBestSelections.official,
+            bestOverlayHwTypes: scopedBestSelections.overlay,
+            bestPerSku,
+            ready: !loading || officialScope.size > 0,
+          }
+        : null,
+    [
+      isUnofficialRun,
+      overlayRowsScopeKey,
+      officialScope,
+      overlayScope,
+      scopedBestSelections,
+      bestPerSku,
+      loading,
+      activeOverlayHwTypes,
+      localOfficialOverride,
+    ],
+  );
+  useOverlayScopeReconciliation(overlayScopeRegistration);
 
   const visibleComparisonRows = useCallback(
     (officialRows: InferenceData[], overlay: OverlayData | null | undefined) => {
@@ -609,6 +614,35 @@ export default function ChartDisplay() {
   }, [effectiveGraphs, selectedXAxisMode]);
 
   const isAgenticSequence = sequenceKind(selectedSequence) === 'agentic';
+  const residentPointIds = useMemo(() => {
+    if (!isAgenticSequence) return [] as number[];
+    const ids = new Set<number>();
+    for (const graph of visibleGraphs) {
+      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      for (const point of points) {
+        if (
+          selectedPrecisions.includes(point.precision) &&
+          point.benchmark_type === 'agentic_traces' &&
+          isPersistedBenchmarkId(point.id)
+        ) {
+          ids.add(point.id);
+        }
+      }
+    }
+    return [...ids];
+  }, [isAgenticSequence, selectedPrecisions, visibleGraphs]);
+  // Unofficial-run artifacts are transformed in memory and do not have
+  // persisted aggregate_stats sketches. Suppress the subtitle in overlay mode
+  // rather than presenting official-only values as if they covered the overlay.
+  const residentSequenceLengthsQuery = useResidentSequenceLengths(
+    residentPointIds,
+    isAgenticSequence && !isUnofficialRun,
+  );
+  const residentSequenceLengths =
+    residentSequenceLengthsQuery.data?.coveredPoints ===
+    residentSequenceLengthsQuery.data?.requestedPoints
+      ? residentSequenceLengthsQuery.data
+      : null;
   const useDerivedXAxis = isAgenticSequence && isAgenticOnlyXAxisMode(selectedXAxisMode);
   const derivedTargetIds = useMemo(() => {
     if (!useDerivedXAxis) return [] as number[];
@@ -779,7 +813,7 @@ export default function ChartDisplay() {
                       );
                     }}
                   />
-                  <Card>
+                  <Card data-coach-mark-root="">
                     {(() => {
                       const chartCaption = (
                         <>
@@ -861,6 +895,28 @@ export default function ChartDisplay() {
                               </>
                             )}
                           </p>
+                          {residentSequenceLengths && (
+                            <p
+                              className="mb-2 text-xs text-muted-foreground"
+                              data-testid="resident-sequence-lengths"
+                            >
+                              {t.completedSequenceLengths(
+                                residentSequenceLengths.isl.n.toLocaleString(
+                                  locale === 'zh' ? 'zh-CN' : 'en-US',
+                                ),
+                              )}{' '}
+                              · ISL p50 {formatTokenLength(residentSequenceLengths.isl.p50)} · p75{' '}
+                              {formatTokenLength(residentSequenceLengths.isl.p75)} · p90{' '}
+                              {formatTokenLength(residentSequenceLengths.isl.p90)} · p95{' '}
+                              {formatTokenLength(residentSequenceLengths.isl.p95)} · p99{' '}
+                              {formatTokenLength(residentSequenceLengths.isl.p99)} | OSL p50{' '}
+                              {formatTokenLength(residentSequenceLengths.osl.p50)} · p75{' '}
+                              {formatTokenLength(residentSequenceLengths.osl.p75)} · p90{' '}
+                              {formatTokenLength(residentSequenceLengths.osl.p90)} · p95{' '}
+                              {formatTokenLength(residentSequenceLengths.osl.p95)} · p99{' '}
+                              {formatTokenLength(residentSequenceLengths.osl.p99)}
+                            </p>
+                          )}
                           <MetricAssumptionNotes selectedYAxisMetric={selectedYAxisMetric} />
                           {isUnofficialRun &&
                             selectedXAxisMode === 'e2e-normalized-interactivity' && (
@@ -977,7 +1033,7 @@ export default function ChartDisplay() {
             </div>
             <ChartControls />
             <ModelArchitectureDiagram model={selectedModel} />
-            {selectedGPUs.length === 0 && <WorkflowInfoDisplay workflowInfo={workflowInfo} />}
+            {selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
             {selectedGPUs.length > 0 && (
               <ComparisonChangelog
                 changelogs={changelogs}

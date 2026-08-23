@@ -32,7 +32,7 @@ const getCachedAgenticAggregates = cachedQuery(
 /**
  * GET /api/v1/agentic-aggregates?ids=1,2,3
  *
- * Returns per-id mean/p50/p75/p90/p99 for ISL, OSL, KV cache utilization,
+ * Returns per-id mean/p50/p75/p90/p95/p99 for ISL, OSL, KV cache utilization,
  * and prefix cache hit rate — computed live from the stored aiperf
  * profile_export.jsonl + server_metrics_json blobs. Ids without a
  * trace_replay blob (or with no usable samples) get nulls.

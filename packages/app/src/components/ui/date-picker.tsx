@@ -1,7 +1,7 @@
 'use client';
 
 import { Calendar, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { track } from '@/lib/analytics';
 
@@ -26,6 +26,42 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { useLocale } from '@/lib/use-locale';
+
+const STRINGS = {
+  en: {
+    placeholder: 'Select date',
+    selectDateError: 'Please select a date',
+    unavailableDatePrefix: 'This date does not exist: ',
+    latest: 'Latest',
+    previousDate: 'Previous available date',
+    nextDate: 'Next available date',
+    runDate: 'Run Date:',
+    title: 'Select a Run Date',
+    description: 'Select a run date to view the performance data for that run.',
+    checking: 'Checking available dates...',
+    goToLatest: 'Go to Latest',
+    cancel: 'Cancel',
+    applying: 'Applying...',
+    apply: 'Apply',
+  },
+  zh: {
+    placeholder: '选择日期',
+    selectDateError: '请选择一个日期',
+    unavailableDatePrefix: '此日期不存在：',
+    latest: '最新',
+    previousDate: '上一个可用日期',
+    nextDate: '下一个可用日期',
+    runDate: '运行日期：',
+    title: '选择运行日期',
+    description: '选择运行日期以查看该次运行的性能数据。',
+    checking: '正在检查可用日期...',
+    goToLatest: '前往最新日期',
+    cancel: '取消',
+    applying: '正在应用...',
+    apply: '应用',
+  },
+} as const;
 
 export interface DatePickerProps {
   date?: string;
@@ -46,10 +82,13 @@ export function DatePicker({
   onChange,
   minDate,
   maxDate,
-  placeholder = 'Select date',
+  placeholder,
   availableDates,
   isCheckingAvailableDates,
 }: DatePickerProps) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const resolvedPlaceholder = placeholder ?? t.placeholder;
   const [open, setOpen] = useState(false);
   const [tempDate, setTempDate] = useState<string | undefined>(date);
   const [isApplying, _setIsApplying] = useState(false);
@@ -58,9 +97,9 @@ export function DatePicker({
   // Get display text for the input
   const getDisplayText = () => {
     if (!date) {
-      return placeholder;
+      return resolvedPlaceholder;
     }
-    return formatDisplayDate(date);
+    return formatDisplayDate(date, locale);
   };
 
   // Handle date selection in calendar
@@ -82,12 +121,12 @@ export function DatePicker({
   // Apply selection
   const handleApply = () => {
     if (!tempDate) {
-      setError('Please select a date');
+      setError(t.selectDateError);
       return;
     }
 
     if (availableDates && !availableDates.includes(tempDate)) {
-      setError(`This date does not exist: ${formatDisplayDate(tempDate)}`);
+      setError(`${t.unavailableDatePrefix}${formatDisplayDate(tempDate, locale)}`);
       return;
     }
 
@@ -176,15 +215,12 @@ export function DatePicker({
   // Reset when opening
   const handleOpenChange = (isOpen: boolean) => {
     track(isOpen ? 'date_picker_opened' : 'date_picker_closed');
+    setError('');
     if (isOpen) {
       setTempDate(date);
     }
     setOpen(isOpen);
   };
-
-  useEffect(() => {
-    setError('');
-  }, [open]);
 
   return (
     <div className="space-y-2">
@@ -196,7 +232,7 @@ export function DatePicker({
           disabled={isCurrentDateLatest() || Boolean(isCheckingAvailableDates)}
           className="text-xs px-2"
         >
-          Latest
+          {t.latest}
         </Button>
         <Button
           variant="ghost"
@@ -205,6 +241,7 @@ export function DatePicker({
           disabled={!canGoPrevious() || Boolean(isCheckingAvailableDates)}
           className="size-8"
           suppressHydrationWarning
+          aria-label={t.previousDate}
         >
           <ChevronLeft className="size-4" />
         </Button>
@@ -215,7 +252,7 @@ export function DatePicker({
               className="!px-5 min-w-[200px] dark:bg-input/90 dark:hover:bg-input/50"
             >
               <Calendar className="mr-0 size-4" />
-              <strong>Run Date:</strong>
+              <strong>{t.runDate}</strong>
               <span className="tabular-nums inline-block w-[6.5em] text-left">
                 {getDisplayText()}
               </span>
@@ -223,10 +260,8 @@ export function DatePicker({
           </DialogTrigger>
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
-              <DialogTitle>Select a Run Date</DialogTitle>
-              <DialogDescription>
-                Select a run date to view the performance data for that run.
-              </DialogDescription>
+              <DialogTitle>{t.title}</DialogTitle>
+              <DialogDescription>{t.description}</DialogDescription>
             </DialogHeader>
             <div className="py-4 relative">
               <CalendarGrid
@@ -241,7 +276,7 @@ export function DatePicker({
                 <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
                   <div className="flex flex-col items-center gap-2">
                     <Loader2 className="size-6 animate-spin text-primary" />
-                    <p className="text-sm text-muted-foreground">Checking available dates...</p>
+                    <p className="text-sm text-muted-foreground">{t.checking}</p>
                   </div>
                 </div>
               )}
@@ -253,16 +288,16 @@ export function DatePicker({
                 onClick={handleGoToLatest}
                 disabled={isLatestDateSelected() || Boolean(isCheckingAvailableDates)}
               >
-                Go to Latest
+                {t.goToLatest}
               </Button>
               <div className="flex gap-2">
                 <DialogClose asChild>
                   <Button variant="outline" onClick={handleCancel}>
-                    Cancel
+                    {t.cancel}
                   </Button>
                 </DialogClose>
                 <Button onClick={handleApply} disabled={isApplying}>
-                  {isApplying ? 'Applying...' : 'Apply'}
+                  {isApplying ? t.applying : t.apply}
                 </Button>
               </div>
             </div>
@@ -274,6 +309,7 @@ export function DatePicker({
           onClick={handleGoNext}
           disabled={!canGoNext() || Boolean(isCheckingAvailableDates)}
           className="size-8"
+          aria-label={t.nextDate}
         >
           <ChevronRight className="size-4" />
         </Button>

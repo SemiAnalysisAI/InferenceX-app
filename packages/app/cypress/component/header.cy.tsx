@@ -4,6 +4,7 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 
 import { Header } from '@/components/header/header';
 import { ThemeProvider } from '@/components/ui/theme-provider';
+import { createMockRouter } from '../support/mock-router';
 
 // Mounted outside the Next app shell; next-style-loader inserts the global
 // stylesheet before this anchor, so it must exist before the import below.
@@ -20,18 +21,6 @@ const queryClient = new QueryClient({
 const MIN_TOUCH_PX = 44;
 /** Tolerance for sub-pixel layout rounding. */
 const EPSILON = 0.5;
-
-function createMockRouter() {
-  return {
-    push: cy.stub(),
-    replace: cy.stub(),
-    refresh: cy.stub(),
-    back: cy.stub(),
-    forward: cy.stub(),
-    prefetch: cy.stub().resolves(),
-    bfcacheId: '',
-  };
-}
 
 function rectOf(selector: string) {
   return cy.get(selector).then(($el) => $el[0].getBoundingClientRect());
@@ -79,6 +68,20 @@ describe('Header', () => {
     cy.wrap(mockRouter.push).should('have.been.calledOnceWith', '/overview');
     cy.tick(250);
     cy.wrap(mockRouter.push).should('have.been.calledTwice');
+  });
+
+  it('retains resilient locale navigation outside Overview', () => {
+    cy.clock();
+    mountHeader('/inference');
+    cy.get('[data-testid="language-toggle"]')
+      .invoke('attr', 'href')
+      .then((href) => {
+        expect(href).to.include('/zh/inference');
+        cy.get('[data-testid="language-toggle"]').click();
+        cy.wrap(mockRouter.push).should('have.been.calledOnceWith', href);
+        cy.tick(250);
+        cy.wrap(mockRouter.push).should('have.been.calledTwice');
+      });
   });
 
   it('makes a click on the tab already showing a no-op', () => {

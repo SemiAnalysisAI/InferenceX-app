@@ -188,7 +188,7 @@ B200 SGLang 自我们去年 10 月首次发布以来，FP4 和 FP8 场景均呈�
 
 ## 分离式推理框架
 
-NVIDIA 使用 Dynamo 作为其分离式推理方案。[Dynamo](https://docs.nvidia.com/dynamo/design-docs/overall-architecture) 是一个专为多节点分布式推理设计的推理框架，具备预填充-解码分离、请求路由和 KV 缓存卸载等技术。它与推理引擎无关，允许我们在基准测试中使用 SGLang 和 TRT-LLM 作为后端。对于 AMD，我们使用 SGLang 配合两种不同的 KV 缓存传输框架：MoRI 和 Mooncake。[MoRI](https://github.com/rocm/mori) 是一个高性能通信接口，专注于 RDMA 和 GPU 集成，提供网络集合操作和专家并行内核等应用。Mooncake [最近加入了 PyTorch 生态系统](https://pytorch.org/blog/mooncake-joins-pytorch-ecosystem/)，支持预填充-解码分离以及多种容错多节点功能。
+NVIDIA 使用 Dynamo 作为其分离式推理方案。[Dynamo](https://docs.nvidia.com/dynamo/design-docs/overall-architecture) 是一个专为多节点分布式推理设计的推理框架，具备预填充-解码分离、请求路由和 KV 缓存 offload 等技术。它与推理引擎无关，允许我们在基准测试中使用 SGLang 和 TRT-LLM 作为后端。对于 AMD，我们使用 SGLang 配合两种不同的 KV 缓存传输框架：MoRI 和 Mooncake。[MoRI](https://github.com/rocm/mori) 是一个高性能通信接口，专注于 RDMA 和 GPU 集成，提供网络集合操作和专家并行内核等应用。Mooncake [最近加入了 PyTorch 生态系统](https://pytorch.org/blog/mooncake-joins-pytorch-ecosystem/)，支持预填充-解码分离以及多种容错多节点功能。
 
 ## DeepSeek Disagg + WideEP 结果深入分析
 
@@ -493,7 +493,7 @@ AMD 在开源分布式推理、宽专家并行和 FP4 可组合性方面落后�
 
 ## AMD ATOM 引擎
 
-AMD 推出了名为 ATOM 的新推理引擎。ATOM 能提供略好的单节点性能，但在许多关键功能上完全缺失，导致无法用于真实工作负载。例如，它不支持 NVMe 或 CPU KVCache 卸载、工具解析、宽专家并行或分离式服务。这导致生产环境中没有任何客户使用它。与 NVIDIA 的 TRTLLM 不同——后者在 TogetherAI 等公司全球范围内每小时生成数十亿 token，[并且支持工具解析和其他功能](https://nvidia.github.io/TensorRT-LLM/commands/trtllm-serve/trtllm-serve.html#cmdoption-trtllm-serve-serve-tool_parser)——由于上述功能缺失，目前没有任何 token 工厂在使用 ATOM。
+AMD 推出了名为 ATOM 的新推理引擎。ATOM 能提供略好的单节点性能，但在许多关键功能上完全缺失，导致无法用于真实工作负载。例如，它不支持 NVMe 或 CPU KV cache offload、工具解析、宽专家并行或分离式服务。这导致生产环境中没有任何客户使用它。与 NVIDIA 的 TRTLLM 不同——后者在 TogetherAI 等公司全球范围内每小时生成数十亿 token，[并且支持工具解析和其他功能](https://nvidia.github.io/TensorRT-LLM/commands/trtllm-serve/trtllm-serve.html#cmdoption-trtllm-serve-serve-tool_parser)——由于上述功能缺失，目前没有任何 token 工厂在使用 ATOM。
 
 此外，vLLM 等开源推理引擎的维护者对 AMD 感到失望，原因是 AMD 提供的工程和 GPU 资源不足。例如，vLLM 首席维护者 Simon Mo 在 GitHub RFC 中表示，他仍然没有可用的 MI355X 来添加到 vLLM CI 中，因此用户体验不佳。vLLM 上目前没有任何 MI355X 测试，而 NVIDIA 的 B200 在 vLLM 上有大量测试。同样，vLLM 上的 MI300X CI 机器数量仍然不够。上游 vLLM 至少还需要 20 台 MI300 机器、20 台 MI325 机器和 20 台 MI355X 机器才能达到与 CUDA 相同的可用性水平。
 
@@ -847,7 +847,7 @@ Microsoft/GitHub 自己也意识到了这个问题，已停止在其状态页面
 
 目前，InferenceX 使用完全随机的 token 作为基准测试的输入。然后我们在 [ISL*0.8, ISL] 分布下均匀变化 ISL/OSL，OSL 类似。由于使用随机数据，我们在所有基准测试中禁用了前缀缓存，因为完全随机数据的前缀缓存命中率期望值为 0%。此外，所有随机数据都是单轮的，意味着每个对话只包含一个提示和一个回答。虽然这提供了良好的基线帕累托前沿，但它不是模拟真实世界生产推理工作负载的实际基准测试方案。
 
-在近期，我们将使用类似 [allenai/WildChat-4.8M](https://huggingface.co/datasets/allenai/WildChat-4.8M) 这样的数据集创建基础多轮基准测试，该数据集记录了真实用户的多轮对话。除了在所有场景中启用前缀缓存外，我们还将启用 KV 缓存 CPU 卸载，因为这是我们在生产工作负载中看到的做法。这将更准确地评估每款芯片的优缺点。例如，MI355X 拥有 288GB HBM3e 而 B200 仅有 192GB。因此，我们预期 MI355X 在高并发多轮场景中表现更好，因为更多内存可以分配给 KV 缓存。另一方面，在 GPU KV 缓存紧张、块被卸载到 CPU 的场景中，我们预期 GB 系列表现更优，因为这些芯片拥有 900 GB/s 双向 CPU-GPU 带宽，相比之下 HGX 使用 PCIe 5.0 和 6.0 分别只有 128 GB/s 和 256 GB/s。此外，我们目前看到 AMD 的 CPU 卸载软件表现不佳，这可能在相同场景中对性能产生负面影响。
+在近期，我们将使用类似 [allenai/WildChat-4.8M](https://huggingface.co/datasets/allenai/WildChat-4.8M) 这样的数据集创建基础多轮基准测试，该数据集记录了真实用户的多轮对话。除了在所有场景中启用前缀缓存外，我们还将启用 KV 缓存 CPU offload，因为这是我们在生产工作负载中看到的做法。这将更准确地评估每款芯片的优缺点。例如，MI355X 拥有 288GB HBM3e 而 B200 仅有 192GB。因此，我们预期 MI355X 在高并发多轮场景中表现更好，因为更多内存可以分配给 KV 缓存。另一方面，在 GPU KV 缓存紧张、块被 offload 到 CPU 的场景中，我们预期 GB 系列表现更优，因为这些芯片拥有 900 GB/s 双向 CPU-GPU 带宽，相比之下 HGX 使用 PCIe 5.0 和 6.0 分别只有 128 GB/s 和 256 GB/s。此外，我们目前看到 AMD 的 CPU offload 软件表现不佳，这可能在相同场景中对性能产生负面影响。
 
 关键是：真实世界的多轮数据集测试了更多 SOTA 推理引擎功能，能够在所有芯片上捕获更细致和可靠的性能数据。
 

@@ -4,7 +4,11 @@ import { BarChart3, Table2 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { getModelReleaseDate } from '@semianalysisai/inferencex-constants';
+import {
+  getModelReleaseDate,
+  TCO_SOURCE_TITLE,
+  TCO_SOURCE_URL,
+} from '@semianalysisai/inferencex-constants';
 
 import type { HardwareConfig } from '@/components/inference/types';
 import { Card } from '@/components/ui/card';
@@ -109,7 +113,7 @@ const STRINGS = {
       'This power budget is too small to power a single chip of the shown hardware. Try a larger value.',
     mwLabel: 'Facility Power (MW)',
     mwTooltip:
-      'Total facility power budget in megawatts. Chip count uses all-in power per chip (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model — not bare TDP.',
+      'Total facility power budget in megawatts. Chip count uses all-in power per chip (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model, not bare TDP.',
     mwPlaceholder: 'e.g. 10',
     colChips: 'Chips',
     colUsers: 'Concurrent Users now',
@@ -120,11 +124,11 @@ const STRINGS = {
     errorPrefix: 'Could not load run history: ',
     noneMeasured:
       'No chip was measured at this interactivity on any run date. Move the target interactivity slider into a measured range. The ranges each chip has been measured over are listed below.',
-    priceLabel: 'Token Price — input, output ($/M tok)',
+    priceLabel: 'Token Price: input, output ($/M tok)',
     priceInputLabel: 'Input token price, $ per million',
     outputPriceInputLabel: 'Output token price, $ per million',
     priceTooltip:
-      "Sale price of tokens, input and output separately — providers bill output at a multiple of input, and the two streams are wildly unequal: 8 input tokens per output token on a fixed 8k/1k sequence, around 130 on agentic traces. Revenue counts both, whichever token type the cost matrix above is set to. The pair defaults to the prices that exactly zero the cheapest visible fleet's margin at its latest config — the competitive floor, at which that chip earns nothing and every pricier chip is underwater — seeded at 4x output over input, which is roughly where the major vendors price. Break-even with two prices is a line rather than a point, so a reset scales both and keeps whatever ratio you have set. Everything above that line is your assumption, not a measurement.",
+      "Sale price of input and output tokens, set separately. Providers bill output at a multiple of input, and the two streams are wildly unequal: 8 input tokens per output token on a fixed 8k/1k sequence, around 130 on agentic traces. Revenue counts both, whichever token type the cost matrix above is set to. The pair defaults to the prices that exactly zero the cheapest visible fleet's margin at its latest config. This is the competitive floor, where that chip earns nothing and every pricier chip is underwater. It starts with output priced at 4x input, roughly matching major vendors. Break-even with two prices is a line rather than a point, so a reset scales both and keeps whatever ratio you have set. Everything above that line is your assumption, not a measurement.",
     priceReset: 'Reset to break-even',
     mtbiLabel: 'MTBI (days)',
     mtbiTooltip:
@@ -133,13 +137,13 @@ const STRINGS = {
     recoveryTooltip: 'Hours to restore service after one interruption.',
     rampLabel: 'Ramp (months)',
     rampTooltip:
-      'Months for a config to roll out across the fleet. Every config gets one: it climbs from whatever the fleet was already serving to the new config\u2019s numbers, and the first climbs from zero. Cost runs at full rate throughout \u2014 racks bill from the moment they are energised, not from the moment they are loaded \u2014 so the first rollout opens at a full day\u2019s cost against no revenue, which is the deepest the margin line ever goes. Your assumption, not a measurement; set it to 0 for configs that take effect instantly.',
+      'Months for a config to roll out across the fleet. Every config gets one: it climbs from whatever the fleet was already serving to the new config\u2019s numbers, and the first climbs from zero. Cost runs at full rate throughout because racks bill from the moment they are energised, not from the moment they are loaded. The first rollout therefore opens at a full day\u2019s cost against no revenue, which is the deepest the margin line ever goes. Your assumption, not a measurement; set it to 0 for configs that take effect instantly.',
     horizonLabel: 'Horizon (months from release)',
     horizonTooltip:
-      "How far past the model's release date to project. Past the last sweep the latest config is held flat — that is what the fleet earns if optimisation stops, not a forecast of further gains.",
+      "How far past the model's release date to project. Past the last sweep, the latest config is held flat. That is what the fleet earns if optimisation stops, not a forecast of further gains.",
     cacheLabel: 'Cached input (% of price)',
     cacheTooltip:
-      'What a cached input token sells for, as a percentage of the price above. Agentic traces reuse enormous prefixes — a median 133 input tokens per output token, of which a median 92% are served from cache on these runs — and providers bill a cache read at a fraction of a fresh token, so charging full price for all of them overstates margin by close to an order of magnitude. The cached fraction is measured per config, not assumed; only the percentage is yours. Set it to 100 to bill every token the same. Fixed sequences record no cache hits at all, which is why this input only appears for agentic traces.',
+      'What a cached input token sells for, as a percentage of the price above. Agentic traces reuse enormous prefixes: a median 133 input tokens per output token, with a median 92% served from cache on these runs. Providers bill a cache read at a fraction of a fresh token, so charging full price for all of them overstates margin by close to an order of magnitude. The cached fraction is measured per config, not assumed; only the percentage is yours. Set it to 100 to bill every token the same. Fixed sequences record no cache hits at all, which is why this input only appears for agentic traces.',
     singleRung:
       'Every chip here has been measured on a single run date, so each line is one config held flat. The staircase this section exists to show needs several dates per config, and agentic trace history does not go back far enough yet. The levels are measured; the absence of steps is a gap in the history, not a finding about the hardware.',
     colChip: 'Chip',
@@ -218,25 +222,25 @@ const STRINGS = {
     captionPrices: (input: string, output: string, cachedPct: string | null) =>
       `输入 $${input} / 输出 $${output} 每百万 token${cachedPct === null ? '' : `，缓存 ${cachedPct}%`}`,
     description:
-      '固定集群自模型发布之日起的表现。Chip 始终不变，变化的是为其提供服务的软件。每次推广采用的配置都优于此前所有配置，并从集群当前服务水平逐步爬升至新配置水平。曲线与成本线之间的差距，就是这些优化工作的回报。',
-    tooSmall: '该功率预算不足以为所示任一 Chip 供电。请尝试更大的数值。',
+      '固定集群自模型发布之日起的表现。芯片始终不变，变化的是为其提供服务的软件。每次推广采用的配置都优于此前所有配置，并从集群当前服务水平逐步爬升至新配置水平。曲线与成本线之间的差距，就是这些优化工作的回报。',
+    tooSmall: '该功率预算不足以为所示任一芯片供电。请尝试更大的数值。',
     mwLabel: '设施功率 (MW)',
     mwTooltip:
-      '设施总功率预算（兆瓦）。Chip 数量按每 Chip 全含功率（主机、网络、散热）计算，数据来自 SemiAnalysis Datacenter Industry Model，而非裸 TDP。',
+      '设施总功率预算（兆瓦）。芯片数量按每芯片全含功率（主机、网络、散热）计算，数据来自 SemiAnalysis Datacenter Industry Model，而非裸 TDP。',
     mwPlaceholder: '如 10',
-    colChips: 'Chip 数',
+    colChips: '芯片数',
     colUsers: '当前并发用户数',
     needMw: '输入设施功率预算，以测算生命周期经济性。',
     noReleaseDate: '该模型暂无发布日期记录，时间轴改以其首次基准测试运行为起点。',
     loading: '正在加载运行历史……',
     errorPrefix: '无法加载运行历史：',
     noneMeasured:
-      '在任何运行日期下都没有 Chip 在该交互性下被实测过。请将目标交互性滑块移入已实测区间。各 Chip 的实测区间见下方列表。',
-    priceLabel: 'Token 价格 — 输入、输出 ($/M tok)',
+      '在任何运行日期下都没有芯片在该交互性下被实测过。请将目标交互性滑块移入已实测区间。各芯片的实测区间见下方列表。',
+    priceLabel: 'Token 价格：输入、输出 ($/M tok)',
     priceInputLabel: '输入 token 价格，$/百万',
     outputPriceInputLabel: '输出 token 价格，$/百万',
     priceTooltip:
-      'Token 售价，输入与输出分别设定——服务商对输出 token 的计价通常是输入的数倍，而两类 token 的数量极不均衡：固定 8k/1k 序列下每个输出 token 对应 8 个输入 token，agentic traces 下约为 130 个。无论上方成本矩阵选择哪种 token 类型，收入均同时计入两者。二者默认取使当前可见集群中成本最低者在其最新配置下利润恰好为零的价格——即竞争底线：该价格下这款 Chip 不赚不亏，而所有更贵的 Chip 均为亏损——并按输出为输入 4 倍的比例设定，这与主流厂商的定价大致相当。在双价格下保本点是一条直线而非一个点，因此重置会按你当前设定的比例同时缩放两个价格。高于该线的部分属于你的假设，而非实测值。',
+      'Token 售价，输入与输出分别设定。服务商对输出 token 的计价通常是输入的数倍，而两类 token 的数量极不均衡：固定 8k/1k 序列下每个输出 token 对应 8 个输入 token，agentic traces 下约为 130 个。无论上方成本矩阵选择哪种 token 类型，收入均同时计入两者。二者默认取使当前可见集群中成本最低者在其最新配置下利润恰好为零的价格，即竞争底线。该价格下这款芯片不赚不亏，而所有更贵的芯片均为亏损。初始比例为输出价格是输入价格的 4 倍，与主流厂商的定价大致相当。在双价格下保本点是一条直线而非一个点，因此重置会按你当前设定的比例同时缩放两个价格。高于该线的部分属于你的假设，而非实测值。',
     priceReset: '重置为保本价',
     mtbiLabel: '平均无故障间隔 (天)',
     mtbiTooltip: '平均中断间隔时间。与恢复时间共同构成对收入的可用性折损。留空表示不建模中断。',
@@ -244,16 +248,16 @@ const STRINGS = {
     recoveryTooltip: '一次中断后恢复服务所需的小时数。',
     rampLabel: '爬坡期 (月)',
     rampTooltip:
-      '一个配置在集群中完成推广所需的月数。每个配置都有各自的推广曲线：从集群当前已提供的水平爬升至新配置的水平，首个配置从零开始爬升。成本在整个期间按满额计入——机架自通电起即开始计费，而非自满载起——因此首次推广开始时即需承担一整天的成本而收入为零，这正是利润率曲线的全程最低点。这是您的假设而非实测值；设为 0 表示配置立即生效。',
+      '一个配置在集群中完成推广所需的月数。每个配置都有各自的推广曲线：从集群当前已提供的水平爬升至新配置的水平，首个配置从零开始爬升。成本在整个期间按满额计入，因为机架自通电起即开始计费，而非自满载起。因此首次推广开始时即需承担一整天的成本而收入为零，这正是利润率曲线的全程最低点。这是你的假设而非实测值；设为 0 表示配置立即生效。',
     horizonLabel: '测算期 (自发布起月数)',
     horizonTooltip:
-      '自模型发布日期起向后测算的月数。在最后一次扫描之后，最新配置将保持不变——这代表若优化停止时集群的收益，而非对后续提升的预测。',
+      '自模型发布日期起向后测算的月数。在最后一次扫描之后，最新配置将保持不变。这代表若优化停止时集群的收益，而非对后续提升的预测。',
     cacheLabel: '缓存输入 (占价格百分比)',
     cacheTooltip:
-      '一个缓存输入 token 的售价，以上方价格的百分比表示。Agentic traces 会复用极长的前缀——中位数为每个输出 token 对应 133 个输入 token，其中中位数 92% 在本批运行中由缓存提供——而服务商对缓存读取仅按新鲜 token 价格的一小部分计费，因此若对全部 token 按满价计费，将使利润被高估近一个数量级。缓存占比按各配置实测得出，并非假设；仅该百分比属于您的假设。设为 100 表示所有 token 同价。固定序列完全没有缓存命中记录，因此该输入项仅在 Agentic Traces 下出现。',
+      '一个缓存输入 token 的售价，以上方价格的百分比表示。Agentic traces 会复用极长的前缀：中位数为每个输出 token 对应 133 个输入 token，其中中位数 92% 在本批运行中由缓存提供。服务商对缓存读取仅按新鲜 token 价格的一小部分计费，因此若对全部 token 按满价计费，将使利润被高估近一个数量级。缓存占比按各配置实测得出，并非假设；仅该百分比属于你的假设。设为 100 表示所有 token 同价。固定序列完全没有缓存命中记录，因此该输入项仅在 Agentic Traces 下出现。',
     singleRung:
-      '此处每款 Chip 都只有单一运行日期的实测数据，因此每条线都是一个配置的水平延伸。本模块所要呈现的阶梯需要同一配置在多个日期上的数据，而 agentic traces 的历史尚不够长。图中的水平值是实测的；缺少台阶反映的是历史数据的空缺，而非关于硬件的结论。',
-    colChip: 'Chip',
+      '此处每款芯片都只有单一运行日期的实测数据，因此每条线都是一个配置的水平延伸。本模块所要呈现的阶梯需要同一配置在多个日期上的数据，而 agentic traces 的历史尚不够长。图中的水平值是实测的；缺少台阶反映的是历史数据的空缺，而非关于硬件的结论。',
+    colChip: '芯片',
     colConfigNow: '当前配置',
     colFirst: '首次运行',
     colLatest: '最新最佳',
@@ -270,7 +274,7 @@ const STRINGS = {
     monthsSuffix: '个月',
     unmeasuredTitle: '该交互性下无实测数据',
     unmeasuredIntro:
-      '以下 Chip 在该场景下有运行历史，但没有任何单次运行的实测范围覆盖目标交互性，因此无法给出可靠数值。各自最接近的实测交互性：',
+      '以下芯片在该场景下有运行历史，但没有任何单次运行的实测范围覆盖目标交互性，因此无法给出可靠数值。各自最接近的实测交互性：',
     unmeasuredRange: (below: number | null, above: number | null, dates: number) => {
       const dateLabel = `共 ${dates} 个运行日期`;
       if (below === null && above === null) return `无实测数据（${dateLabel}）`;
@@ -281,17 +285,17 @@ const STRINGS = {
       return `最近实测为下方 ${below.toFixed(1)}、上方 ${above.toFixed(1)} tok/s/user（${dateLabel}）`;
     },
     unplottable: (chips: string) =>
-      `在该功率预算下无法为 ${chips} 组建集群。该 Chip 缺少已登记的功耗数据，或其实测吞吐无法组成任何规模。此处列出而非直接剔除，以免图表静默遗漏 Chip。`,
+      `在该功率预算下无法为 ${chips} 组建集群。该芯片缺少已登记的功耗数据，或其实测吞吐无法组成任何规模。此处列出而非直接剔除，以免图表静默遗漏芯片。`,
     note: '注意：',
     disagg:
-      '台阶可以由解耦配置取得，且该次交接是同类比较：两种部署方式的总 tok/s/chip 均按 Chip 总数报告，且预填充与解码使用的是同一种硅片，因此切换时集群规模与成本线均不发生变化。当本模块需要输入或输出 token 的单独数值时（用于台阶排序，或将两类 token 分别计价），它由该总量与该次运行实测的 token 构成比推导得出，而非直接读取每芯片的输入/输出速率。在解耦部署下，这两个速率分别按预填充芯片与解码芯片计算，这也正是别处吞吐图表标注其不可直接比较的原因；改为推导可使本模块的所有比较统一在同一分母上。真正改变的是集群形态。自该配置开始推广起，其预填充:解码比例被假定应用于整个集群。实际部署中，这相当于一次重新部署，由爬坡期窗口代为体现，并非实测值。每一级台阶标注的配置即说明其类型。',
+      '台阶可以由解耦配置取得，且该次交接是同类比较：两种部署方式的总 tok/s/chip 均按芯片总数报告，且预填充与解码使用的是同一种硅片，因此切换时集群规模与成本线均不发生变化。当本模块需要输入或输出 token 的单独数值时（用于台阶排序，或将两类 token 分别计价），它由该总量与该次运行实测的 token 构成比推导得出，而非直接读取每芯片的输入/输出速率。在解耦部署下，这两个速率分别按预填充芯片与解码芯片计算，这也正是别处吞吐图表标注其不可直接比较的原因；改为推导可使本模块的所有比较统一在同一分母上。真正改变的是集群形态。自该配置开始推广起，其预填充:解码比例被假定应用于整个集群。实际部署中，这相当于一次重新部署，由爬坡期窗口代为体现，并非实测值。每一级台阶标注的配置即说明其类型。',
     hybrid:
-      '每个 Chip 一条曲线，而非每个软件配置一条：曲线在任一时刻都跟随当时领先的框架、精度与投机解码组合，因此服务集群的配置会沿曲线变化，每一级台阶都标注接管的配置。图例项仍可筛选配置，被隐藏的配置将不参与竞争。每一级台阶都是一个实测运行日期，其在目标交互性下的插值吞吐量优于此前所有日期；未能超越现有配置的扫描不构成台阶，因为集群仍在运行原有配置。配置不会在扫描发现的瞬间生效，因此每个配置都会在推广期内从集群当前已提供的水平爬升至其自身水平。功率与 $/chip/hr 为 TCO 模型的当前值，成本在整个期间保持水平，因为任何配置都不会改变这两项。两种情况下都是同一款芯片。超出某次运行实测交互性区间的结果会被排除而非钳制。',
+      '每款芯片一条曲线，而非每个软件配置一条：曲线在任一时刻都跟随当时领先的框架、精度与投机解码组合，因此服务集群的配置会沿曲线变化，每一级台阶都标注接管的配置。图例项仍可筛选配置，被隐藏的配置将不参与竞争。每一级台阶都是一个实测运行日期，其在目标交互性下的插值吞吐量优于此前所有日期；未能超越现有配置的扫描不构成台阶，因为集群仍在运行原有配置。配置不会在扫描发现的瞬间生效，因此每个配置都会在推广期内从集群当前已提供的水平爬升至其自身水平。功率与 $/chip/hr 为 TCO 模型的当前值，成本在整个期间保持水平，因为任何配置都不会改变这两项。两种情况下都是同一款芯片。超出某次运行实测交互性区间的结果会被排除而非钳制。',
     overlayExempt:
       '通过运行链接加载的非官方运行不会显示在此，因为运行历史 API 仅提供已入库的官方结果。',
     metricLabel: 'Y 轴',
     metricTooltip:
-      '选择绘制的内容。利润为日均收入减去固定的集群成本，因此保本线可显示集群位于其哪一侧。每 MW 利润和每 MW 收入分别将对应的日均指标除以已配置功率。收入不扣除成本，便于在成本差异很大的 Chip 之间比较推广曲线，但此时位置更高并不代表更赚钱。累计收入是自上线以来的累计总额，而非日均指标；它会进一步放大上述注意事项，因为收入曲线下面积最大的 Chip 仍可能从未收回成本。',
+      '选择绘制的内容。利润为日均收入减去固定的集群成本，因此保本线可显示集群位于其哪一侧。每 MW 利润和每 MW 收入分别将对应的日均指标除以已配置功率。收入不扣除成本，便于在成本差异很大的芯片之间比较推广曲线，但此时位置更高并不代表更赚钱。累计收入是自上线以来的累计总额，而非日均指标；它会进一步放大上述注意事项，因为收入曲线下面积最大的芯片仍可能从未收回成本。',
     metricMargin: '利润',
     metricMarginPerMw: '每 MW 利润',
     metricRevenue: '收入',
@@ -315,9 +319,9 @@ const STRINGS = {
     tipSinceFirst: '相比首次运行',
     tipRunLink: '查看运行',
     chartInstructions:
-      '悬停可读取该日期下所有 Chip 的数值 · 点击可冻结读数，再次点击解除 · Shift+滚轮 横向缩放 · 拖动平移 · 双击重置',
+      '悬停可读取该日期下所有芯片的数值 · 点击可冻结读数，再次点击解除 · Shift+滚轮 横向缩放 · 拖动平移 · 双击重置',
     assumptions: (tier: string, chips: string, release: string) =>
-      `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = Chip 数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、爬坡期、平均无故障间隔、恢复时间与测算期为你的假设。吞吐量台阶不是假设。`,
+      `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = 芯片数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、爬坡期、平均无故障间隔、恢复时间与测算期为你的假设。吞吐量台阶不是假设。`,
     source: '来源：',
   },
 } as const;
@@ -1490,9 +1494,9 @@ export default function FleetLifecycle({
               <Link
                 target="_blank"
                 className="underline hover:text-foreground"
-                href="https://semianalysis.com/ai-cloud-tco-model/"
+                href={TCO_SOURCE_URL}
               >
-                SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
+                {TCO_SOURCE_TITLE}
                 <ExternalLinkIcon />
               </Link>
             </small>

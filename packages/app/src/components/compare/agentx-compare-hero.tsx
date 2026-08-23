@@ -19,14 +19,14 @@ const STRINGS = {
     modelAction: 'View results',
   },
   zh: {
-    eyebrow: 'AgentX / 实时结果',
-    title: '对比真实场景下的智能体推理性能',
+    eyebrow: 'AgentX｜最新结果',
+    title: '真实智能体工作负载下的推理性能对比',
     description:
-      '长上下文多轮推理性能，跨 MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100、RTX Pro 等平台进行对比。',
+      '比较不同硬件平台在长上下文、多轮智能体工作负载下的推理性能，覆盖 MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100 和 RTX Pro 等平台。',
     overview: '总览',
-    dashboard: '完整仪表板',
-    methodology: '方法论深度解析',
-    ledgerTitle: '已有 AgentX 结果的模型',
+    dashboard: '查看完整仪表板',
+    methodology: '测试方法',
+    ledgerTitle: '已发布 AgentX 结果的模型',
     modelAction: '查看结果',
   },
 } as const;

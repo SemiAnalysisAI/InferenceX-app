@@ -257,7 +257,20 @@ export interface ChangelogBackfill extends AuditedBackfill {
  * Audited corrections to changelog rows already produced by workflow artifacts.
  * Selectors use the table's complete durable identity. `set` is a partial patch.
  */
-export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [];
+export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [
+  {
+    id: 'run-32242794988-restore-append-only',
+    reason:
+      'PR #2676 produced an append-only delta sweep, but conflict resolution removed the marker before its artifacts were reused for merge ingestion.',
+    githubRunId: 32242794988,
+    runAttempt: 3,
+    baseRef: '43996b8dc1b3fa53989abb0c86491a7d3e3b4472',
+    headRef: 'de871da96f061b097fef318489462a958240917a',
+    set: {
+      appendOnly: true,
+    },
+  },
+];
 
 export type JsonValue =
   | boolean
@@ -347,6 +360,22 @@ const QWEN35_GB300_DYNAMO_TRT = {
   hardware: 'gb300',
   framework: 'dynamo-trt',
   model: 'qwen3.5',
+  precision: 'fp4',
+  specMethod: 'mtp',
+} as const;
+
+const DSV4_GB300_DYNAMO_TRT = {
+  hardware: 'gb300',
+  framework: 'dynamo-trt',
+  model: 'dsv4',
+  precision: 'fp4',
+  specMethod: 'mtp',
+} as const;
+
+const GLM52_GB300_DYNAMO_TRT = {
+  hardware: 'gb300',
+  framework: 'dynamo-trt',
+  model: 'glm5.2',
   precision: 'fp4',
   specMethod: 'mtp',
 } as const;
@@ -526,6 +555,190 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
         kv_offloading: 'dram',
         kv_offload_backend: 'native',
         kv_offload_backend_version: '1.3.0rc24',
+      },
+    },
+  })),
+
+  // The six disaggregated DeepSeek-V4-Pro recipes in run 32403083041
+  // configure a 180 GiB native host KV cache on each prefill worker. The
+  // master matrix omitted the offload annotation, so the artifacts reported
+  // these points as non-offloaded.
+  ...(
+    [
+      [
+        1523,
+        4,
+        '38be5ef96c0cd06d88da9fc176812f805d5a142f618c6c4a98d0e5dd9db6e9b7',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
+          { tp: 8, ep: 8, dpAttn: false, numWorkers: 4 },
+        ),
+      ],
+      [
+        2415,
+        24,
+        'fb3f411ba6d72aa06658b108212333afde9ea2cb499e377fdfc65de5412592cb',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
+          { tp: 4, ep: 4, dpAttn: false, numWorkers: 6 },
+        ),
+      ],
+      [
+        2417,
+        388,
+        '5d290a80ed5a6d5acf4b19a425017929cc9fe416161c59a76369d14e14694bac',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 1 },
+          { tp: 32, ep: 32, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        2419,
+        736,
+        '3c4563cbcbd0145b101f16672e8c8072b55c0dffc0014876cc52b58556d1997b',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 2 },
+          { tp: 32, ep: 32, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        2416,
+        1152,
+        '885edc2b1a2521989da184ecc0520dbbdc962b8813fd5a8a26115c343a54745d',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 3 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        2418,
+        2626,
+        '6e47ac1cc8896a21dcff448d39454300783009dcd1216009b3466a6fc1d1b730',
+        disaggregatedConfig(
+          DSV4_GB300_DYNAMO_TRT,
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 5 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+    ] as const
+  ).map(([productionConfigId, conc, recipeFingerprint, config]) => ({
+    id: `run-32403083041-config-${productionConfigId}-conc-${conc}-native-offload`,
+    reason:
+      'The TensorRT-LLM runtime recipe configured a native host KV cache, but the artifact reported this AgentX point as non-offloaded.',
+    githubRunId: 32403083041,
+    runAttempt: 3,
+    productionConfigId,
+    config,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc,
+    offloadMode: 'off',
+    recipeFingerprint,
+    set: {
+      offloadMode: 'on' as const,
+      metricsRemove: ['allocated_cpu_dram_gb'],
+      metricsMerge: {
+        kv_offloading: 'dram',
+        kv_offload_backend: 'native',
+        kv_offload_backend_version: '1.3.0rc24',
+      },
+    },
+  })),
+
+  // The six disaggregated GLM-5.2 recipes in run 32346724519 configure a
+  // 128 GiB native host KV cache on each prefill worker. The aggregate point
+  // has no host cache and is intentionally excluded. The master matrix omitted
+  // the offload annotation for the disaggregated points.
+  ...(
+    [
+      [
+        2426,
+        20,
+        '16c12cc3717783b1029c8e65865043f7d518de4af8d8477572eb594099844263',
+        disaggregatedConfig(
+          GLM52_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
+          { tp: 8, ep: 8, dpAttn: false, numWorkers: 1 },
+        ),
+      ],
+      [
+        2427,
+        30,
+        'daf6d60e1a5c68f3c00719a50d60d1b77ba603e851eb00f6149ef5989ba42e12',
+        disaggregatedConfig(
+          GLM52_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
+          { tp: 4, ep: 4, dpAttn: false, numWorkers: 4 },
+        ),
+      ],
+      [
+        2428,
+        60,
+        '454122157cfc71a5252e5ec33d7709cc4f4061c52a7ca5b28f4aea1fa3cc9011',
+        disaggregatedConfig(
+          GLM52_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 3 },
+          { tp: 4, ep: 4, dpAttn: false, numWorkers: 4 },
+        ),
+      ],
+      [
+        2429,
+        152,
+        '02abb316847471b7e7bc68e41b3013dafdaddfa6c464274bdfb11d5f3b386e61',
+        disaggregatedConfig(
+          GLM52_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 5 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        2431,
+        227,
+        'ac551c93599bd44d074294d3de65ca5aaa6b240c12187bb5aacbef788446c65f',
+        disaggregatedConfig(
+          GLM52_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 6 },
+          { tp: 8, ep: 8, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+      [
+        2430,
+        259,
+        '86114ba7b339cc49098f489d2621c81c119b7fd156f4f100cde228ff3c8326d2',
+        disaggregatedConfig(
+          GLM52_GB300_DYNAMO_TRT,
+          { tp: 4, ep: 4, dpAttn: true, numWorkers: 8 },
+          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
+        ),
+      ],
+    ] as const
+  ).map(([productionConfigId, conc, recipeFingerprint, config]) => ({
+    id: `run-32346724519-config-${productionConfigId}-conc-${conc}-native-offload`,
+    reason:
+      'The TensorRT-LLM runtime recipe configured a native host KV cache, but the artifact reported this AgentX point as non-offloaded.',
+    githubRunId: 32346724519,
+    runAttempt: 4,
+    productionConfigId,
+    config,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc,
+    offloadMode: 'off',
+    recipeFingerprint,
+    set: {
+      offloadMode: 'on' as const,
+      metricsRemove: ['allocated_cpu_dram_gb'],
+      metricsMerge: {
+        kv_offloading: 'dram',
+        kv_offload_backend: 'native',
+        kv_offload_backend_version: '1.3.0rc22.post1',
       },
     },
   })),

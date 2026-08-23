@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { interpolateForGPU } from '@/components/calculator/interpolation';
 import type { GPUDataPoint, InterpolatedResult } from '@/components/calculator/types';
@@ -45,9 +45,12 @@ export interface CompareInterpolatedTableProps {
   metricLabelOverrides?: Record<string, string>;
 }
 
-interface ColumnData {
+interface ColumnIntent {
   target: number;
   inputValue: string;
+}
+
+interface ColumnData extends ColumnIntent {
   a: InterpolatedResult | null;
   b: InterpolatedResult | null;
 }
@@ -105,46 +108,37 @@ export function CompareInterpolatedTable({
       ? { ...m, label: metricLabelOverrides[m.label] }
       : m,
   );
-  const [columns, setColumns] = useState<ColumnData[]>(() =>
-    defaultTargets.map((target, i) => ({
+  const [columnIntents, setColumnIntents] = useState<ColumnIntent[]>(() =>
+    defaultTargets.map((target) => ({
       target,
       inputValue: String(target),
-      a: ssrRows[i]?.a ?? null,
-      b: ssrRows[i]?.b ?? null,
     })),
   );
 
-  const hasClientDataA = gpuDataPointsA.length > 0;
-  const hasClientDataB = gpuDataPointsB.length > 0;
-  const hasClientData = hasClientDataA || hasClientDataB;
-
-  // When client-side data changes (model/sequence/precision), recompute all columns
-  useEffect(() => {
-    if (!hasClientData) return;
-    setColumns((prev) =>
-      prev.map((col) => ({
-        ...col,
-        a: hasClientDataA
-          ? interpolateForGPU(gpuDataPointsA, col.target, 'interactivity_to_throughput', 'costh')
-          : col.a,
-        b: hasClientDataB
-          ? interpolateForGPU(gpuDataPointsB, col.target, 'interactivity_to_throughput', 'costh')
-          : col.b,
+  const columns = useMemo<ColumnData[]>(
+    () =>
+      columnIntents.map((column, index) => ({
+        ...column,
+        a:
+          gpuDataPointsA.length > 0
+            ? interpolateForGPU(
+                gpuDataPointsA,
+                column.target,
+                'interactivity_to_throughput',
+                'costh',
+              )
+            : (ssrRows[index]?.a ?? null),
+        b:
+          gpuDataPointsB.length > 0
+            ? interpolateForGPU(
+                gpuDataPointsB,
+                column.target,
+                'interactivity_to_throughput',
+                'costh',
+              )
+            : (ssrRows[index]?.b ?? null),
       })),
-    );
-  }, [gpuDataPointsA, gpuDataPointsB, hasClientData, hasClientDataA, hasClientDataB]);
-
-  const reinterpolate = useCallback(
-    (target: number, prevA: InterpolatedResult | null, prevB: InterpolatedResult | null) => {
-      const resultA = hasClientDataA
-        ? interpolateForGPU(gpuDataPointsA, target, 'interactivity_to_throughput', 'costh')
-        : prevA;
-      const resultB = hasClientDataB
-        ? interpolateForGPU(gpuDataPointsB, target, 'interactivity_to_throughput', 'costh')
-        : prevB;
-      return { a: resultA, b: resultB };
-    },
-    [gpuDataPointsA, gpuDataPointsB, hasClientDataA, hasClientDataB],
+    [columnIntents, gpuDataPointsA, gpuDataPointsB, ssrRows],
   );
 
   /**
@@ -154,24 +148,22 @@ export function CompareInterpolatedTable({
   const commitColumnTarget = useCallback(
     (colIndex: number): boolean => {
       let committed = false;
-      setColumns((prev) => {
+      setColumnIntents((prev) => {
         const next = [...prev];
-        const col = next[colIndex];
-        const parsed = parseFloat(col.inputValue);
+        const column = next[colIndex];
+        const parsed = parseFloat(column.inputValue);
 
         if (isNaN(parsed) || parsed <= 0) {
-          next[colIndex] = { ...col, inputValue: String(col.target) };
+          next[colIndex] = { ...column, inputValue: String(column.target) };
           return next;
         }
 
         const clamped = Math.round(
           Math.max(interactivityRange.min, Math.min(interactivityRange.max, parsed)),
         );
-        const results = reinterpolate(clamped, col.a, col.b);
         next[colIndex] = {
           target: clamped,
           inputValue: String(clamped),
-          ...results,
         };
         committed = true;
         return next;
@@ -181,7 +173,7 @@ export function CompareInterpolatedTable({
       }
       return committed;
     },
-    [interactivityRange, reinterpolate],
+    [interactivityRange],
   );
 
   /**
@@ -190,36 +182,26 @@ export function CompareInterpolatedTable({
    */
   const handleInputChange = useCallback(
     (colIndex: number, value: string) => {
-      setColumns((prev) => {
+      setColumnIntents((prev) => {
         const next = [...prev];
-        const col = next[colIndex];
+        const column = next[colIndex];
         const parsed = parseFloat(value);
 
-        // If valid number, update both inputValue and interpolated results
         if (!isNaN(parsed) && parsed > 0) {
           const clamped = Math.round(
             Math.max(interactivityRange.min, Math.min(interactivityRange.max, parsed)),
           );
-          const results = reinterpolate(clamped, col.a, col.b);
           next[colIndex] = {
             target: clamped,
             inputValue: value,
-            ...results,
           };
         } else {
-          next[colIndex] = { ...next[colIndex], inputValue: value };
+          next[colIndex] = { ...column, inputValue: value };
         }
         return next;
       });
     },
-    [
-      hasClientData,
-      hasClientDataA,
-      hasClientDataB,
-      interactivityRange,
-      reinterpolate,
-      gpuDataPointsA,
-    ],
+    [interactivityRange],
   );
 
   const handleInputBlur = useCallback(

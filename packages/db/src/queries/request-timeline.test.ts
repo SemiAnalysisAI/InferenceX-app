@@ -26,19 +26,58 @@ const timeline: RequestTimeline = {
 };
 
 describe('getRequestTimeline', () => {
-  it('returns the current precomputed timeline without selecting the raw profile blob', async () => {
+  it('returns the current precomputed timeline from a bounded text read without selecting the raw profile blob', async () => {
+    const encoded = JSON.stringify(timeline);
     const { sql, calls } = mockSql([
-      [{ trace_replay_id: 870, has_blob: true, request_timeline: timeline }],
+      [
+        {
+          trace_replay_id: 870,
+          has_blob: true,
+          timeline_version: REQUEST_TIMELINE_VERSION,
+        },
+      ],
+      [{ chunk: encoded, chunk_chars: encoded.length }],
     ]);
 
     await expect(getRequestTimeline(sql, 422991)).resolves.toEqual(timeline);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).not.toContain('profile_export_jsonl_gz as blob');
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).not.toContain('profile_export_jsonl_gz as blob');
+  });
+
+  it('never uses compressed JSONB storage size to decide whether to read bounded chunks', async () => {
+    const encoded = JSON.stringify(timeline);
+    const { sql, calls } = mockSql([
+      [
+        {
+          trace_replay_id: 870,
+          has_blob: true,
+          timeline_version: REQUEST_TIMELINE_VERSION,
+        },
+      ],
+      [{ chunk: encoded, chunk_chars: encoded.length }],
+    ]);
+
+    await expect(getRequestTimeline(sql, 422991)).resolves.toEqual(timeline);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).not.toContain('pg_column_size');
+    expect(calls[0]).not.toContain('octet_length');
+    expect(calls[1]).toContain('substr(text');
+    expect(calls[1]).not.toContain('profile_export_jsonl_gz as blob');
   });
 
   it('does not fetch a blob when neither a current timeline nor a blob exists', async () => {
     const { sql, calls } = mockSql([
-      [{ trace_replay_id: 870, has_blob: false, request_timeline: null }],
+      [
+        {
+          trace_replay_id: 870,
+          has_blob: false,
+          timeline_version: null,
+          start_ns: null,
+          end_ns: null,
+          duration_s: null,
+          request_count: null,
+        },
+      ],
     ]);
 
     await expect(getRequestTimeline(sql, 422991)).resolves.toBeNull();
@@ -66,11 +105,16 @@ describe('getRequestTimeline', () => {
         }),
       ),
     );
-    const stale = { ...timeline, version: REQUEST_TIMELINE_VERSION - 1 };
-    const { sql, calls } = mockSql([
-      [{ trace_replay_id: 870, has_blob: true, request_timeline: stale }],
-      [{ blob }],
-    ]);
+    const staleHeader = {
+      trace_replay_id: 870,
+      has_blob: true,
+      timeline_version: REQUEST_TIMELINE_VERSION - 1,
+      start_ns: 100,
+      end_ns: 200,
+      duration_s: 0.0000001,
+      request_count: 0,
+    };
+    const { sql, calls } = mockSql([[staleHeader], [{ blob }]]);
 
     const result = await getRequestTimeline(sql, 422991);
 
@@ -84,11 +128,16 @@ describe('getRequestTimeline', () => {
   });
 
   it('does not write back when the blob is missing (never persists a null timeline)', async () => {
-    const stale = { ...timeline, version: REQUEST_TIMELINE_VERSION - 1 };
-    const { sql, calls } = mockSql([
-      [{ trace_replay_id: 870, has_blob: true, request_timeline: stale }],
-      [{ blob: null }],
-    ]);
+    const staleHeader = {
+      trace_replay_id: 870,
+      has_blob: true,
+      timeline_version: REQUEST_TIMELINE_VERSION - 1,
+      start_ns: 100,
+      end_ns: 200,
+      duration_s: 0.0000001,
+      request_count: 0,
+    };
+    const { sql, calls } = mockSql([[staleHeader], [{ blob: null }]]);
 
     await expect(getRequestTimeline(sql, 422991)).resolves.toBeNull();
     // meta read + blob read only — no write-back for a null recompute.

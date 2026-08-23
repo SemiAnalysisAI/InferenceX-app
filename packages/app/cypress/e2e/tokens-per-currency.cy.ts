@@ -1,8 +1,7 @@
 /**
  * The dashboard now opens on tokens purchasable per $1 USD, and the same
- * quantities are also available priced in yuan. Quick Filters drop out of the
- * agentic scenario, where the curve is already collapsed to one series per
- * model, SKU, and engine.
+ * quantities are also available priced in yuan. Fixed-sequence Quick Filters
+ * remain available from the chart legend.
  */
 describe('Tokens per currency and agentic controls', () => {
   beforeEach(() => {
@@ -11,10 +10,8 @@ describe('Tokens per currency and agentic controls', () => {
     });
   });
 
-  it('renders total tokens per $1 USD from a URL metric', () => {
-    // The dashboard default is still throughput — see DEFAULT_Y_AXIS_METRIC in
-    // InferenceContext for why the flip is held back.
-    cy.visit('/inference?i_metric=y_tokensPerDollarH');
+  it('defaults the y-axis to total tokens per $1 USD', () => {
+    cy.visit('/inference');
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
       'Total Tokens per $1 USD (Owning - Hyperscaler)',
@@ -25,11 +22,19 @@ describe('Tokens per currency and agentic controls', () => {
       .should('have.length.greaterThan', 0);
   });
 
+  it('still honors an explicit ?i_metric=, so shared links are unaffected', () => {
+    cy.visit('/inference?i_metric=y_tpPerGpu');
+    cy.get('[data-testid="yaxis-metric-selector"]').should(
+      'contain.text',
+      'Token Throughput per Chip',
+    );
+  });
+
   it('offers the same quantities priced in yuan', () => {
     cy.visit('/inference');
     cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
     cy.get('[role="option"]')
-      .contains('Total Tokens per ¥1 (Owning - Hyperscaler)')
+      .contains('Total Tokens per ¥1 RMB (Owning - Hyperscaler)')
       .click({ force: true });
     cy.get('[data-testid="scatter-graph"]')
       .first()
@@ -38,11 +43,9 @@ describe('Tokens per currency and agentic controls', () => {
   });
 
   it('keeps Quick Filters for a fixed-sequence scenario', () => {
-    // The agentic half of this rule lives in
-    // cypress/component/inference-chart-controls.cy.tsx: `?i_seq=agentic-traces`
-    // only sticks when the model has agentic availability, which the e2e
-    // fixture set does not carry, so the sequence falls back here.
     cy.visit('/inference?i_seq=8k%2F1k');
-    cy.get('[data-testid="quick-filters"]').should('exist');
+    cy.get('[data-testid="scatter-quick-filters"]').click();
+    cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
+    cy.get('[data-testid="quick-filter-spec-mtp"]').should('exist');
   });
 });

@@ -1,7 +1,10 @@
-import { useState } from 'react';
-import { GlobalFilterContext } from '@/components/GlobalFilterContext';
-import { InferenceContext } from '@/components/inference/InferenceContext';
-import { UnofficialRunContext } from '@/components/unofficial-run-provider';
+import { useReducer, useState } from 'react';
+import { GlobalFilterSelectionContext } from '@/components/GlobalFilterContext';
+import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
+import {
+  overlaySelectionReducer,
+  UnofficialRunContext,
+} from '@/components/unofficial-run-provider';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import ChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { mountWithProviders } from '../support/test-utils';
@@ -9,8 +12,8 @@ import {
   createMockInferenceData,
   createMockChartDefinition,
   createMockHardwareConfig,
-  createMockGlobalFilterContext,
-  createMockInferenceContext,
+  createMockGlobalFilterContexts,
+  createMockInferenceContextValues,
   createMockUnofficialRunContext,
 } from '../support/mock-data';
 import { Model, Precision, Sequence } from '@/lib/data-mappings';
@@ -138,7 +141,7 @@ describe('ScatterGraph', () => {
         }),
       ),
     );
-    const baseInference = createMockInferenceContext();
+    const baseInference = createMockInferenceContextValues();
 
     function OfficialScopeHarness() {
       const [secondScope, setSecondScope] = useState(false);
@@ -155,7 +158,12 @@ describe('ScatterGraph', () => {
       };
 
       return (
-        <InferenceContext.Provider value={inference}>
+        <InferenceContextsProvider
+          data={inference}
+          filters={inference}
+          display={inference}
+          actions={inference}
+        >
           <button data-testid="change-official-scope" onClick={() => setSecondScope(true)}>
             Change official scope
           </button>
@@ -169,7 +177,7 @@ describe('ScatterGraph', () => {
               chartDefinition={chartDefinition}
             />
           </div>
-        </InferenceContext.Provider>
+        </InferenceContextsProvider>
       );
     }
 
@@ -204,7 +212,7 @@ describe('ScatterGraph', () => {
       chartType: 'interactivity',
       y_tpPerGpu_roofline: 'upper_left',
     });
-    const baseInference = createMockInferenceContext();
+    const baseInference = createMockInferenceContextValues();
     const baseUnofficial = createMockUnofficialRunContext();
 
     function DelayedOfficialScopeHarness() {
@@ -256,15 +264,22 @@ describe('ScatterGraph', () => {
         ...baseUnofficial,
         isUnofficialRun: true,
         activeOverlayHwTypes: activeOverlayKeys,
-        setActiveOverlayHwTypes: setActiveOverlayKeys,
+        setUnifiedOverlaySelection: (official: Set<string>, overlay: Set<string>) => {
+          setOfficialOverride(official);
+          setActiveOverlayKeys(overlay);
+        },
         allOverlayHwTypes: new Set(['h100_vllm', 'b200_vllm']),
         localOfficialOverride: officialOverride,
-        setLocalOfficialOverride: setOfficialOverride,
       };
 
       return (
         <UnofficialRunContext.Provider value={unofficial}>
-          <InferenceContext.Provider value={inference}>
+          <InferenceContextsProvider
+            data={inference}
+            filters={inference}
+            display={inference}
+            actions={inference}
+          >
             <button data-testid="change-delayed-chart-scope" onClick={() => setSecondScope(true)}>
               Change scope
             </button>
@@ -291,7 +306,7 @@ describe('ScatterGraph', () => {
                 overlayData={overlayData}
               />
             </div>
-          </InferenceContext.Provider>
+          </InferenceContextsProvider>
         </UnofficialRunContext.Provider>
       );
     }
@@ -644,21 +659,25 @@ describe('ScatterGraph', () => {
       createMockInferenceData({ hwKey: 'h100', x: 300, y: 190, precision: Precision.FP8 }),
       createMockInferenceData({ hwKey: 'h100', x: 340, y: 150, precision: Precision.FP8 }),
     ];
-    const baseInference = createMockInferenceContext();
+    const baseInference = createMockInferenceContextValues();
 
     function IngestedSingletonLabelHarness() {
       const [showLineLabels, setShowLineLabels] = useState(true);
+      const inference = {
+        ...baseInference,
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(['b200_tilert_mtp', 'h100']),
+        hwTypesWithData: new Set(['b200_tilert_mtp', 'h100']),
+        selectedPrecisions: [Precision.FP8],
+        showLineLabels,
+        setShowLineLabels,
+      };
       return (
-        <InferenceContext.Provider
-          value={{
-            ...baseInference,
-            hardwareConfig: hwConfig,
-            activeHwTypes: new Set(['b200_tilert_mtp', 'h100']),
-            hwTypesWithData: new Set(['b200_tilert_mtp', 'h100']),
-            selectedPrecisions: [Precision.FP8],
-            showLineLabels,
-            setShowLineLabels,
-          }}
+        <InferenceContextsProvider
+          data={inference}
+          filters={inference}
+          display={inference}
+          actions={inference}
         >
           <div style={{ width: 800, height: 600 }}>
             <ScatterGraph
@@ -670,7 +689,7 @@ describe('ScatterGraph', () => {
               chartDefinition={interactivityChartDef}
             />
           </div>
-        </InferenceContext.Provider>
+        </InferenceContextsProvider>
       );
     }
 
@@ -879,15 +898,15 @@ describe('ScatterGraph', () => {
     ).should('have.css', 'opacity', '1');
     // The exclusion resolver must be bypassed rather than resolving in favor of
     // either the official or overlay engine family.
-    cy.get('@setActiveOverlayHwTypes').should('not.have.been.called');
+    cy.get('@setUnifiedOverlaySelection').should('not.have.been.called');
 
     // An additional official engine can also be selected while the preview is
     // loaded; the production-only conflict toggle must not be consulted.
     cy.get('label[for="checkbox-h100_vllm"]').click();
     cy.get('@blockedComparisonToggle').should('not.have.been.called');
-    cy.get('@setLocalOfficialOverride').should((setOverride) => {
-      const selection = setOverride.lastCall.args[0] as Set<string>;
-      expect([...selection]).to.have.members(['b200_sglang', 'h100_vllm']);
+    cy.get('@setUnifiedOverlaySelection').should((setSelection) => {
+      const official = setSelection.lastCall.args[0] as Set<string>;
+      expect([...official]).to.have.members(['b200_sglang', 'h100_vllm']);
     });
   });
 
@@ -1156,8 +1175,8 @@ describe('ChartDisplay engine comparison guard', () => {
 
   it('keeps official table rows synchronized with legend state after a scope change', () => {
     const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
-    const baseInference = createMockInferenceContext();
-    const baseGlobalFilters = createMockGlobalFilterContext();
+    const baseInference = createMockInferenceContextValues();
+    const baseGlobalFilters = createMockGlobalFilterContexts().selection;
 
     function OfficialRowsScopeHarness() {
       const [secondScope, setSecondScope] = useState(false);
@@ -1194,8 +1213,13 @@ describe('ChartDisplay engine comparison guard', () => {
       };
 
       return (
-        <GlobalFilterContext.Provider value={globalFilters}>
-          <InferenceContext.Provider value={inference}>
+        <GlobalFilterSelectionContext.Provider value={globalFilters}>
+          <InferenceContextsProvider
+            data={inference}
+            filters={inference}
+            display={inference}
+            actions={inference}
+          >
             <button data-testid="change-official-table-scope" onClick={() => setSecondScope(true)}>
               Change scope
             </button>
@@ -1206,8 +1230,8 @@ describe('ChartDisplay engine comparison guard', () => {
               Select vLLM
             </button>
             <ChartDisplay />
-          </InferenceContext.Provider>
-        </GlobalFilterContext.Provider>
+          </InferenceContextsProvider>
+        </GlobalFilterSelectionContext.Provider>
       );
     }
 
@@ -1223,7 +1247,7 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
     cy.get('[data-testid="inference-results-table"] tbody').contains('vLLM').should('exist');
     cy.get('[data-testid="inference-results-table"] tbody').contains('SGLang').should('not.exist');
-    cy.get('@setLocalOfficialOverride').should('not.have.been.called');
+    cy.get('@setUnifiedOverlaySelection').should('not.have.been.called');
   });
 
   it('renders the table columns without the median interactivity or TTFT columns', () => {
@@ -1416,8 +1440,10 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
     cy.get('[data-testid="inference-results-table"] tbody').contains('vLLM').should('exist');
     cy.get('[data-testid="inference-results-table"] tbody').contains('SGLang').should('exist');
-    // The reconciliation effect must not strip the run's hw types from the provider.
-    cy.get('@setActiveOverlayHwTypes').should('not.have.been.called');
+    cy.get('@reconcileOverlayScope').should((reconcile) => {
+      const scope = reconcile.lastCall.args[0] as { overlayHwTypes: Set<string> };
+      expect([...scope.overlayHwTypes]).to.have.members(['h100_vllm']);
+    });
   });
 
   it('keeps an explicitly empty official legend out of table mode', () => {
@@ -1487,15 +1513,24 @@ describe('ChartDisplay engine comparison guard', () => {
       status: 'completed',
       isNonMainBranch: true,
     };
-    const baseInference = createMockInferenceContext();
-    const baseGlobalFilters = createMockGlobalFilterContext();
+    const baseInference = createMockInferenceContextValues();
+    const baseGlobalFilters = createMockGlobalFilterContexts().selection;
     const baseUnofficial = createMockUnofficialRunContext();
 
     function OverlayScopeHarness() {
       const [secondScope, setSecondScope] = useState(false);
       const [secondScopeLoaded, setSecondScopeLoaded] = useState(false);
-      const [activeOverlayKeys, setActiveOverlayKeys] = useState(new Set(['h100_sglang']));
-      const [officialOverride, setOfficialOverride] = useState<Set<string> | null>(null);
+      const [selection, dispatchSelection] = useReducer(overlaySelectionReducer, {
+        availabilityKey: String(runInfo.id),
+        activeOverlayHwTypes: new Set(['h100_sglang']),
+        availableOverlayHwTypes: new Set(['h100_sglang', 'h200_sglang', 'b200_vllm']),
+        localOfficialOverride: null,
+        scopeKey: `${Model.DeepSeek_V4_Pro}|${Sequence.AgenticTraces}|${Precision.FP4}|${runInfo.url}|official:b200_sglang|overlay:h100_sglang,h200_sglang`,
+        scopeOverlayHwTypes: new Set(['h100_sglang', 'h200_sglang']),
+        scopeReady: true,
+        bestSelectionKey: '',
+        bestPerSku: false,
+      });
       const [, setRenderVersion] = useState(0);
       const model = secondScope ? Model.DeepSeek_R1 : Model.DeepSeek_V4_Pro;
       const officialKeys = secondScope ? ['h100_vllm', 'b200_sglang'] : ['b200_sglang'];
@@ -1554,17 +1589,25 @@ describe('ChartDisplay engine comparison guard', () => {
         unofficialRunInfos: [runInfo],
         runIndexByUrl: { [runInfo.url]: 0, [String(runInfo.id)]: 0 },
         getOverlayData: () => ({ data: overlayRows, hardwareConfig: hwConfig }),
-        activeOverlayHwTypes: activeOverlayKeys,
-        setActiveOverlayHwTypes: setActiveOverlayKeys,
-        allOverlayHwTypes: new Set(['h100_sglang', 'h200_sglang', 'b200_vllm']),
-        localOfficialOverride: officialOverride,
-        setLocalOfficialOverride: setOfficialOverride,
+        activeOverlayHwTypes: selection.activeOverlayHwTypes,
+        reconcileOverlayScope: (
+          input: Parameters<typeof baseUnofficial.reconcileOverlayScope>[0],
+        ) => dispatchSelection({ type: 'scope', input }),
+        setUnifiedOverlaySelection: (official: Set<string>, overlay: Set<string>) =>
+          dispatchSelection({ type: 'selection', official, overlay }),
+        allOverlayHwTypes: selection.availableOverlayHwTypes,
+        localOfficialOverride: selection.localOfficialOverride,
       };
 
       return (
-        <GlobalFilterContext.Provider value={globalFilters}>
+        <GlobalFilterSelectionContext.Provider value={globalFilters}>
           <UnofficialRunContext.Provider value={unofficial}>
-            <InferenceContext.Provider value={inference}>
+            <InferenceContextsProvider
+              data={inference}
+              filters={inference}
+              display={inference}
+              actions={inference}
+            >
               <button data-testid="change-overlay-scope" onClick={() => setSecondScope(true)}>
                 Change scope
               </button>
@@ -1573,7 +1616,13 @@ describe('ChartDisplay engine comparison guard', () => {
               </button>
               <button
                 data-testid="clear-overlay-scope"
-                onClick={() => setActiveOverlayKeys(new Set())}
+                onClick={() =>
+                  dispatchSelection({
+                    type: 'selection',
+                    official: selection.localOfficialOverride ?? new Set(officialKeys),
+                    overlay: new Set(),
+                  })
+                }
               >
                 Clear overlays
               </button>
@@ -1584,9 +1633,9 @@ describe('ChartDisplay engine comparison guard', () => {
                 Rerender
               </button>
               <ChartDisplay />
-            </InferenceContext.Provider>
+            </InferenceContextsProvider>
           </UnofficialRunContext.Provider>
-        </GlobalFilterContext.Provider>
+        </GlobalFilterSelectionContext.Provider>
       );
     }
 

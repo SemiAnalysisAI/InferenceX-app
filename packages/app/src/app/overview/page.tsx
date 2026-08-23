@@ -1,56 +1,13 @@
-import type { Metadata } from 'next';
-
-import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
-
-import { OverviewPageContent } from '@/components/overview/overview-page';
-import { enAlternates } from '@/lib/i18n';
 import {
-  resolveOverviewComparisonMode,
-  resolveOverviewEngineScope,
-  resolveOverviewHardwareRowScope,
-  resolveOverviewModelScope,
-  resolveOverviewReferenceHardware,
-  resolveOverviewRowScope,
-  resolveOverviewTier,
-} from '@/lib/overview-data';
-import { getOverviewPageData } from '@/lib/overview-data.server';
+  buildOverviewMetadata,
+  type OverviewRoutePageProps,
+  renderOverviewPage,
+} from '@/lib/overview-route.server';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION =
-  'Compare hyperscaler cost per million total tokens across MI355X, B200, B300, GB200, and GB300 for the AgentX long-context, multi-turn coding scenario and fixed-sequence scenarios where data is available.';
+export const metadata = buildOverviewMetadata('en');
 
-export const metadata: Metadata = {
-  title: 'Agentic Inference Costs',
-  description: DESCRIPTION,
-  alternates: enAlternates('/overview'),
-  openGraph: {
-    title: `Agentic Inference Costs | ${SITE_NAME}`,
-    description: DESCRIPTION,
-    url: `${SITE_URL}/overview`,
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `Agentic Inference Costs | ${SITE_NAME}`,
-    description: DESCRIPTION,
-  },
-};
-
-interface Props {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}
-
-export default async function OverviewPage({ searchParams }: Props) {
-  const sp = await searchParams;
-  const data = await getOverviewPageData(
-    resolveOverviewTier(sp.tier),
-    resolveOverviewEngineScope(sp.engine),
-    resolveOverviewComparisonMode(sp.compare),
-    resolveOverviewReferenceHardware(sp.ref),
-    resolveOverviewModelScope(sp.models),
-    resolveOverviewRowScope(sp.rows),
-    resolveOverviewHardwareRowScope(sp.hwrows),
-  );
-  return <OverviewPageContent data={data} locale="en" />;
+export default function OverviewPage({ searchParams }: OverviewRoutePageProps) {
+  return renderOverviewPage({ locale: 'en', searchParams });
 }

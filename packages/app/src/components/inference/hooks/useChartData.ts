@@ -3,7 +3,7 @@ import { useMemo, useRef } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { rowToSequence } from '@semianalysisai/inferencex-constants';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/metric-registry';
 import type {
   AggDataEntry,
   ChartDefinition,
@@ -18,6 +18,7 @@ import {
   resolveComparisonEntries,
 } from '@/components/inference/utils/comparisonEntry';
 import { useBenchmarks, benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
+import type { BenchmarkRow } from '@/lib/api';
 import {
   GPU_ALIAS_TO_CANONICAL,
   getModelSortIndex,
@@ -31,6 +32,7 @@ import {
 } from '@/lib/benchmark-run-selection';
 import { Sequence, type Model } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
+import { remapInferencePoint } from '@/lib/chart-utils';
 import { overviewServingSeriesKey, type OverviewServingSeriesRow } from '@/lib/overview-data';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import {
@@ -41,9 +43,8 @@ import {
 } from '@/components/inference/utils/quickFilters';
 
 /**
- * Chart x-axis variant selected by the mode buttons above the plot. This is
- * the single definition — InferenceContext (URL/state) and ChartDisplay
- * (buttons) import it from here.
+ * Chart x-axis variant selected by the mode buttons above the plot. The
+ * inference provider and ChartDisplay import this single definition.
  */
 export type XAxisMode = 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity';
 
@@ -243,6 +244,8 @@ export function useChartData(
     currentConfigKey: string;
     baselineConfigKey: string;
   },
+  benchmarkQueryScope?: string,
+  initialBenchmarkRows?: BenchmarkRow[],
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
@@ -268,7 +271,16 @@ export function useChartData(
     data: baseRows,
     isLoading: baseLoading,
     error: baseError,
-  } = useBenchmarks(selectedModel, queryDate, enabled, asOfRunId);
+  } = useBenchmarks(
+    selectedModel,
+    queryDate,
+    enabled,
+    asOfRunId,
+    undefined,
+    undefined,
+    !asOfRunId && queryDate === '' ? initialBenchmarkRows : undefined,
+    benchmarkQueryScope,
+  );
   const {
     data: runRows,
     isLoading: runLoading,
@@ -561,22 +573,7 @@ export function useChartData(
         const mappedData = hasMetric
           ? filteredData
               .filter((d) => metricKey in d)
-              .map((d: InferenceData) => {
-                const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
-                const roof = (d[metricKey] as { roof: boolean })?.roof ?? false;
-                // xAxisField is `keyof AggDataEntry`; InferenceData embeds those
-                // fields via `Partial<Omit<AggDataEntry, ...>>`, so a typed
-                // accessor catches a future field rename (silent fallthrough to
-                // d.x would otherwise mask the regression).
-                const xCandidate = (d as Partial<AggDataEntry>)[xAxisField];
-                const xValue = typeof xCandidate === 'number' ? xCandidate : d.x;
-                return {
-                  ...d,
-                  x: xValue,
-                  y: yValue,
-                  roof,
-                };
-              })
+              .map((d) => remapInferencePoint(d, metricKey, xAxisField))
           : [];
 
         const isAgentic = selectedSequence === Sequence.AgenticTraces;

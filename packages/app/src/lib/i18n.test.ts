@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { DASHBOARD_ROUTES } from './dashboard-routes';
 
 import {
   enAlternates,
   hasZhSibling,
   isZhPathname,
   languageAlternates,
+  localePath,
   switchLocalePath,
   zhAlternates,
   zhPath,
@@ -20,6 +22,14 @@ describe('zhPath', () => {
   it('prefixes non-root paths', () => {
     expect(zhPath('/blog')).toBe('/zh/blog');
     expect(zhPath('/blog/some-post')).toBe('/zh/blog/some-post');
+  });
+});
+
+describe('localePath', () => {
+  it('keeps English paths and prefixes Chinese paths', () => {
+    expect(localePath('/about', 'en')).toBe('/about');
+    expect(localePath('/about', 'zh')).toBe('/zh/about');
+    expect(localePath('/', 'zh')).toBe('/zh');
   });
 });
 
@@ -44,6 +54,13 @@ describe('hasZhSibling', () => {
     expect(hasZhSibling('/about')).toBe(true);
     expect(hasZhSibling('/collectivex')).toBe(true);
   });
+
+  it.each(DASHBOARD_ROUTES.filter((route) => route.localeMirrored))(
+    'derives the mirrored dashboard route "$path" from the canonical registry',
+    ({ path }) => {
+      expect(hasZhSibling(path)).toBe(true);
+    },
+  );
 
   it('matches blog and compare child paths', () => {
     expect(hasZhSibling('/blog/some-post')).toBe(true);

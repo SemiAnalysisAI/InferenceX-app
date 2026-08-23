@@ -91,16 +91,16 @@ const CONTENT = {
     resultsCta: 'View AgentX Performance Results',
   },
   zh: {
-    eyebrow: 'AgentX v1.0 方法论',
+    eyebrow: 'AgentX v1.0 测试方法',
     title: 'AgentX 基准测试数据集',
     intro:
-      'AgentX 根据自愿提供的 Claude Code 会话生成回放负载。公开 trace 会移除 prompt、代码和 tool payload，同时保留请求长度、prefix 复用、subagent 分支和时间信息。',
+      'AgentX 根据参与者自愿提供的 Claude Code 会话构建回放工作负载。公开 trace 会移除 prompt、源代码和 tool payload，仅保留请求长度、prefix 复用关系、subagent 分支和时间信息。',
     processTitle: 'AgentX 如何构建一次回放',
     steps: [
       {
         title: '采集',
         description:
-          '参与者主动启用 HTTP 代理后，代理会在会话运行期间记录请求与响应时间、token 数、conversation ID 和 subagent ID。',
+          '参与者自愿启用 HTTP 代理后，代理会在会话期间记录请求与响应的时间信息、token 数量、会话 ID 和 subagent ID。',
       },
       {
         title: '转换',
@@ -110,65 +110,65 @@ const CONTENT = {
       {
         title: '重建',
         description:
-          'AIPerf 使用确定性的合成编码与 tool-use token 填充这些 block，再把每个会话重建为有向无环图（DAG），涵盖主 agent 轮次、并行 subagent、辅助请求以及轮次间的 tool 执行时间。',
+          'AIPerf 用确定性生成的 coding token 和 tool-use token 填充这些 block，再将每个会话重建为有向无环图（DAG）。图中包含 main agent 轮次、并行 subagent、辅助请求，以及轮次间的 tool 执行时间。',
       },
       {
         title: '回放与测量',
         description:
-          '每种配置先通过固定 seed 的 warmup 建立 cache 状态，随后在不同并发客户端数量下进行一小时 profiling。每次回放使用独立的 cache-bust 标记，防止无关会话意外共享 prefix。',
+          '每种配置先用固定 seed 执行 warmup，建立 cache 状态；随后在不同并发客户端数量下进行一小时 profiling。每次回放都会加入独立的 cache-bust 标记，避免无关会话共享 prefix。',
       },
     ],
-    datasetTitle: 'v1.0 数据集包含什么',
+    datasetTitle: 'AgentX v1.0 数据集概况',
     datasetIntro:
-      'AgentX v1.0 从内部自愿参与的 trace 语料中筛选出 393 个 Claude Code 会话。入选会话至少包含 20 个请求，Claude Code 版本不低于 2.1.139，并且同时运行的 subagent 不超过 10 个。后处理还会移除重复请求、Claude Code 特有的安全监控与标题生成请求，以及重建后 input 超过 990k token 的请求。',
+      'AgentX v1.0 数据集包含从内部自愿采集的 trace 中筛选出的 393 个 Claude Code 会话。入选会话需至少包含 20 个请求，Claude Code 版本不低于 2.1.139，同时运行的 subagent 不超过 10 个。处理过程中还会移除重复请求、客户端特有的安全监控和标题生成请求，以及重建后 input 长度超过 990k token 的请求。',
     profileLabel: 'v1.0 trace 概况',
     stats: [
-      { value: '393', label: '个会话' },
-      { value: '142k', label: '单请求 input token 中位数' },
-      { value: '444', label: '单请求 output token 中位数' },
-      { value: '44%', label: '包含 subagent 的会话' },
+      { value: '393', label: '会话数' },
+      { value: '142k', label: '单请求 input token 数中位数' },
+      { value: '444', label: '单请求 output token 数中位数' },
+      { value: '44%', label: '含 subagent 的会话' },
     ],
     controlsTitle: '回放控制',
     controls: [
       {
-        title: '从稳态开始',
+        title: '从稳态开始测量',
         description:
-          '固定 seed 会在每段会话 25%–75% 的位置选择起点。Primer 请求和每条回放 lane 额外 10 个 warmup 请求会在 profiling 前建立 KV cache。',
+          '固定 seed 会从每段会话 25%–75% 的区间内选择起点。正式 profiling 前，primer 请求和每条回放通道额外执行的 10 个 warmup 请求会先建立 KV cache。',
       },
       {
         title: '确定性回放',
         description:
-          'Seed 固定会话采样、起点和合成内容。对外报告的指标只覆盖一小时 profiling 窗口，不包含 warmup。',
+          '固定 seed 决定会话采样、起点和合成内容。对外报告的指标仅覆盖一小时 profiling 窗口，不包含 warmup。',
       },
       {
-        title: 'Speculative decoding',
+        title: '投机解码',
         description:
-          '合成 token 可能扭曲 draft token 的接受情况，因此 AgentX 会针对每组 model、speculator、draft length 和 thinking mode，使用 SPEED-Bench 测得并固定 acceptance length。',
+          '合成 token 可能影响 draft token 的接受率，因此 AgentX 会按 model、speculator、draft length 和 thinking mode 的组合，采用 SPEED-Bench 的实测结果固定 acceptance length。',
       },
       {
         title: 'DRAM offload',
         description:
-          '没有标准化 DRAM 配置的服务器上限为 3 TB；GB200 NVL72、GB300 NVL72 和 TPUv7 等标准化系统使用装机容量。每种配置只能按其 GPU 占比使用对应的 DRAM。',
+          '对于没有标准 DRAM 配置的服务器，可用 DRAM 上限为 3 TB。GB200 NVL72、GB300 NVL72 和 TPUv7 标准系统按实际装机容量计算；每种配置只能使用与其 GPU 分配比例相对应的 DRAM。',
       },
     ],
     readingTitle: '如何解读 AgentX 结果',
     reading:
-      '这里的 concurrency 表示同时运行的 agent 客户端数量，不是固定 request batch。AgentX 采用 closed-loop 模式，因此更快的配置会完成更多请求，遇到的负载组合也可能略有不同；这种波动在低并发时最明显。报告结果时，应同时给出吞吐量、首 token 延迟（TTFT）和 interactivity，单一 latency 指标不足以描述完整运行。',
-    qualityNote: 'AgentX 衡量推理系统性能。合成 payload 不适合评估模型回答质量。',
+      '这里的 concurrency 指同时运行的 agent 客户端数量，而不是固定大小的 request batch。AgentX 采用 closed-loop 模式，因此速度更快的配置会完成更多请求，实际遇到的工作负载组合可能略有差异；低并发时这种差异最明显。报告吞吐量时，应同时给出首 token 延迟（TTFT）和 interactivity；单看一个 latency 指标不足以反映整次运行。',
+    qualityNote: 'AgentX 衡量推理系统性能。合成 payload 不能用于模型质量评估。',
     limits:
-      '客户端无法观测服务端 chat template、专有 tokenizer、服务端 tool、加密的 reasoning 内容，也无法精确得知图片和文档最终展开成多少 token。AgentX 使用确定性 placeholder 和针对不同模型校准的 padding 处理这些输入。重建后的 trace 会复现请求长度、时间关系、对话拓扑和 KV 复用模式，但不包含原始会话。',
+      '客户端无法观测服务端的 chat template、专有 tokenizer、服务端 tool、加密 reasoning 内容，也无法准确获知图片和文档展开后的 token 数量。AgentX 对这些输入使用确定性 placeholder 和针对不同模型的 padding。重建后的 trace 会复现请求长度、时间关系、会话拓扑和 KV 复用模式，但不包含原始会话内容。',
     variantsLabel: '数据集变体',
     variants: [
       {
         title: 'full',
-        description: '完整的 AgentX v1.0 回放集，包含最高 1M token 的上下文。',
+        description: '完整的 AgentX v1.0 回放集，包含最长 1M token 的上下文。',
       },
       {
         title: '256k',
-        description: '面向最大上下文配置为 256k token 的模型与推理引擎的限制版。',
+        description: '适用于最大上下文配置为 256k token 的模型和推理引擎。',
       },
     ],
-    methodologyCta: '深入了解 AgentX 方法论',
+    methodologyCta: '查看完整测试方法',
     resultsCta: '查看 AgentX 性能结果',
   },
 } as const;

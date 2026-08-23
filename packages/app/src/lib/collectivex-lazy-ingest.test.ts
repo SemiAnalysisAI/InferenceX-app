@@ -3,16 +3,14 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeRawMatrix, makeRawShard } from '@/components/collectivex/test-fixture';
 
-const { mockGetStates, mockInsert, mockRefresh, mockGetDb, mockGetWriteDb } = vi.hoisted(() => ({
+const { mockGetStates, mockInsert, mockRefresh, mockGetWriteDb } = vi.hoisted(() => ({
   mockGetStates: vi.fn(),
   mockInsert: vi.fn(),
   mockRefresh: vi.fn(),
-  mockGetDb: vi.fn(() => 'mock-sql'),
   mockGetWriteDb: vi.fn(() => 'mock-write-sql'),
 }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  getCollectiveXDb: mockGetDb,
   getCollectiveXWriteDb: mockGetWriteDb,
 }));
 
@@ -460,6 +458,7 @@ describe('ensureCollectiveXRun', () => {
     mockFetch.mockResolvedValueOnce(Response.json(runObject()));
 
     await ensureCollectiveXRun(1, '160');
+    expect(mockGetStates).toHaveBeenCalledWith('mock-write-sql', ['160']);
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockInsert).not.toHaveBeenCalled();

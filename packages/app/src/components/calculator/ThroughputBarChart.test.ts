@@ -624,13 +624,20 @@ describe('generateTooltipHTML overlay treatment', () => {
       false,
       {
         unofficialRun: '非官方运行',
-        branch: '分支',
+        branch: '分支：',
+        dismiss: '点击其他区域关闭',
         viewRun: '查看工作流运行',
         clamped: '超出实测范围——显示最接近的数据点',
+        parallelism: '并行策略：',
+        cost: '成本：',
+        concurrency: '并发数：',
+        precision: '精度：',
+        disaggregated: '分离式：',
+        yes: '是',
       },
     );
     expect(html).toContain('非官方运行');
-    expect(html).toContain('分支');
+    expect(html).toContain('分支：');
     expect(html).toContain('查看工作流运行');
     expect(html).not.toContain('UNOFFICIAL RUN');
   });

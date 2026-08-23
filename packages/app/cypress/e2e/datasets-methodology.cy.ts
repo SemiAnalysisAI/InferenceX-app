@@ -1,8 +1,29 @@
 import { unlockAgenticGate } from '../support/e2e';
 
+const DATASET = {
+  id: 'agentx-v1-full',
+  slug: 'agentx-v1-full',
+  label: 'AgentX v1.0 (full)',
+  variant: 'full',
+  description: 'The complete AgentX v1.0 replay set.',
+  hf_url: null,
+  license: 'apache-2.0',
+  conversation_count: 393,
+  summary: {
+    medianRequestsPerConversation: 20,
+    meanRequestsPerConversation: 24,
+    mainTurns: 7800,
+    subagentGroups: 1300,
+    cachedPct: 0.84,
+    totalIn: 56_000_000,
+    totalOut: 175_000,
+  },
+  ingested_at: '2026-06-21T00:00:00Z',
+};
+
 describe('AgentX dataset methodology', () => {
   beforeEach(() => {
-    cy.intercept('GET', '/api/v1/datasets', { statusCode: 200, body: [] });
+    cy.intercept('GET', '/api/v1/datasets', { statusCode: 200, body: [DATASET] });
   });
 
   it('explains the source, replay sequence, controls, and interpretation in English', () => {
@@ -42,13 +63,30 @@ describe('AgentX dataset methodology', () => {
       cy.get('[data-testid="agentx-methodology-step"]').should('have.length', 4);
       cy.contains('AgentX 如何构建一次回放').should('be.visible');
       cy.contains('回放控制').should('be.visible');
-      cy.contains('合成 payload 不适合评估模型回答质量').should('be.visible');
+      cy.contains('参与者自愿提供的 Claude Code 会话').should('be.visible');
+      cy.contains('会话数').should('be.visible');
+      cy.contains('单请求 input token 数中位数').should('be.visible');
+      cy.contains('单请求 output token 数中位数').should('be.visible');
+      cy.contains('对外报告的指标仅覆盖一小时 profiling 窗口').should('be.visible');
+      cy.contains('合成 payload 不能用于模型质量评估').should('be.visible');
+      cy.contains('对于没有标准 DRAM 配置的服务器，可用 DRAM 上限为 3 TB').should('be.visible');
       cy.get('[data-testid="agentx-methodology-cta"]')
-        .should('contain.text', '深入了解 AgentX 方法论')
+        .should('contain.text', '查看完整测试方法')
         .and('have.attr', 'href', '/zh/agentx/methodology');
       cy.get('[data-testid="agentx-results-cta"]')
         .should('contain.text', '查看 AgentX 性能结果')
         .and('have.attr', 'href', '/zh/inference');
+    });
+
+    cy.get('a[href="/zh/agentx/agentx-v1-full"]').within(() => {
+      cy.contains('会话数').should('be.visible');
+      cy.contains('单会话请求数中位数').should('be.visible');
+      cy.contains('单会话平均请求数').should('be.visible');
+      cy.contains('main agent 轮次').should('be.visible');
+      cy.contains('subagent 组').should('be.visible');
+      cy.contains('cached input 占比').should('be.visible');
+      cy.contains('input token 总数').should('be.visible');
+      cy.contains('output token 总数').should('be.visible');
     });
   });
 

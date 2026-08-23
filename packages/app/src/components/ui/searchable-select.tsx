@@ -67,15 +67,17 @@ export function SearchableSelect({
     setMounted(true);
   }, []);
 
-  React.useEffect(() => {
-    if (!isOpen) {
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (disabled) return;
+    if (!nextOpen && isOpen) {
       if (searchUsedRef.current && trackPrefix) {
         track(`${trackPrefix}_searched`, { query: search });
         searchUsedRef.current = false;
       }
       setSearch('');
     }
-  }, [isOpen, search, trackPrefix]);
+    setIsOpen(nextOpen);
+  };
 
   const filteredGroups = React.useMemo(() => {
     if (!search) return groups;
@@ -101,7 +103,7 @@ export function SearchableSelect({
   const handleSelect = (optionValue: string) => {
     if (disabled) return;
     onValueChange(optionValue);
-    setIsOpen(false);
+    handleOpenChange(false);
   };
   const focusOption = (index: number) => {
     const options = listboxRef.current?.querySelectorAll<HTMLElement>('[role="option"]');
@@ -132,7 +134,7 @@ export function SearchableSelect({
   };
 
   return (
-    <Popover open={isOpen} onOpenChange={(open) => !disabled && setIsOpen(open)}>
+    <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <div className="relative">
         <PopoverTrigger asChild>
           <button

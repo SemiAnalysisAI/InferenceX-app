@@ -2,25 +2,32 @@
 
 Reference for agents modifying filter behavior. Explains which context to touch for a given change, how availability cascades, and how URL params are kept in sync.
 
-## Provider Nesting
+## Provider Ownership
+
+`DashboardShell` resolves provider capabilities from
+`packages/app/src/lib/dashboard-routes.ts`:
 
 ```
 QueryProvider
   ThemeProvider
-    UnofficialRunProvider
-      GlobalFilterProvider          ← availability, model/sequence/precision/date/runId
-        InferenceProvider           ← GPU selection, comparison dates, chart UI, y-axis metric
-          inference tab
-          historical tab (no own provider — reads InferenceContext)
-        EvaluationProvider          ← benchmark, eval-specific date, hardware toggle
-          evaluation tab
-        ReliabilityProvider         ← date range, model toggle
-          reliability tab
-        calculator tab              ← no provider; local useState in ThroughputCalculatorDisplay
-        gpu-specs tab               ← no provider; static data
+    DashboardShell
+      inference / historical / evaluation
+        UnofficialRunProvider
+          GlobalFilterProvider
+            route-owned InferenceProvider or EvaluationProvider
+      calculator
+        UnofficialRunProvider
+          route-owned, URL-seeded GlobalFilterProvider
+      reliability
+        route-owned ReliabilityProvider
+      static / internal routes
+        no data providers
 ```
 
-Source: `packages/app/src/components/page-content.tsx` lines 203–239.
+Compare routes live outside `DashboardShell` and own seeded
+`GlobalFilterProvider` / `InferenceProvider` pairs. Agentic point-detail routes are
+standalone. Provider changes must update the canonical route registry and its parity
+tests rather than adding pathname conditionals in the shell.
 
 ---
 
@@ -30,29 +37,40 @@ Source: `packages/app/src/components/page-content.tsx` lines 203–239.
 
 File: `packages/app/src/components/GlobalFilterContext.tsx`
 
-**Selection state** (user-settable, URL-initialised):
+**Requested selection state** (user or URL intent):
 
-- `selectedModel` — active model (`g_model`)
-- `selectedSequence` — active ISL/OSL sequence (`i_seq`; owned here because it gates availability for all tabs)
-- `selectedPrecisions` — active precision list (`i_prec`; same reason)
-- `selectedRunDate` / `selectedRunId` — active benchmark run date and run ID (`g_rundate`, `g_runid`)
+- `selectedModel` (`g_model`)
+- `selectedSequence` (`i_seq`)
+- `selectedPrecisions` (`i_prec`)
+- requested run date and run ID (`g_rundate`, `g_runid`)
 
-**Effective (auto-corrected) values** (derived, not settable directly):
+**Effective values** (purely derived):
 
-- `effectiveSequence` — the Agentic scenario while the user has made no explicit choice and the
-  model has corresponding availability, otherwise `selectedSequence` if valid for the current
-  model, else 8K/1K, else first available
-- `effectivePrecisions` — subset of `selectedPrecisions` that are available; falls back to `[availablePrecisions[0]]`
-- `effectiveRunDate` — latest available date unless user explicitly picked one
+- `effectiveSequence` resolves the requested scenario against availability
+- `effectivePrecisions` resolves requested precisions against available curves
+- `effectiveRunDate` resolves the requested date or latest valid date
+- `selectedRunId` resolves requested run intent against `availableRuns`
 
-**Derived availability** (memos over `availabilityRows`):
+`GlobalFilterProvider` owns the state, but it does not publish one response-shaped
+context value. Consumers subscribe through five independently memoized domains:
 
-- `availableModels`, `availableSequences`, `availablePrecisions`, `availableDates`
-- `availabilityRows` — raw `AvailabilityRow[]` from `useAvailability()`, passed down to InferenceProvider for GPU filtering
+- `useGlobalFilterSelection`: requested model, sequence, and precision state plus
+  their effective values and `sequenceResolved`
+- `useGlobalFilterActions`: stable setters for selection, run date, and run ID
+- `useGlobalFilterRun`: effective date and run ID selectors plus the manual date revision
+- `useGlobalFilterAvailability`: availability options, raw rows, settled state, and errors
+- `useGlobalFilterWorkflow`: the run map plus workflow loading and error state
 
-**Workflow / run info** (derived from `useWorkflowInfo(effectiveRunDate)`):
+Workflow query updates therefore do not notify selection or action consumers. Selection
+updates do not notify workflow-only consumers. Components should subscribe only to the
+domains they read.
 
-- `availableRuns`, `workflowInfo`, `workflowLoading`, `workflowError`
+Availability owns explicit settled and error states. Consumers must distinguish an
+unresolved request from a settled empty result. Inference fetches are gated on
+`sequenceResolved` and render `availabilityError` rather than an indefinite skeleton.
+
+There is no response-shaped workflow adapter. `RunInfo` and `availableRuns` are the
+canonical run contract.
 
 **Why here, not InferenceProvider**: Model, sequence, and precision are cross-tab. EvaluationContext consumes `selectedModel` and `availableModels` directly. If these lived in InferenceProvider, EvaluationProvider would need an indirect coupling or duplicate state.
 
@@ -62,55 +80,54 @@ File: `packages/app/src/components/GlobalFilterContext.tsx`
 
 File: `packages/app/src/components/inference/InferenceContext.tsx`
 
-Depends on: `GlobalFilterProvider` (reads all filter state and availability, including `availabilityRows`).
+Depends on `GlobalFilterProvider` through its narrow selection, run, availability,
+workflow, and action hooks.
 
-**GPU comparison state** (inference-only, URL-initialised):
+The provider owns inference-specific effects and URL synchronization, then exposes
+four independently memoized domains. Consumers must subscribe only to the domains
+they read.
 
-- `selectedGPUs` — hardware keys selected for GPU filter/comparison (`i_gpus`)
-- `selectedDates` — discrete comparison dates (`i_dates`)
-- `selectedDateRange` — `{startDate, endDate}` for range comparisons (`i_dstart`, `i_dend`)
-- `activeDates` — `Set<string>` toggle controlling visible comparison overlays (keyed by `${date}_${gpuKey}`)
+**`useInferenceData`**
 
-**Chart axis / display state** (URL-initialised):
+Fetched and derived benchmark results:
 
-- `selectedYAxisMetric` (`i_metric`), `selectedXAxisMetric` (`i_xmetric`), `selectedE2eXAxisMetric` (`i_e2e_xmetric`)
-- `scaleType` — `auto | linear | log` (`i_scale`)
-- `hideNonOptimal` (`i_optimal`), `showPointLabels` (`i_label`), `logScale` (`i_log`)
-- `highContrast` (`i_hc`), `isLegendExpanded` (`i_legend`)
-- `useAdvancedLabels` (`i_advlabel`), `showGradientLabels` (`i_gradlabel`)
-- `colorShuffleSeed` — no URL param; ephemeral
+- `graphs`, `hardwareConfig`, `loading`, and `error`
+- `hwTypesWithData`
+- GPU, date, precision, sequence, model, run, and quick-filter availability
 
-**Derived availability** (GPU-level, computed from `availabilityRows` inherited from GlobalFilterContext):
+**`useInferenceFilters`**
 
-- `availableGPUs` — hardware configs that have data for the current model + sequence + precisions AND have a known base GPU in `HW_REGISTRY`
-- `dateRangeAvailableDates` — dates available for the current filter combination, further narrowed by `selectedGPUs`
-- `hwTypesWithData` — `Set<string>` of GPU keys currently present in fetched chart data
+Workflow, filter, and date selection state:
 
-**Hardware toggle set**:
+- effective model, sequence, and precision selections read from global filter state
+- `selectedGPUs`, `selectedDates`, `selectedDateRange`, and `activeDates`
+- `activeHwTypes`, `bestPerSku`, and `quickFilters`
+- effective run selection, custom cost and power values, preset state, and compare scope
 
-- `activeHwTypes` — subset of `hwTypesWithData` that are visible (managed by `useChartDataFilter`)
+This domain owns inference-only selection state. GPU selections and comparison dates
+do not belong in global filter state because evaluation and reliability do not use
+them.
 
-**Tracked configs / presets**:
+**`useInferenceDisplay`**
 
-- `trackedConfigs` — up to 6 pinned data points for cross-chart comparison
-- `activePresetId`, `pendingHwFilter` — active favourite preset and its deferred GPU filter
+Axis and presentation state:
 
-**User overrides**:
+- selected x-axis and y-axis metrics, percentile, and effective x-axis mode
+- scale, optimal-point, label, contrast, legend, and overlay controls
 
-- `userCosts`, `userPowers` — per-GPU cost/power overrides for custom cost metric; reset when `selectedYAxisMetric` changes away from `y_costUser`/`y_powerUser`
+Display changes stay in this domain. A contrast or label toggle therefore does not
+notify filter-only or data-only consumers.
 
-**Run filtering** (inference-local, not written back to GlobalFilterContext):
+**`useInferenceActions`**
 
-- `filteredAvailableRuns` — `availableRuns` filtered to runs matching `selectedModel` + `effectivePrecisions`
-- `effectiveSelectedRunId` — validated run ID within `filteredAvailableRuns`; intentionally NOT synced back to GlobalFilterContext to avoid full-tree re-renders on precision change
+All inference commands and setters. The context value and every exposed action keep
+stable identities. The provider routes each stable action to the latest implementation,
+so new availability or chart data cannot invalidate action-only consumers.
 
-**Charts data** (from `useChartData`):
-
-- `graphs` — `RenderableGraph[]` used by all D3 charts
-- `hardwareConfig` — config map derived from benchmark rows
-- `loading`, `error`
-
-**Why not in GlobalFilterContext**: GPU selection and comparison dates are meaningless outside the inference/historical tabs. Putting them in the global context would pollute the interface for evaluation and reliability.
+Run filtering remains inference-local. `filteredAvailableRuns` narrows global run
+availability to the effective model and precisions. `effectiveSelectedRunId` is
+validated within that set but is not written back through the global run action, so a
+precision-specific fallback cannot replace the user's global run intent.
 
 ---
 
@@ -118,12 +135,16 @@ Depends on: `GlobalFilterProvider` (reads all filter state and availability, inc
 
 File: `packages/app/src/components/evaluation/EvaluationContext.tsx`
 
-Depends on: `GlobalFilterProvider` (reads `selectedModel`, `setSelectedModel`, `selectedRunDate`, `selectedRunDateRev`, `setSelectedRunDate`, `availableModels`, `availableDates`).
+Depends on `GlobalFilterProvider` for model and global date intent.
 
 **Selection state**:
 
-- `selectedRunDate` — evaluation-specific date; initialised from `e_rundate` URL param or `globalRunDate`. Bidirectionally synced: when the user picks a date, it calls `setGlobalRunDate` (if the date exists in inference availability). When `globalRunDate` changes (from another tab), the effect at line 124 applies it here.
-- `selectedBenchmark` — active eval task (`e_bench`)
+- requested evaluation date plus a reducer-derived nearest valid `selectedRunDate`
+- `selectedBenchmark` (`e_bench`)
+
+Explicit evaluation date actions synchronize the global requested date only when that
+date exists in inference availability. Global changes are reducer inputs rather than a
+pair of bidirectional mirroring effects.
 
 **UI state**:
 
@@ -167,15 +188,19 @@ Does NOT consume `GlobalFilterProvider`. Fully standalone — reliability data h
 
 ---
 
-### Tabs without providers
+### Route-Owned Providers
 
-**TCO Calculator** (`calculator` tab): All state is local `useState` inside `ThroughputCalculatorDisplay`. It reads `effectiveSequence` and `effectivePrecisions` from `useGlobalFilters()` for the initial GPU list but does not share state back.
+**TCO Calculator**: the route parses a typed URL seed and mounts the sole
+`GlobalFilterProvider` for the calculator. Calculator-specific visibility, target, and
+bar selection transitions live in one reducer. `visibleHwKeys` remains the single
+source of truth for official and unofficial bars.
 
-It reads `unofficialBenchmarkRows` / `unofficialRunInfos` / `runIndexByUrl` from `useUnofficialRun()` to render unofficial-run overlay bars, but it neither reads nor writes the shared `activeOverlayHwTypes` that the inference and evaluation tabs use: the calculator's local `visibleHwKeys` governs its official and overlay bars alike. Two visibility sets behind one legend can only drift — see [TCO Calculator › Unofficial-Run Overlays](./tco-calculator.md#unofficial-run-overlays-unofficialrun).
+**Historical Trends**: mounts `InferenceProvider` and shares the global filter provider
+declared by its route capability.
 
-**Historical Trends** (`historical` tab): Rendered inside `InferenceProvider` (shares the `inference` + `historical` `isActive` gate). It reads `useInference()` directly — no additional provider. Uses InferenceContext's model/sequence/precision/date state.
+**Reliability**: mounts only `ReliabilityProvider`.
 
-**GPU Specs**: Static data, no provider.
+**GPU Specs and other static/internal pages**: mount no data providers.
 
 ---
 
@@ -201,7 +226,7 @@ GlobalFilterProvider
                          AND precision ∈ effectivePrecisions
   → effectiveRunDate   = latest of availableDates (unless user explicitly picked a date)
 
-InferenceProvider (receives availabilityRows from GlobalFilterContext)
+InferenceProvider (receives availability rows from `useGlobalFilterAvailability`)
   → availableGPUs     = availabilityRows filtered to (model, effectiveSequence, effectivePrecisions)
                         → hwKey extracted via buildAvailabilityHwKey()
                         → filtered by isKnownGpu() (base GPU in HW_REGISTRY)
@@ -239,62 +264,82 @@ Source files: `packages/app/src/lib/url-state.ts`, `packages/app/src/hooks/useUr
 
 | Prefix | Scope                                                                               |
 | ------ | ----------------------------------------------------------------------------------- |
-| `g_`   | GlobalFilterContext — model, run date, run ID                                       |
-| `i_`   | InferenceProvider — sequence, precision, GPUs, dates, metrics, display toggles      |
+| `g_`   | Global filter run and selection contexts: model, run date, run ID                   |
+| `i_`   | Global selection plus InferenceProvider: sequence, precision, GPUs, metrics         |
 | `e_`   | EvaluationProvider — eval date (only when it differs from globalRunDate), benchmark |
 | `r_`   | ReliabilityProvider — date range, display toggles                                   |
 
-Note: `i_seq` and `i_prec` are written by `GlobalFilterProvider` (not InferenceProvider) because they live in GlobalFilterContext.
+Note: `i_seq` and `i_prec` are written by `GlobalFilterProvider` because selection state is owned by `useGlobalFilterSelection`, not InferenceProvider.
 
-### Snapshot-and-clear on load
+### Snapshot, external subscriptions, and writes
 
-`url-state.ts` runs at module-load time (before any React render). It reads all known keys from `window.location.search` into `_initialParams` and copies them into `currentState`. A `setTimeout(0)` callback then strips those keys from the URL via `history.replaceState`. This ensures the URL is clean after load — subsequent writes reflect only current state.
+`url-state.ts` snapshots known share parameters at module load and removes them from the
+visible address bar after hydration while preserving the pathname and hash. Route-owned
+entry points pass typed seeds where they render URL-controlled state on the server.
 
-`useUrlState` caches `_initialParams` in a ref via `readUrlParams()` on first call. All `getUrlParam()` calls return from this snapshot, so providers initialize from the original share URL even if the cleanup timer has already run.
+Live address-bar consumers use the shared `useClientSearch` external store. It subscribes
+once to `popstate` and `CLIENT_SEARCH_CHANGE_EVENT` through `useSyncExternalStore`;
+components do not mirror search strings through independent effects.
 
-### Debounced write-back (150 ms)
+`writeUrlParams` batches state serialization for 150 ms. `useUrlStateSync` and explicit
+state actions write requested/user state, not derived fallbacks.
 
-`writeUrlParams(params)` merges incoming params into `pendingParams` and sets a 150 ms debounce timer. On flush, params matching their default in `PARAM_DEFAULTS` are deleted from `currentState`; non-defaults are stored. This keeps share URLs short.
+The mutable remount snapshot and explicit URL intent are separate. Debounced
+filter writes update the remount snapshot so providers preserve current state,
+but they do not become explicit share-link choices that block automatic
+unofficial-run model selection. A real navigation rebuilds the explicit-intent
+set from the destination URL.
 
-`useUrlStateSync` (used by InferenceProvider, EvaluationProvider, ReliabilityProvider) skips the first render via `isMountedRef` to avoid overwriting the just-snapshotted URL params. GlobalFilterProvider uses a manually-written equivalent (lines 288–308 in `GlobalFilterContext.tsx`).
+### Carrying state across a full-document navigation
+
+The two effects above combine into a trap: filter changes reach only the
+in-memory `currentState`, and the address bar is stripped clean, so **the URL of
+the `/inference` history entry describes nothing**. Any full-document navigation
+away from the chart therefore destroys the state entirely — the module is torn
+down, and Back returns to a bare `/inference` that rebuilds from defaults.
+
+The agentic point-detail links (`/inference/agentic/<id>`, rendered by
+`tooltipUtils.viewChartsButtonHTML` and `legend-points-table.pointDetailHref`)
+are exactly that: plain `<a href>`, deliberately, so browsers can offer
+open-in-new-tab. Three helpers in `url-state.ts` bridge the gap:
+
+| Helper                      | Used by                                                      | Why                                                                           |
+| --------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `rememberChartStateInUrl()` | the point-click handlers (Scatter / GPU graph, legend table) | `history.replaceState`s the chart state onto the entry Back will return to    |
+| `withChartState(href)`      | `agenticDetailHref()`                                        | appends it to the outbound link so the detail page can link back to that view |
+| `currentChartSearch()`      | both of the above                                            | resolves the tab through the `/zh` prefix, flushes pending writes, filters    |
+
+The detail page reads the state back through `withChartState` (its own URL was
+snapshotted into `currentState` at load, then stripped as usual), which is what
+makes its "Inference chart" link land on the chart the reader left rather than
+on defaults.
+
+### Re-hydration on client-side navigation
+
+`useUrlState` calls `refreshUrlParamsOnNavigation(pathname)` **during render**,
+guarded by a module-level last-pathname so it runs at most once per navigation.
+The refresh first flushes pending debounced writes, then applies explicit
+destination parameters over that current state. This prevents a rapid filter
+change followed by a retained-provider tab switch from replaying the previous
+selection.
+
+That ordering also matters because providers read `getUrlParam` in `useState`
+initialisers and mount effects, both of which run before any parent's layout
+effect. With the hook-level refresh, every provider sees the params of the page
+it actually landed on. The once-per-pathname guard keeps a late-mounting
+component from replaying a stale URL over subsequent filter changes.
 
 ### Share URL construction
 
-`buildShareUrl()` flushes pending writes, reads `currentState`, and filters to only the param prefixes relevant to the current tab (defined in `TAB_PARAM_PREFIXES`). Inference share URLs include `g_` + `i_` params; evaluation includes `g_` + `e_`; reliability includes only `r_`.
+`buildShareUrl()` preserves the exact current pathname, locale prefix, dynamic slug, and
+hash. It filters parameters using `shareParamScopes` from the canonical dashboard route
+registry and carries the canonical `unofficialruns` value from the live URL.
 
-Historical Trends and TCO Calculator share the inference tab's URL path (`/inference` and `/calculator` respectively) but have no dedicated param prefix — they inherit whichever `i_` params are relevant.
+### Parameter registry
 
-### Full parameter list
-
-| Param           | Owner               | Default                           |
-| --------------- | ------------------- | --------------------------------- |
-| `g_model`       | GlobalFilterContext | `DeepSeek-R1-0528`                |
-| `g_rundate`     | GlobalFilterContext | `''`                              |
-| `g_runid`       | GlobalFilterContext | `''`                              |
-| `i_seq`         | GlobalFilterContext | `8k/1k`                           |
-| `i_prec`        | GlobalFilterContext | `fp4`                             |
-| `i_metric`      | InferenceProvider   | `y_tpPerGpu`                      |
-| `i_xmetric`     | InferenceProvider   | `p99_ttft`                        |
-| `i_e2e_xmetric` | InferenceProvider   | `''`                              |
-| `i_scale`       | InferenceProvider   | `auto`                            |
-| `i_gpus`        | InferenceProvider   | `''`                              |
-| `i_dates`       | InferenceProvider   | `''`                              |
-| `i_dstart`      | InferenceProvider   | `''`                              |
-| `i_dend`        | InferenceProvider   | `''`                              |
-| `i_optimal`     | InferenceProvider   | `''` (truthy = hide non-optimal)  |
-| `i_label`       | InferenceProvider   | `''` (truthy = show point labels) |
-| `i_nolabel`     | InferenceProvider   | `''` (legacy, read-only)          |
-| `i_hc`          | InferenceProvider   | `''`                              |
-| `i_log`         | InferenceProvider   | `''`                              |
-| `i_legend`      | InferenceProvider   | `''`                              |
-| `i_advlabel`    | InferenceProvider   | `''`                              |
-| `i_gradlabel`   | InferenceProvider   | `''`                              |
-| `e_rundate`     | EvaluationProvider  | `''`                              |
-| `e_bench`       | EvaluationProvider  | `''`                              |
-| `e_hc`          | EvaluationProvider  | `''`                              |
-| `e_labels`      | EvaluationProvider  | `''`                              |
-| `e_legend`      | EvaluationProvider  | `''`                              |
-| `r_range`       | ReliabilityProvider | `last-3-months`                   |
-| `r_pct`         | ReliabilityProvider | `''`                              |
-| `r_hc`          | ReliabilityProvider | `''`                              |
-| `r_legend`      | ReliabilityProvider | `''`                              |
+`UrlStateKey`, `URL_STATE_KEYS`, and `PARAM_DEFAULTS` in
+`packages/app/src/lib/url-state.ts` are the exhaustive parameter source of truth.
+Dashboard scope membership is declared by `shareParamScopes` in
+`packages/app/src/lib/dashboard-routes.ts`. Tests enforce completeness and route-specific
+share behavior, so this document deliberately does not duplicate a manually maintained
+parameter table.

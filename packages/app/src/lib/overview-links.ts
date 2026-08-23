@@ -24,7 +24,8 @@ export type OverviewSearchKey =
   | 'compare'
   | 'models'
   | 'rows'
-  | 'hwrows';
+  | 'hwrows'
+  | 'present';
 
 export const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
   'tier',
@@ -34,12 +35,15 @@ export const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
   'models',
   'rows',
   'hwrows',
+  'present',
 ];
 
 /** Params the client resolves without asking the server. `ref` only picks which
- *  column the percentages are measured against, and every cost that needs is
- *  already in the payload — so it must not vary the data cache key. */
-export const OVERVIEW_CLIENT_ONLY_KEYS: readonly OverviewSearchKey[] = ['ref'];
+ *  column the percentages are measured against, and `present` only records the
+ *  requested layout. Neither changes the Overview payload or its cache key. */
+export const OVERVIEW_CLIENT_ONLY_KEYS = ['ref', 'present'] as const;
+
+export type OverviewClientOnlySearchKey = (typeof OVERVIEW_CLIENT_ONLY_KEYS)[number];
 
 /** Apply one control's destination to the latest pending overview URL.
  * This prevents a second, fast selection from rebuilding from stale server

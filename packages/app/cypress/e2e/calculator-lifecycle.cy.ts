@@ -181,7 +181,7 @@ describe('Calculator — Fleet Lifecycle', () => {
       .find('[data-testid="calc-fleet-mw-input"]')
       .type('10');
     // The figure opens on the chart; the table is the other tab.
-    cy.get('[data-testid="calculator-lifecycle-figure"]', { timeout: 30_000 }).should('be.visible');
+    cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
     showTable();
     cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
@@ -757,7 +757,7 @@ describe('Calculator — Fleet Lifecycle', () => {
     // this asserts nothing about the budget at all.
     cy.get('[data-testid="calculator-controls"] input[type="number"]').clear();
     cy.get('[data-testid="calculator-controls"] input[type="number"]').type('35{enter}');
-    cy.get('[data-testid="calculator-lifecycle-figure"]', { timeout: 30_000 }).should('be.visible');
+    cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
 
     cy.get('[data-testid="calc-fleet-mw-input"]').clear();
     cy.get('[data-testid="calc-fleet-mw-input"]').type('0.0001');
@@ -896,7 +896,7 @@ describe('Calculator — Fleet Lifecycle with agentic traces', () => {
     cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic');
     cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
     cy.wait('@agenticHistory');
-    cy.get('[data-testid="calculator-lifecycle-figure"]', { timeout: 30_000 }).should('be.visible');
+    cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
     showTable();
     cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
   });
@@ -973,7 +973,7 @@ describe('Calculator — Fleet Lifecycle in Chinese', () => {
       .should('contain.text', '集群生命周期')
       .and('contain.text', '设施功率预算');
     cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
-    cy.get('[data-testid="calculator-lifecycle-figure"]', { timeout: 30_000 }).should('be.visible');
+    cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
     // The caption's price line is translated too, units and all.
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('contain', '每百万 token');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('contain', '输入 $');

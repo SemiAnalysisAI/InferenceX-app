@@ -382,7 +382,7 @@ const CONTENT = {
           '在 50 个客户端的回放中，会话图持续展开和汇合，running 与 waiting HTTP 请求数也随之变化。',
       },
       pareto: {
-        alt: 'B200 vLLM MiniMax-M3 在不同客户端 concurrency 下的单 Chip 吞吐量与 p90 interactivity 曲线。',
+        alt: 'B200 vLLM MiniMax-M3 在不同客户端 concurrency 下的单芯片吞吐量与 p90 interactivity 曲线。',
         caption:
           '每个标记点对应一种客户端 concurrency。提高 concurrency 会增加吞吐量，同时降低每个客户端的 interactivity。',
       },
