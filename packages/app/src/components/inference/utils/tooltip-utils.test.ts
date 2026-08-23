@@ -470,7 +470,7 @@ describe('generateTooltipContent', () => {
     );
 
     expect(en).not.toContain('Offload Type');
-    expect(zh).not.toContain('卸载类型');
+    expect(zh).not.toContain('offload 类型');
   });
 
   it('falls back to hwKey when hardware config entry is missing', () => {

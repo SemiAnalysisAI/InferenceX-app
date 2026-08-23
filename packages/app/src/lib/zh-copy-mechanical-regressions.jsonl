@@ -10,6 +10,9 @@
 {"rule": "duplicated-technical-loanword", "kind": "regression", "before": "'正式测量前通过 warmup 预热深层 prefix。'", "after": "'正式测量前通过 warmup 建立深层 prefix。'", "note": "warmup was immediately translated a second time in AgentX FAQ copy"}
 {"rule": "duplicated-technical-loanword", "kind": "regression", "before": "'固定 seed 随机种子后可以复现采样。'", "after": "'固定 seed 后可以复现采样。'", "note": "seed should not be followed by a redundant Chinese translation"}
 {"rule": "duplicated-technical-loanword", "kind": "regression", "before": "'启用 KV offload 卸载后会显示后端。'", "after": "'启用 KV offload 后会显示后端。'", "note": "offload should not be followed by a redundant Chinese translation"}
+{"rule": "duplicated-technical-loanword", "kind": "regression", "before": "'warmup（预热）发生在正式测量之前。'", "after": "'warmup 发生在正式测量之前。'", "note": "English-first full-width parenthetical translation is still redundant"}
+{"rule": "duplicated-technical-loanword", "kind": "regression", "before": "'固定 seed (随机种子) 后可以复现采样。'", "after": "'固定 seed 后可以复现采样。'", "note": "English-first ASCII parenthetical translation is still redundant"}
+{"rule": "duplicated-technical-loanword", "kind": "regression", "before": "'KV offload（卸载）会显示后端。'", "after": "'KV offload 会显示后端。'", "note": "offload followed by a parenthetical Chinese translation is redundant"}
 {"rule": "duplicated-technical-loanword", "kind": "exemption", "text": "'这里所说的预热（warmup）发生在正式测量之前。'", "note": "Chinese-first parenthetical explanation is intentional for a broader audience"}
 {"rule": "duplicated-technical-loanword", "kind": "exemption", "text": "'随机种子（seed）用于固定会话采样。'", "note": "Chinese-first parenthetical explanation remains allowed"}
 {"rule": "duplicated-technical-loanword", "kind": "exemption", "text": "'将 KV cache 卸载（offload）到 DRAM。'", "note": "Chinese-first parenthetical explanation remains allowed"}
