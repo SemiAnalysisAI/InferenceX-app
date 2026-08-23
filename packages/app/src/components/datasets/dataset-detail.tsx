@@ -155,11 +155,18 @@ export function DatasetDetail({ slug }: { slug: string }) {
   const paginationPending = searchInput !== search || isFetching || isPlaceholderData;
 
   if (isLoading) {
-    return <div className="py-12 text-center text-sm text-muted-foreground">{t.loading}</div>;
+    return (
+      <div
+        className="min-h-svh py-12 text-center text-sm text-muted-foreground"
+        data-testid="dataset-detail-loading"
+      >
+        {t.loading}
+      </div>
+    );
   }
   if (isError || !dataset) {
     return (
-      <div className="py-12 text-center text-sm text-destructive">
+      <div className="min-h-svh py-12 text-center text-sm text-destructive">
         {t.notFound}{' '}
         <Link href={`${prefix}/agentx`} className="text-primary underline">
           {t.backToDatasets}
@@ -174,7 +181,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
   const pageCount = Math.ceil(total / PAGE);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="min-h-svh flex flex-col gap-6">
       {/* header */}
       <div>
         <div className="mb-1 flex items-center gap-2">

@@ -19,6 +19,20 @@ const distribution = (values: {
   },
 });
 
+const LAYOUT_DATASET = {
+  id: 'layout-dataset',
+  slug: 'layout-dataset',
+  label: 'Layout dataset',
+  variant: 'full',
+  description: null,
+  hf_url: null,
+  license: 'apache-2.0',
+  conversation_count: 0,
+  summary: {},
+  chart_data: {},
+  ingested_at: '2026-06-23T00:00:00Z',
+};
+
 describe('Dataset distribution percentiles', () => {
   before(() => {
     cy.intercept('GET', '/api/v1/datasets/test-dataset', {
@@ -132,4 +146,29 @@ describe('Dataset distribution percentiles', () => {
       });
     }
   });
+});
+
+describe('Dataset detail loading stability', () => {
+  for (const path of ['/agentx/layout-dataset', '/zh/agentx/layout-dataset']) {
+    it(`keeps the footer below the viewport while ${path} loads`, () => {
+      cy.intercept('GET', '/api/v1/datasets/layout-dataset', {
+        delay: 1500,
+        body: LAYOUT_DATASET,
+      }).as('dataset');
+      cy.intercept('GET', '/api/v1/datasets/layout-dataset/conversations*', {
+        body: { total: 0, items: [] },
+      });
+
+      cy.visit(path, { onBeforeLoad: unlockAgenticGate });
+      cy.get('[data-testid="dataset-detail-loading"]').should('be.visible');
+      cy.get('[data-testid="footer"]').then(($footer) => {
+        cy.window().then((win) => {
+          expect($footer[0].getBoundingClientRect().top).to.be.at.least(win.innerHeight);
+        });
+      });
+
+      cy.wait('@dataset');
+      cy.contains('h1', 'Layout dataset').should('be.visible');
+    });
+  }
 });
