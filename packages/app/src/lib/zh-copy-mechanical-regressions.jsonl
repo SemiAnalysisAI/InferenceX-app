@@ -7,3 +7,9 @@
 {"rule": "hardcoded-english-label", "kind": "regression", "before": "`<div><strong>Concurrency:</strong> ${d.concurrency}</div>`", "after": "`<div><strong>${t.concurrency}：</strong> ${d.concurrency}</div>`", "note": "chart tooltip shipped 16 of these; a /zh reader saw them beside 投机解码：关闭"}
 {"rule": "hardcoded-english-label", "kind": "exemption", "text": "`<div><strong>TP:</strong> ${d.tp}</div>`", "note": "acronym — stays English"}
 {"rule": "hardcoded-english-label", "kind": "exemption", "text": "`<div><strong>tok/s/MW:</strong> ${d.perMw}</div>`", "note": "unit — stays English"}
+{"rule": "duplicated-technical-loanword", "kind": "regression", "before": "'正式测量前通过 warmup 预热深层 prefix。'", "after": "'正式测量前通过 warmup 建立深层 prefix。'", "note": "warmup was immediately translated a second time in AgentX FAQ copy"}
+{"rule": "duplicated-technical-loanword", "kind": "regression", "before": "'固定 seed 随机种子后可以复现采样。'", "after": "'固定 seed 后可以复现采样。'", "note": "seed should not be followed by a redundant Chinese translation"}
+{"rule": "duplicated-technical-loanword", "kind": "regression", "before": "'启用 KV offload 卸载后会显示后端。'", "after": "'启用 KV offload 后会显示后端。'", "note": "offload should not be followed by a redundant Chinese translation"}
+{"rule": "duplicated-technical-loanword", "kind": "exemption", "text": "'这里所说的预热（warmup）发生在正式测量之前。'", "note": "Chinese-first parenthetical explanation is intentional for a broader audience"}
+{"rule": "duplicated-technical-loanword", "kind": "exemption", "text": "'随机种子（seed）用于固定会话采样。'", "note": "Chinese-first parenthetical explanation remains allowed"}
+{"rule": "duplicated-technical-loanword", "kind": "exemption", "text": "'将 KV cache 卸载（offload）到 DRAM。'", "note": "Chinese-first parenthetical explanation remains allowed"}

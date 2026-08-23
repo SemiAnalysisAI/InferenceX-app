@@ -681,7 +681,7 @@ QB 的做法是：在当前批次的截断阈值和路由结果下，求出一�
 
 在 InferenceX 上，我们直接基于内部录制的 Claude Code 轨迹（trace）来评测 Kimi K3 的服务性能。我们回放其中达到稳态的一小时轨迹。每轮的输入 token 中位数为 142k，输出 token 中位数为 444，每个会话的轮数中位数为 65。每轮输出 token 偏短，是 agentic harness 类负载的典型特征——agent 频繁调用工具，连编辑操作也是工具调用。
 
-相比我们此前的 8k1k/1k1k 基准测试，这套基准是一次大的跃进，因为它真实反映了现实中的 agentic 使用场景。从系统角度看，它也更贴近生产系统，能够体现包括 prefix cache 和 KV 向 DRAM 卸载在内的 KV cache 行为。
+相比我们此前的 8k1k/1k1k 基准测试，这套基准是一次大的跃进，因为它真实反映了现实中的 agentic 使用场景。从系统角度看，它也更贴近生产系统，能够体现包括 prefix cache 和 KV 向 DRAM offload 在内的 KV cache 行为。
 
 <Figure
   src="/images/kimi-k3-the-manos-the-mythos-the/inferencex-agentic-trace-distributions.png"
@@ -766,7 +766,7 @@ _本文后续内容——B300 并发扫描、AMD MI355X 与 MI455X 的 bringup�
       "name": "InferenceX 如何评测 Kimi K3？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "使用内部录制的 Claude Code 真实轨迹，而非固定的 8k1k/1k1k 合成负载。我们回放一小时达到稳态的轨迹，每轮输入 token 中位数 142k、输出 token 中位数 444，每个会话轮数中位数 65。每轮输出偏短是 agentic harness 的典型特征，因为 agent 频繁调用工具。回放真实轨迹能够复现生产环境中的 KV cache 行为，包括 prefix cache 命中和 KV 向 DRAM 的卸载。"
+        "text": "使用内部录制的 Claude Code 真实轨迹，而非固定的 8k1k/1k1k 合成负载。我们回放一小时达到稳态的轨迹，每轮输入 token 中位数 142k、输出 token 中位数 444，每个会话轮数中位数 65。每轮输出偏短是 agentic harness 的典型特征，因为 agent 频繁调用工具。回放真实轨迹能够复现生产环境中的 KV cache 行为，包括 prefix cache 命中和 KV 向 DRAM offload。"
       }
     },
     {

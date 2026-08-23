@@ -86,27 +86,30 @@ surface and reason in the PR or add a reviewed example here.
 下表记录默认写法，不是全局替换表。需要例外时，应在 PR 中说明使用场景与理由，或将经过
 审核的案例补充到本文。
 
-| English                | Preferred Chinese   | Context and exceptions                                                                                                                                                                                                            |
-| ---------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| benchmark              | 基准测试            | Use for the process or result set. A short UI label may use “测试” only when the surrounding heading already establishes that it is a benchmark. / 表示测试过程或结果集；只有上下文已经明确是基准测试时，短标签才可简写为“测试”。 |
-| dashboard              | 仪表板              | Use for the interactive data surface. Do not use “完整仪表板” merely to mirror “full”; write “查看完整仪表板” when it is an action. / 表示交互式数据页面；按钮需要表达动作时写“查看完整仪表板”。                                  |
-| chart                  | 图表                | Use “图” only when naming a specific conventional form such as a scatter plot. / 特指散点图等固定图形时可用“图”。                                                                                                                 |
-| configuration / config | 配置                | “测试配置” is preferred when the surrounding text could otherwise refer to deployment configuration. / 容易与部署配置混淆时写“测试配置”。                                                                                         |
-| inference              | 推理                | Keep inside established product names and identifiers. / 产品名和标识符中的英文保持不变。                                                                                                                                         |
-| throughput             | 吞吐量              | Preserve the token type, denominator, and scope. / 必须保留 token 类型、分母和统计范围。                                                                                                                                          |
-| latency                | 延迟                | Preserve percentile and stage qualifiers such as TTFT or TPOT. / 必须保留分位数以及 TTFT、TPOT 等阶段限定。                                                                                                                       |
-| evaluation / eval      | 评估                | Keep `eval` in code identifiers, flags, and filenames. / 代码标识符、flag 和文件名中的 `eval` 不翻译。                                                                                                                            |
-| artifact               | 产物                | Use for CI or benchmark outputs. “文件” is acceptable only when the object is literally a user-facing file. / 表示 CI 或基准测试输出；确实指用户下载的文件时可写“文件”。                                                          |
-| chip                   | 芯片                | Keep English inside units and identifiers such as `tok/s/chip`, `$/chip-hour`, and `ChipSKU`. / `tok/s/chip`、`$/chip-hour`、`ChipSKU` 等单位和标识符保持英文。                                                                   |
-| framework              | 框架                | Keep names such as vLLM, SGLang, and TensorRT-LLM unchanged. / vLLM、SGLang、TensorRT-LLM 等名称不翻译。                                                                                                                          |
-| agent / agentic        | 智能体 / 智能体相关 | Keep `AgentX` as a product name. Translate according to the role, not by replacing every occurrence mechanically. / `AgentX` 作为产品名保持不变；其他场景根据实际角色翻译，不做全局替换。                                         |
-| workload               | 工作负载            | Avoid using “场景” when the source refers to the actual request distribution or task mix. / 原文指请求分布或任务组合时，不要弱化成“场景”。                                                                                        |
-| disaggregated serving  | 分离式推理          | Use “分离式部署” when the sentence is about architecture or deployment rather than the serving process. / 强调架构或部署方式时可写“分离式部署”。                                                                                  |
-| speculative decoding   | 投机解码            | Do not rewrite the ordinary verb “推测”. / 不影响作为普通动词使用的“推测”。                                                                                                                                                       |
-| recipe                 | 测试配置 / 配置方案 | Choose from context; do not leave `recipe` in user-facing prose merely because it appears in code. / 根据上下文选择，不因代码中使用 `recipe` 就在用户文案中保留英文。                                                             |
-| methodology            | 测试方法 / 方法说明 | Use “方法论” only when the content actually discusses a methodology as a field or system of principles. / 只有内容确实讨论一套方法论或原则体系时才使用“方法论”。                                                                  |
-| industry testimonials  | 业界评价            | Use for navigation and section labels. Preserve the speaker's own wording inside each attributed quotation. / 用于导航和栏目名称；每条署名引用仍需保留说话者自己的表达。                                                          |
-| Land Acknowledgement   | 原住民传统领地声明  | Use for the dedicated legal-cultural page and its link. Preserve community, nation, and place names exactly. / 用于对应的法律与文化说明页面及其链接；原住民族群、社群和地名必须准确保留。                                         |
+| English                | Preferred rendering | Context and exceptions                                                                                                                                                                                                                                                                                                                              |
+| ---------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| benchmark              | 基准测试            | Use for the process or result set. A short UI label may use “测试” only when the surrounding heading already establishes that it is a benchmark. / 表示测试过程或结果集；只有上下文已经明确是基准测试时，短标签才可简写为“测试”。                                                                                                                   |
+| dashboard              | 仪表板              | Use for the interactive data surface. Do not use “完整仪表板” merely to mirror “full”; write “查看完整仪表板” when it is an action. / 表示交互式数据页面；按钮需要表达动作时写“查看完整仪表板”。                                                                                                                                                    |
+| chart                  | 图表                | Use “图” only when naming a specific conventional form such as a scatter plot. / 特指散点图等固定图形时可用“图”。                                                                                                                                                                                                                                   |
+| configuration / config | 配置                | “测试配置” is preferred when the surrounding text could otherwise refer to deployment configuration. / 容易与部署配置混淆时写“测试配置”。                                                                                                                                                                                                           |
+| inference              | 推理                | Keep inside established product names and identifiers. / 产品名和标识符中的英文保持不变。                                                                                                                                                                                                                                                           |
+| throughput             | 吞吐量              | Preserve the token type, denominator, and scope. / 必须保留 token 类型、分母和统计范围。                                                                                                                                                                                                                                                            |
+| latency                | 延迟                | Preserve percentile and stage qualifiers such as TTFT or TPOT. / 必须保留分位数以及 TTFT、TPOT 等阶段限定。                                                                                                                                                                                                                                         |
+| evaluation / eval      | 评估                | Keep `eval` in code identifiers, flags, and filenames. / 代码标识符、flag 和文件名中的 `eval` 不翻译。                                                                                                                                                                                                                                              |
+| artifact               | 产物                | Use for CI or benchmark outputs. “文件” is acceptable only when the object is literally a user-facing file. / 表示 CI 或基准测试输出；确实指用户下载的文件时可写“文件”。                                                                                                                                                                            |
+| warmup                 | `warmup`            | Keep English in first-party ML infrastructure UI and technical prose. Chinese-first `预热（warmup）` is acceptable when introducing the concept to a broader audience. Never write the redundant `warmup 预热`. / 第一方 ML 基础设施 UI 与技术文案默认保留英文；面向更广泛读者首次解释概念时可写 `预热（warmup）`，不得使用重复表达 `warmup 预热`。 |
+| seed                   | `seed`              | Keep English in technical copy and preserve flags such as `--random-seed`. Chinese-first `随机种子（seed）` is acceptable in explanatory copy. / 技术文案默认保留英文，`--random-seed` 等 flag 保持不变；解释性文案可写 `随机种子（seed）`。                                                                                                        |
+| offload                | `offload`           | Keep English in first-party ML infrastructure UI and technical prose. Chinese-first `卸载（offload）` is acceptable in explanatory copy; attributed quotations retain the speaker's wording. / 第一方 ML 基础设施 UI 与技术文案默认保留英文；解释性文案可写 `卸载（offload）`，署名引用保留说话者原有措辞。                                         |
+| chip                   | 芯片                | Keep English inside units and identifiers such as `tok/s/chip`, `$/chip-hour`, and `ChipSKU`. / `tok/s/chip`、`$/chip-hour`、`ChipSKU` 等单位和标识符保持英文。                                                                                                                                                                                     |
+| framework              | 框架                | Keep names such as vLLM, SGLang, and TensorRT-LLM unchanged. / vLLM、SGLang、TensorRT-LLM 等名称不翻译。                                                                                                                                                                                                                                            |
+| agent / agentic        | 智能体 / 智能体相关 | Keep `AgentX` as a product name. Translate according to the role, not by replacing every occurrence mechanically. / `AgentX` 作为产品名保持不变；其他场景根据实际角色翻译，不做全局替换。                                                                                                                                                           |
+| workload               | 工作负载            | Avoid using “场景” when the source refers to the actual request distribution or task mix. / 原文指请求分布或任务组合时，不要弱化成“场景”。                                                                                                                                                                                                          |
+| disaggregated serving  | 分离式推理          | Use “分离式部署” when the sentence is about architecture or deployment rather than the serving process. / 强调架构或部署方式时可写“分离式部署”。                                                                                                                                                                                                    |
+| speculative decoding   | 投机解码            | Do not rewrite the ordinary verb “推测”. / 不影响作为普通动词使用的“推测”。                                                                                                                                                                                                                                                                         |
+| recipe                 | 测试配置 / 配置方案 | Choose from context; do not leave `recipe` in user-facing prose merely because it appears in code. / 根据上下文选择，不因代码中使用 `recipe` 就在用户文案中保留英文。                                                                                                                                                                               |
+| methodology            | 测试方法 / 方法说明 | Use “方法论” only when the content actually discusses a methodology as a field or system of principles. / 只有内容确实讨论一套方法论或原则体系时才使用“方法论”。                                                                                                                                                                                    |
+| industry testimonials  | 业界评价            | Use for navigation and section labels. Preserve the speaker's own wording inside each attributed quotation. / 用于导航和栏目名称；每条署名引用仍需保留说话者自己的表达。                                                                                                                                                                            |
+| Land Acknowledgement   | 原住民传统领地声明  | Use for the dedicated legal-cultural page and its link. Preserve community, nation, and place names exactly. / 用于对应的法律与文化说明页面及其链接；原住民族群、社群和地名必须准确保留。                                                                                                                                                           |
 
 ## Review workflow / 审核流程
 
@@ -115,9 +118,11 @@ surface and reason in the PR or add a reviewed example here.
 2. Claude loads `review-zh-copy`, evaluates semantic fidelity and natural Chinese separately,
    and reports complete suggested replacements rather than isolated word swaps.
 3. The skill's findings never block another contributor's merge. Claude must not label a
-   Chinese-copy finding `BLOCKING` or submit a request-changes review for it. If an issue is serious
-   enough that it would normally warrant blocking, Claude labels it
-   `Needs Chinese maintainer confirmation`, mentions `@edwingao28`, and asks for review.
+   Chinese-copy finding `BLOCKING` or submit a request-changes review for it. Clean reviews,
+   routine coverage, and ordinary wording or naturalness suggestions do not mention the Chinese
+   maintainer. Only a high-confidence semantic or factual error, changed attribution or speaker
+   voice, or unresolved high-impact ambiguity is labeled `Needs Chinese maintainer confirmation`
+   and mentions `@edwingao28`.
 4. The Chinese-speaking maintainer manually reads every changed sentence and makes the final
    editorial decision. Attributed quotations receive an explicit attribution-and-voice check.
 
@@ -127,8 +132,10 @@ surface and reason in the PR or add a reviewed example here.
 2. Claude 加载 `review-zh-copy`，分别检查语义准确度和中文自然度，并给出完整改写，
    而不是只替换孤立词语。
 3. skill 的 finding 不阻断其他贡献者合并。Claude 不得把中文文案 finding 标为
-   `BLOCKING`，也不得因此提交 request-changes review。如果某项问题严重到通常需要阻断，
-   则标为 `Needs Chinese maintainer confirmation`，并 `@edwingao28` 请中文维护者审核。
+   `BLOCKING`，也不得因此提交 request-changes review。审核通过、例行 coverage 和普通措辞
+   或自然度建议都不提及中文维护者。只有高置信度的语义或事实错误、署名或说话者语气被
+   改变，或无法消除且影响较大的歧义，才标为 `Needs Chinese maintainer confirmation`，并
+   `@edwingao28` 请中文维护者审核。
 4. 中文维护者逐句人工审阅并作出最终编辑决定；署名引用还要单独核对署名、观点和说话者
    语气。
 
@@ -160,12 +167,16 @@ It must not decide fluency, sentence structure, register, or contextual pronoun 
 确定性 CI 只适合检查与上下文无关的规则，例如标点、受保护标识符、字典完整性，以及确实
 只有一种正确写法的术语。流畅度、句法、语域和第二人称选择不得交给机械规则判定。
 
-The `review-zh-copy` skill assists the judgment layer and stays non-blocking. Serious findings
-mention `@edwingao28` for review instead of holding another contributor's merge, and the Chinese
-maintainer makes the final wording decision. Separately verified mechanical cases from #819 may
-enter deterministic CI fixtures in #820, but editorial rewrites are never automatic ground truth.
+The `review-zh-copy` skill assists the judgment layer and stays non-blocking. It mentions
+`@edwingao28` only for high-confidence semantic or factual risk, attribution risk, or unresolved
+high-impact ambiguity; ordinary findings do not CC the Chinese maintainer. CI does not globally ban
+`预热`, `随机种子`, or `卸载`, because explanations and quotations can use them correctly. It may
+reject context-independent duplication such as `warmup 预热`. Separately verified mechanical cases
+from #819 may enter deterministic CI fixtures in #820, but editorial rewrites are never automatic
+ground truth.
 
-`review-zh-copy` skill 用于辅助判断性审核，并保持非阻断模式。严重 finding 应
-`@edwingao28` 请中文维护者审核，而不是阻止其他贡献者合并；最终文案决定由中文维护者
-作出。#819 中经过单独验证的机械案例可以进入 #820 的确定性 CI fixtures，但编辑性改写
-不得自动视为标准答案。
+`review-zh-copy` skill 用于辅助判断性审核，并保持非阻断模式。只有高置信度的语义或事实
+风险、署名风险，或无法消除且影响较大的歧义才 `@edwingao28`；普通 finding 不 CC 中文
+维护者。CI 不全局禁用 `预热`、`随机种子` 或 `卸载`，因为这些写法在解释与引用中可能
+正确；`warmup 预热` 这类与上下文无关的重复表达则可由 CI 拦截。#819 中经过单独验证的
+机械案例可以进入 #820 的确定性 CI fixtures，但编辑性改写不得自动视为标准答案。

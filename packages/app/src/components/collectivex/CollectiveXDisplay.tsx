@@ -239,7 +239,7 @@ const STRINGS = {
     resetFilter: '重置筛选',
     stableOrdering: '排名顺序稳定性已通过',
     samplingContract: (trials: number, iterations: number, samples: number, warmups: number) =>
-      `${trials}×${iterations} = 每个分项 ${samples} 个样本 · ${warmups} 次同步预热`,
+      `${trials}×${iterations} = 每个分项 ${samples} 个样本 · 同步 warmup ${warmups} 次`,
     selectedFactorsDiffer: '所选配置存在差异',
     differenceLabels: {
       model: '模型',

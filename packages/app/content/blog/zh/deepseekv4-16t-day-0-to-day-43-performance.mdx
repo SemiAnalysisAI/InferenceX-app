@@ -348,10 +348,10 @@ vLLM 的计划在 [DeepSeek V4 路线图 issue (#40902)](https://github.com/vllm
 - **核心模型支持**：持续 MegaMoE 工作（PR #40833）和 NVFP4 支持。
 - **运行时与并行**：Model Runner V2 集成、MTP 优化、prefill/decode (PD) 优化、pipeline parallelism 支持。
 - **Kernel 集成**：paged prefill kernel、fast top-k kernel、更多水平融合、DeepEP V2，以及与 DeepSeek 自研 TileKernels 的集成。
-- **KV cache**：KV cache 卸载，涵盖 PD + CPU 卸载（PR #39654）和分布式 KV 卸载。
+- **KV cache**：KV cache offload，涵盖 PD + CPU offload（PR #39654）和分布式 KV offload。
 - **硬件支持**：在已完成 Hopper 支持的基础上，SM120 和 AMD 支持仍是关键待办项。
 
-这里的核心主题聚焦在周边系统：新的模型运行器、pipeline parallelism、KV 卸载，以及更广泛的硬件覆盖。
+这里的核心主题聚焦在周边系统：新的模型运行器、pipeline parallelism、KV offload，以及更广泛的硬件覆盖。
 
 即将到来的 InferenceX 更新——SemiAnalysis 的开源公共 EcosystemX 仪表板——将可视化所有主要 ML 开源库在所有主要 AI 芯片上的软件演进、CI 覆盖率和队列时间：NVIDIA、AMD、TPU、Trainium、Huawei 等。
 

@@ -165,8 +165,8 @@ const CACHE_STRINGS = {
     legacyDisabled: 'Disabled (legacy data)',
   },
   zh: {
-    offloadType: '卸载类型',
-    offloadBackend: 'KV 卸载引擎',
+    offloadType: 'offload 类型',
+    offloadBackend: 'KV offload 引擎',
     transferEngine: 'KV 传输引擎',
     router: '路由器',
     gpuHitRate: '芯片 Cache 命中率',

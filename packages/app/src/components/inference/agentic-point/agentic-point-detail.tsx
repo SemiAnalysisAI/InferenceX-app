@@ -88,9 +88,9 @@ const STRINGS = {
     warmupWord: 'warmup',
     warmupNotePrefix: '当前显示 ',
     warmupNoteBody:
-      ' 预热阶段——该阶段用于缓存预热，输出被限制为 1 个 token。预热阶段 OSL ≈ 1，交互性/解码指标为空（单 token 输出没有 token 间延迟）。',
+      ' warmup 阶段——该阶段用于建立 cache 状态，输出被限制为 1 个 token。warmup 阶段 OSL ≈ 1，交互性/解码指标为空（单 token 输出没有 token 间延迟）。',
     warmupNoServerData:
-      ' 该数据点没有预热阶段的服务器端指标，因此下方服务器图表为空——上方请求级图表仍反映预热阶段数据。',
+      ' 该数据点没有 warmup 阶段的服务器端指标，因此下方服务器图表为空——上方请求级图表仍反映 warmup 阶段数据。',
     metricSourceError: '无法加载所选服务器指标来源。',
   },
 } as const;

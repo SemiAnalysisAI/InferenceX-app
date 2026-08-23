@@ -89,7 +89,7 @@ const PHASE_OPTIONS: Record<'en' | 'zh', SegmentedToggleOption<PhaseFilter>[]> =
   ],
   zh: [
     { value: 'profiling', label: '性能剖析', testId: 'timeline-phase-profiling' },
-    { value: 'warmup', label: '预热', testId: 'timeline-phase-warmup' },
+    { value: 'warmup', label: 'warmup', testId: 'timeline-phase-warmup' },
   ],
 };
 
