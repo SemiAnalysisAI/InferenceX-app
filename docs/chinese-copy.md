@@ -190,3 +190,76 @@ ground truth.
 维护者。CI 不全局禁用 `预热`、`随机种子` 或 `卸载`，因为这些写法在解释与引用中可能
 正确；`warmup 预热` 这类与上下文无关的重复表达则可由 CI 拦截。#819 中经过单独验证的
 机械案例可以进入 #820 的确定性 CI fixtures，但编辑性改写不得自动视为标准答案。
+
+## Objective CI contract / 客观 CI 检查范围
+
+The objective guard covers only invariants that can be decided without reading a sentence for
+style. Its source scan and mutation fixtures call the same parsers and matchers. Every rule must
+include a failing mutation and an accepted correction; a rule with an exception must also include
+an accepted exception mutation.
+
+客观检查只覆盖无需判断文风即可确定的约束。源码扫描与 mutation fixture 必须调用同一套
+解析器和 matcher。每条规则都要同时提供会失败的 mutation 和可通过的修正；存在例外时，
+还必须提供可通过的例外 mutation。
+
+- App Router parity discovers every real `page.tsx`, removes route groups, and compares English
+  and `/zh` route patterns in both directions. Dynamic, noindex, hidden, and feature-gated pages are
+  included. API handlers, `feed.xml`, `llms*.txt`, sitemap handlers, and per-post OG renderers are
+  not page routes and therefore are not sibling candidates.
+- Blog pairing is bidirectional and includes scheduled posts. Chinese posts continue to reuse the
+  English OG image. Paired content preserves fenced code, math blocks, `Figure` sources, protected
+  inline code, flags, identifiers, unit kinds, link destinations, and JSON-LD syntax/shape. Chinese
+  internal links may add `/zh` (including `/blog` → `/zh/blog`), same-page heading fragments may be
+  localized, and link order may change when paragraphs are reorganized. JSON-LD prose values may
+  be translated; keys, types, array shape, URLs, numbers, booleans, dates, flags, and identifiers
+  remain protected.
+- Explicit `en`/`zh` object literals must have the same statically declared nested key shape.
+  Computed keys and spread contents cannot be proven locally and remain outside this structural
+  check; their explicit sibling keys are still checked.
+- A PR labeled `chinese-copy-only` runs the merge-base-aware English-byte check. English Blog MDX
+  is protected as a whole, while mixed TypeScript/TSX/JSON files protect raw `en` subtrees. The
+  check intentionally permits locale-neutral plumbing and tests; remove the label when English
+  copy is intentionally part of the change.
+- High-confidence copy rules remain limited to the documented `Chip` common-noun case,
+  prose-like hardcoded English labels beside a Chinese dictionary, redundant English-first
+  loanword translations, and unambiguous malformed punctuation such as whitespace before Chinese
+  terminal punctuation. Units and identifiers keep their documented English forms.
+
+- App Router 路由检查会发现所有真实的 `page.tsx`，去掉 route group 后双向比对英文与
+  `/zh` 路由。动态、noindex、隐藏和 feature-gated 页面都在范围内。API handler、
+  `feed.xml`、`llms*.txt`、sitemap handler 和文章 OG renderer 不是页面路由，因此不要求
+  `/zh` sibling。
+- Blog 文章双向配对，定时发布的文章也不例外；中文文章继续复用英文 OG 图。中英文配对
+  必须保留 fenced code、数学公式块、`Figure` 图片来源、受保护的 inline code、flag、
+  identifier、单位种类、链接目标，以及 JSON-LD 的语法和结构。中文站内链接可以添加
+  `/zh`（包括 `/blog` → `/zh/blog`）；页内标题锚点可以随中文标题本地化；段落重组时链接
+  顺序可以变化。JSON-LD 中的说明性文案可以翻译，但 key、type、数组结构、URL、数字、
+  boolean、日期、flag 和 identifier 必须保持不变。
+- 显式 `en`/`zh` object literal 的静态嵌套 key 结构必须一致。computed key 和 spread 的
+  内容无法在本地可靠推断，不纳入该结构检查；同一对象中的其他显式 sibling key 仍会检查。
+- PR 添加 `chinese-copy-only` label 后，会运行基于 merge base 的英文逐字节检查。英文 Blog
+  MDX 整体受保护；混合语言 TypeScript、TSX 和 JSON 文件则保护原始 `en` subtree。测试和
+  不含英文文案的 locale plumbing 可以修改；如果 PR 本来就要改英文文案，应移除该 label。
+- 高置信度文案规则仅限于已记录的 `Chip` 普通名词、已有中文字典旁绕过本地化的英文说明
+  标签、English-first 重复翻译，以及中文句末标点前多余空格等无歧义错误。单位和 identifier
+  继续保留文档规定的英文写法。
+
+Temporary baseline exceptions live in
+`packages/app/src/lib/zh-objective-guard-exceptions.json`. Every row must record a reason and an
+explicit removal condition. Blog exceptions match the exact English and Chinese spans;
+dictionary exceptions fingerprint the exact mismatched key set. A stale, broadened, or newly
+different exception fails its non-vacuity test.
+
+临时 baseline 例外统一记录在
+`packages/app/src/lib/zh-objective-guard-exceptions.json`。每条记录都必须说明原因和明确的
+删除条件。Blog 例外精确匹配中英文两侧文本；字典例外对完整的 key 差异集合计算 fingerprint。
+失效、扩大范围或内容发生变化的例外都会在非空验证中失败。
+
+The deterministic guard never scores fluency, clause order, sentence structure, register,
+contextual pronouns, marketing tone, or quotation voice. It also does not use English-token ratios
+or a closed list to decide whether an established ML infrastructure term should remain English.
+Those decisions stay with `review-zh-copy` and the Chinese maintainer.
+
+确定性检查永远不评价流畅度、分句顺序、句法、语域、上下文相关的第二人称、营销语气或引用
+者口吻，也不会通过英文 token 占比或封闭术语表来判断 ML 基础设施术语是否应保留英文。
+这些判断继续由 `review-zh-copy` 和中文维护者完成。

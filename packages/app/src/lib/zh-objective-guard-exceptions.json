@@ -1,0 +1,28 @@
+{
+  "blog": [
+    {
+      "rule": "inline-code",
+      "file": "deepseekv4-16t-day-0-to-day-43-performance.mdx",
+      "en": "“mhcFusedHcLaunch: hidden_size=7168 not supported (only 4096)”",
+      "zh": "\"mhcFusedHcLaunch: hidden_size=7168 not supported (only 4096)\"",
+      "reason": "The existing translation changed only the quote glyphs inside an inline diagnostic. The content branch owns the editorial correction; this exact pair prevents the independent guard branch from copying that rewrite.",
+      "removeWhen": "Delete this row when the paired article uses the exact English diagnostic bytes."
+    },
+    {
+      "rule": "inline-code",
+      "file": "gb300-nvl72-vs-gb200-nvl72-dsv4-pro-vllm-fp4.mdx",
+      "en": "conc=3072, 28 GPU prefill, 32 GPU decode EP=16, 6,812 tok/s/GPU at 25.9 tok/s/user",
+      "zh": "conc=3072, 28 GPU 预填充, 32 GPU 解码 EP=16, 6,812 tok/s/GPU at 25.9 tok/s/user",
+      "reason": "The existing translation localized words inside inline code. The content branch owns the correction; the exception is exact on both sides and cannot hide another token change.",
+      "removeWhen": "Delete this row when the paired article restores the English inline-code bytes."
+    }
+  ],
+  "dictionaries": [
+    {
+      "file": "src/components/collectivex/CollectiveXDisplay.tsx",
+      "mismatchSha256": "baf66a66ba86581f6b4a990865c5c9fced310c7cb69813f59d163e39fb0dd080",
+      "reason": "The baseline CollectiveX Chinese dictionary contains 74 Chinese-only keys from an unfinished page localization. The data-tools branch owns that rewrite. The digest fingerprints the exact missing-key set, so any added, removed, or renamed mismatch still fails.",
+      "removeWhen": "Delete this row when the CollectiveX en/zh dictionary has structural key parity."
+    }
+  ]
+}
