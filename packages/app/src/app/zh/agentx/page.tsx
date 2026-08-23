@@ -7,7 +7,7 @@ import { zhAlternates, ZH_LANG_TAG, ZH_OG_LOCALE } from '@/lib/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const DESCRIPTION =
-  'AgentX 根据自愿参与采集的 Claude Code 会话构建回放工作负载。可查看测试方法、数据分布和单会话火焰图。';
+  'AgentX 根据参与者自愿提供的 Claude Code 会话构建回放工作负载。可查看测试方法、数据分布和单会话火焰图。';
 
 export const metadata: Metadata = {
   title: 'AgentX 测试方法与数据集',

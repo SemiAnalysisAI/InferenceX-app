@@ -94,7 +94,7 @@ const CONTENT = {
     eyebrow: 'AgentX v1.0 测试方法',
     title: 'AgentX 基准测试数据集',
     intro:
-      'AgentX 根据自愿参与采集的 Claude Code 会话构建回放工作负载。公开 trace 会移除 prompt、源代码和 tool payload，仅保留请求长度、prefix 复用关系、subagent 分支和时间信息。',
+      'AgentX 根据参与者自愿提供的 Claude Code 会话构建回放工作负载。公开 trace 会移除 prompt、源代码和 tool payload，仅保留请求长度、prefix 复用关系、subagent 分支和时间信息。',
     processTitle: 'AgentX 如何构建一次回放',
     steps: [
       {
@@ -123,9 +123,9 @@ const CONTENT = {
       'AgentX v1.0 数据集包含从内部自愿采集的 trace 中筛选出的 393 个 Claude Code 会话。入选会话需至少包含 20 个请求，Claude Code 版本不低于 2.1.139，同时运行的 subagent 不超过 10 个。处理过程中还会移除重复请求、客户端特有的安全监控和标题生成请求，以及重建后 input 长度超过 990k token 的请求。',
     profileLabel: 'v1.0 trace 概况',
     stats: [
-      { value: '393', label: '个会话' },
-      { value: '142k', label: '每个请求的 input token 中位数' },
-      { value: '444', label: '每个请求的 output token 中位数' },
+      { value: '393', label: '会话数' },
+      { value: '142k', label: '单请求 input token 数中位数' },
+      { value: '444', label: '单请求 output token 数中位数' },
       { value: '44%', label: '含 subagent 的会话' },
     ],
     controlsTitle: '回放控制',
@@ -138,7 +138,7 @@ const CONTENT = {
       {
         title: '确定性回放',
         description:
-          '固定 seed 决定会话采样、起点和合成内容。最终指标只统计一小时的 profiling 窗口，不包含 warmup。',
+          '固定 seed 决定会话采样、起点和合成内容。对外报告的指标仅覆盖一小时 profiling 窗口，不包含 warmup。',
       },
       {
         title: '投机解码',
@@ -148,13 +148,13 @@ const CONTENT = {
       {
         title: 'DRAM offload',
         description:
-          '未采用标准 DRAM 配置的服务器，DRAM 上限设为 3 TB。标准 GB200 NVL72、GB300 NVL72 和 TPUv7 系统按实际装机容量计算；每种配置可使用的 DRAM 仅限于与其 GPU 占比相对应的部分。',
+          '对于没有标准 DRAM 配置的服务器，可用 DRAM 上限为 3 TB。GB200 NVL72、GB300 NVL72 和 TPUv7 标准系统按实际装机容量计算；每种配置只能使用与其 GPU 分配比例相对应的 DRAM。',
       },
     ],
     readingTitle: '如何解读 AgentX 结果',
     reading:
       '这里的 concurrency 指同时运行的 agent 客户端数量，而不是固定大小的 request batch。AgentX 采用 closed-loop 模式，因此速度更快的配置会完成更多请求，实际遇到的工作负载组合可能略有差异；低并发时这种差异最明显。报告吞吐量时，应同时给出首 token 延迟（TTFT）和 interactivity；单看一个 latency 指标不足以反映整次运行。',
-    qualityNote: 'AgentX 衡量推理系统性能。合成 payload 不适合评估模型回答质量。',
+    qualityNote: 'AgentX 衡量推理系统性能。合成 payload 不能用于模型质量评估。',
     limits:
       '客户端无法观测服务端的 chat template、专有 tokenizer、服务端 tool、加密 reasoning 内容，也无法准确获知图片和文档展开后的 token 数量。AgentX 对这些输入使用确定性 placeholder 和针对不同模型的 padding。重建后的 trace 会复现请求长度、时间关系、会话拓扑和 KV 复用模式，但不包含原始会话内容。',
     variantsLabel: '数据集变体',
