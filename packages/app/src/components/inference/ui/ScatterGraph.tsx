@@ -295,6 +295,16 @@ const hasNamedTransition = (node: Element, name: string): boolean => {
   return Object.values(schedules).some((schedule) => schedule?.name === name);
 };
 
+const currentZoomRenderContext = (svg: SVGSVGElement, ctx: RenderContext): RenderContext => {
+  const transform = d3.zoomTransform(svg);
+  if (transform.k === 1 && transform.x === 0 && transform.y === 0) return ctx;
+  return {
+    ...ctx,
+    xScale: transform.rescaleX(ctx.xScale as ContinuousScale),
+    yScale: transform.rescaleY(ctx.yScale as ContinuousScale),
+  };
+};
+
 // Derive a readable label from a hwKey using the HARDWARE_CONFIG source of truth.
 // `model` (display name) enables per-model suffix overrides (e.g. M3 MTP → EAGLE).
 const parseHwKeyToLabel = (hwKey: string, model?: string): { name: string; label: string } => {
@@ -1253,6 +1263,20 @@ const ScatterGraph = React.memo(
     // Render context from the last D3 render — lets the decoration effect
     // restyle with the same layout/scales the chart was drawn with.
     const lastRenderCtxRef = useRef<RenderContext | null>(null);
+    const labelDisplayRef = useRef({ showPointLabels, showGradientLabels, showLineLabels });
+    labelDisplayRef.current = { showPointLabels, showGradientLabels, showLineLabels };
+    const pointLabelsVisible = showPointLabels && !showGradientLabels;
+    const lastPointLabelsVisibleRef = useRef(pointLabelsVisible);
+    const lastShowLineLabelsRef = useRef(showLineLabels);
+    const lastShowGradientLabelsRef = useRef(showGradientLabels);
+
+    const getDisplaySelection = useCallback(() => {
+      const svg = chartRef.current?.getSvgElement?.();
+      const ctx = lastRenderCtxRef.current;
+      if (!svg || !ctx) return null;
+      const zoomGroup = d3.select(svg).select<SVGGElement>('.zoom-group');
+      return zoomGroup.empty() ? null : { svg, ctx, zoomGroup };
+    }, []);
 
     // Hover dimming animates via the inline `transition: opacity 150ms ease`
     // the render path puts on dots, rooflines, and labels — a single style
@@ -2611,64 +2635,40 @@ const ScatterGraph = React.memo(
 
     // --- Side effects ---
 
-    // Toggle decoration: restyle the existing DOM when visibility or colors
-    // change (legend hw toggles, precision toggles, optimal-only, high
-    // contrast, theme). This is the cheap "Effect 4" display-toggle path from
-    // docs/d3-charts.md — the full chart rebuild only runs when data or scale
-    // domains actually change.
+    // ScatterGraph has more independent display controls than the generic
+    // D3 scatter layer. Keep their mutation scopes separate so a label-only
+    // toggle never restamps every point shape, visibility flag, or trace
+    // attribute.
     //
-    // This effect can run in the same commit as (right after) the full render
-    // effect, while the renderer's old→new "data-update" entrance transitions
-    // are scheduled but not yet started. It therefore NEVER writes the
-    // attributes those transitions animate — dot-group `transform` and
-    // roofline `d` — or a freshly rebuilt roofline would start its transition
-    // already at the destination and teleport while the dots animate.
+    // Mark styling: visibility, palette, and precision shape. This effect can
+    // run immediately after a full render while the renderer's old-to-new
+    // entrance transitions are only scheduled, so it never writes the
+    // animated dot-group `transform` or roofline `d` attributes.
     useLayoutEffect(() => {
-      const svg = chartRef.current?.getSvgElement?.();
-      const ctx = lastRenderCtxRef.current;
-      if (!svg || !ctx) return;
+      const display = getDisplaySelection();
+      if (!display) return;
+      const { zoomGroup } = display;
       const ir = interactionRef.current;
-      const zoomGroup = d3.select(svg).select<SVGGElement>('.zoom-group');
-      if (zoomGroup.empty()) return;
 
-      // Dots: visibility, vendor recolor, and precision shape.
-      // Hand-rolled rather than a full renderScatterPoints pass so we skip
-      // re-writing label text on every point (the expensive part of the join)
-      // — and, critically, never touch the animated `transform`.
       zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
-        const sel = d3.select(this);
+        const point = d3.select(this);
         const visible = ir.isPointVisible(d);
-        sel.style('opacity', visible ? 1 : 0).style('pointer-events', visible ? 'auto' : 'none');
+        point.style('opacity', visible ? 1 : 0).style('pointer-events', visible ? 'auto' : 'none');
         const color =
           (showGradientLabels && gradientColorByPoint.get(d)) ||
           ir.getCssColor(ir.resolveColor(d.hwKey as string));
         syncPointShape(
-          sel as unknown as d3.Selection<SVGGElement, unknown, null, undefined>,
+          point as unknown as d3.Selection<SVGGElement, unknown, null, undefined>,
           getShapeKeyForPrecision(d.precision, ir.selectedPrecisions),
           color,
         );
         // A precision toggle may replace and append the visible SVG shape.
         // Keep the offload halo above that shape after the swap.
-        sel.selectAll('.offload-halo').raise();
-        // Whether this point's pinned tooltip will offer "View charts". Written
-        // here rather than in the layer's dataAttrs because availability
-        // resolves after the chart renders, and a rebuild would drop the zoom.
-        const pointId = isPersistedBenchmarkId(d.id) ? d.id : null;
-        const persistedAgenticPoint = d.benchmark_type === 'agentic_traces' && pointId !== null;
-        sel
-          .attr(
-            'data-has-trace',
-            pointId !== null && traceAvailability?.[pointId] === true ? 'true' : null,
-          )
-          .attr(
-            'data-trace-availability',
-            persistedAgenticPoint ? (isTraceAvailabilityPending ? 'pending' : 'resolved') : null,
-          );
+        point.selectAll('.offload-halo').raise();
       });
 
-      // Overlay X markers: Optimal Only visibility (mirrors the official dot
-      // loop above — the overlay layer render applies the same predicate, but
-      // a toggle flip must restyle existing DOM without a chart rebuild).
+      // Overlay points keep their X marker and run-derived color. Only their
+      // visibility follows Optimal Only and overlay hardware selection.
       zoomGroup.selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt').each(function (d) {
         const visible = ir.isOverlayPointVisible(d);
         d3.select(this)
@@ -2676,21 +2676,19 @@ const ScatterGraph = React.memo(
           .style('pointer-events', visible ? 'auto' : 'none');
       });
 
-      // Rooflines: visibility + solid-stroke recolor as direct writes (never
-      // `d`). Gradient strokes keep their url(#…) reference — gradient stop
-      // colors come from the fixed parallelism palette and don't change with
-      // the active set.
+      // Rooflines: visibility and solid-stroke recolor as direct writes. Keep
+      // gradient url references intact and never touch animated path geometry.
       zoomGroup.selectAll<SVGPathElement, unknown>('.roofline-path').each(function () {
         const hw = this.dataset.hwKey;
         const precision = this.dataset.precision;
         if (!hw || !precision) return;
-        const el = d3.select(this);
+        const roofline = d3.select(this);
         const visible =
           ir.effectiveActiveHwTypes.has(hw) && ir.selectedPrecisions.includes(precision);
-        el.style('opacity', visible ? 1 : 0);
-        const stroke = el.attr('stroke');
+        roofline.style('opacity', visible ? 1 : 0);
+        const stroke = roofline.attr('stroke');
         if (stroke && !stroke.startsWith('url(')) {
-          el.attr('stroke', ir.getCssColor(ir.resolveColor(hw)));
+          roofline.attr('stroke', ir.getCssColor(ir.resolveColor(hw)));
         }
       });
 
@@ -2713,8 +2711,6 @@ const ScatterGraph = React.memo(
         .selectAll<SVGTextElement, unknown>('.overflow-continuation-label')
         .attr('stroke', ir.getCssColor('--background'));
 
-      // Parallelism / line labels: visibility via data attributes (mirrors
-      // handleLegendHoverEnd). Placement-level updates happen below.
       zoomGroup
         .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
         .style('opacity', function () {
@@ -2724,45 +2720,8 @@ const ScatterGraph = React.memo(
             ir.selectedPrecisions,
           );
         });
-
-      // Label placement (greedy collision layout) depends on the visible set,
-      // so when labels are shown, re-run the rooflines layer render — UNLESS
-      // an entrance transition is still pending/running, because that render
-      // also rewrites roofline `d` and would defeat the animation. In that
-      // case the in-flight render was produced with current interaction state
-      // anyway; the direct writes above keep visibility correct.
-      const entranceInFlight = zoomGroup
-        .selectAll<SVGPathElement, unknown>('.roofline-path')
-        .nodes()
-        .some((node) => hasNamedTransition(node, 'data-update'));
-
-      // Current (possibly zoomed) scales for layer re-renders — same scales
-      // the zoom handler would use.
-      const t = d3.zoomTransform(svg);
-      const zoomed = t.k !== 1 || t.x !== 0 || t.y !== 0;
-      const xScale = zoomed ? t.rescaleX(ctx.xScale as ContinuousScale) : ctx.xScale;
-      const yScale = zoomed ? t.rescaleY(ctx.yScale as ContinuousScale) : ctx.yScale;
-      const decorationCtx: RenderContext = { ...ctx, xScale, yScale };
-
-      const layerByKey = (key: string) => layersRef.current.find((l) => l.key === key);
-      if ((showGradientLabels || showLineLabels) && !entranceInFlight) {
-        const rooflineLayer = layerByKey('rooflines');
-        if (rooflineLayer?.type === 'custom' && rooflineLayer.render) {
-          rooflineLayer.render(zoomGroup, decorationCtx);
-        }
-      }
-
-      if (showPointLabels && !showGradientLabels) {
-        avoidPointLabelCollisions(zoomGroup);
-      }
-
-      // Known-issue annotations follow the visible series; their layer writes
-      // no animated attributes, so re-rendering is always safe.
-      const knownIssueLayer = layerByKey('known-issues');
-      if (knownIssueLayer?.type === 'custom' && knownIssueLayer.render) {
-        knownIssueLayer.render(zoomGroup, decorationCtx);
-      }
     }, [
+      getDisplaySelection,
       isPointVisible,
       isOverlayPointVisible,
       effectiveActiveHwTypes,
@@ -2770,16 +2729,112 @@ const ScatterGraph = React.memo(
       activeOverlayHwTypes,
       getCssColor,
       resolveColor,
-      knownIssueAnnotations,
-      showPointLabels,
-      useAdvancedLabels,
       showGradientLabels,
-      showLineLabels,
       gradientColorByPoint,
-      // Re-stamps `data-has-trace` once the presence lookup resolves.
-      traceAvailability,
-      isTraceAvailabilityPending,
     ]);
+
+    // Trace presence resolves asynchronously after the points render. Stamp
+    // only the tooltip metadata it owns, without restyling any chart marks.
+    useLayoutEffect(() => {
+      const display = getDisplaySelection();
+      if (!display) return;
+      display.zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
+        const pointId = isPersistedBenchmarkId(d.id) ? d.id : null;
+        const persistedAgenticPoint = d.benchmark_type === 'agentic_traces' && pointId !== null;
+        d3.select(this)
+          .attr(
+            'data-has-trace',
+            pointId !== null && traceAvailability?.[pointId] === true ? 'true' : null,
+          )
+          .attr(
+            'data-trace-availability',
+            persistedAgenticPoint ? (isTraceAvailabilityPending ? 'pending' : 'resolved') : null,
+          );
+      });
+    }, [getDisplaySelection, dataIdentity, traceAvailability, isTraceAvailabilityPending]);
+
+    // Label-mode controls own point-label visibility and collision placement.
+    // Line and gradient labels are collision obstacles whose custom layer
+    // renders once through D3's display phase. Replaying that layer before the
+    // point-label collision pass preserves its stable placement behavior
+    // without restyling unrelated point marks. Overlay label visibility remains
+    // owned by the overlay custom layer's matching selective display callback.
+    useLayoutEffect(() => {
+      const visibilityChanged = lastPointLabelsVisibleRef.current !== pointLabelsVisible;
+      const lineLabelsChanged = lastShowLineLabelsRef.current !== showLineLabels;
+      const gradientLabelsChanged = lastShowGradientLabelsRef.current !== showGradientLabels;
+      if (!visibilityChanged && !lineLabelsChanged && !gradientLabelsChanged) return;
+      lastPointLabelsVisibleRef.current = pointLabelsVisible;
+      lastShowLineLabelsRef.current = showLineLabels;
+      lastShowGradientLabelsRef.current = showGradientLabels;
+      const display = getDisplaySelection();
+      if (!display) return;
+      const { svg, ctx, zoomGroup } = display;
+      if (visibilityChanged) {
+        zoomGroup
+          .selectAll<SVGTextElement, unknown>('.dot-group .point-label')
+          .style('display', pointLabelsVisible ? '' : 'none')
+          .style('opacity', pointLabelsVisible ? 1 : 0);
+      }
+      if ((lineLabelsChanged || gradientLabelsChanged) && (showLineLabels || showGradientLabels)) {
+        const entranceInFlight = zoomGroup
+          .selectAll<SVGPathElement, unknown>('.roofline-path')
+          .nodes()
+          .some((node) => hasNamedTransition(node, 'data-update'));
+        const rooflineLayer = layersRef.current.find((layer) => layer.key === 'rooflines');
+        if (!entranceInFlight && rooflineLayer?.type === 'custom' && rooflineLayer.render) {
+          rooflineLayer.render(zoomGroup, currentZoomRenderContext(svg, ctx));
+        }
+      }
+      if (pointLabelsVisible) avoidPointLabelCollisions(zoomGroup);
+    }, [getDisplaySelection, pointLabelsVisible, showGradientLabels, showLineLabels]);
+
+    // Visibility and palette changes can alter label collision placement and
+    // line-label colors. Label mode changes are handled by each custom layer's
+    // display identity, so they do not also enter this pass.
+    useLayoutEffect(() => {
+      const display = getDisplaySelection();
+      if (!display) return;
+      const labelDisplay = labelDisplayRef.current;
+      const { svg, ctx, zoomGroup } = display;
+      const entranceInFlight = zoomGroup
+        .selectAll<SVGPathElement, unknown>('.roofline-path')
+        .nodes()
+        .some((node) => hasNamedTransition(node, 'data-update'));
+
+      if ((labelDisplay.showGradientLabels || labelDisplay.showLineLabels) && !entranceInFlight) {
+        const rooflineLayer = layersRef.current.find((layer) => layer.key === 'rooflines');
+        if (rooflineLayer?.type === 'custom' && rooflineLayer.render) {
+          rooflineLayer.render(zoomGroup, currentZoomRenderContext(svg, ctx));
+        }
+      }
+      if (labelDisplay.showPointLabels && !labelDisplay.showGradientLabels) {
+        avoidPointLabelCollisions(zoomGroup);
+      }
+    }, [
+      getDisplaySelection,
+      isPointVisible,
+      isOverlayPointVisible,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+      activeOverlayHwTypes,
+      getCssColor,
+      resolveColor,
+    ]);
+
+    // Known-issue annotations have their own data and theme inputs. Re-render
+    // only that layer when either changes.
+    useLayoutEffect(() => {
+      const display = getDisplaySelection();
+      if (!display) return;
+      const knownIssueLayer = layersRef.current.find((layer) => layer.key === 'known-issues');
+      if (knownIssueLayer?.type === 'custom' && knownIssueLayer.render) {
+        knownIssueLayer.render(
+          display.zoomGroup,
+          currentZoomRenderContext(display.svg, display.ctx),
+        );
+      }
+    }, [getDisplaySelection, knownIssueAnnotations, getCssColor, resolveColor]);
 
     // D3 custom layers are keyed additions, so removing the overlay layer from
     // the config does not delete DOM that the previous render created. Clear
@@ -2868,7 +2923,6 @@ const ScatterGraph = React.memo(
           data={pointsData}
           dataIdentity={dataIdentity}
           metricIdentity={metricIdentity}
-          displayIdentity={`${showPointLabels}:${showGradientLabels}:${selectedPrecisions.join(',')}`}
           margin={CHART_MARGIN}
           watermark={getChartWatermark(isUnofficialRun)}
           testId="scatter-graph"

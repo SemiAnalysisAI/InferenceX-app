@@ -15,6 +15,8 @@ One effect for every D3 operation takes roughly 500ms (React reconciliation ~200
 
 Custom layers that own scale-neutral decorations declare a `displayIdentity` and an `onDisplayUpdate` callback. The renderer snapshots each identity after the data and metric phases, then reruns only the custom layers whose identities changed. This removes stale labels and decorative overlays without rebuilding joins, scales, or unrelated paths. Callbacks receive the current zoomed scales so toggles do not jump decorations back to the unzoomed frame.
 
+`ScatterGraph` further partitions Effect 4 because its controls have disjoint mutation scopes. Mark visibility, palette/shape, trace metadata, point-label visibility/collision, line-label placement, and known-issue annotations each have a dedicated layout effect. It deliberately omits the generic scatter `displayIdentity`: point-label toggles update only `.point-label` nodes, while the unofficial overlay layer's own display callback updates only `.overlay-label` nodes. Recombining these passes causes label toggles to restamp thousands of unchanged shape, visibility, and trace attributes.
+
 ## In-Place Y-Value Mutation
 
 Effect 3 mutates `datum.y` directly on D3-bound data:

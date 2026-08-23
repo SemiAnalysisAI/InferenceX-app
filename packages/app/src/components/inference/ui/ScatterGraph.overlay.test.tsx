@@ -89,6 +89,9 @@ describe('ScatterGraph unofficial overlays', () => {
     expect(overlayLabel).not.toBeNull();
     expect(officialLabel!.style.display).toBe('none');
     expect(overlayLabel!.style.display).toBe('none');
+    const mutationRecords: MutationRecord[] = [];
+    const observer = new MutationObserver((records) => mutationRecords.push(...records));
+    observer.observe(container.querySelector('svg')!, { attributes: true, subtree: true });
 
     inferenceState.current = {
       ...inferenceState.current,
@@ -98,6 +101,15 @@ describe('ScatterGraph unofficial overlays', () => {
 
     expect(officialLabel!.style.display).toBe('');
     expect(overlayLabel!.style.display).toBe('');
+    mutationRecords.push(...observer.takeRecords());
+    observer.disconnect();
+    expect(mutationRecords.length).toBeGreaterThan(0);
+    expect(
+      mutationRecords.every(
+        ({ target }) =>
+          target instanceof Element && target.closest('.point-label, .overlay-label') !== null,
+      ),
+    ).toBe(true);
     expect(rebuildCount()).toBe(buildsAfterMount);
     unmount();
   });
