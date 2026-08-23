@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { TraceFlamegraph } from '@/components/datasets/trace-flamegraph';
 import { useDatasetConversation } from '@/hooks/api/use-datasets';
+import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { compact, formatShare } from './format';
 import { Stat } from './stat';
@@ -78,7 +79,14 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
         data-locale={locale}
       >
         <span>{t.loadError}</span>
-        <button type="button" className="text-primary underline" onClick={() => void refetch()}>
+        <button
+          type="button"
+          className="text-primary underline"
+          onClick={() => {
+            track('datasets_conversation_retry_clicked', { slug });
+            void refetch();
+          }}
+        >
           {t.retry}
         </button>
         <Link href={`${prefix}/agentx/${slug}`} className="text-primary underline">

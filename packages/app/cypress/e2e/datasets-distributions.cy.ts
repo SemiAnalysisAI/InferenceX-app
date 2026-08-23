@@ -212,11 +212,15 @@ describe('Dataset detail loading stability', () => {
   }
 
   it('renders a localized request error separately from 404 and retries at 390px', () => {
-    let attempts = 0;
+    let completedFailures = 0;
     cy.intercept('GET', '/api/v1/datasets/layout-dataset', (request) => {
-      attempts += 1;
+      const shouldFail = completedFailures < 2;
+      request.alias = shouldFail ? 'datasetFailureRequest' : 'datasetRetryRequest';
+      request.on('after:response', () => {
+        if (shouldFail) completedFailures += 1;
+      });
       request.reply(
-        attempts <= 2 ? { statusCode: 503, body: {} } : { statusCode: 200, body: LAYOUT_DATASET },
+        shouldFail ? { statusCode: 503, body: {} } : { statusCode: 200, body: LAYOUT_DATASET },
       );
     });
     cy.intercept('GET', '/api/v1/datasets/layout-dataset/conversations*', {
@@ -225,12 +229,13 @@ describe('Dataset detail loading stability', () => {
 
     cy.viewport(390, 844);
     cy.visit('/zh/agentx/layout-dataset', { onBeforeLoad: unlockAgenticGate });
-    cy.get('[data-testid="dataset-detail-error"]', { timeout: 10_000 })
+    cy.get('[data-testid="dataset-detail-error"]')
       .should('have.attr', 'data-locale', 'zh')
       .and('have.attr', 'role', 'alert');
     cy.get('[data-testid="dataset-detail-not-found"]').should('not.exist');
     cy.get('[data-testid="dataset-detail-error"] a').should('have.attr', 'href', '/zh/agentx');
     cy.contains('[data-testid="dataset-detail-error"] button', '重试').click();
+    cy.wait('@datasetRetryRequest').its('response.statusCode').should('eq', 200);
     cy.contains('h1', 'Layout dataset').should('be.visible');
     cy.window().then((win) => {
       expect(win.document.documentElement.scrollWidth).to.be.at.most(win.innerWidth);

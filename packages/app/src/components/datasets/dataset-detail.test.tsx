@@ -72,6 +72,7 @@ vi.mock('@/hooks/api/use-datasets', () => ({
 }));
 
 import { DatasetDetail } from './dataset-detail';
+import { track } from '@/lib/analytics';
 
 function changeInput(input: HTMLInputElement, value: string): void {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
@@ -123,7 +124,11 @@ describe('DatasetDetail conversation search', () => {
     );
     expect(retry).toBeDefined();
     act(() => retry?.click());
+    expect(track).toHaveBeenCalledWith('datasets_detail_retry_clicked', { slug: 'trace' });
     expect(testState.dataset.refetch).toHaveBeenCalledOnce();
+    expect(vi.mocked(track).mock.invocationCallOrder[0]).toBeLessThan(
+      testState.dataset.refetch.mock.invocationCallOrder[0]!,
+    );
 
     act(() => root.unmount());
   });

@@ -186,7 +186,14 @@ export function DatasetDetail({ slug }: { slug: string }) {
         data-locale={locale}
       >
         <span>{t.loadError}</span>
-        <button type="button" className="text-primary underline" onClick={() => void refetch()}>
+        <button
+          type="button"
+          className="text-primary underline"
+          onClick={() => {
+            track('datasets_detail_retry_clicked', { slug });
+            void refetch();
+          }}
+        >
           {t.retry}
         </button>
         <Link href={`${prefix}/agentx`} className="text-primary underline">

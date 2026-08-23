@@ -26,12 +26,14 @@ vi.mock('@/components/ui/card', () => ({
   Card: ({ children }: PropsWithChildren) => createElement('div', null, children),
 }));
 vi.mock('@/components/datasets/trace-flamegraph', () => ({ TraceFlamegraph: () => null }));
+vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 vi.mock('@/hooks/api/use-datasets', () => ({
   useDatasetConversation: () => testState.conversation,
 }));
 vi.mock('@/lib/use-locale', () => ({ useLocale: () => testState.locale }));
 
 import { ConversationView } from './conversation-view';
+import { track } from '@/lib/analytics';
 
 afterEach(() => {
   testState.locale = 'en';
@@ -65,7 +67,11 @@ describe('ConversationView request states', () => {
     );
     expect(retry).toBeDefined();
     act(() => retry?.click());
+    expect(track).toHaveBeenCalledWith('datasets_conversation_retry_clicked', { slug: 'trace' });
     expect(testState.conversation.refetch).toHaveBeenCalledOnce();
+    expect(vi.mocked(track).mock.invocationCallOrder[0]).toBeLessThan(
+      testState.conversation.refetch.mock.invocationCallOrder[0]!,
+    );
 
     act(() => root.unmount());
   });

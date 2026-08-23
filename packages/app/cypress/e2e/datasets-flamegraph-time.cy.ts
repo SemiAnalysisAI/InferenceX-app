@@ -208,14 +208,18 @@ describe('Dataset conversation flamegraph timing', () => {
 
 describe('Dataset conversation request states', () => {
   it('renders a localized request error and retries at 375px', () => {
-    let attempts = 0;
+    let completedFailures = 0;
     cy.intercept(
       'GET',
       '/api/v1/datasets/test-dataset/conversations/retry-conversation',
       (request) => {
-        attempts += 1;
+        const shouldFail = completedFailures < 2;
+        request.alias = shouldFail ? 'conversationFailureRequest' : 'conversationRetryRequest';
+        request.on('after:response', () => {
+          if (shouldFail) completedFailures += 1;
+        });
         request.reply(
-          attempts <= 2
+          shouldFail
             ? { statusCode: 503, body: {} }
             : { statusCode: 200, body: EMPTY_CONVERSATION },
         );
@@ -226,7 +230,7 @@ describe('Dataset conversation request states', () => {
     cy.visit('/zh/agentx/test-dataset/conversations/retry-conversation', {
       onBeforeLoad: unlockAgenticGate,
     });
-    cy.get('[data-testid="conversation-view-error"]', { timeout: 10_000 })
+    cy.get('[data-testid="conversation-view-error"]')
       .should('have.attr', 'data-locale', 'zh')
       .and('have.attr', 'role', 'alert');
     cy.get('[data-testid="conversation-view-not-found"]').should('not.exist');
@@ -236,6 +240,7 @@ describe('Dataset conversation request states', () => {
       '/zh/agentx/test-dataset',
     );
     cy.contains('[data-testid="conversation-view-error"] button', '重试').click();
+    cy.wait('@conversationRetryRequest').its('response.statusCode').should('eq', 200);
     cy.contains('h1', 'retry-conversation').should('be.visible');
     cy.window().then((win) => {
       expect(win.document.documentElement.scrollWidth).to.be.at.most(win.innerWidth);
