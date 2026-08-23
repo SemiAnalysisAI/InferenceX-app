@@ -74,6 +74,21 @@ const URL_STATE_KEYS = [
   // Calculator (fleet planner)
   'c_mw',
   'c_costcap',
+  // Calculator (fleet lifecycle) — token price and the ramp/interrupt/horizon
+  // assumptions (the throughput steps are measured; those four are not), plus
+  // which metric the chart plots.
+  'c_price',
+  // Output-token price. Input keeps `c_price`, so a link written before the
+  // split still seeds the field it always seeded.
+  'c_oprice',
+  'c_ramp',
+  // What a cached input token sells for, as a % of the price. Agentic only —
+  // fixed sequences record no cache hits for it to apply to.
+  'c_cache',
+  'c_ly',
+  'c_mtbi',
+  'c_rec',
+  'c_life',
 ] as const;
 
 export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
@@ -150,6 +165,19 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   r_active: '',
   c_mw: '',
   c_costcap: '',
+  // Empty means "use the component's default", which for these two is derived
+  // rather than constant: the price from the cheapest visible chip's break-even,
+  // the horizon from the measured run window. A non-empty default here would be
+  // stripped from share links and silently re-derived on load.
+  c_price: '',
+  c_oprice: '',
+  c_life: '',
+  // Empty means the default y metric (margin).
+  c_ly: '',
+  c_ramp: '3',
+  c_cache: '10',
+  c_mtbi: '24',
+  c_rec: '12',
 };
 
 /** In-memory store of current param values (kept in sync via writeUrlParams). */

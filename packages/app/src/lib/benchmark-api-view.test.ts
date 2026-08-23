@@ -46,6 +46,35 @@ describe('toCalculatorBenchmarkRows', () => {
     ]);
   });
 
+  it('keeps all three cache tiers — the trim cannot know which one a row will use', () => {
+    // `cacheHitRateOf` picks between external and CPU per row, so the allowlist
+    // has to pass all three through or the choice is made for it by the trim.
+    // This runs on every calculator response, agentic included.
+    const cached = toCalculatorBenchmarkRows(
+      [
+        {
+          benchmark_type: 'agentic_traces',
+          isl: null,
+          osl: null,
+          metrics: {
+            tput_per_gpu: 100,
+            server_gpu_cache_hit_rate: 0.77,
+            server_external_cache_hit_rate: 0.06,
+            server_cpu_cache_hit_rate: 0.055,
+            theoretical_cache_hit_rate: 0.95,
+          },
+        },
+      ],
+      'agentic-traces',
+    );
+    expect(cached[0].metrics).toEqual({
+      tput_per_gpu: 100,
+      server_gpu_cache_hit_rate: 0.77,
+      server_external_cache_hit_rate: 0.06,
+      server_cpu_cache_hit_rate: 0.055,
+    });
+  });
+
   it('keeps the agentic percentile inputs used for interpolation', () => {
     expect(toCalculatorBenchmarkRows(rows, 'agentic-traces')).toEqual([
       {

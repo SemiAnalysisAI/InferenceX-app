@@ -53,6 +53,12 @@ interface DataTableProps<T> {
   analyticsPrefix?: string;
   /** Show watermark (default: true). */
   watermark?: boolean;
+  /**
+   * Show the search box (default: true). Turn it off for a table whose rows are
+   * few and already named elsewhere — one line per chip, say — where a search
+   * field is a control the reader has no use for.
+   */
+  searchable?: boolean;
 }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 250, 500] as const;
@@ -106,6 +112,7 @@ export function DataTable<T>({
   testId = 'data-table',
   analyticsPrefix = 'table',
   watermark = true,
+  searchable = true,
 }: DataTableProps<T>) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -138,7 +145,7 @@ export function DataTable<T>({
 
   // Search: match against all columns with sortValue
   const filtered = useMemo(() => {
-    if (!search.trim()) return data;
+    if (!searchable || !search.trim()) return data;
     const q = search.trim().toLowerCase();
     return data.filter((row) =>
       columns.some((col) => {
@@ -146,7 +153,7 @@ export function DataTable<T>({
         return String(col.sortValue(row)).toLowerCase().includes(q);
       }),
     );
-  }, [data, search, columns]);
+  }, [data, search, columns, searchable]);
 
   const sorted = useMemo(() => {
     if (sort.dir === null || sort.columnIndex < 0) return filtered;
@@ -176,35 +183,37 @@ export function DataTable<T>({
   return (
     <div data-testid={testId} className="mt-3 min-w-0 w-full max-w-full">
       {/* Search */}
-      <div className="mb-3 max-w-xs relative">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-        <input
-          ref={searchRef}
-          type="text"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(0);
-          }}
-          placeholder={t.search}
-          className="w-full h-7 pl-8 pr-7 text-xs bg-transparent border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
-          aria-label={t.searchAria}
-        />
-        {search && (
-          <button
-            type="button"
-            onClick={() => {
-              setSearch('');
+      {searchable && (
+        <div className="mb-3 max-w-xs relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <input
+            ref={searchRef}
+            type="text"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
               setPage(0);
-              searchRef.current?.focus();
             }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            aria-label={t.clearSearch}
-          >
-            <X className="size-3" />
-          </button>
-        )}
-      </div>
+            placeholder={t.search}
+            className="w-full h-7 pl-8 pr-7 text-xs bg-transparent border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
+            aria-label={t.searchAria}
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setPage(0);
+                searchRef.current?.focus();
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={t.clearSearch}
+            >
+              <X className="size-3" />
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="overflow-x-auto relative">
         {watermark && isUnofficialDomain === false && (

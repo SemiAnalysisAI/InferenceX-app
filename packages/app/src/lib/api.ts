@@ -114,6 +114,12 @@ export function fetchBenchmarkHistory(
   osl: number,
   signal?: AbortSignal,
   benchmarkType?: 'agentic_traces',
+  /**
+   * Trims the response to the calculator's metric allowlist — a ~24% smaller
+   * payload. Callers that plot measured power must leave this off; those
+   * metrics are not in the allowlist.
+   */
+  view?: 'calculator',
 ) {
   const params = new URLSearchParams({
     model,
@@ -121,6 +127,7 @@ export function fetchBenchmarkHistory(
     osl: String(osl),
   });
   if (benchmarkType) params.set('benchmarkType', benchmarkType);
+  if (view) params.set('view', view);
   return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks/history?${params}`, signal);
 }
 
