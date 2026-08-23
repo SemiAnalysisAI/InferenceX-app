@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 import { describe, expect, it } from 'vitest';
 
 import type { EvaluationChartData } from '../types';
-import { sizeScoreLabelBackgrounds } from './BarChartD3';
+import { evaluationChartBlockingState, sizeScoreLabelBackgrounds } from './BarChartD3';
 import * as barChartModule from './BarChartD3';
 
 function makeDatum(configLabel: string, score: number): EvaluationChartData {
@@ -113,5 +113,22 @@ describe('evaluation chart locale presentation', () => {
     expect(html).toContain('GitHub Actions 运行记录');
     expect(html).not.toContain('Mean Score');
     expect(html).not.toContain('Concurrency');
+  });
+});
+
+describe('evaluation chart blocking state', () => {
+  it('keeps valid chart data visible when only aggregate availability metadata failed', () => {
+    expect(
+      evaluationChartBlockingState({
+        hasChartData: true,
+        isEvaluationDataError: false,
+      }),
+    ).toBeNull();
+    expect(
+      evaluationChartBlockingState({
+        hasChartData: true,
+        isEvaluationDataError: true,
+      }),
+    ).toBe('data-error');
   });
 });

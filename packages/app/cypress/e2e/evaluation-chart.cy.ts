@@ -315,9 +315,14 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
           .should('contain.text', '筛选项可用性数据加载失败。')
           .and('contain.text', '重试');
         cy.get('[data-testid="evaluation-results-table"]').should('be.visible');
+        cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();
+        cy.get('[data-testid="evaluation-query-error"]')
+          .should('contain.text', '筛选项可用性数据加载失败。')
+          .and('contain.text', '重试');
+        cy.get('#evaluation-chart svg circle').should('have.length.greaterThan', 0);
         cy.get('[data-testid="evaluation-query-error"]').contains('重试').click();
         cy.get('[data-testid="evaluation-query-error"]').should('not.exist');
-        cy.get('[data-testid="evaluation-results-table"]').should('be.visible');
+        cy.get('#evaluation-chart svg circle').should('have.length.greaterThan', 0);
         cy.then(() => expect(availabilityAttempts).to.equal(3));
       });
     });

@@ -331,10 +331,21 @@ const EVAL_STRINGS = {
   },
 } as const;
 
+export function evaluationChartBlockingState({
+  hasChartData,
+  isEvaluationDataError,
+}: {
+  hasChartData: boolean;
+  isEvaluationDataError: boolean;
+}): 'data-error' | 'empty' | null {
+  if (isEvaluationDataError) return 'data-error';
+  return hasChartData ? null : 'empty';
+}
+
 export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   const {
     loading,
-    error,
+    isEvaluationDataError,
     chartData,
     unofficialChartData,
     unfilteredChartData,
@@ -1168,7 +1179,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   );
 
   // Show skeleton on first load
-  const isInitializing = loading || (!selectedBenchmark && !error);
+  const isInitializing = loading || (!selectedBenchmark && !isEvaluationDataError);
   if (isInitializing && chartData.length === 0 && unofficialChartData.length === 0) {
     return (
       <div className="p-3">
@@ -1179,14 +1190,18 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     );
   }
 
-  if (error || (chartData.length === 0 && unofficialChartData.length === 0)) {
+  const blockingState = evaluationChartBlockingState({
+    hasChartData: chartData.length > 0 || unofficialChartData.length > 0,
+    isEvaluationDataError,
+  });
+  if (blockingState) {
     const hasSelections = selectedBenchmark && selectedModel && selectedRunDate;
     const hasNoEvalDataForDate =
       hasSelections && availableDates.length > 0 && !availableDates.includes(selectedRunDate);
     return (
       <div className="flex items-center justify-center h-100 text-muted-foreground">
         <div className="text-center">
-          {error ? (
+          {blockingState === 'data-error' ? (
             legendT.loadError
           ) : hasSelections && !modelHasEvalData ? (
             legendT.modelEmpty

@@ -13,9 +13,15 @@ describe('EvalBarChartD3', () => {
     cy.get('[data-slot="skeleton"]').should('have.length.greaterThan', 0);
   });
 
-  it('shows error message when error is set', () => {
+  it('shows an error message when the evaluation-data query fails', () => {
     mountWithProviders(<EvalBarChartD3 />, {
-      evaluation: { error: 'Failed to fetch', chartData: [], loading: false },
+      evaluation: {
+        error: 'Failed to fetch',
+        isError: true,
+        isEvaluationDataError: true,
+        chartData: [],
+        loading: false,
+      },
       unofficial: {},
     });
     cy.contains('Failed to load eval data.').should('be.visible');
