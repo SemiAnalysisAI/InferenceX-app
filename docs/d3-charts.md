@@ -116,6 +116,11 @@ D3 bar charts measure actual Y-axis label widths using a temporary SVG `<text>` 
 
 Opacity animates via inline CSS `transition: opacity 150ms ease` (set on dots, rooflines, and labels in the render path); d3 `.transition()` is reserved for attributes CSS can't animate — the `data-update` entrance transitions on dot `transform` and roofline `d`. Never point both systems at the same property: a d3 transition re-writes the style every animation frame, and each write restarts the CSS transition, emitting `transitionrun`/`transitioncancel` per node per frame (a legend hover across a full chart used to produce tens of thousands of events per session, all of it also observed by PostHog's session-replay MutationObserver). Handlers like legend hover therefore write opacity **once** and let CSS do the animation.
 
+Official coordinate transitions use one 300ms D3 tween for visible points and rooflines. Hidden
+official marks snap directly to their final geometry and are excluded from the transition snapshot,
+avoiding frame-by-frame writes for data the user cannot see. Unofficial overlays retain their
+existing snap behavior. Replay passes a zero duration and remains frame-driven.
+
 ## Batched Label Measurement
 
 Label loops that size a background rect to its text (`.ll-bg`/`.pl-bg`, point-label collision avoidance) must not interleave `getBBox()` with DOM writes — each read after a write forces a synchronous layout, turning N labels into N reflows. The pattern is two passes over the selection: write every label's text first, then measure every bbox (one forced layout for the whole batch), then write the rects. Same rule for `measureLegendRightInset`: it reads `getBoundingClientRect`, so it's skipped entirely when there are no known-issue annotations to place — it would otherwise run on every zoom frame.

@@ -113,32 +113,56 @@ export function createZoomFrameBatcher(
   };
 }
 
-interface TransitionGeometry {
+export interface TransitionGeometry {
   transforms: Map<SVGGElement, string>;
   paths: Map<SVGPathElement, string>;
 }
 
-function captureTransitionGeometry(
+const TRANSITION_POINT_SELECTOR = '.dot-group';
+const TRANSITION_ROOFLINE_SELECTOR = '.roofline-path';
+type GeometryVisibility = (element: SVGElement) => boolean;
+
+function isGeometryVisible(element: SVGElement): boolean {
+  return element.style.opacity !== '0' && element.style.display !== 'none';
+}
+
+function metricGeometryVisibility<T>(layers: LayerConfig<T>[]): GeometryVisibility {
+  const scatterLayer = layers.find((layer) => layer.type === 'scatter');
+  const getOpacity = scatterLayer?.type === 'scatter' ? scatterLayer.config.getOpacity : undefined;
+  if (!getOpacity) return isGeometryVisible;
+
+  return (element) =>
+    element.matches('.dot-group')
+      ? getOpacity(d3.select(element).datum() as Parameters<typeof getOpacity>[0]) > 0
+      : isGeometryVisible(element);
+}
+
+export function captureTransitionGeometry(
   group: d3.Selection<SVGGElement, unknown, any, any>,
 ): TransitionGeometry {
   const transforms = new Map<SVGGElement, string>();
   const paths = new Map<SVGPathElement, string>();
-  group.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
-    transforms.set(this, this.getAttribute('transform') || '');
+  group.selectAll<SVGGElement, unknown>(TRANSITION_POINT_SELECTOR).each(function () {
+    if (isGeometryVisible(this)) transforms.set(this, this.getAttribute('transform') || '');
   });
-  group.selectAll<SVGPathElement, unknown>('.roofline-path').each(function () {
-    paths.set(this, this.getAttribute('d') || '');
+  group.selectAll<SVGPathElement, unknown>(TRANSITION_ROOFLINE_SELECTOR).each(function () {
+    if (isGeometryVisible(this)) paths.set(this, this.getAttribute('d') || '');
   });
   return { transforms, paths };
 }
 
-function animateTransitionGeometry(
+export function animateTransitionGeometry(
   group: d3.Selection<SVGGElement, unknown, any, any>,
   previous: TransitionGeometry | null,
   durationMs: number | undefined = 0,
+  isVisible: GeometryVisibility = isGeometryVisible,
 ): void {
   if (!previous || durationMs <= 0) return;
-  group.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
+  group.selectAll<SVGGElement, unknown>(TRANSITION_POINT_SELECTOR).each(function () {
+    if (!isVisible(this)) {
+      d3.select(this).interrupt('data-update');
+      return;
+    }
     const oldPosition = previous.transforms.get(this);
     const newPosition = this.getAttribute('transform');
     if (oldPosition !== undefined && newPosition && oldPosition !== newPosition) {
@@ -146,7 +170,11 @@ function animateTransitionGeometry(
       d3.select(this).transition('data-update').duration(durationMs).attr('transform', newPosition);
     }
   });
-  group.selectAll<SVGPathElement, unknown>('.roofline-path').each(function () {
+  group.selectAll<SVGPathElement, unknown>(TRANSITION_ROOFLINE_SELECTOR).each(function () {
+    if (!isVisible(this)) {
+      d3.select(this).interrupt('data-update');
+      return;
+    }
     const oldPath = previous.paths.get(this);
     const newPath = this.getAttribute('d');
     if (oldPath !== undefined && newPath && oldPath !== newPath) {
@@ -851,7 +879,12 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     const metricLayerSelections = layers.map((layer) =>
       updateLayerForMetric(layer, renderGroup, currentXScale, currentYScale, layout, metricCtx),
     );
-    animateTransitionGeometry(renderGroup, previousGeometry, transitionDuration);
+    animateTransitionGeometry(
+      renderGroup,
+      previousGeometry,
+      transitionDuration,
+      metricGeometryVisibility(layers),
+    );
     customLayerDisplayIdentitiesRef.current = customLayerDisplayIdentities(layers);
     lastDisplayIdentityRef.current = displayIdentity;
     renderGroup.selectAll('.dot-group').raise();

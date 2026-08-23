@@ -368,7 +368,7 @@ const ScatterGraph = React.memo(
     showAllHardwareTypes = false,
     hardwareConfigOverride,
     overlayData,
-    transitionDuration = 750,
+    transitionDuration = 300,
     niceAxes = true,
     pinLineLabels = false,
     xExtentOverride,
