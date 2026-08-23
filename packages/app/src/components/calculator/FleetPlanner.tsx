@@ -108,7 +108,7 @@ const STRINGS = {
     costCapNoGpus: '当前无可见芯片可评估——请在图表图例中启用硬件。',
     note: '注意：',
     disaggFleet:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码芯片或预填充芯片报告吞吐量，而非按芯片总数——这类配置的集群规模与成本和聚合配置并非同类比较。',
+      '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）按 decode 芯片或 prefill 芯片报告吞吐量，而非按芯片总数。因此，这类配置的集群规模与成本不能直接和聚合配置进行同口径比较。',
     assumptions: (tier: string) =>
       `假设该操作点下 100% 利用率及自有数据中心经济模型：集群成本 = 芯片数 × ${tier} $/chip/hr，每月按 730 小时计。设施功率为每芯片全含功率（主机、网络、散热），非裸 TDP。`,
     source: '来源：',
@@ -382,7 +382,7 @@ export default function FleetPlanner({
   const assumptionsFooter = (
     <>
       <p className="text-xs text-muted-foreground mt-3">
-        {t.assumptions(getCostProviderLabel(costProvider))}
+        {t.assumptions(getCostProviderLabel(costProvider, locale))}
       </p>
       <p className="text-muted-foreground mt-1">
         <small>

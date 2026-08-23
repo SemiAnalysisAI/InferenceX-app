@@ -1,13 +1,40 @@
 import { describe, expect, it } from 'vitest';
 
 import { normalizeGpuData } from '@/components/gpu-specs/gpu-specs-radar-chart';
-import { GPU_CHART_METRICS, GPU_SPECS } from '@/lib/gpu-specs';
+import {
+  formatScaleOutTopology,
+  formatScaleUpTopology,
+  GPU_CHART_METRICS,
+  GPU_SPECS,
+} from '@/lib/gpu-specs';
 
 const RADAR_METRICS = GPU_CHART_METRICS.filter(
   (m) => m.key !== 'scaleUpWorldSize' && m.key !== 'scaleOutBandwidth',
 );
 
 describe('normalizeGpuData', () => {
+  it('defines Chinese display labels and localized non-unit values for every metric', () => {
+    for (const metric of GPU_CHART_METRICS) {
+      const localized = metric as typeof metric & { labelZh?: string; unitZh?: string };
+      expect(localized.labelZh, metric.key).toBeTruthy();
+      expect(localized.unitZh, metric.key).toBeTruthy();
+    }
+    expect(
+      (
+        GPU_CHART_METRICS.find((metric) => metric.key === 'scaleUpWorldSize') as {
+          unitZh?: string;
+        }
+      ).unitZh,
+    ).toBe('芯片');
+  });
+
+  it('localizes topology display values without changing English or protected rail counts', () => {
+    expect(formatScaleOutTopology('8-rail optimized', 'en')).toBe('8-rail optimized');
+    expect(formatScaleOutTopology('8-rail optimized', 'zh')).toBe('8-rail 优化拓扑');
+    expect(formatScaleUpTopology('Switched 4-rail Optimized', 'zh')).toBe('4-rail 优化交换拓扑');
+    expect(formatScaleUpTopology('Full Mesh', 'zh')).toBe('全互连');
+  });
+
   it('returns normalized data for all GPUs', () => {
     const result = normalizeGpuData(GPU_SPECS, RADAR_METRICS);
     expect(result).toHaveLength(9);

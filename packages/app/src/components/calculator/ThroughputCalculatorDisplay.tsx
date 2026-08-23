@@ -260,9 +260,9 @@ const STRINGS = {
     updated: ' • 更新于：',
     note: '注意：',
     disaggCost:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码芯片或预填充芯片计算成本，而非按芯片总数。因此与聚合配置的直接成本对比并非同类比较。',
+      '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）按 decode 芯片或 prefill 芯片计算成本，而非按芯片总数。因此，不能直接与聚合配置的成本进行同口径比较。',
     disaggThroughput:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码芯片或预填充芯片计算吞吐量，而非按芯片总数。因此与聚合配置的直接吞吐量对比并非同类比较。',
+      '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）按 decode 芯片或 prefill 芯片计算吞吐量，而非按芯片总数。因此，不能直接与聚合配置的吞吐量进行同口径比较。',
     compMetricThroughput: '吞吐量',
     compMetricCost: '成本效率',
     compMetricPower: 'tok/s/MW',
@@ -296,7 +296,7 @@ function getChartTitleZh(
       return `${targetLabel}下每满配兆瓦${tokenTypeLabel} token 数`;
     }
     case 'cost': {
-      const providerLabel = getCostProviderLabel(costProvider || 'costh');
+      const providerLabel = getCostProviderLabel(costProvider || 'costh', 'zh');
       return `${targetLabel}下每百万${tokenTypeLabel} token 成本（${providerLabel}）`;
     }
     default: {

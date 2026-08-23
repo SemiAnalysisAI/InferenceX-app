@@ -4,7 +4,30 @@ import * as d3 from 'd3';
 import React, { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import { type GpuMetricKey, type GpuMetricRow, ALL_METRIC_OPTIONS } from './types';
+import { useLocale } from '@/lib/use-locale';
+import {
+  type GpuMetricKey,
+  type GpuMetricRow,
+  ALL_METRIC_OPTIONS,
+  getGpuMetricLabel,
+  getGpuMetricYAxisLabel,
+} from './types';
+
+const STRINGS = {
+  en: {
+    empty: 'No data to display.',
+    instructions:
+      'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    dismiss: 'Click elsewhere to dismiss',
+    chip: 'Chip',
+  },
+  zh: {
+    empty: '暂无可显示的数据。',
+    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    dismiss: '点击其他区域关闭',
+    chip: '芯片',
+  },
+} as const;
 
 interface CorrelationPoint {
   x: number;
@@ -36,6 +59,8 @@ const GpuCorrelationChart = React.memo(
     caption,
     maxPoints,
   }: GpuCorrelationChartProps) => {
+    const locale = useLocale();
+    const t = STRINGS[locale];
     const xConfig = ALL_METRIC_OPTIONS.find((m) => m.key === xMetric)!;
     const yConfig = ALL_METRIC_OPTIONS.find((m) => m.key === yMetric)!;
 
@@ -60,7 +85,7 @@ const GpuCorrelationChart = React.memo(
     if (points.length === 0) {
       return (
         <div className="flex items-center justify-center min-h-[600px]">
-          <p className="text-muted-foreground text-sm">No data to display.</p>
+          <p className="text-muted-foreground text-sm">{t.empty}</p>
         </div>
       );
     }
@@ -74,11 +99,11 @@ const GpuCorrelationChart = React.memo(
         watermark="logo"
         grabCursor={true}
         testId="gpu-metrics-correlation"
-        instructions="Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip"
+        instructions={t.instructions}
         xScale={{ type: 'linear', domain: xDomain, nice: true }}
         yScale={{ type: 'linear', domain: yDomain, nice: true }}
-        xAxis={{ label: xConfig.yAxisLabel, tickCount: 10 }}
-        yAxis={{ label: yConfig.yAxisLabel, tickCount: 8 }}
+        xAxis={{ label: getGpuMetricYAxisLabel(xConfig, locale), tickCount: 10 }}
+        yAxis={{ label: getGpuMetricYAxisLabel(yConfig, locale), tickCount: 8 }}
         layers={[
           // Trend line (linear regression)
           {
@@ -138,10 +163,10 @@ const GpuCorrelationChart = React.memo(
           content: (d: CorrelationPoint, isPinned: boolean) => {
             const color = GPU_COLORS[d.gpuIndex % GPU_COLORS.length];
             return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width:160px; user-select: ${isPinned ? 'text' : 'none'}">
-            ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
-            <div class="font-semibold mb-1" style="color:${color}">Chip ${d.gpuIndex}</div>
-            <div>${xConfig.label}: ${d.x.toFixed(1)} ${xConfig.unit}</div>
-            <div>${yConfig.label}: ${d.y.toFixed(1)} ${yConfig.unit}</div>
+            ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+            <div class="font-semibold mb-1" style="color:${color}">${t.chip} ${d.gpuIndex}</div>
+            <div>${getGpuMetricLabel(xConfig, locale)}${locale === 'zh' ? '：' : ':'} ${d.x.toFixed(1)} ${xConfig.unit}</div>
+            <div>${getGpuMetricLabel(yConfig, locale)}${locale === 'zh' ? '：' : ':'} ${d.y.toFixed(1)} ${yConfig.unit}</div>
           </div>`;
           },
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),

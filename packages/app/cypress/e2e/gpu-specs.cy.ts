@@ -477,3 +477,81 @@ describe('Topology Dialog Navigation', () => {
     cy.get('[role="dialog"]').should('not.exist');
   });
 });
+
+describe('GPU Specs Chinese route', () => {
+  beforeEach(() => {
+    cy.viewport(375, 812);
+    cy.visit('/zh/gpu-specs', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="gpu-specs-content"]').should('be.visible');
+  });
+
+  it('localizes view accessibility, topology values, SVG labels, and dialogs', () => {
+    cy.get('[data-testid="gpu-specs-view-toggle"]').should('have.attr', 'aria-label', '显示模式');
+    cy.get('table').contains('button', '8-rail 优化拓扑').should('exist');
+    cy.get('[data-testid="topology-h200-sxm"] svg').should('contain.text', '芯片 0');
+    cy.get('[data-testid="topology-h200-sxm"] button').click({ force: true });
+    cy.get('[role="dialog"]')
+      .should('contain.text', 'H200 SXM 横向扩展拓扑')
+      .and('contain.text', 'Leaf 交换机：');
+    cy.get('[data-testid="topology-nav-next"]').should('have.attr', 'aria-label', '下一款芯片');
+    cy.get('[role="dialog"] .overflow-x-auto').then(($scroller) => {
+      expect($scroller[0].scrollWidth).to.be.greaterThan($scroller[0].clientWidth);
+    });
+    cy.get('body').type('{esc}');
+  });
+
+  it('localizes chart and radar registries while preserving technical units', () => {
+    cy.get('[data-testid="gpu-specs-chart-view-btn"]').click({ force: true });
+    cy.get('[data-testid="gpu-specs-bar-chart"]')
+      .should('contain.text', '指标：')
+      .and('contain.text', '悬停柱形可查看详情');
+    cy.get('[data-testid="gpu-specs-bar-d3-chart"] svg').should('contain.text', '显存容量 (GB)');
+    cy.get('[data-testid="gpu-specs-bar-d3-chart"] svg .bar')
+      .first()
+      .trigger('mouseenter', { force: true });
+    cy.get('[data-chart-tooltip]:visible').should('contain.text', '显存容量：');
+    cy.get('[data-testid="gpu-specs-radar-view-btn"]').click({ force: true });
+    cy.get('[data-testid="gpu-specs-radar-chart"] svg').should('contain.text', '显存容量');
+    cy.get('[data-testid="gpu-specs-radar-chart"]').should('contain.text', '归一化');
+    cy.get('[data-testid="gpu-specs-radar-chart"] svg .radar-dot')
+      .first()
+      .trigger('mouseenter', { force: true });
+    cy.get('[data-chart-tooltip]:visible').should('contain.text', '显存容量：');
+  });
+
+  it('supports table, topology, chart, and radar navigation at 1440px', () => {
+    cy.viewport(1440, 900);
+    cy.reload();
+    cy.get('[data-testid="gpu-specs-content"]').should('be.visible');
+    cy.get('[data-testid="topology-h200-sxm"] button').click({ force: true });
+    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[data-testid="topology-nav-next"]').click();
+    cy.get('body').type('{esc}');
+    cy.get('[data-testid="gpu-specs-chart-view-btn"]').click();
+    cy.get('[data-testid="gpu-specs-bar-chart"]').should('be.visible');
+    cy.get('[data-testid="gpu-specs-radar-view-btn"]').click();
+    cy.get('[data-testid="gpu-specs-radar-chart"]').should('be.visible');
+  });
+
+  it('keeps wide content internally scrollable and emits hreflang metadata', () => {
+    cy.get('table')
+      .parents('.overflow-x-auto')
+      .first()
+      .then(($scroller) => {
+        expect($scroller[0].scrollWidth).to.be.greaterThan($scroller[0].clientWidth);
+      });
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+    cy.get('link[rel="alternate"][hreflang="en"]')
+      .invoke('attr', 'href')
+      .should('include', '/gpu-specs');
+    cy.get('link[rel="alternate"][hreflang="zh-CN"]')
+      .invoke('attr', 'href')
+      .should('include', '/zh/gpu-specs');
+  });
+});

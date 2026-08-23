@@ -14,7 +14,45 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { getTopologyConfig, type GpuSpec } from '@/lib/gpu-specs';
+import { formatScaleOutTopology, getTopologyConfig, type GpuSpec } from '@/lib/gpu-specs';
+import { useLocale } from '@/lib/use-locale';
+
+const STRINGS = {
+  en: {
+    expand: 'Expand',
+    expandHint: 'Click to expand',
+    previous: 'Previous Chip',
+    next: 'Next Chip',
+    title: 'Scale-Out Topology',
+    diagram: 'scale-out topology diagram',
+    leafSwitch: 'Leaf switch:',
+    spineSwitch: 'Spine switch:',
+    server: 'Server',
+    servers: 'servers',
+    chip: 'Chip',
+    pod: 'Pod',
+    railPod: 'Rail Pod',
+    spine: 'Spine',
+    leaf: 'Leaf',
+  },
+  zh: {
+    expand: '展开',
+    expandHint: '点击展开',
+    previous: '上一款芯片',
+    next: '下一款芯片',
+    title: '横向扩展拓扑',
+    diagram: '横向扩展拓扑图',
+    leafSwitch: 'Leaf 交换机：',
+    spineSwitch: 'Spine 交换机：',
+    server: '服务器',
+    servers: '台服务器',
+    chip: '芯片',
+    pod: 'Pod',
+    railPod: 'Rail Pod',
+    spine: 'Spine',
+    leaf: 'Leaf',
+  },
+} as const;
 
 export interface TopologyDiagramHandle {
   openDialog: () => void;
@@ -32,6 +70,8 @@ export const TopologyDiagram = forwardRef<
   TopologyDiagramHandle,
   { spec: GpuSpec; allSpecs: GpuSpec[] }
 >(({ spec, allSpecs }, ref) => {
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const [open, setOpen] = useState(false);
   const [displayedIndex, setDisplayedIndex] = useState(0);
   const displayedIndexRef = useRef(0);
@@ -96,7 +136,8 @@ export const TopologyDiagram = forwardRef<
       <div className="flex items-center gap-2 mb-2">
         <h4 className="text-sm font-semibold">{spec.name}</h4>
         <span className="text-xs text-muted-foreground">
-          {spec.scaleOutTopology} &middot; {compactConfig.networkTech}
+          {formatScaleOutTopology(spec.scaleOutTopology!, locale)} &middot;{' '}
+          {compactConfig.networkTech}
         </span>
       </div>
       <button
@@ -108,10 +149,10 @@ export const TopologyDiagram = forwardRef<
           setOpen(true);
           track('gpu_specs_topology_expanded', { gpu: spec.name });
         }}
-        aria-label={`Expand ${spec.name} topology diagram`}
+        aria-label={`${t.expand} ${spec.name} ${t.diagram}`}
       >
-        <TopologyD3 spec={spec} config={compactConfig} compact />
-        <p className="text-[10px] text-muted-foreground mt-1 text-center">Click to expand</p>
+        <TopologyD3 spec={spec} config={compactConfig} compact locale={locale} />
+        <p className="text-[10px] text-muted-foreground mt-1 text-center">{t.expandHint}</p>
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -121,15 +162,18 @@ export const TopologyDiagram = forwardRef<
               variant="ghost"
               size="icon"
               onClick={() => navigate('prev')}
-              aria-label="Previous Chip"
+              aria-label={t.previous}
               data-testid="topology-nav-prev"
             >
               <ChevronLeft className="size-5" />
             </Button>
             <DialogHeader className="flex-1">
-              <DialogTitle>{displayedSpec.name} Scale-Out Topology</DialogTitle>
+              <DialogTitle>
+                {displayedSpec.name} {t.title}
+              </DialogTitle>
               <DialogDescription>
-                {displayedSpec.scaleOutTopology} &middot; {displayedConfig?.networkTech}
+                {formatScaleOutTopology(displayedSpec.scaleOutTopology!, locale)} &middot;{' '}
+                {displayedConfig?.networkTech}
                 <span className="ml-2 opacity-60">
                   ({displayedIndex + 1} / {allSpecs.length})
                 </span>
@@ -139,7 +183,7 @@ export const TopologyDiagram = forwardRef<
               variant="ghost"
               size="icon"
               onClick={() => navigate('next')}
-              aria-label="Next Chip"
+              aria-label={t.next}
               data-testid="topology-nav-next"
             >
               <ChevronRight className="size-5" />
@@ -148,14 +192,19 @@ export const TopologyDiagram = forwardRef<
           {displayedConfig && (
             <>
               <div className="overflow-x-auto">
-                <TopologyD3 spec={displayedSpec} config={displayedConfig} compact={false} />
+                <TopologyD3
+                  spec={displayedSpec}
+                  config={displayedConfig}
+                  compact={false}
+                  locale={locale}
+                />
               </div>
               <div className="text-xs text-muted-foreground space-y-1">
                 <p>
-                  <span className="font-medium">Leaf switch:</span> {displayedConfig.switchLabel}
+                  <span className="font-medium">{t.leafSwitch}</span> {displayedConfig.switchLabel}
                 </p>
                 <p>
-                  <span className="font-medium">Spine switch:</span> {displayedConfig.spineLabel}
+                  <span className="font-medium">{t.spineSwitch}</span> {displayedConfig.spineLabel}
                 </p>
                 <p>
                   <span className="font-medium">NIC:</span> {displayedConfig.nicLabel}
@@ -207,6 +256,7 @@ interface TopologyD3Props {
   spec: GpuSpec;
   config: NonNullable<ReturnType<typeof getTopologyConfig>>;
   compact: boolean;
+  locale: 'en' | 'zh';
 }
 
 /**
@@ -224,8 +274,9 @@ interface TopologyD3Props {
  *   └──────────────────────────────┘
  *     ┌Pod 2┐ ┌Pod 3┐ ...             ← Extra pods (abstracted)
  */
-function TopologyD3({ spec, config, compact }: TopologyD3Props) {
+function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const t = STRINGS[locale];
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -406,7 +457,10 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
       .attr('viewBox', `0 0 ${totalW} ${viewBoxH}`)
       .attr('class', compact ? 'w-full max-w-[600px]' : 'w-full min-w-[700px]')
       .attr('role', 'img')
-      .attr('aria-label', `${spec.name} ${spec.scaleOutTopology} scale-out topology diagram`);
+      .attr(
+        'aria-label',
+        `${spec.name} ${formatScaleOutTopology(spec.scaleOutTopology!, locale)} ${t.diagram}`,
+      );
 
     if (!isUnofficialHostname(window.location.hostname)) {
       // Add background logo watermark
@@ -570,7 +624,7 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
       .attr('class', 'fill-green-500/70')
       .style('font-size', labelFontSize)
       .style('font-weight', '500')
-      .text(`${podCount > 1 ? 'Pod 1' : 'Rail Pod'} (${serversPerPod} servers)`);
+      .text(`${podCount > 1 ? `${t.pod} 1` : t.railPod} (${serversPerPod} ${t.servers})`);
 
     // Leaf switch boxes (inside pod)
     const leafGroup = svg.append('g').attr('class', 'leaf-switches');
@@ -611,7 +665,7 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
       .attr('y', s1Y + s1LabelH - 2)
       .attr('class', 'fill-muted-foreground')
       .style('font-size', labelFontSize)
-      .text('Server 1');
+      .text(`${t.server} 1`);
 
     // NIC boxes (inside Server 1)
     const nicGroup = svg.append('g').attr('class', 'nics');
@@ -665,7 +719,7 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
         .attr('class', 'font-medium')
         .style('font-size', fontSize)
         .attr('fill', vendorColor)
-        .text(`Chip ${i}`);
+        .text(`${t.chip} ${i}`);
     }
 
     // Abstracted server boxes (inside same pod as Server 1)
@@ -723,7 +777,7 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
         .attr('class', 'fill-green-500/50')
         .style('font-size', smallFontSize)
         .style('font-weight', '500')
-        .text(`Pod ${i + 2}`);
+        .text(`${t.pod} ${i + 2}`);
     }
 
     // === Labels ===
@@ -736,7 +790,7 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
         .attr('y', spineY + spineBoxH / 2 + 4)
         .attr('class', 'fill-muted-foreground')
         .style('font-size', labelFontSize)
-        .text('Spine');
+        .text(t.spine);
     }
 
     // Legend labels
@@ -748,7 +802,7 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
         .attr('text-anchor', 'middle')
         .attr('class', 'fill-muted-foreground')
         .style('font-size', '7px')
-        .html(`${leafShort} (leaf) &middot; ${spineShort} (spine)`);
+        .html(`${leafShort} (${t.leaf}) &middot; ${spineShort} (${t.spine})`);
     } else {
       svg
         .append('text')
@@ -757,7 +811,7 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
         .attr('text-anchor', 'middle')
         .attr('class', 'fill-muted-foreground')
         .style('font-size', smallFontSize)
-        .text(`Spine: ${spineShort}`);
+        .text(`${t.spine}${locale === 'zh' ? '：' : ': '}${spineShort}`);
       svg
         .append('text')
         .attr('x', totalW / 2)
@@ -765,13 +819,15 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
         .attr('text-anchor', 'middle')
         .attr('class', 'fill-muted-foreground')
         .style('font-size', smallFontSize)
-        .html(`Leaf: ${leafShort} &middot; NIC: ${nicLine1} ${nicLine2}`);
+        .html(
+          `${t.leaf}${locale === 'zh' ? '：' : ': '}${leafShort} &middot; NIC${locale === 'zh' ? '：' : ': '}${nicLine1} ${nicLine2}`,
+        );
     }
 
     return () => {
       container.selectAll('*').remove();
     };
-  }, [spec, config, compact]);
+  }, [spec, config, compact, locale, t]);
 
   return <div ref={containerRef} />;
 }
