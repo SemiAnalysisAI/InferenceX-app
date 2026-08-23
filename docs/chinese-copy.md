@@ -211,21 +211,29 @@ an accepted exception mutation.
   inline code, flags, identifiers, normalized unit multisets, link destinations, and JSON-LD
   syntax/shape. Backtick and tilde fences of any legal length are recognized, as are inline-code
   delimiters longer than one backtick. Markdown links and static MDX/JSX `href`/`src` props share
-  the same matcher. Chinese internal links may add `/zh` (including `/blog` → `/zh/blog`),
+  the same matcher; bare destinations with balanced parentheses, angle-bracket destinations,
+  reference definitions, and static string/template-literal props are all covered. Chinese
+  internal links may add `/zh` (including `/blog` → `/zh/blog`),
   same-page heading fragments may be localized, and link order may change when paragraphs are
   reorganized. Protected-token counts are bidirectional: deleting or adding a flag, identifier,
-  or unit occurrence fails. JSON-LD prose values may be translated; keys, types, array shape,
-  URLs, numbers, booleans, dates, flags, and identifiers remain protected.
+  or unit occurrence fails. Protected forms include throughput, FLOP, bit-bandwidth, power-per-GPU,
+  GPU-hour, and numeric cost-rate units used by the real corpus. JSON-LD wrappers may contain legal
+  whitespace and newlines. Their prose values may be translated; keys, types, array shape, and the
+  exact object/array paths of URLs, numbers, booleans, dates, flags, and identifiers remain protected.
 - Every containing object with an explicit `en` or `zh` object literal must carry the other locale,
   and the two objects must have the same statically declared nested key shape. Identifier and
   quoted locale keys are treated alike. Computed keys and spread contents cannot be proven locally
-  and remain outside this structural check; their explicit sibling keys are still checked.
+  and remain outside this structural check; their explicit assignment and shorthand sibling keys
+  are still checked. Temporary dictionary exceptions are consumed once, so one digest cannot hide
+  two identical object violations.
 - A PR labeled `chinese-copy-only` runs the merge-base-aware English-byte check. English Blog MDX
   is protected as a whole, while mixed TypeScript/TSX/JSON files protect raw `en` subtrees. The
   repository-root pathspec works from the workflow's `packages/app` working directory, and
   rename-aware base/head mapping preserves unchanged moves while still checking an edited renamed
-  file. The check intentionally permits locale-neutral plumbing and tests; remove the label when
-  English copy is intentionally part of the change.
+  file. Additions, copies, modifications, renames, deletions, and Git type changes are included.
+  The objective-guard exception manifest is locale-neutral plumbing rather than UI copy. The check
+  intentionally permits that plumbing and tests; remove the label when English copy is intentionally
+  part of the change.
 - High-confidence copy rules remain limited to the documented `Chip` common-noun case,
   prose-like hardcoded English labels beside a Chinese dictionary, redundant English-first
   loanword translations, and unambiguous malformed punctuation such as whitespace before Chinese
@@ -241,20 +249,26 @@ an accepted exception mutation.
   必须保留 fenced code、数学公式块、`Figure` 图片来源、受保护的 inline code、flag、
   identifier、规范化后的单位多重集、链接目标，以及 JSON-LD 的语法和结构。检查器同时识别
   任意合法长度的反引号或波浪线 fence，以及由多个反引号界定的 inline code；Markdown 链接
-  与 MDX/JSX 中静态的 `href`/`src` 属性共用同一 matcher。中文站内链接可以添加 `/zh`
+  与 MDX/JSX 中静态的 `href`/`src` 属性共用同一 matcher；带平衡括号的普通 destination、
+  尖括号 destination、reference definition，以及静态字符串或 template literal 属性都在
+  检查范围内。中文站内链接可以添加 `/zh`
   （包括 `/blog` → `/zh/blog`）；页内标题锚点可以随中文标题本地化；段落重组时链接顺序可以
-  变化。受保护 token 会双向核对出现次数，增删任何 flag、identifier 或单位都会失败。
-  JSON-LD 中的说明性文案可以翻译，但 key、type、数组结构、URL、数字、boolean、日期、
-  flag 和 identifier 必须保持不变。
+  变化。受保护 token 会双向核对出现次数，增删任何 flag、identifier 或单位都会失败；实际
+  语料中的吞吐量、FLOP、bit 带宽、每 GPU 功耗、GPU-hour 和数值成本率等单位都会覆盖。
+  JSON-LD wrapper 可以包含合法空白与换行，其中的说明性文案可以翻译，但 key、type、数组
+  结构，以及 URL、数字、boolean、日期、flag 和 identifier 所在的对象/数组路径必须保持不变。
 - 只要一个 containing object 中显式声明了 `en` 或 `zh` object literal，就必须同时声明另一
   个 locale，且两者的静态嵌套 key 结构一致；identifier key 与带引号的 locale key 采用相同
   规则。computed key 和 spread 的内容无法在本地可靠推断，不纳入该结构检查；同一对象中的
-  其他显式 sibling key 仍会检查。
+  显式 assignment 与 shorthand sibling key 仍会检查。临时字典例外按次消费，单个 digest
+  不能同时掩盖两个相同的对象错误。
 - PR 添加 `chinese-copy-only` label 后，会运行基于 merge base 的英文逐字节检查。英文 Blog
   MDX 整体受保护；混合语言 TypeScript、TSX 和 JSON 文件则保护原始 `en` subtree。路径检查
   固定从仓库根目录解析，因此工作流在 `packages/app` 下执行也不会漏扫；rename-aware 的
-  base/head 映射允许内容不变的移动，同时仍会拦截重命名文件中的英文改动。测试和不含英文
-  文案的 locale plumbing 可以修改；如果 PR 本来就要改英文文案，应移除该 label。
+  base/head 映射允许内容不变的移动，同时仍会拦截重命名文件中的英文改动；新增、复制、修改、
+  重命名、删除和 Git type change 都会纳入。客观检查的例外 manifest 属于 locale-neutral
+  plumbing，而不是 UI 英文文案。测试和这类 plumbing 可以修改；如果 PR 本来就要改英文文案，
+  应移除该 label。
 - 高置信度文案规则仅限于已记录的 `Chip` 普通名词、已有中文字典旁绕过本地化的英文说明
   标签、English-first 重复翻译，以及中文句末标点前多余空格等无歧义错误。单位和 identifier
   继续保留文档规定的英文写法；缩写和单位标签也明确豁免。TS/TSX 的字符串 literal 与 JSX
@@ -262,15 +276,19 @@ an accepted exception mutation.
 
 Temporary baseline exceptions live in
 `packages/app/src/lib/zh-objective-guard-exceptions.json`. Every row must record a reason and an
-explicit removal condition. Blog exceptions match the exact English and Chinese spans;
+explicit removal condition. Blog inline-code exceptions match exact English and Chinese spans;
+each file's protected-token exception set is pinned to the SHA-256 digest of the complete paired
+English/Chinese source, so a waiver cannot migrate to another occurrence after either post changes.
 an empty side records one exact addition/removal rather than a wildcard, and duplicate occurrences
 require duplicate rows. Dictionary exceptions fingerprint the exact mismatched key set. A stale,
 broadened, or newly different exception fails its non-vacuity test.
 
 临时 baseline 例外统一记录在
 `packages/app/src/lib/zh-objective-guard-exceptions.json`。每条记录都必须说明原因和明确的
-删除条件。Blog 例外精确匹配中英文两侧文本；空字符串一侧表示一次明确的新增或删除，并非
-通配符；重复出现的差异必须逐条记录。字典例外对完整的 key 差异集合计算 fingerprint。
+删除条件。Blog inline-code 例外精确匹配中英文两侧文本；每个文件的 protected-token 例外集合
+还会绑定中英文完整源码对的 SHA-256 digest，因此任一文章变化后，豁免都不能迁移到其他位置。
+空字符串一侧表示一次明确的新增或删除，并非通配符；重复出现的差异必须逐条记录。字典例外
+对完整的 key 差异集合计算 fingerprint。
 失效、扩大范围或内容发生变化的例外都会在非空验证中失败。
 
 The deterministic guard never scores fluency, clause order, sentence structure, register,

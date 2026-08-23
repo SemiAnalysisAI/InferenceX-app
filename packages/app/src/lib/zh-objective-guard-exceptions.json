@@ -21,6 +21,7 @@
       "file": "b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar.mdx",
       "en": "",
       "zh": "tok/s/user",
+      "pairSha256": "fa4f6dc38bd2734b93d19cb00a3ad4e2d136d318cf183e5ed90f314dcaa17368",
       "reason": "The baseline Chinese article repeats this protected unit twice beyond the English article; each exact multiset occurrence remains isolated until the Blog rewrite owns the correction.",
       "removeWhen": "Delete this row when one extra Chinese tok/s/user occurrence is removed."
     },
@@ -37,6 +38,7 @@
       "file": "b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar.mdx",
       "en": "",
       "zh": "tok/s/user",
+      "pairSha256": "b350e97a4d3c851dd8f514caccf6643ee74c0f3a0c08f318b840806a5e1a4434",
       "reason": "The baseline Chinese article has one additional protected unit occurrence owned by the Blog rewrite branch.",
       "removeWhen": "Delete this row when the extra Chinese tok/s/user occurrence is removed."
     },
@@ -45,6 +47,7 @@
       "file": "deepseekv4-16t-day-0-to-day-43-performance.mdx",
       "en": "MW",
       "zh": "tok/s/user",
+      "pairSha256": "0599d4db42ca4b155a1639609112de555b36add0ea5df11155fe9e0ed62fa6d4",
       "reason": "The paired baseline articles differ by exactly one MW and one tok/s/user occurrence; the Blog rewrite branch owns that content correction.",
       "removeWhen": "Delete this row when the article pair has equal protected-token multisets."
     },
@@ -53,6 +56,7 @@
       "file": "gb300-nvl72-vs-gb200-nvl72-dsv4-pro-vllm-fp4.mdx",
       "en": "tok/s/gpu",
       "zh": "GB",
+      "pairSha256": "40f24e77ac9b75578c3c29d4ff9d8e354452daeb6ceab753be5b31a7e01a18a7",
       "reason": "The paired baseline articles differ by one tok/s/gpu and two GB occurrences; the Blog rewrite branch owns that content correction.",
       "removeWhen": "Delete this row when the tok/s/gpu and one extra GB mismatch is removed."
     },
@@ -69,6 +73,7 @@
       "file": "inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper.mdx",
       "en": "",
       "zh": "GB/s",
+      "pairSha256": "5ae2bcaa538c8f667f583e34b2b86cfd869f338a419e011a751c0820f143b7a9",
       "reason": "The baseline Chinese article repeats GB/s five times beyond the English article; each exact multiset occurrence is isolated until its Blog rewrite lands.",
       "removeWhen": "Delete this row when one extra Chinese GB/s occurrence is removed."
     },
@@ -108,9 +113,17 @@
       "rule": "protected-token",
       "file": "inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper.mdx",
       "en": "",
-      "zh": "tok/s",
-      "reason": "The baseline Chinese article has one additional tok/s occurrence owned by the Blog rewrite branch.",
-      "removeWhen": "Delete this row when the extra Chinese tok/s occurrence is removed."
+      "zh": "$0.226/M",
+      "reason": "The baseline Chinese article has one additional numeric cost-rate occurrence owned by the Blog rewrite branch.",
+      "removeWhen": "Delete this row when the extra Chinese $0.226/M occurrence is removed."
+    },
+    {
+      "rule": "protected-token",
+      "file": "inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper.mdx",
+      "en": "",
+      "zh": "Gbit/s",
+      "reason": "The baseline Chinese article has one additional bandwidth-unit occurrence owned by the Blog rewrite branch.",
+      "removeWhen": "Delete this row when the extra Chinese Gbit/s occurrence is removed."
     },
     {
       "rule": "protected-token",
@@ -125,6 +138,7 @@
       "file": "mi355x-kimi-k2-5-vllm-aiter-7x-speedup.mdx",
       "en": "",
       "zh": "tok/s/user",
+      "pairSha256": "e9481ff7bc9f80193f83e2913516319fb78fa37db1f6b759cc586c5ac1d981d5",
       "reason": "The baseline Chinese article has one additional protected unit occurrence owned by the Blog rewrite branch.",
       "removeWhen": "Delete this row when the extra Chinese tok/s/user occurrence is removed."
     },
@@ -133,6 +147,7 @@
       "file": "mi355x-qwen3-5-sglang-v0-5-12-up-to-17x.mdx",
       "en": "",
       "zh": "tok/s/gpu",
+      "pairSha256": "60bad4c8e11f24ae822334fb2c382abc12173e77a3a8a6f47806358875a0552b",
       "reason": "The baseline Chinese article has one additional protected unit occurrence owned by the Blog rewrite branch.",
       "removeWhen": "Delete this row when the extra Chinese tok/s/gpu occurrence is removed."
     },
@@ -141,6 +156,7 @@
       "file": "vera-rubin-nvl72-vs-gb200-nvl72-inference.mdx",
       "en": "MW",
       "zh": "tok/s",
+      "pairSha256": "e5d3302f15aa4fd34d25f1de228e9f5a3731cf032d8394613894ced8af3ea1e7",
       "reason": "The paired baseline articles differ by three MW occurrences and one tok/s occurrence; the Blog rewrite branch owns that content correction.",
       "removeWhen": "Delete this row when the tok/s and one missing Chinese MW mismatch is removed."
     },

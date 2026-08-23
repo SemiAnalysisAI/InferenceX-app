@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -62,6 +63,10 @@ function fixtureRepository(): string {
     )}\n`,
   );
   return directory;
+}
+
+function pairSha256(en: string, zh: string): string {
+  return createHash('sha256').update(JSON.stringify({ en, zh })).digest('hex');
 }
 
 describe('objective Chinese guard mutations', () => {
@@ -148,6 +153,21 @@ describe('objective Chinese guard mutations', () => {
       ).toEqual([]);
     });
 
+    it('includes static shorthand properties in each locale shape', () => {
+      expect(
+        findDictionaryParityViolations(
+          'shorthand.ts',
+          `const COPY = { en: { title }, zh: { heading } };`,
+        ),
+      ).toEqual([
+        expect.objectContaining({
+          rule: 'dictionary-key-parity',
+          missingFromEn: ['heading'],
+          missingFromZh: ['title'],
+        }),
+      ]);
+    });
+
     it('accepts only an exact temporary mismatch fingerprint', () => {
       const mismatch = accepted.replace("retry: '重试'", "again: '重试'");
       const [violation] = findDictionaryParityViolations('copy.ts', mismatch);
@@ -165,6 +185,19 @@ describe('objective Chinese guard mutations', () => {
           [exception],
         ),
       ).toHaveLength(1);
+    });
+
+    it('consumes one dictionary exception for only one matching object', () => {
+      const mismatch = `const A = { en: { title: 'A' }, zh: { heading: '甲' } };
+        const B = { en: { title: 'B' }, zh: { heading: '乙' } };`;
+      const [violation] = findDictionaryParityViolations('copy.ts', mismatch);
+      const exception: DictionaryGuardException = {
+        file: 'copy.ts',
+        mismatchSha256: dictionaryViolationFingerprint(violation),
+        reason: 'One exact legacy object.',
+        removeWhen: 'Delete when that object is aligned.',
+      };
+      expect(findDictionaryParityViolations('copy.ts', mismatch, [exception])).toHaveLength(1);
     });
   });
 
@@ -187,6 +220,13 @@ describe('objective Chinese guard mutations', () => {
       expect(compareEnglishSurfaces('src/copy.test.ts', base, 'anything')).toEqual([]);
       expect(
         compareEnglishSurfaces('src/plumbing.ts', 'export const x = 1;', 'export const x = 2;'),
+      ).toEqual([]);
+      expect(
+        compareEnglishSurfaces(
+          'src/lib/zh-objective-guard-exceptions.json',
+          `{"en":"MW"}`,
+          `{"en":"GB"}`,
+        ),
       ).toEqual([]);
     });
 
@@ -269,6 +309,35 @@ $$
       ).toContainEqual(expect.objectContaining({ rule: 'link-target' }));
     });
 
+    it('protects static template-literal link props without treating them as inline code', () => {
+      const enMdx = '<DashboardCTA href={`/blog/next`}>Open</DashboardCTA>';
+      const zhMdx = '<DashboardCTA href={`/zh/blog/next`}>打开</DashboardCTA>';
+      expect(compareBlogPair('template-prop.mdx', enMdx, zhMdx, [])).toEqual([]);
+      expect(
+        compareBlogPair('template-prop.mdx', enMdx, zhMdx.replace('/next', '/wrong'), []),
+      ).toContainEqual(expect.objectContaining({ rule: 'link-target' }));
+    });
+
+    it('parses nested, angle, and reference Markdown destinations completely', () => {
+      const enMdx = [
+        '[nested](https://example.com/a_(same)/one)',
+        '[angle](<https://example.com/a_(same)/one>)',
+        '[reference][destination]',
+        '',
+        '[destination]: https://example.com/reference-one',
+      ].join('\n');
+      expect(compareBlogPair('links.mdx', enMdx, enMdx, [])).toEqual([]);
+      for (const [kind, mutated] of [
+        ['nested', enMdx.replace('/one)', '/two)')],
+        ['angle', enMdx.replace('/one>)', '/two>)')],
+        ['reference', enMdx.replace('reference-one', 'reference-two')],
+      ]) {
+        expect(compareBlogPair('links.mdx', enMdx, mutated, []), kind).toContainEqual(
+          expect.objectContaining({ rule: 'link-target' }),
+        );
+      }
+    });
+
     it('protects legal tilde fences and inline code with arbitrary backtick delimiters', () => {
       const enMdx = ['~~~bash', 'echo exact', '~~~', '', 'Use `` `literal` exact value ``.'].join(
         '\n',
@@ -307,6 +376,22 @@ $$
       );
     });
 
+    it('protects real throughput, bandwidth, power, and numeric cost-rate forms', () => {
+      const enMdx = 'Rate: 8 tok/sec/user, 400 Gbit/s, 2 kW/GPU, and $1.35/M.';
+      const zhMdx = '速率：8 tok/s/user、400 Gbit/s、2 kW/gpu，成本为 $1.35/M。';
+      expect(compareBlogPair('real-units.mdx', enMdx, zhMdx, [])).toEqual([]);
+      for (const mutated of [
+        zhMdx.replace('tok/s/user', 'tok/s/gpu'),
+        zhMdx.replace('Gbit/s', 'GB/s'),
+        zhMdx.replace('kW/gpu', 'MW/gpu'),
+        zhMdx.replace('$1.35/M', '$1.53/M'),
+      ]) {
+        expect(compareBlogPair('real-units.mdx', enMdx, mutated, [])).toContainEqual(
+          expect.objectContaining({ rule: 'protected-token' }),
+        );
+      }
+    });
+
     it('accepts only an exact protected-token baseline exception', () => {
       const enMdx = 'Capacity is 2 GPU/hr plus 1 GPU/hr.';
       const zhMdx = '容量按 2 GPU/hour 计。';
@@ -315,6 +400,7 @@ $$
         file: 'tokens.mdx',
         en: 'gpu/hr',
         zh: '',
+        pairSha256: pairSha256(enMdx, zhMdx),
         reason: 'Temporary exact baseline mismatch.',
         removeWhen: 'Delete when the missing unit occurrence is restored.',
       };
@@ -324,6 +410,45 @@ $$
       expect(compareBlogPair('tokens.mdx', enMdx, zhMdx, [exception])).toEqual([]);
       expect(compareBlogPair('tokens.mdx', enMdx, `${zhMdx} EXTRA_ID`, [exception])).toContainEqual(
         expect.objectContaining({ rule: 'protected-token' }),
+      );
+    });
+
+    it('cannot migrate a protected-token exception to a different source occurrence', () => {
+      const enMdx = 'A MW and B MW.';
+      const zhMdx = 'A MW。';
+      const exception = {
+        rule: 'protected-token',
+        file: 'anchored-token.mdx',
+        en: 'MW',
+        zh: '',
+        pairSha256: pairSha256(enMdx, zhMdx),
+        reason: 'Temporary exact source snapshot.',
+        removeWhen: 'Delete when the missing MW is restored.',
+      } as BlogGuardException;
+      expect(compareBlogPair('anchored-token.mdx', enMdx, zhMdx, [exception])).toEqual([]);
+      expect(compareBlogPair('anchored-token.mdx', enMdx, 'B MW。', [exception])).toContainEqual(
+        expect.objectContaining({ rule: 'protected-token' }),
+      );
+    });
+
+    it('allows JSON-LD prose translation with multiline wrapper whitespace', () => {
+      const enMdx = [
+        '<JsonLd>',
+        '  {`{"@type":"TechArticle","name":"English"}`}',
+        '</JsonLd>',
+      ].join('\n');
+      const zhMdx = enMdx.replace('English', '中文');
+      expect(compareBlogPair('json-whitespace.mdx', enMdx, zhMdx, [])).toEqual([]);
+    });
+
+    it('preserves JSON-LD protected values at their exact object and array paths', () => {
+      const enMdx = `<JsonLd>{\`{"@type":"ItemList","items":[{"url":"https://example.com/one","position":1},{"url":"https://example.com/two","position":2}]}\`}</JsonLd>`;
+      const zhMdx = enMdx
+        .replace('https://example.com/one', 'https://example.com/TEMP')
+        .replace('https://example.com/two', 'https://example.com/one')
+        .replace('https://example.com/TEMP', 'https://example.com/two');
+      expect(compareBlogPair('json-paths.mdx', enMdx, zhMdx, [])).toContainEqual(
+        expect.objectContaining({ rule: 'json-ld-protected-value' }),
       );
     });
 
@@ -483,6 +608,24 @@ describe('Chinese-only CLI integration', () => {
       );
       const changedHead = fixtureCommit(directory, 'change');
       expect(() => runChineseOnlyGuard(directory, base, changedHead)).toThrow(/renamed\.ts/u);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('inspects a Git type change instead of dropping it from the diff', () => {
+    const directory = fixtureRepository();
+    try {
+      const file = path.join(directory, 'packages/app/src/copy.ts');
+      fs.writeFileSync(
+        file,
+        `export const COPY = { en: { title: 'Exact' }, zh: { title: '旧' } };\n`,
+      );
+      const base = fixtureCommit(directory, 'base');
+      fs.rmSync(file);
+      fs.symlinkSync('different-target.ts', file);
+      const head = fixtureCommit(directory, 'type-change');
+      expect(() => runChineseOnlyGuard(directory, base, head)).toThrow(/copy\.ts/u);
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }

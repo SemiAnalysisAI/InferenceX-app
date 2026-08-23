@@ -55,7 +55,7 @@ function changedFiles(base: string, head: string): ChangedFile[] {
       '--name-status',
       '-z',
       '--find-renames',
-      '--diff-filter=ACMRD',
+      '--diff-filter=ACMRTD',
       `${base}...${head}`,
       '--',
       ':(top)packages/app',

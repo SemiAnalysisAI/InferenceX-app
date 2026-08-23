@@ -12,14 +12,20 @@ export interface GuardViolation {
   readonly missingFromZh?: readonly string[];
 }
 
-export interface BlogGuardException {
-  readonly rule: 'inline-code' | 'protected-token';
+interface BlogGuardExceptionBase {
   readonly file: string;
   readonly en: string;
   readonly zh: string;
   readonly reason: string;
   readonly removeWhen: string;
 }
+
+export type BlogGuardException =
+  | (BlogGuardExceptionBase & { readonly rule: 'inline-code' })
+  | (BlogGuardExceptionBase & {
+      readonly rule: 'protected-token';
+      readonly pairSha256?: string;
+    });
 
 export interface DictionaryGuardException {
   readonly file: string;
@@ -113,12 +119,16 @@ function structuralPaths(expression: ts.Expression, prefix = ''): Set<string> {
   const paths = new Set<string>();
   if (ts.isObjectLiteralExpression(node)) {
     for (const property of node.properties) {
-      if (!ts.isPropertyAssignment(property)) continue;
-      const key = propertyName(property.name);
+      const key =
+        ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property)
+          ? propertyName(property.name)
+          : null;
       if (!key) continue;
       const next = prefix ? `${prefix}.${key}` : key;
       paths.add(next);
-      for (const nested of structuralPaths(property.initializer, next)) paths.add(nested);
+      if (ts.isPropertyAssignment(property)) {
+        for (const nested of structuralPaths(property.initializer, next)) paths.add(nested);
+      }
     }
   } else if (ts.isArrayLiteralExpression(node)) {
     for (const element of node.elements) {
@@ -190,14 +200,17 @@ export function findDictionaryParityViolations(
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
-  return violations.filter(
-    (violation) =>
-      !exceptions.some(
-        (exception) =>
-          normalizedFile(file).endsWith(exception.file) &&
-          dictionaryViolationFingerprint(violation) === exception.mismatchSha256,
-      ),
-  );
+  const remainingExceptions = [...exceptions];
+  return violations.filter((violation) => {
+    const index = remainingExceptions.findIndex(
+      (exception) =>
+        normalizedFile(file).endsWith(exception.file) &&
+        dictionaryViolationFingerprint(violation) === exception.mismatchSha256,
+    );
+    if (index === -1) return true;
+    remainingExceptions.splice(index, 1);
+    return false;
+  });
 }
 
 /** Count object literals that contain at least one statically declared locale object. */
@@ -233,6 +246,7 @@ function englishSubtrees(file: string, source: string): string[] {
 
 function isEnglishSurfaceFile(file: string): boolean {
   const normalized = normalizedFile(file);
+  if (normalized.endsWith('src/lib/zh-objective-guard-exceptions.json')) return false;
   if (/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(normalized) || normalized.includes('/cypress/')) {
     return false;
   }
@@ -330,15 +344,33 @@ function mathBlocks(raw: string): string[] {
   return [...raw.matchAll(/^\$\$\s*$[\s\S]*?^\$\$\s*$/gmu)].map((match) => match[0]);
 }
 
+interface JsonLdBlock extends TextSpan {
+  readonly json: string;
+}
+
+function jsonLdBlocks(raw: string): JsonLdBlock[] {
+  return [...raw.matchAll(/<JsonLd\b[^>]*>\s*\{\s*`(?<json>[\s\S]*?)`\s*\}\s*<\/JsonLd\s*>/gu)].map(
+    (match) => ({
+      start: match.index,
+      end: match.index + match[0].length,
+      text: match[0],
+      json: match.groups?.json.trim() ?? '',
+    }),
+  );
+}
+
 function withoutProtectedBlocks(raw: string): string {
   let cursor = 0;
   const pieces: string[] = [];
-  for (const span of fencedCodeSpans(raw)) {
+  const spans = [...fencedCodeSpans(raw), ...jsonLdBlocks(raw)].sort(
+    (left, right) => left.start - right.start,
+  );
+  for (const span of spans) {
     pieces.push(raw.slice(cursor, span.start), '\n');
     cursor = span.end;
   }
   pieces.push(raw.slice(cursor));
-  return pieces.join('').replaceAll(/<JsonLd>\{`[\s\S]*?`\}<\/JsonLd>/gu, '');
+  return pieces.join('');
 }
 
 function inlineCodeSpans(source: string): TextSpan[] {
@@ -383,8 +415,43 @@ function withoutSpans(source: string, spans: readonly TextSpan[]): string {
   return pieces.join('');
 }
 
+function mdxTagSpans(source: string): TextSpan[] {
+  const spans: TextSpan[] = [];
+  for (let start = 0; start < source.length; start += 1) {
+    if (source[start] !== '<' || !/[!/A-Za-z]/u.test(source[start + 1] ?? '')) continue;
+    let quote = '';
+    let escaped = false;
+    for (let index = start + 1; index < source.length; index += 1) {
+      const character = source[index];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (character === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (quote) {
+        if (character === quote) quote = '';
+        continue;
+      }
+      if (character === '"' || character === "'" || character === '`') {
+        quote = character;
+        continue;
+      }
+      if (character !== '>') continue;
+      const end = index + 1;
+      spans.push({ start, end, text: source.slice(start, end) });
+      start = index;
+      break;
+    }
+  }
+  return spans;
+}
+
 function inlineCode(raw: string): string[] {
-  return inlineCodeSpans(withoutProtectedBlocks(raw)).map((span) => span.text);
+  const source = withoutProtectedBlocks(raw);
+  return inlineCodeSpans(withoutSpans(source, mdxTagSpans(source))).map((span) => span.text);
 }
 
 function figureSources(raw: string): string[] {
@@ -409,13 +476,67 @@ function normalizeLocalizedLink(target: string): string {
   return target.replace(/^\/zh(?=\/|$)/u, '') || '/';
 }
 
+function markdownDestination(source: string, start: number, allowEof = false): string | null {
+  let index = start;
+  while (/[ \t\n\r]/u.test(source[index] ?? '')) index += 1;
+  if (source[index] === '<') {
+    let target = '';
+    for (index += 1; index < source.length; index += 1) {
+      if (source[index] === '\\' && index + 1 < source.length) {
+        target += source[index + 1];
+        index += 1;
+      } else if (source[index] === '>') {
+        return target;
+      } else if (source[index] === '\n' || source[index] === '\r') {
+        return null;
+      } else {
+        target += source[index];
+      }
+    }
+    return null;
+  }
+
+  const targetStart = index;
+  let depth = 0;
+  for (; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === '\\') {
+      index += 1;
+      continue;
+    }
+    if (character === '(') {
+      depth += 1;
+      continue;
+    }
+    if (character === ')') {
+      if (depth === 0) return source.slice(targetStart, index);
+      depth -= 1;
+      continue;
+    }
+    if (/\s/u.test(character) && depth === 0) return source.slice(targetStart, index);
+  }
+  return allowEof && depth === 0 ? source.slice(targetStart) : null;
+}
+
+function markdownLinkTargets(raw: string): string[] {
+  const targets: string[] = [];
+  for (let index = raw.indexOf(']('); index !== -1; index = raw.indexOf('](', index + 2)) {
+    const target = markdownDestination(raw, index + 2);
+    if (target !== null) targets.push(target);
+  }
+  for (const match of raw.matchAll(/^ {0,3}\[(?:\\.|[^\]\n])+\]:[ \t]*(?<destination>.*)$/gmu)) {
+    const destination = match.groups?.destination ?? '';
+    const target = markdownDestination(destination, 0, true);
+    if (target !== null) targets.push(target);
+  }
+  return targets;
+}
+
 function linkTargets(raw: string): string[] {
-  const markdown = [...raw.matchAll(/\]\((?<target>[^)\s]+)(?:\s+"[^"]*")?\)/gu)].map(
-    (match) => match.groups?.target ?? '',
-  );
+  const markdown = markdownLinkTargets(raw);
   const props = [
     ...raw.matchAll(
-      /\b(?:href|src)\s*=\s*(?:"(?<double>[^"]+)"|'(?<single>[^']+)'|\{\s*"(?<expressionDouble>[^"]+)"\s*\}|\{\s*'(?<expressionSingle>[^']+)'\s*\})/gu,
+      /\b(?:href|src)\s*=\s*(?:"(?<double>[^"]+)"|'(?<single>[^']+)'|\{\s*"(?<expressionDouble>[^"]+)"\s*\}|\{\s*'(?<expressionSingle>[^']+)'\s*\}|\{\s*`(?<expressionTemplate>[^`]+)`\s*\})/gu,
     ),
   ].map(
     (match) =>
@@ -423,6 +544,7 @@ function linkTargets(raw: string): string[] {
       match.groups?.single ??
       match.groups?.expressionDouble ??
       match.groups?.expressionSingle ??
+      match.groups?.expressionTemplate ??
       '',
   );
   return [...markdown, ...props].map(normalizeLocalizedLink);
@@ -430,11 +552,11 @@ function linkTargets(raw: string): string[] {
 
 function jsonLdValues(raw: string): unknown[] {
   const values: unknown[] = [];
-  for (const match of raw.matchAll(/<JsonLd>\{`(?<json>\{[\s\S]*?\})`\}<\/JsonLd>/gu)) {
+  for (const block of jsonLdBlocks(raw)) {
     try {
-      values.push(JSON.parse(match.groups?.json ?? ''));
+      values.push(JSON.parse(block.json));
     } catch {
-      values.push({ __invalidJsonLd: match.groups?.json ?? '' });
+      values.push({ __invalidJsonLd: block.json });
     }
   }
   return values;
@@ -448,10 +570,12 @@ function protectedTokens(raw: string): string[] {
   const withoutBlocks = withoutProtectedBlocks(raw);
   const prose = withoutSpans(withoutBlocks, inlineCodeSpans(withoutBlocks));
   const pattern =
-    /--[a-z0-9](?:[\w.-]*[a-z0-9])?(?:=[^\s,，。;；)）`]+)?|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:tokens?|tok)\/s(?:\/(?:user|gpu|GPU|chip))?\b|\b[KMGTPE]?FLOP\/s\b|\b(?:GPU|chip)\/(?:hr|hour)\b|\b(?:GB\/s|TB\/s|GB|TB|ms|µs|ns|kW|MW)\b|\$\/(?:M\s+(?:tok|tokens?)|(?:GPU|chip)[/-](?:hr|hour))/gu;
+    /--[a-z0-9](?:[\w.-]*[a-z0-9])?(?:=[^\s,，。;；)）`]+)?|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:tokens?|tok)\/(?:s|sec)(?:\/(?:user|gpu|GPU|chip))?\b|\b[KMGTPE]?FLOP\/s\b|\b[KMGT]?bit\/s\b|\b(?:kW|MW)\/(?:gpu|GPU)\b|\b(?:GPU|chip)\/(?:hr|hour)\b|\b(?:GB\/s|TB\/s|GB|TB|ms|µs|ns|kW|MW)\b|\$\d+(?:\.\d+)?\/M\b|\$\/(?:M\s+(?:tok|tokens?)|(?:GPU|chip)[/-](?:hr|hour))/gu;
   return [...prose.matchAll(pattern)].map((match) =>
     match[0]
       .replace(/^tokens?(?=\/s)/u, 'tok')
+      .replace(/^tokens?(?=\/sec)/u, 'tok')
+      .replace('/sec', '/s')
       .replace('/GPU', '/gpu')
       .replace(/GPU\/(?:hr|hour)/u, 'gpu/hr')
       .replace(/chip[/-](?:hr|hour)/u, 'chip/hr')
@@ -473,18 +597,19 @@ function jsonShape(value: unknown): unknown {
 
 function protectedJsonValues(value: unknown): string[] {
   const found: string[] = [];
-  const visit = (item: unknown, key = ''): void => {
+  const visit = (item: unknown, valuePath = '$'): void => {
     if (Array.isArray(item)) {
-      item.forEach((child) => visit(child, key));
+      item.forEach((child, index) => visit(child, `${valuePath}[${index}]`));
     } else if (item && typeof item === 'object') {
-      Object.entries(item).forEach(([childKey, child]) => visit(child, childKey));
+      Object.entries(item).forEach(([childKey, child]) => visit(child, `${valuePath}.${childKey}`));
     } else if (typeof item === 'number' || typeof item === 'boolean') {
-      found.push(`${key}:${JSON.stringify(item)}`);
+      found.push(`${valuePath}:${JSON.stringify(item)}`);
     } else if (typeof item === 'string') {
-      if (key === '@type') found.push(`${key}:${item}`);
-      else if (/^https?:\/\//u.test(item)) found.push(`${key}:${normalizeLocalizedLink(item)}`);
-      else if (/^(?:\d{4}-\d{2}-\d{2}|--[a-z0-9-]+|[A-Z][A-Z0-9_]{2,})$/u.test(item)) {
-        found.push(`${key}:${item}`);
+      if (valuePath.endsWith('.@type')) found.push(`${valuePath}:${item}`);
+      else if (/^https?:\/\//u.test(item)) {
+        found.push(`${valuePath}:${normalizeLocalizedLink(item)}`);
+      } else if (/^(?:\d{4}-\d{2}-\d{2}|--[a-z0-9-]+|[A-Z][A-Z0-9_]{2,})$/u.test(item)) {
+        found.push(`${valuePath}:${item}`);
       }
     }
   };
@@ -504,14 +629,27 @@ function addDifference(
   }
 }
 
+function blogPairSha256(en: string, zh: string): string {
+  return createHash('sha256').update(JSON.stringify({ en, zh })).digest('hex');
+}
+
 function applyBlogExceptions(
   rule: BlogGuardException['rule'],
   file: string,
   enValues: string[],
   zhValues: string[],
   exceptions: readonly BlogGuardException[],
+  pairSha256?: string,
 ): void {
-  for (const exception of exceptions.filter((item) => item.file === file && item.rule === rule)) {
+  const protectedPairAuthorized =
+    rule !== 'protected-token' ||
+    exceptions.some(
+      (item) =>
+        item.file === file && item.rule === 'protected-token' && item.pairSha256 === pairSha256,
+    );
+  for (const exception of exceptions.filter(
+    (item) => item.file === file && item.rule === rule && protectedPairAuthorized,
+  )) {
     const enIndex = exception.en === '' ? -1 : enValues.indexOf(exception.en);
     const zhIndex = exception.zh === '' ? -1 : zhValues.indexOf(exception.zh);
     const enMatched = exception.en === '' || enIndex !== -1;
@@ -540,7 +678,14 @@ export function compareBlogPair(
   if (!multisetsEqual(enInline, zhInline)) violations.push({ rule: 'inline-code', file });
   const enProtected = protectedTokens(en);
   const zhProtected = protectedTokens(zh);
-  applyBlogExceptions('protected-token', file, enProtected, zhProtected, exceptions);
+  applyBlogExceptions(
+    'protected-token',
+    file,
+    enProtected,
+    zhProtected,
+    exceptions,
+    blogPairSha256(en, zh),
+  );
   if (!multisetsEqual(enProtected, zhProtected)) {
     violations.push({
       rule: 'protected-token',
