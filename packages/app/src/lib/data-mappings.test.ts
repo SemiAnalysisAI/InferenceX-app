@@ -277,7 +277,7 @@ describe('getModelLabel', () => {
     expect(getModelLabel(Model.Qwen3_5)).toBe('Qwen3.5 397B');
     expect(getModelLabel(Model.Kimi_K2_5)).toBe('Kimi K2.5/2.6/2.7-Code 1T');
     expect(getModelLabel(Model.GLM_5)).toBe('GLM5/5.1 744B');
-    expect(getModelLabel(Model.GLM_5_2)).toBe('GLM5.2/GLM5.3');
+    expect(getModelLabel(Model.GLM_5_2)).toBe('GLM5.2/GLM5.3 744B');
     expect(getModelLabel(Model.MiniMax_M2_5)).toBe('MiniMax M2.5/2.7 230B');
   });
 
