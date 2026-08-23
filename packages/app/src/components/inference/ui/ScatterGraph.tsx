@@ -123,6 +123,7 @@ import {
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
+import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
 import { pointLabelText } from './point-label';
 import {
   type ParetoPointLabel,
@@ -1206,15 +1207,15 @@ const ScatterGraph = React.memo(
           ? (d3.extent(visiblePoints, (d) => d.x) as [number, number])
           : ([0, 100] as [number, number]));
 
-      let useLog = false;
-      if (isInputTputMetric) {
-        const isTTFT =
-          xLabel.toLowerCase().includes('time to first token') ||
-          xLabel.toLowerCase().includes('ttft');
-        if (scaleType === 'log') useLog = ext[0] > 0;
-        else if (scaleType === 'linear') useLog = false;
-        else useLog = isTTFT && ext[0] > 0 && ext[1] / ext[0] > 10;
-      }
+      // `chartDefinition.x` is the resolved data field shared by the live chart
+      // and Replay. Unlike `xLabel`, its identity is stable across locales.
+      const useLog =
+        resolveScatterXAxisScale({
+          extent: ext,
+          selectedYAxisMetric,
+          xAxisField: chartDefinition.x,
+          scaleType,
+        }) === 'log';
 
       const domain: [number, number] = useLog ? [ext[0] * 0.9, ext[1] * 1.05] : [0, ext[1] * 1.05];
       return {
@@ -1223,7 +1224,14 @@ const ScatterGraph = React.memo(
         nice: niceAxes,
         _isLog: useLog,
       };
-    }, [visiblePoints, isInputTputMetric, xLabel, scaleType, niceAxes, xExtentOverride]);
+    }, [
+      visiblePoints,
+      selectedYAxisMetric,
+      chartDefinition.x,
+      scaleType,
+      niceAxes,
+      xExtentOverride,
+    ]);
     const xScaleConfig = useStableValue(xScaleConfigRaw, isSameScaleConfig);
 
     const yScaleConfigRaw = useMemo(() => {
