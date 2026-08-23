@@ -20,6 +20,8 @@ import {
   AGENTIC_COACH_MARK_STORAGE_KEY,
   AGENTIC_POINT_ACTION_SELECTOR,
   SCATTER_RENDERED_EVENT,
+  getAgenticPointAnchorMutationRoot,
+  getAgenticPointAnchorRect,
   resolveAgenticPointAnchor,
 } from '@/lib/nudges/agentic-point-coach-mark';
 import { LANDING_BANNER_STORAGE_KEY } from '@/lib/nudges/landing-banner';
@@ -304,6 +306,8 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       testId: 'agentic-point-coach-mark',
       anchor: {
         resolve: resolveAgenticPointAnchor,
+        getRect: getAgenticPointAnchorRect,
+        getMutationRoot: getAgenticPointAnchorMutationRoot,
         actionSelector: AGENTIC_POINT_ACTION_SELECTOR,
       },
     },

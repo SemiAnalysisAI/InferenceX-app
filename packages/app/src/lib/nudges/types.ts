@@ -68,6 +68,17 @@ export interface NudgeAnchor {
    */
   resolve: () => Element | null;
   /**
+   * Measure and validate a previously resolved anchor. Returning `null` tells
+   * the coach mark to discard it and run the full resolver again. Supplying
+   * this enables anchor reuse during high-frequency geometry updates.
+   */
+  getRect?: (element: Element) => DOMRect | null;
+  /**
+   * Narrow mutation observation to the live surface that owns the anchor.
+   * Defaults to `document.body` for anchors without a stable local root.
+   */
+  getMutationRoot?: (element: Element | null) => Node | null;
+  /**
    * Clicking an element matching this selector counts as taking the nudge's
    * action: the user found the affordance, so record engagement and stop
    * showing it.

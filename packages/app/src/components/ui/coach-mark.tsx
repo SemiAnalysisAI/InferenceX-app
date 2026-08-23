@@ -70,9 +70,12 @@ export function CoachMark({
   const locale = useLocale();
   const strings = STRINGS[locale];
   const cardRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<Element | null>(null);
   const [placement, setPlacement] = useState<CoachMarkPlacement | null>(null);
 
   const resolve = anchor.resolve;
+  const getRect = anchor.getRect;
+  const getMutationRoot = anchor.getMutationRoot;
   const repositionEvents = anchor.repositionEvents;
   const actionSelector = anchor.actionSelector;
 
@@ -83,13 +86,21 @@ export function CoachMark({
     const measure = () => {
       frame = 0;
       const card = cardRef.current;
-      const element = resolve();
-      if (!card || !element) {
+      if (!card) return;
+
+      let element = getRect && anchorRef.current?.isConnected ? anchorRef.current : null;
+      let rect = element && getRect ? getRect(element) : null;
+      if (!element || !rect) {
+        element = resolve();
+        rect = element ? (getRect?.(element) ?? element.getBoundingClientRect()) : null;
+      }
+      anchorRef.current = element && rect ? element : null;
+
+      if (!element || !rect) {
         setPlacement((prev) => (prev === null ? prev : null));
         return;
       }
       const viewport = viewportSize();
-      const rect = element.getBoundingClientRect();
       if (!isAnchorOnScreen(rect, viewport)) {
         setPlacement((prev) => (prev === null ? prev : null));
         return;
@@ -115,13 +126,29 @@ export function CoachMark({
     window.addEventListener('scroll', schedule, { capture: true, passive: true });
     for (const event of repositionEvents ?? []) window.addEventListener(event, schedule);
 
-    // d3 zoom/pan rewrites `transform` on the zoom group and on every point;
-    // re-renders replace the point nodes outright. Watching both, throttled to
-    // one recompute per frame, keeps the pointer glued to its point.
-    const observer = new MutationObserver(schedule);
-    observer.observe(document.body, {
+    // D3 coordinate transitions rewrite `transform` on every point each
+    // frame. Keep the selected anchor for those mutations and validate just
+    // that point. Structural, visibility, and trace-availability changes can
+    // change which point is eligible, so they invalidate the cached choice.
+    const observer = new MutationObserver((records) => {
+      if (
+        records.some(
+          (record) => record.type === 'childList' || record.attributeName !== 'transform',
+        )
+      ) {
+        anchorRef.current = null;
+      }
+      schedule();
+    });
+    observer.observe(getMutationRoot?.(anchorRef.current) ?? document.body, {
       attributes: true,
-      attributeFilter: ['transform', 'style', 'data-has-trace', 'data-benchmark-type'],
+      attributeFilter: [
+        'transform',
+        'style',
+        'data-has-trace',
+        'data-trace-availability',
+        'data-benchmark-type',
+      ],
       childList: true,
       subtree: true,
     });
@@ -133,7 +160,7 @@ export function CoachMark({
       window.removeEventListener('scroll', schedule, { capture: true });
       for (const event of repositionEvents ?? []) window.removeEventListener(event, schedule);
     };
-  }, [resolve, repositionEvents]);
+  }, [resolve, getRect, getMutationRoot, repositionEvents]);
 
   /**
    * Whether the callout is actually on screen. The card stays mounted while

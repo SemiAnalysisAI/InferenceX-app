@@ -28,10 +28,10 @@ function stubRect(element: Element, left: number, top: number, size = 12): void 
 }
 
 /** A point the resolver can find, mid-viewport so it passes the on-screen check. */
-function addPoint(): HTMLElement {
+function addPoint(parent: ParentNode = document.body): HTMLElement {
   const point = document.createElement('div');
   point.className = 'dot-group';
-  document.body.append(point);
+  parent.append(point);
   stubRect(point, 500, 300);
   return point;
 }
@@ -170,5 +170,70 @@ describe('CoachMark input handling', () => {
 
     pressEscape();
     expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CoachMark anchor reuse', () => {
+  it('reuses one resolved anchor across scoped transform mutations', async () => {
+    const chart = document.createElement('div');
+    document.body.append(chart);
+    const point = addPoint(chart);
+    const resolve = vi.fn(() => point);
+    const getRect = vi.fn((element: Element) => element.getBoundingClientRect());
+
+    renderCoachMark({
+      resolve,
+      getRect,
+      getMutationRoot: () => chart,
+      actionSelector: ACTION_SELECTOR,
+    });
+    expect(resolve).toHaveBeenCalledTimes(1);
+    expect(getRect).toHaveBeenCalledTimes(1);
+
+    const outside = document.createElement('div');
+    document.body.append(outside);
+    outside.setAttribute('transform', 'translate(1,1)');
+    await flushReposition();
+    expect(getRect, 'outside mutation ignored').toHaveBeenCalledTimes(1);
+
+    for (let index = 0; index < 20; index++) {
+      point.setAttribute('transform', `translate(${index},${index})`);
+    }
+    await flushReposition();
+
+    expect(resolve, 'full resolver stays cached').toHaveBeenCalledTimes(1);
+    expect(getRect, 'one cached measurement for the frame').toHaveBeenCalledTimes(2);
+  });
+
+  it('resolves a replacement when the cached anchor becomes unusable', async () => {
+    const chart = document.createElement('div');
+    document.body.append(chart);
+    const first = addPoint(chart);
+    const second = addPoint(chart);
+    stubRect(second, 700, 400);
+    let current = first;
+    let firstUsable = true;
+    const resolve = vi.fn(() => current);
+    const getRect = vi.fn((element: Element) =>
+      element === first && !firstUsable ? null : element.getBoundingClientRect(),
+    );
+
+    renderCoachMark({
+      resolve,
+      getRect,
+      getMutationRoot: () => chart,
+      actionSelector: ACTION_SELECTOR,
+    });
+    expect(resolve).toHaveBeenCalledTimes(1);
+
+    current = second;
+    firstUsable = false;
+    first.setAttribute('transform', 'translate(1,1)');
+    await flushReposition();
+
+    expect(resolve).toHaveBeenCalledTimes(2);
+    expect(container.querySelector('[data-testid="coach-mark-target"]')?.getAttribute('cx')).toBe(
+      '706',
+    );
   });
 });

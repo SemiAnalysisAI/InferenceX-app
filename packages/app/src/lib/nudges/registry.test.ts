@@ -134,6 +134,8 @@ describe('NUDGE_REGISTRY integrity', () => {
     expect(coachMark?.storageKey).toBe(AGENTIC_COACH_MARK_STORAGE_KEY);
     expect(dismissesOnAction(coachMark!)).toBe(true);
     expect(coachMark?.content.anchor?.actionSelector).toBe(AGENTIC_POINT_ACTION_SELECTOR);
+    expect(typeof coachMark?.content.anchor?.getRect).toBe('function');
+    expect(typeof coachMark?.content.anchor?.getMutationRoot).toBe('function');
     expect(AGENTIC_COACH_MARK_STORAGE_KEY).toBe('inferencex-agentic-point-coach-mark-dismissed');
   });
 

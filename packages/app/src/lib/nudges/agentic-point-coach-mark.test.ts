@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AGENTIC_POINT_ACTION_SELECTOR,
   AGENTIC_POINT_SELECTOR,
+  getAgenticPointAnchorMutationRoot,
+  getAgenticPointAnchorRect,
   resolveAgenticPointAnchor,
 } from './agentic-point-coach-mark';
 
@@ -102,7 +104,8 @@ function appendChartSvg(chart: Element, spec: ChartSvgSpec): void {
  * resolver can work out the clip region.
  */
 function renderChart(points: PointSpec[], svgSpec?: ChartSvgSpec): Element[] {
-  document.body.innerHTML = '<div data-testid="scatter-graph"></div>';
+  document.body.innerHTML =
+    '<div data-coach-mark-root><div data-testid="scatter-graph"></div></div>';
   const chart = document.querySelector('[data-testid="scatter-graph"]')!;
   stubBox(chart, 0, 0, 1000, 600);
   if (svgSpec) appendChartSvg(chart, svgSpec);
@@ -331,5 +334,38 @@ describe('resolveAgenticPointAnchor', () => {
       { left: 400, top: 4000 },
     ]);
     expect(resolveAgenticPointAnchor()).toBeNull();
+  });
+
+  it('validates a cached marker without measuring sibling points', () => {
+    const [first, selected, last] = renderChart([
+      { left: 100, top: 100, withShape: true },
+      { left: 480, top: 280, withShape: true },
+      { left: 900, top: 500, withShape: true },
+    ]);
+    const anchor = resolveAgenticPointAnchor();
+    expect(anchor).toBe(selected.querySelector('.visible-shape'));
+    const firstMeasure = vi.spyOn(first, 'getBoundingClientRect');
+    const lastMeasure = vi.spyOn(last, 'getBoundingClientRect');
+
+    expect(getAgenticPointAnchorRect(anchor!)).not.toBeNull();
+    expect(firstMeasure, 'first sibling skipped').not.toHaveBeenCalled();
+    expect(lastMeasure, 'last sibling skipped').not.toHaveBeenCalled();
+  });
+
+  it('rejects a cached marker after its point becomes hidden', () => {
+    const [group] = renderChart([{ left: 480, top: 280, withShape: true }]);
+    const anchor = resolveAgenticPointAnchor();
+    expect(anchor).not.toBeNull();
+
+    group.setAttribute('style', 'opacity: 0');
+    expect(getAgenticPointAnchorRect(anchor!)).toBeNull();
+  });
+
+  it('scopes mutation observation to the stable chart surface', () => {
+    const [group] = renderChart([{ left: 480, top: 280, withShape: true }], CHART_SVG);
+    const chartRoot = document.querySelector('[data-coach-mark-root]')!;
+    const anchor = group.querySelector('.visible-shape');
+
+    expect(getAgenticPointAnchorMutationRoot(anchor)).toBe(chartRoot);
   });
 });

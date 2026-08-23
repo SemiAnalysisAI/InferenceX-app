@@ -35,8 +35,11 @@ export const SCATTER_RENDERED_EVENT = 'inferencex:scatter-chart-rendered';
  *    tooltip has no "View charts" link (overlay runs have no stored trace), so
  *    pointing at one would teach a dead end.
  */
-export const AGENTIC_POINT_SELECTOR =
-  '[data-testid="scatter-graph"] .dot-group[data-benchmark-type="agentic_traces"]';
+const SCATTER_GRAPH_SELECTOR = '[data-testid="scatter-graph"]';
+const COACH_MARK_ROOT_SELECTOR = '[data-coach-mark-root]';
+const AGENTIC_POINT_GROUP_SELECTOR = '.dot-group[data-benchmark-type="agentic_traces"]';
+
+export const AGENTIC_POINT_SELECTOR = `${SCATTER_GRAPH_SELECTOR} ${AGENTIC_POINT_GROUP_SELECTOR}`;
 
 /**
  * Clicking any scatter point — official or overlay — means the user found the
@@ -51,6 +54,55 @@ function isRendered(element: Element): boolean {
   // not anchor candidates either.
   const style = getComputedStyle(element);
   return style.opacity !== '0' && style.pointerEvents !== 'none' && style.visibility !== 'hidden';
+}
+
+function agenticPointGroup(element: Element): SVGGElement | null {
+  const group = element.matches(AGENTIC_POINT_GROUP_SELECTOR)
+    ? element
+    : element.closest(AGENTIC_POINT_GROUP_SELECTOR);
+  return group as SVGGElement | null;
+}
+
+function canOpenTrace(group: SVGGElement): boolean {
+  return group.dataset.hasTrace === 'true' || group.dataset.traceAvailability !== 'resolved';
+}
+
+/**
+ * Validate one previously selected point without rescanning every series.
+ *
+ * D3 coordinate transitions mutate every point's `transform` each frame. The
+ * coach mark can keep following its chosen point while this stays non-null;
+ * filtering, clipping, or resolved-empty trace availability invalidates it and
+ * sends the caller back through `resolveAgenticPointAnchor`.
+ */
+export function getAgenticPointAnchorRect(element: Element): DOMRect | null {
+  if (typeof document === 'undefined') return null;
+  const group = agenticPointGroup(element);
+  const chart = group?.closest<HTMLElement>(SCATTER_GRAPH_SELECTOR);
+  if (!group || !chart || !isRendered(group) || !canOpenTrace(group)) return null;
+
+  const viewport = viewportSize();
+  const rect = element.getBoundingClientRect();
+  if (!isAnchorOnScreen(rect, viewport)) return null;
+
+  const svg = chart.querySelector('[data-testid="d3-chart-svg"]');
+  const plot =
+    (svg && plotBounds(svg)) ?? svg?.getBoundingClientRect() ?? chart.getBoundingClientRect();
+  return isAnchorWithin(rect, plot) ? rect : null;
+}
+
+/**
+ * Observe the stable chart owner so point mutations are local, while replacing
+ * the chart itself still invalidates the cached anchor.
+ */
+export function getAgenticPointAnchorMutationRoot(element: Element | null): Node | null {
+  if (typeof document === 'undefined') return null;
+  return (
+    element?.closest(COACH_MARK_ROOT_SELECTOR) ??
+    element?.closest(SCATTER_GRAPH_SELECTOR) ??
+    document.querySelector(COACH_MARK_ROOT_SELECTOR) ??
+    document.querySelector(SCATTER_GRAPH_SELECTOR)
+  );
 }
 
 /**
@@ -93,9 +145,7 @@ export function resolveAgenticPointAnchor(): Element | null {
     const svg = chart.querySelector('[data-testid="d3-chart-svg"]');
     const plot = (svg && plotBounds(svg)) ?? svg?.getBoundingClientRect() ?? chartRect;
 
-    for (const element of chart.querySelectorAll<SVGGElement>(
-      '.dot-group[data-benchmark-type="agentic_traces"]',
-    )) {
+    for (const element of chart.querySelectorAll<SVGGElement>(AGENTIC_POINT_GROUP_SELECTOR)) {
       if (!isRendered(element)) continue;
       const rect = element.getBoundingClientRect();
       if (!isAnchorOnScreen(rect, viewport)) continue;
