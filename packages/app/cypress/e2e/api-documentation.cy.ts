@@ -81,18 +81,21 @@ describe('API documentation', () => {
   });
 
   for (const [path, width] of [
+    ['/api', 1440],
     ['/api', 375],
     ['/zh/api', 390],
   ] as const) {
-    it(`keeps wide API data reachable without page overflow at ${path} on ${width}px`, () => {
+    it(`contains wide schema notes without page overflow at ${path} on ${width}px`, () => {
       cy.viewport(width, 844);
       cy.visit(path);
-      cy.get('[data-testid="api-endpoint-list-benchmarks"] summary').click();
-      cy.get('[data-testid="api-endpoint-list-benchmarks"] .overflow-x-auto')
-        .first()
-        .should('be.visible')
-        .then(($scroller) => {
-          expect($scroller[0].scrollWidth).to.be.greaterThan($scroller[0].clientWidth);
+      cy.get('[data-testid="api-schema-note"]').first().as('schemaNote').should('be.visible');
+      cy.get('@schemaNote').should('have.css', 'min-width', '0px');
+      cy.get('@schemaNote')
+        .find('.overflow-x-auto')
+        .then(($scrollers) => {
+          expect(
+            [...$scrollers].some((scroller) => scroller.scrollWidth > scroller.clientWidth),
+          ).to.equal(true);
         });
       cy.document().then((document) => {
         expect(document.documentElement.scrollWidth).to.be.at.most(

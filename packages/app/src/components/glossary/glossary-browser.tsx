@@ -252,6 +252,8 @@ export function GlossaryBrowser({
                     <Link
                       key={entry.slug}
                       href={`${basePath}/${entry.slug}`}
+                      data-testid="glossary-entry-link"
+                      data-glossary-slug={entry.slug}
                       className="group grid gap-3 px-5 py-6 transition-colors hover:bg-brand/5 md:grid-cols-[minmax(12rem,0.7fr)_minmax(0,1.3fr)_auto] md:items-start md:gap-8 md:px-8"
                     >
                       <div>

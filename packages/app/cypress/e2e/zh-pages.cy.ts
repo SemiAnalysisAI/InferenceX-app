@@ -1,3 +1,59 @@
+const GLOSSARY_SITE_URL = 'https://inferencex.semianalysis.com';
+const GLOSSARY_ENTRY_COUNT = 54;
+
+const GLOSSARY_JOURNEY_MATRIX = [
+  { basePath: '/glossary', detailPrefix: '/glossary/', alternateLocale: 'zh-CN', width: 1440 },
+  { basePath: '/glossary', detailPrefix: '/glossary/', alternateLocale: 'zh-CN', width: 375 },
+  {
+    basePath: '/zh/glossary',
+    detailPrefix: '/zh/glossary/',
+    alternateLocale: 'en',
+    width: 1440,
+  },
+  {
+    basePath: '/zh/glossary',
+    detailPrefix: '/zh/glossary/',
+    alternateLocale: 'en',
+    width: 390,
+  },
+] as const;
+
+function exerciseEveryGlossaryJourney({
+  basePath,
+  detailPrefix,
+  alternateLocale,
+  width,
+}: (typeof GLOSSARY_JOURNEY_MATRIX)[number]) {
+  cy.viewport(width, 900);
+  cy.visit(basePath);
+  cy.get('[data-testid="glossary-entry-link"]')
+    .should('have.length', GLOSSARY_ENTRY_COUNT)
+    .then(($links) => {
+      const hrefs = [...$links].map((link) => link.getAttribute('href'));
+      expect(hrefs.every((href): href is string => Boolean(href))).to.equal(true);
+      expect(new Set(hrefs).size).to.equal(GLOSSARY_ENTRY_COUNT);
+      expect(hrefs.every((href) => href?.startsWith(detailPrefix))).to.equal(true);
+
+      for (const href of hrefs as string[]) {
+        const slug = href.slice(detailPrefix.length);
+        const alternatePath = alternateLocale === 'zh-CN' ? `/zh${href}` : href.replace('/zh', '');
+        cy.get(`[data-testid="glossary-entry-link"][data-glossary-slug="${slug}"]`).click();
+        cy.location('pathname').should('eq', href);
+        cy.get('[data-testid="glossary-detail-page"]')
+          .should('be.visible')
+          .and('have.attr', 'data-glossary-slug', slug);
+        cy.get(`link[rel="alternate"][hreflang="${alternateLocale}"]`).should(
+          'have.attr',
+          'href',
+          `${GLOSSARY_SITE_URL}${alternatePath}`,
+        );
+        cy.go('back');
+        cy.location('pathname').should('eq', basePath);
+        cy.get(`[data-testid="glossary-entry-link"][data-glossary-slug="${slug}"]`).should('exist');
+      }
+    });
+}
+
 describe('Chinese (/zh) pages', () => {
   describe('zh landing page', () => {
     before(() => {
@@ -156,6 +212,12 @@ describe('Chinese (/zh) pages', () => {
   });
 
   describe('Glossary pages', () => {
+    for (const scenario of GLOSSARY_JOURNEY_MATRIX) {
+      it(`opens every ${scenario.basePath} term from the index at ${scenario.width}px`, () => {
+        exerciseEveryGlossaryJourney(scenario);
+      });
+    }
+
     it('supports search, category filtering, empty recovery, and a Chinese term click path', () => {
       cy.viewport(1440, 900);
       cy.visit('/zh/glossary');

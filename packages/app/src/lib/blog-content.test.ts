@@ -21,6 +21,10 @@ const enFiles = fs
   .readdirSync(CONTENT_DIR)
   .filter((f) => f.endsWith('.mdx'))
   .toSorted();
+const zhFiles = fs
+  .readdirSync(ZH_DIR)
+  .filter((f) => f.endsWith('.mdx'))
+  .toSorted();
 
 const read = (file: string) => fs.readFileSync(file, 'utf8');
 
@@ -33,16 +37,27 @@ function frontmatterField(raw: string, field: string): string | null {
 
 function tagList(raw: string): string[] {
   const fm = raw.split('---')[1] ?? '';
-  const after = fm.split(/^tags:\s*$/mu)[1];
-  if (!after) return [];
-  const tags: string[] = [];
-  for (const line of after.split('\n')) {
-    const item = /^\s+-\s+(?<tag>.*)$/u.exec(line);
-    if (!item) break;
-    tags.push(item.groups!.tag.trim());
-  }
-  return tags;
+  const match = /^tags:\s*\n(?<items>(?:[ \t]+-[^\n]*(?:\n|$))+)/mu.exec(fm);
+  if (!match?.groups) return [];
+  return [...match.groups.items.matchAll(/^\s+-\s+(?<tag>.*)$/gmu)].map((item) =>
+    item.groups!.tag.trim(),
+  );
 }
+
+describe('frontmatter tag parsing', () => {
+  it('reads every item from a multiline tags field before the next frontmatter key', () => {
+    const frontmatter = `---
+title: Example
+tags:
+  - benchmark
+  - cann
+publishDate: '2026-08-23'
+---
+`;
+
+    expect(tagList(frontmatter)).toEqual(['benchmark', 'cann']);
+  });
+});
 
 /** Local `<Figure src="/images/...">` and markdown `![alt](/images/...)` references. */
 function localImageRefs(raw: string): string[] {
@@ -64,8 +79,9 @@ function inlineCodeSpans(raw: string): string[] {
   );
 }
 
-it('finds English posts to check', () => {
-  expect(enFiles.length).toBeGreaterThan(0);
+it('checks all 19 current locale pairs in both directions', () => {
+  expect(enFiles).toHaveLength(19);
+  expect(zhFiles).toEqual(enFiles);
 });
 
 describe.each(enFiles)('%s', (file) => {

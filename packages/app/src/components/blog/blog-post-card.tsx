@@ -17,6 +17,8 @@ export function BlogPostCard({ slug, title, basePath = '/blog', children }: Blog
   return (
     <Link
       href={`${basePath}/${slug}`}
+      data-testid="blog-post-card"
+      data-blog-slug={slug}
       className="group relative block rounded-xl border border-border bg-background/20 backdrop-blur-[2px] p-4 md:p-8 transition-all duration-200 hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5 hover:scale-[1.01]"
       onClick={() => track('blog_post_clicked', { slug, title })}
     >

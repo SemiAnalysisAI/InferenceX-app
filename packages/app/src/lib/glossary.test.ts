@@ -139,6 +139,12 @@ describe('Chinese glossary content', () => {
   it('preserves the source scope in audited Chinese definitions', () => {
     expect(getZhGlossaryEntry('ai-inference')?.explanation).not.toContain('相差数倍');
     expect(getZhGlossaryEntry('cost-per-million-tokens')?.significance).toContain('低吞吐量');
+    expect(getZhGlossaryEntry('total-cost-of-ownership')?.benchmarkContext).toContain(
+      '软件实现及工作负载特征',
+    );
+    expect(getZhGlossaryEntry('total-cost-of-ownership')?.benchmarkContext).not.toContain(
+      '软硬件行为',
+    );
     expect(getZhGlossaryEntry('sglang')?.benchmarkContext).toContain('回归或提升');
   });
 });

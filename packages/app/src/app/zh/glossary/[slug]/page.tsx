@@ -123,7 +123,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
   };
 
   return (
-    <main className="relative">
+    <main data-testid="glossary-detail-page" data-glossary-slug={entry.slug} className="relative">
       <JsonLd data={jsonLd} />
       <div className="container mx-auto px-4 lg:px-8">
         <article className="mx-auto max-w-5xl">

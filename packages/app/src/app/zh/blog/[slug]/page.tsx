@@ -88,7 +88,7 @@ export default async function ZhBlogPostPage({ params }: Props) {
   const breadcrumbJsonLd = buildBlogBreadcrumbJsonLdZh(slug, meta.title);
 
   return (
-    <main className="relative">
+    <main data-testid="blog-post-page" data-blog-slug={slug} className="relative">
       <HashScroll />
       <ReadingProgressBar slug={slug} />
       <JsonLd data={jsonLd} />

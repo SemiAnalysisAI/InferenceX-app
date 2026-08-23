@@ -304,7 +304,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'TCO 比标价更适合跨系统经济性比较，尤其是网络与电力基础设施不同的机架级产品；但它仍是模型，必须连同假设一起阅读。',
     benchmarkContext:
-      'InferenceX 将 SemiAnalysis AI Cloud TCO 输入与实测 tok/s/chip 结合，从而区分每小时系统成本和决定该小时 token 产出的软硬件行为。',
+      'InferenceX 将 SemiAnalysis AI Cloud 的 TCO 输入与实测 tok/s/chip 结合，从而把系统每小时成本与决定这一小时 token 产出的软件实现及工作负载特征分开考察。',
   },
   'tokens-per-megawatt': {
     term: '每兆瓦 token 吞吐量',
