@@ -4,6 +4,27 @@ import {
 } from '../support/overlay-fixtures';
 import { unlockAgenticGate } from '../support/e2e';
 
+type CsvCaptureWindow = Cypress.AUTWindow & {
+  __capturedLifecycleCsvBlob?: Blob;
+};
+
+function captureLifecycleCsvDownloads(win: Cypress.AUTWindow): void {
+  const captureWindow = win as CsvCaptureWindow;
+  win.URL.createObjectURL = (object: Blob | MediaSource) => {
+    if (object instanceof win.Blob) captureWindow.__capturedLifecycleCsvBlob = object;
+    return 'blob:calculator-lifecycle-csv-test';
+  };
+  win.HTMLAnchorElement.prototype.click = () => {};
+}
+
+function readCapturedLifecycleCsv(): Cypress.Chainable<string> {
+  return cy.window().then((win) => {
+    const blob = (win as CsvCaptureWindow).__capturedLifecycleCsvBlob;
+    expect(blob, 'captured lifecycle CSV Blob').to.be.instanceOf(win.Blob);
+    return blob!.text();
+  });
+}
+
 // Fleet Lifecycle section on /calculator. The distinguishing behaviours, all
 // worth locking down:
 //  - it reads the FULL run history, so a row's operating point can come from an
@@ -751,6 +772,51 @@ describe('Calculator — Fleet Lifecycle', () => {
     cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
     // The one control that must never vanish with the body it gates.
     cy.get('[data-testid="calc-fleet-mw-input"]').should('be.visible');
+  });
+});
+
+describe('Calculator — legacy lifecycle share links', () => {
+  before(() => {
+    const rows = agenticB300Rows(null);
+    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability });
+    cy.intercept('GET', '/api/v1/benchmarks/history*', { body: rows }).as('legacyPriceHistory');
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: rows }).as('legacyPriceBenchmarks');
+    cy.visit(
+      '/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&c_mw=10&c_price=7',
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+          unlockAgenticGate(win);
+        },
+      },
+    );
+    cy.wait('@legacyPriceBenchmarks');
+    cy.wait('@legacyPriceHistory');
+    cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
+  });
+
+  it('preserves c_price and derives a non-zero output price', () => {
+    cy.get('[data-testid="calc-lifecycle-price-input"]').should('have.value', '7');
+    cy.get('[data-testid="calc-lifecycle-output-price-input"]')
+      .invoke('val')
+      .should((output) => {
+        expect(Number(output)).to.equal(28);
+      });
+  });
+
+  it('exports the physical fleet sizing alongside its economics', () => {
+    showTable();
+    cy.window().then(captureLifecycleCsvDownloads);
+    exportMenu().click();
+    cy.get('[data-testid="export-csv-button"]').click();
+
+    readCapturedLifecycleCsv().then((csv) => {
+      const header = csv.split('\n').find((line) => line.startsWith('Chip,'));
+      expect(header, 'lifecycle CSV header').to.equal(
+        'Chip,Config Now,First Run,Latest Best,Improvements,Gain,Chips,tok/s/MW now,Concurrent Users now,Revenue $/day,Cost $/day,Margin $/day,Payback,Cumulative Margin,Availability',
+      );
+    });
   });
 });
 

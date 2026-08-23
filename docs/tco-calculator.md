@@ -674,7 +674,10 @@ Cached input tokens are discounted into the input stream before pricing (see
 below), so the input price is the fresh-token price.
 
 `c_price` is the input price — unchanged, so a link written before the split
-still seeds the field it always seeded — and `c_oprice` the output price.
+still seeds the field it always seeded — and `c_oprice` the output price. When a
+legacy link has `c_price` alone, the missing output price is derived at the
+default 4x ratio without overwriting the explicit input price; the symmetric
+rule completes a manually authored output-only link.
 
 ### The disaggregated token-split trap
 

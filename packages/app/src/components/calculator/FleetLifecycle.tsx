@@ -367,6 +367,34 @@ function parseNonNegative(raw: string): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
+/**
+ * Resolve the two-field price seed from a share link.
+ *
+ * `c_price` predates the input/output split, so an old link supplies only the
+ * input side. Preserve that explicit value and derive its missing peer at the
+ * default ratio; otherwise marking the pair as URL-owned leaves output blank and
+ * silently bills every output token at $0. The symmetric case makes a manually
+ * authored output-only link complete for the same reason.
+ */
+function initialPriceInputs(params: ReturnType<typeof readUrlParams>): {
+  input: string;
+  output: string;
+  edited: boolean;
+} {
+  let input = params.c_price ?? '';
+  let output = params.c_oprice ?? '';
+  const parsedInput = parseNonNegative(input);
+  const parsedOutput = parseNonNegative(output);
+
+  if (input && !output && parsedInput !== null) {
+    output = formatPrice(parsedInput * DEFAULTS.outputPriceMultiple);
+  } else if (!input && output && parsedOutput !== null) {
+    input = formatPrice(parsedOutput / DEFAULTS.outputPriceMultiple);
+  }
+
+  return { input, output, edited: Boolean(input || output) };
+}
+
 function getLabel(hwKey: string, hardwareConfig: HardwareConfig): string {
   const config = hardwareConfig[hwKey] || getHardwareConfig(hwKey);
   return config ? getDisplayLabel(config) : hwKey;
@@ -511,13 +539,14 @@ export default function FleetLifecycle({
       ? seeded
       : 'margin';
   });
-  const [priceInput, setPriceInput] = useState(() => readUrlParams().c_price ?? '');
-  const [outputPriceInput, setOutputPriceInput] = useState(() => readUrlParams().c_oprice ?? '');
+  const [initialPrices] = useState(() => initialPriceInputs(readUrlParams()));
+  const [priceInput, setPriceInput] = useState(initialPrices.input);
+  const [outputPriceInput, setOutputPriceInput] = useState(initialPrices.output);
   // A price arriving from the URL is the user's, so it must not be overwritten
   // by the break-even default. Either field counts: they are seeded as a pair,
   // so re-seeding one after the user set the other would silently move the ratio
   // they chose.
-  const priceEdited = useRef(Boolean(readUrlParams().c_price ?? readUrlParams().c_oprice));
+  const priceEdited = useRef(initialPrices.edited);
   /**
    * Ratio the pair is seeded at, and restored to by a reset.
    *
@@ -527,8 +556,8 @@ export default function FleetLifecycle({
    * so a reader who set 3x gets 3x back rather than the default.
    */
   const [seedMultiple, setSeedMultiple] = useState(() => {
-    const input = parseNonNegative(readUrlParams().c_price ?? '');
-    const output = parseNonNegative(readUrlParams().c_oprice ?? '');
+    const input = parseNonNegative(initialPrices.input);
+    const output = parseNonNegative(initialPrices.output);
     if (input !== null && input > 0 && output !== null && output > 0) return output / input;
     return DEFAULTS.outputPriceMultiple;
   });
@@ -911,6 +940,9 @@ export default function FleetLifecycle({
       t.colLatest,
       t.colSteps,
       t.colGain,
+      t.colChips,
+      t.colTpPerMw(tokenTypeLabel),
+      t.colUsers,
       t.colRevenue,
       t.colCost,
       t.colMargin,
@@ -925,6 +957,9 @@ export default function FleetLifecycle({
       r.progression.steps.at(-1)?.date ?? '',
       r.series.improvementCount,
       r.series.improvementFactor,
+      r.gpus,
+      r.tpPerMw,
+      r.concurrentUsersNow,
       r.series.revenuePerDay,
       r.series.costPerDay,
       r.series.marginPerDay,
@@ -940,6 +975,7 @@ export default function FleetLifecycle({
   }, [
     rows,
     t,
+    tokenTypeLabel,
     selectedModel,
     priceInput,
     outputPriceInput,
