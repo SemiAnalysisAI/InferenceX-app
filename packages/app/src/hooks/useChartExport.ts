@@ -169,6 +169,22 @@ function waitForRender(): Promise<void> {
   });
 }
 
+/**
+ * html-to-image measures `clientWidth`/`clientHeight`, which exclude content
+ * overflowing the export host. The sidebar legend deliberately grows beyond
+ * that host for long labels, so capture the larger scroll dimensions instead.
+ */
+export function getExportCaptureDimensions(element: HTMLElement): {
+  width: number;
+  height: number;
+} {
+  const bounds = element.getBoundingClientRect();
+  return {
+    width: Math.ceil(Math.max(bounds.width, element.clientWidth, element.scrollWidth)),
+    height: Math.ceil(Math.max(bounds.height, element.clientHeight, element.scrollHeight)),
+  };
+}
+
 /** Add a subtle watermark bar at the bottom of the exported image */
 function addWatermark(dataUrl: string, bgColor: string): Promise<string> {
   return new Promise((resolve) => {
@@ -287,7 +303,7 @@ export function useChartExport({
         | undefined;
 
       // Layout: force side-by-side flex row for export
-      applyStyles(exportElement, { width: 'fit-content', overflow: 'visible', padding: '16px' });
+      applyStyles(exportElement, { width: 'max-content', overflow: 'visible', padding: '16px' });
 
       const flexContainer = clone.querySelector(':scope > .flex') as HTMLElement | null;
       applyStyles(flexContainer, {
@@ -432,7 +448,9 @@ export function useChartExport({
           // Fallback to @font-face extraction from loaded stylesheets.
         }
       }
+      const captureDimensions = getExportCaptureDimensions(exportElement);
       const chartDataUrl = await toPng(exportElement, {
+        ...captureDimensions,
         quality: 1,
         pixelRatio: 2,
         backgroundColor: bgColor,
