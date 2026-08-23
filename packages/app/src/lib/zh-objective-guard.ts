@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 
+import { tokenizer } from 'acorn';
 import ts from 'typescript';
 
 export interface GuardViolation {
@@ -420,11 +421,23 @@ function withoutSpans(source: string, spans: readonly TextSpan[]): string {
   return pieces.join('');
 }
 
-function slashStartsJsRegex(source: string, index: number, lastSignificant: string): boolean {
-  if (!lastSignificant || /[({[=,:;!?&|+\-*%^~<>]/u.test(lastSignificant)) return true;
-  return /(?:^|[^\w$])(?:await|case|delete|in|instanceof|of|return|throw|typeof|void|yield)\s*$/u.test(
-    source.slice(0, index),
-  );
+function mdxExpressionClosingBrace(source: string, openingBrace: number): number | null {
+  const tokens = tokenizer(source.slice(openingBrace + 1), { ecmaVersion: 'latest' });
+  let nestedBraceDepth = 0;
+  try {
+    for (;;) {
+      const token = tokens.getToken();
+      const label = token.type.label;
+      if (label === 'eof') return null;
+      if (label === '{' || label === '${') nestedBraceDepth += 1;
+      else if (label === '}') {
+        if (nestedBraceDepth === 0) return openingBrace + 1 + token.start;
+        nestedBraceDepth -= 1;
+      }
+    }
+  } catch {
+    return null;
+  }
 }
 
 function mdxTagSpans(source: string): TextSpan[] {
@@ -433,26 +446,8 @@ function mdxTagSpans(source: string): TextSpan[] {
     if (source[start] !== '<' || !/[!/A-Za-z]/u.test(source[start + 1] ?? '')) continue;
     let quote = '';
     let escaped = false;
-    let braceDepth = 0;
-    let blockComment = false;
-    let lineComment = false;
-    let regex = false;
-    let regexCharacterClass = false;
-    let lastSignificant = '<';
     for (let index = start + 1; index < source.length; index += 1) {
       const character = source[index];
-      const next = source[index + 1] ?? '';
-      if (lineComment) {
-        if (character === '\n' || character === '\r') lineComment = false;
-        continue;
-      }
-      if (blockComment) {
-        if (character === '*' && next === '/') {
-          blockComment = false;
-          index += 1;
-        }
-        continue;
-      }
       if (escaped) {
         escaped = false;
         continue;
@@ -462,38 +457,7 @@ function mdxTagSpans(source: string): TextSpan[] {
         continue;
       }
       if (quote) {
-        if (character === quote) {
-          quote = '';
-          lastSignificant = character;
-        }
-        continue;
-      }
-      if (regex) {
-        if (character === '[') regexCharacterClass = true;
-        else if (character === ']') regexCharacterClass = false;
-        else if (character === '/' && !regexCharacterClass) {
-          regex = false;
-          lastSignificant = character;
-        }
-        continue;
-      }
-      if (braceDepth > 0 && character === '/' && next === '/') {
-        lineComment = true;
-        index += 1;
-        continue;
-      }
-      if (braceDepth > 0 && character === '/' && next === '*') {
-        blockComment = true;
-        index += 1;
-        continue;
-      }
-      if (
-        braceDepth > 0 &&
-        character === '/' &&
-        slashStartsJsRegex(source, index, lastSignificant)
-      ) {
-        regex = true;
-        regexCharacterClass = false;
+        if (character === quote) quote = '';
         continue;
       }
       if (character === '"' || character === "'" || character === '`') {
@@ -501,22 +465,17 @@ function mdxTagSpans(source: string): TextSpan[] {
         continue;
       }
       if (character === '{') {
-        braceDepth += 1;
-        lastSignificant = character;
+        const closingBrace = mdxExpressionClosingBrace(source, index);
+        if (closingBrace === null) break;
+        index = closingBrace;
         continue;
       }
-      if (character === '}' && braceDepth > 0) {
-        braceDepth -= 1;
-        lastSignificant = character;
-        continue;
-      }
-      if (character === '>' && braceDepth === 0) {
+      if (character === '>') {
         const end = index + 1;
         spans.push({ start, end, text: source.slice(start, end) });
         start = index;
         break;
       }
-      if (!/\s/u.test(character)) lastSignificant = character;
     }
   }
   return spans;

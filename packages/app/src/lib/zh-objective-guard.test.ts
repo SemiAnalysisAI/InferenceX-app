@@ -310,7 +310,15 @@ $$
     });
 
     it('protects static template-literal link props without treating them as inline code', () => {
-      for (const expression of ['score > 0', 'score /* } */ > 0', '/}/.test(score) && score > 0']) {
+      for (const expression of [
+        'score > 0',
+        'score /* } */ > 0',
+        '/}/.test(score) && score > 0',
+        'metrics.return / total > 0',
+        '[.../}/.exec(score)].length > 0',
+        String.raw`/[}\]]/.test(score) && score > 0`,
+        ['`outer $', '{`inner }`}`.length > 0'].join(''),
+      ]) {
         const enMdx = `<DashboardCTA enabled={${expression}} href={\`/blog/next\`}>Open</DashboardCTA>`;
         const zhMdx = `<DashboardCTA enabled={${expression}} href={\`/zh/blog/next\`}>打开</DashboardCTA>`;
         expect(compareBlogPair('template-prop.mdx', enMdx, zhMdx, [])).toEqual([]);
