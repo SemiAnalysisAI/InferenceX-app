@@ -61,29 +61,6 @@ const STRINGS = {
  */
 const SHOW_QUICK_COMPARISONS = false;
 
-/**
- * Kept separately testable while the landing route hides the section. This
- * prevents dormant copy from regressing before the feature flag is flipped.
- */
-export function LandingQuickComparisons({ locale }: { locale: Locale }) {
-  const t = STRINGS[locale];
-
-  return (
-    <Card data-testid="landing-quick-comparisons">
-      <div className="flex items-center gap-2 mb-3">
-        <Sparkles className="size-5 shrink-0 text-brand" />
-        <h2 className="text-lg font-semibold">{t.quickComparisons}</h2>
-      </div>
-      <p className="text-sm text-muted-foreground mb-4">{t.quickComparisonsDesc}</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {FAVORITE_PRESETS.filter((preset) => !preset.hidden).map((preset) => (
-          <CuratedViewCard key={preset.id} preset={preset} />
-        ))}
-      </div>
-    </Card>
-  );
-}
-
 export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
   const t = STRINGS[locale];
   // Internal links stay within the current language tree.
@@ -159,7 +136,20 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
           </Card>
 
           {/* Right - Curated Presets (temporarily hidden, see SHOW_QUICK_COMPARISONS) */}
-          {SHOW_QUICK_COMPARISONS && <LandingQuickComparisons locale={locale} />}
+          {SHOW_QUICK_COMPARISONS && (
+            <Card data-testid="landing-quick-comparisons">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="size-5 shrink-0 text-brand" />
+                <h2 className="text-lg font-semibold">{t.quickComparisons}</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">{t.quickComparisonsDesc}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {FAVORITE_PRESETS.filter((preset) => !preset.hidden).map((preset) => (
+                  <CuratedViewCard key={preset.id} preset={preset} />
+                ))}
+              </div>
+            </Card>
+          )}
         </section>
       </div>
     </main>

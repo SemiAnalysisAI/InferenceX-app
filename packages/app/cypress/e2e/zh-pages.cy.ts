@@ -136,23 +136,6 @@ describe('Chinese (/zh) pages', () => {
     it('links to the English original', () => {
       cy.get('a[href="/blog/inferencemax-open-source-inference-benchmarking"]').should('exist');
     });
-
-    it('localizes the table of contents and heading-link controls at mobile widths', () => {
-      cy.viewport(390, 844);
-      cy.get('details[aria-label="本页目录"]')
-        .should('be.visible')
-        .find('summary')
-        .should('contain.text', '点击展开')
-        .and('not.contain.text', 'click to expand');
-      cy.get('article.prose a[aria-label="复制本节链接"]')
-        .first()
-        .should('have.attr', 'href')
-        .and('match', /^#/u);
-      cy.get('article.prose a[aria-label="Copy link to section"]').should('not.exist');
-      cy.document().then((doc) => {
-        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
-      });
-    });
   });
 
   describe('localized not-found pages', () => {
