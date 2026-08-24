@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { FAQ_ITEMS_ZH } from '@/components/about/faq-data-zh';
 import { AgentXFaq } from '@/components/about/agentx-faq';
 import { buildFaqJsonLd, FaqList } from '@/components/about/faq';
+import { PromoVideo } from '@/components/about/promo-video';
 import { JsonLd } from '@/components/json-ld';
 import { zhAlternates, ZH_OG_LOCALE, ZH_LANG_TAG } from '@/lib/i18n';
 import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-constants';
@@ -35,6 +36,10 @@ export default function AboutPageZh() {
     <main className="relative">
       <JsonLd data={faqJsonLd} />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4 pb-8">
+        <section>
+          <PromoVideo />
+        </section>
+
         <section>
           <Card>
             <h2 className="text-lg font-semibold mb-2">
