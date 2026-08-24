@@ -45,6 +45,10 @@
       "duration": 3125
     },
     {
+      "spec": "cypress/e2e/calculator-lifecycle.cy.ts",
+      "duration": 18000
+    },
+    {
       "spec": "cypress/e2e/calculator-overlay.cy.ts",
       "duration": 9124
     },

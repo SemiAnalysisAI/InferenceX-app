@@ -169,6 +169,29 @@ function waitForRender(): Promise<void> {
   });
 }
 
+/**
+ * html-to-image measures `clientWidth`/`clientHeight`, which exclude content
+ * overflowing the export host. The sidebar legend deliberately grows beyond
+ * that host for long labels, so capture the larger scroll dimensions instead.
+ */
+export function getExportCaptureDimensions(element: HTMLElement): {
+  width: number;
+  height: number;
+} {
+  const bounds = element.getBoundingClientRect();
+  return {
+    width: Math.ceil(Math.max(bounds.width, element.clientWidth, element.scrollWidth)),
+    height: Math.ceil(Math.max(bounds.height, element.clientHeight, element.scrollHeight)),
+  };
+}
+
+/** Keep the plot responsive without stretching small UI icons in the clone. */
+export function normalizeChartSvgWidthsForExport(root: HTMLElement): void {
+  for (const svg of root.querySelectorAll<SVGElement>('svg[data-testid="d3-chart-svg"]')) {
+    svg.style.width = '100%';
+  }
+}
+
 /** Add a subtle watermark bar at the bottom of the exported image */
 function addWatermark(dataUrl: string, bgColor: string): Promise<string> {
   return new Promise((resolve) => {
@@ -312,7 +335,7 @@ export function useChartExport({
       // Force legend into inline flow
       if (legendContainer) {
         legendContainer.style.cssText +=
-          '; position: relative !important; right: auto !important; top: auto !important; left: auto !important; bottom: auto !important; width: auto !important; min-width: fit-content !important; z-index: auto !important; overflow: visible !important; padding: 8px !important;';
+          '; position: relative !important; right: auto !important; top: auto !important; left: auto !important; bottom: auto !important; width: auto !important; min-width: fit-content !important; height: auto !important; min-height: 0 !important; max-height: none !important; z-index: auto !important; overflow: visible !important; padding: 8px !important;';
 
         const scrollContainer = legendContainer.querySelector(
           'ul, [class*="overflow"]',
@@ -408,9 +431,7 @@ export function useChartExport({
       for (const span of clone.querySelectorAll('span')) {
         span.style.fontSize = '14px';
       }
-      for (const svg of clone.querySelectorAll('svg')) {
-        svg.style.width = '100%';
-      }
+      normalizeChartSvgWidthsForExport(clone);
 
       // Wait for fonts before capture
       try {
@@ -432,7 +453,9 @@ export function useChartExport({
           // Fallback to @font-face extraction from loaded stylesheets.
         }
       }
+      const captureDimensions = getExportCaptureDimensions(exportElement);
       const chartDataUrl = await toPng(exportElement, {
+        ...captureDimensions,
         quality: 1,
         pixelRatio: 2,
         backgroundColor: bgColor,

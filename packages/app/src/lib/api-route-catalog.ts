@@ -116,7 +116,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmark-history',
-    sourceSha256: '7d4302fdc83e05237c77b6f6c375e0adbcad3fe911959005c54c8bd1c9bff85a',
+    sourceSha256: '42ba4d72298084ffe079ffcee7b6309ef3fb94d1df4769be4485d95097aa8cbe',
   },
   {
     source: 'src/app/api/v1/collectivex/latest/route.ts',
@@ -452,7 +452,7 @@ export const stablePublicApiContracts = [
   },
   {
     operationId: 'list-benchmark-history',
-    parameters: ['model', 'isl', 'osl', 'benchmarkType'],
+    parameters: ['model', 'isl', 'osl', 'benchmarkType', 'view'],
     statuses: ['200', '400', '500'],
     auth: 'none',
     cachePolicy: 'public-db-day',
@@ -660,7 +660,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api.ts',
-    sourceSha256: '859d84c1af8b9a734e4575e5358aa6e6e399c79c48d4bfb6ec31e0d8ea8f7db6',
+    sourceSha256: '54e398a2041040ed7b66bd5c813041db26287111774dafd13a70d5e545fb24f3',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',

@@ -14,6 +14,7 @@ import {
   getMetricValue,
   getSortedResults,
   getThroughputForType,
+  getComparableTpPerMwForType,
   getTpPerMwForType,
   getValueLabel,
 } from './ThroughputBarChart';
@@ -639,5 +640,73 @@ describe('generateTooltipHTML overlay treatment', () => {
     expect(html).toContain('分支：');
     expect(html).toContain('查看工作流运行');
     expect(html).not.toContain('UNOFFICIAL RUN');
+  });
+});
+
+/** An interpolated read, aggregated by default: 800 + 100 = 900 = the total. */
+const rankResult = (over: Partial<InterpolatedResult> = {}): InterpolatedResult =>
+  ({
+    hwKey: 'mi355x',
+    resultKey: 'mi355x',
+    value: 900,
+    inputTputValue: 800,
+    outputTputValue: 100,
+    cost: 1,
+    costInput: 1,
+    costOutput: 1,
+    tpPerMw: 9000,
+    inputTpPerMw: 8000,
+    outputTpPerMw: 1000,
+    concurrency: 8,
+    nearestPoints: [],
+    ...over,
+  }) as InterpolatedResult;
+
+describe('getComparableTpPerMwForType', () => {
+  it('leaves the total basis alone — it is already per total chip', () => {
+    const r = rankResult({ inputTokenShare: 0.5 });
+    expect(getComparableTpPerMwForType(r, 'total')).toBe(r.tpPerMw);
+    expect(getComparableTpPerMwForType(r, 'total')).toBe(getTpPerMwForType(r, 'total'));
+  });
+
+  it('is an identity for an aggregated config, whose rates already sum to the total', () => {
+    // 800 + 100 = 900, so the share is 8/9 and tpPerMw x share is inputTpPerMw.
+    const r = rankResult({ inputTokenShare: 800 / 900 });
+    expect(getComparableTpPerMwForType(r, 'input')).toBeCloseTo(8000, 6);
+    expect(getComparableTpPerMwForType(r, 'output')).toBeCloseTo(1000, 6);
+  });
+
+  it('deflates a disaggregated config back onto the per-total-chip basis', () => {
+    // 16 prefill + 8 decode chips serving 8192:1024. The reported rates sum to
+    // 1.667x the total, so ranking on them raw reads high.
+    const r = rankResult({
+      value: 300,
+      inputTputValue: 400,
+      outputTputValue: 100,
+      tpPerMw: 3000,
+      inputTpPerMw: 4000,
+      outputTpPerMw: 1000,
+      inputTokenShare: 8192 / 9216,
+    });
+    expect(getTpPerMwForType(r, 'output')).toBe(1000);
+    // Output is a ninth of the tokens, on 3000 tok/s/MW overall.
+    expect(getComparableTpPerMwForType(r, 'output')).toBeCloseTo(3000 / 9, 6);
+    expect(getComparableTpPerMwForType(r, 'output')).toBeLessThan(getTpPerMwForType(r, 'output'));
+    // And the two token types partition the total rather than exceeding it.
+    expect(
+      getComparableTpPerMwForType(r, 'input') + getComparableTpPerMwForType(r, 'output'),
+    ).toBeCloseTo(3000, 6);
+    expect(getTpPerMwForType(r, 'input') + getTpPerMwForType(r, 'output')).toBeGreaterThan(3000);
+  });
+
+  it('falls back to the raw figure when no share was recovered', () => {
+    const r = rankResult();
+    expect(getComparableTpPerMwForType(r, 'input')).toBe(r.inputTpPerMw);
+    expect(getComparableTpPerMwForType(r, 'output')).toBe(r.outputTpPerMw);
+  });
+
+  it('clamps a share outside [0,1]', () => {
+    expect(getComparableTpPerMwForType(rankResult({ inputTokenShare: 1.4 }), 'output')).toBe(0);
+    expect(getComparableTpPerMwForType(rankResult({ inputTokenShare: -1 }), 'input')).toBe(0);
   });
 });

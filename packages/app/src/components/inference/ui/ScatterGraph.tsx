@@ -525,14 +525,21 @@ const ScatterGraph = React.memo(
       },
       [providerActiveOverlayHwTypes, scopedOverlayHwTypes, setUnifiedOverlaySelection],
     );
-    const unifiedToggle = useCallback(
-      (key: string, isOverlay: boolean) => {
-        const prefixedKey = isOverlay ? `overlay:${key}` : key;
-        commitUnifiedSelection(
-          computeToggle(resolvedUnifiedSelection, prefixedKey, allUnifiedHwTypes),
+    const toggleOfficialHwType = useCallback(
+      (key: string) => {
+        // The unofficial run is a pinned comparison, not an official legend item.
+        // Soloing an official series must therefore leave every overlay selection unchanged.
+        setUnifiedOverlaySelection(
+          computeToggle(effectiveOfficialHwTypes, key, hwTypesWithData),
+          providerActiveOverlayHwTypes,
         );
       },
-      [resolvedUnifiedSelection, allUnifiedHwTypes, commitUnifiedSelection],
+      [
+        effectiveOfficialHwTypes,
+        hwTypesWithData,
+        providerActiveOverlayHwTypes,
+        setUnifiedOverlaySelection,
+      ],
     );
     const resetUnifiedSelection = useCallback(() => {
       selectAllHwTypes();
@@ -557,9 +564,9 @@ const ScatterGraph = React.memo(
           return;
         }
         setBestPerSku(false, { applySelection: false });
-        unifiedToggle(key, false);
+        toggleOfficialHwType(key);
       },
-      [overlayData, setBestPerSku, unifiedToggle, toggleHwType],
+      [overlayData, setBestPerSku, toggleOfficialHwType, toggleHwType],
     );
 
     // Legend "X" (remove) — same overlay split as handleToggleHwType. With an

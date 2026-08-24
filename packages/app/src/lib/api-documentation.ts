@@ -722,6 +722,16 @@ export const apiOperations: readonly ApiOperation[] = [
         { type: 'string', enum: ['agentic_traces'] },
         'agentic_traces',
       ),
+      parameter(
+        'view',
+        'query',
+        false,
+        'enum',
+        'calculator trims each row to the metrics the throughput calculator consumes, for a smaller payload. Omit for every stored metric, including measured power.',
+        'calculator 会将每行裁剪为吞吐量计算器所需的指标，以减小响应体积。省略则返回全部已存储指标，包括实测功率。',
+        { type: 'string', enum: ['calculator'] },
+        'calculator',
+      ),
     ],
     responses: [
       success('Historical benchmark rows.', '历史基准行。', benchmarkRowsSchema, benchmarkExample),
