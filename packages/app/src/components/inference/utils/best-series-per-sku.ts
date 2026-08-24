@@ -22,19 +22,25 @@ interface ScoredSeries {
 }
 
 /**
- * Select one configuration line per physical SKU using normalized frontier AUC.
+ * Select the best configuration line per physical SKU using normalized frontier AUC.
  *
  * Every candidate is sampled over the common measured x-domain for that SKU,
  * so a curve cannot win merely because it spans a wider range. The chart's
  * existing Pareto direction and monotone interpolation are reused to keep the
  * ranking aligned with the line users see. Ties are deterministic by hwKey.
+ *
+ * TileRT is the deliberate exception to the one-line policy. Its specialized
+ * operating points can be exceptional even when a broader serving curve wins
+ * the AUC comparison, so every eligible TileRT series remains visible.
  */
 export function bestSeriesPerSku(points: InferenceData[], direction: Direction): Set<string> {
   const bySku = new Map<string, Map<string, InferenceData[]>>();
+  const featured = new Set<string>();
   for (const point of points) {
     if (!isFrontierEligible(point) || !Number.isFinite(point.y)) continue;
     const sku = baseSku(point);
     const key = String(point.hwKey);
+    if (point.framework === 'tilert') featured.add(key);
     let series = bySku.get(sku);
     if (!series) {
       series = new Map();
@@ -45,7 +51,7 @@ export function bestSeriesPerSku(points: InferenceData[], direction: Direction):
     series.set(key, rows);
   }
 
-  const selected = new Set<string>();
+  const selected = new Set(featured);
   const higherYIsBetter = direction.startsWith('upper');
 
   for (const series of bySku.values()) {
