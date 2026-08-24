@@ -49,6 +49,7 @@ const KIMI_K3 = 'kimi-k3-the-manos-the-mythos-the';
 const TILERT = 'ultra-high-interactivity-on-nvidia';
 const AGENT_BENCHMARK = 'agentic-benchmark-agent-benchmark-guide';
 const AGENTIC_WORKLOADS = 'brief-overview-of-agentic-workloads';
+const AGENTX_V3 = 'agentx-inferencexv3-does-cuda-moat';
 
 const entries = [
   {
@@ -85,7 +86,7 @@ const entries = [
     benchmarkContext:
       'InferenceX uses AgentX to measure agentic inference. Read AgentX results alongside fixed-sequence scenarios because they answer different capacity questions. AgentX reports the behavior of a closed-loop session replay instead of treating every request as an independent batch item.',
     relatedTerms: ['agentx', 'agentic-coding-workload', 'subagent', 'prefix-caching', 'kv-cache'],
-    articleSlugs: [AGENTIC_WORKLOADS, AGENT_BENCHMARK, TILERT, VR_RUBIN, INFERENCEX_V2],
+    articleSlugs: [AGENTIC_WORKLOADS, AGENT_BENCHMARK, TILERT, VR_RUBIN, INFERENCEX_V2, AGENTX_V3],
   },
   {
     slug: 'agentx',
@@ -109,7 +110,7 @@ const entries = [
       'closed-loop-benchmark',
       'subagent',
     ],
-    articleSlugs: [AGENTIC_WORKLOADS, AGENT_BENCHMARK, TILERT, VR_RUBIN],
+    articleSlugs: [AGENTIC_WORKLOADS, AGENT_BENCHMARK, TILERT, VR_RUBIN, AGENTX_V3],
   },
   {
     slug: 'agentic-coding-workload',
@@ -127,7 +128,7 @@ const entries = [
     benchmarkContext:
       'AgentX represents this workload with trace-derived request shapes and deterministic synthetic content. It measures inference-system performance. Model coding quality requires a separate evaluation, so quality scores and AgentX serving results answer separate questions.',
     relatedTerms: ['agentic-inference', 'agentx', 'subagent', 'prefix-caching', 'trace-replay'],
-    articleSlugs: [AGENTIC_WORKLOADS, AGENT_BENCHMARK, TILERT, VR_RUBIN, INFERENCEX_V2],
+    articleSlugs: [AGENTIC_WORKLOADS, AGENT_BENCHMARK, TILERT, VR_RUBIN, INFERENCEX_V2, AGENTX_V3],
   },
   {
     slug: 'trace-replay',
@@ -145,7 +146,7 @@ const entries = [
     benchmarkContext:
       'AgentX replays trace-derived sessions through AIPerf. A fixed seed selects sessions, starting points, and synthetic content. Reported results cover the profiling window after cache warmup, which keeps run-to-run comparisons focused on steady-state serving behavior.',
     relatedTerms: ['agentx', 'closed-loop-benchmark', 'subagent', 'concurrency', 'kv-cache'],
-    articleSlugs: [AGENTIC_WORKLOADS, AGENT_BENCHMARK, TILERT, VR_RUBIN],
+    articleSlugs: [AGENTIC_WORKLOADS, AGENT_BENCHMARK, TILERT, VR_RUBIN, AGENTX_V3],
   },
   {
     slug: 'closed-loop-benchmark',
@@ -163,7 +164,7 @@ const entries = [
     benchmarkContext:
       'AgentX uses closed-loop concurrency. Its concurrency value is the number of agent clients; request batch size changes as the sessions advance. Read throughput, time to first token, and interactivity together.',
     relatedTerms: ['agentx', 'trace-replay', 'concurrency', 'throughput', 'latency'],
-    articleSlugs: [AGENT_BENCHMARK, TILERT, INFERENCEX_V2],
+    articleSlugs: [AGENT_BENCHMARK, TILERT, INFERENCEX_V2, AGENTX_V3],
   },
   {
     slug: 'subagent',
@@ -187,7 +188,7 @@ const entries = [
       'trace-replay',
       'concurrency',
     ],
-    articleSlugs: [AGENTIC_WORKLOADS, TILERT, VR_RUBIN],
+    articleSlugs: [AGENTIC_WORKLOADS, TILERT, VR_RUBIN, AGENTX_V3],
   },
   {
     slug: 'inference-engine',
@@ -546,7 +547,7 @@ const entries = [
       'multi-head-latent-attention',
       'high-bandwidth-memory',
     ],
-    articleSlugs: [INFERENCEX_V2, MI355X_KIMI, SGLANG_056, KIMI_K3],
+    articleSlugs: [INFERENCEX_V2, MI355X_KIMI, SGLANG_056, KIMI_K3, AGENTX_V3],
   },
   {
     slug: 'prefix-caching',
@@ -564,7 +565,7 @@ const entries = [
     benchmarkContext:
       'InferenceX generally disables prefix caching on random datasets to isolate full prompt processing from cache policy. Treat benchmark cost as a no-hit baseline unless the recipe says otherwise.',
     relatedTerms: ['kv-cache', 'prefill', 'time-to-first-token', 'nvidia-dynamo'],
-    articleSlugs: [AGENTIC_WORKLOADS, INFERENCEX_V2, GB200_KIMI, KIMI_K3],
+    articleSlugs: [AGENTIC_WORKLOADS, INFERENCEX_V2, GB200_KIMI, KIMI_K3, AGENTX_V3],
   },
   {
     slug: 'disaggregated-inference',
@@ -583,7 +584,7 @@ const entries = [
     benchmarkContext:
       'A disagg label identifies the serving layout, not its performance. Judge it from the prefill and decode world sizes, TP/EP layout, framework, network domain, and the interactivity range where its frontier leads.',
     relatedTerms: ['prefill', 'decode', 'kv-cache', 'nvidia-dynamo', 'wide-expert-parallelism'],
-    articleSlugs: [INFERENCEX_V2, GB200_R1, GB300_DSV4, GB200_KIMI, TILERT],
+    articleSlugs: [INFERENCEX_V2, GB200_R1, GB300_DSV4, GB200_KIMI, TILERT, AGENTX_V3],
   },
   {
     slug: 'speculative-decoding',
@@ -601,7 +602,7 @@ const entries = [
     benchmarkContext:
       'Compare speculative recipes at realistic acceptance rates and verify model quality. InferenceX distinguishes MTP-enabled and disabled curves because the benefit changes across concurrency and interactivity.',
     relatedTerms: ['multi-token-prediction', 'decode', 'batching', 'mixture-of-experts'],
-    articleSlugs: [INFERENCEX_V2, DEEPSEEK_V4, B200_GLM5, KIMI_K3],
+    articleSlugs: [INFERENCEX_V2, DEEPSEEK_V4, B200_GLM5, KIMI_K3, AGENTX_V3],
   },
   {
     slug: 'multi-token-prediction',
