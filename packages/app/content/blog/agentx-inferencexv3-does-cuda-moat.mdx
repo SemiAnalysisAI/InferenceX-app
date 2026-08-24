@@ -1,0 +1,1031 @@
+---
+title: 'AgentX - InferenceXv3: Does the CUDA Moat Hold Up in Agentic Inferencing?'
+subtitle: '$3 Million USD dataset open sourced, 1 Mil+ Context Length, Multiturn, Sub Agents 95%+ KVCache HitRate, GB300 NVL72, MI355X, B200'
+seoDescription: 'AgentX 1.0 is the first fully open source multi-turn agentic coding inference benchmark at 1M context. Agentic results for DeepSeek V4 Pro, Kimi K3, MiniMax M3, Qwen3.5, and GLM 5.3 across GB300 NVL72, B300, B200, MI355X, and H200, plus the 70+ upstream PRs the benchmark drove.'
+date: '2026-08-24'
+publishDate: '2026-08-24'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - gpu
+  - nvidia
+  - amd
+  - announcement
+---
+
+Since the [Claude Code inflection point](https://newsletter.semianalysis.com/p/claude-code-is-the-inflection-point) in November 2025, long-context, multi-turn agentic workloads have grown rapidly. They now dominate traffic for production inferencing. In April 2026, OpenAI’s Enterprise agentic spending overtook ChatGPT spending.
+
+[Claude Code is the Inflection Point](https://newsletter.semianalysis.com/p/claude-code-is-the-inflection-point) — 4% of GitHub public commits are being authored by Claude Code right now. At the current trajectory, we believe that Claude Code will be 20%+ of all daily commits by the end of 2026. While you blinked, AI consumed all of software development.
+
+Agentic workflows have decisively taken the baton. **Today, we announce AgentX 1.0 - the world’s first fully open source, multi-turn agentic coding inference benchmark at 1 million context, released under Apache 2.0. [Our full dashboard is available here.](https://inferencex.semianalysis.com/)**
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/864512bf-1feb-445d-a03a-bbf9f4f1b791_1928x1234.png"
+  caption="Source: [SemiAnalysis](https://openai.com/signals/enterprise-data/)"
+/>
+
+In the past most measured performance based on fixed sequence length prefill and decode workloads, but this is an inaccurate way to measure workloads. Reality is multi-turn, long context, high prefill reuse, with sub agent bursts, KVCache offload, and numerous tool calls. As such we aimed to build the correct way for the industry to measure AI hardware and software performance.
+
+[We have spent more than $3M building this dataset. Today, we open source everything.](https://inferencex.semianalysis.com/) InferenceXv3 implements AgentX, a new realistic scenario in addition to the existing “fixed sequence length” scenarios (8k1k, 1k1k, 1k8k). It improves the benchmark scenarios by using agentic coding traffic instead of the previous single-turn traffic of 8k input and 1k output tokens.
+
+The full matrix runs on ~2MW of continuously operated compute across over 1000 chips spanning a wide range of SKUs, featuring the MI355X, GB300 NVL72, GB200 NVL72, B300, B200, MI325, MI300X, H200, and RTX Pro Servers. Rubin arrives later this month, and TPUs and Mi455X UALoE72 arrive later this year. [Please drop a star if you found our free open source work valuable.](https://github.com/SemiAnalysisAI/InferenceX)
+
+It is great to see amazing performance from both NVIDIA and AMD on agentic workloads. NVIDIA does very good on a lot of frontier models while AMD also does well on some frontier models for specific comparsions.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/8a065d23-de1d-4e2f-a3ae-7af724409c9d_1350x653.png"
+  caption="Source: [SemiAnalysis GitHub](https://github.com/SemiAnalysisAI/InferenceX)"
+/>
+
+The most valuable thing AgentX produced in its first months was not the initial results. It was the massive industry impact the benchmark is already having. **Over 70+ upstream PRs** for optimizing real world production agentic workloads across vLLM, SGLang, TensorRT-LLM, ATOM, AITER, Dynamo, LMCache, and Mooncake, uses AgentX as the north star benchmark proxy. Most of these optimization improvements are transferable to production traffic. We deep dive into each of these optimizations later in the article.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/193e605e-579b-4ed2-9637-5bfdbee5cf71_1286x1515.png"
+  caption="Source: SemiAnalysis"
+/>
+
+Open source is a core principle for InferenceX and thus, we open more of the stack than most people who use that word. That includes an open frontend, a public database served through an easily consumable REST API **that multiple tier 1 AI lab’s capacity planning teams already consume**, public GitHub Actions CI provenance, [logs](https://inferencex.semianalysis.com/inference/agentic/440193?i_seq=agentic-traces&i_xmode=interactivity&view=logs), and accuracy validation on every single point. Crucially, our benchmark configs mainly track [recipes.vllm.ai](http://recipes.vllm.ai) and [SGLang cookbook](https://docs.sglang.io/cookbook/intro) on upstream images such that we are measuring the performance actual customers are experiencing instead of measuring benchmax’ed images.
+
+In three to four weeks, we will release an AgentX update article. It will cover further optimizations to agentic workloads, plus updated performance results from AMD and Nvidia. It is important to understand that the profile of agentic workloads is updating fast. InferenceX will continue to move swiftly to benchmark the relevant workloads.
+
+InferenceX is 100% committed to being open-source - this would not be possible without the contributions and support from our OSS partners. We would like to thank the following people that have made massive contributions to the AgentX 1.0 release:
+
+- **Inferact/vLLM**: Roger Wang, Yifan Qiao, Simon Mo, Jeff Ma, and many others
+- **RedHat/llm-d**: Michael Goin, Robert Shaw, Tyler Michael Smith
+- **RadixArk/SGLang**: Baizhou Zhang, Yuwei An, Mingyi Lu, and many others
+- **LMCache/TensorMesh**: Samuel Shen
+- **Weka**: Callan Fox, Val Bercovici
+- **MoonCake Maintainers:** Teng Ma, Xu Wenjie, Ke Yang
+- **AMD**: Thomas Wang, HaiShaw, Andy Luo, Seungrok Jung, Chun Fang, Parth Panchal, Bill He, Theresa Shan, Hongxia, Fangzhou, Gilbert Lei, Yanfei Wang, Duyi Wang, Peng Sun, Lingpeng Jin, Simon Danielsson, Xiaohu Guo, Haichen Zhang, Chang Liu, Doug Lehr, Poovaiah Palangappa, and many others in the AMD Shanghai Development Centre
+- **Nvidia**: Xin Li, Anthony Casagrande, Kedar Potdar, Ankur Singh, Ishan Dhanani, Nick Comly, Nvidia Shanghai TensorRT-LLM team, and many others
+- **Anthropic staff, for promptly fixing multiple bugs that made implementing AgentX possible**
+- **GitHub:** Austen Stone for helping with reliability of GitHub Actions that AgentX uses
+- And many others
+
+[In addition, we are thankful to all who support our open source InferenceX initiative, including Meta, Microsoft, Oracle, OpenAI, MiniMax, Moonshot Kimi, Alibaba Qwen, and Zhipu GLM.](https://inferencex.semianalysis.com/quotes)
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/e97525a9-216a-4624-91c6-373ee7a3850e_1123x437.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/quotes)"
+/>
+
+## A Brief Overview of Agentic Workloads
+
+At a high level, an agentic workload is characterized by four elements:
+
+1. **Multi-turn:** a session includes many user / assistant interactions (tens or hundreds) compared to a handful in a chatbot scenario. Multi-turn, long context, high prefill reuse, with sub agent bursts and numerous tool calls.
+2. **Long context:** system prompts, tool definitions, and the large number of turns make context accumulate quickly.
+3. **High prefix reuse:** since the conversation progresses linearly, where output from turn n-1 is concatenated to turn n (typically), most context can be served from KV cache rather than recomputed (this depends on amount of storage available to store KV tensors). As n grows, the ratio of cached input relative to uncached typically tends towards 1.
+4. **Sub-agent bursts:** a session launches multiple short-lived sub-agents with fresh context, which create bursty KVCache patterns.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/72b64a02-8a1f-4a19-929c-85c0ed4803cd_2048x909.png"
+  caption="Source: DeepSeek, SemiAnalysis"
+/>
+
+Considering the characteristics above, benchmarking these workloads is fundamentally different from the existing fixed sequence length benchmarks. Namely, agentic inference is inherently a _systems problem_. Because of extremely high prefix reuse, KV tensors must be efficiently transferred across nodes/ranks (NIXL, MORI-IO, Mooncake). Additionally, different conversations should be routed to different nodes/ranks depending on where the appropriate prefix resides in order to maximize cache hit rate (LLM-d, Dynamo, vLLM/SGLang router). Long context conversations stress the HBM capacity for KV cache and necessitate offloading KV tensors to different tiers of memory (DRAM, SSD), a process that needs to be carried out efficiently (Mooncake Store, LMCache, vLLM Simple Offloading, SGLang HiCache).
+
+This is in contrast to fixed sequence length, single turn workloads where prefix reuse is not relevant and inference performance is largely reflective of baseline chip/kernel performance. This is not to say that the plethora of fixed sequence length data on InferenceX is not important. In fact, stripping away the complexities of agentic serving shows clearly how low-level inference performance optimizations are progressing. It also provides an important baseline for AgentX results.
+
+In an attempt to make the AgentX workloads as realistic as possible, we collected an initial corpus of [393 internal SemiAnalysis anonymous Claude Code traces](https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126) to replay. To anonymize the content while keeping the original prefix reuse pattern, we use a method similar to the [Qwen-Bailian dataset](https://github.com/alibaba-edu/qwen-bailian-usagetraces-anon), one of the earliest corpora of production traces. We then use [AIPerf](https://github.com/ai-dynamo/aiperf) to reconstruct the traces according to the original schedule of requests at varying levels of concurrent clients. We worked with Anthropic to ship two Claude Code features to make the AgentX dataset possible. We thank the Anthropic staff for their help.
+
+1. [https://github.com/anthropics/claude-code/issues/49207](https://github.com/anthropics/claude-code/issues/49207)
+2. [https://github.com/anthropics/claude-code/issues/66761](https://github.com/anthropics/claude-code/issues/66761)
+
+This brief introduction to agentic workloads should give the reader enough context to understand the results in the next section. In a later section, we will provide a deeper technical dive into the methodology, replay harness, and dataset.
+
+## Agentic Coding Inference Performance
+
+When looking at inference coding performance, OpenAI, Anthropic, xAI, and other frontier labs focus on three things. They look at performance per dollar versus interactivity (TPOT), TTFT (time to first token), and overall end-to-end task completion. Performance per megawatt is also important, considering that terrestrial datacenter power is a critical constraint (money is a social construct and it appears the labs have an unlimited supply, but power is physically hard to come by in this day and age). [Our datacenter model has estimates of quarter by quarter build up of power demand and supply.](https://semianalysis.com/datacenter-industry-model/)
+
+In this section, we highlight some of the overall agentic performance themes across frontier models. We strongly encourage the reader to use this as a guide to [investigate the results for themselves](https://inferencex.semianalysis.com/). **All of the data is open source and the community has the opportunity to draw their own conclusions on the current state of real world inference performance.**
+
+## DeepSeek V4 Pro 0813
+
+DeepSeek V4 Pro 0813 is an ultra popular frontier open weight model from China. It has ~1.6 Trillion parameters with 49 Billion active parameters.
+
+As of August 21, the following graph shows the best performance per SKU for all submissions, normalized by total cost of ownership (TCO).
+
+The ISL/OSL distribution of _all_ requests among all DeepSeek v4 runs was as follows: ISL p50=88k, p90=272k, p95=404k, p99=675k and OSL p50=413, p90=2.2k, p95=3.7k, p99=8.6k.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/d8337140-b620-476a-abd3-59d6cc447d30_2048x1256.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/b5aee8b4-d11a-48d8-823c-1ca53412e689_2048x1253.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&i_seq=agentic-traces&g_runid=32433563482&i_xmode=interactivity&i_label=0&i_e2e_xmetric=)"
+/>
+
+In general, **it is important to consider both tokens per second per user** (TPS - also known as interactivity) and TTFT, **since these often come at the expense of one another**. For instance, in the graph above, some SKUs achieve very high throughput at decent interactivity, however TTFT is severely degraded. What is an “acceptable” p90 TTFT varies heavily depending on the application. For most production systems serving agentic workloads, you can expect p90 TTFT to be anywhere from 200-5,000ms. Anything over 5-10s is pushing the boundary of what can be considered “online inference.” There are still practical applications for the ultra-high throughput sector of the curve, where latency does not matter and peak system utilization is desirable (batch processing, _very_ long running agents, etc).
+
+In terms of single node performance, MI355X open-source performance (vLLM) trails behind vendor specific ATOM (AMDs equivalent of TensorRT LLM). We think it’s great that AMD is pushing the frontier quickly with ATOM, however we encourage them to make a higher priority of upstreaming these improvements into vLLM.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/d96697d9-bf24-4093-a7db-16d27a52aa08_2048x1200.png"
+  caption="Source: InferenceX"
+/>
+
+AMD’s distributed inference (DI) team has made great progress on 8k1k scenarios over the past six months. The team still has some way to go before DI is a viable solution for realistic workloads. In terms of throughput per GPU vs. interactivity, we observe the 1xDEP8+1xDEP8 disagg config is only able to realize slight performance gains in the high throughput scenarios, while actually performing worse in low latency scenarios.
+
+To make matters worse, any increase in throughput at the middle-to-high interactivity configs is overshadowed by the significant spike in p90 TTFT. One of the reasons for this is the use of SGLang’s --enable-prefill-delayer argument above concurrency 64, [which postpones prefill admission so DP ranks can form fuller batches](https://github.com/sgl-project/sglang/blob/v0.5.17/python/sglang/srt/server_args.py#L3180-L3194) (for up to 30 forward passes). Additionally, these points also increase chunked prefill size from 8,192 to 65,536.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/81475383-510e-4823-9373-751b8a3722e3_2048x1202.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/6254047b-173b-4b1b-9f43-2057eb720b05_2048x1200.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=mi355x_atom%2Cmi355x_mori-sglang&i_vendor=AMD&i_linelabel=0&i_metric=y_tpPerGpu)"
+/>
+
+On e2e latency, ATOM MI355X beats B200 vLLM (it does not beat B300 or B200 SGLang though). The issue with this is that most AI labs in China or the west do not want to use ATOM in production besides 1 small advertising business unit at Alibaba Corp due to tons of missing features. The main Qwen LLM org at baba does not use ATOM in production.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/e8d915c0-c962-4277-b62c-a1b08b8e7179_1924x1262.png"
+  caption="Source: InferenceX"
+/>
+
+Before August 21, 2026, AMD’s MI355X strong SGLang development team was matching B200 vLLM on performance per dollar on end to end (e2e) performance.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/360a051c-6117-4860-a704-b50198f01521_1978x1246.png"
+  caption="Source: InferenceX"
+/>
+
+However, B300 vLLM and B200 SGLang still beat AMD’s MI355X.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9ec4708c-148e-42ee-a7c5-3bf4d9cbdfaa_1938x1246.png"
+  caption="Source: InferenceX"
+/>
+
+After August 21, 2026, due to optimizations in vLLM from Inferact and Nvidia, the performance per dollar of Nvidia’s B200 has surpassed that of the MI355X. This is a close race and we are excited to see the performance optimizations over the next couple weeks. We will be publishing an AgentX update article very soon.
+
+[AMD has listed their DeepSeekv4 vLLM optimization and includes lots of exciting things that they can do to improve their performance](https://github.com/vllm-project/vllm/issues/52911).
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9302da60-5bc1-46e1-9392-74e912b5c200_2024x1236.png"
+  caption="Source: SemiAnalysis"
+/>
+
+Now turning to Nvidia. Their most competitive solutions are GB300 Dynamo TRTLLM and GB200 Dynamo vLLM. Both configs rely on PD disagg to achieve high throughput at reasonable interactivity. Additionally, GB300 configs employ wide-EP (DEP32) decode instances in order to achieve higher throughput at the middle of the frontier.
+
+Note that the 2xDEP8+1xDEP12 GB200 point is significantly closer to the 3xDEP8+1xDEP16 GB300 point in terms of TPS compared to TTFT. Again, TTFT is, in general, more sensitive to the “spikiness” of the workload. Since the GB300 point achieves much higher overall concurrency, it incurs more subagent traffic and hence more cold prefills. We can see this in the TTFT chart for the point:
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/96f9c9f9-eb86-4f87-8332-c85f23040836_2048x916.png"
+  caption="Source: InferenceX"
+/>
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/f79e53f5-c8ff-4ed0-a8a3-c05b9e0b4bab_2048x1191.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/512c6225-5816-493e-839d-e4f539e5b1c4_2048x1215.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_metric=y_tpPerGpu&i_xmode=interactivity&i_linelabel=0&i_best=0&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-trt)"
+/>
+
+When normalized by TCO, B300 vLLM versus B200 vLLM aggregated performance is quite similar. The main difference being that B300 can “squeeze” out extra throughput, given its 50% increase in HBM capacity over B200.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/939b9197-321d-4869-ba13-f0b800343b7b_2048x1300.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_vllm%2Cb300_vllm)"
+/>
+
+We can further visualize this difference using our server metric visualizations, which are new to AgentX.
+
+Under the load of 384 concurrent agentic traces, B300 vLLM DEP8 w/ 3TB DRAM via vLLM simple offloading achieved a 91% HBM cache hit rate with an additional 1.36% DRAM cache hit rate. This is because the **HBM KV cache working set size** is approximately 43M tokens with this configuration, and the load barely exceeds this number of tokens in flight at any given time.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/b7ff2d61-bdab-4c2f-96a0-ec5a52469489_2048x884.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/f86888c4-c1a7-47b0-a580-d1a74876cb9c_2048x898.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference/agentic/439522)"
+/>
+
+With B200 concurrency 196 (all other parameters stay the same), we see only 73% HBM cache hit rate and rely more heavily on DRAM with an offload cache hit rate of nearly 20%. We observe that the HBM KV cache working set size is 22M tokens, roughly half that of B300.
+
+DRAM KV offloading is typically implemented as a write-through cache, meaning every prefix written to the HBM cache is also written to the DRAM cache. Therefore, it is most effective when the amount of DRAM available for offloading is significantly bigger (a multiple of 1.5-3) than HBM KV cache capacity.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/61956823-2928-44ec-b00c-8bb5581b8a13_2048x892.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/70a7a7c7-7918-459c-a4e0-f7fc1edca816_2048x887.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference/agentic/439967)"
+/>
+
+H200 SGLang FP8 is able to serve DeepSeek v4 at low concurrency, and is even competitive with B200/MI355X SGLang from a perf/$ standpoint. However, it cannot compete with the newer SKUs in high throughput scenarios due to lack of HBM.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/770b205f-12a1-4d34-81a7-fb235742d005_2048x1305.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_sglang%2Ch200_dynamo-sglang%2Cmi355x_sglang)"
+/>
+
+Furthermore, the reliance on DRAM KV offloading at higher concurrencies leads to unreasonable latency as the number of users scales.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/91dfd9ca-d13d-43e9-a57e-3be0fcc4a5cf_2048x1315.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=h200_dynamo-sglang&i_optimal=0)"
+/>
+
+Overall, MI355X performs decently well compared to its main competitors B200 and B300. Performance is most comparable at the lower throughput / lower latency parts of the curve, where only tensor parallelism and more rudimentary kernels are deployed. AMD needs to work on optimizing DEP kernels on MI355X to be more competitive in the high throughput scenarios, especially given the 1.5x HBM over B200.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/ba6532b3-aa46-4477-be84-8979b1cce35d_2048x1297.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/29cfd340-d61b-46c4-8d87-e081d937b80c_2048x1303.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_vllm%2Cb300_vllm%2Cmi355x_atom%2Cmi355x_vllm&i_label=0)"
+/>
+
+## Kimi K3 2.8 Trillion Parameters
+
+Kimi K3 is another frontier open weight model from China that has 2.8 Trillion total parameters. This is in the same range in terms of number of parameters vs Claude’s Mythos/Fable5 model architecture. We use this as an open weights proxy model architecture. The Kimi K3 model is so big that it does not even fit on a single B200 server and requires using wide EP/wide TP or pipeline parallelism in order to fit all of the weights. On vLLM, speculation decoding/DSpark did not compose at all with pipeline parallelism until very recently, so B200 performance on Kimi K3 was horrible and was getting mogged by MI355X since B200 was unable to use speculative decoding with pipeline parallelism.
+
+MI355X vLLM worked out of the box on day 0 for short context single turn workloads, but for long context multi turn workloads, MI355X AITER and Triton kernels suffered a massive panic attack on the first week and upstream vLLM was completely unusable for MI355X on realistic workloads.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/a1440922-e1ea-4a74-ab62-f1263ae31ca0_2048x1473.png"
+  caption="Source: SemiAnalysis InferenceX"
+/>
+
+Hopper struggles to serve the AgentX workload for Kimi K3 since Kimi is a massive model and because vLLM maintainers/NVIDIA have not been focusing on optimizing Hopper for Kimi K3. Hopper (SM90) requires custom tuned kernels for K3 along with TP32/EP32 tuned shapes for serving at high interactivity.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/ce2b58fc-b7b7-46c2-ae05-baa14419d233_2048x1459.png"
+  caption="Source: SemiAnalysis InferenceX"
+/>
+
+We think it is great that AMD is quickly pushing K3 performance forward with ATOM. However, we encourage AMD to further prioritize upstreaming these improvements into vLLM. ATOM is currently AMD's best-performing engine, but vLLM remains the more relevant comparison for customers using an upstream open-source serving stack.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/80eb810f-a9ea-4f01-a41b-e19e3409ce74_2048x1459.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/73ded698-c86e-411b-8e7c-f9bb125487b7_2048x1459.png"
+  caption="Source: SemiAnalysis InferenceX"
+/>
+
+On part of the curve between 40 to 60 second e2e latency, MI355X ATOM beats even GB300 NVL72 vLLM on performance per dollar.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/27a3f80e-7959-4651-90eb-f498989908a3_1934x1284.png"
+  caption="Source: SemiAnalysis InferenceX"
+/>
+
+## MiniMax M3
+
+Nvidia absolutely destroys all competitors on MiniMax M3 432B. AMD software performance is horrible on MiniMax especially at high context length due to AMD engineering leadership incentivizing tuning only for short context single turn workloads and ignoring long context multi turn workloads.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/c5396c3d-1823-4818-83de-d89cd8242451_2048x1286.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/5179bd8e-c147-46c8-aeb4-b347049b28a7_2048x1303.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft)"
+/>
+
+B300 TRT-LLM TP2 owns the M3 crown. There is a lack of DP-attention points as it is non-optimal on M3 since KV cache locality becomes a routing constraint. This is further explained later on. For GB200 at concurrency 40, TP4/EP4/DPA gets 0.60x the throughput of plain TP4 at a >3x p90 TTFT. At concurrency 32 it hits 28.8% of cache vs 96.0% theoretical. Each DP rank owns a private quarter of the pool; a 300k-token session re-landing on the wrong rank recomputes everything. No decode config with EP appears on the M3 frontier, likely as the concurrency is not high enough to balance the loads on all experts.
+
+B200/B300 also completely beat their rack-scale counterparts for MiniMax M3 on TCO-normalized throughput. On AgentX, the rack-scale advantage isn’t as pronounced as the Dynamo router can become the bottleneck because its work scales with the number and length of live prefixes. Optimizations on this and the several fixes which moved throughput by double-digit percentages are discussed later on in the article. Also, there are no well tuned kernels for wideEP, wide DCP, nor wide TP. And since GB200/300 have higher TCO so without wide ep/wide DCP, it shows up as worse perf per TCO.
+
+With that being said, we also expect further optimizations from Nvidia on their rack scale solutions for this SKU. We will make sure to highlight these in our follow up article.
+
+No submission currently runs context parallelism, despite P90 ISL of 317k. With 4 KV heads, DCP caps at 2 even at TP8, and the MSA indexer needs its own context-parallel handling (a vLLM PR is opened), see the Context Parallelism section for more discussion on this topic.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/aec34e63-34fd-4c42-87a1-97e5c14661ed_2048x1302.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/2b40624a-223c-44db-a403-0be563b2af82_2048x1298.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_hc=1&i_active=mi355x_vllm)"
+/>
+
+All of Nvidia’s Pareto optimal points include KV offload above concurrency 20, but for AMD none of the Pareto optimal points use KV offload to DRAM. AMD also uses KV offload less than Nvidia on the other models. The reason for this is that GPU-to-CPU transfers for CPU KVCache offloading are highly inefficient on AMD vLLM. The hipMemcpyBatchAsync API was missing until ROCm 7.14. Without hipMemcpyBatchAsync, vLLM’s native Simple CPUOffloading requires doing serialized Memcpy from CPU to GPU instead of batching them into larger message sizes.
+
+It is also worth mentioning that vLLM performance is very comparable to TRT-LLM in terms of throughput versus p90 interactivity. Additionally, vLLM performs better in terms of throughput versus p90 TTFT.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/68f7ad68-3886-4980-9b01-390582728e47_2048x1292.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/729199d9-66c0-42b5-b1b8-f228503c1585_2048x1289.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_trt%2Cb200_vllm%2Cb300_trt%2Cb300_vllm&i_hc=1&i_label=0)"
+/>
+
+## Qwen3.5 397B
+
+Qwen3.5 397B uses GatedDeltaNet instead of vanilla attention for every couple of layers. GatedDeltaNet was invented at MIT/Nvidia Research and has a theoretically constant state storage requirement instead of vanilla attention’s linear storage requirements. This means that it has lower storage requirements compared to an equivalent dense attention model. Unlike end to end model training research like the Nemotron disaster, Nvidia Research is great at fundamental research like GDN and LatentMoE which is used on frontier models.
+
+Note that this model’s native max context length is 262k tokens, so we use the [truncated dataset](https://inferencex.semianalysis.com/agentx/cc-traces-weka-062126-256k). This simulates a workload on a smaller model where the max context length would be frequently reached with many compactions, how users would actually use this model.
+
+Qwen3.5 397B is a strong hold for NVIDIA on SGLang versus SGLang, with over 20x better performance at 90 tok/s/user. There is currently zero competition from AMD for Qwen3.5 SGLang.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/c92da639-dcff-4e39-b9b5-49742677e93c_2048x1289.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/519a7cd0-ac51-4a5c-9c45-ba7c41f6d058_2048x1300.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_hc=1)"
+/>
+
+Again, we observe Nvidia over optimizing for interactivity at the cost of TTFT, especially in the case of TRT-LLM. In the graph above, all of the Nvidia SGLang submissions have much lower p90 TTFT when compared to TRT-LLM.
+
+Compared to H100, on Qwen3.5, B300 FP4 has 12x better performance per dollar.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/cc2cf6c7-aa58-4a76-a0a2-ee0457d9243c_2048x1298.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_hc=1&i_best=0&i_prec=fp4%2Cfp8&i_active=b300_sglang%2Ch100_sglang%2Ch200_sglang)"
+/>
+
+## GLM 5.3
+
+GLM 5.3 builds on top of GLM5.2 744B with additional post training. This is a frontier level model.
+
+In terms of OSS SGLang performance, this is another model where Nvidia again beats AMD on realistic agentic inference performance. At 150 tok/s/user p90 interactivity, Nvidia has up to 5x better cost efficiency, With the current state of AMD software, at 150 tok/s/user, Nvidia’s performance advantage is so great that even if the competitor chip hardware was sold for free (but with providers still of course paying for datacenter hosting and power and other operating costs), cost per token would still be cheaper when using Nvidia.
+
+We look forward to AMD’s performance optimizations in the upcoming AgentX update article in a couple of weeks, which will also include some other very exciting results.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/f85bdb45-792c-4330-9745-674b38b03425_2048x1289.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/4a21d140-b588-4b33-941d-7c8090ac42b5_2048x1286.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=GLM-5.2&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_prec=fp4&i_active=b200_sglang%2Cb300_sglang%2Cgb200_dynamo-sglang%2Cgb300_dynamo-trt%2Cmi355x_atom%2Cmi355x_sglang)"
+/>
+
+When looking at ATOM, AMD has better performance per dollar than GB300 NVL72 SGLang and even TRTLLM for some parts of the range of p90 E2E Normalized Interactivity. Great work to the AMD team on these results. Again, we look forward to AMD porting over these optimizations to SGLang. We also are looking forward to NVIDIA quickly optimizing GB300 NVL72 in the coming weeks.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9337ed5b-a320-49f7-b31b-cc4b5751e0ff_2048x1290.png"
+  caption="Source: SemiAnalysis InferenceX"
+/>
+
+We take a moment to introduce an experimental metric which we call **E2E Normalized Interactivity**. At a high level, this metric is supposed to evaluate how fast a user experiences responsiveness when considering both TTFT as well as TPS. It is defined by OSL/E2EL. Substituting the fact that E2EL equals TTFT plus OSL times TPOT (in reality only OSL - 1 tokens are decoded), we get the following equation.
+
+This is effectively interactivity (the 1/TPOT portion) plus an additional penalty proportional to TTFT.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9e472a49-d228-4d8d-876a-6bc0d59f9d97_746x594.png"
+  caption="Source: SemiAnalysis"
+/>
+
+Please note that this metric is experimental and is not perfect. For instance, it heavily penalizes high TTFT and doesn’t capture all the nuances of certain optimizations such as PD disaggregation. All submissions for AgentX v1.0 optimize for both regular interactivity and TTFT separately. We will continue working on new north star metrics that reflect all nuances of modern agentic inference.
+
+## AgentX Industry Impact - Optimizations for Agentic Workloads
+
+The most impactful result from AgentX in its first months was not producing open source datasets, instead, it has been the **industry impact of 50+ upstream PRs** created by AgentX partners to optimize real world agentic workloads using AgentX as the north star. AgentX’s real agentic traffic benchmarks not only the raw prefill and decode kernels, but also tests the entire end to end token generation process from KV cache lifecycle, hybrid-attention cache correctness, CPU KV offload, transfer progress, routing affinity, to incremental tokenization, request serialization, and scheduler bookkeeping. All of these steps matter for every production agentic deployment.
+
+This is just a continuation of our ongoing mission to help the ecosystem accelerate improvement and deliver light speed improvement in software. A great example is SemiAnalysis’s multi-year collaboration with AMD’s software development team in which we have been providing continual feedback and input to help to modernize their software development principles. This has not only led to many changes that have accelerated AMD’s progress, but also has been instrumental towards getting AMD open source closer to first class on agentic workloads.
+
+## A Brief Introduction to the Distributed Inference Ecosystem
+
+As mentioned, agentic inference is inherently a system-wide problem as opposed to just a chip/kernel level problem. Additionally, when there are large _distributed systems_ handling hundreds of thousands of agentic requests, the scheduling of requests and management of KV cache becomes non-trivial and has legitimate performance implications. For example, sub-agents give bursty KVCache patterns where not properly optimizing, it will improperly evict the main agents cache.
+
+The following diagram illustrates the stack at a high level. At the top, routers (sometimes referred to as “frontends”) route requests to different workers. For instance, in the case a server is running data parallel attention, there are separate KV caches for each DP rank. In order not to thrash any one of the KV caches, requests are routed according to different policies such as [consistent hash](https://github.com/vllm-project/router/blob/main/src/policies/consistent_hash.rs), where requests in the same session/subagent are routed by their unique ID.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/58ac4a3a-cc05-4ff6-9d1e-b28dc0d0f760_1814x2048.png"
+  caption="Source: SemiAnalysis"
+/>
+
+For most routing policies, there is nothing significantly different about each router implementation. Some are separate components such as [vLLM router](https://github.com/vllm-project/router) and [llm-d router](https://github.com/llm-d/llm-d-router) while others are integrated in the engine such as [SGLang model gateway](https://github.com/sgl-project/sglang/tree/main/sgl-model-gateway) and [ATOM Mesh](https://github.com/ROCm/ATOM/tree/main/atom/mesh).
+
+After a request is routed, it is handled by the scheduler of an inference engine such as vLLM, SGLang, etc. The engine is responsible for actually performing the inference and returning the result over an API. Additionally, each engine has an interface for connecting the engine’s internal KV cache to external KV cache managers. This allows for a “pluggable” ecosystem where different KV cache managers can integrate with a variety of inference engines.
+
+A simple deployment, used in the current AgentX results, [runs Mooncake](https://pypi.org/project/mooncake-transfer-engine/) alongside vLLM on the same node. Each vLLM worker embeds a Mooncake Store client and contributes a portion of host DRAM to the external KV-cache pool. vLLM connects to this pool through the MooncakeStoreConnector interface which loads reusable KV blocks into GPU memory and saves newly computed blocks back to host memory. Mooncake Store manages the external cache, including placement and eviction, while Mooncake Transfer Engine performs the actual movement of data between GPU and CPU memory.
+
+Different KV cache managers may use different transfer engines to physically move bytes between memory tiers or machines, such as between prefill and decode workers. Mooncake Store, for example, uses [Mooncake Transfer Engine](https://github.com/kvcache-ai/Mooncake/tree/main/mooncake-transfer-engine) to move KV blocks between GPU memory, host DRAM, and remote nodes.
+
+A deployment can use Mooncake Store to offload reusable KV blocks to host DRAM while simultaneously using NIXL to transfer request-specific KV directly from prefill GPUs to decode GPUs. Mooncake TE handles movement for the Mooncake Store path, while NIXL handles the separate prefill-decode path using UCX and GPUDirect RDMA where supported. Multiple KV-management and transfer paths can therefore coexist within the same inference engine.
+
+The ecosystem consists of many independent components, including inference engines, routers, KV-cache managers, data-transfer libraries, and cluster controllers. Platforms such as Nvidia Dynamo, llm-d, and AMD Infera “package” selected combinations of these components into complete software distributions. They publish compatible container images, connectors, deployment manifests, and orchestration logic that allow the components to be deployed and operated as one system. The resulting product is usually a collection of coordinated containers rather than a single monolithic service (for instance: Dynamo, llm-d, and Infera are typically deployed on k8s and co-ordinate large, distributed systems).
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/af5c4776-221b-43b4-b2fd-d46e46f1ab38_1772x960.png"
+  caption="Source: RedHat / llm-d"
+/>
+
+## Context Parallelism
+
+Long context benefits parallelism techniques that a fixed 8k prompt cannot strongly exercise, because at 8k there is little to divide and TTFT is already short. Moreover, parallelism strategies like TP and DP attention are not optimal at longer context lengths, TP can result in the full KV being replicated on each rank. Although KV is shared for DP attention, it can get hung up on longer contexts, as long context workloads also result in a higher variance of possible context lengths.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/1e2801db-53ff-4029-8b55-01b3c1a7037d_1632x1140.png"
+  caption="Source: SemiAnalysis"
+/>
+
+Context parallelism is a parallelism technique that splits query tokens across GPUs. It comes in two forms: PCP for prefill context parallelism and DCP for decode context parallelism. In PCP, each rank prefills its query chunk (KV ring-passed), since prefill tends to be compute-bound, this parallelizes FLOPs resulting in faster prefill with no giant-prompt prefill spike on one rank. For DCP, each rank scans its KV shard, and the partial attention is then merged flash-decode style. Since decode is memory-BW-bound, parallel KV reads can result in faster tok/s.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/a9544ced-f418-44e0-8910-0cbc63fa26ec_2048x768.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/512c3a96-2ab4-452f-be6a-4fa60900575c_2048x651.png"
+  caption="Source: SemiAnalysis"
+/>
+
+This parallelism technique was invented partially by Nvidia Research. Nvidia Research is great at fundamental research like this while for end to end training research, they are embarrassing America with their horrible Nemotron3 Ultra model which is currently getting massively beaten by even tiny Qwen3.8 27B model. DCP/PCP forms part of CUDA moat as the AMD implementation of DCP/PCP isn’t optimized yet. In the [vLLM support matrix](https://docs.vllm.ai/en/latest/design/attention_backends/#standard-attention-mha-mqa-gqa-backends), every single AMD backend is unsupported.
+
+A few of the changes mentioned in the next few sections focus on DCP/PCP.
+
+## vLLM Agentic Optimizations
+
+Working alongside vLLM maintainers from Inferact, Red Hat, NVIDIA, and AMD, we used AgentX’s realistic replayer as a north star, with the resulting fixes landing upstream where most of the optimizations are highly transferable to production. A few examples follow:
+
+vLLM improved hybrid-attention prefix caching so short-lived sliding-window allocations do not evict useful long-context checkpoints. [Selective retention](https://github.com/vllm-project/vllm/pull/43447) preserves sparse replay boundaries and reported a prefix-cache hit rate above 95% with fourteen concurrent requests and contexts up to one million tokens. The same reachability policy [was applied to Mooncake](https://github.com/vllm-project/vllm/pull/44774), and [unreachable sliding-window lookups were removed](https://github.com/vllm-project/vllm/pull/45444). Earlier follow-up work also [stopped offloading sliding-window blocks that could never be reused](https://github.com/vllm-project/vllm/pull/42258) and [kept the speculative lookahead block in the retained prefix](https://github.com/vllm-project/vllm/pull/44082).
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/df1a505d-b8c3-45f9-b03c-a8798fba54c0_2048x632.png"
+  caption="Source: SemiAnalysis and vLLM GitHub PR for Agentic Workloads"
+/>
+
+Agentic Workloads for high concurrent agents require offloading. Thanks to the aforementioned influence of AgentX, there are already workstreams on vLLM that aim to allow CPU KV offload for hybrid models rather than only for uniform full-attention models. This distinction matters because a uniform model has one KV layout per token, so a connector can describe what to save with a single block geometry. A hybrid model carries several cache groups at once, each with a different shape and a different lifetime, and a connector that assumes one uniform layout cannot express which group a given block belongs to. Offload was therefore unavailable for the models whose long sessions needed it most. The general [SimpleCPU connector](https://github.com/vllm-project/vllm/pull/37160) came first, was [enabled on ROCm](https://github.com/vllm-project/vllm/pull/40549), and was then [extended to DeepSeek-V4 hybrid attention](https://github.com/vllm-project/vllm/pull/42296), reporting 81.7% higher output throughput and 46.6% lower mean e2e latency against recomputing the prefix once it no longer fits in HBM.
+
+Mooncake has also gained [equivalent hybrid-memory allocation support](https://github.com/vllm-project/vllm/pull/42828). The same layout problem resurfaces in disaggregated serving, where a [pending change](https://github.com/vllm-project/vllm/pull/51052) transfers Kimi-K3’s conv+ssm recurrent state alongside the attention KV over MoRI-IO for 1P1D prefill/decode splits; without it the decode side starts from an uninitialized recurrent state. The recurrent-state slot rides the existing remote-block-ids channel, so the disaggregation router needs no model-specific changes, and the path was exercised end-to-end on MI355X, TP8 per leg over cross-node RDMA, with DSpark speculative decoding on both legs.
+
+When profiling realistic workloads, vLLM maintainers noticed that during offload, the cost moved to the store path, which was writing too much and too often. Three new fixes have now addressed this issue:
+
+A store is now [skipped while an identical transfer is already in flight](https://github.com/vllm-project/vllm/pull/41289), so concurrent sessions sharing a prefix pay for it once rather than once each. A store [covers only newly generated KV ranges](https://github.com/vllm-project/vllm/pull/46412), so a session that extends its history writes the delta instead of rewriting the whole prefix on every turn. Finally, a store no longer [depends on whether the same blocks still sit in HBM](https://github.com/vllm-project/vllm/pull/46906), so work already scheduled is not discarded when an eviction lands underneath it.
+
+The load path was tuned separately, because lookups happen on every scheduling decision rather than only when data actually moves. Making [lookups asynchronous in the scheduler path](https://github.com/vllm-project/vllm/pull/45659) keeps the connector off the step’s critical path, so a step no longer waits on CPU-side cache queries before it can admit work. [Compact zero-copy lookup keys](https://github.com/vllm-project/vllm/pull/45969), [parallel receive-side loading](https://github.com/vllm-project/vllm/pull/45971), and [prebuilt Mooncake key strings](https://github.com/vllm-project/vllm/pull/46188) then removed the CPU and transport overhead that remained.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/2c2cfea4-a217-47ad-934b-dbd226bb248c_2048x837.png"
+  caption="Source: SemiAnalysis and vLLM GitHub PR for Agentic Workloads"
+/>
+
+Long-lived hybrid state also forced correctness and accounting fixes that fixed-shape requests rarely reach. vLLM [emits cache events per hybrid cache group](https://github.com/vllm-project/vllm/pull/44103), [strides distributed-context stores correctly](https://github.com/vllm-project/vllm/pull/45371), and [computes lookup prefixes correctly under distributed context and prefill](https://github.com/vllm-project/vllm/pull/46855). A related [context-parallel accounting change](https://github.com/vllm-project/vllm/pull/45340) aligns cache ownership with sharded token ranges. Speculative state is now [propagated across merged Mooncake groups](https://github.com/vllm-project/vllm/pull/49069) and [through the SimpleCPU coordinator](https://github.com/vllm-project/vllm/pull/49071), preventing the repeated-turn cache from silently losing EAGLE state.
+
+Looking at the ROCm side of optimizing Agentic workloads in vLLM, the work continues below the cache layer, where the remaining cost is per-layer rather than per-request. Once the prefix survives and arrives on time, what is left is the decode step itself, and a decode step that runs thousands of times per session pays for every avoidable copy and every mismatched kernel.
+
+Three open changes attack that layer:
+
+- A Kimi-K3 change [writes KDA decode results directly into the layer output buffer](https://github.com/vllm-project/vllm/pull/51183), removing one device copy per KDA layer; the saving is small in isolation and repeated for every layer of every decoded token.
+
+- A second change [selects an AITER sparse-MLA decode kernel](https://github.com/vllm-project/vllm/pull/51714) in place of the generic path, and reported 5.22% higher AgentX output throughput with substantially lower inter-token latency.
+- The third is a useful illustration of how much the measurement shape matters. A companion change [routes full-graph attention projections through tuned AITER GEMMs](https://github.com/vllm-project/vllm/pull/51713) and reached a 2.3% gain on fixed sequences at low concurrency. This shows a kernel-level change can show a clean gain on uniform shapes and then be swamped, on an agentic trace, by the cache and scheduling variance that the trace introduces. A [pending change](https://github.com/vllm-project/vllm/pull/52882) turns that shape sensitivity into the dispatch criterion itself: it replaces the DeepSeek V4 C4A selector’s ROCm top-k bottleneck with a hybrid AITER/native path on gfx950, routing short and medium contexts through AITER and long contexts through a graph-safe tuned native fallback. It reports end-to-end selector speedups of 1.21x to 1.76x, with decode-kernel geomeans of 1.2x to 2.9x across an 84-shape matrix.
+
+## SGLang Agentic Optimizations
+
+The AgentX team has been working closely alongside SGLang maintainers from RadixArk, Meta, Nvidia, and AMD to drive optimizations to Agentic workloads run using SGLang, resulting in massive improvements in production inference performance. Let’s discuss these optimizations in more depth.
+
+We will start by explaining how, from the allocator side, SGLang’s sliding-window work addresses the same conflict vLLM’s retention policy does. Window pages and prefix pages are drawn from one pool, and the window is the greedier consumer: it turns over constantly while the prefix sits still and so, under pressure, the transient allocation displaces the durable one.
+
+Three design improvements attack this problem that from different angles. One [proactively frees pages as they leave the window](https://github.com/sgl-project/sglang/pull/26907) rather than waiting for eviction pressure to find them, so dead window state stops competing for pages it can no longer use. Another [caps compute locks to a single window](https://github.com/sgl-project/sglang/pull/27210), bounding how much of the pool an in-flight request can hold pinned at once. A third [removes stale full-KV entries](https://github.com/sgl-project/sglang/pull/29369) that outlive their usefulness.
+
+Proactive freeing has a fork-shaped blind spot, though: a request branching from a shared prefix can still hold reusable full-KV while the window state at the branch point has already been released, and the whole prefix gets recomputed for want of the cheap half. [Open work](https://github.com/sgl-project/sglang/pull/34565) preserves the SWA state at those branch points so forks inherit the window instead of rebuilding it.
+
+Alongside those, [the ROCm ring-cache fix](https://github.com/sgl-project/sglang/pull/30339) is a correctness rather than a capacity change: a ring buffer reuses slots by construction, and reusing one whose old contents are still referenced yields wrong output rather than slow output. None of this is visible on a single 8k prompt, where the window never laps the prefix and the pool is never contended. On a multi-turn hybrid session, these changes are what decide whether the expensive full-attention history is still there on the next turn.
+
+HiCache is SGLang’s first class in-tree offloading mechanism. It faced the same hybrid problem vLLM’s connectors did, and solved it with an asymmetry: [offload the full-attention cache and reconstruct the short sliding-window tail on the way back](https://github.com/sgl-project/sglang/pull/29417). Only the expensive half is worth moving across the bus, and the cheap half can be rebuilt more quickly than it can be fetched. On AMD, [staged write-back](https://github.com/sgl-project/sglang/pull/28534) keeps that movement from blocking the engine while it happens. Recurrent state was the remaining gap, because it cannot be rebuilt from neighbouring tokens the way a window tail can; [FlashInfer GDN checkpoints](https://github.com/sgl-project/sglang/pull/29735) let it participate in prefix reuse at all, and raised throughput from 47,771 to 53,004 tok/s/GPU at a 92.4% cache-hit rate.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/078ad449-7657-4468-9ff9-3480a7999d89_2048x720.png"
+  caption="Source: SemiAnalysis"
+/>
+
+Two further changes address how variable-length traffic affects kernel pipeline. AgentX realistic sessions tend to arrive at continuously varying context lengths, a similar pattern observed for production traffic. A naive runtime that specializes on length will compile a fresh kernel for nearly every request it sees. SGLang maintainers solved this by passing [context length as a runtime scalar](https://github.com/sgl-project/sglang/pull/30255) instead collapsing it into one compilation, improving AgentX concurrency 384 output throughput by 26.75% and mean TTFT by 36.25%, by removing compilation, not from computing anything faster.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/3a807d67-383b-4aa9-93af-e8f3a68313f4_855x634.png"
+  caption="[Source: GitHub](https://github.com/sgl-project/sglang/pull/30255)"
+/>
+
+In the same spirit, [removing a per-step device-to-host sequence-length synchronization](https://github.com/sgl-project/sglang/pull/30365) eliminates a decode bubble that exists only because the host wanted to know a length the device already had.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/b29e003e-db43-45d4-93be-bac0be04d869_1209x646.png"
+  caption="[Source: GitHub](https://github.com/sgl-project/sglang/pull/30365)"
+/>
+
+Variable length also bites inside the attention kernel itself. On GB300, a mixed-context decode batch pays a tail tax: a matched profile attributed 8.4 ms of a 9.8 ms decode-step delta to attention, with the longest requests dragging out the persistent kernel’s shared wave. [Open work ](https://github.com/sgl-project/sglang/pull/34888)splits TRTLLM MHA decode batches into KV-length-sorted groups so the short requests stop waiting on the longest ones.
+
+Decode can starve one level up as well, at the scheduler rather than in a kernel. Under DP attention, every rank joins the same MoE collective while scheduling attention work locally, so a rank fed a stream of chunked-prefill continuations keeps winning the prefill-first decision while peer ranks’ running batches sit waiting, observed on AgentX runs. [A configurable decode interval](https://github.com/sgl-project/sglang/pull/35017) after prefill forces decode rounds between prefills; on AgentX DSv4 Pro, output throughput rose 141% and p99 inter-token latency fell 97.3%, at the cost of median TTFT rising from 36.5 to 59 seconds, trading off first-token wait for stream smoothness.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/47ce130f-13f2-4732-8431-17e26184b8c3_1846x806.png"
+  caption="Source: SemiAnalysis"
+/>
+
+When a request carries no reusable history such as the start of a subagent, any worker will do just fine, and load balancing is the only question worth asking. When the request carries a MB of cached prefix, sending it to an idle worker that does not hold that prefix is the expensive choice, and the router needs to know where the state already lives. SGLang added [DP cache affinity](https://github.com/sgl-project/sglang/pull/26091), so a session is sticky to the rank holding its cache. In this PR, [DP-aware prefill and decode routing](https://github.com/sgl-project/sglang/pull/26245) is both implemented so that both halves of a disaggregated deployment make that decision consistently, and [cache balance as a routing signal](https://github.com/sgl-project/sglang/pull/26293) so affinity does not degenerate into one hot worker. A router can only act on what it is told, so hybrid cache events also become [radix-cache aware](https://github.com/sgl-project/sglang/pull/26387) and [sliding-window aware](https://github.com/sgl-project/sglang/pull/26579).
+
+Speculative decoding receives special attention, because MTP adds a second, smaller piece of per-request state that has to survive everything the main cache survives. SGLang [fixed draft-window transfer in disaggregated serving](https://github.com/sgl-project/sglang/pull/30461) so that state crosses the prefill-to-decode boundary intact, [added overlap scheduling for high-concurrency online decoding](https://github.com/sgl-project/sglang/pull/30497), [removed a no-op EAGLE renormalization](https://github.com/sgl-project/sglang/pull/31294), and [avoided host synchronizations during EAGLE prefill](https://github.com/sgl-project/sglang/pull/33662). The open [resource-lease scheduling work](https://github.com/sgl-project/sglang/pull/32042) and [data-parallel graph-metadata fix](https://github.com/sgl-project/sglang/pull/32196) continue the same effort, which is to make overlap safe when requests can be retracted and resumed rather than simply run to completion.
+
+When looking at Agentic workloads with Heterogeneous prefill and decode topologies, prefix-aware staging is needed, and this is where prefix caching and disaggregation interact badly. When the two sides are not sharded identically, KV cannot be copied across as one contiguous stream; it has to be split on a transfer grid and reassembled at the offsets the decode side expects. A prefix hit makes that harder, not easier, because the prefill worker now sends only the uncached remainder while the decode side still expects a complete, correctly positioned cache. [Radix-cache support in the staging buffer](https://github.com/sgl-project/sglang/pull/30545) splits cached sends on that grid and scatters them at the correct decode offsets.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/88c2d49d-2612-4334-90c2-8a76ab55fd60_1418x1004.png"
+  caption="Source: SemiAnalysis"
+/>
+
+However, this results in correctness problems. A 127,500-token shared-prefix test went from 2 correct needles out of 128 to 128 out of 128, meaning the cache had been silently landing in the wrong places, which a throughput benchmark would have scored as a fast, confident, but wrong answer. The AgentX comparison additionally raised median per-user output throughput by 9.6% at nearly unchanged total throughput per GPU. The transfer itself also carried dead weight: decode-side PREBUILT batches never enter a model forward, yet every transferred prompt was still flattened and copied into a CUDA input tensor that the first decode step reconstructs from relay metadata anyway. [Dropping that unused prompt transfer](https://github.com/sgl-project/sglang/pull/35070) is the largest single win, driving +18.0% per-user output throughput and +12.7% decode throughput per GPU on AgentX GB300. A [follow-up](https://github.com/sgl-project/sglang/pull/35071) moved the prefill DP-rank bootstrap query off the decode scheduler’s critical path, overlapping an HTTP round trip that had been paid synchronously at result consumption, driving a further +1.36% per-user output throughput on the same deployment. Open work continues along the same seam: [multi-pool DeepSeek-V4 support in UMBP](https://github.com/sgl-project/sglang/pull/30762), [unified-KV HiSparse state carried over MoRI](https://github.com/sgl-project/sglang/pull/32368), and [preserving the prefill-owned token when decode terminates without visible content](https://github.com/sgl-project/sglang/pull/34216). The HiSparse work should be read as a capacity and correctness enabler for long contexts rather than as a throughput win at high concurrency, which it is not yet.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/ed24f1b9-b591-4674-bc94-06394962d03f_2048x544.png"
+  caption="Source: SemiAnalysis"
+/>
+
+## TensorRT-LLM Agentic Optimizations
+
+Next, we shall move onto explaining a couple of the recent optimizations from TensorRT-LLM. First, we look at TRTLLM’s distinct frontend optimization for repeated chat turns, a cost that only exists because the workload is multiturn. Every turn of a conversation re-sends the entire history plus a little more, and the naive implementation re-tokenizes all of it. Tokenization is cheap per kilobyte, but is ruinous when the same 100,000 tokens are tokenized again on every turn.
+
+The obvious fix, to tokenize only the new suffix, is wrong in a way that is easy to miss, because byte-pair encoding is not position-independent. Tokens can merge across the join, so splitting the text at the boundary and concatenating the two token sequences can produce a different sequence than tokenizing the whole string, which quietly diverges from the sequence the prefix cache was built against.
+
+TRTLLM implements [Boundary-aware incremental tokenization](https://github.com/NVIDIA/TensorRT-LLM/pull/17462) which handles this by finding the rendered-text common prefix, rolling back one complete token so any merge that spans the join is recomputed, and tokenizing only the changed suffix from there. On the Qwen3.5 AgentX trace, it matched full tokenization on all 1,087 transitions — the correctness claim, tested rather than assumed — and reduced mean processing time from 185.1 ms to 11.3 ms.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/30a51cf2-e628-4c20-a4a5-5978234ca713_952x541.png"
+  caption="[Source: GitHub](https://github.com/NVIDIA/TensorRT-LLM/pull/17462)"
+/>
+
+A fixed 8k1k request has no prior rendered turn to reuse, so none of this appears there. Relatedly, [chat-template rendering was moved into the input-processing pool](https://github.com/NVIDIA/TensorRT-LLM/pull/16231), so a long template no longer serializes the main request loop behind it.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/00b459b8-9c4c-4c8c-8659-07e14bf5699f_2048x784.png"
+  caption="Source: SemiAnalysis"
+/>
+
+The MiniMax-M3 work focuses on disaggregated KV movement, where the failure is one of granularity. When prefill and decode do not agree on head layout, the KV for one logical request stops being a few large contiguous regions and becomes thousands of small strided pieces, each of which turns into its own transfer descriptor. The bytes moved are unchanged; the per-descriptor overhead is what explodes, and it explodes in the worst way on exactly the long prompts that matter! [Corrected multi-pool mapping and a chunked NIXL bounce path](https://github.com/NVIDIA/TensorRT-LLM/pull/17518) coalesce those pieces through a bounded reusable arena, trading an extra staging copy for orders of magnitude fewer descriptors. Its AgentX diagnostic reduced request-critical KV p99 from 26.74 seconds to 125 ms at concurrency five, and from 10.15 seconds to 288 ms at concurrency forty.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/52bd05ab-914f-4dc5-9f16-a0ea1b495383_959x501.png"
+  caption="Source: [GitHub](https://github.com/NVIDIA/TensorRT-LLM/pull/17518)"
+/>
+
+[Nonblocking context-transfer polling](https://github.com/NVIDIA/TensorRT-LLM/pull/17428) protects the same path by reaping completed transfers even when scheduling stalls. This breaks a feedback loop in which finished KV blocks stay pinned and prevent new admissions. The stalls themselves also had a [removable cause](https://github.com/NVIDIA/TensorRT-LLM/pull/16734): avoiding implicit device-scalar syncs in DeepSeek-V4’s context sparse-attention metadata eliminated 18 four-byte device reads per step that each forced a cudaStreamSynchronize, on a GB300 disaggregated context worker. The fix threads host-side counts through as plain Python ints, so the executor thread no longer holds the GIL for most of a step while the KV-transfer and response threads wait behind it.
+
+TensorRT-LLM also moved irregular long-context work onto more efficient execution paths. [Context graph producers for MiniMax-M3](https://github.com/NVIDIA/TensorRT-LLM/pull/17473) capture stable sparse producers while leaving request-dependent attention eager, and per-user output throughput improved by 12.58 percent in its AgentX test. An open [native KV-event production change](https://github.com/NVIDIA/TensorRT-LLM/pull/16876) reduces allocation and conversion work on the KV-aware routing path.
+
+AgentX also exposed kernel-selection and scheduler-lifetime failures that only appear at scale and duration. Two are about which kernel gets picked. MiniMax-M3 [added CuTeDSL choices to MXFP8 autotuning](https://github.com/NVIDIA/TensorRT-LLM/pull/17316), widening the candidate set and improving output throughput per GPU by roughly 7 to 10% at low-concurrency aggregate points. In the opposite direction, TensorRT-LLM [disabled corrupt split-K MoE tactics](https://github.com/NVIDIA/TensorRT-LLM/pull/17105) after it crashed five of seven AgentX runs, with no crashes in seven matched runs afterwards. A tactic that is fast and wrong is worse than one that is merely slow, and an autotuner will select it enthusiastically unless it is removed from the pool. Selection is not the only way a kernel goes wrong: MiniMax-M3’s legacy sparse-attention path for short queries could hand the SM100 kernel a non-contiguous, head-major block-index view that it read as contiguous, selecting the wrong KV pages and producing incorrect or non-finite output. [Honoring the block-index strides](https://github.com/NVIDIA/TensorRT-LLM/pull/17285) for q_len ≤ 32 fixed the indexing without materializing the tensor or adding a kernel, and five matched full AgentX pairs on GB300 afterwards completed with zero serving errors and no non-finite markers.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/f48290ac-3361-4b0c-a085-ff84dd3dce51_2048x1347.png"
+  caption="Source: [TRT Github](https://github.com/NVIDIA/TensorRT-LLM/pull/17105)"
+/>
+
+The other two are lifetime bugs, which are the characteristic failure of long runs rather than large ones. [Sequence-slot headroom and consistent slot-indexed buffer sizing](https://github.com/NVIDIA/TensorRT-LLM/pull/16279) handle the transient overlap where a completing request and a newly admitted one both need a slot, a window that a steady stream of arrivals and departures hits constantly and a fixed batch never hits at all. A later [attention-data-parallel dummy-request fix](https://github.com/NVIDIA/TensorRT-LLM/pull/17278) kept nine Qwen3.5 disaggregated cells alive where most earlier cells had failed within minutes, the difference between a configuration that benchmarks and one that survives a session.
+
+Two open transfer changes target very long disaggregated prompts, and together they show how a fix can create the next bottleneck. In the default arrangement, a decode worker cannot start until the entire prompt has been prefilled and then transferred, so two expensive phases run back to back even though the first produces its output incrementally. [Pipelined KV transfer](https://github.com/NVIDIA/TensorRT-LLM/pull/15727) begins sending each completed prefill chunk as it lands, so transfer overlaps prefill compute and only the final chunk is on the critical path.
+
+That change makes chunk handling frequent, which exposes work that used to happen once. Its follow-up [retrieves only the block IDs belonging to the current chunk](https://github.com/NVIDIA/TensorRT-LLM/pull/17526) rather than the whole prompt’s block list each time. For a 128,000-token prompt split into 1,024-token chunks, that is the difference between building a 4,096-entry list once and rebuilding it 128 times for every layer group. A per-chunk cost that scales with total prompt length is a cost scaling shape that eats the gain the pipelining just bought.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/e8eeb92e-1aad-4a97-b3c1-28409005809e_2048x769.png"
+  caption="Source: SemiAnalysis"
+/>
+
+## AMD ATOM Agentic Optimizations
+
+AMD’s ATOM engine was originally designed only for single turn workloads instead of real world agentic multi-turn production workloads, so there were a lot of changes needed to the core fundamental ATOM engine and kernels to enable good support for long context multi turn workloads. ATOM still has a long way to go to support agentic workloads relative to where vLLM/SGLang are at present. AgentX is used as the realistic north star target for ATOM’s refactor to support agentic workloads. The first optimization we will chat about that ATOM implemented is smartly using sparse checkpoint retention for DeepSeek-V4 paged sliding-window attention. [The merged implementation](https://github.com/ROCm/ATOM/pull/1640) keeps selected window tails alive so branch and replay requests can resume at useful boundaries. Its measurements separate the two effects cleanly: on the same AgentX trace at concurrency 48, the actual prefix hit rate rose from 5.6% to 96.45%, and losses at the sliding-window gate fell from 91.35% to 0.16%. The second number is the mechanism behind the first. Nine out of ten prefix matches were being found and then discarded for want of a window tail, so the cache was not missing but being overruled.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/5c880335-e1e3-44d9-a123-8e316c9c3808_822x555.png"
+  caption="Source: GitHub"
+/>
+
+Two earlier cache-manager fixes had to land before any of this could be measured, and both fixes are worth noting as examples of a cache that reports itself healthy while doing nothing. One [stopped free-pool hits from destroying shared cache entries](https://github.com/ROCm/ATOM/pull/902); the other, [a deferred-output fix](https://github.com/ROCm/ATOM/pull/939), restored prefix hashing in the default scheduler mode and moved repeated long prompts from zero cached tokens to reuse of every complete prefix block. A separate change lets prefix-hit prefill [stay on the optimized sink attention kernel](https://github.com/ROCm/ATOM/pull/1345) rather than falling back to the generic path, so a cache hit does not quietly cost part of what it saves.
+
+Hybrid models also carry a recurrent or compressor state, which differs from ordinary KV in one decisive way: it cannot be reconstructed from the tokens around it. A window tail can be recomputed from neighboring context, but recurrent state is the accumulated result of everything that came before, so if it is dropped, the only way back is to replay the sequence. ATOM [gave this per-request state a content-addressed checkpoint lifecycle](https://github.com/ROCm/ATOM/pull/1771), letting generated turns leave reusable resume points without reserving a separate protected cache for them. In one test, a request reused 512 generated tokens and computed only a two-token suffix.
+
+The tuning detail matters as much as the feature. Publishing a checkpoint unconditionally costs 17.5% throughput on zero-hit traffic, the price paid by every session that never comes back, in order to help the ones that do. Spacing checkpoints by token interval avoided that penalty, and fixed 1k1k throughput stayed within measurement noise, which is the relevant safety property: a feature aimed at agentic reuse should not tax workloads that will never use it.
+
+ATOM’s AgentX-relevant CPU path starts from the arithmetic that justifies offloading at all. [Standalone LMCache offload](https://github.com/ROCm/ATOM/pull/1318) reloads a 32,000-token prefix from CPU in about 0.32 seconds against roughly 2.5 seconds to recompute it, an eight-fold margin. This makes crossing the bus worth doing at these context lengths and would not hold for a short prompt.
+
+The rest of the path is about ownership and index placement rather than bandwidth. ATOM copied vLLM’s [multi-connector](https://github.com/ROCm/ATOM/pull/1406) design which lets a prefill worker send KV to a remote decode worker and save the same prefix to CPU at once, without freeing the blocks until both consumers are finished; two independent readers of the same blocks is a situation where single-turn won’t get.
+
+[Promoting restored blocks back into the GPU prefix index](https://github.com/ROCm/ATOM/pull/1725) fixes a subtler waste: without it, a prefix loaded from CPU is used and then not registered as resident, so the next turn fetches the same hot prefix across the bus again, paying the transfer repeatedly for a cache that was already in HBM. Follow-up work [fixed asynchronous save ordering, packed-KV geometry, unaligned handoffs, and remote request accounting](https://github.com/ROCm/ATOM/pull/1807) together, eliminating reload corruption across a two-round, 2,638-request validation. This bug surfaces only when the same blocks are saved, evicted, and restored many times over.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/a7bb7f74-e5a3-4da3-b954-89905e54c4da_2048x420.png"
+  caption="Source: SemiAnalysis"
+/>
+
+The distributed path repeats, in a different codebase, and the pattern is already visible in SGLang and Dynamo: routing has to know where state lives. ATOM’s router called ATOMesh is a fork of SGLang’s router with most of the features removed. Unfortunately, ATOMesh required SGLang’s cache-aware routing feature, so that feature had to be added back. ATOM gained KV lifecycle events for cache-aware routers, so the router can know where state lives at all. It also gained multi-node prefill and decode routing, and session-sticky data-parallel routing. The sticky policy is a two-sided compromise worth stating explicitly: a conversation returns to the healthy worker that owns its state, but idle assignments expire so that stickiness does not permanently unbalance the cluster on behalf of sessions that have gone away.
+
+Disaggregation then has to move whatever the model actually keeps, which is not always one uniform cache. DeepSeek-V4 [transfers both buffers of its mixed FP8 and BF16 cache layout](https://github.com/ROCm/ATOM/pull/1737), and EAGLE disaggregation [moves the draft model’s independent KV cache](https://github.com/ROCm/ATOM/pull/1331) alongside the target cache, the same second-cache problem TensorRT-LLM and SGLang each had to solve. [Remote-KV admission and backpressure](https://github.com/ROCm/ATOM/pull/1647) closes the loop by stopping the decode side from accepting more parked transfers than it can safely resume, which is the disaggregated form of accepting work you cannot finish.
+
+On ATOM, [PCP reported 35 to 43% lower mean TTFT](https://github.com/ROCm/ATOM/pull/1220), with total throughput gains of up to about 49% at a 64,000-token input - a gain that grows with input length rather than with batch size. Making that usable in practice required it to compose with everything else a session relies on, so DCP was [made compatible with prefix caching, chunked prefill, and FP8 KV](https://github.com/ROCm/ATOM/pull/1701) and then [extended to MTP](https://github.com/ROCm/ATOM/pull/1746). Parallelism that cannot coexist with the prefix cache would trade one long-context win for another. The same scarcity of parallelism exists inside a single GPU: a batch-1 MLA decode has no head or query dimension to spread, only the KV walk, and a hardcoded split budget of 16 left that walk running on 16 of a gfx950’s 256 CUs. A [still-open change](https://github.com/ROCm/ATOM/pull/1911) stops overriding the kernel’s own split derivation, so Aiter cuts the walk into as many parts as the machine has clusters.
+
+[Chunked pipeline-parallel prefill](https://github.com/ROCm/ATOM/pull/1552) attacks the same problem from the memory side, replacing repeated tensor-parallel collectives with streamed layer-stage handoffs. Its GLM-5.2 result at high load is the most complete in this section: output throughput doubled, median time to first token fell from 28.6 seconds to 8.7 seconds, and each prefill GPU held 3.68 times as many KV blocks. That last figure is the one to read first, because capacity per prefill GPU is what decides how many long sessions can be in flight before the deployment hits the HBM cliff at all.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/8184b9e6-883b-446c-884b-226b5e9fcca1_2048x549.png"
+  caption="Source: SemiAnalysis"
+/>
+
+## ROCm AITER Agentic Optimizations
+
+ATOM/AMD vLLM/AMD SGLang’s long-context execution depends on matching lower-level AITER kernels, because a parallelism strategy at the engine layer is only real if the kernels can express it. [Prefill context-parallel process groups](https://github.com/ROCm/aiter/pull/3728) provide the extra query-sharding dimension that prefill context parallelism needs, and also widen fused-kernel row indexing for prompts above 131,000 tokens. [Decode context parallelism](https://github.com/ROCm/aiter/pull/3267) (DCP) shards KV across the tensor-parallel GPUs already present, so a longer sequence or a larger batch fits without replicating the whole cache on every rank.
+
+Large caches also exposed a class of failure that short fixed requests essentially never reach: address width. A 32-bit offset is entirely adequate until a single cache pool crosses the boundary, at which point the arithmetic wraps and the kernel addresses the wrong row without any error being raised. AITER added [runtime 64-bit dispatch for batch prefill above 4 GB](https://github.com/ROCm/aiter/pull/2893), [64-bit MLA offsets above 2 GB](https://github.com/ROCm/aiter/pull/4474), and [64-bit addressing throughout DeepSeek-V4’s unified cache paths](https://github.com/ROCm/aiter/pull/4680), the last preventing silent reads and writes to the wrong row in pools of roughly 150 million rows.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/ce356c05-883b-4c63-a359-8cfd72dddb63_1408x1046.png"
+  caption="Source: SemiAnalysis"
+/>
+
+DeepSeek-V4 decode also gained [a persistent MLA kernel for 64-head and 128-head MTP packings](https://github.com/ROCm/aiter/pull/3459). Those two head counts are what ordinary decoding and speculative verification actually produce, so this gives the engine a dedicated long-context path for its common shapes instead of treating them as incidental variants of a kernel written for short contexts. It is the same argument as the vLLM AITER sparse-MLA selection above: in long context, the generic path is not a modest compromise, it is the wrong kernel.
+
+## Dynamo Agentic Workload Optimizations
+
+A good chunk of Nvidia submissions use the Dynamo Inference Orchestration and Router Systems. Dynamo’s AgentX series shows that the distributed serving layer can become the bottleneck once engine kernels improve. The router’s work is proportional to the number and length of live prefixes rather than to the number of tokens generated, so a workload of many long, overlapping, long-lived sessions loads it in a way that fixed-shape traffic never does. The first series of PRs reduced the cost of each routing decision: [less work on the lookup hot path](https://github.com/ai-dynamo/dynamo/pull/10540), [no redundant suffix invalidation](https://github.com/ai-dynamo/dynamo/pull/10836), and finally [batched KV matching, registration, ownership, and terminal dereferences](https://github.com/ai-dynamo/dynamo/pull/11095), which reported a 22.2% median output-throughput gain at concurrency 512. Batching helps here for the same reason it helps in an engine: the per-item overhead was dominating the item.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/7af8faf5-300e-4ee5-bc0c-040b7630e923_1016x671.png"
+  caption="Source: GitHub"
+/>
+
+The second series of PRs changed how ownership is represented, which is the harder problem underneath. Every cached block needs to be attributed to the requests relying on it, so it is not freed while still in use and not pinned after everyone has finished. With thousands of concurrent sessions sharing overlapping prefixes, the bookkeeping itself becomes significant. Dynamo moved from [shared block chains](https://github.com/ai-dynamo/dynamo/pull/11503) to [arena-level ownership counts](https://github.com/ai-dynamo/dynamo/pull/11508) and finally to [backend-specific request leases](https://github.com/ai-dynamo/dynamo/pull/12329), each step coarsening the unit being tracked. The lease design reduced AgentX replay time by 23.7% for the vLLM backend and 22.0% for SGLang, and lowered peak memory at the same time, a sign that the previous representation was the problem rather than the traffic.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/e3039950-98e0-4cd0-b7fe-929a120bd7d2_2048x576.png"
+  caption="Source: SemiAnalysis"
+/>
+
+Further router profiles removed costs with the same shape, where a periodic sweep or a full recomputation had been acceptable only because live state used to be small. [Bucketed expiry pruning](https://github.com/ai-dynamo/dynamo/pull/10521) replaced a scan proportional to everything tracked and improved high-churn AgentX throughput by 13.7%. [Delta-only suffix cleanup](https://github.com/ai-dynamo/dynamo/pull/10676) processes only what changed and absorbed about 28 times as many store and remove events in the same window. [Compressed prompt paths](https://github.com/ai-dynamo/dynamo/pull/11644) cut front-end CPU by 35.3% and materially improved tail time to first token, which matters because prompts in this workload are long and largely repeated. Overload state is now [tracked incrementally](https://github.com/ai-dynamo/dynamo/pull/10645) rather than recomputed.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/878dd41d-fc0f-407e-8421-ad05ad9e740c_1087x624.png" />
+
+One routing change is a deliberate trade rather than a pure win. Dynamo can now [charge active decode requests in its routing score](https://github.com/ai-dynamo/dynamo/pull/12158), so a worker already committed to long-running decodes looks more expensive than its queue depth alone suggests. That improved median AgentX latency at a small throughput cost in the reported tuning point, which is the kind of choice that only becomes visible when requests occupy a worker for a long time. An [open follow-up](https://github.com/ai-dynamo/dynamo/pull/13447) packages that trade into an new agentic router preset that pushes further in the same direction, crediting prefix overlap at 2, scaling prefill load by 4, and weighting active decode requests at 64. At that tuning point, the trade stops costing throughput: on an 8xH200 AgentX run, the preset improved fixed-window completed-output throughput by 8.26% over the default cost function, cut run-level p95 time to first token by 43.1% and p95 inter-token latency by 22.6%, and completed one more full trajectory.
+
+The request plane was optimized next, because an agentic trace does not send one request and one response. It sends many related requests carrying largely identical prompts, and streams every token back as its own frame, so serialization and copying are paid per turn and per token rather than once. Switching to [MessagePack request payloads](https://github.com/ai-dynamo/dynamo/pull/10437) improved throughput by 8.1% and reduced average time to first token by 9.7% in its AgentX test, and [direct Python transcoding](https://github.com/ai-dynamo/dynamo/pull/11104) removed an intermediate value tree from that path entirely.
+
+What followed is a sequence of changes that all remove a copy rather than speed one up: not copying [MessagePack event payloads](https://github.com/ai-dynamo/dynamo/pull/11539), not copying [received ZeroMQ frames](https://github.com/ai-dynamo/dynamo/pull/11574), and not paying full [inter-token-latency metrics overhead](https://github.com/ai-dynamo/dynamo/pull/11569) on every token. [The chat streaming hot path](https://github.com/ai-dynamo/dynamo/pull/10433) was shortened for the same reason. Individually, these are unremarkable; multiplied by every streamed token of every concurrent session, they are what determines how many requests per second a frontend can sustain.
+
+High-concurrency profiling then found costs that had nothing to do with moving data. [Static logging filters](https://github.com/ai-dynamo/dynamo/pull/11820) removed a shared span-matcher lock, a contention point rather than a volume problem, and raised reported frontend throughput from 932 to 1,133 requests per second. [Simpler positional radix buckets](https://github.com/ai-dynamo/dynamo/pull/12161) reduced peak memory in the mocker by 5.51 GiB in a 32-worker run. An open change [flushes detokenization metrics once per response](https://github.com/ai-dynamo/dynamo/pull/12999) rather than updating cumulative counters on every streamed chunk, approximately halving frontend CPU time in its matched diagnostic profile. That last one is the clearest example of the category: the instrumentation was cheap per call and ruinous at one call per token.
+
+## LMCache Agentic Optimizations
+
+LMCache is an open-source KV cache layer that sits under inference engines like vLLM, storing reusable KV chunks keyed by prefix hash across CPU DRAM, local NVMe, and remote backends (Mooncake, Redis, S3). LMCache can be used as an alternative to vLLM’s native offloading connectors.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/945da9bc-59ec-4084-9f3a-da58da04b3c5_2048x638.png"
+  caption="Source: SemiAnalysis"
+/>
+
+LMCache’s multiprocess path was changed for the volume and shape of agentic cache movement, beginning with a failure that is not a slowdown but a stop. When each of many requests with contexts above 100,000 tokens reserves the blocks for its whole load before starting, the pool is exhausted by requests that are all waiting and none progressing. [Chunked external-cache loading](https://github.com/LMCache/LMCache/pull/3382) reserves per chunk instead, so loads interleave and drain. At concurrency 32, the validation completed 120 requests where the old path deadlocked after 28, and concurrency 48 kept running with the KV pool 98.5 percent full.
+
+The other changes reduce how much is moved and how often the runtime gets in the way. Storing only the useful portions of DeepSeek-V4’s hybrid groups cut [storage per token by almost twenty times](https://github.com/LMCache/LMCache/pull/3635), and sliding-window prefetch now [loads only the live window](https://github.com/LMCache/LMCache/pull/3869) rather than window state that will never be read, the same reachability argument vLLM applied to offload, approached from the storage side. [One native transfer call per object group](https://github.com/LMCache/LMCache/pull/3908) then removes repeated Python lock handoffs across staging copies and kernel launches, which is overhead proportional to the number of pieces rather than to the bytes in them.
+
+Two current LMCache changes are especially specific to AgentX but remain open. [The hybrid lock-accounting fix](https://github.com/LMCache/LMCache/pull/4524) stops one request from releasing another request’s read locks on shared sliding-window or recurrent-state chunks. Several requests must share the same chunks, the accounting must be per-chunk rather than per-holder, and eviction must actually start. Sustained Kimi-K3 runs with DRAM offload supplied all three and produced tens of thousands of warnings, corrupt generations, and eventually GPU crashes once eviction began. Anything short of a long, shared, memory-pressured run leaves it dormant.
+
+A parallel line of LMCache work made all of the above reachable on AMD Instinct hardware. CacheBlend’s non-prefix reuse depended on flashinfer, which is CUDA-only, so [a Triton block-sparse attention backend](https://github.com/LMCache/LMCache/pull/3092) reimplements the three kernels it needs: block-sparse attention with CSR indices and log-sum-exp output, causal prefill, and log-sum-exp output blending. It then routes to them automatically when ROCm is detected or flashinfer is missing. [ROCm Dockerfiles](https://github.com/LMCache/LMCache/pull/3101) mirror the CUDA build and lightweight images. [An AMD hipFile backend](https://github.com/LMCache/LMCache/pull/3843) extends the GDS L1 slab-file tier, which reached storage only through NVIDIA cuFile, by binding ROCm’s hipFile through ctypes and dispatching on torch.version.hip; the cuFile path is unchanged.
+
+Distribution was the remaining gap. CUDA users installed a prebuilt wheel; AMD users built it from source. We worked together with AMD to publish a [prebuilt gfx942 and gfx950 wheel](https://github.com/LMCache/LMCache/pull/4273) which closes that. It installs into the upstream image and passes all 56 KV-transfer kernel tests on MI350X, and it publishes to a GitHub release rather than PyPI so a plain pip install lmcache stays the CUDA build. [A one-line follow-up](https://github.com/LMCache/LMCache/pull/4363) marks the bind-mounted repository as a git safe directory, which only fails in CI because the container runs as root over a runner-owned checkout and the version introspection in setup.py refuses to read it.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/89c2f79c-a704-4144-a900-ddd69ce306dd_1112x667.png"
+  caption="Source: GitHub"
+/>
+
+[DCP-aware CPU offload](https://github.com/LMCache/LMCache/pull/3561) resolves a straightforward incompatibility between two features that long contexts make mandatory together. With decode context parallelism enabled, each rank holds only a stride of the KV, so what any one rank could save is not a usable prefix; the fix gathers the strided shards before saving and redistributes them after loading. Without it, enabling context parallelism silently disables CPU cache hits for exactly the long prefixes that motivated both features. Its validation recorded more than 30,000 CPU hit events, with single-request loads reaching hundreds of thousands of tokens.
+
+## Mooncake Agentic Optimizations
+
+Mooncake serves Moonshot’s Kimi production traffic along with production traffic at many labs, and is a transfer engine underneath disaggregated vLLM and SGLang configurations. Until recently, Mooncake’s AMD support stopped short of both RDMA registration and offering installable packages.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/32c734aa-1f52-47af-a98e-334978b4e6fa_1778x1386.png"
+  caption="Source: SemiAnalysis"
+/>
+
+Registering GPU memory for RDMA on Nvidia either uses the nvidia-peermem kernel module or exports a dmabuf file descriptor. AMD has no nvidia-peermem equivalent, so GPU-direct RDMA had no path at all and deployments fall back to staging KV through host DRAM. [A HIP dmabuf registration branch](https://github.com/kvcache-ai/Mooncake/pull/2225) adds the mirror of the existing CUDA dmabuf path, exporting through ROCm instead of the CUDA handle call, and resolving the true allocation base first because caching allocators pack tensors at an offset inside a larger allocation. Host memory still registers directly.
+
+Support that cannot be installed is not support. Mooncake published CUDA and MUSA wheels but no ROCm package, so AMD users built the engine from source inside every image. [A ROCm wheel, CI, and release path](https://github.com/kvcache-ai/Mooncake/pull/3184) publishes mooncake-transfer-engine-rocm to PyPI alongside them. This workstream from Andy Luo, AMD engineer, was due to noticing a pattern when dogfooding agentic workloads with AgentX that building MoonCake from source in ROCm is not an first class citizen pattern.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/12cd94ca-2aa7-4e06-a4bd-3153982234c5_1220x680.png"
+  caption="Source: GitHub"
+/>
+
+The transfer engine has no device kernels and does not depend on torch, so one architecture-agnostic wheel covers gfx942 and gfx950, and the ROCm runtime is bound at load time rather than vendored, which means the same wheel works unmodified in both the upstream vLLM ROCm image and the SGLang ROCm image. That was verified as a full cross product: MI300X and MI355X, each under vllm/vllm-openai-rocm and lmsysorg/sglang, running the master binary and a HIP buffer transfer test with data verification. The pull request adds a tag-triggered publish across Python 3.10 through 3.13. An open follow-up [adds a self-hosted two-node MI350X external prefill and decode tier](https://github.com/kvcache-ai/Mooncake/pull/3338) so the ROCm disaggregated path is exercised on real hardware rather than only compiled.
+
+Together, these PRs mean an AMD AgentX run can now install the transfer engine and the KV cache layer from published artifacts into stock upstream images, and move KV directly between GPU memory and the fabric.
+
+## Other Optimizations
+
+The changes above address long-context costs: a prefix that has to survive, a hybrid cache that has to stay correct, a transfer that has to keep up. But there are a whole host of day-zero enablement and correctness bugs that break requests just as badly as a million-token session.
+
+MiniMax-M3 tested whether that ROCm work compounds into day-zero readiness, and the [Advancing AI writeup](https://newsletter.semianalysis.com/p/can-amd-break-the-cuda-moat-amd-advancing) draws the comparison directly: AMD’s first public disaggregated recipe, MI355X FP4, reached InferenceX in January months behind Nvidia, while M3 FP4 disaggregation landed on day zero. This is an improvement from the DeepSeek-R1 period, when parity took months. Three vLLM fixes sat on that day-zero path, and each was a correctness failure rather than a performance one.
+
+Disaggregation was blocked first. NixlConnector’s handshake asserted that the SPLIT-region block_len scales with the prefill-to-decode TP ratio, but block_len follows per-rank KV heads. M3 has 4 KV heads, so a TP4 prefill paired with a TP8 decode is GQA-capped to one head per rank on both sides and the two lengths are equal where the assertion demanded a factor of two. The handshake was rejected, no KV moved, decode regenerated everything from scratch, and gsm8k scored 0. [Validating against the actual head ratio](https://github.com/vllm-project/vllm/pull/45879) fixed this.
+
+The other two were platform splits. M3’s sparse-attention backend read the byte-backed FP8 cache as float8_e4m3fn for every E4M3 configuration. But gfx942’s platform dtype is e4m3fnuz, and the two encodings differ. K and V were therefore altered before the kernels consumed them. The prefill and decode wrappers had also omitted the FNUZ types from their FP8 checks. [Using the platform dtype for the cache view](https://github.com/vllm-project/vllm/pull/45720) fixed both halves. Separately, M3 ships as separate NVIDIA and AMD model files, and only the NVIDIA one implemented the EAGLE3 interface, so speculative decoding aborted at engine init on ROCm with a model-does-not-support error. [Bringing the AMD model to parity](https://github.com/vllm-project/vllm/pull/45546) restored it, with MI355X gsm8k matching both the non-EAGLE3 MI355X run and B200.
+
+The TensorRT-LLM section above covers the M3 work that is long-context specific: descriptor explosion in disaggregated KV transfer, context graph capture, sparse block strides, autotuner candidates, and the corrupt split-K MoE tactics that had to be removed from the pool.
+
+The local AgentX matrix combines session-aware or KV-aware routing, long and variable conversation histories, MTP, hybrid attention, aggregate and disaggregated serving, and concurrency sweeps that cross the HBM capacity cliff. It includes GPU-resident comparisons and CPU DRAM offload through vLLM SimpleCPU, Mooncake, LMCache, and SGLang HiCache. That combination is what activates the upstream work above. The old fixed-sequence matrix usually creates one prompt, performs one prefill, decodes one fixed continuation, and discards the request. It therefore does not measure cache survival across turns, repeated tokenization, session affinity, cache-event traffic, offload churn, transfer progress during scheduler stalls, or long-lived ownership bookkeeping.
+
+The allowed optimization policy treats CPU KV offload as optional. A vendor may use vLLM connectors, LMCache, SGLang HiCache, Mooncake, Dynamo KVBM, or another CPU DRAM connector, or disable offload when the resulting latency and throughput point is better. NVMe offload is deferred. CPU DRAM must scale with the fraction of GPUs used, including the 3 TB cap for non-standardized-DRAM systems. Standardized-DRAM systems have no hard cap but retain the same proportionality rule. The local generator currently applies the 3 TB cap to every runner, so it does not yet implement the standardized-DRAM exception.
+
+The net new optimization surface is not simply longer attention. It is the preservation, movement, routing, reconstruction, and repeated processing of a growing session state. AgentX made those costs large enough to drive generic upstream changes across vLLM, SGLang, TensorRT-LLM, ATOM, AITER, Dynamo, and LMCache. Direct searches of NIXL and Mooncake did not identify additional AgentX-tagged runtime PRs, so their relevant effects remain represented through the engine connector changes above.
+
+## AgentX Methodology Deep Dive
+
+AgentX is a massive shift in open source real world long context multi turn agentic trace replaying and we collected traces over $3M worth of tokens within our own dataset consisting of real world traffic from Claude Code, OpenAI Codex, etc. In addition to the dataset, we developed a comprehensive methodology for replaying the traffic patterns fairly. The goal is to stay as authentic to the organic traffic as possible while being equitable about GPU resource requirements.
+
+We will deep dive into the agentic trace datasets, replay methodology, and agentic behavior in general. It is recommended reading for readers that would like to better understand the overall shape of agentic workloads as well as how harnesses orchestrate requests under the hood.
+
+## $3M USD Agentic Traffic Trace Collector
+
+When initially designing AgentX, our north star goal was to make the benchmark as realistic as possible in terms of KV workload shape and KV reuse patterns. We began experimenting with replaying some existing datasets, such as SWE-bench, Qwen-Bailian, and other random Claude Code traces from HuggingFace. At the time, these datasets did not include significant use of subagents, 1M context, compactions, dynamic workflows, or many other of the recent defining characteristics of an agentic trace. At SemiAnalysis, most of the team are AI power users and use agents for a broad variety of tasks including coding, analyst research, excel modeling, social media operations, and many more. Therefore, we decided that the most achievable and realistic traces could be captured in house.
+
+To collect a large number of traces, we created a proxy that intercepts HTTP requests to Claude / Codex. Then, users that wished to upload traces simply changed the base URL in their Claude / Codex setup to point to the proxy. At the time of writing, we have collected over 8,000 sessions, 3.4 million requests, and 610 billion tokens. Together these represent more than $3M USD in spend. [We open sourced a representative subset of these sessions for the AgentX v1.0 benchmark](https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126).
+
+Although agentic harnesses can appear complex, they ultimately orchestrate a sequence of HTTP requests. Each request contains some combination of system instructions, tool definitions, and accumulated conversation history. As a session progresses, this history grows and is repeatedly sent back to the model, creating the long contexts and high prefix reuse that AgentX is designed to reproduce.
+
+Our proxy records these requests and responses as they occur. It also extracts metadata/HTTP headers such as timestamps, conversation IDs, and subagent IDs, which lets us recover the _structure_ of the conversation (request ordering, concurrent branches, and the approximate parent/child structure of each session). This metadata is what allows us to replay the traces approximately how they would have been seen by the original Anthropic API server.
+
+To protect employee privacy, the replay dataset contains no original prompts, source code, tool arguments, or tool results. Instead, we tokenize each requests’ content and then group it into 64-token blocks, finally replacing each block with a session-scoped chained hash. Matching prompt prefixes therefore produce matching hash prefixes without revealing their contents ([this paper](https://arxiv.org/abs/2506.02634) talks more about this strategy). During replay, these hash blocks can then be replaced with tokens from, say, a coding dataset. So we preserve the approximate context growth and conversation KV-reuse patterns of the original workload.
+
+It’s worth noting that this process is necessarily imperfect, mostly due to the fact that when using a frontier model provider’s API, much of the content that the end LLM server actually sees is hidden. For instance, thinking/reasoning content for SOTA models are now encrypted in HTTP requests and replaced with a deterministic hash in an attempt to hinder distillation attacks. However, it seems like [this didn’t work out exactly as well as the big labs had planned…](https://arxiv.org/html/2608.09867v1)
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/767f2f58-fa9d-40d3-8711-751d243cae9a_500x487.png"
+  caption="Source: SemiAnalysis"
+/>
+
+Furthermore, while we have access to all the raw _content_ of the user/assistant messages, system prompts, tool usage, etc., API providers apply additional chat templating server side that aren’t transparent. We also cannot observe Anthropic’s proprietary tokenizer or context introduced by server-side tools. Images and documents also do not have a straightforward correspondence between their wire representation and the number of tokens processed by the model. We use deterministic placeholders and empirically calibrated, model-specific padding to bring reconstructed prompt lengths to best estimate the content that is actually seen by the server.
+
+We can’t _perfectly_ capture and replay Claude Code / Codex traces as they are _actually seen_ by the Anthropic / OpenAI servers due to incomplete information, but we can get pretty close. The chart below shows the ratio of hash tokens (after our approximations/processing) and the true API provider token count across all request lengths and models.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/7123b5de-9942-4298-8ccd-1b69b8a71df0_2048x1799.png"
+  caption="Source: SemiAnalysis"
+/>
+
+To summarize, collecting real Claude Code traces in the exact way that they would have been replayed against the original server is not easy due to incomplete information. However, we have enough context to collect and replay traces with extremely high fidelity to match original traffic patterns, timing, prefix caching, and DAG patterns.
+
+## AgentX $3Mil Dataset
+
+The dataset used for AgentX v1.0 can be found on [HuggingFace](https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126). It is a 393 session subset of 8.3k session proxy corpus mentioned in the previous section. Additionally, we applied some post-processing to clean up anomalies, such as:
+
+- Removing Claude Code security monitor (auto mode) requests and title generation requests as these are specific to Claude Code and not necessarily representative of general agentic traffic
+- Removing requests with a reconstructed input length greater than 990k tokens (where our approximation overcounted)
+- Remove duplicate requests (sometimes the proxy received identical requests if the connection was dropped)
+
+Additionally, each conversation is formatted into the WEKA trace format, proposed by Callan Fox as part of his [kv-cache-tester](https://github.com/callanjfox/kv-cache-tester) project. We chose this format for storing trace information primarily because we worked closely with Callan to develop the benchmark and found it intuitive for storing per-session traces. All in all, the trace format is quite arbitrary and our proxy dataset could be mapped to other formats such as [Mooncake](https://docs.nvidia.com/aiperf/benchmark-modes/trace-replay-with-mooncake-traces).
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/48045991-20d7-4685-863d-c9aa1d6d3142_1812x2048.png"
+  caption="Source: SemiAnalysis"
+/>
+
+After these are applied, we get the following dataset. Note that not all X-axes are the same.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/f22c9c7e-44ba-4ffd-bdc3-58fbbef8f30d_2048x2004.png"
+  caption="Source: SemiAnalysis"
+/>
+
+The distributions for ISL/OSL and inter-turn latency (in agentic work, this is mainly time taken for tool use) are relatively log-normal. The median ISL is 142k tokens and the median OSL is 444 tokens. The median inter-turn latency (or “tool use time”) was 3.84 seconds. Only ~10% of inter-turn latency was greater than 1 minute. These are likely made up of gaps where the harness is waiting on an actual response from a human.
+
+One thing worth mentioning is that these request distributions will look different depending on which harness is being used, since different amounts/types of context are injected (for instance Pi is known to be minimalist in terms of harness-injected context while Claude Code is known for the opposite. Additionally, the ISL/OSL distributions will depend on the model, as different models have tokenizers that can produce either more/fewer tokens. However, given a significant portion of the world’s agentic coding traffic goes through Claude Code, we believe this is rather representative.
+
+The dataset also has 175 sessions with at least one subagent (~44% of all sessions). There are 1,697 total subagent rollouts in the dataset, with a median of 4 per session. The median wall-clock time for a subagent (beginning of first request to end of last request) is 2.27 minutes. This distribution again follows a relatively log-normal distribution.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/f4792809-087e-431b-acce-aecdd3855b3b_2048x1390.png"
+  caption="Source: SemiAnalysis"
+/>
+
+This dataset includes context up to 1M context, meant to test the more recent frontier open-weight models. Additionally, we have [a truncated 256k context length dataset](https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126-256k) which we replay against models with a max context length of 256k or less.
+
+## Agentic Traffic Trace Replayer
+
+Rather than build a replay solution from the ground up, we decided to partner with [AIPerf](https://github.com/ai-dynamo/aiperf), a vendor agnostic HTTP replayer tool from Nvidia that is adopted by many in the industry including tenstorrent, AWS, AMD, etc. While the intention is to integrate AgentX features into the upstream repo, we maintain a separate [fork](https://github.com/SemiAnalysisAI/aiperf) to be even more vendor neutral such that we have control over allowing even more 3rd more contributions. Again, thank you to the AIPerf team, especially Anthony Casagrande, for the help and dedication to building a realistic and representative agentic benchmark.
+
+An agentic session is naturally described as a directed acyclic graph (DAG). Each request is a node, and an edge means the request at its head cannot be issued until the one at its tail has completed. Every edge additionally carries a delay, specifying how long to wait once that precondition is met.
+
+The simplest session is completely linear, with no subagents and no parallel requests, each request depends on exactly one predecessor. The graph degenerates to a line and the only thing an edge encodes is the inter-turn latency (aka, tool use time or “think” time), which is the client’s local work rather than the model’s.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/20662be0-c311-49e9-8e39-0973d8a1865d_2048x1169.png"
+  caption="Source: SemiAnalysis"
+/>
+
+In agentic traces, subagents can also be spawned. A subagent is a separate stream of requests that has its own context, typically to do a focused task. Multiple subagents can run in parallel to do more aggregate work, and subagents can run in parallel to the main agent in some cases. The main agent then waits on groups of subagents to finish, and then incorporates their outputs back into the main agent’s context (while this is not _always_ the case, this is the most common pattern).
+
+This behavior is responsible for turning the linear chain of requests above into a DAG, where certain requests are dependent on others. When a group of requests belonging to one subagent is identified, AIPerf finds the most recent main agent predecessor and designates it as the “spawning” request. Similarly, the “join” request is identified by the subsequent main agent request after the duration of the subagent group completes.
+
+In the example below, the subagent group consists of a single subagent (001), which runs two requests. Its first request goes out as soon as the main agent’s opening request completes. When that request completes, a 2.2-second inter-turn delay stands in for tool-use wall-clock time, and then the subagent’s second request is sent. The main agent’s second request is the join point for subagent 001. It goes out once both conditions are met: at least 17 seconds have elapsed since the main agent’s first response _and_ subagent 001’s second request has completed.
+
+One small limitation is that HTTP timestamps reveal timing, but not always causality. In the example below, if subagent 001 finishes with seven seconds remaining before main-agent request 2’s recorded start, we cannot tell whether those seven seconds represent work performed after the subagent returned or independent work already underway. AIPerf therefore preserves both constraints: request 2 waits for its recorded main-path delay and for subagent 001 to finish. This reproduces the observed timing and workload topology, but not any dependencies hidden inside the harness. These are things we hope to improve on in subsequent versions of AgentX.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/18adec21-15d9-40cd-af7d-0772da4a9af0_2048x1729.png"
+  caption="Source: SemiAnalysis"
+/>
+
+Multiple subagents can also be spawned from a single request. In the example below, subagents 001 and 002 both identify their spawning parent as main agent request 1, and then join at main agent request 2.
+
+AIPerf can also identify “auxiliary” requests, which are one off requests that do not share context with any other requests in the stream. These branch off of the main agent and never join back. In practical terms, these are requests like Claude Code’s “summarize this session” requests that are unrelated to the conversations context. Another good example is Claude Code’s “/btw” feature.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/3d5f01ad-1736-496b-91b4-31672002bf47_1920x2048.png"
+  caption="Source: SemiAnalysis"
+/>
+
+The example below brings it all together. This is the type of trace snippet you’d see in the actual dataset. We have five parallel streams leaving a single main agent request, separated into groups defined by what main agent request they join upon.
+
+Subagents 001 and 002 finish at 20 and 23 seconds, so the first main agent request starting after that, at 25 seconds, is their join. Subagents 003 and 004 are spawned in the same gap but run much longer, finishing at 46 and 50 seconds, so they join at 52 seconds instead. AIPerf keys each subagent by the pair (spawning request, join request), which means these four streams collapse into two branches even though all four leave the same node. The branch takes the name of its first member, which is why the join edges are labelled with subagent 001 and subagent 003.
+
+This is also the first case where the main agent overlaps its own subagents. The request at 25 seconds goes out while 003 and 004 are still running: the main agent is blocked only on the group that joins it, not on every subagent in flight.
+
+The auxiliary chain attaches to whichever main agent request most recently preceded it, which here is the request at 52 seconds rather than the one that opened the session. That node therefore does two things at once — it receives the second subagent group’s join, and it spawns the one-off. Of course the auxiliary request never joins back.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/d2f465f9-372c-4ee1-b42f-e79fa9fe352b_1677x2048.png"
+  caption="Source: SemiAnalysis"
+/>
+
+## Further AgentX Deep Dive
+
+### Pareto Frontiers Sweeping
+
+In the AgentX workload, in order to generate a Pareto frontier, we sweep over the number of concurrent Claude Code sessions against a single deployment. Since each conversation has realistic inter-turn delays and subagent usage, we get a spikier, more realistic traffic pattern. The example below is an example of replaying 40 concurrent clients against a B200 TP4 vLLM server running MiniMax M3.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/058757ed-531f-4cfb-a1ad-a06b1499ecbd_1360x612.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference/agentic/439239)"
+/>
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/43184e50-b71a-4a48-a569-98d6906cb259_2048x1167.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-13&g_runid=31723588108&i_seq=agentic-traces&i_xmode=interactivity&g_model=MiniMax-M3&i_best=0&i_active=b200_vllm)"
+/>
+
+A final point worth discussing is what metrics are important to consider when evaluating agentic workloads. We believe interactivity (TPS - tokens per second) and time-to-first-token (TTFT) are still important, and these are the industry standard for evaluating SLOs. When viewing AgentX results, it is _extremely important_ to consider both TPS and TTFT together, since there are inference optimizations that can improve one at the cost of the other.
+
+We are currently working on defining a new metric that combines TPS and TTFT in a meaningful way. This should also take into account that in agentic workloads, people often care more about the end-to-end speed at which a _task_ finishes rather than how fast they receive tokens or TTFT.
+
+Finally, it’s worth mentioning that the end-to-end latency, in its current form, is now less meaningful because end-to-end latency is directly proportional to OSL. Therefore, P90 E2E latency is heavily affected by the 10% tail of longest output sequence lengths. While it can still be good to holistically compare the overall performance of certain configurations, we recommend instead looking at a combination of TPS and TTFT.
+
+### Warmup, Timing, Determinism, and Conversation Reuse
+
+The goal of AgentX is to benchmark systems that are already in a steady state. With agentic workloads, this means that profiling should start from a point where some context trajectories are already cached. To mimic a steady state, it is also desirable that not all conversations start at turn 0, which may cause a “[thundering herd](https://en.wikipedia.org/wiki/Thundering_herd_problem)” effect.
+
+Warmup proceeds in two stages. First, AIPerf uses a fixed random seed to select a wall-clock point between 25% and 75% of each conversation. At that point, it identifies every active request stream, including the main agent and any active subagents, and sends the most recent request before the selected point for each stream. These primer requests reconstruct the conversation state at that point and are dispatched together. AIPerf waits for them to drain before continuing.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/963dce62-c49b-4deb-afee-e8dd448526c5_2048x1322.png"
+  caption="Source: SemiAnalysis"
+/>
+
+In the second phase, each replay lane is advanced by 10 additional requests to give additional opportunity for the KV cache to materialize. All warmup requests omit inter-turn delay and use a maximum output length of one token, substantially reducing warmup time.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/85116f5f-be0d-405b-a5d9-6a9237b44cc3_2048x895.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/fef10e0d-261e-4978-8650-b10304ec04d0_2048x897.png"
+  caption="Source: SemiAnalysis"
+/>
+
+When warmup is complete, profiling begins and lasts one hour. All metrics are collected strictly over this duration. For reproducibility, AIPerf accepts a seed that ensures each run samples conversations deterministically, conversations start at the same point, and that each conversation is reconstructed with the same synthetic content run-to-run. During profiling, we impose a 5 minute idle time cap on each stream, so that long inter turn gaps don’t “acquire” a worker lane for the duration of the benchmark. We enforce this so that we can effectively run the benchmark in 1 hour. In later versions of AgentX where we include NVMe offloading, we may choose to increase this so that we can measure a longer TTL. For now, 5 minutes is reasonable as this is [Anthropic’s default KV cache TTL](<https://platform.claude.com/docs/en/build-with-claude/prompt-caching#:~:text=Check%20that%20calls%20are%20made%20within%20the%20cache%20lifetime%20(5%20minutes%20by%20default)>).
+
+This level of determinism ensures that runs using the same inference engine, hardware, concurrency, and server settings are reproducible. However, because AgentX is a [closed-loop benchmark](https://notpeerreviewed.com/blog/tail-latency/), different configurations will complete different numbers of requests at different rates, introducing some natural variation in the workloads they encounter. This is most noticeable at lower concurrency, where fewer requests are completed (naturally) and the workload has less opportunity to converge toward the dataset’s overall distribution.
+
+When a conversation completes during profiling, its replay lane selects another conversation from the dataset sampler. Each replay receives a unique, deterministic cache-bust marker that is prepended to every independent prefix chain, including the main-agent chain and any fresh-context subagent or one-off chains. Forked subagents inherit the marker from their parents. The marker stays the same within a replay, preserving its KV-reuse patterns, but changes between replays to prevent artificially high cache-hit rates. This also enables scenarios to run where concurrency is greater than the number of conversations in the dataset (393).
+
+### AgentX’s Fair Speculative Decoding Methodology
+
+As mentioned, the dataset is anonymized upon collection. This means that the 64-token hash blocks must be synthetically filled in before replay. AIPerf accomplishes this by deterministically sampling from a synthetic coding/tool-use token pool.
+
+Importantly, the KV reuse patterns as well as request timing are maintained, however the synthetic request data does lead to some additional considerations. Namely, running speculative decoding methods on synthetic data may lead to the speculator rejecting/accepting an abnormal number of tokens when compared to non-synthetic data (since the speculator is not trained on synthetic data).
+
+We talked about this shortcoming in our [InferenceX v2 article](https://newsletter.semianalysis.com/i/188090866/multi-token-prediction-mtp), and have since then improved on our methodology. We have worked closely with the community to ensure a mechanism exists in most OSS inference engines that allows users to force how many draft tokens to accept from the speculator (aka, “acceptance length” or “acceptance rate”). Then, for each (model, speculator, draft length, and thinking mode) combination, [we collect the average AL](https://github.com/SemiAnalysisAI/InferenceX/tree/main/golden_al_distribution) on the [SPEED-Bench](https://huggingface.co/datasets/nvidia/SPEED-Bench) agentic coding dataset, a “unified benchmark designed to evaluate speculative decoding (SD) across diverse semantic domains and realistic serving regimes.”
+
+Then, at runtime we apply these realistic Speculative decoding acceptance lengths to AgentX to ensure vendor neutral fairness.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/c15f47a8-fcb3-4220-80ee-4b95bfa7b0b0_2048x1376.png"
+  caption="Source: GitHub"
+/>
+
+## Exploring Agentic Workloads Detailed Telemetry Tutorial
+
+AgentX required more than a new benchmark harness and dataset. [We also spent some time rebuilding parts of the InferenceX visualization to make agentic results easier to explore and digest](https://inferencex.semianalysis.com/inference/agentic/439903). A single AgentX datapoint represents thousands of requests across growing conversations, subagents, warmup periods, cache states, and dynamically changing in-flight load. Due to this, having a single point on a Pareto curve can hide a lot of useful information. As we have said many times - there is never just a one size fits all solution for inference serving.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/46159be7-8b5b-49d7-990f-2ce1cf1217d0_1110x687.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference/agentic/439903)"
+/>
+
+One of our major changes is how we construct the curves themselves. In previous versions of InferenceX, configurations with speculative decoding enabled and disabled were often displayed as separate curves. However, we are now moving away from this approach. The frontend now combines allowed inference optimizations and displays the best available curve for each model, SKU, and inference engine combination. Due to this, individual points along a single curve may use different optimization techniques and configurations, including speculative decoding, disaggregation, or KV cache offload.
+
+Our goal is to show the best production performance available from each hardware and software stack, rather than creating a separate curve for every possible combination of optimizations. However, we still expose the underlying configuration and provenance for every point. Clicking a point shows a tooltip with a detailed view showing exactly which configuration produced it, along with the run metadata, links to the publicly viewable CI provenance, and AgentX specific statistics. From there, the “View charts” link opens the full point-detail page with AgentX specific statistics.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/add2d50c-a0be-4771-a00b-e6b4f1fe8502_2048x1256.png"
+  caption="Source: SemiAnalysis InferenceX"
+/>
+
+The detailed point view provides a much deeper look into the selected AgentX run. It includes input and output sequence length distributions, interactivity and TTFT over time, KV cache utilization, request queue depth, prefix cache hit rate, input and decode throughput, prompt-token source breakdown, and unique input tokens over time. These metrics make it easier to understand why two points with similar aggregate throughput may behave differently throughout the replay.
+
+The page also separates warmup and profiling data. Readers can switch between the two phases to inspect how the system behaves while its cache state is being established and during the profiling period used for the benchmark run.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/91abef64-d639-4da8-8d7e-3499be750011_1001x1541.png"
+  caption="Source: SemiAnalysis InferenceX"
+/>
+
+Points using KV cache offload are surrounded by an additional dotted circle on the main chart, which is used to distinguish points with KV offload enabled. When one of these points is selected, the detail page shows the offload type, KV offload engine, chip cache-hit rate, and CPU cache-hit rate. This makes it possible to see where KV offload contributes to the best curve without creating a separate curve for every offload configuration.
+
+Another new feature is the request timeline. This view shows the individual requests replayed during a selected AgentX run and can be organized either by conversation or by worker. The conversation view groups subagents underneath their corresponding root conversation, making it easy to see when conversations and subagents overlap. Warmup and profiling requests can also still be viewed separately.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/c8fc6236-52bd-45ff-ac2e-539899c00d87_2048x1097.png"
+  caption="Source: SemiAnalysis InferenceX"
+/>
+
+Each request in the timeline is clickable and links directly to the corresponding conversation and turns on the InferenceX datasets page. This allows readers to move from an aggregate point on the Pareto curve to the exact anonymized request that was replayed.
+
+[The AgentX page](https://inferencex.semianalysis.com/datasets) also includes a flamegraph for visualizing the structure of an individual conversation. Each bar represents one turn and is scaled relative to the largest turn in that conversation. The bar is divided into cached prefix tokens, uncached input tokens, and generated output tokens. This gives a visual representation of how the context grows throughout a conversation and how much of each request can be reused from KV cache.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/a0e991d9-6ab6-43e7-9cc9-93ac9ca5b7bd_2048x879.png"
+  caption="Source: SemiAnalysis InferenceX"
+/>
+
+## InferenceX/AgentX Future Next Steps
+
+We are excited to continue our goal of making AgentX the most realistic and representative benchmark. For the foreseeable future, we will continue making [small bug fixes to the current v1.0.x harness](https://github.com/SemiAnalysisAI/aiperf/releases), but have plans to make bigger changes to the v1.1 harness. Submissions for each distinct model will always run the same minor version to ensure all results are comparable.
+
+As a fast follow, we will add SSD/NVMe KV offloading. This will allow an even larger KV cache working set size than DRAM allows, which will allow the high throughput left side of the pareto curve.
+
+We will also capture a larger, more diverse, and more recent dataset of agentic traces across a wider variety of models and harnesses. Rather than representing each request as one contiguous list of hash IDs, the next dataset will preserve the boundaries between system instructions, user and assistant messages, tool calls, and tool results. This will allow AgentX to evaluate workload-aware serving techniques that use information available to the agent harness but normally hidden from the inference engine. For example, a router could direct low-reuse tool traffic to dedicated prefill workers, retain an agent’s prefix during a long tool call, or prefetch and share prefixes when subagents fork. The current format preserves request sizes and KV-reuse patterns, but it lacks the structure needed to evaluate these optimizations.
+
+The following [SGLang RFC](https://github.com/sgl-project/sglang/issues/27574) by Ishan provides a concrete example of why this richer trace structure matters. It proposes a router-initiated hint interface that uses information such as session lifecycles, shared-prefix boundaries, tool-call duration, and subagent state to tell the engine when KV should be shared, prefetched, demoted, pinned, or retained. Capturing this structure would allow future AgentX versions to evaluate these workload-aware cache policies instead of only replaying flat token prefixes.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/36899201-da3b-42ec-888f-2443c63980aa_2048x1260.png"
+  caption="Source: [GitHub](https://github.com/sgl-project/sglang/issues/27574)"
+/>
+
+Lastly, we are capturing fine-grained and coarse grain power telemetry data to have an even more accurate view of the efficiency of the Joules per intelligence of different software and hardware stacks.
+
+We have so much data and so many possible visualizations. Please let us know any visualizations you would like to see, as well as any more general feature requests!
+
+[Suggest Frontend Feature!](https://github.com/SemiAnalysisAI/InferenceX-app/issues/new/choose)
+
+## Performance Throughout the Model Lifecycle
+
+In the following sections, we turn to our historical single turn data (8k1k), which covers each model from launch day through the point we retired it from active testing. There are strong results here from both Nvidia and AMD, including several fixed sequence length configurations where MI355X comes out ahead.
+
+AgentX better represents today’s agentic inference workloads. However, the historical fixed-sequence InferenceX results still remain useful for tracking the performance over time. Workloads such as 8k1k and 1k1k strip away most session-level behavior, including prefix reuse, persistent KV cache state, and routing affinity. This makes them less representative of current production traffic, but still useful for tracking how inference performance improves as software support matures.
+
+<Blur>
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+</Blur>
+
+---
+
+_This article continues on our Substack. [Subscribe to SemiAnalysis](https://newsletter.semianalysis.com/subscribe) to read the complete article._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is AgentX 1.0?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "AgentX 1.0 is the world's first fully open source, multi-turn agentic coding inference benchmark at 1 million context, released under Apache 2.0. It replays real anonymized Claude Code and Codex traces instead of fixed sequence length prompts, and runs on roughly 2MW of continuously operated compute across more than 1000 chips including MI355X, GB300 NVL72, GB200 NVL72, B300, B200, MI325X, MI300X, H200, and RTX Pro servers."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What makes an agentic workload different from a fixed sequence length benchmark?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Agentic workloads are multi-turn, long context, have very high prefix reuse, and launch bursty short-lived subagents. That makes agentic inference a systems problem rather than a kernel problem: KV tensors must be transferred across nodes, requests must be routed to the rank holding the right prefix, and long contexts force KV offload to DRAM or SSD. Fixed sequence length workloads such as 8k1k strip all of that away and mostly measure baseline chip and kernel performance."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does the CUDA moat hold up on agentic workloads?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It depends on the model. On DeepSeek V4 Pro the race is close: MI355X SGLang matched B200 vLLM on performance per dollar until August 21, 2026, when vLLM optimizations from Inferact and NVIDIA pushed B200 ahead, although B300 vLLM and B200 SGLang were already beating MI355X. On MiniMax M3, Qwen3.5, and GLM 5.3, NVIDIA leads by a wide margin, with over 20x better performance at 90 tok/s/user on Qwen3.5 SGLang and up to 5x better cost efficiency on GLM 5.3 at 150 tok/s/user. Context parallelism is a concrete part of the moat: every AMD backend is listed as unsupported in the vLLM attention backend support matrix."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the AgentX dataset made of?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "SemiAnalysis collected traces through a proxy that intercepts HTTP requests to Claude and Codex, gathering over 8,000 sessions, 3.4 million requests, and 610 billion tokens, representing more than 3 million USD of spend. The open sourced AgentX v1.0 subset contains 393 sessions with a median input sequence length of 142k tokens, a median output sequence length of 444 tokens, and a median inter-turn latency of 3.84 seconds. 175 sessions, roughly 44 percent, contain at least one subagent, with 1,697 subagent rollouts in total. Content is anonymized into 64-token blocks replaced by session-scoped chained hashes, so prefix reuse patterns survive but prompts do not."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is E2E Normalized Interactivity?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "E2E Normalized Interactivity is an experimental metric defined as output sequence length divided by end-to-end latency. Because end-to-end latency equals TTFT plus output length times TPOT, the metric works out to interactivity plus a penalty proportional to TTFT, capturing both responsiveness dimensions in one number. It is not perfect: it heavily penalizes high TTFT and does not capture every nuance of optimizations such as prefill-decode disaggregation, so AgentX v1.0 submissions still optimize for interactivity and TTFT separately."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What industry impact has AgentX had so far?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Over 70 upstream pull requests across vLLM, SGLang, TensorRT-LLM, ATOM, AITER, Dynamo, LMCache, and Mooncake used AgentX as the north star benchmark. Examples include hybrid-attention prefix caching in vLLM that reported over 95 percent prefix cache hit rate at 1M context, CPU KV offload extended to DeepSeek V4 for 81.7 percent higher output throughput and 46.6 percent lower mean end-to-end latency, boundary-aware incremental tokenization in TensorRT-LLM that cut mean processing time from 185.1 ms to 11.3 ms on Qwen3.5, and sparse checkpoint retention in AMD ATOM that lifted the DeepSeek V4 prefix hit rate from 5.6 percent to 96.45 percent."
+      }
+    }
+  ]
+}`}</JsonLd>

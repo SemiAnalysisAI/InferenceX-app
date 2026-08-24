@@ -1,0 +1,1031 @@
+---
+title: 'AgentX - InferenceXv3：CUDA 护城河在 agentic 推理中还站得住吗？'
+subtitle: '开源价值 300 万美元的数据集、100 万以上上下文长度、多轮、子智能体、95%+ KVCache 命中率、GB300 NVL72、MI355X、B200'
+seoDescription: 'AgentX 1.0 是首个完全开源、1M 上下文的多轮 agentic 编码推理基准测试。文中给出 DeepSeek V4 Pro、Kimi K3、MiniMax M3、Qwen3.5 和 GLM 5.3 在 GB300 NVL72、B300、B200、MI355X 和 H200 上的 agentic 结果，以及该基准测试推动的 70 多个上游 PR。'
+date: '2026-08-24'
+publishDate: '2026-08-24'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - gpu
+  - nvidia
+  - amd
+  - announcement
+---
+
+自 2025 年 11 月的 [Claude Code 拐点](https://newsletter.semianalysis.com/p/claude-code-is-the-inflection-point)以来，长上下文、多轮的 agentic 工作负载快速增长，如今已经主导了生产推理的流量。2026 年 4 月，OpenAI 的企业级 agentic 支出超过了 ChatGPT 支出。
+
+[Claude Code is the Inflection Point](https://newsletter.semianalysis.com/p/claude-code-is-the-inflection-point) — 当前 GitHub 公开 commit 中有 4% 由 Claude Code 编写。按现在的增长曲线，我们认为到 2026 年底 Claude Code 将占每日全部 commit 的 20% 以上。一眨眼的工夫，AI 已经吞掉了整个软件开发。
+
+agentic 工作流已经明确接过了接力棒。**今天，我们发布 AgentX 1.0 —— 全球首个完全开源、1M 上下文的多轮 agentic 编码推理基准测试，以 Apache 2.0 协议发布。[完整仪表板在此。](https://inferencex.semianalysis.com/)**
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/864512bf-1feb-445d-a03a-bbf9f4f1b791_1928x1234.png"
+  caption="来源：[SemiAnalysis](https://openai.com/signals/enterprise-data/)"
+/>
+
+过去，业界大多用固定序列长度的 prefill 和 decode 工作负载来衡量性能，但这种衡量方式并不准确。真实世界是多轮、长上下文、高 prefill 复用的，还伴随子智能体（sub agent）突发、KVCache offload 和大量工具调用。因此，我们的目标是为整个行业建立一套正确衡量 AI 硬件与软件性能的方法。
+
+[我们投入了超过 300 万美元构建这个数据集。今天，我们把一切都开源。](https://inferencex.semianalysis.com/)InferenceXv3 在既有的“固定序列长度”场景（8k1k、1k1k、1k8k）之外，新增了 AgentX 这一贴近现实的场景。它用 agentic 编码流量替代了此前 8k 输入、1k 输出 token 的单轮流量，让基准测试场景更接近真实。
+
+完整测试矩阵运行在约 2MW 的持续运行算力上，覆盖 1000 多颗芯片和大量 SKU，包括 MI355X、GB300 NVL72、GB200 NVL72、B300、B200、MI325、MI300X、H200 和 RTX Pro 服务器。Rubin 将于本月晚些时候到位，TPU 和 MI455X UALoE72 会在今年内加入。[如果你觉得我们的免费开源工作有价值，欢迎点个 star。](https://github.com/SemiAnalysisAI/InferenceX)
+
+很高兴看到 NVIDIA 和 AMD 在 agentic 工作负载上都拿出了出色的性能。NVIDIA 在很多前沿模型上表现非常好，AMD 在部分前沿模型的特定对比中同样表现不俗。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/8a065d23-de1d-4e2f-a3ae-7af724409c9d_1350x653.png"
+  caption="来源：[SemiAnalysis GitHub](https://github.com/SemiAnalysisAI/InferenceX)"
+/>
+
+AgentX 头几个月产出的最有价值的东西，并不是首批测试结果，而是这个基准测试已经带来的巨大行业影响。**超过 70 个上游 PR** 以 AgentX 作为北极星基准代理，围绕真实生产 agentic 工作负载在 vLLM、SGLang、TensorRT-LLM、ATOM、AITER、Dynamo、LMCache 和 Mooncake 上做优化。这些优化中的大部分都可以迁移到生产流量上。本文后面会逐项深入分析。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/193e605e-579b-4ed2-9637-5bfdbee5cf71_1286x1515.png"
+  caption="来源：SemiAnalysis"
+/>
+
+开源是 InferenceX 的核心原则，因此我们开放的部分比多数把“开源”挂在嘴边的项目都要多：开放的前端、通过易用 REST API 提供服务的公开数据库（**已有多家一线 AI 实验室的容量规划团队在使用**）、公开的 GitHub Actions CI 溯源信息、[运行日志](https://inferencex.semianalysis.com/inference/agentic/440193?i_seq=agentic-traces&i_xmode=interactivity&view=logs)，以及每一个数据点的精度验证。关键在于，我们的测试配置主要跟随 [recipes.vllm.ai](http://recipes.vllm.ai) 和 [SGLang cookbook](https://docs.sglang.io/cookbook/intro) 使用上游镜像，衡量的是客户实际能拿到的性能，而不是针对 benchmark 特调过的镜像。
+
+三到四周后，我们会发布一篇 AgentX 更新文章，涵盖针对 agentic 工作负载的进一步优化，以及 AMD 和 NVIDIA 的最新性能结果。需要理解的是，agentic 工作负载的画像变化很快，InferenceX 会持续快速跟进，测试真正有代表性的工作负载。
+
+InferenceX 100% 坚持开源，这离不开开源伙伴的贡献与支持。我们要感谢以下为 AgentX 1.0 发布做出巨大贡献的人：
+
+- **Inferact/vLLM**：Roger Wang、Yifan Qiao、Simon Mo、Jeff Ma 等多位贡献者
+- **RedHat/llm-d**：Michael Goin、Robert Shaw、Tyler Michael Smith
+- **RadixArk/SGLang**：Baizhou Zhang、Yuwei An、Mingyi Lu 等多位贡献者
+- **LMCache/TensorMesh**：Samuel Shen
+- **Weka**：Callan Fox、Val Bercovici
+- **MoonCake 维护者：** Teng Ma、Xu Wenjie、Ke Yang
+- **AMD**：Thomas Wang、HaiShaw、Andy Luo、Seungrok Jung、Chun Fang、Parth Panchal、Bill He、Theresa Shan、Hongxia、Fangzhou、Gilbert Lei、Yanfei Wang、Duyi Wang、Peng Sun、Lingpeng Jin、Simon Danielsson、Xiaohu Guo、Haichen Zhang、Chang Liu、Doug Lehr、Poovaiah Palangappa，以及 AMD 上海研发中心的众多同事
+- **NVIDIA**：Xin Li、Anthony Casagrande、Kedar Potdar、Ankur Singh、Ishan Dhanani、Nick Comly、NVIDIA 上海 TensorRT-LLM 团队等多位工程师
+- **Anthropic 团队，感谢他们及时修复了多个 bug，让 AgentX 得以实现**
+- **GitHub：** Austen Stone，帮助提升了 AgentX 所依赖的 GitHub Actions 的可靠性
+- 以及其他众多贡献者
+
+[此外，我们也感谢所有支持 InferenceX 开源计划的伙伴，包括 Meta、Microsoft、Oracle、OpenAI、MiniMax、月之暗面 Kimi、阿里巴巴 Qwen 和智谱 GLM。](https://inferencex.semianalysis.com/quotes)
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/e97525a9-216a-4624-91c6-373ee7a3850e_1123x437.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/quotes)"
+/>
+
+## agentic 工作负载简介
+
+从宏观上看，agentic 工作负载有四个特征：
+
+1. **多轮：** 一个会话包含大量用户 / 助手交互（几十到上百轮），而聊天机器人场景只有寥寥数轮。多轮、长上下文、高 prefill 复用，并伴随子智能体突发和大量工具调用。
+2. **长上下文：** 系统提示词、工具定义，加上轮次本身很多，上下文会迅速累积。
+3. **高前缀复用：** 会话是线性推进的，第 n-1 轮的输出通常会拼接进第 n 轮，因此大部分上下文可以从 KV cache 读取而不必重算（具体取决于可用于存放 KV 张量的存储容量）。随着 n 增大，已缓存输入与未缓存输入之比通常趋近于 1。
+4. **子智能体突发：** 一个会话会启动多个带全新上下文的短生命周期子智能体，形成突发式的 KVCache 访问模式。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/72b64a02-8a1f-4a19-929c-85c0ed4803cd_2048x909.png"
+  caption="来源：DeepSeek、SemiAnalysis"
+/>
+
+考虑到上述特征，对这类工作负载做基准测试和现有的固定序列长度基准测试有本质区别：agentic 推理本质上是一个*系统问题*。由于前缀复用率极高，KV 张量必须在节点 / rank 之间高效传输（NIXL、MORI-IO、Mooncake）。此外，不同会话应当根据对应前缀所在的位置被路由到不同节点 / rank，以最大化缓存命中率（LLM-d、Dynamo、vLLM/SGLang router）。长上下文会话会挤占 KV cache 的 HBM 容量，需要把 KV 张量 offload 到不同层级的内存（DRAM、SSD），而这个过程本身也必须高效（Mooncake Store、LMCache、vLLM Simple Offloading、SGLang HiCache）。
+
+相比之下，固定序列长度的单轮工作负载不涉及前缀复用，推理性能基本反映的是芯片 / kernel 的基础性能。这并不是说 InferenceX 上大量的固定序列长度数据不重要。恰恰相反，剥离 agentic 服务的复杂性之后，底层推理优化的进展会显得格外清晰，这些数据也为 AgentX 结果提供了重要基线。
+
+为了让 AgentX 工作负载尽可能贴近真实，我们采集了 [393 条 SemiAnalysis 内部匿名 Claude Code trace](https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126) 作为初始语料用于回放。为在保留原始前缀复用模式的同时对内容做匿名化，我们采用了与 [Qwen-Bailian 数据集](https://github.com/alibaba-edu/qwen-bailian-usagetraces-anon)类似的方法，后者是最早的生产 trace 语料之一。随后我们用 [AIPerf](https://github.com/ai-dynamo/aiperf) 在不同并发客户端数量下，按原始请求时序重建这些 trace。为让 AgentX 数据集成为可能，我们与 Anthropic 合作推动了两项 Claude Code 功能上线，在此感谢 Anthropic 团队的帮助。
+
+1. [https://github.com/anthropics/claude-code/issues/49207](https://github.com/anthropics/claude-code/issues/49207)
+2. [https://github.com/anthropics/claude-code/issues/66761](https://github.com/anthropics/claude-code/issues/66761)
+
+这段简介应该足以让读者理解下一节的测试结果。后文我们会更深入地介绍测试方法、回放框架和数据集。
+
+## agentic 编码推理性能
+
+在评估编码推理性能时，OpenAI、Anthropic、xAI 等前沿实验室主要关注三点：每美元性能与交互性（TPOT）的关系、TTFT（首 token 延迟），以及端到端任务完成情况。每兆瓦性能同样重要，因为地面数据中心电力是关键约束（钱是社会构建物，而且看起来实验室们有的是钱；电力在当下则是实打实地难搞）。[我们的数据中心模型给出了逐季度的电力需求与供给爬坡估算。](https://semianalysis.com/datacenter-industry-model/)
+
+本节我们梳理各前沿模型上 agentic 性能的整体规律。我们强烈建议读者把它当作一份导览，[自己去研究这些结果](https://inferencex.semianalysis.com/)。**所有数据都是开源的，社区完全可以就当下真实推理性能的现状得出自己的结论。**
+
+## DeepSeek V4 Pro 0813
+
+DeepSeek V4 Pro 0813 是一款来自中国、极受欢迎的前沿开放权重模型，总参数约 1.6 万亿，激活参数 490 亿。
+
+下图为截至 8 月 21 日、按总拥有成本（TCO）归一化后各 SKU 全部提交结果中的最佳性能。
+
+所有 DeepSeek v4 运行中*全部*请求的 ISL/OSL 分布如下：ISL p50=88k、p90=272k、p95=404k、p99=675k；OSL p50=413、p90=2.2k、p95=3.7k、p99=8.6k。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/d8337140-b620-476a-abd3-59d6cc447d30_2048x1256.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/b5aee8b4-d11a-48d8-823c-1ca53412e689_2048x1253.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&i_seq=agentic-traces&g_runid=32433563482&i_xmode=interactivity&i_label=0&i_e2e_xmetric=)"
+/>
+
+总体而言，**同时关注每用户每秒 token 数**（TPS，也就是交互性）**和 TTFT 很重要，因为这两者往往此消彼长**。例如上图中，某些 SKU 在还算不错的交互性下拿到了很高的吞吐量，但 TTFT 严重恶化。多高的 p90 TTFT 算“可接受”，很大程度上取决于应用场景。对多数服务 agentic 工作负载的生产系统而言，p90 TTFT 通常在 200–5,000ms 之间。超过 5–10s 就已经在“在线推理”的边界上了。曲线上超高吞吐的那一段仍有实际用途——在延迟不重要、追求系统利用率峰值的场景里（批处理、*超*长时间运行的 agent 等）。
+
+单节点性能方面，MI355X 的开源方案（vLLM）落后于厂商自有的 ATOM（AMD 版的 TensorRT-LLM）。我们认为 AMD 用 ATOM 快速推进性能前沿是好事，但仍建议他们把这些改进更优先地上游到 vLLM。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/d96697d9-bf24-4093-a7db-16d27a52aa08_2048x1200.png"
+  caption="来源：InferenceX"
+/>
+
+AMD 的分布式推理（DI）团队在过去半年里于 8k1k 场景上取得了很大进展，但要让 DI 成为真实工作负载下可用的方案，还有一段路要走。从每 GPU 吞吐量与交互性的关系看，1xDEP8+1xDEP8 的 disagg 配置只在高吞吐区间取得了小幅提升，在低延迟区间反而更差。
+
+更糟的是，中高交互性配置下的吞吐量提升，被 p90 TTFT 的大幅飙升所抵消。原因之一是并发超过 64 时启用了 SGLang 的 `--enable-prefill-delayer` 参数，[它会推迟 prefill 准入，让 DP rank 攒出更满的 batch](https://github.com/sgl-project/sglang/blob/v0.5.17/python/sglang/srt/server_args.py#L3180-L3194)（最多等 30 个 forward pass）。此外，这些点还把 chunked prefill 大小从 8,192 提高到了 65,536。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/81475383-510e-4823-9373-751b8a3722e3_2048x1202.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/6254047b-173b-4b1b-9f43-2057eb720b05_2048x1200.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=mi355x_atom%2Cmi355x_mori-sglang&i_vendor=AMD&i_linelabel=0&i_metric=y_tpPerGpu)"
+/>
+
+在端到端延迟上，ATOM MI355X 胜过 B200 vLLM（但并未胜过 B300 或 B200 SGLang）。问题在于，除了阿里巴巴内部一个小型广告业务部门之外，中国和西方的多数 AI 实验室都不愿在生产中使用 ATOM——它缺失的功能太多。阿里巴巴主力的 Qwen 大模型团队在生产中并不使用 ATOM。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/e8d915c0-c962-4277-b62c-a1b08b8e7179_1924x1262.png"
+  caption="来源：InferenceX"
+/>
+
+在 2026 年 8 月 21 日之前，AMD 实力很强的 MI355X SGLang 开发团队在端到端（e2e）性能的每美元表现上已经追平了 B200 vLLM。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/360a051c-6117-4860-a704-b50198f01521_1978x1246.png"
+  caption="来源：InferenceX"
+/>
+
+不过，B300 vLLM 和 B200 SGLang 仍然领先 AMD 的 MI355X。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9ec4708c-148e-42ee-a7c5-3bf4d9cbdfaa_1938x1246.png"
+  caption="来源：InferenceX"
+/>
+
+2026 年 8 月 21 日之后，得益于 Inferact 和 NVIDIA 在 vLLM 上的优化，NVIDIA B200 的每美元性能已经超过 MI355X。这是一场胶着的竞赛，我们很期待接下来几周的性能优化，也会很快发布 AgentX 更新文章。
+
+[AMD 已经列出了他们的 DeepSeekv4 vLLM 优化清单，里面有不少值得期待的提升空间。](https://github.com/vllm-project/vllm/issues/52911)
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9302da60-5bc1-46e1-9392-74e912b5c200_2024x1236.png"
+  caption="来源：SemiAnalysis"
+/>
+
+再看 NVIDIA。他们最有竞争力的方案是 GB300 Dynamo TRTLLM 和 GB200 Dynamo vLLM，两者都依靠 PD disagg 在合理交互性下取得高吞吐。此外，GB300 配置采用了 wide-EP（DEP32）decode 实例，以在前沿曲线中段获得更高吞吐。
+
+注意，2xDEP8+1xDEP12 的 GB200 点与 3xDEP8+1xDEP16 的 GB300 点在 TPS 上比在 TTFT 上接近得多。同样，TTFT 总体上对工作负载的“突发性”更敏感。由于 GB300 那个点的总并发高得多，它会遇到更多子智能体流量，因而有更多冷 prefill。这一点在该点的 TTFT 图上可以看出来：
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/96f9c9f9-eb86-4f87-8332-c85f23040836_2048x916.png"
+  caption="来源：InferenceX"
+/>
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/f79e53f5-c8ff-4ed0-a8a3-c05b9e0b4bab_2048x1191.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/512c6225-5816-493e-839d-e4f539e5b1c4_2048x1215.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_metric=y_tpPerGpu&i_xmode=interactivity&i_linelabel=0&i_best=0&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-trt)"
+/>
+
+按 TCO 归一化后，B300 vLLM 与 B200 vLLM 的聚合式性能相当接近，主要差别在于 B300 凭借比 B200 多 50% 的 HBM 容量，能“挤”出额外的吞吐量。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/939b9197-321d-4869-ba13-f0b800343b7b_2048x1300.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_vllm%2Cb300_vllm)"
+/>
+
+我们可以用 AgentX 新增的服务端指标可视化进一步观察这个差异。
+
+在 384 条并发 agentic trace 的负载下，B300 vLLM DEP8 配 3TB DRAM、使用 vLLM simple offloading，取得了 91% 的 HBM 缓存命中率，外加 1.36% 的 DRAM 缓存命中率。原因是该配置下 **HBM KV cache 的工作集规模**约为 4300 万 token，而任一时刻在途的 token 数只是略微超过这个量。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/b7ff2d61-bdab-4c2f-96a0-ec5a52469489_2048x884.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/f86888c4-c1a7-47b0-a580-d1a74876cb9c_2048x898.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference/agentic/439522)"
+/>
+
+在 B200、并发 196（其余参数不变）的情况下，HBM 缓存命中率只有 73%，需要更多依赖 DRAM，offload 缓存命中率接近 20%。此时 HBM KV cache 工作集规模为 2200 万 token，大约是 B300 的一半。
+
+DRAM KV offload 通常实现为写穿（write-through）缓存，也就是写入 HBM 缓存的每个前缀同时也会写入 DRAM 缓存。因此，只有当可用于 offload 的 DRAM 显著大于（1.5–3 倍）HBM KV cache 容量时，它才最有效。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/61956823-2928-44ec-b00c-8bb5581b8a13_2048x892.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/70a7a7c7-7918-459c-a4e0-f7fc1edca816_2048x887.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference/agentic/439967)"
+/>
+
+H200 SGLang FP8 能在低并发下服务 DeepSeek v4，从每美元性能看甚至可以和 B200/MI355X SGLang 一较高下。但受限于 HBM 容量，它在高吞吐场景下无法与更新的 SKU 竞争。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/770b205f-12a1-4d34-81a7-fb235742d005_2048x1305.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_sglang%2Ch200_dynamo-sglang%2Cmi355x_sglang)"
+/>
+
+此外，随着用户数增加，高并发下对 DRAM KV offload 的依赖会带来无法接受的延迟。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/91dfd9ca-d13d-43e9-a57e-3be0fcc4a5cf_2048x1315.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=h200_dynamo-sglang&i_optimal=0)"
+/>
+
+总体来看，MI355X 相对主要竞争对手 B200 和 B300 表现尚可。在曲线上低吞吐 / 低延迟那一段两者最为接近，因为那里只用到张量并行和较为基础的 kernel。AMD 需要优化 MI355X 上的 DEP kernel，才能在高吞吐场景下更有竞争力——尤其是它的 HBM 还是 B200 的 1.5 倍。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/ba6532b3-aa46-4477-be84-8979b1cce35d_2048x1297.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/29cfd340-d61b-46c4-8d87-e081d937b80c_2048x1303.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_vllm%2Cb300_vllm%2Cmi355x_atom%2Cmi355x_vllm&i_label=0)"
+/>
+
+## Kimi K3：2.8 万亿参数
+
+Kimi K3 是另一款来自中国的前沿开放权重模型，总参数 2.8 万亿，参数量级与 Claude 的 Mythos/Fable5 模型架构相当。我们把它作为开放权重的架构代理来使用。K3 大到单台 B200 服务器都装不下，必须用 wide EP / wide TP 或流水线并行才能放下全部权重。在 vLLM 上，投机解码 / DSpark 直到最近都完全无法与流水线并行组合，因此 B200 在 Kimi K3 上的表现非常糟糕，被 MI355X 压着打——因为 B200 在流水线并行下用不了投机解码。
+
+MI355X vLLM 在短上下文单轮工作负载上 day 0 即开箱可用，但在长上下文多轮工作负载上，MI355X 的 AITER 和 Triton kernel 在第一周就彻底崩了，上游 vLLM 在真实工作负载下对 MI355X 完全不可用。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/a1440922-e1ea-4a74-ab62-f1263ae31ca0_2048x1473.png"
+  caption="来源：SemiAnalysis InferenceX"
+/>
+
+Hopper 很难承接 Kimi K3 的 AgentX 工作负载：一方面 Kimi 模型体量巨大，另一方面 vLLM 维护者 / NVIDIA 一直没有把精力放在为 K3 优化 Hopper 上。Hopper（SM90）需要为 K3 定制调优 kernel，并针对高交互性服务调优 TP32/EP32 的 shape。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/ce2b58fc-b7b7-46c2-ae05-baa14419d233_2048x1459.png"
+  caption="来源：SemiAnalysis InferenceX"
+/>
+
+我们认为 AMD 用 ATOM 快速推进 K3 性能是件好事，但仍希望 AMD 进一步优先把这些改进上游到 vLLM。ATOM 目前是 AMD 性能最好的引擎，但对使用上游开源服务栈的客户来说，vLLM 才是更有参考价值的对比对象。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/80eb810f-a9ea-4f01-a41b-e19e3409ce74_2048x1459.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/73ded698-c86e-411b-8e7c-f9bb125487b7_2048x1459.png"
+  caption="来源：SemiAnalysis InferenceX"
+/>
+
+在端到端延迟 40 到 60 秒的那段曲线上，MI355X ATOM 的每美元性能甚至超过了 GB300 NVL72 vLLM。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/27a3f80e-7959-4651-90eb-f498989908a3_1934x1284.png"
+  caption="来源：SemiAnalysis InferenceX"
+/>
+
+## MiniMax M3
+
+在 MiniMax M3 432B 上，NVIDIA 完胜所有对手。AMD 的软件性能非常糟糕，长上下文下尤其如此，根源在于 AMD 工程管理层只激励团队针对短上下文单轮工作负载做调优，而忽视了长上下文多轮工作负载。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/c5396c3d-1823-4818-83de-d89cd8242451_2048x1286.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/5179bd8e-c147-46c8-aeb4-b347049b28a7_2048x1303.png"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft)"
+/>
+
+B300 TRT-LLM TP2 拿下了 M3 的桂冠。曲线上缺少 DP-attention 的数据点，因为在 M3 上这种做法并不划算——KV cache 局部性会变成路由约束，后文会进一步说明。以并发 40 的 GB200 为例，TP4/EP4/DPA 的吞吐量只有纯 TP4 的 0.60 倍，而 p90 TTFT 高出 3 倍以上。并发 32 时缓存命中率仅 28.8%，理论值则是 96.0%。每个 DP rank 独占缓存池的四分之一，一个 30 万 token 的会话一旦落到错误的 rank 上，就要全部重算。M3 的前沿曲线上没有出现任何带 EP 的 decode 配置，可能是因为并发还不足以让所有专家的负载均衡起来。
+
+在 MiniMax M3 上，按 TCO 归一化的吞吐量，B200/B300 也完全胜过对应的机架级方案。在 AgentX 上，机架级的优势不像以往那么明显，因为 Dynamo router 可能成为瓶颈——它的工作量随在线前缀的数量和长度增长。相关优化以及若干带来两位数百分比提升的修复会在后文讨论。此外，wideEP、wide DCP 和 wide TP 都还没有调优良好的 kernel。而 GB200/300 的 TCO 更高，在没有 wide EP / wide DCP 的情况下，每 TCO 性能就显得更差。
+
+话虽如此，我们也预期 NVIDIA 会在该 SKU 的机架级方案上做进一步优化，届时会在后续文章中重点介绍。
+
+尽管 P90 ISL 达到 317k，目前还没有任何提交使用上下文并行。M3 只有 4 个 KV head，即使 TP8 下 DCP 也最多只能到 2，而且 MSA indexer 还需要单独的上下文并行处理（vLLM 上已有一个 PR）。更多讨论见后文的上下文并行一节。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/aec34e63-34fd-4c42-87a1-97e5c14661ed_2048x1302.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/2b40624a-223c-44db-a403-0be563b2af82_2048x1298.png"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_hc=1&i_active=mi355x_vllm)"
+/>
+
+NVIDIA 所有 Pareto 最优点在并发 20 以上都启用了 KV offload，而 AMD 的 Pareto 最优点没有一个使用 DRAM KV offload。在其他模型上，AMD 使用 KV offload 的比例也低于 NVIDIA。原因是 AMD vLLM 上 CPU KVCache offload 所需的 GPU 到 CPU 传输效率极低：`hipMemcpyBatchAsync` API 直到 ROCm 7.14 才提供。没有它，vLLM 原生的 Simple CPUOffloading 只能做串行 memcpy，无法把多次拷贝合并成更大的消息。
+
+另外值得一提的是，从吞吐量与 p90 交互性的关系看，vLLM 的表现与 TRT-LLM 非常接近；而在吞吐量与 p90 TTFT 的关系上，vLLM 表现更好。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/68f7ad68-3886-4980-9b01-390582728e47_2048x1292.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/729199d9-66c0-42b5-b1b8-f228503c1585_2048x1289.png"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_trt%2Cb200_vllm%2Cb300_trt%2Cb300_vllm&i_hc=1&i_label=0)"
+/>
+
+## Qwen3.5 397B
+
+Qwen3.5 397B 每隔几层就用 GatedDeltaNet 替代常规注意力。GatedDeltaNet 由 MIT / NVIDIA Research 提出，其状态存储需求在理论上是常数，而常规注意力是线性增长的，因此相比同等规模的稠密注意力模型，它的存储需求更低。与 Nemotron 那样惨败的端到端模型训练研究不同，NVIDIA Research 在 GDN、LatentMoE 这类被前沿模型采用的基础研究上做得非常出色。
+
+注意，该模型原生最大上下文长度为 262k token，因此我们使用[截断后的数据集](https://inferencex.semianalysis.com/agentx/cc-traces-weka-062126-256k)。这模拟的是在上下文上限较小的模型上频繁触顶、频繁压缩上下文的工作负载，也就是用户实际使用这类模型的方式。
+
+在 SGLang 对 SGLang 的对比中，Qwen3.5 397B 是 NVIDIA 的强势领地：90 tok/s/user 时性能领先 20 倍以上。在 Qwen3.5 SGLang 上，AMD 目前完全没有竞争力。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/c92da639-dcff-4e39-b9b5-49742677e93c_2048x1289.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/519a7cd0-ac51-4a5c-9c45-ba7c41f6d058_2048x1300.png"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_hc=1)"
+/>
+
+我们再次看到 NVIDIA 以牺牲 TTFT 为代价过度优化交互性，TRT-LLM 尤其明显。上图中所有 NVIDIA SGLang 提交的 p90 TTFT 都远低于 TRT-LLM。
+
+在 Qwen3.5 上，B300 FP4 的每美元性能是 H100 的 12 倍。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/cc2cf6c7-aa58-4a76-a0a2-ee0457d9243c_2048x1298.png"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_hc=1&i_best=0&i_prec=fp4%2Cfp8&i_active=b300_sglang%2Ch100_sglang%2Ch200_sglang)"
+/>
+
+## GLM 5.3
+
+GLM 5.3 在 GLM5.2 744B 基础上做了额外的后训练，是一款前沿级别的模型。
+
+在开源 SGLang 的性能上，这又是一个 NVIDIA 在真实 agentic 推理性能上胜过 AMD 的模型。在 150 tok/s/user 的 p90 交互性下，NVIDIA 的成本效率最高领先 5 倍。以 AMD 软件当前的状态，在 150 tok/s/user 时 NVIDIA 的性能优势大到这种程度：即便竞品芯片硬件白送（服务商当然仍要承担数据中心托管、电力和其他运营成本），用 NVIDIA 的单 token 成本依然更低。
+
+我们期待 AMD 在几周后的 AgentX 更新文章中带来性能优化，那篇文章还会包含其他一些非常有意思的结果。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/f85bdb45-792c-4330-9745-674b38b03425_2048x1289.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/4a21d140-b588-4b33-941d-7c8090ac42b5_2048x1286.png"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=GLM-5.2&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_prec=fp4&i_active=b200_sglang%2Cb300_sglang%2Cgb200_dynamo-sglang%2Cgb300_dynamo-trt%2Cmi355x_atom%2Cmi355x_sglang)"
+/>
+
+看 ATOM 的话，在 p90 E2E 归一化交互性的部分区间内，AMD 的每美元性能优于 GB300 NVL72 SGLang，甚至优于 TRTLLM。这一结果值得肯定，也再次期待 AMD 把这些优化移植到 SGLang。同时我们也期待 NVIDIA 在接下来几周里尽快优化 GB300 NVL72。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9337ed5b-a320-49f7-b31b-cc4b5751e0ff_2048x1290.png"
+  caption="来源：SemiAnalysis InferenceX"
+/>
+
+这里插入介绍一个我们称之为 **E2E 归一化交互性（E2E Normalized Interactivity）** 的实验性指标。它的目标是在同时考虑 TTFT 和 TPS 的前提下，衡量用户实际感受到的响应速度，定义为 OSL/E2EL。把 E2EL 等于 TTFT 加上 OSL 乘以 TPOT 代入（实际上只解码 OSL - 1 个 token），可得下式。
+
+它本质上等于交互性（1/TPOT 那部分）再加上一项与 TTFT 成正比的惩罚。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9e472a49-d228-4d8d-876a-6bc0d59f9d97_746x594.png"
+  caption="来源：SemiAnalysis"
+/>
+
+需要说明的是，这个指标是实验性的，并不完美。例如它对高 TTFT 的惩罚很重，也无法体现 PD 分离等优化的全部细节。AgentX v1.0 的所有提交仍然分别针对常规交互性和 TTFT 做优化。我们会继续打磨能反映现代 agentic 推理各种细节的新北极星指标。
+
+## AgentX 的行业影响：面向 agentic 工作负载的优化
+
+AgentX 头几个月最有影响力的成果不是产出开源数据集，而是 **AgentX 合作伙伴以 AgentX 为北极星、为优化真实 agentic 工作负载而提交的 50 多个上游 PR** 所带来的行业影响。AgentX 的真实 agentic 流量不只考验原始的 prefill 与 decode kernel，还会检验从 KV cache 生命周期、混合注意力缓存正确性、CPU KV offload、传输进度、路由亲和性，到增量分词、请求序列化和调度器记账在内的完整端到端 token 生成链路。这些环节对每一个生产 agentic 部署都很重要。
+
+这只是我们既有使命的延续：帮助生态加速改进，推动软件以极快的速度进步。一个很好的例子是 SemiAnalysis 与 AMD 软件研发团队多年的合作——我们持续提供反馈和建议，帮助他们现代化软件开发方法。这不仅带来了许多加速 AMD 进展的改变，也在推动 AMD 开源方案在 agentic 工作负载上向一流体验靠拢。
+
+## 分布式推理生态简介
+
+如前所述，agentic 推理本质上是全系统问题，而不只是芯片 / kernel 层面的问题。此外，当大型*分布式系统*要处理数十万条 agentic 请求时，请求调度和 KV cache 管理就不再是小事，会实打实地影响性能。例如子智能体会产生突发式的 KVCache 访问模式，若不加优化，就会错误地把主智能体的缓存挤出去。
+
+下图从宏观上展示了这一技术栈。最上层是 router（有时也叫“frontend”），负责把请求分发给不同 worker。例如当服务端启用数据并行注意力时，每个 DP rank 都有各自的 KV cache。为了避免打乱其中任何一个缓存，请求会按不同策略路由，例如[一致性哈希](https://github.com/vllm-project/router/blob/main/src/policies/consistent_hash.rs)，让同一会话 / 子智能体的请求按唯一 ID 路由到同一处。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/58ac4a3a-cc05-4ff6-9d1e-b28dc0d0f760_1814x2048.png"
+  caption="来源：SemiAnalysis"
+/>
+
+对大多数路由策略来说，各家 router 的实现差异不大。有些是独立组件，例如 [vLLM router](https://github.com/vllm-project/router) 和 [llm-d router](https://github.com/llm-d/llm-d-router)；有些则集成在引擎里，例如 [SGLang model gateway](https://github.com/sgl-project/sglang/tree/main/sgl-model-gateway) 和 [ATOM Mesh](https://github.com/ROCm/ATOM/tree/main/atom/mesh)。
+
+请求路由完成后，会交给 vLLM、SGLang 等推理引擎的调度器处理。引擎负责实际执行推理并通过 API 返回结果。此外，每个引擎都提供接口，把引擎内部的 KV cache 与外部 KV cache 管理器连接起来，从而形成一个“可插拔”的生态：不同的 KV cache 管理器可以与多种推理引擎集成。
+
+当前 AgentX 结果所使用的一种简单部署方式是[在同一节点上把 Mooncake](https://pypi.org/project/mooncake-transfer-engine/) 与 vLLM 一起运行。每个 vLLM worker 内嵌一个 Mooncake Store 客户端，并贡献一部分主机 DRAM 加入外部 KV cache 池。vLLM 通过 MooncakeStoreConnector 接口连接这个池，把可复用的 KV block 载入 GPU 显存，并把新计算出的 block 存回主机内存。Mooncake Store 负责管理外部缓存，包括放置与淘汰；Mooncake Transfer Engine 则负责 GPU 与 CPU 内存之间数据的实际搬运。
+
+不同的 KV cache 管理器可能使用不同的传输引擎，在内存层级之间或机器之间（例如 prefill 与 decode worker 之间）实际搬运字节。以 Mooncake Store 为例，它使用 [Mooncake Transfer Engine](https://github.com/kvcache-ai/Mooncake/tree/main/mooncake-transfer-engine) 在 GPU 显存、主机 DRAM 和远端节点之间搬运 KV block。
+
+一套部署可以一边用 Mooncake Store 把可复用的 KV block offload 到主机 DRAM，一边用 NIXL 把请求专属的 KV 从 prefill GPU 直接传到 decode GPU。Mooncake TE 负责 Mooncake Store 这条路径的搬运，NIXL 则通过 UCX 和（在支持的平台上）GPUDirect RDMA 负责独立的 prefill-decode 路径。也就是说，同一个推理引擎内部可以并存多条 KV 管理与传输路径。
+
+这套生态由许多独立组件构成，包括推理引擎、router、KV cache 管理器、数据传输库和集群控制器。NVIDIA Dynamo、llm-d、AMD Infera 这类平台把其中若干组件“打包”成完整的软件发行版，发布相互兼容的容器镜像、connector、部署清单和编排逻辑，让这些组件可以作为一个系统来部署和运维。最终交付的产品通常是一组协同工作的容器，而不是单体服务（例如 Dynamo、llm-d 和 Infera 通常部署在 k8s 上，用于协调大型分布式系统）。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/af5c4776-221b-43b4-b2fd-d46e46f1ab38_1772x960.png"
+  caption="来源：RedHat / llm-d"
+/>
+
+## 上下文并行
+
+长上下文让某些并行技术真正有了用武之地，而固定 8k 的 prompt 很难体现出来——8k 下没什么可切分的，TTFT 本来就很短。此外，TP 和 DP attention 这类并行策略在更长的上下文下并不理想：TP 会让完整 KV 在每个 rank 上都复制一份；DP attention 虽然共享 KV，但在长上下文下容易卡住，因为长上下文工作负载的上下文长度方差也更大。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/1e2801db-53ff-4029-8b55-01b3c1a7037d_1632x1140.png"
+  caption="来源：SemiAnalysis"
+/>
+
+上下文并行是一种把 query token 切分到多个 GPU 上的并行技术，分为两种形式：用于 prefill 的 PCP 和用于 decode 的 DCP。PCP 中每个 rank 处理自己的 query 分块（KV 以环形方式传递），由于 prefill 通常是计算受限的，这样可以并行化 FLOPs，使 prefill 更快，也不会让某个 rank 单独扛下超大 prompt 的 prefill 尖峰。DCP 中每个 rank 扫描自己那一份 KV 分片，随后以 flash-decode 的方式合并部分注意力结果。由于 decode 是显存带宽受限的，并行读取 KV 可以提高 tok/s。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/a9544ced-f418-44e0-8910-0cbc63fa26ec_2048x768.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/512c3a96-2ab4-452f-be6a-4fa60900575c_2048x651.png"
+  caption="来源：SemiAnalysis"
+/>
+
+这项并行技术部分源自 NVIDIA Research。NVIDIA Research 在这类基础研究上很强，但在端到端训练研究上就相当难堪了——他们的 Nemotron3 Ultra 模型表现糟糕，如今连体量小得多的 Qwen3.8 27B 都能大幅胜过它。DCP/PCP 构成了 CUDA 护城河的一部分，因为 AMD 的 DCP/PCP 实现尚未优化。在 [vLLM 支持矩阵](https://docs.vllm.ai/en/latest/design/attention_backends/#standard-attention-mha-mqa-gqa-backends)里，AMD 的每一个后端都是不支持状态。
+
+接下来几节提到的部分改动就聚焦在 DCP/PCP 上。
+
+## vLLM 的 agentic 优化
+
+我们与来自 Inferact、Red Hat、NVIDIA 和 AMD 的 vLLM 维护者一起，把 AgentX 的真实回放器当作北极星，相关修复最终都进入了上游，其中大部分优化都可以很好地迁移到生产环境。举几个例子：
+
+vLLM 改进了混合注意力的前缀缓存，使短生命周期的滑动窗口分配不会挤掉有价值的长上下文检查点。[选择性保留](https://github.com/vllm-project/vllm/pull/43447)保住了稀疏回放边界，在 14 条并发请求、上下文最长 100 万 token 的条件下，前缀缓存命中率超过 95%。同样的可达性策略[也应用到了 Mooncake](https://github.com/vllm-project/vllm/pull/44774)，并[移除了不可达的滑动窗口查找](https://github.com/vllm-project/vllm/pull/45444)。更早的后续工作还[停止 offload 那些永远不会被复用的滑动窗口 block](https://github.com/vllm-project/vllm/pull/42258)，并[把投机解码的 lookahead block 保留在被保留的前缀中](https://github.com/vllm-project/vllm/pull/44082)。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/df1a505d-b8c3-45f9-b03c-a8798fba54c0_2048x632.png"
+  caption="来源：SemiAnalysis 与 vLLM 中面向 agentic 工作负载的 GitHub PR"
+/>
+
+高并发 agent 的 agentic 工作负载需要 offload。得益于前面提到的 AgentX 的推动，vLLM 上已经有工作流在推进：让 CPU KV offload 支持混合模型，而不只是统一的全注意力模型。这个区别之所以重要，是因为统一模型每个 token 只有一种 KV 布局，connector 用单一 block 几何结构就能描述要保存什么；而混合模型同时携带多个 cache group，每组的形状和生命周期都不同，假设单一布局的 connector 无法表达某个 block 属于哪一组。结果就是，最需要 offload 的长会话模型反而用不上它。通用的 [SimpleCPU connector](https://github.com/vllm-project/vllm/pull/37160) 先落地，随后[在 ROCm 上启用](https://github.com/vllm-project/vllm/pull/40549)，再[扩展到 DeepSeek-V4 的混合注意力](https://github.com/vllm-project/vllm/pull/42296)：相比前缀放不下 HBM 后重新计算，输出吞吐量提高 81.7%，平均端到端延迟降低 46.6%。
+
+Mooncake 也获得了[同等的混合内存分配支持](https://github.com/vllm-project/vllm/pull/42828)。同样的布局问题在分离式服务中再次出现：一个[待合入的改动](https://github.com/vllm-project/vllm/pull/51052)会在 1P1D 的 prefill/decode 拆分下，通过 MoRI-IO 把 Kimi-K3 的 conv+ssm 循环状态与注意力 KV 一起传输；没有它，decode 侧会从未初始化的循环状态开始。循环状态槽位复用既有的 remote-block-ids 通道，因此分离式路由器无需任何模型专属改动。该路径已在 MI355X 上端到端验证：每条链路 TP8、跨节点 RDMA，两侧均开启 DSpark 投机解码。
+
+在对真实工作负载做性能剖析时，vLLM 维护者发现 offload 期间的开销转移到了 store 路径上——写得太多、太频繁。现在有三处修复解决了这个问题：
+
+[当相同的传输已在进行中时跳过 store](https://github.com/vllm-project/vllm/pull/41289)，这样共享同一前缀的并发会话只需付出一次代价，而不是每个会话各付一次。store 现在[只覆盖新生成的 KV 区间](https://github.com/vllm-project/vllm/pull/46412)，因此延续历史的会话只写增量，而不是每轮重写整个前缀。最后，store [不再依赖相同 block 是否仍驻留在 HBM](https://github.com/vllm-project/vllm/pull/46906)，因此已排入队列的工作不会因为底下发生淘汰而被丢弃。
+
+load 路径则单独做了调优，因为查找发生在每次调度决策时，而不只是在真正搬运数据时。[把调度路径上的查找改为异步](https://github.com/vllm-project/vllm/pull/45659)可以让 connector 离开每步的关键路径，这样一步调度不必等待 CPU 侧的缓存查询就能接纳新工作。随后，[紧凑的零拷贝查找 key](https://github.com/vllm-project/vllm/pull/45969)、[接收端并行加载](https://github.com/vllm-project/vllm/pull/45971)和[预构建的 Mooncake key 字符串](https://github.com/vllm-project/vllm/pull/46188)进一步消除了剩余的 CPU 与传输开销。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/2c2cfea4-a217-47ad-934b-dbd226bb248c_2048x837.png"
+  caption="来源：SemiAnalysis 与 vLLM 中面向 agentic 工作负载的 GitHub PR"
+/>
+
+长生命周期的混合状态还带来了固定形状请求几乎遇不到的正确性与记账问题。vLLM 现在[按混合 cache group 分别发出 cache 事件](https://github.com/vllm-project/vllm/pull/44103)，[正确计算分布式上下文 store 的 stride](https://github.com/vllm-project/vllm/pull/45371)，并[在分布式上下文与 prefill 下正确计算查找前缀](https://github.com/vllm-project/vllm/pull/46855)。相关的[上下文并行记账改动](https://github.com/vllm-project/vllm/pull/45340)让缓存归属与分片后的 token 区间对齐。投机状态现在也能[在合并后的 Mooncake group 之间传递](https://github.com/vllm-project/vllm/pull/49069)，并[贯穿 SimpleCPU 协调器](https://github.com/vllm-project/vllm/pull/49071)，避免重复轮次的缓存悄悄丢失 EAGLE 状态。
+
+从 ROCm 侧优化 vLLM 的 agentic 工作负载来看，工作继续下沉到缓存层之下，那里剩余的开销是按层而不是按请求计算的。当前缀既能存活又能及时到达之后，剩下的就是 decode 步骤本身；而一个会话里要跑上千次的 decode 步骤，会为每一次可以避免的拷贝、每一个不匹配的 kernel 付出代价。
+
+有三个尚未合入的改动针对这一层：
+
+- 一个 Kimi-K3 的改动[把 KDA decode 结果直接写入层输出缓冲区](https://github.com/vllm-project/vllm/pull/51183)，为每个 KDA 层省下一次设备内拷贝；单看收益很小，但它会在每个解码 token 的每一层上重复发生。
+
+- 第二个改动[选用 AITER 的稀疏 MLA decode kernel](https://github.com/vllm-project/vllm/pull/51714) 替代通用路径，AgentX 输出吞吐量提高 5.22%，token 间延迟显著降低。
+- 第三个改动很好地说明了测量形态有多重要。配套改动[把 full-graph 注意力投影路由到调优过的 AITER GEMM](https://github.com/vllm-project/vllm/pull/51713)，在低并发的固定序列上取得 2.3% 提升。这说明 kernel 层面的改动可以在统一 shape 上拿到干净的收益，却在 agentic trace 上被缓存与调度带来的波动淹没。一个[待合入的改动](https://github.com/vllm-project/vllm/pull/52882)干脆把这种 shape 敏感性变成了分发依据：它用 gfx950 上的 AITER / native 混合路径取代 DeepSeek V4 C4A selector 的 ROCm top-k 瓶颈，短、中上下文走 AITER，长上下文走 graph-safe 的调优 native 回退路径。据报告，selector 的端到端加速为 1.21x 到 1.76x，在 84 种 shape 的矩阵上 decode kernel 的几何平均加速为 1.2x 到 2.9x。
+
+## SGLang 的 agentic 优化
+
+AgentX 团队与来自 RadixArk、Meta、NVIDIA 和 AMD 的 SGLang 维护者密切合作，推动了 SGLang 上 agentic 工作负载的优化，使生产推理性能大幅提升。下面详细介绍这些优化。
+
+先从分配器一侧说起：SGLang 的滑动窗口工作解决的是与 vLLM 保留策略相同的冲突。窗口页和前缀页取自同一个池子，而窗口是更贪婪的一方——它不断翻转，前缀却静止不动，于是在压力之下，短暂的分配会把持久的分配挤出去。
+
+有三处设计改进从不同角度攻击这个问题。其一是[在页离开窗口时主动释放](https://github.com/sgl-project/sglang/pull/26907)，而不是等淘汰压力来找它们，让失效的窗口状态不再争抢自己已经用不到的页。其二是[把 compute lock 限制在单个窗口内](https://github.com/sgl-project/sglang/pull/27210)，限定一条在途请求最多能同时钉住多少池容量。其三是[清除失去作用后仍然残留的 full-KV 条目](https://github.com/sgl-project/sglang/pull/29369)。
+
+不过主动释放有一个与分叉相关的盲区：从共享前缀分叉出来的请求可能仍持有可复用的 full-KV，而分叉点处的窗口状态已被释放，结果为了缺失的那一半廉价数据，整个前缀都要重算。[进行中的工作](https://github.com/sgl-project/sglang/pull/34565)会在这些分叉点保留 SWA 状态，让分叉继承窗口而不是重建它。
+
+与之并行的 [ROCm ring-cache 修复](https://github.com/sgl-project/sglang/pull/30339)属于正确性而非容量问题：环形缓冲区在设计上就会复用槽位，而复用一个旧内容仍被引用的槽位，产生的是错误输出，而不是变慢的输出。这些在单个 8k prompt 上都看不出来——窗口不会绕过前缀，池子也不会有争用。但在多轮混合注意力会话中，这些改动决定了昂贵的全注意力历史在下一轮是否还在。
+
+HiCache 是 SGLang 内置的一流 offload 机制。它面对与 vLLM connector 相同的混合模型问题，解法是一种不对称处理：[offload 全注意力缓存，回读时再重建那一小段滑动窗口尾部](https://github.com/sgl-project/sglang/pull/29417)。只有昂贵的那一半值得跨总线搬运，廉价的那一半重建比取回更快。在 AMD 上，[分阶段写回](https://github.com/sgl-project/sglang/pull/28534)让这种搬运不会在进行中阻塞引擎。剩下的缺口是循环状态，因为它无法像窗口尾部那样从相邻 token 重建；[FlashInfer GDN 检查点](https://github.com/sgl-project/sglang/pull/29735)让它得以参与前缀复用，在 92.4% 缓存命中率下把吞吐量从 47,771 提升到 53,004 tok/s/GPU。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/078ad449-7657-4468-9ff9-3480a7999d89_2048x720.png"
+  caption="来源：SemiAnalysis"
+/>
+
+另有两处改动针对变长流量对 kernel 流水线的影响。AgentX 的真实会话往往以持续变化的上下文长度到达，生产流量也是类似形态。一个按长度做特化的运行时，几乎会为看到的每个请求重新编译一份 kernel。SGLang 维护者的解法是[把上下文长度作为运行时标量传入](https://github.com/sgl-project/sglang/pull/30255)，而不是把它固化进某一次编译；这让 AgentX 并发 384 的输出吞吐量提升 26.75%、平均 TTFT 改善 36.25%，收益来自消除编译，而不是把计算做得更快。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/3a807d67-383b-4aa9-93af-e8f3a68313f4_855x634.png"
+  caption="[来源：GitHub](https://github.com/sgl-project/sglang/pull/30255)"
+/>
+
+同样的思路下，[移除每步一次的 device-to-host 序列长度同步](https://github.com/sgl-project/sglang/pull/30365)消除了一个 decode 气泡——它之所以存在，只是因为 host 想知道一个 device 早就知道的长度。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/b29e003e-db43-45d4-93be-bac0be04d869_1209x646.png"
+  caption="[来源：GitHub](https://github.com/sgl-project/sglang/pull/30365)"
+/>
+
+变长同样会在注意力 kernel 内部造成损耗。在 GB300 上，混合上下文的 decode batch 要付“长尾税”：一次对照 profile 把 9.8 ms decode 步骤差异中的 8.4 ms 归因于注意力，最长的那些请求拖长了持久化 kernel 的共享 wave。[进行中的工作](https://github.com/sgl-project/sglang/pull/34888)把 TRTLLM MHA 的 decode batch 按 KV 长度分组，让短请求不再等待最长的那些请求。
+
+decode 也可能在更上一层被饿死——不是在 kernel 里，而是在调度器上。在 DP attention 下，每个 rank 都要参与同一个 MoE 集合通信，但注意力工作是本地调度的；于是某个 rank 一旦被喂进一串 chunked-prefill 续段，就会不断赢下“prefill 优先”的决策，而同伴 rank 正在运行的 batch 只能干等——这是在 AgentX 运行中观察到的现象。[可配置的 decode 间隔](https://github.com/sgl-project/sglang/pull/35017)在 prefill 之后强制插入 decode 轮次；在 AgentX DSv4 Pro 上，输出吞吐量提升 141%，p99 token 间延迟下降 97.3%，代价是 TTFT 中位数从 36.5 秒升到 59 秒——用首 token 等待时间换取输出流的平滑度。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/47ce130f-13f2-4732-8431-17e26184b8c3_1846x806.png"
+  caption="来源：SemiAnalysis"
+/>
+
+当一条请求不带任何可复用历史时（例如子智能体刚启动），随便哪个 worker 都可以，唯一值得考虑的就是负载均衡。但当请求带着数 MB 的已缓存前缀时，把它发给一个并不持有该前缀的空闲 worker 就是昂贵的选择，router 必须知道状态究竟在哪里。SGLang 为此加入了 [DP 缓存亲和性](https://github.com/sgl-project/sglang/pull/26091)，让会话粘在持有其缓存的 rank 上。在这个 PR 中，还实现了 [DP 感知的 prefill 与 decode 路由](https://github.com/sgl-project/sglang/pull/26245)，让分离式部署的两侧做出一致的决策；以及[把缓存均衡作为路由信号](https://github.com/sgl-project/sglang/pull/26293)，避免亲和性退化成单个热点 worker。router 只能依据它被告知的信息行动，因此混合缓存事件也变得[对 radix cache 可见](https://github.com/sgl-project/sglang/pull/26387)、[对滑动窗口可见](https://github.com/sgl-project/sglang/pull/26579)。
+
+投机解码得到了特别关注，因为 MTP 为每条请求引入了第二份、更小的状态，它必须挺过主缓存所经历的一切。SGLang [修复了分离式服务中的 draft window 传输](https://github.com/sgl-project/sglang/pull/30461)，让这份状态完整跨越 prefill 到 decode 的边界；[为高并发在线解码加入 overlap 调度](https://github.com/sgl-project/sglang/pull/30497)；[移除了一处无实际作用的 EAGLE 重归一化](https://github.com/sgl-project/sglang/pull/31294)；并[避免 EAGLE prefill 期间的 host 同步](https://github.com/sgl-project/sglang/pull/33662)。尚未合入的[资源租约调度工作](https://github.com/sgl-project/sglang/pull/32042)和[数据并行 graph metadata 修复](https://github.com/sgl-project/sglang/pull/32196)延续同一目标：当请求可能被撤回再恢复、而不是一路跑到结束时，让 overlap 仍然安全。
+
+在 prefill 与 decode 拓扑异构的 agentic 工作负载下，需要前缀感知的暂存，而这正是前缀缓存与分离式服务相互冲突的地方。当两侧的分片方式不一致时，KV 无法作为一整段连续流拷贝过去，必须按传输网格切分，再按 decode 侧期望的偏移重新组装。前缀命中会让这件事更难而不是更容易，因为 prefill worker 此时只发送未缓存的剩余部分，而 decode 侧仍然期待一份完整且位置正确的缓存。[在 staging buffer 中支持 radix cache](https://github.com/sgl-project/sglang/pull/30545) 会按该网格切分已缓存的发送内容，并散布到正确的 decode 偏移上。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/88c2d49d-2612-4334-90c2-8a76ab55fd60_1418x1004.png"
+  caption="来源：SemiAnalysis"
+/>
+
+然而这也带来了正确性问题。一项 127,500 token 的共享前缀测试，从 128 根针中只答对 2 根变成了 128 根全对——说明缓存此前一直悄悄落在错误的位置，而这种情况在吞吐量基准里只会被记成一个又快又自信的错误答案。在 AgentX 对比中，每用户输出吞吐量中位数还提高了 9.6%，而每 GPU 总吞吐量几乎不变。传输本身也带着无用负载：decode 侧的 PREBUILT batch 从不进入模型前向，但每条传过来的 prompt 仍会被展平并拷进一个 CUDA 输入张量，而第一次 decode 步骤反正会用中继元数据重建它。[去掉这次无用的 prompt 传输](https://github.com/sgl-project/sglang/pull/35070)是单项收益最大的改动，在 AgentX GB300 上带来每用户输出吞吐量 +18.0%、每 GPU decode 吞吐量 +12.7%。一个[后续改动](https://github.com/sgl-project/sglang/pull/35071)把 prefill DP-rank 的引导查询移出 decode 调度器的关键路径，让原本在消费结果时同步付出的一次 HTTP 往返得以重叠，在同一部署上再带来 +1.36% 的每用户输出吞吐量。同一条缝隙上还有进行中的工作：[UMBP 中的多池 DeepSeek-V4 支持](https://github.com/sgl-project/sglang/pull/30762)、[通过 MoRI 承载的统一 KV HiSparse 状态](https://github.com/sgl-project/sglang/pull/32368)，以及[在 decode 无可见内容即结束时保留 prefill 侧持有的 token](https://github.com/sgl-project/sglang/pull/34216)。HiSparse 这项工作应当被理解为长上下文的容量与正确性使能，而不是高并发下的吞吐量收益——目前它还不是。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/ed24f1b9-b591-4674-bc94-06394962d03f_2048x544.png"
+  caption="来源：SemiAnalysis"
+/>
+
+## TensorRT-LLM 的 agentic 优化
+
+接下来介绍 TensorRT-LLM 近期的几项优化。首先看 TRTLLM 针对重复对话轮次的前端优化，这项开销完全源自工作负载是多轮的。每一轮对话都会把整段历史再加一点新内容重新发过来，而朴素实现会把这一整段重新分词。按每 KB 计算分词很便宜，但当同样的 10 万 token 每轮都要重新分词一次时，代价就不可接受了。
+
+显而易见的修法——只对新增后缀分词——其实是错的，而且很容易被忽略，因为字节对编码（BPE）并不是位置无关的。token 可能跨越拼接点发生合并，因此在边界处切分文本、再把两段 token 序列拼起来，可能得到与整段分词不同的序列，从而与前缀缓存所依据的序列悄然分叉。
+
+TRTLLM 实现了[边界感知的增量分词](https://github.com/NVIDIA/TensorRT-LLM/pull/17462)：先找出渲染文本的公共前缀，回退一个完整 token 以便重算任何跨拼接点的合并，然后只对变化的后缀分词。在 Qwen3.5 的 AgentX trace 上，它在全部 1,087 次转换中都与完整分词结果一致——这个正确性结论是实测而非假设——并把平均处理时间从 185.1 ms 降到 11.3 ms。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/30a51cf2-e628-4c20-a4a5-5978234ca713_952x541.png"
+  caption="[来源：GitHub](https://github.com/NVIDIA/TensorRT-LLM/pull/17462)"
+/>
+
+固定的 8k1k 请求没有可复用的上一轮渲染结果，因此这些开销根本不会出现。与之相关地，[chat template 渲染被移入输入处理线程池](https://github.com/NVIDIA/TensorRT-LLM/pull/16231)，长 template 不再让主请求循环排在它后面串行执行。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/00b459b8-9c4c-4c8c-8659-07e14bf5699f_2048x784.png"
+  caption="来源：SemiAnalysis"
+/>
+
+MiniMax-M3 相关的工作聚焦在分离式 KV 搬运上，问题出在粒度。当 prefill 与 decode 对 head 布局理解不一致时，一条逻辑请求的 KV 就不再是几块大的连续区域，而变成数千个小的跨步片段，每一片都要生成自己的传输描述符。搬运的字节数没变，爆炸的是每描述符的开销，而且恰恰在最要紧的长 prompt 上爆得最厉害。[修正多池映射并引入分块 NIXL 中转路径](https://github.com/NVIDIA/TensorRT-LLM/pull/17518)，通过一块有界可复用的 arena 把这些碎片合并，用一次额外的暂存拷贝换取数量级更少的描述符。其 AgentX 诊断显示：并发 5 时请求关键路径上的 KV p99 从 26.74 秒降到 125 ms，并发 40 时从 10.15 秒降到 288 ms。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/52bd05ab-914f-4dc5-9f16-a0ea1b495383_959x501.png"
+  caption="来源：[GitHub](https://github.com/NVIDIA/TensorRT-LLM/pull/17518)"
+/>
+
+[非阻塞的上下文传输轮询](https://github.com/NVIDIA/TensorRT-LLM/pull/17428)保护了同一条路径，即使调度停滞也会回收已完成的传输，从而打破一个反馈环：已完成的 KV block 一直被钉住，阻止新请求准入。这些停滞本身也有[可以消除的原因](https://github.com/NVIDIA/TensorRT-LLM/pull/16734)：在 GB300 分离式 context worker 上，避免 DeepSeek-V4 上下文稀疏注意力元数据中的隐式 device 标量同步，消除了每步 18 次四字节 device 读取，而每一次都会强制触发 cudaStreamSynchronize。修复方式是把 host 侧计数以普通 Python int 传递，这样执行线程不再在一步的大部分时间里持有 GIL，让 KV 传输线程和响应线程排队等待。
+
+TensorRT-LLM 还把不规则的长上下文工作迁到了更高效的执行路径上。[MiniMax-M3 的 context graph producer](https://github.com/NVIDIA/TensorRT-LLM/pull/17473) 捕获稳定的稀疏 producer，同时让依赖请求的注意力保持 eager 执行，在其 AgentX 测试中每用户输出吞吐量提升 12.58%。一个进行中的[原生 KV 事件生成改动](https://github.com/NVIDIA/TensorRT-LLM/pull/16876)减少了 KV 感知路由路径上的分配与转换开销。
+
+AgentX 还暴露出只有在规模和时长都够大时才会出现的 kernel 选择与调度器生命周期问题。其中两个与选哪个 kernel 有关。MiniMax-M3 [为 MXFP8 自动调优加入了 CuTeDSL 候选](https://github.com/NVIDIA/TensorRT-LLM/pull/17316)，扩大候选集，在低并发聚合点上把每 GPU 输出吞吐量提高约 7% 到 10%。反方向上，TensorRT-LLM 在[禁用有缺陷的 split-K MoE tactic](https://github.com/NVIDIA/TensorRT-LLM/pull/17105) 之前，七次 AgentX 运行中有五次崩溃，禁用后七次对照运行零崩溃。一个又快又错的 tactic 比单纯慢的 tactic 更糟，而自动调优器只要它还在候选池里就会兴高采烈地选中它。选择并不是 kernel 出错的唯一方式：MiniMax-M3 针对短 query 的旧稀疏注意力路径，可能把一个非连续、head-major 的 block index 视图交给 SM100 kernel，而后者按连续内存解读，于是选中错误的 KV 页，产生错误或非有限的输出。[在 q_len ≤ 32 时遵循 block index 的 stride](https://github.com/NVIDIA/TensorRT-LLM/pull/17285)修复了索引问题，既不需要物化张量，也不需要新增 kernel；此后在 GB300 上完成的五组完整 AgentX 对照运行零服务错误、无非有限值标记。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/f48290ac-3361-4b0c-a085-ff84dd3dce51_2048x1347.png"
+  caption="来源：[TRT Github](https://github.com/NVIDIA/TensorRT-LLM/pull/17105)"
+/>
+
+另外两个是生命周期 bug，这类问题是长时间运行（而非大规模运行）的典型故障。[序列槽位余量与一致的按槽位索引缓冲区尺寸](https://github.com/NVIDIA/TensorRT-LLM/pull/16279)处理的是一个瞬时重叠：一条即将完成的请求和一条新准入的请求同时需要槽位。持续有请求到达和离开的流量会不断撞上这个窗口，而固定 batch 则永远撞不上。之后的[注意力数据并行 dummy request 修复](https://github.com/NVIDIA/TensorRT-LLM/pull/17278)让九个 Qwen3.5 分离式测试格存活下来，而此前多数测试格都在几分钟内失败——这正是“能跑完基准测试的配置”与“能撑住一整个会话的配置”之间的差别。
+
+两个进行中的传输改动针对超长的分离式 prompt，二者合起来展示了一个修复如何制造出下一个瓶颈。默认安排下，decode worker 必须等到整段 prompt 完成 prefill 并传输完毕才能开始，于是两个昂贵阶段串行执行，尽管第一个阶段本来就是增量出结果的。[流水线化的 KV 传输](https://github.com/NVIDIA/TensorRT-LLM/pull/15727)会在每个 prefill 分块完成时就开始发送，让传输与 prefill 计算重叠，只有最后一个分块留在关键路径上。
+
+这个改动让分块处理变得频繁，于是暴露出原本只做一次的工作。它的后续改动[每次只取当前分块对应的 block ID](https://github.com/NVIDIA/TensorRT-LLM/pull/17526)，而不是每次都取整段 prompt 的 block 列表。对一段 128,000 token、按 1,024 token 分块的 prompt 来说，这就是“构建一次 4,096 项列表”与“为每个层组重建 128 次”的差别。一项随 prompt 总长增长的按分块开销，其增长形态会把流水线刚换来的收益吃掉。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/e8eeb92e-1aad-4a97-b3c1-28409005809e_2048x769.png"
+  caption="来源：SemiAnalysis"
+/>
+
+## AMD ATOM 的 agentic 优化
+
+AMD 的 ATOM 引擎最初只面向单轮工作负载设计，而不是真实世界的 agentic 多轮生产工作负载，因此要让它较好地支持长上下文多轮场景，核心引擎和 kernel 都需要大量改动。相比 vLLM/SGLang 目前的水平，ATOM 在支持 agentic 工作负载上还有很长的路要走。AgentX 正被用作 ATOM 这轮重构的真实北极星目标。我们要讲的第一项 ATOM 优化，是对 DeepSeek-V4 分页滑动窗口注意力巧妙使用稀疏检查点保留。[已合入的实现](https://github.com/ROCm/ATOM/pull/1640)保留了选定的窗口尾部，让分叉和回放请求能够从有意义的边界处恢复。它的测量把两种效应分得很清楚：在并发 48 的同一条 AgentX trace 上，实际前缀命中率从 5.6% 升到 96.45%，滑动窗口关口处的损失从 91.35% 降到 0.16%。第二个数字是第一个数字背后的机制——十次前缀匹配里有九次是找到了却因为缺少窗口尾部而被丢弃，也就是说缓存并没有失配，而是被否决了。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/5c880335-e1e3-44d9-a123-8e316c9c3808_822x555.png"
+  caption="来源：GitHub"
+/>
+
+在这一切能被测量之前，还有两处更早的缓存管理器修复必须先落地，它们都是“缓存自报健康、实则什么也没做”的典型案例。其一[阻止空闲池命中破坏共享缓存条目](https://github.com/ROCm/ATOM/pull/902)；其二是[延迟输出的修复](https://github.com/ROCm/ATOM/pull/939)，恢复了默认调度模式下的前缀哈希，让重复的长 prompt 从零缓存 token 变为复用每一个完整前缀 block。另一处改动让前缀命中的 prefill [继续走优化过的 sink attention kernel](https://github.com/ROCm/ATOM/pull/1345)，而不是回退到通用路径，这样缓存命中不会悄悄吃掉它本该节省的一部分开销。
+
+混合模型还带有循环状态或压缩状态，它与普通 KV 有一个决定性区别：无法从周围的 token 重建。窗口尾部可以从相邻上下文重算，但循环状态是此前全部内容累积的结果，一旦丢弃，唯一的办法就是重放整个序列。ATOM [为这类按请求的状态引入了内容寻址的检查点生命周期](https://github.com/ROCm/ATOM/pull/1771)，让已生成的轮次留下可复用的恢复点，而无需为它们单独预留受保护的缓存。在一次测试中，一条请求复用了 512 个已生成 token，只计算了两个 token 的后缀。
+
+调优细节和功能本身同样重要。无条件发布检查点会让零命中流量损失 17.5% 的吞吐量——这是所有一去不回的会话为帮助那些会回来的会话所付出的代价。按 token 间隔来安排检查点避免了这一惩罚，固定 1k1k 的吞吐量保持在测量噪声范围内，而这正是关键的安全性质：一个面向 agentic 复用的功能，不应该让永远用不到它的工作负载付出代价。
+
+ATOM 与 AgentX 相关的 CPU 路径，要从“offload 到底值不值”的算术说起。[独立的 LMCache offload](https://github.com/ROCm/ATOM/pull/1318) 从 CPU 重新载入一段 32,000 token 的前缀约需 0.32 秒，而重算约需 2.5 秒，相差八倍。这说明在这种上下文长度下跨总线是值得的，但对短 prompt 就不成立。
+
+这条路径的其余部分关乎归属与索引位置，而不是带宽。ATOM 借鉴了 vLLM 的 [multi-connector](https://github.com/ROCm/ATOM/pull/1406) 设计，让 prefill worker 可以同时把 KV 发给远端 decode worker 并把同一前缀保存到 CPU，在两个消费方都完成之前不释放这些 block；同一批 block 有两个独立读者，这种情况在单轮场景中根本不会出现。
+
+[把恢复回来的 block 重新登记进 GPU 前缀索引](https://github.com/ROCm/ATOM/pull/1725)修复了一种更隐蔽的浪费：没有它，从 CPU 载入的前缀用过之后不会被登记为常驻，于是下一轮又要跨总线取一次同样的热前缀，为一份其实已经在 HBM 里的缓存反复付出传输代价。后续工作一并[修复了异步保存顺序、打包 KV 的几何结构、未对齐的交接以及远端请求记账](https://github.com/ROCm/ATOM/pull/1807)，在两轮、2,638 条请求的验证中消除了重载损坏。这个 bug 只有在同一批 block 被反复保存、淘汰、恢复很多次时才会显现。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/a7bb7f74-e5a3-4da3-b954-89905e54c4da_2048x420.png"
+  caption="来源：SemiAnalysis"
+/>
+
+分布式路径的故事在另一个代码库里重演，而这个模式在 SGLang 和 Dynamo 中已经出现过：路由必须知道状态在哪里。ATOM 的 router 叫 ATOMesh，是 SGLang router 的一个删掉了大部分功能的分支。可惜的是，ATOMesh 恰恰需要 SGLang 的缓存感知路由能力，于是这项功能又不得不加回来。ATOM 随后获得了面向缓存感知 router 的 KV 生命周期事件，router 由此才能知道状态在哪里；此外还加入了多节点 prefill 与 decode 路由，以及会话粘性的数据并行路由。这个粘性策略是一个值得明说的双向折中：会话会回到持有其状态的健康 worker，但空闲的分配会过期，避免为已经离开的会话长期打破集群均衡。
+
+分离式部署接下来必须搬运模型实际保留的所有状态，而这未必只有一份统一缓存。DeepSeek-V4 需要[同时传输其 FP8 与 BF16 混合缓存布局的两个缓冲区](https://github.com/ROCm/ATOM/pull/1737)，EAGLE 分离式部署则要在传输目标缓存之外[搬运 draft 模型独立的 KV cache](https://github.com/ROCm/ATOM/pull/1331)——这正是 TensorRT-LLM 和 SGLang 各自都解决过的“第二份缓存”问题。[远端 KV 准入与背压](https://github.com/ROCm/ATOM/pull/1647)补上了闭环，防止 decode 侧接收超出其安全恢复能力的挂起传输，这是“接了做不完的活”在分离式场景下的形式。
+
+在 ATOM 上，[PCP 报告平均 TTFT 降低 35% 到 43%](https://github.com/ROCm/ATOM/pull/1220)，在 64,000 token 输入下总吞吐量最高提升约 49%——这种收益随输入长度增长，而不是随 batch 大小增长。要让它在实践中可用，就必须与会话依赖的其他一切组合起来，因此 DCP 被[做到与前缀缓存、chunked prefill 和 FP8 KV 兼容](https://github.com/ROCm/ATOM/pull/1701)，随后又[扩展支持 MTP](https://github.com/ROCm/ATOM/pull/1746)。一种无法与前缀缓存共存的并行方式，只是用一项长上下文收益换掉另一项。同样的并行度匮乏也存在于单块 GPU 内部：batch 为 1 的 MLA decode 没有 head 维度或 query 维度可以铺开，只剩 KV 扫描，而硬编码为 16 的 split 预算让这次扫描只用上了 gfx950 的 256 个 CU 中的 16 个。一个[尚未合入的改动](https://github.com/ROCm/ATOM/pull/1911)不再覆盖 kernel 自身推导出的 split 数，让 Aiter 按机器实际的 cluster 数量切分扫描。
+
+[分块流水线并行 prefill](https://github.com/ROCm/ATOM/pull/1552) 从内存一侧攻击同一问题，用逐层阶段的流式交接取代反复的张量并行集合通信。它在高负载下的 GLM-5.2 结果是本节中最完整的一组：输出吞吐量翻倍，首 token 延迟中位数从 28.6 秒降到 8.7 秒，每块 prefill GPU 能容纳的 KV block 数是原来的 3.68 倍。最后这个数字最值得先看，因为每块 prefill GPU 的容量决定了在部署撞上 HBM 悬崖之前，究竟能有多少条长会话同时在跑。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/8184b9e6-883b-446c-884b-226b5e9fcca1_2048x549.png"
+  caption="来源：SemiAnalysis"
+/>
+
+## ROCm AITER 的 agentic 优化
+
+ATOM / AMD vLLM / AMD SGLang 的长上下文执行依赖底层 AITER kernel 的配套支持，因为引擎层的并行策略只有在 kernel 能表达时才算数。[Prefill 上下文并行进程组](https://github.com/ROCm/aiter/pull/3728)提供了 prefill 上下文并行所需的额外 query 分片维度，同时把融合 kernel 的行索引扩宽到支持 131,000 token 以上的 prompt。[Decode 上下文并行](https://github.com/ROCm/aiter/pull/3267)（DCP）把 KV 分片到已有的张量并行 GPU 上，使更长的序列或更大的 batch 无需在每个 rank 上复制整份缓存即可放下。
+
+大容量缓存还暴露出一类短固定请求基本碰不到的故障：地址位宽。在单个缓存池跨过边界之前，32 位偏移完全够用；一旦越界，算术就会回绕，kernel 会在不报任何错误的情况下访问错误的行。AITER 为此加入了[大于 4 GB 时批量 prefill 的运行时 64 位分发](https://github.com/ROCm/aiter/pull/2893)、[大于 2 GB 时的 64 位 MLA 偏移](https://github.com/ROCm/aiter/pull/4474)，以及[DeepSeek-V4 统一缓存路径全面使用 64 位寻址](https://github.com/ROCm/aiter/pull/4680)，最后一项避免了在约 1.5 亿行的池中静默读写错误的行。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/ce356c05-883b-4c63-a359-8cfd72dddb63_1408x1046.png"
+  caption="来源：SemiAnalysis"
+/>
+
+DeepSeek-V4 的 decode 还获得了[面向 64 head 与 128 head MTP 打包的持久化 MLA kernel](https://github.com/ROCm/aiter/pull/3459)。这两个 head 数正是普通解码和投机验证实际产生的形态，因此引擎在常见 shape 上有了专门的长上下文路径，而不是把它们当成为短上下文编写的 kernel 的附带变体。这与前面 vLLM AITER 稀疏 MLA 选择的道理相同：在长上下文下，通用路径不是一个小小的妥协，而是选错了 kernel。
+
+## Dynamo 的 agentic 工作负载优化
+
+NVIDIA 的相当一部分提交使用了 Dynamo 推理编排与 router 系统。Dynamo 的 AgentX 系列工作表明，一旦引擎 kernel 变快，分布式服务层就可能成为瓶颈。router 的工作量正比于在线前缀的数量和长度，而不是生成的 token 数，因此大量长、相互重叠、生命周期又长的会话给它带来的压力，是固定形状流量永远制造不出来的。第一组 PR 降低了每次路由决策的开销：[减少查找热路径上的工作](https://github.com/ai-dynamo/dynamo/pull/10540)、[消除冗余的后缀失效](https://github.com/ai-dynamo/dynamo/pull/10836)，最后是[批量化 KV 匹配、注册、归属和终止解引用](https://github.com/ai-dynamo/dynamo/pull/11095)，在并发 512 下报告输出吞吐量中位数提升 22.2%。批量化在这里奏效的原因和它在引擎里奏效的原因一样：每项开销已经盖过了项目本身。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/7af8faf5-300e-4ee5-bc0c-040b7630e923_1016x671.png"
+  caption="来源：GitHub"
+/>
+
+第二组 PR 改变了归属关系的表示方式，这是底下更难的问题。每个被缓存的 block 都要归属到依赖它的请求，既不能在仍被使用时释放，也不能在所有人用完后继续钉住。当数千条并发会话共享相互重叠的前缀时，记账本身就成了显著开销。Dynamo 从[共享 block 链](https://github.com/ai-dynamo/dynamo/pull/11503)转向[arena 级归属计数](https://github.com/ai-dynamo/dynamo/pull/11508)，最终走到[后端专属的请求租约](https://github.com/ai-dynamo/dynamo/pull/12329)，每一步都在放粗被追踪的粒度。租约设计让 vLLM 后端的 AgentX 回放时间缩短 23.7%、SGLang 缩短 22.0%，同时还降低了峰值内存——这说明问题出在此前的表示方式，而不是流量本身。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/e3039950-98e0-4cd0-b7fe-929a120bd7d2_2048x576.png"
+  caption="来源：SemiAnalysis"
+/>
+
+进一步的 router profile 消除了同一形态的开销：某个周期性扫描或整体重算之所以过去可以接受，只是因为在线状态一直很小。[分桶式过期清理](https://github.com/ai-dynamo/dynamo/pull/10521)取代了正比于全部被追踪对象的扫描，让高频变动（churn）场景下的 AgentX 吞吐量提升 13.7%。[仅处理增量的后缀清理](https://github.com/ai-dynamo/dynamo/pull/10676)只处理变化的部分，在同样的时间窗口内吸收了约 28 倍的 store 与 remove 事件。[压缩 prompt 路径](https://github.com/ai-dynamo/dynamo/pull/11644)把前端 CPU 占用降低 35.3%，并显著改善了尾部首 token 延迟——这一点很重要，因为这类工作负载中的 prompt 很长且大量重复。过载状态现在也改为[增量跟踪](https://github.com/ai-dynamo/dynamo/pull/10645)，而不是每次重算。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/878dd41d-fc0f-407e-8421-ad05ad9e740c_1087x624.png" />
+
+有一处路由改动是有意为之的取舍，而非纯粹的收益。Dynamo 现在可以[在路由打分中计入活跃的 decode 请求](https://github.com/ai-dynamo/dynamo/pull/12158)，这样一个已经承担了长时间 decode 的 worker，看起来会比单看队列深度更“贵”。在所报告的调优点上，这改善了 AgentX 延迟中位数，代价是少量吞吐量——这种选择只有在请求会长时间占用 worker 时才会显现出来。一个[进行中的后续改动](https://github.com/ai-dynamo/dynamo/pull/13447)把这个取舍打包成新的 agentic router 预设，并在同一方向上走得更远：前缀重叠按 2 计分、prefill 负载按 4 缩放、活跃 decode 请求按 64 加权。在这个调优点上，这笔交易不再牺牲吞吐量：在一次 8xH200 的 AgentX 运行中，该预设相比默认代价函数把固定窗口内完成的输出吞吐量提高 8.26%，运行级 p95 首 token 延迟降低 43.1%、p95 token 间延迟降低 22.6%，并且多完成了一条完整轨迹。
+
+接下来优化的是请求平面，因为一条 agentic trace 不是只发一次请求、收一次响应。它会发出许多携带几乎相同 prompt 的相关请求，并把每个 token 作为独立帧流式返回，于是序列化和拷贝的开销要按轮、按 token 反复付出，而不是只付一次。改用 [MessagePack 请求负载](https://github.com/ai-dynamo/dynamo/pull/10437)在其 AgentX 测试中把吞吐量提高 8.1%、平均首 token 延迟降低 9.7%，[直接 Python 转码](https://github.com/ai-dynamo/dynamo/pull/11104)则把这条路径上的中间值树整个去掉了。
+
+随后的一系列改动都是去掉一次拷贝，而不是把某次拷贝做得更快：不再拷贝 [MessagePack 事件负载](https://github.com/ai-dynamo/dynamo/pull/11539)、不再拷贝[收到的 ZeroMQ 帧](https://github.com/ai-dynamo/dynamo/pull/11574)、不再为每个 token 支付完整的 [token 间延迟指标开销](https://github.com/ai-dynamo/dynamo/pull/11569)。[聊天流式热路径](https://github.com/ai-dynamo/dynamo/pull/10433)也因同样的理由被缩短。单看每一项都平平无奇，但乘上每条并发会话的每个流式 token，它们决定了前端每秒能撑住多少请求。
+
+高并发剖析随后找出了与数据搬运无关的开销。[静态日志过滤](https://github.com/ai-dynamo/dynamo/pull/11820)移除了一个共享的 span matcher 锁——这是争用问题而非数据量问题——把前端吞吐量从 932 提升到 1,133 请求/秒。[更简单的位置 radix 分桶](https://github.com/ai-dynamo/dynamo/pull/12161)在 32 worker 的运行中把 mocker 的峰值内存降低了 5.51 GiB。一个进行中的改动改为[每条响应刷新一次去分词指标](https://github.com/ai-dynamo/dynamo/pull/12999)，而不是每个流式分块都更新累计计数器，在对照诊断 profile 中把前端 CPU 时间大约减半。最后这一项是这类问题最清晰的例子：这套埋点单次调用很便宜，但按每 token 一次调用就是灾难。
+
+## LMCache 的 agentic 优化
+
+LMCache 是一个开源 KV cache 层，位于 vLLM 等推理引擎之下，按前缀哈希把可复用的 KV 分块存放在 CPU DRAM、本地 NVMe 和远端后端（Mooncake、Redis、S3）上。它可以替代 vLLM 原生的 offload connector。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/945da9bc-59ec-4084-9f3a-da58da04b3c5_2048x638.png"
+  caption="来源：SemiAnalysis"
+/>
+
+LMCache 的多进程路径针对 agentic 缓存搬运的量级与形态做了改造，起点是一个不是变慢、而是直接卡死的故障。当许多上下文超过 100,000 token 的请求各自在开始前就为整次加载预留 block 时，池子会被一群全在等待、谁也无法推进的请求耗尽。[分块的外部缓存加载](https://github.com/LMCache/LMCache/pull/3382)改为按分块预留，让加载可以交错进行并逐步排空。在并发 32 下，验证完成了 120 条请求，而旧路径在 28 条时就死锁；并发 48 时在 KV 池 98.5% 占满的情况下仍能继续运行。
+
+其余改动则减少搬运量以及运行时的干扰次数。只存储 DeepSeek-V4 混合分组中真正有用的部分，把[每 token 的存储量减少了近二十倍](https://github.com/LMCache/LMCache/pull/3635)；滑动窗口预取现在[只加载存活窗口](https://github.com/LMCache/LMCache/pull/3869)，而不是那些永远不会被读取的窗口状态——这与 vLLM 在 offload 上采用的可达性论证相同，只是换到存储一侧来看。[每个对象组一次原生传输调用](https://github.com/LMCache/LMCache/pull/3908)随后消除了暂存拷贝与 kernel 启动之间反复的 Python 锁交接，这类开销正比于分片数量而不是字节数。
+
+有两项 LMCache 改动与 AgentX 尤其相关，但目前仍未合入。[混合锁记账修复](https://github.com/LMCache/LMCache/pull/4524)阻止一条请求释放另一条请求在共享滑动窗口分块或循环状态分块上的读锁。要触发它需要三个条件同时成立：多条请求共享同一批分块、记账必须按分块而非按持有者进行、并且淘汰确实开始发生。带 DRAM offload 的长时间 Kimi-K3 运行同时满足了三者，产生了数万条告警、生成内容损坏，并在淘汰开始后最终导致 GPU 崩溃。只要不是长时间、共享且内存吃紧的运行，这个 bug 就一直潜伏着。
+
+另一条并行的 LMCache 工作线让上述一切在 AMD Instinct 硬件上成为可能。CacheBlend 的非前缀复用依赖仅支持 CUDA 的 flashinfer，因此[一个 Triton block-sparse 注意力后端](https://github.com/LMCache/LMCache/pull/3092)重新实现了它所需的三个 kernel：带 CSR 索引和 log-sum-exp 输出的 block-sparse 注意力、causal prefill，以及 log-sum-exp 输出混合。当检测到 ROCm 或缺少 flashinfer 时，会自动路由到这些实现。[ROCm Dockerfile](https://github.com/LMCache/LMCache/pull/3101) 对齐了 CUDA 的构建与轻量镜像。[AMD hipFile 后端](https://github.com/LMCache/LMCache/pull/3843)扩展了此前只能通过 NVIDIA cuFile 访问存储的 GDS L1 slab-file 层，通过 ctypes 绑定 ROCm 的 hipFile 并按 torch.version.hip 分发；cuFile 路径保持不变。
+
+最后剩下的缺口是分发。CUDA 用户装的是预编译 wheel，AMD 用户则要从源码构建。我们与 AMD 合作发布了[预编译的 gfx942 与 gfx950 wheel](https://github.com/LMCache/LMCache/pull/4273)来补上这一块。它可以装进上游镜像，并在 MI350X 上通过全部 56 项 KV 传输 kernel 测试；它发布在 GitHub release 而不是 PyPI 上，因此直接 pip install lmcache 装到的仍是 CUDA 构建。[一行的后续修复](https://github.com/LMCache/LMCache/pull/4363)把 bind mount 进来的仓库标记为 git 安全目录，这个问题只在 CI 中出现，因为容器以 root 身份运行在 runner 所属的 checkout 上，setup.py 里的版本探测会拒绝读取它。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/89c2f79c-a704-4144-a900-ddd69ce306dd_1112x667.png"
+  caption="来源：GitHub"
+/>
+
+[DCP 感知的 CPU offload](https://github.com/LMCache/LMCache/pull/3561) 解决了两个在长上下文下必须同时启用的功能之间的直接冲突。启用 decode 上下文并行后，每个 rank 只持有 KV 的一段 stride，因此任何单个 rank 能保存的内容都不构成可用前缀；修复方式是在保存前汇聚这些跨步分片，加载后再重新分发。没有它，启用上下文并行会悄悄让 CPU 缓存命中失效，而失效的恰恰是催生这两项功能的长前缀。其验证记录了超过 30,000 次 CPU 命中事件，单请求加载量达到数十万 token。
+
+## Mooncake 的 agentic 优化
+
+Mooncake 承载着月之暗面 Kimi 的生产流量以及多家实验室的生产流量，也是分离式 vLLM 与 SGLang 配置底层的传输引擎。直到不久前，Mooncake 的 AMD 支持既没有 RDMA 注册，也没有可直接安装的软件包。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/32c734aa-1f52-47af-a98e-334978b4e6fa_1778x1386.png"
+  caption="来源：SemiAnalysis"
+/>
+
+在 NVIDIA 上为 RDMA 注册 GPU 显存，要么用 nvidia-peermem 内核模块，要么导出 dmabuf 文件描述符。AMD 没有 nvidia-peermem 的对应物，因此 GPU-direct RDMA 完全无路可走，部署只能把 KV 经主机 DRAM 中转。[一个 HIP dmabuf 注册分支](https://github.com/kvcache-ai/Mooncake/pull/2225)加入了与现有 CUDA dmabuf 路径对应的实现，改为通过 ROCm 导出，并先解析出真实的分配基址——因为缓存型分配器会把张量打包在更大一块分配内部的某个偏移处。主机内存仍然直接注册。
+
+装不上的支持等于没有支持。Mooncake 发布过 CUDA 和 MUSA 的 wheel，但没有 ROCm 包，因此 AMD 用户只能在每个镜像里从源码构建引擎。[ROCm wheel、CI 与发布流程](https://github.com/kvcache-ai/Mooncake/pull/3184)把 mooncake-transfer-engine-rocm 一并发布到 PyPI。这项工作来自 AMD 工程师 Andy Luo，他在用 AgentX 试用 agentic 工作负载时注意到一个规律：在 ROCm 上从源码构建 MoonCake 并不是一流公民的做法。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/12cd94ca-2aa7-4e06-a4bd-3153982234c5_1220x680.png"
+  caption="来源：GitHub"
+/>
+
+传输引擎没有设备 kernel，也不依赖 torch，因此一个与架构无关的 wheel 就能同时覆盖 gfx942 和 gfx950；ROCm 运行时是在加载时绑定而非打包进去的，这意味着同一个 wheel 在上游 vLLM ROCm 镜像和 SGLang ROCm 镜像中都能原样使用。这一点是按完整交叉矩阵验证过的：MI300X 和 MI355X，各自在 vllm/vllm-openai-rocm 与 lmsysorg/sglang 下运行 master 二进制以及带数据校验的 HIP buffer 传输测试。该 PR 还加入了按 tag 触发的发布流程，覆盖 Python 3.10 到 3.13。一个进行中的后续改动[增加了自建的双节点 MI350X 外部 prefill 与 decode 层](https://github.com/kvcache-ai/Mooncake/pull/3338)，让 ROCm 分离式路径在真实硬件上得到验证，而不只是能编译通过。
+
+综合这些 PR，AMD 上的 AgentX 运行现在可以把传输引擎和 KV cache 层作为已发布产物直接装进原生上游镜像，并在 GPU 显存与网络 fabric 之间直接搬运 KV。
+
+## 其他优化
+
+上面这些改动针对的是长上下文带来的开销：必须存活的前缀、必须保持正确的混合缓存、必须跟上节奏的传输。但除此之外，还有大量 day-0 使能与正确性 bug，它们让请求失败的程度不亚于百万 token 会话。
+
+MiniMax-M3 检验了这些 ROCm 工作能否累积成 day-0 就绪能力，而 [Advancing AI 那篇文章](https://newsletter.semianalysis.com/p/can-amd-break-the-cuda-moat-amd-advancing)直接给出了对比：AMD 首个公开的分离式配置方案 MI355X FP4 于 1 月才进入 InferenceX，比 NVIDIA 晚了数月；而 M3 FP4 的分离式支持是 day 0 就位的。相比 DeepSeek-R1 时期要花几个月才追平，这已经是明显进步。day-0 路径上有三个 vLLM 修复，每一个都是正确性问题而非性能问题。
+
+首先被卡住的是分离式部署。NixlConnector 的握手断言 SPLIT 区域的 block_len 会随 prefill 与 decode 的 TP 比例缩放，但 block_len 实际跟随的是每 rank 的 KV head 数。M3 只有 4 个 KV head，因此 TP4 prefill 搭配 TP8 decode 时，两侧都被 GQA 限制为每 rank 一个 head，两个长度相等，而断言却要求相差两倍。握手被拒，KV 没有搬运，decode 只能全部重新生成，gsm8k 得分为 0。[改为按实际 head 比例校验](https://github.com/vllm-project/vllm/pull/45879)修复了这个问题。
+
+另外两个是平台差异。M3 的稀疏注意力后端在所有 E4M3 配置下都把以字节存放的 FP8 缓存读作 float8_e4m3fn，但 gfx942 的平台 dtype 是 e4m3fnuz，两种编码并不相同，于是 K 和 V 在被 kernel 消费之前就已经被改变。prefill 和 decode 的 wrapper 也没有把 FNUZ 类型纳入 FP8 检查。[改用平台 dtype 来解释缓存视图](https://github.com/vllm-project/vllm/pull/45720)同时修复了这两处。另外，M3 以 NVIDIA 和 AMD 两个独立模型文件发布，而只有 NVIDIA 那份实现了 EAGLE3 接口，因此在 ROCm 上启用投机解码会在引擎初始化时报“模型不支持”并中止。[把 AMD 模型补齐到同等实现](https://github.com/vllm-project/vllm/pull/45546)恢复了该能力，MI355X 的 gsm8k 分数与未启用 EAGLE3 的 MI355X 运行以及 B200 一致。
+
+上面的 TensorRT-LLM 一节涵盖了 M3 上与长上下文相关的工作：分离式 KV 传输中的描述符爆炸、context graph 捕获、稀疏 block stride、自动调优候选，以及必须从候选池中移除的有缺陷 split-K MoE tactic。
+
+本地的 AgentX 测试矩阵把会话感知或 KV 感知路由、长且长度多变的对话历史、MTP、混合注意力、聚合式与分离式服务，以及跨越 HBM 容量悬崖的并发扫描组合在一起。它既包含全 GPU 驻留的对比，也包含通过 vLLM SimpleCPU、Mooncake、LMCache 和 SGLang HiCache 的 CPU DRAM offload。正是这种组合激活了上述上游工作。旧的固定序列矩阵通常只创建一个 prompt、做一次 prefill、解码一段固定长度的续写，然后丢弃请求。因此它无法衡量跨轮次的缓存存活、重复分词、会话亲和性、缓存事件流量、offload 抖动、调度停滞期间的传输进度，以及长生命周期的归属记账。
+
+允许的优化策略把 CPU KV offload 视为可选项。厂商可以使用 vLLM connector、LMCache、SGLang HiCache、Mooncake、Dynamo KVBM 或其他 CPU DRAM connector，也可以在关闭 offload 后延迟与吞吐更优时选择关闭。NVMe offload 暂缓。CPU DRAM 必须按所用 GPU 比例配置，其中非标准化 DRAM 系统适用 3 TB 上限；标准化 DRAM 系统没有硬性上限，但同样遵循按比例配置的规则。目前本地生成器对所有 runner 一律应用 3 TB 上限，也就是说尚未实现标准化 DRAM 的例外规则。
+
+新增的优化面并不只是“注意力更长了”。它是一份不断增长的会话状态在保留、搬运、路由、重建和反复处理上的开销。AgentX 把这些开销放大到足以驱动 vLLM、SGLang、TensorRT-LLM、ATOM、AITER、Dynamo 和 LMCache 上的通用上游改动。我们直接检索 NIXL 和 Mooncake 未发现更多标记为 AgentX 的运行时 PR，因此它们的相关效果仍然通过上述引擎 connector 改动体现。
+
+## AgentX 测试方法深入解析
+
+AgentX 在开源的真实世界长上下文多轮 agentic trace 回放上是一次重大转变。我们采集了价值超过 300 万美元 token 的 trace，构成自有数据集，内容来自 Claude Code、OpenAI Codex 等真实流量。除数据集外，我们还建立了一套公平回放这些流量模式的完整方法，目标是在尽可能忠实于真实流量的同时，对 GPU 资源需求保持公平。
+
+下面我们会深入介绍 agentic trace 数据集、回放方法以及 agentic 行为本身。希望更好理解 agentic 工作负载整体形态、以及各类 harness 在底层如何编排请求的读者，值得读一读这部分。
+
+## 价值 300 万美元的 agentic 流量 trace 采集器
+
+在最初设计 AgentX 时，我们的北极星目标是让基准测试在 KV 工作负载形态和 KV 复用模式上尽可能真实。我们先尝试回放了一些现有数据集，例如 SWE-bench、Qwen-Bailian 以及 HuggingFace 上的一些 Claude Code trace。当时这些数据集都没有大量使用子智能体、1M 上下文、上下文压缩、动态工作流等近来定义 agentic trace 的特征。在 SemiAnalysis，团队里大多数人都是 AI 重度用户，会用 agent 做各种事情：写代码、分析师研究、Excel 建模、社交媒体运营等等。因此我们判断，最可行也最真实的 trace 只能自己采集。
+
+为了采集足够多的 trace，我们做了一个代理来拦截发往 Claude / Codex 的 HTTP 请求。愿意上传 trace 的用户只需把 Claude / Codex 配置中的 base URL 指向这个代理即可。截至撰稿时，我们已采集超过 8,000 个会话、340 万条请求、6,100 亿 token，合计支出超过 300 万美元。[我们为 AgentX v1.0 基准测试开源了其中具有代表性的一个子集。](https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126)
+
+agentic harness 看起来复杂，但归根结底就是在编排一串 HTTP 请求。每条请求都包含系统指令、工具定义和累积对话历史的某种组合。随着会话推进，这段历史不断增长并被反复发回模型，从而形成 AgentX 想要复现的长上下文与高前缀复用。
+
+我们的代理会实时记录这些请求和响应，同时提取时间戳、conversation ID、subagent ID 等元数据 / HTTP 头，从而还原对话的*结构*（请求顺序、并发分支，以及每个会话大致的父子关系）。正是这些元数据，让我们能够按照原始 Anthropic API 服务端所看到的样子近似回放这些 trace。
+
+为保护员工隐私，回放数据集不包含任何原始 prompt、源代码、工具参数或工具返回结果。我们的做法是先对每条请求的内容分词，再按 64 个 token 分块，最后把每一块替换成一个会话内链式哈希。这样，相同的 prompt 前缀会产生相同的哈希前缀，同时不暴露内容（[这篇论文](https://arxiv.org/abs/2506.02634)对该策略有更多讨论）。回放时，这些哈希块可以替换成来自比如某个编码数据集的 token。由此我们保留了原始工作负载中大致的上下文增长曲线和会话 KV 复用模式。
+
+需要说明的是，这个过程必然不完美，主要原因是使用前沿模型厂商 API 时，末端 LLM 服务器实际看到的内容有很大一部分是隐藏的。例如 SOTA 模型的思考 / 推理内容如今在 HTTP 请求中是加密的，并被替换成确定性哈希，以阻止蒸馏攻击。不过看起来[这招的效果并不像大实验室预期的那么好……](https://arxiv.org/html/2608.09867v1)
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/767f2f58-fa9d-40d3-8711-751d243cae9a_500x487.png"
+  caption="来源：SemiAnalysis"
+/>
+
+此外，虽然我们能拿到用户 / 助手消息、系统提示词、工具使用等全部原始*内容*，但 API 厂商还会在服务端应用额外的、不透明的 chat template。我们也无法观察 Anthropic 的专有分词器，或服务端工具引入的上下文。图片和文档在传输表示与模型实际处理的 token 数之间也没有直接对应关系。我们使用确定性占位符以及按模型经验校准的填充，把重建后的 prompt 长度调整到最接近服务端实际看到的内容。
+
+由于信息不完整，我们无法*完全*按照 Anthropic / OpenAI 服务端*实际看到*的样子采集并回放 Claude Code / Codex 的 trace，但可以做到相当接近。下图展示了在所有请求长度和模型上，哈希 token 数（经我们近似 / 处理之后）与 API 厂商真实 token 计数的比值。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/7123b5de-9942-4298-8ccd-1b69b8a71df0_2048x1799.png"
+  caption="来源：SemiAnalysis"
+/>
+
+总结来说，由于信息不完整，要完全按原始服务端所见的方式采集并回放真实 Claude Code trace 并不容易。但我们掌握的信息足以采集并回放出与原始流量模式、时序、前缀缓存和 DAG 结构高度吻合的 trace。
+
+## AgentX 的 300 万美元数据集
+
+AgentX v1.0 使用的数据集可在 [HuggingFace](https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126) 获取。它是上一节所述 8.3k 会话代理语料中的 393 会话子集。此外我们还做了一些后处理来清理异常，例如：
+
+- 移除 Claude Code 安全监控（auto mode）请求和标题生成请求，因为它们是 Claude Code 特有的，不一定能代表通用 agentic 流量
+- 移除重建后输入长度超过 990k token 的请求（这些是我们的近似方法高估了）
+- 去除重复请求（连接断开时，代理有时会收到完全相同的请求）
+
+此外，每个对话都被整理成 WEKA trace 格式，该格式由 Callan Fox 在其 [kv-cache-tester](https://github.com/callanjfox/kv-cache-tester) 项目中提出。我们选择这个格式，主要是因为我们与 Callan 密切合作开发了这套基准测试，觉得它用来存放按会话组织的 trace 很直观。总体而言 trace 格式的选择相当随意，我们的代理数据集也可以映射到其他格式，例如 [Mooncake](https://docs.nvidia.com/aiperf/benchmark-modes/trace-replay-with-mooncake-traces)。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/48045991-20d7-4685-863d-c9aa1d6d3142_1812x2048.png"
+  caption="来源：SemiAnalysis"
+/>
+
+应用这些处理后，得到如下数据集。注意各子图的 X 轴并不一致。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/f22c9c7e-44ba-4ffd-bdc3-58fbbef8f30d_2048x2004.png"
+  caption="来源：SemiAnalysis"
+/>
+
+ISL/OSL 和轮次间延迟（在 agentic 工作中，这主要是工具调用耗时）的分布大致呈对数正态。ISL 中位数为 142k token，OSL 中位数为 444 token，轮次间延迟中位数为 3.84 秒，只有约 10% 的轮次间延迟超过 1 分钟，这部分很可能是 harness 在等待真人回应的空档。
+
+值得一提的是，这些请求分布会随所用 harness 而不同，因为各家注入的上下文数量 / 类型不一样（例如 Pi 以 harness 注入上下文极少著称，Claude Code 则相反）。此外 ISL/OSL 分布还取决于模型，不同模型的分词器产出的 token 数会更多或更少。不过考虑到全球相当大一部分 agentic 编码流量都经过 Claude Code，我们认为这份数据具有代表性。
+
+数据集中有 175 个会话至少包含一个子智能体（约占全部会话的 44%），共有 1,697 次子智能体 rollout，每个会话中位数为 4 次。子智能体的墙钟时长中位数（从第一条请求开始到最后一条请求结束）为 2.27 分钟，这一分布同样接近对数正态。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/f4792809-087e-431b-acce-aecdd3855b3b_2048x1390.png"
+  caption="来源：SemiAnalysis"
+/>
+
+该数据集包含最长 1M 的上下文，用于测试较新的前沿开放权重模型。此外我们还提供[一个截断到 256k 上下文长度的数据集](https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126-256k)，用于回放最大上下文长度不超过 256k 的模型。
+
+## agentic 流量 trace 回放器
+
+我们没有从零造回放方案，而是选择与 [AIPerf](https://github.com/ai-dynamo/aiperf) 合作。它是 NVIDIA 出品、与厂商无关的 HTTP 回放工具，已被 tenstorrent、AWS、AMD 等众多机构采用。虽然我们的目标是把 AgentX 的功能合入上游仓库，但仍维护一个独立的 [fork](https://github.com/SemiAnalysisAI/aiperf) 以保持更强的厂商中立性，从而能自主接纳更多第三方贡献。再次感谢 AIPerf 团队，特别是 Anthony Casagrande，为构建真实且有代表性的 agentic 基准测试所付出的努力。
+
+一个 agentic 会话天然可以用有向无环图（DAG）描述。每条请求是一个节点，一条边表示：边头部的请求必须等边尾部的请求完成后才能发出。每条边还带有一个延迟，表示前置条件满足后需要再等多久。
+
+最简单的会话是完全线性的：没有子智能体、没有并行请求，每条请求恰好依赖一个前驱。此时图退化成一条线，边所编码的只有轮次间延迟（也就是工具调用时间或“思考”时间），那是客户端本地的工作，不是模型的耗时。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/20662be0-c311-49e9-8e39-0973d8a1865d_2048x1169.png"
+  caption="来源：SemiAnalysis"
+/>
+
+在 agentic trace 中还会派生出子智能体。子智能体是一条拥有独立上下文的请求流，通常用来完成某个聚焦任务。多个子智能体可以并行执行以完成更多工作，某些情况下子智能体也可以与主智能体并行。主智能体随后等待一组子智能体完成，再把它们的输出并入自己的上下文（虽然并非*总是*如此，但这是最常见的模式）。
+
+正是这种行为把上面那条线性请求链变成了 DAG，其中某些请求依赖于另一些请求。当识别出属于同一个子智能体的一组请求时，AIPerf 会找到最近的一条主智能体前驱请求，把它定为“派生”请求；类似地，“汇合”请求则是该子智能体组持续时间结束之后的下一条主智能体请求。
+
+在下面的例子中，子智能体组只包含一个子智能体（001），它发出两条请求。第一条请求在主智能体的首条请求完成后立即发出；该请求完成后，2.2 秒的轮次间延迟代表工具调用的墙钟时间，随后发出子智能体的第二条请求。主智能体的第二条请求是子智能体 001 的汇合点，它在两个条件同时满足后才发出：距主智能体首次响应已过去至少 17 秒，*并且*子智能体 001 的第二条请求已经完成。
+
+一个小的局限是：HTTP 时间戳能反映时序，却未必能反映因果。在下面的例子中，如果子智能体 001 在主智能体请求 2 的记录起始时间之前 7 秒就结束了，我们无法判断这 7 秒是子智能体返回之后才开始的工作，还是原本就在并行进行的独立工作。因此 AIPerf 同时保留两个约束：请求 2 既要等待它记录的主路径延迟，也要等待子智能体 001 完成。这样能复现观察到的时序和工作负载拓扑，但无法复现 harness 内部隐藏的依赖关系。这些是我们希望在后续版本的 AgentX 中改进的地方。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/18adec21-15d9-40cd-af7d-0772da4a9af0_2048x1729.png"
+  caption="来源：SemiAnalysis"
+/>
+
+一条请求也可以同时派生出多个子智能体。在下面的例子中，子智能体 001 和 002 的派生父节点都是主智能体请求 1，并在主智能体请求 2 处汇合。
+
+AIPerf 还能识别“辅助（auxiliary）”请求，即与流中其他请求不共享上下文的一次性请求。它们从主智能体分叉出去，并且不会汇合回来。实际场景中，这类请求例如 Claude Code 的“总结本次会话”请求，与对话上下文无关；另一个很好的例子是 Claude Code 的 `/btw` 功能。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/3d5f01ad-1736-496b-91b4-31672002bf47_1920x2048.png"
+  caption="来源：SemiAnalysis"
+/>
+
+下面的例子把这些要素放在一起，也是实际数据集中会看到的 trace 片段类型。图中有五条并行流从同一条主智能体请求出发，按各自汇合到哪条主智能体请求被分成不同组。
+
+子智能体 001 和 002 分别在第 20 秒和第 23 秒结束，因此其后第一条在第 25 秒发起的主智能体请求就是它们的汇合点。子智能体 003 和 004 在同一个间隙中派生，但运行时间长得多，分别在第 46 秒和第 50 秒结束，因此它们汇合在第 52 秒。AIPerf 用（派生请求，汇合请求）这一组合作为子智能体的键，因此这四条流虽然都从同一节点出发，却被归并为两条分支。分支以其第一个成员命名，这也是汇合边被标为子智能体 001 和子智能体 003 的原因。
+
+这也是第一次出现主智能体与自己的子智能体重叠的情况：第 25 秒发出的请求，是在 003 和 004 仍在运行时发出的——主智能体只被与它汇合的那一组阻塞，而不是被所有在途的子智能体阻塞。
+
+辅助链会挂在它之前最近的那条主智能体请求上，这里是第 52 秒那条，而不是开启会话的那条。因此该节点同时做了两件事：接收第二组子智能体的汇合，并派生这条一次性请求。当然，辅助请求不会再汇合回来。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/d2f465f9-372c-4ee1-b42f-e79fa9fe352b_1677x2048.png"
+  caption="来源：SemiAnalysis"
+/>
+
+## AgentX 进一步解析
+
+### Pareto 前沿扫描
+
+在 AgentX 工作负载中，为了生成 Pareto 前沿，我们针对单套部署扫描并发 Claude Code 会话数。由于每个对话都带有真实的轮次间延迟和子智能体使用，得到的流量模式更尖锐、也更真实。下面这个例子是对运行 MiniMax M3 的 B200 TP4 vLLM 服务端回放 40 个并发客户端。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/058757ed-531f-4cfb-a1ad-a06b1499ecbd_1360x612.png"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference/agentic/439239)"
+/>
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/43184e50-b71a-4a48-a569-98d6906cb259_2048x1167.png"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-13&g_runid=31723588108&i_seq=agentic-traces&i_xmode=interactivity&g_model=MiniMax-M3&i_best=0&i_active=b200_vllm)"
+/>
+
+最后值得讨论的是：评估 agentic 工作负载时应该看哪些指标。我们认为交互性（TPS，每秒 token 数）和首 token 延迟（TTFT）依然重要，它们也是评估 SLO 的行业标准。查看 AgentX 结果时，*必须*把 TPS 和 TTFT 放在一起看，因为有些推理优化会以牺牲一者为代价改善另一者。
+
+我们正在定义一个能把 TPS 和 TTFT 有意义地结合起来的新指标。它还应当体现这样一个事实：在 agentic 工作负载中，人们往往更关心一个*任务*端到端多快完成，而不是收到 token 的速度或 TTFT 本身。
+
+最后要说明的是，端到端延迟在当前形式下参考价值有所下降，因为它与 OSL 直接成正比。因此 P90 端到端延迟会被输出序列长度最长的那 10% 尾部严重影响。它仍可用于整体比较不同配置的综合表现，但我们更建议结合 TPS 和 TTFT 一起看。
+
+### warmup、计时、确定性与对话复用
+
+AgentX 的目标是测量已经进入稳态的系统。对 agentic 工作负载而言，这意味着性能采集应当从部分上下文轨迹已经被缓存的状态开始。为模拟稳态，也不希望所有对话都从第 0 轮开始，否则会造成“[惊群](https://en.wikipedia.org/wiki/Thundering_herd_problem)”效应。
+
+warmup 分两个阶段。第一阶段，AIPerf 用固定的随机 seed 在每个对话 25% 到 75% 之间选取一个墙钟时间点。在该时间点上，它识别出所有活跃的请求流（包括主智能体和任何活跃的子智能体），并为每条流发送该时间点之前最近的一条请求。这些引导请求会重建该时刻的对话状态，并一起发出，AIPerf 会等它们全部完成后再继续。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/963dce62-c49b-4deb-afee-e8dd448526c5_2048x1322.png"
+  caption="来源：SemiAnalysis"
+/>
+
+第二阶段，每条回放通道再前进 10 条请求，让 KV cache 有更多机会成形。所有 warmup 请求都不带轮次间延迟，且最大输出长度为 1 个 token，从而大幅缩短 warmup 时间。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/85116f5f-be0d-405b-a5d9-6a9237b44cc3_2048x895.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/fef10e0d-261e-4978-8650-b10304ec04d0_2048x897.png"
+  caption="来源：SemiAnalysis"
+/>
+
+warmup 结束后开始性能采集，持续一小时，所有指标都严格在这段时间内统计。为保证可复现，AIPerf 接受一个 seed，确保每次运行采样的对话相同、对话起始点相同，且每个对话每次都用相同的合成内容重建。采集期间，我们对每条流设置 5 分钟的空闲上限，避免过长的轮次间空档在整个测试期间“占住”一条 worker 通道。这样做是为了能在 1 小时内完成测试。在后续加入 NVMe offload 的 AgentX 版本中，我们可能会调高这个上限，以便测量更长的 TTL。就目前而言，5 分钟是合理的，因为这也是 [Anthropic 默认的 KV cache TTL](<https://platform.claude.com/docs/en/build-with-claude/prompt-caching#:~:text=Check%20that%20calls%20are%20made%20within%20the%20cache%20lifetime%20(5%20minutes%20by%20default)>)。
+
+这种程度的确定性保证了在推理引擎、硬件、并发和服务端设置相同的情况下，运行结果是可复现的。不过由于 AgentX 是[闭环基准测试](https://notpeerreviewed.com/blog/tail-latency/)，不同配置在不同速率下完成的请求数不同，因而各自遇到的工作负载会有一些自然差异。这在低并发下最明显：完成的请求本来就少，工作负载向数据集整体分布收敛的机会也更少。
+
+当一个对话在采集期间结束时，它所在的回放通道会从数据集采样器中选取另一个对话。每次回放都会获得一个唯一且确定的 cache-bust 标记，并加在每条独立前缀链的最前面，包括主智能体链，以及任何全新上下文的子智能体链或一次性链。分叉出来的子智能体继承父级的标记。这个标记在一次回放内保持不变，从而保留其 KV 复用模式，但在不同回放之间会变化，以避免出现虚高的缓存命中率。这也使得并发数可以超过数据集中的对话总数（393）。
+
+### AgentX 的公平投机解码方法
+
+如前所述，数据集在采集时已做匿名化，因此那些 64 token 的哈希块必须在回放前用合成内容填充。AIPerf 的做法是从一个合成的编码 / 工具调用 token 池中确定性地采样。
+
+重要的是，KV 复用模式和请求时序都被保留了下来，但合成的请求内容确实带来了一些额外考量：在合成数据上运行投机解码方法，可能导致 speculator 接受 / 拒绝的 token 数与真实数据下明显不同（因为 speculator 并未在合成数据上训练过）。
+
+我们在 [InferenceX v2 文章](https://newsletter.semianalysis.com/i/188090866/multi-token-prediction-mtp)中讨论过这个不足，此后改进了方法。我们与社区密切合作，确保大多数开源推理引擎都提供一种机制，让用户可以强制指定从 speculator 接受多少 draft token（即“接受长度”或“接受率”）。随后，对每一种（模型、speculator、draft 长度、思考模式）组合，[我们在 SPEED-Bench 上采集平均 AL](https://github.com/SemiAnalysisAI/InferenceX/tree/main/golden_al_distribution)。[SPEED-Bench](https://huggingface.co/datasets/nvidia/SPEED-Bench) 是一个 agentic 编码数据集，被描述为“用于在多样语义领域和真实服务条件下评估投机解码（SD）的统一基准”。
+
+然后在运行时，我们把这些真实的投机解码接受长度应用到 AgentX 上，以确保厂商中立的公平性。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/c15f47a8-fcb3-4220-80ee-4b95bfa7b0b0_2048x1376.png"
+  caption="来源：GitHub"
+/>
+
+## agentic 工作负载详细遥测数据探索教程
+
+AgentX 需要的不只是新的基准测试 harness 和数据集。[我们还花了一些时间重建 InferenceX 可视化的部分模块，让 agentic 结果更易于探索和理解。](https://inferencex.semianalysis.com/inference/agentic/439903)一个 AgentX 数据点代表着数千条请求，跨越不断增长的对话、子智能体、warmup 阶段、缓存状态和动态变化的在途负载。因此，Pareto 曲线上的单个点会掩盖大量有用信息。正如我们反复强调的：推理服务从来没有一刀切的方案。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/46159be7-8b5b-49d7-990f-2ce1cf1217d0_1110x687.png"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference/agentic/439903)"
+/>
+
+其中一项重要改动是曲线本身的构建方式。在之前版本的 InferenceX 中，启用和未启用投机解码的配置常常被画成两条独立曲线；现在我们不再这样做。前端会合并允许启用的推理优化，为每个模型、SKU 和推理引擎组合展示可获得的最佳曲线。因此，同一条曲线上的不同点可能使用了不同的优化技术和配置，包括投机解码、分离式服务或 KV cache offload。
+
+我们的目标是展示每套软硬件栈在生产中能达到的最佳性能，而不是为每种优化组合都单独画一条曲线。不过，我们仍会公开每个点的底层配置与溯源信息。点击某个点会弹出详细信息，显示究竟是哪套配置产生了它，以及运行元数据、可公开查看的 CI 溯源链接和 AgentX 专属统计。从那里点击“View charts”可以打开完整的点详情页，查看 AgentX 专属统计。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/add2d50c-a0be-4771-a00b-e6b4f1fe8502_2048x1256.png"
+  caption="来源：SemiAnalysis InferenceX"
+/>
+
+点详情页对所选 AgentX 运行提供了深入得多的视角，包含输入和输出序列长度分布、交互性与 TTFT 随时间的变化、KV cache 利用率、请求队列深度、前缀缓存命中率、输入与 decode 吞吐量、prompt token 来源拆分，以及唯一输入 token 随时间的变化。有了这些指标，就更容易理解为什么两个聚合吞吐量相近的点在整个回放过程中表现却不同。
+
+该页面还把 warmup 与采集阶段的数据分开。读者可以在两个阶段之间切换，观察系统在缓存状态建立过程中的行为，以及在用于基准测试的采集期内的行为。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/91abef64-d639-4da8-8d7e-3499be750011_1001x1541.png"
+  caption="来源：SemiAnalysis InferenceX"
+/>
+
+使用 KV cache offload 的点在主图上会多一圈虚线，用来与其他点区分。选中这类点时，详情页会显示 offload 类型、KV offload 引擎、芯片缓存命中率和 CPU 缓存命中率。这样就能看出 KV offload 在最佳曲线中的贡献，而不必为每种 offload 配置单独画一条曲线。
+
+另一个新功能是请求时间线。该视图展示所选 AgentX 运行中回放的各条请求，可以按对话或按 worker 组织。对话视图会把子智能体归到其根对话之下，便于看清对话与子智能体何时重叠。warmup 与采集期的请求同样可以分开查看。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/c8fc6236-52bd-45ff-ac2e-539899c00d87_2048x1097.png"
+  caption="来源：SemiAnalysis InferenceX"
+/>
+
+时间线中的每条请求都可点击，直接跳转到 InferenceX 数据集页面上对应的对话和轮次。这样，读者可以从 Pareto 曲线上的一个聚合点，一路追到实际被回放的那条匿名化请求。
+
+[AgentX 页面](https://inferencex.semianalysis.com/datasets)还提供了火焰图，用于可视化单个对话的结构。每个条形代表一轮，长度相对该对话中最长的一轮缩放，并被拆分为已缓存前缀 token、未缓存输入 token 和生成的输出 token。这直观展示了上下文如何在对话中增长，以及每条请求中有多少可以从 KV cache 复用。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/a0e991d9-6ab6-43e7-9cc9-93ac9ca5b7bd_2048x879.png"
+  caption="来源：SemiAnalysis InferenceX"
+/>
+
+## InferenceX/AgentX 的下一步
+
+我们会继续朝着让 AgentX 成为最真实、最有代表性的基准测试这一目标前进。在可预见的一段时间内，我们会继续为当前的 v1.0.x harness [做小修复](https://github.com/SemiAnalysisAI/aiperf/releases)，同时计划在 v1.1 harness 上做更大的改动。同一模型的所有提交将始终运行同一个次版本，以保证结果可比。
+
+作为快速跟进，我们会加入 SSD/NVMe KV offload。这将支持比 DRAM 更大的 KV cache 工作集，从而打开 Pareto 曲线左侧的高吞吐区间。
+
+我们还会采集规模更大、更多样、更新的 agentic trace 数据集，覆盖更多模型和 harness。下一版数据集不再把每条请求表示为一整串连续的哈希 ID，而会保留系统指令、用户与助手消息、工具调用和工具返回结果之间的边界。这样 AgentX 就能评估那些利用 agent harness 已知、但通常对推理引擎不可见的信息的工作负载感知服务技术。例如，router 可以把低复用的工具流量导向专用 prefill worker、在长时间工具调用期间保留 agent 的前缀，或在子智能体分叉时预取并共享前缀。当前格式保留了请求规模和 KV 复用模式，但缺少评估这些优化所需的结构信息。
+
+Ishan 提交的这份 [SGLang RFC](https://github.com/sgl-project/sglang/issues/27574) 就是说明这种更丰富 trace 结构为何重要的一个具体例子。它提出了一套由 router 发起的提示接口，利用会话生命周期、共享前缀边界、工具调用时长和子智能体状态等信息，告诉引擎何时应当共享、预取、降级、钉住或保留 KV。捕获这些结构信息，将使未来版本的 AgentX 能够评估这类工作负载感知的缓存策略，而不只是回放扁平的 token 前缀。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/36899201-da3b-42ec-888f-2443c63980aa_2048x1260.png"
+  caption="来源：[GitHub](https://github.com/sgl-project/sglang/issues/27574)"
+/>
+
+最后，我们正在采集细粒度和粗粒度的功耗遥测数据，以便更准确地衡量不同软硬件栈“每单位智能所耗焦耳”的效率。
+
+我们手上有大量数据，也有非常多可能的可视化方式。欢迎告诉我们你希望看到哪些可视化，以及更广泛的功能需求！
+
+[提交前端功能建议！](https://github.com/SemiAnalysisAI/InferenceX-app/issues/new/choose)
+
+## 模型全生命周期中的性能表现
+
+接下来几节我们转向历史单轮数据（8k1k），它覆盖每个模型从发布当天到我们停止对其持续测试为止的表现。这里 NVIDIA 和 AMD 都有亮眼结果，包括若干 MI355X 胜出的固定序列长度配置。
+
+AgentX 更能代表当下的 agentic 推理工作负载。不过，历史上的固定序列 InferenceX 结果对追踪性能随时间的变化仍然有用。8k1k、1k1k 这类工作负载剥离了大部分会话级行为，包括前缀复用、持久 KV cache 状态和路由亲和性，因此它们对当前生产流量的代表性较弱，但仍然适合用来观察推理性能如何随软件支持的成熟而提升。
+
+<Blur>
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+</Blur>
+
+---
+
+_本文完整版发布在我们的 Substack 上。[订阅 SemiAnalysis](https://newsletter.semianalysis.com/subscribe) 阅读完整文章。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "什么是 AgentX 1.0？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "AgentX 1.0 是全球首个完全开源、1M 上下文的多轮 agentic 编码推理基准测试，以 Apache 2.0 协议发布。它回放真实的匿名化 Claude Code 与 Codex trace，而不是固定序列长度的 prompt；测试运行在约 2MW 的持续运行算力上，覆盖 1000 多颗芯片，包括 MI355X、GB300 NVL72、GB200 NVL72、B300、B200、MI325X、MI300X、H200 和 RTX Pro 服务器。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "agentic 工作负载与固定序列长度基准测试有什么区别？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "agentic 工作负载是多轮、长上下文的，前缀复用率极高，并会突发启动短生命周期的子智能体。这让 agentic 推理成为系统问题而非 kernel 问题：KV 张量必须跨节点传输，请求必须路由到持有对应前缀的 rank，长上下文还迫使 KV offload 到 DRAM 或 SSD。8k1k 这类固定序列长度工作负载把这些全部剥离，衡量的基本是芯片和 kernel 的基础性能。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "CUDA 护城河在 agentic 工作负载上还站得住吗？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "取决于模型。在 DeepSeek V4 Pro 上竞争非常胶着：MI355X SGLang 在每美元性能上一度追平 B200 vLLM，直到 2026 年 8 月 21 日 Inferact 和 NVIDIA 在 vLLM 上的优化让 B200 反超，而 B300 vLLM 和 B200 SGLang 此前已经领先 MI355X。在 MiniMax M3、Qwen3.5 和 GLM 5.3 上，NVIDIA 大幅领先：Qwen3.5 SGLang 在 90 tok/s/user 下领先 20 倍以上，GLM 5.3 在 150 tok/s/user 下成本效率最高领先 5 倍。上下文并行是护城河中很具体的一环：在 vLLM 的注意力后端支持矩阵中，AMD 的每一个后端都标为不支持。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "AgentX 数据集包含什么？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "SemiAnalysis 通过拦截发往 Claude 和 Codex 的 HTTP 请求的代理采集 trace，累计超过 8,000 个会话、340 万条请求和 6,100 亿 token，合计支出超过 300 万美元。开源的 AgentX v1.0 子集包含 393 个会话，输入序列长度中位数 142k token，输出序列长度中位数 444 token，轮次间延迟中位数 3.84 秒；其中 175 个会话（约 44%）至少包含一个子智能体，共 1,697 次子智能体 rollout。内容被匿名化为 64 token 分块并替换为会话内链式哈希，因此前缀复用模式得以保留，而原始 prompt 不会保留。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "什么是 E2E 归一化交互性？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "E2E 归一化交互性是一个实验性指标，定义为输出序列长度除以端到端延迟。由于端到端延迟等于 TTFT 加上输出长度乘以 TPOT，该指标实际等于交互性加上一项与 TTFT 成正比的惩罚，用一个数字同时刻画两个维度的响应性。它并不完美：对高 TTFT 的惩罚很重，也无法体现 prefill-decode 分离等优化的全部细节，因此 AgentX v1.0 的提交仍然分别针对交互性和 TTFT 做优化。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "AgentX 目前带来了哪些行业影响？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "vLLM、SGLang、TensorRT-LLM、ATOM、AITER、Dynamo、LMCache 和 Mooncake 上已有 70 多个上游 PR 以 AgentX 为北极星基准。例如：vLLM 的混合注意力前缀缓存在 1M 上下文下前缀缓存命中率超过 95%；CPU KV offload 扩展到 DeepSeek V4，输出吞吐量提高 81.7%、平均端到端延迟降低 46.6%；TensorRT-LLM 的边界感知增量分词在 Qwen3.5 上把平均处理时间从 185.1 ms 降到 11.3 ms；AMD ATOM 的稀疏检查点保留把 DeepSeek V4 的前缀命中率从 5.6% 提升到 96.45%。"
+      }
+    }
+  ]
+}`}</JsonLd>
