@@ -58,6 +58,21 @@ describe('Page Load & Navigation', () => {
       );
     });
   });
+
+  it('opens and preserves a direct link to an FAQ answer', () => {
+    cy.visit('/about#faq-normalized-interactivity');
+
+    cy.get('#faq-normalized-interactivity')
+      .should('be.visible')
+      .within(() => {
+        cy.contains(
+          'a[href="#faq-normalized-interactivity"]',
+          'What is the difference between E2E Normalized Interactivity and Interactivity?',
+        ).should('be.visible');
+        cy.contains('The normalized value penalizes slow TTFT').should('be.visible');
+      });
+    cy.location('hash').should('eq', '#faq-normalized-interactivity');
+  });
 });
 
 // Toggle visibility, click behavior, and aria-label are covered by

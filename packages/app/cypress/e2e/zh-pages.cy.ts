@@ -99,6 +99,23 @@ describe('Chinese (/zh) pages', () => {
     });
   });
 
+  describe('zh FAQ', () => {
+    it('uses the same direct-link anchor as the English FAQ', () => {
+      cy.visit('/zh/about#faq-normalized-interactivity');
+
+      cy.get('#faq-normalized-interactivity')
+        .should('be.visible')
+        .within(() => {
+          cy.contains(
+            'a[href="#faq-normalized-interactivity"]',
+            '端到端归一化交互性与交互性有何区别？',
+          ).should('be.visible');
+          cy.contains('TTFT 越长，归一化指标越低').should('be.visible');
+        });
+      cy.location('hash').should('eq', '#faq-normalized-interactivity');
+    });
+  });
+
   describe('zh blog', () => {
     before(() => {
       cy.visit('/zh/blog');
