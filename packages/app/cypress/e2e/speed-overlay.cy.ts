@@ -188,7 +188,9 @@ describe('Y-Axis Metric Search', () => {
     cy.get('[data-slot="select-content"]')
       .find('input[placeholder="Search..."]')
       .type('input token throughput');
-    cy.get('[data-slot="select-content"]').find('[role="option"]').should('have.length', 2);
+    // Matches Input Token Throughput per Chip, Uncached Input Token Throughput
+    // per Chip, and Input Token Throughput per All in Utility MW.
+    cy.get('[data-slot="select-content"]').find('[role="option"]').should('have.length', 3);
     cy.get('[data-slot="select-content"]')
       .find('[role="option"]')
       .first()
