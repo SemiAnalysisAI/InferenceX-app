@@ -1,4 +1,5 @@
 import { Model } from '@/lib/data-mappings';
+import type { AttentionCostSpec } from '@/lib/attention-flops';
 
 /**
  * Model architecture types
@@ -134,6 +135,13 @@ export interface ModelArchitecture {
   ffnVariant?: string;
   /** Elementwise activation applied to the gate projection. Defaults to `SiLU`. */
   ffnGateActivation?: string;
+  /**
+   * Attention-FLOPs cost model for the TFLOP/s-per-chip y-metric — see
+   * attention-flops.ts for the accounting conventions (activation–activation
+   * ops only, MAC = 2 FLOPs, absorbed MLA form). Models without a spec are
+   * simply omitted from that metric.
+   */
+  attention?: AttentionCostSpec;
 }
 
 /**
@@ -177,6 +185,15 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     ],
     developer: 'DeepSeek',
     sourceUrl: 'https://huggingface.co/deepseek-ai/DeepSeek-R1-0528',
+    // Absorbed (MQA-mode) MLA — the form that executes at decode: all 128
+    // query heads score against the shared 576-dim cached latent (512
+    // kv_lora_rank + 64 rope) and aggregate 512-dim latent values.
+    // 2·128·(576+512)·L = 278,528·L per layer. Dims:
+    // https://huggingface.co/deepseek-ai/DeepSeek-R1-0528/raw/main/config.json;
+    // MQA-mode description: https://arxiv.org/html/2512.02556v1.
+    attention: {
+      groups: [{ label: 'MLA (absorbed)', layers: 61, linPerCtx: 278528 }],
+    },
   },
   [Model.DeepSeek_V4_Pro]: {
     model: Model.DeepSeek_V4_Pro,
@@ -242,6 +259,36 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     ],
     developer: 'DeepSeek',
     sourceUrl: 'https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro',
+    // Shared single-latent MQA (d_score = d_v = 512, RoPE in-place in the last
+    // 64 dims). Config `compress_ratios` decodes the full stack as 31 HCA +
+    // 30 CSA layers (the 3 hash-routed MoE layers are HCA, HCA, CSA).
+    // HCA: dense over L/128 pooled entries + 128-token window, no indexer →
+    //   2·128·(512+512)·(L/128 + 128) = 2,048·L + 33,554,432.
+    // CSA: FP4 lightning indexer (64 heads × dim 128) over L/4 pooled keys +
+    //   core attention over top-1024 pooled entries + 128-token window →
+    //   4,096·L + 262,144·(min(1024, L/4) + 128), and
+    //   262,144·min(1024, L/4) ≡ 65,536·min(L, 4096).
+    // Attention sink = one learnable per-head logit (0 KV entries, ~0 FLOPs).
+    // Sources: https://arxiv.org/html/2606.19348v1;
+    // https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/raw/main/config.json;
+    // https://huggingface.co/docs/transformers/en/model_doc/deepseek_v4.
+    attention: {
+      groups: [
+        {
+          label: 'HCA (128:1 pooled, dense)',
+          layers: 31,
+          linPerCtx: 2048,
+          constPerToken: 33554432,
+        },
+        {
+          label: 'CSA (4:1 pooled, indexer top-1024)',
+          layers: 30,
+          linPerCtx: 4096,
+          capped: { coeff: 65536, cap: 4096 },
+          constPerToken: 33554432,
+        },
+      ],
+    },
   },
   [Model.Llama3_3_70B]: {
     model: Model.Llama3_3_70B,
@@ -259,6 +306,12 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     features: ['Grouped Query Attention', 'RoPE'],
     developer: 'Meta',
     sourceUrl: 'https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct',
+    // Dense causal GQA: 4·H·d·L = 4·64·128·L per layer (GQA KV sharing saves
+    // cache, not score/AV compute). Dims:
+    // https://huggingface.co/unsloth/Llama-3.3-70B-Instruct/raw/main/config.json.
+    attention: {
+      groups: [{ label: 'Full GQA', layers: 80, linPerCtx: 65536 }],
+    },
   },
   [Model.Llama3_1_70B]: {
     model: Model.Llama3_1_70B,
@@ -276,6 +329,11 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     features: ['Grouped Query Attention', 'RoPE'],
     developer: 'Meta',
     sourceUrl: 'https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct',
+    // Identical attention geometry to Llama 3.3 70B (80 × 64 heads × dim 128):
+    // https://huggingface.co/unsloth/Meta-Llama-3.1-70B-Instruct/raw/main/config.json.
+    attention: {
+      groups: [{ label: 'Full GQA', layers: 80, linPerCtx: 65536 }],
+    },
   },
   [Model.GptOss]: {
     model: Model.GptOss,
@@ -318,6 +376,17 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     ],
     developer: 'OpenAI',
     sourceUrl: 'https://huggingface.co/openai/gpt-oss-120b',
+    // 18 full + 18 sliding-128 GQA layers, 64 heads × dim 64 → 4·64·64 =
+    // 16,384 FLOPs/token per ctx unit; sliding layers cap L at 128. The
+    // learnable sink is one extra softmax logit per head (~0 FLOPs).
+    // https://huggingface.co/openai/gpt-oss-120b/raw/main/config.json;
+    // https://arxiv.org/abs/2508.10925.
+    attention: {
+      groups: [
+        { label: 'Full GQA', layers: 18, linPerCtx: 16384 },
+        { label: 'Sliding-128 GQA', layers: 18, capped: { coeff: 16384, cap: 128 } },
+      ],
+    },
   },
   [Model.Kimi_K2_5]: {
     model: Model.Kimi_K2_5,
@@ -339,6 +408,13 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     features: ['Multi-head Latent Attention', 'DeepSeek-style MoE', 'YaRN RoPE'],
     developer: 'Moonshot AI',
     sourceUrl: 'https://huggingface.co/moonshotai/Kimi-K2.5',
+    // DeepSeek-V3-style absorbed MLA on all 61 layers, 64 heads: score dim
+    // 576 (512 latent + 64 rope), value dim 512 → 2·64·(576+512)·L =
+    // 139,264·L per layer.
+    // https://huggingface.co/moonshotai/Kimi-K2.5/raw/main/config.json.
+    attention: {
+      groups: [{ label: 'MLA (absorbed)', layers: 61, linPerCtx: 139264 }],
+    },
   },
   [Model.Kimi_K3]: {
     model: Model.Kimi_K3,
@@ -407,6 +483,20 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     ],
     developer: 'Moonshot AI',
     sourceUrl: 'https://huggingface.co/moonshotai/Kimi-K3',
+    // 69 KDA linear-attention layers: gated delta-rule update + readout on a
+    // 128×128 state per head × 96 heads ≈ 7·H·d² = 11,010,048 FLOPs/token,
+    // independent of L (recurrent form; the chunked prefill kernel is ~11%
+    // higher — within noise of this metric). 24 gated-MLA layers are NoPE
+    // (`mla_use_nope`), so score dim = value dim = 512 → 2·96·(512+512)·L =
+    // 196,608·L per layer.
+    // https://huggingface.co/moonshotai/Kimi-K3/raw/main/config.json;
+    // https://arxiv.org/abs/2510.26692.
+    attention: {
+      groups: [
+        { label: 'KDA (linear)', layers: 69, constPerToken: 11010048 },
+        { label: 'Gated MLA (NoPE, absorbed)', layers: 24, linPerCtx: 196608 },
+      ],
+    },
   },
   [Model.MiniMax_M2_5]: {
     model: Model.MiniMax_M2_5,
@@ -434,6 +524,12 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     ],
     developer: 'MiniMax',
     sourceUrl: 'https://huggingface.co/MiniMaxAI/MiniMax-M2',
+    // Dense causal GQA on all 62 layers (config `attn_type_list` is all 1s):
+    // 4·48·128·L = 24,576·L per layer.
+    // https://huggingface.co/MiniMaxAI/MiniMax-M2.5/raw/main/config.json.
+    attention: {
+      groups: [{ label: 'Full GQA', layers: 62, linPerCtx: 24576 }],
+    },
   },
   [Model.MiniMax_M3]: {
     model: Model.MiniMax_M3,
@@ -467,6 +563,24 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     ],
     developer: 'MiniMax',
     sourceUrl: 'https://huggingface.co/MiniMaxAI/MiniMax-M3',
+    // Layers 0–2 dense GQA (4·64·128·L = 32,768·L); layers 3–59 MSA: per-token
+    // index scoring (4 group heads × dim 128, no value head) over all L
+    // positions = 2·4·128·L = 1,024·L, then exact GQA over the top-16
+    // 128-token blocks (2048-token budget) = 32,768·min(L, 2048). Reproduces
+    // the paper's 28.4× attention-compute reduction at 1M.
+    // https://huggingface.co/MiniMaxAI/MiniMax-M3/raw/main/config.json;
+    // https://arxiv.org/html/2606.13392v2.
+    attention: {
+      groups: [
+        { label: 'Dense GQA (layers 0-2)', layers: 3, linPerCtx: 32768 },
+        {
+          label: 'MSA (top-16 blocks of 128)',
+          layers: 57,
+          linPerCtx: 1024,
+          capped: { coeff: 32768, cap: 2048 },
+        },
+      ],
+    },
   },
 };
 

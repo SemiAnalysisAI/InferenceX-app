@@ -69,13 +69,14 @@ export const METRIC_REGISTRY = {
     heading: 'vs. P90 Time To First Token',
   },
   // Achieved model TFLOP/s on the theoretically necessary tokens only:
-  // 2 × active params per token (GEMM-only Kaplan/PaLM convention) times the
-  // new-input-suffix + output token throughput above. Attention-score FLOPs
-  // are deliberately excluded — they depend on each request's context length
-  // (only aggregate token counts reach the chart layer) and on the attention
-  // implementation (MHA/GQA/MLA/linear), so 2N_active is the comparable
-  // cross-model lower bound, in the same spirit as MFU counting only
-  // theoretically required work.
+  // (2 × active params + per-model attention FLOPs per computed token) times
+  // the new-input-suffix + output token throughput above. The attention term
+  // integrates each architecture's mechanism (MLA, CSA/HCA + indexers, MSA,
+  // KDA + gated MLA, sliding/full GQA — specs in model-architectures.ts,
+  // math in attention-flops.ts) over the run's exact per-request (ISL, OSL)
+  // sums at the theoretical cache hit rate, so different request-length
+  // distributions are priced individually and summed. Points without stored
+  // request-length moments or an attention spec omit the metric.
   newInputSuffixOutputTflopsPerGpu: {
     field: 'newInputSuffixOutputTflopsPerGpu.y',
     label: 'New Input Suffix + Output TFLOP/s per Chip (TFLOP/s/chip)',

@@ -22,6 +22,7 @@ import {
   type MetricPercentiles,
   type SequenceLengthSketches,
 } from '../queries/agentic-aggregates';
+import { requestLengthMomentsOf, type RequestLengthMoments } from '../queries/agentic-shared';
 
 export { STATS_VERSION };
 
@@ -39,6 +40,12 @@ export interface AggregateStats {
   e2elPerOsl: MetricPercentiles | null;
   /** Bounded mergeable distributions used by the chart-level subtitle. */
   sequenceLengths: SequenceLengthSketches;
+  /**
+   * Exact joint (ISL, OSL) sums over the request population — the sufficient
+   * statistics the frontend integrates model-specific attention-FLOPs
+   * formulas over (see agentic-shared.ts).
+   */
+  requestLengthMoments: RequestLengthMoments | null;
 }
 
 interface ProfileMetricEnvelope {
@@ -75,12 +82,14 @@ async function extractProfileSamples(
   isl: number[];
   osl: number[];
   e2elPerOsl: number[];
+  pairs: { isl: number; osl: number }[];
 }> {
   const input = Readable.from(compressedChunks).pipe(createGunzip());
   const lines = createInterface({ input, crlfDelay: Infinity });
   const isl: number[] = [];
   const osl: number[] = [];
   const e2elPerOsl: number[] = [];
+  const pairs: { isl: number; osl: number }[] = [];
 
   for await (const line of lines) {
     if (!line) continue;
@@ -100,6 +109,9 @@ async function extractProfileSamples(
     const outputLength = profileMetricValue(metrics.output_sequence_length);
     if (inputLength !== undefined) isl.push(inputLength);
     if (outputLength !== undefined) osl.push(outputLength);
+    if (inputLength !== undefined && outputLength !== undefined) {
+      pairs.push({ isl: inputLength, osl: outputLength });
+    }
 
     const requestLatencyMs = profileMetricValue(metrics.request_latency);
     const ttftMs = profileMetricValue(metrics.time_to_first_token);
@@ -117,7 +129,7 @@ async function extractProfileSamples(
     }
   }
 
-  return { isl, osl, e2elPerOsl };
+  return { isl, osl, e2elPerOsl, pairs };
 }
 
 /**
@@ -132,13 +144,15 @@ export async function computeProfileAggregateStatsFromCompressedChunks(
   let oslPct: MetricPercentiles | null = null;
   let e2elPerOsl: MetricPercentiles | null = null;
   let sequenceLengths: SequenceLengthSketches = { isl: null, osl: null };
+  let requestLengthMoments: RequestLengthMoments | null = null;
 
   try {
-    const { isl, osl, e2elPerOsl: ratios } = await extractProfileSamples(compressedChunks);
+    const { isl, osl, e2elPerOsl: ratios, pairs } = await extractProfileSamples(compressedChunks);
     islPct = percentilesOf(isl);
     oslPct = percentilesOf(osl);
     sequenceLengths = sequenceLengthSketches(isl, osl);
     e2elPerOsl = percentilesOf(ratios);
+    requestLengthMoments = requestLengthMomentsOf(pairs);
   } catch {
     // Ignore malformed blobs and leave the profile-derived fields null.
   }
@@ -151,6 +165,7 @@ export async function computeProfileAggregateStatsFromCompressedChunks(
     prefixCacheHitRate: null,
     e2elPerOsl,
     sequenceLengths,
+    requestLengthMoments,
   };
 }
 

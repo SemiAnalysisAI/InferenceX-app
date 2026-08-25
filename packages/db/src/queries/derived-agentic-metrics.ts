@@ -29,10 +29,12 @@ import {
   fetchAggregateStatsRows,
   percentilesOf,
   readNum,
+  requestLengthMomentsOf,
   sequenceLengthSketches,
   STATS_VERSION,
   writeBackTraceReplayJsonb,
   type MetricPercentiles,
+  type RequestLengthMoments,
   type SequenceLengthSketches,
 } from './agentic-shared';
 
@@ -43,6 +45,13 @@ export interface DerivedAgenticMetric {
   p75_e2e_norm_intvty: number | null;
   /** Slow-tail P90 E2E Normalized Interactivity in tok/s/user — 1 / p90(per-request E2EL/OSL). */
   p90_e2e_norm_intvty: number | null;
+  /**
+   * Exact joint (ISL, OSL) sums over the request population. The frontend
+   * integrates per-model attention-FLOPs formulas over these for the
+   * TFLOP/s-per-chip y-metric. Null when the blob had no usable records or
+   * the stored bundle predates v9 and hasn't self-healed yet.
+   */
+  request_length_moments: RequestLengthMoments | null;
 }
 
 export type DerivedAgenticMetricMap = Record<number, DerivedAgenticMetric>;
@@ -65,6 +74,7 @@ interface StoredAggregateStats {
   prefixCacheHitRate: MetricPercentiles | null;
   e2elPerOsl: MetricPercentiles | null;
   sequenceLengths: SequenceLengthSketches;
+  requestLengthMoments?: RequestLengthMoments | null;
 }
 
 /**
@@ -123,8 +133,10 @@ function invertRatio(v: number | null | undefined): number | null {
  */
 export function computeDerivedFromBlob(jsonl: string): {
   e2el_per_osl: MetricPercentiles | null;
+  request_length_moments: RequestLengthMoments | null;
 } {
   const ratios: number[] = [];
+  const pairs: { isl: number; osl: number }[] = [];
   for (const line of jsonl.split('\n')) {
     if (!line) continue;
     let rec: ProfileRecord;
@@ -134,11 +146,20 @@ export function computeDerivedFromBlob(jsonl: string): {
       continue;
     }
     if (rec.metadata?.benchmark_phase && rec.metadata.benchmark_phase !== 'profiling') continue;
+    // Moments only need the sequence-length pair — keep them even when the
+    // latency fields extractTurn requires are missing or non-positive.
+    const m = rec.metrics ?? {};
+    const isl = readNum(m.input_sequence_length);
+    const osl = readNum(m.output_sequence_length);
+    if (typeof isl === 'number' && typeof osl === 'number') pairs.push({ isl, osl });
     const turn = extractTurn(rec);
     if (!turn) continue;
     ratios.push(turn.request_latency_ms / 1000 / turn.osl);
   }
-  return { e2el_per_osl: percentilesOf(ratios) };
+  return {
+    e2el_per_osl: percentilesOf(ratios),
+    request_length_moments: requestLengthMomentsOf(pairs),
+  };
 }
 
 export async function getDerivedAgenticMetrics(
@@ -167,6 +188,7 @@ export async function getDerivedAgenticMetrics(
         id,
         p75_e2e_norm_intvty: invertRatio(row.stats.e2elPerOsl?.p75),
         p90_e2e_norm_intvty: invertRatio(row.stats.e2elPerOsl?.p90),
+        request_length_moments: row.stats.requestLengthMoments ?? null,
       };
     } else {
       idsNeedingBlob.push(id);
@@ -205,11 +227,12 @@ export async function getDerivedAgenticMetrics(
     const id = Number(row.benchmark_result_id);
     try {
       const jsonl = gunzipSync(row.blob).toString('utf8');
-      const { e2el_per_osl } = computeDerivedFromBlob(jsonl);
+      const { e2el_per_osl, request_length_moments } = computeDerivedFromBlob(jsonl);
       result[id] = {
         id,
         p75_e2e_norm_intvty: invertRatio(e2el_per_osl?.p75),
         p90_e2e_norm_intvty: invertRatio(e2el_per_osl?.p90),
+        request_length_moments,
       };
 
       // Self-heal the shared `aggregate_stats` bundle. We only have the profile
@@ -237,6 +260,7 @@ export async function getDerivedAgenticMetrics(
           prefixCacheHitRate: prior?.prefixCacheHitRate ?? null,
           e2elPerOsl: e2el_per_osl,
           sequenceLengths: sequenceLengthSketches(isl, osl),
+          requestLengthMoments: request_length_moments,
         };
         writeBackTraceReplayJsonb(sql, 'aggregate_stats', Number(row.trace_replay_id), merged);
       }

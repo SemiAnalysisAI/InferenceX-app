@@ -18,7 +18,10 @@ import {
   resolveComparisonEntries,
 } from '@/components/inference/utils/comparisonEntry';
 import { useBenchmarks, benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
+import { useDerivedAgenticMetrics } from '@/hooks/api/use-derived-agentic-metrics';
 import type { BenchmarkRow } from '@/lib/api';
+import type { RequestLengthMoments } from '@/lib/attention-flops';
+import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import {
   GPU_ALIAS_TO_CANONICAL,
   getModelSortIndex,
@@ -384,6 +387,31 @@ export function useChartData(
     overviewHistoryPair?.baselineConfigKey,
   ]);
 
+  // Request-length moment sums for agentic points — the attention-FLOPs input
+  // of the TFLOP/s-per-chip y-metric. Shares the 'derived-agentic-metrics'
+  // react-query cache with ChartDisplay's derived-x fetch, so switching between
+  // the two costs one request. The chart renders without them first; the
+  // TFLOP/s metric fills in when they arrive.
+  const momentTargetIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const r of rows) {
+      const numericId = typeof r.id === 'number' ? r.id : Number(r.id);
+      if (r.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(numericId)) {
+        ids.add(numericId);
+      }
+    }
+    return [...ids].sort((a, b) => a - b);
+  }, [rows]);
+  const derivedAgenticQuery = useDerivedAgenticMetrics(momentTargetIds, momentTargetIds.length > 0);
+  const requestLengthMomentsById = useMemo(() => {
+    if (!derivedAgenticQuery.data) return undefined;
+    const map: Record<number, RequestLengthMoments | null> = {};
+    for (const metric of Object.values(derivedAgenticQuery.data)) {
+      map[metric.id] = metric.request_length_moments;
+    }
+    return map;
+  }, [derivedAgenticQuery.data]);
+
   // Transform filtered rows into chart data
   const { chartData, hardwareConfig: rawHardwareConfig } = useMemo(() => {
     if (rows.length === 0)
@@ -391,8 +419,8 @@ export function useChartData(
         chartData: [] as InferenceData[][],
         hardwareConfig: {} as HardwareConfig,
       };
-    return transformBenchmarkRows(rows, selectedPercentile);
-  }, [rows, selectedPercentile]);
+    return transformBenchmarkRows(rows, selectedPercentile, requestLengthMomentsById);
+  }, [rows, selectedPercentile, requestLengthMomentsById]);
 
   // Sort hardware config — stabilize reference when keys haven't changed.
   // Different sequences for the same model often have the same GPU configs,

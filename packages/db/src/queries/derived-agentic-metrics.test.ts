@@ -28,6 +28,41 @@ describe('computeDerivedFromBlob', () => {
   it('returns null when no usable records', () => {
     const out = computeDerivedFromBlob('');
     expect(out.e2el_per_osl).toBeNull();
+    expect(out.request_length_moments).toBeNull();
+  });
+
+  it('accumulates exact joint (ISL, OSL) moments over profiling records', () => {
+    const lines = [
+      rec('s1', 0, { isl: 100, osl: 50, ttft_ms: 500, latency_ms: 1000 }),
+      rec('s2', 0, { isl: 200, osl: 100, ttft_ms: 1000, latency_ms: 4000 }),
+      // Missing TTFT breaks the latency ratio but NOT the length moments.
+      JSON.stringify({
+        metadata: { conversation_id: 's3', turn_index: 0, benchmark_phase: 'profiling' },
+        metrics: {
+          request_latency: { value: 1000, unit: 'ms' },
+          input_sequence_length: { value: 10, unit: 'tokens' },
+          output_sequence_length: { value: 20, unit: 'tokens' },
+        },
+      }),
+      // Warmup phase is excluded from both.
+      JSON.stringify({
+        metadata: { conversation_id: 's4', turn_index: 0, benchmark_phase: 'warmup' },
+        metrics: {
+          input_sequence_length: { value: 9999, unit: 'tokens' },
+          output_sequence_length: { value: 9999, unit: 'tokens' },
+        },
+      }),
+    ];
+    const out = computeDerivedFromBlob(lines.join('\n'));
+    expect(out.request_length_moments).toEqual({
+      n: 3,
+      sumIsl: 310,
+      sumIslSq: 100 * 100 + 200 * 200 + 10 * 10,
+      sumOsl: 170,
+      sumOslSq: 50 * 50 + 100 * 100 + 20 * 20,
+      sumIslOsl: 100 * 50 + 200 * 100 + 10 * 20,
+    });
+    expect(out.e2el_per_osl?.n).toBe(2);
   });
 
   it('computes per-request E2EL/OSL ratios pooled across sessions', () => {
@@ -258,6 +293,11 @@ describe('getDerivedAgenticMetrics write-back', () => {
     ]);
 
     const result = await getDerivedAgenticMetrics(sql, [7]);
-    expect(result[7]).toEqual({ id: 7, p75_e2e_norm_intvty: null, p90_e2e_norm_intvty: null });
+    expect(result[7]).toEqual({
+      id: 7,
+      p75_e2e_norm_intvty: null,
+      p90_e2e_norm_intvty: null,
+      request_length_moments: null,
+    });
   });
 });

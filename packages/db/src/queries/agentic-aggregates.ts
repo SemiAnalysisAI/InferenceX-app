@@ -33,6 +33,7 @@ import {
   STATS_VERSION,
   writeBackTraceReplayJsonb,
   type MetricPercentiles,
+  type RequestLengthMoments,
   type SequenceLengthSketches,
 } from './agentic-shared';
 
@@ -315,7 +316,7 @@ export async function getAgenticAggregates(
       if (row.profile_blob) {
         try {
           const jsonl = gunzipSync(row.profile_blob).toString('utf8');
-          const { isl, osl } = extractIslOsl(jsonl);
+          const { isl, osl, requestLengthMoments } = extractIslOsl(jsonl);
           const islPct = percentilesOf(isl);
           const oslPct = percentilesOf(osl);
           result[id].isl = islPct;
@@ -334,6 +335,7 @@ export async function getAgenticAggregates(
               prefixCacheHitRate: null,
               e2elPerOsl: derived.e2el_per_osl,
               sequenceLengths: sequenceLengthSketches(isl, osl),
+              requestLengthMoments,
             },
           });
         } catch {
@@ -420,6 +422,7 @@ interface FullAggregateStats {
   prefixCacheHitRate: MetricPercentiles | null;
   e2elPerOsl: MetricPercentiles | null;
   sequenceLengths: SequenceLengthSketches;
+  requestLengthMoments: RequestLengthMoments | null;
 }
 
 function blankAggregate(id: number): AgenticAggregate {

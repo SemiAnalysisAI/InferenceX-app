@@ -19,6 +19,7 @@ import {
 } from '@/components/inference/metric-registry';
 import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
 import type { Model } from '@/lib/data-mappings';
+import { attentionFlopsPerComputedToken } from '@/lib/attention-flops';
 import { getModelArchitecture } from '@/lib/model-architectures';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 import type { Locale } from '@/lib/i18n';
@@ -353,21 +354,34 @@ export function buildDerivedChartFields(
     );
   }
   // Achieved model TFLOP/s per chip on the theoretically necessary tokens:
-  // FLOPs/token = 2 × active params (GEMM-only Kaplan/PaLM convention;
-  // attention-score FLOPs excluded — see metric-registry doc comment).
-  // activeParams is in billions, so tok/s × 2 × 1e9 params / 1e12 = ÷1000.
+  // FLOPs/token = 2 × active params (Kaplan/PaLM GEMM convention) + the
+  // model-specific attention FLOPs per computed token, integrated over the
+  // run's exact per-request (ISL, OSL) sums at the theoretical hit rate
+  // (see attention-flops.ts). Requires the moments and an attention spec —
+  // points without them (fixed-seq, unofficial overlays, models outside the
+  // architecture registry) omit the metric rather than showing a lower bound
+  // inconsistent with other points.
   if (
     wants('newInputSuffixOutputTflopsPerGpu') &&
     hasTheoreticalHitRate &&
     tputPerGpu &&
     inputTputPerGpu
   ) {
-    const activeParams = getModelArchitecture(entry.model as Model)?.activeParams;
-    if (activeParams) {
-      const suffixOutputTput = Math.max(0, tputPerGpu - inputTputPerGpu * theoreticalHitRate);
-      fields.newInputSuffixOutputTflopsPerGpu = chartMetric(
-        (2 * activeParams * suffixOutputTput) / 1000,
+    const arch = getModelArchitecture(entry.model as Model);
+    const moments = entry.request_length_moments;
+    if (arch?.activeParams && arch.attention && moments) {
+      const attnFlopsPerToken = attentionFlopsPerComputedToken(
+        arch.attention,
+        moments,
+        theoreticalHitRate,
       );
+      if (attnFlopsPerToken !== null) {
+        const suffixOutputTput = Math.max(0, tputPerGpu - inputTputPerGpu * theoreticalHitRate);
+        const flopsPerToken = 2 * arch.activeParams * 1e9 + attnFlopsPerToken;
+        fields.newInputSuffixOutputTflopsPerGpu = chartMetric(
+          (suffixOutputTput * flopsPerToken) / 1e12,
+        );
+      }
     }
   }
   if (wants('newInputSuffixTputPerGpu') && hasTheoreticalHitRate && inputTputPerGpu) {

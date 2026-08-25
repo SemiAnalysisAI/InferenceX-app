@@ -48,8 +48,60 @@ import {
  * v8: add p95 and bounded mergeable ISL/OSL sketches. The dashboard merges
  * the sketches for all resident chart points instead of loading request-level
  * timelines or attempting to combine per-point percentiles.
+ *
+ * v9: add `requestLengthMoments` — exact joint moments of the per-request
+ * (ISL, OSL) pairs (n, ΣISL, ΣISL², ΣOSL, ΣOSL², ΣISL·OSL). The frontend
+ * integrates model-specific attention-FLOPs formulas over the true request
+ * population from these sums (prefill attention is quadratic in context, so
+ * E[ISL²] ≠ E[ISL]² matters); marginal percentiles/sketches can't provide the
+ * joint ISL·OSL term the decode integral needs.
  */
-export const STATS_VERSION = 8;
+export const STATS_VERSION = 9;
+
+/**
+ * Exact sums over the per-request (ISL, OSL) pairs of one benchmark point.
+ * Only records carrying BOTH sequence lengths contribute, so every sum is
+ * over the same request population and cross-terms stay consistent.
+ *
+ * These six sums are sufficient statistics for any attention-cost integral
+ * that is polynomial (≤ quadratic) in per-request context length: e.g.
+ * Σᵢ suffix-prefill context = (1−r²)/2 · ΣISL² and Σᵢ decode context =
+ * ΣISL·OSL + (ΣOSL² + ΣOSL)/2, with r the point's theoretical cache hit rate.
+ */
+export interface RequestLengthMoments {
+  /** Number of requests with both ISL and OSL present. */
+  n: number;
+  sumIsl: number;
+  sumIslSq: number;
+  sumOsl: number;
+  sumOslSq: number;
+  sumIslOsl: number;
+}
+
+/** Accumulate the joint moments for paired per-request (ISL, OSL) samples. */
+export function requestLengthMomentsOf(
+  pairs: readonly { isl: number; osl: number }[],
+): RequestLengthMoments | null {
+  if (pairs.length === 0) return null;
+  const m: RequestLengthMoments = {
+    n: 0,
+    sumIsl: 0,
+    sumIslSq: 0,
+    sumOsl: 0,
+    sumOslSq: 0,
+    sumIslOsl: 0,
+  };
+  for (const { isl, osl } of pairs) {
+    if (!Number.isFinite(isl) || !Number.isFinite(osl) || isl < 0 || osl < 0) continue;
+    m.n += 1;
+    m.sumIsl += isl;
+    m.sumIslSq += isl * isl;
+    m.sumOsl += osl;
+    m.sumOslSq += osl * osl;
+    m.sumIslOsl += isl * osl;
+  }
+  return m.n > 0 ? m : null;
+}
 
 interface ProfileRecord {
   metadata?: { benchmark_phase?: string; was_cancelled?: boolean };
@@ -59,10 +111,18 @@ interface ProfileRecord {
   };
 }
 
-/** Parse the profile_export.jsonl → per-request ISL + OSL arrays. */
-export function extractIslOsl(jsonl: string): { isl: number[]; osl: number[] } {
+/**
+ * Parse the profile_export.jsonl → per-request ISL + OSL arrays, plus the
+ * joint (ISL, OSL) moments over records carrying both lengths.
+ */
+export function extractIslOsl(jsonl: string): {
+  isl: number[];
+  osl: number[];
+  requestLengthMoments: RequestLengthMoments | null;
+} {
   const isl: number[] = [];
   const osl: number[] = [];
+  const pairs: { isl: number; osl: number }[] = [];
   for (const line of jsonl.split('\n')) {
     if (!line) continue;
     let rec: ProfileRecord;
@@ -78,8 +138,9 @@ export function extractIslOsl(jsonl: string): { isl: number[]; osl: number[] } {
     const o = readNum(m.output_sequence_length);
     if (typeof i === 'number') isl.push(i);
     if (typeof o === 'number') osl.push(o);
+    if (typeof i === 'number' && typeof o === 'number') pairs.push({ isl: i, osl: o });
   }
-  return { isl, osl };
+  return { isl, osl, requestLengthMoments: requestLengthMomentsOf(pairs) };
 }
 
 export interface MetricPercentiles {

@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { WorkerPower } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
+import type { RequestLengthMoments } from '@/lib/attention-flops';
 import type { HardwareEntry } from '@/lib/constants';
 import type { Model, Sequence } from '@/lib/data-mappings';
 import type { MetricKey } from './metric-registry';
@@ -219,6 +220,14 @@ export interface AggDataEntry {
   total_prompt_tokens?: number;
   /** Total generated (output) tokens. */
   total_generation_tokens?: number;
+  /**
+   * Exact joint (ISL, OSL) sums over the run's request population, fetched
+   * from the derived-agentic-metrics endpoint and merged in by
+   * `transformBenchmarkRows`. Feeds the attention-FLOPs term of the
+   * TFLOP/s-per-chip y-metric; absent on fixed-seq points, unofficial-run
+   * overlays, and rows whose stats haven't been fetched yet.
+   */
+  request_length_moments?: RequestLengthMoments | null;
 }
 
 /**

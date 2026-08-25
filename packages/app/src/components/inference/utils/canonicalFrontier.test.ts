@@ -25,9 +25,9 @@ describe('canonicalNormalizedFrontierIds', () => {
   it('computes the true normalized-interactivity frontier', () => {
     const points = [point(1, 100), point(2, 150), point(3, 120)];
     const metrics = {
-      1: { id: 1, p75_e2e_norm_intvty: 10, p90_e2e_norm_intvty: 10 },
-      2: { id: 2, p75_e2e_norm_intvty: 20, p90_e2e_norm_intvty: 20 },
-      3: { id: 3, p75_e2e_norm_intvty: 30, p90_e2e_norm_intvty: 30 },
+      1: { id: 1, p75_e2e_norm_intvty: 10, p90_e2e_norm_intvty: 10, request_length_moments: null },
+      2: { id: 2, p75_e2e_norm_intvty: 20, p90_e2e_norm_intvty: 20, request_length_moments: null },
+      3: { id: 3, p75_e2e_norm_intvty: 30, p90_e2e_norm_intvty: 30, request_length_moments: null },
     };
 
     expect(
@@ -38,8 +38,8 @@ describe('canonicalNormalizedFrontierIds', () => {
   it('keeps frontiers independent across dates', () => {
     const points = [point(1, 500, { date: '2026-08-01' }), point(2, 100, { date: '2026-08-02' })];
     const metrics = {
-      1: { id: 1, p75_e2e_norm_intvty: 50, p90_e2e_norm_intvty: 50 },
-      2: { id: 2, p75_e2e_norm_intvty: 10, p90_e2e_norm_intvty: 10 },
+      1: { id: 1, p75_e2e_norm_intvty: 50, p90_e2e_norm_intvty: 50, request_length_moments: null },
+      2: { id: 2, p75_e2e_norm_intvty: 10, p90_e2e_norm_intvty: 10, request_length_moments: null },
     };
     expect(
       [...canonicalNormalizedFrontierIds(points, metrics, 'p90', 'upper_left')!].toSorted(),
