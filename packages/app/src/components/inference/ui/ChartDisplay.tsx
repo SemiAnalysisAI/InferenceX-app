@@ -522,6 +522,13 @@ export default function ChartDisplay() {
     () => new Set([...activeOverlayHwTypes].filter((key) => overlayScope.has(key))),
     [activeOverlayHwTypes, overlayScope],
   );
+  // Caption spec badges (TCO $/chip/hr, Power/Chip) should only quote chips
+  // that can actually appear on the plot: the active official legend selection
+  // plus any active unofficial-overlay selection.
+  const captionHwKeys = useMemo(
+    () => new Set([...selectedOfficialHwTypes, ...scopedActiveOverlayHwTypes]),
+    [selectedOfficialHwTypes, scopedActiveOverlayHwTypes],
+  );
   const overlayScopeRegistration = useMemo(
     () =>
       isUnofficialRun
@@ -918,7 +925,10 @@ export default function ChartDisplay() {
                               {formatTokenLength(residentSequenceLengths.osl.p99)}
                             </p>
                           )}
-                          <MetricAssumptionNotes selectedYAxisMetric={selectedYAxisMetric} />
+                          <MetricAssumptionNotes
+                            selectedYAxisMetric={selectedYAxisMetric}
+                            activeHwKeys={captionHwKeys}
+                          />
                           {isUnofficialRun &&
                             selectedXAxisMode === 'e2e-normalized-interactivity' && (
                               <p className="mb-2 text-xs text-muted-foreground">
