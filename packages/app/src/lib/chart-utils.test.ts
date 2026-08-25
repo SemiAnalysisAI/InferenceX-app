@@ -714,6 +714,17 @@ describe('createChartDataPoint', () => {
     expect(point.newInputSuffixOutputTputPerGpu).toBeUndefined();
   });
 
+  it('omits new-input-suffix throughput fields when input throughput is missing', () => {
+    const e = entry({
+      tput_per_gpu: 900,
+      input_tput_per_gpu: 0,
+      theoretical_cache_hit_rate: 0.8,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.newInputSuffixTputPerGpu).toBeUndefined();
+    expect(point.newInputSuffixOutputTputPerGpu).toBeUndefined();
+  });
+
   it('omits new-input-suffix throughput fields when the rate is out of range', () => {
     const e = entry({
       tput_per_gpu: 900,

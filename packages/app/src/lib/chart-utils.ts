@@ -338,7 +338,14 @@ export function buildDerivedChartFields(
     Number.isFinite(theoreticalHitRate) &&
     theoreticalHitRate >= 0 &&
     theoreticalHitRate <= 1;
-  if (wants('newInputSuffixOutputTputPerGpu') && hasTheoreticalHitRate && tputPerGpu) {
+  // Both metrics require input throughput: without it the prefix share can't
+  // be subtracted and suffix+output would silently equal total throughput.
+  if (
+    wants('newInputSuffixOutputTputPerGpu') &&
+    hasTheoreticalHitRate &&
+    tputPerGpu &&
+    inputTputPerGpu
+  ) {
     fields.newInputSuffixOutputTputPerGpu = chartMetric(
       Math.max(0, tputPerGpu - inputTputPerGpu * theoreticalHitRate),
     );
