@@ -7,12 +7,22 @@ import {
   formatPerfPercent,
   formatPerfRatio,
   intersectPathAtX,
+  nextPerfRulerSelection,
   renderPerfRuler,
   type PerfRulerPathLike,
   type PerfRulerPointInput,
   type PerfRulerRenderOptions,
+  type PerfRulerSelectionEntry,
   type PerfRulerTargetInput,
 } from './perf-ruler';
+
+// ── Selection fixtures ───────────────────────────────────────────
+
+const A1: PerfRulerSelectionEntry = { key: 'official:a1', curve: 'curve-a' };
+const A2: PerfRulerSelectionEntry = { key: 'official:a2', curve: 'curve-a' };
+const B1: PerfRulerSelectionEntry = { key: 'official:b1', curve: 'curve-b' };
+const B2: PerfRulerSelectionEntry = { key: 'official:b2', curve: 'curve-b' };
+const C1: PerfRulerSelectionEntry = { key: 'overlay:c1:run', curve: 'curve-c' };
 
 // ── Fixtures ─────────────────────────────────────────────────────────
 
@@ -388,5 +398,46 @@ describe('renderPerfRuler', () => {
 
     const ruler = group.selectAll('.perf-ruler');
     expect(ruler.elements[0].styles['pointer-events']).toBe('none');
+  });
+});
+
+// ── nextPerfRulerSelection ───────────────────────────────────────────
+
+describe('nextPerfRulerSelection', () => {
+  it('anchors the first click', () => {
+    expect(nextPerfRulerSelection([], A1)).toEqual([A1]);
+  });
+
+  it('clears everything when the exact anchor point is re-clicked', () => {
+    expect(nextPerfRulerSelection([A1], A1)).toEqual([]);
+    expect(nextPerfRulerSelection([A1, B1], A1)).toEqual([]);
+  });
+
+  it('moves the anchor along its own curve', () => {
+    expect(nextPerfRulerSelection([A1], A2)).toEqual([A2]);
+  });
+
+  it('moves the anchor along its own curve while keeping the target', () => {
+    expect(nextPerfRulerSelection([A1, B1], A2)).toEqual([A2, B1]);
+  });
+
+  it('selects a different curve as the target', () => {
+    expect(nextPerfRulerSelection([A1], B1)).toEqual([A1, B1]);
+  });
+
+  it('keeps a complete measurement when another point on the target curve is clicked', () => {
+    const prev = [A1, B1];
+    // Same reference back: the target entry identifies a CURVE, so this
+    // click cannot change the iso-x result — React can bail out.
+    expect(nextPerfRulerSelection(prev, B2)).toBe(prev);
+  });
+
+  it('keeps a complete measurement when the original target point is re-clicked', () => {
+    const prev = [A1, B1];
+    expect(nextPerfRulerSelection(prev, B1)).toBe(prev);
+  });
+
+  it('starts a new measurement anchored at a click on a third curve', () => {
+    expect(nextPerfRulerSelection([A1, B1], C1)).toEqual([C1]);
   });
 });

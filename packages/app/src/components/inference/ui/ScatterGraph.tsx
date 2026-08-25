@@ -59,8 +59,10 @@ import { computeTooltipPosition, syncPointShape } from '@/lib/d3-chart/layers/sc
 import {
   computeIsoXRulerGeometry,
   intersectPathAtX,
+  nextPerfRulerSelection,
   renderPerfRuler,
   type PerfRulerGeometry,
+  type PerfRulerSelectionEntry,
 } from '@/lib/d3-chart/layers/perf-ruler';
 import {
   attachOverlayXMarkerHandlers,
@@ -1326,12 +1328,8 @@ const ScatterGraph = React.memo(
     // measurement survives metric/display re-renders where the points still
     // exist. Keys distinguish official points from unofficial overlay
     // points, mirroring the dataIdentity convention.
-    interface PerfRulerClick {
-      key: string;
-      curve: string;
-    }
     const [perfRulerMode, setPerfRulerMode] = useState(false);
-    const [perfRulerSelection, setPerfRulerSelection] = useState<PerfRulerClick[]>([]);
+    const [perfRulerSelection, setPerfRulerSelection] = useState<PerfRulerSelectionEntry[]>([]);
     // Draw passes read the mode through a ref so toggling off clears the
     // ruler in the same pre-paint layout pass — the line/chip must never
     // linger a frame after the switch flips (Bugbot report on PR #853).
@@ -1424,25 +1422,17 @@ const ScatterGraph = React.memo(
       if (kept.length !== perfRulerSelection.length) setPerfRulerSelection(kept);
     }, [perfRulerMode, perfRulerSelection, perfRulerResolvedPoints]);
 
-    // Selection toggling: the first click anchors the ruler; a click on a
-    // DIFFERENT curve selects the target curve; a click on the anchor's own
-    // curve moves the anchor along it; re-clicking the anchor clears the
-    // measurement, re-clicking the target click marker drops the target
-    // only; with a complete measurement, a click on any third curve starts a
-    // new measurement anchored at that point. Ruler-mode clicks measure
-    // INSTEAD of pinning the tooltip, so drop the pin the shared click
-    // handler applied just before this callback ran.
-    const handlePerfRulerPointClick = useCallback((clicked: PerfRulerClick) => {
-      setPerfRulerSelection((prev) => {
-        const anchor = prev[0];
-        const target = prev[1];
-        if (anchor && anchor.key === clicked.key) return [];
-        if (target && target.key === clicked.key) return [anchor];
-        if (!anchor) return [clicked];
-        if (clicked.curve === anchor.curve) return target ? [clicked, target] : [clicked];
-        if (!target) return [anchor, clicked];
-        return [clicked];
-      });
+    // Selection transitions live in the pure module (see the transition
+    // table on nextPerfRulerSelection): first click anchors; a click on the
+    // anchor's curve moves the anchor; a different curve selects the target;
+    // clicks on the already-selected target curve are a no-op (the target
+    // entry identifies a CURVE, so they cannot change the iso-x result); a
+    // third curve starts a new measurement; re-clicking the exact anchor
+    // point clears. Ruler-mode clicks measure INSTEAD of pinning the
+    // tooltip, so drop the pin the shared click handler applied just before
+    // this callback ran.
+    const handlePerfRulerPointClick = useCallback((clicked: PerfRulerSelectionEntry) => {
+      setPerfRulerSelection((prev) => nextPerfRulerSelection(prev, clicked));
       chartRef.current?.dismissTooltip();
       chartRef.current?.hideTooltip();
     }, []);

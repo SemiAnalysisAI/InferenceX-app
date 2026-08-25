@@ -152,6 +152,45 @@ export function computeIsoXRulerGeometry(
   };
 }
 
+/** One perf-ruler click: a stable point key plus the curve it belongs to. */
+export interface PerfRulerSelectionEntry {
+  key: string;
+  curve: string;
+}
+
+/**
+ * Selection-transition table for perf-ruler clicks. The selection holds up
+ * to two entries: `[anchor, target]`. The anchor is a POINT (it defines the
+ * iso-x and one end of the ruler); the target entry only identifies a CURVE
+ * (the other end is that curve's intersection at the anchor's x).
+ *
+ * | State            | Click on…                       | Result                        |
+ * |------------------|---------------------------------|-------------------------------|
+ * | empty            | any point                       | becomes the anchor            |
+ * | any              | the exact anchor point          | clear everything              |
+ * | any              | another point on anchor's curve | move the anchor (keep target) |
+ * | anchor only      | a different curve               | select that curve as target   |
+ * | anchor + target  | any point on the target curve   | no-op (keep the measurement — |
+ * |                  |                                 | it cannot change the result)  |
+ * | anchor + target  | a third curve                   | new measurement anchored there|
+ *
+ * Returns `prev` (same reference) for no-op transitions so React state
+ * updates can bail out without re-rendering.
+ */
+export function nextPerfRulerSelection(
+  prev: PerfRulerSelectionEntry[],
+  clicked: PerfRulerSelectionEntry,
+): PerfRulerSelectionEntry[] {
+  const anchor = prev[0];
+  const target = prev[1];
+  if (anchor && anchor.key === clicked.key) return [];
+  if (!anchor) return [clicked];
+  if (clicked.curve === anchor.curve) return target ? [clicked, target] : [clicked];
+  if (!target) return [anchor, clicked];
+  if (clicked.curve === target.curve) return prev;
+  return [clicked];
+}
+
 export interface PerfRulerRenderOptions {
   /** Stroke for the ruler line and end caps (e.g. `var(--primary)`). */
   color: string;
