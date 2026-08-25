@@ -267,7 +267,7 @@ const entries = [
       'Low latency can require smaller batches or more parallel resources, which may reduce hardware utilization and increase cost. Good serving design chooses a latency service level and then maximizes throughput within it.',
     benchmarkContext:
       'InferenceX exposes workload shape and concurrency alongside interactivity. This keeps a high-throughput batch point from being mistaken for a low-latency serving point.',
-    relatedTerms: ['time-to-first-token', 'time-per-output-token', 'interactivity', 'concurrency'],
+    relatedTerms: ['time-to-first-token', 'time-per-output-token', 'tail-latency', 'interactivity'],
     articleSlugs: [INFERENCEMAX, INFERENCEX_V2],
   },
   {
@@ -518,7 +518,13 @@ const entries = [
       'Prefill has a different resource profile from decode. When both share the same workers, large prompt jobs can interrupt decode batches and make streaming latency less predictable.',
     benchmarkContext:
       'Disaggregated recipes place prefill on a separately sized chip pool. When reading a result, check the prefill tensor parallelism, chip count, input length, and whether KV state must cross a network before decode.',
-    relatedTerms: ['decode', 'kv-cache', 'time-to-first-token', 'disaggregated-inference'],
+    relatedTerms: [
+      'decode',
+      'kv-cache',
+      'chunked-prefill',
+      'time-to-first-token',
+      'arithmetic-intensity',
+    ],
     articleSlugs: [INFERENCEX_V2, GB300_DSV4, GB200_KIMI],
   },
   {
@@ -623,7 +629,7 @@ const entries = [
       'The speedup depends on how many draft tokens are accepted and on the cost of drafting and verification. Dense and MoE models can behave differently because verifying several positions may activate more expert weights.',
     benchmarkContext:
       'Fixed-sequence scenarios keep speculative decoding as part of a curve’s identity, so MTP-enabled and disabled recipes plot separately. Agentic curves instead treat it as point-level metadata and merge the points, with the method named in each tooltip, because AgentX reports the best available curve per model, chip SKU, and engine. Since replayed AgentX content is synthetic, a speculator would accept an unrepresentative number of draft tokens, so runs apply an acceptance length collected per model, speculator, draft length, and thinking mode on an external agentic coding dataset.',
-    relatedTerms: ['multi-token-prediction', 'decode', 'batching', 'agentx', 'mixture-of-experts'],
+    relatedTerms: ['multi-token-prediction', 'acceptance-length', 'decode', 'batching', 'agentx'],
     articleSlugs: [INFERENCEX_V2, DEEPSEEK_V4, B200_GLM5, KIMI_K3, AGENTX_V3],
   },
   {
@@ -871,7 +877,7 @@ const entries = [
       'A nominal format alone says little about speed or quality. Conversion quality, model calibration, outliers, kernel maturity, and hardware support determine the result.',
     benchmarkContext:
       'InferenceX treats precision as a first-class recipe dimension and pairs throughput measurements with accuracy checks. Compare FP8, FP4, NVFP4, MXFP4, and INT4 only when the model, workload, engine, and quality bar are compatible.',
-    relatedTerms: ['fp8', 'fp4', 'nvfp4', 'mxfp4', 'high-bandwidth-memory'],
+    relatedTerms: ['fp8', 'fp4', 'int4', 'bf16', 'kv-cache-quantization'],
     articleSlugs: [INFERENCEX_V2, B200_KIMI, B200_GLM5, MI355X_DSV4],
   },
   {
@@ -1276,6 +1282,466 @@ const entries = [
       'InferenceX reports TileRT as its own framework label and deliberately retains it in best-per-SKU views, because a curve that only survives where it dominates on throughput would drop the operating points TileRT exists to serve. Compare it at matched interactivity rather than on peak throughput alone.',
     relatedTerms: ['inference-engine', 'interactivity', 'decode', 'sglang'],
     articleSlugs: [TILERT, AGENTX_V3],
+  },
+  {
+    slug: 'recipe',
+    term: 'Recipe',
+    aliases: ['configuration', 'serving recipe'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'A recipe is the complete set of choices behind one curve: which model, engine, image, precision, parallelism, and workload were run.',
+    definition:
+      'A recipe is the fully specified combination of model, inference engine and container image, numerical precision, parallelism strategy, chip system, and workload that produces one measured curve.',
+    explanation:
+      'Every point on InferenceX belongs to a recipe, and a concurrency sweep across one recipe traces out its curve. Changing any element produces a different recipe rather than a variation of the same one, which is why an engine image bump is reported as its own result rather than folded into an existing line.',
+    significance:
+      'Peak chip specifications do not describe serving performance, and the same silicon can differ by multiples across recipes. Naming the whole combination is what makes a claim checkable: a number without its recipe cannot be reproduced or fairly compared against another vendor.',
+    benchmarkContext:
+      'InferenceX benchmark configs mainly track the published vLLM and SGLang cookbooks on upstream images, so results reflect what users can actually deploy rather than images tuned for the benchmark. Point tooltips expose the recipe behind each point along with links to the run provenance.',
+    relatedTerms: ['inference-engine', 'pareto-frontier', 'concurrency', 'quantization'],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, AGENTX_V3],
+  },
+  {
+    slug: 'tail-latency',
+    term: 'Tail latency',
+    aliases: ['p90', 'p99', 'percentile latency'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Tail latency describes the slowest requests rather than the typical one, because the unlucky few are what users actually notice.',
+    definition:
+      'Tail latency is the latency at a high percentile of the request distribution, such as p90 or p99, rather than the mean or median.',
+    explanation:
+      'A percentile answers a different question from an average. A p90 of five seconds means one request in ten waited at least that long, and that request may be the one blocking an agent from continuing. Distributions in real serving are heavily skewed, so the mean can sit far below the tail and hide it completely.',
+    significance:
+      'Capacity planning is usually written against a percentile, not an average, because a service that is fast on average and slow at the tail still fails its users. Optimizations can also improve the mean while worsening the tail, which a single-number summary would report as an unambiguous win.',
+    benchmarkContext:
+      'InferenceX reports percentile-qualified metrics and labels the percentile on the axis, so p90 TTFT and mean TTFT are never mixed on one comparison. Agentic runs are especially skewed, because end to end latency scales with output length and the longest generations dominate the tail.',
+    relatedTerms: ['latency', 'time-to-first-token', 'interactivity', 'concurrency'],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2, AGENT_BENCHMARK],
+  },
+  {
+    slug: 'service-level-objective',
+    term: 'Service level objective',
+    abbreviation: 'SLO',
+    aliases: ['latency target', 'SLA target'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'An SLO is the performance promise a deployment has to keep, such as a first token within one second for nine requests in ten.',
+    definition:
+      'A service level objective is a stated target for a serving metric, usually expressed as a percentile bound on latency or interactivity.',
+    explanation:
+      'A useful SLO names a metric, a percentile, and a threshold together. Serving capacity is then whatever throughput the system sustains without breaching it, which is a smaller number than peak throughput and the only one an operator can safely provision against.',
+    significance:
+      'Every point on a throughput curve is reachable, but only part of the curve satisfies a given promise. Two systems can look close on peak throughput and differ sharply in how much of that throughput survives an interactivity or first-token bound.',
+    benchmarkContext:
+      'InferenceX does not impose one industry SLO, because acceptable targets differ by product: interactive coding needs a high token rate, while batch processing tolerates seconds of first-token delay. Read the frontier at your own threshold instead of comparing peak values.',
+    relatedTerms: ['latency', 'tail-latency', 'interactivity', 'iso-interactivity'],
+    articleSlugs: [AGENTX_V3, INFERENCEMAX, AGENT_BENCHMARK],
+  },
+  {
+    slug: 'acceptance-length',
+    term: 'Acceptance length',
+    abbreviation: 'AL',
+    aliases: ['acceptance rate', 'draft acceptance'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Acceptance length is how many drafted tokens the full model actually approves per verification step, which is what decides whether speculation pays off.',
+    definition:
+      'Acceptance length is the average number of speculatively drafted tokens accepted by the target model in one verification pass.',
+    explanation:
+      'Speculative decoding only saves time when drafts survive verification. An acceptance length near one means the draft and verify machinery ran for nothing, while a high value amortizes one expensive target-model step across several emitted tokens. The value depends on the speculator, the draft length, the model, and the content being generated.',
+    significance:
+      'Because acceptance depends on content, a benchmark can accidentally decide the result. Synthetic or anonymized text is out of distribution for a speculator trained on real language, so measured acceptance drifts away from what production would see, in either direction.',
+    benchmarkContext:
+      'AgentX replays anonymized traces filled with synthetic tokens, so it does not let acceptance emerge from that content. Runs instead apply a fixed acceptance length collected per model, speculator, draft length, and thinking mode on an external agentic coding dataset, which keeps the comparison vendor neutral.',
+    relatedTerms: ['speculative-decoding', 'multi-token-prediction', 'eagle', 'agentx'],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2, DEEPSEEK_V4],
+  },
+  {
+    slug: 'unofficial-run',
+    term: 'Unofficial run',
+    aliases: ['unofficial overlay', 'community run'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'An unofficial run is a benchmark run that has not been ingested into the published dataset but can still be drawn on top of the charts from its URL.',
+    definition:
+      'An unofficial run is a CI benchmark run loaded into the dashboard as an overlay from its run identifier, rather than from the published database.',
+    explanation:
+      'Adding a run identifier to the page URL fetches that run and draws its points, rooflines, and rows alongside the official data in distinct overlay colors. The overlay is a separate rendering path, so it can be toggled per hardware type or dismissed per run without disturbing the official selection underneath.',
+    significance:
+      'Publishing a result usually lags producing it, and a contributor tuning a recipe needs to see the new curve against the current frontier before anyone decides to ingest it. The overlay makes an in-flight run reviewable without granting it the standing of a published measurement.',
+    benchmarkContext:
+      'Overlay colors come from a run-index palette rather than the hardware palette, so an overlay is never mistaken for official data. Some views require data that is only persisted for ingested runs, and those views state that overlays are unavailable rather than silently omitting them.',
+    relatedTerms: ['recipe', 'pareto-frontier', 'inference-engine', 'agentx'],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2],
+  },
+  {
+    slug: 'chunked-prefill',
+    term: 'Chunked prefill',
+    aliases: ['split prefill', 'piecewise prefill'],
+    category: 'Serving',
+    plainEnglish:
+      'Chunked prefill reads a long prompt in slices instead of all at once, so other users keep receiving tokens while it is being read.',
+    definition:
+      'Chunked prefill splits prompt processing into fixed-size token chunks that the scheduler interleaves with ongoing decode work.',
+    explanation:
+      'An unsplit prefill occupies the accelerator for as long as the whole prompt takes, and every user already streaming waits behind it. Splitting the prompt lets the scheduler alternate, so decode continues between chunks. The chunk size is a tuning knob: larger chunks prefill more efficiently, smaller chunks interrupt decode less.',
+    significance:
+      'The technique converts a first-token problem for one user into a small, steady tax on everyone else, which is usually the better trade. It matters far more as prompts grow, since a single unsplit hundred-thousand-token prefill would stall a deployment outright.',
+    benchmarkContext:
+      'Chunk size is part of the recipe and can differ across points on the same curve, so a jump in throughput may reflect a retune rather than new hardware. Long agentic prompts make the setting consequential in a way fixed short-prompt scenarios never expose.',
+    relatedTerms: ['prefill', 'decode', 'batching', 'time-to-first-token'],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2, SGLANG_056],
+  },
+  {
+    slug: 'roofline',
+    term: 'Roofline',
+    aliases: ['frontier envelope', 'roofline curve'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'On InferenceX a roofline is the outer envelope drawn through the best points of one hardware configuration, showing the edge of what it achieved.',
+    definition:
+      'A roofline on InferenceX is the Pareto envelope curve drawn per hardware configuration through its non-dominated points for the selected pair of axes.',
+    explanation:
+      'Which corner counts as best depends on the metrics: throughput against interactivity takes the upper right, while a cost axis is better when lower, so the envelope is anchored at whichever corner the selected metric pair defines. Points with a degenerate x value are excluded from eligibility, though they still render in the show-all view.',
+    significance:
+      'Reading a cloud of raw points invites cherry-picking, since a badly tuned configuration contributes points that no operator would ever choose. The envelope shows the achievable boundary per system, which is the shape a capacity decision is actually made against.',
+    benchmarkContext:
+      'This is not the classic roofline model from HPC, which plots attainable FLOPS against arithmetic intensity to expose a compute or memory bound. The dashboard borrows only the picture of an upper bound. Roofline direction is configured per metric, so the same points can produce a different envelope on a different axis.',
+    relatedTerms: ['pareto-frontier', 'iso-interactivity', 'throughput', 'recipe'],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, B200_GLM5],
+  },
+  {
+    slug: 'arithmetic-intensity',
+    term: 'Arithmetic intensity',
+    aliases: ['operational intensity', 'compute to memory ratio'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Arithmetic intensity is how much math a computation does per byte it moves, which decides whether the chip or its memory is the limit.',
+    definition:
+      'Arithmetic intensity is the ratio of arithmetic operations performed to bytes moved between memory and the compute units.',
+    explanation:
+      'Prefill processes many tokens against one set of weights, so it reuses each loaded byte heavily and is usually compute bound. Decode emits one token per step per sequence and must still read the weights and the KV cache, so it moves a great deal of data for very little arithmetic and is usually memory bandwidth bound.',
+    significance:
+      'The two phases are limited by different parts of the chip, which is why a specification sheet with impressive peak FLOPS can disappoint on decode and why batching helps: grouping sequences raises intensity by reusing each weight read across more tokens.',
+    benchmarkContext:
+      'The split explains recurring shapes in the data. Low interactivity points run large batches at high intensity and approach compute limits, while the high interactivity end runs small batches and tracks memory bandwidth, so bandwidth-rich parts often win there despite lower peak throughput.',
+    relatedTerms: ['prefill', 'decode', 'memory-bandwidth', 'batching'],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, TILERT],
+  },
+  {
+    slug: 'prefix-cache-hit-rate',
+    term: 'Prefix cache hit rate',
+    aliases: ['cache hit rate', 'KV reuse rate'],
+    category: 'Serving',
+    plainEnglish:
+      'The hit rate is the share of prompt tokens served from cache instead of being recomputed, which on long sessions is most of the prompt.',
+    definition:
+      'Prefix cache hit rate is the fraction of input tokens satisfied from cached KV state rather than recomputed during prefill.',
+    explanation:
+      'A hit rate is only meaningful next to the tier that produced it, since a token served from accelerator memory and one fetched back from host memory cost very differently. It also depends on more than capacity: eviction can discard a prefix that is still wanted, and routing can send a request to a worker that never held it.',
+    significance:
+      'On multi-turn traffic the hit rate largely determines prefill cost, because each turn resends the whole conversation plus a little more. Once reuse is high, the remaining prefill work is dominated by genuinely new tokens, and the bottleneck moves from computation to cache management.',
+    benchmarkContext:
+      'The AgentX point view reports hit rate over time, separated by cache tier, alongside the prompt token source breakdown. A run that reports high aggregate throughput on a low hit rate is doing far more prefill work than a well-cached deployment would.',
+    relatedTerms: ['prefix-caching', 'kv-cache', 'prefill', 'agentx'],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, AGENT_BENCHMARK],
+  },
+  {
+    slug: 'warmup',
+    term: 'Warmup',
+    aliases: ['warmup phase', 'cache priming'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Warmup is the priming pass before measurement starts, so the run is scored on a system in steady state rather than one with an empty cache.',
+    definition:
+      'Warmup is the phase before the profiling window in which a benchmark primes caches and reaches steady state, and whose requests are excluded from reported results.',
+    explanation:
+      'A cold system misrepresents production twice over: the cache is empty, and every session starting at turn zero creates a synchronized burst that no real deployment sees. AgentX therefore starts each conversation at a seeded point partway through its history, replays the requests needed to reconstruct that state, then advances each replay lane further before measurement begins.',
+    significance:
+      'Where the measurement window starts changes the result. Include the priming pass and prefix reuse looks worse than production; skip priming entirely and cache-dependent recipes are scored on a state they would never serve from.',
+    benchmarkContext:
+      'The AgentX point view separates the two phases, so telemetry can be inspected for either. Warmup requests are capped at a single output token, which is why their output length is about one and their interactivity and decode series are blank: one token has no inter-token latency.',
+    relatedTerms: ['prefix-caching', 'agentx', 'trace-replay', 'closed-loop-benchmark'],
+    articleSlugs: [AGENTX_V3, AGENT_BENCHMARK, AGENTIC_WORKLOADS],
+  },
+  {
+    slug: 'aiperf',
+    term: 'AIPerf',
+    aliases: ['replay harness', 'load generator'],
+    category: 'Agentic inference',
+    plainEnglish:
+      'AIPerf is the vendor-neutral client that sends the benchmark traffic, reconstructing recorded agent sessions and timing every request.',
+    definition:
+      'AIPerf is the open-source HTTP load generation and replay harness that drives AgentX runs against a serving endpoint.',
+    explanation:
+      'It reconstructs each session as a directed acyclic graph in which nodes are requests and edges carry the delay before a dependent request may be sent. That structure reproduces main-agent turns, parallel subagent branches that join later, one-off auxiliary requests, and the tool-use pauses between turns, none of which a flat list of prompts can express.',
+    significance:
+      'The client is part of the measurement. A harness that cannot express dependencies would issue an agentic workload as independent requests and erase exactly the burstiness and reuse the scenario exists to test. Keeping it vendor neutral also keeps the load generator from favoring any one serving stack.',
+    benchmarkContext:
+      'A seed fixes which conversations are sampled, where each starts, and the synthetic content used to fill anonymized blocks, so a rerun of the same recipe replays the same workload. All submissions for a model run the same harness minor version so results stay comparable.',
+    relatedTerms: ['trace-replay', 'agentx', 'closed-loop-benchmark', 'subagent'],
+    articleSlugs: [AGENTX_V3, AGENT_BENCHMARK, AGENTIC_WORKLOADS],
+  },
+  {
+    slug: 'pipeline-parallelism',
+    term: 'Pipeline parallelism',
+    abbreviation: 'PP',
+    aliases: ['layer parallelism', 'PP'],
+    category: 'Parallelism',
+    plainEnglish:
+      'Pipeline parallelism gives each chip a different slice of the layers, passing activations along the chain instead of splitting each layer.',
+    definition:
+      'Pipeline parallelism partitions a model by layer across accelerators, so each stage runs its own layers and forwards activations to the next.',
+    explanation:
+      'Communication is a point to point handoff of activations at stage boundaries, which is far cheaper than the per-layer collectives tensor parallelism requires. The cost is idle time: with one request in flight, every stage but the active one waits, and only a stream of concurrent work keeps the pipeline full.',
+    significance:
+      'For the largest models this is a capacity technique before it is a speed technique. Some frontier models do not fit in one node at all, and pipeline parallelism is what makes them servable, sometimes as the only option when a competing optimization refuses to compose with anything else.',
+    benchmarkContext:
+      'InferenceX reports the pipeline degree in point tooltips and parallelism labels alongside TP, EP, and DP, and only when it exceeds one. Composability matters as much as the degree: a stage split that blocks speculative decoding can cost more than the memory it saved.',
+    relatedTerms: [
+      'tensor-parallelism',
+      'expert-parallelism',
+      'data-parallelism',
+      'high-bandwidth-memory',
+    ],
+    articleSlugs: [AGENTX_V3, KIMI_K3, INFERENCEX_V2],
+  },
+  {
+    slug: 'dp-attention',
+    term: 'Data-parallel attention',
+    abbreviation: 'DPA',
+    aliases: ['DP attention', 'attention data parallelism'],
+    category: 'Parallelism',
+    plainEnglish:
+      'DP attention gives each rank its own slice of the attention work and its own cache, instead of every rank holding a copy of the same thing.',
+    definition:
+      'Data-parallel attention replicates attention computation per rank over disjoint sets of sequences, so each rank owns a private share of the KV cache while experts remain shared.',
+    explanation:
+      'Tensor-parallel attention splits heads and ends up replicating KV state across ranks, which wastes capacity when heads are few. DP attention avoids that duplication by assigning whole sequences to ranks. The ranks still participate together in the MoE collectives, so attention is local while expert dispatch stays global.',
+    significance:
+      'Because each rank owns a private slice of the pool, placement becomes correctness-adjacent for performance: a long session routed to a rank that does not hold its prefix recomputes everything. Measured hit rates can then land far below the theoretical ceiling for reasons that have nothing to do with cache size.',
+    benchmarkContext:
+      'InferenceX shows DP attention in the parallelism section of point tooltips. Whether it helps is model dependent, and configurations without it sometimes dominate the frontier when cache locality turns into a routing constraint.',
+    relatedTerms: [
+      'data-parallelism',
+      'tensor-parallelism',
+      'kv-cache',
+      'mixture-of-experts',
+      'prefix-caching',
+    ],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2, GB200_KIMI],
+  },
+  {
+    slug: 'int4',
+    term: 'INT4',
+    aliases: ['4-bit integer', 'W4A16'],
+    category: 'Numerical precision',
+    plainEnglish:
+      'INT4 stores weights in four-bit integers, shrinking the model enough to move far less memory per token on hardware without native 4-bit floats.',
+    definition:
+      'INT4 is a four-bit integer format used mainly for weight quantization, typically with a higher-precision scale per group of values.',
+    explanation:
+      'Integer formats spread their values evenly, unlike floating point, so INT4 depends on grouped scaling factors to track the local range of each block of weights. Activations commonly stay at higher precision, and the matrix multiply dequantizes on the fly, which makes the technique a memory movement optimization more than an arithmetic one.',
+    significance:
+      'It matters most where 4-bit floating point has no hardware support. On such parts INT4 is the practical route to 4-bit weights, though it usually needs more calibration care than a native format and its accuracy has to be checked rather than assumed.',
+    benchmarkContext:
+      'InferenceX treats INT4 as its own precision key alongside FP4, FP8, and BF16, and precision is part of the recipe rather than a display option. Compare INT4 against a native FP4 recipe only with the accuracy evaluations in view, since the formats are not interchangeable.',
+    relatedTerms: ['quantization', 'fp4', 'fp8', 'memory-bandwidth'],
+    articleSlugs: [B200_KIMI, INFERENCEX_V2, MI355X_KIMI],
+  },
+  {
+    slug: 'bf16',
+    term: 'BF16',
+    aliases: ['bfloat16', 'brain float 16'],
+    category: 'Numerical precision',
+    plainEnglish:
+      'BF16 is the 16-bit format most models are trained in, and serving in it is the accuracy reference the quantized recipes are measured against.',
+    definition:
+      'BF16 is a 16-bit floating point format with the same exponent range as FP32 and a reduced mantissa, widely used for training and as an unquantized serving baseline.',
+    explanation:
+      'Keeping the FP32 exponent range makes BF16 tolerant of the value distributions that appear in transformer activations, so conversion rarely needs the scaling machinery narrower formats require. The tradeoff is precision rather than range, and the format is twice the size of FP8 and four times that of a 4-bit format.',
+    significance:
+      'Its role in a benchmark is usually as a reference point. Weight reads dominate decode, so a BF16 recipe moves far more memory per token than a quantized one and tends to sit lower on the throughput curve while defining the accuracy the others are compared against.',
+    benchmarkContext:
+      'InferenceX carries BF16 as a precision key and reports peak BF16 dense throughput per accelerator in the specs pages. Quantized recipes are validated with accuracy evaluations rather than assumed lossless, which is what makes a BF16 comparison meaningful.',
+    relatedTerms: ['quantization', 'fp8', 'fp4', 'memory-bandwidth'],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, DEEPSEEK_V4],
+  },
+  {
+    slug: 'kv-cache-quantization',
+    term: 'KV cache quantization',
+    aliases: ['FP8 KV cache', 'quantized KV'],
+    category: 'Numerical precision',
+    plainEnglish:
+      'This stores the conversation cache in a smaller format, so a chip holds more context and reads it back faster during generation.',
+    definition:
+      'KV cache quantization stores attention key and value states in a reduced-precision format, independently of the precision used for model weights.',
+    explanation:
+      'Weight precision and cache precision are separate choices, and a recipe can serve FP8 weights with a BF16 cache or the reverse. Halving cache width roughly doubles the tokens that fit in accelerator memory and halves the bytes read per decode step, which is the operation decode spends most of its time on.',
+    significance:
+      'On long-context serving this often buys more than shrinking the weights, because at high concurrency the cache, not the weights, is what exhausts memory. Accuracy sensitivity differs by model and by which of keys and values is quantized, so it needs evaluation rather than a blanket assumption.',
+    benchmarkContext:
+      'Cache precision is part of the recipe, and mixed layouts exist in practice: some models keep two cache buffers at different widths, which disaggregated transfer paths then have to move as a pair. Read a memory-capacity claim together with the cache format behind it.',
+    relatedTerms: ['kv-cache', 'quantization', 'fp8', 'high-bandwidth-memory'],
+    articleSlugs: [INFERENCEX_V2, AGENTX_V3, GB300_DSV4],
+  },
+  {
+    slug: 'sliding-window-attention',
+    term: 'Sliding window attention',
+    abbreviation: 'SWA',
+    aliases: ['local attention', 'windowed attention'],
+    category: 'Model architecture',
+    plainEnglish:
+      'Sliding window attention lets a layer look only at a recent span of tokens, so its cache stops growing once the window is full.',
+    definition:
+      'Sliding window attention restricts each query to a fixed span of preceding tokens, bounding the KV state a layer must retain.',
+    explanation:
+      'Because the span is fixed, the cache for such a layer reaches a ceiling instead of growing with the conversation, and older entries fall out as the window advances. Models usually interleave these layers with full-attention layers, so long-range information still has a path through the network while most layers stay cheap.',
+    significance:
+      'The bounded cost comes with an allocator problem. Window pages turn over constantly while durable prefix pages sit still, and when both are drawn from one pool the transient allocation tends to evict the valuable one, so a long session can lose its expensive full-attention history to short-lived window state.',
+    benchmarkContext:
+      'These effects appear only on multi-turn traffic. A single short prompt never laps the window or contends for the pool, which is why window-aware eviction, offload, and branch handling show up as AgentX-driven engine work rather than as fixed-sequence results.',
+    relatedTerms: ['sparse-attention', 'kv-cache', 'prefix-caching', 'hybrid-attention'],
+    articleSlugs: [AGENTX_V3, KIMI_K3, B200_GLM5],
+  },
+  {
+    slug: 'hybrid-attention',
+    term: 'Hybrid attention',
+    aliases: ['mixed attention', 'hybrid cache model'],
+    category: 'Model architecture',
+    plainEnglish:
+      'A hybrid model mixes attention types across its layers, so its cache is several different kinds of state rather than one uniform block.',
+    definition:
+      'A hybrid attention model interleaves layers of different attention types, producing multiple KV cache groups with distinct shapes and lifetimes.',
+    explanation:
+      'A uniform model has one cache layout per token, so a single block geometry describes everything worth saving. A hybrid model does not: full-attention layers, windowed layers, and recurrent or compressor state coexist, each with its own footprint and its own rules about when it can be discarded and whether it can be rebuilt.',
+    significance:
+      'The distinction is invisible until state has to leave the accelerator. A connector that assumes one uniform layout cannot say which group a block belongs to, so the models with the longest sessions were for a time the ones that could not use offload at all. Recurrent state is the hardest case, since it accumulates everything before it and cannot be recomputed from neighboring tokens.',
+    benchmarkContext:
+      'Frontier open-weight models in the InferenceX matrix are increasingly hybrid, so engine support for hybrid cache groups is part of what a recipe is measuring. Offload, disaggregated transfer, and prefix reuse each had to be extended per group rather than inherited from the uniform case.',
+    relatedTerms: [
+      'sliding-window-attention',
+      'kv-cache',
+      'linear-attention',
+      'sparse-attention',
+      'prefix-caching',
+    ],
+    articleSlugs: [AGENTX_V3, KIMI_K3, DEEPSEEK_V4],
+  },
+  {
+    slug: 'linear-attention',
+    term: 'Linear attention',
+    aliases: ['GatedDeltaNet', 'recurrent attention', 'constant-state attention'],
+    category: 'Model architecture',
+    plainEnglish:
+      'Linear attention keeps a fixed-size running summary instead of every past token, so its memory does not grow as the conversation does.',
+    definition:
+      'Linear attention replaces the growing key and value cache with a recurrent state of constant size that is updated as tokens arrive.',
+    explanation:
+      'Standard attention stores state proportional to sequence length and rereads it every step. A linear or gated recurrent layer carries a fixed-size state instead, trading exact recall of every position for bounded memory. Architectures such as GatedDeltaNet apply this on a fraction of layers, leaving full attention elsewhere to preserve precise long-range lookup.',
+    significance:
+      'For long context the storage saving is substantial, but the state changes what caching means. It cannot be reconstructed from surrounding tokens the way a window tail can, so if it is dropped the only way back is replaying the sequence, and reuse requires an explicit checkpoint mechanism rather than ordinary block reuse.',
+    benchmarkContext:
+      'InferenceX serves models using these layers, and engine support for checkpointing and transferring recurrent state is part of the recipe. A model can be day-zero servable and still lack reuse of that state, which shows up as unexpectedly high prefill cost on repeated turns.',
+    relatedTerms: ['hybrid-attention', 'kv-cache', 'sparse-attention', 'prefill'],
+    articleSlugs: [AGENTX_V3, MI355X_QWEN, KIMI_K3],
+  },
+  {
+    slug: 'nvl72',
+    term: 'NVL72',
+    aliases: ['GB200 NVL72', 'GB300 NVL72', 'rack-scale system'],
+    category: 'Hardware',
+    plainEnglish:
+      'NVL72 is a rack where 72 accelerators share one high-speed fabric, so they behave more like a single large machine than a cluster.',
+    definition:
+      'NVL72 is a rack-scale NVIDIA system that places 72 accelerators in a single NVLink scale-up domain rather than in separate eight-chip nodes.',
+    explanation:
+      'The dashboard specs record NVLink 5.0 at 900 GB/s per chip unidirectional across a scale-up world size of 72, switched through NVSwitch. A conventional node keeps that bandwidth among eight chips and falls back to slower scale-out networking beyond them, so the difference is not raw speed but how many chips are reachable before the fabric changes character.',
+    significance:
+      'Techniques whose cost is dominated by collectives change economics inside a large domain. Wide expert parallelism spreads experts across many chips and pays all-to-all traffic for every token, which is tolerable at scale-up bandwidth and often is not across a scale-out fabric.',
+    benchmarkContext:
+      'A rack-scale advantage is not automatic. Higher cost per chip has to be earned back, and on agentic traffic the orchestration layer can become the bottleneck before the fabric does, so NVL72 configurations sometimes trail eight-chip nodes on TCO-normalized throughput for models that do not exercise wide parallelism.',
+    relatedTerms: [
+      'nvlink',
+      'scale-up-vs-scale-out',
+      'wide-expert-parallelism',
+      'all-to-all',
+      'total-cost-of-ownership',
+    ],
+    articleSlugs: [GB200_R1, GB300_DSV4, GB200_KIMI, VR_RUBIN],
+  },
+  {
+    slug: 'atom',
+    term: 'ATOM',
+    aliases: ['AMD ATOM', 'ATOMesh'],
+    category: 'Software',
+    plainEnglish:
+      'ATOM is AMD’s own inference engine, its answer to a vendor runtime rather than an upstream open-source one.',
+    definition:
+      'ATOM is AMD’s inference engine for Instinct accelerators, positioned as the vendor runtime alongside upstream vLLM and SGLang on ROCm.',
+    explanation:
+      'It occupies the same role for AMD that a vendor runtime does for NVIDIA: tuned for the vendor’s own hardware and free to move ahead of upstream engines. Its router, ATOMesh, began as a fork of the SGLang router. The engine was built for single-turn serving, so long-context multi-turn support required substantial changes to its cache manager and kernels.',
+    significance:
+      'A vendor engine can show what silicon is capable of before the open stack catches up, which makes it useful evidence and awkward guidance at the same time. Most labs deploy upstream engines, so a result that exists only under a vendor runtime does not describe what those users will get.',
+    benchmarkContext:
+      'InferenceX reports ATOM as its own framework label so it is never conflated with a vLLM or SGLang result on the same accelerator. Compare it to other vendor runtimes when asking what the hardware can do, and to upstream engines when asking what a customer can deploy today.',
+    relatedTerms: ['inference-engine', 'rocm', 'vllm', 'sglang', 'tensorrt-llm'],
+    articleSlugs: [AGENTX_V3, MI355X_DSV4, MI355X_GLM5],
+  },
+  {
+    slug: 'aiter',
+    term: 'AITER',
+    aliases: ['AMD AITER', 'ROCm kernel library'],
+    category: 'Software',
+    plainEnglish:
+      'AITER is AMD’s tuned kernel library, the layer that decides how fast attention and matrix work actually run on Instinct chips.',
+    definition:
+      'AITER is AMD’s library of optimized kernels for Instinct accelerators, used by inference engines running on ROCm.',
+    explanation:
+      'Engines express a strategy; kernels decide whether it is fast. AITER supplies tuned attention, matrix, and fused operations, and an engine dispatches to it in place of a generic path. That dispatch decision is itself tunable, and a kernel that wins on one shape can lose on another, so selection may depend on context length rather than being fixed.',
+    significance:
+      'A parallelism strategy is only real if the kernels can express it, which is why context parallelism and long-context sparse attention on AMD arrived as kernel work rather than engine work. Very large caches also expose failures short requests never reach, such as address arithmetic that overflows once a pool crosses a size boundary and silently addresses the wrong row.',
+    benchmarkContext:
+      'The library sits inside the container image a recipe pins, so an AITER improvement can move a curve with no change to the engine version or the hardware. Kernel-level gains measured on uniform shapes do not always survive agentic traces, where cache and scheduling variance can swamp them.',
+    relatedTerms: ['rocm', 'inference-engine', 'sparse-attention', 'memory-bandwidth', 'vllm'],
+    articleSlugs: [MI355X_KIMI, AGENTX_V3, MI355X_DSV4],
+  },
+  {
+    slug: 'flashinfer',
+    term: 'FlashInfer',
+    aliases: ['attention kernel library'],
+    category: 'Software',
+    plainEnglish:
+      'FlashInfer is a library of attention kernels that serving engines call instead of writing their own attention implementations.',
+    definition:
+      'FlashInfer is an open-source library of attention kernels and backends used by inference engines for prefill, decode, and speculative verification.',
+    explanation:
+      'Attention is where most serving-specific complexity lives: paged caches, variable sequence lengths, grouped query heads, sparsity patterns, and verification of drafted tokens all reshape the kernel. A shared library lets several engines reuse one tuned implementation, and engines select a backend per shape and per hardware target.',
+    significance:
+      'Because backends are selected rather than fixed, kernel availability becomes a portability question. A feature implemented only for one vendor’s backend leaves the alternative running a generic path, which on long context is not a small compromise but the wrong kernel for the shape.',
+    benchmarkContext:
+      'The backend in use is part of the recipe, and a change to it can move a curve without any hardware or engine version change. Support for checkpointing recurrent state in these kernels is what allowed hybrid models to participate in prefix reuse at all.',
+    relatedTerms: ['inference-engine', 'sparse-attention', 'kv-cache', 'vllm', 'sglang'],
+    articleSlugs: [AGENTX_V3, SGLANG_056, INFERENCEX_V2],
+  },
+  {
+    slug: 'cuda-graphs',
+    term: 'CUDA graphs',
+    aliases: ['graph capture', 'full-graph mode'],
+    category: 'Software',
+    plainEnglish:
+      'CUDA graphs record a whole sequence of chip operations once and replay it as a unit, removing the per-step cost of launching each one.',
+    definition:
+      'CUDA graph capture records a sequence of kernel launches and their dependencies into a replayable graph, so the sequence is submitted once rather than launched operation by operation.',
+    explanation:
+      'A decode step issues many small kernels, and at small batch sizes the launch and scheduling overhead between them can rival the arithmetic. Capturing the step removes that per-launch cost. The catch is that a graph is fixed: shapes must be stable, so engines capture per bucket and leave genuinely dynamic work outside the graph.',
+    significance:
+      'This is a latency optimization more than a throughput one, and it matters most exactly where batches are small and interactivity is high. It also interacts with everything that changes shape, which is why variable-length agentic traffic can defeat a runtime that specializes too eagerly and recompiles for nearly every request it sees.',
+    benchmarkContext:
+      'Graph usage is part of the engine image a recipe pins, so it can move a curve with no change in hardware. Recipes may capture stable producers while leaving request-dependent attention eager, which is a deliberate compromise between capture coverage and shape flexibility.',
+    relatedTerms: ['cuda', 'decode', 'interactivity', 'inference-engine', 'batching'],
+    articleSlugs: [AGENTX_V3, TILERT, INFERENCEX_V2],
   },
 ] as const satisfies readonly GlossaryEntry[];
 
