@@ -6,6 +6,8 @@ import {
   generateTooltipContent,
   generateOverlayTooltipContent,
   generateGPUGraphTooltipContent,
+  theoreticalPrefixTokens,
+  uncachedInputTokens,
   type TooltipConfig,
   type OverlayTooltipConfig,
 } from '@/components/inference/utils/tooltipUtils';
@@ -332,6 +334,98 @@ describe('generateTooltipContent', () => {
     expect(html).toContain('FP8');
   });
 
+  it('shows theoretical prefix and uncached input token rows for agentic points', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          total_prompt_tokens: 1_000_000,
+          theoretical_cache_hit_rate: 0.92,
+        }),
+      }),
+    );
+    expect(html).toContain('<strong>Theoretical Prefix Tokens:</strong> 920,000');
+    expect(html).toContain('<strong>Input Tokens w/o Prefix Caching:</strong> 80,000');
+  });
+
+  it('omits the prefix token rows when the theoretical hit rate is missing', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          total_prompt_tokens: 1_000_000,
+          theoretical_cache_hit_rate: undefined,
+        }),
+      }),
+    );
+    expect(html).toContain('<strong>Prompt Tokens:</strong> 1,000,000');
+    expect(html).not.toContain('Theoretical Prefix Tokens');
+    expect(html).not.toContain('Input Tokens w/o Prefix Caching');
+  });
+
+  it('never shows prefix token rows on fixed-sequence points', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          benchmark_type: 'single_turn',
+          total_prompt_tokens: 1_000_000,
+          theoretical_cache_hit_rate: 0.92,
+        }),
+      }),
+    );
+    expect(html).not.toContain('Theoretical Prefix Tokens');
+    expect(html).not.toContain('Input Tokens w/o Prefix Caching');
+  });
+
+  it('uses Chinese labels for the prefix token rows on /zh surfaces', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        locale: 'zh',
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          total_prompt_tokens: 500_000,
+          theoretical_cache_hit_rate: 0.9,
+        }),
+      }),
+    );
+    expect(html).toContain('<strong>理论 prefix token 数：</strong> 450,000');
+    expect(html).toContain('<strong>无 prefix cache 的输入 token 数：</strong> 50,000');
+  });
+});
+
+describe('theoreticalPrefixTokens / uncachedInputTokens', () => {
+  it('recovers the prefix token sum from the trace hit rate', () => {
+    const d = pt({ total_prompt_tokens: 1_000_000, theoretical_cache_hit_rate: 0.925 });
+    expect(theoreticalPrefixTokens(d)).toBe(925_000);
+    expect(uncachedInputTokens(d)).toBe(75_000);
+  });
+
+  it('returns undefined when either input is missing', () => {
+    expect(theoreticalPrefixTokens(pt({ total_prompt_tokens: 100 }))).toBeUndefined();
+    expect(theoreticalPrefixTokens(pt({ theoretical_cache_hit_rate: 0.5 }))).toBeUndefined();
+    expect(uncachedInputTokens(pt({ total_prompt_tokens: 100 }))).toBeUndefined();
+  });
+
+  it('rejects out-of-range or NaN hit rates', () => {
+    expect(
+      theoreticalPrefixTokens(pt({ total_prompt_tokens: 100, theoretical_cache_hit_rate: 1.2 })),
+    ).toBeUndefined();
+    expect(
+      theoreticalPrefixTokens(pt({ total_prompt_tokens: 100, theoretical_cache_hit_rate: -0.1 })),
+    ).toBeUndefined();
+    expect(
+      theoreticalPrefixTokens(pt({ total_prompt_tokens: 100, theoretical_cache_hit_rate: NaN })),
+    ).toBeUndefined();
+  });
+
+  it('clamps rounding so uncached input never goes negative', () => {
+    const d = pt({ total_prompt_tokens: 3, theoretical_cache_hit_rate: 1 });
+    expect(theoreticalPrefixTokens(d)).toBe(3);
+    expect(uncachedInputTokens(d)).toBe(0);
+  });
+});
+
+describe('generateTooltipContent cache metadata', () => {
   it('shows offload type, backend, and version instead of the binary offload mode', () => {
     const html = generateTooltipContent(
       tooltipConfig({
