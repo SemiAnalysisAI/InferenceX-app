@@ -9,10 +9,6 @@
  * computation changes so the backfill script knows which rows to recompute.
  */
 
-import { createInterface } from 'node:readline';
-import { Readable } from 'node:stream';
-import { createGunzip } from 'node:zlib';
-
 import { gunzipJsonWithinLimit, streamCollectKeys } from './gzip-json-stream';
 import {
   STATS_VERSION,
@@ -22,7 +18,11 @@ import {
   type MetricPercentiles,
   type SequenceLengthSketches,
 } from '../queries/agentic-aggregates';
-import { requestLengthMomentsOf, type RequestLengthMoments } from '../queries/agentic-shared';
+import {
+  extractProfileSamples,
+  requestLengthMomentsOf,
+  type RequestLengthMoments,
+} from '../queries/agentic-shared';
 
 export { STATS_VERSION };
 
@@ -46,90 +46,6 @@ export interface AggregateStats {
    * formulas over (see agentic-shared.ts).
    */
   requestLengthMoments: RequestLengthMoments | null;
-}
-
-interface ProfileMetricEnvelope {
-  value?: number;
-}
-
-interface ProfileRecord {
-  metadata?: {
-    benchmark_phase?: string;
-    was_cancelled?: boolean;
-  };
-  metrics?: {
-    input_sequence_length?: ProfileMetricEnvelope | number;
-    output_sequence_length?: ProfileMetricEnvelope | number;
-    request_latency?: ProfileMetricEnvelope | number;
-    time_to_first_token?: ProfileMetricEnvelope | number;
-  };
-}
-
-function profileMetricValue(value: ProfileMetricEnvelope | number | undefined): number | undefined {
-  const number = typeof value === 'number' ? value : value?.value;
-  return typeof number === 'number' && Number.isFinite(number) ? number : undefined;
-}
-
-/**
- * Stream a profile export line by line so exceptionally large traces never
- * materialize their multi-gigabyte decompressed JSONL as one string. The
- * numeric sample arrays are tiny relative to the source and are needed for
- * exact percentile calculation.
- */
-async function extractProfileSamples(
-  compressedChunks: Iterable<Uint8Array> | AsyncIterable<Uint8Array>,
-): Promise<{
-  isl: number[];
-  osl: number[];
-  e2elPerOsl: number[];
-  pairs: { isl: number; osl: number }[];
-}> {
-  const input = Readable.from(compressedChunks).pipe(createGunzip());
-  const lines = createInterface({ input, crlfDelay: Infinity });
-  const isl: number[] = [];
-  const osl: number[] = [];
-  const e2elPerOsl: number[] = [];
-  const pairs: { isl: number; osl: number }[] = [];
-
-  for await (const line of lines) {
-    if (!line) continue;
-    let record: ProfileRecord;
-    try {
-      record = JSON.parse(line) as ProfileRecord;
-    } catch {
-      continue;
-    }
-    if (record.metadata?.benchmark_phase && record.metadata.benchmark_phase !== 'profiling') {
-      continue;
-    }
-    if (record.metadata?.was_cancelled === true) continue;
-
-    const metrics = record.metrics ?? {};
-    const inputLength = profileMetricValue(metrics.input_sequence_length);
-    const outputLength = profileMetricValue(metrics.output_sequence_length);
-    if (inputLength !== undefined) isl.push(inputLength);
-    if (outputLength !== undefined) osl.push(outputLength);
-    if (inputLength !== undefined && outputLength !== undefined) {
-      pairs.push({ isl: inputLength, osl: outputLength });
-    }
-
-    const requestLatencyMs = profileMetricValue(metrics.request_latency);
-    const ttftMs = profileMetricValue(metrics.time_to_first_token);
-    if (
-      requestLatencyMs !== undefined &&
-      ttftMs !== undefined &&
-      inputLength !== undefined &&
-      outputLength !== undefined &&
-      requestLatencyMs > 0 &&
-      ttftMs > 0 &&
-      inputLength > 0 &&
-      outputLength > 0
-    ) {
-      e2elPerOsl.push(requestLatencyMs / 1000 / outputLength);
-    }
-  }
-
-  return { isl, osl, e2elPerOsl, pairs };
 }
 
 /**

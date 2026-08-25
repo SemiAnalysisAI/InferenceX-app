@@ -13,6 +13,10 @@
  * write-back. (agentic-aggregates re-exports both for existing importers.)
  */
 
+import { createInterface } from 'node:readline';
+import { Readable } from 'node:stream';
+import { createGunzip } from 'node:zlib';
+
 import type { DbClient } from '../connection.js';
 
 import {
@@ -106,9 +110,81 @@ export function requestLengthMomentsOf(
 interface ProfileRecord {
   metadata?: { benchmark_phase?: string; was_cancelled?: boolean };
   metrics?: {
+    request_latency?: { value?: number; unit?: string } | number;
+    time_to_first_token?: { value?: number; unit?: string } | number;
     input_sequence_length?: { value?: number } | number;
     output_sequence_length?: { value?: number } | number;
   };
+}
+
+/**
+ * Per-request samples pulled from a profile_export.jsonl blob in one pass —
+ * the raw material every profile-derived aggregate is computed from. Both
+ * query fallbacks and the ingest/backfill path share this single extractor so
+ * the fast (stored bundle) and slow (blob recompute) paths can never drift.
+ */
+export interface ProfileSamples {
+  isl: number[];
+  osl: number[];
+  /** Per-request E2E latency / OSL ratios (seconds per output token). */
+  e2elPerOsl: number[];
+  /** (ISL, OSL) pairs over records carrying both lengths. */
+  pairs: { isl: number; osl: number }[];
+}
+
+function addProfileSampleLine(acc: ProfileSamples, line: string): void {
+  if (!line) return;
+  let rec: ProfileRecord;
+  try {
+    rec = JSON.parse(line) as ProfileRecord;
+  } catch {
+    return;
+  }
+  if (rec.metadata?.benchmark_phase && rec.metadata.benchmark_phase !== 'profiling') return;
+  if (rec.metadata?.was_cancelled === true) return;
+  const m = rec.metrics ?? {};
+  const isl = readNum(m.input_sequence_length);
+  const osl = readNum(m.output_sequence_length);
+  if (isl !== undefined) acc.isl.push(isl);
+  if (osl !== undefined) acc.osl.push(osl);
+  if (isl !== undefined && osl !== undefined) acc.pairs.push({ isl, osl });
+  const rl = readNum(m.request_latency);
+  const tt = readNum(m.time_to_first_token);
+  if (
+    rl !== undefined &&
+    tt !== undefined &&
+    isl !== undefined &&
+    osl !== undefined &&
+    rl > 0 &&
+    tt > 0 &&
+    isl > 0 &&
+    osl > 0
+  ) {
+    acc.e2elPerOsl.push(rl / 1000 / osl);
+  }
+}
+
+/** Collect profile samples from an already-decompressed JSONL string. */
+export function collectProfileSamplesFromJsonl(jsonl: string): ProfileSamples {
+  const acc: ProfileSamples = { isl: [], osl: [], e2elPerOsl: [], pairs: [] };
+  for (const line of jsonl.split('\n')) addProfileSampleLine(acc, line);
+  return acc;
+}
+
+/**
+ * Stream a gzipped profile export line by line so exceptionally large traces
+ * never materialize their multi-gigabyte decompressed JSONL as one string.
+ * The numeric sample arrays are tiny relative to the source and are needed
+ * for exact percentile calculation.
+ */
+export async function extractProfileSamples(
+  compressedChunks: Iterable<Uint8Array> | AsyncIterable<Uint8Array>,
+): Promise<ProfileSamples> {
+  const input = Readable.from(compressedChunks).pipe(createGunzip());
+  const lines = createInterface({ input, crlfDelay: Infinity });
+  const acc: ProfileSamples = { isl: [], osl: [], e2elPerOsl: [], pairs: [] };
+  for await (const line of lines) addProfileSampleLine(acc, line);
+  return acc;
 }
 
 /**
@@ -120,27 +196,70 @@ export function extractIslOsl(jsonl: string): {
   osl: number[];
   requestLengthMoments: RequestLengthMoments | null;
 } {
-  const isl: number[] = [];
-  const osl: number[] = [];
-  const pairs: { isl: number; osl: number }[] = [];
-  for (const line of jsonl.split('\n')) {
-    if (!line) continue;
-    let rec: ProfileRecord;
-    try {
-      rec = JSON.parse(line) as ProfileRecord;
-    } catch {
-      continue;
-    }
-    if (rec.metadata?.benchmark_phase && rec.metadata.benchmark_phase !== 'profiling') continue;
-    if (rec.metadata?.was_cancelled === true) continue;
-    const m = rec.metrics ?? {};
-    const i = readNum(m.input_sequence_length);
-    const o = readNum(m.output_sequence_length);
-    if (typeof i === 'number') isl.push(i);
-    if (typeof o === 'number') osl.push(o);
-    if (typeof i === 'number' && typeof o === 'number') pairs.push({ isl: i, osl: o });
-  }
+  const { isl, osl, pairs } = collectProfileSamplesFromJsonl(jsonl);
   return { isl, osl, requestLengthMoments: requestLengthMomentsOf(pairs) };
+}
+
+/**
+ * 8 MiB of bytea per `substring` read — the hex wire encoding doubles it, so
+ * each response stays far under Neon's serverless-HTTP 64 MB response cap.
+ * Production profile blobs reach >240 MB compressed (server blobs are of the
+ * same order), so selecting a whole blob column inline is NEVER safe: the
+ * driver rejects the response (HTTP 507) and the whole query fails.
+ */
+export const BLOB_CHUNK_BYTES = 8 * 1024 * 1024;
+
+export type TraceReplayBlobColumn = 'profile_export_jsonl_gz' | 'server_metrics_json_gz';
+
+/** Normalize a driver-returned bytea value (Buffer, Uint8Array, or hex text). */
+function asBuffer(v: unknown): Buffer | null {
+  if (v === null || v === undefined) return null;
+  if (Buffer.isBuffer(v)) return v;
+  if (v instanceof Uint8Array) return Buffer.from(v);
+  if (typeof v === 'string' && v.startsWith(String.raw`\x`)) return Buffer.from(v.slice(2), 'hex');
+  return null;
+}
+
+/**
+ * Stream a gzipped blob column in bounded `substring` chunks. Self-terminating
+ * on the first short/empty chunk, so no size pre-query is needed and a
+ * `pg_column_size` vs `octet_length` mismatch can never truncate the stream.
+ */
+export async function* streamTraceReplayBlob(
+  sql: DbClient,
+  column: TraceReplayBlobColumn,
+  traceReplayId: number,
+): AsyncGenerator<Buffer> {
+  for (let offset = 1; ; offset += BLOB_CHUNK_BYTES) {
+    // Static SQL per column (no dynamic identifiers) — `column` is a
+    // closed union, not caller-supplied text.
+    const rows = (await (column === 'profile_export_jsonl_gz'
+      ? sql`
+          select substring(profile_export_jsonl_gz from ${offset} for ${BLOB_CHUNK_BYTES}) as chunk
+          from agentic_trace_replay
+          where id = ${traceReplayId}
+        `
+      : sql`
+          select substring(server_metrics_json_gz from ${offset} for ${BLOB_CHUNK_BYTES}) as chunk
+          from agentic_trace_replay
+          where id = ${traceReplayId}
+        `)) as { chunk: unknown }[];
+    const chunk = asBuffer(rows[0]?.chunk);
+    if (!chunk || chunk.length === 0) break;
+    yield chunk;
+    if (chunk.length < BLOB_CHUNK_BYTES) break;
+  }
+}
+
+/** Read a whole blob column via bounded chunks; null when absent/empty. */
+export async function readTraceReplayBlob(
+  sql: DbClient,
+  column: TraceReplayBlobColumn,
+  traceReplayId: number,
+): Promise<Buffer | null> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of streamTraceReplayBlob(sql, column, traceReplayId)) chunks.push(chunk);
+  return chunks.length > 0 ? Buffer.concat(chunks) : null;
 }
 
 export interface MetricPercentiles {
