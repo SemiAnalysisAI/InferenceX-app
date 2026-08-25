@@ -238,6 +238,8 @@ export function createMockInferenceContextValues(
     setLogScale: namedStub('setLogScale'),
     useAdvancedLabels: false,
     setUseAdvancedLabels: namedStub('setUseAdvancedLabels'),
+    showConcurrencyLabels: false,
+    setShowConcurrencyLabels: namedStub('setShowConcurrencyLabels'),
     showGradientLabels: false,
     setShowGradientLabels: namedStub('setShowGradientLabels'),
     showLineLabels: false,

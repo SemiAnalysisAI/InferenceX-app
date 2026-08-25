@@ -339,6 +339,7 @@ const SCATTER_STRINGS = {
     labels: 'Labels',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
+    concurrencyLabels: '# Concurrent Sessions',
     gradientLabels: 'Gradient Labels',
     lineLabels: 'Line Labels',
     resetFilter: 'Reset filter',
@@ -355,6 +356,7 @@ const SCATTER_STRINGS = {
     labels: '标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',
+    concurrencyLabels: '并发会话数',
     gradientLabels: '渐变标签',
     lineLabels: '曲线标签',
     resetFilter: '重置筛选',
@@ -406,6 +408,7 @@ const ScatterGraph = React.memo(
       scaleType,
       isLegendExpanded,
       useAdvancedLabels,
+      showConcurrencyLabels,
       showGradientLabels,
       showLineLabels,
       showSpeedOverlay,
@@ -423,6 +426,7 @@ const ScatterGraph = React.memo(
       setLogScale,
       setIsLegendExpanded,
       setUseAdvancedLabels,
+      setShowConcurrencyLabels,
       setShowGradientLabels,
       setShowLineLabels,
       setShowSpeedOverlay,
@@ -1163,6 +1167,7 @@ const ScatterGraph = React.memo(
       () =>
         [
           useAdvancedLabels ? 'advanced-labels' : 'basic-labels',
+          showConcurrencyLabels ? 'conc-labels' : 'no-conc-labels',
           selectedYAxisMetric,
           `${xScaleConfig.type}:${xScaleConfig.domain.join(',')}`,
           `${yScaleConfig.type}:${yScaleConfig.domain.join(',')}`,
@@ -1180,6 +1185,7 @@ const ScatterGraph = React.memo(
       [
         selectedYAxisMetric,
         useAdvancedLabels,
+        showConcurrencyLabels,
         xScaleConfig,
         yScaleConfig,
         pointsData,
@@ -2044,8 +2050,9 @@ const ScatterGraph = React.memo(
           getOpacity: (d) => (interactionRef.current.isPointVisible(d) ? 1 : 0),
           getPointerEvents: (d) => (interactionRef.current.isPointVisible(d) ? 'auto' : 'none'),
           hideLabels: !showPointLabels || showGradientLabels,
-          // Keep the concurrency (C=) annotation from the agentx scatter labels.
-          getLabelText: (d) => pointLabelText(d, useAdvancedLabels),
+          // Concurrency (C=) is appended only when the advanced
+          // "# Concurrent Sessions" toggle is on.
+          getLabelText: (d) => pointLabelText(d, useAdvancedLabels, showConcurrencyLabels),
           foreground: 'var(--foreground)',
           dataAttrs: {
             'hw-key': (d) => String(d.hwKey),
@@ -2169,7 +2176,9 @@ const ScatterGraph = React.memo(
               // Labels
               const showLabels = showPointLabels && !showGradientLabels;
               overlayPoints.each(function (d) {
-                const lines = pointLabelText(d, useAdvancedLabels).split('\n');
+                const lines = pointLabelText(d, useAdvancedLabels, showConcurrencyLabels).split(
+                  '\n',
+                );
                 const text = d3
                   .select(this)
                   .selectAll<SVGTextElement, boolean>('.overlay-label')
@@ -2573,6 +2582,7 @@ const ScatterGraph = React.memo(
       pointsData,
       showPointLabels,
       useAdvancedLabels,
+      showConcurrencyLabels,
       buildPointId,
       overlayData,
       processedOverlayData,
@@ -3183,6 +3193,19 @@ const ScatterGraph = React.memo(
                   onCheckedChange: (checked: boolean) => {
                     setShowLineLabels(checked);
                     track('latency_line_labels_toggled', { enabled: checked });
+                  },
+                },
+                {
+                  id: 'scatter-concurrency-labels',
+                  label: legendT.concurrencyLabels,
+                  advanced: true,
+                  checked: showConcurrencyLabels,
+                  onCheckedChange: (checked: boolean) => {
+                    setShowConcurrencyLabels(checked);
+                    track('latency_concurrency_labels_toggled', { enabled: checked });
+                    // Concurrency is a point-label annotation; turning it on is
+                    // pointless if labels are hidden, so auto-enable Labels.
+                    if (checked && !showPointLabels) setShowPointLabels(true);
                   },
                 },
                 {
