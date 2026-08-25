@@ -9,12 +9,16 @@ import {
 import { CAROUSEL_LABELS, CAROUSEL_ORGS } from '@/components/quotes/quotes-data';
 import { Card } from '@/components/ui/card';
 
+import { FaqQuestionLink } from './faq-question-link';
+
 export interface FaqLink {
   readonly text: string;
   readonly href: string;
 }
 
 export interface FaqItem {
+  /** Stable, locale-independent fragment identifier for direct links. */
+  readonly id: string;
   readonly question: string;
   /** Intro text shown before any list. */
   readonly answer: string;
@@ -71,8 +75,10 @@ export function FaqList({ title, items }: { title: string; items: readonly FaqIt
         <h2 className="text-lg font-semibold mb-4">{title}</h2>
         <dl className="divide-y divide-border">
           {items.map((item) => (
-            <div key={item.question} className="py-4 first:pt-0 last:pb-0">
-              <dt className="font-medium mb-1">{item.question}</dt>
+            <div id={item.id} key={item.id} className="scroll-mt-24 py-4 first:pt-0 last:pb-0">
+              <dt className="font-medium mb-2">
+                <FaqQuestionLink id={item.id} question={item.question} />
+              </dt>
               <dd className="text-muted-foreground text-sm">
                 {item.answer && (
                   <p>
