@@ -460,6 +460,9 @@ export function InferenceProvider({
   const [showPointLabels, setShowPointLabels] = useState(initialLabelState.showPointLabels);
   const [logScale, setLogScale] = useState(() => getUrlParam('i_log') === '1');
   const [useAdvancedLabels, setUseAdvancedLabels] = useState(initialLabelState.useAdvancedLabels);
+  const [showConcurrencyLabels, setShowConcurrencyLabels] = useState(
+    () => getUrlParam('i_conclabel') === '1',
+  );
   const [showGradientLabels, setShowGradientLabels] = useState(
     () => getUrlParam('i_gradlabel') === '1',
   );
@@ -1377,6 +1380,7 @@ export function InferenceProvider({
       i_scale: scaleType,
       i_legend: isLegendExpanded ? '' : '0',
       i_advlabel: serializedLabelState.i_advlabel,
+      i_conclabel: showConcurrencyLabels ? '1' : '',
       i_gradlabel: showGradientLabels ? '1' : '',
       i_linelabel: serializedLabelState.i_linelabel,
       i_speed: showSpeedOverlay ? '1' : '',
@@ -1403,6 +1407,7 @@ export function InferenceProvider({
       logScale,
       isLegendExpanded,
       useAdvancedLabels,
+      showConcurrencyLabels,
       showGradientLabels,
       showLineLabels,
       showSpeedOverlay,
@@ -1620,6 +1625,7 @@ export function InferenceProvider({
       highContrast,
       logScale,
       useAdvancedLabels,
+      showConcurrencyLabels,
       showGradientLabels,
       showLineLabels,
       showSpeedOverlay,
@@ -1638,6 +1644,7 @@ export function InferenceProvider({
       highContrast,
       logScale,
       useAdvancedLabels,
+      showConcurrencyLabels,
       showGradientLabels,
       showLineLabels,
       showSpeedOverlay,
@@ -1673,6 +1680,7 @@ export function InferenceProvider({
     setHighContrast,
     setLogScale,
     setUseAdvancedLabels,
+    setShowConcurrencyLabels,
     setShowGradientLabels,
     setShowLineLabels,
     setShowSpeedOverlay,

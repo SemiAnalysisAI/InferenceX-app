@@ -132,6 +132,8 @@ export function baseInferenceState() {
     setIsLegendExpanded: noop,
     useAdvancedLabels: false,
     setUseAdvancedLabels: noop,
+    showConcurrencyLabels: false,
+    setShowConcurrencyLabels: noop,
     showGradientLabels: false,
     setShowGradientLabels: noop,
     showLineLabels: false,

@@ -30,9 +30,18 @@ describe('pointLabelText', () => {
     const mtp = { ...standard, spec_decoding: 'mtp' };
     const eagle = { ...standard, spec_decoding: 'eagle' };
 
-    expect(pointLabelText(standard, false)).toBe('8\nC=16');
-    expect(pointLabelText(mtp, false)).toBe('8\nC=16');
-    expect(pointLabelText(eagle, false)).toBe('8\nC=16');
+    expect(pointLabelText(standard, false, true)).toBe('8\nC=16');
+    expect(pointLabelText(mtp, false, true)).toBe('8\nC=16');
+    expect(pointLabelText(eagle, false, true)).toBe('8\nC=16');
+  });
+
+  it('omits concurrency unless the advanced toggle enables it', () => {
+    const standard = point('h100', 'fp8', 1, 1, 8);
+    standard.benchmark_type = 'agentic_traces';
+    standard.spec_decoding = 'none';
+
+    expect(pointLabelText(standard, false, false)).toBe('8');
+    expect(pointLabelText(standard, false, true)).toBe('8\nC=16');
   });
 
   it('keeps fixed-sequence labels unchanged', () => {
@@ -40,7 +49,7 @@ describe('pointLabelText', () => {
     fixed.benchmark_type = 'single_turn';
     fixed.spec_decoding = 'mtp';
 
-    expect(pointLabelText(fixed, false)).toBe('8\nC=16');
+    expect(pointLabelText(fixed, false, true)).toBe('8\nC=16');
   });
 });
 

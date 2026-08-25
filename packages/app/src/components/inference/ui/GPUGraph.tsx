@@ -56,10 +56,8 @@ import {
   comparisonEntrySortValue,
   resolveComparisonEntries,
 } from '@/components/inference/utils/comparisonEntry';
-import {
-  generateGPUGraphTooltipContent,
-  getPointLabel,
-} from '@/components/inference/utils/tooltipUtils';
+import { generateGPUGraphTooltipContent } from '@/components/inference/utils/tooltipUtils';
+import { pointLabelText } from '@/components/inference/ui/point-label';
 import { scatterPointConfigId } from '@/components/inference/utils/point-identity';
 import {
   type KnownIssueAnnotation,
@@ -105,6 +103,7 @@ const GPU_STRINGS = {
     optimalOnly: 'Optimal Only',
     labels: 'Labels',
     parallelismLabels: 'Parallelism Labels',
+    concurrencyLabels: '# Concurrent Sessions',
     lineLabels: 'Line Labels',
     resetFilter: 'Reset filter',
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
@@ -115,6 +114,7 @@ const GPU_STRINGS = {
     optimalOnly: '仅最优',
     labels: '标签',
     parallelismLabels: '并行配置标签',
+    concurrencyLabels: '并发会话数',
     lineLabels: '曲线标签',
     resetFilter: '重置筛选',
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
@@ -149,6 +149,7 @@ const GPUGraph = React.memo(
       logScale,
       isLegendExpanded,
       useAdvancedLabels,
+      showConcurrencyLabels,
       highContrast,
       showLineLabels,
     } = useInferenceDisplay();
@@ -161,6 +162,7 @@ const GPUGraph = React.memo(
       setLogScale,
       setIsLegendExpanded,
       setUseAdvancedLabels,
+      setShowConcurrencyLabels,
       setHighContrast,
       selectAllActiveDates,
       setShowLineLabels,
@@ -468,6 +470,7 @@ const GPUGraph = React.memo(
       () =>
         [
           useAdvancedLabels ? 'advanced-labels' : 'basic-labels',
+          showConcurrencyLabels ? 'conc-labels' : 'no-conc-labels',
           selectedYAxisMetric,
           `linear:${xExtent.join(',')}`,
           `${logScale ? 'log' : 'linear'}:${yDomain.join(',')}`,
@@ -477,7 +480,15 @@ const GPUGraph = React.memo(
         ]
           .toSorted()
           .join('|'),
-      [selectedYAxisMetric, useAdvancedLabels, xExtent, logScale, yDomain, filteredData],
+      [
+        selectedYAxisMetric,
+        useAdvancedLabels,
+        showConcurrencyLabels,
+        xExtent,
+        logScale,
+        yDomain,
+        filteredData,
+      ],
     );
 
     // Color resolver for points/rooflines
@@ -725,11 +736,11 @@ const GPUGraph = React.memo(
             config: {
               getColor,
               hideLabels: !showPointLabels,
-              // Match ScatterGraph: append the concurrency (C=) to the
-              // parallelism/tp label so compare-mode points are annotated the
-              // same way as the single-run scatter chart.
-              getLabelText: (d) =>
-                useAdvancedLabels ? `${getPointLabel(d)}\nC=${d.conc}` : `${d.tp}\nC=${d.conc}`,
+              // Match ScatterGraph: concurrency (C=) is appended only when the
+              // advanced "# Concurrent Sessions" toggle is on, so compare-mode
+              // points are annotated the same way as the single-run scatter
+              // chart.
+              getLabelText: (d) => pointLabelText(d, useAdvancedLabels, showConcurrencyLabels),
               foreground: 'var(--foreground)',
               dataAttrs: {
                 series: (d) => `${d.date}_${d.hwKey}`,
@@ -955,6 +966,19 @@ const GPUGraph = React.memo(
                 onCheckedChange: (c) => {
                   setShowLineLabels(c);
                   track('interactivity_line_labels_toggled', { enabled: c });
+                },
+              },
+              {
+                id: 'gpu-concurrency-labels',
+                label: legendT.concurrencyLabels,
+                advanced: true,
+                checked: showConcurrencyLabels,
+                onCheckedChange: (c) => {
+                  setShowConcurrencyLabels(c);
+                  track('interactivity_concurrency_labels_toggled', { enabled: c });
+                  // Concurrency is a point-label annotation; turning it on is
+                  // pointless if labels are hidden, so auto-enable Labels.
+                  if (c && !showPointLabels) setShowPointLabels(true);
                 },
               },
             ]}
