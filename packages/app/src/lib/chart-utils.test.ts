@@ -694,7 +694,7 @@ describe('createChartDataPoint', () => {
     expect(point.inputTputPerGpu).toEqual({ y: 300, roof: false });
   });
 
-  it('computes theoretical uncached throughput fields when the rate is valid', () => {
+  it('computes prompt-suffix throughput fields when the rate is valid', () => {
     const e = entry({
       tput_per_gpu: 900,
       output_tput_per_gpu: 600,
@@ -702,30 +702,30 @@ describe('createChartDataPoint', () => {
       theoretical_cache_hit_rate: 0.8,
     });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    // uncached input = 300 x (1 - 0.8); uncached total = 900 - 300 x 0.8
-    expect(point.uncachedInputTputPerGpu?.y).toBeCloseTo(60);
-    expect(point.uncachedTputPerGpu?.y).toBeCloseTo(660);
+    // prompt suffix = 300 x (1 - 0.8); suffix + output = 900 - 300 x 0.8
+    expect(point.promptSuffixTputPerGpu?.y).toBeCloseTo(60);
+    expect(point.promptSuffixOutputTputPerGpu?.y).toBeCloseTo(660);
   });
 
-  it('omits theoretical uncached throughput fields when the rate is missing', () => {
+  it('omits prompt-suffix throughput fields when the rate is missing', () => {
     const e = entry({ tput_per_gpu: 900, input_tput_per_gpu: 300 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.uncachedInputTputPerGpu).toBeUndefined();
-    expect(point.uncachedTputPerGpu).toBeUndefined();
+    expect(point.promptSuffixTputPerGpu).toBeUndefined();
+    expect(point.promptSuffixOutputTputPerGpu).toBeUndefined();
   });
 
-  it('omits theoretical uncached throughput fields when the rate is out of range', () => {
+  it('omits prompt-suffix throughput fields when the rate is out of range', () => {
     const e = entry({
       tput_per_gpu: 900,
       input_tput_per_gpu: 300,
       theoretical_cache_hit_rate: 1.2,
     });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.uncachedInputTputPerGpu).toBeUndefined();
-    expect(point.uncachedTputPerGpu).toBeUndefined();
+    expect(point.promptSuffixTputPerGpu).toBeUndefined();
+    expect(point.promptSuffixOutputTputPerGpu).toBeUndefined();
   });
 
-  it('reports zero uncached input and output-only total at a full theoretical hit rate', () => {
+  it('reports zero prompt suffix and output-only suffix+output at a full theoretical hit rate', () => {
     const e = entry({
       tput_per_gpu: 900,
       output_tput_per_gpu: 600,
@@ -733,8 +733,8 @@ describe('createChartDataPoint', () => {
       theoretical_cache_hit_rate: 1,
     });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.uncachedInputTputPerGpu?.y).toBe(0);
-    expect(point.uncachedTputPerGpu?.y).toBeCloseTo(600);
+    expect(point.promptSuffixTputPerGpu?.y).toBe(0);
+    expect(point.promptSuffixOutputTputPerGpu?.y).toBeCloseTo(600);
   });
 
   it('computes tpPerMw from throughput and hardware power', () => {

@@ -327,24 +327,24 @@ export function buildDerivedChartFields(
   if (wants('inputTputPerGpu') && inputTputPerGpu) {
     fields.inputTputPerGpu = chartMetric(inputTputPerGpu);
   }
-  // Theoretical uncached throughput: subtract the infinite-cache theoretical
-  // prefix share of input throughput (rate derived from the trace by the
-  // harness). Uses the theoretical rate rather than server-observed cache
-  // hits so systems with good cache storage aren't penalized — only agentic
-  // trace points carry the rate, so fixed-sequence points omit these fields.
+  // Prompt-suffix throughput: subtract the infinite-cache theoretical prefix
+  // share of input throughput (rate derived from the trace by the harness).
+  // Uses the theoretical rate rather than server-observed cache hits so
+  // systems with good cache storage aren't penalized — only agentic trace
+  // points carry the rate, so fixed-sequence points omit these fields.
   const theoreticalHitRate = entry.theoretical_cache_hit_rate;
   const hasTheoreticalHitRate =
     typeof theoreticalHitRate === 'number' &&
     Number.isFinite(theoreticalHitRate) &&
     theoreticalHitRate >= 0 &&
     theoreticalHitRate <= 1;
-  if (wants('uncachedTputPerGpu') && hasTheoreticalHitRate && tputPerGpu) {
-    fields.uncachedTputPerGpu = chartMetric(
+  if (wants('promptSuffixOutputTputPerGpu') && hasTheoreticalHitRate && tputPerGpu) {
+    fields.promptSuffixOutputTputPerGpu = chartMetric(
       Math.max(0, tputPerGpu - inputTputPerGpu * theoreticalHitRate),
     );
   }
-  if (wants('uncachedInputTputPerGpu') && hasTheoreticalHitRate && inputTputPerGpu) {
-    fields.uncachedInputTputPerGpu = chartMetric(inputTputPerGpu * (1 - theoreticalHitRate));
+  if (wants('promptSuffixTputPerGpu') && hasTheoreticalHitRate && inputTputPerGpu) {
+    fields.promptSuffixTputPerGpu = chartMetric(inputTputPerGpu * (1 - theoreticalHitRate));
   }
   if (wants('tpPerMw')) fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);
   if (wants('inputTputPerMw') && inputTputPerGpu) {
