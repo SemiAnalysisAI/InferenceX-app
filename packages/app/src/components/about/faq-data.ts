@@ -53,6 +53,11 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
     ],
   },
   {
+    question: 'What is the difference between E2E Normalized Interactivity and Interactivity?',
+    answer:
+      'Interactivity measures how quickly tokens stream after generation begins: approximately 1 / inter-token latency (ITL). E2E Normalized Interactivity measures the effective token rate over the whole request, including time to first token (TTFT): output tokens / end-to-end latency, or approximately 1 / (ITL + TTFT / output tokens). Both use tok/s/user. The normalized value penalizes slow TTFT, especially for short responses. Here, "normalized" means normalized by output length; it is not a 0–1 score or a comparison with another system.',
+  },
+  {
     question: 'How often are benchmarks run?',
     answer:
       'Benchmarks originally ran on a nightly schedule, but the number of hardware/framework/model combinations grew too large for that to be practical. Now they re-run when a configuration changes, e.g. a new software release, driver update, or model addition. Historical data is available in the dashboard.',
