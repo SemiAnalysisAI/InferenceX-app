@@ -160,7 +160,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '不同产品需要不同运行点。语音和交互式编程要求较高 token 速率，离线摘要则可以牺牲交互性换取更高总吞吐量；在交互性不一致时比较硬件很容易得出误导性结论。',
     benchmarkContext:
-      'InferenceX 将 tok/s/user 与吞吐量或成本一起绘制，并在等交互性表格中沿各自 Pareto 前沿插值，以固定用户体验。',
+      'InferenceX 将 tok/s/user 与吞吐量或成本一起绘制，并在等交互性表格中沿各自 Pareto 前沿插值，以固定用户体验。由于该坐标轴不计入首 token 之前的等待，agentic 图表还提供端到端归一化交互性，用同一单位把 TTFT 一并纳入。',
     measurement: { label: '常用单位', value: 'token/秒/用户（tok/s/user）' },
   },
   latency: {
@@ -238,7 +238,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '前沿能避免噪声点或调优较差的点扭曲比较，并展示真正的权衡。沿曲线仍不存在普适赢家，最佳点取决于用户最低交互性或最高成本目标。',
     benchmarkContext:
-      'InferenceX 连接并发与配置扫描中的 Pareto 最优点，等交互性比较也沿这些前沿插值，避免用随意选择的原始点直接比较。',
+      'InferenceX 连接并发与配置扫描中的 Pareto 最优点，等交互性比较也沿这些前沿插值，避免用随意选择的原始点直接比较。每个 SKU 最佳配置视图现在会把允许启用的优化合并成一条曲线，按模型、芯片 SKU 和引擎各一条，因此同一条线上相邻的点可能在投机解码、分离式部署或 KV cache offload 上并不相同；每个点仍会展示产生它的具体配置。',
   },
   'iso-interactivity': {
     term: '等交互性',
@@ -250,7 +250,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '固定用户体验可以避免常见基准错误：某系统只有在让每个请求更慢时才达到更高吞吐量，却被错误地称为更快。',
     benchmarkContext:
-      'InferenceX 文章使用等交互性表格比较硬件、精度和软件；超出实测前沿的值会标记为不可达，而不会向观测区间之外外推。',
+      'InferenceX 文章使用等交互性表格比较硬件、精度和软件；超出实测前沿的值会标记为不可达，而不会向观测区间之外外推。前沿始终建立在吞吐量与交互性之上，每百万 token 成本和每 token 焦耳则由插值得到的吞吐量推导，而不是各自单独做样条：它们都是每芯片常数除以吞吐量，单独插值会破坏两个 knot 之间的这一恒等关系。',
   },
   'input-output-sequence-length': {
     term: '输入与输出序列长度',
@@ -264,7 +264,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '不同序列长度的结果不能直接互换。短聊天提示词上的最佳配置，在长上下文摘要或推理中可能排名不同，因为计算、容量与带宽压力都会变化。',
     benchmarkContext:
-      'InferenceX 在图表标签与方案描述中列出 ISL/OSL。只有先匹配工作负载形状，才能把差异归因于硬件或软件。',
+      'InferenceX 在图表标签与方案描述中列出 ISL/OSL。只有先匹配工作负载形状，才能把差异归因于硬件或软件。agentic 运行没有单一的 ISL/OSL 组合可供引用：长度近似服从对数正态分布，因此点详情视图会绘制拟合分布并给出分位数，p90 或 p99 输入长度可能是中位数的数倍。',
   },
   'cost-per-million-tokens': {
     term: '每百万 token 成本',
@@ -292,7 +292,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '芯片峰值 FLOPS 不能单独决定服务经济性；内存、网络、软件成熟度、数值精度和实际利用率都会影响最终比值。',
     benchmarkContext:
-      'InferenceX 在匹配交互性时比较 perf/$，并明确使用的 TCO 输入。该比值不能跨模型、序列长度、精度或延迟区间直接套用。',
+      'InferenceX 在匹配交互性时比较 perf/$，并明确使用的 TCO 输入。该比值不能跨模型、序列长度、精度或延迟区间直接套用。图表用每美元 token 数表达同一套经济性，它数值越大越好，也是默认的 Y 轴。',
   },
   'total-cost-of-ownership': {
     term: '总体拥有成本',
@@ -316,7 +316,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '电力供应往往是新增 AI 部署的硬约束。每兆瓦生成更多 token 的系统，即使单个加速器功耗更高，也能在相同电力配额下服务更多需求。',
     benchmarkContext:
-      '比较 tokens/MW 时必须匹配模型、工作负载、精度与交互性，否则高吞吐低交互点可能看似高效，却无法满足目标用户体验。',
+      '比较 tokens/MW 时必须匹配模型、工作负载、精度与交互性，否则高吞吐低交互点可能看似高效，却无法满足目标用户体验。每 token 能耗表达的是同一份供电预算折算到单位输出上的结果；在遥测可信的前提下，InferenceX 还会给出加速器的实测能耗。',
     measurement: { label: '常用单位', value: '每单位配置市电兆瓦的 token/秒' },
   },
   prefill: {
@@ -354,7 +354,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'KV 缓存压力限制并发与长上下文服务。缓存量化、分页分配、潜在注意力、前缀复用和分离式传输系统都在降低其容量或移动成本。',
     benchmarkContext:
-      '除非方案另有说明，InferenceX 在随机数据比较中禁用前缀缓存，避免无关请求因偶然命中而获得不真实优势。',
+      '除非方案另有说明，InferenceX 在定长场景的随机数据比较中禁用前缀缓存，避免无关请求因偶然命中而获得不真实优势。AgentX 是有意为之的例外：它回放的会话本身就会复用前缀，因此缓存容量、淘汰策略和 offload 都属于该场景要测量的内容。',
   },
   'prefix-caching': {
     term: '前缀缓存',
@@ -367,7 +367,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '具有重复前缀的生产工作负载可能明显快于随机 token 基准；收益取决于命中率、缓存容量、淘汰策略与请求能否路由到持有所需状态的节点。',
     benchmarkContext:
-      'InferenceX 通常在随机数据集上禁用前缀缓存，避免把缓存策略混入完整提示词处理的测量。除非明确说明，应把结果视为无命中基线。',
+      'InferenceX 在定长场景的随机数据集上禁用前缀缓存，避免把缓存策略混入完整提示词处理的测量，因此那些数字应视为无命中基线。AgentX 则相反：命中率本身就是上报指标，会与该点所在的 offload 层级一并展示，因为复用正是这类工作负载的本质特征。',
   },
   'disaggregated-inference': {
     term: '分离式推理',
@@ -393,7 +393,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '加速取决于草稿 token 的接受数量，以及草稿与验证成本。稠密模型和 MoE 的表现可能不同，因为验证多个位置可能激活更多专家权重。',
     benchmarkContext:
-      '应在真实接受率下比较推测方案并验证模型质量。InferenceX 分开展示开启和关闭 MTP 的曲线，因为收益会随并发与交互性变化。',
+      '应在真实接受率下比较投机解码方案并验证模型质量。定长场景仍把投机解码作为曲线标识的一部分，因此开启和关闭 MTP 的方案会分开绘制；agentic 曲线则把它当作数据点级元数据并合并这些点，在 tooltip 中标明具体方式，因为 AgentX 按模型、芯片 SKU 和引擎给出可获得的最佳曲线。由于 AgentX 回放的内容是合成的，speculator 接受的 draft token 数会失真，因此运行时会套用一套按模型、speculator、draft 长度和思考模式在外部 agentic 编码数据集上采集的接受长度。',
   },
   'multi-token-prediction': {
     term: '多 token 预测',
@@ -722,6 +722,118 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '机架级性能由单芯片运行时、路由、缓存传输、拓扑感知与池大小共同决定。这些因素决定 Wide EP 和分离式推理能否提升端到端性能。',
     benchmarkContext:
       'Dynamo vLLM、Dynamo TRT-LLM 标签同时标识编排层与执行引擎。InferenceX 文章还会明确预填充/解码拓扑，因为两种 Dynamo 配置可能表现完全不同。',
+  },
+  'e2e-normalized-interactivity': {
+    term: '端到端归一化交互性',
+    aliases: ['E2E Normalized Interactivity', '归一化交互性', 'OSL/E2EL'],
+    plainEnglish:
+      '这个指标衡量一整条回答到达得有多快，既算首 token 之前的等待，也算之后的流式速度。',
+    definition:
+      '端到端归一化交互性是整条请求上的有效每用户 token 速率，即输出 token 数除以端到端延迟。',
+    explanation:
+      '把端到端延迟展开为 TTFT 加上输出长度乘以每输出 token 时间，该指标约等于 1 除以（token 间延迟加上 TTFT 除以输出 token 数），也就是常规交互性再加一项与首 token 等待成正比的惩罚。这里的“归一化”指按输出长度归一，既不是 0 到 1 的评分，也不是与其他系统对比后的相对值。',
+    significance:
+      '只看交互性，会奖励那些让用户先等很久、之后再快速输出的方案；只看 TTFT，则会奖励开头很快、随后拖沓的方案。把两者合成一个数字，可以暴露只在单一维度上好看的运行点。输出越短，TTFT 惩罚越明显，因为可供摊薄等待时间的 token 更少。',
+    benchmarkContext:
+      'InferenceX 把它作为 agentic 运行的实验性 X 轴模式，因此需要持久化的逐请求 trace，非官方运行 overlay 无法使用该视图。它是有意保留缺陷的：对高 TTFT 惩罚很重，也无法体现 prefill 与 decode 分离等优化的全部细节，所以 AgentX 提交仍会分别针对交互性和 TTFT 做优化。',
+    measurement: { label: '常用单位', value: 'token/秒/用户（tok/s/user）' },
+  },
+  'tokens-per-dollar': {
+    term: '每美元 token 数',
+    aliases: ['tokens per dollar', 'tok/$', '每 1 美元 token 数'],
+    plainEnglish: '每美元 token 数表示一美元基础设施支出能买到多少 token，数值越大说明系统越便宜。',
+    definition:
+      '每美元 token 数是某个配置在一单位建模成本下产出的 token 数量，即每 token 成本的倒数。',
+    explanation:
+      '它由每芯片吞吐量和建模的每芯片小时成本直接得出，因此与每百万 token 成本共用同一套假设，只是换成了人们规划容量时更习惯的方向。InferenceX 为总 token、输入 token 和输出 token 分别给出该指标，覆盖每种成本口径，并同时提供人民币与美元两种计价。',
+    significance:
+      '每百万 token 成本与每美元 token 数对系统的排序完全一致，但后者随硬件变好而升高，与吞吐量方向相同，因此同一张图里的坐标轴不会中途反向。该数值完全依赖背后的成本模型，脱离所声明的口径就不成立。',
+    benchmarkContext:
+      'InferenceX 推理图表默认的 Y 轴就是每 1 美元可购买的总 token 数。阅读时请对照图表上方的 TCO 行，并只在同一成本口径内比较：自有（超大规模费率）、自有（neocloud 费率）和 3 年租赁对同一颗芯片会给出不同结果。',
+    measurement: { label: '常用单位', value: '每 1 美元 token 数（tok/$）' },
+  },
+  'energy-per-token': {
+    term: '每 token 能耗',
+    aliases: ['energy per token', 'J/token', '每请求能耗'],
+    plainEnglish:
+      '每 token 能耗表示系统产出一个 token 要花多少电，是每 token 成本在电力侧的对应指标。',
+    definition:
+      '每 token 能耗是产出单位 token 所消耗的电能，可以按全量供电口径统计，也可以取加速器实测遥测值。',
+    explanation:
+      '两种口径回答的是不同问题，不能混用。全量供电口径把包含供电与制冷开销在内的设施功耗预算除以实测 token 速率；实测口径来自运行期间的加速器遥测，只覆盖芯片本身。InferenceX 还会给出每次成功请求的实测能耗，以及平均功耗占 TDP 的百分比。',
+    significance:
+      '新建部署的约束往往是电力而不是资本开支，每焦耳产出更多 token 的系统能在同样的用电额度下服务更多需求。TDP 占比则单独反映一套方案究竟把加速器压到了什么程度，这是仅看按 token 归一的数值看不出来的。',
+    benchmarkContext:
+      '比较前请先看清标签：全量供电口径与实测口径之间相差整个设施开销。当底层遥测无效或统计范围不明确时，InferenceX 会屏蔽实测能耗，因此数值缺失意味着该测量不可信，而不是这次运行不耗电。',
+    measurement: { label: '常用单位', value: '焦耳/token（J/tok）' },
+  },
+  'context-parallelism': {
+    term: '上下文并行',
+    aliases: ['context parallelism', 'PCP', 'DCP', '序列并行'],
+    plainEnglish:
+      '上下文并行把一条长提示词拆到多颗芯片上，让它们分担读取提示词和扫描注意力状态的工作。',
+    definition:
+      '上下文并行把 query token 切分到多个加速器上，用于 prefill 的形式称为 PCP，用于 decode 的形式称为 DCP。',
+    explanation:
+      'PCP 让每个 rank 处理一段 query，keys 和 values 以环形方式传递，从而并行化计算受限的 prefill，也避免某个 rank 独自承担整条长提示词。DCP 则切分 KV cache 本身，每个 rank 扫描各自分片，再以 flash-decode 方式合并部分注意力结果；由于 decode 受显存带宽限制，并行读取 KV 可以提高可达 token 速率。',
+    significance:
+      '张量并行会在每个 rank 上复制完整 KV cache，数据并行注意力则把会话绑定在持有其分片的 rank 上，两者在上下文达到几十万 token 时都难以扩展。上下文并行直接针对这一点，而且收益随输入长度增长，而不是随 batch 大小增长。',
+    benchmarkContext:
+      'InferenceX 在数据点 tooltip 和并行标签中与 TP、EP、DP 一起展示 DCP 与 PCP 的并行度。各厂商支持程度并不均衡：在 AgentX 1.0 结果发布时，vLLM 支持矩阵中 AMD 的注意力后端仍标为不支持，因此该技术仍构成 CUDA 实际优势的一部分。',
+  },
+  'kv-cache-offload': {
+    term: 'KV cache offload',
+    aliases: ['KV cache offload', 'CPU offload', 'KV 卸载'],
+    plainEnglish:
+      '把芯片放不下的注意力状态暂存到主机内存，长会话下一轮就能直接恢复，而不必整段重算。',
+    definition:
+      'KV cache offload 把 KV block 从加速器显存移到更慢的存储层（通常是主机 DRAM），并在后续请求复用该前缀时再读回来。',
+    explanation:
+      'offload 通常实现为写穿缓存：写入 HBM 缓存的前缀会同时写入较慢的一层，因此当 offload 池容量大致是 HBM 的 1.5 到 3 倍时效果最好。在 agentic 的上下文长度下，重新载入长前缀远比重算划算；但对短提示词结论相反，传输开销会超过它省下的 prefill。',
+    significance:
+      '长 agentic 会话超出 HBM 中 KV 容量的时间，远早于超出合理的 DRAM 预算，因此 offload 决定了有多少并发对话仍可恢复。它也会转移瓶颈：前缀能够留存之后，store 与 load 路径、传输批量化和索引记账才是值得优化的开销。',
+    benchmarkContext:
+      'InferenceX 会给每个使用了 offload 的数据点加上虚线光环，无论它是否位于 Pareto 前沿；点详情视图还会给出 offload 类型、引擎，以及芯片与 CPU 两侧的缓存命中率。offload 属于允许但可选的优化，因此同一条曲线上可以同时存在启用和未启用的数据点。',
+  },
+  'kv-cache-manager': {
+    term: 'KV cache 管理器',
+    aliases: ['KV cache manager', 'Mooncake', 'LMCache', 'HiCache'],
+    plainEnglish:
+      'KV cache 管理器负责把注意力状态存放在芯片之外，并决定哪些保留、哪些淘汰、什么时候取回。',
+    definition:
+      'KV cache 管理器是位于推理引擎之下的可插拔层，负责跨存储层级保存可复用的 KV block，并管理其放置、淘汰与传输。',
+    explanation:
+      '引擎对外提供 connector 接口，因此 Mooncake Store、LMCache、SGLang HiCache 等管理器可以服务不同运行时。管理器按前缀哈希为 block 建立索引，把它们放在主机 DRAM、本地 NVMe 或远端后端；实际的字节搬运由 Mooncake Transfer Engine、NIXL 等传输引擎完成。同一个引擎内部可以并存多条路径。',
+    significance:
+      '一旦工作负载大量复用前缀，这一层的正确性和记账就和内核速度同等重要。混合注意力模型更难处理：一个模型同时携带形状和生命周期都不同的多个 cache group，而假设单一 block 几何结构的 connector 无法描述它们。',
+    benchmarkContext:
+      'InferenceX 把 KV offload 引擎记录为运行元数据，并在 AgentX 点详情视图中展示。框架标签给出的是组合而不是单个引擎，因此一套方案会显示为 Mooncake ATOMesh 或 MoRI SGLang，而不只是引擎名。',
+  },
+  'kv-aware-routing': {
+    term: 'KV 感知路由',
+    aliases: ['KV-aware routing', '缓存感知路由', '会话亲和性'],
+    plainEnglish: 'KV 感知路由把请求发给已经持有该会话状态的 worker，而不是发给当前最空闲的那个。',
+    definition: 'KV 感知路由依据已缓存前缀状态所在的位置来选择 worker，而不是只看队列深度或负载。',
+    explanation:
+      '不带可复用历史的请求发给谁都行，此时只需考虑负载均衡；但带着数 MB 已缓存前缀的请求不同，把它发给没有该前缀的空闲 worker，就要为整条提示词再付一次代价。因此 router 会跟踪 cache 事件、按会话哈希到固定 worker，并让数据并行 rank 对其持有状态的会话保持粘性。',
+    significance:
+      '在数据并行注意力下，每个 rank 只拥有缓存池的一部分，长会话一旦落到错误的 rank 上就要全部重算，实测命中率会远低于理论上限。仅有亲和性也不够：不加约束的粘性会把负载集中到单个热点 worker，因此缓存均衡也必须进入路由打分。',
+    benchmarkContext:
+      '路由位于引擎之外，因此 InferenceX 把它视为方案的一部分：Dynamo vLLM、llm-d vLLM、Mooncake ATOMesh 这类标签同时标明编排层和运行时。它的开销正比于在线前缀的数量和长度，而不是生成的 token 数，所以在内核变快之后，它可能成为 agentic 流量下的瓶颈。',
+  },
+  tilert: {
+    term: 'TileRT',
+    aliases: ['TileRT engine', 'TileRT 引擎'],
+    plainEnglish:
+      'TileRT 是面向极低延迟单用户生成的推理运行时，它把模型编译成一个常驻程序，而不是许多次内核启动。',
+    definition:
+      'TileRT 是一款推理引擎，通过取消以单个 kernel 作为执行单元的范式，来实现超低延迟服务。',
+    explanation:
+      '常规运行时每个 decode 步骤都要依次派发一串 kernel，而在极小 batch 下，kernel 之间的启动与调度开销会盖过实际算术运算。常驻的 engine kernel 把工作保留在加速器上，这正是交互性坐标轴最右端得以企及的原因。',
+    significance:
+      '前沿曲线的高交互性一端与高吞吐一端是不同的工程问题，为其中一端调优的引擎很少能同时拿下另一端。对延迟敏感的产品来说，能达到每用户每秒数百 token 的方案很有价值，即便它的单芯片总吞吐量并不突出。',
+    benchmarkContext:
+      'InferenceX 将 TileRT 作为独立的框架标签，并在每个 SKU 最佳配置视图中特意保留它；否则只按吞吐量取胜的曲线会丢掉 TileRT 真正服务的那些运行点。比较时请在匹配交互性下进行，而不要只看峰值吞吐量。',
   },
 };
 

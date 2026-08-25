@@ -241,9 +241,15 @@ const entries = [
     significance:
       'Different products need different operating points. Voice and interactive coding demand high token rates, while offline summarization can trade interactivity for much more aggregate throughput. Comparing hardware at unmatched interactivity can therefore produce a misleading winner.',
     benchmarkContext:
-      'InferenceX plots tokens per second per user against throughput or cost. Iso-interactivity tables interpolate each system’s Pareto frontier at the same token rate so the comparison holds user experience constant.',
+      'InferenceX plots tokens per second per user against throughput or cost. Iso-interactivity tables interpolate each system’s Pareto frontier at the same token rate so the comparison holds user experience constant. Because this axis ignores the wait before the first token, agentic charts also offer E2E Normalized Interactivity, which folds TTFT into the same unit.',
     measurement: { label: 'Typical unit', value: 'tokens/second/user (tok/s/user)' },
-    relatedTerms: ['time-per-output-token', 'throughput', 'iso-interactivity', 'latency'],
+    relatedTerms: [
+      'time-per-output-token',
+      'throughput',
+      'iso-interactivity',
+      'e2e-normalized-interactivity',
+      'latency',
+    ],
     articleSlugs: [INFERENCEMAX, INFERENCEX_V2, MI355X_KIMI, TILERT],
   },
   {
@@ -352,8 +358,14 @@ const entries = [
     significance:
       'The frontier prevents noisy or poorly tuned points from distorting comparisons and makes the real tradeoff visible. There is still no universal winner along the curve: the best point depends on the user’s minimum interactivity or maximum cost target.',
     benchmarkContext:
-      'InferenceX connects Pareto-optimal points from a concurrency and configuration sweep. Iso-interactivity comparisons interpolate along those frontiers because direct comparisons of arbitrary raw points can mislead.',
-    relatedTerms: ['throughput', 'interactivity', 'iso-interactivity', 'concurrency'],
+      'InferenceX connects Pareto-optimal points from a concurrency and configuration sweep. Iso-interactivity comparisons interpolate along those frontiers because direct comparisons of arbitrary raw points can mislead. Best-per-SKU views now merge the permitted optimizations into one curve per model, chip SKU, and engine, so adjacent points on a single line may differ in speculative decoding, disaggregation, or KV cache offload. Each point still exposes the exact configuration that produced it.',
+    relatedTerms: [
+      'throughput',
+      'interactivity',
+      'iso-interactivity',
+      'kv-cache-offload',
+      'concurrency',
+    ],
     articleSlugs: [INFERENCEMAX, INFERENCEX_V2, MI355X_GLM5],
   },
   {
@@ -369,7 +381,7 @@ const entries = [
     significance:
       'Holding user experience constant avoids a common benchmark error: declaring a high-throughput system faster when it reaches that throughput only by serving every request more slowly.',
     benchmarkContext:
-      'InferenceX articles use iso-interactivity tables for hardware, precision, and software comparisons. Values outside a measured frontier are marked unreachable and are not extrapolated beyond observed data.',
+      'InferenceX articles use iso-interactivity tables for hardware, precision, and software comparisons. Values outside a measured frontier are marked unreachable and are not extrapolated beyond observed data. The frontier is always built on throughput against interactivity; cost per million tokens and joules per token are then derived from the interpolated throughput rather than splined on their own, because each is a per-chip constant divided by that throughput and splining it separately would break the identity between knots.',
     relatedTerms: ['interactivity', 'pareto-frontier', 'throughput', 'performance-per-dollar'],
     articleSlugs: [B200_GLM5, B200_MINIMAX, B200_KIMI, GB300_DSV4],
   },
@@ -388,8 +400,8 @@ const entries = [
     significance:
       'Results from different sequence lengths are not interchangeable. A configuration tuned for short chat prompts can rank differently on long-context summarization or reasoning because compute, memory capacity, and bandwidth pressure shift.',
     benchmarkContext:
-      'InferenceX includes ISL and OSL in chart labels and recipe descriptions. Compare systems on the same workload shape before attributing a difference to hardware or software.',
-    relatedTerms: ['prefill', 'decode', 'kv-cache', 'time-to-first-token'],
+      'InferenceX includes ISL and OSL in chart labels and recipe descriptions. Compare systems on the same workload shape before attributing a difference to hardware or software. Agentic runs have no single pair to quote: lengths follow a roughly lognormal distribution, so the point detail view plots the fitted distribution and reports percentiles, and a p90 or p99 input can be several times the median.',
+    relatedTerms: ['prefill', 'decode', 'kv-cache', 'agentx', 'time-to-first-token'],
     articleSlugs: [INFERENCEMAX, B200_GLM5, GB300_DSV4],
   },
   {
@@ -433,9 +445,10 @@ const entries = [
     significance:
       'Peak chip FLOPS account for only part of serving economics. Memory, networking, software maturity, numerical precision, and achievable utilization all affect the measured output behind the ratio.',
     benchmarkContext:
-      'InferenceX compares perf/$ at matched interactivity and names the TCO inputs used. Ratios should not be carried across different model, sequence-length, precision, or latency regimes.',
+      'InferenceX compares perf/$ at matched interactivity and names the TCO inputs used. Ratios should not be carried across different model, sequence-length, precision, or latency regimes. The charts express the same economics as tokens per dollar, which reads in the higher-is-better direction and is the default y-axis.',
     relatedTerms: [
       'cost-per-million-tokens',
+      'tokens-per-dollar',
       'total-cost-of-ownership',
       'iso-interactivity',
       'throughput',
@@ -479,10 +492,11 @@ const entries = [
     significance:
       'Power availability is often the binding constraint on new AI deployments. A system that produces more tokens per provisioned megawatt can serve more demand from the same utility allocation even if its individual accelerators draw more power.',
     benchmarkContext:
-      'Compare tokens/MW at the same model, workload shape, precision, and interactivity. Otherwise a high-throughput low-interactivity point can appear efficient while failing the target user experience.',
+      'Compare tokens/MW at the same model, workload shape, precision, and interactivity. Otherwise a high-throughput low-interactivity point can appear efficient while failing the target user experience. Energy per token expresses the same provisioned budget per unit of output, and InferenceX additionally reports measured accelerator energy where the telemetry is trustworthy.',
     measurement: { label: 'Typical unit', value: 'tokens/second per provisioned utility MW' },
     relatedTerms: [
       'throughput',
+      'energy-per-token',
       'interactivity',
       'total-cost-of-ownership',
       'performance-per-dollar',
@@ -539,11 +553,12 @@ const entries = [
     significance:
       'KV-cache pressure limits concurrency and long-context serving. Cache quantization, paged allocation, latent attention, prefix reuse, and disaggregated transfer systems all target its capacity or movement cost.',
     benchmarkContext:
-      'InferenceX disables prefix caching for random-data comparisons unless a recipe states otherwise. That keeps unrelated requests from receiving artificial cache hits and makes raw serving stacks easier to compare.',
+      'InferenceX disables prefix caching for fixed-sequence comparisons on random data unless a recipe states otherwise, which keeps unrelated requests from receiving artificial cache hits. AgentX is the deliberate exception: its replayed sessions are built to reuse prefixes, so cache capacity, eviction policy, and offload are part of what the scenario measures.',
     relatedTerms: [
       'prefill',
       'decode',
       'prefix-caching',
+      'kv-cache-offload',
       'multi-head-latent-attention',
       'high-bandwidth-memory',
     ],
@@ -563,8 +578,15 @@ const entries = [
     significance:
       'Production workloads with repeated prefixes may outperform synthetic random-token benchmarks. The benefit depends on hit rate, cache capacity, eviction policy, and whether requests route to workers that hold the needed state.',
     benchmarkContext:
-      'InferenceX generally disables prefix caching on random datasets to isolate full prompt processing from cache policy. Treat benchmark cost as a no-hit baseline unless the recipe says otherwise.',
-    relatedTerms: ['kv-cache', 'prefill', 'time-to-first-token', 'nvidia-dynamo'],
+      'InferenceX disables prefix caching on random fixed-sequence datasets to isolate full prompt processing from cache policy, so treat those numbers as a no-hit baseline. AgentX inverts this: hit rate is a reported quantity there, shown per point alongside the offload tier it was served from, because reuse is the defining property of the workload.',
+    relatedTerms: [
+      'kv-cache',
+      'kv-cache-offload',
+      'kv-aware-routing',
+      'prefill',
+      'time-to-first-token',
+      'nvidia-dynamo',
+    ],
     articleSlugs: [AGENTIC_WORKLOADS, INFERENCEX_V2, GB200_KIMI, KIMI_K3, AGENTX_V3],
   },
   {
@@ -600,8 +622,8 @@ const entries = [
     significance:
       'The speedup depends on how many draft tokens are accepted and on the cost of drafting and verification. Dense and MoE models can behave differently because verifying several positions may activate more expert weights.',
     benchmarkContext:
-      'Compare speculative recipes at realistic acceptance rates and verify model quality. InferenceX distinguishes MTP-enabled and disabled curves because the benefit changes across concurrency and interactivity.',
-    relatedTerms: ['multi-token-prediction', 'decode', 'batching', 'mixture-of-experts'],
+      'Fixed-sequence scenarios keep speculative decoding as part of a curve’s identity, so MTP-enabled and disabled recipes plot separately. Agentic curves instead treat it as point-level metadata and merge the points, with the method named in each tooltip, because AgentX reports the best available curve per model, chip SKU, and engine. Since replayed AgentX content is synthetic, a speculator would accept an unrepresentative number of draft tokens, so runs apply an acceptance length collected per model, speculator, draft length, and thinking mode on an external agentic coding dataset.',
+    relatedTerms: ['multi-token-prediction', 'decode', 'batching', 'agentx', 'mixture-of-experts'],
     articleSlugs: [INFERENCEX_V2, DEEPSEEK_V4, B200_GLM5, KIMI_K3, AGENTX_V3],
   },
   {
@@ -1094,6 +1116,166 @@ const entries = [
       'wide-expert-parallelism',
     ],
     articleSlugs: [GB200_R1, GB300_DSV4, GB200_KIMI, INFERENCEX_V2],
+  },
+  {
+    slug: 'e2e-normalized-interactivity',
+    term: 'E2E Normalized Interactivity',
+    aliases: ['normalized interactivity', 'OSL/E2EL'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'This metric asks how fast a whole answer arrives, counting the wait before the first word as well as the streaming speed after it.',
+    definition:
+      'E2E Normalized Interactivity is the effective per-user token rate across a complete request: output tokens divided by end to end latency.',
+    explanation:
+      'Substituting end to end latency for time to first token plus output length times time per output token gives approximately 1 divided by the sum of inter-token latency and TTFT divided by output tokens. The result is ordinary interactivity plus a penalty proportional to first-token wait. Normalized here means normalized by output length, not scaled to a 0 to 1 score or measured against another system.',
+    significance:
+      'Interactivity alone rewards a recipe that streams quickly after making the user wait, and TTFT alone rewards one that starts fast and then crawls. Folding both into one number exposes operating points that look strong on a single axis. Short responses feel the TTFT penalty most, because there are fewer tokens to amortize the wait across.',
+    benchmarkContext:
+      'InferenceX exposes this as an experimental x-axis mode for agentic runs, which is why it needs persisted per-request traces and is unavailable for unofficial-run overlays. It is deliberately imperfect: it penalizes high TTFT heavily and does not capture every nuance of prefill and decode disaggregation, so AgentX submissions still optimize interactivity and TTFT separately.',
+    measurement: { label: 'Typical unit', value: 'tokens/second/user (tok/s/user)' },
+    relatedTerms: ['interactivity', 'time-to-first-token', 'time-per-output-token', 'latency'],
+    articleSlugs: [AGENTX_V3, AGENT_BENCHMARK],
+  },
+  {
+    slug: 'tokens-per-dollar',
+    term: 'Tokens per dollar',
+    abbreviation: 'tok/$',
+    aliases: ['tokens per $1 USD', 'tokens per RMB'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Tokens per dollar asks how many tokens one dollar of infrastructure spend buys, so a bigger number is a cheaper system.',
+    definition:
+      'Tokens per dollar is the count of tokens a configuration produces for one unit of modeled infrastructure cost, the reciprocal of cost per token.',
+    explanation:
+      'The figure follows directly from throughput per chip and the modeled cost per chip hour, so it carries the same assumptions as cost per million tokens while reading in the direction most people reason about capacity. InferenceX publishes it for total, input, and output tokens, against each cost basis it models, and in Chinese yuan alongside US dollars.',
+    significance:
+      'Cost per million tokens and tokens per dollar rank systems identically, but a metric that rises with better hardware sits the same way up as throughput, so a chart mixing the two no longer inverts halfway down the axis. The absolute value depends entirely on the cost model behind it, so it travels only with its stated basis.',
+    benchmarkContext:
+      'Total tokens per $1 USD is the default y-axis on the InferenceX inference charts. Read it against the TCO row shown above the chart, and compare only within one cost basis: owning at hyperscaler rates, owning at neocloud rates, and three year rental produce different numbers for identical silicon.',
+    measurement: { label: 'Typical unit', value: 'tokens per $1 USD (tok/$)' },
+    relatedTerms: [
+      'cost-per-million-tokens',
+      'performance-per-dollar',
+      'total-cost-of-ownership',
+      'throughput',
+    ],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2, B200_GLM5],
+  },
+  {
+    slug: 'energy-per-token',
+    term: 'Energy per token',
+    abbreviation: 'J/token',
+    aliases: ['joules per token', 'joules per query'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Energy per token is how much electricity the system spends to produce one token, the power-side counterpart of cost per token.',
+    definition:
+      'Energy per token is the electrical energy consumed per token produced, reported either from all-in provisioned power or from measured accelerator telemetry.',
+    explanation:
+      'The two bases answer different questions and are not interchangeable. All-in provisioned figures divide a facility power budget, including power delivery and cooling overhead, by measured token rates. Measured figures come from accelerator telemetry during the run and describe the chips alone. InferenceX also reports measured energy per successful query and average power as a percentage of thermal design power.',
+    significance:
+      'Power, not capital, is often the binding constraint on new deployments, and a system that produces more tokens per joule serves more demand from the same utility allocation. The percentage of TDP figure separately reveals how hard a recipe actually drives its accelerators, which a token-normalized number alone hides.',
+    benchmarkContext:
+      'Read the label before comparing: all-in provisioned and measured values differ by the facility overhead between them. InferenceX withholds measured energy where the underlying telemetry is invalid or its scope is ambiguous, so a missing value means the measurement could not be trusted rather than that the run drew no power.',
+    measurement: { label: 'Typical unit', value: 'joules per token (J/tok)' },
+    relatedTerms: ['tokens-per-megawatt', 'throughput', 'total-cost-of-ownership', 'concurrency'],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, AGENTX_V3],
+  },
+  {
+    slug: 'context-parallelism',
+    term: 'Context parallelism',
+    abbreviation: 'CP',
+    aliases: ['PCP', 'DCP', 'sequence parallelism'],
+    category: 'Parallelism',
+    plainEnglish:
+      'Context parallelism splits one long prompt across several chips so they share the work of reading it and of scanning its stored attention state.',
+    definition:
+      'Context parallelism shards query tokens across accelerators, in a prefill form known as PCP and a decode form known as DCP.',
+    explanation:
+      'PCP gives each rank a chunk of the query while keys and values are passed around a ring, which parallelizes the compute-bound prefill and stops one rank absorbing an entire long prompt. DCP shards the KV cache itself, so every rank scans its own slice and the partial attention results merge flash-decode style. Because decode is memory-bandwidth bound, parallel KV reads raise the achievable token rate.',
+    significance:
+      'Tensor parallelism replicates the full KV cache on each rank and data-parallel attention pins a session to whichever rank owns its shard, so neither scales cleanly as contexts reach hundreds of thousands of tokens. Context parallelism attacks that directly, and its gain grows with input length rather than with batch size.',
+    benchmarkContext:
+      'InferenceX surfaces DCP and PCP degrees in point tooltips and parallelism labels alongside TP, EP, and DP. Support is uneven across vendors: the technique remains part of the practical CUDA advantage because the AMD attention backends were still listed as unsupported in the vLLM matrix at the time of the AgentX 1.0 results.',
+    relatedTerms: ['tensor-parallelism', 'data-parallelism', 'kv-cache', 'prefill', 'decode'],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2],
+  },
+  {
+    slug: 'kv-cache-offload',
+    term: 'KV cache offload',
+    aliases: ['CPU offload', 'KV offloading'],
+    category: 'Serving',
+    plainEnglish:
+      'KV cache offload parks attention state the chips cannot hold in host memory, so a long session can be resumed instead of recomputed.',
+    definition:
+      'KV cache offload moves KV blocks out of accelerator memory into a slower tier, usually host DRAM, and loads them back when a later request reuses that prefix.',
+    explanation:
+      'Offload is usually a write-through cache: a prefix written to the HBM cache is also written to the slower tier, so it helps most when the offload pool is roughly one and a half to three times HBM capacity. Reloading a long prefix beats recomputing it by a wide margin at agentic context lengths, but the arithmetic reverses for short prompts, where the transfer costs more than the prefill it avoids.',
+    significance:
+      'Long agentic sessions exceed HBM KV capacity well before they exceed a plausible DRAM budget, so offload decides how many concurrent conversations stay resumable. It also shifts the bottleneck: once prefixes survive, store and load paths, transfer batching, and index bookkeeping become the costs worth optimizing.',
+    benchmarkContext:
+      'InferenceX rings every point that used KV offload with a dashed halo, whether or not it is Pareto optimal, and the point detail view names the offload type and engine alongside the chip and CPU cache hit rates. Offload is an allowed but optional optimization, so a single curve can mix points with and without it.',
+    relatedTerms: ['kv-cache', 'prefix-caching', 'kv-cache-manager', 'high-bandwidth-memory'],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, KIMI_K3],
+  },
+  {
+    slug: 'kv-cache-manager',
+    term: 'KV cache manager',
+    aliases: ['Mooncake', 'LMCache', 'HiCache'],
+    category: 'Software',
+    plainEnglish:
+      'A KV cache manager is the component that stores attention state outside the chips and decides what to keep, evict, and fetch back.',
+    definition:
+      'A KV cache manager is a pluggable layer beneath an inference engine that stores reusable KV blocks across memory tiers and manages their placement, eviction, and transfer.',
+    explanation:
+      'Engines expose a connector interface, so managers such as Mooncake Store, LMCache, and SGLang HiCache can serve different runtimes. The manager keys blocks by prefix hash and places them in host DRAM, local NVMe, or a remote backend, while a separate transfer engine such as Mooncake Transfer Engine or NIXL performs the byte movement. Several paths can coexist inside one engine.',
+    significance:
+      'Once a workload reuses prefixes heavily, correctness and accounting in this layer matter as much as kernel speed. Hybrid-attention models make it harder still, because a model carrying several cache groups with different shapes and lifetimes cannot be described by a connector that assumes one uniform block geometry.',
+    benchmarkContext:
+      'InferenceX records the KV offload backend as run metadata and shows it in the AgentX point detail view. Framework labels name the combination rather than the engine alone, so a recipe reads as Mooncake ATOMesh or MoRI SGLang instead of just its engine.',
+    relatedTerms: ['kv-cache-offload', 'kv-cache', 'prefix-caching', 'inference-engine'],
+    articleSlugs: [AGENTX_V3, KIMI_K3, INFERENCEX_V2],
+  },
+  {
+    slug: 'kv-aware-routing',
+    term: 'KV-aware routing',
+    aliases: ['cache-aware routing', 'session affinity'],
+    category: 'Serving',
+    plainEnglish:
+      'KV-aware routing sends a request to the worker that already holds its conversation state, instead of to whichever worker is least busy.',
+    definition:
+      'KV-aware routing selects a worker using where cached prefix state already resides, rather than on queue depth or load alone.',
+    explanation:
+      'A request carrying no reusable history can go anywhere, and load balancing is the only question worth asking. A request carrying megabytes of cached prefix is different: sending it to an idle worker that lacks that prefix pays for the whole prompt again. Routers therefore track cache events, hash sessions to consistent workers, and keep data-parallel ranks sticky to the sessions whose state they own.',
+    significance:
+      'Under data-parallel attention each rank owns a private slice of the cache pool, so a long session landing on the wrong rank recomputes everything and the measured hit rate collapses far below its theoretical ceiling. Affinity alone is not enough either, since unchecked stickiness concentrates load on one hot worker, so cache balance has to enter the routing score.',
+    benchmarkContext:
+      'Routing sits outside the engine, so InferenceX treats it as part of the recipe: labels such as Dynamo vLLM, llm-d vLLM, and Mooncake ATOMesh name the orchestration layer as well as the runtime. Its cost scales with the number and length of live prefixes rather than with tokens generated, which is why it can become the bottleneck on agentic traffic once kernels improve.',
+    relatedTerms: [
+      'prefix-caching',
+      'nvidia-dynamo',
+      'data-parallelism',
+      'disaggregated-inference',
+    ],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS],
+  },
+  {
+    slug: 'tilert',
+    term: 'TileRT',
+    aliases: ['TileRT engine'],
+    category: 'Software',
+    plainEnglish:
+      'TileRT is an inference runtime built for very fast single-user generation, compiling a model into one resident program instead of many separate kernel launches.',
+    definition:
+      'TileRT is an inference engine that targets ultra-low-latency serving by abolishing the individual kernel as the unit of execution.',
+    explanation:
+      'A conventional runtime dispatches a sequence of kernels for every decode step, and at very small batch sizes the launch and scheduling overhead between them dominates the arithmetic. A persistent engine kernel keeps the work resident on the accelerator instead, which is what makes the far-right end of the interactivity axis reachable at all.',
+    significance:
+      'The high-interactivity corner of the frontier is a different engineering problem from the high-throughput corner, and an engine tuned for one rarely wins the other. Recipes that reach hundreds of tokens per second per user matter for latency-critical products even when their aggregate throughput per chip is unremarkable.',
+    benchmarkContext:
+      'InferenceX reports TileRT as its own framework label and deliberately retains it in best-per-SKU views, because a curve that only survives where it dominates on throughput would drop the operating points TileRT exists to serve. Compare it at matched interactivity rather than on peak throughput alone.',
+    relatedTerms: ['inference-engine', 'interactivity', 'decode', 'sglang'],
+    articleSlugs: [TILERT, AGENTX_V3],
   },
 ] as const satisfies readonly GlossaryEntry[];
 
