@@ -714,6 +714,30 @@ describe('createChartDataPoint', () => {
     expect(point.newInputSuffixOutputTputPerGpu).toBeUndefined();
   });
 
+  it('derives suffix+output TFLOP/s from 2 × active params for known models', () => {
+    const e = entry({
+      model: 'DeepSeek-R1-0528', // 37B active params
+      tput_per_gpu: 900,
+      input_tput_per_gpu: 600,
+      output_tput_per_gpu: 300,
+      theoretical_cache_hit_rate: 0.8,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    // suffix+output = 900 - 600 × 0.8 = 420 tok/s → 2 × 37e9 × 420 / 1e12
+    expect(point.newInputSuffixOutputTflopsPerGpu?.y).toBeCloseTo(31.08, 5);
+  });
+
+  it('omits suffix+output TFLOP/s for models without architecture data', () => {
+    const e = entry({
+      model: 'not-a-real-model',
+      tput_per_gpu: 900,
+      input_tput_per_gpu: 600,
+      theoretical_cache_hit_rate: 0.8,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.newInputSuffixOutputTflopsPerGpu).toBeUndefined();
+  });
+
   it('omits new-input-suffix throughput fields when input throughput is missing', () => {
     const e = entry({
       tput_per_gpu: 900,

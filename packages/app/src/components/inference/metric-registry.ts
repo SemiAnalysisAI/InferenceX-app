@@ -68,6 +68,22 @@ export const METRIC_REGISTRY = {
     xLabel: 'P90 Time To First Token (s)',
     heading: 'vs. P90 Time To First Token',
   },
+  // Achieved model TFLOP/s on the theoretically necessary tokens only:
+  // 2 × active params per token (GEMM-only Kaplan/PaLM convention) times the
+  // new-input-suffix + output token throughput above. Attention-score FLOPs
+  // are deliberately excluded — they depend on each request's context length
+  // (only aggregate token counts reach the chart layer) and on the attention
+  // implementation (MHA/GQA/MLA/linear), so 2N_active is the comparable
+  // cross-model lower bound, in the same spirit as MFU counting only
+  // theoretically required work.
+  newInputSuffixOutputTflopsPerGpu: {
+    field: 'newInputSuffixOutputTflopsPerGpu.y',
+    label: 'New Input Suffix + Output TFLOP/s per Chip (TFLOP/s/chip)',
+    labelZh: '每芯片新输入 suffix + 输出 TFLOP/s（TFLOP/s/chip）',
+    title: 'New Input Suffix + Output TFLOP/s per Chip',
+    titleZh: '每芯片新输入 suffix + 输出 TFLOP/s',
+    polarity: 'higher',
+  },
   tpPerMw: {
     field: 'tpPerMw.y',
     label: 'Token Throughput per All in Utility MW (tok/s/MW)',
@@ -500,6 +516,7 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
       'y_outputTputPerGpu',
       'y_newInputSuffixOutputTputPerGpu',
       'y_newInputSuffixTputPerGpu',
+      'y_newInputSuffixOutputTflopsPerGpu',
       'y_tpPerMw',
       'y_inputTputPerMw',
       'y_outputTputPerMw',

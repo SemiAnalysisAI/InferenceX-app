@@ -278,6 +278,8 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   // theoretical prefix share). Agentic-trace points only.
   newInputSuffixOutputTputPerGpu?: { y: number; roof: boolean };
   newInputSuffixTputPerGpu?: { y: number; roof: boolean };
+  /** Achieved model TFLOP/s per chip: 2 × active params × suffix+output tok/s. */
+  newInputSuffixOutputTflopsPerGpu?: { y: number; roof: boolean };
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
   outputTputPerMw?: { y: number; roof: boolean };

@@ -18,6 +18,8 @@ import {
   type BenchmarkMetricKey,
 } from '@/components/inference/metric-registry';
 import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
+import type { Model } from '@/lib/data-mappings';
+import { getModelArchitecture } from '@/lib/model-architectures';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 import type { Locale } from '@/lib/i18n';
 
@@ -349,6 +351,24 @@ export function buildDerivedChartFields(
     fields.newInputSuffixOutputTputPerGpu = chartMetric(
       Math.max(0, tputPerGpu - inputTputPerGpu * theoreticalHitRate),
     );
+  }
+  // Achieved model TFLOP/s per chip on the theoretically necessary tokens:
+  // FLOPs/token = 2 × active params (GEMM-only Kaplan/PaLM convention;
+  // attention-score FLOPs excluded — see metric-registry doc comment).
+  // activeParams is in billions, so tok/s × 2 × 1e9 params / 1e12 = ÷1000.
+  if (
+    wants('newInputSuffixOutputTflopsPerGpu') &&
+    hasTheoreticalHitRate &&
+    tputPerGpu &&
+    inputTputPerGpu
+  ) {
+    const activeParams = getModelArchitecture(entry.model as Model)?.activeParams;
+    if (activeParams) {
+      const suffixOutputTput = Math.max(0, tputPerGpu - inputTputPerGpu * theoreticalHitRate);
+      fields.newInputSuffixOutputTflopsPerGpu = chartMetric(
+        (2 * activeParams * suffixOutputTput) / 1000,
+      );
+    }
   }
   if (wants('newInputSuffixTputPerGpu') && hasTheoreticalHitRate && inputTputPerGpu) {
     fields.newInputSuffixTputPerGpu = chartMetric(inputTputPerGpu * (1 - theoreticalHitRate));
