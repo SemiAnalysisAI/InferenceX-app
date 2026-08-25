@@ -835,6 +835,328 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     benchmarkContext:
       'InferenceX 将 TileRT 作为独立的框架标签，并在每个 SKU 最佳配置视图中特意保留它；否则只按吞吐量取胜的曲线会丢掉 TileRT 真正服务的那些运行点。比较时请在匹配交互性下进行，而不要只看峰值吞吐量。',
   },
+  recipe: {
+    term: '测试配置',
+    aliases: ['recipe', '配置方案', '服务配置'],
+    plainEnglish:
+      '一套测试配置就是产生某条曲线的全部选择：模型、引擎、镜像、精度、并行策略和工作负载。',
+    definition:
+      '测试配置是指产生一条实测曲线所需的完整组合：模型、推理引擎与容器镜像、数值精度、并行策略、芯片系统和工作负载。',
+    explanation:
+      'InferenceX 上的每个数据点都属于某套测试配置，对同一套配置做并发扫描就画出它的曲线。改动其中任何一项都会得到另一套配置，而不是同一套配置的变体，因此升级引擎镜像会作为独立结果上报，而不会并入既有曲线。',
+    significance:
+      '芯片峰值规格无法描述服务性能，同一颗芯片在不同配置下可以相差数倍。把整套组合写清楚，结论才可核查：脱离配置的单个数字既无法复现，也无法与其他厂商公平比较。',
+    benchmarkContext:
+      'InferenceX 的测试配置主要跟随 vLLM 与 SGLang 官方 cookbook，并使用上游镜像，因此结果反映用户实际能部署的性能，而不是为基准测试特调过的镜像。数据点 tooltip 会展示背后的配置，并给出运行溯源链接。',
+  },
+  'tail-latency': {
+    term: '尾部延迟',
+    aliases: ['tail latency', 'p90', 'p99', '分位数延迟'],
+    plainEnglish:
+      '尾部延迟描述的是最慢的那部分请求，而不是典型请求，因为用户真正会注意到的正是这些。',
+    definition: '尾部延迟是请求分布高分位处的延迟，例如 p90 或 p99，而不是均值或中位数。',
+    explanation:
+      '分位数回答的问题与平均值不同。p90 为 5 秒意味着每 10 条请求中至少有 1 条等了这么久，而这条请求可能正是卡住某个 agent 继续执行的那一条。真实服务中的延迟分布高度偏斜，均值可能远低于尾部，从而把问题完全掩盖。',
+    significance:
+      '容量规划通常按分位数而不是平均值来定，因为一个平均很快、尾部很慢的服务，对用户来说依然是不合格的。某些优化还会在改善均值的同时恶化尾部，而单一汇总数字只会把它记成一次明确的胜利。',
+    benchmarkContext:
+      'InferenceX 上报的指标都带分位数限定，并在坐标轴上标明，因此 p90 TTFT 与平均 TTFT 不会混在同一次比较里。agentic 运行的分布尤其偏斜，因为端到端延迟随输出长度增长，最长的生成会主导尾部。',
+  },
+  'service-level-objective': {
+    term: '服务级目标',
+    aliases: ['service level objective', 'SLO', '延迟目标'],
+    plainEnglish: 'SLO 是一套部署必须兑现的性能承诺，例如十条请求中有九条要在一秒内返回首 token。',
+    definition: '服务级目标是对某个服务指标设定的目标值，通常表示为对延迟或交互性的分位数约束。',
+    explanation:
+      '一条有用的 SLO 会同时给出指标、分位数和阈值。此时服务容量就是系统在不违反该约束的前提下能维持的吞吐量，它小于峰值吞吐量，也是运营方唯一可以据以规划容量的数字。',
+    significance:
+      '吞吐量曲线上的每个点都是可达的，但只有一部分满足既定承诺。两套系统的峰值吞吐量可能很接近，而在交互性或首 token 约束下能保留多少吞吐量却相差悬殊。',
+    benchmarkContext:
+      'InferenceX 不强加统一的行业 SLO，因为可接受的目标因产品而异：交互式编程需要较高的 token 速率，批处理则可以容忍数秒的首 token 延迟。请按自己的阈值读取前沿曲线，而不要直接比较峰值。',
+  },
+  'acceptance-length': {
+    term: '接受长度',
+    aliases: ['acceptance length', 'AL', '接受率'],
+    plainEnglish:
+      '接受长度是指每次验证中完整模型实际认可的草稿 token 数，它决定了投机解码是否划算。',
+    definition: '接受长度是目标模型在一次验证中平均接受的投机草稿 token 数量。',
+    explanation:
+      '只有草稿能通过验证，投机解码才会省时间。接受长度接近 1 意味着起草与验证这套机制白跑了一趟；数值较高则能把一次昂贵的目标模型计算摊薄到多个输出 token 上。该数值取决于 speculator、草稿长度、模型本身以及正在生成的内容。',
+    significance:
+      '正因为接受率取决于内容，基准测试有可能在无意中左右结论。合成或匿名化文本对于在真实语料上训练的 speculator 而言属于分布外数据，实测接受率会朝任一方向偏离生产环境的真实值。',
+    benchmarkContext:
+      'AgentX 回放的是填充了合成 token 的匿名化 trace，因此不让接受率由这些内容自行决定。运行时改为套用一组固定接受长度，按模型、speculator、草稿长度和思考模式在外部 agentic 编码数据集上采集，从而保持厂商中立。',
+  },
+  'unofficial-run': {
+    term: '非官方运行',
+    aliases: ['unofficial run', '非官方 overlay', '社区运行'],
+    plainEnglish: '非官方运行是尚未入库到已发布数据集的基准运行，但仍可通过 URL 叠加绘制在图表上。',
+    definition:
+      '非官方运行是指通过运行 ID 以 overlay 形式加载进仪表板的 CI 基准运行，其数据不来自已发布的数据库。',
+    explanation:
+      '在页面 URL 中加上运行 ID，就会拉取该次运行，并用专门的 overlay 配色把它的数据点、roofline 和表格行画在官方数据旁边。overlay 走的是独立的渲染路径，因此可以按硬件类型开关，也可以按运行逐个关闭，而不影响下方的官方数据选择。',
+    significance:
+      '结果发布通常滞后于产出，而正在调优某套配置的贡献者，需要在决定是否入库之前先看到新曲线与当前前沿的对比。overlay 让尚未定稿的运行可被审阅，同时不赋予它已发布测量结果的地位。',
+    benchmarkContext:
+      'overlay 的配色来自按运行序号分配的调色板，而不是硬件配色，因此不会被误认为官方数据。部分视图依赖只在入库运行中持久化的数据，这些视图会明确说明 overlay 不可用，而不是默默略过。',
+  },
+  'chunked-prefill': {
+    term: '分块 prefill',
+    aliases: ['chunked prefill', '分块预填充'],
+    plainEnglish:
+      '分块 prefill 把长提示词分片读取，而不是一次性读完，这样其他用户在此期间仍能持续收到 token。',
+    definition:
+      '分块 prefill 把提示词处理切分为固定大小的 token 分块，由调度器与正在进行的 decode 工作交错执行。',
+    explanation:
+      '不切分的 prefill 会占用加速器直到整条提示词处理完，所有正在流式输出的用户都得排在后面。切分之后调度器可以交替执行，让 decode 在分块之间继续推进。分块大小是一个调优旋钮：分块越大 prefill 效率越高，分块越小对 decode 的打断越少。',
+    significance:
+      '这项技术把某一个用户的首 token 问题，转换成对所有人来说小而平稳的开销，通常是更划算的取舍。提示词越长它越重要：单条不切分的十万 token prefill 足以让整套部署卡住。',
+    benchmarkContext:
+      '分块大小属于测试配置的一部分，同一条曲线上不同点的取值也可能不同，因此吞吐量的跳变有可能来自重新调参而不是新硬件。长的 agentic 提示词让这个参数变得关键，而定长短提示词场景根本暴露不出这一点。',
+  },
+  roofline: {
+    term: 'Roofline 曲线',
+    aliases: ['roofline', '前沿包络', 'roofline 曲线'],
+    plainEnglish:
+      '在 InferenceX 上，roofline 是按硬件配置在其最优点上画出的外包络线，用来展示它达到过的边界。',
+    definition:
+      'InferenceX 上的 roofline 是按硬件配置绘制的 Pareto 包络曲线，穿过该配置在当前所选坐标轴下未被支配的数据点。',
+    explanation:
+      '哪个角算“最好”取决于所选指标：吞吐量对交互性取右上角，而成本类指标数值越低越好，因此包络会锚定在所选指标组合定义的那个角上。x 值退化的点不具备入选资格，但在显示全部数据点的视图中仍会绘制。',
+    significance:
+      '直接看一团原始数据点容易挑选有利结果，因为调优不佳的配置也会贡献一些运营方绝不会选择的点。包络线展示的是每套系统可达的边界，而容量决策正是依据这个形状做出的。',
+    benchmarkContext:
+      '这与 HPC 中经典的 roofline 模型不同：后者把可达 FLOPS 与算术强度放在一起，用于判断计算受限还是访存受限，仪表板只借用了“上界”这一图形表达。roofline 方向按指标配置，因此同一批数据点在不同坐标轴下会得到不同的包络。',
+  },
+  'arithmetic-intensity': {
+    term: '算术强度',
+    aliases: ['arithmetic intensity', '运算强度', '计算访存比'],
+    plainEnglish: '算术强度表示每搬运一个字节能做多少次运算，它决定瓶颈落在计算单元还是显存上。',
+    definition: '算术强度是一次计算所执行的算术运算次数与其在显存和计算单元之间搬运的字节数之比。',
+    explanation:
+      'prefill 会用同一份权重处理大量 token，每个载入的字节都被反复复用，因此通常是计算受限的。decode 每一步每条序列只产出一个 token，却仍要读取权重和 KV cache，搬运了大量数据却只做很少运算，因此通常受显存带宽限制。',
+    significance:
+      '两个阶段受限于芯片的不同部分，这解释了为什么峰值 FLOPS 亮眼的规格书在 decode 上可能令人失望，也解释了 batching 为何有效：把多条序列合并会提高算术强度，因为每次权重读取被更多 token 复用。',
+    benchmarkContext:
+      '这一区别解释了数据中反复出现的形态。低交互性的点跑大 batch、算术强度高，接近计算上限；高交互性一端跑小 batch，跟随显存带宽，因此带宽更充裕的硬件常常在这里胜出，尽管其峰值吞吐量更低。',
+  },
+  'prefix-cache-hit-rate': {
+    term: '前缀缓存命中率',
+    aliases: ['prefix cache hit rate', '缓存命中率', 'KV 复用率'],
+    plainEnglish:
+      '命中率是指提示词中有多少 token 直接来自缓存而无需重算，在长会话中这通常是绝大部分。',
+    definition:
+      '前缀缓存命中率是 prefill 阶段由已缓存 KV 状态满足、而非重新计算的输入 token 占比。',
+    explanation:
+      '命中率必须与产生它的缓存层级一起看才有意义，因为从加速器显存读取的 token 与从主机内存取回的 token，代价完全不同。它也不只取决于容量：淘汰策略可能丢掉仍会被用到的前缀，路由也可能把请求发到从未持有该前缀的 worker。',
+    significance:
+      '在多轮流量下，命中率基本决定了 prefill 的开销，因为每一轮都会把整段对话再加一点新内容重新发过来。一旦复用率很高，剩余的 prefill 工作就主要是真正的新 token，瓶颈也从计算转向缓存管理。',
+    benchmarkContext:
+      'AgentX 点详情视图会按缓存层级分别展示命中率随时间的变化，并给出 prompt token 来源拆分。如果一个数据点在低命中率下报出很高的总吞吐量，说明它做的 prefill 工作远多于缓存良好的部署。',
+  },
+  warmup: {
+    term: 'Warmup',
+    aliases: ['warmup', 'warmup 阶段', '缓存预热'],
+    plainEnglish: '性能采集开始前先做一轮预热，让系统进入稳态，而不是在缓存为空的状态下被打分。',
+    definition:
+      'warmup 是性能采集窗口之前的阶段，基准测试在此期间预热缓存并进入稳态，该阶段的请求不计入上报结果。',
+    explanation:
+      '冷启动系统在两方面都不像生产环境：缓存是空的，而且所有会话都从第 0 轮开始会造成同步的突发流量，这在真实部署中并不存在。因此 AgentX 会让每个对话从其历史中一个按 seed 选定的位置开始，先回放重建该状态所需的请求，再让每条回放通道继续前进若干请求，然后才开始测量。',
+    significance:
+      '测量窗口从哪里开始会改变结果。把预热过程算进去，前缀复用会显得比生产环境更差；完全不做预热，依赖缓存的方案则会在一个它们在生产中根本不会遇到的状态下被打分。',
+    benchmarkContext:
+      'AgentX 点详情视图会把两个阶段分开，便于分别查看遥测数据。warmup 请求的输出被限制为单个 token，因此它们的输出长度约为 1，交互性和 decode 曲线为空：单个 token 没有 token 间延迟。',
+  },
+  aiperf: {
+    term: 'AIPerf',
+    aliases: ['AIPerf', '回放框架', '负载生成器'],
+    plainEnglish:
+      'AIPerf 是发送基准流量的厂商中立客户端，负责重建录制的 agent 会话并记录每条请求的时序。',
+    definition: 'AIPerf 是驱动 AgentX 运行、面向服务端点的开源 HTTP 负载生成与回放框架。',
+    explanation:
+      '它把每个会话重建为有向无环图：节点是请求，边携带依赖请求发出前需要等待的延迟。这一结构可以复现主智能体轮次、并行且稍后汇合的子智能体分支、一次性的辅助请求，以及轮次之间的工具调用停顿，而这些都是扁平的提示词列表无法表达的。',
+    significance:
+      '客户端本身就是测量的一部分。无法表达依赖关系的框架，会把 agentic 工作负载当成互相独立的请求发出，从而抹掉这个场景本要考察的突发性与复用特征。保持厂商中立同样重要，可以避免负载生成器偏向某一套服务栈。',
+    benchmarkContext:
+      'seed 固定了采样哪些对话、每个对话从哪里开始，以及用于填充匿名化 block 的合成内容，因此同一套配置重跑会回放同样的工作负载。同一模型的所有提交都运行相同的框架次版本，以保证结果可比。',
+  },
+  'pipeline-parallelism': {
+    term: '流水线并行',
+    aliases: ['pipeline parallelism', 'PP', '层间并行'],
+    plainEnglish: '流水线并行让每颗芯片负责一部分层，沿链条传递激活值，而不是把每一层都切开。',
+    definition:
+      '流水线并行按层切分模型并分配到多个加速器上，每个阶段执行自己的层，并把激活值传给下一个阶段。',
+    explanation:
+      '通信是阶段边界处激活值的点对点交接，比张量并行所需的逐层集合通信便宜得多。代价是空闲：只有一条请求在途时，除当前阶段外其余阶段都在等待，只有持续的并发流量才能把流水线填满。',
+    significance:
+      '对最大的那批模型来说，这首先是容量手段，其次才是提速手段。有些前沿模型根本装不进单个节点，流水线并行才让它们可服务；当某项竞争性优化拒绝与任何方案组合时，它甚至是唯一选项。',
+    benchmarkContext:
+      'InferenceX 在数据点 tooltip 和并行标签中与 TP、EP、DP 一起展示流水线并行度，且仅在大于 1 时显示。可组合性与并行度同样重要：一种会导致投机解码无法启用的阶段切分，代价可能超过它节省的显存。',
+  },
+  'dp-attention': {
+    term: '数据并行注意力',
+    aliases: ['DP attention', 'DPA', '注意力数据并行'],
+    plainEnglish:
+      'DP attention 让每个 rank 处理各自的一批序列并持有自己的缓存，而不是每个 rank 都存同一份副本。',
+    definition:
+      '数据并行注意力让每个 rank 在互不重叠的序列集合上各自计算注意力，因此每个 rank 拥有 KV cache 的私有份额，而专家层仍然共享。',
+    explanation:
+      '张量并行的注意力按 head 切分，在 head 数较少时会在各 rank 之间复制 KV 状态，浪费容量。DP attention 改为把整条序列分配给某个 rank，从而避免这种重复。各 rank 仍共同参与 MoE 集合通信，因此注意力是本地的，而专家分发仍是全局的。',
+    significance:
+      '由于每个 rank 只拥有缓存池的私有一份，请求落在哪里就成了影响性能的关键：长会话一旦被路由到不持有其前缀的 rank，就要全部重算。此时实测命中率会远低于理论上限，而原因与缓存大小毫无关系。',
+    benchmarkContext:
+      'InferenceX 会在数据点 tooltip 的并行策略部分展示 DP attention。它是否有利取决于模型；当缓存局部性变成路由约束时，不启用它的配置有时反而占据前沿曲线。',
+  },
+  int4: {
+    term: 'INT4',
+    aliases: ['INT4', '4 位整数', 'W4A16'],
+    plainEnglish:
+      'INT4 用 4 位整数存放权重，把模型压小，让缺少原生 4 位浮点支持的硬件每个 token 少搬很多数据。',
+    definition:
+      'INT4 是主要用于权重量化的 4 位整数格式，通常为每一组数值配一个更高精度的缩放因子。',
+    explanation:
+      '整数格式的取值是均匀分布的，不像浮点那样疏密不一，因此 INT4 依赖分组缩放因子来跟踪每一块权重的局部数值范围。激活值通常保持更高精度，矩阵乘法在计算时实时反量化，这使得该技术更多是访存优化而不是算力优化。',
+    significance:
+      '它在缺少 4 位浮点硬件支持的平台上最有价值。在这类硬件上，INT4 是落地 4 位权重的现实路径，但通常比原生格式更依赖细致的校准，其精度必须实测验证而不能想当然。',
+    benchmarkContext:
+      'InferenceX 把 INT4 与 FP4、FP8、BF16 并列为独立的精度键，精度属于测试配置而不是显示选项。把 INT4 与原生 FP4 方案对比时，务必同时查看精度评估结果，因为两种格式并不等价。',
+  },
+  bf16: {
+    term: 'BF16',
+    aliases: ['BF16', 'bfloat16', 'brain float 16'],
+    plainEnglish: 'BF16 是多数模型训练所用的 16 位格式，用它做推理也是量化方案精度对照的基准。',
+    definition:
+      'BF16 是一种 16 位浮点格式，指数范围与 FP32 相同而尾数更短，广泛用于训练，也常作为未量化的推理基线。',
+    explanation:
+      '保留 FP32 的指数范围，使 BF16 能很好地容纳 transformer 激活值的数值分布，格式转换很少需要窄格式所依赖的缩放机制。它牺牲的是精度而不是范围，体积是 FP8 的两倍、4 位格式的四倍。',
+    significance:
+      '在基准测试中它通常扮演参照系。decode 阶段以权重读取为主，因此 BF16 方案每个 token 搬运的数据远多于量化方案，往往位于吞吐量曲线更低的位置，同时定义了其他方案所对照的精度水平。',
+    benchmarkContext:
+      'InferenceX 把 BF16 作为精度键，并在规格页给出每个加速器的 BF16 稠密峰值算力。量化方案会通过精度评估验证，而不是默认无损，这正是 BF16 对照有意义的前提。',
+  },
+  'kv-cache-quantization': {
+    term: 'KV cache 量化',
+    aliases: ['KV cache quantization', 'FP8 KV cache', '量化 KV'],
+    plainEnglish: '把对话缓存用更小的格式存放，让芯片装下更多上下文，并在生成时更快地把它读回来。',
+    definition:
+      'KV cache 量化用降精度格式存放注意力的 key 与 value 状态，与模型权重所用精度相互独立。',
+    explanation:
+      '权重精度与缓存精度是两个独立选择，一套方案可以用 FP8 权重搭配 BF16 缓存，反过来也可以。缓存位宽减半，加速器显存能容纳的 token 数大致翻倍，每个 decode 步骤要读取的字节数也减半，而这正是 decode 大部分时间在做的事。',
+    significance:
+      '在长上下文服务中，这往往比压缩权重更划算，因为高并发下最先耗尽显存的是缓存而不是权重。不同模型对精度的敏感度不同，量化 key 还是 value 也有差别，因此需要实测评估而不能一概而论。',
+    benchmarkContext:
+      '缓存精度属于测试配置的一部分，实践中还存在混合布局：有些模型会保留两份位宽不同的缓存缓冲区，分离式传输路径必须把它们成对搬运。阅读显存容量相关的结论时，请连同其背后的缓存格式一起看。',
+  },
+  'sliding-window-attention': {
+    term: '滑动窗口注意力',
+    aliases: ['sliding window attention', 'SWA', '局部注意力'],
+    plainEnglish:
+      '滑动窗口注意力让某些层只看最近一段 token，因此窗口填满之后它的缓存就不再继续增长。',
+    definition:
+      '滑动窗口注意力把每个 query 限制在固定长度的前文范围内，从而限定该层需要保留的 KV 状态。',
+    explanation:
+      '由于窗口长度固定，这类层的缓存会达到上限而不会随对话增长，较早的条目会随窗口推进被移出。模型通常把这类层与全注意力层交错排列，这样远距离信息在网络中仍有通路，而大多数层保持低成本。',
+    significance:
+      '有界的开销带来了分配器层面的问题。窗口页不断翻转，而持久的前缀页静止不动；当两者取自同一个池子时，短暂分配往往会把有价值的那份挤出去，于是长会话可能因为短命的窗口状态而丢失昂贵的全注意力历史。',
+    benchmarkContext:
+      '这些效应只在多轮流量中出现。单条短提示词既不会让窗口绕过前缀，也不会造成池子争用，因此窗口感知的淘汰、offload 和分叉处理都表现为由 AgentX 推动的引擎工作，而不是定长场景的测试结果。',
+  },
+  'hybrid-attention': {
+    term: '混合注意力',
+    aliases: ['hybrid attention', '混合缓存模型'],
+    plainEnglish:
+      '混合模型在不同层使用不同的注意力类型，因此它的缓存是几种不同状态，而不是一块统一的数据。',
+    definition:
+      '混合注意力模型交错使用不同类型的注意力层，从而产生形状和生命周期各不相同的多个 KV cache group。',
+    explanation:
+      '统一模型每个 token 只有一种缓存布局，用单一 block 几何结构就能描述所有需要保存的内容；混合模型则不然：全注意力层、窗口层，以及循环或压缩状态同时存在，各有各的占用、各有各的丢弃时机，能否重建也不一样。',
+    significance:
+      '在状态需要离开加速器之前，这一区别是看不出来的。假设单一布局的 connector 无法说明某个 block 属于哪一组，因此会话最长的那些模型一度反而完全用不了 offload。循环状态最棘手，因为它累积了此前的全部内容，无法从相邻 token 重算。',
+    benchmarkContext:
+      'InferenceX 测试矩阵中的前沿开放权重模型越来越多采用混合结构，因此引擎对混合 cache group 的支持本身就是测试内容的一部分。offload、分离式传输和前缀复用都必须逐组扩展，而不能从统一结构的情形直接继承。',
+  },
+  'linear-attention': {
+    term: '线性注意力',
+    aliases: ['linear attention', 'GatedDeltaNet', '常数状态注意力'],
+    plainEnglish:
+      '线性注意力保存一份固定大小的运行摘要，而不是全部历史 token，因此内存不会随对话增长。',
+    definition:
+      '线性注意力用一个大小恒定、随 token 到达而更新的循环状态，替代不断增长的 key 与 value 缓存。',
+    explanation:
+      '标准注意力保存的状态与序列长度成正比，且每一步都要重新读取。线性或门控循环层改为携带固定大小的状态，用对每个位置的精确回忆换取有界的内存占用。GatedDeltaNet 这类结构只在部分层这样做，其余层保留全注意力，以维持精确的远距离查找能力。',
+    significance:
+      '在长上下文下，节省的存储相当可观，但这种状态改变了缓存的含义：它无法像窗口尾部那样由周围 token 重建，一旦丢弃就只能重放整个序列，因此复用需要显式的检查点机制，而不是普通的 block 复用。',
+    benchmarkContext:
+      'InferenceX 服务的模型中已有采用这类层的，引擎对循环状态的检查点与传输支持属于测试配置的一部分。一个模型可以在 day 0 就能被服务，却仍不支持这类状态的复用，表现为重复轮次上出乎意料的高 prefill 开销。',
+  },
+  nvl72: {
+    term: 'NVL72',
+    aliases: ['NVL72', 'GB200 NVL72', 'GB300 NVL72', '机架级系统'],
+    plainEnglish:
+      'NVL72 是一个机架，其中 72 个加速器共享同一张高速网络，因而更像一台大机器而不是一个集群。',
+    definition:
+      'NVL72 是 NVIDIA 的机架级系统，把 72 个加速器放进同一个 NVLink scale-up 域，而不是分散在多个八芯片节点中。',
+    explanation:
+      '仪表板的规格数据记录为 NVLink 5.0、每颗芯片 900 GB/s 单向带宽、scale-up world size 为 72，并通过 NVSwitch 交换。常规节点把同样的带宽限定在八颗芯片之间，超出后就要退回更慢的 scale-out 网络，因此差别不在于原始速度，而在于换用另一种网络之前能触及多少颗芯片。',
+    significance:
+      '开销以集合通信为主的技术，在大规模 scale-up 域中经济性会发生变化。宽专家并行把专家分散到许多芯片上，每个 token 都要付出 all-to-all 流量；在 scale-up 带宽下这可以承受，在 scale-out 网络上往往不行。',
+    benchmarkContext:
+      '机架级优势并非自动成立。更高的单芯片成本必须被赚回来，而在 agentic 流量下，编排层可能比网络更早成为瓶颈；因此对于不怎么用到宽并行的模型，NVL72 配置在按 TCO 归一化的吞吐量上有时会落后于八芯片节点。',
+  },
+  atom: {
+    term: 'ATOM',
+    aliases: ['ATOM', 'AMD ATOM', 'ATOMesh'],
+    plainEnglish:
+      'ATOM 是 AMD 自研的推理引擎，是它在厂商专用运行时这条路线上的答案，而非上游开源引擎。',
+    definition:
+      'ATOM 是 AMD 面向 Instinct 加速器的推理引擎，与 ROCm 上的上游 vLLM、SGLang 并列，定位为厂商自有运行时。',
+    explanation:
+      '它对 AMD 的意义，与厂商运行时对 NVIDIA 的意义相同：针对自家硬件调优，且可以跑在上游引擎前面。它的 router 名为 ATOMesh，最初是 SGLang router 的一个分支。该引擎最初面向单轮服务设计，因此支持长上下文多轮场景需要对其缓存管理器和 kernel 做大量改造。',
+    significance:
+      '厂商引擎可以在开源栈跟上之前展示硬件的能力上限，这既是有价值的证据，也是不便直接照搬的建议。多数实验室部署的是上游引擎，因此只在厂商运行时下成立的结果，并不能代表这些用户实际拿到的性能。',
+    benchmarkContext:
+      'InferenceX 把 ATOM 作为独立的框架标签，避免与同一加速器上的 vLLM 或 SGLang 结果混为一谈。想知道硬件能做到什么，就拿它与其他厂商运行时比较；想知道客户今天能部署什么，就拿它与上游引擎比较。',
+  },
+  aiter: {
+    term: 'AITER',
+    aliases: ['AITER', 'AMD AITER', 'ROCm kernel 库'],
+    plainEnglish:
+      'AITER 是 AMD 调优过的 kernel 库，决定注意力和矩阵运算在 Instinct 芯片上究竟能跑多快。',
+    definition:
+      'AITER 是 AMD 面向 Instinct 加速器的优化 kernel 库，供运行在 ROCm 上的推理引擎调用。',
+    explanation:
+      '引擎负责表达策略，kernel 决定它是否够快。AITER 提供调优过的注意力、矩阵和融合算子，引擎会用它替代通用路径。这个分发决策本身也可调优，而且在某种 shape 上取胜的 kernel 在另一种 shape 上可能落败，因此选择可能取决于上下文长度，而不是固定不变。',
+    significance:
+      '并行策略只有在 kernel 能表达时才算数，这正是 AMD 上的上下文并行和长上下文稀疏注意力以 kernel 工作而非引擎工作形式出现的原因。超大缓存还会暴露短请求根本触及不到的问题，例如缓存池跨过某个容量边界后地址运算溢出，从而静默访问错误的行。',
+    benchmarkContext:
+      '该库位于测试配置所固定的容器镜像内部，因此 AITER 的改进可以在引擎版本和硬件都不变的情况下推动曲线上移。在统一 shape 上实测到的 kernel 级收益，未必能在 agentic trace 上留存，缓存与调度带来的波动可能将其淹没。',
+  },
+  flashinfer: {
+    term: 'FlashInfer',
+    aliases: ['FlashInfer', '注意力 kernel 库'],
+    plainEnglish: 'FlashInfer 是一个注意力 kernel 库，服务引擎直接调用它，而不必自己实现注意力。',
+    definition:
+      'FlashInfer 是开源的注意力 kernel 与后端库，供推理引擎在 prefill、decode 和投机验证中使用。',
+    explanation:
+      '推理特有的复杂性大多集中在注意力上：分页缓存、变长序列、分组 query head、稀疏模式，以及对草稿 token 的验证，都会改变 kernel 的形态。共享库让多个引擎复用同一份调优实现，引擎则按 shape 和硬件目标选择后端。',
+    significance:
+      '由于后端是被选择而不是固定的，kernel 的可用性就变成了可移植性问题。只为某一家厂商后端实现的功能，会让另一方退回通用路径；而在长上下文下，这不是小小的妥协，而是选错了 kernel。',
+    benchmarkContext:
+      '所使用的后端属于测试配置的一部分，改动它可以在硬件和引擎版本都不变的情况下推动曲线变化。正是这些 kernel 支持了循环状态的检查点，混合模型才得以参与前缀复用。',
+  },
+  'cuda-graphs': {
+    term: 'CUDA graph',
+    aliases: ['CUDA graphs', 'graph capture', 'full-graph 模式'],
+    plainEnglish: 'CUDA graph 把一整串芯片操作录制一次并整体回放，从而免去逐个启动它们的开销。',
+    definition:
+      'CUDA graph capture 把一串 kernel 启动及其依赖关系录制成可回放的图，从而一次性提交整段序列，而不是逐个算子启动。',
+    explanation:
+      '一个 decode 步骤会发出许多小 kernel，在小 batch 下它们之间的启动与调度开销可以与实际运算相当。把整步录制下来即可消除这部分逐次启动的开销。代价是图是固定的：shape 必须稳定，因此引擎会按分桶分别录制，并把真正动态的部分留在图之外。',
+    significance:
+      '这更多是延迟优化而不是吞吐量优化，恰恰在 batch 很小、交互性很高的场景最有价值。它也会与一切改变 shape 的因素相互作用，因此变长的 agentic 流量可能击垮过度特化的运行时，使其几乎为每个请求重新编译。',
+    benchmarkContext:
+      'graph 的使用方式取决于测试配置所固定的引擎镜像，因此它可以在硬件不变的情况下推动曲线变化。有些方案会录制稳定的算子，同时让依赖请求的注意力保持 eager 执行，这是在录制覆盖率与 shape 灵活性之间的有意折中。',
+  },
 };
 
 const entries = getAllGlossaryEntries().map((entry) => {
