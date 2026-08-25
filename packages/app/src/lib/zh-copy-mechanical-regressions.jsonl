@@ -16,3 +16,4 @@
 {"rule": "duplicated-technical-loanword", "kind": "exemption", "text": "'这里所说的预热（warmup）发生在正式测量之前。'", "note": "Chinese-first parenthetical explanation is intentional for a broader audience"}
 {"rule": "duplicated-technical-loanword", "kind": "exemption", "text": "'随机种子（seed）用于固定会话采样。'", "note": "Chinese-first parenthetical explanation remains allowed"}
 {"rule": "duplicated-technical-loanword", "kind": "exemption", "text": "'将 KV cache 卸载（offload）到 DRAM。'", "note": "Chinese-first parenthetical explanation remains allowed"}
+{"rule": "chip-untranslated", "kind": "exemption", "text": "labelZh: '每芯片新输入 suffix + 输出 TFLOP/s（TFLOP/s/chip）',", "note": "TFLOP/s/chip is a unit and stays English like tok/s/chip"}

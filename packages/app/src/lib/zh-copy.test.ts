@@ -84,7 +84,8 @@ function segment(raw: string, isProse: boolean): string[] {
 // "Chip" is an ordinary English noun whose Chinese equivalent (芯片) is what
 // readers actually use, so it cannot inherit GPU's exemption. Units keep the
 // English form per AGENTS.md rule 6 — that is the one recorded exception.
-const CHIP_UNITS = /(?:tok|tokens?)\/s\/chip|\$\/chip[/-](?:hr|hour)|[A-Za-z]Chip\b|\bChip[A-Z]/giu;
+const CHIP_UNITS =
+  /(?:tok|tokens?|[KMGT]?FLOPs?)\/s\/chip|\$\/chip[/-](?:hr|hour)|[A-Za-z]Chip\b|\bChip[A-Z]/giu;
 
 const RULES: Rule[] = [
   {
