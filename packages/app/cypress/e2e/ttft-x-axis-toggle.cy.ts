@@ -1,5 +1,6 @@
 import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 import { agenticMetrics } from '../support/agentic-fixtures';
+import { expandLegendAdvanced } from '../support/legend-advanced';
 
 // This spec exercises the agentic x-axis modes, which only exist when the
 // selected model resolves to the Agentic scenario. The default e2e
@@ -245,6 +246,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     // Line labels name the curve and point labels name the point, so the
     // agentic view turns on both — it differs from fixed-seq only in the
     // parallelism and point labels.
+    expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
@@ -262,6 +264,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+    expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
@@ -465,6 +468,7 @@ describe('Label defaults for fixed-sequence scenarios', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+    expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
@@ -526,6 +530,7 @@ describe('Label defaults for fixed-sequence scenarios', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+    expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');

@@ -3,6 +3,7 @@
  * update the visible output (selector text, SVG axis labels).
  * Merged from url-params.cy.ts + chart-filter-effects.cy.ts + high-contrast.cy.ts.
  */
+import { expandLegendAdvanced } from '../support/legend-advanced';
 const visitWithDismissedModal = (path: string) => {
   cy.visit(path, {
     onBeforeLoad(win) {
@@ -79,13 +80,18 @@ describe('URL Parameter Persistence', () => {
     it('refreshes the automatic Best per SKU selection when the metric changes', () => {
       visitWithDismissedModal('/inference');
 
-      cy.get('[data-testid="scatter-best-per-sku"]')
-        .should('have.attr', 'data-state', 'checked')
-        .then(() =>
-          cy
-            .get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked')
-            .then(($inputs) => [...$inputs].map((input) => input.id).toSorted()),
-        )
+      // Best per SKU lives in the Quick Filters dialog now.
+      cy.get('[data-testid="scatter-quick-filters"]').click();
+      cy.get('[data-testid="quick-filter-best-per-sku"]').should(
+        'have.attr',
+        'data-state',
+        'checked',
+      );
+      cy.contains('button', 'Done').click();
+      cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
+
+      cy.get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked')
+        .then(($inputs) => [...$inputs].map((input) => input.id).toSorted())
         .then((before) => {
           cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
           cy.contains(
@@ -93,11 +99,14 @@ describe('URL Parameter Persistence', () => {
             'Cost per Million Total Tokens (Owning - Hyperscaler)',
           ).click({ force: true });
 
-          cy.get('[data-testid="scatter-best-per-sku"]').should(
+          cy.get('[data-testid="scatter-quick-filters"]').click();
+          cy.get('[data-testid="quick-filter-best-per-sku"]').should(
             'have.attr',
             'data-state',
             'checked',
           );
+          cy.contains('button', 'Done').click();
+          cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
           cy.get('[data-testid="x-axis-mode-ttft"]').click();
           cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
           cy.get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked').then(
@@ -244,6 +253,7 @@ describe('URL Parameter Persistence', () => {
 
     it('keeps tooltip rulers aligned after a zoomed metric switch', () => {
       visitWithDismissedModal('/inference?i_metric=y_tpPerGpu');
+      expandLegendAdvanced();
       cy.get('#scatter-log-scale').first().click();
 
       cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]')
@@ -414,24 +424,28 @@ describe('URL Parameter Persistence', () => {
     it('inference loads with high contrast off by default', () => {
       visitWithDismissedModal('/inference');
       cy.get('[data-testid="scatter-graph"]').should('exist');
+      expandLegendAdvanced();
       cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
     });
 
     it('i_hc=0 disables high contrast on load', () => {
       visitWithDismissedModal('/inference?i_hc=0');
       cy.get('[data-testid="scatter-graph"]').should('exist');
+      expandLegendAdvanced();
       cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
     });
 
     it('i_hc=1 applies high contrast on load', () => {
       visitWithDismissedModal('/inference?i_hc=1');
       cy.get('[data-testid="scatter-graph"]').should('exist');
+      expandLegendAdvanced();
       cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'checked');
     });
 
     it('multiple high contrast params can coexist in URL', () => {
       visitWithDismissedModal('/inference?i_hc=1&r_hc=1&e_hc=1');
       cy.get('[data-testid="scatter-graph"]').should('exist');
+      expandLegendAdvanced();
       cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'checked');
     });
 
@@ -467,6 +481,7 @@ describe('URL Parameter Persistence', () => {
     it('a bare /inference link with neither param renders high contrast AND parallelism labels off', () => {
       visitWithDismissedModal('/inference');
       cy.get('[data-testid="scatter-graph"]').should('exist');
+      expandLegendAdvanced();
       cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
       cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
     });
@@ -474,6 +489,7 @@ describe('URL Parameter Persistence', () => {
     it('i_hc=1&i_advlabel=1 enables both high contrast and parallelism labels on load', () => {
       visitWithDismissedModal('/inference?i_hc=1&i_advlabel=1');
       cy.get('[data-testid="scatter-graph"]').should('exist');
+      expandLegendAdvanced();
       cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'checked');
       cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     });
