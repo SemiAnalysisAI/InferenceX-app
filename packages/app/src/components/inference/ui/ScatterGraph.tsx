@@ -334,7 +334,6 @@ const SCATTER_STRINGS = {
   en: {
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
-    bestPerSku: 'Best per SKU',
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     labels: 'Labels',
     highContrast: 'High Contrast',
@@ -350,7 +349,6 @@ const SCATTER_STRINGS = {
   zh: {
     logScale: '对数缩放',
     optimalOnly: '仅最优',
-    bestPerSku: '每个 SKU 仅显示最佳配置',
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
     labels: '标签',
     highContrast: '高对比度',
@@ -567,6 +565,45 @@ const ScatterGraph = React.memo(
         toggleOfficialHwType(key);
       },
       [overlayData, setBestPerSku, toggleOfficialHwType, toggleHwType],
+    );
+
+    // Best per SKU lives in the Quick Filters dialog, but the handler stays
+    // here: overlay mode owns a temporary unified selection that must be
+    // recomputed (or restored) when the automatic mode flips.
+    const handleBestPerSkuChange = useCallback(
+      (checked: boolean) => {
+        setBestPerSku(checked);
+        if (overlayData) {
+          if (checked) {
+            const direction =
+              chartDefinition[`${selectedYAxisMetric}_roofline` as keyof ChartDefinition];
+            if (
+              direction === 'upper_right' ||
+              direction === 'upper_left' ||
+              direction === 'lower_left' ||
+              direction === 'lower_right'
+            ) {
+              const selection = bestSeriesPerSku(data, direction);
+              for (const key of bestSeriesPerSku(overlayData.data, direction)) {
+                selection.add(`overlay:${key}`);
+              }
+              commitUnifiedSelection(selection);
+            }
+          } else {
+            resetUnifiedSelection();
+          }
+        }
+        track('inference_best_per_sku_toggled', { enabled: checked });
+      },
+      [
+        setBestPerSku,
+        overlayData,
+        chartDefinition,
+        selectedYAxisMetric,
+        data,
+        commitUnifiedSelection,
+        resetUnifiedSelection,
+      ],
     );
 
     // Legend "X" (remove) — same overlay split as handleToggleHwType. With an
@@ -2914,7 +2951,11 @@ const ScatterGraph = React.memo(
               </Button>
             </div>
           </div>
-          <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
+          <QuickFiltersDialog
+            open={quickFiltersOpen}
+            onOpenChange={setQuickFiltersOpen}
+            bestPerSku={{ checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }}
+          />
         </div>
       );
     }
@@ -3062,37 +3103,6 @@ const ScatterGraph = React.memo(
                 track('latency_legend_expanded', { expanded });
               }}
               switches={[
-                {
-                  id: 'scatter-best-per-sku',
-                  label: legendT.bestPerSku,
-                  checked: bestPerSku,
-                  onCheckedChange: (checked: boolean) => {
-                    setBestPerSku(checked);
-                    if (overlayData) {
-                      if (checked) {
-                        const direction =
-                          chartDefinition[
-                            `${selectedYAxisMetric}_roofline` as keyof ChartDefinition
-                          ];
-                        if (
-                          direction === 'upper_right' ||
-                          direction === 'upper_left' ||
-                          direction === 'lower_left' ||
-                          direction === 'lower_right'
-                        ) {
-                          const selection = bestSeriesPerSku(data, direction);
-                          for (const key of bestSeriesPerSku(overlayData.data, direction)) {
-                            selection.add(`overlay:${key}`);
-                          }
-                          commitUnifiedSelection(selection);
-                        }
-                      } else {
-                        resetUnifiedSelection();
-                      }
-                    }
-                    track('inference_best_per_sku_toggled', { enabled: checked });
-                  },
-                },
                 ...(selectedYAxisMetric === 'y_inputTputPerGpu'
                   ? []
                   : [
@@ -3252,7 +3262,11 @@ const ScatterGraph = React.memo(
             />
           }
         />
-        <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
+        <QuickFiltersDialog
+          open={quickFiltersOpen}
+          onOpenChange={setQuickFiltersOpen}
+          bestPerSku={{ checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }}
+        />
         {pointsTable && (
           <LegendPointsDialog
             open

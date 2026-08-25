@@ -80,13 +80,18 @@ describe('URL Parameter Persistence', () => {
     it('refreshes the automatic Best per SKU selection when the metric changes', () => {
       visitWithDismissedModal('/inference');
 
-      cy.get('[data-testid="scatter-best-per-sku"]')
-        .should('have.attr', 'data-state', 'checked')
-        .then(() =>
-          cy
-            .get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked')
-            .then(($inputs) => [...$inputs].map((input) => input.id).toSorted()),
-        )
+      // Best per SKU lives in the Quick Filters dialog now.
+      cy.get('[data-testid="scatter-quick-filters"]').click();
+      cy.get('[data-testid="quick-filter-best-per-sku"]').should(
+        'have.attr',
+        'data-state',
+        'checked',
+      );
+      cy.contains('button', 'Done').click();
+      cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
+
+      cy.get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked')
+        .then(($inputs) => [...$inputs].map((input) => input.id).toSorted())
         .then((before) => {
           cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
           cy.contains(
@@ -94,11 +99,14 @@ describe('URL Parameter Persistence', () => {
             'Cost per Million Total Tokens (Owning - Hyperscaler)',
           ).click({ force: true });
 
-          cy.get('[data-testid="scatter-best-per-sku"]').should(
+          cy.get('[data-testid="scatter-quick-filters"]').click();
+          cy.get('[data-testid="quick-filter-best-per-sku"]').should(
             'have.attr',
             'data-state',
             'checked',
           );
+          cy.contains('button', 'Done').click();
+          cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
           cy.get('[data-testid="x-axis-mode-ttft"]').click();
           cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
           cy.get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked').then(
