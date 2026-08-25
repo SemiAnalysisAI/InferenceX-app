@@ -113,7 +113,9 @@ describe('Chinese (/zh) pages', () => {
           cy.contains('TTFT 越长，归一化指标越低').should('be.visible');
           cy.get('[data-testid="faq-copy-link-faq-normalized-interactivity"]')
             .should('be.visible')
-            .and('contain.text', '复制链接');
+            .and('have.attr', 'title', '复制链接')
+            .find('svg.lucide-link')
+            .should('be.visible');
         });
       cy.location('hash').should('eq', '#faq-normalized-interactivity');
     });

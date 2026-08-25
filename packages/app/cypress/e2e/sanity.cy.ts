@@ -76,9 +76,15 @@ describe('Page Load & Navigation', () => {
         cy.contains('The normalized value penalizes slow TTFT').should('be.visible');
         cy.get('[data-testid="faq-copy-link-faq-normalized-interactivity"]')
           .should('be.visible')
-          .and('contain.text', 'Copy link')
+          .and('have.text', '')
+          .and('have.attr', 'title', 'Copy link')
+          .find('svg.lucide-link')
+          .should('be.visible');
+        cy.get('[data-testid="faq-copy-link-faq-normalized-interactivity"]')
           .click()
-          .should('contain.text', 'Copied');
+          .should('have.attr', 'title', 'Copied')
+          .find('svg.lucide-check')
+          .should('be.visible');
       });
     cy.get('@writeFaqLink').should(
       'have.been.calledOnceWith',
@@ -93,7 +99,12 @@ describe('Page Load & Navigation', () => {
     cy.get('[data-testid^="faq-copy-link-"]')
       .should('have.length', 15)
       .each(($button) => {
-        cy.wrap($button).should('be.visible').and('contain.text', 'Copy link');
+        cy.wrap($button)
+          .should('be.visible')
+          .and('have.text', '')
+          .and('have.attr', 'title', 'Copy link')
+          .find('svg.lucide-link')
+          .should('be.visible');
       });
   });
 });

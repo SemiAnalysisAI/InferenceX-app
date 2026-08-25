@@ -16,7 +16,7 @@ function mountFaqQuestionLink(pathname = '/about') {
 }
 
 describe('FaqQuestionLink', () => {
-  it('shows an explicit button and copies the direct URL', () => {
+  it('shows an icon-only control and copies the direct URL', () => {
     cy.window().then((win) => {
       cy.stub(win.navigator.clipboard, 'writeText').as('writeFaqLink').resolves();
     });
@@ -25,9 +25,17 @@ describe('FaqQuestionLink', () => {
     cy.get(`a[href="#${ID}"]`).should('have.text', QUESTION);
     cy.get(`[data-testid="faq-copy-link-${ID}"]`)
       .should('be.visible')
-      .and('contain.text', 'Copy link')
+      .and('have.text', '')
+      .and('have.attr', 'title', 'Copy link')
+      .and('have.attr', 'aria-label', `Copy link: ${QUESTION}`)
+      .find('svg.lucide-link')
+      .should('be.visible');
+    cy.get(`[data-testid="faq-copy-link-${ID}"]`)
       .click()
-      .should('contain.text', 'Copied');
+      .should('have.attr', 'title', 'Copied')
+      .and('have.attr', 'aria-label', `Copied: ${QUESTION}`)
+      .find('svg.lucide-check')
+      .should('be.visible');
     cy.get('@writeFaqLink').should(
       'have.been.calledOnceWith',
       Cypress.sinon.match(new RegExp(`#${ID}$`, 'u')),
@@ -40,6 +48,8 @@ describe('FaqQuestionLink', () => {
     cy.get(`[data-testid="faq-copy-link-${ID}"]`)
       .should('be.visible')
       .and('have.attr', 'aria-label', `复制链接: ${QUESTION}`)
-      .and('contain.text', '复制链接');
+      .and('have.attr', 'title', '复制链接')
+      .find('svg.lucide-link')
+      .should('be.visible');
   });
 });

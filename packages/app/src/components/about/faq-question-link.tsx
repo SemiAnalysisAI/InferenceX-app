@@ -51,28 +51,31 @@ export function FaqQuestionLink({ id, question }: { id: string; question: string
   }, [id]);
 
   return (
-    <span className="flex flex-col items-start gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+    <span className="flex items-start justify-between gap-3">
       <a
         href={`#${id}`}
         onClick={() => track('about_faq_link_clicked', { id })}
-        className="min-w-0 rounded-sm transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+        className="min-w-0 flex-1 rounded-sm transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
       >
         {question}
       </a>
       <button
         type="button"
         data-testid={`faq-copy-link-${id}`}
-        aria-label={`${strings.copyLink}: ${question}`}
+        aria-label={`${copied ? strings.copied : strings.copyLink}: ${question}`}
+        title={copied ? strings.copied : strings.copyLink}
         onClick={() => void handleCopy()}
-        className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:border-brand/50 hover:bg-muted hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+        className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-xs transition-colors hover:border-brand/50 hover:bg-muted hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
       >
         {copied ? (
-          <Check aria-hidden="true" className="size-3.5" />
+          <Check aria-hidden="true" className="size-4" />
         ) : (
-          <LinkIcon aria-hidden="true" className="size-3.5" />
+          <LinkIcon aria-hidden="true" className="size-4" />
         )}
-        <span aria-live="polite">{copied ? strings.copied : strings.copyLink}</span>
       </button>
+      <span aria-live="polite" className="sr-only">
+        {copied ? `${strings.copied}: ${question}` : ''}
+      </span>
     </span>
   );
 }
