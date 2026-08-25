@@ -903,6 +903,7 @@ const GPUGraph = React.memo(
               {
                 id: 'gpu-log-scale',
                 label: legendT.logScale,
+                advanced: true,
                 checked: logScale,
                 onCheckedChange: (c) => {
                   setLogScale(c);
@@ -912,6 +913,7 @@ const GPUGraph = React.memo(
               {
                 id: 'gpu-high-contrast',
                 label: legendT.highContrast,
+                advanced: true,
                 checked: highContrast,
                 onCheckedChange: (c) => {
                   setHighContrast(c);
@@ -930,6 +932,7 @@ const GPUGraph = React.memo(
               {
                 id: 'gpu-point-labels',
                 label: legendT.labels,
+                advanced: true,
                 checked: showPointLabels,
                 onCheckedChange: (c) => {
                   setShowPointLabels(c);
@@ -939,6 +942,7 @@ const GPUGraph = React.memo(
               {
                 id: 'gpu-parallelism-labels',
                 label: legendT.parallelismLabels,
+                advanced: true,
                 checked: useAdvancedLabels,
                 onCheckedChange: (c) => {
                   setUseAdvancedLabels(c);
@@ -951,6 +955,7 @@ const GPUGraph = React.memo(
               {
                 id: 'gpu-line-labels',
                 label: legendT.lineLabels,
+                advanced: true,
                 checked: showLineLabels,
                 onCheckedChange: (c) => {
                   setShowLineLabels(c);

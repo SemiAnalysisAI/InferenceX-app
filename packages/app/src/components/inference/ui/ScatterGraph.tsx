@@ -3099,6 +3099,7 @@ const ScatterGraph = React.memo(
                       {
                         id: 'scatter-log-scale',
                         label: legendT.logScale,
+                        advanced: true,
                         checked: logScale,
                         onCheckedChange: (checked: boolean) => {
                           setLogScale(checked);
@@ -3124,6 +3125,7 @@ const ScatterGraph = React.memo(
                 {
                   id: 'scatter-point-labels',
                   label: legendT.labels,
+                  advanced: true,
                   checked: showPointLabels,
                   onCheckedChange: (checked: boolean) => {
                     setShowPointLabels(checked);
@@ -3133,6 +3135,7 @@ const ScatterGraph = React.memo(
                 {
                   id: 'scatter-high-contrast',
                   label: legendT.highContrast,
+                  advanced: true,
                   checked: highContrast,
                   onCheckedChange: (checked: boolean) => {
                     setHighContrast(checked);
@@ -3142,6 +3145,7 @@ const ScatterGraph = React.memo(
                 {
                   id: 'scatter-parallelism-labels',
                   label: legendT.parallelismLabels,
+                  advanced: true,
                   checked: useAdvancedLabels,
                   onCheckedChange: (checked: boolean) => {
                     setUseAdvancedLabels(checked);
@@ -3179,6 +3183,7 @@ const ScatterGraph = React.memo(
                 {
                   id: 'scatter-line-labels',
                   label: legendT.lineLabels,
+                  advanced: true,
                   checked: showLineLabels,
                   onCheckedChange: (checked: boolean) => {
                     setShowLineLabels(checked);
