@@ -1849,8 +1849,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/derived-agentic-metrics',
     summary: text('Read derived agentic metrics', '读取派生智能体指标'),
     description: text(
-      'Returns normalized interactivity percentiles keyed by benchmark result ID. IDs are deduplicated and at most 200 are accepted.',
-      '按基准结果 ID 返回归一化交互性百分位。ID 会去重，最多接受 200 个。',
+      'Returns normalized interactivity percentiles and joint request-length moment sums keyed by benchmark result ID. IDs are deduplicated and at most 200 are accepted.',
+      '按基准结果 ID 返回归一化交互性百分位及请求长度联合矩和。ID 会去重，最多接受 200 个。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -1868,16 +1868,43 @@ export const apiOperations: readonly ApiOperation[] = [
     ],
     responses: [
       success(
-        'Result IDs mapped to p75 and p90 normalized interactivity.',
-        '结果 ID 映射到 p75 和 p90 归一化交互性。',
+        'Result IDs mapped to p75/p90 normalized interactivity and exact joint (ISL, OSL) request-length moment sums (null when the profile blob is missing).',
+        '结果 ID 映射到 p75/p90 归一化交互性及精确的 (ISL, OSL) 请求长度联合矩和（缺少 profile blob 时为 null）。',
         mapSchema(
           objectSchema({
             id: integerSchema,
             p75_e2e_norm_intvty: nullableNumberSchema,
             p90_e2e_norm_intvty: nullableNumberSchema,
+            request_length_moments: {
+              type: ['object', 'null'],
+              properties: {
+                n: integerSchema,
+                sumIsl: { type: 'number' },
+                sumIslSq: { type: 'number' },
+                sumOsl: { type: 'number' },
+                sumOslSq: { type: 'number' },
+                sumIslOsl: { type: 'number' },
+              },
+              required: ['n', 'sumIsl', 'sumIslSq', 'sumOsl', 'sumOslSq', 'sumIslOsl'],
+              additionalProperties: false,
+            },
           }),
         ),
-        { '421': { id: 421, p75_e2e_norm_intvty: 31.2, p90_e2e_norm_intvty: 24.8 } },
+        {
+          '421': {
+            id: 421,
+            p75_e2e_norm_intvty: 31.2,
+            p90_e2e_norm_intvty: 24.8,
+            request_length_moments: {
+              n: 2,
+              sumIsl: 300,
+              sumIslSq: 50_000,
+              sumOsl: 150,
+              sumOslSq: 12_500,
+              sumIslOsl: 25_000,
+            },
+          },
+        },
       ),
       errorResponse(
         '400',
