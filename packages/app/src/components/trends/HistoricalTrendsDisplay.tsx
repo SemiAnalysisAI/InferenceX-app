@@ -330,6 +330,7 @@ export default function HistoricalTrendsDisplay() {
                     </p>
                     <MetricAssumptionNotes
                       selectedYAxisMetric={selectedYAxisMetric}
+                      activeHwKeys={activeHwTypes}
                       includeAllPowerThroughputMetrics={false}
                       includePowerThroughputCaveat={false}
                     />

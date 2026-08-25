@@ -150,6 +150,49 @@ describe('MetricAssumptionNotes', () => {
     );
   });
 
+  it('narrows the TCO badges to the base GPUs of the active legend selection', () => {
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_tokensPerDollarH"
+        activeHwKeys={['h200_dynamo-sglang', 'gb300_dynamo-sglang']}
+      />,
+    );
+
+    expect(getVisibleText()).toContain('TCO $/chip/hr:');
+    expect(getVisibleText()).toContain('H200:');
+    expect(getVisibleText()).toContain('GB300:');
+    expect(getVisibleText()).not.toContain('H100:');
+    expect(getVisibleText()).not.toContain('MI300X:');
+  });
+
+  it('narrows the power badges to the active legend selection', () => {
+    renderUi(
+      <MetricAssumptionNotes selectedYAxisMetric="y_tpPerMw" activeHwKeys={new Set(['mi300x'])} />,
+    );
+
+    expect(getVisibleText()).toContain('All in Power/Chip:');
+    expect(getVisibleText()).toContain('MI300X:');
+    expect(getVisibleText()).not.toContain('H100:');
+    expect(getVisibleText()).not.toContain('H200:');
+  });
+
+  it('falls back to every registry GPU when the selection is empty or unrecognized', () => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_tokensPerDollarH" activeHwKeys={[]} />);
+
+    expect(getVisibleText()).toContain('H100:');
+    expect(getVisibleText()).toContain('MI300X:');
+
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_tokensPerDollarH"
+        activeHwKeys={['not-a-gpu_dynamo-sglang']}
+      />,
+    );
+
+    expect(getVisibleText()).toContain('H100:');
+    expect(getVisibleText()).toContain('MI300X:');
+  });
+
   it('renders metric-specific throughput caveats and preserves Joules wording semantics', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_inputTputPerGpu" />);
 
