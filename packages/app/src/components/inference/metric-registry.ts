@@ -43,26 +43,26 @@ export const METRIC_REGISTRY = {
     titleZh: '每芯片输出 token 吞吐量',
     polarity: 'higher',
   },
-  // Prompt-suffix throughput pair: total / input throughput minus the
+  // New-input-suffix throughput pair: total / input throughput minus the
   // infinite-cache theoretical prefix share (trace-derived, agentic only).
   // Deliberately based on the theoretical rate rather than server-observed
   // cache hits so systems with good cache storage aren't penalized — like
   // MFU vs HFU, actual (uncached + output) throughput is always at least the
   // theoretical (uncachable suffix + output) throughput.
-  promptSuffixOutputTputPerGpu: {
-    field: 'promptSuffixOutputTputPerGpu.y',
-    label: 'Prompt Suffix + Output Token Throughput per Chip (tok/s/chip)',
-    labelZh: '每芯片 prompt suffix + 输出 token 吞吐量（tok/s/chip）',
-    title: 'Prompt Suffix + Output Token Throughput per Chip',
-    titleZh: '每芯片 prompt suffix + 输出 token 吞吐量',
+  newInputSuffixOutputTputPerGpu: {
+    field: 'newInputSuffixOutputTputPerGpu.y',
+    label: 'New Input Suffix + Output Token Throughput per Chip (tok/s/chip)',
+    labelZh: '每芯片新输入 suffix + 输出 token 吞吐量（tok/s/chip）',
+    title: 'New Input Suffix + Output Token Throughput per Chip',
+    titleZh: '每芯片新输入 suffix + 输出 token 吞吐量',
     polarity: 'higher',
   },
-  promptSuffixTputPerGpu: {
-    field: 'promptSuffixTputPerGpu.y',
-    label: 'Prompt Suffix Token Throughput per Chip (tok/s/chip)',
-    labelZh: '每芯片 prompt suffix token 吞吐量（tok/s/chip）',
-    title: 'Prompt Suffix Token Throughput per Chip',
-    titleZh: '每芯片 prompt suffix token 吞吐量',
+  newInputSuffixTputPerGpu: {
+    field: 'newInputSuffixTputPerGpu.y',
+    label: 'New Input Suffix Token Throughput per Chip (tok/s/chip)',
+    labelZh: '每芯片新输入 suffix token 吞吐量（tok/s/chip）',
+    title: 'New Input Suffix Token Throughput per Chip',
+    titleZh: '每芯片新输入 suffix token 吞吐量',
     polarity: 'higher',
     x: 'p90_ttft',
     xLabel: 'P90 Time To First Token (s)',
@@ -498,8 +498,8 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
       'y_tpPerGpu',
       'y_inputTputPerGpu',
       'y_outputTputPerGpu',
-      'y_promptSuffixOutputTputPerGpu',
-      'y_promptSuffixTputPerGpu',
+      'y_newInputSuffixOutputTputPerGpu',
+      'y_newInputSuffixTputPerGpu',
       'y_tpPerMw',
       'y_inputTputPerMw',
       'y_outputTputPerMw',

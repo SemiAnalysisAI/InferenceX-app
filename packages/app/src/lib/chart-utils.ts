@@ -327,7 +327,7 @@ export function buildDerivedChartFields(
   if (wants('inputTputPerGpu') && inputTputPerGpu) {
     fields.inputTputPerGpu = chartMetric(inputTputPerGpu);
   }
-  // Prompt-suffix throughput: subtract the infinite-cache theoretical prefix
+  // New-input-suffix throughput: subtract the infinite-cache theoretical prefix
   // share of input throughput (rate derived from the trace by the harness).
   // Uses the theoretical rate rather than server-observed cache hits so
   // systems with good cache storage aren't penalized — only agentic trace
@@ -338,13 +338,13 @@ export function buildDerivedChartFields(
     Number.isFinite(theoreticalHitRate) &&
     theoreticalHitRate >= 0 &&
     theoreticalHitRate <= 1;
-  if (wants('promptSuffixOutputTputPerGpu') && hasTheoreticalHitRate && tputPerGpu) {
-    fields.promptSuffixOutputTputPerGpu = chartMetric(
+  if (wants('newInputSuffixOutputTputPerGpu') && hasTheoreticalHitRate && tputPerGpu) {
+    fields.newInputSuffixOutputTputPerGpu = chartMetric(
       Math.max(0, tputPerGpu - inputTputPerGpu * theoreticalHitRate),
     );
   }
-  if (wants('promptSuffixTputPerGpu') && hasTheoreticalHitRate && inputTputPerGpu) {
-    fields.promptSuffixTputPerGpu = chartMetric(inputTputPerGpu * (1 - theoreticalHitRate));
+  if (wants('newInputSuffixTputPerGpu') && hasTheoreticalHitRate && inputTputPerGpu) {
+    fields.newInputSuffixTputPerGpu = chartMetric(inputTputPerGpu * (1 - theoreticalHitRate));
   }
   if (wants('tpPerMw')) fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);
   if (wants('inputTputPerMw') && inputTputPerGpu) {
