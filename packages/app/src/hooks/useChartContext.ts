@@ -238,17 +238,3 @@ export function useChartDataFilter<TData, TKey extends string>(
 
   return itemsWithData;
 }
-
-/**
- * Creates a memoized filtered dataset based on active items.
- */
-export function useFilteredData<TData, TKey extends string>(
-  data: TData[],
-  activeSet: Set<TKey>,
-  extractKey: (item: TData) => TKey,
-) {
-  return useMemo(
-    () => data.filter((item) => activeSet.has(extractKey(item))),
-    [data, activeSet, extractKey],
-  );
-}
