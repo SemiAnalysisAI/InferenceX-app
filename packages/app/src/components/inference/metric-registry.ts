@@ -43,6 +43,29 @@ export const METRIC_REGISTRY = {
     titleZh: '每芯片输出 token 吞吐量',
     polarity: 'higher',
   },
+  // Theoretical uncached throughput pair: total / input throughput minus the
+  // infinite-cache theoretical prefix share (trace-derived, agentic only).
+  // Deliberately based on the theoretical rate rather than server-observed
+  // cache hits so systems with good cache storage aren't penalized.
+  uncachedTputPerGpu: {
+    field: 'uncachedTputPerGpu.y',
+    label: 'Uncached Token Throughput per Chip (tok/s/chip)',
+    labelZh: '每芯片无 prefix cache token 吞吐量（tok/s/chip）',
+    title: 'Uncached Token Throughput per Chip',
+    titleZh: '每芯片无 prefix cache token 吞吐量',
+    polarity: 'higher',
+  },
+  uncachedInputTputPerGpu: {
+    field: 'uncachedInputTputPerGpu.y',
+    label: 'Uncached Input Token Throughput per Chip (tok/s/chip)',
+    labelZh: '每芯片无 prefix cache 输入 token 吞吐量（tok/s/chip）',
+    title: 'Uncached Input Token Throughput per Chip',
+    titleZh: '每芯片无 prefix cache 输入 token 吞吐量',
+    polarity: 'higher',
+    x: 'p90_ttft',
+    xLabel: 'P90 Time To First Token (s)',
+    heading: 'vs. P90 Time To First Token',
+  },
   tpPerMw: {
     field: 'tpPerMw.y',
     label: 'Token Throughput per All in Utility MW (tok/s/MW)',
@@ -473,6 +496,8 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
       'y_tpPerGpu',
       'y_inputTputPerGpu',
       'y_outputTputPerGpu',
+      'y_uncachedTputPerGpu',
+      'y_uncachedInputTputPerGpu',
       'y_tpPerMw',
       'y_inputTputPerMw',
       'y_outputTputPerMw',
