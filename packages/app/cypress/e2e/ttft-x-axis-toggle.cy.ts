@@ -172,6 +172,20 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     );
   });
 
+  it('offers unobtrusive FAQ help beside E2E Normalized Interactivity', () => {
+    cy.get('[data-testid="normalized-interactivity-faq-link"]')
+      .should('be.visible')
+      .and('have.attr', 'href', '/about#faq-normalized-interactivity')
+      .and('have.attr', 'title', 'What does E2E Normalized Interactivity mean?')
+      .and('have.class', 'no-export')
+      .find('svg[aria-hidden="true"]')
+      .should('be.visible');
+
+    // The metric tabs sit outside the chart capture root, and no-export is a
+    // second guard if this control moves into that tree in the future.
+    cy.get('#chart-0 [data-testid="normalized-interactivity-faq-link"]').should('not.exist');
+  });
+
   it('switches to E2E Normalized Interactivity and updates the heading', () => {
     // The first entry into this mode fetches the trace-derived metrics, which the
     // suite's intercept stubs; the default no longer fetches them on load.

@@ -84,6 +84,7 @@ const ModelArchitectureDiagram = dynamic(() => import('./ModelArchitectureDiagra
   loading: () => <Skeleton className="h-40 w-full" />,
 });
 import WorkflowInfoDisplay from './WorkflowInfoDisplay';
+import { NormalizedInteractivityHelpLink } from './NormalizedInteractivityHelpLink';
 
 type InferenceViewMode = 'chart' | 'table';
 
@@ -1090,16 +1091,38 @@ export default function ChartDisplay() {
             // Before mount, render all buttons so SSR and first client render match.
             if (!mounted) return true;
             return !isAgenticOnlyXAxisMode(value) || isAgenticSequence;
-          }).map(({ value, label, labelZh }) => (
-            <TabsTrigger
-              key={value}
-              value={value}
-              data-testid={`x-axis-mode-${value}`}
-              className="min-w-[130px] sm:min-w-[140px] flex-1 sm:flex-initial justify-center"
-            >
-              {locale === 'zh' ? labelZh : label}
-            </TabsTrigger>
-          ))}
+          }).map(({ value, label, labelZh }) => {
+            const modeLabel = locale === 'zh' ? labelZh : label;
+            if (value !== 'e2e-normalized-interactivity') {
+              return (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  data-testid={`x-axis-mode-${value}`}
+                  className="min-w-[130px] sm:min-w-[140px] flex-1 sm:flex-initial justify-center"
+                >
+                  {modeLabel}
+                </TabsTrigger>
+              );
+            }
+
+            return (
+              <span
+                key={value}
+                role="presentation"
+                className="relative flex flex-1 sm:flex-initial"
+              >
+                <TabsTrigger
+                  value={value}
+                  data-testid={`x-axis-mode-${value}`}
+                  className="min-w-[130px] flex-1 justify-center pr-9 sm:min-w-[140px] sm:flex-initial"
+                >
+                  {modeLabel}
+                </TabsTrigger>
+                <NormalizedInteractivityHelpLink locale={locale} />
+              </span>
+            );
+          })}
         </TabsList>
       </Tabs>
       <div className="flex flex-col gap-4">{displayGraphs}</div>
