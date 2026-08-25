@@ -56,7 +56,12 @@ import type {
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { computeTooltipPosition, syncPointShape } from '@/lib/d3-chart/layers/scatter-points';
-import { computePerfRulerGeometry, renderPerfRuler } from '@/lib/d3-chart/layers/perf-ruler';
+import {
+  computeIsoXRulerGeometry,
+  intersectPathAtX,
+  renderPerfRuler,
+  type PerfRulerGeometry,
+} from '@/lib/d3-chart/layers/perf-ruler';
 import {
   attachOverlayXMarkerHandlers,
   overlayMarkerPosition,
@@ -342,7 +347,8 @@ const SCATTER_STRINGS = {
     gradientLabels: 'Gradient Labels',
     lineLabels: 'Line Labels',
     perfRuler: 'Perf Ruler',
-    perfRulerInfo: 'Click two points to measure the performance multiple between them.',
+    perfRulerInfo:
+      'Click a point to anchor the ruler, then click another curve to measure the performance multiple between the two curves at that same x value.',
     resetFilter: 'Reset filter',
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
@@ -360,7 +366,8 @@ const SCATTER_STRINGS = {
     gradientLabels: '渐变标签',
     lineLabels: '曲线标签',
     perfRuler: '性能标尺',
-    perfRulerInfo: '点击两个数据点，测量二者之间的性能倍数。',
+    perfRulerInfo:
+      '先点击一个数据点固定标尺，再点击另一条曲线，测量两条曲线在同一横坐标处的性能倍数。',
     resetFilter: '重置筛选',
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
     overflowMixed: (count: number) => `${count} 个点已截断`,
@@ -1310,13 +1317,26 @@ const ScatterGraph = React.memo(
       logAvailability: persistedLogAvailability,
     };
 
-    // --- Perf ruler (opt-in: click two points, measure the y-value multiple) ---
-    // Selection stores stable point keys (not indices) so the measurement
-    // survives metric/display re-renders where the points still exist. Keys
-    // distinguish official points from unofficial overlay points, mirroring
-    // the dataIdentity convention.
+    // --- Perf ruler (opt-in: anchor a point, measure the iso-x multiple to another curve) ---
+    // ISO-X semantics: the FIRST selection entry is the anchor point — it
+    // defines the ruler's x position and one end. The SECOND entry only
+    // selects the target CURVE; the ruler's other end is that curve's
+    // rendered-roofline intersection at the anchor's x, not the clicked
+    // point. Selection stores stable point keys (not indices) so the
+    // measurement survives metric/display re-renders where the points still
+    // exist. Keys distinguish official points from unofficial overlay
+    // points, mirroring the dataIdentity convention.
+    interface PerfRulerClick {
+      key: string;
+      curve: string;
+    }
     const [perfRulerMode, setPerfRulerMode] = useState(false);
-    const [perfRulerSelection, setPerfRulerSelection] = useState<string[]>([]);
+    const [perfRulerSelection, setPerfRulerSelection] = useState<PerfRulerClick[]>([]);
+    // Draw passes read the mode through a ref so toggling off clears the
+    // ruler in the same pre-paint layout pass — the line/chip must never
+    // linger a frame after the switch flips (Bugbot report on PR #853).
+    const perfRulerModeRef = useRef(perfRulerMode);
+    perfRulerModeRef.current = perfRulerMode;
 
     const perfRulerKey = useCallback(
       (point: InferenceData, source: 'official' | 'overlay') =>
@@ -1324,6 +1344,20 @@ const ScatterGraph = React.memo(
           ? `official:${buildPointId(point)}`
           : `overlay:${buildPointId(point)}:${point.run_url ?? ''}`,
       [buildPointId],
+    );
+
+    // Curve identity for click semantics: a second click on the SAME curve
+    // moves the anchor; a different curve selects the measurement target.
+    // Official curves are (hw, precision, date) — comparison-date sub-curves
+    // are distinct targets (measuring a config against its own earlier date
+    // is a legitimate regression check). Overlay curves are per (hw,
+    // precision, run), matching the overlayRooflines grouping.
+    const perfRulerCurve = useCallback(
+      (point: InferenceData, source: 'official' | 'overlay') =>
+        source === 'official'
+          ? `official-curve:${String(point.hwKey)}_${point.precision}__${point.date}`
+          : `overlay-curve:${String(point.hwKey)}_${point.precision}:${point.run_url ?? ''}`,
+      [],
     );
 
     // Resolve each selected key to its current point object (raw x/y follow
@@ -1343,7 +1377,7 @@ const ScatterGraph = React.memo(
           ) ?? null
         );
       };
-      return perfRulerSelection.map(resolve);
+      return perfRulerSelection.map((entry) => resolve(entry.key));
     }, [
       perfRulerSelection,
       pointsData,
@@ -1353,13 +1387,31 @@ const ScatterGraph = React.memo(
       isOverlayPointVisible,
     ]);
 
-    const perfRulerMeasuredPair = useMemo(() => {
+    // Anchor point plus the target curve's roofline path class candidates.
+    // The path node is resolved from the DOM at draw time: the RENDERED path
+    // is the measurement surface, so the intersection matches the drawn
+    // curve exactly and stays correct under zoom (paths are redrawn with the
+    // new scales before this layer runs — rooflines render first).
+    const perfRulerMeasurement = useMemo(() => {
       if (perfRulerSelection.length !== 2) return null;
-      const [a, b] = perfRulerResolvedPoints;
-      return a && b ? ([a, b] as const) : null;
-    }, [perfRulerSelection, perfRulerResolvedPoints]);
-    const perfRulerPairRef = useRef(perfRulerMeasuredPair);
-    perfRulerPairRef.current = perfRulerMeasuredPair;
+      const [anchor, target] = perfRulerResolvedPoints;
+      if (!anchor || !target) return null;
+      const targetClasses: string[] = [];
+      if (perfRulerSelection[1].key.startsWith('overlay:')) {
+        const runIndex = overlayRunIndex(target.run_url ?? null, runIndexByUrl);
+        targetClasses.push(
+          `overlay-roofline-${String(target.hwKey)}_${target.precision}_run${runIndex}`,
+        );
+      } else {
+        const base = `${String(target.hwKey)}_${target.precision}`;
+        // A single comparison date renders `roofline-<key>`; multiple dates
+        // split into `roofline-<key>__<date>` sub-paths — try both.
+        targetClasses.push(`roofline-${base}`, `roofline-${base}__${target.date}`);
+      }
+      return { anchor, targetClasses };
+    }, [perfRulerSelection, perfRulerResolvedPoints, runIndexByUrl]);
+    const perfRulerMeasurementRef = useRef(perfRulerMeasurement);
+    perfRulerMeasurementRef.current = perfRulerMeasurement;
 
     // Clear the measurement when the toggle turns off; drop any selected
     // point that disappeared (data/filter change) while keeping the other.
@@ -1372,16 +1424,24 @@ const ScatterGraph = React.memo(
       if (kept.length !== perfRulerSelection.length) setPerfRulerSelection(kept);
     }, [perfRulerMode, perfRulerSelection, perfRulerResolvedPoints]);
 
-    // Selection toggling: first click selects, second click on another point
-    // completes the measurement, a third click starts a new measurement from
-    // that point, re-clicking a selected point deselects it. Ruler-mode
-    // clicks measure INSTEAD of pinning the tooltip, so drop the pin the
-    // shared click handler applied just before this callback ran.
-    const handlePerfRulerPointClick = useCallback((key: string) => {
+    // Selection toggling: the first click anchors the ruler; a click on a
+    // DIFFERENT curve selects the target curve; a click on the anchor's own
+    // curve moves the anchor along it; re-clicking the anchor clears the
+    // measurement, re-clicking the target click marker drops the target
+    // only; with a complete measurement, a click on any third curve starts a
+    // new measurement anchored at that point. Ruler-mode clicks measure
+    // INSTEAD of pinning the tooltip, so drop the pin the shared click
+    // handler applied just before this callback ran.
+    const handlePerfRulerPointClick = useCallback((clicked: PerfRulerClick) => {
       setPerfRulerSelection((prev) => {
-        if (prev.includes(key)) return prev.filter((k) => k !== key);
-        if (prev.length >= 2) return [key];
-        return [...prev, key];
+        const anchor = prev[0];
+        const target = prev[1];
+        if (anchor && anchor.key === clicked.key) return [];
+        if (target && target.key === clicked.key) return [anchor];
+        if (!anchor) return [clicked];
+        if (clicked.curve === anchor.curve) return target ? [clicked, target] : [clicked];
+        if (!target) return [anchor, clicked];
+        return [clicked];
       });
       chartRef.current?.dismissTooltip();
       chartRef.current?.hideTooltip();
@@ -1393,16 +1453,20 @@ const ScatterGraph = React.memo(
       mode: perfRulerMode,
       onPointClick: handlePerfRulerPointClick,
       keyFor: perfRulerKey,
+      curveFor: perfRulerCurve,
     });
     perfRulerRef.current = {
       mode: perfRulerMode,
       onPointClick: handlePerfRulerPointClick,
       keyFor: perfRulerKey,
+      curveFor: perfRulerCurve,
     };
 
-    // Draw (or clear) the ruler from the currently resolved pair. Stable
+    // Draw (or clear) the ruler from the current measurement. Stable
     // callback so the custom layer can live outside the perf-ruler state
-    // dependencies — render/zoom passes read the pair through the ref.
+    // dependencies — render/zoom passes read mode and the measurement
+    // through refs. Gated on the mode ref so a toggle-off clears the ruler
+    // in the very next draw, before the selection-prune state settles.
     const drawPerfRuler = useCallback(
       (
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -1410,13 +1474,33 @@ const ScatterGraph = React.memo(
         yScale: ContinuousScale,
         width: number,
       ) => {
-        const pair = perfRulerPairRef.current;
-        const geometry = pair
-          ? computePerfRulerGeometry(
-              { px: xScale(pair[0].x), py: yScale(pair[0].y), rawY: pair[0].y },
-              { px: xScale(pair[1].x), py: yScale(pair[1].y), rawY: pair[1].y },
-            )
-          : null;
+        const measurement = perfRulerModeRef.current ? perfRulerMeasurementRef.current : null;
+        let geometry: PerfRulerGeometry | null = null;
+        if (measurement) {
+          const { anchor, targetClasses } = measurement;
+          let pathNode: SVGPathElement | null = null;
+          for (const cls of targetClasses) {
+            const node = zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node();
+            if (node) {
+              pathNode = node;
+              break;
+            }
+          }
+          // When the target curve does not span the anchor's x (or has no
+          // rendered path — e.g. a single-point series), draw nothing but
+          // KEEP the selection: zoom/metric changes that make them
+          // intersect bring the ruler back.
+          if (pathNode && typeof pathNode.getPointAtLength === 'function') {
+            const anchorPx = xScale(anchor.x);
+            const hit = intersectPathAtX(pathNode, anchorPx);
+            if (hit) {
+              geometry = computeIsoXRulerGeometry(
+                { px: anchorPx, py: yScale(anchor.y), rawY: anchor.y },
+                { py: hit.y, rawY: yScale.invert(hit.y) },
+              );
+            }
+          }
+        }
         renderPerfRuler(zoomGroup, geometry, {
           color: 'var(--primary)',
           labelBg: 'var(--primary)',
@@ -1601,7 +1685,10 @@ const ScatterGraph = React.memo(
               y: d.y,
               perfRuler: true,
             });
-            ruler.onPointClick(ruler.keyFor(d, 'official'));
+            ruler.onPointClick({
+              key: ruler.keyFor(d, 'official'),
+              curve: ruler.curveFor(d, 'official'),
+            });
             return;
           }
           track('latency_data_point_clicked', { hw: String(d.hwKey), x: d.x, y: d.y });
@@ -2424,7 +2511,10 @@ const ScatterGraph = React.memo(
                       overlay: true,
                       perfRuler: true,
                     });
-                    ruler.onPointClick(ruler.keyFor(point, 'overlay'));
+                    ruler.onPointClick({
+                      key: ruler.keyFor(point, 'overlay'),
+                      curve: ruler.curveFor(point, 'overlay'),
+                    });
                     return;
                   }
                   track('latency_data_point_clicked', {
@@ -2640,8 +2730,8 @@ const ScatterGraph = React.memo(
         };
       });
 
-      // ── Perf ruler (opt-in measurement between two selected points) ──
-      // Selection state is read through perfRulerPairRef, so this layer needs
+      // ── Perf ruler (opt-in iso-x measurement between two curves) ──
+      // Mode and measurement are read through refs, so this layer needs
       // no perf-ruler dependencies: full re-renders redraw it after the data
       // phase (it survives metric/display re-renders where the points still
       // exist), and onZoom keeps it glued to the points during pan/zoom. It
@@ -2966,7 +3056,7 @@ const ScatterGraph = React.memo(
       const display = getDisplaySelection();
       if (!display) return;
       const { svg, ctx, zoomGroup } = display;
-      const selected = new Set(perfRulerSelection);
+      const selected = new Set(perfRulerSelection.map((entry) => entry.key));
 
       const syncRing = (node: SVGGElement, key: string) => {
         const group = d3.select(node);
@@ -2994,7 +3084,7 @@ const ScatterGraph = React.memo(
       });
 
       // Redraw the ruler with the currently applied zoom transform (the
-      // measured pair is read through perfRulerPairRef inside drawPerfRuler).
+      // measurement and mode are read through refs inside drawPerfRuler).
       const zoomCtx = currentZoomRenderContext(svg, ctx);
       drawPerfRuler(
         zoomGroup,
@@ -3006,7 +3096,7 @@ const ScatterGraph = React.memo(
       getDisplaySelection,
       perfRulerMode,
       perfRulerSelection,
-      perfRulerMeasuredPair,
+      perfRulerMeasurement,
       perfRulerKey,
       drawPerfRuler,
       dataIdentity,
@@ -3339,6 +3429,10 @@ const ScatterGraph = React.memo(
                   infoTooltip: legendT.perfRulerInfo,
                   onCheckedChange: (checked: boolean) => {
                     setPerfRulerMode(checked);
+                    // Clear in the same state batch — the pre-paint decoration
+                    // effect then removes the ruler and rings before the next
+                    // frame (no lingering line after toggle-off).
+                    if (!checked) setPerfRulerSelection([]);
                     track('latency_perf_ruler_toggled', { enabled: checked });
                   },
                 },

@@ -1,16 +1,18 @@
 import type * as d3 from 'd3';
 
 /**
- * Perf ruler layer — a vertical measurement ruler between two selected data
- * points. Draws a vertical line at the midpoint of the two points' x pixel
- * positions, spanning their y pixel positions, with short horizontal end caps
- * and a label chip showing the performance multiple between the two RAW
- * y-values (e.g. "2.03x", optionally "+103%").
+ * Perf ruler layer — an ISO-X (iso-interactivity) measurement ruler between
+ * two curves. The user anchors the ruler on a point of curve A; the ruler is
+ * a vertical line at the anchor's x pixel position running from the anchor's
+ * y down/up to curve B's y at that SAME x (found by intersecting curve B's
+ * rendered roofline path). Short horizontal end caps mark both ends and a
+ * label chip shows the performance multiple between the two RAW y-values at
+ * that x (e.g. "2.03x", optionally "+103%").
  *
- * Pure module: geometry math is separated from rendering so both are unit
- * testable (see perf-ruler.test.ts). Rendering follows the narrow-mutation
- * rules from docs/d3-charts.md — a single keyed join, texts written before
- * any measurement, rects sized last.
+ * Pure module: intersection search and geometry math are separated from
+ * rendering so all three are unit testable (see perf-ruler.test.ts).
+ * Rendering follows the narrow-mutation rules from docs/d3-charts.md — a
+ * single keyed join, texts written before any measurement, rects sized last.
  */
 
 type GroupSelection = d3.Selection<SVGGElement, unknown, null, undefined>;
@@ -24,8 +26,16 @@ export interface PerfRulerPointInput {
   rawY: number;
 }
 
+/** The target-curve end of the ruler: the intersection at the anchor's x. */
+export interface PerfRulerTargetInput {
+  /** Pixel y of the target curve at the anchor's x. */
+  py: number;
+  /** Raw data-space y at that intersection (yScale.invert of `py`). */
+  rawY: number;
+}
+
 export interface PerfRulerGeometry {
-  /** Ruler line x pixel position: midpoint of the two points' x positions. */
+  /** Ruler line x pixel position: the anchor point's x. */
   x: number;
   /** Top pixel y of the ruler span. */
   y1: number;
@@ -54,27 +64,88 @@ export function formatPerfPercent(ratio: number): string {
 }
 
 /**
- * Compute ruler geometry for two selected points. Returns null for degenerate
- * inputs: non-finite coordinates or non-positive raw y values (a ratio over a
- * zero/negative value is meaningless, and log scales cannot place them).
- * Argument order does not matter.
+ * Minimal path interface needed by {@link intersectPathAtX}. Satisfied by a
+ * real `SVGPathElement`; unit tests supply a synthetic polyline
+ * implementation, since jsdom has no path-length support.
  */
-export function computePerfRulerGeometry(
-  a: PerfRulerPointInput,
-  b: PerfRulerPointInput,
-): PerfRulerGeometry | null {
-  const inputs = [a.px, a.py, a.rawY, b.px, b.py, b.rawY];
-  if (!inputs.every((value) => Number.isFinite(value))) return null;
-  if (a.rawY <= 0 || b.rawY <= 0) return null;
+export interface PerfRulerPathLike {
+  getTotalLength: () => number;
+  getPointAtLength: (length: number) => { x: number; y: number };
+}
 
-  const hi = Math.max(a.rawY, b.rawY);
-  const lo = Math.min(a.rawY, b.rawY);
+/**
+ * Find the point on `path` at horizontal pixel position `x` via binary search
+ * over the path-length parameter. Valid for paths whose x is monotonic along
+ * their length — true for every roofline: they are Pareto frontiers sorted by
+ * x and rendered with `d3.curveMonotoneX`, which preserves x-monotonicity.
+ *
+ * Works in RENDERED pixel space: the roofline `d` attribute is rewritten with
+ * the current scales on every zoom/metric pass before this layer runs, so the
+ * intersection matches the drawn curve exactly at any zoom level. Returns
+ * null when `x` lies outside the path's x extent (curve B does not span the
+ * anchor's x) or the path is degenerate.
+ */
+export function intersectPathAtX(
+  path: PerfRulerPathLike,
+  x: number,
+  opts?: { tolerance?: number; maxIterations?: number },
+): { x: number; y: number } | null {
+  if (!Number.isFinite(x)) return null;
+  const total = path.getTotalLength();
+  if (!Number.isFinite(total) || total <= 0) return null;
+
+  const start = path.getPointAtLength(0);
+  const end = path.getPointAtLength(total);
+  const ascending = end.x >= start.x;
+  const minX = Math.min(start.x, end.x);
+  const maxX = Math.max(start.x, end.x);
+  // Half-pixel slack so an anchor sitting exactly on a curve endpoint (a
+  // shared frontier point) still intersects despite float noise.
+  const slack = 0.5;
+  if (x < minX - slack || x > maxX + slack) return null;
+
+  const tolerance = opts?.tolerance ?? 0.25;
+  const maxIterations = opts?.maxIterations ?? 48;
+  let lo = 0;
+  let hi = total;
+  let best = Math.abs(start.x - x) <= Math.abs(end.x - x) ? start : end;
+  for (let i = 0; i < maxIterations; i++) {
+    const mid = (lo + hi) / 2;
+    const p = path.getPointAtLength(mid);
+    if (Math.abs(p.x - x) < Math.abs(best.x - x)) best = p;
+    if (Math.abs(p.x - x) <= tolerance) return { x: p.x, y: p.y };
+    if (ascending === p.x < x) lo = mid;
+    else hi = mid;
+  }
+  // Interval exhausted without hitting tolerance (extremely steep segment) —
+  // the closest sample seen is still visually on the curve.
+  return { x: best.x, y: best.y };
+}
+
+/**
+ * Compute iso-x ruler geometry from the anchor point and the target curve's
+ * intersection at the anchor's x. Returns null for degenerate inputs:
+ * non-finite coordinates or non-positive raw y values (a ratio over a
+ * zero/negative value is meaningless, and log scales cannot place them).
+ * The ratio is symmetric: higher raw y over lower raw y, regardless of which
+ * side is the anchor.
+ */
+export function computeIsoXRulerGeometry(
+  anchor: PerfRulerPointInput,
+  target: PerfRulerTargetInput,
+): PerfRulerGeometry | null {
+  const inputs = [anchor.px, anchor.py, anchor.rawY, target.py, target.rawY];
+  if (!inputs.every((value) => Number.isFinite(value))) return null;
+  if (anchor.rawY <= 0 || target.rawY <= 0) return null;
+
+  const hi = Math.max(anchor.rawY, target.rawY);
+  const lo = Math.min(anchor.rawY, target.rawY);
   const ratio = hi / lo;
 
   return {
-    x: (a.px + b.px) / 2,
-    y1: Math.min(a.py, b.py),
-    y2: Math.max(a.py, b.py),
+    x: anchor.px,
+    y1: Math.min(anchor.py, target.py),
+    y2: Math.max(anchor.py, target.py),
     ratio,
     ratioLabel: formatPerfRatio(ratio),
     percentLabel: formatPerfPercent(ratio),
