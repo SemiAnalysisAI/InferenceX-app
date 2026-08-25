@@ -60,7 +60,11 @@ describe('Page Load & Navigation', () => {
   });
 
   it('opens and preserves a direct link to an FAQ answer', () => {
-    cy.visit('/about#faq-normalized-interactivity');
+    cy.visit('/about#faq-normalized-interactivity', {
+      onBeforeLoad(win) {
+        cy.stub(win.navigator.clipboard, 'writeText').as('writeFaqLink').resolves();
+      },
+    });
 
     cy.get('#faq-normalized-interactivity')
       .should('be.visible')
@@ -70,8 +74,27 @@ describe('Page Load & Navigation', () => {
           'What is the difference between E2E Normalized Interactivity and Interactivity?',
         ).should('be.visible');
         cy.contains('The normalized value penalizes slow TTFT').should('be.visible');
+        cy.get('[data-testid="faq-copy-link-faq-normalized-interactivity"]')
+          .should('be.visible')
+          .and('contain.text', 'Copy link')
+          .click()
+          .should('contain.text', 'Copied');
       });
+    cy.get('@writeFaqLink').should(
+      'have.been.calledOnceWith',
+      `${Cypress.config('baseUrl')}/about#faq-normalized-interactivity`,
+    );
     cy.location('hash').should('eq', '#faq-normalized-interactivity');
+  });
+
+  it('shows a copy-link button for every FAQ question', () => {
+    cy.visit('/about');
+
+    cy.get('[data-testid^="faq-copy-link-"]')
+      .should('have.length', 15)
+      .each(($button) => {
+        cy.wrap($button).should('be.visible').and('contain.text', 'Copy link');
+      });
   });
 });
 

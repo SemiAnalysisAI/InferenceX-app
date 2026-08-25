@@ -76,7 +76,7 @@ export function FaqList({ title, items }: { title: string; items: readonly FaqIt
         <dl className="divide-y divide-border">
           {items.map((item) => (
             <div id={item.id} key={item.id} className="scroll-mt-24 py-4 first:pt-0 last:pb-0">
-              <dt className="font-medium mb-1">
+              <dt className="font-medium mb-2">
                 <FaqQuestionLink id={item.id} question={item.question} />
               </dt>
               <dd className="text-muted-foreground text-sm">

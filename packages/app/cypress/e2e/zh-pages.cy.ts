@@ -111,6 +111,9 @@ describe('Chinese (/zh) pages', () => {
             '端到端归一化交互性与交互性有何区别？',
           ).should('be.visible');
           cy.contains('TTFT 越长，归一化指标越低').should('be.visible');
+          cy.get('[data-testid="faq-copy-link-faq-normalized-interactivity"]')
+            .should('be.visible')
+            .and('contain.text', '复制链接');
         });
       cy.location('hash').should('eq', '#faq-normalized-interactivity');
     });
