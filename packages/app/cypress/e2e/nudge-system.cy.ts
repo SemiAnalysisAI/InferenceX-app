@@ -67,7 +67,7 @@ describe('Landing nudges — modals', () => {
     // Banner (inline) and modal (overlay) occupy independent slots
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'Agentic benchmark results are live')
+      .and('contain.text', "OpenAI's Latest In House Chip verus Rubin NVL72")
       .and('contain.text', 'View results');
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
@@ -120,13 +120,13 @@ describe('Landing nudges — modals', () => {
     cy.get('[data-testid="github-star-modal"]').should('not.exist');
   });
 
-  it('localizes the agentic benchmark launch title in Chinese', () => {
+  it('localizes the Rubin comparison banner title in Chinese', () => {
     cy.visit('/zh', {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', '智能体基准测试结果已上线')
+      .and('contain.text', 'OpenAI 最新自研芯片对比 Rubin NVL72')
       .and('contain.text', '查看结果');
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')

@@ -454,8 +454,8 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'Agentic benchmark results are live',
-      titleZh: '智能体基准测试结果已上线',
+      title: "OpenAI's Latest In House Chip verus Rubin NVL72",
+      titleZh: 'OpenAI 最新自研芯片对比 Rubin NVL72',
       description:
         "AgentX is the World's First Fully Open Source Realistic 1Mil+ Long Context, Multi Turn Benchmark",
       descriptionZh: 'AgentX 是全球首个完全开源、贴近真实场景的百万级 (1M+) 长上下文多轮基准测试',
