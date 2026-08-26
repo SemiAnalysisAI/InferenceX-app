@@ -467,10 +467,6 @@ export function InferenceProvider({
     () => getUrlParam('i_gradlabel') === '1',
   );
   const [showLineLabels, setShowLineLabels] = useState(initialLabelState.showLineLabels);
-  const [showSpeedOverlay, setShowSpeedOverlay] = useState(() => getUrlParam('i_speed') === '1');
-  const [showMinecraftOverlay, setShowMinecraftOverlay] = useState(
-    () => getUrlParam('i_mc') === '1',
-  );
   const [userCosts, setUserCosts] = useState<Record<string, number | undefined> | null>(null);
   const [userPowers, setUserPowers] = useState<Record<string, number | undefined> | null>(null);
 
@@ -1383,8 +1379,6 @@ export function InferenceProvider({
       i_conclabel: showConcurrencyLabels ? '1' : '',
       i_gradlabel: showGradientLabels ? '1' : '',
       i_linelabel: serializedLabelState.i_linelabel,
-      i_speed: showSpeedOverlay ? '1' : '',
-      i_mc: showMinecraftOverlay ? '1' : '',
       i_active: iActiveStr,
       i_vendor: quickFilterVendors.join(','),
       i_fw: quickFilterFrameworks.join(','),
@@ -1410,8 +1404,6 @@ export function InferenceProvider({
       showConcurrencyLabels,
       showGradientLabels,
       showLineLabels,
-      showSpeedOverlay,
-      showMinecraftOverlay,
       iActiveStr,
       quickFilterVendors,
       quickFilterFrameworks,
@@ -1628,8 +1620,6 @@ export function InferenceProvider({
       showConcurrencyLabels,
       showGradientLabels,
       showLineLabels,
-      showSpeedOverlay,
-      showMinecraftOverlay,
     }),
     [
       selectedYAxisMetric,
@@ -1647,8 +1637,6 @@ export function InferenceProvider({
       showConcurrencyLabels,
       showGradientLabels,
       showLineLabels,
-      showSpeedOverlay,
-      showMinecraftOverlay,
     ],
   );
 
@@ -1683,8 +1671,6 @@ export function InferenceProvider({
     setShowConcurrencyLabels,
     setShowGradientLabels,
     setShowLineLabels,
-    setShowSpeedOverlay,
-    setShowMinecraftOverlay,
     setSelectedGPUs: setSelectedGPUsAndClear,
     setSelectedDates: setSelectedDatesAndClear,
     setSelectedDatesFromRunExpansion: setSelectedDates,

@@ -209,10 +209,6 @@
       "duration": 715
     },
     {
-      "spec": "cypress/e2e/speed-overlay.cy.ts",
-      "duration": 3412
-    },
-    {
       "spec": "cypress/e2e/throughput-calculator.cy.ts",
       "duration": 15093
     },
