@@ -30,6 +30,11 @@ vi.mock('@/lib/compare-variant-availability', () => ({
   getAllComparableSpecDecodeSlugs: () => Promise.resolve([]),
 }));
 vi.mock('@/lib/glossary', () => ({ getAllGlossaryEntries: () => [] }));
+vi.mock('@/lib/run-rankings-data.server', () => ({
+  getAvailableRunEntries: () => Promise.resolve([]),
+}));
+
+import { getAllRankingPageEntries } from '@/lib/rankings';
 
 import sitemap from './sitemap';
 
@@ -73,6 +78,31 @@ describe('sitemap locale parity', () => {
     for (const slug of slugs) {
       expect(urls.has(`${SITE_URL}/chips/${slug}`)).toBe(true);
       expect(urls.has(`${SITE_URL}${zhPath(`/chips/${slug}`)}`)).toBe(true);
+    }
+  });
+
+  it('emits both locales for the rankings index and every ranking page', async () => {
+    const entries = await sitemap();
+    const urls = new Set(entries.map((entry) => entry.url));
+    expect(urls.has(`${SITE_URL}/rankings`)).toBe(true);
+    expect(urls.has(`${SITE_URL}${zhPath('/rankings')}`)).toBe(true);
+    const rankingEntries = getAllRankingPageEntries();
+    expect(rankingEntries.length).toBeGreaterThan(0);
+    for (const entry of rankingEntries) {
+      expect(urls.has(`${SITE_URL}/rankings/${entry.slug}`)).toBe(true);
+      expect(urls.has(`${SITE_URL}${zhPath(`/rankings/${entry.slug}`)}`)).toBe(true);
+    }
+  });
+
+  it('emits the /run index in both locales and only available run pages', async () => {
+    const entries = await sitemap();
+    const urls = new Set(entries.map((entry) => entry.url));
+    expect(urls.has(`${SITE_URL}/run`)).toBe(true);
+    expect(urls.has(`${SITE_URL}${zhPath('/run')}`)).toBe(true);
+    // Availability mock returns no pairs, so no /run/<pair> URLs may leak in.
+    for (const url of urls) {
+      expect(url.startsWith(`${SITE_URL}/run/`)).toBe(false);
+      expect(url.startsWith(`${SITE_URL}/zh/run/`)).toBe(false);
     }
   });
 
