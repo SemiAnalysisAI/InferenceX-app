@@ -83,6 +83,33 @@ describe('official preview notices', () => {
       .and('contain.text', 'Vera Rubin (July) results are an official preview');
   });
 
+  it('keeps the July Vera Rubin notice off unsupported historical metrics', () => {
+    cy.visit('/historical?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_tpPerGpu');
+
+    cy.get('[data-testid="historical-trends-display"] input[type="number"]', {
+      timeout: 20000,
+    })
+      .clear()
+      .type('100')
+      .blur();
+    cy.get(JALAPENO_NOTICE, { timeout: 20000 }).should('be.visible');
+    cy.get(VERA_RUBIN_NOTICE).should('not.exist');
+  });
+
+  it('shows the Vera Rubin preview when its output-token fleet curve is visible', () => {
+    cy.visit('/fleet?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4');
+
+    cy.get('[data-testid="fleet-cost-type-selector"]').click();
+    cy.get('[role="option"]').contains('Output Tokens').click();
+    cy.get('[data-testid="fleet-legend"]', { timeout: 20000 }).should('contain.text', 'Vera Rubin');
+    cy.get('[data-testid="fleet-controls"] input[type="number"]').clear().type('100').blur();
+    cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
+    cy.get(VERA_RUBIN_NOTICE, { timeout: 20000 })
+      .should('be.visible')
+      .and('contain.text', 'Vera Rubin (July) results are an official preview')
+      .and('not.contain.text', '\u2014');
+  });
+
   it('uses the Chinese disclaimer on /zh and stays absent without Jalapeño results', () => {
     cy.visit(`/zh/inference?${JALAPENO_QUERY}`);
     cy.get(JALAPENO_NOTICE, { timeout: 20000 })
