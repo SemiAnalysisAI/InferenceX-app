@@ -4,10 +4,6 @@ import { track } from '@/lib/analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
-import {
-  includesJalapenoResult,
-  JalapenoOfficialPreviewNotice,
-} from '@/components/jalapeno-official-preview-notice';
 import chartDefinitions, {
   tokenMetricTypeForConfigKey,
   type MetricKey,
@@ -827,15 +823,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             const isTimelineMode = Boolean(
               selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
-            const candidatePreviewRows = isTimelineMode
-              ? graph.data.filter((point) => activeDates.has(`${point.date}_${point.hwKey}`))
-              : visibleComparisonRows(
-                  [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)],
-                  null,
-                ).officialRows;
-            const showsJalapenoPreview = includesJalapenoResult(
-              candidatePreviewRows.map((point) => String(point.hwKey)),
-            );
             const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
             // Which logical metric the x-axis plots right now. Classify off
             // the field `resolveXAxisField` resolves for this chart's current
@@ -1048,7 +1035,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               </>
                             )}
                           </p>
-                          {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
                           {residentSequenceLengths && (
                             <p
                               className="mb-2 text-xs text-muted-foreground"

@@ -35,7 +35,8 @@ import {
 import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+import { JALAPENO_PREVIEW_STRINGS } from '@/components/jalapeno-official-preview-notice';
+import { getHardwareConfig, getModelSortIndex, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import {
   getChartWatermark,
   getPrecisionLabel,
@@ -932,7 +933,10 @@ const ScatterGraph = React.memo(
         activeOverlayHwTypes.has(p.hwKey as string),
       );
       const visiblePoints = [...filteredData, ...visibleOverlayPoints];
-      return matchKnownConfigIssues(modelLabel, visiblePoints).map((issue) => ({
+      const annotations: KnownIssueAnnotation[] = matchKnownConfigIssues(
+        modelLabel,
+        visiblePoints,
+      ).map((issue) => ({
         issue,
         label: parseHwKeyToLabel(issue.hwKey, modelLabel).label,
         color: getCssColor(resolveColor(issue.hwKey)),
@@ -940,6 +944,26 @@ const ScatterGraph = React.memo(
           .filter((p) => pointMatchesIssue(issue, p))
           .map((p) => ({ x: p.x, y: p.y })),
       }));
+      // The official-preview notice intentionally follows only official data:
+      // an unofficial Jalapeño overlay is not an InferenceX publication.
+      const jalapenoPoints = filteredData.filter((point) =>
+        hardwareKeyMatchesAnyBase(String(point.hwKey), ['jalapeno']),
+      );
+      if (jalapenoPoints.length > 0) {
+        const hwKey = String(jalapenoPoints[0]!.hwKey);
+        const previewCopy = JALAPENO_PREVIEW_STRINGS[locale];
+        annotations.push({
+          preview: {
+            id: 'jalapeno-official-preview',
+            summary: previewCopy.title,
+            detail: previewCopy.chartDetail,
+          },
+          label: getDisplayLabel(getHardwareConfig(hwKey, modelLabel)),
+          color: getCssColor(resolveColor(hwKey)),
+          points: jalapenoPoints.map((point) => ({ x: point.x, y: point.y })),
+        });
+      }
+      return annotations;
     }, [
       modelLabel,
       filteredData,
@@ -947,6 +971,7 @@ const ScatterGraph = React.memo(
       activeOverlayHwTypes,
       resolveColor,
       getCssColor,
+      locale,
     ]);
 
     const overlayRooflines = useMemo(() => {
@@ -2878,6 +2903,7 @@ const ScatterGraph = React.memo(
           foreground: current.getCssColor('--foreground'),
           mutedForeground: current.getCssColor('--muted-foreground'),
           onLinkClick: (annotation) =>
+            annotation.issue &&
             track('inference_known_issue_clicked', {
               hwKey: annotation.issue.hwKey,
               issue: annotation.issue.issueRef,

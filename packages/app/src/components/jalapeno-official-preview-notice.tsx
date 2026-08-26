@@ -5,15 +5,17 @@ import { Info } from 'lucide-react';
 import { hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import { useLocale } from '@/lib/use-locale';
 
-const STRINGS = {
+export const JALAPENO_PREVIEW_STRINGS = {
   en: {
     title: 'InferenceX Official Preview',
     description:
       'Jalapeño results are an official preview and may change as validation and publication continue.',
+    chartDetail: 'Results may change as validation and publication continue.',
   },
   zh: {
     title: 'InferenceX 官方预览',
     description: 'Jalapeño 结果为官方预览；随着验证和发布工作的推进，数据可能会调整。',
+    chartDetail: '随着验证和发布工作的推进，结果可能会调整。',
   },
 } as const;
 
@@ -25,7 +27,7 @@ export function includesJalapenoResult(hardwareKeys: Iterable<string>): boolean 
 }
 
 export function JalapenoOfficialPreviewNotice() {
-  const t = STRINGS[useLocale()];
+  const t = JALAPENO_PREVIEW_STRINGS[useLocale()];
 
   return (
     <div

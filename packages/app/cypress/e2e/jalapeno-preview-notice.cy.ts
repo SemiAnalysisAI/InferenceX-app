@@ -9,7 +9,7 @@ describe('Jalapeño official preview notice', () => {
     cy.get(NOTICE)
       .should('be.visible')
       .and('contain.text', 'InferenceX Official Preview')
-      .and('contain.text', 'Jalapeño results are an official preview');
+      .and('contain.text', 'Results may change as validation and publication continue.');
 
     cy.get(
       '[data-testid="chart-legend"] [role="button"][aria-label^="Hide"][aria-label*="Jalapeño"]',
@@ -49,7 +49,7 @@ describe('Jalapeño official preview notice', () => {
     cy.get(NOTICE)
       .should('be.visible')
       .and('contain.text', 'InferenceX 官方预览')
-      .and('contain.text', 'Jalapeño 结果为官方预览');
+      .and('contain.text', '随着验证和发布工作的推进，结果可能会调整。');
 
     cy.visit(
       '/zh/inference?g_model=DeepSeek-V4-Pro&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerGpu',

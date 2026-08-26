@@ -12,8 +12,7 @@ import type { KnownConfigIssue } from '@/lib/known-issues';
 import type { CustomLayerConfig, RenderContext } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 
-export interface KnownIssueAnnotation {
-  issue: KnownConfigIssue;
+interface AnnotationBase {
   /** Display label of the affected series, e.g. "GB300 NVL72 (Dynamo TRTLLM, MTP)" */
   label: string;
   /** Resolved stroke color of the affected series */
@@ -21,6 +20,20 @@ export interface KnownIssueAnnotation {
   /** Data-space coordinates of the series' visible points (arrow targets) */
   points: { x: number; y: number }[];
 }
+
+/** A filed upstream issue or a non-interactive preview notice rendered inside a chart. */
+export type KnownIssueAnnotation = AnnotationBase &
+  (
+    | { issue: KnownConfigIssue; preview?: never }
+    | {
+        issue?: never;
+        preview: {
+          id: string;
+          summary: string;
+          detail: string;
+        };
+      }
+  );
 
 export interface AnnotationRenderOptions {
   chartId: string;
@@ -157,8 +170,7 @@ export function renderKnownIssueAnnotations(
 
   let yCursor = BOX_TOP;
   annotations.forEach((annotation, index) => {
-    const { issue, label, color, points } = annotation;
-
+    const { issue, preview, label, color, points } = annotation;
     const markerId = `known-issue-arrowhead-${chartId}-${index}`;
     defs
       .append('marker')
@@ -174,16 +186,30 @@ export function renderKnownIssueAnnotations(
       .attr('fill', color);
 
     const anchor = layer
-      .append('a')
-      .attr('href', issue.url)
-      .attr('target', '_blank')
-      .attr('rel', 'noopener noreferrer')
+      .append(issue === undefined ? 'g' : 'a')
       .attr('class', 'known-issue-annotation')
-      .attr('data-testid', 'known-issue-annotation')
-      .attr('cursor', 'pointer')
-      .on('click', () => opts.onLinkClick?.(annotation));
+      .attr(
+        'data-testid',
+        preview === undefined ? 'known-issue-annotation' : 'jalapeno-official-preview-notice',
+      )
+      .attr('cursor', issue === undefined ? 'default' : 'pointer');
+    if (issue === undefined) {
+      anchor
+        .attr('role', 'note')
+        .attr('aria-label', preview?.summary ?? null)
+        .attr('data-preview-id', preview?.id ?? null);
+    } else {
+      anchor
+        .attr('href', issue.url)
+        .attr('target', '_blank')
+        .attr('rel', 'noopener noreferrer')
+        .on('click', () => opts.onLinkClick?.(annotation));
+    }
 
-    const detail = `${issue.summary} — filed since ${issue.filed} · `;
+    const detail =
+      issue === undefined
+        ? `${preview!.summary} — ${preview!.detail}`
+        : `${issue.summary} — filed since ${issue.filed} · `;
     const text1 = anchor
       .append('text')
       .attr('font-size', LINE1_SIZE)
@@ -192,14 +218,20 @@ export function renderKnownIssueAnnotations(
       .text(label);
     const text2 = anchor.append('text').attr('font-size', LINE2_SIZE);
     text2.append('tspan').attr('fill', opts.mutedForeground).text(detail);
-    text2
-      .append('tspan')
-      .attr('fill', opts.foreground)
-      .attr('text-decoration', 'underline')
-      .text(issue.issueRef);
+    if (issue !== undefined) {
+      text2
+        .append('tspan')
+        .attr('fill', opts.foreground)
+        .attr('text-decoration', 'underline')
+        .text(issue.issueRef);
+    }
 
     const w1 = measureTextWidth(text1.node(), label.length, LINE1_SIZE) + SWATCH_SPACE;
-    const w2 = measureTextWidth(text2.node(), detail.length + issue.issueRef.length, LINE2_SIZE);
+    const w2 = measureTextWidth(
+      text2.node(),
+      detail.length + (issue?.issueRef.length ?? 0),
+      LINE2_SIZE,
+    );
     const boxW = Math.max(w1, w2) + PAD_X * 2;
     const boxH = PAD_Y * 2 + LINE1_H + LINE2_H;
     const boxRight = width - BOX_RIGHT_GAP - (opts.rightInset ?? 0);

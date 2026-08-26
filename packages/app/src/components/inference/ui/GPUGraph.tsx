@@ -16,7 +16,8 @@ import {
 } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+import { JALAPENO_PREVIEW_STRINGS } from '@/components/jalapeno-official-preview-notice';
+import { getHardwareConfig, getModelSortIndex, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import { getChartWatermark, Sequence } from '@/lib/data-mappings';
 import { generateGpuDateColors, generateHighContrastGpuDateColors } from '@/lib/dynamic-colors';
 import { useLocale } from '@/lib/use-locale';
@@ -391,24 +392,46 @@ const GPUGraph = React.memo(
     // same treatment the scatter view gets, applied to the date-comparison view.
     // Lines here are colored per (gpu, date) pair, so take the first active
     // pair's color as the series swatch.
-    const knownIssueAnnotations = useMemo(
-      (): KnownIssueAnnotation[] =>
-        matchKnownConfigIssues(modelLabel, filteredData).map((issue) => {
-          const cfg = getHardwareConfig(issue.hwKey, modelLabel);
-          const colorEntry = allGraphs.find(
-            (entry) => entry.hwKey === issue.hwKey && activeDates.has(entry.id),
-          );
-          return {
-            issue,
-            label: cfg ? getDisplayLabel(cfg) : issue.hwKey,
-            color: getCssColor(colorEntry?.color ?? resolveColor(issue.hwKey)),
-            points: filteredData
-              .filter((p) => pointMatchesIssue(issue, p))
-              .map((p) => ({ x: p.x, y: p.y })),
-          };
-        }),
-      [modelLabel, filteredData, allGraphs, activeDates, resolveColor, getCssColor],
-    );
+    const knownIssueAnnotations = useMemo((): KnownIssueAnnotation[] => {
+      const annotations: KnownIssueAnnotation[] = matchKnownConfigIssues(
+        modelLabel,
+        filteredData,
+      ).map((issue) => {
+        const cfg = getHardwareConfig(issue.hwKey, modelLabel);
+        const colorEntry = allGraphs.find(
+          (entry) => entry.hwKey === issue.hwKey && activeDates.has(entry.id),
+        );
+        return {
+          issue,
+          label: cfg ? getDisplayLabel(cfg) : issue.hwKey,
+          color: getCssColor(colorEntry?.color ?? resolveColor(issue.hwKey)),
+          points: filteredData
+            .filter((p) => pointMatchesIssue(issue, p))
+            .map((p) => ({ x: p.x, y: p.y })),
+        };
+      });
+      const jalapenoPoints = filteredData.filter((point) =>
+        hardwareKeyMatchesAnyBase(String(point.hwKey), ['jalapeno']),
+      );
+      if (jalapenoPoints.length > 0) {
+        const hwKey = String(jalapenoPoints[0]!.hwKey);
+        const colorEntry = allGraphs.find(
+          (entry) => entry.hwKey === hwKey && activeDates.has(entry.id),
+        );
+        const previewCopy = JALAPENO_PREVIEW_STRINGS[locale];
+        annotations.push({
+          preview: {
+            id: 'jalapeno-official-preview',
+            summary: previewCopy.title,
+            detail: previewCopy.chartDetail,
+          },
+          label: getDisplayLabel(getHardwareConfig(hwKey, modelLabel)),
+          color: getCssColor(colorEntry?.color ?? resolveColor(hwKey)),
+          points: jalapenoPoints.map((point) => ({ x: point.x, y: point.y })),
+        });
+      }
+      return annotations;
+    }, [modelLabel, filteredData, allGraphs, activeDates, resolveColor, getCssColor, locale]);
 
     const knownIssueLayer = useMemo(
       () =>
@@ -420,6 +443,7 @@ const GPUGraph = React.memo(
             foreground: getCssColor('--foreground'),
             mutedForeground: getCssColor('--muted-foreground'),
             onLinkClick: (annotation) =>
+              annotation.issue &&
               track('inference_known_issue_clicked', {
                 hwKey: annotation.issue.hwKey,
                 issue: annotation.issue.issueRef,
