@@ -384,7 +384,8 @@ export function ScenarioSelector({
     if (!isAgenticSelected) return null;
     return (
       <div className="flex flex-col space-y-1.5 lg:col-span-1">
-        <LabelWithTooltip htmlFor={id} label={t.scenario} tooltip={t.scenarioTooltip} />
+        {/* No htmlFor: the static readout is not a labelable control. */}
+        <LabelWithTooltip label={t.scenario} tooltip={t.scenarioTooltip} />
         <div className="flex h-9 items-center gap-1.5 text-sm" data-testid="scenario-static-value">
           <span>{getSequenceLabel(value as Sequence, locale)}</span>
           <AgenticScenarioInfo
