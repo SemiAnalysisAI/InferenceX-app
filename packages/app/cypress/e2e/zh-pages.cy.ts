@@ -45,9 +45,7 @@ describe('Chinese (/zh) pages', () => {
         cy.get('[data-testid="compare-agentx-overview-link"]')
           .should('contain.text', '总览')
           .and('have.attr', 'href', '/zh/overview');
-        cy.get('[data-testid="compare-agentx-methodology-link"]')
-          .should('contain.text', '测试方法')
-          .and('have.attr', 'href', '/zh/agentx');
+        cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
       });
     });
 
