@@ -893,7 +893,9 @@ describe('Calculator — Fleet Lifecycle with agentic traces', () => {
       },
     });
     cy.wait('@agenticBenchmarks');
-    cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic');
+    // The agentic fixture exposes a single scenario, so the dropdown is
+    // replaced by a static readout that keeps the agentic explainer.
+    cy.get('[data-testid="scenario-static-value"]').should('contain.text', 'Agentic');
     cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
     cy.wait('@agenticHistory');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');

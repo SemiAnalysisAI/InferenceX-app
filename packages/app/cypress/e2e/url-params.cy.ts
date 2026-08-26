@@ -381,7 +381,9 @@ describe('URL Parameter Persistence', () => {
     });
 
     it('/inference with invalid ?i_prec=junk falls back to the default', () => {
-      visitWithErrorSpy('/inference?i_prec=junk');
+      // Pair with a multi-precision model — the FP4-only default model hides
+      // the precision selector entirely, leaving nothing to assert against.
+      visitWithErrorSpy('/inference?g_model=DeepSeek-R1-0528&i_prec=junk');
       cy.get('[data-testid="precision-multiselect"]').invoke('text').should('not.contain', 'junk');
       assertNoHydrationMismatch();
     });

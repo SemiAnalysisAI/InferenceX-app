@@ -171,6 +171,45 @@ describe('Chart Selectors', () => {
         .and('have.attr', 'href', '/agentx');
     });
 
+    it('renders nothing when the only scenario is fixed-sequence', () => {
+      cy.mount(
+        <TooltipProvider delayDuration={0}>
+          <div data-testid="selector-host">
+            <ScenarioSelector
+              value={Sequence.EightK_OneK}
+              onChange={() => {}}
+              availableSequences={[Sequence.EightK_OneK]}
+              data-testid="scenario-selector"
+            />
+          </div>
+        </TooltipProvider>,
+      );
+      cy.get('[data-testid="selector-host"]').should('exist');
+      cy.get('[data-testid="scenario-selector"]').should('not.exist');
+      cy.contains('Scenario').should('not.exist');
+    });
+
+    it('keeps a static agentic readout when agentic is the only scenario', () => {
+      // No dropdown — but the explainer (tooltip + /agentx link) must survive,
+      // since agentic-only models are exactly the ones that need it.
+      cy.mount(
+        <TooltipProvider delayDuration={0}>
+          <div data-testid="selector-host">
+            <ScenarioSelector
+              value={Sequence.AgenticTraces}
+              onChange={() => {}}
+              availableSequences={[Sequence.AgenticTraces]}
+              data-testid="scenario-selector"
+            />
+          </div>
+        </TooltipProvider>,
+      );
+      cy.get('[data-testid="scenario-selector"]').should('not.exist');
+      cy.contains('Scenario').should('exist');
+      cy.get('[data-testid="scenario-static-value"]').should('contain.text', 'Agentic');
+      cy.get('[data-testid="scenario-agentic-info"]').should('exist');
+    });
+
     it('hides the agentic explainer on fixed-sequence scenarios', () => {
       cy.mount(<ScenarioSelectorHarness initial={Sequence.EightK_OneK} />);
       cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
@@ -190,6 +229,24 @@ describe('Chart Selectors', () => {
 
     it('shows current selection', () => {
       cy.get('[data-testid="precision-multiselect"]').should('contain', 'FP8');
+    });
+
+    it('renders nothing when only one precision is available', () => {
+      cy.mount(
+        <TooltipProvider>
+          <div data-testid="selector-host">
+            <PrecisionSelector
+              value={['FP8']}
+              onChange={() => {}}
+              availablePrecisions={['FP8']}
+              data-testid="precision-multiselect"
+            />
+          </div>
+        </TooltipProvider>,
+      );
+      cy.get('[data-testid="selector-host"]').should('exist');
+      cy.get('[data-testid="precision-multiselect"]').should('not.exist');
+      cy.contains('Precision').should('not.exist');
     });
   });
 });
