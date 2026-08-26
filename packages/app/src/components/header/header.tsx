@@ -11,6 +11,7 @@ import { NewBadge } from '@/components/ui/new-badge';
 import { MinecraftToggles } from '@/components/minecraft/minecraft-toggles';
 import { navigateInApp } from '@/lib/client-navigation';
 import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
+import { useClientPathname } from '@/hooks/useClientPathname';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { hasZhSibling, isZhPathname, switchLocalePath, ZH_PREFIX, zhPath } from '@/lib/i18n';
 import { NAV_LABELS_ZH, type HeaderNavHref } from '@/lib/tab-meta-zh';
@@ -102,12 +103,16 @@ function isCurrentPage(pathname: string, displayHref: string): boolean {
 
 /** EN ↔ 中文 switcher; maps the current page to its sibling in the other language. */
 function LanguageToggle({
-  pathname,
+  pathname: routerPathname,
   router,
 }: {
   pathname: string;
   router: ReturnType<typeof useRouter>;
 }) {
+  // The toggle maps the CURRENT address to its sibling, so it must see the
+  // live pathname — per-model dashboard routes rewrite the URL with
+  // replaceClientPathname on model switches, which usePathname ignores.
+  const pathname = useClientPathname(routerPathname);
   const isZh = isZhPathname(pathname);
   const target = switchLocalePath(pathname);
   const search = useClientSearch();

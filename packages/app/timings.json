@@ -165,6 +165,10 @@
       "duration": 4570
     },
     {
+      "spec": "cypress/e2e/model-route-slugs.cy.ts",
+      "duration": 2000
+    },
+    {
       "spec": "cypress/e2e/navigation.cy.ts",
       "duration": 3442
     },

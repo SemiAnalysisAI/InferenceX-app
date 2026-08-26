@@ -7,6 +7,7 @@ interface RouterLike {
 }
 
 export const CLIENT_SEARCH_CHANGE_EVENT = 'inferencex:client-search-change';
+export const CLIENT_PATHNAME_CHANGE_EVENT = 'inferencex:client-pathname-change';
 
 /** Keep persistent layout controls in sync when an App Router transition only
  *  changes search params and therefore reuses the root layout. */
@@ -25,6 +26,33 @@ export function replaceClientSearch(searchParams: URLSearchParams): void {
   const href = `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`;
   History.prototype.replaceState.call(window.history, window.history.state, '', href);
   notifyClientSearchChange(href);
+}
+
+/**
+ * Replace only the current document's pathname (keeping search and hash)
+ * without involving the App Router — same pristine-prototype trick as
+ * `replaceClientSearch`. Used by per-model dashboard routes so switching
+ * models rewrites `/historical/kimi-k3` in the address bar without an RSC
+ * navigation or component remount. `usePathname` intentionally keeps the
+ * server-rendered value; route resolution is prefix-based, so nav highlight,
+ * providers, and share scopes are unaffected. Controls that must reflect the
+ * live address bar (the header language toggle) subscribe via
+ * `useClientPathname`, which listens for CLIENT_PATHNAME_CHANGE_EVENT.
+ */
+export function replaceClientPathname(pathname: string): void {
+  const href = `${pathname}${window.location.search}${window.location.hash}`;
+  History.prototype.replaceState.call(window.history, window.history.state, '', href);
+  clientPathnameOverride = pathname;
+  window.dispatchEvent(new CustomEvent(CLIENT_PATHNAME_CHANGE_EVENT, { detail: pathname }));
+}
+
+let clientPathnameOverride: string | null = null;
+
+/** The last pathname written by `replaceClientPathname`, or null. Consumers
+ *  (useClientPathname) honor it only while the address bar still matches, so
+ *  a later App Router navigation naturally retires a stale override. */
+export function getClientPathnameOverride(): string | null {
+  return clientPathnameOverride;
 }
 
 /**

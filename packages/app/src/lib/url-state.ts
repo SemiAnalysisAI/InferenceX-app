@@ -13,6 +13,7 @@
  * Only non-default values are written to keep URLs short.
  */
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/dashboard-routes';
+import { routeModelForPathname } from '@/lib/model-routes';
 
 // All known share-link parameter keys
 const URL_STATE_KEYS = [
@@ -357,6 +358,14 @@ function collectTabParams(): URLSearchParams {
     if (prefixes.some((p) => key.startsWith(p))) {
       filtered.set(key, value);
     }
+  }
+
+  // On per-model routes (/calculator/<slug>, /historical/<slug>) the pathname
+  // already encodes the model, so a matching g_model would be redundant in the
+  // share link. A mismatch (possible mid-transition) is kept — explicit
+  // g_model wins over the path on load, so the link still opens correctly.
+  if (routeModelForPathname(window.location.pathname) === filtered.get('g_model')) {
+    filtered.delete('g_model');
   }
 
   // Carry over any unofficial-run IDs currently reflected in the address bar.
