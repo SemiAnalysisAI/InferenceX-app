@@ -25,6 +25,11 @@ describe('Dropdown one-click switching', () => {
   });
 
   it('only one MultiSelect content panel is open at a time when switching dropdowns', () => {
+    // The default model is FP4-only in the fixtures, which hides the Precision
+    // control — switch to a multi-precision model so both dropdowns exist.
+    cy.visit('/inference?g_model=DeepSeek-R1-0528');
+    cy.get('[data-testid="inference-chart-display"]').should('exist');
+
     cy.get('[data-testid="model-selector"]').click();
     cy.get('[data-slot="select-content"]').should('have.length', 1);
 
