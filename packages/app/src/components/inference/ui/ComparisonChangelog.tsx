@@ -81,6 +81,8 @@ interface ComparisonChangelogProps {
   onAddDate: (date: string) => void;
   onRemoveDate: (date: string) => void;
   onAddAllDates: (dates: string[]) => void;
+  /** Initial expanded state of the changelog body (collapsed in embedded contexts). */
+  defaultExpanded?: boolean;
   /** Earliest date the selected GPU config has benchmark data */
   firstAvailableDate?: string;
 }
@@ -99,8 +101,9 @@ export default function ComparisonChangelog({
   onRemoveDate,
   onAddAllDates,
   firstAvailableDate,
+  defaultExpanded = true,
 }: ComparisonChangelogProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const benchmarkType =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
   const changelogBenchmarkType =

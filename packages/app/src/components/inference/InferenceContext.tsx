@@ -180,6 +180,7 @@ export function InferenceProvider({
   initialBenchmarkModel,
   initialBenchmarkRows,
   initialYAxisMetric,
+  autoSelectAllGpus = false,
 }: {
   children: ReactNode;
   activeTab: string;
@@ -206,6 +207,15 @@ export function InferenceProvider({
    * shared links are unaffected.
    */
   initialYAxisMetric?: string;
+  /**
+   * When true, all chip configs with data for the current model/scenario/
+   * precision selection are selected once availability settles and no
+   * `?i_gpus=` URL param is present. Used by the `/model/[slug]` pages, which
+   * embed the chart without the selector controls — an empty default there
+   * would leave the embed permanently blank. One-shot: after the initial
+   * auto-selection (or when the URL provided chips), user deselections stick.
+   */
+  autoSelectAllGpus?: boolean;
 }) {
   const isActive =
     activeTab === 'inference' || activeTab === 'historical' || activeTab === 'compare';
@@ -685,6 +695,49 @@ export function InferenceProvider({
         label: getDisplayLabel(getHardwareConfig(hw, selectedModel)),
       }));
   }, [availabilityRows, dbModelKeys, effectiveSequence, effectivePrecisions, selectedModel]);
+
+  // One-shot auto-selection of every available chip config (see the
+  // `autoSelectAllGpus` prop doc). The selection is pre-resolved through the
+  // exclusion groups so the embed doesn't open with a cross-engine conflict
+  // toast — setting an already-resolved list keeps `selectedGpuResolution`
+  // null, which is the no-notification path.
+  const autoSelectedGpusRef = useRef(false);
+  useEffect(() => {
+    if (!autoSelectAllGpus || autoSelectedGpusRef.current) return;
+    if (!gpuUrlHydrated || !availabilitySettled || !sequenceResolved) return;
+    if (getUrlParam('i_gpus') || selectedGpuState.length > 0) {
+      autoSelectedGpusRef.current = true;
+      return;
+    }
+    if (availableGPUs.length === 0) return;
+    autoSelectedGpusRef.current = true;
+    const all = new Set(availableGPUs.map((gpu) => gpu.value));
+    // `exclusion` is null when the model/scenario has no comparability guard —
+    // in that case every available chip config is selectable together.
+    const selection = exclusion
+      ? [
+          ...resolveExclusionGroups(
+            all,
+            new Set(),
+            exclusion,
+            exclusionPolicy,
+            defaultExclusionGroup,
+          ).result,
+        ]
+      : [...all];
+    setSelectedGpuState(selection);
+  }, [
+    autoSelectAllGpus,
+    gpuUrlHydrated,
+    availabilitySettled,
+    sequenceResolved,
+    exclusion,
+    exclusionPolicy,
+    defaultExclusionGroup,
+    availableGPUs,
+    selectedGpuState,
+    getUrlParam,
+  ]);
 
   useEffect(() => {
     if (!sequenceResolved) return;

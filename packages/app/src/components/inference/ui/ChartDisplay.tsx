@@ -1,7 +1,6 @@
 'use client';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
-import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
@@ -82,14 +81,71 @@ import CustomPowers from './CustomPowers';
 import GPUGraph from './GPUGraph';
 import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLauncher';
 
-const ModelArchitectureDiagram = dynamic(() => import('./ModelArchitectureDiagram'), {
-  ssr: false,
-  loading: () => <Skeleton className="h-40 w-full" />,
-});
+import Link from 'next/link';
+
+import { Badge } from '@/components/ui/badge';
+import { getModelSlugEntryForDisplayName } from '@/lib/compare-slug';
+import { formatParamCount, getModelArchitecture } from '@/lib/model-architectures';
 import WorkflowInfoDisplay from './WorkflowInfoDisplay';
 import { NormalizedInteractivityHelpLink } from './NormalizedInteractivityHelpLink';
 
 type InferenceViewMode = 'chart' | 'table';
+
+/**
+ * Replaces the old in-card Model Architecture drawer: a row that links to the
+ * model's `/model/[slug]` page, which hosts the full architecture diagram,
+ * vendor eval scores, and a model-focused view of this dashboard. Renders
+ * nothing for models without a public slug (hidden models).
+ */
+function ModelArchitectureLink({ model, locale }: { model: Model; locale: 'en' | 'zh' }) {
+  const entry = getModelSlugEntryForDisplayName(model);
+  if (!entry) return null;
+  const arch = getModelArchitecture(model);
+  const label = getModelLabel(model);
+  return (
+    <Link
+      href={`/model/${entry.slug}`}
+      data-testid="model-architecture-link"
+      className="group rounded-lg border border-border/50 bg-muted/30 px-4 py-2 flex items-center justify-between gap-3 hover:bg-muted/50 transition-colors"
+      onClick={() => track('model_architecture_link_clicked', { model, slug: entry.slug })}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <svg
+          className="size-4 shrink-0 text-muted-foreground"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <line x1="3" y1="9" x2="21" y2="9" />
+          <line x1="9" y1="9" x2="9" y2="21" />
+        </svg>
+        <span className="text-sm font-medium truncate">
+          {locale === 'zh'
+            ? `了解 ${label} 模型架构`
+            : `Learn more about the ${label} architecture`}
+        </span>
+        {arch && (
+          <span className="hidden sm:flex items-center gap-1.5">
+            <Badge variant="outline" className="text-xs py-0">
+              {arch.architectureType === 'moe' ? 'MoE' : 'Dense'}
+            </Badge>
+            <Badge variant="outline" className="text-xs py-0">
+              {arch.attentionType === 'AlternatingSinkGQA' ? 'Sink/Full GQA' : arch.attentionType}
+            </Badge>
+            <Badge variant="outline" className="text-xs py-0">
+              {formatParamCount(arch.totalParams)}
+            </Badge>
+          </span>
+        )}
+      </div>
+      <span className="text-sm shrink-0 text-muted-foreground group-hover:text-foreground transition-colors">
+        →
+      </span>
+    </Link>
+  );
+}
 
 const STRINGS = {
   en: {
@@ -208,8 +264,13 @@ export function formatTokenLength(value: number): string {
 /**
  * Renders the inference chart cards, captions, and overlay controls for the current filtered
  * benchmark data.
+ *
+ * `embedded` renders the chart without the header section (title, description,
+ * share actions, and selector controls) — used by the `/model/[slug]` pages,
+ * which seed the model/scenario/metric via providers instead of user-facing
+ * selectors. The run-date changelog strip and the charts themselves remain.
  */
-export default function ChartDisplay() {
+export default function ChartDisplay({ embedded = false }: { embedded?: boolean } = {}) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const { graphs, loading, error, dateRangeAvailableDates } = useInferenceData();
@@ -1061,15 +1122,21 @@ export default function ChartDisplay() {
       <section className="relative z-20">
         <Card>
           <div className="flex flex-col gap-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold mb-2">{t.inferencePerformance}</h2>
-                <p className="text-muted-foreground text-sm mb-4">{t.inferencePerformanceDesc}</p>
-              </div>
-              <ChartShareActions />
-            </div>
-            <ChartControls />
-            <ModelArchitectureDiagram model={selectedModel} />
+            {!embedded && (
+              <>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold mb-2">{t.inferencePerformance}</h2>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      {t.inferencePerformanceDesc}
+                    </p>
+                  </div>
+                  <ChartShareActions />
+                </div>
+                <ChartControls />
+                <ModelArchitectureLink model={selectedModel} locale={locale} />
+              </>
+            )}
             {selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
             {selectedGPUs.length > 0 && (
               <ComparisonChangelog
@@ -1078,6 +1145,7 @@ export default function ChartDisplay() {
                 selectedPrecisions={selectedPrecisions}
                 modelDbKeys={modelDbKeys}
                 selectedSequence={selectedSequence}
+                defaultExpanded={!embedded}
                 loading={changelogsLoading}
                 totalDatesQueried={totalDatesQueried}
                 selectedDates={selectedDates}

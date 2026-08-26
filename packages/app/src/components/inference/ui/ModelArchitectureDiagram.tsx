@@ -20,6 +20,13 @@ import { renderDiagram } from './model-architecture-diagram-renderer';
 interface ModelArchitectureDiagramProps {
   model: Model;
   className?: string;
+  /**
+   * `drawer` (default) renders the collapsible bar used inside dashboard
+   * cards. `inline` renders the diagram always-expanded with no toggle —
+   * used by the `/model/[slug]` pages where the architecture is the content,
+   * not an aside.
+   */
+  variant?: 'drawer' | 'inline';
 }
 
 interface ArchitectureContentProps {
@@ -188,11 +195,35 @@ function ArchitectureContent({ model, arch, isExpanded }: ArchitectureContentPro
 export default function ModelArchitectureDiagram({
   model,
   className = '',
+  variant = 'drawer',
 }: ModelArchitectureDiagramProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const arch = getModelArchitecture(model);
 
   if (!arch) return null;
+
+  if (variant === 'inline') {
+    return (
+      <div
+        className={`rounded-lg border border-border/50 bg-muted/30 overflow-hidden ${className}`}
+        data-testid="model-architecture-inline"
+      >
+        <div className="px-4 py-2 flex items-center gap-2">
+          <span className="text-sm font-medium">Model Architecture</span>
+          <Badge variant="outline" className="text-xs py-0">
+            {arch.architectureType === 'moe' ? 'MoE' : 'Dense'}
+          </Badge>
+          <Badge variant="outline" className="text-xs py-0">
+            {arch.attentionType === 'AlternatingSinkGQA' ? 'Sink/Full GQA' : arch.attentionType}
+          </Badge>
+          <Badge variant="outline" className="text-xs py-0">
+            {formatParamCount(arch.totalParams)}
+          </Badge>
+        </div>
+        <ArchitectureContent key={model} model={model} arch={arch} isExpanded />
+      </div>
+    );
+  }
 
   const handleToggle = () => {
     const newState = !isExpanded;
