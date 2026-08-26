@@ -117,6 +117,11 @@ describe('NUDGE_REGISTRY integrity', () => {
     if (launch?.type !== 'modal') throw new Error('Missing launch modal');
     launch.content.primaryAction?.onClick();
     expect(location.href).toBe('/zh/inference?i_seq=agentic-traces');
+
+    const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'agentic-results-launch-banner');
+    if (banner?.type !== 'banner') throw new Error('Missing launch banner');
+    banner.content.onLinkClick?.();
+    expect(location.href).toBe('/zh/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4');
   });
 
   it('gives every coach mark an anchor to point at', () => {

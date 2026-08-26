@@ -68,6 +68,10 @@ describe('Landing nudges — modals', () => {
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
       .and('contain.text', "OpenAI's Latest In House Chip verus Rubin NVL72")
+      .and(
+        'contain.text',
+        'Compare Jalapeño (Teacup) with Vera Rubin (July) NVL72 on DeepSeek R1 at 8K / 1K.',
+      )
       .and('contain.text', 'View results');
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
@@ -127,6 +131,10 @@ describe('Landing nudges — modals', () => {
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
       .and('contain.text', 'OpenAI 最新自研芯片对比 Rubin NVL72')
+      .and(
+        'contain.text',
+        '对比 Jalapeño (Teacup) 与 Vera Rubin (July) NVL72 在 DeepSeek R1 8K / 1K 工作负载下的表现。',
+      )
       .and('contain.text', '查看结果');
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
@@ -289,7 +297,10 @@ describe('Landing nudges — banner', () => {
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.get('[data-testid="launch-banner"]').click();
     cy.location('pathname', { timeout: 10000 }).should('eq', '/inference');
-    cy.location('search').should('include', 'i_seq=agentic-traces');
+    cy.location('search')
+      .should('include', 'g_model=DeepSeek-R1-0528')
+      .and('include', 'i_seq=8k%2F1k')
+      .and('include', 'i_prec=fp4');
 
     // Body click must not write the dismissal key — the banner should still
     // render on a fresh visit to landing.
