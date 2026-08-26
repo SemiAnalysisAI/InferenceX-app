@@ -1,38 +1,42 @@
+/**
+ * The architecture diagram lives on the /model/[slug] deep-dive pages, always
+ * expanded (`variant="inline"`). The dashboard renders a link row to those
+ * pages where the collapsible drawer used to be — covered by the final
+ * describe block.
+ */
+
+/** Visit a model deep-dive page and wait for the inline diagram to render. */
+function visitModelPage(slug: string) {
+  cy.viewport(1280, 800);
+  cy.visit(`/model/${slug}`, {
+    onBeforeLoad(win) {
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    },
+  });
+  cy.get('[data-testid="model-architecture-inline"]').should('be.visible');
+  cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+}
+
 describe('Model Architecture Diagram', () => {
-  before(() => {
-    // Use desktop viewport to ensure all UI elements are visible
-    cy.viewport(1280, 800);
-    // Pin to DeepSeek R1 — it has a rich architecture diagram (MoE + dense blocks)
-    // that the tests below exercise. The app's default model is DeepSeek V4 Pro,
-    // which has no architecture entry, so we select R1 explicitly via URL.
-    cy.visit('/inference?g_model=DeepSeek-R1-0528', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-    // Wait for the page to load
-    cy.get('[data-testid="inference-chart-display"]').should('be.visible');
-  });
-
-  it('architecture toggle renders for DeepSeek R1 with MoE badges', () => {
-    cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
-    cy.get('[data-testid="model-architecture-toggle"]').should(
-      'contain.text',
-      'Model Architecture',
-    );
-    cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'MoE');
-    cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'MLA');
-    cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', '671B');
-  });
-
-  it('clicking toggle expands and renders the SVG diagram', () => {
-    cy.get('[data-testid="model-architecture-toggle"]').click();
-    cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
-  });
-
   describe('Collapsible Transformer Blocks (MoE model - DeepSeek R1)', () => {
     before(() => {
-      // SVG is already visible from previous test (testIsolation: false)
+      // DeepSeek R1 has a rich architecture diagram (MoE + dense blocks)
+      // that the tests below exercise.
+      visitModelPage('deepseek-r1');
+    });
+
+    it('inline architecture header renders with MoE badges', () => {
+      cy.get('[data-testid="model-architecture-inline"]').should(
+        'contain.text',
+        'Model Architecture',
+      );
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MLA');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '671B');
+    });
+
+    it('renders the SVG diagram without any toggle click', () => {
+      cy.get('[data-testid="model-architecture-toggle"]').should('not.exist');
       cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
     });
 
@@ -103,22 +107,7 @@ describe('Model Architecture Diagram', () => {
 
   describe('Collapsible Transformer Block (Dense model - Llama 3.3 70B)', () => {
     before(() => {
-      // Switch model and open architecture
-      // Clear any stale Radix scroll lock from prior Select interactions
-      cy.document().then((doc) => {
-        delete doc.body.dataset.scrollLocked;
-        doc.body.style.removeProperty('pointer-events');
-      });
-      cy.get('[role="combobox"]').filter(':visible').first().click();
-      cy.get('[role="option"]').contains('Llama 3.3').click();
-
-      // Only click toggle if SVG is not already visible (previous describe may have left it open)
-      cy.get('body').then(($body) => {
-        if ($body.find('[data-testid="model-architecture-svg"]:visible').length === 0) {
-          cy.get('[data-testid="model-architecture-toggle"]').click();
-        }
-      });
-      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+      visitModelPage('llama-3-3-70b');
     });
 
     it('shows single transformer block without dense sub-block', () => {
@@ -140,34 +129,20 @@ describe('Model Architecture Diagram', () => {
     });
 
     it('shows Dense badge and GQA badge', () => {
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'Dense');
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'GQA');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'Dense');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'GQA');
     });
   });
 
   describe('Collapsible Transformer Blocks (MoE model - Kimi K2.5)', () => {
     before(() => {
-      // Clear any stale Radix scroll lock from prior Select interactions
-      cy.document().then((doc) => {
-        delete doc.body.dataset.scrollLocked;
-        doc.body.style.removeProperty('pointer-events');
-      });
-      cy.get('[role="combobox"]').filter(':visible').first().click();
-      cy.get('[role="option"]').contains('Kimi K2.5/2.6').click();
-
-      cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
-      cy.get('body').then(($body) => {
-        if ($body.find('[data-testid="model-architecture-svg"]:visible').length === 0) {
-          cy.get('[data-testid="model-architecture-toggle"]').click();
-        }
-      });
-      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+      visitModelPage('kimi-k26');
     });
 
     it('shows MoE and MLA badges for Kimi K2.5', () => {
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'MoE');
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'MLA');
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', '1.0T');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MLA');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '1.0T');
     });
 
     it('shows both dense and MoE transformer blocks', () => {
@@ -195,27 +170,13 @@ describe('Model Architecture Diagram', () => {
 
   describe('Collapsible Transformer Blocks (MoE model - MiniMax M2.5)', () => {
     before(() => {
-      // Clear any stale Radix scroll lock from prior Select interactions
-      cy.document().then((doc) => {
-        delete doc.body.dataset.scrollLocked;
-        doc.body.style.removeProperty('pointer-events');
-      });
-      cy.get('[role="combobox"]').filter(':visible').first().click();
-      cy.get('[role="option"]').contains('MiniMax M2.5/2.7').click();
-
-      cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
-      cy.get('body').then(($body) => {
-        if ($body.find('[data-testid="model-architecture-svg"]:visible').length === 0) {
-          cy.get('[data-testid="model-architecture-toggle"]').click();
-        }
-      });
-      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+      visitModelPage('minimax-m27');
     });
 
     it('shows MoE and GQA badges for MiniMax M2.5', () => {
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'MoE');
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'GQA');
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', '230B');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'GQA');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '230B');
     });
 
     it('shows single MoE transformer block without dense sub-block', () => {
@@ -243,27 +204,13 @@ describe('Model Architecture Diagram', () => {
 
   describe('Collapsible Transformer Blocks (MoE model - MiniMax M3)', () => {
     before(() => {
-      // Clear any stale Radix scroll lock from prior Select interactions
-      cy.document().then((doc) => {
-        delete doc.body.dataset.scrollLocked;
-        doc.body.style.removeProperty('pointer-events');
-      });
-      cy.get('[role="combobox"]').filter(':visible').first().click();
-      cy.get('[role="option"]').contains('MiniMax M3').click();
-
-      cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
-      cy.get('body').then(($body) => {
-        if ($body.find('[data-testid="model-architecture-svg"]:visible').length === 0) {
-          cy.get('[data-testid="model-architecture-toggle"]').click();
-        }
-      });
-      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+      visitModelPage('minimax-m3');
     });
 
     it('shows MoE and GQA badges for MiniMax M3', () => {
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'MoE');
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'GQA');
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', '428B');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'GQA');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '428B');
     });
 
     it('GQA attention is NOT expandable (sparse attention rendered as a static block)', () => {
@@ -280,27 +227,13 @@ describe('Model Architecture Diagram', () => {
 
   describe('Alternating Attention Blocks (MoE model - gpt-oss 120B)', () => {
     before(() => {
-      // Clear any stale Radix scroll lock from prior Select interactions
-      cy.document().then((doc) => {
-        delete doc.body.dataset.scrollLocked;
-        doc.body.style.removeProperty('pointer-events');
-      });
-      cy.get('[role="combobox"]').filter(':visible').first().click();
-      cy.get('[role="option"]').contains('gpt-oss').click();
-
-      cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
-      cy.get('body').then(($body) => {
-        if ($body.find('[data-testid="model-architecture-svg"]:visible').length === 0) {
-          cy.get('[data-testid="model-architecture-toggle"]').click();
-        }
-      });
-      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+      visitModelPage('gptoss-120b');
     });
 
     it('shows MoE and Sink/Full GQA badges for gpt-oss', () => {
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'MoE');
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'Sink/Full GQA');
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', '120B');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'Sink/Full GQA');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '120B');
     });
 
     it('shows two separate transformer blocks (no single expand-transformer)', () => {
@@ -356,27 +289,13 @@ describe('Model Architecture Diagram', () => {
 
   describe('Hybrid Attention Blocks (MoE model - DeepSeek V4 Pro)', () => {
     before(() => {
-      // Clear any stale Radix scroll lock from prior Select interactions
-      cy.document().then((doc) => {
-        delete doc.body.dataset.scrollLocked;
-        doc.body.style.removeProperty('pointer-events');
-      });
-      cy.get('[role="combobox"]').filter(':visible').first().click();
-      cy.get('[role="option"]').contains('DeepSeek V4 Pro').click();
-
-      cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
-      cy.get('body').then(($body) => {
-        if ($body.find('[data-testid="model-architecture-svg"]:visible').length === 0) {
-          cy.get('[data-testid="model-architecture-toggle"]').click();
-        }
-      });
-      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+      visitModelPage('deepseek-v4');
     });
 
     it('shows MoE and Hybrid badges for DeepSeek V4 Pro', () => {
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'MoE');
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'Hybrid');
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', '1.6T');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'Hybrid');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '1.6T');
     });
 
     it('shows two separate hybrid (CSA/HCA) blocks with an alternating indicator', () => {
@@ -446,48 +365,16 @@ describe('Model Architecture Diagram', () => {
 
   describe('Hybrid Attention Blocks (MoE model - Kimi K3)', () => {
     before(() => {
-      // The model dropdown only lists models that have availability rows, and the
-      // shared fixtures carry none for kimik3 (nothing ingested yet). Append one
-      // so K3 is selectable, then re-visit with the intercept in place. This block
-      // runs last in the spec, so no earlier block sees the patched availability.
-      cy.fixture('api/availability.json').then((rows: unknown[]) => {
-        cy.intercept('GET', '/api/v1/availability', {
-          body: [
-            ...rows,
-            {
-              model: 'kimik3',
-              isl: 8192,
-              osl: 1024,
-              precision: 'fp4',
-              hardware: 'mi355x',
-              framework: 'vllm',
-              spec_method: 'none',
-              disagg: false,
-              date: '2026-07-18',
-            },
-          ],
-        }).as('availability');
-      });
-      cy.visit('/inference?g_model=Kimi-K3', {
-        onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        },
-      });
-      cy.get('[data-testid="inference-chart-display"]').should('be.visible');
-
-      cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
-      cy.get('body').then(($body) => {
-        if ($body.find('[data-testid="model-architecture-svg"]:visible').length === 0) {
-          cy.get('[data-testid="model-architecture-toggle"]').click();
-        }
-      });
-      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+      // The /model page renders the diagram regardless of benchmark
+      // availability, so no fixture patching is needed (unlike the old
+      // dashboard drawer, which required the model to be selectable).
+      visitModelPage('kimi-k3');
     });
 
     it('shows MoE and Hybrid badges for Kimi K3', () => {
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'MoE');
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'Hybrid');
-      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', '2.8T');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'Hybrid');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '2.8T');
     });
 
     it('renders the KDA and gated-MLA layer categories as two alternating blocks', () => {
@@ -555,6 +442,40 @@ describe('Model Architecture Diagram', () => {
       cy.contains('Kimi Delta Attention (KDA linear attention)').should('be.visible');
       cy.contains('Stable LatentMoE (3584-dim latent)').should('be.visible');
       cy.contains('Released by Moonshot AI').should('be.visible');
+    });
+  });
+
+  describe('Dashboard architecture link (replaces the drawer)', () => {
+    before(() => {
+      cy.viewport(1280, 800);
+      cy.visit('/inference?g_model=DeepSeek-R1-0528', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+      cy.get('[data-testid="inference-chart-display"]').should('be.visible');
+    });
+
+    it('renders a link row with architecture badges instead of the drawer', () => {
+      cy.get('[data-testid="model-architecture-toggle"]').should('not.exist');
+      cy.get('[data-testid="model-architecture-link"]').should('be.visible');
+      cy.get('[data-testid="model-architecture-link"]').should(
+        'contain.text',
+        'Learn more about the DeepSeek R1 0528 671B architecture',
+      );
+      cy.get('[data-testid="model-architecture-link"]').should('contain.text', 'MoE');
+      cy.get('[data-testid="model-architecture-link"]').should('contain.text', 'MLA');
+      cy.get('[data-testid="model-architecture-link"]').should('contain.text', '671B');
+      cy.get('[data-testid="model-architecture-link"]')
+        .should('have.attr', 'href')
+        .and('equal', '/model/deepseek-r1');
+    });
+
+    it('navigates to the model deep-dive page', () => {
+      cy.get('[data-testid="model-architecture-link"]').click();
+      cy.url().should('include', '/model/deepseek-r1');
+      cy.get('[data-testid="model-architecture-inline"]').should('be.visible');
+      cy.get('[data-testid="model-page-dashboard"]').should('exist');
     });
   });
 });

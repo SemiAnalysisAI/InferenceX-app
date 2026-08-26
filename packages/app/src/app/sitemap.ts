@@ -5,6 +5,7 @@ import { listDatasets } from '@semianalysisai/inferencex-db/queries/datasets';
 import { AGENTX_OPTIMIZATION_SLUGS } from '@/lib/agentx-optimizations';
 import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
 import { getAllPosts } from '@/lib/blog';
+import { getModelPageSlugs } from '@/lib/model-pages';
 import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import { canonicalCompareSlug } from '@/lib/compare-slug';
 import {
@@ -149,6 +150,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       if (!zhPosts.has(post.slug)) return [{ ...entry, url: `${BASE_URL}/blog/${post.slug}` }];
       return localizedPair(`/blog/${post.slug}`, entry);
     }),
+    // Model deep-dive pages (architecture + vendor evals + embedded dashboard).
+    // English-only: no /zh sibling, so no localizedPair.
+    ...getModelPageSlugs().map((slug) => ({
+      url: `${BASE_URL}/model/${slug}`,
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+    })),
     ...compareSlugs.flatMap(({ modelSlug, a, b }) =>
       localizedPair(`/compare/${canonicalCompareSlug(modelSlug, a, b)}`, {
         lastModified: now,
