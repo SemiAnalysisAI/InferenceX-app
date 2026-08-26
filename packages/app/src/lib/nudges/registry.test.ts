@@ -121,6 +121,9 @@ describe('NUDGE_REGISTRY integrity', () => {
     const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'openai-rubin-comparison-banner');
     if (banner?.type !== 'banner') throw new Error('Missing launch banner');
     expect(banner.storageKey).toBe('inferencex-openai-rubin-banner-dismissed');
+    expect(banner.content.href).toBe(
+      '/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerMw',
+    );
     expect(banner.analytics).toEqual({
       shown: 'inference_rubin_comparison_banner_shown',
       dismissed: 'inference_rubin_comparison_banner_dismissed',
@@ -129,12 +132,12 @@ describe('NUDGE_REGISTRY integrity', () => {
         banner_id: 'openai-rubin-comparison',
         scenario: '8k/1k',
         model: 'DeepSeek-R1-0528',
-        metric: 'y_outputTputPerGpu',
+        metric: 'y_outputTputPerMw',
       },
     });
     banner.content.onLinkClick?.();
     expect(location.href).toBe(
-      '/zh/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerGpu',
+      '/zh/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerMw',
     );
   });
 

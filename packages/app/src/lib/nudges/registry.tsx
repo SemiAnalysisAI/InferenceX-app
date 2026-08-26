@@ -463,12 +463,12 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: '/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerGpu',
+      href: '/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerMw',
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
         window.location.href = localizedNudgeHref(
-          '/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerGpu',
+          '/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerMw',
         );
       },
     },
@@ -480,7 +480,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
         banner_id: 'openai-rubin-comparison',
         scenario: '8k/1k',
         model: 'DeepSeek-R1-0528',
-        metric: 'y_outputTputPerGpu',
+        metric: 'y_outputTputPerMw',
       },
     },
   },
