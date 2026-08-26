@@ -357,12 +357,10 @@ interface ScenarioSelectorProps {
  * agentic-trace rows rendered flat below. Label is "Scenario" (the ISL/OSL
  * framing only applies to the fixed-seq subset).
  *
- * Renders no dropdown when fewer than two scenarios are available: a dropdown
- * with a single choice is dead UI (e.g. agentic-only models like Kimi K3), so
- * the control disappears instead of offering a no-op menu. When that lone
- * scenario is agentic, a static readout with the explainer stays behind — the
- * workload isn't self-describing, and the tooltip's /agentx link is the only
- * in-controls path to that guidance.
+ * Renders nothing when fewer than two scenarios are available: a dropdown
+ * with a single choice is dead UI (e.g. agentic-only models like Kimi K3),
+ * and a static "Scenario: Agentic" readout is just as redundant when there is
+ * nothing to choose — so the whole control disappears.
  */
 export function ScenarioSelector({
   id = 'scenario-select',
@@ -380,23 +378,7 @@ export function ScenarioSelector({
   const fixedGroups = groupByCategory(fixedSeq, (s) => getSequenceCategory(s as Sequence));
   const isAgenticSelected = sequenceKind(value as Sequence) === 'agentic';
 
-  if (availableSequences.length < 2) {
-    if (!isAgenticSelected) return null;
-    return (
-      <div className="flex flex-col space-y-1.5 lg:col-span-1">
-        {/* No htmlFor: the static readout is not a labelable control. */}
-        <LabelWithTooltip label={t.scenario} tooltip={t.scenarioTooltip} />
-        <div className="flex h-9 items-center gap-1.5 text-sm" data-testid="scenario-static-value">
-          <span>{getSequenceLabel(value as Sequence, locale)}</span>
-          <AgenticScenarioInfo
-            tooltip={t.agenticScenarioTooltip}
-            learnMore={t.agenticScenarioLearnMore}
-            href={locale === 'zh' ? '/zh/agentx' : '/agentx'}
-          />
-        </div>
-      </div>
-    );
-  }
+  if (availableSequences.length < 2) return null;
 
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">

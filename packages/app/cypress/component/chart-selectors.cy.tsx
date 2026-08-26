@@ -189,9 +189,9 @@ describe('Chart Selectors', () => {
       cy.contains('Scenario').should('not.exist');
     });
 
-    it('keeps a static agentic readout when agentic is the only scenario', () => {
-      // No dropdown — but the explainer (tooltip + /agentx link) must survive,
-      // since agentic-only models are exactly the ones that need it.
+    it('renders nothing when agentic is the only scenario', () => {
+      // A static "Scenario: Agentic" readout is as redundant as a one-option
+      // dropdown — the whole control disappears for single-scenario models.
       cy.mount(
         <TooltipProvider delayDuration={0}>
           <div data-testid="selector-host">
@@ -204,10 +204,11 @@ describe('Chart Selectors', () => {
           </div>
         </TooltipProvider>,
       );
+      cy.get('[data-testid="selector-host"]').should('exist');
       cy.get('[data-testid="scenario-selector"]').should('not.exist');
-      cy.contains('Scenario').should('exist');
-      cy.get('[data-testid="scenario-static-value"]').should('contain.text', 'Agentic');
-      cy.get('[data-testid="scenario-agentic-info"]').should('exist');
+      cy.contains('Scenario').should('not.exist');
+      cy.get('[data-testid="scenario-static-value"]').should('not.exist');
+      cy.get('[data-testid="scenario-agentic-info"]').should('not.exist');
     });
 
     it('hides the agentic explainer on fixed-sequence scenarios', () => {
