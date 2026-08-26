@@ -399,6 +399,14 @@ describe('Overview page', () => {
       cy.window().then((after) => {
         expect(after.history.length - before, 'one entry for one selection').to.equal(1);
       });
+      // The unsuccessful stop stays retryable: activating it again re-requests
+      // without stacking another history entry for the byte-identical href.
+      selectOverviewTier(75);
+      cy.wait('@overviewJsonFailure');
+      cy.location('search').should('eq', '?tier=75');
+      cy.window().then((after) => {
+        expect(after.history.length - before, 'retry adds no history entry').to.equal(1);
+      });
     });
 
     cy.go('back');

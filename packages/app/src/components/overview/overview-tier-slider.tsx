@@ -15,7 +15,7 @@ import {
 } from '@/lib/overview-data';
 import { overviewTierHref } from '@/lib/overview-links';
 
-import { useOverviewNavigation } from './overview-navigation';
+import { useOverviewNavigation, useOverviewNavigationError } from './overview-navigation';
 
 interface OverviewTierSliderProps {
   tier: OverviewTier;
@@ -47,6 +47,7 @@ export function OverviewTierSlider({
   unit,
 }: OverviewTierSliderProps) {
   const navigation = useOverviewNavigation();
+  const navigationError = useOverviewNavigationError();
   const pointerActive = useRef(false);
   const committedIndex = useRef(tierIndex(tier));
   const [selectedIndex, setSelectedIndex] = useState(() => tierIndex(tier));
@@ -54,8 +55,17 @@ export function OverviewTierSlider({
   useEffect(() => {
     const index = tierIndex(tier);
     committedIndex.current = index;
-    setSelectedIndex(index);
+    // A payload settling mid-drag must not yank the thumb away from the stop
+    // the pointer is choosing; the gesture's own pointerup/cancel settles it.
+    if (!pointerActive.current) setSelectedIndex(index);
   }, [tier]);
+
+  useEffect(() => {
+    // A failed load leaves the settled tier behind while the thumb and URL
+    // stay on the unsuccessful stop. Re-open the guard so activating that
+    // same stop again retries the navigation instead of returning early.
+    if (navigationError) committedIndex.current = tierIndex(tier);
+  }, [navigationError, tier]);
 
   const selectedTier = OVERVIEW_TIERS[selectedIndex];
   const progress = (selectedIndex / (OVERVIEW_TIERS.length - 1)) * 100;
