@@ -35,6 +35,7 @@ const STRINGS = {
     perfPerDollar: 'Performance per Dollar',
     modelArchitectures: 'Model Architectures',
     glossary: 'AI Inference Glossary',
+    chipSpecs: 'Chip Specs & Pricing',
     languageLink: '中文版',
     languageHref: '/zh',
     languageHrefLang: 'zh-CN',
@@ -66,6 +67,7 @@ const STRINGS = {
     perfPerDollar: '每美元性能',
     modelArchitectures: '模型架构',
     glossary: 'AI 推理术语表',
+    chipSpecs: '芯片规格与价格',
     languageLink: 'English',
     languageHref: '/',
     languageHrefLang: 'en',
@@ -271,6 +273,13 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 {t.glossary}
+              </Link>
+              <Link
+                data-testid="footer-link-chips"
+                href={`${prefix}/chips`}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.chipSpecs}
               </Link>
               <Link
                 data-testid="footer-link-zh"

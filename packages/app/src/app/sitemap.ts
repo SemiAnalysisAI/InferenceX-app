@@ -16,6 +16,7 @@ import {
   canonicalPrecisionCompareSlug,
   canonicalSpecDecodeCompareSlug,
 } from '@/lib/compare-variant-slug';
+import { getAllChipRouteSlugs } from '@/lib/chip-pages';
 import { getAllGlossaryEntries } from '@/lib/glossary';
 import { ACTIVE_INFERENCE_MODEL_SLUGS, INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import { languageAlternates, zhPath } from '@/lib/i18n';
@@ -167,6 +168,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: now,
         changeFrequency: 'monthly' as const,
         priority: 0.6,
+      }),
+    ),
+    ...localizedPair('/chips', {
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    }),
+    ...getAllChipRouteSlugs().flatMap((slug) =>
+      localizedPair(`/chips/${slug}`, {
+        lastModified: now,
+        changeFrequency: 'weekly' as const,
+        priority: 0.7,
       }),
     ),
     ...getAllPosts().flatMap((post) => {
