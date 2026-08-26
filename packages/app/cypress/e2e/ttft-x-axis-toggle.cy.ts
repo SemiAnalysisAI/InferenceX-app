@@ -199,8 +199,8 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
   });
 
-  it('explains the offload halo in the legend and distinguishes it from plain points', () => {
-    cy.get('#chart-0 [data-testid="offload-halo-key"]')
+  it('explains the offload halo in the info footer and distinguishes it from plain points', () => {
+    cy.get('[data-testid="axis-metric-footer-chart-0"] [data-testid="offload-halo-key"]')
       .should('be.visible')
       .and('contain.text', 'KV offload ON');
     cy.get('#chart-0 .offload-halo').should('have.length.at.least', 1);
@@ -211,25 +211,14 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     });
   });
 
-  it('keeps the offload halo explanation in the PNG export clone', () => {
-    cy.window().then((win) => {
-      const exportContainer = win.document.querySelector('#chart-0-export');
-      expect(exportContainer).not.to.equal(null);
-      const state = { seen: false };
-      const observer = new win.MutationObserver(() => {
-        if (exportContainer?.querySelector('[data-testid="offload-halo-key"]')) {
-          state.seen = true;
-          observer.disconnect();
-        }
-      });
-      observer.observe(exportContainer!, { childList: true, subtree: true });
-      (win as typeof win & { __offloadHaloExportState: typeof state }).__offloadHaloExportState =
-        state;
-    });
-
-    cy.get('[data-testid="chart-figure"]').first().find('[data-testid="export-button"]').click();
-    cy.get('[data-testid="export-png-button"]').click();
-    cy.window().its('__offloadHaloExportState.seen').should('eq', true);
+  it('keeps the offload halo explanation out of the chart capture tree', () => {
+    // The key lives in the axis-metric info footer (a `no-export` sibling of
+    // the chart), so the PNG export clone — built from #chart-0 — carries the
+    // halo decoration itself but not the textual key.
+    cy.get('[data-testid="axis-metric-footer-chart-0"] [data-testid="offload-halo-key"]').should(
+      'be.visible',
+    );
+    cy.get('#chart-0 [data-testid="offload-halo-key"]').should('not.exist');
   });
 
   it('shows the selected percentile in the Interactivity axis label', () => {
@@ -640,7 +629,7 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
       'contain.text',
       'P90 Interactivity (tok/s/user)',
     );
-    cy.get('#chart-0 [data-testid="offload-halo-key"]')
+    cy.get('[data-testid="axis-metric-footer-chart-0"] [data-testid="offload-halo-key"]')
       .should('be.visible')
       .and('contain.text', 'KV offload ON');
   });

@@ -120,8 +120,10 @@ describe('ScatterGraph toggle decoration', () => {
     expect(groups[1].querySelector('.offload-halo')).toBeNull();
     expect(groups[2].querySelector('.offload-halo')).not.toBeNull();
     expect(container.querySelector('[data-testid="spec-decode-marker-key"]')).toBeNull();
-    expect(container.querySelector('[data-testid="offload-halo-key"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="agentic-optimization-note"]')).not.toBeNull();
+    // The KV-offload key and optimization note moved to the axis-metric info
+    // footer rendered by ChartDisplay, so the chart itself carries neither.
+    expect(container.querySelector('[data-testid="offload-halo-key"]')).toBeNull();
+    expect(container.querySelector('[data-testid="agentic-optimization-note"]')).toBeNull();
     unmount();
   });
 

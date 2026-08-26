@@ -1,7 +1,7 @@
 'use client';
 
 import { Info, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import {
   METRIC_EXPLANATIONS,
@@ -40,6 +40,11 @@ interface AxisMetricFooterProps {
    * only to extract the percentile prefix for the row name.
    */
   xAxisLabel: string;
+  /**
+   * Chart-level notices (KV-offload halo key, agentic optimization note,
+   * ATOM engine footnote) rendered as the info section's final block.
+   */
+  notices?: ReactNode;
 }
 
 interface FooterRow {
@@ -65,6 +70,7 @@ export default function AxisMetricFooter({
   metricKey,
   xAxisKind,
   xAxisLabel,
+  notices,
 }: AxisMetricFooterProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -150,6 +156,14 @@ export default function AxisMetricFooter({
           </div>
         );
       })}
+      {notices && (
+        <div
+          className="space-y-2 border-t border-border/60 py-2.5"
+          data-testid={`axis-metric-notices-${chartId}`}
+        >
+          {notices}
+        </div>
+      )}
     </div>
   );
 }

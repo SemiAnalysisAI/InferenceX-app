@@ -22,14 +22,14 @@ const STRINGS = {
   },
 } as const;
 
-/** Agentic-only legend note; point tooltips carry the exact optimization method. */
+/** Agentic-only info-footer note; point tooltips carry the exact optimization method. */
 export function AgenticOptimizationNote() {
   const t = STRINGS[useLocale()];
 
   return (
     <div
       data-testid="agentic-optimization-note"
-      className="mt-2 flex w-full items-center gap-1 px-1 pr-2 text-xs italic text-blue-600 dark:text-blue-400"
+      className="flex w-full items-center gap-1 px-1 pr-2 text-xs italic text-blue-600 dark:text-blue-400"
     >
       <span>*{t.label}</span>
       <TooltipProvider delayDuration={100}>

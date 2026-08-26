@@ -57,6 +57,17 @@ function click(el: Element) {
 }
 
 describe('AxisMetricFooter', () => {
+  it('renders notices in a dedicated section only when provided', () => {
+    render();
+    expect(container.querySelector('[data-testid="axis-metric-notices-chart-0"]')).toBeNull();
+    render({ notices: <span data-testid="footer-notice">KV offload ON</span> });
+    const notices = container.querySelector('[data-testid="axis-metric-notices-chart-0"]');
+    expect(notices).not.toBeNull();
+    expect(notices!.querySelector('[data-testid="footer-notice"]')!.textContent).toBe(
+      'KV offload ON',
+    );
+  });
+
   it('renders one collapsed row per axis', () => {
     render();
     const xRow = container.querySelector('[data-testid="axis-metric-row-x-chart-0"]');

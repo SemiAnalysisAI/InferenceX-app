@@ -64,7 +64,6 @@ import {
   createKnownIssueLayer,
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
-import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import {
   parallelismLabelBoxes,
@@ -74,7 +73,6 @@ import {
   updateRenderedLineLabels,
   type LineLabelSeries,
 } from '@/components/inference/ui/line-label-layer';
-import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 
 const FixedSequenceLogDialog = dynamic(() =>
@@ -192,7 +190,6 @@ const GPUGraph = React.memo(
       setQuickFilterDeployment,
       setQuickFilterSpec,
     ]);
-    const hasOffloadHalo = useMemo(() => data.some((point) => point.offload_mode === 'on'), [data]);
 
     // Shared date+GPU pairs. `dates` holds comparison-series entries (plain dates
     // and/or specific-run entries); a same-day range endpoint is dropped when that
@@ -1007,14 +1004,9 @@ const GPUGraph = React.memo(
               },
             ]}
             precisionIndicators={selectedPrecisions}
+            hideAtomFootnote
             keyIndicators={
               <>
-                {hasOffloadHalo || selectedSequence === Sequence.AgenticTraces ? (
-                  <>
-                    {hasOffloadHalo && <OffloadHaloLegendKey />}
-                    {selectedSequence === Sequence.AgenticTraces && <AgenticOptimizationNote />}
-                  </>
-                ) : null}
                 {fixedLogPointId === null ? null : (
                   <FixedSequenceLogDialog
                     pointId={fixedLogPointId}
