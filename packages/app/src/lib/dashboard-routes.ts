@@ -113,6 +113,16 @@ export const DASHBOARD_ROUTES = [
     shareParamScopes: ['g_', 'i_', 'c_'],
   },
   {
+    key: 'fleet',
+    path: '/fleet',
+    canonicalPath: '/fleet',
+    navGroup: 'primary',
+    indexable: true,
+    localeMirrored: true,
+    providers: UNOFFICIAL_ONLY_DASHBOARD_PROVIDERS,
+    shareParamScopes: ['g_', 'i_', 'c_'],
+  },
+  {
     key: 'reliability',
     path: '/reliability',
     canonicalPath: '/reliability',

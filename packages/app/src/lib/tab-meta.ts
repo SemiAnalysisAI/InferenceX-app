@@ -41,6 +41,11 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
     description:
       'Calculate AI inference throughput and total cost of ownership. Compare chip cost-efficiency for LLM serving across hardware configurations.',
   },
+  fleet: {
+    title: 'Fleet Lifecycle Economics',
+    description:
+      'Project a fixed AI inference fleet across its life: size it against a facility power budget, then track revenue, cost, and margin as measured software configs improve over time.',
+  },
   reliability: {
     title: 'Provider Reliability Metrics',
     description:

@@ -14,7 +14,6 @@ import {
 } from '@semianalysisai/inferencex-constants';
 
 import CalculatorTable from '@/components/calculator/CalculatorTable';
-import FleetLifecycle from '@/components/calculator/FleetLifecycle';
 import CostTargetPanel from '@/components/calculator/CostTargetPanel';
 import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
 import {
@@ -43,6 +42,7 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { overlayRunColor } from '@/lib/overlay-run-style';
+import { localePath } from '@/lib/i18n';
 import { readUrlParams, writeUrlParams } from '@/lib/url-state';
 import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -212,9 +212,12 @@ const STRINGS = {
     updated: ' • Updated: ',
     note: 'Note:',
     disaggCost:
-      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall, and $/M tok is derived from those rates — so on the Input and Output token types a disaggregated config reads cheaper than it is, by a median 2× and up to 18× across run history. Total-token cost is unaffected: it comes from throughput per chip overall, which both kinds report on the same basis. The Fleet Lifecycle section below deliberately differs — it derives its per-token-type figures from that total, so everything there is on one denominator.',
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall, and $/M tok is derived from those rates — so on the Input and Output token types a disaggregated config reads cheaper than it is, by a median 2× and up to 18× across run history. Total-token cost is unaffected: it comes from throughput per chip overall, which both kinds report on the same basis. The Fleet Lifecycle page deliberately differs — it derives its per-token-type figures from that total, so everything there is on one denominator.',
     disaggThroughput:
-      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall — divided by fewer chips, so on the Input and Output token types a disaggregated config reads faster per chip than it is, by a median 2× and up to 18× on input and 7× on output. Total throughput is unaffected: both kinds report it per chip overall. The Fleet Lifecycle section below deliberately differs — it derives its per-token-type figures from that total, so everything there is on one denominator.',
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall — divided by fewer chips, so on the Input and Output token types a disaggregated config reads faster per chip than it is, by a median 2× and up to 18× on input and 7× on output. Total throughput is unaffected: both kinds report it per chip overall. The Fleet Lifecycle page deliberately differs — it derives its per-token-type figures from that total, so everything there is on one denominator.',
+    fleetMoved:
+      'Fleet Lifecycle has its own page: a fixed fleet sized against a power budget, projected across its life with every measured config improvement.',
+    fleetMovedLink: 'Open Fleet Lifecycle',
     compMetricThroughput: 'throughput',
     compMetricCost: 'cost efficiency',
     compMetricPower: 'tok/s/MW',
@@ -265,9 +268,12 @@ const STRINGS = {
     updated: ' • 更新于：',
     note: '注意：',
     disaggCost:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数，而 $/M tok 由这些速率推导。因此在「输入」与「输出」token 类型下，解耦配置显示的成本低于实际，中位数偏低 2 倍，在运行历史中最高达 18 倍。总计口径的成本不受影响：它来自按芯片总数计的吞吐量，两种部署方式在该口径上一致。下方的「集群生命周期」模块与此有意不同：它由该总量推导各 token 类型的数值，因此那里的所有数字都在同一分母上。',
+      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数，而 $/M tok 由这些速率推导。因此在「输入」与「输出」token 类型下，解耦配置显示的成本低于实际，中位数偏低 2 倍，在运行历史中最高达 18 倍。总计口径的成本不受影响：它来自按芯片总数计的吞吐量，两种部署方式在该口径上一致。「集群生命周期」页面与此有意不同：它由该总量推导各 token 类型的数值，因此那里的所有数字都在同一分母上。',
     disaggThroughput:
-      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数。由于除以的芯片数更少，在「输入」与「输出」token 类型下，解耦配置显示的每芯片吞吐量高于实际，中位数偏高 2 倍，输入最高达 18 倍、输出最高达 7 倍。总计口径的吞吐量不受影响：两种部署方式均按芯片总数报告。下方的「集群生命周期」模块与此有意不同：它由该总量推导各 token 类型的数值，因此那里的所有数字都在同一分母上。',
+      '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数。由于除以的芯片数更少，在「输入」与「输出」token 类型下，解耦配置显示的每芯片吞吐量高于实际，中位数偏高 2 倍，输入最高达 18 倍、输出最高达 7 倍。总计口径的吞吐量不受影响：两种部署方式均按芯片总数报告。「集群生命周期」页面与此有意不同：它由该总量推导各 token 类型的数值，因此那里的所有数字都在同一分母上。',
+    fleetMoved:
+      '「集群生命周期」已移至独立页面：按功率预算确定固定集群的规模，结合每次实测配置改进，测算其整个生命周期的经济性。',
+    fleetMovedLink: '打开集群生命周期',
     compMetricThroughput: '吞吐量',
     compMetricCost: '成本效率',
     compMetricPower: 'tok/s/MW',
@@ -350,8 +356,8 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const [isTargetInputFocused, setIsTargetInputFocused] = useState(false);
   const [barMetric, setBarMetric] = useState<BarMetric>('throughput');
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
-  // Owned here rather than inside the lifecycle section so the `c_mw` URL seed is
-  // read once, at the level that also hands the budget to the cost-target panel.
+  // The `c_mw` URL seed is read once here; the cost-target panel renders the
+  // input and consumes the budget. The Fleet Lifecycle page shares the param.
   const [mwInput, setMwInput] = useState<string>(() => readUrlParams().c_mw ?? '');
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
   const [barSelectionIntent, setBarSelectionIntent] = useState<{
@@ -1136,6 +1142,8 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           costType={costType}
           visibleHwKeys={visibleHwKeys}
           mw={mw}
+          mwInput={mwInput}
+          onMwInputChange={handleMwInputChange}
         />
       )}
 
@@ -1411,24 +1419,23 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         </section>
       )}
 
-      {/* Fleet lifecycle: all-time-best config projected over a fleet's life.
-          Official results only — see the overlay note in the section. */}
+      {/* Fleet lifecycle now lives on its own page (/fleet); leave a pointer
+          so calculator users can find where the section moved. */}
       {!loading && hasData && (
-        <FleetLifecycle
-          hardwareConfig={hardwareConfig}
-          costProvider={costProvider}
-          costType={costType}
-          targetValue={targetValue}
-          mode={mode}
-          visibleHwKeys={visibleHwKeys}
-          selectedModel={selectedModel}
-          selectedSequence={selectedSequence}
-          selectedPrecisions={selectedPrecisions}
-          selectedPercentile={selectedPercentile}
-          mwInput={mwInput}
-          onMwInputChange={handleMwInputChange}
-          colorResolver={resolveColor}
-        />
+        <section data-testid="calculator-fleet-pointer">
+          <Card>
+            <p className="text-sm text-muted-foreground">
+              {t.fleetMoved}{' '}
+              <Link
+                href={localePath('/fleet', locale)}
+                className="underline hover:text-foreground"
+                data-testid="calculator-fleet-pointer-link"
+              >
+                {t.fleetMovedLink}
+              </Link>
+            </p>
+          </Card>
+        </section>
       )}
     </div>
   );

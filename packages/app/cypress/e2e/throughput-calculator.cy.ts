@@ -735,10 +735,9 @@ describe('TCO Calculator', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Cost target: the inverse of the interactivity slider. The MW-budget
-  // projection this used to sit beside now lives in the lifecycle section, which
-  // owns the budget input and reports chips and users as columns — see
-  // calculator-lifecycle.cy.ts.
+  // Cost target: the inverse of the interactivity slider. The MW-budget input
+  // lives here now that the Fleet Lifecycle section moved to its own /fleet
+  // page — see fleet-lifecycle.cy.ts. Both pages share the `c_mw` URL param.
   // ---------------------------------------------------------------------------
 
   describe('cost target', () => {
@@ -772,11 +771,15 @@ describe('TCO Calculator', () => {
       });
     });
 
-    it('no longer carries a MW budget input — the lifecycle section owns it', () => {
+    it('owns the MW budget input now that the lifecycle section moved to /fleet', () => {
       cy.get('[data-testid="calculator-costcap-section"]')
-        .find('[data-testid="calc-fleet-mw-input"]')
-        .should('not.exist');
-      cy.get('[data-testid="calculator-fleet-section"]').should('not.exist');
+        .find('[data-testid="calc-costcap-mw-input"]')
+        .should('exist');
+      cy.get('[data-testid="calculator-lifecycle-section"]').should('not.exist');
+      // A pointer to the new page replaces the section.
+      cy.get('[data-testid="calculator-fleet-pointer-link"]')
+        .should('have.attr', 'href')
+        .and('match', /\/fleet$/);
     });
 
     it('entering a generous cost target renders reachable interactivity per GPU', () => {
