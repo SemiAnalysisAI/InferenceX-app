@@ -54,6 +54,30 @@ describe('MetricAssumptionNotes', () => {
     expect(getVisibleCaveatText()).toContain('calculate power per decode chip or per prefill chip');
   });
 
+  // Total tok/s/MW divides throughput per chip overall by per-chip power — the
+  // same denominator an aggregated config uses — so, like the total-token cost
+  // metrics, it keeps the power badges but must not carry the disagg caveat.
+  it('hides the disaggregation caveat for the total per-MW metric', () => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_tpPerMw" />);
+
+    expect(getVisibleText()).toContain('All in Power/Chip:');
+    expect(getVisibleText()).toContain('SemiAnalysis Datacenter Industry Model');
+    expect(getVisibleCaveatText()).not.toContain(
+      'calculate power per decode chip or per prefill chip',
+    );
+  });
+
+  it.each(['y_inputTputPerMw', 'y_outputTputPerMw'])(
+    'shows the disaggregation caveat for per-token-type per-MW metric %s',
+    (metric) => {
+      renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
+
+      expect(getVisibleCaveatText()).toContain(
+        'calculate power per decode chip or per prefill chip',
+      );
+    },
+  );
+
   it('preserves historical-trends semantics when both compatibility flags are disabled', () => {
     renderUi(
       <MetricAssumptionNotes
