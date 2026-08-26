@@ -50,19 +50,19 @@ function vsKeywordsZh(page: ChipVsPage): string[] {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
 
-  const chip = getChipPage(slug);
-  if (chip) {
-    const translation = getZhChipTranslation(chip.slug);
+  const entry = getChipPage(slug);
+  if (entry) {
+    const translation = getZhChipTranslation(entry.slug);
     if (!translation) return {};
-    const title = `${chip.title} 规格、价格与 AI 推理基准测试`;
+    const title = `${entry.title} 规格、价格与 AI 推理基准测试`;
     const description = `${translation.summary}${SUPPORTERS_LINE_ZH}`;
-    const url = `${SITE_URL}/zh/chips/${chip.slug}`;
+    const url = `${SITE_URL}/zh/chips/${entry.slug}`;
     return {
       title,
       description,
       keywords: [...translation.keywords],
       authors: [{ name: AUTHOR_NAME }],
-      alternates: zhAlternates(`/chips/${chip.slug}`),
+      alternates: zhAlternates(`/chips/${entry.slug}`),
       openGraph: {
         title: `${title} | ${SITE_NAME}`,
         description,
@@ -109,8 +109,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ZhChipRoutePage({ params }: Props) {
   const { slug } = await params;
 
-  const chip = getChipPage(slug);
-  if (chip) return <ChipDetailContent entry={chip} locale="zh" />;
+  const entry = getChipPage(slug);
+  if (entry) return <ChipDetailContent entry={entry} locale="zh" />;
 
   const vsPage = getChipVsPage(slug);
   if (!vsPage) notFound();
