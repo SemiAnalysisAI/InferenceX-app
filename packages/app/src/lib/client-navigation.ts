@@ -28,6 +28,26 @@ export function replaceClientSearch(searchParams: URLSearchParams): void {
 }
 
 /**
+ * Shallow-replace the current pathname, preserving the query string (minus
+ * `dropParams`) and hash. Unlike `replaceClientSearch`, this goes through the
+ * Next-patched `window.history.replaceState` on purpose: the pathname is
+ * changing, so the App Router must adopt the new URL (`usePathname` updates)
+ * — but as a same-document rewrite, without an RSC fetch or scroll reset.
+ * Router state is carried over so Back/Forward keep working.
+ */
+export function replaceClientPathname(target: string, dropParams: readonly string[] = []): void {
+  if (window.location.pathname === target) return;
+  const search = new URLSearchParams(window.location.search);
+  for (const param of dropParams) search.delete(param);
+  const qs = search.toString();
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${target}${qs ? `?${qs}` : ''}${window.location.hash}`,
+  );
+}
+
+/**
  * The first dashboard transition can request the route without committing the
  * URL change. Repeating the same app-router push after the route payload has
  * been requested preserves same-document navigation and avoids a music restart.

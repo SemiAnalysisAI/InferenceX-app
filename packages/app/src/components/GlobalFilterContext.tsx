@@ -37,10 +37,7 @@ import {
   Sequence,
   SEQUENCE_OPTIONS,
 } from '@/lib/data-mappings';
-import {
-  inferenceModelForPathname,
-  inferenceModelRouteForSelection,
-} from '@/lib/inference-model-slug';
+import { inferenceModelForPathname } from '@/lib/inference-model-slug';
 import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/default-sequence';
@@ -351,30 +348,6 @@ export function GlobalFilterProvider({
     // today, and covering it would mean the Suspense bailout above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
-
-  // Selecting a model on the inference tab moves the URL onto the model's
-  // indexable subroute without a reload: Next intercepts
-  // `history.replaceState`, so `usePathname` stays in sync while the chart
-  // simply re-renders in place — no RSC refetch, no scroll reset. The ref
-  // skips the mount run so hard-loading `/inference` (or a `?g_model=` share
-  // link) keeps its URL; only an actual model switch rewrites the path.
-  // `window.location` is read directly — it is always current, unlike the
-  // `pathname` hook value, which lags a rewrite this very effect made.
-  const modelRouteSyncReadyRef = useRef(false);
-  useEffect(() => {
-    if (!modelRouteSyncReadyRef.current) {
-      modelRouteSyncReadyRef.current = true;
-      return;
-    }
-    const target = inferenceModelRouteForSelection(window.location.pathname, selectedModel);
-    if (target === null || window.location.pathname === target) return;
-    const search = new URLSearchParams(window.location.search);
-    // The path now carries the model — a lingering share-link param would
-    // override it on the next snapshot read.
-    search.delete('g_model');
-    const qs = search.toString();
-    window.history.replaceState(null, '', `${target}${qs ? `?${qs}` : ''}${window.location.hash}`);
-  }, [selectedModel]);
 
   // ── Availability data ─────────────────────────────────────────────────────
   const {
