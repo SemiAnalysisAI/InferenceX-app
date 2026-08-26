@@ -2,12 +2,13 @@ import type * as d3 from 'd3';
 
 /**
  * Perf ruler layer — an ISO-X (iso-interactivity) measurement ruler between
- * two curves. The user anchors the ruler on a point of curve A; the ruler is
- * a vertical line at the anchor's x pixel position running from the anchor's
- * y down/up to curve B's y at that SAME x (found by intersecting curve B's
- * rendered roofline path). Short horizontal end caps mark both ends and a
- * label chip shows the performance multiple between the two RAW y-values at
- * that x (e.g. "2.03x", optionally "+103%").
+ * two curves. The user clicks two curves; the ruler is a vertical line at a
+ * freely chosen iso-x whose BOTH ends are interpolated on the two curves'
+ * rendered roofline paths at that x (neither end needs to be a data point).
+ * The ruler is draggable horizontally to fine-tune the iso-x. Short
+ * horizontal end caps mark both ends and a label chip shows the performance
+ * multiple between the two RAW y-values at that x (e.g. "2.03x",
+ * optionally "+103%").
  *
  * Pure module: intersection search and geometry math are separated from
  * rendering so all three are unit testable (see perf-ruler.test.ts).
@@ -17,25 +18,16 @@ import type * as d3 from 'd3';
 
 type GroupSelection = d3.Selection<SVGGElement, unknown, null, undefined>;
 
-export interface PerfRulerPointInput {
-  /** Pixel x position of the point (already passed through the x scale). */
-  px: number;
-  /** Pixel y position of the point (already passed through the y scale). */
-  py: number;
-  /** Raw data-space y value — the ratio uses raw values, never pixels. */
-  rawY: number;
-}
-
-/** The target-curve end of the ruler: the intersection at the anchor's x. */
-export interface PerfRulerTargetInput {
-  /** Pixel y of the target curve at the anchor's x. */
+/** One end of the ruler: a curve's interpolated position at the iso-x. */
+export interface PerfRulerEndInput {
+  /** Pixel y of the curve at the iso-x (from the rendered path). */
   py: number;
   /** Raw data-space y at that intersection (yScale.invert of `py`). */
   rawY: number;
 }
 
 export interface PerfRulerGeometry {
-  /** Ruler line x pixel position: the anchor point's x. */
+  /** Ruler line x pixel position: the iso-x through the x scale. */
   x: number;
   /** Top pixel y of the ruler span. */
   y1: number;
@@ -123,72 +115,121 @@ export function intersectPathAtX(
 }
 
 /**
- * Compute iso-x ruler geometry from the anchor point and the target curve's
- * intersection at the anchor's x. Returns null for degenerate inputs:
- * non-finite coordinates or non-positive raw y values (a ratio over a
- * zero/negative value is meaningless, and log scales cannot place them).
- * The ratio is symmetric: higher raw y over lower raw y, regardless of which
- * side is the anchor.
+ * Compute iso-x ruler geometry from the two curves' interpolated positions
+ * at the iso-x pixel `x`. Returns null for degenerate inputs: non-finite
+ * coordinates or non-positive raw y values (a ratio over a zero/negative
+ * value is meaningless, and log scales cannot place them). The ratio is
+ * symmetric: higher raw y over lower raw y, regardless of click order.
  */
 export function computeIsoXRulerGeometry(
-  anchor: PerfRulerPointInput,
-  target: PerfRulerTargetInput,
+  x: number,
+  a: PerfRulerEndInput,
+  b: PerfRulerEndInput,
 ): PerfRulerGeometry | null {
-  const inputs = [anchor.px, anchor.py, anchor.rawY, target.py, target.rawY];
+  const inputs = [x, a.py, a.rawY, b.py, b.rawY];
   if (!inputs.every((value) => Number.isFinite(value))) return null;
-  if (anchor.rawY <= 0 || target.rawY <= 0) return null;
+  if (a.rawY <= 0 || b.rawY <= 0) return null;
 
-  const hi = Math.max(anchor.rawY, target.rawY);
-  const lo = Math.min(anchor.rawY, target.rawY);
+  const hi = Math.max(a.rawY, b.rawY);
+  const lo = Math.min(a.rawY, b.rawY);
   const ratio = hi / lo;
 
   return {
-    x: anchor.px,
-    y1: Math.min(anchor.py, target.py),
-    y2: Math.max(anchor.py, target.py),
+    x,
+    y1: Math.min(a.py, b.py),
+    y2: Math.max(a.py, b.py),
     ratio,
     ratioLabel: formatPerfRatio(ratio),
     percentLabel: formatPerfPercent(ratio),
   };
 }
 
-/** One perf-ruler click: a stable point key plus the curve it belongs to. */
-export interface PerfRulerSelectionEntry {
-  key: string;
-  curve: string;
+/** Inclusive pixel x range, e.g. the horizontal extent of a rendered path. */
+export interface PerfRulerXRange {
+  min: number;
+  max: number;
 }
 
 /**
- * Selection-transition table for perf-ruler clicks. The selection holds up
- * to two entries: `[anchor, target]`. The anchor is a POINT (it defines the
- * iso-x and one end of the ruler); the target entry only identifies a CURVE
- * (the other end is that curve's intersection at the anchor's x).
+ * Horizontal pixel extent of a rendered path. Valid for paths whose x is
+ * monotonic along the length parameter (rooflines: pareto frontiers sorted
+ * by x). Returns null for empty/degenerate paths.
+ */
+export function pathXExtent(path: PerfRulerPathLike): PerfRulerXRange | null {
+  const total = path.getTotalLength();
+  if (!Number.isFinite(total) || total <= 0) return null;
+  const start = path.getPointAtLength(0);
+  const end = path.getPointAtLength(total);
+  if (!Number.isFinite(start.x) || !Number.isFinite(end.x)) return null;
+  return { min: Math.min(start.x, end.x), max: Math.max(start.x, end.x) };
+}
+
+/**
+ * Clamp an iso-x pixel position to the overlapping x range of two curves so
+ * a drag can never leave the span where both intersections exist. Returns
+ * null when the ranges do not overlap (no valid iso-x at all) or the input
+ * is not finite.
+ */
+export function clampIsoX(
+  x: number,
+  a: PerfRulerXRange,
+  b?: PerfRulerXRange | null,
+): number | null {
+  if (!Number.isFinite(x)) return null;
+  const min = b ? Math.max(a.min, b.min) : a.min;
+  const max = b ? Math.min(a.max, b.max) : a.max;
+  if (min > max) return null;
+  return Math.min(Math.max(x, min), max);
+}
+
+/** One perf-ruler click: a curve identity plus the click's data-space x. */
+export interface PerfRulerCurveClick {
+  curve: string;
+  isoX: number;
+}
+
+/**
+ * Perf-ruler selection: up to two curve identities plus the iso-x (in DATA
+ * space, so it survives zoom and metric changes). Neither end is a data
+ * point — both are interpolated on the curves' rendered paths at the iso-x.
+ */
+export interface PerfRulerCurveSelection {
+  curves: string[];
+  isoX: number | null;
+}
+
+export const EMPTY_PERF_RULER_SELECTION: PerfRulerCurveSelection = { curves: [], isoX: null };
+
+/**
+ * Selection-transition table for perf-ruler clicks (curve-to-curve
+ * semantics — clicks land on CURVES, either directly on a widened curve hit
+ * stroke or via a data point standing in for its curve at that point's x):
  *
- * | State            | Click on…                       | Result                        |
- * |------------------|---------------------------------|-------------------------------|
- * | empty            | any point                       | becomes the anchor            |
- * | any              | the exact anchor point          | clear everything              |
- * | any              | another point on anchor's curve | move the anchor (keep target) |
- * | anchor only      | a different curve               | select that curve as target   |
- * | anchor + target  | any point on the target curve   | no-op (keep the measurement — |
- * |                  |                                 | it cannot change the result)  |
- * | anchor + target  | a third curve                   | new measurement anchored there|
+ * | State           | Click on…                | Result                          |
+ * |-----------------|--------------------------|---------------------------------|
+ * | empty           | any curve                | curve A selected, iso-x = click |
+ * | any             | an already-selected curve| MOVE iso-x to the click's x     |
+ * | A only          | a different curve        | curve B selected — measurement  |
+ * |                 |                          | complete at the existing iso-x  |
+ * | A + B           | a third curve            | new measurement: that curve is  |
+ * |                 |                          | the new A, iso-x = click        |
  *
- * Returns `prev` (same reference) for no-op transitions so React state
- * updates can bail out without re-rendering.
+ * Dragging the ruler (not handled here) also moves the iso-x; toggling the
+ * mode off clears the selection. Returns `prev` (same reference) for
+ * invalid clicks so React state updates can bail out without re-rendering.
  */
 export function nextPerfRulerSelection(
-  prev: PerfRulerSelectionEntry[],
-  clicked: PerfRulerSelectionEntry,
-): PerfRulerSelectionEntry[] {
-  const anchor = prev[0];
-  const target = prev[1];
-  if (anchor && anchor.key === clicked.key) return [];
-  if (!anchor) return [clicked];
-  if (clicked.curve === anchor.curve) return target ? [clicked, target] : [clicked];
-  if (!target) return [anchor, clicked];
-  if (clicked.curve === target.curve) return prev;
-  return [clicked];
+  prev: PerfRulerCurveSelection,
+  click: PerfRulerCurveClick,
+): PerfRulerCurveSelection {
+  if (!Number.isFinite(click.isoX)) return prev;
+  const [a, b] = prev.curves;
+  if (!a) return { curves: [click.curve], isoX: click.isoX };
+  if (click.curve === a || click.curve === b) {
+    return prev.isoX === click.isoX ? prev : { curves: prev.curves, isoX: click.isoX };
+  }
+  if (!b) return { curves: [a, click.curve], isoX: prev.isoX ?? click.isoX };
+  return { curves: [click.curve], isoX: click.isoX };
 }
 
 export interface PerfRulerRenderOptions {
@@ -270,6 +311,16 @@ export function renderPerfRuler(
     .attr('dominant-baseline', 'central')
     .attr('font-size', `${PERCENT_FONT_SIZE}px`)
     .attr('font-weight', '600');
+  // Wide invisible drag handle over the line — the caller attaches d3.drag
+  // to it to move the iso-x. Its own pointer-events overrides the group's
+  // `none` (pointer-events inherits), so only this element is interactive.
+  entered
+    .append('line')
+    .attr('class', 'pr-drag')
+    .attr('stroke', 'transparent')
+    .attr('stroke-width', 16)
+    .style('pointer-events', 'stroke')
+    .style('cursor', 'ew-resize');
 
   const merged = entered.merge(selection).style('pointer-events', 'none');
 
@@ -298,6 +349,7 @@ export function renderPerfRuler(
     .attr('y1', y2)
     .attr('y2', y2)
     .attr('stroke', opts.color);
+  merged.select('.pr-drag').attr('x1', x).attr('x2', x).attr('y1', y1).attr('y2', y2);
 
   const showPercent =
     Math.abs(y2 - y1) >= (opts.minSpanForPercent ?? DEFAULT_MIN_SPAN_FOR_PERCENT) &&

@@ -3,31 +3,26 @@ import { describe, expect, it } from 'vitest';
 import { createMockGroup } from './test-helpers';
 import {
   DEFAULT_MIN_SPAN_FOR_PERCENT,
+  EMPTY_PERF_RULER_SELECTION,
+  clampIsoX,
   computeIsoXRulerGeometry,
   formatPerfPercent,
   formatPerfRatio,
   intersectPathAtX,
   nextPerfRulerSelection,
+  pathXExtent,
   renderPerfRuler,
+  type PerfRulerCurveSelection,
+  type PerfRulerEndInput,
   type PerfRulerPathLike,
-  type PerfRulerPointInput,
   type PerfRulerRenderOptions,
-  type PerfRulerSelectionEntry,
-  type PerfRulerTargetInput,
 } from './perf-ruler';
 
-// ── Selection fixtures ───────────────────────────────────────────
+// ── Fixtures ─────────────────────────────────────────
 
-const A1: PerfRulerSelectionEntry = { key: 'official:a1', curve: 'curve-a' };
-const A2: PerfRulerSelectionEntry = { key: 'official:a2', curve: 'curve-a' };
-const B1: PerfRulerSelectionEntry = { key: 'official:b1', curve: 'curve-b' };
-const B2: PerfRulerSelectionEntry = { key: 'official:b2', curve: 'curve-b' };
-const C1: PerfRulerSelectionEntry = { key: 'overlay:c1:run', curve: 'curve-c' };
-
-// ── Fixtures ─────────────────────────────────────────────────────────
-
-const ANCHOR: PerfRulerPointInput = { px: 100, py: 50, rawY: 400 };
-const TARGET: PerfRulerTargetInput = { py: 150, rawY: 197 };
+const ISO_X = 100;
+const END_A: PerfRulerEndInput = { py: 50, rawY: 400 };
+const END_B: PerfRulerEndInput = { py: 150, rawY: 197 };
 
 function makeOpts(overrides?: Partial<PerfRulerRenderOptions>): PerfRulerRenderOptions {
   return {
@@ -218,8 +213,8 @@ describe('intersectPathAtX', () => {
 // ── computeIsoXRulerGeometry ─────────────────────────────────────────
 
 describe('computeIsoXRulerGeometry', () => {
-  it('places the line at the anchor x, spanning anchor y to the intersection y', () => {
-    const geometry = computeIsoXRulerGeometry(ANCHOR, TARGET);
+  it('places the line at the iso-x, spanning the two intersection ys', () => {
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B);
     expect(geometry).not.toBeNull();
     expect(geometry!.x).toBe(100);
     expect(geometry!.y1).toBe(50);
@@ -227,24 +222,21 @@ describe('computeIsoXRulerGeometry', () => {
   });
 
   it('computes the ratio from raw y values, higher over lower', () => {
-    const geometry = computeIsoXRulerGeometry(ANCHOR, TARGET);
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B);
     expect(geometry!.ratio).toBeCloseTo(400 / 197, 10);
     expect(geometry!.ratioLabel).toBe('2.03x');
     expect(geometry!.percentLabel).toBe('+103%');
   });
 
-  it('yields the same ratio when the target curve is the faster side', () => {
-    const fromSlowAnchor = computeIsoXRulerGeometry(
-      { px: 100, py: 150, rawY: 197 },
-      { py: 50, rawY: 400 },
-    );
-    expect(fromSlowAnchor!.ratio).toBeCloseTo(400 / 197, 10);
-    expect(fromSlowAnchor!.y1).toBe(50);
-    expect(fromSlowAnchor!.y2).toBe(150);
+  it('yields the same ratio regardless of end order (symmetric)', () => {
+    const swapped = computeIsoXRulerGeometry(ISO_X, END_B, END_A);
+    expect(swapped!.ratio).toBeCloseTo(400 / 197, 10);
+    expect(swapped!.y1).toBe(50);
+    expect(swapped!.y2).toBe(150);
   });
 
-  it('handles the curves crossing at the anchor x (ratio 1, zero-height span)', () => {
-    const geometry = computeIsoXRulerGeometry(ANCHOR, { py: ANCHOR.py, rawY: ANCHOR.rawY });
+  it('handles the curves crossing at the iso-x (ratio 1, zero-height span)', () => {
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, { ...END_A });
     expect(geometry).not.toBeNull();
     expect(geometry!.ratio).toBe(1);
     expect(geometry!.ratioLabel).toBe('1.00x');
@@ -253,25 +245,25 @@ describe('computeIsoXRulerGeometry', () => {
   });
 
   it('returns null when either raw y is zero or negative', () => {
-    expect(computeIsoXRulerGeometry(ANCHOR, { ...TARGET, rawY: 0 })).toBeNull();
-    expect(computeIsoXRulerGeometry({ ...ANCHOR, rawY: -5 }, TARGET)).toBeNull();
+    expect(computeIsoXRulerGeometry(ISO_X, END_A, { ...END_B, rawY: 0 })).toBeNull();
+    expect(computeIsoXRulerGeometry(ISO_X, { ...END_A, rawY: -5 }, END_B)).toBeNull();
   });
 
   it('returns null for non-finite inputs', () => {
-    expect(computeIsoXRulerGeometry({ ...ANCHOR, px: Number.NaN }, TARGET)).toBeNull();
+    expect(computeIsoXRulerGeometry(Number.NaN, END_A, END_B)).toBeNull();
     expect(
-      computeIsoXRulerGeometry(ANCHOR, { ...TARGET, py: Number.POSITIVE_INFINITY }),
+      computeIsoXRulerGeometry(ISO_X, END_A, { ...END_B, py: Number.POSITIVE_INFINITY }),
     ).toBeNull();
-    expect(computeIsoXRulerGeometry(ANCHOR, { ...TARGET, rawY: Number.NaN })).toBeNull();
+    expect(computeIsoXRulerGeometry(ISO_X, END_A, { ...END_B, rawY: Number.NaN })).toBeNull();
   });
 });
 
 // ── renderPerfRuler ──────────────────────────────────────────────────
 
 describe('renderPerfRuler', () => {
-  it('draws the ruler line, two end caps, chip, and label texts', () => {
+  it('draws the ruler line, two end caps, chip, label texts, and drag handle', () => {
     const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ANCHOR, TARGET)!;
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
     renderPerfRuler(group as any, geometry, makeOpts());
 
     const ruler = group.selectAll('.perf-ruler');
@@ -283,11 +275,12 @@ describe('renderPerfRuler', () => {
     expect(children).toContain('pr-bg');
     expect(children).toContain('pr-text pr-text-ratio');
     expect(children).toContain('pr-text pr-text-percent');
+    expect(children).toContain('pr-drag');
   });
 
-  it('positions the vertical line and caps at the anchor x', () => {
+  it('positions the vertical line and caps at the iso-x', () => {
     const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ANCHOR, TARGET)!;
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
     renderPerfRuler(group as any, geometry, makeOpts({ capHalfWidth: 6 }));
 
     const ruler = group.selectAll('.perf-ruler');
@@ -311,9 +304,28 @@ describe('renderPerfRuler', () => {
     expect(capBottom.attrs['y2']).toBe(150);
   });
 
+  it('overlays an invisible wide drag handle spanning the ruler line', () => {
+    const group = createMockGroup();
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
+    renderPerfRuler(group as any, geometry, makeOpts());
+
+    const ruler = group.selectAll('.perf-ruler');
+    const drag = ruler.elements[0].children.find((c) => String(c.attrs['class']) === 'pr-drag')!;
+    expect(drag.attrs['x1']).toBe(100);
+    expect(drag.attrs['x2']).toBe(100);
+    expect(drag.attrs['y1']).toBe(50);
+    expect(drag.attrs['y2']).toBe(150);
+    expect(drag.attrs['stroke']).toBe('transparent');
+    expect(Number(drag.attrs['stroke-width'])).toBeGreaterThanOrEqual(12);
+    // Its own pointer-events overrides the group-level 'none' so the handle
+    // stays draggable while the visible marks never block clicks.
+    expect(drag.styles['pointer-events']).toBe('stroke');
+    expect(drag.styles['cursor']).toBe('ew-resize');
+  });
+
   it('writes the ratio label and shows the percent line for a tall span', () => {
     const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ANCHOR, TARGET)!;
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
     expect(Math.abs(geometry.y2 - geometry.y1)).toBeGreaterThanOrEqual(
       DEFAULT_MIN_SPAN_FOR_PERCENT,
     );
@@ -330,7 +342,7 @@ describe('renderPerfRuler', () => {
 
   it('hides the percent line when the span is too short to fit it cleanly', () => {
     const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ANCHOR, { ...TARGET, py: ANCHOR.py + 10 })!;
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, { ...END_B, py: END_A.py + 10 })!;
     renderPerfRuler(group as any, geometry, makeOpts());
 
     const ruler = group.selectAll('.perf-ruler');
@@ -343,7 +355,7 @@ describe('renderPerfRuler', () => {
 
   it('places the chip to the right of the line by default', () => {
     const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ANCHOR, TARGET)!;
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
     renderPerfRuler(group as any, geometry, makeOpts({ chartWidth: 800 }));
 
     const ruler = group.selectAll('.perf-ruler');
@@ -354,7 +366,7 @@ describe('renderPerfRuler', () => {
 
   it('flips the chip to the left near the right chart edge', () => {
     const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ANCHOR, TARGET)!;
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
     renderPerfRuler(group as any, geometry, makeOpts({ chartWidth: 125 }));
 
     const ruler = group.selectAll('.perf-ruler');
@@ -365,7 +377,7 @@ describe('renderPerfRuler', () => {
 
   it('is idempotent: re-rendering keeps a single ruler group', () => {
     const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ANCHOR, TARGET)!;
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
     renderPerfRuler(group as any, geometry, makeOpts());
     renderPerfRuler(group as any, { ...geometry, x: 200 }, makeOpts());
 
@@ -377,7 +389,7 @@ describe('renderPerfRuler', () => {
 
   it('clears the ruler when geometry is null', () => {
     const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ANCHOR, TARGET)!;
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
     renderPerfRuler(group as any, geometry, makeOpts());
     renderPerfRuler(group as any, null, makeOpts());
 
@@ -393,7 +405,7 @@ describe('renderPerfRuler', () => {
 
   it('disables pointer events so the ruler never blocks point clicks', () => {
     const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ANCHOR, TARGET)!;
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
     renderPerfRuler(group as any, geometry, makeOpts());
 
     const ruler = group.selectAll('.perf-ruler');
@@ -401,43 +413,122 @@ describe('renderPerfRuler', () => {
   });
 });
 
-// ── nextPerfRulerSelection ───────────────────────────────────────────
+// ── nextPerfRulerSelection ───────────────────────────────────
 
 describe('nextPerfRulerSelection', () => {
-  it('anchors the first click', () => {
-    expect(nextPerfRulerSelection([], A1)).toEqual([A1]);
+  const EMPTY = EMPTY_PERF_RULER_SELECTION;
+
+  it('selects curve A and sets the iso-x on the first click', () => {
+    expect(nextPerfRulerSelection(EMPTY, { curve: 'curve-a', isoX: 40 })).toEqual({
+      curves: ['curve-a'],
+      isoX: 40,
+    });
   });
 
-  it('clears everything when the exact anchor point is re-clicked', () => {
-    expect(nextPerfRulerSelection([A1], A1)).toEqual([]);
-    expect(nextPerfRulerSelection([A1, B1], A1)).toEqual([]);
+  it('selects curve B on a different curve, keeping the existing iso-x', () => {
+    const prev: PerfRulerCurveSelection = { curves: ['curve-a'], isoX: 40 };
+    expect(nextPerfRulerSelection(prev, { curve: 'curve-b', isoX: 55 })).toEqual({
+      curves: ['curve-a', 'curve-b'],
+      isoX: 40,
+    });
   });
 
-  it('moves the anchor along its own curve', () => {
-    expect(nextPerfRulerSelection([A1], A2)).toEqual([A2]);
+  it('moves the iso-x when the only selected curve is clicked again', () => {
+    const prev: PerfRulerCurveSelection = { curves: ['curve-a'], isoX: 40 };
+    expect(nextPerfRulerSelection(prev, { curve: 'curve-a', isoX: 72 })).toEqual({
+      curves: ['curve-a'],
+      isoX: 72,
+    });
   });
 
-  it('moves the anchor along its own curve while keeping the target', () => {
-    expect(nextPerfRulerSelection([A1, B1], A2)).toEqual([A2, B1]);
+  it('moves the iso-x when either curve of a complete measurement is clicked', () => {
+    const prev: PerfRulerCurveSelection = { curves: ['curve-a', 'curve-b'], isoX: 40 };
+    expect(nextPerfRulerSelection(prev, { curve: 'curve-a', isoX: 72 })).toEqual({
+      curves: ['curve-a', 'curve-b'],
+      isoX: 72,
+    });
+    expect(nextPerfRulerSelection(prev, { curve: 'curve-b', isoX: 13 })).toEqual({
+      curves: ['curve-a', 'curve-b'],
+      isoX: 13,
+    });
   });
 
-  it('selects a different curve as the target', () => {
-    expect(nextPerfRulerSelection([A1], B1)).toEqual([A1, B1]);
+  it('starts a new measurement when a third curve is clicked', () => {
+    const prev: PerfRulerCurveSelection = { curves: ['curve-a', 'curve-b'], isoX: 40 };
+    expect(nextPerfRulerSelection(prev, { curve: 'curve-c', isoX: 90 })).toEqual({
+      curves: ['curve-c'],
+      isoX: 90,
+    });
   });
 
-  it('keeps a complete measurement when another point on the target curve is clicked', () => {
-    const prev = [A1, B1];
-    // Same reference back: the target entry identifies a CURVE, so this
-    // click cannot change the iso-x result — React can bail out.
-    expect(nextPerfRulerSelection(prev, B2)).toBe(prev);
+  it('returns the same reference when a selected-curve click does not move the iso-x', () => {
+    const prev: PerfRulerCurveSelection = { curves: ['curve-a', 'curve-b'], isoX: 40 };
+    expect(nextPerfRulerSelection(prev, { curve: 'curve-a', isoX: 40 })).toBe(prev);
   });
 
-  it('keeps a complete measurement when the original target point is re-clicked', () => {
-    const prev = [A1, B1];
-    expect(nextPerfRulerSelection(prev, B1)).toBe(prev);
+  it('ignores clicks with a non-finite iso-x (same reference back)', () => {
+    const prev: PerfRulerCurveSelection = { curves: ['curve-a'], isoX: 40 };
+    expect(nextPerfRulerSelection(prev, { curve: 'curve-b', isoX: Number.NaN })).toBe(prev);
+    expect(nextPerfRulerSelection(EMPTY, { curve: 'curve-a', isoX: Number.NaN })).toBe(EMPTY);
   });
 
-  it('starts a new measurement anchored at a click on a third curve', () => {
-    expect(nextPerfRulerSelection([A1, B1], C1)).toEqual([C1]);
+  it('falls back to the click x for curve B when the previous iso-x is missing', () => {
+    const prev: PerfRulerCurveSelection = { curves: ['curve-a'], isoX: null };
+    expect(nextPerfRulerSelection(prev, { curve: 'curve-b', isoX: 55 })).toEqual({
+      curves: ['curve-a', 'curve-b'],
+      isoX: 55,
+    });
+  });
+});
+
+// ── pathXExtent ─────────────────────────────────────────────
+
+describe('pathXExtent', () => {
+  it('returns the min/max x of the path endpoints', () => {
+    const path = polylinePath([
+      { x: 100, y: 100 },
+      { x: 300, y: 50 },
+    ]);
+    expect(pathXExtent(path)).toEqual({ min: 100, max: 300 });
+  });
+
+  it('supports paths whose x decreases along their length', () => {
+    const path = polylinePath([
+      { x: 300, y: 10 },
+      { x: 100, y: 110 },
+    ]);
+    expect(pathXExtent(path)).toEqual({ min: 100, max: 300 });
+  });
+
+  it('returns null for degenerate paths', () => {
+    expect(pathXExtent(polylinePath([]))).toBeNull();
+    expect(pathXExtent(polylinePath([{ x: 10, y: 10 }]))).toBeNull();
+  });
+});
+
+// ── clampIsoX ───────────────────────────────────────────────
+
+describe('clampIsoX', () => {
+  const A = { min: 100, max: 300 };
+  const B = { min: 200, max: 500 };
+
+  it('clamps to the overlapping range of two curves', () => {
+    expect(clampIsoX(150, A, B)).toBe(200);
+    expect(clampIsoX(250, A, B)).toBe(250);
+    expect(clampIsoX(450, A, B)).toBe(300);
+  });
+
+  it('clamps to a single curve when the second is absent', () => {
+    expect(clampIsoX(50, A)).toBe(100);
+    expect(clampIsoX(350, A, null)).toBe(300);
+    expect(clampIsoX(200, A)).toBe(200);
+  });
+
+  it('returns null when the ranges do not overlap', () => {
+    expect(clampIsoX(250, { min: 100, max: 150 }, { min: 200, max: 300 })).toBeNull();
+  });
+
+  it('returns null for a non-finite x', () => {
+    expect(clampIsoX(Number.NaN, A, B)).toBeNull();
   });
 });
