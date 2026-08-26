@@ -1,0 +1,72 @@
+---
+title: 'DeepSeek V4 Pro 的 AgentX 结果：GB200 与 GB300 的机架级分离式部署'
+subtitle: '两者都依赖 PD 分离，GB300 额外使用 DEP32 宽专家并行解码，而差距体现在首 token 延迟而非 token 速率上'
+seoDescription: 'DeepSeek V4 Pro 在 AgentX 上的 NVIDIA 机架级结果。GB300 Dynamo TRTLLM 与 GB200 Dynamo vLLM 都采用 prefill-decode 分离；GB300 那个点在 TTFT 上落后，因为更高的并发带来更多子智能体流量和更多冷 prefill。'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - deepseek
+  - gb200
+  - gb300
+  - nvl72
+  - disagg
+  - wide-ep
+  - nvidia
+---
+
+在 DeepSeek V4 Pro 上，NVIDIA 最有竞争力的方案是 GB300 Dynamo TRTLLM 和 GB200 Dynamo vLLM。两者都依靠 prefill-decode [分离](/zh/glossary/disaggregated-inference)，在合理的[交互性](/zh/glossary/interactivity)下取得高吞吐。GB300 配置还额外采用了 DEP32 的[宽专家并行](/zh/glossary/wide-expert-parallelism)解码实例，以在前沿曲线中段获得更高吞吐。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/512c6225-5816-493e-839d-e4f539e5b1c4_2048x1215.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_metric=y_tpPerGpu&i_xmode=interactivity&i_linelabel=0&i_best=0&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-trt)"
+/>
+
+## 两个点在 token 速率上比在首 token 延迟上更接近
+
+以每用户每秒 token 数衡量时，2xDEP8+1xDEP12 的 GB200 点与 3xDEP8+1xDEP16 的 GB300 点相当接近；但以首 token 延迟衡量时，两者差距明显更大。因此只看交互性坐标轴，会低估这两种配置行为上的差异。
+
+总体而言，TTFT 对工作负载的「突发性」更敏感。GB300 那个点的总并发要高得多，因而会遇到更多子智能体流量，也就有更多冷 prefill。[子智能体](/zh/glossary/subagent)带着全新上下文启动，没有可复用的前缀，因此它的第一条请求是完整 prefill 而不是缓存命中；当足够多这样的请求同时到达时，[尾部延迟](/zh/glossary/tail-latency)就会被推高。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/96f9c9f9-eb86-4f87-8332-c85f23040836_2048x916.png"
+  caption="来源：InferenceX"
+/>
+
+## 为什么这是 agentic 效应而不是硬件效应
+
+在定长工作负载上完全看不到这些。在 8k1k 场景中，每条请求彼此独立且形状相同，因此提高并发只是放大 batch，并不改变已缓存与未缓存工作的构成。而在 AgentX 上，提高并发会改变流量本身的组成：会话更多意味着并行的子智能体分支更多，而这些分支是成簇到达的，不是平滑的请求流。
+
+实际的读法是：一套为了在吞吐曲线上更靠右而调优的机架级配置，同时也接受了更具突发性的 prefill 负载；这个选择的代价落在首 token 延迟上，而不是同一张图所展示的 token 速率上。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/f79e53f5-c8ff-4ed0-a8a3-c05b9e0b4bab_2048x1191.png" />
+
+---
+
+_本文结果只是 AgentX 1.0 的一个切面。完整分析、回放方法，以及该基准测试推动的 70 多个上游 PR，请见 [AgentX - InferenceXv3：CUDA 护城河在 agentic 推理中还站得住吗？](/zh/blog/agentx-inferencexv3-does-cuda-moat)。每个数据点都可以在[免费仪表板](https://inferencex.semianalysis.com/)上自行探索。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "在 DeepSeek V4 Pro 上，NVIDIA 哪种机架级配置最快？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "GB300 Dynamo TRTLLM 和 GB200 Dynamo vLLM 是 NVIDIA 在该模型上最有竞争力的配置，两者都依靠 prefill-decode 分离，在合理交互性下达到高吞吐。GB300 还额外运行 DEP32 的宽专家并行解码实例，以提升前沿曲线中段的吞吐量。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "为什么 GB300 那个点的 TTFT 比 GB200 更差？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "GB300 那个点的总并发高得多，因而带来更多子智能体流量，也就有更多冷 prefill。子智能体带着全新上下文启动、没有可复用前缀，它的第一条请求是完整 prefill；这类请求成簇到达就会推高尾部延迟。总体而言，TTFT 比每用户 token 速率对工作负载的突发性更敏感。"
+      }
+    }
+  ]
+}`}</JsonLd>

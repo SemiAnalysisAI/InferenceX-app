@@ -1,0 +1,75 @@
+---
+title: 'MiniMax M3 的 AgentX 结果：B200 与 B300 为何胜过对应的机架级方案'
+subtitle: 'Dynamo router 成为瓶颈，没有提交使用上下文并行，而 AMD 完全没有用上 KV offload'
+seoDescription: '在 MiniMax M3 上，B200 与 B300 在按 TCO 归一化的吞吐量上胜过 GB200 与 GB300。Dynamo router 可能成为瓶颈，因为其工作量随在线前缀增长；尽管 p90 输入长度达 317k，仍没有提交使用上下文并行；AMD 的 Pareto 最优点则完全没有使用 KV offload。'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - minimax
+  - b200
+  - b300
+  - gb200
+  - gb300
+  - nvl72
+  - dynamo
+  - amd
+  - rocm
+---
+
+在 MiniMax M3 上，按 TCO 归一化的吞吐量方面，B200 与 B300 完全胜过各自对应的机架级方案。对于一个由 NVIDIA 横扫的模型来说，这个内部结果颇令人意外，而原因并不在网络。
+
+在 AgentX 上，机架级的优势不那么明显，因为 Dynamo router 可能成为瓶颈：它的工作量随在线前缀的数量和长度增长，而不是随生成的 token 数增长。此外，这个模型上还没有针对宽专家并行、宽 DCP 或宽张量并行调优良好的 kernel。而 GB200 与 GB300 的 TCO 更高，在没有宽 EP 或宽 DCP 的情况下，这就直接表现为更差的每 TCO 性能。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/aec34e63-34fd-4c42-87a1-97e5c14661ed_2048x1302.png" />
+
+我们也预期 NVIDIA 会在该 SKU 的机架级方案上做进一步优化，并会在后续文章中重点介绍。
+
+## 没有人在使用上下文并行
+
+尽管 p90 输入序列长度达到 317k token，目前仍没有任何提交使用[上下文并行](/zh/glossary/context-parallelism)。这恰恰是该技术存在的意义所在，因此这种缺席需要解释。
+
+M3 只有 4 个 KV head，即使在 TP8 下 DCP 也最多只能到 2；而且 MSA indexer 还需要单独的上下文并行处理，相关 vLLM PR 已经提交。因此这个上限是架构层面的，而不是调优疏忽，它也限定了长上下文并行策略在这个模型上能带来多少收益。
+
+## AMD 的 offload 缺口
+
+NVIDIA 所有 Pareto 最优点在并发 20 以上都启用了 [KV offload](/zh/glossary/kv-cache-offload)。而 AMD 的 Pareto 最优点没有一个使用 DRAM KV offload；在其他模型上，AMD 使用 offload 的比例也低于 NVIDIA。
+
+原因很机械：AMD vLLM 上 CPU KV cache offload 所需的 GPU 到 CPU 传输效率极低，因为 hipMemcpyBatchAsync API 直到 ROCm 7.14 才提供。没有它，vLLM 原生的 simple CPU offloading 只能做串行 memcpy，而无法把多次拷贝合并成更大的消息。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/2b40624a-223c-44db-a403-0be563b2af82_2048x1298.png"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_hc=1&i_active=mi355x_vllm)"
+/>
+
+缺少一个批量拷贝 API，这种事不会出现在规格书上，在定长基准测试中也根本不会被触发。但在长时间的 agentic 会话中，它决定了整整一层内存是否可用。
+
+---
+
+_本文结果只是 AgentX 1.0 的一个切面。完整分析、回放方法，以及该基准测试推动的 70 多个上游 PR，请见 [AgentX - InferenceXv3：CUDA 护城河在 agentic 推理中还站得住吗？](/zh/blog/agentx-inferencexv3-does-cuda-moat)。每个数据点都可以在[免费仪表板](https://inferencex.semianalysis.com/)上自行探索。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "在 MiniMax M3 上，B200 与 B300 为什么胜过 GB200 与 GB300？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "在按 TCO 归一化的吞吐量上，AgentX 中机架级的优势被削弱了：Dynamo router 可能成为瓶颈，因为它的工作量随在线前缀的数量和长度增长，而不是随生成的 token 数增长。此外，该模型上还没有针对宽专家并行、宽 DCP 或宽张量并行调优良好的 kernel，缺少这些能力时，GB200 与 GB300 更高的 TCO 就赚不回来。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "AMD 在 MiniMax M3 上为什么没有使用 KV offload？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "在 AMD vLLM 上，CPU KV cache offload 所需的 GPU 到 CPU 传输效率极低，因为 hipMemcpyBatchAsync API 直到 ROCm 7.14 才提供。没有它，原生的 simple CPU offloading 只能做串行 memcpy 而无法合并成更大的消息；因此 AMD 没有任何 Pareto 最优点使用 DRAM offload，而 NVIDIA 在并发 20 以上的每个最优点都用了。"
+      }
+    }
+  ]
+}`}</JsonLd>

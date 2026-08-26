@@ -1,0 +1,66 @@
+---
+title: 'Qwen3.5 397B 的 AgentX 结果：B300 FP4 的每美元性能是 H100 的 12 倍'
+subtitle: '在长上下文 agentic 工作负载上，四年硬件迭代加上 4 位格式能换来什么'
+seoDescription: '在 Qwen3.5 397B 的 AgentX 运行中，B300 FP4 的每美元性能是 H100 的 12 倍。该对比跨越四代硬件与两种数值格式，工作负载为截断到 256k 的 agentic trace 回放。'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - qwen
+  - b300
+  - h100
+  - h200
+  - fp4
+  - fp8
+  - sglang
+  - nvidia
+---
+
+在 Qwen3.5 上，B300 FP4 的[每美元性能](/zh/glossary/performance-per-dollar)是 H100 的 12 倍。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/cc2cf6c7-aa58-4a76-a0a2-ee0457d9243c_2048x1298.png"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_hc=1&i_best=0&i_prec=fp4%2Cfp8&i_active=b300_sglang%2Ch100_sglang%2Ch200_sglang)"
+/>
+
+## 这个数字代表什么，又不代表什么
+
+这里同时有两个变量在变，读数时都要考虑。第一是四年的硬件迭代；第二是数值格式：该对比跨越 [FP4](/zh/glossary/fp4) 与 [FP8](/zh/glossary/fp8)，并没有固定精度。这样比较反映的是运营方今天在各款硬件上实际能部署的方案，是诚实的口径，但它并不是只针对硅片本身的受控实验。
+
+工作负载同样重要。这不是 8k1k。Qwen3.5 的原生最大上下文长度为 262k token，因此 AgentX 对它回放的是截断到 256k 的 agentic 数据集，这意味着频繁的上下文压缩和大量前缀复用。在长上下文多轮回放上测得的比值，与在互相独立的短提示词上测得的同一比值，是两种不同的结论，而前者更接近真实的生产编码流量。
+
+## 请按你自己的运行点来读
+
+12 倍的总体比值是一个标题，而不是部署方案。真正承载决策的是曲线：先确定你的产品需要的[交互性](/zh/glossary/interactivity)，在该点读取每套系统的表现，并在同一点核对首 token 延迟，然后再下结论。
+
+这也是各模型的 AgentX 图表默认展示完整前沿、而不是单个数字的原因。较老的硬件可能在低并发下于每美元性能上仍有竞争力，却在高吞吐区间完全掉队；单一比值无法同时表达这条曲线的两端。
+
+---
+
+_本文结果只是 AgentX 1.0 的一个切面。完整分析、回放方法，以及该基准测试推动的 70 多个上游 PR，请见 [AgentX - InferenceXv3：CUDA 护城河在 agentic 推理中还站得住吗？](/zh/blog/agentx-inferencexv3-does-cuda-moat)。每个数据点都可以在[免费仪表板](https://inferencex.semianalysis.com/)上自行探索。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "在 Qwen3.5 397B 上，B300 比 H100 好多少？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "在 AgentX 的 Qwen3.5 运行中，B300 FP4 的每美元性能是 H100 的 12 倍。该对比同时跨越硬件代际差异和数值格式差异，因为它覆盖 FP4 与 FP8，并未固定精度。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "这个 12 倍是在定长序列工作负载上测得的吗？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "不是。Qwen3.5 的原生最大上下文长度为 262k token，因此 AgentX 对它回放的是截断到 256k 的 agentic trace 数据集。该工作负载包含频繁的上下文压缩和大量前缀复用，与互相独立的短提示词是完全不同的测量。"
+      }
+    }
+  ]
+}`}</JsonLd>

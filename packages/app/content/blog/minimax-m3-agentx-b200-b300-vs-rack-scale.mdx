@@ -1,0 +1,75 @@
+---
+title: 'MiniMax M3 on AgentX: Why B200 and B300 Beat Their Rack-Scale Counterparts'
+subtitle: 'The Dynamo router becomes the bottleneck, no submission runs context parallelism, and AMD leaves KV offload on the table'
+seoDescription: 'On MiniMax M3, B200 and B300 beat GB200 and GB300 on TCO-normalized throughput. The Dynamo router can bottleneck because its work scales with live prefixes, no submission runs context parallelism despite a 317k p90 input, and AMD Pareto points use no KV offload.'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - minimax
+  - b200
+  - b300
+  - gb200
+  - gb300
+  - nvl72
+  - dynamo
+  - amd
+  - rocm
+---
+
+B200 and B300 completely beat their rack-scale counterparts for MiniMax M3 on TCO-normalized throughput. For a model where NVIDIA sweeps the field, that is a surprising internal result, and the explanation is not about the fabric.
+
+On AgentX the rack-scale advantage is not as pronounced, because the Dynamo router can become the bottleneck: its work scales with the number and length of live prefixes rather than with tokens generated. There are also no well tuned kernels for wide expert parallelism, wide DCP, or wide tensor parallelism on this model. Since GB200 and GB300 carry higher TCO, without wide EP or wide DCP that shows up directly as worse performance per TCO.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/aec34e63-34fd-4c42-87a1-97e5c14661ed_2048x1302.png" />
+
+We also expect further optimizations from NVIDIA on their rack-scale solutions for this SKU, and will highlight them in the follow up article.
+
+## Nobody is running context parallelism
+
+No submission currently runs [context parallelism](/glossary/context-parallelism), despite a p90 input sequence length of 317k tokens. That is exactly the regime the technique exists for, so the absence needs an explanation.
+
+M3 has 4 KV heads, so DCP caps at 2 even at TP8, and the MSA indexer needs its own context-parallel handling, for which a vLLM pull request is open. The ceiling is therefore architectural rather than a tuning oversight, and it bounds how much a long-context parallelism strategy can help on this particular model.
+
+## The AMD offload gap
+
+All of NVIDIA's Pareto optimal points include [KV offload](/glossary/kv-cache-offload) above concurrency 20. For AMD, none of the Pareto optimal points use KV offload to DRAM, and AMD uses offload less than NVIDIA on the other models too.
+
+The reason is mechanical. GPU-to-CPU transfers for CPU KV cache offloading are highly inefficient on AMD vLLM, because the hipMemcpyBatchAsync API was missing until ROCm 7.14. Without it, vLLM's native simple CPU offloading has to perform serialized memcpy operations from CPU to GPU instead of batching them into larger message sizes.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/2b40624a-223c-44db-a403-0be563b2af82_2048x1298.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_hc=1&i_active=mi355x_vllm)"
+/>
+
+A missing batched-copy API is not the kind of thing that shows up in a specification sheet, and on a fixed-sequence benchmark it would never be exercised at all. On long agentic sessions it decides whether an entire tier of memory is usable.
+
+---
+
+_These results are one slice of AgentX 1.0. The full analysis, the replay methodology, and the 70+ upstream PRs the benchmark drove are in [AgentX - InferenceXv3: Does the CUDA Moat Hold Up in Agentic Inferencing?](/blog/agentx-inferencexv3-does-cuda-moat). Every point is explorable on the [free dashboard](https://inferencex.semianalysis.com/)._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Why do B200 and B300 beat GB200 and GB300 on MiniMax M3?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On TCO-normalized throughput, the rack-scale advantage is muted on AgentX because the Dynamo router can become the bottleneck, since its work scales with the number and length of live prefixes rather than with tokens generated. There are also no well tuned kernels for wide expert parallelism, wide DCP, or wide tensor parallelism on this model, and the higher TCO of GB200 and GB300 is not earned back without them."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does AMD use no KV offload on MiniMax M3?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "GPU-to-CPU transfers for CPU KV cache offloading are highly inefficient on AMD vLLM because the hipMemcpyBatchAsync API was missing until ROCm 7.14. Without it, native simple CPU offloading performs serialized memcpy operations instead of batching them into larger messages, so no AMD Pareto optimal point uses DRAM offload while every NVIDIA one above concurrency 20 does."
+      }
+    }
+  ]
+}`}</JsonLd>

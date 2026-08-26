@@ -1,0 +1,73 @@
+---
+title: 'Kimi K3 的 AgentX 结果：流水线并行如何让 B200 失去领先'
+subtitle: '2.8 万亿参数装不进单台 B200 服务器，而 vLLM 无法把投机解码与流水线并行组合起来'
+seoDescription: 'Kimi K3 在 MI355X 与 B200 上的 AgentX 结果。这个 2.8 万亿参数模型装不进单台 B200 服务器；直到最近，vLLM 都无法把投机解码与流水线并行组合使用，导致 B200 落后于 MI355X。'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - kimi
+  - mi355x
+  - b200
+  - vllm
+  - amd
+  - nvidia
+---
+
+Kimi K3 是一款来自中国的前沿开放权重模型，总参数 2.8 万亿，与 Claude 的 Mythos、Fable5 模型架构处于同一量级，因此 AgentX 用它作为该类模型的开放权重代理。
+
+关键在于体量。K3 大到装不进单台 B200 服务器，仅仅为了放下权重，就必须使用宽专家并行、宽张量并行或[流水线并行](/zh/glossary/pipeline-parallelism)。
+
+## 这是可组合性问题，不是硬件问题
+
+在 vLLM 上，[投机解码](/zh/glossary/speculative-decoding)与 DSpark 直到最近都完全无法与流水线并行组合。于是 B200 只能二选一：要么放下模型，要么用上投机解码，两者不可兼得；它在 Kimi K3 上的表现因此很差，输给了 MI355X，而原因与硅片本身毫无关系。
+
+这正是 AgentX 反复揭示的教训：一项在孤立条件下可用的并行策略，与一项能和生产部署所依赖的其他一切组合起来的策略并不是一回事，而前沿曲线只奖励后者。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/a1440922-e1ea-4a74-ab62-f1263ae31ca0_2048x1473.png"
+  caption="来源：SemiAnalysis InferenceX"
+/>
+
+## AMD 遇到的是相反的问题
+
+MI355X vLLM 在短上下文单轮工作负载上 day 0 即开箱可用；但在长上下文多轮工作负载上并非如此：MI355X 的 AITER 和 Triton kernel 在第一周就出了严重问题，上游 vLLM 在真实工作负载下对 MI355X 完全不可用。
+
+把这两种失败并排来看很有价值，因为它们其实是同一个问题的两端。NVIDIA 有 kernel 却缺少可组合性；AMD 有 day 0 可用路径，但它只在与 agentic 流量不相符的工作负载形态下才成立。一个基于定长序列的基准测试，会把第二类问题记录为顺利通过。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/80eb810f-a9ea-4f01-a41b-e19e3409ce74_2048x1459.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/73ded698-c86e-411b-8e7c-f9bb125487b7_2048x1459.png"
+  caption="来源：SemiAnalysis InferenceX"
+/>
+
+---
+
+_本文结果只是 AgentX 1.0 的一个切面。完整分析、回放方法，以及该基准测试推动的 70 多个上游 PR，请见 [AgentX - InferenceXv3：CUDA 护城河在 agentic 推理中还站得住吗？](/zh/blog/agentx-inferencexv3-does-cuda-moat)。每个数据点都可以在[免费仪表板](https://inferencex.semianalysis.com/)上自行探索。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "B200 在 Kimi K3 上为什么表现不佳？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Kimi K3 有 2.8 万亿参数，装不进单台 B200 服务器，因此必须用宽专家并行、宽张量并行或流水线并行来服务。而在 vLLM 上，投机解码与 DSpark 直到最近都无法与流水线并行组合，B200 无法在放下模型的同时使用投机解码，MI355X 因此占了上风。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "MI355X 在 Kimi K3 上表现顺利吗？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "只在较容易的工作负载上顺利。MI355X vLLM 在短上下文单轮工作负载上 day 0 即开箱可用；但在长上下文多轮工作负载上，AITER 与 Triton kernel 在第一周就出现严重问题，上游 vLLM 在真实流量下对 MI355X 不可用。"
+      }
+    }
+  ]
+}`}</JsonLd>

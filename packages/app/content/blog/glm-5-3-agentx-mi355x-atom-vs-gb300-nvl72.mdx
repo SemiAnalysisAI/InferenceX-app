@@ -1,0 +1,75 @@
+---
+title: 'GLM 5.3 on AgentX: MI355X ATOM Beats GB300 NVL72 on Part of the Curve'
+subtitle: 'Where AMD’s vendor engine wins on performance per dollar, and what E2E Normalized Interactivity actually measures'
+seoDescription: 'On GLM 5.3, AMD ATOM has better performance per dollar than GB300 NVL72 SGLang and even TRTLLM for parts of the p90 E2E Normalized Interactivity range. An explainer on what that experimental metric measures and where it misleads.'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - glm5
+  - mi355x
+  - gb300
+  - nvl72
+  - trtllm
+  - sglang
+  - amd
+  - nvidia
+---
+
+When looking at ATOM, AMD has better [performance per dollar](/glossary/performance-per-dollar) than GB300 NVL72 SGLang and even TRTLLM for some parts of the range of p90 E2E Normalized Interactivity. Great work to the AMD team on these results.
+
+The usual two requests apply to both vendors. We look forward to AMD porting these optimizations over to SGLang, and we are also looking forward to NVIDIA quickly optimizing GB300 NVL72 in the coming weeks.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9337ed5b-a320-49f7-b31b-cc4b5751e0ff_2048x1290.png"
+  caption="Source: SemiAnalysis InferenceX"
+/>
+
+## What E2E Normalized Interactivity measures
+
+This result is plotted against an experimental metric worth understanding before drawing conclusions from it. [E2E Normalized Interactivity](/glossary/e2e-normalized-interactivity) is meant to evaluate how fast a user experiences responsiveness when considering both time to first token and tokens per second. It is defined as output sequence length divided by end to end latency.
+
+Substituting the fact that end to end latency equals TTFT plus output length times time per output token, and noting that in reality only output length minus one tokens are decoded, gives the following.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9e472a49-d228-4d8d-876a-6bc0d59f9d97_746x594.png"
+  caption="Source: SemiAnalysis"
+/>
+
+This is effectively [interactivity](/glossary/interactivity), the reciprocal-TPOT portion, plus an additional penalty proportional to TTFT.
+
+## Where the metric misleads
+
+Please note that this metric is experimental and is not perfect. For instance, it heavily penalizes high TTFT and does not capture all the nuances of certain optimizations such as prefill-decode [disaggregation](/glossary/disaggregated-inference). All submissions for AgentX v1.0 optimize for both regular interactivity and TTFT separately, and we will continue working on new north star metrics that reflect all nuances of modern agentic inference.
+
+That caveat cuts in both directions here. A configuration that trades first-token latency for streaming speed is penalized on this axis whether or not that trade suits the product, so a win measured only against E2E Normalized Interactivity should be checked against the separate interactivity and TTFT curves before it becomes a procurement argument.
+
+---
+
+_These results are one slice of AgentX 1.0. The full analysis, the replay methodology, and the 70+ upstream PRs the benchmark drove are in [AgentX - InferenceXv3: Does the CUDA Moat Hold Up in Agentic Inferencing?](/blog/agentx-inferencexv3-does-cuda-moat). Every point is explorable on the [free dashboard](https://inferencex.semianalysis.com/)._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is E2E Normalized Interactivity?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It is an experimental metric defined as output sequence length divided by end to end latency, intended to evaluate how fast a user experiences responsiveness when considering both TTFT and tokens per second. Because end to end latency equals TTFT plus output length times time per output token, it works out to interactivity plus a penalty proportional to TTFT."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Where does AMD ATOM beat GB300 NVL72 on GLM 5.3?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "For some parts of the p90 E2E Normalized Interactivity range, ATOM has better performance per dollar than GB300 NVL72 SGLang and even TRTLLM. The metric is experimental and heavily penalizes high TTFT, so the result should be checked against the separate interactivity and TTFT curves."
+      }
+    }
+  ]
+}`}</JsonLd>

@@ -1,0 +1,73 @@
+---
+title: 'Kimi K3 on AgentX: How Pipeline Parallelism Cost B200 the Lead'
+subtitle: '2.8 trillion parameters do not fit one B200 server, and vLLM could not compose speculative decoding with pipeline parallelism'
+seoDescription: 'Kimi K3 AgentX results on MI355X and B200. The 2.8T model does not fit a single B200 server, and until recently vLLM could not combine speculative decoding with pipeline parallelism, so B200 lost ground to MI355X.'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - kimi
+  - mi355x
+  - b200
+  - vllm
+  - amd
+  - nvidia
+---
+
+Kimi K3 is a frontier open weight model from China with 2.8 trillion total parameters. That puts it in the same range as the Claude Mythos and Fable5 model architectures, which is why AgentX uses it as an open-weights proxy for that class of model.
+
+The size is the story. K3 is so big that it does not fit on a single B200 server, so serving it requires wide expert parallelism, wide tensor parallelism, or [pipeline parallelism](/glossary/pipeline-parallelism) just to hold the weights.
+
+## A composability failure, not a hardware one
+
+On vLLM, [speculative decoding](/glossary/speculative-decoding) and DSpark did not compose with pipeline parallelism at all until very recently. B200 therefore had to choose: fit the model, or run speculative decoding. It could not do both, and its Kimi K3 performance was correspondingly poor, losing to MI355X for reasons that have nothing to do with the silicon.
+
+This is the recurring lesson of AgentX. A parallelism strategy that works in isolation is not the same as one that composes with everything else a production deployment relies on, and the frontier curve only rewards the combination.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/a1440922-e1ea-4a74-ab62-f1263ae31ca0_2048x1473.png"
+  caption="Source: SemiAnalysis InferenceX"
+/>
+
+## AMD had the opposite problem
+
+MI355X vLLM worked out of the box on day zero for short context single turn workloads. For long context multi turn workloads it did not: MI355X AITER and Triton kernels suffered badly in the first week, and upstream vLLM was completely unusable for MI355X on realistic workloads.
+
+The two failures are worth putting side by side, because they are the same failure seen from opposite ends. NVIDIA had the kernels but not the composition; AMD had a day-zero path that held up only under the workload shape that agentic traffic does not resemble. A benchmark built on fixed sequence lengths would have recorded the second problem as a clean pass.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/80eb810f-a9ea-4f01-a41b-e19e3409ce74_2048x1459.png" />
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/73ded698-c86e-411b-8e7c-f9bb125487b7_2048x1459.png"
+  caption="Source: SemiAnalysis InferenceX"
+/>
+
+---
+
+_These results are one slice of AgentX 1.0. The full analysis, the replay methodology, and the 70+ upstream PRs the benchmark drove are in [AgentX - InferenceXv3: Does the CUDA Moat Hold Up in Agentic Inferencing?](/blog/agentx-inferencexv3-does-cuda-moat). Every point is explorable on the [free dashboard](https://inferencex.semianalysis.com/)._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Why did B200 perform poorly on Kimi K3?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Kimi K3 has 2.8 trillion parameters and does not fit on a single B200 server, so it must be served with wide expert parallelism, wide tensor parallelism, or pipeline parallelism. On vLLM, speculative decoding and DSpark did not compose with pipeline parallelism until very recently, so B200 could not use speculative decoding while fitting the model, and MI355X came out ahead."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Did MI355X handle Kimi K3 cleanly?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Only on the easier workload. MI355X vLLM worked out of the box on day zero for short context single turn workloads, but on long context multi turn workloads the AITER and Triton kernels failed badly in the first week and upstream vLLM was unusable for MI355X on realistic traffic."
+      }
+    }
+  ]
+}`}</JsonLd>

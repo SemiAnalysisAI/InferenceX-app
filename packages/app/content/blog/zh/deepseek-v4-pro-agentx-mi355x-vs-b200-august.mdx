@@ -1,0 +1,84 @@
+---
+title: 'DeepSeek V4 Pro 的 AgentX 结果：MI355X 对比 B200，以及 8 月 21 日的反转'
+subtitle: '在端到端延迟的每美元性能上，AMD 一度追平 B200 vLLM，随后上游 vLLM 的优化改变了格局'
+seoDescription: 'DeepSeek V4 Pro 0813 在 MI355X 与 B200 上的 AgentX 1.0 结果。在 2026 年 8 月 21 日之前，MI355X SGLang 在每美元性能上追平了 B200 vLLM；此后来自 Inferact 与 NVIDIA 的 vLLM 优化让 B200 反超。'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - deepseek
+  - mi355x
+  - b200
+  - amd
+  - nvidia
+---
+
+DeepSeek V4 Pro 0813 是一款来自中国、极受欢迎的前沿开放权重模型，总参数约 1.6 万亿，激活参数 490 亿。它也是 [AgentX](/zh/glossary/agentx) 上 AMD 与 NVIDIA 竞争最胶着的模型，而且排名在一周之内就发生了变化。
+
+工作负载在这里很关键。AgentX 回放的是真实的 agentic 编码会话，而不是固定提示词；在所有 DeepSeek V4 运行中，输入长度分布为 p50 88k、p90 272k、p95 404k、p99 675k token，输出分布为 p50 413、p90 2.2k、p95 3.7k、p99 8.6k。这与 8k1k 是完全不同的系统问题。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/360a051c-6117-4860-a704-b50198f01521_1978x1246.png"
+  caption="来源：InferenceX"
+/>
+
+在 2026 年 8 月 21 日之前，AMD 实力很强的 MI355X SGLang 开发团队在端到端性能的每美元表现上追平了 B200 vLLM。这是实打实的结果，值得直说。
+
+但这并不是全部。同一时期，B300 vLLM 和 B200 SGLang 已经领先 MI355X。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9ec4708c-148e-42ee-a7c5-3bf4d9cbdfaa_1938x1246.png"
+  caption="来源：InferenceX"
+/>
+
+8 月 21 日之后，来自 Inferact 和 NVIDIA 的 vLLM 优化让 B200 的每美元性能超过了 MI355X。这仍是一场胶着的竞赛，而不是已成定局；[AMD 也公布了自己的 DeepSeek V4 vLLM 优化清单](https://github.com/vllm-project/vllm/issues/52911)，上面还有不少待办事项。
+
+## ATOM 这个前提
+
+在端到端延迟上，MI355X 上的 ATOM 胜过 B200 vLLM，但没有胜过 B300 或 B200 SGLang。更重要的前提在于部署：中国和西方的多数 AI 实验室都不愿在生产中使用 ATOM，因此只在厂商引擎下成立的优势，并不能代表使用上游软件栈的客户实际拿到的性能。在单节点上，MI355X 的开源方案（vLLM）依然落后于 ATOM。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/e8d915c0-c962-4277-b62c-a1b08b8e7179_1924x1262.png"
+  caption="来源：InferenceX"
+/>
+
+## MI355X 真正有竞争力的区间
+
+总体来看，MI355X 相对 B200 和 B300 表现尚可。在曲线上低吞吐、低延迟的那一段两者最为接近，因为那里只用到张量并行和较为基础的 kernel。差距出现在高吞吐区间，AMD 需要在那里优化自己的 DEP kernel；而且这个差距是在 MI355X 拥有 B200 的 1.5 倍 HBM 的前提下出现的。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/29cfd340-d61b-46c4-8d87-e081d937b80c_2048x1303.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_vllm%2Cb300_vllm%2Cmi355x_atom%2Cmi355x_vllm&i_label=0)"
+/>
+
+两个坐标轴要一起看。某个配置可能在吞吐量对[交互性](/zh/glossary/interactivity)上表现亮眼，却在 [p90](/zh/glossary/tail-latency) 首 token 延迟上把优势还回去，这也是上图选择以 TTFT 为横轴、而不是只看交互性的原因。
+
+---
+
+_本文结果只是 AgentX 1.0 的一个切面。完整分析、回放方法，以及该基准测试推动的 70 多个上游 PR，请见 [AgentX - InferenceXv3：CUDA 护城河在 agentic 推理中还站得住吗？](/zh/blog/agentx-inferencexv3-does-cuda-moat)。每个数据点都可以在[免费仪表板](https://inferencex.semianalysis.com/)上自行探索。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "在 DeepSeek V4 Pro 上，MI355X 胜过 B200 了吗？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "在 2026 年 8 月 21 日之前的一段时间里，MI355X SGLang 在端到端性能的每美元表现上追平了 B200 vLLM，MI355X 上的 ATOM 在端到端延迟上也胜过 B200 vLLM。但同期 B300 vLLM 和 B200 SGLang 都领先 MI355X；8 月 21 日之后，来自 Inferact 和 NVIDIA 的 vLLM 优化让 B200 的每美元性能反超 MI355X。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "MI355X 显存更大，为什么在高吞吐区间反而落后？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "MI355X 的 HBM 是 B200 的 1.5 倍，但在 AgentX 上，它与 B200、B300 最接近的是曲线上低吞吐、低延迟的那一段，那里只用到张量并行和较为基础的 kernel。高吞吐一端依赖 AMD 仍需优化的 DEP kernel，因此额外的显存容量没有转化为前沿吞吐量。"
+      }
+    }
+  ]
+}`}</JsonLd>
