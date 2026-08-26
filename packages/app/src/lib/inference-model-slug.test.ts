@@ -122,4 +122,10 @@ describe('inferenceModelForPathname', () => {
     expect(inferenceModelForPathname('/zh')).toBeNull();
     expect(inferenceModelForPathname('/inference/%E4%B8%8D%E5%AD%98%E5%9C%A8')).toBeNull();
   });
+
+  it('returns null when usePathname yields no pathname (bare test renders)', () => {
+    expect(inferenceModelForPathname(null)).toBeNull();
+    expect(inferenceModelForPathname(undefined)).toBeNull();
+    expect(inferenceModelForPathname('')).toBeNull();
+  });
 });

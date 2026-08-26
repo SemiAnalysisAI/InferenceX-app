@@ -113,8 +113,12 @@ export const ACTIVE_INFERENCE_MODEL_SLUGS: readonly InferenceModelSlug[] =
  * resolves). Used by the dashboard shell to seed `GlobalFilterProvider` and by
  * the provider's pathname effect on soft navigations; an explicit `?g_model=`
  * param always wins over the path pin.
+ *
+ * Accepts null/undefined because `usePathname()` is typed to return null
+ * outside an app router (e.g. in unit tests that render the provider bare).
  */
-export function inferenceModelForPathname(pathname: string): Model | null {
+export function inferenceModelForPathname(pathname: string | null | undefined): Model | null {
+  if (!pathname) return null;
   const barePath = pathname.split(/[?#]/u, 1)[0] || '/';
   const enPath = barePath === '/zh' ? '/' : barePath.replace(/^\/zh(?=\/)/u, '');
   const match = /^\/inference\/(?<slug>[^/]+)\/?$/u.exec(enPath);
