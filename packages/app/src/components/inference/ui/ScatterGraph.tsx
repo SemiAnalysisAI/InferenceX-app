@@ -3577,6 +3577,7 @@ const ScatterGraph = React.memo(
                 {
                   id: 'scatter-perf-ruler',
                   label: legendT.perfRuler,
+                  advanced: true,
                   checked: perfRulerMode,
                   infoTooltip: legendT.perfRulerInfo,
                   onCheckedChange: (checked: boolean) => {
