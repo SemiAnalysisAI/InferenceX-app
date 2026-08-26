@@ -48,9 +48,24 @@ describe('Per-model dashboard routes', () => {
     cy.location('pathname').should('match', /^\/historical\/[a-z0-9-]+$/u);
   });
 
-  it('redirects alias slugs to the canonical model slug', () => {
-    cy.visit('/calculator/kimi', visitOptions);
+  it('redirects alias slugs to the canonical model slug, keeping share-link params', () => {
+    cy.visit('/calculator/kimi?i_seq=8k%2F1k', visitOptions);
     cy.location('pathname').should('eq', '/calculator/kimi-k26');
+    cy.location('search').should('contain', 'i_seq=8k%2F1k');
+  });
+
+  it('language toggle follows the in-place rewritten per-model path', () => {
+    cy.visit('/historical/minimax-m3', visitOptions);
+    cy.get('[data-testid="historical-trends-display"]').should('be.visible');
+    unlockPointerEvents();
+    cy.get('[data-testid="model-selector"]').click();
+    cy.get('[role="option"]').not('[aria-selected="true"]').first().click();
+    cy.location('pathname')
+      .should('match', /^\/historical\/[a-z0-9-]+$/u)
+      .then((rewritten) => {
+        cy.get('[data-testid="language-toggle"]').click();
+        cy.location('pathname').should('eq', `/zh${rewritten}`);
+      });
   });
 
   it('returns 404 for unknown model slugs', () => {

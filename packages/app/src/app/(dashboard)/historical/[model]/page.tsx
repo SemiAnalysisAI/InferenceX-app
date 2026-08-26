@@ -3,7 +3,12 @@ import { notFound, permanentRedirect } from 'next/navigation';
 
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import HistoricalTrendsDisplay from '@/components/trends/HistoricalTrendsDisplay';
-import { MODEL_ROUTES, modelRoutePath, resolveModelRouteSlug } from '@/lib/model-routes';
+import {
+  MODEL_ROUTES,
+  modelRoutePath,
+  pathWithSearchParams,
+  resolveModelRouteSlug,
+} from '@/lib/model-routes';
 import { modelTabMetadata } from '@/lib/tab-meta';
 
 /**
@@ -16,6 +21,7 @@ import { modelTabMetadata } from '@/lib/tab-meta';
 
 interface Props {
   params: Promise<{ model: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export function generateStaticParams() {
@@ -29,13 +35,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return modelTabMetadata('historical', resolved.route);
 }
 
-export default async function HistoricalModelPage({ params }: Props) {
+export default async function HistoricalModelPage({ params, searchParams }: Props) {
   const { model } = await params;
   const resolved = resolveModelRouteSlug(model);
   if (!resolved) notFound();
-  // Aliases and non-canonical casing 308 to the canonical slug, mirroring
-  // /compare/[slug].
-  if (resolved.isAlias) permanentRedirect(modelRoutePath('historical', resolved.route.slug));
+  // Aliases and non-canonical casing 308 to the canonical slug, keeping any
+  // share-link params, mirroring /compare/[slug]. `searchParams` is awaited
+  // only on this branch so the canonical slugs stay statically generated.
+  if (resolved.isAlias) {
+    permanentRedirect(
+      pathWithSearchParams(modelRoutePath('historical', resolved.route.slug), await searchParams),
+    );
+  }
   return (
     <InferenceProvider activeTab="historical">
       <HistoricalTrendsDisplay />

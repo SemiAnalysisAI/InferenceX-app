@@ -3,7 +3,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 
 import ThroughputCalculatorDisplay from '@/components/calculator/ThroughputCalculatorDisplay';
 import { resolveCalculatorUrlSeed } from '@/components/calculator/url-seed';
-import { modelRoutePath, resolveModelRouteSlug } from '@/lib/model-routes';
+import { modelRoutePath, pathWithSearchParams, resolveModelRouteSlug } from '@/lib/model-routes';
 import { modelTabMetadata } from '@/lib/tab-meta';
 
 /**
@@ -30,9 +30,11 @@ export default async function CalculatorModelPage({ params, searchParams }: Prop
   const [{ model }, sp] = await Promise.all([params, searchParams]);
   const resolved = resolveModelRouteSlug(model);
   if (!resolved) notFound();
-  // Aliases and non-canonical casing 308 to the canonical slug, mirroring
-  // /compare/[slug].
-  if (resolved.isAlias) permanentRedirect(modelRoutePath('calculator', resolved.route.slug));
+  // Aliases and non-canonical casing 308 to the canonical slug, keeping any
+  // share-link params, mirroring /compare/[slug].
+  if (resolved.isAlias) {
+    permanentRedirect(pathWithSearchParams(modelRoutePath('calculator', resolved.route.slug), sp));
+  }
   const seed = resolveCalculatorUrlSeed(sp);
   // A legacy explicit ?g_model= wins over the path — same precedence as
   // GlobalFilterProvider, which then canonicalizes the pathname client-side.

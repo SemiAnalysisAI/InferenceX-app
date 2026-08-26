@@ -102,6 +102,24 @@ export function modelRoutePath(tab: ModelRouteTab, slug: string): string {
   return `${MODEL_ROUTE_TAB_PATHS[tab]}/${slug}`;
 }
 
+/**
+ * Reattach incoming search params when 308ing an alias slug to its canonical
+ * path, so share-link state (g_rundate, i_seq, c_price, unofficialruns, …)
+ * survives the redirect.
+ */
+export function pathWithSearchParams(
+  path: string,
+  sp: Record<string, string | string[] | undefined>,
+): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(sp)) {
+    if (typeof value === 'string') params.append(key, value);
+    else if (Array.isArray(value)) for (const item of value) params.append(key, item);
+  }
+  const search = params.toString();
+  return search ? `${path}?${search}` : path;
+}
+
 export interface ParsedModelRoutePathname {
   tab: ModelRouteTab;
   /** True for /zh-prefixed pathnames. */

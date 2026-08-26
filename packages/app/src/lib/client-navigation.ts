@@ -7,6 +7,7 @@ interface RouterLike {
 }
 
 export const CLIENT_SEARCH_CHANGE_EVENT = 'inferencex:client-search-change';
+export const CLIENT_PATHNAME_CHANGE_EVENT = 'inferencex:client-pathname-change';
 
 /** Keep persistent layout controls in sync when an App Router transition only
  *  changes search params and therefore reuses the root layout. */
@@ -34,11 +35,14 @@ export function replaceClientSearch(searchParams: URLSearchParams): void {
  * models rewrites `/historical/kimi-k3` in the address bar without an RSC
  * navigation or component remount. `usePathname` intentionally keeps the
  * server-rendered value; route resolution is prefix-based, so nav highlight,
- * providers, and share scopes are unaffected.
+ * providers, and share scopes are unaffected. Controls that must reflect the
+ * live address bar (the header language toggle) subscribe via
+ * `useClientPathname`, which listens for CLIENT_PATHNAME_CHANGE_EVENT.
  */
 export function replaceClientPathname(pathname: string): void {
   const href = `${pathname}${window.location.search}${window.location.hash}`;
   History.prototype.replaceState.call(window.history, window.history.state, '', href);
+  window.dispatchEvent(new CustomEvent(CLIENT_PATHNAME_CHANGE_EVENT, { detail: pathname }));
 }
 
 /**
