@@ -1,5 +1,6 @@
 import { getAllPosts } from '@/lib/blog';
 import { getAllChipPages, getAllChipVsPages } from '@/lib/chip-pages';
+import { getAllGuides } from '@/lib/guides';
 import { inferenceModelMeta } from '@/lib/inference-model-meta';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
@@ -40,6 +41,12 @@ export async function GET() {
     ...getAllChipVsPages().map(
       (page) =>
         `- [${page.a.label} vs ${page.b.label}](${SITE_URL}/chips/${page.slug}): head-to-head comparison`,
+    ),
+    '',
+    `## Guides`,
+    '',
+    ...getAllGuides().map(
+      (guide) => `- [${guide.title}](${SITE_URL}/guides/${guide.slug}): ${guide.description}`,
     ),
     '',
     `## Articles`,

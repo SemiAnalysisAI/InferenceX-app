@@ -18,6 +18,7 @@ import {
 } from '@/lib/compare-variant-slug';
 import { getAllChipRouteSlugs } from '@/lib/chip-pages';
 import { getAllGlossaryEntries } from '@/lib/glossary';
+import { getAllGuides } from '@/lib/guides';
 import { ACTIVE_INFERENCE_MODEL_SLUGS, INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import { languageAlternates, zhPath } from '@/lib/i18n';
 import {
@@ -165,6 +166,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }),
     ...getAllGlossaryEntries().flatMap((entry) =>
       localizedPair(`/glossary/${entry.slug}`, {
+        lastModified: now,
+        changeFrequency: 'monthly' as const,
+        priority: 0.6,
+      }),
+    ),
+    ...localizedPair('/guides', {
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    }),
+    ...getAllGuides().flatMap((entry) =>
+      localizedPair(`/guides/${entry.slug}`, {
         lastModified: now,
         changeFrequency: 'monthly' as const,
         priority: 0.6,

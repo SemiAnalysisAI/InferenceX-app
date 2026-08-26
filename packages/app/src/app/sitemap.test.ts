@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
 import { getAllChipRouteSlugs } from '@/lib/chip-pages';
+import { getAllGuides } from '@/lib/guides';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import { zhPath } from '@/lib/i18n';
 const mocks = vi.hoisted(() => ({
@@ -73,6 +74,19 @@ describe('sitemap locale parity', () => {
     for (const slug of slugs) {
       expect(urls.has(`${SITE_URL}/chips/${slug}`)).toBe(true);
       expect(urls.has(`${SITE_URL}${zhPath(`/chips/${slug}`)}`)).toBe(true);
+    }
+  });
+
+  it('emits both locales for the guides index and every guide page', async () => {
+    const entries = await sitemap();
+    const urls = new Set(entries.map((entry) => entry.url));
+    expect(urls.has(`${SITE_URL}/guides`)).toBe(true);
+    expect(urls.has(`${SITE_URL}${zhPath('/guides')}`)).toBe(true);
+    const guides = getAllGuides();
+    expect(guides.length).toBeGreaterThanOrEqual(20);
+    for (const guide of guides) {
+      expect(urls.has(`${SITE_URL}/guides/${guide.slug}`)).toBe(true);
+      expect(urls.has(`${SITE_URL}${zhPath(`/guides/${guide.slug}`)}`)).toBe(true);
     }
   });
 
