@@ -57,17 +57,24 @@ import type {
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { computeTooltipPosition, syncPointShape } from '@/lib/d3-chart/layers/scatter-points';
 import {
-  EMPTY_PERF_RULER_SELECTION,
+  EMPTY_PERF_RULER_STATE,
   clampIsoX,
+  clearPerfRulers,
   computeIsoXRulerGeometry,
+  computePerfRulerLabelLayouts,
+  deletePerfRuler,
   intersectPathAtX,
   isPerfRulerCurveVisible,
-  nextPerfRulerSelection,
+  movePerfRulerIsoX,
+  nextPerfRulerState,
   pathXExtent,
-  renderPerfRuler,
-  type PerfRulerCurveSelection,
+  perfRulerCurveSet,
+  prunePerfRulers,
+  renderPerfRulers,
   type PerfRulerEndInput,
   type PerfRulerGeometry,
+  type PerfRulerRenderEntry,
+  type PerfRulerState,
 } from '@/lib/d3-chart/layers/perf-ruler';
 import {
   attachOverlayXMarkerHandlers,
@@ -355,8 +362,9 @@ const SCATTER_STRINGS = {
     lineLabels: 'Line Labels',
     perfRuler: 'Perf Ruler',
     perfRulerInfo:
-      'Click two curves to place a vertical ruler, then drag it to measure the performance multiple between them at any x value.',
+      'Click two curves to place a vertical ruler, then drag it to measure the performance multiple between them at any x value. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
     resetFilter: 'Reset filter',
+    clearPerfRulers: (count: number) => `Clear rulers (${count})`,
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
     overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
@@ -374,8 +382,9 @@ const SCATTER_STRINGS = {
     lineLabels: '曲线标签',
     perfRuler: '性能标尺',
     perfRulerInfo:
-      '先点击两条曲线放置垂直标尺，再拖动标尺，测量任意横坐标下两条曲线之间的性能倍数。',
+      '先点击两条曲线放置垂直标尺，再拖动标尺，测量任意横坐标下两条曲线之间的性能倍数。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
     resetFilter: '重置筛选',
+    clearPerfRulers: (count: number) => `清除标尺（${count}）`,
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
     overflowMixed: (count: number) => `${count} 个点已截断`,
     overflowCost: (count: number, limit: number) => `${count} 个点 > $${limit}/Mtok`,
@@ -1325,31 +1334,32 @@ const ScatterGraph = React.memo(
     };
 
     // --- Perf ruler (opt-in: click two curves, drag the ruler to any iso-x) ---
-    // Curve-to-curve ISO-X semantics: the selection is two CURVES (rendered
-    // roofline path class tokens) plus a freely chosen iso-x stored in DATA
-    // space (xScale.invert of the click), so the measurement survives zoom
-    // and metric changes. BOTH ruler ends are interpolated on the curves'
-    // rendered paths at the iso-x — neither end needs to be a data point.
+    // Curve-to-curve ISO-X semantics: each measurement is two CURVES
+    // (rendered roofline path class tokens) plus a freely chosen iso-x
+    // stored in DATA space (xScale.invert of the click), so measurements
+    // survive zoom and metric changes. BOTH ruler ends are interpolated on
+    // the curves' rendered paths at the iso-x — neither end needs to be a
+    // data point. Multiple rulers accumulate (capped in the pure module);
+    // completing one immediately allows starting the next.
     const [perfRulerMode, setPerfRulerMode] = useState(false);
-    const [perfRulerSelection, setPerfRulerSelection] = useState<PerfRulerCurveSelection>(
-      EMPTY_PERF_RULER_SELECTION,
-    );
-    // Draw passes read mode/selection through refs so toggling off clears
-    // the ruler in the same pre-paint layout pass — the line/chip must never
+    const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
+    // Draw passes read mode/state through refs so toggling off clears the
+    // rulers in the same pre-paint layout pass — lines/labels must never
     // linger a frame after the switch flips (Bugbot report on PR #853).
     const perfRulerModeRef = useRef(perfRulerMode);
     perfRulerModeRef.current = perfRulerMode;
-    const perfRulerSelectionRef = useRef(perfRulerSelection);
-    perfRulerSelectionRef.current = perfRulerSelection;
-    // Live iso-x for draw passes. Dragging the ruler updates it once per
-    // animation frame WITHOUT touching React state (the drag commits on
-    // end), so the ruler follows the pointer with one redraw per frame.
-    // Synced from committed state in an effect (not per render) so an
-    // unrelated re-render mid-drag cannot snap the ruler back.
-    const perfRulerIsoXRef = useRef<number | null>(null);
+    const perfRulerStateRef = useRef(perfRulerState);
+    perfRulerStateRef.current = perfRulerState;
+    // Live per-ruler iso-x overrides for draw passes. Dragging a ruler
+    // updates its entry once per animation frame WITHOUT touching React
+    // state (the drag commits on end), so the ruler follows the pointer
+    // with one redraw per frame. Cleared when committed state changes (an
+    // effect, not per render, so an unrelated re-render mid-drag cannot
+    // snap the dragged ruler back).
+    const perfRulerLiveIsoXRef = useRef(new Map<number, number>());
     useLayoutEffect(() => {
-      perfRulerIsoXRef.current = perfRulerSelection.isoX;
-    }, [perfRulerSelection]);
+      perfRulerLiveIsoXRef.current.clear();
+    }, [perfRulerState]);
 
     // Scales/group from the most recent draw pass — click and drag handlers
     // convert between pixel and data space with the exact scales the chart
@@ -1381,7 +1391,7 @@ const ScatterGraph = React.memo(
       if (!ctx) return;
       track('latency_perf_ruler_curve_clicked', { curve });
       const isoX = Number(ctx.xScale.invert(pixelX));
-      setPerfRulerSelection((prev) => nextPerfRulerSelection(prev, { curve, isoX }));
+      setPerfRulerState((prev) => nextPerfRulerState(prev, { curve, isoX }));
       chartRef.current?.dismissTooltip();
       chartRef.current?.hideTooltip();
     }, []);
@@ -1410,7 +1420,7 @@ const ScatterGraph = React.memo(
         );
         // Single-point series render no roofline path — nothing to measure.
         if (!curve) return;
-        setPerfRulerSelection((prev) => nextPerfRulerSelection(prev, { curve, isoX: point.x }));
+        setPerfRulerState((prev) => nextPerfRulerState(prev, { curve, isoX: point.x }));
         chartRef.current?.dismissTooltip();
         chartRef.current?.hideTooltip();
       },
@@ -1422,14 +1432,13 @@ const ScatterGraph = React.memo(
     const perfRulerRef = useRef({ mode: perfRulerMode, onPointClick: handlePerfRulerPointClick });
     perfRulerRef.current = { mode: perfRulerMode, onPointClick: handlePerfRulerPointClick };
 
-    // Clear the measurement when the toggle turns off (the switch handler
-    // also clears synchronously; this covers programmatic mode changes).
+    // Turning the toggle off clears ALL rulers and any in-progress
+    // selection (documented in the info tooltip — simple and predictable;
+    // the switch handler also clears synchronously, this covers
+    // programmatic mode changes). `clearPerfRulers` bails out with the same
+    // reference when there is nothing to clear.
     useEffect(() => {
-      if (!perfRulerMode) {
-        setPerfRulerSelection((prev) =>
-          prev.curves.length > 0 || prev.isoX !== null ? EMPTY_PERF_RULER_SELECTION : prev,
-        );
-      }
+      if (!perfRulerMode) setPerfRulerState(clearPerfRulers);
     }, [perfRulerMode]);
 
     // Invisible widened hit strokes over every rendered roofline path
@@ -1473,7 +1482,7 @@ const ScatterGraph = React.memo(
             if (!curve || !d || !isPerfRulerCurveVisible(this.style.opacity)) return;
             entries.push({ curve, d });
           });
-        const selected = new Set(perfRulerSelectionRef.current.curves);
+        const selected = perfRulerCurveSet(perfRulerStateRef.current);
         hitLayer
           .selectAll<SVGPathElement, HitEntry>('.perf-ruler-hit')
           .data(entries, (e) => e.curve)
@@ -1498,28 +1507,31 @@ const ScatterGraph = React.memo(
       [],
     );
 
-    // Horizontal drag on the ruler line — the primary way to fine-tune the
-    // iso-x. rAF-throttled: each frame clamps the pointer x to the two
-    // curves' overlapping x range, updates the live iso-x, and redraws; the
-    // value commits to React state on drag end. d3.drag stops mousedown
-    // propagation itself, so dragging the ruler never pans the chart.
-    const perfRulerDragPixelXRef = useRef(0);
+    // Horizontal drag on a ruler line — the primary way to fine-tune that
+    // ruler's iso-x. The drag handle's datum (set by the render join)
+    // identifies WHICH ruler is dragged. rAF-throttled: each frame clamps
+    // the pointer x to that ruler's curve pair's overlapping x range,
+    // updates its live iso-x, and redraws; the value commits to React state
+    // on drag end. d3.drag stops mousedown propagation itself, so dragging
+    // a ruler never pans the chart.
+    const perfRulerDragTargetRef = useRef<{ id: number; pixelX: number } | null>(null);
     const perfRulerDragFrameRef = useRef<number | null>(null);
     const applyPerfRulerDragFrame = useCallback(() => {
       const ctx = perfRulerDrawCtxRef.current;
-      if (!ctx) return;
-      const sel = perfRulerSelectionRef.current;
-      if (sel.curves.length !== 2) return;
-      const [nodeA, nodeB] = sel.curves.map((cls) =>
+      const target = perfRulerDragTargetRef.current;
+      if (!ctx || !target) return;
+      const ruler = perfRulerStateRef.current.rulers.find((r) => r.id === target.id);
+      if (!ruler) return;
+      const [nodeA, nodeB] = [ruler.curveA, ruler.curveB].map((cls) =>
         ctx.zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node(),
       );
       if (!nodeA || !nodeB || typeof nodeA.getPointAtLength !== 'function') return;
       const extentA = pathXExtent(nodeA);
       const extentB = pathXExtent(nodeB);
       if (!extentA || !extentB) return;
-      const clamped = clampIsoX(perfRulerDragPixelXRef.current, extentA, extentB);
+      const clamped = clampIsoX(target.pixelX, extentA, extentB);
       if (clamped === null) return;
-      perfRulerIsoXRef.current = Number(ctx.xScale.invert(clamped));
+      perfRulerLiveIsoXRef.current.set(target.id, Number(ctx.xScale.invert(clamped)));
       drawPerfRulerRef.current?.(ctx.zoomGroup, ctx.xScale, ctx.yScale, ctx.width, ctx.height);
     }, []);
     const applyPerfRulerDragFrameRef = useRef(applyPerfRulerDragFrame);
@@ -1528,33 +1540,43 @@ const ScatterGraph = React.memo(
     const perfRulerDrag = useMemo(
       () =>
         d3
-          .drag<SVGLineElement, unknown>()
-          .on('drag', (event: d3.D3DragEvent<SVGLineElement, unknown, unknown>) => {
-            perfRulerDragPixelXRef.current = event.x;
-            if (perfRulerDragFrameRef.current === null) {
-              perfRulerDragFrameRef.current = requestAnimationFrame(() => {
-                perfRulerDragFrameRef.current = null;
-                applyPerfRulerDragFrameRef.current();
-              });
-            }
-          })
+          .drag<SVGLineElement, PerfRulerRenderEntry>()
+          .on(
+            'drag',
+            (
+              event: d3.D3DragEvent<SVGLineElement, PerfRulerRenderEntry, unknown>,
+              entry: PerfRulerRenderEntry,
+            ) => {
+              perfRulerDragTargetRef.current = { id: entry.id, pixelX: event.x };
+              if (perfRulerDragFrameRef.current === null) {
+                perfRulerDragFrameRef.current = requestAnimationFrame(() => {
+                  perfRulerDragFrameRef.current = null;
+                  applyPerfRulerDragFrameRef.current();
+                });
+              }
+            },
+          )
           .on('end', () => {
-            // Flush the pending frame, then commit the iso-x to state.
+            // Flush the pending frame, then commit this ruler's iso-x.
             if (perfRulerDragFrameRef.current !== null) {
               cancelAnimationFrame(perfRulerDragFrameRef.current);
               perfRulerDragFrameRef.current = null;
               applyPerfRulerDragFrameRef.current();
             }
-            const isoX = perfRulerIsoXRef.current;
-            setPerfRulerSelection((prev) => (prev.isoX === isoX ? prev : { ...prev, isoX }));
+            const target = perfRulerDragTargetRef.current;
+            perfRulerDragTargetRef.current = null;
+            if (!target) return;
+            const isoX = perfRulerLiveIsoXRef.current.get(target.id);
+            if (isoX === undefined) return;
+            setPerfRulerState((prev) => movePerfRulerIsoX(prev, target.id, isoX));
           }),
       [],
     );
 
-    // Draw (or clear) the hit strokes and the ruler for the current draw
+    // Draw (or clear) the hit strokes and all rulers for the current draw
     // pass. Stable callback so the custom layer can live outside the
-    // perf-ruler state dependencies — render/zoom passes read mode,
-    // selection, and iso-x through refs. Gated on the mode ref so a
+    // perf-ruler state dependencies — render/zoom passes read mode, rulers,
+    // and live iso-x values through refs. Gated on the mode ref so a
     // toggle-off clears everything in the very next pre-paint pass.
     const drawPerfRuler = useCallback(
       (
@@ -1566,42 +1588,58 @@ const ScatterGraph = React.memo(
       ) => {
         perfRulerDrawCtxRef.current = { zoomGroup, xScale, yScale, width, height };
         syncPerfRulerHitPaths(zoomGroup);
-        const sel = perfRulerSelectionRef.current;
-        const isoX = perfRulerIsoXRef.current;
-        let geometry: PerfRulerGeometry | null = null;
-        if (perfRulerModeRef.current && sel.curves.length === 2 && isoX !== null) {
-          const pixelX = xScale(isoX);
-          // Both ends are interpolated on the RENDERED paths — the drawn
-          // curve is the measurement surface, so the ruler matches it
-          // exactly and stays correct under zoom (rooflines redraw before
-          // this layer runs). When either curve does not span the iso-x, has
-          // no rendered path, or is hidden (legend/precision toggles keep the
-          // path in the DOM at opacity 0), draw nothing but KEEP the
-          // selection: zoom/drag/legend re-toggles that restore both visible
-          // intersections bring the ruler back.
-          const ends: PerfRulerEndInput[] = [];
-          for (const cls of sel.curves) {
-            const node = zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node();
-            if (!node || typeof node.getPointAtLength !== 'function') break;
-            if (!isPerfRulerCurveVisible(node.style.opacity)) break;
-            const hit = intersectPathAtX(node, pixelX);
-            if (!hit) break;
-            ends.push({ py: hit.y, rawY: yScale.invert(hit.y) });
-          }
-          if (ends.length === 2) {
-            geometry = computeIsoXRulerGeometry(pixelX, ends[0], ends[1]);
+        const state = perfRulerStateRef.current;
+        const entries: PerfRulerRenderEntry[] = [];
+        if (perfRulerModeRef.current && state.rulers.length > 0) {
+          // Both ends of each ruler are interpolated on the RENDERED paths —
+          // the drawn curve is the measurement surface, so the ruler matches
+          // it exactly and stays correct under zoom (rooflines redraw before
+          // this layer runs). When either of a ruler's curves does not span
+          // its iso-x, has no rendered path, or is hidden (legend/precision
+          // toggles keep the path in the DOM at opacity 0), that ruler draws
+          // nothing this frame but KEEPS its state — per ruler, others stay
+          // visible; zoom/drag/legend re-toggles that restore both visible
+          // intersections bring it back.
+          const geometries: (PerfRulerGeometry | null)[] = state.rulers.map((ruler) => {
+            const isoX = perfRulerLiveIsoXRef.current.get(ruler.id) ?? ruler.isoX;
+            const pixelX = xScale(isoX);
+            const ends: PerfRulerEndInput[] = [];
+            for (const cls of [ruler.curveA, ruler.curveB]) {
+              const node = zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node();
+              if (!node || typeof node.getPointAtLength !== 'function') break;
+              if (!isPerfRulerCurveVisible(node.style.opacity)) break;
+              const hit = intersectPathAtX(node, pixelX);
+              if (!hit) break;
+              ends.push({ py: hit.y, rawY: yScale.invert(hit.y) });
+            }
+            return ends.length === 2 ? computeIsoXRulerGeometry(pixelX, ends[0], ends[1]) : null;
+          });
+          // Lay out all labels together so overlapping labels nudge apart.
+          const layouts = computePerfRulerLabelLayouts(geometries, {
+            chartWidth: width,
+            chartHeight: height,
+          });
+          for (const [index, ruler] of state.rulers.entries()) {
+            const geometry = geometries[index];
+            const layout = layouts[index];
+            if (geometry && layout) entries.push({ id: ruler.id, geometry, layout });
           }
         }
-        renderPerfRuler(zoomGroup, geometry, {
+        renderPerfRulers(zoomGroup, entries, {
           color: 'var(--primary)',
           halo: 'var(--background)',
-          chartWidth: width,
-          chartHeight: height,
+          onDelete: (id) => {
+            track('latency_perf_ruler_deleted');
+            setPerfRulerState((prev) => deletePerfRuler(prev, id));
+          },
         });
         // (Re)attach the horizontal drag behavior to the (possibly fresh)
-        // drag handle the render pass just joined.
-        const dragHandle = zoomGroup.select<SVGLineElement>('.perf-ruler .pr-drag');
-        if (!dragHandle.empty()) dragHandle.call(perfRulerDrag);
+        // drag handles the render pass just joined — their datum (the
+        // render entry) tells the drag which ruler it moves.
+        const dragHandles = zoomGroup.selectAll<SVGLineElement, PerfRulerRenderEntry>(
+          '.perf-ruler .pr-drag',
+        );
+        if (!dragHandles.empty()) dragHandles.call(perfRulerDrag);
       },
       [syncPerfRulerHitPaths, perfRulerDrag],
     );
@@ -3154,12 +3192,12 @@ const ScatterGraph = React.memo(
         .remove();
     }, [overlayData]);
 
-    // Perf-ruler decorations: refresh the curve hit strokes and redraw the
-    // ruler whenever the mode, selection, visibility filters, or underlying
-    // data change. Narrow mutation scope — only the hit layer and the ruler
-    // group are touched; the chart itself never rebuilds for a ruler
-    // interaction. Redraws use the currently applied zoom transform (mode,
-    // selection, and iso-x are read through refs inside drawPerfRuler).
+    // Perf-ruler decorations: refresh the curve hit strokes and redraw all
+    // rulers whenever the mode, ruler state, visibility filters, or
+    // underlying data change. Narrow mutation scope — only the hit layer
+    // and the ruler groups are touched; the chart itself never rebuilds for
+    // a ruler interaction. Redraws use the currently applied zoom transform
+    // (mode, rulers, and live iso-x are read through refs in drawPerfRuler).
     //
     // Ordering matters twice here — this effect is deliberately declared
     // AFTER both (a) the mark-styling effect that writes curve opacities
@@ -3178,21 +3216,18 @@ const ScatterGraph = React.memo(
         display.ctx.width,
         display.ctx.height,
       );
-      // Hidden-but-present curves KEEP the selection (a legend re-toggle
-      // brings the ruler back); curves whose paths left the DOM entirely are
-      // truly gone from the data, so prune them from the selection.
-      setPerfRulerSelection((prev) => {
-        if (prev.curves.length === 0) return prev;
-        const kept = prev.curves.filter(
-          (cls) => !display.zoomGroup.select(`.${CSS.escape(cls)}`).empty(),
-        );
-        if (kept.length === prev.curves.length) return prev;
-        return { curves: kept, isoX: kept.length > 0 ? prev.isoX : null };
-      });
+      // Hidden-but-present curves KEEP their rulers (a legend re-toggle
+      // brings a hidden ruler back); curves whose paths left the DOM
+      // entirely are truly gone from the data, so prune each ruler (and the
+      // draft) that references one. `prunePerfRulers` bails out with the
+      // same reference when nothing changed.
+      setPerfRulerState((prev) =>
+        prunePerfRulers(prev, (cls) => !display.zoomGroup.select(`.${CSS.escape(cls)}`).empty()),
+      );
     }, [
       getDisplaySelection,
       perfRulerMode,
-      perfRulerSelection,
+      perfRulerState,
       drawPerfRuler,
       dataIdentity,
       effectiveActiveHwTypes,
@@ -3516,10 +3551,11 @@ const ScatterGraph = React.memo(
                   infoTooltip: legendT.perfRulerInfo,
                   onCheckedChange: (checked: boolean) => {
                     setPerfRulerMode(checked);
-                    // Clear in the same state batch — the pre-paint decoration
-                    // effect then removes the ruler and the curve hit strokes
-                    // before the next frame (no lingering line after toggle-off).
-                    if (!checked) setPerfRulerSelection(EMPTY_PERF_RULER_SELECTION);
+                    // Toggle-off clears ALL rulers in the same state batch —
+                    // the pre-paint decoration effect then removes the rulers
+                    // and the curve hit strokes before the next frame (no
+                    // lingering lines after toggle-off).
+                    if (!checked) setPerfRulerState(clearPerfRulers);
                     track('latency_perf_ruler_toggled', { enabled: checked });
                   },
                 },
@@ -3552,6 +3588,20 @@ const ScatterGraph = React.memo(
                           resetUnifiedSelection();
                           clearQuickFilters();
                           track('latency_legend_filter_reset');
+                        },
+                      },
+                    ]
+                  : []),
+                ...(perfRulerState.rulers.length > 0
+                  ? [
+                      {
+                        id: 'scatter-clear-perf-rulers',
+                        label: legendT.clearPerfRulers(perfRulerState.rulers.length),
+                        onClick: () => {
+                          track('latency_perf_ruler_cleared', {
+                            count: perfRulerState.rulers.length,
+                          });
+                          setPerfRulerState(clearPerfRulers);
                         },
                       },
                     ]

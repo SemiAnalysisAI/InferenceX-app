@@ -9,6 +9,8 @@ import type * as d3 from 'd3';
  * horizontal end caps mark both ends and a big annotation-style label
  * (e.g. "2.03x") sits in open chart space with a curved arrow pointing at
  * the ruler line; the ratio compares the two RAW y-values at that x.
+ * Multiple rulers can coexist (capped at {@link MAX_PERF_RULERS}); each is
+ * individually draggable and deletable via a hover × button.
  *
  * Pure module: intersection search and geometry math are separated from
  * rendering so all three are unit testable (see perf-ruler.test.ts).
@@ -194,48 +196,126 @@ export interface PerfRulerCurveClick {
   isoX: number;
 }
 
-/**
- * Perf-ruler selection: up to two curve identities plus the iso-x (in DATA
- * space, so it survives zoom and metric changes). Neither end is a data
- * point — both are interpolated on the curves' rendered paths at the iso-x.
- */
-export interface PerfRulerCurveSelection {
-  curves: string[];
-  isoX: number | null;
+/** One completed measurement: a curve pair plus its iso-x in DATA space. */
+export interface PerfRulerMeasurement {
+  /** Stable id — render join key, drag identity, and delete target. */
+  id: number;
+  curveA: string;
+  curveB: string;
+  /** Iso-x in DATA space, so it survives zoom and metric changes. */
+  isoX: number;
 }
 
-export const EMPTY_PERF_RULER_SELECTION: PerfRulerCurveSelection = { curves: [], isoX: null };
+/**
+ * Multi-ruler state: completed measurements accumulate in `rulers` while at
+ * most one in-progress `draft` (curve A + iso-x, awaiting curve B) exists.
+ * `nextId` is a monotonic counter so deleted ids are never reused.
+ */
+export interface PerfRulerState {
+  rulers: PerfRulerMeasurement[];
+  draft: PerfRulerCurveClick | null;
+  nextId: number;
+}
 
 /**
- * Selection-transition table for perf-ruler clicks (curve-to-curve
- * semantics — clicks land on CURVES, either directly on a widened curve hit
- * stroke or via a data point standing in for its curve at that point's x):
- *
- * | State           | Click on…                | Result                          |
- * |-----------------|--------------------------|---------------------------------|
- * | empty           | any curve                | curve A selected, iso-x = click |
- * | any             | an already-selected curve| MOVE iso-x to the click's x     |
- * | A only          | a different curve        | curve B selected — measurement  |
- * |                 |                          | complete at the existing iso-x  |
- * | A + B           | a third curve            | new measurement: that curve is  |
- * |                 |                          | the new A, iso-x = click        |
- *
- * Dragging the ruler (not handled here) also moves the iso-x; toggling the
- * mode off clears the selection. Returns `prev` (same reference) for
- * invalid clicks so React state updates can bail out without re-rendering.
+ * Ruler cap — completing a measurement beyond this silently drops the
+ * OLDEST ruler (keeps the chart readable while never rejecting the newest
+ * measurement the user just placed).
  */
-export function nextPerfRulerSelection(
-  prev: PerfRulerCurveSelection,
+export const MAX_PERF_RULERS = 8;
+
+export const EMPTY_PERF_RULER_STATE: PerfRulerState = { rulers: [], draft: null, nextId: 1 };
+
+/**
+ * Click-transition table for multi-ruler mode (clicks land on CURVES,
+ * either on a widened curve hit stroke or via a data point standing in for
+ * its curve at that point's x):
+ *
+ * | State      | Click on…              | Result                             |
+ * |------------|------------------------|------------------------------------|
+ * | no draft   | any curve              | new draft: curve A, iso-x = click  |
+ * | draft on A | curve A again          | MOVE the draft iso-x to the click  |
+ * | draft on A | a different curve B    | measurement COMPLETE at the draft  |
+ * |            |                        | iso-x — appended to `rulers`, the  |
+ * |            |                        | next click starts a fresh draft    |
+ *
+ * Completed rulers are never retargeted by clicks — clicking any curve
+ * after completion starts a NEW ruler (move/reset semantics apply only to
+ * the in-progress draft). Dragging a completed ruler moves its own iso-x
+ * (see {@link movePerfRulerIsoX}); toggling the mode off clears everything.
+ * Returns `prev` (same reference) for no-ops so React state can bail out.
+ */
+export function nextPerfRulerState(
+  prev: PerfRulerState,
   click: PerfRulerCurveClick,
-): PerfRulerCurveSelection {
+): PerfRulerState {
   if (!Number.isFinite(click.isoX)) return prev;
-  const [a, b] = prev.curves;
-  if (!a) return { curves: [click.curve], isoX: click.isoX };
-  if (click.curve === a || click.curve === b) {
-    return prev.isoX === click.isoX ? prev : { curves: prev.curves, isoX: click.isoX };
+  if (!prev.draft) return { ...prev, draft: { curve: click.curve, isoX: click.isoX } };
+  if (click.curve === prev.draft.curve) {
+    return prev.draft.isoX === click.isoX
+      ? prev
+      : { ...prev, draft: { curve: prev.draft.curve, isoX: click.isoX } };
   }
-  if (!b) return { curves: [a, click.curve], isoX: prev.isoX ?? click.isoX };
-  return { curves: [click.curve], isoX: click.isoX };
+  const measurement: PerfRulerMeasurement = {
+    id: prev.nextId,
+    curveA: prev.draft.curve,
+    curveB: click.curve,
+    isoX: prev.draft.isoX,
+  };
+  const rulers = [...prev.rulers, measurement];
+  while (rulers.length > MAX_PERF_RULERS) rulers.shift();
+  return { rulers, draft: null, nextId: prev.nextId + 1 };
+}
+
+/** Move one completed ruler's iso-x (drag commit). No-ops return `prev`. */
+export function movePerfRulerIsoX(prev: PerfRulerState, id: number, isoX: number): PerfRulerState {
+  if (!Number.isFinite(isoX)) return prev;
+  const index = prev.rulers.findIndex((ruler) => ruler.id === id);
+  if (index === -1 || prev.rulers[index].isoX === isoX) return prev;
+  const rulers = [...prev.rulers];
+  rulers[index] = { ...rulers[index], isoX };
+  return { ...prev, rulers };
+}
+
+/** Delete one ruler by id. Unknown ids return `prev` (same reference). */
+export function deletePerfRuler(prev: PerfRulerState, id: number): PerfRulerState {
+  const rulers = prev.rulers.filter((ruler) => ruler.id !== id);
+  return rulers.length === prev.rulers.length ? prev : { ...prev, rulers };
+}
+
+/** Clear all rulers and the draft. Already-empty state returns `prev`. */
+export function clearPerfRulers(prev: PerfRulerState): PerfRulerState {
+  if (prev.rulers.length === 0 && prev.draft === null) return prev;
+  return { rulers: [], draft: null, nextId: prev.nextId };
+}
+
+/**
+ * Prune rulers whose curves left the underlying data entirely (per-ruler:
+ * a ruler survives while BOTH its curves still exist). Hidden-but-present
+ * curves are the caller's visibility concern, not pruning — pass an
+ * existence predicate, not a visibility one. Returns `prev` on no-ops.
+ */
+export function prunePerfRulers(
+  prev: PerfRulerState,
+  curveExists: (curve: string) => boolean,
+): PerfRulerState {
+  const rulers = prev.rulers.filter(
+    (ruler) => curveExists(ruler.curveA) && curveExists(ruler.curveB),
+  );
+  const draft = prev.draft && curveExists(prev.draft.curve) ? prev.draft : null;
+  if (rulers.length === prev.rulers.length && draft === prev.draft) return prev;
+  return { ...prev, rulers, draft };
+}
+
+/** Every curve referenced by any ruler or the draft (hit-halo styling). */
+export function perfRulerCurveSet(state: PerfRulerState): Set<string> {
+  const curves = new Set<string>();
+  for (const ruler of state.rulers) {
+    curves.add(ruler.curveA);
+    curves.add(ruler.curveB);
+  }
+  if (state.draft) curves.add(state.draft.curve);
+  return curves;
 }
 
 export interface PerfRulerRenderOptions {
@@ -246,14 +326,12 @@ export interface PerfRulerRenderOptions {
    * stays readable over chart content. Default `var(--background)`.
    */
   halo?: string;
-  /** Chart inner width; lets the label flip sides instead of clipping. */
-  chartWidth?: number;
-  /** Chart inner height; lets the label drop below near the top edge. */
-  chartHeight?: number;
   /** Half-length of the horizontal end caps in px. Default 6. */
   capHalfWidth?: number;
   /** Big ratio label font size in px. Default 32. */
   labelFontSize?: number;
+  /** Called with the ruler's id when its hover × button is clicked. */
+  onDelete?: (id: number) => void;
 }
 
 export const DEFAULT_LABEL_FONT_SIZE = 32;
@@ -262,6 +340,8 @@ const LABEL_OFFSET_Y = 46;
 const ARROW_TIP_GAP = 5;
 const ARROW_HEAD_LENGTH = 9;
 const ARROW_HEAD_HALF_WIDTH = 4.5;
+const DELETE_GAP = 18;
+const LABEL_COLLISION_NUDGE_TRIES = 4;
 
 export interface PerfRulerLabelLayoutOptions {
   /** Chart inner width; the label flips to the left side when clipping. */
@@ -285,6 +365,48 @@ export interface PerfRulerLabelLayout {
   arrowPath: string;
   /** Filled arrowhead triangle pointing at the ruler-line midpoint. */
   arrowHeadPath: string;
+  /** Center of the × delete button, just past the label's far end. */
+  deleteX: number;
+  deleteY: number;
+}
+
+/** Estimated label width without a DOM (unit-testable placement math). */
+function estimateLabelWidth(label: string, fontSize: number): number {
+  return label.length * fontSize * 0.6;
+}
+
+/** Build the arrow + delete positions for a chosen label placement. */
+function buildLabelLayout(
+  geometry: Pick<PerfRulerGeometry, 'x' | 'y1' | 'y2' | 'ratioLabel'>,
+  side: 1 | -1,
+  labelY: number,
+  fontSize: number,
+): PerfRulerLabelLayout {
+  const midY = (geometry.y1 + geometry.y2) / 2;
+  const labelX = geometry.x + side * LABEL_OFFSET_X;
+  const above = labelY < midY;
+  // Quarter-curve: leaves the label vertically, ends horizontally at the
+  // back of the arrowhead so the head points straight at the line.
+  const startX = labelX + side * 4;
+  const startY = labelY + (above ? 1 : -1) * (fontSize / 2 + 6);
+  const tipX = geometry.x + side * ARROW_TIP_GAP;
+  const backX = tipX + side * ARROW_HEAD_LENGTH;
+  const arrowPath = `M ${startX} ${startY} Q ${startX} ${midY} ${backX} ${midY}`;
+  const arrowHeadPath =
+    `M ${tipX} ${midY} ` +
+    `L ${backX} ${midY - ARROW_HEAD_HALF_WIDTH} ` +
+    `L ${backX} ${midY + ARROW_HEAD_HALF_WIDTH} Z`;
+  const estimatedWidth = estimateLabelWidth(geometry.ratioLabel, fontSize);
+  return {
+    labelX,
+    labelY,
+    textAnchor: side === 1 ? 'start' : 'end',
+    side,
+    arrowPath,
+    arrowHeadPath,
+    deleteX: labelX + side * (estimatedWidth + DELETE_GAP),
+    deleteY: labelY,
+  };
 }
 
 /**
@@ -303,7 +425,7 @@ export function computePerfRulerLabelLayout(
 ): PerfRulerLabelLayout {
   const fontSize = opts?.fontSize ?? DEFAULT_LABEL_FONT_SIZE;
   const midY = (geometry.y1 + geometry.y2) / 2;
-  const estimatedWidth = geometry.ratioLabel.length * fontSize * 0.6;
+  const estimatedWidth = estimateLabelWidth(geometry.ratioLabel, fontSize);
   const requiredRoom = LABEL_OFFSET_X + estimatedWidth + 8;
 
   let side: 1 | -1 = 1;
@@ -312,57 +434,113 @@ export function computePerfRulerLabelLayout(
     if (roomRight < requiredRoom && geometry.x > roomRight) side = -1;
   }
 
-  let above = true;
   let labelY = midY - LABEL_OFFSET_Y;
   if (labelY - fontSize / 2 < 4) {
-    above = false;
     labelY = midY + LABEL_OFFSET_Y;
     if (opts?.chartHeight !== undefined && labelY + fontSize / 2 > opts.chartHeight - 4) {
       // No room below either — clamp the above-placement inside the chart.
-      above = true;
       labelY = Math.max(fontSize / 2 + 4, midY - LABEL_OFFSET_Y);
     }
   }
 
-  const labelX = geometry.x + side * LABEL_OFFSET_X;
-  // Quarter-curve: leaves the label vertically, ends horizontally at the
-  // back of the arrowhead so the head points straight at the line.
-  const startX = labelX + side * 4;
-  const startY = labelY + (above ? 1 : -1) * (fontSize / 2 + 6);
-  const tipX = geometry.x + side * ARROW_TIP_GAP;
-  const backX = tipX + side * ARROW_HEAD_LENGTH;
-  const arrowPath = `M ${startX} ${startY} Q ${startX} ${midY} ${backX} ${midY}`;
-  const arrowHeadPath =
-    `M ${tipX} ${midY} ` +
-    `L ${backX} ${midY - ARROW_HEAD_HALF_WIDTH} ` +
-    `L ${backX} ${midY + ARROW_HEAD_HALF_WIDTH} Z`;
+  return buildLabelLayout(geometry, side, labelY, fontSize);
+}
 
-  return {
-    labelX,
-    labelY,
-    textAnchor: side === 1 ? 'start' : 'end',
-    side,
-    arrowPath,
-    arrowHeadPath,
-  };
+/** Horizontal pixel span of a laid-out label (estimated, no DOM). */
+function labelSpan(
+  layout: PerfRulerLabelLayout,
+  label: string,
+  fontSize: number,
+): { x0: number; x1: number } {
+  const width = estimateLabelWidth(label, fontSize);
+  return layout.textAnchor === 'start'
+    ? { x0: layout.labelX, x1: layout.labelX + width }
+    : { x0: layout.labelX - width, x1: layout.labelX };
 }
 
 /**
- * Render (or clear, when `geometry` is null) the perf ruler inside `group`.
- * Idempotent keyed join — safe to call from render, zoom, and display passes.
- * The whole layer is pointer-events: none so it never intercepts point clicks.
+ * Lay out labels for MULTIPLE rulers at once with cheap collision handling:
+ * each label after the first is nudged vertically (away from its ruler's
+ * midpoint, up to a few steps) while its estimated box overlaps an already
+ * placed label. Best-effort — after the nudge budget, residual overlap is
+ * accepted. Null geometries pass through as null (hidden rulers keep their
+ * slot so results align with the input array).
  */
-export function renderPerfRuler(
+export function computePerfRulerLabelLayouts(
+  geometries: (Pick<PerfRulerGeometry, 'x' | 'y1' | 'y2' | 'ratioLabel'> | null)[],
+  opts?: PerfRulerLabelLayoutOptions,
+): (PerfRulerLabelLayout | null)[] {
+  const fontSize = opts?.fontSize ?? DEFAULT_LABEL_FONT_SIZE;
+  const placed: { x0: number; x1: number; y: number }[] = [];
+  return geometries.map((geometry) => {
+    if (!geometry) return null;
+    let layout = computePerfRulerLabelLayout(geometry, opts);
+    const midY = (geometry.y1 + geometry.y2) / 2;
+    const overlapsPlaced = (candidate: PerfRulerLabelLayout): boolean => {
+      const span = labelSpan(candidate, geometry.ratioLabel, fontSize);
+      return placed.some(
+        (box) =>
+          span.x0 < box.x1 && box.x0 < span.x1 && Math.abs(candidate.labelY - box.y) < fontSize + 8,
+      );
+    };
+    for (
+      let attempt = 0;
+      attempt < LABEL_COLLISION_NUDGE_TRIES && overlapsPlaced(layout);
+      attempt++
+    ) {
+      // Nudge away from the midpoint in the label's current direction; when
+      // that would clip the top, restart below the midpoint instead.
+      const direction = layout.labelY < midY ? -1 : 1;
+      let nudgedY = layout.labelY + direction * (fontSize + 10);
+      if (direction === -1 && nudgedY - fontSize / 2 < 4) nudgedY = midY + LABEL_OFFSET_Y;
+      layout = buildLabelLayout(geometry, layout.side, nudgedY, fontSize);
+    }
+    const span = labelSpan(layout, geometry.ratioLabel, fontSize);
+    placed.push({ x0: span.x0, x1: span.x1, y: layout.labelY });
+    return layout;
+  });
+}
+
+/** One ruler ready to render: id (join key) + geometry + label layout. */
+export interface PerfRulerRenderEntry {
+  id: number;
+  geometry: PerfRulerGeometry;
+  layout: PerfRulerLabelLayout;
+}
+
+/** Delay before the hover × hides — bridges the label → × pointer gap. */
+const DELETE_HIDE_DELAY_MS = 250;
+const hideTimers = new WeakMap<Element, ReturnType<typeof setTimeout>>();
+
+/** Toggle one ruler group's hover affordances (× button + line emphasis). */
+function setPerfRulerHover(node: Element, hovered: boolean): void {
+  const deleteButton = node.querySelector<SVGGElement>('.pr-delete');
+  if (deleteButton) deleteButton.style.display = hovered ? '' : 'none';
+  const line = node.querySelector<SVGLineElement>('.pr-line');
+  line?.setAttribute('stroke-width', hovered ? '3' : '2');
+}
+
+/**
+ * Render ALL perf rulers inside `group` as one keyed join (join key: ruler
+ * id), so rulers enter/exit independently and drags stay bound to the right
+ * ruler. Idempotent — safe to call from render, zoom, and display passes.
+ *
+ * Each ruler group is pointer-events: none so it never intercepts point
+ * clicks; only its drag handle, its big label, and its × button opt back in.
+ * Hovering the label (or drag handle) reveals a circular × delete button
+ * next to the label — the × carries the `no-export` class, which
+ * useChartExport strips from PNG exports.
+ */
+export function renderPerfRulers(
   group: GroupSelection,
-  geometry: PerfRulerGeometry | null,
+  entries: PerfRulerRenderEntry[],
   opts: PerfRulerRenderOptions,
 ): void {
   const selection = group
-    .selectAll<SVGGElement, PerfRulerGeometry>('.perf-ruler')
-    .data(geometry ? [geometry] : []);
+    .selectAll<SVGGElement, PerfRulerRenderEntry>('.perf-ruler')
+    .data(entries, (entry) => String(entry.id));
 
   selection.exit().remove();
-  if (!geometry) return;
 
   const entered = selection.enter().append('g').attr('class', 'perf-ruler');
   entered
@@ -384,17 +562,20 @@ export function renderPerfRuler(
   entered.append('path').attr('class', 'pr-arrow-head').attr('stroke', 'none');
   // Big annotation-style ratio label with a halo stroke painted UNDER the
   // glyph fill (paint-order) so it reads over dense chart content without a
-  // chip rect.
+  // chip rect. It is hoverable (pointer-events overrides the group's none)
+  // so it can reveal this ruler's × delete button.
   entered
     .append('text')
     .attr('class', 'pr-text pr-text-ratio')
     .attr('dominant-baseline', 'central')
     .attr('font-weight', '800')
     .attr('paint-order', 'stroke')
-    .attr('stroke-linejoin', 'round');
+    .attr('stroke-linejoin', 'round')
+    .style('pointer-events', 'auto')
+    .style('cursor', 'default');
   // Wide invisible drag handle over the line — the caller attaches d3.drag
-  // to it to move the iso-x. Its own pointer-events overrides the group's
-  // `none` (pointer-events inherits), so only this element is interactive.
+  // to it to move this ruler's iso-x. Its own pointer-events overrides the
+  // group's `none` (pointer-events inherits).
   entered
     .append('line')
     .attr('class', 'pr-drag')
@@ -402,52 +583,107 @@ export function renderPerfRuler(
     .attr('stroke-width', 16)
     .style('pointer-events', 'stroke')
     .style('cursor', 'ew-resize');
+  // Circular × delete button, revealed on hover. `no-export` keeps it out
+  // of PNG exports (useChartExport hides/filters that class).
+  const enteredDelete = entered
+    .append('g')
+    .attr('class', 'pr-delete no-export')
+    .style('display', 'none')
+    .style('pointer-events', 'all')
+    .style('cursor', 'pointer');
+  enteredDelete.append('circle').attr('class', 'pr-delete-bg').attr('r', 10);
+  enteredDelete
+    .append('text')
+    .attr('class', 'pr-delete-x')
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'central')
+    .attr('font-size', '12px')
+    .attr('font-weight', '700')
+    .text('×');
 
   const merged = entered.merge(selection).style('pointer-events', 'none');
 
-  const { x, y1, y2 } = geometry;
   const capHalfWidth = opts.capHalfWidth ?? 6;
-
-  merged
-    .select('.pr-line')
-    .attr('x1', x)
-    .attr('x2', x)
-    .attr('y1', y1)
-    .attr('y2', y2)
-    .attr('stroke', opts.color);
-  merged
-    .select('.pr-cap-top')
-    .attr('x1', x - capHalfWidth)
-    .attr('x2', x + capHalfWidth)
-    .attr('y1', y1)
-    .attr('y2', y1)
-    .attr('stroke', opts.color);
-  merged
-    .select('.pr-cap-bottom')
-    .attr('x1', x - capHalfWidth)
-    .attr('x2', x + capHalfWidth)
-    .attr('y1', y2)
-    .attr('y2', y2)
-    .attr('stroke', opts.color);
-  merged.select('.pr-drag').attr('x1', x).attr('x2', x).attr('y1', y1).attr('y2', y2);
-
   const fontSize = opts.labelFontSize ?? DEFAULT_LABEL_FONT_SIZE;
-  const layout = computePerfRulerLabelLayout(geometry, {
-    chartWidth: opts.chartWidth,
-    chartHeight: opts.chartHeight,
-    fontSize,
-  });
 
-  merged.select('.pr-arrow').attr('d', layout.arrowPath).attr('stroke', opts.color);
-  merged.select('.pr-arrow-head').attr('d', layout.arrowHeadPath).attr('fill', opts.color);
   merged
-    .select('.pr-text-ratio')
-    .attr('x', layout.labelX)
-    .attr('y', layout.labelY)
-    .attr('text-anchor', layout.textAnchor)
+    .select<SVGLineElement>('.pr-line')
+    .attr('x1', (entry) => entry.geometry.x)
+    .attr('x2', (entry) => entry.geometry.x)
+    .attr('y1', (entry) => entry.geometry.y1)
+    .attr('y2', (entry) => entry.geometry.y2)
+    .attr('stroke', opts.color);
+  merged
+    .select<SVGLineElement>('.pr-cap-top')
+    .attr('x1', (entry) => entry.geometry.x - capHalfWidth)
+    .attr('x2', (entry) => entry.geometry.x + capHalfWidth)
+    .attr('y1', (entry) => entry.geometry.y1)
+    .attr('y2', (entry) => entry.geometry.y1)
+    .attr('stroke', opts.color);
+  merged
+    .select<SVGLineElement>('.pr-cap-bottom')
+    .attr('x1', (entry) => entry.geometry.x - capHalfWidth)
+    .attr('x2', (entry) => entry.geometry.x + capHalfWidth)
+    .attr('y1', (entry) => entry.geometry.y2)
+    .attr('y2', (entry) => entry.geometry.y2)
+    .attr('stroke', opts.color);
+  merged
+    .select<SVGLineElement>('.pr-drag')
+    .attr('x1', (entry) => entry.geometry.x)
+    .attr('x2', (entry) => entry.geometry.x)
+    .attr('y1', (entry) => entry.geometry.y1)
+    .attr('y2', (entry) => entry.geometry.y2);
+
+  merged
+    .select<SVGPathElement>('.pr-arrow')
+    .attr('d', (entry) => entry.layout.arrowPath)
+    .attr('stroke', opts.color);
+  merged
+    .select<SVGPathElement>('.pr-arrow-head')
+    .attr('d', (entry) => entry.layout.arrowHeadPath)
+    .attr('fill', opts.color);
+  merged
+    .select<SVGTextElement>('.pr-text-ratio')
+    .attr('x', (entry) => entry.layout.labelX)
+    .attr('y', (entry) => entry.layout.labelY)
+    .attr('text-anchor', (entry) => entry.layout.textAnchor)
     .attr('font-size', `${fontSize}px`)
     .attr('fill', opts.color)
     .attr('stroke', opts.halo ?? 'var(--background)')
     .attr('stroke-width', 5)
-    .text(geometry.ratioLabel);
+    .text((entry) => entry.geometry.ratioLabel);
+
+  merged
+    .select<SVGGElement>('.pr-delete')
+    .attr('transform', (entry) => `translate(${entry.layout.deleteX}, ${entry.layout.deleteY})`)
+    .on('click', (event: MouseEvent, entry: PerfRulerRenderEntry) => {
+      event.stopPropagation();
+      opts.onDelete?.(entry.id);
+    });
+  merged.select<SVGCircleElement>('.pr-delete-bg').attr('fill', opts.color);
+  merged.select<SVGTextElement>('.pr-delete-x').attr('fill', opts.halo ?? 'var(--background)');
+
+  // Hover reveal: the group itself is not hit-testable, but mouseenter /
+  // mouseleave fire on it when the pointer enters/leaves its interactive
+  // children (label, drag handle, ×). The pointer crosses dead space
+  // between the label and the ×, so hide on a short delay and cancel the
+  // timer when hover resumes.
+  merged
+    .on('mouseenter', (event: MouseEvent) => {
+      const node = event.currentTarget as Element;
+      const timer = hideTimers.get(node);
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        hideTimers.delete(node);
+      }
+      setPerfRulerHover(node, true);
+    })
+    .on('mouseleave', (event: MouseEvent) => {
+      const node = event.currentTarget as Element;
+      const timer = setTimeout(() => {
+        hideTimers.delete(node);
+        setPerfRulerHover(node, false);
+      }, DELETE_HIDE_DELAY_MS);
+      hideTimers.set(node, timer);
+    });
 }

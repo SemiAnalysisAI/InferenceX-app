@@ -5,7 +5,8 @@
  * selection that tracks attribute, style, and text calls. The mock supports
  * the full chaining API used by the layer modules: selectAll, data, join,
  * enter, append, exit, remove, merge, select, attr, style, text, each, datum,
- * empty, nodes, transition, duration.
+ * empty, nodes, transition, duration, on (handlers are recorded on the
+ * element, not dispatched — tests can invoke them directly).
  */
 
 // ─── Mock Element ────────────────────────────────────────────────────
@@ -19,6 +20,8 @@ export interface MockElement {
   children: MockElement[];
   datum: unknown;
   removed: boolean;
+  /** Event handlers recorded by `.on()`, keyed by event type. */
+  handlers?: Record<string, (...args: unknown[]) => void>;
 }
 
 function createMockElement(tag: string, datum?: unknown): MockElement {
@@ -72,6 +75,7 @@ export interface MockSelection<Datum = unknown> {
   size: () => number;
   transition: () => MockSelection<Datum>;
   duration: (ms: number) => MockSelection<Datum>;
+  on: (type: string, listener: (...args: unknown[]) => void) => MockSelection<Datum>;
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────
@@ -183,7 +187,9 @@ function makeSel<D>(
       const store = getChildStore(parentEl);
       const existing = store.get(selectorStr)?.elements.filter((e) => !e.removed) ?? [];
 
-      const bound = makeSel(existing, newData, parentEl, selectorStr);
+      // The UPDATE selection holds only elements with a datum (by index,
+      // like d3) — surplus elements belong to exit(), not update/merge.
+      const bound = makeSel(existing.slice(0, newData.length), newData, parentEl, selectorStr);
 
       // Override enter/exit/join on the data-bound selection.
       bound.enter = () => {
@@ -302,6 +308,17 @@ function makeSel<D>(
       );
     },
 
+    // ── on ──
+    // Records the handler on each element (keyed by event type) without
+    // dispatching — tests can look it up and invoke it directly.
+    on(type: string, listener: (...args: unknown[]) => void): MockSelection<D> {
+      for (const el of elements) {
+        el.handlers ??= {};
+        el.handlers[type] = listener;
+      }
+      return sel;
+    },
+
     // ── Utility ──
     empty: () => elements.length === 0,
     nodes: () => elements,
@@ -364,13 +381,19 @@ function findChildBySelector(el: MockElement, selector: string): MockElement | u
     }
   }
 
-  // Fall back to scanning children by class attribute
+  // Fall back to scanning children by class attribute (breadth-first:
+  // direct children win over nested descendants, like d3's `select`).
   for (const child of el.children) {
     if (child.removed) continue;
     const classes = String(child.attrs['class'] || '').split(/\s+/u);
     if (classes.includes(selectorClass)) {
       return child;
     }
+  }
+  for (const child of el.children) {
+    if (child.removed) continue;
+    const nested = findChildBySelector(child, selector);
+    if (nested) return nested;
   }
   return undefined;
 }

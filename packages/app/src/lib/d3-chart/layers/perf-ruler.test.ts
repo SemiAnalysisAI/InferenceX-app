@@ -1,22 +1,31 @@
 import { describe, expect, it } from 'vitest';
 
-import { createMockGroup } from './test-helpers';
+import { createMockGroup, type MockSelection } from './test-helpers';
 import {
   DEFAULT_LABEL_FONT_SIZE,
-  EMPTY_PERF_RULER_SELECTION,
+  EMPTY_PERF_RULER_STATE,
+  MAX_PERF_RULERS,
   clampIsoX,
+  clearPerfRulers,
   computeIsoXRulerGeometry,
   computePerfRulerLabelLayout,
+  computePerfRulerLabelLayouts,
+  deletePerfRuler,
   formatPerfRatio,
   intersectPathAtX,
   isPerfRulerCurveVisible,
-  nextPerfRulerSelection,
+  movePerfRulerIsoX,
+  nextPerfRulerState,
   pathXExtent,
-  renderPerfRuler,
-  type PerfRulerCurveSelection,
+  perfRulerCurveSet,
+  prunePerfRulers,
+  renderPerfRulers,
   type PerfRulerEndInput,
+  type PerfRulerGeometry,
+  type PerfRulerLabelLayoutOptions,
   type PerfRulerPathLike,
   type PerfRulerRenderOptions,
+  type PerfRulerState,
 } from './perf-ruler';
 
 // ── Fixtures ─────────────────────────────────────────
@@ -329,15 +338,81 @@ describe('computePerfRulerLabelLayout', () => {
     expect(computePerfRulerLabelLayout(tall, { fontSize: 12 }).labelY).toBeLessThan(150);
     expect(small.labelY).toBeGreaterThan(50);
   });
+
+  it('anchors the × delete button just past the label, at the label height', () => {
+    const right = computePerfRulerLabelLayout(GEOMETRY, { chartWidth: 800, chartHeight: 400 });
+    expect(right.side).toBe(1);
+    expect(right.deleteX).toBeGreaterThan(right.labelX);
+    expect(right.deleteY).toBe(right.labelY);
+    const left = computePerfRulerLabelLayout(GEOMETRY, { chartWidth: 125, chartHeight: 400 });
+    expect(left.side).toBe(-1);
+    expect(left.deleteX).toBeLessThan(left.labelX);
+    expect(left.deleteY).toBe(left.labelY);
+  });
 });
 
-// ── renderPerfRuler ────────────────────────────────────────────────────
+// ── computePerfRulerLabelLayouts ──────────────────────────────────
 
-describe('renderPerfRuler', () => {
-  it('draws the ruler line, end caps, arrow, big ratio label, and drag handle', () => {
+describe('computePerfRulerLabelLayouts', () => {
+  const GEOMETRY = { x: 100, y1: 50, y2: 150, ratioLabel: '2.03x' };
+  const OPTS = { chartWidth: 800, chartHeight: 400 };
+
+  it('matches the single-label layout when there is no collision', () => {
+    const [only] = computePerfRulerLabelLayouts([GEOMETRY], OPTS);
+    expect(only).toEqual(computePerfRulerLabelLayout(GEOMETRY, OPTS));
+  });
+
+  it('passes null geometries through, keeping array positions aligned', () => {
+    const layouts = computePerfRulerLabelLayouts([null, GEOMETRY, null], OPTS);
+    expect(layouts).toHaveLength(3);
+    expect(layouts[0]).toBeNull();
+    expect(layouts[1]).not.toBeNull();
+    expect(layouts[2]).toBeNull();
+  });
+
+  it('nudges the second of two colliding labels vertically apart', () => {
+    const [first, second] = computePerfRulerLabelLayouts([GEOMETRY, { ...GEOMETRY }], OPTS);
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(second!.labelY).not.toBe(first!.labelY);
+    expect(Math.abs(second!.labelY - first!.labelY)).toBeGreaterThanOrEqual(
+      DEFAULT_LABEL_FONT_SIZE + 8,
+    );
+    // The nudged label's arrow and × follow it.
+    expect(second!.deleteY).toBe(second!.labelY);
+    expect(second!.arrowPath).not.toBe(first!.arrowPath);
+  });
+
+  it('leaves far-apart labels untouched', () => {
+    const other = { x: 500, y1: 250, y2: 350, ratioLabel: '1.50x' };
+    const [first, second] = computePerfRulerLabelLayouts([GEOMETRY, other], OPTS);
+    expect(first).toEqual(computePerfRulerLabelLayout(GEOMETRY, OPTS));
+    expect(second).toEqual(computePerfRulerLabelLayout(other, OPTS));
+  });
+});
+
+// ── renderPerfRulers ───────────────────────────────────────────────────
+
+/** Render one ruler (id 1) with its layout computed like the caller does. */
+function renderSingle(
+  group: MockSelection,
+  geometry: PerfRulerGeometry | null,
+  opts?: Partial<PerfRulerRenderOptions>,
+  layoutOpts?: PerfRulerLabelLayoutOptions,
+): void {
+  const entries = [];
+  if (geometry) {
+    const [layout] = computePerfRulerLabelLayouts([geometry], layoutOpts);
+    entries.push({ id: 1, geometry, layout: layout! });
+  }
+  renderPerfRulers(group as any, entries, makeOpts(opts));
+}
+
+describe('renderPerfRulers', () => {
+  it('draws the ruler line, end caps, arrow, big ratio label, drag handle, and ×', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderPerfRuler(group as any, geometry, makeOpts());
+    renderSingle(group, geometry);
 
     const ruler = group.selectAll('.perf-ruler');
     expect(ruler.elements).toHaveLength(1);
@@ -349,6 +424,7 @@ describe('renderPerfRuler', () => {
     expect(children).toContain('pr-arrow-head');
     expect(children).toContain('pr-text pr-text-ratio');
     expect(children).toContain('pr-drag');
+    expect(children).toContain('pr-delete no-export');
     // The chip rect and secondary percent line are gone in the big-label
     // design.
     expect(children).not.toContain('pr-bg');
@@ -358,7 +434,7 @@ describe('renderPerfRuler', () => {
   it('positions the vertical line and caps at the iso-x', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderPerfRuler(group as any, geometry, makeOpts({ capHalfWidth: 6 }));
+    renderSingle(group, geometry, { capHalfWidth: 6 });
 
     const ruler = group.selectAll('.perf-ruler');
     const byClass = (cls: string) =>
@@ -384,7 +460,7 @@ describe('renderPerfRuler', () => {
   it('overlays an invisible wide drag handle spanning the ruler line', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderPerfRuler(group as any, geometry, makeOpts());
+    renderSingle(group, geometry);
 
     const ruler = group.selectAll('.perf-ruler');
     const drag = ruler.elements[0].children.find((c) => String(c.attrs['class']) === 'pr-drag')!;
@@ -403,7 +479,7 @@ describe('renderPerfRuler', () => {
   it('writes the big ratio label in the accent color with a readability halo', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderPerfRuler(group as any, geometry, makeOpts({ chartWidth: 800, chartHeight: 400 }));
+    renderSingle(group, geometry, undefined, { chartWidth: 800, chartHeight: 400 });
 
     const ruler = group.selectAll('.perf-ruler');
     const byClass = (cls: string) =>
@@ -422,7 +498,7 @@ describe('renderPerfRuler', () => {
   it('honors a custom halo color and font size', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderPerfRuler(group as any, geometry, makeOpts({ halo: 'white', labelFontSize: 40 }));
+    renderSingle(group, geometry, { halo: 'white', labelFontSize: 40 });
 
     const ruler = group.selectAll('.perf-ruler');
     const label = ruler.elements[0].children.find(
@@ -435,7 +511,7 @@ describe('renderPerfRuler', () => {
   it('draws the arrow curve and filled head in the accent color', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderPerfRuler(group as any, geometry, makeOpts({ chartWidth: 800, chartHeight: 400 }));
+    renderSingle(group, geometry, undefined, { chartWidth: 800, chartHeight: 400 });
 
     const ruler = group.selectAll('.perf-ruler');
     const byClass = (cls: string) =>
@@ -453,7 +529,7 @@ describe('renderPerfRuler', () => {
   it('places the label right of the line by default', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderPerfRuler(group as any, geometry, makeOpts({ chartWidth: 800 }));
+    renderSingle(group, geometry, undefined, { chartWidth: 800 });
 
     const ruler = group.selectAll('.perf-ruler');
     const label = ruler.elements[0].children.find(
@@ -466,7 +542,7 @@ describe('renderPerfRuler', () => {
   it('flips the label to the left near the right chart edge', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderPerfRuler(group as any, geometry, makeOpts({ chartWidth: 125 }));
+    renderSingle(group, geometry, undefined, { chartWidth: 125 });
 
     const ruler = group.selectAll('.perf-ruler');
     const label = ruler.elements[0].children.find(
@@ -479,8 +555,8 @@ describe('renderPerfRuler', () => {
   it('is idempotent: re-rendering keeps a single ruler group', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderPerfRuler(group as any, geometry, makeOpts());
-    renderPerfRuler(group as any, { ...geometry, x: 200 }, makeOpts());
+    renderSingle(group, geometry);
+    renderSingle(group, { ...geometry, x: 200 });
 
     const ruler = group.selectAll('.perf-ruler');
     expect(ruler.elements).toHaveLength(1);
@@ -488,97 +564,254 @@ describe('renderPerfRuler', () => {
     expect(line.attrs['x1']).toBe(200);
   });
 
-  it('clears the ruler when geometry is null', () => {
+  it('renders one group per ruler and removes exited rulers', () => {
+    const group = createMockGroup();
+    const geometryA = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
+    const geometryB = computeIsoXRulerGeometry(300, { py: 40, rawY: 900 }, { py: 90, rawY: 300 })!;
+    const layouts = computePerfRulerLabelLayouts([geometryA, geometryB], { chartWidth: 800 });
+    const entries = [
+      { id: 1, geometry: geometryA, layout: layouts[0]! },
+      { id: 2, geometry: geometryB, layout: layouts[1]! },
+    ];
+    renderPerfRulers(group as any, entries, makeOpts());
+    expect(group.selectAll('.perf-ruler').elements).toHaveLength(2);
+
+    renderPerfRulers(group as any, entries.slice(0, 1), makeOpts());
+    expect(group.selectAll('.perf-ruler').elements).toHaveLength(1);
+  });
+
+  it('clears all rulers when the entry list is empty', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderPerfRuler(group as any, geometry, makeOpts());
-    renderPerfRuler(group as any, null, makeOpts());
+    renderSingle(group, geometry);
+    renderSingle(group, null);
 
     const ruler = group.selectAll('.perf-ruler');
     expect(ruler.elements).toHaveLength(0);
   });
 
-  it('renders nothing when called with null on an empty group', () => {
+  it('renders nothing when called with no entries on an empty group', () => {
     const group = createMockGroup();
-    renderPerfRuler(group as any, null, makeOpts());
+    renderSingle(group, null);
     expect(group.selectAll('.perf-ruler').elements).toHaveLength(0);
   });
 
   it('disables pointer events so the ruler never blocks point clicks', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderPerfRuler(group as any, geometry, makeOpts());
+    renderSingle(group, geometry);
 
     const ruler = group.selectAll('.perf-ruler');
     expect(ruler.elements[0].styles['pointer-events']).toBe('none');
+    // …while the big label opts back in so it can reveal the × on hover.
+    const label = ruler.elements[0].children.find(
+      (c) => String(c.attrs['class']) === 'pr-text pr-text-ratio',
+    )!;
+    expect(label.styles['pointer-events']).toBe('auto');
+  });
+
+  it('hides the × delete button by default and marks it no-export', () => {
+    const group = createMockGroup();
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
+    renderSingle(group, geometry);
+
+    const ruler = group.selectAll('.perf-ruler');
+    const del = ruler.elements[0].children.find(
+      (c) => String(c.attrs['class']) === 'pr-delete no-export',
+    )!;
+    // Hidden until hover; excluded from PNG exports via `no-export`.
+    expect(del.styles['display']).toBe('none');
+    expect(del.styles['pointer-events']).toBe('all');
+    expect(del.styles['cursor']).toBe('pointer');
+    const classes = String(del.attrs['class']).split(/\s+/u);
+    expect(classes).toContain('pr-delete');
+    expect(classes).toContain('no-export');
+    // Circular chip + × glyph in contrast colors.
+    const bg = del.children.find((c) => String(c.attrs['class']) === 'pr-delete-bg')!;
+    expect(bg.tag).toBe('circle');
+    expect(Number(bg.attrs['r'])).toBeGreaterThanOrEqual(9);
+    expect(bg.attrs['fill']).toBe('var(--primary)');
+    const x = del.children.find((c) => String(c.attrs['class']) === 'pr-delete-x')!;
+    expect(x.textContent).toBe('×');
+    expect(x.attrs['fill']).toBe('var(--background)');
+  });
+
+  it('invokes onDelete with the ruler id when the × is clicked', () => {
+    const group = createMockGroup();
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
+    const deleted: number[] = [];
+    let stopped = 0;
+    renderSingle(group, geometry, { onDelete: (id) => deleted.push(id) });
+
+    const ruler = group.selectAll('.perf-ruler');
+    const del = ruler.elements[0].children.find(
+      (c) => String(c.attrs['class']) === 'pr-delete no-export',
+    )!;
+    const click = del.handlers?.['click'];
+    expect(click).toBeTypeOf('function');
+    click!({ stopPropagation: () => stopped++ }, del.datum);
+    expect(deleted).toEqual([1]);
+    // The click must not fall through to the chart underneath.
+    expect(stopped).toBe(1);
+  });
+
+  it('registers hover handlers that reveal the × per ruler group', () => {
+    const group = createMockGroup();
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
+    renderSingle(group, geometry);
+
+    const ruler = group.selectAll('.perf-ruler');
+    expect(ruler.elements[0].handlers?.['mouseenter']).toBeTypeOf('function');
+    expect(ruler.elements[0].handlers?.['mouseleave']).toBeTypeOf('function');
   });
 });
 
-// ── nextPerfRulerSelection ───────────────────────────────────
+// ── nextPerfRulerState ───────────────────────────────────────
 
-describe('nextPerfRulerSelection', () => {
-  const EMPTY = EMPTY_PERF_RULER_SELECTION;
+/** Complete one measurement (two clicks) on a state, for test setup. */
+function complete(state: PerfRulerState, a: string, b: string, isoX: number): PerfRulerState {
+  return nextPerfRulerState(nextPerfRulerState(state, { curve: a, isoX }), {
+    curve: b,
+    isoX: isoX + 1,
+  });
+}
 
-  it('selects curve A and sets the iso-x on the first click', () => {
-    expect(nextPerfRulerSelection(EMPTY, { curve: 'curve-a', isoX: 40 })).toEqual({
-      curves: ['curve-a'],
-      isoX: 40,
-    });
+describe('nextPerfRulerState', () => {
+  const EMPTY = EMPTY_PERF_RULER_STATE;
+
+  it('starts an in-progress draft on the first click', () => {
+    const state = nextPerfRulerState(EMPTY, { curve: 'curve-a', isoX: 40 });
+    expect(state.rulers).toEqual([]);
+    expect(state.draft).toEqual({ curve: 'curve-a', isoX: 40 });
   });
 
-  it('selects curve B on a different curve, keeping the existing iso-x', () => {
-    const prev: PerfRulerCurveSelection = { curves: ['curve-a'], isoX: 40 };
-    expect(nextPerfRulerSelection(prev, { curve: 'curve-b', isoX: 55 })).toEqual({
-      curves: ['curve-a', 'curve-b'],
-      isoX: 40,
-    });
+  it('moves the draft iso-x when the draft curve is clicked again', () => {
+    let state = nextPerfRulerState(EMPTY, { curve: 'curve-a', isoX: 40 });
+    state = nextPerfRulerState(state, { curve: 'curve-a', isoX: 72 });
+    expect(state.draft).toEqual({ curve: 'curve-a', isoX: 72 });
+    expect(state.rulers).toEqual([]);
   });
 
-  it('moves the iso-x when the only selected curve is clicked again', () => {
-    const prev: PerfRulerCurveSelection = { curves: ['curve-a'], isoX: 40 };
-    expect(nextPerfRulerSelection(prev, { curve: 'curve-a', isoX: 72 })).toEqual({
-      curves: ['curve-a'],
-      isoX: 72,
-    });
+  it('completes a measurement at the DRAFT iso-x when a second curve is clicked', () => {
+    let state = nextPerfRulerState(EMPTY, { curve: 'curve-a', isoX: 40 });
+    state = nextPerfRulerState(state, { curve: 'curve-b', isoX: 55 });
+    expect(state.rulers).toEqual([{ id: 1, curveA: 'curve-a', curveB: 'curve-b', isoX: 40 }]);
+    expect(state.draft).toBeNull();
+    expect(state.nextId).toBe(2);
   });
 
-  it('moves the iso-x when either curve of a complete measurement is clicked', () => {
-    const prev: PerfRulerCurveSelection = { curves: ['curve-a', 'curve-b'], isoX: 40 };
-    expect(nextPerfRulerSelection(prev, { curve: 'curve-a', isoX: 72 })).toEqual({
-      curves: ['curve-a', 'curve-b'],
-      isoX: 72,
-    });
-    expect(nextPerfRulerSelection(prev, { curve: 'curve-b', isoX: 13 })).toEqual({
-      curves: ['curve-a', 'curve-b'],
-      isoX: 13,
-    });
+  it('starts a NEW ruler on the next click after a completed measurement', () => {
+    let state = complete(EMPTY, 'curve-a', 'curve-b', 40);
+    // Clicking curve-a again does NOT retarget ruler 1 — it drafts ruler 2.
+    state = nextPerfRulerState(state, { curve: 'curve-a', isoX: 90 });
+    expect(state.rulers).toHaveLength(1);
+    expect(state.rulers[0].isoX).toBe(40);
+    expect(state.draft).toEqual({ curve: 'curve-a', isoX: 90 });
+    // …and completing it appends a second measurement with a fresh id.
+    state = nextPerfRulerState(state, { curve: 'curve-c', isoX: 95 });
+    expect(state.rulers.map((r) => r.id)).toEqual([1, 2]);
+    expect(state.rulers[1]).toEqual({ id: 2, curveA: 'curve-a', curveB: 'curve-c', isoX: 90 });
   });
 
-  it('starts a new measurement when a third curve is clicked', () => {
-    const prev: PerfRulerCurveSelection = { curves: ['curve-a', 'curve-b'], isoX: 40 };
-    expect(nextPerfRulerSelection(prev, { curve: 'curve-c', isoX: 90 })).toEqual({
-      curves: ['curve-c'],
-      isoX: 90,
-    });
+  it('accumulates measurements up to the cap, then drops the OLDEST', () => {
+    let state = EMPTY;
+    for (let i = 0; i < MAX_PERF_RULERS + 2; i++) {
+      state = complete(state, `a${i}`, `b${i}`, i * 10);
+    }
+    expect(state.rulers).toHaveLength(MAX_PERF_RULERS);
+    // The two oldest (a0/b0, a1/b1) were dropped; ids keep counting up.
+    expect(state.rulers[0].curveA).toBe('a2');
+    expect(state.rulers.at(-1)!.curveA).toBe(`a${MAX_PERF_RULERS + 1}`);
+    expect(state.nextId).toBe(MAX_PERF_RULERS + 3);
   });
 
-  it('returns the same reference when a selected-curve click does not move the iso-x', () => {
-    const prev: PerfRulerCurveSelection = { curves: ['curve-a', 'curve-b'], isoX: 40 };
-    expect(nextPerfRulerSelection(prev, { curve: 'curve-a', isoX: 40 })).toBe(prev);
+  it('returns the same reference for no-op clicks', () => {
+    expect(nextPerfRulerState(EMPTY, { curve: 'curve-a', isoX: Number.NaN })).toBe(EMPTY);
+    const drafted = nextPerfRulerState(EMPTY, { curve: 'curve-a', isoX: 40 });
+    expect(nextPerfRulerState(drafted, { curve: 'curve-a', isoX: 40 })).toBe(drafted);
+    expect(nextPerfRulerState(drafted, { curve: 'curve-b', isoX: Number.NaN })).toBe(drafted);
+  });
+});
+
+// ── movePerfRulerIsoX / deletePerfRuler / clearPerfRulers ───────────────
+
+describe('movePerfRulerIsoX', () => {
+  const state = complete(EMPTY_PERF_RULER_STATE, 'curve-a', 'curve-b', 40);
+
+  it('moves only the targeted ruler', () => {
+    const two = complete(state, 'curve-c', 'curve-d', 80);
+    const moved = movePerfRulerIsoX(two, 1, 60);
+    expect(moved.rulers[0].isoX).toBe(60);
+    expect(moved.rulers[1].isoX).toBe(80);
   });
 
-  it('ignores clicks with a non-finite iso-x (same reference back)', () => {
-    const prev: PerfRulerCurveSelection = { curves: ['curve-a'], isoX: 40 };
-    expect(nextPerfRulerSelection(prev, { curve: 'curve-b', isoX: Number.NaN })).toBe(prev);
-    expect(nextPerfRulerSelection(EMPTY, { curve: 'curve-a', isoX: Number.NaN })).toBe(EMPTY);
+  it('returns the same reference for unknown ids, equal values, and non-finite x', () => {
+    expect(movePerfRulerIsoX(state, 99, 60)).toBe(state);
+    expect(movePerfRulerIsoX(state, 1, 40)).toBe(state);
+    expect(movePerfRulerIsoX(state, 1, Number.NaN)).toBe(state);
+  });
+});
+
+describe('deletePerfRuler', () => {
+  it('deletes just the targeted ruler by id', () => {
+    const two = complete(complete(EMPTY_PERF_RULER_STATE, 'a', 'b', 40), 'c', 'd', 80);
+    const afterDelete = deletePerfRuler(two, 1);
+    expect(afterDelete.rulers.map((r) => r.id)).toEqual([2]);
+    // Ids are never reused after a delete.
+    expect(afterDelete.nextId).toBe(3);
   });
 
-  it('falls back to the click x for curve B when the previous iso-x is missing', () => {
-    const prev: PerfRulerCurveSelection = { curves: ['curve-a'], isoX: null };
-    expect(nextPerfRulerSelection(prev, { curve: 'curve-b', isoX: 55 })).toEqual({
-      curves: ['curve-a', 'curve-b'],
-      isoX: 55,
-    });
+  it('returns the same reference when the id is not found', () => {
+    const one = complete(EMPTY_PERF_RULER_STATE, 'a', 'b', 40);
+    expect(deletePerfRuler(one, 99)).toBe(one);
+  });
+});
+
+describe('clearPerfRulers', () => {
+  it('clears all rulers and the draft, preserving the id counter', () => {
+    let state = complete(EMPTY_PERF_RULER_STATE, 'a', 'b', 40);
+    state = nextPerfRulerState(state, { curve: 'c', isoX: 90 });
+    const cleared = clearPerfRulers(state);
+    expect(cleared.rulers).toEqual([]);
+    expect(cleared.draft).toBeNull();
+    expect(cleared.nextId).toBe(state.nextId);
+  });
+
+  it('returns the same reference when already empty', () => {
+    expect(clearPerfRulers(EMPTY_PERF_RULER_STATE)).toBe(EMPTY_PERF_RULER_STATE);
+  });
+});
+
+// ── prunePerfRulers / perfRulerCurveSet ─────────────────────────────
+
+describe('prunePerfRulers', () => {
+  it('removes only rulers whose curves left the data (per ruler)', () => {
+    const two = complete(complete(EMPTY_PERF_RULER_STATE, 'a', 'gone', 40), 'c', 'd', 80);
+    const pruned = prunePerfRulers(two, (curve) => curve !== 'gone');
+    expect(pruned.rulers.map((r) => r.id)).toEqual([2]);
+  });
+
+  it('drops the draft when its curve is gone', () => {
+    const drafted = nextPerfRulerState(EMPTY_PERF_RULER_STATE, { curve: 'gone', isoX: 40 });
+    const pruned = prunePerfRulers(drafted, () => false);
+    expect(pruned.draft).toBeNull();
+  });
+
+  it('returns the same reference when every curve still exists', () => {
+    const one = complete(EMPTY_PERF_RULER_STATE, 'a', 'b', 40);
+    expect(prunePerfRulers(one, () => true)).toBe(one);
+  });
+});
+
+describe('perfRulerCurveSet', () => {
+  it('collects every curve across rulers and the draft', () => {
+    let state = complete(EMPTY_PERF_RULER_STATE, 'a', 'b', 40);
+    state = nextPerfRulerState(state, { curve: 'c', isoX: 90 });
+    expect([...perfRulerCurveSet(state)].sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('is empty for the empty state', () => {
+    expect(perfRulerCurveSet(EMPTY_PERF_RULER_STATE).size).toBe(0);
   });
 });
 
