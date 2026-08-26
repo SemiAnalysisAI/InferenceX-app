@@ -1,3 +1,5 @@
+import { expandLegendAdvanced } from '../support/legend-advanced';
+
 describe('Line Labels Toggle', () => {
   before(() => {
     cy.visit('/inference', {
@@ -8,6 +10,8 @@ describe('Line Labels Toggle', () => {
     // Wait for chart to load
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
     cy.get('.sidebar-legend').first().should('be.visible');
+    // Label switches live in the collapsed-by-default Advanced drawer.
+    expandLegendAdvanced();
   });
 
   it('Line Labels toggle exists in the legend', () => {
@@ -156,6 +160,7 @@ describe('Line Labels Toggle', () => {
       },
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
+    expandLegendAdvanced();
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
 
     // Labels should be rendered
@@ -169,6 +174,7 @@ describe('Line Labels Toggle', () => {
       },
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
+    expandLegendAdvanced();
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
 
     // Labels should not be rendered
@@ -182,6 +188,7 @@ describe('Line Labels Toggle', () => {
       },
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
+    expandLegendAdvanced();
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
   });
 
@@ -192,6 +199,7 @@ describe('Line Labels Toggle', () => {
       },
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
+    expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     // Labels toggle is auto-enabled by the URL hydration so the advanced
     // (parallelism) point labels actually render.
@@ -205,6 +213,7 @@ describe('Line Labels Toggle', () => {
       },
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
+    expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
   });

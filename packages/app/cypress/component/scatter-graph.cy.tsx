@@ -8,6 +8,7 @@ import {
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import ChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { mountWithProviders } from '../support/test-utils';
+import { expandLegendAdvanced } from '../support/legend-advanced';
 import {
   createMockInferenceData,
   createMockChartDefinition,
@@ -711,6 +712,7 @@ describe('ScatterGraph', () => {
       .should('have.text', ' (TileRT, MTP)')
       .and('have.attr', 'fill', '#d1d5db');
 
+    expandLegendAdvanced();
     cy.get('#scatter-line-labels').click();
     cy.get('#test-scatter-ingested-singleton-label svg .line-label').should('not.exist');
     cy.get('#scatter-line-labels').click();

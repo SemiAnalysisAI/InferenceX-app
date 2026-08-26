@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { fetchBenchmarks, type BenchmarkRow } from '@/lib/api';
+import { withSupplementalBenchmarks } from '@/lib/supplemental-benchmarks';
 
 /** Shared query options — reused by useQueries for comparison dates. */
 export function benchmarkQueryOptions(
@@ -30,9 +31,14 @@ export function benchmarkQueryOptions(
         : []),
       ...(scope ? (['scope', scope] as const) : []),
     ] as const,
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchBenchmarks(model, canonicalDate, exact, signal, runId, exactRun, view),
+    queryFn: async ({ signal }: { signal: AbortSignal }) =>
+      withSupplementalBenchmarks(
+        await fetchBenchmarks(model, canonicalDate, exact, signal, runId, exactRun, view),
+        { model, date: canonicalDate, exact, runId, view },
+      ),
     enabled: enabled && Boolean(model),
+    // Pair-scoped SSR payloads must preserve their exact identity and contents;
+    // supplemental rows are merged on every ordinary network read above.
     ...(initialData ? { initialData } : {}),
   };
 }

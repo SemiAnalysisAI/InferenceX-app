@@ -92,7 +92,15 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
     // Inactive row: the hover affordance flips to the "+" restore indicator
     // (explicit "clicking the name brings it back"), and the Hide X is gone.
     cy.get('[data-testid="chart-legend"] [title^="Show B300"]').should('exist');
-    cy.get('[data-testid="scatter-best-per-sku"]').should('have.attr', 'data-state', 'unchecked');
+    // Best per SKU lives in the Quick Filters dialog now.
+    cy.get('[data-testid="scatter-quick-filters"]').click();
+    cy.get('[data-testid="quick-filter-best-per-sku"]').should(
+      'have.attr',
+      'data-state',
+      'unchecked',
+    );
+    cy.contains('button', 'Done').click();
+    cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
     cy.get(
       '[data-testid="chart-legend"] [role="button"][aria-label^="Hide"][aria-label*="B300"]',
     ).should('not.exist');

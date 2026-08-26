@@ -6,6 +6,7 @@ import type { InferenceData, TrendDataPoint, YAxisMetricKey } from '@/components
 import {
   isBenchmarkMetricKey,
   resolveMetricConfigKey,
+  tokenMetricTypeForConfigKey,
 } from '@/components/inference/metric-registry';
 import {
   hermiteInterpolate,
@@ -21,6 +22,12 @@ import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
 import { benchmarkCurveDate, dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
 import { Sequence, type Model } from '@/lib/data-mappings';
+import { supportsTokenMetric } from '@/lib/supplemental-benchmarks';
+
+/** Snapshot-scoped token metric support for raw historical rows. */
+export function rowSupportsTrendMetric(row: BenchmarkRow, selectedYAxisMetric: string): boolean {
+  return supportsTokenMetric(row, tokenMetricTypeForConfigKey(selectedYAxisMetric));
+}
 
 /**
  * Build a lightweight InferenceData-compatible point from a raw BenchmarkRow.
@@ -300,6 +307,7 @@ export function useInterpolatedTrendData({
 
     for (const row of dedupeAgenticHistoryRuns(allRows)) {
       if (!selectedPrecisions.includes(row.precision)) continue;
+      if (!rowSupportsTrendMetric(row, selectedYAxisMetric)) continue;
 
       const point = rowToLightweightPoint(row, requestedMetrics);
       if (!point) continue;
@@ -323,7 +331,7 @@ export function useInterpolatedTrendData({
     }
 
     return result;
-  }, [allRows, selectedPrecisions, requestedMetrics]);
+  }, [allRows, selectedPrecisions, requestedMetrics, selectedYAxisMetric]);
 
   // Interpolation memo — instant when slider moves or metric changes
   const { trendLines, hwKeysWithData } = useMemo(() => {

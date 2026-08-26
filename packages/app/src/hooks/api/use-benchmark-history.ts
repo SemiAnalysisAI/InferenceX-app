@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { fetchBenchmarkHistory } from '@/lib/api';
+import { withSupplementalBenchmarkHistory } from '@/lib/supplemental-benchmarks';
 
 /**
  * Full benchmark history for one model + sequence — every run date, not just
@@ -25,7 +26,11 @@ export function useBenchmarkHistory(
     // Both discriminators are part of the key: these responses have different
     // shapes and must never share a cache entry.
     queryKey: ['benchmark-history', model, isl, osl, benchmarkType ?? 'fixed', view ?? 'full'],
-    queryFn: ({ signal }) => fetchBenchmarkHistory(model, isl, osl, signal, benchmarkType, view),
+    queryFn: async ({ signal }) =>
+      withSupplementalBenchmarkHistory(
+        await fetchBenchmarkHistory(model, isl, osl, signal, benchmarkType, view),
+        { model, isl, osl, benchmarkType },
+      ),
     enabled:
       Boolean(model && (benchmarkType === 'agentic_traces' || (isl && osl))) &&
       (options?.enabled ?? true),

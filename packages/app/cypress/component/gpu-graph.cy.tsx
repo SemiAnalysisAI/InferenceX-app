@@ -185,12 +185,12 @@ describe('GPUGraph', () => {
     cy.get('#test-gpu-agentic-decorations [data-testid="spec-decode-marker-key"]').should(
       'not.exist',
     );
-    cy.get('#test-gpu-agentic-decorations [data-testid="offload-halo-key"]').should('exist');
-    cy.get('#test-gpu-agentic-decorations [data-testid="agentic-optimization-note"]')
-      .should('contain.text', 'Inference optimizations enabled')
-      .find('button')
-      .focus();
-    cy.contains('Each configuration may use inference optimizations').should('be.visible');
+    // The KV-offload key and optimization note moved to the axis-metric info
+    // footer rendered by ChartDisplay, so the chart itself carries neither.
+    cy.get('#test-gpu-agentic-decorations [data-testid="offload-halo-key"]').should('not.exist');
+    cy.get('#test-gpu-agentic-decorations [data-testid="agentic-optimization-note"]').should(
+      'not.exist',
+    );
     cy.get('#test-gpu-agentic-decorations svg .dot-group').first().trigger('mouseenter');
     cy.get('[data-chart-tooltip]').should('contain.text', 'Speculative Decoding');
     cy.get('[data-chart-tooltip]').should('contain.text', 'MTP');

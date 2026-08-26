@@ -11,6 +11,12 @@ import {
 } from '@semianalysisai/inferencex-constants';
 
 import type { HardwareConfig } from '@/components/inference/types';
+import {
+  includesJalapenoResult,
+  includesVeraRubinResult,
+  JalapenoOfficialPreviewNotice,
+  VeraRubinOfficialPreviewNotice,
+} from '@/components/official-preview-notice';
 import { Card } from '@/components/ui/card';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
@@ -588,10 +594,19 @@ export default function FleetLifecycle({
    * hiding a framework removes it from candidacy for its chip's envelope — the
    * legend stays the control it always was, one level below the lines.
    */
-  const visibleProgressions = useMemo(
-    () =>
-      mergeProgressionsByChip(historical.progressions.filter((p) => visibleHwKeys.has(p.hwKey))),
+  const visibleHistoricalProgressions = useMemo(
+    () => historical.progressions.filter((progression) => visibleHwKeys.has(progression.hwKey)),
     [historical.progressions, visibleHwKeys],
+  );
+  const visibleProgressions = useMemo(
+    () => mergeProgressionsByChip(visibleHistoricalProgressions),
+    [visibleHistoricalProgressions],
+  );
+  const showsJalapenoPreview = includesJalapenoResult(
+    visibleHistoricalProgressions.map((progression) => progression.hwKey),
+  );
+  const showsVeraRubinPreview = includesVeraRubinResult(
+    visibleHistoricalProgressions.map((progression) => progression.hwKey),
   );
 
   const anchorDate = useMemo(() => {
@@ -1359,6 +1374,8 @@ export default function FleetLifecycle({
                 />
               }
             />
+            {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
+            {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
             {view === 'table' ? (
               <>
                 <figcaption>{caption}</figcaption>

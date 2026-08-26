@@ -1,0 +1,66 @@
+---
+title: 'Qwen3.5 397B on AgentX: B300 FP4 Delivers 12x the Performance per Dollar of H100'
+subtitle: 'What four years of hardware and a 4-bit format buy on a long-context agentic workload'
+seoDescription: 'On Qwen3.5 397B AgentX runs, B300 FP4 has 12x better performance per dollar than H100. The comparison spans four hardware generations and two numerical formats on a 256k truncated agentic trace replay.'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - qwen
+  - b300
+  - h100
+  - h200
+  - fp4
+  - fp8
+  - sglang
+  - nvidia
+---
+
+Compared to H100, on Qwen3.5, B300 FP4 has 12x better [performance per dollar](/glossary/performance-per-dollar).
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/cc2cf6c7-aa58-4a76-a0a2-ee0457d9243c_2048x1298.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_hc=1&i_best=0&i_prec=fp4%2Cfp8&i_active=b300_sglang%2Ch100_sglang%2Ch200_sglang)"
+/>
+
+## What the number is and is not
+
+Two things are changing at once here, and both belong in the reading. The first is four years of hardware. The second is numerical format: the comparison spans [FP4](/glossary/fp4) and [FP8](/glossary/fp8) rather than holding precision constant, which is the honest way to compare what an operator can actually deploy today on each part, but not a controlled study of the silicon alone.
+
+The workload matters as much. This is not 8k1k. Qwen3.5 has a native max context length of 262k tokens, so AgentX replays the truncated 256k agentic dataset against it, which means frequent context compaction and heavy prefix reuse. A ratio measured on a long-context multi-turn replay is a different claim from the same ratio measured on independent short prompts, and it is the one closer to production coding traffic.
+
+## Read it at your own operating point
+
+A 12x aggregate ratio is a headline, not a deployment plan. The curve is what carries the decision: pick the [interactivity](/glossary/interactivity) your product needs, read each system there, and check the first-token latency at the same point before concluding anything.
+
+That is also why the per-model AgentX charts default to showing the whole frontier rather than a single number. Older hardware can remain competitive at low concurrency on performance per dollar while falling away entirely at high throughput, and a single ratio cannot express both halves of that shape.
+
+---
+
+_These results are one slice of AgentX 1.0. The full analysis, the replay methodology, and the 70+ upstream PRs the benchmark drove are in [AgentX - InferenceXv3: Does the CUDA Moat Hold Up in Agentic Inferencing?](/blog/agentx-inferencexv3-does-cuda-moat). Every point is explorable on the [free dashboard](https://inferencex.semianalysis.com/)._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How much better is B300 than H100 on Qwen3.5 397B?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On the AgentX Qwen3.5 runs, B300 FP4 has 12x better performance per dollar than H100. The comparison spans both a hardware generation gap and a numerical format difference, since it covers FP4 and FP8 rather than holding precision constant."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is the 12x figure measured on a fixed sequence length workload?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Qwen3.5 has a native max context length of 262k tokens, so AgentX replays the truncated 256k agentic trace dataset against it. That workload involves frequent context compaction and heavy prefix reuse, which is a different measurement from independent short prompts."
+      }
+    }
+  ]
+}`}</JsonLd>

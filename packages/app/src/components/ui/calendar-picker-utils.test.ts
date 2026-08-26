@@ -52,14 +52,12 @@ describe('calendar-picker-utils', () => {
     expect(formatCalendarDate(bounds.latestMonth)).toBe('2026-04-20');
   });
 
-  it('supports inclusive and exclusive min/max boundary checks', () => {
+  it('treats min/max boundaries as inclusive', () => {
     const min = parseCalendarDate('2026-01-10');
     const max = parseCalendarDate('2026-01-20');
 
     expect(isCalendarDateOutOfRange(parseCalendarDate('2026-01-10'), min, max)).toBe(false);
     expect(isCalendarDateOutOfRange(parseCalendarDate('2026-01-20'), min, max)).toBe(false);
-    expect(isCalendarDateOutOfRange(parseCalendarDate('2026-01-10'), min, max, true)).toBe(true);
-    expect(isCalendarDateOutOfRange(parseCalendarDate('2026-01-20'), min, max, true)).toBe(true);
     expect(isCalendarDateOutOfRange(parseCalendarDate('2026-01-09'), min, max)).toBe(true);
     expect(isCalendarDateOutOfRange(parseCalendarDate('2026-01-21'), min, max)).toBe(true);
   });

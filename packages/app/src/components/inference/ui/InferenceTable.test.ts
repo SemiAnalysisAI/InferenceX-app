@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
+import { formatInferenceTableNumber } from '@/components/inference/ui/InferenceTable';
 
 // Test the pure logic used by InferenceTable — sorting and value resolution
 import { getNestedYValue } from '@/lib/chart-utils';
@@ -100,5 +101,22 @@ describe('getNestedYValue', () => {
   it('returns 0 for missing paths', () => {
     const point = makePoint({});
     expect(getNestedYValue(point, 'nonexistent.y')).toBe(0);
+  });
+});
+
+describe('formatInferenceTableNumber', () => {
+  it('groups large chart values with commas', () => {
+    expect(formatInferenceTableNumber(87_000)).toBe('87,000');
+    expect(formatInferenceTableNumber(125_500)).toBe('125,500');
+  });
+
+  it('preserves the requested fixed precision while grouping thousands', () => {
+    expect(formatInferenceTableNumber(125_500, 1)).toBe('125,500.0');
+  });
+
+  it('keeps the existing magnitude-based precision for smaller values', () => {
+    expect(formatInferenceTableNumber(12.34)).toBe('12.3');
+    expect(formatInferenceTableNumber(0.1234)).toBe('0.123');
+    expect(formatInferenceTableNumber(0.00123)).toBe('0.0012');
   });
 });

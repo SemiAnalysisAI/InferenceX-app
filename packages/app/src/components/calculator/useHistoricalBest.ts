@@ -91,8 +91,14 @@ export function useHistoricalBest(options: UseHistoricalBestOptions): UseHistori
   // interactivity slider does not rebuild every date's frontier.
   const groups = useMemo(() => {
     if (!rows) return null;
-    return groupHistoryByHwKeyAndDate({ rows, sequence, precisions, percentile });
-  }, [rows, sequence, precisions, percentile]);
+    return groupHistoryByHwKeyAndDate({
+      rows,
+      sequence,
+      precisions,
+      percentile,
+      tokenType: costType,
+    });
+  }, [rows, sequence, precisions, percentile, costType]);
 
   // Stage two — re-read the frontiers at the current operating point. Both the
   // all-time best and the progression share one selection basis, so the table's

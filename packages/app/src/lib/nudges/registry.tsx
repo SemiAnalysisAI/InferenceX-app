@@ -443,7 +443,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // Landing banner
   // -------------------------------------------------------------------------
   {
-    id: 'agentic-results-launch-banner',
+    id: 'openai-rubin-comparison-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -454,26 +454,34 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'Agentic benchmark results are live',
-      titleZh: '智能体基准测试结果已上线',
+      title: "OpenAI's Latest In House Chip verus Rubin NVL72",
+      titleZh: 'OpenAI 最新自研芯片对比 Rubin NVL72',
       description:
-        "AgentX is the World's First Fully Open Source Realistic 1Mil+ Long Context, Multi Turn Benchmark",
-      descriptionZh: 'AgentX 是全球首个完全开源、贴近真实场景的百万级 (1M+) 长上下文多轮基准测试',
+        'Compare Jalapeño (Teacup) with Vera Rubin (July) NVL72 on DeepSeek R1 at 8K / 1K.',
+      descriptionZh:
+        '对比 Jalapeño (Teacup) 与 Vera Rubin (July) NVL72 在 DeepSeek R1 8K / 1K 工作负载下的表现。',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: '/inference?i_seq=agentic-traces',
+      href: '/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerMw',
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = localizedNudgeHref('/inference?i_seq=agentic-traces');
+        window.location.href = localizedNudgeHref(
+          '/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerMw',
+        );
       },
     },
     analytics: {
-      shown: 'agentic_results_banner_shown',
-      dismissed: 'agentic_results_banner_dismissed',
-      action: 'agentic_results_banner_clicked',
-      properties: { banner_id: 'agentic-results-launch', scenario: 'agentic-traces' },
+      shown: 'inference_rubin_comparison_banner_shown',
+      dismissed: 'inference_rubin_comparison_banner_dismissed',
+      action: 'inference_rubin_comparison_banner_clicked',
+      properties: {
+        banner_id: 'openai-rubin-comparison',
+        scenario: '8k/1k',
+        model: 'DeepSeek-R1-0528',
+        metric: 'y_outputTputPerMw',
+      },
     },
   },
 

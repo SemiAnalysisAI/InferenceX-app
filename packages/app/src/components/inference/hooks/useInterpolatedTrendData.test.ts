@@ -7,8 +7,10 @@ import type { BenchmarkRow } from '@/lib/api';
 import {
   interpolateMetricAtInteractivity,
   rowToLightweightPoint,
+  rowSupportsTrendMetric,
   trendMetricDependencies,
 } from './useInterpolatedTrendData';
+import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/supplemental-benchmarks';
 
 // ─── Factory ───
 
@@ -80,6 +82,25 @@ describe('rowToLightweightPoint', () => {
     expect(point?.outputTputPerGpu?.y).toBe(400);
     expect(point?.costhOutput?.y).toBeGreaterThan(0);
     expect(point?.outputTokensPerDollarH?.y).toBeGreaterThan(0);
+  });
+});
+
+describe('rowSupportsTrendMetric', () => {
+  it('limits the July Vera Rubin snapshot to output-token trend metrics', () => {
+    const julyRubin = SUPPLEMENTAL_BENCHMARK_ROWS.find((row) => row.hardware === 'vr200')!;
+
+    expect(rowSupportsTrendMetric(julyRubin, 'y_outputTputPerGpu')).toBe(true);
+    expect(rowSupportsTrendMetric(julyRubin, 'y_tpPerGpu')).toBe(false);
+    expect(rowSupportsTrendMetric(julyRubin, 'y_inputTputPerGpu')).toBe(false);
+  });
+
+  it('leaves a future Vera Rubin snapshot unrestricted without capability metadata', () => {
+    const futureRubin = {
+      ...SUPPLEMENTAL_BENCHMARK_ROWS.find((row) => row.hardware === 'vr200')!,
+      date: '2026-09-01',
+    };
+
+    expect(rowSupportsTrendMetric(futureRubin, 'y_tpPerGpu')).toBe(true);
   });
 });
 

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { BenchmarkRow } from '@/lib/api';
 import { Percentile, Sequence } from '@/lib/data-mappings';
 import { overlayRunIndex } from '@/lib/overlay-run-style';
+import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/supplemental-benchmarks';
 
 import type { GPUDataPoint } from './types';
 import {
@@ -25,6 +26,8 @@ const PYTHON_INTERPOLATION_HELPER = resolve(
   '../../../../..',
   '.claude/skills/write-inferencex-blog/iso_interactivity.py',
 );
+
+const classifyByHardware = (hwKey: string) => ({ key: hwKey, meta: { hwKey } });
 
 function interpolateWithPython(request: Record<string, unknown>): number | null {
   const result = spawnSync('python3', [PYTHON_INTERPOLATION_HELPER], {
@@ -79,6 +82,31 @@ describe('sign', () => {
     expect(sign(0)).toBe(1);
     expect(sign(5)).toBe(1);
     expect(sign(0.001)).toBe(1);
+  });
+});
+
+describe('snapshot token-metric capabilities', () => {
+  const julyVrRows = SUPPLEMENTAL_BENCHMARK_ROWS.filter((row) => row.hardware === 'vr200');
+  const options = {
+    sequence: Sequence.EightK_OneK,
+    precisions: ['fp4'],
+    classify: classifyByHardware,
+  };
+
+  it('keeps July VR200 for output calculator metrics and hides total/input', () => {
+    expect(
+      Object.keys(buildGpuGroups(julyVrRows, { ...options, tokenType: 'output' }).grouped),
+    ).toEqual(['vr200_rubin-july']);
+    expect(buildGpuGroups(julyVrRows, { ...options, tokenType: 'total' }).grouped).toEqual({});
+    expect(buildGpuGroups(julyVrRows, { ...options, tokenType: 'input' }).grouped).toEqual({});
+  });
+
+  it('applies the same restriction to unofficial overlay rows', () => {
+    const overlayRows = julyVrRows.map((row) => ({
+      ...row,
+      run_url: 'https://github.com/org/repo/actions/runs/1',
+    }));
+    expect(buildGpuGroups(overlayRows, { ...options, tokenType: 'total' }).grouped).toEqual({});
   });
 });
 

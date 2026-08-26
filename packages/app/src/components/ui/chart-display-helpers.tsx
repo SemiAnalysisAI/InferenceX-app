@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 
 import {
   HW_REGISTRY,
@@ -18,6 +18,12 @@ import type { Locale } from '@/lib/i18n';
 // Keep these metric-key groups in sync with chart-utils/chart configs when new source-backed
 // metrics are added; this helper owns which caption notes and caveats appear for each family.
 const POWER_SOURCE_METRICS = new Set(['y_tpPerMw', 'y_inputTputPerMw', 'y_outputTputPerMw']);
+// The disaggregation caveat only applies to the per-token-type per-MW metrics: a
+// disaggregated run reports input/output throughput per prefill or per decode chip,
+// so dividing by per-chip power inherits that skew. Total tok/s/MW divides
+// throughput per chip overall by the same per-chip power an aggregated config
+// uses, so it needs no caveat — the same split the cost caveats below make.
+const PER_TOKEN_TYPE_POWER_METRICS = new Set(['y_inputTputPerMw', 'y_outputTputPerMw']);
 const TOTAL_COST_METRICS = new Set([
   'y_costh',
   'y_costn',
@@ -67,7 +73,7 @@ function MetricBadges({
       {label}{' '}
       {Object.entries(values).map(([base, value]) => (
         <Badge key={base} variant="outline">
-          {base.toUpperCase()}: {value}
+          {HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase()}: {value}
         </Badge>
       ))}
     </p>
@@ -188,16 +194,43 @@ export function ChartShareActions() {
 
 export function MetricAssumptionNotes({
   selectedYAxisMetric,
+  activeHwKeys,
   includeAllPowerThroughputMetrics = true,
   includePowerThroughputCaveat = true,
 }: {
   selectedYAxisMetric: string;
+  /**
+   * Active legend hardware keys (e.g. `gb300_dynamo-sglang`). When provided,
+   * the TCO $/chip/hr and Power/Chip badges are narrowed to the base GPUs the
+   * selection covers, so the caption only quotes chips that can appear on the
+   * plot. Omitted (or when the selection maps to no registry GPU) every
+   * registry GPU is shown, preserving the historical behavior.
+   */
+  activeHwKeys?: ReadonlySet<string> | readonly string[];
   // Historical trends only annotates y_tpPerMw and intentionally omits per-MW caveats to preserve
   // the tab's existing caption contract while sharing the same helper as inference.
   includeAllPowerThroughputMetrics?: boolean;
   includePowerThroughputCaveat?: boolean;
 }) {
   const locale = useLocale();
+  // Legend keys are `{base}` or `{base}_{framework/variant}`; badge maps are
+  // keyed by registry base, so reduce the selection to its base GPUs.
+  const activeBases = useMemo(() => {
+    const bases = new Set<string>();
+    for (const key of activeHwKeys ?? []) {
+      const base = key.split('_')[0];
+      if (base in HW_REGISTRY) bases.add(base);
+    }
+    return bases;
+  }, [activeHwKeys]);
+  const filterToActive = (values: Record<string, string | number>) => {
+    if (activeBases.size === 0) return values;
+    const filtered = Object.fromEntries(
+      Object.entries(values).filter(([base]) => activeBases.has(base)),
+    );
+    // Defensive: never render a badge row with an empty value list.
+    return Object.keys(filtered).length > 0 ? filtered : values;
+  };
   const showPowerSource = includeAllPowerThroughputMetrics
     ? POWER_SOURCE_METRICS.has(selectedYAxisMetric)
     : selectedYAxisMetric === 'y_tpPerMw';
@@ -231,7 +264,7 @@ export function MetricAssumptionNotes({
     <>
       {showPowerSource && (
         <>
-          <MetricBadges label={powerLabel} values={POWER_VALUES} />
+          <MetricBadges label={powerLabel} values={filterToActive(POWER_VALUES)} />
           <SourceLink
             href="https://semianalysis.com/datacenter-industry-model/"
             sourceLabel={sourceLabel}
@@ -242,7 +275,7 @@ export function MetricAssumptionNotes({
       )}
       {costValues && (
         <>
-          <MetricBadges label={costLabel} values={costValues} />
+          <MetricBadges label={costLabel} values={filterToActive(costValues)} />
           <SourceLink href={TCO_SOURCE_URL} sourceLabel={sourceLabel}>
             {TCO_SOURCE_TITLE}
           </SourceLink>
@@ -272,14 +305,14 @@ export function MetricAssumptionNotes({
       />
       {includePowerThroughputCaveat && (
         <DisaggCaveat
-          visible={POWER_SOURCE_METRICS.has(selectedYAxisMetric)}
+          visible={PER_TOKEN_TYPE_POWER_METRICS.has(selectedYAxisMetric)}
           calculationNoun="power"
           locale={locale}
         />
       )}
       {showJouleSource && (
         <>
-          <MetricBadges label={powerLabel} values={POWER_VALUES} />
+          <MetricBadges label={powerLabel} values={filterToActive(POWER_VALUES)} />
           <SourceLink
             href="https://semianalysis.com/datacenter-industry-model/"
             sourceLabel={sourceLabel}

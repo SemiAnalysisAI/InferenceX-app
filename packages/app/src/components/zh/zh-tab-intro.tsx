@@ -7,11 +7,25 @@ import { TAB_INTRO_ZH, TAB_META_ZH } from '@/lib/tab-meta-zh';
  * pages. The charts below render in English; this block gives crawlers and
  * readers genuine Chinese content describing what the page shows.
  */
-export function ZhTabIntro({ tab }: { tab: DashboardRouteKey }) {
+export function ZhTabIntro({
+  tab,
+  title,
+  intro,
+}: {
+  tab: DashboardRouteKey;
+  /** Model-specific overrides used by the per-model routes
+   *  (/zh/historical/<slug>); the tab defaults apply when omitted. */
+  title?: string;
+  intro?: string;
+}) {
   return (
     <Card data-testid="zh-tab-intro">
-      <h1 className="text-xl lg:text-2xl font-bold tracking-tight">{TAB_META_ZH[tab].title}</h1>
-      <p className="mt-2 text-sm lg:text-base text-muted-foreground">{TAB_INTRO_ZH[tab]}</p>
+      <h1 className="text-xl lg:text-2xl font-bold tracking-tight">
+        {title ?? TAB_META_ZH[tab].title}
+      </h1>
+      <p className="mt-2 text-sm lg:text-base text-muted-foreground">
+        {intro ?? TAB_INTRO_ZH[tab]}
+      </p>
       <p className="mt-2 text-xs text-muted-foreground">
         图表中的模型、芯片、框架与指标名称均沿用业界通用英文名称。
       </p>

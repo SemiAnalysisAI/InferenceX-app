@@ -1,0 +1,72 @@
+---
+title: 'DeepSeek V4 Pro on AgentX: GB200 vs GB300 Rack-Scale Disaggregation'
+subtitle: 'Both lean on PD disagg, GB300 adds DEP32 wide-EP decode, and the gap shows up in first-token latency rather than token rate'
+seoDescription: 'NVIDIA rack-scale results for DeepSeek V4 Pro on AgentX. GB300 Dynamo TRTLLM and GB200 Dynamo vLLM both use prefill-decode disaggregation, and the GB300 point trails on TTFT because higher concurrency brings more subagent traffic and more cold prefills.'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - deepseek
+  - gb200
+  - gb300
+  - nvl72
+  - disagg
+  - wide-ep
+  - nvidia
+---
+
+On DeepSeek V4 Pro, NVIDIA's most competitive solutions are GB300 Dynamo TRTLLM and GB200 Dynamo vLLM. Both configurations rely on prefill-decode [disaggregation](/glossary/disaggregated-inference) to achieve high throughput at reasonable [interactivity](/glossary/interactivity). GB300 configurations additionally employ [wide expert parallelism](/glossary/wide-expert-parallelism) decode instances at DEP32 in order to achieve higher throughput in the middle of the frontier.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/512c6225-5816-493e-839d-e4f539e5b1c4_2048x1215.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_metric=y_tpPerGpu&i_xmode=interactivity&i_linelabel=0&i_best=0&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-trt)"
+/>
+
+## The two points are closer on token rate than on first token
+
+The 2xDEP8+1xDEP12 GB200 point is significantly closer to the 3xDEP8+1xDEP16 GB300 point in terms of tokens per second per user than it is in terms of time to first token. Reading only the interactivity axis would therefore understate how differently these two configurations behave.
+
+TTFT is, in general, more sensitive to the spikiness of the workload. The GB300 point achieves much higher overall concurrency, so it incurs more subagent traffic and hence more cold prefills. A [subagent](/glossary/subagent) starts with fresh context and no reusable prefix, which means its first request is a full prefill rather than a cache hit, and enough of them arriving together is what moves the [tail](/glossary/tail-latency).
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/96f9c9f9-eb86-4f87-8332-c85f23040836_2048x916.png"
+  caption="Source: InferenceX"
+/>
+
+## Why this is an agentic effect rather than a hardware one
+
+None of this appears on a fixed-sequence workload. At 8k1k every request is independent and identically shaped, so concurrency scales the batch without changing the mix of cached and uncached work. On AgentX, raising concurrency changes the composition of the traffic itself: more sessions means more parallel subagent branches, and those branches arrive in bursts rather than as a smooth stream.
+
+The practical reading is that a rack-scale configuration tuned to sit further right on the throughput curve is also accepting a burstier prefill load, and the cost of that decision lands on first-token latency rather than on the token rate the same chart advertises.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/f79e53f5-c8ff-4ed0-a8a3-c05b9e0b4bab_2048x1191.png" />
+
+---
+
+_These results are one slice of AgentX 1.0. The full analysis, the replay methodology, and the 70+ upstream PRs the benchmark drove are in [AgentX - InferenceXv3: Does the CUDA Moat Hold Up in Agentic Inferencing?](/blog/agentx-inferencexv3-does-cuda-moat). Every point is explorable on the [free dashboard](https://inferencex.semianalysis.com/)._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Which NVIDIA rack-scale configuration is fastest on DeepSeek V4 Pro?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "GB300 Dynamo TRTLLM and GB200 Dynamo vLLM are the most competitive NVIDIA configurations on this model, and both rely on prefill-decode disaggregation to reach high throughput at reasonable interactivity. GB300 additionally runs DEP32 wide expert parallelism decode instances to lift throughput in the middle of the frontier."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does the GB300 point have worse TTFT than GB200?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The GB300 point achieves much higher overall concurrency, which brings more subagent traffic and therefore more cold prefills. Because a subagent starts with fresh context and no reusable prefix, its first request is a full prefill, and bursts of those requests move the tail. TTFT is generally more sensitive to workload spikiness than the per-user token rate is."
+      }
+    }
+  ]
+}`}</JsonLd>

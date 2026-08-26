@@ -35,7 +35,8 @@ import {
 import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+import { OFFICIAL_PREVIEW_SERIES } from '@/components/official-preview-notice';
+import { getHardwareConfig, getModelSortIndex, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import {
   getChartWatermark,
   getPrecisionLabel,
@@ -56,6 +57,26 @@ import type {
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { computeTooltipPosition, syncPointShape } from '@/lib/d3-chart/layers/scatter-points';
+import {
+  EMPTY_PERF_RULER_STATE,
+  clampIsoX,
+  clearPerfRulers,
+  computeIsoXRulerGeometry,
+  computePerfRulerLabelLayouts,
+  deletePerfRuler,
+  intersectPathAtX,
+  isPerfRulerCurveVisible,
+  movePerfRulerIsoX,
+  nextPerfRulerState,
+  pathXExtent,
+  perfRulerCurveSet,
+  prunePerfRulers,
+  renderPerfRulers,
+  type PerfRulerEndInput,
+  type PerfRulerGeometry,
+  type PerfRulerRenderEntry,
+  type PerfRulerState,
+} from '@/lib/d3-chart/layers/perf-ruler';
 import {
   attachOverlayXMarkerHandlers,
   overlayMarkerPosition,
@@ -82,7 +103,6 @@ import {
   type ParetoDirection,
 } from '@/lib/chart-utils';
 import { canonicalParetoIntersection } from '@/components/inference/utils/canonicalFrontier';
-import { type RooflineDirection, getSpeedOverlayCorners } from '@/lib/speed-overlay';
 import type {
   ChartDefinition,
   ClippedInferenceData,
@@ -99,9 +119,7 @@ import {
   scatterPointJoinId,
 } from '@/components/inference/utils/point-identity';
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
-import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
-import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import { pointLabelText } from './point-label';
 import {
@@ -322,6 +340,9 @@ const lineLabelText = (
   model?: string,
 ): string => {
   const config = getHardwareConfig(hwKey, model);
+  if (config.alwaysShowPrecision) {
+    return [getDisplayLabel(config), getPrecisionLabel(precision as Precision)].join(' ');
+  }
   if (!includePrecision) return getDisplayLabel(config);
   return [config.label, getPrecisionLabel(precision as Precision), config.suffix]
     .filter(Boolean)
@@ -334,14 +355,18 @@ const SCATTER_STRINGS = {
   en: {
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
-    bestPerSku: 'Best per SKU',
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     labels: 'Labels',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
+    concurrencyLabels: '# Concurrent Sessions',
     gradientLabels: 'Gradient Labels',
     lineLabels: 'Line Labels',
+    perfRuler: 'Perf Ruler',
+    perfRulerInfo:
+      'Click two curves to place a vertical ruler, then drag it to measure the performance multiple between them at any x value. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
     resetFilter: 'Reset filter',
+    clearPerfRulers: (count: number) => `Clear rulers (${count})`,
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
     overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
@@ -350,14 +375,18 @@ const SCATTER_STRINGS = {
   zh: {
     logScale: '对数缩放',
     optimalOnly: '仅最优',
-    bestPerSku: '每个 SKU 仅显示最佳配置',
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
     labels: '标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',
+    concurrencyLabels: '并发会话数',
     gradientLabels: '渐变标签',
     lineLabels: '曲线标签',
+    perfRuler: '性能标尺',
+    perfRulerInfo:
+      '先点击两条曲线放置垂直标尺，再拖动标尺，测量任意横坐标下两条曲线之间的性能倍数。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
     resetFilter: '重置筛选',
+    clearPerfRulers: (count: number) => `清除标尺（${count}）`,
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
     overflowMixed: (count: number) => `${count} 个点已截断`,
     overflowCost: (count: number, limit: number) => `${count} 个点 > $${limit}/Mtok`,
@@ -406,10 +435,9 @@ const ScatterGraph = React.memo(
       scaleType,
       isLegendExpanded,
       useAdvancedLabels,
+      showConcurrencyLabels,
       showGradientLabels,
       showLineLabels,
-      showSpeedOverlay,
-      showMinecraftOverlay,
     } = useInferenceDisplay();
     const {
       setBestPerSku,
@@ -423,10 +451,9 @@ const ScatterGraph = React.memo(
       setLogScale,
       setIsLegendExpanded,
       setUseAdvancedLabels,
+      setShowConcurrencyLabels,
       setShowGradientLabels,
       setShowLineLabels,
-      setShowSpeedOverlay,
-      setShowMinecraftOverlay,
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
@@ -567,6 +594,45 @@ const ScatterGraph = React.memo(
         toggleOfficialHwType(key);
       },
       [overlayData, setBestPerSku, toggleOfficialHwType, toggleHwType],
+    );
+
+    // Best per SKU lives in the Quick Filters dialog, but the handler stays
+    // here: overlay mode owns a temporary unified selection that must be
+    // recomputed (or restored) when the automatic mode flips.
+    const handleBestPerSkuChange = useCallback(
+      (checked: boolean) => {
+        setBestPerSku(checked);
+        if (overlayData) {
+          if (checked) {
+            const direction =
+              chartDefinition[`${selectedYAxisMetric}_roofline` as keyof ChartDefinition];
+            if (
+              direction === 'upper_right' ||
+              direction === 'upper_left' ||
+              direction === 'lower_left' ||
+              direction === 'lower_right'
+            ) {
+              const selection = bestSeriesPerSku(data, direction);
+              for (const key of bestSeriesPerSku(overlayData.data, direction)) {
+                selection.add(`overlay:${key}`);
+              }
+              commitUnifiedSelection(selection);
+            }
+          } else {
+            resetUnifiedSelection();
+          }
+        }
+        track('inference_best_per_sku_toggled', { enabled: checked });
+      },
+      [
+        setBestPerSku,
+        overlayData,
+        chartDefinition,
+        selectedYAxisMetric,
+        data,
+        commitUnifiedSelection,
+        resetUnifiedSelection,
+      ],
     );
 
     // Legend "X" (remove) — same overlay split as handleToggleHwType. With an
@@ -867,7 +933,10 @@ const ScatterGraph = React.memo(
         activeOverlayHwTypes.has(p.hwKey as string),
       );
       const visiblePoints = [...filteredData, ...visibleOverlayPoints];
-      return matchKnownConfigIssues(modelLabel, visiblePoints).map((issue) => ({
+      const annotations: KnownIssueAnnotation[] = matchKnownConfigIssues(
+        modelLabel,
+        visiblePoints,
+      ).map((issue) => ({
         issue,
         label: parseHwKeyToLabel(issue.hwKey, modelLabel).label,
         color: getCssColor(resolveColor(issue.hwKey)),
@@ -875,6 +944,30 @@ const ScatterGraph = React.memo(
           .filter((p) => pointMatchesIssue(issue, p))
           .map((p) => ({ x: p.x, y: p.y })),
       }));
+      // Official-preview notices intentionally follow only official data. An
+      // unofficial overlay is not an InferenceX publication. `filteredData`
+      // has already applied token-metric support, so the July Rubin notice is
+      // present only on output-token charts alongside its visible curve.
+      for (const previewConfig of OFFICIAL_PREVIEW_SERIES) {
+        const previewPoints = filteredData.filter((point) =>
+          hardwareKeyMatchesAnyBase(String(point.hwKey), previewConfig.baseGpuKeys),
+        );
+        if (previewPoints.length === 0) continue;
+
+        const hwKey = String(previewPoints[0]!.hwKey);
+        const previewCopy = previewConfig.strings[locale];
+        annotations.push({
+          preview: {
+            id: previewConfig.id,
+            summary: previewCopy.title,
+            detail: previewCopy.chartDetail,
+          },
+          label: getDisplayLabel(getHardwareConfig(hwKey, modelLabel)),
+          color: getCssColor(resolveColor(hwKey)),
+          points: previewPoints.map((point) => ({ x: point.x, y: point.y })),
+        });
+      }
+      return annotations;
     }, [
       modelLabel,
       filteredData,
@@ -882,6 +975,7 @@ const ScatterGraph = React.memo(
       activeOverlayHwTypes,
       resolveColor,
       getCssColor,
+      locale,
     ]);
 
     const overlayRooflines = useMemo(() => {
@@ -943,12 +1037,6 @@ const ScatterGraph = React.memo(
 
     // All official points for rendering (unfiltered — visibility via opacity)
     const pointsData = useMemo(() => Object.values(groupedData).flat(), [groupedData]);
-    const hasOffloadHalo = useMemo(
-      () =>
-        pointsData.some((point) => point.offload_mode === 'on') ||
-        processedOverlayData.some((point) => point.offload_mode === 'on'),
-      [pointsData, processedOverlayData],
-    );
     // Bulk presence lookup for agentic points: which ids have a stored
     // trace_replay blob → controls the "View charts" button in the pinned
     // tooltip. We deliberately don't fetch the histograms themselves here;
@@ -1163,6 +1251,7 @@ const ScatterGraph = React.memo(
       () =>
         [
           useAdvancedLabels ? 'advanced-labels' : 'basic-labels',
+          showConcurrencyLabels ? 'conc-labels' : 'no-conc-labels',
           selectedYAxisMetric,
           `${xScaleConfig.type}:${xScaleConfig.domain.join(',')}`,
           `${yScaleConfig.type}:${yScaleConfig.domain.join(',')}`,
@@ -1180,6 +1269,7 @@ const ScatterGraph = React.memo(
       [
         selectedYAxisMetric,
         useAdvancedLabels,
+        showConcurrencyLabels,
         xScaleConfig,
         yScaleConfig,
         pointsData,
@@ -1266,6 +1356,348 @@ const ScatterGraph = React.memo(
       traceAvailability,
       logAvailability: persistedLogAvailability,
     };
+
+    // --- Perf ruler (opt-in: click two curves, drag the ruler to any iso-x) ---
+    // Curve-to-curve ISO-X semantics: each measurement is two CURVES
+    // (rendered roofline path class tokens) plus a freely chosen iso-x
+    // stored in DATA space (xScale.invert of the click), so measurements
+    // survive zoom and metric changes. BOTH ruler ends are interpolated on
+    // the curves' rendered paths at the iso-x — neither end needs to be a
+    // data point. Multiple rulers accumulate (capped in the pure module);
+    // completing one immediately allows starting the next.
+    const [perfRulerMode, setPerfRulerMode] = useState(false);
+    const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
+    // Draw passes read mode/state through refs so toggling off clears the
+    // rulers in the same pre-paint layout pass — lines/labels must never
+    // linger a frame after the switch flips (Bugbot report on PR #853).
+    const perfRulerModeRef = useRef(perfRulerMode);
+    perfRulerModeRef.current = perfRulerMode;
+    const perfRulerStateRef = useRef(perfRulerState);
+    perfRulerStateRef.current = perfRulerState;
+    // Live per-ruler iso-x overrides for draw passes. Dragging a ruler
+    // updates its entry once per animation frame WITHOUT touching React
+    // state (the drag commits on end), so the ruler follows the pointer
+    // with one redraw per frame. Cleared when committed state changes (an
+    // effect, not per render, so an unrelated re-render mid-drag cannot
+    // snap the dragged ruler back).
+    const perfRulerLiveIsoXRef = useRef(new Map<number, number>());
+    useLayoutEffect(() => {
+      perfRulerLiveIsoXRef.current.clear();
+    }, [perfRulerState]);
+
+    // Scales/group from the most recent draw pass — click and drag handlers
+    // convert between pixel and data space with the exact scales the chart
+    // is currently drawn with.
+    const perfRulerDrawCtxRef = useRef<{
+      zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
+      xScale: ContinuousScale;
+      yScale: ContinuousScale;
+      width: number;
+      height: number;
+    } | null>(null);
+    // Forward ref: the drag frame needs to redraw, but drawPerfRuler is
+    // defined below (it also attaches the drag behavior — benign cycle).
+    const drawPerfRulerRef = useRef<
+      | ((
+          zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+          xScale: ContinuousScale,
+          yScale: ContinuousScale,
+          width: number,
+          height: number,
+        ) => void)
+      | null
+    >(null);
+
+    // Completion clamp for nextPerfRulerState: the stored iso-x must lie
+    // inside the curve pair's overlapping x range, or the completed ruler
+    // could render nowhere — no line and no drag handle to recover it.
+    // Data → pixel through the exact scales/paths the chart is currently
+    // drawn with, clamp, and back. Null (missing paths or disjoint spans)
+    // rejects the measurement and keeps the draft anchored.
+    const clampPerfRulerIsoXToOverlap = useCallback(
+      (curveA: string, curveB: string, isoX: number): number | null => {
+        const ctx = perfRulerDrawCtxRef.current;
+        if (!ctx) return null;
+        const [nodeA, nodeB] = [curveA, curveB].map((cls) =>
+          ctx.zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node(),
+        );
+        if (!nodeA || !nodeB || typeof nodeA.getPointAtLength !== 'function') return null;
+        const extentA = pathXExtent(nodeA);
+        const extentB = pathXExtent(nodeB);
+        if (!extentA || !extentB) return null;
+        const clamped = clampIsoX(Number(ctx.xScale(isoX)), extentA, extentB);
+        return clamped === null ? null : Number(ctx.xScale.invert(clamped));
+      },
+      [],
+    );
+
+    // Curve click (widened hit strokes): iso-x is the click's x pixel
+    // through the CURRENT rendered x scale, stored in data space.
+    const handlePerfRulerCurveClick = useCallback(
+      (curve: string, pixelX: number) => {
+        const ctx = perfRulerDrawCtxRef.current;
+        if (!ctx) return;
+        track('latency_perf_ruler_curve_clicked', { curve });
+        const isoX = Number(ctx.xScale.invert(pixelX));
+        setPerfRulerState((prev) =>
+          nextPerfRulerState(prev, { curve, isoX }, clampPerfRulerIsoXToOverlap),
+        );
+        chartRef.current?.dismissTooltip();
+        chartRef.current?.hideTooltip();
+      },
+      [clampPerfRulerIsoXToOverlap],
+    );
+    const perfRulerCurveClickRef = useRef(handlePerfRulerCurveClick);
+    perfRulerCurveClickRef.current = handlePerfRulerCurveClick;
+
+    // Points sit on curves: a ruler-mode click on a data point behaves like
+    // clicking the point's curve at that point's x. Candidates cover the
+    // single- vs multi-date roofline class variants; the first one present
+    // in the DOM wins. Ruler-mode clicks measure INSTEAD of pinning the
+    // tooltip, so drop the pin the shared click handler applied just before
+    // this callback ran.
+    const handlePerfRulerPointClick = useCallback(
+      (point: InferenceData, source: 'official' | 'overlay') => {
+        const ctx = perfRulerDrawCtxRef.current;
+        if (!ctx) return;
+        const base = `${String(point.hwKey)}_${point.precision}`;
+        const candidates =
+          source === 'overlay'
+            ? [
+                `overlay-roofline-${base}_run${overlayRunIndex(point.run_url ?? null, runIndexByUrl)}`,
+              ]
+            : [`roofline-${base}`, `roofline-${base}__${point.date}`];
+        const curve = candidates.find(
+          (cls) => !ctx.zoomGroup.select(`.${CSS.escape(cls)}`).empty(),
+        );
+        // Single-point series render no roofline path — nothing to measure.
+        if (!curve) return;
+        setPerfRulerState((prev) =>
+          nextPerfRulerState(prev, { curve, isoX: point.x }, clampPerfRulerIsoXToOverlap),
+        );
+        chartRef.current?.dismissTooltip();
+        chartRef.current?.hideTooltip();
+      },
+      [runIndexByUrl, clampPerfRulerIsoXToOverlap],
+    );
+
+    // Read by long-lived D3 click closures (official tooltip config + overlay
+    // marker handlers) — same refs-over-closures rule as interactionRef.
+    const perfRulerRef = useRef({ mode: perfRulerMode, onPointClick: handlePerfRulerPointClick });
+    perfRulerRef.current = { mode: perfRulerMode, onPointClick: handlePerfRulerPointClick };
+
+    // Turning the toggle off clears ALL rulers and any in-progress
+    // selection (documented in the info tooltip — simple and predictable;
+    // the switch handler also clears synchronously, this covers
+    // programmatic mode changes). `clearPerfRulers` bails out with the same
+    // reference when there is nothing to clear.
+    useEffect(() => {
+      if (!perfRulerMode) setPerfRulerState(clearPerfRulers);
+    }, [perfRulerMode]);
+
+    // Invisible widened hit strokes over every rendered roofline path
+    // (official AND overlay) make the curves themselves clickable in ruler
+    // mode. The hit layer sits directly ABOVE `.rooflines-layer` (so the
+    // visible 2.5px strokes never shadow the hit strokes) but BELOW the
+    // dot-groups and overlay markers, so point hover/click behavior is
+    // untouched. The layer only exists while ruler mode is on — with the
+    // mode off there is nothing to intercept hovers, clicks, or zoom.
+    const syncPerfRulerHitPaths = useCallback(
+      (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
+        let hitLayer = zoomGroup.select<SVGGElement>('.perf-ruler-hits');
+        const rooflinesLayerNode = zoomGroup.select<SVGGElement>('.rooflines-layer').node();
+        if (!perfRulerModeRef.current || !rooflinesLayerNode) {
+          hitLayer.remove();
+          return;
+        }
+        if (hitLayer.empty()) {
+          const node = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          node.setAttribute('class', 'perf-ruler-hits');
+          rooflinesLayerNode.after(node);
+          hitLayer = d3.select(node) as typeof hitLayer;
+        }
+        interface HitEntry {
+          curve: string;
+          d: string;
+        }
+        const entries: HitEntry[] = [];
+        zoomGroup
+          .selectAll<SVGPathElement, unknown>('.roofline-path, .overlay-roofline-path')
+          .each(function () {
+            // The identity token is the curve-specific class, e.g.
+            // `roofline-H100_fp8`, `roofline-H100_fp8__2026-01-01`, or
+            // `overlay-roofline-H100_fp8_run0`.
+            const curve = [...this.classList].find(
+              (cls) => cls !== 'roofline-path' && cls !== 'overlay-roofline-path',
+            );
+            const d = this.getAttribute('d');
+            // Curves hidden by legend/precision filters keep their paths at
+            // opacity 0 — invisible curves must not be clickable.
+            if (!curve || !d || !isPerfRulerCurveVisible(this.style.opacity)) return;
+            entries.push({ curve, d });
+          });
+        const selected = perfRulerCurveSet(perfRulerStateRef.current);
+        hitLayer
+          .selectAll<SVGPathElement, HitEntry>('.perf-ruler-hit')
+          .data(entries, (e) => e.curve)
+          .join('path')
+          .attr('class', 'perf-ruler-hit')
+          .attr('fill', 'none')
+          .attr('d', (e) => e.d)
+          .attr('stroke', 'var(--primary)')
+          // Selected curves get a faint halo as feedback; unselected hit
+          // strokes are fully transparent (`pointer-events: stroke` still
+          // hit-tests the invisible stroke geometry).
+          .attr('stroke-opacity', (e) => (selected.has(e.curve) ? 0.18 : 0))
+          .attr('stroke-width', 13)
+          .style('pointer-events', 'stroke')
+          .style('cursor', 'crosshair')
+          .on('click', (event: MouseEvent, e: HitEntry) => {
+            event.stopPropagation();
+            const [pixelX] = d3.pointer(event, zoomGroup.node());
+            perfRulerCurveClickRef.current(e.curve, pixelX);
+          });
+      },
+      [],
+    );
+
+    // Horizontal drag on a ruler line — the primary way to fine-tune that
+    // ruler's iso-x. The drag handle's datum (set by the render join)
+    // identifies WHICH ruler is dragged. rAF-throttled: each frame clamps
+    // the pointer x to that ruler's curve pair's overlapping x range,
+    // updates its live iso-x, and redraws; the value commits to React state
+    // on drag end. d3.drag stops mousedown propagation itself, so dragging
+    // a ruler never pans the chart.
+    const perfRulerDragTargetRef = useRef<{ id: number; pixelX: number } | null>(null);
+    const perfRulerDragFrameRef = useRef<number | null>(null);
+    const applyPerfRulerDragFrame = useCallback(() => {
+      const ctx = perfRulerDrawCtxRef.current;
+      const target = perfRulerDragTargetRef.current;
+      if (!ctx || !target) return;
+      const ruler = perfRulerStateRef.current.rulers.find((r) => r.id === target.id);
+      if (!ruler) return;
+      const [nodeA, nodeB] = [ruler.curveA, ruler.curveB].map((cls) =>
+        ctx.zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node(),
+      );
+      if (!nodeA || !nodeB || typeof nodeA.getPointAtLength !== 'function') return;
+      const extentA = pathXExtent(nodeA);
+      const extentB = pathXExtent(nodeB);
+      if (!extentA || !extentB) return;
+      const clamped = clampIsoX(target.pixelX, extentA, extentB);
+      if (clamped === null) return;
+      perfRulerLiveIsoXRef.current.set(target.id, Number(ctx.xScale.invert(clamped)));
+      drawPerfRulerRef.current?.(ctx.zoomGroup, ctx.xScale, ctx.yScale, ctx.width, ctx.height);
+    }, []);
+    const applyPerfRulerDragFrameRef = useRef(applyPerfRulerDragFrame);
+    applyPerfRulerDragFrameRef.current = applyPerfRulerDragFrame;
+
+    const perfRulerDrag = useMemo(
+      () =>
+        d3
+          .drag<SVGLineElement, PerfRulerRenderEntry>()
+          .on(
+            'drag',
+            (
+              event: d3.D3DragEvent<SVGLineElement, PerfRulerRenderEntry, unknown>,
+              entry: PerfRulerRenderEntry,
+            ) => {
+              perfRulerDragTargetRef.current = { id: entry.id, pixelX: event.x };
+              if (perfRulerDragFrameRef.current === null) {
+                perfRulerDragFrameRef.current = requestAnimationFrame(() => {
+                  perfRulerDragFrameRef.current = null;
+                  applyPerfRulerDragFrameRef.current();
+                });
+              }
+            },
+          )
+          .on('end', () => {
+            // Flush the pending frame, then commit this ruler's iso-x.
+            if (perfRulerDragFrameRef.current !== null) {
+              cancelAnimationFrame(perfRulerDragFrameRef.current);
+              perfRulerDragFrameRef.current = null;
+              applyPerfRulerDragFrameRef.current();
+            }
+            const target = perfRulerDragTargetRef.current;
+            perfRulerDragTargetRef.current = null;
+            if (!target) return;
+            const isoX = perfRulerLiveIsoXRef.current.get(target.id);
+            if (isoX === undefined) return;
+            setPerfRulerState((prev) => movePerfRulerIsoX(prev, target.id, isoX));
+          }),
+      [],
+    );
+
+    // Draw (or clear) the hit strokes and all rulers for the current draw
+    // pass. Stable callback so the custom layer can live outside the
+    // perf-ruler state dependencies — render/zoom passes read mode, rulers,
+    // and live iso-x values through refs. Gated on the mode ref so a
+    // toggle-off clears everything in the very next pre-paint pass.
+    const drawPerfRuler = useCallback(
+      (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        xScale: ContinuousScale,
+        yScale: ContinuousScale,
+        width: number,
+        height: number,
+      ) => {
+        perfRulerDrawCtxRef.current = { zoomGroup, xScale, yScale, width, height };
+        syncPerfRulerHitPaths(zoomGroup);
+        const state = perfRulerStateRef.current;
+        const entries: PerfRulerRenderEntry[] = [];
+        if (perfRulerModeRef.current && state.rulers.length > 0) {
+          // Both ends of each ruler are interpolated on the RENDERED paths —
+          // the drawn curve is the measurement surface, so the ruler matches
+          // it exactly and stays correct under zoom (rooflines redraw before
+          // this layer runs). When either of a ruler's curves does not span
+          // its iso-x, has no rendered path, or is hidden (legend/precision
+          // toggles keep the path in the DOM at opacity 0), that ruler draws
+          // nothing this frame but KEEPS its state — per ruler, others stay
+          // visible; zoom/drag/legend re-toggles that restore both visible
+          // intersections bring it back.
+          const geometries: (PerfRulerGeometry | null)[] = state.rulers.map((ruler) => {
+            const isoX = perfRulerLiveIsoXRef.current.get(ruler.id) ?? ruler.isoX;
+            const pixelX = xScale(isoX);
+            const ends: PerfRulerEndInput[] = [];
+            for (const cls of [ruler.curveA, ruler.curveB]) {
+              const node = zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node();
+              if (!node || typeof node.getPointAtLength !== 'function') break;
+              if (!isPerfRulerCurveVisible(node.style.opacity)) break;
+              const hit = intersectPathAtX(node, pixelX);
+              if (!hit) break;
+              ends.push({ py: hit.y, rawY: yScale.invert(hit.y) });
+            }
+            return ends.length === 2 ? computeIsoXRulerGeometry(pixelX, ends[0], ends[1]) : null;
+          });
+          // Lay out all labels together so overlapping labels nudge apart.
+          const layouts = computePerfRulerLabelLayouts(geometries, {
+            chartWidth: width,
+            chartHeight: height,
+          });
+          for (const [index, ruler] of state.rulers.entries()) {
+            const geometry = geometries[index];
+            const layout = layouts[index];
+            if (geometry && layout) entries.push({ id: ruler.id, geometry, layout });
+          }
+        }
+        renderPerfRulers(zoomGroup, entries, {
+          color: 'var(--primary)',
+          halo: 'var(--background)',
+          onDelete: (id) => {
+            track('latency_perf_ruler_deleted');
+            setPerfRulerState((prev) => deletePerfRuler(prev, id));
+          },
+        });
+        // (Re)attach the horizontal drag behavior to the (possibly fresh)
+        // drag handles the render pass just joined — their datum (the
+        // render entry) tells the drag which ruler it moves.
+        const dragHandles = zoomGroup.selectAll<SVGLineElement, PerfRulerRenderEntry>(
+          '.perf-ruler .pr-drag',
+        );
+        if (!dragHandles.empty()) dragHandles.call(perfRulerDrag);
+      },
+      [syncPerfRulerHitPaths, perfRulerDrag],
+    );
+    drawPerfRulerRef.current = drawPerfRuler;
 
     // Render context from the last D3 render — lets the decoration effect
     // restyle with the same layout/scales the chart was drawn with.
@@ -1430,6 +1862,21 @@ const ScatterGraph = React.memo(
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
           ),
         onPointClick: (d: InferenceData) => {
+          // Perf ruler mode: the click acts as a click on the point's CURVE
+          // at the point's x INSTEAD of pinning the tooltip (the handler
+          // drops the pin applied by the shared click path; the hover
+          // tooltip stays available).
+          const ruler = perfRulerRef.current;
+          if (ruler.mode) {
+            track('latency_data_point_clicked', {
+              hw: String(d.hwKey),
+              x: d.x,
+              y: d.y,
+              perfRuler: true,
+            });
+            ruler.onPointClick(d, 'official');
+            return;
+          }
           track('latency_data_point_clicked', { hw: String(d.hwKey), x: d.x, y: d.y });
           const tooltipEl = chartRef.current?.getTooltipElement();
           if (!tooltipEl) return;
@@ -2044,8 +2491,9 @@ const ScatterGraph = React.memo(
           getOpacity: (d) => (interactionRef.current.isPointVisible(d) ? 1 : 0),
           getPointerEvents: (d) => (interactionRef.current.isPointVisible(d) ? 'auto' : 'none'),
           hideLabels: !showPointLabels || showGradientLabels,
-          // Keep the concurrency (C=) annotation from the agentx scatter labels.
-          getLabelText: (d) => pointLabelText(d, useAdvancedLabels),
+          // Concurrency (C=) is appended only when the advanced
+          // "# Concurrent Sessions" toggle is on.
+          getLabelText: (d) => pointLabelText(d, useAdvancedLabels, showConcurrencyLabels),
           foreground: 'var(--foreground)',
           dataAttrs: {
             'hw-key': (d) => String(d.hwKey),
@@ -2169,7 +2617,9 @@ const ScatterGraph = React.memo(
               // Labels
               const showLabels = showPointLabels && !showGradientLabels;
               overlayPoints.each(function (d) {
-                const lines = pointLabelText(d, useAdvancedLabels).split('\n');
+                const lines = pointLabelText(d, useAdvancedLabels, showConcurrencyLabels).split(
+                  '\n',
+                );
                 const text = d3
                   .select(this)
                   .selectAll<SVGTextElement, boolean>('.overlay-label')
@@ -2235,6 +2685,22 @@ const ScatterGraph = React.memo(
                   hide: () => zoomGroup.select('.ruler-group').style('display', 'none'),
                 },
                 onClick: (point) => {
+                  // Overlay points participate in the perf ruler too — a
+                  // ruler-mode click acts as a click on the overlay curve at
+                  // the point's x instead of keeping the pinned tooltip (see
+                  // AGENTS.md "Unofficial Run Support").
+                  const ruler = perfRulerRef.current;
+                  if (ruler.mode) {
+                    track('latency_data_point_clicked', {
+                      hw: String(point.hwKey),
+                      x: point.x,
+                      y: point.y,
+                      overlay: true,
+                      perfRuler: true,
+                    });
+                    ruler.onPointClick(point, 'overlay');
+                    return;
+                  }
                   track('latency_data_point_clicked', {
                     hw: String(point.hwKey),
                     x: point.x,
@@ -2275,109 +2741,6 @@ const ScatterGraph = React.memo(
             },
           }
         : null;
-
-      const speedOverlayLayer: CustomLayerConfig = {
-        type: 'custom',
-        key: 'speed-overlay',
-        displayIdentity: `${showSpeedOverlay}:${showMinecraftOverlay}`,
-        render: (_zoomGroup, ctx) => {
-          const { g } = ctx.layout;
-          g.selectAll('.speed-overlay').remove();
-          if (!showSpeedOverlay && !showMinecraftOverlay) return;
-          const w = ctx.width;
-          const h = ctx.height;
-          const SIZE = 78;
-          const PAD = 8;
-          const STACK_GAP = 4;
-          const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
-          const dir = chartDefinition[rooflineKey] as RooflineDirection | undefined;
-          const { busTop, busLeft } = getSpeedOverlayCorners(dir);
-          const layer = g.append('g').attr('class', 'speed-overlay').attr('pointer-events', 'none');
-
-          // Each enabled "pair" stacks horizontally inward from the chart corner so
-          // the second pair sits next to (not on top of) the first one when both
-          // toggles are on. The bus-side stays anchored to the batch corner; the
-          // car-side stays anchored to the interactive corner. Pair items can have
-          // independent slow/fast sizes so the donkey can be visually heavier than
-          // the elytra without affecting the bus/car pair.
-          interface OverlayPair {
-            id: string;
-            slowSrc: string;
-            fastSrc: string;
-            slowSize: number;
-            fastSize: number;
-          }
-          const enabledPairs: OverlayPair[] = [];
-          if (showSpeedOverlay) {
-            enabledPairs.push({
-              id: 'speed',
-              slowSrc: '/decorative/bus.png',
-              fastSrc: '/decorative/racing-car.png',
-              slowSize: SIZE,
-              fastSize: SIZE,
-            });
-          }
-          if (showMinecraftOverlay) {
-            // donkey-chest.png — Chested_Donkey_JE5 from minecraft.wiki/w/Donkey,
-            //   rendered 50% larger than the other overlay icons (1.5× SIZE).
-            // elytra.png — ElytraNew sprite (front-facing both wings) from the
-            //   Minecraft Fandom wiki at 160×160 pixel-art.
-            enabledPairs.push({
-              id: 'minecraft',
-              slowSrc: '/decorative/donkey-chest.png',
-              fastSrc: '/decorative/elytra.png',
-              slowSize: Math.round(SIZE * 1.5),
-              fastSize: SIZE,
-            });
-          }
-
-          const slowCornerName = `${busTop ? 'top' : 'bottom'}-${busLeft ? 'left' : 'right'}`;
-          const fastCornerName = `${busTop ? 'bottom' : 'top'}-${busLeft ? 'right' : 'left'}`;
-          let slowInward = 0;
-          let fastInward = 0;
-          enabledPairs.forEach((pair) => {
-            const slowX = busLeft ? PAD + slowInward : w - pair.slowSize - PAD - slowInward;
-            const slowY = busTop ? PAD : h - pair.slowSize - PAD;
-            const fastX = busLeft ? w - pair.fastSize - PAD - fastInward : PAD + fastInward;
-            const fastY = busTop ? h - pair.fastSize - PAD : PAD;
-            layer
-              .append('image')
-              .attr('class', `speed-overlay-slow speed-overlay-${pair.id}-slow`)
-              .attr('data-testid', `speed-overlay-${pair.id}-slow`)
-              .attr('data-corner', slowCornerName)
-              .attr('href', pair.slowSrc)
-              .attr('x', slowX)
-              .attr('y', slowY)
-              .attr('width', pair.slowSize)
-              .attr('height', pair.slowSize)
-              .attr('opacity', 0.85);
-            layer
-              .append('image')
-              .attr('class', `speed-overlay-fast speed-overlay-${pair.id}-fast`)
-              .attr('data-testid', `speed-overlay-${pair.id}-fast`)
-              .attr('data-corner', fastCornerName)
-              .attr('href', pair.fastSrc)
-              .attr('x', fastX)
-              .attr('y', fastY)
-              .attr('width', pair.fastSize)
-              .attr('height', pair.fastSize)
-              .attr('opacity', 0.85);
-            slowInward += pair.slowSize + STACK_GAP;
-            fastInward += pair.fastSize + STACK_GAP;
-          });
-
-          // Backwards-compatible aliases so existing E2E tests (speed-overlay.cy.ts)
-          // can still find the bus/car pair via `[data-testid="speed-overlay-bus"]`
-          // and `[data-testid="speed-overlay-car"]`.
-          if (showSpeedOverlay) {
-            layer.select('.speed-overlay-speed-slow').attr('data-testid', 'speed-overlay-bus');
-            layer.select('.speed-overlay-speed-fast').attr('data-testid', 'speed-overlay-car');
-          }
-        },
-        onDisplayUpdate: (_zoomGroup, ctx) => {
-          speedOverlayLayer.render?.(_zoomGroup, ctx);
-        },
-      };
 
       // ── Intentional clipping: interpolated dashed Pareto continuation + arrow ──
       const drawOverflowContinuations = (
@@ -2544,6 +2907,7 @@ const ScatterGraph = React.memo(
           foreground: current.getCssColor('--foreground'),
           mutedForeground: current.getCssColor('--muted-foreground'),
           onLinkClick: (annotation) =>
+            annotation.issue &&
             track('inference_known_issue_clicked', {
               hwKey: annotation.issue.hwKey,
               issue: annotation.issue.issueRef,
@@ -2551,9 +2915,37 @@ const ScatterGraph = React.memo(
         };
       });
 
+      // ── Perf ruler (opt-in iso-x measurement between two curves) ──
+      // Mode and measurement are read through refs, so this layer needs
+      // no perf-ruler dependencies: full re-renders redraw it after the data
+      // phase (the iso-x lives in data space, so it survives metric/display
+      // re-renders), and onZoom keeps it glued to the curves during pan/zoom.
+      // It lives inside the zoomGroup, so it is clipped and PNG-exported like
+      // any other mark.
+      const perfRulerLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'perf-ruler',
+        render: (zoomGroup, ctx) =>
+          drawPerfRuler(
+            zoomGroup,
+            (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
+            (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
+            ctx.width,
+            ctx.height,
+          ),
+        onZoom: (zoomGroup, ctx) =>
+          drawPerfRuler(
+            zoomGroup,
+            ctx.newXScale as ContinuousScale,
+            ctx.newYScale as ContinuousScale,
+            ctx.width,
+            ctx.height,
+          ),
+      };
+
       const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
-      result.push(overflowContinuationLayer, speedOverlayLayer, knownIssueLayer);
+      result.push(overflowContinuationLayer, perfRulerLayer, knownIssueLayer);
       return result;
       // Interaction state (visibility, colors, precision shapes, known-issue
       // annotations) is deliberately NOT a dependency: layer closures read it
@@ -2566,13 +2958,12 @@ const ScatterGraph = React.memo(
       showGradientLabels,
       showLineLabels,
       pinLineLabels,
-      showSpeedOverlay,
-      showMinecraftOverlay,
       gradientColorByPoint,
       chartId,
       pointsData,
       showPointLabels,
       useAdvancedLabels,
+      showConcurrencyLabels,
       buildPointId,
       overlayData,
       processedOverlayData,
@@ -2587,6 +2978,7 @@ const ScatterGraph = React.memo(
       selectedYAxisMetric,
       chartDefinition,
       locale,
+      drawPerfRuler,
     ]);
 
     // Layers handle for the decoration effect — lets it re-run individual
@@ -2855,6 +3247,50 @@ const ScatterGraph = React.memo(
         .remove();
     }, [overlayData]);
 
+    // Perf-ruler decorations: refresh the curve hit strokes and redraw all
+    // rulers whenever the mode, ruler state, visibility filters, or
+    // underlying data change. Narrow mutation scope — only the hit layer
+    // and the ruler groups are touched; the chart itself never rebuilds for
+    // a ruler interaction. Redraws use the currently applied zoom transform
+    // (mode, rulers, and live iso-x are read through refs in drawPerfRuler).
+    //
+    // Ordering matters twice here — this effect is deliberately declared
+    // AFTER both (a) the mark-styling effect that writes curve opacities
+    // from the legend/precision filters, so hiding a curve clears the ruler,
+    // label, arrow, and halos in the SAME commit paint (no lingering frame),
+    // and (b) the overlay-cleanup effect above, so a dismissed overlay's
+    // paths are already gone when the ruler re-resolves.
+    useLayoutEffect(() => {
+      const display = getDisplaySelection();
+      if (!display) return;
+      const zoomCtx = currentZoomRenderContext(display.svg, display.ctx);
+      drawPerfRuler(
+        display.zoomGroup,
+        zoomCtx.xScale as ContinuousScale,
+        zoomCtx.yScale as ContinuousScale,
+        display.ctx.width,
+        display.ctx.height,
+      );
+      // Hidden-but-present curves KEEP their rulers (a legend re-toggle
+      // brings a hidden ruler back); curves whose paths left the DOM
+      // entirely are truly gone from the data, so prune each ruler (and the
+      // draft) that references one. `prunePerfRulers` bails out with the
+      // same reference when nothing changed.
+      setPerfRulerState((prev) =>
+        prunePerfRulers(prev, (cls) => !display.zoomGroup.select(`.${CSS.escape(cls)}`).empty()),
+      );
+    }, [
+      getDisplaySelection,
+      perfRulerMode,
+      perfRulerState,
+      drawPerfRuler,
+      dataIdentity,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+      hideNonOptimal,
+      overlayData,
+    ]);
+
     // Dismiss tooltip on filter changes
     useEffect(() => {
       chartRef.current?.dismissTooltip();
@@ -2914,7 +3350,11 @@ const ScatterGraph = React.memo(
               </Button>
             </div>
           </div>
-          <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
+          <QuickFiltersDialog
+            open={quickFiltersOpen}
+            onOpenChange={setQuickFiltersOpen}
+            bestPerSku={{ checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }}
+          />
         </div>
       );
     }
@@ -3062,43 +3502,13 @@ const ScatterGraph = React.memo(
                 track('latency_legend_expanded', { expanded });
               }}
               switches={[
-                {
-                  id: 'scatter-best-per-sku',
-                  label: legendT.bestPerSku,
-                  checked: bestPerSku,
-                  onCheckedChange: (checked: boolean) => {
-                    setBestPerSku(checked);
-                    if (overlayData) {
-                      if (checked) {
-                        const direction =
-                          chartDefinition[
-                            `${selectedYAxisMetric}_roofline` as keyof ChartDefinition
-                          ];
-                        if (
-                          direction === 'upper_right' ||
-                          direction === 'upper_left' ||
-                          direction === 'lower_left' ||
-                          direction === 'lower_right'
-                        ) {
-                          const selection = bestSeriesPerSku(data, direction);
-                          for (const key of bestSeriesPerSku(overlayData.data, direction)) {
-                            selection.add(`overlay:${key}`);
-                          }
-                          commitUnifiedSelection(selection);
-                        }
-                      } else {
-                        resetUnifiedSelection();
-                      }
-                    }
-                    track('inference_best_per_sku_toggled', { enabled: checked });
-                  },
-                },
                 ...(selectedYAxisMetric === 'y_inputTputPerGpu'
                   ? []
                   : [
                       {
                         id: 'scatter-log-scale',
                         label: legendT.logScale,
+                        advanced: true,
                         checked: logScale,
                         onCheckedChange: (checked: boolean) => {
                           setLogScale(checked);
@@ -3124,6 +3534,7 @@ const ScatterGraph = React.memo(
                 {
                   id: 'scatter-point-labels',
                   label: legendT.labels,
+                  advanced: true,
                   checked: showPointLabels,
                   onCheckedChange: (checked: boolean) => {
                     setShowPointLabels(checked);
@@ -3133,6 +3544,7 @@ const ScatterGraph = React.memo(
                 {
                   id: 'scatter-high-contrast',
                   label: legendT.highContrast,
+                  advanced: true,
                   checked: highContrast,
                   onCheckedChange: (checked: boolean) => {
                     setHighContrast(checked);
@@ -3142,6 +3554,7 @@ const ScatterGraph = React.memo(
                 {
                   id: 'scatter-parallelism-labels',
                   label: legendT.parallelismLabels,
+                  advanced: true,
                   checked: useAdvancedLabels,
                   onCheckedChange: (checked: boolean) => {
                     setUseAdvancedLabels(checked);
@@ -3179,6 +3592,7 @@ const ScatterGraph = React.memo(
                 {
                   id: 'scatter-line-labels',
                   label: legendT.lineLabels,
+                  advanced: true,
                   checked: showLineLabels,
                   onCheckedChange: (checked: boolean) => {
                     setShowLineLabels(checked);
@@ -3186,23 +3600,32 @@ const ScatterGraph = React.memo(
                   },
                 },
                 {
-                  id: 'scatter-speed-overlay',
-                  label: 'Bus / Race Car',
+                  id: 'scatter-perf-ruler',
+                  label: legendT.perfRuler,
                   advanced: true,
-                  checked: showSpeedOverlay,
+                  checked: perfRulerMode,
+                  infoTooltip: legendT.perfRulerInfo,
                   onCheckedChange: (checked: boolean) => {
-                    setShowSpeedOverlay(checked);
-                    track('latency_speed_overlay_toggled', { enabled: checked });
+                    setPerfRulerMode(checked);
+                    // Toggle-off clears ALL rulers in the same state batch —
+                    // the pre-paint decoration effect then removes the rulers
+                    // and the curve hit strokes before the next frame (no
+                    // lingering lines after toggle-off).
+                    if (!checked) setPerfRulerState(clearPerfRulers);
+                    track('latency_perf_ruler_toggled', { enabled: checked });
                   },
                 },
                 {
-                  id: 'scatter-minecraft-overlay',
-                  label: 'Donkey / Elytra',
+                  id: 'scatter-concurrency-labels',
+                  label: legendT.concurrencyLabels,
                   advanced: true,
-                  checked: showMinecraftOverlay,
+                  checked: showConcurrencyLabels,
                   onCheckedChange: (checked: boolean) => {
-                    setShowMinecraftOverlay(checked);
-                    track('latency_minecraft_overlay_toggled', { enabled: checked });
+                    setShowConcurrencyLabels(checked);
+                    track('latency_concurrency_labels_toggled', { enabled: checked });
+                    // Concurrency is a point-label annotation; turning it on is
+                    // pointless if labels are hidden, so auto-enable Labels.
+                    if (checked && !showPointLabels) setShowPointLabels(true);
                   },
                 },
               ]}
@@ -3225,6 +3648,20 @@ const ScatterGraph = React.memo(
                       },
                     ]
                   : []),
+                ...(perfRulerState.rulers.length > 0
+                  ? [
+                      {
+                        id: 'scatter-clear-perf-rulers',
+                        label: legendT.clearPerfRulers(perfRulerState.rulers.length),
+                        onClick: () => {
+                          track('latency_perf_ruler_cleared', {
+                            count: perfRulerState.rulers.length,
+                          });
+                          setPerfRulerState(clearPerfRulers);
+                        },
+                      },
+                    ]
+                  : []),
                 {
                   id: 'scatter-quick-filters',
                   label: legendT.quickFilters(quickFilterCount),
@@ -3235,19 +3672,16 @@ const ScatterGraph = React.memo(
                 },
               ]}
               precisionIndicators={selectedPrecisions}
-              keyIndicators={
-                hasOffloadHalo || selectedSequence === Sequence.AgenticTraces ? (
-                  <>
-                    {hasOffloadHalo && <OffloadHaloLegendKey />}
-                    {selectedSequence === Sequence.AgenticTraces && <AgenticOptimizationNote />}
-                  </>
-                ) : undefined
-              }
+              hideAtomFootnote
               enableTooltips={true}
             />
           }
         />
-        <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
+        <QuickFiltersDialog
+          open={quickFiltersOpen}
+          onOpenChange={setQuickFiltersOpen}
+          bestPerSku={{ checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }}
+        />
         {pointsTable && (
           <LegendPointsDialog
             open

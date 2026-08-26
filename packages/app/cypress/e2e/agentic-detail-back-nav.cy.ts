@@ -254,7 +254,9 @@ describe('Agentic point detail — returning to the chart', () => {
     cy.location('pathname').should('match', /^\/inference\/agentic\/\d+$/u);
     backControl('en').click();
 
-    cy.location('pathname').should('eq', '/inference');
+    // Picking Kimi K3 moved the chart's history entry onto its indexable
+    // subroute, so Back returns there — the path itself now pins the model.
+    cy.location('pathname').should('eq', '/inference/kimi-k3');
     assertRestoredChart();
   });
 

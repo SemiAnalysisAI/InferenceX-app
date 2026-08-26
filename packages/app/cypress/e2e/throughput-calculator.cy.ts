@@ -80,9 +80,12 @@ describe('TCO Calculator', () => {
       });
     });
 
-    it('renders Precision multi-selector', () => {
+    it('hides the Precision selector for a single-precision model', () => {
+      // DeepSeek-V4-Pro is FP4-only in the fixtures — with one precision there
+      // is nothing to choose, so the control is hidden entirely.
+      cy.get('[data-testid="calc-cost-selector"]').should('exist');
       cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.contains('Precision').should('exist');
+        cy.contains('Precision').should('not.exist');
       });
     });
 
@@ -592,7 +595,7 @@ describe('TCO Calculator', () => {
     // open straight to the right model without a flash of the default. See #430.
     it('?g_model= seeds the model selector before client hydration', () => {
       cy.request('/calculator?g_model=DeepSeek-V4-Pro').then((response) => {
-        expect(response.body).to.contain('DeepSeek V4 Pro 1.6T');
+        expect(response.body).to.contain('DeepSeek V4 Pro 0813 1.6T');
         expect(response.body).not.to.contain('DeepSeek R1 0528 671B');
       });
     });
@@ -602,7 +605,10 @@ describe('TCO Calculator', () => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       });
       cy.visit('/calculator?g_model=DeepSeek-V4-Pro');
-      cy.get('[data-testid="calc-model-selector"]').should('contain.text', 'DeepSeek V4 Pro 1.6T');
+      cy.get('[data-testid="calc-model-selector"]').should(
+        'contain.text',
+        'DeepSeek V4 Pro 0813 1.6T',
+      );
     });
   });
 
@@ -653,7 +659,10 @@ describe('TCO Calculator', () => {
     });
 
     it('renders throughput and cost calculations from null-ISL/OSL agentic rows', () => {
-      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic');
+      // The agentic fixture exposes a single scenario, so the scenario
+      // control disappears entirely — no dropdown, no static readout.
+      cy.get('[data-testid="scenario-static-value"]').should('not.exist');
+      cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
       cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
       cy.get('[data-testid="calculator-no-data"]').should('not.exist');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
@@ -710,7 +719,10 @@ describe('TCO Calculator', () => {
       });
       cy.wait('@agenticBenchmarks');
 
-      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic');
+      // Single-scenario fixture → the scenario control disappears entirely;
+      // the gate is locked, so no percentile selector either.
+      cy.get('[data-testid="scenario-static-value"]').should('not.exist');
+      cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
       cy.get('[data-testid="calc-percentile-selector"]').should('not.exist');
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
@@ -723,10 +735,9 @@ describe('TCO Calculator', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Cost target: the inverse of the interactivity slider. The MW-budget
-  // projection this used to sit beside now lives in the lifecycle section, which
-  // owns the budget input and reports chips and users as columns — see
-  // calculator-lifecycle.cy.ts.
+  // Cost target: the inverse of the interactivity slider. The MW-budget input
+  // lives here now that the Fleet Lifecycle section moved to its own /fleet
+  // page — see fleet-lifecycle.cy.ts. Both pages share the `c_mw` URL param.
   // ---------------------------------------------------------------------------
 
   describe('cost target', () => {
@@ -760,11 +771,15 @@ describe('TCO Calculator', () => {
       });
     });
 
-    it('no longer carries a MW budget input — the lifecycle section owns it', () => {
+    it('owns the MW budget input now that the lifecycle section moved to /fleet', () => {
       cy.get('[data-testid="calculator-costcap-section"]')
-        .find('[data-testid="calc-fleet-mw-input"]')
-        .should('not.exist');
-      cy.get('[data-testid="calculator-fleet-section"]').should('not.exist');
+        .find('[data-testid="calc-costcap-mw-input"]')
+        .should('exist');
+      cy.get('[data-testid="calculator-lifecycle-section"]').should('not.exist');
+      // A pointer to the new page replaces the section.
+      cy.get('[data-testid="calculator-fleet-pointer-link"]')
+        .should('have.attr', 'href')
+        .and('match', /\/fleet$/);
     });
 
     it('entering a generous cost target renders reachable interactivity per GPU', () => {

@@ -178,6 +178,20 @@ export function getCompareModelBySlug(slug: string): CompareModelSlug | null {
   return SLUG_TO_MODEL[canonical] ?? null;
 }
 
+const DISPLAY_NAME_TO_SLUG: Record<string, CompareModelSlug> = Object.fromEntries(
+  COMPARE_MODEL_SLUGS.map((m) => [m.displayName, m]),
+);
+
+/**
+ * Resolve a dashboard model (the `Model` enum value / `g_model` param) to its
+ * canonical model-page slug entry. Used by the `/model/[slug]` pages and by
+ * the dashboard's "learn more about the architecture" link. Returns null for
+ * models without a public slug (e.g. hidden models like Llama 3.1 70B).
+ */
+export function getModelSlugEntryForDisplayName(displayName: string): CompareModelSlug | null {
+  return DISPLAY_NAME_TO_SLUG[displayName] ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Slug parsing and canonicalization
 // ---------------------------------------------------------------------------

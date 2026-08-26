@@ -1,4 +1,5 @@
 import type { ChartDefinition } from './types';
+import type { TokenMetricType } from '@/lib/supplemental-benchmarks';
 
 export type RooflineDirection = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 
@@ -415,7 +416,7 @@ export type CustomMetricKey = {
 export type BenchmarkMetricKey = Exclude<MetricKey, CustomMetricKey>;
 export type BenchmarkMetricConfigKey = `y_${BenchmarkMetricKey}`;
 
-export const DEFAULT_METRIC_CONFIG_KEY = 'y_tokensPerDollarH' satisfies MetricConfigKey;
+export const DEFAULT_METRIC_CONFIG_KEY = 'y_tokensPerDollarN' satisfies MetricConfigKey;
 
 export function isMetricKey(metricKey: string): metricKey is MetricKey {
   return Object.hasOwn(METRIC_REGISTRY, metricKey);
@@ -423,6 +424,15 @@ export function isMetricKey(metricKey: string): metricKey is MetricKey {
 
 export function isBenchmarkMetricKey(metricKey: string): metricKey is BenchmarkMetricKey {
   return isMetricKey(metricKey) && !('source' in METRIC_REGISTRY[metricKey]);
+}
+
+/** Token basis represented by a y-axis option. Non-output metrics deliberately
+ * resolve to total/input so output-only snapshots cannot leak into them. */
+export function tokenMetricTypeForConfigKey(metric: string): TokenMetricType {
+  const normalized = metric.toLowerCase();
+  if (normalized.includes('output')) return 'output';
+  if (normalized.includes('input') || /cost[hnr]i$/u.test(normalized)) return 'input';
+  return 'total';
 }
 
 /**

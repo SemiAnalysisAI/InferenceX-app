@@ -7,6 +7,12 @@ import {
   type DashboardRouteKey,
 } from '@/lib/dashboard-routes';
 import { languageAlternates } from '@/lib/i18n';
+import {
+  DEFAULT_ROUTE_MODEL,
+  modelRoutePath,
+  type ModelRoute,
+  type ModelRouteTab,
+} from '@/lib/model-routes';
 
 export const LANDING_META = {
   title: 'Open-Source Agentic Inference Benchmark',
@@ -34,6 +40,11 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
     title: 'Throughput & TCO Calculator',
     description:
       'Calculate AI inference throughput and total cost of ownership. Compare chip cost-efficiency for LLM serving across hardware configurations.',
+  },
+  fleet: {
+    title: 'Fleet Lifecycle Economics',
+    description:
+      'Project a fixed AI inference fleet across its life: size it against a facility power budget, then track revenue, cost, and margin as measured software configs improve over time.',
   },
   reliability: {
     title: 'Provider Reliability Metrics',
@@ -83,6 +94,63 @@ export const isValidTab = isDashboardRouteKey;
 export function getTabTitle(tab: string): string {
   const meta = isDashboardRouteKey(tab) ? TAB_META[tab] : undefined;
   return meta ? `${meta.title} | ${TITLE_SUFFIX}` : TITLE_SUFFIX;
+}
+
+/** Model-specific copy for the per-model tab routes (/calculator/<slug>,
+ *  /historical/<slug>). Same shape as TAB_META but parameterized on the
+ *  model's SEO name. */
+export const MODEL_TAB_META: Record<
+  ModelRouteTab,
+  { title: (seoName: string) => string; description: (seoName: string) => string }
+> = {
+  historical: {
+    title: (seoName) => `${seoName} Historical Inference Trends`,
+    description: (seoName) =>
+      `Track ${seoName} inference performance over time. Historical benchmark data showing chip and provider improvements in latency, throughput, and cost for ${seoName}.`,
+  },
+  calculator: {
+    title: (seoName) => `${seoName} Throughput & TCO Calculator`,
+    description: (seoName) =>
+      `Calculate ${seoName} inference throughput and total cost of ownership. Compare chip cost-efficiency for serving ${seoName} across hardware configurations.`,
+  },
+};
+
+/**
+ * English path a per-model tab page canonicalizes to. The default model's
+ * page shows exactly what the bare tab route shows, so it canonicalizes to
+ * the bare path instead of competing with it; every other model is
+ * self-canonical.
+ */
+export function modelTabCanonicalPath(tab: ModelRouteTab, route: ModelRoute): string {
+  return route.model === DEFAULT_ROUTE_MODEL
+    ? getDashboardRoute(tab).canonicalPath
+    : modelRoutePath(tab, route.slug);
+}
+
+/** Generate Next.js Metadata for a per-model tab page. */
+export function modelTabMetadata(tab: ModelRouteTab, route: ModelRoute): Metadata {
+  const meta = MODEL_TAB_META[tab];
+  const title = meta.title(route.seoName);
+  const description = meta.description(route.seoName);
+  const enPath = modelTabCanonicalPath(tab, route);
+  const url = `${SITE_URL}${enPath}`;
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: url,
+      languages: languageAlternates(enPath),
+    },
+    openGraph: {
+      title: `${title} | ${SITE_NAME}`,
+      description,
+      url,
+    },
+    twitter: {
+      title: `${title} | ${SITE_NAME}`,
+      description,
+    },
+  };
 }
 
 /** Generate Next.js Metadata for a tab page. */

@@ -12,7 +12,7 @@ import { StarButton } from './footer-star-cta';
 const STRINGS = {
   en: {
     description:
-      'Continuous open-source inference benchmarking. Real-world, reproducible, auditable performance data trusted by trillion dollar AI infrastructure operators like OpenAI, Meta, Oracle, Microsoft, etc.',
+      'Continuous open-source agentic inference benchmarking. Real-world, reproducible, auditable performance data trusted by trillion dollar AI infrastructure operators like OpenAI, Meta, Oracle, Microsoft, etc.',
     semianalysis: 'SemiAnalysis',
     mainSite: 'Main Site',
     newsletter: 'Newsletter',
@@ -28,11 +28,14 @@ const STRINGS = {
     more: 'More',
     supporters: 'Supporters',
     agentx: 'AgentX',
+    telemetry: 'Telemetry',
     articles: 'Articles',
     apiReference: 'API Reference',
     gpuReliability: 'Chip Reliability',
     perfPerDollar: 'Performance per Dollar',
+    modelArchitectures: 'Model Architectures',
     glossary: 'AI Inference Glossary',
+    chipSpecs: 'Chip Specs & Pricing',
     languageLink: '中文版',
     languageHref: '/zh',
     languageHrefLang: 'zh-CN',
@@ -41,7 +44,7 @@ const STRINGS = {
   },
   zh: {
     description:
-      'InferenceX 持续开展开源推理基准测试，发布来自真实环境、可复现、可审计的性能数据，并获得 OpenAI、Meta、Oracle、Microsoft 等万亿美元级 AI 基础设施运营方的信赖。',
+      'InferenceX 持续开展开源的 agentic 推理基准测试，发布来自真实环境、可复现、可审计的性能数据，并获得 OpenAI、Meta、Oracle、Microsoft 等万亿美元级 AI 基础设施运营方的信赖。',
     semianalysis: 'SemiAnalysis',
     mainSite: 'SemiAnalysis 官网',
     newsletter: '订阅通讯',
@@ -57,11 +60,14 @@ const STRINGS = {
     more: '更多',
     supporters: '业界评价',
     agentx: 'AgentX',
+    telemetry: '遥测数据',
     articles: '技术文章',
     gpuReliability: '芯片可靠性',
     apiReference: 'API 文档',
     perfPerDollar: '每美元性能',
+    modelArchitectures: '模型架构',
     glossary: 'AI 推理术语表',
+    chipSpecs: '芯片规格与价格',
     languageLink: 'English',
     languageHref: '/',
     languageHrefLang: 'en',
@@ -216,6 +222,14 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 {t.agentx}
               </Link>
               <Link
+                data-testid="footer-link-telemetry"
+                href={`${prefix}/inference/agentic`}
+                onClick={() => track('footer_telemetry_clicked')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.telemetry}
+              </Link>
+              <Link
                 data-testid="footer-link-articles"
                 href={`${prefix}/blog`}
                 onClick={() => track('footer_articles_clicked')}
@@ -246,11 +260,26 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 {t.perfPerDollar}
               </Link>
               <Link
+                data-testid="footer-link-model-architectures"
+                // English-only route (not zh-mirrored), so no locale prefix.
+                href="/model"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.modelArchitectures}
+              </Link>
+              <Link
                 data-testid="footer-link-glossary"
                 href={`${prefix}/glossary`}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 {t.glossary}
+              </Link>
+              <Link
+                data-testid="footer-link-chips"
+                href={`${prefix}/chips`}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.chipSpecs}
               </Link>
               <Link
                 data-testid="footer-link-zh"

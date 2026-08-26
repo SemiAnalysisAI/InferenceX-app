@@ -86,12 +86,20 @@ function segment(raw: string, isProse: boolean): string[] {
 // English form per AGENTS.md rule 6 — that is the one recorded exception.
 const CHIP_UNITS = /(?:tok|tokens?)\/s\/chip|\$\/chip[/-](?:hr|hour)|[A-Za-z]Chip\b|\bChip[A-Z]/giu;
 
+// A URL is an address, not prose. `…/openai-broadcom-jalapeno-inference-chip/`
+// carries the word without stating any translation decision, and rewriting it
+// would break the link, so URLs leave the corpus before any rule reads it.
+const URL_LIKE = /https?:\/\/\S+/giu;
+
+const ignoring = (...patterns: RegExp[]) =>
+  new RegExp(patterns.map((pattern) => pattern.source).join('|'), 'giu');
+
 const RULES: Rule[] = [
   {
     id: 'chip-untranslated',
     corpus: 'chinese',
     fix: '写作「芯片」（单位 tok/s/chip 等除外）',
-    find: matcher(/\b[Cc]hip\b/gu, CHIP_UNITS),
+    find: matcher(/\b[Cc]hip\b/gu, ignoring(URL_LIKE, CHIP_UNITS)),
   },
   {
     id: 'hardcoded-english-label',

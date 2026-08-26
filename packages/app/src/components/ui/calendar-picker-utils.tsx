@@ -137,8 +137,6 @@ export function isCalendarDateOutOfRange(
   date: Date,
   minAllowedDate: Date,
   maxAllowedDate: Date,
-  // MultiDatePicker keeps legacy exclusive min/max boundaries; the other pickers use inclusive edges.
-  excludeBoundaryDates = false,
 ): boolean {
   const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const minDateOnly = new Date(
@@ -151,10 +149,6 @@ export function isCalendarDateOutOfRange(
     maxAllowedDate.getMonth(),
     maxAllowedDate.getDate(),
   );
-  if (excludeBoundaryDates) {
-    return dateOnly <= minDateOnly || dateOnly >= maxDateOnly;
-  }
-
   return dateOnly < minDateOnly || dateOnly > maxDateOnly;
 }
 

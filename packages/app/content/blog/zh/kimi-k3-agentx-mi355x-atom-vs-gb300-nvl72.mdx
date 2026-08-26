@@ -1,0 +1,70 @@
+---
+title: 'Kimi K3 的 AgentX 结果：MI355X ATOM 在部分曲线上胜过 GB300 NVL72'
+subtitle: 'AMD 的厂商引擎在每美元性能前沿上赢下了实打实的一段，而 Hopper 连服务 K3 都很吃力'
+seoDescription: '在 Kimi K3 的 AgentX 运行中，端到端延迟 40 到 60 秒的区间内，MI355X ATOM 在每美元性能上胜过 GB300 NVL72 vLLM；而 Hopper 表现吃力，因为 K3 需要定制的 SM90 kernel 以及调优过的 TP32、EP32 形状。'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - kimi
+  - mi355x
+  - gb300
+  - nvl72
+  - h200
+  - amd
+  - nvidia
+---
+
+在端到端延迟 40 到 60 秒的那段曲线上，MI355X ATOM 的每美元性能甚至胜过 GB300 NVL72 vLLM。在一个 2.8 万亿参数的模型上、面对 NVIDIA 的机架级系统，这是 AMD 实打实赢来的结果。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/27a3f80e-7959-4651-90eb-f498989908a3_1934x1284.png"
+  caption="来源：SemiAnalysis InferenceX"
+/>
+
+## 上游这个前提
+
+AMD 用 [ATOM](/zh/glossary/atom) 快速推进 K3 性能是件好事。与之相伴的建议是：优先把这些改进上游到 vLLM。ATOM 目前是 AMD 性能最好的引擎，但对使用上游开源服务栈的客户来说，vLLM 才是更有参考价值的对比对象；只在厂商运行时下成立的曲线，并不能代表这些客户实际能部署的性能。
+
+## Hopper 基本无法参与
+
+Hopper 很难承接 Kimi K3 的 AgentX 工作负载。一方面 Kimi 确实是个庞大的模型，另一方面 vLLM 维护者和 NVIDIA 一直没有把精力放在为 K3 优化 Hopper 上。
+
+具体原因是明确的，而非笼统的：Hopper（SM90）需要为 K3 定制调优 kernel，并针对高[交互性](/zh/glossary/interactivity)服务调优 TP32 和 EP32 的 shape。这两者目前都不存在，因此真正的约束与其说是硬件，不如说是没有人在做这件事。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/ce2b58fc-b7b7-46c2-ae05-baa14419d233_2048x1459.png"
+  caption="来源：SemiAnalysis InferenceX"
+/>
+
+这提醒我们：基准测试图表上的代际差距，有一部分其实是工程投入上的代际差距。Hopper 多年来能很好地服务 DeepSeek R1，是因为那个模型持续获得 kernel 层面的投入；K3 没有得到同等对待，曲线也就如实反映了这一差别。
+
+---
+
+_本文结果只是 AgentX 1.0 的一个切面。完整分析、回放方法，以及该基准测试推动的 70 多个上游 PR，请见 [AgentX - InferenceXv3：CUDA 护城河在 agentic 推理中还站得住吗？](/zh/blog/agentx-inferencexv3-does-cuda-moat)。每个数据点都可以在[免费仪表板](https://inferencex.semianalysis.com/)上自行探索。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "在 Kimi K3 上，AMD 有胜过 NVIDIA 的地方吗？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "有，在部分曲线上。在端到端延迟 40 到 60 秒的区间内，MI355X ATOM 的每美元性能甚至胜过 GB300 NVL72 vLLM。前提是 ATOM 属于 AMD 的厂商引擎而非上游开源软件栈，因此对多数客户而言 vLLM 仍是更有参考价值的对比对象。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Hopper 在 Kimi K3 上为什么吃力？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Kimi K3 体量巨大，而 vLLM 维护者和 NVIDIA 都没有把精力放在为它优化 Hopper 上。要在 SM90 上以高交互性服务 K3，需要定制调优的 kernel 以及调优过的 TP32、EP32 形状，而这些工作尚未完成。"
+      }
+    }
+  ]
+}`}</JsonLd>

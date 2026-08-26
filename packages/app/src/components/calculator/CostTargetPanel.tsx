@@ -46,6 +46,9 @@ interface CostTargetPanelProps {
    * concurrent users; the interactivity result itself does not need it.
    */
   mw: number | null;
+  /** Raw MW input value (page-owned so the `c_mw` URL param has one writer). */
+  mwInput: string;
+  onMwInputChange: (raw: string) => void;
 }
 
 const STRINGS = {
@@ -58,6 +61,10 @@ const STRINGS = {
     costCapTooltip:
       'Maximum acceptable cost per million tokens (at the selected pricing tier and token type). The answer is the highest interactivity whose interpolated cost stays at or below this ceiling.',
     costCapPlaceholder: 'e.g. 0.50',
+    mwLabel: 'Facility Power (MW)',
+    mwTooltip:
+      'Optional facility power budget in megawatts. When set, the answer is also expressed as concurrent users on a fleet sized to this budget, using all-in power per chip (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model, not bare TDP.',
+    mwPlaceholder: 'e.g. 10',
     colGpu: 'Chip',
     colMaxInteractivity: 'Max Interactivity (tok/s/user)',
     colTputAtIv: 'Throughput (tok/s/chip)',
@@ -81,6 +88,10 @@ const STRINGS = {
     costCapTooltip:
       '每百万 token 的最高可接受成本（按所选定价层级和 token 类型）。结果为插值成本不超过该上限的最高交互性。',
     costCapPlaceholder: '如 0.50',
+    mwLabel: '设施功率 (MW)',
+    mwTooltip:
+      '可选的设施功率预算（兆瓦）。设置后，结果会同时换算为按该预算确定规模的集群可服务的并发用户数；芯片数量按每芯片全含功率（主机、网络、散热）计算，数据来自 SemiAnalysis Datacenter Industry Model，而非裸 TDP。',
+    mwPlaceholder: '如 10',
     colGpu: '芯片',
     colMaxInteractivity: '最高交互性 (tok/s/user)',
     colTputAtIv: '吞吐量 (tok/s/chip)',
@@ -128,6 +139,8 @@ export default function CostTargetPanel({
   costType,
   visibleHwKeys,
   mw,
+  mwInput,
+  onMwInputChange,
 }: CostTargetPanelProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -270,24 +283,45 @@ export default function CostTargetPanel({
           >
             <div className="flex flex-col gap-4">
               <p className="text-muted-foreground text-sm">{t.costCapDescription}</p>
-              <div className="flex flex-col space-y-1.5 max-w-48">
-                <LabelWithTooltip
-                  htmlFor="calc-costcap"
-                  label={t.costCapLabel}
-                  tooltip={t.costCapTooltip}
-                />
-                <Input
-                  id="calc-costcap"
-                  data-testid="calc-costcap-input"
-                  type="number"
-                  min={0}
-                  step="any"
-                  placeholder={t.costCapPlaceholder}
-                  value={costCapInput}
-                  onChange={handleCostCapChange}
-                  onBlur={handleCostCapBlur}
-                  className="w-32 h-9"
-                />
+              <div className="flex flex-wrap gap-4">
+                <div className="flex flex-col space-y-1.5 max-w-48">
+                  <LabelWithTooltip
+                    htmlFor="calc-costcap"
+                    label={t.costCapLabel}
+                    tooltip={t.costCapTooltip}
+                  />
+                  <Input
+                    id="calc-costcap"
+                    data-testid="calc-costcap-input"
+                    type="number"
+                    min={0}
+                    step="any"
+                    placeholder={t.costCapPlaceholder}
+                    value={costCapInput}
+                    onChange={handleCostCapChange}
+                    onBlur={handleCostCapBlur}
+                    className="w-32 h-9"
+                  />
+                </div>
+                <div className="flex flex-col space-y-1.5 max-w-48">
+                  <LabelWithTooltip
+                    htmlFor="calc-costcap-mw"
+                    label={t.mwLabel}
+                    tooltip={t.mwTooltip}
+                  />
+                  <Input
+                    id="calc-costcap-mw"
+                    data-testid="calc-costcap-mw-input"
+                    type="number"
+                    min={0}
+                    step="any"
+                    placeholder={t.mwPlaceholder}
+                    value={mwInput}
+                    onChange={(e) => onMwInputChange(e.target.value)}
+                    onBlur={() => track('calculator_costcap_mw_set', { mw: mwInput })}
+                    className="w-32 h-9"
+                  />
+                </div>
               </div>
               {costCap && costCapRows.length > 0 ? (
                 <>

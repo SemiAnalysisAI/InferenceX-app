@@ -5,6 +5,7 @@ import { listDatasets } from '@semianalysisai/inferencex-db/queries/datasets';
 import { AGENTX_OPTIMIZATION_SLUGS } from '@/lib/agentx-optimizations';
 import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
 import { getAllPosts } from '@/lib/blog';
+import { getModelPageSlugs } from '@/lib/model-pages';
 import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import { canonicalCompareSlug } from '@/lib/compare-slug';
 import {
@@ -15,8 +16,16 @@ import {
   canonicalPrecisionCompareSlug,
   canonicalSpecDecodeCompareSlug,
 } from '@/lib/compare-variant-slug';
+import { getAllChipRouteSlugs } from '@/lib/chip-pages';
 import { getAllGlossaryEntries } from '@/lib/glossary';
+import { ACTIVE_INFERENCE_MODEL_SLUGS, INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import { languageAlternates, zhPath } from '@/lib/i18n';
+import {
+  DEFAULT_ROUTE_MODEL,
+  MODEL_ROUTE_TABS,
+  MODEL_ROUTES,
+  modelRoutePath,
+} from '@/lib/model-routes';
 import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
 
 type SitemapEntry = MetadataRoute.Sitemap[number];
@@ -60,6 +69,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: route.canonicalPath === '/' ? 1 : 0.9,
       }),
     ),
+    // Per-model tab routes (/calculator/<slug>, /historical/<slug>). The
+    // default model's pages canonicalize to the bare tab paths (already
+    // emitted above), so they stay out of the sitemap.
+    ...MODEL_ROUTE_TABS.flatMap((tab) =>
+      MODEL_ROUTES.filter((route) => route.model !== DEFAULT_ROUTE_MODEL).flatMap((route) =>
+        localizedPair(modelRoutePath(tab, route.slug), {
+          lastModified: now,
+          changeFrequency: 'daily' as const,
+          priority: 0.8,
+        }),
+      ),
+    ),
     ...localizedPair('/overview', {
       lastModified: now,
       changeFrequency: 'daily',
@@ -72,6 +93,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'yearly',
       priority: 0.4,
     }),
+    // Per-model inference pages — the indexable path form of
+    // `/inference?g_model=…`. Deprecated models keep their pages (historical
+    // data stays reachable) at a lower priority than actively benchmarked ones.
+    ...INFERENCE_MODEL_SLUGS.flatMap((entry) =>
+      localizedPair(`/inference/${entry.slug}`, {
+        lastModified: now,
+        changeFrequency: 'daily' as const,
+        priority: ACTIVE_INFERENCE_MODEL_SLUGS.includes(entry) ? 0.8 : 0.5,
+      }),
+    ),
     // The catalog index is indexable; the per-point detail pages it links to
     // stay noindex, so only this page enters the sitemap.
     ...localizedPair('/inference/agentic', {
@@ -139,6 +170,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.6,
       }),
     ),
+    ...localizedPair('/chips', {
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    }),
+    ...getAllChipRouteSlugs().flatMap((slug) =>
+      localizedPair(`/chips/${slug}`, {
+        lastModified: now,
+        changeFrequency: 'weekly' as const,
+        priority: 0.7,
+      }),
+    ),
     ...getAllPosts().flatMap((post) => {
       const entry = {
         lastModified: new Date(`${post.modifiedDate ?? post.date}T00:00:00Z`).toISOString(),
@@ -149,6 +192,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       if (!zhPosts.has(post.slug)) return [{ ...entry, url: `${BASE_URL}/blog/${post.slug}` }];
       return localizedPair(`/blog/${post.slug}`, entry);
     }),
+    // Model deep-dive pages (architecture + vendor evals + embedded dashboard).
+    // English-only: no /zh sibling, so no localizedPair.
+    {
+      url: `${BASE_URL}/model`,
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+    },
+    ...getModelPageSlugs().map((slug) => ({
+      url: `${BASE_URL}/model/${slug}`,
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+    })),
     ...compareSlugs.flatMap(({ modelSlug, a, b }) =>
       localizedPair(`/compare/${canonicalCompareSlug(modelSlug, a, b)}`, {
         lastModified: now,

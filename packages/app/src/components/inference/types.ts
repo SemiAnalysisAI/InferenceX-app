@@ -603,10 +603,9 @@ export interface InferenceDisplayContextType {
   highContrast: boolean;
   logScale: boolean;
   useAdvancedLabels: boolean;
+  showConcurrencyLabels: boolean;
   showGradientLabels: boolean;
   showLineLabels: boolean;
-  showSpeedOverlay: boolean;
-  showMinecraftOverlay: boolean;
 }
 
 /** Stable commands that mutate inference state. */
@@ -647,10 +646,9 @@ export interface InferenceActionsContextType {
   setHighContrast: (highContrast: boolean) => void;
   setLogScale: (logScale: boolean) => void;
   setUseAdvancedLabels: (useAdvancedLabels: boolean) => void;
+  setShowConcurrencyLabels: (showConcurrencyLabels: boolean) => void;
   setShowGradientLabels: (showGradientLabels: boolean) => void;
   setShowLineLabels: (showLineLabels: boolean) => void;
-  setShowSpeedOverlay: (showSpeedOverlay: boolean) => void;
-  setShowMinecraftOverlay: (showMinecraftOverlay: boolean) => void;
   setSelectedGPUs: (gpus: string[]) => void;
   setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void;
   setSelectedDatesFromRunExpansion: (dates: string[] | ((prev: string[]) => string[])) => void;

@@ -1,0 +1,84 @@
+---
+title: 'DeepSeek V4 Pro on AgentX: MI355X vs B200, and the August 21 Flip'
+subtitle: 'AMD matched B200 vLLM on performance per dollar for end-to-end latency, then upstream vLLM work moved the line'
+seoDescription: 'AgentX 1.0 results for DeepSeek V4 Pro 0813 on MI355X against B200. MI355X SGLang matched B200 vLLM on performance per dollar until August 21, 2026, when vLLM optimizations from Inferact and NVIDIA put B200 ahead.'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - deepseek
+  - mi355x
+  - b200
+  - amd
+  - nvidia
+---
+
+DeepSeek V4 Pro 0813 is an ultra popular frontier open weight model from China, with roughly 1.6 trillion parameters and 49 billion active. It is also the model where the AMD and NVIDIA race on [AgentX](/glossary/agentx) was closest, and where the ranking changed inside a single week.
+
+The workload matters here. AgentX replays real agentic coding sessions rather than a fixed prompt, and across all DeepSeek V4 runs the input length distribution came out at p50 88k, p90 272k, p95 404k, and p99 675k tokens, against an output distribution of p50 413, p90 2.2k, p95 3.7k, and p99 8.6k. That is a different machine problem from 8k1k.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/360a051c-6117-4860-a704-b50198f01521_1978x1246.png"
+  caption="Source: InferenceX"
+/>
+
+Before August 21, 2026, AMD's strong MI355X SGLang development team was matching B200 vLLM on performance per dollar for end to end performance. That is a real result and worth stating plainly.
+
+It was also not the whole board. B300 vLLM and B200 SGLang were already beating MI355X at the same time.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9ec4708c-148e-42ee-a7c5-3bf4d9cbdfaa_1938x1246.png"
+  caption="Source: InferenceX"
+/>
+
+After August 21, optimizations in vLLM from Inferact and NVIDIA pushed B200 performance per dollar past MI355X. This is a close race rather than a settled one, and [AMD has published its own list of DeepSeek V4 vLLM optimizations](https://github.com/vllm-project/vllm/issues/52911) with plenty left on it.
+
+## The ATOM asterisk
+
+On end to end latency, ATOM on MI355X beats B200 vLLM. It does not beat B300 or B200 SGLang, and the more important caveat is deployment: most AI labs in China or the west do not want to run ATOM in production, so a win that exists only under the vendor engine does not describe what a customer on an upstream stack receives. Single node open-source performance on MI355X, meaning vLLM, still trails ATOM.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/e8d915c0-c962-4277-b62c-a1b08b8e7179_1924x1262.png"
+  caption="Source: InferenceX"
+/>
+
+## Where MI355X is actually competitive
+
+Overall MI355X performs decently against B200 and B300. Performance is most comparable at the lower throughput and lower latency part of the curve, where only tensor parallelism and more rudimentary kernels are deployed. The gap opens at high throughput, where AMD needs to optimize its DEP kernels, and it opens despite MI355X carrying 1.5x the HBM of B200.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/29cfd340-d61b-46c4-8d87-e081d937b80c_2048x1303.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_vllm%2Cb300_vllm%2Cmi355x_atom%2Cmi355x_vllm&i_label=0)"
+/>
+
+Read both axes together. A configuration can look strong on throughput against [interactivity](/glossary/interactivity) and give that back on [p90](/glossary/tail-latency) time to first token, which is why the comparison above is plotted against TTFT rather than interactivity alone.
+
+---
+
+_These results are one slice of AgentX 1.0. The full analysis, the replay methodology, and the 70+ upstream PRs the benchmark drove are in [AgentX - InferenceXv3: Does the CUDA Moat Hold Up in Agentic Inferencing?](/blog/agentx-inferencexv3-does-cuda-moat). Every point is explorable on the [free dashboard](https://inferencex.semianalysis.com/)._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Did MI355X beat B200 on DeepSeek V4 Pro?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "For a period before August 21, 2026, MI355X SGLang matched B200 vLLM on performance per dollar for end to end performance, and ATOM on MI355X beat B200 vLLM on end to end latency. B300 vLLM and B200 SGLang were beating MI355X over the same period, and after August 21 vLLM optimizations from Inferact and NVIDIA put B200 performance per dollar ahead of MI355X."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does MI355X lose ground at high throughput despite more HBM?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "MI355X carries 1.5x the HBM of B200, but on AgentX its performance is most comparable to B200 and B300 at the lower throughput and lower latency part of the curve, where only tensor parallelism and more rudimentary kernels are used. The high throughput end depends on DEP kernels that AMD still needs to optimize, so the extra memory capacity is not converted into frontier throughput."
+      }
+    }
+  ]
+}`}</JsonLd>

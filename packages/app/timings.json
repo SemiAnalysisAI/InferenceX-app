@@ -45,7 +45,7 @@
       "duration": 3125
     },
     {
-      "spec": "cypress/e2e/calculator-lifecycle.cy.ts",
+      "spec": "cypress/e2e/fleet-lifecycle.cy.ts",
       "duration": 18000
     },
     {
@@ -153,6 +153,10 @@
       "duration": 8736
     },
     {
+      "spec": "cypress/e2e/jalapeno-preview-notice.cy.ts",
+      "duration": 36000
+    },
+    {
       "spec": "cypress/e2e/landing-performance.cy.ts",
       "duration": 7422
     },
@@ -167,6 +171,10 @@
     {
       "spec": "cypress/e2e/model-architecture.cy.ts",
       "duration": 5658
+    },
+    {
+      "spec": "cypress/e2e/model-route-slugs.cy.ts",
+      "duration": 2000
     },
     {
       "spec": "cypress/e2e/navigation.cy.ts",
@@ -211,10 +219,6 @@
     {
       "spec": "cypress/e2e/sanity.cy.ts",
       "duration": 1650
-    },
-    {
-      "spec": "cypress/e2e/speed-overlay.cy.ts",
-      "duration": 5276
     },
     {
       "spec": "cypress/e2e/throughput-calculator.cy.ts",

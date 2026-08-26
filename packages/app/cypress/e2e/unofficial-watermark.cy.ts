@@ -1,3 +1,5 @@
+import { expandLegendAdvanced } from '../support/legend-advanced';
+
 describe('Unofficial-run watermark', () => {
   before(() => {
     cy.fixture('api/benchmarks.json').then((benchmarks) => {
@@ -90,6 +92,7 @@ describe('Unofficial-run watermark', () => {
         expect(tooltip).to.contain.text('Chip Cache Hit Rate: 87.5%');
       });
 
+    expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').click();
     cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt')
       .first()

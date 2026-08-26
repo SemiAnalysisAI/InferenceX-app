@@ -4,6 +4,7 @@
 {"rule": "chip-untranslated", "kind": "exemption", "text": "'吞吐量（token/s/chip）'", "note": "expanded spelling of the same unit also stays English"}
 {"rule": "chip-untranslated", "kind": "exemption", "text": "'$/M = TCO（$/chip-hour）× 1,000,000 /（3600 × tok/s/chip）'", "note": "unit inside a formula"}
 {"rule": "chip-untranslated", "kind": "exemption", "text": "const powerLabel = locale === 'zh' ? '全含功率/芯片：' : 'All in Power/Chip:';", "note": "the English sibling on a bilingual ternary must not be rewritten — this exact line was broken once by a line-level scan, which is why segmentation is per string literal"}
+{"rule": "chip-untranslated", "kind": "exemption", "text": "今年 6 月，[OpenAI 公布了这项芯片计划](https://openai.com/index/openai-broadcom-jalapeno-inference-chip/)，与 Broadcom 合作。", "note": "URL path — the word sits in a link target, and rewriting it would break the link"}
 {"rule": "hardcoded-english-label", "kind": "regression", "before": "`<div><strong>Concurrency:</strong> ${d.concurrency}</div>`", "after": "`<div><strong>${t.concurrency}：</strong> ${d.concurrency}</div>`", "note": "chart tooltip shipped 16 of these; a /zh reader saw them beside 投机解码：关闭"}
 {"rule": "hardcoded-english-label", "kind": "exemption", "text": "`<div><strong>TP:</strong> ${d.tp}</div>`", "note": "acronym — stays English"}
 {"rule": "hardcoded-english-label", "kind": "exemption", "text": "`<div><strong>tok/s/MW:</strong> ${d.perMw}</div>`", "note": "unit — stays English"}
