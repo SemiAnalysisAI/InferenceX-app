@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
-import { replaceClientPathname } from '@/lib/client-navigation';
+import { replaceRouterPathname } from '@/lib/client-navigation';
 import { inferenceModelRouteForSelection } from '@/lib/inference-model-slug';
 import { useFeatureGate } from '@/lib/use-feature-gate';
 
@@ -189,7 +189,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     // dropped because the path now carries the model — a lingering share
     // param would override it on the next snapshot read.
     const target = inferenceModelRouteForSelection(window.location.pathname, value);
-    if (target !== null) replaceClientPathname(target, ['g_model']);
+    if (target !== null) replaceRouterPathname(target, ['g_model']);
     track('inference_model_selected', {
       model: value,
     });

@@ -37,6 +37,19 @@ Chinese route map.
 Chart state survives navigation through the URL-state contract rather than a
 long-lived single-page tab tree. Each route mounts only the providers it consumes.
 
+### Per-Model Tab Routes
+
+`/calculator/<model>` and `/historical/<model>` (plus `/zh` siblings) give every
+dashboard model an indexable URL. `packages/app/src/lib/model-routes.ts` derives
+the slugs from the compare-page model registry (one slug vocabulary site-wide)
+and stays a thin layer on top of `dashboard-routes.ts`, whose prefix matching
+already resolves the child paths — it is not a second route registry.
+`GlobalFilterProvider` seeds the model from the pathname; switching models on
+the page rewrites the pathname with the pristine `History.prototype.replaceState`
+(same trick as `replaceClientSearch`), so the address bar tracks the model
+without an App Router navigation or remount. The bare tab paths remain the
+canonical home of the default model; alias slugs 308-redirect like `/compare`.
+
 ## URL State Persistence
 
 Chart filter state (model, sequence, metric, precisions, date range, GPU selections) is serialized to URL query params. This enables shareable links that reproduce exact chart views.

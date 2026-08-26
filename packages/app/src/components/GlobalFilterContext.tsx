@@ -27,6 +27,8 @@ import { useAvailability } from '@/hooks/api/use-availability';
 import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
 import { hasExplicitUrlParam, refreshUrlParams, type UrlStateParams } from '@/lib/url-state';
+import { modelRoutePathnameRewrite, routeModelForPathname } from '@/lib/model-routes';
+import { replaceClientPathname } from '@/lib/client-navigation';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import type { RunInfo } from '@/components/inference/types';
 import {
@@ -208,9 +210,17 @@ export function GlobalFilterProvider({
 }) {
   const { getUrlParam, setUrlParams } = useUrlState();
 
+  // Owned by the Next router. Seeds per-model routes below and keys the
+  // URL-param layout effect further down (see that effect for the full
+  // usePathname-vs-useSearchParams rationale).
+  const pathname = usePathname();
+
   // ── Core filter state ─────────────────────────────────────────────────────
+  // Per-model routes (/historical/<slug>) imply a model at first render so the
+  // server response and hydration already show the routed model — no client
+  // effect flicker. An explicit `initialModel` prop (calculator URL seed) wins.
   const [selectedModel, setSelectedModel] = useState<Model>(
-    () => initialModel ?? Model.DeepSeek_V4_Pro,
+    () => initialModel ?? routeModelForPathname(pathname) ?? Model.DeepSeek_V4_Pro,
   );
 
   const [selectedSequence, setSelectedSequenceRaw] = useState<Sequence>(() => {
@@ -285,9 +295,8 @@ export function GlobalFilterProvider({
   // statically-prerendered page that mounts this provider behind a Suspense
   // boundary, which fails the build on /ai-chart. Pathname changes on the
   // navigations that matter here — the AgentX cards and every share link live
-  // on a different route from /inference.
-  const pathname = usePathname();
-
+  // on a different route from /inference. (`pathname` itself is declared with
+  // the core filter state above, where it also seeds per-model routes.)
   useIsomorphicLayoutEffect(() => {
     // Pull the live URL into the shared snapshot first: `getUrlParam` below and
     // the auto-switch guard further down both read from it, and on a soft
@@ -310,17 +319,23 @@ export function GlobalFilterProvider({
       if (value !== undefined && pattern.test(value)) apply(value);
     };
 
-    // `/inference/<model>` pins the model from the path. On first mount the
-    // shell already seeded `initialModel` from the same pathname, so this is a
-    // no-op; it matters on soft navigations between model pages (and to/from
-    // `/inference`), which do not remount this provider. An explicit
-    // `?g_model=` in the CURRENT URL still wins over the path pin, but on a
-    // model page the snapshot's `g_model` is otherwise ignored: the snapshot
-    // retains params from the previous navigation (`refreshUrlParams` only
-    // overwrites keys present in the live URL), and letting that stale value
-    // through would override the model the path just asked for.
+    // Per-model routes imply a model on soft navigation too (the useState
+    // seed above only covers the mount; soft navigations between model pages
+    // do not remount this provider). Two route families pin the model:
+    // `/calculator/<model>` + `/historical/<model>` (routeModelForPathname)
+    // and `/inference/<model>` (inferenceModelForPathname).
+    const routeModel = routeModelForPathname(pathname);
+    if (routeModel) setSelectedModel(routeModel);
     const pathModel = inferenceModelForPathname(pathname);
     if (pathModel !== null) setSelectedModel(pathModel);
+    // On calculator/historical pages an explicit legacy ?g_model= still wins
+    // (applied after the route pin; the URL-sync effect below then
+    // canonicalizes the pathname to whatever model actually got applied). On
+    // an `/inference/<model>` page, `g_model` applies only when present in
+    // the CURRENT URL: the snapshot retains params from the previous
+    // navigation (`refreshUrlParams` only overwrites keys present in the live
+    // URL), and letting that stale value through would override the model the
+    // path just asked for.
     if (pathModel === null || hasExplicitUrlParam('g_model')) {
       applyIfEnum('g_model', Model, setSelectedModel);
     }
@@ -569,6 +584,13 @@ export function GlobalFilterProvider({
       // leave it out so the link keeps following the per-model densest default.
       i_prec: precisionExplicit ? effectivePrecisions.join(',') : undefined,
     });
+    // Keep per-model pathnames (/calculator/<slug>, /historical/<slug>) in
+    // sync with the selected model — a plain history.replaceState, so switching
+    // models updates the address bar without an App Router navigation, RSC
+    // fetch, or component remount. Null when no rewrite is needed (bare tab
+    // path on the default model stays bare).
+    const pathnameRewrite = modelRoutePathnameRewrite(window.location.pathname, selectedModel);
+    if (pathnameRewrite) replaceClientPathname(pathnameRewrite);
   }, [
     selectedModel,
     requestedRunDate,
