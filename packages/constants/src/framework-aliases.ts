@@ -6,14 +6,17 @@ export interface FwEntry {
 /** Single source of truth for framework metadata. Add new frameworks here. */
 export const FW_REGISTRY: Record<string, FwEntry> = {
   atom: { label: 'ATOM¹' },
+  'coreweave-vera-rubin': { label: 'Vera Rubin' },
   'dynamo-sglang': { label: 'Dynamo SGLang' },
   'dynamo-trt': { label: 'Dynamo TRTLLM' },
   'dynamo-vllm': { label: 'Dynamo vLLM' },
   'llmd-vllm': { label: 'llm-d vLLM' },
   'mooncake-atom': { label: 'Mooncake ATOMesh¹' },
   'mori-sglang': { label: 'MoRI SGLang' },
+  'rubin-july': { label: 'July' },
   sglang: { label: 'SGLang' },
   tilert: { label: 'TileRT' },
+  teacup: { label: 'Teacup' },
   trt: { label: 'TRTLLM' },
   vllm: { label: 'vLLM' },
 };

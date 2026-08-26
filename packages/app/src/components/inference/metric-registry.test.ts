@@ -8,6 +8,7 @@ import {
   METRIC_CONTROL_GROUPS,
   METRIC_REGISTRY,
   resolveMetricConfigKey,
+  tokenMetricTypeForConfigKey,
 } from './metric-registry';
 
 describe('metric registry', () => {
@@ -64,5 +65,13 @@ describe('metric compatibility', () => {
     expect(isBenchmarkMetricKey('tpPerGpu')).toBe(true);
     expect(isBenchmarkMetricKey('measuredJPerSuccessfulQuery')).toBe(true);
     expect(isBenchmarkMetricKey('costUser')).toBe(false);
+  });
+
+  it('classifies output, input, and total token metric options', () => {
+    expect(tokenMetricTypeForConfigKey('y_outputTputPerGpu')).toBe('output');
+    expect(tokenMetricTypeForConfigKey('y_jOutput')).toBe('output');
+    expect(tokenMetricTypeForConfigKey('y_costhi')).toBe('input');
+    expect(tokenMetricTypeForConfigKey('y_tpPerGpu')).toBe('total');
+    expect(tokenMetricTypeForConfigKey('y_measuredAvgPower')).toBe('total');
   });
 });

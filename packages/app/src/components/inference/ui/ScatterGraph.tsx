@@ -339,6 +339,9 @@ const lineLabelText = (
   model?: string,
 ): string => {
   const config = getHardwareConfig(hwKey, model);
+  if (config.alwaysShowPrecision) {
+    return [getDisplayLabel(config), getPrecisionLabel(precision as Precision)].join(' ');
+  }
   if (!includePrecision) return getDisplayLabel(config);
   return [config.label, getPrecisionLabel(precision as Precision), config.suffix]
     .filter(Boolean)

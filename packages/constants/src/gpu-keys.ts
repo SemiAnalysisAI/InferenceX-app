@@ -5,6 +5,8 @@ export interface HwEntry {
   arch: string;
   /** Display label (e.g. "H100", "GB200 NVL72") */
   label: string;
+  /** Optional compact label for power/TCO badges. Defaults to the uppercase key. */
+  badgeLabel?: string;
   /** Chart sort order (lower = first) */
   sort: number;
   /** Thermal design power in watts */
@@ -22,6 +24,17 @@ export interface HwEntry {
 
 /** Single source of truth for GPU metadata. Add new GPUs here. */
 export const HW_REGISTRY: Record<string, HwEntry> = {
+  vr200: {
+    vendor: 'NVIDIA',
+    arch: 'Vera Rubin',
+    label: 'Vera Rubin',
+    sort: -1,
+    tdp: 1800,
+    power: 3.3,
+    costh: 3.61,
+    costn: 3.61,
+    costr: 3.61,
+  },
   h100: {
     vendor: 'NVIDIA',
     arch: 'Hopper',
@@ -136,6 +149,18 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     costn: 0.75,
     costr: 0.52,
   },
+  jalapeno: {
+    vendor: 'Teacup',
+    arch: 'Jalapeño',
+    label: 'Jalapeño',
+    badgeLabel: 'Jalapeño (Teacup)',
+    sort: 10,
+    tdp: 700,
+    power: 1.125,
+    costh: 1.47,
+    costn: 1.56,
+    costr: 1.79,
+  },
 };
 
 /** Canonical set of GPU key strings used across all packages. */
@@ -172,6 +197,7 @@ export const VENDOR_OKLCH_ZONES: Record<
 > = {
   amd: { start: 12, end: 42, chroma: { light: 0.18, dark: 0.22 } },
   nvidia: { start: 120, end: 170, chroma: { light: 0.15, dark: 0.15 } },
+  teacup: { start: 235, end: 270, chroma: { light: 0.14, dark: 0.16 } },
   unknown: { start: 275, end: 330, chroma: { light: 0.14, dark: 0.16 } },
 };
 
@@ -186,16 +212,18 @@ export const VENDOR_OKLCH_ZONES: Record<
  * Layout (360° wheel):
  *   NVIDIA:  60–195  (135°) — greens through cyans
  *   AMD:     300–360 + 0–60  (120°, wraps) — magentas through oranges
- *   unknown: 195–300 (105°) — blues/purples
+ *   Teacup:  195–240 (45°) — cyan/blues
+ *   unknown: 240–300 (60°) — blues/purples
  *
  * Each entry is an array of linear {start, span} segments (wrapping bands
  * are split into two segments).
  */
 export const VENDOR_HSL_ZONES: Record<string, { start: number; span: number }[]> = {
   nvidia: [{ start: 60, span: 135 }],
+  teacup: [{ start: 195, span: 45 }],
   amd: [
     { start: 300, span: 60 },
     { start: 0, span: 60 },
   ],
-  unknown: [{ start: 195, span: 105 }],
+  unknown: [{ start: 240, span: 60 }],
 };

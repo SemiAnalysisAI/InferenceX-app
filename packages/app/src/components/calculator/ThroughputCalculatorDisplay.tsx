@@ -417,6 +417,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     selectedRunDate,
     overlayInput,
     selectedPercentile,
+    undefined,
+    true,
+    costType,
   );
   const error = throughputError;
 
@@ -1218,7 +1221,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                               {t.allInPower}
                               {Object.entries(HW_REGISTRY).map(([base, specs]) => (
                                 <Badge key={base} variant="outline">
-                                  {base.toUpperCase()}: {specs.power}kW
+                                  {specs.badgeLabel ?? base.toUpperCase()}: {specs.power}kW
                                 </Badge>
                               ))}
                             </p>
@@ -1246,7 +1249,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                               {t.tcoPerHr}
                               {Object.entries(HW_REGISTRY).map(([base, specs]) => (
                                 <Badge key={base} variant="outline">
-                                  {base.toUpperCase()}: $
+                                  {specs.badgeLabel ?? base.toUpperCase()}: $
                                   {(costProvider === 'costh'
                                     ? specs.costh
                                     : costProvider === 'costn'
