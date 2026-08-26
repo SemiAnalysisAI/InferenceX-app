@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
+import { replaceRouterPathname } from '@/lib/client-navigation';
+import { inferenceModelRouteForSelection } from '@/lib/inference-model-slug';
 import { useFeatureGate } from '@/lib/use-feature-gate';
 
 import {
@@ -179,6 +181,15 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
 
   const handleModelChange = (value: Model) => {
     setSelectedModel(value);
+    // A deliberate pick moves the URL onto the model's indexable subroute in
+    // place — no reload, RSC refetch, or scroll reset. Kept out of the model
+    // state effects on purpose: programmatic changes (back-nav restore,
+    // config load, auto-switch) must not rewrite the URL, and event handlers
+    // are immune to Strict Mode's double-invoked effects. `g_model` is
+    // dropped because the path now carries the model — a lingering share
+    // param would override it on the next snapshot read.
+    const target = inferenceModelRouteForSelection(window.location.pathname, value);
+    if (target !== null) replaceRouterPathname(target, ['g_model']);
     track('inference_model_selected', {
       model: value,
     });

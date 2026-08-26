@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
+import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import { zhPath } from '@/lib/i18n';
 const mocks = vi.hoisted(() => ({
   fixturesMode: false,
@@ -48,6 +49,16 @@ describe('sitemap locale parity', () => {
 
       expect(urls.has(englishUrl)).toBe(route.indexable);
       expect(urls.has(chineseUrl)).toBe(route.indexable && route.localeMirrored);
+    }
+  });
+
+  it('emits both locales for every /inference/<model> page', async () => {
+    const entries = await sitemap();
+    const urls = new Set(entries.map((entry) => entry.url));
+    expect(INFERENCE_MODEL_SLUGS.length).toBeGreaterThan(0);
+    for (const entry of INFERENCE_MODEL_SLUGS) {
+      expect(urls.has(`${SITE_URL}/inference/${entry.slug}`)).toBe(true);
+      expect(urls.has(`${SITE_URL}${zhPath(`/inference/${entry.slug}`)}`)).toBe(true);
     }
   });
 

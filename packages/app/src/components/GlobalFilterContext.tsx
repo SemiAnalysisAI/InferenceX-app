@@ -39,6 +39,7 @@ import {
   Sequence,
   SEQUENCE_OPTIONS,
 } from '@/lib/data-mappings';
+import { inferenceModelForPathname } from '@/lib/inference-model-slug';
 import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/default-sequence';
@@ -319,12 +320,25 @@ export function GlobalFilterProvider({
     };
 
     // Per-model routes imply a model on soft navigation too (the useState
-    // seed above only covers the mount). Applied before `g_model` so explicit
-    // legacy ?g_model= links still win; the URL-sync effect below then
-    // canonicalizes the pathname to whatever model actually got applied.
+    // seed above only covers the mount; soft navigations between model pages
+    // do not remount this provider). Two route families pin the model:
+    // `/calculator/<model>` + `/historical/<model>` (routeModelForPathname)
+    // and `/inference/<model>` (inferenceModelForPathname).
     const routeModel = routeModelForPathname(pathname);
     if (routeModel) setSelectedModel(routeModel);
-    applyIfEnum('g_model', Model, setSelectedModel);
+    const pathModel = inferenceModelForPathname(pathname);
+    if (pathModel !== null) setSelectedModel(pathModel);
+    // On calculator/historical pages an explicit legacy ?g_model= still wins
+    // (applied after the route pin; the URL-sync effect below then
+    // canonicalizes the pathname to whatever model actually got applied). On
+    // an `/inference/<model>` page, `g_model` applies only when present in
+    // the CURRENT URL: the snapshot retains params from the previous
+    // navigation (`refreshUrlParams` only overwrites keys present in the live
+    // URL), and letting that stale value through would override the model the
+    // path just asked for.
+    if (pathModel === null || hasExplicitUrlParam('g_model')) {
+      applyIfEnum('g_model', Model, setSelectedModel);
+    }
     applyIfEnum('i_seq', Sequence, setSelectedSequence);
     const urlPrec = getUrlParam('i_prec');
     if (urlPrec) {
