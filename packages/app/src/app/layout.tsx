@@ -4,13 +4,12 @@ import './globals.css';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import type { Metadata } from 'next';
-import { DM_Sans } from 'next/font/google';
+import { DM_Sans, Instrument_Sans } from 'next/font/google';
 import localFont from 'next/font/local';
 
 import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
 import { JsonLd } from '@/components/json-ld';
-import { CircuitBackground } from '@/components/circuit-background';
 import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
 import { MinecraftDecorations } from '@/components/minecraft/minecraft-decorations';
 import { ThemeProvider } from '@/components/ui/theme-provider';
@@ -37,6 +36,14 @@ const dm_sans = DM_Sans({
   subsets: ['latin'],
   display: 'optional',
   variable: '--font-dm-sans',
+});
+
+// Primary UI grotesque. DM Sans stays loaded for chart export rendering
+// (useChartExport resolves --font-dm-sans) and as the sans fallback.
+const instrument_sans = Instrument_Sans({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-instrument-sans',
 });
 
 const monocraft = localFont({
@@ -190,16 +197,9 @@ export default async function RootLayout({
   const starCount = await fetchStarCount();
   return (
     <html lang="en" className={monocraft.variable} suppressHydrationWarning>
-      <head>
-        <link
-          rel="preload"
-          as="image"
-          href="/brand/left-pattern-full.svg"
-          fetchPriority="high"
-          media="(min-width: 640px)"
-        />
-      </head>
-      <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
+      <body
+        className={`${dm_sans.variable} ${instrument_sans.variable} antialiased relative min-h-screen flex flex-col`}
+      >
         <style
           id="landing-banner-prepaint-style"
           dangerouslySetInnerHTML={{ __html: landingBannerPrepaintStyle }}
@@ -209,7 +209,6 @@ export default async function RootLayout({
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: landingBannerPrepaintScript }}
         />
-        <CircuitBackground />
         <MinecraftBackgroundLazy />
         <MinecraftDecorations />
         <PostHogProvider>
@@ -217,7 +216,7 @@ export default async function RootLayout({
           <QueryProvider>
             <ThemeProvider
               attribute="class"
-              defaultTheme="dark"
+              defaultTheme="light"
               themes={['light', 'dark', 'minecraft']}
               enableSystem
               disableTransitionOnChange
