@@ -272,8 +272,13 @@ export function RunDetailContent({
   );
 }
 
-/** TTFT/TPOT quote line used by both locales' quick answers when present. */
-export function latencyQuote(data: RunPageData): string | null {
+/**
+ * Formatted best-of-config TTFT and TPOT for the quick answers. Returned as
+ * separate values because each is minimized independently across configs:
+ * the two bests can come from different runs, so composing them as a single
+ * measured pair would misstate the data.
+ */
+export function latencyQuote(data: RunPageData): { ttft: string; tpot: string } | null {
   if (data.bestMedianTtft === null || data.bestMedianTpot === null) return null;
-  return `${fmtMs(data.bestMedianTtft)} TTFT / ${fmtMs(data.bestMedianTpot)} TPOT`;
+  return { ttft: fmtMs(data.bestMedianTtft), tpot: fmtMs(data.bestMedianTpot) };
 }

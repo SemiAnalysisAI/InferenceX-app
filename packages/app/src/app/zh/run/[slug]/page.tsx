@@ -159,7 +159,9 @@ export default async function ZhRunPage({ params }: Props) {
       ? `，按超大规模云价格折合每百万 token ${fmtCostPerMtok(read.costPerMtok)}`
       : '';
   const latency = latencyQuote(data);
-  const quickAnswerLatency = latency ? `最佳实测延迟：${latency}。` : '';
+  const quickAnswerLatency = latency
+    ? `全部实测配置中最快 TTFT 为 ${latency.ttft}，最快 TPOT 为 ${latency.tpot}（两者各自取最优，可能来自不同配置）。`
+    : '';
   const quickAnswer =
     typeof read?.throughputPerGpu === 'number'
       ? `${model} 在 ${chipLabel} 上、每用户每秒 ${data.primaryTier} token 档位下单 GPU 可持续输出 ${fmtThroughput(read.throughputPerGpu)} token/s${quickAnswerCost}${read.framework ? `，推理引擎为 ${read.framework}` : ''}。${quickAnswerLatency}`

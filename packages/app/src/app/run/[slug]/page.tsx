@@ -156,7 +156,9 @@ export default async function RunPage({ params }: Props) {
       ? `, which works out to ${fmtCostPerMtok(read.costPerMtok)} per million tokens at hyperscaler pricing`
       : '';
   const latency = latencyQuote(data);
-  const quickAnswerLatency = latency ? ` Best measured latency: ${latency}.` : '';
+  const quickAnswerLatency = latency
+    ? ` Fastest measured TTFT: ${latency.ttft}; fastest TPOT: ${latency.tpot} (each the best across all configs, not one run).`
+    : '';
   const quickAnswer =
     typeof read?.throughputPerGpu === 'number'
       ? `${entry.model.seoName} sustains ${fmtThroughput(read.throughputPerGpu)} tokens/s per GPU on ${entry.chip.label} at ${data.primaryTier} tokens/s per user${quickAnswerCost}${read.framework ? `, served by ${read.framework}` : ''}.${quickAnswerLatency}`
