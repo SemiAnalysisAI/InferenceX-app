@@ -54,7 +54,7 @@ describe('Chinese (/zh) pages', () => {
     it('footer renders in Chinese with zh-internal links', () => {
       cy.get('[data-testid="footer-brand-description"]').should(
         'contain.text',
-        'InferenceX 持续开展开源推理基准测试',
+        'InferenceX 持续开展开源的 agentic 推理基准测试',
       );
       cy.get('[data-testid="footer-link-supporters"]')
         .should('contain.text', '业界评价')

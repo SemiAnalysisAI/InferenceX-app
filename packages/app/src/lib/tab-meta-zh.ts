@@ -127,8 +127,8 @@ export type HeaderNavHref =
   | '/agentx'
   | '/overview'
   | '/inference'
-  | '/inference/agentic'
   | '/compare'
+  | '/blog'
   | '/about';
 
 /** Chinese labels for the site header nav, keyed by its exact English href set. */
@@ -136,8 +136,8 @@ export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
   '/': '首页',
   '/overview': '总览',
   '/inference': '仪表板',
-  '/inference/agentic': '遥测数据',
   '/compare': '性能对比',
+  '/blog': '技术文章',
   '/agentx': 'AgentX',
   '/about': '关于',
 };

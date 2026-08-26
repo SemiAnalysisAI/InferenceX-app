@@ -42,13 +42,18 @@ describe('AgentX telemetry catalog', () => {
       .and('match', /^\/inference\/agentic\/\d+$/u);
   });
 
-  it('highlights Telemetry rather than Dashboard in the header nav', () => {
+  it('reaches the catalog from the footer and highlights Dashboard in the header nav', () => {
     cy.visit('/inference/agentic', { onBeforeLoad: unlockAgenticGate });
 
-    cy.get('[data-testid="nav-link-telemetry"]')
-      .should('have.attr', 'href', '/inference/agentic')
-      .and('have.class', 'text-brand');
-    cy.get('[data-testid="nav-link-dashboard"]').should('not.have.class', 'text-brand');
+    // Telemetry is a footer destination now, so the catalog sits under the
+    // Dashboard nav entry rather than owning one of its own.
+    cy.get('[data-testid="nav-link-telemetry"]').should('not.exist');
+    cy.get('[data-testid="nav-link-dashboard"]').should('have.class', 'text-brand');
+    cy.get('[data-testid="footer-link-telemetry"]').should(
+      'have.attr',
+      'href',
+      '/inference/agentic',
+    );
   });
 
   it('ships the Simplified Chinese catalog', () => {
