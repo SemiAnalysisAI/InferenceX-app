@@ -79,8 +79,7 @@ describe('X_AXIS_EXPLANATIONS', () => {
 
 describe('resolveXAxisKind', () => {
   const base = {
-    isInputMetric: false,
-    isTtftOverride: false,
+    xAxisField: 'intvty',
     isDerivedNormalizedInteractivity: false,
   };
 
@@ -88,30 +87,34 @@ describe('resolveXAxisKind', () => {
     expect(resolveXAxisKind('interactivity', base)).toBe('interactivity');
   });
 
-  it('interactivity chart plots TTFT for input metrics', () => {
-    expect(resolveXAxisKind('interactivity', { ...base, isInputMetric: true })).toBe('ttft');
+  it('interactivity chart plots TTFT when the resolved field is a TTFT column', () => {
+    expect(resolveXAxisKind('interactivity', { ...base, xAxisField: 'p90_ttft' })).toBe('ttft');
+    expect(resolveXAxisKind('interactivity', { ...base, xAxisField: 'median_ttft' })).toBe('ttft');
+  });
+
+  it('interactivity chart keeps interactivity for input metrics without a TTFT override', () => {
+    // Input metric with no `*_x` config override: `resolveXAxisField` falls
+    // back to the chart's natural x, so the footer must say interactivity.
+    expect(resolveXAxisKind('interactivity', { ...base, xAxisField: 'p90_intvty' })).toBe(
+      'interactivity',
+    );
   });
 
   it('e2e chart plots end-to-end latency by default', () => {
-    expect(resolveXAxisKind('e2e', base)).toBe('e2eLatency');
+    expect(resolveXAxisKind('e2e', { ...base, xAxisField: 'e2el' })).toBe('e2eLatency');
   });
 
   it('e2e chart plots TTFT under the ttft x-axis mode', () => {
-    expect(resolveXAxisKind('e2e', { ...base, isTtftOverride: true })).toBe('ttft');
+    expect(resolveXAxisKind('e2e', { ...base, xAxisField: 'p99_ttft' })).toBe('ttft');
   });
 
   it('e2e chart plots normalized interactivity under the derived agentic mode', () => {
     expect(
       resolveXAxisKind('e2e', {
-        ...base,
-        isTtftOverride: true,
+        xAxisField: 'p90_ttft',
         isDerivedNormalizedInteractivity: true,
       }),
     ).toBe('e2eNormalizedInteractivity');
-  });
-
-  it('input-metric override only applies to the interactivity chart', () => {
-    expect(resolveXAxisKind('e2e', { ...base, isInputMetric: true })).toBe('e2eLatency');
   });
 });
 

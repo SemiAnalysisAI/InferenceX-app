@@ -7,6 +7,7 @@ import { BarChart3, Table2 } from 'lucide-react';
 
 import chartDefinitions, { type MetricKey } from '@/components/inference/metric-registry';
 import { resolveXAxisKind } from '@/components/inference/axis-metric-explanations';
+import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import {
   useInferenceActions,
   useInferenceData,
@@ -750,16 +751,22 @@ export default function ChartDisplay() {
               selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
             const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
-            // Which logical metric the x-axis plots right now. Classify off the
-            // ENGLISH title (like the caption heading) so /zh resolves the same
-            // branch, and mirror the caption's derived-mode/TTFT-override rules.
+            // Which logical metric the x-axis plots right now. Classify off
+            // the field `resolveXAxisField` resolves for this chart's current
+            // state — the same resolver both chart pipelines plot with — so
+            // the footer always matches the drawn axis (e.g. an input metric
+            // without a `*_x` override keeps the natural interactivity x).
+            // Trace-derived agentic modes bypass that resolver, hence the flag.
             const footerXAxisKind = resolveXAxisKind(graph.chartDefinition.chartType, {
-              isInputMetric: metricTitle(graph.chartDefinition, selectedYAxisMetric, 'en')
-                .toLowerCase()
-                .includes('input'),
-              isTtftOverride: Boolean(selectedE2eXAxisMetric?.endsWith('_ttft')),
-              isDerivedNormalizedInteractivity:
-                isAgenticSequence && Boolean(DERIVED_X_MODE_SPECS[selectedXAxisMode]),
+              xAxisField: resolveXAxisField(
+                graph.chartDefinition,
+                selectedYAxisMetric,
+                graph.chartDefinition.chartType === 'e2e'
+                  ? selectedE2eXAxisMetric
+                  : selectedXAxisMetric,
+                { isAgentic: isAgenticSequence, percentile: selectedPercentile },
+              ).xAxisField,
+              isDerivedNormalizedInteractivity: Boolean(derivedSpec),
             });
             return (
               <section key={graphIndex} className="pt-8 md:pt-0">

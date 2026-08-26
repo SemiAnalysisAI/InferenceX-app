@@ -453,29 +453,29 @@ export const X_AXIS_EXPLANATIONS: Record<XAxisKind, XAxisExplanation> = {
 };
 
 /**
- * Resolve which logical x-axis metric a chart is currently plotting. Mirrors
- * the display branches in `ChartDisplay` (chart heading) and the field
- * branches in `resolveXAxisField`, for both the official pipeline and
- * `?unofficialrun=` overlays — the overlay path shares the chart's resolved
- * x-axis, so one footer row describes both.
+ * Resolve which logical x-axis metric a chart is currently plotting.
+ * Classifies off the x-axis data field that `resolveXAxisField` actually
+ * resolved for the chart's current state, so the footer can never disagree
+ * with the drawn axis — `resolveXAxisField` is the single source of truth for
+ * the field, including the input-metric fallback where a metric without a
+ * `*_x` config override keeps plotting the chart's natural x. Trace-derived
+ * agentic x-axis modes bypass that resolver entirely, so they arrive as an
+ * explicit flag. Applies to both the official pipeline and `?unofficialrun=`
+ * overlays — the overlay path shares the chart's resolved x-axis, so one
+ * footer row describes both.
  */
 export function resolveXAxisKind(
   chartType: 'interactivity' | 'e2e',
   opts: {
-    /** English metric title contains 'input' → interactivity chart plots TTFT. */
-    isInputMetric: boolean;
-    /** e2e chart with a *_ttft x-axis mode selected. */
-    isTtftOverride: boolean;
+    /** Resolved x-axis data field from `resolveXAxisField` (e.g. `p90_ttft`). */
+    xAxisField: string;
     /** Agentic trace-derived normalized-interactivity x-axis mode. */
     isDerivedNormalizedInteractivity: boolean;
   },
 ): XAxisKind {
-  if (chartType === 'e2e') {
-    if (opts.isDerivedNormalizedInteractivity) return 'e2eNormalizedInteractivity';
-    if (opts.isTtftOverride) return 'ttft';
-    return 'e2eLatency';
-  }
-  return opts.isInputMetric ? 'ttft' : 'interactivity';
+  if (opts.isDerivedNormalizedInteractivity) return 'e2eNormalizedInteractivity';
+  if (opts.xAxisField.endsWith('ttft')) return 'ttft';
+  return chartType === 'e2e' ? 'e2eLatency' : 'interactivity';
 }
 
 /**
