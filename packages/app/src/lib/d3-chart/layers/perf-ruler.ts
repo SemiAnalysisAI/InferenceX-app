@@ -244,10 +244,20 @@ export const EMPTY_PERF_RULER_STATE: PerfRulerState = { rulers: [], draft: null,
  * the in-progress draft). Dragging a completed ruler moves its own iso-x
  * (see {@link movePerfRulerIsoX}); toggling the mode off clears everything.
  * Returns `prev` (same reference) for no-ops so React state can bail out.
+ *
+ * `clampToOverlap` (optional) constrains a COMPLETING measurement's iso-x
+ * to the overlapping x-range of its curve pair (the caller owns the
+ * pixel-space paths/scales, so it supplies the clamp). Returning null
+ * means the pair shares NO x-range at all — the measurement is rejected
+ * and the draft stays anchored so the user can pick a different second
+ * curve. Without the clamp, an out-of-range iso-x would append a ruler
+ * that never renders and has no drag handle to recover it: stuck in
+ * state, counted against the cap, removable only by clear/toggle-off.
  */
 export function nextPerfRulerState(
   prev: PerfRulerState,
   click: PerfRulerCurveClick,
+  clampToOverlap?: (curveA: string, curveB: string, isoX: number) => number | null,
 ): PerfRulerState {
   if (!Number.isFinite(click.isoX)) return prev;
   if (!prev.draft) return { ...prev, draft: { curve: click.curve, isoX: click.isoX } };
@@ -256,11 +266,17 @@ export function nextPerfRulerState(
       ? prev
       : { ...prev, draft: { curve: prev.draft.curve, isoX: click.isoX } };
   }
+  let isoX = prev.draft.isoX;
+  if (clampToOverlap) {
+    const clamped = clampToOverlap(prev.draft.curve, click.curve, isoX);
+    if (clamped === null || !Number.isFinite(clamped)) return prev;
+    isoX = clamped;
+  }
   const measurement: PerfRulerMeasurement = {
     id: prev.nextId,
     curveA: prev.draft.curve,
     curveB: click.curve,
-    isoX: prev.draft.isoX,
+    isoX,
   };
   const rulers = [...prev.rulers, measurement];
   while (rulers.length > MAX_PERF_RULERS) rulers.shift();
@@ -446,6 +462,18 @@ export function computePerfRulerLabelLayout(
   return buildLabelLayout(geometry, side, labelY, fontSize);
 }
 
+/**
+ * Clamp a label center-y so the glyph box (plus 4px padding) stays inside
+ * [0, chartHeight]. The top clamp always applies; the bottom clamp only
+ * when the chart height is known. Top wins if the chart is shorter than
+ * one label.
+ */
+function clampLabelY(y: number, fontSize: number, chartHeight?: number): number {
+  const min = fontSize / 2 + 4;
+  const max = chartHeight === undefined ? Number.POSITIVE_INFINITY : chartHeight - 4 - fontSize / 2;
+  return Math.max(Math.min(y, max), min);
+}
+
 /** Horizontal pixel span of a laid-out label (estimated, no DOM). */
 function labelSpan(
   layout: PerfRulerLabelLayout,
@@ -493,6 +521,12 @@ export function computePerfRulerLabelLayouts(
       const direction = layout.labelY < midY ? -1 : 1;
       let nudgedY = layout.labelY + direction * (fontSize + 10);
       if (direction === -1 && nudgedY - fontSize / 2 < 4) nudgedY = midY + LABEL_OFFSET_Y;
+      // Every nudge (and the below-midpoint fallback) re-applies the same
+      // vertical clamp as the initial placement — a label and its × chip
+      // must never escape the plot, even at the cost of residual overlap.
+      nudgedY = clampLabelY(nudgedY, fontSize, opts?.chartHeight);
+      // Clamped into a wall: no further progress is possible this direction.
+      if (nudgedY === layout.labelY) break;
       layout = buildLabelLayout(geometry, layout.side, nudgedY, fontSize);
     }
     const span = labelSpan(layout, geometry.ratioLabel, fontSize);

@@ -1384,17 +1384,45 @@ const ScatterGraph = React.memo(
       | null
     >(null);
 
+    // Completion clamp for nextPerfRulerState: the stored iso-x must lie
+    // inside the curve pair's overlapping x range, or the completed ruler
+    // could render nowhere — no line and no drag handle to recover it.
+    // Data → pixel through the exact scales/paths the chart is currently
+    // drawn with, clamp, and back. Null (missing paths or disjoint spans)
+    // rejects the measurement and keeps the draft anchored.
+    const clampPerfRulerIsoXToOverlap = useCallback(
+      (curveA: string, curveB: string, isoX: number): number | null => {
+        const ctx = perfRulerDrawCtxRef.current;
+        if (!ctx) return null;
+        const [nodeA, nodeB] = [curveA, curveB].map((cls) =>
+          ctx.zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node(),
+        );
+        if (!nodeA || !nodeB || typeof nodeA.getPointAtLength !== 'function') return null;
+        const extentA = pathXExtent(nodeA);
+        const extentB = pathXExtent(nodeB);
+        if (!extentA || !extentB) return null;
+        const clamped = clampIsoX(Number(ctx.xScale(isoX)), extentA, extentB);
+        return clamped === null ? null : Number(ctx.xScale.invert(clamped));
+      },
+      [],
+    );
+
     // Curve click (widened hit strokes): iso-x is the click's x pixel
     // through the CURRENT rendered x scale, stored in data space.
-    const handlePerfRulerCurveClick = useCallback((curve: string, pixelX: number) => {
-      const ctx = perfRulerDrawCtxRef.current;
-      if (!ctx) return;
-      track('latency_perf_ruler_curve_clicked', { curve });
-      const isoX = Number(ctx.xScale.invert(pixelX));
-      setPerfRulerState((prev) => nextPerfRulerState(prev, { curve, isoX }));
-      chartRef.current?.dismissTooltip();
-      chartRef.current?.hideTooltip();
-    }, []);
+    const handlePerfRulerCurveClick = useCallback(
+      (curve: string, pixelX: number) => {
+        const ctx = perfRulerDrawCtxRef.current;
+        if (!ctx) return;
+        track('latency_perf_ruler_curve_clicked', { curve });
+        const isoX = Number(ctx.xScale.invert(pixelX));
+        setPerfRulerState((prev) =>
+          nextPerfRulerState(prev, { curve, isoX }, clampPerfRulerIsoXToOverlap),
+        );
+        chartRef.current?.dismissTooltip();
+        chartRef.current?.hideTooltip();
+      },
+      [clampPerfRulerIsoXToOverlap],
+    );
     const perfRulerCurveClickRef = useRef(handlePerfRulerCurveClick);
     perfRulerCurveClickRef.current = handlePerfRulerCurveClick;
 
@@ -1420,11 +1448,13 @@ const ScatterGraph = React.memo(
         );
         // Single-point series render no roofline path — nothing to measure.
         if (!curve) return;
-        setPerfRulerState((prev) => nextPerfRulerState(prev, { curve, isoX: point.x }));
+        setPerfRulerState((prev) =>
+          nextPerfRulerState(prev, { curve, isoX: point.x }, clampPerfRulerIsoXToOverlap),
+        );
         chartRef.current?.dismissTooltip();
         chartRef.current?.hideTooltip();
       },
-      [runIndexByUrl],
+      [runIndexByUrl, clampPerfRulerIsoXToOverlap],
     );
 
     // Read by long-lived D3 click closures (official tooltip config + overlay

@@ -389,6 +389,44 @@ describe('computePerfRulerLabelLayouts', () => {
     expect(first).toEqual(computePerfRulerLabelLayout(GEOMETRY, OPTS));
     expect(second).toEqual(computePerfRulerLabelLayout(other, OPTS));
   });
+
+  it('keeps the below-midpoint collision fallback inside a short chart', () => {
+    // midY = 60 in a 100px chart: the above placement clips the top, and the
+    // naive below-midpoint fallback (midY + 46 = 106) would leave the plot.
+    const geometry = { x: 100, y1: 40, y2: 80, ratioLabel: '2.03x' };
+    const fontSize = DEFAULT_LABEL_FONT_SIZE;
+    const layouts = computePerfRulerLabelLayouts([geometry, { ...geometry }], {
+      chartWidth: 800,
+      chartHeight: 100,
+    });
+    for (const layout of layouts) {
+      expect(layout!.labelY + fontSize / 2).toBeLessThanOrEqual(100 - 4);
+      expect(layout!.labelY - fontSize / 2).toBeGreaterThanOrEqual(4);
+      expect(layout!.deleteY).toBe(layout!.labelY);
+    }
+  });
+
+  it('clamps downward nudges at the chart bottom, accepting residual overlap', () => {
+    // Three identical rulers near the top of a short chart: labels stack
+    // DOWNWARD, and the third label's second nudge (118 + 42 = 160) would
+    // escape a 140px chart without the clamp.
+    const geometry = { x: 100, y1: 10, y2: 50, ratioLabel: '2.03x' };
+    const fontSize = DEFAULT_LABEL_FONT_SIZE;
+    const chartHeight = 140;
+    const layouts = computePerfRulerLabelLayouts([geometry, { ...geometry }, { ...geometry }], {
+      chartWidth: 800,
+      chartHeight,
+    });
+    for (const layout of layouts) {
+      expect(layout!.labelY + fontSize / 2).toBeLessThanOrEqual(chartHeight - 4);
+      expect(layout!.labelY - fontSize / 2).toBeGreaterThanOrEqual(4);
+      expect(layout!.deleteY).toBe(layout!.labelY);
+    }
+    // The first two still resolve their collision; the third accepts overlap
+    // at the clamped bottom rather than leaving the plot.
+    expect(layouts[1]!.labelY).toBeGreaterThan(layouts[0]!.labelY);
+    expect(layouts[2]!.labelY).toBe(chartHeight - 4 - fontSize / 2);
+  });
 });
 
 // ── renderPerfRulers ───────────────────────────────────────────────────
@@ -730,6 +768,42 @@ describe('nextPerfRulerState', () => {
     const drafted = nextPerfRulerState(EMPTY, { curve: 'curve-a', isoX: 40 });
     expect(nextPerfRulerState(drafted, { curve: 'curve-a', isoX: 40 })).toBe(drafted);
     expect(nextPerfRulerState(drafted, { curve: 'curve-b', isoX: Number.NaN })).toBe(drafted);
+  });
+
+  it('stores the CLAMPED iso-x when completion lands outside the pair overlap', () => {
+    const calls: [string, string, number][] = [];
+    const drafted = nextPerfRulerState(EMPTY, { curve: 'curve-a', isoX: 500 });
+    const state = nextPerfRulerState(drafted, { curve: 'curve-b', isoX: 510 }, (a, b, isoX) => {
+      calls.push([a, b, isoX]);
+      return 120; // curve B's span ends at 120 — clamp pulls the ruler back in.
+    });
+    // The clamp sees the DRAFT's iso-x (measurements complete at the draft).
+    expect(calls).toEqual([['curve-a', 'curve-b', 500]]);
+    expect(state.rulers).toEqual([{ id: 1, curveA: 'curve-a', curveB: 'curve-b', isoX: 120 }]);
+    expect(state.draft).toBeNull();
+  });
+
+  it('rejects completion and keeps the draft anchored when the pair has NO overlap', () => {
+    const drafted = nextPerfRulerState(EMPTY, { curve: 'curve-a', isoX: 40 });
+    const state = nextPerfRulerState(drafted, { curve: 'curve-b', isoX: 55 }, () => null);
+    // No measurement was appended, no id burned, the draft survives — the
+    // user can pick a different second curve. Same reference: React bails.
+    expect(state).toBe(drafted);
+    expect(state.rulers).toEqual([]);
+    expect(state.draft).toEqual({ curve: 'curve-a', isoX: 40 });
+  });
+
+  it('does not consult the clamp for draft-start or draft-move clicks', () => {
+    let calls = 0;
+    const clamp = () => {
+      calls++;
+      return null;
+    };
+    const drafted = nextPerfRulerState(EMPTY, { curve: 'curve-a', isoX: 40 }, clamp);
+    expect(drafted.draft).toEqual({ curve: 'curve-a', isoX: 40 });
+    const moved = nextPerfRulerState(drafted, { curve: 'curve-a', isoX: 60 }, clamp);
+    expect(moved.draft).toEqual({ curve: 'curve-a', isoX: 60 });
+    expect(calls).toBe(0);
   });
 });
 
