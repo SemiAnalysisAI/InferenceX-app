@@ -595,7 +595,7 @@ describe('TCO Calculator', () => {
     // open straight to the right model without a flash of the default. See #430.
     it('?g_model= seeds the model selector before client hydration', () => {
       cy.request('/calculator?g_model=DeepSeek-V4-Pro').then((response) => {
-        expect(response.body).to.contain('DeepSeek V4 Pro 1.6T');
+        expect(response.body).to.contain('DeepSeek V4 Pro 0813 1.6T');
         expect(response.body).not.to.contain('DeepSeek R1 0528 671B');
       });
     });
@@ -605,7 +605,10 @@ describe('TCO Calculator', () => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       });
       cy.visit('/calculator?g_model=DeepSeek-V4-Pro');
-      cy.get('[data-testid="calc-model-selector"]').should('contain.text', 'DeepSeek V4 Pro 1.6T');
+      cy.get('[data-testid="calc-model-selector"]').should(
+        'contain.text',
+        'DeepSeek V4 Pro 0813 1.6T',
+      );
     });
   });
 

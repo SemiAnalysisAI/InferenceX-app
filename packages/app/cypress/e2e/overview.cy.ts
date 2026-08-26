@@ -3,7 +3,7 @@ import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-con
 // Order mirrors DEFAULT_MODELS (MODEL_CONFIG insertion order), which fixes the
 // matrix row order.
 const MODEL_LABELS = [
-  'DeepSeek V4 Pro 1.6T',
+  'DeepSeek V4 Pro 0813 1.6T',
   'Kimi K3 2.8T',
   'MiniMax M3 428B',
   'GLM5.2/GLM5.3',
@@ -858,8 +858,11 @@ describe('Overview page', () => {
 
         cy.get('[data-testid="inference-chart-display"]').should('exist');
         cy.get('[data-testid="model-selector"]').click();
-        cy.contains('[role="option"]', 'DeepSeek V4 Pro 1.6T').click();
-        cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro 1.6T');
+        cy.contains('[role="option"]', 'DeepSeek V4 Pro 0813 1.6T').click();
+        cy.get('[data-testid="model-selector"]').should(
+          'contain.text',
+          'DeepSeek V4 Pro 0813 1.6T',
+        );
         cy.get('[data-testid="inference-chart-display"]').should(
           'not.contain.text',
           'No data available',
@@ -1085,12 +1088,12 @@ describe('Overview page', () => {
           .should(
             'have.attr',
             'title',
-            'Estimated from validated benchmark runs. Open raw source dashboard for Jul 18: DeepSeek V4 Pro 1.6T · B200 · SGLang · FP4 · MTP',
+            'Estimated from validated benchmark runs. Open raw source dashboard for Jul 18: DeepSeek V4 Pro 0813 1.6T · B200 · SGLang · FP4 · MTP',
           )
           .and(
             'have.attr',
             'aria-label',
-            'Approximately $0.059. Estimated from validated benchmark runs. Open raw source dashboard for Jul 18: DeepSeek V4 Pro 1.6T · B200 · SGLang · FP4 · MTP',
+            'Approximately $0.059. Estimated from validated benchmark runs. Open raw source dashboard for Jul 18: DeepSeek V4 Pro 0813 1.6T · B200 · SGLang · FP4 · MTP',
           );
         cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
       });
@@ -1286,7 +1289,7 @@ describe('Overview page', () => {
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
       expectAgentxScenario(AGENTX_LABEL);
-      cy.contains('DeepSeek V4 Pro 1.6T').should('exist');
+      cy.contains('DeepSeek V4 Pro 0813 1.6T').should('exist');
       // Priced from the AgentX rows alone — the single-turn sweep never leaks in.
       cy.get(
         '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
@@ -1304,14 +1307,14 @@ describe('Overview page', () => {
       cy.contains('a', 'View details').should(
         'have.attr',
         'aria-label',
-        `View details: DeepSeek V4 Pro 1.6T · ${AGENTX_LABEL}`,
+        `View details: DeepSeek V4 Pro 0813 1.6T · ${AGENTX_LABEL}`,
       );
     });
     desktopModel('DeepSeek-V4-Pro', SINGLE_TURN).within(() => {
       cy.contains('a', 'View details').should(
         'have.attr',
         'aria-label',
-        'View details: DeepSeek V4 Pro 1.6T · 8K/1K',
+        'View details: DeepSeek V4 Pro 0813 1.6T · 8K/1K',
       );
     });
   });
@@ -1784,7 +1787,7 @@ describe('Overview page', () => {
       .as('estimatedB200')
       .invoke('attr', 'title')
       .should('include', '根据已验证的基准测试结果估算。')
-      .and('include', '原始数据仪表板：DeepSeek V4 Pro 1.6T · B200 · SGLang · FP4 · MTP');
+      .and('include', '原始数据仪表板：DeepSeek V4 Pro 0813 1.6T · B200 · SGLang · FP4 · MTP');
     cy.get('@estimatedB200')
       .invoke('attr', 'aria-label')
       .should('include', '约 $0.059。根据已验证的基准测试结果估算。');
