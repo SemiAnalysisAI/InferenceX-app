@@ -1,0 +1,75 @@
+---
+title: 'GLM 5.3 的 AgentX 结果：MI355X ATOM 在部分曲线上胜过 GB300 NVL72'
+subtitle: 'AMD 厂商引擎在每美元性能上胜出的区间，以及端到端归一化交互性究竟衡量什么'
+seoDescription: '在 GLM 5.3 上，于 p90 端到端归一化交互性的部分区间内，AMD ATOM 的每美元性能优于 GB300 NVL72 SGLang，甚至优于 TRTLLM。本文解释这一实验性指标衡量什么，以及它在哪些地方会产生误导。'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - glm5
+  - mi355x
+  - gb300
+  - nvl72
+  - trtllm
+  - sglang
+  - amd
+  - nvidia
+---
+
+看 ATOM 的话，在 p90 端到端归一化交互性的部分区间内，AMD 的[每美元性能](/zh/glossary/performance-per-dollar)优于 GB300 NVL72 SGLang，甚至优于 TRTLLM。这一结果值得肯定，AMD 团队做得很好。
+
+对两家厂商的建议还是那两条：我们期待 AMD 把这些优化移植到 SGLang，也期待 NVIDIA 在接下来几周里尽快优化 GB300 NVL72。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9337ed5b-a320-49f7-b31b-cc4b5751e0ff_2048x1290.png"
+  caption="来源：SemiAnalysis InferenceX"
+/>
+
+## 端到端归一化交互性衡量什么
+
+这个结果所对应的横轴是一个实验性指标，在据此下结论之前值得先弄清楚它的含义。[端到端归一化交互性](/zh/glossary/e2e-normalized-interactivity)的目标，是在同时考虑首 token 延迟和每秒 token 数的前提下，衡量用户实际感受到的响应速度，其定义为输出序列长度除以端到端延迟。
+
+把端到端延迟展开为 TTFT 加上输出长度乘以每输出 token 时间（实际上只解码输出长度减一个 token），可得下式。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9e472a49-d228-4d8d-876a-6bc0d59f9d97_746x594.png"
+  caption="来源：SemiAnalysis"
+/>
+
+它本质上等于[交互性](/zh/glossary/interactivity)（即 1/TPOT 那部分），再加上一项与 TTFT 成正比的惩罚。
+
+## 这个指标在哪里会误导
+
+需要说明的是，该指标是实验性的，并不完美。例如它对高 TTFT 的惩罚很重，也无法体现 prefill-decode [分离](/zh/glossary/disaggregated-inference)等优化的全部细节。AgentX v1.0 的所有提交仍然分别针对常规交互性和 TTFT 做优化；我们也会继续打磨能反映现代 agentic 推理各种细节的新北极星指标。
+
+这个前提在这里对双方都成立。一套用首 token 延迟换取流式速度的配置，在这条坐标轴上一定会被惩罚，无论这种取舍是否契合具体产品；因此仅凭端到端归一化交互性得出的胜负，应当再对照独立的交互性曲线和 TTFT 曲线核实，然后才能作为采购论据。
+
+---
+
+_本文结果只是 AgentX 1.0 的一个切面。完整分析、回放方法，以及该基准测试推动的 70 多个上游 PR，请见 [AgentX - InferenceXv3：CUDA 护城河在 agentic 推理中还站得住吗？](/zh/blog/agentx-inferencexv3-does-cuda-moat)。每个数据点都可以在[免费仪表板](https://inferencex.semianalysis.com/)上自行探索。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "什么是端到端归一化交互性？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "它是一个实验性指标，定义为输出序列长度除以端到端延迟，目的是在同时考虑 TTFT 和每秒 token 数的前提下衡量用户感受到的响应速度。由于端到端延迟等于 TTFT 加上输出长度乘以每输出 token 时间，该指标实际等于交互性加上一项与 TTFT 成正比的惩罚。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "在 GLM 5.3 上，AMD ATOM 在哪里胜过 GB300 NVL72？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "在 p90 端到端归一化交互性的部分区间内，ATOM 的每美元性能优于 GB300 NVL72 SGLang，甚至优于 TRTLLM。该指标是实验性的，且对高 TTFT 惩罚很重，因此这一结果应当再对照独立的交互性曲线和 TTFT 曲线核实。"
+      }
+    }
+  ]
+}`}</JsonLd>

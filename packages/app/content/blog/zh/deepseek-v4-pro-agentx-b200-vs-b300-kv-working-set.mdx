@@ -1,0 +1,86 @@
+---
+title: 'DeepSeek V4 Pro 的 AgentX 结果：B200 对比 B300 与 KV cache 工作集'
+subtitle: '多出 50% 的 HBM 能挤出额外吞吐量，逐点遥测数据说明了它究竟从何而来'
+seoDescription: 'DeepSeek V4 Pro AgentX 运行中 B200 与 B300 的对比。按 TCO 归一化后的吞吐量相当接近，但遥测数据显示 B300 的 HBM 缓存命中率为 91%、B200 为 73%，KV 工作集分别为 4300 万与 2200 万 token。'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - deepseek
+  - b200
+  - b300
+  - h200
+  - nvidia
+---
+
+按[总拥有成本](/zh/glossary/total-cost-of-ownership)归一化之后，B300 vLLM 与 B200 vLLM 在 DeepSeek V4 Pro 上的聚合式性能相当接近。主要差别在于 B300 能挤出额外的吞吐量，因为它的 HBM 容量比 B200 多 50%。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/939b9197-321d-4869-ba13-f0b800343b7b_2048x1300.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_vllm%2Cb300_vllm)"
+/>
+
+真正有意思的不是这个汇总数字，而是 AgentX 服务端遥测在它下面揭示的内容。
+
+## 4300 万 token 对 2200 万 token
+
+在 384 条并发 agentic trace 的负载下，B300 vLLM DEP8 配 3TB DRAM、使用 vLLM simple offloading，取得了 91% 的 HBM 缓存命中率，外加 1.36% 的 DRAM 缓存命中率。原因是该配置下 HBM 中 [KV cache](/zh/glossary/kv-cache) 的工作集规模约为 4300 万 token，而任一时刻在途的 token 数只是略微超过这个量。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/f86888c4-c1a7-47b0-a580-d1a74876cb9c_2048x898.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference/agentic/439522)"
+/>
+
+换成并发 196 的 B200、其余参数不变，情况就反过来了：HBM 缓存命中率降到 73%，部署明显更依赖 DRAM，[offload](/zh/glossary/kv-cache-offload) 缓存命中率接近 20%。此时 HBM 中 KV cache 的工作集规模为 2200 万 token，大约是 B300 的一半。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/70a7a7c7-7918-459c-a4e0-f7fc1edca816_2048x887.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference/agentic/439967)"
+/>
+
+## offload 层为什么需要余量
+
+DRAM KV offload 通常实现为写穿缓存，也就是写入 HBM 缓存的每个前缀同时也会写入 DRAM 缓存。因此，只有当可用于 offload 的 DRAM 显著大于 HBM 中 KV cache 的容量时（大约 1.5 到 3 倍）它才最有效。
+
+正是这一性质，让 B300 额外的 HBM 产生的是叠加效应而不只是简单相加：更大的常驻工作集把更多会话状态留在快速层，慢速层因此只需服务真正的剩余部分，而不必不断吸收被淘汰的数据。
+
+## H200 这个反例
+
+H200 SGLang FP8 能在低并发下服务 DeepSeek V4，从每美元性能看甚至可以和 B200、MI355X SGLang 一较高下。但它无法在高吞吐场景中与更新的 SKU 竞争，因为 HBM 容量不够。
+
+它的失效方式很有教育意义：在更高并发下对 DRAM KV offload 的依赖，会随着用户数增加带来无法接受的延迟。offload 能换来容量，但并不免费；一套需要靠它来弥补结构性显存不足的部署，最终会在尾部延迟上付出代价。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/91dfd9ca-d13d-43e9-a57e-3be0fcc4a5cf_2048x1315.png"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=h200_dynamo-sglang&i_optimal=0)"
+/>
+
+---
+
+_本文结果只是 AgentX 1.0 的一个切面。完整分析、回放方法，以及该基准测试推动的 70 多个上游 PR，请见 [AgentX - InferenceXv3：CUDA 护城河在 agentic 推理中还站得住吗？](/zh/blog/agentx-inferencexv3-does-cuda-moat)。每个数据点都可以在[免费仪表板](https://inferencex.semianalysis.com/)上自行探索。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "在 DeepSeek V4 Pro 上，B300 比 B200 好多少？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "按总拥有成本归一化后，B300 vLLM 与 B200 vLLM 的聚合式性能相当接近。B300 凭借多出 50% 的 HBM 容量挤出了额外吞吐量，这在遥测数据中体现为：并发 384 时 HBM 中 KV cache 工作集约 4300 万 token、缓存命中率 91%；而 B200 在并发 196 时为 2200 万 token、命中率 73%。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "H200 为什么在高并发下落后？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "H200 SGLang FP8 在低并发下能很好地服务 DeepSeek V4，在该区间的每美元性能上甚至可与 B200、MI355X SGLang 一较高下。但它缺少足以支撑高吞吐场景的 HBM，因此随着并发上升只能更多依赖 DRAM KV offload，而这种依赖会随用户数增长带来无法接受的延迟。"
+      }
+    }
+  ]
+}`}</JsonLd>

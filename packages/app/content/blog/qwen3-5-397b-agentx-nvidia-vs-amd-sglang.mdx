@@ -1,0 +1,67 @@
+---
+title: 'Qwen3.5 397B on AgentX: A 20x SGLang Gap at 90 tok/s/user'
+subtitle: 'GatedDeltaNet, a 262k native context, and no AMD competition at all on the same engine'
+seoDescription: 'Qwen3.5 397B AgentX results. On SGLang against SGLang, NVIDIA is over 20x better at 90 tok/s/user with zero competition from AMD, and NVIDIA SGLang submissions hold much lower p90 TTFT than TRT-LLM.'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - qwen
+  - sglang
+  - trtllm
+  - nvidia
+  - amd
+---
+
+Qwen3.5 397B uses GatedDeltaNet instead of vanilla attention for every couple of layers. GatedDeltaNet was invented at MIT and NVIDIA Research and has a theoretically constant state storage requirement instead of vanilla attention's linear storage requirement, which means lower storage than an equivalent dense attention model. Unlike end to end model training research such as the Nemotron disaster, NVIDIA Research is great at fundamental research like GDN and LatentMoE, both of which are used in frontier models.
+
+One methodology note before the results. This model's native max context length is 262k tokens, so AgentX replays the [truncated 256k dataset](https://inferencex.semianalysis.com/agentx/cc-traces-weka-062126-256k) against it. That simulates a workload on a smaller model where the max context length would be frequently reached with many compactions, which is how users would actually use this model.
+
+## The gap
+
+Qwen3.5 397B is a strong hold for NVIDIA on SGLang versus SGLang, with over 20x better performance at 90 tok/s/user. There is currently zero competition from AMD for Qwen3.5 SGLang.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/519a7cd0-ac51-4a5c-9c45-ba7c41f6d058_2048x1300.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_hc=1)"
+/>
+
+Holding the engine constant is what makes this comparison worth stating. A cross-engine result can always be argued about, since the software stacks differ in maturity and in who is paid to optimize them. Here both sides are SGLang, and the gap is still 20x.
+
+## NVIDIA is trading TTFT for interactivity
+
+Within the NVIDIA field, we again observe over-optimization for [interactivity](/glossary/interactivity) at the cost of time to first token, especially in the case of TRT-LLM. In the chart above, all of the NVIDIA SGLang submissions have much lower p90 TTFT when compared to TRT-LLM.
+
+That is a real tradeoff rather than a defect, but it is one a reader has to see. A recipe that streams faster after making the user wait longer will look better on an interactivity axis and worse against a first-token [service level objective](/glossary/service-level-objective), and only reading both together tells you which one fits your product.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/c92da639-dcff-4e39-b9b5-49742677e93c_2048x1289.png" />
+
+---
+
+_These results are one slice of AgentX 1.0. The full analysis, the replay methodology, and the 70+ upstream PRs the benchmark drove are in [AgentX - InferenceXv3: Does the CUDA Moat Hold Up in Agentic Inferencing?](/blog/agentx-inferencexv3-does-cuda-moat). Every point is explorable on the [free dashboard](https://inferencex.semianalysis.com/)._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How much faster is NVIDIA than AMD on Qwen3.5 397B?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On SGLang against SGLang, NVIDIA is over 20x better at 90 tok/s/user, and there is currently zero competition from AMD for Qwen3.5 SGLang. Holding the engine constant on both sides is what makes the comparison meaningful."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does AgentX replay a truncated dataset for Qwen3.5?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The model has a native max context length of 262k tokens, so AgentX uses the truncated 256k context dataset. That simulates a workload on a smaller model where the max context length is frequently reached with many compactions, which is how users would actually use this model."
+      }
+    }
+  ]
+}`}</JsonLd>

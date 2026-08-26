@@ -1,0 +1,69 @@
+---
+title: 'GLM 5.3 的 AgentX 结果：150 tok/s/user 下 NVIDIA 单 token 成本最多低 5 倍'
+subtitle: '在这个运行点上，即便 AMD 硬件白送也仍然填不平差距'
+seoDescription: 'GLM 5.3 在开源 SGLang 上的 AgentX 结果。在 150 tok/s/user 的 p90 交互性下，NVIDIA 的成本效率最高领先 5 倍；差距之大，即便竞品硬件免费，NVIDIA 的单 token 成本依然更低。'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - glm5
+  - b200
+  - b300
+  - mi355x
+  - sglang
+  - nvidia
+  - amd
+---
+
+GLM 5.3 在 GLM 5.2 744B 基础上做了额外的后训练，是一款前沿级别的模型。
+
+在开源 SGLang 的性能上，这又是一个 NVIDIA 在真实 agentic 推理性能上胜过 AMD 的模型。在 150 tok/s/user 的 p90 [交互性](/zh/glossary/interactivity)下，NVIDIA 的成本效率最高领先 5 倍。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/4a21d140-b588-4b33-941d-7c8090ac42b5_2048x1286.png"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=GLM-5.2&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_prec=fp4&i_active=b200_sglang%2Cb300_sglang%2Cgb200_dynamo-sglang%2Cgb300_dynamo-trt%2Cmi355x_atom%2Cmi355x_sglang)"
+/>
+
+## 「硬件白送」检验
+
+衡量这种差距有一个很实用的方法。以 AMD 软件当前的状态，在 150 tok/s/user 时，NVIDIA 的性能优势大到这种程度：即便竞品芯片硬件白送（服务商当然仍要承担数据中心托管、电力和其他运营成本），用 NVIDIA 的单 token 成本依然更低。
+
+这个说法之所以重要，是因为在采购谈判中最常被拿来用的杠杆就是硬件价格；而在这个运行点上，这根杠杆的力量不够。真正的约束是软件，而不是物料成本。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/f85bdb45-792c-4330-9745-674b38b03425_2048x1289.png" />
+
+## 这是一次快照，不是最终结论
+
+这个差距是相对 AMD 软件当前状态测得的，而在这批结果的其他部分中，这一状态一直在快速变化。我们期待 AMD 在几周后的 AgentX 更新文章中带来性能优化，那篇文章还会包含其他一些非常有意思的结果。
+
+范围也要说清楚：这里比较的是开源 SGLang。在同一个模型的部分区间上，AMD 的厂商引擎讲的是另一个故事，我们[另文说明](/zh/blog/glm-5-3-agentx-mi355x-atom-vs-gb300-nvl72)。
+
+---
+
+_本文结果只是 AgentX 1.0 的一个切面。完整分析、回放方法，以及该基准测试推动的 70 多个上游 PR，请见 [AgentX - InferenceXv3：CUDA 护城河在 agentic 推理中还站得住吗？](/zh/blog/agentx-inferencexv3-does-cuda-moat)。每个数据点都可以在[免费仪表板](https://inferencex.semianalysis.com/)上自行探索。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "在 GLM 5.3 上，NVIDIA 比 AMD 便宜多少？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "在开源 SGLang、150 tok/s/user 的 p90 交互性下，NVIDIA 的成本效率最高领先 5 倍。以 AMD 软件在该运行点的当前状态，这一优势大到即便竞品硬件免费（服务商仍需承担托管、电力和其他运营成本），NVIDIA 的单 token 成本依然更低。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "AMD 在 GLM 5.3 上有胜出的地方吗？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "有，但不在这组对比里。5 倍这个数字是开源 SGLang 的结果。使用 ATOM 时，在 p90 端到端归一化交互性的部分区间内，AMD 的每美元性能优于 GB300 NVL72 SGLang，甚至优于 TRTLLM。"
+      }
+    }
+  ]
+}`}</JsonLd>
