@@ -165,6 +165,9 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
     selectedRunDate,
     undefined,
     selectedPercentile,
+    undefined,
+    true,
+    costType,
   );
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;

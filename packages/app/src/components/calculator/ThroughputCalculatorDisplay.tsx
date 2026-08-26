@@ -40,6 +40,12 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
+import {
+  includesJalapenoResult,
+  includesVeraRubinResult,
+  JalapenoOfficialPreviewNotice,
+  VeraRubinOfficialPreviewNotice,
+} from '@/components/official-preview-notice';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { overlayRunColor } from '@/lib/overlay-run-style';
 import { localePath } from '@/lib/i18n';
@@ -417,6 +423,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     selectedRunDate,
     overlayInput,
     selectedPercentile,
+    undefined,
+    true,
+    costType,
   );
   const error = throughputError;
 
@@ -532,6 +541,14 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const barResults = useMemo(
     () => (overlayResults.length > 0 ? [...results, ...overlayResults] : results),
     [results, overlayResults],
+  );
+  const showsJalapenoPreview = useMemo(
+    () => includesJalapenoResult(results.map((result) => result.hwKey)),
+    [results],
+  );
+  const showsVeraRubinPreview = useMemo(
+    () => includesVeraRubinResult(results.map((result) => result.hwKey)),
+    [results],
   );
   const barResultsKey = useMemo(
     () =>
@@ -1209,6 +1226,8 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                             </>
                           )}
                         </p>
+                        {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
+                        {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
                         {barMetric === 'power' && barResults.length > 0 && (
                           <>
                             <p
@@ -1218,7 +1237,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                               {t.allInPower}
                               {Object.entries(HW_REGISTRY).map(([base, specs]) => (
                                 <Badge key={base} variant="outline">
-                                  {base.toUpperCase()}: {specs.power}kW
+                                  {specs.badgeLabel ?? base.toUpperCase()}: {specs.power}kW
                                 </Badge>
                               ))}
                             </p>
@@ -1246,7 +1265,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                               {t.tcoPerHr}
                               {Object.entries(HW_REGISTRY).map(([base, specs]) => (
                                 <Badge key={base} variant="outline">
-                                  {base.toUpperCase()}: $
+                                  {specs.badgeLabel ?? base.toUpperCase()}: $
                                   {(costProvider === 'costh'
                                     ? specs.costh
                                     : costProvider === 'costn'

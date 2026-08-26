@@ -33,7 +33,13 @@ import { Percentile, type Sequence } from '@/lib/data-mappings';
 
 import { interpolateForGPU, paretoFrontUpperLeft } from './interpolation';
 import { buildGpuGroups, type GroupMeta } from './useThroughputData';
-import type { CalculatorMode, CostProvider, GPUDataPoint, InterpolatedResult } from './types';
+import type {
+  CalculatorMode,
+  CostProvider,
+  CostType,
+  GPUDataPoint,
+  InterpolatedResult,
+} from './types';
 
 /** Separator for the `hwKey|date` group key. Dates never contain a pipe. */
 const KEY_SEP = '|';
@@ -106,6 +112,7 @@ export interface GroupHistoryOptions {
   precisions: string[];
   /** Agentic percentile; ignored for fixed sequences. */
   percentile?: Percentile;
+  tokenType?: CostType;
   /**
    * Restricts grouping. Callers driving a legend should leave this unset and
    * filter for display instead, so toggling a legend entry does not rebuild
@@ -121,7 +128,14 @@ export interface GroupHistoryOptions {
  * the read when the target interactivity moves.
  */
 export function groupHistoryByHwKeyAndDate(options: GroupHistoryOptions): HistoryGroups {
-  const { rows, sequence, precisions, percentile = Percentile.P90, visibleHwKeys } = options;
+  const {
+    rows,
+    sequence,
+    precisions,
+    percentile = Percentile.P90,
+    tokenType = 'total',
+    visibleHwKeys,
+  } = options;
   if (rows.length === 0 || precisions.length === 0) {
     return { byHwKey: new Map(), datesSeen: 0 };
   }
@@ -134,6 +148,7 @@ export function groupHistoryByHwKeyAndDate(options: GroupHistoryOptions): Histor
     sequence,
     precisions,
     percentile,
+    tokenType,
     classify: (hwKey, row) => {
       if (visibleHwKeys && !visibleHwKeys.has(hwKey)) return null;
       if (!row.date) return null;

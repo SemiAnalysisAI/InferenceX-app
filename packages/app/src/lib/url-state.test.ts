@@ -46,8 +46,10 @@ describe('PARAM_DEFAULTS', () => {
     // from DEFAULT_Y_AXIS_METRIC, a link captured on the *other* metric would
     // be written without `i_metric` and reopen on the dashboard default.
     const { PARAM_DEFAULTS, DEFAULT_Y_AXIS_METRIC } = await import('@/lib/url-state');
+    const { DEFAULT_METRIC_CONFIG_KEY } = await import('@/components/inference/metric-registry');
     expect(PARAM_DEFAULTS.i_metric).toBe(DEFAULT_Y_AXIS_METRIC);
-    expect(DEFAULT_Y_AXIS_METRIC).toBe('y_tokensPerDollarH');
+    expect(DEFAULT_Y_AXIS_METRIC).toBe('y_tokensPerDollarN');
+    expect(DEFAULT_Y_AXIS_METRIC).toBe(DEFAULT_METRIC_CONFIG_KEY);
   });
 
   it('has expected default for r_range', async () => {

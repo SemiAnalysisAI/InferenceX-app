@@ -73,7 +73,7 @@ function MetricBadges({
       {label}{' '}
       {Object.entries(values).map(([base, value]) => (
         <Badge key={base} variant="outline">
-          {base.toUpperCase()}: {value}
+          {HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase()}: {value}
         </Badge>
       ))}
     </p>

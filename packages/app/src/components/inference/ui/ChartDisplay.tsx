@@ -4,7 +4,10 @@ import { track } from '@/lib/analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
-import chartDefinitions, { type MetricKey } from '@/components/inference/metric-registry';
+import chartDefinitions, {
+  tokenMetricTypeForConfigKey,
+  type MetricKey,
+} from '@/components/inference/metric-registry';
 import { resolveXAxisKind } from '@/components/inference/axis-metric-explanations';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import {
@@ -43,6 +46,7 @@ import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
 import { getDisplayLabel, getFrameworkLabel } from '@/lib/utils';
+import { supportsChartTokenMetric } from '@/lib/supplemental-benchmarks';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useOverlayScopeReconciliation,
@@ -452,8 +456,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
 
       const effectiveXMetric = chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
       const isAgentic = sequenceKind(selectedSequence) === 'agentic';
+      const tokenType = tokenMetricTypeForConfigKey(selectedYAxisMetric);
+      const capableData = rawData.data.filter((point) =>
+        supportsChartTokenMetric(String(point.hwKey), point.date, tokenType),
+      );
       const processed = processOverlayChartDataWithClipping(
-        rawData.data,
+        capableData,
         chartType,
         selectedYAxisMetric,
         effectiveXMetric,

@@ -12,6 +12,7 @@ import { getHardwareKey } from '@/lib/chart-utils';
 import { getModelSortIndex, getHardwareConfig, getGpuSpecs } from '@/lib/constants';
 import { Percentile, Sequence, type Model } from '@/lib/data-mappings';
 import { overlayRunIndex } from '@/lib/overlay-run-style';
+import { supportsTokenMetric } from '@/lib/supplemental-benchmarks';
 
 import {
   getCostField,
@@ -24,7 +25,7 @@ import {
   recoverReciprocalNumerator,
   sign,
 } from './interpolation';
-import type { CostProvider, GPUDataPoint, InterpolatedResult } from './types';
+import type { CostProvider, CostType, GPUDataPoint, InterpolatedResult } from './types';
 
 // Re-export pure functions so existing imports from this module keep working.
 export {
@@ -165,6 +166,8 @@ export function buildGpuGroups<M extends GroupMeta>(
     precisions: string[];
     /** Agentic x/e2e latency percentile. Fixed-sequence rows keep the median. */
     percentile?: Percentile;
+    /** Token basis selected by the consumer; applies to official and overlay rows. */
+    tokenType?: CostType;
     /** Derive a row's group key + metadata. Return null to drop the row. */
     classify: (hwKey: string, row: BenchmarkRow) => { key: string; meta: M } | null;
   },
@@ -173,7 +176,13 @@ export function buildGpuGroups<M extends GroupMeta>(
   groupMeta: Record<string, M>;
   hwConfigMap: HardwareConfig;
 } {
-  const { sequence, precisions, percentile = Percentile.P90, classify } = options;
+  const {
+    sequence,
+    precisions,
+    percentile = Percentile.P90,
+    tokenType = 'total',
+    classify,
+  } = options;
   const grouped: Record<string, GPUDataPoint[]> = {};
   const groupMeta: Record<string, M> = {};
   const hwConfigMap: HardwareConfig = {};
@@ -181,6 +190,7 @@ export function buildGpuGroups<M extends GroupMeta>(
   for (const row of rows) {
     if (rowToSequence(row) !== sequence) continue;
     if (!precisions.includes(row.precision)) continue;
+    if (!supportsTokenMetric(row, tokenType)) continue;
 
     const entry = rowToAggDataEntry(row);
     const hwKey = getHardwareKey(entry);
@@ -267,6 +277,7 @@ export function useThroughputData(
   selectedPercentile: Percentile = Percentile.P90,
   initialRows?: BenchmarkRow[],
   enabled = true,
+  selectedTokenType: CostType = 'total',
 ) {
   const initialCacheScope = useMemo(
     () =>
@@ -327,6 +338,7 @@ export function useThroughputData(
       sequence: selectedSequence,
       precisions: selectedPrecisions,
       percentile: selectedPercentile,
+      tokenType: selectedTokenType,
     };
 
     const official = buildGpuGroups<GroupMeta>(allRows, {
@@ -380,6 +392,7 @@ export function useThroughputData(
     selectedSequence,
     selectedPrecisions,
     selectedPercentile,
+    selectedTokenType,
     overlayRows,
     runIndexByUrl,
   ]);

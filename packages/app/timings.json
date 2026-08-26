@@ -149,6 +149,10 @@
       "duration": 8153
     },
     {
+      "spec": "cypress/e2e/jalapeno-preview-notice.cy.ts",
+      "duration": 36000
+    },
+    {
       "spec": "cypress/e2e/landing-performance.cy.ts",
       "duration": 5609
     },

@@ -3,7 +3,9 @@ import { useMemo, useRef } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { rowToSequence } from '@semianalysisai/inferencex-constants';
 
-import chartDefinitions from '@/components/inference/metric-registry';
+import chartDefinitions, {
+  tokenMetricTypeForConfigKey,
+} from '@/components/inference/metric-registry';
 import type {
   AggDataEntry,
   ChartDefinition,
@@ -34,6 +36,7 @@ import { Sequence, type Model } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
 import { remapInferencePoint } from '@/lib/chart-utils';
 import { overviewServingSeriesKey, type OverviewServingSeriesRow } from '@/lib/overview-data';
+import { supportsChartTokenMetric, type TokenMetricType } from '@/lib/supplemental-benchmarks';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import {
   applyQuickFilters,
@@ -199,6 +202,14 @@ export function applyScopeFilters(
     scoped = scoped.filter((d) => hardwareKeyMatchesAnyBase(String(d.hwKey), compareGpuPair));
   }
   return scoped;
+}
+
+/** Apply snapshot-scoped metric support using the source date, not its display date. */
+export function supportsPointTokenMetric(
+  point: Pick<InferenceData, 'hwKey' | 'date' | 'actualDate'>,
+  tokenType: TokenMetricType,
+): boolean {
+  return supportsChartTokenMetric(String(point.hwKey), point.actualDate ?? point.date, tokenType);
 }
 
 export function useChartData(
@@ -568,12 +579,14 @@ export function useChartData(
         // Filter to points that have the selected metric, then remap x/y.
         // Intentional cost/TTFT outliers are partitioned only after this step
         // so ScatterGraph can retain them for dashed boundary continuations.
-        const hasMetric = filteredData.some((d) => metricKey in d);
+        const tokenType = tokenMetricTypeForConfigKey(selectedYAxisMetric);
+        const metricData = filteredData.filter(
+          (d) => metricKey in d && supportsPointTokenMetric(d, tokenType),
+        );
+        const hasMetric = metricData.length > 0;
         const isTtftX = typeof xAxisField === 'string' && xAxisField.endsWith('_ttft');
         const mappedData = hasMetric
-          ? filteredData
-              .filter((d) => metricKey in d)
-              .map((d) => remapInferencePoint(d, metricKey, xAxisField))
+          ? metricData.map((d) => remapInferencePoint(d, metricKey, xAxisField))
           : [];
 
         const isAgentic = selectedSequence === Sequence.AgenticTraces;
