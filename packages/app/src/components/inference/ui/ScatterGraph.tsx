@@ -82,7 +82,6 @@ import {
   type ParetoDirection,
 } from '@/lib/chart-utils';
 import { canonicalParetoIntersection } from '@/components/inference/utils/canonicalFrontier';
-import { type RooflineDirection, getSpeedOverlayCorners } from '@/lib/speed-overlay';
 import type {
   ChartDefinition,
   ClippedInferenceData,
@@ -409,8 +408,6 @@ const ScatterGraph = React.memo(
       showConcurrencyLabels,
       showGradientLabels,
       showLineLabels,
-      showSpeedOverlay,
-      showMinecraftOverlay,
     } = useInferenceDisplay();
     const {
       setBestPerSku,
@@ -427,8 +424,6 @@ const ScatterGraph = React.memo(
       setShowConcurrencyLabels,
       setShowGradientLabels,
       setShowLineLabels,
-      setShowSpeedOverlay,
-      setShowMinecraftOverlay,
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
@@ -2322,109 +2317,6 @@ const ScatterGraph = React.memo(
           }
         : null;
 
-      const speedOverlayLayer: CustomLayerConfig = {
-        type: 'custom',
-        key: 'speed-overlay',
-        displayIdentity: `${showSpeedOverlay}:${showMinecraftOverlay}`,
-        render: (_zoomGroup, ctx) => {
-          const { g } = ctx.layout;
-          g.selectAll('.speed-overlay').remove();
-          if (!showSpeedOverlay && !showMinecraftOverlay) return;
-          const w = ctx.width;
-          const h = ctx.height;
-          const SIZE = 78;
-          const PAD = 8;
-          const STACK_GAP = 4;
-          const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
-          const dir = chartDefinition[rooflineKey] as RooflineDirection | undefined;
-          const { busTop, busLeft } = getSpeedOverlayCorners(dir);
-          const layer = g.append('g').attr('class', 'speed-overlay').attr('pointer-events', 'none');
-
-          // Each enabled "pair" stacks horizontally inward from the chart corner so
-          // the second pair sits next to (not on top of) the first one when both
-          // toggles are on. The bus-side stays anchored to the batch corner; the
-          // car-side stays anchored to the interactive corner. Pair items can have
-          // independent slow/fast sizes so the donkey can be visually heavier than
-          // the elytra without affecting the bus/car pair.
-          interface OverlayPair {
-            id: string;
-            slowSrc: string;
-            fastSrc: string;
-            slowSize: number;
-            fastSize: number;
-          }
-          const enabledPairs: OverlayPair[] = [];
-          if (showSpeedOverlay) {
-            enabledPairs.push({
-              id: 'speed',
-              slowSrc: '/decorative/bus.png',
-              fastSrc: '/decorative/racing-car.png',
-              slowSize: SIZE,
-              fastSize: SIZE,
-            });
-          }
-          if (showMinecraftOverlay) {
-            // donkey-chest.png — Chested_Donkey_JE5 from minecraft.wiki/w/Donkey,
-            //   rendered 50% larger than the other overlay icons (1.5× SIZE).
-            // elytra.png — ElytraNew sprite (front-facing both wings) from the
-            //   Minecraft Fandom wiki at 160×160 pixel-art.
-            enabledPairs.push({
-              id: 'minecraft',
-              slowSrc: '/decorative/donkey-chest.png',
-              fastSrc: '/decorative/elytra.png',
-              slowSize: Math.round(SIZE * 1.5),
-              fastSize: SIZE,
-            });
-          }
-
-          const slowCornerName = `${busTop ? 'top' : 'bottom'}-${busLeft ? 'left' : 'right'}`;
-          const fastCornerName = `${busTop ? 'bottom' : 'top'}-${busLeft ? 'right' : 'left'}`;
-          let slowInward = 0;
-          let fastInward = 0;
-          enabledPairs.forEach((pair) => {
-            const slowX = busLeft ? PAD + slowInward : w - pair.slowSize - PAD - slowInward;
-            const slowY = busTop ? PAD : h - pair.slowSize - PAD;
-            const fastX = busLeft ? w - pair.fastSize - PAD - fastInward : PAD + fastInward;
-            const fastY = busTop ? h - pair.fastSize - PAD : PAD;
-            layer
-              .append('image')
-              .attr('class', `speed-overlay-slow speed-overlay-${pair.id}-slow`)
-              .attr('data-testid', `speed-overlay-${pair.id}-slow`)
-              .attr('data-corner', slowCornerName)
-              .attr('href', pair.slowSrc)
-              .attr('x', slowX)
-              .attr('y', slowY)
-              .attr('width', pair.slowSize)
-              .attr('height', pair.slowSize)
-              .attr('opacity', 0.85);
-            layer
-              .append('image')
-              .attr('class', `speed-overlay-fast speed-overlay-${pair.id}-fast`)
-              .attr('data-testid', `speed-overlay-${pair.id}-fast`)
-              .attr('data-corner', fastCornerName)
-              .attr('href', pair.fastSrc)
-              .attr('x', fastX)
-              .attr('y', fastY)
-              .attr('width', pair.fastSize)
-              .attr('height', pair.fastSize)
-              .attr('opacity', 0.85);
-            slowInward += pair.slowSize + STACK_GAP;
-            fastInward += pair.fastSize + STACK_GAP;
-          });
-
-          // Backwards-compatible aliases so existing E2E tests (speed-overlay.cy.ts)
-          // can still find the bus/car pair via `[data-testid="speed-overlay-bus"]`
-          // and `[data-testid="speed-overlay-car"]`.
-          if (showSpeedOverlay) {
-            layer.select('.speed-overlay-speed-slow').attr('data-testid', 'speed-overlay-bus');
-            layer.select('.speed-overlay-speed-fast').attr('data-testid', 'speed-overlay-car');
-          }
-        },
-        onDisplayUpdate: (_zoomGroup, ctx) => {
-          speedOverlayLayer.render?.(_zoomGroup, ctx);
-        },
-      };
-
       // ── Intentional clipping: interpolated dashed Pareto continuation + arrow ──
       const drawOverflowContinuations = (
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -2599,7 +2491,7 @@ const ScatterGraph = React.memo(
 
       const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
-      result.push(overflowContinuationLayer, speedOverlayLayer, knownIssueLayer);
+      result.push(overflowContinuationLayer, knownIssueLayer);
       return result;
       // Interaction state (visibility, colors, precision shapes, known-issue
       // annotations) is deliberately NOT a dependency: layer closures read it
@@ -2612,8 +2504,6 @@ const ScatterGraph = React.memo(
       showGradientLabels,
       showLineLabels,
       pinLineLabels,
-      showSpeedOverlay,
-      showMinecraftOverlay,
       gradientColorByPoint,
       chartId,
       pointsData,
@@ -3221,26 +3111,6 @@ const ScatterGraph = React.memo(
                     // Concurrency is a point-label annotation; turning it on is
                     // pointless if labels are hidden, so auto-enable Labels.
                     if (checked && !showPointLabels) setShowPointLabels(true);
-                  },
-                },
-                {
-                  id: 'scatter-speed-overlay',
-                  label: 'Bus / Race Car',
-                  advanced: true,
-                  checked: showSpeedOverlay,
-                  onCheckedChange: (checked: boolean) => {
-                    setShowSpeedOverlay(checked);
-                    track('latency_speed_overlay_toggled', { enabled: checked });
-                  },
-                },
-                {
-                  id: 'scatter-minecraft-overlay',
-                  label: 'Donkey / Elytra',
-                  advanced: true,
-                  checked: showMinecraftOverlay,
-                  onCheckedChange: (checked: boolean) => {
-                    setShowMinecraftOverlay(checked);
-                    track('latency_minecraft_overlay_toggled', { enabled: checked });
                   },
                 },
               ]}

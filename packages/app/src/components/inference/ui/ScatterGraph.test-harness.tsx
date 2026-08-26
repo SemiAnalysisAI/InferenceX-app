@@ -138,10 +138,6 @@ export function baseInferenceState() {
     setShowGradientLabels: noop,
     showLineLabels: false,
     setShowLineLabels: noop,
-    showSpeedOverlay: false,
-    setShowSpeedOverlay: noop,
-    showMinecraftOverlay: false,
-    setShowMinecraftOverlay: noop,
   };
 }
 

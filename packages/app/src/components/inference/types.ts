@@ -606,8 +606,6 @@ export interface InferenceDisplayContextType {
   showConcurrencyLabels: boolean;
   showGradientLabels: boolean;
   showLineLabels: boolean;
-  showSpeedOverlay: boolean;
-  showMinecraftOverlay: boolean;
 }
 
 /** Stable commands that mutate inference state. */
@@ -651,8 +649,6 @@ export interface InferenceActionsContextType {
   setShowConcurrencyLabels: (showConcurrencyLabels: boolean) => void;
   setShowGradientLabels: (showGradientLabels: boolean) => void;
   setShowLineLabels: (showLineLabels: boolean) => void;
-  setShowSpeedOverlay: (showSpeedOverlay: boolean) => void;
-  setShowMinecraftOverlay: (showMinecraftOverlay: boolean) => void;
   setSelectedGPUs: (gpus: string[]) => void;
   setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void;
   setSelectedDatesFromRunExpansion: (dates: string[] | ((prev: string[]) => string[])) => void;

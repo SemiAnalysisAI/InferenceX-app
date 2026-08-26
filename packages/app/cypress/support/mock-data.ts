@@ -244,10 +244,6 @@ export function createMockInferenceContextValues(
     setShowGradientLabels: namedStub('setShowGradientLabels'),
     showLineLabels: false,
     setShowLineLabels: namedStub('setShowLineLabels'),
-    showSpeedOverlay: false,
-    setShowSpeedOverlay: namedStub('setShowSpeedOverlay'),
-    showMinecraftOverlay: false,
-    setShowMinecraftOverlay: namedStub('setShowMinecraftOverlay'),
     selectedGPUs: [],
     setSelectedGPUs: namedStub('setSelectedGPUs'),
     availableGPUs: [

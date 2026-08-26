@@ -47,8 +47,6 @@ const URL_STATE_KEYS = [
   'i_conclabel',
   'i_gradlabel',
   'i_linelabel',
-  'i_speed',
-  'i_mc',
   'i_active',
   // Quick filters (vendor / framework / deployment / mtp-stp).
   // `i_disagg` keeps its historical name for shared-link compatibility.
@@ -145,8 +143,6 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_conclabel: '',
   i_gradlabel: '',
   i_linelabel: '',
-  i_speed: '',
-  i_mc: '',
   i_active: '',
   i_vendor: '',
   i_fw: '',
