@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 
-import { CLIENT_PATHNAME_CHANGE_EVENT } from '@/lib/client-navigation';
+import { CLIENT_PATHNAME_CHANGE_EVENT, getClientPathnameOverride } from '@/lib/client-navigation';
 
 const subscribers = new Set<() => void>();
 let listening = false;
@@ -35,19 +35,22 @@ function subscribeClientPathname(subscriber: () => void): () => void {
 }
 
 /**
- * Live address-bar pathname. `usePathname` deliberately keeps the
- * server-rendered value after `replaceClientPathname` rewrites the URL for
- * per-model dashboard routes; controls that map the CURRENT address to a
- * destination (the header language toggle) read this instead. The router
- * pathname is the server snapshot, so SSR markup and hydration stay
- * consistent; on the client the snapshot re-reads `window.location.pathname`,
- * which App Router navigations, popstate, and `replaceClientPathname` all
- * keep current.
+ * The router pathname, corrected for in-place `replaceClientPathname`
+ * rewrites. `usePathname` deliberately keeps the server-rendered value after
+ * per-model dashboard routes rewrite the URL on a model switch; controls that
+ * map the CURRENT address to a destination (the header language toggle) read
+ * this instead. The override is honored only while the address bar still
+ * matches it, so App Router navigations (which update `routerPathname`) and
+ * popstate transitions retire it naturally — and environments where the
+ * browser URL is not the route (component tests) keep the router value.
  */
 export function useClientPathname(routerPathname: string): string {
   return useSyncExternalStore(
     subscribeClientPathname,
-    () => window.location.pathname,
+    () => {
+      const override = getClientPathnameOverride();
+      return override !== null && window.location.pathname === override ? override : routerPathname;
+    },
     () => routerPathname,
   );
 }

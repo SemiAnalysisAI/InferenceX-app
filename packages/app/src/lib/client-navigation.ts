@@ -42,7 +42,17 @@ export function replaceClientSearch(searchParams: URLSearchParams): void {
 export function replaceClientPathname(pathname: string): void {
   const href = `${pathname}${window.location.search}${window.location.hash}`;
   History.prototype.replaceState.call(window.history, window.history.state, '', href);
+  clientPathnameOverride = pathname;
   window.dispatchEvent(new CustomEvent(CLIENT_PATHNAME_CHANGE_EVENT, { detail: pathname }));
+}
+
+let clientPathnameOverride: string | null = null;
+
+/** The last pathname written by `replaceClientPathname`, or null. Consumers
+ *  (useClientPathname) honor it only while the address bar still matches, so
+ *  a later App Router navigation naturally retires a stale override. */
+export function getClientPathnameOverride(): string | null {
+  return clientPathnameOverride;
 }
 
 /**
