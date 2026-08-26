@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import { createMockGroup } from './test-helpers';
 import {
-  DEFAULT_MIN_SPAN_FOR_PERCENT,
+  DEFAULT_LABEL_FONT_SIZE,
   EMPTY_PERF_RULER_SELECTION,
   clampIsoX,
   computeIsoXRulerGeometry,
-  formatPerfPercent,
+  computePerfRulerLabelLayout,
   formatPerfRatio,
   intersectPathAtX,
+  isPerfRulerCurveVisible,
   nextPerfRulerSelection,
   pathXExtent,
   renderPerfRuler,
@@ -27,8 +28,6 @@ const END_B: PerfRulerEndInput = { py: 150, rawY: 197 };
 function makeOpts(overrides?: Partial<PerfRulerRenderOptions>): PerfRulerRenderOptions {
   return {
     color: 'var(--primary)',
-    labelBg: 'var(--primary)',
-    labelText: 'var(--primary-foreground)',
     ...overrides,
   };
 }
@@ -87,21 +86,25 @@ describe('formatPerfRatio', () => {
   });
 });
 
-// ── formatPerfPercent ────────────────────────────────────────────────
+// ── isPerfRulerCurveVisible ────────────────────────────────────────────────
 
-describe('formatPerfPercent', () => {
-  it('formats the relative gain rounded to whole percent', () => {
-    expect(formatPerfPercent(2.0304)).toBe('+103%');
-    expect(formatPerfPercent(1.5)).toBe('+50%');
+describe('isPerfRulerCurveVisible', () => {
+  it('treats legend-hidden curves (opacity 0) as invisible', () => {
+    expect(isPerfRulerCurveVisible('0')).toBe(false);
+    expect(isPerfRulerCurveVisible('0.0')).toBe(false);
+    expect(isPerfRulerCurveVisible(' 0 ')).toBe(false);
   });
 
-  it('formats an equal pair as +0%', () => {
-    expect(formatPerfPercent(1)).toBe('+0%');
+  it('keeps hover-dimmed and fully opaque curves measurable', () => {
+    expect(isPerfRulerCurveVisible('0.15')).toBe(true);
+    expect(isPerfRulerCurveVisible('1')).toBe(true);
   });
 
-  it('returns empty string for invalid ratios', () => {
-    expect(formatPerfPercent(Number.NaN)).toBe('');
-    expect(formatPerfPercent(0)).toBe('');
+  it('treats missing, empty, or unparseable opacity as visible', () => {
+    expect(isPerfRulerCurveVisible(null)).toBe(true);
+    expect(isPerfRulerCurveVisible(undefined)).toBe(true);
+    expect(isPerfRulerCurveVisible('')).toBe(true);
+    expect(isPerfRulerCurveVisible('inherit')).toBe(true);
   });
 });
 
@@ -225,7 +228,6 @@ describe('computeIsoXRulerGeometry', () => {
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B);
     expect(geometry!.ratio).toBeCloseTo(400 / 197, 10);
     expect(geometry!.ratioLabel).toBe('2.03x');
-    expect(geometry!.percentLabel).toBe('+103%');
   });
 
   it('yields the same ratio regardless of end order (symmetric)', () => {
@@ -240,7 +242,6 @@ describe('computeIsoXRulerGeometry', () => {
     expect(geometry).not.toBeNull();
     expect(geometry!.ratio).toBe(1);
     expect(geometry!.ratioLabel).toBe('1.00x');
-    expect(geometry!.percentLabel).toBe('+0%');
     expect(geometry!.y1).toBe(geometry!.y2);
   });
 
@@ -258,10 +259,82 @@ describe('computeIsoXRulerGeometry', () => {
   });
 });
 
-// ── renderPerfRuler ──────────────────────────────────────────────────
+// ── computePerfRulerLabelLayout ──────────────────────────────────────────────────
+
+describe('computePerfRulerLabelLayout', () => {
+  const GEOMETRY = { x: 100, y1: 50, y2: 150, ratioLabel: '2.03x' };
+
+  it('places the label up-right of the line midpoint by default', () => {
+    const layout = computePerfRulerLabelLayout(GEOMETRY, { chartWidth: 800, chartHeight: 400 });
+    expect(layout.side).toBe(1);
+    expect(layout.textAnchor).toBe('start');
+    expect(layout.labelX).toBeGreaterThan(GEOMETRY.x);
+    expect(layout.labelY).toBeLessThan((GEOMETRY.y1 + GEOMETRY.y2) / 2);
+  });
+
+  it('flips to the left side near the right chart edge', () => {
+    const layout = computePerfRulerLabelLayout(GEOMETRY, { chartWidth: 125, chartHeight: 400 });
+    expect(layout.side).toBe(-1);
+    expect(layout.textAnchor).toBe('end');
+    expect(layout.labelX).toBeLessThan(GEOMETRY.x);
+  });
+
+  it('drops below the midpoint when the label would clip the top', () => {
+    const top = { x: 100, y1: 10, y2: 30, ratioLabel: '2.03x' };
+    const layout = computePerfRulerLabelLayout(top, { chartWidth: 800, chartHeight: 400 });
+    expect(layout.labelY).toBeGreaterThan((top.y1 + top.y2) / 2);
+  });
+
+  it('clamps the label inside the chart when above and below both clip', () => {
+    const top = { x: 100, y1: 10, y2: 30, ratioLabel: '2.03x' };
+    const layout = computePerfRulerLabelLayout(top, { chartWidth: 800, chartHeight: 70 });
+    const fontSize = DEFAULT_LABEL_FONT_SIZE;
+    expect(layout.labelY - fontSize / 2).toBeGreaterThanOrEqual(4);
+    expect(layout.labelY + fontSize / 2).toBeLessThanOrEqual(70);
+  });
+
+  it('ends the arrow curve horizontally next to the line midpoint', () => {
+    const layout = computePerfRulerLabelLayout(GEOMETRY, { chartWidth: 800, chartHeight: 400 });
+    const midY = (GEOMETRY.y1 + GEOMETRY.y2) / 2;
+    // Quadratic curve: M sx sy Q cx cy ex ey — the end point sits a few px
+    // right of the line at the midpoint height, tangent horizontal.
+    const numbers = layout.arrowPath.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+    const [sx, sy, cx, cy, ex, ey] = numbers;
+    expect(sx).toBeGreaterThan(GEOMETRY.x);
+    expect(sy).toBeLessThan(midY);
+    expect(cy).toBe(midY);
+    expect(cx).toBe(sx);
+    expect(ey).toBe(midY);
+    expect(ex).toBeGreaterThan(GEOMETRY.x);
+    expect(ex).toBeLessThan(sx);
+  });
+
+  it('points the arrowhead tip at the line, just off the stroke', () => {
+    const layout = computePerfRulerLabelLayout(GEOMETRY, { chartWidth: 800, chartHeight: 400 });
+    const midY = (GEOMETRY.y1 + GEOMETRY.y2) / 2;
+    const numbers = layout.arrowHeadPath.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+    const [tipX, tipY] = numbers;
+    expect(tipY).toBe(midY);
+    expect(Math.abs(tipX - GEOMETRY.x)).toBeLessThanOrEqual(6);
+    expect(layout.arrowHeadPath.endsWith('Z')).toBe(true);
+  });
+
+  it('respects a custom font size when checking the top clip', () => {
+    const nearTop = { x: 100, y1: 40, y2: 60, ratioLabel: '2.03x' };
+    const small = computePerfRulerLabelLayout(nearTop, { fontSize: 12 });
+    // 50 - 46 = 4 above the top — fits a 12px label (4 - 6 < 4 fails)…
+    // both sizes clip here, so both drop below; a taller chart midpoint
+    // stays above for both.
+    const tall = { x: 100, y1: 100, y2: 200, ratioLabel: '2.03x' };
+    expect(computePerfRulerLabelLayout(tall, { fontSize: 12 }).labelY).toBeLessThan(150);
+    expect(small.labelY).toBeGreaterThan(50);
+  });
+});
+
+// ── renderPerfRuler ────────────────────────────────────────────────────
 
 describe('renderPerfRuler', () => {
-  it('draws the ruler line, two end caps, chip, label texts, and drag handle', () => {
+  it('draws the ruler line, end caps, arrow, big ratio label, and drag handle', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
     renderPerfRuler(group as any, geometry, makeOpts());
@@ -272,10 +345,14 @@ describe('renderPerfRuler', () => {
     expect(children).toContain('pr-line');
     expect(children).toContain('pr-cap pr-cap-top');
     expect(children).toContain('pr-cap pr-cap-bottom');
-    expect(children).toContain('pr-bg');
+    expect(children).toContain('pr-arrow');
+    expect(children).toContain('pr-arrow-head');
     expect(children).toContain('pr-text pr-text-ratio');
-    expect(children).toContain('pr-text pr-text-percent');
     expect(children).toContain('pr-drag');
+    // The chip rect and secondary percent line are gone in the big-label
+    // design.
+    expect(children).not.toContain('pr-bg');
+    expect(children).not.toContain('pr-text pr-text-percent');
   });
 
   it('positions the vertical line and caps at the iso-x', () => {
@@ -323,56 +400,80 @@ describe('renderPerfRuler', () => {
     expect(drag.styles['cursor']).toBe('ew-resize');
   });
 
-  it('writes the ratio label and shows the percent line for a tall span', () => {
+  it('writes the big ratio label in the accent color with a readability halo', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    expect(Math.abs(geometry.y2 - geometry.y1)).toBeGreaterThanOrEqual(
-      DEFAULT_MIN_SPAN_FOR_PERCENT,
-    );
-    renderPerfRuler(group as any, geometry, makeOpts());
+    renderPerfRuler(group as any, geometry, makeOpts({ chartWidth: 800, chartHeight: 400 }));
 
     const ruler = group.selectAll('.perf-ruler');
     const byClass = (cls: string) =>
       ruler.elements[0].children.find((c) => String(c.attrs['class']) === cls)!;
-    expect(byClass('pr-text pr-text-ratio').textContent).toBe('2.03x');
-    const percent = byClass('pr-text pr-text-percent');
-    expect(percent.textContent).toBe('+103%');
-    expect(percent.styles['display']).toBe('');
+    const label = byClass('pr-text pr-text-ratio');
+    expect(label.textContent).toBe('2.03x');
+    expect(label.attrs['font-size']).toBe(`${DEFAULT_LABEL_FONT_SIZE}px`);
+    expect(label.attrs['font-weight']).toBe('800');
+    expect(label.attrs['fill']).toBe('var(--primary)');
+    // Halo: background-colored stroke painted UNDER the glyph fill.
+    expect(label.attrs['paint-order']).toBe('stroke');
+    expect(label.attrs['stroke']).toBe('var(--background)');
+    expect(Number(label.attrs['stroke-width'])).toBeGreaterThan(0);
   });
 
-  it('hides the percent line when the span is too short to fit it cleanly', () => {
+  it('honors a custom halo color and font size', () => {
     const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, { ...END_B, py: END_A.py + 10 })!;
-    renderPerfRuler(group as any, geometry, makeOpts());
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
+    renderPerfRuler(group as any, geometry, makeOpts({ halo: 'white', labelFontSize: 40 }));
 
     const ruler = group.selectAll('.perf-ruler');
-    const percent = ruler.elements[0].children.find(
-      (c) => String(c.attrs['class']) === 'pr-text pr-text-percent',
+    const label = ruler.elements[0].children.find(
+      (c) => String(c.attrs['class']) === 'pr-text pr-text-ratio',
     )!;
-    expect(percent.styles['display']).toBe('none');
-    expect(percent.textContent).toBe('');
+    expect(label.attrs['stroke']).toBe('white');
+    expect(label.attrs['font-size']).toBe('40px');
   });
 
-  it('places the chip to the right of the line by default', () => {
+  it('draws the arrow curve and filled head in the accent color', () => {
+    const group = createMockGroup();
+    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
+    renderPerfRuler(group as any, geometry, makeOpts({ chartWidth: 800, chartHeight: 400 }));
+
+    const ruler = group.selectAll('.perf-ruler');
+    const byClass = (cls: string) =>
+      ruler.elements[0].children.find((c) => String(c.attrs['class']) === cls)!;
+    const layout = computePerfRulerLabelLayout(geometry, { chartWidth: 800, chartHeight: 400 });
+    const arrow = byClass('pr-arrow');
+    expect(arrow.attrs['d']).toBe(layout.arrowPath);
+    expect(arrow.attrs['stroke']).toBe('var(--primary)');
+    expect(arrow.attrs['fill']).toBe('none');
+    const head = byClass('pr-arrow-head');
+    expect(head.attrs['d']).toBe(layout.arrowHeadPath);
+    expect(head.attrs['fill']).toBe('var(--primary)');
+  });
+
+  it('places the label right of the line by default', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
     renderPerfRuler(group as any, geometry, makeOpts({ chartWidth: 800 }));
 
     const ruler = group.selectAll('.perf-ruler');
-    const bg = ruler.elements[0].children.find((c) => String(c.attrs['class']) === 'pr-bg')!;
-    expect(Number(bg.attrs['x'])).toBeGreaterThan(geometry.x);
-    expect(bg.attrs['fill']).toBe('var(--primary)');
+    const label = ruler.elements[0].children.find(
+      (c) => String(c.attrs['class']) === 'pr-text pr-text-ratio',
+    )!;
+    expect(Number(label.attrs['x'])).toBeGreaterThan(geometry.x);
+    expect(label.attrs['text-anchor']).toBe('start');
   });
 
-  it('flips the chip to the left near the right chart edge', () => {
+  it('flips the label to the left near the right chart edge', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
     renderPerfRuler(group as any, geometry, makeOpts({ chartWidth: 125 }));
 
     const ruler = group.selectAll('.perf-ruler');
-    const bg = ruler.elements[0].children.find((c) => String(c.attrs['class']) === 'pr-bg')!;
-    const bgX = Number(bg.attrs['x']);
-    expect(bgX + Number(bg.attrs['width'])).toBeLessThan(geometry.x);
+    const label = ruler.elements[0].children.find(
+      (c) => String(c.attrs['class']) === 'pr-text pr-text-ratio',
+    )!;
+    expect(Number(label.attrs['x'])).toBeLessThan(geometry.x);
+    expect(label.attrs['text-anchor']).toBe('end');
   });
 
   it('is idempotent: re-rendering keeps a single ruler group', () => {

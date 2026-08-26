@@ -6,9 +6,9 @@ import type * as d3 from 'd3';
  * freely chosen iso-x whose BOTH ends are interpolated on the two curves'
  * rendered roofline paths at that x (neither end needs to be a data point).
  * The ruler is draggable horizontally to fine-tune the iso-x. Short
- * horizontal end caps mark both ends and a label chip shows the performance
- * multiple between the two RAW y-values at that x (e.g. "2.03x",
- * optionally "+103%").
+ * horizontal end caps mark both ends and a big annotation-style label
+ * (e.g. "2.03x") sits in open chart space with a curved arrow pointing at
+ * the ruler line; the ratio compares the two RAW y-values at that x.
  *
  * Pure module: intersection search and geometry math are separated from
  * rendering so all three are unit testable (see perf-ruler.test.ts).
@@ -37,8 +37,6 @@ export interface PerfRulerGeometry {
   ratio: number;
   /** Formatted ratio, e.g. "2.03x". */
   ratioLabel: string;
-  /** Formatted relative gain, e.g. "+103%". */
-  percentLabel: string;
 }
 
 /** Format a performance multiple like "2.03x" (fewer decimals as it grows). */
@@ -47,12 +45,6 @@ export function formatPerfRatio(ratio: number): string {
   if (ratio >= 100) return `${Math.round(ratio)}x`;
   if (ratio >= 10) return `${ratio.toFixed(1)}x`;
   return `${ratio.toFixed(2)}x`;
-}
-
-/** Format the relative gain of a multiple like "+103%". */
-export function formatPerfPercent(ratio: number): string {
-  if (!Number.isFinite(ratio) || ratio <= 0) return '';
-  return `+${Math.round((ratio - 1) * 100)}%`;
 }
 
 /**
@@ -140,8 +132,22 @@ export function computeIsoXRulerGeometry(
     y2: Math.max(a.py, b.py),
     ratio,
     ratioLabel: formatPerfRatio(ratio),
-    percentLabel: formatPerfPercent(ratio),
   };
+}
+
+/**
+ * Whether a rendered curve is visible given its inline `opacity` style.
+ * Legend and precision toggles hide curves with `opacity: 0` while leaving
+ * the path in the DOM (so it can fade back in) — those curves must be
+ * neither clickable nor measurable. Hover dimming uses small non-zero
+ * values and stays measurable; a missing/empty opacity means fully visible.
+ */
+export function isPerfRulerCurveVisible(opacity: string | null | undefined): boolean {
+  if (opacity === null || opacity === undefined) return true;
+  const trimmed = opacity.trim();
+  if (trimmed === '') return true;
+  const value = Number(trimmed);
+  return Number.isNaN(value) ? true : value > 0;
 }
 
 /** Inclusive pixel x range, e.g. the horizontal extent of a rendered path. */
@@ -233,42 +239,112 @@ export function nextPerfRulerSelection(
 }
 
 export interface PerfRulerRenderOptions {
-  /** Stroke for the ruler line and end caps (e.g. `var(--primary)`). */
+  /** Stroke for the ruler line, caps, arrow, and label (accent color). */
   color: string;
-  /** Label chip background (readability over chart marks). */
-  labelBg: string;
-  /** Label text color, paired with `labelBg`. */
-  labelText: string;
+  /**
+   * Halo stroke painted behind the big label (paint-order: stroke) so it
+   * stays readable over chart content. Default `var(--background)`.
+   */
+  halo?: string;
   /** Chart inner width; lets the label flip sides instead of clipping. */
   chartWidth?: number;
+  /** Chart inner height; lets the label drop below near the top edge. */
+  chartHeight?: number;
   /** Half-length of the horizontal end caps in px. Default 6. */
   capHalfWidth?: number;
-  /**
-   * Minimum vertical pixel span before the secondary "+NN%" line is shown.
-   * Below this the chip only fits the ratio cleanly. Default 34.
-   */
-  minSpanForPercent?: number;
+  /** Big ratio label font size in px. Default 32. */
+  labelFontSize?: number;
 }
 
-const LABEL_GAP = 10;
-const CHIP_PAD_X = 6;
-const CHIP_PAD_Y = 4;
-const RATIO_FONT_SIZE = 11;
-const PERCENT_FONT_SIZE = 9;
-const LINE_HEIGHT = 13;
-export const DEFAULT_MIN_SPAN_FOR_PERCENT = 34;
+export const DEFAULT_LABEL_FONT_SIZE = 32;
+const LABEL_OFFSET_X = 46;
+const LABEL_OFFSET_Y = 46;
+const ARROW_TIP_GAP = 5;
+const ARROW_HEAD_LENGTH = 9;
+const ARROW_HEAD_HALF_WIDTH = 4.5;
+
+export interface PerfRulerLabelLayoutOptions {
+  /** Chart inner width; the label flips to the left side when clipping. */
+  chartWidth?: number;
+  /** Chart inner height; keeps the below-placement inside the chart. */
+  chartHeight?: number;
+  /** Label font size in px. Default {@link DEFAULT_LABEL_FONT_SIZE}. */
+  fontSize?: number;
+}
+
+export interface PerfRulerLabelLayout {
+  /** Text anchor-point x (near edge of the label, facing the line). */
+  labelX: number;
+  /** Text center y (render with dominant-baseline: central). */
+  labelY: number;
+  /** 'start' when the label sits right of the line, 'end' when left. */
+  textAnchor: 'start' | 'end';
+  /** +1 = label right of the ruler line, -1 = left. */
+  side: 1 | -1;
+  /** Curved arrow from under the label to the ruler-line midpoint. */
+  arrowPath: string;
+  /** Filled arrowhead triangle pointing at the ruler-line midpoint. */
+  arrowHeadPath: string;
+}
 
 /**
- * Estimate text width via getBBox when a real DOM is available, falling back
- * to a character-count estimate in non-DOM environments (unit tests).
+ * Lay out the big annotation label and its arrow (mock-up: a large "2x"
+ * next to the ruler with a curved arrow pointing at the vertical line).
+ * The label prefers the upper-right of the line midpoint (open chart
+ * space), flips horizontally when it would clip the right edge with more
+ * room on the left, and drops below the midpoint when it would clip the
+ * top. The arrow is a quarter-curve whose end tangent is horizontal, so
+ * the arrowhead points squarely at the line's midpoint. Pure — unit
+ * testable without a DOM (text width is estimated from the label length).
  */
-function measureTextWidth(node: unknown, text: string, fontSize: number): number {
-  const maybe = node as { getBBox?: () => { width: number } } | null;
-  if (maybe && typeof maybe.getBBox === 'function') {
-    const width = maybe.getBBox().width;
-    if (width > 0) return width;
+export function computePerfRulerLabelLayout(
+  geometry: Pick<PerfRulerGeometry, 'x' | 'y1' | 'y2' | 'ratioLabel'>,
+  opts?: PerfRulerLabelLayoutOptions,
+): PerfRulerLabelLayout {
+  const fontSize = opts?.fontSize ?? DEFAULT_LABEL_FONT_SIZE;
+  const midY = (geometry.y1 + geometry.y2) / 2;
+  const estimatedWidth = geometry.ratioLabel.length * fontSize * 0.6;
+  const requiredRoom = LABEL_OFFSET_X + estimatedWidth + 8;
+
+  let side: 1 | -1 = 1;
+  if (opts?.chartWidth !== undefined) {
+    const roomRight = opts.chartWidth - geometry.x;
+    if (roomRight < requiredRoom && geometry.x > roomRight) side = -1;
   }
-  return text.length * fontSize * 0.62;
+
+  let above = true;
+  let labelY = midY - LABEL_OFFSET_Y;
+  if (labelY - fontSize / 2 < 4) {
+    above = false;
+    labelY = midY + LABEL_OFFSET_Y;
+    if (opts?.chartHeight !== undefined && labelY + fontSize / 2 > opts.chartHeight - 4) {
+      // No room below either — clamp the above-placement inside the chart.
+      above = true;
+      labelY = Math.max(fontSize / 2 + 4, midY - LABEL_OFFSET_Y);
+    }
+  }
+
+  const labelX = geometry.x + side * LABEL_OFFSET_X;
+  // Quarter-curve: leaves the label vertically, ends horizontally at the
+  // back of the arrowhead so the head points straight at the line.
+  const startX = labelX + side * 4;
+  const startY = labelY + (above ? 1 : -1) * (fontSize / 2 + 6);
+  const tipX = geometry.x + side * ARROW_TIP_GAP;
+  const backX = tipX + side * ARROW_HEAD_LENGTH;
+  const arrowPath = `M ${startX} ${startY} Q ${startX} ${midY} ${backX} ${midY}`;
+  const arrowHeadPath =
+    `M ${tipX} ${midY} ` +
+    `L ${backX} ${midY - ARROW_HEAD_HALF_WIDTH} ` +
+    `L ${backX} ${midY + ARROW_HEAD_HALF_WIDTH} Z`;
+
+  return {
+    labelX,
+    labelY,
+    textAnchor: side === 1 ? 'start' : 'end',
+    side,
+    arrowPath,
+    arrowHeadPath,
+  };
 }
 
 /**
@@ -296,21 +372,26 @@ export function renderPerfRuler(
     .attr('stroke-dasharray', '5 4');
   entered.append('line').attr('class', 'pr-cap pr-cap-top').attr('stroke-width', 2);
   entered.append('line').attr('class', 'pr-cap pr-cap-bottom').attr('stroke-width', 2);
-  entered.append('rect').attr('class', 'pr-bg').attr('rx', 4).attr('ry', 4).attr('opacity', 0.92);
+  // Curved annotation arrow + filled head pointing at the line midpoint.
+  // The head is a plain filled triangle (no <marker>), so it needs no defs
+  // ids, inherits nothing chart-specific, and PNG-exports like any path.
+  entered
+    .append('path')
+    .attr('class', 'pr-arrow')
+    .attr('fill', 'none')
+    .attr('stroke-width', 2.5)
+    .attr('stroke-linecap', 'round');
+  entered.append('path').attr('class', 'pr-arrow-head').attr('stroke', 'none');
+  // Big annotation-style ratio label with a halo stroke painted UNDER the
+  // glyph fill (paint-order) so it reads over dense chart content without a
+  // chip rect.
   entered
     .append('text')
     .attr('class', 'pr-text pr-text-ratio')
-    .attr('text-anchor', 'middle')
     .attr('dominant-baseline', 'central')
-    .attr('font-size', `${RATIO_FONT_SIZE}px`)
-    .attr('font-weight', '700');
-  entered
-    .append('text')
-    .attr('class', 'pr-text pr-text-percent')
-    .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'central')
-    .attr('font-size', `${PERCENT_FONT_SIZE}px`)
-    .attr('font-weight', '600');
+    .attr('font-weight', '800')
+    .attr('paint-order', 'stroke')
+    .attr('stroke-linejoin', 'round');
   // Wide invisible drag handle over the line — the caller attaches d3.drag
   // to it to move the iso-x. Its own pointer-events overrides the group's
   // `none` (pointer-events inherits), so only this element is interactive.
@@ -326,7 +407,6 @@ export function renderPerfRuler(
 
   const { x, y1, y2 } = geometry;
   const capHalfWidth = opts.capHalfWidth ?? 6;
-  const midY = (y1 + y2) / 2;
 
   merged
     .select('.pr-line')
@@ -351,53 +431,23 @@ export function renderPerfRuler(
     .attr('stroke', opts.color);
   merged.select('.pr-drag').attr('x1', x).attr('x2', x).attr('y1', y1).attr('y2', y2);
 
-  const showPercent =
-    Math.abs(y2 - y1) >= (opts.minSpanForPercent ?? DEFAULT_MIN_SPAN_FOR_PERCENT) &&
-    geometry.percentLabel !== '';
+  const fontSize = opts.labelFontSize ?? DEFAULT_LABEL_FONT_SIZE;
+  const layout = computePerfRulerLabelLayout(geometry, {
+    chartWidth: opts.chartWidth,
+    chartHeight: opts.chartHeight,
+    fontSize,
+  });
 
-  // Two passes per docs/d3-charts.md "Batched Label Measurement": write both
-  // texts first, then measure, then position the chip and texts.
-  merged.select('.pr-text-ratio').attr('fill', opts.labelText).text(geometry.ratioLabel);
-  merged
-    .select('.pr-text-percent')
-    .attr('fill', opts.labelText)
-    .style('display', showPercent ? '' : 'none')
-    .text(showPercent ? geometry.percentLabel : '');
-
-  const ratioWidth = measureTextWidth(
-    merged.select('.pr-text-ratio').node(),
-    geometry.ratioLabel,
-    RATIO_FONT_SIZE,
-  );
-  const percentWidth = showPercent
-    ? measureTextWidth(
-        merged.select('.pr-text-percent').node(),
-        geometry.percentLabel,
-        PERCENT_FONT_SIZE,
-      )
-    : 0;
-  const chipWidth = Math.max(ratioWidth, percentWidth) + CHIP_PAD_X * 2;
-  const chipHeight = (showPercent ? 2 : 1) * LINE_HEIGHT + CHIP_PAD_Y * 2;
-
-  // Prefer the right side of the line; flip left when the chip would clip.
-  const flipLeft = opts.chartWidth !== undefined && x + LABEL_GAP + chipWidth > opts.chartWidth;
-  const chipX = flipLeft ? x - LABEL_GAP - chipWidth : x + LABEL_GAP;
-  const chipY = midY - chipHeight / 2;
-  const textX = chipX + chipWidth / 2;
-
-  merged
-    .select('.pr-bg')
-    .attr('x', chipX)
-    .attr('y', chipY)
-    .attr('width', chipWidth)
-    .attr('height', chipHeight)
-    .attr('fill', opts.labelBg);
+  merged.select('.pr-arrow').attr('d', layout.arrowPath).attr('stroke', opts.color);
+  merged.select('.pr-arrow-head').attr('d', layout.arrowHeadPath).attr('fill', opts.color);
   merged
     .select('.pr-text-ratio')
-    .attr('x', textX)
-    .attr('y', chipY + CHIP_PAD_Y + LINE_HEIGHT / 2);
-  merged
-    .select('.pr-text-percent')
-    .attr('x', textX)
-    .attr('y', chipY + CHIP_PAD_Y + LINE_HEIGHT * 1.5);
+    .attr('x', layout.labelX)
+    .attr('y', layout.labelY)
+    .attr('text-anchor', layout.textAnchor)
+    .attr('font-size', `${fontSize}px`)
+    .attr('fill', opts.color)
+    .attr('stroke', opts.halo ?? 'var(--background)')
+    .attr('stroke-width', 5)
+    .text(geometry.ratioLabel);
 }

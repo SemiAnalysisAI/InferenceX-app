@@ -61,6 +61,7 @@ import {
   clampIsoX,
   computeIsoXRulerGeometry,
   intersectPathAtX,
+  isPerfRulerCurveVisible,
   nextPerfRulerSelection,
   pathXExtent,
   renderPerfRuler,
@@ -1358,6 +1359,7 @@ const ScatterGraph = React.memo(
       xScale: ContinuousScale;
       yScale: ContinuousScale;
       width: number;
+      height: number;
     } | null>(null);
     // Forward ref: the drag frame needs to redraw, but drawPerfRuler is
     // defined below (it also attaches the drag behavior — benign cycle).
@@ -1367,6 +1369,7 @@ const ScatterGraph = React.memo(
           xScale: ContinuousScale,
           yScale: ContinuousScale,
           width: number,
+          height: number,
         ) => void)
       | null
     >(null);
@@ -1467,7 +1470,7 @@ const ScatterGraph = React.memo(
             const d = this.getAttribute('d');
             // Curves hidden by legend/precision filters keep their paths at
             // opacity 0 — invisible curves must not be clickable.
-            if (!curve || !d || this.style.opacity === '0') return;
+            if (!curve || !d || !isPerfRulerCurveVisible(this.style.opacity)) return;
             entries.push({ curve, d });
           });
         const selected = new Set(perfRulerSelectionRef.current.curves);
@@ -1517,7 +1520,7 @@ const ScatterGraph = React.memo(
       const clamped = clampIsoX(perfRulerDragPixelXRef.current, extentA, extentB);
       if (clamped === null) return;
       perfRulerIsoXRef.current = Number(ctx.xScale.invert(clamped));
-      drawPerfRulerRef.current?.(ctx.zoomGroup, ctx.xScale, ctx.yScale, ctx.width);
+      drawPerfRulerRef.current?.(ctx.zoomGroup, ctx.xScale, ctx.yScale, ctx.width, ctx.height);
     }, []);
     const applyPerfRulerDragFrameRef = useRef(applyPerfRulerDragFrame);
     applyPerfRulerDragFrameRef.current = applyPerfRulerDragFrame;
@@ -1559,8 +1562,9 @@ const ScatterGraph = React.memo(
         xScale: ContinuousScale,
         yScale: ContinuousScale,
         width: number,
+        height: number,
       ) => {
-        perfRulerDrawCtxRef.current = { zoomGroup, xScale, yScale, width };
+        perfRulerDrawCtxRef.current = { zoomGroup, xScale, yScale, width, height };
         syncPerfRulerHitPaths(zoomGroup);
         const sel = perfRulerSelectionRef.current;
         const isoX = perfRulerIsoXRef.current;
@@ -1570,14 +1574,16 @@ const ScatterGraph = React.memo(
           // Both ends are interpolated on the RENDERED paths — the drawn
           // curve is the measurement surface, so the ruler matches it
           // exactly and stays correct under zoom (rooflines redraw before
-          // this layer runs). When either curve does not span the iso-x (or
-          // has no rendered path), draw nothing but KEEP the selection:
-          // zoom/drag/metric changes that restore both intersections bring
-          // the ruler back.
+          // this layer runs). When either curve does not span the iso-x, has
+          // no rendered path, or is hidden (legend/precision toggles keep the
+          // path in the DOM at opacity 0), draw nothing but KEEP the
+          // selection: zoom/drag/legend re-toggles that restore both visible
+          // intersections bring the ruler back.
           const ends: PerfRulerEndInput[] = [];
           for (const cls of sel.curves) {
             const node = zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`).node();
             if (!node || typeof node.getPointAtLength !== 'function') break;
+            if (!isPerfRulerCurveVisible(node.style.opacity)) break;
             const hit = intersectPathAtX(node, pixelX);
             if (!hit) break;
             ends.push({ py: hit.y, rawY: yScale.invert(hit.y) });
@@ -1588,9 +1594,9 @@ const ScatterGraph = React.memo(
         }
         renderPerfRuler(zoomGroup, geometry, {
           color: 'var(--primary)',
-          labelBg: 'var(--primary)',
-          labelText: 'var(--primary-foreground)',
+          halo: 'var(--background)',
           chartWidth: width,
+          chartHeight: height,
         });
         // (Re)attach the horizontal drag behavior to the (possibly fresh)
         // drag handle the render pass just joined.
@@ -2832,6 +2838,7 @@ const ScatterGraph = React.memo(
             (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
             (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
             ctx.width,
+            ctx.height,
           ),
         onZoom: (zoomGroup, ctx) =>
           drawPerfRuler(
@@ -2839,6 +2846,7 @@ const ScatterGraph = React.memo(
             ctx.newXScale as ContinuousScale,
             ctx.newYScale as ContinuousScale,
             ctx.width,
+            ctx.height,
           ),
       };
 
@@ -3134,24 +3142,6 @@ const ScatterGraph = React.memo(
       }
     }, [getDisplaySelection, knownIssueAnnotations, getCssColor, resolveColor]);
 
-    // Perf-ruler decorations: refresh the curve hit strokes and redraw the
-    // ruler whenever the mode, selection, or underlying data changes. Narrow
-    // mutation scope — only the hit layer and the ruler group are touched;
-    // the chart itself never rebuilds for a ruler interaction. Redraws use
-    // the currently applied zoom transform (mode, selection, and iso-x are
-    // read through refs inside drawPerfRuler).
-    useLayoutEffect(() => {
-      const display = getDisplaySelection();
-      if (!display) return;
-      const zoomCtx = currentZoomRenderContext(display.svg, display.ctx);
-      drawPerfRuler(
-        display.zoomGroup,
-        zoomCtx.xScale as ContinuousScale,
-        zoomCtx.yScale as ContinuousScale,
-        display.ctx.width,
-      );
-    }, [getDisplaySelection, perfRulerMode, perfRulerSelection, drawPerfRuler, dataIdentity]);
-
     // D3 custom layers are keyed additions, so removing the overlay layer from
     // the config does not delete DOM that the previous render created. Clear
     // those marks explicitly when the last unofficial run is dismissed.
@@ -3163,6 +3153,53 @@ const ScatterGraph = React.memo(
         .selectAll('.unofficial-overlay-pt, .overlay-roofline-path, .overlay-overflow-continuation')
         .remove();
     }, [overlayData]);
+
+    // Perf-ruler decorations: refresh the curve hit strokes and redraw the
+    // ruler whenever the mode, selection, visibility filters, or underlying
+    // data change. Narrow mutation scope — only the hit layer and the ruler
+    // group are touched; the chart itself never rebuilds for a ruler
+    // interaction. Redraws use the currently applied zoom transform (mode,
+    // selection, and iso-x are read through refs inside drawPerfRuler).
+    //
+    // Ordering matters twice here — this effect is deliberately declared
+    // AFTER both (a) the mark-styling effect that writes curve opacities
+    // from the legend/precision filters, so hiding a curve clears the ruler,
+    // label, arrow, and halos in the SAME commit paint (no lingering frame),
+    // and (b) the overlay-cleanup effect above, so a dismissed overlay's
+    // paths are already gone when the ruler re-resolves.
+    useLayoutEffect(() => {
+      const display = getDisplaySelection();
+      if (!display) return;
+      const zoomCtx = currentZoomRenderContext(display.svg, display.ctx);
+      drawPerfRuler(
+        display.zoomGroup,
+        zoomCtx.xScale as ContinuousScale,
+        zoomCtx.yScale as ContinuousScale,
+        display.ctx.width,
+        display.ctx.height,
+      );
+      // Hidden-but-present curves KEEP the selection (a legend re-toggle
+      // brings the ruler back); curves whose paths left the DOM entirely are
+      // truly gone from the data, so prune them from the selection.
+      setPerfRulerSelection((prev) => {
+        if (prev.curves.length === 0) return prev;
+        const kept = prev.curves.filter(
+          (cls) => !display.zoomGroup.select(`.${CSS.escape(cls)}`).empty(),
+        );
+        if (kept.length === prev.curves.length) return prev;
+        return { curves: kept, isoX: kept.length > 0 ? prev.isoX : null };
+      });
+    }, [
+      getDisplaySelection,
+      perfRulerMode,
+      perfRulerSelection,
+      drawPerfRuler,
+      dataIdentity,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+      hideNonOptimal,
+      overlayData,
+    ]);
 
     // Dismiss tooltip on filter changes
     useEffect(() => {
