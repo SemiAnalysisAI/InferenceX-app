@@ -190,7 +190,7 @@ export function renderKnownIssueAnnotations(
       .attr('class', 'known-issue-annotation')
       .attr(
         'data-testid',
-        preview === undefined ? 'known-issue-annotation' : 'jalapeno-official-preview-notice',
+        preview === undefined ? 'known-issue-annotation' : `${preview.id}-notice`,
       )
       .attr('cursor', issue === undefined ? 'default' : 'pointer');
     if (issue === undefined) {
@@ -208,8 +208,8 @@ export function renderKnownIssueAnnotations(
 
     const detail =
       issue === undefined
-        ? `${preview!.summary} — ${preview!.detail}`
-        : `${issue.summary} — filed since ${issue.filed} · `;
+        ? `${preview!.summary}: ${preview!.detail}`
+        : `${issue.summary}: filed since ${issue.filed} · `;
     const text1 = anchor
       .append('text')
       .attr('font-size', LINE1_SIZE)

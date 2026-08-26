@@ -35,7 +35,7 @@ import {
 import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { JALAPENO_PREVIEW_STRINGS } from '@/components/jalapeno-official-preview-notice';
+import { OFFICIAL_PREVIEW_SERIES } from '@/components/official-preview-notice';
 import { getHardwareConfig, getModelSortIndex, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import {
   getChartWatermark,
@@ -944,23 +944,27 @@ const ScatterGraph = React.memo(
           .filter((p) => pointMatchesIssue(issue, p))
           .map((p) => ({ x: p.x, y: p.y })),
       }));
-      // The official-preview notice intentionally follows only official data:
-      // an unofficial Jalapeño overlay is not an InferenceX publication.
-      const jalapenoPoints = filteredData.filter((point) =>
-        hardwareKeyMatchesAnyBase(String(point.hwKey), ['jalapeno']),
-      );
-      if (jalapenoPoints.length > 0) {
-        const hwKey = String(jalapenoPoints[0]!.hwKey);
-        const previewCopy = JALAPENO_PREVIEW_STRINGS[locale];
+      // Official-preview notices intentionally follow only official data. An
+      // unofficial overlay is not an InferenceX publication. `filteredData`
+      // has already applied token-metric support, so the July Rubin notice is
+      // present only on output-token charts alongside its visible curve.
+      for (const previewConfig of OFFICIAL_PREVIEW_SERIES) {
+        const previewPoints = filteredData.filter((point) =>
+          hardwareKeyMatchesAnyBase(String(point.hwKey), previewConfig.baseGpuKeys),
+        );
+        if (previewPoints.length === 0) continue;
+
+        const hwKey = String(previewPoints[0]!.hwKey);
+        const previewCopy = previewConfig.strings[locale];
         annotations.push({
           preview: {
-            id: 'jalapeno-official-preview',
+            id: previewConfig.id,
             summary: previewCopy.title,
             detail: previewCopy.chartDetail,
           },
           label: getDisplayLabel(getHardwareConfig(hwKey, modelLabel)),
           color: getCssColor(resolveColor(hwKey)),
-          points: jalapenoPoints.map((point) => ({ x: point.x, y: point.y })),
+          points: previewPoints.map((point) => ({ x: point.x, y: point.y })),
         });
       }
       return annotations;

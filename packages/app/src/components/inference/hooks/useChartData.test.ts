@@ -15,6 +15,7 @@ import {
   filterByGPU,
   derivedModeRoofline,
   flipRooflineDirection,
+  supportsPointTokenMetric,
 } from './useChartData';
 
 interface DedupeInput {
@@ -633,5 +634,27 @@ describe('applyScopeFilters', () => {
   it('still applies the two-GPU compare scope', () => {
     const scoped = applyScopeFilters(points, [], EMPTY_QUICK_FILTERS, ['h200', 'mi355x']);
     expect(scoped.map((p) => p.hwKey)).toEqual(['h200_vllm']);
+  });
+});
+
+describe('supportsPointTokenMetric', () => {
+  it('uses the source snapshot date when a curve is stamped with the selected display date', () => {
+    const julyRubin = scopePoint('vr200_rubin-july', {
+      date: '2026-08-22',
+      actualDate: '2026-07-01',
+    });
+
+    expect(supportsPointTokenMetric(julyRubin, 'output')).toBe(true);
+    expect(supportsPointTokenMetric(julyRubin, 'total')).toBe(false);
+    expect(supportsPointTokenMetric(julyRubin, 'input')).toBe(false);
+  });
+
+  it('does not restrict future Vera Rubin snapshots without capability metadata', () => {
+    const futureRubin = scopePoint('vr200_rubin-july', {
+      date: '2026-10-01',
+      actualDate: '2026-09-01',
+    });
+
+    expect(supportsPointTokenMetric(futureRubin, 'total')).toBe(true);
   });
 });

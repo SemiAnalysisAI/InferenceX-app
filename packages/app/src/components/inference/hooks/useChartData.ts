@@ -36,7 +36,7 @@ import { Sequence, type Model } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
 import { remapInferencePoint } from '@/lib/chart-utils';
 import { overviewServingSeriesKey, type OverviewServingSeriesRow } from '@/lib/overview-data';
-import { supportsChartTokenMetric } from '@/lib/supplemental-benchmarks';
+import { supportsChartTokenMetric, type TokenMetricType } from '@/lib/supplemental-benchmarks';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import {
   applyQuickFilters,
@@ -202,6 +202,14 @@ export function applyScopeFilters(
     scoped = scoped.filter((d) => hardwareKeyMatchesAnyBase(String(d.hwKey), compareGpuPair));
   }
   return scoped;
+}
+
+/** Apply snapshot-scoped metric support using the source date, not its display date. */
+export function supportsPointTokenMetric(
+  point: Pick<InferenceData, 'hwKey' | 'date' | 'actualDate'>,
+  tokenType: TokenMetricType,
+): boolean {
+  return supportsChartTokenMetric(String(point.hwKey), point.actualDate ?? point.date, tokenType);
 }
 
 export function useChartData(
@@ -573,7 +581,7 @@ export function useChartData(
         // so ScatterGraph can retain them for dashed boundary continuations.
         const tokenType = tokenMetricTypeForConfigKey(selectedYAxisMetric);
         const metricData = filteredData.filter(
-          (d) => metricKey in d && supportsChartTokenMetric(String(d.hwKey), d.date, tokenType),
+          (d) => metricKey in d && supportsPointTokenMetric(d, tokenType),
         );
         const hasMetric = metricData.length > 0;
         const isTtftX = typeof xAxisField === 'string' && xAxisField.endsWith('_ttft');

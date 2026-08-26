@@ -16,7 +16,7 @@ import {
 } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
-import { JALAPENO_PREVIEW_STRINGS } from '@/components/jalapeno-official-preview-notice';
+import { OFFICIAL_PREVIEW_SERIES } from '@/components/official-preview-notice';
 import { getHardwareConfig, getModelSortIndex, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import { getChartWatermark, Sequence } from '@/lib/data-mappings';
 import { generateGpuDateColors, generateHighContrastGpuDateColors } from '@/lib/dynamic-colors';
@@ -410,24 +410,26 @@ const GPUGraph = React.memo(
             .map((p) => ({ x: p.x, y: p.y })),
         };
       });
-      const jalapenoPoints = filteredData.filter((point) =>
-        hardwareKeyMatchesAnyBase(String(point.hwKey), ['jalapeno']),
-      );
-      if (jalapenoPoints.length > 0) {
-        const hwKey = String(jalapenoPoints[0]!.hwKey);
+      for (const previewConfig of OFFICIAL_PREVIEW_SERIES) {
+        const previewPoints = filteredData.filter((point) =>
+          hardwareKeyMatchesAnyBase(String(point.hwKey), previewConfig.baseGpuKeys),
+        );
+        if (previewPoints.length === 0) continue;
+
+        const hwKey = String(previewPoints[0]!.hwKey);
         const colorEntry = allGraphs.find(
           (entry) => entry.hwKey === hwKey && activeDates.has(entry.id),
         );
-        const previewCopy = JALAPENO_PREVIEW_STRINGS[locale];
+        const previewCopy = previewConfig.strings[locale];
         annotations.push({
           preview: {
-            id: 'jalapeno-official-preview',
+            id: previewConfig.id,
             summary: previewCopy.title,
             detail: previewCopy.chartDetail,
           },
           label: getDisplayLabel(getHardwareConfig(hwKey, modelLabel)),
           color: getCssColor(colorEntry?.color ?? resolveColor(hwKey)),
-          points: jalapenoPoints.map((point) => ({ x: point.x, y: point.y })),
+          points: previewPoints.map((point) => ({ x: point.x, y: point.y })),
         });
       }
       return annotations;
