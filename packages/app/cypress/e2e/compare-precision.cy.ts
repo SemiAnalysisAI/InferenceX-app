@@ -13,14 +13,14 @@ describe('Compare precision index page', () => {
       cy.get('[data-testid="compare-agentx-model-kimi-k3"]').should(
         'have.attr',
         'href',
-        '/inference?g_model=Kimi-K3&i_seq=agentic-traces&i_optimal=1',
+        '/inference/kimi-k3?i_seq=agentic-traces&i_optimal=1',
       );
       cy.get('[data-testid="compare-agentx-overview-link"]')
         .should('contain.text', 'Overview')
         .and('have.attr', 'href', '/overview');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
         .should('contain.text', 'Full dashboard')
-        .and('have.attr', 'href', '/inference?g_model=Kimi-K3&i_seq=agentic-traces&i_optimal=1');
+        .and('have.attr', 'href', '/inference/kimi-k3?i_seq=agentic-traces&i_optimal=1');
       cy.get('[data-testid="compare-agentx-methodology-link"]')
         .should('contain.text', 'Methodology Deep Dive')
         .and('have.attr', 'href', '/agentx');
@@ -54,14 +54,14 @@ describe('Compare precision index page', () => {
       cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should(
         'have.attr',
         'href',
-        '/zh/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_optimal=1',
+        '/zh/inference/deepseek-v4?i_seq=agentic-traces&i_optimal=1',
       );
       cy.get('[data-testid="compare-agentx-overview-link"]')
         .should('contain.text', '总览')
         .and('have.attr', 'href', '/zh/overview');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
         .should('contain.text', '查看完整仪表板')
-        .and('have.attr', 'href', '/zh/inference?g_model=Kimi-K3&i_seq=agentic-traces&i_optimal=1');
+        .and('have.attr', 'href', '/zh/inference/kimi-k3?i_seq=agentic-traces&i_optimal=1');
       cy.get('[data-testid="compare-agentx-methodology-link"]')
         .should('contain.text', '测试方法')
         .and('have.attr', 'href', '/zh/agentx');

@@ -1,5 +1,6 @@
 import { scenarioSegmentForSequence } from '@/lib/compare-scenario-route';
 import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
+import { getInferenceModelBySlug, inferenceModelPath } from '@/lib/inference-model-slug';
 
 const FEATURED_AGENTX_MODEL_SLUGS = [
   'kimi-k3',
@@ -25,13 +26,18 @@ export const FEATURED_AGENTX_MODELS: readonly CompareModelSlug[] = FEATURED_AGEN
 );
 
 export function agentxDashboardHref(locale: 'en' | 'zh', model: CompareModelSlug): string {
-  const path = locale === 'zh' ? '/zh/inference' : '/inference';
-  const query = new URLSearchParams({
-    g_model: model.displayName,
-    i_seq: 'agentic-traces',
-    i_optimal: '1',
-  });
-  return `${path}?${query}`;
+  // The model rides in the path — the indexable `/inference/<model>` subroute
+  // — so these hero links point crawlers at the canonical model page instead
+  // of a `?g_model=` variant of the base dashboard. Models without a
+  // registered inference page (none of the featured set today) fall back to
+  // the query form.
+  const entry = getInferenceModelBySlug(model.slug);
+  const query = new URLSearchParams();
+  if (!entry) query.set('g_model', model.displayName);
+  query.set('i_seq', 'agentic-traces');
+  query.set('i_optimal', '1');
+  const path = entry ? inferenceModelPath(entry.slug) : '/inference';
+  return `${locale === 'zh' ? `/zh${path}` : path}?${query}`;
 }
 
 export function comparisonScenarioForModel(model: CompareModelSlug): ComparisonScenario {
