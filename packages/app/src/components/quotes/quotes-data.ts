@@ -132,7 +132,7 @@ export const QUOTES: Quote[] = [
   },
   {
     text: 'InferenceMAX™ benchmark is pogchamp & W in chat',
-    textZh: 'InferenceMAX™ 基准测试绝绝子，大写的赢',
+    textZh: 'InferenceMAX™ 为推理基准测试树立了新标杆，是社区的一大胜利',
     name: 'Kaichao You',
     title: 'vLLM Project Co-Lead & PhD Student @ Tsinghua University',
     titleZh: 'vLLM 项目联合负责人、清华大学博士生',
