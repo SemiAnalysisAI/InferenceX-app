@@ -10,6 +10,7 @@ import Link from 'next/link';
 
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { getPostBySlug } from '@/lib/blog';
 import {
   CHIP_VS_HIGHLIGHT_LABELS_EN,
@@ -34,7 +35,13 @@ import {
 import { getGlossaryEntry } from '@/lib/glossary';
 import { getZhGlossaryEntry } from '@/lib/glossary-zh';
 import { type Locale, localePath, ZH_LANG_TAG } from '@/lib/i18n';
-import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import {
+  ACCELERATOR_MODEL_TITLE,
+  ACCELERATOR_MODEL_URL,
+  SITE_URL,
+  TCO_MODEL_TITLE,
+  TCO_SOURCE_URL,
+} from '@semianalysisai/inferencex-constants';
 
 const STRINGS = {
   en: {
@@ -58,6 +65,14 @@ const STRINGS = {
     liveLinkCompare: 'Chip-vs-chip model comparisons',
     liveLinkPerDollar: 'Performance per dollar',
     liveLinkOverview: 'Benchmark methodology & overview',
+    modelsHeading: 'Go deeper with the SemiAnalysis models',
+    modelsBody:
+      'InferenceX measures delivered inference performance. The SemiAnalysis institutional models cover the market behind these chips: who ships them, who buys them, and what they cost to own.',
+    modelsAccDesc:
+      'SKU-level AI accelerator shipments, pricing and specifications, from foundry wafer starts and HBM supply through customer-level installed base, quarterly with multi-year forecasts.',
+    modelsTcoDesc:
+      'The source of the hourly rates on this page: all-in GPU cost of ownership built up from server capex, power, colocation and cost of capital, with rental price scenarios and a full cluster finance suite.',
+    pricingSource: 'Source: $/chip/hr rate tiers from the SemiAnalysis',
     specLabels: {
       vendor: 'Vendor',
       arch: 'Architecture',
@@ -111,6 +126,14 @@ const STRINGS = {
     liveLinkCompare: '芯片对芯片模型对比',
     liveLinkPerDollar: '每美元性能',
     liveLinkOverview: '基准测试方法与总览',
+    modelsHeading: '通过 SemiAnalysis 行业模型深入研究',
+    modelsBody:
+      'InferenceX 测量实际交付的推理性能，而 SemiAnalysis 机构级行业模型覆盖这些芯片背后的市场：谁在出货、谁在采购、拥有成本是多少。',
+    modelsAccDesc:
+      '按 SKU 跟踪 AI 加速器的出货量、价格与规格，覆盖从晶圆代工投片、HBM 供应到客户级装机量的完整链路，按季度更新并包含多年预测。',
+    modelsTcoDesc:
+      '本页每小时费率的数据来源：从服务器资本开支、电力、托管与资金成本自下而上构建 GPU 全含拥有成本，并提供租赁价格情景与完整的集群财务模型。',
+    pricingSource: '来源：$/芯片/小时 费率取自 SemiAnalysis',
     specLabels: {
       vendor: '厂商',
       arch: '架构',
@@ -232,6 +255,50 @@ const LiveResultsSection = ({ locale }: { locale: Locale }) => {
   );
 };
 
+const SEMIANALYSIS_MODELS = [
+  {
+    href: ACCELERATOR_MODEL_URL,
+    title: ACCELERATOR_MODEL_TITLE,
+    descKey: 'modelsAccDesc',
+  },
+  {
+    href: TCO_SOURCE_URL,
+    title: TCO_MODEL_TITLE,
+    descKey: 'modelsTcoDesc',
+  },
+] as const;
+
+const ModelsSection = ({ locale }: { locale: Locale }) => {
+  const t = STRINGS[locale];
+  return (
+    <section aria-labelledby="chip-models" className="mt-10 border-t border-border/50 pt-10">
+      <h2 id="chip-models" className="text-xl font-semibold tracking-tight">
+        {t.modelsHeading}
+      </h2>
+      <p className="mt-2 leading-7 text-muted-foreground">{t.modelsBody}</p>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        {SEMIANALYSIS_MODELS.map((model) => (
+          <a
+            key={model.href}
+            href={model.href}
+            target="_blank"
+            rel="noreferrer"
+            className="group block h-full"
+          >
+            <Card className="h-full p-5 transition-colors hover:border-brand/50">
+              <h3 className="font-semibold text-brand">
+                SemiAnalysis {model.title}
+                <ExternalLinkIcon />
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{t[model.descKey]}</p>
+            </Card>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+};
+
 const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale }) => {
   const t = STRINGS[locale];
   const spec = getChipSpec(entry);
@@ -270,6 +337,18 @@ const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale }) 
           ))}
         </tbody>
       </table>
+      <p className="mt-3 text-sm text-muted-foreground">
+        {t.pricingSource}{' '}
+        <a
+          href={TCO_SOURCE_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="group underline hover:text-foreground"
+        >
+          {TCO_MODEL_TITLE}
+          <ExternalLinkIcon />
+        </a>
+      </p>
     </div>
   );
 };
@@ -415,6 +494,7 @@ export const ChipDetailContent = ({ entry, locale }: { entry: ChipPageEntry; loc
               </section>
               <FaqSection faq={faq} locale={locale} />
               <LiveResultsSection locale={locale} />
+              <ModelsSection locale={locale} />
               <RelatedLinks entry={entry} locale={locale} />
             </div>
           </Card>
@@ -510,6 +590,7 @@ export const ChipVsContent = ({ page, locale }: { page: ChipVsPage; locale: Loca
               </section>
               <FaqSection faq={faq} locale={locale} />
               <LiveResultsSection locale={locale} />
+              <ModelsSection locale={locale} />
             </div>
           </Card>
         </article>
