@@ -839,11 +839,20 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             // official points plus any loaded unofficial-run overlay for
             // this chart type — so they moved out of the legend without
             // changing when they appear.
-            const footerOverlay = selectUnofficialOverlayForMode(
-              selectedXAxisMode,
-              graph.chartDefinition.chartType,
-              overlayDataByChartType,
-            );
+            // GPU/date comparison renders GPUGraph, which plots official
+            // points only — skip the unofficial overlay there so the footer
+            // can't advertise a halo or ATOM series that isn't on the chart.
+            const isGpuComparison =
+              selectedGPUs.length > 0 &&
+              ((selectedDateRange.startDate && selectedDateRange.endDate) ||
+                selectedDates.length > 0);
+            const footerOverlay = isGpuComparison
+              ? undefined
+              : selectUnofficialOverlayForMode(
+                  selectedXAxisMode,
+                  graph.chartDefinition.chartType,
+                  overlayDataByChartType,
+                );
             const footerPoints = [
               ...graph.data,
               ...(footerOverlay?.data ?? []),
@@ -1093,9 +1102,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         );
                       }
 
-                      return selectedGPUs.length > 0 &&
-                        ((selectedDateRange.startDate && selectedDateRange.endDate) ||
-                          selectedDates.length > 0) ? (
+                      return isGpuComparison ? (
                         <GPUGraph
                           chartId={`chart-${graphIndex}`}
                           modelLabel={graph.model}
