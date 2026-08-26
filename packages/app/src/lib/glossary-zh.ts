@@ -1157,6 +1157,443 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     benchmarkContext:
       'graph 的使用方式取决于测试配置所固定的引擎镜像，因此它可以在硬件不变的情况下推动曲线变化。有些方案会录制稳定的算子，同时让依赖请求的注意力保持 eager 执行，这是在录制覆盖率与 shape 灵活性之间的有意折中。',
   },
+  goodput: {
+    term: 'Goodput',
+    aliases: ['goodput', '有效吞吐量', 'SLO 约束吞吐量'],
+    plainEnglish:
+      'Goodput 只统计满足延迟目标的那部分工作量，看起来很快但赶不上截止时间的系统拿不到任何分数。',
+    definition:
+      'Goodput 指满足既定服务等级目标（SLO）的那部分吞吐量，例如首 token 时间上限或每用户每秒最低 token 数。',
+    explanation:
+      '原始吞吐量只关心服务器完成了多少请求，不管每个用户被服务得多慢。Goodput 先做一层过滤：只有满足运营方承诺的延迟或交互性约束的请求才被计入。两套吞吐量完全相同的系统，加上截止时间后 goodput 可能相差很大，因为一套在高负载下仍能压住延迟，另一套则让排队把所有请求都拖过界。',
+    significance:
+      '忽略 goodput 的容量规划要么多买要么超卖。若运营方按峰值吞吐量报价，但只有一半流量能在 SLO 内完成，实际需要的集群规模就是模型估算的两倍。goodput 是把基准测试曲线换算成部署真实承载用户数的那个数字。',
+    benchmarkContext:
+      'InferenceX 发布完整的吞吐量对交互性 Pareto 前沿，而不是单一 goodput 数字，读者可以套用自己的 SLO。像 TCO 计算器那样在固定交互性档位上读取前沿，本质上就是在该档位测量 goodput。',
+  },
+  'model-flops-utilization': {
+    term: '模型算力利用率',
+    aliases: ['MFU', 'model FLOPs utilization', 'MBU'],
+    plainEnglish: 'MFU 把模型实际完成的有效运算与芯片理论峰值运算量相除，得到一个效率百分比。',
+    definition:
+      '模型算力利用率（MFU）是模型逻辑上需要的浮点运算量与硬件在相同墙钟时间内理论峰值运算量之比。',
+    explanation:
+      '峰值 TFLOP/s 假设每个 tensor core 每个周期都在满负荷工作，这在实际推理服务中从不成立。kernel 启动间隙、访存停顿、通信等待和不完美的批处理都会让算力闲置，MFU 把这些损耗折算进一个数字。decode 通常是访存受限的，因此 decode 阶段的 MFU 天然偏低，此时带宽版本的 MBU 往往是更真实的效率指标。',
+    significance:
+      'MFU 把硬件能力与软件成熟度区分开：峰值算力巨大但 kernel 不行的芯片，可能输给算力较低但喂得饱运算单元的芯片。硬件不变而 MFU 上升，正是软件进步的特征，而推理性能的大部分收益正来自软件。',
+    benchmarkContext:
+      'InferenceX 跟踪的是每颗芯片随时间交付的 token 数而非直接报告 MFU。硬件不变而性能大幅提升的反复出现的模式，例如模型发布数周内的数量级改进，本质上就是软件把利用率追讨回来的过程。',
+  },
+  'memory-bound-vs-compute-bound': {
+    term: '访存受限与计算受限',
+    aliases: ['memory bound', 'compute bound', '带宽受限'],
+    plainEnglish: '当运算单元是瓶颈时工作负载是计算受限，当等待数据搬运是瓶颈时则是访存受限。',
+    definition:
+      '当 kernel 的运行时间由算术吞吐能力决定时称为计算受限，由操作数在内存与运算单元之间的搬运速度决定时称为访存受限。',
+    explanation:
+      '每个 kernel 都有算术强度，即运算次数与访问字节数之比。如果这个比值低于硬件的平衡点，内存系统会先于运算单元饱和。LLM 的 prefill 执行算术强度很高的大矩阵乘法，通常是计算受限；而 decode 为每个请求读取全部权重和 KV cache 只产出一个 token，通常是访存受限。',
+    significance:
+      '瓶颈资源决定了哪个硬件规格才重要。decode 的访存受限特性解释了为什么每次加速器发布都把 HBM 容量和带宽放在标题上，为什么量化通过减少搬运字节数来加速 decode，以及为什么算力一般但内存很快的芯片能在交互式服务中获胜。',
+    benchmarkContext:
+      'InferenceX 对并发做扫描，让系统在两种状态之间移动：低并发 decode 受带宽限制，高并发批处理则推向计算极限。每条吞吐量对交互性曲线的形状，反映了该配置发生状态切换的位置。',
+  },
+  'gpu-utilization': {
+    term: 'GPU 利用率',
+    aliases: ['GPU utilization', '芯片利用率', '加速器利用率'],
+    plainEnglish:
+      'GPU 利用率衡量加速器有多忙，但监控工具里常见的百分比可能很高，而真实效率仍然很低。',
+    definition:
+      'GPU 利用率指加速器用于有效工作的时间或能力占比，口径从粗糙的繁忙百分比到严格的模型算力利用率不等。',
+    explanation:
+      '基础监控工具里的利用率只说明有 kernel 驻留，不代表芯片被用得好，一个只占用单个计算单元的 kernel 也会显示为繁忙。更严格的度量把实际交付的运算量或带宽与硬件峰值对比。在推理服务中利用率还受流量影响：请求之间的空闲、低并发以及 agent 会话中的工具调用停顿，都会让花钱买来的芯片闲着。',
+    significance:
+      '集群经济性取决于利用率。批处理和调度做得好的部署与朴素部署之间，同样硬件上每 token 成本常常相差数倍，这正是推理软件和请求路由与芯片本身同样受重视的原因。',
+    benchmarkContext:
+      'InferenceX 报告每个交互性水平下每颗芯片的实际交付吞吐量而非利用率百分比，因此引擎、精度和并行方案之间的利用率差异，会直接表现为同一硬件上曲线之间的间距。',
+  },
+  'continuous-batching': {
+    term: '连续批处理',
+    aliases: ['continuous batching', 'in-flight batching', '动态批处理'],
+    plainEnglish:
+      '连续批处理让新请求在旧请求完成的瞬间就加入正在运行的批次，而不是等整个批次全部结束。',
+    definition:
+      '连续批处理是一种在每个生成步都能接纳和退出请求的调度技术，当各序列在不同时刻完成时始终保持批次饱满。',
+    explanation:
+      '静态批处理先凑齐一组请求、一起运行、一起返回，因此一个批次要等最慢的成员结束。LLM 输出长度差异巨大，这种方式浪费大量算力。连续批处理在每次迭代重组批次：产出最后一个 token 的序列立即离开，排队中的请求在下一步顶上空位，加速器始终保持饱和。',
+    significance:
+      '这是现代 LLM 服务的奠基性优化之一，也是开源引擎取代朴素部署方式的重要原因。它在给定延迟下成倍提高吞吐量，并与分页式 KV cache 内存天然配合，使得槽位复用非常廉价。',
+    benchmarkContext:
+      'InferenceX 测试的每个引擎，包括 vLLM、SGLang 和 TensorRT-LLM，都使用连续批处理。并发扫描测量的正是各调度器在批次填满过程中维持交互性的能力，引擎实现之间的差异在这里显形。',
+  },
+  'paged-attention': {
+    term: 'PagedAttention',
+    aliases: ['paged attention', '分页 KV cache', 'KV cache 分页'],
+    plainEnglish:
+      'PagedAttention 像虚拟内存分页一样，把 KV cache 存进固定大小的小块，避免缓存内存浪费在用不到的空间上。',
+    definition:
+      'PagedAttention 是一种 KV cache 管理技术，通过映射表寻址的固定大小块来分配缓存，而不是为每个请求预留一整块连续区域。',
+    explanation:
+      '按请求连续分配必须为最长可能输出预留空间，而其中大部分永远用不上。分页借用了操作系统的做法：缓存块随序列增长按需分配，序列结束立即释放，共享相同前缀的序列还能通过写时复制共用缓存块。碎片率降到接近零，同样的 HBM 里能容纳多得多的序列。',
+    significance:
+      '这个由 vLLM 提出的思想解锁了让连续批处理真正获益的批次规模，并成为各推理引擎的标准做法。约束长上下文和智能体工作负载并发能力的，是有效 KV 容量而不是裸内存大小。',
+    benchmarkContext:
+      'InferenceX 配置中的所有引擎都以分页或分块形式管理 KV 内存。AgentX 这类长上下文场景的高并发数据点之所以可达，正是因为分页让数百个会话增长收缩时缓存浪费保持很小。',
+  },
+  'radix-attention': {
+    term: 'RadixAttention',
+    aliases: ['radix attention', 'radix tree 缓存', '基数树前缀缓存'],
+    plainEnglish:
+      'RadixAttention 把完成请求的 KV cache 按 token 内容存进基数树，任何新请求都能复用最长匹配前缀。',
+    definition:
+      'RadixAttention 是 SGLang 的前缀缓存设计，请求结束后把 KV cache 条目保留在基数树中，让共享 token 前缀的请求之间自动复用。',
+    explanation:
+      '基数树按 token 内容索引缓存片段，一次查找就能定位新请求已被计算过的最长前缀。复用是自动且跨请求的：多轮对话、许多用户共享的系统提示词、从共同历史分叉出的 agent 分支都会命中相同的缓存节点。近期最少使用等淘汰策略约束树占用的内存上限。',
+    significance:
+      '前缀复用把重复的 prefill 计算变成缓存命中。在每一轮都重发不断增长历史的 agent 流量里，这部分节省可以主导端到端成本。把复用做成结构性能力而不是可选项，是 SGLang 在此类工作负载上表现出色的重要原因。',
+    benchmarkContext:
+      'InferenceX 的 AgentX 轨迹保留了轮次之间和子智能体分支之间真实的共享前缀结构，因此具备强 radix 式复用能力的引擎在智能体场景中的首 token 时间和吞吐量，会明显好于固定序列场景的预测。',
+  },
+  'draft-model': {
+    term: '草稿模型',
+    aliases: ['draft model', 'speculator', '投机草稿模型'],
+    plainEnglish:
+      '草稿模型是投机解码中那个又小又快的模型，先猜出若干后续 token，交给大模型一次性验证。',
+    definition:
+      '草稿模型是投机解码中的轻量提议组件，生成候选 token 序列，由目标模型在单次批量前向中完成验证。',
+    explanation:
+      '草稿有多种形式：同家族的独立小模型、像 EAGLE 那样训练到目标模型上的额外预测头，或某些模型自带的多 token 预测头。草稿廉价地抢先生成几个 token，目标模型一次性检查全部候选，接受的 token 一起输出。被拒绝时回退到目标模型的输出，因此结果与目标分布一致。',
+    significance:
+      '草稿质量决定接受长度，接受长度决定加速比。匹配良好的草稿能在小批次下把 decode 速度提高数倍，而不匹配或过于激进的草稿会浪费验证算力，高负载下甚至拖慢服务。',
+    benchmarkContext:
+      'InferenceX 记录每个结果背后的投机方法和接受长度，并发布用于复现的黄金接受长度分布，因为不切实际的接受率是基准测试数字脱离生产行为的经典方式。',
+  },
+  'offline-inference': {
+    term: '离线推理',
+    aliases: ['offline inference', 'batch inference', '批量推理'],
+    plainEnglish: '离线推理处理一大堆没有用户在等的请求，唯一目标是每美元最多 token，而不是延迟。',
+    definition:
+      '离线推理是没有交互截止时间的模型服务，请求成批处理，目标是总吞吐量和成本而不是单用户延迟。',
+    explanation:
+      '合成数据生成、文档处理、embedding 回填和评估扫描都不在乎单个请求何时返回。调度器因此可以放开手脚：跑内存允许的最大批次、按前缀复用最大化的方式排序请求、把加速器压在吞吐量极限上。在线服务处于同一权衡的另一端，用吞吐量换取每个用户不低于某个交互性下限。',
+    significance:
+      '同一套硬件在离线模式与紧延迟模式之间，每美元 token 数可以相差数倍，所以不说明工作点就报每百万 token 价格几乎没有意义。集群常常因此划分成不同的延迟档位。',
+    benchmarkContext:
+      'InferenceX 吞吐量对交互性曲线的最右端，即批次最大、单用户速度最低处，近似离线运行。在一条曲线的两端各读一次，就能看到该配置从在线到离线的完整成本区间。',
+  },
+  'context-window': {
+    term: '上下文窗口',
+    aliases: ['context window', '上下文长度', '长上下文'],
+    plainEnglish: '上下文窗口是模型一次能处理的最大 token 数，涵盖输入和到目前为止生成的全部内容。',
+    definition:
+      '上下文窗口是模型支持的最大序列长度，约束提示词、对话历史、检索材料与生成输出的 token 总数。',
+    explanation:
+      '注意力让每个 token 都能引用之前的 token，KV cache 为它们全部保存状态，所以更长的窗口意味着随长度增长的内存和计算开销。位置编码方案和训练长度决定可用窗口，服务栈则必须为其预算 KV 容量。现代前沿模型宣称几十万 token 的窗口，但序列接近上限时吞吐量和交互性都会下降。',
+    significance:
+      '长上下文让代码 agent、重检索流水线和文档分析成为可能，也让它们的服务成本变高。滑动窗口层、潜在注意力和线性注意力等架构响应，主要就是为了压弯窗口的成本曲线。',
+    benchmarkContext:
+      'InferenceX 从两个方向覆盖窗口：固定序列场景钉住输入输出长度，例如 8K 输入 1K 输出；AgentX 则回放上下文逐轮增长、逼近真实 agent 工作集的会话。',
+  },
+  'grouped-query-attention': {
+    term: '分组查询注意力',
+    aliases: ['GQA', 'grouped-query attention', 'multi-query attention', 'MQA'],
+    plainEnglish:
+      '分组查询注意力让多个查询头共享一组键值头，在几乎不损失质量的情况下缩小 KV cache。',
+    definition:
+      '分组查询注意力（GQA）是一种注意力变体，把查询头划分成若干组，每组共享一个键值头，从而降低每 token 的 KV cache 大小和带宽。',
+    explanation:
+      '标准多头注意力为每个头都保存键和值，缓存大小随头数增长。多查询注意力（MQA）把所有头折叠到一对键值上，最省内存但可能伤害质量。GQA 处于两者之间：一个模型可以用 8 个 KV 头服务 64 个查询头，把缓存缩小八倍。由于 decode 的主要开销就是读取 KV cache，这一节省直接转化为更快的 token 生成。',
+    significance:
+      'GQA 成为稠密开源模型的默认注意力布局，因为它正面攻击了 decode 真正受限的内存侧。它也为多头潜在注意力等更激进的 KV 压缩方案铺平了道路。',
+    benchmarkContext:
+      '注意力布局由各模型架构固定，因此 GQA 在 InferenceX 中表现为模型层面每 token KV 字节数的差异，进而塑造相同硬件和引擎版本下可达的并发与交互性。',
+  },
+  'active-parameters': {
+    term: '激活参数',
+    aliases: ['active parameters', 'activated parameters', '激活参数量'],
+    plainEnglish:
+      '激活参数是混合专家模型处理每个 token 时实际用到的权重，只占其庞大总规模的一小部分。',
+    definition:
+      '激活参数是稀疏模型中参与计算单个 token 的那部分权重，包括共享层加上路由器选中的专家。',
+    explanation:
+      '一个混合专家模型可能拥有上万亿总参数，但每个 token 只经过几百亿。每 token 计算量随激活参数量增长，这是稀疏前沿模型运行成本可以接受的原因。内存则是另一回事：每个专家都必须驻留在 HBM 里随时待命，所以容量需求和并行方案跟随总参数量，尽管算术量跟随激活参数量。',
+    significance:
+      '总参数与激活参数之分解释了现代推理服务的大部分经济性：万亿参数模型因此可以部署，专家并行因此要跨多颗芯片，按总参数量比较模型也因此说明不了服务成本。',
+    benchmarkContext:
+      'InferenceX 测试的 MoE 模型，包括 DeepSeek、Kimi、Qwen 和 MiniMax 家族，激活比都很低，其配置把专家分布到多个节点，正是因为总参数量决定了内存账单。',
+  },
+  'dense-model': {
+    term: '稠密模型',
+    aliases: ['dense model', '稠密 Transformer'],
+    plainEnglish:
+      '稠密模型对处理的每个 token 都动用全部参数，不像稀疏模型那样把 token 路由给少数专家。',
+    definition: '稠密模型是所有权重都参与每次前向计算的神经网络，每 token 计算量与总参数量成正比。',
+    explanation:
+      '稠密 Transformer 是更简单的设计：每一层用全部权重处理每个 token。这让行为可预测、并行策略直接、单位参数的质量表现强，但服务成本随规模线性增长。混合专家模型打破了这一关联，每个 token 只激活一小部分权重，因此最大的前沿模型是稀疏的，而中小模型往往保持稠密。',
+    significance:
+      '稠密与稀疏之选驱动服务策略。稠密模型占用更少芯片、避开专家路由的复杂性；稀疏模型用大得多的内存占用和更重的跨芯片通信，换取单位算力更高的质量。',
+    benchmarkContext:
+      'InferenceX 的覆盖以运营方实际部署的大型稀疏前沿模型为中心，Llama 级别的稠密基线则提供对照，展示没有专家路由时张量并行和内存压力的表现。',
+  },
+  'reasoning-model': {
+    term: 'Reasoning 模型',
+    aliases: ['reasoning model', '深度思考模型', '思维链模型'],
+    plainEnglish:
+      'Reasoning 模型在回答前生成很长的隐藏思维链，用额外的输出 token 换取困难问题上更好的结果。',
+    definition:
+      'Reasoning 模型是被训练成额外花费生成 token 来推演问题的 LLM，在给出最终答案之前或同时产出大量中间推理。',
+    explanation:
+      '除了扩展训练算力，reasoning 模型还扩展测试时算力：它们用 token 来思考。一个数学或编程问题可能触发数千 token 的内部推演，输出长度相对聊天模型爆炸式增长。对服务而言，负载大幅偏向 decode，每请求的 KV cache 驻留量膨胀，每用户每秒 token 数成为决定难题几秒还是几分钟出答案的指标。',
+    significance:
+      'Reasoning 把推理变成了扩展前沿：能力现在通过在服务时花更多算力来提升，成倍放大对 decode 吞吐量的需求。它重塑了硬件优先级，转向内存带宽和互连，也是智能体工作负载主导当前基准设计的核心原因。',
+    benchmarkContext:
+      'InferenceX 测试的前沿模型都具备 reasoning 能力，其场景反映了这类流量：固定序列测试中的长生成，以及 AgentX 中推演与工具调用在多轮之间交织的完整 agent 会话。',
+  },
+  tokenization: {
+    term: 'Tokenization',
+    aliases: ['分词', 'tokenizer', 'token', 'BPE'],
+    plainEnglish: 'Tokenization 把文本切分成模型实际读写的子词单元，所有性能和价格数字都以它计价。',
+    definition:
+      'Tokenization 是文本与模型处理的离散 token ID 之间的转换，使用通过字节对编码（BPE）等方法学得的固定词表。',
+    explanation:
+      'tokenizer 把常见词映射为单个 token，把较罕见的字符串拆成多个，英文平均大约四个字符一个 token。不同模型家族词表不同，同一段文本在不同模型下的 token 数可能差异明显。下游一切都以 token 计价：上下文窗口、KV cache 大小、吞吐量、每 token 延迟和每百万 token 价格，数的都是这个单位而不是字符或单词。',
+    significance:
+      'token 效率是一个隐藏的价格杠杆：同样内容用更少 token 表达的模型，在相同单价下更便宜。比较供应商或基准测试时不对 tokenizer 差异做归一化，会悄悄扭曲成本和速度结论。',
+    benchmarkContext:
+      'InferenceX 的指标以 token 计价，其 AgentX 轨迹用确定性合成 token 替换原始文本，同时保留每轮 token 数，因此回放的会话以与源工作负载相同的 token 算术压测服务系统。',
+  },
+  'sequence-parallelism': {
+    term: '序列并行',
+    aliases: ['sequence parallelism', 'SP', 'sequence parallel'],
+    plainEnglish: '序列并行把一条长序列切分到多颗芯片上，让一个请求的 token 由多个加速器同时处理。',
+    definition:
+      '序列并行是沿序列的 token 维度在设备间做切分的策略，为超长输入分摊激活内存和注意力计算。',
+    explanation:
+      '张量并行切分的是权重，序列并行切分的是序列本身：每颗芯片持有一段 token 及对应的激活和 KV 状态。注意力因此需要通信，一颗芯片上的查询必须与其他芯片上的键值相遇，ring 式注意力算法把这些通信与计算重叠。在推理中，密切相关的上下文并行正是几十万 token 上下文的 prefill 变得可行的原因。',
+    significance:
+      '当单个请求而非批次过大时，序列式切分就是答案：一次百万 token 的 prefill 可能超出任何单芯片的内存和时间预算。它把上下文长度从一堵硬墙变成一个可扩展维度，代价是互连流量。',
+    benchmarkContext:
+      'InferenceX 记录每个配置的完整并行方案。长上下文智能体场景正是序列和上下文切分选择连同互连质量，把单芯片规格相近的系统明显区分开的地方。',
+  },
+  'all-gather': {
+    term: 'All-gather',
+    aliases: ['allgather', '全收集'],
+    plainEnglish:
+      'All-gather 是一种群体通信操作，结束时每颗芯片都拿到最初分散在所有芯片上的完整数据。',
+    definition:
+      'All-gather 是一种集合通信操作，每个参与设备贡献自己的分片，所有设备都收到全部分片拼接后的结果。',
+    explanation:
+      '分片执行经常需要重组完整张量：某些张量并行布局中矩阵乘法前的权重分片，或需要完整隐藏状态的操作之前各设备的激活。All-gather 把每个分片送到每个 rank，通常按 ring 或 tree 调度执行，开销随张量大小和参与者数量增长。它是 reduce-scatter 的对偶操作，两者组合起来就是一次 all-reduce。',
+    significance:
+      '与 all-reduce、all-to-all 一起，all-gather 是决定并行方案能否扩展的少数几个集合操作之一。它的延迟处在每一使用它的层的关键路径上，这也是芯片间 scale-up 带宽被大力宣传的原因。',
+    benchmarkContext:
+      'InferenceX 测试的每个多芯片配置都通过其并行方案频繁调用集合操作，而 CollectiveX 工作流直接在多家厂商硬件上测量这类操作，让通信行为可以在完整模型运行之外被比较。',
+  },
+  'reduce-scatter': {
+    term: 'Reduce-scatter',
+    aliases: ['reduce scatter', '归约散播'],
+    plainEnglish:
+      'Reduce-scatter 把每颗芯片上对应位置的数据求和，然后让每颗芯片只保留合并结果中属于自己的那一片。',
+    definition:
+      'Reduce-scatter 是一种集合操作，对所有设备贡献的张量做逐元素归约，并把归约结果按分片分发，每个设备一片。',
+    explanation:
+      '当每个 rank 都为同一张量计算出部分结果时，这些部分结果必须相加。Reduce-scatter 完成求和后只把下一步需要的那一片交给每个 rank，避免把完整归约张量发给所有人的浪费。一次 all-reduce 恰好等于 reduce-scatter 加 all-gather，调度器会根据下一个操作实际消费什么来选择融合形式还是拆分形式。',
+    significance:
+      '当下游只需要分片时，用 reduce-scatter 代替完整 all-reduce 能把每个 rank 的接收数据量减半。在 NVL72 这种规模下，集合通信流量与模型本身争夺互连带宽，这一点尤为重要。把这些集合操作与计算重叠，是成熟推理栈的标志性能力。',
+    benchmarkContext:
+      'InferenceX 中带张量并行分片的配置在每一层 Transformer 都会触发归约类集合操作，而 CollectiveX 存在的意义正是在推理实际使用的消息尺寸上，跨厂商发布这些原语的测量结果。',
+  },
+  infiniband: {
+    term: 'InfiniBand',
+    aliases: ['IB', 'InfiniBand 网络', 'NDR InfiniBand'],
+    plainEnglish:
+      'InfiniBand 是连接 AI 集群中各台服务器的高速低延迟网络，承担 NVLink 够不到的跨节点流量。',
+    definition:
+      'InfiniBand 是原生支持 RDMA 的交换式网络，是大多数大型 NVIDIA 集群中节点之间的 scale-out 互连。',
+    explanation:
+      '节点或机柜内部，芯片通过 NVLink 这类 scale-up 链路通信；越过这个边界，流量就进入 scale-out 网络，InfiniBand 在这里与支持 RDMA 的 Ethernet 竞争。InfiniBand 提供微秒级延迟、当前世代每链路数百 Gb/s 的带宽，以及 SHARP 这类在网归约能力。多节点推理、prefill 与 decode 分离、宽专家并行都把跨节点集合通信和 KV 传输放在这张网络上。',
+    significance:
+      '一旦模型跨节点，网络就与算力一样成为一级性能要素。网络选型塑造集群成本和厂商绑定，InfiniBand 与 Ethernet 之争是 AI 基础设施领域最核心的竞争战场之一。',
+    benchmarkContext:
+      'InferenceX 的多节点配置，包括分离式和机柜级结果，都跑在所在集群的 scale-out 网络上，配置元数据会记录互连类型，因为它对跨节点数字的可复现性影响重大。',
+  },
+  rdma: {
+    term: '远程直接内存访问',
+    aliases: ['RDMA', 'RoCE', 'GPUDirect RDMA'],
+    plainEnglish:
+      'RDMA 让一台机器直接通过网络读写另一台机器的内存，两边的 CPU 都不用参与数据拷贝。',
+    definition:
+      '远程直接内存访问（RDMA）是一种网络能力，由网卡在两台机器的内存之间直接搬运数据，绕过操作系统和 CPU 的拷贝开销。',
+    explanation:
+      '常规网络栈在两端都要经过内核缓冲区拷贝数据，消耗 CPU 周期和延迟。RDMA 网卡在已注册的内存区域之间直接传输，GPUDirect 进一步让网卡直接写入加速器的 HBM。InfiniBand 原生内置 RDMA，RoCE 则把同一套语义跑在 Ethernet 上。NCCL、RCCL 等集合通信库，以及分离式服务中的 KV cache 传输路径，都建在这些原语之上。',
+    significance:
+      'RDMA 是整个分布式 AI 栈的地板：没有它，跨节点集合通信和缓存传输早在链路跑满之前就会卡在 CPU 上。RoCE 变体让基于 Ethernet 的集群能以更低成本与 InfiniBand 竞争。',
+    benchmarkContext:
+      'InferenceX 的每个多节点结果在集合通信之下都依赖 RDMA 传输，分离式配置还依赖它完成 prefill 到 decode 的 KV 搬运，因此传输层成熟度是区分相似集群结果的因素之一。',
+  },
+  ualink: {
+    term: 'UALink',
+    aliases: ['Ultra Accelerator Link', 'UALoE'],
+    plainEnglish:
+      'UALink 是机柜内加速器之间高速 scale-up 链路的开放行业标准，是生态对 NVLink 的回应。',
+    definition:
+      'UALink 是面向加速器之间 scale-up 通信的开放互连规范，让机柜内的大量芯片以交换级速度共享内存流量。',
+    explanation:
+      'NVLink 证明了用低延迟内存语义网络连接的一机柜芯片可以表现得像一颗巨型加速器，但它是私有的。UALink 联盟定义了开放的等价方案，让 NVIDIA 之外的厂商也能构建机柜级域。UALink over Ethernet（简称 UALoE）把协议跑在 Ethernet 交换上，AMD Helios 世代的机柜采用这条路线，组成结构上对标 NVL72 的 72 芯片 scale-up 域。',
+    significance:
+      'scale-up 域的大小日益决定服务架构，宽专家并行和分离式部署都希望几十颗芯片处在同一张快速网络内。开放标准决定机柜级推理是继续作为单厂商优势，还是成为整个生态的能力。',
+    benchmarkContext:
+      'InferenceX 在硬件覆盖中把 AMD MI455X 机柜这类 UALoE72 级系统与 NVL72 系统并列，机柜级网络上市后即可在相同模型工作负载上正面对比。',
+  },
+  tdp: {
+    term: '热设计功耗',
+    aliases: ['TDP', '整卡功耗', '全部包含功耗'],
+    plainEnglish:
+      'TDP 是芯片设计上可持续消耗并以热量形式散发的功率，是每份加速器规格表上的标题瓦数。',
+    definition:
+      '热设计功耗（TDP）是芯片被设计为可持续运行的最大功率包络，其散热系统必须能够持续把这些热量排出。',
+    explanation:
+      '现代加速器每颗芯片的功耗在千瓦上下甚至更高，整机柜系统乘上去就是十万瓦量级。只看 TDP 还会低估真实账单：内存、网络、CPU、电源转换损耗和散热开销都叠加在上面，因此每芯片的全部包含功耗明显高于芯片 TDP。数据中心容量按兆瓦出售，这些功率包络直接决定一个场地能容纳多少加速器。',
+    significance:
+      '电力已成为 AI 扩建的硬约束，在许多市场甚至排在资本之前。每芯片 TDP 的持续上升迫使行业转向液冷，也让每瓦性能与每美元性能一样，成为比较芯片世代的主要维度。',
+    benchmarkContext:
+      'InferenceX 用包含散热和基础设施开销的每芯片全部包含功耗来计算每 token 能耗和每兆瓦 token 数，PowerX 工作流正把这些指标从铭牌数值推向运行中的实测功耗。',
+  },
+  pue: {
+    term: '电源使用效率',
+    aliases: ['PUE', 'power usage effectiveness', '能源使用效率'],
+    plainEnglish: 'PUE 衡量数据中心每向内部计算设备输送一瓦电，总共要消耗多少瓦。',
+    definition:
+      '电源使用效率（PUE）是数据中心总功耗与 IT 设备功耗之比，1.0 意味着每一瓦都用于计算。',
+    explanation:
+      '制冷、电源转换和场地系统在服务器之外额外耗能。PUE 为 1.5 意味着每一瓦 IT 负载还要搭上半瓦开销，而现代超大规模 AI 设施借助液冷和高效配电把 PUE 压向 1.1 以下。AI 园区以数百兆瓦计，PUE 的微小差异就会摊出巨大的绝对能耗和成本。',
+    significance:
+      'PUE 把芯片级效率与场地经济性连接起来：芯片消耗的每一瓦在电表上都要乘以 PUE。当电力供给卡住 AI 扩建时，场地效率与芯片和软件一样进入竞争计算。',
+    benchmarkContext:
+      'InferenceX 每 token 能耗和每兆瓦 token 数背后的全部包含功耗，已按现代 AI 数据中心的 PUE 水平计入场地开销，因此其成本与能耗比较反映的是落地的场地经济性而不是裸芯片瓦数。',
+  },
+  int8: {
+    term: 'INT8',
+    aliases: ['8 位整数量化', 'W8A8'],
+    plainEnglish:
+      'INT8 用 8 位整数加缩放因子存储数值，内存相比 16 位格式减半，支持的硬件上算力翻倍。',
+    definition:
+      'INT8 是一种 8 位整数数值格式，搭配每张量或每通道的缩放因子，用于量化推理中的模型权重和激活。',
+    explanation:
+      '整数量化通过缩放因子（有时还有零点）把浮点值映射到 256 个均匀间隔的等级上。均匀间隔对离群值处理得很差，因此 SmoothQuant 等技术先把激活中的离群值迁移到权重里，再按 W8A8 模式对两侧一起量化。在较早的加速器世代，INT8 是 16 位以下的主要快速路径，而新芯片增加了 FP8，同样位宽下指数位带来更宽的动态范围。',
+    significance:
+      'INT8 定义了 LLM 量化的第一波主流实践，在没有 8 位浮点支持的硬件上仍然重要。INT8 与 FP8 的对比也恰好展示了量化的核心权衡：均匀精度对动态范围。',
+    benchmarkContext:
+      'InferenceX 为每个结果标注精度，其精度对比页面存在的原因就是格式切换曾大幅移动曲线。Blackwell 和 MI350 级硬件上的现代配置偏好 FP8 和 FP4 路径，整数格式出现在特定的权重量化配置中。',
+  },
+  'weight-only-quantization': {
+    term: '仅权重量化',
+    aliases: ['weight-only quantization', 'W4A16', 'AWQ', 'GPTQ'],
+    plainEnglish: '仅权重量化只把存储的模型权重压到低精度，运算本身仍在较高精度格式下进行。',
+    definition:
+      '仅权重量化把模型权重存为 4 位整数等低位格式，而激活和算术保持高精度，典型模式是 W4A16。',
+    explanation:
+      '权重是静态的，可以用 GPTQ、AWQ 等方法在离线阶段精心量化，选择能最小化质量损失的缩放和顺序。激活是动态的、更难压缩，保持 16 位可以绕开它们的离群值问题。服务时 kernel 在计算中即时反量化权重，因此访存流量减小，而乘加运算本身并没有变快。',
+    significance:
+      '由于 decode 是访存受限的，削减权重字节数直接加快 token 生成，也让更大的模型装进更少的芯片。仅权重方法让大型开源模型能在普通硬件上运行，在激活量化代价过高时仍是标准方案。',
+    benchmarkContext:
+      'InferenceX 在精度标签中区分仅权重配置与全低精度路径，因为 W4A16 配置和 NVFP4 配置对于是哪些硬件单元和带宽预算产生了曲线，做出的是很不一样的声明。',
+  },
+  'block-scaling': {
+    term: '块缩放',
+    aliases: ['block scaling', 'microscaling', 'MX 格式', '块浮点'],
+    plainEnglish: '块缩放给每一小组低精度数值配一个共享缩放因子，找回超小格式自身缺失的动态范围。',
+    definition:
+      '块缩放是一种量化结构，数值以极低位宽格式存储，每个固定大小的块共享一个较高精度的缩放因子。',
+    explanation:
+      '一个 4 位数只能表示少数几个量级，远不足以覆盖模型张量的动态范围。把数值分成 16 或 32 个元素左右的块并附上共享缩放，每个块就能把格式对准自己的量级。MX 标准格式如 MXFP4、MXFP8 使用 2 的幂缩放，NVFP4 则在 16 元素块上使用 FP8 缩放，粒度更细。',
+    significance:
+      '块缩放是 FP4 推理世代背后的关键思想：没有每块缩放，4 位浮点对前沿模型根本不可用。缩放格式和块大小的选择，如今是硬件厂商与量化方案之间真正的差异化点。',
+    benchmarkContext:
+      'InferenceX 在 Blackwell 和 MI355X 覆盖中的 NVFP4 与 MXFP4 结果都是块缩放格式，精度对比页面很大程度上就是为了展示这些配置相对同硬件 FP8 基线的得失。',
+  },
+  'flash-attention': {
+    term: 'FlashAttention',
+    aliases: ['flash attention', '融合注意力 kernel'],
+    plainEnglish:
+      'FlashAttention 在高速片上内存中分块计算精确注意力，避免生成那个让注意力又慢又耗内存的巨大中间矩阵。',
+    definition:
+      'FlashAttention 是一种注意力算法，把计算分块安排在片上 SRAM 中并增量式重缩放结果，不在 HBM 中实体化完整分数矩阵就得到精确注意力。',
+    explanation:
+      '朴素注意力要把随序列长度平方增长的分数矩阵写入主存再读回，速度由带宽而非算术决定。FlashAttention 把整个计算融合进一个 kernel，让键值块流过片上内存，用在线 softmax 保持结果精确。后续版本和各厂商实现把这一思想扩展到新硬件世代、新头布局和面向推理的 decode 路径。',
+    significance:
+      '这个 kernel 家族让长上下文真正可行，把注意力从长序列的主导成本变成可控的一环。它也是单个精心设计的 kernel 能撕动整个行业性能的最经典例子。',
+    benchmarkContext:
+      'InferenceX 测试的所有引擎都依赖这一脉络的融合注意力 kernel，NVIDIA 硬件上经由 FlashInfer，AMD 上经由 AITER，那里的 kernel 改进经常在硬件不变的情况下移动已发布的曲线。',
+  },
+  triton: {
+    term: 'Triton',
+    aliases: ['OpenAI Triton', 'Triton kernel 语言'],
+    plainEnglish:
+      'Triton 是基于 Python 的加速器 kernel 编写语言，让 ML 工程师不写底层代码也能接近手工调优的速度。',
+    definition:
+      'Triton 是开源的 kernel 编程语言和编译器，开发者用类 Python 代码编写高性能加速器 kernel，在维护后端的厂商之间可移植。',
+    explanation:
+      '传统上写出峰值性能的 kernel 需要 CUDA 或汇编级调优的厂商专家知识。Triton 抬高了抽象层级：开发者编写块级程序，编译器处理访存合并、分块和调度。NVIDIA、AMD 等厂商维护后端，同一份 kernel 源码可以面向多种架构。推理引擎用它实现融合算子、量化路径和没有厂商库可用的 MoE kernel。这个名字与 NVIDIA Triton Inference Server 重名，后者是另一个独立的模型服务产品。',
+    significance:
+      'Triton 降低了模型研究者与硬件性能之间的门槛，其跨厂商后端具有战略意义，因为用它写的 kernel 不会锁定在单一芯片家族上。厂商把 Triton 生态运营得好不好，已经成为其软件叙事的一部分。',
+    benchmarkContext:
+      'InferenceX 配置中的引擎在 CUDA、CUTLASS 和 AITER 代码之外还携带大量 Triton kernel，因此编译器与后端成熟度是 NVIDIA 和 AMD 系统上引擎版本之间曲线移动的隐形推力之一。',
+  },
+  cutlass: {
+    term: 'CUTLASS',
+    aliases: ['CuTe', 'CUDA 线性代数模板库'],
+    plainEnglish:
+      'CUTLASS 是 NVIDIA 的模板库，提供搭建接近硬件峰值速度的矩阵乘法 kernel 所需的积木。',
+    definition:
+      'CUTLASS 是 NVIDIA 开源的可组合 C++ 模板库，用于构建面向各代 GPU tensor core 的 GEMM 及相关 kernel。',
+    explanation:
+      '峰值矩阵乘法性能要求对 tensor core 指令、共享内存搬运和异步流水线的精确编排，而且每代架构都不同。CUTLASS 把这套编排封装成可组合的部件，其 CuTe 层描述数据布局，kernel 作者可以拼装出接近峰值的 GEMM，并在尾部融合偏置、激活或量化缩放，而不必从零开始。推理引擎中大量高性能 kernel 直接建在它之上。',
+    significance:
+      'CUTLASS 是 NVIDIA 教生态使用每一代新 tensor core 的地方，包括 Blackwell 上的 FP4 和 FP8 路径。其模式向引擎扩散的速度，是新芯片多快达到宣称性能的真实变量。',
+    benchmarkContext:
+      'InferenceX 在 NVIDIA 硬件上的结果背后，GEMM 和注意力 kernel 大量源于 CUTLASS 衍生代码，引擎镜像里这些库的版本升级是平台追踪到的曲线逐日变化的常见来源。',
+  },
+  nccl: {
+    term: 'NCCL',
+    aliases: ['RCCL', 'NVIDIA 集合通信库'],
+    plainEnglish:
+      'NCCL 是 NVIDIA 的集合通信库，在集合操作中负责芯片之间的数据搬运，RCCL 是 AMD 的对应实现。',
+    definition:
+      'NCCL 是 NVIDIA 的集合通信库，在节点内经 NVLink、节点间经 RDMA 网络实现 all-reduce、all-gather、all-to-all 等跨 GPU 操作。',
+    explanation:
+      '框架不直接操作互连，而是调用一个集合通信库，由它发现拓扑并为每种消息尺寸选择算法和信道调度。NVIDIA 系统由 NCCL 负责，AMD 维护接口对齐的 RCCL 服务 ROCm 平台。调优是针对具体网络的：ring 与 tree 算法、协议阈值、信道数都随拓扑变化，同一模型在两个集群上的通信行为可能大不相同。',
+    significance:
+      '每个多芯片推理和训练任务都站在这一层之上，集合通信的回退会悄无声息地向整个集群征税。NCCL 与 RCCL 的接口兼容性同样至关重要，引擎可以面向同一套集合通信 API 覆盖多家厂商。',
+    benchmarkContext:
+      'InferenceX 的多芯片配置在每个张量并行和专家并行层都在调用这些库，而 CollectiveX 在推理相关的消息尺寸上跨厂商直接测量底层集合通信性能，把网络行为与模型行为分离开。',
+  },
+  gemm: {
+    term: 'GEMM',
+    aliases: ['通用矩阵乘法', 'matrix multiply'],
+    plainEnglish: 'GEMM 即通用矩阵乘法，是训练和推理神经网络时占据绝大部分算术量的那一种计算。',
+    definition:
+      'GEMM 是通用的矩阵乘矩阵例程，神经网络中的线性层、注意力投影和专家计算最终都归结为它。',
+    explanation:
+      'Transformer 主要由线性变换堆叠而成，服务一个模型就是执行海量矩阵乘法。tensor core 专为加速它们而存在，峰值 TFLOP/s 规格也是针对这类稠密运算给出的。形状决定效率：prefill 产生接近方形的大矩阵乘法能喂饱算力，decode 产生的细长矩阵则受带宽限制。MoE 还带来分组 GEMM，把许多小型专家乘法合并成一次高效启动。',
+    significance:
+      'GEMM 效率是行业里一切性能主张的地基。在真实服务形状下，尤其是 decode 的细长矩阵上，实际交付与峰值 GEMM 吞吐量的差距，解释了规格表比例为何预测不了基准测试排名。',
+    benchmarkContext:
+      'InferenceX 每条曲线背后都是来自 CUTLASS、hipBLASLt 和 Triton 生成代码的 GEMM kernel 堆栈，量化配置最终也站在各厂商在其调度器产生的形状上执行低精度 GEMM 的能力之上。',
+  },
+  'kernel-fusion': {
+    term: 'Kernel 融合',
+    aliases: ['kernel fusion', '算子融合'],
+    plainEnglish:
+      'Kernel 融合把多个小的芯片操作合并成一个，中间数据留在快速内存里而不是反复经过 HBM。',
+    definition:
+      'Kernel 融合把多个连续操作合并为单次 kernel 启动，中间结果保留在寄存器或片上内存中，而不是在步骤之间写回主存。',
+    explanation:
+      '未融合的矩阵乘法、偏置加法、激活函数序列，每一步都把中间张量写入 HBM 再读回。融合成一个 kernel 就消除了这些往返和中间的启动开销。融合可以在库里手工实现，可以通过 CUTLASS 式的模板尾部实现，也可以由 torch.compile 和基于 Triton 的栈自动完成。FlashAttention 是这一思想最著名的单个例子。',
+    significance:
+      '在访存受限的推理中，消除中间流量比提升原始算术能力更值钱，因此融合是引擎手中最可靠的杠杆之一。引擎版本间的提速，很大一部分可以归结为更激进或更精准的融合。',
+    benchmarkContext:
+      'InferenceX 配置钉住的引擎镜像在不同版本和硬件后端上的融合库存不同，这是逐日追踪中硬件不变而曲线移动的常见原因：面向新模型和新精度的融合 kernel 落地了。',
+  },
 };
 
 const entries = getAllGlossaryEntries().map((entry) => {
