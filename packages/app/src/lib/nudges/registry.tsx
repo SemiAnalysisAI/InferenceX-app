@@ -443,7 +443,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // Landing banner
   // -------------------------------------------------------------------------
   {
-    id: 'agentic-results-launch-banner',
+    id: 'openai-rubin-comparison-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -463,20 +463,25 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: '/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4',
+      href: '/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerGpu',
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
         window.location.href = localizedNudgeHref(
-          '/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4',
+          '/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerGpu',
         );
       },
     },
     analytics: {
-      shown: 'agentic_results_banner_shown',
-      dismissed: 'agentic_results_banner_dismissed',
-      action: 'agentic_results_banner_clicked',
-      properties: { banner_id: 'agentic-results-launch', scenario: 'agentic-traces' },
+      shown: 'inference_rubin_comparison_banner_shown',
+      dismissed: 'inference_rubin_comparison_banner_dismissed',
+      action: 'inference_rubin_comparison_banner_clicked',
+      properties: {
+        banner_id: 'openai-rubin-comparison',
+        scenario: '8k/1k',
+        model: 'DeepSeek-R1-0528',
+        metric: 'y_outputTputPerGpu',
+      },
     },
   },
 

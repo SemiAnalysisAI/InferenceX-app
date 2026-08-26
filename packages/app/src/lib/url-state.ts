@@ -97,7 +97,7 @@ export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
 /** Default values for each parameter. Params matching their default are omitted from share URLs. */
 /**
  * Dashboard default y-axis: total tokens purchasable per $1 USD at owning
- * hyperscaler TCO, so the dashboard leads with the economics rather than raw
+ * Neocloud TCO, so the dashboard leads with the economics rather than raw
  * throughput. `?i_metric=` still wins, so existing shared links are unaffected.
  *
  * Lives here rather than in `InferenceContext` because `PARAM_DEFAULTS` below
@@ -105,7 +105,7 @@ export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
  * a link captured on the *other* metric would be written without `i_metric`
  * and reopen on this one.
  */
-export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarH';
+export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarN';
 
 export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_model: 'DeepSeek-V4-Pro',

@@ -56,7 +56,7 @@ describe('First-load navigation', () => {
         // would sit over the footer links these specs click.
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         win.localStorage.removeItem('inferencex-agentic-results-modal-dismissed');
-        win.localStorage.removeItem('inferencex-agentic-results-banner-dismissed');
+        win.localStorage.removeItem('inferencex-openai-rubin-banner-dismissed');
       },
     });
 

@@ -416,7 +416,7 @@ export type CustomMetricKey = {
 export type BenchmarkMetricKey = Exclude<MetricKey, CustomMetricKey>;
 export type BenchmarkMetricConfigKey = `y_${BenchmarkMetricKey}`;
 
-export const DEFAULT_METRIC_CONFIG_KEY = 'y_tokensPerDollarH' satisfies MetricConfigKey;
+export const DEFAULT_METRIC_CONFIG_KEY = 'y_tokensPerDollarN' satisfies MetricConfigKey;
 
 export function isMetricKey(metricKey: string): metricKey is MetricKey {
   return Object.hasOwn(METRIC_REGISTRY, metricKey);

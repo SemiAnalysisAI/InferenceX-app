@@ -21,7 +21,7 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
     'inferencex-agentic-results-modal-dismissed',
-    'inferencex-agentic-results-banner-dismissed',
+    'inferencex-openai-rubin-banner-dismissed',
     'inferencex-reproducibility-nudge-shown',
     'inferencex-star-nudge-shown',
     'inferencex-export-nudge-shown',
@@ -286,7 +286,7 @@ describe('Landing nudges — banner', () => {
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
       // Only the X button should persist a dismissal — show alone must not.
-      expect(win.localStorage.getItem('inferencex-agentic-results-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-openai-rubin-banner-dismissed')).to.eq(null);
     });
   });
 
@@ -300,12 +300,13 @@ describe('Landing nudges — banner', () => {
     cy.location('search')
       .should('include', 'g_model=DeepSeek-R1-0528')
       .and('include', 'i_seq=8k%2F1k')
-      .and('include', 'i_prec=fp4');
+      .and('include', 'i_prec=fp4')
+      .and('include', 'i_metric=y_outputTputPerGpu');
 
     // Body click must not write the dismissal key — the banner should still
     // render on a fresh visit to landing.
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-agentic-results-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-openai-rubin-banner-dismissed')).to.eq(null);
     });
 
     cy.visit('/');
@@ -485,7 +486,7 @@ describe('Nudge scope isolation', () => {
         clearAllNudgeStorage(win);
         // Dismiss all landing nudges so nothing blocks visibility checks
         win.localStorage.setItem('inferencex-agentic-results-modal-dismissed', '1');
-        win.localStorage.setItem('inferencex-agentic-results-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-openai-rubin-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },
     });
