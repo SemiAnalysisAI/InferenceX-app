@@ -656,10 +656,11 @@ describe('TCO Calculator', () => {
     });
 
     it('renders throughput and cost calculations from null-ISL/OSL agentic rows', () => {
-      // The agentic fixture exposes a single scenario, so the scenario
-      // selector is hidden; the percentile control anchors the agentic view.
-      cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
+      // The agentic fixture exposes a single scenario, so the dropdown is
+      // replaced by a static readout that keeps the agentic explainer.
+      cy.get('[data-testid="scenario-static-value"]').should('contain.text', 'Agentic');
       cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
+      cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
       cy.get('[data-testid="calculator-no-data"]').should('not.exist');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
       cy.get('[data-testid="calculator-chart-section"] h2')
@@ -715,8 +716,9 @@ describe('TCO Calculator', () => {
       });
       cy.wait('@agenticBenchmarks');
 
-      // Single-scenario fixture → no scenario selector; the gate is locked, so
-      // no percentile selector either. The P90 heading proves the agentic view.
+      // Single-scenario fixture → the dropdown gives way to a static agentic
+      // readout; the gate is locked, so no percentile selector either.
+      cy.get('[data-testid="scenario-static-value"]').should('contain.text', 'Agentic');
       cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
       cy.get('[data-testid="calc-percentile-selector"]').should('not.exist');
       cy.get('[data-testid="calculator-chart-section"] h2')
