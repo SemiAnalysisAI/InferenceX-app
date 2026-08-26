@@ -288,4 +288,42 @@ describe('getAgenticAggregates write-back', () => {
     expect(calls).toHaveLength(2);
     expect(calls.some((c) => c.text.includes('update agentic_trace_replay'))).toBe(false);
   });
+
+  it('does not stamp a bundle with null server fields when the server blob fails to parse', async () => {
+    const profileBlob = gzipSync(
+      Buffer.from(profileRec({ cid: 's1', isl: 100, osl: 50, ttft_ms: 500, latency_ms: 1000 })),
+    );
+    const staleStats = {
+      version: STATS_VERSION - 1,
+      isl: null,
+      osl: null,
+      kvCacheUtil: null,
+      prefixCacheHitRate: null,
+    };
+    const { sql, calls } = mockSql([
+      [{ benchmark_result_id: 7, stats: staleStats }],
+      [
+        {
+          benchmark_result_id: 7,
+          trace_replay_id: 870,
+          has_profile_blob: true,
+          has_server_blob: true,
+        },
+      ],
+      // Pass 1: profile blob parses fine.
+      [{ chunk: profileBlob }],
+      // Pass 2: server blob chunk is corrupt — gunzip fails.
+      [{ chunk: Buffer.from('not gzip at all') }],
+    ]);
+
+    const result = await getAgenticAggregates(sql, [7]);
+
+    // Profile-derived fields are still served for this request…
+    expect(result[7]?.isl?.n).toBe(1);
+    expect(result[7]?.kvCacheUtil).toBeNull();
+    // …but nothing is written back: stamping a current-version bundle with
+    // null server fields would permanently cache the miss.
+    expect(calls).toHaveLength(4);
+    expect(calls.some((c) => c.text.includes('update agentic_trace_replay'))).toBe(false);
+  });
 });

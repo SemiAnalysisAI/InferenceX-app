@@ -310,7 +310,7 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     // cache, not score/AV compute). Dims:
     // https://huggingface.co/unsloth/Llama-3.3-70B-Instruct/raw/main/config.json.
     attention: {
-      groups: [{ label: 'Full GQA', layers: 80, linPerCtx: 65536 }],
+      groups: [{ label: 'Full GQA', layers: 80, linPerCtx: 32768 }],
     },
   },
   [Model.Llama3_1_70B]: {
@@ -332,7 +332,7 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     // Identical attention geometry to Llama 3.3 70B (80 × 64 heads × dim 128):
     // https://huggingface.co/unsloth/Meta-Llama-3.1-70B-Instruct/raw/main/config.json.
     attention: {
-      groups: [{ label: 'Full GQA', layers: 80, linPerCtx: 65536 }],
+      groups: [{ label: 'Full GQA', layers: 80, linPerCtx: 32768 }],
     },
   },
   [Model.GptOss]: {

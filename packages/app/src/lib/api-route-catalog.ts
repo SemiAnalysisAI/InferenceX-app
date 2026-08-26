@@ -711,7 +711,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/agentic-aggregates.ts',
-    sourceSha256: 'f9745baf7d63b0a52081c4f1b587e9d4eb131b31a8127cd3d1281b87c8ec33cc',
+    sourceSha256: 'd2ce8c8769dd38012ba22054017f600b8e6e978a54a9248dd6085d5fc6b4b642',
     reviewArea: {
       en: 'Agentic aggregate percentile keys, nullability, and ID-keyed response shape.',
       zh: '智能体汇总百分位字段、可空性和按 ID 索引的响应结构。',

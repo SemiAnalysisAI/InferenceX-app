@@ -354,12 +354,13 @@ export async function getAgenticAggregates(
         'server_metrics_json_gz',
         Number(row.trace_replay_id),
       );
-      if (!serverBlob) continue;
-      const json = gunzipJsonWithinLimit(serverBlob);
-      parsed =
-        json === null
-          ? await streamExtractServerMetricSamples(serverBlob)
-          : extractServerMetricSamples(json);
+      if (serverBlob) {
+        const json = gunzipJsonWithinLimit(serverBlob);
+        parsed =
+          json === null
+            ? await streamExtractServerMetricSamples(serverBlob)
+            : extractServerMetricSamples(json);
+      }
     } catch {
       // malformed blob or failed stream fallback — leave nulls
     }
@@ -373,6 +374,12 @@ export async function getAgenticAggregates(
         pending.stats.kvCacheUtil = kvPct;
         pending.stats.prefixCacheHitRate = prefixPct;
       }
+    } else {
+      // A server blob exists but couldn't be read or parsed this time
+      // (transient stream error, oversized JSON, ...). Don't self-heal a
+      // version-stamped bundle with null server fields — that would
+      // permanently cache the miss and the fast path would never retry.
+      pendingById.delete(id);
     }
   }
 
