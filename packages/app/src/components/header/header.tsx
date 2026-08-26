@@ -189,19 +189,16 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
   }, []);
 
   return (
-    <header
-      data-testid="header"
-      className="sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/60 backdrop-blur-[2px]"
-    >
+    <header data-testid="header" className="sticky top-0 z-50 border-b border-border bg-background">
       <div className="container mx-auto px-4 lg:px-8">
-        <div className="flex h-14 items-center gap-6">
+        <div className="flex h-16 items-center gap-8 lg:h-[4.5rem]">
           {/* Brand */}
           <Link
             href={isZh ? '/zh' : '/'}
             data-testid="header-brand"
             className="flex items-center min-h-11 gap-2 shrink-0"
           >
-            <span className="pride-wordmark text-lg font-bold tracking-tight">InferenceX</span>
+            <span className="pride-wordmark text-xl font-bold tracking-tight">InferenceX</span>
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
               by
               <Image
@@ -214,8 +211,9 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             </span>
           </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden items-center gap-1 xl:flex">
+          {/* Desktop nav — quiet text links with a brand underline marking the
+              active section, so the bar reads as editorial rather than app chrome. */}
+          <nav className="hidden items-center gap-6 xl:flex">
             {navLinks.map(({ href, displayHref, label, badgeLabel, testId, event }) => (
               <Link
                 key={href}
@@ -223,10 +221,11 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 href={displayHref}
                 prefetch={isActive(pathname, href) ? false : undefined}
                 className={cn(
-                  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                  'relative inline-flex items-center gap-1.5 py-1.5 text-[0.9375rem] font-medium transition-colors',
+                  'after:absolute after:inset-x-0 after:-bottom-0.5 after:h-0.5 after:rounded-full after:transition-colors',
                   isActive(pathname, href)
-                    ? 'text-brand bg-brand/10'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                    ? 'text-brand after:bg-brand'
+                    : 'text-muted-foreground hover:text-foreground after:bg-transparent',
                 )}
                 onClick={(e) => {
                   track(event);
@@ -302,7 +301,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                       className={cn(
                         'flex items-center min-h-11 px-3 rounded-md text-sm font-medium transition-colors',
                         isActive(pathname, href)
-                          ? 'text-brand bg-brand/10'
+                          ? 'text-brand bg-accent'
                           : 'text-muted-foreground hover:text-foreground hover:bg-muted',
                       )}
                       onClick={(e) => {
