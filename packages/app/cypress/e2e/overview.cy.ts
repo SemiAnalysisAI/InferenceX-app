@@ -43,16 +43,27 @@ const OVERVIEW_TIERS = [30, 50, 75, 100, 150, 200] as const;
 
 function selectOverviewTier(tier: (typeof OVERVIEW_TIERS)[number]) {
   const targetIndex = OVERVIEW_TIERS.indexOf(tier);
-  return cy.get<HTMLInputElement>('[data-testid="overview-tier-slider"]').then(([slider]) => {
+  // Unlike clicks, synthetic input events are not replayed by React, so a
+  // dispatch that lands before hydration finishes is silently dropped. The
+  // `.should` callback retries the whole dispatch until React has committed
+  // the selection, which only happens once the slider is interactive.
+  return cy.get<HTMLInputElement>('[data-testid="overview-tier-slider"]').should(([slider]) => {
     const view = slider.ownerDocument.defaultView;
     if (view === null) throw new Error('Slider has no window');
+    const tracker = (slider as { _valueTracker?: { setValue: (next: string) => void } })
+      ._valueTracker;
+    // React installs the value tracker when hydration commits the input.
+    expect(tracker, 'tier slider is hydrated').to.not.eq(undefined);
     const nativeValueSetter = Object.getOwnPropertyDescriptor(
       view.HTMLInputElement.prototype,
       'value',
     )?.set;
     if (nativeValueSetter === undefined) throw new Error('Range input has no native value setter');
     nativeValueSetter.call(slider, String(targetIndex));
+    // Desync the tracker so React always registers the dispatched input.
+    tracker?.setValue('');
     slider.dispatchEvent(new view.Event('input', { bubbles: true }));
+    expect(slider.dataset.tier, 'slider committed tier').to.eq(String(tier));
   });
 }
 
@@ -285,9 +296,9 @@ describe('Overview page', () => {
     // Keeps its explicit timeout because it waits on the real API through
     // `request.continue` plus the delay above — unlike the URL assertions
     // around it, which the click resolves synchronously.
-    cy.get('[data-testid="overview-tier-switcher"] [aria-current="page"]', {
+    cy.get('[data-testid="overview-tier-slider"]', {
       timeout: 15_000,
-    }).should('have.text', '75');
+    }).should('have.attr', 'data-tier', '75');
     cy.get('[data-overview-engine-scope="all"]').should('have.attr', 'aria-current', 'true');
     cy.location('search').should('eq', '?tier=75&engine=all');
   });
@@ -301,7 +312,7 @@ describe('Overview page', () => {
       });
     }).as('overviewJson');
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    selectOverviewTier(75);
     cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('exist');
     cy.wait('@overviewJson');
     cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('not.exist');
@@ -340,10 +351,7 @@ describe('Overview page', () => {
         'have.text',
         'Could not load the selected comparison. Showing the last successfully loaded data.',
       );
-    cy.get('[data-testid="overview-tier-switcher"] [aria-current="page"]').should(
-      'have.text',
-      '50',
-    );
+    cy.get('[data-testid="overview-tier-slider"]').should('have.attr', 'data-tier', '50');
     cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('not.exist');
     cy.location('search').should('eq', '?tier=75&ref=b300');
     cy.get<number>('@overviewHistoryLength').then((expectedHistoryLength) => {
@@ -366,7 +374,7 @@ describe('Overview page', () => {
       }).as('emptyOverview');
       cy.visit('/zh/overview');
 
-      cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+      selectOverviewTier(75);
       cy.wait('@emptyOverview');
       cy.get('[data-testid="overview-empty-state"]')
         .should('have.attr', 'role', 'status')
@@ -384,7 +392,7 @@ describe('Overview page', () => {
 
     cy.window().then((win) => {
       const before = win.history.length;
-      cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+      selectOverviewTier(75);
       cy.wait('@overviewJsonFailure');
       cy.location('search').should('eq', '?tier=75');
       // A plain `.should` would be satisfied by the transient extra entry.
@@ -407,26 +415,27 @@ describe('Overview page', () => {
       jsonRequests += 1;
     }).as('overviewJson');
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').trigger('pointerover');
+    cy.get('[data-testid="overview-engine-scope-switcher"]')
+      .find('[data-overview-engine-scope="all"]')
+      .trigger('pointerover');
     cy.wait('@overviewJson');
     cy.location('search').should('eq', '');
     cy.then(() => {
       expect(jsonRequests, 'hover warms exactly one response').to.equal(1);
     });
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').click();
-    cy.location('search').should('eq', '?tier=100');
-    cy.get('[data-testid="overview-tier-switcher"] [aria-current="page"]').should(
-      'have.text',
-      '100',
-    );
+    cy.get('[data-testid="overview-engine-scope-switcher"]')
+      .find('[data-overview-engine-scope="all"]')
+      .click();
+    cy.location('search').should('eq', '?engine=all');
+    cy.get('[data-overview-engine-scope="all"]').should('have.attr', 'aria-current', 'true');
     cy.then(() => {
       expect(jsonRequests, 'the click reuses the warmed response').to.equal(1);
     });
 
     cy.get('[data-testid="overview-reference-select"]').click();
     cy.get('[data-overview-reference="b300"]').click();
-    cy.location('search').should('eq', '?tier=100&ref=b300');
+    cy.location('search').should('eq', '?engine=all&ref=b300');
     cy.get('[data-overview-comparison="hardware"]').should('contain.text', 'vs B300');
     cy.then(() => {
       expect(jsonRequests, 'a reference change is derived, not fetched').to.equal(1);
@@ -665,7 +674,7 @@ describe('Overview page', () => {
     cy.location('search').should('eq', '?tier=75&present=1&utm_source=deck');
     cy.location('hash').should('eq', '#matrix');
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').click();
+    selectOverviewTier(100);
     cy.location('search').should('eq', '?tier=100&present=1&utm_source=deck');
     cy.get('[data-testid="overview-presentation-surface"]').should(
       'have.attr',
@@ -701,7 +710,7 @@ describe('Overview page', () => {
     cy.visit('/overview?tier=75', { onBeforeLoad: stubFullscreenApi });
 
     // A selector push creates a real same-document history entry.
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').click();
+    selectOverviewTier(100);
     cy.location('search').should('eq', '?tier=100');
     cy.get('[data-testid="overview-present-toggle"]').click();
     cy.location('search').should('eq', '?tier=100&present=1');
@@ -1826,7 +1835,8 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.get('[data-testid="overview-tier-slider"]')
         .should('have.attr', 'data-tier', '100')
-        .and('have.attr', 'aria-valuetext', '100 tok/s/用户');
+        // tok/s/user is a protected unit that stays untranslated on the zh route.
+        .and('have.attr', 'aria-valuetext', '100 tok/s/user');
       cy.get('[data-tier-option]').should('have.length', 6);
     });
   });
