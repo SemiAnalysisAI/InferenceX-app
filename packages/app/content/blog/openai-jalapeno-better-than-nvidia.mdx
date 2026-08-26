@@ -1,0 +1,383 @@
+---
+title: 'OpenAI Jalapeño: Better Than Nvidia Blackwell'
+subtitle: 'OpenAI’s self-designed ASIC compared with Rubin, Jalapeño’s TCO, throughput per MW, and spicy deets'
+seoDescription: 'OpenAI’s first-generation inference ASIC, built with Broadcom and benchmarked on InferenceX. Perf per MW against Blackwell and Vera Rubin, the HBM4 and MXFP4 specs, the Gluon software stack, why OpenAI skipped prefill-decode disaggregation, and the Katsu, Vindaloo, and Chana rack architecture.'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - inference
+  - benchmark
+  - gpu
+  - nvidia
+  - openai
+  - asic
+  - rubin
+---
+
+OpenAI has spent the past couple years quietly building “Jalapeño,” an inference chip just announced at Hot Chips. Rumors of a successful tapeout had been swirling for a while. But now we have details. OpenAI invited us to look at their chip, go to their labs to check out how real it is, and [benchmark](https://openai.com/index/jalapeno-first-results/) it with our [InferenceX](https://inferencex.semianalysis.com/) suite.
+
+In June, [OpenAI unveiled the chip program](https://openai.com/index/openai-broadcom-jalapeno-inference-chip/) in partnership with Broadcom, built from a blank slate exclusively for LLM inference. [Design work began in the middle of 2024](https://newsletter.semianalysis.com/p/openai-chip-team-is-now-serious), going from initial team hiring to manufacturing tape-out in ~16 months, an extremely fast ASIC development cycle.
+
+In general first generation chips are not competitive, but OpenAI bucks the trend by being industry leading and beating every Nvidia, AMD, and Google chip we have been able to test on multiple top open source models. OpenAI does this with extreme hardware software codesign. Surprisingly, OpenAI is not over specialization on any specific part of model inference, but instead by focusing on being a general chip that delivers high performance in all scenarios.
+
+In this article, we will go into architectural details, software details and performance results for Jalapeño on InferenceX.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/c028f756-4748-4583-91b2-5c4a63893cb5_2048x1153.png"
+  caption="Source: [OpenAI](https://openai.com/index/openai-broadcom-jalapeno-inference-chip/)"
+/>
+
+## A generalized inference chip
+
+Everyone says that OpenAI’s chip is specialized for OpenAI models, but that’s wrong, OpenAI made a generalized chip for AI inference.
+
+The timelines are insane. It shows that claims that use of AI is being used to accelerate chip design are real. Regardless of the quick timelines,Open AI spent a bunch of money, made pragmatic design decisions and their team is cracked, so this comes as no surprise.
+
+Just looking at the specs, it is an immediate contender:
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/e346a4e5-76cb-4fd9-be95-00321116b605_1846x510.png"
+  caption="Source: SemiAnalysis"
+/>
+
+And the use of HBM4 makes it stand out as comparable to flagship GPUs from NVIDIA and AMD:
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/327f95f7-ab6b-44ae-9b8f-17c1ff5d296b_1712x1300.png"
+  caption="Source: OpenAI"
+/>
+
+A lot of the media coverage of this chip has followed a few throwaway comments from OpenAI that claim the chip will be optimized for their models in a way that other chips are not. This is wrong. Jalapeño is a generalized inference chip capable of running all sorts of models, and all sorts of workloads, including our benchmark InferenceX, where we ran the benchmark with OpenAI engineers in the lab. As a joke, OpenAI even showed us it running Doom, which was ported to their chip with just Codex prompts.
+
+The following is our headline perf/W result, looking at token throughput per All-in utility MW. **Jalapeño smokes every other chip**. All this is done without Multi Token Prediction (MTP), while the other chips on the chart are the best performing configs of each respective SKU, all with MTP.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/19a7f45a-df8e-436e-ba04-df5d8610f3da_2048x1330.png"
+  caption="Source: SemiAnalysis"
+/>
+
+Jalapeño beats Blackwell on perf/W across almost all scenarios without being tuned for any specific point in the curve. It excels not only in low-latency scenarios but also in high-throughput scenarios. A more apples to apples comparison is against Single Token Prediction results, it knocks every competitor out of the water. At low concurrency scenarios, Jalapeño demonstrates remarkable interactivity, hitting over 700 tokens per sec per user at concurrency 1 on the DeepSeek R1 model.
+
+Incredibly, this is all achieved with single-token prediction (STP), no speculative decoding and no prefill-decode disaggregation. In addition to DeepSeek R1, we also got to see some other models, including Kimi-K2.5 and GPT-OSS which ran at approximately 1,400 tok/sec/user. For all models, we confirmed that Jalapeño’s GSM8k evals attained results on par with Nvidia chips.
+
+Some caveats on this. First, all numbers are provided to us by OpenAI. We verified the InferenceX runs in person in the lab, but we did not run the full suite of [InferenceX](https://inferencex.semianalysis.com/) benchmarks nor have we seen [AgentX](https://newsletter.semianalysis.com/p/agentx-inferencexv3-does-cuda-moat) results. AgentX is our preferred suite for comparing chip performance due to the datasets’ long context and multi-turn characteristics that reflect the cache behavior of realistic production workflows. Frameworks that perform well on 8k1k may perform worse on AgentX as real production loads stress components like routers, prefix cache mechanisms, cache management, offload infrastructure, etc. These are not tested by single turn 8k1k. Read more about this in out AgentX article.
+
+[AgentX - InferenceXv3: Does CUDA Moat Hold up in Agentic Inferencing?](https://newsletter.semianalysis.com/p/agentx-inferencexv3-does-cuda-moat) — Since the Claude Code inflection point in November 2025, long-context, multi-turn agentic workloads have grown rapidly. They now dominate traffic for production inferencing. In April 2026, OpenAI’s Enterprise agentic spending overtook ChatGPT spending.
+
+Second, we believe that comparison to Blackwell is somewhat incomplete and unfair. Jalapeño is really competing against chips like Rubin that also use HBM4. Vera Rubin systems are starting to ship to customers right now, while it will still be some time before OpenAI has anything beyond engineering samples of Jalapeño.
+
+Thus, performance should really be compared against Rubin, not Blackwell, and in some sense we expect a custom chip like Jalapeño to outperform Blackwell. Vera Rubin NVL72 delivers 5.4x the perf/MW of GB200 NVL72 [as we described in our article analyzing the NVIDIA performance claims in their launch with CoreWeave last month](https://newsletter.semianalysis.com/p/vera-rubin-nvl72-vs-gb200-nvl72-inference). We will compare Jalapeño to Vera Rubin’s July performance figures later below.
+
+[Vera Rubin NVL72 vs GB200 NVL72? Inference TCO & Architecture Analysis](https://newsletter.semianalysis.com/p/vera-rubin-nvl72-vs-gb200-nvl72-inference) — Vera Rubin NVL72 is the second generation of Nvidia’s rack-scale Oberon architecture, and its gains on inference come from extreme co-design. Early results from engineering samples are encouraging. Vera Rubin NVL72 running DeepSeek R1 delivers 5.4x performance per MW and 5x performance per dollar over GB200 NVL72 today, and the gap is even wider against GB200 NVL72 during its early bringup in 2025. Vera Rubin is still in the early bringup stage now, so we expect the gap to continue widen. Rubin's inference performance will keep improving as software matures, the same pattern we demonstrated for Blackwell in our
+
+Third, the models being tested are not on the open frontier. NVIDIA and AMD have published results on larger models such as DeepSeek V4 Pro and Kimi K3, using AgentX. The larger the model and the more recent the release, the more complicated it is to bring up on a new chip. With that said the models OpenAI has working on Jalapeno aren’t exactly small either.
+
+## Performance Analysis
+
+OpenAI designs for perf/W. The reason is simple: OpenAI is currently limited by datacenter power, not by budget or floorspace, and thus tokens per MW is paramount. At Computex 2026, Jensen said that perf/W, reliability and long lifetime are the core features of future GPUs. To quote: “If you have 1 gigawatt of power, then throughput per watt is revenue”. He also mentioned that choosing the wrong architecture just because the chips are cheaper doesn’t make sense.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/69dc13f6-ffb1-4d56-8df7-b75b57280382_1980x1254.png"
+  caption="Source: Computex 2026 keynote"
+/>
+
+This was emphasized by Nvidia during the Vera talk at Hot Chips 2026 while showing the same revenue graph: “The data center is power limited today.” Power matters and drives revenue.
+
+Operators cannot simply obtain more MW because adding GPUs and adding grid capacity happen on very different timescales. Datacenter power envelopes have constraints such as their utility interconnection, infrastructure, cooling capacity, and UPS/backup-generation design. Grid delays repeatedly outpace hardware and construction timelines, driving the need for BtM (behind-the-meter) power capacity: gas turbines and on-site generators built and located at the data center itself. This capacity sits behind the utility’s meter rather than being drawn from the public grid. It lets an operator power a facility without waiting on grid interconnection and utility upgrades, which is exactly why xAI’s Colossus 2 relies so heavily on BtM while its actual grid connection lags far behind. Find out more in our [Energy model](https://semianalysis.com/energy-model/).
+
+As we wrote in an X post, tok/s/MW reduces to tokens per joule since a watt is a joule per second. This makes tok/s/MW representative of a system’s efficiency and ability to convert energy into tokens.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/c1a1da73-425c-4800-b396-01c7d2151be9_1200x1432.png"
+  caption="Source: [SemiAnalysis](https://x.com/SemiAnalysis_/status/2091208991271420076)"
+/>
+
+On this front, even when compared with Rubin, Jalapeño wins. OpenAI’s Jalapeño has STP output token throughput per MW surpassing [Vera Rubin’s MTP results that NVIDIA and CoreWeave published in July. It also far exceeds GB200’s 2025 MTP results.](https://www.coreweave.com/blog/nvidia-vera-rubin-nvl72-on-coreweave-10x-more-tokens-per-megawatt-than-blackwell) As mentioned in our Vera Rubin article, VR was compared to 2025 GB200 results because that was a similar stage of early bring-up, and comparing to GB200 in 2025 holds software maturity constant. Following this logic, we compare Vera Rubin’s latest July 2026 results, GB200 2025 results, and today’s Jalapeño results. This is a very valid comparison as these are the best public Rubin numbers, and OpenAI taped out their chip after Rubin. Both OpenAI and Rubin are still immature thus performance will continue to rise.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/6e8f9fd2-ec7f-45fa-80b9-dc132e32c661_2048x1450.png"
+  caption="Source: OpenAI, SemiAnalysis"
+/>
+
+On perf/TCO, Vera Rubin and Jalapeño are head-to-head, producing almost the same number of output tokens per $. However, as previously mentioned, **Jalapeño’s results are obtained without speculative decoding** and Vera Rubin’s results use speculative decoding. Speculative decoding leads to a ~3-5x reduction in cost per token. When speculative decoding is implemented on Jalapeño, this will enable Jalapeño to serve tokens even more cost effectively. Of course, part of this TCO advantage comes from trading Nvidia’s high margins for Broadcom’s lower (though still high) margins. But this is not all of it. For example, Meta and Microsoft’s AI ASIC programs not getting off the ground despite being at it for much longer shows that cost is only one part of the equation. For Jalapeño’s full TCO breakdown, see the [SemiAnalysis AI Cloud TCO model](https://semianalysis.com/ai-cloud-tco-model/).
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/a6c58331-c05a-4823-9c4b-aae90705bb53_2048x1485.png"
+  caption="Source: OpenAI, SemiAnalysis"
+/>
+
+Architecturally, OpenAI chose not to disaggregate prefill and decode (PD) across separate chip pools. The draft model and main model share the same chips and fabric, a design philosophy that trades some theoretical efficiency for practical operations. The motivation is that the workload mix changes over time, for example the ratio of input to cache write to cache read to output tokens has changed significantly as we have moved through the three eras of models ([knowledge, reasoning, and agentic, as discussed in our recent article](https://newsletter.semianalysis.com/p/are-open-models-catching-up)). Therefore, picking a fixed amount of heterogenous prefill silicon and decode silicon up front can lead to inefficiencies over time. OpenAI chooses a homogenous pool in this architecture and tries to make the chip perform well on everything.
+
+And it does. On Kimi K2.5 (which Cursor Composer 2.5 is based on), Jalapeño reaches nearly 700tok/s/user and more than 9x the next best performing chip at 100tok/s/user.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/3088f64c-9bee-46d9-a445-6818248ba573_2048x1366.png"
+  caption="Source: OpenAI, SemiAnalysis"
+/>
+
+On GPT-OSS, it’s another bloodbath. Jalapeño’s iso-interactivity throughput per MW is nearly double GB200’s highest throughput point and more than 50x GB200’s concurrency 1 point. The higher concurrency Jalapeño points use EP8.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9f245dd7-c6b7-48a3-9215-3976633bb77f_2048x1366.png"
+  caption="Source: OpenAI, SemiAnalysis"
+/>
+
+These results are impressive! However, we have to nitpick: they’re just 8k1k, a much easier workload to tune for, and there are no [AgentX](https://newsletter.semianalysis.com/p/agentx-inferencexv3-does-cuda-moat) runs yet. As mentioned in our [AgentX](https://newsletter.semianalysis.com/p/agentx-inferencexv3-does-cuda-moat) article, multiturn, long context workloads stress much more aspects of the serving stack, such as routers and prefix cache. Many more optimizations are needed to excel in agentic workloads. Read more about this in the [AgentX](https://newsletter.semianalysis.com/p/agentx-inferencexv3-does-cuda-moat) article.
+
+[AgentX - InferenceXv3: Does CUDA Moat Hold up in Agentic Inferencing?](https://newsletter.semianalysis.com/p/agentx-inferencexv3-does-cuda-moat) — Since the Claude Code inflection point in November 2025, long-context, multi-turn agentic workloads have grown rapidly. They now dominate traffic for production inferencing. In April 2026, OpenAI’s Enterprise agentic spending overtook ChatGPT spending.
+
+## Digging into the specs and architecture
+
+All these results were gathered on the A0 stepping of Jalapeño, just 9 months into the program. But there is already a B0 stepping that is currently in the fab! B0 has optimizations that deliver roughly a 25% perf-per-watt improvement over the earlier A0 silicon. Specifically, the B0 stepping delivers 13.4 PFLOPs of MXFP4 on a single reticle-sized compute die that is manufactured on TSMC’s N3P. This compares to 17.5 PFLOPs of dense Rubin NVFP4 for a single Rubin compute die that is similar size and on the same node.
+
+This is more respectable considering Jalapeño’s TDP is only 700W compared to Rubin’s at 900-1,150W per compute die. As Jalapeño is geared towards inference rather than training, it is understandable that OpenAI doesn’t need to push TDPs higher to maximize FLOPs, but regardless the above shows that Jalapeño delivers respectable peak theoretical FLOPs.
+
+When compared directly to other accelerators, Jalapeño has the highest HBM bandwidth per watt, and the highest FLOPs per watt, comparable to the 1,800W Rubin Max-Q configuration:
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/c5795c45-d23b-403c-8bc4-f13d5ba6fb45_2048x394.png"
+  caption="Source: SemiAnalysis"
+/>
+
+Off-package I/O is provided by an N3E I/O chiplet with 32 lanes of 800G SerDes, for the compute fabric, with 24 lanes (600GB/s) being used for local scale-up within the rack, and 8 lanes (200GB/s) for global scale-up which is the 2,048 XPU multi-rack domain. PCIe Gen 5 is used for system I/O to connect to the x86 host CPU.
+
+Jalapeño will ship with HBM4, making this chip one of the relatively early adopters after Nvidia and AMD, even beating the established TPU and Trainium programs. As one of the key architectural principles behind Jalapeño is getting the most out of HBM bandwidth, settling for anything but the best HBM would run counter to that goal. This results in 15.4TB/s of memory bandwidth per package which bests all the other accelerators shipping that are using HBM3E. The 15.4TB/s bandwidth shows its HBM4 can hit 10Gbps pin speeds, which would give it a slight edge over the 9.6Gbps Nvidia is getting out of its HBM4 in Rubin. The HBM is likely provided by Samsung.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/0d7d181a-2bb9-45d4-bd67-2f7e525ce6d1_1426x376.png"
+  caption="Source: OpenAI"
+/>
+
+OpenAI taped out Jalapeño in November 2025, or more specifically, this was a tape out of the CoWoS design, not just the top die silicon. Within 9 months of that Nov 2025 tapeout, and with only 3 months of bring-up on actual silicon, OpenAI has already delivered very good results with Jalapeño. This is all the more impressive as the team is starting from zero on the software stack.
+
+Meanwhile, Rubin’s CoWoS tape out was completed in October 2025, a month earlier, and yet the only early results we have seen are from CoreWeave’s engineering samples. Nvidia has not let us test and release benchmarks in the same way that OpenAI has, indicating their chip software is still immature. The CUDA moat is potentially dead given how fast OpenAI can bring up new models on their silicon.
+
+They are still far from optimized and we can see that generally Jalapeño has delivered better numbers. We don’t think that Nvidia hardware is inferior, but more so that Jalapeño’s software bring-up has progressed more quickly than Nvidia’s. This speaks to the power of hardware/software co-design, which is the main area where a cracked frontier lab ASIC team can excel over more established merchant silicon players. Counterintuitively, starting from scratch may also have benefited OpenAI as it could make clean-sheet architectural decisions without worrying about backwards compatibility or older software versions.
+
+While OpenAI has engineering samples of Jalapeño, production is currently scheduled to gradually ramp over 2027 with most of the output currently scheduled for the end of next year. [For more details of unit volumes and ASPs, see the SemiAnalysis Accelerator Model](https://semianalysis.com/accelerator-hbm-model/).
+
+Suffice to say, OpenAI Jalapeno is a real high volume ASIC.
+
+When compared against Rubin’s timeline, Jalapeño’s is shockingly quick. As shown earlier, Jalapeño’s results beat Rubin’s despite Rubin’s head start.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/bb59cacc-1f16-4c6a-98a5-0f0db74dada7_2048x411.png"
+  caption="Source: SemiAnalysis"
+/>
+
+## Jalapeno Architecture
+
+Digging into the architecture now, the chip’s matrix engine uses MXFP numerical formats and a weight stationary systolic array, similar to TPU. But when compared directly to TPU, it has support for smaller shapes / dimensions, meaning that it doesn’t have weird performance cliffs that get exposed by awkwardly shaped matmuls on bigger systolics.
+
+It also has 64-bit scalar cores and FP32/INT32 vector cores. OpenAI has also invested in redundancy at the tray level and has yield harvesting built in at the core and channel level. They claim that AI assistance in chip design delivered an 8% reduction in SIMD area and a 10% reduction in matrix-engine area during design. While they did not clarify the exact process/voltage/temperature (PVT) conditions, they also mentioned the AI-assisted blocks improved timing and power over the initial blocks.
+
+The Jalapeño architecture design focuses on eliminating memory movement of KVCache and weights as well as fixed latencies and overheads in order to make it possible to get closer to the raw peak flops/bandwidth even for small batches or shapes as compared to other accelerators.
+
+The cores and the HBM are divided into slices, where each core slice has a low-latency local view on its own slice of HBM. Synchronization between slices occurs on a high-bandwidth dedicated collective network. This minimal memory hierarchy already gives Jalapeño a big potential advantage over GPUs, where memory accesses must traverse a complicated memory system, resulting in large latencies that must be amortized or hidden over larger shapes.
+
+This choice is feasible because with careful placement of weights and KVs, synchronization between cores can be restricted to limited, known high-bandwidth comms such as tensor-parallel communication that can be overlapped with compute.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/871631ee-8f0d-4fb6-869c-a6fb298e800e_2048x832.png"
+  caption="Source: OpenAI"
+/>
+
+There is also an additional general NoC which is used for general comms and to access the scale-up network. In general OpenAI saves huge power and gets big performance gains with a simplified NOC and memory subsystem vs Nvidia and Google.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/1f93df86-2ea2-4904-8fd1-e0e5eff4b410_1638x854.png"
+  caption="Source: OpenAI"
+/>
+
+At the core level, OpenAI describes an out-of-order (OoO) core with an L1 cache. This is a large divergence from the pattern we have seen in other accelerators, all of which instead use software-managed scratchpad commonly paired with some async DMA support. Again, the argument being made here is that this allows Jalapeño to avoid fixed overheads such as barrier latencies, which on other accelerators (such as GPUs) need to be hidden or amortized over with higher work per core, and make it harder to get close to the raw peak bandwidth/flops.
+
+The tradeoff is that Jalapeño therefore relies on good prefetching to ensure timely arrivals of memory requests, which is less predictable and more difficult to reason about. However, with Codex in a good harness with access to detailed tracing, it is likely that finding the optimal kernel with the best prefetching for a given shape requires little human intervention. We think that is exactly what OpenAI has done to bring up DeepSeek R1, Kimi K2.5, and GPT-OSS so quickly.
+
+The cores also have support for “small” matrix dimensions, which (depending on how small) should make it more general across different model and batch dimensions less sensitive to matrix dimension alignment, padding overhead, and tiling inefficiency. For instance, TPUs, Trainium, and Etched chips have very large systolic arrays which can require large batches or exactly-divisible model dimensions to avoid tiling inefficiencies.
+
+With Jalapeño, OpenAI has focused on eliminating fixed latencies in the system to allow for as-close-to-roofline performance as possible across all areas of the pareto curve. In theory, this could give them advantages over the GPU at multiple operating points:
+
+- Much better upper-bound performance on low-latency/small-batch inference, which on GPUs is limited by many fixed overheads such as launch latencies, barrier latencies, memory system latency
+- Some potential to achieve closer to the hardware roofline even for large-batch or long-context
+
+This comes with the caveat that even if the upper-bound performance is available in theory, it may be more difficult to realize that performance for real kernels. So it seems the approach is:
+
+1. Design for the highest upper-bound performance across all workload shapes
+2. Let Codex do the tedious work of finding the kernels that achieve that upper bound
+
+Judging by the extremely fast turnaround for the OpenAI team to bring up InferenceX workloads on Jalapeño, we are optimistic about this approach.
+
+If Jalapeño is a success, it will be a strong signal that the industry’s obsession over programming models and perfect, universal compilers are invalidated by frontier AI models.
+
+## Software
+
+OpenAI writes Jalapeño kernels like assembly. Each kernel gets hand-tuned code, some running to ~3,000 lines, backed by correctness checks and a custom sanitizer. Early kernel work was human-in-the-loop rather than fully automated, but this shifted with a more scaled-up, internal version of Codex, one which OpenAI plans to pitch to enterprise customers. The internal serving engine is called “Teacup”. Interestingly, **OpenAI had no internal implementation of MLA kernels until they benchmarked DeepSeek with InferenceX**. The ability for Codex to write functional and efficient kernels so quickly (without any of OpenAI’s kernel engineering team intervening) shows the software pipeline’s developmental ability.
+
+OpenAI programs Jalapeño with Gluon. Gluon is OpenAI’s kernel programming language. Built on top of Triton, Gluon preserves Triton’s SPMD (Single Program Multiple Data) programming model, but it exposes **low-level programming abstractions**. For example, for NVIDIA GPUs, it offers APIs that map to PTX instructions, including MMA instructions, TMA instructions, mbarrier mechanisms, and many more. The most unique abstraction Gluon provides is **the layout**. Generally speaking, a layout defines a mapping between a hardware resource (e.g. 5th register of warp 9) and a tensor element (e.g. tensor element on row 6 column 7). Gluon’s layout abstraction is based on [Linear Layouts](https://arxiv.org/abs/2505.23819), a type of layout algebra OpenAI invented. Linear Layouts mathematically formalizes what a layout is and provides tools to operate on layouts. This enables many features, such as provably correct layout conversions and optimal memory swizzling.
+
+In terms of Jalapeño’s programming model, each Gluon program maps to a persistent thread. We believe this hints that Jalapeño suits the **persistent kernel programming pattern**, where each program executes on multiple tiles, and the programmer, rather than the hardware scheduler, assigns the work. OpenAI mentioned TensorInfo, an abstraction that explicitly encodes layouts. This is likely the set of layouts designed for Jalapeño, which will be powered by Linear Layouts. Finally, each core offers data prefetching and decoupled out-of-order units. For example, a user might program a wait on a prefetched data, which is locked behind a semaphore.
+
+In a weird twist of fate, OpenAI models like GPT 5.6 Sol, which currently run on NVIDIA GPUs, have been used to design a chip that poses a real threat to the CUDA moat - NVIDIA’s own GPUs are helping usher in their potential successor in real time.
+
+Comparing across time, we can also see Jalapeño’s developmental pace, achieving more than 2x throughput improvements at certain interactivities in less than 2 weeks. Each tarball we get from the Jalapeño team has a world of wonders inside.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/b38d958b-6d53-4ebe-b92f-c2cb58de05c2_2048x1485.png"
+  caption="Source: OpenAI, SemiAnalysis"
+/>
+
+Not only did kernel performance improve, in the span of 8 days, the Jalapeño team enabled TP32, building on the previous TP8 configs and expanding beyond a single system to get a full rack-scale config running on a large model. This is a really impressive pace of development.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/a18d5611-f7c1-4e34-8919-99b1c683054f_2048x1485.png"
+  caption="Source: OpenAI, SemiAnalysis"
+/>
+
+To validate performance before committing to real hardware runs, OpenAI also has a simulator “chilisim” accurate to within 5% of measured hardware, using a fixed-width trace bus. Tracing on A0 was limited but has improved substantially on B0, likely with inputs from actual runs on A0 silicon. Engineers have demoed the Codex CLI running an internal model, nicknamed “Raiku” or “5.3 Codex Spark”, at 1.2ms TPOT.
+
+The team also showed off Codex-written demos running directly on the chip: Doom at 36 FPS, an FP32 fluid-dynamics simulation, and a “Liquid Light” mouse-drag visualization.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/d410878f-5f19-40bd-ad2c-d92ad45d65a9_1252x1232.png"
+  caption="Source: SemiAnalysis"
+/>
+
+On the model side, OpenAI’s internal megakernel approach, nicknamed “gigakernel”, is built around a single megakernel that loops on-device to reduce CPU overhead and launch time. The team is also leaning further into test-time compute strategies, with internal interest specifically in how to coherently use 1 million rollouts.
+
+## To Disagg or Not to Disagg, ‘tis the Question
+
+We mentioned earlier that OpenAI is not using prefill decode disaggregation on these chips. This came as a surprise to us, as NVIDIA and AMD GPU performance benefits significantly from PDD, even on homogenous hardware. Let’s dig into why the Jalapeño team went this way.
+
+Prefill-decode disaggregation (PDD) looks attractive when the workload is frozen. Prefill and decode stress hardware differently, so assigning each phase to a separately tuned pool can improve efficiency at one chosen input/output ratio. Production traffic, however, does not stay at that ratio. Input and output sequence lengths, concurrency, cache-hit rates, speculative-acceptance rates, and latency targets all move throughout the day.
+
+Once devices are divided into prefill and decode pools, too much prefill demand leaves decode chips idle while requests queue. But too much decode demand does the opposite. The operator must continuously predict the right split, provision spare capacity on both sides, and rebalance a system whose ideal ratio is always moving.
+
+In a unified system, some resources may be underused during a particular phase, but every device remains available to serve the next request. In a disaggregated system, an entire chip can sit idle simply because it belongs to the wrong pool. Local utilization looks better, but global utilization can be bad.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/92d363ab-c391-4b9a-9f67-516dac22f534_1364x938.png"
+  caption="Source: SemiAnalysis"
+/>
+
+Disaggregation also breaks locality. The prefill worker produces a large KV cache that the decode worker immediately needs, so the system must transfer that state across the network before generation can continue. That adds bandwidth consumption, synchronization, queueing, and another failure domain. The cost also rises with input sequence length because KV cache grows. However, avoiding the movement of KVs is largely a power and latency optimization; being willing to move some KVs around can allow for increased hardware utilization at the expense of some power and per-request latency.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/5789e0ea-2d0d-4924-b338-f0559c7e7ee9_1928x1292.png" />
+
+A fungible fleet shifts capacity between latency-sensitive requests and throughput-oriented batches, while a fixed split strands hardware whenever the traffic mix changes. Moreover, context length changes the balance between attention and FFN work, making any fixed hardware ratio efficient only near its design point.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9f3a37f8-0996-4dea-9631-02ade61d7fae_1358x938.png"
+  caption="Source: SemiAnalysis"
+/>
+
+The same constraint applies to speculative decoding. A draft model has to feed candidate tokens to the verifier with extremely low latency. Separating the two across specialized pools turns a tightly coupled decoding loop into a distributed protocol. The extra communication and coordination can consume the latency saved by drafting. Keeping both models on the same devices and low-latency fabric preserves the locality that makes speculation worthwhile in the first place.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/2eb19374-5a08-4d82-84a3-9875b3fc0f5b_1980x1220.png"
+  caption="Source: SemiAnalysis"
+/>
+
+However, disaggregation can still win where demand is sufficiently large, stable, and predictable, particularly when conventional GPUs need large phase-specific batches to reach good throughput. But it is not free lunch.
+
+## From Japanese to Indian (Mild to Spicy): Katsu, Vindaloo, and Chana - How are the curry dishes put together into a rack system?
+
+The Jalapeño System at the rack unit level consists of a CPU host rack and an ASIC rack. The host rack houses 16 host CPU trays named “Katsu,” each corresponding to one of the 16 ASIC trays, named “Vindaloo,” to the right of the Katsu. Each host houses two Turin-class AMD EPYC CPUs with 1.5TB of DRAM, 2x E1.S, and 2x M.2 SSDs per rack. Each tray is also specced with 400G (2x200G) frontend networking. Each Katsu tray connects to each Vindaloo tray via 8 external PCIe DAC cables that run horizontally across the rack at the front. The system level design is done in partnership with Celestica.
+
+The ASIC rack consists of 16 Vindaloo trays and 8 scale up switch trays (6 for local + 2 for global), named “Chana.” Each Vindaloo tray consists of 8 Jalapeño ASICs, making up a total of 128 Jalapeño ASICs per rack. The ASICs are connected to each of the Chana switch trays via a copper cable backplane, just like that of Nvidia’s Oberon. The scale up topology is split into a local domain of 128 ASICs within the rack and a global domain connecting up to 16 racks or 2,048 ASICs. We will explain the bandwidth and the topology in more detail below.
+
+Power provisioning to a sidecar host rack draws roughly 50kW provisioned (31kW in production), and the ASIC rack draws 130kW, making the total two rack system roughly 160kW. That’s basically a double-wide GB300 rack in terms of power draw.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/596ca531-3bde-44fa-8d1b-34d04b8cc6b8_1304x1382.png"
+  caption="Source: SemiAnalysis, OpenAI"
+/>
+
+OpenAI can connect up to 2,048 Jalapeño XPUs within a single scale-up network. The scale-up network consists of two domains, a local domain connecting all 128 XPUs over backplane within the rack, as well as a global domain connecting 2,048 XPUs over 16 racks using a hybrid of copper and optical interconnect. Each rack consists of 8 Chana switch trays. Six Chana switches in the middle are for the local domain, which come with one 102.4T Tomahawk 6 switch ASIC each. Two Chana switches at the top and bottom of the local switches are for the global domain, which we think could consist of 2x 102.4T Tomahawk 6 switches making up to 204.8T per switch tray.
+
+In the local domain, each of the 128 Jalapeño chips has a per XPU uni-directional bandwidth of 4.8Tb/s and is connected on an all-to-all basis to 6x 102.4Tb/s Tomahawk 6 ASICs. This would amount to 48-differential pair (DP) male and female connector pairs per XPU translating to a total of 6,144DPs worth of passive copper cables per rack used for local scale-up.
+
+For the global domain, 16 racks totaling 2,048 XPUs are connected together via a combination of copper backplane, electrical 204.8T TH6 switch, 1.6T transceivers, and optical circuit switch. Each XPU has a uni-directional bandwidth of 1.6Tb/s for the global link, which is 16-differential pair (DP) male and female connector pairs per XPU for the backplane between the XPU and the global switch. Bandwidth exiting each global switch tray of 2 ASICs each is split between the backplane and front panel optics.
+
+Between local domain and global domain, backplane connector count per rack comes up to 64 DPs per XPU and a total of 8,192 DPs worth of passive copper cables per rack.
+
+The global domain adopts a rail-only architecture consisting of 8-rails across the global domain. We think OpenAI routes optical links in the global domain via Optical Circuit Switches (OCS) installed in every rack. For every XPU, 1.6Tb/s of global bandwidth will travel to the global switch tray over the copper backplane. This then exits the switch through the front panel via 1.6T transceivers, which go to the passive optical switch before exiting the rack. This expands the scale-up world size to 2,048 XPUs combining 16 racks of 128 XPUs each.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/ae9b26b8-471a-43b2-a60c-cd99ce2b9b07_3480x1342.png"
+  caption="Source: SemiAnalysis"
+/>
+
+Because scale-up networking is only about 10% of total system cost, that flexibility buys valuable optionality for future 10–20 trillion parameter models or 2–4 million token context windows. On deployment, OpenAI is partnering with neoclouds and is gathering reliability data with datacenter partners through January while optimizing dock-to-rack rollout time.
+
+## What’s Next
+
+Next, we talk about the future of Jalapeño, whose first production token is coming soon. The next goal is 100MW, and the hurdles will mostly be hardware: How much can they produce, how well can they deploy and operate datacenters, how do they handle monitoring, and resiliency, etc. The software is already proven, and with internal models, every software headstart is easily caught up to. Behind the paywall we will discuss implications for NVIDIA, AMD, Cerebras, and other chip companies who have signed deals with OpenAI in the coming years.
+
+[We also cover production volumes, units, and timelines for the next generation chip in our Accelerator model here](https://semianalysis.com/accelerator-hbm-model/).
+
+## Direct Implications for NVIDIA, AMD and Cerebras
+
+<Blur>
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+</Blur>
+
+---
+
+_This article continues on our Substack. [Subscribe to SemiAnalysis](https://newsletter.semianalysis.com/subscribe) to read the complete article._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is OpenAI Jalapeño?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Jalapeño is OpenAI's first self-designed inference ASIC, built with Broadcom from a blank slate for LLM inference and announced at Hot Chips. Design work began in the middle of 2024 and the CoWoS design taped out in November 2025, roughly a 16 month cycle from team hiring to tape-out. The B0 stepping now in the fab delivers 13.4 PFLOPs of MXFP4 on a single reticle-sized N3P compute die at a 700W TDP, with HBM4 providing 15.4 TB/s of memory bandwidth per package."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does Jalapeño compare to NVIDIA Blackwell and Vera Rubin?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On token throughput per all-in utility megawatt, Jalapeño beats Blackwell across almost all scenarios, and its single-token-prediction results surpass the Vera Rubin MTP figures NVIDIA and CoreWeave published in July 2026. On performance per dollar of TCO, Jalapeño and Vera Rubin are roughly head to head. Blackwell is the weaker comparison because Jalapeño competes against HBM4 parts like Rubin, and Jalapeño achieves these results without speculative decoding while the NVIDIA configurations use it."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why did OpenAI skip prefill-decode disaggregation?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Disaggregation is attractive when the workload mix is frozen, but production traffic is not: input and output lengths, concurrency, cache hit rates, speculative acceptance, and latency targets all move through the day. Once chips are split into prefill and decode pools, an entire chip can sit idle because it belongs to the wrong pool, so local utilization improves while global utilization suffers. A unified pool also preserves the locality that speculative decoding depends on, since a draft model separated from its verifier turns a tight decoding loop into a distributed protocol."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How is a Jalapeño rack put together?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The system is two racks. A host rack holds 16 CPU trays named Katsu, each with two AMD EPYC Turin-class CPUs and 1.5TB of DRAM, connected by external PCIe DAC cables to the ASIC rack. The ASIC rack holds 16 Vindaloo trays of 8 Jalapeño ASICs each, for 128 ASICs per rack, plus 8 Chana scale-up switch trays built on Tomahawk 6. Scale-up runs as a 128-ASIC local domain over a copper backplane and a global domain reaching 2,048 ASICs across 16 racks. The two-rack system draws roughly 160kW."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What software stack runs on Jalapeño?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "OpenAI programs the chip with Gluon, its own kernel language built on Triton, which keeps Triton's SPMD model while exposing low-level abstractions. Its distinguishing feature is the layout abstraction, based on Linear Layouts, a layout algebra OpenAI invented that enables provably correct layout conversions and optimal memory swizzling. The internal serving engine is called Teacup, a simulator called chilisim tracks measured hardware to within 5 percent, and a scaled-up internal version of Codex writes much of the kernel code."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What are the caveats on these Jalapeño results?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "All numbers were provided by OpenAI. SemiAnalysis verified the InferenceX runs in person in the lab but did not run the full benchmark suite, and there are no AgentX results yet. The published runs are 8k1k single-turn, which is easier to tune for than long-context multi-turn traffic: agentic workloads stress routers, prefix caching, cache management, and offload infrastructure that a single-turn 8k1k run never exercises. The models tested are also not the newest frontier open-weight releases."
+      }
+    }
+  ]
+}`}</JsonLd>
