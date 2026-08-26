@@ -85,6 +85,10 @@ describe('chip page registry integrity', () => {
         expect(CHIP_VS_HIGHLIGHT_LABELS_ZH[row.key]).toBeDefined();
         expect(row.aValue.length).toBeGreaterThan(0);
         expect(row.bValue.length).toBeGreaterThan(0);
+        // Only fp4 may omit the ratio (when one side lacks FP4 support).
+        if (row.key !== 'fp4') {
+          expect(row.ratio, `${page.slug} ${row.key} ratio`).toBeDefined();
+        }
       }
     }
   });
@@ -155,6 +159,7 @@ describe('Chinese chip page parity', () => {
 
   it('localizes generated FAQ answers and highlight values', () => {
     expect(localizeVsHighlightValueZh('Not supported')).toBe('不支持');
+    expect(localizeVsHighlightValueZh('72 chips')).toBe('72 芯片');
     expect(localizeVsHighlightValueZh('8 TB/s')).toBe('8 TB/s');
     for (const entry of getAllChipPages()) {
       for (const item of buildZhChipFaq(entry)) {

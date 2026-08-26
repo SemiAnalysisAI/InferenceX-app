@@ -81,6 +81,7 @@ const STRINGS = {
     notSupported: 'Not supported',
     none: 'N/A (NVLink domain only)',
     vsRatioNote: 'Ratios are spec-sheet values; see the live compare pages for measured deltas.',
+    vsRatioNa: 'n/a',
     vsSpecTableCaption: 'Spec-sheet comparison',
     overviewHeading: 'Overview',
     benchmarkHeading: 'How InferenceX benchmarks it',
@@ -133,6 +134,7 @@ const STRINGS = {
     notSupported: '不支持',
     none: '无（仅 NVLink 域内互联）',
     vsRatioNote: '倍数为纸面规格对比；实测差距请见实时对比页面。',
+    vsRatioNa: '不适用',
     vsSpecTableCaption: '纸面规格对比',
     overviewHeading: '概览',
     benchmarkHeading: 'InferenceX 如何测试这款芯片',
@@ -498,7 +500,7 @@ export const ChipVsContent = ({ page, locale }: { page: ChipVsPage; locale: Loca
                           </th>
                           <td className="py-2 pr-4 font-mono">{localizeValue(row.aValue)}</td>
                           <td className="py-2 pr-4 font-mono">{localizeValue(row.bValue)}</td>
-                          <td className="py-2 font-mono">{row.ratio ?? 'n/a'}</td>
+                          <td className="py-2 font-mono">{row.ratio ?? t.vsRatioNa}</td>
                         </tr>
                       ))}
                     </tbody>

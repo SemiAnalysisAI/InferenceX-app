@@ -231,10 +231,14 @@ export const CHIP_VS_HIGHLIGHT_LABELS_ZH: Readonly<Record<ChipVsHighlight['key']
 };
 
 const NOT_SUPPORTED_ZH = '不支持';
+const CHIP_COUNT_PATTERN = /^(?<count>\d+) chips$/u;
 
-/** Localize the generated "Not supported" cell values for zh rendering. */
+/** Localize the generated English cell values ("Not supported", "72 chips") for zh rendering. */
 export function localizeVsHighlightValueZh(value: string): string {
-  return value === 'Not supported' ? NOT_SUPPORTED_ZH : value;
+  if (value === 'Not supported') return NOT_SUPPORTED_ZH;
+  const chipCount = CHIP_COUNT_PATTERN.exec(value)?.groups?.count;
+  if (chipCount) return `${chipCount} 芯片`;
+  return value;
 }
 
 /** Chinese FAQ, generated from the same registries as the English one. */

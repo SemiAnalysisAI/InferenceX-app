@@ -495,6 +495,7 @@ export function buildChipVsHighlights(page: ChipVsPage): readonly ChipVsHighligh
       key: 'scaleUpWorldSize',
       aValue: `${specA.scaleUpWorldSize} chips`,
       bValue: `${specB.scaleUpWorldSize} chips`,
+      ratio: formatRatio(specA.scaleUpWorldSize, specB.scaleUpWorldSize),
     },
   ];
 }
