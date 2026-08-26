@@ -356,6 +356,10 @@ interface ScenarioSelectorProps {
  * Scenario selector — fixed-seq-len rows grouped under "Fixed Sequence Length",
  * agentic-trace rows rendered flat below. Label is "Scenario" (the ISL/OSL
  * framing only applies to the fixed-seq subset).
+ *
+ * Renders nothing when fewer than two scenarios are available: a dropdown with
+ * a single choice is dead UI (e.g. agentic-only models like Kimi K3), so the
+ * control disappears instead of offering a no-op menu.
  */
 export function ScenarioSelector({
   id = 'scenario-select',
@@ -372,6 +376,8 @@ export function ScenarioSelector({
   const agentic = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'agentic');
   const fixedGroups = groupByCategory(fixedSeq, (s) => getSequenceCategory(s as Sequence));
   const isAgenticSelected = sequenceKind(value as Sequence) === 'agentic';
+
+  if (availableSequences.length < 2) return null;
 
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
@@ -503,6 +509,11 @@ interface PrecisionSelectorProps {
   'data-testid'?: string;
 }
 
+/**
+ * Precision multi-select. Renders nothing when fewer than two precisions are
+ * available — a single-precision model (e.g. Kimi K3) has nothing to toggle,
+ * so the control disappears instead of offering a no-op menu.
+ */
 export function PrecisionSelector({
   id = 'precision-select',
   value,
@@ -513,6 +524,9 @@ export function PrecisionSelector({
   'data-testid': testId,
 }: PrecisionSelectorProps) {
   const t = STRINGS[useLocale()];
+
+  if (availablePrecisions.length < 2) return null;
+
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
       <LabelWithTooltip htmlFor={id} label={t.precision} tooltip={t.precisionTooltip} />
