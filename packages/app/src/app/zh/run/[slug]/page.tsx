@@ -4,7 +4,11 @@ import { notFound } from 'next/navigation';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { fmtCostPerMtok, fmtThroughput } from '@/components/live-seo/format';
-import { RunDetailContent, type RunStrings } from '@/components/live-seo/run-page-sections';
+import {
+  latencyQuote,
+  RunDetailContent,
+  type RunStrings,
+} from '@/components/live-seo/run-page-sections';
 import { JsonLd } from '@/components/json-ld';
 import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 import { scenarioLabel } from '@/lib/rankings';
@@ -52,6 +56,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description,
     keywords: runPageKeywordsZh(entry),
     authors: [{ name: AUTHOR_NAME }],
+    // Valid slugs without benchmark data render an empty state; keep those
+    // out of the index (the sitemap already excludes them).
+    ...(data?.hasData ? {} : { robots: { index: false, follow: true } }),
     alternates: zhAlternates(`/run/${entry.slug}`),
     openGraph: {
       title: `${title} | ${SITE_NAME}`,
@@ -151,9 +158,11 @@ export default async function ZhRunPage({ params }: Props) {
     typeof read?.costPerMtok === 'number'
       ? `，按超大规模云价格折合每百万 token ${fmtCostPerMtok(read.costPerMtok)}`
       : '';
+  const latency = latencyQuote(data);
+  const quickAnswerLatency = latency ? `最佳实测延迟：${latency}。` : '';
   const quickAnswer =
     typeof read?.throughputPerGpu === 'number'
-      ? `${model} 在 ${chipLabel} 上、每用户每秒 ${data.primaryTier} token 档位下单 GPU 可持续输出 ${fmtThroughput(read.throughputPerGpu)} token/s${quickAnswerCost}${read.framework ? `，推理引擎为 ${read.framework}` : ''}。`
+      ? `${model} 在 ${chipLabel} 上、每用户每秒 ${data.primaryTier} token 档位下单 GPU 可持续输出 ${fmtThroughput(read.throughputPerGpu)} token/s${quickAnswerCost}${read.framework ? `，推理引擎为 ${read.framework}` : ''}。${quickAnswerLatency}`
       : `${model} 可在 ${chipLabel} 上运行：目前已有 ${data.configCount} 组实测配置，各档位实测结果见下方阶梯表。`;
 
   const t: RunStrings = {

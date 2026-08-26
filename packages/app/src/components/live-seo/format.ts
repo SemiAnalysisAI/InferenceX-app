@@ -24,6 +24,11 @@ export function pctFaster(winner: number, runnerUp: number): number {
   return Math.round((winner / runnerUp - 1) * 100);
 }
 
+/** Percent below the runner-up: a $1 winner against a $2 runner-up is 50. */
+export function pctCheaper(winner: number, runnerUp: number): number {
+  return Math.round((1 - winner / runnerUp) * 100);
+}
+
 /** Milliseconds with sensible precision for TTFT/TPOT quotes. */
 export function fmtMs(value: number): string {
   return value >= 100 ? `${Math.round(value)} ms` : `${value.toFixed(1)} ms`;

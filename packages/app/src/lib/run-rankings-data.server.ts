@@ -4,9 +4,11 @@
  * `/rankings/<slug>` pages.
  *
  * Both families read through `getCachedBenchmarks` — the same cached query the
- * dashboard, /compare, and /overview use — and derive their numbers with
- * `buildOverviewModelSummary`, so a ranked or quoted figure on these pages is
- * always the figure the /overview leaderboard shows for the same cell.
+ * dashboard, /compare, and /overview use — and derive their numbers with the
+ * overview's own config building and read selection (`buildOverviewModelSummary`
+ * for rankings, `overviewHardwareTierReader` for run pages, which also covers
+ * SKUs outside the overview matrix), so a ranked or quoted figure on these
+ * pages is always the figure the overview derivation yields for that cell.
  * Fixtures mode short-circuits inside those shared helpers, so tests and
  * DB-less builds never touch a connection here.
  */
@@ -22,7 +24,8 @@ import {
   buildOverviewModelSummary,
   OVERVIEW_PRIMARY_TIER,
   OVERVIEW_TIERS,
-  overviewScenarioForModel,
+  overviewHardwareTierReader,
+  overviewHeadlineScenarioForModel,
   type OverviewScenario,
   type OverviewTier,
 } from '@/lib/overview-data';
@@ -116,7 +119,7 @@ function costPerMtokAt(costPerGpuHour: number, throughputPerGpu: number): number
 function buildRunPageData(entry: RunPageEntry, rows: BenchmarkRow[]): RunPageData {
   const hwKey = entry.chip.hwKey;
   const hwRows = rows.filter((row) => row.hardware === hwKey);
-  const scenario = overviewScenarioForModel(entry.model.model, rows);
+  const scenario = overviewHeadlineScenarioForModel(entry.model.model, rows);
 
   const frameworks = new Set<string>();
   const precisions = new Set<string>();
@@ -150,16 +153,18 @@ function buildRunPageData(entry: RunPageEntry, rows: BenchmarkRow[]): RunPageDat
     if (row.date && (newest === null || row.date > newest)) newest = row.date;
   }
 
+  // Reads come from the same derivation as the overview matrix but without
+  // its fixed platform list, so H100-class SKUs get real ladders too.
+  const readAt = overviewHardwareTierReader(entry.model.model, rows, scenario);
   const tierLadder: RunTierRead[] = OVERVIEW_TIERS.map((tier) => {
-    const summary = buildOverviewModelSummary(entry.model.model, rows, tier);
-    const platform = summary.platforms.find((p) => p.hardware === hwKey);
+    const { read, costPerMtok } = readAt(hwKey, tier);
     return {
       tier,
-      throughputPerGpu: platform?.read.value ?? null,
-      costPerMtok: platform?.costPerMtok ?? null,
-      precision: platform?.read.config?.precision ?? platform?.precision ?? null,
-      framework: platform?.read.config?.frameworkLabel ?? null,
-      disagg: platform?.read.config?.disagg ?? null,
+      throughputPerGpu: read.value,
+      costPerMtok,
+      precision: read.config?.precision ?? null,
+      framework: read.config?.frameworkLabel ?? null,
+      disagg: read.config?.disagg ?? null,
     };
   });
 
@@ -208,7 +213,7 @@ async function loadRunPageData(slug: string): Promise<RunPageData | null> {
   return buildRunPageData(entry, rows);
 }
 
-const getCachedRunPageData = cachedDerivedData(loadRunPageData, 'run-page-data-v1');
+const getCachedRunPageData = cachedDerivedData(loadRunPageData, 'run-page-data-v2');
 
 export function getRunPageData(slug: string): Promise<RunPageData | null> {
   return getCachedRunPageData(slug);
@@ -232,7 +237,14 @@ async function loadRankingPageData(slug: string): Promise<RankingPageData | null
   );
   if (!entry) return null;
   const rows = await getCachedBenchmarks(entry.dbKeys);
-  const summary = buildOverviewModelSummary(entry.model.model, rows);
+  const scenario = overviewHeadlineScenarioForModel(entry.model.model, rows);
+  const summary = buildOverviewModelSummary(
+    entry.model.model,
+    rows,
+    OVERVIEW_PRIMARY_TIER,
+    'community',
+    scenario,
+  );
   let oldest: string | null = null;
   let newest: string | null = null;
   for (const row of rows) {
@@ -249,7 +261,7 @@ async function loadRankingPageData(slug: string): Promise<RankingPageData | null
   };
 }
 
-const getCachedRankingPageData = cachedDerivedData(loadRankingPageData, 'ranking-page-data-v1');
+const getCachedRankingPageData = cachedDerivedData(loadRankingPageData, 'ranking-page-data-v2');
 
 export function getRankingPageData(slug: string): Promise<RankingPageData | null> {
   return getCachedRankingPageData(slug);

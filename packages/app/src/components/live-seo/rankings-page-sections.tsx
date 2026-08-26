@@ -7,7 +7,7 @@
 
 import Link from 'next/link';
 
-import { fmtCostPerMtok, fmtThroughput, pctFaster } from '@/components/live-seo/format';
+import { fmtCostPerMtok, fmtThroughput, pctCheaper, pctFaster } from '@/components/live-seo/format';
 import type { RankingPageData } from '@/lib/run-rankings-data.server';
 import type { RankingPageEntry, RankingRow } from '@/lib/rankings';
 import { getRunPageEntry } from '@/lib/run-pages';
@@ -44,7 +44,7 @@ function leadSentence(rows: RankingRow[], entry: RankingPageEntry, zh: boolean):
     return zh ? leadZh : lead;
   }
   if (entry.kind === 'cheapest-gpu' && first.costPerMtok && second.costPerMtok) {
-    const pct = pctFaster(second.costPerMtok, first.costPerMtok);
+    const pct = pctCheaper(first.costPerMtok, second.costPerMtok);
     const lead = `${first.hardwareLabel} is the cheapest at ${fmtCostPerMtok(first.costPerMtok)} per million tokens, ${pct}% below ${second.hardwareLabel}.`;
     const leadZh = `${first.hardwareLabel} 成本最低，每百万 token 仅 ${fmtCostPerMtok(first.costPerMtok)}，比第二名 ${second.hardwareLabel} 低 ${pct}%。`;
     return zh ? leadZh : lead;

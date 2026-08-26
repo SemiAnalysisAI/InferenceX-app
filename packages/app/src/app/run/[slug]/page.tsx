@@ -10,7 +10,11 @@ import {
 } from '@semianalysisai/inferencex-constants';
 
 import { fmtCostPerMtok, fmtThroughput } from '@/components/live-seo/format';
-import { RunDetailContent, type RunStrings } from '@/components/live-seo/run-page-sections';
+import {
+  latencyQuote,
+  RunDetailContent,
+  type RunStrings,
+} from '@/components/live-seo/run-page-sections';
 import { JsonLd } from '@/components/json-ld';
 import { enAlternates } from '@/lib/i18n';
 import { scenarioLabel } from '@/lib/rankings';
@@ -58,6 +62,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description,
     keywords: runPageKeywords(entry),
     authors: [{ name: AUTHOR_NAME }],
+    // Valid slugs without benchmark data render an empty state; keep those
+    // out of the index (the sitemap already excludes them).
+    ...(data?.hasData ? {} : { robots: { index: false, follow: true } }),
     alternates: enAlternates(`/run/${entry.slug}`),
     openGraph: { title: `${title} | ${SITE_NAME}`, description, url, type: 'article' },
     twitter: {
@@ -148,9 +155,11 @@ export default async function RunPage({ params }: Props) {
     typeof read?.costPerMtok === 'number'
       ? `, which works out to ${fmtCostPerMtok(read.costPerMtok)} per million tokens at hyperscaler pricing`
       : '';
+  const latency = latencyQuote(data);
+  const quickAnswerLatency = latency ? ` Best measured latency: ${latency}.` : '';
   const quickAnswer =
     typeof read?.throughputPerGpu === 'number'
-      ? `${entry.model.seoName} sustains ${fmtThroughput(read.throughputPerGpu)} tokens/s per GPU on ${entry.chip.label} at ${data.primaryTier} tokens/s per user${quickAnswerCost}${read.framework ? `, served by ${read.framework}` : ''}.`
+      ? `${entry.model.seoName} sustains ${fmtThroughput(read.throughputPerGpu)} tokens/s per GPU on ${entry.chip.label} at ${data.primaryTier} tokens/s per user${quickAnswerCost}${read.framework ? `, served by ${read.framework}` : ''}.${quickAnswerLatency}`
       : `${entry.model.seoName} runs on ${entry.chip.label}: ${data.configCount} benchmarked configs so far. See the interactivity ladder below for measured operating points.`;
 
   const t: RunStrings = {

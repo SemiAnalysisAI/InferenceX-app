@@ -5,6 +5,7 @@ import {
   fmtGpuHour,
   fmtMs,
   fmtThroughput,
+  pctCheaper,
   pctFaster,
 } from '@/components/live-seo/format';
 import { getAllChipPages } from '@/lib/chip-pages';
@@ -122,5 +123,8 @@ describe('live-seo number formatting', () => {
     expect(fmtMs(123.4)).toBe('123 ms');
     expect(fmtMs(45.67)).toBe('45.7 ms');
     expect(pctFaster(250, 200)).toBe(25);
+    // A $1 winner against a $2 runner-up is 50% below, not 100%.
+    expect(pctCheaper(1, 2)).toBe(50);
+    expect(pctCheaper(1.5, 2)).toBe(25);
   });
 });
