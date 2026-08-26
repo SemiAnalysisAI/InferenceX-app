@@ -28,6 +28,20 @@ export function replaceClientSearch(searchParams: URLSearchParams): void {
 }
 
 /**
+ * Replace only the current document's pathname (keeping search and hash)
+ * without involving the App Router — same pristine-prototype trick as
+ * `replaceClientSearch`. Used by per-model dashboard routes so switching
+ * models rewrites `/historical/kimi-k3` in the address bar without an RSC
+ * navigation or component remount. `usePathname` intentionally keeps the
+ * server-rendered value; route resolution is prefix-based, so nav highlight,
+ * providers, and share scopes are unaffected.
+ */
+export function replaceClientPathname(pathname: string): void {
+  const href = `${pathname}${window.location.search}${window.location.hash}`;
+  History.prototype.replaceState.call(window.history, window.history.state, '', href);
+}
+
+/**
  * The first dashboard transition can request the route without committing the
  * URL change. Repeating the same app-router push after the route payload has
  * been requested preserves same-document navigation and avoids a music restart.

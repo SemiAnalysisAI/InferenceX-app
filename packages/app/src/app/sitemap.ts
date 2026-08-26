@@ -17,6 +17,12 @@ import {
 } from '@/lib/compare-variant-slug';
 import { getAllGlossaryEntries } from '@/lib/glossary';
 import { languageAlternates, zhPath } from '@/lib/i18n';
+import {
+  DEFAULT_ROUTE_MODEL,
+  MODEL_ROUTE_TABS,
+  MODEL_ROUTES,
+  modelRoutePath,
+} from '@/lib/model-routes';
 import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
 
 type SitemapEntry = MetadataRoute.Sitemap[number];
@@ -59,6 +65,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: 'daily' as const,
         priority: route.canonicalPath === '/' ? 1 : 0.9,
       }),
+    ),
+    // Per-model tab routes (/calculator/<slug>, /historical/<slug>). The
+    // default model's pages canonicalize to the bare tab paths (already
+    // emitted above), so they stay out of the sitemap.
+    ...MODEL_ROUTE_TABS.flatMap((tab) =>
+      MODEL_ROUTES.filter((route) => route.model !== DEFAULT_ROUTE_MODEL).flatMap((route) =>
+        localizedPair(modelRoutePath(tab, route.slug), {
+          lastModified: now,
+          changeFrequency: 'daily' as const,
+          priority: 0.8,
+        }),
+      ),
     ),
     ...localizedPair('/overview', {
       lastModified: now,

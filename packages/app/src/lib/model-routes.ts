@@ -1,0 +1,170 @@
+import {
+  COMPARE_MODEL_ALIASES,
+  COMPARE_MODEL_SLUGS,
+  type CompareModelSlug,
+} from '@/lib/compare-slug';
+import { Model, MODEL_OPTIONS } from '@/lib/data-mappings';
+
+// ---------------------------------------------------------------------------
+// Per-model dashboard routes: /calculator/<model> and /historical/<model>
+// ---------------------------------------------------------------------------
+//
+// The bare /calculator and /historical tabs render the DEFAULT model; the
+// `[model]` child routes render the same page seeded to a specific model so
+// every model gets its own indexable URL (title, description, canonical, and
+// hreflang all model-specific). Slugs deliberately REUSE the compare-page
+// model registry (`COMPARE_MODEL_SLUGS`) so `kimi-k3` means the same model in
+// `/compare/kimi-k3-b200-vs-mi355x`, `/calculator/kimi-k3`, and
+// `/historical/kimi-k3` — one slug vocabulary across the whole site.
+//
+// Unlike compare (whose slugs are finer-grained than the display dropdown,
+// e.g. distinct kimi-k25/k26 DB buckets), these routes address the dashboard's
+// display-grouped model selector, so exactly one canonical slug exists per
+// visible `Model` option. Aliases (`kimi`, `glm-5`, …) 308-redirect to the
+// canonical slug, mirroring compare behavior.
+
+/** Dashboard tabs that expose per-model child routes. */
+export const MODEL_ROUTE_TABS = ['calculator', 'historical'] as const;
+export type ModelRouteTab = (typeof MODEL_ROUTE_TABS)[number];
+
+const MODEL_ROUTE_TAB_PATHS: Record<ModelRouteTab, `/${string}`> = {
+  calculator: '/calculator',
+  historical: '/historical',
+};
+
+/**
+ * Model the bare tab route renders when no slug (and no `?g_model=`) is
+ * present. Must stay in lockstep with `PARAM_DEFAULTS.g_model` in
+ * `url-state.ts` and the `GlobalFilterProvider` initializer — the pathname
+ * rewrite below treats a bare path as this model, so drift would rewrite the
+ * URL on plain page loads. `model-routes.test.ts` pins the invariant.
+ */
+export const DEFAULT_ROUTE_MODEL: Model = Model.DeepSeek_V4_Pro;
+
+export interface ModelRoute {
+  /** Canonical URL segment, e.g. 'kimi-k3'. Lowercase, hyphen-separated. */
+  slug: string;
+  /** Display-grouped dashboard model this route seeds. */
+  model: Model;
+  /** Natural model name for SEO titles/descriptions, e.g. 'Kimi K3'. */
+  seoName: string;
+  /** Human label for headers, e.g. 'Kimi K3 2.8T'. */
+  label: string;
+}
+
+function compareEntryForModel(model: Model): CompareModelSlug | undefined {
+  return COMPARE_MODEL_SLUGS.find((entry) => entry.displayName === model);
+}
+
+/**
+ * One route per visible dashboard model. Derived (not hand-copied) from the
+ * compare registry so a new model added there automatically gets calculator
+ * and historical routes; the test suite fails if a `MODEL_OPTIONS` entry has
+ * no compare slug to derive from.
+ */
+export const MODEL_ROUTES: ModelRoute[] = MODEL_OPTIONS.flatMap((model) => {
+  const entry = compareEntryForModel(model);
+  if (!entry) return [];
+  return [{ slug: entry.slug, model, seoName: entry.seoName, label: entry.label }];
+});
+
+const ROUTE_BY_SLUG: ReadonlyMap<string, ModelRoute> = new Map(
+  MODEL_ROUTES.map((route) => [route.slug, route]),
+);
+const ROUTE_BY_MODEL: ReadonlyMap<Model, ModelRoute> = new Map(
+  MODEL_ROUTES.map((route) => [route.model, route]),
+);
+
+export interface ResolvedModelRoute {
+  route: ModelRoute;
+  /** True when the input was an alias or non-canonical casing — caller should
+   *  308 to the canonical slug. */
+  isAlias: boolean;
+}
+
+/** Resolve a URL segment (canonical slug, alias, or mixed case) to a model
+ *  route. Returns null for unknown slugs. */
+export function resolveModelRouteSlug(slug: string): ResolvedModelRoute | null {
+  const lower = slug.toLowerCase();
+  const canonical = COMPARE_MODEL_ALIASES[lower] ?? lower;
+  const route = ROUTE_BY_SLUG.get(canonical);
+  if (!route) return null;
+  return { route, isAlias: canonical !== slug };
+}
+
+/** Canonical slug for a model, or null for models without a route (hidden). */
+export function modelRouteSlug(model: Model): string | null {
+  return ROUTE_BY_MODEL.get(model)?.slug ?? null;
+}
+
+/** Canonical English path for a per-model tab page, e.g. '/historical/kimi-k3'. */
+export function modelRoutePath(tab: ModelRouteTab, slug: string): string {
+  return `${MODEL_ROUTE_TAB_PATHS[tab]}/${slug}`;
+}
+
+export interface ParsedModelRoutePathname {
+  tab: ModelRouteTab;
+  /** True for /zh-prefixed pathnames. */
+  zh: boolean;
+  /** URL segment after the tab path, or null on the bare tab route. */
+  slug: string | null;
+}
+
+/**
+ * Parse an English or /zh pathname into its model-routed tab, if any.
+ * `/calculator` → slug null; `/zh/historical/kimi-k3` → slug 'kimi-k3';
+ * anything else (other tabs, deeper children) → null.
+ */
+export function parseModelRoutePathname(pathname: string): ParsedModelRoutePathname | null {
+  const barePath = pathname.split(/[?#]/u, 1)[0] || '/';
+  const zh = barePath === '/zh' || barePath.startsWith('/zh/');
+  const enPath = zh ? barePath.slice('/zh'.length) || '/' : barePath;
+  for (const tab of MODEL_ROUTE_TABS) {
+    const tabPath = MODEL_ROUTE_TAB_PATHS[tab];
+    if (enPath === tabPath) return { tab, zh, slug: null };
+    if (enPath.startsWith(`${tabPath}/`)) {
+      const rest = enPath.slice(tabPath.length + 1);
+      if (!rest || rest.includes('/')) return null;
+      return { tab, zh, slug: rest };
+    }
+  }
+  return null;
+}
+
+/**
+ * Model implied by a model-routed pathname, or null when the pathname is not
+ * a model-routed page or carries no (known) slug. Used to seed
+ * `GlobalFilterProvider` so `/historical/kimi-k3` server-renders and hydrates
+ * on Kimi K3 without waiting for a client effect.
+ */
+export function routeModelForPathname(pathname: string | null | undefined): Model | null {
+  if (!pathname) return null;
+  const parsed = parseModelRoutePathname(pathname);
+  if (!parsed?.slug) return null;
+  return resolveModelRouteSlug(parsed.slug)?.route.model ?? null;
+}
+
+/**
+ * Pathname the address bar should show for `model` while on a model-routed
+ * page, or null when no rewrite is needed. Pure so the model-switch URL
+ * behavior is unit-testable; the caller performs the actual
+ * `history.replaceState`.
+ *
+ * Rules:
+ * - Non-model-routed pages, unknown slugs, and slug-less models → null.
+ * - Bare tab path showing the default model → stays bare (plain page loads
+ *   must not rewrite the URL).
+ * - Any other mismatch (model switched, alias slug, legacy `?g_model=` link
+ *   resolved by the provider) → the canonical slugged path.
+ */
+export function modelRoutePathnameRewrite(pathname: string, model: Model): string | null {
+  const parsed = parseModelRoutePathname(pathname);
+  if (!parsed) return null;
+  if (parsed.slug && !resolveModelRouteSlug(parsed.slug)) return null;
+  const slug = modelRouteSlug(model);
+  if (!slug) return null;
+  if (parsed.slug === slug) return null;
+  if (!parsed.slug && model === DEFAULT_ROUTE_MODEL) return null;
+  const enPath = modelRoutePath(parsed.tab, slug);
+  return parsed.zh ? `/zh${enPath}` : enPath;
+}
