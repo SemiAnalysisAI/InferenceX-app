@@ -192,6 +192,10 @@ export function normalizeChartSvgWidthsForExport(root: HTMLElement): void {
   }
 }
 
+function watermarkFont(size: number): string {
+  return `bold ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+}
+
 /** Add a subtle watermark bar at the bottom of the exported image */
 function addWatermark(dataUrl: string, bgColor: string): Promise<string> {
   return new Promise((resolve) => {
@@ -220,15 +224,13 @@ function addWatermark(dataUrl: string, bgColor: string): Promise<string> {
 
       // Draw watermark text (shrink to fit on narrow exports)
       const WATERMARK_TEXT = 'InferenceX — github.com/SemiAnalysisAI/InferenceX';
-      const fontFor = (size: number) =>
-        `bold ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
       let fontSize = 80;
-      ctx.font = fontFor(fontSize);
+      ctx.font = watermarkFont(fontSize);
       const maxTextWidth = canvas.width - 48;
       const textWidth = ctx.measureText(WATERMARK_TEXT).width;
       if (textWidth > maxTextWidth) {
         fontSize = Math.max(16, Math.floor((fontSize * maxTextWidth) / textWidth));
-        ctx.font = fontFor(fontSize);
+        ctx.font = watermarkFont(fontSize);
       }
       ctx.fillStyle = isDark ? '#aaa' : '#555';
       ctx.textAlign = 'center';
