@@ -12,7 +12,7 @@ import { compileBlogMdx } from '@/lib/blog-mdx';
 import { comparisonScenarioForModel } from '@/lib/compare-agentx';
 import { COMPARE_MODEL_ALIASES } from '@/lib/compare-slug';
 import { getModelPage, getModelPageSlugs } from '@/lib/model-pages';
-import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { AUTHOR_HANDLE, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -26,13 +26,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const page = getModelPage(slug);
   if (!page) return {};
+  const title = `${page.meta.title} — Architecture, Evals & Inference Performance`;
   return {
-    title: {
-      absolute: `${page.meta.title} — Architecture, Evals & Inference Performance | ${SITE_NAME}`,
-    },
+    title: { absolute: `${title} | ${SITE_NAME}` },
     description: page.meta.description,
     // English-only page: canonical without hreflang alternates (no /zh sibling).
     alternates: { canonical: `${SITE_URL}/model/${slug}` },
+    // og:image / twitter:image come from the colocated opengraph-image.tsx.
+    openGraph: {
+      title,
+      description: page.meta.description,
+      url: `${SITE_URL}/model/${slug}`,
+      siteName: SITE_NAME,
+      type: 'article',
+      locale: 'en_US',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description: page.meta.description,
+      site: AUTHOR_HANDLE,
+      creator: AUTHOR_HANDLE,
+    },
   };
 }
 
@@ -64,9 +79,20 @@ export default async function ModelPage({ params }: Props) {
     isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: SITE_URL },
   };
 
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: SITE_NAME, item: SITE_URL },
+      { '@type': 'ListItem', position: 2, name: 'Model Architectures', item: `${SITE_URL}/model` },
+      { '@type': 'ListItem', position: 3, name: meta.title, item: `${SITE_URL}/model/${slug}` },
+    ],
+  };
+
   return (
     <main className="relative">
       <JsonLd data={jsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
         <Card>
           <header>
@@ -74,7 +100,10 @@ export default async function ModelPage({ params }: Props) {
               <Link href="/inference" className="hover:text-foreground transition-colors">
                 Inference Dashboard
               </Link>{' '}
-              / Model
+              /{' '}
+              <Link href="/model" className="hover:text-foreground transition-colors">
+                Model
+              </Link>
             </p>
             <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">{meta.title}</h1>
             <p className="mt-3 text-base lg:text-lg text-muted-foreground">{meta.description}</p>

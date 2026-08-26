@@ -32,6 +32,7 @@ const STRINGS = {
     apiReference: 'API Reference',
     gpuReliability: 'Chip Reliability',
     perfPerDollar: 'Performance per Dollar',
+    modelArchitectures: 'Model Architectures',
     glossary: 'AI Inference Glossary',
     languageLink: '中文版',
     languageHref: '/zh',
@@ -61,6 +62,7 @@ const STRINGS = {
     gpuReliability: '芯片可靠性',
     apiReference: 'API 文档',
     perfPerDollar: '每美元性能',
+    modelArchitectures: '模型架构',
     glossary: 'AI 推理术语表',
     languageLink: 'English',
     languageHref: '/',
@@ -244,6 +246,14 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 {t.perfPerDollar}
+              </Link>
+              <Link
+                data-testid="footer-link-model-architectures"
+                // English-only route (not zh-mirrored), so no locale prefix.
+                href="/model"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.modelArchitectures}
               </Link>
               <Link
                 data-testid="footer-link-glossary"

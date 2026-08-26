@@ -152,6 +152,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }),
     // Model deep-dive pages (architecture + vendor evals + embedded dashboard).
     // English-only: no /zh sibling, so no localizedPair.
+    {
+      url: `${BASE_URL}/model`,
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+    },
     ...getModelPageSlugs().map((slug) => ({
       url: `${BASE_URL}/model/${slug}`,
       lastModified: now,

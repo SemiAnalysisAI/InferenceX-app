@@ -445,6 +445,65 @@ describe('Model Architecture Diagram', () => {
     });
   });
 
+  describe('Model index page (/model)', () => {
+    before(() => {
+      cy.viewport(1280, 800);
+      cy.visit('/model', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+    });
+
+    it('lists every model page with architecture badges', () => {
+      cy.get('h1').should('contain.text', 'Model Architectures');
+      cy.get('[data-testid="model-index-list"] a').should('have.length.at.least', 11);
+      cy.get('[data-testid="model-index-link-kimi-k3"]')
+        .should('contain.text', 'Kimi K3')
+        .and('contain.text', 'MoE')
+        .and('contain.text', 'Hybrid')
+        .and('contain.text', '2.8T')
+        .and('have.attr', 'href', '/model/kimi-k3');
+      // Models without a MODEL_ARCHITECTURES entry still get a card (no badges).
+      cy.get('[data-testid="model-index-link-glm-5-2"]').should('contain.text', 'GLM-5.2');
+    });
+
+    it('navigates to a model deep-dive page', () => {
+      cy.get('[data-testid="model-index-link-deepseek-r1"]').click();
+      cy.url().should('include', '/model/deepseek-r1');
+      cy.get('[data-testid="model-architecture-inline"]').should('be.visible');
+    });
+
+    it('is linked from the footer', () => {
+      cy.get('[data-testid="footer-link-model-architectures"]')
+        .should('have.attr', 'href', '/model')
+        .and('contain.text', 'Model Architectures');
+    });
+  });
+
+  describe('Embedded dashboard changelog starts collapsed', () => {
+    before(() => {
+      cy.viewport(1280, 800);
+      // deepseek-r1 has fixture benchmark data, so the changelog renders.
+      cy.visit('/model/deepseek-r1', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+    });
+
+    it('renders the changelog header collapsed inside the embed', () => {
+      cy.contains('button', 'Config Changelog', { timeout: 20000 })
+        .should('be.visible')
+        .and('have.attr', 'aria-expanded', 'false');
+    });
+
+    it('can still be expanded manually', () => {
+      cy.contains('button', 'Config Changelog').click();
+      cy.contains('button', 'Config Changelog').should('have.attr', 'aria-expanded', 'true');
+    });
+  });
+
   describe('Dashboard architecture link (replaces the drawer)', () => {
     before(() => {
       cy.viewport(1280, 800);

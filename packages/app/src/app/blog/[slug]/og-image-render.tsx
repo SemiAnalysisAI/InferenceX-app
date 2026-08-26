@@ -43,7 +43,16 @@ async function loadTiles() {
   return TILE_GRID.map((t) => (t ? { src: cache[t.file], rotate: t.rotate } : null));
 }
 
-export async function renderOgImage(meta: BlogPostMeta) {
+export async function renderOgImage(
+  meta: Pick<BlogPostMeta, 'title' | 'subtitle' | 'date'>,
+  opts?: {
+    /**
+     * Pre-formatted footer label. When set, `meta.date` is ignored — used by
+     * non-blog reusers (e.g. /model pages) whose dates are free-form text.
+     */
+    dateLabel?: string;
+  },
+) {
   const [logoSrc, tiles] = await Promise.all([
     readFile(join(process.cwd(), 'public/brand/logo-color.png')).then(
       (buf) => `data:image/png;base64,${buf.toString('base64')}`,
@@ -174,12 +183,13 @@ export async function renderOgImage(meta: BlogPostMeta) {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 28, color: '#d4d4d8' }}>
-            {new Date(`${meta.date}T00:00:00Z`).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              timeZone: 'UTC',
-            })}
+            {opts?.dateLabel ??
+              new Date(`${meta.date}T00:00:00Z`).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                timeZone: 'UTC',
+              })}
           </span>
           <img src={logoSrc} height={80} alt="SemiAnalysis" />
         </div>

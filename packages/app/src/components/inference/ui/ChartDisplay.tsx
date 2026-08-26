@@ -1145,6 +1145,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                 selectedPrecisions={selectedPrecisions}
                 modelDbKeys={modelDbKeys}
                 selectedSequence={selectedSequence}
+                defaultExpanded={!embedded}
                 loading={changelogsLoading}
                 totalDatesQueried={totalDatesQueried}
                 selectedDates={selectedDates}
