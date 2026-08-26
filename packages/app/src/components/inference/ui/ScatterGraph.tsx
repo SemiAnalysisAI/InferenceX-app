@@ -118,9 +118,7 @@ import {
   scatterPointJoinId,
 } from '@/components/inference/utils/point-identity';
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
-import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
-import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import { pointLabelText } from './point-label';
 import {
@@ -1007,12 +1005,6 @@ const ScatterGraph = React.memo(
 
     // All official points for rendering (unfiltered — visibility via opacity)
     const pointsData = useMemo(() => Object.values(groupedData).flat(), [groupedData]);
-    const hasOffloadHalo = useMemo(
-      () =>
-        pointsData.some((point) => point.offload_mode === 'on') ||
-        processedOverlayData.some((point) => point.offload_mode === 'on'),
-      [pointsData, processedOverlayData],
-    );
     // Bulk presence lookup for agentic points: which ids have a stored
     // trace_replay blob → controls the "View charts" button in the pinned
     // tooltip. We deliberately don't fetch the histograms themselves here;
@@ -3647,14 +3639,7 @@ const ScatterGraph = React.memo(
                 },
               ]}
               precisionIndicators={selectedPrecisions}
-              keyIndicators={
-                hasOffloadHalo || selectedSequence === Sequence.AgenticTraces ? (
-                  <>
-                    {hasOffloadHalo && <OffloadHaloLegendKey />}
-                    {selectedSequence === Sequence.AgenticTraces && <AgenticOptimizationNote />}
-                  </>
-                ) : undefined
-              }
+              hideAtomFootnote
               enableTooltips={true}
             />
           }

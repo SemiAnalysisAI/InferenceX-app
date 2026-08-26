@@ -42,7 +42,7 @@ import { metricLabel, metricTitle } from '@/lib/chart-utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
-import { getDisplayLabel } from '@/lib/utils';
+import { getDisplayLabel, getFrameworkLabel } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useOverlayScopeReconciliation,
@@ -72,6 +72,10 @@ import { useResidentSequenceLengths } from '@/hooks/api/use-resident-sequence-le
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useLocale } from '@/lib/use-locale';
+
+import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-engine-footnote';
+import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
+import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 
 import AxisMetricFooter from './AxisMetricFooter';
 import ChartControls from './ChartControls';
@@ -829,6 +833,45 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               ).xAxisField,
               isDerivedNormalizedInteractivity: Boolean(derivedSpec),
             });
+            // Notices for the axis-metric info footer: the KV-offload halo
+            // key, the agentic optimization note, and the ATOM engine
+            // footnote. Detected from the same data the chart plots —
+            // official points plus any loaded unofficial-run overlay for
+            // this chart type — so they moved out of the legend without
+            // changing when they appear.
+            // GPU/date comparison renders GPUGraph, which plots official
+            // points only — skip the unofficial overlay there so the footer
+            // can't advertise a halo or ATOM series that isn't on the chart.
+            const isGpuComparison =
+              selectedGPUs.length > 0 &&
+              ((selectedDateRange.startDate && selectedDateRange.endDate) ||
+                selectedDates.length > 0);
+            const footerOverlay = isGpuComparison
+              ? undefined
+              : selectUnofficialOverlayForMode(
+                  selectedXAxisMode,
+                  graph.chartDefinition.chartType,
+                  overlayDataByChartType,
+                );
+            const footerPoints = [
+              ...graph.data,
+              ...(footerOverlay?.data ?? []),
+              ...(footerOverlay?.clippedData ?? []).map((entry) => entry.point),
+            ];
+            const hasOffloadHalo = footerPoints.some((point) => point.offload_mode === 'on');
+            const hasAtomSeries = footerPoints.some(
+              (point) =>
+                point.framework !== undefined &&
+                getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
+            );
+            const footerNotices =
+              hasOffloadHalo || isAgenticSequence || hasAtomSeries ? (
+                <>
+                  {hasOffloadHalo && <OffloadHaloLegendKey />}
+                  {isAgenticSequence && <AgenticOptimizationNote />}
+                  {hasAtomSeries && <AtomEngineFootnote />}
+                </>
+              ) : undefined;
             return (
               <section key={graphIndex} className="pt-8 md:pt-0">
                 <figure data-testid="chart-figure" className="relative rounded-lg">
@@ -1059,9 +1102,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         );
                       }
 
-                      return selectedGPUs.length > 0 &&
-                        ((selectedDateRange.startDate && selectedDateRange.endDate) ||
-                          selectedDates.length > 0) ? (
+                      return isGpuComparison ? (
                         <GPUGraph
                           chartId={`chart-${graphIndex}`}
                           modelLabel={graph.model}
@@ -1099,6 +1140,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       metricKey={selectedYAxisMetric.replace(/^y_/u, '') as MetricKey}
                       xAxisKind={footerXAxisKind}
                       xAxisLabel={graph.chartDefinition.x_label}
+                      notices={footerNotices}
                     />
                     {replayAvailable && (
                       <ReplayLauncher
