@@ -1,0 +1,70 @@
+---
+title: 'Kimi K3 on AgentX: MI355X ATOM Beats GB300 NVL72 on Part of the Curve'
+subtitle: 'AMD’s vendor engine wins a real slice of the performance per dollar frontier, while Hopper struggles to serve K3 at all'
+seoDescription: 'On Kimi K3 AgentX runs, MI355X ATOM beats GB300 NVL72 vLLM on performance per dollar between 40 and 60 seconds of end-to-end latency, while Hopper struggles because K3 needs custom SM90 kernels and tuned TP32 and EP32 shapes.'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - kimi
+  - mi355x
+  - gb300
+  - nvl72
+  - h200
+  - amd
+  - nvidia
+---
+
+On the part of the curve between 40 and 60 seconds of end to end latency, MI355X ATOM beats even GB300 NVL72 vLLM on performance per dollar. On a 2.8 trillion parameter model, against a rack-scale NVIDIA system, that is a result AMD earned.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/27a3f80e-7959-4651-90eb-f498989908a3_1934x1284.png"
+  caption="Source: SemiAnalysis InferenceX"
+/>
+
+## The upstream caveat
+
+It is great that AMD is quickly pushing K3 performance forward with [ATOM](/glossary/atom). The encouragement that goes with that is to prioritize upstreaming these improvements into vLLM. ATOM is currently AMD's best-performing engine, but vLLM remains the more relevant comparison for customers using an upstream open-source serving stack, and a curve that only exists under a vendor runtime does not describe what those customers can deploy.
+
+## Hopper cannot really play
+
+Hopper struggles to serve the AgentX workload for Kimi K3. Part of that is simply that Kimi is a massive model, and part of it is that vLLM maintainers and NVIDIA have not been focusing on optimizing Hopper for K3.
+
+The specifics are concrete rather than vague: Hopper, at SM90, requires custom tuned kernels for K3, along with TP32 and EP32 tuned shapes for serving at high [interactivity](/glossary/interactivity). Neither exists yet, so the hardware is not the binding constraint so much as the absence of anyone working on it.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/ce2b58fc-b7b7-46c2-ae05-baa14419d233_2048x1459.png"
+  caption="Source: SemiAnalysis InferenceX"
+/>
+
+This is a useful reminder that a generation gap in a benchmark chart is partly a generation gap in engineering attention. Hopper served DeepSeek R1 well for years because that model received sustained kernel work. K3 has not received the same, and the curve reflects the difference.
+
+---
+
+_These results are one slice of AgentX 1.0. The full analysis, the replay methodology, and the 70+ upstream PRs the benchmark drove are in [AgentX - InferenceXv3: Does the CUDA Moat Hold Up in Agentic Inferencing?](/blog/agentx-inferencexv3-does-cuda-moat). Every point is explorable on the [free dashboard](https://inferencex.semianalysis.com/)._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Does AMD beat NVIDIA anywhere on Kimi K3?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, on part of the curve. Between 40 and 60 seconds of end to end latency, MI355X ATOM beats even GB300 NVL72 vLLM on performance per dollar. The caveat is that ATOM is AMD's vendor engine rather than an upstream open-source stack, so vLLM remains the more relevant comparison for most customers."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does Hopper struggle on Kimi K3?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Kimi K3 is a massive model, and vLLM maintainers and NVIDIA have not focused on optimizing Hopper for it. Serving K3 at high interactivity on SM90 requires custom tuned kernels plus TP32 and EP32 tuned shapes, and that work has not been done."
+      }
+    }
+  ]
+}`}</JsonLd>

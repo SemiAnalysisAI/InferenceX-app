@@ -18,9 +18,6 @@ import { cn } from '@/lib/utils';
 
 import { GitHubStars } from './GithubStars';
 
-/** The Telemetry nav entry, carved out of the Dashboard tab prefix match. */
-const TELEMETRY_PATH = '/inference/agentic';
-
 const DASHBOARD_TABS = DASHBOARD_ROUTES.map((route) => route.path);
 
 interface NavLink {
@@ -58,16 +55,16 @@ const NAV_LINKS: readonly NavLink[] = [
     event: 'header_dashboard_clicked',
   },
   {
-    href: '/inference/agentic',
-    label: 'Telemetry',
-    testId: 'nav-link-telemetry',
-    event: 'header_telemetry_clicked',
-  },
-  {
     href: '/compare',
     label: 'Comparisons',
     testId: 'nav-link-compare',
     event: 'header_compare_clicked',
+  },
+  {
+    href: '/blog',
+    label: 'Articles',
+    testId: 'nav-link-articles',
+    event: 'header_articles_clicked',
   },
   { href: '/about', label: 'About', testId: 'nav-link-about', event: 'header_about_clicked' },
 ] as const;
@@ -81,13 +78,10 @@ function isActive(pathname: string, href: string): boolean {
       : pathname.slice(ZH_PREFIX.length)
     : pathname;
   if (href === '/') return enPathname === '/';
-  // `/inference/agentic` is its own nav entry, so exclude it here — a bare
-  // `startsWith('/inference')` would light up Dashboard and Telemetry at once.
+  // Dashboard owns every tab path, including the telemetry catalog beneath
+  // `/inference`, which now lives in the footer rather than the primary nav.
   if (href === '/inference') {
-    return (
-      !enPathname.startsWith(TELEMETRY_PATH) &&
-      DASHBOARD_TABS.some((tab) => enPathname.startsWith(tab))
-    );
+    return DASHBOARD_TABS.some((tab) => enPathname.startsWith(tab));
   }
   // Exact match or a child path under `<href>/...`. The bare `startsWith` would
   // light up `/compare` when the user is on `/compare-per-dollar/...` since the

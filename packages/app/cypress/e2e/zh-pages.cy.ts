@@ -45,16 +45,14 @@ describe('Chinese (/zh) pages', () => {
         cy.get('[data-testid="compare-agentx-overview-link"]')
           .should('contain.text', '总览')
           .and('have.attr', 'href', '/zh/overview');
-        cy.get('[data-testid="compare-agentx-methodology-link"]')
-          .should('contain.text', '测试方法')
-          .and('have.attr', 'href', '/zh/agentx');
+        cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
       });
     });
 
     it('footer renders in Chinese with zh-internal links', () => {
       cy.get('[data-testid="footer-brand-description"]').should(
         'contain.text',
-        'InferenceX 持续开展开源推理基准测试',
+        'InferenceX 持续开展开源的 agentic 推理基准测试',
       );
       cy.get('[data-testid="footer-link-supporters"]')
         .should('contain.text', '业界评价')

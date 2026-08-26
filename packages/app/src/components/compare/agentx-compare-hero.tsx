@@ -14,7 +14,6 @@ const STRINGS = {
       'Long Context Multi Turn Inference Performance. Compare Across MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, etc.',
     overview: 'Overview',
     dashboard: 'Full dashboard',
-    methodology: 'Methodology Deep Dive',
     ledgerTitle: 'Models with AgentX results',
     modelAction: 'View results',
   },
@@ -25,7 +24,6 @@ const STRINGS = {
       '比较不同硬件平台在长上下文、多轮智能体工作负载下的推理性能，覆盖 MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100 和 RTX Pro 等平台。',
     overview: '总览',
     dashboard: '查看完整仪表板',
-    methodology: '测试方法',
     ledgerTitle: '已发布 AgentX 结果的模型',
     modelAction: '查看结果',
   },
@@ -92,17 +90,6 @@ export function AgentXCompareHero({
               >
                 {t.dashboard}
                 <ArrowRight aria-hidden="true" className="size-4" />
-              </CompareIndexTrackedLink>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-3">
-              <CompareIndexTrackedLink
-                data-testid="compare-agentx-methodology-link"
-                href={`${prefix}/agentx`}
-                analyticsEvent="compare_agentx_methodology_clicked"
-                analyticsSurface={surface}
-                className="inline-flex min-h-11 items-center rounded-md border border-border px-5 py-2.5 font-semibold text-foreground transition-colors hover:bg-muted"
-              >
-                {t.methodology}
               </CompareIndexTrackedLink>
             </div>
           </div>

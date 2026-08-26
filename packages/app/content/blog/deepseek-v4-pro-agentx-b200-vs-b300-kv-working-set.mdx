@@ -1,0 +1,86 @@
+---
+title: 'DeepSeek V4 Pro on AgentX: B200 vs B300 and the KV Cache Working Set'
+subtitle: '50% more HBM squeezes out extra throughput, and the per-point telemetry shows exactly where it comes from'
+seoDescription: 'B200 against B300 on DeepSeek V4 Pro AgentX runs. TCO-normalized throughput is close, but the telemetry shows a 91% HBM cache hit rate on B300 against 73% on B200, and a KV working set of 43M tokens against 22M.'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - deepseek
+  - b200
+  - b300
+  - h200
+  - nvidia
+---
+
+When normalized by [total cost of ownership](/glossary/total-cost-of-ownership), B300 vLLM and B200 vLLM aggregated performance on DeepSeek V4 Pro is quite similar. The main difference is that B300 can squeeze out extra throughput, given its 50% increase in HBM capacity over B200.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/939b9197-321d-4869-ba13-f0b800343b7b_2048x1300.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_vllm%2Cb300_vllm)"
+/>
+
+The interesting part is not the summary number, it is what the AgentX server telemetry shows underneath it.
+
+## 43 million tokens against 22 million
+
+Under the load of 384 concurrent agentic traces, B300 vLLM DEP8 with 3TB of DRAM using vLLM simple offloading achieved a 91% HBM cache hit rate, with an additional 1.36% DRAM cache hit rate. The reason is that the HBM [KV cache](/glossary/kv-cache) working set size is approximately 43 million tokens with this configuration, and the load barely exceeds that number of tokens in flight at any given time.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/f86888c4-c1a7-47b0-a580-d1a74876cb9c_2048x898.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference/agentic/439522)"
+/>
+
+With B200 at concurrency 196, all other parameters unchanged, the picture inverts. The HBM cache hit rate falls to 73% and the deployment leans much harder on DRAM, with an [offload](/glossary/kv-cache-offload) cache hit rate of nearly 20%. The HBM KV cache working set size here is 22 million tokens, roughly half that of B300.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/70a7a7c7-7918-459c-a4e0-f7fc1edca816_2048x887.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference/agentic/439967)"
+/>
+
+## Why the offload tier needs headroom
+
+DRAM KV offloading is typically implemented as a write-through cache, meaning every prefix written to the HBM cache is also written to the DRAM cache. It is therefore most effective when the amount of DRAM available for offloading is significantly bigger than HBM KV cache capacity, by a multiple of roughly 1.5 to 3.
+
+That property is what makes the extra HBM on B300 compound rather than merely add. A larger resident working set keeps more of the session in the fast tier, which leaves the slower tier serving a genuine remainder rather than absorbing a constant stream of evictions.
+
+## The H200 counterexample
+
+H200 SGLang FP8 is able to serve DeepSeek V4 at low concurrency, and is even competitive with B200 and MI355X SGLang from a performance per dollar standpoint. It cannot compete with the newer SKUs in high throughput scenarios, because it lacks the HBM to do so.
+
+The failure mode is instructive: the reliance on DRAM KV offloading at higher concurrencies leads to unreasonable latency as the number of users scales. Offload buys capacity, but it is not free, and a deployment that depends on it to cover a structural memory shortfall pays for that at the tail.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/91dfd9ca-d13d-43e9-a57e-3be0fcc4a5cf_2048x1315.png"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=h200_dynamo-sglang&i_optimal=0)"
+/>
+
+---
+
+_These results are one slice of AgentX 1.0. The full analysis, the replay methodology, and the 70+ upstream PRs the benchmark drove are in [AgentX - InferenceXv3: Does the CUDA Moat Hold Up in Agentic Inferencing?](/blog/agentx-inferencexv3-does-cuda-moat). Every point is explorable on the [free dashboard](https://inferencex.semianalysis.com/)._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How much better is B300 than B200 on DeepSeek V4 Pro?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "When normalized by total cost of ownership, aggregated B300 vLLM and B200 vLLM performance is quite similar. B300 squeezes out extra throughput thanks to a 50% increase in HBM capacity, which shows up in the telemetry as a 43 million token HBM KV cache working set at concurrency 384 with a 91% cache hit rate, against 22 million tokens and 73% on B200 at concurrency 196."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does H200 fall behind at high concurrency?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "H200 SGLang FP8 serves DeepSeek V4 well at low concurrency and is competitive with B200 and MI355X SGLang on performance per dollar there. It lacks the HBM to compete in high throughput scenarios, so it leans on DRAM KV offloading as concurrency rises, and that reliance leads to unreasonable latency as the number of users scales."
+      }
+    }
+  ]
+}`}</JsonLd>

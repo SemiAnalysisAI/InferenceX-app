@@ -1,0 +1,78 @@
+---
+title: 'MiniMax M3 on AgentX: B300 TRT-LLM TP2 Owns the Crown'
+subtitle: 'NVIDIA sweeps the 432B model, and the missing DP-attention points explain why cache locality became a routing constraint'
+seoDescription: 'MiniMax M3 432B AgentX results. B300 TRT-LLM TP2 leads the frontier, DP attention is absent because KV cache locality becomes a routing constraint, and a GB200 TP4/EP4/DPA point reaches 0.60x the throughput of plain TP4 at over 3x the p90 TTFT.'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - minimax
+  - b300
+  - b200
+  - gb200
+  - trtllm
+  - vllm
+  - nvidia
+---
+
+NVIDIA absolutely destroys all competitors on MiniMax M3 432B. AMD software performance is horrible on MiniMax, especially at high context length, which we attribute to AMD engineering leadership incentivizing tuning only for short context single turn workloads and ignoring long context multi turn workloads.
+
+Within the NVIDIA field, B300 TRT-LLM at TP2 owns the M3 crown.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/5179bd8e-c147-46c8-aeb4-b347049b28a7_2048x1303.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft)"
+/>
+
+## The missing DP-attention points
+
+There is a lack of [DP-attention](/glossary/dp-attention) points on the M3 frontier, and the absence is informative. Data-parallel attention is non-optimal on M3 because KV cache locality becomes a routing constraint.
+
+The numbers make the mechanism concrete. For GB200 at concurrency 40, TP4/EP4/DPA gets 0.60x the throughput of plain TP4 at more than 3x the p90 TTFT. At concurrency 32 it hits 28.8% of cache against 96.0% theoretical. Each DP rank owns a private quarter of the pool, so a 300k-token session re-landing on the wrong rank recomputes everything.
+
+That gap between 28.8% measured and 96.0% theoretical is the whole story of [prefix reuse](/glossary/prefix-cache-hit-rate) under data parallelism: the cache was large enough, and the session simply was not sent to the rank that held it.
+
+No decode config with expert parallelism appears on the M3 frontier either, likely because the concurrency is not high enough to balance the loads across all experts.
+
+## vLLM against TRT-LLM
+
+It is worth mentioning that vLLM performance is very comparable to TRT-LLM in terms of throughput versus p90 interactivity. On throughput versus p90 TTFT, vLLM performs better.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/729199d9-66c0-42b5-b1b8-f228503c1585_2048x1289.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_trt%2Cb200_vllm%2Cb300_trt%2Cb300_vllm&i_hc=1&i_label=0)"
+/>
+
+Which of the two you prefer therefore depends on which axis your product is written against, which is the recurring argument for reading interactivity and first-token latency together rather than picking whichever chart flatters a conclusion.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/68f7ad68-3886-4980-9b01-390582728e47_2048x1292.png" />
+
+---
+
+_These results are one slice of AgentX 1.0. The full analysis, the replay methodology, and the 70+ upstream PRs the benchmark drove are in [AgentX - InferenceXv3: Does the CUDA Moat Hold Up in Agentic Inferencing?](/blog/agentx-inferencexv3-does-cuda-moat). Every point is explorable on the [free dashboard](https://inferencex.semianalysis.com/)._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Which configuration is fastest on MiniMax M3?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "B300 TRT-LLM at TP2 owns the M3 crown. NVIDIA leads the model overall, while AMD software performance is poor on MiniMax, especially at high context length."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why is data-parallel attention missing from the M3 frontier?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "DP attention is non-optimal on M3 because KV cache locality becomes a routing constraint. On GB200 at concurrency 40, TP4/EP4/DPA reaches 0.60x the throughput of plain TP4 at more than 3x the p90 TTFT, and at concurrency 32 the measured cache hit rate is 28.8% against a 96.0% theoretical ceiling, because each DP rank owns a private quarter of the pool and a session landing on the wrong rank recomputes everything."
+      }
+    }
+  ]
+}`}</JsonLd>

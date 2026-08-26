@@ -18,6 +18,12 @@ import type { Locale } from '@/lib/i18n';
 // Keep these metric-key groups in sync with chart-utils/chart configs when new source-backed
 // metrics are added; this helper owns which caption notes and caveats appear for each family.
 const POWER_SOURCE_METRICS = new Set(['y_tpPerMw', 'y_inputTputPerMw', 'y_outputTputPerMw']);
+// The disaggregation caveat only applies to the per-token-type per-MW metrics: a
+// disaggregated run reports input/output throughput per prefill or per decode chip,
+// so dividing by per-chip power inherits that skew. Total tok/s/MW divides
+// throughput per chip overall by the same per-chip power an aggregated config
+// uses, so it needs no caveat — the same split the cost caveats below make.
+const PER_TOKEN_TYPE_POWER_METRICS = new Set(['y_inputTputPerMw', 'y_outputTputPerMw']);
 const TOTAL_COST_METRICS = new Set([
   'y_costh',
   'y_costn',
@@ -299,7 +305,7 @@ export function MetricAssumptionNotes({
       />
       {includePowerThroughputCaveat && (
         <DisaggCaveat
-          visible={POWER_SOURCE_METRICS.has(selectedYAxisMetric)}
+          visible={PER_TOKEN_TYPE_POWER_METRICS.has(selectedYAxisMetric)}
           calculationNoun="power"
           locale={locale}
         />

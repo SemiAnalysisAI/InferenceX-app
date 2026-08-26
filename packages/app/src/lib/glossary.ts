@@ -50,6 +50,17 @@ const TILERT = 'ultra-high-interactivity-on-nvidia';
 const AGENT_BENCHMARK = 'agentic-benchmark-agent-benchmark-guide';
 const AGENTIC_WORKLOADS = 'brief-overview-of-agentic-workloads';
 const AGENTX_V3 = 'agentx-inferencexv3-does-cuda-moat';
+const AGENTX_DSV4_MI355X_B200 = 'deepseek-v4-pro-agentx-mi355x-vs-b200-august';
+const AGENTX_DSV4_B200_B300 = 'deepseek-v4-pro-agentx-b200-vs-b300-kv-working-set';
+const AGENTX_DSV4_GB200_GB300 = 'deepseek-v4-pro-agentx-gb200-vs-gb300-disagg';
+const AGENTX_K3_ATOM = 'kimi-k3-agentx-mi355x-atom-vs-gb300-nvl72';
+const AGENTX_M3_TRT = 'minimax-m3-agentx-b300-trtllm-tp2-vs-the-field';
+const AGENTX_M3_RACK = 'minimax-m3-agentx-b200-b300-vs-rack-scale';
+const AGENTX_QWEN_SGLANG = 'qwen3-5-397b-agentx-nvidia-vs-amd-sglang';
+const AGENTX_QWEN_B300 = 'qwen3-5-397b-agentx-b300-fp4-vs-h100';
+const AGENTX_GLM_SGLANG = 'glm-5-3-agentx-nvidia-vs-amd-sglang-150-toks';
+const AGENTX_GLM_ATOM = 'glm-5-3-agentx-mi355x-atom-vs-gb300-nvl72';
+const JALAPENO = 'openai-jalapeno-better-than-nvidia';
 
 const entries = [
   {
@@ -188,7 +199,7 @@ const entries = [
       'trace-replay',
       'concurrency',
     ],
-    articleSlugs: [AGENTIC_WORKLOADS, TILERT, VR_RUBIN, AGENTX_V3],
+    articleSlugs: [AGENTIC_WORKLOADS, TILERT, VR_RUBIN, AGENTX_V3, AGENTX_DSV4_GB200_GB300],
   },
   {
     slug: 'inference-engine',
@@ -383,7 +394,7 @@ const entries = [
     benchmarkContext:
       'InferenceX articles use iso-interactivity tables for hardware, precision, and software comparisons. Values outside a measured frontier are marked unreachable and are not extrapolated beyond observed data. The frontier is always built on throughput against interactivity; cost per million tokens and joules per token are then derived from the interpolated throughput rather than splined on their own, because each is a per-chip constant divided by that throughput and splining it separately would break the identity between knots.',
     relatedTerms: ['interactivity', 'pareto-frontier', 'throughput', 'performance-per-dollar'],
-    articleSlugs: [B200_GLM5, B200_MINIMAX, B200_KIMI, GB300_DSV4],
+    articleSlugs: [B200_GLM5, B200_MINIMAX, B200_KIMI, GB300_DSV4, AGENTX_GLM_SGLANG],
   },
   {
     slug: 'input-output-sequence-length',
@@ -429,7 +440,7 @@ const entries = [
       'iso-interactivity',
       'performance-per-dollar',
     ],
-    articleSlugs: [INFERENCEX_V2, B200_KIMI, B200_GLM5, GB300_DSV4],
+    articleSlugs: [INFERENCEX_V2, B200_KIMI, B200_GLM5, GB300_DSV4, AGENTX_GLM_SGLANG],
   },
   {
     slug: 'performance-per-dollar',
@@ -453,7 +464,7 @@ const entries = [
       'iso-interactivity',
       'throughput',
     ],
-    articleSlugs: [B200_GLM5, B200_MINIMAX, B200_KIMI, MI355X_GLM5],
+    articleSlugs: [B200_GLM5, B200_MINIMAX, B200_KIMI, MI355X_GLM5, AGENTX_DSV4_MI355X_B200],
   },
   {
     slug: 'total-cost-of-ownership',
@@ -476,7 +487,7 @@ const entries = [
       'tokens-per-megawatt',
       'throughput',
     ],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, GB200_R1, VR_RUBIN],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, GB200_R1, VR_RUBIN, JALAPENO],
   },
   {
     slug: 'tokens-per-megawatt',
@@ -501,7 +512,7 @@ const entries = [
       'total-cost-of-ownership',
       'performance-per-dollar',
     ],
-    articleSlugs: [INFERENCEMAX, DEEPSEEK_V4, VR_RUBIN],
+    articleSlugs: [INFERENCEMAX, DEEPSEEK_V4, VR_RUBIN, JALAPENO],
   },
   {
     slug: 'prefill',
@@ -612,7 +623,16 @@ const entries = [
     benchmarkContext:
       'A disagg label identifies the serving layout, not its performance. Judge it from the prefill and decode world sizes, TP/EP layout, framework, network domain, and the interactivity range where its frontier leads.',
     relatedTerms: ['prefill', 'decode', 'kv-cache', 'nvidia-dynamo', 'wide-expert-parallelism'],
-    articleSlugs: [INFERENCEX_V2, GB200_R1, GB300_DSV4, GB200_KIMI, TILERT, AGENTX_V3],
+    articleSlugs: [
+      INFERENCEX_V2,
+      GB200_R1,
+      GB300_DSV4,
+      GB200_KIMI,
+      TILERT,
+      AGENTX_V3,
+      AGENTX_DSV4_GB200_GB300,
+      JALAPENO,
+    ],
   },
   {
     slug: 'speculative-decoding',
@@ -806,7 +826,7 @@ const entries = [
     benchmarkContext:
       'System topology determines the communication domain. A B200 in an eight-chip node and a GB200 NVL72 expose related silicon through different scale-up group sizes.',
     relatedTerms: ['nvlink', 'wide-expert-parallelism', 'all-to-all', 'tensor-parallelism'],
-    articleSlugs: [INFERENCEX_V2, GB200_R1, GB200_KIMI],
+    articleSlugs: [INFERENCEX_V2, GB200_R1, GB200_KIMI, JALAPENO],
   },
   {
     slug: 'high-bandwidth-memory',
@@ -824,7 +844,7 @@ const entries = [
     benchmarkContext:
       'InferenceX hardware comparisons separate HBM capacity from bandwidth. For example, GB300’s larger capacity fits wider prefill/decode layouts than GB200 despite similar bandwidth per chip.',
     relatedTerms: ['memory-bandwidth', 'decode', 'kv-cache', 'quantization'],
-    articleSlugs: [GB300_DSV4, B200_KIMI, MI355X_DSV4],
+    articleSlugs: [GB300_DSV4, B200_KIMI, MI355X_DSV4, JALAPENO],
   },
   {
     slug: 'memory-bandwidth',
@@ -914,7 +934,7 @@ const entries = [
     benchmarkContext:
       'InferenceX identifies concrete recipe formats such as NVFP4 and MXFP4 where possible and validates representative configurations. Each FP4 line still has its own numerical and operational behavior.',
     relatedTerms: ['quantization', 'nvfp4', 'mxfp4', 'fp8', 'memory-bandwidth'],
-    articleSlugs: [INFERENCEX_V2, B200_KIMI, MI355X_DSV4, SGLANG_056],
+    articleSlugs: [INFERENCEX_V2, B200_KIMI, MI355X_DSV4, SGLANG_056, AGENTX_QWEN_B300],
   },
   {
     slug: 'nvfp4',
@@ -950,7 +970,7 @@ const entries = [
     benchmarkContext:
       'InferenceX records MXFP4 as part of a complete engine and hardware recipe. Comparisons with NVFP4 or FP8 should use the same model, sequence length, quality requirements, and interactivity target.',
     relatedTerms: ['fp4', 'quantization', 'nvfp4', 'rocm', 'memory-bandwidth'],
-    articleSlugs: [MI355X_KIMI, INFERENCEX_V2],
+    articleSlugs: [MI355X_KIMI, INFERENCEX_V2, JALAPENO],
   },
   {
     slug: 'mixture-of-experts',
@@ -1079,7 +1099,14 @@ const entries = [
     benchmarkContext:
       'InferenceX continuously reruns pinned SGLang recipes. Version-to-version curves show where a change affects performance across the operating range and reveal regressions or gains hidden by one peak point.',
     relatedTerms: ['inference-engine', 'eagle', 'vllm', 'rocm', 'cuda'],
-    articleSlugs: [SGLANG_056, B200_GLM5, MI355X_DSV4, MI355X_GLM5, MI355X_QWEN],
+    articleSlugs: [
+      SGLANG_056,
+      B200_GLM5,
+      MI355X_DSV4,
+      MI355X_GLM5,
+      MI355X_QWEN,
+      AGENTX_QWEN_SGLANG,
+    ],
   },
   {
     slug: 'tensorrt-llm',
@@ -1097,7 +1124,7 @@ const entries = [
     benchmarkContext:
       'InferenceX includes direct TensorRT-LLM and Dynamo TensorRT-LLM configurations and also tracks cases where SGLang or vLLM uses a TRT-LLM-derived kernel backend.',
     relatedTerms: ['inference-engine', 'cuda', 'nvidia-dynamo', 'nvfp4', 'sglang'],
-    articleSlugs: [GB200_R1, INFERENCEX_V2, B200_GLM5, B200_MINIMAX],
+    articleSlugs: [GB200_R1, INFERENCEX_V2, B200_GLM5, B200_MINIMAX, AGENTX_M3_TRT],
   },
   {
     slug: 'nvidia-dynamo',
@@ -1140,7 +1167,7 @@ const entries = [
       'InferenceX exposes this as an experimental x-axis mode for agentic runs, which is why it needs persisted per-request traces and is unavailable for unofficial-run overlays. It is deliberately imperfect: it penalizes high TTFT heavily and does not capture every nuance of prefill and decode disaggregation, so AgentX submissions still optimize interactivity and TTFT separately.',
     measurement: { label: 'Typical unit', value: 'tokens/second/user (tok/s/user)' },
     relatedTerms: ['interactivity', 'time-to-first-token', 'time-per-output-token', 'latency'],
-    articleSlugs: [AGENTX_V3, AGENT_BENCHMARK],
+    articleSlugs: [AGENTX_V3, AGENT_BENCHMARK, AGENTX_GLM_ATOM],
   },
   {
     slug: 'tokens-per-dollar',
@@ -1165,7 +1192,7 @@ const entries = [
       'total-cost-of-ownership',
       'throughput',
     ],
-    articleSlugs: [AGENTX_V3, INFERENCEX_V2, B200_GLM5],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2, B200_GLM5, AGENTX_QWEN_B300],
   },
   {
     slug: 'energy-per-token',
@@ -1185,7 +1212,7 @@ const entries = [
       'Read the label before comparing: all-in provisioned and measured values differ by the facility overhead between them. InferenceX withholds measured energy where the underlying telemetry is invalid or its scope is ambiguous, so a missing value means the measurement could not be trusted rather than that the run drew no power.',
     measurement: { label: 'Typical unit', value: 'joules per token (J/tok)' },
     relatedTerms: ['tokens-per-megawatt', 'throughput', 'total-cost-of-ownership', 'concurrency'],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, AGENTX_V3],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, AGENTX_V3, JALAPENO],
   },
   {
     slug: 'context-parallelism',
@@ -1204,7 +1231,7 @@ const entries = [
     benchmarkContext:
       'InferenceX surfaces DCP and PCP degrees in point tooltips and parallelism labels alongside TP, EP, and DP. Support is uneven across vendors: the technique remains part of the practical CUDA advantage because the AMD attention backends were still listed as unsupported in the vLLM matrix at the time of the AgentX 1.0 results.',
     relatedTerms: ['tensor-parallelism', 'data-parallelism', 'kv-cache', 'prefill', 'decode'],
-    articleSlugs: [AGENTX_V3, INFERENCEX_V2],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2, AGENTX_M3_RACK],
   },
   {
     slug: 'kv-cache-offload',
@@ -1222,7 +1249,7 @@ const entries = [
     benchmarkContext:
       'InferenceX rings every point that used KV offload with a dashed halo, whether or not it is Pareto optimal, and the point detail view names the offload type and engine alongside the chip and CPU cache hit rates. Offload is an allowed but optional optimization, so a single curve can mix points with and without it.',
     relatedTerms: ['kv-cache', 'prefix-caching', 'kv-cache-manager', 'high-bandwidth-memory'],
-    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, KIMI_K3],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, KIMI_K3, AGENTX_DSV4_B200_B300],
   },
   {
     slug: 'kv-cache-manager',
@@ -1263,7 +1290,7 @@ const entries = [
       'data-parallelism',
       'disaggregated-inference',
     ],
-    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, AGENTX_M3_RACK],
   },
   {
     slug: 'tilert',
@@ -1409,7 +1436,7 @@ const entries = [
     benchmarkContext:
       'This is not the classic roofline model from HPC, which plots attainable FLOPS against arithmetic intensity to expose a compute or memory bound. The dashboard borrows only the picture of an upper bound. Roofline direction is configured per metric, so the same points can produce a different envelope on a different axis.',
     relatedTerms: ['pareto-frontier', 'iso-interactivity', 'throughput', 'recipe'],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, B200_GLM5],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, B200_GLM5, AGENTX_GLM_ATOM],
   },
   {
     slug: 'arithmetic-intensity',
@@ -1427,7 +1454,7 @@ const entries = [
     benchmarkContext:
       'The split explains recurring shapes in the data. Low interactivity points run large batches at high intensity and approach compute limits, while the high interactivity end runs small batches and tracks memory bandwidth, so bandwidth-rich parts often win there despite lower peak throughput.',
     relatedTerms: ['prefill', 'decode', 'memory-bandwidth', 'batching'],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, TILERT],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, TILERT, JALAPENO],
   },
   {
     slug: 'prefix-cache-hit-rate',
@@ -1445,7 +1472,7 @@ const entries = [
     benchmarkContext:
       'The AgentX point view reports hit rate over time, separated by cache tier, alongside the prompt token source breakdown. A run that reports high aggregate throughput on a low hit rate is doing far more prefill work than a well-cached deployment would.',
     relatedTerms: ['prefix-caching', 'kv-cache', 'prefill', 'agentx'],
-    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, AGENT_BENCHMARK],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, AGENT_BENCHMARK, AGENTX_DSV4_B200_B300],
   },
   {
     slug: 'warmup',
@@ -1530,7 +1557,7 @@ const entries = [
       'mixture-of-experts',
       'prefix-caching',
     ],
-    articleSlugs: [AGENTX_V3, INFERENCEX_V2, GB200_KIMI],
+    articleSlugs: [AGENTX_V3, INFERENCEX_V2, GB200_KIMI, AGENTX_M3_TRT],
   },
   {
     slug: 'int4',
@@ -1645,7 +1672,7 @@ const entries = [
     benchmarkContext:
       'InferenceX serves models using these layers, and engine support for checkpointing and transferring recurrent state is part of the recipe. A model can be day-zero servable and still lack reuse of that state, which shows up as unexpectedly high prefill cost on repeated turns.',
     relatedTerms: ['hybrid-attention', 'kv-cache', 'sparse-attention', 'prefill'],
-    articleSlugs: [AGENTX_V3, MI355X_QWEN, KIMI_K3],
+    articleSlugs: [AGENTX_V3, MI355X_QWEN, KIMI_K3, AGENTX_QWEN_SGLANG],
   },
   {
     slug: 'nvl72',
@@ -1669,7 +1696,7 @@ const entries = [
       'all-to-all',
       'total-cost-of-ownership',
     ],
-    articleSlugs: [GB200_R1, GB300_DSV4, GB200_KIMI, VR_RUBIN],
+    articleSlugs: [GB200_R1, GB300_DSV4, GB200_KIMI, VR_RUBIN, AGENTX_K3_ATOM, JALAPENO],
   },
   {
     slug: 'atom',
@@ -1687,7 +1714,7 @@ const entries = [
     benchmarkContext:
       'InferenceX reports ATOM as its own framework label so it is never conflated with a vLLM or SGLang result on the same accelerator. Compare it to other vendor runtimes when asking what the hardware can do, and to upstream engines when asking what a customer can deploy today.',
     relatedTerms: ['inference-engine', 'rocm', 'vllm', 'sglang', 'tensorrt-llm'],
-    articleSlugs: [AGENTX_V3, MI355X_DSV4, MI355X_GLM5],
+    articleSlugs: [AGENTX_V3, MI355X_DSV4, MI355X_GLM5, AGENTX_DSV4_MI355X_B200, AGENTX_K3_ATOM],
   },
   {
     slug: 'aiter',

@@ -111,7 +111,7 @@ describe('First-load navigation', () => {
     cy.location('pathname').should('eq', '/inference');
   });
 
-  it('leads the landing page with the AgentX hero and its three CTAs', () => {
+  it('leads the landing page with the AgentX hero and its two CTAs', () => {
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
       // The hero owns /compare's h1; on the landing page it is a section heading.
       cy.get('h2').should('have.text', 'Compare Realistic Agentic Inference Perf');
@@ -122,9 +122,7 @@ describe('First-load navigation', () => {
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
         .should('contain.text', 'Full dashboard')
         .and('have.attr', 'href', '/inference/kimi-k3?i_seq=agentic-traces&i_optimal=1');
-      cy.get('[data-testid="compare-agentx-methodology-link"]')
-        .should('contain.text', 'Methodology Deep Dive')
-        .and('have.attr', 'href', '/agentx');
+      cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
       cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
       // Editorial order, not alphabetical — see FEATURED_AGENTX_MODEL_SLUGS.
       cy.get('[data-testid^="compare-agentx-model-"]').then(($rows) => {

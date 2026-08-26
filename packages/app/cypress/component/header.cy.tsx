@@ -137,8 +137,8 @@ describe('Header', () => {
       'AgentX',
       'Overview',
       'Dashboard',
-      'Telemetry',
       'Comparisons',
+      'Articles',
       'About',
     ];
     cy.get('[data-testid^="nav-link-"]').then(($links) => {
@@ -150,7 +150,8 @@ describe('Header', () => {
 
   it('keeps footer destinations out of the primary nav', () => {
     cy.get('[data-testid="nav-link-supporters"]').should('not.exist');
-    cy.get('[data-testid="nav-link-blog"]').should('not.exist');
+    // Telemetry moved to the footer; Articles took its place in the nav.
+    cy.get('[data-testid="nav-link-telemetry"]').should('not.exist');
   });
 
   it('shows the GitHub stars button linking to the correct repo', () => {
@@ -181,8 +182,9 @@ describe('Header', () => {
         .and('have.attr', 'href', '/agentx')
         .find('[data-nav-badge="agentx"]')
         .should('have.text', 'NEW');
+      cy.contains('a', 'Articles').should('be.visible').and('have.attr', 'href', '/blog');
       cy.contains('a', 'Supporters').should('not.exist');
-      cy.contains('a', 'Articles').should('not.exist');
+      cy.contains('a', 'Telemetry').should('not.exist');
     });
   });
 
@@ -285,10 +287,12 @@ describe('Header', () => {
       cy.get('[data-testid="mobile-menu-toggle"]').click();
       cy.get('[data-testid="mobile-menu"]').should('be.visible');
       cy.get('[data-testid="mobile-menu"]').within(() => {
-        ['Home', 'Overview', 'Dashboard', 'Comparisons', 'AgentX', 'About'].forEach((label) => {
-          cy.contains('a', label).should('be.visible');
-        });
-        ['Supporters', 'Articles'].forEach((label) => {
+        ['Home', 'Overview', 'Dashboard', 'Comparisons', 'Articles', 'AgentX', 'About'].forEach(
+          (label) => {
+            cy.contains('a', label).should('be.visible');
+          },
+        );
+        ['Supporters', 'Telemetry'].forEach((label) => {
           cy.contains('a', label).should('not.exist');
         });
       });

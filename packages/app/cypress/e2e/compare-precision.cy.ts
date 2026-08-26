@@ -21,9 +21,7 @@ describe('Compare precision index page', () => {
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
         .should('contain.text', 'Full dashboard')
         .and('have.attr', 'href', '/inference/kimi-k3?i_seq=agentic-traces&i_optimal=1');
-      cy.get('[data-testid="compare-agentx-methodology-link"]')
-        .should('contain.text', 'Methodology Deep Dive')
-        .and('have.attr', 'href', '/agentx');
+      cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
     });
     cy.get('[data-testid="compare-model-catalog"]')
       .should('contain.text', 'AgentX and 8K→1K results')
@@ -62,9 +60,7 @@ describe('Compare precision index page', () => {
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
         .should('contain.text', '查看完整仪表板')
         .and('have.attr', 'href', '/zh/inference/kimi-k3?i_seq=agentic-traces&i_optimal=1');
-      cy.get('[data-testid="compare-agentx-methodology-link"]')
-        .should('contain.text', '测试方法')
-        .and('have.attr', 'href', '/zh/agentx');
+      cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
     });
     cy.get('[data-testid="compare-model-catalog"]').should('contain.text', 'AgentX 与 8K→1K 结果');
     cy.get('#deepseek-v4 a[data-scenario="AgentX"]')

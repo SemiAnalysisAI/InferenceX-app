@@ -80,9 +80,12 @@ describe('TCO Calculator', () => {
       });
     });
 
-    it('renders Precision multi-selector', () => {
+    it('hides the Precision selector for a single-precision model', () => {
+      // DeepSeek-V4-Pro is FP4-only in the fixtures — with one precision there
+      // is nothing to choose, so the control is hidden entirely.
+      cy.get('[data-testid="calc-cost-selector"]').should('exist');
       cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.contains('Precision').should('exist');
+        cy.contains('Precision').should('not.exist');
       });
     });
 
@@ -653,7 +656,10 @@ describe('TCO Calculator', () => {
     });
 
     it('renders throughput and cost calculations from null-ISL/OSL agentic rows', () => {
-      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic');
+      // The agentic fixture exposes a single scenario, so the scenario
+      // control disappears entirely — no dropdown, no static readout.
+      cy.get('[data-testid="scenario-static-value"]').should('not.exist');
+      cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
       cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
       cy.get('[data-testid="calculator-no-data"]').should('not.exist');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
@@ -710,7 +716,10 @@ describe('TCO Calculator', () => {
       });
       cy.wait('@agenticBenchmarks');
 
-      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic');
+      // Single-scenario fixture → the scenario control disappears entirely;
+      // the gate is locked, so no percentile selector either.
+      cy.get('[data-testid="scenario-static-value"]').should('not.exist');
+      cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
       cy.get('[data-testid="calc-percentile-selector"]').should('not.exist');
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()

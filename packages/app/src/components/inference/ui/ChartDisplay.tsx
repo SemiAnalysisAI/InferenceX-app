@@ -5,7 +5,9 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
-import chartDefinitions from '@/components/inference/metric-registry';
+import chartDefinitions, { type MetricKey } from '@/components/inference/metric-registry';
+import { resolveXAxisKind } from '@/components/inference/axis-metric-explanations';
+import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import {
   useInferenceActions,
   useInferenceData,
@@ -72,6 +74,7 @@ import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useLocale } from '@/lib/use-locale';
 
+import AxisMetricFooter from './AxisMetricFooter';
 import ChartControls from './ChartControls';
 import ComparisonChangelog from './ComparisonChangelog';
 import CustomCosts from './CustomCosts';
@@ -748,6 +751,23 @@ export default function ChartDisplay() {
               selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
             const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
+            // Which logical metric the x-axis plots right now. Classify off
+            // the field `resolveXAxisField` resolves for this chart's current
+            // state — the same resolver both chart pipelines plot with — so
+            // the footer always matches the drawn axis (e.g. an input metric
+            // without a `*_x` override keeps the natural interactivity x).
+            // Trace-derived agentic modes bypass that resolver, hence the flag.
+            const footerXAxisKind = resolveXAxisKind(graph.chartDefinition.chartType, {
+              xAxisField: resolveXAxisField(
+                graph.chartDefinition,
+                selectedYAxisMetric,
+                graph.chartDefinition.chartType === 'e2e'
+                  ? selectedE2eXAxisMetric
+                  : selectedXAxisMetric,
+                { isAgentic: isAgenticSequence, percentile: selectedPercentile },
+              ).xAxisField,
+              isDerivedNormalizedInteractivity: Boolean(derivedSpec),
+            });
             return (
               <section key={graphIndex} className="pt-8 md:pt-0">
                 <figure data-testid="chart-figure" className="relative rounded-lg">
@@ -1013,6 +1033,12 @@ export default function ChartDisplay() {
                         </div>
                       );
                     })()}
+                    <AxisMetricFooter
+                      chartId={`chart-${graphIndex}`}
+                      metricKey={selectedYAxisMetric.replace(/^y_/u, '') as MetricKey}
+                      xAxisKind={footerXAxisKind}
+                      xAxisLabel={graph.chartDefinition.x_label}
+                    />
                     {replayAvailable && (
                       <ReplayLauncher
                         ref={(handle) => {
