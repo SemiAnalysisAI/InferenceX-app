@@ -301,7 +301,7 @@ describe('Landing nudges — banner', () => {
       .should('include', 'g_model=DeepSeek-R1-0528')
       .and('include', 'i_seq=8k%2F1k')
       .and('include', 'i_prec=fp4')
-      .and('include', 'i_metric=y_outputTputPerGpu');
+      .and('include', 'i_metric=y_outputTputPerMw');
 
     // Body click must not write the dismissal key — the banner should still
     // render on a fresh visit to landing.
