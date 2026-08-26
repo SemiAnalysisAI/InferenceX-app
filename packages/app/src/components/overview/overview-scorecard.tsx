@@ -9,7 +9,6 @@ import {
   OVERVIEW_HARDWARE,
   OVERVIEW_HISTORY_WINDOW_DAYS,
   OVERVIEW_HISTORY_WINDOWS,
-  OVERVIEW_TIERS,
   overviewHardwareLabel,
   type OverviewComparisonMode,
   type OverviewEngineScope,
@@ -28,7 +27,6 @@ import {
   detailHref,
   overviewEngineScopeHref,
   overviewHref,
-  overviewTierHref,
 } from '@/lib/overview-links';
 
 import { OverviewDetailLink } from './overview-detail-link';
@@ -38,6 +36,7 @@ import { OverviewNavLink } from './overview-nav-link';
 import { type OverviewNavControl, useOverviewNavigation } from './overview-navigation';
 import { OverviewReferenceSelect } from './overview-reference-select';
 import { type OverviewLocale, type OverviewStrings } from './overview-strings';
+import { OverviewTierSlider } from './overview-tier-slider';
 
 interface Formatters {
   cost: Intl.NumberFormat;
@@ -783,8 +782,7 @@ function ActiveSwitcherOption({
   );
 }
 
-/** Every option remains a copyable server-rendered URL; ordinary clicks use a
- *  soft App Router transition and the displayed tier is never a self-link. */
+/** The six benchmarked service levels are exposed as discrete slider stops. */
 export function OverviewTierSwitcher({
   tier,
   engineScope,
@@ -806,50 +804,19 @@ export function OverviewTierSwitcher({
   locale: OverviewLocale;
   strings: OverviewStrings;
 }) {
-  const optionClass =
-    'inline-flex min-h-11 items-center px-3 tabular-nums focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring';
   return (
-    <nav
-      data-testid="overview-tier-switcher"
-      aria-label={strings.tierNavLabel}
-      className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
-    >
-      <span className="text-muted-foreground">{strings.tierNavLabel}</span>
-      <div className="flex divide-x divide-border/60 overflow-hidden rounded-md border border-border/60">
-        {OVERVIEW_TIERS.map((option) =>
-          option === tier ? (
-            <ActiveSwitcherOption
-              key={option}
-              control="tier"
-              aria-current="page"
-              className={`${optionClass} bg-muted font-semibold text-foreground`}
-            >
-              {option}
-            </ActiveSwitcherOption>
-          ) : (
-            <OverviewNavLink
-              key={option}
-              href={overviewTierHref(
-                locale,
-                option,
-                engineScope,
-                comparisonMode,
-                referenceHardware,
-                modelScope,
-                rowScope,
-                hardwareRowScope,
-              )}
-              analytics={{ control: 'tier', value: String(option) }}
-              searchKeys={['tier']}
-              className={`${optionClass} text-muted-foreground transition-colors hover:text-foreground`}
-            >
-              {option}
-            </OverviewNavLink>
-          ),
-        )}
-      </div>
-      <span className="text-muted-foreground">{strings.tierUnit}</span>
-    </nav>
+    <OverviewTierSlider
+      tier={tier}
+      engineScope={engineScope}
+      comparisonMode={comparisonMode}
+      referenceHardware={referenceHardware}
+      modelScope={modelScope}
+      rowScope={rowScope}
+      hardwareRowScope={hardwareRowScope}
+      locale={locale}
+      label={strings.tierNavLabel}
+      unit={strings.tierUnit}
+    />
   );
 }
 

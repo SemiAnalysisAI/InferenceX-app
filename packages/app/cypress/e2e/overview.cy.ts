@@ -39,6 +39,33 @@ const SCOPE_LINE = `${SCOPE_METRIC} · ${SCOPE_DIRECTION} · ${SOURCE_NOTE}`;
 const SCOPE_METRIC_ZH = '超大规模云厂商成本';
 const SCOPE_DIRECTION_ZH = '↓ 越低越好';
 const SCOPE_LINE_ZH = `${SCOPE_METRIC_ZH} · ${SCOPE_DIRECTION_ZH} · ${SOURCE_NOTE_ZH}`;
+const OVERVIEW_TIERS = [30, 50, 75, 100, 150, 200] as const;
+
+function selectOverviewTier(tier: (typeof OVERVIEW_TIERS)[number]) {
+  const targetIndex = OVERVIEW_TIERS.indexOf(tier);
+  // Unlike clicks, synthetic input events are not replayed by React, so a
+  // dispatch that lands before hydration finishes is silently dropped. The
+  // `.should` callback retries the whole dispatch until React has committed
+  // the selection, which only happens once the slider is interactive.
+  return cy.get<HTMLInputElement>('[data-testid="overview-tier-slider"]').should(([slider]) => {
+    const view = slider.ownerDocument.defaultView;
+    if (view === null) throw new Error('Slider has no window');
+    const tracker = (slider as { _valueTracker?: { setValue: (next: string) => void } })
+      ._valueTracker;
+    // React installs the value tracker when hydration commits the input.
+    expect(tracker, 'tier slider is hydrated').to.not.eq(undefined);
+    const nativeValueSetter = Object.getOwnPropertyDescriptor(
+      view.HTMLInputElement.prototype,
+      'value',
+    )?.set;
+    if (nativeValueSetter === undefined) throw new Error('Range input has no native value setter');
+    nativeValueSetter.call(slider, String(targetIndex));
+    // Desync the tracker so React always registers the dispatched input.
+    tracker?.setValue('');
+    slider.dispatchEvent(new view.Event('input', { bubbles: true }));
+    expect(slider.dataset.tier, 'slider committed tier').to.eq(String(tier));
+  });
+}
 
 function expectNoHorizontalOverflow() {
   cy.document().then((doc) => {
@@ -188,14 +215,14 @@ describe('Overview page', () => {
         'preserved';
     });
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    selectOverviewTier(75);
     cy.wait('@overviewJson');
     cy.location('search').should('eq', '?tier=75');
     cy.window().its('__overviewNavigationSentinel').should('eq', 'preserved');
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '50').click();
+    selectOverviewTier(50);
     cy.location('search').should('eq', '');
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    selectOverviewTier(75);
     cy.location('search').should('eq', '?tier=75');
     cy.then(() => {
       expect(jsonRequests, 'one request; both visited selections are cached').to.equal(1);
@@ -226,7 +253,7 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
     cy.intercept('GET', '**/api/v1/overview*').as('overviewJson');
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    selectOverviewTier(75);
     cy.wait('@overviewJson');
     cy.location('search').should('eq', '?tier=75');
 
@@ -259,7 +286,7 @@ describe('Overview page', () => {
       });
     }).as('overviewJson');
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    selectOverviewTier(75);
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .find('[data-overview-engine-scope="all"]')
       .click();
@@ -269,9 +296,9 @@ describe('Overview page', () => {
     // Keeps its explicit timeout because it waits on the real API through
     // `request.continue` plus the delay above — unlike the URL assertions
     // around it, which the click resolves synchronously.
-    cy.get('[data-testid="overview-tier-switcher"] [aria-current="page"]', {
+    cy.get('[data-testid="overview-tier-slider"]', {
       timeout: 15_000,
-    }).should('have.text', '75');
+    }).should('have.attr', 'data-tier', '75');
     cy.get('[data-overview-engine-scope="all"]').should('have.attr', 'aria-current', 'true');
     cy.location('search').should('eq', '?tier=75&engine=all');
   });
@@ -285,7 +312,7 @@ describe('Overview page', () => {
       });
     }).as('overviewJson');
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    selectOverviewTier(75);
     cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('exist');
     cy.wait('@overviewJson');
     cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('not.exist');
@@ -324,10 +351,7 @@ describe('Overview page', () => {
         'have.text',
         'Could not load the selected comparison. Showing the last successfully loaded data.',
       );
-    cy.get('[data-testid="overview-tier-switcher"] [aria-current="page"]').should(
-      'have.text',
-      '50',
-    );
+    cy.get('[data-testid="overview-tier-slider"]').should('have.attr', 'data-tier', '50');
     cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('not.exist');
     cy.location('search').should('eq', '?tier=75&ref=b300');
     cy.get<number>('@overviewHistoryLength').then((expectedHistoryLength) => {
@@ -350,7 +374,7 @@ describe('Overview page', () => {
       }).as('emptyOverview');
       cy.visit('/zh/overview');
 
-      cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+      selectOverviewTier(75);
       cy.wait('@emptyOverview');
       cy.get('[data-testid="overview-empty-state"]')
         .should('have.attr', 'role', 'status')
@@ -368,12 +392,20 @@ describe('Overview page', () => {
 
     cy.window().then((win) => {
       const before = win.history.length;
-      cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+      selectOverviewTier(75);
       cy.wait('@overviewJsonFailure');
       cy.location('search').should('eq', '?tier=75');
       // A plain `.should` would be satisfied by the transient extra entry.
       cy.window().then((after) => {
         expect(after.history.length - before, 'one entry for one selection').to.equal(1);
+      });
+      // The unsuccessful stop stays retryable: activating it again re-requests
+      // without stacking another history entry for the byte-identical href.
+      selectOverviewTier(75);
+      cy.wait('@overviewJsonFailure');
+      cy.location('search').should('eq', '?tier=75');
+      cy.window().then((after) => {
+        expect(after.history.length - before, 'retry adds no history entry').to.equal(1);
       });
     });
 
@@ -391,26 +423,27 @@ describe('Overview page', () => {
       jsonRequests += 1;
     }).as('overviewJson');
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').trigger('pointerover');
+    cy.get('[data-testid="overview-engine-scope-switcher"]')
+      .find('[data-overview-engine-scope="all"]')
+      .trigger('pointerover');
     cy.wait('@overviewJson');
     cy.location('search').should('eq', '');
     cy.then(() => {
       expect(jsonRequests, 'hover warms exactly one response').to.equal(1);
     });
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').click();
-    cy.location('search').should('eq', '?tier=100');
-    cy.get('[data-testid="overview-tier-switcher"] [aria-current="page"]').should(
-      'have.text',
-      '100',
-    );
+    cy.get('[data-testid="overview-engine-scope-switcher"]')
+      .find('[data-overview-engine-scope="all"]')
+      .click();
+    cy.location('search').should('eq', '?engine=all');
+    cy.get('[data-overview-engine-scope="all"]').should('have.attr', 'aria-current', 'true');
     cy.then(() => {
       expect(jsonRequests, 'the click reuses the warmed response').to.equal(1);
     });
 
     cy.get('[data-testid="overview-reference-select"]').click();
     cy.get('[data-overview-reference="b300"]').click();
-    cy.location('search').should('eq', '?tier=100&ref=b300');
+    cy.location('search').should('eq', '?engine=all&ref=b300');
     cy.get('[data-overview-comparison="hardware"]').should('contain.text', 'vs B300');
     cy.then(() => {
       expect(jsonRequests, 'a reference change is derived, not fetched').to.equal(1);
@@ -460,7 +493,7 @@ describe('Overview page', () => {
       );
     });
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '75').click();
+    selectOverviewTier(75);
     cy.location('search').should('eq', '?tier=75&models=all');
     cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('exist');
 
@@ -507,22 +540,21 @@ describe('Overview page', () => {
       platform('b200').find('[data-testid="overview-cost-delta"]').should('exist');
     });
 
-    cy.get('[data-testid="overview-tier-switcher"]')
-      .contains('a', '100')
-      .should('have.attr', 'href', '/overview?tier=100&ref=b300');
+    selectOverviewTier(100);
+    cy.location('search').should('eq', '?tier=100&ref=b300');
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .find('[data-overview-engine-scope="all"]')
-      .should('have.attr', 'href', '/overview?engine=all&ref=b300');
+      .should('have.attr', 'href', '/overview?tier=100&engine=all&ref=b300');
     cy.get('[data-overview-comparison="30d"]').should(
       'have.attr',
       'href',
-      '/overview?ref=b300&compare=30d',
+      '/overview?tier=100&ref=b300&compare=30d',
     );
     cy.get('[data-testid="language-toggle"]')
-      .should('have.attr', 'href', '/zh/overview?ref=b300')
+      .should('have.attr', 'href', '/zh/overview?tier=100&ref=b300')
       .click();
     cy.location('pathname').should('eq', '/zh/overview');
-    cy.location('search').should('eq', '?ref=b300');
+    cy.location('search').should('eq', '?tier=100&ref=b300');
     cy.get('[data-overview-comparison="hardware"]').should('contain.text', '对比 B300');
   });
 
@@ -593,17 +625,16 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-desktop-matrix"] thead').should('contain.text', 'B200');
     cy.get('[data-testid="overview-desktop-matrix"] thead').should('not.contain.text', 'Reference');
 
-    cy.get('[data-testid="overview-tier-switcher"]')
-      .contains('a', '100')
-      .should('have.attr', 'href', '/overview?tier=100&compare=30d');
+    selectOverviewTier(100);
+    cy.location('search').should('eq', '?tier=100&compare=30d');
     cy.get('[data-testid="overview-engine-scope-switcher"]')
       .find('[data-overview-engine-scope="all"]')
-      .should('have.attr', 'href', '/overview?engine=all&compare=30d');
+      .should('have.attr', 'href', '/overview?tier=100&engine=all&compare=30d');
     cy.get('[data-testid="language-toggle"]')
-      .should('have.attr', 'href', '/zh/overview?compare=30d')
+      .should('have.attr', 'href', '/zh/overview?tier=100&compare=30d')
       .click();
     cy.location('pathname').should('eq', '/zh/overview');
-    cy.location('search').should('eq', '?compare=30d');
+    cy.location('search').should('eq', '?tier=100&compare=30d');
     cy.get('[data-testid="overview-comparison-switcher"]')
       .should('have.attr', 'aria-label', '对比方式')
       .within(() => {
@@ -651,7 +682,7 @@ describe('Overview page', () => {
     cy.location('search').should('eq', '?tier=75&present=1&utm_source=deck');
     cy.location('hash').should('eq', '#matrix');
 
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').click();
+    selectOverviewTier(100);
     cy.location('search').should('eq', '?tier=100&present=1&utm_source=deck');
     cy.get('[data-testid="overview-presentation-surface"]').should(
       'have.attr',
@@ -687,7 +718,7 @@ describe('Overview page', () => {
     cy.visit('/overview?tier=75', { onBeforeLoad: stubFullscreenApi });
 
     // A selector push creates a real same-document history entry.
-    cy.get('[data-testid="overview-tier-switcher"]').contains('a', '100').click();
+    selectOverviewTier(100);
     cy.location('search').should('eq', '?tier=100');
     cy.get('[data-testid="overview-present-toggle"]').click();
     cy.location('search').should('eq', '?tier=100&present=1');
@@ -1000,10 +1031,7 @@ describe('Overview page', () => {
     ).click();
     cy.location('search').should('eq', '?engine=all');
     desktopModel('GLM-5.2').find('[data-testid="overview-pair-missing"]').should('have.length', 5);
-    cy.get('[data-testid="overview-tier-switcher"]')
-      .contains('a', '100')
-      .should('have.attr', 'href', '/overview?tier=100&engine=all')
-      .click();
+    selectOverviewTier(100);
     cy.location('search').should('eq', '?tier=100&engine=all');
 
     cy.get('[data-testid="overview-engine-scope-switcher"]')
@@ -1422,7 +1450,7 @@ describe('Overview page', () => {
       .should('not.match', /∞\s*%/);
   });
 
-  it('re-renders the whole matrix at the service level the URL names, via plain links', () => {
+  it('re-renders the whole matrix from the six-stop SLO slider', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
@@ -1432,22 +1460,42 @@ describe('Overview page', () => {
       .and('contain.text', 'SLO');
     cy.get('body').should('not.contain.text', 'Service level');
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
-      cy.get('[aria-current="page"]').should('have.text', '50');
-      // 30 / 75 / 100 / 150 / 200 link out; the active 50 is inert text.
-      cy.get('a').should('have.length', 5);
-      cy.contains('a', '30').should('have.attr', 'href', '/overview?tier=30');
-      cy.contains('a', '150').should('have.attr', 'href', '/overview?tier=150');
-      cy.contains('a', '200').should('have.attr', 'href', '/overview?tier=200');
-      cy.contains('a', '100').should('have.attr', 'href', '/overview?tier=100').click();
+      cy.get('a, button').should('not.exist');
+      cy.get('[data-tier-option]').should('have.length', 6);
+      cy.get('[data-tier-option="50"]').should('have.attr', 'data-selected', 'true');
+      cy.get('[data-testid="overview-tier-ridge"]').should('have.length', 6);
+      cy.get('[data-tier-ridge="30"]').should('have.attr', 'data-state', 'filled');
+      cy.get('[data-tier-ridge="50"]').should('have.attr', 'data-state', 'selected');
+      cy.get('[data-tier-ridge="75"]').should('have.attr', 'data-state', 'unfilled');
+      cy.get('[data-testid="overview-tier-slider"]')
+        .should('have.attr', 'min', '0')
+        .and('have.attr', 'max', '5')
+        .and('have.attr', 'step', '1')
+        .and('have.value', '1')
+        .and('have.attr', 'data-tier', '50')
+        .and('have.attr', 'aria-valuetext', '50 tok/s/user');
     });
+
+    selectOverviewTier(100);
 
     cy.location('search').should('eq', '?tier=100');
     // The metric line never repeats the tier — the switcher states it.
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE);
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
-      cy.get('[aria-current="page"]').should('have.text', '100');
-      cy.contains('a', '50').should('have.attr', 'href', '/overview');
+      cy.get('[data-tier-option="100"]').should('have.attr', 'data-selected', 'true');
+      cy.get('[data-tier-ridge="75"]').should('have.attr', 'data-state', 'filled');
+      cy.get('[data-tier-ridge="100"]').should('have.attr', 'data-state', 'selected');
+      cy.get('[data-tier-ridge="150"]').should('have.attr', 'data-state', 'unfilled');
+      cy.get('[data-testid="overview-tier-slider"]')
+        .should('have.attr', 'type', 'range')
+        .should('have.value', '3')
+        .and('have.attr', 'data-tier', '100')
+        .and('have.attr', 'aria-valuetext', '100 tok/s/user');
     });
+    selectOverviewTier(75);
+    cy.location('search').should('eq', '?tier=75');
+    selectOverviewTier(100);
+    cy.location('search').should('eq', '?tier=100');
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b200').should('contain.text', '$0.124').and('contain.text', 'FP8');
@@ -1793,7 +1841,11 @@ describe('Overview page', () => {
       .and('contain.text', 'SLO');
     cy.get('body').should('not.contain.text', '服务档位');
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
-      cy.contains('a', '50').should('have.attr', 'href', '/zh/overview');
+      cy.get('[data-testid="overview-tier-slider"]')
+        .should('have.attr', 'data-tier', '100')
+        // tok/s/user is a protected unit that stays untranslated on the zh route.
+        .and('have.attr', 'aria-valuetext', '100 tok/s/user');
+      cy.get('[data-tier-option]').should('have.length', 6);
     });
   });
 });
