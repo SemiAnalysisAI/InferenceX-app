@@ -60,6 +60,7 @@ const AGENTX_QWEN_SGLANG = 'qwen3-5-397b-agentx-nvidia-vs-amd-sglang';
 const AGENTX_QWEN_B300 = 'qwen3-5-397b-agentx-b300-fp4-vs-h100';
 const AGENTX_GLM_SGLANG = 'glm-5-3-agentx-nvidia-vs-amd-sglang-150-toks';
 const AGENTX_GLM_ATOM = 'glm-5-3-agentx-mi355x-atom-vs-gb300-nvl72';
+const JALAPENO = 'openai-jalapeno-better-than-nvidia';
 
 const entries = [
   {
@@ -486,7 +487,7 @@ const entries = [
       'tokens-per-megawatt',
       'throughput',
     ],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, GB200_R1, VR_RUBIN],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, GB200_R1, VR_RUBIN, JALAPENO],
   },
   {
     slug: 'tokens-per-megawatt',
@@ -511,7 +512,7 @@ const entries = [
       'total-cost-of-ownership',
       'performance-per-dollar',
     ],
-    articleSlugs: [INFERENCEMAX, DEEPSEEK_V4, VR_RUBIN],
+    articleSlugs: [INFERENCEMAX, DEEPSEEK_V4, VR_RUBIN, JALAPENO],
   },
   {
     slug: 'prefill',
@@ -630,6 +631,7 @@ const entries = [
       TILERT,
       AGENTX_V3,
       AGENTX_DSV4_GB200_GB300,
+      JALAPENO,
     ],
   },
   {
@@ -824,7 +826,7 @@ const entries = [
     benchmarkContext:
       'System topology determines the communication domain. A B200 in an eight-chip node and a GB200 NVL72 expose related silicon through different scale-up group sizes.',
     relatedTerms: ['nvlink', 'wide-expert-parallelism', 'all-to-all', 'tensor-parallelism'],
-    articleSlugs: [INFERENCEX_V2, GB200_R1, GB200_KIMI],
+    articleSlugs: [INFERENCEX_V2, GB200_R1, GB200_KIMI, JALAPENO],
   },
   {
     slug: 'high-bandwidth-memory',
@@ -842,7 +844,7 @@ const entries = [
     benchmarkContext:
       'InferenceX hardware comparisons separate HBM capacity from bandwidth. For example, GB300’s larger capacity fits wider prefill/decode layouts than GB200 despite similar bandwidth per chip.',
     relatedTerms: ['memory-bandwidth', 'decode', 'kv-cache', 'quantization'],
-    articleSlugs: [GB300_DSV4, B200_KIMI, MI355X_DSV4],
+    articleSlugs: [GB300_DSV4, B200_KIMI, MI355X_DSV4, JALAPENO],
   },
   {
     slug: 'memory-bandwidth',
@@ -968,7 +970,7 @@ const entries = [
     benchmarkContext:
       'InferenceX records MXFP4 as part of a complete engine and hardware recipe. Comparisons with NVFP4 or FP8 should use the same model, sequence length, quality requirements, and interactivity target.',
     relatedTerms: ['fp4', 'quantization', 'nvfp4', 'rocm', 'memory-bandwidth'],
-    articleSlugs: [MI355X_KIMI, INFERENCEX_V2],
+    articleSlugs: [MI355X_KIMI, INFERENCEX_V2, JALAPENO],
   },
   {
     slug: 'mixture-of-experts',
@@ -1210,7 +1212,7 @@ const entries = [
       'Read the label before comparing: all-in provisioned and measured values differ by the facility overhead between them. InferenceX withholds measured energy where the underlying telemetry is invalid or its scope is ambiguous, so a missing value means the measurement could not be trusted rather than that the run drew no power.',
     measurement: { label: 'Typical unit', value: 'joules per token (J/tok)' },
     relatedTerms: ['tokens-per-megawatt', 'throughput', 'total-cost-of-ownership', 'concurrency'],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, AGENTX_V3],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, AGENTX_V3, JALAPENO],
   },
   {
     slug: 'context-parallelism',
@@ -1452,7 +1454,7 @@ const entries = [
     benchmarkContext:
       'The split explains recurring shapes in the data. Low interactivity points run large batches at high intensity and approach compute limits, while the high interactivity end runs small batches and tracks memory bandwidth, so bandwidth-rich parts often win there despite lower peak throughput.',
     relatedTerms: ['prefill', 'decode', 'memory-bandwidth', 'batching'],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, TILERT],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, TILERT, JALAPENO],
   },
   {
     slug: 'prefix-cache-hit-rate',
@@ -1694,7 +1696,7 @@ const entries = [
       'all-to-all',
       'total-cost-of-ownership',
     ],
-    articleSlugs: [GB200_R1, GB300_DSV4, GB200_KIMI, VR_RUBIN, AGENTX_K3_ATOM],
+    articleSlugs: [GB200_R1, GB300_DSV4, GB200_KIMI, VR_RUBIN, AGENTX_K3_ATOM, JALAPENO],
   },
   {
     slug: 'atom',
