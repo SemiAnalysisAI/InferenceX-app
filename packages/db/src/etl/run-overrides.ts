@@ -89,6 +89,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   29912027293, // 2026-07-22 | Reason: accidental ingest while testing
   30346826643, // 2026-07-28 | Initial AMD submission for MiniMax M3 used incorrect AgentX harness; MTP/spec decode is AgentX-only. Will update after harness updates.
   30405836523, // 2026-07-28 | Reason: No non-DSpark — kimik3-fp4-b300-vllm-agentic AgentX points run without speculative decoding, and Kimi-K3 agentic coding is published DSpark-only (source run of the PR #2397 sweep-reuse ingest)
+  32695861783, // 2026-08-24 | Reason: dev image — the dsv4-fp4-b300-sglang-agentic-hicache-mtp AgentX sweep ran on lmsysorg/sglang-staging:dev-cu13-pr-35880, built from the unmerged SGLang draft PR sgl-project/sglang#35880 (source run of the PR #2701 sweep-reuse ingest)
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([

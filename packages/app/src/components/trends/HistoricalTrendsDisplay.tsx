@@ -36,6 +36,12 @@ import {
 } from '@/lib/data-mappings';
 import { getDisplayLabel } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import {
+  includesJalapenoResult,
+  includesVeraRubinResult,
+  JalapenoOfficialPreviewNotice,
+  VeraRubinOfficialPreviewNotice,
+} from '@/components/official-preview-notice';
 
 const STRINGS = {
   en: {
@@ -185,6 +191,8 @@ export default function HistoricalTrendsDisplay() {
         }),
     [trendLines, activeHwTypes, hardwareConfig, selectedPrecisions, resolveColor],
   );
+  const showsJalapenoPreview = includesJalapenoResult(lineConfigs.map((config) => config.hwKey));
+  const showsVeraRubinPreview = includesVeraRubinResult(lineConfigs.map((config) => config.hwKey));
 
   if (loading || graphs.length === 0 || trendLoading) {
     return (
@@ -328,8 +336,11 @@ export default function HistoricalTrendsDisplay() {
                         </>
                       )}
                     </p>
+                    {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
+                    {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
                     <MetricAssumptionNotes
                       selectedYAxisMetric={selectedYAxisMetric}
+                      activeHwKeys={activeHwTypes}
                       includeAllPowerThroughputMetrics={false}
                       includePowerThroughputCaveat={false}
                     />

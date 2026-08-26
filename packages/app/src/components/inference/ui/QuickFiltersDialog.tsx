@@ -2,6 +2,7 @@
 
 import { ListFilter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import type { DeploymentMode, SpecMode } from '@/components/inference/types';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 
@@ -32,6 +33,8 @@ const STRINGS = {
     agenticDescription:
       'Narrow the chart by chip vendor, serving framework, and deployment mode. Selecting none in a group shows all.',
     selected: 'selected',
+    bestPerSku: 'Best per SKU',
+    bestPerSkuHint: 'Show only the best configuration for each chip',
     vendor: 'Vendor',
     framework: 'Framework',
     deployment: 'Deployment',
@@ -48,6 +51,8 @@ const STRINGS = {
     description: '按芯片厂商、推理框架、部署模式和投机解码筛选图表。某组不选则显示全部。',
     agenticDescription: '按芯片厂商、推理框架和部署模式筛选图表。某组不选则显示全部。',
     selected: '项已选',
+    bestPerSku: '每个 SKU 仅显示最佳配置',
+    bestPerSkuHint: '每款芯片只显示表现最佳的配置',
     vendor: '厂商',
     framework: '框架',
     deployment: '部署模式',
@@ -78,9 +83,13 @@ function toggleValue<T extends string>(current: T[], value: T): T[] {
 export function QuickFiltersDialog({
   open,
   onOpenChange,
+  bestPerSku,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Optional Best per SKU control (scatter chart only) — the chart owns the
+   * toggle logic because overlay mode manages a temporary unified selection. */
+  bestPerSku?: { checked: boolean; onCheckedChange: (checked: boolean) => void };
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -213,6 +222,20 @@ export function QuickFiltersDialog({
         </DialogHeader>
 
         <div className="divide-y divide-border rounded-md border">
+          {bestPerSku && (
+            <section className="flex items-center justify-between gap-3 px-3 py-3">
+              <div>
+                <h3 className="text-xs font-semibold text-muted-foreground">{t.bestPerSku}</h3>
+                <p className="mt-0.5 text-[11px] text-muted-foreground/70">{t.bestPerSkuHint}</p>
+              </div>
+              <Switch
+                data-testid="quick-filter-best-per-sku"
+                checked={bestPerSku.checked}
+                onCheckedChange={bestPerSku.onCheckedChange}
+                aria-label={t.bestPerSku}
+              />
+            </section>
+          )}
           {groups.map((group) => (
             <section
               key={group.key}

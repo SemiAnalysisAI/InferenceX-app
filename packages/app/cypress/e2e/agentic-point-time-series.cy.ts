@@ -128,7 +128,7 @@ describe('Agentic point request metric time series', () => {
     cy.intercept('GET', '/api/v1/benchmark-siblings*', { body: benchmarkSiblings });
     cy.intercept('GET', '/api/v1/request-chart-data*', {
       body: requestChartPayload(requests),
-    });
+    }).as('requestChartData');
     cy.intercept('GET', '/api/v1/request-timeline*', {
       body: {
         version: 6,
@@ -139,6 +139,10 @@ describe('Agentic point request metric time series', () => {
       },
     });
     cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    // The segmented toggle is present in the server-rendered HTML. Waiting for
+    // this client-only query proves hydration has attached its click handlers,
+    // avoiding a Firefox race where an early click leaves `?view=` unchanged.
+    cy.wait('@requestChartData');
   });
 
   it('uses the shared topology label for the active agentic point', () => {

@@ -125,7 +125,7 @@ const GUARDED_ENGINE_FAMILIES = ['vllm', 'sglang'] as const;
 // duplication needed.
 const MODEL_CONFIG: Record<Model, ModelConfig> = {
   [Model.DeepSeek_V4_Pro]: {
-    label: 'DeepSeek V4 Pro 1.6T',
+    label: 'DeepSeek V4 Pro 0813 1.6T',
     prefix: 'dsv4',
     category: 'default',
     exclusion: MTP_ENGINE_EXCLUSION,

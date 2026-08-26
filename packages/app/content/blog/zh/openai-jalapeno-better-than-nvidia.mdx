@@ -1,0 +1,383 @@
+---
+title: 'OpenAI Jalapeño：比 NVIDIA Blackwell 更强'
+subtitle: 'OpenAI 自研 ASIC 对比 Rubin：Jalapeño 的 TCO、每兆瓦吞吐量，以及那些够辣的细节'
+seoDescription: 'OpenAI 首代自研推理 ASIC，与 Broadcom 合作打造，并在 InferenceX 上完成基准测试。文中对比它与 Blackwell、Vera Rubin 的每兆瓦性能，介绍 HBM4 与 MXFP4 规格、Gluon 软件栈、OpenAI 为何不做 prefill-decode 分离，以及 Katsu、Vindaloo 与 Chana 组成的机架架构。'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - inference
+  - benchmark
+  - gpu
+  - nvidia
+  - openai
+  - asic
+  - rubin
+---
+
+过去两年，OpenAI 一直在低调打造一款名为「Jalapeño」的推理芯片，如今在 Hot Chips 上正式发布。此前关于它成功流片的传闻已经流传了一段时间，现在细节终于公开。OpenAI 邀请我们实地查看这颗芯片、走进他们的实验室确认它的真实性，并用我们的 [InferenceX](https://inferencex.semianalysis.com/) 套件对它做了[基准测试](https://openai.com/index/jalapeno-first-results/)。
+
+今年 6 月，[OpenAI 公布了这项芯片计划](https://openai.com/index/openai-broadcom-jalapeno-inference-chip/)，与 Broadcom 合作，从零开始、专为 LLM 推理设计。[设计工作始于 2024 年年中](https://newsletter.semianalysis.com/p/openai-chip-team-is-now-serious)，从组建团队到量产流片只用了约 16 个月，这在 ASIC 开发中是极快的节奏。
+
+通常第一代芯片并不具备竞争力，但 OpenAI 打破了这一规律：在多个主流开源模型上，它击败了我们测试过的每一款 NVIDIA、AMD 和 Google 芯片，处于业界领先水平。OpenAI 靠的是极致的软硬件协同设计。令人意外的是，他们并没有针对推理的某个特定环节做过度特化，而是专注于做一颗在所有场景下都有高性能的通用芯片。
+
+本文将深入介绍 Jalapeño 的架构细节、软件细节，以及它在 InferenceX 上的性能结果。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/c028f756-4748-4583-91b2-5c4a63893cb5_2048x1153.png"
+  caption="来源：[OpenAI](https://openai.com/index/openai-broadcom-jalapeno-inference-chip/)"
+/>
+
+## 一颗通用的推理芯片
+
+外界普遍认为 OpenAI 的芯片是为自家模型特化的，但这是错的：OpenAI 做的是一颗面向 AI 推理的通用芯片。
+
+这个时间线堪称疯狂，说明「用 AI 加速芯片设计」的说法确有其事。抛开进度不谈，OpenAI 投入了大量资金、做出了务实的设计取舍，团队本身也很能打，因此这个结果并不令人意外。
+
+仅看规格，它就已经是有力的竞争者：
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/e346a4e5-76cb-4fd9-be95-00321116b605_1846x510.png"
+  caption="来源：SemiAnalysis"
+/>
+
+而采用 HBM4，使它足以与 NVIDIA 和 AMD 的旗舰 GPU 相提并论：
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/327f95f7-ab6b-44ae-9b8f-17c1ff5d296b_1712x1300.png"
+  caption="来源：OpenAI"
+/>
+
+关于这颗芯片的媒体报道，大多沿用了 OpenAI 随口提到的几句话，认为它会以其他芯片做不到的方式为自家模型做优化。这种说法是错的。Jalapeño 是一颗通用推理芯片，能够运行各类模型和各类工作负载，也包括我们的 InferenceX 基准测试——我们正是与 OpenAI 工程师一起在实验室里跑的。他们还开玩笑似地展示了在这颗芯片上运行 Doom，而移植工作只用 Codex 提示词就完成了。
+
+下面是我们的核心 perf/W 结果，看的是每兆瓦全量供电所能产出的 token 吞吐量。**Jalapeño 碾压了其他所有芯片**。而且这一切都是在不使用多 token 预测（MTP）的前提下取得的，图中其他芯片则都是各自 SKU 上开启 MTP 的最佳配置。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/19a7f45a-df8e-436e-ba04-df5d8610f3da_2048x1330.png"
+  caption="来源：SemiAnalysis"
+/>
+
+在几乎所有场景下，Jalapeño 的 perf/W 都胜过 Blackwell，而且并没有针对曲线上的某个点做专门调优。它不仅在低延迟场景表现出色，在高吞吐场景同样如此。更对等的比较是与单 token 预测的结果对比，此时它把所有竞争对手都甩在身后。在低并发场景下，Jalapeño 展现出惊人的交互性：在 DeepSeek R1 上，并发为 1 时超过 700 tok/s/user。
+
+更惊人的是，这一切都是在单 token 预测（STP）下完成的，没有投机解码，也没有 prefill 与 decode 分离。除 DeepSeek R1 外，我们还看到了其他一些模型，包括 Kimi-K2.5 和 GPT-OSS，后者约为 1,400 tok/s/user。对所有这些模型，我们确认 Jalapeño 的 GSM8k 评估结果与 NVIDIA 芯片相当。
+
+有几点需要说明。第一，所有数据均由 OpenAI 提供。我们在实验室现场验证了 InferenceX 的运行过程，但没有跑完整套 [InferenceX](https://inferencex.semianalysis.com/) 基准测试，也没有看到 [AgentX](https://newsletter.semianalysis.com/p/agentx-inferencexv3-does-cuda-moat) 结果。AgentX 是我们更倾向用于比较芯片性能的套件，因为其数据集具备长上下文和多轮特征，能反映真实生产流程中的缓存行为。在 8k1k 上表现良好的框架，在 AgentX 上可能明显变差，因为真实生产负载会给 router、前缀缓存机制、缓存管理、offload 基础设施等组件施加压力，而单轮 8k1k 根本考察不到这些。相关内容可参见我们的 AgentX 文章。
+
+[AgentX - InferenceXv3: Does CUDA Moat Hold up in Agentic Inferencing?](https://newsletter.semianalysis.com/p/agentx-inferencexv3-does-cuda-moat) — 自 2025 年 11 月的 Claude Code 拐点以来，长上下文、多轮的 agentic 工作负载快速增长，如今已经主导生产推理的流量。2026 年 4 月，OpenAI 的企业级 agentic 支出超过了 ChatGPT 支出。
+
+第二，我们认为拿它和 Blackwell 比并不完整，也不够公平。Jalapeño 真正的对手是同样使用 HBM4 的 Rubin 这类芯片。Vera Rubin 系统现在已经开始向客户发货，而 OpenAI 手上除了工程样片之外还需要一段时间才能有更多东西。
+
+因此，性能比较的对象应该是 Rubin 而不是 Blackwell；从某种意义上说，我们本就预期 Jalapeño 这样的定制芯片会胜过 Blackwell。Vera Rubin NVL72 的 perf/MW 是 GB200 NVL72 的 5.4 倍，[我们在分析 NVIDIA 上月与 CoreWeave 联合发布时所给出性能数据的文章中已有说明](https://newsletter.semianalysis.com/p/vera-rubin-nvl72-vs-gb200-nvl72-inference)。下文我们会把 Jalapeño 与 Vera Rubin 7 月的性能数据做对比。
+
+[Vera Rubin NVL72 vs GB200 NVL72? Inference TCO & Architecture Analysis](https://newsletter.semianalysis.com/p/vera-rubin-nvl72-vs-gb200-nvl72-inference) — Vera Rubin NVL72 是 NVIDIA 机架级 Oberon 架构的第二代产品，其推理性能提升来自极致的协同设计。工程样片的早期结果令人鼓舞：运行 DeepSeek R1 的 Vera Rubin NVL72 相比 GB200 NVL72 目前有 5.4 倍的每兆瓦性能和 5 倍的每美元性能，而与 2025 年 GB200 NVL72 早期 bring-up 阶段相比差距更大。Vera Rubin 目前仍处于早期 bring-up 阶段，我们预计差距还会继续拉大。随着软件成熟，Rubin 的推理性能会持续提升，这与我们此前在 Blackwell 上观察到的规律一致。
+
+第三，被测试的模型并不处于开源前沿。NVIDIA 和 AMD 已经用 AgentX 公布了 DeepSeek V4 Pro、Kimi K3 等更大模型的结果。模型越大、发布越新，在一颗新芯片上完成 bring-up 就越复杂。话虽如此，OpenAI 在 Jalapeño 上跑通的这些模型也算不上小。
+
+## 性能分析
+
+OpenAI 是按 perf/W 来做设计的。原因很简单：OpenAI 当前的瓶颈是数据中心电力，而不是预算或场地，因此每兆瓦 token 数至关重要。在 Computex 2026 上，黄仁勋表示 perf/W、可靠性和长使用寿命是未来 GPU 的核心特性。用他的原话说：「如果你有 1 吉瓦电力，那么每瓦吞吐量就是营收。」他还提到，仅仅因为芯片更便宜就选择错误的架构是说不通的。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/69dc13f6-ffb1-4d56-8df7-b75b57280382_1980x1254.png"
+  caption="来源：Computex 2026 主题演讲"
+/>
+
+NVIDIA 在 Hot Chips 2026 的 Vera 演讲中展示同一张营收图时也强调了这一点：「今天的数据中心是电力受限的。」电力很重要，而且直接驱动营收。
+
+运营方无法简单地获取更多兆瓦，因为增加 GPU 与增加电网容量的时间尺度完全不同。数据中心的电力上限受制于并网接入、基础设施、制冷能力以及 UPS 与备用发电设计。电网审批的延误一再落后于硬件与建设进度，这催生了对 BtM（表后）电力容量的需求：直接建在数据中心现场的燃气轮机和自备发电机。这部分容量位于电网计费表之后，而不是从公共电网取电，因此运营方无需等待并网和电力扩容就能给园区供电——这正是 xAI 的 Colossus 2 高度依赖 BtM、而实际并网进度远远滞后的原因。更多内容参见我们的[能源模型](https://semianalysis.com/energy-model/)。
+
+正如我们在 X 上写过的，由于瓦特就是焦耳每秒，tok/s/MW 可以约化为每焦耳 token 数。这使 tok/s/MW 能够代表一套系统把能量转化为 token 的效率与能力。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/c1a1da73-425c-4800-b396-01c7d2151be9_1200x1432.png"
+  caption="来源：[SemiAnalysis](https://x.com/SemiAnalysis_/status/2091208991271420076)"
+/>
+
+在这一点上，即便与 Rubin 相比，Jalapeño 也胜出。OpenAI 的 Jalapeño 在 STP 下的每兆瓦输出 token 吞吐量，超过了 [NVIDIA 与 CoreWeave 在 7 月公布的 Vera Rubin MTP 结果，也远超 GB200 在 2025 年的 MTP 结果](https://www.coreweave.com/blog/nvidia-vera-rubin-nvl72-on-coreweave-10x-more-tokens-per-megawatt-than-blackwell)。正如我们在 Vera Rubin 文章中所说，之所以拿 VR 与 2025 年的 GB200 结果对比，是因为二者处于类似的早期 bring-up 阶段，这样可以保持软件成熟度这一变量不变。沿用同样的逻辑，我们把 Vera Rubin 2026 年 7 月的最新结果、GB200 2025 年的结果与今天的 Jalapeño 结果放在一起比较。这是很合理的对比：这些是目前公开的最佳 Rubin 数据，而 OpenAI 的流片时间还在 Rubin 之后。OpenAI 和 Rubin 都还不成熟，性能都会继续提升。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/6e8f9fd2-ec7f-45fa-80b9-dc132e32c661_2048x1450.png"
+  caption="来源：OpenAI、SemiAnalysis"
+/>
+
+在 perf/TCO 上，Vera Rubin 与 Jalapeño 势均力敌，每美元产出的输出 token 数几乎相同。但如前所述，**Jalapeño 的结果是在不使用投机解码的前提下取得的**，而 Vera Rubin 的结果用了投机解码。投机解码可以把单 token 成本降低约 3 到 5 倍。等 Jalapeño 用上投机解码之后，它的 token 服务成本还会更低。当然，这部分 TCO 优势来自用 Broadcom 相对更低（尽管依然很高）的毛利替换了 NVIDIA 的高毛利，但这并不是全部原因。举例来说，Meta 和 Microsoft 的 AI ASIC 项目投入时间更久却始终没能真正跑起来，这说明成本只是方程式的一部分。Jalapeño 的完整 TCO 拆解见 [SemiAnalysis AI Cloud TCO 模型](https://semianalysis.com/ai-cloud-tco-model/)。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/a6c58331-c05a-4823-9c4b-aae90705bb53_2048x1485.png"
+  caption="来源：OpenAI、SemiAnalysis"
+/>
+
+在架构上，OpenAI 选择不把 prefill 与 decode（PD）分离到不同的芯片池。draft 模型与主模型共用同一批芯片和同一张网络，这种设计理念用一部分理论效率换取了运维上的实用性。理由在于工作负载的构成会随时间变化：随着我们走过三个模型时代（[知识、推理和 agentic，见我们近期的文章](https://newsletter.semianalysis.com/p/are-open-models-catching-up)），输入 token、缓存写入、缓存读取与输出 token 之间的比例已经发生了显著变化。因此，事先固定异构的 prefill 硅片与 decode 硅片比例，长期来看会带来低效。OpenAI 在这套架构中选择了同构资源池，并努力让芯片在所有场景下都表现良好。
+
+事实也确实如此。在 Kimi K2.5（Cursor Composer 2.5 基于该模型）上，Jalapeño 达到接近 700 tok/s/user，在 100 tok/s/user 处更是次优芯片的 9 倍以上。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/3088f64c-9bee-46d9-a445-6818248ba573_2048x1366.png"
+  caption="来源：OpenAI、SemiAnalysis"
+/>
+
+在 GPT-OSS 上又是一边倒。Jalapeño 在等交互性下的每兆瓦吞吐量接近 GB200 最高吞吐点的两倍，是 GB200 并发为 1 时的 50 倍以上。Jalapeño 并发较高的那些点使用了 EP8。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9f245dd7-c6b7-48a3-9215-3976633bb77f_2048x1366.png"
+  caption="来源：OpenAI、SemiAnalysis"
+/>
+
+这些结果令人印象深刻！不过我们还是要挑刺：它们只是 8k1k，是一个明显更容易调优的工作负载，而且目前还没有 [AgentX](https://newsletter.semianalysis.com/p/agentx-inferencexv3-does-cuda-moat) 运行结果。正如我们在 [AgentX](https://newsletter.semianalysis.com/p/agentx-inferencexv3-does-cuda-moat) 文章中所说，多轮长上下文工作负载会给服务栈的更多环节施加压力，例如 router 和前缀缓存。要在 agentic 工作负载上取得优异表现，还需要大量优化。更多内容请见 [AgentX](https://newsletter.semianalysis.com/p/agentx-inferencexv3-does-cuda-moat) 文章。
+
+[AgentX - InferenceXv3: Does CUDA Moat Hold up in Agentic Inferencing?](https://newsletter.semianalysis.com/p/agentx-inferencexv3-does-cuda-moat) — 自 2025 年 11 月的 Claude Code 拐点以来，长上下文、多轮的 agentic 工作负载快速增长，如今已经主导生产推理的流量。2026 年 4 月，OpenAI 的企业级 agentic 支出超过了 ChatGPT 支出。
+
+## 深入规格与架构
+
+上述所有结果都是在 Jalapeño 的 A0 步进上取得的，距离项目启动仅 9 个月。而 B0 步进已经在 fab 中流片，其优化相比早期的 A0 硅片带来约 25% 的每瓦性能提升。具体来说，B0 步进在采用台积电 N3P 工艺、单颗满掩模尺寸的计算 die 上提供 13.4 PFLOPs 的 MXFP4 算力。作为对比，尺寸相近、同一工艺节点的单颗 Rubin 计算 die 提供 17.5 PFLOPs 的稠密 NVFP4 算力。
+
+考虑到 Jalapeño 的 TDP 只有 700W，而 Rubin 每颗计算 die 为 900 至 1,150W，这个数字就相当可观了。由于 Jalapeño 面向推理而非训练，OpenAI 不需要把 TDP 推高来榨取 FLOPs，这可以理解；但无论如何，上述数据说明 Jalapeño 的峰值理论算力是拿得出手的。
+
+与其他加速器直接对比时，Jalapeño 拥有最高的每瓦 HBM 带宽和最高的每瓦 FLOPs，与 1,800W 的 Rubin Max-Q 配置相当：
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/c5795c45-d23b-403c-8bc4-f13d5ba6fb45_2048x394.png"
+  caption="来源：SemiAnalysis"
+/>
+
+片外 I/O 由一颗 N3E I/O chiplet 提供，具备 32 条 800G SerDes 通道用于计算网络，其中 24 条（600GB/s）用于机架内的本地 scale-up，8 条（200GB/s）用于全局 scale-up，即 2,048 颗 XPU 的多机架域。系统 I/O 使用 PCIe Gen 5 连接 x86 主机 CPU。
+
+Jalapeño 将搭载 HBM4，使它成为继 NVIDIA 和 AMD 之后相对较早的采用者，甚至领先于已经成熟的 TPU 和 Trainium 项目。既然 Jalapeño 的核心架构原则之一是把 HBM 带宽用到极致，那么选择次优的 HBM 就与这一目标背道而驰。最终它实现了每封装 15.4TB/s 的显存带宽，超过所有在售的 HBM3E 加速器。15.4TB/s 说明其 HBM4 达到了 10Gbps 的引脚速率，略高于 NVIDIA 在 Rubin 上跑出的 9.6Gbps。这批 HBM 很可能由三星提供。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/0d7d181a-2bb9-45d4-bd67-2f7e525ce6d1_1426x376.png"
+  caption="来源：OpenAI"
+/>
+
+OpenAI 在 2025 年 11 月完成了 Jalapeño 的流片，更准确地说，这是 CoWoS 设计的流片，而不只是顶层 die 的硅片流片。在那次流片之后的 9 个月内、且只有 3 个月的实际硅片 bring-up 时间里，OpenAI 就用 Jalapeño 拿出了非常好的结果。考虑到团队的软件栈是从零起步，这就更令人印象深刻了。
+
+与之相对，Rubin 的 CoWoS 流片在 2025 年 10 月完成，早了一个月，但我们目前看到的早期结果只有 CoreWeave 的工程样片。NVIDIA 并没有像 OpenAI 这样让我们测试并发布基准结果，这说明他们的芯片软件仍不成熟。考虑到 OpenAI 在自家硅片上 bring-up 新模型的速度，CUDA 护城河有可能已经不复存在。
+
+它们都还远未优化到位，但总体上可以看到 Jalapeño 交出了更好的数据。我们并不认为 NVIDIA 的硬件更差，更多是 Jalapeño 的软件 bring-up 推进得比 NVIDIA 更快。这体现了软硬件协同设计的威力，而这正是一支能打的前沿实验室 ASIC 团队相比更成熟的商用芯片厂商最可能胜出的地方。反直觉的是，从零开始或许也帮了 OpenAI：他们可以做出干净利落的架构决策，而不必顾虑向后兼容或旧版软件。
+
+虽然 OpenAI 目前只有 Jalapeño 的工程样片，但量产计划将在 2027 年逐步爬坡，大部分产出目前排在明年年底。[关于出货量与 ASP 的更多细节，请见 SemiAnalysis 加速器模型](https://semianalysis.com/accelerator-hbm-model/)。
+
+可以说，OpenAI Jalapeno 是一款真正会大批量出货的 ASIC。
+
+与 Rubin 的时间线相比，Jalapeño 的推进速度快得惊人。如前所示，尽管 Rubin 起步更早，Jalapeño 的结果依然胜出。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/bb59cacc-1f16-4c6a-98a5-0f0db74dada7_2048x411.png"
+  caption="来源：SemiAnalysis"
+/>
+
+## Jalapeno 架构
+
+接下来深入架构。这颗芯片的矩阵引擎采用 MXFP 数值格式和权重驻留（weight stationary）的脉动阵列，与 TPU 类似。但与 TPU 直接对比时，它支持更小的形状与维度，这意味着不会像更大的脉动阵列那样，在遇到形状不规整的矩阵乘法时出现奇怪的性能悬崖。
+
+它还配有 64 位标量核心以及 FP32/INT32 向量核心。OpenAI 在托盘级别投入了冗余设计，并在核心与通道级别内置了良率收割机制。他们表示，AI 辅助设计在设计阶段使 SIMD 面积减少 8%、矩阵引擎面积减少 10%。虽然没有说明具体的工艺、电压、温度（PVT）条件，但他们也提到 AI 辅助生成的模块在时序和功耗上都优于最初版本。
+
+Jalapeño 的架构设计重点在于消除 KVCache 与权重的内存搬运，以及固定延迟和各类开销，从而即便在小 batch 或小形状下，也能比其他加速器更接近原始峰值算力与带宽。
+
+核心与 HBM 被划分为多个 slice，每个核心 slice 对自己那一份 HBM 具有低延迟的本地视图。slice 之间的同步走一张专用的高带宽集合通信网络。这种极简的内存层级结构，已经让 Jalapeño 相对 GPU 具备了很大的潜在优势：在 GPU 上，内存访问必须穿过复杂的内存系统，产生的高延迟只能靠更大的形状去摊薄或掩盖。
+
+之所以可行，是因为只要仔细安排权重和 KV 的放置，核心之间的同步就可以被限制在有限且已知的高带宽通信上，例如可以与计算重叠的张量并行通信。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/871631ee-8f0d-4fb6-869c-a6fb298e800e_2048x832.png"
+  caption="来源：OpenAI"
+/>
+
+此外还有一张通用 NoC，用于常规通信以及访问 scale-up 网络。总体而言，相比 NVIDIA 和 Google，OpenAI 依靠简化的 NoC 与内存子系统节省了大量功耗，并获得了可观的性能提升。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/1f93df86-2ea2-4904-8fd1-e0e5eff4b410_1638x854.png"
+  caption="来源：OpenAI"
+/>
+
+在核心层面，OpenAI 描述的是带 L1 缓存的乱序（OoO）核心。这与我们在其他加速器上看到的模式差异很大：后者普遍采用软件管理的 scratchpad，并搭配某种异步 DMA 支持。同样，这里的论点是它能让 Jalapeño 避免诸如 barrier 延迟这类固定开销；而在 GPU 等其他加速器上，这些开销必须靠给每个核心分配更多工作来掩盖或摊薄，也因此更难逼近原始的峰值带宽与算力。
+
+代价是 Jalapeño 因而更依赖良好的预取来保证内存请求及时到达，而这一点可预测性更差、也更难推理。不过，只要 Codex 处在一个好的 harness 中并能拿到详细 trace，为给定形状找到预取最优的 kernel 很可能几乎不需要人工介入。我们认为 OpenAI 正是这样做的，才得以如此迅速地跑通 DeepSeek R1、Kimi K2.5 和 GPT-OSS。
+
+这些核心还支持「小」矩阵维度。视其小到什么程度，这应当能让它在不同模型和 batch 维度上更通用，也更不易受矩阵维度对齐、padding 开销和 tiling 低效的影响。相比之下，TPU、Trainium 和 Etched 的芯片都采用很大的脉动阵列，往往需要较大 batch 或恰好可整除的模型维度，才能避免 tiling 带来的浪费。
+
+在 Jalapeño 上，OpenAI 专注于消除系统中的固定延迟，以便在 Pareto 曲线的各个区间都尽可能逼近 roofline 性能。理论上，这可能在多个运行点上带来相对 GPU 的优势：
+
+- 在低延迟 / 小 batch 推理上有高得多的性能上界，而 GPU 在这里受制于诸多固定开销，例如启动延迟、barrier 延迟和内存系统延迟
+- 在大 batch 或长上下文场景下，也有一定机会更接近硬件 roofline
+
+需要说明的是，即便理论上存在这样的性能上界，对真实 kernel 而言未必容易兑现。因此这套思路大致是：
+
+1. 面向所有工作负载形状，设计出尽可能高的性能上界
+2. 让 Codex 去做那些繁琐的工作，找出能够逼近该上界的 kernel
+
+从 OpenAI 团队在 Jalapeño 上跑通 InferenceX 工作负载的极快速度来看，我们对这条路线持乐观态度。
+
+如果 Jalapeño 成功，那将是一个强烈信号：业界对编程模型和完美通用编译器的执念，正在被前沿 AI 模型所瓦解。
+
+## 软件
+
+OpenAI 写 Jalapeño 的 kernel 就像写汇编。每个 kernel 都是手工调优的代码，有些长达约 3,000 行，并配有正确性检查和自研 sanitizer。早期的 kernel 工作以人在回路为主而非完全自动化，但随着内部一个规模更大的 Codex 版本投入使用，这一点发生了变化——OpenAI 计划把该版本推向企业客户。内部的服务引擎名为「Teacup」。有意思的是，**在用 InferenceX 对 DeepSeek 做基准测试之前，OpenAI 内部并没有 MLA kernel 的实现**。Codex 能在 OpenAI kernel 工程团队完全不介入的情况下这么快写出可用且高效的 kernel，足见其软件流水线的开发能力。
+
+OpenAI 用 Gluon 为 Jalapeño 编程。Gluon 是 OpenAI 的 kernel 编程语言，构建在 Triton 之上，保留了 Triton 的 SPMD（单程序多数据）编程模型，同时暴露出**更底层的编程抽象**。例如在 NVIDIA GPU 上，它提供映射到 PTX 指令的 API，包括 MMA 指令、TMA 指令、mbarrier 机制等等。Gluon 最独特的抽象是 **layout**。一般来说，layout 定义的是硬件资源（例如 warp 9 的第 5 个寄存器）与张量元素（例如第 6 行第 7 列的元素）之间的映射。Gluon 的 layout 抽象基于 [Linear Layouts](https://arxiv.org/abs/2505.23819)，这是 OpenAI 提出的一套 layout 代数，用数学方式形式化了 layout 的定义，并提供了在 layout 上做运算的工具。由此可以实现许多能力，例如可证明正确的 layout 转换和最优的内存 swizzling。
+
+就 Jalapeño 的编程模型而言，每个 Gluon 程序对应一个常驻线程。我们认为这暗示 Jalapeño 适合**常驻 kernel 编程模式**：每个程序处理多个 tile，且由程序员而非硬件调度器来分配工作。OpenAI 提到了 TensorInfo，这是一种显式编码 layout 的抽象，很可能就是为 Jalapeño 设计、并由 Linear Layouts 驱动的那套 layout。最后，每个核心都提供数据预取和解耦的乱序单元，例如用户可以对已预取的数据编写等待逻辑，由信号量控制解锁。
+
+命运的奇妙之处在于：像 GPT 5.6 Sol 这样目前跑在 NVIDIA GPU 上的 OpenAI 模型，被用来设计了一颗真正威胁 CUDA 护城河的芯片——NVIDIA 自己的 GPU 正在实时地帮助催生它潜在的接班者。
+
+把时间轴拉开看，还能看到 Jalapeño 的开发节奏：在不到两周的时间里，某些交互性区间的吞吐量提升超过 2 倍。Jalapeño 团队每次发来的压缩包里都藏着惊喜。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/b38d958b-6d53-4ebe-b92f-c2cb58de05c2_2048x1485.png"
+  caption="来源：OpenAI、SemiAnalysis"
+/>
+
+不只是 kernel 性能提升。在 8 天之内，Jalapeño 团队在此前 TP8 配置的基础上启用了 TP32，从单机扩展到完整的机架级配置来运行大模型。这样的开发速度确实令人印象深刻。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/a18d5611-f7c1-4e34-8919-99b1c683054f_2048x1485.png"
+  caption="来源：OpenAI、SemiAnalysis"
+/>
+
+为了在投入真实硬件运行之前验证性能，OpenAI 还有一个名为「chilisim」的模拟器，采用定宽 trace 总线，与实测硬件的误差在 5% 以内。A0 上的 tracing 能力有限，但在 B0 上有了大幅改进，很可能吸收了 A0 实际运行的反馈。工程师还演示了 Codex CLI 运行一个内部模型（代号「Raiku」或「5.3 Codex Spark」），TPOT 为 1.2ms。
+
+团队还展示了由 Codex 编写、直接在芯片上运行的演示：36 FPS 的 Doom、一个 FP32 流体力学模拟，以及一个名为「Liquid Light」的鼠标拖拽可视化。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/d410878f-5f19-40bd-ad2c-d92ad45d65a9_1252x1232.png"
+  caption="来源：SemiAnalysis"
+/>
+
+在模型侧，OpenAI 内部的 megakernel 方案（代号「gigakernel」）围绕单个 megakernel 构建，在设备上循环执行，以减少 CPU 开销和启动时间。团队还在进一步押注测试时计算策略，内部尤其关注如何连贯地使用 100 万次 rollout。
+
+## 分离还是不分离，这是个问题
+
+前面提到，OpenAI 在这些芯片上没有使用 prefill decode 分离。这让我们相当意外，因为 NVIDIA 和 AMD 的 GPU 即便在同构硬件上也能从 PDD 中获得显著收益。下面我们来看看 Jalapeño 团队为什么这样选。
+
+当工作负载固定不变时，prefill-decode 分离（PDD）看起来很有吸引力。prefill 与 decode 对硬件的压力方式不同，因此把两个阶段分别放到各自调优过的资源池中，可以在某个选定的输入输出比例下提升效率。但生产流量并不会停在那个比例上：输入与输出序列长度、并发、缓存命中率、投机接受率和延迟目标，都会在一天之内不断变化。
+
+一旦设备被划分为 prefill 池和 decode 池，prefill 需求过多时 decode 芯片就会闲置而请求排队；decode 需求过多时则反过来。运营方必须持续预测正确的比例、在两侧都预留冗余容量，并不断重新平衡一个理想比例始终在移动的系统。
+
+在统一的系统中，某些资源在特定阶段可能利用不足，但每台设备都随时可以服务下一条请求。而在分离式系统中，一颗芯片可能仅仅因为归属于错误的资源池就完全闲置：局部利用率看起来更好，全局利用率却可能很差。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/92d363ab-c391-4b9a-9f67-516dac22f534_1364x938.png"
+  caption="来源：SemiAnalysis"
+/>
+
+分离还会破坏局部性。prefill worker 产生的大量 KV cache 是 decode worker 立刻需要的，因此系统必须先把这份状态通过网络传过去，生成才能继续。这会带来额外的带宽消耗、同步、排队，以及又一个故障域。开销还会随输入序列长度上升，因为 KV cache 会变大。不过，避免搬运 KV 主要是一项功耗与延迟优化；愿意搬运一部分 KV，可以用一些功耗和单请求延迟换来更高的硬件利用率。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/5789e0ea-2d0d-4924-b338-f0559c7e7ee9_1928x1292.png" />
+
+可调配的统一集群能够在延迟敏感请求和吞吐导向的批处理之间转移容量，而固定的划分方式则会在流量构成变化时让硬件被闲置。此外，上下文长度会改变注意力与 FFN 之间的工作量平衡，使任何固定的硬件比例都只在其设计点附近才高效。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9f3a37f8-0996-4dea-9631-02ade61d7fae_1358x938.png"
+  caption="来源：SemiAnalysis"
+/>
+
+同样的约束也适用于投机解码。draft 模型必须以极低延迟把候选 token 送给验证方。把两者拆到各自专用的资源池中，会把一个紧耦合的解码循环变成分布式协议，额外的通信与协调开销可能把起草省下的延迟又吃回去。让两个模型留在同一批设备和同一张低延迟网络上，才能保住让投机解码值得做的那份局部性。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/2eb19374-5a08-4d82-84a3-9875b3fc0f5b_1980x1220.png"
+  caption="来源：SemiAnalysis"
+/>
+
+不过，当需求足够大、足够稳定且可预测时，分离仍然可以胜出，尤其是当常规 GPU 需要较大的分阶段 batch 才能获得良好吞吐时。但它并不是免费的午餐。
+
+## 从日式到印式（由淡到辣）：Katsu、Vindaloo 与 Chana —— 这些咖喱菜如何组成一套机架系统
+
+Jalapeño 系统在机架层面由一个 CPU 主机机架和一个 ASIC 机架组成。主机机架容纳 16 个名为「Katsu」的主机 CPU 托盘，每个对应右侧一个名为「Vindaloo」的 ASIC 托盘。每台主机配备两颗 Turin 级 AMD EPYC CPU 和 1.5TB DRAM，每机架配 2 个 E1.S 和 2 个 M.2 SSD。每个托盘还配有 400G（2x200G）前端网络。每个 Katsu 托盘通过 8 条外部 PCIe DAC 线缆与对应的 Vindaloo 托盘相连，这些线缆在机架前部横向走线。系统级设计由 Celestica 合作完成。
+
+ASIC 机架由 16 个 Vindaloo 托盘和 8 个名为「Chana」的 scale-up 交换托盘（6 个用于本地域、2 个用于全局域）组成。每个 Vindaloo 托盘装有 8 颗 Jalapeño ASIC，每机架合计 128 颗。ASIC 通过铜缆背板连接到各个 Chana 交换托盘，与 NVIDIA 的 Oberon 类似。scale-up 拓扑分为机架内 128 颗 ASIC 的本地域，以及最多连接 16 个机架、2,048 颗 ASIC 的全局域。带宽与拓扑细节见下文。
+
+边车式主机机架的供电约为 50kW 规划容量（生产环境 31kW），ASIC 机架为 130kW，两机架系统合计约 160kW，基本相当于一个双倍宽度的 GB300 机架的功耗。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/596ca531-3bde-44fa-8d1b-34d04b8cc6b8_1304x1382.png"
+  caption="来源：SemiAnalysis、OpenAI"
+/>
+
+OpenAI 可以在单个 scale-up 网络内连接多达 2,048 颗 Jalapeño XPU。该 scale-up 网络由两个域组成：本地域通过背板连接机架内全部 128 颗 XPU；全局域采用铜缆与光互连混合方案，跨 16 个机架连接 2,048 颗 XPU。每个机架有 8 个 Chana 交换托盘，中间 6 个用于本地域，各配一颗 102.4T 的 Tomahawk 6 交换 ASIC；位于本地交换托盘上下方的 2 个用于全局域，我们认为它们可能各由 2 颗 102.4T Tomahawk 6 组成，单托盘可达 204.8T。
+
+在本地域中，128 颗 Jalapeño 芯片每颗具备 4.8Tb/s 的单向带宽，以 all-to-all 方式连接到 6 颗 102.4Tb/s 的 Tomahawk 6 ASIC。这相当于每颗 XPU 需要 48 对差分（DP）公母连接器，每机架用于本地 scale-up 的无源铜缆合计 6,144 DP。
+
+在全局域中，16 个机架共 2,048 颗 XPU 通过铜缆背板、204.8T TH6 电交换、1.6T 光模块和光路交换的组合连接在一起。每颗 XPU 的全局链路具备 1.6Tb/s 单向带宽，对应 XPU 与全局交换之间背板上每颗 XPU 16 对差分连接器。每个全局交换托盘（含 2 颗 ASIC）的出向带宽在背板与前面板光口之间分配。
+
+把本地域与全局域合并计算，每机架每颗 XPU 的背板连接器数量为 64 DP，全机架用于无源铜缆的连接器合计 8,192 DP。
+
+全局域采用 rail-only 架构，跨全局域共 8 条 rail。我们认为 OpenAI 通过安装在每个机架中的光路交换机（OCS）来疏导全局域的光链路。对每颗 XPU 而言，1.6Tb/s 的全局带宽先经铜缆背板到达全局交换托盘，再通过前面板的 1.6T 光模块出口，进入无源光交换后离开机架。由此把 scale-up world size 扩展到 16 个机架、每机架 128 颗、合计 2,048 颗 XPU。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/ae9b26b8-471a-43b2-a60c-cd99ce2b9b07_3480x1342.png"
+  caption="来源：SemiAnalysis"
+/>
+
+由于 scale-up 网络只占系统总成本约 10%，这种灵活性为未来 10 到 20 万亿参数的模型、或 200 万到 400 万 token 的上下文窗口买到了宝贵的可选性。在部署方面，OpenAI 正与 neocloud 合作，并在与数据中心伙伴一起采集可靠性数据直到 1 月，同时优化从到货到上架的部署时间。
+
+## 下一步
+
+接下来我们谈谈 Jalapeño 的未来，它的第一个生产 token 即将到来。下一个目标是 100MW，而障碍主要在硬件侧：能造出多少、数据中心能部署和运营得多好、监控与韧性如何处理等等。软件已经得到验证，而有了内部模型，任何软件上的先发优势都很容易被追上。付费部分我们会讨论这对 NVIDIA、AMD、Cerebras，以及未来几年与 OpenAI 签约的其他芯片公司意味着什么。
+
+[我们在加速器模型中还覆盖了下一代芯片的产量、出货单位与时间线](https://semianalysis.com/accelerator-hbm-model/)。
+
+## 对 NVIDIA、AMD 和 Cerebras 的直接影响
+
+<Blur>
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+</Blur>
+
+---
+
+_本文完整版发布在我们的 Substack 上。[订阅 SemiAnalysis](https://newsletter.semianalysis.com/subscribe) 阅读完整文章。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "什么是 OpenAI Jalapeño？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Jalapeño 是 OpenAI 首款自研推理 ASIC，与 Broadcom 合作、从零开始专为 LLM 推理设计，在 Hot Chips 上正式发布。设计工作始于 2024 年年中，CoWoS 设计于 2025 年 11 月流片，从组建团队到流片约 16 个月。目前在 fab 中的 B0 步进采用台积电 N3P 工艺，在单颗满掩模尺寸的计算 die 上提供 13.4 PFLOPs 的 MXFP4 算力，TDP 为 700W，并通过 HBM4 实现每封装 15.4 TB/s 的显存带宽。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Jalapeño 与 NVIDIA Blackwell、Vera Rubin 相比如何？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "在每兆瓦全量供电的 token 吞吐量上，Jalapeño 在几乎所有场景中都胜过 Blackwell；其单 token 预测（STP）结果还超过了 NVIDIA 与 CoreWeave 在 2026 年 7 月公布的 Vera Rubin MTP 数据。在每美元 TCO 性能上，Jalapeño 与 Vera Rubin 大致势均力敌。与 Blackwell 比较的参考价值较弱，因为 Jalapeño 真正的对手是 Rubin 这类 HBM4 产品；而且 Jalapeño 取得这些结果时并未使用投机解码，NVIDIA 的对应配置则使用了。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "OpenAI 为什么没有采用 prefill-decode 分离？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "当工作负载构成固定时，分离很有吸引力，但生产流量并非如此：输入与输出长度、并发、缓存命中率、投机接受率和延迟目标都会在一天之内变化。一旦把芯片划分为 prefill 池和 decode 池，一颗芯片可能仅因归属错误的资源池而完全闲置，于是局部利用率提升、全局利用率反而下降。统一资源池还能保住投机解码所依赖的局部性：一旦把 draft 模型与验证方分开，紧耦合的解码循环就会变成分布式协议。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Jalapeño 的机架是如何组成的？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "该系统由两个机架组成。主机机架容纳 16 个名为 Katsu 的 CPU 托盘，每个配备两颗 Turin 级 AMD EPYC CPU 和 1.5TB DRAM，通过外部 PCIe DAC 线缆连接到 ASIC 机架。ASIC 机架容纳 16 个 Vindaloo 托盘，每个装有 8 颗 Jalapeño ASIC，每机架合计 128 颗，另有 8 个基于 Tomahawk 6 的 Chana scale-up 交换托盘。scale-up 分为通过铜缆背板连接的 128 颗 ASIC 本地域，以及跨 16 个机架、连接 2,048 颗 ASIC 的全局域。两机架系统功耗约 160kW。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Jalapeño 上运行的是什么软件栈？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "OpenAI 使用自研 kernel 语言 Gluon 为该芯片编程。Gluon 构建在 Triton 之上，保留 Triton 的 SPMD 模型，同时暴露更底层的抽象。它最具特色的能力是 layout 抽象，基于 OpenAI 提出的 layout 代数 Linear Layouts，可实现可证明正确的 layout 转换和最优的内存 swizzling。内部服务引擎名为 Teacup，模拟器 chilisim 与实测硬件的误差在 5% 以内，而大量 kernel 代码由内部规模更大的 Codex 版本编写。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "这些 Jalapeño 结果有哪些需要注意的前提？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "所有数据均由 OpenAI 提供。SemiAnalysis 在实验室现场验证了 InferenceX 的运行过程，但没有跑完整套基准测试，目前也没有 AgentX 结果。公布的运行均为 8k1k 单轮场景，比长上下文多轮流量更容易调优：agentic 工作负载会给 router、前缀缓存、缓存管理和 offload 基础设施施加压力，而单轮 8k1k 完全考察不到这些。此外，所测试的模型也不是最新的前沿开放权重模型。"
+      }
+    }
+  ]
+}`}</JsonLd>

@@ -19,13 +19,21 @@ describe('AgentX comparison links', () => {
     ]);
   });
 
-  it('opens the selected model directly in the Agentic Traces scenario', () => {
+  it('opens the selected model subroute directly in the Agentic Traces scenario', () => {
     expect(agentxDashboardHref('en', FEATURED_AGENTX_MODELS[0])).toBe(
-      '/inference?g_model=Kimi-K3&i_seq=agentic-traces&i_optimal=1',
+      '/inference/kimi-k3?i_seq=agentic-traces&i_optimal=1',
     );
     expect(agentxDashboardHref('zh', FEATURED_AGENTX_MODELS[1])).toBe(
-      '/zh/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_optimal=1',
+      '/zh/inference/deepseek-v4?i_seq=agentic-traces&i_optimal=1',
     );
+  });
+
+  it('routes every featured model to a registered inference page', () => {
+    for (const model of FEATURED_AGENTX_MODELS) {
+      expect(agentxDashboardHref('en', model)).toBe(
+        `/inference/${model.slug}?i_seq=agentic-traces&i_optimal=1`,
+      );
+    }
   });
 
   it('uses AgentX for supported models and 8K→1K for the rest', () => {

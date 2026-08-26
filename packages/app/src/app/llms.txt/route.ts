@@ -1,4 +1,7 @@
 import { getAllPosts } from '@/lib/blog';
+import { getAllChipPages, getAllChipVsPages } from '@/lib/chip-pages';
+import { inferenceModelMeta } from '@/lib/inference-model-meta';
+import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 // oxlint-disable-next-line require-await
@@ -21,6 +24,23 @@ export async function GET() {
     `- [RSS Feed](${SITE_URL}/feed.xml)`,
     `- [Full content for LLMs](${SITE_URL}/llms-full.txt)`,
     `- [GitHub](https://github.com/SemiAnalysisAI/InferenceX)`,
+    '',
+    `## Model Benchmark Pages`,
+    '',
+    ...INFERENCE_MODEL_SLUGS.map(
+      (entry) =>
+        `- [${inferenceModelMeta(entry).title}](${SITE_URL}/inference/${entry.slug}): ${entry.label}`,
+    ),
+    '',
+    `## Chip Pages`,
+    '',
+    ...getAllChipPages().map(
+      (chip) => `- [${chip.title}](${SITE_URL}/chips/${chip.slug}): specs, pricing and benchmarks`,
+    ),
+    ...getAllChipVsPages().map(
+      (page) =>
+        `- [${page.a.label} vs ${page.b.label}](${SITE_URL}/chips/${page.slug}): head-to-head comparison`,
+    ),
     '',
     `## Articles`,
     '',

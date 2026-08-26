@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 import { ZH_OG_LOCALE, zhAlternates, zhPath } from '@/lib/i18n';
+import type { ModelRoute, ModelRouteTab } from '@/lib/model-routes';
 import {
   getDashboardRoute,
   isDashboardRouteKey,
@@ -35,6 +36,11 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
     title: '吞吐量与 TCO 计算器',
     description:
       '计算 AI 推理吞吐量与总拥有成本（TCO）。跨硬件配置对比 LLM 推理服务的芯片成本效益。',
+  },
+  fleet: {
+    title: '集群生命周期经济性',
+    description:
+      '测算固定 AI 推理集群在整个生命周期内的经济性：按设施功率预算确定集群规模，并跟踪实测软件配置随时间改进带来的收入、成本与利润率变化。',
   },
   reliability: {
     title: '服务商可靠性指标',
@@ -88,6 +94,8 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面展示历史趋势图表：跟踪各芯片、框架与模型的推理性能随时间的演进，量化软件栈优化带来的收益。',
   calculator:
     '本页面提供吞吐量与总拥有成本（TCO）计算器：基于真实基准测试数据，估算不同芯片配置下 LLM 推理服务的每百万 token 成本与性价比。',
+  fleet:
+    '本页面提供集群生命周期经济性分析：按设施功率预算确定固定集群的规模，从模型发布之日起，基于历史基准测试中实测的软件配置改进，测算收入、成本、利润率与回本时间。',
   reliability:
     '本页面展示基准测试基础设施的可靠性指标：各芯片集群与服务商的运行成功率、错误率与可用性。',
   'gpu-specs':
@@ -112,6 +120,7 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   evaluation: '准确率评估',
   historical: '历史趋势',
   calculator: 'TCO 计算器',
+  fleet: '集群生命周期',
   reliability: '可靠性',
   'gpu-specs': '芯片规格',
   'gpu-metrics': '芯片功耗',
@@ -127,8 +136,8 @@ export type HeaderNavHref =
   | '/agentx'
   | '/overview'
   | '/inference'
-  | '/inference/agentic'
   | '/compare'
+  | '/blog'
   | '/about';
 
 /** Chinese labels for the site header nav, keyed by its exact English href set. */
@@ -136,13 +145,68 @@ export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
   '/': '首页',
   '/overview': '总览',
   '/inference': '仪表板',
-  '/inference/agentic': '遥测数据',
   '/compare': '性能对比',
+  '/blog': '技术文章',
   '/agentx': 'AgentX',
   '/about': '关于',
 };
 
 const TITLE_SUFFIX = `${SITE_NAME} by ${AUTHOR_NAME}`;
+
+/** Chinese copy for the per-model tab routes (/zh/calculator/<slug>,
+ *  /zh/historical/<slug>). Model names stay in English per site convention. */
+export const MODEL_TAB_META_ZH: Record<
+  ModelRouteTab,
+  {
+    title: (seoName: string) => string;
+    description: (seoName: string) => string;
+    intro: (seoName: string) => string;
+  }
+> = {
+  historical: {
+    title: (seoName) => `${seoName} 历史推理性能趋势`,
+    description: (seoName) =>
+      `跟踪 ${seoName} 推理性能随时间的变化。历史基准测试数据展示各芯片与服务商运行 ${seoName} 时在延迟、吞吐量和成本上的改进。`,
+    intro: (seoName) =>
+      `本页面展示 ${seoName} 的历史趋势图表：跟踪各芯片与框架运行 ${seoName} 时推理性能随时间的演进，量化软件栈优化带来的收益。`,
+  },
+  calculator: {
+    title: (seoName) => `${seoName} 吞吐量与 TCO 计算器`,
+    description: (seoName) =>
+      `计算 ${seoName} 推理的吞吐量与总拥有成本（TCO）。跨硬件配置对比 ${seoName} 推理服务的芯片成本效益。`,
+    intro: (seoName) =>
+      `本页面提供 ${seoName} 吞吐量与总拥有成本（TCO）计算器：基于真实基准测试数据，估算不同芯片配置下 ${seoName} 推理服务的每百万 token 成本与性价比。`,
+  },
+};
+
+/** Generate Next.js Metadata for a per-model /zh tab page. Canonical (and
+ *  hreflang) mirror the English rule in `modelTabCanonicalPath`: the default
+ *  model's page points at the bare tab path, others are self-canonical. */
+export function modelTabMetadataZh(
+  tab: ModelRouteTab,
+  route: ModelRoute,
+  canonicalEnPath: string,
+): Metadata {
+  const meta = MODEL_TAB_META_ZH[tab];
+  const title = meta.title(route.seoName);
+  const description = meta.description(route.seoName);
+  const url = `${SITE_URL}${zhPath(canonicalEnPath)}`;
+  return {
+    title,
+    description,
+    alternates: zhAlternates(canonicalEnPath),
+    openGraph: {
+      title: `${title} | ${SITE_NAME}`,
+      description,
+      url,
+      locale: ZH_OG_LOCALE,
+    },
+    twitter: {
+      title: `${title} | ${TITLE_SUFFIX}`,
+      description,
+    },
+  };
+}
 
 /** Generate Next.js Metadata for a /zh tab page (mirrors `tabMetadata`). */
 export function tabMetadataZh(tab: DashboardRouteKey): Metadata {

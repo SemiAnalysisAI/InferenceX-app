@@ -8,6 +8,7 @@ import { CuratedViewCard } from '@/components/landing/curated-view-card';
 import { NudgeEngine } from '@/components/nudge-engine';
 import { FAVORITE_PRESETS } from '@/components/favorites/favorite-presets';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
+import { ACTIVE_INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import type { Locale } from '@/lib/i18n';
 
 const STRINGS = {
@@ -19,6 +20,7 @@ const STRINGS = {
     platformCoverage:
       'Compare NVIDIA GB300 NVL72, GB200 NVL72, B300, B200, H200, H100, AMD MI355X, MI325X, MI300X and soon VR200 NVL72, AMD MI455X UALoE72, TPUv7 Ironwood, etc across DeepSeekv4 Pro, Qwen, Kimi, GLM, MiniMax, gpt-oss, Llama and other models.',
     overview: 'Overview',
+    browseByModel: 'Or jump straight to the benchmarks for one model:',
     reproTitle: 'Every Result Is Transparently done through Public GitHub Actions Automation',
     reproP1:
       'Every data point on the dashboard is produced by a public GitHub Actions workflow run. The recipe lives in the repo, the run executes on the actual target hardware, and the full logs and artifacts are publicly viewable. Click any point on a chart to jump straight to the run that produced it. All reproducible, auditable, and open source.',
@@ -48,6 +50,7 @@ const STRINGS = {
     platformCoverage:
       '目前覆盖 DeepSeekv4 Pro、Qwen、Kimi、GLM、MiniMax、gpt-oss、Llama 等模型，以及 NVIDIA GB300 NVL72、GB200 NVL72、B300、B200、H200、H100 和 AMD MI355X、MI325X、MI300X 等硬件。后续还将加入 VR200 NVL72、AMD MI455X UALoE72 和 TPUv7 Ironwood。',
     overview: '总览',
+    browseByModel: '也可以直接查看单个模型的基准测试：',
     reproTitle: '所有结果均通过公开的 GitHub Actions 流程生成',
     reproP1:
       '仪表板上的每个数据点都来自一次公开的 GitHub Actions 运行。测试配置保存在仓库中，并在对应的真实硬件上执行；完整日志和产物均可公开查看。点击图表中的任意数据点，即可打开生成该结果的运行记录。整个过程可复现、可审计，并完全开源。',
@@ -123,6 +126,26 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
                 {t.fullDashboard}
                 <ArrowRight aria-hidden="true" className="size-4" />
               </LandingTrackedLink>
+            </div>
+            {/* Per-model entry points — crawlable links to the indexable
+                /inference/<model> pages. Only actively benchmarked models are
+                promoted here; deprecated model pages stay reachable via the
+                sitemap and dashboard selector. */}
+            <p className="text-sm text-muted-foreground mt-6 mb-2">{t.browseByModel}</p>
+            <div className="flex flex-wrap gap-2" data-testid="landing-model-links">
+              {ACTIVE_INFERENCE_MODEL_SLUGS.map((entry) => (
+                <LandingTrackedLink
+                  key={entry.slug}
+                  href={`${prefix}/inference/${entry.slug}`}
+                  data-testid={`landing-model-link-${entry.slug}`}
+                  analyticsEvent="landing_model_page_clicked"
+                  appNavigation
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+                >
+                  {entry.seoName}
+                  <ArrowRight aria-hidden="true" className="size-3.5" />
+                </LandingTrackedLink>
+              ))}
             </div>
           </Card>
 

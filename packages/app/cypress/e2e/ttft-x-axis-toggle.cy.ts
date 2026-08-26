@@ -1,5 +1,6 @@
 import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 import { agenticMetrics } from '../support/agentic-fixtures';
+import { expandLegendAdvanced } from '../support/legend-advanced';
 
 // This spec exercises the agentic x-axis modes, which only exist when the
 // selected model resolves to the Agentic scenario. The default e2e
@@ -172,6 +173,20 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     );
   });
 
+  it('offers unobtrusive FAQ help beside E2E Normalized Interactivity', () => {
+    cy.get('[data-testid="normalized-interactivity-faq-link"]')
+      .should('be.visible')
+      .and('have.attr', 'href', '/about#faq-normalized-interactivity')
+      .and('have.attr', 'title', 'What does E2E Normalized Interactivity mean?')
+      .and('have.class', 'no-export')
+      .find('svg[aria-hidden="true"]')
+      .should('be.visible');
+
+    // The metric tabs sit outside the chart capture root, and no-export is a
+    // second guard if this control moves into that tree in the future.
+    cy.get('#chart-0 [data-testid="normalized-interactivity-faq-link"]').should('not.exist');
+  });
+
   it('switches to E2E Normalized Interactivity and updates the heading', () => {
     // The first entry into this mode fetches the trace-derived metrics, which the
     // suite's intercept stubs; the default no longer fetches them on load.
@@ -184,8 +199,8 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
   });
 
-  it('explains the offload halo in the legend and distinguishes it from plain points', () => {
-    cy.get('#chart-0 [data-testid="offload-halo-key"]')
+  it('explains the offload halo in the info footer and distinguishes it from plain points', () => {
+    cy.get('[data-testid="axis-metric-footer-chart-0"] [data-testid="offload-halo-key"]')
       .should('be.visible')
       .and('contain.text', 'KV offload ON');
     cy.get('#chart-0 .offload-halo').should('have.length.at.least', 1);
@@ -196,25 +211,14 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     });
   });
 
-  it('keeps the offload halo explanation in the PNG export clone', () => {
-    cy.window().then((win) => {
-      const exportContainer = win.document.querySelector('#chart-0-export');
-      expect(exportContainer).not.to.equal(null);
-      const state = { seen: false };
-      const observer = new win.MutationObserver(() => {
-        if (exportContainer?.querySelector('[data-testid="offload-halo-key"]')) {
-          state.seen = true;
-          observer.disconnect();
-        }
-      });
-      observer.observe(exportContainer!, { childList: true, subtree: true });
-      (win as typeof win & { __offloadHaloExportState: typeof state }).__offloadHaloExportState =
-        state;
-    });
-
-    cy.get('[data-testid="chart-figure"]').first().find('[data-testid="export-button"]').click();
-    cy.get('[data-testid="export-png-button"]').click();
-    cy.window().its('__offloadHaloExportState.seen').should('eq', true);
+  it('keeps the offload halo explanation out of the chart capture tree', () => {
+    // The key lives in the axis-metric info footer (a `no-export` sibling of
+    // the chart), so the PNG export clone — built from #chart-0 — carries the
+    // halo decoration itself but not the textual key.
+    cy.get('[data-testid="axis-metric-footer-chart-0"] [data-testid="offload-halo-key"]').should(
+      'be.visible',
+    );
+    cy.get('#chart-0 [data-testid="offload-halo-key"]').should('not.exist');
   });
 
   it('shows the selected percentile in the Interactivity axis label', () => {
@@ -231,6 +235,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     // Line labels name the curve and point labels name the point, so the
     // agentic view turns on both — it differs from fixed-seq only in the
     // parallelism and point labels.
+    expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
@@ -248,6 +253,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+    expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
@@ -451,6 +457,7 @@ describe('Label defaults for fixed-sequence scenarios', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+    expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
@@ -512,6 +519,7 @@ describe('Label defaults for fixed-sequence scenarios', () => {
       },
     });
     cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+    expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
@@ -621,7 +629,7 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
       'contain.text',
       'P90 Interactivity (tok/s/user)',
     );
-    cy.get('#chart-0 [data-testid="offload-halo-key"]')
+    cy.get('[data-testid="axis-metric-footer-chart-0"] [data-testid="offload-halo-key"]')
       .should('be.visible')
       .and('contain.text', 'KV offload ON');
   });

@@ -1,3 +1,5 @@
+import { expandLegendAdvanced } from '../support/legend-advanced';
+
 describe('Gradient Labels Toggle', () => {
   before(() => {
     cy.visit('/inference', {
@@ -8,6 +10,8 @@ describe('Gradient Labels Toggle', () => {
     // Wait for chart to load
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
     cy.get('.sidebar-legend').first().should('be.visible');
+    // Parallelism Labels lives in the collapsed-by-default Advanced drawer.
+    expandLegendAdvanced();
   });
 
   it('Gradient Labels toggle exists in the legend', () => {
@@ -94,6 +98,7 @@ describe('Gradient Labels Toggle', () => {
       },
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
+    expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
   });
 });

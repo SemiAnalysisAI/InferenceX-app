@@ -54,6 +54,8 @@ export interface HardwareEntry {
   suffix: string;
   gpu: string;
   framework?: string;
+  /** Keep precision in curve labels even when the filter selects one precision. */
+  alwaysShowPrecision?: boolean;
 }
 
 const UNKNOWN_HARDWARE: HardwareEntry = {
@@ -78,13 +80,18 @@ function buildHardwareEntry(hwKey: string, model?: string): HardwareEntry | null
   const parts = hwKey.split('_').slice(1);
   const label = reg.label;
   const gpuName = base.toUpperCase(); // always raw uppercase for gpu string
-  const partLabels = parts.map((p) => resolveFrameworkPartLabel(model, p));
+  const isJulyRubinSnapshot = base === 'vr200' && parts[0] === 'rubin-july';
+  const partLabels =
+    base === 'vr200' && parts[0] === 'coreweave-vera-rubin'
+      ? parts.slice(1).map((p) => resolveFrameworkPartLabel(model, p))
+      : parts.map((p) => resolveFrameworkPartLabel(model, p));
 
   return {
     name: hwKey.replaceAll('_', '-'),
     label,
     suffix: partLabels.length > 0 ? `(${partLabels.join(', ')})` : '',
     gpu: [getVendorPrefix(base), gpuName, ...partLabels].join(' '),
+    ...(isJulyRubinSnapshot ? { alwaysShowPrecision: true } : {}),
   };
 }
 

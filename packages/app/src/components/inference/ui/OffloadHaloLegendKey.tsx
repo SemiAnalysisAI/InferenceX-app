@@ -5,15 +5,15 @@ export const OFFLOAD_HALO_STROKE_WIDTH = 1.5;
 export const OFFLOAD_HALO_DASHARRAY = '3 2';
 
 /**
- * Legend key for the dashed ring drawn around agentic points that use KV-cache
- * offload. This stays outside `no-export` content so the chart export clone
- * carries the same explanation into downloaded PNGs.
+ * Key for the dashed ring drawn around agentic points that use KV-cache
+ * offload. Rendered in the axis-metric info footer below the chart (the
+ * footer is `no-export`, so downloaded PNGs carry only the halo itself).
  */
 export function OffloadHaloLegendKey() {
   return (
     <div
       data-testid="offload-halo-key"
-      className="mt-2 flex w-full items-center gap-2 px-1 pr-2 text-xs text-muted-foreground"
+      className="flex w-full items-center gap-2 px-1 pr-2 text-xs text-muted-foreground"
     >
       <svg
         width="16"

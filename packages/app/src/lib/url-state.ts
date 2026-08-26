@@ -13,6 +13,7 @@
  * Only non-default values are written to keep URLs short.
  */
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/dashboard-routes';
+import { routeModelForPathname } from '@/lib/model-routes';
 
 // All known share-link parameter keys
 const URL_STATE_KEYS = [
@@ -44,10 +45,9 @@ const URL_STATE_KEYS = [
   'i_log',
   'i_legend',
   'i_advlabel',
+  'i_conclabel',
   'i_gradlabel',
   'i_linelabel',
-  'i_speed',
-  'i_mc',
   'i_active',
   // Quick filters (vendor / framework / deployment / mtp-stp).
   // `i_disagg` keeps its historical name for shared-link compatibility.
@@ -74,6 +74,21 @@ const URL_STATE_KEYS = [
   // Calculator (fleet planner)
   'c_mw',
   'c_costcap',
+  // Calculator (fleet lifecycle) — token price and the ramp/interrupt/horizon
+  // assumptions (the throughput steps are measured; those four are not), plus
+  // which metric the chart plots.
+  'c_price',
+  // Output-token price. Input keeps `c_price`, so a link written before the
+  // split still seeds the field it always seeded.
+  'c_oprice',
+  'c_ramp',
+  // What a cached input token sells for, as a % of the price. Agentic only —
+  // fixed sequences record no cache hits for it to apply to.
+  'c_cache',
+  'c_ly',
+  'c_mtbi',
+  'c_rec',
+  'c_life',
 ] as const;
 
 export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
@@ -82,7 +97,7 @@ export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
 /** Default values for each parameter. Params matching their default are omitted from share URLs. */
 /**
  * Dashboard default y-axis: total tokens purchasable per $1 USD at owning
- * hyperscaler TCO, so the dashboard leads with the economics rather than raw
+ * Neocloud TCO, so the dashboard leads with the economics rather than raw
  * throughput. `?i_metric=` still wins, so existing shared links are unaffected.
  *
  * Lives here rather than in `InferenceContext` because `PARAM_DEFAULTS` below
@@ -90,7 +105,7 @@ export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
  * a link captured on the *other* metric would be written without `i_metric`
  * and reopen on this one.
  */
-export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarH';
+export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarN';
 
 export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_model: 'DeepSeek-V4-Pro',
@@ -126,10 +141,9 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_log: '',
   i_legend: '',
   i_advlabel: '',
+  i_conclabel: '',
   i_gradlabel: '',
   i_linelabel: '',
-  i_speed: '',
-  i_mc: '',
   i_active: '',
   i_vendor: '',
   i_fw: '',
@@ -150,6 +164,19 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   r_active: '',
   c_mw: '',
   c_costcap: '',
+  // Empty means "use the component's default", which for these two is derived
+  // rather than constant: the price from the cheapest visible chip's break-even,
+  // the horizon from the measured run window. A non-empty default here would be
+  // stripped from share links and silently re-derived on load.
+  c_price: '',
+  c_oprice: '',
+  c_life: '',
+  // Empty means the default y metric (margin).
+  c_ly: '',
+  c_ramp: '3',
+  c_cache: '10',
+  c_mtbi: '24',
+  c_rec: '12',
 };
 
 /** In-memory store of current param values (kept in sync via writeUrlParams). */
@@ -331,6 +358,14 @@ function collectTabParams(): URLSearchParams {
     if (prefixes.some((p) => key.startsWith(p))) {
       filtered.set(key, value);
     }
+  }
+
+  // On per-model routes (/calculator/<slug>, /historical/<slug>) the pathname
+  // already encodes the model, so a matching g_model would be redundant in the
+  // share link. A mismatch (possible mid-transition) is kept — explicit
+  // g_model wins over the path on load, so the link still opens correctly.
+  if (routeModelForPathname(window.location.pathname) === filtered.get('g_model')) {
+    filtered.delete('g_model');
   }
 
   // Carry over any unofficial-run IDs currently reflected in the address bar.

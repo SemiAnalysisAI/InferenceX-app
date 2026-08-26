@@ -14,7 +14,7 @@ describe('Tokens per currency and agentic controls', () => {
     cy.visit('/inference');
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
-      'Total Tokens per $1 USD (Owning - Hyperscaler)',
+      'Total Tokens per $1 USD (Owning - Neocloud Giant)',
     );
     cy.get('[data-testid="scatter-graph"]')
       .first()

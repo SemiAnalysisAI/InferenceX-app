@@ -8,6 +8,7 @@ import {
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import ChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { mountWithProviders } from '../support/test-utils';
+import { expandLegendAdvanced } from '../support/legend-advanced';
 import {
   createMockInferenceData,
   createMockChartDefinition,
@@ -711,6 +712,7 @@ describe('ScatterGraph', () => {
       .should('have.text', ' (TileRT, MTP)')
       .and('have.attr', 'fill', '#d1d5db');
 
+    expandLegendAdvanced();
     cy.get('#scatter-line-labels').click();
     cy.get('#test-scatter-ingested-singleton-label svg .line-label').should('not.exist');
     cy.get('#scatter-line-labels').click();
@@ -907,6 +909,75 @@ describe('ScatterGraph', () => {
     cy.get('@setUnifiedOverlaySelection').should((setSelection) => {
       const official = setSelection.lastCall.args[0] as Set<string>;
       expect([...official]).to.have.members(['b200_sglang', 'h100_vllm']);
+    });
+  });
+
+  it('keeps the unofficial overlay active when soloing an official hardware series', () => {
+    const chartDefinition = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const officialData = ['b200_sglang', 'h100_vllm'].flatMap((hwKey, hwIndex) =>
+      [8, 16, 32].map((x, index) =>
+        createMockInferenceData({
+          hwKey,
+          x,
+          y: 320 - hwIndex * 20 - index * 40,
+          precision: Precision.FP4,
+        }),
+      ),
+    );
+    const runUrl = 'https://github.com/x/y/actions/runs/official-solo';
+    const overlayData = {
+      data: [8, 16, 32].map((x, index) =>
+        createMockInferenceData({
+          hwKey: 'h100_vllm',
+          x,
+          y: 260 - index * 40,
+          precision: Precision.FP4,
+          run_url: runUrl,
+        }),
+      ),
+      hardwareConfig: hwConfig,
+      label: 'official-solo',
+      runUrl,
+    };
+
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-official-solo"
+          modelLabel="DeepSeek V4 Pro"
+          data={officialData}
+          xLabel="Concurrency"
+          yLabel="Throughput / Chip (tok/s)"
+          chartDefinition={chartDefinition}
+          overlayData={overlayData}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_sglang', 'h100_vllm']),
+          hwTypesWithData: new Set(['b200_sglang', 'h100_vllm']),
+          selectedModel: Model.DeepSeek_V4_Pro,
+          selectedSequence: Sequence.AgenticTraces,
+          selectedPrecisions: [Precision.FP4],
+        },
+        unofficial: {
+          activeOverlayHwTypes: new Set(['h100_vllm']),
+          allOverlayHwTypes: new Set(['h100_vllm']),
+        },
+      },
+    );
+
+    cy.get('#test-scatter-official-solo svg .overlay-roofline-path').should('exist');
+    cy.get('label[for="checkbox-h100_vllm"]').click();
+    cy.get('@setUnifiedOverlaySelection').should((setSelection) => {
+      const official = setSelection.lastCall.args[0] as Set<string>;
+      const overlay = setSelection.lastCall.args[1] as Set<string>;
+      expect([...official]).to.deep.equal(['h100_vllm']);
+      expect([...overlay]).to.deep.equal(['h100_vllm']);
     });
   });
 

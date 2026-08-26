@@ -1,0 +1,78 @@
+---
+title: 'MiniMax M3 的 AgentX 结果：B300 TRT-LLM TP2 拿下桂冠'
+subtitle: 'NVIDIA 横扫这个 432B 模型，而缺失的 DP attention 数据点说明了缓存局部性为何变成路由约束'
+seoDescription: 'MiniMax M3 432B 的 AgentX 结果。B300 TRT-LLM TP2 领跑前沿曲线；由于 KV cache 局部性变成路由约束，曲线上没有 DP attention 数据点；GB200 上 TP4/EP4/DPA 的吞吐量只有纯 TP4 的 0.60 倍，而 p90 TTFT 高出 3 倍以上。'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - minimax
+  - b300
+  - b200
+  - gb200
+  - trtllm
+  - vllm
+  - nvidia
+---
+
+在 MiniMax M3 432B 上，NVIDIA 完胜所有对手。AMD 的软件性能非常糟糕，长上下文下尤其如此；我们认为根源在于 AMD 工程管理层只激励团队针对短上下文单轮工作负载做调优，而忽视了长上下文多轮工作负载。
+
+在 NVIDIA 阵营内部，B300 TRT-LLM 在 TP2 下拿下了 M3 的桂冠。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/5179bd8e-c147-46c8-aeb4-b347049b28a7_2048x1303.png"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft)"
+/>
+
+## 缺失的 DP attention 数据点
+
+M3 的前沿曲线上没有 [DP attention](/zh/glossary/dp-attention) 数据点，而这种缺席本身就说明了问题：在 M3 上，数据并行注意力并不划算，因为 KV cache 局部性会变成路由约束。
+
+具体数字让机制变得清晰。以并发 40 的 GB200 为例，TP4/EP4/DPA 的吞吐量只有纯 TP4 的 0.60 倍，而 p90 TTFT 高出 3 倍以上；并发 32 时缓存命中率仅 28.8%，理论值则是 96.0%。每个 DP rank 独占缓存池的四分之一，一个 30 万 token 的会话一旦落到错误的 rank 上，就要全部重算。
+
+28.8% 实测与 96.0% 理论之间的这道鸿沟，正是数据并行下[前缀复用](/zh/glossary/prefix-cache-hit-rate)的全部症结：缓存本身足够大，只是会话没有被发到持有它的那个 rank 上。
+
+M3 的前沿曲线上也没有出现任何带专家并行的 decode 配置，可能是因为并发还不足以让所有专家的负载均衡起来。
+
+## vLLM 与 TRT-LLM 的对比
+
+值得一提的是，从吞吐量与 p90 交互性的关系看，vLLM 的表现与 TRT-LLM 非常接近；而在吞吐量与 p90 TTFT 的关系上，vLLM 表现更好。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/729199d9-66c0-42b5-b1b8-f228503c1585_2048x1289.png"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_trt%2Cb200_vllm%2Cb300_trt%2Cb300_vllm&i_hc=1&i_label=0)"
+/>
+
+因此更倾向于哪一个，取决于你的产品是按哪条坐标轴来定义的。这也再次说明：应当把交互性和首 token 延迟放在一起读，而不是挑一张更符合预设结论的图。
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/68f7ad68-3886-4980-9b01-390582728e47_2048x1292.png" />
+
+---
+
+_本文结果只是 AgentX 1.0 的一个切面。完整分析、回放方法，以及该基准测试推动的 70 多个上游 PR，请见 [AgentX - InferenceXv3：CUDA 护城河在 agentic 推理中还站得住吗？](/zh/blog/agentx-inferencexv3-does-cuda-moat)。每个数据点都可以在[免费仪表板](https://inferencex.semianalysis.com/)上自行探索。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "在 MiniMax M3 上哪种配置最快？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "B300 TRT-LLM 在 TP2 下拿下 M3 桂冠。NVIDIA 在该模型上整体领先，而 AMD 的软件性能表现较差，长上下文场景尤其明显。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "M3 前沿曲线上为什么没有数据并行注意力的数据点？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "在 M3 上 DP attention 并不划算，因为 KV cache 局部性会变成路由约束。在并发 40 的 GB200 上，TP4/EP4/DPA 的吞吐量只有纯 TP4 的 0.60 倍，p90 TTFT 高出 3 倍以上；并发 32 时实测缓存命中率为 28.8%，而理论上限为 96.0%，原因是每个 DP rank 只拥有缓存池的四分之一，会话落到错误的 rank 上就要全部重算。"
+      }
+    }
+  ]
+}`}</JsonLd>

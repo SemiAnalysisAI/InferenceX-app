@@ -16,7 +16,8 @@ import {
 } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+import { OFFICIAL_PREVIEW_SERIES } from '@/components/official-preview-notice';
+import { getHardwareConfig, getModelSortIndex, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import { getChartWatermark, Sequence } from '@/lib/data-mappings';
 import { generateGpuDateColors, generateHighContrastGpuDateColors } from '@/lib/dynamic-colors';
 import { useLocale } from '@/lib/use-locale';
@@ -56,17 +57,14 @@ import {
   comparisonEntrySortValue,
   resolveComparisonEntries,
 } from '@/components/inference/utils/comparisonEntry';
-import {
-  generateGPUGraphTooltipContent,
-  getPointLabel,
-} from '@/components/inference/utils/tooltipUtils';
+import { generateGPUGraphTooltipContent } from '@/components/inference/utils/tooltipUtils';
+import { pointLabelText } from '@/components/inference/ui/point-label';
 import { scatterPointConfigId } from '@/components/inference/utils/point-identity';
 import {
   type KnownIssueAnnotation,
   createKnownIssueLayer,
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
-import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import {
   parallelismLabelBoxes,
@@ -76,7 +74,6 @@ import {
   updateRenderedLineLabels,
   type LineLabelSeries,
 } from '@/components/inference/ui/line-label-layer';
-import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 
 const FixedSequenceLogDialog = dynamic(() =>
@@ -105,6 +102,7 @@ const GPU_STRINGS = {
     optimalOnly: 'Optimal Only',
     labels: 'Labels',
     parallelismLabels: 'Parallelism Labels',
+    concurrencyLabels: '# Concurrent Sessions',
     lineLabels: 'Line Labels',
     resetFilter: 'Reset filter',
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
@@ -115,6 +113,7 @@ const GPU_STRINGS = {
     optimalOnly: '仅最优',
     labels: '标签',
     parallelismLabels: '并行配置标签',
+    concurrencyLabels: '并发会话数',
     lineLabels: '曲线标签',
     resetFilter: '重置筛选',
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
@@ -149,6 +148,7 @@ const GPUGraph = React.memo(
       logScale,
       isLegendExpanded,
       useAdvancedLabels,
+      showConcurrencyLabels,
       highContrast,
       showLineLabels,
     } = useInferenceDisplay();
@@ -161,6 +161,7 @@ const GPUGraph = React.memo(
       setLogScale,
       setIsLegendExpanded,
       setUseAdvancedLabels,
+      setShowConcurrencyLabels,
       setHighContrast,
       selectAllActiveDates,
       setShowLineLabels,
@@ -190,7 +191,6 @@ const GPUGraph = React.memo(
       setQuickFilterDeployment,
       setQuickFilterSpec,
     ]);
-    const hasOffloadHalo = useMemo(() => data.some((point) => point.offload_mode === 'on'), [data]);
 
     // Shared date+GPU pairs. `dates` holds comparison-series entries (plain dates
     // and/or specific-run entries); a same-day range endpoint is dropped when that
@@ -392,24 +392,48 @@ const GPUGraph = React.memo(
     // same treatment the scatter view gets, applied to the date-comparison view.
     // Lines here are colored per (gpu, date) pair, so take the first active
     // pair's color as the series swatch.
-    const knownIssueAnnotations = useMemo(
-      (): KnownIssueAnnotation[] =>
-        matchKnownConfigIssues(modelLabel, filteredData).map((issue) => {
-          const cfg = getHardwareConfig(issue.hwKey, modelLabel);
-          const colorEntry = allGraphs.find(
-            (entry) => entry.hwKey === issue.hwKey && activeDates.has(entry.id),
-          );
-          return {
-            issue,
-            label: cfg ? getDisplayLabel(cfg) : issue.hwKey,
-            color: getCssColor(colorEntry?.color ?? resolveColor(issue.hwKey)),
-            points: filteredData
-              .filter((p) => pointMatchesIssue(issue, p))
-              .map((p) => ({ x: p.x, y: p.y })),
-          };
-        }),
-      [modelLabel, filteredData, allGraphs, activeDates, resolveColor, getCssColor],
-    );
+    const knownIssueAnnotations = useMemo((): KnownIssueAnnotation[] => {
+      const annotations: KnownIssueAnnotation[] = matchKnownConfigIssues(
+        modelLabel,
+        filteredData,
+      ).map((issue) => {
+        const cfg = getHardwareConfig(issue.hwKey, modelLabel);
+        const colorEntry = allGraphs.find(
+          (entry) => entry.hwKey === issue.hwKey && activeDates.has(entry.id),
+        );
+        return {
+          issue,
+          label: cfg ? getDisplayLabel(cfg) : issue.hwKey,
+          color: getCssColor(colorEntry?.color ?? resolveColor(issue.hwKey)),
+          points: filteredData
+            .filter((p) => pointMatchesIssue(issue, p))
+            .map((p) => ({ x: p.x, y: p.y })),
+        };
+      });
+      for (const previewConfig of OFFICIAL_PREVIEW_SERIES) {
+        const previewPoints = filteredData.filter((point) =>
+          hardwareKeyMatchesAnyBase(String(point.hwKey), previewConfig.baseGpuKeys),
+        );
+        if (previewPoints.length === 0) continue;
+
+        const hwKey = String(previewPoints[0]!.hwKey);
+        const colorEntry = allGraphs.find(
+          (entry) => entry.hwKey === hwKey && activeDates.has(entry.id),
+        );
+        const previewCopy = previewConfig.strings[locale];
+        annotations.push({
+          preview: {
+            id: previewConfig.id,
+            summary: previewCopy.title,
+            detail: previewCopy.chartDetail,
+          },
+          label: getDisplayLabel(getHardwareConfig(hwKey, modelLabel)),
+          color: getCssColor(colorEntry?.color ?? resolveColor(hwKey)),
+          points: previewPoints.map((point) => ({ x: point.x, y: point.y })),
+        });
+      }
+      return annotations;
+    }, [modelLabel, filteredData, allGraphs, activeDates, resolveColor, getCssColor, locale]);
 
     const knownIssueLayer = useMemo(
       () =>
@@ -421,6 +445,7 @@ const GPUGraph = React.memo(
             foreground: getCssColor('--foreground'),
             mutedForeground: getCssColor('--muted-foreground'),
             onLinkClick: (annotation) =>
+              annotation.issue &&
               track('inference_known_issue_clicked', {
                 hwKey: annotation.issue.hwKey,
                 issue: annotation.issue.issueRef,
@@ -468,6 +493,7 @@ const GPUGraph = React.memo(
       () =>
         [
           useAdvancedLabels ? 'advanced-labels' : 'basic-labels',
+          showConcurrencyLabels ? 'conc-labels' : 'no-conc-labels',
           selectedYAxisMetric,
           `linear:${xExtent.join(',')}`,
           `${logScale ? 'log' : 'linear'}:${yDomain.join(',')}`,
@@ -477,7 +503,15 @@ const GPUGraph = React.memo(
         ]
           .toSorted()
           .join('|'),
-      [selectedYAxisMetric, useAdvancedLabels, xExtent, logScale, yDomain, filteredData],
+      [
+        selectedYAxisMetric,
+        useAdvancedLabels,
+        showConcurrencyLabels,
+        xExtent,
+        logScale,
+        yDomain,
+        filteredData,
+      ],
     );
 
     // Color resolver for points/rooflines
@@ -725,11 +759,11 @@ const GPUGraph = React.memo(
             config: {
               getColor,
               hideLabels: !showPointLabels,
-              // Match ScatterGraph: append the concurrency (C=) to the
-              // parallelism/tp label so compare-mode points are annotated the
-              // same way as the single-run scatter chart.
-              getLabelText: (d) =>
-                useAdvancedLabels ? `${getPointLabel(d)}\nC=${d.conc}` : `${d.tp}\nC=${d.conc}`,
+              // Match ScatterGraph: concurrency (C=) is appended only when the
+              // advanced "# Concurrent Sessions" toggle is on, so compare-mode
+              // points are annotated the same way as the single-run scatter
+              // chart.
+              getLabelText: (d) => pointLabelText(d, useAdvancedLabels, showConcurrencyLabels),
               foreground: 'var(--foreground)',
               dataAttrs: {
                 series: (d) => `${d.date}_${d.hwKey}`,
@@ -903,6 +937,7 @@ const GPUGraph = React.memo(
               {
                 id: 'gpu-log-scale',
                 label: legendT.logScale,
+                advanced: true,
                 checked: logScale,
                 onCheckedChange: (c) => {
                   setLogScale(c);
@@ -912,6 +947,7 @@ const GPUGraph = React.memo(
               {
                 id: 'gpu-high-contrast',
                 label: legendT.highContrast,
+                advanced: true,
                 checked: highContrast,
                 onCheckedChange: (c) => {
                   setHighContrast(c);
@@ -930,6 +966,7 @@ const GPUGraph = React.memo(
               {
                 id: 'gpu-point-labels',
                 label: legendT.labels,
+                advanced: true,
                 checked: showPointLabels,
                 onCheckedChange: (c) => {
                   setShowPointLabels(c);
@@ -939,6 +976,7 @@ const GPUGraph = React.memo(
               {
                 id: 'gpu-parallelism-labels',
                 label: legendT.parallelismLabels,
+                advanced: true,
                 checked: useAdvancedLabels,
                 onCheckedChange: (c) => {
                   setUseAdvancedLabels(c);
@@ -951,10 +989,24 @@ const GPUGraph = React.memo(
               {
                 id: 'gpu-line-labels',
                 label: legendT.lineLabels,
+                advanced: true,
                 checked: showLineLabels,
                 onCheckedChange: (c) => {
                   setShowLineLabels(c);
                   track('interactivity_line_labels_toggled', { enabled: c });
+                },
+              },
+              {
+                id: 'gpu-concurrency-labels',
+                label: legendT.concurrencyLabels,
+                advanced: true,
+                checked: showConcurrencyLabels,
+                onCheckedChange: (c) => {
+                  setShowConcurrencyLabels(c);
+                  track('interactivity_concurrency_labels_toggled', { enabled: c });
+                  // Concurrency is a point-label annotation; turning it on is
+                  // pointless if labels are hidden, so auto-enable Labels.
+                  if (c && !showPointLabels) setShowPointLabels(true);
                 },
               },
             ]}
@@ -978,14 +1030,9 @@ const GPUGraph = React.memo(
               },
             ]}
             precisionIndicators={selectedPrecisions}
+            hideAtomFootnote
             keyIndicators={
               <>
-                {hasOffloadHalo || selectedSequence === Sequence.AgenticTraces ? (
-                  <>
-                    {hasOffloadHalo && <OffloadHaloLegendKey />}
-                    {selectedSequence === Sequence.AgenticTraces && <AgenticOptimizationNote />}
-                  </>
-                ) : null}
                 {fixedLogPointId === null ? null : (
                   <FixedSequenceLogDialog
                     pointId={fixedLogPointId}

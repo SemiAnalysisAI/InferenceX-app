@@ -1,11 +1,15 @@
 'use client';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
-import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
-import chartDefinitions from '@/components/inference/metric-registry';
+import chartDefinitions, {
+  tokenMetricTypeForConfigKey,
+  type MetricKey,
+} from '@/components/inference/metric-registry';
+import { resolveXAxisKind } from '@/components/inference/axis-metric-explanations';
+import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import {
   useInferenceActions,
   useInferenceData,
@@ -41,7 +45,8 @@ import { metricLabel, metricTitle } from '@/lib/chart-utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
-import { getDisplayLabel } from '@/lib/utils';
+import { getDisplayLabel, getFrameworkLabel } from '@/lib/utils';
+import { supportsChartTokenMetric } from '@/lib/supplemental-benchmarks';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useOverlayScopeReconciliation,
@@ -72,6 +77,11 @@ import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useLocale } from '@/lib/use-locale';
 
+import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-engine-footnote';
+import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
+import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
+
+import AxisMetricFooter from './AxisMetricFooter';
 import ChartControls from './ChartControls';
 import ComparisonChangelog from './ComparisonChangelog';
 import CustomCosts from './CustomCosts';
@@ -79,13 +89,71 @@ import CustomPowers from './CustomPowers';
 import GPUGraph from './GPUGraph';
 import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLauncher';
 
-const ModelArchitectureDiagram = dynamic(() => import('./ModelArchitectureDiagram'), {
-  ssr: false,
-  loading: () => <Skeleton className="h-40 w-full" />,
-});
+import Link from 'next/link';
+
+import { Badge } from '@/components/ui/badge';
+import { getModelSlugEntryForDisplayName } from '@/lib/compare-slug';
+import { formatParamCount, getModelArchitecture } from '@/lib/model-architectures';
 import WorkflowInfoDisplay from './WorkflowInfoDisplay';
+import { NormalizedInteractivityHelpLink } from './NormalizedInteractivityHelpLink';
 
 type InferenceViewMode = 'chart' | 'table';
+
+/**
+ * Replaces the old in-card Model Architecture drawer: a row that links to the
+ * model's `/model/[slug]` page, which hosts the full architecture diagram,
+ * vendor eval scores, and a model-focused view of this dashboard. Renders
+ * nothing for models without a public slug (hidden models).
+ */
+function ModelArchitectureLink({ model, locale }: { model: Model; locale: 'en' | 'zh' }) {
+  const entry = getModelSlugEntryForDisplayName(model);
+  if (!entry) return null;
+  const arch = getModelArchitecture(model);
+  const label = getModelLabel(model);
+  return (
+    <Link
+      href={`/model/${entry.slug}`}
+      data-testid="model-architecture-link"
+      className="group rounded-lg border border-border/50 bg-muted/30 px-4 py-2 flex items-center justify-between gap-3 hover:bg-muted/50 transition-colors"
+      onClick={() => track('model_architecture_link_clicked', { model, slug: entry.slug })}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <svg
+          className="size-4 shrink-0 text-muted-foreground"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <line x1="3" y1="9" x2="21" y2="9" />
+          <line x1="9" y1="9" x2="9" y2="21" />
+        </svg>
+        <span className="text-sm font-medium truncate">
+          {locale === 'zh'
+            ? `了解 ${label} 模型架构`
+            : `Learn more about the ${label} architecture`}
+        </span>
+        {arch && (
+          <span className="hidden sm:flex items-center gap-1.5">
+            <Badge variant="outline" className="text-xs py-0">
+              {arch.architectureType === 'moe' ? 'MoE' : 'Dense'}
+            </Badge>
+            <Badge variant="outline" className="text-xs py-0">
+              {arch.attentionType === 'AlternatingSinkGQA' ? 'Sink/Full GQA' : arch.attentionType}
+            </Badge>
+            <Badge variant="outline" className="text-xs py-0">
+              {formatParamCount(arch.totalParams)}
+            </Badge>
+          </span>
+        )}
+      </div>
+      <span className="text-sm shrink-0 text-muted-foreground group-hover:text-foreground transition-colors">
+        →
+      </span>
+    </Link>
+  );
+}
 
 const STRINGS = {
   en: {
@@ -204,8 +272,13 @@ export function formatTokenLength(value: number): string {
 /**
  * Renders the inference chart cards, captions, and overlay controls for the current filtered
  * benchmark data.
+ *
+ * `embedded` renders the chart without the header section (title, description,
+ * share actions, and selector controls) — used by the `/model/[slug]` pages,
+ * which seed the model/scenario/metric via providers instead of user-facing
+ * selectors. The run-date changelog strip and the charts themselves remain.
  */
-export default function ChartDisplay() {
+export default function ChartDisplay({ embedded = false }: { embedded?: boolean } = {}) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const { graphs, loading, error, dateRangeAvailableDates } = useInferenceData();
@@ -383,8 +456,12 @@ export default function ChartDisplay() {
 
       const effectiveXMetric = chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
       const isAgentic = sequenceKind(selectedSequence) === 'agentic';
+      const tokenType = tokenMetricTypeForConfigKey(selectedYAxisMetric);
+      const capableData = rawData.data.filter((point) =>
+        supportsChartTokenMetric(String(point.hwKey), point.date, tokenType),
+      );
       const processed = processOverlayChartDataWithClipping(
-        rawData.data,
+        capableData,
         chartType,
         selectedYAxisMetric,
         effectiveXMetric,
@@ -520,6 +597,13 @@ export default function ChartDisplay() {
   const scopedActiveOverlayHwTypes = useMemo(
     () => new Set([...activeOverlayHwTypes].filter((key) => overlayScope.has(key))),
     [activeOverlayHwTypes, overlayScope],
+  );
+  // Caption spec badges (TCO $/chip/hr, Power/Chip) should only quote chips
+  // that can actually appear on the plot: the active official legend selection
+  // plus any active unofficial-overlay selection.
+  const captionHwKeys = useMemo(
+    () => new Set([...selectedOfficialHwTypes, ...scopedActiveOverlayHwTypes]),
+    [selectedOfficialHwTypes, scopedActiveOverlayHwTypes],
   );
   const overlayScopeRegistration = useMemo(
     () =>
@@ -740,6 +824,62 @@ export default function ChartDisplay() {
               selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
             const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
+            // Which logical metric the x-axis plots right now. Classify off
+            // the field `resolveXAxisField` resolves for this chart's current
+            // state — the same resolver both chart pipelines plot with — so
+            // the footer always matches the drawn axis (e.g. an input metric
+            // without a `*_x` override keeps the natural interactivity x).
+            // Trace-derived agentic modes bypass that resolver, hence the flag.
+            const footerXAxisKind = resolveXAxisKind(graph.chartDefinition.chartType, {
+              xAxisField: resolveXAxisField(
+                graph.chartDefinition,
+                selectedYAxisMetric,
+                graph.chartDefinition.chartType === 'e2e'
+                  ? selectedE2eXAxisMetric
+                  : selectedXAxisMetric,
+                { isAgentic: isAgenticSequence, percentile: selectedPercentile },
+              ).xAxisField,
+              isDerivedNormalizedInteractivity: Boolean(derivedSpec),
+            });
+            // Notices for the axis-metric info footer: the KV-offload halo
+            // key, the agentic optimization note, and the ATOM engine
+            // footnote. Detected from the same data the chart plots —
+            // official points plus any loaded unofficial-run overlay for
+            // this chart type — so they moved out of the legend without
+            // changing when they appear.
+            // GPU/date comparison renders GPUGraph, which plots official
+            // points only — skip the unofficial overlay there so the footer
+            // can't advertise a halo or ATOM series that isn't on the chart.
+            const isGpuComparison =
+              selectedGPUs.length > 0 &&
+              ((selectedDateRange.startDate && selectedDateRange.endDate) ||
+                selectedDates.length > 0);
+            const footerOverlay = isGpuComparison
+              ? undefined
+              : selectUnofficialOverlayForMode(
+                  selectedXAxisMode,
+                  graph.chartDefinition.chartType,
+                  overlayDataByChartType,
+                );
+            const footerPoints = [
+              ...graph.data,
+              ...(footerOverlay?.data ?? []),
+              ...(footerOverlay?.clippedData ?? []).map((entry) => entry.point),
+            ];
+            const hasOffloadHalo = footerPoints.some((point) => point.offload_mode === 'on');
+            const hasAtomSeries = footerPoints.some(
+              (point) =>
+                point.framework !== undefined &&
+                getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
+            );
+            const footerNotices =
+              hasOffloadHalo || isAgenticSequence || hasAtomSeries ? (
+                <>
+                  {hasOffloadHalo && <OffloadHaloLegendKey />}
+                  {isAgenticSequence && <AgenticOptimizationNote />}
+                  {hasAtomSeries && <AtomEngineFootnote />}
+                </>
+              ) : undefined;
             return (
               <section key={graphIndex} className="pt-8 md:pt-0">
                 <figure data-testid="chart-figure" className="relative rounded-lg">
@@ -917,7 +1057,10 @@ export default function ChartDisplay() {
                               {formatTokenLength(residentSequenceLengths.osl.p99)}
                             </p>
                           )}
-                          <MetricAssumptionNotes selectedYAxisMetric={selectedYAxisMetric} />
+                          <MetricAssumptionNotes
+                            selectedYAxisMetric={selectedYAxisMetric}
+                            activeHwKeys={captionHwKeys}
+                          />
                           {isUnofficialRun &&
                             selectedXAxisMode === 'e2e-normalized-interactivity' && (
                               <p className="mb-2 text-xs text-muted-foreground">
@@ -967,9 +1110,7 @@ export default function ChartDisplay() {
                         );
                       }
 
-                      return selectedGPUs.length > 0 &&
-                        ((selectedDateRange.startDate && selectedDateRange.endDate) ||
-                          selectedDates.length > 0) ? (
+                      return isGpuComparison ? (
                         <GPUGraph
                           chartId={`chart-${graphIndex}`}
                           modelLabel={graph.model}
@@ -1002,6 +1143,13 @@ export default function ChartDisplay() {
                         </div>
                       );
                     })()}
+                    <AxisMetricFooter
+                      chartId={`chart-${graphIndex}`}
+                      metricKey={selectedYAxisMetric.replace(/^y_/u, '') as MetricKey}
+                      xAxisKind={footerXAxisKind}
+                      xAxisLabel={graph.chartDefinition.x_label}
+                      notices={footerNotices}
+                    />
                     {replayAvailable && (
                       <ReplayLauncher
                         ref={(handle) => {
@@ -1024,15 +1172,21 @@ export default function ChartDisplay() {
       <section className="relative z-20">
         <Card>
           <div className="flex flex-col gap-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold mb-2">{t.inferencePerformance}</h2>
-                <p className="text-muted-foreground text-sm mb-4">{t.inferencePerformanceDesc}</p>
-              </div>
-              <ChartShareActions />
-            </div>
-            <ChartControls />
-            <ModelArchitectureDiagram model={selectedModel} />
+            {!embedded && (
+              <>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold mb-2">{t.inferencePerformance}</h2>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      {t.inferencePerformanceDesc}
+                    </p>
+                  </div>
+                  <ChartShareActions />
+                </div>
+                <ChartControls />
+                <ModelArchitectureLink model={selectedModel} locale={locale} />
+              </>
+            )}
             {selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
             {selectedGPUs.length > 0 && (
               <ComparisonChangelog
@@ -1041,6 +1195,7 @@ export default function ChartDisplay() {
                 selectedPrecisions={selectedPrecisions}
                 modelDbKeys={modelDbKeys}
                 selectedSequence={selectedSequence}
+                defaultExpanded={!embedded}
                 loading={changelogsLoading}
                 totalDatesQueried={totalDatesQueried}
                 selectedDates={selectedDates}
@@ -1090,16 +1245,38 @@ export default function ChartDisplay() {
             // Before mount, render all buttons so SSR and first client render match.
             if (!mounted) return true;
             return !isAgenticOnlyXAxisMode(value) || isAgenticSequence;
-          }).map(({ value, label, labelZh }) => (
-            <TabsTrigger
-              key={value}
-              value={value}
-              data-testid={`x-axis-mode-${value}`}
-              className="min-w-[130px] sm:min-w-[140px] flex-1 sm:flex-initial justify-center"
-            >
-              {locale === 'zh' ? labelZh : label}
-            </TabsTrigger>
-          ))}
+          }).map(({ value, label, labelZh }) => {
+            const modeLabel = locale === 'zh' ? labelZh : label;
+            if (value !== 'e2e-normalized-interactivity') {
+              return (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  data-testid={`x-axis-mode-${value}`}
+                  className="min-w-[130px] sm:min-w-[140px] flex-1 sm:flex-initial justify-center"
+                >
+                  {modeLabel}
+                </TabsTrigger>
+              );
+            }
+
+            return (
+              <span
+                key={value}
+                role="presentation"
+                className="relative flex flex-1 sm:flex-initial"
+              >
+                <TabsTrigger
+                  value={value}
+                  data-testid={`x-axis-mode-${value}`}
+                  className="min-w-[130px] flex-1 justify-center pr-9 sm:min-w-[140px] sm:flex-initial"
+                >
+                  {modeLabel}
+                </TabsTrigger>
+                <NormalizedInteractivityHelpLink locale={locale} />
+              </span>
+            );
+          })}
         </TabsList>
       </Tabs>
       <div className="flex flex-col gap-4">{displayGraphs}</div>

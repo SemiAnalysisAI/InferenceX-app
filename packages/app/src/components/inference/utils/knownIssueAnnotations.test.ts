@@ -30,6 +30,28 @@ const mi355xAnnotation: KnownIssueAnnotation = {
   points: [{ x: 150, y: 250 }],
 };
 
+const jalapenoPreview: KnownIssueAnnotation = {
+  preview: {
+    id: 'jalapeno-official-preview',
+    summary: 'InferenceX Official Preview',
+    detail: 'Results may change as validation and publication continue.',
+  },
+  label: 'Jalapeño (Teacup)',
+  color: 'rgb(32, 201, 151)',
+  points: [{ x: 180, y: 280 }],
+};
+
+const veraRubinPreview: KnownIssueAnnotation = {
+  preview: {
+    id: 'vera-rubin-official-preview',
+    summary: 'InferenceX Official Preview',
+    detail: 'Results may change as validation and publication continue.',
+  },
+  label: 'Vera Rubin (July)',
+  color: 'rgb(118, 185, 0)',
+  points: [{ x: 210, y: 240 }],
+};
+
 function baseOptions(overrides: Partial<AnnotationRenderOptions> = {}): AnnotationRenderOptions {
   return {
     chartId: 'chart-0',
@@ -71,13 +93,45 @@ describe('renderKnownIssueAnnotations', () => {
     expect(boxes[0].getAttribute('href')).toBe('https://github.com/NVIDIA/srt-slurm/issues/51');
     expect(boxes[0].getAttribute('target')).toBe('_blank');
     expect(boxes[0].textContent).toContain('GB300 NVL72 (Dynamo TRTLLM, MTP)');
-    expect(boxes[0].textContent).toContain('Accuracy issues — filed since Apr 21, 2026');
+    expect(boxes[0].textContent).toContain('Accuracy issues: filed since Apr 21, 2026');
+    expect(boxes[0].textContent).not.toContain('\u2014');
     expect(boxes[0].textContent).toContain('NVIDIA/srt-slurm#51');
 
     expect(boxes[1].getAttribute('href')).toBe(
       'https://github.com/sgl-project/sglang/issues/27194',
     );
     expect(boxes[1].textContent).toContain('MI355X (MoRI SGLang, MTP)');
+  });
+
+  it('renders an unlinked preview notice in the same on-chart annotation layer', () => {
+    renderKnownIssueAnnotations(g, defs, baseOptions({ annotations: [jalapenoPreview] }));
+
+    const notice = g.select('[data-testid="jalapeno-official-preview-notice"]');
+    expect(notice.empty()).toBe(false);
+    expect(notice.attr('role')).toBe('note');
+    expect(notice.attr('href')).toBeNull();
+    expect(notice.attr('data-preview-id')).toBe('jalapeno-official-preview');
+    expect(notice.text()).toContain('Jalapeño (Teacup)');
+    expect(notice.text()).toContain('InferenceX Official Preview');
+    expect(notice.text()).toContain('InferenceX Official Preview: Results may change');
+    expect(notice.text()).toContain('Results may change as validation and publication continue.');
+    expect(notice.text()).not.toContain('\u2014');
+    expect(g.selectAll('.known-issue-arrow').nodes()).toHaveLength(1);
+  });
+
+  it('assigns separate selectors to Jalapeño and Vera Rubin preview notices', () => {
+    renderKnownIssueAnnotations(
+      g,
+      defs,
+      baseOptions({ annotations: [jalapenoPreview, veraRubinPreview] }),
+    );
+
+    expect(g.select('[data-testid="jalapeno-official-preview-notice"]').empty()).toBe(false);
+    const rubinNotice = g.select('[data-testid="vera-rubin-official-preview-notice"]');
+    expect(rubinNotice.empty()).toBe(false);
+    expect(rubinNotice.text()).toContain('Vera Rubin (July)');
+    expect(rubinNotice.text()).not.toContain('\u2014');
+    expect(g.selectAll('.known-issue-arrow').nodes()).toHaveLength(2);
   });
 
   it('stacks boxes without overlap, right-aligned inside the plot', () => {

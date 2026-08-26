@@ -6,6 +6,15 @@ const CALCULATOR_METRIC_KEYS = new Set([
   'output_tput_per_gpu',
   'prefill_pp',
   'decode_pp',
+  // Cached-input billing in the Fleet Lifecycle section reads these. Only
+  // agentic rows carry them, but the trim runs on every calculator response, so
+  // omitting them here would strip the metric before interpolation ever sees it.
+  'server_gpu_cache_hit_rate',
+  'server_external_cache_hit_rate',
+  // Read only when no external rate is reported, but the trim cannot know that
+  // per row — so it has to survive the allowlist either way. See
+  // `cacheHitRateOf` for why the two are not simply summed.
+  'server_cpu_cache_hit_rate',
   ...['median', 'p75', 'p90'].flatMap((percentile) =>
     ['intvty', 'itl', 'full_response_itl', 'e2el', 'ttlt'].map(
       (metric) => `${percentile}_${metric}`,

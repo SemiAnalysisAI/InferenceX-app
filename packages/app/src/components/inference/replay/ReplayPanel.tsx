@@ -118,7 +118,7 @@ export default function ReplayPanel({
     selectedModel,
     isl,
     osl,
-    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
+    selectedSequence === Sequence.AgenticTraces ? { benchmarkType: 'agentic_traces' } : undefined,
   );
 
   const effectiveX =

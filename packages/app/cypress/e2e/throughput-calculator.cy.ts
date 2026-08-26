@@ -80,9 +80,12 @@ describe('TCO Calculator', () => {
       });
     });
 
-    it('renders Precision multi-selector', () => {
+    it('hides the Precision selector for a single-precision model', () => {
+      // DeepSeek-V4-Pro is FP4-only in the fixtures — with one precision there
+      // is nothing to choose, so the control is hidden entirely.
+      cy.get('[data-testid="calc-cost-selector"]').should('exist');
       cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.contains('Precision').should('exist');
+        cy.contains('Precision').should('not.exist');
       });
     });
 
@@ -522,10 +525,13 @@ describe('TCO Calculator', () => {
         'contain.text',
         'Disaggregated inference configurations',
       );
-      cy.get('[data-testid="calculator-chart-section"]').should(
-        'contain.text',
-        'throughput per decode chip',
-      );
+      cy.get('[data-testid="calculator-chart-section"]')
+        // The direction is the point of the warning, not the phrasing: on these
+        // token types a disaggregated config reads high. Asserting the old wording
+        // alone let the note be reworded into something that no longer said which
+        // way it was wrong.
+        .should('contain.text', 'per prefill chip and per decode chip')
+        .and('contain.text', 'reads faster per chip than it is');
     });
 
     // A disagg config's input/output cost is attributed to only its prefill or
@@ -546,7 +552,10 @@ describe('TCO Calculator', () => {
         cy.get('body').type('{esc}');
         cy.get('[data-testid="calculator-disagg-cost-note"]')
           .should('be.visible')
-          .and('contain.text', 'cost per decode chip');
+          .and('contain.text', 'per prefill chip and per decode chip')
+          // Cheaper, specifically — the flattering direction is what a reader
+          // comparing costs needs told.
+          .and('contain.text', 'reads cheaper than it is');
       }
 
       cy.get('[data-testid="calc-cost-type-selector"]').click();
@@ -557,10 +566,13 @@ describe('TCO Calculator', () => {
 
     it('shows disaggregated throughput disclaimer for power metric', () => {
       cy.get('[data-testid="calculator-metric-power"]').click();
-      cy.get('[data-testid="calculator-chart-section"]').should(
-        'contain.text',
-        'throughput per decode chip',
-      );
+      cy.get('[data-testid="calculator-chart-section"]')
+        // The direction is the point of the warning, not the phrasing: on these
+        // token types a disaggregated config reads high. Asserting the old wording
+        // alone let the note be reworded into something that no longer said which
+        // way it was wrong.
+        .should('contain.text', 'per prefill chip and per decode chip')
+        .and('contain.text', 'reads faster per chip than it is');
     });
   });
 
@@ -583,7 +595,7 @@ describe('TCO Calculator', () => {
     // open straight to the right model without a flash of the default. See #430.
     it('?g_model= seeds the model selector before client hydration', () => {
       cy.request('/calculator?g_model=DeepSeek-V4-Pro').then((response) => {
-        expect(response.body).to.contain('DeepSeek V4 Pro 1.6T');
+        expect(response.body).to.contain('DeepSeek V4 Pro 0813 1.6T');
         expect(response.body).not.to.contain('DeepSeek R1 0528 671B');
       });
     });
@@ -593,7 +605,10 @@ describe('TCO Calculator', () => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       });
       cy.visit('/calculator?g_model=DeepSeek-V4-Pro');
-      cy.get('[data-testid="calc-model-selector"]').should('contain.text', 'DeepSeek V4 Pro 1.6T');
+      cy.get('[data-testid="calc-model-selector"]').should(
+        'contain.text',
+        'DeepSeek V4 Pro 0813 1.6T',
+      );
     });
   });
 
@@ -644,7 +659,10 @@ describe('TCO Calculator', () => {
     });
 
     it('renders throughput and cost calculations from null-ISL/OSL agentic rows', () => {
-      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic');
+      // The agentic fixture exposes a single scenario, so the scenario
+      // control disappears entirely — no dropdown, no static readout.
+      cy.get('[data-testid="scenario-static-value"]').should('not.exist');
+      cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
       cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
       cy.get('[data-testid="calculator-no-data"]').should('not.exist');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
@@ -701,7 +719,10 @@ describe('TCO Calculator', () => {
       });
       cy.wait('@agenticBenchmarks');
 
-      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic');
+      // Single-scenario fixture → the scenario control disappears entirely;
+      // the gate is locked, so no percentile selector either.
+      cy.get('[data-testid="scenario-static-value"]').should('not.exist');
+      cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
       cy.get('[data-testid="calc-percentile-selector"]').should('not.exist');
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
@@ -714,10 +735,12 @@ describe('TCO Calculator', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Fleet planner (MW projection + cost-target inverse lookup)
+  // Cost target: the inverse of the interactivity slider. The MW-budget input
+  // lives here now that the Fleet Lifecycle section moved to its own /fleet
+  // page — see fleet-lifecycle.cy.ts. Both pages share the `c_mw` URL param.
   // ---------------------------------------------------------------------------
 
-  describe('fleet planner', () => {
+  describe('cost target', () => {
     before(() => {
       cy.window().then((win) => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -726,45 +749,37 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
     });
 
-    it('renders both fleet planner cards with empty states', () => {
-      cy.get('[data-testid="calculator-fleet-section"]').should('be.visible');
-      cy.get('[data-testid="calculator-fleet-section"]').should('contain.text', 'Fleet Projection');
-      cy.get('[data-testid="calculator-fleet-empty"]').should('be.visible');
+    it('sits directly under the interactivity slider, since it inverts it', () => {
+      // Reading order is the point: the slider fixes a speed and the cost falls
+      // out; this fixes the cost and the speed falls out. Anything between them
+      // makes the pair read as unrelated.
       cy.get('[data-testid="calculator-costcap-section"]').should('be.visible');
       cy.get('[data-testid="calculator-costcap-empty"]').should('be.visible');
-    });
-
-    it('entering a MW budget renders the fleet projection table', () => {
-      cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
-      cy.get('[data-testid="calculator-fleet-table"]').should('be.visible');
-      cy.get('[data-testid="calculator-fleet-table"]').within(() => {
-        cy.contains('th', 'Chips').should('exist');
-        cy.contains('th', 'Concurrent Users').should('exist');
-        cy.contains('th', 'Fleet $/mo').should('exist');
-        cy.get('tbody tr').should('have.length.greaterThan', 0);
-        // GPU counts are whole, comma-grouped numbers
-        cy.get('tbody tr')
-          .first()
-          .find('td')
-          .eq(1)
-          .invoke('text')
-          .should('match', /^[\d,]+$/u);
+      cy.get('[data-testid="calculator-controls"]').then(($controls) => {
+        cy.get('[data-testid="calculator-costcap-section"]').then(($costcap) => {
+          const order = $controls[0]!.compareDocumentPosition($costcap[0]!);
+          // eslint-disable-next-line no-bitwise
+          expect(order & Node.DOCUMENT_POSITION_FOLLOWING).to.be.greaterThan(0);
+        });
       });
-      cy.get('[data-testid="calculator-fleet-empty"]').should('not.exist');
+      cy.get('[data-testid="calculator-chart-section"]').then(($chart) => {
+        cy.get('[data-testid="calculator-costcap-section"]').then(($costcap) => {
+          const order = $chart[0]!.compareDocumentPosition($costcap[0]!);
+          // eslint-disable-next-line no-bitwise
+          expect(order & Node.DOCUMENT_POSITION_PRECEDING).to.be.greaterThan(0);
+        });
+      });
     });
 
-    it('fleet table shows the utilization and facility-power assumptions', () => {
-      cy.get('[data-testid="calculator-fleet-section"]').should(
-        'contain.text',
-        'Assumes 100% utilization',
-      );
-      cy.get('[data-testid="calculator-fleet-section"]').should(
-        'contain.text',
-        'SemiAnalysis Datacenter Industry Model',
-      );
-      cy.get('[data-testid="calculator-fleet-section"]')
-        .contains('a', TCO_SOURCE_TITLE)
-        .should('have.attr', 'href', TCO_SOURCE_URL);
+    it('owns the MW budget input now that the lifecycle section moved to /fleet', () => {
+      cy.get('[data-testid="calculator-costcap-section"]')
+        .find('[data-testid="calc-costcap-mw-input"]')
+        .should('exist');
+      cy.get('[data-testid="calculator-lifecycle-section"]').should('not.exist');
+      // A pointer to the new page replaces the section.
+      cy.get('[data-testid="calculator-fleet-pointer-link"]')
+        .should('have.attr', 'href')
+        .and('match', /\/fleet$/);
     });
 
     it('entering a generous cost target renders reachable interactivity per GPU', () => {
@@ -789,23 +804,6 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-costcap-table"]').should('contain.text', 'Not reachable');
     });
 
-    it('a budget too small for one GPU shows a dedicated message, not the enter-a-value prompt', () => {
-      cy.get('[data-testid="calc-fleet-mw-input"]').clear();
-      cy.get('[data-testid="calc-fleet-mw-input"]').type('0.0001');
-      cy.get('[data-testid="calculator-fleet-empty"]')
-        .should('be.visible')
-        .and('contain.text', 'too small to power a single chip');
-      cy.get('[data-testid="calculator-fleet-table"]').should('not.exist');
-    });
-
-    it('clearing the MW input restores the empty state', () => {
-      cy.get('[data-testid="calc-fleet-mw-input"]').clear();
-      cy.get('[data-testid="calculator-fleet-empty"]')
-        .should('be.visible')
-        .and('contain.text', 'Enter a facility power budget');
-      cy.get('[data-testid="calculator-fleet-table"]').should('not.exist');
-    });
-
     it('cost-cap table follows legend visibility (soloing a GPU filters its rows)', () => {
       cy.get('[data-testid="calc-costcap-input"]').clear();
       cy.get('[data-testid="calc-costcap-input"]').type('100');
@@ -823,6 +821,45 @@ describe('TCO Calculator', () => {
           fullCount,
         );
       });
+    });
+  });
+
+  describe('folding sections away', () => {
+    before(() => {
+      cy.window().then((win) => {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      });
+      cy.visit('/calculator');
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
+    });
+
+    it('folds the chart away, keeping its title as the handle', () => {
+      // Folded means unmounted, not hidden: these bodies hold D3 charts, and a
+      // reader who folded one should not still be paying to render it.
+      cy.get('[data-testid="calculator-chart-collapse"]').click();
+      cy.get('[data-testid="calculator-figure"]').should('not.exist');
+      // The title only appears in the header once folded — while open the chart's
+      // own caption carries it, and two copies would be worse than none.
+      cy.get('[data-testid="calculator-chart-section"] h2')
+        .should('have.length', 1)
+        .and('contain.text', 'Total Token Throughput per Chip');
+
+      cy.get('[data-testid="calculator-chart-collapse"]').click();
+      cy.get('[data-testid="calculator-figure"]').should('be.visible');
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
+    });
+
+    it('folds the cost-target section away, keeping its heading as the handle', () => {
+      cy.get('[data-testid="calc-costcap-input"]').should('be.visible');
+      cy.get('[data-testid="calculator-costcap-collapse"]').click();
+      cy.get('[data-testid="calc-costcap-input"]').should('not.exist');
+      // The heading stays put, so the folded section still says what it is.
+      cy.get('[data-testid="calculator-costcap-section"]').should(
+        'contain.text',
+        'Interactivity Within a Cost Target',
+      );
+      cy.get('[data-testid="calculator-costcap-collapse"]').click();
+      cy.get('[data-testid="calc-costcap-input"]').should('be.visible');
     });
   });
 });

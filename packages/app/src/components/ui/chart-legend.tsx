@@ -28,6 +28,7 @@ const SHAPE_ICON: Record<ShapeKey, React.ComponentType<{ size?: number; classNam
   diamond: Diamond,
 };
 
+import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from './atom-engine-footnote';
 import ChartLegendItem, { type CommonLegendItemProps } from './chart-legend-item';
 import { Label } from './label';
 import { Switch } from './switch';
@@ -48,8 +49,6 @@ const STRINGS = {
     expandLegend: 'Expand legend',
     hide: (label: string) => `Hide ${label}`,
     showPoints: (label: string) => `Show all ${label} data points`,
-    atomFootnote:
-      'The ATOM engine is promising, however it has yet to serve production tokens. It is still in its infant stage.',
   },
   zh: {
     advanced: '高级',
@@ -63,7 +62,6 @@ const STRINGS = {
     expandLegend: '展开图例',
     hide: (label: string) => `隐藏${label}`,
     showPoints: (label: string) => `显示${label}的全部数据点`,
-    atomFootnote: 'ATOM 引擎前景可期，但尚未用于生产环境 token 服务，仍处于早期阶段。',
   },
 } as const;
 
@@ -109,6 +107,12 @@ export interface ChartLegendProps {
   onItemHoverEnd?: () => void;
   onItemRemove?: (name: string) => void;
   onAdvancedExpandedChange?: (expanded: boolean) => void;
+  /**
+   * Suppress the ATOM engine footnote even when a legend label carries the ¹
+   * marker. Inference charts pass this because they render the footnote in
+   * the axis-metric info footer below the chart instead of in the legend.
+   */
+  hideAtomFootnote?: boolean;
 }
 
 export default function ChartLegend({
@@ -129,6 +133,7 @@ export default function ChartLegend({
   onItemHoverEnd,
   onItemRemove,
   onAdvancedExpandedChange,
+  hideAtomFootnote = false,
 }: ChartLegendProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -235,8 +240,9 @@ export default function ChartLegend({
 
   // Show ATOM footnote when any legend item label contains the ¹ marker
   const hasAtomFootnote = useMemo(
-    () => legendItems.some((item) => item.label.includes('¹')),
-    [legendItems],
+    () =>
+      !hideAtomFootnote && legendItems.some((item) => item.label.includes(ATOM_FOOTNOTE_MARKER)),
+    [legendItems, hideAtomFootnote],
   );
 
   const shapeIndicators = useMemo(() => {
@@ -511,11 +517,7 @@ export default function ChartLegend({
       {fpIndicators}
       {keyIndicators}
       {expandButton}
-      {hasAtomFootnote && (
-        <p className="mt-2 text-[10px] text-muted-foreground/70 leading-tight no-export">
-          <sup>1</sup> {t.atomFootnote}
-        </p>
-      )}
+      {hasAtomFootnote && <AtomEngineFootnote className="mt-2 no-export" />}
     </div>
   ) : null;
 

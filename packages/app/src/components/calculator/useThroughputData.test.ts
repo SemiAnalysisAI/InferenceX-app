@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { BenchmarkRow } from '@/lib/api';
 import { Percentile, Sequence } from '@/lib/data-mappings';
 import { overlayRunIndex } from '@/lib/overlay-run-style';
+import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/supplemental-benchmarks';
 
 import type { GPUDataPoint } from './types';
 import {
@@ -25,6 +26,8 @@ const PYTHON_INTERPOLATION_HELPER = resolve(
   '../../../../..',
   '.claude/skills/write-inferencex-blog/iso_interactivity.py',
 );
+
+const classifyByHardware = (hwKey: string) => ({ key: hwKey, meta: { hwKey } });
 
 function interpolateWithPython(request: Record<string, unknown>): number | null {
   const result = spawnSync('python3', [PYTHON_INTERPOLATION_HELPER], {
@@ -79,6 +82,31 @@ describe('sign', () => {
     expect(sign(0)).toBe(1);
     expect(sign(5)).toBe(1);
     expect(sign(0.001)).toBe(1);
+  });
+});
+
+describe('snapshot token-metric capabilities', () => {
+  const julyVrRows = SUPPLEMENTAL_BENCHMARK_ROWS.filter((row) => row.hardware === 'vr200');
+  const options = {
+    sequence: Sequence.EightK_OneK,
+    precisions: ['fp4'],
+    classify: classifyByHardware,
+  };
+
+  it('keeps July VR200 for output calculator metrics and hides total/input', () => {
+    expect(
+      Object.keys(buildGpuGroups(julyVrRows, { ...options, tokenType: 'output' }).grouped),
+    ).toEqual(['vr200_rubin-july']);
+    expect(buildGpuGroups(julyVrRows, { ...options, tokenType: 'total' }).grouped).toEqual({});
+    expect(buildGpuGroups(julyVrRows, { ...options, tokenType: 'input' }).grouped).toEqual({});
+  });
+
+  it('applies the same restriction to unofficial overlay rows', () => {
+    const overlayRows = julyVrRows.map((row) => ({
+      ...row,
+      run_url: 'https://github.com/org/repo/actions/runs/1',
+    }));
+    expect(buildGpuGroups(overlayRows, { ...options, tokenType: 'total' }).grouped).toEqual({});
   });
 });
 
@@ -387,6 +415,73 @@ describe('interpolateForGPU', () => {
     expect(result!.hwKey).toBe('h100');
     expect(result!.resultKey).toBe('h100');
     expect(result!.nearestPoints).toHaveLength(1);
+  });
+
+  describe('cached-input fraction', () => {
+    // 300 → 500 tok/s across the range so the frontier is well formed; the cache
+    // rate is what these assertions are about.
+    const withCache = (rates: (number | undefined)[]) =>
+      rates.map((cacheHitRate, i) =>
+        makePoint({
+          interactivity: 20 + i * 20,
+          throughput: 500 - i * 100,
+          inputThroughput: 400 - i * 80,
+          ...(cacheHitRate === undefined ? {} : { cacheHitRate }),
+        }),
+      );
+
+    it('interpolates the rate between measured points', () => {
+      const result = interpolateForGPU(
+        withCache([0.4, 0.8]),
+        30,
+        'interactivity_to_throughput',
+        'costh',
+      );
+      // Halfway along the frontier, so between the two measured rates and
+      // strictly inside them — not pinned to either end.
+      expect(result!.cacheHitRate).toBeGreaterThan(0.4);
+      expect(result!.cacheHitRate).toBeLessThan(0.8);
+    });
+
+    it('stays inside the frontier range rather than overshooting', () => {
+      const result = interpolateForGPU(
+        withCache([0.1, 0.9, 0.2]),
+        45,
+        'interactivity_to_throughput',
+        'costh',
+      );
+      expect(result!.cacheHitRate).toBeGreaterThanOrEqual(0.1);
+      expect(result!.cacheHitRate).toBeLessThanOrEqual(0.9);
+    });
+
+    it('is undefined when no point carries a rate — every fixed sequence', () => {
+      const result = interpolateForGPU(
+        withCache([undefined, undefined]),
+        30,
+        'interactivity_to_throughput',
+        'costh',
+      );
+      expect(result!.cacheHitRate).toBeUndefined();
+    });
+
+    it('opts the whole frontier out when only some points carry a rate', () => {
+      // Splining a 0 in for the unmeasured point would invent a dip in the
+      // cached fraction and overstate the billable rate there. Opting out bills
+      // every input token at full price instead — wrong in the safe direction.
+      const result = interpolateForGPU(
+        withCache([0.9, undefined]),
+        30,
+        'interactivity_to_throughput',
+        'costh',
+      );
+      expect(result!.cacheHitRate).toBeUndefined();
+    });
+
+    it('carries the rate through the single-point path too', () => {
+      const points = [makePoint({ interactivity: 30, throughput: 500, cacheHitRate: 0.77 })];
+      const result = interpolateForGPU(points, 25, 'interactivity_to_throughput', 'costh');
+      expect(result!.cacheHitRate).toBe(0.77);
+    });
   });
 
   it('single GPU clamps any target to the lone pareto-front point', () => {
@@ -1080,6 +1175,204 @@ describe('buildGpuGroups', () => {
     // Cost per million tokens is derived, not passed through.
     expect(first.costh).toBeGreaterThan(0);
     expect(first.tpPerMw).toBeGreaterThan(0);
+  });
+
+  describe('cached-input fraction', () => {
+    const withMetrics = (extra: Record<string, number>) =>
+      makeRow({
+        metrics: {
+          median_intvty: 50,
+          tput_per_gpu: 900,
+          output_tput_per_gpu: 300,
+          input_tput_per_gpu: 600,
+          ...extra,
+        },
+      });
+    const only = (row: BenchmarkRow) => {
+      const { grouped } = buildGpuGroups([row], {
+        ...shared,
+        classify: singlePrecisionClassify,
+      });
+      return Object.values(grouped)[0][0];
+    };
+
+    it('is absent when the row records no cache metric — every fixed-sequence row', () => {
+      // Not zero: absent. Zero would mean "measured, and nothing was cached",
+      // which is a claim the data does not make.
+      expect(only(makeRow()).cacheHitRate).toBeUndefined();
+    });
+
+    it('sums the GPU and external hit rates', () => {
+      // Disjoint in the measured data: across production rows carrying both, the
+      // sum never exceeds 1 nor the theoretical ceiling.
+      expect(
+        only(withMetrics({ server_gpu_cache_hit_rate: 0.66, server_external_cache_hit_rate: 0.25 }))
+          .cacheHitRate,
+      ).toBeCloseTo(0.91, 10);
+    });
+
+    // The three tiers do not all stack. These three cases are the shapes the
+    // production data actually comes in; see `cacheHitRateOf` for the counts.
+    it('ignores the CPU tier when an external rate is reported — external already counts it', () => {
+      // The shape of 106 of 132 production rows with a non-zero CPU rate. Adding
+      // CPU here is what breached `theoretical_cache_hit_rate` on 56 of them.
+      expect(
+        only(
+          withMetrics({
+            server_gpu_cache_hit_rate: 0.819,
+            server_external_cache_hit_rate: 0.06,
+            server_cpu_cache_hit_rate: 0.067,
+          }),
+        ).cacheHitRate,
+      ).toBeCloseTo(0.879, 10);
+    });
+
+    it('adds the CPU tier when no external rate is reported', () => {
+      // The shape of the 26 offload-on rows with no external figure, where
+      // `gpu + cpu` breaches the ceiling 0 times. Dropping CPU understated the
+      // cached share by ~5.5pp on these, which overstates revenue.
+      expect(
+        only(withMetrics({ server_gpu_cache_hit_rate: 0.771, server_cpu_cache_hit_rate: 0.055 }))
+          .cacheHitRate,
+      ).toBeCloseTo(0.826, 10);
+    });
+
+    it('reads the CPU tier alone, and an external rate of zero still suppresses it', () => {
+      expect(only(withMetrics({ server_cpu_cache_hit_rate: 0.5 })).cacheHitRate).toBeCloseTo(
+        0.5,
+        10,
+      );
+      // A reported zero is a measurement, not an absence: the router saw no
+      // external hits, and it is still the figure that accounts for the offload
+      // tier. Reading 0.5 here would double-count. No production row has this
+      // shape today, so this pins a deliberate choice about unobserved data —
+      // it is not a regression test for something measured.
+      expect(
+        only(withMetrics({ server_external_cache_hit_rate: 0, server_cpu_cache_hit_rate: 0.5 }))
+          .cacheHitRate,
+      ).toBe(0);
+    });
+
+    it('reads either metric alone', () => {
+      expect(only(withMetrics({ server_gpu_cache_hit_rate: 0.4 })).cacheHitRate).toBeCloseTo(
+        0.4,
+        10,
+      );
+      expect(only(withMetrics({ server_external_cache_hit_rate: 0.3 })).cacheHitRate).toBeCloseTo(
+        0.3,
+        10,
+      );
+    });
+
+    it('clamps into [0,1] — real rows report a GPU rate as high as 1.185', () => {
+      expect(only(withMetrics({ server_gpu_cache_hit_rate: 1.185 })).cacheHitRate).toBe(1);
+      expect(only(withMetrics({ server_gpu_cache_hit_rate: -0.2 })).cacheHitRate).toBe(0);
+    });
+  });
+
+  describe('input token share', () => {
+    const only = (row: BenchmarkRow) => {
+      const { grouped } = buildGpuGroups([row], { ...shared, classify: singlePrecisionClassify });
+      return Object.values(grouped)[0][0];
+    };
+
+    it('takes the share from the rates when they agree with the total', () => {
+      // Self-consistent (700 + 300 = 1000), so the measured split is the split —
+      // even where it disagrees with the sequence shape.
+      const point = only(
+        makeRow({
+          metrics: {
+            median_intvty: 50,
+            tput_per_gpu: 1000,
+            input_tput_per_gpu: 700,
+            output_tput_per_gpu: 300,
+          },
+        }),
+      );
+      expect(point.inputTokenShare).toBeCloseTo(0.7, 9);
+    });
+
+    it('falls back to ISL:OSL when the rates are on a different denominator', () => {
+      // The disaggregated shape, with the real arithmetic: 16 prefill + 8 decode
+      // chips serving 8192:1024. Input is per prefill chip (6400/16 = 400),
+      // output per decode chip (800/8 = 100), total per chip overall
+      // (7200/24 = 300). The rates sum to 1.667x the total, and the split they
+      // imply — 0.8 — is not the split the workload has, which is 8192/9216.
+      const point = only(
+        makeRow({
+          disagg: true,
+          isl: 1024,
+          osl: 1024,
+          metrics: {
+            median_intvty: 50,
+            tput_per_gpu: 300,
+            input_tput_per_gpu: 400,
+            output_tput_per_gpu: 100,
+          },
+        }),
+      );
+      // 1k/1k here, because that is the sequence this describe block selects.
+      expect(point.inputTokenShare).toBeCloseTo(0.5, 9);
+      expect(point.inputTokenShare).not.toBeCloseTo(0.8, 2);
+    });
+
+    it('falls back to the run token counts when there is no fixed sequence', () => {
+      // Agentic traces have no ISL/OSL to fall back to, so the run's own
+      // prompt:generation counts pin the mix instead.
+      const { grouped } = buildGpuGroups(
+        [
+          makeRow({
+            disagg: true,
+            benchmark_type: 'agentic_traces',
+            isl: null,
+            osl: null,
+            metrics: {
+              p90_itl: 1 / 50,
+              tput_per_gpu: 300,
+              input_tput_per_gpu: 400,
+              output_tput_per_gpu: 100,
+              total_prompt_tokens: 9000,
+              total_generation_tokens: 1000,
+            },
+          }),
+        ],
+        {
+          sequence: Sequence.AgenticTraces,
+          precisions: ['fp4'],
+          classify: singlePrecisionClassify,
+        },
+      );
+      expect(Object.values(grouped)[0][0].inputTokenShare).toBeCloseTo(0.9, 9);
+    });
+
+    it('leaves the share unknown when disaggregated rates have no trustworthy mix', () => {
+      const { grouped } = buildGpuGroups(
+        [
+          makeRow({
+            disagg: true,
+            benchmark_type: 'agentic_traces',
+            isl: null,
+            osl: null,
+            metrics: {
+              p90_itl: 1 / 50,
+              tput_per_gpu: 300,
+              input_tput_per_gpu: 400,
+              output_tput_per_gpu: 100,
+            },
+          }),
+        ],
+        {
+          sequence: Sequence.AgenticTraces,
+          precisions: ['fp4'],
+          classify: singlePrecisionClassify,
+        },
+      );
+
+      // 400 / (400 + 100) is a ratio of per-pool rates, not a fleet-wide
+      // token share. Leaving it absent makes lifecycle revenue charge no input
+      // tokens instead of inventing an 80% input mix.
+      expect(Object.values(grouped)[0][0].inputTokenShare).toBeUndefined();
+    });
   });
 
   it('drops rows whose isl/osl do not match the selected sequence', () => {

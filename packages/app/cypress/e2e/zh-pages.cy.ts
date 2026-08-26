@@ -45,16 +45,14 @@ describe('Chinese (/zh) pages', () => {
         cy.get('[data-testid="compare-agentx-overview-link"]')
           .should('contain.text', '总览')
           .and('have.attr', 'href', '/zh/overview');
-        cy.get('[data-testid="compare-agentx-methodology-link"]')
-          .should('contain.text', '测试方法')
-          .and('have.attr', 'href', '/zh/agentx');
+        cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
       });
     });
 
     it('footer renders in Chinese with zh-internal links', () => {
       cy.get('[data-testid="footer-brand-description"]').should(
         'contain.text',
-        'InferenceX 持续开展开源推理基准测试',
+        'InferenceX 持续开展开源的 agentic 推理基准测试',
       );
       cy.get('[data-testid="footer-link-supporters"]')
         .should('contain.text', '业界评价')
@@ -96,6 +94,28 @@ describe('Chinese (/zh) pages', () => {
         .should('contain.text', '准确率评估')
         .and('have.attr', 'href')
         .and('match', /^\/zh\/evaluation/u);
+    });
+  });
+
+  describe('zh FAQ', () => {
+    it('uses the same direct-link anchor as the English FAQ', () => {
+      cy.visit('/zh/about#faq-normalized-interactivity');
+
+      cy.get('#faq-normalized-interactivity')
+        .should('be.visible')
+        .within(() => {
+          cy.contains(
+            'a[href="#faq-normalized-interactivity"]',
+            '端到端归一化交互性与交互性有何区别？',
+          ).should('be.visible');
+          cy.contains('TTFT 越长，归一化指标越低').should('be.visible');
+          cy.get('[data-testid="faq-copy-link-faq-normalized-interactivity"]')
+            .should('be.visible')
+            .and('have.attr', 'title', '复制链接')
+            .find('svg.lucide-link')
+            .should('be.visible');
+        });
+      cy.location('hash').should('eq', '#faq-normalized-interactivity');
     });
   });
 

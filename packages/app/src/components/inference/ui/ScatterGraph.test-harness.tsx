@@ -132,14 +132,12 @@ export function baseInferenceState() {
     setIsLegendExpanded: noop,
     useAdvancedLabels: false,
     setUseAdvancedLabels: noop,
+    showConcurrencyLabels: false,
+    setShowConcurrencyLabels: noop,
     showGradientLabels: false,
     setShowGradientLabels: noop,
     showLineLabels: false,
     setShowLineLabels: noop,
-    showSpeedOverlay: false,
-    setShowSpeedOverlay: noop,
-    showMinecraftOverlay: false,
-    setShowMinecraftOverlay: noop,
   };
 }
 

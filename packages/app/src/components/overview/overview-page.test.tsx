@@ -78,13 +78,15 @@ describe('OverviewPageContent failure states', () => {
       window.history.replaceState({}, '', locale === 'zh' ? '/zh/overview' : '/overview');
       renderPage(locale);
 
-      const tierLink = [...container.querySelectorAll<HTMLAnchorElement>('a')].find(
-        (link) => link.textContent === '75',
+      // The tier control is a slider, not a link, so the failed navigation is
+      // driven through the engine scope link instead.
+      const scopeLink = container.querySelector<HTMLAnchorElement>(
+        'a[data-overview-engine-scope="all"]',
       );
-      expect(tierLink).toBeDefined();
+      expect(scopeLink).not.toBeNull();
 
       await act(async () => {
-        tierLink?.click();
+        scopeLink?.click();
         await Promise.resolve();
         await Promise.resolve();
       });

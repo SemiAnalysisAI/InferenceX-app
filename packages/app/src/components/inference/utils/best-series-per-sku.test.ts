@@ -8,6 +8,16 @@ function point(hw: string, hwKey: string, x: number, y: number): InferenceData {
   return { hw, hwKey, x, y } as InferenceData;
 }
 
+function frameworkPoint(
+  hw: string,
+  hwKey: string,
+  framework: string,
+  x: number,
+  y: number,
+): InferenceData {
+  return { ...point(hw, hwKey, x, y), framework };
+}
+
 describe('bestSeriesPerSku', () => {
   it('selects the highest normalized frontier AUC within each SKU', () => {
     const selected = bestSeriesPerSku(
@@ -57,6 +67,21 @@ describe('bestSeriesPerSku', () => {
     expect(baseSku(point('GB200-NVL72', 'gb200_dynamo-trt', 1, 1))).toBe('GB200');
   });
 
+  it('keeps every eligible TileRT series alongside the SKU AUC winner', () => {
+    const selected = bestSeriesPerSku(
+      [
+        frameworkPoint('B200-8', 'b200_sglang', 'sglang', 20, 1_800),
+        frameworkPoint('B200-8', 'b200_sglang', 'sglang', 60, 1_000),
+        frameworkPoint('B200-8', 'b200_tilert_mtp', 'tilert', 340, 160),
+        frameworkPoint('B200-8', 'b200_tilert_stp', 'tilert', 300, 140),
+        frameworkPoint('B200-8', 'b200_unrelated_endpoint', 'vllm', 400, 120),
+      ],
+      'upper_left',
+    );
+
+    expect(selected).toEqual(new Set(['b200_sglang', 'b200_tilert_mtp', 'b200_tilert_stp']));
+  });
+
   it('ranks unofficial-run overlay series with the same SKU policy', () => {
     const overlayPoint = (hwKey: string, x: number, y: number) =>
       ({
@@ -74,5 +99,23 @@ describe('bestSeriesPerSku', () => {
     );
 
     expect(selected).toEqual(new Set(['b200_overlay_sglang']));
+  });
+
+  it('keeps TileRT series from an unofficial-run overlay', () => {
+    const overlayPoint = (hwKey: string, framework: string, x: number, y: number) =>
+      ({
+        ...frameworkPoint('B200-8', hwKey, framework, x, y),
+        run_url: 'https://github.com/example/actions/runs/123',
+      }) as InferenceData;
+    const selected = bestSeriesPerSku(
+      [
+        overlayPoint('b200_overlay_sglang', 'sglang', 20, 1_800),
+        overlayPoint('b200_overlay_sglang', 'sglang', 60, 1_000),
+        overlayPoint('b200_overlay_tilert_mtp', 'tilert', 340, 160),
+      ],
+      'upper_left',
+    );
+
+    expect(selected).toEqual(new Set(['b200_overlay_sglang', 'b200_overlay_tilert_mtp']));
   });
 });

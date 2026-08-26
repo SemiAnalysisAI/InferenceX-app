@@ -1,0 +1,69 @@
+---
+title: 'GLM 5.3 on AgentX: NVIDIA Is Up to 5x Cheaper per Token at 150 tok/s/user'
+subtitle: 'At this operating point, free AMD silicon would still not close the gap'
+seoDescription: 'GLM 5.3 AgentX results on open source SGLang. At 150 tok/s/user p90 interactivity, NVIDIA has up to 5x better cost efficiency, a gap so large that free competitor hardware would still leave NVIDIA cheaper per token.'
+date: '2026-08-25'
+publishDate: '2026-08-25'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - glm5
+  - b200
+  - b300
+  - mi355x
+  - sglang
+  - nvidia
+  - amd
+---
+
+GLM 5.3 builds on top of GLM 5.2 744B with additional post training. This is a frontier level model.
+
+In terms of open source SGLang performance, this is another model where NVIDIA again beats AMD on realistic agentic inference performance. At 150 tok/s/user p90 [interactivity](/glossary/interactivity), NVIDIA has up to 5x better cost efficiency.
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/4a21d140-b588-4b33-941d-7c8090ac42b5_2048x1286.png"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=GLM-5.2&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_prec=fp4&i_active=b200_sglang%2Cb300_sglang%2Cgb200_dynamo-sglang%2Cgb300_dynamo-trt%2Cmi355x_atom%2Cmi355x_sglang)"
+/>
+
+## The free-hardware test
+
+There is a useful way to size a gap like this. With the current state of AMD software, at 150 tok/s/user, NVIDIA's performance advantage is so great that even if the competitor chip hardware was sold for free, with providers still of course paying for datacenter hosting, power, and other operating costs, cost per token would still be cheaper when using NVIDIA.
+
+That framing matters because hardware price is the lever most often reached for in a procurement conversation, and at this operating point it is not a lever that reaches far enough. The constraint is software, not the bill of materials.
+
+<Figure src="https://substack-post-media.s3.amazonaws.com/public/images/f85bdb45-792c-4330-9745-674b38b03425_2048x1289.png" />
+
+## This is a snapshot, not a verdict
+
+The gap is measured against the current state of AMD software, and that state has been moving quickly elsewhere in these results. We look forward to AMD's performance optimizations in the upcoming AgentX update article in a couple of weeks, which will also include some other very exciting results.
+
+It is also worth being precise about scope: this is the open source SGLang comparison. AMD's vendor engine tells a different story on parts of this same model, which is [covered separately](/blog/glm-5-3-agentx-mi355x-atom-vs-gb300-nvl72).
+
+---
+
+_These results are one slice of AgentX 1.0. The full analysis, the replay methodology, and the 70+ upstream PRs the benchmark drove are in [AgentX - InferenceXv3: Does the CUDA Moat Hold Up in Agentic Inferencing?](/blog/agentx-inferencexv3-does-cuda-moat). Every point is explorable on the [free dashboard](https://inferencex.semianalysis.com/)._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How much cheaper is NVIDIA than AMD on GLM 5.3?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On open source SGLang at 150 tok/s/user p90 interactivity, NVIDIA has up to 5x better cost efficiency. With the current state of AMD software at that operating point, the advantage is large enough that even free competitor hardware, with providers still paying for hosting, power, and other operating costs, would leave cost per token cheaper on NVIDIA."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does AMD win anywhere on GLM 5.3?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, but not on this comparison. The 5x figure is the open source SGLang result. With ATOM, AMD has better performance per dollar than GB300 NVL72 SGLang and even TRTLLM for parts of the p90 E2E Normalized Interactivity range."
+      }
+    }
+  ]
+}`}</JsonLd>

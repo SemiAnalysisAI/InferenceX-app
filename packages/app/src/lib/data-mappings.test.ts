@@ -272,7 +272,7 @@ describe('getModelLabel', () => {
     expect(getModelLabel(Model.Llama3_3_70B)).toBe('Llama 3.3 70B Instruct');
     expect(getModelLabel(Model.Llama3_1_70B)).toBe('Llama 3.1 70B Instruct');
     expect(getModelLabel(Model.DeepSeek_R1)).toBe('DeepSeek R1 0528 671B');
-    expect(getModelLabel(Model.DeepSeek_V4_Pro)).toBe('DeepSeek V4 Pro 1.6T');
+    expect(getModelLabel(Model.DeepSeek_V4_Pro)).toBe('DeepSeek V4 Pro 0813 1.6T');
     expect(getModelLabel(Model.GptOss)).toBe('gpt-oss 120B');
     expect(getModelLabel(Model.Qwen3_5)).toBe('Qwen3.5 397B');
     expect(getModelLabel(Model.Kimi_K2_5)).toBe('Kimi K2.5/2.6/2.7-Code 1T');
