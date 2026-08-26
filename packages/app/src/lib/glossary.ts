@@ -53,7 +53,6 @@ const AGENTX_V3 = 'agentx-inferencexv3-does-cuda-moat';
 const AGENTX_DSV4_MI355X_B200 = 'deepseek-v4-pro-agentx-mi355x-vs-b200-august';
 const AGENTX_DSV4_B200_B300 = 'deepseek-v4-pro-agentx-b200-vs-b300-kv-working-set';
 const AGENTX_DSV4_GB200_GB300 = 'deepseek-v4-pro-agentx-gb200-vs-gb300-disagg';
-const AGENTX_K3_PP = 'kimi-k3-agentx-mi355x-vs-b200-pipeline-parallel';
 const AGENTX_K3_ATOM = 'kimi-k3-agentx-mi355x-atom-vs-gb300-nvl72';
 const AGENTX_M3_TRT = 'minimax-m3-agentx-b300-trtllm-tp2-vs-the-field';
 const AGENTX_M3_RACK = 'minimax-m3-agentx-b200-b300-vs-rack-scale';
@@ -649,7 +648,7 @@ const entries = [
     benchmarkContext:
       'Fixed-sequence scenarios keep speculative decoding as part of a curve’s identity, so MTP-enabled and disabled recipes plot separately. Agentic curves instead treat it as point-level metadata and merge the points, with the method named in each tooltip, because AgentX reports the best available curve per model, chip SKU, and engine. Since replayed AgentX content is synthetic, a speculator would accept an unrepresentative number of draft tokens, so runs apply an acceptance length collected per model, speculator, draft length, and thinking mode on an external agentic coding dataset.',
     relatedTerms: ['multi-token-prediction', 'acceptance-length', 'decode', 'batching', 'agentx'],
-    articleSlugs: [INFERENCEX_V2, DEEPSEEK_V4, B200_GLM5, KIMI_K3, AGENTX_V3, AGENTX_K3_PP],
+    articleSlugs: [INFERENCEX_V2, DEEPSEEK_V4, B200_GLM5, KIMI_K3, AGENTX_V3],
   },
   {
     slug: 'multi-token-prediction',
@@ -1531,7 +1530,7 @@ const entries = [
       'data-parallelism',
       'high-bandwidth-memory',
     ],
-    articleSlugs: [AGENTX_V3, KIMI_K3, INFERENCEX_V2, AGENTX_K3_PP],
+    articleSlugs: [AGENTX_V3, KIMI_K3, INFERENCEX_V2],
   },
   {
     slug: 'dp-attention',

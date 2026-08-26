@@ -1,5 +1,5 @@
 ---
-title: 'MiniMax M3 的 AgentX 结果：B200 与 B300 为何胜过对应的机架级方案'
+title: 'MiniMax M3 的 AgentX 结果：B200 与 B300 为何胜过机架级的 GB200 NVL72 与 GB300 NVL72'
 subtitle: 'Dynamo router 成为瓶颈，没有提交使用上下文并行，而 AMD 完全没有用上 KV offload'
 seoDescription: '在 MiniMax M3 上，B200 与 B300 在按 TCO 归一化的吞吐量上胜过 GB200 与 GB300。Dynamo router 可能成为瓶颈，因为其工作量随在线前缀增长；尽管 p90 输入长度达 317k，仍没有提交使用上下文并行；AMD 的 Pareto 最优点则完全没有使用 KV offload。'
 date: '2026-08-25'
