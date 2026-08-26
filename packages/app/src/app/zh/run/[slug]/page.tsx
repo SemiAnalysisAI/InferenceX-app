@@ -35,7 +35,8 @@ function statLedDescriptionZh(entry: RunPageEntry, data: RunPageData): string {
     read.costPerMtok === null
       ? ''
       : `，按超大规模云价格每百万 token 成本 ${fmtCostPerMtok(read.costPerMtok)}`;
-  return `实测数据：${entry.model.seoName} 在 ${entry.chip.label} 上、每用户每秒 ${data.primaryTier} token 档位下单 GPU 可持续输出 ${fmtThroughput(read.throughputPerGpu)} token/s${cost}。共 ${data.configCount} 组实测配置，数据持续更新。`;
+  const chipLabel = entry.chip.label;
+  return `实测数据：${entry.model.seoName} 在 ${chipLabel} 上、每用户每秒 ${data.primaryTier} token 档位下单 GPU 可持续输出 ${fmtThroughput(read.throughputPerGpu)} token/s${cost}。共 ${data.configCount} 组实测配置，数据持续更新。`;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -69,7 +70,7 @@ function buildFaqZh(
 ): { question: string; answer: string }[] {
   const questions = runPageFaqQuestionsZh(entry);
   const model = entry.model.seoName;
-  const chip = entry.chip.label;
+  const chipLabel = entry.chip.label;
   const read = primaryRead(data);
   const workload = scenarioLabel(data.scenario, 'zh');
 
@@ -77,7 +78,7 @@ function buildFaqZh(
     data.bestThroughputPerGpu === null ? '暂无' : fmtThroughput(data.bestThroughputPerGpu);
   const throughputAnswer =
     typeof read?.throughputPerGpu === 'number'
-      ? `在${workload}、每用户每秒 ${data.primaryTier} token 的交互档位下，${chip} 部署 ${model} 单 GPU 可持续输出 ${fmtThroughput(read.throughputPerGpu)} token/s${read.framework ? `，推理引擎为 ${read.framework}` : ''}${read.precision ? `，精度 ${read.precision.toUpperCase()}` : ''}。全部配置中的实测峰值吞吐为单 GPU ${peak} token/s。`
+      ? `在${workload}、每用户每秒 ${data.primaryTier} token 的交互档位下，${chipLabel} 部署 ${model} 单 GPU 可持续输出 ${fmtThroughput(read.throughputPerGpu)} token/s${read.framework ? `，推理引擎为 ${read.framework}` : ''}${read.precision ? `，精度 ${read.precision.toUpperCase()}` : ''}。全部配置中的实测峰值吞吐为单 GPU ${peak} token/s。`
       : `InferenceX 集群已为该组合完成 ${data.configCount} 组实测配置，各交互档位的实测结果见上方阶梯表。`;
 
   const costAnswer =
@@ -87,7 +88,7 @@ function buildFaqZh(
 
   const servingAnswer = `本页数据来自 ${data.frameworks.join('、')}，精度覆盖 ${data.precisions.map((p) => p.toUpperCase()).join('、')}${data.hasDisagg ? '，包含 prefill 分离部署' : ''}${data.hasMultinode ? '，并包含多节点部署' : ''}。推理引擎持续重新构建并重跑基准，最优配置可能随时变化。`;
 
-  const methodologyAnswer = `所有数字均由 InferenceX 集群在真实 ${chip} 硬件上实测，通过在${workload}下扫描并发数绘制吞吐与交互速度前沿曲线${data.newest ? `；最新一次运行落在 ${data.newest}` : ''}。推导方式与 InferenceX 总览排行榜完全一致。`;
+  const methodologyAnswer = `所有数字均由 InferenceX 集群在真实 ${chipLabel} 硬件上实测，通过在${workload}下扫描并发数绘制吞吐与交互速度前沿曲线${data.newest ? `；最新一次运行落在 ${data.newest}` : ''}。推导方式与 InferenceX 总览排行榜完全一致。`;
 
   return [
     { question: questions.throughput, answer: throughputAnswer },
@@ -108,6 +109,9 @@ export default async function ZhRunPage({ params }: Props) {
   const heading = runPageHeadingZh(entry);
   const faq = data.hasData ? buildFaqZh(entry, data) : [];
   const read = primaryRead(data);
+  const model = entry.model.seoName;
+  const chipLabel = entry.chip.label;
+  const chipTitle = entry.chip.title;
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -149,8 +153,8 @@ export default async function ZhRunPage({ params }: Props) {
       : '';
   const quickAnswer =
     typeof read?.throughputPerGpu === 'number'
-      ? `${entry.model.seoName} 在 ${entry.chip.label} 上、每用户每秒 ${data.primaryTier} token 档位下单 GPU 可持续输出 ${fmtThroughput(read.throughputPerGpu)} token/s${quickAnswerCost}${read.framework ? `，推理引擎为 ${read.framework}` : ''}。`
-      : `${entry.model.seoName} 可在 ${entry.chip.label} 上运行：目前已有 ${data.configCount} 组实测配置，各档位实测结果见下方阶梯表。`;
+      ? `${model} 在 ${chipLabel} 上、每用户每秒 ${data.primaryTier} token 档位下单 GPU 可持续输出 ${fmtThroughput(read.throughputPerGpu)} token/s${quickAnswerCost}${read.framework ? `，推理引擎为 ${read.framework}` : ''}。`
+      : `${model} 可在 ${chipLabel} 上运行：目前已有 ${data.configCount} 组实测配置，各档位实测结果见下方阶梯表。`;
 
   const t: RunStrings = {
     backHref: '/zh/run',
@@ -179,7 +183,7 @@ export default async function ZhRunPage({ params }: Props) {
       neocloud: '新兴云',
       retail: '零售租用',
     },
-    emptyState: `InferenceX 集群尚未发布 ${entry.model.seoName} 在 ${entry.chip.label} 上的基准测试结果。基准测试持续运行，新结果落地后本页会自动填充。`,
+    emptyState: `InferenceX 集群尚未发布 ${model} 在 ${chipLabel} 上的基准测试结果。基准测试持续运行，新结果落地后本页会自动填充。`,
     faqHeading: '常见问题',
     faq,
     exploreHeading: '继续探索数据',
@@ -192,7 +196,7 @@ export default async function ZhRunPage({ params }: Props) {
         href: `/zh/rankings/cheapest-gpu-for-${entry.model.slug}`,
         label: `运行 ${entry.model.seoName} 最省钱 GPU 完整排行`,
       },
-      { href: `/zh/chips/${entry.chip.slug}`, label: `${entry.chip.title} 规格与价格` },
+      { href: `/zh/chips/${entry.chip.slug}`, label: `${chipTitle} 规格与价格` },
       { href: '/zh/inference', label: '交互式推理仪表盘' },
     ],
   };

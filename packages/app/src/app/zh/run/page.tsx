@@ -87,16 +87,19 @@ export default async function ZhRunIndexPage() {
               <Card key={model.slug} className="p-5">
                 <h2 className="text-lg font-semibold tracking-tight">{model.seoName}</h2>
                 <ul className="mt-3 grid gap-1 sm:grid-cols-2">
-                  {(byModel.get(model.slug) ?? []).map((entry) => (
-                    <li key={entry.slug}>
-                      <Link
-                        href={`/zh/run/${entry.slug}`}
-                        className="text-sm font-medium text-brand hover:underline"
-                      >
-                        {model.seoName} 运行在 {entry.chip.label}
-                      </Link>
-                    </li>
-                  ))}
+                  {(byModel.get(model.slug) ?? []).map((entry) => {
+                    const chipLabel = entry.chip.label;
+                    return (
+                      <li key={entry.slug}>
+                        <Link
+                          href={`/zh/run/${entry.slug}`}
+                          className="text-sm font-medium text-brand hover:underline"
+                        >
+                          {model.seoName} 运行在 {chipLabel}
+                        </Link>
+                      </li>
+                    );
+                  })}
                 </ul>
               </Card>
             ))}
