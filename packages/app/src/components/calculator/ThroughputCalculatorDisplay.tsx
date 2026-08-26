@@ -40,6 +40,10 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
+import {
+  includesJalapenoResult,
+  JalapenoOfficialPreviewNotice,
+} from '@/components/jalapeno-official-preview-notice';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { overlayRunColor } from '@/lib/overlay-run-style';
 import { localePath } from '@/lib/i18n';
@@ -535,6 +539,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const barResults = useMemo(
     () => (overlayResults.length > 0 ? [...results, ...overlayResults] : results),
     [results, overlayResults],
+  );
+  const showsJalapenoPreview = useMemo(
+    () => includesJalapenoResult(results.map((result) => result.hwKey)),
+    [results],
   );
   const barResultsKey = useMemo(
     () =>
@@ -1212,6 +1220,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                             </>
                           )}
                         </p>
+                        {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
                         {barMetric === 'power' && barResults.length > 0 && (
                           <>
                             <p
