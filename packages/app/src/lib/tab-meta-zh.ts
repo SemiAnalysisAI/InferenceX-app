@@ -37,6 +37,11 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
     description:
       '计算 AI 推理吞吐量与总拥有成本（TCO）。跨硬件配置对比 LLM 推理服务的芯片成本效益。',
   },
+  fleet: {
+    title: '集群生命周期经济性',
+    description:
+      '测算固定 AI 推理集群在整个生命周期内的经济性：按设施功率预算确定集群规模，并跟踪实测软件配置随时间改进带来的收入、成本与利润率变化。',
+  },
   reliability: {
     title: '服务商可靠性指标',
     description: 'AI 推理服务商可靠性与可用性跟踪。对比各芯片云服务商的错误率与可用性。',
@@ -89,6 +94,8 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面展示历史趋势图表：跟踪各芯片、框架与模型的推理性能随时间的演进，量化软件栈优化带来的收益。',
   calculator:
     '本页面提供吞吐量与总拥有成本（TCO）计算器：基于真实基准测试数据，估算不同芯片配置下 LLM 推理服务的每百万 token 成本与性价比。',
+  fleet:
+    '本页面提供集群生命周期经济性分析：按设施功率预算确定固定集群的规模，从模型发布之日起，基于历史基准测试中实测的软件配置改进，测算收入、成本、利润率与回本时间。',
   reliability:
     '本页面展示基准测试基础设施的可靠性指标：各芯片集群与服务商的运行成功率、错误率与可用性。',
   'gpu-specs':
@@ -113,6 +120,7 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   evaluation: '准确率评估',
   historical: '历史趋势',
   calculator: 'TCO 计算器',
+  fleet: '集群生命周期',
   reliability: '可靠性',
   'gpu-specs': '芯片规格',
   'gpu-metrics': '芯片功耗',

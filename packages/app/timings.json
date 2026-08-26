@@ -41,7 +41,7 @@
       "duration": 1537
     },
     {
-      "spec": "cypress/e2e/calculator-lifecycle.cy.ts",
+      "spec": "cypress/e2e/fleet-lifecycle.cy.ts",
       "duration": 18000
     },
     {

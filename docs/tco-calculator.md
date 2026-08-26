@@ -191,6 +191,16 @@ output tokens and then apply it to total throughput; the existing
 
 ## Fleet Lifecycle (`FleetLifecycle.tsx`)
 
+> **Now on its own page.** The section no longer renders on `/calculator`; it is
+> the body of the `/fleet` route (and `/zh/fleet`), hosted by
+> `FleetLifecycleDisplay.tsx`, which owns the same model/scenario/precision/
+> cost-tier/target controls the calculator page does and renders the chip
+> legend in its controls card, where it stays reachable from the table view and
+> when nothing is plottable. The calculator keeps a pointer card linking to `/fleet`, and
+> its cost-target panel now renders the MW budget input (`c_mw` is shared
+> between the two pages, so a budget set on one seeds the other). Everything
+> below about the section's internals still applies unchanged.
+
 Everything above answers "which chip is cheapest at this interactivity, right
 now?". This section answers "what has a fleet of it earned and cost since the
 model shipped?" — and the answer is measured, not assumed.

@@ -25,7 +25,7 @@ function readCapturedLifecycleCsv(): Cypress.Chainable<string> {
   });
 }
 
-// Fleet Lifecycle section on /calculator. The distinguishing behaviours, all
+// Fleet Lifecycle section on its own /fleet page. The distinguishing behaviours, all
 // worth locking down:
 //  - it reads the FULL run history, so a row's operating point can come from an
 //    earlier date than the caption's run date — and must say which;
@@ -145,7 +145,7 @@ const lineVertices = () =>
     .invoke('attr', 'd')
     .then((d) => (d ?? '').split('L').length);
 
-describe('Calculator — Fleet Lifecycle', () => {
+describe('Fleet — Fleet Lifecycle', () => {
   before(() => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -155,8 +155,9 @@ describe('Calculator — Fleet Lifecycle', () => {
       // something this section can fix, so suppress the nudge rather than race it.
       win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
     });
-    cy.visit('/calculator');
-    cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
+    cy.visit('/fleet');
+    // Readiness: the lifecycle section only mounts once run data has loaded.
+    cy.get('[data-testid="calculator-lifecycle-section"]').should('exist');
   });
 
   beforeEach(resetToChart);
@@ -709,20 +710,25 @@ describe('Calculator — Fleet Lifecycle', () => {
   });
 
   it('follows legend visibility', () => {
+    // The legend lives in the controls card, outside the figure, so it stays
+    // reachable from the table view and even when nothing is plottable.
     showTable();
     // Legend entries are configs and clicking one isolates it. Configs sit one
     // level below the lines now, so isolating a single config leaves at most one
     // chip — and none at all when that config was never measured at the target,
-    // which is a legitimate state rather than a broken chart.
+    // which is a legitimate state rather than a broken chart. The section-level
+    // assertion covers both: the table shows at most one row, or is absent
+    // entirely in favour of the explanatory message.
     cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').then(($rows) => {
       const fullCount = $rows.length;
       expect(fullCount).to.be.greaterThan(1);
-      cy.get('.sidebar-legend label').first().click();
-      cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').should(
-        'have.length.at.most',
-        1,
-      );
-      cy.get('.sidebar-legend label').first().click();
+      cy.get('[data-testid="fleet-legend"] ul label').first().click();
+      cy.get('[data-testid="calculator-lifecycle-section"]').should(($section) => {
+        expect(
+          $section.find('[data-testid="calculator-lifecycle-table"] tbody tr').length,
+        ).to.be.at.most(1);
+      });
+      cy.get('[data-testid="fleet-legend"] ul label').first().click();
       cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').should(
         'have.length',
         fullCount,
@@ -733,11 +739,11 @@ describe('Calculator — Fleet Lifecycle', () => {
   it('explains chips that were never measured at an extreme target instead of dropping them', () => {
     // Pushing the target to the top of the range leaves chips outside their
     // measured interactivity; the honest answer is to say so, with the range.
-    cy.get('[data-testid="calculator-controls"] input[type="range"]')
+    cy.get('[data-testid="fleet-controls"] input[type="range"]')
       .invoke('attr', 'max')
       .then((max) => {
-        cy.get('[data-testid="calculator-controls"] input[type="number"]').clear();
-        cy.get('[data-testid="calculator-controls"] input[type="number"]').type(`${max}{enter}`);
+        cy.get('[data-testid="fleet-controls"] input[type="number"]').clear();
+        cy.get('[data-testid="fleet-controls"] input[type="number"]').type(`${max}{enter}`);
       });
     cy.get('[data-testid="calculator-lifecycle-section"]').should(
       'contain.text',
@@ -755,8 +761,8 @@ describe('Calculator — Fleet Lifecycle', () => {
     // is measured — which is the *other* cause, and would make `noneMeasured`
     // the correct answer. So put the target back in a measured range first, or
     // this asserts nothing about the budget at all.
-    cy.get('[data-testid="calculator-controls"] input[type="number"]').clear();
-    cy.get('[data-testid="calculator-controls"] input[type="number"]').type('35{enter}');
+    cy.get('[data-testid="fleet-controls"] input[type="number"]').clear();
+    cy.get('[data-testid="fleet-controls"] input[type="number"]').type('35{enter}');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
 
     cy.get('[data-testid="calc-fleet-mw-input"]').clear();
@@ -775,22 +781,19 @@ describe('Calculator — Fleet Lifecycle', () => {
   });
 });
 
-describe('Calculator — self-contained lifecycle regressions', () => {
+describe('Fleet — self-contained lifecycle regressions', () => {
   before(() => {
     const rows = agenticB300Rows(null);
     cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability });
     cy.intercept('GET', '/api/v1/benchmarks/history*', { body: rows }).as('legacyPriceHistory');
     cy.intercept('GET', '/api/v1/benchmarks*', { body: rows }).as('legacyPriceBenchmarks');
-    cy.visit(
-      '/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&c_mw=10&c_price=7',
-      {
-        onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-          win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
-          unlockAgenticGate(win);
-        },
+    cy.visit('/fleet?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&c_mw=10&c_price=7', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+        unlockAgenticGate(win);
       },
-    );
+    });
     cy.wait('@legacyPriceBenchmarks');
     cy.wait('@legacyPriceHistory');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
@@ -841,7 +844,7 @@ describe('Calculator — self-contained lifecycle regressions', () => {
   });
 });
 
-describe('Calculator — Fleet Lifecycle with agentic traces', () => {
+describe('Fleet — Fleet Lifecycle with agentic traces', () => {
   // Two run dates so the staircase has a step in it, and a measured cache hit
   // rate on every row so the cached-input discount has something to apply to.
   // The shared history fixture carries ZERO agentic rows, so this spec serves
@@ -886,7 +889,7 @@ describe('Calculator — Fleet Lifecycle with agentic traces', () => {
     cy.intercept('GET', '/api/v1/benchmarks*', { body: [...b300Rows, ...b200Rows] }).as(
       'agenticBenchmarks',
     );
-    cy.visit('/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+    cy.visit('/fleet?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -960,14 +963,15 @@ describe('Calculator — Fleet Lifecycle with agentic traces', () => {
   });
 });
 
-describe('Calculator — Fleet Lifecycle in Chinese', () => {
+describe('Fleet — Fleet Lifecycle in Chinese', () => {
   before(() => {
-    cy.visit('/zh/calculator', {
+    cy.visit('/zh/fleet', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
     });
-    cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
+    // Readiness: the lifecycle section only mounts once run data has loaded.
+    cy.get('[data-testid="calculator-lifecycle-section"]').should('exist');
   });
 
   it('translates the section, including the table headers and notes', () => {
