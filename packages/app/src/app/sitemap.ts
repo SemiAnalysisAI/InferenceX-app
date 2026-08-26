@@ -16,6 +16,7 @@ import {
   canonicalSpecDecodeCompareSlug,
 } from '@/lib/compare-variant-slug';
 import { getAllGlossaryEntries } from '@/lib/glossary';
+import { ACTIVE_INFERENCE_MODEL_SLUGS, INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import { languageAlternates, zhPath } from '@/lib/i18n';
 import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -72,6 +73,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'yearly',
       priority: 0.4,
     }),
+    // Per-model inference pages — the indexable path form of
+    // `/inference?g_model=…`. Deprecated models keep their pages (historical
+    // data stays reachable) at a lower priority than actively benchmarked ones.
+    ...INFERENCE_MODEL_SLUGS.flatMap((entry) =>
+      localizedPair(`/inference/${entry.slug}`, {
+        lastModified: now,
+        changeFrequency: 'daily' as const,
+        priority: ACTIVE_INFERENCE_MODEL_SLUGS.includes(entry) ? 0.8 : 0.5,
+      }),
+    ),
     // The catalog index is indexable; the per-point detail pages it links to
     // stay noindex, so only this page enters the sitemap.
     ...localizedPair('/inference/agentic', {

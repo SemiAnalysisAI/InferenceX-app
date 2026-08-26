@@ -37,6 +37,7 @@ import {
   Sequence,
   SEQUENCE_OPTIONS,
 } from '@/lib/data-mappings';
+import { inferenceModelForPathname } from '@/lib/inference-model-slug';
 import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/default-sequence';
@@ -309,6 +310,13 @@ export function GlobalFilterProvider({
       if (value !== undefined && pattern.test(value)) apply(value);
     };
 
+    // `/inference/<model>` pins the model from the path. On first mount the
+    // shell already seeded `initialModel` from the same pathname, so this is a
+    // no-op; it matters on soft navigations between model pages (and to/from
+    // `/inference`), which do not remount this provider. Applied before the
+    // param reads so an explicit `?g_model=` share link still wins.
+    const pathModel = inferenceModelForPathname(pathname);
+    if (pathModel !== null) setSelectedModel(pathModel);
     applyIfEnum('g_model', Model, setSelectedModel);
     applyIfEnum('i_seq', Sequence, setSelectedSequence);
     const urlPrec = getUrlParam('i_prec');
