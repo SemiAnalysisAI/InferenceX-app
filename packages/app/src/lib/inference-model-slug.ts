@@ -131,3 +131,32 @@ export function inferenceModelForPathname(pathname: string | null | undefined): 
   }
   return getInferenceModelBySlug(segment)?.model ?? null;
 }
+
+/**
+ * Pathname the inference dashboard should shallow-rewrite to when the user
+ * picks `model` from the selector, or null when the current path must be left
+ * alone. Only the inference tab itself qualifies — the base `/inference`
+ * page and the `/inference/<model>` subroutes (in both locale trees). Every
+ * other surface sharing the global model filter (overview, compare, the
+ * agentic catalog, …) keeps its own URL.
+ *
+ * Models without a registry page (hidden entries) fall back to the base
+ * `/inference` path rather than minting a URL that would 404 on reload.
+ */
+export function inferenceModelRouteForSelection(
+  pathname: string | null | undefined,
+  model: Model,
+): string | null {
+  if (!pathname) return null;
+  const barePath = pathname.split(/[?#]/u, 1)[0] || '/';
+  const isZh = barePath === '/zh' || barePath.startsWith('/zh/');
+  const enPath = isZh ? barePath.replace(/^\/zh(?=\/|$)/u, '') || '/' : barePath;
+  const onInferenceTab =
+    enPath === '/inference' ||
+    enPath === '/inference/' ||
+    inferenceModelForPathname(pathname) !== null;
+  if (!onInferenceTab) return null;
+  const slug = inferenceModelSlugForModel(model);
+  const target = slug ? inferenceModelPath(slug) : '/inference';
+  return isZh ? `/zh${target}` : target;
+}

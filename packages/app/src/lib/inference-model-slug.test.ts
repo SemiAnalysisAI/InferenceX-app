@@ -9,6 +9,7 @@ import {
   INFERENCE_MODEL_SLUGS,
   inferenceModelForPathname,
   inferenceModelPath,
+  inferenceModelRouteForSelection,
   inferenceModelSlugForModel,
 } from './inference-model-slug';
 
@@ -127,5 +128,41 @@ describe('inferenceModelForPathname', () => {
     expect(inferenceModelForPathname(null)).toBeNull();
     expect(inferenceModelForPathname(undefined)).toBeNull();
     expect(inferenceModelForPathname('')).toBeNull();
+  });
+});
+
+describe('inferenceModelRouteForSelection', () => {
+  it('rewrites model subroutes to the newly selected model', () => {
+    expect(inferenceModelRouteForSelection('/inference/kimi-k3', Model.DeepSeek_V4_Pro)).toBe(
+      '/inference/deepseek-v4',
+    );
+    expect(inferenceModelRouteForSelection('/zh/inference/kimi-k3', Model.DeepSeek_V4_Pro)).toBe(
+      '/zh/inference/deepseek-v4',
+    );
+  });
+
+  it('moves the base /inference page onto the model subroute', () => {
+    expect(inferenceModelRouteForSelection('/inference', Model.Kimi_K3)).toBe('/inference/kimi-k3');
+    expect(inferenceModelRouteForSelection('/zh/inference', Model.Kimi_K3)).toBe(
+      '/zh/inference/kimi-k3',
+    );
+  });
+
+  it('leaves every other surface alone', () => {
+    expect(inferenceModelRouteForSelection('/', Model.Kimi_K3)).toBeNull();
+    expect(inferenceModelRouteForSelection('/overview', Model.Kimi_K3)).toBeNull();
+    expect(inferenceModelRouteForSelection('/inference/agentic', Model.Kimi_K3)).toBeNull();
+    expect(inferenceModelRouteForSelection('/inference/agentic/point-1', Model.Kimi_K3)).toBeNull();
+    expect(
+      inferenceModelRouteForSelection('/compare/kimi-k3-h100-vs-h200', Model.Kimi_K3),
+    ).toBeNull();
+    expect(inferenceModelRouteForSelection('/zh', Model.Kimi_K3)).toBeNull();
+    expect(inferenceModelRouteForSelection(null, Model.Kimi_K3)).toBeNull();
+  });
+
+  it('keeps the same path when the selection already matches', () => {
+    expect(inferenceModelRouteForSelection('/inference/kimi-k3', Model.Kimi_K3)).toBe(
+      '/inference/kimi-k3',
+    );
   });
 });

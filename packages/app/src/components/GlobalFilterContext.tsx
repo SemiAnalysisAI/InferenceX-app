@@ -37,7 +37,10 @@ import {
   Sequence,
   SEQUENCE_OPTIONS,
 } from '@/lib/data-mappings';
-import { inferenceModelForPathname } from '@/lib/inference-model-slug';
+import {
+  inferenceModelForPathname,
+  inferenceModelRouteForSelection,
+} from '@/lib/inference-model-slug';
 import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/default-sequence';
@@ -313,11 +316,17 @@ export function GlobalFilterProvider({
     // `/inference/<model>` pins the model from the path. On first mount the
     // shell already seeded `initialModel` from the same pathname, so this is a
     // no-op; it matters on soft navigations between model pages (and to/from
-    // `/inference`), which do not remount this provider. Applied before the
-    // param reads so an explicit `?g_model=` share link still wins.
+    // `/inference`), which do not remount this provider. An explicit
+    // `?g_model=` in the CURRENT URL still wins over the path pin, but on a
+    // model page the snapshot's `g_model` is otherwise ignored: the snapshot
+    // retains params from the previous navigation (`refreshUrlParams` only
+    // overwrites keys present in the live URL), and letting that stale value
+    // through would override the model the path just asked for.
     const pathModel = inferenceModelForPathname(pathname);
     if (pathModel !== null) setSelectedModel(pathModel);
-    applyIfEnum('g_model', Model, setSelectedModel);
+    if (pathModel === null || hasExplicitUrlParam('g_model')) {
+      applyIfEnum('g_model', Model, setSelectedModel);
+    }
     applyIfEnum('i_seq', Sequence, setSelectedSequence);
     const urlPrec = getUrlParam('i_prec');
     if (urlPrec) {
@@ -342,6 +351,30 @@ export function GlobalFilterProvider({
     // today, and covering it would mean the Suspense bailout above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
+
+  // Selecting a model on the inference tab moves the URL onto the model's
+  // indexable subroute without a reload: Next intercepts
+  // `history.replaceState`, so `usePathname` stays in sync while the chart
+  // simply re-renders in place — no RSC refetch, no scroll reset. The ref
+  // skips the mount run so hard-loading `/inference` (or a `?g_model=` share
+  // link) keeps its URL; only an actual model switch rewrites the path.
+  // `window.location` is read directly — it is always current, unlike the
+  // `pathname` hook value, which lags a rewrite this very effect made.
+  const modelRouteSyncReadyRef = useRef(false);
+  useEffect(() => {
+    if (!modelRouteSyncReadyRef.current) {
+      modelRouteSyncReadyRef.current = true;
+      return;
+    }
+    const target = inferenceModelRouteForSelection(window.location.pathname, selectedModel);
+    if (target === null || window.location.pathname === target) return;
+    const search = new URLSearchParams(window.location.search);
+    // The path now carries the model — a lingering share-link param would
+    // override it on the next snapshot read.
+    search.delete('g_model');
+    const qs = search.toString();
+    window.history.replaceState(null, '', `${target}${qs ? `?${qs}` : ''}${window.location.hash}`);
+  }, [selectedModel]);
 
   // ── Availability data ─────────────────────────────────────────────────────
   const {

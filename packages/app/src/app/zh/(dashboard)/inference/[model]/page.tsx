@@ -21,6 +21,7 @@ import {
 
 interface Props {
   params: Promise<{ model: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export function generateStaticParams(): { model: string }[] {
@@ -53,11 +54,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ZhInferenceModelPage({ params }: Props) {
+export default async function ZhInferenceModelPage({ params, searchParams }: Props) {
   const { model } = await params;
   const entry = getInferenceModelBySlug(model);
   if (!entry) notFound();
-  if (model !== entry.slug) permanentRedirect(zhPath(inferenceModelPath(entry.slug)));
+  // Preserves the query string so share-link params like `?i_seq=` and
+  // `?i_prec=` survive the redirect — same treatment as the compare pages.
+  if (model !== entry.slug) {
+    const sp = await searchParams;
+    const qs = Object.entries(sp)
+      .flatMap(([k, v]) => {
+        if (Array.isArray(v)) return v.map((vv) => [k, vv] as const);
+        if (v === undefined) return [];
+        return [[k, v] as const];
+      })
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .join('&');
+    permanentRedirect(`${zhPath(inferenceModelPath(entry.slug))}${qs ? `?${qs}` : ''}`);
+  }
   return (
     <>
       <ZhTabIntro tab="inference" />
