@@ -1770,6 +1770,679 @@ const entries = [
     relatedTerms: ['cuda', 'decode', 'interactivity', 'inference-engine', 'batching'],
     articleSlugs: [AGENTX_V3, TILERT, INFERENCEX_V2],
   },
+  {
+    slug: 'goodput',
+    term: 'Goodput',
+    aliases: ['SLO-constrained throughput', 'useful throughput'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Goodput counts only the work that meets your latency target, so a fast-looking system that misses deadlines gets no credit for it.',
+    definition:
+      'Goodput is the portion of throughput that satisfies a stated service level objective, such as a time to first token bound or a minimum tokens per second per user.',
+    explanation:
+      'Raw throughput rewards a server for finishing requests no matter how slowly each user was served. Goodput applies a filter first: a request only counts if it met the latency or interactivity constraint the operator promised. Two systems with identical throughput can have very different goodput once a deadline is applied, because one may hold latency flat under load while the other lets queueing push every request past the bound.',
+    significance:
+      'Capacity planning that ignores goodput overbuys or oversells. An operator who quotes peak throughput but serves half of it within the SLO needs twice the fleet they modeled. Goodput is the number that connects a benchmark curve to how many real users a deployment can actually carry.',
+    benchmarkContext:
+      'InferenceX publishes full throughput versus interactivity Pareto frontiers rather than a single goodput number, which lets readers apply their own SLO. Reading the frontier at a fixed interactivity tier, as the TCO calculator does, is exactly a goodput measurement at that tier.',
+    relatedTerms: [
+      'service-level-objective',
+      'throughput',
+      'interactivity',
+      'iso-interactivity',
+      'tail-latency',
+    ],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2],
+  },
+  {
+    slug: 'model-flops-utilization',
+    term: 'Model FLOPs utilization',
+    abbreviation: 'MFU',
+    aliases: ['MFU', 'model bandwidth utilization', 'MBU'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'MFU compares the useful math a model actually performed against the maximum the chip could theoretically perform, giving an efficiency percentage.',
+    definition:
+      'Model FLOPs utilization is the ratio of the floating point operations a model logically requires to the peak operations the hardware could deliver in the same wall clock time.',
+    explanation:
+      'Peak TFLOP/s figures assume every tensor core is busy every cycle, which never happens in serving. Kernel launch gaps, memory stalls, communication waits, and imperfect batching all leave compute idle. MFU folds all of that into one number. Decode is usually memory bound, so decode MFU is naturally low, and the bandwidth analog MBU is often the more honest efficiency measure for token generation.',
+    significance:
+      'MFU separates hardware capability from software maturity. A chip with enormous peak FLOPs but weak kernels can lose to a slower chip that keeps its units fed. Rising MFU on fixed hardware is the signature of software progress, which is where most inference performance gains come from.',
+    benchmarkContext:
+      'InferenceX tracks delivered tokens per chip over time rather than reporting MFU directly, and the repeated pattern of large gains on unchanged hardware, such as order of magnitude improvements within weeks of a model release, is utilization being recovered by better software.',
+    relatedTerms: ['arithmetic-intensity', 'roofline', 'memory-bandwidth', 'throughput'],
+    articleSlugs: [MI355X_DSV4, DEEPSEEK_V4, INFERENCEX_V2],
+  },
+  {
+    slug: 'memory-bound-vs-compute-bound',
+    term: 'Memory bound vs compute bound',
+    aliases: ['bandwidth bound', 'compute limited'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'A workload is compute bound when the math units are the bottleneck and memory bound when waiting on data movement is the bottleneck.',
+    definition:
+      'A kernel is compute bound when its runtime is set by arithmetic throughput and memory bound when its runtime is set by how fast operands move between memory and the compute units.',
+    explanation:
+      'Every kernel has an arithmetic intensity, the ratio of operations to bytes touched. If that ratio is below the hardware balance point, the memory system saturates before the math units do. LLM prefill runs large matrix multiplies with high intensity and tends to be compute bound, while decode reads the entire working set of weights and KV cache to produce one token per request and is usually memory bound.',
+    significance:
+      'The binding resource decides which hardware spec matters. Memory bound decode explains why HBM capacity and bandwidth headline every accelerator launch, why quantization speeds up decode by shrinking bytes moved, and why a chip with modest FLOPs but fast memory can win interactive serving.',
+    benchmarkContext:
+      'InferenceX sweeps concurrency, which walks a system between regimes: low concurrency decode is bandwidth limited while high concurrency batching pushes toward compute limits. The shape of each throughput versus interactivity curve reflects where that transition happens for a given recipe.',
+    relatedTerms: [
+      'arithmetic-intensity',
+      'roofline',
+      'memory-bandwidth',
+      'high-bandwidth-memory',
+      'decode',
+    ],
+    articleSlugs: [INFERENCEX_V2, TILERT],
+  },
+  {
+    slug: 'gpu-utilization',
+    term: 'GPU utilization',
+    aliases: ['chip utilization', 'accelerator utilization'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'GPU utilization measures how busy an accelerator is, though the common percentage from monitoring tools can look high while real efficiency stays low.',
+    definition:
+      'GPU utilization is the share of time or capability an accelerator spends doing useful work, reported anywhere from coarse busy percentages to strict measures like model FLOPs utilization.',
+    explanation:
+      'The utilization number in basic monitoring tools only says a kernel was resident, not that it used the chip well. A kernel occupying one compute unit still reads as busy. Stricter measures compare delivered arithmetic or bandwidth against hardware peaks. In serving, utilization is also shaped by traffic: idle gaps between requests, low concurrency, and tool call pauses in agent sessions all leave paid-for silicon idle.',
+    significance:
+      'Fleet economics hinge on utilization. The gap between a well batched, well scheduled deployment and a naive one is often several times the cost per token on identical hardware, which is why serving software and request routing get as much attention as the chips themselves.',
+    benchmarkContext:
+      'InferenceX benchmarks report delivered throughput per chip at each interactivity level rather than a utilization percentage, so utilization differences between engines, precisions, and parallelism plans show up directly as separation between curves on the same hardware.',
+    relatedTerms: [
+      'model-flops-utilization',
+      'batching',
+      'concurrency',
+      'throughput',
+      'total-cost-of-ownership',
+    ],
+    articleSlugs: [INFERENCEMAX, AGENTIC_WORKLOADS],
+  },
+  {
+    slug: 'continuous-batching',
+    term: 'Continuous batching',
+    aliases: ['in-flight batching', 'dynamic batching', 'iteration-level scheduling'],
+    category: 'Serving',
+    plainEnglish:
+      'Continuous batching lets new requests join a running batch the moment old ones finish, instead of waiting for the whole batch to complete.',
+    definition:
+      'Continuous batching is a scheduling technique that admits and retires requests at every generation step, keeping the batch full as individual sequences finish at different times.',
+    explanation:
+      'Static batching waits to collect a group of requests, runs them together, and returns them together, so a batch runs as long as its slowest member. Because LLM outputs vary wildly in length, that wastes enormous capacity. Continuous batching reforms the batch every iteration: a sequence that emits its final token leaves immediately and a queued request takes its slot at the next step, so the accelerator stays saturated.',
+    significance:
+      'This is one of the foundational optimizations of modern LLM serving and a large part of why open source engines displaced naive deployment. It multiplies throughput at a given latency and pairs naturally with paged KV cache memory, which makes slot reuse cheap.',
+    benchmarkContext:
+      'Every engine InferenceX benchmarks, including vLLM, SGLang, and TensorRT-LLM, uses continuous batching. Concurrency sweeps measure how well each scheduler holds interactivity as the batch fills, which is where implementation differences between engines become visible.',
+    relatedTerms: ['batching', 'concurrency', 'paged-attention', 'inference-engine', 'throughput'],
+    articleSlugs: [INFERENCEMAX, SGLANG_056],
+  },
+  {
+    slug: 'paged-attention',
+    term: 'PagedAttention',
+    aliases: ['paged KV cache', 'KV cache paging'],
+    category: 'Serving',
+    plainEnglish:
+      'PagedAttention stores the KV cache in small fixed size blocks, like virtual memory pages, so cache memory is not wasted on unused space.',
+    definition:
+      'PagedAttention is a KV cache management technique that allocates cache in fixed size blocks addressed through a mapping table, rather than reserving one contiguous region per request.',
+    explanation:
+      'Contiguous per-request allocation must reserve space for the longest possible output, and most of that reservation is never used. Paging borrows the operating system playbook: cache blocks are allocated on demand as a sequence grows, freed the moment it ends, and shared between sequences with a common prefix through copy on write. Fragmentation drops to near zero, so far more sequences fit in the same HBM.',
+    significance:
+      'Introduced by vLLM, this idea unlocked the batch sizes that make continuous batching pay off and became standard across serving engines. Effective KV capacity, not raw memory size, is what bounds concurrency for long context and agentic workloads.',
+    benchmarkContext:
+      'All engines in InferenceX recipes manage KV memory in paged or block based form. High concurrency points on long context scenarios such as AgentX are only reachable because paging keeps cache waste small as hundreds of sessions grow and shrink.',
+    relatedTerms: ['kv-cache', 'kv-cache-manager', 'continuous-batching', 'prefix-caching', 'vllm'],
+    articleSlugs: [AGENT_BENCHMARK, INFERENCEMAX],
+  },
+  {
+    slug: 'radix-attention',
+    term: 'RadixAttention',
+    aliases: ['radix tree cache', 'radix prefix cache'],
+    category: 'Serving',
+    plainEnglish:
+      'RadixAttention keeps completed KV cache in a radix tree keyed by token content, so any new request can reuse the longest matching prefix.',
+    definition:
+      'RadixAttention is a prefix caching design from SGLang that retains KV cache entries in a radix tree after requests finish, enabling automatic reuse across requests that share token prefixes.',
+    explanation:
+      'A radix tree indexes cached segments by their token content, so lookup finds the longest previously computed prefix of an incoming request in one walk. Reuse is automatic and cross request: multi turn chats, system prompts shared by many users, and agent branches that fork from a common history all hit the same cached nodes. An eviction policy such as least recently used bounds the memory the tree holds.',
+    significance:
+      'Prefix reuse converts redundant prefill compute into cache hits, and in agent traffic where each turn resends a growing history the savings can dominate end to end cost. Making reuse structural rather than opt in is a large part of why SGLang performs well on such workloads.',
+    benchmarkContext:
+      'InferenceX AgentX traces preserve real shared prefix structure between turns and subagent branches, so engines with strong radix style reuse show materially better time to first token and throughput on the agentic scenario than the fixed sequence scenarios would predict.',
+    relatedTerms: [
+      'prefix-caching',
+      'prefix-cache-hit-rate',
+      'kv-cache',
+      'sglang',
+      'agentic-inference',
+    ],
+    articleSlugs: [AGENT_BENCHMARK, AGENTX_QWEN_SGLANG],
+  },
+  {
+    slug: 'draft-model',
+    term: 'Draft model',
+    aliases: ['draft head', 'speculator'],
+    category: 'Serving',
+    plainEnglish:
+      'A draft model is the small fast model in speculative decoding that guesses several upcoming tokens for the large model to verify in one pass.',
+    definition:
+      'A draft model is the lightweight proposal component of speculative decoding, producing candidate token sequences that the target model verifies in a single batched forward pass.',
+    explanation:
+      'Drafts take several forms: a separate small model from the same family, extra prediction heads trained onto the target model as in EAGLE style methods, or the multi token prediction heads some models ship with. The draft races ahead a few tokens cheaply, the target checks all of them at once, and accepted tokens are emitted together. Rejection falls back to the target model output, so results match the target distribution.',
+    significance:
+      'Draft quality sets acceptance length, and acceptance length sets the speedup. A well matched draft can multiply decode speed at low batch sizes, while a mismatched or overly aggressive draft wastes verify compute and can even slow serving under load.',
+    benchmarkContext:
+      'InferenceX records the speculative method and acceptance length behind each result and publishes golden acceptance length distributions for reproduction, because an unrealistic acceptance rate is a classic way a benchmark number stops describing production behavior.',
+    relatedTerms: [
+      'speculative-decoding',
+      'eagle',
+      'multi-token-prediction',
+      'acceptance-length',
+      'decode',
+    ],
+    articleSlugs: [SGLANG_056, GB300_DSV4],
+  },
+  {
+    slug: 'offline-inference',
+    term: 'Offline inference',
+    aliases: ['batch inference', 'offline batch serving'],
+    category: 'Serving',
+    plainEnglish:
+      'Offline inference processes a large pile of requests with no user waiting, so the only goal is maximum tokens per dollar, not latency.',
+    definition:
+      'Offline inference is model serving without an interactive deadline, where requests are processed in bulk and the objective is total throughput and cost rather than per-user latency.',
+    explanation:
+      'Synthetic data generation, document processing, embedding backfills, and evaluation sweeps do not care when any individual request returns. That frees the scheduler to run the largest batches the memory allows, order requests to maximize prefix reuse, and hold the accelerator at its throughput limit. Online serving lives at the opposite end of the same tradeoff, sacrificing throughput to keep every user above an interactivity floor.',
+    significance:
+      'The same hardware can differ by multiples in tokens per dollar between offline and tight latency operation, so quoting a single price per million tokens without stating the operating point is close to meaningless. Fleets often split into latency tiers for this reason.',
+    benchmarkContext:
+      'The right edge of an InferenceX throughput versus interactivity curve, where batch size is maximal and per-user speed is lowest, approximates offline operation. Reading one curve at both edges shows the full online to offline cost range for a recipe.',
+    relatedTerms: [
+      'throughput',
+      'interactivity',
+      'batching',
+      'cost-per-million-tokens',
+      'pareto-frontier',
+    ],
+    articleSlugs: [INFERENCEMAX, B200_MINIMAX],
+  },
+  {
+    slug: 'context-window',
+    term: 'Context window',
+    aliases: ['context length', 'max sequence length', 'long context'],
+    category: 'Model architecture',
+    plainEnglish:
+      'The context window is the maximum number of tokens a model can consider at once, covering both the input and everything generated so far.',
+    definition:
+      'The context window is the maximum sequence length a model supports, bounding the combined token count of prompt, conversation history, retrieved material, and generated output.',
+    explanation:
+      'Attention lets every token reference earlier tokens, and the KV cache holds state for all of them, so a longer window costs memory and compute that grow with length. Position encoding schemes and training length set the usable window, while serving stacks must budget KV capacity for it. Modern frontier models advertise windows of hundreds of thousands of tokens, but throughput and interactivity degrade as sequences approach those limits.',
+    significance:
+      'Long context is what makes coding agents, retrieval heavy pipelines, and document analysis workloads possible, and it is also what makes them expensive to serve. Architectural responses such as sliding window layers, latent attention, and linear attention exist mainly to bend the cost curve of the window.',
+    benchmarkContext:
+      'InferenceX covers the window from both directions: fixed sequence scenarios pin input and output lengths such as 8K in and 1K out, while AgentX replays sessions whose contexts grow turn by turn toward realistic agent working sets.',
+    relatedTerms: [
+      'kv-cache',
+      'input-output-sequence-length',
+      'sliding-window-attention',
+      'linear-attention',
+      'agentic-coding-workload',
+    ],
+    articleSlugs: [AGENTIC_WORKLOADS, KIMI_K3],
+  },
+  {
+    slug: 'grouped-query-attention',
+    term: 'Grouped-query attention',
+    abbreviation: 'GQA',
+    aliases: ['GQA', 'multi-query attention', 'MQA'],
+    category: 'Model architecture',
+    plainEnglish:
+      'Grouped-query attention lets several query heads share one set of key and value heads, shrinking the KV cache without giving up much quality.',
+    definition:
+      'Grouped-query attention is an attention variant where query heads are divided into groups that each share a single key and value head, reducing KV cache size and bandwidth per token.',
+    explanation:
+      'Standard multi-head attention stores keys and values for every head, so cache size scales with head count. Multi-query attention collapses all heads onto one KV pair, which is maximally cheap but can hurt quality. GQA sits between the two: a model might serve 64 query heads from 8 KV heads, cutting cache size eight fold. Because decode is dominated by reading the KV cache, the saving translates directly into faster token generation.',
+    significance:
+      'GQA became the default attention layout for dense open models because it attacks the memory side of decode where serving is actually bound. It also set the stage for more aggressive KV compression schemes such as multi-head latent attention.',
+    benchmarkContext:
+      'Attention layout is fixed by each model architecture, so GQA shows up in InferenceX through model level differences in KV bytes per token, which shape achievable concurrency and interactivity on identical hardware and engine versions.',
+    relatedTerms: [
+      'kv-cache',
+      'multi-head-latent-attention',
+      'decode',
+      'memory-bandwidth',
+      'kv-cache-quantization',
+    ],
+    articleSlugs: [INFERENCEX_V2, AGENT_BENCHMARK],
+  },
+  {
+    slug: 'active-parameters',
+    term: 'Active parameters',
+    aliases: ['activated parameters', 'active params'],
+    category: 'Model architecture',
+    plainEnglish:
+      'Active parameters are the weights a mixture of experts model actually uses for each token, a small slice of its much larger total size.',
+    definition:
+      'Active parameters are the subset of a sparse model, its shared layers plus the experts its router selects, that participate in computing any single token.',
+    explanation:
+      'A mixture of experts model might hold a trillion total parameters while routing each token through only a few tens of billions. Compute per token scales with the active count, which is why sparse frontier models can be affordable to run. Memory tells a different story: every expert must sit in HBM ready to be selected, so capacity requirements and parallelism plans follow total parameters even though arithmetic follows active ones.',
+    significance:
+      'The total versus active split explains most modern serving economics. It is why trillion parameter models are deployable at all, why expert parallelism across many chips exists, and why comparing models by total parameter count says little about their serving cost.',
+    benchmarkContext:
+      'The MoE models InferenceX benchmarks, including the DeepSeek, Kimi, Qwen, and MiniMax families, all have low active to total ratios, and their recipes spread experts across nodes precisely because total parameters set the memory bill.',
+    relatedTerms: [
+      'mixture-of-experts',
+      'expert-parallelism',
+      'wide-expert-parallelism',
+      'high-bandwidth-memory',
+    ],
+    articleSlugs: [DEEPSEEK_V4, KIMI_K3],
+  },
+  {
+    slug: 'dense-model',
+    term: 'Dense model',
+    aliases: ['dense transformer', 'dense LLM'],
+    category: 'Model architecture',
+    plainEnglish:
+      'A dense model applies every one of its parameters to every token it processes, unlike sparse models that route tokens to a few experts.',
+    definition:
+      'A dense model is a neural network in which all weights participate in every forward pass, so compute per token scales directly with total parameter count.',
+    explanation:
+      'Dense transformers are the simpler design: every layer processes every token with all of its weights. That makes their behavior predictable, their parallelism straightforward, and their quality per parameter strong, but serving cost grows linearly with size. Mixture of experts models break that link by activating a fraction of their weights per token, which is why the largest frontier models are sparse while small and mid size models often stay dense.',
+    significance:
+      'The dense versus sparse choice drives serving strategy. Dense models fit on fewer chips and avoid expert routing complexity, while sparse models buy more quality per unit of compute at the price of much larger memory footprints and heavier cross chip communication.',
+    benchmarkContext:
+      'InferenceX coverage centers on the large sparse models operators actually deploy at the frontier, and dense baselines such as Llama class models provide contrast in how tensor parallelism and memory pressure behave without expert routing.',
+    relatedTerms: ['mixture-of-experts', 'active-parameters', 'tensor-parallelism', 'quantization'],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2],
+  },
+  {
+    slug: 'reasoning-model',
+    term: 'Reasoning model',
+    aliases: ['thinking model', 'test-time compute', 'chain-of-thought model'],
+    category: 'Model architecture',
+    plainEnglish:
+      'A reasoning model generates long hidden chains of thought before answering, trading extra output tokens for better results on hard problems.',
+    definition:
+      'A reasoning model is an LLM trained to spend additional generated tokens working through a problem, producing extended intermediate reasoning before or alongside its final answer.',
+    explanation:
+      'Instead of scaling only training compute, reasoning models scale test time compute: they think in tokens. A single math or coding query can trigger thousands of tokens of internal deliberation, so output lengths explode relative to chat models. For serving, that shifts load heavily toward decode, inflates KV cache residency per request, and makes tokens per second per user the metric that decides whether a hard query answers in seconds or minutes.',
+    significance:
+      'Reasoning turned inference into the scaling frontier: capability now improves by spending more at serving time, which multiplies demand for decode throughput. It reshaped hardware priorities toward memory bandwidth and interconnect, and it is a core reason agentic workloads dominate current benchmark design.',
+    benchmarkContext:
+      'The frontier models InferenceX benchmarks are reasoning capable, and its scenarios reflect their traffic: long generations in fixed sequence tests and full agent sessions in AgentX, where deliberation and tool use interleave over many turns.',
+    relatedTerms: ['decode', 'interactivity', 'agentic-inference', 'kv-cache', 'throughput'],
+    articleSlugs: [AGENTIC_WORKLOADS, GB200_R1],
+  },
+  {
+    slug: 'tokenization',
+    term: 'Tokenization',
+    aliases: ['tokenizer', 'token', 'byte pair encoding', 'BPE'],
+    category: 'Model architecture',
+    plainEnglish:
+      'Tokenization splits text into the sub word units a model actually reads and writes, and every performance and price number is quoted in them.',
+    definition:
+      'Tokenization is the conversion between text and the discrete token IDs a model processes, using a fixed vocabulary learned with methods such as byte pair encoding.',
+    explanation:
+      'A tokenizer maps common words to single tokens and rarer strings to several, with English averaging very roughly four characters per token. Vocabularies differ between model families, so identical text can produce meaningfully different token counts across models. Everything downstream is denominated in tokens: context windows, KV cache size, throughput, latency per token, and price per million tokens all count these units, not characters or words.',
+    significance:
+      'Token efficiency is a hidden price lever, since a model that needs fewer tokens for the same content is cheaper at an identical per token rate. Comparing providers or benchmarks without normalizing for tokenizer differences quietly distorts cost and speed conclusions.',
+    benchmarkContext:
+      'InferenceX metrics are token denominated, and its AgentX traces replace original text with deterministic synthetic tokens while preserving per turn token counts, so replayed sessions stress serving systems with the same token arithmetic as the source workload.',
+    relatedTerms: ['throughput', 'cost-per-million-tokens', 'context-window', 'trace-replay'],
+    articleSlugs: [AGENT_BENCHMARK, INFERENCEMAX],
+  },
+  {
+    slug: 'sequence-parallelism',
+    term: 'Sequence parallelism',
+    aliases: ['sequence parallel', 'SP'],
+    category: 'Parallelism',
+    plainEnglish:
+      'Sequence parallelism splits a single long sequence across chips, so the tokens of one request are processed by several accelerators at once.',
+    definition:
+      'Sequence parallelism is a strategy that partitions the token dimension of a sequence across devices, dividing activation memory and attention work for very long inputs.',
+    explanation:
+      'Tensor parallelism splits weights, while sequence parallelism splits the sequence itself: each chip holds a slice of the tokens and the associated activations and KV state. Attention then needs communication, since queries on one chip must meet keys and values on others, which ring style attention algorithms overlap with compute. In inference the closely related context parallel approach is what makes prefill of contexts with hundreds of thousands of tokens tractable.',
+    significance:
+      'Sequence style partitioning is the answer when one request, not the batch, is too large: a single million token prefill can exceed the memory and time budget of any one chip. It converts context length from a hard wall into a scaling dimension, at the price of interconnect traffic.',
+    benchmarkContext:
+      'InferenceX records the full parallelism plan of each recipe, and long context agentic scenarios are where sequence and context partitioning choices, together with interconnect quality, visibly separate systems with similar single chip specifications.',
+    relatedTerms: [
+      'context-parallelism',
+      'tensor-parallelism',
+      'context-window',
+      'prefill',
+      'nvlink',
+    ],
+    articleSlugs: [AGENT_BENCHMARK, VR_RUBIN],
+  },
+  {
+    slug: 'all-gather',
+    term: 'All-gather',
+    aliases: ['allgather', 'gather collective'],
+    category: 'Parallelism',
+    plainEnglish:
+      'All-gather is a group communication step where every chip ends up holding the combined data that started out split across all of them.',
+    definition:
+      'All-gather is a collective operation in which each participating device contributes its shard and every device receives the concatenation of all shards.',
+    explanation:
+      'Sharded execution constantly needs to reassemble full tensors: weight shards before a matrix multiply in some tensor parallel layouts, or per device activations before an operation that needs the whole hidden state. All-gather moves each shard to every rank, typically over a ring or tree schedule, and its cost grows with tensor size and the number of participants. It is the inverse companion of reduce-scatter, and the two composed together form an all-reduce.',
+    significance:
+      'Together with all-reduce and all-to-all, all-gather is one of the handful of collectives that decide whether a parallelism plan scales. Its latency sits on the critical path of every layer that uses it, which is why scale up bandwidth between chips is so heavily marketed.',
+    benchmarkContext:
+      'Every multi chip recipe InferenceX benchmarks exercises collectives through its parallelism plan, and the CollectiveX workstream measures operations like this directly across vendors so communication behavior can be compared outside full model runs.',
+    relatedTerms: [
+      'all-reduce',
+      'reduce-scatter',
+      'tensor-parallelism',
+      'nvlink',
+      'scale-up-vs-scale-out',
+    ],
+    articleSlugs: [VR_RUBIN, INFERENCEX_V2],
+  },
+  {
+    slug: 'reduce-scatter',
+    term: 'Reduce-scatter',
+    aliases: ['reduce scatter collective'],
+    category: 'Parallelism',
+    plainEnglish:
+      'Reduce-scatter sums matching data from every chip and leaves each chip holding just its own slice of the combined result.',
+    definition:
+      'Reduce-scatter is a collective operation that element wise reduces tensors contributed by all devices and distributes the reduced result in shards, one shard per device.',
+    explanation:
+      'When every rank computes a partial result for the same tensor, the partials must be summed. Reduce-scatter does the summation and hands each rank only the slice it will need next, avoiding the waste of giving everyone the full reduced tensor. An all-reduce is exactly a reduce-scatter followed by an all-gather, so schedulers choose between the fused and split forms depending on what the next operation actually consumes.',
+    significance:
+      'Using reduce-scatter instead of a full all-reduce halves the data each rank must receive when only a shard is needed, which matters at NVL72 scale where collective traffic competes with the model itself for interconnect bandwidth. Overlap of these collectives with compute is a defining quality of mature serving stacks.',
+    benchmarkContext:
+      'InferenceX recipes with tensor parallel sharding trigger reduction collectives in every transformer layer, and CollectiveX exists precisely to publish cross vendor measurements of these primitives at the message sizes inference actually uses.',
+    relatedTerms: ['all-reduce', 'all-gather', 'tensor-parallelism', 'nvlink'],
+    articleSlugs: [VR_RUBIN, GB200_KIMI],
+  },
+  {
+    slug: 'infiniband',
+    term: 'InfiniBand',
+    abbreviation: 'IB',
+    aliases: ['IB', 'InfiniBand networking', 'NDR InfiniBand'],
+    category: 'Hardware',
+    plainEnglish:
+      'InfiniBand is a high speed, low latency network fabric that connects servers in AI clusters, carrying traffic between nodes that NVLink cannot reach.',
+    definition:
+      'InfiniBand is a switched network fabric with native RDMA support, used as the scale out interconnect between nodes in most large NVIDIA based AI clusters.',
+    explanation:
+      'Inside a node or rack, chips talk over scale up links such as NVLink. Beyond that boundary, traffic crosses the scale out network, where InfiniBand competes with RDMA capable Ethernet. InfiniBand offers microsecond scale latency, hundreds of gigabits per second per link in current generations, and in network reduction features such as SHARP. Multi node inference, disaggregated prefill and decode, and wide expert parallelism all place their cross node collectives and KV transfers on this fabric.',
+    significance:
+      'Once a model spans nodes, the network joins the compute as a first order performance component. Fabric choice shapes cluster cost and vendor lock in, and the InfiniBand versus Ethernet contest is one of the central competitive battles in AI infrastructure.',
+    benchmarkContext:
+      'InferenceX multi node recipes, including disaggregated and rack scale results, run over the scale out fabric of the host cluster, and recipe metadata records the interconnect because it materially affects reproducibility of cross node numbers.',
+    relatedTerms: [
+      'rdma',
+      'nvlink',
+      'scale-up-vs-scale-out',
+      'disaggregated-inference',
+      'wide-expert-parallelism',
+    ],
+    articleSlugs: [GB200_R1, VR_RUBIN],
+  },
+  {
+    slug: 'rdma',
+    term: 'Remote direct memory access',
+    abbreviation: 'RDMA',
+    aliases: ['RDMA', 'RoCE', 'GPUDirect RDMA'],
+    category: 'Hardware',
+    plainEnglish:
+      'RDMA lets one machine read or write the memory of another directly over the network, without either CPU copying data along the way.',
+    definition:
+      'Remote direct memory access is a networking capability where the network adapter moves data straight between the memories of two machines, bypassing operating system and CPU copy overhead.',
+    explanation:
+      'A conventional network stack copies data through kernel buffers on both ends, burning CPU cycles and latency. RDMA adapters transfer directly between registered memory regions, and GPUDirect extends this so adapters write straight into accelerator HBM. InfiniBand has RDMA built in, while RoCE carries the same verbs over Ethernet. Collective libraries such as NCCL and RCCL, and KV cache transfer paths in disaggregated serving, are built on these primitives.',
+    significance:
+      'RDMA is the floor the whole distributed AI stack stands on: without it, cross node collectives and cache transfers would bottleneck on CPUs long before saturating the links. The RoCE variant is what allows Ethernet based clusters to compete with InfiniBand at lower cost.',
+    benchmarkContext:
+      'Every InferenceX multi node result depends on RDMA transports underneath its collectives and, for disaggregated recipes, underneath prefill to decode KV movement, so transport maturity is part of what separates otherwise similar cluster results.',
+    relatedTerms: [
+      'infiniband',
+      'nvlink',
+      'disaggregated-inference',
+      'kv-cache',
+      'scale-up-vs-scale-out',
+    ],
+    articleSlugs: [GB200_R1, AGENTX_DSV4_GB200_GB300],
+  },
+  {
+    slug: 'ualink',
+    term: 'UALink',
+    aliases: ['Ultra Accelerator Link', 'UALoE'],
+    category: 'Hardware',
+    plainEnglish:
+      'UALink is an open industry standard for the fast scale up links between accelerators in a rack, the ecosystem answer to NVLink.',
+    definition:
+      'UALink is an open interconnect specification for accelerator to accelerator scale up communication, letting many chips in a rack share memory traffic at switch fabric speeds.',
+    explanation:
+      'NVLink proved that a rack of chips joined by a low latency memory semantic fabric can behave like one giant accelerator, but it is proprietary. The UALink consortium defines an open equivalent so vendors beyond NVIDIA can build rack scale domains. UALink over Ethernet, shortened to UALoE, runs the protocol over Ethernet switching. AMD Helios generation racks adopt this path to form 72 chip scale up domains comparable in structure to NVL72.',
+    significance:
+      'Scale up domain size increasingly decides serving architecture, since wide expert parallelism and disaggregation want dozens of chips within one fast fabric. An open standard determines whether rack scale inference stays a single vendor advantage or becomes an ecosystem capability.',
+    benchmarkContext:
+      'InferenceX lists UALoE72 class systems such as AMD MI455X racks alongside NVL72 systems in its hardware coverage, so rack scale fabrics can be compared head to head on identical model workloads as they reach the market.',
+    relatedTerms: ['nvlink', 'nvl72', 'scale-up-vs-scale-out', 'wide-expert-parallelism'],
+    articleSlugs: [VR_RUBIN, AGENTX_V3],
+  },
+  {
+    slug: 'tdp',
+    term: 'Thermal design power',
+    abbreviation: 'TDP',
+    aliases: ['TDP', 'board power', 'all-in power'],
+    category: 'Hardware',
+    plainEnglish:
+      'TDP is the sustained power a chip is designed to draw and shed as heat, the headline wattage on every accelerator spec sheet.',
+    definition:
+      'Thermal design power is the maximum sustained power envelope a chip is engineered to operate within, which its cooling system must dissipate continuously.',
+    explanation:
+      'Modern accelerators run around or above the kilowatt mark per chip, and a full rack system multiplies that into six figures of watts. TDP alone also undersells the true bill: memory, networking, CPUs, power conversion losses, and cooling overhead stack on top, which is why all in power per chip is meaningfully higher than the chip TDP. Datacenter capacity is sold in megawatts, so these envelopes translate directly into how many accelerators a site can host.',
+    significance:
+      'Power has become the binding constraint of AI buildout, ahead of capital in many markets. Rising per chip TDP forced the shift to liquid cooling and made performance per watt, not just performance per dollar, a primary axis for comparing silicon generations.',
+    benchmarkContext:
+      'InferenceX derives energy per token and tokens per megawatt using per chip all in power figures that include cooling and infrastructure overhead above TDP, and the PowerX workstream is extending this from rated figures toward measured draw during runs.',
+    relatedTerms: ['energy-per-token', 'tokens-per-megawatt', 'pue', 'total-cost-of-ownership'],
+    articleSlugs: [INFERENCEX_V2, VR_RUBIN],
+  },
+  {
+    slug: 'pue',
+    term: 'Power usage effectiveness',
+    abbreviation: 'PUE',
+    aliases: ['PUE', 'datacenter efficiency ratio'],
+    category: 'Hardware',
+    plainEnglish:
+      'PUE measures how much total datacenter power is consumed for every watt that actually reaches the computing equipment inside it.',
+    definition:
+      'Power usage effectiveness is the ratio of total facility power to IT equipment power, where a value of 1.0 would mean every watt goes to computing.',
+    explanation:
+      'Cooling, power conversion, and facility systems consume energy on top of the servers themselves. A PUE of 1.5 means half again as much power is spent on overhead as on IT load, while modern hyperscale AI facilities push toward 1.1 and below with liquid cooling and high efficiency distribution. Because AI campuses are sized in hundreds of megawatts, small PUE differences move enormous absolute energy and cost figures.',
+    significance:
+      'PUE links chip level efficiency to facility economics: every watt a chip draws is multiplied by PUE at the utility meter. As power availability gates AI buildout, facility efficiency became part of the competitive calculus alongside silicon and software.',
+    benchmarkContext:
+      'The all in power figures behind InferenceX energy per token and tokens per megawatt metrics incorporate facility overhead consistent with modern AI datacenter PUE, so its cost and energy comparisons reflect delivered facility economics rather than bare chip wattage.',
+    relatedTerms: ['tdp', 'energy-per-token', 'tokens-per-megawatt', 'total-cost-of-ownership'],
+    articleSlugs: [INFERENCEX_V2, INFERENCEMAX],
+  },
+  {
+    slug: 'int8',
+    term: 'INT8',
+    aliases: ['8-bit integer quantization', 'W8A8'],
+    category: 'Numerical precision',
+    plainEnglish:
+      'INT8 stores numbers as 8 bit integers with a scale factor, halving memory versus 16 bit formats and doubling math rates on supporting hardware.',
+    definition:
+      'INT8 is an 8 bit integer numerical format used with per tensor or per channel scale factors to represent model weights and activations in quantized inference.',
+    explanation:
+      'Integer quantization maps floating point values onto 256 evenly spaced levels via a scale, and sometimes a zero point. Uniform spacing handles outliers poorly, so techniques such as SmoothQuant migrate activation outliers into weights before quantizing both sides, in the W8A8 pattern. On older accelerator generations INT8 was the primary fast path below 16 bits, while newer chips add FP8, whose exponent gives it a wider dynamic range at the same bit width.',
+    significance:
+      'INT8 defined the first mainstream wave of LLM quantization and remains relevant on hardware without floating point 8 bit support. The INT8 versus FP8 contrast also illustrates the core quantization tradeoff between uniform precision and dynamic range.',
+    benchmarkContext:
+      'InferenceX labels every result with its precision, and its comparison families exist because format changes moved curves so much. Modern recipes on Blackwell and MI350 class hardware favor FP8 and FP4 paths, with integer formats appearing in specific weight quantized configurations.',
+    relatedTerms: ['quantization', 'fp8', 'int4', 'weight-only-quantization', 'bf16'],
+    articleSlugs: [B200_KIMI, INFERENCEMAX],
+  },
+  {
+    slug: 'weight-only-quantization',
+    term: 'Weight-only quantization',
+    aliases: ['W4A16', 'AWQ', 'GPTQ'],
+    category: 'Numerical precision',
+    plainEnglish:
+      'Weight-only quantization compresses just the stored model weights to low precision while the math still runs in higher precision formats.',
+    definition:
+      'Weight-only quantization stores model weights in a low bit format such as 4 bit integers while keeping activations and arithmetic at higher precision, as in the W4A16 pattern.',
+    explanation:
+      'Weights are static and can be carefully quantized offline with methods such as GPTQ and AWQ, which choose scales and orderings that minimize quality loss. Activations are dynamic and harder to compress, so leaving them at 16 bits sidesteps their outlier problem. At serve time the kernel dequantizes weights on the fly, so memory traffic shrinks even though the multiply accumulate math itself does not get faster.',
+    significance:
+      'Because decode is memory bound, cutting weight bytes directly speeds up token generation and lets larger models fit on fewer chips. Weight-only methods made large open models runnable on modest hardware and remain the standard recipe when activation quantization would cost too much quality.',
+    benchmarkContext:
+      'InferenceX distinguishes weight-only configurations from full low precision paths in its precision labels, since a W4A16 recipe and an NVFP4 recipe make very different claims about which hardware units and bandwidth budgets produced a curve.',
+    relatedTerms: ['quantization', 'int4', 'int8', 'kv-cache-quantization', 'memory-bandwidth'],
+    articleSlugs: [B200_KIMI, MI355X_KIMI],
+  },
+  {
+    slug: 'block-scaling',
+    term: 'Block scaling',
+    aliases: ['microscaling', 'MX formats', 'block floating point'],
+    category: 'Numerical precision',
+    plainEnglish:
+      'Block scaling gives each small group of low precision numbers its own shared scale factor, recovering range that tiny formats lack on their own.',
+    definition:
+      'Block scaling is a quantization structure where values are stored in a very low bit format and each fixed size block of them shares one higher precision scale factor.',
+    explanation:
+      'A 4 bit number can represent only a handful of distinct magnitudes, far too few to span the dynamic range of model tensors. Grouping values into blocks of around 16 or 32 elements and attaching a shared scale lets each block center the format on its own magnitude. The MX standard formats such as MXFP4 and MXFP8 use power of two scales, while NVFP4 uses FP8 scales over 16 element blocks for finer granularity.',
+    significance:
+      'Block scaling is the enabling idea behind the FP4 generation of inference: without per block scales, 4 bit floating point would be unusable for frontier models. Scale format and block size choices are now genuine differentiators between hardware vendors and quantization recipes.',
+    benchmarkContext:
+      'The NVFP4 and MXFP4 results across InferenceX Blackwell and MI355X coverage are block scaled formats, and the compare-precision family exists largely to show what these recipes give up or gain against FP8 baselines on identical hardware.',
+    relatedTerms: ['nvfp4', 'mxfp4', 'fp4', 'fp8', 'quantization'],
+    articleSlugs: [B200_GLM5, GB300_DSV4],
+  },
+  {
+    slug: 'flash-attention',
+    term: 'FlashAttention',
+    aliases: ['flash attention kernel', 'fused attention'],
+    category: 'Software',
+    plainEnglish:
+      'FlashAttention computes exact attention in fast on-chip memory tiles, avoiding the huge intermediate matrix that made attention slow and memory hungry.',
+    definition:
+      'FlashAttention is an attention algorithm that tiles the computation through on-chip SRAM and rescales results incrementally, producing exact attention without materializing the full score matrix in HBM.',
+    explanation:
+      'Naive attention writes a score matrix that grows with the square of sequence length to main memory and reads it back, so bandwidth rather than arithmetic sets its speed. FlashAttention fuses the whole computation into one kernel that streams blocks of keys and values through on-chip memory, using an online softmax to keep results exact. Successive versions and vendor implementations extend the idea to new hardware generations, head layouts, and inference specific decode paths.',
+    significance:
+      'This kernel family is what made long context practical, turning attention from the dominant cost of long sequences into one manageable component. It is also the canonical example of how a single well engineered kernel can shift performance across the entire industry.',
+    benchmarkContext:
+      'Every serving engine InferenceX benchmarks relies on fused attention kernels descended from this line, through libraries such as FlashInfer on NVIDIA hardware and AITER on AMD, and kernel improvements there routinely move published curves without any hardware change.',
+    relatedTerms: ['flashinfer', 'aiter', 'memory-bandwidth', 'context-window', 'kernel-fusion'],
+    articleSlugs: [SGLANG_056, MI355X_QWEN],
+  },
+  {
+    slug: 'triton',
+    term: 'Triton',
+    aliases: ['OpenAI Triton', 'Triton kernel language'],
+    category: 'Software',
+    plainEnglish:
+      'Triton is a Python-based language for writing custom accelerator kernels, letting ML engineers get near hand-tuned speed without writing low level code.',
+    definition:
+      'Triton is an open source kernel programming language and compiler that lets developers write high performance accelerator kernels in Python-like code, portable across vendors that maintain backends.',
+    explanation:
+      'Writing peak performance kernels traditionally requires vendor specific expertise in CUDA or assembly level tuning. Triton raises the abstraction: the developer writes block level programs and the compiler handles memory coalescing, tiling, and scheduling. NVIDIA, AMD, and other vendors maintain backends, so one kernel source can target multiple architectures. Serving engines use it for fused operations, quantization paths, and MoE kernels where no vendor library fits. The name collides with NVIDIA Triton Inference Server, a separate model serving product.',
+    significance:
+      'Triton lowered the barrier between model researchers and hardware performance, and its cross vendor backends are strategically important because kernels written in it are not locked to one chip family. How well a vendor runs the Triton ecosystem has become part of its software story.',
+    benchmarkContext:
+      'Engines in InferenceX recipes ship substantial Triton kernel inventories alongside CUDA, CUTLASS, and AITER code, so compiler and backend maturity is one of the quiet forces behind curve movement between engine versions on both NVIDIA and AMD systems.',
+    relatedTerms: ['cuda', 'rocm', 'kernel-fusion', 'inference-engine', 'gemm'],
+    articleSlugs: [MI355X_DSV4, INFERENCEX_V2],
+  },
+  {
+    slug: 'cutlass',
+    term: 'CUTLASS',
+    aliases: ['CUDA templates for linear algebra', 'CuTe'],
+    category: 'Software',
+    plainEnglish:
+      'CUTLASS is an NVIDIA template library that provides the building blocks for writing matrix multiply kernels that approach peak hardware speed.',
+    definition:
+      'CUTLASS is an open source NVIDIA library of composable C++ templates for building GEMM and related kernels that target tensor cores across GPU generations.',
+    explanation:
+      'Peak matrix multiply performance demands precise choreography of tensor core instructions, shared memory movement, and asynchronous pipelines, and it changes with every architecture. CUTLASS packages that choreography as composable pieces, with its CuTe layer describing data layouts, so kernel authors assemble near peak GEMMs and fuse epilogues such as bias, activation, or quantization scaling instead of starting from scratch. Much of the high performance kernel work in serving engines builds on it directly.',
+    significance:
+      'CUTLASS is where NVIDIA teaches the ecosystem to use each new tensor core generation, including the FP4 and FP8 paths on Blackwell. The speed at which its patterns propagate into engines is a real component of how quickly new silicon reaches its advertised performance.',
+    benchmarkContext:
+      'The GEMM and attention kernels behind InferenceX results on NVIDIA hardware lean heavily on CUTLASS derived code, and version bumps of these libraries inside engine images are a recurring source of day over day curve movement the platform tracks.',
+    relatedTerms: ['cuda', 'gemm', 'kernel-fusion', 'flashinfer', 'nvfp4'],
+    articleSlugs: [SGLANG_056, GB300_DSV4],
+  },
+  {
+    slug: 'nccl',
+    term: 'NCCL',
+    abbreviation: 'NCCL',
+    aliases: ['NVIDIA Collective Communications Library', 'RCCL'],
+    category: 'Software',
+    plainEnglish:
+      'NCCL is the NVIDIA library that moves data between chips during collective operations, with RCCL as its AMD counterpart.',
+    definition:
+      'NCCL is the NVIDIA collective communications library implementing operations such as all-reduce, all-gather, and all-to-all across GPUs, over NVLink within nodes and RDMA fabrics between them.',
+    explanation:
+      'Frameworks do not talk to interconnects directly; they call a collectives library that discovers the topology and picks algorithms and channel schedules for each message size. NCCL handles that for NVIDIA systems, and AMD maintains RCCL with a matching interface for ROCm platforms. Tuning is fabric specific: ring versus tree algorithms, protocol thresholds, and channel counts all shift with topology, which is why the same model can communicate very differently on two clusters.',
+    significance:
+      'Every multi chip inference and training job stands on this layer, and a collectives regression can silently tax an entire fleet. Interface compatibility between NCCL and RCCL is also load bearing for portability, since engines can target one collectives API across vendors.',
+    benchmarkContext:
+      'InferenceX multi chip recipes exercise these libraries in every tensor parallel and expert parallel layer, and CollectiveX measures the underlying collective performance directly across vendors at inference relevant message sizes, separating fabric behavior from model behavior.',
+    relatedTerms: ['all-reduce', 'all-gather', 'all-to-all', 'nvlink', 'rdma'],
+    articleSlugs: [GB200_KIMI, VR_RUBIN],
+  },
+  {
+    slug: 'gemm',
+    term: 'GEMM',
+    abbreviation: 'GEMM',
+    aliases: ['general matrix multiply', 'matrix multiplication kernel'],
+    category: 'Software',
+    plainEnglish:
+      'GEMM is the general matrix multiply operation, the single computation that consumes most of the arithmetic in training and serving neural networks.',
+    definition:
+      'GEMM is the general matrix to matrix multiply routine, the core primitive that linear layers, attention projections, and expert computations in neural networks reduce to.',
+    explanation:
+      'Transformers are mostly stacks of linear transformations, so serving a model means executing enormous numbers of matrix multiplies. Tensor cores exist specifically to accelerate them, and peak TFLOP/s specifications are quoted for these dense operations. Shape determines efficiency: prefill produces large square-ish multiplies that saturate compute, while decode produces skinny ones that are bandwidth bound. MoE adds grouped GEMMs, where many small expert multiplies are batched into one efficient launch.',
+    significance:
+      'GEMM efficiency is the substrate of every performance claim in the industry. The gap between delivered and peak GEMM throughput at real serving shapes, especially the thin matrices of decode, explains much of why spec sheet ratios fail to predict benchmark rankings.',
+    benchmarkContext:
+      'Behind every InferenceX curve sits a stack of GEMM kernels from libraries such as CUTLASS, hipBLASLt, and Triton generated code, and quantized recipes ultimately stand on how well each vendor executes low precision GEMMs at the shapes its scheduler produces.',
+    relatedTerms: [
+      'cutlass',
+      'arithmetic-intensity',
+      'memory-bound-vs-compute-bound',
+      'mixture-of-experts',
+      'triton',
+    ],
+    articleSlugs: [INFERENCEX_V2, MI355X_GLM5],
+  },
+  {
+    slug: 'kernel-fusion',
+    term: 'Kernel fusion',
+    aliases: ['fused kernels', 'operator fusion'],
+    category: 'Software',
+    plainEnglish:
+      'Kernel fusion merges several small chip operations into one, so intermediate data stays in fast memory instead of bouncing through HBM.',
+    definition:
+      'Kernel fusion combines multiple consecutive operations into a single kernel launch, keeping intermediate results in registers or on-chip memory rather than writing them to main memory between steps.',
+    explanation:
+      'An unfused sequence like matrix multiply, bias add, and activation writes its intermediate tensor to HBM after each step and reads it back for the next. Fusing them into one kernel eliminates those round trips and the launch overhead between them. Fusion happens by hand in libraries, through template epilogues in CUTLASS style code, and automatically in compilers such as torch.compile and Triton based stacks. FlashAttention is the most famous single example of the idea.',
+    significance:
+      'In memory bound inference, removing intermediate traffic is worth more than raw arithmetic improvements, so fusion is one of the most reliable levers engines have. A large share of version over version engine speedups reduces to more aggressive or better targeted fusion.',
+    benchmarkContext:
+      'InferenceX recipes pin engine images whose fusion inventories differ by version and by hardware backend, which is a recurring reason day over day tracking shows curves moving on unchanged silicon as fused kernels land for new models and precisions.',
+    relatedTerms: [
+      'flash-attention',
+      'cuda-graphs',
+      'gemm',
+      'memory-bandwidth',
+      'inference-engine',
+    ],
+    articleSlugs: [MI355X_KIMI, SGLANG_056],
+  },
 ] as const satisfies readonly GlossaryEntry[];
 
 export type GlossaryPreview = Pick<
