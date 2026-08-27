@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { MEASURED_POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
-import { extractWorkers, mapBenchmarkRow } from './benchmark-mapper';
+import {
+  extractWorkers,
+  mapBenchmarkRow,
+  normalizePowerContractMetrics,
+  scrubWithheldPowerMetrics,
+} from './benchmark-mapper';
 import { createSkipTracker } from './skip-tracker';
 
 /** Minimal valid v1 benchmark row. */
@@ -858,6 +863,49 @@ describe('mapBenchmarkRow', () => {
       expect(result!.metrics).not.toHaveProperty('avg_mem_used_mb');
       expect(result!.workers).toBeUndefined();
     });
+  });
+});
+
+describe('scrubWithheldPowerMetrics (direct — supplemental ingest path)', () => {
+  // ingest-supplemental.ts persists metrics without mapBenchmarkRow, calling
+  // normalizePowerContractMetrics + scrubWithheldPowerMetrics on the raw
+  // record directly. Pin that usage pattern here.
+  function supplementalMetrics(overrides: Record<string, any> = {}): Record<string, number> {
+    const { workers: _workers, ...measured } = dirtyPowerPayload();
+    return { tput_per_gpu: 567.8, ...measured, ...overrides };
+  }
+
+  it('strips every measured key on power_valid=0 and reports withheld', () => {
+    const metrics = supplementalMetrics({ power_valid: 0, power_metric_schema_version: 2 });
+
+    expect(scrubWithheldPowerMetrics(metrics)).toBe(true);
+    for (const key of MEASURED_POWER_METRIC_KEYS) {
+      expect(metrics).not.toHaveProperty(key);
+    }
+    expect(metrics.power_valid).toBe(0);
+    expect(metrics.power_metric_schema_version).toBe(2);
+    expect(metrics.tput_per_gpu).toBe(567.8);
+  });
+
+  it('leaves power_valid=1 and legacy no-verdict records untouched', () => {
+    for (const metrics of [supplementalMetrics({ power_valid: 1 }), supplementalMetrics()]) {
+      const before = { ...metrics };
+      expect(scrubWithheldPowerMetrics(metrics)).toBe(false);
+      expect(metrics).toEqual(before);
+    }
+  });
+
+  it('fails closed on a malformed verdict when composed with normalization', () => {
+    const metrics = supplementalMetrics({ power_valid: 2 });
+    // The exact ingest-supplemental.ts call sequence: same object as row
+    // and metrics.
+    normalizePowerContractMetrics(metrics, metrics);
+    expect(scrubWithheldPowerMetrics(metrics)).toBe(true);
+
+    expect(metrics.power_valid).toBe(0);
+    for (const key of MEASURED_POWER_METRIC_KEYS) {
+      expect(metrics).not.toHaveProperty(key);
+    }
   });
 });
 

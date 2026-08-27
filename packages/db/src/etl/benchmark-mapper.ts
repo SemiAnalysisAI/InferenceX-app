@@ -467,7 +467,7 @@ function captureNumericMetrics(row: Record<string, any>): Record<string, number>
  * two fields are semantic discriminators, so loose numeric coercion must never
  * turn malformed producer output into an affirmative verdict or schema.
  */
-function normalizePowerContractMetrics(
+export function normalizePowerContractMetrics(
   row: Record<string, any>,
   metrics: Record<string, number>,
 ): void {
@@ -507,12 +507,15 @@ function normalizePowerContractMetrics(
  * future companion fields such as power_invalid_reasons / power_audit).
  * Legacy rows without a verdict are untouched. Returns true when the
  * row's power is withheld so the caller also drops the workers payload.
- * This is the single enforcement point — the query layer intentionally
- * serves metrics unfiltered (see queries/benchmarks.ts rawMetrics), and
- * the frontend independently withholds at display
+ * This is the single enforcement policy at ingest: every mapBenchmarkRow
+ * path runs it here, and ingest-supplemental.ts — the one persistence
+ * path that bypasses mapBenchmarkRow — applies the same normalize+scrub
+ * pair to its verbatim metrics. The query layer intentionally serves
+ * metrics unfiltered (see queries/benchmarks.ts rawMetrics), and the
+ * frontend independently withholds at display
  * (benchmark-transform.ts rowToAggDataEntry).
  */
-function scrubWithheldPowerMetrics(metrics: Record<string, number>): boolean {
+export function scrubWithheldPowerMetrics(metrics: Record<string, number>): boolean {
   if (metrics.power_valid !== 0) return false;
   for (const key of MEASURED_POWER_METRIC_KEYS) delete metrics[key];
   return true;
