@@ -67,7 +67,7 @@ describe('rankings registry', () => {
   it('has one page per (kind, model) pair', () => {
     const entries = getAllRankingPageEntries();
     expect(entries.length).toBe(RANKING_KINDS.length * INFERENCE_MODEL_SLUGS.length);
-    expect(entries.length).toBe(22);
+    expect(entries.length).toBe(24);
   });
 
   it('has unique, well-formed slugs', () => {
