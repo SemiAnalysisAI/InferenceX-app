@@ -97,7 +97,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
         htmlFor={id}
         className={cn(
           'group/item flex items-center cursor-pointer hover:underline peer-focus-visible:ring-1 peer-focus-visible:ring-offset-1 peer-focus-visible:outline-none rounded-sm',
-          isLegendExpanded ? 'w-fit whitespace-nowrap' : '',
+          isLegendExpanded ? 'w-fit whitespace-nowrap' : 'max-w-full',
         )}
         title={!isLegendExpanded && isLongText ? label : title}
         onMouseEnter={onHover && isActive ? () => onHover(hw || name) : undefined}
@@ -170,7 +170,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
           className={cn(
             'pr-2',
             isLongText && !isLegendExpanded
-              ? 'truncate'
+              ? 'truncate min-w-0'
               : isLegendExpanded
                 ? 'whitespace-nowrap'
                 : 'whitespace-normal',

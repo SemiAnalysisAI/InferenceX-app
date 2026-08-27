@@ -150,13 +150,14 @@ describe('ChartLegend (sidebar variant)', () => {
     cy.contains('Reset filter').should('not.exist');
   });
 
-  it('expand/collapse button toggles legend state', () => {
-    cy.get('.sidebar-legend').should('have.class', 'bg-accent');
-    cy.get('.sidebar-legend button')
-      .filter(':contains("Collapse"), :contains("Expand")')
-      .first()
-      .click();
-    cy.get('.sidebar-legend').should('not.have.class', 'bg-accent');
+  it('close button hides the panel and the reopen button restores it', () => {
+    cy.get('.sidebar-legend').should('exist');
+    cy.get('[data-testid="legend-close-button"]').click();
+    cy.get('.sidebar-legend').should('not.exist');
+    cy.get('[data-testid="legend-open-button"]').should('be.visible');
+    cy.get('[data-testid="legend-open-button"]').click();
+    cy.get('.sidebar-legend').should('exist');
+    cy.get('[data-testid="legend-open-button"]').should('not.exist');
   });
 
   it('renders no points-table icon when items have no onShowPoints handler', () => {
