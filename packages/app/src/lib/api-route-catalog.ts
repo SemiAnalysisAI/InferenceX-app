@@ -443,7 +443,7 @@ export const stablePublicApiContracts = [
   },
   {
     operationId: 'list-benchmarks',
-    parameters: ['model', 'date', 'exact', 'runId', 'exactRun'],
+    parameters: ['model', 'date', 'exact', 'runId', 'exactRun', 'view', 'sequence', 'powerValid'],
     statuses: ['200', '400', '500'],
     auth: 'none',
     cachePolicy: 'public-db-day',

@@ -9,7 +9,9 @@ describe('API documentation', () => {
       .and('contain.text', 'Quickstart')
       .and('contain.text', 'curl')
       .and('contain.text', '/api/v1/availability')
-      .and('contain.text', 'Endpoint reference');
+      .and('contain.text', 'Endpoint reference')
+      .and('contain.text', 'Measured power')
+      .and('contain.text', 'powerValid');
     cy.get('[data-testid="api-openapi-link"]').should('have.attr', 'href', '/api/openapi.json');
     cy.get('[data-testid="api-spec-version"]').should('have.text', 'v1 · OpenAPI 3.1');
     cy.get('[data-testid="api-endpoint-list-benchmarks"]')
@@ -45,6 +47,10 @@ describe('API documentation', () => {
         'operationId',
         'list-benchmarks',
       );
+      const benchmarkParameterNames = body.paths['/api/v1/benchmarks'].get.parameters.map(
+        (parameter: { name: string }) => parameter.name,
+      );
+      expect(benchmarkParameterNames).to.include('powerValid');
       expect(body.paths['/api/v1/collectivex/runs/{runId}'].get).to.have.property(
         'operationId',
         'get-collectivex-run',
@@ -58,7 +64,8 @@ describe('API documentation', () => {
       .and('contain.text', '快速入门')
       .and('contain.text', '约定')
       .and('contain.text', '端点参考')
-      .and('contain.text', 'BenchmarkRow 与指标');
+      .and('contain.text', 'BenchmarkRow 与指标')
+      .and('contain.text', '实测功率');
     cy.get('[data-testid="api-openapi-link"]').should('have.attr', 'href', '/api/openapi.json');
     cy.get('link[rel="alternate"][hreflang="en"]').should('have.attr', 'href', `${SITE_URL}/api`);
     cy.get('link[rel="alternate"][hreflang="zh-CN"]').should(
