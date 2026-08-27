@@ -86,6 +86,12 @@ const NON_METRIC_KEYS = new Set([
   // sibling of the metrics JSONB by mapBenchmarkRow so the metrics column
   // stays Record<string, number> for the index signature on BenchmarkRow.
   'workers',
+  // Power audit provenance (array / object, never scalars). Extracted into
+  // dedicated BenchmarkParams fields by mapBenchmarkRow. Listed here because
+  // Number(['5']) === 5: without the guard a malformed single-element reasons
+  // array would be auto-captured as a bogus numeric metric.
+  'power_invalid_reasons',
+  'power_audit',
 ]);
 
 /**
@@ -126,6 +132,25 @@ export interface WorkerPower {
   avg_mem_used_mb?: number;
 }
 
+/**
+ * Compact measurement-window audit emitted by aggregate_power.py alongside
+ * the power_valid verdict (present on valid and invalid rows alike). All
+ * fields optional: {@link extractPowerAudit} omits malformed numerics rather
+ * than dropping the whole object, and single-node telemetry has no srt-slurm
+ * producer so both shas are null there. Stored on benchmark_results in the
+ * dedicated `power_audit` JSONB column (migration 014).
+ */
+export interface PowerAudit {
+  window_start_unix?: number;
+  window_end_unix?: number;
+  expected_gpu_count?: number;
+  observed_gpu_count?: number;
+  sample_count?: number;
+  max_sample_gap_s?: number;
+  producer_sha?: string | null;
+  exporter_image_sha256?: string | null;
+}
+
 export interface BenchmarkParams {
   config: ConfigParams;
   benchmarkType: BenchmarkType;
@@ -148,6 +173,19 @@ export interface BenchmarkParams {
    * predating the multinode patch.
    */
   workers?: WorkerPower[];
+  /**
+   * Producer reason codes explaining a withheld power verdict
+   * (aggregate_power.py emits them when power_valid == 0). Stored in the
+   * dedicated `power_invalid_reasons` JSONB column (migration 014).
+   * Undefined for legacy artifacts and rows with a valid verdict.
+   */
+  powerInvalidReasons?: string[];
+  /**
+   * Compact power measurement-window audit from the same producer contract.
+   * Stored in the dedicated `power_audit` JSONB column (migration 014).
+   * Undefined for legacy artifacts predating the provenance contract.
+   */
+  powerAudit?: PowerAudit;
 }
 
 /**
@@ -358,6 +396,12 @@ export function mapBenchmarkRow(
   // narrowing — anything other than a non-empty array of objects is dropped,
   // and a withheld power verdict drops the payload entirely.
   const workers = powerWithheld ? undefined : extractWorkers(row.workers);
+  // Audit provenance is extracted unconditionally on power_valid: the
+  // contract says reasons appear when power_valid == 0, but the app stores
+  // whatever validly arrives — tolerance in both directions, and no data
+  // loss if a future producer annotates valid rows too.
+  const powerInvalidReasons = extractPowerInvalidReasons(row.power_invalid_reasons);
+  const powerAudit = extractPowerAudit(row.power_audit);
 
   return {
     config: {
@@ -379,6 +423,8 @@ export function mapBenchmarkRow(
     recipeFingerprint,
     metrics,
     workers,
+    powerInvalidReasons,
+    powerAudit,
   };
 }
 
@@ -503,8 +549,9 @@ export function normalizePowerContractMetrics(
  * normalized verdict is an explicit invalid (power_valid === 0), delete
  * every measured power/energy/telemetry metric so withheld measurements
  * can never be persisted or served, even if a producer regression ships
- * them. Keeps power_valid and power_metric_schema_version (and any
- * future companion fields such as power_invalid_reasons / power_audit).
+ * them. Keeps power_valid and power_metric_schema_version (the
+ * companion power_invalid_reasons / power_audit provenance never enters
+ * metrics at all — it rides dedicated BenchmarkParams fields).
  * Legacy rows without a verdict are untouched. Returns true when the
  * row's power is withheld so the caller also drops the workers payload.
  * This is the single enforcement policy at ingest: every mapBenchmarkRow
@@ -563,4 +610,92 @@ export function extractWorkers(raw: unknown): WorkerPower[] | undefined {
     out.push(w);
   }
   return out.length > 0 ? out : undefined;
+}
+
+/** Producer reason codes are lowercase snake_case identifiers. */
+const POWER_REASON_CODE_RE = /^[a-z][a-z0-9_]*$/u;
+const MAX_POWER_REASON_CODES = 32;
+const MAX_POWER_REASON_LENGTH = 64;
+const MAX_POWER_AUDIT_SHA_LENGTH = 128;
+
+/**
+ * Narrow a raw `power_invalid_reasons` value from the artifact JSON to
+ * `string[]` or undefined. Entries must be snake_case strings (length ≤ 64
+ * after trim) to be kept; anything else is dropped silently (same policy as
+ * `extractWorkers`). Deduplicates preserving first-seen order and caps the
+ * result at 32 codes. Returns undefined for any non-array input or an empty
+ * result so the eventual JSONB column stores null rather than `[]`.
+ */
+export function extractPowerInvalidReasons(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    if (typeof entry !== 'string') continue;
+    const code = entry.trim();
+    if (code.length === 0 || code.length > MAX_POWER_REASON_LENGTH) continue;
+    if (!POWER_REASON_CODE_RE.test(code) || seen.has(code)) continue;
+    seen.add(code);
+    out.push(code);
+    if (out.length >= MAX_POWER_REASON_CODES) break;
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/** parseNum plus a finiteness guard: parseNum passes Infinity through. */
+function auditFiniteNum(v: unknown): number | undefined {
+  const n = parseNum(v);
+  return n !== undefined && Number.isFinite(n) ? n : undefined;
+}
+
+/** GPU/sample counts must be non-negative safe integers. */
+function auditCount(v: unknown): number | undefined {
+  const n = parseInt2(v);
+  return n !== undefined && Number.isSafeInteger(n) && n >= 0 ? n : undefined;
+}
+
+/** Trimmed non-empty string of bounded length, anything else → null. */
+function auditSha(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  return s.length > 0 && s.length <= MAX_POWER_AUDIT_SHA_LENGTH ? s : null;
+}
+
+/**
+ * Narrow a raw `power_audit` value from the artifact JSON to a fixed 8-key
+ * {@link PowerAudit} or undefined. Field-by-field: window/gap fields must be
+ * finite numbers, counts must be non-negative safe integers; malformed
+ * numerics are omitted, since a partial audit beats none. The shas keep a
+ * trimmed non-empty string of length ≤ 128 and collapse anything else
+ * (including explicit null) to null, matching the contract's string|null.
+ * Unknown keys are dropped so the stored object stays bounded. Returns
+ * undefined for non-object input and for an empty husk (no numeric field
+ * survived and both shas are null) so the eventual JSONB column stores null
+ * rather than `{}`.
+ */
+export function extractPowerAudit(raw: unknown): PowerAudit | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const e = raw as Record<string, unknown>;
+  const audit: PowerAudit = {};
+
+  const window_start_unix = auditFiniteNum(e.window_start_unix);
+  if (window_start_unix !== undefined) audit.window_start_unix = window_start_unix;
+  const window_end_unix = auditFiniteNum(e.window_end_unix);
+  if (window_end_unix !== undefined) audit.window_end_unix = window_end_unix;
+  const max_sample_gap_s = auditFiniteNum(e.max_sample_gap_s);
+  if (max_sample_gap_s !== undefined) audit.max_sample_gap_s = max_sample_gap_s;
+  const expected_gpu_count = auditCount(e.expected_gpu_count);
+  if (expected_gpu_count !== undefined) audit.expected_gpu_count = expected_gpu_count;
+  const observed_gpu_count = auditCount(e.observed_gpu_count);
+  if (observed_gpu_count !== undefined) audit.observed_gpu_count = observed_gpu_count;
+  const sample_count = auditCount(e.sample_count);
+  if (sample_count !== undefined) audit.sample_count = sample_count;
+  const hasNumericField = Object.keys(audit).length > 0;
+
+  audit.producer_sha = auditSha(e.producer_sha);
+  audit.exporter_image_sha256 = auditSha(e.exporter_image_sha256);
+  if (!hasNumericField && audit.producer_sha === null && audit.exporter_image_sha256 === null) {
+    return undefined;
+  }
+  return audit;
 }

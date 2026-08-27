@@ -7,7 +7,7 @@ import path from 'node:path';
 
 import type postgres from 'postgres';
 import { cleanLogText, type ServerLogFile, type ServerLogFilePath } from './server-log-artifacts';
-import type { BenchmarkType, WorkerPower } from './benchmark-mapper';
+import type { BenchmarkType, PowerAudit, WorkerPower } from './benchmark-mapper';
 import { kvCachePoolTokensFromServerLog } from './server-log-metrics';
 
 type Sql = ReturnType<typeof postgres>;
@@ -23,6 +23,8 @@ export interface BenchmarkPersistenceInput {
   recipeFingerprint: string | null;
   metrics: Record<string, number>;
   workers?: WorkerPower[];
+  powerInvalidReasons?: string[];
+  powerAudit?: PowerAudit;
 }
 
 type BenchmarkPointIdentity = Pick<
@@ -88,11 +90,21 @@ export async function bulkIngestBenchmarkRows(
   const workersJsons = deduped.map((r) =>
     r.workers === undefined ? null : JSON.stringify(r.workers),
   );
+  // Same encoding for the power audit provenance columns: JSON null lanes
+  // keep the jsonb[] unnest inputs homogeneous and store SQL NULL for rows
+  // whose artifacts predate the provenance contract.
+  const powerInvalidReasonsJsons = deduped.map((r) =>
+    r.powerInvalidReasons === undefined ? null : JSON.stringify(r.powerInvalidReasons),
+  );
+  const powerAuditJsons = deduped.map((r) =>
+    r.powerAudit === undefined ? null : JSON.stringify(r.powerAudit),
+  );
 
   const result = await sql<{ inserted: boolean; id: number }[]>`
     insert into benchmark_results (
       workflow_run_id, config_id, benchmark_type, offload_mode, date,
-      isl, osl, conc, image, recipe_fingerprint, metrics, workers
+      isl, osl, conc, image, recipe_fingerprint, metrics, workers,
+      power_invalid_reasons, power_audit
     )
     select
       ${workflowRunId},
@@ -106,7 +118,9 @@ export async function bulkIngestBenchmarkRows(
       unnest(${sql.array(images)}),
       unnest(${sql.array(recipeFingerprints)}),
       unnest(${sql.array(metricsJsons)}::jsonb[]),
-      unnest(${sql.array(workersJsons)}::jsonb[])
+      unnest(${sql.array(workersJsons)}::jsonb[]),
+      unnest(${sql.array(powerInvalidReasonsJsons)}::jsonb[]),
+      unnest(${sql.array(powerAuditJsons)}::jsonb[])
     on conflict (
       workflow_run_id, config_id, benchmark_type, isl, osl, conc, offload_mode,
       recipe_fingerprint
@@ -120,7 +134,11 @@ export async function bulkIngestBenchmarkRows(
         jsonb_build_object('kv_cache_pool_tokens', benchmark_results.metrics->'kv_cache_pool_tokens')
       ),
       image = excluded.image,
-      workers = excluded.workers
+      workers = excluded.workers,
+      -- Like workers, the fresh artifact is authoritative for provenance: a
+      -- re-ingest from an artifact without the fields deliberately nulls them.
+      power_invalid_reasons = excluded.power_invalid_reasons,
+      power_audit = excluded.power_audit
     returning (xmax = 0) as inserted, id
   `;
 

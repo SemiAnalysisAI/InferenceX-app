@@ -135,6 +135,7 @@ const TOOLTIP_STRINGS = {
     precision: 'Precision',
     inputTputPerChip: 'Input Token Throughput per Chip',
     outputTputPerChip: 'Output Token Throughput per Chip',
+    powerWithheld: 'Measured power withheld',
   },
   zh: {
     dismiss: '点击其他区域关闭',
@@ -149,6 +150,7 @@ const TOOLTIP_STRINGS = {
     precision: '精度',
     inputTputPerChip: '每芯片输入 token 吞吐量',
     outputTputPerChip: '每芯片输出 token 吞吐量',
+    powerWithheld: '实测功耗未采信',
   },
 } as const;
 
@@ -411,6 +413,26 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
     ${tooltipLine(t.dpAttention, d.dp_attention ? 'True' : 'False')}`;
 };
 
+/** Producer reason codes are snake_case; anything else never reaches the DOM. */
+const POWER_REASON_CODE_RE = /^[a-z][a-z0-9_]*$/u;
+
+/**
+ * One muted line explaining a withheld measured-power verdict. Empty unless
+ * the point carries producer reason codes. Codes are re-validated against the
+ * snake_case shape before interpolation (defense in depth — tooltip content
+ * is raw HTML) and humanized by replacing underscores with spaces.
+ */
+const powerWithheldHTML = (d: InferenceData, locale: Locale): string => {
+  if (!Array.isArray(d.power_invalid_reasons) || d.power_invalid_reasons.length === 0) return '';
+  const codes = d.power_invalid_reasons
+    .filter(
+      (code) => typeof code === 'string' && code.length <= 64 && POWER_REASON_CODE_RE.test(code),
+    )
+    .map((code) => code.replaceAll('_', ' '));
+  if (codes.length === 0) return '';
+  return tooltipLine(TOOLTIP_STRINGS[locale].powerWithheld, codes.join(', '));
+};
+
 /**
  * Generates HTML content for official data point tooltips.
  *
@@ -463,6 +485,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
       ${generateCacheMetadataHTML(d, locale)}
+      ${powerWithheldHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${runLinkHTML(runUrl)}
       ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(config.hasLog), d.id, d.benchmark_type, locale)}
@@ -503,6 +526,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
       ${generateCacheMetadataHTML(d, locale)}
+      ${powerWithheldHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
     </div>
   `;

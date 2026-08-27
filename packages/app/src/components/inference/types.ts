@@ -114,6 +114,11 @@ export interface AggDataEntry {
   // Measured GPU telemetry (emitted by runner's aggregate_power.py).
   // Optional because historical runs predate the fields.
   power_valid?: number;
+  /**
+   * Producer reason codes explaining a withheld power verdict
+   * (PLAN-06 contract; present only when power_valid == 0 upstream).
+   */
+  power_invalid_reasons?: string[];
   power_metric_schema_version?: number;
   avg_power_w?: number;
   joules_per_successful_query?: number;
