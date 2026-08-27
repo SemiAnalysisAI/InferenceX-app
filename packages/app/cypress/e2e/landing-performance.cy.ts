@@ -107,11 +107,14 @@ describe('Landing page performance', () => {
       );
       expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(false);
       expect(resourceNames.some((name) => name.includes('/Monocraft-'))).to.eq(false);
-      // The carousel only renders the active quote's logo, and it always starts on
-      // the first (MiniMax) quote, so a mobile load fetches at most that one logo —
-      // never the full supporter set.
-      const carouselLogos = new Set(resourceNames.filter((name) => name.includes('/logos/')));
-      expect(carouselLogos.size).to.be.lessThan(3);
+      // The landing AgentX ledger has five lazy model marks. A mobile viewport may
+      // fetch any visible subset, but the text-only supporter strip must not pull
+      // in its former logo set.
+      const landingLogos = new Set(resourceNames.filter((name) => name.includes('/logos/')));
+      expect(landingLogos.size).to.be.lessThan(6);
+      expect(
+        [...landingLogos].filter((name) => !new URL(name).pathname.endsWith('-color.svg')),
+      ).to.deep.eq([]);
       expect(
         resourceNames.some(
           (name) => name.includes('/brand/logo-color.webp') && name.includes('w=128'),

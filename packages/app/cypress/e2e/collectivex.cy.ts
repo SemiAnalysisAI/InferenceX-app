@@ -43,6 +43,11 @@ const kvDataset = buildDataset({
   ],
   meta: { run_id: '162', generated_at: '2026-08-07T12:20:00Z', source_sha: 'e'.repeat(40) },
 });
+const kvComparisonDataset = buildDataset({
+  shards: [makeRawShard()],
+  kv: [{}],
+  meta: { run_id: '164', generated_at: '2026-08-09T12:20:00Z', source_sha: 'a'.repeat(40) },
+});
 const kvOnlyDataset = buildDataset({
   shards: [],
   kv: [{}],
@@ -650,6 +655,44 @@ describe('CollectiveX kv-transfer card', () => {
         expect($kv[0].compareDocumentPosition($chart[0]) & 4).to.equal(4);
       });
     });
+  });
+
+  it('plots the fixed frontier axes and keeps multi-run lines aligned with the legend', () => {
+    installRuns([kvComparisonDataset, kvDataset]);
+    installRun(kvComparisonDataset);
+    installRun(kvDataset, 'comparisonKvRun');
+    openCollectiveX();
+
+    cy.get(`[data-testid="collectivex-run-visible-${kvDataset.run.run_id}"]`).check();
+    cy.wait('@comparisonKvRun');
+    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', 'Frontier').click();
+
+    cy.get('[data-testid="collectivex-kv-metric-toggle"]').should('not.exist');
+    cy.get('[data-testid="collectivex-kv-frontier-chart"]')
+      .should('contain.text', 'Aggregate pull bandwidth at p50 (GB/s, log)')
+      .and('contain.text', 'Burst p95 latency per in-flight request (ms, log)');
+    cy.get('[data-testid="collectivex-kv-frontier-chart"] .line-path')
+      .should('have.length', 2)
+      .then(($lines) => {
+        expect([...$lines].map((line) => line.getAttribute('stroke-dasharray'))).to.have.members([
+          'none',
+          '9 4',
+        ]);
+      });
+  });
+
+  it('localizes the frontier control and chart copy on the Chinese page', () => {
+    installRuns([kvDataset]);
+    installRun(kvDataset);
+    cy.visit('/zh/collectivex');
+    cy.wait('@runs');
+    cy.wait('@run');
+
+    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', '帕累托前沿').click();
+    cy.get('[data-testid="collectivex-kv-frontier-chart"]')
+      .should('contain.text', 'p50 聚合 pull 带宽（GB/s，对数）')
+      .and('contain.text', '每个在途请求的突发 p95 延迟（ms，对数）')
+      .and('contain.text', '越靠右下越优');
   });
 
   it('renders no kv card and no KV suite badge for an EP-only run', () => {
