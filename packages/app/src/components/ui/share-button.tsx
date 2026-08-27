@@ -6,11 +6,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ShareLinkedInButton, ShareTwitterButton } from '@/components/share-buttons';
 import { track } from '@/lib/analytics';
 import { buildShareUrl } from '@/lib/url-state';
+import { cn } from '@/lib/utils';
 
 import { Button } from './button';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
 
-export function ShareButton() {
+export function ShareButton({ className }: { className?: string } = {}) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [url, setUrl] = useState('');
@@ -55,7 +56,10 @@ export function ShareButton() {
         <Button
           data-testid="share-button"
           size="sm"
-          className="h-8 gap-1.5 bg-brand text-primary-foreground hover:bg-brand/90 text-xs font-medium"
+          className={cn(
+            'h-8 gap-1.5 bg-brand text-primary-foreground hover:bg-brand/90 text-xs font-medium',
+            className,
+          )}
           title="Share this view"
         >
           <Share2 className="size-3.5" />
