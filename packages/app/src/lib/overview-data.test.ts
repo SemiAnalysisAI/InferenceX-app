@@ -1336,9 +1336,12 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       overviewRowsFixture as unknown as Record<string, BenchmarkRow[]>,
     );
 
-    // Curated scenarios: DeepSeek, MiniMax and Qwen each get both rows, Kimi
+    // Curated scenarios: DeepSeek, MiniMax and Qwen3.5 each get both rows, Kimi
     // K3 and GLM are AgentX-only. Kimi K2.5 is absent — deprecated models are
     // not default models, and the matrix is built from DEFAULT_MODELS.
+    // Qwen3.8-Flash-Next is curated AgentX-only, like Kimi K3 and GLM: the
+    // model is benchmarked on agentic traces, so it must not claim a
+    // fixed-sequence row it will never fill.
     expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([
       `${Model.DeepSeek_V4_Pro}/single_turn_8k1k`,
       `${Model.DeepSeek_V4_Pro}/agentx`,
@@ -1348,6 +1351,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       `${Model.GLM_5_2}/agentx`,
       `${Model.Qwen3_5}/single_turn_8k1k`,
       `${Model.Qwen3_5}/agentx`,
+      `${Model.Qwen3_8_Flash_Next}/agentx`,
     ]);
     expect(page.models.length).toBeGreaterThan(DEFAULT_MODELS.size);
     expect(page).not.toHaveProperty('datasetThroughDate');

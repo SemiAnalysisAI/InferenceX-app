@@ -170,15 +170,14 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
   [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
   // 176B total: a 125B main model plus a 51B n-gram embedding table, 6B active
   // per forward pass, and a separate 4B MTP head the parameter count excludes.
-  // Experimental rather than default while the only data is the day-zero H200
-  // FP8 agentic arm: `default` would seat it in the /overview matrix, which is
-  // built from DEFAULT_MODELS and would render an empty fixed-sequence row for
-  // it. It stays fully selectable everywhere else, since MODEL_OPTIONS excludes
-  // only `hidden`. Promote to `default` once the sweep covers more chips.
+  // Default alongside the other current models, so it appears in the /overview
+  // matrix from day zero. The matrix is built from DEFAULT_MODELS, so its
+  // fixed-sequence row stays empty until the sweep covers 8k1k as well as the
+  // agentic scenario.
   [Model.Qwen3_8_Flash_Next]: {
     label: 'Qwen3.8 Flash Next 176B',
     prefix: 'qwen3.8next',
-    category: 'experimental',
+    category: 'default',
   },
   [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'deprecated' },
   [Model.MiniMax_M2_5]: {
