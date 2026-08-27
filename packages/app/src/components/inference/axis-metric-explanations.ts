@@ -197,6 +197,18 @@ function provisionedJoules(tokenType: TokenType): MetricExplanation {
   };
 }
 
+/**
+ * Certification-tier note appended to every Measured Energy explanation:
+ * pairs the dotted legacy-power point ring and the Quick Filters → Measured
+ * Power pills with the footer text that explains them.
+ */
+const MEASURED_TIER_NOTE_EN =
+  ' Points without a producer validation verdict are legacy measurements — marked with a ' +
+  'dotted ring on the chart and filterable via Quick Filters → Measured Power.';
+const MEASURED_TIER_NOTE_ZH =
+  '没有生产端验证结论的数据点属于旧版测量——在图表上以虚线圆环标记，' +
+  '并可通过快捷筛选中的“实测功耗”进行筛选。';
+
 type MeasuredPhase = 'run' | 'prefill' | 'decode';
 
 const MEASURED_PHASE_EN: Record<MeasuredPhase, string> = {
@@ -216,11 +228,13 @@ function measuredPower(phase: MeasuredPhase): MetricExplanation {
     description: {
       en:
         `Average per-chip accelerator power actually drawn during ${MEASURED_PHASE_EN[phase]}, ` +
-        'read from runner telemetry. Unlike the all-in provisioned metrics, this reflects real ' +
-        'measured draw, not the provisioned budget.',
+        `read from runner telemetry. Unlike the all-in provisioned metrics, this reflects real ` +
+        `measured draw, not the provisioned budget.${MEASURED_TIER_NOTE_EN}`,
       zh:
         `${MEASURED_PHASE_ZH[phase]}每块加速器芯片的实际平均功耗，来自运行器遥测数据。` +
-        '与全电源配置类指标不同，它反映的是真实实测功耗，而不是按配置计算的预算值。',
+        `与全电源配置类指标不同，它反映的是真实实测功耗，而不是按配置计算的预算值。${
+          MEASURED_TIER_NOTE_ZH
+        }`,
     },
     formula: {
       en: `W = mean of sampled per-chip accelerator power draw over ${MEASURED_PHASE_EN[phase]}`,
@@ -236,10 +250,10 @@ function measuredJoulesPerToken(tokenType: TokenType): MetricExplanation {
         `Measured accelerator energy consumed per ${
           tokenType === 'total' ? 'token (including prompt tokens)' : `${tokenType} token`
         }, from runner power telemetry integrated over the run. Lower means the system converts ` +
-        'electricity into tokens more efficiently.',
+        `electricity into tokens more efficiently.${MEASURED_TIER_NOTE_EN}`,
       zh:
         `每个${TOKEN_TYPE_ZH[tokenType]}消耗的加速器实测能耗，由运行器功耗遥测在整个运行期间积分得到。` +
-        '数值越低，说明系统把电能转化为 token 的效率越高。',
+        `数值越低，说明系统把电能转化为 token 的效率越高。${MEASURED_TIER_NOTE_ZH}`,
     },
     formula: {
       en: `J/tok = measured accelerator energy over the run ÷ ${TOKEN_TYPE_EN[tokenType]} processed`,
@@ -341,12 +355,12 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   measuredJPerSuccessfulQuery: {
     description: {
       en:
-        'Measured accelerator energy consumed per successfully completed request, from runner ' +
-        'power telemetry. It charges the energy of the whole run only to requests that finished ' +
-        'successfully.',
+        `Measured accelerator energy consumed per successfully completed request, from runner ` +
+        `power telemetry. It charges the energy of the whole run only to requests that finished ` +
+        `successfully.${MEASURED_TIER_NOTE_EN}`,
       zh:
-        '每个成功完成的请求消耗的加速器实测能耗，来自运行器功耗遥测。' +
-        '整个运行的能耗只计入成功完成的请求。',
+        `每个成功完成的请求消耗的加速器实测能耗，来自运行器功耗遥测。` +
+        `整个运行的能耗只计入成功完成的请求。${MEASURED_TIER_NOTE_ZH}`,
     },
     formula: {
       en: 'J/query = measured accelerator energy over the run ÷ successfully completed requests',
@@ -356,9 +370,9 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   measuredWhPerSuccessfulQuery: {
     description: {
       en:
-        'The same measured energy per successful request expressed in watt-hours, a more ' +
-        'familiar household unit (1 Wh = 3,600 J).',
-      zh: '与每次成功请求实测能耗相同的量，换算成更直观的瓦时单位（1 Wh = 3,600 J）。',
+        `The same measured energy per successful request expressed in watt-hours, a more ` +
+        `familiar household unit (1 Wh = 3,600 J).${MEASURED_TIER_NOTE_EN}`,
+      zh: `与每次成功请求实测能耗相同的量，换算成更直观的瓦时单位（1 Wh = 3,600 J）。${MEASURED_TIER_NOTE_ZH}`,
     },
     formula: {
       en: 'Wh/query = measured J per successful query ÷ 3,600',
@@ -368,11 +382,13 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   measuredPowerPercentTdp: {
     description: {
       en:
-        'Measured average per-chip power as a share of the accelerator’s rated TDP. Values well ' +
-        'below 100% suggest the workload leaves thermal or power headroom on the table.',
+        `Measured average per-chip power as a share of the accelerator’s rated TDP. Values well ` +
+        `below 100% suggest the workload leaves thermal or power headroom on the table.${
+          MEASURED_TIER_NOTE_EN
+        }`,
       zh:
-        '每芯片实测平均功耗占加速器额定 TDP 的百分比。' +
-        '明显低于 100% 说明该工作负载没有用满散热或供电余量。',
+        `每芯片实测平均功耗占加速器额定 TDP 的百分比。` +
+        `明显低于 100% 说明该工作负载没有用满散热或供电余量。${MEASURED_TIER_NOTE_ZH}`,
     },
     formula: {
       en: '% TDP = measured average power per chip (W) ÷ rated TDP (W) × 100',

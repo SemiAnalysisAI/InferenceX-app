@@ -483,6 +483,33 @@ export interface MetricControlGroup {
   gated?: boolean;
 }
 
+/**
+ * The nine runner-telemetry y-axes in the "Measured Energy" control group.
+ * Exported (and referenced by the group below, so the two cannot drift) for
+ * consumers that treat measured axes specially — the legacy-power point ring,
+ * tooltip tier line, and footer legend key.
+ */
+export const MEASURED_ENERGY_METRIC_CONFIG_KEYS = [
+  'y_measuredPrefillAvgPower',
+  'y_measuredDecodeAvgPower',
+  'y_measuredAvgPower',
+  'y_measuredJPerInputToken',
+  'y_measuredJPerOutputToken',
+  'y_measuredJPerTotalToken',
+  'y_measuredJPerSuccessfulQuery',
+  'y_measuredWhPerSuccessfulQuery',
+  'y_measuredPowerPercentTdp',
+] as const satisfies readonly MetricConfigKey[];
+
+const MEASURED_ENERGY_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = new Set(
+  MEASURED_ENERGY_METRIC_CONFIG_KEYS,
+);
+
+/** Whether a y-axis config key plots one of the Measured Energy metrics. */
+export function isMeasuredEnergyConfigKey(configKey: string): boolean {
+  return MEASURED_ENERGY_METRIC_CONFIG_KEY_SET.has(configKey);
+}
+
 export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
   {
     label: 'Throughput',
@@ -554,17 +581,7 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
   {
     label: 'Measured Energy',
     labelZh: '实测能耗',
-    metrics: [
-      'y_measuredPrefillAvgPower',
-      'y_measuredDecodeAvgPower',
-      'y_measuredAvgPower',
-      'y_measuredJPerInputToken',
-      'y_measuredJPerOutputToken',
-      'y_measuredJPerTotalToken',
-      'y_measuredJPerSuccessfulQuery',
-      'y_measuredWhPerSuccessfulQuery',
-      'y_measuredPowerPercentTdp',
-    ],
+    metrics: MEASURED_ENERGY_METRIC_CONFIG_KEYS,
   },
   {
     label: 'Custom User Values',

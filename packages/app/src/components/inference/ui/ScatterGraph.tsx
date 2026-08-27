@@ -120,6 +120,8 @@ import {
 } from '@/components/inference/utils/point-identity';
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
+import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
+import { isMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import { pointLabelText } from './point-label';
 import {
@@ -463,6 +465,9 @@ const ScatterGraph = React.memo(
     const legendT = SCATTER_STRINGS[locale];
     const costLimit = chartDefinition.y_cost_limit ?? 0;
     const latencyLimit = chartDefinition.y_latency_limit ?? 0;
+    // Legacy-power rings decorate points only while a Measured Energy y-axis
+    // is selected (see legacy-power-marker.ts).
+    const isMeasuredEnergyAxis = isMeasuredEnergyConfigKey(selectedYAxisMetric);
 
     const {
       isUnofficialRun,
@@ -2604,14 +2609,15 @@ const ScatterGraph = React.memo(
                   overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
                 );
 
-              // Match official points: KV offload is the only persistent
-              // point decoration. Decode method remains in the tooltip.
+              // Match official points: KV offload and the measured-axis
+              // legacy-power ring are the only persistent point decorations.
+              // Decode method remains in the tooltip.
               overlayPoints.each(function (d) {
-                renderOffloadHalo(
-                  d3.select(this),
-                  d,
-                  overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
+                const overlayStroke = overlayRunColor(
+                  overlayRunIndex(d.run_url ?? null, runIndexByUrl),
                 );
+                renderOffloadHalo(d3.select(this), d, overlayStroke);
+                renderLegacyPowerRing(d3.select(this), d, isMeasuredEnergyAxis, overlayStroke);
               });
 
               // Labels
@@ -2976,6 +2982,7 @@ const ScatterGraph = React.memo(
       xLabel,
       yLabel,
       selectedYAxisMetric,
+      isMeasuredEnergyAxis,
       chartDefinition,
       locale,
       drawPerfRuler,
@@ -2997,9 +3004,11 @@ const ScatterGraph = React.memo(
         // CSS transitions for smooth opacity animation on hw toggle
         zoomGroup.selectAll('.dot-group').style('transition', 'opacity 150ms ease');
 
-        // Offload halo: dashed ring on every point that used KV offload (Pareto or not)
+        // Offload halo: dashed ring on every point that used KV offload (Pareto or not).
+        // Legacy-power ring: dotted ring on unvalidated telemetry, measured axes only.
         zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
           renderOffloadHalo(d3.select(this), d, 'var(--foreground)');
+          renderLegacyPowerRing(d3.select(this), d, isMeasuredEnergyAxis, 'var(--foreground)');
         });
 
         avoidPointLabelCollisions(zoomGroup);
@@ -3029,6 +3038,9 @@ const ScatterGraph = React.memo(
         optimalPointKeys,
         getCssColor,
         resolveColor,
+        // A metric-only change must re-run the decoration pass so legacy-power
+        // rings appear/disappear with the Measured Energy axis selection.
+        isMeasuredEnergyAxis,
       ],
     );
 
@@ -3062,8 +3074,9 @@ const ScatterGraph = React.memo(
           color,
         );
         // A precision toggle may replace and append the visible SVG shape.
-        // Keep the offload halo above that shape after the swap.
+        // Keep the decorations above that shape after the swap.
         point.selectAll('.offload-halo').raise();
+        point.selectAll('.legacy-power-ring').raise();
       });
 
       // Overlay points keep their X marker and run-derived color. Only their
