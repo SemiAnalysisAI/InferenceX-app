@@ -71,7 +71,6 @@ describe('NUDGE_REGISTRY integrity', () => {
     const ids = NUDGE_REGISTRY.map((n) => n.id).toSorted();
     expect(ids).toEqual([
       'agentic-point-detail',
-      'agentic-results-launch-modal',
       'agentx-telemetry-tutorial',
       'eval-samples',
       'export',
@@ -83,14 +82,6 @@ describe('NUDGE_REGISTRY integrity', () => {
       'reproducibility',
       'star-nudge',
     ]);
-  });
-
-  it('renders the agentic launch modal centered, with the dismissed key e2e suppresses', () => {
-    const launch = NUDGE_REGISTRY.find((n) => n.id === 'agentic-results-launch-modal');
-    expect(launch?.content.centered).toBe(true);
-    // cypress/support/e2e.ts seeds this key so the backdrop can't cover the
-    // UI under test; a rename here has to be mirrored there.
-    expect(launch?.storageKey).toBe('inferencex-agentic-results-modal-dismissed');
   });
 
   it('renders the telemetry tutorial as an uncentered card on the agentic detail scope', () => {
@@ -112,11 +103,6 @@ describe('NUDGE_REGISTRY integrity', () => {
     if (reproducibility?.type !== 'toast') throw new Error('Missing reproducibility toast');
     reproducibility.content.action?.onClick();
     expect(location.href).toBe('/zh/about#reproducibility');
-
-    const launch = NUDGE_REGISTRY.find((nudge) => nudge.id === 'agentic-results-launch-modal');
-    if (launch?.type !== 'modal') throw new Error('Missing launch modal');
-    launch.content.primaryAction?.onClick();
-    expect(location.href).toBe('/zh/inference?i_seq=agentic-traces');
 
     const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'openai-rubin-comparison-banner');
     if (banner?.type !== 'banner') throw new Error('Missing launch banner');
