@@ -36,9 +36,10 @@ const STRINGS = {
     batchCaption: 'at the largest measured ISL',
     islCaption: 'at batch 1',
     frontierCaption:
-      'each line walks the batch ladder at the largest measured ISL; down-right is better. ' +
-      'Solid points are Pareto-optimal within their backend, ringed points across the whole SKU; ' +
-      'a backend that serializes requests collapses to a single point.',
+      'each line traces a backend Pareto frontier over its batch ladder at the largest measured ISL; ' +
+      'down-right is better. Full-color points are frontier-optimal within their backend, faded points ' +
+      'are dominated, ringed points are optimal across the whole SKU; a backend that serializes ' +
+      'requests collapses to a single point.',
     yControl: 'Metric',
     xControl: 'X axis',
     pageControl: 'Page size',
@@ -53,8 +54,8 @@ const STRINGS = {
     batchCaption: '取最大实测 ISL',
     islCaption: '取批大小 1',
     frontierCaption:
-      '每条线沿最大实测 ISL 的批大小阶梯移动，右下方更优。' +
-      '实心点为各后端内部的帕累托最优，带圆环的点为整个 SKU 范围内的最优；' +
+      '每条线为该后端在最大实测 ISL 下沿批大小阶梯的帕累托前沿，右下方更优。' +
+      '全色点为各后端内部的前沿最优，淡色点为被支配点，带圆环的点为整个 SKU 范围内的最优；' +
       '串行处理请求的后端会收缩为一个点。',
     yControl: '指标',
     xControl: 'X 轴',

@@ -88,17 +88,19 @@ export function CollectiveXKvFrontierChart({
     () => new Map(cases.map((kase) => [`${kase.run_id}:${kase.case_id}`, kase.run_index])),
     [cases],
   );
-  // Batch-ladder walk per series: sorted by requests in flight, so a
-  // serializing backend draws a stub and an overlapping one a curve.
+  // Pareto roofline per series, matching the /inference scatter: the line
+  // connects only frontier points, so a serializing backend draws a stub and
+  // an overlapping one a descending envelope.
   const lines = useMemo(() => {
     const bySeries: Record<string, CollectiveXKvFrontierPoint[]> = {};
     for (const point of points) {
+      if (!point.onSeriesFrontier) continue;
       (bySeries[point.seriesId] ??= []).push(point);
     }
     const result: Record<string, { x: number; y: number }[]> = {};
     for (const [seriesId, seriesPoints] of Object.entries(bySeries)) {
       result[seriesId] = seriesPoints
-        .toSorted((a, b) => a.row.batch - b.row.batch)
+        .toSorted((a, b) => a.x - b.x)
         .map((point) => ({ x: point.x, y: point.y }));
     }
     return result;
@@ -148,10 +150,10 @@ export function CollectiveXKvFrontierChart({
           key: 'collectivex-kv-frontier-lines',
           lines,
           config: {
-            getColor: (key) => faded(colors[colorBySeries.get(key) ?? ''] ?? '#888'),
+            getColor: (key) => colors[colorBySeries.get(key) ?? ''] ?? '#888',
             getStrokeDasharray: (key) => collectiveXRunDasharray(runIndexBySeries.get(key) ?? 0),
-            strokeWidth: 1.75,
-            curve: d3.curveLinear,
+            strokeWidth: 2.5,
+            curve: d3.curveMonotoneX,
           },
         },
         {
@@ -167,9 +169,7 @@ export function CollectiveXKvFrontierChart({
               const color = colors[point.colorKey] ?? '#888';
               return point.onSeriesFrontier ? color : faded(color);
             },
-            getRadius: (point) => (point.onSeriesFrontier ? 4.5 : 3),
-            stroke: 'var(--background)',
-            strokeWidth: 1,
+            getRadius: () => 3.5,
             keyFn: (point) => `${point.seriesId}-${point.row.batch}`,
             maxPoints: Infinity,
           },
@@ -218,8 +218,8 @@ export function CollectiveXKvFrontierChart({
         onHoverStart: (selectionEl) => {
           selectionEl.attr('r', 6);
         },
-        onHoverEnd: (selectionEl, point) => {
-          selectionEl.attr('r', point.onSeriesFrontier ? 4.5 : 3);
+        onHoverEnd: (selectionEl) => {
+          selectionEl.attr('r', 3.5);
         },
       }}
       transitionDuration={200}
