@@ -13,6 +13,7 @@ import {
 
 import { useUnofficialDomain } from '@/hooks/useUnofficialDomain';
 import { track } from '@/lib/analytics';
+import { matchesSearch } from '@/lib/search-match';
 import {
   Select,
   SelectContent,
@@ -143,15 +144,16 @@ export function DataTable<T>({
     setPage(0);
   };
 
-  // Search: match against all columns with sortValue
+  // Search: punctuation-insensitive token matching across all columns with a
+  // sortValue, so "B300 vllm" finds a "B300 (vLLM)" row and multi-token
+  // queries can span columns (#406).
   const filtered = useMemo(() => {
     if (!searchable || !search.trim()) return data;
-    const q = search.trim().toLowerCase();
     return data.filter((row) =>
-      columns.some((col) => {
-        if (!col.sortValue) return false;
-        return String(col.sortValue(row)).toLowerCase().includes(q);
-      }),
+      matchesSearch(
+        search,
+        ...columns.map((col) => (col.sortValue ? String(col.sortValue(row)) : null)),
+      ),
     );
   }, [data, search, columns, searchable]);
 

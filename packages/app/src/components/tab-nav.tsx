@@ -15,6 +15,7 @@ import {
   type DashboardRouteKey,
 } from '@/lib/dashboard-routes';
 import { localePath } from '@/lib/i18n';
+import { TAB_LABELS_EN } from '@/lib/tab-meta';
 import { TAB_LABELS_ZH } from '@/lib/tab-meta-zh';
 import { useFeatureGate } from '@/lib/use-feature-gate';
 import { Card } from '@/components/ui/card';
@@ -32,22 +33,6 @@ import {
 } from '@/components/ui/select';
 import { useClientSearchParams } from '@/hooks/useClientSearch';
 import { cn } from '@/lib/utils';
-
-const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
-  inference: 'Inference Performance',
-  evaluation: 'Accuracy Evals',
-  historical: 'Historical Trends',
-  calculator: 'TCO Calculator',
-  fleet: 'Fleet Lifecycle',
-  reliability: 'Reliability',
-  'gpu-specs': 'Chip Specs',
-  submissions: 'Submissions',
-  collectivex: 'CollectiveX',
-  'ai-chart': 'AI Chart',
-  'gpu-metrics': 'PowerX',
-  'current-inferencex-image': 'Images',
-  feedback: 'Feedback',
-};
 
 const PRIMARY_TABS = DASHBOARD_ROUTES.filter((route) => route.navGroup === 'primary');
 const GATED_TABS = DASHBOARD_ROUTES.filter((route) => route.navGroup === 'feature-gated');

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 
+import { CommandPalette } from '@/components/ui/command-palette';
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { NewBadge } from '@/components/ui/new-badge';
 import { MinecraftToggles } from '@/components/minecraft/minecraft-toggles';
@@ -253,6 +254,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
 
           {/* Right side */}
           <div className="ml-auto flex items-center gap-2">
+            <CommandPalette />
             <span className="hidden sm:flex">
               <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" starCount={starCount} />
             </span>

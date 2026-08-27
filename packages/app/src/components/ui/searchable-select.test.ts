@@ -105,6 +105,17 @@ describe('SearchableSelect', () => {
     expect(items[0]?.textContent).toContain('Cost per Million Total Tokens (Hyperscaler)');
   });
 
+  it('ignores punctuation and word order in the query (#406)', () => {
+    render();
+    openMenu();
+    // "(Hyperscaler)" is wrapped in parentheses in the option label; a plain
+    // multi-word query must still match, in either token order.
+    setSearchValue('hyperscaler tokens');
+    const items = document.body.querySelectorAll('[data-slot="select-item"]');
+    expect(items).toHaveLength(1);
+    expect(items[0]?.textContent).toContain('Cost per Million Total Tokens (Hyperscaler)');
+  });
+
   it('shows a "No results" message when nothing matches', () => {
     render();
     openMenu();
