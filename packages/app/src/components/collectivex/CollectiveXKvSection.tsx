@@ -39,10 +39,15 @@ const STRINGS = {
       'each line walks the batch ladder at the largest measured ISL; down-right is better. ' +
       'A backend that serializes requests collapses to a single point; hover a point for its ' +
       'Pareto status.',
+    frontierOption: 'Frontier',
     yControl: 'Metric',
     xControl: 'X axis',
     pageControl: 'Page size',
     opControl: 'Direction',
+    metricAriaLabel: 'CollectiveX KV metric',
+    xAriaLabel: 'CollectiveX KV X axis',
+    pageAriaLabel: 'CollectiveX KV page size',
+    opAriaLabel: 'CollectiveX KV direction',
   },
   zh: {
     heading: 'KV 缓存传输',
@@ -53,12 +58,17 @@ const STRINGS = {
     batchCaption: '取最大实测 ISL',
     islCaption: '取批大小 1',
     frontierCaption:
-      '每条线沿最大实测 ISL 的批大小阶梯移动，右下方更优。' +
+      '每条线连接最大实测 ISL 下的批大小阶梯，越靠右下越优。' +
       '串行处理请求的后端会收缩为一个点；悬停可查看各点的帕累托状态。',
+    frontierOption: '帕累托前沿',
     yControl: '指标',
     xControl: 'X 轴',
     pageControl: '页大小',
     opControl: '方向',
+    metricAriaLabel: 'CollectiveX KV 指标',
+    xAriaLabel: 'CollectiveX KV X 轴',
+    pageAriaLabel: 'CollectiveX KV 页大小',
+    opAriaLabel: 'CollectiveX KV 传输方向',
   },
 } as const;
 
@@ -277,7 +287,7 @@ export function CollectiveXKvSection({
                     setYAxis(value);
                     track('collectivex_kv_metric_changed', { metric: value });
                   }}
-                  ariaLabel="CollectiveX kv metric"
+                  ariaLabel={strings.metricAriaLabel}
                   testId="collectivex-kv-metric-toggle"
                   options={[
                     { value: 'bandwidth', label: 'GB/s' },
@@ -294,12 +304,12 @@ export function CollectiveXKvSection({
                   setXAxis(value);
                   track('collectivex_kv_xaxis_changed', { axis: value });
                 }}
-                ariaLabel="CollectiveX kv x axis"
+                ariaLabel={strings.xAriaLabel}
                 testId="collectivex-kv-xaxis-toggle"
                 options={[
                   { value: 'batch', label: 'Batch' },
                   { value: 'isl', label: 'ISL' },
-                  { value: 'frontier', label: 'Frontier' },
+                  { value: 'frontier', label: strings.frontierOption },
                 ]}
               />
             </div>
@@ -308,7 +318,7 @@ export function CollectiveXKvSection({
               <SegmentedToggle
                 value={pageTokens}
                 onValueChange={setPageTokens}
-                ariaLabel="CollectiveX kv page size"
+                ariaLabel={strings.pageAriaLabel}
                 testId="collectivex-kv-page-toggle"
                 options={[
                   { value: '64', label: '64' },
@@ -321,7 +331,7 @@ export function CollectiveXKvSection({
               <SegmentedToggle
                 value={op}
                 onValueChange={setOp}
-                ariaLabel="CollectiveX kv direction"
+                ariaLabel={strings.opAriaLabel}
                 testId="collectivex-kv-op-toggle"
                 options={[
                   { value: 'pull', label: 'pull' },

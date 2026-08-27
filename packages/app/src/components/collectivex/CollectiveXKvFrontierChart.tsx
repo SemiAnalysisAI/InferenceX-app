@@ -4,12 +4,14 @@ import * as d3 from 'd3';
 import { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import { useLocale } from '@/lib/use-locale';
 
 import {
   type CollectiveXKvFrontierPoint,
   type CollectiveXKvFrontierSelection,
   type CollectiveXKvRunCase,
   collectiveXKvFrontierPoints,
+  collectiveXRunDasharray,
 } from './data';
 
 interface CollectiveXKvFrontierChartProps {
@@ -21,6 +23,45 @@ interface CollectiveXKvFrontierChartProps {
   legendElement?: React.ReactNode;
   testId?: string;
 }
+
+const STRINGS = {
+  en: {
+    noData: 'No measured KV rows match the selected page size and direction.',
+    instructions:
+      'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    xAxis: (op: CollectiveXKvFrontierSelection['op']) =>
+      `Aggregate ${op} bandwidth at p50 (GB/s, log)`,
+    yAxis: 'Burst p95 latency per in-flight request (ms, log)',
+    dismiss: 'Click elsewhere to dismiss',
+    skuFrontier: 'SKU-wide frontier',
+    backendFrontier: 'backend frontier',
+    dominated: 'dominated',
+    pointContext: (row: CollectiveXKvFrontierPoint['row'], tier: string) =>
+      `${row.op} · page ${row.page_tokens} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong>`,
+    pointMetrics: (point: CollectiveXKvFrontierPoint) =>
+      `Aggregate ${point.x.toFixed(point.x >= 100 ? 0 : 2)} GB/s · p95 ÷ in-flight ${point.y.toFixed(point.y >= 100 ? 0 : 1)} ms`,
+    latency: (point: CollectiveXKvFrontierPoint) =>
+      `Burst latency p50 / p95: ${point.row.latency_ms.p50.toFixed(1)} / ${point.row.latency_ms.p95.toFixed(1)} ms · ${point.row.descs.toLocaleString('en-US')} descriptors/request`,
+    verify: (passed: boolean) => `verify: ${passed ? 'passed' : 'FAILED'}`,
+  },
+  zh: {
+    noData: '没有与所选页大小和传输方向匹配的 KV 实测数据。',
+    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    xAxis: (op: CollectiveXKvFrontierSelection['op']) => `p50 聚合 ${op} 带宽（GB/s，对数）`,
+    yAxis: '每个在途请求的突发 p95 延迟（ms，对数）',
+    dismiss: '点击其他位置关闭',
+    skuFrontier: 'SKU 级帕累托前沿',
+    backendFrontier: '后端帕累托前沿',
+    dominated: '被支配',
+    pointContext: (row: CollectiveXKvFrontierPoint['row'], tier: string) =>
+      `${row.op} · 页大小 ${row.page_tokens} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong>`,
+    pointMetrics: (point: CollectiveXKvFrontierPoint) =>
+      `聚合带宽 ${point.x.toFixed(point.x >= 100 ? 0 : 2)} GB/s · p95 ÷ 在途请求数 ${point.y.toFixed(point.y >= 100 ? 0 : 1)} ms`,
+    latency: (point: CollectiveXKvFrontierPoint) =>
+      `突发延迟 p50 / p95：${point.row.latency_ms.p50.toFixed(1)} / ${point.row.latency_ms.p95.toFixed(1)} ms · ${point.row.descs.toLocaleString('en-US')} 个描述符/请求`,
+    verify: (passed: boolean) => `校验：${passed ? '通过' : '失败'}`,
+  },
+} as const;
 
 function paddedDomain(values: number[]): [number, number] {
   if (values.length === 0) return [1, 10];
@@ -54,7 +95,13 @@ export function CollectiveXKvFrontierChart({
   legendElement,
   testId,
 }: CollectiveXKvFrontierChartProps) {
+  const locale = useLocale();
+  const strings = STRINGS[locale === 'zh' ? 'zh' : 'en'];
   const points = useMemo(() => collectiveXKvFrontierPoints(cases, selection), [cases, selection]);
+  const runIndexBySeries = useMemo(
+    () => new Map(cases.map((kase) => [`${kase.run_id}:${kase.case_id}`, kase.run_index])),
+    [cases],
+  );
   // Roofline per series in the /inference style, drawn through the full batch
   // ladder: because raising the batch improves both axes until the backend
   // saturates, the strict Pareto set is usually a single point, so the ladder
@@ -83,9 +130,7 @@ export function CollectiveXKvFrontierChart({
   const noDataOverlay =
     points.length === 0 ? (
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <p className="text-sm text-muted-foreground">
-          No measured kv rows match the selected page size and direction.
-        </p>
+        <p className="text-sm text-muted-foreground">{strings.noData}</p>
       </div>
     ) : undefined;
 
@@ -98,16 +143,16 @@ export function CollectiveXKvFrontierChart({
       watermark="logo"
       testId={testId}
       grabCursor
-      instructions="Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip"
+      instructions={strings.instructions}
       xScale={{ type: 'log', domain: xDomain, nice: false }}
       yScale={{ type: 'log', domain: yDomain, nice: false }}
       xAxis={{
-        label: `Aggregate ${selection.op} bandwidth at p50 (GB/s, log)`,
+        label: strings.xAxis(selection.op),
         tickCount: 6,
         tickFormat: (value) => formatCompact(Number(value)),
       }}
       yAxis={{
-        label: 'Burst p95 latency per in-flight request (ms, log)',
+        label: strings.yAxis,
         tickCount: 5,
         tickFormat: (value) => formatCompact(Number(value)),
       }}
@@ -118,6 +163,7 @@ export function CollectiveXKvFrontierChart({
           lines,
           config: {
             getColor: (key) => colors[colorBySeries.get(key) ?? ''] ?? '#888',
+            getStrokeDasharray: (key) => collectiveXRunDasharray(runIndexBySeries.get(key) ?? 0),
             strokeWidth: 2.5,
             curve: d3.curveMonotoneX,
           },
@@ -151,17 +197,17 @@ export function CollectiveXKvFrontierChart({
           const color = colors[point.colorKey] ?? '#888';
           const { row } = point;
           const tier = point.onSkuFrontier
-            ? 'SKU-wide frontier'
+            ? strings.skuFrontier
             : point.onSeriesFrontier
-              ? 'backend frontier'
-              : 'dominated';
+              ? strings.backendFrontier
+              : strings.dominated;
           return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; max-width: 380px; user-select: ${isPinned ? 'text' : 'none'}">
-            ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
+            ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${strings.dismiss}</div>` : ''}
             <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
-            <div>${row.op} · page ${row.page_tokens} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong></div>
-            <div>Aggregate ${point.x.toFixed(point.x >= 100 ? 0 : 2)} GB/s · p95 ÷ in-flight ${point.y.toFixed(point.y >= 100 ? 0 : 1)} ms</div>
-            <div class="text-muted-foreground">Burst latency p50 / p95: ${row.latency_ms.p50.toFixed(1)} / ${row.latency_ms.p95.toFixed(1)} ms · ${row.descs.toLocaleString('en-US')} descriptors/request</div>
-            <div class="text-muted-foreground">verify: ${row.verify_passed ? 'passed' : 'FAILED'}</div>
+            <div>${strings.pointContext(row, tier)}</div>
+            <div>${strings.pointMetrics(point)}</div>
+            <div class="text-muted-foreground">${strings.latency(point)}</div>
+            <div class="text-muted-foreground">${strings.verify(row.verify_passed)}</div>
           </div>`;
         },
         getRulerX: (point, scale) =>
