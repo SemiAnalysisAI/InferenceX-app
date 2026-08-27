@@ -31,8 +31,8 @@ describe('model developer logos', () => {
   it('points every mapping at an existing file under public/logos', () => {
     for (const [developer, logo] of Object.entries(MODEL_DEVELOPER_LOGOS)) {
       expect(
-        fs.existsSync(path.join(LOGOS_DIR, logo)),
-        `logo file '${logo}' for '${developer}' not found in public/logos`,
+        fs.existsSync(path.join(LOGOS_DIR, logo.file)),
+        `logo file '${logo.file}' for '${developer}' not found in public/logos`,
       ).toBe(true);
     }
   });
