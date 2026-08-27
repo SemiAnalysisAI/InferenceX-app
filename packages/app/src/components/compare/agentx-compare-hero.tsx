@@ -14,7 +14,7 @@ import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 const MODEL_LOGOS: Record<string, string> = {
   'kimi-k3': '/logos/models/kimi.svg',
   'deepseek-v4': '/logos/models/deepseek.svg',
-  'glm-5-2': '/logos/models/zhipu.svg',
+  'glm-5-2': '/logos/models/zai.svg',
   'minimax-m3': '/logos/models/minimax.svg',
   'qwen-3-5': '/logos/models/qwen.svg',
 };

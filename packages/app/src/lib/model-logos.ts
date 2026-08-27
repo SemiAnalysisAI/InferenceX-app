@@ -4,7 +4,7 @@
  * Full-color logos render as-is in both themes. Shared by every surface that
  * renders model/developer logos (`/model` pages, inference chart captions).
  */
-export const MONOCHROME_LOGO_FILES: ReadonlySet<string> = new Set(['openai.svg']);
+export const MONOCHROME_LOGO_FILES: ReadonlySet<string> = new Set(['openai.svg', 'zai.svg']);
 
 /** Whether a logo file needs a dark-mode invert to stay visible. */
 export function isMonochromeLogo(file: string): boolean {
@@ -29,7 +29,9 @@ export const MODEL_DEVELOPER_LOGOS: Record<string, string> = {
   'Moonshot AI': 'kimi-color.svg',
   // OpenAI's brand mark is monochrome by design — no color variant exists.
   OpenAI: 'openai.svg',
-  'Z.ai (Zhipu AI)': 'zhipu-color.svg',
+  // Z.ai (formerly Zhipu AI) rebranded from the blue dotted Zhipu mark to the
+  // Z.ai "Z" — monochrome by design, so it carries the dark-mode invert.
+  'Z.ai (Zhipu AI)': 'zai.svg',
 };
 
 /** Logo filename under `/logos/` for a model developer, if one exists. */
