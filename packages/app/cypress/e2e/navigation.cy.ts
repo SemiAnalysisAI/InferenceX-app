@@ -114,6 +114,10 @@ describe('First-load navigation', () => {
           'qwen-3-8-flash-next',
         ]);
       });
+      // Every featured ledger row carries the NEW pill.
+      cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
+        .should('have.length', 6)
+        .each(($badge) => expect($badge.text()).to.equal('NEW'));
     });
     cy.get('[data-testid="compare-agentx-overview-link"]').click();
     cy.location('pathname').should('eq', '/overview');

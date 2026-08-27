@@ -2,6 +2,7 @@ import { ArrowRight } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
+import { NewBadge } from '@/components/ui/new-badge';
 import { agentxDashboardHref, FEATURED_AGENTX_MODELS } from '@/lib/compare-agentx';
 
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
@@ -33,6 +34,7 @@ const STRINGS = {
     dashboard: 'Full dashboard',
     ledgerTitle: 'Models with AgentX results',
     modelAction: 'View results',
+    newModel: 'NEW',
   },
   zh: {
     eyebrow: 'AgentX｜最新结果',
@@ -43,6 +45,7 @@ const STRINGS = {
     dashboard: '查看完整仪表板',
     ledgerTitle: '已发布 AgentX 结果的模型',
     modelAction: '查看结果',
+    newModel: '新',
   },
 } as const;
 
@@ -139,8 +142,9 @@ export function AgentXCompareHero({
                       />
                     )}
                     <span className="min-w-0">
-                      <span className="block text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
-                        {model.label}
+                      <span className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
+                        <span className="min-w-0">{model.label}</span>
+                        <NewBadge data-new-badge="agentx-ledger">{t.newModel}</NewBadge>
                       </span>
                       <span className="mt-1 block font-mono text-[10px] tracking-[0.14em] text-brand uppercase">
                         AgentX

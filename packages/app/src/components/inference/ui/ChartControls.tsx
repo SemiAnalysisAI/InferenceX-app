@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { replaceRouterPathname } from '@/lib/client-navigation';
+import { AGENTX_NEW_MODEL_DISPLAY_NAMES } from '@/lib/compare-agentx';
 import { inferenceModelRouteForSelection } from '@/lib/inference-model-slug';
 import { useFeatureGate } from '@/lib/use-feature-gate';
 
@@ -305,6 +306,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             availableModels={availableModels}
             data-testid="model-selector"
             trailing={<ModelArchitectureInfoLink model={selectedModel} locale={locale} />}
+            newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
           />
           <ScenarioSelector
             value={selectedSequence}

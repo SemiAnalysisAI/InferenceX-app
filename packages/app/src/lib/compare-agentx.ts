@@ -27,6 +27,16 @@ export const FEATURED_AGENTX_MODELS: readonly CompareModelSlug[] = FEATURED_AGEN
   },
 );
 
+/**
+ * `Model` enum values (the dashboard's model identifiers) for the featured
+ * AgentX set. The landing/compare hero ledger and the /inference model
+ * selector both mark these models with a NEW badge, so the badge follows the
+ * single featured list instead of maintaining a second one.
+ */
+export const AGENTX_NEW_MODEL_DISPLAY_NAMES: ReadonlySet<string> = new Set(
+  FEATURED_AGENTX_MODELS.map((model) => model.displayName),
+);
+
 export function agentxDashboardHref(locale: 'en' | 'zh', model: CompareModelSlug): string {
   // The model rides in the path — the indexable `/inference/<model>` subroute
   // — so these hero links point crawlers at the canonical model page instead

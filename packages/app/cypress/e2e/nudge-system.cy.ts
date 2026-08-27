@@ -54,8 +54,10 @@ describe('Landing nudges — modals', () => {
         'Compare Jalapeño (Teacup) with Vera Rubin (July) NVL72 on DeepSeek R1 at 8K / 1K.',
       )
       .and('contain.text', 'View results');
+    // Banner + header-nav badges, plus the six AgentX hero ledger rows — the
+    // shared pill must render at the same fixed size everywhere it appears.
     cy.get('[data-new-badge]')
-      .should('have.length', 2)
+      .should('have.length', 8)
       .then(($badges) => {
         const sizes = [...$badges].map((badge) => {
           const rect = badge.getBoundingClientRect();
