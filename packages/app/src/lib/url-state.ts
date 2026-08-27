@@ -51,12 +51,14 @@ const URL_STATE_KEYS = [
   'i_gradlabel',
   'i_linelabel',
   'i_active',
-  // Quick filters (vendor / framework / deployment / mtp-stp).
+  // Quick filters (vendor / framework / deployment / mtp-stp / power tier).
   // `i_disagg` keeps its historical name for shared-link compatibility.
   'i_vendor',
   'i_fw',
   'i_disagg',
   'i_spec',
+  // Measured-power certification tiers ('certified' / 'legacy', comma-joined).
+  'i_power',
   // Exact serving-envelope pair behind an Overview 30-day comparison cell.
   'i_overview_current',
   'i_overview_baseline',
@@ -156,6 +158,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_fw: '',
   i_disagg: '',
   i_spec: '',
+  i_power: '',
   i_overview_current: '',
   i_overview_baseline: '',
   e_rundate: '',

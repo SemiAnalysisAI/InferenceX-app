@@ -8,6 +8,7 @@ const availableQuickFilters: QuickFilters = {
   frameworks: ['vllm', 'sglang'],
   deployment: ['single-node', 'multi-node', 'disagg'],
   spec: ['mtp', 'stp'],
+  power: ['certified', 'legacy'],
 };
 
 describe('QuickFiltersDialog', () => {
@@ -47,6 +48,7 @@ describe('QuickFiltersDialog', () => {
           frameworks: ['sglang'],
           deployment: ['disagg'],
           spec: ['mtp'],
+          power: ['certified'],
         },
         availableQuickFilters,
       },
@@ -57,5 +59,6 @@ describe('QuickFiltersDialog', () => {
     cy.get('@setQuickFilterFrameworks').should('have.been.calledWith', []);
     cy.get('@setQuickFilterDeployment').should('have.been.calledWith', []);
     cy.get('@setQuickFilterSpec').should('have.been.calledWith', []);
+    cy.get('@setQuickFilterPower').should('have.been.calledWith', []);
   });
 });

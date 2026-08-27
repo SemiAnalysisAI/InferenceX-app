@@ -3,6 +3,7 @@ import type { WorkerPower } from '@semianalysisai/inferencex-db/queries/benchmar
 
 import type { HardwareEntry } from '@/lib/constants';
 import type { Model, Sequence } from '@/lib/data-mappings';
+import type { PowerTier } from '@/lib/power-tier';
 import type { MetricKey } from './metric-registry';
 
 export type { WorkerPower };
@@ -115,6 +116,14 @@ export interface AggDataEntry {
   // Optional because historical runs predate the fields.
   power_valid?: number;
   power_metric_schema_version?: number;
+  /**
+   * Certification tier for the measured power telemetry, derived by
+   * `resolvePowerTier` in the transform: `certified` for producer-validated
+   * rows (with whole-deployment energy semantics where applicable), `legacy`
+   * for telemetry that predates the validation contract, absent when no
+   * measured telemetry survives gating.
+   */
+  power_tier?: PowerTier;
   avg_power_w?: number;
   joules_per_successful_query?: number;
   joules_per_output_token?: number;
@@ -555,6 +564,8 @@ export interface QuickFilters {
   frameworks: string[];
   deployment: DeploymentMode[];
   spec: SpecMode[];
+  /** Measured-power certification tiers (see `@/lib/power-tier`). */
+  power: PowerTier[];
 }
 
 /**
@@ -660,6 +671,7 @@ export interface InferenceActionsContextType {
   setQuickFilterFrameworks: (frameworks: string[]) => void;
   setQuickFilterDeployment: (modes: DeploymentMode[]) => void;
   setQuickFilterSpec: (modes: SpecMode[]) => void;
+  setQuickFilterPower: (tiers: PowerTier[]) => void;
   setIsLegendExpanded: (expanded: boolean) => void;
   setHideNonOptimal: (hide: boolean) => void;
   setShowPointLabels: (show: boolean) => void;
