@@ -53,6 +53,10 @@
       "duration": 4000
     },
     {
+      "spec": "cypress/e2e/certified-power-filter.cy.ts",
+      "duration": 1000
+    },
+    {
       "spec": "cypress/e2e/chart-overflow-continuation.cy.ts",
       "duration": 1955
     },

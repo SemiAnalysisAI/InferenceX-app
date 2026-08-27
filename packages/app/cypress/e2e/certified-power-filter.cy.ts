@@ -1,0 +1,174 @@
+// Certified-vs-legacy measured power (PLAN-02 / gap G2): on the Measured
+// Energy y-axes, points without a producer validation verdict carry a dotted
+// ring and a footer legend key, and Quick Filters gains a "Measured Power"
+// category (Certified/Legacy pills, `i_power` share-link param). Fixture rows
+// are intercepted so one config is certified (power_valid=1) and one is
+// legacy (no verdict), keeping every assertion deterministic regardless of
+// what the production dataset contains.
+
+const POWER_MODEL = 'dsv4';
+const POWER_DATE = '2026-08-20';
+
+const powerPercentileLadder = (prefix: string, base: number): Record<string, number> => ({
+  [`median_${prefix}`]: base,
+  [`p75_${prefix}`]: base * 1.2,
+  [`p90_${prefix}`]: base * 1.5,
+  [`p95_${prefix}`]: base * 1.7,
+  [`p99_${prefix}`]: base * 2.2,
+  [`std_${prefix}`]: base * 0.3,
+});
+
+const powerMetrics = (conc: number): Record<string, number> => {
+  const scale = conc / 16;
+  const itl = 0.011 * scale;
+  return {
+    ...powerPercentileLadder('ttft', 0.4 * scale),
+    ...powerPercentileLadder('tpot', 0.012 * scale),
+    ...powerPercentileLadder('itl', itl),
+    ...powerPercentileLadder('e2el', 8 * scale),
+    median_intvty: 1 / itl,
+    p75_intvty: 1 / (itl * 1.2),
+    p90_intvty: 1 / (itl * 1.5),
+    p99_intvty: 1 / (itl * 2.2),
+    std_intvty: (1 / itl) * 0.1,
+    tput_per_gpu: 950 / Math.sqrt(scale),
+    output_tput_per_gpu: 210,
+    input_tput_per_gpu: 740,
+  };
+};
+
+const powerConfigs = [
+  // Legacy telemetry: measured watts without a producer verdict.
+  { hardware: 'b200', framework: 'vllm', power: { avg_power_w: 560 } },
+  // Certified telemetry: explicit power_valid=1 verdict.
+  { hardware: 'mi300x', framework: 'sglang', power: { power_valid: 1, avg_power_w: 685.5 } },
+];
+
+const powerAvailability = powerConfigs.map((config) => ({
+  model: POWER_MODEL,
+  isl: 8192,
+  osl: 1024,
+  precision: 'fp4',
+  hardware: config.hardware,
+  framework: config.framework,
+  spec_method: 'none',
+  disagg: false,
+  benchmark_type: 'single_turn',
+  date: POWER_DATE,
+}));
+
+let powerBenchmarkId = 990000;
+const powerBenchmarks = powerConfigs.flatMap((config) =>
+  [16, 64, 128].map((conc) => ({
+    id: powerBenchmarkId++,
+    hardware: config.hardware,
+    framework: config.framework,
+    model: POWER_MODEL,
+    precision: 'fp4',
+    spec_method: 'none',
+    disagg: false,
+    is_multinode: false,
+    prefill_tp: 8,
+    decode_tp: 8,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    isl: 8192,
+    osl: 1024,
+    conc,
+    offload_mode: 'off',
+    benchmark_type: 'single_turn',
+    image: `${config.framework}/server:test`,
+    metrics: { ...powerMetrics(conc), ...config.power },
+    workers: null,
+    date: POWER_DATE,
+    run_url: null,
+  })),
+);
+
+function visitCertifiedPowerChart(extraParams = '') {
+  cy.intercept('GET', '/api/v1/availability', { body: powerAvailability }).as('availability');
+  cy.intercept('GET', '/api/v1/benchmarks*', { body: powerBenchmarks }).as('benchmarks');
+  cy.visit(`/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
+    onBeforeLoad(win) {
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    },
+  });
+  cy.wait(['@availability', '@benchmarks']);
+  cy.get('[data-testid="inference-chart-display"]', { timeout: 30_000 }).should('exist');
+  cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
+}
+
+describe('Certified vs legacy measured power', () => {
+  it('rings legacy points on a measured axis and filters them via Quick Filters', () => {
+    visitCertifiedPowerChart();
+
+    // No decorations off the Measured Energy axes.
+    cy.get('.legacy-power-ring').should('not.exist');
+    cy.get('[data-testid="legacy-power-key"]').should('not.exist');
+
+    // Pick "Measured Average Power per Chip" from the y-axis dropdown. The
+    // select list is a scroll container and Measured Energy sits below the
+    // fold, so scroll before clicking.
+    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.contains('[role="option"]', 'Measured Average Power per Chip')
+      .scrollIntoView()
+      .should('be.visible')
+      .click();
+    cy.get('[data-slot="select-content"]').should('not.exist');
+
+    // The no-verdict config is ringed; the certified one is not. The footer
+    // legend key appears with the ringed points.
+    cy.get('.dot-group[data-hw-key^="b200"] .legacy-power-ring').should('exist');
+    cy.get('.dot-group[data-hw-key^="mi300x"] .legacy-power-ring').should('not.exist');
+    cy.get('[data-testid="legacy-power-key"]').should('be.visible');
+    cy.screenshot('legacy-power-rings', { capture: 'viewport' });
+
+    // Quick Filters gains the Measured Power category with both pills enabled.
+    cy.get('[data-testid="scatter-quick-filters"]').click();
+    cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
+    cy.get('[data-testid="quick-filter-power-certified"]').should('be.enabled');
+    cy.get('[data-testid="quick-filter-power-legacy"]').should('be.enabled');
+
+    // Certified-only: legacy points (and with them every ring and the legend
+    // key) leave the chart while the certified series stays.
+    cy.get('[data-testid="quick-filter-power-certified"]').click();
+    cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
+    cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
+    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
+    cy.get('.legacy-power-ring').should('not.exist');
+    cy.get('[data-testid="legacy-power-key"]').should('not.exist');
+    cy.get('[data-testid="inference-chart-display"] svg').should('exist');
+    cy.screenshot('certified-only-filter', { capture: 'viewport' });
+
+    // Clear filters restores the legacy series, rings, and legend key.
+    cy.contains('button', 'Clear filters').click();
+    cy.get('[data-testid="quick-filters-selected-count"]').should('not.exist');
+    cy.get('[data-testid="quick-filter-power-certified"]').should(
+      'have.attr',
+      'aria-pressed',
+      'false',
+    );
+    cy.contains('button', 'Done').click();
+    cy.get('.dot-group[data-hw-key^="b200"] .legacy-power-ring').should('exist');
+    cy.get('[data-testid="legacy-power-key"]').should('be.visible');
+  });
+
+  it('restores a shared i_power=certified link with the pill pre-selected', () => {
+    // Note: filter writes live in the in-memory share-link store (the address
+    // bar is deliberately stripped after load — see url-state.ts), so the
+    // durable observable behavior is the restore direction tested here.
+    visitCertifiedPowerChart('&i_metric=y_measuredAvgPower&i_power=certified');
+
+    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
+    cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
+    cy.get('[data-testid="legacy-power-key"]').should('not.exist');
+
+    cy.get('[data-testid="scatter-quick-filters"]').click();
+    cy.get('[data-testid="quick-filter-power-certified"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+    cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
+  });
+});
