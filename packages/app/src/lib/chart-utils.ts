@@ -550,6 +550,8 @@ type MeasuredPowerChartFields = Partial<
     | 'measuredJPerOutputToken'
     | 'measuredJPerTotalToken'
     | 'measuredJPerInputToken'
+    | 'measuredPrefillJPerInputToken'
+    | 'measuredDecodeJPerOutputToken'
     | 'measuredJPerSuccessfulQuery'
     | 'measuredWhPerSuccessfulQuery'
     | 'measuredPowerPercentTdp'
@@ -579,6 +581,14 @@ function buildMeasuredPowerChartFields(
       : {}),
     ...(typeof entry.joules_per_input_token === 'number'
       ? { measuredJPerInputToken: chartMetric(entry.joules_per_input_token) }
+      : {}),
+    // Role-local energy is not additionally gated on power_valid here —
+    // rowToAggDataEntry already scrubbed it, same as the role-watts fields.
+    ...(typeof entry.prefill_joules_per_input_token === 'number'
+      ? { measuredPrefillJPerInputToken: chartMetric(entry.prefill_joules_per_input_token) }
+      : {}),
+    ...(typeof entry.decode_joules_per_output_token === 'number'
+      ? { measuredDecodeJPerOutputToken: chartMetric(entry.decode_joules_per_output_token) }
       : {}),
     ...(typeof entry.joules_per_successful_query === 'number'
       ? {
