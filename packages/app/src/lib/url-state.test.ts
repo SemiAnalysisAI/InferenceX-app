@@ -64,6 +64,11 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.e_bench).toBe('');
   });
 
+  it('has an empty default for the measured-power quick filter (filter off)', async () => {
+    const { PARAM_DEFAULTS } = await import('@/lib/url-state');
+    expect(PARAM_DEFAULTS.i_power).toBe('');
+  });
+
   it('has empty string default for i_gradlabel', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_gradlabel).toBe('');
