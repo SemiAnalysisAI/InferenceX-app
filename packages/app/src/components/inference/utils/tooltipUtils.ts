@@ -6,6 +6,7 @@ import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
+import { isMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
 import {
   meaningfulParallelismSize,
   parallelismLabel,
@@ -142,6 +143,9 @@ const TOOLTIP_STRINGS = {
     precision: 'Precision',
     inputTputPerChip: 'Input Token Throughput per Chip',
     outputTputPerChip: 'Output Token Throughput per Chip',
+    powerData: 'Power Data',
+    powerCertified: 'Certified (validated measurement)',
+    powerLegacy: 'Legacy (no validation verdict)',
   },
   zh: {
     dismiss: '点击其他区域关闭',
@@ -156,8 +160,22 @@ const TOOLTIP_STRINGS = {
     precision: '精度',
     inputTputPerChip: '每芯片输入 token 吞吐量',
     outputTputPerChip: '每芯片输出 token 吞吐量',
+    powerData: '功耗数据',
+    powerCertified: '已认证（通过验证的测量）',
+    powerLegacy: '旧版（无验证结论）',
   },
 } as const;
+
+/**
+ * Measured-power certification tier line. Rendered only while a Measured
+ * Energy y-axis is selected and the point carries a tier — non-measured axes
+ * and telemetry-free points stay unchanged.
+ */
+const powerTierHTML = (d: InferenceData, selectedYAxisMetric: string, locale: Locale): string => {
+  if (!isMeasuredEnergyConfigKey(selectedYAxisMetric) || !d.power_tier) return '';
+  const t = TOOLTIP_STRINGS[locale];
+  return tooltipLine(t.powerData, d.power_tier === 'certified' ? t.powerCertified : t.powerLegacy);
+};
 
 const CACHE_STRINGS = {
   en: {
@@ -483,6 +501,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           ${tooltipLine(t.outputTputPerChip, `${fmt(d['outputTputPerGpu'].y)}`)}`
           : ''
       }
+      ${powerTierHTML(d, selectedYAxisMetric, locale)}
       ${tooltipLine(t.totalChips, d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
@@ -503,7 +522,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
  * @returns HTML string for the tooltip content
  */
 export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): string => {
-  const { data: d, isPinned, xLabel, yLabel, overlayData } = config;
+  const { data: d, isPinned, xLabel, yLabel, selectedYAxisMetric, overlayData } = config;
   const locale = config.locale ?? 'en';
   const t = TOOLTIP_STRINGS[locale];
   const hwConfig = overlayData.hardwareConfig[d.hwKey];
@@ -523,6 +542,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${tooltipLine(t.date, formatTooltipDate(d.actualDate ?? d.date, locale))}
       ${tooltipLine(xLabel, fmt(d.x))}
       ${tooltipLine(yLabel, fmt(d.y))}
+      ${powerTierHTML(d, selectedYAxisMetric, locale)}
       ${tooltipLine(t.totalChips, d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
@@ -580,6 +600,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           ${tooltipLine(t.outputTputPerChip, `${fmt(d['outputTputPerGpu'].y)}`)}`
           : ''
       }
+      ${powerTierHTML(d, selectedYAxisMetric, locale)}
       ${tooltipLine(t.totalChips, d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
