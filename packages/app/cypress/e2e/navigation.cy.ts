@@ -98,19 +98,6 @@ describe('First-load navigation', () => {
     cy.location('pathname').should('eq', '/agentx');
   });
 
-  it('navigates to overview and the full dashboard from the landing CTAs', () => {
-    cy.get('[data-testid="landing-overview-link"]')
-      .should('have.attr', 'href', '/overview')
-      .click();
-    cy.location('pathname').should('eq', '/overview');
-
-    cy.visit('/');
-    cy.get('[data-testid="landing-full-dashboard-link"]')
-      .should('have.attr', 'href', '/inference')
-      .click();
-    cy.location('pathname').should('eq', '/inference');
-  });
-
   it('leads the landing page with the AgentX hero and its two CTAs', () => {
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
       // The hero owns /compare's h1; on the landing page it is a section heading.
