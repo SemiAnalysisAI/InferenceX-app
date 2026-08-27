@@ -1154,6 +1154,36 @@ describe('createChartDataPoint per-stage measured power fields', () => {
     expect(point.measuredJPerInputToken!.y).toBe(0.18);
     expect(point.measuredJPerOutputToken!.y).toBe(1.64);
   });
+
+  it('emits role-local energy fields when the role joules scalars are present', () => {
+    const e = entry({ prefill_joules_per_input_token: 0.4, decode_joules_per_output_token: 5.1 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredPrefillJPerInputToken).toBeDefined();
+    expect(point.measuredPrefillJPerInputToken!.y).toBe(0.4);
+    expect(point.measuredPrefillJPerInputToken!.roof).toBe(false);
+    expect(point.measuredDecodeJPerOutputToken).toBeDefined();
+    expect(point.measuredDecodeJPerOutputToken!.y).toBe(5.1);
+    expect(point.measuredDecodeJPerOutputToken!.roof).toBe(false);
+  });
+
+  it('omits role-local energy fields on rows without the role joules scalars', () => {
+    // Single-node aggregated (and legacy) rows never carry role energy — the
+    // fields must be absent (not 0) so the coverage filter drops them from the
+    // role-energy axes rather than plotting fake data.
+    const e = entry({ avg_power_w: 685.5, joules_per_output_token: 8.4 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredPrefillJPerInputToken).toBeUndefined();
+    expect(point.measuredDecodeJPerOutputToken).toBeUndefined();
+  });
+
+  it('preserves a zero role-local energy value (not falsy-coerced away)', () => {
+    const e = entry({ prefill_joules_per_input_token: 0, decode_joules_per_output_token: 0 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredPrefillJPerInputToken).toBeDefined();
+    expect(point.measuredPrefillJPerInputToken!.y).toBe(0);
+    expect(point.measuredDecodeJPerOutputToken).toBeDefined();
+    expect(point.measuredDecodeJPerOutputToken!.y).toBe(0);
+  });
 });
 
 // ===========================================================================
