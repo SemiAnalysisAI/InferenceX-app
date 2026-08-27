@@ -47,6 +47,7 @@ import {
 } from '@/lib/data-mappings';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { useLocale } from '@/lib/use-locale';
+import { getLineLabelVendorIcon } from '@/lib/vendor-logos';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
@@ -2261,6 +2262,7 @@ const ScatterGraph = React.memo(
 
           renderLineLabels(zoomGroup, lineLabels, {
             seriesAttribute: 'data-hw-key',
+            iconFor: (label) => getLineLabelVendorIcon(label.seriesId),
             configureGroup: (labelGroup, label) => {
               labelGroup
                 .attr('data-visible', label.visible ? '1' : '0')
