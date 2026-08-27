@@ -227,6 +227,8 @@ const generateWorkerPowerHTML = (d: InferenceData, isPinned: boolean, locale: Lo
       );
     }
     if (typeof w.avg_util_pct === 'number') parts.push(`${fmt(w.avg_util_pct)}%`);
+    // avg_mem_used_mb follows the nvidia-smi/telemetry convention (MiB despite
+    // the _mb suffix), hence /1024 → GiB. Revisit if PLAN-09's producer differs.
     if (typeof w.avg_mem_used_mb === 'number') parts.push(`${fmt(w.avg_mem_used_mb / 1024)} GiB`);
     if (Array.isArray(w.hosts) && w.hosts.length > 0) parts.push(escapeHtml(w.hosts.join(',')));
     return `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px; overflow-wrap: anywhere;">${parts.join(' · ')}</div>`;

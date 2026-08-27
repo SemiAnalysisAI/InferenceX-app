@@ -129,11 +129,20 @@ describe('AgentX measured power (role energy axes + worker drilldown)', () => {
     cy.get('[data-slot="select-content"]').should('not.exist');
 
     // Only the disagg series carries prefill_joules_per_input_token; the
-    // aggregate series drops off the chart while the legend universe stays
-    // intact (selectionPoints reconciliation).
+    // aggregate series is coverage-filtered off the chart AND out of the
+    // rendered legend (hwTypesWithData is metric-aware — InferenceContext).
     cy.get(DISAGG_DOTS).should('have.length', 3);
     cy.get(AGGREGATE_DOTS).should('not.exist');
     cy.get('[data-testid="chart-legend"]').should('contain.text', 'B200');
+    cy.get('[data-testid="chart-legend"]').should('not.contain.text', 'B300');
+
+    // The switch is non-destructive: the selection universe never intersects
+    // metric coverage (selectableHwTypes), so picking a whole-run measured
+    // axis both series carry brings the aggregate series straight back.
+    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.contains('[role="option"]', 'Measured Joules per Output Token').scrollIntoView().click();
+    cy.get('[data-slot="select-content"]').should('not.exist');
+    cy.get(AGGREGATE_DOTS).should('have.length', 3);
     cy.get('[data-testid="chart-legend"]').should('contain.text', 'B300');
   });
 
