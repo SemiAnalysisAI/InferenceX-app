@@ -107,6 +107,10 @@ export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
  */
 export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarN';
 
+/** Shared defaults for the fleet lifecycle and calculator MW controls. */
+export const DEFAULT_FLEET_MW = '10';
+export const DEFAULT_LIFECYCLE_RAMP_MONTHS = '0.5';
+
 export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_model: 'DeepSeek-V4-Pro',
   g_rundate: '',
@@ -162,7 +166,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   r_hc: '',
   r_legend: '',
   r_active: '',
-  c_mw: '',
+  c_mw: DEFAULT_FLEET_MW,
   c_costcap: '',
   // Empty means "use the component's default", which for these two is derived
   // rather than constant: the price from the cheapest visible chip's break-even,
@@ -173,7 +177,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   c_life: '',
   // Empty means the default y metric (margin).
   c_ly: '',
-  c_ramp: '3',
+  c_ramp: DEFAULT_LIFECYCLE_RAMP_MONTHS,
   c_cache: '10',
   c_mtbi: '24',
   c_rec: '12',

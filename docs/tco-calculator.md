@@ -375,8 +375,9 @@ Four conventions the numbers depend on:
   energised, not from the moment they are loaded. So the opening rollout is paid for
   in full while it earns its way up from zero, which is what puts the first months
   below the rule and gives payback its meaning.
-- **The ramp is an assumption; the steps are not.** It defaults to a nominal
-  quarter (`c_ramp`), and 0 means every config takes effect instantly.
+- **The ramp is an assumption; the steps are not.** It defaults to half a month
+  (`c_ramp`) and moves in quarter-month increments; 0 means every config takes
+  effect instantly.
 - **Markers sit at the release instant** — the foot of each rollout, not its top —
   so every dot on the chart is a sweep the user can open.
 - **Interrupts are an availability haircut, not drawn events.** A 24-day MTBI
@@ -980,6 +981,6 @@ against that allowlist so a stale or hand-edited link falls back to `margin` rat
 than seeding an unknown metric).
 The first two default to
 `''` in `PARAM_DEFAULTS` because their real defaults are derived, not constant — see
-the comment there. The MW budget is
-`c_mw`, owned by `ThroughputCalculatorDisplay` and passed to both the fleet
-planner and this section so one input drives both.
+the comment there. The MW budget is `c_mw`, defaults to 10 MW, and is shared by
+the calculator and Fleet Lifecycle page so a budget set on either seeds the
+other.
