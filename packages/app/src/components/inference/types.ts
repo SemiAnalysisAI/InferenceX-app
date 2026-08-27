@@ -329,6 +329,9 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   measuredJPerOutputToken?: { y: number; roof: boolean };
   measuredJPerTotalToken?: { y: number; roof: boolean };
   measuredJPerInputToken?: { y: number; roof: boolean };
+  // Role-local energy (prefill/decode workers only) — disagg-only in practice.
+  measuredPrefillJPerInputToken?: { y: number; roof: boolean };
+  measuredDecodeJPerOutputToken?: { y: number; roof: boolean };
   measuredJPerSuccessfulQuery?: { y: number; roof: boolean };
   measuredWhPerSuccessfulQuery?: { y: number; roof: boolean };
   measuredPowerPercentTdp?: { y: number; roof: boolean };

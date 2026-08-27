@@ -178,6 +178,67 @@ const powerTierHTML = (d: InferenceData, selectedYAxisMetric: string, locale: Lo
   return tooltipLine(t.powerData, d.power_tier === 'certified' ? t.powerCertified : t.powerLegacy);
 };
 
+/** Escape strings that arrive from artifact JSONB (worker role / hosts)
+ *  before interpolating them into tooltip HTML. */
+const escapeHtml = (s: string): string =>
+  s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+
+const WORKER_POWER_STRINGS = {
+  en: {
+    heading: 'Measured Worker Power',
+    chips: 'chips',
+    more: (n: number) => `+${n} more workers`,
+  },
+  zh: {
+    heading: '各 Worker 实测功耗',
+    chips: '芯片',
+    more: (n: number) => `另有 ${n} 个 worker`,
+  },
+} as const;
+
+/** Pinned tooltips list at most this many workers before the "+N more" line. */
+const WORKER_ROWS_LIMIT = 8;
+
+/**
+ * Per-worker measured power drilldown. Rendered only while the tooltip is
+ * pinned (same rule as the point-detail actions) so hover tooltips stay lean;
+ * nothing renders when `workers` is absent or empty — production AgentX rows
+ * currently ship without it.
+ */
+const generateWorkerPowerHTML = (d: InferenceData, isPinned: boolean, locale: Locale): string => {
+  if (!isPinned || !Array.isArray(d.workers) || d.workers.length === 0) return '';
+  const t = WORKER_POWER_STRINGS[locale];
+  const rows = d.workers.slice(0, WORKER_ROWS_LIMIT).map((w) => {
+    const parts = [
+      `<strong>${escapeHtml(w.role)}[${w.worker_idx}]</strong>`,
+      `${w.num_gpus} ${t.chips}`,
+      `${fmt(w.avg_power_w)} W`,
+    ];
+    if (typeof w.avg_temp_c === 'number') {
+      parts.push(
+        typeof w.peak_temp_c === 'number'
+          ? `${fmt(w.avg_temp_c)}/${fmt(w.peak_temp_c)}°C`
+          : `${fmt(w.avg_temp_c)}°C`,
+      );
+    }
+    if (typeof w.avg_util_pct === 'number') parts.push(`${fmt(w.avg_util_pct)}%`);
+    if (typeof w.avg_mem_used_mb === 'number') parts.push(`${fmt(w.avg_mem_used_mb / 1024)} GiB`);
+    if (Array.isArray(w.hosts) && w.hosts.length > 0) parts.push(escapeHtml(w.hosts.join(',')));
+    return `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px; overflow-wrap: anywhere;">${parts.join(' · ')}</div>`;
+  });
+  const overflow = d.workers.length - WORKER_ROWS_LIMIT;
+  return `<div data-testid="tooltip-worker-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px;">
+      <div style="color: var(--foreground); font-size: 11px; font-weight: 600; margin-bottom: 4px;">${t.heading}</div>
+      ${rows.join('')}
+      ${overflow > 0 ? `<div style="color: var(--muted-foreground); font-size: 11px;">${t.more(overflow)}</div>` : ''}
+    </div>`;
+};
+
 const CACHE_STRINGS = {
   en: {
     offloadType: 'Offload Type',
@@ -513,6 +574,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
       ${generateCacheMetadataHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
+      ${generateWorkerPowerHTML(d, isPinned, locale)}
       ${runLinkHTML(runUrl, locale)}
       ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(config.hasLog), d.id, d.benchmark_type, locale)}
     </div>
@@ -554,6 +616,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
       ${generateCacheMetadataHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
+      ${generateWorkerPowerHTML(d, isPinned, locale)}
     </div>
   `;
 };
@@ -612,6 +675,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
       ${generateCacheMetadataHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
+      ${generateWorkerPowerHTML(d, isPinned, locale)}
       ${runLinkHTML(runUrl, locale)}
       ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(hasLog), d.id, d.benchmark_type, locale)}
     </div>
