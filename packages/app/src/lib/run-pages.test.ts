@@ -35,7 +35,7 @@ describe('run pages registry', () => {
   it('has one candidate per (model, chip) pair', () => {
     const entries = getAllRunPageEntries();
     expect(entries.length).toBe(INFERENCE_MODEL_SLUGS.length * getAllChipPages().length);
-    expect(entries.length).toBe(99);
+    expect(entries.length).toBe(108);
   });
 
   it('has unique, well-formed slugs', () => {

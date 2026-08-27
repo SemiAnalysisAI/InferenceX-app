@@ -6,6 +6,7 @@ export enum Model {
   DeepSeek_R1 = 'DeepSeek-R1-0528',
   GptOss = 'gpt-oss-120b',
   Qwen3_5 = 'Qwen-3.5-397B-A17B',
+  Qwen3_8_Flash_Next = 'Qwen3.8-Flash-Next',
   Kimi_K2_5 = 'Kimi-K2.5',
   Kimi_K3 = 'Kimi-K3',
   MiniMax_M2_5 = 'MiniMax-M2.5',
@@ -167,6 +168,18 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
   // the selector presents both releases over the existing GLM-5.2 data bucket.
   [Model.GLM_5_2]: { label: 'GLM5.2/GLM5.3 744B', prefix: 'glm5.2', category: 'default' },
   [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
+  // 176B total: a 125B main model plus a 51B n-gram embedding table, 6B active
+  // per forward pass, and a separate 4B MTP head the parameter count excludes.
+  // Experimental rather than default while the only data is the day-zero H200
+  // FP8 agentic arm: `default` would seat it in the /overview matrix, which is
+  // built from DEFAULT_MODELS and would render an empty fixed-sequence row for
+  // it. It stays fully selectable everywhere else, since MODEL_OPTIONS excludes
+  // only `hidden`. Promote to `default` once the sweep covers more chips.
+  [Model.Qwen3_8_Flash_Next]: {
+    label: 'Qwen3.8 Flash Next 176B',
+    prefix: 'qwen3.8next',
+    category: 'experimental',
+  },
   [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'deprecated' },
   [Model.MiniMax_M2_5]: {
     // M2.5 and M2.7 share an architecture — same GLM5/5.1 pattern as Kimi.

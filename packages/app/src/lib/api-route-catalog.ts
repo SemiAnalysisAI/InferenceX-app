@@ -687,7 +687,7 @@ export const apiContractSourceDigests = [
     // Reviewed again for the release-date corrections: values inside
     // MODEL_RELEASE_DATES only. No published model name, alias, or parameter enum
     // is touched, and no endpoint exposes a release date, so the docs stand.
-    sourceSha256: 'f8f46a341bf57384c0080c2ed75d867801142675ded08225281cf7c102236628',
+    sourceSha256: '9faf1ed1ed1712ee04741b6aa2291d42b2c202c2dadbb1a2681b5391da555e6c',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
