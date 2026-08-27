@@ -1,0 +1,58 @@
+/* ============================================================
+ * InferenceX motion system — restrained, evidence-focused.
+ *
+ * Principles:
+ * - Animate transform and opacity only (compositor-friendly, CLS-safe).
+ * - Entrances decelerate into place; micro-feedback stays under 200ms.
+ * - The hidden pre-reveal state exists only while JavaScript is running
+ *   AND the visitor has not requested reduced motion, so crawlers,
+ *   no-JS visitors, and reduced-motion users always get static content.
+ *
+ * Usage: wrap a block in <Reveal> (src/components/motion/reveal.tsx),
+ * which flips `data-inview` once the block enters the viewport.
+ * Stagger siblings with the `delayMs` prop (sets --motion-reveal-delay).
+ * ============================================================ */
+
+:root {
+  /* Decelerating "settle" curve shared by every entrance. */
+  --motion-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Section/card reveals. Hover and press feedback stays at 150–200ms
+     and is declared per component (Tailwind motion-safe utilities or
+     .motion-press below), not here. */
+  --motion-reveal-duration: 550ms;
+  --motion-reveal-distance: 12px;
+}
+
+/* Reveal-on-view primitive. `scripting: enabled` keeps the hidden state
+   away from no-JS visitors and crawlers; older browsers that don't know
+   the feature simply never hide content (query evaluates to false). */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  [data-reveal] {
+    opacity: 0;
+    transform: translateY(var(--motion-reveal-distance));
+    transition:
+      opacity var(--motion-reveal-duration) var(--motion-ease-enter),
+      transform var(--motion-reveal-duration) var(--motion-ease-enter);
+    transition-delay: var(--motion-reveal-delay, 0ms);
+  }
+
+  [data-reveal][data-inview='true'] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Press feedback for buttons and button-shaped links. Extends the usual
+   `transition-colors` set with transform so hover tints keep animating.
+   Declared outside Tailwind's layers so it wins over the utility. */
+@media (prefers-reduced-motion: no-preference) {
+  .motion-press {
+    transition-property: color, background-color, border-color, opacity, transform;
+    transition-duration: 150ms;
+    transition-timing-function: var(--motion-ease-enter);
+  }
+
+  .motion-press:active {
+    transform: scale(0.98);
+  }
+}
