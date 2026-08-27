@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { MEASURED_POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
 import {
+  extractPowerAudit,
+  extractPowerInvalidReasons,
   extractWorkers,
   mapBenchmarkRow,
   normalizePowerContractMetrics,
@@ -435,6 +437,13 @@ describe('mapBenchmarkRow', () => {
       }
       expect(result!.metrics).not.toHaveProperty('power_invalid_reasons');
       expect(result!.metrics).not.toHaveProperty('power_audit');
+      expect(result!.powerInvalidReasons).toEqual(['window_too_short']);
+      expect(result!.powerAudit).toEqual({
+        window_start_unix: 1,
+        window_end_unix: 2,
+        producer_sha: null,
+        exporter_image_sha256: null,
+      });
     });
   });
 
@@ -971,6 +980,241 @@ describe('extractWorkers', () => {
 
   it('returns undefined when every entry is malformed', () => {
     expect(extractWorkers([null, 'bad', 0, undefined])).toBeUndefined();
+  });
+});
+
+describe('extractPowerInvalidReasons', () => {
+  it('keeps valid snake_case codes in first-seen order', () => {
+    expect(
+      extractPowerInvalidReasons(['sampling_gap_exceeded', 'expected_gpu_count_mismatch']),
+    ).toEqual(['sampling_gap_exceeded', 'expected_gpu_count_mismatch']);
+  });
+
+  it('deduplicates preserving first-seen order', () => {
+    expect(
+      extractPowerInvalidReasons([
+        'telemetry_file_missing',
+        'no_usable_power_samples',
+        'telemetry_file_missing',
+      ]),
+    ).toEqual(['telemetry_file_missing', 'no_usable_power_samples']);
+  });
+
+  it.each([
+    ['non-string entry', [42]],
+    ['empty string', ['']],
+    ['hyphenated code', ['Bad-Reason']],
+    ['uppercase code', ['UPPER']],
+    ['leading digit', ['9lives']],
+    ['65-char code', ['a'.repeat(65)]],
+  ])('silently drops %s', (_name, raw) => {
+    expect(extractPowerInvalidReasons(raw)).toBeUndefined();
+  });
+
+  it('drops malformed entries while keeping valid siblings', () => {
+    expect(extractPowerInvalidReasons([42, 'sampling_gap_exceeded', '<img src=x>', null])).toEqual([
+      'sampling_gap_exceeded',
+    ]);
+  });
+
+  it('keeps a 64-char code (boundary)', () => {
+    const code = 'a'.repeat(64);
+    expect(extractPowerInvalidReasons([code])).toEqual([code]);
+  });
+
+  it('caps the result at 32 codes', () => {
+    const raw = Array.from({ length: 40 }, (_v, i) => `reason_${i}`);
+    const result = extractPowerInvalidReasons(raw);
+    expect(result).toHaveLength(32);
+    expect(result![0]).toBe('reason_0');
+    expect(result![31]).toBe('reason_31');
+  });
+
+  it.each([
+    ['empty array', []],
+    ['non-array object', { reason: 'x' }],
+    ['string', 'sampling_gap_exceeded'],
+    ['null', null],
+    ['undefined', undefined],
+  ])('returns undefined (never []) for %s', (_name, raw) => {
+    expect(extractPowerInvalidReasons(raw)).toBeUndefined();
+  });
+});
+
+describe('extractPowerAudit', () => {
+  /** Full valid audit as aggregate_power.py emits it on a multinode run. */
+  const fullAudit = {
+    window_start_unix: 1756174800.25,
+    window_end_unix: 1756175400.75,
+    expected_gpu_count: 16,
+    observed_gpu_count: 16,
+    sample_count: 9600,
+    max_sample_gap_s: 1.013,
+    producer_sha: '887a6cb7c2ec174e5e2b977468a12ab34cd56ef7',
+    exporter_image_sha256:
+      'sha256:0b7f1a2c3d4e5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7',
+  };
+
+  it('round-trips a full valid object across all 8 fields', () => {
+    expect(extractPowerAudit(fullAudit)).toEqual(fullAudit);
+  });
+
+  it('omits Infinity / NaN / junk-string numerics (partial audit beats none)', () => {
+    expect(
+      extractPowerAudit({
+        ...fullAudit,
+        window_start_unix: Number.POSITIVE_INFINITY,
+        window_end_unix: Number.NaN,
+        max_sample_gap_s: 'garbage',
+      }),
+    ).toEqual({
+      expected_gpu_count: 16,
+      observed_gpu_count: 16,
+      sample_count: 9600,
+      producer_sha: fullAudit.producer_sha,
+      exporter_image_sha256: fullAudit.exporter_image_sha256,
+    });
+  });
+
+  it('rejects negative and non-safe-integer counts', () => {
+    expect(
+      extractPowerAudit({
+        ...fullAudit,
+        expected_gpu_count: -1,
+        observed_gpu_count: Number.MAX_SAFE_INTEGER + 1,
+        sample_count: Number.POSITIVE_INFINITY,
+      }),
+    ).toEqual({
+      window_start_unix: fullAudit.window_start_unix,
+      window_end_unix: fullAudit.window_end_unix,
+      max_sample_gap_s: fullAudit.max_sample_gap_s,
+      producer_sha: fullAudit.producer_sha,
+      exporter_image_sha256: fullAudit.exporter_image_sha256,
+    });
+  });
+
+  it('keeps shas trimmed and collapses null / number / oversized shas to null', () => {
+    expect(
+      extractPowerAudit({
+        sample_count: 1,
+        producer_sha: '  abc123  ',
+        exporter_image_sha256: null,
+      }),
+    ).toEqual({ sample_count: 1, producer_sha: 'abc123', exporter_image_sha256: null });
+    expect(
+      extractPowerAudit({
+        sample_count: 1,
+        producer_sha: 42,
+        exporter_image_sha256: 'x'.repeat(129),
+      }),
+    ).toEqual({ sample_count: 1, producer_sha: null, exporter_image_sha256: null });
+  });
+
+  it('nulls the explicit-null numeric fields a producer emits without a benchmark window', () => {
+    // aggregate_power.py sets window_* / max_sample_gap_s to null when the
+    // benchmark result was unreadable; those are omitted, not kept as null.
+    expect(
+      extractPowerAudit({
+        window_start_unix: null,
+        window_end_unix: null,
+        expected_gpu_count: 8,
+        observed_gpu_count: 0,
+        sample_count: 0,
+        max_sample_gap_s: null,
+        producer_sha: null,
+        exporter_image_sha256: null,
+      }),
+    ).toEqual({
+      expected_gpu_count: 8,
+      observed_gpu_count: 0,
+      sample_count: 0,
+      producer_sha: null,
+      exporter_image_sha256: null,
+    });
+  });
+
+  it('drops unknown keys (fixed 8-key shape bounds the stored object)', () => {
+    expect(extractPowerAudit({ sample_count: 3, integration_method: 'trapezoid' })).toEqual({
+      sample_count: 3,
+      producer_sha: null,
+      exporter_image_sha256: null,
+    });
+  });
+
+  it.each([
+    ['string', 'audit'],
+    ['array', [1, 2]],
+    ['null', null],
+    ['undefined', undefined],
+    ['number', 7],
+  ])('returns undefined for non-object input: %s', (_name, raw) => {
+    expect(extractPowerAudit(raw)).toBeUndefined();
+  });
+
+  it('returns undefined for an empty husk (no numerics, both shas null)', () => {
+    expect(extractPowerAudit({})).toBeUndefined();
+    expect(extractPowerAudit({ producer_sha: null, exporter_image_sha256: 42 })).toBeUndefined();
+    expect(extractPowerAudit({ window_start_unix: 'junk' })).toBeUndefined();
+  });
+});
+
+describe('mapBenchmarkRow — power audit provenance', () => {
+  const reasons = ['sampling_gap_exceeded', 'expected_gpu_count_mismatch'];
+  const audit = {
+    window_start_unix: 1756174800,
+    window_end_unix: 1756175400,
+    expected_gpu_count: 8,
+    observed_gpu_count: 8,
+    sample_count: 4800,
+    max_sample_gap_s: 1.013,
+    producer_sha: null,
+    exporter_image_sha256: null,
+  };
+
+  it.each([
+    ['v1', makeV1Row],
+    ['v2', makeV2Row],
+    ['agentic', makeAgenticRow],
+  ])('lands the contract fields on BenchmarkParams for %s rows', (_name, makeRow) => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(
+      makeRow({ power_valid: 0, power_invalid_reasons: reasons, power_audit: audit }),
+      tracker,
+    );
+    expect(result!.powerInvalidReasons).toEqual(reasons);
+    expect(result!.powerAudit).toEqual(audit);
+  });
+
+  it('stores provenance from valid rows too (tolerance in both directions)', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeV2Row({ power_valid: 1, power_audit: audit }), tracker);
+    expect(result!.metrics.power_valid).toBe(1);
+    expect(result!.powerAudit).toEqual(audit);
+    expect(result!.powerInvalidReasons).toBeUndefined();
+  });
+
+  it('leaves both fields undefined on legacy rows', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeV2Row(), tracker);
+    expect(result!.powerInvalidReasons).toBeUndefined();
+    expect(result!.powerAudit).toBeUndefined();
+  });
+
+  it("never captures a malformed ['5'] reasons array as a numeric metric", () => {
+    // Number(['5']) === 5 — without the NON_METRIC_KEYS guard the generic
+    // capture loop would mint a bogus power_invalid_reasons numeric metric.
+    const tracker = createSkipTracker();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const result = mapBenchmarkRow(makeV2Row({ power_invalid_reasons: ['5'] }), tracker);
+      expect(result!.metrics).not.toHaveProperty('power_invalid_reasons');
+      expect(result!.powerInvalidReasons).toBeUndefined();
+      expect(warn.mock.calls.map((call) => String(call[0]))).not.toContainEqual(
+        expect.stringContaining('power_invalid_reasons'),
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

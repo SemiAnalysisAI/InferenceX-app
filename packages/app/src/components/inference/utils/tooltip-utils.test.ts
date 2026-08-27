@@ -798,6 +798,74 @@ describe('generateGPUGraphTooltipContent', () => {
   });
 });
 
+describe('measured-power withheld tooltip line', () => {
+  const reasons = ['sampling_gap_exceeded', 'expected_gpu_count_mismatch'];
+
+  it('renders the withheld line with humanized codes (en)', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ power_valid: 0, power_invalid_reasons: reasons }) }),
+    );
+    expect(html).toContain('Measured power withheld');
+    expect(html).toContain('sampling gap exceeded');
+    expect(html).toContain('expected gpu count mismatch');
+  });
+
+  it('renders the withheld line in Chinese on /zh surfaces', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({ power_valid: 0, power_invalid_reasons: reasons }),
+        locale: 'zh',
+      }),
+    );
+    expect(html).toContain('实测功耗未采信');
+    expect(html).toContain('sampling gap exceeded');
+  });
+
+  it('filters malformed codes before HTML interpolation (defense in depth)', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          power_valid: 0,
+          power_invalid_reasons: ['<img src=x>', 'sampling_gap_exceeded', 'UPPER'],
+        }),
+      }),
+    );
+    expect(html).not.toContain('<img src=x>');
+    expect(html).not.toContain('UPPER');
+    expect(html).toContain('sampling gap exceeded');
+  });
+
+  it('omits the line entirely when every code is malformed', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ power_valid: 0, power_invalid_reasons: ['<img src=x>'] }) }),
+    );
+    expect(html).not.toContain('Measured power withheld');
+  });
+
+  it.each([
+    ['absent reasons', pt({ power_valid: 0 })],
+    ['empty reasons', pt({ power_valid: 0, power_invalid_reasons: [] })],
+    ['valid row', pt({ power_valid: 1 })],
+  ])('omits the line for %s', (_name, data) => {
+    const html = generateTooltipContent(tooltipConfig({ data }));
+    expect(html).not.toContain('Measured power withheld');
+  });
+
+  it('gives unofficial overlay tooltips the same line', () => {
+    const html = generateOverlayTooltipContent({
+      ...tooltipConfig({ data: pt({ power_valid: 0, power_invalid_reasons: reasons }) }),
+      overlayData: {
+        label: 'feature-branch',
+        hardwareConfig: mockHardwareConfig,
+        data: [],
+        runUrl: 'https://example.com',
+      } as any,
+    } as OverlayTooltipConfig);
+    expect(html).toContain('Measured power withheld');
+    expect(html).toContain('sampling gap exceeded');
+  });
+});
+
 describe('worker power drilldown', () => {
   const workers = [
     { role: 'frontend', worker_idx: 0, hosts: ['fe0'], num_gpus: 0, avg_power_w: 120 },
