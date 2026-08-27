@@ -6,6 +6,19 @@ import { agentxDashboardHref, FEATURED_AGENTX_MODELS } from '@/lib/compare-agent
 
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 
+/**
+ * Full-color brand marks for the ledger rows. Keyed by compare slug so a
+ * featured model without a registered mark simply renders without one instead
+ * of breaking the row.
+ */
+const MODEL_LOGOS: Record<string, string> = {
+  'kimi-k3': '/logos/models/kimi.svg',
+  'deepseek-v4': '/logos/models/deepseek.svg',
+  'glm-5-2': '/logos/models/zhipu.svg',
+  'minimax-m3': '/logos/models/minimax.svg',
+  'qwen-3-5': '/logos/models/qwen.svg',
+};
+
 const STRINGS = {
   en: {
     eyebrow: 'AgentX / live results',
@@ -109,12 +122,25 @@ export function AgentXCompareHero({
                   appNavigation
                   className="group flex min-h-14 items-center justify-between gap-4 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 >
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
-                      {model.label}
-                    </span>
-                    <span className="mt-1 block font-mono text-[10px] tracking-[0.14em] text-brand uppercase">
-                      AgentX
+                  <span className="flex min-w-0 items-center gap-3">
+                    {MODEL_LOGOS[model.slug] && (
+                      <img
+                        src={MODEL_LOGOS[model.slug]}
+                        alt=""
+                        aria-hidden="true"
+                        width={32}
+                        height={32}
+                        loading="lazy"
+                        className="size-8 shrink-0 object-contain"
+                      />
+                    )}
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
+                        {model.label}
+                      </span>
+                      <span className="mt-1 block font-mono text-[10px] tracking-[0.14em] text-brand uppercase">
+                        AgentX
+                      </span>
                     </span>
                   </span>
                   <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
