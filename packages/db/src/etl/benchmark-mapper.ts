@@ -6,7 +6,11 @@
 
 import type { ConfigParams } from './config-cache';
 import type { SkipTracker } from './skip-tracker';
-import { METRIC_KEYS, PRECISION_KEYS } from '@semianalysisai/inferencex-constants';
+import {
+  MEASURED_POWER_METRIC_KEYS,
+  METRIC_KEYS,
+  PRECISION_KEYS,
+} from '@semianalysisai/inferencex-constants';
 import { flattenAgenticAggRow } from './agentic-v3-flatten';
 import { preferFullResponseMetrics } from './full-response-interactivity';
 import {
@@ -343,12 +347,17 @@ export function mapBenchmarkRow(
       ? rawRecipeFingerprint.trim()
       : null;
 
+  // Scrub AFTER the last mutation of `metrics` (the agentic
+  // preferFullResponseMetrics reassignment and the extractRuntimeMetadata
+  // merge above) so no later step can resurrect a withheld key.
+  const powerWithheld = scrubWithheldPowerMetrics(metrics);
   // Per-worker measured-power breakdown. The runner emits this as an array
   // of objects sibling to the scalar metrics; we surface it on a dedicated
   // BenchmarkParams.workers field so downstream consumers can treat it as
   // structured data without polluting the flat metrics record. Defensive
-  // narrowing — anything other than a non-empty array of objects is dropped.
-  const workers = extractWorkers(row.workers);
+  // narrowing — anything other than a non-empty array of objects is dropped,
+  // and a withheld power verdict drops the payload entirely.
+  const workers = powerWithheld ? undefined : extractWorkers(row.workers);
 
   return {
     config: {
@@ -487,6 +496,26 @@ function normalizePowerContractMetrics(
   } else {
     delete metrics.power_metric_schema_version;
   }
+}
+
+/**
+ * Defense-in-depth for the power publication contract: when the
+ * normalized verdict is an explicit invalid (power_valid === 0), delete
+ * every measured power/energy/telemetry metric so withheld measurements
+ * can never be persisted or served, even if a producer regression ships
+ * them. Keeps power_valid and power_metric_schema_version (and any
+ * future companion fields such as power_invalid_reasons / power_audit).
+ * Legacy rows without a verdict are untouched. Returns true when the
+ * row's power is withheld so the caller also drops the workers payload.
+ * This is the single enforcement point — the query layer intentionally
+ * serves metrics unfiltered (see queries/benchmarks.ts rawMetrics), and
+ * the frontend independently withholds at display
+ * (benchmark-transform.ts rowToAggDataEntry).
+ */
+function scrubWithheldPowerMetrics(metrics: Record<string, number>): boolean {
+  if (metrics.power_valid !== 0) return false;
+  for (const key of MEASURED_POWER_METRIC_KEYS) delete metrics[key];
+  return true;
 }
 
 /**
