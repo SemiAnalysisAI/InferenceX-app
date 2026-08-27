@@ -119,8 +119,14 @@
   --color-card: var(--card);
 
   /* Fonts */
-  --font-sans: var(--font-dm-sans);
+  --font-sans: var(--font-instrument-sans, var(--font-dm-sans));
   --font-mono: monospace;
+
+  /* Brand surfaces */
+  --color-mint: var(--mint);
+  --color-mint-foreground: var(--mint-foreground);
+  --color-ink: var(--ink);
+  --color-ink-foreground: var(--ink-foreground);
 
   /* Breakpoints */
   --breakpoint-2xl: 80rem;
@@ -139,29 +145,36 @@
 
 :root {
   /* Setup variables */
-  --radius: 0.625rem;
+  --radius: 0.75rem;
 
-  /* Base Theme Colors */
-  --background: #eaebec;
-  --foreground: #131416;
-  --card: #eaebec;
-  --card-foreground: #131416;
-  --popover: #fafafa;
-  --popover-foreground: #171717;
-  --primary: #f7b041;
-  --primary-foreground: #fafafa;
+  /* Base Theme Colors — clean research-institute palette: white ground,
+     near-black ink, deep-teal accent, mint call-to-action surfaces. */
+  --background: #ffffff;
+  --foreground: #090c0c;
+  --card: #ffffff;
+  --card-foreground: #090c0c;
+  --popover: #ffffff;
+  --popover-foreground: #090c0c;
+  --primary: #077463;
+  --primary-foreground: #ffffff;
   --secondary: #0b86d1;
   --secondary-foreground: #fafafa;
-  --brand: var(--secondary);
-  --muted: #b4b9bc;
-  --muted-foreground: #27272a;
-  --accent: #fafafa;
-  --accent-foreground: #1d1f21;
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: #656b72;
-  --border-alt: #c2ccd7;
-  --input: #656b72;
-  --ring: #27272a;
+  --brand: var(--primary);
+  --muted: #eef0ef;
+  --muted-foreground: #4d5754;
+  --accent: #e6fef3;
+  --accent-foreground: #090c0c;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #dbe0de;
+  --border-alt: #edf0ef;
+  --input: #c8cfcc;
+  --ring: #077463;
+
+  /* Mint pill CTA + dark ink band surfaces */
+  --mint: #70efd1;
+  --mint-foreground: #04211c;
+  --ink: #0e2b26;
+  --ink-foreground: #e9f4f0;
 
   /* Sidebar */
   --sidebar: oklch(0.205 0 0);
@@ -186,27 +199,34 @@
 }
 
 .dark {
-  /* Base Theme Colors */
-  --background: #131416;
-  --foreground: #eaebec;
-  --card: #131416;
-  --card-foreground: #eaebec;
-  --popover: #171717;
-  --popover-foreground: #fafafa;
-  --primary: #f7b041;
-  --primary-foreground: #131416;
+  /* Base Theme Colors — dark translation of the light palette: deep
+     teal-black ground with the mint accent carrying brand emphasis. */
+  --background: #0b1413;
+  --foreground: #e8f1ee;
+  --card: #101c1a;
+  --card-foreground: #e8f1ee;
+  --popover: #12211e;
+  --popover-foreground: #e8f1ee;
+  --primary: #70efd1;
+  --primary-foreground: #04211c;
   --secondary: #0b86d1;
   --secondary-foreground: #fafafa;
   --brand: var(--primary);
-  --muted: #27272a;
-  --muted-foreground: #b4b9bc;
-  --accent: #1d1f21;
-  --accent-foreground: #fafafa;
+  --muted: #1b2b28;
+  --muted-foreground: #9db3ad;
+  --accent: #16302a;
+  --accent-foreground: #e8f1ee;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: #656b72;
-  --border-alt: #222426;
+  --border: #29403b;
+  --border-alt: #16211f;
   --input: oklch(1 0 0 / 15%);
-  --ring: #fafafa;
+  --ring: #70efd1;
+
+  /* Mint pill CTA + ink band surfaces */
+  --mint: #70efd1;
+  --mint-foreground: #04211c;
+  --ink: #0e2b26;
+  --ink-foreground: #e9f4f0;
 
   /* Sidebar */
   --sidebar-foreground: oklch(0.985 0 0);
@@ -228,6 +248,33 @@
   --overlay-run-5: oklch(0.7 0.22 330);
   --overlay-run-6: oklch(0.72 0.2 230);
   --overlay-run-7: oklch(0.78 0.18 60);
+}
+
+/* ── Footer ink band ──
+   Rescopes the theme tokens inside the footer so its children (links, star
+   button, share buttons) render light-on-dark without per-component edits.
+   Skipped under the minecraft theme, which owns its full-page look. */
+html:not(.minecraft) .footer-ink {
+  --background: var(--ink);
+  --foreground: var(--ink-foreground);
+  --card: #143530;
+  --card-foreground: var(--ink-foreground);
+  --popover: #143530;
+  --popover-foreground: var(--ink-foreground);
+  --primary: var(--mint);
+  --primary-foreground: var(--mint-foreground);
+  --brand: var(--mint);
+  --muted: #16332e;
+  --muted-foreground: #a4bfb8;
+  --accent: #16332e;
+  --accent-foreground: var(--ink-foreground);
+  --border: #23443d;
+  --border-alt: #1a3831;
+  --input: #23443d;
+  --ring: var(--mint);
+
+  background-color: var(--ink);
+  color: var(--ink-foreground);
 }
 
 /* ── Minecraft Theme ── */
