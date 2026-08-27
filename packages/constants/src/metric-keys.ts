@@ -1,4 +1,55 @@
 /**
+ * Measured power / energy / GPU-telemetry metrics that MUST be withheld
+ * whenever a row carries an invalid power verdict (power_valid = 0).
+ * Excludes the contract discriminators (power_valid,
+ * power_metric_schema_version) and the invalid-verdict companion fields
+ * (power_invalid_reasons, power_audit), which are always kept. Add any new
+ * measured power/telemetry key here — it feeds METRIC_KEYS automatically.
+ * Mirrored by the display-layer withholding in
+ * packages/app/src/lib/benchmark-transform.ts (rowToAggDataEntry).
+ */
+export const MEASURED_POWER_METRIC_KEY_LIST = [
+  // measured power / energy (emitted by runner's aggregate_power.py)
+  // avg_power_w:             mean per-GPU draw (W) during the load window
+  // joules_per_successful_query: whole-deployment energy / successful requests
+  // joules_per_output_token: energy / total_output_tokens. CLUSTER-WIDE on
+  //                          schema-version-2 rows, including disaggregated runs.
+  // joules_per_total_token:  total_system_energy / (total_input + total_output)
+  //                          — cluster-wide; workload-shape-fair view that
+  //                          doesn't treat prompt as free.
+  'avg_power_w',
+  'joules_per_successful_query',
+  'joules_per_output_token',
+  'joules_per_total_token',
+  // multinode / disagg role splits (emitted only when the deployment has
+  // distinct prefill / decode workers)
+  // prefill_avg_power_w / decode_avg_power_w:  mean per-GPU draw within each role
+  // Explicit role-local energy remains separate from the version-2 unprefixed
+  // whole-deployment fields.
+  'prefill_avg_power_w',
+  'decode_avg_power_w',
+  'joules_per_input_token',
+  'prefill_joules_per_input_token',
+  'decode_joules_per_output_token',
+  // cluster-wide GPU telemetry beyond power (emitted by aggregate_power.py when
+  // the perfmon CSVs include temperature, utilization, or memory samples).
+  // avg_temp_c:        mean per-GPU temperature (Celsius) during load window
+  // peak_temp_c:       max instantaneous per-GPU temperature in window
+  // avg_util_pct:      mean per-GPU GPU-utilization percent (0-100)
+  // avg_mem_used_mb:   mean per-GPU memory used (MiB / MB)
+  // Single-node and multinode runs both surface these as flat scalars; the
+  // per-worker breakdown carries the same fields on each entry in workers[].
+  'avg_temp_c',
+  'peak_temp_c',
+  'avg_util_pct',
+  'avg_mem_used_mb',
+] as const;
+
+export const MEASURED_POWER_METRIC_KEYS: ReadonlySet<string> = new Set(
+  MEASURED_POWER_METRIC_KEY_LIST,
+);
+
+/**
  * Canonical set of metric keys stored in the benchmark_results.metrics JSONB column.
  *
  * Latency values (ttft/tpot/itl/e2el/intvty) are in seconds. Throughput values are
@@ -130,45 +181,14 @@ export const METRIC_KEYS = new Set([
   // profiling window (agentic aiperf; flat in v2 artifacts, mapped from
   // server_metrics.kv_cache.gpu_usage_pct in v3)
   'gpu_kv_cache_usage_pct',
-  // measured power / energy (emitted by runner's aggregate_power.py)
+  // measured power / energy publication contract (aggregate_power.py)
   // power_valid: numeric 1/0 publication verdict; explicit 0 withholds power
   // power_metric_schema_version: version 2 defines every unprefixed
   //                              joules_per_* field as whole-deployment energy
-  // avg_power_w:             mean per-GPU draw (W) during the load window
-  // joules_per_successful_query: whole-deployment energy / successful requests
-  // joules_per_output_token: energy / total_output_tokens. CLUSTER-WIDE on
-  //                          schema-version-2 rows, including disaggregated runs.
-  // joules_per_total_token:  total_system_energy / (total_input + total_output)
-  //                          — cluster-wide; workload-shape-fair view that
-  //                          doesn't treat prompt as free.
   'power_valid',
   'power_metric_schema_version',
-  'avg_power_w',
-  'joules_per_successful_query',
-  'joules_per_output_token',
-  'joules_per_total_token',
-  // multinode / disagg role splits (emitted only when the deployment has
-  // distinct prefill / decode workers)
-  // prefill_avg_power_w / decode_avg_power_w:  mean per-GPU draw within each role
-  // Explicit role-local energy remains separate from the version-2 unprefixed
-  // whole-deployment fields.
-  'prefill_avg_power_w',
-  'decode_avg_power_w',
-  'joules_per_input_token',
-  'prefill_joules_per_input_token',
-  'decode_joules_per_output_token',
-  // cluster-wide GPU telemetry beyond power (emitted by aggregate_power.py when
-  // the perfmon CSVs include temperature, utilization, or memory samples).
-  // avg_temp_c:        mean per-GPU temperature (Celsius) during load window
-  // peak_temp_c:       max instantaneous per-GPU temperature in window
-  // avg_util_pct:      mean per-GPU GPU-utilization percent (0-100)
-  // avg_mem_used_mb:   mean per-GPU memory used (MiB / MB)
-  // Single-node and multinode runs both surface these as flat scalars; the
-  // per-worker breakdown carries the same fields on each entry in workers[].
-  'avg_temp_c',
-  'peak_temp_c',
-  'avg_util_pct',
-  'avg_mem_used_mb',
+  // measured power / energy / telemetry values, withheld when power_valid = 0
+  ...MEASURED_POWER_METRIC_KEY_LIST,
   // extended parallelism dimensions (2026-07+ artifacts): pipeline parallelism
   // and decode/prefill context parallelism per role. These are config
   // dimensions, not measurements, but the configs table has no columns for
