@@ -33,9 +33,7 @@ const mocks = vi.hoisted(() => ({
     isLoading: false,
     error: null as Error | null,
   },
-  getUrlParam: vi.fn((key: string): string | undefined =>
-    key === 'i_seq' ? '8k/1k' : undefined,
-  ),
+  getUrlParam: vi.fn((key: string): string | undefined => (key === 'i_seq' ? '8k/1k' : undefined)),
   setUrlParams: vi.fn(),
   hasExplicitUrlParam: vi.fn((_key: string) => false),
 }));
