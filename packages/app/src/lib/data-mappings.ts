@@ -179,7 +179,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'GLM5/5.1 744B',
     prefix: 'glm5',
     category: 'deprecated',
-    logo: 'zhipu-color.svg',
+    logo: 'zai-color.svg',
   },
   // GLM-5.2 and GLM-5.3 share the same architecture and inference profile, so
   // the selector presents both releases over the existing GLM-5.2 data bucket.
@@ -187,7 +187,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'GLM5.2/GLM5.3 744B',
     prefix: 'glm5.2',
     category: 'default',
-    logo: 'zhipu-color.svg',
+    logo: 'zai-color.svg',
   },
   [Model.Qwen3_5]: {
     label: 'Qwen3.5 397B',

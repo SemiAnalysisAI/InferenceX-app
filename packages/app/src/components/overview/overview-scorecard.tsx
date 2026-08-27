@@ -2,6 +2,7 @@
 
 import { type ComponentPropsWithoutRef, useEffect, useRef } from 'react';
 
+import { ModelLogo } from '@/components/ui/model-logo';
 import {
   OVERVIEW_DEFAULT_HISTORY_WINDOW,
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
@@ -509,6 +510,10 @@ function ModelName({ model, strings }: { model: OverviewModelSummary; strings: O
   return (
     <div>
       <h2 className="text-sm font-semibold leading-snug">
+        {/* Full-color creator mark, same treatment as the /inference chart
+            caption and /model pages. `ModelLogo` renders nothing when the
+            model has no configured logo or the asset fails to load. */}
+        <ModelLogo model={model.model} className="mr-1.5" />
         {model.modelLabel}
         {badge === undefined ? null : (
           <span
