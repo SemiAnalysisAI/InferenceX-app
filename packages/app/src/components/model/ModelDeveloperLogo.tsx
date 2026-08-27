@@ -1,4 +1,4 @@
-import { getModelDeveloperLogo } from '@/lib/model-logos';
+import { getModelDeveloperLogo, isMonochromeLogo } from '@/lib/model-logos';
 
 /**
  * Full-color developer logo for `/model` surfaces. Renders nothing when the
@@ -18,11 +18,11 @@ export default function ModelDeveloperLogo({
 
   return (
     <img
-      src={`/logos/${logo.file}`}
+      src={`/logos/${logo}`}
       alt={`${developer} logo`}
       width={48}
       height={48}
-      className={`shrink-0 object-contain ${logo.monochrome ? 'dark:invert' : ''} ${className ?? ''}`}
+      className={`shrink-0 object-contain ${isMonochromeLogo(logo) ? 'dark:invert' : ''} ${className ?? ''}`}
     />
   );
 }
