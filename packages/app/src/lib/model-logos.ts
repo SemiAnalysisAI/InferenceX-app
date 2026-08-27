@@ -4,7 +4,7 @@
  * Full-color logos render as-is in both themes. Shared by every surface that
  * renders model/developer logos (`/model` pages, inference chart captions).
  */
-export const MONOCHROME_LOGO_FILES: ReadonlySet<string> = new Set(['kimi.svg', 'openai.svg']);
+export const MONOCHROME_LOGO_FILES: ReadonlySet<string> = new Set(['openai.svg']);
 
 /** Whether a logo file needs a dark-mode invert to stay visible. */
 export function isMonochromeLogo(file: string): boolean {
@@ -23,10 +23,10 @@ export const MODEL_DEVELOPER_LOGOS: Record<string, string> = {
   Meta: 'meta-color.svg',
   MiniMax: 'minimax-color.svg',
   // Moonshot AI's model pages are all Kimi models; the Kimi product mark is
-  // the recognizable brand, and like Moonshot's own mark it is monochrome by
-  // design (the color variant is a white-on-blue app tile that vanishes on
-  // light backgrounds).
-  'Moonshot AI': 'kimi.svg',
+  // the recognizable brand. `kimi-color.svg` sets the white-and-blue mark on
+  // its brand black rounded tile (the Kimi app icon), so it stays full-color
+  // AND visible on light backgrounds — unlike the bare color variant.
+  'Moonshot AI': 'kimi-color.svg',
   // OpenAI's brand mark is monochrome by design — no color variant exists.
   OpenAI: 'openai.svg',
   'Z.ai (Zhipu AI)': 'zhipu-color.svg',
