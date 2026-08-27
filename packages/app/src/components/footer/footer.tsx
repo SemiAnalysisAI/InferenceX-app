@@ -118,7 +118,10 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
           </div>
 
           {/* Center — Links */}
-          <div data-testid="footer-links" className="grid grid-cols-3 gap-x-6 gap-y-8">
+          <div
+            data-testid="footer-links"
+            className="grid grid-cols-3 gap-x-6 gap-y-8 break-words min-w-0"
+          >
             <div data-testid="footer-links-semianalysis" className="flex flex-col gap-2.5">
               <span className="text-sm font-medium text-foreground">{t.semianalysis}</span>
               <a

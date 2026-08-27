@@ -32,7 +32,7 @@ const FeedbackForm = dynamic(
   { ssr: false },
 );
 import { GitHubIcon } from '@/components/ui/github-icon';
-import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/star-storage';
+import { STARRED_EVENT, STARRED_KEY } from '@/lib/star-storage';
 import type { NudgeDefinition } from './types';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
@@ -353,50 +353,13 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   },
 
   // -------------------------------------------------------------------------
-  // Landing modals
-  // -------------------------------------------------------------------------
-  {
-    id: 'github-star-modal',
-    type: 'modal',
-    trigger: { type: 'immediate' },
-    dismissal: { type: 'timed', durationMs: 7 * 24 * 60 * 60 * 1000 },
-    storageKey: 'inferencex-star-modal-dismissed',
-    permanentSuppressKey: STARRED_KEY,
-    permanentSuppressEvent: STARRED_EVENT,
-    priority: 40,
-    scope: 'landing',
-    content: {
-      icon: Star,
-      iconClassName: 'text-yellow-500 fill-yellow-500',
-      title: 'Star InferenceX on GitHub',
-      titleZh: '在 GitHub 上为 InferenceX 加星',
-      description:
-        'Star InferenceX on GitHub to get notified when we publish new benchmark data. We update chip performance comparisons regularly — starring is the easiest way to stay in the loop and help the project grow.',
-      descriptionZh:
-        '在 GitHub 上为 InferenceX 加星，以便在我们发布新基准测试数据时收到通知。我们定期更新芯片性能对比——加星是保持关注并帮助项目成长的最简单方式。',
-      testId: 'github-star-modal',
-      dismissLabel: 'Maybe Later',
-      dismissLabelZh: '稍后再看',
-      primaryAction: {
-        label: 'Star on GitHub',
-        labelZh: '在 GitHub 上加星',
-        icon: <GitHubIcon className="size-4" />,
-        onClick: () => {
-          window.open(GITHUB_REPO_URL, '_blank', 'noopener,noreferrer');
-          saveStarred();
-        },
-      },
-      actionClassName: 'star-button-glow',
-    },
-    analytics: {
-      shown: 'star_modal_shown',
-      dismissed: 'star_modal_dismissed',
-      action: 'star_modal_starred',
-    },
-  },
-
-  // -------------------------------------------------------------------------
   // Landing banner
+  //
+  // Note: the landing scope deliberately has no GitHub star nudge. The footer
+  // grid already carries the persistent star CTA (footer-star-cta) and the
+  // header carries another, so a fixed bottom card here duplicated the control
+  // and covered the footer. The engagement-triggered star-nudge toast on the
+  // dashboard scope is the only overlay star prompt.
   // -------------------------------------------------------------------------
   {
     id: 'openai-rubin-comparison-banner',
