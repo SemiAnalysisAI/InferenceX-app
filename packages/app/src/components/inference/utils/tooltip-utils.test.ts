@@ -726,3 +726,95 @@ describe('generateGPUGraphTooltipContent', () => {
     ).not.toContain('data-action="view-charts"');
   });
 });
+
+// ===========================================================================
+// measured-power certification tier line (all three generators)
+// ===========================================================================
+describe('power tier tooltip line', () => {
+  it('states the tier for a legacy point on a measured axis', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        selectedYAxisMetric: 'y_measuredJPerOutputToken',
+        data: pt({ power_tier: 'legacy' }),
+      }),
+    );
+    expect(html).toContain('<strong>Power Data:</strong> Legacy (no validation verdict)');
+  });
+
+  it('states the certified tier on a measured axis', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        selectedYAxisMetric: 'y_measuredAvgPower',
+        data: pt({ power_tier: 'certified' }),
+      }),
+    );
+    expect(html).toContain('<strong>Power Data:</strong> Certified (validated measurement)');
+  });
+
+  it('omits the tier line on non-measured axes', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        selectedYAxisMetric: 'y_tpPerGpu',
+        data: pt({ power_tier: 'legacy' }),
+      }),
+    );
+    expect(html).not.toContain('Power Data');
+  });
+
+  it('omits the tier line when the point carries no tier', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ selectedYAxisMetric: 'y_measuredAvgPower', data: pt() }),
+    );
+    expect(html).not.toContain('Power Data');
+  });
+
+  it('renders the ZH strings under the zh locale', () => {
+    const legacy = generateTooltipContent(
+      tooltipConfig({
+        selectedYAxisMetric: 'y_measuredJPerOutputToken',
+        data: pt({ power_tier: 'legacy' }),
+        locale: 'zh',
+      }),
+    );
+    const certified = generateTooltipContent(
+      tooltipConfig({
+        selectedYAxisMetric: 'y_measuredJPerOutputToken',
+        data: pt({ power_tier: 'certified' }),
+        locale: 'zh',
+      }),
+    );
+    expect(legacy).toContain('<strong>功耗数据：</strong> 旧版（无验证结论）');
+    expect(certified).toContain('<strong>功耗数据：</strong> 已认证（通过验证的测量）');
+  });
+
+  it('reaches overlay and GPU-graph tooltips through the same gate', () => {
+    const overlay = generateOverlayTooltipContent({
+      ...tooltipConfig({
+        selectedYAxisMetric: 'y_measuredAvgPower',
+        data: pt({ power_tier: 'legacy' }),
+      }),
+      overlayData: {
+        label: 'feature-branch',
+        hardwareConfig: mockHardwareConfig,
+        data: [],
+        runUrl: 'https://example.com',
+      } as any,
+    });
+    const gpuGraph = generateGPUGraphTooltipContent(
+      tooltipConfig({
+        selectedYAxisMetric: 'y_measuredAvgPower',
+        data: pt({ power_tier: 'legacy' }),
+      }),
+    );
+    const gpuGraphOffAxis = generateGPUGraphTooltipContent(
+      tooltipConfig({
+        selectedYAxisMetric: 'y_costh',
+        data: pt({ power_tier: 'legacy' }),
+      }),
+    );
+
+    expect(overlay).toContain('<strong>Power Data:</strong> Legacy (no validation verdict)');
+    expect(gpuGraph).toContain('<strong>Power Data:</strong> Legacy (no validation verdict)');
+    expect(gpuGraphOffAxis).not.toContain('Power Data');
+  });
+});

@@ -213,7 +213,7 @@ describe('ScatterGraph unofficial overlays', () => {
     // exactly as it would the official points.
     inferenceState.current = {
       ...baseInferenceState(),
-      quickFilters: { vendors: ['AMD'], frameworks: [], deployment: [], spec: [] },
+      quickFilters: { vendors: ['AMD'], frameworks: [], deployment: [], spec: [], power: [] },
     };
     const { container, unmount } = mountChart({
       overlayData: {
