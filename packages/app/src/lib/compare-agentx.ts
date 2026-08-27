@@ -31,13 +31,18 @@ export function agentxDashboardHref(locale: 'en' | 'zh', model: CompareModelSlug
   // of a `?g_model=` variant of the base dashboard. Models without a
   // registered inference page (none of the featured set today) fall back to
   // the query form.
+  //
+  // No `i_seq` / `i_optimal` params: every model here has AgentX data, and the
+  // dashboard already defaults such models to the Agentic scenario
+  // (resolveEffectiveSequence) with "Optimal Only" on (i_optimal !== '0'), so
+  // the bare model page IS the AgentX optimal-only view — and the canonical,
+  // shareable address for it.
   const entry = getInferenceModelBySlug(model.slug);
-  const query = new URLSearchParams();
-  if (!entry) query.set('g_model', model.displayName);
-  query.set('i_seq', 'agentic-traces');
-  query.set('i_optimal', '1');
   const path = entry ? inferenceModelPath(entry.slug) : '/inference';
-  return `${locale === 'zh' ? `/zh${path}` : path}?${query}`;
+  const localizedPath = locale === 'zh' ? `/zh${path}` : path;
+  if (entry) return localizedPath;
+  const query = new URLSearchParams({ g_model: model.displayName });
+  return `${localizedPath}?${query}`;
 }
 
 export function comparisonScenarioForModel(model: CompareModelSlug): ComparisonScenario {

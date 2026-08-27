@@ -121,7 +121,7 @@ describe('First-load navigation', () => {
         .and('have.attr', 'href', '/overview');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
         .should('contain.text', 'Full dashboard')
-        .and('have.attr', 'href', '/inference/kimi-k3?i_seq=agentic-traces&i_optimal=1');
+        .and('have.attr', 'href', '/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
       cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
       // Editorial order, not alphabetical — see FEATURED_AGENTX_MODEL_SLUGS.

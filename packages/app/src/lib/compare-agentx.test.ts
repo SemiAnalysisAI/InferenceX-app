@@ -19,20 +19,14 @@ describe('AgentX comparison links', () => {
     ]);
   });
 
-  it('opens the selected model subroute directly in the Agentic Traces scenario', () => {
-    expect(agentxDashboardHref('en', FEATURED_AGENTX_MODELS[0])).toBe(
-      '/inference/kimi-k3?i_seq=agentic-traces&i_optimal=1',
-    );
-    expect(agentxDashboardHref('zh', FEATURED_AGENTX_MODELS[1])).toBe(
-      '/zh/inference/deepseek-v4?i_seq=agentic-traces&i_optimal=1',
-    );
+  it('opens the bare model subroute — Agentic + Optimal Only are already the defaults', () => {
+    expect(agentxDashboardHref('en', FEATURED_AGENTX_MODELS[0])).toBe('/inference/kimi-k3');
+    expect(agentxDashboardHref('zh', FEATURED_AGENTX_MODELS[1])).toBe('/zh/inference/deepseek-v4');
   });
 
-  it('routes every featured model to a registered inference page', () => {
+  it('routes every featured model to a registered inference page without query params', () => {
     for (const model of FEATURED_AGENTX_MODELS) {
-      expect(agentxDashboardHref('en', model)).toBe(
-        `/inference/${model.slug}?i_seq=agentic-traces&i_optimal=1`,
-      );
+      expect(agentxDashboardHref('en', model)).toBe(`/inference/${model.slug}`);
     }
   });
 
