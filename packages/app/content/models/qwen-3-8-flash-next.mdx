@@ -1,0 +1,123 @@
+---
+title: 'Qwen3.8-Flash-Next'
+developer: 'Alibaba (Qwen)'
+releaseDate: 'August 2026'
+description: "Alibaba's open-weights preview of the Qwen4 architecture: 176B total across a 125B main model and a 51B n-gram embedding table, 6B active, with Qwen Sparse Attention, gated residuals and a Gated DeltaNet hybrid stack."
+---
+
+## Overview
+
+Qwen3.8-Flash-Next is an open-weights preview of the architecture underlying **Qwen4**, published by Alibaba's Qwen team in August 2026 ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next); [Qwen blog](https://qwen.ai/blog?id=qwen3.8-flash-next)). Qwen frames the release as deliberately architectural rather than a scaling exercise: the card describes the design as emphasising "architectural innovation for sustainable AGI progress, departing from the scaling-focused approach of simply increasing parameters and context windows" ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)). The stated purpose of shipping it early is to give the developer community time to prepare for the full Qwen4 family ([TechNode](https://technode.com/2026/08/26/alibabas-qwen-to-open-source-qwen3-8-flash-next-previewing-qwen4-architecture/)).
+
+The parameter count needs care. The card leads with "125B with 6B activated", but that figure covers the main model only. A **51B n-gram embedding table** brings the total to **176B**, and a separate **4B MTP head** sits outside both numbers ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8)). Reading the headline alone understates the checkpoint by roughly a third, which matters for capacity planning even though the n-gram table is a lookup rather than a compute-bearing parameter block.
+
+Weights ship under the `qwen-community-1.0` license, in BF16 and in an FP8 checkpoint that uses fine-grained quantization with a block size of 128; Qwen states the FP8 build's "performance metrics are nearly identical to those of the original model" ([Qwen3.8-Flash-Next-FP8 card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8)). Thinking mode is enabled by default, emitting `<think>...</think>` blocks, and is configurable through `enable_thinking`, `preserve_thinking` and `reasoning_effort`; preserved thinking retains reasoning blocks across conversation history by default ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+
+On InferenceX the model is benchmarked on the [AgentX](/glossary/agentx) agentic-traces scenario rather than fixed sequence lengths, served by SGLang with native NEXTN [multi-token prediction](/glossary/multi-token-prediction). Hopper cannot run the NVFP4 checkpoint — there are no SM100 tensor cores on sm_90 — so H200 serves the FP8 weights while Blackwell parts serve `RadixArk/Qwen3.8-Flash-Next-NVFP4`.
+
+## Architecture
+
+- **Total / active parameters:** 176B total — a 125B main model plus a 51B n-gram embedding table — with 6B activated per forward pass, and a further 4B in the MTP head ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8))
+- **Layers:** 48 ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8))
+- **Hidden layout:** `12 × (3 × (Gated DeltaNet → MoE) → 1 × (Qwen Sparse Attention → MoE))` — a 3:1 linear-to-sparse-attention hybrid ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8))
+- **Hidden dimension:** 2560 ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8))
+- **Gated DeltaNet (linear attention):** 48 value heads, 16 QK heads, head dimension 128 ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8))
+- **Qwen Sparse Attention (full attention):** 24 Q heads, 2 KV heads, head dimension 256, rotary position embedding dimension 64 ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8))
+- **QSA indexer:** MQA with 4 query heads and 1 shared key head, indexer head dimension 128, budget of "512 blocks or 2048 tokens" ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8))
+- **MoE experts:** 512 experts, 10 routed + 1 shared activated per token, expert intermediate dimension 640 ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8))
+- **N-gram embedding:** 20,000,000 bigram/trigram embeddings applied at layer 2 ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8))
+- **Gated residual:** 4 branches, bottleneck rank 320 ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8))
+- **MTP:** 1 layer, trained with multi-steps ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8))
+- **Vocabulary:** 248,320 (padded) ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8))
+- **Context window:** 262,144 tokens native, extensible up to 1,000,000 ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8))
+- **Precision:** BF16 weights, plus an FP8 checkpoint using fine-grained quantization at block size 128 ([Qwen3.8-Flash-Next-FP8 card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8))
+- **License:** `qwen-community-1.0` ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next))
+
+## The Qwen4 architecture innovations
+
+Four changes distinguish this checkpoint from Qwen3.5 and the Qwen3-Next line it descends from. Each one attacks a different cost in the serving loop, which is why the model is interesting on a benchmark that measures whole systems rather than kernels.
+
+### N-gram embedding: parameter scaling that is not MoE
+
+The headline idea is a second axis for adding parameters. Qwen describes the n-gram table as "a unique axis for parameter scaling that requires less computation" than mixture-of-experts, achieving "highly efficient parameter scaling for memory-constrained accelerators" by "indexing with short n-grams" ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+
+The mechanics matter for anyone sizing a deployment. Twenty million bigram and trigram embeddings are applied at layer 2, contributing 51B parameters — more than 40% of the checkpoint's non-MTP weight — while adding a table lookup rather than a matrix multiply. MoE buys capacity by activating more experts, which costs both memory bandwidth and all-to-all traffic when experts are sharded; an n-gram table buys capacity by growing a structure that is read, not computed. On an accelerator where HBM capacity binds before FLOPS do, those are very different trades.
+
+It also changes what "active parameters" means as a proxy for cost. Six billion active parameters implies a very cheap forward pass, and for the MoE and attention stack it is; the n-gram table is capacity you pay for in memory footprint rather than in arithmetic per token.
+
+### Qwen Sparse Attention: sparsity at the micro-block level
+
+QSA replaces the Gated Attention layers of Qwen3.5's hybrid with a sparse mechanism that "operates at the micro-block level" rather than per token, which the card says "cuts long-context latency significantly" ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+
+The selection machinery is small and explicit: an MQA indexer with 4 query heads and a single shared key head, head dimension 128, choosing under a fixed budget of 512 blocks or 2048 tokens. A bounded budget is the operationally important part. Attention cost stops growing with context length once the budget binds, so the per-token cost of a 200k-token session converges toward the cost of a much shorter one, and long-context [interactivity](/glossary/interactivity) stops degrading the way a dense-attention model's does.
+
+Sparsity of this kind is a systems claim as much as a modelling one. As InferenceX has repeatedly found with [sparse attention](/glossary/sparse-attention) stacks, theoretical sparsity says little about realised speed: index construction, irregular memory access, kernel fusion and precision support decide what actually arrives, which is why the benchmark pins engine and image versions alongside the model.
+
+### Gated residual: finer control across a widened residual stream
+
+The gated residual "modulates information flowing through widened residual streams via an element-wise, data-dependent read gate and per-branch scalar write gate", which Qwen says provides "finer-grained expressiveness across layers while preserving training stability and keeping inference overhead low" ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)). The configuration is 4 branches at bottleneck rank 320.
+
+The read gate is element-wise and data-dependent; the write gate is a single scalar per branch. That asymmetry is the design: expressive where it is cheap to be expressive, and deliberately coarse where per-element parameters would add inference cost for little return.
+
+### The hybrid ratio and MTP, carried forward
+
+Two elements are inherited rather than new, and both matter for how the model serves. The 3:1 interleave of Gated DeltaNet to full-attention layers is the same ratio Qwen3.5 uses, keeping most layers on [linear attention](/glossary/linear-attention) whose state does not grow with sequence length. And the model ships a 1-layer MTP head trained with multiple steps, exposed by SGLang as native NEXTN [speculative decoding](/glossary/speculative-decoding).
+
+MTP is the piece with the largest effect on measured throughput, and also the one most sensitive to how it is benchmarked. AgentX replays anonymized traces filled with synthetic tokens, so a speculator would accept an unrepresentative number of draft tokens if left to the content; runs therefore apply a fixed [acceptance length](/glossary/acceptance-length) measured separately, which for this model at MTP=3 was 3.24 with thinking off.
+
+### Training recipe
+
+Qwen also reports optimizer-level changes: Muon and AdamW applied to specific weight categories, and the elimination of traditional batch-size warmups in favour of starting directly at the target batch size, which "substantially reduces total optimizer steps" ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)). This has no bearing on inference performance, but it is part of what Qwen means by previewing Qwen4 rather than shipping a larger Qwen3.
+
+## Official vendor eval scores
+
+All values below are Qwen-reported for Qwen3.8-Flash-Next as published on the Hugging Face model card. The card's own comparison columns name Qwen3.8-27B, Qwen3.7-Plus and DeepSeek-V4-Flash; those are omitted here in favour of the cross-page Nemotron 3 Ultra reference.
+
+| Benchmark                    | Score     | Nemotron3 Ultra     | % better | Source                                                          |
+| ---------------------------- | --------- | ------------------- | -------- | --------------------------------------------------------------- |
+| GPQA Diamond                 | 91.7      | 87.0 (no tools)     | +5.4%    | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| LiveCodeBench v6             | 91.9      | 89.0 (v6)           | +3.3%    | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| SWE-bench Multilingual       | 81.0      | 67.7                | +19.6%   | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| SWE-bench Pro                | 62.5      | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| IFBench                      | 81.3      | 81.7 (prompt loose) | -0.5%    | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| DeepSWE 1.1                  | 58.7      | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| Toolathlon Verified          | 73.5      | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| CoWorkBench                  | 73.9      | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| JobBench                     | 55.7      | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| Agents' Last Exam (Pass@1)   | 25.2      | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| ClawEval-MM (Pass@3)         | 64.4      | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| AndroidWorld                 | 84.5      | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| OSWorld 2.0 (Binary/Partial) | 19.4/52.3 | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| Vision2Web                   | 64.0      | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| ERQA                         | 72.3      | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| LVBench                      | 76.6      | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| RealWorldQA                  | 88.5      | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| RecreationBench              | 49.9      | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| MathVision (Without/With CI) | 90.6/95.7 | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+| CharXiv RQ (Without/With CI) | 84.6/90.6 | n.a.                | —        | [HF model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) |
+
+Nemotron 3 Ultra figures are the vendor-reported numbers from the [NVIDIA Nemotron 3 Ultra model card](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16), shown as a common reference point across model pages. `n.a.` means NVIDIA does not report that benchmark, or reports a different variant of it that would not be a like-for-like comparison. **% better** is `(score − Nemotron) / Nemotron`, computed only where both sides are a plain number on the same metric; a rating scale, a range, or a prose cell shows `—` instead. Neither column is a head-to-head evaluation: each score is self-reported by its own vendor under its own harness.
+
+## Benchmark explanations
+
+- **GPQA Diamond** — graduate-level, Google-proof multiple-choice questions in biology, chemistry and physics written by domain PhDs ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+- **LiveCodeBench v6** — contamination-controlled competitive-programming problems collected over time; measures code generation correctness ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+- **SWE-bench Multilingual** — real GitHub issue resolution extended beyond Python to repositories in multiple programming languages ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+- **SWE-bench Pro** — a harder issue-resolution set than SWE-bench Verified, with longer and more involved patches ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+- **DeepSWE 1.1** — agentic software-engineering tasks scored on whether the agent's changes resolve the task end to end ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+- **Toolathlon Verified** — verified subset of multi-tool agentic tasks, scoring correct tool selection and sequencing ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+- **CoWorkBench / JobBench** — workplace-style agentic task suites measuring completion of realistic multi-step office and job workflows ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+- **Agents' Last Exam** — very hard agentic tasks designed to remain unsolved by current systems; reported Pass@1 ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+- **IFBench** — instruction-following accuracy under explicit constraints ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+- **AndroidWorld / OSWorld 2.0** — GUI-agent benchmarks driving a real Android environment and a real desktop OS respectively; OSWorld reports binary and partial credit ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+- **Vision2Web / ClawEval-MM / RecreationBench** — multimodal agentic and understanding suites over web pages and visual scenes ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+- **LVBench / RealWorldQA / ERQA** — long-video understanding, real-world visual question answering, and embodied reasoning question answering ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+- **MathVision / CharXiv RQ** — visual mathematics and chart-reasoning benchmarks, each reported with and without a code interpreter ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)).
+
+## Caveats
+
+- **The 125B figure is the main model, not the checkpoint.** Total parameters are 176B once the 51B n-gram embedding table is counted, with a further 4B in the MTP head ([Hugging Face model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8)).
+- **All eval scores are vendor-reported**, produced by Qwen under its own harness. The card's comparison columns are also Qwen's own selection of rivals.
+- **Precision differs by chip generation.** Hopper has no NVFP4 path, so H200 results use the FP8 checkpoint while Blackwell results use NVFP4. Compare across chips with that in mind.
+- **The acceptance length used for MTP is measured separately**, not derived from the replayed traces, because AgentX content is synthetic. The interim value at the first sweep was 3.24 at MTP=3, collected with thinking off.
+- **This is an architecture preview.** Qwen positions the checkpoint as an early look at Qwen4 rather than a finished flagship, and engine support was days old at first benchmark, so results should be expected to move as kernels mature.
