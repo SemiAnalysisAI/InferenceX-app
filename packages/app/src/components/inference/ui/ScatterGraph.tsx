@@ -2,6 +2,7 @@
 
 import { track } from '@/lib/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
 import dynamic from 'next/dynamic';
@@ -461,6 +462,7 @@ const ScatterGraph = React.memo(
     } = useInferenceActions();
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
+    const ephemeralUrlState = useEphemeralUrlState();
     const costLimit = chartDefinition.y_cost_limit ?? 0;
     const latencyLimit = chartDefinition.y_latency_limit ?? 0;
 
@@ -1889,8 +1891,10 @@ const ScatterGraph = React.memo(
               btnEvent.stopPropagation();
               // Full-document navigation: stamp the chart state onto THIS
               // history entry first, or Back returns to a bare /inference that
-              // rebuilds from defaults.
-              rememberChartStateInUrl();
+              // rebuilds from defaults. Skipped in ephemeral scopes (/model
+              // embeds): the store holds the primary dashboard's state there,
+              // not this chart's.
+              if (!ephemeralUrlState) rememberChartStateInUrl();
               track('latency_view_charts_opened', {
                 id: d.id,
                 hwKey: String(d.hwKey),
