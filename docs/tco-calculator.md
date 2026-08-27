@@ -176,11 +176,18 @@ Tokens-per-dollar uses `3600 / $/GPU-hr`; normalized token revenue uses
 matching throughput frontier is essential: total-throughput knots are not
 necessarily the output- or input-throughput Pareto knots.
 
-The normalized revenue axis intentionally prices every input and output token at
-the same `$1/M tok` rate. It is a model-independent SLA comparison, not the fleet
-lifecycle section's realized-revenue model. Actual provider revenue must keep the
-two streams and their prices separate, as described below; it cannot be recovered
-from one blended total-token price.
+The revenue axis defaults to pricing every input and output token at the same
+`$1/M tok` rate, making it a model-independent SLA comparison. Its OpenRouter
+option fetches the selected model's current public prompt/completion prices from
+`https://openrouter.ai/api/v1/models` and prices the streams separately. Aggregate
+rows use their measured input/output split. Disaggregated rows cannot use the raw
+per-prefill/per-decode rates together, so they apply the fixed ISL:OSL shape or
+the measured agentic prompt:generation mix to total tok/s/GPU. The OpenRouter
+option uses standard prompt/completion prices and does not apply cache discounts.
+
+Neither mode is the fleet lifecycle section's realized-revenue model: it does not
+model availability, rollout, or a user-supplied cached-input discount. Those
+business assumptions remain in Fleet Lifecycle below.
 
 ### The consistency guard
 

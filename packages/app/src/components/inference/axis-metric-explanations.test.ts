@@ -55,10 +55,12 @@ describe('METRIC_EXPLANATIONS completeness', () => {
     }
   });
 
-  it('states the normalized sale price behind token revenue', () => {
+  it('states both available sale-price sources behind token revenue', () => {
     const explanation = METRIC_EXPLANATIONS.tokenRevenuePerGpuHour;
     expect(explanation.description.en).toContain('$1 per million');
+    expect(explanation.description.en).toContain('OpenRouter');
     expect(explanation.description.zh).toContain('每百万 1 美元');
+    expect(explanation.description.zh).toContain('OpenRouter');
     expect(explanation.formula.en).toContain('$/GPU/hr =');
   });
 });
@@ -143,8 +145,6 @@ describe('metricRowLabel', () => {
   it('resolves locale-aware titles from the registry', () => {
     expect(metricRowLabel('tpPerGpu', 'en')).toBe('Token Throughput per Chip');
     expect(metricRowLabel('tpPerGpu', 'zh')).toBe('每芯片 token 吞吐量');
-    expect(metricRowLabel('tokenRevenuePerGpuHour', 'en')).toBe(
-      'Token Revenue per GPU Hour at $1/M tok',
-    );
+    expect(metricRowLabel('tokenRevenuePerGpuHour', 'en')).toBe('Token Revenue per GPU Hour');
   });
 });

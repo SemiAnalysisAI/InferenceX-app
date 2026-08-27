@@ -25,7 +25,9 @@ Two independent splines need not preserve `metric * throughput = constant` betwe
 measured knots. Pass `reciprocal_of='throughput'` (or the matching output/input
 throughput key) to spline that throughput and re-derive the metric. The live
 inference charts also expose tokens/$ and normalized token revenue as separate
-metrics; both are directly proportional to throughput. Pass
+metrics; both are directly proportional to throughput. OpenRouter-priced revenue
+is proportional only when the input/output mix stays constant; otherwise spline
+the already-priced metric directly. Pass
 `proportional_to='throughput'` (or the matching output/input throughput key) so
 they use the same Pareto knots and spline as that throughput before applying the
 recovered multiplier. See docs/tco-calculator.md for a reproducible measurement.
@@ -222,7 +224,8 @@ def interpolate_metric(
     `_unreachable_` in that row.
 
     The Pareto frontier is built on (interactivity, throughput). For tokens/$ or
-    normalized token revenue, `proportional_to` names the total/output/input
+    normalized token revenue (and revenue with a constant token mix),
+    `proportional_to` names the total/output/input
     throughput it scales; that throughput also supplies the frontier knots so
     both curves stay aligned.
 
@@ -233,7 +236,8 @@ def interpolate_metric(
     latency, and measured energy — whose numerator varies per point).
 
     `proportional_to` names the throughput key for metrics of the form
-    `throughput * constant` (tokens/$ and normalized token revenue). That
+    `throughput * constant` (tokens/$, normalized token revenue, and revenue
+    with a constant input/output mix). That
     throughput is splined and the recovered multiplier applied, matching the
     dashboard.
     """
@@ -320,7 +324,7 @@ def interpolate_metric(
 def _cli() -> None:
     """Stdin: {"points": [...], "target_iv": N, "metric_key": "...",
                "reciprocal_of": "throughput" for $/M tok and J/token,
-               "proportional_to": "throughput" for tokens/$ or token revenue}
+               "proportional_to": "throughput" for tokens/$ or revenue with a constant mix}
     Stdout: {"value": N or null}"""
     req = json.loads(sys.stdin.read())
     value = interpolate_metric(

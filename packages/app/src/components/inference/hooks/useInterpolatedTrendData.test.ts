@@ -83,6 +83,28 @@ describe('rowToLightweightPoint', () => {
     expect(point?.costhOutput?.y).toBeGreaterThan(0);
     expect(point?.outputTokensPerDollarH?.y).toBeGreaterThan(0);
   });
+
+  it('applies OpenRouter input and output prices to historical points', () => {
+    const point = rowToLightweightPoint(
+      makeBenchmarkRow({
+        metrics: {
+          tput_per_gpu: 400,
+          input_tput_per_gpu: 320,
+          output_tput_per_gpu: 80,
+          median_intvty: 20,
+        },
+      }),
+      ['tokenRevenuePerGpuHour'],
+      {
+        source: 'openrouter',
+        inputPerMillion: 1.122,
+        outputPerMillion: 3.366,
+        openRouterModelId: 'deepseek/deepseek-v4-pro-0813',
+      },
+    );
+
+    expect(point?.tokenRevenuePerGpuHour?.y).toBeCloseTo(2.261952, 10);
+  });
 });
 
 describe('rowSupportsTrendMetric', () => {

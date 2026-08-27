@@ -46,10 +46,10 @@ export const METRIC_REGISTRY = {
   },
   tokenRevenuePerGpuHour: {
     field: 'tokenRevenuePerGpuHour.y',
-    label: 'Token Revenue per GPU Hour at $1/M tok ($/GPU/hr)',
-    labelZh: '按 $1/百万 token 计价的每 GPU 小时 token 收入（$/GPU/hr）',
-    title: 'Token Revenue per GPU Hour at $1/M tok',
-    titleZh: '按 $1/百万 token 计价的每 GPU 小时 token 收入',
+    label: 'Token Revenue per GPU Hour ($/GPU/hr)',
+    labelZh: '每 GPU 小时 token 收入（$/GPU/hr）',
+    title: 'Token Revenue per GPU Hour',
+    titleZh: '每 GPU 小时 token 收入',
     polarity: 'higher',
   },
   tpPerMw: {

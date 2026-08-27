@@ -74,6 +74,11 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_advlabel).toBe('');
   });
 
+  it('strips the normalized revenue source but preserves OpenRouter as explicit state', async () => {
+    const { PARAM_DEFAULTS } = await import('@/lib/url-state');
+    expect(PARAM_DEFAULTS.i_revenue).toBe('normalized');
+  });
+
   it('has empty string defaults for legend-active params', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_active).toBe('');
@@ -118,6 +123,12 @@ describe('readUrlParams', () => {
     const params = readUrlParams();
     expect(params.i_gradlabel).toBe('0');
     expect(params.i_advlabel).toBe('1');
+  });
+
+  it('reads the token-revenue price source from the URL', async () => {
+    setupWindow('?i_revenue=openrouter');
+    const { readUrlParams } = await import('@/lib/url-state');
+    expect(readUrlParams().i_revenue).toBe('openrouter');
   });
 
   it('returns empty object when no URL params exist', async () => {

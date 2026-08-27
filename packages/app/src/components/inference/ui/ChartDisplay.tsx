@@ -10,6 +10,7 @@ import chartDefinitions, {
 } from '@/components/inference/metric-registry';
 import { resolveXAxisKind } from '@/components/inference/axis-metric-explanations';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
+import { applyTokenRevenuePricing } from '@/components/inference/token-revenue';
 import {
   useInferenceActions,
   useInferenceData,
@@ -303,6 +304,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedE2eXAxisMetric,
     selectedPercentile,
     selectedXAxisMode,
+    tokenRevenuePricing,
   } = useInferenceDisplay();
   const {
     setSelectedDates,
@@ -458,7 +460,11 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       const effectiveXMetric = chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
       const isAgentic = sequenceKind(selectedSequence) === 'agentic';
       const tokenType = tokenMetricTypeForConfigKey(selectedYAxisMetric);
-      const capableData = rawData.data.filter((point) =>
+      const pricedData =
+        selectedYAxisMetric === 'y_tokenRevenuePerGpuHour'
+          ? applyTokenRevenuePricing(rawData.data, tokenRevenuePricing)
+          : rawData.data;
+      const capableData = pricedData.filter((point) =>
         supportsChartTokenMetric(String(point.hwKey), point.date, tokenType),
       );
       const processed = processOverlayChartDataWithClipping(
@@ -519,6 +525,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedE2eXAxisMetric,
     selectedPercentile,
     selectedXAxisMode,
+    tokenRevenuePricing,
     compareGpuPair,
   ]);
 

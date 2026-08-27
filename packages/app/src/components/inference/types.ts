@@ -274,7 +274,7 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   tpPerGpu: { y: number; roof: boolean };
   outputTputPerGpu?: { y: number; roof: boolean };
   inputTputPerGpu?: { y: number; roof: boolean };
-  /** Gross revenue at a normalized $1 per million total tokens. */
+  /** Gross token revenue using the selected normalized or OpenRouter prices. */
   tokenRevenuePerGpuHour?: { y: number; roof: boolean };
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
@@ -348,6 +348,18 @@ export interface ClippedInferenceData {
  * Keys of InferenceData that have the roofline metric structure ({y, roof}).
  */
 export type YAxisMetricKey = MetricKey;
+
+export type TokenRevenuePriceSource = 'normalized' | 'openrouter';
+
+export interface TokenRevenuePricing {
+  source: TokenRevenuePriceSource;
+  /** Published or assumed input-token sale price, $/M tok. */
+  inputPerMillion: number;
+  /** Published or assumed output-token sale price, $/M tok. */
+  outputPerMillion: number;
+  /** Exact OpenRouter catalog id when `source` is `openrouter`. */
+  openRouterModelId?: string;
+}
 
 /**
  * Defines the configuration and labels for a specific chart.
@@ -594,6 +606,11 @@ export interface InferenceFiltersContextType {
 /** Axis choices and visual presentation state. */
 export interface InferenceDisplayContextType {
   selectedYAxisMetric: string;
+  tokenRevenuePriceSource: TokenRevenuePriceSource;
+  tokenRevenuePricing: TokenRevenuePricing | null;
+  openRouterModelId: string | null;
+  openRouterPricingLoading: boolean;
+  openRouterPricingError: string | null;
   selectedPercentile: string;
   selectedXAxisMetric: string | null;
   selectedE2eXAxisMetric: string | null;
@@ -632,6 +649,7 @@ export interface InferenceActionsContextType {
   setSelectedSequence: (sequence: Sequence) => void;
   setSelectedPrecisions: (precisions: string[]) => void;
   setSelectedYAxisMetric: (metric: string) => void;
+  setTokenRevenuePriceSource: (source: TokenRevenuePriceSource) => void;
   setSelectedPercentile: (percentile: string) => void;
   setSelectedXAxisMetric: (metric: string | null) => void;
   setSelectedXAxisMode: (

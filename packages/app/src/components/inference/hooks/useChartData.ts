@@ -12,8 +12,11 @@ import type {
   HardwareConfig,
   InferenceData,
   RenderableGraph,
+  TokenRevenuePricing,
+  TokenRevenuePriceSource,
   YAxisMetricKey,
 } from '@/components/inference/types';
+import { applyTokenRevenuePricing } from '@/components/inference/token-revenue';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
 import {
   parseComparisonEntry,
@@ -224,6 +227,8 @@ export function useChartData(
   selectedDateRange: { startDate: string; endDate: string },
   userCosts: Record<string, number | undefined> | null,
   userPowers: Record<string, number | undefined> | null,
+  tokenRevenuePricing: TokenRevenuePricing | null,
+  tokenRevenuePriceSource: TokenRevenuePriceSource,
   selectedRunDate?: string,
   enabled = true,
   latestAvailableDate?: string,
@@ -513,9 +518,6 @@ export function useChartData(
         const xAxisFlipped =
           xAxisField !== naturalX && !(chartDef.chartType === 'e2e' && isTtftOverride);
 
-        const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
-        const dynamicYLabel = chartDef[yLabelKey];
-
         const rooflineOverrides: Partial<ChartDefinition> = {};
         if (xAxisFlipped) {
           for (const key of Object.keys(chartDef) as (keyof ChartDefinition)[]) {
@@ -528,10 +530,36 @@ export function useChartData(
           }
         }
 
+        const revenueLabels: Partial<ChartDefinition> =
+          selectedYAxisMetric === 'y_tokenRevenuePerGpuHour'
+            ? tokenRevenuePriceSource === 'openrouter'
+              ? {
+                  y_tokenRevenuePerGpuHour_label:
+                    'Token Revenue per GPU Hour at OpenRouter Pricing ($/GPU/hr)',
+                  y_tokenRevenuePerGpuHour_labelZh:
+                    '按 OpenRouter 价格计算的每 GPU 小时 token 收入（$/GPU/hr）',
+                  y_tokenRevenuePerGpuHour_title:
+                    'Token Revenue per GPU Hour at OpenRouter Pricing',
+                  y_tokenRevenuePerGpuHour_titleZh:
+                    '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
+                }
+              : {
+                  y_tokenRevenuePerGpuHour_label:
+                    'Token Revenue per GPU Hour at $1/M tok ($/GPU/hr)',
+                  y_tokenRevenuePerGpuHour_labelZh:
+                    '按 $1/百万 token 计价的每 GPU 小时 token 收入（$/GPU/hr）',
+                  y_tokenRevenuePerGpuHour_title: 'Token Revenue per GPU Hour at $1/M tok',
+                  y_tokenRevenuePerGpuHour_titleZh: '按 $1/百万 token 计价的每 GPU 小时 token 收入',
+                }
+            : {};
+        const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
+        const dynamicYLabel = { ...chartDef, ...revenueLabels }[yLabelKey];
+
         return {
           chartDefinition: {
             ...chartDef,
             ...rooflineOverrides,
+            ...revenueLabels,
             heading: chartHeading,
             x_label: xAxisLabel,
             y_label: dynamicYLabel === null ? undefined : String(dynamicYLabel),
@@ -546,12 +574,20 @@ export function useChartData(
       selectedE2eXAxisMetric,
       selectedPercentile,
       selectedSequence,
+      tokenRevenuePriceSource,
     ],
   );
 
   // Build renderable graphs (data processing + stable chart definitions)
   const graphs: RenderableGraph[] = useMemo(() => {
     if (chartData.length === 0) return [];
+    if (
+      selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' &&
+      tokenRevenuePriceSource === 'openrouter' &&
+      !tokenRevenuePricing
+    ) {
+      return [];
+    }
 
     let dataSource: InferenceData[][] = chartData;
     if (
@@ -562,6 +598,9 @@ export function useChartData(
     }
     if (selectedYAxisMetric === 'y_powerUser' && userPowers) {
       dataSource = chartData.map((d) => calculatePowerForGpus(d, userPowers));
+    }
+    if (selectedYAxisMetric === 'y_tokenRevenuePerGpuHour') {
+      dataSource = chartData.map((d) => applyTokenRevenuePricing(d, tokenRevenuePricing));
     }
 
     const result = stableChartDefinitions.map(
@@ -616,6 +655,8 @@ export function useChartData(
     selectedGPUs,
     userCosts,
     userPowers,
+    tokenRevenuePricing,
+    tokenRevenuePriceSource,
     stableChartDefinitions,
     compareGpuPair,
     selectedPercentile,

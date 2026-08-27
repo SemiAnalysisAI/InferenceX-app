@@ -107,18 +107,17 @@ function tokenRevenuePerGpuHour(): MetricExplanation {
   return {
     description: {
       en:
-        'Gross token revenue a GPU could earn per hour at this operating point if every total ' +
-        'token (input + output) is sold at $1 per million. It turns the throughput/interactivity ' +
-        'tradeoff into a business-facing SLA curve. If input and output use one sale price, scale ' +
-        'the curve linearly; use Fleet Lifecycle when they are priced separately.',
+        'Gross token revenue a GPU could earn per hour at this operating point. The normalized ' +
+        'source prices every input and output token at $1 per million; the OpenRouter source uses ' +
+        "the selected model's current public input and output prices. This turns the " +
+        'throughput/interactivity tradeoff into a business-facing SLA curve.',
       zh:
-        '假设输入和输出 token 均按每百万 1 美元售出，表示该运行点下每块 GPU 每小时可获得的 token 毛收入。' +
-        '该指标把吞吐量与交互性的权衡转换为面向业务的 SLA 曲线。若输入和输出采用同一售价，可按实际售价线性缩放；' +
-        '若两者分别计价，请使用 Fleet Lifecycle。',
+        '表示该运行点下每块 GPU 每小时可获得的 token 毛收入。标准化模式将输入和输出 token 均按每百万 1 美元计价；' +
+        'OpenRouter 模式采用所选模型当前公开的输入和输出价格。该指标把吞吐量与交互性的权衡转换为面向业务的 SLA 曲线。',
     },
     formula: {
-      en: '$/GPU/hr = total tok/s/GPU × 3,600 ÷ 1,000,000 × $1/M tok',
-      zh: '$/GPU/hr = 总 tok/s/GPU × 3,600 ÷ 1,000,000 × $1/百万 token',
+      en: '$/GPU/hr = total tok/s/GPU × (input share × input $/M + output share × output $/M) × 3,600 ÷ 1,000,000',
+      zh: '$/GPU/hr = 总 tok/s/GPU ×（输入占比 × 输入 $/百万 + 输出占比 × 输出 $/百万）× 3,600 ÷ 1,000,000',
     },
   };
 }
