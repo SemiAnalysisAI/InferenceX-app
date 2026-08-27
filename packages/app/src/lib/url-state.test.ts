@@ -74,6 +74,11 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_advlabel).toBe('');
   });
 
+  it('strips the normalized revenue source but preserves OpenRouter as explicit state', async () => {
+    const { PARAM_DEFAULTS } = await import('@/lib/url-state');
+    expect(PARAM_DEFAULTS.i_revenue).toBe('normalized');
+  });
+
   it('has empty string defaults for legend-active params', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_active).toBe('');
@@ -118,6 +123,12 @@ describe('readUrlParams', () => {
     const params = readUrlParams();
     expect(params.i_gradlabel).toBe('0');
     expect(params.i_advlabel).toBe('1');
+  });
+
+  it('reads the token-revenue price source from the URL', async () => {
+    setupWindow('?i_revenue=openrouter');
+    const { readUrlParams } = await import('@/lib/url-state');
+    expect(readUrlParams().i_revenue).toBe('openrouter');
   });
 
   it('returns empty object when no URL params exist', async () => {
@@ -297,6 +308,18 @@ describe('writeUrlParams + buildShareUrl', () => {
 
     const url = buildShareUrl();
     expect(url).not.toContain('g_model');
+  });
+
+  it('removes the revenue source instead of emitting an empty query param off-metric', async () => {
+    setupWindow('?i_revenue=openrouter', '/inference');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+
+    // InferenceContext writes the default source when token revenue is not the
+    // active metric, which must clear stale state without serializing i_revenue=.
+    writeUrlParams({ i_revenue: 'normalized' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(buildShareUrl()).not.toContain('i_revenue');
   });
 
   it('removes params with undefined value', async () => {

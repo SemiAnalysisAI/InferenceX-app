@@ -47,6 +47,8 @@ interface ModelConfig {
   label: string;
   prefix: string;
   category: CategoryTag;
+  /** Exact public model id in OpenRouter's `/api/v1/models` catalog. */
+  openRouterModelId?: string;
   /**
    * Filename under `public/logos/` for the model creator's logo, shown beside
    * the model name in UI surfaces such as the inference chart caption. Absent =
@@ -136,6 +138,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'DeepSeek V4 Pro 0813 1.6T',
     prefix: 'dsv4',
     category: 'default',
+    openRouterModelId: 'deepseek/deepseek-v4-pro-0813',
     logo: 'deepseek-color.svg',
     exclusion: MTP_ENGINE_EXCLUSION,
   },
@@ -145,6 +148,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Kimi K3 2.8T',
     prefix: 'kimik3',
     category: 'default',
+    openRouterModelId: 'moonshotai/kimi-k3',
     logo: 'kimi-color.svg',
   },
   [Model.Kimi_K2_5]: {
@@ -161,24 +165,28 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Kimi K2.5/2.6/2.7-Code 1T',
     prefix: 'kimik2.5',
     category: 'deprecated',
+    openRouterModelId: 'moonshotai/kimi-k2.7-code',
     logo: 'kimi-color.svg',
   },
   [Model.MiniMax_M3]: {
     label: 'MiniMax M3 428B',
     prefix: 'minimaxm3',
     category: 'default',
+    openRouterModelId: 'minimax/minimax-m3',
     logo: 'minimax-color.svg',
   },
   [Model.DeepSeek_R1]: {
     label: 'DeepSeek R1 0528 671B',
     prefix: 'dsr1',
     category: 'maintenance',
+    openRouterModelId: 'deepseek/deepseek-r1-0528',
     logo: 'deepseek-color.svg',
   },
   [Model.GLM_5]: {
     label: 'GLM5/5.1 744B',
     prefix: 'glm5',
     category: 'deprecated',
+    openRouterModelId: 'z-ai/glm-5.1',
     logo: 'zai-color.svg',
   },
   // GLM-5.2 and GLM-5.3 share the same architecture and inference profile, so
@@ -187,12 +195,14 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'GLM5.2/GLM5.3 744B',
     prefix: 'glm5.2',
     category: 'default',
+    openRouterModelId: 'z-ai/glm-5.3',
     logo: 'zai-color.svg',
   },
   [Model.Qwen3_5]: {
     label: 'Qwen3.5 397B',
     prefix: 'qwen3.5',
     category: 'default',
+    openRouterModelId: 'qwen/qwen3.5-397b-a17b',
     logo: 'qwen-color.svg',
   },
   // 176B total: a 125B main model plus a 51B n-gram embedding table, 6B active
@@ -205,12 +215,14 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Qwen3.8 Flash Next 176B',
     prefix: 'qwen3.8next',
     category: 'default',
+    openRouterModelId: 'qwen/qwen3.8-flash',
     logo: 'qwen-color.svg',
   },
   [Model.GptOss]: {
     label: 'gpt-oss 120B',
     prefix: 'gptoss',
     category: 'deprecated',
+    openRouterModelId: 'openai/gpt-oss-120b',
     logo: 'openai.svg',
   },
   [Model.MiniMax_M2_5]: {
@@ -219,18 +231,21 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'MiniMax M2.5/2.7 230B',
     prefix: 'minimaxm2.5',
     category: 'deprecated',
+    openRouterModelId: 'minimax/minimax-m2.7',
     logo: 'minimax-color.svg',
   },
   [Model.Llama3_3_70B]: {
     label: 'Llama 3.3 70B Instruct',
     prefix: '70b',
     category: 'deprecated',
+    openRouterModelId: 'meta-llama/llama-3.3-70b-instruct',
     logo: 'meta-color.svg',
   },
   [Model.Llama3_1_70B]: {
     label: 'Llama 3.1 70B Instruct',
     prefix: '',
     category: 'hidden',
+    openRouterModelId: 'meta-llama/llama-3.1-70b-instruct',
     logo: 'meta-color.svg',
   },
 };
@@ -271,6 +286,11 @@ export function getModelCategory(model: Model): CategoryTag {
 
 export function getModelLabel(model: Model): string {
   return MODEL_CONFIG[model]?.label ?? model;
+}
+
+/** Exact OpenRouter catalog model used for live input/output pricing. */
+export function getOpenRouterModelId(model: Model): string | null {
+  return MODEL_CONFIG[model]?.openRouterModelId ?? null;
 }
 
 /**

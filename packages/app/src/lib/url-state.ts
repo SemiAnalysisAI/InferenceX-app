@@ -25,6 +25,8 @@ const URL_STATE_KEYS = [
   'i_seq',
   'i_prec',
   'i_metric',
+  // Token-revenue sale-price source: normalized $1/M or live OpenRouter catalog.
+  'i_revenue',
   'i_pctl',
   'i_xmetric',
   'i_e2e_xmetric',
@@ -128,6 +130,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   // "default") or it would silently revert to the per-model auto default on reload.
   i_prec: '',
   i_metric: DEFAULT_Y_AXIS_METRIC,
+  i_revenue: 'normalized',
   i_pctl: 'p90',
   i_xmetric: 'p90_ttft',
   i_e2e_xmetric: 'p90_ttft',

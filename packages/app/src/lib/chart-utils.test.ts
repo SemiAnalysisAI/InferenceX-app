@@ -676,6 +676,13 @@ describe('createChartDataPoint', () => {
     expect(point.tpPerGpu).toEqual({ y: 2000, roof: false });
   });
 
+  it('computes token revenue per GPU hour at the normalized $1/M token price', () => {
+    const e = entry({ tput_per_gpu: 2000 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    // 2,000 tok/s/GPU × 3,600 s/hr ÷ 1,000,000 tok × $1/M tok = $7.20/GPU/hr.
+    expect(point.tokenRevenuePerGpuHour).toEqual({ y: 7.2, roof: false });
+  });
+
   it('sets outputTputPerGpu when output_tput_per_gpu > 0', () => {
     const e = entry({ output_tput_per_gpu: 800 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
@@ -858,6 +865,16 @@ describe('buildDerivedChartFields', () => {
     expect(historicalFields).toEqual({
       outputTputPerGpu: fullPoint.outputTputPerGpu,
       costhOutput: fullPoint.costhOutput,
+    });
+  });
+
+  it('selectively derives normalized token revenue for historical trends', () => {
+    const historicalFields = buildDerivedChartFields(entry({ tput_per_gpu: 1250 }), 'h100', [
+      'tokenRevenuePerGpuHour',
+    ]);
+
+    expect(historicalFields).toEqual({
+      tokenRevenuePerGpuHour: { y: 4.5, roof: false },
     });
   });
 
