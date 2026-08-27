@@ -145,7 +145,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Kimi K3 2.8T',
     prefix: 'kimik3',
     category: 'default',
-    logo: 'kimi.svg',
+    logo: 'kimi-color.svg',
   },
   [Model.Kimi_K2_5]: {
     // K2.5, K2.6, and K2.7-Code share an architecture, so the dropdown surfaces
@@ -161,7 +161,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Kimi K2.5/2.6/2.7-Code 1T',
     prefix: 'kimik2.5',
     category: 'deprecated',
-    logo: 'kimi.svg',
+    logo: 'kimi-color.svg',
   },
   [Model.MiniMax_M3]: {
     label: 'MiniMax M3 428B',
