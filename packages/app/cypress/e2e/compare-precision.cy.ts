@@ -9,7 +9,7 @@ describe('Compare precision index page', () => {
     cy.visit('/compare');
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
       cy.get('h1').should('have.text', 'Compare Realistic Agentic Inference Perf');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 6);
       cy.get('[data-testid="compare-agentx-model-kimi-k3"]').should(
         'have.attr',
         'href',
@@ -52,7 +52,7 @@ describe('Compare precision index page', () => {
     cy.visit('/zh/compare');
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
       cy.get('h1').should('have.text', '真实智能体工作负载下的推理性能对比');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 6);
       cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should(
         'have.attr',
         'href',

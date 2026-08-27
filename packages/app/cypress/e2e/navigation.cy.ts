@@ -123,7 +123,7 @@ describe('First-load navigation', () => {
         .should('contain.text', 'Full dashboard')
         .and('have.attr', 'href', '/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 6);
       // Editorial order, not alphabetical — see FEATURED_AGENTX_MODEL_SLUGS.
       cy.get('[data-testid^="compare-agentx-model-"]').then(($rows) => {
         const slugs = [...$rows].map((row) =>
@@ -135,6 +135,7 @@ describe('First-load navigation', () => {
           'glm-5-2',
           'minimax-m3',
           'qwen-3-5',
+          'qwen-3-8-flash-next',
         ]);
       });
     });
