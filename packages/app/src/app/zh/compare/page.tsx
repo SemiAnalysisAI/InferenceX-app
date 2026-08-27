@@ -174,6 +174,14 @@ export default async function CompareIndexPageZh() {
                           label={label}
                           archLine={archLine}
                           scenarioLabel={scenario.label}
+                          hardwareA={{
+                            label: aMeta?.label ?? a.toUpperCase(),
+                            vendor: aMeta?.vendor,
+                          }}
+                          hardwareB={{
+                            label: bMeta?.label ?? b.toUpperCase(),
+                            vendor: bMeta?.vendor,
+                          }}
                         />
                       );
                     })}

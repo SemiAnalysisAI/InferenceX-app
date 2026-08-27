@@ -7,16 +7,19 @@ import { agentxDashboardHref, FEATURED_AGENTX_MODELS } from '@/lib/compare-agent
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 
 /**
- * Full-color brand marks for the ledger rows. Keyed by compare slug so a
- * featured model without a registered mark simply renders without one instead
- * of breaking the row.
+ * Full-color brand marks for the ledger rows, sharing the `*-color.svg`
+ * assets used by `/model` pages and inference chart captions. Keyed by
+ * compare slug so a featured model without a registered mark simply renders
+ * without one instead of breaking the row.
  */
 const MODEL_LOGOS: Record<string, string> = {
-  'kimi-k3': '/logos/models/kimi.svg',
-  'deepseek-v4': '/logos/models/deepseek.svg',
-  'glm-5-2': '/logos/models/zai.svg',
-  'minimax-m3': '/logos/models/minimax.svg',
-  'qwen-3-5': '/logos/models/qwen.svg',
+  'kimi-k3': '/logos/kimi-color.svg',
+  'deepseek-v4': '/logos/deepseek-color.svg',
+  // GLM ships under the Z.ai product brand, so the ledger shows the Z.ai
+  // mark rather than the Zhipu corporate dot cluster.
+  'glm-5-2': '/logos/zai-color.svg',
+  'minimax-m3': '/logos/minimax-color.svg',
+  'qwen-3-5': '/logos/qwen-color.svg',
 };
 
 const STRINGS = {

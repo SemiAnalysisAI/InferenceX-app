@@ -42,6 +42,10 @@ describe('Compare precision index page', () => {
       .should('contain.text', '8K→1K')
       .and('have.attr', 'href')
       .and('match', /\/8k-1k$/u);
+    // Vendor logos render beside each hardware label in the pair cards:
+    // NVIDIA uses the full-color green mark, AMD its monochrome brand mark.
+    cy.get('a[data-scenario] img[src="/logos/nvidia-color.svg"]').should('exist');
+    cy.get('a[data-scenario] img[src="/logos/amd.svg"]').should('exist');
   });
 
   it('ships the same AgentX-first hierarchy on the Simplified Chinese page', () => {
@@ -67,6 +71,8 @@ describe('Compare precision index page', () => {
       .first()
       .should('have.attr', 'href')
       .and('match', /^\/zh\/compare\/.+\/agentic$/u);
+    cy.get('a[data-scenario] img[src="/logos/nvidia-color.svg"]').should('exist');
+    cy.get('a[data-scenario] img[src="/logos/amd.svg"]').should('exist');
   });
 
   it('renders the /compare-per-dollar index with precision and spec-decode CTA links', () => {
