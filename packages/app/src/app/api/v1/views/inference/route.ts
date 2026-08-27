@@ -207,9 +207,7 @@ export function GET(request: NextRequest) {
       runIdValue === null || runIdValue === ''
         ? undefined
         : String(parseNumberParam(runIdValue, 'runId', 0, { integer: true, min: 1 }));
-    // Case-fold like calculator/fleet: hwKeys and base GPU keys are lowercase
-    // by convention, so `gpus=B200` must select the same series as `b200`.
-    const gpus = parseFreeListParam(search.get('gpus')).map((gpu) => gpu.toLowerCase());
+    const gpus = parseFreeListParam(search.get('gpus'));
     const vendors = parseListParam(search.get('vendors'), 'vendors', VENDOR_VALUES);
     const frameworks = parseListParam(
       search.get('frameworks'),

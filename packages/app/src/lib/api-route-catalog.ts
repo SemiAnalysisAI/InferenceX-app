@@ -426,7 +426,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'b0cc76ba3c26593bb9baa0b21700958f8f814b544c96b05a089ef333508a0ff0',
+    sourceSha256: 'cde99d3239593d545a3b0519ce0cb2d6eff6716c27d4d21dbd32fdeffe0eb603',
   },
   {
     source: 'src/app/api/v1/views/historical/route.ts',
@@ -434,7 +434,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: '4f34341a7af66bd0c80de33f5c7a30d796f8c4047c325087688f48e1b72bdc9a',
+    sourceSha256: '6456561351d5e0ebc194c9d7b1246132ba0282e6798eac376d1295ed2dfb5069',
   },
   {
     source: 'src/app/api/v1/views/calculator/route.ts',
@@ -442,7 +442,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-calculator-view',
-    sourceSha256: '2136b521b64c7d92953ca846d47b1ba094cc67d8b14c8939ca48da3b3627728d',
+    sourceSha256: '184d927f5c4158001cae79eb97e58a3339a41c1386c6eded17e6c0923661e765',
   },
   {
     source: 'src/app/api/v1/views/fleet/route.ts',
@@ -450,7 +450,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-fleet-view',
-    sourceSha256: 'ff1951989f3841b254f7afe0de690b5e1ab7b43ffd4ebf71c7193dddcde64277',
+    sourceSha256: 'a0da6b6e4442364e67d66edce7177a957e45735103d1f3da0dfbbbc7907b2405',
   },
   {
     source: 'src/app/api/v1/views/reliability/route.ts',

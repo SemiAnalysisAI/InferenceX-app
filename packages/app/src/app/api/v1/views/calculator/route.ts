@@ -219,7 +219,7 @@ export function GET(request: NextRequest): Promise<Response> {
       throw new ViewsApiParamError('runId', `Invalid runId: ${runIdRaw} (numeric run id required)`);
     }
     const runId = runIdRaw && /^\d+$/u.test(runIdRaw) ? runIdRaw : undefined;
-    const gpus = parseFreeListParam(search.get('gpus')).map((gpu) => gpu.toLowerCase());
+    const gpus = parseFreeListParam(search.get('gpus'));
     const format = parseFormatParam(search.get('format'));
 
     const rows = FIXTURES_MODE

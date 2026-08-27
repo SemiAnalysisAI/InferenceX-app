@@ -124,12 +124,17 @@ export function parseListParam<T extends string>(
   return [...new Set(resolved)].toSorted();
 }
 
-/** Free-form comma list (e.g. hardware keys); canonical sorted unique values. */
+/**
+ * Free-form comma list (e.g. hardware keys); canonical lowercase sorted unique
+ * values. Case-folding happens BEFORE dedup/sort so `B200,b200` collapses to
+ * one entry and mixed-case input yields the same canonical list (and thus the
+ * same derived-data cache key) as lowercase input.
+ */
 export function parseFreeListParam(value: string | null): string[] {
   if (!value) return [];
   const items = value
     .split(',')
-    .map((item) => item.trim())
+    .map((item) => item.trim().toLowerCase())
     .filter((item) => item.length > 0);
   return [...new Set(items)].toSorted();
 }

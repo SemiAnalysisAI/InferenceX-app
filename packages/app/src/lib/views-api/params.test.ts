@@ -86,6 +86,7 @@ describe('parseEnumParam / parseListParam', () => {
 
   it('parses free lists into sorted unique values', () => {
     expect(parseFreeListParam('b200_trt,gb200, b200_trt')).toEqual(['b200_trt', 'gb200']);
+    expect(parseFreeListParam('B200_trt,GB200,b200_trt')).toEqual(['b200_trt', 'gb200']);
     expect(parseFreeListParam(null)).toEqual([]);
   });
 });
