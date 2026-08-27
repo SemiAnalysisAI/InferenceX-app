@@ -16,6 +16,7 @@ describe('AgentX comparison links', () => {
       'glm-5-2',
       'minimax-m3',
       'qwen-3-5',
+      'qwen-3-8-flash-next',
     ]);
   });
 

@@ -7,7 +7,9 @@ const FEATURED_AGENTX_MODEL_SLUGS = [
   'deepseek-v4',
   'glm-5-2',
   'minimax-m3',
+  // Editorial call: Flash Next sits below Qwen 3.5, the family's flagship row.
   'qwen-3-5',
+  'qwen-3-8-flash-next',
 ] as const;
 
 const FEATURED_AGENTX_MODEL_SET = new Set<string>(FEATURED_AGENTX_MODEL_SLUGS);
