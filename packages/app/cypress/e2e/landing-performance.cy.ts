@@ -47,7 +47,7 @@ describe('Landing page performance', () => {
     cy.viewport(412, 823);
     cy.request('/')
       .its('body')
-      .should('contain', 'See more supporters')
+      .should('contain', 'See full quotes')
       .and('contain', 'data-testid="launch-banner"');
 
     cy.intercept('GET', '**/_next/static/**/*.js', (request) => {
@@ -65,11 +65,14 @@ describe('Landing page performance', () => {
     });
 
     cy.get('[data-testid="launch-banner"]').should('be.visible');
-    cy.get('[data-testid="intro-section"]').should('contain.text', 'See more supporters');
-    cy.get('[data-testid="quote-carousel-more-row"]')
+    cy.get('[data-testid="intro-section"]').should(
+      'contain.text',
+      'See full quotes & more supporters',
+    );
+    cy.get('[data-testid="supporters-more-row"]')
       .should('have.class', 'justify-end')
       .find('a')
-      .should('have.text', 'See more supporters →');
+      .should('have.text', 'See full quotes & more supporters →');
     expectLowCls();
   });
 
@@ -84,7 +87,10 @@ describe('Landing page performance', () => {
 
     cy.get('html').should('have.attr', 'data-landing-banner-dismissed');
     cy.get('[data-testid="launch-banner"]').should('not.exist');
-    cy.get('[data-testid="intro-section"]').should('contain.text', 'See more supporters');
+    cy.get('[data-testid="intro-section"]').should(
+      'contain.text',
+      'See full quotes & more supporters',
+    );
     expectLowCls();
   });
 
@@ -113,7 +119,7 @@ describe('Landing page performance', () => {
     });
   });
 
-  it('preloads only the default font and initially visible supporter logo', () => {
+  it('preloads only the default font and no supporter logos', () => {
     cy.request('/').then((response) => {
       // Next emits resource preloads as a `Link` response header (when `/` renders
       // dynamically) and/or as inlined <link rel="preload"> tags in the document
@@ -150,10 +156,9 @@ describe('Landing page performance', () => {
       }
 
       expect([...fonts]).to.have.length(1);
-      expect([...logos]).to.have.length(1);
-      // MiniMax is pinned first in the carousel order, so it's the initially
-      // visible supporter the server renders (index 0) and preloads.
-      expect([...logos][0]).to.eq('/logos/minimax.svg');
+      // The supporters band no longer renders a quote block, so no supporter
+      // logo is visible on the landing page and none should be preloaded.
+      expect([...logos]).to.have.length(0);
     });
   });
 
