@@ -36,6 +36,8 @@ const STRINGS = {
     modelArchitectures: 'Model Architectures',
     glossary: 'AI Inference Glossary',
     chipSpecs: 'Chip Specs & Pricing',
+    rankings: 'GPU Rankings',
+    runPages: 'Model on GPU Results',
     languageLink: '中文版',
     languageHref: '/zh',
     languageHrefLang: 'zh-CN',
@@ -68,6 +70,8 @@ const STRINGS = {
     modelArchitectures: '模型架构',
     glossary: 'AI 推理术语表',
     chipSpecs: '芯片规格与价格',
+    rankings: 'GPU 排行榜',
+    runPages: '模型在 GPU 上的实测结果',
     languageLink: 'English',
     languageHref: '/',
     languageHrefLang: 'en',
@@ -280,6 +284,20 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 {t.chipSpecs}
+              </Link>
+              <Link
+                data-testid="footer-link-rankings"
+                href={`${prefix}/rankings`}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.rankings}
+              </Link>
+              <Link
+                data-testid="footer-link-run"
+                href={`${prefix}/run`}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.runPages}
               </Link>
               <Link
                 data-testid="footer-link-zh"

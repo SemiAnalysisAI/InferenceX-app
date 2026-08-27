@@ -364,6 +364,24 @@ export function overviewScenariosForModel(
       OVERVIEW_SCENARIOS.filter((scenario) => curated.includes(scenario));
 }
 
+/**
+ * The single scenario a stat-led SEO surface quotes for a model: the first
+ * curated scenario that actually has rows, then the first curated scenario.
+ * Keeps /run and /rankings from headlining a workload the overview matrix
+ * does not show for the model (Kimi K3 and GLM 5.2 stay on AgentX even when
+ * single-turn rows exist).
+ */
+export function overviewHeadlineScenarioForModel(
+  model: Model,
+  rows: readonly BenchmarkRow[] = [],
+): OverviewScenario {
+  const scenarios = overviewScenariosForModel(model, rows);
+  return (
+    scenarios.find((scenario) => rows.some((row) => overviewScenarioOfRow(row) === scenario)) ??
+    scenarios[0]
+  );
+}
+
 function overviewEngineRows(
   rows: readonly BenchmarkRow[],
   engineScope: OverviewEngineScope,
@@ -792,6 +810,30 @@ export function buildOverviewModelSummary(
     category: getModelCategory(model),
     scenario,
     platforms: buildPlatformResults(model, scenario, scenarioRows, tier, referenceHardware),
+  };
+}
+
+/**
+ * Tier reads for one hardware SKU without the OVERVIEW_HARDWARE restriction.
+ * Same config building and read selection as the overview matrix, so a /run
+ * page for H100-class hardware quotes the number the overview would show if
+ * its matrix listed that SKU.
+ */
+export function overviewHardwareTierReader(
+  model: Model,
+  rows: BenchmarkRow[],
+  scenario: OverviewScenario = overviewScenarioForModel(model, rows),
+  engineScope: OverviewEngineScope = 'community',
+): (
+  hardware: string,
+  tier: OverviewTier,
+) => { read: OverviewTierRead; costPerMtok: number | null } {
+  const scopedRows = overviewEngineRows(rows, engineScope);
+  const scenarioRows = overviewScenarioRows(scenario, scopedRows);
+  const configs = buildConfigs(model, scenario, scenarioRows);
+  return (hardware, tier) => {
+    const read = selectPlatformRead(configs, hardware, tier);
+    return { read, costPerMtok: overviewCostPerMtok(hardware, read.value) };
   };
 }
 
