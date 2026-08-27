@@ -1,3 +1,5 @@
+import type { RequestLengthMoments } from '@/lib/attention-flops';
+
 import { bulkIdsFetcher, useBulkIdsQuery } from './benchmark-id-query';
 
 export interface DerivedAgenticMetric {
@@ -7,6 +9,8 @@ export interface DerivedAgenticMetric {
   p75_e2e_norm_intvty: number | null;
   /** Slow-tail P90 E2E Normalized Interactivity in tok/s/user — 1 / p90(per-request E2EL/OSL). */
   p90_e2e_norm_intvty: number | null;
+  /** Exact joint (ISL, OSL) sums over the run's requests — attention-FLOPs input. */
+  request_length_moments: RequestLengthMoments | null;
 }
 
 export type DerivedAgenticMetricMap = Record<number, DerivedAgenticMetric>;

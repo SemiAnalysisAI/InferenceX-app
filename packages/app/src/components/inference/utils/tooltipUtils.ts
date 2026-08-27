@@ -220,9 +220,58 @@ const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => 
  * separately because fixed-sequence rows can carry it too.
  */
 const AGENTIC_STRINGS = {
-  en: { speculativeDecoding: 'Speculative Decoding', off: 'Off' },
-  zh: { speculativeDecoding: '投机解码', off: '关闭' },
+  en: {
+    speculativeDecoding: 'Speculative Decoding',
+    off: 'Off',
+    theoreticalPrefixTokens: 'Theoretical Prefix Tokens',
+    uncachedInputTokens: 'Input Tokens w/o Prefix Caching',
+  },
+  zh: {
+    speculativeDecoding: '投机解码',
+    off: '关闭',
+    theoreticalPrefixTokens: '理论 prefix token 数',
+    uncachedInputTokens: '无 prefix cache 的输入 token 数',
+  },
 } as const;
+
+/**
+ * Theoretical prefix tokens for a point: the sum of every prompt prefix the
+ * workload has already seen, under an infinite cache. The harness reports that
+ * sum as a rate over served prompt tokens (`theoretical_cache_hit_rate`, the
+ * infinite-cache hit rate computed from the trace), so multiplying it back
+ * with `total_prompt_tokens` recovers the token sum. This is deliberately the
+ * THEORETICAL prefix — what could have been cached given the trace — not the
+ * server-observed cache hits, so systems with better real caching are not
+ * penalized on derived uncached-input metrics.
+ */
+export const theoreticalPrefixTokens = (d: InferenceData): number | undefined => {
+  const rate = d.theoretical_cache_hit_rate;
+  const prompt = d.total_prompt_tokens;
+  if (
+    prompt === undefined ||
+    prompt === null ||
+    rate === undefined ||
+    rate === null ||
+    Number.isNaN(rate) ||
+    rate < 0 ||
+    rate > 1
+  ) {
+    return undefined;
+  }
+  return Math.round(prompt * rate);
+};
+
+/**
+ * Input tokens without prefix caching: served prompt tokens minus the
+ * theoretical prefix ({@link theoreticalPrefixTokens}). Approximates the
+ * prompt tokens that must be prefilled even by a system with an infinite
+ * prefix cache.
+ */
+export const uncachedInputTokens = (d: InferenceData): number | undefined => {
+  const prefix = theoreticalPrefixTokens(d);
+  if (prefix === undefined || d.total_prompt_tokens === undefined) return undefined;
+  return Math.max(0, d.total_prompt_tokens - prefix);
+};
 
 const generateAgenticHTML = (d: InferenceData, locale: Locale): string => {
   if (d.benchmark_type !== 'agentic_traces') return '';
@@ -255,6 +304,16 @@ const generateAgenticHTML = (d: InferenceData, locale: Locale): string => {
   if (d.total_prompt_tokens !== undefined) {
     parts.push(tooltipLine('Prompt Tokens', formatNumber(d.total_prompt_tokens)));
   }
+
+  const theoreticalPrefix = theoreticalPrefixTokens(d);
+  if (theoreticalPrefix !== undefined) {
+    parts.push(tooltipLine(t.theoreticalPrefixTokens, formatNumber(theoreticalPrefix)));
+  }
+  const uncachedInput = uncachedInputTokens(d);
+  if (uncachedInput !== undefined) {
+    parts.push(tooltipLine(t.uncachedInputTokens, formatNumber(uncachedInput)));
+  }
+
   if (d.total_generation_tokens !== undefined) {
     parts.push(tooltipLine('Generated Tokens', formatNumber(d.total_generation_tokens)));
   }

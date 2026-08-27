@@ -21,18 +21,19 @@
  *   WORST request's effective token rate.
  */
 
-import { gunzipSync } from 'node:zlib';
-
 import type { DbClient } from '../connection.js';
 import {
-  extractIslOsl,
+  collectProfileSamplesFromJsonl,
+  extractProfileSamples,
   fetchAggregateStatsRows,
   percentilesOf,
-  readNum,
+  requestLengthMomentsOf,
   sequenceLengthSketches,
   STATS_VERSION,
+  streamTraceReplayBlob,
   writeBackTraceReplayJsonb,
   type MetricPercentiles,
+  type RequestLengthMoments,
   type SequenceLengthSketches,
 } from './agentic-shared';
 
@@ -43,6 +44,13 @@ export interface DerivedAgenticMetric {
   p75_e2e_norm_intvty: number | null;
   /** Slow-tail P90 E2E Normalized Interactivity in tok/s/user — 1 / p90(per-request E2EL/OSL). */
   p90_e2e_norm_intvty: number | null;
+  /**
+   * Exact joint (ISL, OSL) sums over the request population. The frontend
+   * integrates per-model attention-FLOPs formulas over these for the
+   * TFLOP/s-per-chip y-metric. Null when the blob had no usable records or
+   * the stored bundle predates v9 and hasn't self-healed yet.
+   */
+  request_length_moments: RequestLengthMoments | null;
 }
 
 export type DerivedAgenticMetricMap = Record<number, DerivedAgenticMetric>;
@@ -65,48 +73,7 @@ interface StoredAggregateStats {
   prefixCacheHitRate: MetricPercentiles | null;
   e2elPerOsl: MetricPercentiles | null;
   sequenceLengths: SequenceLengthSketches;
-}
-
-/**
- * JSONL blobs can be ~1-2 MB compressed (~5-10 MB raw) and Neon's serverless
- * HTTP driver caps responses at 64 MB — chunk to stay well under.
- */
-const QUERY_CHUNK_SIZE = 6;
-
-interface RecordMetrics {
-  request_latency?: { value?: number; unit?: string } | number;
-  time_to_first_token?: { value?: number; unit?: string } | number;
-  input_sequence_length?: { value?: number } | number;
-  output_sequence_length?: { value?: number } | number;
-}
-
-interface RecordMetadata {
-  conversation_id?: string;
-  turn_index?: number;
-  benchmark_phase?: string;
-}
-
-interface ProfileRecord {
-  metadata?: RecordMetadata;
-  metrics?: RecordMetrics;
-}
-
-interface TurnFields {
-  request_latency_ms: number;
-  ttft_ms: number;
-  isl: number;
-  osl: number;
-}
-
-function extractTurn(rec: ProfileRecord): TurnFields | null {
-  const m = rec.metrics ?? {};
-  const rl = readNum(m.request_latency);
-  const tt = readNum(m.time_to_first_token);
-  const isl = readNum(m.input_sequence_length);
-  const osl = readNum(m.output_sequence_length);
-  if (rl === undefined || tt === undefined || isl === undefined || osl === undefined) return null;
-  if (rl <= 0 || tt <= 0 || isl <= 0 || osl <= 0) return null;
-  return { request_latency_ms: rl, ttft_ms: tt, isl, osl };
+  requestLengthMoments?: RequestLengthMoments | null;
 }
 
 /** 1/x for a positive stored ratio; null when the bundle/percentile is absent. */
@@ -123,22 +90,16 @@ function invertRatio(v: number | null | undefined): number | null {
  */
 export function computeDerivedFromBlob(jsonl: string): {
   e2el_per_osl: MetricPercentiles | null;
+  request_length_moments: RequestLengthMoments | null;
 } {
-  const ratios: number[] = [];
-  for (const line of jsonl.split('\n')) {
-    if (!line) continue;
-    let rec: ProfileRecord;
-    try {
-      rec = JSON.parse(line) as ProfileRecord;
-    } catch {
-      continue;
-    }
-    if (rec.metadata?.benchmark_phase && rec.metadata.benchmark_phase !== 'profiling') continue;
-    const turn = extractTurn(rec);
-    if (!turn) continue;
-    ratios.push(turn.request_latency_ms / 1000 / turn.osl);
-  }
-  return { e2el_per_osl: percentilesOf(ratios) };
+  // Moments only need the sequence-length pair — the shared collector keeps
+  // them even when the latency fields the ratio requires are missing or
+  // non-positive.
+  const { e2elPerOsl, pairs } = collectProfileSamplesFromJsonl(jsonl);
+  return {
+    e2el_per_osl: percentilesOf(e2elPerOsl),
+    request_length_moments: requestLengthMomentsOf(pairs),
+  };
 }
 
 export async function getDerivedAgenticMetrics(
@@ -167,6 +128,7 @@ export async function getDerivedAgenticMetrics(
         id,
         p75_e2e_norm_intvty: invertRatio(row.stats.e2elPerOsl?.p75),
         p90_e2e_norm_intvty: invertRatio(row.stats.e2elPerOsl?.p90),
+        request_length_moments: row.stats.requestLengthMoments ?? null,
       };
     } else {
       idsNeedingBlob.push(id);
@@ -176,40 +138,42 @@ export async function getDerivedAgenticMetrics(
 
   if (idsNeedingBlob.length === 0) return result;
 
-  // Fallback: parse the profile blob directly. Used for rows whose
+  // Fallback: recompute from the profile blob. Used for rows whose
   // `aggregate_stats` is null or computed by an older STATS_VERSION; the
   // backfill script drains the population so this path should be rare.
-  // `trace_replay_id` + the (small) stale `aggregate_stats` come along on the
-  // same join — no extra round-trip — so we can self-heal after recompute.
-  const rows: {
-    benchmark_result_id: number;
-    trace_replay_id: number;
-    blob: Buffer;
-  }[] = [];
-  for (let i = 0; i < idsNeedingBlob.length; i += QUERY_CHUNK_SIZE) {
-    const chunk = idsNeedingBlob.slice(i, i + QUERY_CHUNK_SIZE);
-    const chunkRows = (await sql`
-      select
-        br.id as benchmark_result_id,
-        atr.id as trace_replay_id,
-        atr.profile_export_jsonl_gz as blob
-      from benchmark_results br
-      join agentic_trace_replay atr on atr.id = br.trace_replay_id
-      where br.id = any(${chunk}::bigint[])
-        and atr.profile_export_jsonl_gz is not null
-    `) as { benchmark_result_id: number; trace_replay_id: number; blob: Buffer }[];
-    rows.push(...chunkRows);
-  }
+  //
+  // The blob is NEVER selected whole: production profile exports reach
+  // >240 MB compressed while Neon's serverless HTTP driver caps a response at
+  // 64 MB (HTTP 507 above that — the failure that blanked the TFLOP/s
+  // metric for every pre-v9 row). Instead a cheap metadata query maps ids to
+  // trace_replay rows, then each blob streams through bounded `substring`
+  // chunks into a streaming gunzip line parser — the same pattern
+  // backfill-aggregate-stats.ts uses for oversized TOAST values.
+  const metaRows = (await sql`
+    select
+      br.id as benchmark_result_id,
+      atr.id as trace_replay_id
+    from benchmark_results br
+    join agentic_trace_replay atr on atr.id = br.trace_replay_id
+    where br.id = any(${idsNeedingBlob}::bigint[])
+      and atr.profile_export_jsonl_gz is not null
+  `) as { benchmark_result_id: number; trace_replay_id: number }[];
 
-  for (const row of rows) {
+  // Serial on purpose: each blob already parallelizes nothing and bounding
+  // concurrency keeps peak memory at one decompression stream.
+  for (const row of metaRows) {
     const id = Number(row.benchmark_result_id);
     try {
-      const jsonl = gunzipSync(row.blob).toString('utf8');
-      const { e2el_per_osl } = computeDerivedFromBlob(jsonl);
+      const { isl, osl, e2elPerOsl, pairs } = await extractProfileSamples(
+        streamTraceReplayBlob(sql, 'profile_export_jsonl_gz', Number(row.trace_replay_id)),
+      );
+      const e2el_per_osl = percentilesOf(e2elPerOsl);
+      const request_length_moments = requestLengthMomentsOf(pairs);
       result[id] = {
         id,
         p75_e2e_norm_intvty: invertRatio(e2el_per_osl?.p75),
         p90_e2e_norm_intvty: invertRatio(e2el_per_osl?.p90),
+        request_length_moments,
       };
 
       // Self-heal the shared `aggregate_stats` bundle. We only have the profile
@@ -228,7 +192,6 @@ export async function getDerivedAgenticMetrics(
       const prior = staleStatsById.get(id) ?? null;
       const canPreserveServerFields = Boolean(prior?.kvCacheUtil || prior?.prefixCacheHitRate);
       if (canPreserveServerFields) {
-        const { isl, osl } = extractIslOsl(jsonl);
         const merged: StoredAggregateStats = {
           version: STATS_VERSION,
           isl: percentilesOf(isl),
@@ -237,11 +200,13 @@ export async function getDerivedAgenticMetrics(
           prefixCacheHitRate: prior?.prefixCacheHitRate ?? null,
           e2elPerOsl: e2el_per_osl,
           sequenceLengths: sequenceLengthSketches(isl, osl),
+          requestLengthMoments: request_length_moments,
         };
         writeBackTraceReplayJsonb(sql, 'aggregate_stats', Number(row.trace_replay_id), merged);
       }
     } catch {
-      // Skip malformed blobs silently — frontend treats missing ids as "no data".
+      // One malformed/unreadable blob must never take down the whole
+      // response — the frontend treats missing ids as "no data".
     }
   }
   return result;

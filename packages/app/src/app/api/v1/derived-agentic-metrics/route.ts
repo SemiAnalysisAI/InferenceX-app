@@ -38,6 +38,8 @@ const getCachedDerivedAgenticMetrics = cachedQuery(
  *  - p75/p90_e2e_norm_intvty: slow-tail OSL / E2E-latency in tok/s/user,
  *    computed as 1 / pXX(per-request E2EL/OSL) across every turn in every
  *    session — plain interactivity charged for the prefill wait.
+ *  - request_length_moments: exact joint (ISL, OSL) moment sums over profiling
+ *    requests, used client-side for closed-form attention-FLOP pricing.
  *
  * Ids without a trace_replay blob or with unparseable records are omitted.
  */

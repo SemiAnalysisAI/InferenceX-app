@@ -694,6 +694,116 @@ describe('createChartDataPoint', () => {
     expect(point.inputTputPerGpu).toEqual({ y: 300, roof: false });
   });
 
+  it('computes new-input-suffix throughput fields when the rate is valid', () => {
+    const e = entry({
+      tput_per_gpu: 900,
+      output_tput_per_gpu: 600,
+      input_tput_per_gpu: 300,
+      theoretical_cache_hit_rate: 0.8,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    // input suffix = 300 x (1 - 0.8); suffix + output = 900 - 300 x 0.8
+    expect(point.newInputSuffixTputPerGpu?.y).toBeCloseTo(60);
+    expect(point.newInputSuffixOutputTputPerGpu?.y).toBeCloseTo(660);
+  });
+
+  it('omits new-input-suffix throughput fields when the rate is missing', () => {
+    const e = entry({ tput_per_gpu: 900, input_tput_per_gpu: 300 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.newInputSuffixTputPerGpu).toBeUndefined();
+    expect(point.newInputSuffixOutputTputPerGpu).toBeUndefined();
+  });
+
+  it('derives suffix+output TFLOP/s from GEMM + attention FLOPs for known models', () => {
+    const e = entry({
+      model: 'DeepSeek-R1-0528', // 37B active params, 61 absorbed-MLA layers
+      tput_per_gpu: 900,
+      input_tput_per_gpu: 600,
+      output_tput_per_gpu: 300,
+      theoretical_cache_hit_rate: 0.8,
+      // One request: ISL 1000, OSL 100.
+      request_length_moments: {
+        n: 1,
+        sumIsl: 1000,
+        sumIslSq: 1_000_000,
+        sumOsl: 100,
+        sumOslSq: 10_000,
+        sumIslOsl: 100_000,
+      },
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    // suffix+output = 900 - 600 × 0.8 = 420 tok/s.
+    // Σctx = (1-0.64)/2·1e6 + 0.1·1000 + 1e5 + (1e4+100)/2 = 285,150;
+    // Σtokens = 0.2·1000 + 100 = 300;
+    // attention = 61·278,528·285,150/300 = 16,149,192,704 FLOPs/token;
+    // (2·37e9 + 16,149,192,704) × 420 / 1e12 = 37.86266… TFLOP/s.
+    expect(point.newInputSuffixOutputTflopsPerGpu?.y).toBeCloseTo(37.86266093568, 5);
+  });
+
+  it('omits suffix+output TFLOP/s for models without architecture data', () => {
+    const e = entry({
+      model: 'not-a-real-model',
+      tput_per_gpu: 900,
+      input_tput_per_gpu: 600,
+      theoretical_cache_hit_rate: 0.8,
+      request_length_moments: {
+        n: 1,
+        sumIsl: 1000,
+        sumIslSq: 1_000_000,
+        sumOsl: 100,
+        sumOslSq: 10_000,
+        sumIslOsl: 100_000,
+      },
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.newInputSuffixOutputTflopsPerGpu).toBeUndefined();
+  });
+
+  it('omits suffix+output TFLOP/s when request-length moments are missing', () => {
+    const e = entry({
+      model: 'DeepSeek-R1-0528',
+      tput_per_gpu: 900,
+      input_tput_per_gpu: 600,
+      theoretical_cache_hit_rate: 0.8,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.newInputSuffixOutputTflopsPerGpu).toBeUndefined();
+  });
+
+  it('omits new-input-suffix throughput fields when input throughput is missing', () => {
+    const e = entry({
+      tput_per_gpu: 900,
+      input_tput_per_gpu: 0,
+      theoretical_cache_hit_rate: 0.8,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.newInputSuffixTputPerGpu).toBeUndefined();
+    expect(point.newInputSuffixOutputTputPerGpu).toBeUndefined();
+  });
+
+  it('omits new-input-suffix throughput fields when the rate is out of range', () => {
+    const e = entry({
+      tput_per_gpu: 900,
+      input_tput_per_gpu: 300,
+      theoretical_cache_hit_rate: 1.2,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.newInputSuffixTputPerGpu).toBeUndefined();
+    expect(point.newInputSuffixOutputTputPerGpu).toBeUndefined();
+  });
+
+  it('reports zero input suffix and output-only suffix+output at a full theoretical hit rate', () => {
+    const e = entry({
+      tput_per_gpu: 900,
+      output_tput_per_gpu: 600,
+      input_tput_per_gpu: 300,
+      theoretical_cache_hit_rate: 1,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.newInputSuffixTputPerGpu?.y).toBe(0);
+    expect(point.newInputSuffixOutputTputPerGpu?.y).toBeCloseTo(600);
+  });
+
   it('computes tpPerMw from throughput and hardware power', () => {
     // tpPerMw = (tput_per_gpu * 1000) / power = (1000 * 1000) / 700
     const e = entry({ tput_per_gpu: 1000 });

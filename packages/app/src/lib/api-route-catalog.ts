@@ -191,7 +191,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-derived-agentic-metrics',
-    sourceSha256: '68013b8e1a0354e677c075b5ab31df4be5889fdc0dc2eb82dbe52a108f4d1db2',
+    sourceSha256: '13c6ba2b0b4d827745336b016728970651580a79bec59bf4fae9743d35d8eb19',
   },
   {
     source: 'src/app/api/v1/eval-samples-live/route.ts',
@@ -711,7 +711,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/agentic-aggregates.ts',
-    sourceSha256: 'fae8d19971730132cb30cd781f677562bfc6328b1f4e35a8268a8391ad187c18',
+    sourceSha256: 'd2ce8c8769dd38012ba22054017f600b8e6e978a54a9248dd6085d5fc6b4b642',
     reviewArea: {
       en: 'Agentic aggregate percentile keys, nullability, and ID-keyed response shape.',
       zh: '智能体汇总百分位字段、可空性和按 ID 索引的响应结构。',

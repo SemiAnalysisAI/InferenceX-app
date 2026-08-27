@@ -19,6 +19,7 @@ import {
 } from '@/lib/chart-utils';
 import { getHardwareConfig } from '@/lib/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import type { RequestLengthMoments } from '@/lib/attention-flops';
 import type { BenchmarkRow } from '@/lib/api';
 
 /**
@@ -362,10 +363,16 @@ export function mergeRunScopedRows(
  *   (default 'median'). Swaps `median_intvty`/`median_e2el` in the chart
  *   definition for the chosen percentile — only agentic rows carry the
  *   full set (median/p90/p99/p99.9) so this mainly affects that scenario.
+ * @param requestLengthMomentsById Optional per-persisted-id (ISL, OSL) moment
+ *   sums from the derived-agentic-metrics endpoint. Merged into each entry
+ *   before derived fields are built so the TFLOP/s-per-chip metric can price
+ *   attention FLOPs; callers without them (unofficial-run overlays, AI chart)
+ *   simply omit that metric.
  */
 export function transformBenchmarkRows(
   rows: BenchmarkRow[],
   percentile = 'median',
+  requestLengthMomentsById?: Record<number, RequestLengthMoments | null>,
 ): {
   chartData: InferenceData[][];
   hardwareConfig: HardwareConfig;
@@ -378,6 +385,9 @@ export function transformBenchmarkRows(
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const entry = rowToAggDataEntry(row);
+    if (requestLengthMomentsById && entry.id !== undefined) {
+      entry.request_length_moments = requestLengthMomentsById[entry.id] ?? null;
+    }
     const hwKey = getHardwareKey(entry);
     entry.hwKey = hwKey;
 

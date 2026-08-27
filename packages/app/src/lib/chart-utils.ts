@@ -18,6 +18,9 @@ import {
   type BenchmarkMetricKey,
 } from '@/components/inference/metric-registry';
 import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
+import type { Model } from '@/lib/data-mappings';
+import { attentionFlopsPerComputedToken } from '@/lib/attention-flops';
+import { getModelArchitecture } from '@/lib/model-architectures';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 import type { Locale } from '@/lib/i18n';
 
@@ -328,6 +331,63 @@ export function buildDerivedChartFields(
   }
   if (wants('inputTputPerGpu') && inputTputPerGpu) {
     fields.inputTputPerGpu = chartMetric(inputTputPerGpu);
+  }
+  // New-input-suffix throughput: subtract the infinite-cache theoretical prefix
+  // share of input throughput (rate derived from the trace by the harness).
+  // Uses the theoretical rate rather than server-observed cache hits so
+  // systems with good cache storage aren't penalized — only agentic trace
+  // points carry the rate, so fixed-sequence points omit these fields.
+  const theoreticalHitRate = entry.theoretical_cache_hit_rate;
+  const hasTheoreticalHitRate =
+    typeof theoreticalHitRate === 'number' &&
+    Number.isFinite(theoreticalHitRate) &&
+    theoreticalHitRate >= 0 &&
+    theoreticalHitRate <= 1;
+  // Both metrics require input throughput: without it the prefix share can't
+  // be subtracted and suffix+output would silently equal total throughput.
+  if (
+    wants('newInputSuffixOutputTputPerGpu') &&
+    hasTheoreticalHitRate &&
+    tputPerGpu &&
+    inputTputPerGpu
+  ) {
+    fields.newInputSuffixOutputTputPerGpu = chartMetric(
+      Math.max(0, tputPerGpu - inputTputPerGpu * theoreticalHitRate),
+    );
+  }
+  // Achieved model TFLOP/s per chip on the theoretically necessary tokens:
+  // FLOPs/token = 2 × active params (Kaplan/PaLM GEMM convention) + the
+  // model-specific attention FLOPs per computed token, integrated over the
+  // run's exact per-request (ISL, OSL) sums at the theoretical hit rate
+  // (see attention-flops.ts). Requires the moments and an attention spec —
+  // points without them (fixed-seq, unofficial overlays, models outside the
+  // architecture registry) omit the metric rather than showing a lower bound
+  // inconsistent with other points.
+  if (
+    wants('newInputSuffixOutputTflopsPerGpu') &&
+    hasTheoreticalHitRate &&
+    tputPerGpu &&
+    inputTputPerGpu
+  ) {
+    const arch = getModelArchitecture(entry.model as Model);
+    const moments = entry.request_length_moments;
+    if (arch?.activeParams && arch.attention && moments) {
+      const attnFlopsPerToken = attentionFlopsPerComputedToken(
+        arch.attention,
+        moments,
+        theoreticalHitRate,
+      );
+      if (attnFlopsPerToken !== null) {
+        const suffixOutputTput = Math.max(0, tputPerGpu - inputTputPerGpu * theoreticalHitRate);
+        const flopsPerToken = 2 * arch.activeParams * 1e9 + attnFlopsPerToken;
+        fields.newInputSuffixOutputTflopsPerGpu = chartMetric(
+          (suffixOutputTput * flopsPerToken) / 1e12,
+        );
+      }
+    }
+  }
+  if (wants('newInputSuffixTputPerGpu') && hasTheoreticalHitRate && inputTputPerGpu) {
+    fields.newInputSuffixTputPerGpu = chartMetric(inputTputPerGpu * (1 - theoreticalHitRate));
   }
   if (wants('tpPerMw')) fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);
   if (wants('inputTputPerMw') && inputTputPerGpu) {

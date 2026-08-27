@@ -28,6 +28,41 @@ describe('computeDerivedFromBlob', () => {
   it('returns null when no usable records', () => {
     const out = computeDerivedFromBlob('');
     expect(out.e2el_per_osl).toBeNull();
+    expect(out.request_length_moments).toBeNull();
+  });
+
+  it('accumulates exact joint (ISL, OSL) moments over profiling records', () => {
+    const lines = [
+      rec('s1', 0, { isl: 100, osl: 50, ttft_ms: 500, latency_ms: 1000 }),
+      rec('s2', 0, { isl: 200, osl: 100, ttft_ms: 1000, latency_ms: 4000 }),
+      // Missing TTFT breaks the latency ratio but NOT the length moments.
+      JSON.stringify({
+        metadata: { conversation_id: 's3', turn_index: 0, benchmark_phase: 'profiling' },
+        metrics: {
+          request_latency: { value: 1000, unit: 'ms' },
+          input_sequence_length: { value: 10, unit: 'tokens' },
+          output_sequence_length: { value: 20, unit: 'tokens' },
+        },
+      }),
+      // Warmup phase is excluded from both.
+      JSON.stringify({
+        metadata: { conversation_id: 's4', turn_index: 0, benchmark_phase: 'warmup' },
+        metrics: {
+          input_sequence_length: { value: 9999, unit: 'tokens' },
+          output_sequence_length: { value: 9999, unit: 'tokens' },
+        },
+      }),
+    ];
+    const out = computeDerivedFromBlob(lines.join('\n'));
+    expect(out.request_length_moments).toEqual({
+      n: 3,
+      sumIsl: 310,
+      sumIslSq: 100 * 100 + 200 * 200 + 10 * 10,
+      sumOsl: 170,
+      sumOslSq: 50 * 50 + 100 * 100 + 20 * 20,
+      sumIslOsl: 100 * 50 + 200 * 100 + 10 * 20,
+    });
+    expect(out.e2el_per_osl?.n).toBe(2);
   });
 
   it('computes per-request E2EL/OSL ratios pooled across sessions', () => {
@@ -156,8 +191,11 @@ describe('getDerivedAgenticMetrics write-back', () => {
     const { sql, calls } = mockSql([
       // fetchAggregateStatsRows
       [{ benchmark_result_id: 7, stats: staleStats }],
-      // fallback profile-blob query
-      [{ benchmark_result_id: 7, trace_replay_id: 870, blob }],
+      // fallback metadata query (ids → trace_replay rows; no blob inline)
+      [{ benchmark_result_id: 7, trace_replay_id: 870 }],
+      // first substring chunk — shorter than BLOB_CHUNK_BYTES, so the
+      // streaming reader terminates without another round-trip
+      [{ chunk: blob }],
     ]);
 
     const result = await getDerivedAgenticMetrics(sql, [7]);
@@ -166,10 +204,12 @@ describe('getDerivedAgenticMetrics write-back', () => {
     expect(result[7]?.p90_e2e_norm_intvty).toBeCloseTo(1 / 0.038, 6);
     expect(result[7]?.p75_e2e_norm_intvty).toBeCloseTo(1 / 0.035, 6);
 
-    // 3 calls: stats read, blob read, write-back UPDATE.
-    expect(calls).toHaveLength(3);
-    expect(calls[2]!.text).toContain('update agentic_trace_replay set aggregate_stats');
-    expect(calls[2]!.text).toContain('::jsonb where id');
+    // 4 calls: stats read, metadata read, blob chunk read, write-back UPDATE.
+    expect(calls).toHaveLength(4);
+    // The blob is streamed via bounded substring chunks — never selected whole.
+    expect(calls[2]!.text).toContain('substring(profile_export_jsonl_gz from');
+    expect(calls[3]!.text).toContain('update agentic_trace_replay set aggregate_stats');
+    expect(calls[3]!.text).toContain('::jsonb where id');
 
     // The write-back binds a COMPLETE, version-stamped bundle at the new version,
     // recomputing profile fields and carrying server fields forward untouched.
@@ -182,7 +222,7 @@ describe('getDerivedAgenticMetrics write-back', () => {
       kvCacheUtil: unknown;
       e2elPerOsl: { p75: number; p90: number; n: number } | null;
     }
-    const [written, traceReplayId] = calls[2]!.values as [WrittenStats, number];
+    const [written, traceReplayId] = calls[3]!.values as [WrittenStats, number];
     expect(traceReplayId).toBe(870);
     expect(written.version).toBe(STATS_VERSION);
     expect(written.e2elPerOsl?.n).toBe(2);
@@ -210,16 +250,18 @@ describe('getDerivedAgenticMetrics write-back', () => {
     const { sql, calls } = mockSql([
       // fetchAggregateStatsRows — no stored bundle at all
       [{ benchmark_result_id: 7, stats: null }],
-      // fallback profile-blob query
-      [{ benchmark_result_id: 7, trace_replay_id: 870, blob }],
+      // fallback metadata query
+      [{ benchmark_result_id: 7, trace_replay_id: 870 }],
+      // single substring chunk
+      [{ chunk: blob }],
     ]);
 
     const result = await getDerivedAgenticMetrics(sql, [7]);
 
     // Caller still gets the freshly computed metric (1 / 0.02 s-per-token).
     expect(result[7]?.p90_e2e_norm_intvty).toBeCloseTo(50, 6);
-    // Stats read + blob read only — no write-back UPDATE.
-    expect(calls).toHaveLength(2);
+    // Stats read + metadata read + chunk read only — no write-back UPDATE.
+    expect(calls).toHaveLength(3);
     expect(calls.some((c) => c.text.includes('update agentic_trace_replay'))).toBe(false);
   });
 
@@ -258,6 +300,11 @@ describe('getDerivedAgenticMetrics write-back', () => {
     ]);
 
     const result = await getDerivedAgenticMetrics(sql, [7]);
-    expect(result[7]).toEqual({ id: 7, p75_e2e_norm_intvty: null, p90_e2e_norm_intvty: null });
+    expect(result[7]).toEqual({
+      id: 7,
+      p75_e2e_norm_intvty: null,
+      p90_e2e_norm_intvty: null,
+      request_length_moments: null,
+    });
   });
 });

@@ -44,6 +44,48 @@ export const METRIC_REGISTRY = {
     titleZh: '每芯片输出 token 吞吐量',
     polarity: 'higher',
   },
+  // New-input-suffix throughput pair: total / input throughput minus the
+  // infinite-cache theoretical prefix share (trace-derived, agentic only).
+  // Deliberately based on the theoretical rate rather than server-observed
+  // cache hits so systems with good cache storage aren't penalized — like
+  // MFU vs HFU, actual (uncached + output) throughput is always at least the
+  // theoretical (uncachable suffix + output) throughput.
+  newInputSuffixOutputTputPerGpu: {
+    field: 'newInputSuffixOutputTputPerGpu.y',
+    label: 'New Input Suffix + Output Token Throughput per Chip (tok/s/chip)',
+    labelZh: '每芯片新输入 suffix + 输出 token 吞吐量（tok/s/chip）',
+    title: 'New Input Suffix + Output Token Throughput per Chip',
+    titleZh: '每芯片新输入 suffix + 输出 token 吞吐量',
+    polarity: 'higher',
+  },
+  newInputSuffixTputPerGpu: {
+    field: 'newInputSuffixTputPerGpu.y',
+    label: 'New Input Suffix Token Throughput per Chip (tok/s/chip)',
+    labelZh: '每芯片新输入 suffix token 吞吐量（tok/s/chip）',
+    title: 'New Input Suffix Token Throughput per Chip',
+    titleZh: '每芯片新输入 suffix token 吞吐量',
+    polarity: 'higher',
+    x: 'p90_ttft',
+    xLabel: 'P90 Time To First Token (s)',
+    heading: 'vs. P90 Time To First Token',
+  },
+  // Achieved model TFLOP/s on the theoretically necessary tokens only:
+  // (2 × active params + per-model attention FLOPs per computed token) times
+  // the new-input-suffix + output token throughput above. The attention term
+  // integrates each architecture's mechanism (MLA, CSA/HCA + indexers, MSA,
+  // KDA + gated MLA, sliding/full GQA — specs in model-architectures.ts,
+  // math in attention-flops.ts) over the run's exact per-request (ISL, OSL)
+  // sums at the theoretical cache hit rate, so different request-length
+  // distributions are priced individually and summed. Points without stored
+  // request-length moments or an attention spec omit the metric.
+  newInputSuffixOutputTflopsPerGpu: {
+    field: 'newInputSuffixOutputTflopsPerGpu.y',
+    label: 'New Input Suffix + Output TFLOP/s per Chip (TFLOP/s/chip)',
+    labelZh: '每芯片新输入 suffix + 输出 TFLOP/s（TFLOP/s/chip）',
+    title: 'New Input Suffix + Output TFLOP/s per Chip',
+    titleZh: '每芯片新输入 suffix + 输出 TFLOP/s',
+    polarity: 'higher',
+  },
   tpPerMw: {
     field: 'tpPerMw.y',
     label: 'Token Throughput per All in Utility MW (tok/s/MW)',
@@ -483,6 +525,9 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
       'y_tpPerGpu',
       'y_inputTputPerGpu',
       'y_outputTputPerGpu',
+      'y_newInputSuffixOutputTputPerGpu',
+      'y_newInputSuffixTputPerGpu',
+      'y_newInputSuffixOutputTflopsPerGpu',
       'y_tpPerMw',
       'y_inputTputPerMw',
       'y_outputTputPerMw',

@@ -211,10 +211,19 @@ describe('getAgenticAggregates write-back', () => {
     const { sql, calls } = mockSql([
       // fetchAggregateStatsRows
       [{ benchmark_result_id: 7, stats: staleStats }],
-      // Pass 1: profile blob (+ trace_replay_id for write-back)
-      [{ benchmark_result_id: 7, trace_replay_id: 870, profile_blob: profileBlob }],
-      // Pass 2: server blob
-      [{ benchmark_result_id: 7, server_blob: serverBlob }],
+      // metadata query: ids → trace_replay rows + blob presence (no blob inline)
+      [
+        {
+          benchmark_result_id: 7,
+          trace_replay_id: 870,
+          has_profile_blob: true,
+          has_server_blob: true,
+        },
+      ],
+      // Pass 1: profile blob substring chunk (short → stream terminates)
+      [{ chunk: profileBlob }],
+      // Pass 2: server blob substring chunk
+      [{ chunk: serverBlob }],
     ]);
 
     const result = await getAgenticAggregates(sql, [7]);
@@ -223,14 +232,17 @@ describe('getAgenticAggregates write-back', () => {
     expect(result[7]?.isl?.n).toBe(2);
     expect(result[7]?.kvCacheUtil?.mean).toBeCloseTo(0.25, 6);
 
-    // 4 calls: stats read, profile read, server read, write-back UPDATE.
-    expect(calls).toHaveLength(4);
-    expect(calls[3]!.text).toContain('update agentic_trace_replay set aggregate_stats');
-    expect(calls[3]!.text).toContain('::jsonb where id');
+    // 5 calls: stats read, metadata read, profile chunk, server chunk, write-back UPDATE.
+    expect(calls).toHaveLength(5);
+    // Blobs are streamed via bounded substring chunks — never selected whole.
+    expect(calls[2]!.text).toContain('substring(profile_export_jsonl_gz from');
+    expect(calls[3]!.text).toContain('substring(server_metrics_json_gz from');
+    expect(calls[4]!.text).toContain('update agentic_trace_replay set aggregate_stats');
+    expect(calls[4]!.text).toContain('::jsonb where id');
 
     // The payload OBJECT is bound directly (not stringified — that would
     // double-encode into a JSONB string).
-    const [written, traceReplayId] = calls[3]!.values as [WrittenStats, number];
+    const [written, traceReplayId] = calls[4]!.values as [WrittenStats, number];
     expect(traceReplayId).toBe(870);
     expect(written.version).toBe(STATS_VERSION);
     // Server field FRESHLY recomputed (0.25), not the stale 0.9 carried forward.
@@ -258,16 +270,60 @@ describe('getAgenticAggregates write-back', () => {
     };
     const { sql, calls } = mockSql([
       [{ benchmark_result_id: 7, stats: staleStats }],
-      // Pass 1: no profile blob → nothing to recompute, nothing to heal.
-      [{ benchmark_result_id: 7, trace_replay_id: 870, profile_blob: null }],
-      // Pass 2: no server blob either.
-      [{ benchmark_result_id: 7, server_blob: null }],
+      // Metadata: both blobs missing → nothing to recompute, nothing to heal,
+      // and no substring reads are even issued.
+      [
+        {
+          benchmark_result_id: 7,
+          trace_replay_id: 870,
+          has_profile_blob: false,
+          has_server_blob: false,
+        },
+      ],
     ]);
 
     await getAgenticAggregates(sql, [7]);
 
-    // stats read + 2 blob reads only — no write-back (profile parse never succeeded).
-    expect(calls).toHaveLength(3);
+    // stats read + metadata read only — no write-back (profile parse never ran).
+    expect(calls).toHaveLength(2);
+    expect(calls.some((c) => c.text.includes('update agentic_trace_replay'))).toBe(false);
+  });
+
+  it('does not stamp a bundle with null server fields when the server blob fails to parse', async () => {
+    const profileBlob = gzipSync(
+      Buffer.from(profileRec({ cid: 's1', isl: 100, osl: 50, ttft_ms: 500, latency_ms: 1000 })),
+    );
+    const staleStats = {
+      version: STATS_VERSION - 1,
+      isl: null,
+      osl: null,
+      kvCacheUtil: null,
+      prefixCacheHitRate: null,
+    };
+    const { sql, calls } = mockSql([
+      [{ benchmark_result_id: 7, stats: staleStats }],
+      [
+        {
+          benchmark_result_id: 7,
+          trace_replay_id: 870,
+          has_profile_blob: true,
+          has_server_blob: true,
+        },
+      ],
+      // Pass 1: profile blob parses fine.
+      [{ chunk: profileBlob }],
+      // Pass 2: server blob chunk is corrupt — gunzip fails.
+      [{ chunk: Buffer.from('not gzip at all') }],
+    ]);
+
+    const result = await getAgenticAggregates(sql, [7]);
+
+    // Profile-derived fields are still served for this request…
+    expect(result[7]?.isl?.n).toBe(1);
+    expect(result[7]?.kvCacheUtil).toBeNull();
+    // …but nothing is written back: stamping a current-version bundle with
+    // null server fields would permanently cache the miss.
+    expect(calls).toHaveLength(4);
     expect(calls.some((c) => c.text.includes('update agentic_trace_replay'))).toBe(false);
   });
 });

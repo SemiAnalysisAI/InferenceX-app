@@ -97,6 +97,16 @@ describe('computeAggregateStats', () => {
     expect(stats.e2elPerOsl?.p50).toBeCloseTo(2 / 75, 6);
     // p90 of 3 values (linear interpolation): pos=1.8 → 0.02667 + 0.8×(0.03-0.02667)
     expect(stats.e2elPerOsl?.p90).toBeCloseTo(2 / 75 + 0.8 * (0.03 - 2 / 75), 6);
+
+    // Exact joint (ISL, OSL) moments for closed-form attention-FLOP pricing.
+    expect(stats.requestLengthMoments).toEqual({
+      n: 3,
+      sumIsl: 600,
+      sumIslSq: 100 * 100 + 200 * 200 + 300 * 300,
+      sumOsl: 225,
+      sumOslSq: 50 * 50 + 75 * 75 + 100 * 100,
+      sumIslOsl: 100 * 50 + 200 * 75 + 300 * 100,
+    });
   });
 
   it('excludes cancelled requests from every streamed profile distribution', async () => {
@@ -114,6 +124,8 @@ describe('computeAggregateStats', () => {
     expect(stats.e2elPerOsl?.n).toBe(1);
     expect(stats.sequenceLengths.isl?.n).toBe(1);
     expect(stats.sequenceLengths.osl?.n).toBe(1);
+    expect(stats.requestLengthMoments?.n).toBe(1);
+    expect(stats.requestLengthMoments?.sumIslSq).toBe(100 * 100);
   });
 
   it('accepts a gzip profile split across arbitrarily small compressed chunks', async () => {
