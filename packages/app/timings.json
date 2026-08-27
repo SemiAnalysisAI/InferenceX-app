@@ -41,12 +41,12 @@
       "duration": 1537
     },
     {
-      "spec": "cypress/e2e/fleet-lifecycle.cy.ts",
-      "duration": 18000
-    },
-    {
       "spec": "cypress/e2e/calculator-overlay.cy.ts",
       "duration": 5318
+    },
+    {
+      "spec": "cypress/e2e/certified-power-filter.cy.ts",
+      "duration": 1000
     },
     {
       "spec": "cypress/e2e/chart-overflow-continuation.cy.ts",
@@ -119,6 +119,10 @@
     {
       "spec": "cypress/e2e/fixed-sequence-logs.cy.ts",
       "duration": 1000
+    },
+    {
+      "spec": "cypress/e2e/fleet-lifecycle.cy.ts",
+      "duration": 18000
     },
     {
       "spec": "cypress/e2e/gpu-compare-agentic-detail.cy.ts",
