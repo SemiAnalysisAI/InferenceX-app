@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { InferenceData, TokenRevenuePricing } from './types';
 import {
   applyTokenRevenuePricing,
+  formatTokenPrice,
   inputTokenShareForRevenue,
   NORMALIZED_TOKEN_REVENUE_PRICING,
   tokenRevenuePerGpuHour,
@@ -40,6 +41,12 @@ const openRouterPricing: TokenRevenuePricing = {
 };
 
 describe('token revenue', () => {
+  it('formats subtitle prices without unnecessary trailing zeroes', () => {
+    expect(formatTokenPrice(1)).toBe('1');
+    expect(formatTokenPrice(1.122)).toBe('1.122');
+    expect(formatTokenPrice(0.000001)).toBe('0.000001');
+  });
+
   it('keeps the normalized $1/M axis equal to million total tokens per GPU hour', () => {
     expect(tokenRevenuePerGpuHour(point(), NORMALIZED_TOKEN_REVENUE_PRICING)).toBe(7.2);
   });

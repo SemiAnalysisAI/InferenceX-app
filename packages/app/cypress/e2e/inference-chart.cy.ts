@@ -114,6 +114,14 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="openrouter-price-summary"]')
       .should('contain.text', 'Input $1.122/M tok')
       .and('contain.text', 'Output $3.366/M tok');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('[data-testid="token-revenue-subtitle-prices"]')
+      .should('have.text', 'Input $1.122/M tok · Output $3.366/M tok')
+      .then(($prices) => {
+        const subtitle = $prices.parent().text();
+        expect(subtitle.indexOf($prices.text())).to.be.lessThan(subtitle.indexOf('Updated:'));
+      });
     cy.get('[data-testid="openrouter-pricing-link"]').should(
       'have.attr',
       'href',
@@ -154,7 +162,12 @@ describe('Inference Chart', () => {
         ],
       },
     }).as('openRouterPricingZh');
-    cy.visit('/zh/inference?i_metric=y_tokenRevenuePerGpuHour&i_revenue=openrouter');
+    interceptOverlayRun();
+    cy.visit(
+      `/zh/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokenRevenuePerGpuHour&i_revenue=openrouter`,
+      { onBeforeLoad: unlockAgenticGate },
+    );
+    cy.wait('@unofficialRun');
     cy.wait('@openRouterPricingZh');
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
@@ -167,6 +180,14 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="openrouter-price-summary"]')
       .should('contain.text', '输入 $1.122/百万 token')
       .and('contain.text', '输出 $3.366/百万 token');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('[data-testid="token-revenue-subtitle-prices"]')
+      .should('have.text', '输入 $1.122/百万 token · 输出 $3.366/百万 token')
+      .then(($prices) => {
+        const subtitle = $prices.parent().text();
+        expect(subtitle.indexOf($prices.text())).to.be.lessThan(subtitle.indexOf('更新时间：'));
+      });
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('h2')

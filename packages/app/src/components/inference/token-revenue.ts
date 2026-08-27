@@ -10,6 +10,11 @@ export const NORMALIZED_TOKEN_REVENUE_PRICING: TokenRevenuePricing = {
   outputPerMillion: 1,
 };
 
+/** Format a $/M tok sale price consistently across revenue UI surfaces. */
+export function formatTokenPrice(value: number): string {
+  return value.toLocaleString('en-US', { maximumFractionDigits: 6 });
+}
+
 /**
  * Fraction of a point's per-GPU token throughput that is input.
  *

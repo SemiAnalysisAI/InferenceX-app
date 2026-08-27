@@ -32,6 +32,7 @@ import {
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { METRIC_CONTROL_GROUPS, METRIC_REGISTRY } from '@/components/inference/metric-registry';
+import { formatTokenPrice } from '@/components/inference/token-revenue';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
@@ -111,10 +112,6 @@ const METRIC_TITLE_MAP = new Map(
 const METRIC_TITLE_ZH_MAP = new Map(
   Object.entries(METRIC_REGISTRY).map(([key, metric]) => [`y_${key}`, metric.titleZh]),
 );
-
-function formatTokenPrice(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 6 });
-}
 
 interface ChartControlsProps {
   /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
