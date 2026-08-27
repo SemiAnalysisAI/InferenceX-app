@@ -99,7 +99,9 @@ export function GET(request: NextRequest) {
       max: 1000,
     });
     const precisions = parsePrecisionsParam(search.get('precisions'));
-    const gpus = parseFreeListParam(search.get('gpus'));
+    // Case-fold like calculator/fleet, so the echoed `params.gpus` matches the
+    // lowercase keys the filter actually uses.
+    const gpus = parseFreeListParam(search.get('gpus')).map((value) => value.toLowerCase());
     const vendors = parseListParam(search.get('vendors'), 'vendors', VENDOR_VALUES);
     const frameworks = parseListParam(
       search.get('frameworks'),

@@ -181,6 +181,21 @@ describe('GET /api/v1/views/inference', () => {
     expect(body.series[0].gpu).toBe('mi300x');
   });
 
+  it('case-folds the gpus filter: uppercase base keys select the same series', async () => {
+    const upperRes = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&gpus=MI300X'),
+    );
+    expect(upperRes.status).toBe(200);
+    const upper = await upperRes.json();
+    const lowerRes = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&gpus=mi300x'),
+    );
+    const lower = await lowerRes.json();
+    expect(upper.params.gpus).toEqual(['mi300x']);
+    expect(upper.series).toEqual(lower.series);
+    expect(upper.series.length).toBeGreaterThan(0);
+  });
+
   it('returns flat CSV rows when format=csv', async () => {
     const res = await GET(
       request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&format=csv'),
