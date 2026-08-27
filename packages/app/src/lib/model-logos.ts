@@ -4,7 +4,7 @@
  * Full-color logos render as-is in both themes. Shared by every surface that
  * renders model/developer logos (`/model` pages, inference chart captions).
  */
-export const MONOCHROME_LOGO_FILES: ReadonlySet<string> = new Set(['kimi.svg', 'openai.svg']);
+export const MONOCHROME_LOGO_FILES: ReadonlySet<string> = new Set(['openai.svg']);
 
 /** Whether a logo file needs a dark-mode invert to stay visible. */
 export function isMonochromeLogo(file: string): boolean {
@@ -22,14 +22,16 @@ export const MODEL_DEVELOPER_LOGOS: Record<string, string> = {
   DeepSeek: 'deepseek-color.svg',
   Meta: 'meta-color.svg',
   MiniMax: 'minimax-color.svg',
-  // Moonshot AI's model pages are all Kimi models; the Kimi product mark is
-  // the recognizable brand, and like Moonshot's own mark it is monochrome by
-  // design (the color variant is a white-on-blue app tile that vanishes on
-  // light backgrounds).
-  'Moonshot AI': 'kimi.svg',
+  // Moonshot AI's model pages are all Kimi models. The full-color Kimi mark
+  // is white-on-blue, so it ships as a self-contained dark app tile
+  // (`models/kimi.svg`) that stays legible on light and dark backgrounds.
+  'Moonshot AI': 'models/kimi.svg',
   // OpenAI's brand mark is monochrome by design — no color variant exists.
   OpenAI: 'openai.svg',
-  'Z.ai (Zhipu AI)': 'zhipu-color.svg',
+  // Zhipu rebranded as Z.ai; the actual Z.ai mark is the "Z" glyph (brand
+  // color #000), shipped as a self-contained white-on-black app tile so it
+  // renders full-color on both themes without an invert.
+  'Z.ai (Zhipu AI)': 'models/zai.svg',
 };
 
 /** Logo filename under `/logos/` for a model developer, if one exists. */

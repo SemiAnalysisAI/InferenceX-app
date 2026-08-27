@@ -5,7 +5,7 @@ import matter from 'gray-matter';
 import { describe, expect, it } from 'vitest';
 
 import { Model, getModelLogo } from '@/lib/data-mappings';
-import { MODEL_DEVELOPER_LOGOS, getModelDeveloperLogo } from '@/lib/model-logos';
+import { MODEL_DEVELOPER_LOGOS, getModelDeveloperLogo, isMonochromeLogo } from '@/lib/model-logos';
 
 const MODELS_DIR = path.join(process.cwd(), 'content', 'models');
 const LOGOS_DIR = path.join(process.cwd(), 'public', 'logos');
@@ -51,5 +51,25 @@ describe('model developer logos', () => {
 
   it('returns undefined for unknown developers', () => {
     expect(getModelDeveloperLogo('Unknown Lab')).toBeUndefined();
+  });
+
+  it('uses the actual Z.ai mark for GLM models', () => {
+    expect(getModelLogo(Model.GLM_5)).toBe('models/zai.svg');
+    expect(getModelLogo(Model.GLM_5_2)).toBe('models/zai.svg');
+    expect(getModelDeveloperLogo('Z.ai (Zhipu AI)')).toBe('models/zai.svg');
+  });
+
+  it('keeps every model logo full-color except monochrome-by-design marks', () => {
+    // `currentColor` fills are the monochrome giveaway: a full-color mark
+    // ships its own brand fills and never inherits the text color.
+    for (const model of Object.values(Model)) {
+      const logo = getModelLogo(model);
+      if (!logo || !logo.endsWith('.svg') || isMonochromeLogo(logo)) continue;
+      const svg = fs.readFileSync(path.join(LOGOS_DIR, logo), 'utf8');
+      expect(
+        svg.includes('currentColor'),
+        `logo '${logo}' for model '${model}' is not full-color`,
+      ).toBe(false);
+    }
   });
 });

@@ -4,6 +4,7 @@ import { Info } from 'lucide-react';
 
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { track } from '@/lib/analytics';
+import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
@@ -153,6 +154,15 @@ function AgenticScenarioInfo({
   );
 }
 
+// Full-color creator logo beside each model name, in the dropdown rows and
+// the closed trigger alike. `ModelLogo` renders nothing for models without
+// a configured logo, so rows degrade to plain text instead of breaking.
+const toOption = (model: string) => ({
+  value: model,
+  label: getModelLabel(model as Model),
+  icon: <ModelLogo model={model as Model} />,
+});
+
 interface ModelSelectorProps {
   id?: string;
   value: string;
@@ -177,20 +187,14 @@ export function ModelSelector({
   const sections = [
     {
       id: 'default',
-      options: groups.default.map((model) => ({
-        value: model,
-        label: getModelLabel(model as Model),
-      })),
+      options: groups.default.map(toOption),
     },
     ...(groups.experimental.length > 0
       ? [
           {
             id: 'experimental',
             header: t.experimentalSupport,
-            options: groups.experimental.map((model) => ({
-              value: model,
-              label: getModelLabel(model as Model),
-            })),
+            options: groups.experimental.map(toOption),
           },
         ]
       : []),
@@ -205,10 +209,7 @@ export function ModelSelector({
                 reason={t.maintenanceReason}
               />
             ),
-            options: groups.maintenance.map((model) => ({
-              value: model,
-              label: getModelLabel(model as Model),
-            })),
+            options: groups.maintenance.map(toOption),
           },
         ]
       : []),
@@ -223,10 +224,7 @@ export function ModelSelector({
                 reason={t.deprecatedModelReason}
               />
             ),
-            options: groups.deprecated.map((model) => ({
-              value: model,
-              label: getModelLabel(model as Model),
-            })),
+            options: groups.deprecated.map(toOption),
           },
         ]
       : []),

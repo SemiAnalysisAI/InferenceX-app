@@ -145,7 +145,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Kimi K3 2.8T',
     prefix: 'kimik3',
     category: 'default',
-    logo: 'kimi.svg',
+    logo: 'models/kimi.svg',
   },
   [Model.Kimi_K2_5]: {
     // K2.5, K2.6, and K2.7-Code share an architecture, so the dropdown surfaces
@@ -161,7 +161,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Kimi K2.5/2.6/2.7-Code 1T',
     prefix: 'kimik2.5',
     category: 'deprecated',
-    logo: 'kimi.svg',
+    logo: 'models/kimi.svg',
   },
   [Model.MiniMax_M3]: {
     label: 'MiniMax M3 428B',
@@ -179,7 +179,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'GLM5/5.1 744B',
     prefix: 'glm5',
     category: 'deprecated',
-    logo: 'zhipu-color.svg',
+    logo: 'models/zai.svg',
   },
   // GLM-5.2 and GLM-5.3 share the same architecture and inference profile, so
   // the selector presents both releases over the existing GLM-5.2 data bucket.
@@ -187,7 +187,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'GLM5.2/GLM5.3 744B',
     prefix: 'glm5.2',
     category: 'default',
-    logo: 'zhipu-color.svg',
+    logo: 'models/zai.svg',
   },
   [Model.Qwen3_5]: {
     label: 'Qwen3.5 397B',
