@@ -2,9 +2,14 @@
  * Logo files under `public/logos/` whose brand mark is plain black
  * (`currentColor` SVGs): they need a dark-mode invert to stay visible.
  * Full-color logos render as-is in both themes. Shared by every surface that
- * renders model/developer logos (`/model` pages, inference chart captions).
+ * renders model/developer or hardware-vendor logos (`/model` pages, inference
+ * chart captions, `/compare` pair cards).
+ *
+ * `amd.svg` is here because AMD's brand guidelines only permit the standard
+ * black logo or the reversed-out white logo — no color variant exists, so the
+ * dark-mode invert reproduces the official reversed treatment.
  */
-export const MONOCHROME_LOGO_FILES: ReadonlySet<string> = new Set(['openai.svg']);
+export const MONOCHROME_LOGO_FILES: ReadonlySet<string> = new Set(['amd.svg', 'openai.svg']);
 
 /** Whether a logo file needs a dark-mode invert to stay visible. */
 export function isMonochromeLogo(file: string): boolean {
