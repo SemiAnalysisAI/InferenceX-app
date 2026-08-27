@@ -76,7 +76,6 @@ describe('NUDGE_REGISTRY integrity', () => {
       'export',
       'feedback-modal',
       'filter-hint',
-      'github-star-modal',
       'gradient-label',
       'openai-rubin-comparison-banner',
       'reproducibility',

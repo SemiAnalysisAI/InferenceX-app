@@ -112,39 +112,16 @@ describe('Landing nudges — modals', () => {
       .and('contain.text', '查看结果');
   });
 
-  it('shows the star modal on the landing page', () => {
+  it('does not float a duplicate GitHub star card over the footer', () => {
+    // The persistent star CTA lives in the footer grid (footer-star-cta) and
+    // the header; the old immediate star modal duplicated it and covered the
+    // footer, so it must stay gone.
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
-    cy.get('[data-testid="github-star-modal"]').should('be.visible');
-  });
-
-  it('star modal dismiss uses timed strategy — re-shows after expiry', () => {
-    cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
-    });
-    cy.get('[data-testid="github-star-modal"]').should('be.visible');
-    cy.get('[data-testid="github-star-modal-dismiss"]').click();
+    cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.get('[data-testid="github-star-modal"]').should('not.exist');
-
-    cy.window().then((win) => {
-      const value = win.localStorage.getItem('inferencex-star-modal-dismissed');
-      expect(value).to.not.equal(null);
-      expect(Number(value)).to.be.greaterThan(0);
-    });
-  });
-
-  it('starring permanently suppresses both star modal and star nudge', () => {
-    cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
-    });
-    cy.get('[data-testid="github-star-modal"]').should('be.visible');
-    cy.get('[data-testid="github-star-modal-action"]').click();
-    cy.get('[data-testid="github-star-modal"]').should('not.exist');
-
-    cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-starred')).to.eq('1');
-    });
+    cy.get('[data-testid="footer-star-cta"]').should('exist');
   });
 });
 
