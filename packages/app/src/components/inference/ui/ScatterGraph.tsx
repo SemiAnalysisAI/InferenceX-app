@@ -474,6 +474,7 @@ const ScatterGraph = React.memo(
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
+      setQuickFilterPower,
     } = useInferenceActions();
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
@@ -1088,17 +1089,20 @@ const ScatterGraph = React.memo(
       quickFilters.vendors.length +
       quickFilters.frameworks.length +
       quickFilters.deployment.length +
+      quickFilters.power.length +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
     const clearQuickFilters = useCallback(() => {
       setQuickFilterVendors([]);
       setQuickFilterFrameworks([]);
       setQuickFilterDeployment([]);
       setQuickFilterSpec([]);
+      setQuickFilterPower([]);
     }, [
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
+      setQuickFilterPower,
     ]);
 
     const pointsTable = useMemo(() => {
