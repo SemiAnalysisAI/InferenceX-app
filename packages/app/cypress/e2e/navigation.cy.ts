@@ -1,8 +1,6 @@
 // Merged from tabs.cy.ts and first-load-navigation.cy.ts
 // to reduce per-file Cypress startup overhead (~500ms per file)
 
-import { keepLaunchModal } from '../support/e2e';
-
 describe('Chart Section Tabs — E2E', () => {
   before(() => {
     cy.window().then((win) => {
@@ -44,31 +42,22 @@ describe('Chart Section Tabs — E2E', () => {
 });
 
 describe('First-load navigation', () => {
-  // These specs need the launch modal to actually show on first load.
-  before(keepLaunchModal);
-
   beforeEach(() => {
     cy.visit('/', {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-starred');
-        // Snoozed, not cleared: dismissing the launch modal below makes the
-        // star modal the next eligible landing nudge, and its corner card
-        // would sit over the footer links these specs click.
+        // Snoozed, not cleared: the star modal is the eligible landing nudge
+        // on first load, and its corner card would sit over the footer links
+        // these specs click.
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-agentic-results-modal-dismissed');
         win.localStorage.removeItem('inferencex-openai-rubin-banner-dismissed');
       },
     });
 
-    // The launch modal is centered behind a backdrop, so it owns the first
-    // interaction — dismiss it before exercising the page underneath.
-    cy.get('[data-testid="launch-modal"]').should('be.visible');
-    cy.get('[data-testid="launch-modal-dismiss"]').click();
-    cy.get('[data-testid="launch-modal"]').should('not.exist');
     cy.get('body').should('not.have.attr', 'data-scroll-locked');
   });
 
-  it('navigates to articles from the footer after the launch modal is dismissed', () => {
+  it('navigates to articles from the footer', () => {
     cy.get('[data-testid="footer-link-articles"]').scrollIntoView().click();
     cy.location('pathname').should('eq', '/blog');
   });
