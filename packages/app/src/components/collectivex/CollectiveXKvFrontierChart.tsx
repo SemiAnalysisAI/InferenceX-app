@@ -88,19 +88,19 @@ export function CollectiveXKvFrontierChart({
     () => new Map(cases.map((kase) => [`${kase.run_id}:${kase.case_id}`, kase.run_index])),
     [cases],
   );
-  // Pareto roofline per series, matching the /inference scatter: the line
-  // connects only frontier points, so a serializing backend draws a stub and
-  // an overlapping one a descending envelope.
+  // Roofline per series in the /inference style, drawn through the full batch
+  // ladder: because raising the batch improves both axes until the backend
+  // saturates, the strict Pareto set is usually a single point, so the ladder
+  // itself is the achievable curve and its endpoint the frontier.
   const lines = useMemo(() => {
     const bySeries: Record<string, CollectiveXKvFrontierPoint[]> = {};
     for (const point of points) {
-      if (!point.onSeriesFrontier) continue;
       (bySeries[point.seriesId] ??= []).push(point);
     }
     const result: Record<string, { x: number; y: number }[]> = {};
     for (const [seriesId, seriesPoints] of Object.entries(bySeries)) {
       result[seriesId] = seriesPoints
-        .toSorted((a, b) => a.x - b.x)
+        .toSorted((a, b) => a.row.batch - b.row.batch)
         .map((point) => ({ x: point.x, y: point.y }));
     }
     return result;
