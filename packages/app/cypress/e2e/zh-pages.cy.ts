@@ -61,9 +61,7 @@ describe('Chinese (/zh) pages', () => {
         'href',
         '/zh/land-acknowledgement',
       );
-      cy.get('[data-testid="footer-link-zh"]')
-        .should('contain.text', 'English')
-        .and('have.attr', 'href', '/');
+      cy.get('[data-testid="footer-link-zh"]').should('not.exist');
     });
   });
 

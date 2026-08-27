@@ -38,9 +38,6 @@ const STRINGS = {
     chipSpecs: 'Chip Specs & Pricing',
     rankings: 'GPU Rankings',
     runPages: 'Model on GPU Results',
-    languageLink: '中文版',
-    languageHref: '/zh',
-    languageHrefLang: 'zh-CN',
     cta: 'If this data helps your work, consider starring us on GitHub or sharing with your network.',
     rights: 'All rights reserved.',
   },
@@ -72,9 +69,6 @@ const STRINGS = {
     chipSpecs: '芯片规格与价格',
     rankings: 'GPU 排行榜',
     runPages: '模型在 GPU 上的实测结果',
-    languageLink: 'English',
-    languageHref: '/',
-    languageHrefLang: 'en',
     cta: '如果这些数据对您的工作有帮助，欢迎在 GitHub 上点个 Star，或分享给同事。',
     rights: '版权所有。',
   },
@@ -308,14 +302,6 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {t.runPages}
-                </Link>
-                <Link
-                  data-testid="footer-link-zh"
-                  href={t.languageHref}
-                  hrefLang={t.languageHrefLang}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {t.languageLink}
                 </Link>
               </div>
             </div>
