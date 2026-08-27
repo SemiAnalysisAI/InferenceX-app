@@ -1,6 +1,11 @@
-import { DB_MODEL_TO_DISPLAY, DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
+import {
+  DB_MODEL_TO_DISPLAY,
+  DISPLAY_MODEL_TO_DB,
+  POWER_METRIC_KEYS,
+} from '@semianalysisai/inferencex-constants';
 import { COLLECTIVEX_VERSIONS } from '@semianalysisai/inferencex-db/collectivex/types';
 
+import { POWER_VALIDITY_FILTERS } from './benchmark-power-validity';
 import { PUBLIC_API_ERRORS } from './public-api-errors';
 
 export type ApiDocumentationLocale = 'en' | 'zh';
@@ -192,6 +197,59 @@ const errorResponse = (
   mediaType: 'application/json',
 });
 
+const powerMetricDescriptions: Readonly<Record<(typeof POWER_METRIC_KEYS)[number], string>> = {
+  power_valid:
+    'Publication verdict: 1 = validated measurement window; 0 = failed validation — measured power/energy values are withheld from this row end-to-end, so treat any that remain as unreliable; absent = legacy row predating validation.',
+  power_metric_schema_version:
+    'Power schema version. Version 2 defines every unprefixed joules_per_* field as whole-deployment energy, including on disaggregated runs.',
+  avg_power_w: 'Mean per-GPU power draw in watts during the measured load window.',
+  joules_per_successful_query: 'Whole-deployment energy in joules divided by successful requests.',
+  joules_per_output_token:
+    'Energy per generated output token in joules; cluster-wide on schema-version-2 rows, including disaggregated runs.',
+  joules_per_total_token:
+    'Total system energy divided by input plus output tokens; a workload-shape-fair view that does not treat prompt tokens as free.',
+  prefill_avg_power_w:
+    'Mean per-GPU power draw in watts across prefill workers; emitted only for deployments with distinct prefill and decode roles.',
+  decode_avg_power_w:
+    'Mean per-GPU power draw in watts across decode workers; emitted only for deployments with distinct prefill and decode roles.',
+  joules_per_input_token:
+    'Energy per input token in joules; cluster-wide on schema-version-2 rows.',
+  prefill_joules_per_input_token: 'Role-local prefill energy per input token in joules.',
+  decode_joules_per_output_token: 'Role-local decode energy per generated output token in joules.',
+  avg_temp_c: 'Mean per-GPU temperature in degrees Celsius during the load window.',
+  peak_temp_c:
+    'Maximum instantaneous per-GPU temperature in degrees Celsius during the load window.',
+  avg_util_pct: 'Mean per-GPU utilization percentage (0-100) during the load window.',
+  avg_mem_used_mb: 'Mean per-GPU memory used in MB during the load window.',
+};
+const benchmarkMetricsSchema: ApiSchema = {
+  type: 'object',
+  additionalProperties: numberSchema,
+  description:
+    'Scalar metric map. Keys evolve independently; measured power / energy / GPU-telemetry keys are typed below.',
+  properties: Object.fromEntries(
+    POWER_METRIC_KEYS.map((key): [string, ApiSchema] => [
+      key,
+      { type: 'number', description: powerMetricDescriptions[key] },
+    ]),
+  ),
+};
+const powerAuditSchema: ApiSchema = {
+  type: 'object',
+  properties: {
+    window_start_unix: numberSchema,
+    window_end_unix: numberSchema,
+    expected_gpu_count: integerSchema,
+    observed_gpu_count: integerSchema,
+    sample_count: integerSchema,
+    max_sample_gap_s: numberSchema,
+    producer_sha: nullableStringSchema,
+    exporter_image_sha256: nullableStringSchema,
+  },
+  additionalProperties: true,
+  description:
+    'Reserved (forthcoming): power measurement-window audit emitted by newer producers. Absent on legacy rows.',
+};
 const workerPowerSchema = objectSchemaWithOptional(
   {
     role: stringSchema,
@@ -234,14 +292,20 @@ const benchmarkRowSchema = objectSchemaWithOptional(
     offload_mode: stringSchema,
     image: nullableStringSchema,
     recipe_fingerprint: nullableStringSchema,
-    metrics: metricMapSchema,
+    metrics: benchmarkMetricsSchema,
     workers: arraySchema(workerPowerSchema),
+    power_invalid_reasons: {
+      ...arraySchema(stringSchema),
+      description:
+        'Reserved (forthcoming): snake_case reason codes, present when metrics.power_valid == 0. Absent on legacy rows.',
+    },
+    power_audit: powerAuditSchema,
     date: { type: 'string', format: 'date' },
     workflow_run_id: integerSchema,
     run_started_at: { type: ['string', 'null'], format: 'date-time' },
     run_url: nullableStringSchema,
   },
-  ['workers', 'workflow_run_id', 'run_started_at'],
+  ['workers', 'power_invalid_reasons', 'power_audit', 'workflow_run_id', 'run_started_at'],
 );
 const benchmarkRowsSchema = arraySchema(benchmarkRowSchema);
 const benchmarkExample = [
@@ -271,7 +335,17 @@ const benchmarkExample = [
     offload_mode: 'off',
     image: 'vllm/vllm-openai:v0.10.2',
     recipe_fingerprint: '7d72a33d7d72a33d7d72a33d7d72a33d7d72a33d7d72a33d7d72a33d7d72a33d',
-    metrics: { median_ttft: 0.42, median_tpot: 0.018, tput_per_gpu: 128.4 },
+    metrics: {
+      median_ttft: 0.42,
+      median_tpot: 0.018,
+      tput_per_gpu: 128.4,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      avg_power_w: 678.5,
+      joules_per_output_token: 5.3,
+      joules_per_total_token: 2.65,
+      avg_temp_c: 61.2,
+    },
     date: '2026-08-08',
     run_url: 'https://github.com/semianalysis/inference-benchmarks/actions/runs/123456789',
   },
@@ -589,8 +663,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/benchmarks',
     summary: text('Read benchmark results', '读取基准结果'),
     description: text(
-      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId to return only that workflow run. The page-owned calculator view is not part of this public contract.',
-      '按展示模型返回原始基准行。可用 date 获取截至该日的快照，exact=true 限定该日，runId 约束最新查询，或将 exactRun=true 与数字 runId 组合以仅返回该工作流运行。页面专用的计算器视图不属于此公开契约。',
+      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId to return only that workflow run. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change), and powerValid filters rows by measured-power validity and cannot be combined with view=calculator.',
+      '按展示模型返回原始基准行。可用 date 获取截至该日的快照，exact=true 限定该日，runId 约束最新查询，或将 exactRun=true 与数字 runId 组合以仅返回该工作流运行。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）；powerValid 按实测功率有效性筛选行，且不能与 view=calculator 组合使用。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -645,6 +719,36 @@ export const apiOperations: readonly ApiOperation[] = [
         { type: 'boolean', default: false },
         false,
       ),
+      parameter(
+        'view',
+        'query',
+        false,
+        'enum',
+        'calculator trims each row to the page-owned metric allowlist the throughput calculator consumes and removes workers; measured power metrics are excluded from this view. Requires sequence. Omit for every stored metric, including measured power.',
+        'calculator 会将每行裁剪为吞吐量计算器所需的页面专用指标允许列表并移除 workers；此视图不包含实测功率指标。需要同时提供 sequence。省略则返回全部已存储指标，包括实测功率。',
+        { type: 'string', enum: ['calculator'] },
+        'calculator',
+      ),
+      parameter(
+        'sequence',
+        'query',
+        false,
+        'enum',
+        'Required when view=calculator and ignored otherwise. Unknown values yield 400 Unknown calculator sequence.',
+        '当 view=calculator 时必填，其余情况会被忽略。未知值返回 400 Unknown calculator sequence。',
+        { type: 'string', enum: ['1k/1k', '1k/8k', '8k/1k', 'agentic-traces'] },
+        '1k/1k',
+      ),
+      parameter(
+        'powerValid',
+        'query',
+        false,
+        'enum',
+        '1 keeps only rows with a validated power measurement (metrics.power_valid == 1); 0 keeps only explicitly invalidated rows; any applies no filter (default; includes legacy rows without a verdict); strictV2 keeps rows with power_valid == 1 and power_metric_schema_version == 2 (whole-deployment energy semantics) — stricter than the InferenceX UI, which also displays validated rows that predate schema versioning. Unknown values yield 400 Unknown powerValid filter; cannot be combined with view=calculator.',
+        '1 仅保留具有已验证功率测量的行（metrics.power_valid == 1）；0 仅保留被明确判定无效的行；any 不做筛选（默认值；包含没有判定结果的旧数据行）；strictV2 保留 power_valid == 1 且 power_metric_schema_version == 2（全部署能耗语义）的行——比 InferenceX 界面更严格，界面还会展示早于版本标注机制的已验证行。未知值返回 400 Unknown powerValid filter；不能与 view=calculator 组合使用。',
+        { type: 'string', enum: POWER_VALIDITY_FILTERS, default: 'any' },
+        'strictV2',
+      ),
     ],
     responses: [
       success(
@@ -655,8 +759,8 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'The model is missing or unsupported.',
-        '模型缺失或不受支持。',
+        'The model is missing or unsupported, the calculator sequence is unknown, the powerValid filter is unknown, or powerValid is combined with view=calculator.',
+        '模型缺失或不受支持、计算器序列未知、powerValid 筛选值未知，或 powerValid 与 view=calculator 组合使用。',
         PUBLIC_API_ERRORS.unknownModel,
       ),
       errorResponse(
@@ -2554,6 +2658,21 @@ const overview = {
       ),
       shape: 'BenchmarkRows',
       example: benchmarkExample[0],
+    },
+    {
+      id: 'measured-power',
+      title: text('Measured power', '实测功率'),
+      description: text(
+        'Benchmark rows may carry measured power, energy, and GPU-telemetry metric keys (avg_power_w, joules_per_*, avg_temp_c, peak_temp_c, avg_util_pct, avg_mem_used_mb). power_valid is tri-state: 1 means the measurement window was validated; 0 means validation failed and measured values are withheld end-to-end (the producer strips them and ingest scrubs them — treat any that remain as unreliable); absent marks a legacy row predating validation. power_metric_schema_version == 2 defines every unprefixed joules_per_* field as whole-deployment energy — unversioned disaggregated joules are ambiguous because those fields previously carried role-local values. workers[] carries the per-worker power/telemetry breakdown on multinode and disaggregated runs. power_invalid_reasons and power_audit are reserved forthcoming fields. Filter rows with the powerValid request parameter; its strict value is named strictV2 (power_valid == 1 and power_metric_schema_version == 2) rather than "certified" because it is stricter than the InferenceX UI, which also displays validated rows that predate schema versioning.',
+        '基准行可能携带实测功率、能耗和 GPU 遥测指标键（avg_power_w、joules_per_*、avg_temp_c、peak_temp_c、avg_util_pct、avg_mem_used_mb）。power_valid 为三态：1 表示测量窗口已通过验证；0 表示验证失败，实测值会被全链路扣留（生产端剥离、摄取端再次清除——若仍残留请视为不可靠）；缺失表示早于验证机制的旧数据行。power_metric_schema_version == 2 将所有无前缀的 joules_per_* 字段定义为全部署能耗——未标注版本的分离式 joules 含义不明确，因为这些字段曾承载角色本地值。多节点和分离式运行的每 worker 功率/遥测明细位于 workers[]。power_invalid_reasons 与 power_audit 为预留的即将推出字段。可使用 powerValid 请求参数筛选行；其严格取值命名为 strictV2（power_valid == 1 且 power_metric_schema_version == 2）而非 "certified"，因为它比 InferenceX 界面更严格——界面还会展示早于版本标注机制的已验证行。',
+      ),
+      shape: 'BenchmarkRows',
+      example: {
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        avg_power_w: 678.5,
+        joules_per_output_token: 5.3,
+      },
     },
     {
       id: 'metric-maps',
