@@ -47,7 +47,7 @@ describe('Landing page performance', () => {
     cy.viewport(412, 823);
     cy.request('/')
       .its('body')
-      .should('contain', 'See more supporters')
+      .should('contain', 'See full quotes')
       .and('contain', 'data-testid="launch-banner"');
 
     cy.intercept('GET', '**/_next/static/**/*.js', (request) => {
@@ -65,11 +65,14 @@ describe('Landing page performance', () => {
     });
 
     cy.get('[data-testid="launch-banner"]').should('be.visible');
-    cy.get('[data-testid="intro-section"]').should('contain.text', 'See more supporters');
-    cy.get('[data-testid="quote-carousel-more-row"]')
+    cy.get('[data-testid="intro-section"]').should(
+      'contain.text',
+      'See full quotes & more supporters',
+    );
+    cy.get('[data-testid="supporters-more-row"]')
       .should('have.class', 'justify-end')
       .find('a')
-      .should('have.text', 'See more supporters →');
+      .should('have.text', 'See full quotes & more supporters →');
     expectLowCls();
   });
 
@@ -84,7 +87,10 @@ describe('Landing page performance', () => {
 
     cy.get('html').should('have.attr', 'data-landing-banner-dismissed');
     cy.get('[data-testid="launch-banner"]').should('not.exist');
-    cy.get('[data-testid="intro-section"]').should('contain.text', 'See more supporters');
+    cy.get('[data-testid="intro-section"]').should(
+      'contain.text',
+      'See full quotes & more supporters',
+    );
     expectLowCls();
   });
 

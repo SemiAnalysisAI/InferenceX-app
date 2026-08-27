@@ -1,13 +1,13 @@
-import { QuoteCarousel } from '@/components/quote-carousel';
+import { SupportersStrip } from '@/components/supporters-strip';
 import { QUOTES, CAROUSEL_ORGS, CAROUSEL_LABELS } from '@/components/quotes/quotes-data';
 import type { Locale } from '@/lib/i18n';
 
-// Carousel order follows QUOTES order — carousel orgs are listed first there.
-const carouselQuotes = QUOTES.filter((q) => (CAROUSEL_ORGS as readonly string[]).includes(q.org));
-
-const CAROUSEL_OVERRIDES = {
-  labels: CAROUSEL_LABELS,
-};
+// Strip order follows QUOTES order — supporter orgs are listed first there.
+const supporterOrgs = [
+  ...new Set(
+    QUOTES.filter((q) => (CAROUSEL_ORGS as readonly string[]).includes(q.org)).map((q) => q.org),
+  ),
+].map((org) => CAROUSEL_LABELS[org] ?? org);
 
 const STRINGS = {
   en: {
@@ -23,19 +23,10 @@ const STRINGS = {
 export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
   const isZh = locale === 'zh';
   const t = STRINGS[locale];
-  // Quotes fall back to the English original until a translation lands.
-  const quotes = isZh
-    ? carouselQuotes.map((q) => ({
-        ...q,
-        text: q.textZh ?? q.text,
-        title: q.titleZh ?? q.title,
-      }))
-    : carouselQuotes;
   return (
     <section className="py-8 md:py-12">
-      {/* Mint-tinted supporters band: the quote carousel already carries the
-          org strip, so the section frames it with an editorial heading
-          instead of card chrome. */}
+      {/* Mint-tinted supporters band: quote text lives on /quotes now — the
+          band keeps just the org strip and a link out, saving vertical space. */}
       <div
         data-testid="intro-section"
         className="rounded-2xl bg-accent px-5 py-8 md:px-10 md:py-10 dark:bg-card dark:border dark:border-border"
@@ -45,11 +36,10 @@ export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
           {t.heading}
         </h2>
         <div className="mt-8">
-          <QuoteCarousel
-            quotes={quotes}
-            overrides={CAROUSEL_OVERRIDES}
+          <SupportersStrip
+            orgs={supporterOrgs}
             moreHref={isZh ? '/zh/quotes' : '/quotes'}
-            moreLabel={isZh ? '查看业界评价 →' : undefined}
+            moreLabel={isZh ? '查看完整评价与更多支持者 →' : undefined}
           />
         </div>
       </div>
