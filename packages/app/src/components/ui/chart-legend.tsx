@@ -1,6 +1,5 @@
 'use client';
 
-import { track } from '@/lib/analytics';
 import {
   ChevronDown,
   ChevronRight,
@@ -12,7 +11,7 @@ import {
   Triangle,
   X,
 } from 'lucide-react';
-import React, { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { SHAPE_ORDER, type ShapeKey, getShapeKeyForPrecision } from '@/lib/chart-rendering';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
@@ -38,9 +37,6 @@ export type { CommonLegendItemProps } from './chart-legend-item';
 const STRINGS = {
   en: {
     advanced: 'Advanced',
-    searchPlaceholder: 'Search...',
-    searchAria: 'Search legend',
-    clearSearch: 'Clear search',
     moreInfo: (label: string) => `More info about ${label}`,
     hideLegend: 'Hide legend',
     showLegend: 'Show legend',
@@ -49,9 +45,6 @@ const STRINGS = {
   },
   zh: {
     advanced: '高级',
-    searchPlaceholder: '搜索…',
-    searchAria: '搜索图例',
-    clearSearch: '清除搜索',
     moreInfo: (label: string) => `查看${label}的更多信息`,
     hideLegend: '隐藏图例',
     showLegend: '显示图例',
@@ -135,7 +128,6 @@ export default function ChartLegend({
   const isSidebar = variant === 'sidebar';
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const advancedControlsId = useId();
 
@@ -170,22 +162,6 @@ export default function ChartLegend({
     return filterAndSortLegendItems(legendItems, '', !disableActiveSort);
   }, [legendItems, isSidebar, disableActiveSort]);
 
-  // Compute which items match the search query (used to hide non-matching via CSS)
-  const hiddenNames = useMemo(() => {
-    if (!isSidebar) return new Set<string>();
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return new Set<string>();
-    return new Set(
-      legendItems
-        .filter(
-          (item) =>
-            !item.label.toLowerCase().includes(query) &&
-            !(item.title && item.title.toLowerCase().includes(query)),
-        )
-        .map((item) => item.name),
-    );
-  }, [legendItems, searchQuery, isSidebar]);
-
   const rows = useMemo(() => {
     if (!grouped) return null;
     const items = isSidebar ? sortedItems : legendItems;
@@ -213,7 +189,7 @@ export default function ChartLegend({
   // (Epoch-style). It never overlays the chart; closing it (X) removes it
   // entirely and the chart reclaims the width.
   const outerClasses = isSidebar
-    ? 'p-2 rounded-sm border bg-accent text-sm flex flex-col h-full legend-container sidebar-legend w-full'
+    ? 'p-3 rounded-md border border-border/60 bg-background text-sm flex flex-col h-full legend-container sidebar-legend w-full'
     : grouped
       ? cn(
           'py-1 px-2 md:py-1 rounded-sm border text-sm top-0 right-0 bg-accent transition-all md:flex md:flex-col legend-container',
@@ -263,12 +239,6 @@ export default function ChartLegend({
       ? 'flex gap-x-4 flex-wrap flex-row md:block md:overflow-y-auto md:flex-1 md:min-h-0'
       : 'flex flex-row flex-wrap gap-x-4 gap-y-2 md:block md:overflow-y-auto md:flex-1 md:min-h-0';
 
-  const trackSearchOnBlur = useCallback(() => {
-    if (searchQuery.trim()) {
-      track('inference_legend_searched', { query: searchQuery.trim() });
-    }
-  }, [searchQuery]);
-
   // Fully-closed sidebar: render only a reopen affordance at the top-right of
   // the chart area (all hooks above have already run unconditionally).
   if (isSidebar && !isLegendExpanded) {
@@ -288,32 +258,9 @@ export default function ChartLegend({
     );
   }
 
-  const searchInput = isSidebar ? (
-    <div className="pb-1.5 no-export flex items-center gap-1">
-      <div className="relative flex-1">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onBlur={trackSearchOnBlur}
-          placeholder={t.searchPlaceholder}
-          aria-label={t.searchAria}
-          className="w-full px-2 py-1 pr-6 rounded-md border border-border bg-background text-foreground text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-sky-500/50 focus:border-sky-500/50"
-        />
-        {searchQuery && (
-          <button
-            type="button"
-            onClick={() => {
-              track('inference_legend_search_cleared');
-              setSearchQuery('');
-            }}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-sm text-muted-foreground hover:text-foreground transition-colors"
-            aria-label={t.clearSearch}
-          >
-            <X size={12} />
-          </button>
-        )}
-      </div>
+  // Slim header: just the close (X) affordance, right-aligned (Epoch-style).
+  const panelHeader = isSidebar ? (
+    <div className="pb-1 no-export flex justify-end">
       <button
         type="button"
         data-testid="legend-close-button"
@@ -449,7 +396,7 @@ export default function ChartLegend({
   ) : null;
 
   // Compute li className for a legend item (shared by tooltip and non-tooltip paths)
-  const itemClassName = (item: CommonLegendItemProps, isHidden: boolean) =>
+  const itemClassName = (item: CommonLegendItemProps) =>
     cn(
       'transition-opacity duration-300',
       isSidebar
@@ -460,11 +407,10 @@ export default function ChartLegend({
           ? 'opacity-100'
           : 'opacity-50 no-export',
       itemsExpanded && 'md:w-full md:block',
-      isHidden && 'h-0 m-0! p-0! overflow-hidden',
     );
 
   // Render a single legend item, optionally wrapped with a tooltip
-  const renderItem = (item: CommonLegendItemProps, isHidden: boolean) => {
+  const renderItem = (item: CommonLegendItemProps) => {
     const legendItem = (
       <ChartLegendItem
         name={item.name}
@@ -489,7 +435,7 @@ export default function ChartLegend({
     );
 
     return (
-      <li key={item.name} className={itemClassName(item, isHidden)}>
+      <li key={item.name} className={itemClassName(item)}>
         {enableTooltips ? (
           <TooltipRoot>
             <TooltipTrigger asChild>
@@ -531,57 +477,43 @@ export default function ChartLegend({
         style={isSidebar || isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
         className={cn(scrollClasses, 'custom-scrollbar')}
       >
-        {rows.map((row, i) => {
-          const allHidden =
-            isSidebar && row.every((item: CommonLegendItemProps) => hiddenNames.has(item.name));
-          return (
-            <div
-              key={i}
+        {rows.map((row, i) => (
+          <div key={i} className={cn('p-1 rounded-sm shrink-0', i > 0 && 'mt-2')}>
+            <div className="text-sm font-medium text-muted-foreground gpu-legend-title whitespace-nowrap overflow-ellipsis overflow-hidden">
+              {row[0].title}
+            </div>
+            <ul
               className={cn(
-                'p-1 rounded-sm shrink-0',
-                i > 0 && 'mt-2',
-                allHidden && 'h-0 m-0! p-0! overflow-hidden',
+                'flex flex-wrap gap-x-2 gap-y-1',
+                itemsExpanded && 'md:block md:space-y-1',
               )}
             >
-              <div className="text-sm font-medium text-muted-foreground gpu-legend-title whitespace-nowrap overflow-ellipsis overflow-hidden">
-                {row[0].title}
-              </div>
-              <ul
-                className={cn(
-                  'flex flex-wrap gap-x-2 gap-y-1',
-                  itemsExpanded && 'md:block md:space-y-1',
-                )}
-              >
-                {row.map((item: CommonLegendItemProps) => {
-                  const isHidden = isSidebar && hiddenNames.has(item.name);
-                  return (
-                    <li key={item.name} className={cn(isHidden && 'h-0 m-0! p-0! overflow-hidden')}>
-                      <ChartLegendItem
-                        name={item.name}
-                        hw={item.hw}
-                        label={item.label}
-                        color={item.color}
-                        lineDasharray={item.lineDasharray}
-                        title={item.title}
-                        isActive={item.isActive}
-                        onClick={item.onClick}
-                        onHover={onItemHover}
-                        onHoverEnd={onItemHoverEnd}
-                        onRemove={removeFor(item)}
-                        onShowPoints={item.onShowPoints}
-                        hideAriaLabel={t.hide(item.label)}
-                        showPointsAriaLabel={t.showPoints(item.label)}
-                        isLegendExpanded={itemsExpanded}
-                        sidebarMode={isSidebar}
-                        asFragment
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          );
-        })}
+              {row.map((item: CommonLegendItemProps) => (
+                <li key={item.name}>
+                  <ChartLegendItem
+                    name={item.name}
+                    hw={item.hw}
+                    label={item.label}
+                    color={item.color}
+                    lineDasharray={item.lineDasharray}
+                    title={item.title}
+                    isActive={item.isActive}
+                    onClick={item.onClick}
+                    onHover={onItemHover}
+                    onHoverEnd={onItemHoverEnd}
+                    onRemove={removeFor(item)}
+                    onShowPoints={item.onShowPoints}
+                    hideAriaLabel={t.hide(item.label)}
+                    showPointsAriaLabel={t.showPoints(item.label)}
+                    isLegendExpanded={itemsExpanded}
+                    sidebarMode={isSidebar}
+                    asFragment
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
     ) : (
       <ul
@@ -589,16 +521,14 @@ export default function ChartLegend({
         style={isSidebar || isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
         className={cn(scrollClasses, 'custom-scrollbar')}
       >
-        {(isSidebar ? sortedItems : legendItems).map((item) =>
-          renderItem(item, isSidebar && hiddenNames.has(item.name)),
-        )}
+        {(isSidebar ? sortedItems : legendItems).map((item) => renderItem(item))}
       </ul>
     );
 
   const content = (
     <div className={isSidebar ? 'h-full' : 'relative'}>
       <div data-testid="chart-legend" className={outerClasses} style={outerStyle}>
-        {searchInput}
+        {panelHeader}
         {scrollContent}
         {bottomControls}
       </div>

@@ -120,21 +120,8 @@ describe('ChartLegend (sidebar variant)', () => {
     cy.get('.sidebar-legend label').first().find('span').first().should('exist');
   });
 
-  it('search input filters legend items by hiding non-matches', () => {
-    cy.get('.sidebar-legend input[placeholder="Search..."]').should('exist');
-    cy.get('.sidebar-legend input[placeholder="Search..."]').clear().type('MI300');
-    // Non-matching items are hidden via overflow-hidden class, not removed from DOM
-    cy.get('.sidebar-legend li.overflow-hidden').should('have.length', 3);
-    cy.get('.sidebar-legend li:not(.overflow-hidden)').should('have.length', 1);
-    cy.get('.sidebar-legend li:not(.overflow-hidden)').should('contain.text', 'AMD MI300X');
-  });
-
-  it('search clear button resets search', () => {
-    cy.get('.sidebar-legend input[placeholder="Search..."]').type('test');
-    cy.get('button[aria-label="Clear search"]').should('be.visible');
-    cy.get('button[aria-label="Clear search"]').click();
-    cy.get('.sidebar-legend input[placeholder="Search..."]').should('have.value', '');
-    cy.get('button[aria-label="Clear search"]').should('not.exist');
+  it('renders no search input (removed from the sidebar panel)', () => {
+    cy.get('.sidebar-legend input[type="text"]').should('not.exist');
   });
 
   it('clicking a legend item toggles its active state', () => {
