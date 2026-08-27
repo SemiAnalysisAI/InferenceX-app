@@ -29,10 +29,9 @@ export const MODEL_DEVELOPER_LOGOS: Record<string, string> = {
   'Moonshot AI': 'kimi-color.svg',
   // OpenAI's brand mark is monochrome by design — no color variant exists.
   OpenAI: 'openai.svg',
-  // Z.ai's current brand mark is the angular "Z" glyph, black by design (the
-  // old blue Zhipu molecule is the retired brand). `zai-color.svg` sets the
-  // white mark on its brand-black rounded tile (the Z.ai app icon) — the same
-  // treatment as Kimi — so it stays brand-accurate AND visible in both themes.
+  // The Z.ai brand mark is monochrome by design — no color variant exists.
+  // `zai-color.svg` sets the white Z glyph on its brand black rounded tile
+  // (the Z.ai app icon), so it stays theme-independent like the Kimi mark.
   'Z.ai (Zhipu AI)': 'zai-color.svg',
 };
 
