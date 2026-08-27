@@ -82,9 +82,13 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.r_active).toBe('');
   });
 
-  it('has empty string defaults for calculator fleet-planner params', async () => {
-    const { PARAM_DEFAULTS } = await import('@/lib/url-state');
-    expect(PARAM_DEFAULTS.c_mw).toBe('');
+  it('keeps the fleet defaults aligned with URL-state stripping', async () => {
+    const { DEFAULT_FLEET_MW, DEFAULT_LIFECYCLE_RAMP_MONTHS, PARAM_DEFAULTS } =
+      await import('@/lib/url-state');
+    expect(DEFAULT_FLEET_MW).toBe('10');
+    expect(DEFAULT_LIFECYCLE_RAMP_MONTHS).toBe('0.5');
+    expect(PARAM_DEFAULTS.c_mw).toBe(DEFAULT_FLEET_MW);
+    expect(PARAM_DEFAULTS.c_ramp).toBe(DEFAULT_LIFECYCLE_RAMP_MONTHS);
     expect(PARAM_DEFAULTS.c_costcap).toBe('');
   });
 });
@@ -453,7 +457,7 @@ describe('buildShareUrl tab filtering', () => {
       g_model: 'x',
       i_seq: 'y',
       i_pctl: 'p75',
-      c_mw: '10',
+      c_mw: '20',
       c_costcap: '0.5',
       r_range: 'last-7-days',
     });
@@ -463,7 +467,7 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).toContain('g_model=x');
     expect(url).toContain('i_seq=y');
     expect(url).toContain('i_pctl=p75');
-    expect(url).toContain('c_mw=10');
+    expect(url).toContain('c_mw=20');
     expect(url).toContain('c_costcap=0.5');
     expect(url).not.toContain('r_range');
   });
