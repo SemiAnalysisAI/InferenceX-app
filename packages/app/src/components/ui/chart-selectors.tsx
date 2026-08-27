@@ -1,6 +1,7 @@
 'use client';
 
 import { Info } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { track } from '@/lib/analytics';
@@ -171,6 +172,12 @@ interface ModelSelectorProps {
   onOpenChange?: (open: boolean) => void;
   availableModels: string[];
   'data-testid'?: string;
+  /**
+   * Optional affordance rendered beside the closed trigger (outside the
+   * dropdown, mirroring the scenario selector's info icon) — e.g. the
+   * model-architecture deep-dive link on the inference dashboard.
+   */
+  trailing?: ReactNode;
 }
 
 export function ModelSelector({
@@ -181,6 +188,7 @@ export function ModelSelector({
   onOpenChange,
   availableModels,
   'data-testid': testId,
+  trailing,
 }: ModelSelectorProps) {
   const t = STRINGS[useLocale()];
   const groups = groupByCategory(availableModels, (m) => getModelCategory(m as Model));
@@ -233,28 +241,31 @@ export function ModelSelector({
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-2">
       <LabelWithTooltip htmlFor={id} label={t.model} tooltip={t.modelTooltip} />
-      <div>
-        <MultiSelect
-          sections={sections}
-          value={[value]}
-          onChange={(values) => {
-            const next = values[0];
-            if (!next) return;
-            track('selector_model_changed', { model: next });
-            onChange(next as Model);
-          }}
-          open={open}
-          onOpenChange={onOpenChange}
-          triggerId={id}
-          triggerTestId={testId}
-          placeholder={t.model}
-          minSelections={1}
-          maxSelections={1}
-          showClearAll={false}
-          searchable={false}
-          plainSelectedText
-          showSelectionSummary={false}
-        />
+      <div className="flex items-center gap-1.5">
+        <div className="min-w-0 flex-1">
+          <MultiSelect
+            sections={sections}
+            value={[value]}
+            onChange={(values) => {
+              const next = values[0];
+              if (!next) return;
+              track('selector_model_changed', { model: next });
+              onChange(next as Model);
+            }}
+            open={open}
+            onOpenChange={onOpenChange}
+            triggerId={id}
+            triggerTestId={testId}
+            placeholder={t.model}
+            minSelections={1}
+            maxSelections={1}
+            showClearAll={false}
+            searchable={false}
+            plainSelectedText
+            showSelectionSummary={false}
+          />
+        </div>
+        {trailing}
       </div>
     </div>
   );

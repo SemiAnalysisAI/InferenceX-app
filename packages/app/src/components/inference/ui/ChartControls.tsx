@@ -34,6 +34,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { METRIC_CONTROL_GROUPS, METRIC_REGISTRY } from '@/components/inference/metric-registry';
 import { formatTokenPrice } from '@/components/inference/token-revenue';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
+import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
 
@@ -303,6 +304,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             onOpenChange={handleDropdownOpenChange('model')}
             availableModels={availableModels}
             data-testid="model-selector"
+            trailing={<ModelArchitectureInfoLink model={selectedModel} locale={locale} />}
           />
           <ScenarioSelector
             value={selectedSequence}
