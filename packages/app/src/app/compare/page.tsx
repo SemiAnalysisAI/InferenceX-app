@@ -9,10 +9,12 @@ import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { ModelLogo } from '@/components/ui/model-logo';
 import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
 import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
 import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
 import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
+import { type Model } from '@/lib/data-mappings';
 
 export const dynamic = 'force-dynamic';
 
@@ -154,7 +156,15 @@ export default async function CompareIndexPage() {
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
               <div>
-                <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
+                {/* `displayName` is the Model enum value by contract (see
+                    CompareModelSlug in compare-slug.ts), so the shared
+                    ModelLogo resolves each section's brand mark (DeepSeek,
+                    MiniMax, Kimi, ...) from MODEL_CONFIG and renders nothing
+                    for models without one. */}
+                <h2 className="flex items-center gap-2.5 text-xl lg:text-2xl font-bold tracking-tight">
+                  <ModelLogo model={model.displayName as Model} className="size-6 lg:size-7" />
+                  {model.label}
+                </h2>
                 <p className="text-sm text-muted-foreground mt-1">
                   {pairs.length} chip pair{pairs.length === 1 ? '' : 's'} with benchmark data on{' '}
                   {model.label}.
