@@ -92,6 +92,36 @@ describe('token revenue', () => {
     );
   });
 
+  it('rejects incomplete fixed-sequence token mixes', () => {
+    const partialSequence = point({
+      tput_per_gpu: 1_000,
+      input_tput_per_gpu: 1_600,
+      output_tput_per_gpu: 200,
+      isl: 8_192,
+      osl: null,
+      total_prompt_tokens: undefined,
+      total_generation_tokens: undefined,
+    });
+
+    expect(inputTokenShareForRevenue(partialSequence)).toBeNull();
+    expect(tokenRevenuePerGpuHour(partialSequence, openRouterPricing)).toBeNull();
+  });
+
+  it('rejects incomplete agentic token mixes', () => {
+    const partialAgentic = point({
+      tput_per_gpu: 1_000,
+      input_tput_per_gpu: 3_000,
+      output_tput_per_gpu: 100,
+      isl: null,
+      osl: null,
+      total_prompt_tokens: 1_300,
+      total_generation_tokens: undefined,
+    });
+
+    expect(inputTokenShareForRevenue(partialAgentic)).toBeNull();
+    expect(tokenRevenuePerGpuHour(partialAgentic, openRouterPricing)).toBeNull();
+  });
+
   it('removes the normalized placeholder when OpenRouter pricing is unavailable', () => {
     const original = point({ tokenRevenuePerGpuHour: { y: 7.2, roof: false } });
     const [cleared] = applyTokenRevenuePricing([original], null);

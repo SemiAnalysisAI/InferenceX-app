@@ -34,13 +34,16 @@ export function inputTokenShareForRevenue(point: InferenceData): number | null {
     return input / sum;
   }
 
-  const isl = point.isl ?? 0;
-  const osl = point.osl ?? 0;
-  if (isl + osl > 0) return isl / (isl + osl);
+  const { isl, osl } = point;
+  if (typeof isl === 'number' && typeof osl === 'number' && isl + osl > 0) {
+    return isl / (isl + osl);
+  }
 
-  const prompt = point.total_prompt_tokens ?? 0;
-  const generation = point.total_generation_tokens ?? 0;
-  if (prompt + generation > 0) return prompt / (prompt + generation);
+  const prompt = point.total_prompt_tokens;
+  const generation = point.total_generation_tokens;
+  if (typeof prompt === 'number' && typeof generation === 'number' && prompt + generation > 0) {
+    return prompt / (prompt + generation);
+  }
 
   return null;
 }

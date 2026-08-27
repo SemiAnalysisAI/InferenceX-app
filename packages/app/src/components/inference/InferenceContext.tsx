@@ -1447,7 +1447,8 @@ export function InferenceProvider({
   useUrlStateSync(
     {
       i_metric: selectedYAxisMetric,
-      i_revenue: selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' ? tokenRevenuePriceSource : '',
+      i_revenue:
+        selectedYAxisMetric === 'y_tokenRevenuePerGpuHour' ? tokenRevenuePriceSource : 'normalized',
       i_pctl: selectedPercentile,
       i_gpus: selectedGPUs.join(','),
       i_dates: selectedDates.join(','),

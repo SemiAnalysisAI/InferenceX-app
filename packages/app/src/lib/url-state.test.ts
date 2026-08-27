@@ -310,6 +310,18 @@ describe('writeUrlParams + buildShareUrl', () => {
     expect(url).not.toContain('g_model');
   });
 
+  it('removes the revenue source instead of emitting an empty query param off-metric', async () => {
+    setupWindow('?i_revenue=openrouter', '/inference');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+
+    // InferenceContext writes the default source when token revenue is not the
+    // active metric, which must clear stale state without serializing i_revenue=.
+    writeUrlParams({ i_revenue: 'normalized' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(buildShareUrl()).not.toContain('i_revenue');
+  });
+
   it('removes params with undefined value', async () => {
     setupWindow('?g_model=custom', '/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
