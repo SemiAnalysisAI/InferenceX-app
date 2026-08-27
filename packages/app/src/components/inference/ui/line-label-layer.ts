@@ -273,16 +273,12 @@ export interface LineLabelIconSpec {
   height: number;
 }
 
-/** Padding between a label icon's chip edge and the mark inside it. */
-const ICON_CHIP_PAD = 2;
-/** Gap between the icon chip and the label text. */
+/** Gap between the icon and the label text. */
 const ICON_TEXT_GAP = 4;
-/** Icon chip height — matches the pill's inner height at the 10px font. */
-const ICON_CHIP_HEIGHT = 14;
 
 /** Horizontal space an icon occupies to the left of the label text. */
 function iconSpace(icon: LineLabelIconSpec | undefined): number {
-  return icon ? icon.width + ICON_CHIP_PAD * 2 + ICON_TEXT_GAP : 0;
+  return icon ? icon.width + ICON_TEXT_GAP : 0;
 }
 
 export function renderLineLabels(
@@ -367,33 +363,17 @@ export function renderLineLabels(
       .attr('height', bbox.height + 6)
       .attr('fill', label.color);
 
-    // White chip + full-color mark. The chip keeps official brand colors
-    // (NVIDIA green, AMD black) legible on any pill fill in both themes.
-    const chipData = icon ? [icon] : [];
-    const chipHeight = Math.max(ICON_CHIP_HEIGHT, Math.min(bbox.height + 2, 16));
-    const chipY = bbox.y + bbox.height / 2 - chipHeight / 2;
-    const chipX = bbox.x - space;
-    labelGroup
-      .selectAll<SVGRectElement, LineLabelIconSpec>('.ll-logo-chip')
-      .data(chipData)
-      .join('rect')
-      .attr('class', 'll-logo-chip')
-      .attr('rx', 3)
-      .attr('ry', 3)
-      .attr('fill', 'white')
-      .attr('x', chipX)
-      .attr('y', chipY)
-      .attr('width', (d) => d.width + ICON_CHIP_PAD * 2)
-      .attr('height', chipHeight);
+    // Full-color mark drawn directly on the pill — transparent background, so
+    // the icon shares the label's own fill shade (including gradient fills).
     labelGroup
       .selectAll<SVGImageElement, LineLabelIconSpec>('.ll-logo')
-      .data(chipData)
+      .data(icon ? [icon] : [])
       .join('image')
       .attr('class', 'll-logo')
       .attr('href', (d) => d.href)
       .attr('preserveAspectRatio', 'xMidYMid meet')
-      .attr('x', chipX + ICON_CHIP_PAD)
-      .attr('y', (d) => chipY + (chipHeight - d.height) / 2)
+      .attr('x', bbox.x - space)
+      .attr('y', (d) => bbox.y + bbox.height / 2 - d.height / 2)
       .attr('width', (d) => d.width)
       .attr('height', (d) => d.height);
   }

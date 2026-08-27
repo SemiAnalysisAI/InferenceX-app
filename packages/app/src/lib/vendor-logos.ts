@@ -32,10 +32,9 @@ import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
  * Color notes (this is deliberate — do not swap in the monochrome
  * `public/logos/{nvidia,amd}.svg` simple-icons assets here):
  * - NVIDIA: official brand green `#76B900` eye mark.
- * - AMD: the official full-color (positive) AMD lockup is black-on-white.
- * Line-label pills are filled with the series color, so each mark sits on a
- * small white chip to preserve the official full-color rendering on any
- * pill background in both light and dark mode.
+ * - AMD: the official full-color (positive) AMD lockup in brand black.
+ * The marks are drawn with a transparent background directly on the pill,
+ * so the area behind each logo stays the exact shade of the line-label fill.
  */
 export interface VendorLogoIcon {
   /** `data:image/svg+xml` URI for an SVG `<image href>`. */
