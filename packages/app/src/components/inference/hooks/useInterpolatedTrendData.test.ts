@@ -368,6 +368,25 @@ describe('interpolateMetricAtInteractivity', () => {
     expect(result!).toBeLessThan(700);
   });
 
+  it('keeps token revenue proportional to the interpolated total throughput', () => {
+    const points = [
+      makePoint({
+        x: 20,
+        tpPerGpu: { y: 800, roof: false },
+        tokenRevenuePerGpuHour: { y: 2.88, roof: false },
+      }),
+      makePoint({
+        x: 60,
+        tpPerGpu: { y: 400, roof: false },
+        tokenRevenuePerGpuHour: { y: 1.44, roof: false },
+      }),
+    ];
+
+    const throughput = interpolateMetricAtInteractivity(points, 40, 'tpPerGpu');
+    const revenue = interpolateMetricAtInteractivity(points, 40, 'tokenRevenuePerGpuHour');
+    expect(revenue).toBeCloseTo(throughput! * 0.0036, 10);
+  });
+
   it('returns exact boundary value at the lowest frontier x', () => {
     const points = [
       makePoint({ x: 10, tpPerGpu: { y: 1000, roof: false } }),

@@ -44,6 +44,14 @@ export const METRIC_REGISTRY = {
     titleZh: '每芯片输出 token 吞吐量',
     polarity: 'higher',
   },
+  tokenRevenuePerGpuHour: {
+    field: 'tokenRevenuePerGpuHour.y',
+    label: 'Token Revenue per GPU Hour at $1/M tok ($/GPU/hr)',
+    labelZh: '按 $1/百万 token 计价的每 GPU 小时 token 收入（$/GPU/hr）',
+    title: 'Token Revenue per GPU Hour at $1/M tok',
+    titleZh: '按 $1/百万 token 计价的每 GPU 小时 token 收入',
+    polarity: 'higher',
+  },
   tpPerMw: {
     field: 'tpPerMw.y',
     label: 'Token Throughput per All in Utility MW (tok/s/MW)',
@@ -487,6 +495,11 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
       'y_inputTputPerMw',
       'y_outputTputPerMw',
     ],
+  },
+  {
+    label: 'Token Revenue per GPU Hour',
+    labelZh: '每 GPU 小时 token 收入',
+    metrics: ['y_tokenRevenuePerGpuHour'],
   },
   {
     label: 'Total Tokens per $1 USD',

@@ -96,6 +96,7 @@ const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> 
  * from the corresponding tokens-per-dollar chart.
  */
 const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
+  tokenRevenuePerGpuHour: 'tpPerGpu',
   tokensPerDollarH: 'tpPerGpu',
   tokensPerDollarN: 'tpPerGpu',
   tokensPerDollarR: 'tpPerGpu',
@@ -163,8 +164,8 @@ export function interpolateMetricAtInteractivity(
 ): number | null {
   if (points.length === 0) return null;
 
-  // Tokens/$ uses the corresponding total/output/input throughput frontier so
-  // its knots exactly match the throughput/interactivity serving envelope.
+  // Proportional business metrics use the corresponding total/output/input
+  // throughput frontier so their knots exactly match the serving envelope.
   const proportionalThroughputKey = PROPORTIONAL_TO_THROUGHPUT[metricKey];
   const frontierThroughputKey = proportionalThroughputKey ?? 'tpPerGpu';
   for (const point of points) {
@@ -206,9 +207,9 @@ export function interpolateMetricAtInteractivity(
     metricYs.push(v);
   }
 
-  // Tokens/$ is `throughput * 3600 / hourlyCost`. Spline the matching
-  // throughput and apply that constant multiplier so the purchasing-power
-  // curve cannot drift from its throughput/interactivity Pareto curve.
+  // Token revenue and tokens/$ are fixed multiples of throughput. Spline the
+  // matching throughput and apply that multiplier so the derived curve cannot
+  // drift from its throughput/interactivity Pareto curve.
   if (proportionalThroughputKey) {
     const tputYs = sorted.map((p) => extractMetric(p, proportionalThroughputKey)!);
     const multiplier = recoverProportionalMultiplier(metricYs, tputYs);

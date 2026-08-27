@@ -1,3 +1,6 @@
+import { unlockAgenticGate } from '../support/e2e';
+import { interceptOverlayRun, OVERLAY_RUN_ID } from '../support/overlay-fixtures';
+
 describe('Inference Chart', () => {
   before(() => {
     cy.window().then((win) => {
@@ -70,6 +73,54 @@ describe('Inference Chart', () => {
       .should('have.attr', 'aria-pressed', 'true')
       .click()
       .should('have.attr', 'aria-pressed', 'false');
+  });
+
+  it('plots normalized token revenue for official and unofficial runs', () => {
+    interceptOverlayRun();
+    cy.visit(
+      `/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokenRevenuePerGpuHour`,
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          unlockAgenticGate(win);
+        },
+      },
+    );
+    cy.wait('@unofficialRun');
+
+    cy.get('[data-testid="yaxis-metric-selector"]').should(
+      'contain.text',
+      'Token Revenue per GPU Hour at $1/M tok',
+    );
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('h2')
+      .should('contain.text', 'Token Revenue per GPU Hour at $1/M tok');
+    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
+      'have.length.greaterThan',
+      0,
+    );
+    cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
+      'have.length.greaterThan',
+      0,
+    );
+    cy.get('[data-testid^="axis-metric-row-y-"]').first().click();
+    cy.get('[data-testid^="axis-metric-body-y-"]')
+      .first()
+      .should('contain.text', '$1 per million')
+      .and('contain.text', '$/GPU/hr =');
+  });
+
+  it('ships the normalized token-revenue axis in Chinese', () => {
+    cy.visit('/zh/inference?i_metric=y_tokenRevenuePerGpuHour');
+    cy.get('[data-testid="yaxis-metric-selector"]').should(
+      'contain.text',
+      '按 $1/百万 token 计价的每 GPU 小时 token 收入',
+    );
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('h2')
+      .should('contain.text', '按 $1/百万 token 计价的每 GPU 小时 token 收入');
   });
 
   it('surfaces the error instead of an endless skeleton when availability fails', () => {

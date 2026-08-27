@@ -329,6 +329,11 @@ export function buildDerivedChartFields(
   if (wants('inputTputPerGpu') && inputTputPerGpu) {
     fields.inputTputPerGpu = chartMetric(inputTputPerGpu);
   }
+  if (wants('tokenRevenuePerGpuHour')) {
+    // At $1 per million total tokens, million tokens per GPU hour is
+    // numerically equal to gross token revenue in $/GPU/hr.
+    fields.tokenRevenuePerGpuHour = chartMetric(millionTokensPerHour);
+  }
   if (wants('tpPerMw')) fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);
   if (wants('inputTputPerMw') && inputTputPerGpu) {
     fields.inputTputPerMw = chartMetric(

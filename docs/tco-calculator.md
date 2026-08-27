@@ -167,13 +167,20 @@ at every interpolated point.
 compare interpolation models on a fixed snapshot, but they must not be presented
 as permanent impact figures for the changing live dataset.
 
-The `/inference` page also exposes tokens-per-dollar as separate Y-axis metrics;
-it does not replace the cost-per-million metrics. Historical trends for these
-purchasing-power metrics select Pareto knots from the matching total, output, or
-input throughput, spline that throughput, and apply the constant
-`3600 / $/GPU-hr` multiplier. Reusing the matching throughput frontier is
-essential: total-throughput knots are not necessarily the output- or
-input-throughput Pareto knots.
+The `/inference` page also exposes tokens-per-dollar and normalized token revenue
+as separate Y-axis metrics; neither replaces the cost-per-million metrics.
+Historical trends for these proportional metrics select Pareto knots from the
+matching throughput, spline that throughput, and apply the constant multiplier.
+Tokens-per-dollar uses `3600 / $/GPU-hr`; normalized token revenue uses
+`3600 / 1,000,000` at the axis's explicit `$1/M tok` sale price. Reusing the
+matching throughput frontier is essential: total-throughput knots are not
+necessarily the output- or input-throughput Pareto knots.
+
+The normalized revenue axis intentionally prices every input and output token at
+the same `$1/M tok` rate. It is a model-independent SLA comparison, not the fleet
+lifecycle section's realized-revenue model. Actual provider revenue must keep the
+two streams and their prices separate, as described below; it cannot be recovered
+from one blended total-token price.
 
 ### The consistency guard
 

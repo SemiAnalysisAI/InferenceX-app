@@ -103,6 +103,26 @@ function throughputPerMw(tokenType: TokenType): MetricExplanation {
   };
 }
 
+function tokenRevenuePerGpuHour(): MetricExplanation {
+  return {
+    description: {
+      en:
+        'Gross token revenue a GPU could earn per hour at this operating point if every total ' +
+        'token (input + output) is sold at $1 per million. It turns the throughput/interactivity ' +
+        'tradeoff into a business-facing SLA curve. If input and output use one sale price, scale ' +
+        'the curve linearly; use Fleet Lifecycle when they are priced separately.',
+      zh:
+        '假设输入和输出 token 均按每百万 1 美元售出，表示该运行点下每块 GPU 每小时可获得的 token 毛收入。' +
+        '该指标把吞吐量与交互性的权衡转换为面向业务的 SLA 曲线。若输入和输出采用同一售价，可按实际售价线性缩放；' +
+        '若两者分别计价，请使用 Fleet Lifecycle。',
+    },
+    formula: {
+      en: '$/GPU/hr = total tok/s/GPU × 3,600 ÷ 1,000,000 × $1/M tok',
+      zh: '$/GPU/hr = 总 tok/s/GPU × 3,600 ÷ 1,000,000 × $1/百万 token',
+    },
+  };
+}
+
 function costPerMillion(basis: CostBasis, tokenType: TokenType): MetricExplanation {
   return {
     description: {
@@ -239,6 +259,7 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   tpPerGpu: throughputPerChip('total'),
   inputTputPerGpu: throughputPerChip('input'),
   outputTputPerGpu: throughputPerChip('output'),
+  tokenRevenuePerGpuHour: tokenRevenuePerGpuHour(),
   tpPerMw: throughputPerMw('total'),
   inputTputPerMw: throughputPerMw('input'),
   outputTputPerMw: throughputPerMw('output'),
