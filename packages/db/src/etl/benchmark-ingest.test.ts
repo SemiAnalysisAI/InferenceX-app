@@ -7,8 +7,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Sql } from './db-utils';
 import {
   benchmarkPointIngestKey,
+  bulkIngestBenchmarkRows,
   insertServerLogFilePaths,
   insertServerLogFiles,
+  type BenchmarkPersistenceInput,
 } from './benchmark-ingest';
 
 const point = (recipeFingerprint: string | null) => ({
@@ -54,6 +56,80 @@ function fakeTransactionSql(linkedId: number | null) {
   tag.begin = (fn: (tx: typeof tag) => Promise<void>) => fn(tag);
   return { sql: tag as Sql, calls };
 }
+
+function captureInsertSql() {
+  const calls: { text: string; values: unknown[] }[] = [];
+  const tag = vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
+    calls.push({ text: strings.join('?').replaceAll(/\s+/gu, ' ').trim(), values });
+    return Promise.resolve([]);
+  }) as any;
+  tag.array = (value: unknown) => value;
+  return { sql: tag as Sql, calls };
+}
+
+describe('bulkIngestBenchmarkRows — power audit provenance lanes', () => {
+  const provenancedRow: BenchmarkPersistenceInput = {
+    configId: 7,
+    benchmarkType: 'single_turn',
+    isl: 1024,
+    osl: 1024,
+    conc: 64,
+    offloadMode: 'off',
+    image: 'img',
+    recipeFingerprint: null,
+    metrics: { power_valid: 0 },
+    powerInvalidReasons: ['sampling_gap_exceeded'],
+    powerAudit: {
+      window_start_unix: 1756174800,
+      window_end_unix: 1756175400,
+      expected_gpu_count: 8,
+      observed_gpu_count: 8,
+      sample_count: 4800,
+      max_sample_gap_s: 1.013,
+      producer_sha: null,
+      exporter_image_sha256: null,
+    },
+  };
+  const legacyRow: BenchmarkPersistenceInput = {
+    configId: 8,
+    benchmarkType: 'single_turn',
+    isl: 1024,
+    osl: 1024,
+    conc: 128,
+    offloadMode: 'off',
+    image: 'img',
+    recipeFingerprint: null,
+    metrics: { tput_per_gpu: 100 },
+  };
+
+  it('names both columns, adds two jsonb lanes, and refreshes both on conflict', async () => {
+    const { sql, calls } = captureInsertSql();
+    await bulkIngestBenchmarkRows(sql, [provenancedRow, legacyRow], 42, '2026-08-27');
+
+    const { text } = calls[0];
+    expect(text).toContain('metrics, workers, power_invalid_reasons, power_audit )');
+    // metrics + workers + power_invalid_reasons + power_audit
+    expect(text.match(/::jsonb\[\]/gu)).toHaveLength(4);
+    expect(text).toContain('power_invalid_reasons = excluded.power_invalid_reasons');
+    expect(text).toContain('power_audit = excluded.power_audit');
+  });
+
+  it('serializes present fields and contributes null lanes for absent ones', async () => {
+    const { sql, calls } = captureInsertSql();
+    await bulkIngestBenchmarkRows(sql, [provenancedRow, legacyRow], 42, '2026-08-27');
+
+    // Template value order mirrors the INSERT column list; the provenance
+    // lanes ride directly after metrics and workers.
+    const { values } = calls[0];
+    expect(values[10]).toEqual([
+      JSON.stringify(provenancedRow.metrics),
+      JSON.stringify(legacyRow.metrics),
+    ]);
+    expect(values[11]).toEqual([null, null]);
+    expect(values[12]).toEqual([JSON.stringify(provenancedRow.powerInvalidReasons), null]);
+    expect(values[13]).toEqual([JSON.stringify(provenancedRow.powerAudit), null]);
+  });
+});
 
 describe('insertServerLogFiles', () => {
   const files = [

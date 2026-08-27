@@ -280,6 +280,25 @@ describe('rowToAggDataEntry', () => {
     expect(entry.joules_per_output_token).toBe(8.4);
   });
 
+  it('passes through producer power_invalid_reasons on withheld rows', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: { power_valid: 0 },
+        power_invalid_reasons: ['thermal_throttle', 'sample_gap'],
+      }),
+    );
+    expect(entry.power_invalid_reasons).toEqual(['thermal_throttle', 'sample_gap']);
+  });
+
+  it.each([
+    ['legacy row without the field', {}],
+    ['API null (SQL NULL column)', { power_invalid_reasons: null }],
+    ['empty array', { power_invalid_reasons: [] }],
+  ])('leaves power_invalid_reasons undefined for %s', (_name, overrides) => {
+    const entry = rowToAggDataEntry(makeRow({ metrics: {}, ...overrides }));
+    expect(entry.power_invalid_reasons).toBeUndefined();
+  });
+
   it('passes through versioned whole-deployment joules per successful query', () => {
     const entry = rowToAggDataEntry(
       makeRow({

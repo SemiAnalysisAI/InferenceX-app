@@ -113,3 +113,45 @@ describe('append-only benchmark snapshots', () => {
     expect(values).toEqual([['dsv4']]);
   });
 });
+
+describe('power audit provenance reads (tolerant to a not-yet-applied migration 014)', () => {
+  const TOLERANT_BR = [
+    "to_jsonb(br) -> 'power_invalid_reasons' AS power_invalid_reasons",
+    "to_jsonb(br) -> 'power_audit' AS power_audit",
+  ];
+
+  it('selects both columns via to_jsonb on the exact-run path', async () => {
+    const captured = captureSql();
+    await getBenchmarksForRun(captured.sql, 'dsv4', 123456);
+    const { text } = captured.query();
+    for (const piece of TOLERANT_BR) expect(text).toContain(piece);
+    expect(text).not.toMatch(/\b(?:br|lb)\.power_(?:invalid_reasons|audit)\b/u);
+  });
+
+  it('selects both columns via to_jsonb on the dated latest path', async () => {
+    const captured = captureSql();
+    await getLatestBenchmarks(captured.sql, 'dsv4', '2026-08-01');
+    const { text } = captured.query();
+    for (const piece of TOLERANT_BR) expect(text).toContain(piece);
+    expect(text).not.toMatch(/\b(?:br|lb)\.power_(?:invalid_reasons|audit)\b/u);
+  });
+
+  it('selects both columns via to_jsonb on the history path', async () => {
+    const captured = captureSql();
+    await getAllBenchmarksForHistory(captured.sql, 'dsv4', 8192, 1024);
+    const { text } = captured.query();
+    for (const piece of TOLERANT_BR) expect(text).toContain(piece);
+    expect(text).not.toMatch(/\b(?:br|lb)\.power_(?:invalid_reasons|audit)\b/u);
+  });
+
+  it('selects both columns via to_jsonb on the no-date matview path', async () => {
+    const captured = captureSql();
+    await getLatestBenchmarks(captured.sql, 'dsv4');
+    const { text } = captured.query();
+    expect(text).toContain("to_jsonb(lb) -> 'power_invalid_reasons' AS power_invalid_reasons");
+    expect(text).toContain("to_jsonb(lb) -> 'power_audit' AS power_audit");
+    // The #407 lesson, pinned: a bare column reference would fail to PLAN
+    // until the next ingest run applies migration 014.
+    expect(text).not.toMatch(/\b(?:br|lb)\.power_(?:invalid_reasons|audit)\b/u);
+  });
+});
