@@ -133,6 +133,13 @@
         "vitest": "^4.1.10",
       },
     },
+    "packages/skills": {
+      "name": "@semianalysisai/inferencex-skills",
+      "version": "0.1.0",
+      "bin": {
+        "inferencex-skills": "bin/install.mjs",
+      },
+    },
   },
   "trustedDependencies": [
     "esbuild",
@@ -609,6 +616,8 @@
     "@semianalysisai/inferencex-db": ["@semianalysisai/inferencex-db@workspace:packages/db"],
 
     "@semianalysisai/inferencex-mcp": ["@semianalysisai/inferencex-mcp@workspace:packages/mcp"],
+
+    "@semianalysisai/inferencex-skills": ["@semianalysisai/inferencex-skills@workspace:packages/skills"],
 
     "@shikijs/core": ["@shikijs/core@4.4.3", "", { "dependencies": { "@shikijs/primitive": "4.4.3", "@shikijs/types": "4.4.3", "@shikijs/vscode-textmate": "^10.0.2", "@types/hast": "^3.0.5", "hast-util-to-html": "^9.0.5" } }, "sha512-QCR4q2ZO/ILJEuwiBMel4wdcTDb1JGwfjKTxPDF6x8ixOaluPrVqIn06C99AcRPhmYlBR56d/Fb+GN58GzExpg=="],
 
