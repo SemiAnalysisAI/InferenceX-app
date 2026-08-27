@@ -38,9 +38,10 @@ import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import { ShareButton } from '@/components/ui/share-button';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
+import { MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { metricLabel, metricTitle } from '@/lib/chart-utils';
@@ -905,13 +906,16 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           : 'interactivity'
                     }
                     leadingControls={
-                      <SegmentedToggle
-                        value={getViewMode(graphIndex)}
-                        options={viewModeOptions}
-                        onValueChange={(v) => handleViewModeChange(graphIndex, v)}
-                        ariaLabel={t.viewMode}
-                        testId={`inference-view-toggle-${graphIndex}`}
-                      />
+                      <>
+                        <SegmentedToggle
+                          value={getViewMode(graphIndex)}
+                          options={viewModeOptions}
+                          onValueChange={(v) => handleViewModeChange(graphIndex, v)}
+                          ariaLabel={t.viewMode}
+                          testId={`inference-view-toggle-${graphIndex}`}
+                        />
+                        {!embedded && <ShareButton className="h-7" />}
+                      </>
                     }
                     hideImageExport={getViewMode(graphIndex) === 'table'}
                     setIsLegendExpanded={setIsLegendExpanded}
@@ -1207,7 +1211,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       {t.inferencePerformanceDesc}
                     </p>
                   </div>
-                  <ChartShareActions />
+                  {/* The chart-row ShareButton lives in ChartButtons, which is desktop-only
+                      (`hidden md:flex`); keep a header Share on mobile so small screens
+                      don't lose the share entry point. */}
+                  <div className="md:hidden">
+                    <ShareButton />
+                  </div>
                 </div>
                 <ChartControls />
                 <ModelArchitectureLink model={selectedModel} locale={locale} />
