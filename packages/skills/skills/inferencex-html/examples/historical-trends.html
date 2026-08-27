@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>InferenceX — Historical Trends</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 24px;
+        color: #212121;
+      }
+      #controls {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+      #controls label {
+        font-size: 13px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      #chart-wrap {
+        position: relative;
+        height: 55vh;
+        min-height: 360px;
+      }
+      #status {
+        color: #b71c1c;
+        font-size: 14px;
+      }
+      #meta {
+        color: #757575;
+        font-size: 11px;
+        margin-top: 8px;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>InferenceX — historical trends</h1>
+    <p style="font-size: 13px; color: #616161">
+      Metric value interpolated at a fixed target interactivity, per hardware config, per snapshot
+      date (<code>/api/v1/views/historical</code>).
+    </p>
+    <div id="controls">
+      <label
+        >Model
+        <select id="model"></select
+      ></label>
+      <label
+        >Metric
+        <select id="metric"></select
+      ></label>
+      <label
+        >Target tok/s/user <input type="number" id="target" value="35" min="1" style="width: 90px"
+      /></label>
+      <label>Log y <input type="checkbox" id="logy" /></label>
+    </div>
+    <p id="status"></p>
+    <div id="chart-wrap"><canvas id="chart"></canvas></div>
+    <p id="meta"></p>
+
+    <script>
+      const BASE = 'https://inferencex.semianalysis.com';
+      const GPU_COLORS = {
+        h100: '#8bc34a',
+        h200: '#4caf50',
+        b200: '#009688',
+        b300: '#00bcd4',
+        gb200: '#3f51b5',
+        gb300: '#673ab7',
+        vr200: '#2196f3',
+        rtx6000pro: '#607d8b',
+        mi300x: '#ff9800',
+        mi325x: '#f44336',
+        mi355x: '#e91e63',
+        jalapeno: '#795548',
+      };
+      const colorFor = (hwKey) => GPU_COLORS[hwKey.split('_')[0].toLowerCase()] || '#9e9e9e';
+
+      async function getView(name, params = {}) {
+        const url = new URL(`${BASE}/api/v1/views/${name}`);
+        for (const [k, v] of Object.entries(params))
+          if (v !== undefined && v !== '') url.searchParams.set(k, v);
+        const res = await fetch(url);
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(
+            res.status === 404
+              ? 'views API (beta) not available at this base URL yet'
+              : `${res.status}: ${body.error || 'request failed'}${body.allowed ? ` — allowed: ${body.allowed.join(', ')}` : ''}`,
+          );
+        }
+        return res.json();
+      }
+
+      let chart;
+
+      async function draw() {
+        const status = document.getElementById('status');
+        status.textContent = 'Loading…';
+        try {
+          const view = await getView('historical', {
+            model: document.getElementById('model').value,
+            metric: document.getElementById('metric').value,
+            target: document.getElementById('target').value,
+          });
+          status.textContent = '';
+
+          // Union of all snapshot dates = category x-axis (no date adapter needed).
+          const dates = [
+            ...new Set(view.series.flatMap((s) => s.points.map((p) => p.date))),
+          ].sort();
+          const datasets = view.series
+            .filter((s) => s.points.length > 0)
+            .map((s) => {
+              const byDate = Object.fromEntries(s.points.map((p) => [p.date, p]));
+              return {
+                label: s.label,
+                data: dates.map((d) => (byDate[d] ? byDate[d].value : null)),
+                borderColor: colorFor(s.hwKey),
+                backgroundColor: colorFor(s.hwKey),
+                spanGaps: true,
+                borderWidth: 1.8,
+                // Clamped points (target outside that day's measured frontier) drawn as triangles.
+                pointStyle: dates.map((d) =>
+                  byDate[d] && byDate[d].clamped ? 'triangle' : 'circle',
+                ),
+                pointRadius: dates.map((d) => (byDate[d] ? (byDate[d].clamped ? 5 : 2.5) : 0)),
+              };
+            });
+
+          // Registry labels usually already end with their unit, e.g. "... ($)".
+          const yTitle =
+            view.metric.unit && !/\)\s*$/.test(view.metric.label)
+              ? `${view.metric.label} (${view.metric.unit})`
+              : view.metric.label;
+          if (chart) chart.destroy();
+          chart = new Chart(document.getElementById('chart'), {
+            type: 'line',
+            data: { labels: dates, datasets },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              scales: {
+                x: { title: { display: true, text: 'Snapshot date' } },
+                y: {
+                  type: document.getElementById('logy').checked ? 'logarithmic' : 'linear',
+                  title: { display: true, text: `${yTitle} @ ${view.target} tok/s/user` },
+                },
+              },
+              plugins: { legend: { labels: { boxWidth: 10, font: { size: 10 } } } },
+            },
+          });
+          document.getElementById('meta').textContent =
+            `InferenceX views API · generatedAt=${view.generatedAt} · params=${JSON.stringify(view.params)}`;
+        } catch (err) {
+          status.textContent = `Error: ${err.message}`;
+        }
+      }
+
+      function fill(id, values, selected) {
+        const el = document.getElementById(id);
+        el.innerHTML = '';
+        for (const v of values) {
+          const o = document.createElement('option');
+          o.value = v.value;
+          o.textContent = v.label;
+          if (v.value === selected) o.selected = true;
+          el.appendChild(o);
+        }
+      }
+
+      async function init() {
+        try {
+          const opts = await getView('options');
+          fill(
+            'model',
+            opts.models.map((m) => ({ value: m.name, label: m.name })),
+            'DeepSeek-V4-Pro',
+          );
+          fill(
+            'metric',
+            opts.metrics.map((m) => ({ value: m.key, label: m.label })),
+            'costh',
+          );
+        } catch {
+          fill(
+            'model',
+            [{ value: 'DeepSeek-V4-Pro', label: 'DeepSeek-V4-Pro' }],
+            'DeepSeek-V4-Pro',
+          );
+          fill(
+            'metric',
+            ['costh', 'costn', 'costr', 'tokensPerDollarN', 'tpPerGpu'].map((v) => ({
+              value: v,
+              label: v,
+            })),
+            'costh',
+          );
+        }
+        for (const id of ['model', 'metric', 'target', 'logy']) {
+          document.getElementById(id).addEventListener('change', draw);
+        }
+        draw();
+      }
+
+      init();
+    </script>
+  </body>
+</html>

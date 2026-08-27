@@ -10,5 +10,10 @@
     }
   },
   "include": ["packages/**/*.ts", "packages/**/*.tsx", "scripts/**/*.ts"],
-  "exclude": ["packages/*/node_modules", "packages/*/.next", "packages/*/scratch"]
+  "exclude": [
+    "packages/*/node_modules",
+    "packages/*/.next",
+    "packages/*/scratch",
+    "packages/skills"
+  ]
 }
