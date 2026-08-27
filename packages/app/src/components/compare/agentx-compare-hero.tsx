@@ -28,7 +28,7 @@ const STRINGS = {
     eyebrow: 'AgentX / live results',
     title: 'Compare Realistic Agentic Inference Perf',
     description:
-      'Long Context Multi Turn Inference Performance. Compare Across MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, etc.',
+      'Long Context Multi Turn Inference Performance. Compare Across OpenAI Jalapeño, MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, etc.',
     overview: 'Overview',
     dashboard: 'Full dashboard',
     ledgerTitle: 'Models with AgentX results',
@@ -38,7 +38,7 @@ const STRINGS = {
     eyebrow: 'AgentX｜最新结果',
     title: '真实智能体工作负载下的推理性能对比',
     description:
-      '比较不同硬件平台在长上下文、多轮智能体工作负载下的推理性能，覆盖 MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100 和 RTX Pro 等平台。',
+      '比较不同硬件平台在长上下文、多轮智能体工作负载下的推理性能，覆盖 OpenAI Jalapeño、MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100 和 RTX Pro 等平台。',
     overview: '总览',
     dashboard: '查看完整仪表板',
     ledgerTitle: '已发布 AgentX 结果的模型',
