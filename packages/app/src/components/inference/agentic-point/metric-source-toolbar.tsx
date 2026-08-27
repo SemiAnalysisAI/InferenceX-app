@@ -66,7 +66,7 @@ export function MetricSourceToolbar({
 }) {
   return (
     <div
-      className="sticky top-16 z-40 flex items-center justify-between gap-2 rounded-lg border border-border/40 bg-background/90 px-3 py-2 shadow-sm backdrop-blur"
+      className="sticky top-16 xl:top-4 z-40 flex items-center justify-between gap-2 rounded-lg border border-border/40 bg-background/90 px-3 py-2 shadow-sm backdrop-blur"
       data-testid="metric-source-toolbar"
     >
       {hasWarmup ? (
